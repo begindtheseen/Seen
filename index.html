@@ -33,7 +33,6 @@ body{background:var(--ink);color:var(--text);font-family:var(--body);font-size:1
 body::before{content:'';position:fixed;inset:0;background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.025'/%3E%3C/svg%3E");pointer-events:none;z-index:9998}
 
 @keyframes heroIn{from{opacity:0;transform:translateY(18px)}to{opacity:1;transform:translateY(0)}}
-@keyframes loadBar{0%{width:0%;margin-left:0}50%{width:60%;margin-left:20%}100%{width:0%;margin-left:100%}}
 @keyframes heroOut{from{opacity:1;transform:translateY(0)}to{opacity:0;transform:translateY(-14px)}}
 .hero-line-in{animation:heroIn .38s cubic-bezier(.22,1,.36,1) both}
 .hero-line-out{animation:heroOut .28s ease forwards}
@@ -511,26 +510,9 @@ nav{position:fixed;top:0;left:0;right:0;z-index:500;height:58px;display:flex;ali
 <body>
 
 <script>
-const SUPABASE_URL='https://tmngmmofrplsldvlobfx.supabase.co';
-const SUPABASE_ANON_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRtbmdtbW9mcnBsc2xkdmxvYmZ4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc3OTk3ODYsImV4cCI6MjA5MzM3NTc4Nn0.kAL3GbMilYTM3z7Ct4YM2nTh3n-f1UXXqiDHOl3fsRc';
-let db = null;
-try {
-  if (typeof supabase !== 'undefined') {
-    db = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-  }
-} catch(e) { console.warn('Supabase init failed:', e); }
-const DEMO = !db;
-
-// ── SAFE SHIMS — prevent ReferenceError if main script hasn't loaded yet ──
-// These get overwritten when the main script block loads
-function doSearch(){window._pendingAction=doSearch;} 
-function go(p){window._pendingNav=p;}
-function showToast(m){console.log(m);}
-function openEmployerPanel(){}
-function goToEmployerDashboard(){window.open('employer.html','_blank');}
-function startSignup(t){window._pendingSignup=t;}
-function showSigninForm(){}
-function qs(n,l){window._qs={n,l};}
+const SUPABASE_URL='YOUR_SUPABASE_URL',SUPABASE_ANON_KEY='YOUR_SUPABASE_ANON_KEY';
+let db=null;try{db=supabase.createClient(SUPABASE_URL,SUPABASE_ANON_KEY)}catch(e){}
+const DEMO=!db||SUPABASE_URL==='YOUR_SUPABASE_URL';
 
 // ── SCORING ENGINE ──
 const Score={
@@ -770,140 +752,61 @@ const Agg={
 </div>
 
 <!-- ═══════════════════════════════════════
-     LOGIN / SIGNUP — full flow
+     LOGIN / SIGNUP
 ═══════════════════════════════════════ -->
 <div class="page" id="page-login">
-  <div style="min-height:100vh;display:flex;align-items:center;justify-content:center;padding:1.5rem">
-    <div style="width:100%;max-width:420px;animation:fadeUp .4s ease both">
+  <div style="min-height:100vh;display:flex;align-items:center;justify-content:center;padding:2rem">
+    <div style="width:100%;max-width:400px;animation:fadeUp .4s ease both">
 
       <!-- Logo -->
-      <div style="display:flex;align-items:center;gap:.5rem;margin-bottom:2rem;justify-content:center">
+      <div style="display:flex;align-items:center;gap:.5rem;margin-bottom:2.5rem;justify-content:center">
         <span style="width:8px;height:8px;border-radius:50%;background:var(--green);display:inline-block;animation:pulse 2s infinite"></span>
         <span style="font-family:var(--display);font-size:1.3rem;font-weight:800;color:var(--white);letter-spacing:-.02em">Seen</span>
       </div>
 
-      <!-- STEP 0: Who are you -->
-      <div id="step-who">
-        <div style="text-align:center;margin-bottom:1.75rem">
-          <div style="font-family:var(--display);font-size:1.5rem;font-weight:800;color:var(--white);letter-spacing:-.025em;margin-bottom:.35rem">Who are you?</div>
-          <div style="font-size:.85rem;color:var(--sub);font-weight:300">Pick one to get started</div>
+      <!-- Path selector -->
+      <div id="loginPathSelector">
+        <div style="text-align:center;margin-bottom:2rem">
+          <div style="font-family:var(--display);font-size:1.5rem;font-weight:700;color:var(--white);letter-spacing:-.025em;margin-bottom:.4rem">Welcome back.</div>
+          <div style="font-size:.85rem;color:var(--sub);font-weight:300">Who are you signing in as?</div>
         </div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:.75rem;margin-bottom:1.25rem">
-          <button onclick="startSignup('seeker')" style="background:var(--surface);border:1.5px solid var(--line2);border-radius:12px;padding:1.5rem 1rem;cursor:pointer;transition:all .2s;text-align:center" onmouseover="this.style.borderColor='var(--green)';this.style.background='var(--gdim)'" onmouseout="this.style.borderColor='var(--line2)';this.style.background='var(--surface)'">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:.75rem;margin-bottom:1.5rem">
+          <button onclick="selectLoginPath('seeker')" style="background:var(--surface);border:1.5px solid var(--line2);border-radius:12px;padding:1.5rem 1rem;cursor:pointer;transition:all .2s;text-align:center" onmouseover="this.style.borderColor='var(--green)';this.style.background='var(--gdim)'" onmouseout="this.style.borderColor='var(--line2)';this.style.background='var(--surface)'">
             <div style="font-size:1.75rem;margin-bottom:.6rem">🎯</div>
             <div style="font-family:var(--display);font-size:.9rem;font-weight:700;color:var(--white);margin-bottom:.2rem">Job Seeker</div>
-            <div style="font-size:.72rem;color:var(--dim);font-weight:300">Find real jobs, track applications, avoid getting ghosted</div>
+            <div style="font-size:.72rem;color:var(--dim);font-weight:300">Track applications, check companies, use Resume AI</div>
           </button>
-          <button onclick="startSignup('employer')" style="background:var(--surface);border:1.5px solid var(--line2);border-radius:12px;padding:1.5rem 1rem;cursor:pointer;transition:all .2s;text-align:center" onmouseover="this.style.borderColor='var(--blue)';this.style.background='var(--bdim)'" onmouseout="this.style.borderColor='var(--line2)';this.style.background='var(--surface)'">
+          <button onclick="selectLoginPath('employer')" style="background:var(--surface);border:1.5px solid var(--line2);border-radius:12px;padding:1.5rem 1rem;cursor:pointer;transition:all .2s;text-align:center" onmouseover="this.style.borderColor='var(--blue)';this.style.background='var(--bdim)'" onmouseout="this.style.borderColor='var(--line2)';this.style.background='var(--surface)'">
             <div style="font-size:1.75rem;margin-bottom:.6rem">🏢</div>
             <div style="font-family:var(--display);font-size:.9rem;font-weight:700;color:var(--white);margin-bottom:.2rem">Employer</div>
-            <div style="font-size:.72rem;color:var(--dim);font-weight:300">Manage your score, respond to reports, post listings</div>
+            <div style="font-size:.72rem;color:var(--dim);font-weight:300">Manage your score, disputes, and listings</div>
           </button>
         </div>
         <div style="text-align:center;font-size:.78rem;color:var(--muted)">
-          Already have an account? <button onclick="showSigninForm()" style="background:none;border:none;color:var(--green);font-size:.78rem;cursor:pointer;text-decoration:underline;font-family:var(--body)">Sign in →</button>
+          No account? <button onclick="go('jobs')" style="background:none;border:none;color:var(--green);font-size:.78rem;cursor:pointer;text-decoration:underline;font-family:var(--body)">Browse without signing in →</button>
         </div>
       </div>
 
-      <!-- STEP 1: Email + name -->
-      <div id="step-email" style="display:none">
-        <button onclick="showStep('who')" style="background:none;border:none;color:var(--dim);font-family:var(--mono);font-size:.68rem;cursor:pointer;margin-bottom:1.5rem;display:flex;align-items:center;gap:.35rem">← back</button>
-        <div style="font-family:var(--display);font-size:1.4rem;font-weight:800;color:var(--white);letter-spacing:-.025em;margin-bottom:.2rem">Create your account</div>
-        <div style="font-size:.82rem;color:var(--sub);font-weight:300;margin-bottom:1.5rem">Free forever for job seekers</div>
-        <div style="margin-bottom:.85rem">
-          <label style="font-family:var(--mono);font-size:.6rem;text-transform:uppercase;letter-spacing:.08em;color:var(--dim);display:block;margin-bottom:.35rem">First name</label>
-          <input id="signupName" type="text" placeholder="What should we call you?" style="width:100%;background:var(--surface);border:1.5px solid var(--line2);border-radius:8px;padding:.72rem 1rem;color:var(--white);font-family:var(--body);font-size:.875rem;outline:none;caret-color:var(--green)" onfocus="this.style.borderColor='var(--green)'" onblur="this.style.borderColor='var(--line2)'"/>
-        </div>
-        <div style="margin-bottom:1.25rem">
-          <label style="font-family:var(--mono);font-size:.6rem;text-transform:uppercase;letter-spacing:.08em;color:var(--dim);display:block;margin-bottom:.35rem">Email</label>
-          <input id="signupEmail" type="email" placeholder="you@email.com" style="width:100%;background:var(--surface);border:1.5px solid var(--line2);border-radius:8px;padding:.72rem 1rem;color:var(--white);font-family:var(--body);font-size:.875rem;outline:none;caret-color:var(--green)" onfocus="this.style.borderColor='var(--green)'" onblur="this.style.borderColor='var(--line2)'" onkeydown="if(event.key==='Enter')goToPasswordStep()"/>
-        </div>
-        <button onclick="goToPasswordStep()" style="width:100%;padding:.85rem;background:var(--green);color:var(--ink);border:none;border-radius:8px;font-family:var(--display);font-weight:800;font-size:.9rem;cursor:pointer;margin-bottom:.75rem">Continue →</button>
+      <!-- Seeker login form -->
+      <div id="seekerLoginForm" style="display:none">
+        <button onclick="document.getElementById('loginPathSelector').style.display='block';document.getElementById('seekerLoginForm').style.display='none'" style="background:none;border:none;color:var(--dim);font-family:var(--mono);font-size:.68rem;cursor:pointer;margin-bottom:1.5rem;display:flex;align-items:center;gap:.35rem">← back</button>
+        <div style="font-family:var(--display);font-size:1.4rem;font-weight:700;color:var(--white);letter-spacing:-.025em;margin-bottom:.25rem">Sign in</div>
+        <div style="font-size:.82rem;color:var(--sub);font-weight:300;margin-bottom:1.75rem">Job seeker account · Free forever</div>
+        <div style="margin-bottom:.85rem"><label style="font-family:var(--mono);font-size:.6rem;text-transform:uppercase;letter-spacing:.08em;color:var(--dim);display:block;margin-bottom:.35rem">First name</label><input id="seekerName" type="text" placeholder="Your first name" style="width:100%;background:var(--surface);border:1.5px solid var(--line2);border-radius:8px;padding:.72rem 1rem;color:var(--white);font-family:var(--body);font-size:.875rem;outline:none;caret-color:var(--green)" onfocus="this.style.borderColor='var(--green)'" onblur="this.style.borderColor='var(--line2)'"/></div>
+        <div style="margin-bottom:.85rem"><label style="font-family:var(--mono);font-size:.6rem;text-transform:uppercase;letter-spacing:.08em;color:var(--dim);display:block;margin-bottom:.35rem">Email</label><input id="seekerEmail" type="email" placeholder="you@email.com" style="width:100%;background:var(--surface);border:1.5px solid var(--line2);border-radius:8px;padding:.72rem 1rem;color:var(--white);font-family:var(--body);font-size:.875rem;outline:none;caret-color:var(--green)" onfocus="this.style.borderColor='var(--green)'" onblur="this.style.borderColor='var(--line2)'"/></div>
+        <div style="margin-bottom:1.25rem"><label style="font-family:var(--mono);font-size:.6rem;text-transform:uppercase;letter-spacing:.08em;color:var(--dim);display:block;margin-bottom:.35rem">Password</label><input id="seekerPass" type="password" placeholder="••••••••" style="width:100%;background:var(--surface);border:1.5px solid var(--line2);border-radius:8px;padding:.72rem 1rem;color:var(--white);font-family:var(--body);font-size:.875rem;outline:none;caret-color:var(--green)" onfocus="this.style.borderColor='var(--green)'" onblur="this.style.borderColor='var(--line2)'" onkeydown="if(event.key==='Enter')doSeekerLogin()"/></div>
+        <button onclick="doSeekerLogin()" style="width:100%;padding:.85rem;background:var(--green);color:var(--ink);border:none;border-radius:8px;font-family:var(--display);font-weight:800;font-size:.9rem;cursor:pointer;transition:all .15s;margin-bottom:.75rem" onmouseover="this.style.background='#00ffaa'" onmouseout="this.style.background='var(--green)'">Sign in →</button>
+        <div style="text-align:center;font-family:var(--mono);font-size:.65rem;color:var(--muted)">No account yet? This will create one.</div>
       </div>
 
-      <!-- STEP 2: Password -->
-      <div id="step-password" style="display:none">
-        <button onclick="showStep('email')" style="background:none;border:none;color:var(--dim);font-family:var(--mono);font-size:.68rem;cursor:pointer;margin-bottom:1.5rem;display:flex;align-items:center;gap:.35rem">← back</button>
-        <div style="font-family:var(--display);font-size:1.4rem;font-weight:800;color:var(--white);letter-spacing:-.025em;margin-bottom:.2rem">Set a password</div>
-        <div style="font-size:.82rem;color:var(--sub);font-weight:300;margin-bottom:1.5rem" id="passwordSubline">Make it something you'll remember</div>
-        <div style="margin-bottom:.75rem">
-          <label style="font-family:var(--mono);font-size:.6rem;text-transform:uppercase;letter-spacing:.08em;color:var(--dim);display:block;margin-bottom:.35rem">Password</label>
-          <input id="signupPass" type="password" placeholder="At least 8 characters" style="width:100%;background:var(--surface);border:1.5px solid var(--line2);border-radius:8px;padding:.72rem 1rem;color:var(--white);font-family:var(--body);font-size:.875rem;outline:none;caret-color:var(--green)" onfocus="this.style.borderColor='var(--green)'" onblur="this.style.borderColor='var(--line2)'" oninput="checkPasswordStrength(this.value)"/>
-        </div>
-        <!-- Password strength bar -->
-        <div style="margin-bottom:1.25rem">
-          <div style="height:3px;background:var(--line2);border-radius:2px;overflow:hidden;margin-bottom:.3rem">
-            <div id="passStrengthBar" style="height:100%;width:0%;border-radius:2px;transition:all .3s;background:var(--red)"></div>
-          </div>
-          <div id="passStrengthLabel" style="font-family:var(--mono);font-size:.62rem;color:var(--muted)"></div>
-        </div>
-        <button id="createAccountBtn" onclick="createAccount()" style="width:100%;padding:.85rem;background:var(--green);color:var(--ink);border:none;border-radius:8px;font-family:var(--display);font-weight:800;font-size:.9rem;cursor:pointer;margin-bottom:.75rem">Create account →</button>
-      </div>
-
-      <!-- STEP 3: Email verification sent -->
-      <div id="step-verify" style="display:none;text-align:center">
-        <div style="font-size:3rem;margin-bottom:1rem">📬</div>
-        <div style="font-family:var(--display);font-size:1.4rem;font-weight:800;color:var(--white);letter-spacing:-.025em;margin-bottom:.5rem">Check your email</div>
-        <div style="font-size:.85rem;color:var(--sub);font-weight:300;line-height:1.7;margin-bottom:1.25rem">We sent a verification link to<br><strong id="verifyEmailDisplay" style="color:var(--white)"></strong></div>
-        <div style="background:var(--gdim);border:1px solid var(--gmid);border-radius:8px;padding:.85rem 1rem;font-family:var(--mono);font-size:.68rem;color:var(--green);margin-bottom:1.5rem;line-height:1.65;text-align:left">
-          ✓ Click the link in your email<br>
-          ✓ Come back here and tap the button below<br>
-          ✓ You'll be taken straight to setup
-        </div>
-        <button onclick="checkVerification()" style="width:100%;padding:.85rem;background:var(--green);color:var(--ink);border:none;border-radius:8px;font-family:var(--display);font-weight:800;font-size:.9rem;cursor:pointer;margin-bottom:.75rem">I verified my email →</button>
-        <button onclick="resendVerification()" style="width:100%;padding:.65rem;background:none;border:1px solid var(--line2);color:var(--sub);border-radius:8px;font-family:var(--body);font-size:.8rem;cursor:pointer;margin-bottom:.75rem">Resend verification email</button>
-        <button onclick="doSignOut();showStep('who')" style="background:none;border:none;color:var(--muted);font-family:var(--mono);font-size:.62rem;cursor:pointer">Use a different email</button>
-      </div>
-
-      <!-- STEP 4: SURVEY — shown after email verification -->
-      <div id="step-survey" style="display:none">
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1.5rem">
-          <div style="font-family:var(--mono);font-size:.62rem;color:var(--green);letter-spacing:.08em;text-transform:uppercase">Quick setup</div>
-          <div style="font-family:var(--mono);font-size:.62rem;color:var(--muted)" id="surveyProgress">1 of 5</div>
-        </div>
-        <!-- Progress bar -->
-        <div style="height:3px;background:var(--line2);border-radius:2px;overflow:hidden;margin-bottom:1.75rem">
-          <div id="surveyBar" style="height:100%;width:20%;background:var(--green);border-radius:2px;transition:width .3s ease"></div>
-        </div>
-        <div id="surveyQuestion"></div>
-      </div>
-
-      <!-- STEP 5: Sign in form (for returning users) -->
-      <div id="step-signin" style="display:none">
-        <button onclick="showStep('who')" style="background:none;border:none;color:var(--dim);font-family:var(--mono);font-size:.68rem;cursor:pointer;margin-bottom:1.5rem;display:flex;align-items:center;gap:.35rem">← back</button>
-        <div style="font-family:var(--display);font-size:1.4rem;font-weight:800;color:var(--white);letter-spacing:-.025em;margin-bottom:.2rem">Welcome back</div>
-        <div style="font-size:.82rem;color:var(--sub);font-weight:300;margin-bottom:1.5rem">Sign in to your account</div>
-        <div style="margin-bottom:.85rem">
-          <label style="font-family:var(--mono);font-size:.6rem;text-transform:uppercase;letter-spacing:.08em;color:var(--dim);display:block;margin-bottom:.35rem">Email</label>
-          <input id="signinEmail" type="email" placeholder="you@email.com" style="width:100%;background:var(--surface);border:1.5px solid var(--line2);border-radius:8px;padding:.72rem 1rem;color:var(--white);font-family:var(--body);font-size:.875rem;outline:none;caret-color:var(--green)" onfocus="this.style.borderColor='var(--green)'" onblur="this.style.borderColor='var(--line2)'"/>
-        </div>
-        <div style="margin-bottom:.5rem">
-          <label style="font-family:var(--mono);font-size:.6rem;text-transform:uppercase;letter-spacing:.08em;color:var(--dim);display:block;margin-bottom:.35rem">Password</label>
-          <input id="signinPass" type="password" placeholder="••••••••" style="width:100%;background:var(--surface);border:1.5px solid var(--line2);border-radius:8px;padding:.72rem 1rem;color:var(--white);font-family:var(--body);font-size:.875rem;outline:none;caret-color:var(--green)" onfocus="this.style.borderColor='var(--green)'" onblur="this.style.borderColor='var(--line2)'" onkeydown="if(event.key==='Enter')doSignIn()"/>
-        </div>
-        <div style="text-align:right;margin-bottom:1.25rem">
-          <button onclick="resetPassword()" style="background:none;border:none;color:var(--muted);font-family:var(--mono);font-size:.62rem;cursor:pointer;text-decoration:underline">Forgot password?</button>
-        </div>
-        <button id="signinBtn" onclick="doSignIn()" style="width:100%;padding:.85rem;background:var(--green);color:var(--ink);border:none;border-radius:8px;font-family:var(--display);font-weight:800;font-size:.9rem;cursor:pointer;margin-bottom:.75rem">Sign in →</button>
-        <div style="text-align:center;font-size:.78rem;color:var(--muted)">
-          No account? <button onclick="showStep('who')" style="background:none;border:none;color:var(--green);font-size:.78rem;cursor:pointer;text-decoration:underline;font-family:var(--body)">Create one →</button>
-        </div>
-      </div>
-
-      <!-- Employer sign in -->
-      <div id="step-employer" style="display:none">
-        <button onclick="showStep('who')" style="background:none;border:none;color:var(--dim);font-family:var(--mono);font-size:.68rem;cursor:pointer;margin-bottom:1.5rem;display:flex;align-items:center;gap:.35rem">← back</button>
-        <div style="font-family:var(--display);font-size:1.4rem;font-weight:800;color:var(--white);letter-spacing:-.025em;margin-bottom:.2rem">Employer sign in</div>
-        <div style="font-size:.82rem;color:var(--sub);font-weight:300;margin-bottom:1.5rem">Verified employer dashboard</div>
-        <div style="margin-bottom:.85rem">
-          <label style="font-family:var(--mono);font-size:.6rem;text-transform:uppercase;letter-spacing:.08em;color:var(--dim);display:block;margin-bottom:.35rem">Work email</label>
-          <input id="empEmail" type="email" placeholder="you@company.com" style="width:100%;background:var(--surface);border:1.5px solid var(--line2);border-radius:8px;padding:.72rem 1rem;color:var(--white);font-family:var(--body);font-size:.875rem;outline:none;caret-color:var(--blue)" onfocus="this.style.borderColor='var(--blue)'" onblur="this.style.borderColor='var(--line2)'"/>
-        </div>
-        <div style="margin-bottom:1.25rem">
-          <label style="font-family:var(--mono);font-size:.6rem;text-transform:uppercase;letter-spacing:.08em;color:var(--dim);display:block;margin-bottom:.35rem">Password</label>
-          <input id="empPass" type="password" placeholder="••••••••" style="width:100%;background:var(--surface);border:1.5px solid var(--line2);border-radius:8px;padding:.72rem 1rem;color:var(--white);font-family:var(--body);font-size:.875rem;outline:none;caret-color:var(--blue)" onfocus="this.style.borderColor='var(--blue)'" onblur="this.style.borderColor='var(--line2)'" onkeydown="if(event.key==='Enter')doEmployerLogin()"/>
-        </div>
-        <button onclick="doEmployerLogin()" style="display:block;width:100%;padding:.85rem;background:var(--blue);color:#fff;border:none;border-radius:8px;font-family:var(--display);font-weight:800;font-size:.9rem;cursor:pointer;margin-bottom:.75rem">Open dashboard →</button>
+      <!-- Employer login form -->
+      <div id="employerLoginForm" style="display:none">
+        <button onclick="document.getElementById('loginPathSelector').style.display='block';document.getElementById('employerLoginForm').style.display='none'" style="background:none;border:none;color:var(--dim);font-family:var(--mono);font-size:.68rem;cursor:pointer;margin-bottom:1.5rem;display:flex;align-items:center;gap:.35rem">← back</button>
+        <div style="font-family:var(--display);font-size:1.4rem;font-weight:700;color:var(--white);letter-spacing:-.025em;margin-bottom:.25rem">Employer sign in</div>
+        <div style="font-size:.82rem;color:var(--sub);font-weight:300;margin-bottom:1.75rem">Verified employer dashboard</div>
+        <div style="margin-bottom:.85rem"><label style="font-family:var(--mono);font-size:.6rem;text-transform:uppercase;letter-spacing:.08em;color:var(--dim);display:block;margin-bottom:.35rem">Work email</label><input id="empEmail" type="email" placeholder="you@company.com" style="width:100%;background:var(--surface);border:1.5px solid var(--line2);border-radius:8px;padding:.72rem 1rem;color:var(--white);font-family:var(--body);font-size:.875rem;outline:none;caret-color:var(--blue)" onfocus="this.style.borderColor='var(--blue)'" onblur="this.style.borderColor='var(--line2)'"/></div>
+        <div style="margin-bottom:1.25rem"><label style="font-family:var(--mono);font-size:.6rem;text-transform:uppercase;letter-spacing:.08em;color:var(--dim);display:block;margin-bottom:.35rem">Password</label><input id="empPass" type="password" placeholder="••••••••" style="width:100%;background:var(--surface);border:1.5px solid var(--line2);border-radius:8px;padding:.72rem 1rem;color:var(--white);font-family:var(--body);font-size:.875rem;outline:none;caret-color:var(--blue)" onfocus="this.style.borderColor='var(--blue)'" onblur="this.style.borderColor='var(--line2)'" onkeydown="if(event.key==='Enter')doEmployerLogin()"/></div>
+        <button onclick="goToEmployerDashboard()" style="display:block;width:100%;padding:.85rem;background:var(--blue);color:#fff;border:none;border-radius:8px;font-family:var(--display);font-weight:800;font-size:.9rem;cursor:pointer;transition:all .15s;margin-bottom:.75rem" onmouseover="this.style.opacity='.88'" onmouseout="this.style.opacity='1'">Open dashboard →</button>
         <div style="text-align:center;font-family:var(--mono);font-size:.65rem;color:var(--muted)">Don't have an account? <span style="color:var(--blue);cursor:pointer" onclick="openEmployerPanel()">Learn about verified employer →</span></div>
       </div>
 
@@ -1089,8 +992,6 @@ const Agg={
       <div class="co-mets" id="coMets"></div>
     </div>
     <div class="agg-bar" id="aggBar" style="display:none"><div class="agg-item"><div class="agg-dot"></div>Live aggregating</div></div>
-    <!-- AI Research panel — shown when data is sparse -->
-    <div id="ctc-ai" style="display:none"></div>
     <div class="co-tabs">
       <button class="ctab active" onclick="switchTab('ov',this)">Overview</button>
       <button class="ctab" onclick="switchTab('process',this)">Process Score</button>
@@ -1513,63 +1414,11 @@ function loadFeatured(){
 // ═══════════════════════════════════════════════
 // JOBS PAGE
 // ═══════════════════════════════════════════════
-async function loadJobs(){
+function loadJobs(){
   const q=(document.getElementById('jobsInp')?.value||'').toLowerCase();
   const loc=(document.getElementById('jobsLoc')?.value||'').toLowerCase();
   const min=parseInt(document.getElementById('sRange')?.value||0);
   const ver=document.getElementById('verOnly')?.checked;
-
-  document.getElementById('jobsList').innerHTML='<div class="loader"><div class="spinner"></div><div class="loader-txt">Loading listings...</div></div>';
-
-  try {
-    let query = db.from('jobs')
-      .select(`*, companies(name, logo_letter, verified, industry), company_locations(score, ghost_rate, response_rate, waste_score, avg_wait_days, city)`)
-      .eq('status', 'active')
-      .order('created_at', { ascending: false })
-      .limit(50);
-
-    if (q) query = query.ilike('title', `%${q}%`);
-    if (loc) query = query.ilike('city', `%${loc}%`);
-    if (ver) query = query.eq('verified', true);
-
-    const { data: jobs, error } = await query;
-
-    if (error || !jobs?.length) {
-      // Fall back to mock data if DB empty
-      loadJobsMock(q, loc, min, ver);
-      return;
-    }
-
-    const filtered = jobs.filter(j => (j.company_locations?.score || 50) >= min);
-    document.getElementById('jobsCt').textContent = filtered.length + ' listings';
-    document.getElementById('jobsList').innerHTML = filtered.map(j => {
-      const score = j.company_locations?.score || 50;
-      const risk = Score.risk(score);
-      const waste = j.company_locations?.waste_score || 40;
-      const wl = Score.wasteLabel(waste);
-      const co = j.companies?.name || 'Unknown';
-      const logo = j.companies?.logo_letter || co[0];
-      return `<div class="jlc" onclick="viewCompany('${j.company_id}','${co}','${j.city||''}')">
-        <div>
-          <div class="jlc-title">${j.title}</div>
-          <div class="jlc-co"><span>${co}</span>${j.verified?'<span style="font-family:var(--mono);font-size:.55rem;color:var(--green)">✓</span>':''}</div>
-          <div class="jlc-loc">📍 ${j.city||'Remote'}</div>
-          <div class="jlc-meta"><span class="jlc-mi">${j.job_type}</span><span class="jlc-mi">·</span><span class="jlc-mi">${j.experience_level}</span></div>
-        </div>
-        <div class="jlc-r">
-          <div class="jlc-s ${risk}">${score}</div>
-          <div class="jlc-sl">transparency</div>
-          <div class="jlc-sal">${j.salary_min&&j.salary_max?'$'+(j.salary_min/1000).toFixed(0)+'k–$'+(j.salary_max/1000).toFixed(0)+'k':'Salary TBD'}</div>
-          <button class="btn btn-green" style="font-size:.62rem;padding:.28rem .7rem;margin-top:.1rem" onclick="event.stopPropagation();openApplyModal('${j.id}','${co}','${j.title}','${j.city||'Remote'}',${score},'${risk}',${waste})">+ Track</button>
-        </div>
-      </div>`;
-    }).join('');
-  } catch(e) {
-    loadJobsMock(q, loc, min, ver);
-  }
-}
-
-function loadJobsMock(q='',loc='',min=0,ver=false){
   let jobs=[...JOBS];
   if(q)jobs=jobs.filter(j=>j.title.toLowerCase().includes(q)||j.co.toLowerCase().includes(q));
   if(loc)jobs=jobs.filter(j=>j.city.toLowerCase().includes(loc)||loc==='remote'&&j.city==='Remote');
@@ -1594,43 +1443,10 @@ function loadJobsMock(q='',loc='',min=0,ver=false){
       </div>
     </div>`;}).join('');
 }
-function renderAIResearch(container, r, name) {
-  const conf={high:{color:'var(--green)',label:'High confidence'},medium:{color:'var(--amber)',label:'Medium confidence'},low:{color:'var(--muted)',label:'Low confidence'}};
-  const c=conf[r.data_confidence]||conf.low;
-  container.innerHTML=`
-    <div style="background:var(--surface);border:1px solid var(--line2);border-radius:12px;padding:1.25rem;margin-bottom:1rem;position:relative;overflow:hidden">
-      <div style="position:absolute;top:0;right:0;background:var(--gdim);border-bottom-left-radius:8px;border:1px solid var(--gmid);padding:.2rem .65rem;font-family:var(--mono);font-size:.55rem;color:var(--green);letter-spacing:.06em">🧠 AI-RESEARCHED</div>
-      <div style="display:flex;align-items:flex-start;gap:.75rem;margin-bottom:1rem;margin-top:.5rem">
-        <div style="width:28px;height:28px;border-radius:7px;background:var(--gdim);border:1px solid var(--gmid);display:flex;align-items:center;justify-content:center;font-size:.85rem;flex-shrink:0">🧠</div>
-        <div>
-          <div style="font-family:var(--display);font-size:.88rem;font-weight:700;color:var(--white);margin-bottom:.15rem">What we know about ${name}</div>
-          <div style="font-family:var(--mono);font-size:.58rem;color:${c.color}">${c.label} · ${r.sources_note||'Based on public reputation data'}</div>
-        </div>
-      </div>
-      <p style="font-size:.82rem;color:var(--sub);line-height:1.7;font-weight:300;margin-bottom:1rem">${r.summary}</p>
-      ${(r.ghost_rate_estimate!==null||r.response_rate_estimate!==null)?`
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:.65rem;margin-bottom:1rem">
-        ${r.ghost_rate_estimate!==null?`<div style="background:var(--rdim);border:1px solid #ff3b5c18;border-radius:8px;padding:.75rem;text-align:center"><div style="font-family:var(--mono);font-size:1.35rem;font-weight:500;color:var(--red);line-height:1;margin-bottom:.2rem">~${r.ghost_rate_estimate}%</div><div style="font-family:var(--mono);font-size:.58rem;color:var(--muted);text-transform:uppercase;letter-spacing:.07em">Est. ghost rate</div></div>`:''}
-        ${r.response_rate_estimate!==null?`<div style="background:var(--gdim);border:1px solid var(--gmid);border-radius:8px;padding:.75rem;text-align:center"><div style="font-family:var(--mono);font-size:1.35rem;font-weight:500;color:var(--green);line-height:1;margin-bottom:.2rem">~${r.response_rate_estimate}%</div><div style="font-family:var(--mono);font-size:.58rem;color:var(--muted);text-transform:uppercase;letter-spacing:.07em">Est. response rate</div></div>`:''}
-      </div>`:''}
-      ${r.known_issues?.length?`
-      <div style="margin-bottom:.85rem">
-        <div style="font-family:var(--mono);font-size:.6rem;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:.5rem">Known issues</div>
-        ${r.known_issues.map(i=>`<div style="display:flex;align-items:flex-start;gap:.45rem;padding:.28rem 0;font-size:.8rem;color:var(--sub)"><span style="color:var(--red);flex-shrink:0">✗</span>${i}</div>`).join('')}
-      </div>`:''}
-      ${r.known_positives?.length?`
-      <div style="margin-bottom:.85rem">
-        <div style="font-family:var(--mono);font-size:.6rem;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:.5rem">What they do right</div>
-        ${r.known_positives.map(p=>`<div style="display:flex;align-items:flex-start;gap:.45rem;padding:.28rem 0;font-size:.8rem;color:var(--sub)"><span style="color:var(--green);flex-shrink:0">✓</span>${p}</div>`).join('')}
-      </div>`:''}
-      ${r.process_notes?`<div style="background:var(--raised);border-radius:7px;padding:.65rem .85rem;font-size:.78rem;color:var(--dim);line-height:1.65;margin-bottom:.85rem"><strong style="color:var(--sub);font-size:.7rem">Typical process:</strong> ${r.process_notes}</div>`:''}
-      <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.5rem">
-        <div style="font-family:var(--mono);font-size:.58rem;color:var(--muted)">AI-researched · Not user-reported · May not reflect recent changes</div>
-        <button class="btn btn-ghost" style="font-size:.68rem" onclick="go('report')">Add your experience →</button>
-      </div>
-    </div>`;
-}
 
+// ═══════════════════════════════════════════════
+// DEMAND MAP
+// ═══════════════════════════════════════════════
 function loadDemand(){
   const lf=(document.getElementById('demLoc')?.value||'').toLowerCase();
   const nf=(document.getElementById('demNiche')?.value||'').toLowerCase();
@@ -1743,7 +1559,6 @@ async function viewCompany(id,name,loc){
   const sc=locSc||(co?.sc)||{overall_score:50,risk_level:'warn',response_rate:.5,ghost_rate:.3,avg_wait_days:30,report_count:0,waste:40,avg_rounds:3,process_score:50};
   const risk=sc.risk_level||Score.risk(sc.overall_score);
   const vibeList=VIBES[ck]||VIBES.default;
-  const isSparse = (sc.report_count || 0) < 5;
 
   document.getElementById('coLogo').textContent=co?.logo||(name||'?')[0].toUpperCase();
   document.getElementById('coName').textContent=co?.name||name;
@@ -1766,38 +1581,6 @@ async function viewCompany(id,name,loc){
     <div class="co-m"><span class="co-mn" style="color:${sc.waste>60?'var(--red)':sc.waste>30?'var(--amber)':'var(--green)'}">${sc.waste||'—'}%</span><span class="co-ml">Waste risk</span></div>
     <div class="co-m"><span class="co-mn">${sc.report_count||0}</span><span class="co-ml">Reports</span></div>`;
 
-  // AI Research Panel — show loading state, then fire
-  const aiPanel = document.getElementById('ctc-ai');
-  if (aiPanel) {
-    if (isSparse) {
-      aiPanel.style.display = 'block';
-      aiPanel.innerHTML = `
-        <div style="background:var(--surface);border:1px solid var(--line2);border-radius:12px;padding:1.25rem;margin-bottom:1rem">
-          <div style="display:flex;align-items:center;gap:.65rem;margin-bottom:.85rem">
-            <div style="width:28px;height:28px;border-radius:7px;background:var(--gdim);border:1px solid var(--gmid);display:flex;align-items:center;justify-content:center;font-size:.85rem;flex-shrink:0">🧠</div>
-            <div>
-              <div style="font-family:var(--display);font-size:.82rem;font-weight:700;color:var(--white)">AI Research</div>
-              <div style="font-family:var(--mono);font-size:.58rem;color:var(--muted)">Researching ${name}${loc?' in '+loc:''}...</div>
-            </div>
-            <div style="margin-left:auto"><div class="spinner"></div></div>
-          </div>
-          <div style="height:3px;background:var(--line2);border-radius:2px;overflow:hidden">
-            <div style="height:100%;background:var(--green);border-radius:2px;animation:loadBar 2s ease infinite"></div>
-          </div>
-        </div>`;
-
-      // Fire AI research
-      const research = await aiResearchCompany(name, loc);
-      if (research) {
-        renderAIResearch(aiPanel, research, name);
-      } else {
-        aiPanel.innerHTML = '';
-      }
-    } else {
-      aiPanel.style.display = 'none';
-    }
-  }
-
   // Overview
   document.getElementById('ctc-ov').innerHTML=`
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1rem">
@@ -1818,7 +1601,7 @@ async function viewCompany(id,name,loc){
     </div>
     <div style="background:var(--raised);border-radius:7px;padding:.7rem .95rem;font-family:var(--mono);font-size:.58rem;color:var(--muted)">Scores from user reports and public data. Not a definitive claim. <a href="#" onclick="go('report');return false" style="color:var(--green);text-decoration:none">Add a report →</a></div>`;
 
-  // Process score tab
+  // Process score tab — unique to Seen
   document.getElementById('ctc-process').innerHTML=`
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1rem">
       <div style="background:var(--card);border:1px solid var(--line);border-radius:10px;padding:1.2rem">
@@ -1917,66 +1700,35 @@ async function submitReport(){
   const exp=document.getElementById('rEx').value.trim();
   if(!co||!ti||!loc){showToast('Company, job title and location required.');return;}
 
+  // ── Content moderation checks ──
   const rateCheck=Mod.rateCheck();
   if(!rateCheck.ok){showToast(rateCheck.msg);return;}
+
   const coCheck=Mod.check(co+' '+ti);
   if(!coCheck.ok){showToast(coCheck.msg);return;}
-  if(exp){const expCheck=Mod.check(exp);if(!expCheck.ok){showToast(expCheck.msg);return;}}
 
-  const safeCo=Mod.sanitize(co);
-  const safeTi=Mod.sanitize(ti);
-  const safeExp=exp?Mod.sanitize(exp):'';
-
-  const btn=document.querySelector('.sub-btn');
-  if(btn){btn.textContent='Submitting...';btn.disabled=true;}
-
-  try {
-    // Find or create company
-    let { data: companies } = await db.from('companies').select('id').ilike('name', safeCo).limit(1);
-    let companyId = companies?.[0]?.id;
-
-    if (!companyId) {
-      const { data: newCo } = await db.from('companies').insert({ name: safeCo, logo_letter: safeCo[0].toUpperCase() }).select('id').single();
-      companyId = newCo?.id;
-    }
-
-    // Find or create location
-    let { data: locations } = await db.from('company_locations').select('id').eq('company_id', companyId).ilike('city', loc).limit(1);
-    let locationId = locations?.[0]?.id;
-
-    if (!locationId) {
-      const { data: newLoc } = await db.from('company_locations').insert({ company_id: companyId, city: loc }).select('id').single();
-      locationId = newLoc?.id;
-    }
-
-    // Insert report
-    const { error } = await db.from('reports').insert({
-      company_id: companyId,
-      location_id: locationId,
-      role: safeTi,
-      platform: document.getElementById('rPl')?.value || '',
-      outcome: document.querySelector('input[name="resp"]:checked')?.value || 'waiting',
-      ghost_stage: document.querySelector('input[name="stage"]:checked')?.value || null,
-      rounds: parseInt(document.getElementById('rRounds')?.value || 0),
-      wait_days: null,
-      unpaid_work: document.getElementById('rUp')?.value || 'na',
-      experience_level: document.getElementById('rExp')?.value || '',
-      report_text: safeExp || null,
-      source: 'direct',
-      needs_review: !!(Mod.check(safeExp).flag),
-    });
-
-    if (error) throw error;
-
-    document.getElementById('repOk').style.display='block';
-    ['rCo','rTi','rLoc','rEx'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
-    document.querySelectorAll('input[name="resp"],input[name="stage"]').forEach(r=>r.checked=false);
-    showToast('Submitted. Score updated. You just helped someone.');
-  } catch(e) {
-    showToast('Submission failed. Please try again.');
+  if(exp){
+    const expCheck=Mod.check(exp);
+    if(!expCheck.ok){showToast(expCheck.msg);return;}
   }
 
-  if(btn){btn.textContent='Submit anonymously →';btn.disabled=false;}
+  const safeExp=exp?Mod.sanitize(exp):'';
+  const safeCo=Mod.sanitize(co);
+  const safeTi=Mod.sanitize(ti);
+  // ── End moderation ──
+
+  if(!DEMO&&db){
+    try{
+      let{data:cos}=await db.from('companies').select('id').ilike('name',safeCo).limit(1);
+      let cid=cos?.[0]?.id;
+      if(!cid){const{data:nc}=await db.from('companies').insert({name:safeCo,location:loc}).select().single();cid=nc.id;}
+      await db.from('reports').insert({company_id:cid,role:safeTi,platform:document.getElementById('rPl').value,response_type:document.querySelector('input[name="resp"]:checked')?.value||'waiting',wait_time_days:parseInt(document.getElementById('rWt')?.value)||null,unpaid_work:document.getElementById('rUp').value,experience_text:safeExp||null,source:'direct'});
+    }catch(e){}
+  }
+  document.getElementById('repOk').style.display='block';
+  ['rCo','rTi','rLoc','rEx'].forEach(id=>document.getElementById(id).value='');
+  document.querySelectorAll('input[name="resp"],input[name="stage"]').forEach(r=>r.checked=false);
+  showToast('Submitted. Score + process funnel updated. You just helped someone.');
 }
 
 // ═══════════════════════════════════════════════
@@ -2022,22 +1774,8 @@ document.querySelectorAll('input[name="resp"]').forEach(radio => {
 });
 
 // ═══════════════════════════════════════════════
-// AI COMPANY RESEARCH — calls Vercel Edge Function
-// API key lives securely in Vercel env variables
+// EMPLOYER PANEL
 // ═══════════════════════════════════════════════
-async function aiResearchCompany(name, location) {
-  try {
-    const response = await fetch('/api/research', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ company: name, location: location || '' })
-    });
-    if (!response.ok) throw new Error('API error');
-    return await response.json();
-  } catch(e) {
-    return null;
-  }
-}
 function openEmployerPanel(){
   const panel=document.getElementById('employerPanel');
   const overlay=document.getElementById('employerOverlay');
@@ -2237,67 +1975,48 @@ const STAGE_DAYS_EXPECTED = [3, 7, 14, 21, 30, 45]; // typical days to reach eac
 const AppStore = {
   KEY: 'seen_applications_v1',
 
-  async load() {
-    if (Auth.isLoggedIn()) {
-      try {
-        const { data } = await db.from('applications').select('*').order('applied_at', { ascending: false });
-        return (data || []).map(a => ({
-          id: a.id, jobId: a.job_id, company: a.company_name, role: a.role,
-          location: a.city, platform: a.platform, jobUrl: a.job_url,
-          stage: a.stage, status: a.status, score: a.score, waste: a.waste_score,
-          appliedAt: new Date(a.applied_at).getTime(), updatedAt: new Date(a.updated_at).getTime(),
-        }));
-      } catch(e) {}
-    }
-    try { return JSON.parse(localStorage.getItem(this.KEY) || '[]'); } catch(e) { return []; }
+  load() {
+    try { return JSON.parse(localStorage.getItem(this.KEY) || '[]'); }
+    catch(e) { return []; }
   },
 
-  async add(app) {
-    if (Auth.isLoggedIn()) {
-      try {
-        const uid = (await db.auth.getUser()).data.user?.id;
-        const { error } = await db.from('applications').insert({
-          user_id: uid, company_name: app.company, role: app.role,
-          city: app.location, platform: app.platform, job_url: app.jobUrl,
-          stage: 'Applied', status: 'active', score: app.score, waste_score: app.waste,
-        });
-        if (error) throw error;
-        return { ok: true };
-      } catch(e) {}
+  save(apps) {
+    try { localStorage.setItem(this.KEY, JSON.stringify(apps)); }
+    catch(e) {}
+  },
+
+  add(app) {
+    const apps = this.load();
+    // Prevent duplicate tracking of same job
+    if (apps.find(a => a.jobId === app.jobId && a.status === 'active')) {
+      return { ok: false, msg: 'Already tracking this application.' };
     }
-    const apps = this.loadSync();
-    if (apps.find(a => a.jobId === app.jobId && a.status === 'active')) return { ok: false, msg: 'Already tracking this.' };
-    apps.unshift({ ...app, id: 'app_' + Date.now(), appliedAt: Date.now(), updatedAt: Date.now() });
-    localStorage.setItem(this.KEY, JSON.stringify(apps));
+    apps.unshift(app);
+    this.save(apps);
     return { ok: true };
   },
 
-  async update(id, changes) {
-    if (Auth.isLoggedIn()) {
-      try {
-        const dbChanges = {};
-        if (changes.stage) dbChanges.stage = changes.stage;
-        if (changes.status) dbChanges.status = changes.status;
-        dbChanges.updated_at = new Date().toISOString();
-        await db.from('applications').update(dbChanges).eq('id', id);
-        return;
-      } catch(e) {}
-    }
-    const apps = this.loadSync();
+  update(id, changes) {
+    const apps = this.load();
     const idx = apps.findIndex(a => a.id === id);
-    if (idx !== -1) { apps[idx] = { ...apps[idx], ...changes, updatedAt: Date.now() }; localStorage.setItem(this.KEY, JSON.stringify(apps)); }
-  },
-
-  async remove(id) {
-    if (Auth.isLoggedIn()) {
-      try { await db.from('applications').delete().eq('id', id); return; } catch(e) {}
+    if (idx === -1) return;
+    apps[idx] = { ...apps[idx], ...changes, updatedAt: Date.now() };
+    // Log stage change to history
+    if (changes.stage && changes.stage !== apps[idx].stage) {
+      apps[idx].history = apps[idx].history || [];
+      apps[idx].history.push({ stage: changes.stage, date: Date.now() });
     }
-    const apps = this.loadSync().filter(a => a.id !== id);
-    localStorage.setItem(this.KEY, JSON.stringify(apps));
+    this.save(apps);
   },
 
-  loadSync() { try { return JSON.parse(localStorage.getItem(this.KEY) || '[]'); } catch(e) { return []; } },
-  clear() { localStorage.removeItem(this.KEY); if (Auth.isLoggedIn()) db.from('applications').delete().neq('id', '0'); },
+  remove(id) {
+    const apps = this.load().filter(a => a.id !== id);
+    this.save(apps);
+  },
+
+  clear() {
+    localStorage.removeItem(this.KEY);
+  },
 };
 
 // ═══════════════════════════════════════════════
@@ -2324,8 +2043,8 @@ function getNudge(app) {
 // ═══════════════════════════════════════════════
 // TRACKER PAGE RENDERER
 // ═══════════════════════════════════════════════
-async function renderTracker() {
-  const apps = await AppStore.load();
+function renderTracker() {
+  const apps = AppStore.load();
   const active = apps.filter(a => a.status === 'active');
   const ghosted = apps.filter(a => a.status === 'ghosted');
   const hired = apps.filter(a => a.status === 'hired');
@@ -2478,18 +2197,17 @@ function scrollToApp(id) {
   if (el) { el.scrollIntoView({ behavior: 'smooth', block: 'center' }); el.style.boxShadow = '0 0 0 2px var(--green)'; setTimeout(() => el.style.boxShadow = '', 1500); }
 }
 
-async function markAppStatus(id, status) {
-  await AppStore.update(id, { status });
-  await renderTracker();
-  await renderSeekerDash();
-  const msgs = { ghosted: '👻 Marked ghosted. Consider reporting it.', hired: '🎉 Congrats!', rejected: 'Marked as rejected.' };
+function markAppStatus(id, status) {
+  AppStore.update(id, { status });
+  renderTracker();
+  const msgs = { ghosted: '👻 Marked as ghosted. Consider reporting it.', hired: '🎉 Congrats! Marked as hired.', rejected: 'Marked as rejected.' };
   showToast(msgs[status] || 'Updated.');
 }
 
-async function clearAllApplications() {
+function clearAllApplications() {
   if (!confirm('Clear all tracked applications? This cannot be undone.')) return;
-  await AppStore.clear();
-  await renderTracker();
+  AppStore.clear();
+  renderTracker();
   showToast('All applications cleared.');
 }
 
@@ -2540,34 +2258,34 @@ function openApplyModal(jobId, company, role, location, score, risk, waste) {
   document.getElementById('applyModal').classList.add('open');
 }
 
-
-async function confirmApply(jobId, company, role, location, score, risk, waste) {
+function confirmApply(jobId, company, role, location, score, risk, waste) {
   const platform = document.getElementById('applyPlatform')?.value || '';
   const url = document.getElementById('applyUrl')?.value || '';
-  const btn = document.querySelector('#applyModal .btn-green');
-  if (btn) { btn.textContent = 'Saving...'; btn.disabled = true; }
 
   const app = {
     id: 'app_' + Date.now() + '_' + Math.random().toString(36).slice(2,7),
     jobId, company, role, location, score, risk, waste,
     platform, jobUrl: url,
-    stage: 'Applied', status: 'active',
-    appliedAt: Date.now(), updatedAt: Date.now(),
+    stage: 'Applied',
+    status: 'active',
+    appliedAt: Date.now(),
+    updatedAt: Date.now(),
+    history: [{ stage: 'Applied', date: Date.now() }],
   };
 
-  const result = await AppStore.add(app);
+  const result = AppStore.add(app);
   closeApplyModalDirect();
 
   if (result.ok) {
-    showToast(Auth.isLoggedIn() ? '✓ Saved to your account.' : '✓ Logged locally. Sign in to sync.');
-    const apps = await AppStore.load();
-    const activeCount = apps.filter(a => a.status === 'active').length;
+    showToast('✓ Application logged. Check My Applications to track it.');
+    // Update nav badge
     const badge = document.getElementById('trackerBadge');
-    if (badge && activeCount > 0) { badge.textContent = activeCount; badge.style.display = 'inline'; }
+    const apps = AppStore.load();
+    const activeCount = apps.filter(a => a.status === 'active').length;
+    if (badge) { badge.textContent = activeCount; badge.style.display = 'inline'; }
   } else {
     showToast(result.msg);
   }
-  if (btn) { btn.textContent = 'Log application →'; btn.disabled = false; }
 }
 
 function closeApplyModal(e) { if (e.target === document.getElementById('applyModal')) closeApplyModalDirect(); }
@@ -2576,30 +2294,30 @@ function closeApplyModalDirect() { document.getElementById('applyModal').classLi
 // ═══════════════════════════════════════════════
 // STAGE UPDATE MODAL
 // ═══════════════════════════════════════════════
-async function openStageModal(appId) {
-  const apps = await AppStore.load();
+function openStageModal(appId) {
+  const apps = AppStore.load();
   const app = apps.find(a => a.id === appId);
   if (!app) return;
 
   document.getElementById('stageModalBody').innerHTML = `
-    <p style="font-size:.82rem;color:var(--sub);font-weight:300;margin-bottom:1.1rem;line-height:1.65">Where is <strong style="color:var(--white)">${app.role}</strong> at ${app.company}?</p>
+    <p style="font-size:.82rem;color:var(--sub);font-weight:300;margin-bottom:1.1rem;line-height:1.65">Where is <strong style="color:var(--white)">${app.role}</strong> at ${app.company} in the process?</p>
     <div style="display:flex;flex-direction:column;gap:.38rem;margin-bottom:1.1rem">
       ${STAGES.map(s => `
-        <button onclick="updateStage('${appId}','${s}')" style="padding:.72rem 1rem;background:${app.stage===s?'var(--gdim)':'var(--raised)'};border:1px solid ${app.stage===s?'#00ff8730':'var(--line2)'};border-radius:8px;color:${app.stage===s?'var(--green)':'var(--sub)'};font-family:var(--body);font-size:.82rem;font-weight:${app.stage===s?'600':'400'};cursor:pointer;text-align:left;transition:all .15s">
+        <button onclick="updateStage('${appId}','${s}')" style="padding:.72rem 1rem;background:${app.stage===s?'var(--gdim)':'var(--raised)'};border:1px solid ${app.stage===s?'#00ff8730':'var(--line2)'};border-radius:8px;color:${app.stage===s?'var(--green)':'var(--sub)'};font-family:var(--body);font-size:.82rem;font-weight:${app.stage===s?'600':'400'};cursor:pointer;text-align:left;transition:all .15s" onmouseover="this.style.borderColor='var(--green)';this.style.color='var(--green)'" onmouseout="this.style.borderColor='${app.stage===s?'#00ff8730':'var(--line2)'}';this.style.color='${app.stage===s?'var(--green)':'var(--sub)'}'">
           ${app.stage === s ? '● ' : '○ '}${s}
         </button>`).join('')}
     </div>
     <div style="padding:.75rem 1rem;background:var(--raised);border-radius:7px;font-family:var(--mono);font-size:.62rem;color:var(--muted);line-height:1.6">
-      ${Auth.isLoggedIn() ? '✓ Synced to your account.' : 'Sign in to sync across devices.'}
+      Stage updates are recorded privately in your history. Each stage update helps Seen improve company funnel data for everyone.
     </div>`;
 
   document.getElementById('stageModal').classList.add('open');
 }
 
-async function updateStage(appId, stage) {
-  await AppStore.update(appId, { stage });
+function updateStage(appId, stage) {
+  AppStore.update(appId, { stage });
   closeStageModalDirect();
-  await renderTracker();
+  renderTracker();
   showToast(`Stage updated: ${stage}`);
 }
 
@@ -2609,8 +2327,8 @@ function closeStageModalDirect() { document.getElementById('stageModal').classLi
 // ═══════════════════════════════════════════════
 // PRE-FILL REPORT from tracker
 // ═══════════════════════════════════════════════
-async function prefillReport(appId) {
-  const apps = await AppStore.load();
+function prefillReport(appId) {
+  const apps = AppStore.load();
   const app = apps.find(a => a.id === appId);
   if (!app) { go('report'); return; }
 
@@ -2631,311 +2349,42 @@ async function prefillReport(appId) {
 }
 
 // ═══════════════════════════════════════════════
-// REAL AUTH — Supabase
+// AUTH STATE
+// Production: replace with Supabase Auth
 // ═══════════════════════════════════════════════
-const Auth = {
-  _user: null,
-  _profile: null,
-
-  async init() {
-    const { data: { session } } = await db.auth.getSession();
-    if (session?.user) {
-      this._user = session.user;
-      await this.loadProfile();
-    }
-    // Listen for auth changes
-    db.auth.onAuthStateChange(async (event, session) => {
-      if (event === 'SIGNED_IN' && session?.user) {
-        this._user = session.user;
-        await this.loadProfile();
-        updateNav();
-
-        // Check email confirmed
-        if (!session.user.email_confirmed_at) {
-          // Not verified yet — show verify screen
-          go('login');
-          showStep('verify');
-          const verifyEl = document.getElementById('verifyEmailDisplay');
-          if (verifyEl) verifyEl.textContent = session.user.email;
-          return;
-        }
-
-        // New user — no survey yet → show survey
-        if (!this._profile?.onboarding_survey && this.isSeeker()) {
-          go('login');
-          startSurvey();
-          return;
-        }
-
-        if (this.isSeeker()) { renderSeekerDash(); go('seeker-dash'); }
-        else if (this.isEmployer()) goToEmployerDashboard();
-
-      } else if (event === 'SIGNED_OUT') {
-        this._user = null;
-        this._profile = null;
-        updateNav();
-        go('landing');
-      }
-    });
-  },
-
-  async loadProfile() {
-    if (!this._user) return;
-    const { data } = await db.from('profiles').select('*').eq('id', this._user.id).single();
-    this._profile = data;
-  },
-
-  get() { return this._profile || (this._user ? { type: 'seeker', name: this._user.email?.split('@')[0], email: this._user.email } : null); },
-  isSeeker() { return this._profile?.type === 'seeker' || (!this._profile && !!this._user); },
-  isEmployer() { return this._profile?.type === 'employer'; },
-  isLoggedIn() { return !!this._user; },
+const Auth={
+  KEY:'seen_user_v1',
+  get(){try{return JSON.parse(localStorage.getItem(this.KEY));}catch(e){return null;}},
+  set(user){localStorage.setItem(this.KEY,JSON.stringify(user));},
+  clear(){localStorage.removeItem(this.KEY);},
+  isSeeker(){return this.get()?.type==='seeker';},
 };
 
-// ═══════════════════════════════════════════════
-// SIGNUP FLOW
-// ═══════════════════════════════════════════════
-let _signupType = 'seeker';
-let _surveyAnswers = {};
-let _surveyStep = 0;
-
-const SURVEY = [
-  { q:"what's your situation right now?", id:'situation', opts:[
-    {val:'hunting',label:'🔥 Actively job hunting'},
-    {val:'casual',label:'👀 Casually looking'},
-    {val:'ghosted',label:'👻 Just got ghosted lol'},
-    {val:'employed',label:'💼 Employed but curious'},
-  ]},
-  { q:"biggest frustration with job apps?", id:'frustration', opts:[
-    {val:'ghosting',label:'👻 Getting ghosted'},
-    {val:'fake',label:'🪤 Fake listings'},
-    {val:'salary',label:'💸 No salary info'},
-    {val:'rounds',label:'😮‍💨 Too many rounds'},
-    {val:'all',label:'🔥 Honestly all of it'},
-  ]},
-  { q:"what industry are you in?", id:'industry', opts:[
-    {val:'tech',label:'💻 Tech'},
-    {val:'healthcare',label:'🏥 Healthcare'},
-    {val:'retail',label:'🛍️ Food & Retail'},
-    {val:'logistics',label:'📦 Logistics'},
-    {val:'finance',label:'💰 Finance'},
-    {val:'other',label:'✳️ Other'},
-  ]},
-  { q:"what's your experience level?", id:'experience', opts:[
-    {val:'entry',label:'🌱 Entry level (0–2 yrs)'},
-    {val:'mid',label:'📈 Mid level (3–6 yrs)'},
-    {val:'senior',label:'⭐ Senior (7+ yrs)'},
-  ]},
-  { q:"what city are you in?", id:'city', type:'text', placeholder:'e.g. Los Angeles, CA' },
-];
-
-function showStep(step) {
-  ['who','email','password','verify','survey','signin','employer'].forEach(s => {
-    const el = document.getElementById('step-' + s);
-    if (el) el.style.display = 'none';
-  });
-  const target = document.getElementById('step-' + step);
-  if (target) { target.style.display = 'block'; target.style.animation = 'fadeUp .3s ease both'; }
+function selectLoginPath(type){
+  document.getElementById('loginPathSelector').style.display='none';
+  if(type==='seeker')document.getElementById('seekerLoginForm').style.display='block';
+  if(type==='employer')document.getElementById('employerLoginForm').style.display='block';
 }
 
-function startSignup(type) {
-  _signupType = type;
-  if (type === 'employer') { showStep('employer'); return; }
-  showStep('email');
+function doSeekerLogin(){
+  const name=document.getElementById('seekerName')?.value?.trim();
+  const email=document.getElementById('seekerEmail')?.value?.trim();
+  if(!name){showToast('Enter your first name.');return;}
+  if(!email||!email.includes('@')){showToast('Enter a valid email.');return;}
+  Auth.set({type:'seeker',email,name});
+  updateNav();renderSeekerDash();go('seeker-dash');
+  showToast('Welcome, '+name+' 👋');
 }
 
-function showSigninForm() { showStep('signin'); }
-function selectLoginPath(type) { startSignup(type); }
-
-function goToPasswordStep() {
-  const name = document.getElementById('signupName')?.value?.trim();
-  const email = document.getElementById('signupEmail')?.value?.trim();
-  if (!name) { showToast('Enter your first name.'); return; }
-  if (!email || !email.includes('@')) { showToast('Enter a valid email.'); return; }
-  const sub = document.getElementById('passwordSubline');
-  if (sub) sub.textContent = 'Creating account for ' + email;
-  showStep('password');
-}
-
-function checkPasswordStrength(val) {
-  const bar = document.getElementById('passStrengthBar');
-  const label = document.getElementById('passStrengthLabel');
-  if (!bar || !label) return;
-  let s = 0;
-  if (val.length >= 8) s++;
-  if (/[A-Z]/.test(val)) s++;
-  if (/[0-9]/.test(val)) s++;
-  if (/[^A-Za-z0-9]/.test(val)) s++;
-  const levels = [
-    {w:'25%',color:'var(--red)',text:'Too short'},
-    {w:'50%',color:'var(--amber)',text:'Weak'},
-    {w:'75%',color:'var(--amber)',text:'Almost there'},
-    {w:'100%',color:'var(--green)',text:'Strong ✓'},
-  ];
-  const l = levels[Math.max(0, s - 1)];
-  bar.style.width = val.length ? l.w : '0%';
-  bar.style.background = l.color;
-  label.textContent = val.length ? l.text : '';
-  label.style.color = l.color;
-}
-
-async function createAccount() {
-  const name = document.getElementById('signupName')?.value?.trim();
-  const email = document.getElementById('signupEmail')?.value?.trim();
-  const pass = document.getElementById('signupPass')?.value?.trim();
-  if (!pass || pass.length < 8) { showToast('Password must be at least 8 characters.'); return; }
-  const btn = document.getElementById('createAccountBtn');
-  if (btn) { btn.textContent = 'Creating account...'; btn.disabled = true; }
-
-  const { error } = await db.auth.signUp({
-    email, password: pass,
-    options: { data: { name, type: 'seeker' }, emailRedirectTo: 'https://seenjobs.io' }
-  });
-
-  if (btn) { btn.textContent = 'Create account →'; btn.disabled = false; }
-  if (error) { showToast(error.message); return; }
-
-  const verifyEl = document.getElementById('verifyEmailDisplay');
-  if (verifyEl) verifyEl.textContent = email;
-  showStep('verify');
-}
-
-async function checkVerification() {
-  // Refresh the session to get latest email_confirmed_at
-  const { data: { user }, error } = await db.auth.getUser();
-  if (error || !user) { showToast('Not signed in. Try signing in again.'); showStep('signin'); return; }
-
-  if (!user.email_confirmed_at) {
-    showToast("We haven't received your verification yet. Click the link in your email first.");
-    return;
-  }
-
-  // Verified — load profile and proceed
-  await Auth.loadProfile();
-  if (!Auth._profile?.onboarding_survey) {
-    startSurvey();
-  } else {
-    updateNav();
-    renderSeekerDash();
-    go('seeker-dash');
-  }
-}
-  const email = document.getElementById('signupEmail')?.value?.trim();
-  if (!email) { showToast('Go back and enter your email first.'); return; }
-  const { error } = await db.auth.resend({ type: 'signup', email,
-    options: { emailRedirectTo: 'https://seenjobs.io' }
-  });
-  showToast(error ? error.message : 'Verification email resent!');
-}
-
-async function doSignIn() {
-  const email = document.getElementById('signinEmail')?.value?.trim();
-  const pass = document.getElementById('signinPass')?.value?.trim();
-  if (!email || !email.includes('@')) { showToast('Enter a valid email.'); return; }
-  if (!pass) { showToast('Enter your password.'); return; }
-  const btn = document.getElementById('signinBtn');
-  if (btn) { btn.textContent = 'Signing in...'; btn.disabled = true; }
-  const { error } = await db.auth.signInWithPassword({ email, password: pass });
-  if (btn) { btn.textContent = 'Sign in →'; btn.disabled = false; }
-  if (error) { showToast(error.message); return; }
-  // Auth state change listener handles redirect
-}
-
-async function doSeekerLogin() { doSignIn(); } // backwards compat
-
-async function resetPassword() {
-  const email = document.getElementById('signinEmail')?.value?.trim();
-  if (!email || !email.includes('@')) { showToast('Enter your email first.'); return; }
-  const { error } = await db.auth.resetPasswordForEmail(email, { redirectTo: 'https://seenjobs.io' });
-  showToast(error ? error.message : 'Password reset email sent!');
-}
-
-async function doEmployerLogin() {
-  const email = document.getElementById('empEmail')?.value?.trim();
-  const pass = document.getElementById('empPass')?.value?.trim();
-  if (!email || !email.includes('@')) { showToast('Enter a valid email.'); return; }
-  if (!pass || pass.length < 6) { showToast('Password must be at least 6 characters.'); return; }
-  const { error } = await db.auth.signInWithPassword({ email, password: pass });
-  if (error) { showToast(error.message); return; }
+function doEmployerLogin(){
+  const email=document.getElementById('empEmail')?.value?.trim();
+  if(!email||!email.includes('@')){showToast('Enter a valid email.');return;}
+  Auth.set({type:'employer',email,name:email.split('@')[0]});
   goToEmployerDashboard();
 }
 
-async function doSignOut() {
-  await db.auth.signOut();
-  showToast('Signed out.');
-}
-
-// ─── SURVEY ENGINE ───
-function startSurvey() {
-  _surveyStep = 0;
-  _surveyAnswers = {};
-  showStep('survey');
-  renderSurveyQuestion();
-}
-
-function renderSurveyQuestion() {
-  const q = SURVEY[_surveyStep];
-  const bar = document.getElementById('surveyBar');
-  const progress = document.getElementById('surveyProgress');
-  if (bar) bar.style.width = ((_surveyStep + 1) / SURVEY.length * 100) + '%';
-  if (progress) progress.textContent = `${_surveyStep + 1} of ${SURVEY.length}`;
-  const el = document.getElementById('surveyQuestion');
-  if (!el) return;
-
-  if (q.type === 'text') {
-    el.innerHTML = `
-      <div style="font-family:var(--display);font-size:1.25rem;font-weight:800;color:var(--white);letter-spacing:-.025em;margin-bottom:1.25rem;line-height:1.2">${q.q}</div>
-      <input id="surveyTextInput" type="text" placeholder="${q.placeholder}" style="width:100%;background:var(--surface);border:1.5px solid var(--line2);border-radius:8px;padding:.85rem 1rem;color:var(--white);font-family:var(--body);font-size:.9rem;outline:none;caret-color:var(--green);margin-bottom:1rem" onfocus="this.style.borderColor='var(--green)'" onblur="this.style.borderColor='var(--line2)'" onkeydown="if(event.key==='Enter')surveyAnswer(document.getElementById('surveyTextInput').value)"/>
-      <button onclick="surveyAnswer(document.getElementById('surveyTextInput').value)" style="width:100%;padding:.85rem;background:var(--green);color:var(--ink);border:none;border-radius:8px;font-family:var(--display);font-weight:800;font-size:.9rem;cursor:pointer">Continue →</button>
-      ${_surveyStep>0?`<button onclick="surveyBack()" style="width:100%;padding:.6rem;background:none;border:none;color:var(--muted);font-family:var(--mono);font-size:.65rem;cursor:pointer;margin-top:.5rem">← back</button>`:''}`;
-  } else {
-    el.innerHTML = `
-      <div style="font-family:var(--display);font-size:1.25rem;font-weight:800;color:var(--white);letter-spacing:-.025em;margin-bottom:1.25rem;line-height:1.2">${q.q}</div>
-      <div style="display:flex;flex-direction:column;gap:.45rem">
-        ${q.opts.map(opt=>`<button onclick="surveyAnswer('${opt.val}')" style="padding:.85rem 1rem;background:var(--surface);border:1.5px solid var(--line2);border-radius:10px;color:var(--text);font-family:var(--body);font-size:.85rem;cursor:pointer;text-align:left;transition:all .15s" onmouseover="this.style.borderColor='var(--green)';this.style.background='var(--gdim)'" onmouseout="this.style.borderColor='var(--line2)';this.style.background='var(--surface)'">${opt.label}</button>`).join('')}
-      </div>
-      ${_surveyStep>0?`<button onclick="surveyBack()" style="width:100%;padding:.6rem;background:none;border:none;color:var(--muted);font-family:var(--mono);font-size:.65rem;cursor:pointer;margin-top:.75rem">← back</button>`:''}`;
-  }
-}
-
-async function surveyAnswer(val) {
-  if (!val?.trim()) { showToast('Pick an answer to continue.'); return; }
-  _surveyAnswers[SURVEY[_surveyStep].id] = val;
-  if (_surveyStep < SURVEY.length - 1) {
-    _surveyStep++;
-    renderSurveyQuestion();
-  } else {
-    await completeSurvey();
-  }
-}
-
-function surveyBack() {
-  if (_surveyStep > 0) { _surveyStep--; renderSurveyQuestion(); }
-}
-
-async function completeSurvey() {
-  try {
-    const { data: { user } } = await db.auth.getUser();
-    if (user) {
-      await db.from('profiles').upsert({
-        id: user.id, email: user.email,
-        name: user.user_metadata?.name || user.email.split('@')[0],
-        type: 'seeker',
-        onboarding_survey: JSON.stringify(_surveyAnswers),
-      });
-    }
-  } catch(e) {}
-
-  const el = document.getElementById('surveyQuestion');
-  const bar = document.getElementById('surveyBar');
-  if (bar) bar.style.width = '100%';
-  if (el) el.innerHTML = `<div style="text-align:center;padding:1rem 0"><div style="font-size:2.5rem;margin-bottom:.85rem">🎉</div><div style="font-family:var(--display);font-size:1.3rem;font-weight:800;color:var(--white);letter-spacing:-.025em;margin-bottom:.4rem">You're all set.</div><div style="font-size:.85rem;color:var(--sub);font-weight:300;margin-bottom:1.5rem">Taking you to your dashboard...</div></div>`;
-
-  await sleep(1500);
-  await Auth.init();
-  updateNav();
-  renderSeekerDash();
-  go('seeker-dash');
-  showToast('Welcome to Seen 👋');
+function doSignOut(){
+  Auth.clear();updateNav();go('landing');showToast('Signed out.');
 }
 
 function updateNav(){
@@ -2944,13 +2393,13 @@ function updateNav(){
   const loginBtn=document.getElementById('navLoginBtn');
   const empBtn=document.getElementById('navEmployerBtn');
   const badge=document.getElementById('trackerBadge');
-  if(Auth.isSeeker()){
+  // Update tracker badge
+  const apps=AppStore.load();
+  const activeCount=apps.filter(a=>a.status==='active').length;
+  if(badge&&activeCount>0){badge.textContent=activeCount;badge.style.display='inline';}
+  if(user?.type==='seeker'){
     if(pills)pills.style.display='flex';
     if(loginBtn){loginBtn.textContent='My dashboard';loginBtn.onclick=()=>{renderSeekerDash();go('seeker-dash');};}
-    if(empBtn)empBtn.style.display='none';
-  } else if(Auth.isEmployer()){
-    if(pills)pills.style.display='none';
-    if(loginBtn){loginBtn.textContent='My dashboard';loginBtn.onclick=goToEmployerDashboard;}
     if(empBtn)empBtn.style.display='none';
   } else {
     if(pills)pills.style.display='none';
@@ -2962,9 +2411,9 @@ function updateNav(){
 // ═══════════════════════════════════════════════
 // SEEKER DASHBOARD
 // ═══════════════════════════════════════════════
-async function renderSeekerDash(){
+function renderSeekerDash(){
   const user=Auth.get();
-  const apps=await AppStore.load();
+  const apps=AppStore.load();
   const active=apps.filter(a=>a.status==='active');
   const ghosted=apps.filter(a=>a.status==='ghosted');
   const hired=apps.filter(a=>a.status==='hired');
@@ -3023,28 +2472,25 @@ async function renderSeekerDash(){
 // NAVIGATION
 // ═══════════════════════════════════════════════
 function go(page){
-  try {
-    if(page==='home'){
-      page=Auth.isSeeker()?'seeker-dash':'landing';
-      if(page==='seeker-dash')renderSeekerDash();
-    }
-    document.querySelectorAll('.page, .page-full').forEach(p=>p.classList.remove('active'));
-    const el=document.getElementById('page-'+page);
-    if(!el)return;
-    el.classList.add('active');
-    document.querySelectorAll('.ntab').forEach(t=>t.classList.remove('active'));
-    const tabMap={jobs:'nt-jobs',demand:'nt-demand',resume:'nt-resume',tracker:'nt-tracker'};
-    if(tabMap[page]){const t=document.getElementById(tabMap[page]);if(t)t.classList.add('active');}
-    window.scrollTo(0,0);
-    if(page==='jobs')loadJobs();
-    if(page==='demand')loadDemand();
-    if(page==='faq')renderFAQ();
-    if(page==='legal')renderLegal();
-    if(page==='tracker')renderTracker();
+  if(page==='home'){
+    page=Auth.isSeeker()?'seeker-dash':'landing';
     if(page==='seeker-dash')renderSeekerDash();
-  } catch(e) {
-    console.warn('Navigation error:', e);
   }
+  // Hide everything — both page types
+  document.querySelectorAll('.page, .page-full').forEach(p=>p.classList.remove('active'));
+  const el=document.getElementById('page-'+page);
+  if(!el)return;
+  el.classList.add('active');
+  document.querySelectorAll('.ntab').forEach(t=>t.classList.remove('active'));
+  const tabMap={jobs:'nt-jobs',demand:'nt-demand',resume:'nt-resume',tracker:'nt-tracker'};
+  if(tabMap[page]){const t=document.getElementById(tabMap[page]);if(t)t.classList.add('active');}
+  window.scrollTo(0,0);
+  if(page==='jobs')loadJobs();
+  if(page==='demand')loadDemand();
+  if(page==='faq')renderFAQ();
+  if(page==='legal')renderLegal();
+  if(page==='tracker')renderTracker();
+  if(page==='seeker-dash')renderSeekerDash();
 }
 
 // ── ROTATING HERO HEADLINE ──
@@ -3120,20 +2566,9 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 // ── INIT ──
-// Execute any pending actions from before this script loaded
-if (window._pendingNav) { go(window._pendingNav); window._pendingNav=null; }
-if (window._pendingAction) { window._pendingAction(); window._pendingAction=null; }
-if (window._pendingSignup) { startSignup(window._pendingSignup); window._pendingSignup=null; }
-if (window._qs) { qs(window._qs.n, window._qs.l); window._qs=null; }
-
 updateNav();
 startHeroRotation();
-if (db) {
-  Auth.init().then(() => {
-    updateNav();
-    if (Auth.isSeeker()) { renderSeekerDash(); go('seeker-dash'); }
-  }).catch(e => console.warn('Auth init error:', e));
-}
+if(Auth.isSeeker()){renderSeekerDash();go('seeker-dash');}
 </script>
 </body>
 </html>
