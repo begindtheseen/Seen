@@ -815,8 +815,17 @@ const API = {
 
   async createListing(data) {
     try {
-      const coId = Store.get('company')?.id;
-      if (!coId) throw new Error('No company');
+      // Get company ID from authenticated user — works after refresh
+      let coId = Store.get('company')?.id;
+      if (!coId) {
+        const uid = (await db.auth.getUser()).data.user?.id;
+        if (uid) {
+          const { data: ep } = await db.from('employer_profiles').select('company_id').eq('id', uid).single();
+          coId = ep?.company_id;
+        }
+      }
+      if (!coId) throw new Error('No company found. Please sign out and sign back in.');
+
       // Find or create location
       let { data: locs } = await db.from('company_locations').select('id').eq('company_id', coId).ilike('city', data.location).limit(1);
       let locId = locs?.[0]?.id;
@@ -824,19 +833,21 @@ const API = {
         const { data: newLoc } = await db.from('company_locations').insert({ company_id: coId, city: data.location }).select('id').single();
         locId = newLoc?.id;
       }
+
       const { data: job, error } = await db.from('jobs').insert({
         company_id: coId, location_id: locId,
         title: data.title, description: data.description,
         salary_min: data.salaryMin, salary_max: data.salaryMax,
         job_type: data.type, experience_level: data.level,
-        city: data.location, status: 'active', verified: Store.get('company')?.verified || false,
+        city: data.location, status: 'active',
+        verified: Store.get('company')?.verified || false,
       }).select().single();
+
       if (error) throw error;
       return { ok: true, data: { ...job, applications: 0 } };
     } catch(e) {
-      const listing = { id: 'lst_' + Date.now(), ...data, status: 'active', applications: 0, createdAt: new Date().toISOString() };
-      MOCK_LISTINGS.unshift(listing);
-      return { ok: true, data: listing };
+      console.error('createListing error:', e.message);
+      return { ok: false, error: e.message };
     }
   },
 
@@ -2042,13 +2053,15 @@ async function submitListing() {
     description: desc,
   });
 
+  btn.textContent = 'Post listing →'; btn.disabled = false;
+
   if (result.ok) {
     closeListingModalDirect();
-    showToastMsg('Listing posted with verified badge ✓', 'success');
+    showToastMsg('Listing posted ✓ — visible on seenjobs.io now', 'success');
     renderListings();
+  } else {
+    showToastMsg(result.error || 'Failed to post listing', 'error');
   }
-
-  btn.textContent = 'Post listing →'; btn.disabled = false;
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -2426,7 +2439,77 @@ function filterListings(q){
 
   5. AUTH
 // ═══════════════════════════════════════════════
-// EMPLOYER NOTIFICATIONS
+// EMPLOYER AUTH — persist session on refresh
+// ═══════════════════════════════════════════════
+async function initEmployerAuth() {
+  if (!db) return;
+  try {
+    const { data: { session } } = await db.auth.getSession();
+    if (session?.user) {
+      const uid = session.user.id;
+
+      // Try cached company first for instant load
+      const cached = Store.get('company');
+
+      // Always refresh from DB to stay accurate
+      let company = null;
+      try {
+        const { data: empProfile } = await db.from('employer_profiles')
+          .select('*, companies(*)').eq('id', uid).single();
+
+        if (empProfile?.companies) {
+          company = {
+            ...MOCK_EMPLOYER,
+            id: empProfile.companies.id,
+            name: empProfile.companies.name,
+            email: session.user.email,
+            verified: empProfile.verified || false,
+            plan: empProfile.plan || 'free',
+          };
+        } else {
+          // No company yet — create one
+          const coName = session.user.email.split('@')[1]?.split('.')[0] || 'My Company';
+          const { data: newCo } = await db.from('companies')
+            .insert({ name: coName, logo_letter: coName[0].toUpperCase() })
+            .select().single();
+          if (newCo) {
+            await db.from('employer_profiles').upsert({ id: uid, company_id: newCo.id });
+            company = { ...MOCK_EMPLOYER, id: newCo.id, name: newCo.name, email: session.user.email };
+          }
+        }
+      } catch(e) {
+        // Fall back to cache if DB fails
+        company = cached || { ...MOCK_EMPLOYER, email: session.user.email };
+      }
+
+      if (!company) company = { ...MOCK_EMPLOYER, email: session.user.email };
+
+      Store.set('user', company);
+      Store.set('company', company);
+
+      document.getElementById('loginScreen').style.display = 'none';
+      document.getElementById('appShell').style.display = 'grid';
+      updateSidebar();
+      showView('dashboard');
+      updateEmpNotifBadge();
+    }
+
+    db.auth.onAuthStateChange(async (event, session) => {
+      if (event === 'SIGNED_IN' && session?.user) {
+        // Re-init on sign in
+        initEmployerAuth();
+      } else if (event === 'SIGNED_OUT') {
+        Store.set('user', null);
+        Store.set('company', null);
+        document.getElementById('appShell').style.display = 'none';
+        document.getElementById('loginScreen').style.display = 'block';
+      }
+    });
+  } catch(e) { console.warn('Employer auth init:', e); }
+}
+
+// Run on load
+initEmployerAuth();
 // ═══════════════════════════════════════════════
 let empNotifOpen = false;
 
