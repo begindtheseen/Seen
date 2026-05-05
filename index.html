@@ -858,7 +858,8 @@ nav{position:fixed;top:0;left:0;right:0;z-index:500;height:58px;display:flex;ali
       <div>
         <div style="font-family:var(--mono);font-size:.62rem;color:var(--green);letter-spacing:.08em;text-transform:uppercase;margin-bottom:.35rem" id="dashGreeting">Good morning</div>
         <h1 style="font-family:var(--display);font-size:1.75rem;font-weight:800;color:var(--white);letter-spacing:-.035em;margin-bottom:.2rem" id="dashName">Welcome back.</h1>
-        <p style="font-size:.8rem;color:var(--sub);font-weight:300" id="dashSubline">Here's where things stand.</p>
+        <p style="font-size:.8rem;color:var(--sub);font-weight:300;margin-bottom:.75rem" id="dashSubline">Here's where things stand.</p>
+        <div id="dashSurveyInsight"></div>
       </div>
       <button class="btn btn-ghost" onclick="doSignOut()" style="font-size:.75rem;flex-shrink:0">Sign out</button>
     </div>
@@ -1381,7 +1382,10 @@ const Auth = {
           await this.loadProfile();
           updateNav();
           if(!session.user.email_confirmed_at) { go('login'); showStep('verify'); const el=document.getElementById('verifyEmailDisplay'); if(el) el.textContent=session.user.email; return; }
-          if(!this._profile?.onboarding_survey && this.isSeeker()) { go('login'); startSurvey(); return; }
+          // Check survey — handle both object and string stored values
+          const survey = this._profile?.onboarding_survey;
+          const surveyDone = survey && survey !== 'null' && survey !== '{}' && Object.keys(typeof survey === 'string' ? JSON.parse(survey) : survey).length > 0;
+          if(!surveyDone && this.isSeeker()) { go('login'); startSurvey(); return; }
           if(this.isSeeker()) { renderSeekerDash(); go('seeker-dash'); }
           else if(this.isEmployer()) goToEmployerDashboard();
         } else if(event==='SIGNED_OUT') {
@@ -2477,9 +2481,21 @@ async function sendResetCode() {
   if (!email || !email.includes('@')) { showToast('Enter a valid email.'); return; }
   const btn = document.getElementById('sendResetCodeBtn');
   if (btn) { btn.textContent = 'Sending...'; btn.disabled = true; }
-  const { error } = await db.auth.signInWithOtp({ email, options: { shouldCreateUser: false } });
+
+  // Use signInWithOtp with options that force numeric OTP
+  const { error } = await db.auth.signInWithOtp({
+    email,
+    options: {
+      shouldCreateUser: false,
+      data: { type: 'recovery' }
+    }
+  });
+
   if (btn) { btn.textContent = 'Send code →'; btn.disabled = false; }
-  if (error) { showToast(error.message.includes('not found') ? 'No account found with that email.' : error.message); return; }
+  if (error) {
+    showToast(error.message.includes('not found') || error.message.includes('user') ? 'No account found with that email.' : error.message);
+    return;
+  }
   _resetEmail = email;
   const conf = document.getElementById('resetEmailConfirm');
   if (conf) conf.textContent = email;
@@ -2554,7 +2570,9 @@ async function checkVerification(){
   if(error||!user){showToast('Not signed in. Try again.');showStep('signin');return;}
   if(!user.email_confirmed_at){showToast("Haven't received your verification yet. Click the link in your email first.");return;}
   await Auth.loadProfile();
-  if(!Auth._profile?.onboarding_survey){startSurvey();}
+  const survey = Auth._profile?.onboarding_survey;
+  const surveyDone = survey && survey !== 'null' && survey !== '{}' && Object.keys(typeof survey === 'string' ? JSON.parse(survey) : survey).length > 0;
+  if(!surveyDone){startSurvey();}
   else{updateNav();renderSeekerDash();go('seeker-dash');}
 }
 async function resendVerification(){
@@ -2617,13 +2635,32 @@ async function surveyAnswer(val){
 }
 function surveyBack(){if(_surveyStep>0){_surveyStep--;renderSurveyQuestion();}}
 async function completeSurvey(){
-  if(db){try{const {data:{user}}=await db.auth.getUser();if(user){await db.from('profiles').upsert({id:user.id,email:user.email,name:user.user_metadata?.name||user.email.split('@')[0],type:'seeker',onboarding_survey:JSON.stringify(_surveyAnswers)});}}catch(e){}}
-  const el=document.getElementById('surveyQuestion');const bar=document.getElementById('surveyBar');
+  try {
+    const {data:{user}} = await db.auth.getUser();
+    if(user && db){
+      await db.from('profiles').upsert({
+        id: user.id,
+        email: user.email,
+        name: user.user_metadata?.name || user.email.split('@')[0],
+        type: 'seeker',
+        onboarding_survey: _surveyAnswers, // save as JSONB object not string
+        survey_completed: true,
+      });
+      // Reload profile so the check works
+      await Auth.loadProfile();
+    }
+  } catch(e) { console.warn('Survey save:', e); }
+
+  const el=document.getElementById('surveyQuestion');
+  const bar=document.getElementById('surveyBar');
   if(bar)bar.style.width='100%';
   if(el)el.innerHTML=`<div style="text-align:center;padding:1rem 0"><div style="font-size:2.5rem;margin-bottom:.85rem">🎉</div><div style="font-family:var(--display);font-size:1.3rem;font-weight:800;color:var(--white);letter-spacing:-.025em;margin-bottom:.4rem">You're all set.</div><div style="font-size:.85rem;color:var(--sub);font-weight:300;margin-bottom:1.5rem">Taking you to your dashboard...</div></div>`;
+
   await sleep(1500);
-  if(db)await Auth.init();
-  updateNav();renderSeekerDash();go('seeker-dash');showToast('Welcome to Seen 👋');
+  updateNav();
+  await renderSeekerDash();
+  go('seeker-dash');
+  showToast('Welcome to Seen 👋');
 }
 
 function updateNav(){
@@ -2666,13 +2703,42 @@ async function renderSeekerDash(){
   const hired=apps.filter(a=>a.status==='hired');
   const responded=apps.filter(a=>a.status!=='active');
   const _=id=>document.getElementById(id);
+
+  // Get survey data for personalization
+  let survey = Auth._profile?.onboarding_survey;
+  if (typeof survey === 'string') { try { survey = JSON.parse(survey); } catch(e) { survey = {}; } }
+  survey = survey || {};
+
   // Greeting
   const hour=new Date().getHours();
   const greet=hour<12?'Good morning':hour<17?'Good afternoon':'Good evening';
   const name = user?.name ? user.name.charAt(0).toUpperCase() + user.name.slice(1).split(/[^a-zA-Z]/)[0] : 'there';
   if(_('dashGreeting'))_('dashGreeting').textContent=greet;
   if(_('dashName'))_('dashName').textContent=`Hey, ${name}.`;
-  if(_('dashSubline'))_('dashSubline').textContent=active.length?`You have ${active.length} active application${active.length!==1?'s':''}.`:"No applications tracked yet. Hit '+ Track' on any job.";
+
+  // Personalized subline based on survey
+  let subline = active.length ? `You have ${active.length} active application${active.length!==1?'s':''}.` : "No applications tracked yet. Hit 'Apply' on any job.";
+  if (!active.length && survey.situation === 'ghosted') subline = "Sorry you got ghosted. Let's find somewhere better.";
+  else if (!active.length && survey.situation === 'hunting') subline = "Ready to hunt? Browse jobs below.";
+  else if (!active.length && survey.situation === 'casual') subline = "Casually looking? Browse jobs and save the ones you like.";
+  if(_('dashSubline'))_('dashSubline').textContent = subline;
+
+  // Show survey insights if we have data
+  const insightEl = _('dashSurveyInsight');
+  if (insightEl && survey.frustration) {
+    const frustrationMap = {
+      ghosting: { label: 'Ghosting alerts on', desc: "We'll flag companies with high ghost rates before you apply." },
+      fake: { label: 'Fake listing detection on', desc: "AI research fires automatically on companies with sparse data." },
+      salary: { label: 'Salary transparency on', desc: "We show salary ranges upfront. No more guessing." },
+      rounds: { label: 'Process transparency on', desc: "We track how many rounds each company typically runs." },
+      all: { label: 'Full transparency mode on', desc: "Everything Seen has is working for you." },
+    };
+    const f = frustrationMap[survey.frustration];
+    if (f) insightEl.innerHTML = `<div style="background:var(--gdim);border:1px solid var(--gmid);border-radius:8px;padding:.65rem .9rem;display:flex;align-items:flex-start;gap:.65rem;margin-bottom:1rem">
+      <span style="color:var(--green);font-size:.9rem;flex-shrink:0">✓</span>
+      <div><div style="font-family:var(--mono);font-size:.62rem;color:var(--green);font-weight:600;margin-bottom:.1rem">${f.label}</div><div style="font-size:.72rem;color:var(--sub);font-weight:300">${f.desc}</div></div>
+    </div>`;
+  }
   // Stats
   const rr=apps.length?Math.round((responded.filter(a=>a.status==='hired').length/apps.length)*100)+'%':'—';
   if(_('dStatActive'))_('dStatActive').textContent=active.length;
