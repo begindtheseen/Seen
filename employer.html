@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+
 <html lang="en">
 <head>
 <meta charset="UTF-8"/>
@@ -18,66 +19,66 @@ const db = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 
 /* ═══════════════════════════════════════════════
-   DESIGN SYSTEM
-   Light mode — professional, data-forward
-   Stripe/Linear employer aesthetic
-   Completely different from job seeker side
+DESIGN SYSTEM
+Light mode — professional, data-forward
+Stripe/Linear employer aesthetic
+Completely different from job seeker side
 ═══════════════════════════════════════════════ */
 :root{
-  /* Surfaces */
-  --bg:#f8f8fb;
-  --bg2:#f0f0f5;
-  --surface:#ffffff;
-  --raised:#fafafa;
-  --line:#e8e8f0;
-  --line2:#d8d8e8;
+/* Surfaces */
+–bg:#f8f8fb;
+–bg2:#f0f0f5;
+–surface:#ffffff;
+–raised:#fafafa;
+–line:#e8e8f0;
+–line2:#d8d8e8;
 
-  /* Text */
-  --tx:#0f0f18;
-  --tx2:#3a3a52;
-  --sub:#6a6a88;
-  --dim:#9898b0;
-  --muted:#b8b8cc;
+/* Text */
+–tx:#0f0f18;
+–tx2:#3a3a52;
+–sub:#6a6a88;
+–dim:#9898b0;
+–muted:#b8b8cc;
 
-  /* Accent — deep indigo, not green */
-  --accent:#4f46e5;
-  --accent2:#6366f1;
-  --accent-dim:#4f46e510;
-  --accent-mid:#4f46e528;
-  --accent-text:#3730a3;
+/* Accent — deep indigo, not green */
+–accent:#4f46e5;
+–accent2:#6366f1;
+–accent-dim:#4f46e510;
+–accent-mid:#4f46e528;
+–accent-text:#3730a3;
 
-  /* Status colors */
-  --green:#059669;
-  --green-bg:#ecfdf5;
-  --green-b:#a7f3d0;
-  --red:#dc2626;
-  --red-bg:#fef2f2;
-  --red-b:#fecaca;
-  --amber:#d97706;
-  --amber-bg:#fffbeb;
-  --amber-b:#fde68a;
-  --blue:#2563eb;
-  --blue-bg:#eff6ff;
-  --blue-b:#bfdbfe;
+/* Status colors */
+–green:#059669;
+–green-bg:#ecfdf5;
+–green-b:#a7f3d0;
+–red:#dc2626;
+–red-bg:#fef2f2;
+–red-b:#fecaca;
+–amber:#d97706;
+–amber-bg:#fffbeb;
+–amber-b:#fde68a;
+–blue:#2563eb;
+–blue-bg:#eff6ff;
+–blue-b:#bfdbfe;
 
-  /* Score colors — same as job seeker side for consistency */
-  --score-safe:#059669;
-  --score-warn:#d97706;
-  --score-danger:#dc2626;
+/* Score colors — same as job seeker side for consistency */
+–score-safe:#059669;
+–score-warn:#d97706;
+–score-danger:#dc2626;
 
-  --display:'Syne',sans-serif;
-  --mono:'DM Mono',monospace;
-  --body:'Instrument Sans',sans-serif;
+–display:‘Syne’,sans-serif;
+–mono:‘DM Mono’,monospace;
+–body:‘Instrument Sans’,sans-serif;
 
-  --r:10px;
-  --r-lg:14px;
-  --shadow:0 1px 3px rgba(0,0,0,.08),0 1px 2px rgba(0,0,0,.04);
-  --shadow-md:0 4px 16px rgba(0,0,0,.08),0 2px 4px rgba(0,0,0,.04);
-  --shadow-lg:0 12px 40px rgba(0,0,0,.1),0 4px 8px rgba(0,0,0,.04);
+–r:10px;
+–r-lg:14px;
+–shadow:0 1px 3px rgba(0,0,0,.08),0 1px 2px rgba(0,0,0,.04);
+–shadow-md:0 4px 16px rgba(0,0,0,.08),0 2px 4px rgba(0,0,0,.04);
+–shadow-lg:0 12px 40px rgba(0,0,0,.1),0 4px 8px rgba(0,0,0,.04);
 }
 
 html{scroll-behavior:smooth}
-body{background:var(--bg);color:var(--tx);font-family:var(--body);font-size:15px;line-height:1.6;-webkit-font-smoothing:antialiased;overflow-x:hidden}
+body{background:var(–bg);color:var(–tx);font-family:var(–body);font-size:15px;line-height:1.6;-webkit-font-smoothing:antialiased;overflow-x:hidden}
 
 @keyframes fadeUp{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
 @keyframes fadeIn{from{opacity:0}to{opacity:1}}
@@ -86,294 +87,294 @@ body{background:var(--bg);color:var(--tx);font-family:var(--body);font-size:15px
 @keyframes slideIn{from{opacity:0;transform:translateX(20px)}to{opacity:1;transform:translateX(0)}}
 @keyframes countUp{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
 @keyframes shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
-@keyframes barGrow{from{width:0}to{width:var(--w)}}
+@keyframes barGrow{from{width:0}to{width:var(–w)}}
 
 /* ── LAYOUT ── */
 .app-shell{display:grid;grid-template-columns:240px 1fr;min-height:100vh}
 
 /* ── SIDEBAR ── */
-.sidebar{background:var(--surface);border-right:1px solid var(--line);display:flex;flex-direction:column;position:fixed;top:0;left:0;bottom:0;width:240px;z-index:200;transition:transform .25s ease}
-.sidebar-logo{display:flex;align-items:center;gap:.65rem;padding:1.4rem 1.5rem;border-bottom:1px solid var(--line)}
-.sidebar-logo-mark{display:flex;align-items:center;gap:.4rem;font-family:var(--display);font-size:1.1rem;font-weight:800;color:var(--tx);letter-spacing:-.02em}
-.sidebar-logo-dot{width:7px;height:7px;border-radius:50%;background:var(--accent);flex-shrink:0}
-.sidebar-logo-badge{font-family:var(--mono);font-size:.52rem;background:var(--accent-dim);color:var(--accent-text);border:1px solid var(--accent-mid);border-radius:4px;padding:.12rem .4rem;font-weight:500;letter-spacing:.04em}
-.sidebar-company{padding:1rem 1.25rem;border-bottom:1px solid var(--line)}
-.sc-label{font-family:var(--mono);font-size:.55rem;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin-bottom:.4rem}
-.sc-name{font-family:var(--display);font-size:.88rem;font-weight:700;color:var(--tx);letter-spacing:-.01em;margin-bottom:.2rem}
+.sidebar{background:var(–surface);border-right:1px solid var(–line);display:flex;flex-direction:column;position:fixed;top:0;left:0;bottom:0;width:240px;z-index:200;transition:transform .25s ease}
+.sidebar-logo{display:flex;align-items:center;gap:.65rem;padding:1.4rem 1.5rem;border-bottom:1px solid var(–line)}
+.sidebar-logo-mark{display:flex;align-items:center;gap:.4rem;font-family:var(–display);font-size:1.1rem;font-weight:800;color:var(–tx);letter-spacing:-.02em}
+.sidebar-logo-dot{width:7px;height:7px;border-radius:50%;background:var(–accent);flex-shrink:0}
+.sidebar-logo-badge{font-family:var(–mono);font-size:.52rem;background:var(–accent-dim);color:var(–accent-text);border:1px solid var(–accent-mid);border-radius:4px;padding:.12rem .4rem;font-weight:500;letter-spacing:.04em}
+.sidebar-company{padding:1rem 1.25rem;border-bottom:1px solid var(–line)}
+.sc-label{font-family:var(–mono);font-size:.55rem;text-transform:uppercase;letter-spacing:.1em;color:var(–muted);margin-bottom:.4rem}
+.sc-name{font-family:var(–display);font-size:.88rem;font-weight:700;color:var(–tx);letter-spacing:-.01em;margin-bottom:.2rem}
 .sc-score{display:flex;align-items:center;gap:.4rem}
-.sc-score-n{font-family:var(--mono);font-size:.75rem;font-weight:500}
-.sc-score-bar{flex:1;height:3px;background:var(--line2);border-radius:2px;overflow:hidden}
+.sc-score-n{font-family:var(–mono);font-size:.75rem;font-weight:500}
+.sc-score-bar{flex:1;height:3px;background:var(–line2);border-radius:2px;overflow:hidden}
 .sc-score-fill{height:100%;border-radius:2px;transition:width 1s ease}
-.nav-section{padding:.75rem .75rem .25rem;font-family:var(--mono);font-size:.52rem;text-transform:uppercase;letter-spacing:.12em;color:var(--muted)}
-.nav-item{display:flex;align-items:center;gap:.6rem;padding:.6rem .75rem;border-radius:8px;margin:0 .5rem .1rem;cursor:pointer;transition:all .15s;text-decoration:none;font-size:.82rem;font-weight:500;color:var(--sub);border:none;background:none;width:calc(100% - 1rem);text-align:left}
-.nav-item:hover{background:var(--bg2);color:var(--tx)}
-.nav-item.active{background:var(--accent-dim);color:var(--accent-text);font-weight:600}
+.nav-section{padding:.75rem .75rem .25rem;font-family:var(–mono);font-size:.52rem;text-transform:uppercase;letter-spacing:.12em;color:var(–muted)}
+.nav-item{display:flex;align-items:center;gap:.6rem;padding:.6rem .75rem;border-radius:8px;margin:0 .5rem .1rem;cursor:pointer;transition:all .15s;text-decoration:none;font-size:.82rem;font-weight:500;color:var(–sub);border:none;background:none;width:calc(100% - 1rem);text-align:left}
+.nav-item:hover{background:var(–bg2);color:var(–tx)}
+.nav-item.active{background:var(–accent-dim);color:var(–accent-text);font-weight:600}
 .nav-item-icon{font-size:.9rem;flex-shrink:0;width:18px;text-align:center}
-.nav-badge{font-family:var(--mono);font-size:.52rem;background:var(--red-bg);color:var(--red);border:1px solid var(--red-b);border-radius:100px;padding:.1rem .4rem;margin-left:auto;font-weight:600}
-.nav-badge.green{background:var(--green-bg);color:var(--green);border-color:var(--green-b)}
-.sidebar-footer{margin-top:auto;padding:1rem .75rem;border-top:1px solid var(--line)}
-.sf-plan{display:flex;align-items:center;justify-content:space-between;padding:.6rem .75rem;background:var(--accent-dim);border:1px solid var(--accent-mid);border-radius:8px;margin-bottom:.5rem}
-.sf-plan-name{font-family:var(--mono);font-size:.62rem;color:var(--accent-text);font-weight:500}
-.sf-plan-cta{font-family:var(--mono);font-size:.58rem;color:var(--accent);cursor:pointer;text-decoration:underline}
+.nav-badge{font-family:var(–mono);font-size:.52rem;background:var(–red-bg);color:var(–red);border:1px solid var(–red-b);border-radius:100px;padding:.1rem .4rem;margin-left:auto;font-weight:600}
+.nav-badge.green{background:var(–green-bg);color:var(–green);border-color:var(–green-b)}
+.sidebar-footer{margin-top:auto;padding:1rem .75rem;border-top:1px solid var(–line)}
+.sf-plan{display:flex;align-items:center;justify-content:space-between;padding:.6rem .75rem;background:var(–accent-dim);border:1px solid var(–accent-mid);border-radius:8px;margin-bottom:.5rem}
+.sf-plan-name{font-family:var(–mono);font-size:.62rem;color:var(–accent-text);font-weight:500}
+.sf-plan-cta{font-family:var(–mono);font-size:.58rem;color:var(–accent);cursor:pointer;text-decoration:underline}
 
 /* ── MAIN CONTENT ── */
 .main{margin-left:240px;display:flex;flex-direction:column;min-height:100vh}
-.topbar{background:var(--surface);border-bottom:1px solid var(--line);padding:.85rem 2rem;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100}
-.topbar-title{font-family:var(--display);font-size:1rem;font-weight:700;color:var(--tx);letter-spacing:-.02em}
+.topbar{background:var(–surface);border-bottom:1px solid var(–line);padding:.85rem 2rem;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100}
+.topbar-title{font-family:var(–display);font-size:1rem;font-weight:700;color:var(–tx);letter-spacing:-.02em}
 .topbar-right{display:flex;align-items:center;gap:.65rem}
 .content{padding:2rem;flex:1}
 
 /* ── BUTTONS ── */
-.btn{display:inline-flex;align-items:center;gap:.35rem;padding:.48rem 1rem;border-radius:8px;font-family:var(--body);font-weight:600;font-size:.78rem;cursor:pointer;text-decoration:none;transition:all .15s;border:none;white-space:nowrap}
-.btn-primary{background:var(--accent);color:#fff}
-.btn-primary:hover{background:var(--accent2);transform:translateY(-1px);box-shadow:0 4px 16px rgba(79,70,229,.3)}
-.btn-secondary{background:var(--surface);color:var(--tx2);border:1px solid var(--line2)}
-.btn-secondary:hover{border-color:var(--sub);background:var(--raised)}
-.btn-danger{background:var(--red-bg);color:var(--red);border:1px solid var(--red-b)}
+.btn{display:inline-flex;align-items:center;gap:.35rem;padding:.48rem 1rem;border-radius:8px;font-family:var(–body);font-weight:600;font-size:.78rem;cursor:pointer;text-decoration:none;transition:all .15s;border:none;white-space:nowrap}
+.btn-primary{background:var(–accent);color:#fff}
+.btn-primary:hover{background:var(–accent2);transform:translateY(-1px);box-shadow:0 4px 16px rgba(79,70,229,.3)}
+.btn-secondary{background:var(–surface);color:var(–tx2);border:1px solid var(–line2)}
+.btn-secondary:hover{border-color:var(–sub);background:var(–raised)}
+.btn-danger{background:var(–red-bg);color:var(–red);border:1px solid var(–red-b)}
 .btn-danger:hover{background:#fee2e2;transform:translateY(-1px)}
-.btn-success{background:var(--green-bg);color:var(--green);border:1px solid var(--green-b)}
+.btn-success{background:var(–green-bg);color:var(–green);border:1px solid var(–green-b)}
 .btn-success:hover{background:#d1fae5}
-.btn-ghost{background:transparent;color:var(--sub);border:1px solid var(--line2)}
-.btn-ghost:hover{color:var(--tx);border-color:var(--sub)}
+.btn-ghost{background:transparent;color:var(–sub);border:1px solid var(–line2)}
+.btn-ghost:hover{color:var(–tx);border-color:var(–sub)}
 .btn-sm{padding:.32rem .65rem;font-size:.72rem}
 .btn-lg{padding:.7rem 1.6rem;font-size:.875rem}
 .btn-icon{padding:.48rem;border-radius:7px}
 
 /* ── CARDS ── */
-.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-lg);padding:1.5rem;box-shadow:var(--shadow)}
+.card{background:var(–surface);border:1px solid var(–line);border-radius:var(–r-lg);padding:1.5rem;box-shadow:var(–shadow)}
 .card-sm{padding:1.1rem}
-.card-title{font-family:var(--display);font-size:.9rem;font-weight:700;color:var(--tx);letter-spacing:-.02em;margin-bottom:.25rem}
-.card-sub{font-size:.78rem;color:var(--sub);font-weight:300}
+.card-title{font-family:var(–display);font-size:.9rem;font-weight:700;color:var(–tx);letter-spacing:-.02em;margin-bottom:.25rem}
+.card-sub{font-size:.78rem;color:var(–sub);font-weight:300}
 
 /* ── STAT CARDS ── */
 .stat-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:1rem;margin-bottom:1.5rem}
-.stat-card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-lg);padding:1.35rem;box-shadow:var(--shadow);animation:fadeUp .4s ease both}
+.stat-card{background:var(–surface);border:1px solid var(–line);border-radius:var(–r-lg);padding:1.35rem;box-shadow:var(–shadow);animation:fadeUp .4s ease both}
 .stat-card:nth-child(2){animation-delay:.05s}
 .stat-card:nth-child(3){animation-delay:.1s}
 .stat-card:nth-child(4){animation-delay:.15s}
-.stat-label{font-family:var(--mono);font-size:.6rem;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin-bottom:.6rem;display:flex;align-items:center;justify-content:space-between}
-.stat-value{font-family:var(--mono);font-size:1.85rem;font-weight:500;line-height:1;letter-spacing:-.03em;margin-bottom:.3rem;animation:countUp .5s ease both}
-.stat-trend{font-family:var(--mono);font-size:.65rem;display:flex;align-items:center;gap:.25rem}
-.trend-up{color:var(--green)}.trend-down{color:var(--red)}.trend-flat{color:var(--muted)}
+.stat-label{font-family:var(–mono);font-size:.6rem;text-transform:uppercase;letter-spacing:.1em;color:var(–muted);margin-bottom:.6rem;display:flex;align-items:center;justify-content:space-between}
+.stat-value{font-family:var(–mono);font-size:1.85rem;font-weight:500;line-height:1;letter-spacing:-.03em;margin-bottom:.3rem;animation:countUp .5s ease both}
+.stat-trend{font-family:var(–mono);font-size:.65rem;display:flex;align-items:center;gap:.25rem}
+.trend-up{color:var(–green)}.trend-down{color:var(–red)}.trend-flat{color:var(–muted)}
 
 /* ── SCORE DISPLAY ── */
 .score-hero{display:flex;flex-direction:column;align-items:center;justify-content:center;width:90px;height:90px;border-radius:50%;border:3px solid;flex-shrink:0;position:relative}
-.score-hero::after{content:'';position:absolute;inset:-5px;border-radius:50%;border:1px solid;opacity:.2}
-.score-hero.safe{border-color:var(--score-safe);background:#ecfdf5}.score-hero.safe::after{border-color:var(--score-safe)}
-.score-hero.warn{border-color:var(--score-warn);background:#fffbeb}.score-hero.warn::after{border-color:var(--score-warn)}
-.score-hero.danger{border-color:var(--score-danger);background:#fef2f2}.score-hero.danger::after{border-color:var(--score-danger)}
-.score-hero-n{font-family:var(--mono);font-size:1.6rem;font-weight:500;line-height:1}
-.score-hero.safe .score-hero-n{color:var(--score-safe)}
-.score-hero.warn .score-hero-n{color:var(--score-warn)}
-.score-hero.danger .score-hero-n{color:var(--score-danger)}
-.score-hero-l{font-family:var(--mono);font-size:.5rem;text-transform:uppercase;letter-spacing:.06em;margin-top:.1rem}
-.score-hero.safe .score-hero-l{color:var(--score-safe)}
-.score-hero.warn .score-hero-l{color:var(--score-warn)}
-.score-hero.danger .score-hero-l{color:var(--score-danger)}
+.score-hero::after{content:’’;position:absolute;inset:-5px;border-radius:50%;border:1px solid;opacity:.2}
+.score-hero.safe{border-color:var(–score-safe);background:#ecfdf5}.score-hero.safe::after{border-color:var(–score-safe)}
+.score-hero.warn{border-color:var(–score-warn);background:#fffbeb}.score-hero.warn::after{border-color:var(–score-warn)}
+.score-hero.danger{border-color:var(–score-danger);background:#fef2f2}.score-hero.danger::after{border-color:var(–score-danger)}
+.score-hero-n{font-family:var(–mono);font-size:1.6rem;font-weight:500;line-height:1}
+.score-hero.safe .score-hero-n{color:var(–score-safe)}
+.score-hero.warn .score-hero-n{color:var(–score-warn)}
+.score-hero.danger .score-hero-n{color:var(–score-danger)}
+.score-hero-l{font-family:var(–mono);font-size:.5rem;text-transform:uppercase;letter-spacing:.06em;margin-top:.1rem}
+.score-hero.safe .score-hero-l{color:var(–score-safe)}
+.score-hero.warn .score-hero-l{color:var(–score-warn)}
+.score-hero.danger .score-hero-l{color:var(–score-danger)}
 
 /* ── STATUS BADGES ── */
-.badge{display:inline-flex;align-items:center;gap:.28rem;font-family:var(--mono);font-size:.62rem;font-weight:500;padding:.2rem .6rem;border-radius:100px;border:1px solid}
-.badge-pending{background:var(--amber-bg);color:var(--amber);border-color:var(--amber-b)}
-.badge-approved{background:var(--green-bg);color:var(--green);border-color:var(--green-b)}
-.badge-rejected{background:var(--red-bg);color:var(--red);border-color:var(--red-b)}
-.badge-review{background:var(--blue-bg);color:var(--blue);border-color:var(--blue-b)}
-.badge-verified{background:var(--accent-dim);color:var(--accent-text);border-color:var(--accent-mid)}
+.badge{display:inline-flex;align-items:center;gap:.28rem;font-family:var(–mono);font-size:.62rem;font-weight:500;padding:.2rem .6rem;border-radius:100px;border:1px solid}
+.badge-pending{background:var(–amber-bg);color:var(–amber);border-color:var(–amber-b)}
+.badge-approved{background:var(–green-bg);color:var(–green);border-color:var(–green-b)}
+.badge-rejected{background:var(–red-bg);color:var(–red);border-color:var(–red-b)}
+.badge-review{background:var(–blue-bg);color:var(–blue);border-color:var(–blue-b)}
+.badge-verified{background:var(–accent-dim);color:var(–accent-text);border-color:var(–accent-mid)}
 .badge-dot{width:5px;height:5px;border-radius:50%;background:currentColor;animation:pulse 2s infinite}
 
 /* ── TABLES ── */
-.table-wrap{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-lg);overflow:hidden;box-shadow:var(--shadow)}
-.table-hdr{display:flex;align-items:center;justify-content:space-between;padding:1.15rem 1.5rem;border-bottom:1px solid var(--line)}
-.table-title{font-family:var(--display);font-size:.9rem;font-weight:700;color:var(--tx);letter-spacing:-.02em}
+.table-wrap{background:var(–surface);border:1px solid var(–line);border-radius:var(–r-lg);overflow:hidden;box-shadow:var(–shadow)}
+.table-hdr{display:flex;align-items:center;justify-content:space-between;padding:1.15rem 1.5rem;border-bottom:1px solid var(–line)}
+.table-title{font-family:var(–display);font-size:.9rem;font-weight:700;color:var(–tx);letter-spacing:-.02em}
 .table-controls{display:flex;align-items:center;gap:.5rem}
 .tbl{width:100%;border-collapse:collapse}
-.tbl th{font-family:var(--mono);font-size:.6rem;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);padding:.75rem 1.5rem;text-align:left;border-bottom:1px solid var(--line);background:var(--raised);font-weight:400}
-.tbl td{padding:.9rem 1.5rem;border-bottom:1px solid var(--line);font-size:.82rem;color:var(--tx2);vertical-align:middle}
+.tbl th{font-family:var(–mono);font-size:.6rem;text-transform:uppercase;letter-spacing:.1em;color:var(–muted);padding:.75rem 1.5rem;text-align:left;border-bottom:1px solid var(–line);background:var(–raised);font-weight:400}
+.tbl td{padding:.9rem 1.5rem;border-bottom:1px solid var(–line);font-size:.82rem;color:var(–tx2);vertical-align:middle}
 .tbl tr:last-child td{border-bottom:none}
-.tbl tr:hover td{background:var(--bg2)}
+.tbl tr:hover td{background:var(–bg2)}
 .tbl tr{transition:background .1s}
 
 /* ── FORM ELEMENTS ── */
-.input,.select,.textarea{width:100%;background:var(--surface);border:1.5px solid var(--line2);border-radius:8px;padding:.65rem .95rem;color:var(--tx);font-family:var(--body);font-size:.875rem;outline:none;transition:border-color .15s,box-shadow .15s;appearance:none}
-.input:focus,.select:focus,.textarea:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-dim)}
-.input::placeholder,.textarea::placeholder{color:var(--muted)}
+.input,.select,.textarea{width:100%;background:var(–surface);border:1.5px solid var(–line2);border-radius:8px;padding:.65rem .95rem;color:var(–tx);font-family:var(–body);font-size:.875rem;outline:none;transition:border-color .15s,box-shadow .15s;appearance:none}
+.input:focus,.select:focus,.textarea:focus{border-color:var(–accent);box-shadow:0 0 0 3px var(–accent-dim)}
+.input::placeholder,.textarea::placeholder{color:var(–muted)}
 .textarea{min-height:100px;resize:vertical;line-height:1.6}
-.label{display:block;font-family:var(--mono);font-size:.62rem;text-transform:uppercase;letter-spacing:.07em;color:var(--tx2);margin-bottom:.38rem;font-weight:400}
+.label{display:block;font-family:var(–mono);font-size:.62rem;text-transform:uppercase;letter-spacing:.07em;color:var(–tx2);margin-bottom:.38rem;font-weight:400}
 .form-group{margin-bottom:1rem}
 .form-row{display:grid;grid-template-columns:1fr 1fr;gap:1rem}
 
 /* ── RADIO BUTTONS ── */
 .radio-group{display:flex;flex-direction:column;gap:.38rem}
 .radio-opt input{display:none}
-.radio-lbl{display:flex;align-items:flex-start;gap:.65rem;padding:.75rem 1rem;border:1.5px solid var(--line2);border-radius:8px;cursor:pointer;transition:all .15s;background:var(--surface)}
-.radio-lbl:hover{border-color:var(--accent);background:var(--accent-dim)}
-.radio-opt input:checked+.radio-lbl{border-color:var(--accent);background:var(--accent-dim)}
-.radio-lbl-title{font-size:.82rem;font-weight:600;color:var(--tx);margin-bottom:.15rem}
-.radio-lbl-sub{font-size:.72rem;color:var(--sub);font-weight:300}
-.radio-dot{width:16px;height:16px;border-radius:50%;border:2px solid var(--line2);flex-shrink:0;margin-top:.1rem;display:flex;align-items:center;justify-content:center;transition:all .15s}
-.radio-opt input:checked+.radio-lbl .radio-dot{border-color:var(--accent);background:var(--accent)}
-.radio-opt input:checked+.radio-lbl .radio-dot::after{content:'';width:6px;height:6px;border-radius:50%;background:#fff}
+.radio-lbl{display:flex;align-items:flex-start;gap:.65rem;padding:.75rem 1rem;border:1.5px solid var(–line2);border-radius:8px;cursor:pointer;transition:all .15s;background:var(–surface)}
+.radio-lbl:hover{border-color:var(–accent);background:var(–accent-dim)}
+.radio-opt input:checked+.radio-lbl{border-color:var(–accent);background:var(–accent-dim)}
+.radio-lbl-title{font-size:.82rem;font-weight:600;color:var(–tx);margin-bottom:.15rem}
+.radio-lbl-sub{font-size:.72rem;color:var(–sub);font-weight:300}
+.radio-dot{width:16px;height:16px;border-radius:50%;border:2px solid var(–line2);flex-shrink:0;margin-top:.1rem;display:flex;align-items:center;justify-content:center;transition:all .15s}
+.radio-opt input:checked+.radio-lbl .radio-dot{border-color:var(–accent);background:var(–accent)}
+.radio-opt input:checked+.radio-lbl .radio-dot::after{content:’’;width:6px;height:6px;border-radius:50%;background:#fff}
 
 /* ── PROGRESS BARS ── */
-.prog-bar{height:6px;background:var(--line2);border-radius:3px;overflow:hidden;margin-top:.4rem}
+.prog-bar{height:6px;background:var(–line2);border-radius:3px;overflow:hidden;margin-top:.4rem}
 .prog-fill{height:100%;border-radius:3px;transition:width 1.2s cubic-bezier(.25,.46,.45,.94)}
 
 /* ── METRIC BARS ── */
 .mbar{display:flex;align-items:center;gap:.75rem;margin-bottom:.5rem}
-.mbar-label{font-size:.75rem;color:var(--sub);width:140px;flex-shrink:0;font-weight:400}
-.mbar-track{flex:1;height:4px;background:var(--line2);border-radius:2px;overflow:hidden}
+.mbar-label{font-size:.75rem;color:var(–sub);width:140px;flex-shrink:0;font-weight:400}
+.mbar-track{flex:1;height:4px;background:var(–line2);border-radius:2px;overflow:hidden}
 .mbar-fill{height:100%;border-radius:2px;transition:width 1.2s ease}
-.mbar-val{font-family:var(--mono);font-size:.65rem;color:var(--sub);width:36px;text-align:right}
+.mbar-val{font-family:var(–mono);font-size:.65rem;color:var(–sub);width:36px;text-align:right}
 
 /* ── TABS ── */
-.tab-row{display:flex;gap:.15rem;border-bottom:2px solid var(--line);margin-bottom:1.5rem}
-.tab-btn{background:none;border:none;padding:.6rem 1rem;font-family:var(--body);font-size:.8rem;font-weight:500;color:var(--sub);cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-2px;transition:all .15s}
-.tab-btn:hover{color:var(--tx)}
-.tab-btn.active{color:var(--accent-text);border-bottom-color:var(--accent);font-weight:600}
+.tab-row{display:flex;gap:.15rem;border-bottom:2px solid var(–line);margin-bottom:1.5rem}
+.tab-btn{background:none;border:none;padding:.6rem 1rem;font-family:var(–body);font-size:.8rem;font-weight:500;color:var(–sub);cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-2px;transition:all .15s}
+.tab-btn:hover{color:var(–tx)}
+.tab-btn.active{color:var(–accent-text);border-bottom-color:var(–accent);font-weight:600}
 .tab-panel{display:none}.tab-panel.active{display:block;animation:fadeIn .18s ease}
 
 /* ── DISPUTE CARD ── */
-.dispute-card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-lg);padding:1.35rem;margin-bottom:.85rem;box-shadow:var(--shadow);transition:box-shadow .15s}
-.dispute-card:hover{box-shadow:var(--shadow-md)}
+.dispute-card{background:var(–surface);border:1px solid var(–line);border-radius:var(–r-lg);padding:1.35rem;margin-bottom:.85rem;box-shadow:var(–shadow);transition:box-shadow .15s}
+.dispute-card:hover{box-shadow:var(–shadow-md)}
 .dc-header{display:flex;align-items:flex-start;justify-content:space-between;gap:1rem;margin-bottom:1rem}
-.dc-report-text{font-size:.82rem;color:var(--tx2);line-height:1.7;font-weight:300;background:var(--bg2);border-left:3px solid var(--line2);padding:.75rem 1rem;border-radius:0 6px 6px 0;margin-bottom:1rem;font-style:italic}
-.dc-meta{display:flex;gap:.75rem;flex-wrap:wrap;font-family:var(--mono);font-size:.62rem;color:var(--muted);margin-bottom:1rem}
+.dc-report-text{font-size:.82rem;color:var(–tx2);line-height:1.7;font-weight:300;background:var(–bg2);border-left:3px solid var(–line2);padding:.75rem 1rem;border-radius:0 6px 6px 0;margin-bottom:1rem;font-style:italic}
+.dc-meta{display:flex;gap:.75rem;flex-wrap:wrap;font-family:var(–mono);font-size:.62rem;color:var(–muted);margin-bottom:1rem}
 .dc-actions{display:flex;gap:.5rem;align-items:center}
-.dc-response{background:var(--green-bg);border:1px solid var(--green-b);border-radius:8px;padding:.75rem 1rem;font-size:.8rem;color:var(--green);margin-top:.75rem;font-weight:300;line-height:1.65}
+.dc-response{background:var(–green-bg);border:1px solid var(–green-b);border-radius:8px;padding:.75rem 1rem;font-size:.8rem;color:var(–green);margin-top:.75rem;font-weight:300;line-height:1.65}
 
 /* ── TIMELINE ── */
 .timeline{position:relative;padding-left:1.5rem}
-.timeline::before{content:'';position:absolute;left:5px;top:4px;bottom:4px;width:1.5px;background:var(--line2)}
+.timeline::before{content:’’;position:absolute;left:5px;top:4px;bottom:4px;width:1.5px;background:var(–line2)}
 .tl-item{position:relative;margin-bottom:1.1rem;padding-left:.75rem}
-.tl-item::before{content:'';position:absolute;left:-1.15rem;top:5px;width:8px;height:8px;border-radius:50%;border:2px solid var(--line2);background:var(--surface)}
-.tl-item.done::before{border-color:var(--green);background:var(--green)}
-.tl-item.active::before{border-color:var(--accent);background:var(--accent)}
-.tl-date{font-family:var(--mono);font-size:.58rem;color:var(--muted);margin-bottom:.2rem}
-.tl-text{font-size:.8rem;color:var(--tx2);font-weight:400}
+.tl-item::before{content:’’;position:absolute;left:-1.15rem;top:5px;width:8px;height:8px;border-radius:50%;border:2px solid var(–line2);background:var(–surface)}
+.tl-item.done::before{border-color:var(–green);background:var(–green)}
+.tl-item.active::before{border-color:var(–accent);background:var(–accent)}
+.tl-date{font-family:var(–mono);font-size:.58rem;color:var(–muted);margin-bottom:.2rem}
+.tl-text{font-size:.8rem;color:var(–tx2);font-weight:400}
 
 /* ── CHART MOCK ── */
 .chart-area{height:120px;display:flex;align-items:flex-end;gap:3px;padding:0 .25rem}
 .chart-bar{flex:1;border-radius:3px 3px 0 0;min-height:4px;transition:height .8s cubic-bezier(.25,.46,.45,.94);cursor:pointer;position:relative}
-.chart-bar:hover::after{content:attr(data-tip);position:absolute;bottom:calc(100% + 6px);left:50%;transform:translateX(-50%);background:var(--tx);color:var(--surface);font-family:var(--mono);font-size:.58rem;padding:.2rem .5rem;border-radius:4px;white-space:nowrap;pointer-events:none}
+.chart-bar:hover::after{content:attr(data-tip);position:absolute;bottom:calc(100% + 6px);left:50%;transform:translateX(-50%);background:var(–tx);color:var(–surface);font-family:var(–mono);font-size:.58rem;padding:.2rem .5rem;border-radius:4px;white-space:nowrap;pointer-events:none}
 .chart-labels{display:flex;gap:3px;padding:0 .25rem;margin-top:.35rem}
-.chart-label{flex:1;text-align:center;font-family:var(--mono);font-size:.55rem;color:var(--muted)}
+.chart-label{flex:1;text-align:center;font-family:var(–mono);font-size:.55rem;color:var(–muted)}
 
 /* ── NOTIFICATION DOT ── */
-.notif-dot{width:8px;height:8px;border-radius:50%;background:var(--red);position:absolute;top:0;right:0;border:2px solid var(--surface)}
+.notif-dot{width:8px;height:8px;border-radius:50%;background:var(–red);position:absolute;top:0;right:0;border:2px solid var(–surface)}
 
 /* ── MODAL ── */
 .modal-ov{display:none;position:fixed;inset:0;background:rgba(15,15,24,.5);backdrop-filter:blur(8px);z-index:1000;align-items:center;justify-content:center;padding:1.5rem}
 .modal-ov.open{display:flex;animation:fadeIn .18s ease}
-.modal{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-lg);width:100%;max-width:580px;max-height:88vh;overflow-y:auto;box-shadow:var(--shadow-lg);animation:fadeUp .2s ease}
-.modal-hdr{display:flex;align-items:center;justify-content:space-between;padding:1.25rem 1.5rem;border-bottom:1px solid var(--line);position:sticky;top:0;background:var(--surface);z-index:1}
-.modal-title{font-family:var(--display);font-size:1rem;font-weight:700;color:var(--tx);letter-spacing:-.02em}
-.modal-close{background:none;border:none;color:var(--muted);font-size:1.1rem;cursor:pointer;padding:.2rem;border-radius:5px;transition:all .15s}
-.modal-close:hover{background:var(--bg2);color:var(--tx)}
+.modal{background:var(–surface);border:1px solid var(–line);border-radius:var(–r-lg);width:100%;max-width:580px;max-height:88vh;overflow-y:auto;box-shadow:var(–shadow-lg);animation:fadeUp .2s ease}
+.modal-hdr{display:flex;align-items:center;justify-content:space-between;padding:1.25rem 1.5rem;border-bottom:1px solid var(–line);position:sticky;top:0;background:var(–surface);z-index:1}
+.modal-title{font-family:var(–display);font-size:1rem;font-weight:700;color:var(–tx);letter-spacing:-.02em}
+.modal-close{background:none;border:none;color:var(–muted);font-size:1.1rem;cursor:pointer;padding:.2rem;border-radius:5px;transition:all .15s}
+.modal-close:hover{background:var(–bg2);color:var(–tx)}
 .modal-body{padding:1.5rem}
-.modal-footer{padding:1rem 1.5rem;border-top:1px solid var(--line);display:flex;justify-content:flex-end;gap:.6rem;background:var(--raised)}
+.modal-footer{padding:1rem 1.5rem;border-top:1px solid var(–line);display:flex;justify-content:flex-end;gap:.6rem;background:var(–raised)}
 
 /* ── EMPTY STATE ── */
-.empty-state{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:4rem 2rem;text-align:center;color:var(--muted)}
+.empty-state{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:4rem 2rem;text-align:center;color:var(–muted)}
 .empty-icon{font-size:2.5rem;opacity:.4;margin-bottom:.75rem}
-.empty-title{font-family:var(--display);font-size:.95rem;font-weight:600;color:var(--sub);margin-bottom:.4rem}
+.empty-title{font-family:var(–display);font-size:.95rem;font-weight:600;color:var(–sub);margin-bottom:.4rem}
 .empty-sub{font-size:.8rem;font-weight:300;max-width:280px;line-height:1.65}
 
 /* ── LOGIN PAGE ── */
-.login-wrap{min-height:100vh;display:flex;align-items:center;justify-content:center;background:var(--bg);padding:2rem}
-.login-card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-lg);padding:2.5rem;width:100%;max-width:420px;box-shadow:var(--shadow-lg)}
+.login-wrap{min-height:100vh;display:flex;align-items:center;justify-content:center;background:var(–bg);padding:2rem}
+.login-card{background:var(–surface);border:1px solid var(–line);border-radius:var(–r-lg);padding:2.5rem;width:100%;max-width:420px;box-shadow:var(–shadow-lg)}
 .login-logo{display:flex;align-items:center;gap:.5rem;margin-bottom:2rem}
-.login-logo-text{font-family:var(--display);font-size:1.2rem;font-weight:800;color:var(--tx);letter-spacing:-.02em}
-.login-title{font-family:var(--display);font-size:1.4rem;font-weight:700;color:var(--tx);letter-spacing:-.025em;margin-bottom:.3rem}
-.login-sub{font-size:.85rem;color:var(--sub);font-weight:300;margin-bottom:2rem;line-height:1.65}
-.login-divider{display:flex;align-items:center;gap:.75rem;margin:1.25rem 0;font-size:.75rem;color:var(--muted)}
-.login-divider::before,.login-divider::after{content:'';flex:1;height:1px;background:var(--line)}
-.login-link{color:var(--accent);text-decoration:none;font-size:.82rem}
+.login-logo-text{font-family:var(–display);font-size:1.2rem;font-weight:800;color:var(–tx);letter-spacing:-.02em}
+.login-title{font-family:var(–display);font-size:1.4rem;font-weight:700;color:var(–tx);letter-spacing:-.025em;margin-bottom:.3rem}
+.login-sub{font-size:.85rem;color:var(–sub);font-weight:300;margin-bottom:2rem;line-height:1.65}
+.login-divider{display:flex;align-items:center;gap:.75rem;margin:1.25rem 0;font-size:.75rem;color:var(–muted)}
+.login-divider::before,.login-divider::after{content:’’;flex:1;height:1px;background:var(–line)}
+.login-link{color:var(–accent);text-decoration:none;font-size:.82rem}
 .login-link:hover{text-decoration:underline}
 
 /* ── TOAST ── */
 .toast-container{position:fixed;top:1.25rem;right:1.25rem;z-index:9999;display:flex;flex-direction:column;gap:.5rem}
-.toast{background:var(--tx);color:var(--surface);padding:.7rem 1.1rem;border-radius:9px;font-size:.8rem;font-weight:500;box-shadow:var(--shadow-lg);animation:slideIn .2s ease;display:flex;align-items:center;gap:.6rem;max-width:320px;transition:opacity .28s ease,transform .28s ease}
-.toast.success{background:var(--green)}.toast.error{background:var(--red)}.toast.info{background:var(--blue)}
+.toast{background:var(–tx);color:var(–surface);padding:.7rem 1.1rem;border-radius:9px;font-size:.8rem;font-weight:500;box-shadow:var(–shadow-lg);animation:slideIn .2s ease;display:flex;align-items:center;gap:.6rem;max-width:320px;transition:opacity .28s ease,transform .28s ease}
+.toast.success{background:var(–green)}.toast.error{background:var(–red)}.toast.info{background:var(–blue)}
 .toast-icon{font-size:.9rem;flex-shrink:0}
 
 /* ── LOADER ── */
-.spinner{width:18px;height:18px;border:1.5px solid var(--line2);border-top-color:var(--accent);border-radius:50%;animation:spin .6s linear infinite}
-.page-loader{display:flex;align-items:center;justify-content:center;padding:4rem;gap:.75rem;color:var(--muted);font-family:var(--mono);font-size:.75rem}
-.skel{background:linear-gradient(90deg,var(--bg2) 25%,var(--line) 50%,var(--bg2) 75%);background-size:200% 100%;animation:shimmer 1.5s infinite;border-radius:6px}
+.spinner{width:18px;height:18px;border:1.5px solid var(–line2);border-top-color:var(–accent);border-radius:50%;animation:spin .6s linear infinite}
+.page-loader{display:flex;align-items:center;justify-content:center;padding:4rem;gap:.75rem;color:var(–muted);font-family:var(–mono);font-size:.75rem}
+.skel{background:linear-gradient(90deg,var(–bg2) 25%,var(–line) 50%,var(–bg2) 75%);background-size:200% 100%;animation:shimmer 1.5s infinite;border-radius:6px}
 
 /* ── TOGGLE SWITCH — real, animated ── */
-.toggle-wrap{display:flex;align-items:center;justify-content:space-between;padding:.65rem 0;border-bottom:1px solid var(--line)}
+.toggle-wrap{display:flex;align-items:center;justify-content:space-between;padding:.65rem 0;border-bottom:1px solid var(–line)}
 .toggle-wrap:last-child{border-bottom:none}
-.toggle-label{font-size:.82rem;color:var(--tx2);line-height:1.4;flex:1;padding-right:1rem}
-.toggle-sublabel{font-size:.72rem;color:var(--muted);font-weight:300;display:block;margin-top:.1rem}
+.toggle-label{font-size:.82rem;color:var(–tx2);line-height:1.4;flex:1;padding-right:1rem}
+.toggle-sublabel{font-size:.72rem;color:var(–muted);font-weight:300;display:block;margin-top:.1rem}
 .toggle{position:relative;width:40px;height:22px;flex-shrink:0;cursor:pointer}
 .toggle input{opacity:0;width:0;height:0;position:absolute}
-.toggle-track{position:absolute;inset:0;border-radius:100px;background:var(--line2);transition:background .22s ease;border:1.5px solid var(--line2)}
-.toggle input:checked~.toggle-track{background:var(--accent);border-color:var(--accent)}
+.toggle-track{position:absolute;inset:0;border-radius:100px;background:var(–line2);transition:background .22s ease;border:1.5px solid var(–line2)}
+.toggle input:checked~.toggle-track{background:var(–accent);border-color:var(–accent)}
 .toggle-thumb{position:absolute;top:2px;left:2px;width:16px;height:16px;border-radius:50%;background:#fff;box-shadow:0 1px 4px rgba(0,0,0,.18);transition:transform .22s cubic-bezier(.4,0,.2,1)}
 .toggle input:checked~.toggle-thumb{transform:translateX(18px)}
-.toggle:focus-within .toggle-track{box-shadow:0 0 0 3px var(--accent-mid)}
+.toggle:focus-within .toggle-track{box-shadow:0 0 0 3px var(–accent-mid)}
 
 /* ── CHAR COUNTER ── */
-.char-counter{font-family:var(--mono);font-size:.6rem;color:var(--muted);text-align:right;margin-top:.28rem;transition:color .15s}
-.char-counter.warn{color:var(--amber)}.char-counter.danger{color:var(--red)}
+.char-counter{font-family:var(–mono);font-size:.6rem;color:var(–muted);text-align:right;margin-top:.28rem;transition:color .15s}
+.char-counter.warn{color:var(–amber)}.char-counter.danger{color:var(–red)}
 
 /* ── CONFIRM DIALOG ── */
-.confirm-dialog{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-lg);padding:1.5rem;max-width:360px;box-shadow:var(--shadow-lg);animation:fadeUp .18s ease}
-.confirm-title{font-family:var(--display);font-size:.95rem;font-weight:700;color:var(--tx);margin-bottom:.4rem}
-.confirm-body{font-size:.82rem;color:var(--sub);font-weight:300;line-height:1.65;margin-bottom:1.25rem}
+.confirm-dialog{background:var(–surface);border:1px solid var(–line);border-radius:var(–r-lg);padding:1.5rem;max-width:360px;box-shadow:var(–shadow-lg);animation:fadeUp .18s ease}
+.confirm-title{font-family:var(–display);font-size:.95rem;font-weight:700;color:var(–tx);margin-bottom:.4rem}
+.confirm-body{font-size:.82rem;color:var(–sub);font-weight:300;line-height:1.65;margin-bottom:1.25rem}
 .confirm-actions{display:flex;gap:.5rem;justify-content:flex-end}
 
 /* ── SKELETON LOADING ── */
 .skel-line{height:14px;border-radius:6px;margin-bottom:.5rem}
 .skel-line.sm{height:10px;width:60%}
 .skel-line.lg{height:20px}
-.skel-card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-lg);padding:1.35rem;margin-bottom:.75rem}
+.skel-card{background:var(–surface);border:1px solid var(–line);border-radius:var(–r-lg);padding:1.35rem;margin-bottom:.75rem}
 
 /* ── SEARCH BAR ── */
-.search-bar{display:flex;align-items:center;gap:.5rem;background:var(--surface);border:1.5px solid var(--line2);border-radius:8px;padding:.5rem .85rem;transition:border-color .15s}
-.search-bar:focus-within{border-color:var(--accent)}
-.search-bar input{background:none;border:none;outline:none;font-family:var(--body);font-size:.82rem;color:var(--tx);flex:1;caret-color:var(--accent)}
-.search-bar input::placeholder{color:var(--muted)}
-.search-icon{color:var(--muted);font-size:.85rem;flex-shrink:0}
+.search-bar{display:flex;align-items:center;gap:.5rem;background:var(–surface);border:1.5px solid var(–line2);border-radius:8px;padding:.5rem .85rem;transition:border-color .15s}
+.search-bar:focus-within{border-color:var(–accent)}
+.search-bar input{background:none;border:none;outline:none;font-family:var(–body);font-size:.82rem;color:var(–tx);flex:1;caret-color:var(–accent)}
+.search-bar input::placeholder{color:var(–muted)}
+.search-icon{color:var(–muted);font-size:.85rem;flex-shrink:0}
 
 /* ── PERIOD TABS ── */
-.period-tabs{display:flex;gap:.2rem;background:var(--bg2);border:1px solid var(--line);border-radius:8px;padding:.2rem}
-.period-tab{background:none;border:none;padding:.32rem .72rem;border-radius:6px;font-family:var(--mono);font-size:.7rem;color:var(--muted);cursor:pointer;transition:all .15s}
-.period-tab.active{background:var(--surface);color:var(--tx);box-shadow:var(--shadow)}
+.period-tabs{display:flex;gap:.2rem;background:var(–bg2);border:1px solid var(–line);border-radius:8px;padding:.2rem}
+.period-tab{background:none;border:none;padding:.32rem .72rem;border-radius:6px;font-family:var(–mono);font-size:.7rem;color:var(–muted);cursor:pointer;transition:all .15s}
+.period-tab.active{background:var(–surface);color:var(–tx);box-shadow:var(–shadow)}
 
 /* ── TOOLTIP ── */
 .tooltip-wrap{position:relative;display:inline-flex}
 .tooltip-wrap:hover .tooltip-box{opacity:1;transform:translateY(0);pointer-events:auto}
-.tooltip-box{position:absolute;bottom:calc(100% + 6px);left:50%;transform:translateX(-50%) translateY(4px);background:var(--tx);color:var(--surface);font-family:var(--mono);font-size:.65rem;padding:.4rem .7rem;border-radius:6px;white-space:nowrap;opacity:0;transition:all .15s;pointer-events:none;z-index:100;line-height:1.5}
-.tooltip-box::after{content:'';position:absolute;top:100%;left:50%;transform:translateX(-50%);border:4px solid transparent;border-top-color:var(--tx)}
+.tooltip-box{position:absolute;bottom:calc(100% + 6px);left:50%;transform:translateX(-50%) translateY(4px);background:var(–tx);color:var(–surface);font-family:var(–mono);font-size:.65rem;padding:.4rem .7rem;border-radius:6px;white-space:nowrap;opacity:0;transition:all .15s;pointer-events:none;z-index:100;line-height:1.5}
+.tooltip-box::after{content:’’;position:absolute;top:100%;left:50%;transform:translateX(-50%);border:4px solid transparent;border-top-color:var(–tx)}
 
 /* ── PREVIEW BOX ── */
-.preview-box{background:var(--bg2);border:1px solid var(--line2);border-radius:8px;padding:1rem;font-size:.8rem;color:var(--tx2);line-height:1.7;font-weight:300;border-left:3px solid var(--accent)}
-.preview-label{font-family:var(--mono);font-size:.58rem;text-transform:uppercase;letter-spacing:.09em;color:var(--muted);margin-bottom:.5rem}
+.preview-box{background:var(–bg2);border:1px solid var(–line2);border-radius:8px;padding:1rem;font-size:.8rem;color:var(–tx2);line-height:1.7;font-weight:300;border-left:3px solid var(–accent)}
+.preview-label{font-family:var(–mono);font-size:.58rem;text-transform:uppercase;letter-spacing:.09em;color:var(–muted);margin-bottom:.5rem}
 
 /* ── UNSAVED BANNER ── */
-.unsaved-banner{display:none;position:sticky;top:58px;z-index:50;background:var(--amber-bg);border-bottom:1px solid var(--amber-b);padding:.6rem 1.5rem;display:none;align-items:center;justify-content:space-between;font-size:.8rem;color:var(--amber)}
+.unsaved-banner{display:none;position:sticky;top:58px;z-index:50;background:var(–amber-bg);border-bottom:1px solid var(–amber-b);padding:.6rem 1.5rem;display:none;align-items:center;justify-content:space-between;font-size:.8rem;color:var(–amber)}
 .unsaved-banner.show{display:flex}
 
 /* ── INVITE MODAL ── */
 .role-selector{display:grid;grid-template-columns:repeat(3,1fr);gap:.4rem;margin-bottom:1rem}
 
 /* Bottom nav for mobile */
-.mobile-nav{display:none;position:fixed;bottom:0;left:0;right:0;z-index:300;background:var(--surface);border-top:1px solid var(--line);padding:.5rem .5rem calc(.5rem + env(safe-area-inset-bottom));justify-content:space-around;align-items:center}
+.mobile-nav{display:none;position:fixed;bottom:0;left:0;right:0;z-index:300;background:var(–surface);border-top:1px solid var(–line);padding:.5rem .5rem calc(.5rem + env(safe-area-inset-bottom));justify-content:space-around;align-items:center}
 .mob-nav-btn{display:flex;flex-direction:column;align-items:center;gap:.18rem;background:none;border:none;cursor:pointer;padding:.3rem .6rem;border-radius:8px;transition:all .15s;min-width:52px}
 .mob-nav-icon{font-size:1.15rem;line-height:1}
-.mob-nav-lbl{font-family:var(--mono);font-size:.5rem;text-transform:uppercase;letter-spacing:.06em;color:var(--muted)}
-.mob-nav-btn.active .mob-nav-lbl{color:var(--accent-text)}
+.mob-nav-lbl{font-family:var(–mono);font-size:.5rem;text-transform:uppercase;letter-spacing:.06em;color:var(–muted)}
+.mob-nav-btn.active .mob-nav-lbl{color:var(–accent-text)}
 .mob-nav-btn.active .mob-nav-icon{transform:scale(1.1)}
-.mob-nav-badge{position:absolute;top:0;right:0;width:14px;height:14px;border-radius:50%;background:var(--red);color:#fff;font-size:.5rem;font-weight:700;display:flex;align-items:center;justify-content:center;border:2px solid var(--surface)}
+.mob-nav-badge{position:absolute;top:0;right:0;width:14px;height:14px;border-radius:50%;background:var(–red);color:#fff;font-size:.5rem;font-weight:700;display:flex;align-items:center;justify-content:center;border:2px solid var(–surface)}
 
 /* Mobile overlay when sidebar open */
 .sidebar-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:199;backdrop-filter:blur(2px)}
 .sidebar-overlay.open{display:block}
 
 /* Hamburger */
-.hamburger{display:none;background:none;border:none;cursor:pointer;padding:.4rem;border-radius:7px;color:var(--tx2);font-size:1.1rem;transition:background .15s}
-.hamburger:hover{background:var(--bg2)}
+.hamburger{display:none;background:none;border:none;cursor:pointer;padding:.4rem;border-radius:7px;color:var(–tx2);font-size:1.1rem;transition:background .15s}
+.hamburger:hover{background:var(–bg2)}
 
 /* Responsive grid helpers */
 .grid-dash{display:grid;grid-template-columns:1fr 300px;gap:1.25rem;margin-bottom:1.25rem}
@@ -384,82 +385,85 @@ body{background:var(--bg);color:var(--tx);font-family:var(--body);font-size:15px
 .table-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch}
 
 @media(max-width:1100px){
-  .grid-dash{grid-template-columns:1fr}
-  .grid-score-top{grid-template-columns:1fr}
-  .sidebar{width:220px}
-  .main{margin-left:220px}
+.grid-dash{grid-template-columns:1fr}
+.grid-score-top{grid-template-columns:1fr}
+.sidebar{width:220px}
+.main{margin-left:220px}
 }
 
 @media(max-width:900px){
-  .grid-2col{grid-template-columns:1fr}
-  .stat-grid{grid-template-columns:repeat(2,1fr)}
-  .form-row{grid-template-columns:1fr}
+.grid-2col{grid-template-columns:1fr}
+.stat-grid{grid-template-columns:repeat(2,1fr)}
+.form-row{grid-template-columns:1fr}
 }
 
 @media(max-width:768px){
-  /* Layout */
-  .app-shell{grid-template-columns:1fr}
-  .sidebar{transform:translateX(-100%);width:260px;z-index:200}
-  .sidebar.open{transform:translateX(0);box-shadow:var(--shadow-lg)}
-  .main{margin-left:0;padding-bottom:72px}
-  .content{padding:1rem}
+/* Layout */
+.app-shell{grid-template-columns:1fr}
+.sidebar{transform:translateX(-100%);width:260px;z-index:200}
+.sidebar.open{transform:translateX(0);box-shadow:var(–shadow-lg)}
+.main{margin-left:0;padding-bottom:72px}
+.content{padding:1rem}
 
-  /* Show mobile elements */
-  .mobile-nav{display:flex}
-  .hamburger{display:flex}
+/* Show mobile elements */
+.mobile-nav{display:flex}
+.hamburger{display:flex}
 
-  /* Hide desktop sidebar nav from topbar, show hamburger */
-  .topbar{padding:.75rem 1rem}
+/* Hide desktop sidebar nav from topbar, show hamburger */
+.topbar{padding:.75rem 1rem}
 
-  /* Stats */
-  .stat-grid{grid-template-columns:1fr 1fr;gap:.65rem}
+/* Stats */
+.stat-grid{grid-template-columns:1fr 1fr;gap:.65rem}
 
-  /* Tables */
-  .tbl thead{display:none}
-  .tbl tr{display:block;border-bottom:1px solid var(--line);padding:.5rem 0}
-  .tbl td{display:flex;justify-content:space-between;align-items:center;padding:.4rem 1rem;border:none;font-size:.8rem}
-  .tbl td::before{content:attr(data-label);font-family:var(--mono);font-size:.6rem;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);flex-shrink:0;margin-right:1rem}
+/* Tables */
+.tbl thead{display:none}
+.tbl tr{display:block;border-bottom:1px solid var(–line);padding:.5rem 0}
+.tbl td{display:flex;justify-content:space-between;align-items:center;padding:.4rem 1rem;border:none;font-size:.8rem}
+.tbl td::before{content:attr(data-label);font-family:var(–mono);font-size:.6rem;text-transform:uppercase;letter-spacing:.08em;color:var(–muted);flex-shrink:0;margin-right:1rem}
 
-  /* Score hero in dashboard */
-  .score-hero-wrap{flex-direction:column;text-align:center}
-  .score-hero-wrap .score-hero{margin:0 auto .75rem}
-  .score-hero-wrap p{text-align:center}
-  .score-hero-wrap .btn-row{justify-content:center}
+/* Score hero in dashboard */
+.score-hero-wrap{flex-direction:column;text-align:center}
+.score-hero-wrap .score-hero{margin:0 auto .75rem}
+.score-hero-wrap p{text-align:center}
+.score-hero-wrap .btn-row{justify-content:center}
 
-  /* Dispute cards */
-  .dc-header{flex-direction:column;gap:.5rem}
-  .dc-actions{flex-wrap:wrap}
+/* Dispute cards */
+.dc-header{flex-direction:column;gap:.5rem}
+.dc-actions{flex-wrap:wrap}
 
-  /* Charts shrink */
-  .chart-area{height:80px}
+/* Charts shrink */
+.chart-area{height:80px}
 
-  /* Modal full screen on mobile */
-  .modal-ov{padding:.5rem}
-  .modal{max-height:95vh;border-radius:14px 14px 0 0;position:fixed;bottom:0;left:0;right:0;max-width:100%}
+/* Modal full screen on mobile */
+.modal-ov{padding:.5rem}
+.modal{max-height:95vh;border-radius:14px 14px 0 0;position:fixed;bottom:0;left:0;right:0;max-width:100%}
 
-  /* Analytics benchmark row */
-  .bench-row{grid-template-columns:1fr}
+/* Analytics benchmark row */
+.bench-row{grid-template-columns:1fr}
 }
 
 @media(max-width:480px){
-  .stat-grid{grid-template-columns:1fr}
-  .topbar-title{font-size:.9rem}
-  .content{padding:.75rem}
-  .stat-card{padding:1rem}
-  .stat-value{font-size:1.5rem}
+.stat-grid{grid-template-columns:1fr}
+.topbar-title{font-size:.9rem}
+.content{padding:.75rem}
+.stat-card{padding:1rem}
+.stat-value{font-size:1.5rem}
 }
 </style>
+
 </head>
 <body>
 
 <!-- ══════════════════════════════════════════
      TOAST CONTAINER
 ══════════════════════════════════════════ -->
+
 <div class="toast-container" id="toastContainer"></div>
 
 <!-- ══════════════════════════════════════════
      LOGIN SCREEN
 ══════════════════════════════════════════ -->
+
 <div id="loginScreen">
   <div class="login-wrap">
     <div class="login-card">
@@ -471,40 +475,45 @@ body{background:var(--bg);color:var(--tx);font-family:var(--body);font-size:15px
       <div class="login-title">Sign in to your dashboard</div>
       <p class="login-sub">Manage your transparency score, dispute reports, and connect with top candidates who already trust you.</p>
 
-      <div class="form-group">
-        <label class="label">Work email</label>
-        <input class="input" id="loginEmail" type="email" placeholder="you@company.com"/>
-      </div>
-      <div class="form-group">
-        <label class="label">Password</label>
-        <input class="input" id="loginPass" type="password" placeholder="••••••••"/>
-      </div>
+```
+  <div class="form-group">
+    <label class="label">Work email</label>
+    <input class="input" id="loginEmail" type="email" placeholder="you@company.com"/>
+  </div>
+  <div class="form-group">
+    <label class="label">Password</label>
+    <input class="input" id="loginPass" type="password" placeholder="••••••••"/>
+  </div>
 
-      <button class="btn btn-primary btn-lg" style="width:100%;justify-content:center;margin-top:.25rem" onclick="doLogin()">Sign in →</button>
+  <button class="btn btn-primary btn-lg" style="width:100%;justify-content:center;margin-top:.25rem" onclick="doLogin()">Sign in →</button>
 
-      <div class="login-divider">or</div>
+  <div class="login-divider">or</div>
 
-      <button class="btn btn-secondary btn-lg" style="width:100%;justify-content:center" onclick="doLogin()">
-        <span>🏢</span> Continue with Google Workspace
-      </button>
+  <button class="btn btn-secondary btn-lg" style="width:100%;justify-content:center" onclick="doLogin()">
+    <span>🏢</span> Continue with Google Workspace
+  </button>
 
-      <div style="text-align:center;margin-top:1.5rem;font-size:.8rem;color:var(--sub)">
-        Don't have an account? <a href="#" class="login-link" onclick="doLogin()">Claim your company →</a>
-      </div>
+  <div style="text-align:center;margin-top:1.5rem;font-size:.8rem;color:var(--sub)">
+    Don't have an account? <a href="#" class="login-link" onclick="doLogin()">Claim your company →</a>
+  </div>
 
-      <div style="margin-top:1.5rem;padding:.85rem 1rem;background:var(--bg2);border-radius:8px;font-size:.75rem;color:var(--sub);text-align:center;line-height:1.65">
-        <strong style="color:var(--tx)">Demo mode:</strong> Click sign in to explore the employer dashboard with sample data.
-      </div>
-    </div>
+  <div style="margin-top:1.5rem;padding:.85rem 1rem;background:var(--bg2);border-radius:8px;font-size:.75rem;color:var(--sub);text-align:center;line-height:1.65">
+    <strong style="color:var(--tx)">Demo mode:</strong> Click sign in to explore the employer dashboard with sample data.
+  </div>
+</div>
+```
+
   </div>
 </div>
 
 <!-- ══════════════════════════════════════════
      APP SHELL (shown after login)
 ══════════════════════════════════════════ -->
+
 <div id="appShell" class="app-shell" style="display:none">
 
   <!-- SIDEBAR -->
+
   <aside class="sidebar" id="sidebar">
     <div class="sidebar-logo">
       <div class="sidebar-logo-mark">
@@ -514,37 +523,41 @@ body{background:var(--bg);color:var(--tx);font-family:var(--body);font-size:15px
       <span class="sidebar-logo-badge">Employer</span>
     </div>
 
-    <div class="sidebar-company">
-      <div class="sc-label">Current company</div>
-      <div class="sc-name" id="sidebarCoName">Acme Corp</div>
-      <div class="sc-score">
-        <span class="sc-score-n" id="sidebarScore" style="color:var(--score-safe)">74</span>
-        <div class="sc-score-bar"><div class="sc-score-fill" id="sidebarScoreFill" style="width:74%;background:var(--score-safe)"></div></div>
-        <span style="font-family:var(--mono);font-size:.55rem;color:var(--muted)">/ 100</span>
-      </div>
-    </div>
+```
+<div class="sidebar-company">
+  <div class="sc-label">Current company</div>
+  <div class="sc-name" id="sidebarCoName">Acme Corp</div>
+  <div class="sc-score">
+    <span class="sc-score-n" id="sidebarScore" style="color:var(--score-safe)">74</span>
+    <div class="sc-score-bar"><div class="sc-score-fill" id="sidebarScoreFill" style="width:74%;background:var(--score-safe)"></div></div>
+    <span style="font-family:var(--mono);font-size:.55rem;color:var(--muted)">/ 100</span>
+  </div>
+</div>
 
-    <div class="nav-section">Main</div>
-    <button class="nav-item active" onclick="showView('dashboard')" id="nav-dashboard"><span class="nav-item-icon">📊</span>Dashboard</button>
-    <button class="nav-item" onclick="showView('reports')" id="nav-reports"><span class="nav-item-icon">📋</span>Applicant Reports <span class="nav-badge" id="disputeCount">3</span></button>
-    <button class="nav-item" onclick="showView('disputes')" id="nav-disputes"><span class="nav-item-icon">⚖️</span>Disputes <span class="nav-badge" id="openDisputeCount">2</span></button>
-    <button class="nav-item" onclick="showView('listings')" id="nav-listings"><span class="nav-item-icon">📝</span>Listings</button>
-    <button class="nav-item" onclick="showView('analytics')" id="nav-analytics"><span class="nav-item-icon">📈</span>Analytics</button>
+<div class="nav-section">Main</div>
+<button class="nav-item active" onclick="showView('dashboard')" id="nav-dashboard"><span class="nav-item-icon">📊</span>Dashboard</button>
+<button class="nav-item" onclick="showView('reports')" id="nav-reports"><span class="nav-item-icon">📋</span>Applicant Reports <span class="nav-badge" id="disputeCount">3</span></button>
+<button class="nav-item" onclick="showView('disputes')" id="nav-disputes"><span class="nav-item-icon">⚖️</span>Disputes <span class="nav-badge" id="openDisputeCount">2</span></button>
+<button class="nav-item" onclick="showView('listings')" id="nav-listings"><span class="nav-item-icon">📝</span>Listings</button>
+<button class="nav-item" onclick="showView('analytics')" id="nav-analytics"><span class="nav-item-icon">📈</span>Analytics</button>
 
-    <div class="nav-section">Account</div>
-    <button class="nav-item" onclick="showView('settings')" id="nav-settings"><span class="nav-item-icon">⚙️</span>Settings</button>
-    <button class="nav-item" onclick="showView('team')" id="nav-team"><span class="nav-item-icon">👥</span>Team</button>
+<div class="nav-section">Account</div>
+<button class="nav-item" onclick="showView('settings')" id="nav-settings"><span class="nav-item-icon">⚙️</span>Settings</button>
+<button class="nav-item" onclick="showView('team')" id="nav-team"><span class="nav-item-icon">👥</span>Team</button>
 
-    <div class="sidebar-footer">
-      <div class="sf-plan">
-        <span class="sf-plan-name">✓ Verified · Pro plan</span>
-        <span class="sf-plan-cta" onclick="showView('settings')">Manage</span>
-      </div>
-      <button class="nav-item" onclick="doLogout()" style="color:var(--muted)"><span class="nav-item-icon">←</span>Sign out</button>
-    </div>
+<div class="sidebar-footer">
+  <div class="sf-plan">
+    <span class="sf-plan-name">✓ Verified · Pro plan</span>
+    <span class="sf-plan-cta" onclick="showView('settings')">Manage</span>
+  </div>
+  <button class="nav-item" onclick="doLogout()" style="color:var(--muted)"><span class="nav-item-icon">←</span>Sign out</button>
+</div>
+```
+
   </aside>
 
   <!-- MAIN -->
+
   <main class="main">
     <div class="topbar">
       <div style="display:flex;align-items:center;gap:.75rem">
@@ -555,36 +568,41 @@ body{background:var(--bg);color:var(--tx);font-family:var(--body);font-size:15px
         <div style="position:relative">
           <button class="btn btn-ghost btn-icon" onclick="toggleEmployerNotifs()" id="empNotifBell" style="position:relative">🔔<span id="empNotifBadge" style="display:none;position:absolute;top:-2px;right:-2px;background:#ef4444;color:#fff;border-radius:50%;width:16px;height:16px;font-size:.6rem;display:none;align-items:center;justify-content:center;font-weight:700"></span></button>
 
-          <!-- Employer Notifications Panel -->
-          <div id="empNotifPanel" style="display:none;position:fixed;top:56px;right:1rem;width:380px;max-height:520px;background:#fff;border:1px solid #e8e8f0;border-radius:14px;box-shadow:0 16px 48px rgba(0,0,0,.15);z-index:1000;overflow:hidden">
-            <div style="display:flex;align-items:center;justify-content:space-between;padding:.85rem 1rem;border-bottom:1px solid #f0f0f8">
-              <div style="font-size:.88rem;font-weight:700;color:#0f0f18">Notifications</div>
-              <div style="display:flex;gap:.5rem">
-                <button onclick="markAllEmpNotifsRead()" style="background:none;border:none;font-family:monospace;font-size:.62rem;color:#9898b0;cursor:pointer">Mark all read</button>
-                <button onclick="toggleEmployerNotifs()" style="background:none;border:none;color:#9898b0;cursor:pointer">✕</button>
-              </div>
-            </div>
-            <div id="empNotifList" style="overflow-y:auto;max-height:450px"></div>
+```
+      <!-- Employer Notifications Panel -->
+      <div id="empNotifPanel" style="display:none;position:fixed;top:56px;right:1rem;width:380px;max-height:520px;background:#fff;border:1px solid #e8e8f0;border-radius:14px;box-shadow:0 16px 48px rgba(0,0,0,.15);z-index:1000;overflow:hidden">
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:.85rem 1rem;border-bottom:1px solid #f0f0f8">
+          <div style="font-size:.88rem;font-weight:700;color:#0f0f18">Notifications</div>
+          <div style="display:flex;gap:.5rem">
+            <button onclick="markAllEmpNotifsRead()" style="background:none;border:none;font-family:monospace;font-size:.62rem;color:#9898b0;cursor:pointer">Mark all read</button>
+            <button onclick="toggleEmployerNotifs()" style="background:none;border:none;color:#9898b0;cursor:pointer">✕</button>
           </div>
-          <span class="notif-dot" id="notifDot"></span>
         </div>
-        <div style="display:flex;align-items:center;gap:.5rem;padding:.35rem .75rem;background:var(--bg2);border:1px solid var(--line);border-radius:8px;cursor:pointer" onclick="showView('settings')">
-          <div style="width:24px;height:24px;border-radius:50%;background:var(--accent-dim);border:1px solid var(--accent-mid);display:flex;align-items:center;justify-content:center;font-size:.65rem;font-weight:700;color:var(--accent-text)">AC</div>
-          <span style="font-size:.78rem;font-weight:500;color:var(--tx2);display:none" class="show-desktop">Acme Corp</span>
-          <span style="font-size:.6rem;color:var(--muted);display:none" class="show-desktop">▾</span>
-        </div>
+        <div id="empNotifList" style="overflow-y:auto;max-height:450px"></div>
       </div>
+      <span class="notif-dot" id="notifDot"></span>
     </div>
+    <div style="display:flex;align-items:center;gap:.5rem;padding:.35rem .75rem;background:var(--bg2);border:1px solid var(--line);border-radius:8px;cursor:pointer" onclick="showView('settings')">
+      <div style="width:24px;height:24px;border-radius:50%;background:var(--accent-dim);border:1px solid var(--accent-mid);display:flex;align-items:center;justify-content:center;font-size:.65rem;font-weight:700;color:var(--accent-text)">AC</div>
+      <span style="font-size:.78rem;font-weight:500;color:var(--tx2);display:none" class="show-desktop">Acme Corp</span>
+      <span style="font-size:.6rem;color:var(--muted);display:none" class="show-desktop">▾</span>
+    </div>
+  </div>
+</div>
 
-    <div class="content" id="mainContent">
-      <!-- Views rendered here by JS -->
-    </div>
+<div class="content" id="mainContent">
+  <!-- Views rendered here by JS -->
+</div>
+```
+
   </main>
 
   <!-- SIDEBAR OVERLAY (mobile) -->
+
   <div class="sidebar-overlay" id="sidebarOverlay" onclick="closeSidebar()"></div>
 
   <!-- MOBILE BOTTOM NAV -->
+
   <nav class="mobile-nav">
     <button class="mob-nav-btn active" id="mob-dashboard" onclick="showView('dashboard');setMobActive('dashboard')">
       <span class="mob-nav-icon">📊</span>
@@ -614,6 +632,7 @@ body{background:var(--bg);color:var(--tx);font-family:var(--body);font-size:15px
 <!-- ══════════════════════════════════════════
      DISPUTE MODAL
 ══════════════════════════════════════════ -->
+
 <div class="modal-ov" id="disputeModal" onclick="closeDisputeModal(event)">
   <div class="modal">
     <div class="modal-hdr">
@@ -628,6 +647,7 @@ body{background:var(--bg);color:var(--tx);font-family:var(--body);font-size:15px
 <!-- ══════════════════════════════════════════
      ADD LISTING MODAL
 ══════════════════════════════════════════ -->
+
 <div class="modal-ov" id="listingModal" onclick="closeListingModal(event)">
   <div class="modal">
     <div class="modal-hdr">
@@ -1685,654 +1705,616 @@ async function renderSettings() {
         <div class="form-group">
           <label class="label">Company description <span style="color:var(--muted)">(shown on your employer page)</span></label>
           <textarea class="textarea" id="settDesc" maxlength="300" oninput="updateCharCount('settDesc','settDescCount',300);markUnsaved()" placeholder="Tell applicants what makes your company a great place to work..." style="min-height:80px"></textarea>
-          <div class="char-counter" id="settDescCount">0 / 300</div>
-        </div>
-        <div style="display:flex;justify-content:flex-end;margin-top:.5rem">
-          <button class="btn btn-primary btn-sm" onclick="saveProfile()">Save changes</button>
+
+```
+      <div class="char-counter" id="settDescCount">0 / 300</div>
+    </div>
+    <div style="display:flex;justify-content:flex-end;margin-top:.5rem">
+      <button class="btn btn-primary btn-sm" onclick="saveProfile()">Save changes</button>
+    </div>
+  </div>
+
+  <!-- VERIFIED STATUS -->
+  <div class="card" style="margin-bottom:1rem">
+    <div class="card-title" style="margin-bottom:.25rem">Verified status</div>
+    <div class="card-sub" style="margin-bottom:1rem">Your current plan and verification status</div>
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:1rem;background:var(--green-bg);border:1px solid var(--green-b);border-radius:8px;flex-wrap:wrap;gap:.75rem">
+      <div style="display:flex;align-items:center;gap:.75rem">
+        <div style="font-size:1.4rem">✅</div>
+        <div>
+          <div style="font-family:var(--display);font-weight:600;color:var(--green);margin-bottom:.15rem">Verified Employer · Pro Plan</div>
+          <div style="font-size:.75rem;color:var(--green);opacity:.75">$149/month · Next billing May 15, 2025 · 3 active listings</div>
         </div>
       </div>
-
-      <!-- VERIFIED STATUS -->
-      <div class="card" style="margin-bottom:1rem">
-        <div class="card-title" style="margin-bottom:.25rem">Verified status</div>
-        <div class="card-sub" style="margin-bottom:1rem">Your current plan and verification status</div>
-        <div style="display:flex;align-items:center;justify-content:space-between;padding:1rem;background:var(--green-bg);border:1px solid var(--green-b);border-radius:8px;flex-wrap:wrap;gap:.75rem">
-          <div style="display:flex;align-items:center;gap:.75rem">
-            <div style="font-size:1.4rem">✅</div>
-            <div>
-              <div style="font-family:var(--display);font-weight:600;color:var(--green);margin-bottom:.15rem">Verified Employer · Pro Plan</div>
-              <div style="font-size:.75rem;color:var(--green);opacity:.75">$149/month · Next billing May 15, 2025 · 3 active listings</div>
-            </div>
-          </div>
-          <div style="display:flex;gap:.4rem;flex-wrap:wrap">
-            <button class="btn btn-success btn-sm" onclick="showToastMsg('Redirecting to billing portal...')">Manage plan</button>
-            <button class="btn btn-ghost btn-sm" onclick="showToastMsg('Invoice sent to your email')">Download invoice</button>
-          </div>
-        </div>
-        <div style="margin-top:.85rem;padding:.75rem 1rem;background:var(--bg2);border-radius:8px">
-          <div style="font-family:var(--mono);font-size:.6rem;text-transform:uppercase;letter-spacing:.09em;color:var(--muted);margin-bottom:.6rem">Verified commitment</div>
-          ${['Respond to all applicants within 30 days','Keep job listings accurate and up-to-date','Close listings when roles are filled','Provide feedback when possible','No unpaid work without compensation'].map((c,i) => `
-            <div style="display:flex;align-items:center;gap:.5rem;font-size:.78rem;color:var(--tx2);padding:.3rem 0">
-              <span style="color:var(--green);font-size:.75rem">✓</span>${c}
-            </div>`).join('')}
-        </div>
+      <div style="display:flex;gap:.4rem;flex-wrap:wrap">
+        <button class="btn btn-success btn-sm" onclick="showToastMsg('Redirecting to billing portal...')">Manage plan</button>
+        <button class="btn btn-ghost btn-sm" onclick="showToastMsg('Invoice sent to your email')">Download invoice</button>
       </div>
+    </div>
+    <div style="margin-top:.85rem;padding:.75rem 1rem;background:var(--bg2);border-radius:8px">
+      <div style="font-family:var(--mono);font-size:.6rem;text-transform:uppercase;letter-spacing:.09em;color:var(--muted);margin-bottom:.6rem">Verified commitment</div>
+      ${['Respond to all applicants within 30 days','Keep job listings accurate and up-to-date','Close listings when roles are filled','Provide feedback when possible','No unpaid work without compensation'].map((c,i) => `
+        <div style="display:flex;align-items:center;gap:.5rem;font-size:.78rem;color:var(--tx2);padding:.3rem 0">
+          <span style="color:var(--green);font-size:.75rem">✓</span>${c}
+        </div>`).join('')}
+    </div>
+  </div>
 
-      <!-- NOTIFICATIONS — real toggles -->
-      <div class="card" style="margin-bottom:1rem">
-        <div class="card-title" style="margin-bottom:.25rem">Notification preferences</div>
-        <div class="card-sub" style="margin-bottom:1rem">Choose when you want to be alerted</div>
-        ${notifs.map(n => `
-          <div class="toggle-wrap">
-            <div class="toggle-label">
-              ${n.label}
-              <span class="toggle-sublabel">${n.sub}</span>
-            </div>
-            <label class="toggle" aria-label="${n.label}">
-              <input type="checkbox" id="${n.id}" ${n.checked ? 'checked' : ''} onchange="showToastMsg('Preference saved','success')"/>
-              <div class="toggle-track"></div>
-              <div class="toggle-thumb"></div>
-            </label>
-          </div>`).join('')}
+  <!-- NOTIFICATIONS — real toggles -->
+  <div class="card" style="margin-bottom:1rem">
+    <div class="card-title" style="margin-bottom:.25rem">Notification preferences</div>
+    <div class="card-sub" style="margin-bottom:1rem">Choose when you want to be alerted</div>
+    ${notifs.map(n => `
+      <div class="toggle-wrap">
+        <div class="toggle-label">
+          ${n.label}
+          <span class="toggle-sublabel">${n.sub}</span>
+        </div>
+        <label class="toggle" aria-label="${n.label}">
+          <input type="checkbox" id="${n.id}" ${n.checked ? 'checked' : ''} onchange="showToastMsg('Preference saved','success')"/>
+          <div class="toggle-track"></div>
+          <div class="toggle-thumb"></div>
+        </label>
+      </div>`).join('')}
+  </div>
+
+  <!-- EMAIL SETTINGS -->
+  <div class="card" style="margin-bottom:1rem">
+    <div class="card-title" style="margin-bottom:1rem;padding-bottom:.75rem;border-bottom:1px solid var(--line)">Email & security</div>
+    <div class="form-row">
+      <div class="form-group"><label class="label">Account email</label><input class="input" value="admin@acmecorp.com" oninput="markUnsaved()"/></div>
+      <div class="form-group"><label class="label">Billing email</label><input class="input" value="billing@acmecorp.com" oninput="markUnsaved()"/></div>
+    </div>
+    <div class="form-group">
+      <label class="label">Two-factor authentication</label>
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:.65rem 1rem;background:var(--bg2);border:1px solid var(--line);border-radius:8px">
+        <div>
+          <div style="font-size:.82rem;font-weight:500;color:var(--tx)">2FA not enabled</div>
+          <div style="font-size:.72rem;color:var(--muted)">Protect your account with an authenticator app</div>
+        </div>
+        <button class="btn btn-primary btn-sm" onclick="showToastMsg('2FA setup — coming soon')">Enable 2FA</button>
       </div>
+    </div>
 
-      <!-- EMAIL SETTINGS -->
-      <div class="card" style="margin-bottom:1rem">
-        <div class="card-title" style="margin-bottom:1rem;padding-bottom:.75rem;border-bottom:1px solid var(--line)">Email & security</div>
-        <div class="form-row">
-          <div class="form-group"><label class="label">Account email</label><input class="input" value="admin@acmecorp.com" oninput="markUnsaved()"/></div>
-          <div class="form-group"><label class="label">Billing email</label><input class="input" value="billing@acmecorp.com" oninput="markUnsaved()"/></div>
-        </div>
-        <div class="form-group">
-          <label class="label">Two-factor authentication</label>
-          <div style="display:flex;align-items:center;justify-content:space-between;padding:.65rem 1rem;background:var(--bg2);border:1px solid var(--line);border-radius:8px">
-            <div>
-              <div style="font-size:.82rem;font-weight:500;color:var(--tx)">2FA not enabled</div>
-              <div style="font-size:.72rem;color:var(--muted)">Protect your account with an authenticator app</div>
-            </div>
-            <button class="btn btn-primary btn-sm" onclick="showToastMsg('2FA setup — coming soon')">Enable 2FA</button>
+    <!-- PASSWORD RESET — real, code-based -->
+    <div class="form-group">
+      <label class="label">Password</label>
+      <div style="background:var(--bg2);border:1px solid var(--line);border-radius:8px;padding:1rem" id="passwordResetSection">
+        <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.5rem">
+          <div>
+            <div style="font-size:.82rem;font-weight:500;color:var(--tx)">Change your password</div>
+            <div style="font-size:.72rem;color:var(--muted)">We'll send a verification code to your email on file</div>
           </div>
+          <button class="btn btn-secondary btn-sm" onclick="initiatePasswordReset()">Send reset code</button>
         </div>
-
-        <!-- PASSWORD RESET — real, code-based -->
-        <div class="form-group">
-          <label class="label">Password</label>
-          <div style="background:var(--bg2);border:1px solid var(--line);border-radius:8px;padding:1rem" id="passwordResetSection">
-            <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.5rem">
-              <div>
-                <div style="font-size:.82rem;font-weight:500;color:var(--tx)">Change your password</div>
-                <div style="font-size:.72rem;color:var(--muted)">We'll send a verification code to your email on file</div>
-              </div>
-              <button class="btn btn-secondary btn-sm" onclick="initiatePasswordReset()">Send reset code</button>
+        <!-- Code entry — hidden until code sent -->
+        <div id="passwordCodeEntry" style="display:none;margin-top:1rem;border-top:1px solid var(--line);padding-top:1rem">
+          <div style="font-family:var(--mono);font-size:.65rem;color:var(--accent-text);margin-bottom:.75rem">✓ Code sent to your email. Enter it below with your new password.</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:.65rem;margin-bottom:.65rem">
+            <div class="form-group" style="margin:0">
+              <label class="label">8-digit code</label>
+              <input class="input" id="resetCode" type="text" maxlength="8" placeholder="12345678" style="font-family:var(--mono);font-size:1.1rem;letter-spacing:.15em;text-align:center"/>
             </div>
-            <!-- Code entry — hidden until code sent -->
-            <div id="passwordCodeEntry" style="display:none;margin-top:1rem;border-top:1px solid var(--line);padding-top:1rem">
-              <div style="font-family:var(--mono);font-size:.65rem;color:var(--accent-text);margin-bottom:.75rem">✓ Code sent to your email. Enter it below with your new password.</div>
-              <div style="display:grid;grid-template-columns:1fr 1fr;gap:.65rem;margin-bottom:.65rem">
-                <div class="form-group" style="margin:0">
-                  <label class="label">6-digit code</label>
-                  <input class="input" id="resetCode" type="text" maxlength="6" placeholder="123456" style="font-family:var(--mono);font-size:1.1rem;letter-spacing:.15em;text-align:center"/>
-                </div>
-                <div class="form-group" style="margin:0">
-                  <label class="label">New password</label>
-                  <input class="input" id="resetNewPass" type="password" placeholder="Min 8 characters"/>
-                </div>
-              </div>
-              <div style="margin-bottom:.65rem">
-                <label class="label">Confirm new password</label>
-                <input class="input" id="resetConfirmPass" type="password" placeholder="Confirm password"/>
-              </div>
-              <div style="display:flex;gap:.5rem;justify-content:flex-end">
-                <button class="btn btn-ghost btn-sm" onclick="document.getElementById('passwordCodeEntry').style.display='none'">Cancel</button>
-                <button class="btn btn-primary btn-sm" onclick="verifyAndResetPassword()">Update password →</button>
-              </div>
+            <div class="form-group" style="margin:0">
+              <label class="label">New password</label>
+              <input class="input" id="resetNewPass" type="password" placeholder="Min 8 characters"/>
             </div>
           </div>
-        </div>
-
-        <div style="display:flex;justify-content:flex-end">
-          <button class="btn btn-primary btn-sm" onclick="saveProfile()">Save email settings</button>
-        </div>
-      </div>
-
-      <!-- DANGER ZONE — with confirm step -->
-      <div class="card" style="border-color:var(--red-b)">
-        <div class="card-title" style="color:var(--red);margin-bottom:.25rem">Danger zone</div>
-        <div class="card-sub" style="margin-bottom:1rem">These actions are permanent and cannot be undone</div>
-        <div style="display:flex;flex-direction:column;gap:.65rem">
-          <div style="display:flex;align-items:center;justify-content:space-between;padding:.75rem 1rem;border:1px solid var(--line);border-radius:8px;flex-wrap:wrap;gap:.5rem">
-            <div>
-              <div style="font-size:.82rem;font-weight:500;color:var(--tx)">Export all data</div>
-              <div style="font-size:.72rem;color:var(--muted)">Download all reports, listings, and analytics as CSV</div>
-            </div>
-            <button class="btn btn-ghost btn-sm" onclick="showToastMsg('Export emailed to admin@acmecorp.com')">Export data</button>
+          <div style="margin-bottom:.65rem">
+            <label class="label">Confirm new password</label>
+            <input class="input" id="resetConfirmPass" type="password" placeholder="Confirm password"/>
           </div>
-          <div style="display:flex;align-items:center;justify-content:space-between;padding:.75rem 1rem;border:1px solid var(--red-b);border-radius:8px;background:var(--red-bg);flex-wrap:wrap;gap:.5rem">
-            <div>
-              <div style="font-size:.82rem;font-weight:500;color:var(--red)">Delete company account</div>
-              <div style="font-size:.72rem;color:var(--red);opacity:.7">Permanently removes all data. Cannot be undone.</div>
-            </div>
-            <button class="btn btn-danger btn-sm" onclick="confirmDelete()">Delete account</button>
+          <div style="display:flex;gap:.5rem;justify-content:flex-end">
+            <button class="btn btn-ghost btn-sm" onclick="document.getElementById('passwordCodeEntry').style.display='none'">Cancel</button>
+            <button class="btn btn-primary btn-sm" onclick="verifyAndResetPassword()">Update password →</button>
           </div>
         </div>
       </div>
-    </div>`;
+    </div>
+
+    <div style="display:flex;justify-content:flex-end">
+      <button class="btn btn-primary btn-sm" onclick="saveProfile()">Save email settings</button>
+    </div>
+  </div>
+
+  <!-- DANGER ZONE — with confirm step -->
+  <div class="card" style="border-color:var(--red-b)">
+    <div class="card-title" style="color:var(--red);margin-bottom:.25rem">Danger zone</div>
+    <div class="card-sub" style="margin-bottom:1rem">These actions are permanent and cannot be undone</div>
+    <div style="display:flex;flex-direction:column;gap:.65rem">
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:.75rem 1rem;border:1px solid var(--line);border-radius:8px;flex-wrap:wrap;gap:.5rem">
+        <div>
+          <div style="font-size:.82rem;font-weight:500;color:var(--tx)">Export all data</div>
+          <div style="font-size:.72rem;color:var(--muted)">Download all reports, listings, and analytics as CSV</div>
+        </div>
+        <button class="btn btn-ghost btn-sm" onclick="showToastMsg('Export emailed to admin@acmecorp.com')">Export data</button>
+      </div>
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:.75rem 1rem;border:1px solid var(--red-b);border-radius:8px;background:var(--red-bg);flex-wrap:wrap;gap:.5rem">
+        <div>
+          <div style="font-size:.82rem;font-weight:500;color:var(--red)">Delete company account</div>
+          <div style="font-size:.72rem;color:var(--red);opacity:.7">Permanently removes all data. Cannot be undone.</div>
+        </div>
+        <button class="btn btn-danger btn-sm" onclick="confirmDelete()">Delete account</button>
+      </div>
+    </div>
+  </div>
+</div>`;
+```
+
 }
 
 // ═══════════════════════════════════════════════════════════════
 // TEAM VIEW
 // ═══════════════════════════════════════════════════════════════
 async function renderTeam() {
-  const members = [
-    { name: 'Alex Chen', email: 'alex@acmecorp.com', role: 'Admin', joined: '2025-01-15', avatar: 'AC' },
-    { name: 'Sam Rivera', email: 'sam@acmecorp.com', role: 'Editor', joined: '2025-02-08', avatar: 'SR' },
-    { name: 'Jordan Park', email: 'jordan@acmecorp.com', role: 'Viewer', joined: '2025-03-22', avatar: 'JP' },
-  ];
-  document.getElementById('mainContent').innerHTML = `
-    <div style="animation:fadeUp .35s ease both;max-width:680px">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1.5rem">
-        <h2 style="font-family:var(--display);font-size:1.1rem;font-weight:700;color:var(--tx);letter-spacing:-.02em">Team Access</h2>
-        <button class="btn btn-primary btn-sm" onclick="openInviteModal()">+ Invite teammate</button>
-      </div>
-      <div class="table-wrap">
-        <table class="tbl">
-          <thead><tr><th>Member</th><th>Role</th><th>Joined</th><th>Actions</th></tr></thead>
-          <tbody>
-            ${members.map(m => `
-              <tr>
-                <td>
-                  <div style="display:flex;align-items:center;gap:.75rem">
-                    <div style="width:32px;height:32px;border-radius:50%;background:var(--accent-dim);border:1px solid var(--accent-mid);display:flex;align-items:center;justify-content:center;font-size:.65rem;font-weight:700;color:var(--accent-text);flex-shrink:0">${m.avatar}</div>
-                    <div><div style="font-weight:500;color:var(--tx)">${m.name}</div><div style="font-family:var(--mono);font-size:.62rem;color:var(--muted)">${m.email}</div></div>
-                  </div>
-                </td>
-                <td><span class="badge ${m.role === 'Admin' ? 'badge-verified' : m.role === 'Editor' ? 'badge-review' : 'badge-pending'}">${m.role}</span></td>
-                <td style="font-family:var(--mono);font-size:.72rem;color:var(--sub)">${formatDate(m.joined)}</td>
-                <td>
-                  <div style="display:flex;gap:.35rem">
-                    <button class="btn btn-ghost btn-sm" onclick="showToastMsg('Role updated')">Edit role</button>
-                    ${m.role !== 'Admin' ? `<button class="btn btn-danger btn-sm" onclick="showToastMsg('Member removed')">Remove</button>` : ''}
-                  </div>
-                </td>
-              </tr>`).join('')}
-          </tbody>
-        </table>
-      </div>
-      <div style="margin-top:1rem;padding:.85rem 1.1rem;background:var(--bg2);border:1px solid var(--line);border-radius:8px;font-size:.78rem;color:var(--sub)">
-        <strong style="color:var(--tx)">Role permissions:</strong> Admin — full access including billing. Editor — manage listings and respond to reports. Viewer — read-only access to analytics and reports.
-      </div>
-    </div>`;
+const members = [
+{ name: ‘Alex Chen’, email: ‘alex@acmecorp.com’, role: ‘Admin’, joined: ‘2025-01-15’, avatar: ‘AC’ },
+{ name: ‘Sam Rivera’, email: ‘sam@acmecorp.com’, role: ‘Editor’, joined: ‘2025-02-08’, avatar: ‘SR’ },
+{ name: ‘Jordan Park’, email: ‘jordan@acmecorp.com’, role: ‘Viewer’, joined: ‘2025-03-22’, avatar: ‘JP’ },
+];
+document.getElementById(‘mainContent’).innerHTML = `<div style="animation:fadeUp .35s ease both;max-width:680px"> <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1.5rem"> <h2 style="font-family:var(--display);font-size:1.1rem;font-weight:700;color:var(--tx);letter-spacing:-.02em">Team Access</h2> <button class="btn btn-primary btn-sm" onclick="openInviteModal()">+ Invite teammate</button> </div> <div class="table-wrap"> <table class="tbl"> <thead><tr><th>Member</th><th>Role</th><th>Joined</th><th>Actions</th></tr></thead> <tbody> ${members.map(m =>`
+<tr>
+<td>
+<div style="display:flex;align-items:center;gap:.75rem">
+<div style="width:32px;height:32px;border-radius:50%;background:var(--accent-dim);border:1px solid var(--accent-mid);display:flex;align-items:center;justify-content:center;font-size:.65rem;font-weight:700;color:var(--accent-text);flex-shrink:0">${m.avatar}</div>
+<div><div style="font-weight:500;color:var(--tx)">${m.name}</div><div style="font-family:var(--mono);font-size:.62rem;color:var(--muted)">${m.email}</div></div>
+</div>
+</td>
+<td><span class="badge ${m.role === 'Admin' ? 'badge-verified' : m.role === 'Editor' ? 'badge-review' : 'badge-pending'}">${m.role}</span></td>
+<td style="font-family:var(--mono);font-size:.72rem;color:var(--sub)">${formatDate(m.joined)}</td>
+<td>
+<div style="display:flex;gap:.35rem">
+<button class="btn btn-ghost btn-sm" onclick="showToastMsg('Role updated')">Edit role</button>
+${m.role !== ‘Admin’ ? `<button class="btn btn-danger btn-sm" onclick="showToastMsg('Member removed')">Remove</button>` : ‘’}
+</div>
+</td>
+</tr>`).join('')} </tbody> </table> </div> <div style="margin-top:1rem;padding:.85rem 1.1rem;background:var(--bg2);border:1px solid var(--line);border-radius:8px;font-size:.78rem;color:var(--sub)"> <strong style="color:var(--tx)">Role permissions:</strong> Admin — full access including billing. Editor — manage listings and respond to reports. Viewer — read-only access to analytics and reports. </div> </div>`;
 }
 
 // ═══════════════════════════════════════════════════════════════
 // DISPUTE MODAL
 // ═══════════════════════════════════════════════════════════════
 function openDisputeModal(reportId) {
-  const reports = Store.get('reports');
-  const report = reports.find(r => r.id === reportId);
-  if (!report) return;
+const reports = Store.get(‘reports’);
+const report = reports.find(r => r.id === reportId);
+if (!report) return;
 
-  document.getElementById('disputeModalTitle').textContent = `Dispute Report — ${report.role}`;
-  document.getElementById('disputeModalBody').innerHTML = `
-    <div style="background:var(--bg2);border-left:3px solid var(--line2);padding:.75rem 1rem;border-radius:0 6px 6px 0;margin-bottom:1.25rem;font-size:.8rem;color:var(--tx2);font-style:italic;line-height:1.7">"${report.text}"</div>
+document.getElementById(‘disputeModalTitle’).textContent = `Dispute Report — ${report.role}`;
+document.getElementById(‘disputeModalBody’).innerHTML = `
+<div style="background:var(--bg2);border-left:3px solid var(--line2);padding:.75rem 1rem;border-radius:0 6px 6px 0;margin-bottom:1.25rem;font-size:.8rem;color:var(--tx2);font-style:italic;line-height:1.7">”${report.text}”</div>
 
-    <div style="font-family:var(--mono);font-size:.58rem;text-transform:uppercase;letter-spacing:.09em;color:var(--muted);margin-bottom:.75rem">What is your reason for disputing?</div>
-    <div class="radio-group" id="disputeReasonGroup">
-      ${[
-        { val: 'factual_inaccuracy', title: 'Factual inaccuracy', sub: 'The report contains specific facts that are demonstrably false. You have evidence.' },
-        { val: 'context_missing', title: 'Missing important context', sub: 'The report omits key context that changes the meaning of what happened.' },
-        { val: 'personal_info', title: 'Contains personal information', sub: 'The report names or identifies specific individual employees.' },
-        { val: 'false_experience', title: 'False or fabricated experience', sub: 'You have strong reason to believe this person did not apply to this role.' },
-        { val: 'guideline_violation', title: 'Violates content guidelines', sub: 'The report contains threats, hate speech, or other prohibited content.' },
-      ].map(opt => `
-        <div class="radio-opt">
-          <input type="radio" name="disputeReason" id="dr_${opt.val}" value="${opt.val}"/>
-          <label class="radio-lbl" for="dr_${opt.val}">
-            <div class="radio-dot"></div>
-            <div>
-              <div class="radio-lbl-title">${opt.title}</div>
-              <div class="radio-lbl-sub">${opt.sub}</div>
-            </div>
-          </label>
-        </div>`).join('')}
-    </div>
+```
+<div style="font-family:var(--mono);font-size:.58rem;text-transform:uppercase;letter-spacing:.09em;color:var(--muted);margin-bottom:.75rem">What is your reason for disputing?</div>
+<div class="radio-group" id="disputeReasonGroup">
+  ${[
+    { val: 'factual_inaccuracy', title: 'Factual inaccuracy', sub: 'The report contains specific facts that are demonstrably false. You have evidence.' },
+    { val: 'context_missing', title: 'Missing important context', sub: 'The report omits key context that changes the meaning of what happened.' },
+    { val: 'personal_info', title: 'Contains personal information', sub: 'The report names or identifies specific individual employees.' },
+    { val: 'false_experience', title: 'False or fabricated experience', sub: 'You have strong reason to believe this person did not apply to this role.' },
+    { val: 'guideline_violation', title: 'Violates content guidelines', sub: 'The report contains threats, hate speech, or other prohibited content.' },
+  ].map(opt => `
+    <div class="radio-opt">
+      <input type="radio" name="disputeReason" id="dr_${opt.val}" value="${opt.val}"/>
+      <label class="radio-lbl" for="dr_${opt.val}">
+        <div class="radio-dot"></div>
+        <div>
+          <div class="radio-lbl-title">${opt.title}</div>
+          <div class="radio-lbl-sub">${opt.sub}</div>
+        </div>
+      </label>
+    </div>`).join('')}
+</div>
 
-    <div class="form-group" style="margin-top:1.1rem">
-      <label class="label">Explain your dispute <span style="color:var(--red)">*</span></label>
-      <textarea class="textarea" id="disputeReason" placeholder="Describe specifically why this report is inaccurate or violates guidelines. Be specific and factual."></textarea>
-    </div>
+<div class="form-group" style="margin-top:1.1rem">
+  <label class="label">Explain your dispute <span style="color:var(--red)">*</span></label>
+  <textarea class="textarea" id="disputeReason" placeholder="Describe specifically why this report is inaccurate or violates guidelines. Be specific and factual."></textarea>
+</div>
 
-    <div class="form-group">
-      <label class="label">Evidence (optional)</label>
-      <input class="input" id="disputeEvidence" type="text" placeholder="e.g. Email records, ATS timestamps, public announcement links"/>
-    </div>
+<div class="form-group">
+  <label class="label">Evidence (optional)</label>
+  <input class="input" id="disputeEvidence" type="text" placeholder="e.g. Email records, ATS timestamps, public announcement links"/>
+</div>
 
-    <div style="font-family:var(--mono);font-size:.58rem;text-transform:uppercase;letter-spacing:.09em;color:var(--muted);margin-bottom:.65rem;margin-top:1rem">What action are you requesting?</div>
-    <div class="radio-group">
-      ${[
-        { val: 'remove', title: 'Remove the report', sub: 'Only granted for clear guideline violations or personal information. Not granted for negative experiences.' },
-        { val: 'update', title: 'Update with correction', sub: 'Add a factual correction alongside the report.' },
-        { val: 'add_context', title: 'Add context note', sub: 'Add important context that changes the interpretation.' },
-      ].map(opt => `
-        <div class="radio-opt">
-          <input type="radio" name="disputeAction" id="da_${opt.val}" value="${opt.val}"/>
-          <label class="radio-lbl" for="da_${opt.val}">
-            <div class="radio-dot"></div>
-            <div>
-              <div class="radio-lbl-title">${opt.title}</div>
-              <div class="radio-lbl-sub">${opt.sub}</div>
-            </div>
-          </label>
-        </div>`).join('')}
-    </div>
+<div style="font-family:var(--mono);font-size:.58rem;text-transform:uppercase;letter-spacing:.09em;color:var(--muted);margin-bottom:.65rem;margin-top:1rem">What action are you requesting?</div>
+<div class="radio-group">
+  ${[
+    { val: 'remove', title: 'Remove the report', sub: 'Only granted for clear guideline violations or personal information. Not granted for negative experiences.' },
+    { val: 'update', title: 'Update with correction', sub: 'Add a factual correction alongside the report.' },
+    { val: 'add_context', title: 'Add context note', sub: 'Add important context that changes the interpretation.' },
+  ].map(opt => `
+    <div class="radio-opt">
+      <input type="radio" name="disputeAction" id="da_${opt.val}" value="${opt.val}"/>
+      <label class="radio-lbl" for="da_${opt.val}">
+        <div class="radio-dot"></div>
+        <div>
+          <div class="radio-lbl-title">${opt.title}</div>
+          <div class="radio-lbl-sub">${opt.sub}</div>
+        </div>
+      </label>
+    </div>`).join('')}
+</div>
 
-    <div style="background:var(--amber-bg);border:1px solid var(--amber-b);border-radius:8px;padding:.85rem 1rem;font-size:.75rem;color:var(--amber);margin-top:1.25rem;line-height:1.65">
-      ⚠ Seen reviews all disputes within 14 business days. We do not remove reports simply because they are negative. Submitting false dispute claims may affect your verified status.
-    </div>`;
+<div style="background:var(--amber-bg);border:1px solid var(--amber-b);border-radius:8px;padding:.85rem 1rem;font-size:.75rem;color:var(--amber);margin-top:1.25rem;line-height:1.65">
+  ⚠ Seen reviews all disputes within 14 business days. We do not remove reports simply because they are negative. Submitting false dispute claims may affect your verified status.
+</div>`;
+```
 
-  document.getElementById('disputeModalFooter').innerHTML = `
-    <button class="btn btn-secondary" onclick="closeDisputeModalDirect()">Cancel</button>
-    <button class="btn btn-primary" onclick="submitDisputeForm('${reportId}')">Submit dispute →</button>`;
+document.getElementById(‘disputeModalFooter’).innerHTML = ` <button class="btn btn-secondary" onclick="closeDisputeModalDirect()">Cancel</button> <button class="btn btn-primary" onclick="submitDisputeForm('${reportId}')">Submit dispute →</button>`;
 
-  document.getElementById('disputeModal').classList.add('open');
+document.getElementById(‘disputeModal’).classList.add(‘open’);
 }
 
 async function submitDisputeForm(reportId) {
-  const category = document.querySelector('input[name="disputeReason"]:checked')?.value;
-  const reason = document.getElementById('disputeReason').value.trim();
-  const evidence = document.getElementById('disputeEvidence').value.trim();
-  const action = document.querySelector('input[name="disputeAction"]:checked')?.value;
+const category = document.querySelector(‘input[name=“disputeReason”]:checked’)?.value;
+const reason = document.getElementById(‘disputeReason’).value.trim();
+const evidence = document.getElementById(‘disputeEvidence’).value.trim();
+const action = document.querySelector(‘input[name=“disputeAction”]:checked’)?.value;
 
-  if (!category) { showToastMsg('Please select a dispute reason', 'error'); return; }
-  if (!reason || reason.length < 20) { showToastMsg('Please provide a detailed explanation (20+ characters)', 'error'); return; }
-  if (!action) { showToastMsg('Please select a requested action', 'error'); return; }
+if (!category) { showToastMsg(‘Please select a dispute reason’, ‘error’); return; }
+if (!reason || reason.length < 20) { showToastMsg(‘Please provide a detailed explanation (20+ characters)’, ‘error’); return; }
+if (!action) { showToastMsg(‘Please select a requested action’, ‘error’); return; }
 
-  const btn = event.target;
-  btn.textContent = 'Submitting...';
-  btn.disabled = true;
+const btn = event.target;
+btn.textContent = ‘Submitting…’;
+btn.disabled = true;
 
-  const result = await API.createDispute(reportId, { reason, category, evidence, requestedAction: action });
+const result = await API.createDispute(reportId, { reason, category, evidence, requestedAction: action });
 
-  if (result.ok) {
-    // Mark report as disputed
-    const reports = Store.get('reports');
-    const report = reports.find(r => r.id === reportId);
-    if (report) { report.disputed = true; report.disputeStatus = 'pending_review'; }
+if (result.ok) {
+// Mark report as disputed
+const reports = Store.get(‘reports’);
+const report = reports.find(r => r.id === reportId);
+if (report) { report.disputed = true; report.disputeStatus = ‘pending_review’; }
 
-    // Update badge count
-    const count = parseInt(document.getElementById('openDisputeCount').textContent || '0');
-    document.getElementById('openDisputeCount').textContent = count + 1;
+```
+// Update badge count
+const count = parseInt(document.getElementById('openDisputeCount').textContent || '0');
+document.getElementById('openDisputeCount').textContent = count + 1;
 
-    closeDisputeModalDirect();
-    showToastMsg('Dispute submitted. Seen team will review within 14 business days.', 'success');
-    renderReports();
-  }
+closeDisputeModalDirect();
+showToastMsg('Dispute submitted. Seen team will review within 14 business days.', 'success');
+renderReports();
+```
 
-  btn.textContent = 'Submit dispute →';
-  btn.disabled = false;
+}
+
+btn.textContent = ‘Submit dispute →’;
+btn.disabled = false;
 }
 
 // openResponseModal defined in utils section above
 
 function openResponseModal(reportId) {
-  const reports = Store.get('reports');
-  const report = reports.find(r => r.id === reportId);
-  if (!report) return;
-  document.getElementById('disputeModalTitle').textContent = `Publish Response — ${report.role}`;
-  document.getElementById('disputeModalBody').innerHTML = `
-    <div style="background:var(--bg2);border-left:3px solid var(--line2);padding:.75rem 1rem;border-radius:0 6px 6px 0;margin-bottom:1.25rem;font-size:.8rem;color:var(--tx2);font-style:italic;line-height:1.7">"${report.text}"</div>
-    <div style="padding:.75rem 1rem;background:var(--blue-bg);border:1px solid var(--blue-b);border-radius:8px;font-size:.78rem;color:var(--blue);margin-bottom:1.25rem;line-height:1.65">
-      Your response will be published publicly alongside this report. Be professional, honest, and specific.
-    </div>
-    <div class="form-group">
-      <label class="label">Your response <span style="color:var(--red)">*</span> <span style="color:var(--muted)">(max 500 chars)</span></label>
-      <textarea class="textarea" id="responseText" maxlength="500" style="min-height:110px" oninput="updateCharCount('responseText','respCount',500);updateResponsePreview()" placeholder="We apologize for the lack of communication. This role was affected by [reason]. We have since [action]. We appreciate your time."></textarea>
-      <div class="char-counter" id="respCount">0 / 500</div>
-    </div>
-    <div id="responsePreview" style="display:none;margin-top:.75rem">
-      <div class="preview-label">Preview — how this appears on Seen</div>
-      <div class="preview-box">
-        <div style="font-family:var(--mono);font-size:.6rem;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:.4rem">Applicant report</div>
-        <div style="font-size:.8rem;color:var(--sub);font-style:italic;margin-bottom:.75rem">"${report.text.slice(0,120)}${report.text.length>120?'...':''}"</div>
-        <div style="font-family:var(--mono);font-size:.6rem;text-transform:uppercase;letter-spacing:.08em;color:var(--accent-text);margin-bottom:.4rem">Employer response</div>
-        <div style="font-size:.8rem;color:var(--tx2)" id="respPreviewText">Your response will appear here as you type...</div>
-      </div>
-    </div>
-    <div style="font-family:var(--mono);font-size:.6rem;color:var(--muted);margin-top:.65rem">Responses cannot be edited after publishing.</div>`;
-  document.getElementById('disputeModalFooter').innerHTML = `
-    <button class="btn btn-secondary" onclick="closeDisputeModalDirect()">Cancel</button>
-    <button class="btn btn-primary" onclick="submitResponse('${reportId}')">Publish response →</button>`;
-  document.getElementById('disputeModal').classList.add('open');
+const reports = Store.get(‘reports’);
+const report = reports.find(r => r.id === reportId);
+if (!report) return;
+document.getElementById(‘disputeModalTitle’).textContent = `Publish Response — ${report.role}`;
+document.getElementById(‘disputeModalBody’).innerHTML = ` <div style="background:var(--bg2);border-left:3px solid var(--line2);padding:.75rem 1rem;border-radius:0 6px 6px 0;margin-bottom:1.25rem;font-size:.8rem;color:var(--tx2);font-style:italic;line-height:1.7">"${report.text}"</div> <div style="padding:.75rem 1rem;background:var(--blue-bg);border:1px solid var(--blue-b);border-radius:8px;font-size:.78rem;color:var(--blue);margin-bottom:1.25rem;line-height:1.65"> Your response will be published publicly alongside this report. Be professional, honest, and specific. </div> <div class="form-group"> <label class="label">Your response <span style="color:var(--red)">*</span> <span style="color:var(--muted)">(max 500 chars)</span></label> <textarea class="textarea" id="responseText" maxlength="500" style="min-height:110px" oninput="updateCharCount('responseText','respCount',500);updateResponsePreview()" placeholder="We apologize for the lack of communication. This role was affected by [reason]. We have since [action]. We appreciate your time."></textarea> <div class="char-counter" id="respCount">0 / 500</div> </div> <div id="responsePreview" style="display:none;margin-top:.75rem"> <div class="preview-label">Preview — how this appears on Seen</div> <div class="preview-box"> <div style="font-family:var(--mono);font-size:.6rem;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:.4rem">Applicant report</div> <div style="font-size:.8rem;color:var(--sub);font-style:italic;margin-bottom:.75rem">"${report.text.slice(0,120)}${report.text.length>120?'...':''}"</div> <div style="font-family:var(--mono);font-size:.6rem;text-transform:uppercase;letter-spacing:.08em;color:var(--accent-text);margin-bottom:.4rem">Employer response</div> <div style="font-size:.8rem;color:var(--tx2)" id="respPreviewText">Your response will appear here as you type...</div> </div> </div> <div style="font-family:var(--mono);font-size:.6rem;color:var(--muted);margin-top:.65rem">Responses cannot be edited after publishing.</div>`;
+document.getElementById(‘disputeModalFooter’).innerHTML = ` <button class="btn btn-secondary" onclick="closeDisputeModalDirect()">Cancel</button> <button class="btn btn-primary" onclick="submitResponse('${reportId}')">Publish response →</button>`;
+document.getElementById(‘disputeModal’).classList.add(‘open’);
 }
 
 async function submitResponse(reportId) {
-  const text = document.getElementById('responseText').value.trim();
-  if (!text || text.length < 20) { showToastMsg('Response must be at least 20 characters', 'error'); return; }
+const text = document.getElementById(‘responseText’).value.trim();
+if (!text || text.length < 20) { showToastMsg(‘Response must be at least 20 characters’, ‘error’); return; }
 
-  const btn = event.target;
-  btn.textContent = 'Publishing...'; btn.disabled = true;
+const btn = event.target;
+btn.textContent = ‘Publishing…’; btn.disabled = true;
 
-  const result = await API.respondToReport(reportId, text);
+const result = await API.respondToReport(reportId, text);
 
-  if (result.ok) {
-    const reports = Store.get('reports');
-    const report = reports.find(r => r.id === reportId);
-    if (report) { report.hasResponse = true; report.response = text; }
-    closeDisputeModalDirect();
-    showToastMsg('Response published alongside the report', 'success');
-    renderReports();
-  }
-
-  btn.textContent = 'Publish response →'; btn.disabled = false;
+if (result.ok) {
+const reports = Store.get(‘reports’);
+const report = reports.find(r => r.id === reportId);
+if (report) { report.hasResponse = true; report.response = text; }
+closeDisputeModalDirect();
+showToastMsg(‘Response published alongside the report’, ‘success’);
+renderReports();
 }
 
-function closeDisputeModal(e) { if (e.target === document.getElementById('disputeModal')) closeDisputeModalDirect(); }
-function closeDisputeModalDirect() { document.getElementById('disputeModal').classList.remove('open'); }
+btn.textContent = ‘Publish response →’; btn.disabled = false;
+}
+
+function closeDisputeModal(e) { if (e.target === document.getElementById(‘disputeModal’)) closeDisputeModalDirect(); }
+function closeDisputeModalDirect() { document.getElementById(‘disputeModal’).classList.remove(‘open’); }
 
 // ═══════════════════════════════════════════════════════════════
 // LISTING MODAL
 // ═══════════════════════════════════════════════════════════════
-function openListingModal() { document.getElementById('listingModal').classList.add('open'); }
-function closeListingModal(e) { if (e.target === document.getElementById('listingModal')) closeListingModalDirect(); }
-function closeListingModalDirect() { document.getElementById('listingModal').classList.remove('open'); }
+function openListingModal() { document.getElementById(‘listingModal’).classList.add(‘open’); }
+function closeListingModal(e) { if (e.target === document.getElementById(‘listingModal’)) closeListingModalDirect(); }
+function closeListingModalDirect() { document.getElementById(‘listingModal’).classList.remove(‘open’); }
 
 async function submitListing() {
-  const title = document.getElementById('lTitle').value.trim();
-  const loc = document.getElementById('lLoc').value.trim();
-  const desc = document.getElementById('lDesc').value.trim();
-  if (!title || !loc || !desc) { showToastMsg('Please fill in all required fields', 'error'); return; }
+const title = document.getElementById(‘lTitle’).value.trim();
+const loc = document.getElementById(‘lLoc’).value.trim();
+const desc = document.getElementById(‘lDesc’).value.trim();
+if (!title || !loc || !desc) { showToastMsg(‘Please fill in all required fields’, ‘error’); return; }
 
-  const btn = event.target; btn.textContent = 'Posting...'; btn.disabled = true;
+const btn = event.target; btn.textContent = ‘Posting…’; btn.disabled = true;
 
-  const result = await API.createListing({
-    title, location: loc,
-    type: document.getElementById('lType').value,
-    level: document.getElementById('lLevel').value,
-    salaryMin: parseInt(document.getElementById('lSalMin').value) || 0,
-    salaryMax: parseInt(document.getElementById('lSalMax').value) || 0,
-    description: desc,
-  });
+const result = await API.createListing({
+title, location: loc,
+type: document.getElementById(‘lType’).value,
+level: document.getElementById(‘lLevel’).value,
+salaryMin: parseInt(document.getElementById(‘lSalMin’).value) || 0,
+salaryMax: parseInt(document.getElementById(‘lSalMax’).value) || 0,
+description: desc,
+});
 
-  btn.textContent = 'Post listing →'; btn.disabled = false;
+btn.textContent = ‘Post listing →’; btn.disabled = false;
 
-  if (result.ok) {
-    closeListingModalDirect();
-    showToastMsg('Listing posted ✓ — visible on seenjobs.io now', 'success');
-    renderListings();
-  } else {
-    showToastMsg(result.error || 'Failed to post listing', 'error');
-  }
+if (result.ok) {
+closeListingModalDirect();
+showToastMsg(‘Listing posted ✓ — visible on seenjobs.io now’, ‘success’);
+renderListings();
+} else {
+showToastMsg(result.error || ‘Failed to post listing’, ‘error’);
+}
 }
 
 // ═══════════════════════════════════════════════════════════════
 // TOAST SYSTEM
 // ═══════════════════════════════════════════════════════════════
-function showToastMsg(msg, type = '') {
-  const icons = { success: '✓', error: '✗', info: 'ℹ' };
-  const container = document.getElementById('toastContainer');
-  // Kill any existing toast immediately — no stacking
-  container.querySelectorAll('.toast').forEach(t => t.remove());
-  const toast = document.createElement('div');
-  toast.className = `toast ${type}`;
-  toast.innerHTML = `<span class="toast-icon">${icons[type] || '●'}</span>${msg}`;
-  container.appendChild(toast);
-  // Auto dismiss
-  clearTimeout(container._toastTimer);
-  container._toastTimer = setTimeout(() => {
-    toast.style.opacity = '0';
-    toast.style.transform = 'translateX(20px)';
-    setTimeout(() => toast.remove(), 280);
-  }, 2800);
+function showToastMsg(msg, type = ‘’) {
+const icons = { success: ‘✓’, error: ‘✗’, info: ‘ℹ’ };
+const container = document.getElementById(‘toastContainer’);
+// Kill any existing toast immediately — no stacking
+container.querySelectorAll(’.toast’).forEach(t => t.remove());
+const toast = document.createElement(‘div’);
+toast.className = `toast ${type}`;
+toast.innerHTML = `<span class="toast-icon">${icons[type] || '●'}</span>${msg}`;
+container.appendChild(toast);
+// Auto dismiss
+clearTimeout(container._toastTimer);
+container._toastTimer = setTimeout(() => {
+toast.style.opacity = ‘0’;
+toast.style.transform = ‘translateX(20px)’;
+setTimeout(() => toast.remove(), 280);
+}, 2800);
 }
 
 // ═══════════════════════════════════════════════════════════════
 // SIDEBAR TOGGLE (mobile)
 // ═══════════════════════════════════════════════════════════════
 function toggleSidebar() {
-  const sidebar = document.getElementById('sidebar');
-  const overlay = document.getElementById('sidebarOverlay');
-  sidebar.classList.toggle('open');
-  overlay.classList.toggle('open');
+const sidebar = document.getElementById(‘sidebar’);
+const overlay = document.getElementById(‘sidebarOverlay’);
+sidebar.classList.toggle(‘open’);
+overlay.classList.toggle(‘open’);
 }
 
 function closeSidebar() {
-  document.getElementById('sidebar').classList.remove('open');
-  document.getElementById('sidebarOverlay').classList.remove('open');
+document.getElementById(‘sidebar’).classList.remove(‘open’);
+document.getElementById(‘sidebarOverlay’).classList.remove(‘open’);
 }
 
 // Close sidebar when nav item clicked on mobile
-document.querySelectorAll('.nav-item').forEach(btn => {
-  btn.addEventListener('click', () => {
-    if (window.innerWidth <= 768) closeSidebar();
-  });
+document.querySelectorAll(’.nav-item’).forEach(btn => {
+btn.addEventListener(‘click’, () => {
+if (window.innerWidth <= 768) closeSidebar();
+});
 });
 
 // ═══════════════════════════════════════════════════════════════
 // MOBILE BOTTOM NAV SYNC
 // ═══════════════════════════════════════════════════════════════
 function setMobActive(view) {
-  document.querySelectorAll('.mob-nav-btn').forEach(b => b.classList.remove('active'));
-  const active = document.getElementById('mob-' + view);
-  if (active) active.classList.add('active');
+document.querySelectorAll(’.mob-nav-btn’).forEach(b => b.classList.remove(‘active’));
+const active = document.getElementById(‘mob-’ + view);
+if (active) active.classList.add(‘active’);
 }
 
 // ═══════════════════════════════════════════════
 // PASSWORD RESET — OTP code to email on file
 // ═══════════════════════════════════════════════
 async function initiatePasswordReset() {
-  const user = (await db.auth.getUser()).data.user;
-  if (!user?.email) { showToastMsg('No email on file.', 'error'); return; }
+const user = (await db.auth.getUser()).data.user;
+if (!user?.email) { showToastMsg(‘No email on file.’, ‘error’); return; }
 
-  const btn = event?.target;
-  if (btn) { btn.textContent = 'Sending...'; btn.disabled = true; }
+const btn = event?.target;
+if (btn) { btn.textContent = ‘Sending…’; btn.disabled = true; }
 
-  // Send OTP to email on file
-  const { error } = await db.auth.signInWithOtp({
-    email: user.email,
-    options: { shouldCreateUser: false }
-  });
+// Send OTP to email on file
+const { error } = await db.auth.signInWithOtp({
+email: user.email,
+options: { shouldCreateUser: false }
+});
 
-  if (btn) { btn.textContent = 'Send reset code'; btn.disabled = false; }
+if (btn) { btn.textContent = ‘Send reset code’; btn.disabled = false; }
 
-  if (error) {
-    showToastMsg(error.message, 'error');
-    return;
-  }
+if (error) {
+showToastMsg(error.message, ‘error’);
+return;
+}
 
-  // Show code entry
-  document.getElementById('passwordCodeEntry').style.display = 'block';
-  showToastMsg('Code sent to ' + user.email, 'success');
+// Show code entry
+document.getElementById(‘passwordCodeEntry’).style.display = ‘block’;
+showToastMsg(’Code sent to ’ + user.email, ‘success’);
 }
 
 async function verifyAndResetPassword() {
-  const code = document.getElementById('resetCode')?.value?.trim();
-  const newPass = document.getElementById('resetNewPass')?.value?.trim();
-  const confirmPass = document.getElementById('resetConfirmPass')?.value?.trim();
-  const user = (await db.auth.getUser()).data.user;
+const code = document.getElementById(‘resetCode’)?.value?.trim();
+const newPass = document.getElementById(‘resetNewPass’)?.value?.trim();
+const confirmPass = document.getElementById(‘resetConfirmPass’)?.value?.trim();
+const user = (await db.auth.getUser()).data.user;
 
-  if (!code || code.length !== 6) { showToastMsg('Enter the 6-digit code from your email.', 'error'); return; }
-  if (!newPass || newPass.length < 8) { showToastMsg('Password must be at least 8 characters.', 'error'); return; }
-  if (newPass !== confirmPass) { showToastMsg('Passwords don\'t match.', 'error'); return; }
+if (!code || code.length < 6) { showToastMsg(‘Enter the 8-digit code from your email.’, ‘error’); return; }
+if (!newPass || newPass.length < 8) { showToastMsg(‘Password must be at least 8 characters.’, ‘error’); return; }
+if (newPass !== confirmPass) { showToastMsg(‘Passwords don't match.’, ‘error’); return; }
 
-  const btn = event?.target;
-  if (btn) { btn.textContent = 'Updating...'; btn.disabled = true; }
+const btn = event?.target;
+if (btn) { btn.textContent = ‘Updating…’; btn.disabled = true; }
 
-  // Verify OTP then update password
-  const { error: otpError } = await db.auth.verifyOtp({
-    email: user.email,
-    token: code,
-    type: 'email'
-  });
+// Verify OTP then update password
+const { error: otpError } = await db.auth.verifyOtp({
+email: user.email,
+token: code,
+type: ‘email’
+});
 
-  if (otpError) {
-    if (btn) { btn.textContent = 'Update password →'; btn.disabled = false; }
-    showToastMsg('Invalid or expired code. Request a new one.', 'error');
-    return;
-  }
+if (otpError) {
+if (btn) { btn.textContent = ‘Update password →’; btn.disabled = false; }
+showToastMsg(‘Invalid or expired code. Request a new one.’, ‘error’);
+return;
+}
 
-  // Code verified — update password
-  const { error: passError } = await db.auth.updateUser({ password: newPass });
+// Code verified — update password
+const { error: passError } = await db.auth.updateUser({ password: newPass });
 
-  if (btn) { btn.textContent = 'Update password →'; btn.disabled = false; }
+if (btn) { btn.textContent = ‘Update password →’; btn.disabled = false; }
 
-  if (passError) {
-    showToastMsg(passError.message, 'error');
-    return;
-  }
+if (passError) {
+showToastMsg(passError.message, ‘error’);
+return;
+}
 
-  // Success — clear form
-  document.getElementById('passwordCodeEntry').style.display = 'none';
-  document.getElementById('resetCode').value = '';
-  document.getElementById('resetNewPass').value = '';
-  document.getElementById('resetConfirmPass').value = '';
-  showToastMsg('Password updated successfully ✓', 'success');
+// Success — clear form
+document.getElementById(‘passwordCodeEntry’).style.display = ‘none’;
+document.getElementById(‘resetCode’).value = ‘’;
+document.getElementById(‘resetNewPass’).value = ‘’;
+document.getElementById(‘resetConfirmPass’).value = ‘’;
+showToastMsg(‘Password updated successfully ✓’, ‘success’);
 }
 style.textContent = `@media(min-width:769px){.show-desktop{display:inline!important}}`;
 document.head.appendChild(style);
 
 // FIX 20: formatDate — handle bad inputs
 function formatDate(iso) {
-  if (!iso) return '—';
-  try {
-    const d = new Date(iso);
-    if (isNaN(d.getTime())) return iso;
-    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-  } catch(e) { return iso; }
+if (!iso) return ‘—’;
+try {
+const d = new Date(iso);
+if (isNaN(d.getTime())) return iso;
+return d.toLocaleDateString(‘en-US’, { month: ‘short’, day: ‘numeric’, year: ‘numeric’ });
+} catch(e) { return iso; }
 }
 
 function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
 // FIX 22: Char counter
 function updateCharCount(inputId, counterId, max) {
-  const el = document.getElementById(inputId);
-  const counter = document.getElementById(counterId);
-  if (!el || !counter) return;
-  const len = el.value.length;
-  counter.textContent = `${len} / ${max}`;
-  counter.className = 'char-counter' + (len > max*.9?' danger':len > max*.75?' warn':'');
+const el = document.getElementById(inputId);
+const counter = document.getElementById(counterId);
+if (!el || !counter) return;
+const len = el.value.length;
+counter.textContent = `${len} / ${max}`;
+counter.className = ‘char-counter’ + (len > max*.9?’ danger’:len > max*.75?’ warn’:’’);
 }
 
 // FIX 16: Analytics period tabs
 const PERIOD_DATA = {
-  '7d': { scoreHistory:[72,73,72,74,74,73,74], labels:['Mon','Tue','Wed','Thu','Fri','Sat','Sun'], label:'Last 7 days' },
-  '30d': { scoreHistory:[68,69,70,69,71,72,71,73,73,74,74,74,73,74,74,74,73,74,74,74,74,73,74,74,74,74,73,74,74,74], labels:Array.from({length:30},(_,i)=>i+1+''), label:'Last 30 days' },
-  '12m': { scoreHistory:[62,65,64,68,70,69,72,71,73,74,74,74], labels:['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'], label:'12 months' },
+‘7d’: { scoreHistory:[72,73,72,74,74,73,74], labels:[‘Mon’,‘Tue’,‘Wed’,‘Thu’,‘Fri’,‘Sat’,‘Sun’], label:‘Last 7 days’ },
+‘30d’: { scoreHistory:[68,69,70,69,71,72,71,73,73,74,74,74,73,74,74,74,73,74,74,74,74,73,74,74,74,74,73,74,74,74], labels:Array.from({length:30},(_,i)=>i+1+’’), label:‘Last 30 days’ },
+‘12m’: { scoreHistory:[62,65,64,68,70,69,72,71,73,74,74,74], labels:[‘Jan’,‘Feb’,‘Mar’,‘Apr’,‘May’,‘Jun’,‘Jul’,‘Aug’,‘Sep’,‘Oct’,‘Nov’,‘Dec’], label:‘12 months’ },
 };
 
 function setPeriod(period, btn) {
-  document.querySelectorAll('.period-tab').forEach(b=>b.classList.remove('active'));
-  btn.classList.add('active');
-  const co=Store.get('company');
-  const risk=co.score>=70?'safe':co.score>=40?'warn':'danger';
-  const scoreColor={safe:'var(--score-safe)',warn:'var(--score-warn)',danger:'var(--score-danger)'}[risk];
-  const pd=PERIOD_DATA[period]||PERIOD_DATA['12m'];
-  renderMiniChart('bigScoreChart','bigScoreLabels',pd.scoreHistory,pd.labels,scoreColor);
-  showToastMsg(`Showing ${pd.label}`);
+document.querySelectorAll(’.period-tab’).forEach(b=>b.classList.remove(‘active’));
+btn.classList.add(‘active’);
+const co=Store.get(‘company’);
+const risk=co.score>=70?‘safe’:co.score>=40?‘warn’:‘danger’;
+const scoreColor={safe:‘var(–score-safe)’,warn:‘var(–score-warn)’,danger:‘var(–score-danger)’}[risk];
+const pd=PERIOD_DATA[period]||PERIOD_DATA[‘12m’];
+renderMiniChart(‘bigScoreChart’,‘bigScoreLabels’,pd.scoreHistory,pd.labels,scoreColor);
+showToastMsg(`Showing ${pd.label}`);
 }
 
 // FIX 25: Response preview live update
 function updateResponsePreview() {
-  const text = document.getElementById('responseText')?.value||'';
-  const preview = document.getElementById('responsePreview');
-  const previewText = document.getElementById('respPreviewText');
-  if (!preview||!previewText) return;
-  preview.style.display = text.length>10?'block':'none';
-  previewText.textContent = text;
+const text = document.getElementById(‘responseText’)?.value||’’;
+const preview = document.getElementById(‘responsePreview’);
+const previewText = document.getElementById(‘respPreviewText’);
+if (!preview||!previewText) return;
+preview.style.display = text.length>10?‘block’:‘none’;
+previewText.textContent = text;
 }
 
 // FIX 19: Improvement roadmap status cycling
 function toggleImprovementStatus(idx) {
-  const states=['Not started','In progress','Done'];
-  const el=document.getElementById('imp_'+idx);
-  if(!el)return;
-  const cur=el.dataset.state||'Not started';
-  const next=states[(states.indexOf(cur)+1)%states.length];
-  el.dataset.state=next;
-  el.className='badge '+(next==='Done'?'badge-approved':next==='In progress'?'badge-review':'badge-pending');
-  el.textContent=next;
-  showToastMsg('Marked as: '+next);
+const states=[‘Not started’,‘In progress’,‘Done’];
+const el=document.getElementById(‘imp_’+idx);
+if(!el)return;
+const cur=el.dataset.state||‘Not started’;
+const next=states[(states.indexOf(cur)+1)%states.length];
+el.dataset.state=next;
+el.className=’badge ’+(next===‘Done’?‘badge-approved’:next===‘In progress’?‘badge-review’:‘badge-pending’);
+el.textContent=next;
+showToastMsg(’Marked as: ’+next);
 }
 
 // FIX 23: Real invite modal
 function openInviteModal() {
-  const ov=document.createElement('div');
-  ov.className='modal-ov open';
-  ov.innerHTML=`<div class="modal" style="max-width:440px">
-    <div class="modal-hdr"><div class="modal-title">Invite teammate</div><button class="modal-close" onclick="this.closest('.modal-ov').remove()">✕</button></div>
-    <div class="modal-body">
-      <div class="form-group"><label class="label">Email address</label><input class="input" id="inviteEmail" type="email" placeholder="colleague@company.com"/></div>
-      <div class="form-group"><label class="label" style="margin-bottom:.5rem">Role</label>
-        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:.4rem">
-          ${[{v:'admin',l:'Admin',s:'Full access + billing'},{v:'editor',l:'Editor',s:'Listings + reports'},{v:'viewer',l:'Viewer',s:'Read-only'}].map(r=>`
-            <div class="radio-opt">
-              <input type="radio" name="inviteRole" id="ir_${r.v}" value="${r.v}" ${r.v==='editor'?'checked':''}/>
-              <label class="radio-lbl" for="ir_${r.v}" style="flex-direction:column;align-items:flex-start;gap:.15rem;padding:.65rem .75rem">
-                <div class="radio-lbl-title">${r.l}</div>
-                <div class="radio-lbl-sub">${r.s}</div>
-              </label>
-            </div>`).join('')}
-        </div>
-      </div>
-      <div class="form-group"><label class="label">Personal note (optional)</label><textarea class="textarea" id="inviteMsg" style="min-height:70px" placeholder="Joining our hiring transparency dashboard..."></textarea></div>
-    </div>
-    <div class="modal-footer">
-      <button class="btn btn-secondary" onclick="this.closest('.modal-ov').remove()">Cancel</button>
-      <button class="btn btn-primary" onclick="sendInvite(this)">Send invite →</button>
-    </div>
+const ov=document.createElement(‘div’);
+ov.className=‘modal-ov open’;
+ov.innerHTML=`<div class="modal" style="max-width:440px"> <div class="modal-hdr"><div class="modal-title">Invite teammate</div><button class="modal-close" onclick="this.closest('.modal-ov').remove()">✕</button></div> <div class="modal-body"> <div class="form-group"><label class="label">Email address</label><input class="input" id="inviteEmail" type="email" placeholder="colleague@company.com"/></div> <div class="form-group"><label class="label" style="margin-bottom:.5rem">Role</label> <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:.4rem"> ${[{v:'admin',l:'Admin',s:'Full access + billing'},{v:'editor',l:'Editor',s:'Listings + reports'},{v:'viewer',l:'Viewer',s:'Read-only'}].map(r=>`
+<div class="radio-opt">
+<input type=“radio” name=“inviteRole” id=“ir_${r.v}” value=”${r.v}” ${r.v===‘editor’?‘checked’:’’}/>
+<label class="radio-lbl" for="ir_${r.v}" style="flex-direction:column;align-items:flex-start;gap:.15rem;padding:.65rem .75rem">
+<div class="radio-lbl-title">${r.l}</div>
+<div class="radio-lbl-sub">${r.s}</div>
+</label>
+</div>`).join(’’)}
+</div>
+</div>
+<div class="form-group"><label class="label">Personal note (optional)</label><textarea class="textarea" id="inviteMsg" style="min-height:70px" placeholder="Joining our hiring transparency dashboard..."></textarea></div>
+</div>
+<div class="modal-footer">
+<button class="btn btn-secondary" onclick="this.closest('.modal-ov').remove()">Cancel</button>
+<button class="btn btn-primary" onclick="sendInvite(this)">Send invite →</button>
+</div>
+
   </div>`;
   document.body.appendChild(ov);
   ov.addEventListener('click',e=>{if(e.target===ov)ov.remove();});
 }
 
 async function sendInvite(btn) {
-  const email=document.getElementById('inviteEmail')?.value?.trim();
-  if(!email||!email.includes('@')){showToastMsg('Enter a valid email','error');return;}
-  btn.textContent='Sending...';btn.disabled=true;
-  await sleep(700);
-  btn.closest('.modal-ov').remove();
-  showToastMsg(`Invite sent to ${email}`,'success');
+const email=document.getElementById(‘inviteEmail’)?.value?.trim();
+if(!email||!email.includes(’@’)){showToastMsg(‘Enter a valid email’,‘error’);return;}
+btn.textContent=‘Sending…’;btn.disabled=true;
+await sleep(700);
+btn.closest(’.modal-ov’).remove();
+showToastMsg(`Invite sent to ${email}`,‘success’);
 }
 
 // FIX 21: Unsaved changes
 let _hasUnsaved=false;
 function markUnsaved(){
-  if(!_hasUnsaved){
-    _hasUnsaved=true;
-    const b=document.getElementById('unsavedBanner');
-    if(b)b.classList.add('show');
-  }
+if(!_hasUnsaved){
+_hasUnsaved=true;
+const b=document.getElementById(‘unsavedBanner’);
+if(b)b.classList.add(‘show’);
+}
 }
 function discardChanges(){
-  _hasUnsaved=false;
-  const b=document.getElementById('unsavedBanner');
-  if(b)b.classList.remove('show');
-  renderSettings();
-  showToastMsg('Changes discarded');
+_hasUnsaved=false;
+const b=document.getElementById(‘unsavedBanner’);
+if(b)b.classList.remove(‘show’);
+renderSettings();
+showToastMsg(‘Changes discarded’);
 }
 function saveProfile(){
-  _hasUnsaved=false;
-  const b=document.getElementById('unsavedBanner');
-  if(b)b.classList.remove('show');
-  const co=Store.get('company');
-  const nameEl=document.getElementById('settCoName');
-  if(nameEl)co.name=nameEl.value;
-  updateSidebar();
-  showToastMsg('Profile saved','success');
+_hasUnsaved=false;
+const b=document.getElementById(‘unsavedBanner’);
+if(b)b.classList.remove(‘show’);
+const co=Store.get(‘company’);
+const nameEl=document.getElementById(‘settCoName’);
+if(nameEl)co.name=nameEl.value;
+updateSidebar();
+showToastMsg(‘Profile saved’,‘success’);
 }
 
 // FIX 24: Confirm dialog system
 function openConfirm({title,body,confirmLabel,confirmClass,requireType,onConfirm}){
-  const ov=document.createElement('div');
-  ov.className='modal-ov open';
-  ov.style.alignItems='center';
-  ov.innerHTML=`<div class="confirm-dialog">
-    <div class="confirm-title">${title}</div>
-    <div class="confirm-body">${body}</div>
-    ${requireType?`<input class="input" id="confirmTypeInput" placeholder='Type ${requireType} to confirm' style="margin-bottom:1rem"/>`:''}
-    <div class="confirm-actions">
-      <button class="btn btn-ghost btn-sm" onclick="this.closest('.modal-ov').remove()">Cancel</button>
-      <button class="btn ${confirmClass} btn-sm" onclick="handleConfirm(this,'${requireType||''}')">${confirmLabel}</button>
-    </div>
+const ov=document.createElement(‘div’);
+ov.className=‘modal-ov open’;
+ov.style.alignItems=‘center’;
+ov.innerHTML=`<div class="confirm-dialog"> <div class="confirm-title">${title}</div> <div class="confirm-body">${body}</div> ${requireType?`<input class="input" id="confirmTypeInput" placeholder='Type ${requireType} to confirm' style="margin-bottom:1rem"/>`:’’}
+<div class="confirm-actions">
+<button class="btn btn-ghost btn-sm" onclick="this.closest('.modal-ov').remove()">Cancel</button>
+<button class="btn ${confirmClass} btn-sm" onclick="handleConfirm(this,'${requireType||''}')">${confirmLabel}</button>
+</div>
+
   </div>`;
   ov._onConfirm=onConfirm;
   document.body.appendChild(ov);
@@ -2340,172 +2322,162 @@ function openConfirm({title,body,confirmLabel,confirmClass,requireType,onConfirm
 }
 
 function handleConfirm(btn,requireType){
-  const ov=btn.closest('.modal-ov');
-  if(requireType){
-    const val=document.getElementById('confirmTypeInput')?.value;
-    if(val!==requireType){showToastMsg(`Type "${requireType}" to confirm`,'error');return;}
-  }
-  ov._onConfirm?.();
-  ov.remove();
+const ov=btn.closest(’.modal-ov’);
+if(requireType){
+const val=document.getElementById(‘confirmTypeInput’)?.value;
+if(val!==requireType){showToastMsg(`Type "${requireType}" to confirm`,‘error’);return;}
+}
+ov._onConfirm?.();
+ov.remove();
 }
 
 function confirmDelete(){
-  openConfirm({title:'Delete company account?',body:'This permanently removes all data and your verified status. Type DELETE to confirm.',confirmLabel:'Permanently delete',confirmClass:'btn-danger',requireType:'DELETE',onConfirm:()=>showToastMsg('Contact support@tryseen.io to complete deletion','error')});
+openConfirm({title:‘Delete company account?’,body:‘This permanently removes all data and your verified status. Type DELETE to confirm.’,confirmLabel:‘Permanently delete’,confirmClass:‘btn-danger’,requireType:‘DELETE’,onConfirm:()=>showToastMsg(‘Contact support@tryseen.io to complete deletion’,‘error’)});
 }
 
 async function closeListing(id){
-  openConfirm({
-    title:'Close this listing?',
-    body:'Marks the role as filled and removes it from active listings. Improves your transparency score.',
-    confirmLabel:'Close listing',
-    confirmClass:'btn-primary',
-    onConfirm:async()=>{
-      await API.closeListing(id);
-      showToastMsg('Listing closed. Score updating...','success');
-      renderListings();
-    },
-  });
+openConfirm({
+title:‘Close this listing?’,
+body:‘Marks the role as filled and removes it from active listings. Improves your transparency score.’,
+confirmLabel:‘Close listing’,
+confirmClass:‘btn-primary’,
+onConfirm:async()=>{
+await API.closeListing(id);
+showToastMsg(‘Listing closed. Score updating…’,‘success’);
+renderListings();
+},
+});
 }
 
 // FIX 11+12: Login Enter key + ESC closes modals + inline validation feedback
-document.addEventListener('keydown',e=>{
-  if(e.key==='Escape'){
-    document.querySelectorAll('.modal-ov.open').forEach(m=>{
-      if(m.id==='disputeModal')closeDisputeModalDirect();
-      else if(m.id==='listingModal')closeListingModalDirect();
-      else m.remove();
-    });
-    closeSidebar();
-  }
-  if(e.key==='Enter'&&document.getElementById('loginScreen')?.style.display!=='none'){
-    const emailEl=document.getElementById('loginEmail');
-    const passEl=document.getElementById('loginPass');
-    if(document.activeElement===emailEl||document.activeElement===passEl)doLogin();
-  }
+document.addEventListener(‘keydown’,e=>{
+if(e.key===‘Escape’){
+document.querySelectorAll(’.modal-ov.open’).forEach(m=>{
+if(m.id===‘disputeModal’)closeDisputeModalDirect();
+else if(m.id===‘listingModal’)closeListingModalDirect();
+else m.remove();
+});
+closeSidebar();
+}
+if(e.key===‘Enter’&&document.getElementById(‘loginScreen’)?.style.display!==‘none’){
+const emailEl=document.getElementById(‘loginEmail’);
+const passEl=document.getElementById(‘loginPass’);
+if(document.activeElement===emailEl||document.activeElement===passEl)doLogin();
+}
 });
 
 // FIX 13: Score tooltip
-function scoreTooltip(){showToastMsg('Formula: 50 + (response×40) − (ghost×30) − (wait×15) + log(reports)×5');}
+function scoreTooltip(){showToastMsg(‘Formula: 50 + (response×40) − (ghost×30) − (wait×15) + log(reports)×5’);}
 
 // FIX 14: Listings search helper (wires to renderListings table body id)
 function filterListings(q){
-  const data=Store.get('listings')||[];
-  const filtered=q?data.filter(l=>l.title.toLowerCase().includes(q.toLowerCase())||l.location.toLowerCase().includes(q.toLowerCase())):data;
-  const tbody=document.getElementById('listingsBody');
-  if(!tbody)return;
-  tbody.innerHTML=filtered.map(l=>`
-    <tr>
-      <td data-label="Role"><div style="font-weight:500;color:var(--tx)">${l.title}</div><div style="font-family:var(--mono);font-size:.6rem;color:var(--muted)">Posted ${formatDate(l.createdAt)}</div></td>
-      <td data-label="Location" style="font-size:.8rem">${l.location}</td>
-      <td data-label="Type"><div style="font-size:.78rem">${l.type}</div><div style="font-family:var(--mono);font-size:.6rem;color:var(--muted)">${l.level}</div></td>
-      <td data-label="Salary" style="font-family:var(--mono);font-size:.78rem;color:var(--score-safe)">$${(l.salaryMin/1000).toFixed(0)}k–$${(l.salaryMax/1000).toFixed(0)}k</td>
-      <td data-label="Applications"><div style="font-family:var(--mono);font-size:.88rem;font-weight:500">${l.applications}</div><div class="prog-bar" style="width:80px"><div class="prog-fill" style="width:${Math.min(100,l.applications/1.5)}%;background:var(--accent)"></div></div></td>
-      <td data-label="Status"><span class="badge ${l.status==='active'?'badge-approved':'badge-pending'}"><span class="badge-dot" style="${l.status!=='active'?'animation:none;opacity:.5':''}"></span>${l.status}</span></td>
-      <td data-label="Actions"><div style="display:flex;gap:.35rem">${l.status==='active'?`<button class="btn btn-danger btn-sm" onclick="closeListing('${l.id}')">Close role</button>`:`<span style="font-family:var(--mono);font-size:.65rem;color:var(--muted)">Closed</span>`}</div></td>
-    </tr>`).join('');
+const data=Store.get(‘listings’)||[];
+const filtered=q?data.filter(l=>l.title.toLowerCase().includes(q.toLowerCase())||l.location.toLowerCase().includes(q.toLowerCase())):data;
+const tbody=document.getElementById(‘listingsBody’);
+if(!tbody)return;
+tbody.innerHTML=filtered.map(l=>` <tr> <td data-label="Role"><div style="font-weight:500;color:var(--tx)">${l.title}</div><div style="font-family:var(--mono);font-size:.6rem;color:var(--muted)">Posted ${formatDate(l.createdAt)}</div></td> <td data-label="Location" style="font-size:.8rem">${l.location}</td> <td data-label="Type"><div style="font-size:.78rem">${l.type}</div><div style="font-family:var(--mono);font-size:.6rem;color:var(--muted)">${l.level}</div></td> <td data-label="Salary" style="font-family:var(--mono);font-size:.78rem;color:var(--score-safe)">$${(l.salaryMin/1000).toFixed(0)}k–$${(l.salaryMax/1000).toFixed(0)}k</td> <td data-label="Applications"><div style="font-family:var(--mono);font-size:.88rem;font-weight:500">${l.applications}</div><div class="prog-bar" style="width:80px"><div class="prog-fill" style="width:${Math.min(100,l.applications/1.5)}%;background:var(--accent)"></div></div></td> <td data-label="Status"><span class="badge ${l.status==='active'?'badge-approved':'badge-pending'}"><span class="badge-dot" style="${l.status!=='active'?'animation:none;opacity:.5':''}"></span>${l.status}</span></td> <td data-label="Actions"><div style="display:flex;gap:.35rem">${l.status==='active'?`<button class="btn btn-danger btn-sm" onclick="closeListing('${l.id}')">Close role</button>`:`<span style="font-family:var(--mono);font-size:.65rem;color:var(--muted)">Closed</span>`}</div></td> </tr>`).join(’’);
 }
 
 // ═══════════════════════════════════════════════════════════════
 // SCALABILITY NOTES (for future dev team)
 // ═══════════════════════════════════════════════════════════════
 /*
-  MIGRATION PATH TO PRODUCTION:
+MIGRATION PATH TO PRODUCTION:
 
-  1. BACKEND (Supabase → custom API)
-     - Each API.method() already has the shape of a real endpoint
-     - Replace mock data returns with: return await fetch(`${API.BASE}/endpoint`, {...})
-     - Add Authorization: Bearer ${Store.get('token')} header to all calls
-     - Supabase schema: schema.sql already in /outputs
+1. BACKEND (Supabase → custom API)
+- Each API.method() already has the shape of a real endpoint
+- Replace mock data returns with: return await fetch(`${API.BASE}/endpoint`, {…})
+- Add Authorization: Bearer ${Store.get(‘token’)} header to all calls
+- Supabase schema: schema.sql already in /outputs
+1. FRONTEND FRAMEWORK (HTML → React/Next.js)
+- Each renderXxx() function → becomes a React component
+- Store → Zustand: const useStore = create((set) => ({ …Store }))
+- ROUTES → React Router: <Route path=”/employer/:id/:view” element={<View/>}/>
+- API object stays identical
+1. MOBILE APP (React Native)
+- All API calls are platform-agnostic (no DOM dependencies)
+- CSS custom properties → React Native StyleSheet constants (same values)
+- Store pattern identical in RN with Zustand
+- UI components rebuild in RN — business logic unchanged
+1. INFINITE SCALE BACKEND
+- Supabase → Postgres on any provider (same schema)
+- Add Redis caching layer for score calculations
+- Score recalculation → async job queue (not synchronous)
+- Reddit aggregation → scheduled cron job, not on-demand
+- Add CDN for static assets, Cloudflare for edge caching
+- DB read replicas for analytics queries
+1. AUTH
+   // ═══════════════════════════════════════════════
+   // EMPLOYER AUTH — persist session on refresh
+   // ═══════════════════════════════════════════════
+   async function initEmployerAuth() {
+   if (!db) return;
+   try {
+   const { data: { session } } = await db.auth.getSession();
+   if (session?.user) {
+   const uid = session.user.id;
+   
+   // Try cached company first for instant load
+   const cached = Store.get(‘company’);
+   
+   // Always refresh from DB to stay accurate
+   let company = null;
+   try {
+   const { data: empProfile } = await db.from(‘employer_profiles’)
+   .select(’*, companies(*)’).eq(‘id’, uid).single();
+   
+   if (empProfile?.companies) {
+   company = {
+   …MOCK_EMPLOYER,
+   id: empProfile.companies.id,
+   name: empProfile.companies.name,
+   email: session.user.email,
+   verified: empProfile.verified || false,
+   plan: empProfile.plan || ‘free’,
+   };
+   } else {
+   // No company yet — create one
+   const coName = session.user.email.split(’@’)[1]?.split(’.’)[0] || ‘My Company’;
+   const { data: newCo } = await db.from(‘companies’)
+   .insert({ name: coName, logo_letter: coName[0].toUpperCase() })
+   .select().single();
+   if (newCo) {
+   await db.from(‘employer_profiles’).upsert({ id: uid, company_id: newCo.id });
+   company = { …MOCK_EMPLOYER, id: newCo.id, name: newCo.name, email: session.user.email };
+   }
+   }
+   } catch(e) {
+   // Fall back to cache if DB fails
+   company = cached || { …MOCK_EMPLOYER, email: session.user.email };
+   }
+   
+   if (!company) company = { …MOCK_EMPLOYER, email: session.user.email };
+   
+   Store.set(‘user’, company);
+   Store.set(‘company’, company);
+   
+   document.getElementById(‘loginScreen’).style.display = ‘none’;
+   document.getElementById(‘appShell’).style.display = ‘grid’;
+   updateSidebar();
+   showView(‘dashboard’);
+   updateEmpNotifBadge();
+   }
 
-  2. FRONTEND FRAMEWORK (HTML → React/Next.js)
-     - Each renderXxx() function → becomes a React component
-     - Store → Zustand: const useStore = create((set) => ({ ...Store }))
-     - ROUTES → React Router: <Route path="/employer/:id/:view" element={<View/>}/>
-     - API object stays identical
+```
+db.auth.onAuthStateChange(async (event, session) => {
+  if (event === 'SIGNED_IN' && session?.user) {
+    // Re-init on sign in
+    initEmployerAuth();
+  } else if (event === 'SIGNED_OUT') {
+    Store.set('user', null);
+    Store.set('company', null);
+    document.getElementById('appShell').style.display = 'none';
+    document.getElementById('loginScreen').style.display = 'block';
+  }
+});
+```
 
-  3. MOBILE APP (React Native)
-     - All API calls are platform-agnostic (no DOM dependencies)
-     - CSS custom properties → React Native StyleSheet constants (same values)
-     - Store pattern identical in RN with Zustand
-     - UI components rebuild in RN — business logic unchanged
-
-  4. INFINITE SCALE BACKEND
-     - Supabase → Postgres on any provider (same schema)
-     - Add Redis caching layer for score calculations
-     - Score recalculation → async job queue (not synchronous)
-     - Reddit aggregation → scheduled cron job, not on-demand
-     - Add CDN for static assets, Cloudflare for edge caching
-     - DB read replicas for analytics queries
-
-  5. AUTH
-// ═══════════════════════════════════════════════
-// EMPLOYER AUTH — persist session on refresh
-// ═══════════════════════════════════════════════
-async function initEmployerAuth() {
-  if (!db) return;
-  try {
-    const { data: { session } } = await db.auth.getSession();
-    if (session?.user) {
-      const uid = session.user.id;
-
-      // Try cached company first for instant load
-      const cached = Store.get('company');
-
-      // Always refresh from DB to stay accurate
-      let company = null;
-      try {
-        const { data: empProfile } = await db.from('employer_profiles')
-          .select('*, companies(*)').eq('id', uid).single();
-
-        if (empProfile?.companies) {
-          company = {
-            ...MOCK_EMPLOYER,
-            id: empProfile.companies.id,
-            name: empProfile.companies.name,
-            email: session.user.email,
-            verified: empProfile.verified || false,
-            plan: empProfile.plan || 'free',
-          };
-        } else {
-          // No company yet — create one
-          const coName = session.user.email.split('@')[1]?.split('.')[0] || 'My Company';
-          const { data: newCo } = await db.from('companies')
-            .insert({ name: coName, logo_letter: coName[0].toUpperCase() })
-            .select().single();
-          if (newCo) {
-            await db.from('employer_profiles').upsert({ id: uid, company_id: newCo.id });
-            company = { ...MOCK_EMPLOYER, id: newCo.id, name: newCo.name, email: session.user.email };
-          }
-        }
-      } catch(e) {
-        // Fall back to cache if DB fails
-        company = cached || { ...MOCK_EMPLOYER, email: session.user.email };
-      }
-
-      if (!company) company = { ...MOCK_EMPLOYER, email: session.user.email };
-
-      Store.set('user', company);
-      Store.set('company', company);
-
-      document.getElementById('loginScreen').style.display = 'none';
-      document.getElementById('appShell').style.display = 'grid';
-      updateSidebar();
-      showView('dashboard');
-      updateEmpNotifBadge();
-    }
-
-    db.auth.onAuthStateChange(async (event, session) => {
-      if (event === 'SIGNED_IN' && session?.user) {
-        // Re-init on sign in
-        initEmployerAuth();
-      } else if (event === 'SIGNED_OUT') {
-        Store.set('user', null);
-        Store.set('company', null);
-        document.getElementById('appShell').style.display = 'none';
-        document.getElementById('loginScreen').style.display = 'block';
-      }
-    });
-  } catch(e) { console.warn('Employer auth init:', e); }
+} catch(e) { console.warn(‘Employer auth init:’, e); }
 }
 
 // Run on load
@@ -2514,134 +2486,124 @@ initEmployerAuth();
 let empNotifOpen = false;
 
 async function loadEmployerNotifs() {
-  if (!db) return [];
-  try {
-    const uid = (await db.auth.getUser()).data.user?.id;
-    if (!uid) return [];
-    const { data } = await db.from('notifications')
-      .select('*').eq('user_id', uid).order('created_at', { ascending: false }).limit(20);
-    return data || [];
-  } catch(e) { return []; }
+if (!db) return [];
+try {
+const uid = (await db.auth.getUser()).data.user?.id;
+if (!uid) return [];
+const { data } = await db.from(‘notifications’)
+.select(’*’).eq(‘user_id’, uid).order(‘created_at’, { ascending: false }).limit(20);
+return data || [];
+} catch(e) { return []; }
 }
 
 async function updateEmpNotifBadge() {
-  if (!db) return;
-  try {
-    const uid = (await db.auth.getUser()).data.user?.id;
-    if (!uid) return;
-    const { count } = await db.from('notifications')
-      .select('*', { count: 'exact', head: true }).eq('user_id', uid).eq('read', false);
-    const badge = document.getElementById('empNotifBadge');
-    if (badge) {
-      if (count > 0) { badge.textContent = count > 9 ? '9+' : count; badge.style.display = 'flex'; }
-      else { badge.style.display = 'none'; }
-    }
-  } catch(e) {}
+if (!db) return;
+try {
+const uid = (await db.auth.getUser()).data.user?.id;
+if (!uid) return;
+const { count } = await db.from(‘notifications’)
+.select(’*’, { count: ‘exact’, head: true }).eq(‘user_id’, uid).eq(‘read’, false);
+const badge = document.getElementById(‘empNotifBadge’);
+if (badge) {
+if (count > 0) { badge.textContent = count > 9 ? ‘9+’ : count; badge.style.display = ‘flex’; }
+else { badge.style.display = ‘none’; }
+}
+} catch(e) {}
 }
 
 async function toggleEmployerNotifs() {
-  const panel = document.getElementById('empNotifPanel');
-  if (!panel) return;
-  empNotifOpen = !empNotifOpen;
-  panel.style.display = empNotifOpen ? 'block' : 'none';
-  if (empNotifOpen) await renderEmpNotifs();
+const panel = document.getElementById(‘empNotifPanel’);
+if (!panel) return;
+empNotifOpen = !empNotifOpen;
+panel.style.display = empNotifOpen ? ‘block’ : ‘none’;
+if (empNotifOpen) await renderEmpNotifs();
 }
 
 async function renderEmpNotifs() {
-  const list = document.getElementById('empNotifList');
-  if (!list) return;
-  list.innerHTML = '<div style="padding:1.25rem;text-align:center;font-size:.75rem;color:#9898b0">Loading...</div>';
-  const notifs = await loadEmployerNotifs();
-  if (!notifs.length) {
-    list.innerHTML = `<div style="padding:2rem;text-align:center"><div style="font-size:1.75rem;margin-bottom:.5rem">🔕</div><div style="font-size:.88rem;font-weight:600;color:#0f0f18;margin-bottom:.25rem">No notifications yet</div><div style="font-size:.72rem;color:#9898b0">Applications will appear here</div></div>`;
-    return;
-  }
-  list.innerHTML = notifs.map(n => {
-    const data = n.data || {};
-    const isNew = !n.read;
-    return `<div style="padding:1rem;border-bottom:1px solid #f0f0f8;background:${isNew?'#f8f8ff':'#fff'}">
-      <div style="display:flex;align-items:flex-start;gap:.65rem;margin-bottom:${data.applicant_email?'.75rem':'0'}">
-        <div style="font-size:1.1rem;flex-shrink:0">${n.type==='new_application'?'📋':'🔔'}</div>
-        <div style="flex:1">
-          <div style="font-size:.82rem;font-weight:700;color:#0f0f18;margin-bottom:.15rem">${n.title}</div>
-          <div style="font-size:.72rem;color:#6a6a88;line-height:1.5;margin-bottom:.2rem">${n.body||''}</div>
-          <div style="font-size:.62rem;color:#9898b0;font-family:monospace">${empTimeAgo(n.created_at)}</div>
-        </div>
-        ${isNew?'<div style="width:6px;height:6px;border-radius:50%;background:#4f46e5;flex-shrink:0;margin-top:.3rem"></div>':''}
-      </div>
-      ${data.applicant_email?`
-      <div style="background:#f4f4f8;border-radius:8px;padding:.75rem;margin-left:1.75rem">
-        <div style="font-size:.72rem;color:#0f0f18;margin-bottom:.35rem"><strong>${data.applicant_name||'Applicant'}</strong> · <a href="mailto:${data.applicant_email}" style="color:#4f46e5">${data.applicant_email}</a></div>
-        ${data.resume_url?`<div style="font-size:.68rem;color:#6a6a88;margin-bottom:.35rem">Resume: <a href="${data.resume_url}" target="_blank" style="color:#4f46e5">View →</a></div>`:''}
-        ${data.cover_note?`<div style="font-size:.7rem;color:#6a6a88;font-style:italic;margin-bottom:.5rem">"${data.cover_note}"</div>`:''}
-        <div style="display:flex;gap:.4rem;flex-wrap:wrap">
-          <a href="mailto:${data.applicant_email}?subject=Re: Your application for ${data.role||'the position'}" style="display:inline-block;padding:.38rem .85rem;background:#4f46e5;color:#fff;text-decoration:none;border-radius:6px;font-size:.72rem;font-weight:600">Reply →</a>
-          <button onclick="updateApplicationStage('${n.id}','${data.application_id||''}','Reviewing','${data.applicant_email||''}')" style="padding:.38rem .85rem;background:#f0fdf4;border:1px solid #bbf7d0;color:#15803d;border-radius:6px;font-size:.72rem;font-weight:600;cursor:pointer">Reviewing</button>
-          <button onclick="updateApplicationStage('${n.id}','${data.application_id||''}','Interview','${data.applicant_email||''}')" style="padding:.38rem .85rem;background:#eff6ff;border:1px solid #bfdbfe;color:#1d4ed8;border-radius:6px;font-size:.72rem;font-weight:600;cursor:pointer">Interview</button>
-          <button onclick="updateApplicationStage('${n.id}','${data.application_id||''}','Rejected','${data.applicant_email||''}')" style="padding:.38rem .85rem;background:#fef2f2;border:1px solid #fecaca;color:#dc2626;border-radius:6px;font-size:.72rem;font-weight:600;cursor:pointer">Reject</button>
-        </div>
-      </div>`:''}
-    </div>`;
-  }).join('');
+const list = document.getElementById(‘empNotifList’);
+if (!list) return;
+list.innerHTML = ‘<div style="padding:1.25rem;text-align:center;font-size:.75rem;color:#9898b0">Loading…</div>’;
+const notifs = await loadEmployerNotifs();
+if (!notifs.length) {
+list.innerHTML = `<div style="padding:2rem;text-align:center"><div style="font-size:1.75rem;margin-bottom:.5rem">🔕</div><div style="font-size:.88rem;font-weight:600;color:#0f0f18;margin-bottom:.25rem">No notifications yet</div><div style="font-size:.72rem;color:#9898b0">Applications will appear here</div></div>`;
+return;
+}
+list.innerHTML = notifs.map(n => {
+const data = n.data || {};
+const isNew = !n.read;
+return `<div style="padding:1rem;border-bottom:1px solid #f0f0f8;background:${isNew?'#f8f8ff':'#fff'}"> <div style="display:flex;align-items:flex-start;gap:.65rem;margin-bottom:${data.applicant_email?'.75rem':'0'}"> <div style="font-size:1.1rem;flex-shrink:0">${n.type==='new_application'?'📋':'🔔'}</div> <div style="flex:1"> <div style="font-size:.82rem;font-weight:700;color:#0f0f18;margin-bottom:.15rem">${n.title}</div> <div style="font-size:.72rem;color:#6a6a88;line-height:1.5;margin-bottom:.2rem">${n.body||''}</div> <div style="font-size:.62rem;color:#9898b0;font-family:monospace">${empTimeAgo(n.created_at)}</div> </div> ${isNew?'<div style="width:6px;height:6px;border-radius:50%;background:#4f46e5;flex-shrink:0;margin-top:.3rem"></div>':''} </div> ${data.applicant_email?`
+<div style="background:#f4f4f8;border-radius:8px;padding:.75rem;margin-left:1.75rem">
+<div style="font-size:.72rem;color:#0f0f18;margin-bottom:.35rem"><strong>${data.applicant_name||‘Applicant’}</strong> · <a href="mailto:${data.applicant_email}" style="color:#4f46e5">${data.applicant_email}</a></div>
+${data.resume_url?`<div style="font-size:.68rem;color:#6a6a88;margin-bottom:.35rem">Resume: <a href="${data.resume_url}" target="_blank" style="color:#4f46e5">View →</a></div>`:’’}
+${data.cover_note?`<div style="font-size:.7rem;color:#6a6a88;font-style:italic;margin-bottom:.5rem">"${data.cover_note}"</div>`:’’}
+<div style="display:flex;gap:.4rem;flex-wrap:wrap">
+<a href="mailto:${data.applicant_email}?subject=Re: Your application for ${data.role||'the position'}" style="display:inline-block;padding:.38rem .85rem;background:#4f46e5;color:#fff;text-decoration:none;border-radius:6px;font-size:.72rem;font-weight:600">Reply →</a>
+<button onclick="updateApplicationStage('${n.id}','${data.application_id||''}','Reviewing','${data.applicant_email||''}')" style="padding:.38rem .85rem;background:#f0fdf4;border:1px solid #bbf7d0;color:#15803d;border-radius:6px;font-size:.72rem;font-weight:600;cursor:pointer">Reviewing</button>
+<button onclick="updateApplicationStage('${n.id}','${data.application_id||''}','Interview','${data.applicant_email||''}')" style="padding:.38rem .85rem;background:#eff6ff;border:1px solid #bfdbfe;color:#1d4ed8;border-radius:6px;font-size:.72rem;font-weight:600;cursor:pointer">Interview</button>
+<button onclick="updateApplicationStage('${n.id}','${data.application_id||''}','Rejected','${data.applicant_email||''}')" style="padding:.38rem .85rem;background:#fef2f2;border:1px solid #fecaca;color:#dc2626;border-radius:6px;font-size:.72rem;font-weight:600;cursor:pointer">Reject</button>
+</div>
+</div>`:''} </div>`;
+}).join(’’);
 
-  // Mark all read
-  try {
-    const uid = (await db.auth.getUser()).data.user?.id;
-    if (uid) await db.from('notifications').update({ read: true }).eq('user_id', uid).eq('read', false);
-    updateEmpNotifBadge();
-  } catch(e) {}
+// Mark all read
+try {
+const uid = (await db.auth.getUser()).data.user?.id;
+if (uid) await db.from(‘notifications’).update({ read: true }).eq(‘user_id’, uid).eq(‘read’, false);
+updateEmpNotifBadge();
+} catch(e) {}
 }
 
 async function updateApplicationStage(notifId, applicationId, stage, applicantEmail) {
-  if (!applicationId || !db) { showToastMsg('Cannot update.', 'error'); return; }
-  try {
-    await db.from('applications').update({ employer_stage: stage, updated_at: new Date().toISOString() }).eq('id', applicationId);
-    // Notify the seeker
-    const { data: appData } = await db.from('applications').select('user_id, role, company_name').eq('id', applicationId).single();
-    if (appData?.user_id) {
-      await db.from('notifications').insert({
-        user_id: appData.user_id, type: 'stage_update',
-        title: `Update on your ${appData.role} application`,
-        body: `${appData.company_name} marked your application as: ${stage}`,
-        data: { application_id: applicationId, new_stage: stage, company: appData.company_name, role: appData.role }
-      });
-    }
-    showToastMsg(`Marked as ${stage} ✓`, 'success');
-    await renderEmpNotifs();
-  } catch(e) { showToastMsg('Update failed: ' + e.message, 'error'); }
+if (!applicationId || !db) { showToastMsg(‘Cannot update.’, ‘error’); return; }
+try {
+await db.from(‘applications’).update({ employer_stage: stage, updated_at: new Date().toISOString() }).eq(‘id’, applicationId);
+// Notify the seeker
+const { data: appData } = await db.from(‘applications’).select(‘user_id, role, company_name’).eq(‘id’, applicationId).single();
+if (appData?.user_id) {
+await db.from(‘notifications’).insert({
+user_id: appData.user_id, type: ‘stage_update’,
+title: `Update on your ${appData.role} application`,
+body: `${appData.company_name} marked your application as: ${stage}`,
+data: { application_id: applicationId, new_stage: stage, company: appData.company_name, role: appData.role }
+});
+}
+showToastMsg(`Marked as ${stage} ✓`, ‘success’);
+await renderEmpNotifs();
+} catch(e) { showToastMsg(’Update failed: ’ + e.message, ‘error’); }
 }
 
 async function markAllEmpNotifsRead() {
-  if (!db) return;
-  try {
-    const uid = (await db.auth.getUser()).data.user?.id;
-    if (uid) await db.from('notifications').update({ read: true }).eq('user_id', uid);
-    updateEmpNotifBadge(); renderEmpNotifs();
-  } catch(e) {}
+if (!db) return;
+try {
+const uid = (await db.auth.getUser()).data.user?.id;
+if (uid) await db.from(‘notifications’).update({ read: true }).eq(‘user_id’, uid);
+updateEmpNotifBadge(); renderEmpNotifs();
+} catch(e) {}
 }
 
 function empTimeAgo(d) {
-  if (!d) return '';
-  const diff = Date.now() - new Date(d).getTime();
-  const m = Math.floor(diff/60000);
-  if (m < 1) return 'just now'; if (m < 60) return m+'m ago';
-  const h = Math.floor(m/60); if (h < 24) return h+'h ago';
-  return Math.floor(h/24)+'d ago';
+if (!d) return ‘’;
+const diff = Date.now() - new Date(d).getTime();
+const m = Math.floor(diff/60000);
+if (m < 1) return ‘just now’; if (m < 60) return m+‘m ago’;
+const h = Math.floor(m/60); if (h < 24) return h+‘h ago’;
+return Math.floor(h/24)+‘d ago’;
 }
 
-document.addEventListener('click', e => {
-  const panel = document.getElementById('empNotifPanel');
-  const bell = document.getElementById('empNotifBell');
-  if (empNotifOpen && panel && !panel.contains(e.target) && !bell?.contains(e.target)) {
-    empNotifOpen = false; panel.style.display = 'none';
-  }
+document.addEventListener(‘click’, e => {
+const panel = document.getElementById(‘empNotifPanel’);
+const bell = document.getElementById(‘empNotifBell’);
+if (empNotifOpen && panel && !panel.contains(e.target) && !bell?.contains(e.target)) {
+empNotifOpen = false; panel.style.display = ‘none’;
+}
 });
 
 // Poll for new notifications every 30 seconds
 setInterval(updateEmpNotifBadge, 30000);
-     - Add OAuth (Google Workspace for employers)
-     - Row-level security in Supabase already configured in schema.sql
+- Add OAuth (Google Workspace for employers)
+- Row-level security in Supabase already configured in schema.sql
 */
 </script>
+
 </body>
 </html>
