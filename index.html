@@ -2711,9 +2711,9 @@ function buildAppCard(app) {
         <button class="btn btn-ghost" style="font-size:.7rem" onclick="markAppStatus('${app.id}','rejected')">✗ Rejected</button>
       ` : `
         <button class="btn btn-ghost" style="font-size:.7rem" onclick="prefillReport('${app.id}')">Report your experience →</button>
-        <button class="btn btn-ghost" style="font-size:.7rem" onclick="AppStore.remove('${app.id}');renderTracker()">Remove</button>
+        <button class="btn btn-ghost" style="font-size:.7rem" onclick="removeApp('${app.id}')">Remove</button>
       `}
-      <button class="btn btn-ghost" style="font-size:.7rem;margin-left:auto;color:var(--muted)" onclick="AppStore.remove('${app.id}');renderTracker()">✕</button>
+      <button class="btn btn-ghost" style="font-size:.7rem;margin-left:auto;color:var(--muted)" onclick="removeApp('${app.id}')">✕</button>
     </div>
 
     <!-- Hiring Manager + Insider Intel — lazy loaded -->
@@ -4784,6 +4784,11 @@ async function updateStage(appId, stage) {
   closeStageModalDirect();
   await renderTracker();
   showToast(`Stage updated: ${stage}`);
+}
+
+async function removeApp(id) {
+  await AppStore.remove(id);
+  await renderTracker();
 }
 
 async function markAppStatus(id, status) {
