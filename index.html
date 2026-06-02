@@ -4089,7 +4089,7 @@ function showFullApplyForm(jobId, company, role, location, score, risk, waste, a
       if (fileNameEl) fileNameEl.textContent = stored.fileName || 'My Resume';
       // Store the text as the resume value (not a URL)
       if (hiddenVal) hiddenVal.value = 'profile_resume';
-      window._applyResumeText = stored.text;
+      if (!window._resumeWasOptimized) window._applyResumeText = stored.text;
     } else {
       // No profile resume — show link input
       if (profileSection) profileSection.style.display = 'none';
