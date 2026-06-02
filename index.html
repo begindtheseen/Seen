@@ -2181,7 +2181,7 @@ function switchTab(n,btn){
 // ═══════════════════════════════════════════════
 // UTILS
 // ═══════════════════════════════════════════════
-function showToast(m){const t=document.getElementById('toast');t.textContent=m;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),3200);}
+function showToast(m){const t=document.getElementById('toast');if(!t)return;t.textContent=m;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),3200);}
 function sleep(ms){return new Promise(r=>setTimeout(r,ms));}
 
 // ═══════════════════════════════════════════════
@@ -2214,9 +2214,11 @@ document.querySelectorAll('input[name="resp"]').forEach(radio => {
     document.getElementById('sl3').textContent = labels.s3;
     document.getElementById('sl4').textContent = labels.s4;
     // Also hide/show the stage section gracefully for auto-reject
-    const stageSection = document.getElementById('stageLabel').closest('.fg');
-    stageSection.style.opacity = val === 'autoreject' ? '0.45' : '1';
-    stageSection.style.pointerEvents = val === 'autoreject' ? 'none' : 'auto';
+    const stageSection = document.getElementById('stageLabel')?.closest('.fg');
+    if (stageSection) {
+      stageSection.style.opacity = val === 'autoreject' ? '0.45' : '1';
+      stageSection.style.pointerEvents = val === 'autoreject' ? 'none' : 'auto';
+    }
   });
 });
 
@@ -3227,7 +3229,7 @@ function go(page){
           if (status) status.style.display = 'block';
           if (ta) { ta.style.display = 'none'; }
         }
-      });
+      }).catch(e => console.warn('resume load:', e));
     }
     // Show/hide back-to-dashboard button
     const backBtn = document.getElementById('backToDashBtn');
@@ -3535,7 +3537,7 @@ async function submitReport(){
       await db.from('reports').insert({company_id:cid,location_id:lid,role:safeTi,platform:document.getElementById('rPl')?.value||'',outcome:document.querySelector('input[name="resp"]:checked')?.value||'waiting',ghost_stage:document.querySelector('input[name="stage"]:checked')?.value||null,rounds:parseInt(document.getElementById('rRounds')?.value||0),wait_days:null,unpaid_work:document.getElementById('rUp')?.value||'na',experience_level:document.getElementById('rExp')?.value||'',report_text:safeExp||null,source:'direct',needs_review:false});
     }catch(e){console.warn('Report save error:',e);}
   }
-  document.getElementById('repOk').style.display='block';
+  const repOk=document.getElementById('repOk');if(repOk)repOk.style.display='block';
   ['rCo','rTi','rLoc','rEx'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
   document.querySelectorAll('input[name="resp"],input[name="stage"]').forEach(r=>r.checked=false);
   showToast('Submitted. Score updated. You just helped someone.');
@@ -3766,6 +3768,39 @@ function showApplyMode(mode, jobId, company, role, location, score, risk, waste,
   }
 }
 
+function proceedAsGuest(jobId, company, role, location, score, risk, waste, applyEmail) {
+  const job = JOBS.find(j => j.id === jobId);
+  showFullApplyForm(jobId, company, role, location, score, risk, waste, applyEmail, job, Score.wasteLabel(waste));
+}
+
+async function confirmApply(jobId, company, role, location, score, risk, waste) {
+  const platform = document.getElementById('applyPlatform')?.value || 'Seen';
+  const jobUrl = document.getElementById('applyUrl')?.value?.trim() || '';
+  const btn = document.querySelector('#trackFormSection .btn-green');
+  if (btn) { btn.textContent = 'Saving...'; btn.disabled = true; }
+  try {
+    await AppStore.add({
+      id: 'app_' + Date.now(),
+      jobId, company, role, location, score,
+      risk: risk || Score.risk(score),
+      waste: waste || 25,
+      platform, jobUrl,
+      stage: 'Applied', status: 'active',
+      appliedAt: Date.now(), updatedAt: Date.now(),
+    });
+    closeApplyModalDirect();
+    const apps = await AppStore.load();
+    const badge = document.getElementById('trackerBadge');
+    if (badge) { const c = apps.filter(a => a.status === 'active').length; if (c > 0) { badge.textContent = c; badge.style.display = 'inline'; } }
+    if (Auth.isSeeker()) renderSeekerDash().catch(() => {});
+    showToast('Application tracked! View it in your dashboard.');
+  } catch(e) {
+    console.error('confirmApply:', e);
+    showToast('Failed to save. Please try again.');
+    if (btn) { btn.textContent = 'Log application →'; btn.disabled = false; }
+  }
+}
+
 async function showAIOptimizeFlow(jobId, company, role, location, score, risk, waste, applyEmail) {
   const body = document.getElementById('applyModalBody');
   const stored = await ResumeStore.load();
@@ -3990,7 +4025,7 @@ function showFullApplyForm(jobId, company, role, location, score, risk, waste, a
       if (linkSection) linkSection.style.display = 'block';
       window._applyResumeText = null;
     }
-  });
+  }).catch(e => console.warn('resume load:', e));
 }
 
 function showApplyResumeOverride() {
@@ -4145,10 +4180,10 @@ async function submitApplication(jobId, company, role, location, score, risk, wa
         employer_stage: 'New',
         score: score,
         waste_score: waste,
-        job_url: resume,
+        job_url: null,
         applicant_name: name,
         applicant_email: email,
-        resume_url: resume,
+        resume_url: resumeLabel,
         cover_note: note,
       }).select('id').single();
 
@@ -4161,7 +4196,7 @@ async function submitApplication(jobId, company, role, location, score, risk, wa
           'new_application',
           `New application — ${role}`,
           `${name} applied for ${role}. Tap to review.`,
-          { application_id: applicationId, applicant_name: name, applicant_email: email, resume_url: resume, cover_note: note, role, company, location }
+          { application_id: applicationId, applicant_name: name, applicant_email: email, resume_url: resumeLabel, cover_note: note, role, company, location }
         );
       }
     }
@@ -4220,7 +4255,8 @@ async function submitApplication(jobId, company, role, location, score, risk, wa
 // ═══════════════════════════════════════════════
 async function initSeekerPasswordReset() {
   if (!db) { showToast('Connection error.'); return; }
-  const { data:{ user } } = await db.auth.getUser();
+  const authRes = await db.auth.getUser().catch(() => null);
+  const user = authRes?.data?.user;
   if (!user?.email) { showToast('No email on file.'); return; }
 
   const btn = event?.target;
@@ -4368,9 +4404,10 @@ const ResumeStore = {
     localStorage.removeItem(this._key());
     localStorage.removeItem(this._metaKey());
     if (db && Auth.isLoggedIn()) {
-      db.auth.getUser().then(({ data: { user } }) => {
+      db.auth.getUser().then(res => {
+        const user = res?.data?.user;
         if (user) db.from('profiles').update({ resume_text: null, resume_file_name: null, resume_word_count: null }).eq('id', user.id);
-      });
+      }).catch(e => console.warn('ResumeStore.clear:', e));
     }
   }
 };
@@ -4552,7 +4589,7 @@ function renderProposalResults(container, d, job, company) {
 function copyProposal() {
   const content=document.getElementById('proposalContent')?.innerText;
   if(!content)return;
-  navigator.clipboard.writeText(content).then(()=>showToast('Copied to clipboard!'));
+  navigator.clipboard.writeText(content).then(()=>showToast('Copied to clipboard!')).catch(()=>showToast('Copy failed — select and copy manually.'));
 }
 
 async function toggleSaveJob(jobId, company, title, city, score) {
