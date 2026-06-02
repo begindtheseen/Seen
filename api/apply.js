@@ -13,7 +13,10 @@ export default async function handler(req) {
   const headers = { 'Access-Control-Allow-Origin': '*', 'Content-Type': 'application/json' };
 
   try {
-    const { applicantName, applicantEmail, role, company, location, resumeLink, resumeText, coverNote, applyEmail } = await req.json();
+    const { applicantName, applicantEmail, role, company, location, resumeLink, resumeText: rawResumeText, coverNote, applyEmail } = await req.json();
+    // Reject binary/docx XML content — only include if it looks like human-readable text
+    const isReadable = t => t && t.length > 20 && !/(word\/|\.xml|docProps|rels\/|PK\x03)/.test(t.slice(0, 500));
+    const resumeText = isReadable(rawResumeText) ? rawResumeText : null;
 
     const RESEND_KEY = process.env.RESEND_KEY;
     if (!RESEND_KEY) throw new Error('RESEND_KEY not configured');
