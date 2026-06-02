@@ -2523,9 +2523,12 @@ const AppStore = {
     return {ok:true};
   },
   async update(id, changes) {
-    if(Auth.isLoggedIn() && db) { try { await db.from('applications').update({...changes,updated_at:new Date().toISOString()}).eq('id',id); return; } catch(e) { console.warn('AppStore.update:', e.message); } }
-    const apps=this.loadSync(); const idx=apps.findIndex(a=>a.id===id);
-    if(idx!==-1){ apps[idx]={...apps[idx],...changes,updatedAt:Date.now()}; localStorage.setItem(this.KEY,JSON.stringify(apps)); }
+    // Always update localStorage cache immediately so the tracker re-renders correctly
+    const apps = this.loadSync();
+    const idx = apps.findIndex(a => a.id === id);
+    if (idx !== -1) { apps[idx] = {...apps[idx], ...changes, updatedAt: Date.now()}; localStorage.setItem(this.KEY, JSON.stringify(apps)); }
+    // Also persist to Supabase if logged in
+    if (Auth.isLoggedIn() && db) { try { await db.from('applications').update({...changes, updated_at: new Date().toISOString()}).eq('id', id); } catch(e) { console.warn('AppStore.update:', e.message); } }
   },
   async remove(id) {
     if(Auth.isLoggedIn()&&db){ try{ await db.from('applications').delete().eq('id',id); return; }catch(e){} }
