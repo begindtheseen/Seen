@@ -1620,7 +1620,7 @@ const VIBES={
   default:['📊 Data still loading','🔍 Add a report'],
 };
 
-const JOBS=[
+const FALLBACK_JOBS=[
   // ── ORANGE COUNTY ──
   {id:'j_oc1',co:'Hoag Hospital',logo:'HH',ver:false,title:'Registered Nurse – ICU',loc:'Newport Beach, CA',city:'Newport Beach, CA',type:'Full-time',lvl:'Mid level',niche:'Healthcare',sal:'$95k–$130k',score:78,risk:'safe',waste:11,apply_email:'careers@hoag.org',vibes:['✅ Responds within 1 week','💉 Strong benefits','📍 Orange County']},
   {id:'j_oc2',co:'Disneyland Resort',logo:'DL',ver:false,title:'Guest Experience Host',loc:'Anaheim, CA',city:'Anaheim, CA',type:'Part-time',lvl:'Entry level',niche:'Retail',sal:'$19–22/hr',score:71,risk:'safe',waste:16,apply_email:'disneylandcareers@disney.com',vibes:['⚡ Fast process','🎢 Unique workplace','✅ Clear timeline']},
@@ -1651,6 +1651,8 @@ const JOBS=[
   {id:'j_r1',co:'Stripe',logo:'S',ver:true,title:'Senior Software Engineer',loc:'Remote',city:'Remote',type:'Full-time',lvl:'Senior',niche:'Tech',sal:'$160k–$220k',score:88,risk:'safe',waste:4,apply_email:'jobs@stripe.com',vibes:['✅ Clear timeline','⚡ Fast process','💬 Real responses']},
   {id:'j_r2',co:'Linear',logo:'L',ver:true,title:'Product Designer',loc:'Remote',city:'Remote',type:'Full-time',lvl:'Mid level',niche:'Tech',sal:'$120k–$160k',score:91,risk:'safe',waste:3,apply_email:'jobs@linear.app',vibes:['🏆 Best process in tech','✅ Respectful','📅 Timeline given upfront']},
 ];
+
+let JOBS=[...FALLBACK_JOBS]; // populated from Supabase at runtime
 
 const REPORTS={
   '5':[{role:'Software Engineer',resp:'ghosted',wait:90,stage:'After assessment',loc:'Seattle, WA',text:'Applied 3 months ago. 2-hour assessment. Complete silence since. Listing still active.',src:'reddit'},
@@ -1785,20 +1787,27 @@ function loadLdr(){
 // ═══════════════════════════════════════════════
 // FEATURED JOBS
 // ═══════════════════════════════════════════════
-function loadFeatured(){
-  const jobs=JOBS.filter(j=>j.score>=70).slice(0,6);
-  document.getElementById('featGrid').innerHTML=jobs.map((j,i)=>{
-    const wl=Score.wasteLabel(j.waste);
-    return`<div class="jcard" style="animation:fadeUp .4s ${i*.06}s ease both" onclick="viewCompany('${j.id}','${j.co}','${j.city}')">
-      <div class="jc-head">
-        <div class="jc-logo">${j.logo}</div>
-        <div class="jc-scores"><div class="jc-ts ${j.risk}">${j.score}</div><div class="jc-ts-lbl">transparency</div></div>
-      </div>
-      <div class="jc-co">${j.co}${j.ver?' · <span style="color:var(--green);font-size:.55rem">✓</span>':''}</div>
-      <div class="jc-title">${j.title}</div>
-      <div class="jc-loc">📍 ${j.loc}</div>
-      <div class="jc-vibes">${j.vibes.slice(0,2).map(v=>`<span class="vibe v-n">${v}</span>`).join('')}</div>
-      <div class="jc-bot"><div class="jc-sal">${j.sal}</div><div style="display:flex;gap:.35rem"><button class="btn btn-ghost" style="font-size:.62rem;padding:.28rem .6rem" onclick="event.stopPropagation();toggleSaveJob('${j.id}','${j.co}','${j.title}','${j.city}',${j.score})" id="save_${j.id}">♡</button><button class="btn btn-green" style="font-size:.62rem;padding:.28rem .7rem" onclick="event.stopPropagation();openApplyModal('${j.id}','${j.co}','${j.title}','${j.city}',${j.score},'${j.risk}',${j.waste},'${j.apply_email||''}')">Apply →</button></div></div>
+async function loadFeatured(){
+  const el=document.getElementById('featGrid');
+  if(!el)return;
+  let jobs=[];
+  if(db){
+    try{
+      const{data}=await db.from('jobs').select('*').gt('expires_at',new Date().toISOString()).gte('score',70).order('score',{ascending:false}).limit(6);
+      if(data?.length)jobs=data.map(_normalizeDbJob);
+    }catch(e){}
+  }
+  if(!jobs.length)jobs=FALLBACK_JOBS.filter(j=>j.score>=70).slice(0,6);
+  el.innerHTML=jobs.map((j,i)=>{
+    const risk=j.risk||Score.risk(j.score);
+    const applyAct=j._url?`window.open('${j._url.replace(/'/g,"\\'")}','_blank')`:`openApplyModal('${j.id}','${(j.co||'').replace(/'/g,"\\'")}','${(j.title||'').replace(/'/g,"\\'")}','${(j.city||'').replace(/'/g,"\\'")}',${j.score},'${risk}',${j.waste||25},'${j.apply_email||''}')`;
+    return`<div class="jcard" style="animation:fadeUp .4s ${i*.06}s ease both">
+      <div class="jc-head"><div class="jc-logo">${j.logo||(j.co||'?')[0]}</div><div class="jc-scores"><div class="jc-ts ${risk}">${j.score}</div><div class="jc-ts-lbl">transparency</div></div></div>
+      <div class="jc-co">${j.co||''}</div>
+      <div class="jc-title">${j.title||''}</div>
+      <div class="jc-loc">📍 ${j.loc||j.city||''}</div>
+      <div class="jc-vibes">${(j.vibes||[]).slice(0,2).map(v=>`<span class="vibe v-n">${v}</span>`).join('')}</div>
+      <div class="jc-bot"><div class="jc-sal">${j.sal||'—'}</div><div style="display:flex;gap:.35rem"><button class="btn btn-ghost" style="font-size:.62rem;padding:.28rem .6rem" onclick="event.stopPropagation();toggleSaveJob('${j.id}','${(j.co||'').replace(/'/g,"\\'")}','${(j.title||'').replace(/'/g,"\\'")}','${(j.city||'').replace(/'/g,"\\'")}',${j.score})" id="save_${j.id}">♡</button><button class="btn btn-green" style="font-size:.62rem;padding:.28rem .7rem" onclick="event.stopPropagation();${applyAct}">Apply →</button></div></div>
     </div>`;}).join('');
 }
 
@@ -1922,38 +1931,93 @@ function renderJobResults(jobs, l) {
   }).join('') + '</div>';
 }
 
-function loadJobs(){
-  const q=(document.getElementById('jobsInp')?.value||'').toLowerCase();
-  const loc=(document.getElementById('jobsLoc')?.value||'').toLowerCase();
+// Normalize a Supabase jobs row → FALLBACK_JOBS shape so all existing code works
+function _normalizeDbJob(j){
+  const score=j.score||65;
+  return{
+    id:j.id,
+    co:j.company||'',
+    logo:(j.company||'?')[0].toUpperCase(),
+    ver:false,
+    title:j.title||'',
+    loc:j.location||'',
+    city:j.location||'',
+    type:j.type||'Full-time',
+    lvl:j.level||'Mid level',
+    niche:'Job',
+    sal:j.salary||'—',
+    score,
+    risk:Score.risk(score),
+    waste:j.waste_score||25,
+    apply_email:'',
+    _url:j.apply_url||null,
+    vibes:[(j.description||'').slice(0,80)||`via ${j.source||'Job board'}`],
+  };
+}
+
+async function loadJobs(){
+  const q=(document.getElementById('jobsInp')?.value||'').trim();
+  const loc=(document.getElementById('jobsLoc')?.value||'').trim();
   const min=parseInt(document.getElementById('sRange')?.value||0);
-  const ver=document.getElementById('verOnly')?.checked;
-  let jobs=[...JOBS];
-  if(q)jobs=jobs.filter(j=>j.title.toLowerCase().includes(q)||j.co.toLowerCase().includes(q));
-  if(loc)jobs=jobs.filter(j=>j.city.toLowerCase().includes(loc)||loc==='remote'&&j.city==='Remote');
-  jobs=jobs.filter(j=>j.score>=min);
-  if(ver)jobs=jobs.filter(j=>j.ver);
-  jobs.sort((a,b)=>b.score-a.score);
-  document.getElementById('jobsCt').textContent=jobs.length+' listings';
-  document.getElementById('jobsList').innerHTML=jobs.map(j=>{
-    const wl=Score.wasteLabel(j.waste);
-    return`<div class="jlc" onclick="viewCompany('${j.id}','${j.co}','${j.city}')">
-      <div>
+  const listEl=document.getElementById('jobsList');
+  const countEl=document.getElementById('jobsCt');
+
+  // User typed a query → hand off to live web search (always fresh)
+  if(q){searchJobs(q,loc);return;}
+
+  if(listEl)listEl.innerHTML='<div style="text-align:center;padding:3rem;font-family:var(--mono);font-size:.7rem;color:var(--muted)"><div class="spinner" style="margin:0 auto 1rem"></div>Loading listings...</div>';
+
+  let jobs=[];
+  if(db){
+    try{
+      let query=db.from('jobs').select('*').gt('expires_at',new Date().toISOString()).gte('score',min||0).order('score',{ascending:false}).limit(60);
+      if(loc)query=query.ilike('location',`%${loc}%`);
+      const{data}=await query;
+      if(data?.length){
+        jobs=data.map(_normalizeDbJob);
+        // Keep JOBS up to date so JOBS.find() calls work in the apply modal
+        JOBS.splice(0,JOBS.length,...jobs,...FALLBACK_JOBS);
+      }
+    }catch(e){console.warn('loadJobs db:',e);}
+  }
+
+  // Fall back to hardcoded if db has no real listings yet
+  if(!jobs.length){
+    jobs=[...FALLBACK_JOBS].filter(j=>j.score>=min);
+    if(loc)jobs=jobs.filter(j=>(j.city||'').toLowerCase().includes(loc.toLowerCase()));
+    jobs.sort((a,b)=>b.score-a.score);
+  }
+
+  if(countEl)countEl.textContent=`${jobs.length} listings`;
+  if(!listEl)return;
+  if(!jobs.length){
+    listEl.innerHTML='<div style="text-align:center;padding:3rem;font-family:var(--mono);font-size:.72rem;color:var(--muted)">No listings match. Try searching or adjusting filters.</div>';
+    return;
+  }
+  listEl.innerHTML='<div class="jlay">'+jobs.map(j=>{
+    const risk=j.risk||Score.risk(j.score);
+    const applyAct=j._url
+      ?`window.open('${j._url.replace(/'/g,"\\'")}','_blank')`
+      :`openApplyModal('${j.id}','${(j.co||'').replace(/'/g,"\\'")}','${(j.title||'').replace(/'/g,"\\'")}','${(j.city||'').replace(/'/g,"\\'")}',${j.score},'${risk}',${j.waste||25},'${j.apply_email||''}')`;
+    return`<div class="jlc">
+      <div class="jlc-l">
         <div class="jlc-title">${j.title}</div>
-        <div class="jlc-co"><span>${j.co}</span>${j.ver?'<span style="font-family:var(--mono);font-size:.55rem;color:var(--green)">✓</span>':''}</div>
-        <div class="jlc-loc">📍 ${j.loc}</div>
-        <div class="jlc-meta">${j.vibes.slice(0,2).map(v=>`<span class="vibe v-n" style="font-size:.55rem">${v}</span>`).join('')}</div>
+        <div class="jlc-co">${j.co}</div>
+        <div class="jlc-loc">📍 ${j.loc||j.city}</div>
+        ${j.vibes?.[0]?`<div style="font-size:.72rem;color:var(--muted);margin-top:.3rem;line-height:1.55">${j.vibes[0]}</div>`:''}
+        <div class="jlc-meta" style="margin-top:.3rem"><span class="jlc-mi">${j.type}</span><span class="jlc-mi">·</span><span class="jlc-mi">${j.lvl}</span></div>
       </div>
       <div class="jlc-r">
-        <div class="jlc-s ${j.risk}">${j.score}</div>
+        <div class="jlc-s ${risk}">${j.score}</div>
         <div class="jlc-sl">transparency</div>
         <div class="jlc-sal">${j.sal}</div>
-        <div style="display:flex;gap:.25rem;margin-top:.1rem">
-          <button class="btn btn-ghost" style="font-size:.58rem;padding:.22rem .5rem" onclick="event.stopPropagation();toggleSaveJob('${j.id}','${j.co}','${j.title}','${j.city}',${j.score})" id="save_${j.id}">♡</button>
-          <button class="btn btn-green" style="font-size:.62rem;padding:.28rem .7rem" onclick="event.stopPropagation();openApplyModal('${j.id}','${j.co}','${j.title}','${j.city}',${j.score},'${j.risk}',${j.waste},'${j.apply_email||''}')">Apply →</button>
+        <div style="display:flex;gap:.25rem;margin-top:.3rem">
+          <button class="btn btn-ghost" style="font-size:.58rem;padding:.22rem .5rem" onclick="event.stopPropagation();toggleSaveJob('${j.id}','${(j.co||'').replace(/'/g,"\\'")}','${(j.title||'').replace(/'/g,"\\'")}','${(j.city||'').replace(/'/g,"\\'")}',${j.score})" id="save_${j.id}">♡</button>
+          <button class="btn btn-green" style="font-size:.62rem;padding:.28rem .7rem" onclick="event.stopPropagation();${applyAct}">Apply →</button>
         </div>
       </div>
-    </div>`;}).join('');
-  setTimeout(initSaveButtons, 100);
+    </div>`;}).join('')+'</div>';
+  setTimeout(initSaveButtons,100);
 }
 
 // ═══════════════════════════════════════════════
@@ -2254,8 +2318,16 @@ function goToEmployerDashboard(){
   document.body.removeChild(a);
 }
 
-// INIT
-loadJobs();
+// INIT — pre-populate JOBS from Supabase so JOBS.find() works for apply modal
+(async()=>{
+  if(db){
+    try{
+      const{data}=await db.from('jobs').select('*').gt('expires_at',new Date().toISOString()).order('score',{ascending:false}).limit(100);
+      if(data?.length)JOBS.splice(0,JOBS.length,...data.map(_normalizeDbJob),...FALLBACK_JOBS);
+    }catch(e){}
+  }
+  loadFeatured();
+})();
 
 // ═══════════════════════════════════════════════
 // CONTENT MODERATION
