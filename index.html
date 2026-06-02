@@ -1952,6 +1952,7 @@ function _normalizeDbJob(j){
     apply_email:'',
     _url:j.apply_url||null,
     vibes:[(j.description||'').slice(0,80)||`via ${j.source||'Job board'}`],
+    description:j.description||'',
   };
 }
 
@@ -3894,10 +3895,6 @@ async function showAIOptimizeFlow(jobId, company, role, location, score, risk, w
         '<textarea id="aiOptResume" placeholder="Paste your resume here..." style="width:100%;background:var(--raised);border:1.5px solid var(--line2);border-radius:8px;padding:.65rem .9rem;color:var(--white);font-family:var(--body);font-size:.8rem;outline:none;min-height:100px;resize:vertical;caret-color:var(--green)"></textarea>' +
       '</div>'
     ) +
-    '<div style="margin-bottom:.85rem">' +
-      '<label style="font-family:var(--mono);font-size:.58rem;text-transform:uppercase;letter-spacing:.07em;color:var(--dim);display:block;margin-bottom:.32rem">Paste the job description *</label>' +
-      '<textarea id="aiOptJD" placeholder="Paste the full job description here for best results..." style="width:100%;background:var(--raised);border:1.5px solid var(--line2);border-radius:8px;padding:.65rem .9rem;color:var(--white);font-family:var(--body);font-size:.8rem;outline:none;min-height:110px;resize:vertical;caret-color:var(--green)"></textarea>' +
-    '</div>' +
     '<div style="display:flex;gap:.5rem">' +
       '<button class="btn btn-ghost" style="flex:1;justify-content:center;font-size:.78rem" onclick="openApplyModal(\'' + jobId + '\',\'' + company.replace(/'/g,"\\'") + '\',\'' + role.replace(/'/g,"\\'") + '\',\'' + location + '\',' + score + ',\'' + risk + '\',' + waste + ',\'' + applyEmail + '\')">← Back</button>' +
       '<button class="btn btn-green" style="flex:2;justify-content:center;font-weight:800" id="aiOptBtn" onclick="runAIOptimize(\'' + jobId + '\',\'' + company.replace(/'/g,"\\'") + '\',\'' + role.replace(/'/g,"\\'") + '\',\'' + location + '\',' + score + ',\'' + risk + '\',' + waste + ',\'' + applyEmail + '\')">Optimize →</button>' +
@@ -3920,18 +3917,16 @@ async function runAIOptimize(jobId, company, role, location, score, risk, waste,
     return;
   }
 
-  // Get JD — from textarea (always ask for it now for best results)
-  const pastedJD = document.getElementById('aiOptJD')?.value?.trim();
   const job = JOBS.find(j => j.id === jobId);
-  const jd = pastedJD || (job ? [
-    'Job Title: ' + job.title,
-    'Company: ' + job.co,
-    'Location: ' + job.city,
-    'Type: ' + job.type + ' - ' + job.lvl,
-    'Salary: ' + job.sal,
-  ].join('\n') : 'Role: ' + role + ' at ' + company);
-
-  if (!pastedJD) { showToast('Paste the job description for best results.'); }
+  const jd = (job?.description && job.description.length > 20)
+    ? job.description
+    : (job ? [
+        'Job Title: ' + job.title,
+        'Company: ' + job.co,
+        'Location: ' + job.city,
+        'Type: ' + job.type + ' - ' + job.lvl,
+        'Salary: ' + job.sal,
+      ].join('\n') : 'Role: ' + role + ' at ' + company);
 
   document.getElementById('applyModalBody').innerHTML = `
     <div style="text-align:center;padding:2rem 0">
