@@ -1620,7 +1620,7 @@ const VIBES={
   default:['📊 Data still loading','🔍 Add a report'],
 };
 
-const JOBS=[
+const FALLBACK_JOBS=[
   // ── ORANGE COUNTY ──
   {id:'j_oc1',co:'Hoag Hospital',logo:'HH',ver:false,title:'Registered Nurse – ICU',loc:'Newport Beach, CA',city:'Newport Beach, CA',type:'Full-time',lvl:'Mid level',niche:'Healthcare',sal:'$95k–$130k',score:78,risk:'safe',waste:11,apply_email:'careers@hoag.org',vibes:['✅ Responds within 1 week','💉 Strong benefits','📍 Orange County']},
   {id:'j_oc2',co:'Disneyland Resort',logo:'DL',ver:false,title:'Guest Experience Host',loc:'Anaheim, CA',city:'Anaheim, CA',type:'Part-time',lvl:'Entry level',niche:'Retail',sal:'$19–22/hr',score:71,risk:'safe',waste:16,apply_email:'disneylandcareers@disney.com',vibes:['⚡ Fast process','🎢 Unique workplace','✅ Clear timeline']},
@@ -1651,6 +1651,8 @@ const JOBS=[
   {id:'j_r1',co:'Stripe',logo:'S',ver:true,title:'Senior Software Engineer',loc:'Remote',city:'Remote',type:'Full-time',lvl:'Senior',niche:'Tech',sal:'$160k–$220k',score:88,risk:'safe',waste:4,apply_email:'jobs@stripe.com',vibes:['✅ Clear timeline','⚡ Fast process','💬 Real responses']},
   {id:'j_r2',co:'Linear',logo:'L',ver:true,title:'Product Designer',loc:'Remote',city:'Remote',type:'Full-time',lvl:'Mid level',niche:'Tech',sal:'$120k–$160k',score:91,risk:'safe',waste:3,apply_email:'jobs@linear.app',vibes:['🏆 Best process in tech','✅ Respectful','📅 Timeline given upfront']},
 ];
+
+let JOBS=[...FALLBACK_JOBS]; // populated from Supabase at runtime
 
 const REPORTS={
   '5':[{role:'Software Engineer',resp:'ghosted',wait:90,stage:'After assessment',loc:'Seattle, WA',text:'Applied 3 months ago. 2-hour assessment. Complete silence since. Listing still active.',src:'reddit'},
@@ -1785,20 +1787,27 @@ function loadLdr(){
 // ═══════════════════════════════════════════════
 // FEATURED JOBS
 // ═══════════════════════════════════════════════
-function loadFeatured(){
-  const jobs=JOBS.filter(j=>j.score>=70).slice(0,6);
-  document.getElementById('featGrid').innerHTML=jobs.map((j,i)=>{
-    const wl=Score.wasteLabel(j.waste);
-    return`<div class="jcard" style="animation:fadeUp .4s ${i*.06}s ease both" onclick="viewCompany('${j.id}','${j.co}','${j.city}')">
-      <div class="jc-head">
-        <div class="jc-logo">${j.logo}</div>
-        <div class="jc-scores"><div class="jc-ts ${j.risk}">${j.score}</div><div class="jc-ts-lbl">transparency</div></div>
-      </div>
-      <div class="jc-co">${j.co}${j.ver?' · <span style="color:var(--green);font-size:.55rem">✓</span>':''}</div>
-      <div class="jc-title">${j.title}</div>
-      <div class="jc-loc">📍 ${j.loc}</div>
-      <div class="jc-vibes">${j.vibes.slice(0,2).map(v=>`<span class="vibe v-n">${v}</span>`).join('')}</div>
-      <div class="jc-bot"><div class="jc-sal">${j.sal}</div><div style="display:flex;gap:.35rem"><button class="btn btn-ghost" style="font-size:.62rem;padding:.28rem .6rem" onclick="event.stopPropagation();toggleSaveJob('${j.id}','${j.co}','${j.title}','${j.city}',${j.score})" id="save_${j.id}">♡</button><button class="btn btn-green" style="font-size:.62rem;padding:.28rem .7rem" onclick="event.stopPropagation();openApplyModal('${j.id}','${j.co}','${j.title}','${j.city}',${j.score},'${j.risk}',${j.waste},'${j.apply_email||''}')">Apply →</button></div></div>
+async function loadFeatured(){
+  const el=document.getElementById('featGrid');
+  if(!el)return;
+  let jobs=[];
+  if(db){
+    try{
+      const{data}=await db.from('jobs').select('*').gt('expires_at',new Date().toISOString()).gte('score',70).order('score',{ascending:false}).limit(6);
+      if(data?.length)jobs=data.map(_normalizeDbJob);
+    }catch(e){}
+  }
+  if(!jobs.length)jobs=FALLBACK_JOBS.filter(j=>j.score>=70).slice(0,6);
+  el.innerHTML=jobs.map((j,i)=>{
+    const risk=j.risk||Score.risk(j.score);
+    const applyAct=j._url?`window.open('${j._url.replace(/'/g,"\\'")}','_blank')`:`openApplyModal('${j.id}','${(j.co||'').replace(/'/g,"\\'")}','${(j.title||'').replace(/'/g,"\\'")}','${(j.city||'').replace(/'/g,"\\'")}',${j.score},'${risk}',${j.waste||25},'${j.apply_email||''}')`;
+    return`<div class="jcard" style="animation:fadeUp .4s ${i*.06}s ease both">
+      <div class="jc-head"><div class="jc-logo">${j.logo||(j.co||'?')[0]}</div><div class="jc-scores"><div class="jc-ts ${risk}">${j.score}</div><div class="jc-ts-lbl">transparency</div></div></div>
+      <div class="jc-co">${j.co||''}</div>
+      <div class="jc-title">${j.title||''}</div>
+      <div class="jc-loc">📍 ${j.loc||j.city||''}</div>
+      <div class="jc-vibes">${(j.vibes||[]).slice(0,2).map(v=>`<span class="vibe v-n">${v}</span>`).join('')}</div>
+      <div class="jc-bot"><div class="jc-sal">${j.sal||'—'}</div><div style="display:flex;gap:.35rem"><button class="btn btn-ghost" style="font-size:.62rem;padding:.28rem .6rem" onclick="event.stopPropagation();toggleSaveJob('${j.id}','${(j.co||'').replace(/'/g,"\\'")}','${(j.title||'').replace(/'/g,"\\'")}','${(j.city||'').replace(/'/g,"\\'")}',${j.score})" id="save_${j.id}">♡</button><button class="btn btn-green" style="font-size:.62rem;padding:.28rem .7rem" onclick="event.stopPropagation();${applyAct}">Apply →</button></div></div>
     </div>`;}).join('');
 }
 
@@ -1922,38 +1931,94 @@ function renderJobResults(jobs, l) {
   }).join('') + '</div>';
 }
 
-function loadJobs(){
-  const q=(document.getElementById('jobsInp')?.value||'').toLowerCase();
-  const loc=(document.getElementById('jobsLoc')?.value||'').toLowerCase();
+// Normalize a Supabase jobs row → FALLBACK_JOBS shape so all existing code works
+function _normalizeDbJob(j){
+  const score=j.score||65;
+  return{
+    id:j.id,
+    co:j.company||'',
+    logo:(j.company||'?')[0].toUpperCase(),
+    ver:false,
+    title:j.title||'',
+    loc:j.location||'',
+    city:j.location||'',
+    type:j.type||'Full-time',
+    lvl:j.level||'Mid level',
+    niche:'Job',
+    sal:j.salary||'—',
+    score,
+    risk:Score.risk(score),
+    waste:j.waste_score||25,
+    apply_email:'',
+    _url:j.apply_url||null,
+    vibes:[(j.description||'').slice(0,80)||`via ${j.source||'Job board'}`],
+    description:j.description||'',
+  };
+}
+
+async function loadJobs(){
+  const q=(document.getElementById('jobsInp')?.value||'').trim();
+  const loc=(document.getElementById('jobsLoc')?.value||'').trim();
   const min=parseInt(document.getElementById('sRange')?.value||0);
-  const ver=document.getElementById('verOnly')?.checked;
-  let jobs=[...JOBS];
-  if(q)jobs=jobs.filter(j=>j.title.toLowerCase().includes(q)||j.co.toLowerCase().includes(q));
-  if(loc)jobs=jobs.filter(j=>j.city.toLowerCase().includes(loc)||loc==='remote'&&j.city==='Remote');
-  jobs=jobs.filter(j=>j.score>=min);
-  if(ver)jobs=jobs.filter(j=>j.ver);
-  jobs.sort((a,b)=>b.score-a.score);
-  document.getElementById('jobsCt').textContent=jobs.length+' listings';
-  document.getElementById('jobsList').innerHTML=jobs.map(j=>{
-    const wl=Score.wasteLabel(j.waste);
-    return`<div class="jlc" onclick="viewCompany('${j.id}','${j.co}','${j.city}')">
-      <div>
+  const listEl=document.getElementById('jobsList');
+  const countEl=document.getElementById('jobsCt');
+
+  // User typed a query → hand off to live web search (always fresh)
+  if(q){searchJobs(q,loc);return;}
+
+  if(listEl)listEl.innerHTML='<div style="text-align:center;padding:3rem;font-family:var(--mono);font-size:.7rem;color:var(--muted)"><div class="spinner" style="margin:0 auto 1rem"></div>Loading listings...</div>';
+
+  let jobs=[];
+  if(db){
+    try{
+      let query=db.from('jobs').select('*').gt('expires_at',new Date().toISOString()).gte('score',min||0).order('score',{ascending:false}).limit(60);
+      if(loc)query=query.ilike('location',`%${loc}%`);
+      const{data}=await query;
+      if(data?.length){
+        jobs=data.map(_normalizeDbJob);
+        // Keep JOBS up to date so JOBS.find() calls work in the apply modal
+        JOBS.splice(0,JOBS.length,...jobs,...FALLBACK_JOBS);
+      }
+    }catch(e){console.warn('loadJobs db:',e);}
+  }
+
+  // Fall back to hardcoded if db has no real listings yet
+  if(!jobs.length){
+    jobs=[...FALLBACK_JOBS].filter(j=>j.score>=min);
+    if(loc)jobs=jobs.filter(j=>(j.city||'').toLowerCase().includes(loc.toLowerCase()));
+    jobs.sort((a,b)=>b.score-a.score);
+  }
+
+  if(countEl)countEl.textContent=`${jobs.length} listings`;
+  if(!listEl)return;
+  if(!jobs.length){
+    listEl.innerHTML='<div style="text-align:center;padding:3rem;font-family:var(--mono);font-size:.72rem;color:var(--muted)">No listings match. Try searching or adjusting filters.</div>';
+    return;
+  }
+  listEl.innerHTML='<div class="jlay">'+jobs.map(j=>{
+    const risk=j.risk||Score.risk(j.score);
+    const applyAct=j._url
+      ?`window.open('${j._url.replace(/'/g,"\\'")}','_blank')`
+      :`openApplyModal('${j.id}','${(j.co||'').replace(/'/g,"\\'")}','${(j.title||'').replace(/'/g,"\\'")}','${(j.city||'').replace(/'/g,"\\'")}',${j.score},'${risk}',${j.waste||25},'${j.apply_email||''}')`;
+    return`<div class="jlc">
+      <div class="jlc-l">
         <div class="jlc-title">${j.title}</div>
-        <div class="jlc-co"><span>${j.co}</span>${j.ver?'<span style="font-family:var(--mono);font-size:.55rem;color:var(--green)">✓</span>':''}</div>
-        <div class="jlc-loc">📍 ${j.loc}</div>
-        <div class="jlc-meta">${j.vibes.slice(0,2).map(v=>`<span class="vibe v-n" style="font-size:.55rem">${v}</span>`).join('')}</div>
+        <div class="jlc-co">${j.co}</div>
+        <div class="jlc-loc">📍 ${j.loc||j.city}</div>
+        ${j.vibes?.[0]?`<div style="font-size:.72rem;color:var(--muted);margin-top:.3rem;line-height:1.55">${j.vibes[0]}</div>`:''}
+        <div class="jlc-meta" style="margin-top:.3rem"><span class="jlc-mi">${j.type}</span><span class="jlc-mi">·</span><span class="jlc-mi">${j.lvl}</span></div>
       </div>
       <div class="jlc-r">
-        <div class="jlc-s ${j.risk}">${j.score}</div>
+        <div class="jlc-s ${risk}">${j.score}</div>
         <div class="jlc-sl">transparency</div>
         <div class="jlc-sal">${j.sal}</div>
-        <div style="display:flex;gap:.25rem;margin-top:.1rem">
-          <button class="btn btn-ghost" style="font-size:.58rem;padding:.22rem .5rem" onclick="event.stopPropagation();toggleSaveJob('${j.id}','${j.co}','${j.title}','${j.city}',${j.score})" id="save_${j.id}">♡</button>
-          <button class="btn btn-green" style="font-size:.62rem;padding:.28rem .7rem" onclick="event.stopPropagation();openApplyModal('${j.id}','${j.co}','${j.title}','${j.city}',${j.score},'${j.risk}',${j.waste},'${j.apply_email||''}')">Apply →</button>
+        <div style="display:flex;gap:.25rem;margin-top:.3rem">
+          <button class="btn btn-ghost" style="font-size:.58rem;padding:.22rem .5rem" onclick="event.stopPropagation();toggleSaveJob('${j.id}','${(j.co||'').replace(/'/g,"\\'")}','${(j.title||'').replace(/'/g,"\\'")}','${(j.city||'').replace(/'/g,"\\'")}',${j.score})" id="save_${j.id}">♡</button>
+          <button class="btn btn-green" style="font-size:.62rem;padding:.28rem .7rem" onclick="event.stopPropagation();${applyAct}">Apply →</button>
         </div>
       </div>
-    </div>`;}).join('');
-  setTimeout(initSaveButtons, 100);
+    </div>`;}).join('')+'</div>';
+  setTimeout(initSaveButtons,100);
 }
 
 // ═══════════════════════════════════════════════
@@ -2181,7 +2246,7 @@ function switchTab(n,btn){
 // ═══════════════════════════════════════════════
 // UTILS
 // ═══════════════════════════════════════════════
-function showToast(m){const t=document.getElementById('toast');t.textContent=m;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),3200);}
+function showToast(m){const t=document.getElementById('toast');if(!t)return;t.textContent=m;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),3200);}
 function sleep(ms){return new Promise(r=>setTimeout(r,ms));}
 
 // ═══════════════════════════════════════════════
@@ -2214,9 +2279,11 @@ document.querySelectorAll('input[name="resp"]').forEach(radio => {
     document.getElementById('sl3').textContent = labels.s3;
     document.getElementById('sl4').textContent = labels.s4;
     // Also hide/show the stage section gracefully for auto-reject
-    const stageSection = document.getElementById('stageLabel').closest('.fg');
-    stageSection.style.opacity = val === 'autoreject' ? '0.45' : '1';
-    stageSection.style.pointerEvents = val === 'autoreject' ? 'none' : 'auto';
+    const stageSection = document.getElementById('stageLabel')?.closest('.fg');
+    if (stageSection) {
+      stageSection.style.opacity = val === 'autoreject' ? '0.45' : '1';
+      stageSection.style.pointerEvents = val === 'autoreject' ? 'none' : 'auto';
+    }
   });
 });
 
@@ -2252,8 +2319,16 @@ function goToEmployerDashboard(){
   document.body.removeChild(a);
 }
 
-// INIT
-loadJobs();
+// INIT — pre-populate JOBS from Supabase so JOBS.find() works for apply modal
+(async()=>{
+  if(db){
+    try{
+      const{data}=await db.from('jobs').select('*').gt('expires_at',new Date().toISOString()).order('score',{ascending:false}).limit(100);
+      if(data?.length)JOBS.splice(0,JOBS.length,...data.map(_normalizeDbJob),...FALLBACK_JOBS);
+    }catch(e){}
+  }
+  loadFeatured();
+})();
 
 // ═══════════════════════════════════════════════
 // CONTENT MODERATION
@@ -3227,7 +3302,7 @@ function go(page){
           if (status) status.style.display = 'block';
           if (ta) { ta.style.display = 'none'; }
         }
-      });
+      }).catch(e => console.warn('resume load:', e));
     }
     // Show/hide back-to-dashboard button
     const backBtn = document.getElementById('backToDashBtn');
@@ -3535,7 +3610,7 @@ async function submitReport(){
       await db.from('reports').insert({company_id:cid,location_id:lid,role:safeTi,platform:document.getElementById('rPl')?.value||'',outcome:document.querySelector('input[name="resp"]:checked')?.value||'waiting',ghost_stage:document.querySelector('input[name="stage"]:checked')?.value||null,rounds:parseInt(document.getElementById('rRounds')?.value||0),wait_days:null,unpaid_work:document.getElementById('rUp')?.value||'na',experience_level:document.getElementById('rExp')?.value||'',report_text:safeExp||null,source:'direct',needs_review:false});
     }catch(e){console.warn('Report save error:',e);}
   }
-  document.getElementById('repOk').style.display='block';
+  const repOk=document.getElementById('repOk');if(repOk)repOk.style.display='block';
   ['rCo','rTi','rLoc','rEx'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
   document.querySelectorAll('input[name="resp"],input[name="stage"]').forEach(r=>r.checked=false);
   showToast('Submitted. Score updated. You just helped someone.');
@@ -3766,6 +3841,39 @@ function showApplyMode(mode, jobId, company, role, location, score, risk, waste,
   }
 }
 
+function proceedAsGuest(jobId, company, role, location, score, risk, waste, applyEmail) {
+  const job = JOBS.find(j => j.id === jobId);
+  showFullApplyForm(jobId, company, role, location, score, risk, waste, applyEmail, job, Score.wasteLabel(waste));
+}
+
+async function confirmApply(jobId, company, role, location, score, risk, waste) {
+  const platform = document.getElementById('applyPlatform')?.value || 'Seen';
+  const jobUrl = document.getElementById('applyUrl')?.value?.trim() || '';
+  const btn = document.querySelector('#trackFormSection .btn-green');
+  if (btn) { btn.textContent = 'Saving...'; btn.disabled = true; }
+  try {
+    await AppStore.add({
+      id: 'app_' + Date.now(),
+      jobId, company, role, location, score,
+      risk: risk || Score.risk(score),
+      waste: waste || 25,
+      platform, jobUrl,
+      stage: 'Applied', status: 'active',
+      appliedAt: Date.now(), updatedAt: Date.now(),
+    });
+    closeApplyModalDirect();
+    const apps = await AppStore.load();
+    const badge = document.getElementById('trackerBadge');
+    if (badge) { const c = apps.filter(a => a.status === 'active').length; if (c > 0) { badge.textContent = c; badge.style.display = 'inline'; } }
+    if (Auth.isSeeker()) renderSeekerDash().catch(() => {});
+    showToast('Application tracked! View it in your dashboard.');
+  } catch(e) {
+    console.error('confirmApply:', e);
+    showToast('Failed to save. Please try again.');
+    if (btn) { btn.textContent = 'Log application →'; btn.disabled = false; }
+  }
+}
+
 async function showAIOptimizeFlow(jobId, company, role, location, score, risk, waste, applyEmail) {
   const body = document.getElementById('applyModalBody');
   const stored = await ResumeStore.load();
@@ -3787,10 +3895,6 @@ async function showAIOptimizeFlow(jobId, company, role, location, score, risk, w
         '<textarea id="aiOptResume" placeholder="Paste your resume here..." style="width:100%;background:var(--raised);border:1.5px solid var(--line2);border-radius:8px;padding:.65rem .9rem;color:var(--white);font-family:var(--body);font-size:.8rem;outline:none;min-height:100px;resize:vertical;caret-color:var(--green)"></textarea>' +
       '</div>'
     ) +
-    '<div style="margin-bottom:.85rem">' +
-      '<label style="font-family:var(--mono);font-size:.58rem;text-transform:uppercase;letter-spacing:.07em;color:var(--dim);display:block;margin-bottom:.32rem">Paste the job description *</label>' +
-      '<textarea id="aiOptJD" placeholder="Paste the full job description here for best results..." style="width:100%;background:var(--raised);border:1.5px solid var(--line2);border-radius:8px;padding:.65rem .9rem;color:var(--white);font-family:var(--body);font-size:.8rem;outline:none;min-height:110px;resize:vertical;caret-color:var(--green)"></textarea>' +
-    '</div>' +
     '<div style="display:flex;gap:.5rem">' +
       '<button class="btn btn-ghost" style="flex:1;justify-content:center;font-size:.78rem" onclick="openApplyModal(\'' + jobId + '\',\'' + company.replace(/'/g,"\\'") + '\',\'' + role.replace(/'/g,"\\'") + '\',\'' + location + '\',' + score + ',\'' + risk + '\',' + waste + ',\'' + applyEmail + '\')">← Back</button>' +
       '<button class="btn btn-green" style="flex:2;justify-content:center;font-weight:800" id="aiOptBtn" onclick="runAIOptimize(\'' + jobId + '\',\'' + company.replace(/'/g,"\\'") + '\',\'' + role.replace(/'/g,"\\'") + '\',\'' + location + '\',' + score + ',\'' + risk + '\',' + waste + ',\'' + applyEmail + '\')">Optimize →</button>' +
@@ -3813,18 +3917,16 @@ async function runAIOptimize(jobId, company, role, location, score, risk, waste,
     return;
   }
 
-  // Get JD — from textarea (always ask for it now for best results)
-  const pastedJD = document.getElementById('aiOptJD')?.value?.trim();
   const job = JOBS.find(j => j.id === jobId);
-  const jd = pastedJD || (job ? [
-    'Job Title: ' + job.title,
-    'Company: ' + job.co,
-    'Location: ' + job.city,
-    'Type: ' + job.type + ' - ' + job.lvl,
-    'Salary: ' + job.sal,
-  ].join('\n') : 'Role: ' + role + ' at ' + company);
-
-  if (!pastedJD) { showToast('Paste the job description for best results.'); }
+  const jd = (job?.description && job.description.length > 20)
+    ? job.description
+    : (job ? [
+        'Job Title: ' + job.title,
+        'Company: ' + job.co,
+        'Location: ' + job.city,
+        'Type: ' + job.type + ' - ' + job.lvl,
+        'Salary: ' + job.sal,
+      ].join('\n') : 'Role: ' + role + ' at ' + company);
 
   document.getElementById('applyModalBody').innerHTML = `
     <div style="text-align:center;padding:2rem 0">
@@ -3850,16 +3952,8 @@ async function runAIOptimize(jobId, company, role, location, score, risk, waste,
 
   } catch(e) {
     console.error('AI Optimize error:', e.message);
-    // Store pending so Redo button works
     window._pendingOptimize = { jobId, company, role, location, score, risk, waste, applyEmail };
-    document.getElementById('applyModalBody').innerHTML =
-      '<div style="padding:1.25rem;background:var(--rdim);border:1px solid #ff3b5c28;border-radius:8px;margin-bottom:1rem;font-family:var(--mono);font-size:.72rem;color:var(--red);line-height:1.65">' +
-      'Optimization failed: ' + e.message +
-      '</div>' +
-      '<div style="display:flex;gap:.5rem">' +
-      '<button class="btn btn-ghost" style="flex:1;justify-content:center" onclick="redoOptimize()">Try again</button>' +
-      '<button class="btn btn-green" style="flex:2;justify-content:center;font-weight:800" onclick="approveAndContinue()">Use standard apply →</button>' +
-      '</div>';
+    approveAndContinue();
   }
 }
 
@@ -3990,7 +4084,7 @@ function showFullApplyForm(jobId, company, role, location, score, risk, waste, a
       if (linkSection) linkSection.style.display = 'block';
       window._applyResumeText = null;
     }
-  });
+  }).catch(e => console.warn('resume load:', e));
 }
 
 function showApplyResumeOverride() {
@@ -4145,10 +4239,10 @@ async function submitApplication(jobId, company, role, location, score, risk, wa
         employer_stage: 'New',
         score: score,
         waste_score: waste,
-        job_url: resume,
+        job_url: null,
         applicant_name: name,
         applicant_email: email,
-        resume_url: resume,
+        resume_url: resumeLabel,
         cover_note: note,
       }).select('id').single();
 
@@ -4161,7 +4255,7 @@ async function submitApplication(jobId, company, role, location, score, risk, wa
           'new_application',
           `New application — ${role}`,
           `${name} applied for ${role}. Tap to review.`,
-          { application_id: applicationId, applicant_name: name, applicant_email: email, resume_url: resume, cover_note: note, role, company, location }
+          { application_id: applicationId, applicant_name: name, applicant_email: email, resume_url: resumeLabel, cover_note: note, role, company, location }
         );
       }
     }
@@ -4220,7 +4314,8 @@ async function submitApplication(jobId, company, role, location, score, risk, wa
 // ═══════════════════════════════════════════════
 async function initSeekerPasswordReset() {
   if (!db) { showToast('Connection error.'); return; }
-  const { data:{ user } } = await db.auth.getUser();
+  const authRes = await db.auth.getUser().catch(() => null);
+  const user = authRes?.data?.user;
   if (!user?.email) { showToast('No email on file.'); return; }
 
   const btn = event?.target;
@@ -4368,9 +4463,10 @@ const ResumeStore = {
     localStorage.removeItem(this._key());
     localStorage.removeItem(this._metaKey());
     if (db && Auth.isLoggedIn()) {
-      db.auth.getUser().then(({ data: { user } }) => {
+      db.auth.getUser().then(res => {
+        const user = res?.data?.user;
         if (user) db.from('profiles').update({ resume_text: null, resume_file_name: null, resume_word_count: null }).eq('id', user.id);
-      });
+      }).catch(e => console.warn('ResumeStore.clear:', e));
     }
   }
 };
@@ -4552,7 +4648,7 @@ function renderProposalResults(container, d, job, company) {
 function copyProposal() {
   const content=document.getElementById('proposalContent')?.innerText;
   if(!content)return;
-  navigator.clipboard.writeText(content).then(()=>showToast('Copied to clipboard!'));
+  navigator.clipboard.writeText(content).then(()=>showToast('Copied to clipboard!')).catch(()=>showToast('Copy failed — select and copy manually.'));
 }
 
 async function toggleSaveJob(jobId, company, title, city, score) {
