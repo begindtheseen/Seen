@@ -2531,8 +2531,10 @@ const AppStore = {
     if (Auth.isLoggedIn() && db) { try { await db.from('applications').update({...changes, updated_at: new Date().toISOString()}).eq('id', id); } catch(e) { console.warn('AppStore.update:', e.message); } }
   },
   async remove(id) {
-    if(Auth.isLoggedIn()&&db){ try{ await db.from('applications').delete().eq('id',id); return; }catch(e){} }
-    localStorage.setItem(this.KEY,JSON.stringify(this.loadSync().filter(a=>a.id!==id)));
+    // Always remove from localStorage cache immediately
+    localStorage.setItem(this.KEY, JSON.stringify(this.loadSync().filter(a => a.id !== id)));
+    // Also delete from Supabase if logged in
+    if (Auth.isLoggedIn() && db) { try { await db.from('applications').delete().eq('id', id); } catch(e) { console.warn('AppStore.remove:', e.message); } }
   },
   loadSync(){ try{return JSON.parse(localStorage.getItem(this.KEY)||'[]');}catch(e){return[];} },
   async clear(){ if(Auth.isLoggedIn()&&db){try{const uid=(await db.auth.getUser()).data.user?.id;await db.from('applications').delete().eq('user_id',uid);}catch(e){}} localStorage.removeItem(this.KEY); },
