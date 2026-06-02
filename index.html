@@ -3997,6 +3997,15 @@ function approveAndContinue() {
   const p = window._pendingOptimize;
   if (!p) return;
   const job = JOBS.find(j => j.id === p.jobId);
+  // Apply optimized bullets into the resume text so the updated version gets submitted
+  if (p.data?.optimized_bullets?.length && p.originalResume) {
+    let optimized = p.originalResume;
+    for (const c of p.data.optimized_bullets) {
+      if (c.original && c.optimized) optimized = optimized.replace(c.original, c.optimized);
+    }
+    window._applyResumeText = optimized;
+    window._resumeWasOptimized = true;
+  }
   showFullApplyForm(p.jobId, p.company, p.role, p.location, p.score, p.risk, p.waste, p.applyEmail, job, Score.wasteLabel(p.waste));
 }
 
@@ -4194,14 +4203,18 @@ async function submitApplication(jobId, company, role, location, score, risk, wa
 
   // Get resume label for display (never show raw text)
   const resumeVal = document.getElementById('appResumeValue')?.value?.trim();
+  const wasOptimized = !!window._resumeWasOptimized;
   let resumeLabel = 'On file';
-  if (resumeVal === 'profile_resume') {
+  if (wasOptimized) {
+    resumeLabel = 'AI-optimized resume (Seen)';
+  } else if (resumeVal === 'profile_resume') {
     resumeLabel = 'Resume on file (Seen profile)';
   } else if (resumeVal === 'override_resume') {
     resumeLabel = 'Uploaded resume';
   } else if (resumeVal && resumeVal.startsWith('http')) {
     resumeLabel = resumeVal;
   }
+  window._resumeWasOptimized = false; // reset after reading
 
   if (!name) { showToast('Enter your name.'); return; }
   if (!email || !email.includes('@')) { showToast('Enter a valid email.'); return; }
@@ -4272,7 +4285,7 @@ async function submitApplication(jobId, company, role, location, score, risk, wa
     fetch('/api/apply', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ applicantName: name, applicantEmail: email, role, company, location, resumeLink: resumeLabel || 'On file', coverNote: note, applyEmail: applyEmail || '' })
+      body: JSON.stringify({ applicantName: name, applicantEmail: email, role, company, location, resumeLink: resumeLabel || 'On file', resumeText: window._applyResumeText || null, coverNote: note, applyEmail: applyEmail || '' })
     }).catch(e => console.warn('Email:', e));
 
     closeApplyModalDirect();
