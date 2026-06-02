@@ -2498,7 +2498,7 @@ const AppStore = {
       try {
         const { data, error } = await db.from('applications').select('*').order('created_at',{ascending:false});
         if(error) throw error;
-        return (data||[]).map(a=>({
+        if(data?.length) return data.map(a=>({
           id:a.id, jobId:a.job_id, company:a.company_name, role:a.role,
           location:a.city, platform:a.platform, jobUrl:a.job_url,
           stage:a.stage||'Applied', status:a.status||'active',
@@ -2509,14 +2509,17 @@ const AppStore = {
         }));
       } catch(e) { console.warn('AppStore.load error:', e.message); }
     }
+    // Fall back to localStorage cache (covers Supabase failures and table not existing yet)
     try { return JSON.parse(localStorage.getItem(this.KEY)||'[]'); } catch(e) { return []; }
   },
   async add(app) {
-    // Only used for localStorage fallback — Supabase insert is done in submitApplication
-    if(Auth.isLoggedIn() && db) return {ok:true}; // Supabase already handled it
-    const apps=this.loadSync();
-    apps.unshift({...app,id:app.id||('app_'+Date.now()),appliedAt:Date.now(),updatedAt:Date.now()});
-    localStorage.setItem(this.KEY,JSON.stringify(apps));
+    // Always write to localStorage as a cache so tracker works even if Supabase fails
+    const apps = this.loadSync();
+    const entry = {...app, id: app.id||('app_'+Date.now()), appliedAt: app.appliedAt||Date.now(), updatedAt: app.updatedAt||Date.now()};
+    if (!apps.find(a => a.id === entry.id)) {
+      apps.unshift(entry);
+      localStorage.setItem(this.KEY, JSON.stringify(apps));
+    }
     return {ok:true};
   },
   async update(id, changes) {
