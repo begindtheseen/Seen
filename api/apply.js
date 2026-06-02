@@ -13,7 +13,7 @@ export default async function handler(req) {
   const headers = { 'Access-Control-Allow-Origin': '*', 'Content-Type': 'application/json' };
 
   try {
-    const { applicantName, applicantEmail, role, company, location, resumeLink, coverNote, applyEmail } = await req.json();
+    const { applicantName, applicantEmail, role, company, location, resumeLink, resumeText, coverNote, applyEmail } = await req.json();
 
     const RESEND_KEY = process.env.RESEND_KEY;
     if (!RESEND_KEY) throw new Error('RESEND_KEY not configured');
@@ -48,7 +48,7 @@ export default async function handler(req) {
     <div style="font-size:14px;color:#e4e4f0;margin-bottom:6px"><strong style="color:#9898b0">Role:</strong> ${role}</div>
     <div style="font-size:14px;color:#e4e4f0;margin-bottom:6px"><strong style="color:#9898b0">Company:</strong> ${company}</div>
     <div style="font-size:14px;color:#e4e4f0;margin-bottom:6px"><strong style="color:#9898b0">Location:</strong> ${location}</div>
-    <div style="font-size:14px;color:#e4e4f0"><strong style="color:#9898b0">Resume:</strong> <a href="${resumeLink}" style="color:#4b9eff">${resumeLink}</a></div>
+    <div style="font-size:14px;color:#e4e4f0"><strong style="color:#9898b0">Resume:</strong> ${resumeLink?.startsWith('http') ? `<a href="${resumeLink}" style="color:#4b9eff">${resumeLink}</a>` : `<span style="color:#e4e4f0">${resumeLink || 'On file'}</span>`}</div>
     ${coverNote ? `<div style="font-size:14px;color:#e4e4f0;margin-top:10px;padding-top:10px;border-top:1px solid #2e2e3e"><strong style="color:#9898b0">Your note:</strong> ${coverNote}</div>` : ''}
   </div>
   <p style="margin:0 0 20px;font-size:13px;color:#8888a0;line-height:1.7">Track this application at <a href="https://seenjobs.io" style="color:#00ff87">seenjobs.io</a>. We'll remind you if you don't hear back within the expected window.</p>
@@ -88,9 +88,10 @@ export default async function handler(req) {
       <div style="font-size:12px;color:#9898b0;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:10px;font-family:monospace">Applicant details</div>
       <div style="font-size:14px;color:#0f0f18;margin-bottom:6px"><strong>Name:</strong> ${applicantName}</div>
       <div style="font-size:14px;color:#0f0f18;margin-bottom:6px"><strong>Email:</strong> <a href="mailto:${applicantEmail}" style="color:#4f46e5">${applicantEmail}</a></div>
-      <div style="font-size:14px;color:#0f0f18;margin-bottom:6px"><strong>Resume:</strong> <a href="${resumeLink}" style="color:#4f46e5">${resumeLink}</a></div>
+      <div style="font-size:14px;color:#0f0f18;margin-bottom:6px"><strong>Resume:</strong> ${resumeLink?.startsWith('http') ? `<a href="${resumeLink}" style="color:#4f46e5">${resumeLink}</a>` : `<span>${resumeLink || 'On file'}</span>`}</div>
       ${coverNote ? `<div style="font-size:14px;color:#0f0f18;margin-top:10px;padding-top:10px;border-top:1px solid #e8e8f0"><strong>Cover note:</strong><br><span style="color:#444">${coverNote}</span></div>` : ''}
     </div>
+    ${resumeText ? `<div style="background:#f4f4f8;border-radius:8px;padding:16px;margin-bottom:20px"><div style="font-size:12px;color:#9898b0;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:10px;font-family:monospace">Resume</div><pre style="font-size:12px;color:#0f0f18;white-space:pre-wrap;word-break:break-word;margin:0;line-height:1.6;font-family:monospace">${resumeText.replace(/</g,'&lt;').replace(/>/g,'&gt;').slice(0,8000)}</pre></div>` : ''}
     <a href="mailto:${applicantEmail}?subject=Re: Your application for ${role} at ${company}" style="display:inline-block;padding:12px 24px;background:#4f46e5;color:#fff;text-decoration:none;border-radius:8px;font-size:14px;font-weight:700">Reply to applicant →</a>
   </div>
   <p style="text-align:center;font-size:11px;color:#9898b0;margin-top:16px">Sent via Seen · seenjobs.io</p>
@@ -112,7 +113,7 @@ export default async function handler(req) {
           subject: `Application via Seen — ${role}`,
           html: `<p>New application from <strong>${applicantName}</strong> for <strong>${role}</strong>.</p>
 <p>Email: <a href="mailto:${applicantEmail}">${applicantEmail}</a></p>
-<p>Resume: <a href="${resumeLink}">${resumeLink}</a></p>
+<p>Resume: ${resumeLink?.startsWith('http') ? `<a href="${resumeLink}">${resumeLink}</a>` : (resumeLink || 'On file')}</p>
 ${coverNote ? `<p>Note: ${coverNote}</p>` : ''}
 <p><small>Sent via Seen · seenjobs.io</small></p>`
         })
