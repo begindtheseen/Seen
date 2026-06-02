@@ -3957,16 +3957,8 @@ async function runAIOptimize(jobId, company, role, location, score, risk, waste,
 
   } catch(e) {
     console.error('AI Optimize error:', e.message);
-    // Store pending so Redo button works
     window._pendingOptimize = { jobId, company, role, location, score, risk, waste, applyEmail };
-    document.getElementById('applyModalBody').innerHTML =
-      '<div style="padding:1.25rem;background:var(--rdim);border:1px solid #ff3b5c28;border-radius:8px;margin-bottom:1rem;font-family:var(--mono);font-size:.72rem;color:var(--red);line-height:1.65">' +
-      'Optimization failed: ' + e.message +
-      '</div>' +
-      '<div style="display:flex;gap:.5rem">' +
-      '<button class="btn btn-ghost" style="flex:1;justify-content:center" onclick="redoOptimize()">Try again</button>' +
-      '<button class="btn btn-green" style="flex:2;justify-content:center;font-weight:800" onclick="approveAndContinue()">Use standard apply →</button>' +
-      '</div>';
+    approveAndContinue();
   }
 }
 
