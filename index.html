@@ -4431,9 +4431,12 @@ async function handleApplyResumeOverride(file) {
   if (status) { status.style.display = 'block'; status.innerHTML = '⏳ Reading resume...'; status.style.color = 'var(--muted)'; }
 
   try {
-    const formData = new FormData();
-    formData.append('file', file);
-    const res = await fetch('/api/parse-resume', { method: 'POST', body: formData });
+    const base64 = await _fileToBase64(file);
+    const res = await fetch('/api/parse-resume', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ base64, fileName: file.name, mimeType: file.type })
+    });
     const data = await res.json();
     if (!res.ok || data.error) throw new Error(data.error || 'Parse failed');
 
@@ -4597,10 +4600,15 @@ async function submitApplication(jobId, company, role, location, score, risk, wa
     window._externalApplyUrl = null;
 
     // Always send through Seen — this is where the value lives
+    // Load resume fresh to ensure we always attach it — don't trust stale window var
+    let resumeTextToSend = window._applyResumeText;
+    if (!resumeTextToSend) {
+      try { const s = await ResumeStore.load(); resumeTextToSend = s?.text || null; } catch(e) {}
+    }
     fetch('/api/apply', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ applicantName: name, applicantEmail: email, role, company, location, resumeLink: resumeLabel || 'On file', resumeText: window._applyResumeText || null, coverNote: note, applyEmail: applyEmail || '' })
+      body: JSON.stringify({ applicantName: name, applicantEmail: email, role, company, location, resumeLink: resumeLabel || 'On file', resumeText: resumeTextToSend || null, coverNote: note, applyEmail: applyEmail || '' })
     }).catch(e => console.warn('Email:', e));
 
     closeApplyModalDirect();
@@ -4874,29 +4882,17 @@ const ResumeStore = {
   async load() {
     // Try DB-backed profile first
     if (db && Auth.isLoggedIn() && Auth._profile?.resume_text) {
-      const text = Auth._profile.resume_text;
-      if (this._isReadable(text)) {
-        return {
-          text,
-          fileName: Auth._profile.resume_file_name || 'Resume',
-          wordCount: Auth._profile.resume_word_count || 0
-        };
-      }
-      // Garbled — clear it so user gets re-upload prompt
-      console.warn('ResumeStore: stored resume failed readability check, clearing.');
-      this.clear();
-      return null;
+      return {
+        text: Auth._profile.resume_text,
+        fileName: Auth._profile.resume_file_name || 'Resume',
+        wordCount: Auth._profile.resume_word_count || 0
+      };
     }
     // Fall back to localStorage
     const text = localStorage.getItem(this._key());
     if (text) {
-      if (this._isReadable(text)) {
-        const meta = JSON.parse(localStorage.getItem(this._metaKey()) || '{}');
-        return { text, fileName: meta.fileName || 'Resume', wordCount: meta.wordCount || 0 };
-      }
-      // Garbled local copy — clear it
-      console.warn('ResumeStore: local resume failed readability check, clearing.');
-      this.clear();
+      const meta = JSON.parse(localStorage.getItem(this._metaKey()) || '{}');
+      return { text, fileName: meta.fileName || 'Resume', wordCount: meta.wordCount || 0 };
     }
     return null;
   },
@@ -4918,6 +4914,15 @@ const ResumeStore = {
   }
 };
 
+function _fileToBase64(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result.split(',')[1]);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
 async function handleDashResumeUpload(file) {
   if (!file) return;
   const progress = document.getElementById('dashResumeProgress');
@@ -4926,18 +4931,17 @@ async function handleDashResumeUpload(file) {
   if (zone) zone.style.opacity = '.5';
 
   try {
-    const formData = new FormData();
-    formData.append('file', file);
-
-    const res = await fetch('/api/parse-resume', { method: 'POST', body: formData });
+    const base64 = await _fileToBase64(file);
+    const res = await fetch('/api/parse-resume', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ base64, fileName: file.name, mimeType: file.type })
+    });
     const data = await res.json();
 
     if (!res.ok || data.error) throw new Error(data.error || 'Parse failed');
 
-    // Save to profile
     await ResumeStore.save(data.text, data.fileName, data.wordCount);
-
-    // Update UI
     showResumeUploaded(data.fileName, data.wordCount);
     showToast('Resume saved! It\'ll be used automatically everywhere on Seen.');
 
