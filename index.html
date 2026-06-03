@@ -3422,6 +3422,11 @@ function updateNav(){
 // SEEKER DASHBOARD
 // ═══════════════════════════════════════════════
 async function renderSeekerDash(){
+  // Ensure profile is loaded — if it's null here (race with auth init) load it now
+  if (!Auth._profile && Auth.isLoggedIn()) {
+    try { await Auth.loadProfile(); } catch(e) {}
+  }
+
   const user=Auth.get();
   const apps=await AppStore.load();
   const active=apps.filter(a=>a.status==='active');
@@ -3435,11 +3440,11 @@ async function renderSeekerDash(){
   if (typeof survey === 'string') { try { survey = JSON.parse(survey); } catch(e) { survey = {}; } }
   survey = survey || {};
 
-  // Greeting — prefer localStorage name so saved changes show immediately
+  // Greeting — localStorage first (most recent save), then profile, never email prefix
   const hour=new Date().getHours();
   const greet=hour<12?'Good morning':hour<17?'Good afternoon':'Good evening';
   const localName = _loadProfileLocal()?.name;
-  const rawName = localName || user?.name || '';
+  const rawName = localName || Auth._profile?.name || '';
   const name = rawName ? rawName.charAt(0).toUpperCase() + rawName.slice(1).split(/[^a-zA-Z]/)[0] : 'there';
   if(_('dashGreeting'))_('dashGreeting').textContent=greet;
   if(_('dashName'))_('dashName').textContent=`Hey, ${name}.`;
@@ -4347,9 +4352,13 @@ function approveAndContinue() {
 
 function showFullApplyForm(jobId, company, role, location, score, risk, waste, applyEmail, job, wl) {
   const loggedIn = Auth.isLoggedIn();
-  // External jobs (Adzuna etc.) have a direct apply URL — track + open instead of email
   window._externalApplyUrl = job?._url || null;
   const isExternal = !!window._externalApplyUrl;
+
+  // Pull name from localStorage first (most recent save), fallback to auth metadata
+  const profileName = _loadProfileLocal()?.name || Auth.get()?.name || '';
+  const profileEmail = Auth._user?.email || Auth.get()?.email || '';
+
   document.getElementById('applyModalBody').innerHTML = `
     <div style="display:flex;align-items:center;gap:.55rem;padding:.75rem 1rem;background:var(--raised);border-radius:8px;margin-bottom:1.25rem;flex-wrap:wrap">
       <div class="sring ${Score.risk(score)}" style="width:38px;height:38px;flex-shrink:0"><div class="sring-n" style="font-size:.85rem">${score}</div></div>
@@ -4357,8 +4366,21 @@ function showFullApplyForm(jobId, company, role, location, score, risk, waste, a
       <span class="${wl.cls}" style="font-size:.6rem">${wl.txt}</span>
     </div>
     <div id="applyFormSection">
-      <div style="margin-bottom:.75rem"><label style="font-family:var(--mono);font-size:.58rem;text-transform:uppercase;letter-spacing:.07em;color:var(--dim);display:block;margin-bottom:.32rem">Your name *</label><input id="appName" type="text" placeholder="Full name" value="${Auth.get()?.name||''}" style="width:100%;background:var(--raised);border:1.5px solid var(--line2);border-radius:8px;padding:.65rem .9rem;color:var(--white);font-family:var(--body);font-size:.84rem;outline:none;caret-color:var(--green)" onfocus="this.style.borderColor='var(--green)'" onblur="this.style.borderColor='var(--line2)'"/></div>
-      <div style="margin-bottom:.75rem"><label style="font-family:var(--mono);font-size:.58rem;text-transform:uppercase;letter-spacing:.07em;color:var(--dim);display:block;margin-bottom:.32rem">Email *</label><input id="appEmail" type="email" placeholder="you@email.com" value="${Auth.get()?.email||''}" style="width:100%;background:var(--raised);border:1.5px solid var(--line2);border-radius:8px;padding:.65rem .9rem;color:var(--white);font-family:var(--body);font-size:.84rem;outline:none;caret-color:var(--green)" onfocus="this.style.borderColor='var(--green)'" onblur="this.style.borderColor='var(--line2)'"/></div>
+      ${loggedIn ? `
+      <div style="display:flex;align-items:center;gap:.65rem;padding:.65rem .9rem;background:var(--gdim);border:1px solid var(--gmid);border-radius:8px;margin-bottom:.85rem">
+        <span style="font-size:1.1rem;flex-shrink:0">👤</span>
+        <div style="flex:1;min-width:0">
+          <div style="font-family:var(--display);font-size:.82rem;font-weight:700;color:var(--white)">${profileName || 'You'}</div>
+          <div style="font-family:var(--mono);font-size:.6rem;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${profileEmail}</div>
+        </div>
+        <span style="font-family:var(--mono);font-size:.55rem;color:var(--green);white-space:nowrap">From profile</span>
+      </div>
+      <input type="hidden" id="appName" value="${profileName.replace(/"/g,'&quot;')}"/>
+      <input type="hidden" id="appEmail" value="${profileEmail.replace(/"/g,'&quot;')}"/>
+      ` : `
+      <div style="margin-bottom:.75rem"><label style="font-family:var(--mono);font-size:.58rem;text-transform:uppercase;letter-spacing:.07em;color:var(--dim);display:block;margin-bottom:.32rem">Your name *</label><input id="appName" type="text" placeholder="Full name" value="" style="width:100%;background:var(--raised);border:1.5px solid var(--line2);border-radius:8px;padding:.65rem .9rem;color:var(--white);font-family:var(--body);font-size:.84rem;outline:none;caret-color:var(--green)" onfocus="this.style.borderColor='var(--green)'" onblur="this.style.borderColor='var(--line2)'"/></div>
+      <div style="margin-bottom:.75rem"><label style="font-family:var(--mono);font-size:.58rem;text-transform:uppercase;letter-spacing:.07em;color:var(--dim);display:block;margin-bottom:.32rem">Email *</label><input id="appEmail" type="email" placeholder="you@email.com" value="" style="width:100%;background:var(--raised);border:1.5px solid var(--line2);border-radius:8px;padding:.65rem .9rem;color:var(--white);font-family:var(--body);font-size:.84rem;outline:none;caret-color:var(--green)" onfocus="this.style.borderColor='var(--green)'" onblur="this.style.borderColor='var(--line2)'"/></div>
+      `}
 
       <!-- Resume section — clean, no tacky links -->
       <div style="margin-bottom:.75rem" id="applyResumeSection">
