@@ -4382,7 +4382,8 @@ let _pendingApplication = null;
 // JOB DETAIL MODAL
 // ═══════════════════════════════════════════════
 function openJobDetailModal(jobId) {
-  const j = JOBS.find(x => x.id === jobId);
+  // Supabase IDs may be integers; onclick always passes strings — use == not ===
+  const j = JOBS.find(x => x.id == jobId);
   if (!j) return;
 
   const risk = j.risk || Score.risk(j.score);
@@ -4424,8 +4425,8 @@ function openJobDetailModal(jobId) {
     <div style="border-top:1px solid var(--line2);padding-top:1rem">${descHtml}</div>`;
 
   document.getElementById('jdmFoot').innerHTML = `
-    <button id="jdmSaveBtn_${jobId}" onclick="toggleSaveJob('${jobId}','${company}','${role}','${loc}',${score});_updateJdmSaveBtn('${jobId}')" style="background:none;border:1px solid var(--line2);border-radius:8px;padding:.65rem .9rem;font-size:.85rem;cursor:pointer;color:var(--muted);transition:all .15s" onmouseover="this.style.borderColor='var(--green)';this.style.color='var(--green)'" onmouseout="this.style.borderColor='var(--line2)';this.style.color='var(--muted)'">♡</button>
-    <button onclick="closeJobDetailModal();openApplyModal(${applyArgs})" style="flex:1;background:var(--green);color:var(--ink);border:none;border-radius:8px;padding:.65rem 1rem;font-family:var(--display);font-weight:800;font-size:.82rem;cursor:pointer;transition:opacity .15s" onmouseover="this.opacity='.88'" onmouseout="">Apply &amp; Optimize →</button>`;
+    <button id="jdmSaveBtn_${jobId}" onclick="(async()=>{await toggleSaveJob('${jobId}','${company}','${role}','${loc}',${score});await _updateJdmSaveBtn('${jobId}');})()" style="background:none;border:1px solid var(--line2);border-radius:8px;padding:.65rem .9rem;font-size:.85rem;cursor:pointer;color:var(--muted);transition:all .15s">♡</button>
+    <button onclick="closeJobDetailModal();openApplyModal(${applyArgs})" style="flex:1;background:var(--green);color:var(--ink);border:none;border-radius:8px;padding:.65rem 1rem;font-family:var(--display);font-weight:800;font-size:.82rem;cursor:pointer;transition:opacity .15s">Apply &amp; Optimize →</button>`;
 
   // Sync save button state
   _updateJdmSaveBtn(jobId);
@@ -4447,7 +4448,7 @@ function closeJobDetailModal() {
 }
 
 function openApplyModal(jobId, company, role, location, score, risk, waste, applyEmail) {
-  const job = JOBS.find(j => j.id === jobId);
+  const job = JOBS.find(j => j.id == jobId);
   const wl = Score.wasteLabel(waste);
 
   document.getElementById('applyModalTitle').textContent = role;
@@ -4499,13 +4500,13 @@ function showApplyMode(mode, jobId, company, role, location, score, risk, waste,
   if (mode === 'ai') {
     showAIOptimizeFlow(jobId, company, role, location, score, risk, waste, applyEmail);
   } else {
-    const job = JOBS.find(j => j.id === jobId);
+    const job = JOBS.find(j => j.id == jobId);
     showFullApplyForm(jobId, company, role, location, score, risk, waste, applyEmail, job, Score.wasteLabel(waste));
   }
 }
 
 function proceedAsGuest(jobId, company, role, location, score, risk, waste, applyEmail) {
-  const job = JOBS.find(j => j.id === jobId);
+  const job = JOBS.find(j => j.id == jobId);
   showFullApplyForm(jobId, company, role, location, score, risk, waste, applyEmail, job, Score.wasteLabel(waste));
 }
 
@@ -4540,7 +4541,7 @@ async function confirmApply(jobId, company, role, location, score, risk, waste) 
 async function showAIOptimizeFlow(jobId, company, role, location, score, risk, waste, applyEmail) {
   const body = document.getElementById('applyModalBody');
   const stored = await ResumeStore.load();
-  const job = JOBS.find(j => j.id === jobId);
+  const job = JOBS.find(j => j.id == jobId);
   const storedDesc = (job?.description && job.description.length > 20) ? job.description : '';
 
   body.innerHTML =
@@ -4582,7 +4583,7 @@ async function runAIOptimize(jobId, company, role, location, score, risk, waste,
     return;
   }
 
-  const job = JOBS.find(j => j.id === jobId);
+  const job = JOBS.find(j => j.id == jobId);
   // Prefer user-pasted JD from the form, then stored description, then fallback metadata
   const pastedJD = document.getElementById('aiOptJD')?.value?.trim();
   const jd = (pastedJD && pastedJD.length > 20)
@@ -4715,7 +4716,7 @@ function redoOptimize() {
 function approveAndContinue() {
   const p = window._pendingOptimize;
   if (!p) return;
-  const job = JOBS.find(j => j.id === p.jobId);
+  const job = JOBS.find(j => j.id == p.jobId);
   // Apply optimized bullets into the resume text so the updated version gets submitted
   if (p.data?.optimized_bullets?.length && p.originalResume) {
     let optimized = p.originalResume;
