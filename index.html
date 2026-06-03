@@ -2104,7 +2104,7 @@ async function loadJobs(){
     const lastFetch=parseInt(localStorage.getItem(cacheKey)||'0');
     const needsFetch=(Date.now()-lastFetch)>6*60*60*1000; // 6-hour cooldown per city
     if(needsFetch){
-      localStorage.setItem(cacheKey,Date.now().toString());
+      // Don't set timestamp yet — only lock if fetch actually returns jobs
       if(listEl)listEl.innerHTML='<div style="text-align:center;padding:3rem;font-family:var(--mono);font-size:.7rem;color:var(--muted)"><div class="spinner" style="margin:0 auto 1rem"></div>Finding jobs near '+effectiveLoc.split(',')[0]+'...</div>';
       try{
         const r=await fetch('/api/fetch-location-jobs',{
@@ -2115,6 +2115,7 @@ async function loadJobs(){
         if(r.ok){
           const d=await r.json();
           if(d.jobs?.length){
+            localStorage.setItem(cacheKey,Date.now().toString()); // Only lock after success
             // Give each on-demand job a temp ID for client-side use
             jobs=d.jobs.map((j,i)=>_normalizeDbJob({...j,id:j.id||('az_'+i+'_'+Date.now())}));
             JOBS.splice(0,JOBS.length,...jobs,...FALLBACK_JOBS);
