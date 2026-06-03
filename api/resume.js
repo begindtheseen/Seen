@@ -22,10 +22,11 @@ export default async function handler(req, res) {
     // Validate resume text is actually readable before sending to Claude
     if (body.resume !== undefined) {
       const r = body.resume || '';
-      const words = (r.match(/[A-Za-z][A-Za-z\s]{2,}/g) || []).join('');
-      const readable = words.length;
-      // Require >55% readable content AND at least 80 chars of readable words
-      if (r.length > 0 && (readable / r.length < 0.55 || readable < 80)) {
+      // Count pure alphabetic words (3+ letters) — catches binary/base64 garbage
+      // which has essentially no real English words, while allowing resumes heavy
+      // with dates, numbers, abbreviations, and medical/technical codes.
+      const wordMatches = r.match(/[A-Za-z]{3,}/g) || [];
+      if (r.length > 100 && wordMatches.length < 20) {
         return res.status(400).json({ error: 'RESUME_CORRUPTED' });
       }
     }
