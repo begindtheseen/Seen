@@ -1943,7 +1943,53 @@ async function searchJobs(query, location) {
   if (listEl) listEl.innerHTML = `<div style="text-align:center;padding:3rem;font-family:var(--mono);font-size:.7rem;color:var(--muted)"><div class="spinner" style="margin:0 auto 1rem"></div>Searching${l ? ' near ' + l : ''}...</div>`;
   if (countEl) countEl.textContent = 'Searching...';
 
+  // ── Step 1: Check DB cache first — no API cost ──
+  if (db) {
+    try {
+      const city = (l.split(',')[0] || '').trim();
+      const qWords = q.toLowerCase().split(/\s+/).filter(w => w.length > 2);
+      // Build a filter: match any word of the query against title or search_query
+      const titleFilter = qWords.map(w => `title.ilike.%${w}%`).join(',');
+      const sqFilter = qWords.map(w => `search_query.ilike.%${w}%`).join(',');
+      let dbQuery = db.from('jobs').select('*')
+        .gt('expires_at', new Date().toISOString())
+        .or([titleFilter, sqFilter].filter(Boolean).join(','))
+        .order('score', { ascending: false })
+        .limit(40);
+      if (city) dbQuery = dbQuery.ilike('location', `%${city}%`);
+      const { data: cached } = await dbQuery;
+      if (cached && cached.length >= 5) {
+        const jobs = cached.map(_normalizeDbJob);
+        JOBS.splice(0, JOBS.length, ...jobs, ...FALLBACK_JOBS);
+        if (countEl) countEl.textContent = `${jobs.length} positions${l ? ' near ' + l : ''}`;
+        window._lastSearchResults = jobs;
+        renderJobResults(jobs, l);
+        // Refresh in background if cache is older than 4 hours (fire and forget)
+        const cacheKey = 'srch_' + q.toLowerCase().replace(/\s+/g,'_') + '_' + (city||'').toLowerCase();
+        const lastSearch = parseInt(localStorage.getItem(cacheKey) || '0');
+        if (Date.now() - lastSearch > 4 * 60 * 60 * 1000) {
+          localStorage.setItem(cacheKey, Date.now().toString());
+          _refreshSearchInBackground(q, l, radius);
+        }
+        return;
+      }
+    } catch(e) { console.warn('searchJobs cache check:', e); }
+  }
+
+  // ── Step 2: Rate-limit API calls — one per (query+city) per 2 hours ──
+  const city2 = (l.split(',')[0] || '').trim().toLowerCase();
+  const cacheKey2 = 'srch_' + q.toLowerCase().replace(/\s+/g,'_') + '_' + city2;
+  const lastSearch2 = parseInt(localStorage.getItem(cacheKey2) || '0');
+  if (Date.now() - lastSearch2 < 2 * 60 * 60 * 1000) {
+    // Still rate-limited but cache was empty — show no results quietly
+    if (listEl) listEl.innerHTML = `<div style="text-align:center;padding:3rem"><div style="font-size:1.75rem;margin-bottom:.75rem">🔍</div><div style="font-family:var(--display);font-size:.9rem;font-weight:700;color:var(--white);margin-bottom:.35rem">No cached results</div><div style="font-size:.8rem;color:var(--sub)">Try again in a few minutes or broaden the search</div></div>`;
+    if (countEl) countEl.textContent = '0 results';
+    return;
+  }
+
+  // ── Step 3: Live API search (Claude web search) — only when cache miss ──
   try {
+    localStorage.setItem(cacheKey2, Date.now().toString());
     const res = await fetch('/api/jobs', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -1954,23 +2000,9 @@ async function searchJobs(query, location) {
 
     const jobs = data.jobs || [];
 
-    // Cache to Supabase — fire and forget with proper async
+    // Cache ALL results to Supabase — server already did this but client backup covers edge cases
     if (db && jobs.length) {
-      (async () => {
-        for (const job of jobs.slice(0, 10)) {
-          try {
-            await db.from('jobs').upsert({
-              title: job.title, company: job.company,
-              location: job.location || l || 'US',
-              salary: job.salary, description: job.description,
-              apply_url: job.url, source: job.source,
-              type: job.type || 'Full-time', level: job.level || 'Mid level',
-              search_query: q, score: job.score || 65, waste_score: job.waste_score || 25,
-              expires_at: new Date(Date.now() + 30*24*60*60*1000).toISOString(),
-            }, { onConflict: 'title,company,location', ignoreDuplicates: true });
-          } catch(e) { /* ignore cache errors */ }
-        }
-      })();
+      _persistJobsToDB(jobs, q, l).catch(() => {});
     }
 
     if (!jobs.length) {
@@ -1988,6 +2020,44 @@ async function searchJobs(query, location) {
     if (listEl) listEl.innerHTML = `<div style="text-align:center;padding:2rem;font-family:var(--mono);font-size:.7rem;color:var(--red)">Search failed — ${e.message}</div>`;
     if (countEl) countEl.textContent = 'Error';
   }
+}
+
+// Background refresh after serving from cache — updates DB without blocking UI
+async function _refreshSearchInBackground(q, l, radius) {
+  try {
+    const res = await fetch('/api/jobs', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ query: q, location: l, radius }) });
+    if (!res.ok) return;
+    const data = await res.json();
+    const jobs = data.jobs || [];
+    if (db && jobs.length) {
+      if (db && jobs.length) await _persistJobsToDB(jobs, q, l).catch(() => {});
+    }
+  } catch(e) { /* background, ignore */ }
+}
+
+// Bulk-upsert all jobs to DB — single POST, server handles dedup via unique index
+async function _persistJobsToDB(jobs, searchQuery, location) {
+  if (!db || !jobs.length) return;
+  const expires = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+  const rows = jobs.map(j => ({
+    title: j.title || j.co || '',
+    company: j.co || j.company || '',
+    location: j.city || j.location || location || 'US',
+    salary: j.sal || j.salary || null,
+    description: ((j.description || j.vibes?.[0] || '')).slice(0, 2000),
+    apply_url: j._url || j.apply_url || j.url || null,
+    source: j.source || 'Seen',
+    type: j.type || 'Full-time',
+    level: j.lvl || j.level || 'Mid level',
+    search_query: searchQuery || '',
+    score: j.score || 65,
+    waste_score: j.waste || j.waste_score || 25,
+    expires_at: expires,
+  })).filter(r => r.title && r.company);
+  if (!rows.length) return;
+  try {
+    await db.from('jobs').upsert(rows, { onConflict: 'title,company,location', ignoreDuplicates: false });
+  } catch(e) { console.warn('_persistJobsToDB:', e.message); }
 }
 
 function renderJobResults(jobs, l) {
