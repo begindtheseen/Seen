@@ -4841,7 +4841,24 @@ const ResumeStore = {
     return `seen_resume_meta_${uid}`;
   },
 
+  // Check if text is actually readable English prose (not garbled binary/XML)
+  _isReadable(text) {
+    if (!text || text.length < 50) return false;
+    const readable = (text.match(/[A-Za-z][A-Za-z\s]{2,}/g) || []).join('').length;
+    return readable / text.length >= 0.4;
+  },
+
   async save(text, fileName, wordCount) {
+    // Patch in-memory profile immediately so loadProfile() race can't wipe it
+    if (Auth._profile) {
+      Auth._profile.resume_text = text;
+      Auth._profile.resume_file_name = fileName;
+      Auth._profile.resume_word_count = wordCount;
+    }
+    // Persist to localStorage
+    localStorage.setItem(this._key(), text);
+    localStorage.setItem(this._metaKey(), JSON.stringify({ fileName, wordCount }));
+    // Persist to DB (cross-device)
     if (db && Auth.isLoggedIn()) {
       try {
         const uid = (await db.auth.getUser()).data.user?.id;
@@ -4851,31 +4868,48 @@ const ResumeStore = {
           resume_word_count: wordCount,
           resume_updated_at: new Date().toISOString()
         }).eq('id', uid);
-      } catch(e) { console.warn('Resume save:', e); }
+      } catch(e) { console.warn('Resume DB save (non-fatal):', e); }
     }
-    localStorage.setItem(this._key(), text);
-    localStorage.setItem(this._metaKey(), JSON.stringify({ fileName, wordCount }));
   },
 
   async load() {
-    // Supabase profile is the source of truth
+    // Try DB-backed profile first
     if (db && Auth.isLoggedIn() && Auth._profile?.resume_text) {
-      return {
-        text: Auth._profile.resume_text,
-        fileName: Auth._profile.resume_file_name || 'Resume',
-        wordCount: Auth._profile.resume_word_count || 0
-      };
+      const text = Auth._profile.resume_text;
+      if (this._isReadable(text)) {
+        return {
+          text,
+          fileName: Auth._profile.resume_file_name || 'Resume',
+          wordCount: Auth._profile.resume_word_count || 0
+        };
+      }
+      // Garbled — clear it so user gets re-upload prompt
+      console.warn('ResumeStore: stored resume failed readability check, clearing.');
+      this.clear();
+      return null;
     }
-    // Fall back to user-specific local cache only
+    // Fall back to localStorage
     const text = localStorage.getItem(this._key());
-    const meta = JSON.parse(localStorage.getItem(this._metaKey()) || '{}');
-    if (text) return { text, fileName: meta.fileName || 'Resume', wordCount: meta.wordCount || 0 };
+    if (text) {
+      if (this._isReadable(text)) {
+        const meta = JSON.parse(localStorage.getItem(this._metaKey()) || '{}');
+        return { text, fileName: meta.fileName || 'Resume', wordCount: meta.wordCount || 0 };
+      }
+      // Garbled local copy — clear it
+      console.warn('ResumeStore: local resume failed readability check, clearing.');
+      this.clear();
+    }
     return null;
   },
 
   clear() {
     localStorage.removeItem(this._key());
     localStorage.removeItem(this._metaKey());
+    if (Auth._profile) {
+      Auth._profile.resume_text = null;
+      Auth._profile.resume_file_name = null;
+      Auth._profile.resume_word_count = null;
+    }
     if (db && Auth.isLoggedIn()) {
       db.auth.getUser().then(res => {
         const user = res?.data?.user;
