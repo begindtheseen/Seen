@@ -76,22 +76,33 @@ JOB DESCRIPTION:\n${(jobDescription||'').slice(0,2500)}${background?'\nCANDIDATE
       return res.status(400).json({ error: 'Unknown tool: ' + tool });
     }
 
-    const apiRes = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': ANTHROPIC_KEY,
-        'anthropic-version': '2023-06-01',
-      },
-      body: JSON.stringify({
-        model: 'claude-haiku-4-5-20251001',
-        max_tokens: 2000,
-        system: systemPrompt,
-        messages: [{ role: 'user', content: prompt }],
-      }),
+    const requestBody = JSON.stringify({
+      model: 'claude-haiku-4-5-20251001',
+      max_tokens: 2000,
+      system: systemPrompt,
+      messages: [{ role: 'user', content: prompt }],
     });
 
+    // Retry up to 2 times on 429 rate limit with backoff
+    let apiRes;
+    for (let attempt = 0; attempt < 3; attempt++) {
+      if (attempt > 0) await new Promise(r => setTimeout(r, attempt * 3000));
+      apiRes = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': ANTHROPIC_KEY,
+          'anthropic-version': '2023-06-01',
+        },
+        body: requestBody,
+      });
+      if (apiRes.status !== 429) break;
+    }
+
     if (!apiRes.ok) {
+      if (apiRes.status === 429) {
+        return res.status(429).json({ error: 'The optimizer is busy right now — try again in a few seconds.' });
+      }
       const errText = await apiRes.text();
       throw new Error('Claude API ' + apiRes.status + ': ' + errText.slice(0, 200));
     }
