@@ -85,10 +85,14 @@ JOB DESCRIPTION:\n${(jobDescription||'').slice(0,2500)}${background?'\nCANDIDATE
       messages: [{ role: 'user', content: prompt }],
     });
 
-    // Retry up to 2 times on 429 rate limit with backoff
+    // Retry up to 4 times on 429 — respect retry-after header if present
     let apiRes;
-    for (let attempt = 0; attempt < 3; attempt++) {
-      if (attempt > 0) await new Promise(r => setTimeout(r, attempt * 3000));
+    for (let attempt = 0; attempt < 5; attempt++) {
+      if (attempt > 0) {
+        const retryAfter = apiRes?.headers?.get('retry-after');
+        const waitMs = retryAfter ? Math.min(parseInt(retryAfter) * 1000, 30000) : attempt * 6000;
+        await new Promise(r => setTimeout(r, waitMs));
+      }
       apiRes = await fetch('https://api.anthropic.com/v1/messages', {
         method: 'POST',
         headers: {
