@@ -1449,27 +1449,23 @@ nav{position:fixed;top:0;left:0;right:0;z-index:500;height:58px;display:flex;ali
     <div style="background:var(--surface);border:1px solid var(--line);border-radius:14px;overflow:hidden;margin-bottom:1.5rem">
       <div style="padding:.85rem 1.25rem;border-bottom:1px solid var(--line);font-family:var(--mono);font-size:.62rem;color:var(--dim);text-transform:uppercase;letter-spacing:.08em">Job preferences</div>
       <div style="padding:1.25rem">
-        <div style="margin-bottom:1rem">
-          <label style="font-family:var(--mono);font-size:.6rem;text-transform:uppercase;letter-spacing:.08em;color:var(--dim);display:block;margin-bottom:.4rem">Industry</label>
-          <select id="profIndustry" style="width:100%;background:var(--raised);border:1.5px solid var(--line2);border-radius:8px;padding:.7rem 1rem;color:var(--white);font-family:var(--body);font-size:.875rem;outline:none;appearance:none;cursor:pointer;box-sizing:border-box" onfocus="this.style.borderColor='var(--green)'" onblur="this.style.borderColor='var(--line2)'">
-            <option value="">— Select industry —</option>
-            <option value="tech">💻 Tech</option>
-            <option value="healthcare">🏥 Healthcare</option>
-            <option value="retail">🛍️ Food &amp; Retail</option>
-            <option value="logistics">📦 Logistics</option>
-            <option value="finance">💰 Finance</option>
-            <option value="other">✳️ Other</option>
-          </select>
-        </div>
-        <div>
-          <label style="font-family:var(--mono);font-size:.6rem;text-transform:uppercase;letter-spacing:.08em;color:var(--dim);display:block;margin-bottom:.4rem">Experience level</label>
-          <select id="profExperience" style="width:100%;background:var(--raised);border:1.5px solid var(--line2);border-radius:8px;padding:.7rem 1rem;color:var(--white);font-family:var(--body);font-size:.875rem;outline:none;appearance:none;cursor:pointer;box-sizing:border-box" onfocus="this.style.borderColor='var(--green)'" onblur="this.style.borderColor='var(--line2)'">
-            <option value="">— Select level —</option>
-            <option value="entry">🌱 Entry level (0–2 yrs)</option>
-            <option value="mid">📈 Mid level (3–6 yrs)</option>
-            <option value="senior">⭐ Senior (7+ yrs)</option>
-          </select>
-        </div>
+        <label style="font-family:var(--mono);font-size:.6rem;text-transform:uppercase;letter-spacing:.08em;color:var(--dim);display:block;margin-bottom:.4rem">Experience level</label>
+        <select id="profExperience" style="width:100%;background:var(--raised);border:1.5px solid var(--line2);border-radius:8px;padding:.7rem 1rem;color:var(--white);font-family:var(--body);font-size:.875rem;outline:none;appearance:none;cursor:pointer;box-sizing:border-box" onfocus="this.style.borderColor='var(--green)'" onblur="this.style.borderColor='var(--line2)'">
+          <option value="">— Select level —</option>
+          <option value="entry">🌱 Entry level (0–2 yrs)</option>
+          <option value="mid">📈 Mid level (3–6 yrs)</option>
+          <option value="senior">⭐ Senior (7+ yrs)</option>
+        </select>
+        <div style="font-family:var(--mono);font-size:.6rem;color:var(--muted);margin-top:.5rem">Use the search filter on the Jobs page to filter by industry.</div>
+      </div>
+    </div>
+
+    <!-- Account & Security -->
+    <div style="background:var(--surface);border:1px solid var(--line);border-radius:14px;overflow:hidden;margin-bottom:1.5rem">
+      <div style="padding:.85rem 1.25rem;border-bottom:1px solid var(--line);font-family:var(--mono);font-size:.62rem;color:var(--dim);text-transform:uppercase;letter-spacing:.08em">Account &amp; Security</div>
+      <div style="padding:1.25rem">
+        <div style="font-size:.78rem;color:var(--sub);margin-bottom:.75rem;line-height:1.6">To change your password, sign out and use "Forgot password" on the sign-in screen.</div>
+        <button onclick="doSignOut()" style="background:none;border:1px solid var(--line2);color:var(--muted);border-radius:8px;padding:.6rem 1.25rem;font-family:var(--mono);font-size:.72rem;cursor:pointer;width:100%">Sign out</button>
       </div>
     </div>
 
@@ -2051,8 +2047,10 @@ async function loadJobs(){
 
   if(listEl)listEl.innerHTML='<div style="text-align:center;padding:3rem;font-family:var(--mono);font-size:.7rem;color:var(--muted)"><div class="spinner" style="margin:0 auto 1rem"></div>Loading listings...</div>';
 
-  // Effective location: input field > profile city > none (show all)
-  const profileCity=Auth._profile?.city||null;
+  // Effective location: input field > DB profile city > localStorage city > none
+  const dbCity = Auth._profile?.city || null;
+  const localCity = _loadProfileLocal()?.city || null;
+  const profileCity = dbCity || localCity;
   const effectiveLoc=locInput||profileCity;
 
   let jobs=[];
@@ -3518,7 +3516,10 @@ function go(page){
     if(page==='jobs'){
       // Pre-fill location from user profile if input is blank
       const locInp=document.getElementById('jobSearchLocation');
-      if(locInp&&!locInp.value&&Auth._profile?.city)locInp.value=Auth._profile.city;
+      if(locInp&&!locInp.value){
+        const c=Auth._profile?.city||_loadProfileLocal()?.city||'';
+        if(c)locInp.value=c;
+      }
       loadJobs();
     }
     if(page==='report')loadCommunityReports();
@@ -4666,28 +4667,41 @@ function closeSideMenu() {
   document.getElementById('sideMenuOverlay').classList.remove('open');
 }
 
+function _profileLocalKey() {
+  return 'seen_profile_' + (Auth._user?.id || Auth._user?.email || 'guest');
+}
+
+function _saveProfileLocal(data) {
+  try { localStorage.setItem(_profileLocalKey(), JSON.stringify(data)); } catch(e) {}
+}
+
+function _loadProfileLocal() {
+  try { return JSON.parse(localStorage.getItem(_profileLocalKey()) || 'null'); } catch(e) { return null; }
+}
+
 function renderProfilePage() {
   const user = Auth.get();
-  const profile = Auth._profile;
+  // Merge DB profile with localStorage fallback so saved data always shows
+  const dbProfile = Auth._profile || {};
+  const local = _loadProfileLocal() || {};
+  const profile = { ...local, ...dbProfile }; // DB wins if both exist
+
   const v = id => document.getElementById(id);
-
-  if (v('profName')) v('profName').value = profile?.name || user?.name || '';
+  if (v('profName')) v('profName').value = profile.name || user?.name || '';
   if (v('profEmail')) v('profEmail').value = user?.email || '';
-  if (v('profCity')) v('profCity').value = profile?.city || '';
-  if (v('profIndustry')) v('profIndustry').value = profile?.industry || '';
-  if (v('profExperience')) v('profExperience').value = profile?.experience || '';
+  if (v('profCity')) v('profCity').value = profile.city || '';
+  if (v('profExperience')) v('profExperience').value = profile.experience || '';
 
-  // Show prompt banner if profile is incomplete
-  const incomplete = !profile?.city || !profile?.industry;
+  // Show banner if city is missing
   const existing = document.getElementById('profileIncompleteBanner');
   if (existing) existing.remove();
-  if (incomplete) {
+  if (!profile.city) {
     const banner = document.createElement('div');
     banner.id = 'profileIncompleteBanner';
     banner.style.cssText = 'background:var(--raised);border:1px solid var(--amber);border-radius:10px;padding:.85rem 1rem;font-family:var(--mono);font-size:.68rem;color:var(--amber);margin-bottom:1.25rem;line-height:1.65';
-    banner.innerHTML = '⚠ Fill in your city and industry so Seen can show you relevant jobs automatically.';
-    const firstCard = document.querySelector('#page-profile .page > div > div');
-    if (firstCard) firstCard.parentNode.insertBefore(banner, firstCard);
+    banner.innerHTML = '⚠ Add your city so Seen can auto-load nearby jobs.';
+    const saveBtn = document.getElementById('saveProfileBtn');
+    if (saveBtn) saveBtn.parentNode.insertBefore(banner, saveBtn);
   }
 }
 
@@ -4695,37 +4709,43 @@ async function saveProfile() {
   const btn = document.getElementById('saveProfileBtn');
   const name = (document.getElementById('profName')?.value || '').trim();
   const city = (document.getElementById('profCity')?.value || '').trim();
-  const industry = document.getElementById('profIndustry')?.value || '';
   const experience = document.getElementById('profExperience')?.value || '';
 
   if (!name) { showToast('Enter your name.'); return; }
 
   if (btn) { btn.textContent = 'Saving...'; btn.disabled = true; }
 
-  try {
-    if (db && Auth._user) {
+  // 1. Save to localStorage immediately — this always works
+  const localData = { name, city, experience, savedAt: Date.now() };
+  _saveProfileLocal(localData);
+
+  // 2. Patch Auth._profile in memory so jobs page picks it up right away
+  if (!Auth._profile) Auth._profile = {};
+  Auth._profile.name = name;
+  Auth._profile.city = city;
+  Auth._profile.experience = experience;
+
+  // 3. Try to save to Supabase DB (requires columns to exist — run SQL migration)
+  if (db && Auth._user) {
+    try {
       await db.from('profiles').upsert({
         id: Auth._user.id,
-        name,
-        city,
-        industry,
-        experience,
         email: Auth._user.email,
+        name, city, experience,
       });
-      await Auth.loadProfile();
-    }
-
-    // Also update the location input on the jobs page so it takes effect immediately
-    const locInp = document.getElementById('jobSearchLocation');
-    if (locInp && city) locInp.value = city;
-
-    showToast('Profile saved ✓');
-    if (btn) { btn.textContent = 'Save changes →'; btn.disabled = false; }
-  } catch (e) {
-    console.error('saveProfile:', e);
-    showToast('Could not save — try again.');
-    if (btn) { btn.textContent = 'Save changes →'; btn.disabled = false; }
+    } catch(e) { console.warn('Profile DB save (non-fatal):', e.message); }
   }
+
+  // 4. Update jobs page location input immediately
+  const locInp = document.getElementById('jobSearchLocation');
+  if (locInp && city) locInp.value = city;
+
+  showToast('Profile saved ✓');
+  if (btn) { btn.textContent = 'Save changes →'; btn.disabled = false; }
+
+  // Re-render banner state
+  const existing = document.getElementById('profileIncompleteBanner');
+  if (existing && city) existing.remove();
 }
 
 function renderSideMenu() {
