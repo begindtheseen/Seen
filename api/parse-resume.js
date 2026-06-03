@@ -1,3 +1,7 @@
+import zlib from 'zlib';
+import { promisify } from 'util';
+const inflateRaw = promisify(zlib.inflateRaw);
+
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
@@ -31,40 +35,15 @@ export default async function handler(req, res) {
     let extractedText = '';
 
     if (isPDF) {
+      // Use Claude's native PDF vision — retry on rate limit
       const b64 = fileBuffer.toString('base64');
-      const response = await fetch('https://api.anthropic.com/v1/messages', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-api-key': process.env.ANTHROPIC_KEY,
-          'anthropic-version': '2023-06-01',
-        },
-        body: JSON.stringify({
-          model: 'claude-haiku-4-5-20251001',
-          max_tokens: 4000,
-          messages: [{
-            role: 'user',
-            content: [
-              { type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: b64 } },
-              { type: 'text', text: 'Extract ALL text from this resume. Preserve structure — job titles, companies, dates, bullets, skills, education. Output the raw text only, no commentary.' }
-            ]
-          }]
-        })
-      });
-
-      if (!response.ok) {
-        const errText = await response.text();
-        throw new Error('PDF extraction failed: ' + response.status + ' ' + errText.slice(0, 100));
-      }
-      const data = await response.json();
-      extractedText = data.content?.[0]?.text || '';
-
-    } else if (isWord) {
-      extractedText = extractWordText(fileBuffer);
-
-      if (!extractedText || extractedText.length < 150) {
-        const b64 = fileBuffer.toString('base64');
-        const response = await fetch('https://api.anthropic.com/v1/messages', {
+      let apiRes;
+      for (let attempt = 0; attempt < 3; attempt++) {
+        if (attempt > 0) {
+          const wait = apiRes?.headers?.get('retry-after');
+          await new Promise(r => setTimeout(r, wait ? Math.min(parseInt(wait) * 1000, 20000) : attempt * 6000));
+        }
+        apiRes = await fetch('https://api.anthropic.com/v1/messages', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -73,15 +52,59 @@ export default async function handler(req, res) {
           },
           body: JSON.stringify({
             model: 'claude-haiku-4-5-20251001',
-            max_tokens: 4000,
+            max_tokens: 3000,
             messages: [{
               role: 'user',
-              content: 'Extract all readable text from this Word document resume (base64 encoded). Return only the extracted resume text.\n\nBase64: ' + b64.slice(0, 6000)
+              content: [
+                { type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: b64 } },
+                { type: 'text', text: 'Extract ALL text from this resume. Preserve structure — job titles, companies, dates, bullets, skills, education. Output the raw text only, no commentary.' }
+              ]
             }]
           })
         });
-        if (response.ok) {
-          const data = await response.json();
+        if (apiRes.status !== 429) break;
+      }
+
+      if (!apiRes.ok) {
+        const errText = await apiRes.text();
+        throw new Error('PDF extraction failed: ' + apiRes.status + ' ' + errText.slice(0, 100));
+      }
+      const data = await apiRes.json();
+      extractedText = data.content?.[0]?.text || '';
+
+    } else if (isWord) {
+      // Proper DOCX extraction: parse the ZIP, decompress word/document.xml, pull <w:t> content
+      extractedText = await extractDocxText(fileBuffer);
+
+      // If ZIP parsing failed (old .doc binary, corrupted file), fall back to Claude
+      if (!extractedText || extractedText.length < 150) {
+        const b64 = fileBuffer.toString('base64');
+        let apiRes;
+        for (let attempt = 0; attempt < 3; attempt++) {
+          if (attempt > 0) {
+            const wait = apiRes?.headers?.get('retry-after');
+            await new Promise(r => setTimeout(r, wait ? Math.min(parseInt(wait) * 1000, 20000) : attempt * 6000));
+          }
+          apiRes = await fetch('https://api.anthropic.com/v1/messages', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'x-api-key': process.env.ANTHROPIC_KEY,
+              'anthropic-version': '2023-06-01',
+            },
+            body: JSON.stringify({
+              model: 'claude-haiku-4-5-20251001',
+              max_tokens: 3000,
+              messages: [{
+                role: 'user',
+                content: 'Extract all text from this Word document resume (base64). Return ONLY the extracted resume text with no commentary.\n\nBase64: ' + b64.slice(0, 8000)
+              }]
+            })
+          });
+          if (apiRes.status !== 429) break;
+        }
+        if (apiRes?.ok) {
+          const data = await apiRes.json();
           const result = data.content?.[0]?.text || '';
           if (result && result.length > 100) extractedText = result;
         }
@@ -101,24 +124,74 @@ export default async function handler(req, res) {
   }
 }
 
-function extractWordText(buffer) {
+// Parse DOCX (ZIP archive) using Node.js built-in zlib — no npm required.
+// Finds word/document.xml, decompresses it (DEFLATE), extracts <w:t> text runs.
+async function extractDocxText(buffer) {
   try {
-    const raw = buffer.toString('latin1');
-    const xmlMatches = raw.match(/<w:t[^>]*>([^<]+)<\/w:t>/g) || [];
-    if (xmlMatches.length > 5) {
-      const texts = xmlMatches.map(m => m.replace(/<[^>]+>/g, '').trim()).filter(t => t.length > 0);
-      const joined = texts.join(' ').replace(/\s+/g, ' ').trim();
-      if (joined.length > 100) return joined;
+    const xml = await readZipEntry(buffer, 'word/document.xml');
+    if (!xml) return '';
+
+    // Decode XML entities and extract text runs
+    const xmlMatches = xml.match(/<w:t[^>]*>([^<]*)<\/w:t>/g) || [];
+    const texts = xmlMatches
+      .map(m => m.replace(/<[^>]+>/g, '').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&apos;/g, "'").replace(/&quot;/g, '"').trim())
+      .filter(t => t.length > 0);
+
+    // Preserve paragraph breaks by detecting paragraph boundaries
+    let result = '';
+    let inParagraph = false;
+    const paragraphs = xml.split(/<\/w:p>/);
+    for (const para of paragraphs) {
+      const tMatches = para.match(/<w:t[^>]*>([^<]*)<\/w:t>/g) || [];
+      const paraText = tMatches
+        .map(m => m.replace(/<[^>]+>/g, '').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&apos;/g, "'").replace(/&quot;/g, '"'))
+        .join('').trim();
+      if (paraText) result += paraText + '\n';
     }
-    // Fallback: readable ASCII runs
-    let readable = '';
-    for (let i = 0; i < raw.length; i++) {
-      const c = raw.charCodeAt(i);
-      if ((c >= 32 && c <= 126) || c === 9 || c === 10 || c === 13) readable += raw[i];
-    }
-    const words = readable.match(/[A-Za-z]{3,}(?:[A-Za-z0-9 ,.!?:;@()\-/&'"\n\t]*)/g) || [];
-    return words.join(' ').replace(/\s+/g, ' ').trim();
+
+    return result.trim() || texts.join(' ');
   } catch(e) {
     return '';
   }
+}
+
+// Minimal ZIP reader — finds a named entry, decompresses if needed
+async function readZipEntry(buffer, targetName) {
+  let offset = 0;
+
+  while (offset < buffer.length - 30) {
+    // Local file header signature: PK\x03\x04
+    if (buffer[offset] !== 0x50 || buffer[offset+1] !== 0x4B ||
+        buffer[offset+2] !== 0x03 || buffer[offset+3] !== 0x04) {
+      offset++;
+      continue;
+    }
+
+    const compression   = buffer.readUInt16LE(offset + 8);
+    const compressedSz  = buffer.readUInt32LE(offset + 18);
+    const uncompressedSz = buffer.readUInt32LE(offset + 22);
+    const nameLen       = buffer.readUInt16LE(offset + 26);
+    const extraLen      = buffer.readUInt16LE(offset + 28);
+
+    const entryName = buffer.slice(offset + 30, offset + 30 + nameLen).toString('utf8');
+    const dataStart = offset + 30 + nameLen + extraLen;
+
+    if (entryName === targetName) {
+      const compressed = buffer.slice(dataStart, dataStart + compressedSz);
+      if (compression === 0) {
+        // Stored (no compression)
+        return compressed.toString('utf8');
+      } else if (compression === 8) {
+        // DEFLATE
+        const decompressed = await inflateRaw(compressed);
+        return decompressed.toString('utf8');
+      }
+      return null; // unsupported compression
+    }
+
+    offset = dataStart + compressedSz;
+    if (compressedSz === 0 && nameLen === 0) offset++; // guard against infinite loop
+  }
+
+  return null; // entry not found
 }

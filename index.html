@@ -1991,7 +1991,8 @@ async function searchJobs(query, location) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ query: q, location: l, radius })
     });
-    const data = await res.json();
+    let data;
+    try { data = await res.json(); } catch(_) { throw new Error('Search unavailable — try again in a moment'); }
     if (!res.ok || data.error) throw new Error(data.error || 'Search failed');
 
     const jobs = data.jobs || [];
