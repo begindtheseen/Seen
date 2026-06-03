@@ -1655,13 +1655,17 @@ const Auth = {
     try {
       const { data } = await db.from('profiles').select('*').eq('id', this._user.id).single();
       const local = _loadProfileLocal() || {};
-      // localStorage wins — it reflects the user's most recent action on this browser.
-      // DB fills in fields that have never been saved locally (e.g. first session on new device).
+      const localTs = local.savedAt || 0;
+      const dbTs = data?.updated_at ? new Date(data.updated_at).getTime() : 0;
+      // DB is the cross-device source of truth.
+      // Only let localStorage override specific fields if it was saved MORE RECENTLY than the DB row
+      // (i.e. the user just made a change on this device that hasn't synced yet).
+      const localWins = localTs > dbTs;
       this._profile = {
         ...(data || {}),
-        name: local.name || data?.name || '',
-        city: local.city || data?.city || '',
-        experience: local.experience || data?.experience || '',
+        name:       (localWins && local.name)       ? local.name       : (data?.name       || local.name       || ''),
+        city:       (localWins && local.city)       ? local.city       : (data?.city       || local.city       || ''),
+        experience: (localWins && local.experience) ? local.experience : (data?.experience || local.experience || ''),
       };
     } catch(e) {
       const local = _loadProfileLocal() || {};
@@ -4361,6 +4365,18 @@ async function createAccount() {
     return;
   }
 
+  // Create profile row immediately so data exists before survey completes
+  if (data?.user && db) {
+    try {
+      await db.from('profiles').upsert({
+        id: data.user.id,
+        email: data.user.email,
+        name,
+        type: 'seeker',
+      }, { onConflict: 'id' });
+    } catch(e) { /* non-fatal — survey will upsert again */ }
+  }
+
   // Show verify screen
   const el = document.getElementById('verifyEmailDisplay');
   if (el) el.textContent = email;
@@ -4942,16 +4958,19 @@ async function doSignIn() {
   if (btn) { btn.textContent = 'Sign in →'; btn.disabled = false; }
 
   if (error) {
-    if (error.message?.includes('Invalid login')) {
-      showToast('Wrong email or password. Try again.');
-      const passEl = document.getElementById('signinPass');
+    const msg = error.message || '';
+    const passEl = document.getElementById('signinPass');
+    if (msg.includes('Invalid login') || msg.includes('invalid_credentials') || msg.includes('Invalid credentials')) {
+      showToast('Wrong email or password — use "Forgot password?" to reset.');
       if (passEl) { passEl.value = ''; passEl.style.borderColor = 'var(--red)'; passEl.focus(); }
-    } else if (error.message?.includes('rate limit') || error.message?.includes('Too many')) {
+    } else if (msg.includes('rate limit') || msg.includes('Too many')) {
       showToast('Too many attempts. Wait a few minutes and try again.');
-    } else if (error.message?.includes('confirmed')) {
-      showToast('Please verify your email first. Check your inbox.');
+    } else if (msg.includes('confirm') || msg.includes('verified') || msg.includes('not confirmed')) {
+      showToast('Check your email — click the verification link we sent you first.');
+    } else if (msg.includes('not found') || msg.includes('no user')) {
+      showToast('No account found with that email. Try signing up.');
     } else {
-      showToast(error.message);
+      showToast('Sign in failed: ' + msg);
     }
   }
 }
@@ -5228,15 +5247,16 @@ async function saveProfile() {
   Auth._profile.city = city;
   Auth._profile.experience = experience;
 
-  // 3. Persist to Supabase DB — update existing row (profile row created on signup)
+  // 3. Persist to Supabase DB — upsert so it works whether or not a row exists yet
   if (db && Auth._user) {
     try {
-      const { error } = await db.from('profiles').update({ name, city, experience }).eq('id', Auth._user.id);
-      if (error) {
-        // Row might not exist yet — upsert as fallback
-        const { error: err2 } = await db.from('profiles').upsert({ id: Auth._user.id, email: Auth._user.email, name, city, experience }, { onConflict: 'id' });
-        if (err2) console.warn('Profile DB save failed:', err2.message, '— data saved to localStorage only');
-      }
+      const { error } = await db.from('profiles').upsert({
+        id: Auth._user.id,
+        email: Auth._user.email,
+        name, city, experience,
+        updated_at: new Date().toISOString(),
+      }, { onConflict: 'id' });
+      if (error) console.warn('Profile DB save failed:', error.message, '— data saved to localStorage only');
     } catch(e) { console.warn('Profile DB save (non-fatal):', e.message); }
   }
 
