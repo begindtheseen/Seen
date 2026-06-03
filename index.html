@@ -1568,6 +1568,21 @@ nav{position:fixed;top:0;left:0;right:0;z-index:500;height:58px;display:flex;ali
   </div>
 </div>
 
+<!-- JOB DETAIL MODAL -->
+<div class="modal-ov" id="jobDetailModal" onclick="if(event.target===this)closeJobDetailModal()">
+  <div class="modal" style="max-width:620px;display:flex;flex-direction:column;max-height:88vh">
+    <div class="m-hdr" style="flex-shrink:0">
+      <div style="flex:1;min-width:0">
+        <div class="m-ti" id="jdmTitle" style="font-size:1rem;line-height:1.3"></div>
+        <div style="font-family:var(--mono);font-size:.6rem;color:var(--muted);margin-top:.2rem" id="jdmSub"></div>
+      </div>
+      <button class="m-cl" onclick="closeJobDetailModal()">✕</button>
+    </div>
+    <div id="jdmBody" style="flex:1;overflow-y:auto;padding:1.25rem 1.5rem"></div>
+    <div id="jdmFoot" style="flex-shrink:0;padding:1rem 1.5rem;border-top:1px solid var(--line2);display:flex;gap:.6rem"></div>
+  </div>
+</div>
+
 <!-- UPDATE STAGE MODAL -->
 <div class="modal-ov" id="stageModal" onclick="closeStageModal(event)">
   <div class="modal" style="max-width:460px">
@@ -1936,7 +1951,7 @@ async function loadFeatured(){
   el.innerHTML=jobs.map((j,i)=>{
     const risk=j.risk||Score.risk(j.score);
     const applyAct=`openApplyModal('${j.id}','${(j.co||'').replace(/'/g,"\\'")}','${(j.title||'').replace(/'/g,"\\'")}','${(j.city||'').replace(/'/g,"\\'")}',${j.score},'${risk}',${j.waste||25},'${j.apply_email||''}')`;
-    return`<div class="jcard" style="animation:fadeUp .4s ${i*.06}s ease both">
+    return`<div class="jcard" style="animation:fadeUp .4s ${i*.06}s ease both;cursor:pointer" onclick="openJobDetailModal('${j.id}')">
       <div class="jc-head"><div class="jc-logo">${j.logo||(j.co||'?')[0]}</div><div class="jc-scores"><div class="jc-ts ${risk}">${j.score}</div><div class="jc-ts-lbl">transparency</div></div></div>
       <div class="jc-co">${j.co||''}</div>
       <div class="jc-title">${j.title||''}</div>
@@ -2110,7 +2125,7 @@ function renderJobResults(jobs, l) {
       JOBS.push({ id: safeId, _url: job.url || job.apply_url || null, co: safeCompany, title: safeTitle, city: safeLoc, score, waste, description: job.description || '', vibes: [job.description ? job.description.slice(0,80) : ('via ' + (job.source||'Job board'))] });
     }
     const applyAction = "openApplyModal('" + safeId + "','" + safeCompany + "','" + safeTitle + "','" + safeLoc + "'," + score + ",'" + Score.risk(score) + "'," + waste + ",'')";
-    return '<div class="jlc">' +
+    return '<div class="jlc" style="cursor:pointer" onclick="openJobDetailModal(\'' + safeId + '\')">' +
       '<div class="jlc-top">' +
         '<div style="flex:1">' +
           '<div class="jlc-title">' + (job.title||'') + '</div>' +
@@ -2419,7 +2434,7 @@ async function loadJobs(){
   listEl.innerHTML='<div class="jlay">'+jobs.map(j=>{
     const risk=j.risk||Score.risk(j.score);
     const applyAct=`openApplyModal('${j.id}','${(j.co||'').replace(/'/g,"\\'")}','${(j.title||'').replace(/'/g,"\\'")}','${(j.city||'').replace(/'/g,"\\'")}',${j.score},'${risk}',${j.waste||25},'${j.apply_email||''}')`;
-    return`<div class="jlc">
+    return`<div class="jlc" style="cursor:pointer" onclick="openJobDetailModal('${j.id}')">
       <div class="jlc-top">
         <div style="flex:1">
           <div class="jlc-title">${j.title}</div>
@@ -4362,6 +4377,74 @@ async function createAccount() {
 // FIX 4: Guest apply → prompt sign in/up
 // ═══════════════════════════════════════════════
 let _pendingApplication = null;
+
+// ═══════════════════════════════════════════════
+// JOB DETAIL MODAL
+// ═══════════════════════════════════════════════
+function openJobDetailModal(jobId) {
+  const j = JOBS.find(x => x.id === jobId);
+  if (!j) return;
+
+  const risk = j.risk || Score.risk(j.score);
+  const wl = Score.wasteLabel(j.waste || 25);
+  const company = (j.co || '').replace(/'/g, "\\'");
+  const role    = (j.title || '').replace(/'/g, "\\'");
+  const loc     = (j.city || j.loc || '').replace(/'/g, "\\'");
+  const score   = j.score || 65;
+  const waste   = j.waste || 25;
+  const applyArgs = `'${jobId}','${company}','${role}','${loc}',${score},'${risk}',${waste},'${j.apply_email||''}'`;
+
+  document.getElementById('jdmTitle').textContent = j.title || '';
+  document.getElementById('jdmSub').textContent   = (j.co || '') + (j.city||j.loc ? ' · 📍 ' + (j.city||j.loc) : '');
+
+  // Meta chips
+  const metaChips = [
+    j.type || 'Full-time',
+    j.lvl  || 'Mid level',
+    j.sal && j.sal !== '—' ? j.sal : null,
+  ].filter(Boolean).map(m => `<span style="background:var(--raised);border:1px solid var(--line2);border-radius:5px;padding:.2rem .55rem;font-size:.65rem;font-family:var(--mono);color:var(--sub)">${m}</span>`).join('');
+
+  // Format description — split on newlines, wrap paragraphs
+  const raw = (j.description || j.vibes?.[0] || 'No description available.');
+  const descHtml = raw.split(/\n+/).map(p => p.trim()).filter(Boolean)
+    .map(p => `<p style="margin:0 0 .75rem;line-height:1.7;color:var(--sub);font-size:.8rem">${p}</p>`).join('');
+
+  document.getElementById('jdmBody').innerHTML = `
+    <div style="display:flex;align-items:center;gap:.85rem;margin-bottom:1.1rem">
+      <div style="width:46px;height:46px;border-radius:10px;background:var(--raised);border:1px solid var(--line2);display:flex;align-items:center;justify-content:center;font-family:var(--display);font-weight:800;font-size:1.15rem;color:var(--white);flex-shrink:0">${(j.co||'?')[0].toUpperCase()}</div>
+      <div style="flex:1;min-width:0">
+        <div style="font-family:var(--display);font-size:.95rem;font-weight:700;color:var(--white);margin-bottom:.3rem;display:flex;flex-wrap:wrap;gap:.3rem">${metaChips}</div>
+        ${j._url ? `<div style="font-family:var(--mono);font-size:.58rem;color:var(--muted)">via ${(()=>{try{return new URL(j._url).hostname.replace('www.','')}catch(e){return j._url}})()}</div>` : ''}
+      </div>
+      <div style="text-align:center;flex-shrink:0">
+        <div class="sring ${risk}" style="width:42px;height:42px"><div class="sring-n" style="font-size:.85rem">${score}</div></div>
+        <div style="font-family:var(--mono);font-size:.5rem;color:var(--muted);margin-top:.2rem">score</div>
+      </div>
+    </div>
+    <div style="border-top:1px solid var(--line2);padding-top:1rem">${descHtml}</div>`;
+
+  document.getElementById('jdmFoot').innerHTML = `
+    <button id="jdmSaveBtn_${jobId}" onclick="toggleSaveJob('${jobId}','${company}','${role}','${loc}',${score});_updateJdmSaveBtn('${jobId}')" style="background:none;border:1px solid var(--line2);border-radius:8px;padding:.65rem .9rem;font-size:.85rem;cursor:pointer;color:var(--muted);transition:all .15s" onmouseover="this.style.borderColor='var(--green)';this.style.color='var(--green)'" onmouseout="this.style.borderColor='var(--line2)';this.style.color='var(--muted)'">♡</button>
+    <button onclick="closeJobDetailModal();openApplyModal(${applyArgs})" style="flex:1;background:var(--green);color:var(--ink);border:none;border-radius:8px;padding:.65rem 1rem;font-family:var(--display);font-weight:800;font-size:.82rem;cursor:pointer;transition:opacity .15s" onmouseover="this.opacity='.88'" onmouseout="">Apply &amp; Optimize →</button>`;
+
+  // Sync save button state
+  _updateJdmSaveBtn(jobId);
+
+  document.getElementById('jobDetailModal').classList.add('open');
+}
+
+async function _updateJdmSaveBtn(jobId) {
+  const btn = document.getElementById('jdmSaveBtn_' + jobId);
+  if (!btn) return;
+  const saved = await SavedJobs.isSaved(jobId);
+  btn.textContent = saved ? '♥' : '♡';
+  btn.style.color = saved ? 'var(--green)' : 'var(--muted)';
+  btn.style.borderColor = saved ? 'var(--green)' : 'var(--line2)';
+}
+
+function closeJobDetailModal() {
+  document.getElementById('jobDetailModal').classList.remove('open');
+}
 
 function openApplyModal(jobId, company, role, location, score, risk, waste, applyEmail) {
   const job = JOBS.find(j => j.id === jobId);
