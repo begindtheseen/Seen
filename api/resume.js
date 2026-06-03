@@ -45,15 +45,25 @@ RESUME:\n${(resume||'').slice(0,4000)}`;
     } else if (tool === 'optimize') {
       const { job, company, resume, jobDescription } = body;
       if (!resume) return res.status(400).json({ error: 'Resume required' });
-      systemPrompt = 'You are a resume optimizer. Rewrite resume bullets to match job keywords and improve ATS score. Return ONLY valid JSON.';
-      prompt = `Optimize this resume for the job. Return ONLY a JSON object:
-{"optimized_bullets":[{"original":"<bullet>","optimized":"<rewrite with keywords>"}],"keywords_added":["..."]}
+      systemPrompt = 'You are a career strategist who aligns candidate experience to specific job requirements. Return ONLY valid JSON with no markdown.';
+      prompt = `Tailor this resume specifically for the ${job} role at ${company}.
 
-Find 3-6 bullets that most need improvement.
+Step 1: Identify the 5-6 most important requirements, skills, or qualities this employer is actually hiring for.
+Step 2: Find which of the candidate's real experiences best match each of those requirements.
+Step 3: Rewrite 4-6 bullets to make the connection explicit — use the employer's exact language and terminology.
+
+Rules:
+- Never fabricate experience. Only rewrite based on what the candidate actually did.
+- Mirror the JD's vocabulary exactly (if JD says "pipeline management" don't write "sales tracking").
+- Each rewritten bullet must directly address one of the job's key requirements.
+- A recruiter should read each bullet and immediately see why it's relevant to THIS role.
 
 JOB: ${job} at ${company}
-JOB DESCRIPTION:\n${(jobDescription||'').slice(0,2000)}
-RESUME:\n${(resume||'').slice(0,4000)}`;
+JOB DESCRIPTION:\n${(jobDescription||'').slice(0,2500)}
+RESUME:\n${(resume||'').slice(0,4000)}
+
+Return ONLY this JSON:
+{"job_priorities":["<top requirement>","<second>","<third>","<fourth>","<fifth>"],"optimized_bullets":[{"original":"<exact text from resume>","optimized":"<rewritten to address JD requirement>","addresses":"<which priority in 3-5 words>"}],"keywords_added":["<exact JD term>"]}`;
 
     } else if (tool === 'coach') {
       const { job, company, jobDescription, background } = body;
@@ -81,7 +91,7 @@ JOB DESCRIPTION:\n${(jobDescription||'').slice(0,2500)}${background?'\nCANDIDATE
 
     const requestBody = JSON.stringify({
       model: 'claude-haiku-4-5-20251001',
-      max_tokens: 2000,
+      max_tokens: tool === 'optimize' ? 2500 : 2000,
       system: systemPrompt,
       messages: [{ role: 'user', content: prompt }],
     });
