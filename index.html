@@ -2160,6 +2160,7 @@ function _normalizeDbJob(j){
     _url:j.apply_url||null,
     vibes:[(j.description||'').slice(0,80)||`via ${j.source||'Job board'}`],
     description:j.description||'',
+    created_at:j.created_at||null,
   };
 }
 
@@ -2198,56 +2199,53 @@ async function applyJobFilters(){
   const hasFilters = niche||level||type||posted;
   if(clearBtn)clearBtn.style.display=hasFilters?'':'none';
 
-  // No filters active — fall back to normal load
   if(!hasFilters){loadJobs();return;}
 
   const listEl  = document.getElementById('jobsList');
   const countEl = document.getElementById('jobsCt');
-  if(listEl)listEl.innerHTML='<div style="text-align:center;padding:3rem;font-family:var(--mono);font-size:.7rem;color:var(--muted)"><div class="spinner" style="margin:0 auto 1rem"></div>Filtering...</div>';
+  const loc     = document.getElementById('jobSearchLocation')?.value||'';
 
-  let jobs=[];
-  if(db){
+  // ── Step 1: filter the already-loaded JOBS array instantly (no network) ──
+  const cutoffMs = posted ? Date.now() - parseInt(posted)*24*60*60*1000 : 0;
+  const nicheKws = (niche && NICHE_KEYWORDS[niche]?.length) ? NICHE_KEYWORDS[niche].map(k=>k.toLowerCase()) : null;
+
+  let jobs = JOBS.filter(j => {
+    if(nicheKws){
+      const text=((j.title||'')+' '+(j.description||'')).toLowerCase();
+      if(!nicheKws.some(k=>text.includes(k))) return false;
+    }
+    if(level && j.lvl && !j.lvl.toLowerCase().includes(level.toLowerCase())) return false;
+    if(type  && j.type && !j.type.toLowerCase().includes(type.toLowerCase()))  return false;
+    if(cutoffMs && j.created_at && new Date(j.created_at).getTime() < cutoffMs) return false;
+    return true;
+  });
+
+  // ── Step 2: if client-side returns few results, query DB directly ──
+  if(jobs.length < 3 && db){
     try{
       let q=db.from('jobs').select('*').gt('expires_at',new Date().toISOString()).order('score',{ascending:false}).limit(100);
-
-      // Level filter
-      if(level) q=q.ilike('level','%'+level+'%');
-
-      // Type filter
-      if(type) q=q.ilike('type','%'+type+'%');
-
-      // Posted-within filter
-      if(posted){
-        const cutoff=new Date(Date.now()-parseInt(posted)*24*60*60*1000).toISOString();
-        q=q.gte('created_at',cutoff);
-      }
-
-      // Niche filter — keyword OR across job title
-      if(niche&&NICHE_KEYWORDS[niche]?.length){
-        const kws=NICHE_KEYWORDS[niche];
-        q=q.or(kws.map(k=>'title.ilike.%'+k+'%').join(','));
-      }
-
-      // Also respect current location from search bar
-      const locInput=(document.getElementById('jobSearchLocation')?.value||'').trim();
-      if(locInput){
-        const parts=locInput.split(',').map(p=>p.trim());
+      if(level)  q=q.ilike('level','%'+level+'%');
+      if(type)   q=q.ilike('type','%'+type+'%');
+      if(cutoffMs) q=q.gte('created_at',new Date(cutoffMs).toISOString());
+      if(nicheKws) q=q.or(nicheKws.map(k=>'title.ilike.%'+k+'%,description.ilike.%'+k+'%').join(','));
+      if(loc){
+        const parts=loc.split(',').map(p=>p.trim());
         const city=parts[0];const state=(parts[1]||'').trim();
         if(state) q=q.or('location.ilike.%'+city+'%,location.ilike.%'+state+'%');
         else q=q.ilike('location','%'+city+'%');
       }
-
       const{data}=await q;
       if(data?.length){
         jobs=data.map(_normalizeDbJob);
         JOBS.splice(0,JOBS.length,...jobs,...FALLBACK_JOBS);
       }
-    }catch(e){console.warn('applyJobFilters:',e);}
+    }catch(e){console.warn('applyJobFilters db:',e);}
   }
 
   if(countEl)countEl.textContent=jobs.length?`${jobs.length} filtered results`:'No matches';
-  if(!jobs.length&&listEl)listEl.innerHTML='<div style="text-align:center;padding:3rem;font-family:var(--mono);font-size:.72rem;color:var(--muted)">No listings match those filters. Try broadening your search.</div>';
-  else renderJobResults(jobs, document.getElementById('jobSearchLocation')?.value||'');
+  if(!jobs.length&&listEl)
+    listEl.innerHTML='<div style="text-align:center;padding:3rem;font-family:var(--mono);font-size:.72rem;color:var(--muted)">No listings match those filters. Try broadening your search.</div>';
+  else renderJobResults(jobs, loc);
 }
 
 async function loadJobs(){
