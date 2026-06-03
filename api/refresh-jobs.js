@@ -157,7 +157,10 @@ export default async function handler(req) {
   const cronSecret = process.env.CRON_SECRET;
   if (cronSecret) {
     const auth = req.headers.get('authorization') || '';
-    if (auth !== `Bearer ${cronSecret}`) {
+    const url = new URL(req.url);
+    const querySecret = url.searchParams.get('secret') || '';
+    // Accept secret via Authorization header (Vercel cron) OR ?secret= query param (browser trigger)
+    if (auth !== `Bearer ${cronSecret}` && querySecret !== cronSecret) {
       return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers });
     }
   }
