@@ -1,6 +1,30 @@
 // On-demand Adzuna fetch for a user's specific city
 // Called when the user's city has no results in Supabase
 
+const STATE_ABBR = {
+  'Alabama':'AL','Alaska':'AK','Arizona':'AZ','Arkansas':'AR','California':'CA',
+  'Colorado':'CO','Connecticut':'CT','Delaware':'DE','Florida':'FL','Georgia':'GA',
+  'Hawaii':'HI','Idaho':'ID','Illinois':'IL','Indiana':'IN','Iowa':'IA','Kansas':'KS',
+  'Kentucky':'KY','Louisiana':'LA','Maine':'ME','Maryland':'MD','Massachusetts':'MA',
+  'Michigan':'MI','Minnesota':'MN','Mississippi':'MS','Missouri':'MO','Montana':'MT',
+  'Nebraska':'NE','Nevada':'NV','New Hampshire':'NH','New Jersey':'NJ','New Mexico':'NM',
+  'New York':'NY','North Carolina':'NC','North Dakota':'ND','Ohio':'OH','Oklahoma':'OK',
+  'Oregon':'OR','Pennsylvania':'PA','Rhode Island':'RI','South Carolina':'SC',
+  'South Dakota':'SD','Tennessee':'TN','Texas':'TX','Utah':'UT','Vermont':'VT',
+  'Virginia':'VA','Washington':'WA','West Virginia':'WV','Wisconsin':'WI','Wyoming':'WY',
+  'District of Columbia':'DC',
+};
+
+// Normalize "Norwalk, California" → "Norwalk, CA" so Adzuna geocodes it correctly
+function normalizeLocation(loc) {
+  if (!loc) return loc;
+  const parts = loc.split(',').map(p => p.trim());
+  const city = parts[0];
+  const state = parts[1] || '';
+  const abbr = STATE_ABBR[state] || state;
+  return abbr ? `${city}, ${abbr}` : city;
+}
+
 const CATEGORIES_BY_INDUSTRY = {
   tech: ['Software Engineer', 'Data Analyst', 'Product Manager', 'DevOps Engineer', 'UX Designer'],
   healthcare: ['Registered Nurse', 'Medical Assistant', 'Physical Therapist', 'LVN', 'CNA'],
@@ -43,12 +67,15 @@ function wasteScore(company) {
   return Math.min(85, w);
 }
 
-async function fetchAdzuna(what, where, appId, appKey) {
+async function fetchAdzuna(what, where, appId, appKey, distanceKm) {
   const url = new URL('https://api.adzuna.com/v1/api/jobs/us/search/1');
   url.searchParams.set('app_id', appId);
   url.searchParams.set('app_key', appKey);
   url.searchParams.set('what', what);
-  if (where && where.toLowerCase() !== 'remote') url.searchParams.set('where', where);
+  if (where && where.toLowerCase() !== 'remote') {
+    url.searchParams.set('where', where);
+    if (distanceKm) url.searchParams.set('distance', distanceKm.toString());
+  }
   url.searchParams.set('results_per_page', '50');
   url.searchParams.set('sort_by', 'date');
 
@@ -101,15 +128,28 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { location, industry } = req.body || {};
+    const { location, industry, radius } = req.body || {};
     if (!location) return res.status(400).json({ error: 'No location', jobs: [] });
 
     const categories = CATEGORIES_BY_INDUSTRY[industry] || CATEGORIES_BY_INDUSTRY.default;
+    // Convert miles to km for Adzuna's distance param (default 25mi → ~40km)
+    const distanceKm = radius ? Math.round(parseInt(radius) * 1.609) : 40;
+    // Normalize "Norwalk, California" → "Norwalk, CA" for Adzuna geocoder
+    const normalizedLoc = normalizeLocation(location);
+    const cityOnly = normalizedLoc.split(',')[0].trim();
 
-    const results = await Promise.allSettled(
-      categories.slice(0, 6).map(cat => fetchAdzuna(cat, location, APP_ID, APP_KEY))
+    let results = await Promise.allSettled(
+      categories.slice(0, 6).map(cat => fetchAdzuna(cat, normalizedLoc, APP_ID, APP_KEY, distanceKm))
     );
-    const allJobs = results.filter(r => r.status === 'fulfilled').flatMap(r => r.value);
+    let allJobs = results.filter(r => r.status === 'fulfilled').flatMap(r => r.value);
+
+    // If normalized city+state returned nothing, retry with just the city name
+    if (!allJobs.length && cityOnly !== normalizedLoc) {
+      results = await Promise.allSettled(
+        categories.slice(0, 4).map(cat => fetchAdzuna(cat, cityOnly, APP_ID, APP_KEY, distanceKm))
+      );
+      allJobs = results.filter(r => r.status === 'fulfilled').flatMap(r => r.value);
+    }
 
     // Save to Supabase so future visits are instant
     if (SUPABASE_URL && SUPABASE_SERVICE_KEY && allJobs.length) {
