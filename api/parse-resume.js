@@ -1,50 +1,37 @@
-export const config = { runtime: 'edge' };
+export default async function handler(req, res) {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 
-export default async function handler(req) {
-  if (req.method === 'OPTIONS') return new Response(null, { status: 200, headers: {
-    'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Methods': 'POST, OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type'
-  }});
-  if (req.method !== 'POST') return new Response('Method not allowed', { status: 405 });
-
-  const headers = { 'Access-Control-Allow-Origin': '*', 'Content-Type': 'application/json' };
+  if (req.method === 'OPTIONS') return res.status(200).end();
+  if (req.method !== 'POST') return res.status(405).end('Method not allowed');
 
   try {
-    const formData = await req.formData();
-    const file = formData.get('file');
+    let body = req.body;
+    if (typeof body === 'string') { try { body = JSON.parse(body); } catch(e) { body = {}; } }
+    if (!body || typeof body !== 'object') body = {};
 
-    if (!file) return new Response(JSON.stringify({ error: 'No file provided' }), { status: 400, headers });
+    const { base64, fileName, mimeType } = body;
+    if (!base64) return res.status(400).json({ error: 'No file data provided' });
 
-    const fileName = file.name?.toLowerCase() || '';
-    const isPDF = fileName.endsWith('.pdf') || file.type === 'application/pdf';
-    const isWord = fileName.endsWith('.docx') || fileName.endsWith('.doc') ||
-                   file.type?.includes('word') || file.type?.includes('officedocument');
+    const fileBuffer = Buffer.from(base64, 'base64');
+    if (fileBuffer.length > 10 * 1024 * 1024) {
+      return res.status(400).json({ error: 'File too large. Max 10MB.' });
+    }
+
+    const nameLower = (fileName || '').toLowerCase();
+    const isPDF = nameLower.endsWith('.pdf') || (mimeType || '').includes('pdf');
+    const isWord = nameLower.endsWith('.docx') || nameLower.endsWith('.doc') ||
+                   (mimeType || '').includes('word') || (mimeType || '').includes('officedocument');
 
     if (!isPDF && !isWord) {
-      return new Response(JSON.stringify({ error: 'Only PDF and Word documents (.pdf, .doc, .docx) are supported.' }), { status: 400, headers });
+      return res.status(400).json({ error: 'Only PDF and Word documents (.pdf, .doc, .docx) are supported.' });
     }
-
-    if (file.size > 10 * 1024 * 1024) {
-      return new Response(JSON.stringify({ error: 'File too large. Max 10MB.' }), { status: 400, headers });
-    }
-
-    const arrayBuffer = await file.arrayBuffer();
-    const bytes = new Uint8Array(arrayBuffer);
-
-    // Convert to base64
-    let binary = '';
-    const chunkSize = 8192;
-    for (let i = 0; i < bytes.length; i += chunkSize) {
-      const chunk = bytes.subarray(i, i + chunkSize);
-      binary += String.fromCharCode(...chunk);
-    }
-    const base64 = btoa(binary);
 
     let extractedText = '';
 
     if (isPDF) {
-      // Claude supports PDF natively
+      const b64 = fileBuffer.toString('base64');
       const response = await fetch('https://api.anthropic.com/v1/messages', {
         method: 'POST',
         headers: {
@@ -58,14 +45,8 @@ export default async function handler(req) {
           messages: [{
             role: 'user',
             content: [
-              {
-                type: 'document',
-                source: { type: 'base64', media_type: 'application/pdf', data: base64 }
-              },
-              {
-                type: 'text',
-                text: 'Extract ALL text from this resume. Preserve the structure — job titles, companies, dates, bullet points, skills, education. Output the raw text only, no commentary.'
-              }
+              { type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: b64 } },
+              { type: 'text', text: 'Extract ALL text from this resume. Preserve structure — job titles, companies, dates, bullets, skills, education. Output the raw text only, no commentary.' }
             ]
           }]
         })
@@ -73,19 +54,16 @@ export default async function handler(req) {
 
       if (!response.ok) {
         const errText = await response.text();
-        throw new Error(`PDF extraction failed: ${response.status} ${errText}`);
+        throw new Error('PDF extraction failed: ' + response.status + ' ' + errText.slice(0, 100));
       }
       const data = await response.json();
       extractedText = data.content?.[0]?.text || '';
 
     } else if (isWord) {
-      // Word docs (.docx) are ZIP files containing XML
-      // We'll extract the text from the XML manually
-      extractedText = await extractWordText(bytes);
+      extractedText = extractWordText(fileBuffer);
 
-      // If we got meaningful text, great. Otherwise fall back to Claude text extraction
-      if (!extractedText || extractedText.length < 100) {
-        // Try asking Claude to interpret the raw content
+      if (!extractedText || extractedText.length < 150) {
+        const b64 = fileBuffer.toString('base64');
         const response = await fetch('https://api.anthropic.com/v1/messages', {
           method: 'POST',
           headers: {
@@ -98,66 +76,48 @@ export default async function handler(req) {
             max_tokens: 4000,
             messages: [{
               role: 'user',
-              content: `This is raw content extracted from a Word document resume (base64): ${base64.substring(0, 2000)}...
-              
-Based on any readable text you can find, reconstruct the resume content. If you cannot extract meaningful text, return "UNREADABLE".`
+              content: 'Extract all readable text from this Word document resume (base64 encoded). Return only the extracted resume text.\n\nBase64: ' + b64.slice(0, 6000)
             }]
           })
         });
-        const data = await response.json();
-        const result = data.content?.[0]?.text || '';
-        if (result !== 'UNREADABLE') extractedText = result;
+        if (response.ok) {
+          const data = await response.json();
+          const result = data.content?.[0]?.text || '';
+          if (result && result.length > 100) extractedText = result;
+        }
       }
     }
 
     if (!extractedText || extractedText.length < 50) {
-      return new Response(JSON.stringify({ 
-        error: 'Could not extract text. Make sure the file contains readable text (not a scanned image). Try saving as PDF and uploading that instead.' 
-      }), { status: 422, headers });
+      return res.status(422).json({ error: 'Could not extract readable text. Make sure the file has selectable text (not a scanned image). Try exporting as PDF.' });
     }
 
-    return new Response(JSON.stringify({
-      ok: true,
-      text: extractedText,
-      fileName: file.name,
-      fileType: isPDF ? 'pdf' : 'word',
-      wordCount: extractedText.split(/\s+/).filter(w => w.length > 0).length
-    }), { status: 200, headers });
+    const wordCount = extractedText.split(/\s+/).filter(w => w.length > 0).length;
+    return res.status(200).json({ ok: true, text: extractedText, fileName, fileType: isPDF ? 'pdf' : 'word', wordCount });
 
   } catch(err) {
     console.error('Parse resume error:', err.message);
-    return new Response(JSON.stringify({ error: err.message }), { status: 500, headers });
+    return res.status(500).json({ error: err.message });
   }
 }
 
-// Extract text from .docx (which is a ZIP containing word/document.xml)
-async function extractWordText(bytes) {
+function extractWordText(buffer) {
   try {
-    // Look for the XML content between <w:t> tags in the raw bytes
-    const decoder = new TextDecoder('utf-8', { fatal: false });
-    const raw = decoder.decode(bytes);
-    
-    // docx files contain XML - extract all text between <w:t> tags
-    const matches = raw.match(/<w:t[^>]*>([^<]+)<\/w:t>/g) || [];
-    const texts = matches.map(m => m.replace(/<[^>]+>/g, '').trim()).filter(t => t.length > 0);
-    
-    if (texts.length > 10) {
-      return texts.join(' ').replace(/\s+/g, ' ').trim();
+    const raw = buffer.toString('latin1');
+    const xmlMatches = raw.match(/<w:t[^>]*>([^<]+)<\/w:t>/g) || [];
+    if (xmlMatches.length > 5) {
+      const texts = xmlMatches.map(m => m.replace(/<[^>]+>/g, '').trim()).filter(t => t.length > 0);
+      const joined = texts.join(' ').replace(/\s+/g, ' ').trim();
+      if (joined.length > 100) return joined;
     }
-
-    // Also try extracting readable ASCII text directly
+    // Fallback: readable ASCII runs
     let readable = '';
     for (let i = 0; i < raw.length; i++) {
-      const code = raw.charCodeAt(i);
-      if ((code >= 32 && code <= 126) || code === 10 || code === 13) {
-        readable += raw[i];
-      }
+      const c = raw.charCodeAt(i);
+      if ((c >= 32 && c <= 126) || c === 9 || c === 10 || c === 13) readable += raw[i];
     }
-    
-    // Find sequences of readable text (at least 4 chars)
-    const sequences = readable.match(/[A-Za-z][A-Za-z0-9 ,.\-@()&/]{3,}/g) || [];
-    return sequences.join(' ').replace(/\s+/g, ' ').trim();
-    
+    const words = readable.match(/[A-Za-z]{3,}(?:[A-Za-z0-9 ,.!?:;@()\-/&'"\n\t]*)/g) || [];
+    return words.join(' ').replace(/\s+/g, ' ').trim();
   } catch(e) {
     return '';
   }
