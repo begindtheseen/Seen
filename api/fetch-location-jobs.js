@@ -43,12 +43,15 @@ function wasteScore(company) {
   return Math.min(85, w);
 }
 
-async function fetchAdzuna(what, where, appId, appKey) {
+async function fetchAdzuna(what, where, appId, appKey, distanceKm) {
   const url = new URL('https://api.adzuna.com/v1/api/jobs/us/search/1');
   url.searchParams.set('app_id', appId);
   url.searchParams.set('app_key', appKey);
   url.searchParams.set('what', what);
-  if (where && where.toLowerCase() !== 'remote') url.searchParams.set('where', where);
+  if (where && where.toLowerCase() !== 'remote') {
+    url.searchParams.set('where', where);
+    if (distanceKm) url.searchParams.set('distance', distanceKm.toString());
+  }
   url.searchParams.set('results_per_page', '50');
   url.searchParams.set('sort_by', 'date');
 
@@ -101,13 +104,15 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { location, industry } = req.body || {};
+    const { location, industry, radius } = req.body || {};
     if (!location) return res.status(400).json({ error: 'No location', jobs: [] });
 
     const categories = CATEGORIES_BY_INDUSTRY[industry] || CATEGORIES_BY_INDUSTRY.default;
+    // Convert miles to km for Adzuna's distance param (default 25mi → ~40km)
+    const distanceKm = radius ? Math.round(parseInt(radius) * 1.609) : 40;
 
     const results = await Promise.allSettled(
-      categories.slice(0, 6).map(cat => fetchAdzuna(cat, location, APP_ID, APP_KEY))
+      categories.slice(0, 6).map(cat => fetchAdzuna(cat, location, APP_ID, APP_KEY, distanceKm))
     );
     const allJobs = results.filter(r => r.status === 'fulfilled').flatMap(r => r.value);
 

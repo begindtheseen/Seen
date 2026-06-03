@@ -1946,7 +1946,9 @@ async function searchJobs(query, location) {
   // ── Step 1: Check DB first — instant, no API cost ──
   if (db) {
     try {
-      const city = (l.split(',')[0] || '').trim();
+      const locParts = l.split(',').map(p => p.trim());
+      const city = locParts[0] || '';
+      const state = (locParts[1] || '').trim();
       const qWords = q.toLowerCase().split(/\s+/).filter(w => w.length > 2);
       const titleFilter = qWords.map(w => `title.ilike.%${w}%`).join(',');
       const sqFilter = qWords.map(w => `search_query.ilike.%${w}%`).join(',');
@@ -1956,7 +1958,13 @@ async function searchJobs(query, location) {
         .order('score', { ascending: false })
         .limit(40);
       if (orClause) dbQuery = dbQuery.or(orClause);
-      if (city) dbQuery = dbQuery.ilike('location', `%${city}%`);
+      if (city) {
+        if (radius > 10 && state) {
+          dbQuery = dbQuery.or(`location.ilike.%${city}%,location.ilike.%${state}%`);
+        } else if (city) {
+          dbQuery = dbQuery.ilike('location', `%${city}%`);
+        }
+      }
       const { data: cached } = await dbQuery;
       if (cached && cached.length >= 5) {
         const jobs = cached.map(_normalizeDbJob);
@@ -2149,12 +2157,15 @@ async function loadJobs(){
       } else if(effectiveLoc){
         const parts=effectiveLoc.split(',').map(p=>p.trim());
         const city=parts[0];
-        const state=parts[1]||'';
-        if(radiusVal<=25){
+        const state=(parts[1]||'').trim();
+        if(radiusVal<=10){
+          // Tight radius — exact city only
           query=query.ilike('location',`%${city}%`);
+        } else if(state){
+          // Broader radius — include city + entire state (catches suburbs/nearby cities)
+          query=query.or(`location.ilike.%${city}%,location.ilike.%${state}%`);
         } else {
-          const stateFilter=state||city;
-          query=query.or(`location.ilike.%${stateFilter}%,location.ilike.%remote%`);
+          query=query.ilike('location',`%${city}%`);
         }
       }
 
@@ -2184,7 +2195,7 @@ async function loadJobs(){
         const r=await fetch('/api/fetch-location-jobs',{
           method:'POST',
           headers:{'Content-Type':'application/json'},
-          body:JSON.stringify({location:effectiveLoc,industry:Auth._profile?.industry||null})
+          body:JSON.stringify({location:effectiveLoc,industry:Auth._profile?.industry||null,radius:radiusVal||25})
         });
         if(r.ok){
           const d=await r.json();
