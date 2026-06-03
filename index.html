@@ -4755,7 +4755,14 @@ async function submitApplication(jobId, company, role, location, score, risk, wa
     fetch('/api/apply', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ applicantName: name, applicantEmail: email, role, company, location, resumeLink: resumeLabel || 'On file', resumeText: resumeTextToSend || null, coverNote: note, applyEmail: applyEmail || '' })
+      body: JSON.stringify({
+        applicantName: name, applicantEmail: email, role, company, location,
+        resumeLink: resumeLabel || 'On file', resumeText: resumeTextToSend || null,
+        coverNote: note, applyEmail: applyEmail || '',
+        optimizedBullets: window._lastOptimization?.optimized_bullets || [],
+        keywords: window._lastOptimization?.keywords_added || [],
+        wasOptimized: !!(wasOptimized && window._lastOptimization?.optimized_bullets?.length)
+      })
     }).catch(e => console.warn('Email:', e));
 
     closeApplyModalDirect();
