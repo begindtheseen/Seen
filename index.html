@@ -2164,12 +2164,14 @@ function _normalizeDbJob(j){
   };
 }
 
+// Niche keywords matched against job TITLE only — keep phrases specific enough
+// to avoid false positives from boilerplate description text
 const NICHE_KEYWORDS = {
-  tech:       ['software','developer','engineer','data','cloud','devops','product manager','IT','SaaS','QA','frontend','backend'],
-  healthcare: ['nurse','medical','health','hospital','clinical','patient','dental','pharmacy','therapist','RN','CNA','EMT'],
-  retail:     ['retail','sales','customer service','food','restaurant','cashier','store','bartender','server','barista','associate'],
-  logistics:  ['warehouse','logistics','driver','delivery','supply chain','shipping','forklift','distribution','dispatcher'],
-  finance:    ['finance','accounting','bank','insurance','financial','audit','tax','payroll','bookkeeping','analyst'],
+  tech:       ['software','developer','engineer','devops','frontend','backend','fullstack','data scientist','machine learning','cybersecurity','cloud architect','QA','SRE','product manager'],
+  healthcare: ['nurse','nursing','RN','CNA','LPN','EMT','paramedic','medical assistant','physician','therapist','dental','pharmacy','clinical','healthcare','patient care','surgical','radiology','caregiver'],
+  retail:     ['retail','cashier','barista','bartender','food service','restaurant','grocery','sales associate','store manager','customer service','front desk','host','server','merchandise'],
+  logistics:  ['warehouse','logistics','delivery driver','supply chain','forklift','dispatcher','shipping','distribution','freight','CDL','truck','fulfillment'],
+  finance:    ['accountant','accounting','bookkeeper','auditor','financial analyst','tax preparer','underwriter','loan officer','payroll','banker','finance manager','insurance agent'],
   other:      [],
 };
 
@@ -2211,8 +2213,9 @@ async function applyJobFilters(){
 
   let jobs = JOBS.filter(j => {
     if(nicheKws){
-      const text=((j.title||'')+' '+(j.description||'')).toLowerCase();
-      if(!nicheKws.some(k=>text.includes(k))) return false;
+      // Title-only match — description has too much boilerplate that causes false positives
+      const title=(j.title||'').toLowerCase();
+      if(!nicheKws.some(k=>title.includes(k))) return false;
     }
     if(level && j.lvl && !j.lvl.toLowerCase().includes(level.toLowerCase())) return false;
     if(type  && j.type && !j.type.toLowerCase().includes(type.toLowerCase()))  return false;
@@ -2227,7 +2230,7 @@ async function applyJobFilters(){
       if(level)  q=q.ilike('level','%'+level+'%');
       if(type)   q=q.ilike('type','%'+type+'%');
       if(cutoffMs) q=q.gte('created_at',new Date(cutoffMs).toISOString());
-      if(nicheKws) q=q.or(nicheKws.map(k=>'title.ilike.%'+k+'%,description.ilike.%'+k+'%').join(','));
+      if(nicheKws) q=q.or(nicheKws.map(k=>'title.ilike.%'+k+'%').join(','));
       if(loc){
         const parts=loc.split(',').map(p=>p.trim());
         const city=parts[0];const state=(parts[1]||'').trim();
