@@ -69,6 +69,38 @@ export default async function handler(req, res) {
     jobs = jobs.map(j => ({ ...j, score: scoreJob(j), waste_score: wasteScore(j) }));
     jobs.sort((a, b) => b.score - a.score);
 
+    // Persist all results to Supabase — fire and forget, don't block the response
+    const SUPABASE_URL = process.env.SUPABASE_URL;
+    const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY;
+    if (SUPABASE_URL && SUPABASE_SERVICE_KEY && jobs.length) {
+      const expires = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+      const rows = jobs.map(j => ({
+        title: j.title,
+        company: j.company,
+        location: j.location || loc || 'US',
+        salary: j.salary || null,
+        description: (j.description || '').slice(0, 2000),
+        apply_url: j.url || null,
+        source: j.source || 'Web search',
+        type: j.type || 'Full-time',
+        level: j.level || 'Mid level',
+        search_query: query,
+        score: j.score || 65,
+        waste_score: j.waste_score || 25,
+        expires_at: expires,
+      }));
+      fetch(`${SUPABASE_URL}/rest/v1/jobs`, {
+        method: 'POST',
+        headers: {
+          apikey: SUPABASE_SERVICE_KEY,
+          Authorization: `Bearer ${SUPABASE_SERVICE_KEY}`,
+          'Content-Type': 'application/json',
+          Prefer: 'resolution=merge-duplicates,return=minimal',
+        },
+        body: JSON.stringify(rows),
+      }).catch(e => console.warn('jobs DB save:', e.message));
+    }
+
     return res.status(200).json({ ok: true, jobs, query, location: loc });
 
   } catch(err) {

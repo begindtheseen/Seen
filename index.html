@@ -2000,23 +2000,9 @@ async function searchJobs(query, location) {
 
     const jobs = data.jobs || [];
 
-    // Cache results to Supabase for future searches
+    // Cache ALL results to Supabase — server already did this but client backup covers edge cases
     if (db && jobs.length) {
-      (async () => {
-        for (const job of jobs.slice(0, 15)) {
-          try {
-            await db.from('jobs').upsert({
-              title: job.title, company: job.company,
-              location: job.location || l || 'US',
-              salary: job.salary, description: (job.description || '').slice(0, 2000),
-              apply_url: job.url, source: job.source,
-              type: job.type || 'Full-time', level: job.level || 'Mid level',
-              search_query: q, score: job.score || 65, waste_score: job.waste_score || 25,
-              expires_at: new Date(Date.now() + 7*24*60*60*1000).toISOString(),
-            }, { onConflict: 'title,company,location', ignoreDuplicates: true });
-          } catch(e) { /* ignore */ }
-        }
-      })();
+      _persistJobsToDB(jobs, q, l).catch(() => {});
     }
 
     if (!jobs.length) {
@@ -2044,20 +2030,34 @@ async function _refreshSearchInBackground(q, l, radius) {
     const data = await res.json();
     const jobs = data.jobs || [];
     if (db && jobs.length) {
-      for (const job of jobs.slice(0, 15)) {
-        try {
-          await db.from('jobs').upsert({
-            title: job.title, company: job.company, location: job.location || l || 'US',
-            salary: job.salary, description: (job.description || '').slice(0, 2000),
-            apply_url: job.url, source: job.source,
-            type: job.type || 'Full-time', level: job.level || 'Mid level',
-            search_query: q, score: job.score || 65, waste_score: job.waste_score || 25,
-            expires_at: new Date(Date.now() + 7*24*60*60*1000).toISOString(),
-          }, { onConflict: 'title,company,location', ignoreDuplicates: true });
-        } catch(e) { /* ignore */ }
-      }
+      if (db && jobs.length) await _persistJobsToDB(jobs, q, l).catch(() => {});
     }
   } catch(e) { /* background, ignore */ }
+}
+
+// Bulk-upsert all jobs to DB — single POST, server handles dedup via unique index
+async function _persistJobsToDB(jobs, searchQuery, location) {
+  if (!db || !jobs.length) return;
+  const expires = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+  const rows = jobs.map(j => ({
+    title: j.title || j.co || '',
+    company: j.co || j.company || '',
+    location: j.city || j.location || location || 'US',
+    salary: j.sal || j.salary || null,
+    description: ((j.description || j.vibes?.[0] || '')).slice(0, 2000),
+    apply_url: j._url || j.apply_url || j.url || null,
+    source: j.source || 'Seen',
+    type: j.type || 'Full-time',
+    level: j.lvl || j.level || 'Mid level',
+    search_query: searchQuery || '',
+    score: j.score || 65,
+    waste_score: j.waste || j.waste_score || 25,
+    expires_at: expires,
+  })).filter(r => r.title && r.company);
+  if (!rows.length) return;
+  try {
+    await db.from('jobs').upsert(rows, { onConflict: 'title,company,location', ignoreDuplicates: false });
+  } catch(e) { console.warn('_persistJobsToDB:', e.message); }
 }
 
 function renderJobResults(jobs, l) {
