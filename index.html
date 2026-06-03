@@ -1943,19 +1943,19 @@ async function searchJobs(query, location) {
   if (listEl) listEl.innerHTML = `<div style="text-align:center;padding:3rem;font-family:var(--mono);font-size:.7rem;color:var(--muted)"><div class="spinner" style="margin:0 auto 1rem"></div>Searching${l ? ' near ' + l : ''}...</div>`;
   if (countEl) countEl.textContent = 'Searching...';
 
-  // ── Step 1: Check DB cache first — no API cost ──
+  // ── Step 1: Check DB first — instant, no API cost ──
   if (db) {
     try {
       const city = (l.split(',')[0] || '').trim();
       const qWords = q.toLowerCase().split(/\s+/).filter(w => w.length > 2);
-      // Build a filter: match any word of the query against title or search_query
       const titleFilter = qWords.map(w => `title.ilike.%${w}%`).join(',');
       const sqFilter = qWords.map(w => `search_query.ilike.%${w}%`).join(',');
+      const orClause = [titleFilter, sqFilter].filter(Boolean).join(',');
       let dbQuery = db.from('jobs').select('*')
         .gt('expires_at', new Date().toISOString())
-        .or([titleFilter, sqFilter].filter(Boolean).join(','))
         .order('score', { ascending: false })
         .limit(40);
+      if (orClause) dbQuery = dbQuery.or(orClause);
       if (city) dbQuery = dbQuery.ilike('location', `%${city}%`);
       const { data: cached } = await dbQuery;
       if (cached && cached.length >= 5) {
@@ -1964,10 +1964,10 @@ async function searchJobs(query, location) {
         if (countEl) countEl.textContent = `${jobs.length} positions${l ? ' near ' + l : ''}`;
         window._lastSearchResults = jobs;
         renderJobResults(jobs, l);
-        // Refresh in background if cache is older than 4 hours (fire and forget)
-        const cacheKey = 'srch_' + q.toLowerCase().replace(/\s+/g,'_') + '_' + (city||'').toLowerCase();
-        const lastSearch = parseInt(localStorage.getItem(cacheKey) || '0');
-        if (Date.now() - lastSearch > 4 * 60 * 60 * 1000) {
+        // Silently refresh in background if stale (>6h)
+        const cacheKey = 'srch_' + q.toLowerCase().replace(/\s+/g,'_') + '_' + city.toLowerCase();
+        const lastFetch = parseInt(localStorage.getItem(cacheKey) || '0');
+        if (Date.now() - lastFetch > 6 * 60 * 60 * 1000) {
           localStorage.setItem(cacheKey, Date.now().toString());
           _refreshSearchInBackground(q, l, radius);
         }
@@ -1976,20 +1976,8 @@ async function searchJobs(query, location) {
     } catch(e) { console.warn('searchJobs cache check:', e); }
   }
 
-  // ── Step 2: Rate-limit API calls — one per (query+city) per 2 hours ──
-  const city2 = (l.split(',')[0] || '').trim().toLowerCase();
-  const cacheKey2 = 'srch_' + q.toLowerCase().replace(/\s+/g,'_') + '_' + city2;
-  const lastSearch2 = parseInt(localStorage.getItem(cacheKey2) || '0');
-  if (Date.now() - lastSearch2 < 2 * 60 * 60 * 1000) {
-    // Still rate-limited but cache was empty — show no results quietly
-    if (listEl) listEl.innerHTML = `<div style="text-align:center;padding:3rem"><div style="font-size:1.75rem;margin-bottom:.75rem">🔍</div><div style="font-family:var(--display);font-size:.9rem;font-weight:700;color:var(--white);margin-bottom:.35rem">No cached results</div><div style="font-size:.8rem;color:var(--sub)">Try again in a few minutes or broaden the search</div></div>`;
-    if (countEl) countEl.textContent = '0 results';
-    return;
-  }
-
-  // ── Step 3: Live API search (Claude web search) — only when cache miss ──
+  // ── Step 2: DB had < 5 results — hit the API, store everything ──
   try {
-    localStorage.setItem(cacheKey2, Date.now().toString());
     const res = await fetch('/api/jobs', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -2000,7 +1988,7 @@ async function searchJobs(query, location) {
 
     const jobs = data.jobs || [];
 
-    // Cache ALL results to Supabase — server already did this but client backup covers edge cases
+    // Persist ALL results to DB so next search for same query is instant
     if (db && jobs.length) {
       _persistJobsToDB(jobs, q, l).catch(() => {});
     }
