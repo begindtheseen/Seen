@@ -2141,6 +2141,12 @@ function renderJobResults(jobs, l) {
 // Normalize a Supabase jobs row → FALLBACK_JOBS shape so all existing code works
 function _normalizeDbJob(j){
   const score=j.score||65;
+  const t=(j.title||'').toLowerCase();
+  // Infer level from title — DB field is rarely populated by Adzuna
+  let lvl=j.level||'';
+  if(/\b(senior|sr\.?|lead|principal|director|head of|vp|vice president|chief|manager|supervisor|staff)\b/.test(t)) lvl='Senior';
+  else if(/\b(junior|jr\.?|entry|associate|trainee|coordinator|assistant|intern|apprentice)\b/.test(t)) lvl='Entry level';
+  else if(!lvl||lvl==='Mid level') lvl='Mid level';
   return{
     id:j.id,
     co:j.company||'',
@@ -2150,7 +2156,7 @@ function _normalizeDbJob(j){
     loc:j.location||'',
     city:j.location||'',
     type:j.type||'Full-time',
-    lvl:j.level||'Mid level',
+    lvl,
     niche:'Job',
     sal:j.salary||'—',
     score,
@@ -2164,16 +2170,12 @@ function _normalizeDbJob(j){
   };
 }
 
-// Infer experience level from job title — more reliable than the DB's level field
-// since Adzuna rarely populates it (most jobs default to 'Mid level').
+// Map the normalized lvl string → filter bucket
+// _normalizeDbJob already infers lvl from title, so this is just a bucket lookup.
 function _inferLevel(job) {
-  const t = (job.title || '').toLowerCase();
-  const stored = (job.lvl || '').toLowerCase();
-  if (/\b(senior|sr\.?|lead|principal|director|head of|vp|vice president|chief|manager|supervisor|staff)\b/.test(t)) return 'senior';
-  if (/\b(junior|jr\.?|entry.?level|entry|associate|trainee|coordinator|assistant|intern|apprentice)\b/.test(t)) return 'entry';
-  // Fall back to stored value if title is ambiguous
-  if (stored.includes('senior') || stored.includes('lead')) return 'senior';
-  if (stored.includes('entry') || stored.includes('junior') || stored === 'internship') return 'entry';
+  const lvl = (job.lvl || '').toLowerCase();
+  if (lvl.includes('senior') || lvl.includes('lead') || lvl.includes('director') || lvl.includes('manager')) return 'senior';
+  if (lvl.includes('entry') || lvl.includes('junior') || lvl.includes('intern') || lvl.includes('associate') || lvl.includes('trainee') || lvl.includes('assistant') || lvl.includes('coordinator')) return 'entry';
   return 'mid';
 }
 
