@@ -1287,6 +1287,12 @@ nav{position:fixed;top:0;left:0;right:0;z-index:500;height:58px;display:flex;ali
     </div>
     <button class="sub-btn" onclick="submitReport()">Submit anonymously →</button>
     <div class="ok-msg" id="repOk">✓ Submitted. Score and process funnel updated. You just helped someone.</div>
+
+    <div style="margin-top:2.5rem">
+      <div style="font-family:var(--display);font-size:.88rem;font-weight:700;color:var(--white);margin-bottom:.25rem">Recent community reports</div>
+      <div style="font-family:var(--mono);font-size:.62rem;color:var(--muted);margin-bottom:1.25rem">Anonymous · from real applicants · updates live</div>
+      <div id="communityReportsFeed"><div style="text-align:center;padding:2rem;font-family:var(--mono);font-size:.65rem;color:var(--muted)"><div class="spinner" style="margin:0 auto .75rem;width:16px;height:16px"></div>Loading...</div></div>
+    </div>
   </div>
 </div>
 
@@ -1983,19 +1989,26 @@ async function loadJobs(){
     }catch(e){console.warn('loadJobs db:',e);}
   }
 
-  // Fall back to hardcoded if db has no real listings yet
+  // No Supabase jobs yet — prompt search instead of showing fake listings
   if(!jobs.length){
-    jobs=[...FALLBACK_JOBS].filter(j=>j.score>=min);
-    if(loc)jobs=jobs.filter(j=>(j.city||'').toLowerCase().includes(loc.toLowerCase()));
-    jobs.sort((a,b)=>b.score-a.score);
+    if(countEl)countEl.textContent='';
+    if(listEl)listEl.innerHTML=`
+      <div style="text-align:center;padding:3rem 1.5rem;max-width:400px;margin:0 auto">
+        <div style="font-size:2rem;margin-bottom:1rem">🔍</div>
+        <div style="font-family:var(--display);font-size:1rem;font-weight:700;color:var(--white);margin-bottom:.5rem">Search for real jobs</div>
+        <div style="font-family:var(--mono);font-size:.7rem;color:var(--muted);line-height:1.7;margin-bottom:1.25rem">Type a job title and your city above to find currently-open listings with real apply links — pulled live from the web.</div>
+        <div style="display:flex;flex-direction:column;gap:.5rem;font-family:var(--mono);font-size:.65rem;color:var(--dim)">
+          <span onclick="document.getElementById('jobsInp').value='Registered Nurse';loadJobs()" style="cursor:pointer;padding:.4rem .8rem;background:var(--raised);border-radius:6px;border:1px solid var(--line2)">Registered Nurse →</span>
+          <span onclick="document.getElementById('jobsInp').value='Software Engineer';loadJobs()" style="cursor:pointer;padding:.4rem .8rem;background:var(--raised);border-radius:6px;border:1px solid var(--line2)">Software Engineer →</span>
+          <span onclick="document.getElementById('jobsInp').value='Customer Service';loadJobs()" style="cursor:pointer;padding:.4rem .8rem;background:var(--raised);border-radius:6px;border:1px solid var(--line2)">Customer Service →</span>
+          <span onclick="document.getElementById('jobsInp').value='Medical Assistant';loadJobs()" style="cursor:pointer;padding:.4rem .8rem;background:var(--raised);border-radius:6px;border:1px solid var(--line2)">Medical Assistant →</span>
+        </div>
+      </div>`;
+    return;
   }
 
   if(countEl)countEl.textContent=`${jobs.length} listings`;
   if(!listEl)return;
-  if(!jobs.length){
-    listEl.innerHTML='<div style="text-align:center;padding:3rem;font-family:var(--mono);font-size:.72rem;color:var(--muted)">No listings match. Try searching or adjusting filters.</div>';
-    return;
-  }
   listEl.innerHTML='<div class="jlay">'+jobs.map(j=>{
     const risk=j.risk||Score.risk(j.score);
     const applyAct=j._url
@@ -2172,15 +2185,36 @@ async function viewCompany(id,name,loc){
     </div>
     <div style="background:var(--gdim);border:1px solid var(--gmid);border-radius:8px;padding:.75rem 1rem;font-family:var(--mono);font-size:.62rem;color:var(--green)">This feature is exclusive to Seen. No other job board tracks which stage companies ghost at.</div>`;
 
-  // Reports
-  const reps=REPORTS[co?.id||'']||[];
-  const locReps=loc?reps.filter(r=>r.loc?.toLowerCase().includes(loc.toLowerCase())):reps;
-  const show=locReps.length?locReps:reps;
+  // Reports — load live from Supabase
   const ocC={ghosted:'v-r',autoreject:'v-y',human:'v-g',waiting:'v-y',hired:'v-g'};
   const ocL={ghosted:'👻 Ghosted',autoreject:'🤖 Auto-rejected',human:'✅ Got response',waiting:'⏳ Waiting',hired:'🎉 Hired'};
-  document.getElementById('ctc-reports').innerHTML=show.length?
-    show.map(r=>`<div class="rcard"><div class="rc-hd"><div class="rc-av">${r.src[0].toUpperCase()}</div><div style="flex:1"><div class="rc-role">${r.role}${r.stage?` · Ghosted at: ${r.stage}`:''}</div><div class="rc-meta">${r.loc?'📍 '+r.loc+' · ':''} Waited ${r.wait}d</div></div><span class="vibe ${ocC[r.resp]||'v-n'}">${ocL[r.resp]||r.resp}</span></div><div class="rc-body">${r.text}</div><div class="rc-footer"><span style="font-family:var(--mono);font-size:.56rem;color:var(--muted)">via</span><span class="vibe v-n" style="font-size:.55rem">${r.src}</span></div></div>`).join(''):
-    `<div style="text-align:center;padding:2.5rem;color:var(--muted);font-family:var(--mono);font-size:.7rem">No reports yet${loc?' for '+loc:''}.<br><br><button class="btn btn-ghost" onclick="go('report')">Be the first to report →</button></div>`;
+  document.getElementById('ctc-reports').innerHTML='<div style="text-align:center;padding:2rem;font-family:var(--mono);font-size:.65rem;color:var(--muted)"><div class="spinner" style="margin:0 auto .75rem;width:16px;height:16px"></div>Loading reports...</div>';
+  (async()=>{
+    let show=[];
+    if(db){
+      try{
+        let q=db.from('reports').select('role,outcome,ghost_stage,rounds,report_text,platform,created_at,company_locations(city)').order('created_at',{ascending:false}).limit(20);
+        if(co?.id)q=q.eq('company_id',co.id);
+        const{data}=await q;
+        if(data?.length){
+          show=data.map(r=>({
+            role:r.role||'Unknown role',
+            resp:r.outcome||'waiting',
+            stage:r.ghost_stage,
+            rounds:r.rounds,
+            loc:r.company_locations?.city||'',
+            text:r.report_text||'',
+            src:r.platform||'Direct',
+            wait: r.rounds ? r.rounds*7 : null,
+          }));
+          if(loc)show=show.filter(r=>!r.loc||r.loc.toLowerCase().includes(loc.toLowerCase()));
+        }
+      }catch(e){console.warn('reports load:',e);}
+    }
+    document.getElementById('ctc-reports').innerHTML=show.length?
+      show.map(r=>`<div class="rcard"><div class="rc-hd"><div class="rc-av">${(r.src||'?')[0].toUpperCase()}</div><div style="flex:1"><div class="rc-role">${r.role}${r.stage?` · Ghosted at: ${r.stage}`:''}</div><div class="rc-meta">${r.loc?'📍 '+r.loc+' · ':''}${r.rounds?r.rounds+' rounds':''}</div></div><span class="vibe ${ocC[r.resp]||'v-n'}">${ocL[r.resp]||r.resp}</span></div>${r.text?`<div class="rc-body">${r.text.replace(/</g,'&lt;').replace(/>/g,'&gt;')}</div>`:''}<div class="rc-footer"><span style="font-family:var(--mono);font-size:.56rem;color:var(--muted)">via</span><span class="vibe v-n" style="font-size:.55rem">${r.src}</span></div></div>`).join(''):
+      `<div style="text-align:center;padding:2.5rem;color:var(--muted);font-family:var(--mono);font-size:.7rem">No reports yet${loc?' for '+loc:''}.<br><br><button class="btn btn-ghost" onclick="go('report')">Be the first to report →</button></div>`;
+  })();
 
   // Locations tab
   const locEs=Object.entries(LOC_SCORES).filter(([k])=>k.startsWith(ck+'|'));
@@ -3352,6 +3386,7 @@ function go(page){
     if (footer) footer.style.display = page === 'landing' ? '' : 'none';
     window.scrollTo(0,0);
     if(page==='jobs')loadJobs();
+    if(page==='report')loadCommunityReports();
     if(page==='demand')loadDemand();
     if(page==='faq')renderFAQ();
     if(page==='legal')renderLegal();
@@ -3651,6 +3686,43 @@ function renderAIResearch(container, r, name) {
     </div>`;
 }
 
+async function loadCommunityReports() {
+  const feed = document.getElementById('communityReportsFeed');
+  if (!feed || !db) return;
+  try {
+    const { data } = await db.from('reports')
+      .select('role, outcome, ghost_stage, rounds, report_text, platform, created_at, companies(name), company_locations(city)')
+      .order('created_at', { ascending: false })
+      .limit(15);
+    if (!data?.length) {
+      feed.innerHTML = '<div style="text-align:center;padding:2rem;font-family:var(--mono);font-size:.65rem;color:var(--muted)">No reports yet. Be the first.</div>';
+      return;
+    }
+    const ocC = { ghosted:'v-r', autoreject:'v-y', human:'v-g', waiting:'v-y', hired:'v-g' };
+    const ocL = { ghosted:'👻 Ghosted', autoreject:'🤖 Auto-rejected', human:'✅ Got response', waiting:'⏳ Waiting', hired:'🎉 Hired' };
+    feed.innerHTML = data.map(r => {
+      const co = r.companies?.name || 'Unknown company';
+      const city = r.company_locations?.city || '';
+      const ago = r.created_at ? Math.floor((Date.now() - new Date(r.created_at)) / 86400000) : null;
+      return `<div class="rcard">
+        <div class="rc-hd">
+          <div class="rc-av">${co[0].toUpperCase()}</div>
+          <div style="flex:1">
+            <div class="rc-role">${r.role || 'Unknown role'} at ${co}${r.ghost_stage ? ' · Ghosted at: '+r.ghost_stage : ''}</div>
+            <div class="rc-meta">${city ? '📍 '+city+' · ' : ''}${r.rounds ? r.rounds+' rounds · ' : ''}${ago !== null ? (ago === 0 ? 'Today' : ago+'d ago') : ''}</div>
+          </div>
+          <span class="vibe ${ocC[r.outcome]||'v-n'}">${ocL[r.outcome]||r.outcome||'—'}</span>
+        </div>
+        ${r.report_text ? `<div class="rc-body">${r.report_text.replace(/</g,'&lt;').replace(/>/g,'&gt;')}</div>` : ''}
+        <div class="rc-footer"><span style="font-family:var(--mono);font-size:.56rem;color:var(--muted)">via</span><span class="vibe v-n" style="font-size:.55rem">${r.platform || 'Direct'}</span></div>
+      </div>`;
+    }).join('');
+  } catch(e) {
+    console.warn('communityReports:', e.message);
+    feed.innerHTML = '<div style="text-align:center;padding:1rem;font-family:var(--mono);font-size:.65rem;color:var(--muted)">Could not load reports.</div>';
+  }
+}
+
 // ── REAL submitReport ──
 async function submitReport(){
   const co=document.getElementById('rCo').value.trim();
@@ -3678,6 +3750,7 @@ async function submitReport(){
   document.querySelectorAll('input[name="resp"],input[name="stage"]').forEach(r=>r.checked=false);
   showToast('Submitted. Score updated. You just helped someone.');
   if(btn){btn.textContent='Submit anonymously →';btn.disabled=false;}
+  loadCommunityReports();
 }
 
 // ═══════════════════════════════════════════════
@@ -4080,10 +4153,6 @@ function showFullApplyForm(jobId, company, role, location, score, risk, waste, a
       <div style="flex:1"><div style="font-size:.75rem;font-weight:600;color:var(--white)">${Score.label(Score.risk(score))} transparency</div><div style="font-family:var(--mono);font-size:.58rem;color:var(--muted)">${job?.vibes?.[0]||''}</div></div>
       <span class="${wl.cls}" style="font-size:.6rem">${wl.txt}</span>
     </div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--line);border-radius:8px;overflow:hidden;margin-bottom:1.25rem">
-      <button id="tabApply" onclick="switchApplyTab('apply')" style="padding:.55rem;background:var(--green);color:var(--ink);border:none;font-family:var(--display);font-size:.78rem;font-weight:800;cursor:pointer">Apply directly</button>
-      <button id="tabTrack" onclick="switchApplyTab('track')" style="padding:.55rem;background:var(--raised);color:var(--sub);border:none;font-family:var(--body);font-size:.78rem;font-weight:500;cursor:pointer">Just track it</button>
-    </div>
     <div id="applyFormSection">
       <div style="margin-bottom:.75rem"><label style="font-family:var(--mono);font-size:.58rem;text-transform:uppercase;letter-spacing:.07em;color:var(--dim);display:block;margin-bottom:.32rem">Your name *</label><input id="appName" type="text" placeholder="Full name" value="${Auth.get()?.name||''}" style="width:100%;background:var(--raised);border:1.5px solid var(--line2);border-radius:8px;padding:.65rem .9rem;color:var(--white);font-family:var(--body);font-size:.84rem;outline:none;caret-color:var(--green)" onfocus="this.style.borderColor='var(--green)'" onblur="this.style.borderColor='var(--line2)'"/></div>
       <div style="margin-bottom:.75rem"><label style="font-family:var(--mono);font-size:.58rem;text-transform:uppercase;letter-spacing:.07em;color:var(--dim);display:block;margin-bottom:.32rem">Email *</label><input id="appEmail" type="email" placeholder="you@email.com" value="${Auth.get()?.email||''}" style="width:100%;background:var(--raised);border:1.5px solid var(--line2);border-radius:8px;padding:.65rem .9rem;color:var(--white);font-family:var(--body);font-size:.84rem;outline:none;caret-color:var(--green)" onfocus="this.style.borderColor='var(--green)'" onblur="this.style.borderColor='var(--line2)'"/></div>
@@ -4123,14 +4192,6 @@ function showFullApplyForm(jobId, company, role, location, score, risk, waste, a
       <div style="display:flex;gap:.5rem">
         <button class="btn btn-ghost" style="flex:1;justify-content:center" onclick="closeApplyModalDirect()">Cancel</button>
         <button class="btn btn-green" id="submitAppBtn" style="flex:2;justify-content:center;font-weight:800" onclick="submitApplication('${jobId}','${company}','${role}','${location}',${score},'${Score.risk(score)}',${waste},'${applyEmail||''}')">Submit application →</button>
-      </div>
-    </div>
-    <div id="trackFormSection" style="display:none">
-      <div style="margin-bottom:.75rem"><label style="font-family:var(--mono);font-size:.58rem;text-transform:uppercase;letter-spacing:.07em;color:var(--dim);display:block;margin-bottom:.32rem">Applied via</label><select id="applyPlatform" style="width:100%;background:var(--raised);border:1.5px solid var(--line2);border-radius:8px;padding:.65rem .9rem;color:var(--white);font-family:var(--body);font-size:.84rem;outline:none;appearance:none"><option value="">Select platform...</option><option>Company website</option><option>LinkedIn</option><option>Indeed</option><option>Glassdoor</option><option>Referral</option><option>Other</option></select></div>
-      <div style="margin-bottom:1rem"><label style="font-family:var(--mono);font-size:.58rem;text-transform:uppercase;letter-spacing:.07em;color:var(--dim);display:block;margin-bottom:.32rem">Job URL (optional)</label><input id="applyUrl" type="url" placeholder="https://..." style="width:100%;background:var(--raised);border:1.5px solid var(--line2);border-radius:8px;padding:.65rem .9rem;color:var(--white);font-family:var(--body);font-size:.84rem;outline:none;caret-color:var(--green)"/></div>
-      <div style="display:flex;gap:.5rem">
-        <button class="btn btn-ghost" style="flex:1;justify-content:center" onclick="closeApplyModalDirect()">Cancel</button>
-        <button class="btn btn-green" style="flex:2;justify-content:center;font-weight:800" onclick="confirmApply('${jobId}','${company}','${role}','${location}',${score},'${Score.risk(score)}',${waste})">Log application →</button>
       </div>
     </div>`;
 
