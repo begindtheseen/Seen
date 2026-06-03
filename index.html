@@ -1620,13 +1620,14 @@ const Auth = {
     try {
       const { data } = await db.from('profiles').select('*').eq('id', this._user.id).single();
       const local = _loadProfileLocal() || {};
-      // DB wins for fields it has; localStorage fills gaps where DB has null/missing
-      this._profile = data ? {
-        ...data,
-        name: data.name || local.name || '',
-        city: data.city || local.city || '',
-        experience: data.experience || local.experience || '',
-      } : { name: local.name || '', city: local.city || '', experience: local.experience || '' };
+      // localStorage wins — it reflects the user's most recent action on this browser.
+      // DB fills in fields that have never been saved locally (e.g. first session on new device).
+      this._profile = {
+        ...(data || {}),
+        name: local.name || data?.name || '',
+        city: local.city || data?.city || '',
+        experience: local.experience || data?.experience || '',
+      };
     } catch(e) {
       const local = _loadProfileLocal() || {};
       if (!this._profile) this._profile = { name: local.name || '', city: local.city || '', experience: local.experience || '' };
@@ -3434,10 +3435,12 @@ async function renderSeekerDash(){
   if (typeof survey === 'string') { try { survey = JSON.parse(survey); } catch(e) { survey = {}; } }
   survey = survey || {};
 
-  // Greeting
+  // Greeting — prefer localStorage name so saved changes show immediately
   const hour=new Date().getHours();
   const greet=hour<12?'Good morning':hour<17?'Good afternoon':'Good evening';
-  const name = user?.name ? user.name.charAt(0).toUpperCase() + user.name.slice(1).split(/[^a-zA-Z]/)[0] : 'there';
+  const localName = _loadProfileLocal()?.name;
+  const rawName = localName || user?.name || '';
+  const name = rawName ? rawName.charAt(0).toUpperCase() + rawName.slice(1).split(/[^a-zA-Z]/)[0] : 'there';
   if(_('dashGreeting'))_('dashGreeting').textContent=greet;
   if(_('dashName'))_('dashName').textContent=`Hey, ${name}.`;
 
@@ -4739,11 +4742,11 @@ function renderProfilePage() {
   const user = Auth.get();
   const dbProfile = Auth._profile || {};
   const local = _loadProfileLocal() || {};
-  // Non-null value from either source wins — DB null never wipes good localStorage data
+  // localStorage wins — most recent local save takes priority over DB
   const profile = {
-    name: dbProfile.name || local.name || '',
-    city: dbProfile.city || local.city || '',
-    experience: dbProfile.experience || local.experience || '',
+    name: local.name || dbProfile.name || '',
+    city: local.city || dbProfile.city || '',
+    experience: local.experience || dbProfile.experience || '',
   };
 
   const v = id => document.getElementById(id);
