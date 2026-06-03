@@ -4347,8 +4347,8 @@ async function runAIOptimize(jobId, company, role, location, score, risk, waste,
   document.getElementById('applyModalBody').innerHTML = `
     <div style="text-align:center;padding:2rem 0">
       <div class="spinner" style="margin:0 auto 1rem"></div>
-      <div style="font-family:var(--display);font-size:.9rem;font-weight:700;color:var(--white);margin-bottom:.35rem">Rewriting for ATS...</div>
-      <div style="font-family:var(--mono);font-size:.65rem;color:var(--muted)">Matching keywords · Quantifying achievements</div>
+      <div style="font-family:var(--display);font-size:.9rem;font-weight:700;color:var(--white);margin-bottom:.35rem">Tailoring for this role...</div>
+      <div style="font-family:var(--mono);font-size:.65rem;color:var(--muted)">Reading JD · Mapping your experience · Aligning language</div>
     </div>`;
 
   try {
@@ -4411,31 +4411,46 @@ function showOptimizeApproval(data, originalResume, jobId, company, role, locati
   const body = document.getElementById('applyModalBody');
   const changes = data.optimized_bullets || [];
   const keywords = data.keywords_added || [];
+  const priorities = data.job_priorities || [];
 
-  // Store in window so onclick buttons don't need to pass strings
   window._pendingOptimize = { data, originalResume, jobId, company, role, location, score, risk, waste, applyEmail };
+  window._lastOptimization = data;
+
+  const esc = s => (s||'').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 
   body.innerHTML = `
     <div style="margin-bottom:.85rem">
-      <div style="font-family:var(--display);font-size:.88rem;font-weight:700;color:var(--white);margin-bottom:.2rem">Review changes</div>
-      <div style="font-size:.75rem;color:var(--sub);font-weight:300">Approve to use the optimized version.</div>
+      <div style="font-family:var(--display);font-size:.88rem;font-weight:700;color:var(--white);margin-bottom:.2rem">Tailored for this role</div>
+      <div style="font-size:.75rem;color:var(--sub);font-weight:300">Review each change — approve to apply to your submission.</div>
     </div>
-    ${keywords.length ? `<div style="background:var(--gdim);border:1px solid var(--gmid);border-radius:7px;padding:.55rem .85rem;font-family:var(--mono);font-size:.6rem;color:var(--green);margin-bottom:.85rem">✓ Keywords added: ${keywords.slice(0,6).join(', ')}</div>` : ''}
-    <div style="max-height:240px;overflow-y:auto;margin-bottom:.85rem">
+
+    ${priorities.length ? `
+    <div style="background:var(--raised);border:1px solid var(--line2);border-radius:8px;padding:.7rem .85rem;margin-bottom:.85rem">
+      <div style="font-family:var(--mono);font-size:.58rem;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;margin-bottom:.5rem">What ${esc(company)} is hiring for</div>
+      <div style="display:flex;flex-direction:column;gap:.28rem">
+        ${priorities.map(p => `<div style="font-size:.72rem;color:var(--sub);line-height:1.4"><span style="color:var(--green);margin-right:.4rem">▸</span>${esc(p)}</div>`).join('')}
+      </div>
+    </div>` : ''}
+
+    <div style="font-family:var(--mono);font-size:.58rem;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;margin-bottom:.5rem">${changes.length} bullet${changes.length !== 1 ? 's' : ''} tailored</div>
+
+    <div style="max-height:260px;overflow-y:auto;margin-bottom:.85rem">
       ${changes.length ? changes.map(c => `
         <div style="background:var(--surface);border:1px solid var(--line2);border-radius:8px;padding:.75rem;margin-bottom:.45rem">
-          <div style="font-family:var(--mono);font-size:.55rem;color:var(--red);margin-bottom:.2rem">✗ Original</div>
-          <div style="font-size:.72rem;color:var(--sub);line-height:1.55;margin-bottom:.4rem">${(c.original||'').replace(/</g,'&lt;').replace(/>/g,'&gt;')}</div>
-          <div style="font-family:var(--mono);font-size:.55rem;color:var(--green);margin-bottom:.2rem">✓ Optimized</div>
-          <div style="font-size:.72rem;color:var(--white);line-height:1.55">${(c.optimized||'').replace(/</g,'&lt;').replace(/>/g,'&gt;')}</div>
-        </div>`).join('') : '<div style="font-size:.78rem;color:var(--muted);text-align:center;padding:.75rem">Your resume already matches well! No major changes needed.</div>'}
+          ${c.addresses ? `<div style="font-family:var(--mono);font-size:.55rem;color:var(--muted);margin-bottom:.45rem;display:flex;align-items:center;gap:.35rem"><span style="color:var(--green)">↳</span> TARGETS: <span style="color:var(--white)">${esc(c.addresses)}</span></div>` : ''}
+          <div style="font-family:var(--mono);font-size:.55rem;color:var(--red);margin-bottom:.2rem">✗ Before</div>
+          <div style="font-size:.72rem;color:var(--sub);line-height:1.55;margin-bottom:.5rem">${esc(c.original)}</div>
+          <div style="font-family:var(--mono);font-size:.55rem;color:var(--green);margin-bottom:.2rem">✓ Tailored</div>
+          <div style="font-size:.72rem;color:var(--white);line-height:1.55">${esc(c.optimized)}</div>
+        </div>`).join('') : `<div style="font-size:.78rem;color:var(--muted);text-align:center;padding:.75rem">Your resume already aligns well with this role.</div>`}
     </div>
+
+    ${keywords.length ? `<div style="background:var(--gdim);border:1px solid var(--gmid);border-radius:7px;padding:.5rem .8rem;font-family:var(--mono);font-size:.58rem;color:var(--green);margin-bottom:.85rem;line-height:1.6">✓ JD language matched: ${keywords.slice(0,8).join(' · ')}</div>` : ''}
+
     <div style="display:flex;gap:.5rem">
       <button class="btn btn-ghost" style="flex:1;justify-content:center;font-size:.75rem" onclick="redoOptimize()">Redo</button>
-      <button class="btn btn-green" style="flex:2;justify-content:center;font-weight:800;font-size:.82rem" onclick="approveAndContinue()">Approve & continue →</button>
+      <button class="btn btn-green" style="flex:2;justify-content:center;font-weight:800;font-size:.82rem" onclick="approveAndContinue()">Apply tailored version →</button>
     </div>`;
-
-  window._lastOptimization = data;
 }
 
 function redoOptimize() {
