@@ -5,7 +5,7 @@
     "api/resume.js": { "maxDuration": 30 },
     "api/apply.js": { "maxDuration": 30 },
     "api/parse-resume.js": { "maxDuration": 30 },
-    "api/jobs.js": { "maxDuration": 30 }
+    "api/jobs.js": { "maxDuration": 60 }
   },
   "crons": [
     { "path": "/api/refresh-jobs", "schedule": "0 2 * * *" },
