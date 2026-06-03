@@ -3777,25 +3777,7 @@ async function renderSeekerDash(){
   }
 
   // Saved jobs
-  const savedEl = _('dashSavedJobs');
-  if (savedEl) {
-    const saved = await SavedJobs.load();
-    if (!saved.length) {
-      savedEl.innerHTML = `<div style="font-size:.75rem;color:var(--muted);font-weight:300;padding:.5rem 0">No saved jobs yet. Tap ♡ on any listing.</div>`;
-    } else {
-      savedEl.innerHTML = saved.slice(0, 5).map(s => `
-        <div style="display:flex;align-items:center;justify-content:space-between;padding:.6rem 0;border-bottom:1px solid var(--line);gap:.75rem">
-          <div style="flex:1;min-width:0">
-            <div style="font-family:var(--display);font-size:.8rem;font-weight:700;color:var(--white);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${s.role}</div>
-            <div style="font-size:.68rem;color:var(--dim)">${s.company} · ${s.location||''}</div>
-          </div>
-          <div style="display:flex;align-items:center;gap:.4rem;flex-shrink:0">
-            <div style="font-family:var(--mono);font-size:.75rem;color:${Score.color(Score.risk(s.score))}">${s.score}</div>
-            <button onclick="SavedJobs.remove('${s.job_id}');renderSeekerDash()" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:.75rem;padding:.1rem .25rem" title="Remove">✕</button>
-          </div>
-        </div>`).join('');
-    }
-  }
+  await _refreshDashSaved();
 
   // Check resume and gate AI features
   checkResumeGate();
@@ -3804,11 +3786,28 @@ async function renderSeekerDash(){
 // ═══════════════════════════════════════════════
 // NAVIGATION
 // ═══════════════════════════════════════════════
+let _navSkipHistory = false;
+
+window.addEventListener('popstate', function(e) {
+  const page = e.state?.page;
+  _navSkipHistory = true;
+  if (page) {
+    go(page);
+  } else {
+    // No history state — go to a sensible default within the app
+    go(Auth.isSeeker() ? 'seeker-dash' : 'landing');
+  }
+  _navSkipHistory = false;
+});
+
 function go(page){
   try {
     if(page==='home'){
       page=Auth.isSeeker()?'seeker-dash':'landing';
       if(page==='seeker-dash')renderSeekerDash();
+    }
+    if(!_navSkipHistory){
+      history.pushState({page}, '', window.location.pathname + window.location.search);
     }
     document.querySelectorAll('.page, .page-full').forEach(p=>p.classList.remove('active'));
     const el=document.getElementById('page-'+page);
@@ -4024,7 +4023,9 @@ const SavedJobs = {
   async load() {
     if (Auth.isLoggedIn() && db) {
       try {
-        const { data } = await db.from('saved_jobs').select('*').order('saved_at', { ascending: false });
+        const uid = Auth._user?.id;
+        if (!uid) throw new Error('no uid');
+        const { data } = await db.from('saved_jobs').select('*').eq('user_id', uid).order('saved_at', { ascending: false });
         return data || [];
       } catch(e) {}
     }
@@ -4034,9 +4035,9 @@ const SavedJobs = {
   async save(job) {
     if (Auth.isLoggedIn() && db) {
       try {
-        const uid = (await db.auth.getUser()).data.user?.id;
+        const uid = Auth._user?.id || (await db.auth.getUser()).data.user?.id;
         const { error } = await db.from('saved_jobs').upsert({
-          user_id: uid, job_id: job.id, company: job.co,
+          user_id: uid, job_id: String(job.id), company: job.co,
           role: job.title, location: job.city, score: job.score
         }, { onConflict: 'user_id,job_id' });
         if (error) throw error;
@@ -4044,22 +4045,28 @@ const SavedJobs = {
       } catch(e) {}
     }
     const saved = this.loadSync();
-    if (saved.find(s => s.job_id === job.id)) return { ok: false, msg: 'Already saved.' };
-    saved.unshift({ job_id: job.id, company: job.co, role: job.title, location: job.city, score: job.score, saved_at: new Date().toISOString() });
+    if (saved.find(s => String(s.job_id) === String(job.id))) return { ok: false, msg: 'Already saved.' };
+    saved.unshift({ job_id: String(job.id), company: job.co, role: job.title, location: job.city, score: job.score, saved_at: new Date().toISOString() });
     localStorage.setItem(this.KEY, JSON.stringify(saved));
     return { ok: true };
   },
 
   async remove(jobId) {
+    const sid = String(jobId);
     if (Auth.isLoggedIn() && db) {
-      try { await db.from('saved_jobs').delete().eq('job_id', jobId); return; } catch(e) {}
+      try {
+        const uid = Auth._user?.id;
+        if (uid) await db.from('saved_jobs').delete().eq('user_id', uid).eq('job_id', sid);
+        return;
+      } catch(e) {}
     }
-    localStorage.setItem(this.KEY, JSON.stringify(this.loadSync().filter(s => s.job_id !== jobId)));
+    localStorage.setItem(this.KEY, JSON.stringify(this.loadSync().filter(s => String(s.job_id) !== sid)));
   },
 
   async isSaved(jobId) {
+    const sid = String(jobId);
     const saved = await this.load();
-    return saved.some(s => s.job_id === jobId);
+    return saved.some(s => String(s.job_id) === sid);
   },
 
   loadSync() { try { return JSON.parse(localStorage.getItem(this.KEY) || '[]'); } catch(e) { return []; } }
@@ -5584,11 +5591,12 @@ function copyProposal() {
 }
 
 async function toggleSaveJob(jobId, company, title, city, score) {
-  const job = { id: jobId, co: company, title, city, score };
-  const isSaved = await SavedJobs.isSaved(jobId);
-  const btn = document.getElementById('save_' + jobId);
+  const sid = String(jobId);
+  const job = { id: sid, co: company, title, city, score };
+  const isSaved = await SavedJobs.isSaved(sid);
+  const btn = document.getElementById('save_' + sid);
   if (isSaved) {
-    await SavedJobs.remove(jobId);
+    await SavedJobs.remove(sid);
     if (btn) { btn.textContent = '♡'; btn.style.color = ''; }
     showToast('Removed from saved jobs.');
   } else {
@@ -5596,14 +5604,54 @@ async function toggleSaveJob(jobId, company, title, city, score) {
     if (btn) { btn.textContent = '♥'; btn.style.color = 'var(--red)'; }
     showToast('Saved! Find it in your dashboard.');
   }
+  // Sync the job detail modal heart if it's open for this job
+  const jdBtn = document.getElementById('jdSaveBtn');
+  if (jdBtn && window._jdJob && String(window._jdJob.sid) === sid) {
+    const nowSaved = !isSaved;
+    jdBtn.textContent = nowSaved ? '♥' : '♡';
+    jdBtn.style.color = nowSaved ? 'var(--green)' : 'var(--muted)';
+  }
+  // Refresh dashboard saved jobs panel if it's visible
+  const dashEl = document.getElementById('dashSavedJobs');
+  if (dashEl) _refreshDashSaved();
+}
+
+async function _refreshDashSaved() {
+  const savedEl = document.getElementById('dashSavedJobs');
+  if (!savedEl) return;
+  const saved = await SavedJobs.load();
+  if (!saved.length) {
+    savedEl.innerHTML = `<div style="font-size:.75rem;color:var(--muted);font-weight:300;padding:.5rem 0">No saved jobs yet. Tap ♡ on any listing.</div>`;
+  } else {
+    savedEl.innerHTML = saved.slice(0, 5).map(s => `
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:.6rem 0;border-bottom:1px solid var(--line);gap:.75rem">
+        <div style="flex:1;min-width:0">
+          <div style="font-family:var(--display);font-size:.8rem;font-weight:700;color:var(--white);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${s.role||s.title||'Job'}</div>
+          <div style="font-size:.68rem;color:var(--dim)">${s.company||s.co||''} · ${s.location||s.city||''}</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:.4rem;flex-shrink:0">
+          <div style="font-family:var(--mono);font-size:.75rem;color:${Score.color(Score.risk(s.score))}">${s.score||''}</div>
+          <button onclick="removeSavedJobFromDash('${s.job_id}')" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:.75rem;padding:.1rem .25rem" title="Remove">✕</button>
+        </div>
+      </div>`).join('');
+  }
+}
+
+async function removeSavedJobFromDash(jobId) {
+  await SavedJobs.remove(jobId);
+  const sid = String(jobId);
+  const cardBtn = document.getElementById('save_' + sid);
+  if (cardBtn) { cardBtn.textContent = '♡'; cardBtn.style.color = ''; }
+  await _refreshDashSaved();
 }
 
 async function initSaveButtons() {
   const saved = await SavedJobs.load();
-  const savedIds = new Set(saved.map(s => s.job_id));
+  const savedIds = new Set(saved.map(s => String(s.job_id)));
   document.querySelectorAll('[id^="save_"]').forEach(btn => {
     const jobId = btn.id.replace('save_', '');
     if (savedIds.has(jobId)) { btn.textContent = '♥'; btn.style.color = 'var(--red)'; }
+    else { btn.textContent = '♡'; btn.style.color = ''; }
   });
 }
 
