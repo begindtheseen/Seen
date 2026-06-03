@@ -1630,8 +1630,11 @@ const Auth = {
             (() => { try { const s = this._profile?.onboarding_survey; if(!s) return false; const o = typeof s==='string'?JSON.parse(s):s; return o && Object.keys(o).length > 0; } catch(e) { return false; } })();
 
           if(!surveyDone && this.isSeeker()) { go('login'); startSurvey(); return; }
-          if(this.isSeeker()) { renderSeekerDash(); go('seeker-dash'); }
-          else if(this.isEmployer()) goToEmployerDashboard();
+          if(this.isSeeker()) {
+            SavedJobs.syncFromDb().catch(()=>{});
+            AppStore.syncFromDb().catch(()=>{});
+            renderSeekerDash(); go('seeker-dash');
+          } else if(this.isEmployer()) goToEmployerDashboard();
 
         } else if(event === 'TOKEN_REFRESHED' && session?.user) {
           // Silent refresh — just update user, don't redirect
@@ -2950,24 +2953,50 @@ const STAGES = ['Applied','Viewed','Phone Screen','Interview','Final Round','Off
 
 const AppStore = {
   KEY: 'seen_applications_v1',
+  _mapRow(a) {
+    return {
+      id:a.id, jobId:a.job_id, company:a.company_name, role:a.role,
+      location:a.city, platform:a.platform, jobUrl:a.job_url,
+      stage:a.stage||'Applied', status:a.status||'active',
+      score:a.score, waste:a.waste_score,
+      employerStage:a.employer_stage,
+      appliedAt: a.created_at ? new Date(a.created_at).getTime() : Date.now(),
+      updatedAt: a.updated_at ? new Date(a.updated_at).getTime() : Date.now()
+    };
+  },
   async load() {
     if(Auth.isLoggedIn() && db) {
       try {
-        const { data, error } = await db.from('applications').select('*').order('created_at',{ascending:false});
+        const uid = Auth._user?.id;
+        if(!uid) throw new Error('no uid');
+        const { data, error } = await db.from('applications').select('*').eq('user_id', uid).order('created_at',{ascending:false});
         if(error) throw error;
-        if(data?.length) return data.map(a=>({
-          id:a.id, jobId:a.job_id, company:a.company_name, role:a.role,
-          location:a.city, platform:a.platform, jobUrl:a.job_url,
-          stage:a.stage||'Applied', status:a.status||'active',
-          score:a.score, waste:a.waste_score,
-          employerStage:a.employer_stage,
-          appliedAt: a.created_at ? new Date(a.created_at).getTime() : Date.now(),
-          updatedAt: a.updated_at ? new Date(a.updated_at).getTime() : Date.now()
-        }));
+        if(data) {
+          const mapped = data.map(a => this._mapRow(a));
+          // Merge: DB authoritative + any local items not yet synced (temp ids starting with 'app_')
+          const dbIds = new Set(mapped.map(a => a.id));
+          const local = this.loadSync();
+          const localExtra = local.filter(a => !dbIds.has(a.id) && String(a.id).startsWith('app_'));
+          const merged = [...mapped, ...localExtra];
+          localStorage.setItem(this.KEY, JSON.stringify(merged));
+          return merged;
+        }
       } catch(e) { console.warn('AppStore.load error:', e.message); }
     }
-    // Fall back to localStorage cache (covers Supabase failures and table not existing yet)
+    // Fall back to localStorage cache
     try { return JSON.parse(localStorage.getItem(this.KEY)||'[]'); } catch(e) { return []; }
+  },
+  async syncFromDb() {
+    if(!Auth.isLoggedIn() || !db) return;
+    try {
+      const uid = Auth._user?.id;
+      if(!uid) return;
+      const { data } = await db.from('applications').select('*').eq('user_id', uid).order('created_at',{ascending:false});
+      if(data && data.length > 0) {
+        const mapped = data.map(a => this._mapRow(a));
+        localStorage.setItem(this.KEY, JSON.stringify(mapped));
+      }
+    } catch(e) { console.warn('AppStore.syncFromDb:', e.message); }
   },
   async add(app) {
     // Always write to localStorage as a cache so tracker works even if Supabase fails
@@ -4020,56 +4049,83 @@ document.addEventListener('DOMContentLoaded', () => {
 const SavedJobs = {
   KEY: 'seen_saved_v1',
 
+  // localStorage is the immediate source of truth for toggle state.
+  // Supabase is synced in background and used for cross-device loading.
+
+  loadSync() {
+    try { return JSON.parse(localStorage.getItem(this.KEY) || '[]'); } catch(e) { return []; }
+  },
+
+  isSaved(jobId) {
+    // Synchronous — no async DB read, so toggle is always reliable
+    return this.loadSync().some(s => String(s.job_id) === String(jobId));
+  },
+
+  save(job) {
+    const sid = String(job.id);
+    const saved = this.loadSync();
+    if (!saved.find(s => String(s.job_id) === sid)) {
+      saved.unshift({ job_id: sid, company: job.co, role: job.title, location: job.city, score: job.score, saved_at: new Date().toISOString() });
+      localStorage.setItem(this.KEY, JSON.stringify(saved));
+    }
+    // Sync to Supabase in background — don't block or await
+    if (Auth.isLoggedIn() && db) {
+      const uid = Auth._user?.id;
+      if (uid) {
+        db.from('saved_jobs').upsert(
+          { user_id: uid, job_id: sid, company: job.co, role: job.title, location: job.city, score: job.score },
+          { onConflict: 'user_id,job_id' }
+        ).catch(() => {});
+      }
+    }
+    return { ok: true };
+  },
+
+  remove(jobId) {
+    const sid = String(jobId);
+    localStorage.setItem(this.KEY, JSON.stringify(this.loadSync().filter(s => String(s.job_id) !== sid)));
+    // Sync to Supabase in background
+    if (Auth.isLoggedIn() && db) {
+      const uid = Auth._user?.id;
+      if (uid) db.from('saved_jobs').delete().eq('user_id', uid).eq('job_id', sid).catch(() => {});
+    }
+  },
+
+  // For display (dashboard list) — fetches from Supabase and syncs back to localStorage
   async load() {
     if (Auth.isLoggedIn() && db) {
       try {
         const uid = Auth._user?.id;
         if (!uid) throw new Error('no uid');
         const { data } = await db.from('saved_jobs').select('*').eq('user_id', uid).order('saved_at', { ascending: false });
-        return data || [];
+        if (data) {
+          // Merge: DB + any local items not yet synced
+          const dbIds = new Set(data.map(s => String(s.job_id)));
+          const localExtra = this.loadSync().filter(s => !dbIds.has(String(s.job_id)));
+          const merged = [...data, ...localExtra];
+          localStorage.setItem(this.KEY, JSON.stringify(merged));
+          return merged;
+        }
       } catch(e) {}
     }
-    try { return JSON.parse(localStorage.getItem(this.KEY) || '[]'); } catch(e) { return []; }
+    return this.loadSync();
   },
 
-  async save(job) {
-    if (Auth.isLoggedIn() && db) {
-      try {
-        const uid = Auth._user?.id || (await db.auth.getUser()).data.user?.id;
-        const { error } = await db.from('saved_jobs').upsert({
-          user_id: uid, job_id: String(job.id), company: job.co,
-          role: job.title, location: job.city, score: job.score
-        }, { onConflict: 'user_id,job_id' });
-        if (error) throw error;
-        return { ok: true };
-      } catch(e) {}
-    }
-    const saved = this.loadSync();
-    if (saved.find(s => String(s.job_id) === String(job.id))) return { ok: false, msg: 'Already saved.' };
-    saved.unshift({ job_id: String(job.id), company: job.co, role: job.title, location: job.city, score: job.score, saved_at: new Date().toISOString() });
-    localStorage.setItem(this.KEY, JSON.stringify(saved));
-    return { ok: true };
-  },
-
-  async remove(jobId) {
-    const sid = String(jobId);
-    if (Auth.isLoggedIn() && db) {
-      try {
-        const uid = Auth._user?.id;
-        if (uid) await db.from('saved_jobs').delete().eq('user_id', uid).eq('job_id', sid);
-        return;
-      } catch(e) {}
-    }
-    localStorage.setItem(this.KEY, JSON.stringify(this.loadSync().filter(s => String(s.job_id) !== sid)));
-  },
-
-  async isSaved(jobId) {
-    const sid = String(jobId);
-    const saved = await this.load();
-    return saved.some(s => String(s.job_id) === sid);
-  },
-
-  loadSync() { try { return JSON.parse(localStorage.getItem(this.KEY) || '[]'); } catch(e) { return []; } }
+  // Pull DB saved jobs into localStorage (call after login)
+  async syncFromDb() {
+    if (!Auth.isLoggedIn() || !db) return;
+    try {
+      const uid = Auth._user?.id;
+      if (!uid) return;
+      const { data } = await db.from('saved_jobs').select('*').eq('user_id', uid).order('saved_at', { ascending: false });
+      if (data && data.length > 0) {
+        const local = this.loadSync();
+        const dbIds = new Set(data.map(s => String(s.job_id)));
+        const localExtra = local.filter(s => !dbIds.has(String(s.job_id)));
+        localStorage.setItem(this.KEY, JSON.stringify([...data, ...localExtra]));
+      }
+    } catch(e) {}
+  }
 };
 
 // ═══════════════════════════════════════════════
@@ -4479,25 +4535,19 @@ function openJobDetailModal(jobId) {
   acts.appendChild(applyBtn);
   body.appendChild(acts);
 
-  // Set initial save state async
-  SavedJobs.isSaved(sid).then(function(saved) {
-    const b = document.getElementById('jdSaveBtn');
-    if (!b) return;
-    b.textContent = saved ? '♥' : '♡';
-    b.style.color = saved ? 'var(--green)' : '';
-  });
+  // Set initial save state (synchronous now)
+  const alreadySaved = SavedJobs.isSaved(sid);
+  saveBtn.textContent = alreadySaved ? '♥' : '♡';
+  saveBtn.style.color = alreadySaved ? 'var(--green)' : 'var(--muted)';
 
   document.getElementById('applyModal').classList.add('open');
 }
 
-async function jdSaveToggle() {
+function jdSaveToggle() {
   const d = window._jdJob;
   if (!d) return;
   const j = d.j;
-  await toggleSaveJob(d.sid, j ? j.co||'' : '', j ? j.title||'' : '', j ? j.city||j.loc||'' : '', j ? j.score||65 : 65);
-  const saved = await SavedJobs.isSaved(d.sid);
-  const b = document.getElementById('jdSaveBtn');
-  if (b) { b.textContent = saved ? '♥' : '♡'; b.style.color = saved ? 'var(--green)' : 'var(--muted)'; }
+  toggleSaveJob(d.sid, j ? j.co||'' : '', j ? j.title||'' : '', j ? j.city||j.loc||'' : '', j ? j.score||65 : 65);
 }
 
 function closeJobDetailModal() { closeApplyModalDirect(); }
@@ -5590,30 +5640,33 @@ function copyProposal() {
   navigator.clipboard.writeText(content).then(()=>showToast('Copied to clipboard!')).catch(()=>showToast('Copy failed — select and copy manually.'));
 }
 
-async function toggleSaveJob(jobId, company, title, city, score) {
+function toggleSaveJob(jobId, company, title, city, score) {
   const sid = String(jobId);
   const job = { id: sid, co: company, title, city, score };
-  const isSaved = await SavedJobs.isSaved(sid);
-  const btn = document.getElementById('save_' + sid);
-  if (isSaved) {
-    await SavedJobs.remove(sid);
-    if (btn) { btn.textContent = '♡'; btn.style.color = ''; }
+  // isSaved is now synchronous — reads localStorage, never blocks
+  const wasSaved = SavedJobs.isSaved(sid);
+
+  if (wasSaved) {
+    SavedJobs.remove(sid);
     showToast('Removed from saved jobs.');
   } else {
-    await SavedJobs.save(job);
-    if (btn) { btn.textContent = '♥'; btn.style.color = 'var(--red)'; }
+    SavedJobs.save(job);
     showToast('Saved! Find it in your dashboard.');
   }
-  // Sync the job detail modal heart if it's open for this job
+
+  // Update card button
+  const btn = document.getElementById('save_' + sid);
+  if (btn) { btn.textContent = wasSaved ? '♡' : '♥'; btn.style.color = wasSaved ? '' : 'var(--red)'; }
+
+  // Update job detail modal heart if open for this job
   const jdBtn = document.getElementById('jdSaveBtn');
   if (jdBtn && window._jdJob && String(window._jdJob.sid) === sid) {
-    const nowSaved = !isSaved;
-    jdBtn.textContent = nowSaved ? '♥' : '♡';
-    jdBtn.style.color = nowSaved ? 'var(--green)' : 'var(--muted)';
+    jdBtn.textContent = wasSaved ? '♡' : '♥';
+    jdBtn.style.color = wasSaved ? 'var(--muted)' : 'var(--green)';
   }
-  // Refresh dashboard saved jobs panel if it's visible
-  const dashEl = document.getElementById('dashSavedJobs');
-  if (dashEl) _refreshDashSaved();
+
+  // Refresh dashboard panel (async is fine here — just updating display)
+  _refreshDashSaved();
 }
 
 async function _refreshDashSaved() {
@@ -5646,8 +5699,9 @@ async function removeSavedJobFromDash(jobId) {
 }
 
 async function initSaveButtons() {
-  const saved = await SavedJobs.load();
-  const savedIds = new Set(saved.map(s => String(s.job_id)));
+  // Load from DB (merges into localStorage) so subsequent isSaved() calls are current
+  await SavedJobs.load();
+  const savedIds = new Set(SavedJobs.loadSync().map(s => String(s.job_id)));
   document.querySelectorAll('[id^="save_"]').forEach(btn => {
     const jobId = btn.id.replace('save_', '');
     if (savedIds.has(jobId)) { btn.textContent = '♥'; btn.style.color = 'var(--red)'; }
