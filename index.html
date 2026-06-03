@@ -1440,7 +1440,10 @@ nav{position:fixed;top:0;left:0;right:0;z-index:500;height:58px;display:flex;ali
       <div style="padding:.85rem 1.25rem;border-bottom:1px solid var(--line);font-family:var(--mono);font-size:.62rem;color:var(--dim);text-transform:uppercase;letter-spacing:.08em">Job location</div>
       <div style="padding:1.25rem">
         <label style="font-family:var(--mono);font-size:.6rem;text-transform:uppercase;letter-spacing:.08em;color:var(--dim);display:block;margin-bottom:.4rem">Your city</label>
-        <input id="profCity" type="text" style="width:100%;background:var(--raised);border:1.5px solid var(--line2);border-radius:8px;padding:.7rem 1rem;color:var(--white);font-family:var(--body);font-size:.875rem;outline:none;caret-color:var(--green);box-sizing:border-box" onfocus="this.style.borderColor='var(--green)'" onblur="this.style.borderColor='var(--line2)'" placeholder="e.g. Los Angeles, CA"/>
+        <div style="position:relative">
+          <input id="profCity" type="text" autocomplete="off" style="width:100%;background:var(--raised);border:1.5px solid var(--line2);border-radius:8px;padding:.7rem 1rem;color:var(--white);font-family:var(--body);font-size:.875rem;outline:none;caret-color:var(--green);box-sizing:border-box" onfocus="this.style.borderColor='var(--green)'" onblur="this.style.borderColor='var(--line2)'" placeholder="e.g. Los Angeles, CA" oninput="debounceLocationSuggest(this.value,'profCitySuggestions')"/>
+          <div id="profCitySuggestions" style="position:absolute;z-index:200;background:var(--surface);border:1px solid var(--line2);border-radius:8px;width:100%;display:none;box-shadow:0 8px 24px rgba(0,0,0,.4);top:calc(100% + 4px);left:0"></div>
+        </div>
         <div style="font-family:var(--mono);font-size:.6rem;color:var(--muted);margin-top:.5rem">Used to auto-load nearby job listings on the Jobs page.</div>
       </div>
     </div>
@@ -3245,8 +3248,12 @@ function renderSurveyQuestion(){
   if(progress)progress.textContent=`${_surveyStep+1} of ${SURVEY.length}`;
   const el=document.getElementById('surveyQuestion');if(!el)return;
   if(q.type==='text'){
+    const isCityQ = q.id === 'city';
     el.innerHTML=`<div style="font-family:var(--display);font-size:1.25rem;font-weight:800;color:var(--white);letter-spacing:-.025em;margin-bottom:1.25rem;line-height:1.2">${q.q}</div>
-    <input id="surveyTextInput" type="text" placeholder="${q.placeholder}" style="width:100%;background:var(--surface);border:1.5px solid var(--line2);border-radius:8px;padding:.85rem 1rem;color:var(--white);font-family:var(--body);font-size:.9rem;outline:none;caret-color:var(--green);margin-bottom:1rem" onfocus="this.style.borderColor='var(--green)'" onblur="this.style.borderColor='var(--line2)'" onkeydown="if(event.key==='Enter')surveyAnswer(document.getElementById('surveyTextInput').value)"/>
+    <div style="position:relative;margin-bottom:1rem">
+      <input id="surveyTextInput" type="text" autocomplete="off" placeholder="${q.placeholder}" style="width:100%;background:var(--surface);border:1.5px solid var(--line2);border-radius:8px;padding:.85rem 1rem;color:var(--white);font-family:var(--body);font-size:.9rem;outline:none;caret-color:var(--green);box-sizing:border-box" onfocus="this.style.borderColor='var(--green)'" onblur="this.style.borderColor='var(--line2)'" onkeydown="if(event.key==='Enter')surveyAnswer(document.getElementById('surveyTextInput').value)" ${isCityQ?'oninput="debounceLocationSuggest(this.value,\'surveyCitySuggestions\')"':''}/>
+      ${isCityQ?'<div id="surveyCitySuggestions" style="position:absolute;z-index:200;background:var(--surface);border:1px solid var(--line2);border-radius:8px;width:100%;display:none;box-shadow:0 8px 24px rgba(0,0,0,.4);top:calc(100% + 4px);left:0"></div>':''}
+    </div>
     <button onclick="surveyAnswer(document.getElementById('surveyTextInput').value)" style="width:100%;padding:.85rem;background:var(--green);color:var(--ink);border:none;border-radius:8px;font-family:var(--display);font-weight:800;font-size:.9rem;cursor:pointer">Continue →</button>
     ${_surveyStep>0?`<button onclick="surveyBack()" style="width:100%;padding:.6rem;background:none;border:none;color:var(--muted);font-family:var(--mono);font-size:.65rem;cursor:pointer;margin-top:.5rem">← back</button>`:''}`;
   } else {
@@ -3609,8 +3616,13 @@ function showLocationSuggestions(results, listId) {
   list.style.display = 'block';
 }
 function selectLocation(value, listId) {
-  const inputId = listId === 'jobLocSuggestions' ? 'jobSearchLocation' : 'heroLoc';
-  const input = document.getElementById(inputId);
+  const inputMap = {
+    'jobLocSuggestions': 'jobSearchLocation',
+    'heroLocSuggestions': 'heroLoc',
+    'profCitySuggestions': 'profCity',
+    'surveyCitySuggestions': 'surveyTextInput',
+  };
+  const input = document.getElementById(inputMap[listId] || 'jobSearchLocation');
   if (input) { input.value = value; input.style.borderColor = 'var(--green)'; }
   hideSuggestions(listId);
 }
@@ -3621,6 +3633,8 @@ function hideSuggestions(listId) {
 document.addEventListener('click', e => {
   if (!e.target.closest('#jobLocSuggestions') && !e.target.closest('#jobSearchLocation')) hideSuggestions('jobLocSuggestions');
   if (!e.target.closest('#heroLocSuggestions') && !e.target.closest('#heroLoc')) hideSuggestions('heroLocSuggestions');
+  if (!e.target.closest('#profCitySuggestions') && !e.target.closest('#profCity')) hideSuggestions('profCitySuggestions');
+  if (!e.target.closest('#surveyCitySuggestions') && !e.target.closest('#surveyTextInput')) hideSuggestions('surveyCitySuggestions');
 });
 
 const HERO_LINES = [
