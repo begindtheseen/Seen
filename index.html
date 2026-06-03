@@ -2128,7 +2128,7 @@ async function loadJobs(){
   const listEl=document.getElementById('jobsList');
   const countEl=document.getElementById('jobsCt');
 
-  // User typed a query → live search (Claude web search)
+  // User typed a query → live search
   if(q){searchJobs(q,locInput);return;}
 
   if(listEl)listEl.innerHTML='<div style="text-align:center;padding:3rem;font-family:var(--mono);font-size:.7rem;color:var(--muted)"><div class="spinner" style="margin:0 auto 1rem"></div>Loading listings...</div>';
@@ -2145,17 +2145,14 @@ async function loadJobs(){
       let query=db.from('jobs').select('*').gt('expires_at',new Date().toISOString()).order('score',{ascending:false}).limit(80);
 
       if(radiusVal===0){
-        // Remote only
         query=query.ilike('location','%remote%');
       } else if(effectiveLoc){
         const parts=effectiveLoc.split(',').map(p=>p.trim());
         const city=parts[0];
         const state=parts[1]||'';
         if(radiusVal<=25){
-          // Narrow: match city name
           query=query.ilike('location',`%${city}%`);
         } else {
-          // Broad (50/100 mi): match state + include remote
           const stateFilter=state||city;
           query=query.or(`location.ilike.%${stateFilter}%,location.ilike.%remote%`);
         }
@@ -2169,13 +2166,19 @@ async function loadJobs(){
     }catch(e){console.warn('loadJobs db:',e);}
   }
 
-  // If user has a location but nothing in DB yet, trigger on-demand Adzuna fetch
-  if(!jobs.length&&effectiveLoc){
+  // DB had nothing for this location — fetch from Adzuna and populate DB
+  // Only respect the 6h cooldown if we already have jobs (avoid hammering API unnecessarily).
+  // If DB is empty, always fetch — a previous fetch may have failed to save.
+  if(!jobs.length && effectiveLoc){
     const cacheKey='locFetch_'+effectiveLoc.replace(/[\s,]/g,'').toLowerCase();
     const lastFetch=parseInt(localStorage.getItem(cacheKey)||'0');
-    const needsFetch=(Date.now()-lastFetch)>6*60*60*1000; // 6-hour cooldown per city
-    if(needsFetch){
-      // Don't set timestamp yet — only lock if fetch actually returns jobs
+    const recentFetch=(Date.now()-lastFetch)<6*60*60*1000;
+    // Skip only if we fetched recently AND DB actually has something (jobs from a broader query)
+    let anyJobs=0;
+    if(recentFetch && db){
+      try{ const{count}=await db.from('jobs').select('*',{count:'exact',head:true}).gt('expires_at',new Date().toISOString()); anyJobs=count||0; }catch(e){}
+    }
+    if(!recentFetch || anyJobs===0){
       if(listEl)listEl.innerHTML='<div style="text-align:center;padding:3rem;font-family:var(--mono);font-size:.7rem;color:var(--muted)"><div class="spinner" style="margin:0 auto 1rem"></div>Finding jobs near '+effectiveLoc.split(',')[0]+'...</div>';
       try{
         const r=await fetch('/api/fetch-location-jobs',{
@@ -2186,14 +2189,26 @@ async function loadJobs(){
         if(r.ok){
           const d=await r.json();
           if(d.jobs?.length){
-            localStorage.setItem(cacheKey,Date.now().toString()); // Only lock after success
-            // Give each on-demand job a temp ID for client-side use
+            localStorage.setItem(cacheKey,Date.now().toString());
             jobs=d.jobs.map((j,i)=>_normalizeDbJob({...j,id:j.id||('az_'+i+'_'+Date.now())}));
             JOBS.splice(0,JOBS.length,...jobs,...FALLBACK_JOBS);
+            // Also persist to DB so next load is instant
+            _persistJobsToDB(d.jobs, null, effectiveLoc).catch(()=>{});
           }
         }
       }catch(e){console.warn('location fetch:',e);}
     }
+  }
+
+  // Still nothing — try broader fallback: any recent DB listings regardless of location
+  if(!jobs.length && db){
+    try{
+      const{data}=await db.from('jobs').select('*').gt('expires_at',new Date().toISOString()).order('score',{ascending:false}).limit(40);
+      if(data?.length){
+        jobs=data.map(_normalizeDbJob);
+        JOBS.splice(0,JOBS.length,...jobs,...FALLBACK_JOBS);
+      }
+    }catch(e){}
   }
 
   // If still nothing, show search prompt
