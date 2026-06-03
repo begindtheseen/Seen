@@ -2164,6 +2164,19 @@ function _normalizeDbJob(j){
   };
 }
 
+// Infer experience level from job title — more reliable than the DB's level field
+// since Adzuna rarely populates it (most jobs default to 'Mid level').
+function _inferLevel(job) {
+  const t = (job.title || '').toLowerCase();
+  const stored = (job.lvl || '').toLowerCase();
+  if (/\b(senior|sr\.?|lead|principal|director|head of|vp|vice president|chief|manager|supervisor|staff)\b/.test(t)) return 'senior';
+  if (/\b(junior|jr\.?|entry.?level|entry|associate|trainee|coordinator|assistant|intern|apprentice)\b/.test(t)) return 'entry';
+  // Fall back to stored value if title is ambiguous
+  if (stored.includes('senior') || stored.includes('lead')) return 'senior';
+  if (stored.includes('entry') || stored.includes('junior') || stored === 'internship') return 'entry';
+  return 'mid';
+}
+
 // Niche keywords matched against job TITLE only — keep phrases specific enough
 // to avoid false positives from boilerplate description text
 const NICHE_KEYWORDS = {
@@ -2217,7 +2230,7 @@ async function applyJobFilters(){
       const title=(j.title||'').toLowerCase();
       if(!nicheKws.some(k=>title.includes(k))) return false;
     }
-    if(level && j.lvl && !j.lvl.toLowerCase().includes(level.toLowerCase())) return false;
+    if(level && _inferLevel(j) !== level) return false;
     if(type  && j.type && !j.type.toLowerCase().includes(type.toLowerCase()))  return false;
     if(cutoffMs && j.created_at && new Date(j.created_at).getTime() < cutoffMs) return false;
     return true;
@@ -2227,7 +2240,9 @@ async function applyJobFilters(){
   if(jobs.length < 3 && db){
     try{
       let q=db.from('jobs').select('*').gt('expires_at',new Date().toISOString()).order('score',{ascending:false}).limit(100);
-      if(level)  q=q.ilike('level','%'+level+'%');
+      // Level filter: use title keywords since DB level field is unreliable
+      if(level === 'senior') q=q.or('title.ilike.%senior%,title.ilike.%lead%,title.ilike.%director%,title.ilike.%manager%,title.ilike.%principal%');
+      else if(level === 'entry') q=q.or('title.ilike.%junior%,title.ilike.%entry%,title.ilike.%associate%,title.ilike.%trainee%,title.ilike.%assistant%,title.ilike.%coordinator%,title.ilike.%intern%');
       if(type)   q=q.ilike('type','%'+type+'%');
       if(cutoffMs) q=q.gte('created_at',new Date(cutoffMs).toISOString());
       if(nicheKws) q=q.or(nicheKws.map(k=>'title.ilike.%'+k+'%').join(','));
