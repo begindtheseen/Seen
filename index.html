@@ -451,12 +451,13 @@ nav{position:fixed;top:0;left:0;right:0;z-index:500;height:58px;display:flex;ali
 /* MODAL */
 .modal-ov{display:none;position:fixed;inset:0;background:rgba(0,0,0,.82);backdrop-filter:blur(20px);z-index:800;align-items:flex-start;justify-content:center;padding-top:90px}
 .modal-ov.open{display:flex}
-.modal{background:var(--card);border:1px solid var(--line2);border-radius:16px;width:100%;max-width:720px;max-height:82vh;overflow-y:auto;box-shadow:0 40px 120px rgba(0,0,0,.7);animation:fadeUp .18s ease}
-.m-hdr{display:flex;align-items:center;justify-content:space-between;padding:1.2rem 1.5rem;border-bottom:1px solid var(--line);position:sticky;top:0;background:var(--card);z-index:1}
+.modal{background:var(--card);border:1px solid var(--line2);border-radius:16px;width:100%;max-width:720px;max-height:82vh;display:flex;flex-direction:column;box-shadow:0 40px 120px rgba(0,0,0,.7);animation:fadeUp .18s ease}
+.m-hdr{display:flex;align-items:center;justify-content:space-between;padding:1.2rem 1.5rem;border-bottom:1px solid var(--line);flex-shrink:0;background:var(--card);z-index:1;border-radius:16px 16px 0 0}
 .m-ti{font-family:var(--display);font-size:1rem;font-weight:800;color:var(--white);letter-spacing:-.02em}
 .m-cl{background:none;border:none;color:var(--dim);font-size:1.1rem;cursor:pointer;padding:.2rem;transition:color .15s}
 .m-cl:hover{color:var(--sub)}
-.m-body{padding:1.5rem}
+.m-body{padding:1.5rem;overflow-y:auto;flex:1}
+.m-foot{display:flex;gap:.5rem;padding:1rem 1.5rem;border-top:1px solid var(--line);flex-shrink:0;background:var(--card);border-radius:0 0 16px 16px}
 
 /* DISCLAIMER */
 .disc{background:var(--void);border-bottom:1px solid var(--line);padding:.45rem 2rem;text-align:center;font-family:var(--mono);font-size:.58rem;color:var(--muted)}
@@ -1565,6 +1566,7 @@ nav{position:fixed;top:0;left:0;right:0;z-index:500;height:58px;display:flex;ali
       <button class="m-cl" onclick="closeApplyModalDirect()">✕</button>
     </div>
     <div class="m-body" id="applyModalBody"></div>
+    <div class="m-foot" id="applyModalFoot" style="display:none"></div>
   </div>
 </div>
 
@@ -3300,7 +3302,12 @@ async function clearAllApplications() {
 }
 
 function closeApplyModal(e) { if (e.target === document.getElementById('applyModal')) closeApplyModalDirect(); }
-function closeApplyModalDirect() { document.getElementById('applyModal').classList.remove('open'); }
+function closeApplyModalDirect() {
+  document.getElementById('applyModal').classList.remove('open');
+  const foot = document.getElementById('applyModalFoot');
+  if (foot) foot.style.display = 'none';
+  window._jdJob = null;
+}
 
 // ═══════════════════════════════════════════════
 // STAGE UPDATE MODAL
@@ -4452,15 +4459,14 @@ async function createAccount() {
 let _pendingApplication = null;
 
 // ═══════════════════════════════════════════════
-// JOB DETAIL MODAL (uses existing applyModal)
+// JOB DETAIL MODAL (uses existing applyModal + new sticky footer)
 // ═══════════════════════════════════════════════
-// Stores the current job detail so jdSaveToggle() can reference it without inline JS
 window._jdJob = null;
 
 function openJobDetailModal(jobId) {
   const sid = String(jobId);
   const j = JOBS.find(x => String(x.id) === sid);
-  window._jdJob = j ? { sid, j } : { sid, j: null };
+  window._jdJob = { sid, j: j || null };
 
   const co    = j ? (j.co    || '')                   : '';
   const title = j ? (j.title || 'Job Listing')         : 'Job Listing';
@@ -4468,77 +4474,36 @@ function openJobDetailModal(jobId) {
   const score = j ? (j.score || 65)                    : 65;
   const waste = j ? (j.waste || 25)                    : 25;
   const risk  = j ? (j.risk  || Score.risk(score))     : 'warn';
-  const type  = j ? (j.type  || 'Full-time')           : '';
+  const type  = j ? (j.type  || '')                    : '';
   const lvl   = j ? (j.lvl   || '')                    : '';
   const sal   = j ? (j.sal && j.sal !== '—' ? j.sal : '') : '';
   const desc  = j ? (j.description || (j.vibes && j.vibes[0]) || '') : '';
 
   document.getElementById('applyModalTitle').textContent = title;
-  document.getElementById('applyModalSub').textContent   = co + (loc ? ' · 📍 ' + loc : '');
+  document.getElementById('applyModalSub').textContent   = co + (loc ? '  ·  📍 ' + loc : '');
 
-  const body = document.getElementById('applyModalBody');
-  body.innerHTML = '';
+  // Scrollable body — meta + description
+  const chips = [type, lvl, sal].filter(Boolean).map(t =>
+    `<span style="background:var(--raised);border:1px solid var(--line2);border-radius:5px;padding:.18rem .5rem;font-size:.63rem;font-family:var(--mono);color:var(--sub)">${t}</span>`
+  ).join('');
 
-  // ── Meta row ──
-  const meta = document.createElement('div');
-  meta.style.cssText = 'display:flex;align-items:center;gap:.65rem;padding-bottom:.9rem;margin-bottom:.9rem;border-bottom:1px solid var(--line)';
+  document.getElementById('applyModalBody').innerHTML =
+    `<div style="display:flex;align-items:center;gap:.65rem;padding-bottom:.9rem;margin-bottom:.9rem;border-bottom:1px solid var(--line)">
+       <div style="width:40px;height:40px;border-radius:8px;background:var(--raised);border:1px solid var(--line2);display:flex;align-items:center;justify-content:center;font-family:var(--display);font-weight:800;font-size:1rem;color:var(--white);flex-shrink:0">${(co||'?')[0].toUpperCase()}</div>
+       <div style="flex:1;display:flex;flex-wrap:wrap;gap:.3rem">${chips}</div>
+       <div style="text-align:center;flex-shrink:0"><div class="sring ${risk}" style="width:36px;height:36px"><div class="sring-n" style="font-size:.78rem">${score}</div></div><div style="font-family:var(--mono);font-size:.45rem;color:var(--muted);margin-top:.15rem">score</div></div>
+     </div>
+     <div style="color:var(--sub);font-size:.78rem;line-height:1.75;white-space:pre-wrap">${(desc||'No description available.').replace(/</g,'&lt;')}</div>`;
 
-  const logo = document.createElement('div');
-  logo.style.cssText = 'width:40px;height:40px;border-radius:8px;background:var(--raised);border:1px solid var(--line2);display:flex;align-items:center;justify-content:center;font-family:var(--display);font-weight:800;font-size:1rem;color:var(--white);flex-shrink:0';
-  logo.textContent = (co || '?')[0].toUpperCase();
-
-  const chips = document.createElement('div');
-  chips.style.cssText = 'flex:1;display:flex;flex-wrap:wrap;gap:.3rem';
-  [type, lvl, sal].filter(Boolean).forEach(t => {
-    const s = document.createElement('span');
-    s.style.cssText = 'background:var(--raised);border:1px solid var(--line2);border-radius:5px;padding:.18rem .5rem;font-size:.63rem;font-family:var(--mono);color:var(--sub)';
-    s.textContent = t;
-    chips.appendChild(s);
-  });
-
-  const ring = document.createElement('div');
-  ring.style.cssText = 'text-align:center;flex-shrink:0';
-  ring.innerHTML = '<div class="sring ' + risk + '" style="width:36px;height:36px"><div class="sring-n" style="font-size:.78rem">' + score + '</div></div><div style="font-family:var(--mono);font-size:.45rem;color:var(--muted);margin-top:.15rem">score</div>';
-
-  meta.appendChild(logo);
-  meta.appendChild(chips);
-  meta.appendChild(ring);
-  body.appendChild(meta);
-
-  // ── Description ──
-  const descDiv = document.createElement('div');
-  descDiv.style.cssText = 'color:var(--sub);font-size:.78rem;line-height:1.75;margin-bottom:1.25rem;white-space:pre-wrap';
-  descDiv.textContent = desc || 'No description available.';
-  body.appendChild(descDiv);
-
-  // ── Action buttons ──
-  const acts = document.createElement('div');
-  acts.style.cssText = 'display:flex;gap:.5rem;padding-top:.75rem;border-top:1px solid var(--line)';
-
-  const saveBtn = document.createElement('button');
-  saveBtn.type = 'button';
-  saveBtn.id = 'jdSaveBtn';
-  saveBtn.style.cssText = 'background:none;border:1px solid var(--line2);border-radius:8px;padding:.6rem .9rem;font-size:.9rem;cursor:pointer;color:var(--muted);flex-shrink:0;transition:all .15s';
-  saveBtn.textContent = '♡';
-  saveBtn.addEventListener('click', jdSaveToggle);
-
-  const applyBtn = document.createElement('button');
-  applyBtn.type = 'button';
-  applyBtn.style.cssText = 'flex:1;background:var(--green);color:var(--ink);border:none;border-radius:8px;padding:.6rem 1rem;font-family:var(--display);font-weight:800;font-size:.82rem;cursor:pointer';
-  applyBtn.textContent = 'Apply & Optimize →';
-  applyBtn.addEventListener('click', function() {
-    closeApplyModalDirect();
-    setTimeout(function() { openApplyModal(sid, co, title, loc, score, risk, waste, j ? j.apply_email || '' : ''); }, 50);
-  });
-
-  acts.appendChild(saveBtn);
-  acts.appendChild(applyBtn);
-  body.appendChild(acts);
-
-  // Set initial save state (synchronous now)
-  const alreadySaved = SavedJobs.isSaved(sid);
-  saveBtn.textContent = alreadySaved ? '♥' : '♡';
-  saveBtn.style.color = alreadySaved ? 'var(--green)' : 'var(--muted)';
+  // Sticky footer — always visible, inline onclick so iOS never misses it
+  const saved = SavedJobs.isSaved(sid);
+  const foot = document.getElementById('applyModalFoot');
+  foot.style.display = 'flex';
+  foot.innerHTML =
+    `<button id="jdSaveBtn" type="button" onclick="jdSaveToggle()"
+       style="background:none;border:1px solid var(--line2);border-radius:8px;padding:.65rem 1rem;font-size:1rem;cursor:pointer;color:${saved?'var(--green)':'var(--muted)'};flex-shrink:0;transition:all .15s">${saved?'♥':'♡'}</button>
+     <button type="button" onclick="jdApplyClick()"
+       style="flex:1;background:var(--green);color:var(--ink);border:none;border-radius:8px;padding:.65rem 1rem;font-family:var(--display);font-weight:800;font-size:.82rem;cursor:pointer">Apply &amp; Optimize →</button>`;
 
   document.getElementById('applyModal').classList.add('open');
 }
@@ -4548,9 +4513,39 @@ function jdSaveToggle() {
   if (!d) return;
   const j = d.j;
   toggleSaveJob(d.sid, j ? j.co||'' : '', j ? j.title||'' : '', j ? j.city||j.loc||'' : '', j ? j.score||65 : 65);
+  // Update button face immediately from localStorage state
+  const b = document.getElementById('jdSaveBtn');
+  if (b) {
+    const now = SavedJobs.isSaved(d.sid);
+    b.textContent = now ? '♥' : '♡';
+    b.style.color = now ? 'var(--green)' : 'var(--muted)';
+  }
 }
 
-function closeJobDetailModal() { closeApplyModalDirect(); }
+function jdApplyClick() {
+  const d = window._jdJob;
+  if (!d) return;
+  const j = d.j;
+  const sid   = d.sid;
+  const co    = j ? j.co    || '' : '';
+  const title = j ? j.title || '' : '';
+  const loc   = j ? j.city  || j.loc || '' : '';
+  const score = j ? j.score || 65 : 65;
+  const waste = j ? j.waste || 25 : 25;
+  const risk  = j ? j.risk  || Score.risk(score) : 'warn';
+  const email = j ? j.apply_email || '' : '';
+  // Hide the footer before switching to apply form
+  const foot = document.getElementById('applyModalFoot');
+  if (foot) foot.style.display = 'none';
+  closeApplyModalDirect();
+  setTimeout(function() { openApplyModal(sid, co, title, loc, score, risk, waste, email); }, 50);
+}
+
+function closeJobDetailModal() {
+  const foot = document.getElementById('applyModalFoot');
+  if (foot) foot.style.display = 'none';
+  closeApplyModalDirect();
+}
 
 function openApplyModal(jobId, company, role, location, score, risk, waste, applyEmail) {
   const job = JOBS.find(j => j.id == jobId);
