@@ -1569,19 +1569,6 @@ nav{position:fixed;top:0;left:0;right:0;z-index:500;height:58px;display:flex;ali
 </div>
 
 <!-- JOB DETAIL MODAL -->
-<div class="modal-ov" id="jobDetailModal" onclick="if(event.target===this)closeJobDetailModal()">
-  <div class="modal" style="max-width:620px;display:flex;flex-direction:column;max-height:88vh">
-    <div class="m-hdr" style="flex-shrink:0">
-      <div style="flex:1;min-width:0">
-        <div class="m-ti" id="jdmTitle" style="font-size:1rem;line-height:1.3"></div>
-        <div style="font-family:var(--mono);font-size:.6rem;color:var(--muted);margin-top:.2rem" id="jdmSub"></div>
-      </div>
-      <button class="m-cl" onclick="closeJobDetailModal()">✕</button>
-    </div>
-    <div id="jdmBody" style="flex:1;overflow-y:auto;padding:1.25rem 1.5rem"></div>
-    <div id="jdmFoot" style="flex-shrink:0;padding:1rem 1.5rem;border-top:1px solid var(--line2);display:flex;gap:.6rem"></div>
-  </div>
-</div>
 
 <!-- UPDATE STAGE MODAL -->
 <div class="modal-ov" id="stageModal" onclick="closeStageModal(event)">
@@ -4379,69 +4366,70 @@ async function createAccount() {
 let _pendingApplication = null;
 
 // ═══════════════════════════════════════════════
-// JOB DETAIL MODAL
+// JOB DETAIL MODAL (uses existing applyModal)
 // ═══════════════════════════════════════════════
 function openJobDetailModal(jobId) {
-  // Supabase IDs may be integers; onclick always passes strings — use == not ===
-  const j = JOBS.find(x => x.id == jobId);
-  if (!j) return;
+  const sid = String(jobId);
+  const j = JOBS.find(x => String(x.id) === sid);
 
-  const risk = j.risk || Score.risk(j.score);
-  const wl = Score.wasteLabel(j.waste || 25);
-  const company = (j.co || '').replace(/'/g, "\\'");
-  const role    = (j.title || '').replace(/'/g, "\\'");
-  const loc     = (j.city || j.loc || '').replace(/'/g, "\\'");
-  const score   = j.score || 65;
-  const waste   = j.waste || 25;
-  const applyArgs = `'${jobId}','${company}','${role}','${loc}',${score},'${risk}',${waste},'${j.apply_email||''}'`;
+  const risk  = j ? (j.risk || Score.risk(j.score)) : 'warn';
+  const score = j ? (j.score || 65) : 65;
+  const waste = j ? (j.waste || 25) : 25;
+  const co    = j ? (j.co || '') : '';
+  const title = j ? (j.title || '') : '';
+  const loc   = j ? (j.city || j.loc || '') : '';
+  const applyEmail = j ? (j.apply_email || '') : '';
 
-  document.getElementById('jdmTitle').textContent = j.title || '';
-  document.getElementById('jdmSub').textContent   = (j.co || '') + (j.city||j.loc ? ' · 📍 ' + (j.city||j.loc) : '');
+  // Escape for JS string arguments inside onclick attrs
+  const esc = s => s.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+  const applyArgs = `'${sid}','${esc(co)}','${esc(title)}','${esc(loc)}',${score},'${risk}',${waste},'${esc(applyEmail)}'`;
 
-  // Meta chips
-  const metaChips = [
+  document.getElementById('applyModalTitle').textContent = title || 'Job Listing';
+  document.getElementById('applyModalSub').textContent   = co + (loc ? ' · 📍 ' + loc : '');
+
+  const metaChips = j ? [
     j.type || 'Full-time',
-    j.lvl  || 'Mid level',
+    j.lvl  || '',
     j.sal && j.sal !== '—' ? j.sal : null,
-  ].filter(Boolean).map(m => `<span style="background:var(--raised);border:1px solid var(--line2);border-radius:5px;padding:.2rem .55rem;font-size:.65rem;font-family:var(--mono);color:var(--sub)">${m}</span>`).join('');
+  ].filter(Boolean).map(m =>
+    `<span style="background:var(--raised);border:1px solid var(--line2);border-radius:5px;padding:.18rem .5rem;font-size:.63rem;font-family:var(--mono);color:var(--sub)">${m}</span>`
+  ).join('') : '';
 
-  // Format description — split on newlines, wrap paragraphs
-  const raw = (j.description || j.vibes?.[0] || 'No description available.');
-  const descHtml = raw.split(/\n+/).map(p => p.trim()).filter(Boolean)
-    .map(p => `<p style="margin:0 0 .75rem;line-height:1.7;color:var(--sub);font-size:.8rem">${p}</p>`).join('');
+  const raw = j ? (j.description || (j.vibes||[])[0] || '') : '';
+  const descHtml = raw
+    ? raw.split(/\n+/).map(p => p.trim()).filter(Boolean)
+        .map(p => `<p style="margin:0 0 .65rem;line-height:1.7;color:var(--sub);font-size:.78rem">${p}</p>`).join('')
+    : '<p style="color:var(--muted);font-size:.78rem">No description available.</p>';
 
-  document.getElementById('jdmBody').innerHTML = `
-    <div style="display:flex;align-items:center;gap:.85rem;margin-bottom:1.1rem">
-      <div style="width:46px;height:46px;border-radius:10px;background:var(--raised);border:1px solid var(--line2);display:flex;align-items:center;justify-content:center;font-family:var(--display);font-weight:800;font-size:1.15rem;color:var(--white);flex-shrink:0">${(j.co||'?')[0].toUpperCase()}</div>
-      <div style="flex:1;min-width:0">
-        <div style="font-family:var(--display);font-size:.95rem;font-weight:700;color:var(--white);margin-bottom:.3rem;display:flex;flex-wrap:wrap;gap:.3rem">${metaChips}</div>
-        ${j._url ? `<div style="font-family:var(--mono);font-size:.58rem;color:var(--muted)">via ${(()=>{try{return new URL(j._url).hostname.replace('www.','')}catch(e){return j._url}})()}</div>` : ''}
-      </div>
+  document.getElementById('applyModalBody').innerHTML = `
+    <div style="display:flex;align-items:center;gap:.75rem;margin-bottom:1rem;padding-bottom:1rem;border-bottom:1px solid var(--line)">
+      <div style="width:42px;height:42px;border-radius:9px;background:var(--raised);border:1px solid var(--line2);display:flex;align-items:center;justify-content:center;font-family:var(--display);font-weight:800;font-size:1.1rem;color:var(--white);flex-shrink:0">${(co||'?')[0].toUpperCase()}</div>
+      <div style="flex:1;min-width:0;display:flex;flex-wrap:wrap;gap:.3rem;align-items:center">${metaChips}</div>
       <div style="text-align:center;flex-shrink:0">
-        <div class="sring ${risk}" style="width:42px;height:42px"><div class="sring-n" style="font-size:.85rem">${score}</div></div>
-        <div style="font-family:var(--mono);font-size:.5rem;color:var(--muted);margin-top:.2rem">score</div>
+        <div class="sring ${risk}" style="width:38px;height:38px"><div class="sring-n" style="font-size:.8rem">${score}</div></div>
+        <div style="font-family:var(--mono);font-size:.48rem;color:var(--muted);margin-top:.15rem">score</div>
       </div>
     </div>
-    <div style="border-top:1px solid var(--line2);padding-top:1rem">${descHtml}</div>`;
+    <div style="margin-bottom:1.25rem">${descHtml}</div>
+    <div style="display:flex;gap:.5rem;padding-top:.5rem;border-top:1px solid var(--line)">
+      <button id="jdSaveBtn_${sid}" onclick="(async()=>{await toggleSaveJob('${sid}','${esc(co)}','${esc(title)}','${esc(loc)}',${score});const b=document.getElementById('jdSaveBtn_${sid}');if(b){const s=await SavedJobs.isSaved('${sid}');b.textContent=s?'♥':'♡';b.style.color=s?'var(--green)':'var(--muted)';b.style.borderColor=s?'var(--green)':'var(--line2)';}})()" style="background:none;border:1px solid var(--line2);border-radius:8px;padding:.6rem .85rem;font-size:.85rem;cursor:pointer;color:var(--muted);flex-shrink:0;transition:all .15s">♡</button>
+      <button onclick="openApplyModal(${applyArgs})" style="flex:1;background:var(--green);color:var(--ink);border:none;border-radius:8px;padding:.6rem 1rem;font-family:var(--display);font-weight:800;font-size:.82rem;cursor:pointer">Apply &amp; Optimize →</button>
+    </div>`;
 
-  document.getElementById('jdmFoot').innerHTML = `
-    <button id="jdmSaveBtn_${jobId}" onclick="(async()=>{await toggleSaveJob('${jobId}','${company}','${role}','${loc}',${score});await _updateJdmSaveBtn('${jobId}');})()" style="background:none;border:1px solid var(--line2);border-radius:8px;padding:.65rem .9rem;font-size:.85rem;cursor:pointer;color:var(--muted);transition:all .15s">♡</button>
-    <button onclick="closeJobDetailModal();openApplyModal(${applyArgs})" style="flex:1;background:var(--green);color:var(--ink);border:none;border-radius:8px;padding:.65rem 1rem;font-family:var(--display);font-weight:800;font-size:.82rem;cursor:pointer;transition:opacity .15s">Apply &amp; Optimize →</button>`;
+  // Set initial save state
+  SavedJobs.isSaved(sid).then(saved => {
+    const b = document.getElementById('jdSaveBtn_' + sid);
+    if (!b) return;
+    b.textContent = saved ? '♥' : '♡';
+    b.style.color = saved ? 'var(--green)' : 'var(--muted)';
+    b.style.borderColor = saved ? 'var(--green)' : 'var(--line2)';
+  });
 
-  // Sync save button state
-  _updateJdmSaveBtn(jobId);
-
-  document.getElementById('jobDetailModal').classList.add('open');
+  document.getElementById('applyModal').classList.add('open');
 }
 
-async function _updateJdmSaveBtn(jobId) {
-  const btn = document.getElementById('jdmSaveBtn_' + jobId);
-  if (!btn) return;
-  const saved = await SavedJobs.isSaved(jobId);
-  btn.textContent = saved ? '♥' : '♡';
-  btn.style.color = saved ? 'var(--green)' : 'var(--muted)';
-  btn.style.borderColor = saved ? 'var(--green)' : 'var(--line2)';
-}
+function closeJobDetailModal() { closeApplyModalDirect(); }
+
 
 function closeJobDetailModal() {
   document.getElementById('jobDetailModal').classList.remove('open');
