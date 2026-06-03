@@ -1617,7 +1617,20 @@ const Auth = {
 
   async loadProfile() {
     if(!this._user || !db) return;
-    try { const { data } = await db.from('profiles').select('*').eq('id', this._user.id).single(); this._profile = data; } catch(e) {}
+    try {
+      const { data } = await db.from('profiles').select('*').eq('id', this._user.id).single();
+      const local = _loadProfileLocal() || {};
+      // DB wins for fields it has; localStorage fills gaps where DB has null/missing
+      this._profile = data ? {
+        ...data,
+        name: data.name || local.name || '',
+        city: data.city || local.city || '',
+        experience: data.experience || local.experience || '',
+      } : { name: local.name || '', city: local.city || '', experience: local.experience || '' };
+    } catch(e) {
+      const local = _loadProfileLocal() || {};
+      if (!this._profile) this._profile = { name: local.name || '', city: local.city || '', experience: local.experience || '' };
+    }
   },
 
   get() { return this._profile || (this._user ? { type:'seeker', name:this._user.user_metadata?.name || this._user.email?.split('@')[0], email:this._user.email } : null); },
@@ -4724,10 +4737,14 @@ function _loadProfileLocal() {
 
 function renderProfilePage() {
   const user = Auth.get();
-  // Merge DB profile with localStorage fallback so saved data always shows
   const dbProfile = Auth._profile || {};
   const local = _loadProfileLocal() || {};
-  const profile = { ...local, ...dbProfile }; // DB wins if both exist
+  // Non-null value from either source wins — DB null never wipes good localStorage data
+  const profile = {
+    name: dbProfile.name || local.name || '',
+    city: dbProfile.city || local.city || '',
+    experience: dbProfile.experience || local.experience || '',
+  };
 
   const v = id => document.getElementById(id);
   if (v('profName')) v('profName').value = profile.name || user?.name || '';
@@ -4768,14 +4785,15 @@ async function saveProfile() {
   Auth._profile.city = city;
   Auth._profile.experience = experience;
 
-  // 3. Try to save to Supabase DB (requires columns to exist — run SQL migration)
+  // 3. Persist to Supabase DB — update existing row (profile row created on signup)
   if (db && Auth._user) {
     try {
-      await db.from('profiles').upsert({
-        id: Auth._user.id,
-        email: Auth._user.email,
-        name, city, experience,
-      });
+      const { error } = await db.from('profiles').update({ name, city, experience }).eq('id', Auth._user.id);
+      if (error) {
+        // Row might not exist yet — upsert as fallback
+        const { error: err2 } = await db.from('profiles').upsert({ id: Auth._user.id, email: Auth._user.email, name, city, experience }, { onConflict: 'id' });
+        if (err2) console.warn('Profile DB save failed:', err2.message, '— data saved to localStorage only');
+      }
     } catch(e) { console.warn('Profile DB save (non-fatal):', e.message); }
   }
 
