@@ -7,7 +7,10 @@ export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).end('Method not allowed');
 
   try {
-    const body = req.body || {};
+    // Defensively parse body — Vercel usually does this but guard for edge cases
+    let body = req.body;
+    if (typeof body === 'string') { try { body = JSON.parse(body); } catch(e) { body = {}; } }
+    if (!body || typeof body !== 'object') body = {};
     const { tool } = body;
     if (!tool) return res.status(400).json({ error: 'Missing tool parameter' });
 
