@@ -22,9 +22,11 @@ export default async function handler(req, res) {
     // Validate resume text is actually readable before sending to Claude
     if (body.resume !== undefined) {
       const r = body.resume || '';
-      const readable = (r.match(/[A-Za-z][A-Za-z\s]{2,}/g) || []).join('').length;
-      if (r.length > 0 && readable / r.length < 0.4) {
-        return res.status(400).json({ error: 'Resume text appears corrupted or unreadable. Please re-upload your resume from My Dashboard.' });
+      const words = (r.match(/[A-Za-z][A-Za-z\s]{2,}/g) || []).join('');
+      const readable = words.length;
+      // Require >55% readable content AND at least 80 chars of readable words
+      if (r.length > 0 && (readable / r.length < 0.55 || readable < 80)) {
+        return res.status(400).json({ error: 'RESUME_CORRUPTED' });
       }
     }
 
@@ -116,6 +118,11 @@ JOB DESCRIPTION:\n${(jobDescription||'').slice(0,2500)}${background?'\nCANDIDATE
     let parsed;
     try { parsed = JSON.parse(objMatch[0]); }
     catch(e) { throw new Error('Invalid JSON from model'); }
+
+    // If Claude itself returned an error object (e.g. couldn't parse the resume), surface it as 400
+    if (parsed.error) {
+      return res.status(400).json({ error: 'RESUME_CORRUPTED' });
+    }
 
     return res.status(200).json(parsed);
 
