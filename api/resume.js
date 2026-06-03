@@ -31,46 +31,40 @@ export default async function handler(req, res) {
     if (tool === 'scanner') {
       const { job, company, resume, jobDescription } = body;
       if (!resume || !jobDescription) return res.status(400).json({ error: 'Resume and job description required' });
-      systemPrompt = 'You are an ATS resume scanner. Analyze resume fit for a job and return ONLY valid JSON with no markdown.';
-      prompt = `Analyze this resume against the job description. Return ONLY a JSON object:
+      systemPrompt = 'ATS scanner. Return ONLY valid JSON, no markdown.';
+      prompt = `Analyze resume vs job. Return ONLY this JSON:
 {"match_score":<0-100>,"score_summary":"<2 sentences>","missing_keywords":["..."],"strong_keywords":["..."],"specific_fixes":[{"current":"<bullet>","improved":"<rewrite>"}],"ghost_risk_note":"<1 sentence>"}
-
 JOB: ${job} at ${company}
-JOB DESCRIPTION:\n${(jobDescription||'').slice(0,3000)}
-RESUME:\n${(resume||'').slice(0,4000)}`;
+JD:\n${(jobDescription||'').slice(0,1500)}
+RESUME:\n${(resume||'').slice(0,2500)}`;
 
     } else if (tool === 'optimize') {
       const { job, company, resume, jobDescription } = body;
       if (!resume) return res.status(400).json({ error: 'Resume required' });
-      systemPrompt = 'You are a resume optimizer. Rewrite resume bullets to match job keywords and improve ATS score. Return ONLY valid JSON.';
-      prompt = `Optimize this resume for the job. Return ONLY a JSON object:
-{"optimized_bullets":[{"original":"<bullet>","optimized":"<rewrite with keywords>"}],"keywords_added":["..."]}
-
-Find 3-6 bullets that most need improvement.
-
+      systemPrompt = 'Resume optimizer. Return ONLY valid JSON, no markdown.';
+      prompt = `Rewrite 3-5 resume bullets to match job keywords. Return ONLY:
+{"optimized_bullets":[{"original":"<bullet>","optimized":"<improved>"}],"keywords_added":["..."]}
 JOB: ${job} at ${company}
-JOB DESCRIPTION:\n${(jobDescription||'').slice(0,2000)}
-RESUME:\n${(resume||'').slice(0,4000)}`;
+JD:\n${(jobDescription||'').slice(0,1200)}
+RESUME:\n${(resume||'').slice(0,2500)}`;
 
     } else if (tool === 'coach') {
       const { job, company, jobDescription, background } = body;
       if (!job || !company || !jobDescription) return res.status(400).json({ error: 'Job, company, and job description required' });
-      systemPrompt = 'You are a job application strategist. Return ONLY valid JSON.';
-      prompt = `Create an application playbook. Return ONLY a JSON object:
-{"hiring_manager_script":"<LinkedIn message>","timing_note":"<why apply fast>","company_intel":"<2-3 things about ${company}>","cover_letter_framework":"<3 paragraph framework>","referral_strategy":"<how to get referral>"}
-
+      systemPrompt = 'Job application strategist. Return ONLY valid JSON, no markdown.';
+      prompt = `Application playbook. Return ONLY:
+{"hiring_manager_script":"<LinkedIn message>","timing_note":"<1 sentence>","company_intel":"<2-3 facts about ${company}>","cover_letter_framework":"<3 paragraph outline>","referral_strategy":"<1 sentence>"}
 JOB: ${job} at ${company}
-JOB DESCRIPTION:\n${(jobDescription||'').slice(0,2500)}${background?'\nCANDIDATE:\n'+background.slice(0,1000):''}`;
+JD:\n${(jobDescription||'').slice(0,1500)}${background?'\nCANDIDATE:\n'+background.slice(0,600):''}`;
 
     } else if (tool === 'proposal') {
       const { job, company, jobDescription, background } = body;
       if (!job || !company || !jobDescription) return res.status(400).json({ error: 'Job, company, and job description required' });
-      systemPrompt = 'You are a career strategist. Return ONLY valid JSON.';
-      prompt = `Write a 30/60/90 day plan. Return ONLY a JSON object:
-{"day_30":"<30 day plan>","day_60":"<60 day plan>","day_90":"<90 day plan>","opening_note":"<1 sentence>"}
-
+      systemPrompt = 'Career strategist. Return ONLY valid JSON, no markdown.';
+      prompt = `30/60/90 day plan. Return ONLY:
+{"day_30":"<plan>","day_60":"<plan>","day_90":"<plan>","opening_note":"<1 sentence>"}
 JOB: ${job} at ${company}
-JOB DESCRIPTION:\n${(jobDescription||'').slice(0,2500)}${background?'\nCANDIDATE:\n'+background.slice(0,1000):''}`;
+JD:\n${(jobDescription||'').slice(0,1500)}${background?'\nCANDIDATE:\n'+background.slice(0,600):''}`;
 
     } else {
       return res.status(400).json({ error: 'Unknown tool: ' + tool });
@@ -78,7 +72,7 @@ JOB DESCRIPTION:\n${(jobDescription||'').slice(0,2500)}${background?'\nCANDIDATE
 
     const requestBody = JSON.stringify({
       model: 'claude-haiku-4-5-20251001',
-      max_tokens: 2000,
+      max_tokens: 1200,
       system: systemPrompt,
       messages: [{ role: 'user', content: prompt }],
     });
