@@ -293,19 +293,25 @@ nav{position:fixed;top:0;left:0;right:0;z-index:500;height:58px;display:flex;ali
 .jct{font-family:var(--mono);font-size:.68rem;color:var(--muted)}
 .jss{background:var(--card);border:1px solid var(--line2);border-radius:6px;padding:.33rem .68rem;font-family:var(--mono);font-size:.68rem;color:var(--sub);outline:none;cursor:pointer}
 .jlist{border:1px solid var(--line);border-radius:12px;overflow:hidden}
-.jlc{display:grid;grid-template-columns:1fr auto;gap:.85rem;align-items:center;padding:1.05rem 1.3rem;border-bottom:1px solid var(--line);cursor:pointer;transition:background .12s}
+.jlc{display:flex;flex-direction:column;padding:1.05rem 1.3rem;border-bottom:1px solid var(--line);cursor:pointer;transition:background .12s}
 .jlc:last-child{border-bottom:none}
 .jlc:hover{background:var(--raised)}
-.jlc-title{font-family:var(--display);font-size:.95rem;font-weight:700;color:var(--white);margin-bottom:.15rem;letter-spacing:-.02em}
-.jlc-co{font-size:.76rem;color:var(--dim);margin-bottom:.1rem;display:flex;align-items:center;gap:.38rem}
-.jlc-loc{font-family:var(--mono);font-size:.62rem;color:var(--blue);margin-bottom:.32rem}
-.jlc-meta{display:flex;gap:.5rem;flex-wrap:wrap;align-items:center}
-.jlc-mi{font-family:var(--mono);font-size:.6rem;color:var(--muted)}
-.jlc-r{display:flex;flex-direction:column;align-items:flex-end;gap:.22rem}
-.jlc-s{font-family:var(--mono);font-size:1.4rem;font-weight:500;line-height:1}
+.jlc-top{display:flex;align-items:flex-start;justify-content:space-between;gap:.75rem;margin-bottom:.3rem}
+.jlc-title{font-family:var(--display);font-size:.95rem;font-weight:700;color:var(--white);letter-spacing:-.02em;flex:1}
+.jlc-score-badge{display:flex;flex-direction:column;align-items:center;flex-shrink:0}
+.jlc-s{font-family:var(--mono);font-size:1.25rem;font-weight:500;line-height:1}
 .jlc-s.safe{color:var(--green)}.jlc-s.warn{color:var(--amber)}.jlc-s.danger{color:var(--red)}
-.jlc-sl{font-family:var(--mono);font-size:.52rem;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
+.jlc-sl{font-family:var(--mono);font-size:.48rem;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
+.jlc-co{font-size:.76rem;color:var(--dim);margin-bottom:.1rem}
+.jlc-loc{font-family:var(--mono);font-size:.62rem;color:var(--blue);margin-bottom:.32rem}
+.jlc-meta{display:flex;gap:.5rem;flex-wrap:wrap;align-items:center;margin-bottom:.65rem}
+.jlc-mi{font-family:var(--mono);font-size:.6rem;color:var(--muted)}
 .jlc-sal{font-family:var(--mono);font-size:.7rem;color:var(--green)}
+.jlc-actions{display:flex;gap:.5rem;align-items:center}
+.jlc-apply{flex:1;background:var(--green);color:var(--ink);border:none;border-radius:8px;padding:.6rem 1rem;font-family:var(--display);font-weight:800;font-size:.8rem;cursor:pointer;text-align:center;transition:opacity .15s}
+.jlc-apply:hover{opacity:.88}
+.jlc-save{background:none;border:1px solid var(--line2);color:var(--muted);border-radius:8px;padding:.6rem .75rem;font-size:.8rem;cursor:pointer;flex-shrink:0;transition:all .15s}
+.jlc-save:hover{border-color:var(--green);color:var(--green)}
 .jlc-waste-badge{font-family:var(--mono);font-size:.58rem}
 
 /* ═══ DEMAND MAP ═══ */
@@ -1980,34 +1986,40 @@ function renderJobResults(jobs, l) {
   listEl.innerHTML = '<div class="jlay">' + jobs.map(job => {
     const score = job.score || 65;
     const risk = Score.risk(score);
-    const wl = Score.wasteLabel(job.waste_score || 25);
     const safeId = 'srch_' + Math.random().toString(36).slice(2,8);
     const safeCompany = (job.company||'').replace(/['"\\]/g,'');
     const safeTitle = (job.title||'').replace(/['"\\]/g,'');
     const safeLoc = (job.location||l||'US').replace(/['"\\]/g,'');
-    const applyAction = job.url ? "window.open('" + job.url + "','_blank')" : "showToast('Search ' + encodeURIComponent('" + safeTitle + " at " + safeCompany + "') + ' on Google')";
+    const waste = job.waste_score || 25;
+    // Store the external URL on a temp job object so the modal can redirect after optimization
+    if (job.url || job.apply_url) {
+      const tempJob = JOBS.find(j => j.id === safeId);
+      if (!tempJob) JOBS.push({ id: safeId, _url: job.url || job.apply_url, co: safeCompany, title: safeTitle, city: safeLoc, score, waste, vibes: [job.description ? job.description.slice(0,80) : ('via ' + (job.source||'Job board'))] });
+    }
+    const applyAction = "openApplyModal('" + safeId + "','" + safeCompany + "','" + safeTitle + "','" + safeLoc + "'," + score + ",'" + Score.risk(score) + "'," + waste + ",'')";
     return '<div class="jlc">' +
-      '<div class="jlc-l">' +
-        '<div class="jlc-title">' + (job.title||'') + '</div>' +
-        '<div class="jlc-co">' + (job.company||'') + '</div>' +
-        '<div class="jlc-loc">📍 ' + (job.location||l||'US') + '</div>' +
-        (job.description ? '<div style="font-size:.72rem;color:var(--muted);margin-top:.3rem;line-height:1.55">' + job.description.slice(0,120) + '...</div>' : '') +
-        '<div class="jlc-meta" style="margin-top:.3rem">' +
-          '<span class="jlc-mi">' + (job.type||'Full-time') + '</span>' +
-          '<span class="jlc-mi">·</span>' +
-          '<span class="jlc-mi">' + (job.level||'Mid level') + '</span>' +
-          '<span class="jlc-mi">·</span>' +
-          '<span class="jlc-mi" style="color:var(--blue)">' + (job.source||'Job board') + '</span>' +
+      '<div class="jlc-top">' +
+        '<div style="flex:1">' +
+          '<div class="jlc-title">' + (job.title||'') + '</div>' +
+          '<div class="jlc-co">' + (job.company||'') + '</div>' +
+          '<div class="jlc-loc">📍 ' + (job.location||l||'US') + '</div>' +
+        '</div>' +
+        '<div class="jlc-score-badge">' +
+          '<div class="jlc-s ' + risk + '">' + score + '</div>' +
+          '<div class="jlc-sl">score</div>' +
         '</div>' +
       '</div>' +
-      '<div class="jlc-r">' +
-        '<div class="jlc-s ' + risk + '">' + score + '</div>' +
-        '<div class="jlc-sl">transparency</div>' +
-        '<div class="jlc-sal">' + (job.salary||'—') + '</div>' +
-        '<div style="display:flex;gap:.25rem;margin-top:.3rem">' +
-          '<button class="btn btn-ghost" style="font-size:.58rem;padding:.22rem .5rem" onclick="event.stopPropagation();toggleSaveJob(\'' + safeId + '\',\'' + safeCompany + '\',\'' + safeTitle + '\',\'' + safeLoc + '\',' + score + ')">♡</button>' +
-          '<button class="btn btn-green" style="font-size:.62rem;padding:.28rem .7rem" onclick="event.stopPropagation();' + applyAction + '">Apply →</button>' +
-        '</div>' +
+      (job.description ? '<div style="font-size:.72rem;color:var(--muted);margin-bottom:.4rem;line-height:1.5">' + job.description.slice(0,120) + '...</div>' : '') +
+      '<div class="jlc-meta">' +
+        '<span class="jlc-mi">' + (job.type||'Full-time') + '</span>' +
+        '<span class="jlc-mi">·</span>' +
+        '<span class="jlc-mi">' + (job.level||'Mid level') + '</span>' +
+        (job.salary ? '<span class="jlc-mi">·</span><span class="jlc-sal">' + job.salary + '</span>' : '') +
+        '<span class="jlc-mi">·</span><span class="jlc-mi" style="color:var(--blue)">' + (job.source||'Job board') + '</span>' +
+      '</div>' +
+      '<div class="jlc-actions">' +
+        '<button class="jlc-save" id="save_' + safeId + '" onclick="event.stopPropagation();toggleSaveJob(\'' + safeId + '\',\'' + safeCompany + '\',\'' + safeTitle + '\',\'' + safeLoc + '\',' + score + ')">♡</button>' +
+        '<button class="jlc-apply" onclick="event.stopPropagation();' + applyAction + '">Apply &amp; Optimize →</button>' +
       '</div>' +
     '</div>';
   }).join('') + '</div>';
@@ -2146,21 +2158,25 @@ async function loadJobs(){
     const risk=j.risk||Score.risk(j.score);
     const applyAct=`openApplyModal('${j.id}','${(j.co||'').replace(/'/g,"\\'")}','${(j.title||'').replace(/'/g,"\\'")}','${(j.city||'').replace(/'/g,"\\'")}',${j.score},'${risk}',${j.waste||25},'${j.apply_email||''}')`;
     return`<div class="jlc">
-      <div class="jlc-l">
-        <div class="jlc-title">${j.title}</div>
-        <div class="jlc-co">${j.co}</div>
-        <div class="jlc-loc">📍 ${j.loc||j.city}</div>
-        ${j.vibes?.[0]?`<div style="font-size:.72rem;color:var(--muted);margin-top:.3rem;line-height:1.55">${j.vibes[0]}</div>`:''}
-        <div class="jlc-meta" style="margin-top:.3rem"><span class="jlc-mi">${j.type}</span><span class="jlc-mi">·</span><span class="jlc-mi">${j.lvl}</span></div>
-      </div>
-      <div class="jlc-r">
-        <div class="jlc-s ${risk}">${j.score}</div>
-        <div class="jlc-sl">transparency</div>
-        <div class="jlc-sal">${j.sal}</div>
-        <div style="display:flex;gap:.25rem;margin-top:.3rem">
-          <button class="btn btn-ghost" style="font-size:.58rem;padding:.22rem .5rem" onclick="event.stopPropagation();toggleSaveJob('${j.id}','${(j.co||'').replace(/'/g,"\\'")}','${(j.title||'').replace(/'/g,"\\'")}','${(j.city||'').replace(/'/g,"\\'")}',${j.score})" id="save_${j.id}">♡</button>
-          <button class="btn btn-green" style="font-size:.62rem;padding:.28rem .7rem" onclick="event.stopPropagation();${applyAct}">Apply →</button>
+      <div class="jlc-top">
+        <div style="flex:1">
+          <div class="jlc-title">${j.title}</div>
+          <div class="jlc-co">${j.co}</div>
+          <div class="jlc-loc">📍 ${j.loc||j.city}</div>
         </div>
+        <div class="jlc-score-badge">
+          <div class="jlc-s ${risk}">${j.score}</div>
+          <div class="jlc-sl">score</div>
+        </div>
+      </div>
+      ${j.vibes?.[0]?`<div style="font-size:.72rem;color:var(--muted);margin-bottom:.4rem;line-height:1.5">${j.vibes[0]}</div>`:''}
+      <div class="jlc-meta">
+        <span class="jlc-mi">${j.type}</span><span class="jlc-mi">·</span><span class="jlc-mi">${j.lvl}</span>
+        ${j.sal&&j.sal!=='—'?`<span class="jlc-mi">·</span><span class="jlc-sal">${j.sal}</span>`:''}
+      </div>
+      <div class="jlc-actions">
+        <button class="jlc-save" id="save_${j.id}" onclick="event.stopPropagation();toggleSaveJob('${j.id}','${(j.co||'').replace(/'/g,"\\'")}','${(j.title||'').replace(/'/g,"\\'")}','${(j.city||'').replace(/'/g,"\\'")}',${j.score})">♡</button>
+        <button class="jlc-apply" onclick="event.stopPropagation();${applyAct}">Apply &amp; Optimize →</button>
       </div>
     </div>`;}).join('')+'</div>';
   setTimeout(initSaveButtons,100);
