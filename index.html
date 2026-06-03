@@ -293,19 +293,25 @@ nav{position:fixed;top:0;left:0;right:0;z-index:500;height:58px;display:flex;ali
 .jct{font-family:var(--mono);font-size:.68rem;color:var(--muted)}
 .jss{background:var(--card);border:1px solid var(--line2);border-radius:6px;padding:.33rem .68rem;font-family:var(--mono);font-size:.68rem;color:var(--sub);outline:none;cursor:pointer}
 .jlist{border:1px solid var(--line);border-radius:12px;overflow:hidden}
-.jlc{display:grid;grid-template-columns:1fr auto;gap:.85rem;align-items:center;padding:1.05rem 1.3rem;border-bottom:1px solid var(--line);cursor:pointer;transition:background .12s}
+.jlc{display:flex;flex-direction:column;padding:1.05rem 1.3rem;border-bottom:1px solid var(--line);cursor:pointer;transition:background .12s}
 .jlc:last-child{border-bottom:none}
 .jlc:hover{background:var(--raised)}
-.jlc-title{font-family:var(--display);font-size:.95rem;font-weight:700;color:var(--white);margin-bottom:.15rem;letter-spacing:-.02em}
-.jlc-co{font-size:.76rem;color:var(--dim);margin-bottom:.1rem;display:flex;align-items:center;gap:.38rem}
-.jlc-loc{font-family:var(--mono);font-size:.62rem;color:var(--blue);margin-bottom:.32rem}
-.jlc-meta{display:flex;gap:.5rem;flex-wrap:wrap;align-items:center}
-.jlc-mi{font-family:var(--mono);font-size:.6rem;color:var(--muted)}
-.jlc-r{display:flex;flex-direction:column;align-items:flex-end;gap:.22rem}
-.jlc-s{font-family:var(--mono);font-size:1.4rem;font-weight:500;line-height:1}
+.jlc-top{display:flex;align-items:flex-start;justify-content:space-between;gap:.75rem;margin-bottom:.3rem}
+.jlc-title{font-family:var(--display);font-size:.95rem;font-weight:700;color:var(--white);letter-spacing:-.02em;flex:1}
+.jlc-score-badge{display:flex;flex-direction:column;align-items:center;flex-shrink:0}
+.jlc-s{font-family:var(--mono);font-size:1.25rem;font-weight:500;line-height:1}
 .jlc-s.safe{color:var(--green)}.jlc-s.warn{color:var(--amber)}.jlc-s.danger{color:var(--red)}
-.jlc-sl{font-family:var(--mono);font-size:.52rem;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
+.jlc-sl{font-family:var(--mono);font-size:.48rem;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
+.jlc-co{font-size:.76rem;color:var(--dim);margin-bottom:.1rem}
+.jlc-loc{font-family:var(--mono);font-size:.62rem;color:var(--blue);margin-bottom:.32rem}
+.jlc-meta{display:flex;gap:.5rem;flex-wrap:wrap;align-items:center;margin-bottom:.65rem}
+.jlc-mi{font-family:var(--mono);font-size:.6rem;color:var(--muted)}
 .jlc-sal{font-family:var(--mono);font-size:.7rem;color:var(--green)}
+.jlc-actions{display:flex;gap:.5rem;align-items:center}
+.jlc-apply{flex:1;background:var(--green);color:var(--ink);border:none;border-radius:8px;padding:.6rem 1rem;font-family:var(--display);font-weight:800;font-size:.8rem;cursor:pointer;text-align:center;transition:opacity .15s}
+.jlc-apply:hover{opacity:.88}
+.jlc-save{background:none;border:1px solid var(--line2);color:var(--muted);border-radius:8px;padding:.6rem .75rem;font-size:.8rem;cursor:pointer;flex-shrink:0;transition:all .15s}
+.jlc-save:hover{border-color:var(--green);color:var(--green)}
 .jlc-waste-badge{font-family:var(--mono);font-size:.58rem}
 
 /* ═══ DEMAND MAP ═══ */
@@ -1440,7 +1446,10 @@ nav{position:fixed;top:0;left:0;right:0;z-index:500;height:58px;display:flex;ali
       <div style="padding:.85rem 1.25rem;border-bottom:1px solid var(--line);font-family:var(--mono);font-size:.62rem;color:var(--dim);text-transform:uppercase;letter-spacing:.08em">Job location</div>
       <div style="padding:1.25rem">
         <label style="font-family:var(--mono);font-size:.6rem;text-transform:uppercase;letter-spacing:.08em;color:var(--dim);display:block;margin-bottom:.4rem">Your city</label>
-        <input id="profCity" type="text" style="width:100%;background:var(--raised);border:1.5px solid var(--line2);border-radius:8px;padding:.7rem 1rem;color:var(--white);font-family:var(--body);font-size:.875rem;outline:none;caret-color:var(--green);box-sizing:border-box" onfocus="this.style.borderColor='var(--green)'" onblur="this.style.borderColor='var(--line2)'" placeholder="e.g. Los Angeles, CA"/>
+        <div style="position:relative">
+          <input id="profCity" type="text" autocomplete="off" style="width:100%;background:var(--raised);border:1.5px solid var(--line2);border-radius:8px;padding:.7rem 1rem;color:var(--white);font-family:var(--body);font-size:.875rem;outline:none;caret-color:var(--green);box-sizing:border-box" onfocus="this.style.borderColor='var(--green)'" onblur="this.style.borderColor='var(--line2)'" placeholder="e.g. Los Angeles, CA" oninput="debounceLocationSuggest(this.value,'profCitySuggestions')"/>
+          <div id="profCitySuggestions" style="position:absolute;z-index:200;background:var(--surface);border:1px solid var(--line2);border-radius:8px;width:100%;display:none;box-shadow:0 8px 24px rgba(0,0,0,.4);top:calc(100% + 4px);left:0"></div>
+        </div>
         <div style="font-family:var(--mono);font-size:.6rem;color:var(--muted);margin-top:.5rem">Used to auto-load nearby job listings on the Jobs page.</div>
       </div>
     </div>
@@ -1449,27 +1458,23 @@ nav{position:fixed;top:0;left:0;right:0;z-index:500;height:58px;display:flex;ali
     <div style="background:var(--surface);border:1px solid var(--line);border-radius:14px;overflow:hidden;margin-bottom:1.5rem">
       <div style="padding:.85rem 1.25rem;border-bottom:1px solid var(--line);font-family:var(--mono);font-size:.62rem;color:var(--dim);text-transform:uppercase;letter-spacing:.08em">Job preferences</div>
       <div style="padding:1.25rem">
-        <div style="margin-bottom:1rem">
-          <label style="font-family:var(--mono);font-size:.6rem;text-transform:uppercase;letter-spacing:.08em;color:var(--dim);display:block;margin-bottom:.4rem">Industry</label>
-          <select id="profIndustry" style="width:100%;background:var(--raised);border:1.5px solid var(--line2);border-radius:8px;padding:.7rem 1rem;color:var(--white);font-family:var(--body);font-size:.875rem;outline:none;appearance:none;cursor:pointer;box-sizing:border-box" onfocus="this.style.borderColor='var(--green)'" onblur="this.style.borderColor='var(--line2)'">
-            <option value="">— Select industry —</option>
-            <option value="tech">💻 Tech</option>
-            <option value="healthcare">🏥 Healthcare</option>
-            <option value="retail">🛍️ Food &amp; Retail</option>
-            <option value="logistics">📦 Logistics</option>
-            <option value="finance">💰 Finance</option>
-            <option value="other">✳️ Other</option>
-          </select>
-        </div>
-        <div>
-          <label style="font-family:var(--mono);font-size:.6rem;text-transform:uppercase;letter-spacing:.08em;color:var(--dim);display:block;margin-bottom:.4rem">Experience level</label>
-          <select id="profExperience" style="width:100%;background:var(--raised);border:1.5px solid var(--line2);border-radius:8px;padding:.7rem 1rem;color:var(--white);font-family:var(--body);font-size:.875rem;outline:none;appearance:none;cursor:pointer;box-sizing:border-box" onfocus="this.style.borderColor='var(--green)'" onblur="this.style.borderColor='var(--line2)'">
-            <option value="">— Select level —</option>
-            <option value="entry">🌱 Entry level (0–2 yrs)</option>
-            <option value="mid">📈 Mid level (3–6 yrs)</option>
-            <option value="senior">⭐ Senior (7+ yrs)</option>
-          </select>
-        </div>
+        <label style="font-family:var(--mono);font-size:.6rem;text-transform:uppercase;letter-spacing:.08em;color:var(--dim);display:block;margin-bottom:.4rem">Experience level</label>
+        <select id="profExperience" style="width:100%;background:var(--raised);border:1.5px solid var(--line2);border-radius:8px;padding:.7rem 1rem;color:var(--white);font-family:var(--body);font-size:.875rem;outline:none;appearance:none;cursor:pointer;box-sizing:border-box" onfocus="this.style.borderColor='var(--green)'" onblur="this.style.borderColor='var(--line2)'">
+          <option value="">— Select level —</option>
+          <option value="entry">🌱 Entry level (0–2 yrs)</option>
+          <option value="mid">📈 Mid level (3–6 yrs)</option>
+          <option value="senior">⭐ Senior (7+ yrs)</option>
+        </select>
+        <div style="font-family:var(--mono);font-size:.6rem;color:var(--muted);margin-top:.5rem">Use the search filter on the Jobs page to filter by industry.</div>
+      </div>
+    </div>
+
+    <!-- Account & Security -->
+    <div style="background:var(--surface);border:1px solid var(--line);border-radius:14px;overflow:hidden;margin-bottom:1.5rem">
+      <div style="padding:.85rem 1.25rem;border-bottom:1px solid var(--line);font-family:var(--mono);font-size:.62rem;color:var(--dim);text-transform:uppercase;letter-spacing:.08em">Account &amp; Security</div>
+      <div style="padding:1.25rem">
+        <div style="font-size:.78rem;color:var(--sub);margin-bottom:.75rem;line-height:1.6">To change your password, sign out and use "Forgot password" on the sign-in screen.</div>
+        <button onclick="doSignOut()" style="background:none;border:1px solid var(--line2);color:var(--muted);border-radius:8px;padding:.6rem 1.25rem;font-family:var(--mono);font-size:.72rem;cursor:pointer;width:100%">Sign out</button>
       </div>
     </div>
 
@@ -1981,34 +1986,40 @@ function renderJobResults(jobs, l) {
   listEl.innerHTML = '<div class="jlay">' + jobs.map(job => {
     const score = job.score || 65;
     const risk = Score.risk(score);
-    const wl = Score.wasteLabel(job.waste_score || 25);
     const safeId = 'srch_' + Math.random().toString(36).slice(2,8);
     const safeCompany = (job.company||'').replace(/['"\\]/g,'');
     const safeTitle = (job.title||'').replace(/['"\\]/g,'');
     const safeLoc = (job.location||l||'US').replace(/['"\\]/g,'');
-    const applyAction = job.url ? "window.open('" + job.url + "','_blank')" : "showToast('Search ' + encodeURIComponent('" + safeTitle + " at " + safeCompany + "') + ' on Google')";
+    const waste = job.waste_score || 25;
+    // Store the external URL on a temp job object so the modal can redirect after optimization
+    if (job.url || job.apply_url) {
+      const tempJob = JOBS.find(j => j.id === safeId);
+      if (!tempJob) JOBS.push({ id: safeId, _url: job.url || job.apply_url, co: safeCompany, title: safeTitle, city: safeLoc, score, waste, vibes: [job.description ? job.description.slice(0,80) : ('via ' + (job.source||'Job board'))] });
+    }
+    const applyAction = "openApplyModal('" + safeId + "','" + safeCompany + "','" + safeTitle + "','" + safeLoc + "'," + score + ",'" + Score.risk(score) + "'," + waste + ",'')";
     return '<div class="jlc">' +
-      '<div class="jlc-l">' +
-        '<div class="jlc-title">' + (job.title||'') + '</div>' +
-        '<div class="jlc-co">' + (job.company||'') + '</div>' +
-        '<div class="jlc-loc">📍 ' + (job.location||l||'US') + '</div>' +
-        (job.description ? '<div style="font-size:.72rem;color:var(--muted);margin-top:.3rem;line-height:1.55">' + job.description.slice(0,120) + '...</div>' : '') +
-        '<div class="jlc-meta" style="margin-top:.3rem">' +
-          '<span class="jlc-mi">' + (job.type||'Full-time') + '</span>' +
-          '<span class="jlc-mi">·</span>' +
-          '<span class="jlc-mi">' + (job.level||'Mid level') + '</span>' +
-          '<span class="jlc-mi">·</span>' +
-          '<span class="jlc-mi" style="color:var(--blue)">' + (job.source||'Job board') + '</span>' +
+      '<div class="jlc-top">' +
+        '<div style="flex:1">' +
+          '<div class="jlc-title">' + (job.title||'') + '</div>' +
+          '<div class="jlc-co">' + (job.company||'') + '</div>' +
+          '<div class="jlc-loc">📍 ' + (job.location||l||'US') + '</div>' +
+        '</div>' +
+        '<div class="jlc-score-badge">' +
+          '<div class="jlc-s ' + risk + '">' + score + '</div>' +
+          '<div class="jlc-sl">score</div>' +
         '</div>' +
       '</div>' +
-      '<div class="jlc-r">' +
-        '<div class="jlc-s ' + risk + '">' + score + '</div>' +
-        '<div class="jlc-sl">transparency</div>' +
-        '<div class="jlc-sal">' + (job.salary||'—') + '</div>' +
-        '<div style="display:flex;gap:.25rem;margin-top:.3rem">' +
-          '<button class="btn btn-ghost" style="font-size:.58rem;padding:.22rem .5rem" onclick="event.stopPropagation();toggleSaveJob(\'' + safeId + '\',\'' + safeCompany + '\',\'' + safeTitle + '\',\'' + safeLoc + '\',' + score + ')">♡</button>' +
-          '<button class="btn btn-green" style="font-size:.62rem;padding:.28rem .7rem" onclick="event.stopPropagation();' + applyAction + '">Apply →</button>' +
-        '</div>' +
+      (job.description ? '<div style="font-size:.72rem;color:var(--muted);margin-bottom:.4rem;line-height:1.5">' + job.description.slice(0,120) + '...</div>' : '') +
+      '<div class="jlc-meta">' +
+        '<span class="jlc-mi">' + (job.type||'Full-time') + '</span>' +
+        '<span class="jlc-mi">·</span>' +
+        '<span class="jlc-mi">' + (job.level||'Mid level') + '</span>' +
+        (job.salary ? '<span class="jlc-mi">·</span><span class="jlc-sal">' + job.salary + '</span>' : '') +
+        '<span class="jlc-mi">·</span><span class="jlc-mi" style="color:var(--blue)">' + (job.source||'Job board') + '</span>' +
+      '</div>' +
+      '<div class="jlc-actions">' +
+        '<button class="jlc-save" id="save_' + safeId + '" onclick="event.stopPropagation();toggleSaveJob(\'' + safeId + '\',\'' + safeCompany + '\',\'' + safeTitle + '\',\'' + safeLoc + '\',' + score + ')">♡</button>' +
+        '<button class="jlc-apply" onclick="event.stopPropagation();' + applyAction + '">Apply &amp; Optimize →</button>' +
       '</div>' +
     '</div>';
   }).join('') + '</div>';
@@ -2051,8 +2062,10 @@ async function loadJobs(){
 
   if(listEl)listEl.innerHTML='<div style="text-align:center;padding:3rem;font-family:var(--mono);font-size:.7rem;color:var(--muted)"><div class="spinner" style="margin:0 auto 1rem"></div>Loading listings...</div>';
 
-  // Effective location: input field > profile city > none (show all)
-  const profileCity=Auth._profile?.city||null;
+  // Effective location: input field > DB profile city > localStorage city > none
+  const dbCity = Auth._profile?.city || null;
+  const localCity = _loadProfileLocal()?.city || null;
+  const profileCity = dbCity || localCity;
   const effectiveLoc=locInput||profileCity;
 
   let jobs=[];
@@ -2145,21 +2158,25 @@ async function loadJobs(){
     const risk=j.risk||Score.risk(j.score);
     const applyAct=`openApplyModal('${j.id}','${(j.co||'').replace(/'/g,"\\'")}','${(j.title||'').replace(/'/g,"\\'")}','${(j.city||'').replace(/'/g,"\\'")}',${j.score},'${risk}',${j.waste||25},'${j.apply_email||''}')`;
     return`<div class="jlc">
-      <div class="jlc-l">
-        <div class="jlc-title">${j.title}</div>
-        <div class="jlc-co">${j.co}</div>
-        <div class="jlc-loc">📍 ${j.loc||j.city}</div>
-        ${j.vibes?.[0]?`<div style="font-size:.72rem;color:var(--muted);margin-top:.3rem;line-height:1.55">${j.vibes[0]}</div>`:''}
-        <div class="jlc-meta" style="margin-top:.3rem"><span class="jlc-mi">${j.type}</span><span class="jlc-mi">·</span><span class="jlc-mi">${j.lvl}</span></div>
-      </div>
-      <div class="jlc-r">
-        <div class="jlc-s ${risk}">${j.score}</div>
-        <div class="jlc-sl">transparency</div>
-        <div class="jlc-sal">${j.sal}</div>
-        <div style="display:flex;gap:.25rem;margin-top:.3rem">
-          <button class="btn btn-ghost" style="font-size:.58rem;padding:.22rem .5rem" onclick="event.stopPropagation();toggleSaveJob('${j.id}','${(j.co||'').replace(/'/g,"\\'")}','${(j.title||'').replace(/'/g,"\\'")}','${(j.city||'').replace(/'/g,"\\'")}',${j.score})" id="save_${j.id}">♡</button>
-          <button class="btn btn-green" style="font-size:.62rem;padding:.28rem .7rem" onclick="event.stopPropagation();${applyAct}">Apply →</button>
+      <div class="jlc-top">
+        <div style="flex:1">
+          <div class="jlc-title">${j.title}</div>
+          <div class="jlc-co">${j.co}</div>
+          <div class="jlc-loc">📍 ${j.loc||j.city}</div>
         </div>
+        <div class="jlc-score-badge">
+          <div class="jlc-s ${risk}">${j.score}</div>
+          <div class="jlc-sl">score</div>
+        </div>
+      </div>
+      ${j.vibes?.[0]?`<div style="font-size:.72rem;color:var(--muted);margin-bottom:.4rem;line-height:1.5">${j.vibes[0]}</div>`:''}
+      <div class="jlc-meta">
+        <span class="jlc-mi">${j.type}</span><span class="jlc-mi">·</span><span class="jlc-mi">${j.lvl}</span>
+        ${j.sal&&j.sal!=='—'?`<span class="jlc-mi">·</span><span class="jlc-sal">${j.sal}</span>`:''}
+      </div>
+      <div class="jlc-actions">
+        <button class="jlc-save" id="save_${j.id}" onclick="event.stopPropagation();toggleSaveJob('${j.id}','${(j.co||'').replace(/'/g,"\\'")}','${(j.title||'').replace(/'/g,"\\'")}','${(j.city||'').replace(/'/g,"\\'")}',${j.score})">♡</button>
+        <button class="jlc-apply" onclick="event.stopPropagation();${applyAct}">Apply &amp; Optimize →</button>
       </div>
     </div>`;}).join('')+'</div>';
   setTimeout(initSaveButtons,100);
@@ -3247,8 +3264,12 @@ function renderSurveyQuestion(){
   if(progress)progress.textContent=`${_surveyStep+1} of ${SURVEY.length}`;
   const el=document.getElementById('surveyQuestion');if(!el)return;
   if(q.type==='text'){
+    const isCityQ = q.id === 'city';
     el.innerHTML=`<div style="font-family:var(--display);font-size:1.25rem;font-weight:800;color:var(--white);letter-spacing:-.025em;margin-bottom:1.25rem;line-height:1.2">${q.q}</div>
-    <input id="surveyTextInput" type="text" placeholder="${q.placeholder}" style="width:100%;background:var(--surface);border:1.5px solid var(--line2);border-radius:8px;padding:.85rem 1rem;color:var(--white);font-family:var(--body);font-size:.9rem;outline:none;caret-color:var(--green);margin-bottom:1rem" onfocus="this.style.borderColor='var(--green)'" onblur="this.style.borderColor='var(--line2)'" onkeydown="if(event.key==='Enter')surveyAnswer(document.getElementById('surveyTextInput').value)"/>
+    <div style="position:relative;margin-bottom:1rem">
+      <input id="surveyTextInput" type="text" autocomplete="off" placeholder="${q.placeholder}" style="width:100%;background:var(--surface);border:1.5px solid var(--line2);border-radius:8px;padding:.85rem 1rem;color:var(--white);font-family:var(--body);font-size:.9rem;outline:none;caret-color:var(--green);box-sizing:border-box" onfocus="this.style.borderColor='var(--green)'" onblur="this.style.borderColor='var(--line2)'" onkeydown="if(event.key==='Enter')surveyAnswer(document.getElementById('surveyTextInput').value)" ${isCityQ?'oninput="debounceLocationSuggest(this.value,\'surveyCitySuggestions\')"':''}/>
+      ${isCityQ?'<div id="surveyCitySuggestions" style="position:absolute;z-index:200;background:var(--surface);border:1px solid var(--line2);border-radius:8px;width:100%;display:none;box-shadow:0 8px 24px rgba(0,0,0,.4);top:calc(100% + 4px);left:0"></div>':''}
+    </div>
     <button onclick="surveyAnswer(document.getElementById('surveyTextInput').value)" style="width:100%;padding:.85rem;background:var(--green);color:var(--ink);border:none;border-radius:8px;font-family:var(--display);font-weight:800;font-size:.9rem;cursor:pointer">Continue →</button>
     ${_surveyStep>0?`<button onclick="surveyBack()" style="width:100%;padding:.6rem;background:none;border:none;color:var(--muted);font-family:var(--mono);font-size:.65rem;cursor:pointer;margin-top:.5rem">← back</button>`:''}`;
   } else {
@@ -3518,7 +3539,10 @@ function go(page){
     if(page==='jobs'){
       // Pre-fill location from user profile if input is blank
       const locInp=document.getElementById('jobSearchLocation');
-      if(locInp&&!locInp.value&&Auth._profile?.city)locInp.value=Auth._profile.city;
+      if(locInp&&!locInp.value){
+        const c=Auth._profile?.city||_loadProfileLocal()?.city||'';
+        if(c)locInp.value=c;
+      }
       loadJobs();
     }
     if(page==='report')loadCommunityReports();
@@ -3608,8 +3632,13 @@ function showLocationSuggestions(results, listId) {
   list.style.display = 'block';
 }
 function selectLocation(value, listId) {
-  const inputId = listId === 'jobLocSuggestions' ? 'jobSearchLocation' : 'heroLoc';
-  const input = document.getElementById(inputId);
+  const inputMap = {
+    'jobLocSuggestions': 'jobSearchLocation',
+    'heroLocSuggestions': 'heroLoc',
+    'profCitySuggestions': 'profCity',
+    'surveyCitySuggestions': 'surveyTextInput',
+  };
+  const input = document.getElementById(inputMap[listId] || 'jobSearchLocation');
   if (input) { input.value = value; input.style.borderColor = 'var(--green)'; }
   hideSuggestions(listId);
 }
@@ -3620,6 +3649,8 @@ function hideSuggestions(listId) {
 document.addEventListener('click', e => {
   if (!e.target.closest('#jobLocSuggestions') && !e.target.closest('#jobSearchLocation')) hideSuggestions('jobLocSuggestions');
   if (!e.target.closest('#heroLocSuggestions') && !e.target.closest('#heroLoc')) hideSuggestions('heroLocSuggestions');
+  if (!e.target.closest('#profCitySuggestions') && !e.target.closest('#profCity')) hideSuggestions('profCitySuggestions');
+  if (!e.target.closest('#surveyCitySuggestions') && !e.target.closest('#surveyTextInput')) hideSuggestions('surveyCitySuggestions');
 });
 
 const HERO_LINES = [
@@ -4666,28 +4697,41 @@ function closeSideMenu() {
   document.getElementById('sideMenuOverlay').classList.remove('open');
 }
 
+function _profileLocalKey() {
+  return 'seen_profile_' + (Auth._user?.id || Auth._user?.email || 'guest');
+}
+
+function _saveProfileLocal(data) {
+  try { localStorage.setItem(_profileLocalKey(), JSON.stringify(data)); } catch(e) {}
+}
+
+function _loadProfileLocal() {
+  try { return JSON.parse(localStorage.getItem(_profileLocalKey()) || 'null'); } catch(e) { return null; }
+}
+
 function renderProfilePage() {
   const user = Auth.get();
-  const profile = Auth._profile;
+  // Merge DB profile with localStorage fallback so saved data always shows
+  const dbProfile = Auth._profile || {};
+  const local = _loadProfileLocal() || {};
+  const profile = { ...local, ...dbProfile }; // DB wins if both exist
+
   const v = id => document.getElementById(id);
-
-  if (v('profName')) v('profName').value = profile?.name || user?.name || '';
+  if (v('profName')) v('profName').value = profile.name || user?.name || '';
   if (v('profEmail')) v('profEmail').value = user?.email || '';
-  if (v('profCity')) v('profCity').value = profile?.city || '';
-  if (v('profIndustry')) v('profIndustry').value = profile?.industry || '';
-  if (v('profExperience')) v('profExperience').value = profile?.experience || '';
+  if (v('profCity')) v('profCity').value = profile.city || '';
+  if (v('profExperience')) v('profExperience').value = profile.experience || '';
 
-  // Show prompt banner if profile is incomplete
-  const incomplete = !profile?.city || !profile?.industry;
+  // Show banner if city is missing
   const existing = document.getElementById('profileIncompleteBanner');
   if (existing) existing.remove();
-  if (incomplete) {
+  if (!profile.city) {
     const banner = document.createElement('div');
     banner.id = 'profileIncompleteBanner';
     banner.style.cssText = 'background:var(--raised);border:1px solid var(--amber);border-radius:10px;padding:.85rem 1rem;font-family:var(--mono);font-size:.68rem;color:var(--amber);margin-bottom:1.25rem;line-height:1.65';
-    banner.innerHTML = '⚠ Fill in your city and industry so Seen can show you relevant jobs automatically.';
-    const firstCard = document.querySelector('#page-profile .page > div > div');
-    if (firstCard) firstCard.parentNode.insertBefore(banner, firstCard);
+    banner.innerHTML = '⚠ Add your city so Seen can auto-load nearby jobs.';
+    const saveBtn = document.getElementById('saveProfileBtn');
+    if (saveBtn) saveBtn.parentNode.insertBefore(banner, saveBtn);
   }
 }
 
@@ -4695,37 +4739,43 @@ async function saveProfile() {
   const btn = document.getElementById('saveProfileBtn');
   const name = (document.getElementById('profName')?.value || '').trim();
   const city = (document.getElementById('profCity')?.value || '').trim();
-  const industry = document.getElementById('profIndustry')?.value || '';
   const experience = document.getElementById('profExperience')?.value || '';
 
   if (!name) { showToast('Enter your name.'); return; }
 
   if (btn) { btn.textContent = 'Saving...'; btn.disabled = true; }
 
-  try {
-    if (db && Auth._user) {
+  // 1. Save to localStorage immediately — this always works
+  const localData = { name, city, experience, savedAt: Date.now() };
+  _saveProfileLocal(localData);
+
+  // 2. Patch Auth._profile in memory so jobs page picks it up right away
+  if (!Auth._profile) Auth._profile = {};
+  Auth._profile.name = name;
+  Auth._profile.city = city;
+  Auth._profile.experience = experience;
+
+  // 3. Try to save to Supabase DB (requires columns to exist — run SQL migration)
+  if (db && Auth._user) {
+    try {
       await db.from('profiles').upsert({
         id: Auth._user.id,
-        name,
-        city,
-        industry,
-        experience,
         email: Auth._user.email,
+        name, city, experience,
       });
-      await Auth.loadProfile();
-    }
-
-    // Also update the location input on the jobs page so it takes effect immediately
-    const locInp = document.getElementById('jobSearchLocation');
-    if (locInp && city) locInp.value = city;
-
-    showToast('Profile saved ✓');
-    if (btn) { btn.textContent = 'Save changes →'; btn.disabled = false; }
-  } catch (e) {
-    console.error('saveProfile:', e);
-    showToast('Could not save — try again.');
-    if (btn) { btn.textContent = 'Save changes →'; btn.disabled = false; }
+    } catch(e) { console.warn('Profile DB save (non-fatal):', e.message); }
   }
+
+  // 4. Update jobs page location input immediately
+  const locInp = document.getElementById('jobSearchLocation');
+  if (locInp && city) locInp.value = city;
+
+  showToast('Profile saved ✓');
+  if (btn) { btn.textContent = 'Save changes →'; btn.disabled = false; }
+
+  // Re-render banner state
+  const existing = document.getElementById('profileIncompleteBanner');
+  if (existing && city) existing.remove();
 }
 
 function renderSideMenu() {
