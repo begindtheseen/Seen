@@ -6,29 +6,34 @@ function toBase64(str) {
 function buildResumeHTML(text, name, role, company, optimizedBullets = [], keywords = [], wasOptimized = false) {
   if (!text || text.length < 50) return null;
 
+  const esc = s => (s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+
   const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
   const displayName = name || lines[0] || 'Applicant';
 
-  // First few lines that look like contact info (email, phone, city)
+  // First few lines that look like contact info (email, phone, city/state, LinkedIn)
   const contactLines = [];
-  let bodyStart = 1; // skip name line
-  for (let i = 1; i < Math.min(6, lines.length); i++) {
+  let bodyStart = 1;
+  for (let i = 1; i < Math.min(7, lines.length); i++) {
     const l = lines[i];
-    if (/@/.test(l) || /\d{3}[\-\.\s\(]\d{3}/.test(l) || /^[A-Za-z\s]+,\s*[A-Z]{2}/.test(l) || /linkedin\.com|github\.com/i.test(l)) {
-      contactLines.push(l);
-      bodyStart = i + 1;
-    } else if (contactLines.length > 0 && l.length < 80 && !/[A-Z]{4,}/.test(l)) {
-      contactLines.push(l);
-      bodyStart = i + 1;
-    } else {
-      break;
-    }
+    const isContact = /@/.test(l) || /\d{3}[\-\.\s\(]\d{3}/.test(l) ||
+      /^[A-Za-z\s]+,\s*[A-Z]{2}/.test(l) || /linkedin\.com|github\.com/i.test(l) ||
+      /^[\w\s,·\-\.\(\)@+]+$/.test(l) && l.length < 80;
+    if (isContact) { contactLines.push(l); bodyStart = i + 1; }
+    else if (contactLines.length > 0 && l.length < 100 && !/[A-Z]{3,}/.test(l)) {
+      contactLines.push(l); bodyStart = i + 1;
+    } else { break; }
   }
 
-  // Section header detection: ALL CAPS, short
-  const isSectionHeader = l => /^[A-Z][A-Z\s&\/\-]+$/.test(l) && l.length >= 3 && l.length < 50;
+  // Section header: ALL CAPS, short, no lowercase
+  const isSectionHeader = l => /^[A-Z][A-Z\s&\/\-]{2,}$/.test(l) && l.length < 50;
 
-  // Parse sections
+  // Job entry line: has em-dash or pipe AND a year/month/present keyword
+  const isJobLine = l =>
+    /(—|–|\|)/.test(l) &&
+    /(19|20)\d{2}|present|current|Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec/i.test(l);
+
+  // Parse into named sections
   const sections = [];
   let current = null;
   for (let i = bodyStart; i < lines.length; i++) {
@@ -37,13 +42,18 @@ function buildResumeHTML(text, name, role, company, optimizedBullets = [], keywo
       if (current) sections.push(current);
       current = { title: l, lines: [] };
     } else {
-      if (!current) current = { title: 'ABOUT', lines: [] };
+      if (!current) current = { title: 'SUMMARY', lines: [] };
       current.lines.push(l);
     }
   }
   if (current && current.lines.length) sections.push(current);
 
-  function formatSection(sectionLines) {
+  function formatSection(title, sectionLines) {
+    // Summary/About: render as a styled blockquote, not a list
+    if (/^(SUMMARY|ABOUT|PROFILE|OBJECTIVE|OVERVIEW)/.test(title)) {
+      return sectionLines.map(l => `<p class="sum">${esc(l)}</p>`).join('');
+    }
+
     let html = '';
     let inJob = false;
     let bulletBuffer = [];
@@ -56,26 +66,26 @@ function buildResumeHTML(text, name, role, company, optimizedBullets = [], keywo
     };
 
     for (const l of sectionLines) {
-      const isBullet = /^[•·\-\*→]/.test(l) || (/^\w/.test(l) && l.endsWith(';'));
-      // Job title lines: contain em-dash/pipe AND a date/location pattern
-      const isJobMeta = /(—|–|\|)/.test(l) && (/(19|20)\d{2}|present|current|Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec/i.test(l));
-      // Standalone bold-worthy header: no bullets, short, title-case or all-caps
-      const isSubHeader = !isBullet && !isJobMeta && l.length < 80 && /^[A-Z]/.test(l) && (/(—|–|\|)/.test(l) || /^[A-Z][a-z]/.test(l));
+      const hasBulletChar = /^[•·\-\*→]\s/.test(l);
+      const isJobMeta = isJobLine(l);
 
       if (isJobMeta) {
         flushBullets();
-        const parts = l.split(/—|–|\|/).map(p => p.trim());
-        html += `<div class="je"><div class="jt">${esc(parts[0])}</div><div class="jm">${esc(parts.slice(1).join(' · '))}</div>`;
+        if (inJob) html += '</div>';
+        const parts = l.split(/—|–|\|/).map(p => p.trim()).filter(Boolean);
+        const jobTitle = parts[0] || '';
+        const jobMeta = parts.slice(1).join(' · ');
+        html += `<div class="je"><div class="jt">${esc(jobTitle)}</div>${jobMeta ? `<div class="jm">${esc(jobMeta)}</div>` : ''}`;
         inJob = true;
-      } else if (isBullet) {
-        const txt = l.replace(/^[•·\-\*→]\s*/, '').trim();
-        bulletBuffer.push(txt);
-      } else if (isSubHeader && inJob) {
-        // part of previous job entry header continuation
-        html += `<div class="jm">${esc(l)}</div>`;
+      } else if (hasBulletChar) {
+        bulletBuffer.push(l.replace(/^[•·\-\*→]\s*/, '').trim());
+      } else if (inJob) {
+        // Inside a job entry, treat all non-meta lines as bullet points —
+        // extracted resume text rarely preserves bullet chars, so every
+        // responsibility/achievement line is an implicit bullet.
+        bulletBuffer.push(l);
       } else {
         flushBullets();
-        if (inJob) { html += '</div>'; inJob = false; }
         html += `<p>${esc(l)}</p>`;
       }
     }
@@ -83,8 +93,6 @@ function buildResumeHTML(text, name, role, company, optimizedBullets = [], keywo
     if (inJob) html += '</div>';
     return html;
   }
-
-  const esc = s => (s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 
   const highlightSection = wasOptimized && optimizedBullets.length ? `
     <div class="hl-box">
@@ -125,6 +133,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;m
 .hl-bl li{font-size:14px;color:#14532d;font-weight:500}
 .hl-bl li::before{color:#00c65a}
 p{color:#3d3d55;font-size:13.5px;margin-bottom:7px}
+.sum{color:#3d3d55;font-size:13.5px;line-height:1.7;margin-bottom:8px;padding:12px 16px;background:#f8f9fb;border-left:3px solid #00e676;border-radius:0 6px 6px 0}
 .ft{margin-top:36px;padding-top:14px;border-top:1px solid #eee;text-align:center;font-size:11px;color:#aaa}
 @media print{body{padding:28px 24px}}
 </style>
@@ -136,7 +145,7 @@ p{color:#3d3d55;font-size:13.5px;margin-bottom:7px}
   <div class="tag">${wasOptimized ? `AI-OPTIMIZED FOR ${esc(role.toUpperCase())}` : 'APPLIED VIA SEEN'}</div>
 </div>
 ${highlightSection}
-${sections.map(s => `<div class="sec"><div class="st">${esc(s.title)}</div>${formatSection(s.lines)}</div>`).join('')}
+${sections.map(s => `<div class="sec"><div class="st">${esc(s.title)}</div>${formatSection(s.title, s.lines)}</div>`).join('')}
 <div class="ft">Submitted via Seen · seenjobs.io · Transparent job applications</div>
 </body>
 </html>`;
