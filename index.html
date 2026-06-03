@@ -4375,72 +4375,109 @@ let _pendingApplication = null;
 // ═══════════════════════════════════════════════
 // JOB DETAIL MODAL (uses existing applyModal)
 // ═══════════════════════════════════════════════
+// Stores the current job detail so jdSaveToggle() can reference it without inline JS
+window._jdJob = null;
+
 function openJobDetailModal(jobId) {
   const sid = String(jobId);
   const j = JOBS.find(x => String(x.id) === sid);
+  window._jdJob = j ? { sid, j } : { sid, j: null };
 
-  const risk  = j ? (j.risk || Score.risk(j.score)) : 'warn';
-  const score = j ? (j.score || 65) : 65;
-  const waste = j ? (j.waste || 25) : 25;
-  const co    = j ? (j.co || '') : '';
-  const title = j ? (j.title || '') : '';
-  const loc   = j ? (j.city || j.loc || '') : '';
-  const applyEmail = j ? (j.apply_email || '') : '';
+  const co    = j ? (j.co    || '')                   : '';
+  const title = j ? (j.title || 'Job Listing')         : 'Job Listing';
+  const loc   = j ? (j.city  || j.loc || '')           : '';
+  const score = j ? (j.score || 65)                    : 65;
+  const waste = j ? (j.waste || 25)                    : 25;
+  const risk  = j ? (j.risk  || Score.risk(score))     : 'warn';
+  const type  = j ? (j.type  || 'Full-time')           : '';
+  const lvl   = j ? (j.lvl   || '')                    : '';
+  const sal   = j ? (j.sal && j.sal !== '—' ? j.sal : '') : '';
+  const desc  = j ? (j.description || (j.vibes && j.vibes[0]) || '') : '';
 
-  // Escape for JS string arguments inside onclick attrs
-  const esc = s => s.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
-  const applyArgs = `'${sid}','${esc(co)}','${esc(title)}','${esc(loc)}',${score},'${risk}',${waste},'${esc(applyEmail)}'`;
-
-  document.getElementById('applyModalTitle').textContent = title || 'Job Listing';
+  document.getElementById('applyModalTitle').textContent = title;
   document.getElementById('applyModalSub').textContent   = co + (loc ? ' · 📍 ' + loc : '');
 
-  const metaChips = j ? [
-    j.type || 'Full-time',
-    j.lvl  || '',
-    j.sal && j.sal !== '—' ? j.sal : null,
-  ].filter(Boolean).map(m =>
-    `<span style="background:var(--raised);border:1px solid var(--line2);border-radius:5px;padding:.18rem .5rem;font-size:.63rem;font-family:var(--mono);color:var(--sub)">${m}</span>`
-  ).join('') : '';
+  const body = document.getElementById('applyModalBody');
+  body.innerHTML = '';
 
-  const raw = j ? (j.description || (j.vibes||[])[0] || '') : '';
-  const descHtml = raw
-    ? raw.split(/\n+/).map(p => p.trim()).filter(Boolean)
-        .map(p => `<p style="margin:0 0 .65rem;line-height:1.7;color:var(--sub);font-size:.78rem">${p}</p>`).join('')
-    : '<p style="color:var(--muted);font-size:.78rem">No description available.</p>';
+  // ── Meta row ──
+  const meta = document.createElement('div');
+  meta.style.cssText = 'display:flex;align-items:center;gap:.65rem;padding-bottom:.9rem;margin-bottom:.9rem;border-bottom:1px solid var(--line)';
 
-  document.getElementById('applyModalBody').innerHTML = `
-    <div style="display:flex;align-items:center;gap:.75rem;margin-bottom:1rem;padding-bottom:1rem;border-bottom:1px solid var(--line)">
-      <div style="width:42px;height:42px;border-radius:9px;background:var(--raised);border:1px solid var(--line2);display:flex;align-items:center;justify-content:center;font-family:var(--display);font-weight:800;font-size:1.1rem;color:var(--white);flex-shrink:0">${(co||'?')[0].toUpperCase()}</div>
-      <div style="flex:1;min-width:0;display:flex;flex-wrap:wrap;gap:.3rem;align-items:center">${metaChips}</div>
-      <div style="text-align:center;flex-shrink:0">
-        <div class="sring ${risk}" style="width:38px;height:38px"><div class="sring-n" style="font-size:.8rem">${score}</div></div>
-        <div style="font-family:var(--mono);font-size:.48rem;color:var(--muted);margin-top:.15rem">score</div>
-      </div>
-    </div>
-    <div style="margin-bottom:1.25rem">${descHtml}</div>
-    <div style="display:flex;gap:.5rem;padding-top:.5rem;border-top:1px solid var(--line)">
-      <button id="jdSaveBtn_${sid}" onclick="(async()=>{await toggleSaveJob('${sid}','${esc(co)}','${esc(title)}','${esc(loc)}',${score});const b=document.getElementById('jdSaveBtn_${sid}');if(b){const s=await SavedJobs.isSaved('${sid}');b.textContent=s?'♥':'♡';b.style.color=s?'var(--green)':'var(--muted)';b.style.borderColor=s?'var(--green)':'var(--line2)';}})()" style="background:none;border:1px solid var(--line2);border-radius:8px;padding:.6rem .85rem;font-size:.85rem;cursor:pointer;color:var(--muted);flex-shrink:0;transition:all .15s">♡</button>
-      <button onclick="openApplyModal(${applyArgs})" style="flex:1;background:var(--green);color:var(--ink);border:none;border-radius:8px;padding:.6rem 1rem;font-family:var(--display);font-weight:800;font-size:.82rem;cursor:pointer">Apply &amp; Optimize →</button>
-    </div>`;
+  const logo = document.createElement('div');
+  logo.style.cssText = 'width:40px;height:40px;border-radius:8px;background:var(--raised);border:1px solid var(--line2);display:flex;align-items:center;justify-content:center;font-family:var(--display);font-weight:800;font-size:1rem;color:var(--white);flex-shrink:0';
+  logo.textContent = (co || '?')[0].toUpperCase();
 
-  // Set initial save state
-  SavedJobs.isSaved(sid).then(saved => {
-    const b = document.getElementById('jdSaveBtn_' + sid);
+  const chips = document.createElement('div');
+  chips.style.cssText = 'flex:1;display:flex;flex-wrap:wrap;gap:.3rem';
+  [type, lvl, sal].filter(Boolean).forEach(t => {
+    const s = document.createElement('span');
+    s.style.cssText = 'background:var(--raised);border:1px solid var(--line2);border-radius:5px;padding:.18rem .5rem;font-size:.63rem;font-family:var(--mono);color:var(--sub)';
+    s.textContent = t;
+    chips.appendChild(s);
+  });
+
+  const ring = document.createElement('div');
+  ring.style.cssText = 'text-align:center;flex-shrink:0';
+  ring.innerHTML = '<div class="sring ' + risk + '" style="width:36px;height:36px"><div class="sring-n" style="font-size:.78rem">' + score + '</div></div><div style="font-family:var(--mono);font-size:.45rem;color:var(--muted);margin-top:.15rem">score</div>';
+
+  meta.appendChild(logo);
+  meta.appendChild(chips);
+  meta.appendChild(ring);
+  body.appendChild(meta);
+
+  // ── Description ──
+  const descDiv = document.createElement('div');
+  descDiv.style.cssText = 'color:var(--sub);font-size:.78rem;line-height:1.75;margin-bottom:1.25rem;white-space:pre-wrap';
+  descDiv.textContent = desc || 'No description available.';
+  body.appendChild(descDiv);
+
+  // ── Action buttons ──
+  const acts = document.createElement('div');
+  acts.style.cssText = 'display:flex;gap:.5rem;padding-top:.75rem;border-top:1px solid var(--line)';
+
+  const saveBtn = document.createElement('button');
+  saveBtn.type = 'button';
+  saveBtn.id = 'jdSaveBtn';
+  saveBtn.style.cssText = 'background:none;border:1px solid var(--line2);border-radius:8px;padding:.6rem .9rem;font-size:.9rem;cursor:pointer;color:var(--muted);flex-shrink:0;transition:all .15s';
+  saveBtn.textContent = '♡';
+  saveBtn.addEventListener('click', jdSaveToggle);
+
+  const applyBtn = document.createElement('button');
+  applyBtn.type = 'button';
+  applyBtn.style.cssText = 'flex:1;background:var(--green);color:var(--ink);border:none;border-radius:8px;padding:.6rem 1rem;font-family:var(--display);font-weight:800;font-size:.82rem;cursor:pointer';
+  applyBtn.textContent = 'Apply & Optimize →';
+  applyBtn.addEventListener('click', function() {
+    closeApplyModalDirect();
+    setTimeout(function() { openApplyModal(sid, co, title, loc, score, risk, waste, j ? j.apply_email || '' : ''); }, 50);
+  });
+
+  acts.appendChild(saveBtn);
+  acts.appendChild(applyBtn);
+  body.appendChild(acts);
+
+  // Set initial save state async
+  SavedJobs.isSaved(sid).then(function(saved) {
+    const b = document.getElementById('jdSaveBtn');
     if (!b) return;
     b.textContent = saved ? '♥' : '♡';
-    b.style.color = saved ? 'var(--green)' : 'var(--muted)';
-    b.style.borderColor = saved ? 'var(--green)' : 'var(--line2)';
+    b.style.color = saved ? 'var(--green)' : '';
   });
 
   document.getElementById('applyModal').classList.add('open');
 }
 
-function closeJobDetailModal() { closeApplyModalDirect(); }
-
-
-function closeJobDetailModal() {
-  document.getElementById('jobDetailModal').classList.remove('open');
+async function jdSaveToggle() {
+  const d = window._jdJob;
+  if (!d) return;
+  const j = d.j;
+  await toggleSaveJob(d.sid, j ? j.co||'' : '', j ? j.title||'' : '', j ? j.city||j.loc||'' : '', j ? j.score||65 : 65);
+  const saved = await SavedJobs.isSaved(d.sid);
+  const b = document.getElementById('jdSaveBtn');
+  if (b) { b.textContent = saved ? '♥' : '♡'; b.style.color = saved ? 'var(--green)' : 'var(--muted)'; }
 }
+
+function closeJobDetailModal() { closeApplyModalDirect(); }
 
 function openApplyModal(jobId, company, role, location, score, risk, waste, applyEmail) {
   const job = JOBS.find(j => j.id == jobId);
