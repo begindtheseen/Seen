@@ -19,6 +19,15 @@ export default async function handler(req, res) {
 
     let prompt, systemPrompt;
 
+    // Validate resume text is actually readable before sending to Claude
+    if (body.resume !== undefined) {
+      const r = body.resume || '';
+      const readable = (r.match(/[A-Za-z][A-Za-z\s]{2,}/g) || []).join('').length;
+      if (r.length > 0 && readable / r.length < 0.4) {
+        return res.status(400).json({ error: 'Resume text appears corrupted or unreadable. Please re-upload your resume from My Dashboard.' });
+      }
+    }
+
     if (tool === 'scanner') {
       const { job, company, resume, jobDescription } = body;
       if (!resume || !jobDescription) return res.status(400).json({ error: 'Resume and job description required' });

@@ -1,50 +1,48 @@
-export const config = { runtime: 'edge' };
+export default async function handler(req, res) {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 
-export default async function handler(req) {
-  if (req.method === 'OPTIONS') return new Response(null, { status: 200, headers: {
-    'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Methods': 'POST, OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type'
-  }});
-  if (req.method !== 'POST') return new Response('Method not allowed', { status: 405 });
-
-  const headers = { 'Access-Control-Allow-Origin': '*', 'Content-Type': 'application/json' };
+  if (req.method === 'OPTIONS') return res.status(200).end();
+  if (req.method !== 'POST') return res.status(405).end('Method not allowed');
 
   try {
-    const formData = await req.formData();
-    const file = formData.get('file');
+    // Vercel provides formData via req.body for multipart — use raw approach
+    const contentType = req.headers['content-type'] || '';
+    if (!contentType.includes('multipart/form-data')) {
+      return res.status(400).json({ error: 'Multipart form required' });
+    }
 
-    if (!file) return new Response(JSON.stringify({ error: 'No file provided' }), { status: 400, headers });
+    // Read raw body as buffer
+    const chunks = [];
+    for await (const chunk of req) chunks.push(chunk);
+    const rawBody = Buffer.concat(chunks);
 
-    const fileName = file.name?.toLowerCase() || '';
-    const isPDF = fileName.endsWith('.pdf') || file.type === 'application/pdf';
-    const isWord = fileName.endsWith('.docx') || fileName.endsWith('.doc') ||
-                   file.type?.includes('word') || file.type?.includes('officedocument');
+    // Extract boundary
+    const boundaryMatch = contentType.match(/boundary=([^\s;]+)/);
+    if (!boundaryMatch) return res.status(400).json({ error: 'No boundary in multipart' });
+    const boundary = boundaryMatch[1];
+
+    // Parse the multipart body to get the file
+    const { fileName, fileBuffer, mimeType } = parseMultipart(rawBody, boundary);
+    if (!fileBuffer) return res.status(400).json({ error: 'No file provided' });
+
+    const nameLower = (fileName || '').toLowerCase();
+    const isPDF = nameLower.endsWith('.pdf') || mimeType?.includes('pdf');
+    const isWord = nameLower.endsWith('.docx') || nameLower.endsWith('.doc') ||
+                   mimeType?.includes('word') || mimeType?.includes('officedocument');
 
     if (!isPDF && !isWord) {
-      return new Response(JSON.stringify({ error: 'Only PDF and Word documents (.pdf, .doc, .docx) are supported.' }), { status: 400, headers });
+      return res.status(400).json({ error: 'Only PDF and Word documents (.pdf, .doc, .docx) are supported.' });
     }
-
-    if (file.size > 10 * 1024 * 1024) {
-      return new Response(JSON.stringify({ error: 'File too large. Max 10MB.' }), { status: 400, headers });
+    if (fileBuffer.length > 10 * 1024 * 1024) {
+      return res.status(400).json({ error: 'File too large. Max 10MB.' });
     }
-
-    const arrayBuffer = await file.arrayBuffer();
-    const bytes = new Uint8Array(arrayBuffer);
-
-    // Convert to base64
-    let binary = '';
-    const chunkSize = 8192;
-    for (let i = 0; i < bytes.length; i += chunkSize) {
-      const chunk = bytes.subarray(i, i + chunkSize);
-      binary += String.fromCharCode(...chunk);
-    }
-    const base64 = btoa(binary);
 
     let extractedText = '';
 
     if (isPDF) {
-      // Claude supports PDF natively
+      const base64 = fileBuffer.toString('base64');
       const response = await fetch('https://api.anthropic.com/v1/messages', {
         method: 'POST',
         headers: {
@@ -58,14 +56,8 @@ export default async function handler(req) {
           messages: [{
             role: 'user',
             content: [
-              {
-                type: 'document',
-                source: { type: 'base64', media_type: 'application/pdf', data: base64 }
-              },
-              {
-                type: 'text',
-                text: 'Extract ALL text from this resume. Preserve the structure — job titles, companies, dates, bullet points, skills, education. Output the raw text only, no commentary.'
-              }
+              { type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: base64 } },
+              { type: 'text', text: 'Extract ALL text from this resume. Preserve structure — job titles, companies, dates, bullets, skills, education. Output raw text only, no commentary.' }
             ]
           }]
         })
@@ -73,19 +65,17 @@ export default async function handler(req) {
 
       if (!response.ok) {
         const errText = await response.text();
-        throw new Error(`PDF extraction failed: ${response.status} ${errText}`);
+        throw new Error('PDF extraction failed: ' + response.status + ' ' + errText.slice(0, 100));
       }
       const data = await response.json();
       extractedText = data.content?.[0]?.text || '';
 
     } else if (isWord) {
-      // Word docs (.docx) are ZIP files containing XML
-      // We'll extract the text from the XML manually
-      extractedText = await extractWordText(bytes);
+      extractedText = extractWordText(fileBuffer);
 
-      // If we got meaningful text, great. Otherwise fall back to Claude text extraction
-      if (!extractedText || extractedText.length < 100) {
-        // Try asking Claude to interpret the raw content
+      // If extraction yielded too little, send to Claude as fallback
+      if (!extractedText || extractedText.length < 150) {
+        const base64 = fileBuffer.toString('base64');
         const response = await fetch('https://api.anthropic.com/v1/messages', {
           method: 'POST',
           headers: {
@@ -98,66 +88,94 @@ export default async function handler(req) {
             max_tokens: 4000,
             messages: [{
               role: 'user',
-              content: `This is raw content extracted from a Word document resume (base64): ${base64.substring(0, 2000)}...
-              
-Based on any readable text you can find, reconstruct the resume content. If you cannot extract meaningful text, return "UNREADABLE".`
+              content: 'This is a Word document resume in base64. Extract all readable text from it, preserving structure. Only return the extracted text, nothing else.\n\nBase64: ' + base64.slice(0, 4000)
             }]
           })
         });
-        const data = await response.json();
-        const result = data.content?.[0]?.text || '';
-        if (result !== 'UNREADABLE') extractedText = result;
+        if (response.ok) {
+          const data = await response.json();
+          const result = data.content?.[0]?.text || '';
+          if (result && result.length > 100 && result !== 'UNREADABLE') extractedText = result;
+        }
       }
     }
 
+    // Validate the extracted text is actually readable
     if (!extractedText || extractedText.length < 50) {
-      return new Response(JSON.stringify({ 
-        error: 'Could not extract text. Make sure the file contains readable text (not a scanned image). Try saving as PDF and uploading that instead.' 
-      }), { status: 422, headers });
+      return res.status(422).json({ error: 'Could not extract readable text. Make sure the file contains selectable text (not a scanned image). Try exporting as PDF.' });
     }
 
-    return new Response(JSON.stringify({
-      ok: true,
-      text: extractedText,
-      fileName: file.name,
-      fileType: isPDF ? 'pdf' : 'word',
-      wordCount: extractedText.split(/\s+/).filter(w => w.length > 0).length
-    }), { status: 200, headers });
+    const readableChars = (extractedText.match(/[A-Za-z][A-Za-z\s]{2,}/g) || []).join('').length;
+    if (readableChars / extractedText.length < 0.35) {
+      return res.status(422).json({ error: 'Extracted text appears garbled. Try exporting your resume as PDF and uploading that instead.' });
+    }
+
+    const wordCount = extractedText.split(/\s+/).filter(w => w.length > 0).length;
+    return res.status(200).json({ ok: true, text: extractedText, fileName, fileType: isPDF ? 'pdf' : 'word', wordCount });
 
   } catch(err) {
     console.error('Parse resume error:', err.message);
-    return new Response(JSON.stringify({ error: err.message }), { status: 500, headers });
+    return res.status(500).json({ error: err.message });
   }
 }
 
-// Extract text from .docx (which is a ZIP containing word/document.xml)
-async function extractWordText(bytes) {
+function parseMultipart(buffer, boundary) {
+  const boundaryBuf = Buffer.from('--' + boundary);
+  const parts = [];
+  let start = 0;
+
+  while (start < buffer.length) {
+    const boundaryIdx = buffer.indexOf(boundaryBuf, start);
+    if (boundaryIdx === -1) break;
+    const headerStart = boundaryIdx + boundaryBuf.length + 2; // skip \r\n
+    const headerEnd = buffer.indexOf(Buffer.from('\r\n\r\n'), headerStart);
+    if (headerEnd === -1) break;
+    const headers = buffer.slice(headerStart, headerEnd).toString();
+    const dataStart = headerEnd + 4;
+    const nextBoundary = buffer.indexOf(boundaryBuf, dataStart);
+    const dataEnd = nextBoundary === -1 ? buffer.length : nextBoundary - 2; // strip \r\n before boundary
+    parts.push({ headers, data: buffer.slice(dataStart, dataEnd) });
+    start = nextBoundary === -1 ? buffer.length : nextBoundary;
+  }
+
+  for (const part of parts) {
+    const cdMatch = part.headers.match(/Content-Disposition:[^\r\n]*/i);
+    if (!cdMatch) continue;
+    const isFile = /filename=/i.test(cdMatch[0]);
+    if (!isFile) continue;
+    const fnMatch = cdMatch[0].match(/filename="?([^";\r\n]+)"?/i);
+    const fileName = fnMatch ? fnMatch[1].trim() : 'resume';
+    const ctMatch = part.headers.match(/Content-Type:\s*([^\r\n]+)/i);
+    const mimeType = ctMatch ? ctMatch[1].trim() : '';
+    return { fileName, fileBuffer: part.data, mimeType };
+  }
+  return { fileName: null, fileBuffer: null, mimeType: null };
+}
+
+function extractWordText(buffer) {
   try {
-    // Look for the XML content between <w:t> tags in the raw bytes
-    const decoder = new TextDecoder('utf-8', { fatal: false });
-    const raw = decoder.decode(bytes);
-    
-    // docx files contain XML - extract all text between <w:t> tags
-    const matches = raw.match(/<w:t[^>]*>([^<]+)<\/w:t>/g) || [];
-    const texts = matches.map(m => m.replace(/<[^>]+>/g, '').trim()).filter(t => t.length > 0);
-    
-    if (texts.length > 10) {
-      return texts.join(' ').replace(/\s+/g, ' ').trim();
+    // docx is a ZIP file — find word/document.xml content inside
+    const raw = buffer.toString('latin1');
+
+    // Look for XML content with <w:t> tags (standard docx format)
+    const xmlMatches = raw.match(/<w:t[^>]*>([^<]+)<\/w:t>/g) || [];
+    if (xmlMatches.length > 5) {
+      const texts = xmlMatches.map(m => m.replace(/<[^>]+>/g, '').trim()).filter(t => t.length > 0);
+      const joined = texts.join(' ').replace(/\s+/g, ' ').trim();
+      if (joined.length > 100) return joined;
     }
 
-    // Also try extracting readable ASCII text directly
+    // Fallback: extract long runs of readable ASCII
     let readable = '';
     for (let i = 0; i < raw.length; i++) {
-      const code = raw.charCodeAt(i);
-      if ((code >= 32 && code <= 126) || code === 10 || code === 13) {
+      const c = raw.charCodeAt(i);
+      if ((c >= 32 && c <= 126) || c === 9 || c === 10 || c === 13) {
         readable += raw[i];
       }
     }
-    
-    // Find sequences of readable text (at least 4 chars)
-    const sequences = readable.match(/[A-Za-z][A-Za-z0-9 ,.\-@()&/]{3,}/g) || [];
-    return sequences.join(' ').replace(/\s+/g, ' ').trim();
-    
+    // Filter to sequences that look like words (at least 3 alphabetic chars)
+    const words = readable.match(/[A-Za-z]{3,}(?:[A-Za-z0-9 ,.!?:;@()\-/&'"\n\t]*)/g) || [];
+    return words.join(' ').replace(/\s+/g, ' ').trim();
   } catch(e) {
     return '';
   }

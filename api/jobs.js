@@ -1,17 +1,19 @@
-export const config = { runtime: 'edge' };
+export default async function handler(req, res) {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 
-export default async function handler(req) {
-  if (req.method === 'OPTIONS') return new Response(null, { status: 200, headers: {
-    'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Methods': 'POST, OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type'
-  }});
+  if (req.method === 'OPTIONS') return res.status(200).end();
+  if (req.method !== 'POST') return res.status(405).end('Method not allowed');
 
   const headers = { 'Access-Control-Allow-Origin': '*', 'Content-Type': 'application/json' };
 
   try {
-    const { query, location, radius } = await req.json();
-    if (!query) return new Response(JSON.stringify({ error: 'No query' }), { status: 400, headers });
+    let body = req.body;
+    if (typeof body === 'string') { try { body = JSON.parse(body); } catch(e) { body = {}; } }
+    if (!body || typeof body !== 'object') body = {};
+    const { query, location, radius } = body;
+    if (!query) return res.status(400).json({ error: 'No query' });
 
     const loc = (location || '').trim();
     const radiusMiles = radius || 25;
@@ -21,19 +23,23 @@ export default async function handler(req) {
       'Search multiple times if needed. Always return at least 8 results.',
       'If the exact city has few results, include nearby cities or remote options.',
       'Return ONLY a valid JSON array with no markdown, no explanation:',
-      '[{"title":"...","company":"...","location":"City, State","salary":"$Xk-$Yk or null","url":"apply URL","description":"2-3 sentences","type":"Full-time","level":"Mid level","source":"LinkedIn/Indeed/etc"}]'
+      '[{"title":"...","company":"...","location":"City, State","salary":"$Xk-$Yk or null","url":"apply URL","description":"3-5 sentences describing the role, key responsibilities, and requirements","type":"Full-time","level":"Mid level","source":"LinkedIn/Indeed/etc"}]'
     ].join('\n');
 
     const userPrompt = loc
       ? 'Find open ' + query + ' jobs within ' + radiusMiles + ' miles of ' + loc + '. Search LinkedIn, Indeed, Greenhouse, Lever, Workday. Do multiple searches. Return at least 8 results. If not enough nearby, include remote options.'
       : 'Find open ' + query + ' jobs in the US or remote. Search LinkedIn, Indeed, Greenhouse, Lever. Return at least 8 results.';
 
+    const ANTHROPIC_KEY = process.env.ANTHROPIC_KEY;
+    if (!ANTHROPIC_KEY) return res.status(500).json({ error: 'ANTHROPIC_KEY not configured', jobs: [] });
+
     const apiRes = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'x-api-key': process.env.ANTHROPIC_KEY,
+        'x-api-key': ANTHROPIC_KEY,
         'anthropic-version': '2023-06-01',
+        'anthropic-beta': 'web-search-2025-03-05',
       },
       body: JSON.stringify({
         model: 'claude-haiku-4-5-20251001',
@@ -63,11 +69,11 @@ export default async function handler(req) {
     jobs = jobs.map(j => ({ ...j, score: scoreJob(j), waste_score: wasteScore(j) }));
     jobs.sort((a, b) => b.score - a.score);
 
-    return new Response(JSON.stringify({ ok: true, jobs, query, location: loc }), { status: 200, headers });
+    return res.status(200).json({ ok: true, jobs, query, location: loc });
 
   } catch(err) {
     console.error('Jobs error:', err.message);
-    return new Response(JSON.stringify({ error: err.message, jobs: [] }), { status: 500, headers });
+    return res.status(500).json({ error: err.message, jobs: [] });
   }
 }
 
