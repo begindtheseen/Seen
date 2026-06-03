@@ -1088,6 +1088,38 @@ nav{position:fixed;top:0;left:0;right:0;z-index:500;height:58px;display:flex;ali
         </select>
         <button onclick="searchJobs()" style="padding:.65rem 1.25rem;background:var(--green);color:var(--ink);border:none;border-radius:8px;font-family:var(--display);font-weight:800;font-size:.84rem;cursor:pointer;white-space:nowrap">Search →</button>
       </div>
+      <!-- Filter bar — DB only, no API calls -->
+      <div style="display:flex;gap:.4rem;flex-wrap:wrap;margin-top:.6rem;align-items:center">
+        <span style="font-family:var(--mono);font-size:.58rem;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-right:.2rem">Filter:</span>
+        <select id="filterNiche" onchange="applyJobFilters()" style="background:var(--surface);border:1px solid var(--line2);border-radius:7px;padding:.4rem .65rem;color:var(--sub);font-family:var(--mono);font-size:.68rem;outline:none;cursor:pointer">
+          <option value="">Any industry</option>
+          <option value="tech">Tech / Software</option>
+          <option value="healthcare">Healthcare</option>
+          <option value="retail">Retail / Food Service</option>
+          <option value="logistics">Logistics / Warehouse</option>
+          <option value="finance">Finance</option>
+          <option value="other">Other</option>
+        </select>
+        <select id="filterLevel" onchange="applyJobFilters()" style="background:var(--surface);border:1px solid var(--line2);border-radius:7px;padding:.4rem .65rem;color:var(--sub);font-family:var(--mono);font-size:.68rem;outline:none;cursor:pointer">
+          <option value="">Any level</option>
+          <option value="entry">Entry level</option>
+          <option value="mid">Mid level</option>
+          <option value="senior">Senior</option>
+        </select>
+        <select id="filterType" onchange="applyJobFilters()" style="background:var(--surface);border:1px solid var(--line2);border-radius:7px;padding:.4rem .65rem;color:var(--sub);font-family:var(--mono);font-size:.68rem;outline:none;cursor:pointer">
+          <option value="">Any type</option>
+          <option value="Full-time">Full-time</option>
+          <option value="Part-time">Part-time</option>
+          <option value="Contract">Contract</option>
+        </select>
+        <select id="filterPosted" onchange="applyJobFilters()" style="background:var(--surface);border:1px solid var(--line2);border-radius:7px;padding:.4rem .65rem;color:var(--sub);font-family:var(--mono);font-size:.68rem;outline:none;cursor:pointer">
+          <option value="">Any time</option>
+          <option value="1">Last 24 hours</option>
+          <option value="7">Last week</option>
+          <option value="30">Last month</option>
+        </select>
+        <button onclick="clearJobFilters()" id="clearFiltersBtn" style="display:none;background:none;border:none;font-family:var(--mono);font-size:.62rem;color:var(--muted);cursor:pointer;padding:.4rem .5rem">✕ Clear</button>
+      </div>
     </div>
     <div>
       <div class="jtb"><div class="jct" id="jobsCt">Enter a search above →</div><select class="jss" id="jobsSort" onchange="sortSearchResults()"><option>By transparency</option><option>Lowest waste risk</option><option>Most recent</option></select></div>
@@ -1591,7 +1623,8 @@ const Auth = {
             return;
           }
 
-          const surveyDone = this._profile?.survey_completed === true ||
+          const surveyDone = localStorage.getItem('_seen_survey_done') === '1' ||
+            this._profile?.survey_completed === true ||
             (() => { try { const s = this._profile?.onboarding_survey; if(!s) return false; const o = typeof s==='string'?JSON.parse(s):s; return o && Object.keys(o).length > 0; } catch(e) { return false; } })();
 
           if(!surveyDone && this.isSeeker()) { go('login'); startSurvey(); return; }
@@ -2128,6 +2161,93 @@ function _normalizeDbJob(j){
     vibes:[(j.description||'').slice(0,80)||`via ${j.source||'Job board'}`],
     description:j.description||'',
   };
+}
+
+const NICHE_KEYWORDS = {
+  tech:       ['software','developer','engineer','data','cloud','devops','product manager','IT','SaaS','QA','frontend','backend'],
+  healthcare: ['nurse','medical','health','hospital','clinical','patient','dental','pharmacy','therapist','RN','CNA','EMT'],
+  retail:     ['retail','sales','customer service','food','restaurant','cashier','store','bartender','server','barista','associate'],
+  logistics:  ['warehouse','logistics','driver','delivery','supply chain','shipping','forklift','distribution','dispatcher'],
+  finance:    ['finance','accounting','bank','insurance','financial','audit','tax','payroll','bookkeeping','analyst'],
+  other:      [],
+};
+
+function _hasActiveFilters(){
+  return ['filterNiche','filterLevel','filterType','filterPosted'].some(id=>{
+    const el=document.getElementById(id);
+    return el&&el.value!=='';
+  });
+}
+
+function clearJobFilters(){
+  ['filterNiche','filterLevel','filterType','filterPosted'].forEach(id=>{
+    const el=document.getElementById(id);
+    if(el)el.value='';
+  });
+  const btn=document.getElementById('clearFiltersBtn');
+  if(btn)btn.style.display='none';
+  loadJobs();
+}
+
+async function applyJobFilters(){
+  const niche   = document.getElementById('filterNiche')?.value   || '';
+  const level   = document.getElementById('filterLevel')?.value   || '';
+  const type    = document.getElementById('filterType')?.value    || '';
+  const posted  = document.getElementById('filterPosted')?.value  || '';
+  const clearBtn= document.getElementById('clearFiltersBtn');
+  const hasFilters = niche||level||type||posted;
+  if(clearBtn)clearBtn.style.display=hasFilters?'':'none';
+
+  // No filters active — fall back to normal load
+  if(!hasFilters){loadJobs();return;}
+
+  const listEl  = document.getElementById('jobsList');
+  const countEl = document.getElementById('jobsCt');
+  if(listEl)listEl.innerHTML='<div style="text-align:center;padding:3rem;font-family:var(--mono);font-size:.7rem;color:var(--muted)"><div class="spinner" style="margin:0 auto 1rem"></div>Filtering...</div>';
+
+  let jobs=[];
+  if(db){
+    try{
+      let q=db.from('jobs').select('*').gt('expires_at',new Date().toISOString()).order('score',{ascending:false}).limit(100);
+
+      // Level filter
+      if(level) q=q.ilike('level','%'+level+'%');
+
+      // Type filter
+      if(type) q=q.ilike('type','%'+type+'%');
+
+      // Posted-within filter
+      if(posted){
+        const cutoff=new Date(Date.now()-parseInt(posted)*24*60*60*1000).toISOString();
+        q=q.gte('created_at',cutoff);
+      }
+
+      // Niche filter — keyword OR across job title
+      if(niche&&NICHE_KEYWORDS[niche]?.length){
+        const kws=NICHE_KEYWORDS[niche];
+        q=q.or(kws.map(k=>'title.ilike.%'+k+'%').join(','));
+      }
+
+      // Also respect current location from search bar
+      const locInput=(document.getElementById('jobSearchLocation')?.value||'').trim();
+      if(locInput){
+        const parts=locInput.split(',').map(p=>p.trim());
+        const city=parts[0];const state=(parts[1]||'').trim();
+        if(state) q=q.or('location.ilike.%'+city+'%,location.ilike.%'+state+'%');
+        else q=q.ilike('location','%'+city+'%');
+      }
+
+      const{data}=await q;
+      if(data?.length){
+        jobs=data.map(_normalizeDbJob);
+        JOBS.splice(0,JOBS.length,...jobs,...FALLBACK_JOBS);
+      }
+    }catch(e){console.warn('applyJobFilters:',e);}
+  }
+
+  if(countEl)countEl.textContent=jobs.length?`${jobs.length} filtered results`:'No matches';
+  if(!jobs.length&&listEl)listEl.innerHTML='<div style="text-align:center;padding:3rem;font-family:var(--mono);font-size:.72rem;color:var(--muted)">No listings match those filters. Try broadening your search.</div>';
+  else renderJobResults(jobs, document.getElementById('jobSearchLocation')?.value||'');
 }
 
 async function loadJobs(){
@@ -3261,7 +3381,8 @@ async function checkVerification(){
   if(error||!user){showToast('Not signed in. Try again.');showStep('signin');return;}
   if(!user.email_confirmed_at){showToast("Haven't received your verification yet. Click the link in your email first.");return;}
   await Auth.loadProfile();
-  const surveyDone = Auth._profile?.survey_completed === true ||
+  const surveyDone = localStorage.getItem('_seen_survey_done') === '1' ||
+    Auth._profile?.survey_completed === true ||
     (() => { try { const s = Auth._profile?.onboarding_survey; if(!s) return false; const o = typeof s==='string'?JSON.parse(s):s; return o && Object.keys(o).length > 0; } catch(e) { return false; } })();
   if(!surveyDone){startSurvey();}
   else{updateNav();renderSeekerDash();go('seeker-dash');}
@@ -3404,6 +3525,7 @@ async function completeSurvey(){
         situation: _surveyAnswers.situation || null,
         frustration: _surveyAnswers.frustration || null,
       });
+      localStorage.setItem('_seen_survey_done', '1');
       await Auth.loadProfile(); // reload so survey_completed is in memory
     }
   } catch(e) { console.warn('Survey save:', e); }
@@ -3648,6 +3770,12 @@ function go(page){
       if(locInp&&!locInp.value){
         const c=Auth._profile?.city||_loadProfileLocal()?.city||'';
         if(c)locInp.value=c;
+      }
+      // Pre-fill niche filter from profile industry (only if user hasn't changed it)
+      const nicheEl=document.getElementById('filterNiche');
+      if(nicheEl&&nicheEl.value===''){
+        const ind=Auth._profile?.industry||_loadProfileLocal()?.industry||'';
+        if(ind&&nicheEl.querySelector(`option[value="${ind}"]`))nicheEl.value=ind;
       }
       loadJobs();
     }
