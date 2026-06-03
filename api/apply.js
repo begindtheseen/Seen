@@ -1,27 +1,17 @@
-export const config = { runtime: 'edge' };
-
-// Encode text as base64 for email attachments (edge-runtime safe)
 function toBase64(str) {
-  const bytes = new TextEncoder().encode(str);
-  let binary = '';
-  for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
-  return btoa(binary);
+  return Buffer.from(str, 'utf-8').toString('base64');
 }
 
-export default async function handler(req) {
-  if (req.method === 'OPTIONS') {
-    return new Response(null, { status: 200, headers: {
-      'Access-Control-Allow-Origin': '*',
-      'Access-Control-Allow-Methods': 'POST, OPTIONS',
-      'Access-Control-Allow-Headers': 'Content-Type'
-    }});
-  }
-  if (req.method !== 'POST') return new Response('Method not allowed', { status: 405 });
+export default async function handler(req, res) {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 
-  const headers = { 'Access-Control-Allow-Origin': '*', 'Content-Type': 'application/json' };
+  if (req.method === 'OPTIONS') return res.status(200).end();
+  if (req.method !== 'POST') return res.status(405).end('Method not allowed');
 
   try {
-    const { applicantName, applicantEmail, role, company, location, resumeLink, resumeText: rawResumeText, coverNote, applyEmail } = await req.json();
+    const { applicantName, applicantEmail, role, company, location, resumeLink, resumeText: rawResumeText, coverNote, applyEmail } = req.body || {};
 
     // Reject binary/docx XML — only attach if it looks like human-readable text
     const isReadable = t => t && t.length > 20 && !/(word\/|\.xml|docProps|rels\/|PK\x03)/.test(t.slice(0, 500));
@@ -142,10 +132,10 @@ ${coverNote ? `<p>Note: ${coverNote}</p>` : ''}
     const failed = results.filter(r => r.status === 'rejected');
     if (failed.length) console.error('Some emails failed:', failed);
 
-    return new Response(JSON.stringify({ ok: true }), { status: 200, headers });
+    return res.status(200).json({ ok: true });
 
   } catch (err) {
     console.error('Apply error:', err.message);
-    return new Response(JSON.stringify({ error: err.message }), { status: 500, headers });
+    return res.status(500).json({ error: err.message });
   }
 }

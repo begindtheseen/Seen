@@ -1,110 +1,67 @@
-export const config = { runtime: 'edge' };
+export default async function handler(req, res) {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 
-export default async function handler(req) {
-  if (req.method === 'OPTIONS') return new Response(null, { status: 200, headers: {
-    'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Methods': 'POST, OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type'
-  }});
-  if (req.method !== 'POST') return new Response('Method not allowed', { status: 405 });
-
-  const headers = { 'Access-Control-Allow-Origin': '*', 'Content-Type': 'application/json' };
+  if (req.method === 'OPTIONS') return res.status(200).end();
+  if (req.method !== 'POST') return res.status(405).end('Method not allowed');
 
   try {
-    const body = await req.json();
+    const body = req.body || {};
     const { tool } = body;
-
-    if (!tool) return new Response(JSON.stringify({ error: 'Missing tool parameter' }), { status: 400, headers });
+    if (!tool) return res.status(400).json({ error: 'Missing tool parameter' });
 
     const ANTHROPIC_KEY = process.env.ANTHROPIC_KEY;
-    if (!ANTHROPIC_KEY) throw new Error('ANTHROPIC_KEY not configured');
+    if (!ANTHROPIC_KEY) return res.status(500).json({ error: 'ANTHROPIC_KEY not configured' });
 
     let prompt, systemPrompt;
 
     if (tool === 'scanner') {
       const { job, company, resume, jobDescription } = body;
-      if (!resume || !jobDescription) return new Response(JSON.stringify({ error: 'Resume and job description required' }), { status: 400, headers });
-
+      if (!resume || !jobDescription) return res.status(400).json({ error: 'Resume and job description required' });
       systemPrompt = 'You are an ATS resume scanner. Analyze resume fit for a job and return ONLY valid JSON with no markdown.';
       prompt = `Analyze this resume against the job description. Return ONLY a JSON object:
-{
-  "match_score": <0-100 integer>,
-  "score_summary": "<2 sentences on overall fit>",
-  "missing_keywords": ["<keyword>", ...],
-  "strong_keywords": ["<keyword>", ...],
-  "specific_fixes": [{"current": "<bullet from resume>", "improved": "<rewritten bullet>"}, ...],
-  "ghost_risk_note": "<1 sentence on ghost risk for ${company || 'this company'}>"
-}
+{"match_score":<0-100>,"score_summary":"<2 sentences>","missing_keywords":["..."],"strong_keywords":["..."],"specific_fixes":[{"current":"<bullet>","improved":"<rewrite>"}],"ghost_risk_note":"<1 sentence>"}
 
 JOB: ${job} at ${company}
-JOB DESCRIPTION:
-${(jobDescription || '').slice(0, 3000)}
-
-RESUME:
-${(resume || '').slice(0, 4000)}`;
+JOB DESCRIPTION:\n${(jobDescription||'').slice(0,3000)}
+RESUME:\n${(resume||'').slice(0,4000)}`;
 
     } else if (tool === 'optimize') {
       const { job, company, resume, jobDescription } = body;
-      if (!resume) return new Response(JSON.stringify({ error: 'Resume required' }), { status: 400, headers });
-
+      if (!resume) return res.status(400).json({ error: 'Resume required' });
       systemPrompt = 'You are a resume optimizer. Rewrite resume bullets to match job keywords and improve ATS score. Return ONLY valid JSON.';
       prompt = `Optimize this resume for the job. Return ONLY a JSON object:
-{
-  "optimized_bullets": [
-    {"original": "<original bullet>", "optimized": "<rewritten bullet with keywords>"},
-    ...
-  ],
-  "keywords_added": ["<keyword1>", "<keyword2>", ...]
-}
+{"optimized_bullets":[{"original":"<bullet>","optimized":"<rewrite with keywords>"}],"keywords_added":["..."]}
 
-Find 3-6 bullets that most need improvement. Add relevant keywords from the job description.
+Find 3-6 bullets that most need improvement.
 
 JOB: ${job} at ${company}
-JOB DESCRIPTION:
-${(jobDescription || '').slice(0, 2000)}
-
-RESUME:
-${(resume || '').slice(0, 4000)}`;
+JOB DESCRIPTION:\n${(jobDescription||'').slice(0,2000)}
+RESUME:\n${(resume||'').slice(0,4000)}`;
 
     } else if (tool === 'coach') {
       const { job, company, jobDescription, background } = body;
-      if (!job || !company || !jobDescription) return new Response(JSON.stringify({ error: 'Job, company, and job description required' }), { status: 400, headers });
-
-      systemPrompt = 'You are a job application strategist. Give actionable, specific advice. Return ONLY valid JSON.';
-      prompt = `Create an application playbook for this candidate. Return ONLY a JSON object:
-{
-  "hiring_manager_script": "<LinkedIn message template to find/reach hiring manager, 3-4 sentences>",
-  "timing_note": "<why applying in first 24-48 hours matters, specific to this role/company>",
-  "company_intel": "<2-3 key things to know about ${company}'s culture/hiring based on the JD>",
-  "cover_letter_framework": "<3-paragraph framework: hook, body, close — specific to this role>",
-  "referral_strategy": "<how to get a referral at ${company}, specific steps>"
-}
+      if (!job || !company || !jobDescription) return res.status(400).json({ error: 'Job, company, and job description required' });
+      systemPrompt = 'You are a job application strategist. Return ONLY valid JSON.';
+      prompt = `Create an application playbook. Return ONLY a JSON object:
+{"hiring_manager_script":"<LinkedIn message>","timing_note":"<why apply fast>","company_intel":"<2-3 things about ${company}>","cover_letter_framework":"<3 paragraph framework>","referral_strategy":"<how to get referral>"}
 
 JOB: ${job} at ${company}
-JOB DESCRIPTION:
-${(jobDescription || '').slice(0, 2500)}
-${background ? '\nCANDIDATE BACKGROUND:\n' + background.slice(0, 1000) : ''}`;
+JOB DESCRIPTION:\n${(jobDescription||'').slice(0,2500)}${background?'\nCANDIDATE:\n'+background.slice(0,1000):''}`;
 
     } else if (tool === 'proposal') {
       const { job, company, jobDescription, background } = body;
-      if (!job || !company || !jobDescription) return new Response(JSON.stringify({ error: 'Job, company, and job description required' }), { status: 400, headers });
-
-      systemPrompt = 'You are a career strategist. Write a compelling 30/60/90 day plan. Return ONLY valid JSON.';
-      prompt = `Write a 30/60/90 day plan for a candidate applying for this role. Return ONLY a JSON object:
-{
-  "day_30": "<First 30 days plan — learning, onboarding, quick wins. 3-4 specific bullet points as a string with newlines>",
-  "day_60": "<Days 31-60 — contributing, building relationships, first projects. 3-4 specific points>",
-  "day_90": "<Days 61-90 — leading initiatives, measurable impact, strategy. 3-4 specific points>",
-  "opening_note": "<1 sentence framing why this candidate is ready to hit the ground running>"
-}
+      if (!job || !company || !jobDescription) return res.status(400).json({ error: 'Job, company, and job description required' });
+      systemPrompt = 'You are a career strategist. Return ONLY valid JSON.';
+      prompt = `Write a 30/60/90 day plan. Return ONLY a JSON object:
+{"day_30":"<30 day plan>","day_60":"<60 day plan>","day_90":"<90 day plan>","opening_note":"<1 sentence>"}
 
 JOB: ${job} at ${company}
-JOB DESCRIPTION:
-${(jobDescription || '').slice(0, 2500)}
-${background ? '\nCANDIDATE BACKGROUND:\n' + background.slice(0, 1000) : ''}`;
+JOB DESCRIPTION:\n${(jobDescription||'').slice(0,2500)}${background?'\nCANDIDATE:\n'+background.slice(0,1000):''}`;
 
     } else {
-      return new Response(JSON.stringify({ error: 'Unknown tool: ' + tool }), { status: 400, headers });
+      return res.status(400).json({ error: 'Unknown tool: ' + tool });
     }
 
     const apiRes = await fetch('https://api.anthropic.com/v1/messages', {
@@ -118,8 +75,8 @@ ${background ? '\nCANDIDATE BACKGROUND:\n' + background.slice(0, 1000) : ''}`;
         model: 'claude-haiku-4-5-20251001',
         max_tokens: 2000,
         system: systemPrompt,
-        messages: [{ role: 'user', content: prompt }]
-      })
+        messages: [{ role: 'user', content: prompt }],
+      }),
     });
 
     if (!apiRes.ok) {
@@ -129,7 +86,6 @@ ${background ? '\nCANDIDATE BACKGROUND:\n' + background.slice(0, 1000) : ''}`;
 
     const apiData = await apiRes.json();
     const text = (apiData.content || []).filter(b => b.type === 'text').map(b => b.text).join('');
-
     const clean = text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
     const objMatch = clean.match(/\{[\s\S]*\}/);
     if (!objMatch) throw new Error('No JSON in response');
@@ -138,10 +94,10 @@ ${background ? '\nCANDIDATE BACKGROUND:\n' + background.slice(0, 1000) : ''}`;
     try { parsed = JSON.parse(objMatch[0]); }
     catch(e) { throw new Error('Invalid JSON from model'); }
 
-    return new Response(JSON.stringify(parsed), { status: 200, headers });
+    return res.status(200).json(parsed);
 
   } catch(err) {
     console.error('Resume API error:', err.message);
-    return new Response(JSON.stringify({ error: err.message }), { status: 500, headers });
+    return res.status(500).json({ error: err.message });
   }
 }

@@ -1,7 +1,9 @@
 {
   "functions": {
     "api/refresh-jobs.js": { "maxDuration": 60 },
-    "api/fetch-location-jobs.js": { "maxDuration": 30 }
+    "api/fetch-location-jobs.js": { "maxDuration": 30 },
+    "api/resume.js": { "maxDuration": 30 },
+    "api/apply.js": { "maxDuration": 30 }
   },
   "crons": [
     { "path": "/api/refresh-jobs", "schedule": "0 2 * * *" },
