@@ -1,9 +1,9 @@
-export const config = { runtime: 'edge' };
+// Node.js serverless — no edge runtime, supports maxDuration in vercel.json
+// 50 searches split into 5 batches of 10, one batch per cron run (5× daily)
+// Each batch completes in ~5s well under the 60s maxDuration
 
-// 50 Adzuna searches per cron run — covers major US metros + categories
-// 250 free calls/day × 50 results = up to 12,500 real listings per day
 const ALL_SEARCHES = [
-  // Healthcare
+  // Batch 0 — 2am UTC — Healthcare
   { what: 'Registered Nurse', where: 'Los Angeles, CA' },
   { what: 'Registered Nurse', where: 'New York, NY' },
   { what: 'Registered Nurse', where: 'Chicago, IL' },
@@ -11,15 +11,12 @@ const ALL_SEARCHES = [
   { what: 'Registered Nurse', where: 'Phoenix, AZ' },
   { what: 'Medical Assistant', where: 'Los Angeles, CA' },
   { what: 'Medical Assistant', where: 'Dallas, TX' },
-  { what: 'Medical Assistant', where: 'Phoenix, AZ' },
   { what: 'Physical Therapist', where: 'Los Angeles, CA' },
-  { what: 'Physical Therapist', where: 'Chicago, IL' },
   { what: 'LVN', where: 'Orange County, CA' },
   { what: 'CNA', where: 'New York, NY' },
+  // Batch 1 — 6am UTC — Healthcare cont + Tech
   { what: 'CNA', where: 'Atlanta, GA' },
-  { what: 'Clinical Research Coordinator', where: 'Boston, MA' },
   { what: 'Social Worker', where: 'New York, NY' },
-  // Tech
   { what: 'Software Engineer', where: 'San Francisco, CA' },
   { what: 'Software Engineer', where: 'Seattle, WA' },
   { what: 'Software Engineer', where: 'Austin, TX' },
@@ -28,36 +25,54 @@ const ALL_SEARCHES = [
   { what: 'Data Analyst', where: 'New York, NY' },
   { what: 'Data Analyst', where: 'Chicago, IL' },
   { what: 'Data Analyst', where: 'Remote' },
+  // Batch 2 — 10am UTC — Tech cont + Finance
   { what: 'Product Manager', where: 'San Francisco, CA' },
   { what: 'UX Designer', where: 'New York, NY' },
   { what: 'UX Designer', where: 'Remote' },
   { what: 'DevOps Engineer', where: 'Remote' },
-  // Business / Finance
   { what: 'Financial Analyst', where: 'New York, NY' },
   { what: 'Financial Analyst', where: 'Chicago, IL' },
   { what: 'Marketing Manager', where: 'New York, NY' },
   { what: 'Marketing Manager', where: 'Los Angeles, CA' },
+  { what: 'Accountant', where: 'Boston, MA' },
+  { what: 'Business Analyst', where: 'Chicago, IL' },
+  // Batch 3 — 2pm UTC — Business + Logistics
   { what: 'Project Manager', where: 'Remote' },
   { what: 'Project Manager', where: 'Houston, TX' },
   { what: 'Operations Manager', where: 'Dallas, TX' },
-  { what: 'Accountant', where: 'Boston, MA' },
   { what: 'HR Manager', where: 'Atlanta, GA' },
-  { what: 'Business Analyst', where: 'Chicago, IL' },
   { what: 'Sales Representative', where: 'Miami, FL' },
   { what: 'Sales Representative', where: 'Remote' },
-  // Logistics / Trades
   { what: 'Warehouse Associate', where: 'Los Angeles, CA' },
   { what: 'Warehouse Associate', where: 'Chicago, IL' },
   { what: 'CDL Truck Driver', where: 'Dallas, TX' },
   { what: 'CDL Truck Driver', where: 'Houston, TX' },
+  // Batch 4 — 6pm UTC — Trades + Service
   { what: 'Electrician', where: 'Phoenix, AZ' },
   { what: 'Construction Manager', where: 'Denver, CO' },
-  // Retail / Service
   { what: 'Customer Service Representative', where: 'Remote' },
   { what: 'Restaurant Manager', where: 'Miami, FL' },
   { what: 'Teacher', where: 'Los Angeles, CA' },
   { what: 'Teacher', where: 'Chicago, IL' },
+  { what: 'Medical Assistant', where: 'Phoenix, AZ' },
+  { what: 'Physical Therapist', where: 'Chicago, IL' },
+  { what: 'Clinical Research Coordinator', where: 'Boston, MA' },
+  { what: 'Customer Service Representative', where: 'New York, NY' },
 ];
+
+const BATCH_HOURS = [2, 6, 10, 14, 18]; // UTC hours matching cron schedule
+const BATCH_SIZE = 10;
+
+function getCurrentBatch() {
+  const hour = new Date().getUTCHours();
+  // Find closest scheduled hour, default batch 0
+  let best = 0, bestDiff = 99;
+  BATCH_HOURS.forEach((h, i) => {
+    const diff = Math.abs(hour - h);
+    if (diff < bestDiff) { bestDiff = diff; best = i; }
+  });
+  return best;
+}
 
 function formatSalary(min, max) {
   if (!min && !max) return null;
@@ -100,8 +115,14 @@ async function fetchAdzuna(what, where, appId, appKey) {
   url.searchParams.set('results_per_page', '50');
   url.searchParams.set('sort_by', 'date');
 
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 8000); // 8s per call max
   try {
-    const res = await fetch(url.toString(), { headers: { Accept: 'application/json' } });
+    const res = await fetch(url.toString(), {
+      headers: { Accept: 'application/json' },
+      signal: controller.signal,
+    });
+    clearTimeout(timeout);
     if (!res.ok) return [];
     const data = await res.json();
     return (data.results || []).map(j => ({
@@ -120,6 +141,7 @@ async function fetchAdzuna(what, where, appId, appKey) {
       expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
     })).filter(j => j.company !== 'Unknown' && j.apply_url);
   } catch (e) {
+    clearTimeout(timeout);
     console.warn('Adzuna fetch error:', e.message);
     return [];
   }
@@ -151,17 +173,15 @@ async function deleteExpired(supabaseUrl, serviceKey) {
   });
 }
 
-export default async function handler(req) {
+export default async function handler(req, res) {
   const headers = { 'Content-Type': 'application/json' };
 
   const cronSecret = process.env.CRON_SECRET;
   if (cronSecret) {
-    const auth = req.headers.get('authorization') || '';
-    const url = new URL(req.url);
-    const querySecret = url.searchParams.get('secret') || '';
-    // Accept secret via Authorization header (Vercel cron) OR ?secret= query param (browser trigger)
-    if (auth !== `Bearer ${cronSecret}` && querySecret !== cronSecret) {
-      return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers });
+    const authHeader = req.headers['authorization'] || '';
+    const querySecret = new URL(req.url, 'https://x').searchParams.get('secret') || '';
+    if (authHeader !== `Bearer ${cronSecret}` && querySecret !== cronSecret) {
+      return res.status(401).json({ error: 'Unauthorized' });
     }
   }
 
@@ -171,25 +191,26 @@ export default async function handler(req) {
   const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY;
 
   if (!ADZUNA_APP_ID || !ADZUNA_APP_KEY) {
-    return new Response(JSON.stringify({ error: 'Missing ADZUNA_APP_ID or ADZUNA_APP_KEY env vars. Sign up free at developer.adzuna.com' }), { status: 500, headers });
+    return res.status(500).json({ error: 'Missing ADZUNA_APP_ID or ADZUNA_APP_KEY' });
   }
   if (!SUPABASE_URL || !SUPABASE_SERVICE_KEY) {
-    return new Response(JSON.stringify({ error: 'Missing SUPABASE_URL or SUPABASE_SERVICE_KEY' }), { status: 500, headers });
+    return res.status(500).json({ error: 'Missing SUPABASE_URL or SUPABASE_SERVICE_KEY' });
   }
 
   try {
     await deleteExpired(SUPABASE_URL, SUPABASE_SERVICE_KEY);
 
-    // Run all 50 searches in batches of 10 to stay under rate limits
-    const allJobs = [];
-    const batchSize = 10;
-    for (let i = 0; i < ALL_SEARCHES.length; i += batchSize) {
-      const batch = ALL_SEARCHES.slice(i, i + batchSize);
-      const results = await Promise.allSettled(
-        batch.map(s => fetchAdzuna(s.what, s.where, ADZUNA_APP_ID, ADZUNA_APP_KEY))
-      );
-      results.filter(r => r.status === 'fulfilled').forEach(r => allJobs.push(...r.value));
-    }
+    // Pick which batch of 10 to run based on current UTC hour
+    // Pass ?batch=0..4 to override (useful for manual trigger of all batches)
+    const batchParam = new URL(req.url, 'https://x').searchParams.get('batch');
+    const batchIndex = batchParam !== null ? parseInt(batchParam) : getCurrentBatch();
+    const searches = ALL_SEARCHES.slice(batchIndex * BATCH_SIZE, (batchIndex + 1) * BATCH_SIZE);
+
+    // Run all 10 searches in parallel
+    const results = await Promise.allSettled(
+      searches.map(s => fetchAdzuna(s.what, s.where, ADZUNA_APP_ID, ADZUNA_APP_KEY))
+    );
+    const allJobs = results.filter(r => r.status === 'fulfilled').flatMap(r => r.value);
 
     // Upsert in batches of 25
     const upsertResults = [];
@@ -198,16 +219,17 @@ export default async function handler(req) {
       upsertResults.push(result);
     }
 
-    return new Response(JSON.stringify({
+    return res.status(200).json({
       ok: true,
       date: new Date().toISOString(),
-      searches: ALL_SEARCHES.length,
+      batch: batchIndex,
+      searches: searches.length,
       found: allJobs.length,
       upserted: upsertResults.reduce((sum, r) => sum + (r.upserted || 0), 0),
-    }), { status: 200, headers });
+    });
 
   } catch (err) {
     console.error('refresh-jobs error:', err.message);
-    return new Response(JSON.stringify({ error: err.message }), { status: 500, headers });
+    return res.status(500).json({ error: err.message });
   }
 }

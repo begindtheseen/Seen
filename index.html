@@ -1888,7 +1888,7 @@ async function loadFeatured(){
   if(!jobs.length)jobs=FALLBACK_JOBS.filter(j=>j.score>=70).slice(0,6);
   el.innerHTML=jobs.map((j,i)=>{
     const risk=j.risk||Score.risk(j.score);
-    const applyAct=j._url?`window.open('${j._url.replace(/'/g,"\\'")}','_blank')`:`openApplyModal('${j.id}','${(j.co||'').replace(/'/g,"\\'")}','${(j.title||'').replace(/'/g,"\\'")}','${(j.city||'').replace(/'/g,"\\'")}',${j.score},'${risk}',${j.waste||25},'${j.apply_email||''}')`;
+    const applyAct=`openApplyModal('${j.id}','${(j.co||'').replace(/'/g,"\\'")}','${(j.title||'').replace(/'/g,"\\'")}','${(j.city||'').replace(/'/g,"\\'")}',${j.score},'${risk}',${j.waste||25},'${j.apply_email||''}')`;
     return`<div class="jcard" style="animation:fadeUp .4s ${i*.06}s ease both">
       <div class="jc-head"><div class="jc-logo">${j.logo||(j.co||'?')[0]}</div><div class="jc-scores"><div class="jc-ts ${risk}">${j.score}</div><div class="jc-ts-lbl">transparency</div></div></div>
       <div class="jc-co">${j.co||''}</div>
@@ -2104,7 +2104,7 @@ async function loadJobs(){
     const lastFetch=parseInt(localStorage.getItem(cacheKey)||'0');
     const needsFetch=(Date.now()-lastFetch)>6*60*60*1000; // 6-hour cooldown per city
     if(needsFetch){
-      localStorage.setItem(cacheKey,Date.now().toString());
+      // Don't set timestamp yet — only lock if fetch actually returns jobs
       if(listEl)listEl.innerHTML='<div style="text-align:center;padding:3rem;font-family:var(--mono);font-size:.7rem;color:var(--muted)"><div class="spinner" style="margin:0 auto 1rem"></div>Finding jobs near '+effectiveLoc.split(',')[0]+'...</div>';
       try{
         const r=await fetch('/api/fetch-location-jobs',{
@@ -2115,6 +2115,7 @@ async function loadJobs(){
         if(r.ok){
           const d=await r.json();
           if(d.jobs?.length){
+            localStorage.setItem(cacheKey,Date.now().toString()); // Only lock after success
             // Give each on-demand job a temp ID for client-side use
             jobs=d.jobs.map((j,i)=>_normalizeDbJob({...j,id:j.id||('az_'+i+'_'+Date.now())}));
             JOBS.splice(0,JOBS.length,...jobs,...FALLBACK_JOBS);
@@ -4365,13 +4366,14 @@ function showFullApplyForm(jobId, company, role, location, score, risk, waste, a
       </div>
 
       <div style="margin-bottom:1rem"><label style="font-family:var(--mono);font-size:.58rem;text-transform:uppercase;letter-spacing:.07em;color:var(--dim);display:block;margin-bottom:.32rem">Cover note (optional)</label><textarea id="appNote" placeholder="Why you're a fit (2-3 sentences max)..." style="width:100%;background:var(--raised);border:1.5px solid var(--line2);border-radius:8px;padding:.65rem .9rem;color:var(--white);font-family:var(--body);font-size:.84rem;outline:none;caret-color:var(--green);min-height:72px;resize:vertical" onfocus="this.style.borderColor='var(--green)'" onblur="this.style.borderColor='var(--line2)'"></textarea></div>
-      <div style="background:${isExternal?'var(--raised)':loggedIn?'var(--gdim)':'var(--raised)'};border:1px solid ${isExternal?'var(--line2)':loggedIn?'var(--gmid)':'var(--line2)'};border-radius:7px;padding:.6rem .9rem;font-family:var(--mono);font-size:.6rem;color:${isExternal?'var(--blue)':loggedIn?'var(--green)':'var(--muted)'};margin-bottom:1rem;line-height:1.65">
-        ${isExternal?'→ Opens the company\'s application page in a new tab · Tracked in your dashboard':loggedIn?'✓ Saved to your account and tracked in your dashboard':'ℹ Guest application — not tracked. Sign in to track.'}
+      <div style="background:${loggedIn?'var(--gdim)':'var(--raised)'};border:1px solid ${loggedIn?'var(--gmid)':'var(--line2)'};border-radius:7px;padding:.6rem .9rem;font-family:var(--mono);font-size:.6rem;color:${loggedIn?'var(--green)':'var(--muted)'};margin-bottom:1rem;line-height:1.65">
+        ${loggedIn?'✓ Resume sent to Seen · Saved to your dashboard and tracked':'ℹ Guest application — not tracked. Sign in to track.'}
       </div>
-      <div style="display:flex;gap:.5rem">
+      <div style="display:flex;gap:.5rem;margin-bottom:${isExternal?'.6rem':'0'}">
         <button class="btn btn-ghost" style="flex:1;justify-content:center" onclick="closeApplyModalDirect()">Cancel</button>
-        <button class="btn btn-green" id="submitAppBtn" style="flex:2;justify-content:center;font-weight:800" onclick="submitApplication('${jobId}','${company}','${role}','${location}',${score},'${Score.risk(score)}',${waste},'${applyEmail||''}')">${isExternal?'Apply on company site →':'Submit application →'}</button>
+        <button class="btn btn-green" id="submitAppBtn" style="flex:2;justify-content:center;font-weight:800" onclick="submitApplication('${jobId}','${company}','${role}','${location}',${score},'${Score.risk(score)}',${waste},'${applyEmail||''}')">Submit application →</button>
       </div>
+      ${isExternal?`<div style="text-align:center"><a href="${window._externalApplyUrl||''}" target="_blank" rel="noopener" style="font-family:var(--mono);font-size:.6rem;color:var(--blue);text-decoration:none">Or apply directly on the company's site →</a></div>`:''}
     </div>`;
 
   document.getElementById('applyModal').classList.add('open');
@@ -4587,17 +4589,12 @@ async function submitApplication(jobId, company, role, location, score, risk, wa
     const externalUrl = window._externalApplyUrl || null;
     window._externalApplyUrl = null;
 
-    if (externalUrl) {
-      // External job: open the real application page + track it, skip Seen email
-      window.open(externalUrl, '_blank');
-    } else {
-      // Seen-direct job: send emails via /api/apply
-      fetch('/api/apply', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ applicantName: name, applicantEmail: email, role, company, location, resumeLink: resumeLabel || 'On file', resumeText: window._applyResumeText || null, coverNote: note, applyEmail: applyEmail || '' })
-      }).catch(e => console.warn('Email:', e));
-    }
+    // Always send through Seen — this is where the value lives
+    fetch('/api/apply', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ applicantName: name, applicantEmail: email, role, company, location, resumeLink: resumeLabel || 'On file', resumeText: window._applyResumeText || null, coverNote: note, applyEmail: applyEmail || '' })
+    }).catch(e => console.warn('Email:', e));
 
     closeApplyModalDirect();
 
@@ -4614,10 +4611,11 @@ async function submitApplication(jobId, company, role, location, score, risk, wa
     ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:9999;display:flex;align-items:center;justify-content:center;padding:1.5rem';
     ov.innerHTML = `<div style="background:var(--surface);border:1px solid var(--line2);border-radius:16px;padding:2rem;max-width:360px;width:100%;text-align:center;animation:fadeUp .3s ease">
       <div style="font-size:2.5rem;margin-bottom:.75rem">✅</div>
-      <div style="font-family:var(--display);font-size:1.2rem;font-weight:800;color:var(--white);letter-spacing:-.025em;margin-bottom:.35rem">${externalUrl ? 'Application page opened!' : 'Application sent!'}</div>
+      <div style="font-family:var(--display);font-size:1.2rem;font-weight:800;color:var(--white);letter-spacing:-.025em;margin-bottom:.35rem">Application sent!</div>
       <div style="font-size:.82rem;color:var(--sub);font-weight:300;line-height:1.7;margin-bottom:.4rem">${role} at ${company}</div>
-      <div style="font-family:var(--mono);font-size:.62rem;color:var(--green);margin-bottom:1.5rem">${location} · Saved to your dashboard</div>
-      <div style="font-family:var(--mono);font-size:.6rem;color:var(--muted);background:var(--raised);border-radius:8px;padding:.65rem;margin-bottom:1.25rem;line-height:1.65">${externalUrl ? 'The job page opened in a new tab — finish applying there.' : 'Confirmation email sent to ' + email}</div>
+      <div style="font-family:var(--mono);font-size:.62rem;color:var(--green);margin-bottom:1rem">${location} · Saved to your dashboard</div>
+      <div style="font-family:var(--mono);font-size:.6rem;color:var(--muted);background:var(--raised);border-radius:8px;padding:.65rem;margin-bottom:1rem;line-height:1.65">Resume sent to Seen · Confirmation email sent to ${email}</div>
+      ${externalUrl ? `<a href="${externalUrl}" target="_blank" rel="noopener" style="display:block;font-family:var(--mono);font-size:.65rem;color:var(--blue);margin-bottom:1rem;line-height:1.6;text-decoration:none">Also apply directly on the company's site →</a>` : ''}
       <div style="display:flex;gap:.5rem">
         <button onclick="this.closest('[style*=fixed]').remove()" style="flex:1;padding:.72rem;background:var(--raised);border:1px solid var(--line2);border-radius:8px;color:var(--sub);font-family:var(--body);font-size:.8rem;cursor:pointer">Close</button>
         <button onclick="this.closest('[style*=fixed]').remove();go('tracker')" style="flex:2;padding:.72rem;background:var(--green);border:none;border-radius:8px;color:var(--ink);font-family:var(--display);font-weight:800;font-size:.8rem;cursor:pointer">View tracker →</button>

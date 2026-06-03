@@ -1,7 +1,5 @@
-export const config = { runtime: 'edge' };
-
 // On-demand Adzuna fetch for a user's specific city
-// Called when the user's city has fewer than 10 results in Supabase
+// Called when the user's city has no results in Supabase
 
 const CATEGORIES_BY_INDUSTRY = {
   tech: ['Software Engineer', 'Data Analyst', 'Product Manager', 'DevOps Engineer', 'UX Designer'],
@@ -10,7 +8,7 @@ const CATEGORIES_BY_INDUSTRY = {
   logistics: ['Warehouse Associate', 'CDL Truck Driver', 'Operations Manager', 'Supply Chain Analyst', 'Logistics Coordinator'],
   retail: ['Customer Service Representative', 'Restaurant Manager', 'Retail Manager', 'Sales Representative', 'Store Manager'],
   other: ['Project Manager', 'Operations Manager', 'Customer Service Representative', 'Marketing Manager', 'HR Manager'],
-  default: ['Customer Service Representative', 'Operations Manager', 'Registered Nurse', 'Software Engineer', 'Sales Representative', 'Project Manager', 'Data Analyst', 'Accountant'],
+  default: ['Customer Service Representative', 'Registered Nurse', 'Software Engineer', 'Sales Representative', 'Project Manager', 'Data Analyst', 'Accountant', 'Operations Manager'],
 };
 
 function formatSalary(min, max) {
@@ -54,8 +52,14 @@ async function fetchAdzuna(what, where, appId, appKey) {
   url.searchParams.set('results_per_page', '50');
   url.searchParams.set('sort_by', 'date');
 
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 8000);
   try {
-    const res = await fetch(url.toString(), { headers: { Accept: 'application/json' } });
+    const res = await fetch(url.toString(), {
+      headers: { Accept: 'application/json' },
+      signal: controller.signal,
+    });
+    clearTimeout(timeout);
     if (!res.ok) return [];
     const data = await res.json();
     const expires = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
@@ -75,18 +79,17 @@ async function fetchAdzuna(what, where, appId, appKey) {
       expires_at: expires,
     })).filter(j => j.company !== 'Unknown' && j.apply_url);
   } catch (e) {
+    clearTimeout(timeout);
     return [];
   }
 }
 
-export default async function handler(req) {
-  if (req.method === 'OPTIONS') return new Response(null, { status: 200, headers: {
-    'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Methods': 'POST, OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-  }});
+export default async function handler(req, res) {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
 
-  const headers = { 'Access-Control-Allow-Origin': '*', 'Content-Type': 'application/json' };
+  if (req.method === 'OPTIONS') return res.status(200).end();
 
   const APP_ID = process.env.ADZUNA_APP_ID;
   const APP_KEY = process.env.ADZUNA_APP_KEY;
@@ -94,23 +97,19 @@ export default async function handler(req) {
   const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY;
 
   if (!APP_ID || !APP_KEY) {
-    return new Response(JSON.stringify({ error: 'Adzuna not configured', jobs: [] }), { status: 200, headers });
+    return res.status(200).json({ error: 'Adzuna not configured', jobs: [] });
   }
 
   try {
-    const { location, industry } = await req.json();
-    if (!location) return new Response(JSON.stringify({ error: 'No location', jobs: [] }), { status: 400, headers });
+    const { location, industry } = req.body || {};
+    if (!location) return res.status(400).json({ error: 'No location', jobs: [] });
 
     const categories = CATEGORIES_BY_INDUSTRY[industry] || CATEGORIES_BY_INDUSTRY.default;
 
-    // Fetch top 6 categories in parallel
     const results = await Promise.allSettled(
       categories.slice(0, 6).map(cat => fetchAdzuna(cat, location, APP_ID, APP_KEY))
     );
-
-    const allJobs = results
-      .filter(r => r.status === 'fulfilled')
-      .flatMap(r => r.value);
+    const allJobs = results.filter(r => r.status === 'fulfilled').flatMap(r => r.value);
 
     // Save to Supabase so future visits are instant
     if (SUPABASE_URL && SUPABASE_SERVICE_KEY && allJobs.length) {
@@ -126,9 +125,9 @@ export default async function handler(req) {
       });
     }
 
-    return new Response(JSON.stringify({ ok: true, jobs: allJobs, location }), { status: 200, headers });
+    return res.status(200).json({ ok: true, jobs: allJobs, location });
   } catch (err) {
     console.error('fetch-location-jobs error:', err.message);
-    return new Response(JSON.stringify({ error: err.message, jobs: [] }), { status: 500, headers });
+    return res.status(500).json({ error: err.message, jobs: [] });
   }
 }
