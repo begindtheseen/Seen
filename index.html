@@ -4487,20 +4487,22 @@ function openJobDetailModal(jobId) {
     `<span style="background:var(--raised);border:1px solid var(--line2);border-radius:5px;padding:.18rem .5rem;font-size:.63rem;font-family:var(--mono);color:var(--sub)">${t}</span>`
   ).join('');
 
+  const jobUrl = j ? (j._url || j.apply_url || '') : '';
   document.getElementById('applyModalBody').innerHTML =
     `<div style="display:flex;align-items:center;gap:.65rem;padding-bottom:.9rem;margin-bottom:.9rem;border-bottom:1px solid var(--line)">
        <div style="width:40px;height:40px;border-radius:8px;background:var(--raised);border:1px solid var(--line2);display:flex;align-items:center;justify-content:center;font-family:var(--display);font-weight:800;font-size:1rem;color:var(--white);flex-shrink:0">${(co||'?')[0].toUpperCase()}</div>
        <div style="flex:1;display:flex;flex-wrap:wrap;gap:.3rem">${chips}</div>
        <div style="text-align:center;flex-shrink:0"><div class="sring ${risk}" style="width:36px;height:36px"><div class="sring-n" style="font-size:.78rem">${score}</div></div><div style="font-family:var(--mono);font-size:.45rem;color:var(--muted);margin-top:.15rem">score</div></div>
      </div>
-     <div style="color:var(--sub);font-size:.78rem;line-height:1.75;white-space:pre-wrap">${(desc||'No description available.').replace(/</g,'&lt;')}</div>`;
+     <div style="color:var(--sub);font-size:.78rem;line-height:1.75;white-space:pre-wrap;margin-bottom:.75rem">${(desc||'No description available.').replace(/</g,'&lt;')}</div>
+     ${jobUrl ? `<a href="${jobUrl}" target="_blank" rel="noopener" style="display:inline-block;font-family:var(--mono);font-size:.65rem;color:var(--green);text-decoration:none;margin-bottom:.5rem">View full listing ↗</a>` : ''}`;
 
-  // Sticky footer — always visible, inline onclick so iOS never misses it
+  // Sticky footer — always visible, pass `this` so handler has direct button ref
   const saved = SavedJobs.isSaved(sid);
   const foot = document.getElementById('applyModalFoot');
   foot.style.display = 'flex';
   foot.innerHTML =
-    `<button id="jdSaveBtn" type="button" onclick="jdSaveToggle()"
+    `<button id="jdSaveBtn" type="button" data-saved="${saved?'1':'0'}" onclick="jdSaveToggle(this)"
        style="background:none;border:1px solid var(--line2);border-radius:8px;padding:.65rem 1rem;font-size:1rem;cursor:pointer;color:${saved?'var(--green)':'var(--muted)'};flex-shrink:0;transition:all .15s">${saved?'♥':'♡'}</button>
      <button type="button" onclick="jdApplyClick()"
        style="flex:1;background:var(--green);color:var(--ink);border:none;border-radius:8px;padding:.65rem 1rem;font-family:var(--display);font-weight:800;font-size:.82rem;cursor:pointer">Apply &amp; Optimize →</button>`;
@@ -4508,18 +4510,33 @@ function openJobDetailModal(jobId) {
   document.getElementById('applyModal').classList.add('open');
 }
 
-function jdSaveToggle() {
+function jdSaveToggle(btn) {
   const d = window._jdJob;
   if (!d) return;
   const j = d.j;
-  toggleSaveJob(d.sid, j ? j.co||'' : '', j ? j.title||'' : '', j ? j.city||j.loc||'' : '', j ? j.score||65 : 65);
-  // Update button face immediately from localStorage state
-  const b = document.getElementById('jdSaveBtn');
-  if (b) {
-    const now = SavedJobs.isSaved(d.sid);
-    b.textContent = now ? '♥' : '♡';
-    b.style.color = now ? 'var(--green)' : 'var(--muted)';
+  const sid = d.sid;
+  const wasSaved = btn.dataset.saved === '1';
+
+  // Update button face FIRST — before any storage or async work
+  if (wasSaved) {
+    btn.dataset.saved = '0';
+    btn.textContent = '♡';
+    btn.style.color = 'var(--muted)';
+    SavedJobs.remove(sid);
+    showToast('Removed from saved jobs.');
+  } else {
+    btn.dataset.saved = '1';
+    btn.textContent = '♥';
+    btn.style.color = 'var(--green)';
+    SavedJobs.save({ id: sid, co: j?.co||'', title: j?.title||'', city: j?.city||j?.loc||'', score: j?.score||65 });
+    showToast('Saved! Find it in your dashboard.');
   }
+
+  // Keep card button in sync if visible behind modal
+  const cardBtn = document.getElementById('save_' + sid);
+  if (cardBtn) { cardBtn.textContent = wasSaved ? '♡' : '♥'; cardBtn.style.color = wasSaved ? '' : 'var(--red)'; }
+
+  _refreshDashSaved();
 }
 
 function jdApplyClick() {
@@ -5638,7 +5655,6 @@ function copyProposal() {
 function toggleSaveJob(jobId, company, title, city, score) {
   const sid = String(jobId);
   const job = { id: sid, co: company, title, city, score };
-  // isSaved is now synchronous — reads localStorage, never blocks
   const wasSaved = SavedJobs.isSaved(sid);
 
   if (wasSaved) {
@@ -5649,18 +5665,10 @@ function toggleSaveJob(jobId, company, title, city, score) {
     showToast('Saved! Find it in your dashboard.');
   }
 
-  // Update card button
+  // Update the card button that was clicked
   const btn = document.getElementById('save_' + sid);
   if (btn) { btn.textContent = wasSaved ? '♡' : '♥'; btn.style.color = wasSaved ? '' : 'var(--red)'; }
 
-  // Update job detail modal heart if open for this job
-  const jdBtn = document.getElementById('jdSaveBtn');
-  if (jdBtn && window._jdJob && String(window._jdJob.sid) === sid) {
-    jdBtn.textContent = wasSaved ? '♡' : '♥';
-    jdBtn.style.color = wasSaved ? 'var(--muted)' : 'var(--green)';
-  }
-
-  // Refresh dashboard panel (async is fine here — just updating display)
   _refreshDashSaved();
 }
 
