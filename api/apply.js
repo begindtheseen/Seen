@@ -96,9 +96,7 @@ function buildResumeHTML(text, name, role, company, optimizedBullets = [], keywo
 
   const highlightSection = wasOptimized && optimizedBullets.length ? `
     <div class="hl-box">
-      <div class="st" style="color:#059669;border-color:#a7f3d0">
-        ★ TAILORED FOR ${esc(role.toUpperCase())} AT ${esc(company.toUpperCase())}
-      </div>
+      <div class="hl-title">Tailored for ${esc(role)} at ${esc(company)}</div>
       <ul class="bl hl-bl">
         ${optimizedBullets.slice(0, 5).map(b => `<li>${esc(b.optimized || b)}</li>`).join('')}
       </ul>
@@ -113,28 +111,28 @@ function buildResumeHTML(text, name, role, company, optimizedBullets = [], keywo
 <title>${esc(displayName)} · ${esc(role)}</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
-body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;max-width:800px;margin:0 auto;padding:44px 40px;color:#1a1a2e;background:#fff;font-size:14px;line-height:1.55}
-.hdr{padding-bottom:20px;margin-bottom:26px;border-bottom:3px solid #00e676}
-.nm{font-size:28px;font-weight:800;letter-spacing:-.03em;color:#0a0a14;margin-bottom:5px}
-.ct{font-size:13px;color:#555;display:flex;flex-wrap:wrap;gap:0 14px}
-.tag{display:inline-flex;align-items:center;gap:5px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:20px;padding:3px 11px;font-size:10.5px;font-weight:700;color:#15803d;letter-spacing:.05em;margin-top:8px}
-.tag::before{content:'●';color:#00e676;font-size:7px}
-.hl-box{background:#f0fdf4;border:1px solid #bbf7d0;border-left:4px solid #00e676;border-radius:0 8px 8px 0;padding:16px 20px;margin-bottom:26px}
-.kws{display:flex;flex-wrap:wrap;gap:5px;margin-top:10px}
-.kw{background:#dcfce7;color:#166534;border-radius:4px;padding:2px 7px;font-size:11px;font-weight:600;font-family:monospace}
-.sec{margin-bottom:22px}
-.st{font-size:10px;text-transform:uppercase;letter-spacing:.12em;color:#059669;font-weight:800;margin-bottom:10px;padding-bottom:5px;border-bottom:1px solid #e2f5ea}
-.je{margin-bottom:14px}
-.jt{font-size:15px;font-weight:700;color:#0a0a14}
-.jm{font-size:12px;color:#666;margin:2px 0 7px}
-.bl{list-style:none;padding:0}
-.bl li{padding:2px 0 2px 18px;position:relative;color:#2d2d44;font-size:13.5px;line-height:1.5}
-.bl li::before{content:'→';position:absolute;left:0;color:#00b359;font-weight:700;font-size:11px;top:4px}
-.hl-bl li{font-size:14px;color:#14532d;font-weight:500}
-.hl-bl li::before{color:#00c65a}
-p{color:#3d3d55;font-size:13.5px;margin-bottom:7px}
-.sum{color:#3d3d55;font-size:13.5px;line-height:1.7;margin-bottom:8px;padding:12px 16px;background:#f8f9fb;border-left:3px solid #00e676;border-radius:0 6px 6px 0}
-.ft{margin-top:36px;padding-top:14px;border-top:1px solid #eee;text-align:center;font-size:11px;color:#aaa}
+body{font-family:Georgia,'Times New Roman',serif;max-width:760px;margin:0 auto;padding:48px 44px;color:#111;background:#fff;font-size:14px;line-height:1.6}
+.hdr{padding-bottom:18px;margin-bottom:24px;border-bottom:2px solid #111;text-align:center}
+.nm{font-size:26px;font-weight:700;letter-spacing:.02em;color:#111;margin-bottom:6px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif}
+.ct{font-size:12.5px;color:#444;display:flex;flex-wrap:wrap;justify-content:center;gap:0 16px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif}
+.ct span+span::before{content:'|';margin-right:16px;color:#bbb}
+.badge{display:inline-block;margin-top:8px;font-size:10px;font-family:-apple-system,sans-serif;color:#666;letter-spacing:.06em;text-transform:uppercase}
+.hl-box{border:1px solid #d0d0d8;border-radius:6px;padding:14px 18px;margin-bottom:24px;background:#fafafa}
+.hl-title{font-size:10px;text-transform:uppercase;letter-spacing:.1em;color:#444;font-weight:700;margin-bottom:10px;font-family:-apple-system,sans-serif}
+.kws{display:flex;flex-wrap:wrap;gap:4px;margin-top:10px}
+.kw{background:#efefef;color:#333;border-radius:3px;padding:2px 7px;font-size:10.5px;font-weight:600;font-family:-apple-system,sans-serif}
+.sec{margin-bottom:20px}
+.st{font-size:10px;text-transform:uppercase;letter-spacing:.14em;color:#111;font-weight:700;margin-bottom:8px;padding-bottom:4px;border-bottom:1px solid #111;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif}
+.je{margin-bottom:12px}
+.jt{font-size:14px;font-weight:700;color:#111;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif}
+.jm{font-size:12px;color:#555;margin:2px 0 6px;font-style:italic;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif}
+.bl{list-style:disc;padding-left:18px}
+.bl li{padding:1px 0;color:#222;font-size:13.5px;line-height:1.55}
+.hl-bl{list-style:disc;padding-left:18px}
+.hl-bl li{font-size:13.5px;color:#222;line-height:1.55;font-family:-apple-system,sans-serif}
+p{color:#222;font-size:13.5px;margin-bottom:6px}
+.sum{color:#333;font-size:13.5px;line-height:1.7;margin-bottom:0;font-style:italic}
+.ft{margin-top:32px;padding-top:12px;border-top:1px solid #ddd;text-align:center;font-size:10.5px;color:#aaa;font-family:-apple-system,sans-serif}
 @media print{body{padding:28px 24px}}
 </style>
 </head>
@@ -142,11 +140,11 @@ p{color:#3d3d55;font-size:13.5px;margin-bottom:7px}
 <div class="hdr">
   <div class="nm">${esc(displayName)}</div>
   <div class="ct">${contactLines.map(l => `<span>${esc(l)}</span>`).join('')}</div>
-  <div class="tag">${wasOptimized ? `AI-OPTIMIZED FOR ${esc(role.toUpperCase())}` : 'APPLIED VIA SEEN'}</div>
+  <div class="badge">${wasOptimized ? `Application tailored for ${esc(role)} · Seen` : 'Applied via Seen'}</div>
 </div>
 ${highlightSection}
 ${sections.map(s => `<div class="sec"><div class="st">${esc(s.title)}</div>${formatSection(s.title, s.lines)}</div>`).join('')}
-<div class="ft">Submitted via Seen · seenjobs.io · Transparent job applications</div>
+<div class="ft">Submitted via Seen · seenjobs.io</div>
 </body>
 </html>`;
 }
