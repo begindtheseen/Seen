@@ -1619,9 +1619,12 @@ nav{position:fixed;top:0;left:0;right:0;z-index:500;height:58px;display:flex;ali
     <div id="jlReport" style="margin-top:1.5rem"></div>
   </div>
   <div style="position:sticky;bottom:0;background:var(--bg);border-top:1px solid var(--line2);padding:.9rem 1rem;z-index:10">
-    <div style="max-width:720px;margin:0 auto;display:flex;gap:.75rem">
-      <button id="jlSaveBtn" type="button" data-saved="0" onclick="jlSaveToggle(this)" style="background:none;border:1px solid var(--line2);border-radius:8px;padding:.65rem 1rem;font-size:1.1rem;cursor:pointer;color:var(--muted);flex-shrink:0;transition:all .15s">♡</button>
-      <button type="button" onclick="jlApplyClick()" style="flex:1;background:var(--green);color:var(--ink);border:none;border-radius:8px;padding:.65rem 1rem;font-family:var(--display);font-weight:800;font-size:.85rem;cursor:pointer">Apply &amp; Optimize →</button>
+    <div style="max-width:720px;margin:0 auto;display:flex;flex-direction:column;gap:.5rem">
+      <button id="jlCheckCoBtn" type="button" onclick="" style="display:block;width:100%;text-align:center;font-family:var(--mono);font-size:.65rem;color:var(--amber);background:none;padding:.4rem 0;border:1px solid #ffb83030;border-radius:8px;letter-spacing:.02em;cursor:pointer">🏢 Check company — ghost rate, reviews &amp; score →</button>
+      <div style="display:flex;gap:.75rem">
+        <button id="jlSaveBtn" type="button" data-saved="0" onclick="jlSaveToggle(this)" style="background:none;border:1px solid var(--line2);border-radius:8px;padding:.65rem 1rem;font-size:1.1rem;cursor:pointer;color:var(--muted);flex-shrink:0;transition:all .15s">♡</button>
+        <button type="button" onclick="jlApplyClick()" style="flex:1;background:var(--green);color:var(--ink);border:none;border-radius:8px;padding:.65rem 1rem;font-family:var(--display);font-weight:800;font-size:.85rem;cursor:pointer">Apply &amp; Optimize →</button>
+      </div>
     </div>
   </div>
 </div>
@@ -5247,6 +5250,13 @@ async function openJobListing(jobId) {
     saveBtn.dataset.saved = saved ? '1' : '0';
     saveBtn.textContent = saved ? '♥' : '♡';
     saveBtn.style.color = saved ? 'var(--green)' : 'var(--muted)';
+  }
+
+  // Wire Check company button with this job's company + location
+  const checkCoBtn = document.getElementById('jlCheckCoBtn');
+  if (checkCoBtn) {
+    checkCoBtn.textContent = `🏢 Check ${co || 'company'} — ghost rate, reviews & score →`;
+    checkCoBtn.onclick = () => openModal(co, loc);
   }
 
   // AI insights — skeleton while loading
