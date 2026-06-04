@@ -62,13 +62,14 @@ export default async function handler(req, res) {
           if (t2.ok) { const r = await t2.json(); if (r.length > cached.length) { cached = r; if (cached.length >= 3) hitTier = 2; } }
         }
 
-        // Tier 3: keyword match in actual job titles — catches semantic variants
-        // e.g. "amazon driver" finds jobs titled "Amazon Delivery Driver" saved under "amazon dsp"
+        // Tier 3: company + role keyword matching across the right fields
+        // "amazon" alone → company field (all Amazon jobs regardless of role)
+        // "delivery driver" → title field (all delivery drivers from every company)
+        // "amazon delivery driver" → company=amazon + title contains delivery+driver
         if (cached.length < 3) {
-          const kws = extractKeywords(qNorm);
-          if (kws.length >= 2) {
-            const andParam = `(${kws.map(k => `title.ilike.*${k}*`).join(',')})`;
-            const t3 = await fetch(`${SUPABASE_URL}/rest/v1/jobs?and=${encodeURIComponent(andParam)}&expires_at=gt.${now}&limit=25`, { headers: dbHeaders });
+          const t3filter = buildTier3Filter(qNorm);
+          if (t3filter) {
+            const t3 = await fetch(`${SUPABASE_URL}/rest/v1/jobs?${t3filter}&expires_at=gt.${now}&limit=25`, { headers: dbHeaders });
             if (t3.ok) { const r = await t3.json(); if (Array.isArray(r) && r.length >= 3) { cached = r; hitTier = 3; } }
           }
         }
@@ -216,18 +217,47 @@ function normalizeQuery(q) {
   return n.replace(/\s+/g, ' ').trim();
 }
 
-// Extract the 2-3 most meaningful words from a query for title-level keyword matching.
-// Strips stop words so "jobs near remote" → ["jobs"] doesn't produce noise hits.
-function extractKeywords(q) {
+// Known company names — keywords matching these search the `company` column
+// so "amazon" alone returns all Amazon jobs, not just ones with "amazon" in the title.
+const COMPANIES = new Set([
+  'amazon','walmart','target','costco','kroger','cvs','walgreens','dollar',
+  'ups','fedex','usps','dhl',
+  'google','apple','microsoft','meta','netflix','tesla','uber','lyft',
+  'doordash','instacart','airbnb','stripe','shopify','salesforce','oracle',
+  'ibm','cisco','intel','nvidia',
+  'mcdonalds','starbucks','chipotle','dominos',
+  'disney','nike','ford','gm','boeing','lockheed',
+  'jpmorgan','chase','bankofamerica','wellsfargo','citigroup',
+  'pfizer','johnson','unitedhealth','humana','merck','abbvie',
+  'deloitte','accenture','kpmg',
+]);
+
+// Build a PostgREST filter for tier-3 cache lookup.
+// Company keywords → filter on `company` field; everything else → filter on `title`.
+// Single condition uses a direct filter; multiple conditions use and=().
+function buildTier3Filter(q) {
   const STOP = new Set([
     'and','or','the','a','an','in','at','for','with','of','to','by','is','are',
     'job','jobs','position','positions','role','roles','work','near','remote',
     'hiring','wanted','open','full','part','time','entry','level',
   ]);
-  return q.split(/\s+/)
+  const words = q.split(/\s+/)
     .map(w => w.replace(/[^a-z0-9]/g, ''))
-    .filter(w => w.length > 2 && !STOP.has(w))
-    .slice(0, 3);
+    .filter(w => w.length > 1 && !STOP.has(w))
+    .slice(0, 4);
+
+  if (!words.length) return null;
+
+  const conditions = words.map(w =>
+    COMPANIES.has(w) ? `company.ilike.*${w}*` : `title.ilike.*${w}*`
+  );
+
+  if (conditions.length === 1) {
+    // Simple single-column filter: e.g. company=ilike.*amazon*
+    const [col, op, val] = conditions[0].split('.');
+    return `${col}=${op}.${val}`;
+  }
+  return `and=${encodeURIComponent(`(${conditions.join(',')})`)}`;
 }
 
 function scoreJob(job) {
