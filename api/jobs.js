@@ -6,8 +6,6 @@ export default async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(200).end();
   if (req.method !== 'POST') return res.status(405).end('Method not allowed');
 
-  const headers = { 'Access-Control-Allow-Origin': '*', 'Content-Type': 'application/json' };
-
   try {
     let body = req.body;
     if (typeof body === 'string') { try { body = JSON.parse(body); } catch(e) { body = {}; } }
@@ -27,8 +25,8 @@ export default async function handler(req, res) {
     ].join('\n');
 
     const userPrompt = loc
-      ? 'Find open ' + query + ' jobs within ' + radiusMiles + ' miles of ' + loc + '. Search LinkedIn, Indeed, Greenhouse, Lever, Workday. Do multiple searches. Return at least 8 results. If not enough nearby, include remote options.'
-      : 'Find open ' + query + ' jobs in the US or remote. Search LinkedIn, Indeed, Greenhouse, Lever. Return at least 8 results.';
+      ? `Find open ${query} jobs within ${radiusMiles} miles of ${loc}. Search LinkedIn, Indeed, Greenhouse, Lever, Workday. Do multiple searches. Return at least 8 results. If not enough nearby, include remote options.`
+      : `Find open ${query} jobs in the US or remote. Search LinkedIn, Indeed, Greenhouse, Lever. Return at least 8 results.`;
 
     const ANTHROPIC_KEY = process.env.ANTHROPIC_KEY;
     if (!ANTHROPIC_KEY) return res.status(500).json({ error: 'ANTHROPIC_KEY not configured', jobs: [] });
@@ -41,41 +39,49 @@ export default async function handler(req, res) {
       'Content-Type': 'application/json',
     };
 
-    // Expand abbreviations and normalize for consistent cache keys
-    // e.g. "Amazon DSP" → "amazon delivery driver", "RN" → "registered nurse"
-    const qNorm = normalizeQuery(query);
+    const qNorm = query.toLowerCase().trim();
 
-    // ── Server-side DB cache check (3 tiers) ─────────────────────────────────
+    // canonical stays in outer scope so the save section can use it
+    let canonical = qNorm;
+
+    // ── Smart DB cache check ──────────────────────────────────────────────────
     if (SUPABASE_URL && SUPABASE_SERVICE_KEY) {
       try {
+        // Get canonical + related terms via expansion cache or Haiku
+        const expansion = await getQueryExpansion(qNorm, SUPABASE_URL, dbHeaders, ANTHROPIC_KEY);
+        canonical = expansion.canonical;
+        const searchTerms = [canonical, ...expansion.related].filter(Boolean);
+
         const now = encodeURIComponent(new Date().toISOString());
-        let cached = [], hitTier = 0;
+        let cached = [], hitTerm = '';
 
-        // Tier 1: exact normalized search_query match
-        const t1 = await fetch(`${SUPABASE_URL}/rest/v1/jobs?search_query=ilike.${encodeURIComponent(qNorm)}&expires_at=gt.${now}&limit=25`, { headers: dbHeaders });
-        if (t1.ok) { cached = await t1.json(); if (cached.length >= 3) hitTier = 1; }
-
-        // Tier 2: normalized query is a substring of a stored search_query
-        // e.g. "nurse" hits "registered nurse"
-        if (cached.length < 3) {
-          const t2 = await fetch(`${SUPABASE_URL}/rest/v1/jobs?search_query=ilike.*${encodeURIComponent(qNorm)}*&expires_at=gt.${now}&limit=25`, { headers: dbHeaders });
-          if (t2.ok) { const r = await t2.json(); if (r.length > cached.length) { cached = r; if (cached.length >= 3) hitTier = 2; } }
-        }
-
-        // Tier 3: company + role keyword matching across the right fields
-        // "amazon" alone → company field (all Amazon jobs regardless of role)
-        // "delivery driver" → title field (all delivery drivers from every company)
-        // "amazon delivery driver" → company=amazon + title contains delivery+driver
-        if (cached.length < 3) {
-          const t3filter = buildTier3Filter(qNorm);
-          if (t3filter) {
-            const t3 = await fetch(`${SUPABASE_URL}/rest/v1/jobs?${t3filter}&expires_at=gt.${now}&limit=25`, { headers: dbHeaders });
-            if (t3.ok) { const r = await t3.json(); if (Array.isArray(r) && r.length >= 3) { cached = r; hitTier = 3; } }
+        // Search the DB for each expansion term
+        for (const term of searchTerms) {
+          if (cached.length >= 3) break;
+          const r = await fetch(
+            `${SUPABASE_URL}/rest/v1/jobs?search_query=ilike.${encodeURIComponent(term)}&expires_at=gt.${now}&limit=25`,
+            { headers: dbHeaders }
+          );
+          if (r.ok) {
+            const rows = await r.json();
+            if (Array.isArray(rows) && rows.length > cached.length) { cached = rows; hitTerm = term; }
           }
         }
 
-        if (cached?.length >= 3) {
-          console.log(`CACHE HIT tier=${hitTier}: "${query}" → "${qNorm}" @ "${loc}" — ${cached.length} results`);
+        // Final fallback: keyword match across title + company fields
+        if (cached.length < 3) {
+          const t3filter = buildFallbackFilter(qNorm);
+          if (t3filter) {
+            const t3 = await fetch(`${SUPABASE_URL}/rest/v1/jobs?${t3filter}&expires_at=gt.${now}&limit=25`, { headers: dbHeaders });
+            if (t3.ok) {
+              const rows = await t3.json();
+              if (Array.isArray(rows) && rows.length >= 3) { cached = rows; hitTerm = 'keyword-fallback'; }
+            }
+          }
+        }
+
+        if (cached.length >= 3) {
+          console.log(`CACHE HIT: "${query}" → "${canonical}" (matched "${hitTerm}") @ "${loc}" — ${cached.length} results`);
           const jobs = cached.map(j => ({
             title: j.title, company: j.company, location: j.location || loc,
             salary: j.salary, url: j.apply_url, description: j.description,
@@ -85,7 +91,7 @@ export default async function handler(req, res) {
           return res.status(200).json({ ok: true, jobs, query, location: loc, _src: 'cache' });
         }
       } catch(e) { console.warn('Cache check error:', e.message); }
-      console.log(`CACHE MISS: "${query}" → "${qNorm}" @ "${loc}" — calling Claude API`);
+      console.log(`CACHE MISS: "${query}" → "${canonical}" @ "${loc}" — calling Claude API`);
     }
 
     let apiRes;
@@ -113,7 +119,7 @@ export default async function handler(req, res) {
       });
       if (apiRes.status !== 429 && apiRes.status !== 529) break;
     }
-    console.log(`API CALLED: "${query}" @ "${loc}"`);
+    console.log(`API CALLED: "${query}" → "${canonical}" @ "${loc}"`);
 
     if (!apiRes.ok) {
       const errText = await apiRes.text();
@@ -134,8 +140,7 @@ export default async function handler(req, res) {
     jobs = jobs.map(j => ({ ...j, score: scoreJob(j), waste_score: wasteScore(j) }));
     jobs.sort((a, b) => b.score - a.score);
 
-    // Await the save — fire-and-forget is unreliable in Vercel serverless
-    // (execution context can terminate after res.json() before the fetch lands)
+    // Save under the canonical key so all equivalent queries hit this cache
     if (SUPABASE_URL && SUPABASE_SERVICE_KEY && jobs.length) {
       const expires = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
       const rows = jobs.map(j => ({
@@ -148,7 +153,7 @@ export default async function handler(req, res) {
         source: j.source || 'Web search',
         type: j.type || 'Full-time',
         level: j.level || 'Mid level',
-        search_query: qNorm,
+        search_query: canonical,
         score: j.score || 65,
         waste_score: j.waste_score || 25,
         expires_at: expires,
@@ -156,23 +161,16 @@ export default async function handler(req, res) {
       try {
         const saveRes = await fetch(`${SUPABASE_URL}/rest/v1/jobs`, {
           method: 'POST',
-          headers: {
-            apikey: SUPABASE_SERVICE_KEY,
-            Authorization: `Bearer ${SUPABASE_SERVICE_KEY}`,
-            'Content-Type': 'application/json',
-            Prefer: 'resolution=ignore-duplicates,return=minimal',
-          },
+          headers: { ...dbHeaders, Prefer: 'resolution=ignore-duplicates,return=minimal' },
           body: JSON.stringify(rows),
         });
         if (saveRes.ok) {
-          console.log(`CACHE SAVED: "${qNorm}" @ "${loc}" — ${jobs.length} jobs`);
+          console.log(`CACHE SAVED: "${canonical}" @ "${loc}" — ${jobs.length} jobs`);
         } else {
           const errText = await saveRes.text();
           console.error(`CACHE SAVE FAILED: ${saveRes.status}`, errText.slice(0, 300));
         }
-      } catch (e) {
-        console.error('CACHE SAVE ERROR:', e.message);
-      }
+      } catch(e) { console.error('CACHE SAVE ERROR:', e.message); }
     }
 
     return res.status(200).json({ ok: true, jobs, query, location: loc });
@@ -183,44 +181,87 @@ export default async function handler(req, res) {
   }
 }
 
-// Expand common abbreviations to their canonical job title form so
-// "Amazon DSP", "Amazon driver", and "Amazon delivery driver" all map
-// to the same normalized key and hit the same cache bucket.
-function normalizeQuery(q) {
-  const ABBREV = {
-    'dsp':  'delivery driver',
-    'rn':   'registered nurse',
-    'lpn':  'licensed practical nurse',
-    'lvn':  'licensed vocational nurse',
-    'cna':  'certified nursing assistant',
-    'cna\'s': 'certified nursing assistant',
-    'swe':  'software engineer',
-    'pm':   'product manager',
-    'qa':   'quality assurance engineer',
-    'hr':   'human resources',
-    'cdl':  'commercial truck driver',
-    'ux':   'ux designer',
-    'ui':   'ui designer',
-    'ml':   'machine learning engineer',
-    'hvac': 'hvac technician',
-    'cpa':  'accountant',
-    'pt':   'physical therapist',
-    'ot':   'occupational therapist',
-    'np':   'nurse practitioner',
-    'pa':   'physician assistant',
-    'med':  'medical',
-  };
-  let n = q.toLowerCase().trim();
-  for (const [abbr, full] of Object.entries(ABBREV)) {
-    n = n.replace(new RegExp(`\\b${abbr}\\b`, 'gi'), full);
+// ── Query expansion ───────────────────────────────────────────────────────────
+// Returns canonical job title + related search terms for any query.
+// Checks the query_expansions DB table first (free), falls back to a Haiku call
+// (~$0.00001) which is then cached so the same reasoning never runs twice.
+async function getQueryExpansion(qNorm, supabaseUrl, dbHeaders, anthropicKey) {
+  const fallback = { canonical: qNorm, related: [] };
+
+  // Check expansion cache
+  try {
+    const r = await fetch(
+      `${supabaseUrl}/rest/v1/query_expansions?raw_query=ilike.${encodeURIComponent(qNorm)}&limit=1`,
+      { headers: dbHeaders }
+    );
+    if (r.ok) {
+      const rows = await r.json();
+      if (Array.isArray(rows) && rows.length > 0) {
+        return { canonical: rows[0].canonical, related: rows[0].related || [] };
+      }
+    }
+  } catch(e) {}
+
+  if (!anthropicKey) return fallback;
+
+  try {
+    const r = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': anthropicKey,
+        'anthropic-version': '2023-06-01',
+      },
+      body: JSON.stringify({
+        model: 'claude-haiku-4-5-20251001',
+        max_tokens: 200,
+        messages: [{
+          role: 'user',
+          content: `Job search expert. Given a job search query, return its canonical form and related search terms that describe the SAME kind of work.
+
+Return ONLY valid JSON: {"canonical":"...","related":["...","...","..."]}
+
+Rules:
+- canonical: the single most standard industry job title (lowercase, 1-6 words)
+- related: 4-6 other terms a job seeker or recruiter uses for this SAME type of job
+- Keep company specificity: "amazon dsp" → "amazon delivery driver", not just "delivery driver"
+- Keep role specificity: "package handler" and "delivery driver" are DIFFERENT jobs — do not conflate them
+- Company-only queries like "amazon" → canonical="amazon", related=["amazon warehouse", "amazon delivery driver", "amazon flex", "amazon fulfillment associate"]
+- Abbreviations: DSP=delivery service partner=delivery driver, RN=registered nurse, CNA=nursing assistant, SWE=software engineer, CDL=truck driver, HVAC=hvac technician, etc.
+
+Query: "${qNorm}"`
+        }]
+      })
+    });
+
+    if (!r.ok) return fallback;
+    const apiData = await r.json();
+    const text = (apiData.content || []).find(b => b.type === 'text')?.text || '';
+    const match = text.replace(/```json\n?/g, '').replace(/```\n?/g, '').match(/\{[\s\S]*?\}/);
+    if (!match) return fallback;
+
+    const parsed = JSON.parse(match[0]);
+    const canonical = (parsed.canonical || qNorm).toLowerCase().trim();
+    const related = (parsed.related || []).slice(0, 6).map(s => String(s).toLowerCase().trim()).filter(Boolean);
+
+    // Cache forever — fire-and-forget is fine here since it's just a lookup cache
+    fetch(`${supabaseUrl}/rest/v1/query_expansions`, {
+      method: 'POST',
+      headers: { ...dbHeaders, Prefer: 'resolution=ignore-duplicates,return=minimal' },
+      body: JSON.stringify({ raw_query: qNorm, canonical, related }),
+    }).catch(() => {});
+
+    return { canonical, related };
+  } catch(e) {
+    return fallback;
   }
-  return n.replace(/\s+/g, ' ').trim();
 }
 
-// Known company names — keywords matching these search the `company` column
-// so "amazon" alone returns all Amazon jobs, not just ones with "amazon" in the title.
+// ── Keyword fallback filter ───────────────────────────────────────────────────
+// Last-resort DB filter when no expansion term produced results.
+// Routes known company names to the company column, everything else to title.
 const COMPANIES = new Set([
-  'amazon','walmart','target','costco','kroger','cvs','walgreens','dollar',
+  'amazon','walmart','target','costco','kroger','cvs','walgreens',
   'ups','fedex','usps','dhl',
   'google','apple','microsoft','meta','netflix','tesla','uber','lyft',
   'doordash','instacart','airbnb','stripe','shopify','salesforce','oracle',
@@ -232,10 +273,7 @@ const COMPANIES = new Set([
   'deloitte','accenture','kpmg',
 ]);
 
-// Build a PostgREST filter for tier-3 cache lookup.
-// Company keywords → filter on `company` field; everything else → filter on `title`.
-// Single condition uses a direct filter; multiple conditions use and=().
-function buildTier3Filter(q) {
+function buildFallbackFilter(q) {
   const STOP = new Set([
     'and','or','the','a','an','in','at','for','with','of','to','by','is','are',
     'job','jobs','position','positions','role','roles','work','near','remote',
@@ -253,7 +291,6 @@ function buildTier3Filter(q) {
   );
 
   if (conditions.length === 1) {
-    // Simple single-column filter: e.g. company=ilike.*amazon*
     const [col, op, val] = conditions[0].split('.');
     return `${col}=${op}.${val}`;
   }
