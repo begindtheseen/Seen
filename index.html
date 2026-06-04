@@ -451,12 +451,13 @@ nav{position:fixed;top:0;left:0;right:0;z-index:500;height:58px;display:flex;ali
 /* MODAL */
 .modal-ov{display:none;position:fixed;inset:0;background:rgba(0,0,0,.82);backdrop-filter:blur(20px);z-index:800;align-items:flex-start;justify-content:center;padding-top:90px}
 .modal-ov.open{display:flex}
-.modal{background:var(--card);border:1px solid var(--line2);border-radius:16px;width:100%;max-width:720px;max-height:82vh;overflow-y:auto;box-shadow:0 40px 120px rgba(0,0,0,.7);animation:fadeUp .18s ease}
-.m-hdr{display:flex;align-items:center;justify-content:space-between;padding:1.2rem 1.5rem;border-bottom:1px solid var(--line);position:sticky;top:0;background:var(--card);z-index:1}
+.modal{background:var(--card);border:1px solid var(--line2);border-radius:16px;width:100%;max-width:720px;max-height:82vh;display:flex;flex-direction:column;box-shadow:0 40px 120px rgba(0,0,0,.7);animation:fadeUp .18s ease}
+.m-hdr{display:flex;align-items:center;justify-content:space-between;padding:1.2rem 1.5rem;border-bottom:1px solid var(--line);flex-shrink:0;background:var(--card);z-index:1;border-radius:16px 16px 0 0}
 .m-ti{font-family:var(--display);font-size:1rem;font-weight:800;color:var(--white);letter-spacing:-.02em}
 .m-cl{background:none;border:none;color:var(--dim);font-size:1.1rem;cursor:pointer;padding:.2rem;transition:color .15s}
 .m-cl:hover{color:var(--sub)}
-.m-body{padding:1.5rem}
+.m-body{padding:1.5rem;overflow-y:auto;flex:1}
+.m-foot{display:flex;gap:.5rem;padding:1rem 1.5rem;border-top:1px solid var(--line);flex-shrink:0;background:var(--card);border-radius:0 0 16px 16px}
 
 /* DISCLAIMER */
 .disc{background:var(--void);border-bottom:1px solid var(--line);padding:.45rem 2rem;text-align:center;font-family:var(--mono);font-size:.58rem;color:var(--muted)}
@@ -952,11 +953,11 @@ nav{position:fixed;top:0;left:0;right:0;z-index:500;height:58px;display:flex;ali
           <div style="background:var(--gdim);border:1px solid var(--gmid);border-radius:7px;padding:.55rem .85rem;font-family:var(--mono);font-size:.6rem;color:var(--green);line-height:1.65">✓ Resume saved — auto-used in Resume AI and job applications</div>
         </div>
         <div id="resumeEmptyState">
-          <div id="dashResumeDropZone" onclick="document.getElementById('dashResumeInput').click()" ondragover="event.preventDefault();this.style.borderColor='var(--green)';this.style.background='var(--gdim)'" ondragleave="this.style.borderColor='var(--line2)';this.style.background='var(--raised)'" ondrop="handleDashResumeDrop(event)" style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:.5rem;padding:1.25rem;background:var(--raised);border:1.5px dashed var(--line2);border-radius:8px;cursor:pointer;transition:all .2s">
+          <label for="dashResumeInput" id="dashResumeDropZone" ondragover="event.preventDefault();this.style.borderColor='var(--green)';this.style.background='var(--gdim)'" ondragleave="this.style.borderColor='var(--line2)';this.style.background='var(--raised)'" ondrop="handleDashResumeDrop(event)" style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:.5rem;padding:1.25rem;background:var(--raised);border:1.5px dashed var(--line2);border-radius:8px;cursor:pointer;transition:all .2s">
             <div style="font-size:1.5rem">📄</div>
             <div style="font-family:var(--display);font-size:.8rem;font-weight:700;color:var(--white)">Upload your resume</div>
             <div style="font-family:var(--mono);font-size:.58rem;color:var(--muted)">PDF or Word · Max 10MB · Used everywhere on Seen</div>
-          </div>
+          </label>
           <input id="dashResumeInput" type="file" accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document" style="display:none" onchange="handleDashResumeUpload(this.files[0])"/>
           <div id="dashResumeProgress" style="display:none;margin-top:.65rem;padding:.6rem .9rem;background:var(--raised);border:1px solid var(--line2);border-radius:7px;font-family:var(--mono);font-size:.65rem;color:var(--dim);align-items:center;gap:.5rem"></div>
         </div>
@@ -1565,6 +1566,7 @@ nav{position:fixed;top:0;left:0;right:0;z-index:500;height:58px;display:flex;ali
       <button class="m-cl" onclick="closeApplyModalDirect()">✕</button>
     </div>
     <div class="m-body" id="applyModalBody"></div>
+    <div class="m-foot" id="applyModalFoot" style="display:none"></div>
   </div>
 </div>
 
@@ -1630,8 +1632,11 @@ const Auth = {
             (() => { try { const s = this._profile?.onboarding_survey; if(!s) return false; const o = typeof s==='string'?JSON.parse(s):s; return o && Object.keys(o).length > 0; } catch(e) { return false; } })();
 
           if(!surveyDone && this.isSeeker()) { go('login'); startSurvey(); return; }
-          if(this.isSeeker()) { renderSeekerDash(); go('seeker-dash'); }
-          else if(this.isEmployer()) goToEmployerDashboard();
+          if(this.isSeeker()) {
+            SavedJobs.syncFromDb().catch(()=>{});
+            AppStore.syncFromDb().catch(()=>{});
+            renderSeekerDash(); go('seeker-dash');
+          } else if(this.isEmployer()) goToEmployerDashboard();
 
         } else if(event === 'TOKEN_REFRESHED' && session?.user) {
           // Silent refresh — just update user, don't redirect
@@ -2950,48 +2955,93 @@ const STAGES = ['Applied','Viewed','Phone Screen','Interview','Final Round','Off
 
 const AppStore = {
   KEY: 'seen_applications_v1',
+  _mapRow(a) {
+    return {
+      id:a.id, jobId:a.job_id, company:a.company_name, role:a.role,
+      location:a.city, platform:a.platform, jobUrl:a.job_url,
+      stage:a.stage||'Applied', status:a.status||'active',
+      score:a.score, waste:a.waste_score,
+      employerStage:a.employer_stage,
+      appliedAt: a.created_at ? new Date(a.created_at).getTime() : Date.now(),
+      updatedAt: a.updated_at ? new Date(a.updated_at).getTime() : Date.now()
+    };
+  },
   async load() {
     if(Auth.isLoggedIn() && db) {
       try {
-        const { data, error } = await db.from('applications').select('*').order('created_at',{ascending:false});
+        const uid = Auth._user?.id;
+        if(!uid) throw new Error('no uid');
+        const { data, error } = await db.from('applications').select('*').eq('user_id', uid).order('created_at',{ascending:false});
         if(error) throw error;
-        if(data?.length) return data.map(a=>({
-          id:a.id, jobId:a.job_id, company:a.company_name, role:a.role,
-          location:a.city, platform:a.platform, jobUrl:a.job_url,
-          stage:a.stage||'Applied', status:a.status||'active',
-          score:a.score, waste:a.waste_score,
-          employerStage:a.employer_stage,
-          appliedAt: a.created_at ? new Date(a.created_at).getTime() : Date.now(),
-          updatedAt: a.updated_at ? new Date(a.updated_at).getTime() : Date.now()
-        }));
+        if(data) {
+          const mapped = data.map(a => this._mapRow(a));
+          const dbIds = new Set(mapped.map(a => a.id));
+          const local = this.loadSync();
+          const localExtra = local.filter(a => !dbIds.has(a.id) && String(a.id).startsWith('app_'));
+          const merged = [...mapped, ...localExtra];
+          localStorage.setItem(this.KEY, JSON.stringify(merged));
+          if(localExtra.length > 0) this._pushLocalToDb(localExtra, uid);
+          return merged;
+        }
       } catch(e) { console.warn('AppStore.load error:', e.message); }
     }
-    // Fall back to localStorage cache (covers Supabase failures and table not existing yet)
     try { return JSON.parse(localStorage.getItem(this.KEY)||'[]'); } catch(e) { return []; }
   },
+  _pushLocalToDb(apps, uid) {
+    for(const app of apps) {
+      db.from('applications').insert({
+        user_id: uid,
+        company_name: app.company||'',
+        role: app.role||'',
+        city: app.location||'',
+        platform: app.platform||'Seen',
+        status: app.status||'active',
+        stage: app.stage||'Applied',
+        score: app.score||null,
+        waste_score: app.waste||null,
+      }).select('id').single().then(({data:row,error}) => {
+        if(!error && row?.id) {
+          const stored = this.loadSync();
+          const idx = stored.findIndex(a => a.id === app.id);
+          if(idx !== -1) { stored[idx] = {...stored[idx], id: row.id}; localStorage.setItem(this.KEY, JSON.stringify(stored)); }
+        }
+      }).catch(()=>{});
+    }
+  },
+  async syncFromDb() {
+    if(!Auth.isLoggedIn() || !db) return;
+    try {
+      const uid = Auth._user?.id;
+      if(!uid) return;
+      const { data } = await db.from('applications').select('*').eq('user_id', uid).order('created_at',{ascending:false});
+      const local = this.loadSync();
+      const localExtra = local.filter(a => String(a.id).startsWith('app_'));
+      if(data && data.length > 0) {
+        const mapped = data.map(a => this._mapRow(a));
+        const merged = [...mapped, ...localExtra];
+        localStorage.setItem(this.KEY, JSON.stringify(merged));
+      }
+      if(localExtra.length > 0 && uid) this._pushLocalToDb(localExtra, uid);
+    } catch(e) { console.warn('AppStore.syncFromDb:', e.message); }
+  },
   async add(app) {
-    // Always write to localStorage as a cache so tracker works even if Supabase fails
     const apps = this.loadSync();
     const entry = {...app, id: app.id||('app_'+Date.now()), appliedAt: app.appliedAt||Date.now(), updatedAt: app.updatedAt||Date.now()};
-    if (!apps.find(a => a.id === entry.id)) {
+    if(!apps.find(a => a.id === entry.id)) {
       apps.unshift(entry);
       localStorage.setItem(this.KEY, JSON.stringify(apps));
     }
     return {ok:true};
   },
   async update(id, changes) {
-    // Always update localStorage cache immediately so the tracker re-renders correctly
     const apps = this.loadSync();
     const idx = apps.findIndex(a => a.id === id);
-    if (idx !== -1) { apps[idx] = {...apps[idx], ...changes, updatedAt: Date.now()}; localStorage.setItem(this.KEY, JSON.stringify(apps)); }
-    // Also persist to Supabase if logged in
-    if (Auth.isLoggedIn() && db) { try { await db.from('applications').update({...changes, updated_at: new Date().toISOString()}).eq('id', id); } catch(e) { console.warn('AppStore.update:', e.message); } }
+    if(idx !== -1) { apps[idx] = {...apps[idx], ...changes, updatedAt: Date.now()}; localStorage.setItem(this.KEY, JSON.stringify(apps)); }
+    if(Auth.isLoggedIn() && db) { try { await db.from('applications').update({...changes, updated_at: new Date().toISOString()}).eq('id', id); } catch(e) { console.warn('AppStore.update:', e.message); } }
   },
   async remove(id) {
-    // Always remove from localStorage cache immediately
     localStorage.setItem(this.KEY, JSON.stringify(this.loadSync().filter(a => a.id !== id)));
-    // Also delete from Supabase if logged in
-    if (Auth.isLoggedIn() && db) { try { await db.from('applications').delete().eq('id', id); } catch(e) { console.warn('AppStore.remove:', e.message); } }
+    if(Auth.isLoggedIn() && db) { try { await db.from('applications').delete().eq('id', id); } catch(e) { console.warn('AppStore.remove:', e.message); } }
   },
   loadSync(){ try{return JSON.parse(localStorage.getItem(this.KEY)||'[]');}catch(e){return[];} },
   async clear(){ if(Auth.isLoggedIn()&&db){try{const uid=(await db.auth.getUser()).data.user?.id;await db.from('applications').delete().eq('user_id',uid);}catch(e){}} localStorage.removeItem(this.KEY); },
@@ -3271,7 +3321,12 @@ async function clearAllApplications() {
 }
 
 function closeApplyModal(e) { if (e.target === document.getElementById('applyModal')) closeApplyModalDirect(); }
-function closeApplyModalDirect() { document.getElementById('applyModal').classList.remove('open'); }
+function closeApplyModalDirect() {
+  document.getElementById('applyModal').classList.remove('open');
+  const foot = document.getElementById('applyModalFoot');
+  if (foot) foot.style.display = 'none';
+  window._jdJob = null;
+}
 
 // ═══════════════════════════════════════════════
 // STAGE UPDATE MODAL
@@ -3597,11 +3652,11 @@ async function completeSurvey(){
       <div style="font-family:var(--display);font-size:1.2rem;font-weight:800;color:var(--white);letter-spacing:-.025em;margin-bottom:.35rem">One last thing.</div>
       <div style="font-size:.85rem;color:var(--sub);font-weight:300;line-height:1.7">Upload your resume so Seen can analyze your fit for jobs, optimize it for ATS, and find the hiring manager — all automatically.</div>
     </div>
-    <div id="onboardResumeZone" onclick="document.getElementById('onboardResumeInput').click()" ondragover="event.preventDefault();this.style.borderColor='var(--green)';this.style.background='var(--gdim)'" ondragleave="this.style.borderColor='var(--line2)';this.style.background='var(--raised)'" ondrop="handleOnboardResumeDrop(event)" style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:.5rem;padding:1.5rem;background:var(--raised);border:1.5px dashed var(--line2);border-radius:10px;cursor:pointer;transition:all .2s;margin-bottom:.75rem">
+    <label for="onboardResumeInput" id="onboardResumeZone" ondragover="event.preventDefault();this.style.borderColor='var(--green)';this.style.background='var(--gdim)'" ondragleave="this.style.borderColor='var(--line2)';this.style.background='var(--raised)'" ondrop="handleOnboardResumeDrop(event)" style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:.5rem;padding:1.5rem;background:var(--raised);border:1.5px dashed var(--line2);border-radius:10px;cursor:pointer;transition:all .2s;margin-bottom:.75rem">
       <div style="font-size:1.75rem">📄</div>
       <div style="font-family:var(--display);font-size:.9rem;font-weight:700;color:var(--white)">Upload resume</div>
       <div style="font-family:var(--mono);font-size:.6rem;color:var(--muted)">PDF or Word · Max 10MB</div>
-    </div>
+    </label>
     <input id="onboardResumeInput" type="file" accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document" style="display:none" onchange="handleOnboardResumeUpload(this.files[0])"/>
     <div id="onboardResumeProgress" style="display:none;margin-bottom:.75rem;padding:.65rem .9rem;background:var(--raised);border:1px solid var(--line2);border-radius:7px;font-family:var(--mono);font-size:.65rem;color:var(--dim);align-items:center;gap:.5rem"></div>
     <div style="display:flex;gap:.5rem">
@@ -3626,9 +3681,12 @@ async function handleOnboardResumeUpload(file) {
   if (zone) zone.style.opacity = '.5';
 
   try {
-    const formData = new FormData();
-    formData.append('file', file);
-    const res = await fetch('/api/parse-resume', { method: 'POST', body: formData });
+    const base64 = await _fileToBase64(file);
+    const res = await fetch('/api/parse-resume', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ base64, fileName: file.name, mimeType: file.type })
+    });
     const data = await res.json();
     if (!res.ok || data.error) throw new Error(data.error || 'Parse failed');
 
@@ -3777,25 +3835,7 @@ async function renderSeekerDash(){
   }
 
   // Saved jobs
-  const savedEl = _('dashSavedJobs');
-  if (savedEl) {
-    const saved = await SavedJobs.load();
-    if (!saved.length) {
-      savedEl.innerHTML = `<div style="font-size:.75rem;color:var(--muted);font-weight:300;padding:.5rem 0">No saved jobs yet. Tap ♡ on any listing.</div>`;
-    } else {
-      savedEl.innerHTML = saved.slice(0, 5).map(s => `
-        <div style="display:flex;align-items:center;justify-content:space-between;padding:.6rem 0;border-bottom:1px solid var(--line);gap:.75rem">
-          <div style="flex:1;min-width:0">
-            <div style="font-family:var(--display);font-size:.8rem;font-weight:700;color:var(--white);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${s.role}</div>
-            <div style="font-size:.68rem;color:var(--dim)">${s.company} · ${s.location||''}</div>
-          </div>
-          <div style="display:flex;align-items:center;gap:.4rem;flex-shrink:0">
-            <div style="font-family:var(--mono);font-size:.75rem;color:${Score.color(Score.risk(s.score))}">${s.score}</div>
-            <button onclick="SavedJobs.remove('${s.job_id}');renderSeekerDash()" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:.75rem;padding:.1rem .25rem" title="Remove">✕</button>
-          </div>
-        </div>`).join('');
-    }
-  }
+  await _refreshDashSaved();
 
   // Check resume and gate AI features
   checkResumeGate();
@@ -3804,11 +3844,28 @@ async function renderSeekerDash(){
 // ═══════════════════════════════════════════════
 // NAVIGATION
 // ═══════════════════════════════════════════════
+let _navSkipHistory = false;
+
+window.addEventListener('popstate', function(e) {
+  const page = e.state?.page;
+  _navSkipHistory = true;
+  if (page) {
+    go(page);
+  } else {
+    // No history state — go to a sensible default within the app
+    go(Auth.isSeeker() ? 'seeker-dash' : 'landing');
+  }
+  _navSkipHistory = false;
+});
+
 function go(page){
   try {
     if(page==='home'){
       page=Auth.isSeeker()?'seeker-dash':'landing';
       if(page==='seeker-dash')renderSeekerDash();
+    }
+    if(!_navSkipHistory){
+      history.pushState({page}, '', window.location.pathname + window.location.search);
     }
     document.querySelectorAll('.page, .page-full').forEach(p=>p.classList.remove('active'));
     const el=document.getElementById('page-'+page);
@@ -4021,48 +4078,96 @@ document.addEventListener('DOMContentLoaded', () => {
 const SavedJobs = {
   KEY: 'seen_saved_v1',
 
-  async load() {
-    if (Auth.isLoggedIn() && db) {
-      try {
-        const { data } = await db.from('saved_jobs').select('*').order('saved_at', { ascending: false });
-        return data || [];
-      } catch(e) {}
-    }
+  // localStorage is the immediate source of truth for toggle state.
+  // Supabase is synced in background and used for cross-device loading.
+
+  loadSync() {
     try { return JSON.parse(localStorage.getItem(this.KEY) || '[]'); } catch(e) { return []; }
   },
 
-  async save(job) {
-    if (Auth.isLoggedIn() && db) {
-      try {
-        const uid = (await db.auth.getUser()).data.user?.id;
-        const { error } = await db.from('saved_jobs').upsert({
-          user_id: uid, job_id: job.id, company: job.co,
-          role: job.title, location: job.city, score: job.score
-        }, { onConflict: 'user_id,job_id' });
-        if (error) throw error;
-        return { ok: true };
-      } catch(e) {}
-    }
+  isSaved(jobId) {
+    // Synchronous — no async DB read, so toggle is always reliable
+    return this.loadSync().some(s => String(s.job_id) === String(jobId));
+  },
+
+  save(job) {
+    const sid = String(job.id);
     const saved = this.loadSync();
-    if (saved.find(s => s.job_id === job.id)) return { ok: false, msg: 'Already saved.' };
-    saved.unshift({ job_id: job.id, company: job.co, role: job.title, location: job.city, score: job.score, saved_at: new Date().toISOString() });
-    localStorage.setItem(this.KEY, JSON.stringify(saved));
+    if (!saved.find(s => String(s.job_id) === sid)) {
+      saved.unshift({ job_id: sid, company: job.co, role: job.title, location: job.city, score: job.score, saved_at: new Date().toISOString() });
+      localStorage.setItem(this.KEY, JSON.stringify(saved));
+    }
+    // Sync to Supabase in background — don't block or await
+    if (Auth.isLoggedIn() && db) {
+      const uid = Auth._user?.id;
+      if (uid) {
+        db.from('saved_jobs').upsert(
+          { user_id: uid, job_id: sid, company: job.co, role: job.title, location: job.city, score: job.score },
+          { onConflict: 'user_id,job_id' }
+        ).catch(() => {});
+      }
+    }
     return { ok: true };
   },
 
-  async remove(jobId) {
+  remove(jobId) {
+    const sid = String(jobId);
+    localStorage.setItem(this.KEY, JSON.stringify(this.loadSync().filter(s => String(s.job_id) !== sid)));
+    // Sync to Supabase in background
     if (Auth.isLoggedIn() && db) {
-      try { await db.from('saved_jobs').delete().eq('job_id', jobId); return; } catch(e) {}
+      const uid = Auth._user?.id;
+      if (uid) db.from('saved_jobs').delete().eq('user_id', uid).eq('job_id', sid).catch(() => {});
     }
-    localStorage.setItem(this.KEY, JSON.stringify(this.loadSync().filter(s => s.job_id !== jobId)));
   },
 
-  async isSaved(jobId) {
-    const saved = await this.load();
-    return saved.some(s => s.job_id === jobId);
+  _pushLocalToDb(items, uid) {
+    for(const s of items) {
+      db.from('saved_jobs').upsert(
+        { user_id: uid, job_id: String(s.job_id), company: s.company||'', role: s.role||'', location: s.location||'', score: s.score||null },
+        { onConflict: 'user_id,job_id' }
+      ).catch(() => {});
+    }
   },
 
-  loadSync() { try { return JSON.parse(localStorage.getItem(this.KEY) || '[]'); } catch(e) { return []; } }
+  // For display (dashboard list) — fetches from Supabase and syncs back to localStorage
+  async load() {
+    if (Auth.isLoggedIn() && db) {
+      try {
+        const uid = Auth._user?.id;
+        if (!uid) throw new Error('no uid');
+        const { data } = await db.from('saved_jobs').select('*').eq('user_id', uid).order('saved_at', { ascending: false });
+        if (data) {
+          const dbIds = new Set(data.map(s => String(s.job_id)));
+          const localExtra = this.loadSync().filter(s => !dbIds.has(String(s.job_id)));
+          if(localExtra.length > 0) this._pushLocalToDb(localExtra, uid);
+          const merged = [...data, ...localExtra];
+          localStorage.setItem(this.KEY, JSON.stringify(merged));
+          return merged;
+        }
+      } catch(e) {}
+    }
+    return this.loadSync();
+  },
+
+  // Pull DB saved jobs into localStorage + push any local-only items up (call after login)
+  async syncFromDb() {
+    if (!Auth.isLoggedIn() || !db) return;
+    try {
+      const uid = Auth._user?.id;
+      if (!uid) return;
+      const { data } = await db.from('saved_jobs').select('*').eq('user_id', uid).order('saved_at', { ascending: false });
+      const local = this.loadSync();
+      const dbIds = new Set((data || []).map(s => String(s.job_id)));
+      const localExtra = local.filter(s => !dbIds.has(String(s.job_id)));
+      // Push any local-only items to Supabase so they survive cross-device
+      if(localExtra.length > 0) this._pushLocalToDb(localExtra, uid);
+      if(data && data.length > 0) {
+        localStorage.setItem(this.KEY, JSON.stringify([...data, ...localExtra]));
+      } else if(localExtra.length > 0) {
+        // No DB data yet but we have local items — keep them (already being pushed above)
+      }
+    } catch(e) {}
+  }
 };
 
 // ═══════════════════════════════════════════════
@@ -4389,15 +4494,14 @@ async function createAccount() {
 let _pendingApplication = null;
 
 // ═══════════════════════════════════════════════
-// JOB DETAIL MODAL (uses existing applyModal)
+// JOB DETAIL MODAL (uses existing applyModal + new sticky footer)
 // ═══════════════════════════════════════════════
-// Stores the current job detail so jdSaveToggle() can reference it without inline JS
 window._jdJob = null;
 
 function openJobDetailModal(jobId) {
   const sid = String(jobId);
   const j = JOBS.find(x => String(x.id) === sid);
-  window._jdJob = j ? { sid, j } : { sid, j: null };
+  window._jdJob = { sid, j: j || null };
 
   const co    = j ? (j.co    || '')                   : '';
   const title = j ? (j.title || 'Job Listing')         : 'Job Listing';
@@ -4405,95 +4509,100 @@ function openJobDetailModal(jobId) {
   const score = j ? (j.score || 65)                    : 65;
   const waste = j ? (j.waste || 25)                    : 25;
   const risk  = j ? (j.risk  || Score.risk(score))     : 'warn';
-  const type  = j ? (j.type  || 'Full-time')           : '';
+  const type  = j ? (j.type  || '')                    : '';
   const lvl   = j ? (j.lvl   || '')                    : '';
   const sal   = j ? (j.sal && j.sal !== '—' ? j.sal : '') : '';
   const desc  = j ? (j.description || (j.vibes && j.vibes[0]) || '') : '';
 
   document.getElementById('applyModalTitle').textContent = title;
-  document.getElementById('applyModalSub').textContent   = co + (loc ? ' · 📍 ' + loc : '');
+  document.getElementById('applyModalSub').textContent   = co + (loc ? '  ·  📍 ' + loc : '');
 
-  const body = document.getElementById('applyModalBody');
-  body.innerHTML = '';
+  // Scrollable body — meta + description
+  const chips = [type, lvl, sal].filter(Boolean).map(t =>
+    `<span style="background:var(--raised);border:1px solid var(--line2);border-radius:5px;padding:.18rem .5rem;font-size:.63rem;font-family:var(--mono);color:var(--sub)">${t}</span>`
+  ).join('');
 
-  // ── Meta row ──
-  const meta = document.createElement('div');
-  meta.style.cssText = 'display:flex;align-items:center;gap:.65rem;padding-bottom:.9rem;margin-bottom:.9rem;border-bottom:1px solid var(--line)';
+  const jobUrl = j ? (j._url || j.apply_url || '') : '';
+  const searchUrl = j ? 'https://www.google.com/search?q=' + encodeURIComponent((j.title||'') + ' ' + (j.co||'') + ' job') : '';
+  const linkUrl = jobUrl || searchUrl;
+  document.getElementById('applyModalBody').innerHTML =
+    `<div style="display:flex;align-items:center;gap:.65rem;padding-bottom:.9rem;margin-bottom:.9rem;border-bottom:1px solid var(--line)">
+       <div style="width:40px;height:40px;border-radius:8px;background:var(--raised);border:1px solid var(--line2);display:flex;align-items:center;justify-content:center;font-family:var(--display);font-weight:800;font-size:1rem;color:var(--white);flex-shrink:0">${(co||'?')[0].toUpperCase()}</div>
+       <div style="flex:1;display:flex;flex-wrap:wrap;gap:.3rem">${chips}</div>
+       <div style="text-align:center;flex-shrink:0"><div class="sring ${risk}" style="width:36px;height:36px"><div class="sring-n" style="font-size:.78rem">${score}</div></div><div style="font-family:var(--mono);font-size:.45rem;color:var(--muted);margin-top:.15rem">score</div></div>
+     </div>
+     <div style="color:var(--sub);font-size:.78rem;line-height:1.75;white-space:pre-wrap">${(desc||'No description available.').replace(/</g,'&lt;')}</div>`;
 
-  const logo = document.createElement('div');
-  logo.style.cssText = 'width:40px;height:40px;border-radius:8px;background:var(--raised);border:1px solid var(--line2);display:flex;align-items:center;justify-content:center;font-family:var(--display);font-weight:800;font-size:1rem;color:var(--white);flex-shrink:0';
-  logo.textContent = (co || '?')[0].toUpperCase();
-
-  const chips = document.createElement('div');
-  chips.style.cssText = 'flex:1;display:flex;flex-wrap:wrap;gap:.3rem';
-  [type, lvl, sal].filter(Boolean).forEach(t => {
-    const s = document.createElement('span');
-    s.style.cssText = 'background:var(--raised);border:1px solid var(--line2);border-radius:5px;padding:.18rem .5rem;font-size:.63rem;font-family:var(--mono);color:var(--sub)';
-    s.textContent = t;
-    chips.appendChild(s);
-  });
-
-  const ring = document.createElement('div');
-  ring.style.cssText = 'text-align:center;flex-shrink:0';
-  ring.innerHTML = '<div class="sring ' + risk + '" style="width:36px;height:36px"><div class="sring-n" style="font-size:.78rem">' + score + '</div></div><div style="font-family:var(--mono);font-size:.45rem;color:var(--muted);margin-top:.15rem">score</div>';
-
-  meta.appendChild(logo);
-  meta.appendChild(chips);
-  meta.appendChild(ring);
-  body.appendChild(meta);
-
-  // ── Description ──
-  const descDiv = document.createElement('div');
-  descDiv.style.cssText = 'color:var(--sub);font-size:.78rem;line-height:1.75;margin-bottom:1.25rem;white-space:pre-wrap';
-  descDiv.textContent = desc || 'No description available.';
-  body.appendChild(descDiv);
-
-  // ── Action buttons ──
-  const acts = document.createElement('div');
-  acts.style.cssText = 'display:flex;gap:.5rem;padding-top:.75rem;border-top:1px solid var(--line)';
-
-  const saveBtn = document.createElement('button');
-  saveBtn.type = 'button';
-  saveBtn.id = 'jdSaveBtn';
-  saveBtn.style.cssText = 'background:none;border:1px solid var(--line2);border-radius:8px;padding:.6rem .9rem;font-size:.9rem;cursor:pointer;color:var(--muted);flex-shrink:0;transition:all .15s';
-  saveBtn.textContent = '♡';
-  saveBtn.addEventListener('click', jdSaveToggle);
-
-  const applyBtn = document.createElement('button');
-  applyBtn.type = 'button';
-  applyBtn.style.cssText = 'flex:1;background:var(--green);color:var(--ink);border:none;border-radius:8px;padding:.6rem 1rem;font-family:var(--display);font-weight:800;font-size:.82rem;cursor:pointer';
-  applyBtn.textContent = 'Apply & Optimize →';
-  applyBtn.addEventListener('click', function() {
-    closeApplyModalDirect();
-    setTimeout(function() { openApplyModal(sid, co, title, loc, score, risk, waste, j ? j.apply_email || '' : ''); }, 50);
-  });
-
-  acts.appendChild(saveBtn);
-  acts.appendChild(applyBtn);
-  body.appendChild(acts);
-
-  // Set initial save state async
-  SavedJobs.isSaved(sid).then(function(saved) {
-    const b = document.getElementById('jdSaveBtn');
-    if (!b) return;
-    b.textContent = saved ? '♥' : '♡';
-    b.style.color = saved ? 'var(--green)' : '';
-  });
+  // Sticky footer — save, optional "full listing" link, apply
+  const saved = SavedJobs.isSaved(sid);
+  const foot = document.getElementById('applyModalFoot');
+  foot.style.cssText = 'display:flex;flex-direction:column;gap:.5rem;padding:1rem 1.5rem;border-top:1px solid var(--line);flex-shrink:0;background:var(--card);border-radius:0 0 16px 16px';
+  foot.innerHTML =
+    `${linkUrl ? `<a href="${linkUrl}" target="_blank" rel="noopener"
+       style="display:block;text-align:center;font-family:var(--mono);font-size:.65rem;color:var(--green);text-decoration:none;padding:.4rem 0;border:1px solid var(--line2);border-radius:8px;letter-spacing:.02em">View full listing ↗</a>` : ''}
+     <div style="display:flex;gap:.5rem">
+       <button id="jdSaveBtn" type="button" data-saved="${saved?'1':'0'}" onclick="jdSaveToggle(this)"
+         style="background:none;border:1px solid var(--line2);border-radius:8px;padding:.65rem 1rem;font-size:1rem;cursor:pointer;color:${saved?'var(--green)':'var(--muted)'};flex-shrink:0;transition:all .15s">${saved?'♥':'♡'}</button>
+       <button type="button" onclick="jdApplyClick()"
+         style="flex:1;background:var(--green);color:var(--ink);border:none;border-radius:8px;padding:.65rem 1rem;font-family:var(--display);font-weight:800;font-size:.82rem;cursor:pointer">Apply &amp; Optimize →</button>
+     </div>`;
 
   document.getElementById('applyModal').classList.add('open');
 }
 
-async function jdSaveToggle() {
+function jdSaveToggle(btn) {
   const d = window._jdJob;
   if (!d) return;
   const j = d.j;
-  await toggleSaveJob(d.sid, j ? j.co||'' : '', j ? j.title||'' : '', j ? j.city||j.loc||'' : '', j ? j.score||65 : 65);
-  const saved = await SavedJobs.isSaved(d.sid);
-  const b = document.getElementById('jdSaveBtn');
-  if (b) { b.textContent = saved ? '♥' : '♡'; b.style.color = saved ? 'var(--green)' : 'var(--muted)'; }
+  const sid = d.sid;
+  const wasSaved = btn.dataset.saved === '1';
+
+  // Update button face FIRST — before any storage or async work
+  if (wasSaved) {
+    btn.dataset.saved = '0';
+    btn.textContent = '♡';
+    btn.style.color = 'var(--muted)';
+    SavedJobs.remove(sid);
+    showToast('Removed from saved jobs.');
+  } else {
+    btn.dataset.saved = '1';
+    btn.textContent = '♥';
+    btn.style.color = 'var(--green)';
+    SavedJobs.save({ id: sid, co: j?.co||'', title: j?.title||'', city: j?.city||j?.loc||'', score: j?.score||65 });
+    showToast('Saved! Find it in your dashboard.');
+  }
+
+  // Keep card button in sync if visible behind modal
+  const cardBtn = document.getElementById('save_' + sid);
+  if (cardBtn) { cardBtn.textContent = wasSaved ? '♡' : '♥'; cardBtn.style.color = wasSaved ? '' : 'var(--red)'; }
+
+  _refreshDashSaved();
 }
 
-function closeJobDetailModal() { closeApplyModalDirect(); }
+function jdApplyClick() {
+  const d = window._jdJob;
+  if (!d) return;
+  const j = d.j;
+  const sid   = d.sid;
+  const co    = j ? j.co    || '' : '';
+  const title = j ? j.title || '' : '';
+  const loc   = j ? j.city  || j.loc || '' : '';
+  const score = j ? j.score || 65 : 65;
+  const waste = j ? j.waste || 25 : 25;
+  const risk  = j ? j.risk  || Score.risk(score) : 'warn';
+  const email = j ? j.apply_email || '' : '';
+  // Hide the footer before switching to apply form
+  const foot = document.getElementById('applyModalFoot');
+  if (foot) foot.style.display = 'none';
+  closeApplyModalDirect();
+  setTimeout(function() { openApplyModal(sid, co, title, loc, score, risk, waste, email); }, 50);
+}
+
+function closeJobDetailModal() {
+  const foot = document.getElementById('applyModalFoot');
+  if (foot) foot.style.display = 'none';
+  closeApplyModalDirect();
+}
 
 function openApplyModal(jobId, company, role, location, score, risk, waste, applyEmail) {
   const job = JOBS.find(j => j.id == jobId);
@@ -5023,26 +5132,17 @@ async function submitApplication(jobId, company, role, location, score, risk, wa
         employerUserId = dbJob?.companies?.employer_profiles?.[0]?.id || null;
       } catch(e) {}
 
-      const { data: appData, error } = await db.from('applications').insert({
-        user_id: uid,
-        job_id: dbJobId,
-        company_name: company,
-        role: role,
-        city: location,
-        platform: 'Seen',
-        status: 'active',
-        stage: 'Applied',
-        employer_stage: 'New',
-        score: score,
-        waste_score: waste,
-        job_url: null,
-        applicant_name: name,
-        applicant_email: email,
-        resume_url: resumeLabel,
-        cover_note: note,
-      }).select('id').single();
-
-      if (!error && appData) applicationId = appData.id;
+      // Try full insert first; fall back to core fields if schema doesn't have extended columns
+      let appData = null, appError = null;
+      const coreInsert = { user_id: uid, company_name: company, role, city: location, platform: 'Seen', status: 'active', stage: 'Applied', score, waste_score: waste };
+      const fullInsert = { ...coreInsert, job_id: dbJobId, employer_stage: 'New', job_url: null, applicant_name: name, applicant_email: email, resume_url: resumeLabel, cover_note: note };
+      ({ data: appData, error: appError } = await db.from('applications').insert(fullInsert).select('id').single());
+      if(appError) {
+        // Full insert failed (likely schema mismatch) — retry with just core fields
+        const fallback = await db.from('applications').insert(coreInsert).select('id').single();
+        if(!fallback.error && fallback.data) { appData = fallback.data; appError = null; }
+      }
+      if (!appError && appData) applicationId = appData.id;
 
       // 2. Notify employer if we found their account
       if (employerUserId && applicationId) {
@@ -5583,27 +5683,63 @@ function copyProposal() {
   navigator.clipboard.writeText(content).then(()=>showToast('Copied to clipboard!')).catch(()=>showToast('Copy failed — select and copy manually.'));
 }
 
-async function toggleSaveJob(jobId, company, title, city, score) {
-  const job = { id: jobId, co: company, title, city, score };
-  const isSaved = await SavedJobs.isSaved(jobId);
-  const btn = document.getElementById('save_' + jobId);
-  if (isSaved) {
-    await SavedJobs.remove(jobId);
-    if (btn) { btn.textContent = '♡'; btn.style.color = ''; }
+function toggleSaveJob(jobId, company, title, city, score) {
+  const sid = String(jobId);
+  const job = { id: sid, co: company, title, city, score };
+  const wasSaved = SavedJobs.isSaved(sid);
+
+  if (wasSaved) {
+    SavedJobs.remove(sid);
     showToast('Removed from saved jobs.');
   } else {
-    await SavedJobs.save(job);
-    if (btn) { btn.textContent = '♥'; btn.style.color = 'var(--red)'; }
+    SavedJobs.save(job);
     showToast('Saved! Find it in your dashboard.');
+  }
+
+  // Update the card button that was clicked
+  const btn = document.getElementById('save_' + sid);
+  if (btn) { btn.textContent = wasSaved ? '♡' : '♥'; btn.style.color = wasSaved ? '' : 'var(--red)'; }
+
+  _refreshDashSaved();
+}
+
+async function _refreshDashSaved() {
+  const savedEl = document.getElementById('dashSavedJobs');
+  if (!savedEl) return;
+  const saved = await SavedJobs.load();
+  if (!saved.length) {
+    savedEl.innerHTML = `<div style="font-size:.75rem;color:var(--muted);font-weight:300;padding:.5rem 0">No saved jobs yet. Tap ♡ on any listing.</div>`;
+  } else {
+    savedEl.innerHTML = saved.slice(0, 5).map(s => `
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:.6rem 0;border-bottom:1px solid var(--line);gap:.75rem">
+        <div style="flex:1;min-width:0">
+          <div style="font-family:var(--display);font-size:.8rem;font-weight:700;color:var(--white);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${s.role||s.title||'Job'}</div>
+          <div style="font-size:.68rem;color:var(--dim)">${s.company||s.co||''} · ${s.location||s.city||''}</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:.4rem;flex-shrink:0">
+          <div style="font-family:var(--mono);font-size:.75rem;color:${Score.color(Score.risk(s.score))}">${s.score||''}</div>
+          <button onclick="removeSavedJobFromDash('${s.job_id}')" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:.75rem;padding:.1rem .25rem" title="Remove">✕</button>
+        </div>
+      </div>`).join('');
   }
 }
 
+async function removeSavedJobFromDash(jobId) {
+  await SavedJobs.remove(jobId);
+  const sid = String(jobId);
+  const cardBtn = document.getElementById('save_' + sid);
+  if (cardBtn) { cardBtn.textContent = '♡'; cardBtn.style.color = ''; }
+  await _refreshDashSaved();
+}
+
 async function initSaveButtons() {
-  const saved = await SavedJobs.load();
-  const savedIds = new Set(saved.map(s => s.job_id));
+  // Load from DB (merges into localStorage) so subsequent isSaved() calls are current
+  await SavedJobs.load();
+  const savedIds = new Set(SavedJobs.loadSync().map(s => String(s.job_id)));
   document.querySelectorAll('[id^="save_"]').forEach(btn => {
     const jobId = btn.id.replace('save_', '');
     if (savedIds.has(jobId)) { btn.textContent = '♥'; btn.style.color = 'var(--red)'; }
+    else { btn.textContent = '♡'; btn.style.color = ''; }
   });
 }
 
