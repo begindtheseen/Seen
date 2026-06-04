@@ -9,7 +9,8 @@
     "api/jobs.js": { "maxDuration": 60 },
     "api/user-sync.js": { "maxDuration": 15 },
     "api/company-score.js": { "maxDuration": 45 },
-    "api/refresh-companies.js": { "maxDuration": 60 }
+    "api/refresh-companies.js": { "maxDuration": 60 },
+    "api/merge-companies.js": { "maxDuration": 60 }
   },
   "crons": [
     { "path": "/api/refresh-jobs", "schedule": "0 2 * * *" },
@@ -18,6 +19,7 @@
     { "path": "/api/refresh-jobs", "schedule": "0 14 * * *" },
     { "path": "/api/refresh-jobs", "schedule": "0 18 * * *" },
     { "path": "/api/refresh-jobs", "schedule": "0 22 * * *" },
-    { "path": "/api/refresh-companies", "schedule": "0 3 * * *" }
+    { "path": "/api/refresh-companies", "schedule": "0 3 * * *" },
+    { "path": "/api/merge-companies", "schedule": "0 4 * * 0" }
   ]
 }
