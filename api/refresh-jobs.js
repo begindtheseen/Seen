@@ -1,3 +1,5 @@
+import { getQueryExpansion } from './_utils/expand.js';
+
 // Node.js serverless — no edge runtime, supports maxDuration in vercel.json
 // 60 searches split into 6 batches of 10, one batch per cron run (6× daily)
 // Each batch completes in ~5s well under the 60s maxDuration
@@ -146,7 +148,6 @@ async function fetchAdzuna(what, where, appId, appKey) {
       source: 'Adzuna',
       type: j.contract_time === 'part_time' ? 'Part-time' : 'Full-time',
       level: inferLevel(j.title),
-      search_query: what,
       score: scoreJob(j.company?.display_name, j.salary_min),
       waste_score: wasteScore(j.company?.display_name),
       expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
@@ -348,9 +349,31 @@ export default async function handler(req, res) {
     const batchIndex = batchParam !== null ? parseInt(batchParam) : getCurrentBatch();
     const searches = ALL_SEARCHES.slice(batchIndex * BATCH_SIZE, (batchIndex + 1) * BATCH_SIZE);
 
-    // Run all 10 searches in parallel
+    const dbHeaders = {
+      apikey: SUPABASE_SERVICE_KEY,
+      Authorization: `Bearer ${SUPABASE_SERVICE_KEY}`,
+      'Content-Type': 'application/json',
+    };
+    const ANTHROPIC_KEY = process.env.ANTHROPIC_KEY;
+
+    // Resolve canonical form for each search term (DB cache → Haiku, runs once per term)
+    const canonicalMap = Object.fromEntries(
+      await Promise.all(
+        searches.map(async s => {
+          const qNorm = s.what.toLowerCase().trim();
+          const { canonical } = await getQueryExpansion(qNorm, SUPABASE_URL, dbHeaders, ANTHROPIC_KEY);
+          return [s.what, canonical];
+        })
+      )
+    );
+
+    // Run all searches in parallel, tag each job with its canonical search_query
     const results = await Promise.allSettled(
-      searches.map(s => fetchAdzuna(s.what, s.where, ADZUNA_APP_ID, ADZUNA_APP_KEY))
+      searches.map(async s => {
+        const jobs = await fetchAdzuna(s.what, s.where, ADZUNA_APP_ID, ADZUNA_APP_KEY);
+        const canonical = canonicalMap[s.what] || s.what.toLowerCase().trim();
+        return jobs.map(j => ({ ...j, search_query: canonical }));
+      })
     );
     const allJobs = results.filter(r => r.status === 'fulfilled').flatMap(r => r.value);
 
