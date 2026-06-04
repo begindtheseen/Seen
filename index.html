@@ -3065,6 +3065,31 @@ const AppStore = {
       apps.unshift(entry);
       localStorage.setItem(this.KEY, JSON.stringify(apps));
     }
+    // Write to Supabase immediately so other devices see it right away
+    if(Auth.isLoggedIn() && db) {
+      const uid = Auth._user?.id;
+      if(uid) {
+        db.from('applications').insert({
+          user_id: uid,
+          company_name: entry.company || '',
+          role: entry.role || '',
+          city: entry.location || '',
+          platform: entry.platform || 'Seen',
+          job_url: entry.jobUrl || null,
+          status: entry.status || 'active',
+          stage: entry.stage || 'Applied',
+          score: entry.score || null,
+          waste_score: entry.waste || null,
+        }).select('id').single().then(({ data: row, error }) => {
+          if (!error && row?.id) {
+            // Replace temp app_ id with real DB id in localStorage
+            const stored = this.loadSync();
+            const idx = stored.findIndex(a => a.id === entry.id);
+            if(idx !== -1) { stored[idx] = {...stored[idx], id: row.id}; localStorage.setItem(this.KEY, JSON.stringify(stored)); }
+          }
+        }).catch(() => {});
+      }
+    }
     return {ok:true};
   },
   async update(id, changes) {
