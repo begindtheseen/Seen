@@ -2131,14 +2131,17 @@ function renderJobResults(jobs, l) {
   listEl.innerHTML = '<div class="jlay">' + jobs.map(job => {
     const score = job.score || 65;
     const risk = Score.risk(score);
-    const safeId = 'srch_' + Math.random().toString(36).slice(2,8);
-    const safeCompany = (job.company||'').replace(/['"\\]/g,'');
-    const safeTitle = (job.title||'').replace(/['"\\]/g,'');
-    const safeLoc = (job.location||l||'US').replace(/['"\\]/g,'');
-    const waste = job.waste_score || 25;
+    // Use real DB id when available so saved-state survives re-renders; fall back to random only for raw Adzuna results
+    const safeId = job.id ? String(job.id) : 'srch_' + Math.random().toString(36).slice(2,8);
+    // _normalizeDbJob uses co/loc/lvl; raw Adzuna uses company/location/level — handle both
+    const safeCompany = (job.company || job.co || '').replace(/['"\\]/g,'');
+    const safeTitle   = (job.title  || '').replace(/['"\\]/g,'');
+    const safeLoc     = (job.location || job.loc || job.city || l || 'US').replace(/['"\\]/g,'');
+    const levelLabel  = job.level || job.lvl || 'Mid level';
+    const waste = job.waste_score || job.waste || 25;
     // Register job in JOBS so the optimizer and modal can look it up by ID
     if (!JOBS.find(j => j.id === safeId)) {
-      JOBS.push({ id: safeId, _url: job.url || job.apply_url || null, co: safeCompany, title: safeTitle, city: safeLoc, score, waste, description: job.description || '', vibes: [job.description ? job.description.slice(0,80) : ('via ' + (job.source||'Job board'))] });
+      JOBS.push({ id: safeId, _url: job.apply_url || job.url || job._url || null, co: safeCompany, title: safeTitle, city: safeLoc, score, waste, lvl: levelLabel, description: job.description || '', vibes: [job.description ? job.description.slice(0,80) : ('via ' + (job.source||'Job board'))] });
     }
     const applyAction = "openApplyModal('" + safeId + "','" + safeCompany + "','" + safeTitle + "','" + safeLoc + "'," + score + ",'" + Score.risk(score) + "'," + waste + ",'')";
     return '<div class="jlc">' +
@@ -2158,7 +2161,7 @@ function renderJobResults(jobs, l) {
         '<div class="jlc-meta">' +
           '<span class="jlc-mi">' + (job.type||'Full-time') + '</span>' +
           '<span class="jlc-mi">·</span>' +
-          '<span class="jlc-mi">' + (job.level||'Mid level') + '</span>' +
+          '<span class="jlc-mi">' + levelLabel + '</span>' +
           (job.salary ? '<span class="jlc-mi">·</span><span class="jlc-sal">' + job.salary + '</span>' : '') +
           '<span class="jlc-mi">·</span><span class="jlc-mi" style="color:var(--blue)">' + (job.source||'Job board') + '</span>' +
         '</div>' +
