@@ -4261,10 +4261,14 @@ async function _requestGpsLocation(inputId){
       inp.value=loc;
       inp.style.borderColor='var(--green)';
       showToast('📍 Showing jobs near '+loc);
+      inp.placeholder=origPh;
+      setTimeout(()=>{if(inp)inp.style.borderColor='';},1500);
+      return loc;
     }
   }catch(e){/* denied or failed — user types manually */}
   inp.placeholder=origPh;
   setTimeout(()=>{if(inp)inp.style.borderColor='';},1500);
+  return null;
 }
 
 function go(page){
@@ -4294,7 +4298,11 @@ function go(page){
         if(c)locInp.value=c;
       }
       // If location is still empty, ask for GPS — works for guests too
-      _requestGpsLocation('jobSearchLocation');
+      // Re-run loadJobs once GPS resolves so results are location-filtered
+      const _hadLoc=locInp?.value.trim()||'';
+      _requestGpsLocation('jobSearchLocation').then(detectedLoc=>{
+        if(detectedLoc&&!_hadLoc)loadJobs();
+      });
       // Pre-fill niche filter from profile industry (only if user hasn't changed it)
       const nicheEl=document.getElementById('filterNiche');
       if(nicheEl&&nicheEl.value===''){
