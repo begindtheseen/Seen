@@ -463,7 +463,7 @@ nav{position:fixed;top:0;left:0;right:0;z-index:500;height:58px;display:flex;ali
 .m-ti{font-family:var(--display);font-size:1rem;font-weight:800;color:var(--white);letter-spacing:-.02em}
 .m-cl{background:none;border:none;color:var(--dim);font-size:1.1rem;cursor:pointer;padding:.2rem;transition:color .15s}
 .m-cl:hover{color:var(--sub)}
-.m-body{padding:1.5rem;overflow-y:auto;flex:1}
+.m-body{padding:1.5rem;overflow-y:auto;flex:1;overscroll-behavior:contain;-webkit-overflow-scrolling:touch}
 .m-foot{display:flex;gap:.5rem;padding:1rem 1.5rem;border-top:1px solid var(--line);flex-shrink:0;background:var(--card);border-radius:0 0 16px 16px}
 
 /* DISCLAIMER */
@@ -6174,6 +6174,16 @@ if(db){
     else if(Auth.isEmployer()){goToEmployerDashboard();}
   }).catch(e=>console.warn('Auth init:',e));
 }
+
+// Lock body scroll when any modal is open — prevents background page scroll on iOS
+(function() {
+  function _syncBodyScroll() {
+    document.body.style.overflow = document.querySelector('.modal-ov.open') ? 'hidden' : '';
+  }
+  document.querySelectorAll('.modal-ov').forEach(function(ov) {
+    new MutationObserver(_syncBodyScroll).observe(ov, { attributes: true, attributeFilter: ['class'] });
+  });
+})();
 </script>
 </body>
 </html>
