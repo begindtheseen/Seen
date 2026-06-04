@@ -1,90 +1,301 @@
 import { getQueryExpansion } from './_utils/expand.js';
 
-// Node.js serverless — no edge runtime, supports maxDuration in vercel.json
-// 60 searches split into 6 batches of 10, one batch per cron run (6× daily)
-// Each batch completes in ~5s well under the 60s maxDuration
+// 240 searches across 12 batches of 20. 6 cron runs/day → all 12 batches covered in 2 days.
+// Adzuna free tier: 250 calls/day — 120/day (20×6) stays well within limit.
+// Each Adzuna call returns up to 50 jobs → ~6,000 new listings refreshed every 2 days.
 
 const ALL_SEARCHES = [
-  // Batch 0 — 2am UTC — Healthcare mid/senior
+  // ── Healthcare mid/senior ─────────────────────────────────────────────────
   { what: 'Registered Nurse', where: 'Los Angeles, CA' },
   { what: 'Registered Nurse', where: 'New York, NY' },
   { what: 'Registered Nurse', where: 'Chicago, IL' },
   { what: 'Registered Nurse', where: 'Houston, TX' },
   { what: 'Registered Nurse', where: 'Phoenix, AZ' },
+  { what: 'Registered Nurse', where: 'Atlanta, GA' },
   { what: 'Physical Therapist', where: 'Los Angeles, CA' },
   { what: 'Physical Therapist', where: 'Chicago, IL' },
-  { what: 'LVN', where: 'Orange County, CA' },
+  { what: 'Physical Therapist', where: 'Dallas, TX' },
+  { what: 'Occupational Therapist', where: 'New York, NY' },
+  { what: 'Occupational Therapist', where: 'Los Angeles, CA' },
+  { what: 'Speech Language Pathologist', where: 'New York, NY' },
+  { what: 'Dental Hygienist', where: 'Los Angeles, CA' },
+  { what: 'Dental Hygienist', where: 'Phoenix, AZ' },
+  { what: 'LVN', where: 'Los Angeles, CA' },
+  { what: 'LVN', where: 'Houston, TX' },
+  { what: 'Nurse Practitioner', where: 'New York, NY' },
+  { what: 'Nurse Practitioner', where: 'Dallas, TX' },
   { what: 'Social Worker', where: 'New York, NY' },
-  { what: 'Clinical Research Coordinator', where: 'Boston, MA' },
-  // Batch 1 — 6am UTC — Healthcare entry level
+  { what: 'Social Worker', where: 'Chicago, IL' },
+  // ── Healthcare entry level ────────────────────────────────────────────────
   { what: 'CNA', where: 'New York, NY' },
   { what: 'CNA', where: 'Atlanta, GA' },
   { what: 'CNA', where: 'Los Angeles, CA' },
+  { what: 'CNA', where: 'Chicago, IL' },
+  { what: 'CNA', where: 'Houston, TX' },
   { what: 'Medical Assistant', where: 'Los Angeles, CA' },
   { what: 'Medical Assistant', where: 'Dallas, TX' },
   { what: 'Medical Assistant', where: 'Phoenix, AZ' },
+  { what: 'Medical Assistant', where: 'Atlanta, GA' },
   { what: 'Home Health Aide', where: 'New York, NY' },
   { what: 'Home Health Aide', where: 'Chicago, IL' },
+  { what: 'Home Health Aide', where: 'Houston, TX' },
   { what: 'Patient Care Technician', where: 'Houston, TX' },
+  { what: 'Patient Care Technician', where: 'Atlanta, GA' },
   { what: 'Pharmacy Technician', where: 'Los Angeles, CA' },
-  // Batch 2 — 10am UTC — Tech mid/senior + Finance
+  { what: 'Pharmacy Technician', where: 'Chicago, IL' },
+  { what: 'Phlebotomist', where: 'Los Angeles, CA' },
+  { what: 'Phlebotomist', where: 'Dallas, TX' },
+  { what: 'Dental Assistant', where: 'Los Angeles, CA' },
+  { what: 'Dental Assistant', where: 'Phoenix, AZ' },
+  // ── Healthcare specialist ─────────────────────────────────────────────────
+  { what: 'Radiologic Technologist', where: 'New York, NY' },
+  { what: 'Radiologic Technologist', where: 'Houston, TX' },
+  { what: 'Ultrasound Technician', where: 'Los Angeles, CA' },
+  { what: 'EMT', where: 'New York, NY' },
+  { what: 'EMT', where: 'Chicago, IL' },
+  { what: 'Paramedic', where: 'Houston, TX' },
+  { what: 'Paramedic', where: 'Phoenix, AZ' },
+  { what: 'Medical Biller', where: 'Remote' },
+  { what: 'Medical Coder', where: 'Remote' },
+  { what: 'Healthcare Administrator', where: 'New York, NY' },
+  { what: 'Mental Health Counselor', where: 'New York, NY' },
+  { what: 'Mental Health Counselor', where: 'Los Angeles, CA' },
+  { what: 'Veterinary Technician', where: 'Los Angeles, CA' },
+  { what: 'Veterinary Technician', where: 'Denver, CO' },
+  { what: 'Clinical Research Coordinator', where: 'Boston, MA' },
+  { what: 'Medical Receptionist', where: 'Los Angeles, CA' },
+  { what: 'Sterile Processing Technician', where: 'Chicago, IL' },
+  { what: 'Surgical Tech', where: 'Dallas, TX' },
+  { what: 'Dialysis Technician', where: 'Houston, TX' },
+  { what: 'Health Information Technician', where: 'Remote' },
+  // ── Tech senior ───────────────────────────────────────────────────────────
   { what: 'Software Engineer', where: 'San Francisco, CA' },
   { what: 'Software Engineer', where: 'Seattle, WA' },
   { what: 'Software Engineer', where: 'Austin, TX' },
   { what: 'Software Engineer', where: 'New York, NY' },
   { what: 'Software Engineer', where: 'Remote' },
+  { what: 'Senior Software Engineer', where: 'San Francisco, CA' },
+  { what: 'Senior Software Engineer', where: 'Remote' },
   { what: 'Product Manager', where: 'San Francisco, CA' },
+  { what: 'Product Manager', where: 'New York, NY' },
+  { what: 'Product Manager', where: 'Remote' },
   { what: 'DevOps Engineer', where: 'Remote' },
-  { what: 'Financial Analyst', where: 'New York, NY' },
-  { what: 'Financial Analyst', where: 'Chicago, IL' },
-  { what: 'Accountant', where: 'Boston, MA' },
-  // Batch 3 — 2pm UTC — Tech entry + Business entry
+  { what: 'DevOps Engineer', where: 'Seattle, WA' },
+  { what: 'Data Scientist', where: 'San Francisco, CA' },
+  { what: 'Data Scientist', where: 'New York, NY' },
+  { what: 'Data Scientist', where: 'Remote' },
+  { what: 'Cloud Engineer', where: 'Remote' },
+  { what: 'Cybersecurity Analyst', where: 'Washington, DC' },
+  { what: 'Cybersecurity Analyst', where: 'Remote' },
+  { what: 'Machine Learning Engineer', where: 'Remote' },
+  { what: 'Backend Developer', where: 'Remote' },
+  // ── Tech entry/mid ────────────────────────────────────────────────────────
+  { what: 'Frontend Developer', where: 'New York, NY' },
+  { what: 'Frontend Developer', where: 'Remote' },
+  { what: 'Full Stack Developer', where: 'Austin, TX' },
+  { what: 'Full Stack Developer', where: 'Remote' },
+  { what: 'Web Developer', where: 'Remote' },
+  { what: 'Data Analyst', where: 'New York, NY' },
+  { what: 'Data Analyst', where: 'Chicago, IL' },
+  { what: 'Data Analyst', where: 'Remote' },
+  { what: 'QA Engineer', where: 'Remote' },
+  { what: 'IT Support Specialist', where: 'New York, NY' },
+  { what: 'IT Support Specialist', where: 'Los Angeles, CA' },
+  { what: 'Network Administrator', where: 'Dallas, TX' },
+  { what: 'UX Designer', where: 'Remote' },
+  { what: 'UX Designer', where: 'New York, NY' },
   { what: 'Junior Software Engineer', where: 'Remote' },
   { what: 'Junior Software Engineer', where: 'New York, NY' },
-  { what: 'Data Analyst', where: 'New York, NY' },
-  { what: 'Data Analyst', where: 'Remote' },
-  { what: 'UX Designer', where: 'Remote' },
-  { what: 'Administrative Assistant', where: 'New York, NY' },
-  { what: 'Administrative Assistant', where: 'Los Angeles, CA' },
+  { what: 'React Developer', where: 'Remote' },
+  { what: 'Python Developer', where: 'Remote' },
+  { what: 'Database Administrator', where: 'Remote' },
+  { what: 'IT Project Manager', where: 'Remote' },
+  // ── Finance / Business ────────────────────────────────────────────────────
+  { what: 'Financial Analyst', where: 'New York, NY' },
+  { what: 'Financial Analyst', where: 'Chicago, IL' },
+  { what: 'Financial Analyst', where: 'Dallas, TX' },
+  { what: 'Accountant', where: 'New York, NY' },
+  { what: 'Accountant', where: 'Chicago, IL' },
+  { what: 'Accountant', where: 'Los Angeles, CA' },
+  { what: 'Bookkeeper', where: 'Remote' },
+  { what: 'Bookkeeper', where: 'New York, NY' },
+  { what: 'Tax Accountant', where: 'New York, NY' },
+  { what: 'Tax Accountant', where: 'Remote' },
+  { what: 'Financial Advisor', where: 'New York, NY' },
+  { what: 'Financial Advisor', where: 'Dallas, TX' },
+  { what: 'Loan Officer', where: 'New York, NY' },
+  { what: 'Loan Officer', where: 'Los Angeles, CA' },
+  { what: 'Bank Teller', where: 'New York, NY' },
+  { what: 'Bank Teller', where: 'Houston, TX' },
+  { what: 'Business Analyst', where: 'New York, NY' },
+  { what: 'Business Analyst', where: 'Chicago, IL' },
+  { what: 'Business Analyst', where: 'Remote' },
+  { what: 'Insurance Agent', where: 'Dallas, TX' },
+  // ── Office / Admin ────────────────────────────────────────────────────────
   { what: 'Customer Service Representative', where: 'Remote' },
   { what: 'Customer Service Representative', where: 'New York, NY' },
-  { what: 'Business Analyst', where: 'Chicago, IL' },
-  // Batch 4 — 6pm UTC — Retail + Logistics entry
+  { what: 'Customer Service Representative', where: 'Dallas, TX' },
+  { what: 'Administrative Assistant', where: 'New York, NY' },
+  { what: 'Administrative Assistant', where: 'Los Angeles, CA' },
+  { what: 'Administrative Assistant', where: 'Chicago, IL' },
+  { what: 'Receptionist', where: 'New York, NY' },
+  { what: 'Receptionist', where: 'Los Angeles, CA' },
+  { what: 'Office Manager', where: 'New York, NY' },
+  { what: 'Office Manager', where: 'Chicago, IL' },
+  { what: 'Executive Assistant', where: 'New York, NY' },
+  { what: 'Executive Assistant', where: 'Remote' },
+  { what: 'Data Entry Clerk', where: 'Remote' },
+  { what: 'Paralegal', where: 'New York, NY' },
+  { what: 'Paralegal', where: 'Los Angeles, CA' },
+  { what: 'Legal Assistant', where: 'New York, NY' },
+  { what: 'Operations Manager', where: 'New York, NY' },
+  { what: 'Operations Manager', where: 'Chicago, IL' },
+  { what: 'Project Manager', where: 'Remote' },
+  { what: 'Project Manager', where: 'New York, NY' },
+  // ── HR / Recruiting / Marketing ───────────────────────────────────────────
+  { what: 'Human Resources Manager', where: 'New York, NY' },
+  { what: 'Human Resources Manager', where: 'Chicago, IL' },
+  { what: 'HR Coordinator', where: 'Atlanta, GA' },
+  { what: 'HR Coordinator', where: 'Remote' },
+  { what: 'Recruiter', where: 'New York, NY' },
+  { what: 'Recruiter', where: 'Remote' },
+  { what: 'Talent Acquisition Specialist', where: 'Remote' },
+  { what: 'Marketing Manager', where: 'New York, NY' },
+  { what: 'Marketing Manager', where: 'Los Angeles, CA' },
+  { what: 'Marketing Coordinator', where: 'New York, NY' },
+  { what: 'Marketing Coordinator', where: 'Remote' },
+  { what: 'Social Media Manager', where: 'Remote' },
+  { what: 'Content Writer', where: 'Remote' },
+  { what: 'Copywriter', where: 'Remote' },
+  { what: 'Graphic Designer', where: 'Remote' },
+  { what: 'Graphic Designer', where: 'New York, NY' },
+  { what: 'SEO Specialist', where: 'Remote' },
+  { what: 'Email Marketing Specialist', where: 'Remote' },
+  { what: 'Brand Manager', where: 'New York, NY' },
+  { what: 'Digital Marketing Specialist', where: 'Remote' },
+  // ── Sales ─────────────────────────────────────────────────────────────────
+  { what: 'Sales Representative', where: 'New York, NY' },
+  { what: 'Sales Representative', where: 'Dallas, TX' },
+  { what: 'Sales Representative', where: 'Chicago, IL' },
+  { what: 'Account Manager', where: 'New York, NY' },
+  { what: 'Account Manager', where: 'Remote' },
+  { what: 'Account Manager', where: 'Chicago, IL' },
+  { what: 'Account Executive', where: 'San Francisco, CA' },
+  { what: 'Account Executive', where: 'Remote' },
+  { what: 'Inside Sales Representative', where: 'Remote' },
+  { what: 'Inside Sales Representative', where: 'Dallas, TX' },
+  { what: 'Sales Manager', where: 'New York, NY' },
+  { what: 'Sales Manager', where: 'Chicago, IL' },
+  { what: 'Business Development Representative', where: 'Remote' },
+  { what: 'Customer Success Manager', where: 'Remote' },
+  { what: 'Real Estate Agent', where: 'Los Angeles, CA' },
+  { what: 'Real Estate Agent', where: 'Dallas, TX' },
+  { what: 'Leasing Consultant', where: 'Los Angeles, CA' },
+  { what: 'Property Manager', where: 'Dallas, TX' },
+  { what: 'Property Manager', where: 'Atlanta, GA' },
+  { what: 'Mortgage Loan Originator', where: 'New York, NY' },
+  // ── Warehouse / Logistics ─────────────────────────────────────────────────
+  { what: 'Warehouse Associate', where: 'Los Angeles, CA' },
+  { what: 'Warehouse Associate', where: 'Chicago, IL' },
+  { what: 'Warehouse Associate', where: 'Dallas, TX' },
+  { what: 'Warehouse Associate', where: 'Houston, TX' },
+  { what: 'Amazon Warehouse', where: 'Los Angeles, CA' },
+  { what: 'Amazon Warehouse', where: 'New York, NY' },
+  { what: 'Amazon Warehouse', where: 'Dallas, TX' },
+  { what: 'Amazon Warehouse', where: 'Chicago, IL' },
+  { what: 'Amazon Warehouse', where: 'Phoenix, AZ' },
+  { what: 'Delivery Driver', where: 'Los Angeles, CA' },
+  { what: 'Delivery Driver', where: 'New York, NY' },
+  { what: 'Delivery Driver', where: 'Chicago, IL' },
+  { what: 'Forklift Operator', where: 'Chicago, IL' },
+  { what: 'Forklift Operator', where: 'Dallas, TX' },
+  { what: 'Forklift Operator', where: 'Los Angeles, CA' },
+  { what: 'CDL Truck Driver', where: 'Dallas, TX' },
+  { what: 'CDL Truck Driver', where: 'Chicago, IL' },
+  { what: 'CDL Truck Driver', where: 'Houston, TX' },
+  { what: 'Logistics Coordinator', where: 'Los Angeles, CA' },
+  { what: 'Package Handler', where: 'Los Angeles, CA' },
+  // ── Retail / Food service ─────────────────────────────────────────────────
   { what: 'Sales Associate', where: 'Los Angeles, CA' },
   { what: 'Sales Associate', where: 'New York, NY' },
   { what: 'Sales Associate', where: 'Chicago, IL' },
-  { what: 'Retail Associate', where: 'Remote' },
-  { what: 'Warehouse Associate', where: 'Los Angeles, CA' },
-  { what: 'Warehouse Associate', where: 'Chicago, IL' },
-  { what: 'CDL Truck Driver', where: 'Dallas, TX' },
-  { what: 'Delivery Driver', where: 'Los Angeles, CA' },
-  { what: 'Customer Service Associate', where: 'Miami, FL' },
-  { what: 'Receptionist', where: 'New York, NY' },
-  // Batch 5 — 10pm UTC — Trades + Education + Mixed entry
-  { what: 'Electrician', where: 'Phoenix, AZ' },
-  { what: 'Construction Worker', where: 'Denver, CO' },
-  { what: 'Restaurant Manager', where: 'Miami, FL' },
+  { what: 'Sales Associate', where: 'Houston, TX' },
+  { what: 'Cashier', where: 'Los Angeles, CA' },
+  { what: 'Cashier', where: 'New York, NY' },
+  { what: 'Cashier', where: 'Dallas, TX' },
+  { what: 'Barista', where: 'Seattle, WA' },
+  { what: 'Barista', where: 'New York, NY' },
+  { what: 'Barista', where: 'Los Angeles, CA' },
+  { what: 'Cook', where: 'New York, NY' },
+  { what: 'Cook', where: 'Los Angeles, CA' },
   { what: 'Server', where: 'New York, NY' },
+  { what: 'Server', where: 'Las Vegas, NV' },
+  { what: 'Bartender', where: 'New York, NY' },
+  { what: 'Bartender', where: 'Miami, FL' },
+  { what: 'Restaurant Manager', where: 'New York, NY' },
+  { what: 'Restaurant Manager', where: 'Miami, FL' },
+  { what: 'Shift Supervisor', where: 'Chicago, IL' },
+  { what: 'Retail Manager', where: 'Dallas, TX' },
+  // ── Trades ────────────────────────────────────────────────────────────────
+  { what: 'Electrician', where: 'Phoenix, AZ' },
+  { what: 'Electrician', where: 'Houston, TX' },
+  { what: 'Electrician', where: 'Dallas, TX' },
+  { what: 'Plumber', where: 'Los Angeles, CA' },
+  { what: 'Plumber', where: 'Houston, TX' },
+  { what: 'Plumber', where: 'Atlanta, GA' },
+  { what: 'HVAC Technician', where: 'Phoenix, AZ' },
+  { what: 'HVAC Technician', where: 'Atlanta, GA' },
+  { what: 'HVAC Technician', where: 'Houston, TX' },
+  { what: 'Welder', where: 'Houston, TX' },
+  { what: 'Welder', where: 'Dallas, TX' },
+  { what: 'Carpenter', where: 'New York, NY' },
+  { what: 'Carpenter', where: 'Los Angeles, CA' },
+  { what: 'Automotive Technician', where: 'Los Angeles, CA' },
+  { what: 'Automotive Technician', where: 'Dallas, TX' },
+  { what: 'Diesel Mechanic', where: 'Dallas, TX' },
+  { what: 'Maintenance Technician', where: 'Los Angeles, CA' },
+  { what: 'Maintenance Technician', where: 'Chicago, IL' },
+  { what: 'Construction Worker', where: 'Houston, TX' },
+  { what: 'Construction Worker', where: 'Phoenix, AZ' },
+  // ── Education / Services ──────────────────────────────────────────────────
   { what: 'Teacher', where: 'Los Angeles, CA' },
   { what: 'Teacher', where: 'Chicago, IL' },
-  { what: 'Project Manager', where: 'Remote' },
-  { what: 'Marketing Coordinator', where: 'New York, NY' },
-  { what: 'HR Coordinator', where: 'Atlanta, GA' },
-  { what: 'Operations Associate', where: 'Dallas, TX' },
+  { what: 'Teacher', where: 'New York, NY' },
+  { what: 'Teacher', where: 'Houston, TX' },
+  { what: 'Teaching Assistant', where: 'New York, NY' },
+  { what: 'Teaching Assistant', where: 'Los Angeles, CA' },
+  { what: 'Special Education Teacher', where: 'New York, NY' },
+  { what: 'School Counselor', where: 'Los Angeles, CA' },
+  { what: 'Childcare Worker', where: 'New York, NY' },
+  { what: 'Childcare Worker', where: 'Chicago, IL' },
+  { what: 'Security Guard', where: 'Los Angeles, CA' },
+  { what: 'Security Guard', where: 'New York, NY' },
+  { what: 'Security Guard', where: 'Chicago, IL' },
+  { what: 'Landscaper', where: 'Phoenix, AZ' },
+  { what: 'Landscaper', where: 'Dallas, TX' },
+  { what: 'Personal Trainer', where: 'New York, NY' },
+  { what: 'Personal Trainer', where: 'Los Angeles, CA' },
+  { what: 'Cosmetologist', where: 'Los Angeles, CA' },
+  { what: 'Tutor', where: 'Remote' },
+  { what: 'Dispatcher', where: 'Dallas, TX' },
 ];
 
-const BATCH_HOURS = [2, 6, 10, 14, 18, 22]; // UTC hours matching cron schedule
-const BATCH_SIZE = 10;
+const BATCH_SIZE = 20;
 
+// Progressive rotation — cycles through ALL batches over time rather than
+// repeating the same 6 forever. Uses day-of-year so each cron run advances
+// through the full search list over ~2 days, then wraps around.
 function getCurrentBatch() {
-  const hour = new Date().getUTCHours();
-  // Find closest scheduled hour, default batch 0
-  let best = 0, bestDiff = 99;
-  BATCH_HOURS.forEach((h, i) => {
-    const diff = Math.abs(hour - h);
-    if (diff < bestDiff) { bestDiff = diff; best = i; }
-  });
-  return best;
+  const BATCH_HOURS = [2, 6, 10, 14, 18, 22];
+  const now = new Date();
+  const hour = now.getUTCHours();
+  const runsPerDay = BATCH_HOURS.length;
+  const totalBatches = Math.ceil(ALL_SEARCHES.length / BATCH_SIZE);
+  const runOfDay = BATCH_HOURS.reduce((best, h, i) => {
+    return Math.abs(h - hour) < Math.abs(BATCH_HOURS[best] - hour) ? i : best;
+  }, 0);
+  const dayOfYear = Math.floor((now - new Date(now.getUTCFullYear(), 0, 0)) / 86400000);
+  return (dayOfYear * runsPerDay + runOfDay) % totalBatches;
 }
 
 function formatSalary(min, max) {
@@ -150,7 +361,7 @@ async function fetchAdzuna(what, where, appId, appKey) {
       level: inferLevel(j.title),
       score: scoreJob(j.company?.display_name, j.salary_min),
       waste_score: wasteScore(j.company?.display_name),
-      expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+      expires_at: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(),
     })).filter(j => j.company !== 'Unknown' && j.apply_url && j.description && j.description.length > 80);
   } catch (e) {
     clearTimeout(timeout);
@@ -254,7 +465,7 @@ JOB DESCRIPTION:\n${(job.description || '').slice(0, 2000)}`
         hidden_requirements: parsed.hidden_requirements || [],
         insider_tip: parsed.insider_tip || '',
         description_summary: parsed.description_summary || '',
-        expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+        expires_at: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(),
       }),
     });
   } catch(e) {
@@ -387,7 +598,6 @@ export default async function handler(req, res) {
     // Pre-generate insights for new/uncached jobs — eliminates thundering herd.
     // Awaited with a 30s cap so cron stays well within 60s maxDuration.
     const allRows = upsertResults.flatMap(r => r.rows || []);
-    const ANTHROPIC_KEY = process.env.ANTHROPIC_KEY;
     await Promise.race([
       pregenInsights(allRows, SUPABASE_URL, SUPABASE_SERVICE_KEY, ANTHROPIC_KEY),
       new Promise(r => setTimeout(r, 30000)),

@@ -124,6 +124,32 @@ export default async function handler(req, res) {
     console.log(`API CALLED: "${query}" → "${canonical}" @ "${loc}"`);
 
     if (!apiRes.ok) {
+      // Rate limited — try serving stale (expired) cache before failing
+      if ((apiRes.status === 429 || apiRes.status === 529) && SUPABASE_URL && SUPABASE_SERVICE_KEY) {
+        const searchTerms = [canonical, ...(await (async () => {
+          try {
+            const exp = await fetch(`${SUPABASE_URL}/rest/v1/query_expansions?raw_query=ilike.${encodeURIComponent(canonical)}&limit=1`, { headers: dbHeaders });
+            if (exp.ok) { const rows = await exp.json(); return rows[0]?.related || []; }
+          } catch(e) {}
+          return [];
+        })())].filter(Boolean);
+        for (const term of searchTerms) {
+          const r = await fetch(`${SUPABASE_URL}/rest/v1/jobs?search_query=ilike.${encodeURIComponent(term)}&limit=25`, { headers: dbHeaders });
+          if (r.ok) {
+            const rows = await r.json();
+            if (Array.isArray(rows) && rows.length >= 3) {
+              console.log(`STALE CACHE FALLBACK: "${query}" → "${term}" — ${rows.length} results`);
+              const jobs = rows.map(j => ({
+                title: j.title, company: j.company, location: j.location || loc,
+                salary: j.salary, url: j.apply_url, description: j.description,
+                type: j.type || 'Full-time', level: j.level || 'Mid level',
+                source: j.source || 'Seen', score: j.score || 65, waste_score: j.waste_score || 25,
+              }));
+              return res.status(200).json({ ok: true, jobs, query, location: loc, _src: 'stale-cache' });
+            }
+          }
+        }
+      }
       const errText = await apiRes.text();
       throw new Error('API ' + apiRes.status + ': ' + errText.slice(0, 150));
     }
