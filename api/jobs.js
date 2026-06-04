@@ -88,7 +88,7 @@ export default async function handler(req, res) {
         company: j.company,
         location: j.location || loc || 'US',
         salary: j.salary || null,
-        description: (j.description || '').slice(0, 2000),
+        description: (j.description || '').slice(0, 8000),
         apply_url: j.url || null,
         source: j.source || 'Web search',
         type: j.type || 'Full-time',

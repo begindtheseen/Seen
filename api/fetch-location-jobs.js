@@ -95,7 +95,7 @@ async function fetchAdzuna(what, where, appId, appKey, distanceKm) {
       company: j.company?.display_name || 'Unknown',
       location: j.location?.display_name || where,
       salary: formatSalary(j.salary_min, j.salary_max),
-      description: (j.description || '').replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim().slice(0, 2000),
+      description: (j.description || '').replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim().slice(0, 8000),
       apply_url: j.redirect_url || null,
       source: 'Adzuna',
       type: j.contract_time === 'part_time' ? 'Part-time' : 'Full-time',
