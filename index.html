@@ -1915,14 +1915,6 @@ function computeScoresFromData(reports, jobs, webScore) {
 
   return null;
 }
-  const avgWait = waitArr.length ? waitArr.reduce((s, v) => s + v, 0) / waitArr.length : 30;
-  const waste = Score.waste(gr, avgRounds, unpaid / n);
-  const overall = Score.calc(rr, gr, avgWait, n);
-  return { overall_score: overall, risk_level: Score.risk(overall), ghost_rate: gr, response_rate: rr,
-    avg_wait_days: Math.round(avgWait), avg_rounds: Math.round(avgRounds * 10) / 10,
-    waste, report_count: n, data_quality: n >= 10 ? 'strong' : n >= 5 ? 'moderate' : 'limited',
-    process_score: overall };
-}
 
 // ═══════════════════════════════════════════════
 // DATA — companies, location scores, jobs
