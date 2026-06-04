@@ -208,12 +208,12 @@ async function _generateOne(job, supabaseUrl, serviceKey, anthropicKey) {
       },
       body: JSON.stringify({
         model: 'claude-haiku-4-5-20251001',
-        max_tokens: 500,
+        max_tokens: 900,
         system: 'You are a job market analyst. Return ONLY valid JSON with no markdown.',
         messages: [{
           role: 'user',
           content: `Analyze this job posting. Return ONLY this JSON:
-{"what_they_want":["<skill/trait>","<2>","<3>","<4>","<5>"],"hidden_requirements":["<unstated expectation>","<2>","<3>"],"insider_tip":"<1 sentence strategic advice>"}
+{"what_they_want":["<skill/trait>","<2>","<3>","<4>","<5>"],"hidden_requirements":["<unstated expectation>","<2>","<3>"],"insider_tip":"<1 sentence strategic advice>","description_summary":"<2-3 paragraph overview of role, responsibilities, and requirements written for job seekers>"}
 
 JOB: ${job.title} at ${job.company}
 JOB DESCRIPTION:\n${(job.description || '').slice(0, 2000)}`
@@ -241,7 +241,7 @@ JOB DESCRIPTION:\n${(job.description || '').slice(0, 2000)}`
         what_they_want: parsed.what_they_want || [],
         hidden_requirements: parsed.hidden_requirements || [],
         insider_tip: parsed.insider_tip || '',
-        description_summary: '',
+        description_summary: parsed.description_summary || '',
         expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
       }),
     });

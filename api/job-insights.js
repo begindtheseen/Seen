@@ -31,7 +31,8 @@ export default async function handler(req, res) {
       );
       if (checkRes.ok) {
         const rows = await checkRes.json();
-        if (rows?.length) {
+        // Skip cache if caller needs a summary but the cached row has none
+        if (rows?.length && (!needsSummary || rows[0].description_summary)) {
           const row = rows[0];
           return res.status(200).json({
             what_they_want: row.what_they_want || [],

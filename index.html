@@ -4130,13 +4130,14 @@ const SavedJobs = {
     return { ok: true };
   },
 
-  remove(jobId) {
+  async remove(jobId) {
     const sid = String(jobId);
     localStorage.setItem(this.KEY, JSON.stringify(this.loadSync().filter(s => String(s.job_id) !== sid)));
-    // Sync to Supabase in background
     if (Auth.isLoggedIn() && db) {
       const uid = Auth._user?.id;
-      if (uid) db.from('saved_jobs').delete().eq('user_id', uid).eq('job_id', sid).catch(() => {});
+      if (uid) {
+        try { await db.from('saved_jobs').delete().eq('user_id', uid).eq('job_id', sid); } catch(e) {}
+      }
     }
   },
 
@@ -4690,13 +4691,16 @@ async function openJobListing(jobId) {
        </div>
      </div>`;
 
-  // Full description — skeleton for now, AI summary fills in after insights load
+  // Full description — AI always generates a clean summary; skeleton while loading
   const descText = desc || '';
-  const looksClipped = descText.length >= 1900 && !/[.!?]$/.test(descText.trim());
   document.getElementById('jlDesc').innerHTML =
     `<div>
-       <div style="font-family:var(--mono);font-size:.58rem;text-transform:uppercase;letter-spacing:.08em;color:var(--dim);margin-bottom:.75rem">About This Role</div>
-       <div id="jlDescBody" style="color:var(--sub);font-size:.82rem;line-height:1.8;white-space:pre-wrap">${looksClipped ? '<span style="color:var(--muted);font-style:italic">Loading complete description...</span>' : (descText||'No description available.').replace(/</g,'&lt;')}</div>
+       <div style="font-family:var(--mono);font-size:.58rem;text-transform:uppercase;letter-spacing:.08em;color:var(--dim);margin-bottom:.75rem">ABOUT THIS ROLE</div>
+       <div id="jlDescBody">
+         <div style="display:flex;flex-direction:column;gap:.65rem">
+           ${[95,82,90,70,86,75,92,65,80,88].map(w=>`<div style="height:.58rem;background:var(--raised);border-radius:4px;width:${w}%;animation:pulse 1.4s ease infinite"></div>`).join('')}
+         </div>
+       </div>
      </div>`;
 
   // Report experience placeholder
@@ -4711,16 +4715,34 @@ async function openJobListing(jobId) {
 
   // AI insights — L1: localStorage (24h), L2: DB via /api/job-insights (7d shared across all users)
   const _INSIGHTS_L1_TTL = 24 * 60 * 60 * 1000;
+
+  // Format any description text into clean readable HTML paragraphs
+  function _formatDescText(text) {
+    if (!text || text.length < 10) return '<p style="font-size:.84rem;color:var(--muted);font-weight:300">No description available.</p>';
+    let t = text.replace(/^Category\s*:\s*[^\n.]+\s*/i, '').trim();
+    const lines = t.split(/\n+/).map(l => l.trim()).filter(Boolean);
+    if (!lines.length) return `<p style="font-size:.84rem;color:var(--sub);line-height:1.8">${t.replace(/</g,'&lt;')}</p>`;
+    return lines.map(l =>
+      `<p style="font-size:.84rem;color:var(--sub);line-height:1.8;margin:0 0 .85rem">${l.replace(/</g,'&lt;')}</p>`
+    ).join('');
+  }
+
   function _renderInsights(data) {
     const el = document.getElementById('jlInsightsContent');
-    if (!el) return;
+    const db = document.getElementById('jlDescBody');
 
-    // Fill in description body with AI summary if the raw text was clipped
-    if (data.description_summary) {
-      const db = document.getElementById('jlDescBody');
-      if (db) db.innerHTML = data.description_summary.replace(/</g, '&lt;');
+    // Always update description — prefer AI summary, fall back to formatted raw text
+    if (db) {
+      if (data.description_summary) {
+        db.innerHTML = _formatDescText(data.description_summary);
+      } else if (descText) {
+        db.innerHTML = _formatDescText(descText);
+      } else {
+        db.innerHTML = '<p style="font-size:.84rem;color:var(--muted);font-weight:300">No description available.</p>';
+      }
     }
 
+    if (!el) return;
     if (!data.what_they_want?.length) {
       el.innerHTML = `<div style="font-size:.75rem;color:var(--muted)">AI insights unavailable for this listing.</div>`;
       return;
@@ -4765,10 +4787,11 @@ async function openJobListing(jobId) {
       _renderInsights(cached);
     } else {
       // L2: dedicated endpoint — checks DB first, generates on miss, stores for all users
+      // needsSummary: true — always generate AI summary so raw Adzuna text never shows
       fetch('/api/job-insights', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ jobId: sid, job: title, company: co, jobDescription: desc, needsSummary: looksClipped })
+        body: JSON.stringify({ jobId: sid, job: title, company: co, jobDescription: desc, needsSummary: true })
       })
       .then(r => r.json())
       .then(data => {
@@ -4780,11 +4803,15 @@ async function openJobListing(jobId) {
       .catch(() => {
         const el = document.getElementById('jlInsightsContent');
         if (el) el.innerHTML = `<div style="font-size:.75rem;color:var(--muted)">AI insights unavailable for this listing.</div>`;
+        const db = document.getElementById('jlDescBody');
+        if (db) db.innerHTML = _formatDescText(descText);
       });
     }
   } else {
     const el = document.getElementById('jlInsightsContent');
     if (el) el.innerHTML = `<div style="font-size:.75rem;color:var(--muted)">No description available for AI analysis.</div>`;
+    const db = document.getElementById('jlDescBody');
+    if (db) db.innerHTML = descText ? _formatDescText(descText) : '<p style="font-size:.84rem;color:var(--muted);font-weight:300">No description available.</p>';
   }
 }
 
@@ -5928,10 +5955,10 @@ function toggleSaveJob(jobId, company, title, city, score) {
   _refreshDashSaved();
 }
 
-async function _refreshDashSaved() {
+function _refreshDashSaved() {
   const savedEl = document.getElementById('dashSavedJobs');
   if (!savedEl) return;
-  const saved = await SavedJobs.load();
+  const saved = SavedJobs.loadSync();
   if (!saved.length) {
     savedEl.innerHTML = `<div style="font-size:.75rem;color:var(--muted);font-weight:300;padding:.5rem 0">No saved jobs yet. Tap ♡ on any listing.</div>`;
   } else {
