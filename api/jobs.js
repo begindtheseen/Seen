@@ -41,27 +41,40 @@ export default async function handler(req, res) {
       'Content-Type': 'application/json',
     };
 
-    // Normalize query for consistent cache keys
-    const qNorm = query.toLowerCase().trim();
+    // Expand abbreviations and normalize for consistent cache keys
+    // e.g. "Amazon DSP" → "amazon delivery driver", "RN" → "registered nurse"
+    const qNorm = normalizeQuery(query);
 
-    // ── Server-side DB cache check ────────────────────────────────────────────
+    // ── Server-side DB cache check (3 tiers) ─────────────────────────────────
     if (SUPABASE_URL && SUPABASE_SERVICE_KEY) {
       try {
-        // Exact match first (cheapest), then broadened ILIKE if not enough
-        const exactUrl = `${SUPABASE_URL}/rest/v1/jobs?search_query=ilike.${encodeURIComponent(qNorm)}&expires_at=gt.${encodeURIComponent(new Date().toISOString())}&limit=25`;
-        const broadUrl = `${SUPABASE_URL}/rest/v1/jobs?search_query=ilike.${encodeURIComponent('%' + qNorm + '%')}&expires_at=gt.${encodeURIComponent(new Date().toISOString())}&limit=25`;
+        const now = encodeURIComponent(new Date().toISOString());
+        let cached = [], hitTier = 0;
 
-        let cached = [];
-        const exactRes = await fetch(exactUrl, { headers: dbHeaders });
-        if (exactRes.ok) cached = await exactRes.json();
+        // Tier 1: exact normalized search_query match
+        const t1 = await fetch(`${SUPABASE_URL}/rest/v1/jobs?search_query=ilike.${encodeURIComponent(qNorm)}&expires_at=gt.${now}&limit=25`, { headers: dbHeaders });
+        if (t1.ok) { cached = await t1.json(); if (cached.length >= 3) hitTier = 1; }
 
+        // Tier 2: normalized query is a substring of a stored search_query
+        // e.g. "nurse" hits "registered nurse"
         if (cached.length < 3) {
-          const broadRes = await fetch(broadUrl, { headers: dbHeaders });
-          if (broadRes.ok) cached = await broadRes.json();
+          const t2 = await fetch(`${SUPABASE_URL}/rest/v1/jobs?search_query=ilike.*${encodeURIComponent(qNorm)}*&expires_at=gt.${now}&limit=25`, { headers: dbHeaders });
+          if (t2.ok) { const r = await t2.json(); if (r.length > cached.length) { cached = r; if (cached.length >= 3) hitTier = 2; } }
+        }
+
+        // Tier 3: keyword match in actual job titles — catches semantic variants
+        // e.g. "amazon driver" finds jobs titled "Amazon Delivery Driver" saved under "amazon dsp"
+        if (cached.length < 3) {
+          const kws = extractKeywords(qNorm);
+          if (kws.length >= 2) {
+            const andParam = `(${kws.map(k => `title.ilike.*${k}*`).join(',')})`;
+            const t3 = await fetch(`${SUPABASE_URL}/rest/v1/jobs?and=${encodeURIComponent(andParam)}&expires_at=gt.${now}&limit=25`, { headers: dbHeaders });
+            if (t3.ok) { const r = await t3.json(); if (Array.isArray(r) && r.length >= 3) { cached = r; hitTier = 3; } }
+          }
         }
 
         if (cached?.length >= 3) {
-          console.log(`CACHE HIT: "${query}" @ "${loc}" — ${cached.length} results from DB`);
+          console.log(`CACHE HIT tier=${hitTier}: "${query}" → "${qNorm}" @ "${loc}" — ${cached.length} results`);
           const jobs = cached.map(j => ({
             title: j.title, company: j.company, location: j.location || loc,
             salary: j.salary, url: j.apply_url, description: j.description,
@@ -71,7 +84,7 @@ export default async function handler(req, res) {
           return res.status(200).json({ ok: true, jobs, query, location: loc, _src: 'cache' });
         }
       } catch(e) { console.warn('Cache check error:', e.message); }
-      console.log(`CACHE MISS: "${query}" @ "${loc}" — calling Claude API`);
+      console.log(`CACHE MISS: "${query}" → "${qNorm}" @ "${loc}" — calling Claude API`);
     }
 
     let apiRes;
@@ -167,6 +180,54 @@ export default async function handler(req, res) {
     console.error('Jobs error:', err.message);
     return res.status(500).json({ error: err.message, jobs: [] });
   }
+}
+
+// Expand common abbreviations to their canonical job title form so
+// "Amazon DSP", "Amazon driver", and "Amazon delivery driver" all map
+// to the same normalized key and hit the same cache bucket.
+function normalizeQuery(q) {
+  const ABBREV = {
+    'dsp':  'delivery driver',
+    'rn':   'registered nurse',
+    'lpn':  'licensed practical nurse',
+    'lvn':  'licensed vocational nurse',
+    'cna':  'certified nursing assistant',
+    'cna\'s': 'certified nursing assistant',
+    'swe':  'software engineer',
+    'pm':   'product manager',
+    'qa':   'quality assurance engineer',
+    'hr':   'human resources',
+    'cdl':  'commercial truck driver',
+    'ux':   'ux designer',
+    'ui':   'ui designer',
+    'ml':   'machine learning engineer',
+    'hvac': 'hvac technician',
+    'cpa':  'accountant',
+    'pt':   'physical therapist',
+    'ot':   'occupational therapist',
+    'np':   'nurse practitioner',
+    'pa':   'physician assistant',
+    'med':  'medical',
+  };
+  let n = q.toLowerCase().trim();
+  for (const [abbr, full] of Object.entries(ABBREV)) {
+    n = n.replace(new RegExp(`\\b${abbr}\\b`, 'gi'), full);
+  }
+  return n.replace(/\s+/g, ' ').trim();
+}
+
+// Extract the 2-3 most meaningful words from a query for title-level keyword matching.
+// Strips stop words so "jobs near remote" → ["jobs"] doesn't produce noise hits.
+function extractKeywords(q) {
+  const STOP = new Set([
+    'and','or','the','a','an','in','at','for','with','of','to','by','is','are',
+    'job','jobs','position','positions','role','roles','work','near','remote',
+    'hiring','wanted','open','full','part','time','entry','level',
+  ]);
+  return q.split(/\s+/)
+    .map(w => w.replace(/[^a-z0-9]/g, ''))
+    .filter(w => w.length > 2 && !STOP.has(w))
+    .slice(0, 3);
 }
 
 function scoreJob(job) {
