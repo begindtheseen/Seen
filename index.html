@@ -397,14 +397,14 @@ nav{position:fixed;top:0;left:0;right:0;z-index:500;height:58px;display:flex;ali
 .co-loc-tag{display:inline-flex;align-items:center;gap:.28rem;background:var(--bdim);border:1px solid #4b9eff20;border-radius:4px;padding:.18rem .55rem;font-family:var(--mono);font-size:.6rem;color:var(--blue);margin-bottom:.5rem}
 .co-mets{display:grid;grid-template-columns:repeat(6,1fr);gap:1px;background:var(--line);border:1px solid var(--line);border-radius:8px;overflow:hidden}
 .co-m{background:var(--raised);padding:.88rem .65rem;text-align:center}
-.co-grade-card{border:2px solid;border-radius:14px;padding:1rem 1.25rem;text-align:center;min-width:92px;flex-shrink:0;position:relative}
-.co-grade-card.safe{border-color:#00ff8740;background:linear-gradient(160deg,var(--raised),rgba(0,255,135,.06));box-shadow:0 0 28px rgba(0,255,135,.1)}
-.co-grade-card.warn{border-color:#ffb83040;background:linear-gradient(160deg,var(--raised),rgba(255,184,48,.06));box-shadow:0 0 28px rgba(255,184,48,.1)}
-.co-grade-card.danger{border-color:#ff3b5c40;background:linear-gradient(160deg,var(--raised),rgba(255,59,92,.06));box-shadow:0 0 28px rgba(255,59,92,.1)}
-.co-grade-lbl{font-family:var(--mono);font-size:.42rem;text-transform:uppercase;letter-spacing:.13em;color:var(--muted);display:block;margin-bottom:.35rem}
-.co-grade-letter{font-family:var(--display);font-weight:800;font-size:3rem;line-height:1;letter-spacing:-.04em;display:block}
+.co-grade-bar{display:flex;align-items:center;gap:.85rem;border:1px solid;border-radius:10px;padding:.7rem 1.1rem;margin-bottom:.85rem}
+.co-grade-bar.safe{border-color:#00ff8730;box-shadow:0 0 18px rgba(0,255,135,.07);background:var(--raised)}
+.co-grade-bar.warn{border-color:#ffb83030;box-shadow:0 0 18px rgba(255,184,48,.07);background:var(--raised)}
+.co-grade-bar.danger{border-color:#ff3b5c30;box-shadow:0 0 18px rgba(255,59,92,.07);background:var(--raised)}
+.co-grade-letter{font-family:var(--display);font-weight:800;font-size:2.4rem;line-height:1;letter-spacing:-.04em;flex-shrink:0}
 .co-grade-letter.safe{color:var(--green)}.co-grade-letter.warn{color:var(--amber)}.co-grade-letter.danger{color:var(--red)}
-.co-grade-score{font-family:var(--mono);font-size:.6rem;color:var(--muted);margin-top:.3rem;display:block}
+.co-grade-lbl{font-family:var(--mono);font-size:.4rem;text-transform:uppercase;letter-spacing:.13em;color:var(--muted);display:block;margin-bottom:.15rem}
+.co-grade-score{font-family:var(--mono);font-size:.68rem;color:var(--text);display:block}
 .co-verified{display:inline-flex;align-items:center;gap:.28rem;background:var(--gdim);border:1px solid #00ff8730;border-radius:100px;padding:.2rem .6rem;font-family:var(--mono);font-size:.58rem;color:var(--green)}
 .co-share-btn{background:none;border:1px solid var(--line2);border-radius:8px;padding:.3rem .75rem;font-family:var(--mono);font-size:.6rem;color:var(--sub);cursor:pointer;transition:all .15s;display:inline-flex;align-items:center;gap:.28rem}
 .co-share-btn:hover{border-color:var(--green);color:var(--green)}
@@ -646,7 +646,7 @@ nav{position:fixed;top:0;left:0;right:0;z-index:500;height:58px;display:flex;ali
     <button class="ntab" onclick="go('jobs')" id="nt-jobs">Jobs</button>
     <button class="ntab" onclick="go('demand')" id="nt-demand">Demand</button>
     <button class="ntab" onclick="go('resume')" id="nt-resume">Resume AI</button>
-    <button class="ntab" onclick="go('tracker')" id="nt-tracker">Tracking <span class="ntab-new" id="trackerBadge" style="display:none;background:var(--amber);color:var(--ink)">0</span></button>
+    <button class="ntab" onclick="go('tracker')" id="nt-tracker">Track <span class="ntab-new" id="trackerBadge" style="display:none;background:var(--amber);color:var(--ink)">0</span></button>
   </div>
   <div class="nav-right" id="navRight">
     <button id="backToDashBtn" onclick="renderSeekerDash();go('seeker-dash')" style="display:none;background:none;border:1px solid var(--line2);color:var(--sub);border-radius:8px;padding:.32rem .75rem;font-family:var(--mono);font-size:.62rem;cursor:pointer;white-space:nowrap">← Dashboard</button>
@@ -1279,10 +1279,10 @@ nav{position:fixed;top:0;left:0;right:0;z-index:500;height:58px;display:flex;ali
           <div class="co-loc-tag" id="coLocTag" style="display:none"></div>
           <div class="co-ind" id="coInd"></div>
           <div id="coTags" style="display:flex;gap:.3rem;flex-wrap:wrap;margin-top:.45rem"></div>
-        <div id="coMeta" style="display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;margin-top:.6rem"></div>
+          <div id="coMeta" style="display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;margin-top:.6rem"></div>
         </div>
-        <div id="coSB"></div>
       </div>
+      <div id="coSB"></div>
       <div class="co-mets" id="coMets"></div>
     </div>
     <div class="agg-bar" id="aggBar" style="display:none"><div class="agg-item"><div class="agg-dot"></div>Live aggregating</div></div>
@@ -2873,12 +2873,13 @@ async function viewCompany(id,name,loc){
   if(loc){const lt=document.getElementById('coLocTag');lt.textContent='📍 '+loc;lt.style.display='inline-flex';}
   document.getElementById('aggBar').style.display='flex';
 
-  // Grade card — the shareable hero element
   document.getElementById('coSB').innerHTML=`
-    <div class="co-grade-card ${risk}">
-      <span class="co-grade-lbl">Seen Grade</span>
+    <div class="co-grade-bar ${risk}">
       <span class="co-grade-letter ${risk}">${grade}</span>
-      <span class="co-grade-score">${sc.overall_score} / 100</span>
+      <div style="flex:1">
+        <span class="co-grade-lbl">Seen Grade</span>
+        <span class="co-grade-score">${sc.overall_score} / 100</span>
+      </div>
     </div>`;
 
   // Tags row
@@ -2907,7 +2908,7 @@ async function viewCompany(id,name,loc){
 
   // Overview
   document.getElementById('ctc-ov').innerHTML=`
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1rem">
+    <div style="display:grid;grid-template-columns:${window.innerWidth<600?'1fr':'1fr 1fr'};gap:1rem;margin-bottom:1rem">
       <div style="background:var(--card);border:1px solid var(--line);border-radius:10px;padding:1.2rem">
         <div style="font-family:var(--mono);font-size:.56rem;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:.85rem">Score breakdown${loc?' ('+loc+')':''}</div>
         <div class="mbar" style="--w:${Math.round((sc.response_rate||0)*100)}%"><div class="mbar-lbl" style="width:110px">Response rate</div><div class="mbar-track"><div class="mbar-fill" style="width:${Math.round((sc.response_rate||0)*100)}%;background:${Score.color(risk)}"></div></div><div class="mbar-val">${Math.round((sc.response_rate||0)*100)}%</div></div>
@@ -2930,7 +2931,7 @@ async function viewCompany(id,name,loc){
 
   // Process score tab — unique to Seen
   document.getElementById('ctc-process').innerHTML=`
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1rem">
+    <div style="display:grid;grid-template-columns:${window.innerWidth<600?'1fr':'1fr 1fr'};gap:1rem;margin-bottom:1rem">
       <div style="background:var(--card);border:1px solid var(--line);border-radius:10px;padding:1.2rem">
         <div style="font-family:var(--mono);font-size:.56rem;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:.85rem">Process score</div>
         <div style="font-family:var(--mono);font-size:2.5rem;font-weight:500;color:${Score.color(risk)};line-height:1;margin-bottom:.25rem">${sc.process_score||'—'}</div>
@@ -3033,11 +3034,16 @@ async function viewCompany(id,name,loc){
       : `<span class="vibe v-n" style="font-size:.52rem;margin-top:.25rem">Job listing data</span>`;
 
     document.getElementById('coSB').innerHTML = `
-      <div class="co-grade-card ${rr2}">
-        <span class="co-grade-lbl">Seen Grade</span>
+      <div class="co-grade-bar ${rr2}">
         <span class="co-grade-letter ${rr2}">${letterGrade(rsc.overall_score)}</span>
-        <span class="co-grade-score">${rsc.overall_score} / 100</span>
-        ${dqBadge}
+        <div style="flex:1">
+          <span class="co-grade-lbl">Seen Grade</span>
+          <span class="co-grade-score">${rsc.overall_score} / 100</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;justify-content:flex-end">
+          ${dqBadge}
+          <button onclick="(()=>{const u='https://seenjobs.io/#company/'+encodeURIComponent('${(name||'').replace(/'/g,"\\'")}');navigator.share?navigator.share({title:'${(name||'').replace(/'/g,"\\'")} on Seen',url:u}):navigator.clipboard.writeText(u).then(()=>showToast('Link copied!'))})()" class="co-share-btn">↗ Share</button>
+        </div>
       </div>`;
 
     document.getElementById('coMets').innerHTML = `
@@ -3063,7 +3069,7 @@ async function viewCompany(id,name,loc){
     const rsp = Math.round((rsc.response_rate || 0) * 100);
     const rgp = Math.round((rsc.ghost_rate || 0) * 100);
     document.getElementById('ctc-ov').innerHTML = `
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1rem">
+      <div style="display:grid;grid-template-columns:${window.innerWidth<600?'1fr':'1fr 1fr'};gap:1rem;margin-bottom:1rem">
         <div style="background:var(--card);border:1px solid var(--line);border-radius:10px;padding:1.2rem">
           <div style="font-family:var(--mono);font-size:.56rem;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:.85rem">Score breakdown${loc ? ' (' + loc + ')' : ''}</div>
           <div class="mbar"><div class="mbar-lbl" style="width:110px">Response rate</div><div class="mbar-track"><div class="mbar-fill" style="width:${rsp}%;background:${Score.color(rr2)}"></div></div><div class="mbar-val">${rsp}%</div></div>
@@ -3085,7 +3091,7 @@ async function viewCompany(id,name,loc){
       </div>`;
 
     document.getElementById('ctc-process').innerHTML = `
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1rem">
+      <div style="display:grid;grid-template-columns:${window.innerWidth<600?'1fr':'1fr 1fr'};gap:1rem;margin-bottom:1rem">
         <div style="background:var(--card);border:1px solid var(--line);border-radius:10px;padding:1.2rem">
           <div style="font-family:var(--mono);font-size:.56rem;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:.85rem">Process score</div>
           <div style="font-family:var(--mono);font-size:2.5rem;font-weight:500;color:${Score.color(rr2)};line-height:1;margin-bottom:.25rem">${rsc.overall_score}</div>
