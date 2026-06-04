@@ -2205,7 +2205,9 @@ function _inferLevelFromText(title, description) {
 
 function _normalizeDbJob(j){
   const score=j.score||65;
-  const lvl = _inferLevelFromText(j.title, j.description);
+  // j.level is stored by the cron (title-only inference, reliable) — use it directly.
+  // Fall back to _inferLevelFromText only for rows created before level was added.
+  const lvl = j.level || _inferLevelFromText(j.title, j.description);
   return{
     id:j.id,
     co:j.company||'',
@@ -2300,9 +2302,10 @@ async function applyJobFilters(){
   if(jobs.length < 3 && db){
     try{
       let q=db.from('jobs').select('*').gt('expires_at',new Date().toISOString()).order('score',{ascending:false}).limit(100);
-      // Level filter: use title keywords since DB level field is unreliable
-      if(level === 'senior') q=q.or('title.ilike.%senior%,title.ilike.%lead%,title.ilike.%director%,title.ilike.%manager%,title.ilike.%principal%');
-      else if(level === 'entry') q=q.or('title.ilike.%junior%,title.ilike.%entry%,title.ilike.%associate%,title.ilike.%trainee%,title.ilike.%assistant%,title.ilike.%coordinator%,title.ilike.%intern%');
+      // Filter by stored level column — set by cron via title-only inferLevel(), reliable
+      if(level === 'entry') q=q.eq('level','Entry level');
+      else if(level === 'mid') q=q.eq('level','Mid level');
+      else if(level === 'senior') q=q.in('level',['Senior','Director+']);
       if(type)   q=q.ilike('type','%'+type+'%');
       if(cutoffMs) q=q.gte('created_at',new Date(cutoffMs).toISOString());
       if(nicheKws) q=q.or(nicheKws.map(k=>'title.ilike.%'+k+'%').join(','));
