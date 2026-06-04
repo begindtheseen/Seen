@@ -4707,45 +4707,66 @@ async function openJobListing(jobId) {
        <div style="font-size:.75rem;color:var(--muted);font-weight:300;line-height:1.65">Applied here? Share how it went — response rate, interview process, offer outcome. Help the community cut through the noise.</div>
      </div>`;
 
-  // Fetch AI insights (no resume needed — job description only)
+  // AI insights — check localStorage cache first (3-day TTL), only hit API on cache miss
+  const _INSIGHTS_TTL = 3 * 24 * 60 * 60 * 1000;
+  function _renderInsights(data) {
+    const el = document.getElementById('jlInsightsContent');
+    if (!el || !data.what_they_want?.length) return;
+    let html = `<ul style="list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:.6rem">`;
+    for (const item of data.what_they_want) {
+      html += `<li style="display:flex;align-items:flex-start;gap:.55rem;font-size:.8rem;color:var(--sub);line-height:1.5"><span style="color:var(--green);font-size:.6rem;margin-top:.22rem;flex-shrink:0">▶</span>${item}</li>`;
+    }
+    html += `</ul>`;
+    if (data.hidden_requirements?.length || data.insider_tip) {
+      html += `<div style="margin-top:1rem;padding-top:1rem;border-top:1px solid var(--line)">`;
+      if (data.hidden_requirements?.length) {
+        html += `<div style="font-family:var(--mono);font-size:.55rem;text-transform:uppercase;letter-spacing:.08em;color:var(--dim);margin-bottom:.55rem">Unstated Expectations</div>`;
+        html += `<ul style="list-style:none;padding:0;margin:0 0 .85rem;display:flex;flex-direction:column;gap:.45rem">`;
+        for (const r of data.hidden_requirements) {
+          html += `<li style="display:flex;align-items:flex-start;gap:.5rem;font-size:.75rem;color:var(--muted);line-height:1.5"><span style="color:var(--red);font-size:.55rem;margin-top:.2rem;flex-shrink:0">◆</span>${r}</li>`;
+        }
+        html += `</ul>`;
+      }
+      if (data.insider_tip) {
+        html += `<div style="background:var(--card);border:1px solid var(--line);border-radius:7px;padding:.65rem .9rem;font-size:.75rem;color:var(--sub);line-height:1.6"><span style="color:var(--green);font-weight:700">Tip: </span>${data.insider_tip}</div>`;
+      }
+      html += `</div>`;
+    }
+    el.innerHTML = html;
+  }
+
   if (desc && desc.length > 80) {
-    fetch('/api/resume', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ tool: 'job-insights', job: title, company: co, jobDescription: desc })
-    })
-    .then(r => r.json())
-    .then(data => {
-      const el = document.getElementById('jlInsightsContent');
-      if (!el || !data.what_they_want?.length) return;
-
-      let html = `<ul style="list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:.6rem">`;
-      for (const item of data.what_they_want) {
-        html += `<li style="display:flex;align-items:flex-start;gap:.55rem;font-size:.8rem;color:var(--sub);line-height:1.5"><span style="color:var(--green);font-size:.6rem;margin-top:.22rem;flex-shrink:0">▶</span>${item}</li>`;
+    const cacheKey = 'ji_' + sid;
+    let cached = null;
+    try {
+      const raw = localStorage.getItem(cacheKey);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (Date.now() - parsed.ts < _INSIGHTS_TTL) cached = parsed.data;
+        else localStorage.removeItem(cacheKey);
       }
-      html += `</ul>`;
+    } catch(e) {}
 
-      if (data.hidden_requirements?.length || data.insider_tip) {
-        html += `<div style="margin-top:1rem;padding-top:1rem;border-top:1px solid var(--line)">`;
-        if (data.hidden_requirements?.length) {
-          html += `<div style="font-family:var(--mono);font-size:.55rem;text-transform:uppercase;letter-spacing:.08em;color:var(--dim);margin-bottom:.55rem">Unstated Expectations</div>`;
-          html += `<ul style="list-style:none;padding:0;margin:0 0 .85rem;display:flex;flex-direction:column;gap:.45rem">`;
-          for (const r of data.hidden_requirements) {
-            html += `<li style="display:flex;align-items:flex-start;gap:.5rem;font-size:.75rem;color:var(--muted);line-height:1.5"><span style="color:var(--red);font-size:.55rem;margin-top:.2rem;flex-shrink:0">◆</span>${r}</li>`;
-          }
-          html += `</ul>`;
+    if (cached) {
+      _renderInsights(cached);
+    } else {
+      fetch('/api/resume', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tool: 'job-insights', job: title, company: co, jobDescription: desc })
+      })
+      .then(r => r.json())
+      .then(data => {
+        if (data.what_they_want?.length) {
+          try { localStorage.setItem(cacheKey, JSON.stringify({ ts: Date.now(), data })); } catch(e) {}
         }
-        if (data.insider_tip) {
-          html += `<div style="background:var(--card);border:1px solid var(--line);border-radius:7px;padding:.65rem .9rem;font-size:.75rem;color:var(--sub);line-height:1.6"><span style="color:var(--green);font-weight:700">Tip: </span>${data.insider_tip}</div>`;
-        }
-        html += `</div>`;
-      }
-      el.innerHTML = html;
-    })
-    .catch(() => {
-      const el = document.getElementById('jlInsightsContent');
-      if (el) el.innerHTML = `<div style="font-size:.75rem;color:var(--muted)">AI insights unavailable for this listing.</div>`;
-    });
+        _renderInsights(data);
+      })
+      .catch(() => {
+        const el = document.getElementById('jlInsightsContent');
+        if (el) el.innerHTML = `<div style="font-size:.75rem;color:var(--muted)">AI insights unavailable for this listing.</div>`;
+      });
+    }
   } else {
     const el = document.getElementById('jlInsightsContent');
     if (el) el.innerHTML = `<div style="font-size:.75rem;color:var(--muted)">No description available for AI analysis.</div>`;
