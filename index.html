@@ -1832,6 +1832,51 @@ const Agg={
   }
 };
 
+// ── REAL COMPANY DATA PIPELINE ───────────────────────────────────────────────
+async function loadRealCompanyData(companyName, cityHint) {
+  if (!db) return null;
+  try {
+    const { data: cos } = await db.from('companies').select('id').ilike('name', companyName).limit(1);
+    const coId = cos?.[0]?.id;
+    if (!coId) return null;
+    const { data: reports } = await db.from('reports')
+      .select('outcome,ghost_stage,rounds,wait_days,unpaid_work')
+      .eq('company_id', coId).eq('needs_review', false).limit(300);
+    const now = new Date().toISOString();
+    const { data: jobs } = await db.from('jobs')
+      .select('salary,source,score,waste_score')
+      .ilike('company', `%${companyName}%`)
+      .gt('expires_at', now).limit(50);
+    return { reports: reports || [], jobs: jobs || [] };
+  } catch(e) { console.warn('loadRealCompanyData:', e.message); return null; }
+}
+
+function computeScoresFromData(reports, jobs) {
+  const n = reports.length;
+  if (n < 3) {
+    if (!jobs.length) return null;
+    const avgScore = Math.round(jobs.reduce((s, j) => s + (j.score || 65), 0) / jobs.length);
+    const avgWaste = Math.round(jobs.reduce((s, j) => s + (j.waste_score || 25), 0) / jobs.length);
+    return { overall_score: avgScore, risk_level: Score.risk(avgScore), ghost_rate: null,
+      response_rate: null, avg_wait_days: null, avg_rounds: null,
+      waste: avgWaste, report_count: 0, data_quality: 'jobs_only' };
+  }
+  const ghosted = reports.filter(r => r.outcome === 'ghosted').length;
+  const human   = reports.filter(r => r.outcome === 'human' || r.outcome === 'hired').length;
+  const unpaid  = reports.filter(r => r.unpaid_work === 'yes').length;
+  const gr = ghosted / n, rr = human / n;
+  const roundsArr = reports.filter(r => r.rounds > 0).map(r => r.rounds);
+  const avgRounds = roundsArr.length ? roundsArr.reduce((s, v) => s + v, 0) / roundsArr.length : 3;
+  const waitArr = reports.filter(r => r.wait_days > 0).map(r => r.wait_days);
+  const avgWait = waitArr.length ? waitArr.reduce((s, v) => s + v, 0) / waitArr.length : 30;
+  const waste = Score.waste(gr, avgRounds, unpaid / n);
+  const overall = Score.calc(rr, gr, avgWait, n);
+  return { overall_score: overall, risk_level: Score.risk(overall), ghost_rate: gr, response_rate: rr,
+    avg_wait_days: Math.round(avgWait), avg_rounds: Math.round(avgRounds * 10) / 10,
+    waste, report_count: n, data_quality: n >= 10 ? 'strong' : n >= 5 ? 'moderate' : 'limited',
+    process_score: overall };
+}
+
 // ═══════════════════════════════════════════════
 // DATA — companies, location scores, jobs
 // ═══════════════════════════════════════════════
@@ -2721,6 +2766,7 @@ async function viewCompany(id,name,loc){
   const co=COS[ck]||Object.values(COS).find(c=>c.id===id||c.name.toLowerCase().includes(ck));
   const lk=loc?`${ck}|${loc.toLowerCase()}`:null;
   const locSc=lk?LOC_SCORES[lk]:null;
+  const isUnknown=!locSc&&!co;
   const sc=locSc||(co?.sc)||{overall_score:50,risk_level:'warn',response_rate:.5,ghost_rate:.3,avg_wait_days:30,report_count:0,waste:40,avg_rounds:3,process_score:50};
   const risk=sc.risk_level||Score.risk(sc.overall_score);
   const vibeList=VIBES[ck]||VIBES.default;
@@ -2754,6 +2800,7 @@ async function viewCompany(id,name,loc){
     `<span class="${Score.wasteLabel(sc.waste||40).cls} waste-badge">${Score.wasteLabel(sc.waste||40).txt}</span>`,
     ghostHigh?`<span class="vibe v-r">👻 ${ghostPct}% ghost rate</span>`:'',
     co?.ver?`<span class="co-verified">✓ Seen Verified</span>`:'',
+    isUnknown?`<span class="vibe v-y">⚠ Estimated — add a report</span>`:'',
     ...vibeList.slice(0,2).map(v=>`<span class="vibe v-n">${v}</span>`),
   ].filter(Boolean).join('');
 
@@ -2865,6 +2912,112 @@ async function viewCompany(id,name,loc){
         </div>
       </div>`}).join('')}</div>`:
     `<div style="text-align:center;padding:2.5rem;color:var(--muted);font-family:var(--mono);font-size:.7rem">No location-specific data yet.<br>Add a report with your location to start building this.</div>`;
+
+  // Load real scores from community reports + job listings, overwrite initial render
+  (async () => {
+    const realData = await loadRealCompanyData(co?.name || name, loc);
+    const rsc = realData ? computeScoresFromData(realData.reports, realData.jobs) : null;
+
+    if (!rsc) {
+      if (isUnknown) {
+        document.getElementById('coSB').innerHTML = `
+          <div class="co-grade-card warn">
+            <span class="co-grade-lbl">Seen Grade</span>
+            <span class="co-grade-letter warn" style="opacity:.3">?</span>
+            <span class="co-grade-score" style="color:var(--muted)">No data yet</span>
+          </div>`;
+        document.getElementById('coMets').innerHTML = `<div class="co-m" style="grid-column:1/-1;padding:1.5rem;text-align:center;font-family:var(--mono);font-size:.65rem;color:var(--muted)">No community reports yet — <a href="javascript:void(0)" onclick="go('report')" style="color:var(--green);text-decoration:none">be first to share →</a></div>`;
+        document.getElementById('coTags').innerHTML = `<span class="vibe v-n">📊 No data yet</span><span class="vibe v-y">+ Add a report to start this page</span>`;
+      }
+      return;
+    }
+
+    const rr2 = rsc.risk_level;
+    const gh2 = (rsc.ghost_rate || 0) > .5;
+    const gp2 = rsc.ghost_rate !== null ? Math.round((rsc.ghost_rate || 0) * 100) : null;
+    const rp2 = rsc.response_rate !== null ? Math.round((rsc.response_rate || 0) * 100) : null;
+    const gc2 = gh2 ? 'var(--red)' : (rsc.ghost_rate || 0) > .3 ? 'var(--amber)' : 'var(--green)';
+    const wc2 = (rsc.avg_wait_days || 0) > 21 ? 'var(--amber)' : 'var(--text)';
+    const wac = (rsc.waste || 0) > 60 ? 'var(--red)' : (rsc.waste || 0) > 30 ? 'var(--amber)' : 'var(--green)';
+    const dq = rsc.data_quality;
+    const dqBadge = dq === 'strong' ? `<span class="vibe v-g" style="font-size:.52rem;margin-top:.25rem">✓ ${rsc.report_count} real reports</span>`
+      : dq === 'moderate' ? `<span class="vibe v-y" style="font-size:.52rem;margin-top:.25rem">~ ${rsc.report_count} reports</span>`
+      : dq === 'limited' ? `<span class="vibe v-y" style="font-size:.52rem;margin-top:.25rem">~ ${rsc.report_count} reports — add yours</span>`
+      : `<span class="vibe v-n" style="font-size:.52rem;margin-top:.25rem">Job listing data</span>`;
+
+    document.getElementById('coSB').innerHTML = `
+      <div class="co-grade-card ${rr2}">
+        <span class="co-grade-lbl">Seen Grade</span>
+        <span class="co-grade-letter ${rr2}">${letterGrade(rsc.overall_score)}</span>
+        <span class="co-grade-score">${rsc.overall_score} / 100</span>
+        ${dqBadge}
+      </div>`;
+
+    document.getElementById('coMets').innerHTML = `
+      <div class="co-m"><span class="co-mn" style="color:${Score.color(rr2)}">${rsc.overall_score}</span><span class="co-ml">Score</span></div>
+      <div class="co-m"><span class="co-mn" style="color:var(--blue)">${rp2 !== null ? rp2 + '%' : '—'}</span><span class="co-ml">Response rate</span></div>
+      <div class="co-m ${gh2 ? 'co-alarm' : ''}"><span class="co-mn" style="color:${gc2}">${gh2 ? '👻 ' : ''}${gp2 !== null ? gp2 + '%' : '—'}</span><span class="co-ml">Ghost rate</span></div>
+      <div class="co-m"><span class="co-mn" style="color:${wc2}">${rsc.avg_wait_days !== null ? rsc.avg_wait_days + 'd' : '—'}</span><span class="co-ml">Avg wait</span></div>
+      <div class="co-m"><span class="co-mn" style="color:${wac}">${rsc.waste !== null ? rsc.waste + '%' : '—'}</span><span class="co-ml">Waste risk</span></div>
+      <div class="co-m"><span class="co-mn">${rsc.report_count}</span><span class="co-ml">Reports</span></div>`;
+
+    document.getElementById('coTags').innerHTML = [
+      locSc ? `<span class="vibe v-b">📍 Location-specific</span>` : '',
+      rsc.waste !== null ? `<span class="${Score.wasteLabel(rsc.waste).cls} waste-badge">${Score.wasteLabel(rsc.waste).txt}</span>` : '',
+      gh2 ? `<span class="vibe v-r">👻 ${gp2}% ghost rate</span>` : '',
+      co?.ver ? `<span class="co-verified">✓ Seen Verified</span>` : '',
+      dq === 'strong' ? `<span class="vibe v-g">✓ ${rsc.report_count} verified reports</span>`
+        : dq === 'moderate' ? `<span class="vibe v-y">~ ${rsc.report_count} community reports</span>`
+        : dq === 'limited' ? `<span class="vibe v-y">~ ${rsc.report_count} reports — add yours</span>`
+        : `<span class="vibe v-n">Job listing data only</span>`,
+      ...vibeList.slice(0, 2).map(v => `<span class="vibe v-n">${v}</span>`),
+    ].filter(Boolean).join('');
+
+    const rsp = Math.round((rsc.response_rate || 0) * 100);
+    const rgp = Math.round((rsc.ghost_rate || 0) * 100);
+    document.getElementById('ctc-ov').innerHTML = `
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1rem">
+        <div style="background:var(--card);border:1px solid var(--line);border-radius:10px;padding:1.2rem">
+          <div style="font-family:var(--mono);font-size:.56rem;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:.85rem">Score breakdown${loc ? ' (' + loc + ')' : ''}</div>
+          <div class="mbar"><div class="mbar-lbl" style="width:110px">Response rate</div><div class="mbar-track"><div class="mbar-fill" style="width:${rsp}%;background:${Score.color(rr2)}"></div></div><div class="mbar-val">${rsp}%</div></div>
+          <div class="mbar"><div class="mbar-lbl" style="width:110px">Ghost rate</div><div class="mbar-track"><div class="mbar-fill mf-r" style="width:${rgp}%"></div></div><div class="mbar-val">${rgp}%</div></div>
+          <div class="mbar"><div class="mbar-lbl" style="width:110px">Waste risk</div><div class="mbar-track"><div class="mbar-fill" style="width:${rsc.waste || 0}%;background:${wac}"></div></div><div class="mbar-val">${rsc.waste !== null ? rsc.waste + '%' : '—'}</div></div>
+        </div>
+        <div style="background:var(--card);border:1px solid var(--line);border-radius:10px;padding:1.2rem">
+          <div style="font-family:var(--mono);font-size:.56rem;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:.85rem">Vibe check</div>
+          <div style="display:flex;gap:.3rem;flex-wrap:wrap">${vibeList.map(v => `<span class="vibe v-n">${v}</span>`).join('')}</div>
+          <div style="margin-top:1rem;display:flex;flex-direction:column;gap:.4rem">
+            <button class="btn btn-ghost" style="width:100%;justify-content:center;font-size:.72rem" onclick="go('resume')">⚡ Analyze my resume for this role</button>
+            <button class="btn btn-ghost" style="width:100%;justify-content:center;font-size:.72rem" onclick="go('report')">+ Report your experience</button>
+          </div>
+        </div>
+      </div>
+      <div style="background:var(--raised);border-radius:7px;padding:.7rem .95rem;font-family:var(--mono);font-size:.58rem;color:var(--muted);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.5rem">
+        <span>📊 Based on ${rsc.report_count} ${dq === 'jobs_only' ? 'job listings' : 'community reports'} · ${dq === 'strong' ? 'High confidence' : dq === 'moderate' ? 'Moderate confidence' : dq === 'limited' ? 'Limited data — add yours' : 'Job data only'}</span>
+        <a href="#" onclick="go('report');return false" style="color:var(--green);text-decoration:none;white-space:nowrap">+ Add your report →</a>
+      </div>`;
+
+    document.getElementById('ctc-process').innerHTML = `
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1rem">
+        <div style="background:var(--card);border:1px solid var(--line);border-radius:10px;padding:1.2rem">
+          <div style="font-family:var(--mono);font-size:.56rem;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:.85rem">Process score</div>
+          <div style="font-family:var(--mono);font-size:2.5rem;font-weight:500;color:${Score.color(rr2)};line-height:1;margin-bottom:.25rem">${rsc.overall_score}</div>
+          <div style="font-family:var(--mono);font-size:.55rem;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;margin-bottom:1rem">out of 100</div>
+          <div style="font-family:var(--mono);font-size:.62rem;color:var(--dim)">Avg rounds: <span style="color:var(--text)">${rsc.avg_rounds !== null ? rsc.avg_rounds : '—'}</span></div>
+          <div style="font-family:var(--mono);font-size:.62rem;color:var(--dim);margin-top:.3rem">Avg timeline: <span style="color:var(--text)">${rsc.avg_wait_days !== null ? rsc.avg_wait_days + ' days' : '—'}</span></div>
+        </div>
+        <div style="background:var(--card);border:1px solid var(--line);border-radius:10px;padding:1.2rem">
+          <div style="font-family:var(--mono);font-size:.56rem;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:.85rem">Where they ghost</div>
+          <div class="funnel">
+            <div class="funnel-stage"><div class="funnel-label" style="width:100px">Applied</div><div class="funnel-bar-wrap"><div class="funnel-bar-fill" style="width:100%;background:var(--sub)"></div></div><div class="funnel-pct">100%</div></div>
+            <div class="funnel-stage"><div class="funnel-label" style="width:100px">Viewed</div><div class="funnel-bar-wrap"><div class="funnel-bar-fill" style="width:${Math.round((rsc.response_rate||0)*1.8*100)}%;background:var(--blue)"></div></div><div class="funnel-pct">${Math.round((rsc.response_rate||0)*1.8*100)}%</div></div>
+            <div class="funnel-stage"><div class="funnel-label" style="width:100px">Responded</div><div class="funnel-bar-wrap"><div class="funnel-bar-fill" style="width:${rsp}%;background:var(--amber)"></div></div><div class="funnel-pct">${rsp}%</div></div>
+            <div class="funnel-stage"><div class="funnel-label" style="width:100px">Ghosted</div><div class="funnel-bar-wrap"><div class="funnel-bar-fill" style="width:${rgp}%;background:var(--red)"></div></div><div class="funnel-pct">${rgp}%<span class="funnel-ghost-note">← most here</span></div></div>
+          </div>
+        </div>
+      </div>
+      <div style="background:var(--gdim);border:1px solid var(--gmid);border-radius:8px;padding:.75rem 1rem;font-family:var(--mono);font-size:.62rem;color:var(--green)">This feature is exclusive to Seen. No other job board tracks which stage companies ghost at.</div>`;
+  })();
 
   generateRoles(co?.name||name);
 
