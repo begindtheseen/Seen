@@ -2004,53 +2004,77 @@ async function runSearch(name,loc){
 
   document.getElementById('mBody').innerHTML=`<div style="padding:.25rem 0"><div style="font-family:var(--mono);font-size:.58rem;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:.75rem">Live aggregation</div><div id="aLog" style="font-family:var(--mono);font-size:.68rem;color:var(--dim);line-height:2.3"></div></div>`;
   const L=m=>document.getElementById('aLog').innerHTML+=`<div>${m}</div>`;
-  L(`<span style="color:var(--green)">→</span> Querying database...`);await sleep(280);
-  L(`<span style="color:var(--green)">→</span> Scanning Reddit${loc?` · filtering for "${loc}"`:''}...`);
-  let reddit=[];try{reddit=await Agg.reddit(name);}catch(e){}
-  await sleep(300);L(`<span style="color:var(--green)">✓</span> Reddit: ${reddit.length>0?reddit.length+' posts':'CORS blocks (runs server-side in prod)'}`);
-  if(loc){await sleep(200);L(`<span style="color:var(--blue)">→</span> Applying location filter: ${loc}`);await sleep(250);L(`<span style="color:var(--blue)">✓</span> Location data applied`);}
-  await sleep(200);L(`<span style="color:var(--green)">→</span> Computing transparency + waste scores...`);await sleep(320);L(`<span style="color:var(--green)">✓</span> Done`);await sleep(250);
+  L(`<span style="color:var(--green)">→</span> Querying community reports...`);await sleep(280);
 
-  const sc=locSc||(known?.sc)||Agg.signals(reddit)||{overall_score:50,risk_level:'warn',response_rate:.5,ghost_rate:.3,avg_wait_days:30,report_count:0,waste:40};
+  // Fire real data load while animation plays
+  const realDataPromise=loadRealCompanyData(name,loc);
+
+  if(loc){L(`<span style="color:var(--blue)">→</span> Filtering for ${loc}...`);await sleep(220);}
+  L(`<span style="color:var(--green)">→</span> Computing transparency + waste scores...`);await sleep(340);
+  L(`<span style="color:var(--green)">✓</span> Done`);await sleep(180);
+
+  const realData=await realDataPromise;
+  const realSc=realData?computeScoresFromData(realData.reports,realData.jobs):null;
+  const sc=realSc||locSc||(known?.sc)||{overall_score:50,risk_level:'warn',response_rate:.5,ghost_rate:.3,avg_wait_days:30,report_count:0,waste:40};
   const risk=sc.risk_level||Score.risk(sc.overall_score);
-  const wl=Score.wasteLabel(sc.waste||40);
+  const grade=letterGrade(sc.overall_score);
   const vibeList=VIBES[ck]||VIBES.default;
-  const isLoc=!!locSc;const isAI=!known&&!reddit.length;
+  const ghostPct=Math.round((sc.ghost_rate||0)*100);
+  const respPct=Math.round((sc.response_rate||0)*100);
+  const ghostHigh=(sc.ghost_rate||0)>.5;
+  const dq=realSc?.data_quality;
+  const dqLabel=dq==='strong'?`✓ ${sc.report_count} community reports`
+    :dq==='moderate'?`~ ${sc.report_count} community reports`
+    :dq==='limited'?`~ ${sc.report_count} reports — add yours`
+    :dq==='jobs_only'?`Job listing data · no direct reports yet`
+    :locSc?`📍 Location-specific score${locSc.note?' — '+locSc.note:''}`
+    :known?`Seen data · add a report to improve`
+    :`⚠ Estimated — be first to report`;
 
-  document.getElementById('mTitle').textContent=(known?.name||name)+(loc?' · '+loc:'')+' — Report';
+  document.getElementById('mTitle').textContent=(known?.name||name)+(loc?' · '+loc:'');
   document.getElementById('mBody').innerHTML=`
-    ${isLoc?`<div style="background:var(--gdim);border:1px solid var(--gmid);border-radius:7px;padding:.55rem .9rem;font-family:var(--mono);font-size:.62rem;color:var(--green);margin-bottom:.85rem">📍 Location-specific score${locSc?.note?' — '+locSc.note:''}</div>`:''}
-    ${isAI?`<div style="background:var(--adim);border:1px solid #ffb83025;border-radius:7px;padding:.55rem .9rem;font-family:var(--mono);font-size:.62rem;color:var(--amber);margin-bottom:.85rem">⚠ AI-estimated. No direct reports yet — add yours to improve accuracy.</div>`:''}
-    <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:.85rem;margin-bottom:1.1rem">
-      <div>
-        <div style="font-family:var(--display);font-size:1.4rem;font-weight:800;color:var(--white);letter-spacing:-.035em">${known?.name||name}</div>
-        ${loc?`<div style="font-family:var(--mono);font-size:.62rem;color:var(--blue);margin-top:.2rem">📍 ${loc}</div>`:''}
-        <div style="font-family:var(--mono);font-size:.62rem;color:var(--dim);margin-top:.18rem">${known?.ind||''}</div>
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:1rem;margin-bottom:1rem">
+      <div style="flex:1;min-width:0">
+        <div style="font-family:var(--display);font-size:1.45rem;font-weight:800;color:var(--white);letter-spacing:-.035em;line-height:1.1">${known?.name||name}</div>
+        ${loc?`<div style="font-family:var(--mono);font-size:.62rem;color:var(--blue);margin-top:.22rem">📍 ${loc}</div>`:''}
+        <div style="font-family:var(--mono);font-size:.58rem;color:var(--dim);margin-top:.15rem">${known?.ind||''}</div>
+        <div style="font-family:var(--mono);font-size:.54rem;color:var(--muted);margin-top:.5rem;padding:.25rem .6rem;background:var(--raised);border-radius:6px;display:inline-block">${dqLabel}</div>
       </div>
-      <div class="sring ${risk}" style="width:64px;height:64px;flex-shrink:0"><div class="sring-n" style="font-size:1.35rem">${sc.overall_score}</div><div class="sring-l">${Score.label(risk)}</div></div>
+      <div class="co-grade-card ${risk}" style="flex-shrink:0;min-width:86px;text-align:center">
+        <span class="co-grade-lbl">Seen Grade</span>
+        <span class="co-grade-letter ${risk}">${grade}</span>
+        <span class="co-grade-score">${sc.overall_score} / 100</span>
+      </div>
     </div>
 
-    <!-- WASTE SCORE — unique to Seen -->
+    ${ghostHigh?`<div style="background:var(--rdim);border:1px solid #ff3b5c35;border-radius:9px;padding:.7rem 1rem;margin-bottom:.85rem;display:flex;align-items:center;gap:.65rem">
+      <span style="font-size:1.5rem;flex-shrink:0">👻</span>
+      <div>
+        <div style="font-family:var(--mono);font-size:.72rem;font-weight:500;color:var(--red)">${ghostPct}% ghost rate — HIGH RISK</div>
+        <div style="font-family:var(--mono);font-size:.56rem;color:rgba(255,59,92,.55);margin-top:.1rem">Most applicants never hear back from this company</div>
+      </div>
+    </div>`:''}
+
     <div style="background:var(--rdim);border:1px solid #ff3b5c20;border-radius:8px;padding:.7rem 1rem;display:flex;align-items:center;justify-content:space-between;margin-bottom:.85rem">
-      <div><div style="font-family:var(--mono);font-size:.58rem;color:var(--red);text-transform:uppercase;letter-spacing:.08em">⚡ Waste probability</div><div style="font-family:var(--mono);font-size:.58rem;color:rgba(255,59,92,.5);margin-top:.1rem">Chance this job wastes your time</div></div>
+      <div><div style="font-family:var(--mono);font-size:.58rem;color:var(--red);text-transform:uppercase;letter-spacing:.08em">⚡ Waste probability</div><div style="font-family:var(--mono);font-size:.55rem;color:rgba(255,59,92,.5);margin-top:.1rem">Chance this application wastes your time</div></div>
       <div style="font-family:var(--mono);font-size:1.4rem;font-weight:500;color:var(--red)">${sc.waste||'—'}%</div>
     </div>
 
     <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--line);border:1px solid var(--line);border-radius:8px;overflow:hidden;margin-bottom:.85rem">
-      ${mbox(sc.response_rate!=null?Math.round(sc.response_rate*100)+'%':'—','Response',Score.color(risk))}
-      ${mbox(sc.ghost_rate!=null?Math.round(sc.ghost_rate*100)+'%':'—','Ghost rate','var(--red)')}
+      ${mbox(respPct+'%','Response rate',Score.color(risk))}
+      ${mbox(ghostPct+'%','Ghost rate',ghostHigh?'var(--red)':'var(--amber)')}
       ${mbox(sc.avg_wait_days!=null?sc.avg_wait_days+'d':'—','Avg wait','var(--white)')}
     </div>
 
-    <!-- VIBE TAGS -->
     <div style="display:flex;gap:.28rem;flex-wrap:wrap;margin-bottom:.85rem">${vibeList.slice(0,4).map(v=>`<span class="vibe v-n">${v}</span>`).join('')}</div>
 
     <div class="mbar"><div class="mbar-lbl" style="width:85px">Transparency</div><div class="mbar-track"><div class="mbar-fill" style="width:${sc.overall_score}%;background:${Score.color(risk)}"></div></div><div class="mbar-val" style="color:${Score.color(risk)}">${sc.overall_score}</div></div>
-    <div class="mbar"><div class="mbar-lbl" style="width:85px">Ghost rate</div><div class="mbar-track"><div class="mbar-fill mf-r" style="width:${Math.round((sc.ghost_rate||0)*100)}%"></div></div><div class="mbar-val">${sc.ghost_rate!=null?Math.round(sc.ghost_rate*100)+'%':'—'}</div></div>
-    <div style="margin-top:.85rem;padding:.5rem .75rem;background:var(--raised);border-radius:6px;font-family:var(--mono);font-size:.56rem;color:var(--muted)">Based on ${sc.report_count||0} reports · Not a definitive claim · Scores vary by location</div>
-    <div style="display:flex;gap:.45rem;margin-top:.85rem">
-      <button class="btn btn-solid" style="flex:1;justify-content:center" onclick="closeModDirect();viewCompany('${known?.id||'x'}','${known?.name||name}','${loc}')">Full report + process score →</button>
-      <button class="btn btn-ghost" style="flex:1;justify-content:center" onclick="closeModDirect();go('report')">Add your report →</button>
+    <div class="mbar"><div class="mbar-lbl" style="width:85px">Ghost rate</div><div class="mbar-track"><div class="mbar-fill mf-r" style="width:${ghostPct}%"></div></div><div class="mbar-val">${ghostPct}%</div></div>
+
+    <div style="display:flex;gap:.45rem;margin-top:1rem">
+      <button class="btn btn-solid" style="flex:1;justify-content:center;font-size:.75rem" onclick="closeModDirect();viewCompany('${known?.id||'x'}','${known?.name||name}','${loc}')">Full report →</button>
+      <button class="btn btn-ghost" style="padding:.65rem .9rem;font-size:.75rem;flex-shrink:0" onclick="shareCompanyReport('${(name||'').replace(/'/g,"\\'")}')">↗ Share</button>
+      <button class="btn btn-ghost" style="padding:.65rem .9rem;font-size:.75rem;flex-shrink:0" onclick="closeModDirect();go('report')">+ Report</button>
     </div>`;
 }
 
@@ -2068,8 +2092,8 @@ function loadLdr(){
     return`<div class="ldr-item" onclick="viewCompany('${c.id}','${c.name}','')">
       <div class="ldr-rank">#${i+1}</div>
       <div class="ldr-name">${c.name}</div>
-      <div class="ldr-score ${risk}">${c.sc.overall_score}</div>
-      <div class="ldr-label">${Score.label(risk)}</div>
+      <div class="ldr-score ${risk}">${letterGrade(c.sc.overall_score)}</div>
+      <div class="ldr-label">${c.sc.overall_score}/100 · ${Score.label(risk)}</div>
       <div class="ldr-waste" style="color:${c.sc.waste>60?'var(--red)':c.sc.waste>30?'var(--amber)':'var(--green)'}">${c.sc.waste}% waste risk</div>
       <div class="ldr-bar"><div class="ldr-fill" style="width:${c.sc.overall_score}%;background:${fc}"></div></div>
     </div>`;}).join('');
