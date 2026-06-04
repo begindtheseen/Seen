@@ -1682,15 +1682,13 @@ const Auth = {
   },
 
   async loadProfile() {
-    if(!this._user || !db) return;
+    if(!this._user) return;
     try {
-      const { data } = await db.from('profiles').select('*').eq('id', this._user.id).single();
+      const result = await _sync('load_profile');
+      const data = result?.profile || null;
       const local = _loadProfileLocal() || {};
       const localTs = local.savedAt || 0;
       const dbTs = data?.updated_at ? new Date(data.updated_at).getTime() : 0;
-      // DB is the cross-device source of truth.
-      // Only let localStorage override specific fields if it was saved MORE RECENTLY than the DB row
-      // (i.e. the user just made a change on this device that hasn't synced yet).
       const localWins = localTs > dbTs;
       this._profile = {
         ...(data || {}),
@@ -3639,22 +3637,19 @@ async function surveyAnswer(val){
 function surveyBack(){if(_surveyStep>0){_surveyStep--;renderSurveyQuestion();}}
 async function completeSurvey(){
   try {
-    const {data:{user}} = await db.auth.getUser();
-    if(user && db){
-      await db.from('profiles').upsert({
-        id: user.id,
-        email: user.email,
-        name: user.user_metadata?.name || user.email.split('@')[0],
+    if(Auth._user){
+      await _sync('save_profile', { profile: {
+        email: Auth._user.email,
+        name: Auth._user.user_metadata?.name || Auth._user.email.split('@')[0],
         type: 'seeker',
         onboarding_survey: _surveyAnswers,
         survey_completed: true,
-        // Save individual fields so they persist and don't re-ask
         city: _surveyAnswers.city || null,
         industry: _surveyAnswers.industry || null,
         experience: _surveyAnswers.experience || null,
         situation: _surveyAnswers.situation || null,
         frustration: _surveyAnswers.frustration || null,
-      });
+      }});
       localStorage.setItem('_seen_survey_done', '1');
       await Auth.loadProfile(); // reload so survey_completed is in memory
     }
@@ -4443,15 +4438,8 @@ async function createAccount() {
   }
 
   // Create profile row immediately so data exists before survey completes
-  if (data?.user && db) {
-    try {
-      await db.from('profiles').upsert({
-        id: data.user.id,
-        email: data.user.email,
-        name,
-        type: 'seeker',
-      }, { onConflict: 'id' });
-    } catch(e) { /* non-fatal — survey will upsert again */ }
+  if (data?.user) {
+    _sync('save_profile', { profile: { email: data.user.email, name, type: 'seeker' } }).catch(() => {});
   }
 
   // Show verify screen
@@ -5550,17 +5538,10 @@ async function saveProfile() {
   Auth._profile.city = city;
   Auth._profile.experience = experience;
 
-  // 3. Persist to Supabase DB — upsert so it works whether or not a row exists yet
-  if (db && Auth._user) {
-    try {
-      const { error } = await db.from('profiles').upsert({
-        id: Auth._user.id,
-        email: Auth._user.email,
-        name, city, experience,
-        updated_at: new Date().toISOString(),
-      }, { onConflict: 'id' });
-      if (error) console.warn('Profile DB save failed:', error.message, '— data saved to localStorage only');
-    } catch(e) { console.warn('Profile DB save (non-fatal):', e.message); }
+  // 3. Persist to DB via proxy — bypasses RLS
+  if (Auth._user) {
+    _sync('save_profile', { profile: { email: Auth._user.email, name, city, experience } })
+      .catch(e => console.warn('Profile DB save (non-fatal):', e.message));
   }
 
   // 4. Update jobs page location input immediately
@@ -5649,17 +5630,9 @@ const ResumeStore = {
     // Persist to localStorage
     localStorage.setItem(this._key(), text);
     localStorage.setItem(this._metaKey(), JSON.stringify({ fileName, wordCount }));
-    // Persist to DB (cross-device)
-    if (db && Auth.isLoggedIn()) {
-      try {
-        const uid = (await db.auth.getUser()).data.user?.id;
-        await db.from('profiles').update({
-          resume_text: text,
-          resume_file_name: fileName,
-          resume_word_count: wordCount,
-          resume_updated_at: new Date().toISOString()
-        }).eq('id', uid);
-      } catch(e) { console.warn('Resume DB save (non-fatal):', e); }
+    // Persist to DB via proxy — bypasses RLS
+    if (Auth.isLoggedIn()) {
+      _sync('save_resume', { text, fileName, wordCount }).catch(e => console.warn('Resume DB save (non-fatal):', e));
     }
   },
 
@@ -5672,23 +5645,20 @@ const ResumeStore = {
         wordCount: Auth._profile.resume_word_count || 0
       };
     }
-    // 2. Re-fetch profile from DB — handles cross-device case where profile was loaded
-    //    before resume was uploaded on another device
-    if (db && Auth.isLoggedIn()) {
+    // 2. Re-fetch profile from DB via proxy — handles cross-device case
+    if (Auth.isLoggedIn()) {
       try {
-        const uid = Auth._user?.id;
-        if (uid) {
-          const { data } = await db.from('profiles').select('resume_text,resume_file_name,resume_word_count').eq('id', uid).single();
-          if (data?.resume_text) {
-            if (Auth._profile) {
-              Auth._profile.resume_text = data.resume_text;
-              Auth._profile.resume_file_name = data.resume_file_name;
-              Auth._profile.resume_word_count = data.resume_word_count;
-            }
-            localStorage.setItem(this._key(), data.resume_text);
-            localStorage.setItem(this._metaKey(), JSON.stringify({ fileName: data.resume_file_name || 'Resume', wordCount: data.resume_word_count || 0 }));
-            return { text: data.resume_text, fileName: data.resume_file_name || 'Resume', wordCount: data.resume_word_count || 0 };
+        const result = await _sync('load_profile');
+        const data = result?.profile;
+        if (data?.resume_text) {
+          if (Auth._profile) {
+            Auth._profile.resume_text = data.resume_text;
+            Auth._profile.resume_file_name = data.resume_file_name;
+            Auth._profile.resume_word_count = data.resume_word_count;
           }
+          localStorage.setItem(this._key(), data.resume_text);
+          localStorage.setItem(this._metaKey(), JSON.stringify({ fileName: data.resume_file_name || 'Resume', wordCount: data.resume_word_count || 0 }));
+          return { text: data.resume_text, fileName: data.resume_file_name || 'Resume', wordCount: data.resume_word_count || 0 };
         }
       } catch(e) {}
     }
@@ -5709,11 +5679,8 @@ const ResumeStore = {
       Auth._profile.resume_file_name = null;
       Auth._profile.resume_word_count = null;
     }
-    if (db && Auth.isLoggedIn()) {
-      db.auth.getUser().then(res => {
-        const user = res?.data?.user;
-        if (user) db.from('profiles').update({ resume_text: null, resume_file_name: null, resume_word_count: null }).eq('id', user.id);
-      }).catch(e => console.warn('ResumeStore.clear:', e));
+    if (Auth.isLoggedIn()) {
+      _sync('clear_resume').catch(e => console.warn('ResumeStore.clear:', e));
     }
   }
 };

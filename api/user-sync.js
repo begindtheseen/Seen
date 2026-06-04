@@ -122,5 +122,52 @@ export default async function handler(req, res) {
     return res.status(200).json({ ok: true });
   }
 
+  // ── LOAD PROFILE ────────────────────────────────────────────────────────────
+  if (action === 'load_profile') {
+    const r = await db(`profiles?id=eq.${uid}&limit=1`);
+    const rows = r.ok ? await r.json() : [];
+    return res.status(200).json({ profile: rows[0] || null });
+  }
+
+  // ── SAVE PROFILE ────────────────────────────────────────────────────────────
+  if (action === 'save_profile') {
+    const p = body.profile || {};
+    const PROFILE_FIELDS = ['email','name','type','city','industry','experience','situation','frustration','onboarding_survey','survey_completed'];
+    const row = { id: uid, updated_at: new Date().toISOString() };
+    PROFILE_FIELDS.forEach(f => { if (p[f] !== undefined) row[f] = p[f]; });
+    const r = await db('profiles', {
+      method: 'POST',
+      body: JSON.stringify(row),
+      headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
+    });
+    return res.status(r.ok ? 200 : 400).json({ ok: r.ok });
+  }
+
+  // ── SAVE RESUME ─────────────────────────────────────────────────────────────
+  if (action === 'save_resume') {
+    const { text, fileName, wordCount } = body;
+    const r = await db(`profiles?id=eq.${uid}`, {
+      method: 'PATCH',
+      body: JSON.stringify({
+        resume_text: text || null,
+        resume_file_name: fileName || null,
+        resume_word_count: wordCount || null,
+        resume_updated_at: new Date().toISOString(),
+      }),
+      headers: { Prefer: 'return=minimal' },
+    });
+    return res.status(r.ok ? 200 : 400).json({ ok: r.ok });
+  }
+
+  // ── CLEAR RESUME ────────────────────────────────────────────────────────────
+  if (action === 'clear_resume') {
+    await db(`profiles?id=eq.${uid}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ resume_text: null, resume_file_name: null, resume_word_count: null }),
+      headers: { Prefer: 'return=minimal' },
+    });
+    return res.status(200).json({ ok: true });
+  }
+
   return res.status(400).json({ error: 'Unknown action: ' + action });
 }
