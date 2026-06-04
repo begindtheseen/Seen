@@ -1653,8 +1653,10 @@ const Auth = {
             return;
           }
 
+          const acctAgeMs = session.user.created_at ? Date.now() - new Date(session.user.created_at).getTime() : 0;
           const surveyDone = localStorage.getItem('_seen_survey_done') === '1' ||
             this._profile?.survey_completed === true ||
+            acctAgeMs > 60 * 60 * 1000 || // account >1 hour old = returning user, skip survey
             (() => { try { const s = this._profile?.onboarding_survey; if(!s) return false; const o = typeof s==='string'?JSON.parse(s):s; return o && Object.keys(o).length > 0; } catch(e) { return false; } })();
 
           if(!surveyDone && this.isSeeker()) { go('login'); startSurvey(); return; }
@@ -1683,6 +1685,8 @@ const Auth = {
 
   async loadProfile() {
     if(!this._user) return;
+    // Name from JWT user_metadata — always available cross-device, no DB needed
+    const metaName = this._user.user_metadata?.name || this._user.email?.split('@')[0] || '';
     try {
       const result = await _sync('load_profile');
       const data = result?.profile || null;
@@ -1692,13 +1696,25 @@ const Auth = {
       const localWins = localTs > dbTs;
       this._profile = {
         ...(data || {}),
-        name:       (localWins && local.name)       ? local.name       : (data?.name       || local.name       || ''),
+        name:       (localWins && local.name) ? local.name : (data?.name || local.name || metaName),
         city:       (localWins && local.city)       ? local.city       : (data?.city       || local.city       || ''),
         experience: (localWins && local.experience) ? local.experience : (data?.experience || local.experience || ''),
       };
+      // Cache survey flag locally so new devices don't force the survey again
+      if (this._profile?.survey_completed) localStorage.setItem('_seen_survey_done', '1');
+      // If no DB profile row yet, push whatever we have so other devices can see it
+      if (!data) {
+        _sync('save_profile', { profile: {
+          email: this._user.email,
+          name: this._profile.name,
+          city: this._profile.city || '',
+          experience: this._profile.experience || '',
+          type: 'seeker',
+        }}).catch(() => {});
+      }
     } catch(e) {
       const local = _loadProfileLocal() || {};
-      if (!this._profile) this._profile = { name: local.name || '', city: local.city || '', experience: local.experience || '' };
+      if (!this._profile) this._profile = { name: local.name || metaName, city: local.city || '', experience: local.experience || '' };
     }
   },
 
@@ -3509,8 +3525,10 @@ async function checkVerification(){
   if(error||!user){showToast('Not signed in. Try again.');showStep('signin');return;}
   if(!user.email_confirmed_at){showToast("Haven't received your verification yet. Click the link in your email first.");return;}
   await Auth.loadProfile();
+  const acctAgeMs = Auth._user?.created_at ? Date.now() - new Date(Auth._user.created_at).getTime() : 0;
   const surveyDone = localStorage.getItem('_seen_survey_done') === '1' ||
     Auth._profile?.survey_completed === true ||
+    acctAgeMs > 60 * 60 * 1000 || // returning user
     (() => { try { const s = Auth._profile?.onboarding_survey; if(!s) return false; const o = typeof s==='string'?JSON.parse(s):s; return o && Object.keys(o).length > 0; } catch(e) { return false; } })();
   if(!surveyDone){startSurvey();}
   else{updateNav();renderSeekerDash();go('seeker-dash');}
@@ -5662,10 +5680,13 @@ const ResumeStore = {
         }
       } catch(e) {}
     }
-    // 3. localStorage fallback
+    // 3. localStorage fallback — and push to DB so other devices can see it
     const text = localStorage.getItem(this._key());
     if (text) {
       const meta = JSON.parse(localStorage.getItem(this._metaKey()) || '{}');
+      if (Auth.isLoggedIn()) {
+        _sync('save_resume', { text, fileName: meta.fileName || 'Resume', wordCount: meta.wordCount || 0 }).catch(() => {});
+      }
       return { text, fileName: meta.fileName || 'Resume', wordCount: meta.wordCount || 0 };
     }
     return null;
