@@ -144,7 +144,7 @@ export default async function handler(req, res) {
           apikey: SUPABASE_SERVICE_KEY,
           Authorization: `Bearer ${SUPABASE_SERVICE_KEY}`,
           'Content-Type': 'application/json',
-          Prefer: 'resolution=merge-duplicates,return=minimal',
+          Prefer: 'return=minimal',
         },
         body: JSON.stringify(rows),
       }).then(r => {
