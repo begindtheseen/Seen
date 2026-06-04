@@ -3655,7 +3655,7 @@ function surveyBack(){if(_surveyStep>0){_surveyStep--;renderSurveyQuestion();}}
 async function completeSurvey(){
   try {
     if(Auth._user){
-      await _sync('save_profile', { profile: {
+      const result = await _sync('save_profile', { profile: {
         email: Auth._user.email,
         name: Auth._user.user_metadata?.name || '',
         type: 'seeker',
@@ -3664,9 +3664,11 @@ async function completeSurvey(){
         city: _surveyAnswers.city || null,
         industry: _surveyAnswers.industry || null,
         experience: _surveyAnswers.experience || null,
-        situation: _surveyAnswers.situation || null,
-        frustration: _surveyAnswers.frustration || null,
       }});
+      if (!result?.ok) {
+        // Retry with just the flag if full save failed
+        await _sync('save_profile', { profile: { survey_completed: true } });
+      }
       localStorage.setItem('_seen_survey_done', '1');
       await Auth.loadProfile(); // reload so survey_completed is in memory
     }

@@ -132,30 +132,40 @@ export default async function handler(req, res) {
   // ── SAVE PROFILE ────────────────────────────────────────────────────────────
   if (action === 'save_profile') {
     const p = body.profile || {};
-    const PROFILE_FIELDS = ['email','name','type','city','industry','experience','situation','frustration','onboarding_survey','survey_completed'];
-    const row = { id: uid, updated_at: new Date().toISOString() };
-    PROFILE_FIELDS.forEach(f => { if (p[f] !== undefined) row[f] = p[f]; });
-    const r = await db('profiles', {
+    // Only include columns guaranteed to exist — survey fields saved separately
+    const SAFE_FIELDS = ['email','name','type','city','industry','experience','survey_completed','onboarding_survey'];
+    const row = { id: uid };
+    SAFE_FIELDS.forEach(f => { if (p[f] !== undefined) row[f] = p[f]; });
+    const r = await db('profiles?on_conflict=id', {
       method: 'POST',
       body: JSON.stringify(row),
       headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
     });
+    if (!r.ok) {
+      const errText = await r.text().catch(() => '');
+      console.error('save_profile failed:', r.status, errText);
+    }
     return res.status(r.ok ? 200 : 400).json({ ok: r.ok });
   }
 
-  // ── SAVE RESUME ─────────────────────────────────────────────────────────────
+  // ── SAVE RESUME — upsert so it works even if profile row doesn't exist yet ──
   if (action === 'save_resume') {
     const { text, fileName, wordCount } = body;
-    const r = await db(`profiles?id=eq.${uid}`, {
-      method: 'PATCH',
+    const r = await db('profiles?on_conflict=id', {
+      method: 'POST',
       body: JSON.stringify({
+        id: uid,
         resume_text: text || null,
         resume_file_name: fileName || null,
         resume_word_count: wordCount || null,
         resume_updated_at: new Date().toISOString(),
       }),
-      headers: { Prefer: 'return=minimal' },
+      headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
     });
+    if (!r.ok) {
+      const errText = await r.text().catch(() => '');
+      console.error('save_resume failed:', r.status, errText);
+    }
     return res.status(r.ok ? 200 : 400).json({ ok: r.ok });
   }
 
