@@ -35,28 +35,40 @@ export default async function handler(req, res) {
 
     const SUPABASE_URL = process.env.SUPABASE_URL;
     const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY;
-    const dbHeaders = { apikey: SUPABASE_SERVICE_KEY, Authorization: `Bearer ${SUPABASE_SERVICE_KEY}` };
+    const dbHeaders = {
+      apikey: SUPABASE_SERVICE_KEY,
+      Authorization: `Bearer ${SUPABASE_SERVICE_KEY}`,
+      'Content-Type': 'application/json',
+    };
 
-    // ── Server-side DB cache check — prevents duplicate Claude calls across all devices ──
+    // Normalize query for consistent cache keys
+    const qNorm = query.toLowerCase().trim();
+
+    // ── Server-side DB cache check ────────────────────────────────────────────
     if (SUPABASE_URL && SUPABASE_SERVICE_KEY) {
       try {
-        const qPattern = encodeURIComponent('%' + query.toLowerCase() + '%');
-        const cacheRes = await fetch(
-          `${SUPABASE_URL}/rest/v1/jobs?search_query=ilike.${qPattern}&expires_at=gt.${new Date().toISOString()}&limit=10`,
-          { headers: dbHeaders }
-        );
-        if (cacheRes.ok) {
-          const cached = await cacheRes.json();
-          if (cached?.length >= 5) {
-            console.log(`CACHE HIT: "${query}" @ "${loc}" — ${cached.length} results from DB`);
-            const jobs = cached.map(j => ({
-              title: j.title, company: j.company, location: j.location || loc,
-              salary: j.salary, url: j.apply_url, description: j.description,
-              type: j.type || 'Full-time', level: j.level || 'Mid level',
-              source: j.source || 'Seen', score: j.score || 65, waste_score: j.waste_score || 25,
-            }));
-            return res.status(200).json({ ok: true, jobs, query, location: loc, _src: 'cache' });
-          }
+        // Exact match first (cheapest), then broadened ILIKE if not enough
+        const exactUrl = `${SUPABASE_URL}/rest/v1/jobs?search_query=ilike.${encodeURIComponent(qNorm)}&expires_at=gt.${encodeURIComponent(new Date().toISOString())}&limit=25`;
+        const broadUrl = `${SUPABASE_URL}/rest/v1/jobs?search_query=ilike.${encodeURIComponent('%' + qNorm + '%')}&expires_at=gt.${encodeURIComponent(new Date().toISOString())}&limit=25`;
+
+        let cached = [];
+        const exactRes = await fetch(exactUrl, { headers: dbHeaders });
+        if (exactRes.ok) cached = await exactRes.json();
+
+        if (cached.length < 3) {
+          const broadRes = await fetch(broadUrl, { headers: dbHeaders });
+          if (broadRes.ok) cached = await broadRes.json();
+        }
+
+        if (cached?.length >= 3) {
+          console.log(`CACHE HIT: "${query}" @ "${loc}" — ${cached.length} results from DB`);
+          const jobs = cached.map(j => ({
+            title: j.title, company: j.company, location: j.location || loc,
+            salary: j.salary, url: j.apply_url, description: j.description,
+            type: j.type || 'Full-time', level: j.level || 'Mid level',
+            source: j.source || 'Seen', score: j.score || 65, waste_score: j.waste_score || 25,
+          }));
+          return res.status(200).json({ ok: true, jobs, query, location: loc, _src: 'cache' });
         }
       } catch(e) { console.warn('Cache check error:', e.message); }
       console.log(`CACHE MISS: "${query}" @ "${loc}" — calling Claude API`);
@@ -121,7 +133,7 @@ export default async function handler(req, res) {
         source: j.source || 'Web search',
         type: j.type || 'Full-time',
         level: j.level || 'Mid level',
-        search_query: query,
+        search_query: qNorm,
         score: j.score || 65,
         waste_score: j.waste_score || 25,
         expires_at: expires,
@@ -135,8 +147,10 @@ export default async function handler(req, res) {
           Prefer: 'resolution=merge-duplicates,return=minimal',
         },
         body: JSON.stringify(rows),
-      }).then(() => console.log(`CACHE SAVED: "${query}" @ "${loc}" — ${jobs.length} jobs`))
-        .catch(e => console.warn('jobs DB save:', e.message));
+      }).then(r => {
+        if (r.ok) console.log(`CACHE SAVED: "${qNorm}" @ "${loc}" — ${jobs.length} jobs`);
+        else r.text().then(t => console.error(`CACHE SAVE FAILED: ${r.status}`, t.slice(0, 200)));
+      }).catch(e => console.error('jobs DB save:', e.message));
     }
 
     return res.status(200).json({ ok: true, jobs, query, location: loc });
