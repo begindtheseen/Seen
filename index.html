@@ -1582,6 +1582,24 @@ nav{position:fixed;top:0;left:0;right:0;z-index:500;height:58px;display:flex;ali
     <div class="m-body" id="stageModalBody"></div>
   </div>
 </div>
+
+<!-- FULL JOB LISTING PAGE -->
+<div class="page" id="page-job-detail">
+  <div style="max-width:720px;margin:0 auto;padding:1.25rem 1rem 7rem">
+    <button onclick="jlGoBack()" style="background:none;border:none;font-family:var(--mono);font-size:.65rem;color:var(--dim);cursor:pointer;padding:.25rem 0;margin-bottom:1.5rem;display:inline-flex;align-items:center;gap:.35rem;transition:color .15s" onmouseover="this.style.color='var(--sub)'" onmouseout="this.style.color='var(--dim)'">← Back to jobs</button>
+    <div id="jlHeader"></div>
+    <div id="jlInsights" style="margin-top:1.5rem"></div>
+    <div id="jlDesc" style="margin-top:1.5rem"></div>
+    <div id="jlReport" style="margin-top:1.5rem"></div>
+  </div>
+  <div style="position:sticky;bottom:0;background:var(--bg);border-top:1px solid var(--line2);padding:.9rem 1rem;z-index:10">
+    <div style="max-width:720px;margin:0 auto;display:flex;gap:.75rem">
+      <button id="jlSaveBtn" type="button" data-saved="0" onclick="jlSaveToggle(this)" style="background:none;border:1px solid var(--line2);border-radius:8px;padding:.65rem 1rem;font-size:1.1rem;cursor:pointer;color:var(--muted);flex-shrink:0;transition:all .15s">♡</button>
+      <button type="button" onclick="jlApplyClick()" style="flex:1;background:var(--green);color:var(--ink);border:none;border-radius:8px;padding:.65rem 1rem;font-family:var(--display);font-weight:800;font-size:.85rem;cursor:pointer">Apply &amp; Optimize →</button>
+    </div>
+  </div>
+</div>
+
 <script>
 const SUPABASE_URL='https://tmngmmofrplsldvlobfx.supabase.co';
 const SUPABASE_ANON_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRtbmdtbW9mcnBsc2xkdmxvYmZ4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc3OTk3ODYsImV4cCI6MjA5MzM3NTc4Nn0.kAL3GbMilYTM3z7Ct4YM2nTh3n-f1UXXqiDHOl3fsRc';
@@ -3848,11 +3866,13 @@ let _navSkipHistory = false;
 
 window.addEventListener('popstate', function(e) {
   const page = e.state?.page;
+  const jobId = e.state?.jobId;
   _navSkipHistory = true;
-  if (page) {
+  if (page === 'job-detail' && jobId) {
+    openJobListing(jobId);
+  } else if (page) {
     go(page);
   } else {
-    // No history state — go to a sensible default within the app
     go(Auth.isSeeker() ? 'seeker-dash' : 'landing');
   }
   _navSkipHistory = false;
@@ -4522,9 +4542,6 @@ function openJobDetailModal(jobId) {
     `<span style="background:var(--raised);border:1px solid var(--line2);border-radius:5px;padding:.18rem .5rem;font-size:.63rem;font-family:var(--mono);color:var(--sub)">${t}</span>`
   ).join('');
 
-  const jobUrl = j ? (j._url || j.apply_url || '') : '';
-  const searchUrl = j ? 'https://www.google.com/search?q=' + encodeURIComponent((j.title||'') + ' ' + (j.co||'') + ' job') : '';
-  const linkUrl = jobUrl || searchUrl;
   document.getElementById('applyModalBody').innerHTML =
     `<div style="display:flex;align-items:center;gap:.65rem;padding-bottom:.9rem;margin-bottom:.9rem;border-bottom:1px solid var(--line)">
        <div style="width:40px;height:40px;border-radius:8px;background:var(--raised);border:1px solid var(--line2);display:flex;align-items:center;justify-content:center;font-family:var(--display);font-weight:800;font-size:1rem;color:var(--white);flex-shrink:0">${(co||'?')[0].toUpperCase()}</div>
@@ -4533,13 +4550,13 @@ function openJobDetailModal(jobId) {
      </div>
      <div style="color:var(--sub);font-size:.78rem;line-height:1.75;white-space:pre-wrap">${(desc||'No description available.').replace(/</g,'&lt;')}</div>`;
 
-  // Sticky footer — save, optional "full listing" link, apply
+  // Sticky footer
   const saved = SavedJobs.isSaved(sid);
   const foot = document.getElementById('applyModalFoot');
   foot.style.cssText = 'display:flex;flex-direction:column;gap:.5rem;padding:1rem 1.5rem;border-top:1px solid var(--line);flex-shrink:0;background:var(--card);border-radius:0 0 16px 16px';
   foot.innerHTML =
-    `${linkUrl ? `<a href="${linkUrl}" target="_blank" rel="noopener"
-       style="display:block;text-align:center;font-family:var(--mono);font-size:.65rem;color:var(--green);text-decoration:none;padding:.4rem 0;border:1px solid var(--line2);border-radius:8px;letter-spacing:.02em">View full listing ↗</a>` : ''}
+    `<button type="button" onclick="openJobListing('${sid}')"
+       style="display:block;width:100%;text-align:center;font-family:var(--mono);font-size:.65rem;color:var(--green);background:none;padding:.4rem 0;border:1px solid var(--line2);border-radius:8px;letter-spacing:.02em;cursor:pointer">View full listing + AI insights →</button>
      <div style="display:flex;gap:.5rem">
        <button id="jdSaveBtn" type="button" data-saved="${saved?'1':'0'}" onclick="jdSaveToggle(this)"
          style="background:none;border:1px solid var(--line2);border-radius:8px;padding:.65rem 1rem;font-size:1rem;cursor:pointer;color:${saved?'var(--green)':'var(--muted)'};flex-shrink:0;transition:all .15s">${saved?'♥':'♡'}</button>
@@ -4602,6 +4619,178 @@ function closeJobDetailModal() {
   const foot = document.getElementById('applyModalFoot');
   if (foot) foot.style.display = 'none';
   closeApplyModalDirect();
+}
+
+// ═══════════════════════════════════════════════
+// FULL JOB LISTING PAGE
+// ═══════════════════════════════════════════════
+let _currentListing = null;
+
+async function openJobListing(jobId) {
+  const sid = String(jobId);
+  const j = JOBS.find(x => String(x.id) === sid);
+  _currentListing = { sid, j: j || null };
+
+  const co    = j ? (j.co    || '') : '';
+  const title = j ? (j.title || 'Job Listing') : 'Job Listing';
+  const loc   = j ? (j.city  || j.loc || '') : '';
+  const score = j ? (j.score || 65) : 65;
+  const waste = j ? (j.waste || 25) : 25;
+  const risk  = j ? (j.risk  || Score.risk(score)) : 'warn';
+  const type  = j ? (j.type  || '') : '';
+  const lvl   = j ? (j.lvl   || '') : '';
+  const sal   = j ? (j.sal && j.sal !== '—' ? j.sal : '') : '';
+  const desc  = j ? (j.description || (j.vibes && j.vibes[0]) || '') : '';
+
+  // Close popup if open
+  closeApplyModalDirect();
+
+  // Navigate — skip the normal history push so we can do our own with jobId
+  _navSkipHistory = true;
+  go('job-detail');
+  _navSkipHistory = false;
+  history.pushState({ page: 'job-detail', jobId: sid }, '', window.location.pathname);
+
+  // Header
+  const chips = [type, lvl, sal].filter(Boolean).map(t =>
+    `<span style="background:var(--raised);border:1px solid var(--line2);border-radius:5px;padding:.2rem .55rem;font-size:.65rem;font-family:var(--mono);color:var(--sub)">${t}</span>`
+  ).join('');
+
+  document.getElementById('jlHeader').innerHTML =
+    `<div style="display:flex;align-items:flex-start;gap:1rem;margin-bottom:1rem">
+       <div style="width:52px;height:52px;border-radius:10px;background:var(--raised);border:1px solid var(--line2);display:flex;align-items:center;justify-content:center;font-family:var(--display);font-weight:800;font-size:1.3rem;color:var(--white);flex-shrink:0">${(co||'?')[0].toUpperCase()}</div>
+       <div style="flex:1;min-width:0">
+         <h1 style="font-family:var(--display);font-size:1.25rem;font-weight:800;color:var(--white);letter-spacing:-.025em;line-height:1.2;margin-bottom:.3rem">${title}</h1>
+         <div style="font-family:var(--mono);font-size:.65rem;color:var(--dim)">${co}${loc ? ' · 📍 ' + loc : ''}</div>
+       </div>
+       <div style="text-align:center;flex-shrink:0">
+         <div class="sring ${risk}" style="width:44px;height:44px"><div class="sring-n" style="font-size:.85rem">${score}</div></div>
+         <div style="font-family:var(--mono);font-size:.45rem;color:var(--muted);margin-top:.15rem">score</div>
+       </div>
+     </div>
+     <div style="display:flex;flex-wrap:wrap;gap:.4rem">${chips}</div>`;
+
+  // Save button state
+  const saved = SavedJobs.isSaved(sid);
+  const saveBtn = document.getElementById('jlSaveBtn');
+  if (saveBtn) {
+    saveBtn.dataset.saved = saved ? '1' : '0';
+    saveBtn.textContent = saved ? '♥' : '♡';
+    saveBtn.style.color = saved ? 'var(--green)' : 'var(--muted)';
+  }
+
+  // AI insights — skeleton while loading
+  document.getElementById('jlInsights').innerHTML =
+    `<div style="background:var(--gdim);border:1px solid var(--gmid);border-radius:12px;padding:1.25rem">
+       <div style="font-family:var(--mono);font-size:.58rem;text-transform:uppercase;letter-spacing:.08em;color:var(--dim);margin-bottom:.85rem">WHAT ${(co||'THIS COMPANY').toUpperCase()} IS HIRING FOR</div>
+       <div id="jlInsightsContent">
+         <div style="display:flex;flex-direction:column;gap:.7rem">
+           ${[80,65,72,58,68].map(w=>`<div style="height:.65rem;background:var(--raised);border-radius:4px;width:${w}%;animation:pulse 1.4s ease infinite"></div>`).join('')}
+         </div>
+       </div>
+     </div>`;
+
+  // Full description
+  document.getElementById('jlDesc').innerHTML =
+    `<div>
+       <div style="font-family:var(--mono);font-size:.58rem;text-transform:uppercase;letter-spacing:.08em;color:var(--dim);margin-bottom:.75rem">Full Description</div>
+       <div style="color:var(--sub);font-size:.82rem;line-height:1.8;white-space:pre-wrap">${(desc||'No description available.').replace(/</g,'&lt;')}</div>
+     </div>`;
+
+  // Report experience placeholder
+  document.getElementById('jlReport').innerHTML =
+    `<div style="background:var(--raised);border:1px solid var(--line2);border-radius:12px;padding:1.25rem;opacity:.6">
+       <div style="display:flex;align-items:center;gap:.65rem;margin-bottom:.45rem">
+         <div style="font-family:var(--display);font-size:.9rem;font-weight:700;color:var(--muted)">Report Your Experience</div>
+         <span style="background:var(--line);color:var(--dim);font-family:var(--mono);font-size:.5rem;padding:.15rem .45rem;border-radius:4px;letter-spacing:.06em">COMING SOON</span>
+       </div>
+       <div style="font-size:.75rem;color:var(--muted);font-weight:300;line-height:1.65">Applied here? Share how it went — response rate, interview process, offer outcome. Help the community cut through the noise.</div>
+     </div>`;
+
+  // Fetch AI insights (no resume needed — job description only)
+  if (desc && desc.length > 80) {
+    fetch('/api/resume', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ tool: 'job-insights', job: title, company: co, jobDescription: desc })
+    })
+    .then(r => r.json())
+    .then(data => {
+      const el = document.getElementById('jlInsightsContent');
+      if (!el || !data.what_they_want?.length) return;
+
+      let html = `<ul style="list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:.6rem">`;
+      for (const item of data.what_they_want) {
+        html += `<li style="display:flex;align-items:flex-start;gap:.55rem;font-size:.8rem;color:var(--sub);line-height:1.5"><span style="color:var(--green);font-size:.6rem;margin-top:.22rem;flex-shrink:0">▶</span>${item}</li>`;
+      }
+      html += `</ul>`;
+
+      if (data.hidden_requirements?.length || data.insider_tip) {
+        html += `<div style="margin-top:1rem;padding-top:1rem;border-top:1px solid var(--line)">`;
+        if (data.hidden_requirements?.length) {
+          html += `<div style="font-family:var(--mono);font-size:.55rem;text-transform:uppercase;letter-spacing:.08em;color:var(--dim);margin-bottom:.55rem">Unstated Expectations</div>`;
+          html += `<ul style="list-style:none;padding:0;margin:0 0 .85rem;display:flex;flex-direction:column;gap:.45rem">`;
+          for (const r of data.hidden_requirements) {
+            html += `<li style="display:flex;align-items:flex-start;gap:.5rem;font-size:.75rem;color:var(--muted);line-height:1.5"><span style="color:var(--red);font-size:.55rem;margin-top:.2rem;flex-shrink:0">◆</span>${r}</li>`;
+          }
+          html += `</ul>`;
+        }
+        if (data.insider_tip) {
+          html += `<div style="background:var(--card);border:1px solid var(--line);border-radius:7px;padding:.65rem .9rem;font-size:.75rem;color:var(--sub);line-height:1.6"><span style="color:var(--green);font-weight:700">Tip: </span>${data.insider_tip}</div>`;
+        }
+        html += `</div>`;
+      }
+      el.innerHTML = html;
+    })
+    .catch(() => {
+      const el = document.getElementById('jlInsightsContent');
+      if (el) el.innerHTML = `<div style="font-size:.75rem;color:var(--muted)">AI insights unavailable for this listing.</div>`;
+    });
+  } else {
+    const el = document.getElementById('jlInsightsContent');
+    if (el) el.innerHTML = `<div style="font-size:.75rem;color:var(--muted)">No description available for AI analysis.</div>`;
+  }
+}
+
+function jlGoBack() {
+  if (window.history.length > 1) { window.history.back(); }
+  else { go(Auth.isSeeker() ? 'jobs' : 'landing'); }
+}
+
+function jlSaveToggle(btn) {
+  const d = _currentListing;
+  if (!d) return;
+  const j = d.j;
+  const sid = d.sid;
+  const wasSaved = btn.dataset.saved === '1';
+  if (wasSaved) {
+    btn.dataset.saved = '0'; btn.textContent = '♡'; btn.style.color = 'var(--muted)';
+    SavedJobs.remove(sid);
+    showToast('Removed from saved jobs.');
+  } else {
+    btn.dataset.saved = '1'; btn.textContent = '♥'; btn.style.color = 'var(--green)';
+    SavedJobs.save({ id: sid, co: j?.co||'', title: j?.title||'', city: j?.city||j?.loc||'', score: j?.score||65 });
+    showToast('Saved! Find it in your dashboard.');
+  }
+  const cardBtn = document.getElementById('save_' + sid);
+  if (cardBtn) { cardBtn.textContent = wasSaved ? '♡' : '♥'; cardBtn.style.color = wasSaved ? '' : 'var(--red)'; }
+  _refreshDashSaved();
+}
+
+function jlApplyClick() {
+  const d = _currentListing;
+  if (!d) return;
+  const j = d.j;
+  const sid   = d.sid;
+  const co    = j ? j.co    || '' : '';
+  const title = j ? j.title || '' : '';
+  const loc   = j ? j.city  || j.loc || '' : '';
+  const score = j ? j.score || 65 : 65;
+  const waste = j ? j.waste || 25 : 25;
+  const risk  = j ? j.risk  || Score.risk(score) : 'warn';
+  const email = j ? j.apply_email || '' : '';
+  go('jobs');
+  setTimeout(() => openApplyModal(sid, co, title, loc, score, risk, waste, email), 50);
 }
 
 function openApplyModal(jobId, company, role, location, score, risk, waste, applyEmail) {
