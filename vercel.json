@@ -10,7 +10,8 @@
     "api/user-sync.js": { "maxDuration": 15 },
     "api/company-score.js": { "maxDuration": 45 },
     "api/refresh-companies.js": { "maxDuration": 60 },
-    "api/merge-companies.js": { "maxDuration": 60 }
+    "api/merge-companies.js": { "maxDuration": 60 },
+    "api/moderate-report.js": { "maxDuration": 20 }
   },
   "crons": [
     { "path": "/api/refresh-jobs", "schedule": "0 2 * * *" },

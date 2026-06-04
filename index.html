@@ -1312,11 +1312,11 @@ nav{position:fixed;top:0;left:0;right:0;z-index:500;height:58px;display:flex;ali
     <div class="fblock">
       <div class="fb-hd">01 — The listing</div>
       <div class="f2">
-        <div class="fg"><label class="fl">Company *</label><input class="fi-r" id="rCo" type="text" placeholder="e.g. McDonald's"/></div>
+        <div class="fg"><label class="fl">Company *</label><input class="fi-r" id="rCo" type="text" placeholder="e.g. McDonald's" oninput="_rCoHint(this.value)"/><div id="rCoHint" style="font-family:var(--mono);font-size:.58rem;color:var(--green);margin-top:.28rem;min-height:.9em"></div></div>
         <div class="fg"><label class="fl">Job title *</label><input class="fi-r" id="rTi" type="text" placeholder="e.g. Cashier"/></div>
       </div>
       <div class="f2">
-        <div class="fg"><label class="fl">Location * <span style="color:var(--blue)">(required)</span></label><input class="fi-r" id="rLoc" type="text" placeholder="e.g. Irvine, CA"/></div>
+        <div class="fg"><label class="fl">Location * <span style="color:var(--blue)">(city &amp; state)</span></label><input class="fi-r" id="rLoc" type="text" placeholder="e.g. Irvine, CA"/><div id="rLocHint" style="font-family:var(--mono);font-size:.58rem;margin-top:.28rem;min-height:.9em"></div></div>
         <div class="fg"><label class="fl">Platform</label><select class="fs-r" id="rPl"><option>Select...</option><option>Indeed</option><option>LinkedIn</option><option>Glassdoor</option><option>In-store / walk-in</option><option>Company website</option><option>Other</option></select></div>
       </div>
       <div class="f2">
@@ -3066,26 +3066,37 @@ async function viewCompany(id,name,loc){
     let show=[];
     if(db){
       try{
-        let q=db.from('reports').select('role,outcome,ghost_stage,rounds,report_text,platform,created_at,company_locations(city)').order('created_at',{ascending:false}).limit(20);
-        if(co?.id)q=q.eq('company_id',co.id);
-        const{data}=await q;
-        if(data?.length){
-          show=data.map(r=>({
-            role:r.role||'Unknown role',
-            resp:r.outcome||'waiting',
-            stage:r.ghost_stage,
-            rounds:r.rounds,
-            loc:r.company_locations?.city||'',
-            text:r.report_text||'',
-            src:r.platform||'Direct',
-            wait: r.rounds ? r.rounds*7 : null,
-          }));
-          if(loc)show=show.filter(r=>!r.loc||r.loc.toLowerCase().includes(loc.toLowerCase()));
+        // Use same multi-ID approach as loadRealCompanyData so reports from
+        // "Amazon Web Services", "Amazon Fresh" etc. all show on the Amazon page
+        const _canon=normalizeCompanyName(co?.name||name);
+        const _word=_canon.split(/\s+/)[0];
+        const{data:_cos}=await db.from('companies').select('id,name').ilike('name',`%${_word}%`).limit(20);
+        const _ids=(_cos||[]).filter(c=>normalizeCompanyName(c.name)===_canon).map(c=>c.id).filter(Boolean);
+        if(_ids.length>0){
+          const ago=dt=>dt?Math.floor((Date.now()-new Date(dt))/86400000):null;
+          const{data}=await db.from('reports')
+            .select('role,outcome,ghost_stage,rounds,report_text,platform,created_at,company_locations(city)')
+            .in('company_id',_ids)
+            .order('created_at',{ascending:false}).limit(30);
+          if(data?.length){
+            show=data.map(r=>({
+              role:r.role||'Unknown role',
+              resp:r.outcome||'waiting',
+              stage:r.ghost_stage,
+              rounds:r.rounds,
+              loc:r.company_locations?.city||'',
+              text:r.report_text||'',
+              src:r.platform||'Direct',
+              days:ago(r.created_at),
+            }));
+            if(loc)show=show.filter(r=>!r.loc||r.loc.toLowerCase().includes(loc.toLowerCase()));
+          }
         }
       }catch(e){console.warn('reports load:',e);}
     }
     document.getElementById('ctc-reports').innerHTML=show.length?
-      show.map(r=>`<div class="rcard"><div class="rc-hd"><div class="rc-av">${(r.src||'?')[0].toUpperCase()}</div><div style="flex:1"><div class="rc-role">${r.role}${r.stage?` · Ghosted at: ${r.stage}`:''}</div><div class="rc-meta">${r.loc?'📍 '+r.loc+' · ':''}${r.rounds?r.rounds+' rounds':''}</div></div><span class="vibe ${ocC[r.resp]||'v-n'}">${ocL[r.resp]||r.resp}</span></div>${r.text?`<div class="rc-body">${r.text.replace(/</g,'&lt;').replace(/>/g,'&gt;')}</div>`:''}<div class="rc-footer"><span style="font-family:var(--mono);font-size:.56rem;color:var(--muted)">via</span><span class="vibe v-n" style="font-size:.55rem">${r.src}</span></div></div>`).join(''):
+      `<div style="font-family:var(--mono);font-size:.58rem;color:var(--muted);margin-bottom:.85rem">${show.length} report${show.length!==1?'s':''} from real applicants · anonymous · verified</div>`+
+      show.map(r=>`<div class="rcard"><div class="rc-hd"><div class="rc-av">${(r.role||'?')[0].toUpperCase()}</div><div style="flex:1"><div class="rc-role">${r.role.replace(/</g,'&lt;')}${r.stage?` <span style="color:var(--muted)">· ghosted at ${r.stage}</span>`:''}</div><div class="rc-meta">${r.loc?'📍 '+r.loc.replace(/</g,'&lt;')+' · ':''}${r.rounds?r.rounds+' round'+(r.rounds!==1?'s':'')+(r.days!==null?' · ':' '):''}${r.days!==null?(r.days===0?'today':r.days+'d ago'):''}</div></div><span class="vibe ${ocC[r.resp]||'v-n'}">${ocL[r.resp]||r.resp}</span></div>${r.text?`<div class="rc-body">${r.text.replace(/</g,'&lt;').replace(/>/g,'&gt;')}</div>`:''}<div class="rc-footer"><span style="font-family:var(--mono);font-size:.56rem;color:var(--muted)">via</span><span class="vibe v-n" style="font-size:.55rem">${r.src}</span></div></div>`).join(''):
       `<div style="text-align:center;padding:2.5rem;color:var(--muted);font-family:var(--mono);font-size:.7rem">No reports yet${loc?' for '+loc:''}.<br><br><button class="btn btn-ghost" onclick="go('report')">Be the first to report →</button></div>`;
   })();
 
@@ -3116,10 +3127,9 @@ async function viewCompany(id,name,loc){
     if (!rsc) {
       if (isUnknown) {
         document.getElementById('coSB').innerHTML = `
-          <div class="co-grade-card warn">
-            <span class="co-grade-lbl">Seen Grade</span>
+          <div class="co-grade-bar warn">
             <span class="co-grade-letter warn" style="opacity:.3">?</span>
-            <span class="co-grade-score" style="color:var(--muted)">No data yet</span>
+            <div style="flex:1"><span class="co-grade-lbl">Seen Grade</span><span class="co-grade-score" style="color:var(--muted)">No data yet</span></div>
           </div>`;
         document.getElementById('coMets').innerHTML = `<div class="co-m" style="grid-column:1/-1;padding:1.5rem;text-align:center;font-family:var(--mono);font-size:.65rem;color:var(--muted)">No community reports yet — <a href="javascript:void(0)" onclick="go('report')" style="color:var(--green);text-decoration:none">be first to share →</a></div>`;
         document.getElementById('coTags').innerHTML = `<span class="vibe v-n">📊 No data yet</span><span class="vibe v-y">+ Add a report to start this page</span>`;
@@ -4802,6 +4812,14 @@ async function loadCommunityReports() {
 }
 
 // ── REAL submitReport ──
+// Company name hint — shows canonical name when user types a variant
+function _rCoHint(val) {
+  const hint = document.getElementById('rCoHint');
+  if (!hint) return;
+  const canonical = normalizeCompanyName(val.trim());
+  hint.textContent = canonical && canonical !== val.trim() ? `→ Filing under: ${canonical}` : '';
+}
+
 async function submitReport(){
   const co=document.getElementById('rCo').value.trim();
   const ti=document.getElementById('rTi').value.trim();
@@ -4809,22 +4827,55 @@ async function submitReport(){
   const exp=document.getElementById('rEx').value.trim();
   if(!co||!ti||!loc){showToast('Company, job title and location required.');return;}
   const rateCheck=Mod.rateCheck();if(!rateCheck.ok){showToast(rateCheck.msg);return;}
-  const coCheck=Mod.check(co+' '+ti);if(!coCheck.ok){showToast(coCheck.msg);return;}
-  const safeCo=Mod.sanitize(normalizeCompanyName(co)),safeTi=Mod.sanitize(ti),safeExp=exp?Mod.sanitize(exp):'';
-  const btn=document.querySelector('.sub-btn');if(btn){btn.textContent='Submitting...';btn.disabled=true;}
+  const coCheck=Mod.check(co+' '+ti+' '+exp);if(!coCheck.ok){showToast(coCheck.msg);return;}
+
+  const btn=document.querySelector('.sub-btn');
+  if(btn){btn.textContent='Checking report…';btn.disabled=true;}
+
+  // ── AI moderation + location validation ────────────────────────────────────
+  let finalLoc=loc, finalExp=exp;
+  try {
+    const modRes=await fetch('/api/moderate-report',{
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({company:normalizeCompanyName(co),role:ti,location:loc,experience:exp}),
+    });
+    if(modRes.ok){
+      const mod=await modRes.json();
+      if(!mod.ok && mod.issues?.length){
+        showToast(mod.issues[0]);
+        const locHint=document.getElementById('rLocHint');
+        if(locHint) locHint.innerHTML=mod.issues.map(i=>`<span style="color:var(--red)">${i}</span>`).join('<br>');
+        if(btn){btn.textContent='Submit anonymously →';btn.disabled=false;}
+        return;
+      }
+      // Accept AI-corrected spelling + normalized location
+      if(mod.corrected_experience) finalExp=mod.corrected_experience;
+      if(mod.normalized_location)  finalLoc=mod.normalized_location;
+      // Update location field to show normalized value
+      const locInp=document.getElementById('rLoc');
+      if(locInp&&mod.normalized_location) locInp.value=mod.normalized_location;
+      const locHint=document.getElementById('rLocHint');
+      if(locHint) locHint.innerHTML=`<span style="color:var(--green)">✓ ${finalLoc}</span>`;
+    }
+  } catch(e) { /* fail open — don't block on network error */ }
+
+  if(btn) btn.textContent='Submitting…';
+  const safeCo=Mod.sanitize(normalizeCompanyName(co)),safeTi=Mod.sanitize(ti),safeExp=finalExp?Mod.sanitize(finalExp):'';
+
   if(db){
     try{
       let{data:cos}=await db.from('companies').select('id').ilike('name',safeCo).limit(1);
       let cid=cos?.[0]?.id;
       if(!cid){const{data:nc}=await db.from('companies').insert({name:safeCo,logo_letter:safeCo[0].toUpperCase()}).select('id').single();cid=nc?.id;}
-      let{data:locs}=await db.from('company_locations').select('id').eq('company_id',cid).ilike('city',loc).limit(1);
+      let{data:locs}=await db.from('company_locations').select('id').eq('company_id',cid).ilike('city',finalLoc).limit(1);
       let lid=locs?.[0]?.id;
-      if(!lid){const{data:nl}=await db.from('company_locations').insert({company_id:cid,city:loc}).select('id').single();lid=nl?.id;}
+      if(!lid){const{data:nl}=await db.from('company_locations').insert({company_id:cid,city:finalLoc}).select('id').single();lid=nl?.id;}
       await db.from('reports').insert({company_id:cid,location_id:lid,role:safeTi,platform:document.getElementById('rPl')?.value||'',outcome:document.querySelector('input[name="resp"]:checked')?.value||'waiting',ghost_stage:document.querySelector('input[name="stage"]:checked')?.value||null,rounds:parseInt(document.getElementById('rRounds')?.value||0),wait_days:null,unpaid_work:document.getElementById('rUp')?.value||'na',experience_level:document.getElementById('rExp')?.value||'',report_text:safeExp||null,source:'direct',needs_review:false});
     }catch(e){console.warn('Report save error:',e);}
   }
   const repOk=document.getElementById('repOk');if(repOk)repOk.style.display='block';
   ['rCo','rTi','rLoc','rEx'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+  ['rCoHint','rLocHint'].forEach(id=>{const el=document.getElementById(id);if(el)el.textContent='';});
   document.querySelectorAll('input[name="resp"],input[name="stage"]').forEach(r=>r.checked=false);
   showToast('Submitted. Score updated. You just helped someone.');
   if(btn){btn.textContent='Submit anonymously →';btn.disabled=false;}
