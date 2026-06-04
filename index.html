@@ -2180,6 +2180,9 @@ function _inferLevelFromText(title, description) {
   if (/\b(senior|sr\.?\s|lead\s|principal|director|head of|vp\b|vice president|chief\s|staff\s+eng)\b/.test(t)) return 'Senior';
   // Title: unambiguous entry signals
   if (/\b(junior|jr\.?\s|entry[\s-]level|trainee|intern\b|apprentice)\b/.test(t)) return 'Entry level';
+  // Title: role-based entry signals — title always beats description for these (a "Sales Associate"
+  // posting that mentions "3 years" is still an associate-level role)
+  if (/\b(associate\b|coordinator\b|assistant\b|host\b|representative\b|specialist\b)\b/.test(t)) return 'Entry level';
 
   // Description: years-of-experience pattern catches most job postings
   // Match patterns like "3+ years", "5 or more years", "minimum 2 years", "2-4 years"
@@ -2195,9 +2198,6 @@ function _inferLevelFromText(title, description) {
   if (/\b(entry[\s-]level|no experience required|recent grad|new grad|0[\s-]?years)\b/.test(d)) return 'Entry level';
   // Description: explicit senior signals
   if (/\b(senior|seasoned professional|extensive experience|10\+\s*years)\b/.test(d)) return 'Senior';
-
-  // Title: softer entry signals (coordinator/assistant lean entry but aren't definitive)
-  if (/\b(associate\s|coordinator\b|assistant\s)\b/.test(t)) return 'Entry level';
 
   // No signal found — default mid (truly unknown)
   return 'Mid level';
@@ -2314,7 +2314,11 @@ async function applyJobFilters(){
       }
       const{data}=await q;
       if(data?.length){
-        jobs=data.map(_normalizeDbJob);
+        const mapped=data.map(_normalizeDbJob);
+        // Re-apply level filter client-side — DB query uses title keywords as proxy but
+        // _inferLevelFromText is more accurate (reads description too)
+        jobs = level ? mapped.filter(j=>_inferLevel(j)===level) : mapped;
+        if(!jobs.length) jobs=mapped; // fallback: show DB results if filter removes all
         JOBS.splice(0,JOBS.length,...jobs,...FALLBACK_JOBS);
       }
     }catch(e){console.warn('applyJobFilters db:',e);}
@@ -5034,7 +5038,7 @@ async function runAIOptimize(jobId, company, role, location, score, risk, waste,
     console.error('AI Optimize error:', e.message);
     window._pendingOptimize = { jobId, company, role, location, score, risk, waste, applyEmail };
     const isCorrupted = /RESUME_CORRUPTED|corrupt|garbl|unreadable|re-upload|parse resume/i.test(e.message);
-    const isBusy = /busy|rate.limit|429/i.test(e.message);
+    const isBusy = /busy|rate.limit|429|529|overload/i.test(e.message);
     document.getElementById('applyModalBody').innerHTML = isCorrupted ? `
       <div style="text-align:center;padding:1.5rem 0 1rem">
         <div style="font-size:1.5rem;margin-bottom:.6rem">📄</div>

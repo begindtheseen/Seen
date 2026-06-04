@@ -96,7 +96,7 @@ JOB DESCRIPTION:\n${(jobDescription||'').slice(0,2500)}${background?'\nCANDIDATE
       messages: [{ role: 'user', content: prompt }],
     });
 
-    // Retry up to 4 times on 429 — respect retry-after header if present
+    // Retry up to 5 times on 429 (rate limit) or 529 (overloaded) — both are transient
     let apiRes;
     for (let attempt = 0; attempt < 5; attempt++) {
       if (attempt > 0) {
@@ -113,11 +113,11 @@ JOB DESCRIPTION:\n${(jobDescription||'').slice(0,2500)}${background?'\nCANDIDATE
         },
         body: requestBody,
       });
-      if (apiRes.status !== 429) break;
+      if (apiRes.status !== 429 && apiRes.status !== 529) break;
     }
 
     if (!apiRes.ok) {
-      if (apiRes.status === 429) {
+      if (apiRes.status === 429 || apiRes.status === 529) {
         return res.status(429).json({ error: 'The optimizer is busy right now — try again in a few seconds.' });
       }
       const errText = await apiRes.text();

@@ -90,7 +90,7 @@ JOB DESCRIPTION:\n${descInput}`;
         messages: [{ role: 'user', content: prompt }],
       })
     });
-    if (apiRes.status !== 429) break;
+    if (apiRes.status !== 429 && apiRes.status !== 529) break;
   }
 
   if (!apiRes?.ok) {
