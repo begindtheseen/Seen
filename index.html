@@ -1731,17 +1731,37 @@ const Auth = {
 // Service key lives only on the server; client sends its JWT for identity verification.
 async function _sync(action, payload = {}) {
   const token = await Auth.token();
-  if (!token) return null;
+  if (!token) { console.error('[sync] no token for action:', action); return null; }
   try {
     const r = await fetch('/api/user-sync', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
       body: JSON.stringify({ action, ...payload }),
     });
-    if (!r.ok) { console.warn('_sync error:', action, r.status); return null; }
+    if (!r.ok) {
+      const body = await r.text().catch(() => '');
+      console.error(`[sync] ${action} → ${r.status}:`, body);
+      return null;
+    }
     return await r.json();
-  } catch(e) { console.warn('_sync network error:', action, e.message); return null; }
+  } catch(e) {
+    console.error(`[sync] ${action} network error:`, e.message);
+    return null;
+  }
 }
+
+// Diagnostic helper — call window.seenDiag() in browser console to test sync
+window.seenDiag = async () => {
+  console.log('=== Seen Sync Diagnostic ===');
+  console.log('Logged in:', Auth.isLoggedIn(), '| User:', Auth._user?.id);
+  const token = await Auth.token();
+  console.log('Token:', token ? token.slice(0,20)+'...' : 'MISSING');
+  const load = await _sync('load');
+  console.log('load result:', load);
+  const profile = await _sync('load_profile');
+  console.log('load_profile result:', profile);
+  console.log('=== End ===');
+};
 
 // ── SCORING ENGINE ──
 const Score={

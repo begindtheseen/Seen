@@ -39,6 +39,7 @@ export default async function handler(req, res) {
   let body = req.body;
   if (typeof body === 'string') { try { body = JSON.parse(body); } catch(e) { body = {}; } }
   const { action } = body || {};
+  console.log(`[user-sync] action=${action} uid=${uid}`);
 
   // ── LOAD — return all applications + saved jobs for this user ───────────────
   if (action === 'load') {
@@ -67,8 +68,13 @@ export default async function handler(req, res) {
       waste_score:  a.waste     || null,
     };
     const r = await db('applications', { method: 'POST', body: JSON.stringify(row), headers: { Prefer: 'return=representation' } });
-    const data = r.ok ? await r.json() : null;
-    if (!r.ok) return res.status(400).json({ error: 'Insert failed' });
+    if (!r.ok) {
+      const errText = await r.text().catch(() => '');
+      console.error('[user-sync] add_application failed:', r.status, errText);
+      return res.status(400).json({ error: 'Insert failed' });
+    }
+    const data = await r.json();
+    console.log('[user-sync] add_application ok, id:', data?.[0]?.id);
     return res.status(200).json({ id: data?.[0]?.id || null });
   }
 
