@@ -1988,6 +1988,22 @@ function doSearch(){
 }
 function qs(name,loc=''){document.getElementById('heroInp').value=name;document.getElementById('heroLoc').value=loc;openModal(name,loc);}
 
+function openCompanySearch(){
+  document.getElementById('modalOv').classList.add('open');
+  document.getElementById('mTitle').textContent='Check a Company';
+  document.getElementById('mBody').innerHTML=`
+    <p style="font-family:var(--mono);font-size:.7rem;color:var(--dim);margin-bottom:1.1rem">Real ghost rates, waste scores &amp; transparency data before you apply.</p>
+    <div style="display:flex;gap:.5rem;margin-bottom:.85rem">
+      <input id="coSearchInp" class="fi-r" type="text" placeholder="Type a company name..." style="flex:1" onkeydown="if(event.key==='Enter'){const v=this.value.trim();if(v)openModal(v,'')}"/>
+      <button class="btn btn-solid" style="flex-shrink:0;padding:.65rem 1rem;font-size:.8rem" onclick="const v=document.getElementById('coSearchInp').value.trim();if(v)openModal(v,'')">Check →</button>
+    </div>
+    <div style="font-family:var(--mono);font-size:.55rem;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:.5rem">Popular</div>
+    <div style="display:flex;gap:.4rem;flex-wrap:wrap">
+      ${['Amazon','Stripe','Linear','Accenture','Deloitte','Indeed','Meta','Shopify',"McDonald's"].map(c=>`<button class="qtag" onclick="openModal('${c.replace(/'/g,"\\'")}','')">${c}</button>`).join('')}
+    </div>`;
+  setTimeout(()=>document.getElementById('coSearchInp')?.focus(),120);
+}
+
 function openModal(name,loc){
   document.getElementById('modalOv').classList.add('open');
   document.getElementById('mTitle').textContent=`Checking: ${name}${loc?' · '+loc:''}`;
@@ -5929,11 +5945,11 @@ function renderSideMenu() {
       { icon: '📊', label: 'Job Demand', page: 'demand' },
       { icon: '🤖', label: 'Resume AI', page: 'resume' },
       { icon: '📋', label: 'My Applications', page: 'tracker' },
-      { icon: '🏢', label: 'Check a Company', page: 'company' },
+      { icon: '🏢', label: 'Check a Company', page: 'company', action: () => openCompanySearch() },
       { icon: '📝', label: 'Report Experience', page: 'report' },
       { icon: '⚙️', label: 'Profile Settings', page: 'profile' },
     ].map(item => `
-      <button class="side-menu-item ${currentPage === item.page ? 'active' : ''}" 
+      <button class="side-menu-item ${currentPage === item.page ? 'active' : ''}"
               onclick="${item.action ? `(${item.action.toString()})();closeSideMenu()` : `go('${item.page}');closeSideMenu()`}">
         <span class="side-menu-icon">${item.icon}</span>${item.label}
       </button>`).join('');
@@ -5941,11 +5957,11 @@ function renderSideMenu() {
     items.innerHTML = [
       { icon: '💼', label: 'Browse Jobs', page: 'jobs' },
       { icon: '📊', label: 'Job Demand', page: 'demand' },
-      { icon: '🔍', label: 'Check a Company', page: 'company' },
+      { icon: '🔍', label: 'Check a Company', page: 'company', action: () => openCompanySearch() },
       { icon: '📝', label: 'Report Experience', page: 'report' },
       { icon: '🔑', label: 'Sign In', page: 'login' },
     ].map(item => `
-      <button class="side-menu-item" onclick="go('${item.page}');closeSideMenu()">
+      <button class="side-menu-item" onclick="${item.action ? `(${item.action.toString()})();closeSideMenu()` : `go('${item.page}');closeSideMenu()`}">
         <span class="side-menu-icon">${item.icon}</span>${item.label}
       </button>`).join('');
   } else {
