@@ -1702,15 +1702,14 @@ const Auth = {
       };
       // Cache survey flag locally so new devices don't force the survey again
       if (this._profile?.survey_completed) localStorage.setItem('_seen_survey_done', '1');
-      // If no DB profile row yet, push whatever we have so other devices can see it
-      if (!data) {
-        _sync('save_profile', { profile: {
-          email: this._user.email,
-          name: this._profile.name,
-          city: this._profile.city || '',
-          experience: this._profile.experience || '',
-          type: 'seeker',
-        }}).catch(() => {});
+      // Push local fields to DB if DB is missing them (handles first-load on any device)
+      const needsPush = !data || (!data.name && this._profile.name) || (!data.city && this._profile.city);
+      if (needsPush) {
+        const patch = { email: this._user.email, type: 'seeker' };
+        if (this._profile.name)       patch.name       = this._profile.name;
+        if (this._profile.city)       patch.city       = this._profile.city;
+        if (this._profile.experience) patch.experience = this._profile.experience;
+        _sync('save_profile', { profile: patch }).catch(() => {});
       }
     } catch(e) {
       const local = _loadProfileLocal() || {};
@@ -6056,6 +6055,22 @@ async function markAppStatus(id, status) {
   const msgs = { ghosted:'👻 Marked ghosted. Consider reporting it.', hired:'🎉 Congrats!', rejected:'Marked as rejected.' };
   showToast(msgs[status] || 'Updated.');
 }
+
+// Re-sync dashboard when tab becomes visible again (catches data added on other devices)
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible' && Auth.isLoggedIn()) {
+    const activePage = document.querySelector('.page.active, .page-full.active')?.id;
+    if (activePage === 'page-seeker-dash') {
+      AppStore.syncFromDb().then(() => renderSeekerDash()).catch(() => {});
+    }
+  }
+});
+// Safari bfcache: page restored from cache after navigating back
+window.addEventListener('pageshow', e => {
+  if (e.persisted && Auth.isLoggedIn()) {
+    AppStore.syncFromDb().then(() => renderSeekerDash()).catch(() => {});
+  }
+});
 
 // ── INIT ──
 updateNav();
