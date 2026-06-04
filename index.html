@@ -2975,18 +2975,38 @@ const AppStore = {
         if(error) throw error;
         if(data) {
           const mapped = data.map(a => this._mapRow(a));
-          // Merge: DB authoritative + any local items not yet synced (temp ids starting with 'app_')
           const dbIds = new Set(mapped.map(a => a.id));
           const local = this.loadSync();
           const localExtra = local.filter(a => !dbIds.has(a.id) && String(a.id).startsWith('app_'));
           const merged = [...mapped, ...localExtra];
           localStorage.setItem(this.KEY, JSON.stringify(merged));
+          if(localExtra.length > 0) this._pushLocalToDb(localExtra, uid);
           return merged;
         }
       } catch(e) { console.warn('AppStore.load error:', e.message); }
     }
-    // Fall back to localStorage cache
     try { return JSON.parse(localStorage.getItem(this.KEY)||'[]'); } catch(e) { return []; }
+  },
+  _pushLocalToDb(apps, uid) {
+    for(const app of apps) {
+      db.from('applications').insert({
+        user_id: uid,
+        company_name: app.company||'',
+        role: app.role||'',
+        city: app.location||'',
+        platform: app.platform||'Seen',
+        status: app.status||'active',
+        stage: app.stage||'Applied',
+        score: app.score||null,
+        waste_score: app.waste||null,
+      }).select('id').single().then(({data:row,error}) => {
+        if(!error && row?.id) {
+          const stored = this.loadSync();
+          const idx = stored.findIndex(a => a.id === app.id);
+          if(idx !== -1) { stored[idx] = {...stored[idx], id: row.id}; localStorage.setItem(this.KEY, JSON.stringify(stored)); }
+        }
+      }).catch(()=>{});
+    }
   },
   async syncFromDb() {
     if(!Auth.isLoggedIn() || !db) return;
@@ -2994,35 +3014,34 @@ const AppStore = {
       const uid = Auth._user?.id;
       if(!uid) return;
       const { data } = await db.from('applications').select('*').eq('user_id', uid).order('created_at',{ascending:false});
+      const local = this.loadSync();
+      const localExtra = local.filter(a => String(a.id).startsWith('app_'));
       if(data && data.length > 0) {
         const mapped = data.map(a => this._mapRow(a));
-        localStorage.setItem(this.KEY, JSON.stringify(mapped));
+        const merged = [...mapped, ...localExtra];
+        localStorage.setItem(this.KEY, JSON.stringify(merged));
       }
+      if(localExtra.length > 0 && uid) this._pushLocalToDb(localExtra, uid);
     } catch(e) { console.warn('AppStore.syncFromDb:', e.message); }
   },
   async add(app) {
-    // Always write to localStorage as a cache so tracker works even if Supabase fails
     const apps = this.loadSync();
     const entry = {...app, id: app.id||('app_'+Date.now()), appliedAt: app.appliedAt||Date.now(), updatedAt: app.updatedAt||Date.now()};
-    if (!apps.find(a => a.id === entry.id)) {
+    if(!apps.find(a => a.id === entry.id)) {
       apps.unshift(entry);
       localStorage.setItem(this.KEY, JSON.stringify(apps));
     }
     return {ok:true};
   },
   async update(id, changes) {
-    // Always update localStorage cache immediately so the tracker re-renders correctly
     const apps = this.loadSync();
     const idx = apps.findIndex(a => a.id === id);
-    if (idx !== -1) { apps[idx] = {...apps[idx], ...changes, updatedAt: Date.now()}; localStorage.setItem(this.KEY, JSON.stringify(apps)); }
-    // Also persist to Supabase if logged in
-    if (Auth.isLoggedIn() && db) { try { await db.from('applications').update({...changes, updated_at: new Date().toISOString()}).eq('id', id); } catch(e) { console.warn('AppStore.update:', e.message); } }
+    if(idx !== -1) { apps[idx] = {...apps[idx], ...changes, updatedAt: Date.now()}; localStorage.setItem(this.KEY, JSON.stringify(apps)); }
+    if(Auth.isLoggedIn() && db) { try { await db.from('applications').update({...changes, updated_at: new Date().toISOString()}).eq('id', id); } catch(e) { console.warn('AppStore.update:', e.message); } }
   },
   async remove(id) {
-    // Always remove from localStorage cache immediately
     localStorage.setItem(this.KEY, JSON.stringify(this.loadSync().filter(a => a.id !== id)));
-    // Also delete from Supabase if logged in
-    if (Auth.isLoggedIn() && db) { try { await db.from('applications').delete().eq('id', id); } catch(e) { console.warn('AppStore.remove:', e.message); } }
+    if(Auth.isLoggedIn() && db) { try { await db.from('applications').delete().eq('id', id); } catch(e) { console.warn('AppStore.remove:', e.message); } }
   },
   loadSync(){ try{return JSON.parse(localStorage.getItem(this.KEY)||'[]');}catch(e){return[];} },
   async clear(){ if(Auth.isLoggedIn()&&db){try{const uid=(await db.auth.getUser()).data.user?.id;await db.from('applications').delete().eq('user_id',uid);}catch(e){}} localStorage.removeItem(this.KEY); },
@@ -4098,6 +4117,15 @@ const SavedJobs = {
     }
   },
 
+  _pushLocalToDb(items, uid) {
+    for(const s of items) {
+      db.from('saved_jobs').upsert(
+        { user_id: uid, job_id: String(s.job_id), company: s.company||'', role: s.role||'', location: s.location||'', score: s.score||null },
+        { onConflict: 'user_id,job_id' }
+      ).catch(() => {});
+    }
+  },
+
   // For display (dashboard list) — fetches from Supabase and syncs back to localStorage
   async load() {
     if (Auth.isLoggedIn() && db) {
@@ -4106,9 +4134,9 @@ const SavedJobs = {
         if (!uid) throw new Error('no uid');
         const { data } = await db.from('saved_jobs').select('*').eq('user_id', uid).order('saved_at', { ascending: false });
         if (data) {
-          // Merge: DB + any local items not yet synced
           const dbIds = new Set(data.map(s => String(s.job_id)));
           const localExtra = this.loadSync().filter(s => !dbIds.has(String(s.job_id)));
+          if(localExtra.length > 0) this._pushLocalToDb(localExtra, uid);
           const merged = [...data, ...localExtra];
           localStorage.setItem(this.KEY, JSON.stringify(merged));
           return merged;
@@ -4118,18 +4146,22 @@ const SavedJobs = {
     return this.loadSync();
   },
 
-  // Pull DB saved jobs into localStorage (call after login)
+  // Pull DB saved jobs into localStorage + push any local-only items up (call after login)
   async syncFromDb() {
     if (!Auth.isLoggedIn() || !db) return;
     try {
       const uid = Auth._user?.id;
       if (!uid) return;
       const { data } = await db.from('saved_jobs').select('*').eq('user_id', uid).order('saved_at', { ascending: false });
-      if (data && data.length > 0) {
-        const local = this.loadSync();
-        const dbIds = new Set(data.map(s => String(s.job_id)));
-        const localExtra = local.filter(s => !dbIds.has(String(s.job_id)));
+      const local = this.loadSync();
+      const dbIds = new Set((data || []).map(s => String(s.job_id)));
+      const localExtra = local.filter(s => !dbIds.has(String(s.job_id)));
+      // Push any local-only items to Supabase so they survive cross-device
+      if(localExtra.length > 0) this._pushLocalToDb(localExtra, uid);
+      if(data && data.length > 0) {
         localStorage.setItem(this.KEY, JSON.stringify([...data, ...localExtra]));
+      } else if(localExtra.length > 0) {
+        // No DB data yet but we have local items — keep them (already being pushed above)
       }
     } catch(e) {}
   }
@@ -5092,26 +5124,17 @@ async function submitApplication(jobId, company, role, location, score, risk, wa
         employerUserId = dbJob?.companies?.employer_profiles?.[0]?.id || null;
       } catch(e) {}
 
-      const { data: appData, error } = await db.from('applications').insert({
-        user_id: uid,
-        job_id: dbJobId,
-        company_name: company,
-        role: role,
-        city: location,
-        platform: 'Seen',
-        status: 'active',
-        stage: 'Applied',
-        employer_stage: 'New',
-        score: score,
-        waste_score: waste,
-        job_url: null,
-        applicant_name: name,
-        applicant_email: email,
-        resume_url: resumeLabel,
-        cover_note: note,
-      }).select('id').single();
-
-      if (!error && appData) applicationId = appData.id;
+      // Try full insert first; fall back to core fields if schema doesn't have extended columns
+      let appData = null, appError = null;
+      const coreInsert = { user_id: uid, company_name: company, role, city: location, platform: 'Seen', status: 'active', stage: 'Applied', score, waste_score: waste };
+      const fullInsert = { ...coreInsert, job_id: dbJobId, employer_stage: 'New', job_url: null, applicant_name: name, applicant_email: email, resume_url: resumeLabel, cover_note: note };
+      ({ data: appData, error: appError } = await db.from('applications').insert(fullInsert).select('id').single());
+      if(appError) {
+        // Full insert failed (likely schema mismatch) — retry with just core fields
+        const fallback = await db.from('applications').insert(coreInsert).select('id').single();
+        if(!fallback.error && fallback.data) { appData = fallback.data; appError = null; }
+      }
+      if (!appError && appData) applicationId = appData.id;
 
       // 2. Notify employer if we found their account
       if (employerUserId && applicationId) {
