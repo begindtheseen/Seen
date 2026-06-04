@@ -953,11 +953,11 @@ nav{position:fixed;top:0;left:0;right:0;z-index:500;height:58px;display:flex;ali
           <div style="background:var(--gdim);border:1px solid var(--gmid);border-radius:7px;padding:.55rem .85rem;font-family:var(--mono);font-size:.6rem;color:var(--green);line-height:1.65">✓ Resume saved — auto-used in Resume AI and job applications</div>
         </div>
         <div id="resumeEmptyState">
-          <div id="dashResumeDropZone" onclick="document.getElementById('dashResumeInput').click()" ondragover="event.preventDefault();this.style.borderColor='var(--green)';this.style.background='var(--gdim)'" ondragleave="this.style.borderColor='var(--line2)';this.style.background='var(--raised)'" ondrop="handleDashResumeDrop(event)" style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:.5rem;padding:1.25rem;background:var(--raised);border:1.5px dashed var(--line2);border-radius:8px;cursor:pointer;transition:all .2s">
+          <label for="dashResumeInput" id="dashResumeDropZone" ondragover="event.preventDefault();this.style.borderColor='var(--green)';this.style.background='var(--gdim)'" ondragleave="this.style.borderColor='var(--line2)';this.style.background='var(--raised)'" ondrop="handleDashResumeDrop(event)" style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:.5rem;padding:1.25rem;background:var(--raised);border:1.5px dashed var(--line2);border-radius:8px;cursor:pointer;transition:all .2s">
             <div style="font-size:1.5rem">📄</div>
             <div style="font-family:var(--display);font-size:.8rem;font-weight:700;color:var(--white)">Upload your resume</div>
             <div style="font-family:var(--mono);font-size:.58rem;color:var(--muted)">PDF or Word · Max 10MB · Used everywhere on Seen</div>
-          </div>
+          </label>
           <input id="dashResumeInput" type="file" accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document" style="display:none" onchange="handleDashResumeUpload(this.files[0])"/>
           <div id="dashResumeProgress" style="display:none;margin-top:.65rem;padding:.6rem .9rem;background:var(--raised);border:1px solid var(--line2);border-radius:7px;font-family:var(--mono);font-size:.65rem;color:var(--dim);align-items:center;gap:.5rem"></div>
         </div>
@@ -3652,11 +3652,11 @@ async function completeSurvey(){
       <div style="font-family:var(--display);font-size:1.2rem;font-weight:800;color:var(--white);letter-spacing:-.025em;margin-bottom:.35rem">One last thing.</div>
       <div style="font-size:.85rem;color:var(--sub);font-weight:300;line-height:1.7">Upload your resume so Seen can analyze your fit for jobs, optimize it for ATS, and find the hiring manager — all automatically.</div>
     </div>
-    <div id="onboardResumeZone" onclick="document.getElementById('onboardResumeInput').click()" ondragover="event.preventDefault();this.style.borderColor='var(--green)';this.style.background='var(--gdim)'" ondragleave="this.style.borderColor='var(--line2)';this.style.background='var(--raised)'" ondrop="handleOnboardResumeDrop(event)" style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:.5rem;padding:1.5rem;background:var(--raised);border:1.5px dashed var(--line2);border-radius:10px;cursor:pointer;transition:all .2s;margin-bottom:.75rem">
+    <label for="onboardResumeInput" id="onboardResumeZone" ondragover="event.preventDefault();this.style.borderColor='var(--green)';this.style.background='var(--gdim)'" ondragleave="this.style.borderColor='var(--line2)';this.style.background='var(--raised)'" ondrop="handleOnboardResumeDrop(event)" style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:.5rem;padding:1.5rem;background:var(--raised);border:1.5px dashed var(--line2);border-radius:10px;cursor:pointer;transition:all .2s;margin-bottom:.75rem">
       <div style="font-size:1.75rem">📄</div>
       <div style="font-family:var(--display);font-size:.9rem;font-weight:700;color:var(--white)">Upload resume</div>
       <div style="font-family:var(--mono);font-size:.6rem;color:var(--muted)">PDF or Word · Max 10MB</div>
-    </div>
+    </label>
     <input id="onboardResumeInput" type="file" accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document" style="display:none" onchange="handleOnboardResumeUpload(this.files[0])"/>
     <div id="onboardResumeProgress" style="display:none;margin-bottom:.75rem;padding:.65rem .9rem;background:var(--raised);border:1px solid var(--line2);border-radius:7px;font-family:var(--mono);font-size:.65rem;color:var(--dim);align-items:center;gap:.5rem"></div>
     <div style="display:flex;gap:.5rem">
@@ -3681,9 +3681,12 @@ async function handleOnboardResumeUpload(file) {
   if (zone) zone.style.opacity = '.5';
 
   try {
-    const formData = new FormData();
-    formData.append('file', file);
-    const res = await fetch('/api/parse-resume', { method: 'POST', body: formData });
+    const base64 = await _fileToBase64(file);
+    const res = await fetch('/api/parse-resume', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ base64, fileName: file.name, mimeType: file.type })
+    });
     const data = await res.json();
     if (!res.ok || data.error) throw new Error(data.error || 'Parse failed');
 
@@ -4520,6 +4523,8 @@ function openJobDetailModal(jobId) {
   ).join('');
 
   const jobUrl = j ? (j._url || j.apply_url || '') : '';
+  const searchUrl = j ? 'https://www.google.com/search?q=' + encodeURIComponent((j.title||'') + ' ' + (j.co||'') + ' job') : '';
+  const linkUrl = jobUrl || searchUrl;
   document.getElementById('applyModalBody').innerHTML =
     `<div style="display:flex;align-items:center;gap:.65rem;padding-bottom:.9rem;margin-bottom:.9rem;border-bottom:1px solid var(--line)">
        <div style="width:40px;height:40px;border-radius:8px;background:var(--raised);border:1px solid var(--line2);display:flex;align-items:center;justify-content:center;font-family:var(--display);font-weight:800;font-size:1rem;color:var(--white);flex-shrink:0">${(co||'?')[0].toUpperCase()}</div>
@@ -4533,7 +4538,7 @@ function openJobDetailModal(jobId) {
   const foot = document.getElementById('applyModalFoot');
   foot.style.cssText = 'display:flex;flex-direction:column;gap:.5rem;padding:1rem 1.5rem;border-top:1px solid var(--line);flex-shrink:0;background:var(--card);border-radius:0 0 16px 16px';
   foot.innerHTML =
-    `${jobUrl ? `<a href="${jobUrl}" target="_blank" rel="noopener"
+    `${linkUrl ? `<a href="${linkUrl}" target="_blank" rel="noopener"
        style="display:block;text-align:center;font-family:var(--mono);font-size:.65rem;color:var(--green);text-decoration:none;padding:.4rem 0;border:1px solid var(--line2);border-radius:8px;letter-spacing:.02em">View full listing ↗</a>` : ''}
      <div style="display:flex;gap:.5rem">
        <button id="jdSaveBtn" type="button" data-saved="${saved?'1':'0'}" onclick="jdSaveToggle(this)"
