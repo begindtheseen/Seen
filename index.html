@@ -5115,12 +5115,17 @@ function openJobDetailModal(jobId) {
      </div>
      ${desc ? `<div style="color:var(--sub);font-size:.78rem;line-height:1.75;white-space:pre-wrap">${desc.replace(/</g,'&lt;')}</div>` : '<div style="color:var(--muted);font-size:.75rem;font-family:var(--mono);text-align:center;padding:.5rem 0">No description available.</div>'}`;
 
+  const coEsc = co.replace(/'/g,"\\'");
+  const locEsc = loc.replace(/'/g,"\\'");
+
   // Sticky footer — save + apply buttons unchanged
   const saved = SavedJobs.isSaved(sid);
   const foot = document.getElementById('applyModalFoot');
   foot.style.cssText = 'display:flex;flex-direction:column;gap:.5rem;padding:1rem 1.5rem;border-top:1px solid var(--line);flex-shrink:0;background:var(--card);border-radius:0 0 16px 16px';
   foot.innerHTML =
-    `<button type="button" onclick="openJobListing('${sid}')"
+    `<button type="button" onclick="openModal('${coEsc}','${locEsc}')"
+       style="display:block;width:100%;text-align:center;font-family:var(--mono);font-size:.65rem;color:var(--amber);background:none;padding:.4rem 0;border:1px solid #ffb83030;border-radius:8px;letter-spacing:.02em;cursor:pointer">🏢 Check ${co.replace(/</g,'&lt;')} — ghost rate, reviews &amp; score →</button>
+     <button type="button" onclick="openJobListing('${sid}')"
        style="display:block;width:100%;text-align:center;font-family:var(--mono);font-size:.65rem;color:var(--green);background:none;padding:.4rem 0;border:1px solid var(--line2);border-radius:8px;letter-spacing:.02em;cursor:pointer">View full listing + AI insights →</button>
      <div style="display:flex;gap:.5rem">
        <button id="jdSaveBtn" type="button" data-saved="${saved?'1':'0'}" onclick="jdSaveToggle(this)"
