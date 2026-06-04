@@ -4690,16 +4690,13 @@ async function openJobListing(jobId) {
        </div>
      </div>`;
 
-  // Full description
-  const jobOrigUrl = j ? (j._url || j.apply_url || '') : '';
-  const descText = desc || 'No description available.';
+  // Full description — skeleton for now, AI summary fills in after insights load
+  const descText = desc || '';
   const looksClipped = descText.length >= 1900 && !/[.!?]$/.test(descText.trim());
   document.getElementById('jlDesc').innerHTML =
     `<div>
-       <div style="font-family:var(--mono);font-size:.58rem;text-transform:uppercase;letter-spacing:.08em;color:var(--dim);margin-bottom:.75rem">Full Description</div>
-       <div style="color:var(--sub);font-size:.82rem;line-height:1.8;white-space:pre-wrap">${descText.replace(/</g,'&lt;')}</div>
-       ${looksClipped && jobOrigUrl ? `<a href="${jobOrigUrl}" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;gap:.35rem;margin-top:.85rem;font-family:var(--mono);font-size:.62rem;color:var(--dim);text-decoration:none;border:1px solid var(--line2);border-radius:6px;padding:.3rem .65rem">View full posting on original site ↗</a>` : ''}
-       ${looksClipped && !jobOrigUrl ? `<div style="margin-top:.75rem;font-family:var(--mono);font-size:.6rem;color:var(--muted)">Description may be abbreviated — newer listings show complete text.</div>` : ''}
+       <div style="font-family:var(--mono);font-size:.58rem;text-transform:uppercase;letter-spacing:.08em;color:var(--dim);margin-bottom:.75rem">About This Role</div>
+       <div id="jlDescBody" style="color:var(--sub);font-size:.82rem;line-height:1.8;white-space:pre-wrap">${looksClipped ? '<span style="color:var(--muted);font-style:italic">Loading complete description...</span>' : (descText||'No description available.').replace(/</g,'&lt;')}</div>
      </div>`;
 
   // Report experience placeholder
@@ -4717,6 +4714,13 @@ async function openJobListing(jobId) {
   function _renderInsights(data) {
     const el = document.getElementById('jlInsightsContent');
     if (!el) return;
+
+    // Fill in description body with AI summary if the raw text was clipped
+    if (data.description_summary) {
+      const db = document.getElementById('jlDescBody');
+      if (db) db.innerHTML = data.description_summary.replace(/</g, '&lt;');
+    }
+
     if (!data.what_they_want?.length) {
       el.innerHTML = `<div style="font-size:.75rem;color:var(--muted)">AI insights unavailable for this listing.</div>`;
       return;
