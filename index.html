@@ -312,6 +312,7 @@ nav{position:fixed;top:0;left:0;right:0;z-index:500;height:58px;display:flex;ali
 .jlc-apply:hover{opacity:.88}
 .jlc-save{background:none;border:1px solid var(--line2);color:var(--muted);border-radius:8px;padding:.6rem .75rem;font-size:.8rem;cursor:pointer;flex-shrink:0;transition:all .15s}
 .jlc-save:hover{border-color:var(--green);color:var(--green)}
+.jlc-save[data-saved="1"]{color:var(--green);border-color:var(--green)}
 .jlc-waste-badge{font-family:var(--mono);font-size:.58rem}
 
 /* ═══ DEMAND MAP ═══ */
@@ -2167,7 +2168,7 @@ function renderJobResults(jobs, l) {
         '</div>' +
       '</button>' +
       '<div class="jlc-actions">' +
-        '<button class="jlc-save" id="save_' + safeId + '" onclick="toggleSaveJob(\'' + safeId + '\',\'' + safeCompany + '\',\'' + safeTitle + '\',\'' + safeLoc + '\',' + score + ')">♡</button>' +
+        '<button class="jlc-save" data-saved="0" id="save_' + safeId + '" onclick="toggleSaveJob(\'' + safeId + '\',\'' + safeCompany + '\',\'' + safeTitle + '\',\'' + safeLoc + '\',' + score + ')">♡</button>' +
         '<button class="jlc-apply" onclick="' + applyAction + '">Apply &amp; Optimize →</button>' +
       '</div>' +
     '</div>';
@@ -2481,7 +2482,7 @@ async function loadJobs(){
         </div>
       </button>
       <div class="jlc-actions">
-        <button class="jlc-save" id="save_${jid}" onclick="toggleSaveJob('${jid}','${(j.co||'').replace(/'/g,"\\'")}','${(j.title||'').replace(/'/g,"\\'")}','${(j.city||'').replace(/'/g,"\\'")}',${j.score})">♡</button>
+        <button class="jlc-save" data-saved="0" id="save_${jid}" onclick="toggleSaveJob('${jid}','${(j.co||'').replace(/'/g,"\\'")}','${(j.title||'').replace(/'/g,"\\'")}','${(j.city||'').replace(/'/g,"\\'")}',${j.score})">♡</button>
         <button class="jlc-apply" onclick="${applyAct}">Apply &amp; Optimize →</button>
       </div>
     </div>`;}).join('')+'</div>';
@@ -5958,7 +5959,7 @@ function toggleSaveJob(jobId, company, title, city, score) {
 
   // Update the card button that was clicked
   const btn = document.getElementById('save_' + sid);
-  if (btn) { btn.textContent = wasSaved ? '♡' : '♥'; btn.style.color = wasSaved ? '' : 'var(--red)'; }
+  if (btn) { btn.textContent = wasSaved ? '♡' : '♥'; btn.dataset.saved = wasSaved ? '0' : '1'; btn.style.color = ''; }
 
   _refreshDashSaved();
 }
@@ -5988,7 +5989,7 @@ async function removeSavedJobFromDash(jobId) {
   await SavedJobs.remove(jobId);
   const sid = String(jobId);
   const cardBtn = document.getElementById('save_' + sid);
-  if (cardBtn) { cardBtn.textContent = '♡'; cardBtn.style.color = ''; }
+  if (cardBtn) { cardBtn.textContent = '♡'; cardBtn.dataset.saved = '0'; cardBtn.style.color = ''; }
   await _refreshDashSaved();
 }
 
@@ -5998,8 +5999,8 @@ async function initSaveButtons() {
   const savedIds = new Set(SavedJobs.loadSync().map(s => String(s.job_id)));
   document.querySelectorAll('[id^="save_"]').forEach(btn => {
     const jobId = btn.id.replace('save_', '');
-    if (savedIds.has(jobId)) { btn.textContent = '♥'; btn.style.color = 'var(--red)'; }
-    else { btn.textContent = '♡'; btn.style.color = ''; }
+    if (savedIds.has(jobId)) { btn.textContent = '♥'; btn.dataset.saved = '1'; btn.style.color = ''; }
+    else { btn.textContent = '♡'; btn.dataset.saved = '0'; btn.style.color = ''; }
   });
 }
 
