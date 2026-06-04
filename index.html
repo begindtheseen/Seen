@@ -1685,8 +1685,8 @@ const Auth = {
 
   async loadProfile() {
     if(!this._user) return;
-    // Name from JWT user_metadata — always available cross-device, no DB needed
-    const metaName = this._user.user_metadata?.name || this._user.email?.split('@')[0] || '';
+    // Name from JWT user_metadata — only use if it looks like a real name (not email prefix)
+    const metaName = this._user.user_metadata?.name || '';
     try {
       const result = await _sync('load_profile');
       const data = result?.profile || null;
@@ -1718,7 +1718,7 @@ const Auth = {
     }
   },
 
-  get() { return this._profile || (this._user ? { type:'seeker', name:this._user.user_metadata?.name || this._user.email?.split('@')[0], email:this._user.email } : null); },
+  get() { return this._profile || (this._user ? { type:'seeker', name:this._user.user_metadata?.name || '', email:this._user.email } : null); },
   isLoggedIn() { return !!this._user; },
   isSeeker() { return !!this._user && this._profile?.type !== 'employer'; },
   async token() {
@@ -3658,7 +3658,7 @@ async function completeSurvey(){
     if(Auth._user){
       await _sync('save_profile', { profile: {
         email: Auth._user.email,
-        name: Auth._user.user_metadata?.name || Auth._user.email.split('@')[0],
+        name: Auth._user.user_metadata?.name || '',
         type: 'seeker',
         onboarding_survey: _surveyAnswers,
         survey_completed: true,
