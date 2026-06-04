@@ -1,66 +1,77 @@
 // Node.js serverless — no edge runtime, supports maxDuration in vercel.json
-// 50 searches split into 5 batches of 10, one batch per cron run (5× daily)
+// 60 searches split into 6 batches of 10, one batch per cron run (6× daily)
 // Each batch completes in ~5s well under the 60s maxDuration
 
 const ALL_SEARCHES = [
-  // Batch 0 — 2am UTC — Healthcare
+  // Batch 0 — 2am UTC — Healthcare mid/senior
   { what: 'Registered Nurse', where: 'Los Angeles, CA' },
   { what: 'Registered Nurse', where: 'New York, NY' },
   { what: 'Registered Nurse', where: 'Chicago, IL' },
   { what: 'Registered Nurse', where: 'Houston, TX' },
   { what: 'Registered Nurse', where: 'Phoenix, AZ' },
+  { what: 'Physical Therapist', where: 'Los Angeles, CA' },
+  { what: 'Physical Therapist', where: 'Chicago, IL' },
+  { what: 'LVN', where: 'Orange County, CA' },
+  { what: 'Social Worker', where: 'New York, NY' },
+  { what: 'Clinical Research Coordinator', where: 'Boston, MA' },
+  // Batch 1 — 6am UTC — Healthcare entry level
+  { what: 'CNA', where: 'New York, NY' },
+  { what: 'CNA', where: 'Atlanta, GA' },
+  { what: 'CNA', where: 'Los Angeles, CA' },
   { what: 'Medical Assistant', where: 'Los Angeles, CA' },
   { what: 'Medical Assistant', where: 'Dallas, TX' },
-  { what: 'Physical Therapist', where: 'Los Angeles, CA' },
-  { what: 'LVN', where: 'Orange County, CA' },
-  { what: 'CNA', where: 'New York, NY' },
-  // Batch 1 — 6am UTC — Healthcare cont + Tech
-  { what: 'CNA', where: 'Atlanta, GA' },
-  { what: 'Social Worker', where: 'New York, NY' },
+  { what: 'Medical Assistant', where: 'Phoenix, AZ' },
+  { what: 'Home Health Aide', where: 'New York, NY' },
+  { what: 'Home Health Aide', where: 'Chicago, IL' },
+  { what: 'Patient Care Technician', where: 'Houston, TX' },
+  { what: 'Pharmacy Technician', where: 'Los Angeles, CA' },
+  // Batch 2 — 10am UTC — Tech mid/senior + Finance
   { what: 'Software Engineer', where: 'San Francisco, CA' },
   { what: 'Software Engineer', where: 'Seattle, WA' },
   { what: 'Software Engineer', where: 'Austin, TX' },
   { what: 'Software Engineer', where: 'New York, NY' },
   { what: 'Software Engineer', where: 'Remote' },
-  { what: 'Data Analyst', where: 'New York, NY' },
-  { what: 'Data Analyst', where: 'Chicago, IL' },
-  { what: 'Data Analyst', where: 'Remote' },
-  // Batch 2 — 10am UTC — Tech cont + Finance
   { what: 'Product Manager', where: 'San Francisco, CA' },
-  { what: 'UX Designer', where: 'New York, NY' },
-  { what: 'UX Designer', where: 'Remote' },
   { what: 'DevOps Engineer', where: 'Remote' },
   { what: 'Financial Analyst', where: 'New York, NY' },
   { what: 'Financial Analyst', where: 'Chicago, IL' },
-  { what: 'Marketing Manager', where: 'New York, NY' },
-  { what: 'Marketing Manager', where: 'Los Angeles, CA' },
   { what: 'Accountant', where: 'Boston, MA' },
+  // Batch 3 — 2pm UTC — Tech entry + Business entry
+  { what: 'Junior Software Engineer', where: 'Remote' },
+  { what: 'Junior Software Engineer', where: 'New York, NY' },
+  { what: 'Data Analyst', where: 'New York, NY' },
+  { what: 'Data Analyst', where: 'Remote' },
+  { what: 'UX Designer', where: 'Remote' },
+  { what: 'Administrative Assistant', where: 'New York, NY' },
+  { what: 'Administrative Assistant', where: 'Los Angeles, CA' },
+  { what: 'Customer Service Representative', where: 'Remote' },
+  { what: 'Customer Service Representative', where: 'New York, NY' },
   { what: 'Business Analyst', where: 'Chicago, IL' },
-  // Batch 3 — 2pm UTC — Business + Logistics
-  { what: 'Project Manager', where: 'Remote' },
-  { what: 'Project Manager', where: 'Houston, TX' },
-  { what: 'Operations Manager', where: 'Dallas, TX' },
-  { what: 'HR Manager', where: 'Atlanta, GA' },
-  { what: 'Sales Representative', where: 'Miami, FL' },
-  { what: 'Sales Representative', where: 'Remote' },
+  // Batch 4 — 6pm UTC — Retail + Logistics entry
+  { what: 'Sales Associate', where: 'Los Angeles, CA' },
+  { what: 'Sales Associate', where: 'New York, NY' },
+  { what: 'Sales Associate', where: 'Chicago, IL' },
+  { what: 'Retail Associate', where: 'Remote' },
   { what: 'Warehouse Associate', where: 'Los Angeles, CA' },
   { what: 'Warehouse Associate', where: 'Chicago, IL' },
   { what: 'CDL Truck Driver', where: 'Dallas, TX' },
-  { what: 'CDL Truck Driver', where: 'Houston, TX' },
-  // Batch 4 — 6pm UTC — Trades + Service
+  { what: 'Delivery Driver', where: 'Los Angeles, CA' },
+  { what: 'Customer Service Associate', where: 'Miami, FL' },
+  { what: 'Receptionist', where: 'New York, NY' },
+  // Batch 5 — 10pm UTC — Trades + Education + Mixed entry
   { what: 'Electrician', where: 'Phoenix, AZ' },
-  { what: 'Construction Manager', where: 'Denver, CO' },
-  { what: 'Customer Service Representative', where: 'Remote' },
+  { what: 'Construction Worker', where: 'Denver, CO' },
   { what: 'Restaurant Manager', where: 'Miami, FL' },
+  { what: 'Server', where: 'New York, NY' },
   { what: 'Teacher', where: 'Los Angeles, CA' },
   { what: 'Teacher', where: 'Chicago, IL' },
-  { what: 'Medical Assistant', where: 'Phoenix, AZ' },
-  { what: 'Physical Therapist', where: 'Chicago, IL' },
-  { what: 'Clinical Research Coordinator', where: 'Boston, MA' },
-  { what: 'Customer Service Representative', where: 'New York, NY' },
+  { what: 'Project Manager', where: 'Remote' },
+  { what: 'Marketing Coordinator', where: 'New York, NY' },
+  { what: 'HR Coordinator', where: 'Atlanta, GA' },
+  { what: 'Operations Associate', where: 'Dallas, TX' },
 ];
 
-const BATCH_HOURS = [2, 6, 10, 14, 18]; // UTC hours matching cron schedule
+const BATCH_HOURS = [2, 6, 10, 14, 18, 22]; // UTC hours matching cron schedule
 const BATCH_SIZE = 10;
 
 function getCurrentBatch() {
@@ -139,7 +150,7 @@ async function fetchAdzuna(what, where, appId, appKey) {
       score: scoreJob(j.company?.display_name, j.salary_min),
       waste_score: wasteScore(j.company?.display_name),
       expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
-    })).filter(j => j.company !== 'Unknown' && j.apply_url);
+    })).filter(j => j.company !== 'Unknown' && j.apply_url && j.description && j.description.length > 80);
   } catch (e) {
     clearTimeout(timeout);
     console.warn('Adzuna fetch error:', e.message);

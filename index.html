@@ -2317,11 +2317,9 @@ async function applyJobFilters(){
       }
       const{data}=await q;
       if(data?.length){
-        const mapped=data.map(_normalizeDbJob);
-        // Re-apply level filter client-side — DB query uses title keywords as proxy but
-        // _inferLevelFromText is more accurate (reads description too)
+        const mapped=data.map(_normalizeDbJob).filter(j=>j.description&&j.description.length>80);
         jobs = level ? mapped.filter(j=>_inferLevel(j)===level) : mapped;
-        if(!jobs.length) jobs=mapped; // fallback: show DB results if filter removes all
+        if(!jobs.length) jobs=mapped;
         JOBS.splice(0,JOBS.length,...jobs,...FALLBACK_JOBS);
       }
     }catch(e){console.warn('applyJobFilters db:',e);}
@@ -2375,7 +2373,7 @@ async function loadJobs(){
 
       const{data}=await query;
       if(data?.length){
-        jobs=data.map(_normalizeDbJob);
+        jobs=data.map(_normalizeDbJob).filter(j=>j.description&&j.description.length>80);
         JOBS.splice(0,JOBS.length,...jobs,...FALLBACK_JOBS);
       }
     }catch(e){console.warn('loadJobs db:',e);}
@@ -5970,12 +5968,12 @@ function _refreshDashSaved() {
     savedEl.innerHTML = `<div style="font-size:.75rem;color:var(--muted);font-weight:300;padding:.5rem 0">No saved jobs yet. Tap ♡ on any listing.</div>`;
   } else {
     savedEl.innerHTML = saved.slice(0, 5).map(s => `
-      <div style="display:flex;align-items:center;justify-content:space-between;padding:.6rem 0;border-bottom:1px solid var(--line);gap:.75rem">
+      <div onclick="openJobListing('${s.job_id}')" style="display:flex;align-items:center;justify-content:space-between;padding:.6rem 0;border-bottom:1px solid var(--line);gap:.75rem;cursor:pointer" onmouseover="this.style.opacity='.75'" onmouseout="this.style.opacity='1'">
         <div style="flex:1;min-width:0">
           <div style="font-family:var(--display);font-size:.8rem;font-weight:700;color:var(--white);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${s.role||s.title||'Job'}</div>
           <div style="font-size:.68rem;color:var(--dim)">${s.company||s.co||''} · ${s.location||s.city||''}</div>
         </div>
-        <div style="display:flex;align-items:center;gap:.4rem;flex-shrink:0">
+        <div style="display:flex;align-items:center;gap:.4rem;flex-shrink:0" onclick="event.stopPropagation()">
           <div style="font-family:var(--mono);font-size:.75rem;color:${Score.color(Score.risk(s.score))}">${s.score||''}</div>
           <button onclick="removeSavedJobFromDash('${s.job_id}')" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:.75rem;padding:.1rem .25rem" title="Remove">✕</button>
         </div>
