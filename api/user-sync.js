@@ -1,0 +1,126 @@
+// Proxy all user data reads/writes through the service key so RLS never blocks them.
+// The client sends its Supabase access token; we validate it here, then use the
+// service key to talk to the DB. No RLS policies required on the client side.
+
+export default async function handler(req, res) {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  if (req.method === 'OPTIONS') return res.status(200).end();
+  if (req.method !== 'POST') return res.status(405).end('Method not allowed');
+
+  const SUPABASE_URL = process.env.SUPABASE_URL;
+  const SERVICE_KEY  = process.env.SUPABASE_SERVICE_KEY;
+  if (!SUPABASE_URL || !SERVICE_KEY) return res.status(500).json({ error: 'DB not configured' });
+
+  // ── Validate caller's Supabase JWT ──────────────────────────────────────────
+  const token = (req.headers.authorization || '').replace(/^Bearer\s+/i, '').trim();
+  if (!token) return res.status(401).json({ error: 'No auth token' });
+
+  const userRes = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
+    headers: { apikey: SERVICE_KEY, Authorization: `Bearer ${token}` },
+  });
+  if (!userRes.ok) return res.status(401).json({ error: 'Invalid token' });
+  const { id: uid } = await userRes.json();
+  if (!uid) return res.status(401).json({ error: 'Could not identify user' });
+
+  // ── All DB calls use service key — bypasses RLS ─────────────────────────────
+  const db = (path, opts = {}) => fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
+    ...opts,
+    headers: {
+      apikey: SERVICE_KEY,
+      Authorization: `Bearer ${SERVICE_KEY}`,
+      'Content-Type': 'application/json',
+      Prefer: 'return=representation',
+      ...(opts.headers || {}),
+    },
+  });
+
+  let body = req.body;
+  if (typeof body === 'string') { try { body = JSON.parse(body); } catch(e) { body = {}; } }
+  const { action } = body || {};
+
+  // ── LOAD — return all applications + saved jobs for this user ───────────────
+  if (action === 'load') {
+    const [appsRes, savedRes] = await Promise.all([
+      db(`applications?user_id=eq.${uid}&order=created_at.desc`),
+      db(`saved_jobs?user_id=eq.${uid}&order=saved_at.desc`),
+    ]);
+    const apps  = appsRes.ok  ? await appsRes.json()  : [];
+    const saved = savedRes.ok ? await savedRes.json() : [];
+    return res.status(200).json({ applications: apps, saved_jobs: saved });
+  }
+
+  // ── ADD APPLICATION ─────────────────────────────────────────────────────────
+  if (action === 'add_application') {
+    const a = body.application || {};
+    const row = {
+      user_id:      uid,
+      company_name: a.company   || '',
+      role:         a.role      || '',
+      city:         a.location  || '',
+      platform:     a.platform  || 'Seen',
+      job_url:      a.jobUrl    || null,
+      status:       a.status    || 'active',
+      stage:        a.stage     || 'Applied',
+      score:        a.score     || null,
+      waste_score:  a.waste     || null,
+    };
+    const r = await db('applications', { method: 'POST', body: JSON.stringify(row), headers: { Prefer: 'return=representation' } });
+    const data = r.ok ? await r.json() : null;
+    if (!r.ok) return res.status(400).json({ error: 'Insert failed' });
+    return res.status(200).json({ id: data?.[0]?.id || null });
+  }
+
+  // ── REMOVE APPLICATION ──────────────────────────────────────────────────────
+  if (action === 'remove_application') {
+    const { id } = body;
+    // Accept both real UUIDs and legacy app_ ids stored in the DB
+    if (id) await db(`applications?id=eq.${encodeURIComponent(id)}&user_id=eq.${uid}`, { method: 'DELETE', headers: { Prefer: 'return=minimal' } });
+    return res.status(200).json({ ok: true });
+  }
+
+  // ── SAVE JOB ────────────────────────────────────────────────────────────────
+  if (action === 'save_job') {
+    const j = body.job || {};
+    const row = {
+      user_id:  uid,
+      job_id:   String(j.id || ''),
+      company:  j.co    || '',
+      role:     j.title || '',
+      location: j.city  || '',
+      score:    j.score || null,
+    };
+    const r = await db('saved_jobs', {
+      method: 'POST',
+      body: JSON.stringify(row),
+      headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
+    });
+    return res.status(200).json({ ok: r.ok });
+  }
+
+  // ── UNSAVE JOB ──────────────────────────────────────────────────────────────
+  if (action === 'unsave_job') {
+    const { jobId } = body;
+    if (jobId) await db(`saved_jobs?user_id=eq.${uid}&job_id=eq.${encodeURIComponent(String(jobId))}`, { method: 'DELETE', headers: { Prefer: 'return=minimal' } });
+    return res.status(200).json({ ok: true });
+  }
+
+  // ── UPDATE APPLICATION STAGE/STATUS ─────────────────────────────────────────
+  if (action === 'update_application') {
+    const { id, changes } = body;
+    if (!id || !changes) return res.status(400).json({ error: 'id and changes required' });
+    const allowed = {};
+    if (changes.stage)  allowed.stage  = changes.stage;
+    if (changes.status) allowed.status = changes.status;
+    if (Object.keys(allowed).length) {
+      await db(`applications?id=eq.${encodeURIComponent(id)}&user_id=eq.${uid}`, {
+        method: 'PATCH', body: JSON.stringify({ ...allowed, updated_at: new Date().toISOString() }),
+        headers: { Prefer: 'return=minimal' },
+      });
+    }
+    return res.status(200).json({ ok: true });
+  }
+
+  return res.status(400).json({ error: 'Unknown action: ' + action });
+}
