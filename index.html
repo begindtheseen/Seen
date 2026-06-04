@@ -1100,8 +1100,11 @@ nav{position:fixed;top:0;left:0;right:0;z-index:500;height:58px;display:flex;ali
       <!-- Live search bar -->
       <div style="display:flex;gap:.5rem;margin-top:1rem;flex-wrap:wrap">
         <input id="jobSearchQuery" type="text" placeholder="Job title or role..." style="flex:2;min-width:180px;background:var(--surface);border:1.5px solid var(--line2);border-radius:8px;padding:.65rem .9rem;color:var(--white);font-family:var(--body);font-size:.84rem;outline:none;caret-color:var(--green)" onfocus="this.style.borderColor='var(--green)'" onblur="this.style.borderColor='var(--line2)'" onkeydown="if(event.key==='Enter')searchJobs()"/>
-        <input id="jobSearchLocation" type="text" placeholder="City, state, or zip..." autocomplete="off" style="flex:1;min-width:130px;background:var(--surface);border:1.5px solid var(--line2);border-radius:8px;padding:.65rem .9rem;color:var(--white);font-family:var(--body);font-size:.84rem;outline:none;caret-color:var(--green)" onfocus="this.style.borderColor='var(--green)'" onblur="this.style.borderColor='var(--line2)'" onkeydown="if(event.key==='Enter')searchJobs()" oninput="debounceLocationSuggest(this.value,'jobLocSuggestions')"/>
-        <div id="jobLocSuggestions" style="position:absolute;z-index:200;background:var(--surface);border:1px solid var(--line2);border-radius:8px;width:280px;display:none;box-shadow:0 8px 24px rgba(0,0,0,.4);margin-top:2.5rem"></div>
+        <div style="position:relative;flex:1;min-width:130px;display:flex;gap:0">
+          <input id="jobSearchLocation" type="text" placeholder="City, state, or zip..." autocomplete="off" style="flex:1;width:100%;background:var(--surface);border:1.5px solid var(--line2);border-radius:8px;padding:.65rem 2.4rem .65rem .9rem;color:var(--white);font-family:var(--body);font-size:.84rem;outline:none;caret-color:var(--green)" onfocus="this.style.borderColor='var(--green)'" onblur="this.style.borderColor='var(--line2)'" onkeydown="if(event.key==='Enter')searchJobs()" oninput="debounceLocationSuggest(this.value,'jobLocSuggestions')"/>
+          <button title="Use my location" onclick="_requestGpsLocation('jobSearchLocation')" style="position:absolute;right:.5rem;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;font-size:1rem;color:var(--muted);padding:0;line-height:1;transition:color .15s" onmouseenter="this.style.color='var(--green)'" onmouseleave="this.style.color='var(--muted)'">📍</button>
+          <div id="jobLocSuggestions" style="position:absolute;z-index:200;background:var(--surface);border:1px solid var(--line2);border-radius:8px;width:280px;display:none;box-shadow:0 8px 24px rgba(0,0,0,.4);top:100%;left:0;margin-top:.25rem"></div>
+        </div>
         <select id="jobSearchRadius" style="background:var(--surface);border:1.5px solid var(--line2);border-radius:8px;padding:.65rem .75rem;color:var(--white);font-family:var(--mono);font-size:.72rem;outline:none;appearance:none;cursor:pointer">
           <option value="10">10 mi</option>
           <option value="25" selected>25 mi</option>
@@ -4231,6 +4234,39 @@ window.addEventListener('popstate', function(e) {
   _navSkipHistory = false;
 });
 
+const STATE_ABBR={Alabama:'AL',Alaska:'AK',Arizona:'AZ',Arkansas:'AR',California:'CA',Colorado:'CO',Connecticut:'CT',Delaware:'DE',Florida:'FL',Georgia:'GA',Hawaii:'HI',Idaho:'ID',Illinois:'IL',Indiana:'IN',Iowa:'IA',Kansas:'KS',Kentucky:'KY',Louisiana:'LA',Maine:'ME',Maryland:'MD',Massachusetts:'MA',Michigan:'MI',Minnesota:'MN',Mississippi:'MS',Missouri:'MO',Montana:'MT',Nebraska:'NE',Nevada:'NV','New Hampshire':'NH','New Jersey':'NJ','New Mexico':'NM','New York':'NY','North Carolina':'NC','North Dakota':'ND',Ohio:'OH',Oklahoma:'OK',Oregon:'OR',Pennsylvania:'PA','Rhode Island':'RI','South Carolina':'SC','South Dakota':'SD',Tennessee:'TN',Texas:'TX',Utah:'UT',Vermont:'VT',Virginia:'VA',Washington:'WA','West Virginia':'WV',Wisconsin:'WI',Wyoming:'WY','District of Columbia':'DC'};
+
+async function _requestGpsLocation(inputId){
+  if(!navigator.geolocation)return;
+  const inp=document.getElementById(inputId);
+  if(!inp||inp.value.trim())return;
+  const origPh=inp.placeholder;
+  inp.placeholder='📍 Detecting...';
+  inp.style.borderColor='var(--green)';
+  try{
+    const pos=await new Promise((res,rej)=>
+      navigator.geolocation.getCurrentPosition(res,rej,{timeout:8000,maximumAge:300000})
+    );
+    const {latitude:lat,longitude:lon}=pos.coords;
+    const r=await fetch(
+      `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}`,
+      {headers:{'User-Agent':'seenjobs.io/1.0','Accept-Language':'en'}}
+    );
+    if(!r.ok)throw new Error('geocode');
+    const geo=await r.json();
+    const city=geo.address.city||geo.address.town||geo.address.village||geo.address.county||'';
+    const state=STATE_ABBR[geo.address.state]||geo.address.state||'';
+    const loc=city&&state?`${city}, ${state}`:city||state;
+    if(loc&&inp&&!inp.value.trim()){
+      inp.value=loc;
+      inp.style.borderColor='var(--green)';
+      showToast('📍 Showing jobs near '+loc);
+    }
+  }catch(e){/* denied or failed — user types manually */}
+  inp.placeholder=origPh;
+  setTimeout(()=>{if(inp)inp.style.borderColor='';},1500);
+}
+
 function go(page){
   try {
     if(page==='home'){
@@ -4257,6 +4293,8 @@ function go(page){
         const c=Auth._profile?.city||_loadProfileLocal()?.city||'';
         if(c)locInp.value=c;
       }
+      // If location is still empty, ask for GPS — works for guests too
+      _requestGpsLocation('jobSearchLocation');
       // Pre-fill niche filter from profile industry (only if user hasn't changed it)
       const nicheEl=document.getElementById('filterNiche');
       if(nicheEl&&nicheEl.value===''){
