@@ -7,7 +7,9 @@
     "api/apply.js": { "maxDuration": 30 },
     "api/parse-resume.js": { "maxDuration": 30 },
     "api/jobs.js": { "maxDuration": 60 },
-    "api/user-sync.js": { "maxDuration": 15 }
+    "api/user-sync.js": { "maxDuration": 15 },
+    "api/company-score.js": { "maxDuration": 45 },
+    "api/refresh-companies.js": { "maxDuration": 60 }
   },
   "crons": [
     { "path": "/api/refresh-jobs", "schedule": "0 2 * * *" },
@@ -15,6 +17,7 @@
     { "path": "/api/refresh-jobs", "schedule": "0 10 * * *" },
     { "path": "/api/refresh-jobs", "schedule": "0 14 * * *" },
     { "path": "/api/refresh-jobs", "schedule": "0 18 * * *" },
-    { "path": "/api/refresh-jobs", "schedule": "0 22 * * *" }
+    { "path": "/api/refresh-jobs", "schedule": "0 22 * * *" },
+    { "path": "/api/refresh-companies", "schedule": "0 3 * * *" }
   ]
 }

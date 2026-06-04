@@ -1839,38 +1839,82 @@ const Agg={
 async function loadRealCompanyData(companyName, cityHint) {
   if (!db) return null;
   try {
+    // Fetch community reports first (fast, direct DB)
     const { data: cos } = await db.from('companies').select('id').ilike('name', companyName).limit(1);
     const coId = cos?.[0]?.id;
-    if (!coId) return null;
-    const { data: reports } = await db.from('reports')
-      .select('outcome,ghost_stage,rounds,wait_days,unpaid_work')
-      .eq('company_id', coId).eq('needs_review', false).limit(300);
+    let reports = [];
+    if (coId) {
+      const { data: rpts } = await db.from('reports')
+        .select('outcome,ghost_stage,rounds,wait_days,unpaid_work')
+        .eq('company_id', coId).eq('needs_review', false).limit(300);
+      reports = rpts || [];
+    }
     const now = new Date().toISOString();
     const { data: jobs } = await db.from('jobs')
       .select('salary,source,score,waste_score')
       .ilike('company', `%${companyName}%`)
       .gt('expires_at', now).limit(50);
-    return { reports: reports || [], jobs: jobs || [] };
+
+    // If ≥3 community reports, use them — most accurate, no API needed
+    if (reports.length >= 3) {
+      return { reports, jobs: jobs || [], source: 'community' };
+    }
+
+    // Otherwise call /api/company-score which searches Reddit/Glassdoor/Blind via Claude
+    // Returns instantly if cached (30-day TTL), runs web search only on first lookup
+    try {
+      const r = await fetch('/api/company-score', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: companyName }),
+      });
+      if (r.ok) {
+        const d = await r.json();
+        if (d.ok && d.score) return { reports, jobs: jobs || [], webScore: d.score, source: d._src };
+      }
+    } catch(e) { console.warn('company-score:', e.message); }
+
+    return { reports, jobs: jobs || [], source: 'limited' };
   } catch(e) { console.warn('loadRealCompanyData:', e.message); return null; }
 }
 
-function computeScoresFromData(reports, jobs) {
+function computeScoresFromData(reports, jobs, webScore) {
   const n = reports.length;
-  if (n < 3) {
-    if (!jobs.length) return null;
+
+  // Priority 1: Community reports ≥3 — real user submissions, highest accuracy
+  if (n >= 3) {
+    const ghosted = reports.filter(r => r.outcome === 'ghosted').length;
+    const human   = reports.filter(r => r.outcome === 'human' || r.outcome === 'hired').length;
+    const unpaid  = reports.filter(r => r.unpaid_work === 'yes').length;
+    const gr = ghosted / n, rr = human / n;
+    const roundsArr = reports.filter(r => r.rounds > 0).map(r => r.rounds);
+    const avgRounds = roundsArr.length ? roundsArr.reduce((s, v) => s + v, 0) / roundsArr.length : 3;
+    const waitArr = reports.filter(r => r.wait_days > 0).map(r => r.wait_days);
+    const avgWait = waitArr.length ? waitArr.reduce((s, v) => s + v, 0) / waitArr.length : 30;
+    const waste = Score.waste(gr, avgRounds, unpaid / n);
+    const overall = Score.calc(rr, gr, avgWait, n);
+    return { overall_score: overall, risk_level: Score.risk(overall), ghost_rate: gr, response_rate: rr,
+      avg_wait_days: Math.round(avgWait), avg_rounds: Math.round(avgRounds * 10) / 10,
+      waste, report_count: n, data_quality: n >= 10 ? 'strong' : n >= 5 ? 'moderate' : 'limited',
+      process_score: overall, data_source: 'community' };
+  }
+
+  // Priority 2: Web research — Claude searched Reddit/Glassdoor/Blind for real posts
+  if (webScore) {
+    return { ...webScore, report_count: n > 0 ? n : webScore.report_count };
+  }
+
+  // Priority 3: Job listing averages — rough signal only
+  if (jobs.length >= 3) {
     const avgScore = Math.round(jobs.reduce((s, j) => s + (j.score || 65), 0) / jobs.length);
     const avgWaste = Math.round(jobs.reduce((s, j) => s + (j.waste_score || 25), 0) / jobs.length);
     return { overall_score: avgScore, risk_level: Score.risk(avgScore), ghost_rate: null,
       response_rate: null, avg_wait_days: null, avg_rounds: null,
-      waste: avgWaste, report_count: 0, data_quality: 'jobs_only' };
+      waste: avgWaste, report_count: 0, data_quality: 'jobs_only', data_source: 'job_listings' };
   }
-  const ghosted = reports.filter(r => r.outcome === 'ghosted').length;
-  const human   = reports.filter(r => r.outcome === 'human' || r.outcome === 'hired').length;
-  const unpaid  = reports.filter(r => r.unpaid_work === 'yes').length;
-  const gr = ghosted / n, rr = human / n;
-  const roundsArr = reports.filter(r => r.rounds > 0).map(r => r.rounds);
-  const avgRounds = roundsArr.length ? roundsArr.reduce((s, v) => s + v, 0) / roundsArr.length : 3;
-  const waitArr = reports.filter(r => r.wait_days > 0).map(r => r.wait_days);
+
+  return null;
+}
   const avgWait = waitArr.length ? waitArr.reduce((s, v) => s + v, 0) / waitArr.length : 30;
   const waste = Score.waste(gr, avgRounds, unpaid / n);
   const overall = Score.calc(rr, gr, avgWait, n);
@@ -2033,7 +2077,7 @@ async function runSearch(name,loc){
   L(`<span style="color:var(--green)">✓</span> Done`);await sleep(180);
 
   const realData=await realDataPromise;
-  const realSc=realData?computeScoresFromData(realData.reports,realData.jobs):null;
+  const realSc=realData?computeScoresFromData(realData.reports,realData.jobs,realData.webScore):null;
   const sc=realSc||locSc||(known?.sc)||{overall_score:50,risk_level:'warn',response_rate:.5,ghost_rate:.3,avg_wait_days:30,report_count:0,waste:40};
   const risk=sc.risk_level||Score.risk(sc.overall_score);
   const grade=letterGrade(sc.overall_score);
@@ -2967,7 +3011,7 @@ async function viewCompany(id,name,loc){
   // Load real scores from community reports + job listings, overwrite initial render
   (async () => {
     const realData = await loadRealCompanyData(co?.name || name, loc);
-    const rsc = realData ? computeScoresFromData(realData.reports, realData.jobs) : null;
+    const rsc = realData ? computeScoresFromData(realData.reports, realData.jobs, realData.webScore) : null;
 
     if (!rsc) {
       if (isUnknown) {
