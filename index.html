@@ -2091,7 +2091,15 @@ async function runSearch(name,loc){
       <button class="btn btn-solid" style="flex:1;justify-content:center;font-size:.75rem" onclick="closeModDirect();viewCompany('${known?.id||'x'}','${known?.name||name}','${loc}')">Full report →</button>
       <button class="btn btn-ghost" style="padding:.65rem .9rem;font-size:.75rem;flex-shrink:0" onclick="shareCompanyReport('${(name||'').replace(/'/g,"\\'")}')">↗ Share</button>
       <button class="btn btn-ghost" style="padding:.65rem .9rem;font-size:.75rem;flex-shrink:0" onclick="closeModDirect();go('report')">+ Report</button>
-    </div>`;
+    </div>
+    ${!Auth.isLoggedIn()?`<div style="margin-top:.85rem;padding:.65rem .95rem;background:var(--raised);border-radius:9px;border:1px solid var(--line2);display:flex;align-items:center;justify-content:space-between;gap:.75rem">
+      <div>
+        <div style="font-family:var(--mono);font-size:.63rem;color:var(--text);margin-bottom:.12rem">Your experience moves this score.</div>
+        <div style="font-family:var(--mono);font-size:.55rem;color:var(--muted)">60 seconds · fully anonymous · helps the next person</div>
+      </div>
+      <button class="btn btn-ghost" style="font-size:.65rem;padding:.4rem .8rem;flex-shrink:0;white-space:nowrap;border-color:var(--green);color:var(--green)" onclick="closeModDirect();go('login')">Add yours →</button>
+    </div>`:''}`;
+
 }
 
 function mbox(v,l,c){return`<div style="background:var(--raised);padding:.82rem .6rem;text-align:center"><span style="font-family:var(--mono);font-size:1rem;font-weight:500;color:${c};display:block;margin-bottom:.18rem">${v}</span><span style="font-family:var(--mono);font-size:.5rem;text-transform:uppercase;letter-spacing:.07em;color:var(--muted)">${l}</span></div>`;}
@@ -6437,6 +6445,17 @@ window.addEventListener('pageshow', e => {
   if (e.persisted) _syncAllAndRefresh();
 });
 
+// ── SHARED LINK ROUTING ──
+function _handleSharedLink(){
+  const h=window.location.hash;
+  if(!h.startsWith('#company/'))return;
+  const raw=decodeURIComponent(h.slice(9));
+  if(!raw)return;
+  // Proper-case the name for display (amazon → Amazon, mcdonald's → McDonald's)
+  const displayName=raw.split(/\s+/).map(w=>w.charAt(0).toUpperCase()+w.slice(1)).join(' ');
+  setTimeout(()=>openModal(displayName,''),450);
+}
+
 // ── INIT ──
 updateNav();
 startHeroRotation();
@@ -6445,7 +6464,10 @@ if(db){
     updateNav();
     if(Auth.isSeeker()){renderSeekerDash();go('seeker-dash');}
     else if(Auth.isEmployer()){goToEmployerDashboard();}
-  }).catch(e=>console.warn('Auth init:',e));
+    _handleSharedLink();
+  }).catch(e=>{console.warn('Auth init:',e);_handleSharedLink();});
+} else {
+  setTimeout(_handleSharedLink, 500);
 }
 
 // Lock body scroll when any modal is open — prevents background page scroll on iOS
