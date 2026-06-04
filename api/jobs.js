@@ -120,7 +120,8 @@ export default async function handler(req, res) {
     jobs = jobs.map(j => ({ ...j, score: scoreJob(j), waste_score: wasteScore(j) }));
     jobs.sort((a, b) => b.score - a.score);
 
-    // Persist all results to Supabase — fire and forget, don't block the response
+    // Await the save — fire-and-forget is unreliable in Vercel serverless
+    // (execution context can terminate after res.json() before the fetch lands)
     if (SUPABASE_URL && SUPABASE_SERVICE_KEY && jobs.length) {
       const expires = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
       const rows = jobs.map(j => ({
@@ -138,19 +139,26 @@ export default async function handler(req, res) {
         waste_score: j.waste_score || 25,
         expires_at: expires,
       }));
-      fetch(`${SUPABASE_URL}/rest/v1/jobs`, {
-        method: 'POST',
-        headers: {
-          apikey: SUPABASE_SERVICE_KEY,
-          Authorization: `Bearer ${SUPABASE_SERVICE_KEY}`,
-          'Content-Type': 'application/json',
-          Prefer: 'return=minimal',
-        },
-        body: JSON.stringify(rows),
-      }).then(r => {
-        if (r.ok) console.log(`CACHE SAVED: "${qNorm}" @ "${loc}" — ${jobs.length} jobs`);
-        else r.text().then(t => console.error(`CACHE SAVE FAILED: ${r.status}`, t.slice(0, 200)));
-      }).catch(e => console.error('jobs DB save:', e.message));
+      try {
+        const saveRes = await fetch(`${SUPABASE_URL}/rest/v1/jobs`, {
+          method: 'POST',
+          headers: {
+            apikey: SUPABASE_SERVICE_KEY,
+            Authorization: `Bearer ${SUPABASE_SERVICE_KEY}`,
+            'Content-Type': 'application/json',
+            Prefer: 'resolution=ignore-duplicates,return=minimal',
+          },
+          body: JSON.stringify(rows),
+        });
+        if (saveRes.ok) {
+          console.log(`CACHE SAVED: "${qNorm}" @ "${loc}" — ${jobs.length} jobs`);
+        } else {
+          const errText = await saveRes.text();
+          console.error(`CACHE SAVE FAILED: ${saveRes.status}`, errText.slice(0, 300));
+        }
+      } catch (e) {
+        console.error('CACHE SAVE ERROR:', e.message);
+      }
     }
 
     return res.status(200).json({ ok: true, jobs, query, location: loc });
