@@ -4162,12 +4162,9 @@ const SavedJobs = {
     if (Auth.isLoggedIn()) {
       const result = await _sync('load');
       if (result?.saved_jobs) {
-        const dbIds = new Set(result.saved_jobs.map(s => String(s.job_id)));
-        const localExtra = this.loadSync().filter(s => !dbIds.has(String(s.job_id)));
-        if (localExtra.length) localExtra.forEach(s => _sync('save_job', { job: { id: s.job_id, co: s.company, title: s.role, city: s.location, score: s.score } }));
-        const merged = [...result.saved_jobs, ...localExtra];
-        localStorage.setItem(this.KEY, JSON.stringify(merged));
-        return merged;
+        // DB is authoritative — overwrite local cache so deletions on other devices reflect here
+        localStorage.setItem(this.KEY, JSON.stringify(result.saved_jobs));
+        return result.saved_jobs;
       }
     }
     return this.loadSync();
@@ -5689,19 +5686,28 @@ const ResumeStore = {
       try {
         const result = await _sync('load_profile');
         const data = result?.profile;
-        if (data?.resume_text) {
-          if (Auth._profile) {
-            Auth._profile.resume_text = data.resume_text;
-            Auth._profile.resume_file_name = data.resume_file_name;
-            Auth._profile.resume_word_count = data.resume_word_count;
+        if (data) {
+          if (data.resume_text) {
+            // DB has resume — cache it and return
+            if (Auth._profile) {
+              Auth._profile.resume_text = data.resume_text;
+              Auth._profile.resume_file_name = data.resume_file_name;
+              Auth._profile.resume_word_count = data.resume_word_count;
+            }
+            localStorage.setItem(this._key(), data.resume_text);
+            localStorage.setItem(this._metaKey(), JSON.stringify({ fileName: data.resume_file_name || 'Resume', wordCount: data.resume_word_count || 0 }));
+            return { text: data.resume_text, fileName: data.resume_file_name || 'Resume', wordCount: data.resume_word_count || 0 };
+          } else {
+            // Profile row exists but resume was deleted — DB wins, purge local cache
+            localStorage.removeItem(this._key());
+            localStorage.removeItem(this._metaKey());
+            if (Auth._profile) { Auth._profile.resume_text = null; Auth._profile.resume_file_name = null; Auth._profile.resume_word_count = null; }
+            return null;
           }
-          localStorage.setItem(this._key(), data.resume_text);
-          localStorage.setItem(this._metaKey(), JSON.stringify({ fileName: data.resume_file_name || 'Resume', wordCount: data.resume_word_count || 0 }));
-          return { text: data.resume_text, fileName: data.resume_file_name || 'Resume', wordCount: data.resume_word_count || 0 };
         }
       } catch(e) {}
     }
-    // 3. localStorage fallback — and push to DB so other devices can see it
+    // 3. localStorage fallback (only if no profile row yet or _sync failed) — push to DB
     const text = localStorage.getItem(this._key());
     if (text) {
       const meta = JSON.parse(localStorage.getItem(this._metaKey()) || '{}');
@@ -6078,20 +6084,24 @@ async function markAppStatus(id, status) {
   showToast(msgs[status] || 'Updated.');
 }
 
-// Re-sync dashboard when tab becomes visible again (catches data added on other devices)
-document.addEventListener('visibilitychange', () => {
-  if (document.visibilityState === 'visible' && Auth.isLoggedIn()) {
+// Re-sync all user data when tab becomes visible (catches changes made on other devices)
+function _syncAllAndRefresh() {
+  if (!Auth.isLoggedIn()) return;
+  Promise.all([AppStore.syncFromDb(), SavedJobs.syncFromDb()]).then(() => {
     const activePage = document.querySelector('.page.active, .page-full.active')?.id;
     if (activePage === 'page-seeker-dash') {
-      AppStore.syncFromDb().then(() => renderSeekerDash()).catch(() => {});
+      renderSeekerDash();
+      _refreshDashSaved();
+      loadDashResumeState();
     }
-  }
+  }).catch(() => {});
+}
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible') _syncAllAndRefresh();
 });
 // Safari bfcache: page restored from cache after navigating back
 window.addEventListener('pageshow', e => {
-  if (e.persisted && Auth.isLoggedIn()) {
-    AppStore.syncFromDb().then(() => renderSeekerDash()).catch(() => {});
-  }
+  if (e.persisted) _syncAllAndRefresh();
 });
 
 // ── INIT ──
