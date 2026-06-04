@@ -4526,18 +4526,21 @@ function openJobDetailModal(jobId) {
        <div style="flex:1;display:flex;flex-wrap:wrap;gap:.3rem">${chips}</div>
        <div style="text-align:center;flex-shrink:0"><div class="sring ${risk}" style="width:36px;height:36px"><div class="sring-n" style="font-size:.78rem">${score}</div></div><div style="font-family:var(--mono);font-size:.45rem;color:var(--muted);margin-top:.15rem">score</div></div>
      </div>
-     <div style="color:var(--sub);font-size:.78rem;line-height:1.75;white-space:pre-wrap;margin-bottom:.75rem">${(desc||'No description available.').replace(/</g,'&lt;')}</div>
-     ${jobUrl ? `<a href="${jobUrl}" target="_blank" rel="noopener" style="display:inline-block;font-family:var(--mono);font-size:.65rem;color:var(--green);text-decoration:none;margin-bottom:.5rem">View full listing ↗</a>` : ''}`;
+     <div style="color:var(--sub);font-size:.78rem;line-height:1.75;white-space:pre-wrap">${(desc||'No description available.').replace(/</g,'&lt;')}</div>`;
 
-  // Sticky footer — always visible, pass `this` so handler has direct button ref
+  // Sticky footer — save, optional "full listing" link, apply
   const saved = SavedJobs.isSaved(sid);
   const foot = document.getElementById('applyModalFoot');
-  foot.style.display = 'flex';
+  foot.style.cssText = 'display:flex;flex-direction:column;gap:.5rem;padding:1rem 1.5rem;border-top:1px solid var(--line);flex-shrink:0;background:var(--card);border-radius:0 0 16px 16px';
   foot.innerHTML =
-    `<button id="jdSaveBtn" type="button" data-saved="${saved?'1':'0'}" onclick="jdSaveToggle(this)"
-       style="background:none;border:1px solid var(--line2);border-radius:8px;padding:.65rem 1rem;font-size:1rem;cursor:pointer;color:${saved?'var(--green)':'var(--muted)'};flex-shrink:0;transition:all .15s">${saved?'♥':'♡'}</button>
-     <button type="button" onclick="jdApplyClick()"
-       style="flex:1;background:var(--green);color:var(--ink);border:none;border-radius:8px;padding:.65rem 1rem;font-family:var(--display);font-weight:800;font-size:.82rem;cursor:pointer">Apply &amp; Optimize →</button>`;
+    `${jobUrl ? `<a href="${jobUrl}" target="_blank" rel="noopener"
+       style="display:block;text-align:center;font-family:var(--mono);font-size:.65rem;color:var(--green);text-decoration:none;padding:.4rem 0;border:1px solid var(--line2);border-radius:8px;letter-spacing:.02em">View full listing ↗</a>` : ''}
+     <div style="display:flex;gap:.5rem">
+       <button id="jdSaveBtn" type="button" data-saved="${saved?'1':'0'}" onclick="jdSaveToggle(this)"
+         style="background:none;border:1px solid var(--line2);border-radius:8px;padding:.65rem 1rem;font-size:1rem;cursor:pointer;color:${saved?'var(--green)':'var(--muted)'};flex-shrink:0;transition:all .15s">${saved?'♥':'♡'}</button>
+       <button type="button" onclick="jdApplyClick()"
+         style="flex:1;background:var(--green);color:var(--ink);border:none;border-radius:8px;padding:.65rem 1rem;font-family:var(--display);font-weight:800;font-size:.82rem;cursor:pointer">Apply &amp; Optimize →</button>
+     </div>`;
 
   document.getElementById('applyModal').classList.add('open');
 }
