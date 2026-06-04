@@ -272,6 +272,46 @@ async function deleteExpired(supabaseUrl, serviceKey) {
   });
 }
 
+// Scan every active listing and immediately remove any that fail quality standards.
+// Runs every cron hit — cheap (only fetches id + description + apply_url).
+async function deleteJunk(supabaseUrl, serviceKey) {
+  try {
+    const res = await fetch(
+      `${supabaseUrl}/rest/v1/jobs?select=id,description,apply_url&expires_at=gt.${new Date().toISOString()}&limit=2000`,
+      { headers: { apikey: serviceKey, Authorization: `Bearer ${serviceKey}` } }
+    );
+    if (!res.ok) return { removed: 0 };
+    const rows = await res.json();
+
+    const badIds = (rows || []).filter(r =>
+      !r.description ||
+      r.description.trim().length < 80 ||
+      !r.apply_url
+    ).map(r => r.id);
+
+    if (!badIds.length) return { removed: 0 };
+
+    // Delete in chunks of 100 to stay inside URL length limits
+    for (let i = 0; i < badIds.length; i += 100) {
+      const chunk = badIds.slice(i, i + 100);
+      await fetch(`${supabaseUrl}/rest/v1/jobs?id=in.(${chunk.join(',')})`, {
+        method: 'DELETE',
+        headers: {
+          apikey: serviceKey,
+          Authorization: `Bearer ${serviceKey}`,
+          Prefer: 'return=minimal',
+        },
+      });
+    }
+
+    console.log(`deleteJunk: removed ${badIds.length} junk listings`);
+    return { removed: badIds.length };
+  } catch(e) {
+    console.error('deleteJunk error:', e.message);
+    return { removed: 0 };
+  }
+}
+
 export default async function handler(req, res) {
   const headers = { 'Content-Type': 'application/json' };
 
@@ -297,7 +337,10 @@ export default async function handler(req, res) {
   }
 
   try {
-    await deleteExpired(SUPABASE_URL, SUPABASE_SERVICE_KEY);
+    const [, junkResult] = await Promise.all([
+      deleteExpired(SUPABASE_URL, SUPABASE_SERVICE_KEY),
+      deleteJunk(SUPABASE_URL, SUPABASE_SERVICE_KEY),
+    ]);
 
     // Pick which batch of 10 to run based on current UTC hour
     // Pass ?batch=0..4 to override (useful for manual trigger of all batches)
@@ -334,6 +377,7 @@ export default async function handler(req, res) {
       searches: searches.length,
       found: allJobs.length,
       upserted: upsertResults.reduce((sum, r) => sum + (r.upserted || 0), 0),
+      purged: junkResult.removed,
     });
 
   } catch (err) {
