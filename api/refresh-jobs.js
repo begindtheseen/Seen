@@ -1,5 +1,43 @@
 import { getQueryExpansion } from './_utils/expand.js';
 
+// Canonical company name aliases — keeps all subsidiaries/variants under one brand
+// so job listings roll up correctly to the same company insights page.
+const _ALIASES = {
+  'aws': 'Amazon', 'amazon web services': 'Amazon', 'amazon.com': 'Amazon',
+  'amazon fresh': 'Amazon', 'amazon logistics': 'Amazon', 'whole foods': 'Amazon',
+  'whole foods market': 'Amazon', 'zappos': 'Amazon', 'ring': 'Amazon', 'twitch': 'Amazon',
+  'facebook': 'Meta', 'instagram': 'Meta', 'whatsapp': 'Meta', 'meta platforms': 'Meta',
+  'alphabet': 'Google', 'alphabet inc': 'Google', 'google llc': 'Google', 'youtube': 'Google',
+  'deepmind': 'Google', 'waymo': 'Google',
+  'microsoft corp': 'Microsoft', 'microsoft corporation': 'Microsoft',
+  'apple inc': 'Apple', 'jpmorgan chase': 'JPMorgan', 'jp morgan': 'JPMorgan',
+  'goldman sachs group': 'Goldman Sachs', 'bank of america corp': 'Bank of America',
+  'wells fargo bank': 'Wells Fargo', 'unitedhealth group': 'UnitedHealth',
+  'cvs pharmacy': 'CVS Health', 'cvs caremark': 'CVS Health',
+  'deloitte llp': 'Deloitte', 'deloitte consulting': 'Deloitte',
+  'walmart inc': 'Walmart', 'wal-mart': 'Walmart', 'target corporation': 'Target',
+  'costco wholesale': 'Costco', 'salesforce inc': 'Salesforce', 'salesforce.com': 'Salesforce',
+  'slack': 'Salesforce', 'tableau': 'Salesforce',
+  'ibm corporation': 'IBM', 'international business machines': 'IBM',
+  'oracle corporation': 'Oracle', 'accenture plc': 'Accenture',
+  'tesla inc': 'Tesla', 'tesla motors': 'Tesla',
+  'lockheed martin corporation': 'Lockheed Martin',
+  'raytheon technologies': 'Raytheon', 'boeing company': 'Boeing',
+  'spacex': 'SpaceX', 'space exploration technologies': 'SpaceX',
+  'netflix inc': 'Netflix', 'uber technologies': 'Uber', 'lyft inc': 'Lyft',
+  'shopify inc': 'Shopify', 'doordash inc': 'DoorDash',
+  "mcdonald's corporation": "McDonald's", 'mcdonalds': "McDonald's",
+  'starbucks corporation': 'Starbucks', 'instacart': 'Instacart', 'maplebear': 'Instacart',
+};
+const _SFXRE = /[\s,]+(inc\.?|llc\.?|corp\.?|ltd\.?|co\.|plc\.?|group|holdings)\.?$/i;
+function normalizeCompany(raw) {
+  if (!raw) return raw;
+  const k = raw.toLowerCase().trim();
+  if (_ALIASES[k]) return _ALIASES[k];
+  const k2 = k.replace(_SFXRE, '').trim();
+  return _ALIASES[k2] || raw.trim();
+}
+
 // 240 searches across 12 batches of 20. 6 cron runs/day → all 12 batches covered in 2 days.
 // Adzuna free tier: 250 calls/day — 120/day (20×6) stays well within limit.
 // Each Adzuna call returns up to 50 jobs → ~6,000 new listings refreshed every 2 days.
@@ -351,7 +389,7 @@ async function fetchAdzuna(what, where, appId, appKey) {
     const data = await res.json();
     return (data.results || []).map(j => ({
       title: j.title || what,
-      company: j.company?.display_name || 'Unknown',
+      company: normalizeCompany(j.company?.display_name) || 'Unknown',
       location: j.location?.display_name || where,
       salary: formatSalary(j.salary_min, j.salary_max),
       description: (j.description || '').replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim().slice(0, 8000),
@@ -359,8 +397,8 @@ async function fetchAdzuna(what, where, appId, appKey) {
       source: 'Adzuna',
       type: j.contract_time === 'part_time' ? 'Part-time' : 'Full-time',
       level: inferLevel(j.title),
-      score: scoreJob(j.company?.display_name, j.salary_min),
-      waste_score: wasteScore(j.company?.display_name),
+      score: scoreJob(normalizeCompany(j.company?.display_name), j.salary_min),
+      waste_score: wasteScore(normalizeCompany(j.company?.display_name)),
       expires_at: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(),
     })).filter(j => j.company !== 'Unknown' && j.apply_url && j.description && j.description.length > 80);
   } catch (e) {

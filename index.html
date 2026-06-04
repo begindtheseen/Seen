@@ -1835,24 +1835,130 @@ const Agg={
   }
 };
 
-// ── REAL COMPANY DATA PIPELINE ───────────────────────────────────────────────
+// ── COMPANY NAME NORMALIZATION ────────────────────────────────────────────────
+// Maps known brand aliases / subsidiaries → canonical name so all reports,
+// jobs, and scores roll up under one record regardless of how the name was typed.
+const COMPANY_ALIASES = {
+  // Amazon family
+  'aws': 'Amazon', 'amazon.com': 'Amazon', 'amazon web services': 'Amazon',
+  'amazon fresh': 'Amazon', 'amazon logistics': 'Amazon', 'amazon prime video': 'Amazon',
+  'whole foods market': 'Amazon', 'whole foods': 'Amazon', 'zappos': 'Amazon',
+  'ring': 'Amazon', 'twitch': 'Amazon', 'audible': 'Amazon',
+  // Meta family
+  'facebook': 'Meta', 'fb': 'Meta', 'instagram': 'Meta', 'whatsapp': 'Meta',
+  'oculus': 'Meta', 'meta platforms': 'Meta', 'meta platforms inc': 'Meta',
+  // Google / Alphabet
+  'alphabet': 'Google', 'alphabet inc': 'Google', 'google llc': 'Google',
+  'youtube': 'Google', 'deepmind': 'Google', 'waymo': 'Google', 'waze': 'Google',
+  // Microsoft
+  'microsoft corp': 'Microsoft', 'microsoft corporation': 'Microsoft',
+  'azure': 'Microsoft', 'xbox': 'Microsoft', 'activision blizzard': 'Microsoft',
+  'github': 'GitHub',
+  // Apple
+  'apple inc': 'Apple', 'apple computer': 'Apple',
+  // LinkedIn
+  'linkedin corporation': 'LinkedIn', 'linkedin learning': 'LinkedIn',
+  // JPMorgan
+  'jp morgan': 'JPMorgan', 'j.p. morgan': 'JPMorgan', 'jpmorgan chase': 'JPMorgan',
+  'jpmorgan chase & co': 'JPMorgan', 'jpmorgan chase and co': 'JPMorgan',
+  // Goldman Sachs
+  'goldman sachs group': 'Goldman Sachs', 'goldman sachs & co': 'Goldman Sachs',
+  // Bank of America
+  'bank of america corp': 'Bank of America', 'bank of america corporation': 'Bank of America', 'bofa': 'Bank of America',
+  // Wells Fargo
+  'wells fargo bank': 'Wells Fargo', 'wells fargo & company': 'Wells Fargo',
+  // McKinsey
+  'mckinsey & company': 'McKinsey', 'mckinsey and company': 'McKinsey',
+  // UnitedHealth
+  'unitedhealth group': 'UnitedHealth', 'united health': 'UnitedHealth',
+  'united health group': 'UnitedHealth', 'optum': 'UnitedHealth',
+  // CVS
+  'cvs pharmacy': 'CVS Health', 'cvs caremark': 'CVS Health', 'cvs health corporation': 'CVS Health',
+  // Kaiser
+  'kaiser': 'Kaiser Permanente', 'kaiser permanente health plan': 'Kaiser Permanente',
+  // Walmart
+  'walmart inc': 'Walmart', 'wal-mart': 'Walmart', "sam's club": 'Walmart',
+  // Target
+  'target corporation': 'Target', 'target corp': 'Target',
+  // Costco
+  'costco wholesale': 'Costco', 'costco wholesale corporation': 'Costco',
+  // Salesforce
+  'salesforce inc': 'Salesforce', 'salesforce.com': 'Salesforce',
+  'slack': 'Salesforce', 'tableau': 'Salesforce', 'mulesoft': 'Salesforce',
+  // IBM
+  'ibm corporation': 'IBM', 'international business machines': 'IBM',
+  // Oracle
+  'oracle corporation': 'Oracle',
+  // Deloitte
+  'deloitte llp': 'Deloitte', 'deloitte & touche': 'Deloitte', 'deloitte consulting': 'Deloitte',
+  // Accenture
+  'accenture plc': 'Accenture',
+  // Defense
+  'lockheed martin corporation': 'Lockheed Martin',
+  'raytheon technologies': 'Raytheon', 'rtx': 'Raytheon', 'raytheon company': 'Raytheon',
+  'boeing company': 'Boeing', 'the boeing company': 'Boeing',
+  // Tech
+  'spacex': 'SpaceX', 'space exploration technologies': 'SpaceX',
+  'tesla inc': 'Tesla', 'tesla motors': 'Tesla',
+  'netflix inc': 'Netflix', 'uber technologies': 'Uber', 'lyft inc': 'Lyft',
+  'stripe inc': 'Stripe', 'shopify inc': 'Shopify', 'doordash inc': 'DoorDash',
+  'instacart': 'Instacart', 'maplebear': 'Instacart',
+  'chewy inc': 'Chewy', 'wayfair llc': 'Wayfair',
+  'airbnb inc': 'Airbnb', 'figma inc': 'Figma', 'notion labs': 'Notion',
+  'vercel inc': 'Vercel', 'openai': 'OpenAI',
+  // Food
+  "mcdonald's corporation": "McDonald's", 'mcdonalds': "McDonald's",
+  'starbucks corporation': 'Starbucks', 'starbucks corp': 'Starbucks',
+  // Staffing
+  'indeed.com': 'Indeed', 'indeed inc': 'Indeed',
+};
+const _CORP_SUFFIX = /[\s,]+(inc\.?|llc\.?|corp\.?|ltd\.?|co\.|plc\.?|group|holdings|enterprises|solutions|technologies|gmbh|s\.a\.|ag)\.?$/i;
+
+function normalizeCompanyName(raw) {
+  if (!raw) return raw;
+  const key2 = raw.toLowerCase().trim();
+  if (COMPANY_ALIASES[key2]) return COMPANY_ALIASES[key2];
+  const key1 = key2.replace(_CORP_SUFFIX, '').trim();
+  if (COMPANY_ALIASES[key1]) return COMPANY_ALIASES[key1];
+  return raw.trim(); // return as-is — don't change names we don't know about
+}
+
+// ── REAL COMPANY DATA PIPELINE ────────────────────────────────────────────────
 async function loadRealCompanyData(companyName, cityHint) {
   if (!db) return null;
   try {
-    // Fetch community reports first (fast, direct DB)
-    const { data: cos } = await db.from('companies').select('id').ilike('name', companyName).limit(1);
-    const coId = cos?.[0]?.id;
+    const canonical = normalizeCompanyName(companyName);
+    // Use first significant word for the DB search so we catch variants like
+    // "Amazon Web Services", "Amazon Fresh" when looking up "Amazon"
+    const searchWord = canonical.split(/\s+/)[0];
+
+    // Fetch all company records whose name contains the canonical brand word
+    const { data: cos } = await db.from('companies')
+      .select('id,name')
+      .ilike('name', `%${searchWord}%`)
+      .limit(20);
+
+    // Keep only records that normalize to the same canonical name
+    // e.g. "Amazon Web Services" → normalizeCompanyName → "Amazon" === "Amazon" ✓
+    const matchingIds = (cos || [])
+      .filter(c => normalizeCompanyName(c.name) === canonical)
+      .map(c => c.id)
+      .filter(Boolean);
+
     let reports = [];
-    if (coId) {
+    if (matchingIds.length > 0) {
       const { data: rpts } = await db.from('reports')
         .select('outcome,ghost_stage,rounds,wait_days,unpaid_work')
-        .eq('company_id', coId).eq('needs_review', false).limit(300);
+        .in('company_id', matchingIds)
+        .eq('needs_review', false)
+        .limit(300);
       reports = rpts || [];
     }
+
     const now = new Date().toISOString();
     const { data: jobs } = await db.from('jobs')
       .select('salary,source,score,waste_score')
-      .ilike('company', `%${companyName}%`)
+      .ilike('company', `%${canonical}%`)
       .gt('expires_at', now).limit(50);
 
     // If ≥3 community reports, use them — most accurate, no API needed
@@ -1866,7 +1972,7 @@ async function loadRealCompanyData(companyName, cityHint) {
       const r = await fetch('/api/company-score', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: companyName }),
+        body: JSON.stringify({ name: canonical }),
       });
       if (r.ok) {
         const d = await r.json();
@@ -2044,10 +2150,11 @@ function openCompanySearch(){
 }
 
 function openModal(name,loc){
+  const canonical=normalizeCompanyName(name);
   document.getElementById('modalOv').classList.add('open');
-  document.getElementById('mTitle').textContent=`Checking: ${name}${loc?' · '+loc:''}`;
+  document.getElementById('mTitle').textContent=`Checking: ${canonical}${loc?' · '+loc:''}`;
   document.getElementById('mBody').innerHTML=`<div class="loader"><div class="spinner"></div><div class="loader-txt">Aggregating${loc?' location-specific':''} data...</div></div>`;
-  runSearch(name,loc);
+  runSearch(canonical,loc);
 }
 
 async function runSearch(name,loc){
@@ -4703,7 +4810,7 @@ async function submitReport(){
   if(!co||!ti||!loc){showToast('Company, job title and location required.');return;}
   const rateCheck=Mod.rateCheck();if(!rateCheck.ok){showToast(rateCheck.msg);return;}
   const coCheck=Mod.check(co+' '+ti);if(!coCheck.ok){showToast(coCheck.msg);return;}
-  const safeCo=Mod.sanitize(co),safeTi=Mod.sanitize(ti),safeExp=exp?Mod.sanitize(exp):'';
+  const safeCo=Mod.sanitize(normalizeCompanyName(co)),safeTi=Mod.sanitize(ti),safeExp=exp?Mod.sanitize(exp):'';
   const btn=document.querySelector('.sub-btn');if(btn){btn.textContent='Submitting...';btn.disabled=true;}
   if(db){
     try{
