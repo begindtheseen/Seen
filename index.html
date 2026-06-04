@@ -2524,6 +2524,9 @@ function renderJobResults(jobs, l) {
           '<span class="jlc-mi">·</span><span class="jlc-mi" style="color:var(--blue)">' + (job.source||'Job board') + '</span>' +
         '</div>' +
       '</button>' +
+      '<div style="margin-bottom:.4rem">' +
+        '<button onclick="openModal(\'' + safeCompany + '\',\'' + safeLoc + '\')" style="display:block;width:100%;text-align:center;font-family:var(--mono);font-size:.72rem;font-weight:700;color:var(--amber);background:#ffb83012;padding:.5rem 0;border:1px solid #ffb83055;border-radius:8px;letter-spacing:.02em;cursor:pointer">🏢 Check ' + safeCompany + '</button>' +
+      '</div>' +
       '<div class="jlc-actions">' +
         '<button class="jlc-save" data-saved="' + (isSaved ? '1' : '0') + '" id="save_' + safeId + '" onclick="toggleSaveJob(\'' + safeId + '\',\'' + safeCompany + '\',\'' + safeTitle + '\',\'' + safeLoc + '\',' + score + ')">' + (isSaved ? '♥' : '♡') + '</button>' +
         '<button class="jlc-apply" onclick="' + applyAction + '">Apply &amp; Optimize →</button>' +
