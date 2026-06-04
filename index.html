@@ -4768,7 +4768,7 @@ async function openJobListing(jobId) {
       fetch('/api/job-insights', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ jobId: sid, job: title, company: co, jobDescription: desc })
+        body: JSON.stringify({ jobId: sid, job: title, company: co, jobDescription: desc, needsSummary: looksClipped })
       })
       .then(r => r.json())
       .then(data => {
