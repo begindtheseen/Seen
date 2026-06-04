@@ -85,16 +85,6 @@ JOB DESCRIPTION:\n${(jobDescription||'').slice(0,2500)}${background?'\nCANDIDATE
 JOB: ${job} at ${company}
 JOB DESCRIPTION:\n${(jobDescription||'').slice(0,2500)}${background?'\nCANDIDATE:\n'+background.slice(0,1000):''}`;
 
-    } else if (tool === 'job-insights') {
-      const { job, company, jobDescription } = body;
-      if (!job || !company || !jobDescription) return res.status(400).json({ error: 'Job, company, and job description required' });
-      systemPrompt = 'You are a job market analyst. Return ONLY valid JSON with no markdown.';
-      prompt = `Analyze this job posting. Return ONLY this JSON object:
-{"what_they_want":["<most important skill/trait>","<second>","<third>","<fourth>","<fifth>"],"hidden_requirements":["<unstated expectation>","<second>","<third>"],"insider_tip":"<1 sentence strategic advice for applicants>"}
-
-JOB: ${job} at ${company}
-JOB DESCRIPTION:\n${(jobDescription||'').slice(0,3000)}`;
-
     } else {
       return res.status(400).json({ error: 'Unknown tool: ' + tool });
     }

@@ -4712,11 +4712,15 @@ async function openJobListing(jobId) {
        <div style="font-size:.75rem;color:var(--muted);font-weight:300;line-height:1.65">Applied here? Share how it went — response rate, interview process, offer outcome. Help the community cut through the noise.</div>
      </div>`;
 
-  // AI insights — check localStorage cache first (3-day TTL), only hit API on cache miss
-  const _INSIGHTS_TTL = 3 * 24 * 60 * 60 * 1000;
+  // AI insights — L1: localStorage (24h), L2: DB via /api/job-insights (7d shared across all users)
+  const _INSIGHTS_L1_TTL = 24 * 60 * 60 * 1000;
   function _renderInsights(data) {
     const el = document.getElementById('jlInsightsContent');
-    if (!el || !data.what_they_want?.length) return;
+    if (!el) return;
+    if (!data.what_they_want?.length) {
+      el.innerHTML = `<div style="font-size:.75rem;color:var(--muted)">AI insights unavailable for this listing.</div>`;
+      return;
+    }
     let html = `<ul style="list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:.6rem">`;
     for (const item of data.what_they_want) {
       html += `<li style="display:flex;align-items:flex-start;gap:.55rem;font-size:.8rem;color:var(--sub);line-height:1.5"><span style="color:var(--green);font-size:.6rem;margin-top:.22rem;flex-shrink:0">▶</span>${item}</li>`;
@@ -4741,13 +4745,14 @@ async function openJobListing(jobId) {
   }
 
   if (desc && desc.length > 80) {
+    // L1: localStorage
     const cacheKey = 'ji_' + sid;
     let cached = null;
     try {
       const raw = localStorage.getItem(cacheKey);
       if (raw) {
-        const parsed = JSON.parse(raw);
-        if (Date.now() - parsed.ts < _INSIGHTS_TTL) cached = parsed.data;
+        const entry = JSON.parse(raw);
+        if (Date.now() - entry.ts < _INSIGHTS_L1_TTL) cached = entry.data;
         else localStorage.removeItem(cacheKey);
       }
     } catch(e) {}
@@ -4755,10 +4760,11 @@ async function openJobListing(jobId) {
     if (cached) {
       _renderInsights(cached);
     } else {
-      fetch('/api/resume', {
+      // L2: dedicated endpoint — checks DB first, generates on miss, stores for all users
+      fetch('/api/job-insights', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ tool: 'job-insights', job: title, company: co, jobDescription: desc })
+        body: JSON.stringify({ jobId: sid, job: title, company: co, jobDescription: desc })
       })
       .then(r => r.json())
       .then(data => {

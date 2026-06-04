@@ -1,5 +1,6 @@
 {
   "functions": {
+    "api/job-insights.js": { "maxDuration": 20 },
     "api/refresh-jobs.js": { "maxDuration": 60 },
     "api/fetch-location-jobs.js": { "maxDuration": 30 },
     "api/resume.js": { "maxDuration": 30 },
