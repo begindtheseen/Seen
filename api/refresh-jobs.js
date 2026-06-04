@@ -148,18 +148,106 @@ async function fetchAdzuna(what, where, appId, appKey) {
 }
 
 async function upsertJobs(jobs, supabaseUrl, serviceKey) {
-  if (!jobs.length) return { upserted: 0 };
-  const res = await fetch(`${supabaseUrl}/rest/v1/jobs`, {
+  if (!jobs.length) return { upserted: 0, rows: [] };
+  const res = await fetch(`${supabaseUrl}/rest/v1/jobs?select=id,title,company,description`, {
     method: 'POST',
     headers: {
       apikey: serviceKey,
       Authorization: `Bearer ${serviceKey}`,
       'Content-Type': 'application/json',
-      Prefer: 'resolution=merge-duplicates,return=minimal',
+      Prefer: 'resolution=merge-duplicates,return=representation',
     },
     body: JSON.stringify(jobs),
   });
-  return { upserted: jobs.length, ok: res.ok, status: res.status };
+  if (!res.ok) return { upserted: 0, rows: [] };
+  const rows = await res.json();
+  return { upserted: Array.isArray(rows) ? rows.length : 0, rows: Array.isArray(rows) ? rows : [] };
+}
+
+// Pre-generate insights for jobs that don't have them yet.
+// 5 concurrent Haiku calls, max 20 jobs per cron run (~8s total).
+// After the first pass the DB fills up and this becomes a near no-op.
+async function pregenInsights(jobs, supabaseUrl, serviceKey, anthropicKey) {
+  if (!jobs.length || !anthropicKey || !supabaseUrl || !serviceKey) return;
+
+  const eligible = jobs.filter(j => j.id && j.description && j.description.length > 80).slice(0, 20);
+  if (!eligible.length) return;
+
+  // Batch-check which job_ids already have valid cached insights
+  const idList = eligible.map(j => `"${j.id}"`).join(',');
+  let existingIds = new Set();
+  try {
+    const checkRes = await fetch(
+      `${supabaseUrl}/rest/v1/job_insights?job_id=in.(${idList})&expires_at=gt.${new Date().toISOString()}&select=job_id`,
+      { headers: { apikey: serviceKey, Authorization: `Bearer ${serviceKey}` } }
+    );
+    if (checkRes.ok) {
+      const existing = await checkRes.json();
+      existingIds = new Set((existing || []).map(r => String(r.job_id)));
+    }
+  } catch(e) { /* table may not exist yet — skip */ return; }
+
+  const needed = eligible.filter(j => !existingIds.has(String(j.id)));
+  if (!needed.length) return;
+
+  // Generate 5 at a time — fast, cheap, safe on rate limits
+  const CONCURRENCY = 5;
+  for (let i = 0; i < needed.length; i += CONCURRENCY) {
+    await Promise.all(needed.slice(i, i + CONCURRENCY).map(job => _generateOne(job, supabaseUrl, serviceKey, anthropicKey)));
+  }
+}
+
+async function _generateOne(job, supabaseUrl, serviceKey, anthropicKey) {
+  try {
+    const apiRes = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': anthropicKey,
+        'anthropic-version': '2023-06-01',
+      },
+      body: JSON.stringify({
+        model: 'claude-haiku-4-5-20251001',
+        max_tokens: 500,
+        system: 'You are a job market analyst. Return ONLY valid JSON with no markdown.',
+        messages: [{
+          role: 'user',
+          content: `Analyze this job posting. Return ONLY this JSON:
+{"what_they_want":["<skill/trait>","<2>","<3>","<4>","<5>"],"hidden_requirements":["<unstated expectation>","<2>","<3>"],"insider_tip":"<1 sentence strategic advice>"}
+
+JOB: ${job.title} at ${job.company}
+JOB DESCRIPTION:\n${(job.description || '').slice(0, 2000)}`
+        }]
+      })
+    });
+    if (!apiRes.ok) return;
+
+    const text = (await apiRes.json()).content?.filter(b => b.type === 'text').map(b => b.text).join('') || '';
+    const match = text.replace(/```json\n?/g, '').replace(/```\n?/g, '').match(/\{[\s\S]*\}/);
+    if (!match) return;
+    const parsed = JSON.parse(match[0]);
+    if (!parsed?.what_they_want?.length) return;
+
+    await fetch(`${supabaseUrl}/rest/v1/job_insights`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        apikey: serviceKey,
+        Authorization: `Bearer ${serviceKey}`,
+        Prefer: 'resolution=merge-duplicates',
+      },
+      body: JSON.stringify({
+        job_id: String(job.id),
+        what_they_want: parsed.what_they_want || [],
+        hidden_requirements: parsed.hidden_requirements || [],
+        insider_tip: parsed.insider_tip || '',
+        description_summary: '',
+        expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+      }),
+    });
+  } catch(e) {
+    console.error('pregen _generateOne:', e.message);
+  }
 }
 
 async function deleteExpired(supabaseUrl, serviceKey) {
@@ -212,12 +300,21 @@ export default async function handler(req, res) {
     );
     const allJobs = results.filter(r => r.status === 'fulfilled').flatMap(r => r.value);
 
-    // Upsert in batches of 25
+    // Upsert in batches of 25, collect returned rows for insight pre-gen
     const upsertResults = [];
     for (let i = 0; i < allJobs.length; i += 25) {
       const result = await upsertJobs(allJobs.slice(i, i + 25), SUPABASE_URL, SUPABASE_SERVICE_KEY);
       upsertResults.push(result);
     }
+
+    // Pre-generate insights for new/uncached jobs — eliminates thundering herd.
+    // Awaited with a 30s cap so cron stays well within 60s maxDuration.
+    const allRows = upsertResults.flatMap(r => r.rows || []);
+    const ANTHROPIC_KEY = process.env.ANTHROPIC_KEY;
+    await Promise.race([
+      pregenInsights(allRows, SUPABASE_URL, SUPABASE_SERVICE_KEY, ANTHROPIC_KEY),
+      new Promise(r => setTimeout(r, 30000)),
+    ]).catch(e => console.error('pregen error (non-fatal):', e.message));
 
     return res.status(200).json({
       ok: true,
