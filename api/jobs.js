@@ -33,6 +33,35 @@ export default async function handler(req, res) {
     const ANTHROPIC_KEY = process.env.ANTHROPIC_KEY;
     if (!ANTHROPIC_KEY) return res.status(500).json({ error: 'ANTHROPIC_KEY not configured', jobs: [] });
 
+    const SUPABASE_URL = process.env.SUPABASE_URL;
+    const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY;
+    const dbHeaders = { apikey: SUPABASE_SERVICE_KEY, Authorization: `Bearer ${SUPABASE_SERVICE_KEY}` };
+
+    // ── Server-side DB cache check — prevents duplicate Claude calls across all devices ──
+    if (SUPABASE_URL && SUPABASE_SERVICE_KEY) {
+      try {
+        const qPattern = encodeURIComponent('%' + query.toLowerCase() + '%');
+        const cacheRes = await fetch(
+          `${SUPABASE_URL}/rest/v1/jobs?search_query=ilike.${qPattern}&expires_at=gt.${new Date().toISOString()}&limit=10`,
+          { headers: dbHeaders }
+        );
+        if (cacheRes.ok) {
+          const cached = await cacheRes.json();
+          if (cached?.length >= 5) {
+            console.log(`CACHE HIT: "${query}" @ "${loc}" — ${cached.length} results from DB`);
+            const jobs = cached.map(j => ({
+              title: j.title, company: j.company, location: j.location || loc,
+              salary: j.salary, url: j.apply_url, description: j.description,
+              type: j.type || 'Full-time', level: j.level || 'Mid level',
+              source: j.source || 'Seen', score: j.score || 65, waste_score: j.waste_score || 25,
+            }));
+            return res.status(200).json({ ok: true, jobs, query, location: loc, _src: 'cache' });
+          }
+        }
+      } catch(e) { console.warn('Cache check error:', e.message); }
+      console.log(`CACHE MISS: "${query}" @ "${loc}" — calling Claude API`);
+    }
+
     let apiRes;
     for (let attempt = 0; attempt < 3; attempt++) {
       if (attempt > 0) {
@@ -56,8 +85,9 @@ export default async function handler(req, res) {
           messages: [{ role: 'user', content: userPrompt }]
         })
       });
-      if (apiRes.status !== 429) break;
+      if (apiRes.status !== 429 && apiRes.status !== 529) break;
     }
+    console.log(`API CALLED: "${query}" @ "${loc}"`);
 
     if (!apiRes.ok) {
       const errText = await apiRes.text();
@@ -79,8 +109,6 @@ export default async function handler(req, res) {
     jobs.sort((a, b) => b.score - a.score);
 
     // Persist all results to Supabase — fire and forget, don't block the response
-    const SUPABASE_URL = process.env.SUPABASE_URL;
-    const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY;
     if (SUPABASE_URL && SUPABASE_SERVICE_KEY && jobs.length) {
       const expires = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
       const rows = jobs.map(j => ({
@@ -107,7 +135,8 @@ export default async function handler(req, res) {
           Prefer: 'resolution=merge-duplicates,return=minimal',
         },
         body: JSON.stringify(rows),
-      }).catch(e => console.warn('jobs DB save:', e.message));
+      }).then(() => console.log(`CACHE SAVED: "${query}" @ "${loc}" — ${jobs.length} jobs`))
+        .catch(e => console.warn('jobs DB save:', e.message));
     }
 
     return res.status(200).json({ ok: true, jobs, query, location: loc });

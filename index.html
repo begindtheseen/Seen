@@ -312,7 +312,8 @@ nav{position:fixed;top:0;left:0;right:0;z-index:500;height:58px;display:flex;ali
 .jlc-apply:hover{opacity:.88}
 .jlc-save{background:none;border:1px solid var(--line2);color:var(--muted);border-radius:8px;padding:.6rem .75rem;font-size:.8rem;cursor:pointer;flex-shrink:0;transition:all .15s}
 .jlc-save:hover{border-color:var(--green);color:var(--green)}
-.jlc-save[data-saved="1"]{color:var(--green);border-color:var(--green)}
+.jlc-save[data-saved="1"]{background:rgba(255,59,92,.13);color:#ff3b5c;border-color:#ff3b5c}
+.jlc-save[data-saved="1"]:hover{background:rgba(255,59,92,.22);color:#ff3b5c;border-color:#ff3b5c}
 .jlc-waste-badge{font-family:var(--mono);font-size:.58rem}
 
 /* ═══ DEMAND MAP ═══ */
@@ -1616,7 +1617,13 @@ const Auth = {
     if(!db) return;
     try {
       const { data: { session } } = await db.auth.getSession();
-      if(session?.user) { this._user = session.user; await this.loadProfile(); }
+      if(session?.user) {
+        this._user = session.user;
+        await this.loadProfile();
+        // Sync cross-device data for existing sessions (SIGNED_IN event only fires on new logins)
+        SavedJobs.syncFromDb().catch(()=>{});
+        AppStore.syncFromDb().catch(()=>{});
+      }
       db.auth.onAuthStateChange(async (event, session) => {
 
         if(event === 'PASSWORD_RECOVERY') {
@@ -2031,7 +2038,7 @@ async function searchJobs(query, location) {
         }
       }
       const { data: cached } = await dbQuery;
-      if (cached && cached.length >= 5) {
+      if (cached && cached.length >= 3) {
         const jobs = cached.map(_normalizeDbJob);
         JOBS.splice(0, JOBS.length, ...jobs, ...FALLBACK_JOBS);
         if (countEl) countEl.textContent = `${jobs.length} positions${l ? ' near ' + l : ''}`;
@@ -5722,7 +5729,7 @@ const ResumeStore = {
   },
 
   async load() {
-    // Try DB-backed profile first
+    // 1. In-memory profile (fastest — already fetched from DB)
     if (db && Auth.isLoggedIn() && Auth._profile?.resume_text) {
       return {
         text: Auth._profile.resume_text,
@@ -5730,7 +5737,27 @@ const ResumeStore = {
         wordCount: Auth._profile.resume_word_count || 0
       };
     }
-    // Fall back to localStorage
+    // 2. Re-fetch profile from DB — handles cross-device case where profile was loaded
+    //    before resume was uploaded on another device
+    if (db && Auth.isLoggedIn()) {
+      try {
+        const uid = Auth._user?.id;
+        if (uid) {
+          const { data } = await db.from('profiles').select('resume_text,resume_file_name,resume_word_count').eq('id', uid).single();
+          if (data?.resume_text) {
+            if (Auth._profile) {
+              Auth._profile.resume_text = data.resume_text;
+              Auth._profile.resume_file_name = data.resume_file_name;
+              Auth._profile.resume_word_count = data.resume_word_count;
+            }
+            localStorage.setItem(this._key(), data.resume_text);
+            localStorage.setItem(this._metaKey(), JSON.stringify({ fileName: data.resume_file_name || 'Resume', wordCount: data.resume_word_count || 0 }));
+            return { text: data.resume_text, fileName: data.resume_file_name || 'Resume', wordCount: data.resume_word_count || 0 };
+          }
+        }
+      } catch(e) {}
+    }
+    // 3. localStorage fallback
     const text = localStorage.getItem(this._key());
     if (text) {
       const meta = JSON.parse(localStorage.getItem(this._metaKey()) || '{}');
