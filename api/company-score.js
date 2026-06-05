@@ -221,9 +221,11 @@ Return ONLY this JSON:
     };
     try {
       // Try with web_reviews column; fall back without it if column doesn't exist yet
+      // Use merge-duplicates so force_refresh actually updates existing cached rows
+      const prefer = force_refresh ? 'resolution=merge-duplicates,return=minimal' : 'resolution=ignore-duplicates,return=minimal';
       let saveRes = await fetch(`${SUPABASE_URL}/rest/v1/company_scores`, {
         method: 'POST',
-        headers: { ...dbHeaders, Prefer: 'resolution=ignore-duplicates,return=minimal' },
+        headers: { ...dbHeaders, Prefer: prefer },
         body: JSON.stringify({ ...rowBase, web_reviews: reviews }),
       });
       if (!saveRes.ok && saveRes.status === 400) {
@@ -232,7 +234,7 @@ Return ONLY this JSON:
           console.warn('COMPANY SCORE: web_reviews column missing, retrying without it');
           saveRes = await fetch(`${SUPABASE_URL}/rest/v1/company_scores`, {
             method: 'POST',
-            headers: { ...dbHeaders, Prefer: 'resolution=ignore-duplicates,return=minimal' },
+            headers: { ...dbHeaders, Prefer: prefer },
             body: JSON.stringify(rowBase),
           });
         }

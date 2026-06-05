@@ -19,7 +19,8 @@
     "api/jobs.js": { "maxDuration": 60 },
     "api/user-sync.js": { "maxDuration": 15 },
     "api/company-score.js": { "maxDuration": 45 },
-    "api/moderate-report.js": { "maxDuration": 20 }
+    "api/moderate-report.js": { "maxDuration": 20 },
+    "api/populate-reviews.js": { "maxDuration": 60 }
   },
   "crons": [
     { "path": "/api/refresh-jobs", "schedule": "0 2 * * *" },
