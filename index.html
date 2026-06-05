@@ -3142,7 +3142,7 @@ async function viewCompany(id,name,loc){
     const ago=dt=>dt?Math.floor((Date.now()-new Date(dt))/86400000):null;
     let show=allReports.map(r=>({
       role:r.role||'Unknown role',resp:r.outcome||'waiting',stage:r.ghost_stage,
-      rounds:r.rounds,loc:r.company_locations?.city||'',text:r.report_text||'',
+      rounds:r.rounds,loc:r.city||r.company_locations?.city||'',text:r.report_text||'',
       src:r.platform||'Direct',days:ago(r.created_at),
     }));
     if(cityFilter)show=show.filter(r=>!r.loc||r.loc.toLowerCase().includes(cityFilter.toLowerCase()));
