@@ -1592,6 +1592,7 @@ nav{position:fixed;top:0;left:0;right:0;z-index:500;height:58px;display:flex;ali
       <button class="m-cl" onclick="closeApplyModalDirect()">✕</button>
     </div>
     <div class="m-body" id="applyModalBody"></div>
+    <button id="jdCheckCoBtn" type="button" onclick="" style="display:none;width:calc(100% - 3rem);margin:0 1.5rem .75rem;text-align:center;font-family:var(--mono);font-size:.78rem;font-weight:700;color:var(--amber);background:#ffb83015;padding:.65rem 0;border:1px solid #ffb83060;border-radius:8px;letter-spacing:.02em;cursor:pointer">🏢 Check company — ghost rate, reviews &amp; score →</button>
     <div class="m-foot" id="applyModalFoot" style="display:none"></div>
   </div>
 </div>
@@ -3865,6 +3866,8 @@ function closeApplyModalDirect() {
   document.getElementById('applyModal').classList.remove('open');
   const foot = document.getElementById('applyModalFoot');
   if (foot) foot.style.display = 'none';
+  const ck = document.getElementById('jdCheckCoBtn');
+  if (ck) ck.style.display = 'none';
   window._jdJob = null;
 }
 
@@ -5124,14 +5127,20 @@ function openJobDetailModal(jobId) {
   const coEsc = co.replace(/'/g,"\\'");
   const locEsc = loc.replace(/'/g,"\\'");
 
-  // Sticky footer — save + apply buttons unchanged
+  // Wire static check company button (always in DOM, just update text + onclick)
+  const jdCheck = document.getElementById('jdCheckCoBtn');
+  if (jdCheck) {
+    jdCheck.style.display = 'block';
+    jdCheck.textContent = `🏢 Check ${co || 'company'} — ghost rate, reviews & score →`;
+    jdCheck.onclick = () => { closeApplyModalDirect(); openModal(co, loc); };
+  }
+
+  // Footer — view full listing + save + apply
   const saved = SavedJobs.isSaved(sid);
   const foot = document.getElementById('applyModalFoot');
-  foot.style.cssText = 'display:flex;flex-direction:column;gap:.5rem;padding:1rem 1.5rem;border-top:1px solid var(--line);flex-shrink:0;background:var(--card);border-radius:0 0 16px 16px';
+  foot.style.cssText = 'display:flex;flex-direction:column;gap:.5rem;padding:.75rem 1.5rem 1.25rem;border-top:1px solid var(--line);flex-shrink:0;background:var(--card);border-radius:0 0 16px 16px';
   foot.innerHTML =
-    `<button type="button" onclick="openModal('${coEsc}','${locEsc}')"
-       style="display:block;width:100%;text-align:center;font-family:var(--mono);font-size:.75rem;font-weight:700;color:var(--amber);background:#ffb83012;padding:.6rem 0;border:1px solid #ffb83055;border-radius:8px;letter-spacing:.02em;cursor:pointer">🏢 Check ${co.replace(/</g,'&lt;')} — ghost rate, reviews &amp; score →</button>
-     <button type="button" onclick="openJobListing('${sid}')"
+    `<button type="button" onclick="openJobListing('${sid}')"
        style="display:block;width:100%;text-align:center;font-family:var(--mono);font-size:.68rem;color:var(--green);background:none;padding:.4rem 0;border:1px solid var(--line2);border-radius:8px;letter-spacing:.02em;cursor:pointer">View full listing + AI insights →</button>
      <div style="display:flex;gap:.5rem">
        <button id="jdSaveBtn" type="button" data-saved="${saved?'1':'0'}" onclick="jdSaveToggle(this)"
@@ -5444,6 +5453,8 @@ function openApplyModal(jobId, company, role, location, score, risk, waste, appl
 
   document.getElementById('applyModalTitle').textContent = role;
   document.getElementById('applyModalSub').textContent = company + ' · ' + location;
+  const _jdCk = document.getElementById('jdCheckCoBtn');
+  if (_jdCk) _jdCk.style.display = 'none';
 
   // Not logged in — prompt sign in
   if (!Auth.isLoggedIn()) {
