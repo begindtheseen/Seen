@@ -1963,19 +1963,6 @@ async function loadRealCompanyData(companyName, cityHint) {
     // "Amazon Web Services", "Amazon Fresh" when looking up "Amazon"
     const searchWord = canonical.split(/\s+/)[0];
 
-    // Fetch all company records whose name contains the canonical brand word
-    const { data: cos } = await db.from('companies')
-      .select('id,name')
-      .ilike('name', `%${searchWord}%`)
-      .limit(20);
-
-    // Keep only records that normalize to the same canonical name
-    // e.g. "Amazon Web Services" → normalizeCompanyName → "Amazon" === "Amazon" ✓
-    const matchingIds = (cos || [])
-      .filter(c => normalizeCompanyName(c.name) === canonical)
-      .map(c => c.id)
-      .filter(Boolean);
-
     // Fetch reports via server API (bypasses RLS on reports table)
     let reports = [];
     try {
