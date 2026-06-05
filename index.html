@@ -1592,7 +1592,7 @@ nav{position:fixed;top:0;left:0;right:0;z-index:500;height:58px;display:flex;ali
       <button class="m-cl" onclick="closeApplyModalDirect()">✕</button>
     </div>
     <div class="m-body" id="applyModalBody"></div>
-    <button id="jdCheckCoBtn" type="button" onclick="" style="display:none;width:calc(100% - 3rem);margin:0 1.5rem .75rem;text-align:center;font-family:var(--display);font-size:.85rem;font-weight:800;color:#000;background:var(--amber);padding:.7rem 0;border:none;border-radius:8px;cursor:pointer">🏢 Check company →</button>
+    <button id="jdCheckCoBtn" type="button" onclick="" style="display:none;width:calc(100% - 3rem);margin:0 1.5rem .5rem;text-align:left;font-family:var(--mono);font-size:.65rem;color:var(--amber);background:none;border:none;padding:.25rem 0;cursor:pointer;opacity:.85">🏢 Check company →</button>
     <div class="m-foot" id="applyModalFoot" style="display:none"></div>
   </div>
 </div>
@@ -1621,7 +1621,7 @@ nav{position:fixed;top:0;left:0;right:0;z-index:500;height:58px;display:flex;ali
   </div>
   <div style="position:sticky;bottom:0;background:var(--bg);border-top:1px solid var(--line2);padding:.9rem 1rem;z-index:10">
     <div style="max-width:720px;margin:0 auto;display:flex;flex-direction:column;gap:.5rem">
-      <button id="jlCheckCoBtn" type="button" onclick="" style="display:block;width:100%;text-align:center;font-family:var(--display);font-size:.85rem;font-weight:800;color:#000;background:var(--amber);padding:.65rem 0;border:none;border-radius:8px;cursor:pointer">🏢 Check company →</button>
+      <button id="jlCheckCoBtn" type="button" onclick="" style="display:block;width:100%;text-align:center;font-family:var(--mono);font-size:.65rem;color:var(--amber);background:none;border:none;padding:.25rem 0 .5rem;cursor:pointer;opacity:.85">🏢 Check company →</button>
       <div style="display:flex;gap:.75rem">
         <button id="jlSaveBtn" type="button" data-saved="0" onclick="jlSaveToggle(this)" style="background:none;border:1px solid var(--line2);border-radius:8px;padding:.65rem 1rem;font-size:1.1rem;cursor:pointer;color:var(--muted);flex-shrink:0;transition:all .15s">♡</button>
         <button type="button" onclick="jlApplyClick()" style="flex:1;background:var(--green);color:var(--ink);border:none;border-radius:8px;padding:.65rem 1rem;font-family:var(--display);font-weight:800;font-size:.85rem;cursor:pointer">Apply &amp; Optimize →</button>
@@ -2525,7 +2525,7 @@ function renderJobResults(jobs, l) {
           '<span class="jlc-mi">·</span><span class="jlc-mi" style="color:var(--blue)">' + (job.source||'Job board') + '</span>' +
         '</div>' +
       '</button>' +
-      '<button onclick="openModal(\'' + safeCompany + '\',\'' + safeLoc + '\')" style="display:block;width:100%;text-align:center;font-family:var(--display);font-size:.82rem;font-weight:800;color:#000;background:var(--amber);padding:.6rem 1rem;border:none;border-radius:8px;cursor:pointer;margin-bottom:.4rem">🏢 Check ' + safeCompany + ' →</button>' +
+      '<button onclick="openModal(\'' + safeCompany + '\',\'' + safeLoc + '\')" style="display:block;width:100%;text-align:left;font-family:var(--mono);font-size:.62rem;color:var(--amber);background:none;border:none;padding:.1rem 0 .55rem;cursor:pointer;opacity:.8">🏢 Check ' + safeCompany + ' →</button>' +
       '<div class="jlc-actions">' +
         '<button class="jlc-save" data-saved="' + (isSaved ? '1' : '0') + '" id="save_' + safeId + '" onclick="toggleSaveJob(\'' + safeId + '\',\'' + safeCompany + '\',\'' + safeTitle + '\',\'' + safeLoc + '\',' + score + ')">' + (isSaved ? '♥' : '♡') + '</button>' +
         '<button class="jlc-apply" onclick="' + applyAction + '">Apply &amp; Optimize →</button>' +
