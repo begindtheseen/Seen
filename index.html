@@ -3168,7 +3168,7 @@ async function viewCompany(id,name,loc){
               src:r.platform||'Direct',
               days:ago(r.created_at),
             }));
-            if(loc)show=show.filter(r=>!r.loc||r.loc.toLowerCase().includes(loc.toLowerCase()));
+            // Don't filter by location — show all reports for the company (loc shown on each card)
           }
         }
       }catch(e){console.warn('reports load:',e);}
@@ -3176,7 +3176,7 @@ async function viewCompany(id,name,loc){
     document.getElementById('ctc-reports').innerHTML=show.length?
       `<div style="font-family:var(--mono);font-size:.58rem;color:var(--muted);margin-bottom:.85rem">${show.length} report${show.length!==1?'s':''} from real applicants · anonymous · verified</div>`+
       show.map(r=>`<div class="rcard"><div class="rc-hd"><div class="rc-av">${(r.role||'?')[0].toUpperCase()}</div><div style="flex:1"><div class="rc-role">${r.role.replace(/</g,'&lt;')}${r.stage?` <span style="color:var(--muted)">· ghosted at ${r.stage}</span>`:''}</div><div class="rc-meta">${r.loc?'📍 '+r.loc.replace(/</g,'&lt;')+' · ':''}${r.rounds?r.rounds+' round'+(r.rounds!==1?'s':'')+(r.days!==null?' · ':' '):''}${r.days!==null?(r.days===0?'today':r.days+'d ago'):''}</div></div><span class="vibe ${ocC[r.resp]||'v-n'}">${ocL[r.resp]||r.resp}</span></div>${r.text?`<div class="rc-body">${r.text.replace(/</g,'&lt;').replace(/>/g,'&gt;')}</div>`:''}<div class="rc-footer"><span style="font-family:var(--mono);font-size:.56rem;color:var(--muted)">via</span><span class="vibe v-n" style="font-size:.55rem">${r.src}</span></div></div>`).join(''):
-      `<div style="text-align:center;padding:2.5rem;color:var(--muted);font-family:var(--mono);font-size:.7rem">No reports yet${loc?' for '+loc:''}.<br><br><button class="btn btn-ghost" onclick="prefillReport('${normalizeCompanyName(co?.name||name)}');go('report')">Be the first to report →</button></div>`;
+      `<div style="text-align:center;padding:2.5rem;color:var(--muted);font-family:var(--mono);font-size:.7rem">No reports yet.<br><br><button class="btn btn-ghost" onclick="prefillReport('${normalizeCompanyName(co?.name||name)}');go('report')">Be the first to report →</button></div>`;
   })();
 
   // Locations tab
