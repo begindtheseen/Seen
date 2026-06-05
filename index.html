@@ -5402,6 +5402,7 @@ function openJobDetailModal(jobId) {
          style="flex:1;background:var(--green);color:var(--ink);border:none;border-radius:8px;padding:.65rem 1rem;font-family:var(--display);font-weight:800;font-size:.82rem;cursor:pointer">Apply &amp; Optimize →</button>
      </div>`;
 
+  _applyModalGlow(risk);
   document.getElementById('applyModal').classList.add('open');
 }
 
@@ -5700,6 +5701,12 @@ function jlApplyClick() {
   setTimeout(() => openApplyModal(sid, co, title, loc, score, risk, waste, email), 50);
 }
 
+function _applyModalGlow(risk) {
+  const c = risk==='safe' ? '16,185,129' : risk==='danger' ? '239,68,68' : '245,158,11';
+  const el = document.querySelector('#applyModal .modal');
+  if (el) el.style.boxShadow = `0 0 70px rgba(${c},0.32),0 0 140px rgba(${c},0.12),0 40px 120px rgba(0,0,0,0.75)`;
+}
+
 function openApplyModal(jobId, company, role, location, score, risk, waste, applyEmail) {
   const job = JOBS.find(j => j.id == jobId);
   const wl = Score.wasteLabel(waste);
@@ -5723,6 +5730,7 @@ function openApplyModal(jobId, company, role, location, score, risk, waste, appl
         <button class="btn btn-ghost" style="width:100%;justify-content:center" onclick="proceedAsGuest('${jobId}','${company}','${role}','${location}',${score},'${risk}',${waste},'${applyEmail||''}')">Continue as guest</button>
       </div>
       <div style="font-family:var(--mono);font-size:.6rem;color:var(--muted);text-align:center;line-height:1.65">Guest applications are sent but not tracked.<br>Sign up free — takes 60 seconds.</div>`;
+    _applyModalGlow(risk);
     document.getElementById('applyModal').classList.add('open');
     return;
   }
@@ -5748,6 +5756,7 @@ function openApplyModal(jobId, company, role, location, score, risk, waste, appl
     </div>
     <button class="btn btn-ghost" style="width:100%;justify-content:center;font-size:.78rem" onclick="closeApplyModalDirect()">Cancel</button>`;
 
+  _applyModalGlow(risk);
   document.getElementById('applyModal').classList.add('open');
 }
 
