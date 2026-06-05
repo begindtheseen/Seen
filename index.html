@@ -2038,7 +2038,8 @@ function computeScoresFromData(reports, jobs, webScore) {
 
   // Priority 2: Web research — Claude searched Reddit/Glassdoor/Blind for real posts
   if (webScore) {
-    return { ...webScore, report_count: n > 0 ? n : webScore.report_count };
+    // report_count = actual Seen DB reports only (not AI estimate)
+    return { ...webScore, report_count: n, web_report_count: webScore.report_count };
   }
 
   // Priority 3: Job listing averages — rough signal only
@@ -3106,6 +3107,10 @@ async function viewCompany(id,name,loc){
         const _word=_canon.split(/\s+/)[0];
         const{data:_cos}=await db.from('companies').select('id,name').ilike('name',`%${_word}%`).limit(20);
         const _ids=(_cos||[]).filter(c=>normalizeCompanyName(c.name)===_canon).map(c=>c.id).filter(Boolean);
+        // If company not found, create a stub so submitted reports can link to it
+        if(_ids.length===0){
+          try{const{data:_stub}=await db.from('companies').insert({name:_canon,logo_letter:_canon[0]?.toUpperCase()||'?'}).select('id').single();if(_stub?.id)_ids.push(_stub.id);}catch(_e){}
+        }
         if(_ids.length>0){
           const ago=dt=>dt?Math.floor((Date.now()-new Date(dt))/86400000):null;
           const{data}=await db.from('reports')
@@ -3179,10 +3184,11 @@ async function viewCompany(id,name,loc){
     const wc2 = (rsc.avg_wait_days || 0) > 21 ? 'var(--amber)' : 'var(--text)';
     const wac = (rsc.waste || 0) > 60 ? 'var(--red)' : (rsc.waste || 0) > 30 ? 'var(--amber)' : 'var(--green)';
     const dq = rsc.data_quality;
-    const dqBadge = dq === 'strong' ? `<span class="vibe v-g" style="font-size:.52rem;margin-top:.25rem">✓ ${rsc.report_count} real reports</span>`
-      : dq === 'moderate' ? `<span class="vibe v-y" style="font-size:.52rem;margin-top:.25rem">~ ${rsc.report_count} reports</span>`
+    const dqBadge = dq === 'strong' ? `<span class="vibe v-g" style="font-size:.52rem;margin-top:.25rem">✓ ${rsc.report_count} verified reports</span>`
+      : dq === 'moderate' ? `<span class="vibe v-y" style="font-size:.52rem;margin-top:.25rem">~ ${rsc.report_count} community reports</span>`
       : dq === 'limited' ? `<span class="vibe v-y" style="font-size:.52rem;margin-top:.25rem">~ ${rsc.report_count} reports — add yours</span>`
-      : `<span class="vibe v-n" style="font-size:.52rem;margin-top:.25rem">Job listing data</span>`;
+      : rsc.data_source === 'community' ? `<span class="vibe v-y" style="font-size:.52rem;margin-top:.25rem">Web research · be first to report</span>`
+      : `<span class="vibe v-n" style="font-size:.52rem;margin-top:.25rem">Job listing data only</span>`;
 
     document.getElementById('coSB').innerHTML = `
       <div class="co-grade-bar ${rr2}">
@@ -3203,7 +3209,7 @@ async function viewCompany(id,name,loc){
       <div class="co-m ${gh2 ? 'co-alarm' : ''}"><span class="co-mn" style="color:${gc2}">${gh2 ? '👻 ' : ''}${gp2 !== null ? gp2 + '%' : '—'}</span><span class="co-ml">Ghost rate</span></div>
       <div class="co-m"><span class="co-mn" style="color:${wc2}">${rsc.avg_wait_days !== null ? rsc.avg_wait_days + 'd' : '—'}</span><span class="co-ml">Avg wait</span></div>
       <div class="co-m"><span class="co-mn" style="color:${wac}">${rsc.waste !== null ? rsc.waste + '%' : '—'}</span><span class="co-ml">Waste risk</span></div>
-      <div class="co-m"><span class="co-mn">${rsc.report_count}</span><span class="co-ml">Reports</span></div>`;
+      <div class="co-m"><span class="co-mn">${rsc.report_count > 0 ? rsc.report_count : (rsc.web_report_count ? '~'+rsc.web_report_count : '0')}</span><span class="co-ml">${rsc.report_count > 0 ? 'Reports' : rsc.web_report_count ? 'Web est.' : 'Reports'}</span></div>`;
 
     document.getElementById('coTags').innerHTML = [
       locSc ? `<span class="vibe v-b">📍 Location-specific</span>` : '',
@@ -3213,6 +3219,7 @@ async function viewCompany(id,name,loc){
       dq === 'strong' ? `<span class="vibe v-g">✓ ${rsc.report_count} verified reports</span>`
         : dq === 'moderate' ? `<span class="vibe v-y">~ ${rsc.report_count} community reports</span>`
         : dq === 'limited' ? `<span class="vibe v-y">~ ${rsc.report_count} reports — add yours</span>`
+        : rsc.web_report_count ? `<span class="vibe v-n">Web research · be first to report on Seen</span>`
         : `<span class="vibe v-n">Job listing data only</span>`,
       ...vibeList.slice(0, 2).map(v => `<span class="vibe v-n">${v}</span>`),
     ].filter(Boolean).join('');
@@ -4940,9 +4947,12 @@ async function submitReport(){
 
   if(db){
     try{
-      let{data:cos}=await db.from('companies').select('id').ilike('name',safeCo).limit(1);
-      let cid=cos?.[0]?.id;
-      if(!cid){const{data:nc}=await db.from('companies').insert({name:safeCo,logo_letter:safeCo[0].toUpperCase()}).select('id').single();cid=nc?.id;}
+      // Use substring ILIKE + normalization filter (same as display query) for robust matching
+      const _coWord=safeCo.split(/\s+/)[0];
+      let{data:cosList}=await db.from('companies').select('id,name').ilike('name',`%${_coWord}%`).limit(20);
+      let cid=(cosList||[]).find(c=>normalizeCompanyName(c.name)===safeCo)?.id
+            ||(cosList||[]).find(c=>c.name.toLowerCase()===safeCo.toLowerCase())?.id;
+      if(!cid){const{data:nc}=await db.from('companies').insert({name:safeCo,logo_letter:safeCo[0]?.toUpperCase()||'?'}).select('id').single();cid=nc?.id;}
       let{data:locs}=await db.from('company_locations').select('id').eq('company_id',cid).ilike('city',finalLoc).limit(1);
       let lid=locs?.[0]?.id;
       if(!lid){const{data:nl}=await db.from('company_locations').insert({company_id:cid,city:finalLoc}).select('id').single();lid=nl?.id;}
