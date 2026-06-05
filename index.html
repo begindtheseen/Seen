@@ -2240,7 +2240,7 @@ async function runSearch(name,loc){
     <div style="display:flex;gap:.45rem;margin-top:1rem">
       <button class="btn btn-solid" style="flex:1;justify-content:center;font-size:.75rem" onclick="closeModDirect();viewCompany('${known?.id||'x'}','${known?.name||name}','${loc}')">Full report →</button>
       <button class="btn btn-ghost" style="padding:.65rem .9rem;font-size:.75rem;flex-shrink:0" onclick="shareCompanyReport('${(name||'').replace(/'/g,"\\'")}')">↗ Share</button>
-      <button class="btn btn-ghost" style="padding:.65rem .9rem;font-size:.75rem;flex-shrink:0" onclick="closeModDirect();go('report')">+ Report</button>
+      <button class="btn btn-ghost" style="padding:.65rem .9rem;font-size:.75rem;flex-shrink:0" onclick="closeModDirect();prefillReport('${(name||'').replace(/'/g,"\\'")}');go('report')">+ Report</button>
     </div>
     ${!Auth.isLoggedIn()?`<div style="margin-top:.85rem;padding:.65rem .95rem;background:var(--raised);border-radius:9px;border:1px solid var(--line2);display:flex;align-items:center;justify-content:space-between;gap:.75rem">
       <div>
@@ -3034,13 +3034,13 @@ async function viewCompany(id,name,loc){
         <div style="display:flex;gap:.3rem;flex-wrap:wrap">${vibeList.map(v=>`<span class="vibe v-n">${v}</span>`).join('')}</div>
         <div style="margin-top:1rem;display:flex;flex-direction:column;gap:.4rem">
           <button class="btn btn-ghost" style="width:100%;justify-content:center;font-size:.72rem" onclick="go('resume')">⚡ Analyze my resume for this role</button>
-          <button class="btn btn-ghost" style="width:100%;justify-content:center;font-size:.72rem" onclick="go('report')">+ Report your experience</button>
+          <button class="btn btn-ghost" style="width:100%;justify-content:center;font-size:.72rem" onclick="prefillReport('${name}');go('report')">+ Report your experience</button>
         </div>
       </div>
     </div>
     <div style="background:var(--raised);border-radius:7px;padding:.7rem .95rem;font-family:var(--mono);font-size:.58rem;color:var(--muted);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.5rem">
       <span>📊 Based on ${sc.report_count||0} verified reports · Public hiring data · Seen analysis</span>
-      <a href="#" onclick="go('report');return false" style="color:var(--green);text-decoration:none;white-space:nowrap">+ Add your report →</a>
+      <a href="#" onclick="prefillReport('${name}');go('report');return false" style="color:var(--green);text-decoration:none;white-space:nowrap">+ Add your report →</a>
     </div>`;
 
   // Process score tab — unique to Seen
@@ -3104,7 +3104,7 @@ async function viewCompany(id,name,loc){
     document.getElementById('ctc-reports').innerHTML=show.length?
       `<div style="font-family:var(--mono);font-size:.58rem;color:var(--muted);margin-bottom:.85rem">${show.length} report${show.length!==1?'s':''} from real applicants · anonymous · verified</div>`+
       show.map(r=>`<div class="rcard"><div class="rc-hd"><div class="rc-av">${(r.role||'?')[0].toUpperCase()}</div><div style="flex:1"><div class="rc-role">${r.role.replace(/</g,'&lt;')}${r.stage?` <span style="color:var(--muted)">· ghosted at ${r.stage}</span>`:''}</div><div class="rc-meta">${r.loc?'📍 '+r.loc.replace(/</g,'&lt;')+' · ':''}${r.rounds?r.rounds+' round'+(r.rounds!==1?'s':'')+(r.days!==null?' · ':' '):''}${r.days!==null?(r.days===0?'today':r.days+'d ago'):''}</div></div><span class="vibe ${ocC[r.resp]||'v-n'}">${ocL[r.resp]||r.resp}</span></div>${r.text?`<div class="rc-body">${r.text.replace(/</g,'&lt;').replace(/>/g,'&gt;')}</div>`:''}<div class="rc-footer"><span style="font-family:var(--mono);font-size:.56rem;color:var(--muted)">via</span><span class="vibe v-n" style="font-size:.55rem">${r.src}</span></div></div>`).join(''):
-      `<div style="text-align:center;padding:2.5rem;color:var(--muted);font-family:var(--mono);font-size:.7rem">No reports yet${loc?' for '+loc:''}.<br><br><button class="btn btn-ghost" onclick="go('report')">Be the first to report →</button></div>`;
+      `<div style="text-align:center;padding:2.5rem;color:var(--muted);font-family:var(--mono);font-size:.7rem">No reports yet${loc?' for '+loc:''}.<br><br><button class="btn btn-ghost" onclick="prefillReport('${normalizeCompanyName(co?.name||name)}');go('report')">Be the first to report →</button></div>`;
   })();
 
   // Locations tab
@@ -3205,13 +3205,13 @@ async function viewCompany(id,name,loc){
           <div style="display:flex;gap:.3rem;flex-wrap:wrap">${vibeList.map(v => `<span class="vibe v-n">${v}</span>`).join('')}</div>
           <div style="margin-top:1rem;display:flex;flex-direction:column;gap:.4rem">
             <button class="btn btn-ghost" style="width:100%;justify-content:center;font-size:.72rem" onclick="go('resume')">⚡ Analyze my resume for this role</button>
-            <button class="btn btn-ghost" style="width:100%;justify-content:center;font-size:.72rem" onclick="go('report')">+ Report your experience</button>
+            <button class="btn btn-ghost" style="width:100%;justify-content:center;font-size:.72rem" onclick="prefillReport('${name}');go('report')">+ Report your experience</button>
           </div>
         </div>
       </div>
       <div style="background:var(--raised);border-radius:7px;padding:.7rem .95rem;font-family:var(--mono);font-size:.58rem;color:var(--muted);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.5rem">
         <span>📊 Based on ${rsc.report_count} ${dq === 'jobs_only' ? 'job listings' : 'community reports'} · ${dq === 'strong' ? 'High confidence' : dq === 'moderate' ? 'Moderate confidence' : dq === 'limited' ? 'Limited data — add yours' : 'Job data only'}</span>
-        <a href="#" onclick="go('report');return false" style="color:var(--green);text-decoration:none;white-space:nowrap">+ Add your report →</a>
+        <a href="#" onclick="prefillReport('${name}');go('report');return false" style="color:var(--green);text-decoration:none;white-space:nowrap">+ Add your report →</a>
       </div>`;
 
     document.getElementById('ctc-process').innerHTML = `
@@ -3248,24 +3248,58 @@ async function viewCompany(id,name,loc){
 }
 
 async function generateRoles(name){
-  try{
-    const r=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:350,messages:[{role:'user',content:`3 realistic open roles at "${name}". ONLY JSON array: [{"title":"role","type":"Full-time|Remote","salary":"$Xk-$Xk","score":0-100,"level":"Entry|Mid|Senior","posted":"Xd ago","wasteRisk":0-100}]`}]})});
-    const d=await r.json();
-    const roles=JSON.parse(d.content.map(i=>i.text||'').join('').replace(/```json|```/g,'').trim());
-    document.getElementById('ctc-roles').innerHTML=`<div style="border:1px solid var(--line);border-radius:10px;overflow:hidden">`+roles.map(r=>{
-      const rk=Score.risk(r.score);const wl=Score.wasteLabel(r.wasteRisk||50);
-      return`<div style="display:flex;align-items:center;justify-content:space-between;padding:.9rem 1.2rem;border-bottom:1px solid var(--line);cursor:pointer;transition:background .12s" onmouseenter="this.style.background='var(--raised)'" onmouseleave="this.style.background=''">
-        <div>
-          <div style="font-family:var(--display);font-weight:700;color:var(--white);letter-spacing:-.02em;margin-bottom:.18rem">${r.title}</div>
-          <div style="font-family:var(--mono);font-size:.6rem;color:var(--dim);margin-bottom:.3rem">${r.type} · ${r.level} · Posted ${r.posted}</div>
-          <span class="${wl.cls}">${wl.txt}</span>
+  const el = document.getElementById('ctc-roles');
+  const canon = normalizeCompanyName(name);
+
+  // 1. Try in-memory JOBS first (already loaded from search)
+  let jobs = (JOBS || []).filter(j => normalizeCompanyName(j.co || j.company || '') === canon);
+
+  // 2. Fall back to Supabase if no in-memory matches
+  if (!jobs.length && db) {
+    try {
+      const word = canon.split(/\s+/)[0];
+      const { data: cos } = await db.from('companies').select('id,name').ilike('name', `%${word}%`).limit(20);
+      const ids = (cos || []).filter(c => normalizeCompanyName(c.name) === canon).map(c => c.id).filter(Boolean);
+      if (ids.length) {
+        const { data } = await db.from('jobs')
+          .select('id,title,city,salary,score,waste_score,type,level,source')
+          .in('company_id', ids)
+          .gt('expires_at', new Date().toISOString())
+          .order('score', { ascending: false })
+          .limit(20);
+        if (data?.length) jobs = data.map(j => ({
+          id: j.id, co: canon, title: j.title, city: j.city, sal: j.salary,
+          score: j.score || 65, waste: j.waste_score || 25,
+          type: j.type || 'Full-time', lvl: j.level || 'Mid level', source: j.source || 'Job board',
+        }));
+      }
+    } catch(e) {}
+  }
+
+  if (!jobs.length) {
+    el.innerHTML = `<div style="text-align:center;padding:2.5rem;color:var(--muted);font-family:var(--mono);font-size:.7rem">No current listings found for ${canon}.<br><span style="font-size:.6rem;opacity:.6">Search for "${canon}" in the Jobs tab to load listings.</span></div>`;
+    return;
+  }
+
+  el.innerHTML =
+    `<div style="font-family:var(--mono);font-size:.58rem;color:var(--muted);margin-bottom:.75rem">${jobs.length} live listing${jobs.length!==1?'s':''} · sourced from job boards</div>` +
+    `<div style="border:1px solid var(--line);border-radius:10px;overflow:hidden">` +
+    jobs.map(j => {
+      const risk = Score.risk(j.score);
+      const wl = Score.wasteLabel(j.waste || 25);
+      const jid = String(j.id);
+      return `<div style="display:flex;align-items:center;justify-content:space-between;padding:.85rem 1.1rem;border-bottom:1px solid var(--line);gap:.75rem;cursor:pointer;transition:background .12s" onclick="openJobDetailModal('${jid}')" onmouseenter="this.style.background='var(--raised)'" onmouseleave="this.style.background=''">
+        <div style="flex:1;min-width:0">
+          <div style="font-family:var(--display);font-weight:700;color:var(--white);font-size:.88rem;letter-spacing:-.02em;margin-bottom:.18rem">${(j.title||'').replace(/</g,'&lt;')}</div>
+          <div style="font-family:var(--mono);font-size:.6rem;color:var(--dim);margin-bottom:.28rem">${j.type||'Full-time'} · ${j.lvl||'Mid level'}${j.city?' · 📍 '+j.city:''}</div>
+          <span class="${wl.cls} waste-badge">${wl.txt}</span>
         </div>
-        <div style="display:flex;align-items:center;gap:.75rem">
-          <div style="font-family:var(--mono);font-size:.72rem;color:var(--green)">${r.salary}</div>
-          <div class="sring ${rk}" style="width:48px;height:48px"><div class="sring-n" style="font-size:1rem">${r.score}</div><div class="sring-l">/100</div></div>
+        <div style="display:flex;align-items:center;gap:.65rem;flex-shrink:0">
+          ${j.sal ? `<div style="font-family:var(--mono);font-size:.72rem;color:var(--green)">${j.sal}</div>` : ''}
+          <div class="sring ${risk}" style="width:44px;height:44px"><div class="sring-n" style="font-size:.88rem">${j.score}</div></div>
         </div>
-      </div>`;}).join('')+'</div>';
-  }catch(e){document.getElementById('ctc-roles').innerHTML=`<div class="loader"><div class="loader-txt">Could not load roles.</div></div>`;}
+      </div>`;
+    }).join('') + `</div>`;
 }
 
 function switchTab(n,btn){
@@ -3284,6 +3318,13 @@ function switchTab(n,btn){
 // ═══════════════════════════════════════════════
 function showToast(m){const t=document.getElementById('toast');if(!t)return;t.textContent=m;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),3200);}
 function sleep(ms){return new Promise(r=>setTimeout(r,ms));}
+
+// Pre-fill company field in report form so reports attach to the right company
+function prefillReport(company) {
+  const canonical = normalizeCompanyName(company || '');
+  const f = document.getElementById('rCo');
+  if (f) { f.value = canonical; _rCoHint(canonical); }
+}
 
 // ═══════════════════════════════════════════════
 // REPORT FORM — dynamic stage label
