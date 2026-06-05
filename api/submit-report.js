@@ -109,7 +109,7 @@ export default async function handler(req, res) {
     }
 
     // ── 3. Insert report ──────────────────────────────────────────────────────
-    const report = {
+    const reportBase = {
       company_id: cid,
       location_id: lid || null,
       role: (role || '').trim().slice(0, 200),
@@ -123,14 +123,25 @@ export default async function handler(req, res) {
       report_text: report_text ? report_text.slice(0, 2000) : null,
       source: 'direct',
       needs_review: false,
-      company_name: safeCo,
     };
 
-    const repRes = await fetch(`${SUPABASE_URL}/rest/v1/reports`, {
+    // Try with company_name first; fall back without it if column doesn't exist yet
+    let repRes = await fetch(`${SUPABASE_URL}/rest/v1/reports`, {
       method: 'POST',
       headers: { ...hdrs, Prefer: 'return=minimal' },
-      body: JSON.stringify(report),
+      body: JSON.stringify({ ...reportBase, company_name: safeCo }),
     });
+    if (!repRes.ok && repRes.status === 400) {
+      const errText = await repRes.text();
+      if (errText.includes('company_name') || errText.includes('column')) {
+        console.warn('submit-report: company_name column missing, retrying without it');
+        repRes = await fetch(`${SUPABASE_URL}/rest/v1/reports`, {
+          method: 'POST',
+          headers: { ...hdrs, Prefer: 'return=minimal' },
+          body: JSON.stringify(reportBase),
+        });
+      }
+    }
 
     if (!repRes.ok) {
       const errText = await repRes.text();
