@@ -4240,9 +4240,10 @@ async function deleteAccount() {
     const token = session?.access_token;
     if (!token) throw new Error('Not signed in');
 
-    const res = await fetch('/api/delete-account', {
+    const res = await fetch('/api/user-sync', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+      body: JSON.stringify({ action: 'delete_account' }),
     });
 
     if (!res.ok) {
@@ -5010,9 +5011,10 @@ async function submitReport(){
   const safeCo=Mod.sanitize(normalizeCompanyName(co)),safeTi=Mod.sanitize(ti),safeExp=finalExp?Mod.sanitize(finalExp):'';
 
   try{
-    const repRes=await fetch('/api/submit-report',{
+    const repRes=await fetch('/api/reports',{
       method:'POST',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({
+        action:'submit',
         company:safeCo,role:safeTi,location:finalLoc,
         platform:document.getElementById('rPl')?.value||'',
         outcome:document.querySelector('input[name="resp"]:checked')?.value||'waiting',

@@ -15,14 +15,64 @@ export default async function handler(req, res) {
 
   let body = req.body;
   if (typeof body === 'string') try { body = JSON.parse(body); } catch(e) { body = {}; }
-  const { company, city } = body || {};
-  if (!company) return res.status(400).json({ error: 'company required' });
+  body = body || {};
 
-  const hdrs = {
+  const hdrsBase = {
     apikey: SUPABASE_SERVICE_KEY,
     Authorization: `Bearer ${SUPABASE_SERVICE_KEY}`,
     'Content-Type': 'application/json',
   };
+
+  // ── Submit report (merged from submit-report.js) ────────────────────────────
+  if (body.action === 'submit') {
+    const { company: co, role, location, platform, outcome, ghost_stage, rounds, unpaid_work, experience_level, report_text } = body;
+    if (!co || !role || !location) return res.status(400).json({ error: 'company, role and location required' });
+    const hdrs = { ...hdrsBase, Prefer: 'return=representation' };
+    const safeCo = co.trim().slice(0, 200);
+    const safeLoc = location.trim().slice(0, 200);
+    const normalize = n => n ? n.trim().toLowerCase().replace(/[\s,]+(inc\.?|llc\.?|corp\.?|ltd\.?|co\.|plc\.?|group|holdings|enterprises|solutions|technologies)\.?$/i, '').trim() : '';
+    const coNorm = normalize(safeCo);
+
+    const coWord = encodeURIComponent(safeCo.split(/\s+/)[0]);
+    const coSearch = await fetch(`${SUPABASE_URL}/rest/v1/companies?name=ilike.*${coWord}*&select=id,name&limit=20`, { headers: hdrs });
+    const coRows = coSearch.ok ? await coSearch.json() : [];
+    let cid = (coRows || []).find(c => normalize(c.name) === coNorm)?.id || (coRows || []).find(c => c.name.toLowerCase() === safeCo.toLowerCase())?.id || null;
+
+    if (!cid) {
+      const insRes = await fetch(`${SUPABASE_URL}/rest/v1/companies`, { method: 'POST', headers: hdrs, body: JSON.stringify({ name: safeCo, logo_letter: safeCo[0]?.toUpperCase() || '?' }) });
+      if (insRes.ok) { const insRows = await insRes.json(); cid = Array.isArray(insRows) ? insRows[0]?.id : insRows?.id; }
+      if (!cid) {
+        const retry = await fetch(`${SUPABASE_URL}/rest/v1/companies?name=ilike.${encodeURIComponent(safeCo)}&select=id&limit=1`, { headers: hdrs });
+        if (retry.ok) { const r = await retry.json(); cid = r?.[0]?.id || null; }
+      }
+    }
+    if (!cid) return res.status(500).json({ error: 'Could not resolve company record' });
+
+    const locSearch = await fetch(`${SUPABASE_URL}/rest/v1/company_locations?company_id=eq.${cid}&city=ilike.${encodeURIComponent(safeLoc)}&select=id&limit=1`, { headers: hdrs });
+    const locRows = locSearch.ok ? await locSearch.json() : [];
+    let lid = locRows?.[0]?.id || null;
+    if (!lid) {
+      const locIns = await fetch(`${SUPABASE_URL}/rest/v1/company_locations`, { method: 'POST', headers: hdrs, body: JSON.stringify({ company_id: cid, city: safeLoc }) });
+      if (locIns.ok) { const lr = await locIns.json(); lid = Array.isArray(lr) ? lr[0]?.id : lr?.id; }
+      if (!lid) { const lr2 = await fetch(`${SUPABASE_URL}/rest/v1/company_locations?company_id=eq.${cid}&select=id&limit=1`, { headers: hdrs }); if (lr2.ok) { const r2 = await lr2.json(); lid = r2?.[0]?.id || null; } }
+    }
+
+    const reportBase = { company_id: cid, location_id: lid || null, role: (role||'').trim().slice(0,200), platform: (platform||'').trim().slice(0,100), outcome: outcome||'waiting', ghost_stage: ghost_stage||null, rounds: parseInt(rounds)||0, wait_days: null, unpaid_work: unpaid_work||'na', experience_level: (experience_level||'').trim().slice(0,50), report_text: report_text ? report_text.slice(0,2000) : null, source: 'direct', needs_review: false };
+    let repRes = await fetch(`${SUPABASE_URL}/rest/v1/reports`, { method: 'POST', headers: { ...hdrs, Prefer: 'return=minimal' }, body: JSON.stringify({ ...reportBase, company_name: safeCo }) });
+    if (!repRes.ok && repRes.status === 400) {
+      const errText = await repRes.text();
+      if (errText.includes('company_name') || errText.includes('column')) repRes = await fetch(`${SUPABASE_URL}/rest/v1/reports`, { method: 'POST', headers: { ...hdrs, Prefer: 'return=minimal' }, body: JSON.stringify(reportBase) });
+    }
+    if (!repRes.ok) { const e = await repRes.text(); return res.status(500).json({ error: 'Failed to save report', detail: e.slice(0,100) }); }
+    console.log(`REPORT SAVED: "${safeCo}" @ "${safeLoc}" company_id:${cid}`);
+    return res.status(200).json({ ok: true, company_id: cid });
+  }
+
+  // ── Fetch reports ───────────────────────────────────────────────────────────
+  const { company, city } = body;
+  if (!company) return res.status(400).json({ error: 'company required' });
+
+  const hdrs = hdrsBase;
 
   // Normalize: strip legal suffixes, lowercase for matching
   const normalize = n => n ? n.trim().toLowerCase()
