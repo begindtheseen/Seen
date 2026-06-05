@@ -4993,12 +4993,28 @@ async function submitReport(){
       let{data:cosList}=await db.from('companies').select('id,name').ilike('name',`%${_coWord}%`).limit(20);
       let cid=(cosList||[]).find(c=>normalizeCompanyName(c.name)===safeCo)?.id
             ||(cosList||[]).find(c=>c.name.toLowerCase()===safeCo.toLowerCase())?.id;
-      if(!cid){const{data:nc}=await db.from('companies').insert({name:safeCo,logo_letter:safeCo[0]?.toUpperCase()||'?'}).select('id').single();cid=nc?.id;}
+      if(!cid){
+        const{data:nc,error:ncErr}=await db.from('companies').insert({name:safeCo,logo_letter:safeCo[0]?.toUpperCase()||'?'}).select('id').single();
+        if(nc?.id){cid=nc.id;}
+        else{
+          // Insert likely failed due to unique constraint — fetch the existing row
+          console.warn('Company insert failed:',ncErr?.message,'— retrying select for:',safeCo);
+          const{data:retry}=await db.from('companies').select('id').ilike('name',safeCo).limit(1).single();
+          cid=retry?.id||null;
+          if(!cid){
+            // Last resort: exact match on first word
+            const{data:retry2}=await db.from('companies').select('id').ilike('name',`%${_coWord}%`).limit(1).single();
+            cid=retry2?.id||null;
+          }
+        }
+      }
+      if(!cid){console.error('REPORT: could not find or create company for:',safeCo);if(btn){btn.textContent='Submit anonymously →';btn.disabled=false;}showToast('Error saving report — please try again.');return;}
       let{data:locs}=await db.from('company_locations').select('id').eq('company_id',cid).ilike('city',finalLoc).limit(1);
       let lid=locs?.[0]?.id;
-      if(!lid){const{data:nl}=await db.from('company_locations').insert({company_id:cid,city:finalLoc}).select('id').single();lid=nl?.id;}
-      await db.from('reports').insert({company_id:cid,location_id:lid,role:safeTi,platform:document.getElementById('rPl')?.value||'',outcome:document.querySelector('input[name="resp"]:checked')?.value||'waiting',ghost_stage:document.querySelector('input[name="stage"]:checked')?.value||null,rounds:parseInt(document.getElementById('rRounds')?.value||0),wait_days:null,unpaid_work:document.getElementById('rUp')?.value||'na',experience_level:document.getElementById('rExp')?.value||'',report_text:safeExp||null,source:'direct',needs_review:false});
-    }catch(e){console.warn('Report save error:',e);}
+      if(!lid){const{data:nl,error:nlErr}=await db.from('company_locations').insert({company_id:cid,city:finalLoc}).select('id').single();lid=nl?.id;if(nlErr&&!nl?.id){const{data:lr}=await db.from('company_locations').select('id').eq('company_id',cid).limit(1).single();lid=lr?.id||null;}}
+      const{error:repErr}=await db.from('reports').insert({company_id:cid,location_id:lid,role:safeTi,platform:document.getElementById('rPl')?.value||'',outcome:document.querySelector('input[name="resp"]:checked')?.value||'waiting',ghost_stage:document.querySelector('input[name="stage"]:checked')?.value||null,rounds:parseInt(document.getElementById('rRounds')?.value||0),wait_days:null,unpaid_work:document.getElementById('rUp')?.value||'na',experience_level:document.getElementById('rExp')?.value||'',report_text:safeExp||null,source:'direct',needs_review:false});
+      if(repErr){console.error('Report insert error:',repErr);if(btn){btn.textContent='Submit anonymously →';btn.disabled=false;}showToast('Error saving report — please try again.');return;}
+    }catch(e){console.error('Report save error:',e);if(btn){btn.textContent='Submit anonymously →';btn.disabled=false;}showToast('Error saving report — please try again.');return;}
   }
   const repOk=document.getElementById('repOk');if(repOk)repOk.style.display='block';
   ['rCo','rTi','rLoc','rEx'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
