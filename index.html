@@ -1997,8 +1997,31 @@ async function loadRealCompanyData(companyName, cityHint) {
       return { reports, jobs: jobs || [], source: 'community' };
     }
 
-    // Otherwise call /api/company-score which searches Reddit/Glassdoor/Blind via Claude
-    // Returns instantly if cached (30-day TTL), runs web search only on first lookup
+    // Check company_scores DB cache directly — avoids an API round-trip when cached
+    try {
+      const { data: cs } = await db.from('company_scores')
+        .select('overall_score,ghost_rate,response_rate,avg_wait_days,avg_rounds,waste_score,unpaid_rate,report_count,data_quality,industry,raw_summary,expires_at')
+        .ilike('company_name', canonical)
+        .gt('expires_at', new Date().toISOString())
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .single();
+      if (cs) {
+        const s = cs.overall_score;
+        const webScore = {
+          overall_score: s, ghost_rate: cs.ghost_rate, response_rate: cs.response_rate,
+          avg_wait_days: cs.avg_wait_days, avg_rounds: cs.avg_rounds, waste: cs.waste_score,
+          unpaid_rate: cs.unpaid_rate, report_count: cs.report_count || 0,
+          data_quality: cs.data_quality || 'medium', data_source: 'web_research',
+          risk_level: s >= 70 ? 'safe' : s >= 40 ? 'warn' : 'danger',
+          industry: cs.industry || '', summary: cs.raw_summary || '', process_score: s,
+        };
+        return { reports, jobs: jobs || [], webScore, source: 'db_cache' };
+      }
+    } catch(_e) {}
+
+    // No DB cache — call /api/company-score which searches Reddit/Glassdoor/Blind via Claude
+    // Runs web search only on first lookup, then caches for 30 days
     try {
       const r = await fetch('/api/company-score', {
         method: 'POST',
@@ -2369,7 +2392,7 @@ async function searchJobs(query, location) {
     renderJobResults(instant, l);
     if (countEl) countEl.textContent = 'Searching…';
   } else {
-    if (listEl) listEl.innerHTML = `<div style="text-align:center;padding:3rem;font-family:var(--mono);font-size:.7rem;color:var(--muted)"><div class="spinner" style="margin:0 auto 1rem"></div>Searching${l ? ' near ' + l : ''}…</div>`;
+    if (listEl) listEl.innerHTML = `<div style="text-align:center;padding:3rem;font-family:var(--mono);font-size:.7rem;color:var(--muted)"><div class="spinner" style="margin:0 auto 1rem"></div>Finding positions tailored to you${l ? ' near ' + l.split(',')[0] : ''}…</div>`;
     if (countEl) countEl.textContent = 'Searching…';
   }
 
@@ -2800,7 +2823,7 @@ async function loadJobs(){
     const lastFetch=parseInt(localStorage.getItem(cacheKey)||'0');
     const recentFetch=(Date.now()-lastFetch)<6*60*60*1000;
     if(!recentFetch){
-      if(listEl)listEl.innerHTML='<div style="text-align:center;padding:3rem;font-family:var(--mono);font-size:.7rem;color:var(--muted)"><div class="spinner" style="margin:0 auto 1rem"></div>Finding jobs near '+effectiveLoc.split(',')[0]+'...</div>';
+      if(listEl)listEl.innerHTML='<div style="text-align:center;padding:3rem;font-family:var(--mono);font-size:.7rem;color:var(--muted)"><div class="spinner" style="margin:0 auto 1rem"></div>Finding positions near '+effectiveLoc.split(',')[0]+'…</div>';
       try{
         const r=await fetch('/api/fetch-location-jobs',{
           method:'POST',
@@ -3653,7 +3676,8 @@ const AppStore = {
     const entry = {...app, id: app.id||('app_'+Date.now()), appliedAt: app.appliedAt||Date.now(), updatedAt: app.updatedAt||Date.now()};
     const apps = this.loadSync();
     if(!apps.find(a => a.id === entry.id)) { apps.unshift(entry); localStorage.setItem(this.KEY, JSON.stringify(apps)); }
-    if (Auth.isLoggedIn()) {
+    // Only sync to DB if this is a local temp ID — real UUIDs are already in Supabase
+    if (Auth.isLoggedIn() && String(entry.id).startsWith('app_')) {
       _sync('add_application', { application: entry }).then(result => {
         if (result?.id) {
           const stored = this.loadSync();
@@ -6093,13 +6117,22 @@ async function submitApplication(jobId, company, role, location, score, risk, wa
       }
     }
 
-    // 3. Save to local tracker
+    // 3. Save to local tracker (use real DB id if available — skips duplicate sync)
     await AppStore.add({
       id: applicationId || ('app_' + Date.now()),
       jobId, company, role, location, score, risk, waste,
       platform: 'Seen', stage: 'Applied', status: 'active',
       appliedAt: Date.now(), updatedAt: Date.now(),
     });
+    // Clear any stale local entry for same job so only one shows in tracker
+    if (applicationId) {
+      const stored = AppStore.loadSync();
+      const dupes = stored.filter(a => a.jobId === jobId && String(a.id) !== String(applicationId));
+      if (dupes.length) {
+        const clean = stored.filter(a => !(a.jobId === jobId && String(a.id) !== String(applicationId)));
+        localStorage.setItem(AppStore.KEY, JSON.stringify(clean));
+      }
+    }
 
     const externalUrl = window._externalApplyUrl || null;
     window._externalApplyUrl = null;
