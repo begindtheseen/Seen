@@ -3675,7 +3675,9 @@ const AppStore = {
   async add(app) {
     const entry = {...app, id: app.id||('app_'+Date.now()), appliedAt: app.appliedAt||Date.now(), updatedAt: app.updatedAt||Date.now()};
     const apps = this.loadSync();
-    if(!apps.find(a => a.id === entry.id)) { apps.unshift(entry); localStorage.setItem(this.KEY, JSON.stringify(apps)); }
+    // Dedup by id OR by jobId (catches rapid double-clicks that create different temp ids)
+    const isDupe = apps.find(a => a.id === entry.id || (entry.jobId && a.jobId === entry.jobId));
+    if(!isDupe) { apps.unshift(entry); localStorage.setItem(this.KEY, JSON.stringify(apps)); }
     // Only sync to DB if this is a local temp ID — real UUIDs are already in Supabase
     if (Auth.isLoggedIn() && String(entry.id).startsWith('app_')) {
       _sync('add_application', { application: entry }).then(result => {

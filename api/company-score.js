@@ -199,7 +199,7 @@ Return ONLY this JSON:
     try {
       const saveRes = await fetch(`${SUPABASE_URL}/rest/v1/company_scores`, {
         method: 'POST',
-        headers: { ...dbHeaders, Prefer: 'return=minimal' },
+        headers: { ...dbHeaders, Prefer: 'resolution=ignore-duplicates,return=minimal' },
         body: JSON.stringify(row),
       });
       if (saveRes.ok) console.log(`COMPANY SCORE SAVED: "${name}"`);
