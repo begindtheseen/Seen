@@ -2198,6 +2198,9 @@ function openCompanySearch(){
 function openModal(name,loc){
   const canonical=normalizeCompanyName(name);
   document.getElementById('modalOv').classList.add('open');
+  // Neutral glow while loading
+  const _mn=document.querySelector('#modalOv .modal');
+  if(_mn) _mn.style.boxShadow='0 0 60px rgba(99,102,241,0.18),0 0 120px rgba(124,58,237,0.08),0 40px 120px rgba(0,0,0,0.78)';
   document.getElementById('mTitle').textContent=`Checking: ${canonical}${loc?' · '+loc:''}`;
   document.getElementById('mBody').innerHTML=`<div class="loader"><div class="spinner"></div><div class="loader-txt">Aggregating${loc?' location-specific':''} data...</div></div>`;
   runSearch(canonical,loc);
@@ -2225,6 +2228,7 @@ async function runSearch(name,loc){
   const realSc=realData?computeScoresFromData(realData.reports,realData.jobs,realData.webScore):null;
   const sc=realSc||locSc||(known?.sc)||{overall_score:50,risk_level:'warn',response_rate:.5,ghost_rate:.3,avg_wait_days:30,report_count:0,waste:40};
   const risk=sc.risk_level||Score.risk(sc.overall_score);
+  _modalGlow('#modalOv .modal', risk);
   const grade=letterGrade(sc.overall_score);
   const vibeList=VIBES[ck]||VIBES.default;
   const ghostPct=Math.round((sc.ghost_rate||0)*100);
@@ -5701,11 +5705,12 @@ function jlApplyClick() {
   setTimeout(() => openApplyModal(sid, co, title, loc, score, risk, waste, email), 50);
 }
 
-function _applyModalGlow(risk) {
+function _modalGlow(selector, risk) {
   const c = risk==='safe' ? '16,185,129' : risk==='danger' ? '239,68,68' : '245,158,11';
-  const el = document.querySelector('#applyModal .modal');
-  if (el) el.style.boxShadow = `0 0 70px rgba(${c},0.32),0 0 140px rgba(${c},0.12),0 40px 120px rgba(0,0,0,0.75)`;
+  const el = document.querySelector(selector);
+  if (el) el.style.boxShadow = `0 0 70px rgba(${c},0.35),0 0 140px rgba(${c},0.14),0 40px 120px rgba(0,0,0,0.78)`;
 }
+function _applyModalGlow(risk) { _modalGlow('#applyModal .modal', risk); }
 
 function openApplyModal(jobId, company, role, location, score, risk, waste, applyEmail) {
   const job = JOBS.find(j => j.id == jobId);
