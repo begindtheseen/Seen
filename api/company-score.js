@@ -147,6 +147,10 @@ export default async function handler(req, res) {
         results.push({ company:co, score:overall, reviews:revs.length, saved:sv.ok });
         console.log(`POPULATE: "${co}" → ${overall}, ${revs.length} reviews, saved:${sv.ok}`);
       } catch(e) {
+        // Mark as attempted with empty reviews so it stops blocking the queue
+        try {
+          await fetch(`${SUPABASE_URL}/rest/v1/company_scores`, { method:'POST', headers:{...dbH,Prefer:'resolution=merge-duplicates,return=minimal'}, body:JSON.stringify({company_name:co, web_reviews:[]}) });
+        } catch(_e) {}
         results.push({ company:co, error:e.message });
         console.error(`POPULATE: "${co}" failed:`, e.message);
       }
