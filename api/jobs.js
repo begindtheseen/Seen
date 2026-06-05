@@ -46,40 +46,41 @@ export default async function handler(req, res) {
     // canonical stays in outer scope so the save section can use it
     let canonical = qNorm;
 
-    // ── Smart DB cache check ──────────────────────────────────────────────────
+    // ── Smart DB cache check (parallel) ──────────────────────────────────────
     if (SUPABASE_URL && SUPABASE_SERVICE_KEY) {
       try {
-        // Get canonical + related terms via expansion cache or Haiku
-        const expansion = await getQueryExpansion(qNorm, SUPABASE_URL, dbHeaders, ANTHROPIC_KEY);
+        const now = encodeURIComponent(new Date().toISOString());
+        const t3filter = buildFallbackFilter(qNorm);
+
+        // Run expansion lookup AND keyword fallback in parallel — no serial waiting
+        const [expansion, kwRows] = await Promise.all([
+          getQueryExpansion(qNorm, SUPABASE_URL, dbHeaders, ANTHROPIC_KEY),
+          t3filter
+            ? fetch(`${SUPABASE_URL}/rest/v1/jobs?${t3filter}&expires_at=gt.${now}&limit=25`, { headers: dbHeaders })
+                .then(r => r.ok ? r.json() : []).catch(() => [])
+            : Promise.resolve([]),
+        ]);
+
         canonical = expansion.canonical;
         const searchTerms = [canonical, ...expansion.related].filter(Boolean);
 
-        const now = encodeURIComponent(new Date().toISOString());
-        let cached = [], hitTerm = '';
+        // Run ALL expansion-term DB lookups in parallel
+        const termRows = await Promise.all(
+          searchTerms.map(term =>
+            fetch(`${SUPABASE_URL}/rest/v1/jobs?search_query=ilike.${encodeURIComponent(term)}&expires_at=gt.${now}&limit=25`, { headers: dbHeaders })
+              .then(r => r.ok ? r.json() : []).catch(() => [])
+          )
+        );
 
-        // Search the DB for each expansion term
-        for (const term of searchTerms) {
-          if (cached.length >= 3) break;
-          const r = await fetch(
-            `${SUPABASE_URL}/rest/v1/jobs?search_query=ilike.${encodeURIComponent(term)}&expires_at=gt.${now}&limit=25`,
-            { headers: dbHeaders }
-          );
-          if (r.ok) {
-            const rows = await r.json();
-            if (Array.isArray(rows) && rows.length > cached.length) { cached = rows; hitTerm = term; }
+        // Pick best result: expansion terms first (most specific), then keyword fallback
+        let cached = [], hitTerm = '';
+        for (let i = 0; i < termRows.length; i++) {
+          if (Array.isArray(termRows[i]) && termRows[i].length > cached.length) {
+            cached = termRows[i]; hitTerm = searchTerms[i];
           }
         }
-
-        // Final fallback: keyword match across title + company fields
-        if (cached.length < 3) {
-          const t3filter = buildFallbackFilter(qNorm);
-          if (t3filter) {
-            const t3 = await fetch(`${SUPABASE_URL}/rest/v1/jobs?${t3filter}&expires_at=gt.${now}&limit=25`, { headers: dbHeaders });
-            if (t3.ok) {
-              const rows = await t3.json();
-              if (Array.isArray(rows) && rows.length >= 3) { cached = rows; hitTerm = 'keyword-fallback'; }
-            }
-          }
+        if (cached.length < 3 && Array.isArray(kwRows) && kwRows.length >= 3) {
+          cached = kwRows; hitTerm = 'keyword-fallback';
         }
 
         if (cached.length >= 3) {

@@ -2359,8 +2359,28 @@ async function searchJobs(query, location) {
 
   const listEl = document.getElementById('jobsList');
   const countEl = document.getElementById('jobsCt');
-  if (listEl) listEl.innerHTML = `<div style="text-align:center;padding:3rem;font-family:var(--mono);font-size:.7rem;color:var(--muted)"><div class="spinner" style="margin:0 auto 1rem"></div>Searching${l ? ' near ' + l : ''}...</div>`;
-  if (countEl) countEl.textContent = 'Searching...';
+
+  // ── Instant: show matching fallback jobs while real results load ──
+  const qFirst = q.toLowerCase().split(/\s+/)[0];
+  const instant = FALLBACK_JOBS.filter(j =>
+    (j.title||'').toLowerCase().includes(qFirst) || (j.niche||'').toLowerCase().includes(qFirst)
+  ).slice(0, 4);
+  if (instant.length && listEl) {
+    renderJobResults(instant, l);
+    if (countEl) countEl.textContent = 'Searching…';
+  } else {
+    if (listEl) listEl.innerHTML = `<div style="text-align:center;padding:3rem;font-family:var(--mono);font-size:.7rem;color:var(--muted)"><div class="spinner" style="margin:0 auto 1rem"></div>Searching${l ? ' near ' + l : ''}…</div>`;
+    if (countEl) countEl.textContent = 'Searching…';
+  }
+
+  // ── Pre-fire API after 500ms so it's already in-flight if DB misses ──
+  let _prefiredApi = null;
+  const _preFireTimer = setTimeout(() => {
+    _prefiredApi = fetch('/api/jobs', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ query: q, location: l, radius }),
+    });
+  }, 500);
 
   // ── Step 1: Check DB first — instant, no API cost ──
   if (db) {
@@ -2372,7 +2392,8 @@ async function searchJobs(query, location) {
       const titleFilter = qWords.map(w => `title.ilike.%${w}%`).join(',');
       const sqFilter = qWords.map(w => `search_query.ilike.%${w}%`).join(',');
       const orClause = [titleFilter, sqFilter].filter(Boolean).join(',');
-      let dbQuery = db.from('jobs').select('*')
+      let dbQuery = db.from('jobs')
+        .select('id,title,company,location,salary,description,apply_url,source,type,level,score,waste_score,expires_at,search_query')
         .gt('expires_at', new Date().toISOString())
         .order('score', { ascending: false })
         .limit(40);
@@ -2380,12 +2401,13 @@ async function searchJobs(query, location) {
       if (city) {
         if (radius > 10 && state) {
           dbQuery = dbQuery.or(`location.ilike.%${city}%,location.ilike.%${state}%`);
-        } else if (city) {
+        } else {
           dbQuery = dbQuery.ilike('location', `%${city}%`);
         }
       }
       const { data: cached } = await dbQuery;
       if (cached && cached.length >= 3) {
+        clearTimeout(_preFireTimer);
         const jobs = cached.map(_normalizeDbJob);
         JOBS.splice(0, JOBS.length, ...jobs, ...FALLBACK_JOBS);
         if (countEl) countEl.textContent = `${jobs.length} positions${l ? ' near ' + l : ''}`;
@@ -2403,13 +2425,13 @@ async function searchJobs(query, location) {
     } catch(e) { console.warn('searchJobs cache check:', e); }
   }
 
-  // ── Step 2: DB had < 5 results — hit the API, store everything ──
+  // ── Step 2: DB had < 3 results — use pre-fired API request or start one now ──
   try {
-    const res = await fetch('/api/jobs', {
+    const res = await (_prefiredApi || fetch('/api/jobs', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ query: q, location: l, radius })
-    });
+      body: JSON.stringify({ query: q, location: l, radius }),
+    }));
     let data;
     try { data = await res.json(); } catch(_) { throw new Error('Search unavailable — try again in a moment'); }
     if (!res.ok || data.error) throw new Error(data.error || 'Search failed');
@@ -2777,12 +2799,7 @@ async function loadJobs(){
     const cacheKey='locFetch_'+effectiveLoc.replace(/[\s,]/g,'').toLowerCase();
     const lastFetch=parseInt(localStorage.getItem(cacheKey)||'0');
     const recentFetch=(Date.now()-lastFetch)<6*60*60*1000;
-    // Skip only if we fetched recently AND DB actually has something (jobs from a broader query)
-    let anyJobs=0;
-    if(recentFetch && db){
-      try{ const{count}=await db.from('jobs').select('*',{count:'exact',head:true}).gt('expires_at',new Date().toISOString()); anyJobs=count||0; }catch(e){}
-    }
-    if(!recentFetch || anyJobs===0){
+    if(!recentFetch){
       if(listEl)listEl.innerHTML='<div style="text-align:center;padding:3rem;font-family:var(--mono);font-size:.7rem;color:var(--muted)"><div class="spinner" style="margin:0 auto 1rem"></div>Finding jobs near '+effectiveLoc.split(',')[0]+'...</div>';
       try{
         const r=await fetch('/api/fetch-location-jobs',{
