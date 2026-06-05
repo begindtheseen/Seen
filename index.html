@@ -1927,6 +1927,33 @@ function normalizeCompanyName(raw) {
   return raw.trim(); // return as-is — don't change names we don't know about
 }
 
+// Brands where hiring quality varies significantly by location/franchise owner.
+// Seekers get a prominent "check your specific location" warning on the company page.
+const FRANCHISE_BRANDS = new Set([
+  // Fast food
+  "McDonald's", 'Burger King', 'Wendy\'s', 'Taco Bell', 'KFC', 'Chick-fil-A',
+  'Popeyes', 'Subway', 'Domino\'s', 'Pizza Hut', 'Papa Johns', 'Little Caesars',
+  'Sonic', 'Arby\'s', 'Jack in the Box', 'Carl\'s Jr', 'Hardee\'s', 'Whataburger',
+  'Five Guys', 'Shake Shack', 'Wingstop', 'Raising Cane\'s', 'Culver\'s',
+  // Coffee / fast casual
+  'Starbucks', 'Dunkin\'', 'Tim Hortons', 'Panera Bread', 'Chipotle', 'Panda Express',
+  'Wingstop', 'Buffalo Wild Wings', 'Applebee\'s', 'Denny\'s', 'IHOP',
+  // Retail / convenience
+  '7-Eleven', 'Circle K', 'Casey\'s', 'Ace Hardware', 'Anytime Fitness',
+  'Planet Fitness', 'The UPS Store', 'Supercuts', 'Great Clips', 'Sport Clips',
+  // Staffing (branch-based, each office is different)
+  'Robert Half', 'Randstad', 'Manpower', 'Adecco', 'Kelly Services',
+  'Aerotek', 'Insight Global', 'TEKsystems',
+  // Real estate / services
+  'RE/MAX', 'Keller Williams', 'Century 21', 'Coldwell Banker', 'Servpro',
+  // Hotels
+  'Marriott', 'Hilton', 'Holiday Inn', 'Best Western', 'Hampton Inn',
+]);
+
+function isFranchise(name) {
+  return FRANCHISE_BRANDS.has(normalizeCompanyName(name || ''));
+}
+
 // ── REAL COMPANY DATA PIPELINE ────────────────────────────────────────────────
 async function loadRealCompanyData(companyName, cityHint) {
   if (!db) return null;
@@ -3786,7 +3813,7 @@ function buildAppCard(app) {
     <div class="nudge ${nudge.type}">
       <span style="flex-shrink:0">${nudge.type==='danger-nudge'?'⚠':nudge.type==='safe-nudge'?'✓':'→'}</span>
       <span>${nudge.msg}${nudge.action==='mark-ghosted' ? ` <button onclick="markAppStatus('${app.id}','ghosted')" style="background:none;border:none;color:var(--red);font-family:var(--mono);font-size:.6rem;cursor:pointer;text-decoration:underline;padding:0">Mark ghosted</button>` : ''}
-      ${nudge.action==='report'||nudge.action==='report-positive' ? ` <button onclick="prefillReport('${app.id}')" style="background:none;border:none;color:var(--green);font-family:var(--mono);font-size:.6rem;cursor:pointer;text-decoration:underline;padding:0">Report now →</button>` : ''}</span>
+      ${nudge.action==='report'||nudge.action==='report-positive' ? ` <button onclick="prefillReportFromApp('${app.id}')" style="background:none;border:none;color:var(--green);font-family:var(--mono);font-size:.6rem;cursor:pointer;text-decoration:underline;padding:0">Report now →</button>` : ''}</span>
     </div>` : ''}
 
     <!-- Actions -->
@@ -3797,7 +3824,7 @@ function buildAppCard(app) {
         <button class="btn btn-ghost" style="font-size:.7rem" onclick="markAppStatus('${app.id}','hired')">🎉 Got the job</button>
         <button class="btn btn-ghost" style="font-size:.7rem" onclick="markAppStatus('${app.id}','rejected')">✗ Rejected</button>
       ` : `
-        <button class="btn btn-ghost" style="font-size:.7rem" onclick="prefillReport('${app.id}')">Report your experience →</button>
+        <button class="btn btn-ghost" style="font-size:.7rem" onclick="prefillReportFromApp('${app.id}')">Report your experience →</button>
         <button class="btn btn-ghost" style="font-size:.7rem" onclick="removeApp('${app.id}')">Remove</button>
       `}
       <button class="btn btn-ghost" style="font-size:.7rem;margin-left:auto;color:var(--muted)" onclick="removeApp('${app.id}')">✕</button>
@@ -3939,7 +3966,7 @@ function closeStageModalDirect() { document.getElementById('stageModal').classLi
 // ═══════════════════════════════════════════════
 // PRE-FILL REPORT from tracker
 // ═══════════════════════════════════════════════
-function prefillReport(appId) {
+function prefillReportFromApp(appId) {
   const apps = AppStore.load();
   const app = apps.find(a => a.id === appId);
   if (!app) { go('report'); return; }
@@ -3950,11 +3977,10 @@ function prefillReport(appId) {
     const tiEl = document.getElementById('rTi');
     const locEl = document.getElementById('rLoc');
     const plEl = document.getElementById('rPl');
-    if (coEl) coEl.value = app.company;
+    if (coEl) { coEl.value = app.company; _rCoHint(app.company); }
     if (tiEl) tiEl.value = app.role;
     if (locEl) locEl.value = app.location;
     if (plEl && app.platform) { Array.from(plEl.options).forEach(o => { if (o.value === app.platform || o.text === app.platform) plEl.value = o.value; }); }
-    // Pre-select ghosted if that's the status
     if (app.status === 'ghosted') { const r = document.getElementById('r1'); if (r) r.checked = true; }
     showToast('Report pre-filled from your tracker.');
   }, 300);
