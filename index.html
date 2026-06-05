@@ -2006,7 +2006,9 @@ async function loadRealCompanyData(companyName, cityHint) {
           industry: cs.industry || '', summary: cs.raw_summary || '', process_score: s,
           web_reviews: reviews,
         };
-        return { reports, jobs: jobs || [], webScore, source: 'db_cache' };
+        // Only use anon cache if it has reviews; otherwise fall through to API
+        // (which uses service key and always has the newest row)
+        if (reviews.length > 0) return { reports, jobs: jobs || [], webScore, source: 'db_cache' };
       }
     } catch(_e) {}
 
