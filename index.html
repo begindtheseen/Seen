@@ -3020,6 +3020,10 @@ function shareCompanyReport(name) {
 
 async function viewCompany(id,name,loc){
   go('company');
+  // Encode current company into the URL hash so Safari can restore after page discard
+  const _hn=encodeURIComponent((name||'').toLowerCase().trim());
+  const _hl=loc?'/'+encodeURIComponent((loc||'').toLowerCase().trim()):'';
+  history.replaceState(null,'',window.location.pathname+window.location.search+'#company/'+_hn+_hl);
   const ck=(name||'').toLowerCase().trim();
   const co=COS[ck]||Object.values(COS).find(c=>c.id===id||c.name.toLowerCase().includes(ck));
   const lk=loc?`${ck}|${loc.toLowerCase()}`:null;
@@ -4616,6 +4620,8 @@ function go(page){
       page=Auth.isSeeker()?'seeker-dash':'landing';
       if(page==='seeker-dash')renderSeekerDash();
     }
+    // Persist last page so we can restore after Safari discards the page
+    try { if(page!=='landing'&&page!=='home') sessionStorage.setItem('sp',page); } catch(_e){}
     if(!_navSkipHistory){
       history.pushState({page}, '', window.location.pathname + window.location.search);
     }
@@ -6917,15 +6923,25 @@ window.addEventListener('pageshow', e => {
   if (e.persisted) _syncAllAndRefresh();
 });
 
-// ── SHARED LINK ROUTING ──
+// ── SHARED LINK + SESSION RESTORE ROUTING ──
 function _handleSharedLink(){
   const h=window.location.hash;
-  if(!h.startsWith('#company/'))return;
-  const raw=decodeURIComponent(h.slice(9));
-  if(!raw)return;
-  // Proper-case the name for display (amazon → Amazon, mcdonald's → McDonald's)
-  const displayName=raw.split(/\s+/).map(w=>w.charAt(0).toUpperCase()+w.slice(1)).join(' ');
-  setTimeout(()=>openModal(displayName,''),450);
+  if(h.startsWith('#company/')){
+    const parts=decodeURIComponent(h.slice(9)).split('/');
+    const raw=parts[0];
+    if(!raw)return;
+    const toTitle=s=>s.split(/\s+/).map(w=>w.charAt(0).toUpperCase()+w.slice(1)).join(' ');
+    const displayName=toTitle(raw);
+    const loc=parts[1]?toTitle(parts[1]):'';
+    // Small delay so auth/data init finishes first
+    setTimeout(()=>viewCompany(null,displayName,loc),500);
+    return;
+  }
+  // Non-company page restore via sessionStorage
+  const sp=sessionStorage.getItem('sp');
+  if(sp&&sp!=='company'&&sp!=='landing'){
+    setTimeout(()=>go(sp),100);
+  }
 }
 
 // ── INIT ──
@@ -6934,8 +6950,9 @@ startHeroRotation();
 if(db){
   Auth.init().then(()=>{
     updateNav();
-    if(Auth.isSeeker()){renderSeekerDash();go('seeker-dash');}
-    else if(Auth.isEmployer()){goToEmployerDashboard();}
+    const _restoring=window.location.hash.startsWith('#company/')||!!sessionStorage.getItem('sp');
+    if(Auth.isSeeker()){renderSeekerDash();if(!_restoring)go('seeker-dash');}
+    else if(Auth.isEmployer()&&!_restoring){goToEmployerDashboard();}
     _handleSharedLink();
   }).catch(e=>{console.warn('Auth init:',e);_handleSharedLink();});
 } else {
