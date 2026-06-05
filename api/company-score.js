@@ -95,14 +95,17 @@ export default async function handler(req, res) {
       'Content-Type': 'application/json',
     };
 
-    // Find companies missing web_reviews
+    // Find companies missing web_reviews — newest row per company wins
     const listRes = await fetch(
-      `${SUPABASE_URL}/rest/v1/company_scores?select=company_name,web_reviews&order=created_at.asc&limit=200`,
+      `${SUPABASE_URL}/rest/v1/company_scores?select=company_name,web_reviews&order=created_at.desc&limit=200`,
       { headers: dbH }
     );
     if (!listRes.ok) return res.status(502).json({ error: 'DB list failed', detail: await listRes.text() });
     const rows = await listRes.json();
-    const targets = (rows || []).filter(r => {
+    // Deduplicate: first occurrence per company_name is the newest (desc order)
+    const seen = new Set();
+    const deduped = (rows || []).filter(r => { if (!r.company_name || seen.has(r.company_name)) return false; seen.add(r.company_name); return true; });
+    const targets = deduped.filter(r => {
       if (!r.web_reviews) return true;
       try { const v = typeof r.web_reviews === 'string' ? JSON.parse(r.web_reviews) : r.web_reviews; return !Array.isArray(v) || v.length === 0; } catch(_e) { return true; }
     }).map(r => r.company_name).filter(Boolean);
