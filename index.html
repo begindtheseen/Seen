@@ -4887,10 +4887,10 @@ const Notifs = {
 // ═══════════════════════════════════════════════
 async function aiResearchCompany(name, location) {
   try {
-    const response = await fetch('/api/research', {
+    const response = await fetch('/api/company-score', {
       method: 'POST',
       headers: {'Content-Type':'application/json'},
-      body: JSON.stringify({company:name, location:location||''})
+      body: JSON.stringify({action:'research', company:name, location:location||''})
     });
     if(!response.ok) throw new Error('API error');
     return await response.json();

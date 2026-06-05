@@ -54,6 +54,33 @@ export default async function handler(req, res) {
   if (typeof body === 'string') try { body = JSON.parse(body); } catch(e) { body = {}; }
   body = body || {};
 
+  // ── Research mode (replaces research.js) ─────────────────────────────────────
+  if (body.action === 'research') {
+    const ANTHROPIC_KEY = process.env.ANTHROPIC_KEY;
+    if (!ANTHROPIC_KEY) return res.status(500).json({ error: 'ANTHROPIC_KEY missing' });
+    const { company: co, location } = body;
+    if (!co) return res.status(400).json({ error: 'company required' });
+    const locationStr = location ? ` in ${location}` : '';
+    try {
+      const apiRes = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-api-key': ANTHROPIC_KEY, 'anthropic-version': '2023-06-01', 'anthropic-beta': 'web-search-2025-03-05' },
+        body: JSON.stringify({
+          model: 'claude-haiku-4-5-20251001', max_tokens: 1500,
+          tools: [{ type: 'web_search_20250305', name: 'web_search' }],
+          system: `You are a hiring transparency researcher. Search Reddit (r/jobs, r/recruitinghell, r/cscareerquestions), Glassdoor, and news for real hiring data. Return ONLY valid JSON, no markdown.`,
+          messages: [{ role: 'user', content: `Research hiring practices for: ${co}${locationStr}. Return ONLY this JSON: {"summary":"2-3 sentences","ghost_rate_estimate":0-100 or null,"response_rate_estimate":0-100 or null,"avg_rounds_estimate":number or null,"known_issues":["up to 5 real complaints"],"known_positives":["up to 3 positives"],"process_notes":"string or null","data_confidence":"high|medium|low","sources_note":"string","reddit_mentions":number,"glassdoor_rating":number or null}` }],
+        })
+      });
+      if (!apiRes.ok) throw new Error(`Claude ${apiRes.status}`);
+      const d = await apiRes.json();
+      const txt = (d.content || []).filter(b => b.type === 'text').map(b => b.text).join('');
+      const clean = txt.replace(/```json|```/g, '').trim();
+      let parsed; try { parsed = JSON.parse(clean); } catch(e) { const m = clean.match(/\{[\s\S]*\}/); parsed = m ? JSON.parse(m[0]) : { error: 'Parse failed', summary: 'Could not parse results.', data_confidence: 'low', known_issues: [], known_positives: [], sources_note: 'Search completed.' }; }
+      return res.json(parsed);
+    } catch(err) { return res.status(500).json({ error: err.message }); }
+  }
+
   // ── Populate mode: bulk-generate reviews for companies missing them ─────────
   if (body.action === 'populate' || req.method === 'GET') {
     const SUPABASE_URL = process.env.SUPABASE_URL;
