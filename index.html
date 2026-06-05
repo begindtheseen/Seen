@@ -1301,6 +1301,7 @@ nav{position:fixed;top:0;left:0;right:0;z-index:500;height:58px;display:flex;ali
     <div class="ctc" id="ctc-roles"><div class="loader"><div class="spinner"></div></div></div>
     <div class="ctc" id="ctc-rd"><div class="loader"><div class="spinner"></div></div></div>
   </div>
+  <div id="ctc-web-reviews" style="padding:0 1rem 1.5rem"></div>
 </div>
 
 <!-- ═══ REPORT ═══ -->
@@ -3332,6 +3333,38 @@ async function viewCompany(id,name,loc){
         </div>
       </div>
       <div style="background:var(--gdim);border:1px solid var(--gmid);border-radius:8px;padding:.75rem 1rem;font-family:var(--mono);font-size:.62rem;color:var(--green)">This feature is exclusive to Seen. No other job board tracks which stage companies ghost at.</div>`;
+  })();
+
+  // Web reviews — independent fetch, outside the scoring pipeline
+  (async () => {
+    const wrEl = document.getElementById('ctc-web-reviews');
+    if (!wrEl) return;
+    wrEl.innerHTML = '';
+    try {
+      const r = await fetch('/api/company-score', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: normalizeCompanyName(co?.name || name) }),
+      });
+      if (!r.ok) return;
+      const d = await r.json();
+      const reviews = d?.score?.web_reviews;
+      if (!Array.isArray(reviews) || !reviews.length) return;
+      const sentColor = s => s === 'positive' ? 'var(--green)' : s === 'negative' ? 'var(--red)' : 'var(--amber)';
+      const sentLabel = s => s === 'positive' ? '✓ Positive' : s === 'negative' ? '✗ Negative' : '~ Mixed';
+      wrEl.innerHTML = `
+        <div style="font-family:var(--mono);font-size:.56rem;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:.75rem">What applicants are saying online</div>
+        <div style="display:flex;flex-direction:column;gap:.6rem">
+          ${reviews.map(rv => `<div style="background:var(--card);border:1px solid var(--line);border-radius:8px;padding:.85rem 1rem">
+            <div style="font-family:var(--mono);font-size:.65rem;color:var(--dim);line-height:1.55;margin-bottom:.5rem">"${(rv.text||'').replace(/"/g,'&quot;').replace(/`/g,'&#96;')}"</div>
+            <div style="display:flex;align-items:center;gap:.5rem;flex-wrap:wrap">
+              <span style="font-family:var(--mono);font-size:.54rem;font-weight:600;color:${sentColor(rv.sentiment)}">${sentLabel(rv.sentiment)}</span>
+              ${rv.source ? `<span style="font-family:var(--mono);font-size:.52rem;color:var(--muted)">${rv.source.replace(/</g,'&lt;')}</span>` : ''}
+              ${rv.year ? `<span style="font-family:var(--mono);font-size:.52rem;color:var(--muted)">${rv.year}</span>` : ''}
+            </div>
+          </div>`).join('')}
+        </div>`;
+    } catch(e) { console.warn('web reviews:', e); }
   })();
 
   generateRoles(co?.name||name);
