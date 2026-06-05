@@ -1987,7 +1987,7 @@ async function loadRealCompanyData(companyName, cityHint) {
     // Check company_scores DB cache directly — avoids an API round-trip when cached
     try {
       const { data: cs } = await db.from('company_scores')
-        .select('overall_score,ghost_rate,response_rate,avg_wait_days,avg_rounds,waste_score,unpaid_rate,report_count,data_quality,industry,raw_summary,expires_at')
+        .select('overall_score,ghost_rate,response_rate,avg_wait_days,avg_rounds,waste_score,unpaid_rate,report_count,data_quality,industry,raw_summary,web_reviews,expires_at')
         .ilike('company_name', canonical)
         .gt('expires_at', new Date().toISOString())
         .order('created_at', { ascending: false })
@@ -1995,6 +1995,8 @@ async function loadRealCompanyData(companyName, cityHint) {
         .single();
       if (cs) {
         const s = cs.overall_score;
+        let reviews = [];
+        if (cs.web_reviews) { try { reviews = typeof cs.web_reviews === 'string' ? JSON.parse(cs.web_reviews) : cs.web_reviews; } catch(_e) {} }
         const webScore = {
           overall_score: s, ghost_rate: cs.ghost_rate, response_rate: cs.response_rate,
           avg_wait_days: cs.avg_wait_days, avg_rounds: cs.avg_rounds, waste: cs.waste_score,
@@ -2002,6 +2004,7 @@ async function loadRealCompanyData(companyName, cityHint) {
           data_quality: cs.data_quality || 'medium', data_source: 'web_research',
           risk_level: s >= 70 ? 'safe' : s >= 40 ? 'warn' : 'danger',
           industry: cs.industry || '', summary: cs.raw_summary || '', process_score: s,
+          web_reviews: reviews,
         };
         return { reports, jobs: jobs || [], webScore, source: 'db_cache' };
       }
@@ -3096,7 +3099,24 @@ async function viewCompany(id,name,loc){
     <div style="background:var(--raised);border-radius:7px;padding:.7rem .95rem;font-family:var(--mono);font-size:.58rem;color:var(--muted);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.5rem">
       <span>📊 Based on ${sc.report_count||0} verified reports · Public hiring data · Seen analysis</span>
       <a href="#" onclick="prefillReport('${name}');go('report');return false" style="color:var(--green);text-decoration:none;white-space:nowrap">+ Add your report →</a>
-    </div>`;
+    </div>
+    ${(sc.web_reviews&&sc.web_reviews.length)?`<div style="margin-top:1.25rem">
+      <div style="font-family:var(--mono);font-size:.56rem;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:.75rem">What applicants are saying online</div>
+      <div style="display:flex;flex-direction:column;gap:.6rem">
+        ${sc.web_reviews.map(r=>{
+          const sColor=r.sentiment==='positive'?'var(--green)':r.sentiment==='negative'?'var(--red)':'var(--amber)';
+          const sLabel=r.sentiment==='positive'?'✓ Positive':r.sentiment==='negative'?'✗ Negative':'~ Mixed';
+          return `<div style="background:var(--card);border:1px solid var(--line);border-radius:8px;padding:.85rem 1rem">
+            <div style="font-family:var(--mono);font-size:.65rem;color:var(--dim);line-height:1.55;margin-bottom:.5rem">"${r.text.replace(/"/g,'&quot;')}"</div>
+            <div style="display:flex;align-items:center;gap:.5rem;flex-wrap:wrap">
+              <span style="font-family:var(--mono);font-size:.54rem;font-weight:600;color:${sColor}">${sLabel}</span>
+              ${r.source?`<span style="font-family:var(--mono);font-size:.52rem;color:var(--muted)">${r.source.replace(/</g,'&lt;')}</span>`:''}
+              ${r.year?`<span style="font-family:var(--mono);font-size:.52rem;color:var(--muted)">${r.year}</span>`:''}
+            </div>
+          </div>`;
+        }).join('')}
+      </div>
+    </div>`:''}` ;
 
   // Process score tab — unique to Seen
   document.getElementById('ctc-process').innerHTML=`
@@ -3270,7 +3290,24 @@ async function viewCompany(id,name,loc){
       <div style="background:var(--raised);border-radius:7px;padding:.7rem .95rem;font-family:var(--mono);font-size:.58rem;color:var(--muted);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.5rem">
         <span>📊 Based on ${rsc.report_count} ${dq === 'jobs_only' ? 'job listings' : 'community reports'} · ${dq === 'strong' ? 'High confidence' : dq === 'moderate' ? 'Moderate confidence' : dq === 'limited' ? 'Limited data — add yours' : 'Job data only'}</span>
         <a href="#" onclick="prefillReport('${name}');go('report');return false" style="color:var(--green);text-decoration:none;white-space:nowrap">+ Add your report →</a>
-      </div>`;
+      </div>
+      ${(rsc.web_reviews&&rsc.web_reviews.length)?`<div style="margin-top:1.25rem">
+        <div style="font-family:var(--mono);font-size:.56rem;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:.75rem">What applicants are saying online</div>
+        <div style="display:flex;flex-direction:column;gap:.6rem">
+          ${rsc.web_reviews.map(r=>{
+            const sColor=r.sentiment==='positive'?'var(--green)':r.sentiment==='negative'?'var(--red)':'var(--amber)';
+            const sLabel=r.sentiment==='positive'?'✓ Positive':r.sentiment==='negative'?'✗ Negative':'~ Mixed';
+            return `<div style="background:var(--card);border:1px solid var(--line);border-radius:8px;padding:.85rem 1rem">
+              <div style="font-family:var(--mono);font-size:.65rem;color:var(--dim);line-height:1.55;margin-bottom:.5rem">"${r.text.replace(/"/g,'&quot;')}"</div>
+              <div style="display:flex;align-items:center;gap:.5rem;flex-wrap:wrap">
+                <span style="font-family:var(--mono);font-size:.54rem;font-weight:600;color:${sColor}">${sLabel}</span>
+                ${r.source?`<span style="font-family:var(--mono);font-size:.52rem;color:var(--muted)">${r.source.replace(/</g,'&lt;')}</span>`:''}
+                ${r.year?`<span style="font-family:var(--mono);font-size:.52rem;color:var(--muted)">${r.year}</span>`:''}
+              </div>
+            </div>`;
+          }).join('')}
+        </div>
+      </div>`:''}` ;
 
     document.getElementById('ctc-process').innerHTML = `
       <div style="display:grid;grid-template-columns:${window.innerWidth<600?'1fr':'1fr 1fr'};gap:1rem;margin-bottom:1rem">

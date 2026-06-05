@@ -21,6 +21,10 @@ function calcWaste(ghostRate, avgRounds, unpaidRate) {
 
 function rowToScore(row) {
   const s = row.overall_score;
+  let reviews = [];
+  if (row.web_reviews) {
+    try { reviews = typeof row.web_reviews === 'string' ? JSON.parse(row.web_reviews) : row.web_reviews; } catch(_e) {}
+  }
   return {
     overall_score: s,
     ghost_rate: row.ghost_rate,
@@ -36,6 +40,7 @@ function rowToScore(row) {
     industry: row.industry || '',
     summary: row.raw_summary || '',
     process_score: s,
+    web_reviews: reviews,
   };
 }
 
@@ -94,6 +99,8 @@ Search for: ghosting complaints, interview timelines, number of rounds, unpaid t
 
 Count the evidence: how many posts report ghosting vs getting a human response?
 
+Also find 4-6 specific quotes or close paraphrases from real applicants on Reddit, Glassdoor, or Blind. Include a mix of positive and negative if they exist. Each review should be a real person's direct experience — not a summary.
+
 Return ONLY this JSON:
 {
   "ghost_rate": 0.0-1.0,
@@ -104,7 +111,15 @@ Return ONLY this JSON:
   "report_count": number_of_community_posts_found,
   "data_quality": "high" or "medium" or "low",
   "industry": "e.g. E-Commerce, Fintech, Consulting",
-  "summary": "2-3 sentences describing what applicants actually experience at this company"
+  "summary": "2-3 sentences describing what applicants actually experience at this company",
+  "reviews": [
+    {
+      "text": "exact quote or close paraphrase from a real post",
+      "sentiment": "positive" or "negative" or "mixed",
+      "source": "Reddit r/recruitinghell" or "Glassdoor" or "Blind" etc,
+      "year": "2024"
+    }
+  ]
 }`;
 
   let apiRes;
@@ -120,7 +135,7 @@ Return ONLY this JSON:
       },
       body: JSON.stringify({
         model: 'claude-haiku-4-5-20251001',
-        max_tokens: 1000,
+        max_tokens: 2000,
         tools: [{ type: 'web_search_20250305', name: 'web_search' }],
         system: systemPrompt,
         messages: [{ role: 'user', content: userPrompt }],
@@ -158,6 +173,13 @@ Return ONLY this JSON:
   const overall = calcScore(rr, gr, wait, cnt);
   const waste   = calcWaste(gr, rounds, unpaid);
 
+  const reviews = Array.isArray(parsed.reviews) ? parsed.reviews.slice(0, 6).map(r => ({
+    text: (r.text || '').slice(0, 400),
+    sentiment: ['positive','negative','mixed'].includes(r.sentiment) ? r.sentiment : 'mixed',
+    source: (r.source || '').slice(0, 80),
+    year: (r.year || '').slice(0, 4),
+  })) : [];
+
   const score = {
     overall_score: overall,
     ghost_rate: gr,
@@ -173,6 +195,7 @@ Return ONLY this JSON:
     industry: (parsed.industry || '').slice(0, 80),
     summary: (parsed.summary || '').slice(0, 500),
     process_score: overall,
+    web_reviews: reviews,
   };
 
   console.log(`COMPANY SCORE COMPUTED: "${name}" → ${overall} (ghost:${Math.round(gr*100)}%, resp:${Math.round(rr*100)}%)`);
@@ -180,7 +203,7 @@ Return ONLY this JSON:
   // ── 4. Cache in DB ────────────────────────────────────────────────────────
   if (SUPABASE_URL && SUPABASE_SERVICE_KEY) {
     const expires = new Date(Date.now() + SCORE_TTL_MS).toISOString();
-    const row = {
+    const rowBase = {
       company_name: name.toLowerCase().trim(),
       overall_score: overall,
       ghost_rate: gr,
@@ -197,11 +220,23 @@ Return ONLY this JSON:
       expires_at: expires,
     };
     try {
-      const saveRes = await fetch(`${SUPABASE_URL}/rest/v1/company_scores`, {
+      // Try with web_reviews column; fall back without it if column doesn't exist yet
+      let saveRes = await fetch(`${SUPABASE_URL}/rest/v1/company_scores`, {
         method: 'POST',
         headers: { ...dbHeaders, Prefer: 'resolution=ignore-duplicates,return=minimal' },
-        body: JSON.stringify(row),
+        body: JSON.stringify({ ...rowBase, web_reviews: reviews }),
       });
+      if (!saveRes.ok && saveRes.status === 400) {
+        const errText = await saveRes.text();
+        if (errText.includes('web_reviews') || errText.includes('column')) {
+          console.warn('COMPANY SCORE: web_reviews column missing, retrying without it');
+          saveRes = await fetch(`${SUPABASE_URL}/rest/v1/company_scores`, {
+            method: 'POST',
+            headers: { ...dbHeaders, Prefer: 'resolution=ignore-duplicates,return=minimal' },
+            body: JSON.stringify(rowBase),
+          });
+        }
+      }
       if (saveRes.ok) console.log(`COMPANY SCORE SAVED: "${name}"`);
       else console.error('Save failed:', await saveRes.text());
     } catch(e) { console.error('Save error:', e.message); }
