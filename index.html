@@ -1980,12 +1980,8 @@ async function loadRealCompanyData(companyName, cityHint) {
       .ilike('company', `%${canonical}%`)
       .gt('expires_at', now).limit(50);
 
-    // If ≥3 community reports, use them — most accurate, no API needed
-    if (reports.length >= 3) {
-      return { reports, jobs: jobs || [], source: 'community' };
-    }
-
     // Check company_scores DB cache directly — avoids an API round-trip when cached
+    // Always run even when community reports exist (≥3) so web reviews appear in the Overview tab.
     try {
       const { data: cs } = await db.from('company_scores')
         .select('overall_score,ghost_rate,response_rate,avg_wait_days,avg_rounds,waste_score,unpaid_rate,report_count,data_quality,industry,raw_summary,web_reviews,expires_at')
