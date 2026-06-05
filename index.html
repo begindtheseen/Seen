@@ -3012,22 +3012,48 @@ let _shareCtx = null;
 function shareCompanyReport(name) {
   const url = 'https://seenjobs.io/#company/' + encodeURIComponent((name||'').toLowerCase().trim());
   const ctx = (_shareCtx && _shareCtx.name && _shareCtx.name.toLowerCase() === (name||'').toLowerCase()) ? _shareCtx : null;
+  // Pick a variant deterministically based on name so the same company always gets the same message
+  const v = (name||'').split('').reduce((h,c)=>((h<<5)-h)+c.charCodeAt(0),0) & 3;
   let msg;
   if (ctx) {
     if (ctx.risk === 'danger') {
-      msg = `🚨 Before you apply to ${name} — ${ctx.ghost}% of applicants get ghosted (score: ${ctx.score}/100). Someone sent you this for a reason: ${url}`;
+      const opts = [
+        `${name} ghosts ${ctx.ghost}% of applicants — and they're still posting jobs. someone built a site to track this and it's free: ${url}`,
+        `i just checked ${name}'s hiring score and it's ${ctx.score}/100. ${ctx.ghost}% ghost rate. if you're applying there rn you need to see this: ${url}`,
+        `this is why job hunting feels broken. ${name} ghosts ${ctx.ghost}% of applicants and nobody talks about it: ${url}`,
+        `wait — ${name} has a ${ctx.score}/100 hiring score and a ${ctx.ghost}% ghost rate. someone made a whole tracker for this: ${url}`,
+      ];
+      msg = opts[v];
     } else if (ctx.risk === 'warn') {
-      msg = `⚠️ Heads up on ${name}: ${ctx.ghost}% ghost rate, ${ctx.score}/100 hiring score. Check the full breakdown before you apply: ${url}`;
+      const opts = [
+        `checking a company's ghost rate before applying is free. ${name} is at ${ctx.ghost}% with a ${ctx.score}/100 score — make of that what you will: ${url}`,
+        `${name} scores ${ctx.score}/100 on hiring transparency. ${ctx.ghost}% ghost rate. would you still apply? ${url}`,
+        `found a site that tracks how companies actually treat applicants. ${name}: ${ctx.score}/100, ${ctx.ghost}% ghost rate: ${url}`,
+        `if you're applying to ${name} you probably want to see their ${ctx.score}/100 hiring score first: ${url}`,
+      ];
+      msg = opts[v];
     } else {
-      msg = `✅ ${name} actually scores well on hiring transparency — ${ctx.score}/100, ${ctx.ghost}% ghost rate. Rare. Check it: ${url}`;
+      const opts = [
+        `${name} actually has a solid hiring score — ${ctx.score}/100, ${ctx.ghost}% ghost rate. rare in this market: ${url}`,
+        `not all companies are the same. ${name} scores ${ctx.score}/100 on hiring transparency. one of the good ones: ${url}`,
+        `ok ${name} is actually legit — ${ctx.score}/100 score, ${ctx.ghost}% ghost rate tracked by real applicants. see the full breakdown: ${url}`,
+        `${name} scores ${ctx.score}/100 on Seen. you can check any company before you apply — ghost rate, timelines, everything: ${url}`,
+      ];
+      msg = opts[v];
     }
   } else {
-    msg = `Check ${name}'s hiring score before you apply — ghost rate, waste risk & more tracked by real applicants: ${url}`;
+    const opts = [
+      `you can check any company's hiring score before you apply. here's ${name}'s: ${url}`,
+      `someone built a site that tracks ghost rates and hiring transparency by company. ${name} is on it: ${url}`,
+      `found this for ${name} — real applicant data, ghost rates, waste risk, all free: ${url}`,
+      `if you're applying to ${name} or know someone who is — this is worth 30 seconds: ${url}`,
+    ];
+    msg = opts[v];
   }
   if (navigator.share) {
     navigator.share({ text: msg }).catch(()=>{});
   } else if (navigator.clipboard) {
-    navigator.clipboard.writeText(msg).then(() => showToast('Copied! Paste it anywhere 🔗'));
+    navigator.clipboard.writeText(msg).then(() => showToast('Copied!'));
   }
 }
 
