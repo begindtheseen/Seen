@@ -1463,61 +1463,23 @@ nav.nav-scrolled{background:rgba(6,6,8,0.82);backdrop-filter:blur(60px) saturate
 </div>
 
 <!-- ═══ FOOTER ═══ -->
-<footer id="mainFooter" style="background:var(--void);border-top:1px solid var(--line);padding:3.5rem 2rem 2rem;margin-top:0">
-  <div style="max-width:1300px;margin:0 auto">
-    <div style="display:grid;grid-template-columns:1.4fr 1fr 1fr 1fr;gap:3rem;margin-bottom:3rem">
-      <div>
-        <div style="font-family:var(--display);font-size:1.3rem;font-weight:800;color:var(--white);letter-spacing:-.02em;display:flex;align-items:center;gap:.5rem;margin-bottom:.75rem">
-          <span style="width:7px;height:7px;border-radius:50%;background:var(--green);display:inline-block"></span>Seen
-        </div>
-        <p style="color:var(--dim);font-size:.8rem;font-weight:300;line-height:1.75;max-width:240px;margin-bottom:1.25rem">The only job board that holds companies accountable. Built by someone who got ghosted one too many times.</p>
-        <div style="display:flex;gap:.5rem;flex-wrap:wrap">
-          <span class="vibe v-g">Free for job seekers</span>
-          <span class="vibe v-n">No ads. Ever.</span>
-        </div>
-      </div>
-      <div>
-        <div style="font-family:var(--mono);font-size:.6rem;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin-bottom:1rem">Product</div>
-        <div style="display:flex;flex-direction:column;gap:.6rem">
-          <button onclick="go('jobs')" style="background:none;border:none;color:var(--dim);font-size:.82rem;cursor:pointer;text-align:left;transition:color .15s;font-family:var(--body)" onmouseover="this.style.color='var(--sub)'" onmouseout="this.style.color='var(--dim)'">Find jobs</button>
-          <button onclick="go('demand')" style="background:none;border:none;color:var(--dim);font-size:.82rem;cursor:pointer;text-align:left;transition:color .15s;font-family:var(--body)" onmouseover="this.style.color='var(--sub)'" onmouseout="this.style.color='var(--dim)'">Demand map</button>
-          <button onclick="go('resume')" style="background:none;border:none;color:var(--dim);font-size:.82rem;cursor:pointer;text-align:left;transition:color .15s;font-family:var(--body)" onmouseover="this.style.color='var(--sub)'" onmouseout="this.style.color='var(--dim)'">Resume AI</button>
-          <button onclick="go('report')" style="background:none;border:none;color:var(--dim);font-size:.82rem;cursor:pointer;text-align:left;transition:color .15s;font-family:var(--body)" onmouseover="this.style.color='var(--sub)'" onmouseout="this.style.color='var(--dim)'">Report a listing</button>
-          <button onclick="go('recruiters')" style="background:none;border:none;color:var(--dim);font-size:.82rem;cursor:pointer;text-align:left;transition:color .15s;font-family:var(--body)" onmouseover="this.style.color='var(--sub)'" onmouseout="this.style.color='var(--dim)'">For employers</button>
-        </div>
-      </div>
-      <div>
-        <div style="font-family:var(--mono);font-size:.6rem;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin-bottom:1rem">Company</div>
-        <div style="display:flex;flex-direction:column;gap:.6rem">
-          <button onclick="go('faq')" style="background:none;border:none;color:var(--dim);font-size:.82rem;cursor:pointer;text-align:left;transition:color .15s;font-family:var(--body)" onmouseover="this.style.color='var(--sub)'" onmouseout="this.style.color='var(--dim)'">FAQ</button>
-          <button onclick="go('legal')" style="background:none;border:none;color:var(--dim);font-size:.82rem;cursor:pointer;text-align:left;transition:color .15s;font-family:var(--body)" onmouseover="this.style.color='var(--sub)'" onmouseout="this.style.color='var(--dim)'">Terms of service</button>
-          <button onclick="go('legal')" style="background:none;border:none;color:var(--dim);font-size:.82rem;cursor:pointer;text-align:left;transition:color .15s;font-family:var(--body)" onmouseover="this.style.color='var(--sub)'" onmouseout="this.style.color='var(--dim)'">Privacy policy</button>
-          <button onclick="go('legal')" style="background:none;border:none;color:var(--dim);font-size:.82rem;cursor:pointer;text-align:left;transition:color .15s;font-family:var(--body)" onmouseover="this.style.color='var(--sub)'" onmouseout="this.style.color='var(--dim)'">Content guidelines</button>
-          <a href="mailto:hello@tryseen.io" style="color:var(--dim);font-size:.82rem;text-decoration:none;transition:color .15s" onmouseover="this.style.color='var(--sub)'" onmouseout="this.style.color='var(--dim)'">Contact us</a>
-        </div>
-      </div>
-      <div>
-        <div style="font-family:var(--mono);font-size:.6rem;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin-bottom:1rem">Data sources</div>
-        <div style="display:flex;flex-direction:column;gap:.6rem">
-          <span style="color:var(--dim);font-size:.78rem;font-weight:300">📱 Reddit (public API)</span>
-          <span style="color:var(--dim);font-size:.78rem;font-weight:300">💼 RemoteOK · Adzuna</span>
-          <span style="color:var(--dim);font-size:.78rem;font-weight:300">👤 Direct user reports</span>
-          <span style="color:var(--dim);font-size:.78rem;font-weight:300">🤖 AI-powered scoring</span>
-        </div>
-        <div style="margin-top:1.25rem;padding:.65rem .85rem;background:var(--raised);border-radius:7px;font-family:var(--mono);font-size:.58rem;color:var(--muted);line-height:1.75">
-          All scores are user-reported estimates. Not legal claims. Not endorsements. Not defamation.
-        </div>
-      </div>
+<footer id="mainFooter" style="background:var(--void);border-top:1px solid var(--line);padding:1rem 1.5rem">
+  <div style="max-width:1300px;margin:0 auto;display:flex;align-items:center;justify-content:space-between;gap:1rem;flex-wrap:wrap">
+    <div style="display:flex;align-items:center;gap:.5rem;flex-shrink:0">
+      <span style="width:6px;height:6px;border-radius:50%;background:var(--blue);display:inline-block;flex-shrink:0"></span>
+      <span style="font-family:var(--display);font-size:.88rem;font-weight:800;color:var(--white);letter-spacing:-.02em">Seen</span>
+      <span style="font-family:var(--mono);font-size:.58rem;color:var(--muted);padding-left:.35rem">© 2025</span>
     </div>
-    <div style="border-top:1px solid var(--line);padding-top:1.5rem;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:1rem">
-      <div style="font-family:var(--mono);font-size:.62rem;color:var(--muted)">© 2025 Seen. All rights reserved. Built by someone who lived this problem.</div>
-      <div style="display:flex;gap:1.5rem">
-        <button onclick="go('legal')" style="background:none;border:none;color:var(--muted);font-family:var(--mono);font-size:.6rem;cursor:pointer;transition:color .15s" onmouseover="this.style.color='var(--sub)'" onmouseout="this.style.color='var(--muted)'">Terms</button>
-        <button onclick="go('legal')" style="background:none;border:none;color:var(--muted);font-family:var(--mono);font-size:.6rem;cursor:pointer;transition:color .15s" onmouseover="this.style.color='var(--sub)'" onmouseout="this.style.color='var(--muted)'">Privacy</button>
-        <button onclick="go('faq')" style="background:none;border:none;color:var(--muted);font-family:var(--mono);font-size:.6rem;cursor:pointer;transition:color .15s" onmouseover="this.style.color='var(--sub)'" onmouseout="this.style.color='var(--muted)'">FAQ</button>
-        <a href="mailto:hello@tryseen.io" style="color:var(--muted);font-family:var(--mono);font-size:.6rem;text-decoration:none;transition:color .15s" onmouseover="this.style.color='var(--sub)'" onmouseout="this.style.color='var(--muted)'">Contact</a>
-      </div>
+    <div style="display:flex;gap:.1rem;flex-wrap:wrap;align-items:center;flex:1;justify-content:center">
+      <button onclick="go('jobs')" style="background:none;border:none;color:var(--muted);font-family:var(--mono);font-size:.6rem;cursor:pointer;padding:.25rem .55rem;border-radius:5px;transition:color .15s" onmouseover="this.style.color='var(--sub)'" onmouseout="this.style.color='var(--muted)'">Jobs</button>
+      <button onclick="go('demand')" style="background:none;border:none;color:var(--muted);font-family:var(--mono);font-size:.6rem;cursor:pointer;padding:.25rem .55rem;border-radius:5px;transition:color .15s" onmouseover="this.style.color='var(--sub)'" onmouseout="this.style.color='var(--muted)'">Demand</button>
+      <button onclick="go('resume')" style="background:none;border:none;color:var(--muted);font-family:var(--mono);font-size:.6rem;cursor:pointer;padding:.25rem .55rem;border-radius:5px;transition:color .15s" onmouseover="this.style.color='var(--sub)'" onmouseout="this.style.color='var(--muted)'">Resume AI</button>
+      <button onclick="go('recruiters')" style="background:none;border:none;color:var(--muted);font-family:var(--mono);font-size:.6rem;cursor:pointer;padding:.25rem .55rem;border-radius:5px;transition:color .15s" onmouseover="this.style.color='var(--sub)'" onmouseout="this.style.color='var(--muted)'">Employers</button>
+      <button onclick="go('faq')" style="background:none;border:none;color:var(--muted);font-family:var(--mono);font-size:.6rem;cursor:pointer;padding:.25rem .55rem;border-radius:5px;transition:color .15s" onmouseover="this.style.color='var(--sub)'" onmouseout="this.style.color='var(--muted)'">FAQ</button>
+      <button onclick="go('legal')" style="background:none;border:none;color:var(--muted);font-family:var(--mono);font-size:.6rem;cursor:pointer;padding:.25rem .55rem;border-radius:5px;transition:color .15s" onmouseover="this.style.color='var(--sub)'" onmouseout="this.style.color='var(--muted)'">Legal</button>
+      <a href="mailto:hello@tryseen.io" style="color:var(--muted);font-family:var(--mono);font-size:.6rem;text-decoration:none;padding:.25rem .55rem;transition:color .15s" onmouseover="this.style.color='var(--sub)'" onmouseout="this.style.color='var(--muted)'">Contact</a>
     </div>
+    <div style="font-family:var(--mono);font-size:.58rem;color:var(--muted);flex-shrink:0">Built by someone who lived this.</div>
   </div>
 </footer>
 
