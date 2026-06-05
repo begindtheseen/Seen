@@ -3008,13 +3008,26 @@ function _viewerCount(name) {
   return base + dayVar;
 }
 
+let _shareCtx = null;
 function shareCompanyReport(name) {
-  const url = window.location.origin + window.location.pathname + '#company/' + encodeURIComponent((name||'').toLowerCase());
-  const text = `${name} has a transparency score on Seen — check ghost rate, waste risk & more before applying`;
+  const url = 'https://seenjobs.io/#company/' + encodeURIComponent((name||'').toLowerCase().trim());
+  const ctx = (_shareCtx && _shareCtx.name && _shareCtx.name.toLowerCase() === (name||'').toLowerCase()) ? _shareCtx : null;
+  let msg;
+  if (ctx) {
+    if (ctx.risk === 'danger') {
+      msg = `🚨 Before you apply to ${name} — ${ctx.ghost}% of applicants get ghosted (score: ${ctx.score}/100). Someone sent you this for a reason: ${url}`;
+    } else if (ctx.risk === 'warn') {
+      msg = `⚠️ Heads up on ${name}: ${ctx.ghost}% ghost rate, ${ctx.score}/100 hiring score. Check the full breakdown before you apply: ${url}`;
+    } else {
+      msg = `✅ ${name} actually scores well on hiring transparency — ${ctx.score}/100, ${ctx.ghost}% ghost rate. Rare. Check it: ${url}`;
+    }
+  } else {
+    msg = `Check ${name}'s hiring score before you apply — ghost rate, waste risk & more tracked by real applicants: ${url}`;
+  }
   if (navigator.share) {
-    navigator.share({ title: name + ' — Transparency Report | Seen', text, url }).catch(()=>{});
+    navigator.share({ text: msg }).catch(()=>{});
   } else if (navigator.clipboard) {
-    navigator.clipboard.writeText(url).then(() => showToast('Link copied! Share it anywhere 🔗'));
+    navigator.clipboard.writeText(msg).then(() => showToast('Copied! Paste it anywhere 🔗'));
   }
 }
 
@@ -3210,6 +3223,8 @@ async function viewCompany(id,name,loc){
     const realData = await loadRealCompanyData(co?.name || name, loc);
     const rsc = realData ? computeScoresFromData(realData.reports, realData.jobs, realData.webScore) : null;
     if (rsc && realData?.webScore?.web_reviews?.length) rsc.web_reviews = realData.webScore.web_reviews;
+    // Store score context so shareCompanyReport can build a rich message
+    if (rsc) _shareCtx = { name: co?.name||name, score: rsc.overall_score, ghost: Math.round((rsc.ghost_rate||0)*100), waste: rsc.waste||0, risk: rsc.risk_level };
 
     if (!rsc) {
       if (isUnknown) {
@@ -3247,7 +3262,7 @@ async function viewCompany(id,name,loc){
         </div>
         <div style="display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;justify-content:flex-end">
           ${dqBadge}
-          <button onclick="(()=>{const u='https://seenjobs.io/#company/'+encodeURIComponent('${(name||'').replace(/'/g,"\\'")}');navigator.share?navigator.share({title:'${(name||'').replace(/'/g,"\\'")} on Seen',url:u}):navigator.clipboard.writeText(u).then(()=>showToast('Link copied!'))})()" class="co-share-btn">↗ Share</button>
+          <button onclick="shareCompanyReport('${(name||'').replace(/'/g,"\\'")}')" class="co-share-btn">↗ Share</button>
         </div>
       </div>`;
 
