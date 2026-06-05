@@ -3206,6 +3206,7 @@ async function viewCompany(id,name,loc){
   (async () => {
     const realData = await loadRealCompanyData(co?.name || name, loc);
     const rsc = realData ? computeScoresFromData(realData.reports, realData.jobs, realData.webScore) : null;
+    if (rsc && realData?.webScore?.web_reviews?.length) rsc.web_reviews = realData.webScore.web_reviews;
 
     if (!rsc) {
       if (isUnknown) {
