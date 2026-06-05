@@ -123,6 +123,7 @@ export default async function handler(req, res) {
       report_text: report_text ? report_text.slice(0, 2000) : null,
       source: 'direct',
       needs_review: false,
+      company_name: safeCo,
     };
 
     const repRes = await fetch(`${SUPABASE_URL}/rest/v1/reports`, {
