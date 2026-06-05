@@ -1976,15 +1976,15 @@ async function loadRealCompanyData(companyName, cityHint) {
       .map(c => c.id)
       .filter(Boolean);
 
+    // Fetch reports via server API (bypasses RLS on reports table)
     let reports = [];
-    if (matchingIds.length > 0) {
-      const { data: rpts } = await db.from('reports')
-        .select('outcome,ghost_stage,rounds,wait_days,unpaid_work')
-        .in('company_id', matchingIds)
-        .eq('needs_review', false)
-        .limit(300);
-      reports = rpts || [];
-    }
+    try {
+      const rRes = await fetch('/api/reports', {
+        method: 'POST', headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({ company: canonical }),
+      });
+      if (rRes.ok) { const rd = await rRes.json(); reports = rd.reports || []; }
+    } catch(_e) {}
 
     const now = new Date().toISOString();
     const { data: jobs } = await db.from('jobs')
@@ -3133,50 +3133,47 @@ async function viewCompany(id,name,loc){
     </div>
     <div style="background:var(--gdim);border:1px solid var(--gmid);border-radius:8px;padding:.75rem 1rem;font-family:var(--mono);font-size:.62rem;color:var(--green)">This feature is exclusive to Seen. No other job board tracks which stage companies ghost at.</div>`;
 
-  // Reports — load live from Supabase
+  // Reports — load via server API (bypasses RLS)
   const ocC={ghosted:'v-r',autoreject:'v-y',human:'v-g',waiting:'v-y',hired:'v-g'};
   const ocL={ghosted:'👻 Ghosted',autoreject:'🤖 Auto-rejected',human:'✅ Got response',waiting:'⏳ Waiting',hired:'🎉 Hired'};
   document.getElementById('ctc-reports').innerHTML='<div style="text-align:center;padding:2rem;font-family:var(--mono);font-size:.65rem;color:var(--muted)"><div class="spinner" style="margin:0 auto .75rem;width:16px;height:16px"></div>Loading reports...</div>';
-  (async()=>{
-    let show=[];
-    if(db){
-      try{
-        // Use same multi-ID approach as loadRealCompanyData so reports from
-        // "Amazon Web Services", "Amazon Fresh" etc. all show on the Amazon page
-        const _canon=normalizeCompanyName(co?.name||name);
-        const _word=_canon.split(/\s+/)[0];
-        const{data:_cos}=await db.from('companies').select('id,name').ilike('name',`%${_word}%`).limit(20);
-        const _ids=(_cos||[]).filter(c=>normalizeCompanyName(c.name)===_canon).map(c=>c.id).filter(Boolean);
-        // If company not found, create a stub so submitted reports can link to it
-        if(_ids.length===0){
-          try{const{data:_stub}=await db.from('companies').insert({name:_canon,logo_letter:_canon[0]?.toUpperCase()||'?'}).select('id').single();if(_stub?.id)_ids.push(_stub.id);}catch(_e){}
-        }
-        if(_ids.length>0){
-          const ago=dt=>dt?Math.floor((Date.now()-new Date(dt))/86400000):null;
-          const{data}=await db.from('reports')
-            .select('role,outcome,ghost_stage,rounds,report_text,platform,created_at,company_locations(city)')
-            .in('company_id',_ids)
-            .order('created_at',{ascending:false}).limit(30);
-          if(data?.length){
-            show=data.map(r=>({
-              role:r.role||'Unknown role',
-              resp:r.outcome||'waiting',
-              stage:r.ghost_stage,
-              rounds:r.rounds,
-              loc:r.company_locations?.city||'',
-              text:r.report_text||'',
-              src:r.platform||'Direct',
-              days:ago(r.created_at),
-            }));
-            // Don't filter by location — show all reports for the company (loc shown on each card)
-          }
-        }
-      }catch(e){console.warn('reports load:',e);}
-    }
+  const _coNameForReports=normalizeCompanyName(co?.name||name);
+  const _renderReports=(allReports,cities,cityFilter)=>{
+    const ago=dt=>dt?Math.floor((Date.now()-new Date(dt))/86400000):null;
+    let show=allReports.map(r=>({
+      role:r.role||'Unknown role',resp:r.outcome||'waiting',stage:r.ghost_stage,
+      rounds:r.rounds,loc:r.company_locations?.city||'',text:r.report_text||'',
+      src:r.platform||'Direct',days:ago(r.created_at),
+    }));
+    if(cityFilter)show=show.filter(r=>!r.loc||r.loc.toLowerCase().includes(cityFilter.toLowerCase()));
+    const filterBar=cities.length>1?`<div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.85rem;flex-wrap:wrap">
+      <span style="font-family:var(--mono);font-size:.58rem;color:var(--muted)">Filter by location:</span>
+      <button onclick="_filterReports('${_coNameForReports.replace(/'/g,"\\'")}','')" style="padding:.25rem .6rem;border-radius:20px;border:1px solid ${!cityFilter?'var(--green)':'var(--line2)'};background:${!cityFilter?'var(--gdim)':'transparent'};color:${!cityFilter?'var(--green)':'var(--muted)'};font-family:var(--mono);font-size:.56rem;cursor:pointer">All</button>
+      ${cities.map(c=>`<button onclick="_filterReports('${_coNameForReports.replace(/'/g,"\\'")}','${c.replace(/'/g,"\\'")}',window._coReportsAll)" style="padding:.25rem .6rem;border-radius:20px;border:1px solid ${cityFilter===c?'var(--green)':'var(--line2)'};background:${cityFilter===c?'var(--gdim)':'transparent'};color:${cityFilter===c?'var(--green)':'var(--muted)'};font-family:var(--mono);font-size:.56rem;cursor:pointer">${c.replace(/</g,'&lt;')}</button>`).join('')}
+    </div>`:'';
     document.getElementById('ctc-reports').innerHTML=show.length?
-      `<div style="font-family:var(--mono);font-size:.58rem;color:var(--muted);margin-bottom:.85rem">${show.length} report${show.length!==1?'s':''} from real applicants · anonymous · verified</div>`+
+      filterBar+`<div style="font-family:var(--mono);font-size:.58rem;color:var(--muted);margin-bottom:.85rem">${show.length} report${show.length!==1?'s':''} from real applicants · anonymous · verified</div>`+
       show.map(r=>`<div class="rcard"><div class="rc-hd"><div class="rc-av">${(r.role||'?')[0].toUpperCase()}</div><div style="flex:1"><div class="rc-role">${r.role.replace(/</g,'&lt;')}${r.stage?` <span style="color:var(--muted)">· ghosted at ${r.stage}</span>`:''}</div><div class="rc-meta">${r.loc?'📍 '+r.loc.replace(/</g,'&lt;')+' · ':''}${r.rounds?r.rounds+' round'+(r.rounds!==1?'s':'')+(r.days!==null?' · ':' '):''}${r.days!==null?(r.days===0?'today':r.days+'d ago'):''}</div></div><span class="vibe ${ocC[r.resp]||'v-n'}">${ocL[r.resp]||r.resp}</span></div>${r.text?`<div class="rc-body">${r.text.replace(/</g,'&lt;').replace(/>/g,'&gt;')}</div>`:''}<div class="rc-footer"><span style="font-family:var(--mono);font-size:.56rem;color:var(--muted)">via</span><span class="vibe v-n" style="font-size:.55rem">${r.src}</span></div></div>`).join(''):
-      `<div style="text-align:center;padding:2.5rem;color:var(--muted);font-family:var(--mono);font-size:.7rem">No reports yet.<br><br><button class="btn btn-ghost" onclick="prefillReport('${normalizeCompanyName(co?.name||name)}');go('report')">Be the first to report →</button></div>`;
+      filterBar+`<div style="text-align:center;padding:2.5rem;color:var(--muted);font-family:var(--mono);font-size:.7rem">${cityFilter?`No reports for ${cityFilter}.`:'No reports yet.'}<br><br><button class="btn btn-ghost" onclick="prefillReport('${_coNameForReports.replace(/'/g,"\\'")}');go('report')">Be the first to report →</button></div>`;
+  };
+  window._filterReports=(coName,cityFilter,cached)=>{
+    if(cached){_renderReports(cached,window._coCities||[],cityFilter);return;}
+    document.getElementById('ctc-reports').innerHTML='<div style="text-align:center;padding:2rem;font-family:var(--mono);font-size:.65rem;color:var(--muted)">Filtering...</div>';
+    fetch('/api/reports',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({company:coName})})
+      .then(r=>r.json()).then(d=>{window._coReportsAll=d.reports||[];window._coCities=d.cities||[];_renderReports(window._coReportsAll,window._coCities,cityFilter);}).catch(()=>{});
+  };
+  (async()=>{
+    try{
+      const rRes=await fetch('/api/reports',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({company:_coNameForReports})});
+      if(!rRes.ok)throw new Error('reports API '+rRes.status);
+      const rd=await rRes.json();
+      window._coReportsAll=rd.reports||[];
+      window._coCities=rd.cities||[];
+      _renderReports(window._coReportsAll,window._coCities,'');
+    }catch(e){
+      console.warn('reports load:',e);
+      document.getElementById('ctc-reports').innerHTML='<div style="text-align:center;padding:2rem;font-family:var(--mono);font-size:.65rem;color:var(--muted)">Could not load reports.</div>';
+    }
   })();
 
   // Locations tab
