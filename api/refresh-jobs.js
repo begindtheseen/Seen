@@ -409,8 +409,54 @@ async function fetchAdzuna(what, where, appId, appKey) {
   }
 }
 
+// Cache company name → id within a single cron run to avoid duplicate lookups
+const _companyIdCache = {};
+
+async function getOrCreateCompanyId(name, supabaseUrl, serviceKey) {
+  if (!name) return null;
+  const canon = normalizeCompany(name);
+  if (_companyIdCache[canon]) return _companyIdCache[canon];
+  const h = {
+    apikey: serviceKey,
+    Authorization: `Bearer ${serviceKey}`,
+    'Content-Type': 'application/json',
+    Prefer: 'return=representation',
+  };
+  // Look up by canonical name first
+  const look = await fetch(
+    `${supabaseUrl}/rest/v1/companies?name=eq.${encodeURIComponent(canon)}&select=id&limit=1`,
+    { headers: h }
+  );
+  if (look.ok) {
+    const rows = await look.json();
+    if (rows?.[0]?.id) {
+      _companyIdCache[canon] = rows[0].id;
+      return rows[0].id;
+    }
+  }
+  // Create it
+  const create = await fetch(`${supabaseUrl}/rest/v1/companies`, {
+    method: 'POST',
+    headers: { ...h, Prefer: 'resolution=merge-duplicates,return=representation' },
+    body: JSON.stringify({ name: canon }),
+  });
+  if (create.ok) {
+    const rows = await create.json();
+    const id = Array.isArray(rows) ? rows[0]?.id : rows?.id;
+    if (id) { _companyIdCache[canon] = id; return id; }
+  }
+  return null;
+}
+
 async function upsertJobs(jobs, supabaseUrl, serviceKey) {
   if (!jobs.length) return { upserted: 0, rows: [] };
+
+  // Stamp company_id on every job before inserting
+  const withIds = await Promise.all(jobs.map(async j => {
+    const cid = await getOrCreateCompanyId(j.company, supabaseUrl, serviceKey);
+    return cid ? { ...j, company_id: cid } : j;
+  }));
+
   const res = await fetch(`${supabaseUrl}/rest/v1/jobs?select=id,title,company,description`, {
     method: 'POST',
     headers: {
@@ -419,7 +465,7 @@ async function upsertJobs(jobs, supabaseUrl, serviceKey) {
       'Content-Type': 'application/json',
       Prefer: 'resolution=merge-duplicates,return=representation',
     },
-    body: JSON.stringify(jobs),
+    body: JSON.stringify(withIds),
   });
   if (!res.ok) return { upserted: 0, rows: [] };
   const rows = await res.json();
@@ -642,9 +688,32 @@ export default async function handler(req, res) {
       new Promise(r => setTimeout(r, 30000)),
     ]).catch(e => console.error('pregen error (non-fatal):', e.message));
 
-    // Sunday only: merge duplicate company records
+    // Sunday only: backfill company_id on jobs that are missing it + merge duplicates
     let merged = 0;
     if (new Date().getDay() === 0 && SUPABASE_URL && SUPABASE_SERVICE_KEY) {
+      // Backfill: find jobs with no company_id, stamp them
+      try {
+        const h = { apikey: SUPABASE_SERVICE_KEY, Authorization: `Bearer ${SUPABASE_SERVICE_KEY}` };
+        const nullRes = await fetch(
+          `${SUPABASE_URL}/rest/v1/jobs?company_id=is.null&select=id,company&limit=500`,
+          { headers: h }
+        );
+        if (nullRes.ok) {
+          const nullJobs = await nullRes.json();
+          for (const j of (nullJobs || [])) {
+            const cid = await getOrCreateCompanyId(j.company, SUPABASE_URL, SUPABASE_SERVICE_KEY);
+            if (cid) {
+              await fetch(`${SUPABASE_URL}/rest/v1/jobs?id=eq.${j.id}`, {
+                method: 'PATCH',
+                headers: { ...h, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
+                body: JSON.stringify({ company_id: cid }),
+              });
+            }
+          }
+          console.log(`BACKFILL: stamped company_id on ${nullJobs?.length || 0} jobs`);
+        }
+      } catch(e) { console.error('backfill error (non-fatal):', e.message); }
+
       const mr = await mergeCompanies(SUPABASE_URL, SUPABASE_SERVICE_KEY).catch(() => ({}));
       merged = mr.deleted || 0;
     }
