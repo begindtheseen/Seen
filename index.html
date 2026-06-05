@@ -2528,7 +2528,7 @@ function renderJobResults(jobs, l) {
       '<button onclick="openModal(\'' + safeCompany + '\',\'' + safeLoc + '\')" style="display:block;width:100%;text-align:center;font-family:var(--display);font-size:.82rem;font-weight:800;color:#000;background:var(--amber);padding:.6rem 1rem;border:none;border-radius:8px;cursor:pointer;margin-bottom:.4rem">🏢 Check ' + safeCompany + ' →</button>' +
       '<div class="jlc-actions">' +
         '<button class="jlc-save" data-saved="' + (isSaved ? '1' : '0') + '" id="save_' + safeId + '" onclick="toggleSaveJob(\'' + safeId + '\',\'' + safeCompany + '\',\'' + safeTitle + '\',\'' + safeLoc + '\',' + score + ')">' + (isSaved ? '♥' : '♡') + '</button>' +
-        '<button class="jlc-apply" onclick="' + applyAction + '">Apply &amp; Optimize ✓</button>' +
+        '<button class="jlc-apply" onclick="' + applyAction + '">Apply &amp; Optimize →</button>' +
       '</div>' +
     '</div>';
   }).join('');

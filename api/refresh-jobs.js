@@ -1,4 +1,5 @@
 import { getQueryExpansion } from './_utils/expand.js';
+import { mergeCompanies } from './_utils/merge.js';
 
 // Canonical company name aliases — keeps all subsidiaries/variants under one brand
 // so job listings roll up correctly to the same company insights page.
@@ -641,6 +642,13 @@ export default async function handler(req, res) {
       new Promise(r => setTimeout(r, 30000)),
     ]).catch(e => console.error('pregen error (non-fatal):', e.message));
 
+    // Sunday only: merge duplicate company records
+    let merged = 0;
+    if (new Date().getDay() === 0 && SUPABASE_URL && SUPABASE_SERVICE_KEY) {
+      const mr = await mergeCompanies(SUPABASE_URL, SUPABASE_SERVICE_KEY).catch(() => ({}));
+      merged = mr.deleted || 0;
+    }
+
     return res.status(200).json({
       ok: true,
       date: new Date().toISOString(),
@@ -649,6 +657,7 @@ export default async function handler(req, res) {
       found: allJobs.length,
       upserted: upsertResults.reduce((sum, r) => sum + (r.upserted || 0), 0),
       purged: junkResult.removed,
+      merged,
     });
 
   } catch (err) {
