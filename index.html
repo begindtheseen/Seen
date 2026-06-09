@@ -1872,54 +1872,119 @@ nav.nav-scrolled{background:rgba(6,6,8,0.82);backdrop-filter:blur(60px) saturate
     </div>
     <div style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:.75rem;margin-bottom:1.5rem">
       <div>
-        <h1 style="font-family:var(--display);font-size:2rem;font-weight:800;color:var(--white);letter-spacing:-.04em;line-height:1.05;margin-bottom:.25rem">Platform stats</h1>
+        <h1 style="font-family:var(--display);font-size:2rem;font-weight:800;color:var(--white);letter-spacing:-.04em;line-height:1.05;margin-bottom:.25rem">Data flywheel</h1>
         <p style="font-size:.8rem;color:var(--sub);font-weight:300" id="admLastUpdated">Loading…</p>
       </div>
       <button onclick="renderAdminPage()" style="background:none;border:1px solid var(--line2);border-radius:8px;padding:.5rem 1rem;font-family:var(--mono);font-size:.65rem;color:var(--sub);cursor:pointer;transition:all .15s;flex-shrink:0" onmouseover="this.style.borderColor='var(--blue)';this.style.color='var(--white)'" onmouseout="this.style.borderColor='var(--line2)';this.style.color='var(--sub)'">↻ Refresh</button>
     </div>
 
-    <!-- KPI tiles -->
-    <div class="adm-kpi-row" id="admKpiRow">
-      <div class="adm-kpi"><div class="adm-kpi-l">Total active jobs</div><div class="adm-kpi-n" id="admTotalJobs">—</div><div class="adm-kpi-sub">in database now</div></div>
-      <div class="adm-kpi"><div class="adm-kpi-l">Added last 24h</div><div class="adm-kpi-n" id="admFreshJobs">—</div><div class="adm-kpi-sub">approx, from expiry</div></div>
-      <div class="adm-kpi"><div class="adm-kpi-l">Searches today</div><div class="adm-kpi-n" id="admSearchesToday">—</div><div class="adm-kpi-sub" id="admSearchTodaySub">API cache misses</div></div>
-      <div class="adm-kpi"><div class="adm-kpi-l">Searches this week</div><div class="adm-kpi-n" id="admSearchesWeek">—</div><div class="adm-kpi-sub">last 7 days</div></div>
+    <!-- Row 1: Users + Reports (the two primary growth metrics) -->
+    <div style="font-family:var(--mono);font-size:.5rem;text-transform:uppercase;letter-spacing:.14em;color:var(--dim);margin-bottom:.4rem">Users</div>
+    <div class="adm-kpi-row" style="margin-bottom:1.25rem">
+      <div class="adm-kpi" style="--ds-c:var(--blue)">
+        <div class="adm-kpi-l">Total accounts</div>
+        <div class="adm-kpi-n" id="admTotalUsers">—</div>
+        <div class="adm-kpi-sub">all time</div>
+      </div>
+      <div class="adm-kpi">
+        <div class="adm-kpi-l">New today</div>
+        <div class="adm-kpi-n" id="admNewToday">—</div>
+        <div class="adm-kpi-sub">last 24h</div>
+      </div>
+      <div class="adm-kpi">
+        <div class="adm-kpi-l">New this week</div>
+        <div class="adm-kpi-n" id="admNewWeek">—</div>
+        <div class="adm-kpi-sub">last 7 days</div>
+      </div>
+      <div class="adm-kpi">
+        <div class="adm-kpi-l">Companies scored</div>
+        <div class="adm-kpi-n" id="admCoScored">—</div>
+        <div class="adm-kpi-sub">with AI scores</div>
+      </div>
     </div>
 
-    <!-- Search volume chart (only shown when search_logs table exists) -->
-    <div class="adm-panel" id="admChartPanel" style="display:none">
+    <div style="font-family:var(--mono);font-size:.5rem;text-transform:uppercase;letter-spacing:.14em;color:var(--dim);margin-bottom:.4rem">Community data</div>
+    <div class="adm-kpi-row" style="margin-bottom:1.25rem">
+      <div class="adm-kpi" style="border-left:2px solid var(--green)">
+        <div class="adm-kpi-l">Total reports</div>
+        <div class="adm-kpi-n" id="admTotalReports" style="color:var(--green)">—</div>
+        <div class="adm-kpi-sub">all time</div>
+      </div>
+      <div class="adm-kpi">
+        <div class="adm-kpi-l">Reports today</div>
+        <div class="adm-kpi-n" id="admReportsToday">—</div>
+        <div class="adm-kpi-sub">last 24h</div>
+      </div>
+      <div class="adm-kpi">
+        <div class="adm-kpi-l">Reports this week</div>
+        <div class="adm-kpi-n" id="admReportsWeek">—</div>
+        <div class="adm-kpi-sub">last 7 days</div>
+      </div>
+      <div class="adm-kpi" style="border-left:2px solid var(--red)">
+        <div class="adm-kpi-l">Ghost rate (30d)</div>
+        <div class="adm-kpi-n" id="admGhostRate" style="color:var(--red)">—</div>
+        <div class="adm-kpi-sub">of tracked apps</div>
+      </div>
+    </div>
+
+    <div style="font-family:var(--mono);font-size:.5rem;text-transform:uppercase;letter-spacing:.14em;color:var(--dim);margin-bottom:.4rem">Application tracking</div>
+    <div class="adm-kpi-row" style="margin-bottom:1.5rem">
+      <div class="adm-kpi">
+        <div class="adm-kpi-l">Apps tracked total</div>
+        <div class="adm-kpi-n" id="admTotalApps">—</div>
+        <div class="adm-kpi-sub">across all users</div>
+      </div>
+      <div class="adm-kpi">
+        <div class="adm-kpi-l">Ghosted (30d)</div>
+        <div class="adm-kpi-n" id="admGhostedApps" style="color:var(--amber)">—</div>
+        <div class="adm-kpi-sub">tracked as ghosted</div>
+      </div>
+      <div class="adm-kpi">
+        <div class="adm-kpi-l">Hired (30d)</div>
+        <div class="adm-kpi-n" id="admHiredApps" style="color:var(--green)">—</div>
+        <div class="adm-kpi-sub">tracked as hired</div>
+      </div>
+      <div class="adm-kpi" id="admCoLookupKpi">
+        <div class="adm-kpi-l">Co. lookups today</div>
+        <div class="adm-kpi-n" id="admCoLookupToday">—</div>
+        <div class="adm-kpi-sub">company pages viewed</div>
+      </div>
+    </div>
+
+    <!-- Reports per day chart -->
+    <div class="adm-panel" id="admChartPanel">
       <div class="adm-panel-hdr">
-        Search volume — last 7 days
+        Reports submitted — last 30 days
         <span style="font-family:var(--mono);font-size:.5rem;color:var(--dim)">one bar = one day</span>
       </div>
-      <div style="padding:.75rem 1rem .5rem">
-        <div class="adm-chart-row" id="admChart"></div>
-        <div style="display:flex;justify-content:space-between;padding:.25rem 0 0;font-family:var(--mono);font-size:.44rem;color:var(--dim)" id="admChartLabels"></div>
+      <div style="padding:.85rem 1rem .6rem">
+        <div class="adm-chart-row" id="admChart" style="height:56px"></div>
+        <div style="display:flex;justify-content:space-between;padding:.3rem 0 0;font-family:var(--mono);font-size:.44rem;color:var(--dim)" id="admChartLabels"></div>
       </div>
     </div>
 
-    <!-- Two-column: top job queries + top locations -->
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:.65rem;margin-bottom:1rem" id="admTwoCol">
+    <!-- Two-column: most reported companies + most searched companies -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:.65rem;margin-top:.65rem;margin-bottom:.65rem" id="admTwoCol">
       <div class="adm-panel">
-        <div class="adm-panel-hdr">Top job queries in DB</div>
-        <div id="admTopQueries"><div style="padding:.85rem 1rem;font-family:var(--mono);font-size:.62rem;color:var(--dim)">Loading…</div></div>
+        <div class="adm-panel-hdr">Most reported companies <span style="color:var(--dim);font-weight:400">(30d)</span></div>
+        <div id="admTopReported"><div style="padding:.85rem 1rem;font-family:var(--mono);font-size:.62rem;color:var(--dim)">Loading…</div></div>
       </div>
       <div class="adm-panel">
-        <div class="adm-panel-hdr">Top locations in DB</div>
-        <div id="admTopLocations"><div style="padding:.85rem 1rem;font-family:var(--mono);font-size:.62rem;color:var(--dim)">Loading…</div></div>
+        <div class="adm-panel-hdr">Most researched companies <span id="admCoLookupWeekLabel" style="color:var(--dim);font-weight:400">(7d)</span></div>
+        <div id="admTopSearched"><div style="padding:.85rem 1rem;font-family:var(--mono);font-size:.62rem;color:var(--dim)">Loading…</div></div>
       </div>
     </div>
 
-    <!-- Most-searched queries (from live search logs, if available) -->
-    <div class="adm-panel" id="admLiveSearchPanel" style="display:none">
-      <div class="adm-panel-hdr">Most searched this week <span style="color:var(--green)">live</span></div>
-      <div id="admLiveSearches"></div>
+    <!-- Outcome breakdown -->
+    <div class="adm-panel" id="admOutcomePanel">
+      <div class="adm-panel-hdr">Report outcome breakdown <span style="color:var(--dim);font-weight:400">(30d)</span></div>
+      <div style="display:flex;gap:.5rem;flex-wrap:wrap;padding:.75rem 1rem" id="admOutcomes"></div>
     </div>
 
-    <!-- Setup note for search_logs -->
+    <!-- Setup note: search_logs not created yet -->
     <div id="admSetupNote" style="display:none;background:rgba(245,158,11,.06);border:1px solid rgba(245,158,11,.2);border-radius:10px;padding:1rem 1.1rem;margin-top:1rem">
-      <div style="font-family:var(--mono);font-size:.6rem;color:var(--amber);text-transform:uppercase;letter-spacing:.1em;margin-bottom:.5rem">Action needed — enable search tracking</div>
-      <p style="font-size:.78rem;color:var(--sub);margin-bottom:.75rem;line-height:1.6">Run this SQL in your <a href="https://app.supabase.com" target="_blank" style="color:var(--blue);text-decoration:none">Supabase SQL editor</a> to unlock live search volume tracking:</p>
+      <div style="font-family:var(--mono);font-size:.6rem;color:var(--amber);text-transform:uppercase;letter-spacing:.1em;margin-bottom:.5rem">Enable company lookup tracking</div>
+      <p style="font-size:.78rem;color:var(--sub);margin-bottom:.75rem;line-height:1.6">Run this SQL in your <a href="https://app.supabase.com" target="_blank" style="color:var(--blue);text-decoration:none">Supabase SQL editor</a> once to track which companies users are researching:</p>
       <pre style="background:rgba(0,0,0,.35);border:1px solid rgba(255,255,255,.08);border-radius:6px;padding:.75rem 1rem;font-family:var(--mono);font-size:.65rem;color:var(--white);overflow-x:auto;line-height:1.7;margin:0">CREATE TABLE IF NOT EXISTS search_logs (
   id bigserial PRIMARY KEY,
   query text NOT NULL,
@@ -1931,12 +1996,13 @@ nav.nav-scrolled{background:rgba(6,6,8,0.82);backdrop-filter:blur(60px) saturate
 CREATE INDEX IF NOT EXISTS idx_search_logs_created
   ON search_logs(created_at DESC);
 ALTER TABLE search_logs ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "service only" ON search_logs
-  FOR ALL USING (false);</pre>
-      <p style="font-size:.72rem;color:var(--dim);margin-top:.5rem">The last two lines lock the table down to service-key only (no public reads). Once created, every search that hits the API will be logged automatically.</p>
+-- Allow anon INSERT only (so frontend can log company views)
+CREATE POLICY "insert only" ON search_logs FOR INSERT WITH CHECK (true);
+-- Block all reads from the client side
+CREATE POLICY "no reads" ON search_logs FOR SELECT USING (false);</pre>
     </div>
 
-    <!-- Auth / access error state -->
+    <!-- Auth / access error -->
     <div id="admAuthError" style="display:none;text-align:center;padding:3rem 1rem">
       <div style="font-size:2rem;margin-bottom:1rem">🔒</div>
       <div style="font-family:var(--display);font-size:1.1rem;font-weight:700;color:var(--white);margin-bottom:.4rem">Access restricted</div>
@@ -4084,6 +4150,14 @@ function _renderCoTrackBar(name, loc, sc) {
 async function viewCompany(id,name,loc){
   go('company');
   if (name) RecentSearches.push(name, loc||'');
+  // Log company lookup for admin analytics (fire-and-forget, never blocks UI)
+  if (name && db) {
+    fetch(`${SUPABASE_URL}/rest/v1/search_logs`, {
+      method: 'POST',
+      headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}`, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
+      body: JSON.stringify({ query: name.trim(), location: loc || '', result_count: 1, source: 'company' }),
+    }).catch(() => {});
+  }
   // Encode current company into the URL hash so Safari can restore after page discard
   const _hn=encodeURIComponent((name||'').toLowerCase().trim());
   const _hl=loc?'/'+encodeURIComponent((loc||'').toLowerCase().trim()):'';
@@ -4797,18 +4871,14 @@ async function renderAdminPage() {
   const errEl = document.getElementById('admAuthError');
   const errMsg = document.getElementById('admAuthMsg');
   const setupNote = document.getElementById('admSetupNote');
-  const chartPanel = document.getElementById('admChartPanel');
-  const livePanel = document.getElementById('admLiveSearchPanel');
   const lastUpdated = document.getElementById('admLastUpdated');
 
-  // Hide error, show loading state
   if (errEl) errEl.style.display = 'none';
   if (setupNote) setupNote.style.display = 'none';
   if (lastUpdated) lastUpdated.textContent = 'Loading…';
 
   const set = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
 
-  // Must be logged in — use the async token getter so we always get a fresh JWT
   const token = await Auth.token();
   if (!token) {
     if (errEl) errEl.style.display = 'block';
@@ -4817,108 +4887,108 @@ async function renderAdminPage() {
   }
 
   try {
-    const res = await fetch('/api/admin-stats', {
-      headers: { Authorization: `Bearer ${token}` },
-    });
+    const res = await fetch('/api/admin-stats', { headers: { Authorization: `Bearer ${token}` } });
 
-    if (res.status === 401) {
-      if (errEl) errEl.style.display = 'block';
-      if (errMsg) errMsg.textContent = 'Session expired. Please sign in again.';
-      return;
-    }
-    if (res.status === 403) {
-      if (errEl) errEl.style.display = 'block';
-      if (errMsg) errMsg.textContent = 'This page is restricted to Seen admin accounts.';
-      return;
-    }
+    if (res.status === 401) { if (errEl) errEl.style.display = 'block'; if (errMsg) errMsg.textContent = 'Session expired — sign in again.'; return; }
+    if (res.status === 403) { if (errEl) errEl.style.display = 'block'; if (errMsg) errMsg.textContent = 'Restricted to Seen admin accounts.'; return; }
     if (!res.ok) throw new Error('API error ' + res.status);
 
-    const data = await res.json();
+    const d = await res.json();
 
-    // KPI tiles
-    set('admTotalJobs', (data.jobs?.total ?? '—').toLocaleString());
-    set('admFreshJobs', (data.jobs?.added_last_24h_approx ?? '—').toLocaleString());
+    // ── Users ─────────────────────────────────────────────────────────────
+    set('admTotalUsers',   (d.users?.total       ?? 0).toLocaleString());
+    set('admNewToday',     (d.users?.new_today    ?? 0).toLocaleString());
+    set('admNewWeek',      (d.users?.new_this_week ?? 0).toLocaleString());
+    set('admCoScored',     (d.companies?.with_scores ?? 0).toLocaleString());
 
-    const searchesToday = data.searches?.today;
-    const searchesWeek = data.searches?.week_total;
-    set('admSearchesToday', searchesToday !== null && searchesToday !== undefined ? searchesToday.toLocaleString() : '—');
-    set('admSearchesWeek', searchesWeek !== null && searchesWeek !== undefined ? searchesWeek.toLocaleString() : '—');
+    // ── Reports ───────────────────────────────────────────────────────────
+    set('admTotalReports',  (d.reports?.total      ?? 0).toLocaleString());
+    set('admReportsToday',  (d.reports?.today      ?? 0).toLocaleString());
+    set('admReportsWeek',   (d.reports?.this_week  ?? 0).toLocaleString());
 
-    // If search_logs table doesn't exist yet, show setup note and mark stats as N/A
-    if (!data.search_logs_ready) {
-      set('admSearchesToday', 'N/A');
-      set('admSearchesWeek', 'N/A');
-      set('admSearchTodaySub', 'not yet tracked');
+    // ── Applications + ghost rate ─────────────────────────────────────────
+    set('admTotalApps',   (d.applications?.total    ?? 0).toLocaleString());
+    set('admGhostedApps', (d.applications?.ghosted_30d ?? 0).toLocaleString());
+    set('admHiredApps',   (d.applications?.hired_30d   ?? 0).toLocaleString());
+    const gr = d.applications?.ghost_rate_pct;
+    set('admGhostRate', gr !== null && gr !== undefined ? gr + '%' : '—');
+
+    // ── Company lookups ───────────────────────────────────────────────────
+    if (!d.company_lookups?.ready) {
+      set('admCoLookupToday', 'N/A');
       if (setupNote) setupNote.style.display = 'block';
     } else {
-      if (setupNote) setupNote.style.display = 'none';
+      set('admCoLookupToday', (d.company_lookups?.today ?? 0).toLocaleString());
     }
 
-    // Search volume chart
-    const chart = data.searches?.chart;
-    if (chart && chart.length && chartPanel) {
-      chartPanel.style.display = 'block';
-      const max = Math.max(...chart.map(d => d.count), 1);
-      const chartEl = document.getElementById('admChart');
-      const labelsEl = document.getElementById('admChartLabels');
-      if (chartEl) {
-        chartEl.innerHTML = chart.map(d => {
-          const pct = Math.round((d.count / max) * 100);
-          return `<div class="adm-chart-bar" style="height:${pct}%" title="${d.date}: ${d.count} searches"></div>`;
-        }).join('');
-      }
+    // ── Reports chart ─────────────────────────────────────────────────────
+    const chart = d.reports?.chart;
+    const chartEl = document.getElementById('admChart');
+    const labelsEl = document.getElementById('admChartLabels');
+    if (chart && chart.length && chartEl) {
+      const max = Math.max(...chart.map(c => c.count), 1);
+      chartEl.innerHTML = chart.map(c => {
+        const pct = Math.max(4, Math.round((c.count / max) * 100));
+        return `<div class="adm-chart-bar" style="height:${pct}%" title="${c.date}: ${c.count} reports"></div>`;
+      }).join('');
       if (labelsEl) {
-        labelsEl.innerHTML = chart.map(d => {
-          const dt = new Date(d.date + 'T12:00:00');
+        // Only show ~6 evenly spaced labels to avoid crowding
+        const step = Math.max(1, Math.floor(chart.length / 6));
+        labelsEl.innerHTML = chart.map((c, i) => {
+          if (i % step !== 0 && i !== chart.length - 1) return '<span></span>';
+          const dt = new Date(c.date + 'T12:00:00');
           return `<span>${dt.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>`;
         }).join('');
       }
+    } else if (chartEl) {
+      chartEl.innerHTML = '<div style="font-family:var(--mono);font-size:.62rem;color:var(--dim);padding:.5rem 0">No reports yet</div>';
     }
 
-    // Live search top queries (from search_logs)
-    const liveQ = data.searches?.top_queries;
-    if (liveQ && liveQ.length && livePanel) {
-      livePanel.style.display = 'block';
-      const max2 = liveQ[0].count;
-      document.getElementById('admLiveSearches').innerHTML = liveQ.map(({ query, count }) => `
-        <div class="adm-row">
-          <div style="font-family:var(--mono);font-size:.68rem;color:var(--white);min-width:0;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${query}</div>
-          <div class="adm-bar-wrap"><div class="adm-bar" style="width:${Math.round(count/max2*100)}%"></div></div>
-          <div style="font-family:var(--mono);font-size:.62rem;color:var(--sub);min-width:2.5rem;text-align:right">${count}</div>
-        </div>`).join('');
+    // ── Most reported companies ────────────────────────────────────────────
+    const topRep = d.reports?.top_companies || [];
+    const maxRep = topRep[0]?.count || 1;
+    document.getElementById('admTopReported').innerHTML = topRep.length
+      ? topRep.map(({ company, count }) => `
+          <div class="adm-row">
+            <div style="font-family:var(--mono);font-size:.62rem;color:var(--white);flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${company}</div>
+            <div class="adm-bar-wrap"><div class="adm-bar" style="width:${Math.round(count/maxRep*100)}%"></div></div>
+            <div style="font-family:var(--mono);font-size:.62rem;color:var(--sub);min-width:2rem;text-align:right">${count}</div>
+          </div>`).join('')
+      : '<div style="padding:.85rem 1rem;font-family:var(--mono);font-size:.62rem;color:var(--dim)">No reports yet</div>';
+
+    // ── Most researched companies ──────────────────────────────────────────
+    const topSearch = d.company_lookups?.top || [];
+    const maxSearch = topSearch[0]?.count || 1;
+    document.getElementById('admTopSearched').innerHTML = topSearch.length
+      ? topSearch.map(({ company, count }) => `
+          <div class="adm-row">
+            <div style="font-family:var(--mono);font-size:.62rem;color:var(--white);flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${company}</div>
+            <div class="adm-bar-wrap"><div class="adm-bar green" style="width:${Math.round(count/maxSearch*100)}%"></div></div>
+            <div style="font-family:var(--mono);font-size:.62rem;color:var(--sub);min-width:2rem;text-align:right">${count}</div>
+          </div>`).join('')
+      : `<div style="padding:.85rem 1rem;font-family:var(--mono);font-size:.62rem;color:var(--dim)">${d.company_lookups?.ready ? 'No lookups yet this week' : 'Tracking not enabled — see setup note below'}</div>`;
+
+    // ── Outcome breakdown ─────────────────────────────────────────────────
+    const outcomes = d.reports?.outcome_breakdown || {};
+    const outcomeColors = { ghosted:'var(--red)', rejected:'var(--amber)', interview:'var(--blue)', offer:'var(--green)', waiting:'var(--dim)' };
+    const outcomeEl = document.getElementById('admOutcomes');
+    if (outcomeEl) {
+      outcomeEl.innerHTML = Object.entries(outcomes)
+        .filter(([, v]) => v > 0)
+        .sort((a, b) => b[1] - a[1])
+        .map(([k, v]) => `
+          <div style="background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.07);border-radius:8px;padding:.5rem .85rem;display:flex;align-items:center;gap:.5rem">
+            <span style="font-family:var(--mono);font-size:.58rem;text-transform:capitalize;color:${outcomeColors[k]||'var(--sub)'}">${k}</span>
+            <span style="font-family:var(--mono);font-size:.82rem;font-weight:600;color:var(--white)">${v}</span>
+          </div>`).join('') || '<div style="font-family:var(--mono);font-size:.62rem;color:var(--dim)">No report data yet</div>';
     }
 
-    // Top job queries (from DB job tags)
-    const topQ = data.top_job_queries || [];
-    const maxQ = topQ[0]?.count || 1;
-    document.getElementById('admTopQueries').innerHTML = topQ.length
-      ? topQ.map(({ query, count }) => `
-        <div class="adm-row">
-          <div style="font-family:var(--mono);font-size:.62rem;color:var(--white);min-width:0;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${query}</div>
-          <div class="adm-bar-wrap"><div class="adm-bar" style="width:${Math.round(count/maxQ*100)}%"></div></div>
-          <div style="font-family:var(--mono);font-size:.62rem;color:var(--sub);min-width:2.5rem;text-align:right">${count}</div>
-        </div>`).join('')
-      : '<div style="padding:.85rem 1rem;font-family:var(--mono);font-size:.62rem;color:var(--dim)">No data yet</div>';
-
-    // Top locations
-    const topL = data.top_locations || [];
-    const maxL = topL[0]?.count || 1;
-    document.getElementById('admTopLocations').innerHTML = topL.length
-      ? topL.map(({ location, count }) => `
-        <div class="adm-row">
-          <div style="font-family:var(--mono);font-size:.62rem;color:var(--white);min-width:0;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${location}</div>
-          <div class="adm-bar-wrap"><div class="adm-bar green" style="width:${Math.round(count/maxL*100)}%"></div></div>
-          <div style="font-family:var(--mono);font-size:.62rem;color:var(--sub);min-width:2.5rem;text-align:right">${count}</div>
-        </div>`).join('')
-      : '<div style="padding:.85rem 1rem;font-family:var(--mono);font-size:.62rem;color:var(--dim)">No data yet</div>';
-
-    // Two-col grid collapses to single col on mobile
+    // Mobile: collapse two-col to single
     const twoCol = document.getElementById('admTwoCol');
     if (twoCol && window.innerWidth < 600) twoCol.style.gridTemplateColumns = '1fr';
 
-    // Updated timestamp
-    if (lastUpdated && data.generated_at) {
-      lastUpdated.textContent = 'Last updated ' + new Date(data.generated_at).toLocaleTimeString();
+    if (lastUpdated && d.generated_at) {
+      lastUpdated.textContent = 'Updated ' + new Date(d.generated_at).toLocaleTimeString();
     }
 
   } catch (e) {

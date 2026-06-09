@@ -23,10 +23,7 @@ export default async function handler(req, res) {
 
   try {
     const userRes = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
-      headers: {
-        apikey: SUPABASE_SERVICE_KEY,
-        Authorization: `Bearer ${token}`,
-      },
+      headers: { apikey: SUPABASE_SERVICE_KEY, Authorization: `Bearer ${token}` },
     });
     if (!userRes.ok) return res.status(401).json({ error: 'Invalid token' });
     const user = await userRes.json();
@@ -41,113 +38,170 @@ export default async function handler(req, res) {
     apikey: SUPABASE_SERVICE_KEY,
     Authorization: `Bearer ${SUPABASE_SERVICE_KEY}`,
   };
-  const now = new Date().toISOString();
-  // Approximation: jobs with expires_at > (now + 6d 20h) were added in last ~4 hours
-  // jobs with expires_at > (now + 6d 0h) were added in last ~24 hours
-  // Full 7-day window = any active job (could have been added anytime in last 7 days)
-  const fresh24h = new Date(Date.now() + 6 * 86400000).toISOString();
-  const sevenDaysAgo = new Date(Date.now() - 7 * 86400000).toISOString();
-  const oneDayAgo = new Date(Date.now() - 86400000).toISOString();
 
-  // Returns the count from Content-Range header, or 0 on any error
-  const safeCount = async (url) => {
+  const now = new Date().toISOString();
+  const oneDayAgo  = new Date(Date.now() - 86400000).toISOString();
+  const sevenDaysAgo = new Date(Date.now() - 7 * 86400000).toISOString();
+  const thirtyDaysAgo = new Date(Date.now() - 30 * 86400000).toISOString();
+
+  // Count rows from a table with optional filter. Returns integer. Never throws.
+  const count = async (table, filter = '') => {
     try {
+      const url = `${SUPABASE_URL}/rest/v1/${table}?select=id${filter ? '&' + filter : ''}`;
       const r = await fetch(url, { headers: { ...svc, Prefer: 'count=exact', Range: '0-0' } });
       if (!r.ok) return 0;
       return parseInt(r.headers?.get('Content-Range')?.split('/')?.[1] ?? '0') || 0;
     } catch { return 0; }
   };
 
-  const safeJson = async (url) => {
+  // Fetch JSON rows. Returns array. Never throws.
+  const rows = async (table, filter = '', select = '*', limit = 1000) => {
     try {
+      const url = `${SUPABASE_URL}/rest/v1/${table}?select=${select}&limit=${limit}${filter ? '&' + filter : ''}`;
       const r = await fetch(url, { headers: svc });
-      return r.ok ? await r.json() : [];
+      return r.ok ? (await r.json() || []) : [];
     } catch { return []; }
   };
 
-  // Probe whether search_logs table exists — a 404/400 from Supabase means the table
-  // is missing; a 200 (even with 0 rows) means it exists and logging is active.
+  // Check whether search_logs table exists (probe with limit=0)
   const searchLogsReady = await (async () => {
     try {
       const r = await fetch(`${SUPABASE_URL}/rest/v1/search_logs?limit=0&select=id`, { headers: svc });
-      return r.ok; // 200 = table exists, 4xx = does not exist
+      return r.ok;
     } catch { return false; }
   })();
 
+  // Run all queries in parallel
   const [
-    totalJobs,
-    freshJobs,
-    queryRows,
-    searchLogsToday,
-    searchLogsWeek,
-    locationRows,
+    totalUsers,
+    newUsersToday,
+    newUsersWeek,
+
+    totalReports,
+    reportsToday,
+    reportsWeek,
+    recentReports,        // for daily chart + top companies
+
+    totalApplications,
+    recentApplications,   // for ghost rate + stage breakdown
+
+    companiesWithScores,
+
+    companySearchesToday, // from search_logs where source='company'
+    companySearchesWeek,
+    companySearchRows,    // for top searched companies
   ] = await Promise.all([
-    safeCount(`${SUPABASE_URL}/rest/v1/jobs?expires_at=gt.${now}&select=id`),
-    safeCount(`${SUPABASE_URL}/rest/v1/jobs?expires_at=gt.${fresh24h}&select=id`),
-    safeJson(`${SUPABASE_URL}/rest/v1/jobs?expires_at=gt.${now}&select=search_query&limit=5000`),
-    searchLogsReady
-      ? safeCount(`${SUPABASE_URL}/rest/v1/search_logs?created_at=gt.${oneDayAgo}&select=id`)
-      : Promise.resolve(0),
-    searchLogsReady
-      ? safeJson(`${SUPABASE_URL}/rest/v1/search_logs?created_at=gt.${sevenDaysAgo}&select=created_at,query,location&limit=10000`)
-      : Promise.resolve([]),
-    safeJson(`${SUPABASE_URL}/rest/v1/jobs?expires_at=gt.${now}&select=location&limit=5000`),
+    // ── Users ──────────────────────────────────────────────────────────────
+    count('profiles'),
+    count('profiles', `created_at=gt.${oneDayAgo}`),
+    count('profiles', `created_at=gt.${sevenDaysAgo}`),
+
+    // ── Community reports ───────────────────────────────────────────────────
+    count('reports'),
+    count('reports', `created_at=gt.${oneDayAgo}`),
+    count('reports', `created_at=gt.${sevenDaysAgo}`),
+    rows('reports', `created_at=gt.${thirtyDaysAgo}`, 'company_name,outcome,created_at', 5000),
+
+    // ── Application tracking ────────────────────────────────────────────────
+    count('applications'),
+    rows('applications', `created_at=gt.${thirtyDaysAgo}`, 'company_name,stage,status,created_at', 5000),
+
+    // ── Company data coverage ────────────────────────────────────────────────
+    count('company_scores'),
+
+    // ── Company lookups (search_logs source='company') ───────────────────────
+    searchLogsReady ? count('search_logs', `source=eq.company&created_at=gt.${oneDayAgo}`) : Promise.resolve(null),
+    searchLogsReady ? count('search_logs', `source=eq.company&created_at=gt.${sevenDaysAgo}`) : Promise.resolve(null),
+    searchLogsReady ? rows('search_logs', `source=eq.company&created_at=gt.${sevenDaysAgo}`, 'query,created_at', 5000) : Promise.resolve([]),
   ]);
 
-  // Top search queries from job tags
-  const qCounts = {};
-  for (const r of (queryRows || [])) {
-    const q = (r.search_query || '').trim().toLowerCase();
-    if (q) qCounts[q] = (qCounts[q] || 0) + 1;
-  }
-  const topQueries = Object.entries(qCounts)
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 20)
-    .map(([query, count]) => ({ query, count }));
-
-  // Top locations
-  const lCounts = {};
-  for (const r of (locationRows || [])) {
-    const loc = (r.location || 'Unknown').split(',')[0].trim() || 'Unknown';
-    lCounts[loc] = (lCounts[loc] || 0) + 1;
-  }
-  const topLocations = Object.entries(lCounts)
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 10)
-    .map(([location, count]) => ({ location, count }));
-
-  // Search volume by day (from search_logs if table exists)
-  const searchByDay = {};
-  const searchTopQ = {};
-  for (const r of (searchLogsWeek || [])) {
+  // ── Reports: daily chart (last 30 days) ─────────────────────────────────
+  const reportsByDay = {};
+  for (const r of recentReports) {
     const day = (r.created_at || '').slice(0, 10);
-    if (day) searchByDay[day] = (searchByDay[day] || 0) + 1;
-    const q = (r.query || '').trim().toLowerCase();
-    if (q) searchTopQ[q] = (searchTopQ[q] || 0) + 1;
+    if (day) reportsByDay[day] = (reportsByDay[day] || 0) + 1;
   }
-  const searchChart = Object.entries(searchByDay)
+  const reportChart = Object.entries(reportsByDay)
     .sort(([a], [b]) => a.localeCompare(b))
+    .slice(-30)
     .map(([date, count]) => ({ date, count }));
-  const searchTopQueries = Object.entries(searchTopQ)
+
+  // ── Reports: top companies by report count ───────────────────────────────
+  const reportCoCounts = {};
+  for (const r of recentReports) {
+    const co = (r.company_name || '').trim();
+    if (co) reportCoCounts[co] = (reportCoCounts[co] || 0) + 1;
+  }
+  const topReportedCompanies = Object.entries(reportCoCounts)
     .sort((a, b) => b[1] - a[1])
-    .slice(0, 10)
-    .map(([query, count]) => ({ query, count }));
+    .slice(0, 15)
+    .map(([company, count]) => ({ company, count }));
+
+  // ── Reports: outcome breakdown ───────────────────────────────────────────
+  const outcomes = { ghosted: 0, rejected: 0, offer: 0, interview: 0, waiting: 0 };
+  for (const r of recentReports) {
+    const o = (r.outcome || '').toLowerCase();
+    if (o === 'ghosted' || r.ghost_stage) outcomes.ghosted++;
+    else if (outcomes[o] !== undefined) outcomes[o]++;
+  }
+
+  // ── Applications: ghost rate ─────────────────────────────────────────────
+  let ghostedApps = 0, hiredApps = 0;
+  for (const a of recentApplications) {
+    const s = (a.status || a.stage || '').toLowerCase();
+    if (s.includes('ghost') || s.includes('no response')) ghostedApps++;
+    if (s.includes('hired') || s.includes('offer') || s.includes('accepted')) hiredApps++;
+  }
+  const ghostRate = recentApplications.length > 0
+    ? Math.round((ghostedApps / recentApplications.length) * 100)
+    : null;
+
+  // ── Company searches: top companies being researched ─────────────────────
+  const coSearchCounts = {};
+  for (const r of companySearchRows) {
+    const q = (r.query || '').trim();
+    if (q) coSearchCounts[q] = (coSearchCounts[q] || 0) + 1;
+  }
+  const topSearchedCompanies = Object.entries(coSearchCounts)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 15)
+    .map(([company, count]) => ({ company, count }));
 
   return res.status(200).json({
     ok: true,
-    jobs: {
-      total: totalJobs,
-      added_last_24h_approx: freshJobs,
+    generated_at: now,
+
+    users: {
+      total: totalUsers,
+      new_today: newUsersToday,
+      new_this_week: newUsersWeek,
     },
-    search_logs_ready: searchLogsReady,
-    searches: {
-      today: searchLogsReady ? searchLogsToday : null,
-      week_total: searchLogsReady ? (searchLogsWeek || []).length : null,
-      chart: searchLogsReady && searchChart.length ? searchChart : null,
-      top_queries: searchLogsReady && searchTopQueries.length ? searchTopQueries : null,
+
+    reports: {
+      total: totalReports,
+      today: reportsToday,
+      this_week: reportsWeek,
+      chart: reportChart.length ? reportChart : null,
+      top_companies: topReportedCompanies,
+      outcome_breakdown: outcomes,
     },
-    top_job_queries: topQueries,
-    top_locations: topLocations,
-    generated_at: new Date().toISOString(),
+
+    applications: {
+      total: totalApplications,
+      ghost_rate_pct: ghostRate,
+      ghosted_30d: ghostedApps,
+      hired_30d: hiredApps,
+    },
+
+    companies: {
+      with_scores: companiesWithScores,
+    },
+
+    company_lookups: {
+      ready: searchLogsReady,
+      today: companySearchesToday,
+      this_week: companySearchesWeek,
+      top: topSearchedCompanies.length ? topSearchedCompanies : null,
+    },
   });
 }
