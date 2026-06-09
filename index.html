@@ -2195,6 +2195,58 @@ function openCompanySearch(){
   setTimeout(()=>document.getElementById('coSearchInp')?.focus(),120);
 }
 
+// ── Application tracking helpers for company check modal ──
+function _modalTrackCTA(name, loc, sc) {
+  const existing = AppStore.loadSync().find(a => a.company.toLowerCase() === name.toLowerCase() && a.status === 'active');
+  if (existing) {
+    const days = Math.floor((Date.now() - existing.appliedAt) / 86400000);
+    const avgWait = sc?.avg_wait_days || 30;
+    const pct = Math.round((1 - (sc?.ghost_rate || 0.4)) * 100);
+    const overdue = days > avgWait * 1.1;
+    return `<div style="background:${overdue?'var(--rdim)':'rgba(16,185,129,0.07)'};border:1px solid ${overdue?'rgba(239,68,68,0.2)':'rgba(16,185,129,0.2)'};border-radius:9px;padding:.65rem .95rem;display:flex;align-items:center;justify-content:space-between;gap:.75rem">
+      <div>
+        <div style="font-family:var(--mono);font-size:.63rem;color:${overdue?'var(--red)':'var(--green)'};margin-bottom:.1rem">${overdue?`⚠ ${days}d with no update — past typical window`:`✓ Tracking · ${days}d since applied`}</div>
+        <div style="font-family:var(--mono);font-size:.54rem;color:var(--muted)">${overdue?`${Math.round((sc?.ghost_rate||0.4)*100)}% ghost rate at this company — consider moving on`:`${pct}% respond · avg ${avgWait}d`}</div>
+      </div>
+      <button class="btn btn-ghost" style="font-size:.6rem;padding:.35rem .7rem;flex-shrink:0;white-space:nowrap" onclick="closeModDirect();go('tracker')">View →</button>
+    </div>`;
+  }
+  const safeName = name.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+  const safeLoc = (loc||'').replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+  return `<button class="btn btn-solid" style="width:100%;justify-content:center;font-size:.75rem;background:linear-gradient(135deg,rgba(16,185,129,0.18),rgba(99,102,241,0.18));border-color:rgba(16,185,129,0.35);color:var(--green)" onclick="quickTrackApplication('${safeName}','${safeLoc}')">+ Track application to ${name}</button>`;
+}
+
+async function quickTrackApplication(name, loc) {
+  const ck = name.toLowerCase().trim();
+  const known = COS[ck] || Object.values(COS).find(c => c.name.toLowerCase().includes(ck));
+  const lk = loc ? `${ck}|${loc.toLowerCase()}` : null;
+  const sc = (lk ? LOC_SCORES[lk] : null) || known?.sc || {avg_wait_days:30, ghost_rate:0.4, response_rate:0.5};
+  const pct = Math.round((1 - (sc.ghost_rate || 0.4)) * 100);
+  const avgWait = sc.avg_wait_days || 30;
+  await AppStore.add({
+    company: name,
+    role: loc ? `Role at ${name} (${loc})` : `Role at ${name}`,
+    location: loc || '',
+    platform: 'seen',
+    score: sc.overall_score,
+    waste: sc.waste,
+    stage: 'Applied',
+    status: 'active'
+  });
+  const row = document.getElementById('modalTrackRow');
+  if (row) {
+    row.innerHTML = `<div style="background:rgba(16,185,129,0.08);border:1px solid rgba(16,185,129,0.25);border-radius:9px;padding:.75rem 1rem">
+      <div style="font-family:var(--mono);font-size:.65rem;font-weight:500;color:var(--green);margin-bottom:.3rem">✓ Application tracked</div>
+      <div style="font-family:var(--mono);font-size:.57rem;color:var(--dim);line-height:1.65">${pct}% of applicants hear back · avg wait <strong style="color:var(--white)">${avgWait} days</strong>${sc.ghost_rate > 0.5 ? ` · <span style="color:var(--red)">⚠ high ghost rate — set a reminder</span>` : ''}</div>
+      <div style="display:flex;gap:.35rem;margin-top:.6rem">
+        <button class="btn btn-ghost" style="font-size:.62rem;padding:.38rem .75rem" onclick="closeModDirect();go('tracker')">View tracker →</button>
+        <button class="btn btn-ghost" style="font-size:.62rem;padding:.38rem .75rem" onclick="closeModDirect();prefillReport('${name.replace(/'/g,"\\'")}');go('report')">+ Report experience</button>
+      </div>
+    </div>`;
+  }
+  showToast(`Tracking application to ${name}`);
+}
+
 function openModal(name,loc){
   const canonical=normalizeCompanyName(name);
   document.getElementById('modalOv').classList.add('open');
@@ -2226,7 +2278,8 @@ async function runSearch(name,loc){
 
   const realData=await realDataPromise;
   const realSc=realData?computeScoresFromData(realData.reports,realData.jobs,realData.webScore):null;
-  const sc=realSc||locSc||(known?.sc)||{overall_score:50,risk_level:'warn',response_rate:.5,ghost_rate:.3,avg_wait_days:30,report_count:0,waste:40};
+  // COS is authoritative when realSc has <3 community reports (web estimate / AI data)
+  const sc=locSc||(realSc?.report_count>=3?realSc:null)||(known?.sc)||realSc||{overall_score:50,risk_level:'warn',response_rate:.5,ghost_rate:.3,avg_wait_days:30,report_count:0,waste:40};
   const risk=sc.risk_level||Score.risk(sc.overall_score);
   _modalGlow('#modalOv .modal', risk);
   const grade=letterGrade(sc.overall_score);
@@ -2283,7 +2336,8 @@ async function runSearch(name,loc){
     <div class="mbar"><div class="mbar-lbl" style="width:85px">Transparency</div><div class="mbar-track"><div class="mbar-fill" style="width:${sc.overall_score}%;background:${Score.color(risk)}"></div></div><div class="mbar-val" style="color:${Score.color(risk)}">${sc.overall_score}</div></div>
     <div class="mbar"><div class="mbar-lbl" style="width:85px">Ghost rate</div><div class="mbar-track"><div class="mbar-fill mf-r" style="width:${ghostPct}%"></div></div><div class="mbar-val">${ghostPct}%</div></div>
 
-    <div style="display:flex;gap:.45rem;margin-top:1rem">
+    <div id="modalTrackRow" style="margin-top:1rem">${_modalTrackCTA(known?.name||name, loc, sc)}</div>
+    <div style="display:flex;gap:.45rem;margin-top:.45rem">
       <button class="btn btn-solid" style="flex:1;justify-content:center;font-size:.75rem" onclick="closeModDirect();viewCompany('${known?.id||'x'}','${known?.name||name}','${loc}')">Full report →</button>
       <button class="btn btn-ghost" style="padding:.65rem .9rem;font-size:.75rem;flex-shrink:0" onclick="shareCompanyReport('${(name||'').replace(/'/g,"\\'")}')">↗ Share</button>
       <button class="btn btn-ghost" style="padding:.65rem .9rem;font-size:.75rem;flex-shrink:0" onclick="closeModDirect();prefillReport('${(name||'').replace(/'/g,"\\'")}');go('report')">+ Report</button>
