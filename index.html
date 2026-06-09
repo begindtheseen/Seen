@@ -208,6 +208,13 @@ nav.nav-scrolled{background:rgba(6,6,8,0.82);backdrop-filter:blur(60px) saturate
 .search-wrap:focus-within{border-color:var(--blue);box-shadow:0 0 0 3px var(--bdim)}
 .search-row{display:flex;align-items:stretch}
 .search-field{display:flex;align-items:center;flex:1;padding:0 1.15rem;gap:.6rem;border-right:1px solid var(--line);position:relative}
+@media(max-width:540px){
+  .search-row{flex-direction:column}
+  .search-field{border-right:none;border-bottom:1px solid var(--line);min-height:52px}
+  .search-loc{border-right:none;border-bottom:1px solid var(--line);width:auto!important;flex:1;min-height:46px}
+  .search-loc-row{display:flex}
+  .search-btn{border-radius:0;min-height:46px;font-size:.85rem;width:auto;padding:0 1.25rem}
+}
 .search-field-icon{color:var(--muted);font-size:.9rem;flex-shrink:0}
 .search-inp{background:transparent;border:none;outline:none;padding:1rem 0;color:var(--white);font-family:var(--body);font-size:.9rem;width:100%;caret-color:var(--blue)}
 .search-inp::placeholder{color:var(--muted)}
@@ -796,12 +803,14 @@ nav.nav-scrolled{background:rgba(6,6,8,0.82);backdrop-filter:blur(60px) saturate
             <span class="search-field-icon">🔍</span>
             <input class="search-inp" id="heroInp" type="text" placeholder="Company or job title..." autocomplete="off" oninput="debounceCompanySuggest(this.value)" onkeydown="handleCompanyKey(event)"/>
           </div>
-          <div class="search-loc">
-            <span style="color:var(--muted);font-size:.8rem;flex-shrink:0">📍</span>
-            <input class="loc-inp" id="heroLoc" type="text" placeholder="City or zip" autocomplete="off" oninput="debounceLocationSuggest(this.value,'heroLocSuggestions')" onkeydown="if(event.key==='Enter')doSearch()"/>
-            <div id="heroLocSuggestions" style="position:absolute;z-index:200;background:var(--surface);border:1px solid var(--line2);border-radius:8px;width:240px;display:none;box-shadow:0 8px 24px rgba(0,0,0,.4);top:100%;left:0"></div>
+          <div class="search-loc-row" style="display:flex;flex:0 0 auto">
+            <div class="search-loc" style="position:relative">
+              <span style="color:var(--muted);font-size:.8rem;flex-shrink:0">📍</span>
+              <input class="loc-inp" id="heroLoc" type="text" placeholder="City or zip" autocomplete="off" oninput="debounceLocationSuggest(this.value,'heroLocSuggestions')" onkeydown="if(event.key==='Enter')doSearch()"/>
+              <div id="heroLocSuggestions" style="position:absolute;z-index:200;background:var(--surface);border:1px solid var(--line2);border-radius:8px;width:240px;display:none;box-shadow:0 8px 24px rgba(0,0,0,.4);top:100%;left:0"></div>
+            </div>
+            <button class="search-btn" onclick="doSearch()">Check →</button>
           </div>
-          <button class="search-btn" onclick="doSearch()">Check →</button>
         </div>
       </div>
       <div id="heroCompSuggestions" style="position:absolute;z-index:200;background:var(--surface);border:1px solid var(--line2);border-radius:8px;width:100%;display:none;box-shadow:0 8px 24px rgba(0,0,0,.4);top:calc(100% + 4px);left:0;overflow:hidden"></div>
@@ -3412,27 +3421,32 @@ function shareCompanyReport(name) {
 function shareToReddit(name) {
   const ctx = (_shareCtx && _shareCtx.name && _shareCtx.name.toLowerCase() === (name||'').toLowerCase()) ? _shareCtx : null;
   const url = 'https://seenjobs.io/#company/' + encodeURIComponent((name||'').toLowerCase().trim());
-  const score = ctx?.score || '?';
-  const ghost = ctx?.ghost ?? '?';
-  const waste = ctx?.waste ?? '?';
-  const title = ctx
-    ? (ctx.risk === 'danger'
-      ? `${name} ghosts ${ghost}% of applicants — ${score}/100 hiring score [data from Seen]`
-      : ctx.risk === 'warn'
-      ? `Just checked ${name}'s hiring transparency score: ${score}/100 — ${ghost}% ghost rate`
-      : `${name} actually has a good hiring score: ${score}/100, ${ghost}% ghost rate`)
-    : `${name} hiring transparency check — full breakdown`;
-  const body = ctx
-    ? `Ran ${name} through Seen (hiring transparency tracker built on real applicant data).\n\n**Score: ${score}/100 | Ghost rate: ${ghost}% | Waste risk: ${waste}%**\n\nThis is based on community reports + web research from Reddit, Glassdoor, and Blind.\n\n→ Full breakdown (free): ${url}\n\nHas anyone else applied here recently? Curious if the data matches your experience.`
-    : `Ran ${name} through Seen — a free tool that tracks ghost rates, response times, and hiring scores for thousands of companies.\n\n→ See the full report: ${url}\n\nThe data comes from real applicants. Worth checking before you spend a Sunday on an application.`;
-  const redditUrl = 'https://www.reddit.com/r/jobs/submit?title=' + encodeURIComponent(title) + '&text=' + encodeURIComponent(body);
-  const copied = title + '\n\n' + body;
-  if (navigator.clipboard) {
-    navigator.clipboard.writeText(copied).then(() => {
-      showToast('Reddit post copied! Paste it in r/jobs, r/recruitinghell, or r/cscareerquestions 🚀');
-    });
+  const score = ctx?.score ?? '–';
+  const ghost = ctx?.ghost != null ? ctx.ghost + '%' : '–';
+  const resp = ctx?.resp != null ? ctx.resp + '%' : '–';
+  const wait = ctx?.wait != null ? ctx.wait + 'd' : '–';
+  const grade = ctx?.grade || '';
+  // Clean card text — no pitch, just data
+  const card = [
+    name + (grade ? '  ' + grade : ''),
+    '─'.repeat(28),
+    'Score         ' + score + '/100',
+    'Ghost rate    ' + ghost,
+    'Response rate ' + resp,
+    'Avg wait      ' + wait,
+    '─'.repeat(28),
+    url,
+  ].join('\n');
+  // Use native share on mobile (iOS share sheet), fall back to reddit submit
+  if (navigator.share) {
+    navigator.share({ text: card }).catch(() => {});
+  } else {
+    const redditUrl = 'https://www.reddit.com/r/jobs/submit?title='
+      + encodeURIComponent(name + ' hiring stats')
+      + '&text=' + encodeURIComponent(card);
+    window.open(redditUrl, '_blank', 'noopener');
   }
-  window.open(redditUrl, '_blank', 'noopener');
+  if (navigator.clipboard) navigator.clipboard.writeText(card).catch(() => {});
 }
 
 function _updateMetaTags(name, sc) {
@@ -3693,7 +3707,7 @@ async function viewCompany(id,name,loc){
     const rsc = realData ? computeScoresFromData(realData.reports, realData.jobs, realData.webScore) : null;
     // Store score context so shareCompanyReport can build a rich message
     if (rsc) {
-      _shareCtx = { name: co?.name||name, score: rsc.overall_score, ghost: Math.round((rsc.ghost_rate||0)*100), waste: rsc.waste||0, risk: rsc.risk_level };
+      _shareCtx = { name: co?.name||name, score: rsc.overall_score, ghost: Math.round((rsc.ghost_rate||0)*100), resp: Math.round((rsc.response_rate||0)*100), wait: rsc.avg_wait_days||null, waste: rsc.waste||0, risk: rsc.risk_level, grade: typeof letterGrade === 'function' ? letterGrade(rsc.overall_score) : '' };
       _updateMetaTags(co?.name||name, rsc);
     }
 
@@ -5382,8 +5396,13 @@ function go(page){
       page=Auth.isSeeker()?'seeker-dash':'landing';
       if(page==='seeker-dash')renderSeekerDash();
     }
-    // Persist last page so we can restore after Safari discards the page
-    try { if(page!=='landing'&&page!=='home') sessionStorage.setItem('sp',page); } catch(_e){}
+    // Persist last page so we can restore after Safari discards the page (localStorage survives tab discard)
+    try {
+      if(page!=='landing'&&page!=='home') {
+        sessionStorage.setItem('sp',page);
+        localStorage.setItem('seen_last_page', JSON.stringify({page, ts: Date.now()}));
+      }
+    } catch(_e){}
     if(!_navSkipHistory){
       history.pushState({page}, '', window.location.pathname + window.location.search);
     }
@@ -7783,10 +7802,17 @@ function _handleSharedLink(){
     setTimeout(()=>viewCompany(null,displayName,loc),500);
     return;
   }
-  // Non-company page restore via sessionStorage
-  const sp=sessionStorage.getItem('sp');
+  // Non-company page restore — sessionStorage first, localStorage fallback (survives iOS tab discard)
+  let sp = sessionStorage.getItem('sp');
+  if (!sp) {
+    try {
+      const saved = JSON.parse(localStorage.getItem('seen_last_page') || '{}');
+      // Only restore if within 2 hours
+      if (saved.page && saved.ts && (Date.now() - saved.ts) < 2 * 60 * 60 * 1000) sp = saved.page;
+    } catch(_e) {}
+  }
   if(sp&&sp!=='company'&&sp!=='landing'){
-    setTimeout(()=>go(sp),100);
+    setTimeout(()=>go(sp),150);
   }
 }
 
@@ -7796,7 +7822,8 @@ startHeroRotation();
 if(db){
   Auth.init().then(()=>{
     updateNav();
-    const _restoring=window.location.hash.startsWith('#company/')||!!sessionStorage.getItem('sp');
+    const _lsPage=(()=>{try{const s=JSON.parse(localStorage.getItem('seen_last_page')||'{}');return(s.page&&s.ts&&(Date.now()-s.ts)<7200000)?s.page:null;}catch(e){return null;}})();
+    const _restoring=window.location.hash.startsWith('#company/')||!!sessionStorage.getItem('sp')||!!_lsPage;
     if(Auth.isSeeker()){renderSeekerDash();if(!_restoring)go('seeker-dash');}
     else if(Auth.isEmployer()&&!_restoring){goToEmployerDashboard();}
     _handleSharedLink();
