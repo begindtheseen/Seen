@@ -3491,7 +3491,7 @@ function _rr(c, x, y, w, h, r) {
 }
 
 function _drawSeenCard(name, d) {
-  const W = 1200, H = 675;
+  const W = 1080, H = 1080;
   const canvas = document.createElement('canvas');
   canvas.width = W; canvas.height = H;
   const c = canvas.getContext('2d');
@@ -3502,115 +3502,129 @@ function _drawSeenCard(name, d) {
   const grade = d.grade || letterGrade(d.score||50);
   const coKey = Object.keys(COS).find(k => COS[k].name.toLowerCase()===(name||'').toLowerCase()) || '';
   const ind = COS[coKey]?.ind || '';
+  const PAD = 64;
 
   // ── Background ──────────────────────────────────────────────────────────────
-  const bg = c.createLinearGradient(0,0,W,H);
-  bg.addColorStop(0,'#02040a'); bg.addColorStop(1,'#080b1a');
-  c.fillStyle = bg; c.fillRect(0,0,W,H);
+  c.fillStyle = '#02040a'; c.fillRect(0,0,W,H);
 
-  // Accent glows
-  const g1 = c.createRadialGradient(W-160,100,0,W-160,100,480);
-  g1.addColorStop(0,'rgba(124,58,237,0.22)'); g1.addColorStop(1,'rgba(0,0,0,0)');
-  c.fillStyle = g1; c.fillRect(0,0,W,H);
-  const g2 = c.createRadialGradient(140,H-100,0,140,H-100,380);
-  g2.addColorStop(0,'rgba(29,78,216,0.14)'); g2.addColorStop(1,'rgba(0,0,0,0)');
-  c.fillStyle = g2; c.fillRect(0,0,W,H);
+  // Risk-colored glow behind grade
+  const glowG = c.createRadialGradient(W/2, 480, 0, W/2, 480, 380);
+  glowG.addColorStop(0, riskColor + '28'); glowG.addColorStop(1, 'rgba(0,0,0,0)');
+  c.fillStyle = glowG; c.fillRect(0,0,W,H);
 
-  // Subtle border
-  _rr(c,1,1,W-2,H-2,20); c.strokeStyle='rgba(255,255,255,0.07)'; c.lineWidth=1.5; c.stroke();
+  // Purple top-right + blue bottom-left accents
+  const ga = c.createRadialGradient(W, 0, 0, W, 0, 520);
+  ga.addColorStop(0,'rgba(124,58,237,0.20)'); ga.addColorStop(1,'rgba(0,0,0,0)');
+  c.fillStyle = ga; c.fillRect(0,0,W,H);
+  const gb = c.createRadialGradient(0, H, 0, 0, H, 420);
+  gb.addColorStop(0,'rgba(29,78,216,0.13)'); gb.addColorStop(1,'rgba(0,0,0,0)');
+  c.fillStyle = gb; c.fillRect(0,0,W,H);
 
-  const PAD = 60;
+  // Card border
+  _rr(c,1,1,W-2,H-2,24); c.strokeStyle='rgba(255,255,255,0.07)'; c.lineWidth=1.5; c.stroke();
 
-  // ── Seen eyebrow ─────────────────────────────────────────────────────────────
-  c.font = '700 15px "Syne",sans-serif';
-  c.fillStyle = 'rgba(255,255,255,0.25)';
-  c.textAlign = 'left'; c.textBaseline = 'top';
-  c.fillText('SEEN  ·  HIRING TRANSPARENCY', PAD, PAD-2);
-
-  // ── Company logo box ─────────────────────────────────────────────────────────
-  const LS = 72, LY = PAD+32;
-  _rr(c,PAD,LY,LS,LS,14); c.fillStyle='rgba(255,255,255,0.07)'; c.fill();
-  _rr(c,PAD,LY,LS,LS,14); c.strokeStyle='rgba(255,255,255,0.12)'; c.lineWidth=1; c.stroke();
-  c.font = `700 ${Math.min(30,Math.floor(LS*.44))}px "Syne",sans-serif`;
-  c.fillStyle='#ffffff'; c.textAlign='center'; c.textBaseline='middle';
-  c.fillText((name||'?')[0].toUpperCase(), PAD+LS/2, LY+LS/2);
-
-  // ── Company name + industry ──────────────────────────────────────────────────
+  // ── Eyebrow ───────────────────────────────────────────────────────────────────
+  c.font='600 13px "DM Mono",monospace'; c.fillStyle='rgba(255,255,255,0.22)';
   c.textAlign='left'; c.textBaseline='top';
-  c.font='800 40px "Syne",sans-serif';
-  c.fillStyle='#ffffff';
-  c.fillText(name||'—', PAD+LS+20, LY+4);
-  c.font='400 16px "DM Mono",monospace';
-  c.fillStyle='rgba(255,255,255,0.4)';
-  c.fillText(ind, PAD+LS+20, LY+52);
+  c.fillText('SEEN  ·  HIRING TRANSPARENCY', PAD, PAD);
+  c.textAlign='right';
+  c.fillText('seenjobs.io', W-PAD, PAD);
 
-  // ── Grade ────────────────────────────────────────────────────────────────────
-  c.textAlign='right'; c.textBaseline='top';
-  c.font='800 96px "Syne",sans-serif';
-  c.fillStyle=riskColor;
-  c.fillText(grade, W-PAD, LY-10);
-  c.font='500 18px "DM Mono",monospace';
-  c.fillStyle='rgba(255,255,255,0.35)';
-  c.fillText(`${d.score??'—'}/100`, W-PAD, LY+82);
+  // ── Company row ───────────────────────────────────────────────────────────────
+  const compY = PAD + 44;
+  const LS = 84;
+  _rr(c,PAD,compY,LS,LS,18); c.fillStyle='rgba(255,255,255,0.08)'; c.fill();
+  _rr(c,PAD,compY,LS,LS,18); c.strokeStyle='rgba(255,255,255,0.14)'; c.lineWidth=1; c.stroke();
+  c.font=`800 ${Math.min(34,Math.floor(LS*.42))}px "Syne",sans-serif`;
+  c.fillStyle='#fff'; c.textAlign='center'; c.textBaseline='middle';
+  c.fillText((name||'?')[0].toUpperCase(), PAD+LS/2, compY+LS/2);
 
-  // ── Divider ──────────────────────────────────────────────────────────────────
-  const divY = LY+LS+36;
-  c.strokeStyle='rgba(255,255,255,0.08)'; c.lineWidth=1;
-  c.beginPath(); c.moveTo(PAD,divY); c.lineTo(W-PAD,divY); c.stroke();
+  c.textAlign='left'; c.textBaseline='top';
+  c.font='800 44px "Syne",sans-serif'; c.fillStyle='#fff';
+  const maxNW = W - PAD - LS - 24 - PAD;
+  let dispN = name||'—';
+  while (c.measureText(dispN).width > maxNW && dispN.length > 3) dispN = dispN.slice(0,-1);
+  if (dispN !== (name||'—')) dispN += '…';
+  c.fillText(dispN, PAD+LS+22, compY+10);
+  c.font='400 17px "DM Mono",monospace'; c.fillStyle='rgba(255,255,255,0.38)';
+  c.fillText(ind||'Company', PAD+LS+22, compY+62);
 
-  // ── Metric tiles ─────────────────────────────────────────────────────────────
+  // ── Divider 1 ────────────────────────────────────────────────────────────────
+  const d1Y = compY + LS + 36;
+  c.strokeStyle='rgba(255,255,255,0.07)'; c.lineWidth=1;
+  c.beginPath(); c.moveTo(PAD,d1Y); c.lineTo(W-PAD,d1Y); c.stroke();
+
+  // ── Grade — hero ─────────────────────────────────────────────────────────────
+  const riskLbl = risk==='safe'?'GOOD TO APPLY':risk==='danger'?'HIGH RISK — APPLY WITH CAUTION':'PROCEED WITH CAUTION';
+  c.font='600 13px "DM Mono",monospace'; c.fillStyle=riskColor+'99';
+  c.textAlign='center'; c.textBaseline='top';
+  c.fillText(riskLbl, W/2, d1Y+28);
+
+  c.font='800 210px "Syne",sans-serif'; c.fillStyle=riskColor;
+  c.textAlign='center'; c.textBaseline='top';
+  c.fillText(grade, W/2, d1Y+50);
+
+  c.font='500 21px "DM Mono",monospace'; c.fillStyle='rgba(255,255,255,0.38)';
+  c.textAlign='center'; c.textBaseline='top';
+  c.fillText(`${d.score??'—'}  /  100`, W/2, d1Y+272);
+
+  // ── Divider 2 ────────────────────────────────────────────────────────────────
+  const d2Y = d1Y + 310;
+  c.strokeStyle='rgba(255,255,255,0.07)'; c.lineWidth=1;
+  c.beginPath(); c.moveTo(PAD,d2Y); c.lineTo(W-PAD,d2Y); c.stroke();
+
+  // ── Metrics 2×2 grid ─────────────────────────────────────────────────────────
   const metrics = [
-    { lbl:'GHOST RATE',    val: d.ghost!=null ? d.ghost+'%'  : '—', col: d.ghost>50?'#ef4444':d.ghost>25?'#f59e0b':'#10b981' },
-    { lbl:'RESPONSE RATE', val: d.resp!=null  ? d.resp+'%'   : '—', col: d.resp>60?'#10b981':d.resp>30?'#f59e0b':'#ef4444'  },
-    { lbl:'AVG WAIT',      val: d.wait!=null  ? d.wait+'d'   : '—', col: d.wait<14?'#10b981':d.wait<30?'#f59e0b':'#ef4444'  },
-    { lbl:'WASTE RISK',    val: d.waste!=null ? d.waste+'%'  : '—', col: d.waste<25?'#10b981':d.waste<55?'#f59e0b':'#ef4444' },
+    { lbl:'GHOST RATE',    val: d.ghost!=null ? d.ghost+'%' : '—', col: d.ghost>50?'#ef4444':d.ghost>25?'#f59e0b':'#10b981' },
+    { lbl:'RESPONSE RATE', val: d.resp!=null  ? d.resp+'%'  : '—', col: d.resp>60?'#10b981':d.resp>30?'#f59e0b':'#ef4444'   },
+    { lbl:'AVG WAIT',      val: d.wait!=null  ? d.wait+'d'  : '—', col: d.wait<14?'#10b981':d.wait<30?'#f59e0b':'#ef4444'   },
+    { lbl:'WASTE RISK',    val: d.waste!=null ? d.waste+'%' : '—', col: d.waste<25?'#10b981':d.waste<55?'#f59e0b':'#ef4444'  },
   ];
-  const tileW = Math.floor((W - PAD*2 - 24) / 4);
-  const tileH = 130, tileY = divY+28;
+  const gap = 14;
+  const tW = Math.floor((W - PAD*2 - gap) / 2);
+  const tH = 118;
+  const mY = d2Y + 26;
   metrics.forEach((m, i) => {
-    const tx = PAD + i*(tileW+8);
-    _rr(c,tx,tileY,tileW,tileH,14);
-    c.fillStyle='rgba(255,255,255,0.04)'; c.fill();
-    _rr(c,tx,tileY,tileW,tileH,14);
-    c.strokeStyle='rgba(255,255,255,0.07)'; c.lineWidth=1; c.stroke();
-    c.font='700 44px "Syne",sans-serif';
-    c.fillStyle=m.col; c.textAlign='center'; c.textBaseline='middle';
-    c.fillText(m.val, tx+tileW/2, tileY+54);
-    c.font='500 12px "DM Mono",monospace';
-    c.fillStyle='rgba(255,255,255,0.38)'; c.textBaseline='bottom';
-    c.fillText(m.lbl, tx+tileW/2, tileY+tileH-14);
+    const row = Math.floor(i/2), col = i%2;
+    const tx = PAD + col*(tW+gap), ty = mY + row*(tH+gap);
+    _rr(c,tx,ty,tW,tH,16); c.fillStyle='rgba(255,255,255,0.045)'; c.fill();
+    _rr(c,tx,ty,tW,tH,16); c.strokeStyle='rgba(255,255,255,0.08)'; c.lineWidth=1; c.stroke();
+    c.font='700 50px "Syne",sans-serif'; c.fillStyle=m.col;
+    c.textAlign='center'; c.textBaseline='middle';
+    c.fillText(m.val, tx+tW/2, ty+tH/2-10);
+    c.font='500 12px "DM Mono",monospace'; c.fillStyle='rgba(255,255,255,0.32)';
+    c.textBaseline='bottom';
+    c.fillText(m.lbl, tx+tW/2, ty+tH-13);
   });
 
-  // ── VIBES tags ───────────────────────────────────────────────────────────────
+  // ── VIBES tags ────────────────────────────────────────────────────────────────
   const vibes = VIBES[coKey] || VIBES[(name||'').toLowerCase()] || [];
-  const vibeY = tileY + tileH + 30;
+  const vY = mY + 2*(tH+gap) + 22;
   if (vibes.length) {
-    c.font='400 14px "DM Mono",monospace';
+    c.font='400 13px "DM Mono",monospace';
     let vx = PAD;
     vibes.slice(0,5).forEach(v => {
-      const tw = c.measureText(v).width + 24;
+      const tw = c.measureText(v).width + 22;
       if (vx+tw > W-PAD) return;
-      _rr(c,vx,vibeY,tw,30,7);
-      c.fillStyle='rgba(255,255,255,0.06)'; c.fill();
-      _rr(c,vx,vibeY,tw,30,7);
-      c.strokeStyle='rgba(255,255,255,0.1)'; c.lineWidth=1; c.stroke();
-      c.fillStyle='rgba(255,255,255,0.6)'; c.textAlign='center'; c.textBaseline='middle';
-      c.fillText(v, vx+tw/2, vibeY+15);
+      _rr(c,vx,vY,tw,28,7); c.fillStyle='rgba(255,255,255,0.06)'; c.fill();
+      _rr(c,vx,vY,tw,28,7); c.strokeStyle='rgba(255,255,255,0.1)'; c.lineWidth=1; c.stroke();
+      c.fillStyle='rgba(255,255,255,0.55)'; c.textAlign='center'; c.textBaseline='middle';
+      c.fillText(v, vx+tw/2, vY+14);
       vx += tw+8;
     });
   }
 
-  // ── Bottom bar ───────────────────────────────────────────────────────────────
-  const botY = H-52;
+  // ── Footer ────────────────────────────────────────────────────────────────────
+  const fY = H - 62;
   c.strokeStyle='rgba(255,255,255,0.07)'; c.lineWidth=1;
-  c.beginPath(); c.moveTo(PAD,botY); c.lineTo(W-PAD,botY); c.stroke();
-  c.font='700 18px "Syne",sans-serif'; c.fillStyle='#ffffff';
+  c.beginPath(); c.moveTo(PAD,fY-8); c.lineTo(W-PAD,fY-8); c.stroke();
+  c.font='700 16px "Syne",sans-serif'; c.fillStyle='#fff';
   c.textAlign='left'; c.textBaseline='middle';
-  c.fillText('Seen', PAD, botY+26);
-  c.font='400 13px "DM Mono",monospace'; c.fillStyle='rgba(255,255,255,0.3)';
-  c.fillText('seenjobs.io  ·  community hiring data', PAD+54, botY+26);
-  c.textAlign='right'; c.fillStyle='rgba(255,255,255,0.2)';
-  c.fillText('scores based on real applicant reports', W-PAD, botY+26);
+  c.fillText('Seen', PAD, fY+16);
+  c.font='400 12px "DM Mono",monospace'; c.fillStyle='rgba(255,255,255,0.28)';
+  c.fillText('seenjobs.io  ·  community hiring data', PAD+50, fY+16);
+  c.textAlign='right'; c.fillStyle='rgba(255,255,255,0.18)';
+  c.fillText('grades from real applicant reports', W-PAD, fY+16);
 
   return canvas;
 }
