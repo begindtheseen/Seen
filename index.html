@@ -998,6 +998,7 @@ nav.nav-scrolled{background:rgba(6,6,8,0.82);backdrop-filter:blur(60px) saturate
         <button class="btn btn-ghost" style="justify-content:flex-start;font-size:.78rem" onclick="go('demand')">🗺️ Demand map</button>
         <button class="btn btn-ghost" style="justify-content:flex-start;font-size:.78rem" onclick="go('tracker')">📋 All applications</button>
         <button class="btn btn-ghost" style="justify-content:flex-start;font-size:.78rem" onclick="go('report')">📢 Report a company</button>
+        <button class="btn btn-ghost" style="justify-content:flex-start;font-size:.78rem;grid-column:1/-1" onclick="generateWeeklyDigest()">📊 Copy weekly digest</button>
       </div>
     </div>
 
@@ -4199,8 +4200,12 @@ const AppStore = {
   async add(app) {
     const entry = {...app, id: app.id||('app_'+Date.now()), appliedAt: app.appliedAt||Date.now(), updatedAt: app.updatedAt||Date.now()};
     const apps = this.loadSync();
-    // Dedup by id OR by jobId (catches rapid double-clicks that create different temp ids)
-    const isDupe = apps.find(a => a.id === entry.id || (entry.jobId && a.jobId === entry.jobId));
+    // Dedup by id, jobId, or company+role (catches re-tracks and rapid double-clicks)
+    const isDupe = apps.find(a =>
+      a.id === entry.id ||
+      (entry.jobId && a.jobId === entry.jobId) ||
+      (!entry.jobId && a.company?.toLowerCase() === entry.company?.toLowerCase() && a.role?.toLowerCase() === entry.role?.toLowerCase() && a.status === 'active')
+    );
     if(!isDupe) { apps.unshift(entry); localStorage.setItem(this.KEY, JSON.stringify(apps)); }
     // Only sync to DB if this is a local temp ID — real UUIDs are already in Supabase
     if (Auth.isLoggedIn() && String(entry.id).startsWith('app_')) {
@@ -5032,6 +5037,50 @@ function updateNav(){
     if(empBtn)empBtn.style.display='inline-flex';
     if(bell)bell.style.display='none';
     if(backBtn)backBtn.style.display='none';
+  }
+}
+
+async function generateWeeklyDigest() {
+  const apps = await AppStore.load();
+  if (!apps.length) { showToast('No applications yet — start tracking to generate a digest.'); return; }
+  const now = Date.now();
+  const weekAgo = now - 7 * 86400000;
+  const active = apps.filter(a => a.status === 'active');
+  const thisWeek = apps.filter(a => a.appliedAt >= weekAgo);
+  const ghosted = apps.filter(a => a.status === 'ghosted');
+  const hired = apps.filter(a => a.status === 'hired');
+  const overdue = active.filter(a => {
+    const d = Math.floor((now - a.appliedAt) / 86400000);
+    const co = Object.values(COS).find(c => c.name.toLowerCase() === a.company.toLowerCase());
+    return d > (co?.sc?.avg_wait_days || 30) * 1.1;
+  });
+  const avgWasteRisk = active.length
+    ? Math.round(active.reduce((s,a) => s + (a.waste||40), 0) / active.length)
+    : null;
+  const date = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+  const lines = [
+    `📊 My Job Search · Week of ${date}`,
+    ``,
+    `📋 Pipeline: ${active.length} active · ${thisWeek.length} applied this week`,
+    ghosted.length ? `👻 Ghosted: ${ghosted.length}` : null,
+    hired.length ? `🎉 Hired: ${hired.length}` : null,
+    overdue.length ? `⚠️  Overdue: ${overdue.length} past response window` : null,
+    avgWasteRisk !== null ? `⚡ Avg waste risk in pipeline: ${avgWasteRisk}%` : null,
+    ``,
+    `Top active applications:`,
+    ...active.slice(0, 5).map(a => {
+      const d = Math.floor((now - a.appliedAt) / 86400000);
+      const co = Object.values(COS).find(c => c.name.toLowerCase() === a.company.toLowerCase());
+      const score = co?.sc?.overall_score || a.score || '?';
+      return `  • ${a.role} @ ${a.company} (${d}d · score ${score}/100)`;
+    }),
+    active.length > 5 ? `  + ${active.length - 5} more` : null,
+    ``,
+    `Data powered by Seen — seenjobs.io`,
+  ].filter(l => l !== null).join('\n');
+  if (navigator.clipboard) {
+    await navigator.clipboard.writeText(lines);
+    showToast('Weekly digest copied! Paste in notes, email, or anywhere 📋');
   }
 }
 
