@@ -204,7 +204,7 @@ nav.nav-scrolled{background:rgba(6,6,8,0.82);backdrop-filter:blur(60px) saturate
 .hero-sub strong{color:var(--text);font-weight:500}
 
 /* SEARCH — location aware */
-.search-wrap{background:var(--card);border:1px solid var(--line2);border-radius:12px;overflow:hidden;transition:border-color .2s,box-shadow .2s;animation:fadeUp .6s .08s ease both}
+.search-wrap{background:var(--card);border:1px solid var(--line2);border-radius:10px;overflow:hidden;transition:border-color .2s,box-shadow .2s;animation:fadeUp .6s .08s ease both}
 .search-wrap:focus-within{border-color:var(--blue);box-shadow:0 0 0 3px var(--bdim)}
 .search-row{display:flex;align-items:stretch}
 .search-field{display:flex;align-items:center;flex:1;padding:0 1.15rem;gap:.6rem;border-right:1px solid var(--line);position:relative}
@@ -290,7 +290,7 @@ nav.nav-scrolled{background:rgba(6,6,8,0.82);backdrop-filter:blur(60px) saturate
 .feat-sec{padding:4rem 1.5rem;max-width:1200px;margin:0 auto}
 .feat-hdr{display:flex;align-items:flex-end;justify-content:space-between;margin-bottom:1.5rem}
 .jgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:.75rem}
-.jcard{background:rgba(255,255,255,0.035);border:1px solid rgba(255,255,255,0.09);border-radius:16px;padding:1.1rem 1.15rem;cursor:pointer;transition:all 0.25s ease;display:flex;flex-direction:column;gap:.6rem;position:relative;overflow:hidden;backdrop-filter:blur(16px);box-shadow:0 4px 24px rgba(0,0,0,0.3),inset 0 1px 0 rgba(255,255,255,0.05)}
+.jcard{background:rgba(255,255,255,0.035);border:1px solid rgba(255,255,255,0.11);border-radius:16px;padding:1.1rem 1.15rem;cursor:pointer;transition:all 0.25s ease;display:flex;flex-direction:column;gap:.6rem;position:relative;overflow:hidden;backdrop-filter:blur(16px);box-shadow:0 6px 28px rgba(0,0,0,0.34),inset 0 1px 0 rgba(255,255,255,0.06)}
 .jcard::after{content:'';position:absolute;bottom:0;left:0;right:0;height:50%;background:linear-gradient(to top,rgba(29,78,216,0.12) 0%,rgba(124,58,237,0.07) 40%,transparent 100%);pointer-events:none;border-radius:0 0 16px 16px;opacity:0;transition:opacity 0.25s ease}
 .jcard:hover::after{opacity:1}
 /* Risk-tinted neon glow — resting state */
@@ -617,9 +617,27 @@ nav.nav-scrolled{background:rgba(6,6,8,0.82);backdrop-filter:blur(60px) saturate
 .tracker-stat-n{font-family:var(--mono);font-size:1.35rem;font-weight:500;color:var(--white);display:block;line-height:1}
 .tracker-stat-l{font-family:var(--mono);font-size:.55rem;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-top:.2rem}
 
+/* ═══ SEEKER DASH — mission control stat tiles ═══ */
+.dstat-row{display:grid;grid-template-columns:repeat(4,1fr);gap:.55rem;margin-bottom:1.25rem}
+.dstat{position:relative;overflow:hidden;background:linear-gradient(160deg,rgba(255,255,255,0.05) 0%,rgba(255,255,255,0.015) 100%);border:1px solid rgba(255,255,255,0.08);border-left:2px solid var(--ds-c,rgba(255,255,255,0.18));border-radius:10px;padding:.9rem 1rem;backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);box-shadow:0 4px 18px rgba(0,0,0,0.3),inset 0 1px 0 rgba(255,255,255,0.05);transition:transform .2s ease,box-shadow .2s ease}
+.dstat::after{content:'';position:absolute;top:0;right:0;width:60%;height:100%;background:radial-gradient(ellipse at top right,var(--ds-glow,transparent) 0%,transparent 70%);pointer-events:none}
+.dstat:hover{transform:translateY(-2px);box-shadow:0 8px 26px rgba(0,0,0,0.42),inset 0 1px 0 rgba(255,255,255,0.07)}
+.dstat-l{font-family:var(--mono);font-size:.53rem;text-transform:uppercase;letter-spacing:.12em;color:var(--muted);margin-bottom:.45rem}
+.dstat-n{font-family:var(--mono);font-size:1.7rem;font-weight:500;line-height:1;color:var(--white)}
+.dstat.ds-blue{--ds-c:var(--blue);--ds-glow:rgba(59,130,246,0.12)}
+.dstat.ds-indigo{--ds-c:var(--indigo);--ds-glow:rgba(99,102,241,0.12)}
+.dstat.ds-green{--ds-c:var(--green);--ds-glow:rgba(16,185,129,0.12)}
+.dstat.ds-red{--ds-c:var(--red);--ds-glow:rgba(239,68,68,0.12)}
+/* Quick actions — icon chip presentation */
+.qact{display:flex;align-items:center;gap:.6rem;justify-content:flex-start;font-size:.78rem;padding:.55rem .7rem}
+.qact-ic{width:28px;height:28px;border-radius:8px;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.09);display:inline-flex;align-items:center;justify-content:center;font-size:.85rem;flex-shrink:0;box-shadow:inset 0 1px 0 rgba(255,255,255,0.06)}
+/* Jobs empty state — suggested search chips */
+.sugg-chip{background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.12);border-radius:100px;padding:.5rem 1.05rem;font-family:var(--mono);font-size:.66rem;color:var(--sub);cursor:pointer;transition:all .18s ease}
+.sugg-chip:hover{border-color:var(--green);color:var(--green);background:var(--gdim);box-shadow:0 0 16px rgba(16,185,129,0.15);transform:translateY(-1px)}
+
 /* RESPONSIVE */
 @media(max-width:1024px){.hero{grid-template-columns:1fr;gap:2.5rem}.hero-terminal{display:none}.jgrid{grid-template-columns:1fr 1fr}.ldr-grid{grid-template-columns:repeat(3,1fr)}.how-grid{grid-template-columns:1fr 1fr}.diff-grid{grid-template-columns:1fr 1fr}.resume-layout{grid-template-columns:1fr}.demand-grid{grid-template-columns:1fr}.pgrid{grid-template-columns:1fr}.co-mets{grid-template-columns:repeat(3,1fr)}}
-@media(max-width:768px){nav{padding:0 1rem}.ntab{padding:.28rem .42rem;font-size:.65rem}.hero{padding:3rem 1.25rem 2.5rem}.jgrid{grid-template-columns:1fr}.ldr-grid{grid-template-columns:repeat(2,1fr)}.jlay{grid-template-columns:1fr}.filts{display:none}.how-grid{grid-template-columns:1fr}.f2{grid-template-columns:1fr}.demand-stat-row{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:768px){nav{padding:0 1rem}.ntab{padding:.28rem .42rem;font-size:.65rem}.hero{padding:3rem 1.25rem 2.5rem}.jgrid{grid-template-columns:1fr}.ldr-grid{grid-template-columns:repeat(2,1fr)}.jlay{grid-template-columns:1fr}.filts{display:none}.how-grid{grid-template-columns:1fr}.f2{grid-template-columns:1fr}.demand-stat-row{grid-template-columns:repeat(2,1fr)}.dstat-row{grid-template-columns:1fr 1fr}}
 
 /* ═══════════════════════════════════════
    VERDICT FEED — live audit terminal
@@ -1099,23 +1117,23 @@ nav.nav-scrolled{background:rgba(6,6,8,0.82);backdrop-filter:blur(60px) saturate
       <button class="btn btn-ghost" onclick="doSignOut()" style="font-size:.75rem;flex-shrink:0">Sign out</button>
     </div>
 
-    <!-- Stat row — 2x2 on mobile, 4 across on desktop -->
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--line);border:1px solid var(--line);border-radius:12px;overflow:hidden;margin-bottom:1.25rem" id="seekerStatRow">
-      <div style="background:var(--surface);padding:1rem">
-        <div style="font-family:var(--mono);font-size:.55rem;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin-bottom:.4rem">Active</div>
-        <div style="font-family:var(--mono);font-size:1.65rem;font-weight:500;color:var(--white);line-height:1" id="dStatActive">0</div>
+    <!-- Stat row — mission control tiles: 2x2 on mobile, 4 across on desktop -->
+    <div class="dstat-row" id="seekerStatRow">
+      <div class="dstat ds-blue">
+        <div class="dstat-l">Active</div>
+        <div class="dstat-n" id="dStatActive">0</div>
       </div>
-      <div style="background:var(--surface);padding:1rem">
-        <div style="font-family:var(--mono);font-size:.55rem;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin-bottom:.4rem">Response rate</div>
-        <div style="font-family:var(--mono);font-size:1.65rem;font-weight:500;color:var(--blue);line-height:1" id="dStatRR">—</div>
+      <div class="dstat ds-indigo">
+        <div class="dstat-l">Response rate</div>
+        <div class="dstat-n" style="color:var(--blue)" id="dStatRR">—</div>
       </div>
-      <div style="background:var(--surface);padding:1rem">
-        <div style="font-family:var(--mono);font-size:.55rem;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin-bottom:.4rem">Ghosted</div>
-        <div style="font-family:var(--mono);font-size:1.65rem;font-weight:500;color:var(--red);line-height:1" id="dStatGhosted">0</div>
+      <div class="dstat ds-red">
+        <div class="dstat-l">Ghosted</div>
+        <div class="dstat-n" style="color:var(--red)" id="dStatGhosted">0</div>
       </div>
-      <div style="background:var(--surface);padding:1rem">
-        <div style="font-family:var(--mono);font-size:.55rem;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin-bottom:.4rem">Hired</div>
-        <div style="font-family:var(--mono);font-size:1.65rem;font-weight:500;color:var(--green);line-height:1" id="dStatHired">0</div>
+      <div class="dstat ds-green">
+        <div class="dstat-l">Hired</div>
+        <div class="dstat-n" style="color:var(--green)" id="dStatHired">0</div>
       </div>
     </div>
 
@@ -1143,11 +1161,11 @@ nav.nav-scrolled{background:rgba(6,6,8,0.82);backdrop-filter:blur(60px) saturate
     <div style="margin-bottom:1.25rem">
       <div style="font-family:var(--display);font-size:.9rem;font-weight:700;color:var(--white);letter-spacing:-.02em;margin-bottom:.75rem">Quick actions</div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:.5rem">
-        <button class="btn btn-ghost" style="justify-content:flex-start;font-size:.78rem" onclick="go('resume')">🧠 Resume AI</button>
-        <button class="btn btn-ghost" style="justify-content:flex-start;font-size:.78rem" onclick="go('demand')">🗺️ Demand map</button>
-        <button class="btn btn-ghost" style="justify-content:flex-start;font-size:.78rem" onclick="go('tracker')">📋 All applications</button>
-        <button class="btn btn-ghost" style="justify-content:flex-start;font-size:.78rem" onclick="go('report')">📢 Report a company</button>
-        <button class="btn btn-ghost" style="justify-content:flex-start;font-size:.78rem;grid-column:1/-1" onclick="generateWeeklyDigest()">📊 Copy weekly digest</button>
+        <button class="btn btn-ghost qact" onclick="go('resume')"><span class="qact-ic">🧠</span>Resume AI</button>
+        <button class="btn btn-ghost qact" onclick="go('demand')"><span class="qact-ic">🗺️</span>Demand map</button>
+        <button class="btn btn-ghost qact" onclick="go('tracker')"><span class="qact-ic">📋</span>All applications</button>
+        <button class="btn btn-ghost qact" onclick="go('report')"><span class="qact-ic">📢</span>Report a company</button>
+        <button class="btn btn-ghost qact" style="grid-column:1/-1" onclick="generateWeeklyDigest()"><span class="qact-ic">📊</span>Copy weekly digest</button>
       </div>
     </div>
 
@@ -1356,7 +1374,17 @@ nav.nav-scrolled{background:rgba(6,6,8,0.82);backdrop-filter:blur(60px) saturate
     </div>
     <div>
       <div class="jtb"><div class="jct" id="jobsCt">Enter a search above →</div><select class="jss" id="jobsSort" onchange="sortSearchResults()"><option>By transparency</option><option>Lowest waste risk</option><option>Most recent</option></select></div>
-      <div class="jlist" id="jobsList"><div style="text-align:center;padding:3rem;font-family:var(--mono);font-size:.72rem;color:var(--muted)">Search for any job title above to find open positions.</div></div>
+      <div class="jlist" id="jobsList"><div style="text-align:center;padding:2.75rem 1.5rem 3.25rem">
+        <div style="font-family:var(--mono);font-size:.56rem;color:var(--green);text-transform:uppercase;letter-spacing:.16em;margin-bottom:.5rem">Start a search</div>
+        <div style="font-family:var(--display);font-size:1.1rem;font-weight:700;color:var(--white);letter-spacing:-.02em;margin-bottom:.4rem">What role are you hunting?</div>
+        <div style="font-family:var(--mono);font-size:.62rem;color:var(--muted);margin-bottom:1.15rem">Every result is transparency-scored before you waste a single application.</div>
+        <div style="display:flex;gap:.45rem;flex-wrap:wrap;justify-content:center">
+          <button class="sugg-chip" onclick="document.getElementById('jobSearchQuery').value='Software Engineer';searchJobs()">Software Engineer</button>
+          <button class="sugg-chip" onclick="document.getElementById('jobSearchQuery').value='Product Manager';searchJobs()">Product Manager</button>
+          <button class="sugg-chip" onclick="document.getElementById('jobSearchQuery').value='Data Analyst';searchJobs()">Data Analyst</button>
+          <button class="sugg-chip" onclick="document.getElementById('jobSearchQuery').value='Marketing';searchJobs()">Marketing</button>
+        </div>
+      </div></div>
     </div>
   </div>
 </div>
@@ -2657,11 +2685,14 @@ async function runSearch(name,loc){
       </div>
     </div>
 
-    ${ghostHigh?`<div style="background:var(--rdim);border:1px solid #ff3b5c35;border-radius:9px;padding:.7rem 1rem;margin-bottom:.85rem;display:flex;align-items:center;gap:.65rem">
-      <span style="font-size:1.5rem;flex-shrink:0">👻</span>
-      <div>
-        <div style="font-family:var(--mono);font-size:.72rem;font-weight:500;color:var(--red)">${ghostPct}% ghost rate — HIGH RISK</div>
-        <div style="font-family:var(--mono);font-size:.56rem;color:rgba(255,59,92,.55);margin-top:.1rem">Most applicants never hear back from this company</div>
+    ${ghostHigh?`<div style="position:relative;overflow:hidden;background:linear-gradient(90deg,rgba(239,68,68,.14) 0%,rgba(239,68,68,.04) 100%);border:1px solid #ff3b5c35;border-left:3px solid var(--red);border-radius:9px;padding:.75rem 1rem;margin-bottom:.85rem;display:flex;align-items:center;justify-content:space-between;gap:.85rem">
+      <div style="min-width:0">
+        <div style="font-family:var(--mono);font-size:.56rem;font-weight:500;color:var(--red);text-transform:uppercase;letter-spacing:.16em;margin-bottom:.22rem;display:flex;align-items:center;gap:.4rem"><span style="width:6px;height:6px;border-radius:50%;background:var(--red);box-shadow:0 0 8px var(--red);animation:pulse 1.2s infinite;display:inline-block;flex-shrink:0"></span>Ghosting alert — high risk</div>
+        <div style="font-family:var(--mono);font-size:.58rem;color:rgba(255,59,92,.65)">Most applicants never hear back from this company</div>
+      </div>
+      <div style="text-align:right;flex-shrink:0">
+        <div style="font-family:var(--display);font-size:1.7rem;font-weight:800;color:var(--red);line-height:.95;letter-spacing:-.03em;text-shadow:0 0 26px rgba(239,68,68,.45)">${ghostPct}%</div>
+        <div style="font-family:var(--mono);font-size:.46rem;color:rgba(255,59,92,.55);text-transform:uppercase;letter-spacing:.14em;margin-top:.12rem">Ghost rate</div>
       </div>
     </div>`:''}
 
@@ -3432,15 +3463,15 @@ async function loadJobs(){
   if(!jobs.length){
     if(countEl)countEl.textContent='';
     if(listEl)listEl.innerHTML=`
-      <div style="text-align:center;padding:3rem 1.5rem;max-width:400px;margin:0 auto">
-        <div style="font-size:2rem;margin-bottom:1rem">🔍</div>
-        <div style="font-family:var(--display);font-size:1rem;font-weight:700;color:var(--white);margin-bottom:.5rem">Search for jobs</div>
-        <div style="font-family:var(--mono);font-size:.7rem;color:var(--muted);line-height:1.7;margin-bottom:1.25rem">${effectiveLoc?'No listings cached for '+effectiveLoc.split(',')[0]+' yet — try a search above or check back after the daily refresh.':'Enter a job title to search, or set your location in your profile to auto-load your local feed.'}</div>
-        <div style="display:flex;flex-direction:column;gap:.5rem;font-family:var(--mono);font-size:.65rem;color:var(--dim)">
-          <span onclick="document.getElementById('jobSearchQuery').value='Registered Nurse';loadJobs()" style="cursor:pointer;padding:.4rem .8rem;background:var(--raised);border-radius:6px;border:1px solid var(--line2)">Registered Nurse →</span>
-          <span onclick="document.getElementById('jobSearchQuery').value='Software Engineer';loadJobs()" style="cursor:pointer;padding:.4rem .8rem;background:var(--raised);border-radius:6px;border:1px solid var(--line2)">Software Engineer →</span>
-          <span onclick="document.getElementById('jobSearchQuery').value='Customer Service';loadJobs()" style="cursor:pointer;padding:.4rem .8rem;background:var(--raised);border-radius:6px;border:1px solid var(--line2)">Customer Service →</span>
-          <span onclick="document.getElementById('jobSearchQuery').value='Medical Assistant';loadJobs()" style="cursor:pointer;padding:.4rem .8rem;background:var(--raised);border-radius:6px;border:1px solid var(--line2)">Medical Assistant →</span>
+      <div style="text-align:center;padding:2.75rem 1.5rem 3.25rem;max-width:460px;margin:0 auto">
+        <div style="font-family:var(--mono);font-size:.56rem;color:var(--green);text-transform:uppercase;letter-spacing:.16em;margin-bottom:.5rem">Start a search</div>
+        <div style="font-family:var(--display);font-size:1.1rem;font-weight:700;color:var(--white);letter-spacing:-.02em;margin-bottom:.4rem">What role are you hunting?</div>
+        <div style="font-family:var(--mono);font-size:.62rem;color:var(--muted);line-height:1.7;margin-bottom:1.15rem">${effectiveLoc?'No listings cached for '+effectiveLoc.split(',')[0]+' yet — try a search above or check back after the daily refresh.':'Every result is transparency-scored before you waste a single application.'}</div>
+        <div style="display:flex;gap:.45rem;flex-wrap:wrap;justify-content:center">
+          <button class="sugg-chip" onclick="document.getElementById('jobSearchQuery').value='Software Engineer';loadJobs()">Software Engineer</button>
+          <button class="sugg-chip" onclick="document.getElementById('jobSearchQuery').value='Product Manager';loadJobs()">Product Manager</button>
+          <button class="sugg-chip" onclick="document.getElementById('jobSearchQuery').value='Data Analyst';loadJobs()">Data Analyst</button>
+          <button class="sugg-chip" onclick="document.getElementById('jobSearchQuery').value='Marketing';loadJobs()">Marketing</button>
         </div>
       </div>`;
     return;
