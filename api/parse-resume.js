@@ -3,7 +3,10 @@ import { promisify } from 'util';
 const inflateRaw = promisify(zlib.inflateRaw);
 
 export default async function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
+  const _o=req.headers.origin||'';
+  const _devO=!_o||_o.includes('localhost')||_o.includes('127.0.0.1');
+  res.setHeader('Access-Control-Allow-Origin',(_devO||['https://seenjobs.io','https://www.seenjobs.io'].includes(_o))?(_o||'*'):'https://seenjobs.io');
+  res.setHeader('Vary','Origin');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 

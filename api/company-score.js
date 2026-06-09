@@ -44,11 +44,10 @@ function rowToScore(row) {
   };
 }
 
+import { applyRateLimit } from './_utils/ratelimit.js';
+
 export default async function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'POST, GET, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-  if (req.method === 'OPTIONS') return res.status(200).end();
+  if (await applyRateLimit(req, res, 'company-score')) return;
 
   let body = req.body;
   if (typeof body === 'string') try { body = JSON.parse(body); } catch(e) { body = {}; }

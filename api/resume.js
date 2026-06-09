@@ -1,17 +1,17 @@
-export default async function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+import { applyRateLimit } from './_utils/ratelimit.js';
 
-  if (req.method === 'OPTIONS') return res.status(200).end();
+export default async function handler(req, res) {
+  // Rate limit keyed per tool so each tool has its own bucket
+  let body = req.body;
+  if (typeof body === 'string') { try { body = JSON.parse(body); } catch(e) { body = {}; } }
+  if (!body || typeof body !== 'object') body = {};
+  const { tool } = body;
+  const endpoint = tool ? `resume-${tool}` : 'resume';
+  if (await applyRateLimit(req, res, endpoint)) return;
+
   if (req.method !== 'POST') return res.status(405).end('Method not allowed');
 
   try {
-    // Defensively parse body — Vercel usually does this but guard for edge cases
-    let body = req.body;
-    if (typeof body === 'string') { try { body = JSON.parse(body); } catch(e) { body = {}; } }
-    if (!body || typeof body !== 'object') body = {};
-    const { tool } = body;
     if (!tool) return res.status(400).json({ error: 'Missing tool parameter' });
 
     const ANTHROPIC_KEY = process.env.ANTHROPIC_KEY;
