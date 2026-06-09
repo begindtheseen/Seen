@@ -49,9 +49,11 @@ export default async function handler(req, res) {
   const sevenDaysAgo = new Date(Date.now() - 7 * 86400000).toISOString();
   const oneDayAgo = new Date(Date.now() - 86400000).toISOString();
 
+  // Returns the count from Content-Range header, or 0 on any error
   const safeCount = async (url) => {
     try {
       const r = await fetch(url, { headers: { ...svc, Prefer: 'count=exact', Range: '0-0' } });
+      if (!r.ok) return 0;
       return parseInt(r.headers?.get('Content-Range')?.split('/')?.[1] ?? '0') || 0;
     } catch { return 0; }
   };
@@ -62,6 +64,15 @@ export default async function handler(req, res) {
       return r.ok ? await r.json() : [];
     } catch { return []; }
   };
+
+  // Probe whether search_logs table exists — a 404/400 from Supabase means the table
+  // is missing; a 200 (even with 0 rows) means it exists and logging is active.
+  const searchLogsReady = await (async () => {
+    try {
+      const r = await fetch(`${SUPABASE_URL}/rest/v1/search_logs?limit=0&select=id`, { headers: svc });
+      return r.ok; // 200 = table exists, 4xx = does not exist
+    } catch { return false; }
+  })();
 
   const [
     totalJobs,
@@ -74,8 +85,12 @@ export default async function handler(req, res) {
     safeCount(`${SUPABASE_URL}/rest/v1/jobs?expires_at=gt.${now}&select=id`),
     safeCount(`${SUPABASE_URL}/rest/v1/jobs?expires_at=gt.${fresh24h}&select=id`),
     safeJson(`${SUPABASE_URL}/rest/v1/jobs?expires_at=gt.${now}&select=search_query&limit=5000`),
-    safeCount(`${SUPABASE_URL}/rest/v1/search_logs?created_at=gt.${oneDayAgo}&select=id`),
-    safeJson(`${SUPABASE_URL}/rest/v1/search_logs?created_at=gt.${sevenDaysAgo}&select=created_at,query,location&limit=10000`),
+    searchLogsReady
+      ? safeCount(`${SUPABASE_URL}/rest/v1/search_logs?created_at=gt.${oneDayAgo}&select=id`)
+      : Promise.resolve(0),
+    searchLogsReady
+      ? safeJson(`${SUPABASE_URL}/rest/v1/search_logs?created_at=gt.${sevenDaysAgo}&select=created_at,query,location&limit=10000`)
+      : Promise.resolve([]),
     safeJson(`${SUPABASE_URL}/rest/v1/jobs?expires_at=gt.${now}&select=location&limit=5000`),
   ]);
 
@@ -124,11 +139,12 @@ export default async function handler(req, res) {
       total: totalJobs,
       added_last_24h_approx: freshJobs,
     },
+    search_logs_ready: searchLogsReady,
     searches: {
-      today: searchLogsToday || null,
-      week_total: (searchLogsWeek || []).length || null,
-      chart: searchChart.length ? searchChart : null,
-      top_queries: searchTopQueries.length ? searchTopQueries : null,
+      today: searchLogsReady ? searchLogsToday : null,
+      week_total: searchLogsReady ? (searchLogsWeek || []).length : null,
+      chart: searchLogsReady && searchChart.length ? searchChart : null,
+      top_queries: searchLogsReady && searchTopQueries.length ? searchTopQueries : null,
     },
     top_job_queries: topQueries,
     top_locations: topLocations,

@@ -4844,13 +4844,14 @@ async function renderAdminPage() {
     set('admSearchesToday', searchesToday !== null && searchesToday !== undefined ? searchesToday.toLocaleString() : '—');
     set('admSearchesWeek', searchesWeek !== null && searchesWeek !== undefined ? searchesWeek.toLocaleString() : '—');
 
-    // If search logging not set up yet, show the setup note and mark stats as N/A
-    const hasSearchLogs = searchesToday !== null;
-    if (!hasSearchLogs) {
+    // If search_logs table doesn't exist yet, show setup note and mark stats as N/A
+    if (!data.search_logs_ready) {
       set('admSearchesToday', 'N/A');
       set('admSearchesWeek', 'N/A');
       set('admSearchTodaySub', 'not yet tracked');
       if (setupNote) setupNote.style.display = 'block';
+    } else {
+      if (setupNote) setupNote.style.display = 'none';
     }
 
     // Search volume chart
