@@ -277,9 +277,9 @@ nav.nav-scrolled{background:rgba(6,6,8,0.82);backdrop-filter:blur(60px) saturate
 .ldr-waste{font-family:var(--mono);font-size:.55rem;color:var(--red);margin-top:.3rem}
 
 /* ═══ SIDE MENU ═══ */
-.side-menu{position:fixed;left:0;top:0;bottom:0;width:260px;background:var(--void);border-right:1px solid var(--line);z-index:10001;transform:translateX(-100%);transition:transform .25s ease;display:flex;flex-direction:column;padding:1.5rem 0}
+.side-menu{position:fixed;left:0;top:0;bottom:0;width:260px;background:var(--void);border-right:1px solid var(--line);z-index:500;transform:translateX(-100%);transition:transform .25s ease;display:flex;flex-direction:column;padding:1.5rem 0}
 .side-menu.open{transform:translateX(0)}
-.side-menu-overlay{position:fixed;inset:0;background:rgba(0,0,0,.78);z-index:10000;display:none;backdrop-filter:blur(6px)}
+.side-menu-overlay{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:499;display:none;backdrop-filter:blur(4px)}
 .side-menu-overlay.open{display:block}
 .side-menu-logo{display:flex;align-items:center;gap:.5rem;padding:0 1.25rem 1.5rem;border-bottom:1px solid var(--line);margin-bottom:1rem}
 .side-menu-item{display:flex;align-items:center;gap:.75rem;padding:.75rem 1.25rem;font-family:var(--body);font-size:.85rem;color:var(--sub);cursor:pointer;transition:all .15s;border:none;background:none;width:100%;text-align:left}
@@ -708,7 +708,7 @@ nav.nav-scrolled{background:rgba(6,6,8,0.82);backdrop-filter:blur(60px) saturate
     <!-- populated by renderSideMenu() -->
   </div>
   <div style="margin-top:auto;padding:1rem 1.25rem;border-top:1px solid var(--line)">
-    <div id="sideMenuUserInfo" style="display:none"></div>
+    <div style="font-family:var(--mono);font-size:.6rem;color:var(--muted);margin-bottom:.75rem" id="sideMenuUserInfo"></div>
     <button onclick="doSignOut();closeSideMenu()" style="background:none;border:1px solid var(--line2);color:var(--muted);border-radius:8px;padding:.5rem 1rem;font-family:var(--mono);font-size:.65rem;cursor:pointer;width:100%" id="sideMenuSignOut" style="display:none">Sign out</button>
   </div>
 </div>
@@ -722,7 +722,6 @@ nav.nav-scrolled{background:rgba(6,6,8,0.82);backdrop-filter:blur(60px) saturate
     <button class="ntab" onclick="go('demand')" id="nt-demand">Demand</button>
     <button class="ntab" onclick="go('resume')" id="nt-resume">Resume AI</button>
     <button class="ntab" onclick="go('tracker')" id="nt-tracker">Track <span class="ntab-new" id="trackerBadge" style="display:none;background:var(--amber);color:var(--ink)">0</span><span class="ntab-new" id="trackerCheckBadge" style="display:none;background:var(--red);color:#fff;margin-left:.15rem">!</span></button>
-    <button class="ntab" onclick="renderFeed();go('feed')" id="nt-feed">Feed</button>
   </div>
   <div class="nav-right" id="navRight">
     <button id="backToDashBtn" onclick="renderSeekerDash();go('seeker-dash')" style="display:none;background:none;border:1px solid var(--line2);color:var(--sub);border-radius:8px;padding:.32rem .75rem;font-family:var(--mono);font-size:.62rem;cursor:pointer;white-space:nowrap">← Dashboard</button>
@@ -796,7 +795,7 @@ nav.nav-scrolled{background:rgba(6,6,8,0.82);backdrop-filter:blur(60px) saturate
       </div>
     </div>
     <!-- Subtitle — in normal flow, never overlaps anything -->
-    <div id="heroSub" style="font-family:var(--mono);font-size:clamp(.65rem,1.4vw,.82rem);color:rgba(255,255,255,.42);letter-spacing:.02em;line-height:1.5;margin:.5rem 0 1.5rem;animation:fadeUp .5s .12s ease both">Ghost rates · response times · hiring scores · 47,000+ companies</div>
+    <div id="heroSub" style="font-family:var(--mono);font-size:clamp(.65rem,1.4vw,.82rem);color:rgba(255,255,255,.62);letter-spacing:.02em;line-height:1.5;margin:.5rem 0 1.5rem;animation:fadeUp .5s .12s ease both">Ghost rates · response times · hiring scores · 47,000+ companies</div>
 
     <!-- Search — fixed position below headline, never moves -->
     <div style="width:100%;max-width:520px;margin:0 auto 1.1rem;animation:fadeUp .5s .16s ease both;position:relative">
@@ -826,27 +825,22 @@ nav.nav-scrolled{background:rgba(6,6,8,0.82);backdrop-filter:blur(60px) saturate
     </div>
 
     <!-- Quick tags — dynamically rendered from COS by renderQuickTags() -->
-    <div id="heroQuickTags" style="display:flex;align-items:center;justify-content:center;gap:.65rem;margin-bottom:1.5rem;flex-wrap:wrap;animation:fadeUp .5s .22s ease both">
+    <div id="heroQuickTags" style="display:flex;align-items:center;justify-content:center;gap:.65rem;margin-bottom:2rem;flex-wrap:wrap;animation:fadeUp .5s .22s ease both">
       <button class="qtag" onclick="qs('Amazon','Seattle, WA')">👻 Amazon</button>
       <button class="qtag" onclick="qs('X (Twitter)','San Francisco, CA')">👻 X (Twitter)</button>
       <button class="qtag" onclick="qs('Stripe','')">✅ Stripe</button>
-      <button class="qtag" onclick="qs('Google','')">📋 Google</button>
-      <button class="qtag" onclick="qs('OpenAI','')">⚡ OpenAI</button>
     </div>
 
     <!-- CTAs -->
-    <div style="display:flex;gap:.75rem;justify-content:center;flex-wrap:wrap;animation:fadeUp .5s .28s ease both;margin-bottom:1.5rem">
-      <button class="btn btn-green btn-lg" onclick="go('login')" style="min-width:165px;justify-content:center">Get started free →</button>
-      <button class="btn btn-ghost btn-lg" onclick="go('jobs')" style="min-width:165px;justify-content:center;background:rgba(255,255,255,.08);border-color:rgba(255,255,255,.2);color:var(--white)">Browse jobs</button>
+    <div style="display:flex;flex-direction:column;align-items:center;gap:.65rem;animation:fadeUp .5s .28s ease both">
+      <button class="btn btn-green btn-lg" onclick="go('login')" style="min-width:220px;justify-content:center;font-size:.95rem;padding:.85rem 2rem">Get started free →</button>
+      <button onclick="go('jobs')" style="background:none;border:none;font-family:var(--mono);font-size:.7rem;color:rgba(255,255,255,.45);cursor:pointer;padding:.25rem .5rem;transition:color .15s" onmouseover="this.style.color='rgba(255,255,255,.75)'" onmouseout="this.style.color='rgba(255,255,255,.45)'">or browse jobs without an account →</button>
     </div>
-
-    <!-- Social proof mini-cards — 3 companies with grade badges -->
-    <div style="display:flex;align-items:center;justify-content:center;gap:.75rem;flex-wrap:wrap;animation:fadeUp .5s .35s ease both;margin-bottom:.25rem" id="heroProofCards"></div>
   </div>
 
   <!-- Bottom disclaimer — pinned -->
   <div style="position:relative;z-index:2;text-align:center;padding:.85rem;font-family:var(--mono);font-size:.58rem;color:rgba(255,255,255,.3)">
-    Free for job seekers · No account required to search · © 2025 Seen / seenjobs.io · <a href="#" onclick="go('legal');return false" style="color:rgba(255,255,255,.3);text-decoration:underline">Legal</a>
+    Free for job seekers · No account required to search · <a href="#" onclick="go('legal');return false" style="color:rgba(255,255,255,.3);text-decoration:underline">Legal</a>
   </div>
 </div>
 
@@ -874,39 +868,6 @@ nav.nav-scrolled{background:rgba(6,6,8,0.82);backdrop-filter:blur(60px) saturate
 
     <!-- Grid -->
     <div id="ldrGrid" class="ldr-grid" style="grid-template-columns:1fr"></div>
-  </div>
-</div>
-
-<!-- ═══════════════════════════════════════
-     COMMUNITY FEED
-═══════════════════════════════════════ -->
-<div class="page" id="page-feed">
-  <div style="max-width:680px;margin:0 auto;padding:2rem 1.25rem 4rem">
-    <div style="margin-bottom:1.5rem">
-      <div class="eyebrow">Real experiences · anonymized</div>
-      <h1 style="font-family:var(--display);font-size:1.75rem;font-weight:800;color:var(--white);letter-spacing:-.03em;margin-bottom:.3rem">Community feed</h1>
-      <p style="color:var(--sub);font-size:.8rem;font-weight:300">What applicants are experiencing right now. No PR spin.</p>
-    </div>
-    <!-- Filter chips -->
-    <div style="display:flex;gap:.45rem;flex-wrap:wrap;margin-bottom:1.25rem" id="feedFilters">
-      <button class="vibe v-n feed-filter active" data-filter="all" onclick="filterFeed('all',this)" style="font-size:.65rem;padding:.3rem .75rem;cursor:pointer">All</button>
-      <button class="vibe v-r feed-filter" data-filter="ghosted" onclick="filterFeed('ghosted',this)" style="font-size:.65rem;padding:.3rem .75rem;cursor:pointer">👻 Ghosted</button>
-      <button class="vibe v-g feed-filter" data-filter="hired" onclick="filterFeed('hired',this)" style="font-size:.65rem;padding:.3rem .75rem;cursor:pointer">✅ Hired</button>
-      <button class="vibe v-y feed-filter" data-filter="interview" onclick="filterFeed('interview',this)" style="font-size:.65rem;padding:.3rem .75rem;cursor:pointer">💬 Interviewing</button>
-      <button class="vibe v-r feed-filter" data-filter="rejected" onclick="filterFeed('rejected',this)" style="font-size:.65rem;padding:.3rem .75rem;cursor:pointer">❌ Rejected</button>
-    </div>
-    <!-- Feed list -->
-    <div id="feedList"></div>
-    <div id="feedEmpty" style="display:none;text-align:center;padding:3rem 1rem">
-      <div style="font-size:2rem;margin-bottom:.75rem">👀</div>
-      <div style="font-family:var(--mono);font-size:.72rem;color:var(--muted)">No reports match that filter yet.</div>
-    </div>
-    <!-- CTA to submit -->
-    <div style="margin-top:2rem;background:var(--bdim);border:1px solid var(--bmid);border-radius:14px;padding:1.25rem;text-align:center">
-      <div style="font-family:var(--display);font-size:.95rem;font-weight:700;color:var(--white);margin-bottom:.35rem">Share your experience</div>
-      <div style="font-size:.78rem;color:var(--sub);font-weight:300;margin-bottom:.9rem">Anonymized. Helps thousands of job seekers make smarter decisions.</div>
-      <button class="btn btn-solid" onclick="go('report')" style="font-size:.78rem">Report a company →</button>
-    </div>
   </div>
 </div>
 
@@ -1077,18 +1038,8 @@ nav.nav-scrolled{background:rgba(6,6,8,0.82);backdrop-filter:blur(60px) saturate
         <button class="btn btn-ghost" style="justify-content:flex-start;font-size:.78rem" onclick="go('demand')">🗺️ Demand map</button>
         <button class="btn btn-ghost" style="justify-content:flex-start;font-size:.78rem" onclick="go('tracker')">📋 All applications</button>
         <button class="btn btn-ghost" style="justify-content:flex-start;font-size:.78rem" onclick="go('report')">📢 Report a company</button>
-        <button class="btn btn-ghost" style="justify-content:flex-start;font-size:.78rem" onclick="renderFeed();go('feed')">👁️ Community feed</button>
-        <button class="btn btn-ghost" style="justify-content:flex-start;font-size:.78rem" onclick="generateWeeklyDigest()">📊 Copy weekly digest</button>
+        <button class="btn btn-ghost" style="justify-content:flex-start;font-size:.78rem;grid-column:1/-1" onclick="generateWeeklyDigest()">📊 Copy weekly digest</button>
       </div>
-    </div>
-
-    <!-- My Seen Stats -->
-    <div style="background:var(--surface);border:1px solid var(--line);border-radius:12px;overflow:hidden;margin-bottom:1.25rem">
-      <div style="padding:.85rem 1.1rem;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between">
-        <div style="font-family:var(--display);font-size:.82rem;font-weight:700;color:var(--white)">My Seen stats</div>
-        <span style="font-family:var(--mono);font-size:.58rem;color:var(--muted)">your job search, analyzed</span>
-      </div>
-      <div id="userStatsPanel" style="padding:1rem 1.1rem"></div>
     </div>
 
 
@@ -1252,13 +1203,13 @@ nav.nav-scrolled{background:rgba(6,6,8,0.82);backdrop-filter:blur(60px) saturate
           <button title="Use my location" onclick="_requestGpsLocation('jobSearchLocation')" style="position:absolute;right:.5rem;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;font-size:1rem;color:var(--muted);padding:0;line-height:1;transition:color .15s" onmouseenter="this.style.color='var(--green)'" onmouseleave="this.style.color='var(--muted)'">📍</button>
           <div id="jobLocSuggestions" style="position:absolute;z-index:200;background:var(--surface);border:1px solid var(--line2);border-radius:8px;width:280px;display:none;box-shadow:0 8px 24px rgba(0,0,0,.4);top:100%;left:0;margin-top:.25rem"></div>
         </div>
-        <select id="jobSearchRadius" onchange="loadJobs()" style="background:var(--surface);border:1.5px solid var(--line2);border-radius:8px;padding:.65rem .75rem;color:var(--white);font-family:var(--mono);font-size:.72rem;outline:none;appearance:none;cursor:pointer">
+        <select id="jobSearchRadius" style="background:var(--surface);border:1.5px solid var(--line2);border-radius:8px;padding:.65rem .75rem;color:var(--white);font-family:var(--mono);font-size:.72rem;outline:none;appearance:none;cursor:pointer">
           <option value="10">10 mi</option>
           <option value="25" selected>25 mi</option>
           <option value="50">50 mi</option>
           <option value="100">100 mi</option>
+          <option value="0">Remote</option>
         </select>
-        <button id="includeRemoteBtn" onclick="toggleIncludeRemote()" style="padding:.65rem .85rem;background:var(--surface);border:1.5px solid var(--line2);border-radius:8px;font-family:var(--mono);font-size:.68rem;color:var(--sub);cursor:pointer;white-space:nowrap;transition:all .15s" title="Toggle remote jobs">+ Remote</button>
         <button onclick="searchJobs()" style="padding:.65rem 1.25rem;background:linear-gradient(135deg,#3b82f6 0%,#8b5cf6 100%);color:#fff;border:none;border-radius:8px;font-family:var(--display);font-weight:800;font-size:.84rem;cursor:pointer;white-space:nowrap;box-shadow:0 0 20px rgba(59,130,246,0.3)">Search →</button>
       </div>
       <!-- Filter bar — DB only, no API calls -->
@@ -1623,6 +1574,21 @@ nav.nav-scrolled{background:rgba(6,6,8,0.82);backdrop-filter:blur(60px) saturate
           <div id="profCitySuggestions" style="position:absolute;z-index:200;background:var(--surface);border:1px solid var(--line2);border-radius:8px;width:100%;display:none;box-shadow:0 8px 24px rgba(0,0,0,.4);top:calc(100% + 4px);left:0"></div>
         </div>
         <div style="font-family:var(--mono);font-size:.6rem;color:var(--muted);margin-top:.5rem">Used to auto-load nearby job listings on the Jobs page.</div>
+      </div>
+    </div>
+
+    <!-- Job preferences -->
+    <div style="background:var(--surface);border:1px solid var(--line);border-radius:14px;overflow:hidden;margin-bottom:1.5rem">
+      <div style="padding:.85rem 1.25rem;border-bottom:1px solid var(--line);font-family:var(--mono);font-size:.62rem;color:var(--dim);text-transform:uppercase;letter-spacing:.08em">Job preferences</div>
+      <div style="padding:1.25rem">
+        <label style="font-family:var(--mono);font-size:.6rem;text-transform:uppercase;letter-spacing:.08em;color:var(--dim);display:block;margin-bottom:.4rem">Experience level</label>
+        <select id="profExperience" style="width:100%;background:var(--raised);border:1.5px solid var(--line2);border-radius:8px;padding:.7rem 1rem;color:var(--white);font-family:var(--body);font-size:.875rem;outline:none;appearance:none;cursor:pointer;box-sizing:border-box" onfocus="this.style.borderColor='var(--green)'" onblur="this.style.borderColor='var(--line2)'">
+          <option value="">— Select level —</option>
+          <option value="entry">🌱 Entry level (0–2 yrs)</option>
+          <option value="mid">📈 Mid level (3–6 yrs)</option>
+          <option value="senior">⭐ Senior (7+ yrs)</option>
+        </select>
+        <div style="font-family:var(--mono);font-size:.6rem;color:var(--muted);margin-top:.5rem">Use the search filter on the Jobs page to filter by industry.</div>
       </div>
     </div>
 
@@ -2247,42 +2213,6 @@ const COS={
   coinbase:{id:'28',name:'Coinbase',ind:'Crypto / Fintech',logo:'CB',ver:false,sc:{overall_score:61,response_rate:.62,ghost_rate:.32,avg_wait_days:18,report_count:74,risk_level:'safe',waste:30,avg_rounds:4.0,process_score:58}},
   figma:{id:'29',name:'Figma',ind:'Design Tools',logo:'FG',ver:true,sc:{overall_score:85,response_rate:.84,ghost_rate:.08,avg_wait_days:10,report_count:41,risk_level:'safe',waste:8,avg_rounds:3.6,process_score:88}},
   vercel:{id:'30',name:'Vercel',ind:'Developer Infra',logo:'V',ver:true,sc:{overall_score:89,response_rate:.88,ghost_rate:.05,avg_wait_days:7,report_count:29,risk_level:'safe',waste:5,avg_rounds:3.0,process_score:92}},
-  // ── Expansion pack ─────────────────────────────────────────────────────
-  spotify:{id:'31',name:'Spotify',ind:'Audio / Streaming',logo:'SP',ver:false,sc:{overall_score:73,response_rate:.72,ghost_rate:.22,avg_wait_days:19,report_count:94,risk_level:'safe',waste:20,avg_rounds:4.0,process_score:71}},
-  adobe:{id:'32',name:'Adobe',ind:'Creative Software',logo:'AD',ver:false,sc:{overall_score:58,response_rate:.55,ghost_rate:.38,avg_wait_days:27,report_count:167,risk_level:'warn',waste:40,avg_rounds:4.6,process_score:55}},
-  palantir:{id:'33',name:'Palantir',ind:'Data Analytics',logo:'PL',ver:false,sc:{overall_score:46,response_rate:.44,ghost_rate:.50,avg_wait_days:32,report_count:112,risk_level:'warn',waste:52,avg_rounds:5.8,process_score:42}},
-  reddit:{id:'34',name:'Reddit',ind:'Social Media',logo:'R',ver:false,sc:{overall_score:54,response_rate:.52,ghost_rate:.42,avg_wait_days:24,report_count:78,risk_level:'warn',waste:44,avg_rounds:3.8,process_score:50}},
-  tiktok:{id:'35',name:'TikTok',ind:'Social Media / Tech',logo:'TT',ver:false,sc:{overall_score:41,response_rate:.38,ghost_rate:.54,avg_wait_days:36,report_count:143,risk_level:'warn',waste:58,avg_rounds:4.2,process_score:38}},
-  hubspot:{id:'36',name:'HubSpot',ind:'Marketing SaaS',logo:'HS',ver:true,sc:{overall_score:79,response_rate:.80,ghost_rate:.14,avg_wait_days:13,report_count:88,risk_level:'safe',waste:14,avg_rounds:3.6,process_score:82}},
-  twilio:{id:'37',name:'Twilio',ind:'Communication APIs',logo:'TW',ver:false,sc:{overall_score:55,response_rate:.54,ghost_rate:.40,avg_wait_days:22,report_count:64,risk_level:'warn',waste:42,avg_rounds:3.8,process_score:52}},
-  datadog:{id:'38',name:'Datadog',ind:'Observability SaaS',logo:'DD',ver:false,sc:{overall_score:77,response_rate:.78,ghost_rate:.17,avg_wait_days:14,report_count:56,risk_level:'safe',waste:16,avg_rounds:4.0,process_score:79}},
-  zoom:{id:'39',name:'Zoom',ind:'Video Comms',logo:'Z',ver:false,sc:{overall_score:52,response_rate:.50,ghost_rate:.44,avg_wait_days:26,report_count:112,risk_level:'warn',waste:46,avg_rounds:3.2,process_score:49}},
-  dropbox:{id:'40',name:'Dropbox',ind:'Cloud Storage',logo:'DB',ver:false,sc:{overall_score:49,response_rate:.48,ghost_rate:.46,avg_wait_days:28,report_count:76,risk_level:'warn',waste:48,avg_rounds:3.4,process_score:46}},
-  block:{id:'41',name:'Block',ind:'Fintech / Payments',logo:'BK',ver:false,sc:{overall_score:56,response_rate:.56,ghost_rate:.38,avg_wait_days:21,report_count:82,risk_level:'warn',waste:38,avg_rounds:3.8,process_score:54}},
-  snowflake:{id:'42',name:'Snowflake',ind:'Cloud Data',logo:'SN',ver:false,sc:{overall_score:71,response_rate:.70,ghost_rate:.24,avg_wait_days:18,report_count:67,risk_level:'safe',waste:22,avg_rounds:4.4,process_score:68}},
-  servicenow:{id:'43',name:'ServiceNow',ind:'Enterprise SaaS',logo:'SN2',ver:false,sc:{overall_score:69,response_rate:.68,ghost_rate:.28,avg_wait_days:20,report_count:98,risk_level:'safe',waste:26,avg_rounds:4.0,process_score:66}},
-  workday:{id:'44',name:'Workday',ind:'HR Software',logo:'WD',ver:false,sc:{overall_score:62,response_rate:.60,ghost_rate:.34,avg_wait_days:22,report_count:104,risk_level:'safe',waste:34,avg_rounds:4.2,process_score:60}},
-  atlassian:{id:'45',name:'Atlassian',ind:'Developer Tools',logo:'AT',ver:true,sc:{overall_score:81,response_rate:.82,ghost_rate:.12,avg_wait_days:12,report_count:73,risk_level:'safe',waste:11,avg_rounds:3.8,process_score:84}},
-  robinhood:{id:'46',name:'Robinhood',ind:'Fintech',logo:'RH',ver:false,sc:{overall_score:44,response_rate:.42,ghost_rate:.52,avg_wait_days:30,report_count:58,risk_level:'warn',waste:54,avg_rounds:3.6,process_score:40}},
-  jpmorgan:{id:'47',name:'JPMorgan Chase',ind:'Banking',logo:'JP',ver:false,sc:{overall_score:55,response_rate:.54,ghost_rate:.40,avg_wait_days:24,report_count:198,risk_level:'warn',waste:42,avg_rounds:4.6,process_score:52}},
-  goldman:{id:'48',name:'Goldman Sachs',ind:'Investment Banking',logo:'GS',ver:false,sc:{overall_score:73,response_rate:.74,ghost_rate:.22,avg_wait_days:18,report_count:147,risk_level:'safe',waste:22,avg_rounds:4.8,process_score:71}},
-  capitalOne:{id:'49',name:'Capital One',ind:'Banking / Tech',logo:'CO',ver:false,sc:{overall_score:67,response_rate:.66,ghost_rate:.28,avg_wait_days:16,report_count:134,risk_level:'safe',waste:28,avg_rounds:3.8,process_score:65}},
-  disney:{id:'50',name:'Disney',ind:'Entertainment',logo:'DS',ver:false,sc:{overall_score:50,response_rate:.50,ghost_rate:.46,avg_wait_days:28,report_count:162,risk_level:'warn',waste:48,avg_rounds:3.6,process_score:48}},
-  comcast:{id:'51',name:'Comcast',ind:'Telecom / Media',logo:'CM',ver:false,sc:{overall_score:28,response_rate:.24,ghost_rate:.76,avg_wait_days:46,report_count:187,risk_level:'danger',waste:76,avg_rounds:3.2,process_score:22}},
-  verizon:{id:'52',name:'Verizon',ind:'Telecom',logo:'VZ',ver:false,sc:{overall_score:42,response_rate:.40,ghost_rate:.54,avg_wait_days:32,report_count:213,risk_level:'warn',waste:56,avg_rounds:3.4,process_score:38}},
-  att:{id:'53',name:'AT&T',ind:'Telecom',logo:'AT&T',ver:false,sc:{overall_score:36,response_rate:.32,ghost_rate:.62,avg_wait_days:38,report_count:231,risk_level:'danger',waste:64,avg_rounds:3.6,process_score:30}},
-  doordash:{id:'54',name:'DoorDash',ind:'Delivery / Logistics',logo:'DS2',ver:false,sc:{overall_score:53,response_rate:.52,ghost_rate:.42,avg_wait_days:22,report_count:97,risk_level:'warn',waste:44,avg_rounds:3.8,process_score:50}},
-  snap:{id:'55',name:'Snap',ind:'Social Media',logo:'SC',ver:false,sc:{overall_score:57,response_rate:.56,ghost_rate:.38,avg_wait_days:22,report_count:84,risk_level:'warn',waste:38,avg_rounds:3.4,process_score:55}},
-  pinterest:{id:'56',name:'Pinterest',ind:'Social Media',logo:'PI',ver:false,sc:{overall_score:60,response_rate:.60,ghost_rate:.34,avg_wait_days:20,report_count:72,risk_level:'safe',waste:34,avg_rounds:3.2,process_score:58}},
-  openai:{id:'57',name:'OpenAI',ind:'AI Research',logo:'OA',ver:false,sc:{overall_score:83,response_rate:.84,ghost_rate:.10,avg_wait_days:11,report_count:41,risk_level:'safe',waste:10,avg_rounds:4.6,process_score:86}},
-  anthropic:{id:'58',name:'Anthropic',ind:'AI Safety',logo:'AN',ver:false,sc:{overall_score:87,response_rate:.88,ghost_rate:.07,avg_wait_days:9,report_count:28,risk_level:'safe',waste:7,avg_rounds:4.2,process_score:90}},
-  nvidia:{id:'59',name:'Nvidia',ind:'Semiconductors / AI',logo:'NV',ver:false,sc:{overall_score:69,response_rate:.68,ghost_rate:.28,avg_wait_days:21,report_count:156,risk_level:'safe',waste:26,avg_rounds:4.4,process_score:66}},
-  intel:{id:'60',name:'Intel',ind:'Semiconductors',logo:'IN2',ver:false,sc:{overall_score:43,response_rate:.42,ghost_rate:.52,avg_wait_days:34,report_count:198,risk_level:'warn',waste:54,avg_rounds:5.0,process_score:39}},
-  cisco:{id:'61',name:'Cisco',ind:'Networking',logo:'CI',ver:false,sc:{overall_score:51,response_rate:.50,ghost_rate:.44,avg_wait_days:28,report_count:176,risk_level:'warn',waste:46,avg_rounds:4.2,process_score:48}},
-  okta:{id:'62',name:'Okta',ind:'Identity Security',logo:'OK',ver:false,sc:{overall_score:64,response_rate:.64,ghost_rate:.30,avg_wait_days:18,report_count:62,risk_level:'safe',waste:30,avg_rounds:3.8,process_score:62}},
-  crowdstrike:{id:'63',name:'CrowdStrike',ind:'Cybersecurity',logo:'CS2',ver:false,sc:{overall_score:70,response_rate:.70,ghost_rate:.25,avg_wait_days:16,report_count:54,risk_level:'safe',waste:24,avg_rounds:4.0,process_score:68}},
-  instacart:{id:'64',name:'Instacart',ind:'Grocery Delivery',logo:'IC2',ver:false,sc:{overall_score:47,response_rate:.46,ghost_rate:.50,avg_wait_days:26,report_count:61,risk_level:'warn',waste:52,avg_rounds:3.2,process_score:44}},
-  plaid:{id:'65',name:'Plaid',ind:'Fintech Infrastructure',logo:'PD',ver:true,sc:{overall_score:78,response_rate:.80,ghost_rate:.15,avg_wait_days:13,report_count:38,risk_level:'safe',waste:14,avg_rounds:3.6,process_score:80}},
 };
 
 const LOC_SCORES={
@@ -2324,41 +2254,6 @@ const VIBES={
   shopify:['✅ Transparent timeline','💬 Thoughtful recruiter follow-up','⚡ 2-3 week process','📅 Status updates given'],
   deloitte:['👻 Ghosts after final round','📋 5–7 rounds','⏳ 2–3 month pipeline','🤖 Heavy ATS filtering'],
   indeed:['👻 Ironic given what they do','🤖 Fully automated screening','⏳ Slow internal process','⚠ Frequently repost same roles'],
-  spotify:['✅ Responds in 2-3 weeks','📋 4 rounds typical','💬 Usually human recruiters','🎵 Culture-focused hiring'],
-  adobe:['⚠ Ghost rate after phone screen','📋 4-5 rounds','⏳ Slow pipeline','🤖 Mixed ATS and human'],
-  palantir:['📋 5-8 rounds including projects','💸 Unpaid work reported','⏳ Very long process','⚠ High bar, high ghost rate'],
-  reddit:['⚠ Moderate ghost rate','📋 3-4 rounds','⏳ 3-4 week avg','🔄 Roles reopen quickly'],
-  tiktok:['⚠ Inconsistent process','⏳ Long pipeline','📋 4+ rounds','🤖 Heavy automation at screen stage'],
-  hubspot:['✅ Very communicative','📅 Timeline shared early','⚡ 2-3 week process','💬 Real human follow-up'],
-  twilio:['⚠ Some ghosting post-layoffs','📋 4 rounds','⏳ 2-3 week process','🤖 ATS heavy first stage'],
-  datadog:['✅ Responds consistently','⚡ 2-3 week process','📋 4 rounds including take-home','💬 Specific feedback provided'],
-  zoom:['⚠ Post-pandemic hiring slowdown','⏳ Slow pipeline','📋 3-4 rounds','🤖 Lots of automation'],
-  dropbox:['⚠ High ghost rate after layoffs','📋 3-4 rounds','⏳ Slow to follow up','🔄 Same roles reposted'],
-  block:['⚠ Mixed ghosting reports','📋 4 rounds','⏳ 2-3 weeks','💸 Strong comp package'],
-  snowflake:['✅ Usually responds','📋 4-5 rounds','⏳ 2-3 week process','💬 Technical bar is high'],
-  servicenow:['✅ Structured process','📋 4 rounds','⏳ 3-week avg','💼 Enterprise culture'],
-  workday:['⚠ Moderate ghost rate','📋 4-5 rounds','⏳ 3-4 week process','🤖 Heavy ATS use'],
-  atlassian:['✅ Strong communication','📅 Timeline upfront','⚡ 3-week process','💬 Thoughtful feedback'],
-  robinhood:['⚠ Post-IPO chaos reports','📋 4 rounds','⏳ Unpredictable timeline','🔄 Roles frequently reopen'],
-  jpmorgan:['📋 4-5 rounds','⏳ 3-4 week process','⚠ High ghost rate at junior levels','💼 Very structured'],
-  goldman:['📋 5+ rounds','✅ Communicates at senior level','⏳ 3-week process','💸 Top comp'],
-  capitalOne:['✅ Responds well','⚡ Faster than most banks','📋 4 rounds','💻 Tech-forward HR'],
-  disney:['⚠ Ghost rate mid-process','📋 3-4 rounds','⏳ Slow pipeline','🎬 High competition'],
-  comcast:['👻 Very high ghost rate','🤖 Fully automated pipeline','⏳ No follow-up common','⚠ Poor candidate experience'],
-  verizon:['⚠ High ghost rate','⏳ Slow pipeline','🤖 Heavy automation','📋 3-4 rounds'],
-  att:['👻 Ghosts frequently','⏳ Very slow pipeline','🤖 ATS-heavy','📋 3-5 rounds with long gaps'],
-  doordash:['⚠ Moderate ghost rate','📋 4-5 rounds','⏳ 3-4 week process','🚗 Fast-moving culture'],
-  snap:['⚠ Moderate ghosting','📋 4 rounds','⏳ 2-3 weeks','🎨 Creative culture'],
-  pinterest:['✅ Usually responds','📋 3-4 rounds','⏳ 2-3 weeks','💬 Thoughtful process'],
-  openai:['⚡ Fast process for top candidates','📋 4-5 rounds','✅ Very communicative','🤖 High technical bar'],
-  anthropic:['🏆 Excellent process','✅ Detailed feedback','📋 4 rounds','⚡ Efficient timeline'],
-  nvidia:['📋 4-5 rounds','⏳ 2-3 week process','✅ Usually responds','💰 Top-tier comp'],
-  intel:['👻 Ghost rate rising post-layoffs','📋 5 rounds','⏳ 4-6 week process','🤖 Heavy ATS'],
-  cisco:['⚠ Moderate ghost rate','📋 4-5 rounds','⏳ 3-4 week process','🤖 Lots of automated screening'],
-  okta:['✅ Responds within 2 weeks','📋 4 rounds','💬 Human-first process','⚡ 2-3 week timeline'],
-  crowdstrike:['✅ Communicates well','📋 4 rounds','⏳ 2-3 weeks','🔐 Security-focused culture'],
-  instacart:['⚠ Mixed ghost reports','📋 3-4 rounds','⏳ Inconsistent timeline','🔄 Roles reopen often'],
-  plaid:['✅ Very responsive','⚡ Fast process','📋 3-4 rounds','💬 Clear feedback always'],
   default:['📊 Data still loading','🔍 Add a report'],
 };
 
@@ -2646,10 +2541,9 @@ async function runSearch(name,loc){
         <div style="font-family:var(--mono);font-size:.54rem;color:var(--muted);margin-top:.5rem;padding:.25rem .6rem;background:var(--raised);border-radius:6px;display:inline-block">${dqLabel}</div>
         ${(()=>{const n=sc.report_count||0;const pct=Math.min(100,n>=50?100:n>=10?70:n>=5?45:n>=1?25:8);const col=pct>=70?'var(--green)':pct>=40?'var(--amber)':'var(--muted)';return`<div style="margin-top:.5rem;display:flex;align-items:center;gap:.5rem"><div style="flex:1;height:3px;background:var(--raised);border-radius:2px;overflow:hidden"><div style="height:100%;width:${pct}%;background:${col};border-radius:2px;transition:width .6s ease"></div></div><span style="font-family:var(--mono);font-size:.5rem;color:${col};white-space:nowrap">${pct>=70?'High confidence':pct>=40?'Moderate':'Estimated'}</span></div>`;})()}
       </div>
-      <div class="co-grade-card ${risk}" style="flex-shrink:0;min-width:86px;text-align:center">
-        <span class="co-grade-lbl">Seen Grade</span>
-        <span class="co-grade-letter ${risk}">${grade}</span>
-        <span class="co-grade-score">${sc.overall_score} / 100</span>
+      <div style="flex-shrink:0;text-align:right">
+        <div style="font-family:var(--display);font-weight:800;font-size:3.6rem;line-height:1;letter-spacing:-.04em;color:${Score.color(risk)};text-shadow:0 0 32px ${Score.color(risk)}55">${grade}</div>
+        <div style="font-family:var(--mono);font-size:.62rem;color:var(--muted);margin-top:.15rem">${sc.overall_score} / 100</div>
       </div>
     </div>
 
@@ -2661,10 +2555,17 @@ async function runSearch(name,loc){
       </div>
     </div>`:''}
 
-    <div style="background:var(--rdim);border:1px solid #ff3b5c20;border-radius:8px;padding:.7rem 1rem;display:flex;align-items:center;justify-content:space-between;margin-bottom:.85rem">
-      <div><div style="font-family:var(--mono);font-size:.58rem;color:var(--red);text-transform:uppercase;letter-spacing:.08em">⚡ Waste probability</div><div style="font-family:var(--mono);font-size:.55rem;color:rgba(255,59,92,.5);margin-top:.1rem">Chance this application wastes your time</div></div>
-      <div style="font-family:var(--mono);font-size:1.4rem;font-weight:500;color:var(--red)">${sc.waste||'—'}%</div>
-    </div>
+    ${(()=>{
+      const w=sc.waste||40;
+      const wc=w>60?'var(--red)':w>30?'var(--amber)':'var(--green)';
+      const wbg=w>60?'var(--rdim)':w>30?'var(--adim)':'var(--gdim)';
+      const wborder=w>60?'#ff3b5c20':w>30?'#f59e0b20':'#10b98120';
+      const wlabel=w>60?'High time risk':w>30?'Moderate risk':'Low risk';
+      return`<div style="background:${wbg};border:1px solid ${wborder};border-radius:8px;padding:.7rem 1rem;display:flex;align-items:center;justify-content:space-between;margin-bottom:.85rem">
+        <div><div style="font-family:var(--mono);font-size:.58rem;color:${wc};text-transform:uppercase;letter-spacing:.08em">Time risk · ${wlabel}</div><div style="font-family:var(--mono);font-size:.55rem;color:${wc};opacity:.55;margin-top:.1rem">Chance this application wastes your time</div></div>
+        <div style="font-family:var(--mono);font-size:1.4rem;font-weight:500;color:${wc}">${w}%</div>
+      </div>`;
+    })()}
 
     <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--line);border:1px solid var(--line);border-radius:8px;overflow:hidden;margin-bottom:.85rem">
       ${mbox(respPct+'%','Response rate',Score.color(risk))}
@@ -2678,12 +2579,16 @@ async function runSearch(name,loc){
     <div class="mbar"><div class="mbar-lbl" style="width:85px">Ghost rate</div><div class="mbar-track"><div class="mbar-fill mf-r" style="width:${ghostPct}%"></div></div><div class="mbar-val">${ghostPct}%</div></div>
 
     <div id="modalTrackRow" style="margin-top:1rem">${_modalTrackCTA(known?.name||name, loc, sc)}</div>
-    <div style="display:flex;gap:.45rem;margin-top:.45rem;flex-wrap:wrap">
-      <button class="btn btn-solid" style="flex:1;min-width:120px;justify-content:center;font-size:.75rem" onclick="closeModDirect();viewCompany('${known?.id||'x'}','${known?.name||name}','${loc}')">Full report →</button>
-      <button class="btn btn-ghost" style="padding:.65rem .9rem;font-size:.75rem;flex-shrink:0" onclick="shareCompanyReport('${(name||'').replace(/'/g,"\\'")}')">↗ Share</button>
-      <button class="btn btn-ghost" style="padding:.65rem .9rem;font-size:.72rem;flex-shrink:0;background:rgba(255,69,0,0.1);border-color:rgba(255,69,0,0.25);color:#ff6314" onclick="shareToReddit('${(name||'').replace(/'/g,"\\'")}')">🔴 Reddit</button>
-      <button class="btn btn-ghost" style="padding:.65rem .9rem;font-size:.72rem;flex-shrink:0;background:rgba(255,255,255,0.06);border-color:rgba(255,255,255,0.15);color:var(--text)" onclick="shareToThreads('${(name||'').replace(/'/g,"\\'")}')">🧵 Threads</button>
-      <button class="btn btn-ghost" style="padding:.65rem .9rem;font-size:.75rem;flex-shrink:0" onclick="closeModDirect();prefillReport('${(name||'').replace(/'/g,"\\'")}');go('report')">+ Report</button>
+    <div style="display:flex;flex-direction:column;gap:.5rem;margin-top:.55rem">
+      <div style="display:flex;gap:.45rem">
+        <button class="btn btn-solid" style="flex:1;justify-content:center;font-size:.8rem;padding:.72rem 1rem" onclick="closeModDirect();viewCompany('${known?.id||'x'}','${known?.name||name}','${loc}')">Full report →</button>
+        <button class="btn btn-ghost" style="flex:1;justify-content:center;font-size:.78rem;padding:.72rem 1rem" onclick="closeModDirect();prefillReport('${(name||'').replace(/'/g,"\\'")}');go('report')">+ Report experience</button>
+      </div>
+      <div style="display:flex;gap:.35rem">
+        <button style="flex:1;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.1);border-radius:8px;padding:.5rem;font-family:var(--mono);font-size:.65rem;color:var(--sub);cursor:pointer;transition:all .15s;display:flex;align-items:center;justify-content:center;gap:.3rem" onclick="shareCompanyReport('${(name||'').replace(/'/g,"\\'")}')">↗ Share</button>
+        <button style="flex:1;background:rgba(255,69,0,0.07);border:1px solid rgba(255,69,0,0.2);border-radius:8px;padding:.5rem;font-family:var(--mono);font-size:.65rem;color:#ff6314;cursor:pointer;transition:all .15s;display:flex;align-items:center;justify-content:center;gap:.3rem" onclick="shareToReddit('${(name||'').replace(/'/g,"\\'")}')">🔴 Reddit</button>
+        <button style="flex:1;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.1);border-radius:8px;padding:.5rem;font-family:var(--mono);font-size:.65rem;color:var(--text);cursor:pointer;transition:all .15s;display:flex;align-items:center;justify-content:center;gap:.3rem" onclick="shareToThreads('${(name||'').replace(/'/g,"\\'")}')">🧵 Threads</button>
+      </div>
     </div>
     ${!Auth.isLoggedIn()?`<div style="margin-top:.85rem;padding:.65rem .95rem;background:var(--raised);border-radius:9px;border:1px solid var(--line2);display:flex;align-items:center;justify-content:space-between;gap:.75rem">
       <div>
@@ -2698,232 +2603,6 @@ async function runSearch(name,loc){
 function mbox(v,l,c){return`<div style="background:var(--raised);padding:.82rem .6rem;text-align:center"><span style="font-family:var(--mono);font-size:1rem;font-weight:500;color:${c};display:block;margin-bottom:.18rem">${v}</span><span style="font-family:var(--mono);font-size:.5rem;text-transform:uppercase;letter-spacing:.07em;color:var(--muted)">${l}</span></div>`;}
 function closeMod(e){if(e.target===document.getElementById('modalOv'))closeModDirect();}
 function closeModDirect(){document.getElementById('modalOv').classList.remove('open');}
-
-// ═══════════════════════════════════════════════
-// COMMUNITY FEED
-// ═══════════════════════════════════════════════
-const FEED_SEED = [
-  {co:'Amazon',key:'amazon',role:'Software Engineer II',loc:'Seattle, WA',outcome:'ghosted',wait:72,text:'Applied through their portal. Completed a 2-hour online assessment. Complete silence for 3 months. Listing still active and reposted.',ts:Date.now()-3*3600000},
-  {co:'Stripe',key:'stripe',role:'Backend Engineer',loc:'Remote',outcome:'hired',wait:9,text:'Most organized process I\'ve been through. Told me the exact interview format on day 1. Offer came 9 days after first call.',ts:Date.now()-6*3600000},
-  {co:'Accenture',key:'accenture',role:'Business Analyst',loc:'Chicago, IL',outcome:'ghosted',wait:120,text:'Recruiter reached out to ME on LinkedIn, scheduled a call, then disappeared after the intro call. 4 months of silence.',ts:Date.now()-10*3600000},
-  {co:'Google',key:'google',role:'Product Manager',loc:'Mountain View, CA',outcome:'rejected',wait:28,text:'5 rounds of interviews over 3 weeks. Got a form rejection email with no feedback. Exhausting process for zero signal.',ts:Date.now()-1.5*86400000},
-  {co:'Linear',key:'linear',role:'Product Designer',loc:'Remote',outcome:'hired',wait:7,text:'3 rounds total, each with a clear agenda. Felt like they actually read my portfolio. Offer in a week.',ts:Date.now()-2*86400000},
-  {co:'Meta',key:'meta',role:'Data Scientist',loc:'Menlo Park, CA',outcome:'ghosted',wait:45,text:'Auto-rejection after submitting resume. No recruiter contact ever. The "reviewing your application" email was the last I heard.',ts:Date.now()-2.5*86400000},
-  {co:'OpenAI',key:'openai',role:'Research Engineer',loc:'San Francisco, CA',outcome:'interview',wait:5,text:'Recruiter responded in under a week. Very organized — calendar invite came with prep materials and agenda. Still in the process.',ts:Date.now()-3*86400000},
-  {co:'Comcast',key:'comcast',role:'Network Engineer',loc:'Philadelphia, PA',outcome:'ghosted',wait:90,text:'Applied to 3 separate roles over 3 months. Zero responses on any of them. All listings are still live.',ts:Date.now()-4*86400000},
-  {co:'Microsoft',key:'microsoft',role:'Program Manager',loc:'Redmond, WA',outcome:'interview',wait:12,text:'Recruiter followed up in 2 weeks. Told me expected timeline and what each round tests. Mid-process now — good experience so far.',ts:Date.now()-5*86400000},
-  {co:'Deloitte',key:'deloitte',role:'Consultant',loc:'New York, NY',outcome:'ghosted',wait:95,text:'7 rounds including case interviews. Made it to the final round. Radio silence for 3 months after. Ghosted at the end.',ts:Date.now()-6*86400000},
-  {co:'HubSpot',key:'hubspot',role:'Sales Engineer',loc:'Remote',outcome:'rejected',wait:14,text:'Appreciated that they gave me a rejection with actual feedback — rare. Clear process, just wasn\'t the right fit.',ts:Date.now()-7*86400000},
-  {co:'AT&T',key:'att',role:'Solutions Architect',loc:'Dallas, TX',outcome:'ghosted',wait:60,text:'Applied twice to the same role posted 4 times. Not a single acknowledgment from a human. Pure ATS black hole.',ts:Date.now()-8*86400000},
-  {co:'Atlassian',key:'atlassian',role:'Software Engineer',loc:'Remote',outcome:'hired',wait:14,text:'4 rounds, all well-structured. Interviewers clearly prepped. Got honest feedback after each round. Accepted the offer.',ts:Date.now()-9*86400000},
-  {co:'Palantir',key:'palantir',role:'Forward Deployed Engineer',loc:'New York, NY',outcome:'rejected',wait:38,text:'8 rounds including a week-long project. Good communication throughout but eventually rejected. At least they explained why.',ts:Date.now()-10*86400000},
-  {co:'Anthropic',key:'anthropic',role:'Product Manager',loc:'San Francisco, CA',outcome:'interview',wait:8,text:'Fastest response I\'ve had from a top tech company. Detailed prep materials before each round. Process feels unusually human.',ts:Date.now()-11*86400000},
-  {co:'Indeed',key:'indeed',role:'Product Manager',loc:'Austin, TX',outcome:'ghosted',wait:90,text:'The irony of applying to a job board company and being ghosted for 3 months is not lost on me.',ts:Date.now()-13*86400000},
-  {co:'Shopify',key:'shopify',role:'UX Designer',loc:'Remote',outcome:'hired',wait:18,text:'Recruiter kept me updated at each stage. Never had to chase anyone. Knew exactly what to expect. Great process.',ts:Date.now()-15*86400000},
-  {co:'TikTok',key:'tiktok',role:'Software Engineer',loc:'Los Angeles, CA',outcome:'ghosted',wait:55,text:'Very disorganized process — different recruiters emailed me about the same role. Then silence. Seems like their HR is overwhelmed.',ts:Date.now()-16*86400000},
-];
-
-let _feedFilter = 'all';
-let _feedData = [...FEED_SEED];
-
-async function renderFeed() {
-  const listEl = document.getElementById('feedList');
-  if (!listEl) return;
-
-  // Load real community reports from Supabase if available
-  if (db) {
-    try {
-      const { data, error } = await db.from('company_reports').select('*').order('created_at', { ascending: false }).limit(40);
-      if (!error && data?.length) {
-        const real = data.map(r => ({
-          co: r.company_name || 'Unknown',
-          key: (r.company_name||'').toLowerCase().replace(/[^a-z0-9]/g,''),
-          role: r.role || 'Applicant',
-          loc: r.location || '',
-          outcome: r.outcome || 'unknown',
-          wait: r.response_time_days || 0,
-          text: r.notes || '',
-          ts: new Date(r.created_at).getTime(),
-          real: true,
-        }));
-        _feedData = [...real, ...FEED_SEED.slice(0, Math.max(0, 12 - real.length))];
-      }
-    } catch(e) {}
-  }
-
-  _renderFeedList();
-}
-
-function filterFeed(f, btn) {
-  _feedFilter = f;
-  document.querySelectorAll('.feed-filter').forEach(b => {
-    b.classList.remove('v-g','v-r','v-y','v-b');
-    b.classList.add('v-n');
-  });
-  if (btn) {
-    btn.classList.remove('v-n');
-    const cls = f==='hired'?'v-g':f==='ghosted'||f==='rejected'?'v-r':f==='interview'?'v-y':'v-n';
-    btn.classList.add(cls);
-  }
-  _renderFeedList();
-}
-
-function _renderFeedList() {
-  const listEl = document.getElementById('feedList');
-  const emptyEl = document.getElementById('feedEmpty');
-  if (!listEl) return;
-
-  const items = _feedFilter === 'all' ? _feedData : _feedData.filter(r => r.outcome === _feedFilter);
-  emptyEl.style.display = items.length ? 'none' : 'block';
-
-  const outcomeLabel = { ghosted: '👻 Ghosted', hired: '✅ Hired', interview: '💬 Interviewing', rejected: '❌ Rejected', unknown: '❓ Unknown' };
-  const outcomeColor = { ghosted: 'var(--red)', hired: 'var(--green)', interview: 'var(--amber)', rejected: 'var(--muted)', unknown: 'var(--muted)' };
-  const outcomeBg = { ghosted: 'var(--rdim)', hired: 'var(--gdim)', interview: 'var(--adim)', rejected: 'rgba(255,255,255,.04)', unknown: 'rgba(255,255,255,.04)' };
-
-  listEl.innerHTML = items.map(r => {
-    const co = Object.values(COS).find(c => c.name.toLowerCase() === r.co.toLowerCase()) || Object.values(COS).find(c => r.key && c.name.toLowerCase().includes(r.key.slice(0,6)));
-    const sc = co?.sc;
-    const grade = sc ? letterGrade(sc.overall_score) : '?';
-    const gradeColor = sc ? Score.color(sc.risk_level || Score.risk(sc.overall_score)) : 'var(--muted)';
-    const timeAgo = _timeAgo(r.ts);
-    const outcomeC = outcomeColor[r.outcome] || 'var(--muted)';
-    const outcomeBgC = outcomeBg[r.outcome] || 'rgba(255,255,255,.04)';
-    return `<div style="background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:1rem 1.1rem;margin-bottom:.65rem;cursor:pointer;transition:all .2s" onclick="qs('${r.co.replace(/'/g,"\\'")}','')" onmouseover="this.style.borderColor='var(--line2)'" onmouseout="this.style.borderColor='var(--line)'">
-      <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:.75rem;margin-bottom:.6rem">
-        <div style="display:flex;align-items:center;gap:.65rem;min-width:0">
-          <div style="width:34px;height:34px;border-radius:8px;background:${outcomeBgC};border:1px solid ${outcomeC}30;display:flex;align-items:center;justify-content:center;font-family:var(--display);font-weight:800;font-size:.9rem;color:${gradeColor};flex-shrink:0">${grade}</div>
-          <div style="min-width:0">
-            <div style="font-family:var(--display);font-size:.9rem;font-weight:700;color:var(--white);letter-spacing:-.015em">${r.co}</div>
-            <div style="font-family:var(--mono);font-size:.6rem;color:var(--dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${r.role}${r.loc?' · '+r.loc:''}</div>
-          </div>
-        </div>
-        <div style="display:flex;flex-direction:column;align-items:flex-end;gap:.25rem;flex-shrink:0">
-          <div style="background:${outcomeBgC};border:1px solid ${outcomeC}35;border-radius:100px;padding:.15rem .55rem;font-family:var(--mono);font-size:.58rem;color:${outcomeC};white-space:nowrap">${outcomeLabel[r.outcome]||r.outcome}</div>
-          ${r.wait > 0 ? `<div style="font-family:var(--mono);font-size:.55rem;color:var(--muted)">${r.wait}d wait</div>` : ''}
-        </div>
-      </div>
-      ${r.text ? `<div style="font-size:.78rem;color:var(--sub);line-height:1.6;font-weight:300;margin-bottom:.5rem">${r.text.slice(0,180)}${r.text.length>180?'…':''}</div>` : ''}
-      <div style="display:flex;align-items:center;justify-content:space-between">
-        <div style="font-family:var(--mono);font-size:.55rem;color:var(--muted)">${timeAgo}</div>
-        ${r.real ? '<div style="font-family:var(--mono);font-size:.52rem;color:var(--green);background:var(--gdim);border-radius:3px;padding:.06rem .3rem">verified report</div>' : '<div style="font-family:var(--mono);font-size:.52rem;color:var(--muted)">community</div>'}
-      </div>
-    </div>`;
-  }).join('');
-}
-
-function _timeAgo(ts) {
-  const s = Math.floor((Date.now() - ts) / 1000);
-  if (s < 3600) return `${Math.floor(s/60)}m ago`;
-  if (s < 86400) return `${Math.floor(s/3600)}h ago`;
-  if (s < 604800) return `${Math.floor(s/86400)}d ago`;
-  return `${Math.floor(s/604800)}w ago`;
-}
-
-// ═══════════════════════════════════════════════
-// USER STATS PANEL (in seeker-dash)
-// ═══════════════════════════════════════════════
-function renderUserStats(apps) {
-  const el = document.getElementById('userStatsPanel');
-  if (!el) return;
-  if (!apps?.length) {
-    el.innerHTML = `<div style="font-family:var(--mono);font-size:.68rem;color:var(--muted);text-align:center;padding:.5rem 0">Track your first application to start building your stats.</div>`;
-    return;
-  }
-
-  const total = apps.length;
-  const ghosted = apps.filter(a=>a.status==='ghosted').length;
-  const hired = apps.filter(a=>a.status==='hired').length;
-  const rejected = apps.filter(a=>a.status==='rejected').length;
-  const interview = apps.filter(a=>a.status==='interview').length;
-  const active = apps.filter(a=>a.status==='active').length;
-  const responded = hired + rejected + interview;
-  const rrPct = total ? Math.round((responded/total)*100) : 0;
-  const ghostPct = total ? Math.round((ghosted/total)*100) : 0;
-
-  const withTime = apps.filter(a=>a.responseTimeDays>0);
-  const avgWait = withTime.length ? Math.round(withTime.reduce((s,a)=>s+a.responseTimeDays,0)/withTime.length) : null;
-
-  // Company tier breakdown
-  const tierCount = {A:0,B:0,C:0,D:0,F:0,unk:0};
-  apps.forEach(a => {
-    const co = Object.values(COS).find(c=>c.name.toLowerCase()===(a.company||'').toLowerCase());
-    if (co?.sc) { const g=letterGrade(co.sc.overall_score).replace(/[+-]/,''); tierCount[g]=(tierCount[g]||0)+1; }
-    else tierCount.unk++;
-  });
-
-  // Badges
-  const badges = [];
-  if (total >= 1) badges.push({icon:'📋',label:'First Application'});
-  if (total >= 10) badges.push({icon:'🔟',label:'10 Apps Tracked'});
-  if (total >= 25) badges.push({icon:'🎯',label:'Serious Candidate'});
-  if (hired >= 1) badges.push({icon:'🎉',label:'Landed an Offer'});
-  if (ghosted >= 5) badges.push({icon:'👻',label:'Ghosting Veteran'});
-  if (apps.filter(a=>a.company&&Object.values(COS).find(c=>c.name.toLowerCase()===a.company.toLowerCase()&&c.sc?.risk_level==='safe')).length >= 3) badges.push({icon:'✅',label:'Quality Applicant'});
-
-  const ghostColor = ghostPct > 60 ? 'var(--red)' : ghostPct > 30 ? 'var(--amber)' : 'var(--green)';
-  const gradeColors = {A:'var(--green)',B:'var(--green)',C:'var(--amber)',D:'var(--red)',F:'var(--red)'};
-
-  el.innerHTML = `
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--line);border:1px solid var(--line);border-radius:10px;overflow:hidden;margin-bottom:1rem">
-      <div style="background:var(--raised);padding:.75rem 1rem">
-        <div style="font-family:var(--mono);font-size:.52rem;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin-bottom:.3rem">Total tracked</div>
-        <div style="font-family:var(--mono);font-size:1.5rem;font-weight:500;color:var(--white);line-height:1">${total}</div>
-      </div>
-      <div style="background:var(--raised);padding:.75rem 1rem">
-        <div style="font-family:var(--mono);font-size:.52rem;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin-bottom:.3rem">Your ghost rate</div>
-        <div style="font-family:var(--mono);font-size:1.5rem;font-weight:500;color:${ghostColor};line-height:1">${ghostPct}%</div>
-      </div>
-      <div style="background:var(--raised);padding:.75rem 1rem">
-        <div style="font-family:var(--mono);font-size:.52rem;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin-bottom:.3rem">Response rate</div>
-        <div style="font-family:var(--mono);font-size:1.5rem;font-weight:500;color:var(--blue);line-height:1">${rrPct}%</div>
-      </div>
-      <div style="background:var(--raised);padding:.75rem 1rem">
-        <div style="font-family:var(--mono);font-size:.52rem;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin-bottom:.3rem">Avg wait</div>
-        <div style="font-family:var(--mono);font-size:1.5rem;font-weight:500;color:var(--white);line-height:1">${avgWait !== null ? avgWait+'d' : '—'}</div>
-      </div>
-    </div>
-    ${Object.keys(tierCount).filter(g=>g!=='unk'&&tierCount[g]>0).length > 0 ? `
-    <div style="margin-bottom:1rem">
-      <div style="font-family:var(--mono);font-size:.55rem;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:.5rem">Applications by company grade</div>
-      <div style="display:flex;gap:.4rem;flex-wrap:wrap">
-        ${['A','B','C','D','F'].filter(g=>tierCount[g]>0).map(g=>`<div style="background:rgba(255,255,255,.04);border:1px solid var(--line2);border-radius:6px;padding:.3rem .65rem;text-align:center"><div style="font-family:var(--mono);font-size:.85rem;font-weight:500;color:${gradeColors[g]||'var(--muted)'}">${g}</div><div style="font-family:var(--mono);font-size:.5rem;color:var(--muted)">${tierCount[g]}</div></div>`).join('')}
-        ${tierCount.unk>0?`<div style="background:rgba(255,255,255,.04);border:1px solid var(--line2);border-radius:6px;padding:.3rem .65rem;text-align:center"><div style="font-family:var(--mono);font-size:.85rem;font-weight:500;color:var(--muted)">?</div><div style="font-family:var(--mono);font-size:.5rem;color:var(--muted)">${tierCount.unk}</div></div>`:''}
-      </div>
-    </div>` : ''}
-    ${badges.length ? `
-    <div>
-      <div style="font-family:var(--mono);font-size:.55rem;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:.5rem">Earned badges</div>
-      <div style="display:flex;gap:.4rem;flex-wrap:wrap">
-        ${badges.map(b=>`<div style="display:inline-flex;align-items:center;gap:.3rem;background:var(--bdim);border:1px solid var(--bmid);border-radius:100px;padding:.22rem .65rem;font-family:var(--mono);font-size:.6rem;color:var(--blue)">${b.icon} ${b.label}</div>`).join('')}
-      </div>
-    </div>` : ''}`;
-}
-
-// ═══════════════════════════════════════════════
-// LANDING HERO PROOF CARDS
-// ═══════════════════════════════════════════════
-function renderHeroProofCards() {
-  const el = document.getElementById('heroProofCards');
-  if (!el) return;
-  const picks = [
-    COS.linear, COS.stripe, COS.amazon, COS.openai, COS.comcast
-  ].filter(Boolean);
-  el.innerHTML = picks.map(co => {
-    const s = co.sc;
-    const g = letterGrade(s.overall_score);
-    const risk = s.risk_level || Score.risk(s.overall_score);
-    const c = Score.color(risk);
-    const ghost = Math.round(s.ghost_rate * 100);
-    const hoverBorderColor = risk==='safe'?'rgba(16,185,129,.45)':risk==='warn'?'rgba(245,158,11,.45)':'rgba(239,68,68,.45)';
-    return `<div onclick="qs('${co.name}','')" style="display:inline-flex;align-items:center;gap:.6rem;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);border-radius:10px;padding:.45rem .85rem;cursor:pointer;transition:all .2s;backdrop-filter:blur(16px)" onmouseover="this.style.borderColor='${hoverBorderColor}';this.style.background='rgba(255,255,255,.09)'" onmouseout="this.style.borderColor='rgba(255,255,255,.1)';this.style.background='rgba(255,255,255,.06)'">
-      <span style="font-family:var(--display);font-weight:800;font-size:1rem;color:${c}">${g}</span>
-      <div>
-        <div style="font-family:var(--display);font-size:.7rem;font-weight:700;color:var(--white);line-height:1.2">${co.name}</div>
-        <div style="font-family:var(--mono);font-size:.52rem;color:var(--muted)">${ghost}% ghost rate</div>
-      </div>
-    </div>`;
-  }).join('');
-}
 
 // ═══════════════════════════════════════════════
 // LEADERBOARD
@@ -3039,17 +2718,18 @@ function renderQuickTags() {
     lyft:'San Francisco, CA',coinbase:'Remote',figma:'San Francisco, CA',vercel:'Remote',
   };
   const entries = Object.entries(COS);
-  // Top 3 worst by ghost rate, top 2 best by overall score, plus 1 mid-tier interesting one
   const byGhost = [...entries].sort((a,b) => (b[1].sc.ghost_rate||0)-(a[1].sc.ghost_rate||0));
   const byScore = [...entries].sort((a,b) => (b[1].sc.overall_score||0)-(a[1].sc.overall_score||0));
   const worst3 = byGhost.slice(0, 3);
   const best2 = byScore.slice(0, 2);
-  const shown = new Set([...worst3.map(e=>e[0]), ...best2.map(e=>e[0])]);
   const picks = [...worst3.map(([k,c]) => ({k,c,type:'bad'})), ...best2.map(([k,c]) => ({k,c,type:'good'}))];
   el.innerHTML = picks.map(({k,c,type}) => {
     const loc = cityHint[k] || '';
-    const icon = type==='bad' ? (c.sc.ghost_rate > .7 ? '💀' : '👻') : '✅';
-    return `<button class="qtag" onclick="qs('${c.name.replace(/'/g,"\\'")}','${loc}')" title="${type==='bad'?c.sc.ghost_rate*100|0+'% ghost rate':c.sc.overall_score+'/100'}">${icon} ${c.name}</button>`;
+    const grade = letterGrade(c.sc.overall_score);
+    const risk = c.sc.risk_level || Score.risk(c.sc.overall_score);
+    const gradeColor = risk==='safe'?'var(--green)':risk==='warn'?'var(--amber)':'var(--red)';
+    const gradeBg = risk==='safe'?'rgba(16,185,129,0.12)':risk==='warn'?'rgba(245,158,11,0.12)':'rgba(239,68,68,0.12)';
+    return `<button onclick="qs('${c.name.replace(/'/g,"\\'")}','${loc}')" style="display:inline-flex;align-items:center;gap:.45rem;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);border-radius:8px;padding:.35rem .7rem;cursor:pointer;transition:all .15s;font-family:var(--body);font-size:.72rem;color:var(--text)" onmouseover="this.style.background='rgba(255,255,255,0.09)';this.style.borderColor='rgba(255,255,255,0.2)'" onmouseout="this.style.background='rgba(255,255,255,0.05)';this.style.borderColor='rgba(255,255,255,0.1)'">${c.name}<span style="font-family:var(--mono);font-size:.65rem;font-weight:700;color:${gradeColor};background:${gradeBg};border-radius:4px;padding:.05rem .35rem">${grade}</span></button>`;
   }).join('');
 }
 
@@ -3409,222 +3089,6 @@ function _inferLevel(job) {
   return 'mid';
 }
 
-// ── REAL RADIUS FILTERING ──────────────────────────────────────────────────
-// Haversine distance in miles between two lat/lng pairs
-function _haversineMi(lat1,lon1,lat2,lon2){
-  const R=3958.8,dL=(lat2-lat1)*Math.PI/180,dG=(lon2-lon1)*Math.PI/180;
-  const a=Math.sin(dL/2)**2+Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dG/2)**2;
-  return R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));
-}
-
-// Coordinates for ~200 US cities + metros (lat, lng)
-const CITY_COORDS={
-  // California
-  'los angeles':[34.052,-118.244],'los angeles ca':[34.052,-118.244],
-  'san francisco':[37.775,-122.419],'san francisco ca':[37.775,-122.419],
-  'san diego':[32.715,-117.161],'san diego ca':[32.715,-117.161],
-  'san jose':[37.338,-121.886],'san jose ca':[37.338,-121.886],
-  'sacramento':[38.581,-121.494],'sacramento ca':[38.581,-121.494],
-  'fresno':[36.737,-119.787],'fresno ca':[36.737,-119.787],
-  'long beach':[33.770,-118.193],'long beach ca':[33.770,-118.193],
-  'oakland':[37.804,-122.271],'oakland ca':[37.804,-122.271],
-  'bakersfield':[35.373,-119.019],'bakersfield ca':[35.373,-119.019],
-  'anaheim':[33.836,-117.914],'anaheim ca':[33.836,-117.914],
-  'santa ana':[33.746,-117.868],'santa ana ca':[33.746,-117.868],
-  'riverside':[33.953,-117.396],'riverside ca':[33.953,-117.396],
-  'stockton':[37.958,-121.291],'stockton ca':[37.958,-121.291],
-  'irvine':[33.684,-117.826],'irvine ca':[33.684,-117.826],
-  'chula vista':[32.640,-117.084],'chula vista ca':[32.640,-117.084],
-  'fremont':[37.548,-121.989],'fremont ca':[37.548,-121.989],
-  'santa clarita':[34.391,-118.542],'santa clarita ca':[34.391,-118.542],
-  'san bernardino':[34.108,-117.289],'san bernardino ca':[34.108,-117.289],
-  'modesto':[37.638,-120.997],'modesto ca':[37.638,-120.997],
-  'fontana':[34.092,-117.435],'fontana ca':[34.092,-117.435],
-  'moreno valley':[33.937,-117.230],'moreno valley ca':[33.937,-117.230],
-  'glendale':[34.143,-118.255],'glendale ca':[34.143,-118.255],
-  'huntington beach':[33.660,-117.999],'huntington beach ca':[33.660,-117.999],
-  'garden grove':[33.774,-117.941],'garden grove ca':[33.774,-117.941],
-  'oceanside':[33.196,-117.379],'oceanside ca':[33.196,-117.379],
-  'santa rosa':[38.440,-122.714],'santa rosa ca':[38.440,-122.714],
-  'torrance':[33.836,-118.340],'torrance ca':[33.836,-118.340],
-  'pasadena':[34.148,-118.144],'pasadena ca':[34.148,-118.144],
-  'pomona':[34.055,-117.752],'pomona ca':[34.055,-117.752],
-  'escondido':[33.119,-117.087],'escondido ca':[33.119,-117.087],
-  'sunnyvale':[37.369,-122.038],'sunnyvale ca':[37.369,-122.038],
-  'hayward':[37.668,-122.081],'hayward ca':[37.668,-122.081],
-  'corona':[33.875,-117.566],'corona ca':[33.875,-117.566],
-  'el monte':[34.068,-118.027],'el monte ca':[34.068,-118.027],
-  'burbank':[34.181,-118.309],'burbank ca':[34.181,-118.309],
-  'inglewood':[33.962,-118.353],'inglewood ca':[33.962,-118.353],
-  'compton':[33.896,-118.222],'compton ca':[33.896,-118.222],
-  'orange':[33.788,-117.853],'orange ca':[33.788,-117.853],
-  'fullerton':[33.870,-117.924],'fullerton ca':[33.870,-117.924],
-  'costa mesa':[33.641,-117.919],'costa mesa ca':[33.641,-117.919],
-  'newport beach':[33.617,-117.929],'newport beach ca':[33.617,-117.929],
-  'beverly hills':[34.074,-118.401],'beverly hills ca':[34.074,-118.401],
-  'santa monica':[34.019,-118.491],'santa monica ca':[34.019,-118.491],
-  'hawthorne':[33.917,-118.352],'hawthorne ca':[33.917,-118.352],
-  'carson':[33.832,-118.282],'carson ca':[33.832,-118.282],
-  'westwood':[34.063,-118.447],'westwood ca':[34.063,-118.447],
-  'culver city':[34.021,-118.397],'culver city ca':[34.021,-118.397],
-  // Pacific NW
-  'seattle':[47.606,-122.332],'seattle wa':[47.606,-122.332],
-  'portland':[45.523,-122.676],'portland or':[45.523,-122.676],
-  'bellevue':[47.610,-122.201],'bellevue wa':[47.610,-122.201],
-  'tacoma':[47.253,-122.444],'tacoma wa':[47.253,-122.444],
-  'spokane':[47.659,-117.426],'spokane wa':[47.659,-117.426],
-  'vancouver':[45.631,-122.672],'vancouver wa':[45.631,-122.672],
-  // Mountain West
-  'phoenix':[33.448,-112.074],'phoenix az':[33.448,-112.074],
-  'tucson':[32.222,-110.975],'tucson az':[32.222,-110.975],
-  'mesa':[33.415,-111.831],'mesa az':[33.415,-111.831],
-  'scottsdale':[33.494,-111.926],'scottsdale az':[33.494,-111.926],
-  'tempe':[33.425,-111.940],'tempe az':[33.425,-111.940],
-  'gilbert':[33.353,-111.789],'gilbert az':[33.353,-111.789],
-  'glendale az':[33.539,-112.186],
-  'chandler':[33.306,-111.841],'chandler az':[33.306,-111.841],
-  'las vegas':[36.175,-115.137],'las vegas nv':[36.175,-115.137],
-  'henderson':[36.040,-114.982],'henderson nv':[36.040,-114.982],
-  'reno':[39.529,-119.813],'reno nv':[39.529,-119.813],
-  'denver':[39.739,-104.984],'denver co':[39.739,-104.984],
-  'colorado springs':[38.834,-104.821],'colorado springs co':[38.834,-104.821],
-  'aurora':[39.729,-104.832],'aurora co':[39.729,-104.832],
-  'salt lake city':[40.761,-111.891],'salt lake city ut':[40.761,-111.891],
-  'boise':[43.616,-116.200],'boise id':[43.616,-116.200],
-  'albuquerque':[35.085,-106.651],'albuquerque nm':[35.085,-106.651],
-  // Texas
-  'houston':[29.760,-95.370],'houston tx':[29.760,-95.370],
-  'san antonio':[29.425,-98.494],'san antonio tx':[29.425,-98.494],
-  'dallas':[32.776,-96.797],'dallas tx':[32.776,-96.797],
-  'austin':[30.267,-97.743],'austin tx':[30.267,-97.743],
-  'fort worth':[32.755,-97.331],'fort worth tx':[32.755,-97.331],
-  'el paso':[31.772,-106.474],'el paso tx':[31.772,-106.474],
-  'arlington':[32.736,-97.108],'arlington tx':[32.736,-97.108],
-  'plano':[33.020,-96.699],'plano tx':[33.020,-96.699],
-  'lubbock':[33.578,-101.856],'lubbock tx':[33.578,-101.856],
-  'laredo':[27.506,-99.508],'laredo tx':[27.506,-99.508],
-  'garland':[32.913,-96.639],'garland tx':[32.913,-96.639],
-  'irving':[32.814,-96.945],'irving tx':[32.814,-96.945],
-  'frisco':[33.150,-96.824],'frisco tx':[33.150,-96.824],
-  'mckinney':[33.197,-96.616],'mckinney tx':[33.197,-96.616],
-  // Midwest
-  'chicago':[41.878,-87.630],'chicago il':[41.878,-87.630],
-  'indianapolis':[39.768,-86.158],'indianapolis in':[39.768,-86.158],
-  'columbus':[39.961,-82.999],'columbus oh':[39.961,-82.999],
-  'detroit':[42.331,-83.046],'detroit mi':[42.331,-83.046],
-  'minneapolis':[44.978,-93.265],'minneapolis mn':[44.978,-93.265],
-  'milwaukee':[43.039,-87.906],'milwaukee wi':[43.039,-87.906],
-  'kansas city':[39.100,-94.578],'kansas city mo':[39.100,-94.578],
-  'st. louis':[38.627,-90.197],'st louis mo':[38.627,-90.197],'st. louis mo':[38.627,-90.197],
-  'omaha':[41.258,-95.938],'omaha ne':[41.258,-95.938],
-  'wichita':[37.688,-97.336],'wichita ks':[37.688,-97.336],
-  'cleveland':[41.499,-81.695],'cleveland oh':[41.499,-81.695],
-  'cincinnati':[39.103,-84.512],'cincinnati oh':[39.103,-84.512],
-  'toledo':[41.664,-83.556],'toledo oh':[41.664,-83.556],
-  'pittsburgh':[40.440,-79.996],'pittsburgh pa':[40.440,-79.996],
-  'st. paul':[44.944,-93.093],'st paul mn':[44.944,-93.093],
-  // Southeast
-  'atlanta':[33.749,-84.388],'atlanta ga':[33.749,-84.388],
-  'charlotte':[35.227,-80.843],'charlotte nc':[35.227,-80.843],
-  'miami':[25.774,-80.194],'miami fl':[25.774,-80.194],
-  'orlando':[28.538,-81.379],'orlando fl':[28.538,-81.379],
-  'tampa':[27.950,-82.458],'tampa fl':[27.950,-82.458],
-  'jacksonville':[30.332,-81.656],'jacksonville fl':[30.332,-81.656],
-  'nashville':[36.165,-86.784],'nashville tn':[36.165,-86.784],
-  'raleigh':[35.780,-78.639],'raleigh nc':[35.780,-78.639],
-  'memphis':[35.150,-90.049],'memphis tn':[35.150,-90.049],
-  'louisville':[38.253,-85.759],'louisville ky':[38.253,-85.759],
-  'new orleans':[29.951,-90.071],'new orleans la':[29.951,-90.071],
-  'birmingham':[33.521,-86.802],'birmingham al':[33.521,-86.802],
-  'richmond':[37.541,-77.434],'richmond va':[37.541,-77.434],
-  'virginia beach':[36.853,-75.978],'virginia beach va':[36.853,-75.978],
-  'fort lauderdale':[26.122,-80.143],'fort lauderdale fl':[26.122,-80.143],
-  'durham':[35.994,-78.899],'durham nc':[35.994,-78.899],
-  'greensboro':[36.073,-79.791],'greensboro nc':[36.073,-79.791],
-  'charleston':[32.776,-79.931],'charleston sc':[32.776,-79.931],
-  'savannah':[32.080,-81.099],'savannah ga':[32.080,-81.099],
-  'tallahassee':[30.438,-84.281],'tallahassee fl':[30.438,-84.281],
-  'st. petersburg':[27.771,-82.639],'st petersburg fl':[27.771,-82.639],
-  'cape coral':[26.563,-81.949],'cape coral fl':[26.563,-81.949],
-  'knoxville':[35.961,-83.921],'knoxville tn':[35.961,-83.921],
-  // Northeast
-  'new york':[40.713,-74.006],'new york ny':[40.713,-74.006],'nyc':[40.713,-74.006],
-  'philadelphia':[39.953,-75.165],'philadelphia pa':[39.953,-75.165],
-  'boston':[42.360,-71.059],'boston ma':[42.360,-71.059],
-  'washington':[38.908,-77.021],'washington dc':[38.908,-77.021],
-  'baltimore':[39.290,-76.612],'baltimore md':[39.290,-76.612],
-  'newark':[40.736,-74.172],'newark nj':[40.736,-74.172],
-  'jersey city':[40.729,-74.078],'jersey city nj':[40.729,-74.078],
-  'buffalo':[42.886,-78.879],'buffalo ny':[42.886,-78.879],
-  'rochester':[43.157,-77.616],'rochester ny':[43.157,-77.616],
-  'hartford':[41.763,-72.685],'hartford ct':[41.763,-72.685],
-  'bridgeport':[41.179,-73.190],'bridgeport ct':[41.179,-73.190],
-  'providence':[41.824,-71.413],'providence ri':[41.824,-71.413],
-  'worcester':[42.263,-71.802],'worcester ma':[42.263,-71.802],
-  'syracuse':[43.048,-76.148],'syracuse ny':[43.048,-76.148],
-  'manchester':[42.996,-71.455],'manchester nh':[42.996,-71.455],
-  // Other major metros
-  'anchorage':[61.218,-149.900],'anchorage ak':[61.218,-149.900],
-  'honolulu':[21.306,-157.858],'honolulu hi':[21.306,-157.858],
-  'baton rouge':[30.451,-91.154],'baton rouge la':[30.451,-91.154],
-  'des moines':[41.586,-93.625],'des moines ia':[41.586,-93.625],
-  'madison':[43.073,-89.401],'madison wi':[43.073,-89.401],
-  'grand rapids':[42.963,-85.668],'grand rapids mi':[42.963,-85.668],
-  'little rock':[34.746,-92.289],'little rock ar':[34.746,-92.289],
-  'sioux falls':[43.550,-96.700],'sioux falls sd':[43.550,-96.700],
-  'columbia':[34.000,-81.035],'columbia sc':[34.000,-81.035],
-  'fayetteville':[36.063,-94.158],'fayetteville ar':[36.063,-94.158],
-  'tacoma wa':[47.253,-122.444],
-  'eugene':[44.052,-123.087],'eugene or':[44.052,-123.087],
-  'hawthorne ca':[33.917,-118.352],
-  'menlo park':[37.453,-122.182],'menlo park ca':[37.453,-122.182],
-  'mountain view':[37.386,-122.083],'mountain view ca':[37.386,-122.083],
-  'palo alto':[37.441,-122.143],'palo alto ca':[37.441,-122.143],
-  'san mateo':[37.563,-122.322],'san mateo ca':[37.563,-122.322],
-  'redwood city':[37.485,-122.236],'redwood city ca':[37.485,-122.236],
-  'santa clara':[37.354,-121.955],'santa clara ca':[37.354,-121.955],
-  'cupertino':[37.323,-122.032],'cupertino ca':[37.323,-122.032],
-  'san ramon':[37.780,-121.978],'san ramon ca':[37.780,-121.978],
-  'walnut creek':[37.906,-122.065],'walnut creek ca':[37.906,-122.065],
-  'concord':[37.978,-122.031],'concord ca':[37.978,-122.031],
-  'el segundo':[33.919,-118.417],'el segundo ca':[33.919,-118.417],
-  'playa vista':[33.977,-118.428],'playa vista ca':[33.977,-118.428],
-  'venice':[33.986,-118.474],'venice ca':[33.986,-118.474],
-  'westminster':[33.753,-118.000],'westminster ca':[33.753,-118.000],
-};
-
-let _includeRemote = false;
-function toggleIncludeRemote(){
-  _includeRemote = !_includeRemote;
-  const btn = document.getElementById('includeRemoteBtn');
-  if(btn){
-    btn.style.background = _includeRemote ? 'var(--bdim)' : 'var(--surface)';
-    btn.style.borderColor = _includeRemote ? 'var(--blue)' : 'var(--line2)';
-    btn.style.color = _includeRemote ? 'var(--blue)' : 'var(--sub)';
-    btn.textContent = _includeRemote ? '✓ Remote' : '+ Remote';
-  }
-  loadJobs();
-}
-
-function _cityCoords(locStr){
-  if(!locStr)return null;
-  const key=locStr.toLowerCase().trim().replace(/\s*,\s*/g,' ').replace(/\.\s*/g,'').replace(/\s+/g,' ');
-  if(CITY_COORDS[key])return CITY_COORDS[key];
-  // Try just the city part (before comma)
-  const city=key.split(' ').slice(0,-1).join(' ');
-  if(city&&CITY_COORDS[city])return CITY_COORDS[city];
-  const cityOnly=locStr.split(',')[0].trim().toLowerCase();
-  if(CITY_COORDS[cityOnly])return CITY_COORDS[cityOnly];
-  return null;
-}
-
-function _withinRadius(jobLoc, userCoords, radiusMi){
-  if(!jobLoc||radiusMi===0)return false;
-  const jc=_cityCoords(jobLoc);
-  if(!jc)return true; // unknown city — don't exclude it
-  return _haversineMi(userCoords[0],userCoords[1],jc[0],jc[1])<=radiusMi;
-}
-
 // Niche keywords matched against job TITLE only — keep phrases specific enough
 // to avoid false positives from boilerplate description text
 const NICHE_KEYWORDS = {
@@ -3658,7 +3122,6 @@ async function applyJobFilters(){
   const level   = document.getElementById('filterLevel')?.value   || '';
   const type    = document.getElementById('filterType')?.value    || '';
   const posted  = document.getElementById('filterPosted')?.value  || '';
-  const radiusVal=parseInt(document.getElementById('jobSearchRadius')?.value||'25');
   const clearBtn= document.getElementById('clearFiltersBtn');
   const hasFilters = niche||level||type||posted;
   if(clearBtn)clearBtn.style.display=hasFilters?'':'none';
@@ -3668,7 +3131,6 @@ async function applyJobFilters(){
   const listEl  = document.getElementById('jobsList');
   const countEl = document.getElementById('jobsCt');
   const loc     = document.getElementById('jobSearchLocation')?.value||'';
-  const userCoords = loc ? _cityCoords(loc) : null;
 
   // ── Step 1: filter the already-loaded JOBS array instantly (no network) ──
   const cutoffMs = posted ? Date.now() - parseInt(posted)*24*60*60*1000 : 0;
@@ -3683,12 +3145,6 @@ async function applyJobFilters(){
     if(level && _inferLevel(j) !== level) return false;
     if(type  && j.type && !j.type.toLowerCase().includes(type.toLowerCase()))  return false;
     if(cutoffMs && j.created_at && new Date(j.created_at).getTime() < cutoffMs) return false;
-    // Radius: enforce Haversine distance; remote jobs follow the toggle
-    if(userCoords && radiusVal>0){
-      const jl=j.loc||j.location||'';
-      if(jl.toLowerCase().includes('remote')) return _includeRemote;
-      if(!_withinRadius(jl,userCoords,radiusVal))return false;
-    }
     return true;
   });
 
@@ -3746,7 +3202,7 @@ async function loadJobs(){
   let jobs=[];
   if(db){
     try{
-      let query=db.from('jobs').select('*').gt('expires_at',new Date().toISOString()).order('score',{ascending:false}).limit(200);
+      let query=db.from('jobs').select('*').gt('expires_at',new Date().toISOString()).order('score',{ascending:false}).limit(80);
 
       if(radiusVal===0){
         query=query.ilike('location','%remote%');
@@ -3754,9 +3210,15 @@ async function loadJobs(){
         const parts=effectiveLoc.split(',').map(p=>p.trim());
         const city=parts[0];
         const state=(parts[1]||'').trim();
-        // Broad DB pre-filter by state (actual distance enforced client-side below)
-        if(state) query=query.or(`location.ilike.%${city}%,location.ilike.%${state}%`);
-        else query=query.ilike('location',`%${city}%`);
+        if(radiusVal<=10){
+          // Tight radius — exact city only
+          query=query.ilike('location',`%${city}%`);
+        } else if(state){
+          // Broader radius — include city + entire state (catches suburbs/nearby cities)
+          query=query.or(`location.ilike.%${city}%,location.ilike.%${state}%`);
+        } else {
+          query=query.ilike('location',`%${city}%`);
+        }
       }
 
       const{data}=await query;
@@ -3765,22 +3227,6 @@ async function loadJobs(){
         JOBS.splice(0,JOBS.length,...jobs,...FALLBACK_JOBS);
       }
     }catch(e){console.warn('loadJobs db:',e);}
-  }
-
-  // ── Actual radius enforcement (Haversine) ──
-  if(radiusVal>0&&effectiveLoc&&jobs.length){
-    const userCoords=_cityCoords(effectiveLoc);
-    if(userCoords){
-      const filtered=jobs.filter(j=>{
-        const loc=(j.loc||j.location||'').toLowerCase();
-        if(loc.includes('remote')) return _includeRemote; // honour toggle
-        return _withinRadius(j.loc||j.location,userCoords,radiusVal);
-      });
-      // Only apply if we got reasonable results — avoid wiping list for unknown cities
-      if(filtered.length>=3||(filtered.length>0&&filtered.length>=jobs.length*0.25)){
-        jobs=filtered;
-      }
-    }
   }
 
   // DB had nothing for this location — fetch from Adzuna and populate DB
@@ -4929,7 +4375,6 @@ function goToEmployerDashboard(){
   loadFeatured();
   populateTicker();
   renderQuickTags();
-  renderHeroProofCards();
   RecentSearches.render();
   // Show check badge on nav if there are pending checks
   setTimeout(updateCheckBadge, 600);
@@ -6416,9 +5861,6 @@ async function renderSeekerDash(){
   if(_('dStatGhosted'))_('dStatGhosted').textContent=ghosted.length;
   if(_('dStatHired'))_('dStatHired').textContent=hired.length;
 
-  // User stats panel
-  renderUserStats(apps);
-
   // Pipeline intelligence — aggregate insights from resolved apps
   const insightBand = _('dashPipelineInsight');
   if (insightBand && apps.length >= 2) {
@@ -6565,7 +6007,7 @@ function go(page){
     if(!el){ console.warn('Page not found: page-'+page); return; }
     el.classList.add('active');
     document.querySelectorAll('.ntab').forEach(t=>t.classList.remove('active'));
-    const tabMap={jobs:'nt-jobs',demand:'nt-demand',resume:'nt-resume',tracker:'nt-tracker',feed:'nt-feed'};
+    const tabMap={jobs:'nt-jobs',demand:'nt-demand',resume:'nt-resume',tracker:'nt-tracker'};
     if(tabMap[page]){const t=document.getElementById(tabMap[page]);if(t)t.classList.add('active');}
     const footer = document.getElementById('mainFooter');
     if (footer) footer.style.display = page === 'landing' ? '' : 'none';
@@ -8442,7 +7884,6 @@ function renderSideMenu() {
     items.innerHTML = [
       { icon: '🏠', label: 'My Dashboard', page: 'seeker-dash', action: () => { renderSeekerDash(); go('seeker-dash'); } },
       { icon: '💼', label: 'Browse Jobs', page: 'jobs' },
-      { icon: '👁️', label: 'Community Feed', page: 'feed', action: () => { renderFeed(); go('feed'); } },
       { icon: '📊', label: 'Job Demand', page: 'demand' },
       { icon: '🤖', label: 'Resume AI', page: 'resume' },
       { icon: '📋', label: 'My Applications', page: 'tracker' },
@@ -8458,7 +7899,6 @@ function renderSideMenu() {
   } else if (!Auth.isLoggedIn()) {
     items.innerHTML = [
       { icon: '💼', label: 'Browse Jobs', page: 'jobs' },
-      { icon: '👁️', label: 'Community Feed', page: 'feed', action: () => { renderFeed(); go('feed'); } },
       { icon: '📊', label: 'Job Demand', page: 'demand' },
       { icon: '🏆', label: 'Company Rankings', page: 'companies' },
       { icon: '🔍', label: 'Check a Company', page: 'company', action: () => openCompanySearch() },
@@ -8972,33 +8412,14 @@ function _handleSharedLink(){
   if (!sp) {
     try {
       const saved = JSON.parse(localStorage.getItem('seen_last_page') || '{}');
-      // Restore within 8 hours — covers typical browsing session gaps
-      if (saved.page && saved.ts && (Date.now() - saved.ts) < 8 * 60 * 60 * 1000) sp = saved.page;
+      // Only restore if within 2 hours
+      if (saved.page && saved.ts && (Date.now() - saved.ts) < 2 * 60 * 60 * 1000) sp = saved.page;
     } catch(_e) {}
   }
   if(sp&&sp!=='company'&&sp!=='landing'){
     setTimeout(()=>go(sp),150);
   }
 }
-
-// ── IMMEDIATE PRE-AUTH RESTORE ──
-// Safari discards backgrounded tabs — on reload, auth init takes 0.5-2s during which
-// the landing page shows. Fix: if localStorage has a recent session token AND a saved page,
-// immediately swap to that page before the network round-trip completes.
-(function _immediateRestore() {
-  try {
-    // Supabase stores its session token in localStorage under a key containing "supabase"
-    const hasSession = Object.keys(localStorage).some(k => k.includes('supabase') && k.includes('auth'));
-    if (!hasSession) return;
-    const saved = JSON.parse(localStorage.getItem('seen_last_page') || '{}');
-    if (!saved.page || !saved.ts || (Date.now() - saved.ts) > 7200000) return;
-    if (saved.page === 'landing' || saved.page === 'login') return;
-    // Swap page immediately — no animation, no data yet, just shows the shell
-    document.querySelectorAll('.page, .page-full').forEach(p => p.classList.remove('active'));
-    const el = document.getElementById('page-' + saved.page);
-    if (el) { el.classList.add('active'); window.scrollTo(0, 0); }
-  } catch(e) {}
-})();
 
 // ── INIT ──
 updateNav();
