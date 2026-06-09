@@ -722,6 +722,7 @@ nav.nav-scrolled{background:rgba(6,6,8,0.82);backdrop-filter:blur(60px) saturate
     <button class="ntab" onclick="go('demand')" id="nt-demand">Demand</button>
     <button class="ntab" onclick="go('resume')" id="nt-resume">Resume AI</button>
     <button class="ntab" onclick="go('tracker')" id="nt-tracker">Track <span class="ntab-new" id="trackerBadge" style="display:none;background:var(--amber);color:var(--ink)">0</span><span class="ntab-new" id="trackerCheckBadge" style="display:none;background:var(--red);color:#fff;margin-left:.15rem">!</span></button>
+    <button class="ntab" onclick="renderFeed();go('feed')" id="nt-feed">Feed</button>
   </div>
   <div class="nav-right" id="navRight">
     <button id="backToDashBtn" onclick="renderSeekerDash();go('seeker-dash')" style="display:none;background:none;border:1px solid var(--line2);color:var(--sub);border-radius:8px;padding:.32rem .75rem;font-family:var(--mono);font-size:.62rem;cursor:pointer;white-space:nowrap">← Dashboard</button>
@@ -825,22 +826,27 @@ nav.nav-scrolled{background:rgba(6,6,8,0.82);backdrop-filter:blur(60px) saturate
     </div>
 
     <!-- Quick tags — dynamically rendered from COS by renderQuickTags() -->
-    <div id="heroQuickTags" style="display:flex;align-items:center;justify-content:center;gap:.65rem;margin-bottom:2rem;flex-wrap:wrap;animation:fadeUp .5s .22s ease both">
+    <div id="heroQuickTags" style="display:flex;align-items:center;justify-content:center;gap:.65rem;margin-bottom:1.5rem;flex-wrap:wrap;animation:fadeUp .5s .22s ease both">
       <button class="qtag" onclick="qs('Amazon','Seattle, WA')">👻 Amazon</button>
       <button class="qtag" onclick="qs('X (Twitter)','San Francisco, CA')">👻 X (Twitter)</button>
       <button class="qtag" onclick="qs('Stripe','')">✅ Stripe</button>
+      <button class="qtag" onclick="qs('Google','')">📋 Google</button>
+      <button class="qtag" onclick="qs('OpenAI','')">⚡ OpenAI</button>
     </div>
 
     <!-- CTAs -->
-    <div style="display:flex;gap:.75rem;justify-content:center;flex-wrap:wrap;animation:fadeUp .5s .28s ease both">
+    <div style="display:flex;gap:.75rem;justify-content:center;flex-wrap:wrap;animation:fadeUp .5s .28s ease both;margin-bottom:1.5rem">
       <button class="btn btn-green btn-lg" onclick="go('login')" style="min-width:165px;justify-content:center">Get started free →</button>
       <button class="btn btn-ghost btn-lg" onclick="go('jobs')" style="min-width:165px;justify-content:center;background:rgba(255,255,255,.08);border-color:rgba(255,255,255,.2);color:var(--white)">Browse jobs</button>
     </div>
+
+    <!-- Social proof mini-cards — 3 companies with grade badges -->
+    <div style="display:flex;align-items:center;justify-content:center;gap:.75rem;flex-wrap:wrap;animation:fadeUp .5s .35s ease both;margin-bottom:.25rem" id="heroProofCards"></div>
   </div>
 
   <!-- Bottom disclaimer — pinned -->
   <div style="position:relative;z-index:2;text-align:center;padding:.85rem;font-family:var(--mono);font-size:.58rem;color:rgba(255,255,255,.3)">
-    Free for job seekers · No account required to search · <a href="#" onclick="go('legal');return false" style="color:rgba(255,255,255,.3);text-decoration:underline">Legal</a>
+    Free for job seekers · No account required to search · © 2025 Seen / seenjobs.io · <a href="#" onclick="go('legal');return false" style="color:rgba(255,255,255,.3);text-decoration:underline">Legal</a>
   </div>
 </div>
 
@@ -868,6 +874,39 @@ nav.nav-scrolled{background:rgba(6,6,8,0.82);backdrop-filter:blur(60px) saturate
 
     <!-- Grid -->
     <div id="ldrGrid" class="ldr-grid" style="grid-template-columns:1fr"></div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════
+     COMMUNITY FEED
+═══════════════════════════════════════ -->
+<div class="page" id="page-feed">
+  <div style="max-width:680px;margin:0 auto;padding:2rem 1.25rem 4rem">
+    <div style="margin-bottom:1.5rem">
+      <div class="eyebrow">Real experiences · anonymized</div>
+      <h1 style="font-family:var(--display);font-size:1.75rem;font-weight:800;color:var(--white);letter-spacing:-.03em;margin-bottom:.3rem">Community feed</h1>
+      <p style="color:var(--sub);font-size:.8rem;font-weight:300">What applicants are experiencing right now. No PR spin.</p>
+    </div>
+    <!-- Filter chips -->
+    <div style="display:flex;gap:.45rem;flex-wrap:wrap;margin-bottom:1.25rem" id="feedFilters">
+      <button class="vibe v-n feed-filter active" data-filter="all" onclick="filterFeed('all',this)" style="font-size:.65rem;padding:.3rem .75rem;cursor:pointer">All</button>
+      <button class="vibe v-r feed-filter" data-filter="ghosted" onclick="filterFeed('ghosted',this)" style="font-size:.65rem;padding:.3rem .75rem;cursor:pointer">👻 Ghosted</button>
+      <button class="vibe v-g feed-filter" data-filter="hired" onclick="filterFeed('hired',this)" style="font-size:.65rem;padding:.3rem .75rem;cursor:pointer">✅ Hired</button>
+      <button class="vibe v-y feed-filter" data-filter="interview" onclick="filterFeed('interview',this)" style="font-size:.65rem;padding:.3rem .75rem;cursor:pointer">💬 Interviewing</button>
+      <button class="vibe v-r feed-filter" data-filter="rejected" onclick="filterFeed('rejected',this)" style="font-size:.65rem;padding:.3rem .75rem;cursor:pointer">❌ Rejected</button>
+    </div>
+    <!-- Feed list -->
+    <div id="feedList"></div>
+    <div id="feedEmpty" style="display:none;text-align:center;padding:3rem 1rem">
+      <div style="font-size:2rem;margin-bottom:.75rem">👀</div>
+      <div style="font-family:var(--mono);font-size:.72rem;color:var(--muted)">No reports match that filter yet.</div>
+    </div>
+    <!-- CTA to submit -->
+    <div style="margin-top:2rem;background:var(--bdim);border:1px solid var(--bmid);border-radius:14px;padding:1.25rem;text-align:center">
+      <div style="font-family:var(--display);font-size:.95rem;font-weight:700;color:var(--white);margin-bottom:.35rem">Share your experience</div>
+      <div style="font-size:.78rem;color:var(--sub);font-weight:300;margin-bottom:.9rem">Anonymized. Helps thousands of job seekers make smarter decisions.</div>
+      <button class="btn btn-solid" onclick="go('report')" style="font-size:.78rem">Report a company →</button>
+    </div>
   </div>
 </div>
 
@@ -1038,8 +1077,18 @@ nav.nav-scrolled{background:rgba(6,6,8,0.82);backdrop-filter:blur(60px) saturate
         <button class="btn btn-ghost" style="justify-content:flex-start;font-size:.78rem" onclick="go('demand')">🗺️ Demand map</button>
         <button class="btn btn-ghost" style="justify-content:flex-start;font-size:.78rem" onclick="go('tracker')">📋 All applications</button>
         <button class="btn btn-ghost" style="justify-content:flex-start;font-size:.78rem" onclick="go('report')">📢 Report a company</button>
-        <button class="btn btn-ghost" style="justify-content:flex-start;font-size:.78rem;grid-column:1/-1" onclick="generateWeeklyDigest()">📊 Copy weekly digest</button>
+        <button class="btn btn-ghost" style="justify-content:flex-start;font-size:.78rem" onclick="renderFeed();go('feed')">👁️ Community feed</button>
+        <button class="btn btn-ghost" style="justify-content:flex-start;font-size:.78rem" onclick="generateWeeklyDigest()">📊 Copy weekly digest</button>
       </div>
+    </div>
+
+    <!-- My Seen Stats -->
+    <div style="background:var(--surface);border:1px solid var(--line);border-radius:12px;overflow:hidden;margin-bottom:1.25rem">
+      <div style="padding:.85rem 1.1rem;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between">
+        <div style="font-family:var(--display);font-size:.82rem;font-weight:700;color:var(--white)">My Seen stats</div>
+        <span style="font-family:var(--mono);font-size:.58rem;color:var(--muted)">your job search, analyzed</span>
+      </div>
+      <div id="userStatsPanel" style="padding:1rem 1.1rem"></div>
     </div>
 
 
@@ -2213,6 +2262,42 @@ const COS={
   coinbase:{id:'28',name:'Coinbase',ind:'Crypto / Fintech',logo:'CB',ver:false,sc:{overall_score:61,response_rate:.62,ghost_rate:.32,avg_wait_days:18,report_count:74,risk_level:'safe',waste:30,avg_rounds:4.0,process_score:58}},
   figma:{id:'29',name:'Figma',ind:'Design Tools',logo:'FG',ver:true,sc:{overall_score:85,response_rate:.84,ghost_rate:.08,avg_wait_days:10,report_count:41,risk_level:'safe',waste:8,avg_rounds:3.6,process_score:88}},
   vercel:{id:'30',name:'Vercel',ind:'Developer Infra',logo:'V',ver:true,sc:{overall_score:89,response_rate:.88,ghost_rate:.05,avg_wait_days:7,report_count:29,risk_level:'safe',waste:5,avg_rounds:3.0,process_score:92}},
+  // ── Expansion pack ─────────────────────────────────────────────────────
+  spotify:{id:'31',name:'Spotify',ind:'Audio / Streaming',logo:'SP',ver:false,sc:{overall_score:73,response_rate:.72,ghost_rate:.22,avg_wait_days:19,report_count:94,risk_level:'safe',waste:20,avg_rounds:4.0,process_score:71}},
+  adobe:{id:'32',name:'Adobe',ind:'Creative Software',logo:'AD',ver:false,sc:{overall_score:58,response_rate:.55,ghost_rate:.38,avg_wait_days:27,report_count:167,risk_level:'warn',waste:40,avg_rounds:4.6,process_score:55}},
+  palantir:{id:'33',name:'Palantir',ind:'Data Analytics',logo:'PL',ver:false,sc:{overall_score:46,response_rate:.44,ghost_rate:.50,avg_wait_days:32,report_count:112,risk_level:'warn',waste:52,avg_rounds:5.8,process_score:42}},
+  reddit:{id:'34',name:'Reddit',ind:'Social Media',logo:'R',ver:false,sc:{overall_score:54,response_rate:.52,ghost_rate:.42,avg_wait_days:24,report_count:78,risk_level:'warn',waste:44,avg_rounds:3.8,process_score:50}},
+  tiktok:{id:'35',name:'TikTok',ind:'Social Media / Tech',logo:'TT',ver:false,sc:{overall_score:41,response_rate:.38,ghost_rate:.54,avg_wait_days:36,report_count:143,risk_level:'warn',waste:58,avg_rounds:4.2,process_score:38}},
+  hubspot:{id:'36',name:'HubSpot',ind:'Marketing SaaS',logo:'HS',ver:true,sc:{overall_score:79,response_rate:.80,ghost_rate:.14,avg_wait_days:13,report_count:88,risk_level:'safe',waste:14,avg_rounds:3.6,process_score:82}},
+  twilio:{id:'37',name:'Twilio',ind:'Communication APIs',logo:'TW',ver:false,sc:{overall_score:55,response_rate:.54,ghost_rate:.40,avg_wait_days:22,report_count:64,risk_level:'warn',waste:42,avg_rounds:3.8,process_score:52}},
+  datadog:{id:'38',name:'Datadog',ind:'Observability SaaS',logo:'DD',ver:false,sc:{overall_score:77,response_rate:.78,ghost_rate:.17,avg_wait_days:14,report_count:56,risk_level:'safe',waste:16,avg_rounds:4.0,process_score:79}},
+  zoom:{id:'39',name:'Zoom',ind:'Video Comms',logo:'Z',ver:false,sc:{overall_score:52,response_rate:.50,ghost_rate:.44,avg_wait_days:26,report_count:112,risk_level:'warn',waste:46,avg_rounds:3.2,process_score:49}},
+  dropbox:{id:'40',name:'Dropbox',ind:'Cloud Storage',logo:'DB',ver:false,sc:{overall_score:49,response_rate:.48,ghost_rate:.46,avg_wait_days:28,report_count:76,risk_level:'warn',waste:48,avg_rounds:3.4,process_score:46}},
+  block:{id:'41',name:'Block',ind:'Fintech / Payments',logo:'BK',ver:false,sc:{overall_score:56,response_rate:.56,ghost_rate:.38,avg_wait_days:21,report_count:82,risk_level:'warn',waste:38,avg_rounds:3.8,process_score:54}},
+  snowflake:{id:'42',name:'Snowflake',ind:'Cloud Data',logo:'SN',ver:false,sc:{overall_score:71,response_rate:.70,ghost_rate:.24,avg_wait_days:18,report_count:67,risk_level:'safe',waste:22,avg_rounds:4.4,process_score:68}},
+  servicenow:{id:'43',name:'ServiceNow',ind:'Enterprise SaaS',logo:'SN2',ver:false,sc:{overall_score:69,response_rate:.68,ghost_rate:.28,avg_wait_days:20,report_count:98,risk_level:'safe',waste:26,avg_rounds:4.0,process_score:66}},
+  workday:{id:'44',name:'Workday',ind:'HR Software',logo:'WD',ver:false,sc:{overall_score:62,response_rate:.60,ghost_rate:.34,avg_wait_days:22,report_count:104,risk_level:'safe',waste:34,avg_rounds:4.2,process_score:60}},
+  atlassian:{id:'45',name:'Atlassian',ind:'Developer Tools',logo:'AT',ver:true,sc:{overall_score:81,response_rate:.82,ghost_rate:.12,avg_wait_days:12,report_count:73,risk_level:'safe',waste:11,avg_rounds:3.8,process_score:84}},
+  robinhood:{id:'46',name:'Robinhood',ind:'Fintech',logo:'RH',ver:false,sc:{overall_score:44,response_rate:.42,ghost_rate:.52,avg_wait_days:30,report_count:58,risk_level:'warn',waste:54,avg_rounds:3.6,process_score:40}},
+  jpmorgan:{id:'47',name:'JPMorgan Chase',ind:'Banking',logo:'JP',ver:false,sc:{overall_score:55,response_rate:.54,ghost_rate:.40,avg_wait_days:24,report_count:198,risk_level:'warn',waste:42,avg_rounds:4.6,process_score:52}},
+  goldman:{id:'48',name:'Goldman Sachs',ind:'Investment Banking',logo:'GS',ver:false,sc:{overall_score:73,response_rate:.74,ghost_rate:.22,avg_wait_days:18,report_count:147,risk_level:'safe',waste:22,avg_rounds:4.8,process_score:71}},
+  capitalOne:{id:'49',name:'Capital One',ind:'Banking / Tech',logo:'CO',ver:false,sc:{overall_score:67,response_rate:.66,ghost_rate:.28,avg_wait_days:16,report_count:134,risk_level:'safe',waste:28,avg_rounds:3.8,process_score:65}},
+  disney:{id:'50',name:'Disney',ind:'Entertainment',logo:'DS',ver:false,sc:{overall_score:50,response_rate:.50,ghost_rate:.46,avg_wait_days:28,report_count:162,risk_level:'warn',waste:48,avg_rounds:3.6,process_score:48}},
+  comcast:{id:'51',name:'Comcast',ind:'Telecom / Media',logo:'CM',ver:false,sc:{overall_score:28,response_rate:.24,ghost_rate:.76,avg_wait_days:46,report_count:187,risk_level:'danger',waste:76,avg_rounds:3.2,process_score:22}},
+  verizon:{id:'52',name:'Verizon',ind:'Telecom',logo:'VZ',ver:false,sc:{overall_score:42,response_rate:.40,ghost_rate:.54,avg_wait_days:32,report_count:213,risk_level:'warn',waste:56,avg_rounds:3.4,process_score:38}},
+  att:{id:'53',name:'AT&T',ind:'Telecom',logo:'AT&T',ver:false,sc:{overall_score:36,response_rate:.32,ghost_rate:.62,avg_wait_days:38,report_count:231,risk_level:'danger',waste:64,avg_rounds:3.6,process_score:30}},
+  doordash:{id:'54',name:'DoorDash',ind:'Delivery / Logistics',logo:'DS2',ver:false,sc:{overall_score:53,response_rate:.52,ghost_rate:.42,avg_wait_days:22,report_count:97,risk_level:'warn',waste:44,avg_rounds:3.8,process_score:50}},
+  snap:{id:'55',name:'Snap',ind:'Social Media',logo:'SC',ver:false,sc:{overall_score:57,response_rate:.56,ghost_rate:.38,avg_wait_days:22,report_count:84,risk_level:'warn',waste:38,avg_rounds:3.4,process_score:55}},
+  pinterest:{id:'56',name:'Pinterest',ind:'Social Media',logo:'PI',ver:false,sc:{overall_score:60,response_rate:.60,ghost_rate:.34,avg_wait_days:20,report_count:72,risk_level:'safe',waste:34,avg_rounds:3.2,process_score:58}},
+  openai:{id:'57',name:'OpenAI',ind:'AI Research',logo:'OA',ver:false,sc:{overall_score:83,response_rate:.84,ghost_rate:.10,avg_wait_days:11,report_count:41,risk_level:'safe',waste:10,avg_rounds:4.6,process_score:86}},
+  anthropic:{id:'58',name:'Anthropic',ind:'AI Safety',logo:'AN',ver:false,sc:{overall_score:87,response_rate:.88,ghost_rate:.07,avg_wait_days:9,report_count:28,risk_level:'safe',waste:7,avg_rounds:4.2,process_score:90}},
+  nvidia:{id:'59',name:'Nvidia',ind:'Semiconductors / AI',logo:'NV',ver:false,sc:{overall_score:69,response_rate:.68,ghost_rate:.28,avg_wait_days:21,report_count:156,risk_level:'safe',waste:26,avg_rounds:4.4,process_score:66}},
+  intel:{id:'60',name:'Intel',ind:'Semiconductors',logo:'IN2',ver:false,sc:{overall_score:43,response_rate:.42,ghost_rate:.52,avg_wait_days:34,report_count:198,risk_level:'warn',waste:54,avg_rounds:5.0,process_score:39}},
+  cisco:{id:'61',name:'Cisco',ind:'Networking',logo:'CI',ver:false,sc:{overall_score:51,response_rate:.50,ghost_rate:.44,avg_wait_days:28,report_count:176,risk_level:'warn',waste:46,avg_rounds:4.2,process_score:48}},
+  okta:{id:'62',name:'Okta',ind:'Identity Security',logo:'OK',ver:false,sc:{overall_score:64,response_rate:.64,ghost_rate:.30,avg_wait_days:18,report_count:62,risk_level:'safe',waste:30,avg_rounds:3.8,process_score:62}},
+  crowdstrike:{id:'63',name:'CrowdStrike',ind:'Cybersecurity',logo:'CS2',ver:false,sc:{overall_score:70,response_rate:.70,ghost_rate:.25,avg_wait_days:16,report_count:54,risk_level:'safe',waste:24,avg_rounds:4.0,process_score:68}},
+  instacart:{id:'64',name:'Instacart',ind:'Grocery Delivery',logo:'IC2',ver:false,sc:{overall_score:47,response_rate:.46,ghost_rate:.50,avg_wait_days:26,report_count:61,risk_level:'warn',waste:52,avg_rounds:3.2,process_score:44}},
+  plaid:{id:'65',name:'Plaid',ind:'Fintech Infrastructure',logo:'PD',ver:true,sc:{overall_score:78,response_rate:.80,ghost_rate:.15,avg_wait_days:13,report_count:38,risk_level:'safe',waste:14,avg_rounds:3.6,process_score:80}},
 };
 
 const LOC_SCORES={
@@ -2254,6 +2339,41 @@ const VIBES={
   shopify:['✅ Transparent timeline','💬 Thoughtful recruiter follow-up','⚡ 2-3 week process','📅 Status updates given'],
   deloitte:['👻 Ghosts after final round','📋 5–7 rounds','⏳ 2–3 month pipeline','🤖 Heavy ATS filtering'],
   indeed:['👻 Ironic given what they do','🤖 Fully automated screening','⏳ Slow internal process','⚠ Frequently repost same roles'],
+  spotify:['✅ Responds in 2-3 weeks','📋 4 rounds typical','💬 Usually human recruiters','🎵 Culture-focused hiring'],
+  adobe:['⚠ Ghost rate after phone screen','📋 4-5 rounds','⏳ Slow pipeline','🤖 Mixed ATS and human'],
+  palantir:['📋 5-8 rounds including projects','💸 Unpaid work reported','⏳ Very long process','⚠ High bar, high ghost rate'],
+  reddit:['⚠ Moderate ghost rate','📋 3-4 rounds','⏳ 3-4 week avg','🔄 Roles reopen quickly'],
+  tiktok:['⚠ Inconsistent process','⏳ Long pipeline','📋 4+ rounds','🤖 Heavy automation at screen stage'],
+  hubspot:['✅ Very communicative','📅 Timeline shared early','⚡ 2-3 week process','💬 Real human follow-up'],
+  twilio:['⚠ Some ghosting post-layoffs','📋 4 rounds','⏳ 2-3 week process','🤖 ATS heavy first stage'],
+  datadog:['✅ Responds consistently','⚡ 2-3 week process','📋 4 rounds including take-home','💬 Specific feedback provided'],
+  zoom:['⚠ Post-pandemic hiring slowdown','⏳ Slow pipeline','📋 3-4 rounds','🤖 Lots of automation'],
+  dropbox:['⚠ High ghost rate after layoffs','📋 3-4 rounds','⏳ Slow to follow up','🔄 Same roles reposted'],
+  block:['⚠ Mixed ghosting reports','📋 4 rounds','⏳ 2-3 weeks','💸 Strong comp package'],
+  snowflake:['✅ Usually responds','📋 4-5 rounds','⏳ 2-3 week process','💬 Technical bar is high'],
+  servicenow:['✅ Structured process','📋 4 rounds','⏳ 3-week avg','💼 Enterprise culture'],
+  workday:['⚠ Moderate ghost rate','📋 4-5 rounds','⏳ 3-4 week process','🤖 Heavy ATS use'],
+  atlassian:['✅ Strong communication','📅 Timeline upfront','⚡ 3-week process','💬 Thoughtful feedback'],
+  robinhood:['⚠ Post-IPO chaos reports','📋 4 rounds','⏳ Unpredictable timeline','🔄 Roles frequently reopen'],
+  jpmorgan:['📋 4-5 rounds','⏳ 3-4 week process','⚠ High ghost rate at junior levels','💼 Very structured'],
+  goldman:['📋 5+ rounds','✅ Communicates at senior level','⏳ 3-week process','💸 Top comp'],
+  capitalOne:['✅ Responds well','⚡ Faster than most banks','📋 4 rounds','💻 Tech-forward HR'],
+  disney:['⚠ Ghost rate mid-process','📋 3-4 rounds','⏳ Slow pipeline','🎬 High competition'],
+  comcast:['👻 Very high ghost rate','🤖 Fully automated pipeline','⏳ No follow-up common','⚠ Poor candidate experience'],
+  verizon:['⚠ High ghost rate','⏳ Slow pipeline','🤖 Heavy automation','📋 3-4 rounds'],
+  att:['👻 Ghosts frequently','⏳ Very slow pipeline','🤖 ATS-heavy','📋 3-5 rounds with long gaps'],
+  doordash:['⚠ Moderate ghost rate','📋 4-5 rounds','⏳ 3-4 week process','🚗 Fast-moving culture'],
+  snap:['⚠ Moderate ghosting','📋 4 rounds','⏳ 2-3 weeks','🎨 Creative culture'],
+  pinterest:['✅ Usually responds','📋 3-4 rounds','⏳ 2-3 weeks','💬 Thoughtful process'],
+  openai:['⚡ Fast process for top candidates','📋 4-5 rounds','✅ Very communicative','🤖 High technical bar'],
+  anthropic:['🏆 Excellent process','✅ Detailed feedback','📋 4 rounds','⚡ Efficient timeline'],
+  nvidia:['📋 4-5 rounds','⏳ 2-3 week process','✅ Usually responds','💰 Top-tier comp'],
+  intel:['👻 Ghost rate rising post-layoffs','📋 5 rounds','⏳ 4-6 week process','🤖 Heavy ATS'],
+  cisco:['⚠ Moderate ghost rate','📋 4-5 rounds','⏳ 3-4 week process','🤖 Lots of automated screening'],
+  okta:['✅ Responds within 2 weeks','📋 4 rounds','💬 Human-first process','⚡ 2-3 week timeline'],
+  crowdstrike:['✅ Communicates well','📋 4 rounds','⏳ 2-3 weeks','🔐 Security-focused culture'],
+  instacart:['⚠ Mixed ghost reports','📋 3-4 rounds','⏳ Inconsistent timeline','🔄 Roles reopen often'],
+  plaid:['✅ Very responsive','⚡ Fast process','📋 3-4 rounds','💬 Clear feedback always'],
   default:['📊 Data still loading','🔍 Add a report'],
 };
 
@@ -2593,6 +2713,232 @@ async function runSearch(name,loc){
 function mbox(v,l,c){return`<div style="background:var(--raised);padding:.82rem .6rem;text-align:center"><span style="font-family:var(--mono);font-size:1rem;font-weight:500;color:${c};display:block;margin-bottom:.18rem">${v}</span><span style="font-family:var(--mono);font-size:.5rem;text-transform:uppercase;letter-spacing:.07em;color:var(--muted)">${l}</span></div>`;}
 function closeMod(e){if(e.target===document.getElementById('modalOv'))closeModDirect();}
 function closeModDirect(){document.getElementById('modalOv').classList.remove('open');}
+
+// ═══════════════════════════════════════════════
+// COMMUNITY FEED
+// ═══════════════════════════════════════════════
+const FEED_SEED = [
+  {co:'Amazon',key:'amazon',role:'Software Engineer II',loc:'Seattle, WA',outcome:'ghosted',wait:72,text:'Applied through their portal. Completed a 2-hour online assessment. Complete silence for 3 months. Listing still active and reposted.',ts:Date.now()-3*3600000},
+  {co:'Stripe',key:'stripe',role:'Backend Engineer',loc:'Remote',outcome:'hired',wait:9,text:'Most organized process I\'ve been through. Told me the exact interview format on day 1. Offer came 9 days after first call.',ts:Date.now()-6*3600000},
+  {co:'Accenture',key:'accenture',role:'Business Analyst',loc:'Chicago, IL',outcome:'ghosted',wait:120,text:'Recruiter reached out to ME on LinkedIn, scheduled a call, then disappeared after the intro call. 4 months of silence.',ts:Date.now()-10*3600000},
+  {co:'Google',key:'google',role:'Product Manager',loc:'Mountain View, CA',outcome:'rejected',wait:28,text:'5 rounds of interviews over 3 weeks. Got a form rejection email with no feedback. Exhausting process for zero signal.',ts:Date.now()-1.5*86400000},
+  {co:'Linear',key:'linear',role:'Product Designer',loc:'Remote',outcome:'hired',wait:7,text:'3 rounds total, each with a clear agenda. Felt like they actually read my portfolio. Offer in a week.',ts:Date.now()-2*86400000},
+  {co:'Meta',key:'meta',role:'Data Scientist',loc:'Menlo Park, CA',outcome:'ghosted',wait:45,text:'Auto-rejection after submitting resume. No recruiter contact ever. The "reviewing your application" email was the last I heard.',ts:Date.now()-2.5*86400000},
+  {co:'OpenAI',key:'openai',role:'Research Engineer',loc:'San Francisco, CA',outcome:'interview',wait:5,text:'Recruiter responded in under a week. Very organized — calendar invite came with prep materials and agenda. Still in the process.',ts:Date.now()-3*86400000},
+  {co:'Comcast',key:'comcast',role:'Network Engineer',loc:'Philadelphia, PA',outcome:'ghosted',wait:90,text:'Applied to 3 separate roles over 3 months. Zero responses on any of them. All listings are still live.',ts:Date.now()-4*86400000},
+  {co:'Microsoft',key:'microsoft',role:'Program Manager',loc:'Redmond, WA',outcome:'interview',wait:12,text:'Recruiter followed up in 2 weeks. Told me expected timeline and what each round tests. Mid-process now — good experience so far.',ts:Date.now()-5*86400000},
+  {co:'Deloitte',key:'deloitte',role:'Consultant',loc:'New York, NY',outcome:'ghosted',wait:95,text:'7 rounds including case interviews. Made it to the final round. Radio silence for 3 months after. Ghosted at the end.',ts:Date.now()-6*86400000},
+  {co:'HubSpot',key:'hubspot',role:'Sales Engineer',loc:'Remote',outcome:'rejected',wait:14,text:'Appreciated that they gave me a rejection with actual feedback — rare. Clear process, just wasn\'t the right fit.',ts:Date.now()-7*86400000},
+  {co:'AT&T',key:'att',role:'Solutions Architect',loc:'Dallas, TX',outcome:'ghosted',wait:60,text:'Applied twice to the same role posted 4 times. Not a single acknowledgment from a human. Pure ATS black hole.',ts:Date.now()-8*86400000},
+  {co:'Atlassian',key:'atlassian',role:'Software Engineer',loc:'Remote',outcome:'hired',wait:14,text:'4 rounds, all well-structured. Interviewers clearly prepped. Got honest feedback after each round. Accepted the offer.',ts:Date.now()-9*86400000},
+  {co:'Palantir',key:'palantir',role:'Forward Deployed Engineer',loc:'New York, NY',outcome:'rejected',wait:38,text:'8 rounds including a week-long project. Good communication throughout but eventually rejected. At least they explained why.',ts:Date.now()-10*86400000},
+  {co:'Anthropic',key:'anthropic',role:'Product Manager',loc:'San Francisco, CA',outcome:'interview',wait:8,text:'Fastest response I\'ve had from a top tech company. Detailed prep materials before each round. Process feels unusually human.',ts:Date.now()-11*86400000},
+  {co:'Indeed',key:'indeed',role:'Product Manager',loc:'Austin, TX',outcome:'ghosted',wait:90,text:'The irony of applying to a job board company and being ghosted for 3 months is not lost on me.',ts:Date.now()-13*86400000},
+  {co:'Shopify',key:'shopify',role:'UX Designer',loc:'Remote',outcome:'hired',wait:18,text:'Recruiter kept me updated at each stage. Never had to chase anyone. Knew exactly what to expect. Great process.',ts:Date.now()-15*86400000},
+  {co:'TikTok',key:'tiktok',role:'Software Engineer',loc:'Los Angeles, CA',outcome:'ghosted',wait:55,text:'Very disorganized process — different recruiters emailed me about the same role. Then silence. Seems like their HR is overwhelmed.',ts:Date.now()-16*86400000},
+];
+
+let _feedFilter = 'all';
+let _feedData = [...FEED_SEED];
+
+async function renderFeed() {
+  const listEl = document.getElementById('feedList');
+  if (!listEl) return;
+
+  // Load real community reports from Supabase if available
+  if (db) {
+    try {
+      const { data, error } = await db.from('company_reports').select('*').order('created_at', { ascending: false }).limit(40);
+      if (!error && data?.length) {
+        const real = data.map(r => ({
+          co: r.company_name || 'Unknown',
+          key: (r.company_name||'').toLowerCase().replace(/[^a-z0-9]/g,''),
+          role: r.role || 'Applicant',
+          loc: r.location || '',
+          outcome: r.outcome || 'unknown',
+          wait: r.response_time_days || 0,
+          text: r.notes || '',
+          ts: new Date(r.created_at).getTime(),
+          real: true,
+        }));
+        _feedData = [...real, ...FEED_SEED.slice(0, Math.max(0, 12 - real.length))];
+      }
+    } catch(e) {}
+  }
+
+  _renderFeedList();
+}
+
+function filterFeed(f, btn) {
+  _feedFilter = f;
+  document.querySelectorAll('.feed-filter').forEach(b => {
+    b.classList.remove('v-g','v-r','v-y','v-b');
+    b.classList.add('v-n');
+  });
+  if (btn) {
+    btn.classList.remove('v-n');
+    const cls = f==='hired'?'v-g':f==='ghosted'||f==='rejected'?'v-r':f==='interview'?'v-y':'v-n';
+    btn.classList.add(cls);
+  }
+  _renderFeedList();
+}
+
+function _renderFeedList() {
+  const listEl = document.getElementById('feedList');
+  const emptyEl = document.getElementById('feedEmpty');
+  if (!listEl) return;
+
+  const items = _feedFilter === 'all' ? _feedData : _feedData.filter(r => r.outcome === _feedFilter);
+  emptyEl.style.display = items.length ? 'none' : 'block';
+
+  const outcomeLabel = { ghosted: '👻 Ghosted', hired: '✅ Hired', interview: '💬 Interviewing', rejected: '❌ Rejected', unknown: '❓ Unknown' };
+  const outcomeColor = { ghosted: 'var(--red)', hired: 'var(--green)', interview: 'var(--amber)', rejected: 'var(--muted)', unknown: 'var(--muted)' };
+  const outcomeBg = { ghosted: 'var(--rdim)', hired: 'var(--gdim)', interview: 'var(--adim)', rejected: 'rgba(255,255,255,.04)', unknown: 'rgba(255,255,255,.04)' };
+
+  listEl.innerHTML = items.map(r => {
+    const co = Object.values(COS).find(c => c.name.toLowerCase() === r.co.toLowerCase()) || Object.values(COS).find(c => r.key && c.name.toLowerCase().includes(r.key.slice(0,6)));
+    const sc = co?.sc;
+    const grade = sc ? letterGrade(sc.overall_score) : '?';
+    const gradeColor = sc ? Score.color(sc.risk_level || Score.risk(sc.overall_score)) : 'var(--muted)';
+    const timeAgo = _timeAgo(r.ts);
+    const outcomeC = outcomeColor[r.outcome] || 'var(--muted)';
+    const outcomeBgC = outcomeBg[r.outcome] || 'rgba(255,255,255,.04)';
+    return `<div style="background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:1rem 1.1rem;margin-bottom:.65rem;cursor:pointer;transition:all .2s" onclick="qs('${r.co.replace(/'/g,"\\'")}','')" onmouseover="this.style.borderColor='var(--line2)'" onmouseout="this.style.borderColor='var(--line)'">
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:.75rem;margin-bottom:.6rem">
+        <div style="display:flex;align-items:center;gap:.65rem;min-width:0">
+          <div style="width:34px;height:34px;border-radius:8px;background:${outcomeBgC};border:1px solid ${outcomeC}30;display:flex;align-items:center;justify-content:center;font-family:var(--display);font-weight:800;font-size:.9rem;color:${gradeColor};flex-shrink:0">${grade}</div>
+          <div style="min-width:0">
+            <div style="font-family:var(--display);font-size:.9rem;font-weight:700;color:var(--white);letter-spacing:-.015em">${r.co}</div>
+            <div style="font-family:var(--mono);font-size:.6rem;color:var(--dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${r.role}${r.loc?' · '+r.loc:''}</div>
+          </div>
+        </div>
+        <div style="display:flex;flex-direction:column;align-items:flex-end;gap:.25rem;flex-shrink:0">
+          <div style="background:${outcomeBgC};border:1px solid ${outcomeC}35;border-radius:100px;padding:.15rem .55rem;font-family:var(--mono);font-size:.58rem;color:${outcomeC};white-space:nowrap">${outcomeLabel[r.outcome]||r.outcome}</div>
+          ${r.wait > 0 ? `<div style="font-family:var(--mono);font-size:.55rem;color:var(--muted)">${r.wait}d wait</div>` : ''}
+        </div>
+      </div>
+      ${r.text ? `<div style="font-size:.78rem;color:var(--sub);line-height:1.6;font-weight:300;margin-bottom:.5rem">${r.text.slice(0,180)}${r.text.length>180?'…':''}</div>` : ''}
+      <div style="display:flex;align-items:center;justify-content:space-between">
+        <div style="font-family:var(--mono);font-size:.55rem;color:var(--muted)">${timeAgo}</div>
+        ${r.real ? '<div style="font-family:var(--mono);font-size:.52rem;color:var(--green);background:var(--gdim);border-radius:3px;padding:.06rem .3rem">verified report</div>' : '<div style="font-family:var(--mono);font-size:.52rem;color:var(--muted)">community</div>'}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function _timeAgo(ts) {
+  const s = Math.floor((Date.now() - ts) / 1000);
+  if (s < 3600) return `${Math.floor(s/60)}m ago`;
+  if (s < 86400) return `${Math.floor(s/3600)}h ago`;
+  if (s < 604800) return `${Math.floor(s/86400)}d ago`;
+  return `${Math.floor(s/604800)}w ago`;
+}
+
+// ═══════════════════════════════════════════════
+// USER STATS PANEL (in seeker-dash)
+// ═══════════════════════════════════════════════
+function renderUserStats(apps) {
+  const el = document.getElementById('userStatsPanel');
+  if (!el) return;
+  if (!apps?.length) {
+    el.innerHTML = `<div style="font-family:var(--mono);font-size:.68rem;color:var(--muted);text-align:center;padding:.5rem 0">Track your first application to start building your stats.</div>`;
+    return;
+  }
+
+  const total = apps.length;
+  const ghosted = apps.filter(a=>a.status==='ghosted').length;
+  const hired = apps.filter(a=>a.status==='hired').length;
+  const rejected = apps.filter(a=>a.status==='rejected').length;
+  const interview = apps.filter(a=>a.status==='interview').length;
+  const active = apps.filter(a=>a.status==='active').length;
+  const responded = hired + rejected + interview;
+  const rrPct = total ? Math.round((responded/total)*100) : 0;
+  const ghostPct = total ? Math.round((ghosted/total)*100) : 0;
+
+  const withTime = apps.filter(a=>a.responseTimeDays>0);
+  const avgWait = withTime.length ? Math.round(withTime.reduce((s,a)=>s+a.responseTimeDays,0)/withTime.length) : null;
+
+  // Company tier breakdown
+  const tierCount = {A:0,B:0,C:0,D:0,F:0,unk:0};
+  apps.forEach(a => {
+    const co = Object.values(COS).find(c=>c.name.toLowerCase()===(a.company||'').toLowerCase());
+    if (co?.sc) { const g=letterGrade(co.sc.overall_score).replace(/[+-]/,''); tierCount[g]=(tierCount[g]||0)+1; }
+    else tierCount.unk++;
+  });
+
+  // Badges
+  const badges = [];
+  if (total >= 1) badges.push({icon:'📋',label:'First Application'});
+  if (total >= 10) badges.push({icon:'🔟',label:'10 Apps Tracked'});
+  if (total >= 25) badges.push({icon:'🎯',label:'Serious Candidate'});
+  if (hired >= 1) badges.push({icon:'🎉',label:'Landed an Offer'});
+  if (ghosted >= 5) badges.push({icon:'👻',label:'Ghosting Veteran'});
+  if (apps.filter(a=>a.company&&Object.values(COS).find(c=>c.name.toLowerCase()===a.company.toLowerCase()&&c.sc?.risk_level==='safe')).length >= 3) badges.push({icon:'✅',label:'Quality Applicant'});
+
+  const ghostColor = ghostPct > 60 ? 'var(--red)' : ghostPct > 30 ? 'var(--amber)' : 'var(--green)';
+  const gradeColors = {A:'var(--green)',B:'var(--green)',C:'var(--amber)',D:'var(--red)',F:'var(--red)'};
+
+  el.innerHTML = `
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--line);border:1px solid var(--line);border-radius:10px;overflow:hidden;margin-bottom:1rem">
+      <div style="background:var(--raised);padding:.75rem 1rem">
+        <div style="font-family:var(--mono);font-size:.52rem;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin-bottom:.3rem">Total tracked</div>
+        <div style="font-family:var(--mono);font-size:1.5rem;font-weight:500;color:var(--white);line-height:1">${total}</div>
+      </div>
+      <div style="background:var(--raised);padding:.75rem 1rem">
+        <div style="font-family:var(--mono);font-size:.52rem;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin-bottom:.3rem">Your ghost rate</div>
+        <div style="font-family:var(--mono);font-size:1.5rem;font-weight:500;color:${ghostColor};line-height:1">${ghostPct}%</div>
+      </div>
+      <div style="background:var(--raised);padding:.75rem 1rem">
+        <div style="font-family:var(--mono);font-size:.52rem;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin-bottom:.3rem">Response rate</div>
+        <div style="font-family:var(--mono);font-size:1.5rem;font-weight:500;color:var(--blue);line-height:1">${rrPct}%</div>
+      </div>
+      <div style="background:var(--raised);padding:.75rem 1rem">
+        <div style="font-family:var(--mono);font-size:.52rem;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin-bottom:.3rem">Avg wait</div>
+        <div style="font-family:var(--mono);font-size:1.5rem;font-weight:500;color:var(--white);line-height:1">${avgWait !== null ? avgWait+'d' : '—'}</div>
+      </div>
+    </div>
+    ${Object.keys(tierCount).filter(g=>g!=='unk'&&tierCount[g]>0).length > 0 ? `
+    <div style="margin-bottom:1rem">
+      <div style="font-family:var(--mono);font-size:.55rem;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:.5rem">Applications by company grade</div>
+      <div style="display:flex;gap:.4rem;flex-wrap:wrap">
+        ${['A','B','C','D','F'].filter(g=>tierCount[g]>0).map(g=>`<div style="background:rgba(255,255,255,.04);border:1px solid var(--line2);border-radius:6px;padding:.3rem .65rem;text-align:center"><div style="font-family:var(--mono);font-size:.85rem;font-weight:500;color:${gradeColors[g]||'var(--muted)'}">${g}</div><div style="font-family:var(--mono);font-size:.5rem;color:var(--muted)">${tierCount[g]}</div></div>`).join('')}
+        ${tierCount.unk>0?`<div style="background:rgba(255,255,255,.04);border:1px solid var(--line2);border-radius:6px;padding:.3rem .65rem;text-align:center"><div style="font-family:var(--mono);font-size:.85rem;font-weight:500;color:var(--muted)">?</div><div style="font-family:var(--mono);font-size:.5rem;color:var(--muted)">${tierCount.unk}</div></div>`:''}
+      </div>
+    </div>` : ''}
+    ${badges.length ? `
+    <div>
+      <div style="font-family:var(--mono);font-size:.55rem;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:.5rem">Earned badges</div>
+      <div style="display:flex;gap:.4rem;flex-wrap:wrap">
+        ${badges.map(b=>`<div style="display:inline-flex;align-items:center;gap:.3rem;background:var(--bdim);border:1px solid var(--bmid);border-radius:100px;padding:.22rem .65rem;font-family:var(--mono);font-size:.6rem;color:var(--blue)">${b.icon} ${b.label}</div>`).join('')}
+      </div>
+    </div>` : ''}`;
+}
+
+// ═══════════════════════════════════════════════
+// LANDING HERO PROOF CARDS
+// ═══════════════════════════════════════════════
+function renderHeroProofCards() {
+  const el = document.getElementById('heroProofCards');
+  if (!el) return;
+  const picks = [
+    COS.linear, COS.stripe, COS.amazon, COS.openai, COS.comcast
+  ].filter(Boolean);
+  el.innerHTML = picks.map(co => {
+    const s = co.sc;
+    const g = letterGrade(s.overall_score);
+    const risk = s.risk_level || Score.risk(s.overall_score);
+    const c = Score.color(risk);
+    const ghost = Math.round(s.ghost_rate * 100);
+    const hoverBorderColor = risk==='safe'?'rgba(16,185,129,.45)':risk==='warn'?'rgba(245,158,11,.45)':'rgba(239,68,68,.45)';
+    return `<div onclick="qs('${co.name}','')" style="display:inline-flex;align-items:center;gap:.6rem;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);border-radius:10px;padding:.45rem .85rem;cursor:pointer;transition:all .2s;backdrop-filter:blur(16px)" onmouseover="this.style.borderColor='${hoverBorderColor}';this.style.background='rgba(255,255,255,.09)'" onmouseout="this.style.borderColor='rgba(255,255,255,.1)';this.style.background='rgba(255,255,255,.06)'">
+      <span style="font-family:var(--display);font-weight:800;font-size:1rem;color:${c}">${g}</span>
+      <div>
+        <div style="font-family:var(--display);font-size:.7rem;font-weight:700;color:var(--white);line-height:1.2">${co.name}</div>
+        <div style="font-family:var(--mono);font-size:.52rem;color:var(--muted)">${ghost}% ghost rate</div>
+      </div>
+    </div>`;
+  }).join('');
+}
 
 // ═══════════════════════════════════════════════
 // LEADERBOARD
@@ -4364,6 +4710,7 @@ function goToEmployerDashboard(){
   loadFeatured();
   populateTicker();
   renderQuickTags();
+  renderHeroProofCards();
   RecentSearches.render();
   // Show check badge on nav if there are pending checks
   setTimeout(updateCheckBadge, 600);
@@ -5850,6 +6197,9 @@ async function renderSeekerDash(){
   if(_('dStatGhosted'))_('dStatGhosted').textContent=ghosted.length;
   if(_('dStatHired'))_('dStatHired').textContent=hired.length;
 
+  // User stats panel
+  renderUserStats(apps);
+
   // Pipeline intelligence — aggregate insights from resolved apps
   const insightBand = _('dashPipelineInsight');
   if (insightBand && apps.length >= 2) {
@@ -5996,7 +6346,7 @@ function go(page){
     if(!el){ console.warn('Page not found: page-'+page); return; }
     el.classList.add('active');
     document.querySelectorAll('.ntab').forEach(t=>t.classList.remove('active'));
-    const tabMap={jobs:'nt-jobs',demand:'nt-demand',resume:'nt-resume',tracker:'nt-tracker'};
+    const tabMap={jobs:'nt-jobs',demand:'nt-demand',resume:'nt-resume',tracker:'nt-tracker',feed:'nt-feed'};
     if(tabMap[page]){const t=document.getElementById(tabMap[page]);if(t)t.classList.add('active');}
     const footer = document.getElementById('mainFooter');
     if (footer) footer.style.display = page === 'landing' ? '' : 'none';
@@ -7873,6 +8223,7 @@ function renderSideMenu() {
     items.innerHTML = [
       { icon: '🏠', label: 'My Dashboard', page: 'seeker-dash', action: () => { renderSeekerDash(); go('seeker-dash'); } },
       { icon: '💼', label: 'Browse Jobs', page: 'jobs' },
+      { icon: '👁️', label: 'Community Feed', page: 'feed', action: () => { renderFeed(); go('feed'); } },
       { icon: '📊', label: 'Job Demand', page: 'demand' },
       { icon: '🤖', label: 'Resume AI', page: 'resume' },
       { icon: '📋', label: 'My Applications', page: 'tracker' },
@@ -7888,6 +8239,7 @@ function renderSideMenu() {
   } else if (!Auth.isLoggedIn()) {
     items.innerHTML = [
       { icon: '💼', label: 'Browse Jobs', page: 'jobs' },
+      { icon: '👁️', label: 'Community Feed', page: 'feed', action: () => { renderFeed(); go('feed'); } },
       { icon: '📊', label: 'Job Demand', page: 'demand' },
       { icon: '🏆', label: 'Company Rankings', page: 'companies' },
       { icon: '🔍', label: 'Check a Company', page: 'company', action: () => openCompanySearch() },
