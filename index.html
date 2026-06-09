@@ -842,19 +842,16 @@ nav.nav-scrolled{background:rgba(6,6,8,0.82);backdrop-filter:blur(60px) saturate
 ═══════════════════════════════════════ -->
 <div class="page-full active" id="page-landing" style="position:relative">
 
-  <!-- PRECISION FIELD BACKGROUND -->
-  <div style="position:absolute;inset:0;z-index:0;pointer-events:none;background:#020205">
-    <!-- Subtle ambient — green=safe companies exist, red=danger exists -->
-    <div style="position:absolute;inset:0;background:
-      radial-gradient(ellipse at 8% 85%,rgba(16,185,129,0.09) 0%,transparent 45%),
-      radial-gradient(ellipse at 92% 12%,rgba(239,68,68,0.07) 0%,transparent 42%),
-      radial-gradient(ellipse at 45% 35%,rgba(59,130,246,0.04) 0%,transparent 55%)"></div>
-    <!-- Precision grid — structural, not decorative -->
-    <div style="position:absolute;inset:0;background-image:linear-gradient(rgba(255,255,255,.016) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.016) 1px,transparent 1px);background-size:56px 56px;-webkit-mask-image:radial-gradient(ellipse 120% 65% at 50% 0%,black 0%,transparent 100%);mask-image:radial-gradient(ellipse 120% 65% at 50% 0%,black 0%,transparent 100%)"></div>
-    <!-- Fade to void at bottom -->
-    <div style="position:absolute;inset:0;background:linear-gradient(to bottom,transparent 40%,rgba(2,2,5,0.7) 80%,#020205 100%)"></div>
-    <!-- Audit scan band — confirms data is live -->
-    <div class="audit-scan"></div>
+  <!-- DEEP COSMOS BACKGROUND -->
+  <div style="position:absolute;inset:0;z-index:0;pointer-events:none;background:
+    radial-gradient(ellipse at 18% 65%,rgba(29,78,216,0.55) 0%,transparent 52%),
+    radial-gradient(ellipse at 82% 28%,rgba(124,58,237,0.48) 0%,transparent 48%),
+    radial-gradient(ellipse at 55% 92%,rgba(8,145,178,0.22) 0%,transparent 42%),
+    radial-gradient(ellipse at 8% 12%,rgba(99,102,241,0.32) 0%,transparent 38%),
+    radial-gradient(ellipse at 72% 78%,rgba(139,92,246,0.2) 0%,transparent 40%),
+    #02040a">
+    <!-- Bottom fade -->
+    <div style="position:absolute;inset:0;pointer-events:none;background:linear-gradient(to bottom,rgba(2,4,10,0.05) 0%,transparent 30%,transparent 55%,rgba(2,4,10,0.82) 88%,#02040a 100%)"></div>
   </div>
 
   <!-- TICKER — pinned to top below nav -->
@@ -869,12 +866,15 @@ nav.nav-scrolled{background:rgba(6,6,8,0.82);backdrop-filter:blur(60px) saturate
       <!-- LEFT COLUMN — the verdict -->
       <div>
 
-        <!-- Eyebrow: The Index -->
-        <div class="idx-eyebrow" data-count="/ 47,000+ COMPANIES INDEXED">The Hiring Transparency Index</div>
+        <!-- Kicker pill -->
+        <div style="display:inline-flex;align-items:center;gap:.4rem;background:rgba(59,130,246,0.1);border:1px solid rgba(59,130,246,0.2);color:var(--blue);font-family:var(--mono);font-size:.63rem;padding:.25rem .85rem;border-radius:100px;margin-bottom:1.75rem;animation:fadeUp .5s ease both">
+          <span style="width:5px;height:5px;border-radius:50%;background:var(--blue);animation:pulse 2s infinite;display:inline-block"></span>
+          47,000+ companies scored · updated live
+        </div>
 
-        <!-- Headline — rotating, left-aligned -->
+        <!-- Headline — rotating -->
         <div style="animation:fadeUp .5s .06s ease both">
-          <div id="heroHeadlineWrap" style="min-height:clamp(68px,16vw,180px);display:flex;flex-direction:column;justify-content:center;align-items:flex-start">
+          <div id="heroHeadlineWrap" style="height:clamp(115px,18vw,200px);display:flex;flex-direction:column;justify-content:center;align-items:flex-start;overflow:hidden">
             <h1 id="rotatingHero" style="font-family:var(--display);font-size:clamp(2rem,8.5vw,5.2rem);font-weight:800;line-height:1.05;letter-spacing:-.04em;color:var(--white);margin:0;width:100%;text-align:left">
               <span id="heroLine1" style="display:block"></span>
               <span id="heroLine2" style="display:block;background:linear-gradient(135deg,#a5b4fc,#c084fc,#e879f9);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;font-style:italic"></span>
