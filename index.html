@@ -206,7 +206,7 @@ nav.nav-scrolled{background:rgba(6,6,8,0.82);backdrop-filter:blur(60px) saturate
 .search-wrap{background:var(--card);border:1px solid var(--line2);border-radius:12px;overflow:hidden;transition:border-color .2s,box-shadow .2s;animation:fadeUp .6s .08s ease both}
 .search-wrap:focus-within{border-color:var(--blue);box-shadow:0 0 0 3px var(--bdim)}
 .search-row{display:flex;align-items:stretch}
-.search-field{display:flex;align-items:center;flex:1;padding:0 1.15rem;gap:.6rem;border-right:1px solid var(--line)}
+.search-field{display:flex;align-items:center;flex:1;padding:0 1.15rem;gap:.6rem;border-right:1px solid var(--line);position:relative}
 .search-field-icon{color:var(--muted);font-size:.9rem;flex-shrink:0}
 .search-inp{background:transparent;border:none;outline:none;padding:1rem 0;color:var(--white);font-family:var(--body);font-size:.9rem;width:100%;caret-color:var(--blue)}
 .search-inp::placeholder{color:var(--muted)}
@@ -793,7 +793,8 @@ nav.nav-scrolled{background:rgba(6,6,8,0.82);backdrop-filter:blur(60px) saturate
         <div class="search-row">
           <div class="search-field">
             <span class="search-field-icon">🔍</span>
-            <input class="search-inp" id="heroInp" type="text" placeholder="Company or job title..."/>
+            <input class="search-inp" id="heroInp" type="text" placeholder="Company or job title..." autocomplete="off" oninput="debounceCompanySuggest(this.value)" onkeydown="handleCompanyKey(event)"/>
+            <div id="heroCompSuggestions" style="position:absolute;z-index:200;background:var(--surface);border:1px solid var(--line2);border-radius:8px;width:100%;display:none;box-shadow:0 8px 24px rgba(0,0,0,.4);top:calc(100% + 6px);left:0;overflow:hidden"></div>
           </div>
           <div class="search-loc">
             <span style="color:var(--muted);font-size:.8rem;flex-shrink:0">📍</span>
@@ -828,6 +829,33 @@ nav.nav-scrolled{background:rgba(6,6,8,0.82);backdrop-filter:blur(60px) saturate
   <!-- Bottom disclaimer — pinned -->
   <div style="position:relative;z-index:2;text-align:center;padding:.85rem;font-family:var(--mono);font-size:.58rem;color:rgba(255,255,255,.3)">
     Free for job seekers · No account required to search · <a href="#" onclick="go('legal');return false" style="color:rgba(255,255,255,.3);text-decoration:underline">Legal</a>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════
+     COMPANIES LEADERBOARD
+═══════════════════════════════════════ -->
+<div class="page" id="page-companies">
+  <div style="max-width:960px;margin:0 auto;padding:2.5rem 1.5rem">
+    <div style="margin-bottom:2rem">
+      <div class="eyebrow">Transparency rankings</div>
+      <h1 style="font-family:var(--display);font-size:1.9rem;font-weight:800;color:var(--white);letter-spacing:-.03em;margin-bottom:.35rem">Company scoreboard</h1>
+      <p style="color:var(--sub);font-size:.82rem;font-weight:300">Ranked by hiring transparency score. Ghost rate, response rate, and process quality — all in one place.</p>
+    </div>
+
+    <!-- Filters -->
+    <div style="display:flex;align-items:center;gap:.65rem;flex-wrap:wrap;margin-bottom:1.5rem">
+      <input id="coFilterInp" type="text" placeholder="Search companies..." autocomplete="off"
+        style="flex:1;min-width:180px;max-width:280px;background:var(--surface);border:1.5px solid var(--line2);border-radius:8px;padding:.55rem 1rem;color:var(--white);font-family:var(--mono);font-size:.78rem;outline:none;caret-color:var(--blue)"
+        oninput="filterCoLeaderboard(this.value)"
+        onfocus="this.style.borderColor='var(--blue)'" onblur="this.style.borderColor='var(--line2)'"/>
+      <button onclick="sortCoLeaderboard('score')" id="ldrSortScore" class="btn btn-ghost" style="font-size:.72rem;padding:.45rem .85rem;background:var(--bdim);border-color:var(--blue)">Score ↓</button>
+      <button onclick="sortCoLeaderboard('ghost')" id="ldrSortGhost" class="btn btn-ghost" style="font-size:.72rem;padding:.45rem .85rem">Ghost rate</button>
+      <button onclick="sortCoLeaderboard('wait')" id="ldrSortWait" class="btn btn-ghost" style="font-size:.72rem;padding:.45rem .85rem">Wait time</button>
+    </div>
+
+    <!-- Grid -->
+    <div id="ldrGrid" class="ldr-grid" style="grid-template-columns:1fr"></div>
   </div>
 </div>
 
@@ -1586,6 +1614,7 @@ nav.nav-scrolled{background:rgba(6,6,8,0.82);backdrop-filter:blur(60px) saturate
       </div>
       <div style="display:flex;align-items:center;gap:.5rem">
         <div id="trackerStats" style="display:flex;gap:1rem"></div>
+        <button class="btn btn-ghost" onclick="clearDuplicateApplications()" style="font-size:.72rem">Clear dupes</button>
         <button class="btn btn-ghost" onclick="clearAllApplications()" style="font-size:.72rem">Clear all</button>
       </div>
     </div>
@@ -2158,6 +2187,10 @@ const VIBES={
   coinbase:['✅ Communicates well','📋 4 rounds','⏳ 2-week avg','🔐 Crypto-focused culture'],
   figma:['🏆 Excellent process','✅ Very responsive','📅 Timeline shared','💬 Genuine feedback given'],
   vercel:['🏆 Best-in-class process','✅ Fast responses','⚡ Short timeline','💬 Specific feedback always'],
+  meta:['👻 High ghost rate post-layoffs','📋 4–5 rounds','🤖 Auto-rejection common','⏳ Slow to respond'],
+  shopify:['✅ Transparent timeline','💬 Thoughtful recruiter follow-up','⚡ 2-3 week process','📅 Status updates given'],
+  deloitte:['👻 Ghosts after final round','📋 5–7 rounds','⏳ 2–3 month pipeline','🤖 Heavy ATS filtering'],
+  indeed:['👻 Ironic given what they do','🤖 Fully automated screening','⏳ Slow internal process','⚠ Frequently repost same roles'],
   default:['📊 Data still loading','🔍 Add a report'],
 };
 
@@ -2500,18 +2533,77 @@ function closeModDirect(){document.getElementById('modalOv').classList.remove('o
 // ═══════════════════════════════════════════════
 // LEADERBOARD
 // ═══════════════════════════════════════════════
-function loadLdr(){
-  const sorted=Object.values(COS).sort((a,b)=>b.sc.overall_score-a.sc.overall_score).slice(0,5);
-  document.getElementById('ldrGrid').innerHTML=sorted.map((c,i)=>{
-    const risk=c.sc.risk_level,fc=Score.color(risk);
-    return`<div class="ldr-item" onclick="viewCompany('${c.id}','${c.name}','')">
-      <div class="ldr-rank">#${i+1}</div>
-      <div class="ldr-name">${c.name}</div>
-      <div class="ldr-score ${risk}">${letterGrade(c.sc.overall_score)}</div>
-      <div class="ldr-label">${c.sc.overall_score}/100 · ${Score.label(risk)}</div>
-      <div class="ldr-waste" style="color:${c.sc.waste>60?'var(--red)':c.sc.waste>30?'var(--amber)':'var(--green)'}">${c.sc.waste}% waste risk</div>
-      <div class="ldr-bar"><div class="ldr-fill" style="width:${c.sc.overall_score}%;background:${fc}"></div></div>
-    </div>`;}).join('');
+let _ldrSort = 'score';
+let _ldrQuery = '';
+
+function loadLdr() { _renderLdrGrid(); }
+
+function sortCoLeaderboard(key) {
+  _ldrSort = key;
+  ['score','ghost','wait'].forEach(k => {
+    const btn = document.getElementById('ldrSort' + k.charAt(0).toUpperCase() + k.slice(1));
+    if (btn) btn.style.borderColor = k === key ? 'var(--blue)' : 'var(--line2)';
+    if (btn) btn.style.background = k === key ? 'var(--bdim)' : '';
+  });
+  _renderLdrGrid();
+}
+
+function filterCoLeaderboard(q) { _ldrQuery = q; _renderLdrGrid(); }
+
+function _renderLdrGrid() {
+  const el = document.getElementById('ldrGrid');
+  if (!el) return;
+  let entries = Object.values(COS);
+  if (_ldrQuery) {
+    const q = _ldrQuery.toLowerCase();
+    entries = entries.filter(c => c.name.toLowerCase().includes(q) || c.ind.toLowerCase().includes(q));
+  }
+  if (_ldrSort === 'ghost') entries = entries.sort((a,b) => (b.sc.ghost_rate||0) - (a.sc.ghost_rate||0));
+  else if (_ldrSort === 'wait') entries = entries.sort((a,b) => (b.sc.avg_wait_days||0) - (a.sc.avg_wait_days||0));
+  else entries = entries.sort((a,b) => (b.sc.overall_score||0) - (a.sc.overall_score||0));
+
+  if (!entries.length) { el.innerHTML = '<div style="padding:3rem;text-align:center;color:var(--muted);font-family:var(--mono);font-size:.78rem">No companies match that search.</div>'; return; }
+
+  el.innerHTML = entries.map((c, i) => {
+    const risk = c.sc.risk_level;
+    const ghost = Math.round((c.sc.ghost_rate||0)*100);
+    const resp = Math.round((c.sc.response_rate||0)*100);
+    const ghostColor = ghost > 60 ? 'var(--red)' : ghost > 35 ? 'var(--amber)' : 'var(--green)';
+    const scoreColor = Score.color(risk);
+    return `<div onclick="viewCompany('${c.id}','${c.name}','')" style="display:flex;align-items:center;gap:1rem;padding:.85rem 1.1rem;border-bottom:1px solid var(--line);cursor:pointer;transition:background .15s" onmouseover="this.style.background='var(--raised)'" onmouseout="this.style.background=''">
+      <div style="font-family:var(--mono);font-size:.62rem;color:var(--muted);width:22px;text-align:right;flex-shrink:0">#${i+1}</div>
+      <div style="width:36px;height:36px;border-radius:8px;background:var(--surface);border:1px solid var(--line2);display:flex;align-items:center;justify-content:center;font-family:var(--display);font-weight:800;font-size:.75rem;color:var(--white);flex-shrink:0">${c.logo||c.name[0]}</div>
+      <div style="flex:1;min-width:0">
+        <div style="font-family:var(--display);font-weight:700;font-size:.88rem;color:var(--white)">${c.name}${c.ver?'<span style="font-size:.55rem;margin-left:.4rem;color:var(--blue)">✓ verified</span>':''}</div>
+        <div style="font-family:var(--mono);font-size:.62rem;color:var(--muted)">${c.ind}</div>
+      </div>
+      <div style="display:flex;align-items:center;gap:1.5rem;flex-shrink:0">
+        <div style="text-align:center;display:none" class="ldr-stat-hide">
+          <div style="font-family:var(--mono);font-size:.72rem;color:${ghostColor};font-weight:600">${ghost}%</div>
+          <div style="font-family:var(--mono);font-size:.54rem;color:var(--muted)">ghost</div>
+        </div>
+        <div style="text-align:center;display:none" class="ldr-stat-hide">
+          <div style="font-family:var(--mono);font-size:.72rem;color:var(--green);font-weight:600">${resp}%</div>
+          <div style="font-family:var(--mono);font-size:.54rem;color:var(--muted)">responds</div>
+        </div>
+        <div style="text-align:center">
+          <div style="font-family:var(--display);font-size:1.1rem;font-weight:800;color:${scoreColor}">${letterGrade(c.sc.overall_score)}</div>
+          <div style="font-family:var(--mono);font-size:.52rem;color:var(--muted)">${c.sc.overall_score}/100</div>
+        </div>
+        <div style="width:80px;display:none" class="ldr-bar-hide">
+          <div style="height:4px;background:var(--line2);border-radius:2px;overflow:hidden">
+            <div style="height:100%;width:${c.sc.overall_score}%;background:${scoreColor};border-radius:2px;transition:width .4s"></div>
+          </div>
+          <div style="font-family:var(--mono);font-size:.52rem;color:var(--muted);margin-top:.2rem">${c.sc.report_count||0} reports</div>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+
+  // Show extra stats on wider screens
+  const wide = window.innerWidth > 600;
+  el.querySelectorAll('.ldr-stat-hide').forEach(e => e.style.display = wide ? 'block' : 'none');
+  el.querySelectorAll('.ldr-bar-hide').forEach(e => e.style.display = wide ? 'block' : 'none');
 }
 
 // ═══════════════════════════════════════════════
@@ -4618,6 +4710,22 @@ async function clearAllApplications() {
   showToast('All applications cleared.');
 }
 
+async function clearDuplicateApplications() {
+  const apps = AppStore.loadSync();
+  const seen = new Map();
+  const keep = [];
+  for (const a of apps) {
+    const key = (a.company||'').toLowerCase() + '|' + (a.role||'').toLowerCase();
+    if (!seen.has(key)) { seen.set(key, true); keep.push(a); }
+  }
+  const removed = apps.length - keep.length;
+  if (removed === 0) { showToast('No duplicates found.'); return; }
+  if (!confirm(`Remove ${removed} duplicate application${removed > 1 ? 's' : ''}?`)) return;
+  localStorage.setItem(AppStore.KEY, JSON.stringify(keep));
+  await renderTracker();
+  showToast(`Removed ${removed} duplicate${removed > 1 ? 's' : ''}.`);
+}
+
 function closeApplyModal(e) { if (e.target === document.getElementById('applyModal')) closeApplyModalDirect(); }
 function closeApplyModalDirect() {
   document.getElementById('applyModal').classList.remove('open');
@@ -5315,6 +5423,7 @@ function go(page){
     if(page==='faq')renderFAQ();
     if(page==='legal')renderLegal();
     if(page==='tracker')renderTracker().catch(e=>console.warn('tracker render:',e));
+    if(page==='companies')loadLdr();
     if(page==='seeker-dash'){renderSeekerDash();loadDashResumeState();}
     if(page==='resume'){
       ResumeStore.load().then(stored => {
@@ -5366,6 +5475,71 @@ async function requireResume(onHasResume) {
   return true;
 }
 // ═══════════════════════════════════════════════
+// COMPANY AUTOCOMPLETE — COS + fuzzy match
+// ═══════════════════════════════════════════════
+let _compTimer = null;
+let _compIdx = -1;
+function debounceCompanySuggest(val) {
+  clearTimeout(_compTimer);
+  _compIdx = -1;
+  if (!val || val.length < 1) { hideSuggestions('heroCompSuggestions'); return; }
+  _compTimer = setTimeout(() => showCompanySuggestions(val), 120);
+}
+function showCompanySuggestions(query) {
+  const list = document.getElementById('heroCompSuggestions');
+  if (!list) return;
+  const q = query.toLowerCase().trim();
+  const matches = Object.values(COS)
+    .map(c => c.name)
+    .filter(name => name.toLowerCase().includes(q))
+    .sort((a, b) => {
+      const ai = a.toLowerCase().indexOf(q), bi = b.toLowerCase().indexOf(q);
+      if (ai !== bi) return ai - bi;
+      return a.localeCompare(b);
+    })
+    .slice(0, 7);
+  if (!matches.length) { hideSuggestions('heroCompSuggestions'); return; }
+  list.innerHTML = matches.map((name, i) => {
+    const key = Object.keys(COS).find(k => COS[k].name === name) || '';
+    const sc = COS[key]?.sc || {};
+    const ghost = sc.ghost_rate != null ? Math.round(sc.ghost_rate * 100) + '% ghost' : '';
+    const score = sc.overall_score != null ? sc.overall_score + '/100' : '';
+    const badge = ghost ? `<span style="font-size:.65rem;color:${sc.ghost_rate > .5 ? 'var(--red)' : 'var(--green)'};margin-left:.4rem;font-family:var(--mono)">${ghost}</span>` : (score ? `<span style="font-size:.65rem;color:var(--muted);margin-left:.4rem;font-family:var(--mono)">${score}</span>` : '');
+    return `<div class="_coSug" data-name="${name.replace(/"/g,'&quot;')}" onclick="selectCompanySuggest('${name.replace(/'/g,"\\'")}');return false" style="padding:.6rem 1rem;cursor:pointer;font-size:.85rem;color:var(--white);border-bottom:1px solid var(--line);transition:background .15s;display:flex;align-items:center" onmouseover="this.style.background='var(--raised)'" onmouseout="this.style.background=''">${name}${badge}</div>`;
+  }).join('');
+  list.style.display = 'block';
+}
+function selectCompanySuggest(name) {
+  const inp = document.getElementById('heroInp');
+  if (inp) { inp.value = name; inp.style.borderColor = 'var(--green)'; }
+  hideSuggestions('heroCompSuggestions');
+  _compIdx = -1;
+}
+function handleCompanyKey(e) {
+  const list = document.getElementById('heroCompSuggestions');
+  const items = list ? list.querySelectorAll('._coSug') : [];
+  if (e.key === 'ArrowDown') {
+    e.preventDefault();
+    _compIdx = Math.min(_compIdx + 1, items.length - 1);
+    items.forEach((el, i) => el.style.background = i === _compIdx ? 'var(--raised)' : '');
+  } else if (e.key === 'ArrowUp') {
+    e.preventDefault();
+    _compIdx = Math.max(_compIdx - 1, -1);
+    items.forEach((el, i) => el.style.background = i === _compIdx ? 'var(--raised)' : '');
+  } else if (e.key === 'Enter') {
+    if (_compIdx >= 0 && items[_compIdx]) {
+      e.preventDefault();
+      selectCompanySuggest(items[_compIdx].dataset.name);
+    } else {
+      hideSuggestions('heroCompSuggestions');
+      doSearch();
+    }
+  } else if (e.key === 'Escape') {
+    hideSuggestions('heroCompSuggestions');
+    _compIdx = -1;
+  }
+}
+// ═══════════════════════════════════════════════
 // LOCATION AUTOCOMPLETE — Nominatim (free, no key)
 // ═══════════════════════════════════════════════
 let _locTimer = null;
@@ -5415,6 +5589,7 @@ document.addEventListener('click', e => {
   if (!e.target.closest('#heroLocSuggestions') && !e.target.closest('#heroLoc')) hideSuggestions('heroLocSuggestions');
   if (!e.target.closest('#profCitySuggestions') && !e.target.closest('#profCity')) hideSuggestions('profCitySuggestions');
   if (!e.target.closest('#surveyCitySuggestions') && !e.target.closest('#surveyTextInput')) hideSuggestions('surveyCitySuggestions');
+  if (!e.target.closest('#heroCompSuggestions') && !e.target.closest('#heroInp')) { hideSuggestions('heroCompSuggestions'); _compIdx = -1; }
 });
 
 const HERO_LINES = [
@@ -7089,6 +7264,7 @@ function renderSideMenu() {
       { icon: '📊', label: 'Job Demand', page: 'demand' },
       { icon: '🤖', label: 'Resume AI', page: 'resume' },
       { icon: '📋', label: 'My Applications', page: 'tracker' },
+      { icon: '🏆', label: 'Company Rankings', page: 'companies' },
       { icon: '🏢', label: 'Check a Company', page: 'company', action: () => openCompanySearch() },
       { icon: '📝', label: 'Report Experience', page: 'report' },
       { icon: '⚙️', label: 'Profile Settings', page: 'profile' },
@@ -7101,6 +7277,7 @@ function renderSideMenu() {
     items.innerHTML = [
       { icon: '💼', label: 'Browse Jobs', page: 'jobs' },
       { icon: '📊', label: 'Job Demand', page: 'demand' },
+      { icon: '🏆', label: 'Company Rankings', page: 'companies' },
       { icon: '🔍', label: 'Check a Company', page: 'company', action: () => openCompanySearch() },
       { icon: '📝', label: 'Report Experience', page: 'report' },
       { icon: '🔑', label: 'Sign In', page: 'login' },
