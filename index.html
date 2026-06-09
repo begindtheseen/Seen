@@ -804,6 +804,12 @@ nav.nav-scrolled{background:rgba(6,6,8,0.82);backdrop-filter:blur(60px) saturate
       </div>
     </div>
 
+    <!-- Recent searches — shown if localStorage has history -->
+    <div id="heroRecent" style="display:none;margin-bottom:.6rem;animation:fadeUp .5s .2s ease both">
+      <div style="font-family:var(--mono);font-size:.52rem;text-transform:uppercase;letter-spacing:.08em;color:rgba(255,255,255,.3);margin-bottom:.4rem">Recent</div>
+      <div id="heroRecentItems" style="display:flex;align-items:center;justify-content:center;gap:.4rem;flex-wrap:wrap"></div>
+    </div>
+
     <!-- Quick tags — dynamically rendered from COS by renderQuickTags() -->
     <div id="heroQuickTags" style="display:flex;align-items:center;justify-content:center;gap:.65rem;margin-bottom:2rem;flex-wrap:wrap;animation:fadeUp .5s .22s ease both">
       <button class="qtag" onclick="qs('Amazon','Seattle, WA')">👻 Amazon</button>
@@ -2223,10 +2229,33 @@ function doSearch(){
     go('jobs');
     setTimeout(() => searchJobs(q, l), 300);
   } else {
+    RecentSearches.push(q, l);
     openModal(q,l);
   }
 }
-function qs(name,loc=''){document.getElementById('heroInp').value=name;document.getElementById('heroLoc').value=loc;openModal(name,loc);}
+function qs(name,loc=''){document.getElementById('heroInp').value=name;document.getElementById('heroLoc').value=loc;RecentSearches.push(name,loc);openModal(name,loc);}
+
+// Recent searches — persisted in localStorage
+const RecentSearches = {
+  KEY: 'seen_recent_v1',
+  get() { try { return JSON.parse(localStorage.getItem(this.KEY) || '[]'); } catch(e) { return []; } },
+  push(name, loc) {
+    const list = this.get().filter(r => r.name.toLowerCase() !== name.toLowerCase());
+    list.unshift({ name, loc });
+    localStorage.setItem(this.KEY, JSON.stringify(list.slice(0, 6)));
+    this.render();
+  },
+  render() {
+    const list = this.get();
+    const wrap = document.getElementById('heroRecent');
+    const items = document.getElementById('heroRecentItems');
+    if (!wrap || !items || !list.length) { if(wrap) wrap.style.display='none'; return; }
+    wrap.style.display = 'block';
+    items.innerHTML = list.map(r =>
+      `<button class="qtag" style="font-size:.58rem;padding:.2rem .55rem;opacity:.75" onclick="qs('${r.name.replace(/'/g,"\\'")}','${(r.loc||'').replace(/'/g,"\\'")}')">↩ ${r.name}${r.loc?` · ${r.loc}`:''}</button>`
+    ).join('');
+  },
+};
 
 function openCompanySearch(){
   document.getElementById('modalOv').classList.add('open');
@@ -3322,6 +3351,15 @@ function _updateMetaTags(name, sc) {
   document.title = title;
   setMeta('ogTitle', title); setMeta('ogDesc', desc); setMeta('ogUrl', url);
   setMeta('twTitle', title); setMeta('twDesc', desc);
+  // JSON-LD structured data for company pages
+  let ldEl = document.getElementById('_jsonLd');
+  if (!ldEl) { ldEl = document.createElement('script'); ldEl.type = 'application/ld+json'; ldEl.id = '_jsonLd'; document.head.appendChild(ldEl); }
+  ldEl.textContent = JSON.stringify({
+    '@context': 'https://schema.org', '@type': 'Organization',
+    name, url: `https://seenjobs.io/#company/${encodeURIComponent((name||'').toLowerCase())}`,
+    description: desc,
+    ...(score ? { aggregateRating: { '@type': 'AggregateRating', ratingValue: score, bestRating: 100, worstRating: 0, ratingCount: sc.report_count || 1 } } : {}),
+  });
 }
 
 function _buildExpectedTimeline(sc, risk, safeName, loc) {
@@ -3375,6 +3413,7 @@ function _renderCoTrackBar(name, loc, sc) {
 
 async function viewCompany(id,name,loc){
   go('company');
+  if (name) RecentSearches.push(name, loc||'');
   // Encode current company into the URL hash so Safari can restore after page discard
   const _hn=encodeURIComponent((name||'').toLowerCase().trim());
   const _hl=loc?'/'+encodeURIComponent((loc||'').toLowerCase().trim()):'';
@@ -3870,6 +3909,7 @@ function goToEmployerDashboard(){
   loadFeatured();
   populateTicker();
   renderQuickTags();
+  RecentSearches.render();
 })();
 
 // ═══════════════════════════════════════════════
