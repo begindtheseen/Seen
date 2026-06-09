@@ -2529,6 +2529,7 @@ async function runSearch(name,loc){
       <button class="btn btn-solid" style="flex:1;min-width:120px;justify-content:center;font-size:.75rem" onclick="closeModDirect();viewCompany('${known?.id||'x'}','${known?.name||name}','${loc}')">Full report →</button>
       <button class="btn btn-ghost" style="padding:.65rem .9rem;font-size:.75rem;flex-shrink:0" onclick="shareCompanyReport('${(name||'').replace(/'/g,"\\'")}')">↗ Share</button>
       <button class="btn btn-ghost" style="padding:.65rem .9rem;font-size:.72rem;flex-shrink:0;background:rgba(255,69,0,0.1);border-color:rgba(255,69,0,0.25);color:#ff6314" onclick="shareToReddit('${(name||'').replace(/'/g,"\\'")}')">🔴 Reddit</button>
+      <button class="btn btn-ghost" style="padding:.65rem .9rem;font-size:.72rem;flex-shrink:0;background:rgba(255,255,255,0.06);border-color:rgba(255,255,255,0.15);color:var(--text)" onclick="shareToThreads('${(name||'').replace(/'/g,"\\'")}')">🧵 Threads</button>
       <button class="btn btn-ghost" style="padding:.65rem .9rem;font-size:.75rem;flex-shrink:0" onclick="closeModDirect();prefillReport('${(name||'').replace(/'/g,"\\'")}');go('report')">+ Report</button>
     </div>
     ${!Auth.isLoggedIn()?`<div style="margin-top:.85rem;padding:.65rem .95rem;background:var(--raised);border-radius:9px;border:1px solid var(--line2);display:flex;align-items:center;justify-content:space-between;gap:.75rem">
@@ -3431,6 +3432,12 @@ function shareToReddit(name) {
   _buildCardPreview(name, d);
 }
 
+function shareToThreads(name) {
+  const d = (_shareCtx && _shareCtx.name?.toLowerCase() === (name||'').toLowerCase()) ? _shareCtx : null;
+  if (!d) { showToast('No data loaded yet — open the company first.'); return; }
+  _buildCardPreview(name, d);
+}
+
 async function _buildCardPreview(name, d) {
   showToast('Building card…');
   await document.fonts.ready;
@@ -3443,34 +3450,45 @@ async function _buildCardPreview(name, d) {
   if (existing) existing.remove();
   const ov = document.createElement('div');
   ov.id = '_cardPreviewOv';
-  ov.style.cssText = 'position:fixed;inset:0;z-index:9999;background:rgba(2,4,10,0.95);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:.9rem;padding:1.25rem;overflow-y:auto;-webkit-overflow-scrolling:touch';
+  ov.style.cssText = 'position:fixed;inset:0;z-index:9999;background:rgba(2,4,10,0.95);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:.85rem;padding:1.25rem;overflow-y:auto;-webkit-overflow-scrolling:touch';
   ov.innerHTML = `
-    <div style="font-family:var(--mono);font-size:.55rem;color:rgba(255,255,255,0.35);letter-spacing:.1em;text-transform:uppercase">Company card ready</div>
-    <img src="${dataUrl}" style="max-width:min(100%,560px);width:100%;border-radius:12px;box-shadow:0 24px 80px rgba(0,0,0,0.9)"/>
-    <div style="display:flex;gap:.6rem;flex-wrap:wrap;justify-content:center;width:100%;max-width:420px">
-      <button style="flex:1;min-width:160px;background:rgba(255,69,0,0.15);border:1px solid rgba(255,69,0,0.4);color:#ff6314;font-family:var(--mono);font-size:.72rem;font-weight:600;padding:.75rem 1.1rem;border-radius:9px;cursor:pointer" onclick="saveCardAndOpenReddit()">🔴 Save &amp; Open Reddit</button>
-      <button style="flex:0 0 auto;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);color:rgba(255,255,255,0.4);font-family:var(--mono);font-size:.72rem;padding:.75rem 1rem;border-radius:9px;cursor:pointer" onclick="document.getElementById('_cardPreviewOv')?.remove();_pendingCardBlob=null">Cancel</button>
+    <div style="font-family:var(--mono);font-size:.55rem;color:rgba(255,255,255,0.3);letter-spacing:.1em;text-transform:uppercase">Share your company card</div>
+    <img src="${dataUrl}" style="max-width:min(100%,480px);width:100%;border-radius:12px;box-shadow:0 24px 80px rgba(0,0,0,0.9)"/>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:.55rem;width:100%;max-width:420px">
+      <button style="background:rgba(255,69,0,0.15);border:1px solid rgba(255,69,0,0.4);color:#ff6314;font-family:var(--mono);font-size:.7rem;font-weight:600;padding:.75rem .9rem;border-radius:9px;cursor:pointer" onclick="saveCardAndOpen('reddit')">🔴 Reddit</button>
+      <button style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.18);color:#fff;font-family:var(--mono);font-size:.7rem;font-weight:600;padding:.75rem .9rem;border-radius:9px;cursor:pointer" onclick="saveCardAndOpen('threads')">🧵 Threads</button>
+      <button style="background:rgba(99,102,241,0.1);border:1px solid rgba(99,102,241,0.25);color:rgba(180,180,255,0.85);font-family:var(--mono);font-size:.7rem;padding:.75rem .9rem;border-radius:9px;cursor:pointer" onclick="saveCardAndOpen('download')">↓ Save Image</button>
+      <button style="background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);color:rgba(255,255,255,0.35);font-family:var(--mono);font-size:.7rem;padding:.75rem .9rem;border-radius:9px;cursor:pointer" onclick="document.getElementById('_cardPreviewOv')?.remove();_pendingCardBlob=null">Cancel</button>
     </div>
-    <div style="font-family:var(--mono);font-size:.54rem;color:rgba(255,255,255,0.22);text-align:center;max-width:300px;line-height:1.9">① Save the image &nbsp;·&nbsp; ② Go to Reddit &nbsp;·&nbsp; ③ Attach it to your post</div>`;
+    <div style="font-family:var(--mono);font-size:.52rem;color:rgba(255,255,255,0.2);text-align:center;line-height:1.9">Save the image → open the app → attach it to your post</div>`;
   document.body.appendChild(ov);
 }
 
-function saveCardAndOpenReddit() {
+function saveCardAndOpen(dest) {
   if (!_pendingCardBlob) return;
   const { blob, name } = _pendingCardBlob;
   const safeName = (name||'company').replace(/[^a-z0-9]/gi,'_');
   const file = new File([blob], safeName + '_seen.png', { type: 'image/png' });
-  // Open Reddit first — synchronous in user gesture handler, so no popup block
-  window.open('https://www.reddit.com/r/jobs/submit?type=image', '_blank', 'noopener');
-  // Then save the image: native share sheet on iOS, download link on desktop
+
+  // Open destination synchronously (user gesture — no popup block)
+  if (dest === 'reddit') {
+    window.open('https://www.reddit.com/r/jobs/submit?type=image', '_blank', 'noopener');
+  } else if (dest === 'threads') {
+    const shareUrl = 'https://seenjobs.io/#company/' + encodeURIComponent((name||'').toLowerCase().trim());
+    const txt = encodeURIComponent(`checked ${name} on Seen — here's their hiring transparency score 👇\n\n${shareUrl}`);
+    window.open('https://www.threads.net/intent/post?text=' + txt, '_blank', 'noopener');
+  }
+
+  // Save image: native share sheet on iOS, download on desktop
   if (navigator.share && navigator.canShare?.({ files: [file] })) {
     navigator.share({ files: [file] }).catch(e => { if (e.name !== 'AbortError') _downloadCard(blob, file.name); });
   } else {
     _downloadCard(blob, file.name);
   }
+
   document.getElementById('_cardPreviewOv')?.remove();
   _pendingCardBlob = null;
-  showToast('Image saved! Attach it to your Reddit post 📎');
+  if (dest !== 'download') showToast('Image saved! Attach it to your post 📎');
 }
 
 function _downloadCard(blob, filename) {
@@ -3478,7 +3496,7 @@ function _downloadCard(blob, filename) {
   const a = document.createElement('a');
   a.href = url; a.download = filename; a.click();
   setTimeout(() => URL.revokeObjectURL(url), 2000);
-  showToast('Card saved! Upload it on Reddit 👆');
+  showToast('Card saved!');
 }
 
 function _rr(c, x, y, w, h, r) {
@@ -3760,7 +3778,8 @@ async function viewCompany(id,name,loc){
   document.getElementById('coMeta').innerHTML=`
     <span class="co-live">${viewers.toLocaleString()} checked this week</span>
     <button class="co-share-btn" onclick="shareCompanyReport('${(name||'').replace(/'/g,"\\'")}')">↗ Share</button>
-    <button class="co-share-btn" style="background:rgba(255,69,0,0.12);border-color:rgba(255,69,0,0.3);color:#ff6314" onclick="shareToReddit('${(name||'').replace(/'/g,"\\'")}')">🔴 Reddit</button>`;
+    <button class="co-share-btn" style="background:rgba(255,69,0,0.12);border-color:rgba(255,69,0,0.3);color:#ff6314" onclick="shareToReddit('${(name||'').replace(/'/g,"\\'")}')">🔴 Reddit</button>
+    <button class="co-share-btn" style="background:rgba(255,255,255,0.06);border-color:rgba(255,255,255,0.15)" onclick="shareToThreads('${(name||'').replace(/'/g,"\\'")}')">🧵 Threads</button>`;
 
   // Metrics — alarming stats pop red
   document.getElementById('coMets').innerHTML=`
