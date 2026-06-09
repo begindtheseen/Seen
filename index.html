@@ -662,7 +662,8 @@ nav.nav-scrolled{background:rgba(6,6,8,0.82);backdrop-filter:blur(60px) saturate
 @media(max-width:540px){.l-grid{padding:0 1.25rem}}
 
 /* ═══ HERO STAT STRIP ═══ */
-.hstat-strip{display:flex;gap:1.8rem;margin-bottom:1.6rem;animation:fadeUp .5s .1s ease both}
+.hstat-strip{display:flex;gap:1.8rem;margin-bottom:1.6rem;animation:fadeUp .5s .1s ease both;margin-top:.35rem}
+@media(max-width:600px){.hstat-strip{gap:1.2rem;margin-bottom:1.25rem}.hstat-n{font-size:.88rem!important}.hstat-l{font-size:.46rem!important}}
 .hstat-n{font-family:var(--mono);font-size:1rem;font-weight:500;color:var(--white);display:block;line-height:1;letter-spacing:-.02em}
 .hstat-l{font-family:var(--mono);font-size:.5rem;color:var(--muted);margin-top:.18rem;text-transform:uppercase;letter-spacing:.07em}
 .hstat-div{width:1px;background:var(--line);align-self:stretch}
@@ -676,9 +677,10 @@ nav.nav-scrolled{background:rgba(6,6,8,0.82);backdrop-filter:blur(60px) saturate
 .vtag-grade.danger{color:var(--red);background:rgba(239,68,68,0.12)}
 
 /* ═══ EYEBROW / INDEX HEADER ═══ */
-.idx-eyebrow{font-family:var(--mono);font-size:.58rem;font-weight:600;text-transform:uppercase;letter-spacing:.3em;color:var(--green);margin-bottom:1.5rem;display:flex;align-items:center;gap:14px;animation:fadeUp .5s ease both}
+.idx-eyebrow{font-family:var(--mono);font-size:.58rem;font-weight:600;text-transform:uppercase;letter-spacing:.28em;color:var(--green);margin-bottom:1.4rem;display:flex;align-items:center;gap:14px;animation:fadeUp .5s ease both;flex-wrap:nowrap;white-space:nowrap;overflow:hidden}
 .idx-eyebrow::before{content:'';width:32px;height:1px;background:var(--green);flex-shrink:0}
-.idx-eyebrow::after{content:attr(data-count);color:rgba(255,255,255,.28);letter-spacing:.16em;font-weight:400}
+.idx-eyebrow::after{content:attr(data-count);color:rgba(255,255,255,.28);letter-spacing:.14em;font-weight:400}
+@media(max-width:600px){.idx-eyebrow::after{display:none}.idx-eyebrow{letter-spacing:.18em;font-size:.52rem}}
 
 /* ═══ SCANNING AUDIT BAND ═══ */
 @keyframes auditScan{0%{left:-160px}100%{left:100vw}}
@@ -854,8 +856,8 @@ nav.nav-scrolled{background:rgba(6,6,8,0.82);backdrop-filter:blur(60px) saturate
 
         <!-- Headline — rotating, left-aligned -->
         <div style="animation:fadeUp .5s .06s ease both">
-          <div id="heroHeadlineWrap" style="height:clamp(68px,16vw,180px);display:flex;flex-direction:column;justify-content:center;align-items:flex-start">
-            <h1 id="rotatingHero" style="font-family:var(--display);font-size:clamp(2.4rem,5.8vw,5.2rem);font-weight:800;line-height:1.0;letter-spacing:-.04em;color:var(--white);margin:0;width:100%;text-align:left">
+          <div id="heroHeadlineWrap" style="min-height:clamp(68px,16vw,180px);display:flex;flex-direction:column;justify-content:center;align-items:flex-start">
+            <h1 id="rotatingHero" style="font-family:var(--display);font-size:clamp(2rem,8.5vw,5.2rem);font-weight:800;line-height:1.05;letter-spacing:-.04em;color:var(--white);margin:0;width:100%;text-align:left">
               <span id="heroLine1" style="display:block"></span>
               <span id="heroLine2" style="display:block;background:linear-gradient(135deg,#a5b4fc,#c084fc,#e879f9);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;font-style:italic"></span>
             </h1>
