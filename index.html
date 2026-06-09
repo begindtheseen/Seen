@@ -592,7 +592,8 @@ nav.nav-scrolled{background:rgba(6,6,8,0.82);backdrop-filter:blur(60px) saturate
 
 /* Pipeline horizontal scroll */
 .tracker-pipeline-wrap{display:flex;gap:1rem;min-width:max-content;padding:.25rem .1rem}
-.pipeline-col{width:200px;flex-shrink:0}
+.pipeline-col{width:200px;flex-shrink:0;max-height:340px}
+@media(max-width:600px){.tracker-pipeline-wrap{display:none}}
 .pipeline-col-hdr{font-family:var(--mono);font-size:.6rem;text-transform:uppercase;letter-spacing:.09em;color:var(--muted);margin-bottom:.55rem;display:flex;align-items:center;justify-content:space-between}
 .pipeline-col-count{background:var(--raised);border:1px solid var(--line2);border-radius:100px;padding:.08rem .45rem;font-size:.58rem;color:var(--dim)}
 .pipeline-mini-card{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:.75rem;margin-bottom:.45rem;cursor:pointer;transition:all .15s;font-size:.75rem}
@@ -4365,13 +4366,28 @@ async function renderTracker() {
     cols.forEach(s => grouped[s] = []);
     active.forEach(a => { const key = a.stage || 'Applied'; if (grouped[key]) grouped[key].push(a); else grouped['Applied'].push(a); });
 
+    // Mobile: compact stage-count row (no cards)
+    const mobileSummary = STAGES.map(stage => {
+      const n = (grouped[stage]||[]).length;
+      if (!n) return '';
+      return `<div style="background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:.5rem .75rem;text-align:center;flex:1;min-width:0">
+        <div style="font-family:var(--mono);font-size:1.1rem;font-weight:500;color:var(--white)">${n}</div>
+        <div style="font-family:var(--mono);font-size:.52rem;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-top:.1rem">${stage}</div>
+      </div>`;
+    }).filter(Boolean).join('');
+
     pipeEl.innerHTML = `<div style="font-family:var(--mono);font-size:.6rem;text-transform:uppercase;letter-spacing:.09em;color:var(--muted);margin-bottom:.75rem">Application pipeline</div>
+    <!-- Mobile: compact counts row -->
+    <div style="display:none" class="pipe-mobile-summary">${mobileSummary}</div>
+    <!-- Desktop: full Kanban (hidden on mobile via CSS) -->
     <div class="tracker-pipeline-wrap">
       ${STAGES.map(stage => {
         const items = grouped[stage] || [];
+        const visible = items.slice(0, 3);
+        const overflow = items.length - 3;
         return `<div class="pipeline-col">
           <div class="pipeline-col-hdr">${stage} <span class="pipeline-col-count">${items.length}</span></div>
-          ${items.length ? items.map(a => {
+          ${visible.length ? visible.map(a => {
             const days = Math.floor((Date.now()-a.appliedAt)/86400000);
             const dc = days < 7 ? 'color:var(--green)' : days > 30 ? 'color:var(--red)' : 'color:var(--amber)';
             return `<div class="pipeline-mini-card" onclick="scrollToApp('${a.id}')">
@@ -4380,9 +4396,18 @@ async function renderTracker() {
               <div class="days" style="${dc}">${days}d ago</div>
             </div>`;
           }).join('') : `<div style="height:60px;border:1px dashed var(--line2);border-radius:7px;display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:.58rem;color:var(--muted)">Empty</div>`}
+          ${overflow > 0 ? `<div style="font-family:var(--mono);font-size:.58rem;color:var(--muted);text-align:center;padding:.3rem 0">+${overflow} more ↓</div>` : ''}
         </div>`;
       }).join('')}
     </div>`;
+
+    // Show mobile summary, hide Kanban on small screens
+    const mobileEl = pipeEl.querySelector('.pipe-mobile-summary');
+    if (mobileEl) mobileEl.style.display = 'flex';
+    if (window.innerWidth <= 600 && mobileEl) {
+      mobileEl.style.cssText += ';display:flex;gap:.5rem;flex-wrap:wrap;';
+      pipeEl.querySelector('.tracker-pipeline-wrap').style.display = 'none';
+    }
   } else if (pipeEl) {
     pipeEl.innerHTML = '';
   }
