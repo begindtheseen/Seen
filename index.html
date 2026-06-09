@@ -2,8 +2,16 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>Seen — The job board that holds companies accountable.</title>
-<meta name="description" content="Seen is the only job board with real process scores, waste probability, hiring timeline predictions, and enforcement on every listing. Built for job seekers, not employers."/>
+<title>Seen — Know before you apply.</title>
+<meta name="description" content="Check any company's ghost rate, response time, and hiring score before you apply. 47,000+ companies scored by real applicants. Free for job seekers."/>
+<meta property="og:title" id="ogTitle" content="Seen — Know before you apply."/>
+<meta property="og:description" id="ogDesc" content="Ghost rates. Response times. Hiring scores. For 47,000+ companies — from real applicants."/>
+<meta property="og:type" content="website"/>
+<meta property="og:url" id="ogUrl" content="https://seenjobs.io/"/>
+<meta property="og:site_name" content="Seen"/>
+<meta name="twitter:card" content="summary"/>
+<meta name="twitter:title" id="twTitle" content="Seen — Know before you apply."/>
+<meta name="twitter:description" id="twDesc" content="Ghost rates. Response times. Hiring scores. For 47,000+ companies — from real applicants."/>
 <meta name="keywords" content="ghost job detector, hiring transparency, process score, job board accountability, waste score jobs, honest hiring 2025"/>
 <meta name="robots" content="index, follow"/>
 <link rel="canonical" href="https://tryseen.io/"/>
@@ -14,22 +22,27 @@
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
-  --ink:#07070a;--void:#0c0c10;--surface:#111118;--card:#16161e;--raised:#1c1c26;
-  --line:#22222e;--line2:#2e2e3e;--muted:#454558;--dim:#6b6b82;
-  --sub:#9898b0;--text:#e4e4f0;--white:#f0f0f8;
-  --green:#00ff87;--gdim:#00ff8712;--gmid:#00ff8728;
-  --red:#ff3b5c;--rdim:#ff3b5c12;
-  --amber:#ffb830;--adim:#ffb83012;
-  --blue:#4b9eff;--bdim:#4b9eff10;
-  --purple:#b06eff;--pdim:#b06eff10;
-  --pink:#ff6eb0;--pkdim:#ff6eb010;
-  --cyan:#00e5ff;--cydim:#00e5ff10;
+  --ink:#02040a;--void:#05070f;--surface:#0c0f1a;--card:rgba(255,255,255,0.03);--raised:rgba(255,255,255,0.05);
+  --line:rgba(255,255,255,0.08);--line2:rgba(255,255,255,0.12);--muted:#4b5563;--dim:#6b7280;
+  --sub:#9ca3af;--text:#e5e7eb;--white:#f9fafb;
+  --green:#10b981;--gdim:rgba(16,185,129,0.08);--gmid:rgba(16,185,129,0.15);
+  --red:#ef4444;--rdim:rgba(239,68,68,0.08);--rmid:rgba(239,68,68,0.15);
+  --amber:#f59e0b;--adim:rgba(245,158,11,0.08);--amid:rgba(245,158,11,0.15);
+  --blue:#3b82f6;--bdim:rgba(59,130,246,0.1);--bmid:rgba(59,130,246,0.2);
+  --indigo:#6366f1;--idim:rgba(99,102,241,0.12);--imid:rgba(99,102,241,0.22);
+  --violet:#7c3aed;--vdim:rgba(124,58,237,0.1);--vmid:rgba(124,58,237,0.2);
+  --purple:#8b5cf6;--pdim:rgba(139,92,246,0.1);--pmid:rgba(139,92,246,0.2);
+  --cyan:#22d3ee;--cydim:rgba(34,211,238,0.1);
+  --teal:#0891b2;--tdim:rgba(8,145,178,0.08);
+  /* Gradient stops — used across buttons, fills, text */
+  --g-start:#1d4ed8;--g-mid:#7c3aed;--g-end:#a855f7;
+  --g-text-start:#a5b4fc;--g-text-mid:#c084fc;--g-text-end:#e879f9;
   --display:'Syne',sans-serif;
   --mono:'DM Mono',monospace;
   --body:'Instrument Sans',sans-serif;
 }
 html{scroll-behavior:smooth;overflow-x:hidden}
-body{background:var(--ink);color:var(--text);font-family:var(--body);font-size:15px;line-height:1.6;overflow-x:hidden;-webkit-font-smoothing:antialiased;width:100%;max-width:100%}
+body{background:var(--ink);background-image:radial-gradient(ellipse at 30% 0%,rgba(99,102,241,0.07) 0%,transparent 50%),radial-gradient(ellipse at 80% 100%,rgba(124,58,237,0.05) 0%,transparent 50%);color:var(--text);font-family:var(--body);font-size:15px;line-height:1.6;overflow-x:hidden;-webkit-font-smoothing:antialiased;width:100%;max-width:100%}
 body::before{content:'';position:fixed;inset:0;background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.025'/%3E%3C/svg%3E");pointer-events:none;z-index:9998}
 
 @keyframes heroIn{from{opacity:0;transform:translateY(18px)}to{opacity:1;transform:translateY(0)}}
@@ -45,25 +58,62 @@ body::before{content:'';position:fixed;inset:0;background-image:url("data:image/
 @keyframes countUp{from{opacity:0;transform:scale(.85)}to{opacity:1;transform:scale(1)}}
 @keyframes slideRight{from{width:0}to{width:var(--target-w)}}
 @keyframes shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
+@keyframes auroraFloat{0%,100%{transform:translate(0,0) scale(1)}33%{transform:translate(3%,2%) scale(1.05)}66%{transform:translate(-2%,3%) scale(0.97)}}
+@keyframes auroraFloat2{0%,100%{transform:translate(0,0) scale(1)}33%{transform:translate(-4%,3%) scale(1.08)}66%{transform:translate(5%,-2%) scale(0.94)}}
+@keyframes auroraFloat3{0%,100%{transform:translate(0,0) scale(1)}50%{transform:translate(2%,-4%) scale(1.06)}}
+
+/* AURORA — Deep Cosmos: royal blue, indigo, violet, teal */
+.aurora{position:fixed;inset:0;pointer-events:none;z-index:0;overflow:hidden}
+/* Orb 1 — royal blue → indigo, top-left */
+.aurora::before{content:'';position:absolute;top:-35%;left:-25%;width:80vw;height:80vh;border-radius:50%;background:radial-gradient(ellipse at center,rgba(29,78,216,0.3) 0%,rgba(99,102,241,0.18) 40%,rgba(124,58,237,0.06) 65%,transparent 80%);filter:blur(90px);animation:auroraFloat 14s ease-in-out infinite}
+/* Orb 2 — violet → teal, bottom-right */
+.aurora::after{content:'';position:absolute;bottom:-25%;right:-20%;width:70vw;height:70vh;border-radius:50%;background:radial-gradient(ellipse at center,rgba(124,58,237,0.26) 0%,rgba(139,92,246,0.14) 35%,rgba(8,145,178,0.08) 65%,transparent 80%);filter:blur(80px);animation:auroraFloat2 17s ease-in-out infinite}
+/* Orb 3 — indigo center depth, very slow */
+.aurora-3{position:absolute;top:20%;left:30%;width:50vw;height:55vh;border-radius:50%;background:radial-gradient(ellipse at center,rgba(99,102,241,0.14) 0%,rgba(124,58,237,0.06) 50%,transparent 75%);filter:blur(100px);animation:auroraFloat3 22s ease-in-out infinite}
+
+/* GLASS */
+.glass{background:rgba(255,255,255,0.04);backdrop-filter:blur(24px) saturate(160%);border:1px solid rgba(255,255,255,0.1);border-radius:16px;box-shadow:0 8px 40px rgba(0,0,0,0.5),0 0 0 1px rgba(255,255,255,0.03),inset 0 1px 0 rgba(255,255,255,0.06);transition:box-shadow 0.25s ease,transform 0.2s ease}
+.glass:hover{box-shadow:0 16px 56px rgba(0,0,0,0.6),0 0 48px rgba(59,130,246,0.2),0 0 80px rgba(139,92,246,0.1),0 0 0 1px rgba(255,255,255,0.08);transform:translateY(-2px)}
+.glass-blue{box-shadow:0 8px 40px rgba(0,0,0,0.5),0 0 60px rgba(59,130,246,0.2),inset 0 1px 0 rgba(59,130,246,0.1)}
+.glass-purple{box-shadow:0 8px 40px rgba(0,0,0,0.5),0 0 60px rgba(139,92,246,0.18),inset 0 1px 0 rgba(139,92,246,0.1)}
+
+/* GLOW CARD — Deep Cosmos aurora fill */
+.glow-card{position:relative;overflow:hidden;background:linear-gradient(160deg,rgba(255,255,255,0.04) 0%,rgba(99,102,241,0.03) 100%);backdrop-filter:blur(24px) saturate(160%);border:1px solid rgba(255,255,255,0.1);border-radius:20px;box-shadow:0 12px 48px rgba(0,0,0,0.6),0 0 0 1px rgba(99,102,241,0.06),inset 0 1px 0 rgba(255,255,255,0.07);transition:all 0.3s ease}
+.glow-card::before{content:'';position:absolute;top:0;left:0;right:0;bottom:0;background:radial-gradient(ellipse at 50% -15%,rgba(29,78,216,0.14) 0%,rgba(99,102,241,0.06) 40%,transparent 65%);pointer-events:none;z-index:0}
+.glow-card::after{content:'';position:absolute;bottom:0;left:0;right:0;height:62%;background:linear-gradient(to top,rgba(29,78,216,0.24) 0%,rgba(124,58,237,0.16) 30%,rgba(8,145,178,0.06) 60%,transparent 100%);pointer-events:none;border-radius:0 0 20px 20px;z-index:0}
+.glow-card>*{position:relative;z-index:1}
+.glow-card:hover{border-color:rgba(99,102,241,0.35);box-shadow:0 20px 64px rgba(0,0,0,0.7),0 0 60px rgba(124,58,237,0.22),0 0 100px rgba(29,78,216,0.12),inset 0 1px 0 rgba(255,255,255,0.09);transform:translateY(-3px)}
+
+/* GLOW UTILITIES */
+.glow-blue{box-shadow:0 0 40px rgba(29,78,216,0.4),0 0 80px rgba(99,102,241,0.15)}
+.glow-purple{box-shadow:0 0 40px rgba(124,58,237,0.38),0 0 80px rgba(139,92,246,0.12)}
+.glow-text-blue{color:var(--indigo);text-shadow:0 0 24px rgba(99,102,241,0.7),0 0 48px rgba(124,58,237,0.3)}
+/* Gradient text — Deep Cosmos */
+.grad-text{background:linear-gradient(135deg,var(--g-text-start) 0%,var(--g-text-mid) 55%,var(--g-text-end) 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.grad-text-cool{background:linear-gradient(135deg,#a5b4fc 0%,#67e8f9 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
 
 /* NAV */
-nav{position:fixed;top:0;left:0;right:0;z-index:500;height:58px;display:flex;align-items:center;justify-content:space-between;padding:0 1.25rem;background:rgba(7,7,10,.95);backdrop-filter:blur(28px);border-bottom:1px solid var(--line);box-sizing:border-box}
+nav{position:fixed;top:0;left:0;right:0;z-index:500;height:58px;display:flex;align-items:center;justify-content:space-between;padding:0 1.25rem;background:rgba(6,6,8,0.55);backdrop-filter:blur(40px) saturate(180%);-webkit-backdrop-filter:blur(40px) saturate(180%);border-bottom:1px solid rgba(255,255,255,0.08);box-shadow:0 1px 0 rgba(255,255,255,0.04),0 4px 24px rgba(0,0,0,0.25);box-sizing:border-box;transition:background .3s ease,border-color .3s ease,box-shadow .3s ease}
+nav.nav-scrolled{background:rgba(6,6,8,0.82);backdrop-filter:blur(60px) saturate(200%);-webkit-backdrop-filter:blur(60px) saturate(200%);border-bottom-color:rgba(255,255,255,0.11);box-shadow:0 1px 0 rgba(255,255,255,0.06),0 8px 32px rgba(0,0,0,0.4)}
 .logo{font-family:var(--display);font-size:1.2rem;font-weight:800;color:var(--white);text-decoration:none;letter-spacing:-.02em;display:flex;align-items:center;gap:.5rem;flex-shrink:0}
-.logo-pulse{width:8px;height:8px;border-radius:50%;background:var(--green);animation:pulse 2s infinite,glow 3s infinite;flex-shrink:0}
-.nav-pills{display:flex;gap:.1rem;background:var(--void);border:1px solid var(--line);border-radius:10px;padding:.2rem;overflow-x:auto;overflow-y:hidden;flex-shrink:1;min-width:0;scrollbar-width:none}
+.logo-pulse{width:8px;height:8px;border-radius:50%;background:var(--blue);box-shadow:0 0 10px rgba(59,130,246,0.6);animation:pulse 2s infinite;flex-shrink:0}
+/* Nav tabs — no container, each tab stands alone */
+.nav-pills{display:flex;gap:.08rem;background:none;border:none;border-radius:0;padding:0;overflow-x:auto;overflow-y:hidden;flex-shrink:1;min-width:0;scrollbar-width:none;box-shadow:none;-webkit-mask-image:linear-gradient(to right,transparent 0,#000 12px,#000 calc(100% - 12px),transparent 100%);mask-image:linear-gradient(to right,transparent 0,#000 12px,#000 calc(100% - 12px),transparent 100%)}
 .nav-pills::-webkit-scrollbar{display:none}
-.ntab{background:none;border:none;padding:.32rem .55rem;font-family:var(--body);font-size:.72rem;font-weight:500;color:var(--dim);cursor:pointer;border-radius:7px;transition:all .15s;white-space:nowrap}
-.ntab:hover{color:var(--sub);background:var(--raised)}
-.ntab.active{color:var(--white);background:var(--raised)}
-.ntab-new{font-family:var(--mono);font-size:.5rem;background:var(--green);color:var(--ink);border-radius:3px;padding:.1rem .3rem;font-weight:700;letter-spacing:.04em}
+/* Inactive — clean text, no box */
+.ntab{background:none;border:none;padding:.35rem .62rem;font-family:var(--body);font-size:.73rem;font-weight:500;color:rgba(255,255,255,0.38);cursor:pointer;border-radius:10px;transition:color .18s ease;white-space:nowrap;letter-spacing:.005em}
+.ntab:hover{color:rgba(255,255,255,0.68)}
+/* Active — individual Liquid Glass capsule, not a container */
+.ntab.active{color:#fff;font-weight:600;background:rgba(255,255,255,0.1);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border-radius:10px;box-shadow:0 1px 0 rgba(255,255,255,0) inset,0 2px 10px rgba(0,0,0,0.35);outline:1px solid rgba(255,255,255,0.12)}
+.ntab-new{font-family:var(--mono);font-size:.5rem;background:var(--blue);color:#fff;border-radius:3px;padding:.1rem .3rem;font-weight:700;letter-spacing:.04em}
 .nav-right{display:flex;align-items:center;gap:.45rem;flex-shrink:0}
 .btn{display:inline-flex;align-items:center;gap:.32rem;padding:.44rem 1rem;border-radius:8px;font-family:var(--body);font-weight:600;font-size:.76rem;cursor:pointer;text-decoration:none;transition:all .15s;border:none;white-space:nowrap}
-.btn-ghost{background:transparent;color:var(--sub);border:1px solid var(--line2)}
-.btn-ghost:hover{border-color:var(--muted);color:var(--text)}
-.btn-solid{background:var(--white);color:var(--ink);font-weight:700}
-.btn-solid:hover{background:var(--green);transform:translateY(-1px);box-shadow:0 4px 20px var(--gmid)}
-.btn-green{background:var(--green);color:var(--ink);font-weight:800}
-.btn-green:hover{background:#00ffaa;transform:translateY(-1px);box-shadow:0 6px 28px var(--gmid)}
+.btn-ghost{background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.1);color:var(--sub);transition:all 0.2s ease}
+.btn-ghost:hover{background:rgba(59,130,246,0.08);border-color:rgba(59,130,246,0.4);color:var(--blue);box-shadow:0 0 16px rgba(59,130,246,0.12)}
+.btn-solid{background:linear-gradient(135deg,#1d4ed8 0%,#7c3aed 55%,#a855f7 100%);color:#fff;font-weight:700;box-shadow:0 0 24px rgba(124,58,237,0.35),0 0 48px rgba(29,78,216,0.15);transition:all 0.2s ease}
+.btn-solid:hover{background:linear-gradient(135deg,#3b82f6 0%,#8b5cf6 55%,#c084fc 100%);box-shadow:0 0 40px rgba(124,58,237,0.5),0 0 80px rgba(99,102,241,0.2);transform:translateY(-1px)}
+.btn-green{background:linear-gradient(135deg,#1d4ed8 0%,#7c3aed 55%,#a855f7 100%);color:#fff;font-weight:800;box-shadow:0 0 28px rgba(124,58,237,0.4)}
+.btn-green:hover{box-shadow:0 0 48px rgba(124,58,237,0.6),0 4px 28px rgba(99,102,241,0.3);transform:translateY(-1px)}
 .btn-purple{background:var(--purple);color:#fff;font-weight:700}
 .btn-purple:hover{opacity:.88;transform:translateY(-1px)}
 .btn-lg{padding:.72rem 1.75rem;font-size:.875rem}
@@ -71,28 +121,29 @@ nav{position:fixed;top:0;left:0;right:0;z-index:500;height:58px;display:flex;ali
 
 /* PAGES */
 .page{display:none;min-height:100vh;padding-top:58px;box-sizing:border-box;overflow-x:hidden;width:100%}
-.page.active{display:block;animation:fadeIn .2s ease}
+.page.active{display:block;animation:pageIn 0.25s cubic-bezier(0.22,1,0.36,1) both}
+@keyframes pageIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
 .page-full{display:none;height:100vh;overflow:hidden;padding-top:58px;box-sizing:border-box;width:100%}
 .page-full.active{display:flex;flex-direction:column;animation:fadeIn .2s ease}
 .wrap{max-width:1300px;margin:0 auto;padding:0 1.25rem}
 
 /* SHARED COMPONENTS */
-.spinner{width:20px;height:20px;border:1.5px solid var(--line2);border-top-color:var(--green);border-radius:50%;animation:spin .6s linear infinite}
+.spinner{width:20px;height:20px;border:1.5px solid var(--line2);border-top-color:var(--blue);border-radius:50%;animation:spin .6s linear infinite}
 .loader{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:3.5rem;gap:.65rem}
 .loader-txt{font-family:var(--mono);font-size:.7rem;color:var(--dim)}
-.skel{background:linear-gradient(90deg,var(--card) 25%,var(--raised) 50%,var(--card) 75%);background-size:200% 100%;animation:shimmer 1.5s infinite;border-radius:6px}
-.eyebrow{font-family:var(--mono);font-size:.62rem;color:var(--green);letter-spacing:.1em;text-transform:uppercase;margin-bottom:.7rem}
+.skel{background:linear-gradient(90deg,rgba(255,255,255,0.04) 25%,rgba(255,255,255,0.08) 50%,rgba(255,255,255,0.04) 75%);background-size:200% 100%;animation:shimmer 1.8s infinite;border-radius:8px}
+.eyebrow{font-family:var(--mono);font-size:.62rem;color:var(--blue);letter-spacing:.1em;text-transform:uppercase;margin-bottom:.7rem}
 .section-h{font-family:var(--display);font-size:clamp(1.9rem,3.8vw,3rem);font-weight:800;color:var(--white);letter-spacing:-.03em;line-height:1.05;margin-bottom:.6rem}
 .section-h .dim{color:var(--muted)}
-.section-h .acc{color:var(--green)}
+.section-h .acc{color:var(--blue)}
 .section-p{color:var(--sub);font-size:.9rem;font-weight:300;line-height:1.8;max-width:500px}
 
 /* SCORE COMPONENTS */
 .sring{display:flex;flex-direction:column;align-items:center;justify-content:center;border-radius:50%;border:2px solid;flex-shrink:0;position:relative}
-.sring::after{content:'';position:absolute;inset:-3px;border-radius:50%;border:1px solid;opacity:.3}
-.sring.safe{border-color:var(--green);background:var(--gdim)}.sring.safe::after{border-color:var(--green)}
-.sring.warn{border-color:var(--amber);background:var(--adim)}.sring.warn::after{border-color:var(--amber)}
-.sring.danger{border-color:var(--red);background:var(--rdim)}.sring.danger::after{border-color:var(--red)}
+.sring::after{content:'';position:absolute;inset:-4px;border-radius:50%;border:1px solid;opacity:.4}
+.sring.safe{border-color:var(--green);background:rgba(16,185,129,0.1);box-shadow:0 0 20px rgba(16,185,129,0.3),0 0 40px rgba(16,185,129,0.1)}.sring.safe::after{border-color:var(--green)}
+.sring.warn{border-color:var(--amber);background:var(--adim);box-shadow:0 0 20px rgba(245,158,11,0.3),0 0 40px rgba(245,158,11,0.1)}.sring.warn::after{border-color:var(--amber)}
+.sring.danger{border-color:var(--red);background:var(--rdim);box-shadow:0 0 20px rgba(239,68,68,0.3),0 0 40px rgba(239,68,68,0.1)}.sring.danger::after{border-color:var(--red)}
 .sring-n{font-family:var(--mono);font-weight:500;line-height:1}
 .sring.safe .sring-n{color:var(--green)}.sring.warn .sring-n{color:var(--amber)}.sring.danger .sring-n{color:var(--red)}
 .sring-l{font-family:var(--mono);font-size:.46rem;letter-spacing:.07em;margin-top:.08rem}
@@ -105,14 +156,14 @@ nav{position:fixed;top:0;left:0;right:0;z-index:500;height:58px;display:flex;ali
 .waste-high{background:var(--rdim);color:var(--red);border-color:#ff3b5c30}
 
 /* VIBE TAGS */
-.vibe{display:inline-flex;align-items:center;gap:.25rem;font-family:var(--mono);font-size:.6rem;padding:.2rem .58rem;border-radius:100px;border:1px solid;cursor:default;transition:all .2s}
+.vibe{display:inline-flex;align-items:center;gap:.25rem;font-family:var(--mono);font-size:.6rem;padding:.2rem .58rem;border-radius:100px;border:1px solid rgba(255,255,255,0.1);cursor:default;transition:all .2s;backdrop-filter:blur(8px)}
 .vibe:hover{transform:scale(1.05)}
-.v-g{background:var(--gdim);color:var(--green);border-color:#00ff8728}
-.v-r{background:var(--rdim);color:var(--red);border-color:#ff3b5c28}
-.v-y{background:var(--adim);color:var(--amber);border-color:#ffb83028}
-.v-b{background:var(--bdim);color:var(--blue);border-color:#4b9eff28}
-.v-p{background:var(--pdim);color:var(--purple);border-color:#b06eff28}
-.v-n{background:var(--raised);color:var(--dim);border-color:var(--line2)}
+.v-g{background:rgba(16,185,129,0.1);color:#34d399;border-color:rgba(16,185,129,0.2)}
+.v-r{background:rgba(239,68,68,0.1);color:#f87171;border-color:rgba(239,68,68,0.2)}
+.v-y{background:rgba(245,158,11,0.1);color:#fbbf24;border-color:rgba(245,158,11,0.2)}
+.v-b{background:rgba(59,130,246,0.1);color:#60a5fa;border-color:rgba(59,130,246,0.2)}
+.v-p{background:var(--pdim);color:var(--purple);border-color:rgba(139,92,246,0.2)}
+.v-n{background:rgba(255,255,255,0.05);color:var(--sub);border-color:rgba(255,255,255,0.1)}
 
 /* METRIC BAR */
 .mbar{display:flex;align-items:center;gap:.65rem;margin-bottom:.45rem}
@@ -143,44 +194,45 @@ nav{position:fixed;top:0;left:0;right:0;z-index:500;height:58px;display:flex;ali
 /* ═══ HOME HERO ═══ */
 .hero{padding:5.5rem 2rem 4rem;max-width:1300px;margin:0 auto;display:grid;grid-template-columns:1fr 420px;gap:4.5rem;align-items:center}
 .hero-l{animation:fadeUp .6s ease both}
-.hero-kicker{display:inline-flex;align-items:center;gap:.45rem;background:var(--gdim);border:1px solid var(--gmid);color:var(--green);font-family:var(--mono);font-size:.65rem;padding:.28rem .88rem;border-radius:100px;margin-bottom:2rem}
-.hero-kicker::before{content:'';width:5px;height:5px;border-radius:50%;background:var(--green);animation:pulse 2s infinite}
+.hero-kicker{display:inline-flex;align-items:center;gap:.45rem;background:var(--bdim);border:1px solid var(--bmid);color:var(--blue);font-family:var(--mono);font-size:.65rem;padding:.28rem .88rem;border-radius:100px;margin-bottom:2rem}
+.hero-kicker::before{content:'';width:5px;height:5px;border-radius:50%;background:var(--blue);animation:pulse 2s infinite}
 .hero h1{font-family:var(--display);font-size:clamp(2.8rem,5.5vw,5rem);font-weight:800;line-height:.98;letter-spacing:-.04em;color:var(--white);margin-bottom:1.35rem}
 .hero h1 .line2{color:var(--muted)}
-.hero h1 .acc{color:var(--green);font-style:italic}
+.hero h1 .acc{color:var(--blue);font-style:italic}
 .hero-sub{font-size:1rem;color:var(--sub);line-height:1.8;margin-bottom:2rem;font-weight:300;max-width:480px}
 .hero-sub strong{color:var(--text);font-weight:500}
 
 /* SEARCH — location aware */
 .search-wrap{background:var(--card);border:1px solid var(--line2);border-radius:12px;overflow:hidden;transition:border-color .2s,box-shadow .2s;animation:fadeUp .6s .08s ease both}
-.search-wrap:focus-within{border-color:var(--green);box-shadow:0 0 0 3px var(--gdim)}
+.search-wrap:focus-within{border-color:var(--blue);box-shadow:0 0 0 3px var(--bdim)}
 .search-row{display:flex;align-items:stretch}
 .search-field{display:flex;align-items:center;flex:1;padding:0 1.15rem;gap:.6rem;border-right:1px solid var(--line)}
 .search-field-icon{color:var(--muted);font-size:.9rem;flex-shrink:0}
-.search-inp{background:transparent;border:none;outline:none;padding:1rem 0;color:var(--white);font-family:var(--body);font-size:.9rem;width:100%;caret-color:var(--green)}
+.search-inp{background:transparent;border:none;outline:none;padding:1rem 0;color:var(--white);font-family:var(--body);font-size:.9rem;width:100%;caret-color:var(--blue)}
 .search-inp::placeholder{color:var(--muted)}
 .search-loc{display:flex;align-items:center;gap:.5rem;padding:0 1rem;width:185px;border-right:1px solid var(--line)}
-.loc-inp{background:transparent;border:none;outline:none;color:var(--white);font-family:var(--mono);font-size:.75rem;width:100%;caret-color:var(--green);padding:1rem 0}
+.loc-inp{background:transparent;border:none;outline:none;color:var(--white);font-family:var(--mono);font-size:.75rem;width:100%;caret-color:var(--blue);padding:1rem 0}
 .loc-inp::placeholder{color:var(--muted)}
-.search-btn{background:var(--green);color:var(--ink);border:none;padding:0 1.5rem;font-family:var(--display);font-weight:800;font-size:.8rem;cursor:pointer;transition:background .15s;letter-spacing:.01em;white-space:nowrap}
-.search-btn:hover{background:#00ffaa}
+.search-btn{background:linear-gradient(135deg,#1d4ed8 0%,#7c3aed 55%,#a855f7 100%);color:#fff;border:none;padding:0 1.5rem;font-family:var(--display);font-weight:800;font-size:.8rem;cursor:pointer;transition:all .2s ease;letter-spacing:.01em;white-space:nowrap;box-shadow:0 0 24px rgba(124,58,237,0.35)}
+.search-btn:hover{background:linear-gradient(135deg,#3b82f6 0%,#8b5cf6 55%,#c084fc 100%);box-shadow:0 0 40px rgba(124,58,237,0.55)}
 
 .quick-wrap{display:flex;gap:.35rem;flex-wrap:wrap;margin-top:.65rem;animation:fadeUp .6s .12s ease both}
 .qtag{background:transparent;border:1px solid var(--line2);color:var(--dim);font-family:var(--mono);font-size:.62rem;padding:.2rem .58rem;border-radius:6px;cursor:pointer;transition:all .15s}
-.qtag:hover{border-color:var(--green);color:var(--green)}
+.qtag:hover{border-color:var(--blue);color:var(--blue)}
 
 .hero-stats{display:flex;gap:2.5rem;margin-top:2.25rem;padding-top:2rem;border-top:1px solid var(--line);animation:fadeUp .6s .18s ease both}
 .hs-n{font-family:var(--mono);font-size:1.65rem;font-weight:500;color:var(--white);display:block;line-height:1;letter-spacing:-.03em}
 .hs-l{font-size:.65rem;color:var(--muted);margin-top:.25rem;font-weight:300}
 
 /* HERO TERMINAL */
-.hero-terminal{background:var(--card);border:1px solid var(--line2);border-radius:14px;overflow:hidden;animation:fadeUp .7s .1s ease both;position:relative}
-.hero-terminal::before{content:'';position:absolute;top:-40px;right:-40px;width:160px;height:160px;background:radial-gradient(circle,var(--green) 0%,transparent 70%);opacity:.04;pointer-events:none}
+.hero-terminal{background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.12);border-radius:18px;overflow:hidden;animation:fadeUp .7s .1s ease both;position:relative;box-shadow:0 16px 56px rgba(0,0,0,0.55),0 0 60px rgba(59,130,246,0.12),inset 0 1px 0 rgba(255,255,255,0.07)}
+.hero-terminal::before{content:'';position:absolute;bottom:0;left:0;right:0;height:55%;background:linear-gradient(to top,rgba(29,78,216,0.2) 0%,rgba(124,58,237,0.12) 35%,rgba(8,145,178,0.04) 65%,transparent 100%);pointer-events:none;z-index:0}
+.hero-terminal>*{position:relative;z-index:1}
 .ht-bar{display:flex;align-items:center;gap:.38rem;padding:.78rem 1rem;border-bottom:1px solid var(--line);background:var(--raised)}
 .ht-dot{width:8px;height:8px;border-radius:50%}
 .ht-url{font-family:var(--mono);font-size:.62rem;color:var(--dim);margin-left:.3rem;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.ht-status{display:flex;align-items:center;gap:.3rem;font-family:var(--mono);font-size:.58rem;color:var(--green)}
-.ht-status::before{content:'';width:4px;height:4px;border-radius:50%;background:var(--green);animation:pulse 1.5s infinite}
+.ht-status{display:flex;align-items:center;gap:.3rem;font-family:var(--mono);font-size:.58rem;color:var(--blue)}
+.ht-status::before{content:'';width:4px;height:4px;border-radius:50%;background:var(--blue);animation:pulse 1.5s infinite}
 .ht-body{padding:1.2rem}
 .ht-loc{display:inline-flex;align-items:center;gap:.3rem;background:var(--bdim);border:1px solid #4b9eff20;border-radius:4px;padding:.18rem .52rem;font-family:var(--mono);font-size:.58rem;color:var(--blue);margin-bottom:.75rem}
 .ht-co{font-family:var(--display);font-size:1.15rem;font-weight:800;color:var(--white);margin-bottom:.12rem;letter-spacing:-.02em}
@@ -199,7 +251,7 @@ nav{position:fixed;top:0;left:0;right:0;z-index:500;height:58px;display:flex;ali
 
 /* ═══ COMPANY SCORE LEADERBOARD ═══ */
 .leaderboard-sec{border-top:1px solid var(--line);border-bottom:1px solid var(--line);padding:4.5rem 2rem;background:var(--void);position:relative;overflow:hidden}
-.leaderboard-sec::before{content:'';position:absolute;top:-100px;left:50%;transform:translateX(-50%);width:600px;height:300px;background:radial-gradient(ellipse,rgba(0,255,135,.03) 0%,transparent 70%);pointer-events:none}
+.leaderboard-sec::before{content:'';position:absolute;top:-100px;left:50%;transform:translateX(-50%);width:700px;height:400px;background:radial-gradient(ellipse,rgba(59,130,246,.15) 0%,rgba(139,92,246,0.06) 40%,transparent 70%);pointer-events:none;filter:blur(40px)}
 .ldr-inner{max-width:1300px;margin:0 auto}
 .ldr-hdr{display:flex;align-items:flex-end;justify-content:space-between;margin-bottom:2rem}
 .ldr-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:1px;background:var(--line);border:1px solid var(--line);border-radius:12px;overflow:hidden}
@@ -230,11 +282,17 @@ nav{position:fixed;top:0;left:0;right:0;z-index:500;height:58px;display:flex;ali
 .feat-sec{padding:4rem 1.5rem;max-width:1200px;margin:0 auto}
 .feat-hdr{display:flex;align-items:flex-end;justify-content:space-between;margin-bottom:1.5rem}
 .jgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:.75rem}
-.jcard{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:1.1rem 1.15rem;cursor:pointer;transition:all .18s;display:flex;flex-direction:column;gap:.6rem;position:relative;overflow:hidden}
-.jcard:hover{border-color:var(--line2);box-shadow:0 6px 24px rgba(0,0,0,.25)}
-.jcard.safe{border-left:2px solid var(--green)}
-.jcard.warn{border-left:2px solid var(--amber)}
-.jcard.danger{border-left:2px solid var(--red)}
+.jcard{background:rgba(255,255,255,0.035);border:1px solid rgba(255,255,255,0.09);border-radius:16px;padding:1.1rem 1.15rem;cursor:pointer;transition:all 0.25s ease;display:flex;flex-direction:column;gap:.6rem;position:relative;overflow:hidden;backdrop-filter:blur(16px);box-shadow:0 4px 24px rgba(0,0,0,0.3),inset 0 1px 0 rgba(255,255,255,0.05)}
+.jcard::after{content:'';position:absolute;bottom:0;left:0;right:0;height:50%;background:linear-gradient(to top,rgba(29,78,216,0.12) 0%,rgba(124,58,237,0.07) 40%,transparent 100%);pointer-events:none;border-radius:0 0 16px 16px;opacity:0;transition:opacity 0.25s ease}
+.jcard:hover::after{opacity:1}
+/* Risk-tinted neon glow — resting state */
+.jcard.safe{border-left:2px solid var(--green);box-shadow:0 4px 24px rgba(0,0,0,0.35),0 0 18px rgba(16,185,129,0.14),inset 0 1px 0 rgba(255,255,255,0.05)}
+.jcard.warn{border-left:2px solid var(--amber);box-shadow:0 4px 24px rgba(0,0,0,0.35),0 0 18px rgba(245,158,11,0.14),inset 0 1px 0 rgba(255,255,255,0.05)}
+.jcard.danger{border-left:2px solid var(--red);box-shadow:0 4px 24px rgba(0,0,0,0.35),0 0 18px rgba(239,68,68,0.14),inset 0 1px 0 rgba(255,255,255,0.05)}
+/* Hover — glow intensifies to match risk */
+.jcard.safe:hover{background:rgba(255,255,255,0.05);border-color:rgba(16,185,129,0.5);box-shadow:0 12px 40px rgba(0,0,0,0.55),0 0 40px rgba(16,185,129,0.22),0 0 80px rgba(16,185,129,0.08);transform:translateY(-3px)}
+.jcard.warn:hover{background:rgba(255,255,255,0.05);border-color:rgba(245,158,11,0.5);box-shadow:0 12px 40px rgba(0,0,0,0.55),0 0 40px rgba(245,158,11,0.22),0 0 80px rgba(245,158,11,0.08);transform:translateY(-3px)}
+.jcard.danger:hover{background:rgba(255,255,255,0.05);border-color:rgba(239,68,68,0.5);box-shadow:0 12px 40px rgba(0,0,0,0.55),0 0 40px rgba(239,68,68,0.22),0 0 80px rgba(239,68,68,0.08);transform:translateY(-3px)}
 .jc-head{display:flex;align-items:flex-start;justify-content:space-between;gap:.65rem}
 .jc-logo{width:32px;height:32px;border-radius:7px;background:var(--raised);border:1px solid var(--line2);display:flex;align-items:center;justify-content:center;font-family:var(--display);font-weight:800;font-size:.72rem;color:var(--sub);flex-shrink:0}
 .jc-scores{display:flex;flex-direction:column;align-items:flex-end;gap:.1rem}
@@ -246,18 +304,18 @@ nav{position:fixed;top:0;left:0;right:0;z-index:500;height:58px;display:flex;ali
 .jc-loc{font-family:var(--mono);font-size:.58rem;color:var(--blue);display:flex;align-items:center;gap:.25rem}
 .jc-vibes{display:flex;gap:.22rem;flex-wrap:wrap}
 .jc-bot{display:flex;align-items:center;justify-content:space-between;margin-top:.2rem;padding-top:.6rem;border-top:1px solid var(--line)}
-.jc-sal{font-family:var(--mono);font-size:.68rem;color:var(--green);font-weight:500}
+.jc-sal{font-family:var(--mono);font-size:.68rem;color:var(--cyan);font-weight:500}
 
 /* ═══ HOW IT WORKS ═══ */
 .how-sec{padding:5rem 2rem;max-width:1300px;margin:0 auto}
 .how-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--line);border:1px solid var(--line);border-radius:14px;overflow:hidden;margin-top:2.5rem}
 .how-card{background:var(--card);padding:2rem 1.75rem}
-.how-n{font-family:var(--mono);font-size:.6rem;color:var(--green);letter-spacing:.06em;margin-bottom:1.1rem;display:flex;align-items:center;gap:.4rem}
+.how-n{font-family:var(--mono);font-size:.6rem;color:var(--blue);letter-spacing:.06em;margin-bottom:1.1rem;display:flex;align-items:center;gap:.4rem}
 .how-n::after{content:'';flex:1;height:1px;background:var(--line2)}
 .how-icon{font-size:1.4rem;margin-bottom:.75rem;display:block}
 .how-h{font-family:var(--display);font-size:1rem;font-weight:700;color:var(--white);margin-bottom:.45rem;letter-spacing:-.02em}
 .how-p{font-size:.78rem;color:var(--sub);font-weight:300;line-height:1.72}
-.how-tag{display:inline-flex;align-items:center;font-family:var(--mono);font-size:.55rem;background:var(--gdim);color:var(--green);border:1px solid var(--gmid);border-radius:3px;padding:.1rem .35rem;margin-top:.6rem}
+.how-tag{display:inline-flex;align-items:center;font-family:var(--mono);font-size:.55rem;background:var(--bdim);color:var(--blue);border:1px solid var(--bmid);border-radius:3px;padding:.1rem .35rem;margin-top:.6rem}
 
 /* ═══ WHAT WE DO DIFFERENTLY ═══ */
 .diff-sec{background:var(--void);border-top:1px solid var(--line);border-bottom:1px solid var(--line);padding:5rem 2rem}
@@ -267,7 +325,7 @@ nav{position:fixed;top:0;left:0;right:0;z-index:500;height:58px;display:flex;ali
 .diff-item:hover{background:var(--raised)}
 .diff-us{font-family:var(--display);font-size:1.05rem;font-weight:700;color:var(--white);margin-bottom:.5rem;letter-spacing:-.02em}
 .diff-desc{font-size:.8rem;color:var(--sub);font-weight:300;line-height:1.72}
-.diff-winner{display:inline-flex;align-items:center;font-family:var(--mono);font-size:.6rem;background:var(--gdim);color:var(--green);border:1px solid var(--gmid);padding:.2rem .6rem;border-radius:4px;margin-top:.85rem}
+.diff-winner{display:inline-flex;align-items:center;font-family:var(--mono);font-size:.6rem;background:var(--bdim);color:var(--blue);border:1px solid var(--bmid);padding:.2rem .6rem;border-radius:4px;margin-top:.85rem}
 
 /* ═══ JOBS PAGE ═══ */
 .jpage{max-width:1300px;margin:0 auto;padding:2.5rem 2rem}
@@ -275,8 +333,8 @@ nav{position:fixed;top:0;left:0;right:0;z-index:500;height:58px;display:flex;ali
 .jpage-hdr h1{font-family:var(--display);font-size:2rem;font-weight:800;color:var(--white);letter-spacing:-.03em;margin-bottom:.28rem}
 .jpage-hdr p{color:var(--sub);font-size:.82rem;font-weight:300}
 .jsb{display:flex;gap:.55rem;margin-bottom:1.35rem;flex-wrap:wrap}
-.jsi{background:var(--card);border:1px solid var(--line2);border-radius:8px;padding:.68rem .95rem;color:var(--white);font-family:var(--body);font-size:.83rem;outline:none;transition:border-color .2s,box-shadow .2s;caret-color:var(--green)}
-.jsi:focus{border-color:var(--green);box-shadow:0 0 0 2px var(--gdim)}
+.jsi{background:var(--card);border:1px solid var(--line2);border-radius:8px;padding:.68rem .95rem;color:var(--white);font-family:var(--body);font-size:.83rem;outline:none;transition:border-color .2s,box-shadow .2s;caret-color:var(--blue)}
+.jsi:focus{border-color:var(--blue);box-shadow:0 0 0 2px var(--bdim)}
 .jsi::placeholder{color:var(--muted)}
 .jsi.flex1{flex:1}
 .jlay{display:grid;grid-template-columns:220px 1fr;gap:1.35rem}
@@ -284,18 +342,22 @@ nav{position:fixed;top:0;left:0;right:0;z-index:500;height:58px;display:flex;ali
 .fh{font-family:var(--mono);font-size:.58rem;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin-bottom:.55rem;margin-top:.85rem}
 .fh:first-child{margin-top:0}
 .fo{display:flex;align-items:center;gap:.4rem;margin-bottom:.3rem;cursor:pointer;font-size:.78rem;color:var(--sub)}
-.fo input{accent-color:var(--green)}
+.fo input{accent-color:var(--blue)}
 .fc{font-family:var(--mono);font-size:.6rem;color:var(--muted);margin-left:auto}
 .rng label{font-size:.75rem;color:var(--sub);display:flex;justify-content:space-between;margin-bottom:.2rem}
-.rng label span{font-family:var(--mono);color:var(--green)}
-.rng input{width:100%;accent-color:var(--green)}
+.rng label span{font-family:var(--mono);color:var(--blue)}
+.rng input{width:100%;accent-color:var(--blue)}
 .jtb{display:flex;align-items:center;justify-content:space-between;margin-bottom:.85rem}
 .jct{font-family:var(--mono);font-size:.68rem;color:var(--muted)}
 .jss{background:var(--card);border:1px solid var(--line2);border-radius:6px;padding:.33rem .68rem;font-family:var(--mono);font-size:.68rem;color:var(--sub);outline:none;cursor:pointer}
 .jlist{border:1px solid var(--line);border-radius:12px;overflow:hidden}
-.jlc{display:flex;flex-direction:column;padding:1.05rem 1.3rem;border-bottom:1px solid var(--line);cursor:pointer;transition:background .12s}
+.jlc{display:flex;flex-direction:column;padding:1.05rem 1.3rem;border-bottom:1px solid var(--line);cursor:pointer;transition:all 0.18s ease;position:relative}
 .jlc:last-child{border-bottom:none}
-.jlc:hover{background:var(--raised)}
+.jlc:hover{background:rgba(255,255,255,0.03)}
+/* Risk neon on list cards */
+.jlc.safe:hover{box-shadow:inset 0 0 0 1px rgba(16,185,129,0.15),0 0 20px rgba(16,185,129,0.07)}
+.jlc.warn:hover{box-shadow:inset 0 0 0 1px rgba(245,158,11,0.15),0 0 20px rgba(245,158,11,0.07)}
+.jlc.danger:hover{box-shadow:inset 0 0 0 1px rgba(239,68,68,0.15),0 0 20px rgba(239,68,68,0.07)}
 .jlc-top{display:flex;align-items:flex-start;justify-content:space-between;gap:.75rem;margin-bottom:.3rem}
 .jlc-title{font-family:var(--display);font-size:.95rem;font-weight:700;color:var(--white);letter-spacing:-.02em;flex:1}
 .jlc-score-badge{display:flex;flex-direction:column;align-items:center;flex-shrink:0}
@@ -306,12 +368,12 @@ nav{position:fixed;top:0;left:0;right:0;z-index:500;height:58px;display:flex;ali
 .jlc-loc{font-family:var(--mono);font-size:.62rem;color:var(--blue);margin-bottom:.32rem}
 .jlc-meta{display:flex;gap:.5rem;flex-wrap:wrap;align-items:center;margin-bottom:.65rem}
 .jlc-mi{font-family:var(--mono);font-size:.6rem;color:var(--muted)}
-.jlc-sal{font-family:var(--mono);font-size:.7rem;color:var(--green)}
+.jlc-sal{font-family:var(--mono);font-size:.7rem;color:var(--cyan)}
 .jlc-actions{display:flex;gap:.5rem;align-items:center}
-.jlc-apply{flex:1;background:var(--green);color:var(--ink);border:none;border-radius:8px;padding:.6rem 1rem;font-family:var(--display);font-weight:800;font-size:.8rem;cursor:pointer;text-align:center;transition:opacity .15s}
-.jlc-apply:hover{opacity:.88}
+.jlc-apply{flex:1;background:linear-gradient(135deg,#1d4ed8 0%,#7c3aed 55%,#a855f7 100%);color:#fff;border:none;border-radius:8px;padding:.6rem 1rem;font-family:var(--display);font-weight:800;font-size:.8rem;cursor:pointer;text-align:center;transition:all .2s ease;box-shadow:0 0 20px rgba(124,58,237,0.3)}
+.jlc-apply:hover{box-shadow:0 0 36px rgba(124,58,237,0.52);transform:translateY(-1px)}
 .jlc-save{background:none;border:1px solid var(--line2);color:var(--muted);border-radius:8px;padding:.6rem .75rem;font-size:.8rem;cursor:pointer;flex-shrink:0;transition:all .15s}
-.jlc-save:hover{border-color:var(--green);color:var(--green)}
+.jlc-save:hover{border-color:var(--blue);color:var(--blue)}
 .jlc-save[data-saved="1"]{background:rgba(255,59,92,.13);color:#ff3b5c;border-color:#ff3b5c}
 .jlc-save[data-saved="1"]:hover{background:rgba(255,59,92,.22);color:#ff3b5c;border-color:#ff3b5c}
 .jlc-waste-badge{font-family:var(--mono);font-size:.58rem}
@@ -351,18 +413,18 @@ nav{position:fixed;top:0;left:0;right:0;z-index:500;height:58px;display:flex;ali
 .resume-layout{display:grid;grid-template-columns:1fr 1fr;gap:1.25rem}
 .rpanel{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:1.75rem}
 .rpanel-title{font-family:var(--mono);font-size:.6rem;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin-bottom:1.15rem;padding-bottom:.8rem;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between}
-.rp-live{display:flex;align-items:center;gap:.3rem;color:var(--green);font-size:.58rem}
-.rp-live::before{content:'';width:4px;height:4px;border-radius:50%;background:var(--green);animation:pulse 1.5s infinite}
+.rp-live{display:flex;align-items:center;gap:.3rem;color:var(--blue);font-size:.58rem}
+.rp-live::before{content:'';width:4px;height:4px;border-radius:50%;background:var(--blue);animation:pulse 1.5s infinite}
 .fg{margin-bottom:1rem}
 .fl{display:block;font-family:var(--mono);font-size:.62rem;text-transform:uppercase;letter-spacing:.07em;color:var(--dim);margin-bottom:.38rem}
-.fi,.fs{width:100%;background:var(--raised);border:1px solid var(--line2);border-radius:8px;padding:.68rem .95rem;color:var(--white);font-family:var(--body);font-size:.85rem;outline:none;transition:border-color .2s,box-shadow .2s;appearance:none;caret-color:var(--green)}
-.fi:focus,.fs:focus{border-color:var(--green);box-shadow:0 0 0 2px var(--gdim)}
+.fi,.fs{width:100%;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.1);border-radius:10px;padding:.68rem .95rem;color:var(--white);font-family:var(--body);font-size:.85rem;outline:none;transition:border-color .2s,box-shadow .2s;appearance:none;caret-color:var(--blue)}
+.fi:focus,.fs:focus{border-color:var(--blue);box-shadow:0 0 0 1px rgba(59,130,246,0.4),0 0 20px rgba(59,130,246,0.15)}
 .fi::placeholder{color:var(--muted)}
-.rta{width:100%;background:var(--raised);border:1px solid var(--line2);border-radius:8px;padding:.75rem .95rem;color:var(--white);font-family:var(--mono);font-size:.7rem;outline:none;resize:vertical;line-height:1.65;min-height:130px;transition:border-color .2s;caret-color:var(--green)}
-.rta:focus{border-color:var(--green);box-shadow:0 0 0 2px var(--gdim)}
+.rta{width:100%;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.1);border-radius:10px;padding:.75rem .95rem;color:var(--white);font-family:var(--mono);font-size:.7rem;outline:none;resize:vertical;line-height:1.65;min-height:130px;transition:border-color .2s,box-shadow .2s;caret-color:var(--blue)}
+.rta:focus{border-color:var(--blue);box-shadow:0 0 0 1px rgba(59,130,246,0.4),0 0 20px rgba(59,130,246,0.15)}
 .rta::placeholder{color:var(--muted)}
-.analyze-btn{width:100%;padding:.9rem;background:var(--green);color:var(--ink);border:none;border-radius:8px;font-family:var(--display);font-weight:800;font-size:.9rem;letter-spacing:.01em;cursor:pointer;transition:all .15s;margin-top:.5rem}
-.analyze-btn:hover{background:#00ffaa;transform:translateY(-1px);box-shadow:0 6px 28px var(--gmid)}
+.analyze-btn{width:100%;padding:.9rem;background:linear-gradient(135deg,#1d4ed8 0%,#7c3aed 55%,#a855f7 100%);color:#fff;border:none;border-radius:8px;font-family:var(--display);font-weight:800;font-size:.9rem;letter-spacing:.01em;cursor:pointer;transition:all .2s ease;margin-top:.5rem;box-shadow:0 0 24px rgba(124,58,237,0.32)}
+.analyze-btn:hover{background:linear-gradient(135deg,#3b82f6 0%,#8b5cf6 55%,#c084fc 100%);transform:translateY(-1px);box-shadow:0 0 40px rgba(124,58,237,0.52)}
 .analyze-btn:disabled{opacity:.45;cursor:not-allowed;transform:none}
 .r-empty{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:380px;color:var(--muted);text-align:center;gap:.65rem}
 .r-empty-icon{font-size:2.5rem;opacity:.35;animation:float 3s ease infinite}
@@ -389,7 +451,9 @@ nav{position:fixed;top:0;left:0;right:0;z-index:500;height:58px;display:flex;ali
 .cow{max-width:1000px;margin:0 auto;padding:2.5rem 2rem}
 .back-btn{background:none;border:none;color:var(--dim);font-family:var(--mono);font-size:.68rem;cursor:pointer;margin-bottom:1.5rem;display:flex;align-items:center;gap:.38rem;transition:color .15s}
 .back-btn:hover{color:var(--sub)}
-.co-hdr{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:2rem;margin-bottom:1.15rem}
+.co-hdr{background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.1);border-radius:18px;padding:2rem;margin-bottom:1.15rem;position:relative;overflow:hidden;box-shadow:0 12px 48px rgba(0,0,0,0.5),inset 0 1px 0 rgba(255,255,255,0.07)}
+.co-hdr::after{content:'';position:absolute;bottom:0;left:0;right:0;height:50%;background:linear-gradient(to top,rgba(29,78,216,0.14) 0%,rgba(124,58,237,0.08) 35%,rgba(8,145,178,0.03) 65%,transparent 100%);pointer-events:none;z-index:0}
+.co-hdr>*{position:relative;z-index:1}
 .co-top{display:flex;align-items:flex-start;gap:1.25rem;margin-bottom:1.75rem}
 .co-logo-lg{width:54px;height:54px;border-radius:11px;background:var(--raised);border:1px solid var(--line2);display:flex;align-items:center;justify-content:center;font-family:var(--display);font-size:1.3rem;font-weight:800;color:var(--sub);flex-shrink:0}
 .co-name{font-family:var(--display);font-size:2rem;font-weight:800;color:var(--white);letter-spacing:-.04em;margin-bottom:.12rem}
@@ -397,17 +461,17 @@ nav{position:fixed;top:0;left:0;right:0;z-index:500;height:58px;display:flex;ali
 .co-loc-tag{display:inline-flex;align-items:center;gap:.28rem;background:var(--bdim);border:1px solid #4b9eff20;border-radius:4px;padding:.18rem .55rem;font-family:var(--mono);font-size:.6rem;color:var(--blue);margin-bottom:.5rem}
 .co-mets{display:grid;grid-template-columns:repeat(6,1fr);gap:1px;background:var(--line);border:1px solid var(--line);border-radius:8px;overflow:hidden}
 .co-m{background:var(--raised);padding:.88rem .65rem;text-align:center}
-.co-grade-bar{display:flex;align-items:center;gap:.85rem;border:1px solid;border-radius:10px;padding:.7rem 1.1rem;margin-bottom:.85rem}
-.co-grade-bar.safe{border-color:#00ff8730;box-shadow:0 0 18px rgba(0,255,135,.07);background:var(--raised)}
-.co-grade-bar.warn{border-color:#ffb83030;box-shadow:0 0 18px rgba(255,184,48,.07);background:var(--raised)}
-.co-grade-bar.danger{border-color:#ff3b5c30;box-shadow:0 0 18px rgba(255,59,92,.07);background:var(--raised)}
+.co-grade-bar{display:flex;align-items:center;gap:1rem;padding:1.1rem 1.25rem;border-radius:14px;border:1px solid rgba(255,255,255,0.08);background:rgba(255,255,255,0.03);backdrop-filter:blur(16px);margin-bottom:1rem}
+.co-grade-bar.safe{border-color:rgba(16,185,129,0.35);background:rgba(16,185,129,0.08);box-shadow:0 0 40px rgba(16,185,129,0.2),0 0 80px rgba(16,185,129,0.08)}
+.co-grade-bar.warn{border-color:rgba(245,158,11,0.35);background:rgba(245,158,11,0.08);box-shadow:0 0 40px rgba(245,158,11,0.2),0 0 80px rgba(245,158,11,0.08)}
+.co-grade-bar.danger{border-color:rgba(239,68,68,0.35);background:rgba(239,68,68,0.08);box-shadow:0 0 40px rgba(239,68,68,0.2),0 0 80px rgba(239,68,68,0.08)}
 .co-grade-letter{font-family:var(--display);font-weight:800;font-size:2.4rem;line-height:1;letter-spacing:-.04em;flex-shrink:0}
 .co-grade-letter.safe{color:var(--green)}.co-grade-letter.warn{color:var(--amber)}.co-grade-letter.danger{color:var(--red)}
 .co-grade-lbl{font-family:var(--mono);font-size:.4rem;text-transform:uppercase;letter-spacing:.13em;color:var(--muted);display:block;margin-bottom:.15rem}
 .co-grade-score{font-family:var(--mono);font-size:.68rem;color:var(--text);display:block}
 .co-verified{display:inline-flex;align-items:center;gap:.28rem;background:var(--gdim);border:1px solid #00ff8730;border-radius:100px;padding:.2rem .6rem;font-family:var(--mono);font-size:.58rem;color:var(--green)}
 .co-share-btn{background:none;border:1px solid var(--line2);border-radius:8px;padding:.3rem .75rem;font-family:var(--mono);font-size:.6rem;color:var(--sub);cursor:pointer;transition:all .15s;display:inline-flex;align-items:center;gap:.28rem}
-.co-share-btn:hover{border-color:var(--green);color:var(--green)}
+.co-share-btn:hover{border-color:var(--blue);color:var(--blue)}
 .co-live{display:inline-flex;align-items:center;gap:.32rem;font-family:var(--mono);font-size:.58rem;color:var(--muted)}
 .co-live::before{content:'';width:5px;height:5px;border-radius:50%;background:var(--green);animation:pulse 1.5s infinite;flex-shrink:0}
 .co-alarm{background:var(--rdim)!important}
@@ -416,11 +480,11 @@ nav{position:fixed;top:0;left:0;right:0;z-index:500;height:58px;display:flex;ali
 .co-ml{font-family:var(--mono);font-size:.5rem;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);margin-top:.18rem}
 .agg-bar{display:flex;align-items:center;gap:1.1rem;padding:.65rem .95rem;background:var(--bdim);border:1px solid #4b9eff18;border-radius:8px;margin-bottom:1.15rem;flex-wrap:wrap}
 .agg-item{display:flex;align-items:center;gap:.38rem;font-family:var(--mono);font-size:.6rem;color:var(--blue)}
-.agg-dot{width:5px;height:5px;border-radius:50%;background:var(--green);animation:pulse 1.5s infinite}
+.agg-dot{width:5px;height:5px;border-radius:50%;background:var(--blue);animation:pulse 1.5s infinite}
 .co-tabs{display:flex;gap:.08rem;border-bottom:1px solid var(--line);margin-bottom:1.35rem}
 .ctab{background:none;border:none;padding:.62rem .95rem;font-family:var(--body);font-size:.77rem;font-weight:500;color:var(--dim);cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px;transition:all .15s}
 .ctab:hover{color:var(--sub)}
-.ctab.active{color:var(--white);border-bottom-color:var(--green)}
+.ctab.active{color:var(--white);border-bottom-color:var(--blue)}
 .ctc{display:none}.ctc.active{display:block;animation:fadeIn .18s ease}
 .rcard{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:1.15rem;margin-bottom:.65rem}
 .rc-hd{display:flex;align-items:center;gap:.65rem;margin-bottom:.65rem}
@@ -437,17 +501,17 @@ nav{position:fixed;top:0;left:0;right:0;z-index:500;height:58px;display:flex;ali
 .fblock{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:1.65rem;margin-bottom:.8rem}
 .fb-hd{font-family:var(--mono);font-size:.6rem;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin-bottom:1.1rem;padding-bottom:.75rem;border-bottom:1px solid var(--line)}
 .f2{display:grid;grid-template-columns:1fr 1fr;gap:.75rem}
-.fi-r,.fs-r,.ft-r{width:100%;background:var(--raised);border:1px solid var(--line2);border-radius:8px;padding:.65rem .9rem;color:var(--white);font-family:var(--body);font-size:.84rem;outline:none;transition:border-color .2s;appearance:none;caret-color:var(--green)}
-.fi-r:focus,.fs-r:focus,.ft-r:focus{border-color:var(--green);box-shadow:0 0 0 2px var(--gdim)}
+.fi-r,.fs-r,.ft-r{width:100%;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.1);border-radius:10px;padding:.65rem .9rem;color:var(--white);font-family:var(--body);font-size:.84rem;outline:none;transition:border-color .2s,box-shadow .2s;appearance:none;caret-color:var(--blue)}
+.fi-r:focus,.fs-r:focus,.ft-r:focus{border-color:var(--blue);box-shadow:0 0 0 1px rgba(59,130,246,0.4),0 0 20px rgba(59,130,246,0.15)}
 .fi-r::placeholder,.ft-r::placeholder{color:var(--muted)}
 .ft-r{min-height:80px;resize:vertical;line-height:1.6;font-family:var(--body)}
 .radio-row{display:grid;grid-template-columns:1fr 1fr;gap:.38rem}
 .rb input{display:none}
 .rl{display:block;text-align:center;padding:.58rem;border:1px solid var(--line2);border-radius:7px;font-size:.76rem;font-weight:500;cursor:pointer;transition:all .15s;background:var(--raised);color:var(--sub)}
-.rb input:checked+.rl{border-color:var(--green);background:var(--gdim);color:var(--green)}
-.sub-btn{width:100%;padding:.9rem;background:var(--green);color:var(--ink);border:none;border-radius:9px;font-family:var(--display);font-weight:800;font-size:.9rem;letter-spacing:.01em;cursor:pointer;transition:all .15s}
-.sub-btn:hover{background:#00ffaa;transform:translateY(-1px);box-shadow:0 6px 28px var(--gmid)}
-.ok-msg{display:none;background:var(--gdim);border:1px solid var(--gmid);color:var(--green);padding:.82rem 1rem;border-radius:8px;font-family:var(--mono);font-size:.7rem;text-align:center;margin-top:.8rem}
+.rb input:checked+.rl{border-color:var(--blue);background:var(--bdim);color:var(--blue)}
+.sub-btn{width:100%;padding:.9rem;background:linear-gradient(135deg,#1d4ed8 0%,#7c3aed 55%,#a855f7 100%);color:#fff;border:none;border-radius:9px;font-family:var(--display);font-weight:800;font-size:.9rem;letter-spacing:.01em;cursor:pointer;transition:all .2s ease;box-shadow:0 0 24px rgba(124,58,237,0.32)}
+.sub-btn:hover{background:linear-gradient(135deg,#3b82f6 0%,#8b5cf6 55%,#c084fc 100%);transform:translateY(-1px);box-shadow:0 0 40px rgba(124,58,237,0.5)}
+.ok-msg{display:none;background:var(--gdim);border:1px solid rgba(16,185,129,0.3);color:var(--green);padding:.82rem 1rem;border-radius:8px;font-family:var(--mono);font-size:.7rem;text-align:center;margin-top:.8rem}
 
 /* ═══ RECRUITERS ═══ */
 .rec-wrap{max-width:1100px;margin:0 auto;padding:4rem 2rem}
@@ -457,14 +521,14 @@ nav{position:fixed;top:0;left:0;right:0;z-index:500;height:58px;display:flex;ali
 .pgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--line);border:1px solid var(--line);border-radius:14px;overflow:hidden;margin-bottom:3rem}
 .pc{background:var(--card);padding:2rem}
 .pc.feat{background:var(--raised)}
-.pc-eye{font-family:var(--mono);font-size:.58rem;text-transform:uppercase;letter-spacing:.1em;color:var(--green);margin-bottom:1rem;display:block}
+.pc-eye{font-family:var(--mono);font-size:.58rem;text-transform:uppercase;letter-spacing:.1em;color:var(--blue);margin-bottom:1rem;display:block}
 .pc-nm{font-family:var(--display);font-size:1.1rem;font-weight:800;color:var(--white);margin-bottom:.28rem;letter-spacing:-.02em}
 .pc-pr{font-family:var(--mono);font-size:2.8rem;font-weight:500;line-height:1;color:var(--white);margin-bottom:.2rem}
 .pc-pr sup{font-size:1rem;vertical-align:super;font-family:var(--body);font-weight:300;color:var(--dim)}
 .pc-per{font-family:var(--mono);font-size:.65rem;color:var(--muted);margin-bottom:1.75rem}
 .pc-fs{list-style:none;margin-bottom:1.75rem}
 .pc-fs li{font-size:.8rem;color:var(--sub);padding:.42rem 0;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:.45rem;font-weight:300}
-.pc-fs li::before{content:'—';color:var(--green);font-family:var(--mono);font-size:.68rem;flex-shrink:0}
+.pc-fs li::before{content:'—';color:var(--blue);font-family:var(--mono);font-size:.68rem;flex-shrink:0}
 .pc-fs li:last-child{border-bottom:none}
 .rec-bot{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:3rem;text-align:center}
 .rec-bot h2{font-family:var(--display);font-size:2rem;font-weight:800;color:var(--white);letter-spacing:-.035em;margin-bottom:.65rem}
@@ -473,7 +537,7 @@ nav{position:fixed;top:0;left:0;right:0;z-index:500;height:58px;display:flex;ali
 /* MODAL */
 .modal-ov{display:none;position:fixed;inset:0;background:rgba(0,0,0,.82);backdrop-filter:blur(20px);z-index:800;align-items:flex-start;justify-content:center;padding-top:90px}
 .modal-ov.open{display:flex}
-.modal{background:var(--card);border:1px solid var(--line2);border-radius:16px;width:100%;max-width:720px;max-height:82vh;display:flex;flex-direction:column;box-shadow:0 40px 120px rgba(0,0,0,.7);animation:fadeUp .18s ease}
+.modal{background:rgba(12,15,26,0.92);border:1px solid rgba(255,255,255,0.1);border-radius:20px;width:100%;max-width:720px;max-height:82vh;display:flex;flex-direction:column;box-shadow:0 40px 120px rgba(0,0,0,.75),0 0 80px rgba(99,102,241,0.18),0 0 160px rgba(124,58,237,0.08);animation:fadeUp .18s ease;backdrop-filter:blur(24px)}
 .m-hdr{display:flex;align-items:center;justify-content:space-between;padding:1.2rem 1.5rem;border-bottom:1px solid var(--line);flex-shrink:0;background:var(--card);z-index:1;border-radius:16px 16px 0 0}
 .m-ti{font-family:var(--display);font-size:1rem;font-weight:800;color:var(--white);letter-spacing:-.02em}
 .m-cl{background:none;border:none;color:var(--dim);font-size:1.1rem;cursor:pointer;padding:.2rem;transition:color .15s}
@@ -483,7 +547,7 @@ nav{position:fixed;top:0;left:0;right:0;z-index:500;height:58px;display:flex;ali
 
 /* DISCLAIMER */
 .disc{background:var(--void);border-bottom:1px solid var(--line);padding:.45rem 2rem;text-align:center;font-family:var(--mono);font-size:.58rem;color:var(--muted)}
-.disc a{color:var(--green);text-decoration:none}
+.disc a{color:var(--blue);text-decoration:none}
 
 /* TOAST */
 .toast{position:fixed;bottom:1.4rem;left:50%;transform:translateX(-50%) translateY(60px);background:var(--raised);border:1px solid var(--line2);color:var(--sub);padding:.6rem 1.35rem;border-radius:9px;font-family:var(--mono);font-size:.7rem;z-index:9997;transition:all .22s ease;opacity:0;white-space:nowrap;box-shadow:0 8px 32px rgba(0,0,0,.4)}
@@ -510,7 +574,7 @@ nav{position:fixed;top:0;left:0;right:0;z-index:500;height:58px;display:flex;ali
 .stage-step{flex:1;padding:.32rem .2rem;text-align:center;font-family:var(--mono);font-size:.52rem;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);background:var(--raised);transition:all .2s;white-space:nowrap;border-right:1px solid var(--line2);cursor:default}
 .stage-step:last-child{border-right:none}
 .stage-step.done{background:var(--gdim);color:var(--green)}
-.stage-step.current{background:var(--green);color:var(--ink);font-weight:700}
+.stage-step.current{background:var(--blue);color:#fff;font-weight:700}
 .stage-step.ghosted-stage{background:var(--rdim);color:var(--red)}
 .stage-step.hired-stage{background:var(--gdim);color:var(--green);font-weight:700}
 
@@ -532,7 +596,7 @@ nav{position:fixed;top:0;left:0;right:0;z-index:500;height:58px;display:flex;ali
 .pipeline-col-hdr{font-family:var(--mono);font-size:.6rem;text-transform:uppercase;letter-spacing:.09em;color:var(--muted);margin-bottom:.55rem;display:flex;align-items:center;justify-content:space-between}
 .pipeline-col-count{background:var(--raised);border:1px solid var(--line2);border-radius:100px;padding:.08rem .45rem;font-size:.58rem;color:var(--dim)}
 .pipeline-mini-card{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:.75rem;margin-bottom:.45rem;cursor:pointer;transition:all .15s;font-size:.75rem}
-.pipeline-mini-card:hover{border-color:var(--green);background:var(--raised)}
+.pipeline-mini-card:hover{border-color:var(--blue);background:var(--raised)}
 .pipeline-mini-card .co{color:var(--dim);font-size:.65rem;margin-bottom:.15rem}
 .pipeline-mini-card .role{font-weight:600;color:var(--white);font-family:var(--display);font-size:.78rem;letter-spacing:-.01em;margin-bottom:.25rem}
 .pipeline-mini-card .days{font-family:var(--mono);font-size:.58rem}
@@ -548,7 +612,7 @@ nav{position:fixed;top:0;left:0;right:0;z-index:500;height:58px;display:flex;ali
 </style>
 </head>
 <body>
-
+<div class="aurora"><div class="aurora-3"></div></div>
 
 <!-- EMPLOYER SIDE PANEL -->
 <div id="employerPanel" style="position:fixed;top:0;right:-380px;bottom:0;width:380px;background:var(--surface);border-left:1px solid var(--line2);z-index:600;transition:right .3s cubic-bezier(.4,0,.2,1);display:flex;flex-direction:column;box-shadow:-12px 0 48px rgba(0,0,0,.5)">
@@ -607,7 +671,7 @@ nav{position:fixed;top:0;left:0;right:0;z-index:500;height:58px;display:flex;ali
   </div>
 
   <div style="padding:1.25rem 1.5rem;border-top:1px solid var(--line);display:flex;flex-direction:column;gap:.5rem;background:var(--raised)">
-    <button onclick="goToEmployerDashboard()" style="display:flex;align-items:center;justify-content:center;gap:.4rem;padding:.78rem 1rem;background:var(--green);color:var(--ink);border:none;border-radius:8px;font-family:var(--display);font-weight:800;font-size:.875rem;cursor:pointer;transition:all .15s;width:100%" onmouseover="this.style.background='#00ffaa'" onmouseout="this.style.background='var(--green)'">
+    <button onclick="goToEmployerDashboard()" style="display:flex;align-items:center;justify-content:center;gap:.4rem;padding:.78rem 1rem;background:linear-gradient(135deg,#3b82f6 0%,#8b5cf6 100%);color:#fff;border:none;border-radius:8px;font-family:var(--display);font-weight:800;font-size:.875rem;cursor:pointer;transition:all .2s ease;width:100%;box-shadow:0 0 20px rgba(59,130,246,0.3)" onmouseover="this.style.background='linear-gradient(135deg,#60a5fa 0%,#a78bfa 100%)';this.style.boxShadow='0 0 32px rgba(59,130,246,0.5)'" onmouseout="this.style.background='linear-gradient(135deg,#3b82f6 0%,#8b5cf6 100%)';this.style.boxShadow='0 0 20px rgba(59,130,246,0.3)'"">
       Open employer dashboard →
     </button>
     <button onclick="closeEmployerPanel();go('recruiters')" style="padding:.65rem 1rem;background:transparent;color:var(--sub);border:1px solid var(--line2);border-radius:8px;font-family:var(--body);font-weight:500;font-size:.82rem;cursor:pointer;transition:all .15s" onmouseover="this.style.borderColor='var(--muted)';this.style.color='var(--text)'" onmouseout="this.style.borderColor='var(--line2)';this.style.color='var(--sub)'">
@@ -625,7 +689,7 @@ nav{position:fixed;top:0;left:0;right:0;z-index:500;height:58px;display:flex;ali
 <!-- SIDE MENU -->
 <div class="side-menu" id="sideMenu">
   <div class="side-menu-logo">
-    <span style="width:8px;height:8px;border-radius:50%;background:var(--green);display:inline-block"></span>
+    <span style="width:8px;height:8px;border-radius:50%;background:var(--blue);box-shadow:0 0 10px rgba(59,130,246,0.6);display:inline-block"></span>
     <span style="font-family:var(--display);font-size:1.1rem;font-weight:800;color:var(--white);letter-spacing:-.02em">Seen</span>
     <button onclick="closeSideMenu()" style="margin-left:auto;background:none;border:none;color:var(--muted);cursor:pointer;font-size:1rem">✕</button>
   </div>
@@ -684,56 +748,40 @@ nav{position:fixed;top:0;left:0;right:0;z-index:500;height:58px;display:flex;ali
 ═══════════════════════════════════════ -->
 <div class="page-full active" id="page-landing" style="position:relative">
 
-  <!-- PHOTO BACKGROUND -->
-  <div style="position:absolute;inset:0;z-index:0;background:#0a0f0a">
-    <img
-      src="https://images.unsplash.com/photo-1497366216548-37526070297c?auto=format&fit=crop&w=1400&q=75"
-      alt=""
-      style="width:100%;height:100%;object-fit:cover;object-position:center 30%;filter:brightness(.38) saturate(.7)"
-    />
-    <!-- Gradient overlay -->
-    <div style="position:absolute;inset:0;background:linear-gradient(to bottom,rgba(7,7,10,.65) 0%,rgba(7,7,10,.2) 40%,rgba(7,7,10,.45) 70%,rgba(7,7,10,.95) 100%)"></div>
-    <!-- Green tint -->
-    <div style="position:absolute;inset:0;background:radial-gradient(ellipse at 50% 45%,rgba(0,255,135,.05) 0%,transparent 60%)"></div>
+  <!-- DEEP COSMOS MESH BACKGROUND -->
+  <div style="position:absolute;inset:0;z-index:0;background:
+    radial-gradient(ellipse at 18% 65%,rgba(29,78,216,0.38) 0%,transparent 52%),
+    radial-gradient(ellipse at 82% 28%,rgba(124,58,237,0.32) 0%,transparent 48%),
+    radial-gradient(ellipse at 55% 92%,rgba(8,145,178,0.16) 0%,transparent 42%),
+    radial-gradient(ellipse at 8% 12%,rgba(99,102,241,0.22) 0%,transparent 38%),
+    radial-gradient(ellipse at 72% 78%,rgba(139,92,246,0.14) 0%,transparent 40%),
+    #02040a">
+    <!-- Bottom fade to page background -->
+    <div style="position:absolute;inset:0;background:linear-gradient(to bottom,rgba(2,4,10,0.1) 0%,transparent 35%,transparent 60%,rgba(2,4,10,0.85) 88%,#02040a 100%)"></div>
   </div>
 
   <!-- TICKER — pinned to top below nav -->
   <div class="ticker-wrap" style="position:relative;z-index:2;flex-shrink:0">
-    <div class="ticker-track">
-      <span class="tick"><span class="tco">AMAZON</span><span class="tloc">Seattle</span><span class="ts danger">24</span></span><span class="tdiv">·</span>
-      <span class="tick"><span class="tco">STRIPE</span><span class="tloc">Remote</span><span class="ts safe">88</span></span><span class="tdiv">·</span>
-      <span class="tick"><span class="tco">LINEAR</span><span class="tloc">Remote</span><span class="ts safe">91</span></span><span class="tdiv">·</span>
-      <span class="tick"><span class="tco">MCDONALD'S</span><span class="tloc">Irvine, CA</span><span class="ts safe">74</span></span><span class="tdiv">·</span>
-      <span class="tick"><span class="tco">MCDONALD'S</span><span class="tloc">Chicago, IL</span><span class="ts danger">31</span></span><span class="tdiv">·</span>
-      <span class="tick"><span class="tco">ACCENTURE</span><span class="tloc">Chicago</span><span class="ts danger">29</span></span><span class="tdiv">·</span>
-      <span class="tick"><span class="tco">INDEED</span><span class="tloc">Austin</span><span class="ts danger">31</span></span><span class="tdiv">·</span>
-      <span class="tick"><span class="tco">AMAZON</span><span class="tloc">Seattle</span><span class="ts danger">24</span></span><span class="tdiv">·</span>
-      <span class="tick"><span class="tco">STRIPE</span><span class="tloc">Remote</span><span class="ts safe">88</span></span><span class="tdiv">·</span>
-      <span class="tick"><span class="tco">LINEAR</span><span class="tloc">Remote</span><span class="ts safe">91</span></span><span class="tdiv">·</span>
-      <span class="tick"><span class="tco">MCDONALD'S</span><span class="tloc">Irvine, CA</span><span class="ts safe">74</span></span><span class="tdiv">·</span>
-      <span class="tick"><span class="tco">MCDONALD'S</span><span class="tloc">Chicago, IL</span><span class="ts danger">31</span></span><span class="tdiv">·</span>
-      <span class="tick"><span class="tco">ACCENTURE</span><span class="tloc">Chicago</span><span class="ts danger">29</span></span><span class="tdiv">·</span>
-      <span class="tick"><span class="tco">INDEED</span><span class="tloc">Austin</span><span class="ts danger">31</span></span>
-    </div>
+    <div class="ticker-track" id="tickerTrack"></div>
   </div>
 
   <!-- MAIN CONTENT — fixed layout, nothing shifts -->
   <div style="position:relative;z-index:2;flex:1;display:flex;flex-direction:column;justify-content:center;align-items:center;padding:0 1.5rem;text-align:center">
 
     <!-- Kicker pill -->
-    <div style="display:inline-flex;align-items:center;gap:.4rem;background:rgba(0,255,135,.1);border:1px solid rgba(0,255,135,.2);color:var(--green);font-family:var(--mono);font-size:.63rem;padding:.25rem .85rem;border-radius:100px;margin-bottom:2rem;animation:fadeUp .5s ease both">
-      <span style="width:5px;height:5px;border-radius:50%;background:var(--green);animation:pulse 2s infinite;display:inline-block"></span>
+    <div style="display:inline-flex;align-items:center;gap:.4rem;background:rgba(59,130,246,0.1);border:1px solid rgba(59,130,246,0.2);color:var(--blue);font-family:var(--mono);font-size:.63rem;padding:.25rem .85rem;border-radius:100px;margin-bottom:2rem;animation:fadeUp .5s ease both">
+      <span style="width:5px;height:5px;border-radius:50%;background:var(--blue);animation:pulse 2s infinite;display:inline-block"></span>
       47,000+ companies scored · updated live
     </div>
 
-    <!-- HEADLINE — fixed height container, text swaps inside it -->
+    <!-- HEADLINE — 2-line rotating headline + static sub -->
     <div style="width:100%;max-width:680px;margin:0 auto;animation:fadeUp .5s .08s ease both">
-      <div id="heroHeadlineWrap" style="height:clamp(140px,38vw,300px);display:flex;flex-direction:column;justify-content:center;align-items:center;overflow:hidden">
-        <h1 id="rotatingHero" style="font-family:var(--display);font-size:clamp(1.9rem,5.5vw,4.8rem);font-weight:800;line-height:1.05;letter-spacing:-.03em;color:var(--white);text-shadow:0 2px 20px rgba(0,0,0,.5);margin:0;width:100%">
+      <div id="heroHeadlineWrap" style="height:clamp(150px,34vw,280px);display:flex;flex-direction:column;justify-content:center;align-items:center;overflow:visible">
+        <h1 id="rotatingHero" style="font-family:var(--display);font-size:clamp(2.2rem,7vw,5.2rem);font-weight:800;line-height:1.07;letter-spacing:-.035em;color:var(--white);text-shadow:0 2px 20px rgba(0,0,0,.5);margin:0 0 .6rem;width:100%">
           <span id="heroLine1" style="display:block"></span>
-          <span id="heroLine2" style="display:block"></span>
-          <span id="heroLine3" style="display:block;color:var(--green);font-style:italic"></span>
+          <span id="heroLine2" style="display:block;background:linear-gradient(135deg,#a5b4fc,#c084fc,#e879f9);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;font-style:italic"></span>
         </h1>
+        <div id="heroSub" style="font-family:var(--mono);font-size:clamp(.72rem,1.5vw,.9rem);color:rgba(255,255,255,.5);letter-spacing:.01em;line-height:1.5">Ghost rates · response times · hiring scores · 47,000+ companies</div>
       </div>
     </div>
 
@@ -782,7 +830,7 @@ nav{position:fixed;top:0;left:0;right:0;z-index:500;height:58px;display:flex;ali
   <div style="min-height:100vh;display:flex;align-items:center;justify-content:center;padding:1.5rem">
     <div style="width:100%;max-width:420px;animation:fadeUp .4s ease both">
       <div style="display:flex;align-items:center;gap:.5rem;margin-bottom:2rem;justify-content:center">
-        <span style="width:8px;height:8px;border-radius:50%;background:var(--green);display:inline-block;animation:pulse 2s infinite"></span>
+        <span style="width:8px;height:8px;border-radius:50%;background:var(--blue);box-shadow:0 0 10px rgba(59,130,246,0.6);display:inline-block;animation:pulse 2s infinite"></span>
         <span style="font-family:var(--display);font-size:1.3rem;font-weight:800;color:var(--white);letter-spacing:-.02em">Seen</span>
       </div>
 
@@ -793,7 +841,7 @@ nav{position:fixed;top:0;left:0;right:0;z-index:500;height:58px;display:flex;ali
           <div style="font-size:.85rem;color:var(--sub);font-weight:300">Pick one to get started</div>
         </div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:.75rem;margin-bottom:1.25rem">
-          <button onclick="startSignup('seeker')" style="background:var(--surface);border:1.5px solid var(--line2);border-radius:12px;padding:1.5rem 1rem;cursor:pointer;transition:all .2s;text-align:center" onmouseover="this.style.borderColor='var(--green)';this.style.background='var(--gdim)'" onmouseout="this.style.borderColor='var(--line2)';this.style.background='var(--surface)'">
+          <button onclick="startSignup('seeker')" style="background:var(--surface);border:1.5px solid var(--line2);border-radius:12px;padding:1.5rem 1rem;cursor:pointer;transition:all .2s;text-align:center" onmouseover="this.style.borderColor='var(--blue)';this.style.background='var(--bdim)'" onmouseout="this.style.borderColor='var(--line2)';this.style.background='var(--surface)'">
             <div style="font-size:1.75rem;margin-bottom:.6rem">🎯</div>
             <div style="font-family:var(--display);font-size:.9rem;font-weight:700;color:var(--white);margin-bottom:.2rem">Job Seeker</div>
             <div style="font-size:.72rem;color:var(--dim);font-weight:300">Find real jobs, track applications, avoid getting ghosted</div>
@@ -804,7 +852,7 @@ nav{position:fixed;top:0;left:0;right:0;z-index:500;height:58px;display:flex;ali
             <div style="font-size:.72rem;color:var(--dim);font-weight:300">Manage your score, respond to reports, post listings</div>
           </button>
         </div>
-        <div style="text-align:center;font-size:.78rem;color:var(--muted)">Already have an account? <button onclick="showSigninForm()" style="background:none;border:none;color:var(--green);font-size:.78rem;cursor:pointer;text-decoration:underline;font-family:var(--body)">Sign in →</button></div>
+        <div style="text-align:center;font-size:.78rem;color:var(--muted)">Already have an account? <button onclick="showSigninForm()" style="background:none;border:none;color:var(--blue);font-size:.78rem;cursor:pointer;text-decoration:underline;font-family:var(--body)">Sign in →</button></div>
       </div>
 
       <!-- STEP 1: Email + name -->
@@ -812,9 +860,9 @@ nav{position:fixed;top:0;left:0;right:0;z-index:500;height:58px;display:flex;ali
         <button onclick="showStep('who')" style="background:none;border:none;color:var(--dim);font-family:var(--mono);font-size:.68rem;cursor:pointer;margin-bottom:1.5rem;display:flex;align-items:center;gap:.35rem">← back</button>
         <div style="font-family:var(--display);font-size:1.4rem;font-weight:800;color:var(--white);letter-spacing:-.025em;margin-bottom:.2rem">Create your account</div>
         <div style="font-size:.82rem;color:var(--sub);font-weight:300;margin-bottom:1.5rem">Free forever for job seekers</div>
-        <div style="margin-bottom:.85rem"><label style="font-family:var(--mono);font-size:.6rem;text-transform:uppercase;letter-spacing:.08em;color:var(--dim);display:block;margin-bottom:.35rem">First name</label><input id="signupName" type="text" placeholder="What should we call you?" style="width:100%;background:var(--surface);border:1.5px solid var(--line2);border-radius:8px;padding:.72rem 1rem;color:var(--white);font-family:var(--body);font-size:.875rem;outline:none;caret-color:var(--green)" onfocus="this.style.borderColor='var(--green)'" onblur="this.style.borderColor='var(--line2)'"/></div>
-        <div style="margin-bottom:1.25rem"><label style="font-family:var(--mono);font-size:.6rem;text-transform:uppercase;letter-spacing:.08em;color:var(--dim);display:block;margin-bottom:.35rem">Email</label><input id="signupEmail" type="email" placeholder="you@email.com" style="width:100%;background:var(--surface);border:1.5px solid var(--line2);border-radius:8px;padding:.72rem 1rem;color:var(--white);font-family:var(--body);font-size:.875rem;outline:none;caret-color:var(--green)" onfocus="this.style.borderColor='var(--green)'" onblur="this.style.borderColor='var(--line2)'" onkeydown="if(event.key==='Enter')goToPasswordStep()"/></div>
-        <button onclick="goToPasswordStep()" style="width:100%;padding:.85rem;background:var(--green);color:var(--ink);border:none;border-radius:8px;font-family:var(--display);font-weight:800;font-size:.9rem;cursor:pointer;margin-bottom:.75rem">Continue →</button>
+        <div style="margin-bottom:.85rem"><label style="font-family:var(--mono);font-size:.6rem;text-transform:uppercase;letter-spacing:.08em;color:var(--dim);display:block;margin-bottom:.35rem">First name</label><input id="signupName" type="text" placeholder="What should we call you?" style="width:100%;background:var(--surface);border:1.5px solid var(--line2);border-radius:8px;padding:.72rem 1rem;color:var(--white);font-family:var(--body);font-size:.875rem;outline:none;caret-color:var(--blue)" onfocus="this.style.borderColor='var(--blue)'" onblur="this.style.borderColor='var(--line2)'"/></div>
+        <div style="margin-bottom:1.25rem"><label style="font-family:var(--mono);font-size:.6rem;text-transform:uppercase;letter-spacing:.08em;color:var(--dim);display:block;margin-bottom:.35rem">Email</label><input id="signupEmail" type="email" placeholder="you@email.com" style="width:100%;background:var(--surface);border:1.5px solid var(--line2);border-radius:8px;padding:.72rem 1rem;color:var(--white);font-family:var(--body);font-size:.875rem;outline:none;caret-color:var(--blue)" onfocus="this.style.borderColor='var(--blue)'" onblur="this.style.borderColor='var(--line2)'" onkeydown="if(event.key==='Enter')goToPasswordStep()"/></div>
+        <button onclick="goToPasswordStep()" style="width:100%;padding:.85rem;background:linear-gradient(135deg,#3b82f6 0%,#8b5cf6 100%);color:#fff;border:none;border-radius:8px;font-family:var(--display);font-weight:800;font-size:.9rem;cursor:pointer;margin-bottom:.75rem;box-shadow:0 0 20px rgba(59,130,246,0.3)">Continue →</button>
       </div>
 
       <!-- STEP 2: Password -->
@@ -822,9 +870,9 @@ nav{position:fixed;top:0;left:0;right:0;z-index:500;height:58px;display:flex;ali
         <button onclick="showStep('email')" style="background:none;border:none;color:var(--dim);font-family:var(--mono);font-size:.68rem;cursor:pointer;margin-bottom:1.5rem;display:flex;align-items:center;gap:.35rem">← back</button>
         <div style="font-family:var(--display);font-size:1.4rem;font-weight:800;color:var(--white);letter-spacing:-.025em;margin-bottom:.2rem">Set a password</div>
         <div style="font-size:.82rem;color:var(--sub);font-weight:300;margin-bottom:1.5rem" id="passwordSubline">Make it something you'll remember</div>
-        <div style="margin-bottom:.75rem"><label style="font-family:var(--mono);font-size:.6rem;text-transform:uppercase;letter-spacing:.08em;color:var(--dim);display:block;margin-bottom:.35rem">Password</label><input id="signupPass" type="password" placeholder="At least 8 characters" style="width:100%;background:var(--surface);border:1.5px solid var(--line2);border-radius:8px;padding:.72rem 1rem;color:var(--white);font-family:var(--body);font-size:.875rem;outline:none;caret-color:var(--green)" onfocus="this.style.borderColor='var(--green)'" onblur="this.style.borderColor='var(--line2)'" oninput="checkPasswordStrength(this.value)" onkeydown="if(event.key==='Enter')createAccount()"/></div>
+        <div style="margin-bottom:.75rem"><label style="font-family:var(--mono);font-size:.6rem;text-transform:uppercase;letter-spacing:.08em;color:var(--dim);display:block;margin-bottom:.35rem">Password</label><input id="signupPass" type="password" placeholder="At least 8 characters" style="width:100%;background:var(--surface);border:1.5px solid var(--line2);border-radius:8px;padding:.72rem 1rem;color:var(--white);font-family:var(--body);font-size:.875rem;outline:none;caret-color:var(--blue)" onfocus="this.style.borderColor='var(--blue)'" onblur="this.style.borderColor='var(--line2)'" oninput="checkPasswordStrength(this.value)" onkeydown="if(event.key==='Enter')createAccount()"/></div>
         <div style="margin-bottom:1.25rem"><div style="height:3px;background:var(--line2);border-radius:2px;overflow:hidden;margin-bottom:.3rem"><div id="passStrengthBar" style="height:100%;width:0%;border-radius:2px;transition:all .3s;background:var(--red)"></div></div><div id="passStrengthLabel" style="font-family:var(--mono);font-size:.62rem;color:var(--muted)"></div></div>
-        <button id="createAccountBtn" onclick="createAccount()" style="width:100%;padding:.85rem;background:var(--green);color:var(--ink);border:none;border-radius:8px;font-family:var(--display);font-weight:800;font-size:.9rem;cursor:pointer;margin-bottom:.75rem">Create account →</button>
+        <button id="createAccountBtn" onclick="createAccount()" style="width:100%;padding:.85rem;background:linear-gradient(135deg,#3b82f6 0%,#8b5cf6 100%);color:#fff;border:none;border-radius:8px;font-family:var(--display);font-weight:800;font-size:.9rem;cursor:pointer;margin-bottom:.75rem;box-shadow:0 0 20px rgba(59,130,246,0.3)">Create account →</button>
       </div>
 
       <!-- STEP 3: Verify email -->
@@ -832,10 +880,10 @@ nav{position:fixed;top:0;left:0;right:0;z-index:500;height:58px;display:flex;ali
         <div style="font-size:3rem;margin-bottom:1rem">📬</div>
         <div style="font-family:var(--display);font-size:1.4rem;font-weight:800;color:var(--white);letter-spacing:-.025em;margin-bottom:.5rem">Check your email</div>
         <div style="font-size:.85rem;color:var(--sub);font-weight:300;line-height:1.7;margin-bottom:1.25rem">We sent a verification link to<br><strong id="verifyEmailDisplay" style="color:var(--white)"></strong></div>
-        <div style="background:var(--gdim);border:1px solid var(--gmid);border-radius:8px;padding:.85rem 1rem;font-family:var(--mono);font-size:.68rem;color:var(--green);margin-bottom:1.5rem;line-height:1.65;text-align:left">
+        <div style="background:var(--bdim);border:1px solid var(--bmid);border-radius:8px;padding:.85rem 1rem;font-family:var(--mono);font-size:.68rem;color:var(--blue);margin-bottom:1.5rem;line-height:1.65;text-align:left">
           ✓ Click the link in your email<br>✓ Come back here and tap below<br>✓ You'll go straight to setup
         </div>
-        <button onclick="checkVerification()" style="width:100%;padding:.85rem;background:var(--green);color:var(--ink);border:none;border-radius:8px;font-family:var(--display);font-weight:800;font-size:.9rem;cursor:pointer;margin-bottom:.75rem">I verified my email →</button>
+        <button onclick="checkVerification()" style="width:100%;padding:.85rem;background:linear-gradient(135deg,#3b82f6 0%,#8b5cf6 100%);color:#fff;border:none;border-radius:8px;font-family:var(--display);font-weight:800;font-size:.9rem;cursor:pointer;margin-bottom:.75rem;box-shadow:0 0 20px rgba(59,130,246,0.3)">I verified my email →</button>
         <button onclick="resendVerification()" style="width:100%;padding:.65rem;background:none;border:1px solid var(--line2);color:var(--sub);border-radius:8px;font-family:var(--body);font-size:.8rem;cursor:pointer;margin-bottom:.75rem">Resend verification email</button>
         <button onclick="useADifferentEmail()" style="background:none;border:none;color:var(--muted);font-family:var(--mono);font-size:.62rem;cursor:pointer">Use a different email</button>
       </div>
@@ -843,10 +891,10 @@ nav{position:fixed;top:0;left:0;right:0;z-index:500;height:58px;display:flex;ali
       <!-- STEP 4: Survey -->
       <div id="step-survey" style="display:none">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1.5rem">
-          <div style="font-family:var(--mono);font-size:.62rem;color:var(--green);letter-spacing:.08em;text-transform:uppercase">Quick setup</div>
+          <div style="font-family:var(--mono);font-size:.62rem;color:var(--blue);letter-spacing:.08em;text-transform:uppercase">Quick setup</div>
           <div style="font-family:var(--mono);font-size:.62rem;color:var(--muted)" id="surveyProgress">1 of 5</div>
         </div>
-        <div style="height:3px;background:var(--line2);border-radius:2px;overflow:hidden;margin-bottom:1.75rem"><div id="surveyBar" style="height:100%;width:20%;background:var(--green);border-radius:2px;transition:width .3s ease"></div></div>
+        <div style="height:3px;background:var(--line2);border-radius:2px;overflow:hidden;margin-bottom:1.75rem"><div id="surveyBar" style="height:100%;width:20%;background:linear-gradient(90deg,#3b82f6,#8b5cf6);border-radius:2px;transition:width .3s ease"></div></div>
         <div id="surveyQuestion"></div>
       </div>
 
@@ -855,11 +903,11 @@ nav{position:fixed;top:0;left:0;right:0;z-index:500;height:58px;display:flex;ali
         <button onclick="showStep('who')" style="background:none;border:none;color:var(--dim);font-family:var(--mono);font-size:.68rem;cursor:pointer;margin-bottom:1.5rem;display:flex;align-items:center;gap:.35rem">← back</button>
         <div style="font-family:var(--display);font-size:1.4rem;font-weight:800;color:var(--white);letter-spacing:-.025em;margin-bottom:.2rem">Welcome back</div>
         <div style="font-size:.82rem;color:var(--sub);font-weight:300;margin-bottom:1.5rem">Sign in to your account</div>
-        <div style="margin-bottom:.85rem"><label style="font-family:var(--mono);font-size:.6rem;text-transform:uppercase;letter-spacing:.08em;color:var(--dim);display:block;margin-bottom:.35rem">Email</label><input id="signinEmail" type="email" placeholder="you@email.com" style="width:100%;background:var(--surface);border:1.5px solid var(--line2);border-radius:8px;padding:.72rem 1rem;color:var(--white);font-family:var(--body);font-size:.875rem;outline:none;caret-color:var(--green)" onfocus="this.style.borderColor='var(--green)'" onblur="this.style.borderColor='var(--line2)'"/></div>
-        <div style="margin-bottom:.5rem"><label style="font-family:var(--mono);font-size:.6rem;text-transform:uppercase;letter-spacing:.08em;color:var(--dim);display:block;margin-bottom:.35rem">Password</label><input id="signinPass" type="password" placeholder="••••••••" style="width:100%;background:var(--surface);border:1.5px solid var(--line2);border-radius:8px;padding:.72rem 1rem;color:var(--white);font-family:var(--body);font-size:.875rem;outline:none;caret-color:var(--green)" onfocus="this.style.borderColor='var(--green)'" onblur="this.style.borderColor='var(--line2)'" onkeydown="if(event.key==='Enter')doSignIn()"/></div>
+        <div style="margin-bottom:.85rem"><label style="font-family:var(--mono);font-size:.6rem;text-transform:uppercase;letter-spacing:.08em;color:var(--dim);display:block;margin-bottom:.35rem">Email</label><input id="signinEmail" type="email" placeholder="you@email.com" style="width:100%;background:var(--surface);border:1.5px solid var(--line2);border-radius:8px;padding:.72rem 1rem;color:var(--white);font-family:var(--body);font-size:.875rem;outline:none;caret-color:var(--blue)" onfocus="this.style.borderColor='var(--blue)'" onblur="this.style.borderColor='var(--line2)'"/></div>
+        <div style="margin-bottom:.5rem"><label style="font-family:var(--mono);font-size:.6rem;text-transform:uppercase;letter-spacing:.08em;color:var(--dim);display:block;margin-bottom:.35rem">Password</label><input id="signinPass" type="password" placeholder="••••••••" style="width:100%;background:var(--surface);border:1.5px solid var(--line2);border-radius:8px;padding:.72rem 1rem;color:var(--white);font-family:var(--body);font-size:.875rem;outline:none;caret-color:var(--blue)" onfocus="this.style.borderColor='var(--blue)'" onblur="this.style.borderColor='var(--line2)'" onkeydown="if(event.key==='Enter')doSignIn()"/></div>
         <div style="text-align:right;margin-bottom:1.25rem"><button onclick="resetPassword()" style="background:none;border:none;color:var(--muted);font-family:var(--mono);font-size:.62rem;cursor:pointer;text-decoration:underline">Forgot password?</button></div>
-        <button id="signinBtn" onclick="doSignIn()" style="width:100%;padding:.85rem;background:var(--green);color:var(--ink);border:none;border-radius:8px;font-family:var(--display);font-weight:800;font-size:.9rem;cursor:pointer;margin-bottom:.75rem">Sign in →</button>
-        <div style="text-align:center;font-size:.78rem;color:var(--muted)">No account? <button onclick="showStep('who')" style="background:none;border:none;color:var(--green);font-size:.78rem;cursor:pointer;text-decoration:underline;font-family:var(--body)">Create one →</button></div>
+        <button id="signinBtn" onclick="doSignIn()" style="width:100%;padding:.85rem;background:linear-gradient(135deg,#3b82f6 0%,#8b5cf6 100%);color:#fff;border:none;border-radius:8px;font-family:var(--display);font-weight:800;font-size:.9rem;cursor:pointer;margin-bottom:.75rem;box-shadow:0 0 20px rgba(59,130,246,0.3)">Sign in →</button>
+        <div style="text-align:center;font-size:.78rem;color:var(--muted)">No account? <button onclick="showStep('who')" style="background:none;border:none;color:var(--blue);font-size:.78rem;cursor:pointer;text-decoration:underline;font-family:var(--body)">Create one →</button></div>
       </div>
 
       <!-- Employer form -->
@@ -886,7 +934,7 @@ nav{position:fixed;top:0;left:0;right:0;z-index:500;height:58px;display:flex;ali
     <!-- Greeting -->
     <div style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:.75rem;margin-bottom:1.75rem">
       <div>
-        <div style="font-family:var(--mono);font-size:.62rem;color:var(--green);letter-spacing:.08em;text-transform:uppercase;margin-bottom:.35rem" id="dashGreeting">Good morning</div>
+        <div style="font-family:var(--mono);font-size:.62rem;color:var(--blue);letter-spacing:.08em;text-transform:uppercase;margin-bottom:.35rem" id="dashGreeting">Good morning</div>
         <h1 style="font-family:var(--display);font-size:1.75rem;font-weight:800;color:var(--white);letter-spacing:-.035em;margin-bottom:.2rem" id="dashName">Welcome back.</h1>
         <p style="font-size:.8rem;color:var(--sub);font-weight:300;margin-bottom:.75rem" id="dashSubline">Here's where things stand.</p>
         <div id="dashSurveyInsight"></div>
@@ -902,7 +950,7 @@ nav{position:fixed;top:0;left:0;right:0;z-index:500;height:58px;display:flex;ali
       </div>
       <div style="background:var(--surface);padding:1rem">
         <div style="font-family:var(--mono);font-size:.55rem;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin-bottom:.4rem">Response rate</div>
-        <div style="font-family:var(--mono);font-size:1.65rem;font-weight:500;color:var(--green);line-height:1" id="dStatRR">—</div>
+        <div style="font-family:var(--mono);font-size:1.65rem;font-weight:500;color:var(--blue);line-height:1" id="dStatRR">—</div>
       </div>
       <div style="background:var(--surface);padding:1rem">
         <div style="font-family:var(--mono);font-size:.55rem;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin-bottom:.4rem">Ghosted</div>
@@ -920,6 +968,7 @@ nav{position:fixed;top:0;left:0;right:0;z-index:500;height:58px;display:flex;ali
         <div style="font-family:var(--display);font-size:.9rem;font-weight:700;color:var(--white);letter-spacing:-.02em">Active applications</div>
         <button class="btn btn-ghost" style="font-size:.7rem" onclick="go('tracker')">View all →</button>
       </div>
+      <div id="dashPipelineInsight" style="display:none"></div>
       <div id="dashActiveApps"></div>
       <button class="btn btn-green" style="width:100%;justify-content:center;font-size:.82rem;margin-top:.85rem" onclick="go('jobs')">Find more jobs →</button>
     </div>
@@ -949,7 +998,7 @@ nav{position:fixed;top:0;left:0;right:0;z-index:500;height:58px;display:flex;ali
     <div style="background:var(--surface);border:1px solid var(--line);border-radius:12px;overflow:hidden;margin-bottom:1.25rem">
       <div style="padding:.85rem 1.1rem;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between">
         <div style="font-family:var(--display);font-size:.82rem;font-weight:700;color:var(--white)">Saved Jobs</div>
-        <button onclick="go('jobs')" style="background:none;border:none;font-family:var(--mono);font-size:.6rem;color:var(--green);cursor:pointer">Browse →</button>
+        <button onclick="go('jobs')" style="background:none;border:none;font-family:var(--mono);font-size:.6rem;color:var(--blue);cursor:pointer">Browse →</button>
       </div>
       <div style="padding:.75rem 1.1rem" id="dashSavedJobs">
         <div style="font-size:.75rem;color:var(--muted);font-weight:300">No saved jobs yet. Tap ♡ on any listing.</div>
@@ -972,10 +1021,10 @@ nav{position:fixed;top:0;left:0;right:0;z-index:500;height:58px;display:flex;ali
             </div>
             <button onclick="clearStoredResume()" style="margin-left:auto;background:none;border:none;font-family:var(--mono);font-size:.6rem;color:var(--muted);cursor:pointer">Replace</button>
           </div>
-          <div style="background:var(--gdim);border:1px solid var(--gmid);border-radius:7px;padding:.55rem .85rem;font-family:var(--mono);font-size:.6rem;color:var(--green);line-height:1.65">✓ Resume saved — auto-used in Resume AI and job applications</div>
+          <div style="background:var(--bdim);border:1px solid var(--bmid);border-radius:7px;padding:.55rem .85rem;font-family:var(--mono);font-size:.6rem;color:var(--blue);line-height:1.65">✓ Resume saved — auto-used in Resume AI and job applications</div>
         </div>
         <div id="resumeEmptyState">
-          <label for="dashResumeInput" id="dashResumeDropZone" ondragover="event.preventDefault();this.style.borderColor='var(--green)';this.style.background='var(--gdim)'" ondragleave="this.style.borderColor='var(--line2)';this.style.background='var(--raised)'" ondrop="handleDashResumeDrop(event)" style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:.5rem;padding:1.25rem;background:var(--raised);border:1.5px dashed var(--line2);border-radius:8px;cursor:pointer;transition:all .2s">
+          <label for="dashResumeInput" id="dashResumeDropZone" ondragover="event.preventDefault();this.style.borderColor='var(--blue)';this.style.background='var(--bdim)'" ondragleave="this.style.borderColor='var(--line2)';this.style.background='var(--raised)'" ondrop="handleDashResumeDrop(event)" style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:.5rem;padding:1.25rem;background:var(--raised);border:1.5px dashed var(--line2);border-radius:8px;cursor:pointer;transition:all .2s">
             <div style="font-size:1.5rem">📄</div>
             <div style="font-family:var(--display);font-size:.8rem;font-weight:700;color:var(--white)">Upload your resume</div>
             <div style="font-family:var(--mono);font-size:.58rem;color:var(--muted)">PDF or Word · Max 10MB · Used everywhere on Seen</div>
@@ -987,16 +1036,16 @@ nav{position:fixed;top:0;left:0;right:0;z-index:500;height:58px;display:flex;ali
     </div>
 
     <!-- Resume AI teaser -->
-    <div id="resumeAITeaser" style="background:var(--gdim);border:1px solid var(--gmid);border-radius:12px;padding:1rem;margin-bottom:1.25rem">
+    <div id="resumeAITeaser" style="background:var(--bdim);border:1px solid var(--bmid);border-radius:12px;padding:1rem;margin-bottom:1.25rem">
       <div id="resumeTeaserLocked" style="display:none">
         <div style="font-family:var(--display);font-size:.88rem;font-weight:700;color:var(--muted);margin-bottom:.2rem">Know your odds first.</div>
         <div style="font-size:.75rem;color:var(--muted);font-weight:300;line-height:1.6;margin-bottom:.65rem">Upload your resume above to unlock AI resume scanning, job optimization, and hiring manager search.</div>
         <button class="btn btn-ghost" style="width:100%;justify-content:center;font-size:.78rem;opacity:.5;cursor:not-allowed" disabled>Resume AI locked — upload resume first</button>
       </div>
       <div id="resumeTeaserUnlocked">
-        <div style="font-family:var(--display);font-size:.88rem;font-weight:700;color:var(--green);margin-bottom:.2rem">Know your odds first.</div>
-        <div style="font-size:.75rem;color:var(--green);opacity:.75;font-weight:300;line-height:1.6;margin-bottom:.65rem">Paste any JD. Get a match score, ATS keywords, and specific rewrites before you apply.</div>
-        <button class="btn btn-green" style="width:100%;justify-content:center;font-size:.78rem" onclick="go('resume')">Try Resume AI →</button>
+        <div style="font-family:var(--display);font-size:.88rem;font-weight:700;color:var(--blue);margin-bottom:.2rem">Know your odds first.</div>
+        <div style="font-size:.75rem;color:var(--blue);opacity:.75;font-weight:300;line-height:1.6;margin-bottom:.65rem">Paste any JD. Get a match score, ATS keywords, and specific rewrites before you apply.</div>
+        <button class="btn btn-solid" style="width:100%;justify-content:center;font-size:.78rem" onclick="go('resume')">Try Resume AI →</button>
       </div>
     </div>
 
@@ -1012,18 +1061,18 @@ nav{position:fixed;top:0;left:0;right:0;z-index:500;height:58px;display:flex;ali
           <button class="btn btn-ghost" style="font-size:.75rem" onclick="initSeekerPasswordReset()">Send code →</button>
         </div>
         <div id="seekerCodeEntry" style="display:none;border-top:1px solid var(--line);padding-top:.85rem">
-          <div style="font-family:var(--mono);font-size:.62rem;color:var(--green);margin-bottom:.75rem">✓ Check your email for the 8-digit code</div>
+          <div style="font-family:var(--mono);font-size:.62rem;color:var(--blue);margin-bottom:.75rem">✓ Check your email for the 8-digit code</div>
           <div style="margin-bottom:.65rem">
             <label style="font-family:var(--mono);font-size:.58rem;text-transform:uppercase;letter-spacing:.07em;color:var(--dim);display:block;margin-bottom:.32rem">Verification code</label>
-            <input id="seekerResetCode" type="text" maxlength="8" placeholder="12345678" style="width:100%;background:var(--raised);border:1.5px solid var(--line2);border-radius:8px;padding:.65rem .9rem;color:var(--white);font-family:var(--mono);font-size:1.1rem;letter-spacing:.15em;text-align:center;outline:none;caret-color:var(--green)"/>
+            <input id="seekerResetCode" type="text" maxlength="8" placeholder="12345678" style="width:100%;background:var(--raised);border:1.5px solid var(--line2);border-radius:8px;padding:.65rem .9rem;color:var(--white);font-family:var(--mono);font-size:1.1rem;letter-spacing:.15em;text-align:center;outline:none;caret-color:var(--blue)"/>
           </div>
           <div style="margin-bottom:.65rem">
             <label style="font-family:var(--mono);font-size:.58rem;text-transform:uppercase;letter-spacing:.07em;color:var(--dim);display:block;margin-bottom:.32rem">New password</label>
-            <input id="seekerNewPass" type="password" placeholder="Min 8 characters" style="width:100%;background:var(--raised);border:1.5px solid var(--line2);border-radius:8px;padding:.65rem .9rem;color:var(--white);font-family:var(--body);font-size:.84rem;outline:none;caret-color:var(--green)"/>
+            <input id="seekerNewPass" type="password" placeholder="Min 8 characters" style="width:100%;background:var(--raised);border:1.5px solid var(--line2);border-radius:8px;padding:.65rem .9rem;color:var(--white);font-family:var(--body);font-size:.84rem;outline:none;caret-color:var(--blue)"/>
           </div>
           <div style="margin-bottom:.85rem">
             <label style="font-family:var(--mono);font-size:.58rem;text-transform:uppercase;letter-spacing:.07em;color:var(--dim);display:block;margin-bottom:.32rem">Confirm new password</label>
-            <input id="seekerConfirmPass" type="password" placeholder="Confirm password" style="width:100%;background:var(--raised);border:1.5px solid var(--line2);border-radius:8px;padding:.65rem .9rem;color:var(--white);font-family:var(--body);font-size:.84rem;outline:none;caret-color:var(--green)"/>
+            <input id="seekerConfirmPass" type="password" placeholder="Confirm password" style="width:100%;background:var(--raised);border:1.5px solid var(--line2);border-radius:8px;padding:.65rem .9rem;color:var(--white);font-family:var(--body);font-size:.84rem;outline:none;caret-color:var(--blue)"/>
           </div>
           <div style="display:flex;gap:.5rem">
             <button class="btn btn-ghost" style="flex:1;justify-content:center;font-size:.78rem" onclick="document.getElementById('seekerCodeEntry').style.display='none'">Cancel</button>
@@ -1046,7 +1095,7 @@ nav{position:fixed;top:0;left:0;right:0;z-index:500;height:58px;display:flex;ali
   <div style="min-height:100vh;display:flex;align-items:center;justify-content:center;padding:1.5rem">
     <div style="width:100%;max-width:420px;animation:fadeUp .4s ease both">
       <div style="display:flex;align-items:center;gap:.5rem;margin-bottom:2rem;justify-content:center">
-        <span style="width:8px;height:8px;border-radius:50%;background:var(--green);display:inline-block"></span>
+        <span style="width:8px;height:8px;border-radius:50%;background:var(--blue);box-shadow:0 0 10px rgba(59,130,246,0.6);display:inline-block"></span>
         <span style="font-family:var(--display);font-size:1.3rem;font-weight:800;color:var(--white);letter-spacing:-.02em">Seen</span>
       </div>
 
@@ -1056,9 +1105,9 @@ nav{position:fixed;top:0;left:0;right:0;z-index:500;height:58px;display:flex;ali
         <div style="font-size:.82rem;color:var(--sub);font-weight:300;margin-bottom:1.5rem">Enter your email and we'll send a 8-digit code</div>
         <div style="margin-bottom:1.25rem">
           <label style="font-family:var(--mono);font-size:.6rem;text-transform:uppercase;letter-spacing:.08em;color:var(--dim);display:block;margin-bottom:.35rem">Email address</label>
-          <input id="resetEmailInput" type="email" placeholder="you@email.com" style="width:100%;background:var(--surface);border:1.5px solid var(--line2);border-radius:8px;padding:.72rem 1rem;color:var(--white);font-family:var(--body);font-size:.875rem;outline:none;caret-color:var(--green)" onfocus="this.style.borderColor='var(--green)'" onblur="this.style.borderColor='var(--line2)'" onkeydown="if(event.key==='Enter')sendResetCode()"/>
+          <input id="resetEmailInput" type="email" placeholder="you@email.com" style="width:100%;background:var(--surface);border:1.5px solid var(--line2);border-radius:8px;padding:.72rem 1rem;color:var(--white);font-family:var(--body);font-size:.875rem;outline:none;caret-color:var(--blue)" onfocus="this.style.borderColor='var(--blue)'" onblur="this.style.borderColor='var(--line2)'" onkeydown="if(event.key==='Enter')sendResetCode()"/>
         </div>
-        <button id="sendResetCodeBtn" onclick="sendResetCode()" style="width:100%;padding:.85rem;background:var(--green);color:var(--ink);border:none;border-radius:8px;font-family:var(--display);font-weight:800;font-size:.9rem;cursor:pointer;margin-bottom:.75rem">Send code →</button>
+        <button id="sendResetCodeBtn" onclick="sendResetCode()" style="width:100%;padding:.85rem;background:linear-gradient(135deg,#3b82f6 0%,#8b5cf6 100%);color:#fff;border:none;border-radius:8px;font-family:var(--display);font-weight:800;font-size:.9rem;cursor:pointer;margin-bottom:.75rem;box-shadow:0 0 20px rgba(59,130,246,0.3)">Send code →</button>
         <div style="text-align:center"><button onclick="go('login');showStep('signin')" style="background:none;border:none;color:var(--muted);font-family:var(--mono);font-size:.65rem;cursor:pointer">Back to sign in</button></div>
       </div>
 
@@ -1066,20 +1115,20 @@ nav{position:fixed;top:0;left:0;right:0;z-index:500;height:58px;display:flex;ali
       <div id="resetStep2" style="display:none">
         <div style="font-family:var(--display);font-size:1.4rem;font-weight:800;color:var(--white);letter-spacing:-.025em;margin-bottom:.2rem">Enter your code</div>
         <div style="font-size:.82rem;color:var(--sub);font-weight:300;margin-bottom:.35rem">We sent a 8-digit code to</div>
-        <div style="font-family:var(--mono);font-size:.82rem;color:var(--green);margin-bottom:1.5rem" id="resetEmailConfirm"></div>
+        <div style="font-family:var(--mono);font-size:.82rem;color:var(--blue);margin-bottom:1.5rem" id="resetEmailConfirm"></div>
         <div style="margin-bottom:.85rem">
           <label style="font-family:var(--mono);font-size:.6rem;text-transform:uppercase;letter-spacing:.08em;color:var(--dim);display:block;margin-bottom:.35rem">8-digit code</label>
-          <input id="resetOtpInput" type="text" maxlength="8" placeholder="12345678" style="width:100%;background:var(--surface);border:1.5px solid var(--line2);border-radius:8px;padding:.85rem 1rem;color:var(--white);font-family:var(--mono);font-size:1.4rem;letter-spacing:.2em;text-align:center;outline:none;caret-color:var(--green)" onfocus="this.style.borderColor='var(--green)'" onblur="this.style.borderColor='var(--line2)'"/>
+          <input id="resetOtpInput" type="text" maxlength="8" placeholder="12345678" style="width:100%;background:var(--surface);border:1.5px solid var(--line2);border-radius:8px;padding:.85rem 1rem;color:var(--white);font-family:var(--mono);font-size:1.4rem;letter-spacing:.2em;text-align:center;outline:none;caret-color:var(--blue)" onfocus="this.style.borderColor='var(--blue)'" onblur="this.style.borderColor='var(--line2)'"/>
         </div>
         <div style="margin-bottom:.85rem">
           <label style="font-family:var(--mono);font-size:.6rem;text-transform:uppercase;letter-spacing:.08em;color:var(--dim);display:block;margin-bottom:.35rem">New password</label>
-          <input id="resetNewPassInput" type="password" placeholder="Min 8 characters" style="width:100%;background:var(--surface);border:1.5px solid var(--line2);border-radius:8px;padding:.72rem 1rem;color:var(--white);font-family:var(--body);font-size:.875rem;outline:none;caret-color:var(--green)" onfocus="this.style.borderColor='var(--green)'" onblur="this.style.borderColor='var(--line2)'"/>
+          <input id="resetNewPassInput" type="password" placeholder="Min 8 characters" style="width:100%;background:var(--surface);border:1.5px solid var(--line2);border-radius:8px;padding:.72rem 1rem;color:var(--white);font-family:var(--body);font-size:.875rem;outline:none;caret-color:var(--blue)" onfocus="this.style.borderColor='var(--blue)'" onblur="this.style.borderColor='var(--line2)'"/>
         </div>
         <div style="margin-bottom:1.25rem">
           <label style="font-family:var(--mono);font-size:.6rem;text-transform:uppercase;letter-spacing:.08em;color:var(--dim);display:block;margin-bottom:.35rem">Confirm new password</label>
-          <input id="resetConfirmPassInput" type="password" placeholder="Confirm password" style="width:100%;background:var(--surface);border:1.5px solid var(--line2);border-radius:8px;padding:.72rem 1rem;color:var(--white);font-family:var(--body);font-size:.875rem;outline:none;caret-color:var(--green)" onfocus="this.style.borderColor='var(--green)'" onblur="this.style.borderColor='var(--line2)'" onkeydown="if(event.key==='Enter')verifyResetCode()"/>
+          <input id="resetConfirmPassInput" type="password" placeholder="Confirm password" style="width:100%;background:var(--surface);border:1.5px solid var(--line2);border-radius:8px;padding:.72rem 1rem;color:var(--white);font-family:var(--body);font-size:.875rem;outline:none;caret-color:var(--blue)" onfocus="this.style.borderColor='var(--blue)'" onblur="this.style.borderColor='var(--line2)'" onkeydown="if(event.key==='Enter')verifyResetCode()"/>
         </div>
-        <button id="verifyResetBtn" onclick="verifyResetCode()" style="width:100%;padding:.85rem;background:var(--green);color:var(--ink);border:none;border-radius:8px;font-family:var(--display);font-weight:800;font-size:.9rem;cursor:pointer;margin-bottom:.75rem">Update password →</button>
+        <button id="verifyResetBtn" onclick="verifyResetCode()" style="width:100%;padding:.85rem;background:linear-gradient(135deg,#3b82f6 0%,#8b5cf6 100%);color:#fff;border:none;border-radius:8px;font-family:var(--display);font-weight:800;font-size:.9rem;cursor:pointer;margin-bottom:.75rem;box-shadow:0 0 20px rgba(59,130,246,0.3)">Update password →</button>
         <div style="text-align:center"><button onclick="document.getElementById('resetStep2').style.display='none';document.getElementById('resetStep1').style.display='block'" style="background:none;border:none;color:var(--muted);font-family:var(--mono);font-size:.65rem;cursor:pointer">Resend code</button></div>
       </div>
 
@@ -1112,7 +1161,7 @@ nav{position:fixed;top:0;left:0;right:0;z-index:500;height:58px;display:flex;ali
           <option value="100">100 mi</option>
           <option value="0">Remote</option>
         </select>
-        <button onclick="searchJobs()" style="padding:.65rem 1.25rem;background:var(--green);color:var(--ink);border:none;border-radius:8px;font-family:var(--display);font-weight:800;font-size:.84rem;cursor:pointer;white-space:nowrap">Search →</button>
+        <button onclick="searchJobs()" style="padding:.65rem 1.25rem;background:linear-gradient(135deg,#3b82f6 0%,#8b5cf6 100%);color:#fff;border:none;border-radius:8px;font-family:var(--display);font-weight:800;font-size:.84rem;cursor:pointer;white-space:nowrap;box-shadow:0 0 20px rgba(59,130,246,0.3)">Search →</button>
       </div>
       <!-- Filter bar — DB only, no API calls -->
       <div style="display:flex;gap:.4rem;flex-wrap:wrap;margin-top:.6rem;align-items:center">
@@ -1180,14 +1229,14 @@ nav{position:fixed;top:0;left:0;right:0;z-index:500;height:58px;display:flex;ali
 
     <!-- Header -->
     <div style="margin-bottom:2rem">
-      <div style="font-family:var(--mono);font-size:.62rem;color:var(--green);letter-spacing:.1em;text-transform:uppercase;margin-bottom:.5rem">AI Resume Advisor</div>
+      <div style="font-family:var(--mono);font-size:.62rem;color:var(--blue);letter-spacing:.1em;text-transform:uppercase;margin-bottom:.5rem">AI Resume Advisor</div>
       <h1 style="font-family:var(--display);font-size:1.75rem;font-weight:800;color:var(--white);letter-spacing:-.035em;margin-bottom:.4rem">The unfair advantage toolkit.</h1>
       <p style="font-size:.85rem;color:var(--sub);font-weight:300;line-height:1.75;max-width:580px">Stop submitting into the void. Get the exact moves that put you outside the pile — ATS optimization, hiring manager research, cover letter frameworks, and a pre-proposal that makes you unforgettable.</p>
     </div>
 
     <!-- Tool tabs -->
     <div style="display:flex;gap:.35rem;margin-bottom:1.75rem;flex-wrap:wrap">
-      <button onclick="switchResumeTool('scanner')" id="rt-scanner" style="padding:.5rem 1rem;background:var(--green);color:var(--ink);border:none;border-radius:8px;font-family:var(--display);font-size:.78rem;font-weight:800;cursor:pointer">📄 Resume Scanner</button>
+      <button onclick="switchResumeTool('scanner')" id="rt-scanner" style="padding:.5rem 1rem;background:linear-gradient(135deg,#3b82f6 0%,#8b5cf6 100%);color:#fff;border:none;border-radius:8px;font-family:var(--display);font-size:.78rem;font-weight:800;cursor:pointer;box-shadow:0 0 16px rgba(59,130,246,0.3)">📄 Resume Scanner</button>
       <button onclick="switchResumeTool('coach')" id="rt-coach" style="padding:.5rem 1rem;background:var(--raised);color:var(--sub);border:1px solid var(--line2);border-radius:8px;font-family:var(--body);font-size:.78rem;cursor:pointer">🎯 Advantage Coach</button>
       <button onclick="switchResumeTool('proposal')" id="rt-proposal" style="padding:.5rem 1rem;background:var(--raised);color:var(--sub);border:1px solid var(--line2);border-radius:8px;font-family:var(--body);font-size:.78rem;cursor:pointer">⚡ Pre-Proposal</button>
     </div>
@@ -1197,16 +1246,16 @@ nav{position:fixed;top:0;left:0;right:0;z-index:500;height:58px;display:flex;ali
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.25rem">
         <div>
           <div style="font-family:var(--mono);font-size:.6rem;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:1rem">Your information</div>
-          <div style="margin-bottom:.75rem"><label style="font-family:var(--mono);font-size:.6rem;text-transform:uppercase;letter-spacing:.07em;color:var(--dim);display:block;margin-bottom:.32rem">Job title you're applying for</label><input id="aiJob" type="text" placeholder="e.g. Marketing Manager" style="width:100%;background:var(--surface);border:1.5px solid var(--line2);border-radius:8px;padding:.65rem .9rem;color:var(--white);font-family:var(--body);font-size:.84rem;outline:none;caret-color:var(--green)"/></div>
-          <div style="margin-bottom:.75rem"><label style="font-family:var(--mono);font-size:.6rem;text-transform:uppercase;letter-spacing:.07em;color:var(--dim);display:block;margin-bottom:.32rem">Company + location</label><input id="aiCo" type="text" placeholder="e.g. Netflix · Los Angeles, CA" style="width:100%;background:var(--surface);border:1.5px solid var(--line2);border-radius:8px;padding:.65rem .9rem;color:var(--white);font-family:var(--body);font-size:.84rem;outline:none;caret-color:var(--green)"/></div>
+          <div style="margin-bottom:.75rem"><label style="font-family:var(--mono);font-size:.6rem;text-transform:uppercase;letter-spacing:.07em;color:var(--dim);display:block;margin-bottom:.32rem">Job title you're applying for</label><input id="aiJob" type="text" placeholder="e.g. Marketing Manager" style="width:100%;background:var(--surface);border:1.5px solid var(--line2);border-radius:8px;padding:.65rem .9rem;color:var(--white);font-family:var(--body);font-size:.84rem;outline:none;caret-color:var(--blue)"/></div>
+          <div style="margin-bottom:.75rem"><label style="font-family:var(--mono);font-size:.6rem;text-transform:uppercase;letter-spacing:.07em;color:var(--dim);display:block;margin-bottom:.32rem">Company + location</label><input id="aiCo" type="text" placeholder="e.g. Netflix · Los Angeles, CA" style="width:100%;background:var(--surface);border:1.5px solid var(--line2);border-radius:8px;padding:.65rem .9rem;color:var(--white);font-family:var(--body);font-size:.84rem;outline:none;caret-color:var(--blue)"/></div>
           <div style="margin-bottom:.75rem"><label style="font-family:var(--mono);font-size:.6rem;text-transform:uppercase;letter-spacing:.07em;color:var(--dim);display:block;margin-bottom:.32rem">Your resume</label>
-          <div id="resumeAIStatus" style="background:var(--gdim);border:1px solid var(--gmid);border-radius:7px;padding:.55rem .85rem;font-family:var(--mono);font-size:.62rem;color:var(--green);margin-bottom:.5rem;display:none">✓ Using resume from your profile</div>
-          <textarea id="aiResume" placeholder="Paste your resume here, or upload one in your dashboard to auto-fill..." style="width:100%;background:var(--surface);border:1.5px solid var(--line2);border-radius:8px;padding:.65rem .9rem;color:var(--white);font-family:var(--body);font-size:.82rem;outline:none;min-height:120px;resize:vertical;caret-color:var(--green)"></textarea></div>
-          <div style="margin-bottom:1rem"><label style="font-family:var(--mono);font-size:.6rem;text-transform:uppercase;letter-spacing:.07em;color:var(--dim);display:block;margin-bottom:.32rem">Job description</label><textarea id="aiJD" placeholder="Paste the full job description..." style="width:100%;background:var(--surface);border:1.5px solid var(--line2);border-radius:8px;padding:.65rem .9rem;color:var(--white);font-family:var(--body);font-size:.82rem;outline:none;min-height:120px;resize:vertical;caret-color:var(--green)"></textarea></div>
-          <button id="analyzeBtn" onclick="analyzeResume()" style="width:100%;padding:.85rem;background:var(--green);color:var(--ink);border:none;border-radius:8px;font-family:var(--display);font-weight:800;font-size:.9rem;cursor:pointer">Analyze my odds →</button>
+          <div id="resumeAIStatus" style="background:var(--bdim);border:1px solid var(--bmid);border-radius:7px;padding:.55rem .85rem;font-family:var(--mono);font-size:.62rem;color:var(--blue);margin-bottom:.5rem;display:none">✓ Using resume from your profile</div>
+          <textarea id="aiResume" placeholder="Paste your resume here, or upload one in your dashboard to auto-fill..." style="width:100%;background:var(--surface);border:1.5px solid var(--line2);border-radius:8px;padding:.65rem .9rem;color:var(--white);font-family:var(--body);font-size:.82rem;outline:none;min-height:120px;resize:vertical;caret-color:var(--blue)"></textarea></div>
+          <div style="margin-bottom:1rem"><label style="font-family:var(--mono);font-size:.6rem;text-transform:uppercase;letter-spacing:.07em;color:var(--dim);display:block;margin-bottom:.32rem">Job description</label><textarea id="aiJD" placeholder="Paste the full job description..." style="width:100%;background:var(--surface);border:1.5px solid var(--line2);border-radius:8px;padding:.65rem .9rem;color:var(--white);font-family:var(--body);font-size:.82rem;outline:none;min-height:120px;resize:vertical;caret-color:var(--blue)"></textarea></div>
+          <button id="analyzeBtn" onclick="analyzeResume()" style="width:100%;padding:.85rem;background:linear-gradient(135deg,#3b82f6 0%,#8b5cf6 100%);color:#fff;border:none;border-radius:8px;font-family:var(--display);font-weight:800;font-size:.9rem;cursor:pointer;box-shadow:0 0 20px rgba(59,130,246,0.3)">Analyze my odds →</button>
         </div>
         <div>
-          <div style="font-family:var(--mono);font-size:.6rem;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:1rem">AI analysis <span id="rpLive" style="display:none;color:var(--green);animation:pulse 1s infinite">● Generating</span></div>
+          <div style="font-family:var(--mono);font-size:.6rem;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:1rem">AI analysis <span id="rpLive" style="display:none;color:var(--blue);animation:pulse 1s infinite">● Generating</span></div>
           <div id="resumeOut" style="min-height:400px">
             <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:300px;gap:.75rem;opacity:.4">
               <div style="font-size:2rem">⚡</div>
@@ -1222,11 +1271,11 @@ nav{position:fixed;top:0;left:0;right:0;z-index:500;height:58px;display:flex;ali
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.25rem">
         <div>
           <div style="font-family:var(--mono);font-size:.6rem;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:1rem">Target role</div>
-          <div style="margin-bottom:.75rem"><label style="font-family:var(--mono);font-size:.6rem;text-transform:uppercase;letter-spacing:.07em;color:var(--dim);display:block;margin-bottom:.32rem">Job title</label><input id="coachJob" type="text" placeholder="e.g. Product Manager" style="width:100%;background:var(--surface);border:1.5px solid var(--line2);border-radius:8px;padding:.65rem .9rem;color:var(--white);font-family:var(--body);font-size:.84rem;outline:none;caret-color:var(--green)"/></div>
-          <div style="margin-bottom:.75rem"><label style="font-family:var(--mono);font-size:.6rem;text-transform:uppercase;letter-spacing:.07em;color:var(--dim);display:block;margin-bottom:.32rem">Company</label><input id="coachCompany" type="text" placeholder="e.g. Spotify" style="width:100%;background:var(--surface);border:1.5px solid var(--line2);border-radius:8px;padding:.65rem .9rem;color:var(--white);font-family:var(--body);font-size:.84rem;outline:none;caret-color:var(--green)"/></div>
-          <div style="margin-bottom:1rem"><label style="font-family:var(--mono);font-size:.6rem;text-transform:uppercase;letter-spacing:.07em;color:var(--dim);display:block;margin-bottom:.32rem">Job description (paste)</label><textarea id="coachJD" placeholder="Paste the job description..." style="width:100%;background:var(--surface);border:1.5px solid var(--line2);border-radius:8px;padding:.65rem .9rem;color:var(--white);font-family:var(--body);font-size:.82rem;outline:none;min-height:140px;resize:vertical;caret-color:var(--green)"></textarea></div>
-          <div style="margin-bottom:1rem"><label style="font-family:var(--mono);font-size:.6rem;text-transform:uppercase;letter-spacing:.07em;color:var(--dim);display:block;margin-bottom:.32rem">Your background (brief)</label><textarea id="coachBackground" placeholder="e.g. 3 years in marketing, B2B SaaS focus, strong in content strategy..." style="width:100%;background:var(--surface);border:1.5px solid var(--line2);border-radius:8px;padding:.65rem .9rem;color:var(--white);font-family:var(--body);font-size:.82rem;outline:none;min-height:80px;resize:vertical;caret-color:var(--green)"></textarea></div>
-          <button onclick="runAdvantageCoach()" style="width:100%;padding:.85rem;background:var(--green);color:var(--ink);border:none;border-radius:8px;font-family:var(--display);font-weight:800;font-size:.9rem;cursor:pointer" id="coachBtn">Get my playbook →</button>
+          <div style="margin-bottom:.75rem"><label style="font-family:var(--mono);font-size:.6rem;text-transform:uppercase;letter-spacing:.07em;color:var(--dim);display:block;margin-bottom:.32rem">Job title</label><input id="coachJob" type="text" placeholder="e.g. Product Manager" style="width:100%;background:var(--surface);border:1.5px solid var(--line2);border-radius:8px;padding:.65rem .9rem;color:var(--white);font-family:var(--body);font-size:.84rem;outline:none;caret-color:var(--blue)"/></div>
+          <div style="margin-bottom:.75rem"><label style="font-family:var(--mono);font-size:.6rem;text-transform:uppercase;letter-spacing:.07em;color:var(--dim);display:block;margin-bottom:.32rem">Company</label><input id="coachCompany" type="text" placeholder="e.g. Spotify" style="width:100%;background:var(--surface);border:1.5px solid var(--line2);border-radius:8px;padding:.65rem .9rem;color:var(--white);font-family:var(--body);font-size:.84rem;outline:none;caret-color:var(--blue)"/></div>
+          <div style="margin-bottom:1rem"><label style="font-family:var(--mono);font-size:.6rem;text-transform:uppercase;letter-spacing:.07em;color:var(--dim);display:block;margin-bottom:.32rem">Job description (paste)</label><textarea id="coachJD" placeholder="Paste the job description..." style="width:100%;background:var(--surface);border:1.5px solid var(--line2);border-radius:8px;padding:.65rem .9rem;color:var(--white);font-family:var(--body);font-size:.82rem;outline:none;min-height:140px;resize:vertical;caret-color:var(--blue)"></textarea></div>
+          <div style="margin-bottom:1rem"><label style="font-family:var(--mono);font-size:.6rem;text-transform:uppercase;letter-spacing:.07em;color:var(--dim);display:block;margin-bottom:.32rem">Your background (brief)</label><textarea id="coachBackground" placeholder="e.g. 3 years in marketing, B2B SaaS focus, strong in content strategy..." style="width:100%;background:var(--surface);border:1.5px solid var(--line2);border-radius:8px;padding:.65rem .9rem;color:var(--white);font-family:var(--body);font-size:.82rem;outline:none;min-height:80px;resize:vertical;caret-color:var(--blue)"></textarea></div>
+          <button onclick="runAdvantageCoach()" style="width:100%;padding:.85rem;background:linear-gradient(135deg,#3b82f6 0%,#8b5cf6 100%);color:#fff;border:none;border-radius:8px;font-family:var(--display);font-weight:800;font-size:.9rem;cursor:pointer;box-shadow:0 0 20px rgba(59,130,246,0.3)" id="coachBtn">Get my playbook →</button>
         </div>
         <div>
           <div style="font-family:var(--mono);font-size:.6rem;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:1rem">Your playbook</div>
@@ -1245,12 +1294,12 @@ nav{position:fixed;top:0;left:0;right:0;z-index:500;height:58px;display:flex;ali
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.25rem">
         <div>
           <div style="font-family:var(--mono);font-size:.6rem;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:1rem">Generate a pre-proposal</div>
-          <div style="background:var(--gdim);border:1px solid var(--gmid);border-radius:8px;padding:.85rem;margin-bottom:1rem;font-size:.78rem;color:var(--green);line-height:1.7">💡 A pre-proposal is a 1-page document showing how you'd approach the first 30–60–90 days. Attach it to your application. Almost no one does this — it makes you unforgettable.</div>
-          <div style="margin-bottom:.75rem"><label style="font-family:var(--mono);font-size:.6rem;text-transform:uppercase;letter-spacing:.07em;color:var(--dim);display:block;margin-bottom:.32rem">Job title</label><input id="propJob" type="text" placeholder="e.g. Head of Growth" style="width:100%;background:var(--surface);border:1.5px solid var(--line2);border-radius:8px;padding:.65rem .9rem;color:var(--white);font-family:var(--body);font-size:.84rem;outline:none;caret-color:var(--green)"/></div>
-          <div style="margin-bottom:.75rem"><label style="font-family:var(--mono);font-size:.6rem;text-transform:uppercase;letter-spacing:.07em;color:var(--dim);display:block;margin-bottom:.32rem">Company</label><input id="propCompany" type="text" placeholder="e.g. DoorDash" style="width:100%;background:var(--surface);border:1.5px solid var(--line2);border-radius:8px;padding:.65rem .9rem;color:var(--white);font-family:var(--body);font-size:.84rem;outline:none;caret-color:var(--green)"/></div>
-          <div style="margin-bottom:1rem"><label style="font-family:var(--mono);font-size:.6rem;text-transform:uppercase;letter-spacing:.07em;color:var(--dim);display:block;margin-bottom:.32rem">Job description</label><textarea id="propJD" placeholder="Paste the job description..." style="width:100%;background:var(--surface);border:1.5px solid var(--line2);border-radius:8px;padding:.65rem .9rem;color:var(--white);font-family:var(--body);font-size:.82rem;outline:none;min-height:120px;resize:vertical;caret-color:var(--green)"></textarea></div>
-          <div style="margin-bottom:1rem"><label style="font-family:var(--mono);font-size:.6rem;text-transform:uppercase;letter-spacing:.07em;color:var(--dim);display:block;margin-bottom:.32rem">Your relevant experience</label><textarea id="propBackground" placeholder="What do you bring to this role?" style="width:100%;background:var(--surface);border:1.5px solid var(--line2);border-radius:8px;padding:.65rem .9rem;color:var(--white);font-family:var(--body);font-size:.82rem;outline:none;min-height:80px;resize:vertical;caret-color:var(--green)"></textarea></div>
-          <button onclick="generateProposal()" style="width:100%;padding:.85rem;background:var(--green);color:var(--ink);border:none;border-radius:8px;font-family:var(--display);font-weight:800;font-size:.9rem;cursor:pointer" id="propBtn">Generate pre-proposal →</button>
+          <div style="background:var(--bdim);border:1px solid var(--bmid);border-radius:8px;padding:.85rem;margin-bottom:1rem;font-size:.78rem;color:var(--blue);line-height:1.7">💡 A pre-proposal is a 1-page document showing how you'd approach the first 30–60–90 days. Attach it to your application. Almost no one does this — it makes you unforgettable.</div>
+          <div style="margin-bottom:.75rem"><label style="font-family:var(--mono);font-size:.6rem;text-transform:uppercase;letter-spacing:.07em;color:var(--dim);display:block;margin-bottom:.32rem">Job title</label><input id="propJob" type="text" placeholder="e.g. Head of Growth" style="width:100%;background:var(--surface);border:1.5px solid var(--line2);border-radius:8px;padding:.65rem .9rem;color:var(--white);font-family:var(--body);font-size:.84rem;outline:none;caret-color:var(--blue)"/></div>
+          <div style="margin-bottom:.75rem"><label style="font-family:var(--mono);font-size:.6rem;text-transform:uppercase;letter-spacing:.07em;color:var(--dim);display:block;margin-bottom:.32rem">Company</label><input id="propCompany" type="text" placeholder="e.g. DoorDash" style="width:100%;background:var(--surface);border:1.5px solid var(--line2);border-radius:8px;padding:.65rem .9rem;color:var(--white);font-family:var(--body);font-size:.84rem;outline:none;caret-color:var(--blue)"/></div>
+          <div style="margin-bottom:1rem"><label style="font-family:var(--mono);font-size:.6rem;text-transform:uppercase;letter-spacing:.07em;color:var(--dim);display:block;margin-bottom:.32rem">Job description</label><textarea id="propJD" placeholder="Paste the job description..." style="width:100%;background:var(--surface);border:1.5px solid var(--line2);border-radius:8px;padding:.65rem .9rem;color:var(--white);font-family:var(--body);font-size:.82rem;outline:none;min-height:120px;resize:vertical;caret-color:var(--blue)"></textarea></div>
+          <div style="margin-bottom:1rem"><label style="font-family:var(--mono);font-size:.6rem;text-transform:uppercase;letter-spacing:.07em;color:var(--dim);display:block;margin-bottom:.32rem">Your relevant experience</label><textarea id="propBackground" placeholder="What do you bring to this role?" style="width:100%;background:var(--surface);border:1.5px solid var(--line2);border-radius:8px;padding:.65rem .9rem;color:var(--white);font-family:var(--body);font-size:.82rem;outline:none;min-height:80px;resize:vertical;caret-color:var(--blue)"></textarea></div>
+          <button onclick="generateProposal()" style="width:100%;padding:.85rem;background:linear-gradient(135deg,#3b82f6 0%,#8b5cf6 100%);color:#fff;border:none;border-radius:8px;font-family:var(--display);font-weight:800;font-size:.9rem;cursor:pointer;box-shadow:0 0 20px rgba(59,130,246,0.3)" id="propBtn">Generate pre-proposal →</button>
         </div>
         <div>
           <div style="font-family:var(--mono);font-size:.6rem;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:1rem">Your pre-proposal</div>
@@ -1286,6 +1335,7 @@ nav{position:fixed;top:0;left:0;right:0;z-index:500;height:58px;display:flex;ali
       <div class="co-mets" id="coMets"></div>
     </div>
     <div class="agg-bar" id="aggBar" style="display:none"><div class="agg-item"><div class="agg-dot"></div>Live aggregating</div></div>
+    <div id="coTrackBar" style="margin:0 0 .75rem"></div>
     <div class="co-tabs">
       <button class="ctab active" onclick="switchTab('ov',this)">Overview</button>
       <button class="ctab" onclick="switchTab('process',this)">Process Score</button>
@@ -1301,6 +1351,7 @@ nav{position:fixed;top:0;left:0;right:0;z-index:500;height:58px;display:flex;ali
     <div class="ctc" id="ctc-roles"><div class="loader"><div class="spinner"></div></div></div>
     <div class="ctc" id="ctc-rd"><div class="loader"><div class="spinner"></div></div></div>
   </div>
+  <div id="ctc-web-reviews" style="padding:0 1rem 1.5rem"></div>
 </div>
 
 <!-- ═══ REPORT ═══ -->
@@ -1364,7 +1415,7 @@ nav{position:fixed;top:0;left:0;right:0;z-index:500;height:58px;display:flex;ali
 <div class="page" id="page-recruiters">
   <div class="rec-wrap">
     <div class="rec-hero">
-      <div style="display:inline-flex;align-items:center;gap:.42rem;background:var(--gdim);border:1px solid var(--gmid);color:var(--green);font-family:var(--mono);font-size:.62rem;padding:.28rem .85rem;border-radius:100px;margin-bottom:1.5rem;animation:glow 3s infinite"><span style="width:5px;height:5px;border-radius:50%;background:var(--green);display:inline-block;animation:pulse 2s infinite"></span>Early access open</div>
+      <div style="display:inline-flex;align-items:center;gap:.42rem;background:var(--bdim);border:1px solid var(--bmid);color:var(--blue);font-family:var(--mono);font-size:.62rem;padding:.28rem .85rem;border-radius:100px;margin-bottom:1.5rem"><span style="width:5px;height:5px;border-radius:50%;background:var(--blue);display:inline-block;animation:pulse 2s infinite"></span>Early access open</div>
       <h1>The companies that respond<br><span style="color:var(--muted)">win everything.</span></h1>
       <p>Job seekers check Seen before they apply — and they check by location. A verified badge at your specific branch tells them your process is real, transparent, and worth their time before they ever hit apply.</p>
       <button class="btn btn-green btn-xl" onclick="showToast('Waitlist opening soon!')">Get your location verified →</button>
@@ -1415,61 +1466,23 @@ nav{position:fixed;top:0;left:0;right:0;z-index:500;height:58px;display:flex;ali
 </div>
 
 <!-- ═══ FOOTER ═══ -->
-<footer id="mainFooter" style="background:var(--void);border-top:1px solid var(--line);padding:3.5rem 2rem 2rem;margin-top:0">
-  <div style="max-width:1300px;margin:0 auto">
-    <div style="display:grid;grid-template-columns:1.4fr 1fr 1fr 1fr;gap:3rem;margin-bottom:3rem">
-      <div>
-        <div style="font-family:var(--display);font-size:1.3rem;font-weight:800;color:var(--white);letter-spacing:-.02em;display:flex;align-items:center;gap:.5rem;margin-bottom:.75rem">
-          <span style="width:7px;height:7px;border-radius:50%;background:var(--green);display:inline-block"></span>Seen
-        </div>
-        <p style="color:var(--dim);font-size:.8rem;font-weight:300;line-height:1.75;max-width:240px;margin-bottom:1.25rem">The only job board that holds companies accountable. Built by someone who got ghosted one too many times.</p>
-        <div style="display:flex;gap:.5rem;flex-wrap:wrap">
-          <span class="vibe v-g">Free for job seekers</span>
-          <span class="vibe v-n">No ads. Ever.</span>
-        </div>
-      </div>
-      <div>
-        <div style="font-family:var(--mono);font-size:.6rem;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin-bottom:1rem">Product</div>
-        <div style="display:flex;flex-direction:column;gap:.6rem">
-          <button onclick="go('jobs')" style="background:none;border:none;color:var(--dim);font-size:.82rem;cursor:pointer;text-align:left;transition:color .15s;font-family:var(--body)" onmouseover="this.style.color='var(--sub)'" onmouseout="this.style.color='var(--dim)'">Find jobs</button>
-          <button onclick="go('demand')" style="background:none;border:none;color:var(--dim);font-size:.82rem;cursor:pointer;text-align:left;transition:color .15s;font-family:var(--body)" onmouseover="this.style.color='var(--sub)'" onmouseout="this.style.color='var(--dim)'">Demand map</button>
-          <button onclick="go('resume')" style="background:none;border:none;color:var(--dim);font-size:.82rem;cursor:pointer;text-align:left;transition:color .15s;font-family:var(--body)" onmouseover="this.style.color='var(--sub)'" onmouseout="this.style.color='var(--dim)'">Resume AI</button>
-          <button onclick="go('report')" style="background:none;border:none;color:var(--dim);font-size:.82rem;cursor:pointer;text-align:left;transition:color .15s;font-family:var(--body)" onmouseover="this.style.color='var(--sub)'" onmouseout="this.style.color='var(--dim)'">Report a listing</button>
-          <button onclick="go('recruiters')" style="background:none;border:none;color:var(--dim);font-size:.82rem;cursor:pointer;text-align:left;transition:color .15s;font-family:var(--body)" onmouseover="this.style.color='var(--sub)'" onmouseout="this.style.color='var(--dim)'">For employers</button>
-        </div>
-      </div>
-      <div>
-        <div style="font-family:var(--mono);font-size:.6rem;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin-bottom:1rem">Company</div>
-        <div style="display:flex;flex-direction:column;gap:.6rem">
-          <button onclick="go('faq')" style="background:none;border:none;color:var(--dim);font-size:.82rem;cursor:pointer;text-align:left;transition:color .15s;font-family:var(--body)" onmouseover="this.style.color='var(--sub)'" onmouseout="this.style.color='var(--dim)'">FAQ</button>
-          <button onclick="go('legal')" style="background:none;border:none;color:var(--dim);font-size:.82rem;cursor:pointer;text-align:left;transition:color .15s;font-family:var(--body)" onmouseover="this.style.color='var(--sub)'" onmouseout="this.style.color='var(--dim)'">Terms of service</button>
-          <button onclick="go('legal')" style="background:none;border:none;color:var(--dim);font-size:.82rem;cursor:pointer;text-align:left;transition:color .15s;font-family:var(--body)" onmouseover="this.style.color='var(--sub)'" onmouseout="this.style.color='var(--dim)'">Privacy policy</button>
-          <button onclick="go('legal')" style="background:none;border:none;color:var(--dim);font-size:.82rem;cursor:pointer;text-align:left;transition:color .15s;font-family:var(--body)" onmouseover="this.style.color='var(--sub)'" onmouseout="this.style.color='var(--dim)'">Content guidelines</button>
-          <a href="mailto:hello@tryseen.io" style="color:var(--dim);font-size:.82rem;text-decoration:none;transition:color .15s" onmouseover="this.style.color='var(--sub)'" onmouseout="this.style.color='var(--dim)'">Contact us</a>
-        </div>
-      </div>
-      <div>
-        <div style="font-family:var(--mono);font-size:.6rem;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin-bottom:1rem">Data sources</div>
-        <div style="display:flex;flex-direction:column;gap:.6rem">
-          <span style="color:var(--dim);font-size:.78rem;font-weight:300">📱 Reddit (public API)</span>
-          <span style="color:var(--dim);font-size:.78rem;font-weight:300">💼 RemoteOK · Adzuna</span>
-          <span style="color:var(--dim);font-size:.78rem;font-weight:300">👤 Direct user reports</span>
-          <span style="color:var(--dim);font-size:.78rem;font-weight:300">🤖 AI-powered scoring</span>
-        </div>
-        <div style="margin-top:1.25rem;padding:.65rem .85rem;background:var(--raised);border-radius:7px;font-family:var(--mono);font-size:.58rem;color:var(--muted);line-height:1.75">
-          All scores are user-reported estimates. Not legal claims. Not endorsements. Not defamation.
-        </div>
-      </div>
+<footer id="mainFooter" style="background:var(--void);border-top:1px solid var(--line);padding:1rem 1.5rem">
+  <div style="max-width:1300px;margin:0 auto;display:flex;align-items:center;justify-content:space-between;gap:1rem;flex-wrap:wrap">
+    <div style="display:flex;align-items:center;gap:.5rem;flex-shrink:0">
+      <span style="width:6px;height:6px;border-radius:50%;background:var(--blue);display:inline-block;flex-shrink:0"></span>
+      <span style="font-family:var(--display);font-size:.88rem;font-weight:800;color:var(--white);letter-spacing:-.02em">Seen</span>
+      <span style="font-family:var(--mono);font-size:.58rem;color:var(--muted);padding-left:.35rem">© 2025</span>
     </div>
-    <div style="border-top:1px solid var(--line);padding-top:1.5rem;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:1rem">
-      <div style="font-family:var(--mono);font-size:.62rem;color:var(--muted)">© 2025 Seen. All rights reserved. Built by someone who lived this problem.</div>
-      <div style="display:flex;gap:1.5rem">
-        <button onclick="go('legal')" style="background:none;border:none;color:var(--muted);font-family:var(--mono);font-size:.6rem;cursor:pointer;transition:color .15s" onmouseover="this.style.color='var(--sub)'" onmouseout="this.style.color='var(--muted)'">Terms</button>
-        <button onclick="go('legal')" style="background:none;border:none;color:var(--muted);font-family:var(--mono);font-size:.6rem;cursor:pointer;transition:color .15s" onmouseover="this.style.color='var(--sub)'" onmouseout="this.style.color='var(--muted)'">Privacy</button>
-        <button onclick="go('faq')" style="background:none;border:none;color:var(--muted);font-family:var(--mono);font-size:.6rem;cursor:pointer;transition:color .15s" onmouseover="this.style.color='var(--sub)'" onmouseout="this.style.color='var(--muted)'">FAQ</button>
-        <a href="mailto:hello@tryseen.io" style="color:var(--muted);font-family:var(--mono);font-size:.6rem;text-decoration:none;transition:color .15s" onmouseover="this.style.color='var(--sub)'" onmouseout="this.style.color='var(--muted)'">Contact</a>
-      </div>
+    <div style="display:flex;gap:.1rem;flex-wrap:wrap;align-items:center;flex:1;justify-content:center">
+      <button onclick="go('jobs')" style="background:none;border:none;color:var(--muted);font-family:var(--mono);font-size:.6rem;cursor:pointer;padding:.25rem .55rem;border-radius:5px;transition:color .15s" onmouseover="this.style.color='var(--sub)'" onmouseout="this.style.color='var(--muted)'">Jobs</button>
+      <button onclick="go('demand')" style="background:none;border:none;color:var(--muted);font-family:var(--mono);font-size:.6rem;cursor:pointer;padding:.25rem .55rem;border-radius:5px;transition:color .15s" onmouseover="this.style.color='var(--sub)'" onmouseout="this.style.color='var(--muted)'">Demand</button>
+      <button onclick="go('resume')" style="background:none;border:none;color:var(--muted);font-family:var(--mono);font-size:.6rem;cursor:pointer;padding:.25rem .55rem;border-radius:5px;transition:color .15s" onmouseover="this.style.color='var(--sub)'" onmouseout="this.style.color='var(--muted)'">Resume AI</button>
+      <button onclick="go('recruiters')" style="background:none;border:none;color:var(--muted);font-family:var(--mono);font-size:.6rem;cursor:pointer;padding:.25rem .55rem;border-radius:5px;transition:color .15s" onmouseover="this.style.color='var(--sub)'" onmouseout="this.style.color='var(--muted)'">Employers</button>
+      <button onclick="go('faq')" style="background:none;border:none;color:var(--muted);font-family:var(--mono);font-size:.6rem;cursor:pointer;padding:.25rem .55rem;border-radius:5px;transition:color .15s" onmouseover="this.style.color='var(--sub)'" onmouseout="this.style.color='var(--muted)'">FAQ</button>
+      <button onclick="go('legal')" style="background:none;border:none;color:var(--muted);font-family:var(--mono);font-size:.6rem;cursor:pointer;padding:.25rem .55rem;border-radius:5px;transition:color .15s" onmouseover="this.style.color='var(--sub)'" onmouseout="this.style.color='var(--muted)'">Legal</button>
+      <a href="mailto:hello@tryseen.io" style="color:var(--muted);font-family:var(--mono);font-size:.6rem;text-decoration:none;padding:.25rem .55rem;transition:color .15s" onmouseover="this.style.color='var(--sub)'" onmouseout="this.style.color='var(--muted)'">Contact</a>
     </div>
+    <div style="font-family:var(--mono);font-size:.58rem;color:var(--muted);flex-shrink:0">Built by someone who lived this.</div>
   </div>
 </footer>
 
@@ -1980,8 +1993,7 @@ async function loadRealCompanyData(companyName, cityHint) {
       .gt('expires_at', now).limit(50);
 
     // Check company_scores DB cache directly — avoids an API round-trip when cached
-    // Note: we always check for web_reviews even when community reports exist (≥3),
-    // so the Overview tab can show "What applicants are saying online" alongside community scores.
+    // Always run even when community reports exist (≥3) so web reviews appear in the Overview tab.
     try {
       const { data: cs } = await db.from('company_scores')
         .select('overall_score,ghost_rate,response_rate,avg_wait_days,avg_rounds,waste_score,unpaid_rate,report_count,data_quality,industry,raw_summary,web_reviews,expires_at')
@@ -2003,7 +2015,9 @@ async function loadRealCompanyData(companyName, cityHint) {
           industry: cs.industry || '', summary: cs.raw_summary || '', process_score: s,
           web_reviews: reviews,
         };
-        return { reports, jobs: jobs || [], webScore, source: 'db_cache' };
+        // Only use anon cache if it has reviews; otherwise fall through to API
+        // (which uses service key and always has the newest row)
+        if (reviews.length > 0) return { reports, jobs: jobs || [], webScore, source: 'db_cache' };
       }
     } catch(_e) {}
 
@@ -2191,9 +2205,121 @@ function openCompanySearch(){
   setTimeout(()=>document.getElementById('coSearchInp')?.focus(),120);
 }
 
+// ── Application tracking helpers for company check modal ──
+function _modalTrackCTA(name, loc, sc) {
+  const existing = AppStore.loadSync().find(a => a.company.toLowerCase() === name.toLowerCase() && a.status === 'active');
+  if (existing) {
+    const days = Math.floor((Date.now() - existing.appliedAt) / 86400000);
+    const avgWait = sc?.avg_wait_days || 30;
+    const pct = Math.round((1 - (sc?.ghost_rate || 0.4)) * 100);
+    const overdue = days > avgWait * 1.1;
+    return `<div style="background:${overdue?'var(--rdim)':'rgba(16,185,129,0.07)'};border:1px solid ${overdue?'rgba(239,68,68,0.2)':'rgba(16,185,129,0.2)'};border-radius:9px;padding:.65rem .95rem;display:flex;align-items:center;justify-content:space-between;gap:.75rem">
+      <div>
+        <div style="font-family:var(--mono);font-size:.63rem;color:${overdue?'var(--red)':'var(--green)'};margin-bottom:.1rem">${overdue?`⚠ ${days}d with no update — past typical window`:`✓ Tracking · ${days}d since applied`}</div>
+        <div style="font-family:var(--mono);font-size:.54rem;color:var(--muted)">${overdue?`${Math.round((sc?.ghost_rate||0.4)*100)}% ghost rate at this company — consider moving on`:`${pct}% respond · avg ${avgWait}d`}</div>
+      </div>
+      <button class="btn btn-ghost" style="font-size:.6rem;padding:.35rem .7rem;flex-shrink:0;white-space:nowrap" onclick="closeModDirect();go('tracker')">View →</button>
+    </div>`;
+  }
+  const safeName = name.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+  const safeLoc = (loc||'').replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+  return `<button class="btn btn-solid" style="width:100%;justify-content:center;font-size:.75rem;background:linear-gradient(135deg,rgba(16,185,129,0.18),rgba(99,102,241,0.18));border-color:rgba(16,185,129,0.35);color:var(--green)" onclick="showTrackRoleInput('${safeName}','${safeLoc}','modalTrackRow')">+ Track application to ${name}</button>`;
+}
+
+function showTrackRoleInput(name, loc, containerId) {
+  const row = document.getElementById(containerId);
+  if (!row) return;
+  const safeName = name.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+  const safeLoc = (loc||'').replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+  row.innerHTML = `<div style="background:rgba(99,102,241,0.07);border:1px solid rgba(99,102,241,0.22);border-radius:10px;padding:.75rem 1rem">
+    <div style="font-family:var(--mono);font-size:.6rem;color:var(--dim);margin-bottom:.5rem">What role did you apply for?</div>
+    <div style="display:flex;gap:.4rem">
+      <input type="text" id="trackRoleInput_${containerId}" placeholder="e.g. Software Engineer" autocomplete="off"
+        style="flex:1;background:var(--surface);border:1px solid var(--line2);border-radius:7px;padding:.5rem .75rem;font-family:var(--mono);font-size:.7rem;color:var(--text);outline:none;-webkit-appearance:none"
+        onkeydown="if(event.key==='Enter'){event.preventDefault();quickTrackApplication('${safeName}','${safeLoc}',this.value,'${containerId}')}"
+      />
+      <button class="btn btn-solid" style="font-size:.72rem;flex-shrink:0;background:linear-gradient(135deg,rgba(16,185,129,0.25),rgba(99,102,241,0.2));border-color:rgba(16,185,129,0.4);color:var(--green)"
+        onclick="quickTrackApplication('${safeName}','${safeLoc}',document.getElementById('trackRoleInput_${containerId}').value||'','${containerId}')">Track →</button>
+    </div>
+    <div style="font-family:var(--mono);font-size:.52rem;color:var(--muted);margin-top:.35rem">Leave blank to skip · you can update it later</div>
+  </div>`;
+  setTimeout(() => document.getElementById('trackRoleInput_' + containerId)?.focus(), 60);
+}
+
+async function quickTrackApplication(name, loc, role, containerId) {
+  // Soft paywall — guests capped at 5 tracked apps
+  if (!Auth.isLoggedIn()) {
+    const existing = AppStore.loadSync();
+    if (existing.length >= 5) {
+      const cid = containerId || 'modalTrackRow';
+      const row = document.getElementById(cid);
+      if (row) row.innerHTML = `<div style="background:var(--gdim);border:1px solid var(--gmid);border-radius:10px;padding:.85rem 1rem;text-align:center">
+        <div style="font-family:var(--mono);font-size:.65rem;font-weight:500;color:var(--green);margin-bottom:.3rem">Free limit reached (5 apps)</div>
+        <div style="font-family:var(--mono);font-size:.57rem;color:var(--dim);margin-bottom:.6rem">Sign in free for unlimited tracking + timeline predictions</div>
+        <button class="btn btn-solid" style="width:100%;justify-content:center;font-size:.72rem" onclick="if(document.getElementById('modalOv')?.classList.contains('open'))closeModDirect();go('login')">Sign in free →</button>
+      </div>`;
+      return;
+    }
+  }
+  const ck = name.toLowerCase().trim();
+  const known = COS[ck] || Object.values(COS).find(c => c.name.toLowerCase().includes(ck));
+  const lk = loc ? `${ck}|${loc.toLowerCase()}` : null;
+  const sc = (lk ? LOC_SCORES[lk] : null) || known?.sc || {avg_wait_days:30, ghost_rate:0.4, response_rate:0.5};
+  const pct = Math.round((1 - (sc.ghost_rate || 0.4)) * 100);
+  const avgWait = sc.avg_wait_days || 30;
+  const roleLabel = role?.trim() || name;
+  await AppStore.add({
+    company: name,
+    role: role?.trim() || name,
+    location: loc || '',
+    platform: 'seen',
+    score: sc.overall_score,
+    waste: sc.waste,
+    stage: 'Applied',
+    status: 'active'
+  });
+  const cid = containerId || 'modalTrackRow';
+  const row = document.getElementById(cid);
+  if (row) {
+    const highGhost = (sc.ghost_rate || 0) > 0.5;
+    row.innerHTML = `<div style="background:rgba(16,185,129,0.08);border:1px solid rgba(16,185,129,0.25);border-radius:9px;padding:.75rem 1rem">
+      <div style="font-family:var(--mono);font-size:.65rem;font-weight:500;color:var(--green);margin-bottom:.25rem">✓ Tracking — ${roleLabel} at ${name}</div>
+      <div style="font-family:var(--mono);font-size:.57rem;color:var(--dim);line-height:1.65">${pct}% of applicants hear back · avg response <strong style="color:var(--white)">${avgWait} days</strong>${highGhost ? ` · <span style="color:var(--red)">⚠ high ghost rate</span>` : ''}</div>
+      <div style="display:flex;gap:.35rem;margin-top:.6rem">
+        <button class="btn btn-ghost" style="font-size:.62rem;padding:.38rem .75rem" onclick="if(document.getElementById('modalOv')?.classList.contains('open'))closeModDirect();go('tracker')">View tracker →</button>
+        <button class="btn btn-ghost" style="font-size:.62rem;padding:.38rem .75rem" onclick="if(document.getElementById('modalOv')?.classList.contains('open'))closeModDirect();prefillReport('${name.replace(/'/g,"\\'")}');go('report')">+ Report experience</button>
+      </div>
+    </div>`;
+  }
+  showToast(`Tracking: ${roleLabel} at ${name}`);
+  // Offer browser notifications on first track
+  if ('Notification' in window && Notification.permission === 'default') {
+    setTimeout(() => _offerNotifications(name, avgWait), 2500);
+  }
+}
+
+function _offerNotifications(company, avgWait) {
+  const banner = document.createElement('div');
+  banner.id = 'notifBanner';
+  banner.style.cssText = 'position:fixed;bottom:1.25rem;left:50%;transform:translateX(-50%);z-index:9001;background:var(--card);border:1px solid rgba(99,102,241,0.3);border-radius:14px;padding:.95rem 1.1rem;max-width:380px;width:calc(100vw - 1.5rem);box-shadow:0 12px 48px rgba(0,0,0,0.65);transition:opacity .3s';
+  banner.innerHTML = `
+    <div style="font-family:var(--mono);font-size:.65rem;font-weight:600;color:var(--white);margin-bottom:.25rem">Get notified when it's time to follow up</div>
+    <div style="font-family:var(--mono);font-size:.58rem;color:var(--dim);margin-bottom:.65rem;line-height:1.6">We'll remind you if ${company} hasn't responded after ${avgWait} days. No spam — just the nudge you need.</div>
+    <div style="display:flex;gap:.4rem">
+      <button class="btn btn-ghost" style="flex:1;justify-content:center;font-size:.65rem" onclick="document.getElementById('notifBanner')?.remove()">Not now</button>
+      <button class="btn btn-solid" style="flex:2;justify-content:center;font-size:.65rem" onclick="Notification.requestPermission().then(p=>{document.getElementById('notifBanner')?.remove();if(p==='granted')showToast('Notifications on — we\\'ll remind you when it matters.')})">Enable notifications</button>
+    </div>`;
+  document.body.appendChild(banner);
+  setTimeout(() => { if(banner.parentNode){banner.style.opacity='0';} }, 12000);
+  setTimeout(() => banner.remove(), 12400);
+}
+
 function openModal(name,loc){
   const canonical=normalizeCompanyName(name);
   document.getElementById('modalOv').classList.add('open');
+  // Neutral glow while loading
+  const _mn=document.querySelector('#modalOv .modal');
+  if(_mn) _mn.style.boxShadow='0 0 60px rgba(99,102,241,0.18),0 0 120px rgba(124,58,237,0.08),0 40px 120px rgba(0,0,0,0.78)';
   document.getElementById('mTitle').textContent=`Checking: ${canonical}${loc?' · '+loc:''}`;
   document.getElementById('mBody').innerHTML=`<div class="loader"><div class="spinner"></div><div class="loader-txt">Aggregating${loc?' location-specific':''} data...</div></div>`;
   runSearch(canonical,loc);
@@ -2219,8 +2345,10 @@ async function runSearch(name,loc){
 
   const realData=await realDataPromise;
   const realSc=realData?computeScoresFromData(realData.reports,realData.jobs,realData.webScore):null;
-  const sc=realSc||locSc||(known?.sc)||{overall_score:50,risk_level:'warn',response_rate:.5,ghost_rate:.3,avg_wait_days:30,report_count:0,waste:40};
+  // COS is authoritative when realSc has <3 community reports (web estimate / AI data)
+  const sc=locSc||(realSc?.report_count>=3?realSc:null)||(known?.sc)||realSc||{overall_score:50,risk_level:'warn',response_rate:.5,ghost_rate:.3,avg_wait_days:30,report_count:0,waste:40};
   const risk=sc.risk_level||Score.risk(sc.overall_score);
+  _modalGlow('#modalOv .modal', risk);
   const grade=letterGrade(sc.overall_score);
   const vibeList=VIBES[ck]||VIBES.default;
   const ghostPct=Math.round((sc.ghost_rate||0)*100);
@@ -2275,7 +2403,8 @@ async function runSearch(name,loc){
     <div class="mbar"><div class="mbar-lbl" style="width:85px">Transparency</div><div class="mbar-track"><div class="mbar-fill" style="width:${sc.overall_score}%;background:${Score.color(risk)}"></div></div><div class="mbar-val" style="color:${Score.color(risk)}">${sc.overall_score}</div></div>
     <div class="mbar"><div class="mbar-lbl" style="width:85px">Ghost rate</div><div class="mbar-track"><div class="mbar-fill mf-r" style="width:${ghostPct}%"></div></div><div class="mbar-val">${ghostPct}%</div></div>
 
-    <div style="display:flex;gap:.45rem;margin-top:1rem">
+    <div id="modalTrackRow" style="margin-top:1rem">${_modalTrackCTA(known?.name||name, loc, sc)}</div>
+    <div style="display:flex;gap:.45rem;margin-top:.45rem">
       <button class="btn btn-solid" style="flex:1;justify-content:center;font-size:.75rem" onclick="closeModDirect();viewCompany('${known?.id||'x'}','${known?.name||name}','${loc}')">Full report →</button>
       <button class="btn btn-ghost" style="padding:.65rem .9rem;font-size:.75rem;flex-shrink:0" onclick="shareCompanyReport('${(name||'').replace(/'/g,"\\'")}')">↗ Share</button>
       <button class="btn btn-ghost" style="padding:.65rem .9rem;font-size:.75rem;flex-shrink:0" onclick="closeModDirect();prefillReport('${(name||'').replace(/'/g,"\\'")}');go('report')">+ Report</button>
@@ -2309,6 +2438,23 @@ function loadLdr(){
       <div class="ldr-waste" style="color:${c.sc.waste>60?'var(--red)':c.sc.waste>30?'var(--amber)':'var(--green)'}">${c.sc.waste}% waste risk</div>
       <div class="ldr-bar"><div class="ldr-fill" style="width:${c.sc.overall_score}%;background:${fc}"></div></div>
     </div>`;}).join('');
+}
+
+// ═══════════════════════════════════════════════
+// TICKER — live scores from COS
+// ═══════════════════════════════════════════════
+function populateTicker(){
+  const el=document.getElementById('tickerTrack');
+  if(!el)return;
+  // Industry → readable city hint
+  const cityHint={amazon:'Seattle',stripe:'Remote',linear:'Remote',shopify:'Remote',meta:'Menlo Park',accenture:'Chicago',notion:'Remote',deloitte:'New York',indeed:'Austin'};
+  const entries=Object.entries(COS).map(([key,c])=>{
+    const s=c.sc.overall_score,risk=c.sc.risk_level,loc=cityHint[key]||c.ind;
+    return`<span class="tick"><span class="tco">${c.name.toUpperCase()}</span><span class="tloc">${loc}</span><span class="ts ${risk}">${s}</span></span><span class="tdiv">·</span>`;
+  });
+  // Double for seamless infinite scroll
+  const html=entries.join('')+entries.join('');
+  el.innerHTML=html;
 }
 
 // ═══════════════════════════════════════════════
@@ -3006,18 +3152,126 @@ function _viewerCount(name) {
   return base + dayVar;
 }
 
+let _shareCtx = null;
 function shareCompanyReport(name) {
-  const url = window.location.origin + window.location.pathname + '#company/' + encodeURIComponent((name||'').toLowerCase());
-  const text = `${name} has a transparency score on Seen — check ghost rate, waste risk & more before applying`;
+  const url = 'https://seenjobs.io/#company/' + encodeURIComponent((name||'').toLowerCase().trim());
+  const ctx = (_shareCtx && _shareCtx.name && _shareCtx.name.toLowerCase() === (name||'').toLowerCase()) ? _shareCtx : null;
+  // Pick a variant deterministically based on name so the same company always gets the same message
+  const v = (name||'').split('').reduce((h,c)=>((h<<5)-h)+c.charCodeAt(0),0) & 3;
+  let msg;
+  if (ctx) {
+    if (ctx.risk === 'danger') {
+      const opts = [
+        `${name} ghosts ${ctx.ghost}% of applicants — and they're still posting jobs. someone built a site to track this and it's free: ${url}`,
+        `i just checked ${name}'s hiring score and it's ${ctx.score}/100. ${ctx.ghost}% ghost rate. if you're applying there rn you need to see this: ${url}`,
+        `this is why job hunting feels broken. ${name} ghosts ${ctx.ghost}% of applicants and nobody talks about it: ${url}`,
+        `wait — ${name} has a ${ctx.score}/100 hiring score and a ${ctx.ghost}% ghost rate. someone made a whole tracker for this: ${url}`,
+      ];
+      msg = opts[v];
+    } else if (ctx.risk === 'warn') {
+      const opts = [
+        `checking a company's ghost rate before applying is free. ${name} is at ${ctx.ghost}% with a ${ctx.score}/100 score — make of that what you will: ${url}`,
+        `${name} scores ${ctx.score}/100 on hiring transparency. ${ctx.ghost}% ghost rate. would you still apply? ${url}`,
+        `found a site that tracks how companies actually treat applicants. ${name}: ${ctx.score}/100, ${ctx.ghost}% ghost rate: ${url}`,
+        `if you're applying to ${name} you probably want to see their ${ctx.score}/100 hiring score first: ${url}`,
+      ];
+      msg = opts[v];
+    } else {
+      const opts = [
+        `${name} actually has a solid hiring score — ${ctx.score}/100, ${ctx.ghost}% ghost rate. rare in this market: ${url}`,
+        `not all companies are the same. ${name} scores ${ctx.score}/100 on hiring transparency. one of the good ones: ${url}`,
+        `ok ${name} is actually legit — ${ctx.score}/100 score, ${ctx.ghost}% ghost rate tracked by real applicants. see the full breakdown: ${url}`,
+        `${name} scores ${ctx.score}/100 on Seen. you can check any company before you apply — ghost rate, timelines, everything: ${url}`,
+      ];
+      msg = opts[v];
+    }
+  } else {
+    const opts = [
+      `you can check any company's hiring score before you apply. here's ${name}'s: ${url}`,
+      `someone built a site that tracks ghost rates and hiring transparency by company. ${name} is on it: ${url}`,
+      `found this for ${name} — real applicant data, ghost rates, waste risk, all free: ${url}`,
+      `if you're applying to ${name} or know someone who is — this is worth 30 seconds: ${url}`,
+    ];
+    msg = opts[v];
+  }
   if (navigator.share) {
-    navigator.share({ title: name + ' — Transparency Report | Seen', text, url }).catch(()=>{});
+    navigator.share({ text: msg }).catch(()=>{});
   } else if (navigator.clipboard) {
-    navigator.clipboard.writeText(url).then(() => showToast('Link copied! Share it anywhere 🔗'));
+    navigator.clipboard.writeText(msg).then(() => showToast('Copied!'));
+  }
+}
+
+function _updateMetaTags(name, sc) {
+  const score = sc?.overall_score;
+  const ghost = sc?.ghost_rate ? Math.round(sc.ghost_rate * 100) : null;
+  const risk = sc?.risk_level || 'warn';
+  const riskLabel = risk === 'safe' ? 'Good' : risk === 'danger' ? 'High risk' : 'Moderate';
+  const title = score ? `${name} · ${score}/100 · ${riskLabel} — Seen` : `${name} Hiring Score — Seen`;
+  const desc = score
+    ? `${name} scores ${score}/100 on Seen.${ghost !== null ? ` ${ghost}% ghost rate.` : ''} Check hiring transparency, response times, and waste risk before you apply.`
+    : `Check ${name}'s hiring transparency score, ghost rate, and response time on Seen before you apply.`;
+  const url = `https://seenjobs.io/#company/${encodeURIComponent((name||'').toLowerCase().trim())}`;
+  const setMeta = (id, val) => { const el = document.getElementById(id); if (el) el.setAttribute('content', val); };
+  document.title = title;
+  setMeta('ogTitle', title); setMeta('ogDesc', desc); setMeta('ogUrl', url);
+  setMeta('twTitle', title); setMeta('twDesc', desc);
+}
+
+function _buildExpectedTimeline(sc, risk, safeName, loc) {
+  if (!sc) return '';
+  const avgWait = sc.avg_wait_days || 30;
+  const rr = Math.round((sc.response_rate||0)*100);
+  const gr = Math.round((sc.ghost_rate||0)*100);
+  const w = sc.waste || 40;
+  const wColor = w > 60 ? 'var(--red)' : w > 30 ? 'var(--amber)' : 'var(--green)';
+  const rrColor = Score.color(risk);
+  const safeLoc = (loc||'').replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+  return `<div style="background:rgba(99,102,241,0.07);border:1px solid rgba(99,102,241,0.18);border-radius:12px;padding:1rem 1.1rem;margin-bottom:1rem">
+    <div style="font-family:var(--mono);font-size:.56rem;text-transform:uppercase;letter-spacing:.08em;color:var(--indigo);margin-bottom:.75rem">📅 If you applied today</div>
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:.75rem;margin-bottom:.85rem">
+      <div><div style="font-family:var(--mono);font-size:1.3rem;font-weight:500;color:var(--white);line-height:1;margin-bottom:.15rem">${avgWait}d</div><div style="font-family:var(--mono);font-size:.52rem;color:var(--muted)">avg response</div></div>
+      <div><div style="font-family:var(--mono);font-size:1.3rem;font-weight:500;color:${rrColor};line-height:1;margin-bottom:.15rem">${rr}%</div><div style="font-family:var(--mono);font-size:.52rem;color:var(--muted)">hear back</div></div>
+      <div><div style="font-family:var(--mono);font-size:1.3rem;font-weight:500;color:${wColor};line-height:1;margin-bottom:.15rem">${w}%</div><div style="font-family:var(--mono);font-size:.52rem;color:var(--muted)">waste risk</div></div>
+    </div>
+    <div id="coTrackBarExpected">
+      <button class="btn btn-solid" style="width:100%;justify-content:center;font-size:.75rem;background:linear-gradient(135deg,rgba(16,185,129,0.15),rgba(99,102,241,0.15));border-color:rgba(16,185,129,0.3);color:var(--green)" onclick="showTrackRoleInput('${safeName}','${safeLoc}','coTrackBarExpected')">I'm applying here — track it</button>
+    </div>
+  </div>`;
+}
+
+function _renderCoTrackBar(name, loc, sc) {
+  const bar = document.getElementById('coTrackBar');
+  if (!bar) return;
+  const existing = AppStore.loadSync().find(a => a.company.toLowerCase() === name.toLowerCase() && a.status === 'active');
+  const safeName = name.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+  const safeLoc = (loc||'').replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+  if (existing) {
+    const days = Math.floor((Date.now() - existing.appliedAt) / 86400000);
+    const avgWait = sc?.avg_wait_days || 30;
+    const overdue = days > avgWait * 1.1;
+    bar.innerHTML = `<div style="background:${overdue?'var(--rdim)':'rgba(16,185,129,0.07)'};border:1px solid ${overdue?'rgba(239,68,68,0.22)':'rgba(16,185,129,0.2)'};border-radius:10px;padding:.75rem 1rem;display:flex;align-items:center;justify-content:space-between;gap:.75rem;flex-wrap:wrap">
+      <div>
+        <div style="font-family:var(--mono);font-size:.65rem;font-weight:500;color:${overdue?'var(--red)':'var(--green)'};margin-bottom:.15rem">${overdue?`⚠ ${days}d — past typical response window`:`✓ You're tracking this · ${days}d since applied`}</div>
+        <div style="font-family:var(--mono);font-size:.57rem;color:var(--muted)">${existing.role}${overdue?' · consider marking ghosted or moving on':` · avg response ${avgWait}d`}</div>
+      </div>
+      <div style="display:flex;gap:.4rem;flex-shrink:0">
+        ${overdue?`<button class="btn btn-ghost" style="font-size:.62rem;padding:.35rem .7rem;color:var(--red);border-color:rgba(239,68,68,0.3)" onclick="markAppStatus('${existing.id}','ghosted');_renderCoTrackBar('${safeName}','${safeLoc}',null)">Mark ghosted</button>`:''}
+        <button class="btn btn-ghost" style="font-size:.62rem;padding:.35rem .7rem" onclick="go('tracker')">View tracker →</button>
+      </div>
+    </div>`;
+  } else {
+    bar.innerHTML = `<div id="coTrackBarInner">
+      <button class="btn btn-solid" style="width:100%;justify-content:center;font-size:.78rem;padding:.75rem;background:linear-gradient(135deg,rgba(16,185,129,0.15),rgba(99,102,241,0.15));border-color:rgba(16,185,129,0.3);color:var(--green)" onclick="showTrackRoleInput('${safeName}','${safeLoc}','coTrackBarInner')">+ I applied here — track this application</button>
+    </div>`;
   }
 }
 
 async function viewCompany(id,name,loc){
   go('company');
+  // Encode current company into the URL hash so Safari can restore after page discard
+  const _hn=encodeURIComponent((name||'').toLowerCase().trim());
+  const _hl=loc?'/'+encodeURIComponent((loc||'').toLowerCase().trim()):'';
+  history.replaceState(null,'',window.location.pathname+window.location.search+'#company/'+_hn+_hl);
   const ck=(name||'').toLowerCase().trim();
   const co=COS[ck]||Object.values(COS).find(c=>c.id===id||c.name.toLowerCase().includes(ck));
   const lk=loc?`${ck}|${loc.toLowerCase()}`:null;
@@ -3041,6 +3295,8 @@ async function viewCompany(id,name,loc){
   document.getElementById('coInd').textContent=co?.ind||'';
   if(loc){const lt=document.getElementById('coLocTag');lt.textContent='📍 '+loc;lt.style.display='inline-flex';}
   document.getElementById('aggBar').style.display='flex';
+  _renderCoTrackBar(co?.name||name, loc, sc);
+  _updateMetaTags(co?.name||name, sc);
 
   document.getElementById('coSB').innerHTML=`
     <div class="co-grade-bar ${risk}">
@@ -3076,7 +3332,10 @@ async function viewCompany(id,name,loc){
     <div class="co-m"><span class="co-mn">${sc.report_count||0}</span><span class="co-ml">Reports</span></div>`;
 
   // Overview
+  const _coN = co?.name||name;
+  const _coNSafe = _coN.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
   document.getElementById('ctc-ov').innerHTML=`
+    ${_buildExpectedTimeline(sc, risk, _coNSafe, loc)}
     <div style="display:grid;grid-template-columns:${window.innerWidth<600?'1fr':'1fr 1fr'};gap:1rem;margin-bottom:1rem">
       <div style="background:var(--card);border:1px solid var(--line);border-radius:10px;padding:1.2rem">
         <div style="font-family:var(--mono);font-size:.56rem;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:.85rem">Score breakdown${loc?' ('+loc+')':''}</div>
@@ -3203,6 +3462,12 @@ async function viewCompany(id,name,loc){
   (async () => {
     const realData = await loadRealCompanyData(co?.name || name, loc);
     const rsc = realData ? computeScoresFromData(realData.reports, realData.jobs, realData.webScore) : null;
+    if (rsc && realData?.webScore?.web_reviews?.length) rsc.web_reviews = realData.webScore.web_reviews;
+    // Store score context so shareCompanyReport can build a rich message
+    if (rsc) {
+      _shareCtx = { name: co?.name||name, score: rsc.overall_score, ghost: Math.round((rsc.ghost_rate||0)*100), waste: rsc.waste||0, risk: rsc.risk_level };
+      _updateMetaTags(co?.name||name, rsc);
+    }
 
     if (!rsc) {
       if (isUnknown) {
@@ -3240,7 +3505,7 @@ async function viewCompany(id,name,loc){
         </div>
         <div style="display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;justify-content:flex-end">
           ${dqBadge}
-          <button onclick="(()=>{const u='https://seenjobs.io/#company/'+encodeURIComponent('${(name||'').replace(/'/g,"\\'")}');navigator.share?navigator.share({title:'${(name||'').replace(/'/g,"\\'")} on Seen',url:u}):navigator.clipboard.writeText(u).then(()=>showToast('Link copied!'))})()" class="co-share-btn">↗ Share</button>
+          <button onclick="shareCompanyReport('${(name||'').replace(/'/g,"\\'")}')" class="co-share-btn">↗ Share</button>
         </div>
       </div>`;
 
@@ -3268,6 +3533,7 @@ async function viewCompany(id,name,loc){
     const rsp = Math.round((rsc.response_rate || 0) * 100);
     const rgp = Math.round((rsc.ghost_rate || 0) * 100);
     document.getElementById('ctc-ov').innerHTML = `
+      ${_buildExpectedTimeline(rsc, rr2, (co?.name||name).replace(/\\/g,'\\\\').replace(/'/g,"\\'"), loc)}
       <div style="display:grid;grid-template-columns:${window.innerWidth<600?'1fr':'1fr 1fr'};gap:1rem;margin-bottom:1rem">
         <div style="background:var(--card);border:1px solid var(--line);border-radius:10px;padding:1.2rem">
           <div style="font-family:var(--mono);font-size:.56rem;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:.85rem">Score breakdown${loc ? ' (' + loc + ')' : ''}</div>
@@ -3326,6 +3592,38 @@ async function viewCompany(id,name,loc){
         </div>
       </div>
       <div style="background:var(--gdim);border:1px solid var(--gmid);border-radius:8px;padding:.75rem 1rem;font-family:var(--mono);font-size:.62rem;color:var(--green)">This feature is exclusive to Seen. No other job board tracks which stage companies ghost at.</div>`;
+  })();
+
+  // Web reviews — independent fetch, outside the scoring pipeline
+  (async () => {
+    const wrEl = document.getElementById('ctc-web-reviews');
+    if (!wrEl) return;
+    wrEl.innerHTML = '';
+    try {
+      const r = await fetch('/api/company-score', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: normalizeCompanyName(co?.name || name) }),
+      });
+      if (!r.ok) return;
+      const d = await r.json();
+      const reviews = d?.score?.web_reviews;
+      if (!Array.isArray(reviews) || !reviews.length) return;
+      const sentColor = s => s === 'positive' ? 'var(--green)' : s === 'negative' ? 'var(--red)' : 'var(--amber)';
+      const sentLabel = s => s === 'positive' ? '✓ Positive' : s === 'negative' ? '✗ Negative' : '~ Mixed';
+      wrEl.innerHTML = `
+        <div style="font-family:var(--mono);font-size:.56rem;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:.75rem">What applicants are saying online</div>
+        <div style="display:flex;flex-direction:column;gap:.6rem">
+          ${reviews.map(rv => `<div style="background:var(--card);border:1px solid var(--line);border-radius:8px;padding:.85rem 1rem">
+            <div style="font-family:var(--mono);font-size:.65rem;color:var(--dim);line-height:1.55;margin-bottom:.5rem">"${(rv.text||'').replace(/"/g,'&quot;').replace(/`/g,'&#96;')}"</div>
+            <div style="display:flex;align-items:center;gap:.5rem;flex-wrap:wrap">
+              <span style="font-family:var(--mono);font-size:.54rem;font-weight:600;color:${sentColor(rv.sentiment)}">${sentLabel(rv.sentiment)}</span>
+              ${rv.source ? `<span style="font-family:var(--mono);font-size:.52rem;color:var(--muted)">${rv.source.replace(/</g,'&lt;')}</span>` : ''}
+              ${rv.year ? `<span style="font-family:var(--mono);font-size:.52rem;color:var(--muted)">${rv.year}</span>` : ''}
+            </div>
+          </div>`).join('')}
+        </div>`;
+    } catch(e) { console.warn('web reviews:', e); }
   })();
 
   generateRoles(co?.name||name);
@@ -3497,6 +3795,7 @@ function goToEmployerDashboard(){
     }catch(e){}
   }
   loadFeatured();
+  populateTicker();
 })();
 
 // ═══════════════════════════════════════════════
@@ -3723,6 +4022,69 @@ const AppStore = {
 };
 
 // ═══════════════════════════════════════════════
+// APPLICATION TIMELINE BUILDER
+// Visual day-progress bar for tracker cards
+// ═══════════════════════════════════════════════
+function _buildTimeline(app) {
+  const co = Object.values(COS).find(c => c.name.toLowerCase() === app.company.toLowerCase());
+  const avgWait = co?.sc?.avg_wait_days || 30;
+  const days = Math.floor((Date.now() - app.appliedAt) / 86400000);
+  const pct = Math.min(100, (days / avgWait) * 100);
+  const color = pct < 75 ? 'var(--green)' : pct < 115 ? 'var(--amber)' : 'var(--red)';
+  const statusLbl = pct < 75 ? 'On track' : pct < 115 ? 'In the window' : '⚠ Past window';
+  const dotPct = Math.min(97, pct);
+  const appliedLbl = new Date(app.appliedAt).toLocaleDateString('en-US',{month:'short',day:'numeric'});
+  const expectedDate = new Date(app.appliedAt + avgWait * 86400000).toLocaleDateString('en-US',{month:'short',day:'numeric'});
+  return `<div style="margin:.6rem 0 .85rem">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.38rem">
+      <span style="font-family:var(--mono);font-size:.54rem;color:var(--muted)">${appliedLbl}</span>
+      <span style="font-family:var(--mono);font-size:.6rem;font-weight:600;color:${color}">Day ${days} · ${statusLbl}</span>
+      <span style="font-family:var(--mono);font-size:.54rem;color:var(--muted)">Avg: ${expectedDate}</span>
+    </div>
+    <div style="height:5px;background:var(--line);border-radius:3px;position:relative;overflow:visible;margin:0 4px">
+      <div style="height:100%;width:${pct}%;background:linear-gradient(to right,var(--green),${color});border-radius:3px"></div>
+      <div style="position:absolute;top:50%;left:${dotPct}%;transform:translate(-50%,-50%);width:12px;height:12px;border-radius:50%;background:${color};box-shadow:0 0 8px ${color},0 0 20px ${color}55;border:2px solid var(--void)"></div>
+    </div>
+    <div style="display:flex;justify-content:space-between;font-family:var(--mono);font-size:.5rem;color:var(--muted);margin-top:.28rem">
+      <span>Day 0</span><span>← typical response window →</span><span>Day ${avgWait}</span>
+    </div>
+  </div>`;
+}
+
+// ═══════════════════════════════════════════════
+// OUTCOME REPORT PROMPT
+// After marking ghosted/hired, gently ask user
+// to convert outcome into a community report
+// ═══════════════════════════════════════════════
+function _promptOutcomeReport(app, status, days) {
+  const existing = document.getElementById('outcomeReportBanner');
+  if (existing) existing.remove();
+  const isGhosted = status === 'ghosted';
+  const isHired = status === 'hired';
+  if (!isGhosted && !isHired) return;
+  const banner = document.createElement('div');
+  banner.id = 'outcomeReportBanner';
+  banner.style.cssText = 'position:fixed;bottom:1.25rem;left:50%;transform:translateX(-50%);z-index:9000;background:var(--card);border:1px solid '+(isHired?'rgba(16,185,129,0.35)':'rgba(239,68,68,0.3)')+';border-radius:14px;padding:.95rem 1.1rem;max-width:380px;width:calc(100vw - 1.5rem);box-shadow:0 12px 48px rgba(0,0,0,0.65),0 0 40px rgba(99,102,241,0.08);transition:opacity .3s';
+  const safeId = (app.id||'').replace(/'/g,"\\'");
+  const safeName = (app.company||'').replace(/'/g,"\\'");
+  banner.innerHTML = `
+    <div style="font-family:var(--mono);font-size:.65rem;font-weight:600;color:${isHired?'var(--green)':'var(--red)'};margin-bottom:.25rem">
+      ${isHired ? `🎉 You got the job at ${app.company}` : `👻 ${app.company} ghosted you after ${days} days`}
+    </div>
+    <div style="font-family:var(--mono);font-size:.58rem;color:var(--dim);margin-bottom:.65rem;line-height:1.6">
+      Your experience tells the next applicant what to expect. It takes 60 seconds and moves their score.
+    </div>
+    <div style="display:flex;gap:.4rem">
+      <button class="btn btn-ghost" style="flex:1;justify-content:center;font-size:.65rem" onclick="document.getElementById('outcomeReportBanner')?.remove()">Skip</button>
+      <button class="btn btn-solid" style="flex:2;justify-content:center;font-size:.65rem;${isHired?'background:rgba(16,185,129,0.2);border-color:rgba(16,185,129,0.4);color:var(--green)':''}"
+        onclick="document.getElementById('outcomeReportBanner')?.remove();prefillReportFromApp('${safeId}')">Report my experience →</button>
+    </div>`;
+  document.body.appendChild(banner);
+  setTimeout(() => { if(banner.parentNode){banner.style.opacity='0';} }, 14000);
+  setTimeout(() => banner.remove(), 14400);
+}
+
+// ═══════════════════════════════════════════════
 // SMART NUDGE ENGINE
 // Calculates what the silence probably means
 // based on the company's known ghost patterns
@@ -3840,7 +4202,7 @@ function buildAppCard(app) {
         <div class="app-card-logo">${(app.company||'?')[0].toUpperCase()}</div>
         <div>
           <div class="app-card-co">${app.company}</div>
-          <div class="app-card-title">${app.role}</div>
+          <div class="app-card-title" style="display:flex;align-items:center;gap:.4rem">${app.role}<button onclick="editAppRole('${app.id}')" title="Edit role" style="background:none;border:none;font-family:var(--mono);font-size:.55rem;color:var(--muted);cursor:pointer;padding:0;line-height:1;opacity:.5" onmouseover="this.style.opacity=1" onmouseout="this.style.opacity=.5">✎</button></div>
           <div class="app-card-loc">📍 ${app.location}</div>
           ${app.employerStage && app.employerStage !== 'New' ? `<div style="margin-top:.3rem;display:inline-flex;align-items:center;gap:.3rem;background:${app.employerStage==='Rejected'?'var(--rdim)':app.employerStage==='Interview'?'var(--bdim)':'var(--gdim)'};border:1px solid ${app.employerStage==='Rejected'?'#ff3b5c28':app.employerStage==='Interview'?'#4b9eff28':'var(--gmid)'};border-radius:5px;padding:.18rem .5rem;font-family:var(--mono);font-size:.58rem;color:${app.employerStage==='Rejected'?'var(--red)':app.employerStage==='Interview'?'var(--blue)':'var(--green)'}">🏢 Employer: ${app.employerStage}</div>` : ''}
         </div>
@@ -3851,6 +4213,9 @@ function buildAppCard(app) {
         <div style="margin-top:.3rem"><span class="${wl.cls}" style="font-size:.55rem">${wl.txt}</span></div>
       </div>
     </div>
+
+    <!-- Timeline (active apps only) -->
+    ${app.status === 'active' ? _buildTimeline(app) : ''}
 
     <!-- Stage pipeline -->
     ${app.status === 'active' ? `
@@ -3986,6 +4351,28 @@ async function loadTrackerIntel(appId, company, role) {
 function scrollToApp(id) {
   const el = document.getElementById('app_' + id);
   if (el) { el.scrollIntoView({ behavior: 'smooth', block: 'center' }); el.style.boxShadow = '0 0 0 2px var(--green)'; setTimeout(() => el.style.boxShadow = '', 1500); }
+}
+
+function editAppRole(appId) {
+  const apps = AppStore.loadSync();
+  const app = apps.find(a => a.id === appId);
+  if (!app) return;
+  const titleEl = document.querySelector(`#app_${appId} .app-card-title`);
+  if (!titleEl) return;
+  const current = app.role || '';
+  titleEl.innerHTML = `<input type="text" value="${current.replace(/"/g,'&quot;')}" id="roleEditInput_${appId}"
+    style="background:var(--surface);border:1px solid var(--indigo);border-radius:5px;padding:.22rem .55rem;font-family:var(--mono);font-size:.75rem;color:var(--text);outline:none;width:100%;-webkit-appearance:none"
+    onblur="saveAppRole('${appId}',this.value)"
+    onkeydown="if(event.key==='Enter'){event.preventDefault();this.blur();}if(event.key==='Escape'){renderTracker();}"
+  />`;
+  const inp = document.getElementById('roleEditInput_' + appId);
+  if (inp) { inp.focus(); inp.select(); }
+}
+
+async function saveAppRole(appId, newRole) {
+  const trimmed = newRole.trim();
+  if (trimmed) { await AppStore.update(appId, { role: trimmed }); }
+  renderTracker();
 }
 
 async function clearAllApplications() {
@@ -4237,9 +4624,10 @@ async function deleteAccount() {
     const token = session?.access_token;
     if (!token) throw new Error('Not signed in');
 
-    const res = await fetch('/api/delete-account', {
+    const res = await fetch('/api/user-sync', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+      body: JSON.stringify({ action: 'delete_account' }),
     });
 
     if (!res.ok) {
@@ -4471,11 +4859,30 @@ async function renderSeekerDash(){
     </div>`;
   }
   // Stats
-  const rr=apps.length?Math.round((responded.filter(a=>a.status==='hired').length/apps.length)*100)+'%':'—';
   if(_('dStatActive'))_('dStatActive').textContent=active.length;
   if(_('dStatRR'))_('dStatRR').textContent=apps.length?Math.round((apps.filter(a=>a.status!=='active'&&a.status!=='ghosted').length/apps.length)*100)+'%':'—';
   if(_('dStatGhosted'))_('dStatGhosted').textContent=ghosted.length;
   if(_('dStatHired'))_('dStatHired').textContent=hired.length;
+
+  // Pipeline intelligence — aggregate insights from resolved apps
+  const insightBand = _('dashPipelineInsight');
+  if (insightBand && apps.length >= 2) {
+    const resolved = apps.filter(a => a.status !== 'active');
+    const withTiming = resolved.filter(a => a.responseTimeDays > 0);
+    const avgRT = withTiming.length ? Math.round(withTiming.reduce((s,a) => s+a.responseTimeDays, 0) / withTiming.length) : null;
+    const personalRR = apps.length ? Math.round((apps.filter(a => a.status==='hired'||a.status==='rejected').length / apps.length) * 100) : null;
+    const overdue = active.filter(a => { const d=Math.floor((Date.now()-a.appliedAt)/86400000); const co=Object.values(COS).find(c=>c.name.toLowerCase()===a.company.toLowerCase()); return d>(co?.sc?.avg_wait_days||30)*1.1; });
+    const parts = [];
+    if (overdue.length) parts.push(`<span style="color:var(--red)">⚠ ${overdue.length} app${overdue.length>1?'s':''} past response window</span>`);
+    if (avgRT) parts.push(`avg response: ${avgRT}d`);
+    if (personalRR !== null && resolved.length >= 2) parts.push(`your response rate: ${personalRR}%`);
+    if (ghosted.length) parts.push(`${ghosted.length} ghosted`);
+    if (hired.length) parts.push(`${hired.length} hired 🎉`);
+    if (parts.length) {
+      insightBand.style.display = 'block';
+      insightBand.innerHTML = `<div style="background:var(--raised);border:1px solid var(--line2);border-radius:9px;padding:.65rem .95rem;font-family:var(--mono);font-size:.6rem;color:var(--dim);display:flex;flex-wrap:wrap;gap:.55rem;align-items:center;margin-bottom:1rem"><span style="color:var(--muted);font-size:.54rem;text-transform:uppercase;letter-spacing:.07em">Your pipeline</span>${parts.map(p=>`<span>${p}</span>`).join('<span style="color:var(--line2)">·</span>')}</div>`;
+    }
+  }
   // Active apps preview
   const appsEl=_('dashActiveApps');
   if(appsEl){
@@ -4485,10 +4892,16 @@ async function renderSeekerDash(){
       appsEl.innerHTML=active.slice(0,4).map(app=>{
         const days=Math.floor((Date.now()-app.appliedAt)/86400000);
         const rc=Score.risk(app.score);
+        const nudge=getNudge(app);
+        const isOverdue=nudge.type==='danger-nudge';
+        const borderC=isOverdue?'rgba(239,68,68,0.25)':'var(--line)';
         const dc=days<7?'var(--green)':days<21?'var(--sub)':days<35?'var(--amber)':'var(--red)';
-        return`<div style="background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:.95rem 1.1rem;margin-bottom:.55rem;display:flex;align-items:center;justify-content:space-between;gap:.85rem;cursor:pointer;transition:border-color .15s" onmouseover="this.style.borderColor='var(--line2)'" onmouseout="this.style.borderColor='var(--line)'" onclick="go('tracker')">
-          <div style="flex:1;min-width:0"><div style="font-family:var(--display);font-size:.88rem;font-weight:700;color:var(--white);letter-spacing:-.01em;margin-bottom:.12rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${app.role}</div><div style="font-size:.72rem;color:var(--dim);margin-bottom:.28rem">${app.company} · 📍 ${app.location}</div><div style="font-family:var(--mono);font-size:.58rem;background:var(--raised);border:1px solid var(--line2);border-radius:4px;display:inline-block;padding:.1rem .42rem;color:var(--sub)">${app.stage||'Applied'}</div></div>
-          <div style="text-align:right;flex-shrink:0"><div style="font-family:var(--mono);font-size:.9rem;font-weight:500;color:${Score.color(rc)};margin-bottom:.18rem">${app.score}</div><div style="font-family:var(--mono);font-size:.58rem;color:${dc}">${days===0?'Today':days+'d ago'}</div></div>
+        return`<div style="background:var(--surface);border:1px solid ${borderC};border-radius:10px;padding:.95rem 1.1rem;margin-bottom:.55rem;cursor:pointer;transition:border-color .15s" onmouseover="this.style.borderColor='var(--line2)'" onmouseout="this.style.borderColor='${borderC}'" onclick="go('tracker')">
+          <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:.85rem;margin-bottom:${nudge.msg?'.55rem':'0'}">
+            <div style="flex:1;min-width:0"><div style="font-family:var(--display);font-size:.88rem;font-weight:700;color:var(--white);letter-spacing:-.01em;margin-bottom:.12rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${app.role}</div><div style="font-size:.72rem;color:var(--dim);margin-bottom:.28rem">${app.company}${app.location?' · 📍 '+app.location:''}</div><div style="font-family:var(--mono);font-size:.58rem;background:var(--raised);border:1px solid var(--line2);border-radius:4px;display:inline-block;padding:.1rem .42rem;color:var(--sub)">${app.stage||'Applied'}</div></div>
+            <div style="text-align:right;flex-shrink:0"><div style="font-family:var(--mono);font-size:.9rem;font-weight:500;color:${Score.color(rc)};margin-bottom:.18rem">${app.score}</div><div style="font-family:var(--mono);font-size:.58rem;color:${dc}">${days===0?'Today':days+'d ago'}</div></div>
+          </div>
+          ${nudge.msg?`<div style="font-family:var(--mono);font-size:.58rem;color:${isOverdue?'var(--red)':'var(--dim)'};padding:${isOverdue?'.4rem .6rem':'0'};background:${isOverdue?'var(--rdim)':'transparent'};border-radius:6px;border:${isOverdue?'1px solid rgba(239,68,68,0.15)':'none'}">${isOverdue?'⚠ ':''}${nudge.msg}</div>`:''}
         </div>`;
       }).join('');
     }
@@ -4580,6 +4993,8 @@ function go(page){
       page=Auth.isSeeker()?'seeker-dash':'landing';
       if(page==='seeker-dash')renderSeekerDash();
     }
+    // Persist last page so we can restore after Safari discards the page
+    try { if(page!=='landing'&&page!=='home') sessionStorage.setItem('sp',page); } catch(_e){}
     if(!_navSkipHistory){
       history.pushState({page}, '', window.location.pathname + window.location.search);
     }
@@ -4723,14 +5138,14 @@ document.addEventListener('click', e => {
 });
 
 const HERO_LINES = [
-  ['stop applying',      'to ghost',            'jobs.'],
-  ['they ghosted you.',  'not you.',             'them.'],
-  ['your next job',      'actually',             'responds.'],
-  ['a job board',        "that's on",            'your side.'],
-  ['check the score',    'before you waste',     'your sunday.'],
-  ['no more take-homes', 'for jobs already',     'filled.'],
-  ['the receipt on',     'every company',        'that ghosts.'],
-  ['you applied.',       'they saw it.',         "they're just..."],
+  ['know before',        'you apply.'],
+  ['does this company',  'actually respond?'],
+  ['see who ghosts.',    'see who hires.'],
+  ['check the score.',   'skip the waste.'],
+  ['your time matters.', 'spend it wisely.'],
+  ['the hiring data',    'companies hide.'],
+  ['stop guessing.',     'start knowing.'],
+  ['47,000+ companies.', 'all scored. free.'],
 ];
 
 let _heroIdx = 0;
@@ -4739,24 +5154,20 @@ let _heroTimer = null;
 function setHeroLines(lines, animate) {
   const e1 = document.getElementById('heroLine1');
   const e2 = document.getElementById('heroLine2');
-  const e3 = document.getElementById('heroLine3');
   if (!e1) return;
 
   if (!animate) {
     e1.textContent = lines[0];
     e2.textContent = lines[1];
-    e3.textContent = lines[2];
     e1.className = 'hero-line-in';
-    e2.style.animationDelay = '.06s'; e2.className = 'hero-line-in';
-    e3.style.animationDelay = '.12s'; e3.className = 'hero-line-in';
+    e2.style.animationDelay = '.08s'; e2.className = 'hero-line-in';
     return;
   }
 
-  // Fade out all three staggered upward
-  [e1, e2, e3].forEach((el, i) => {
-    el.style.animationDelay = (i * .04) + 's';
+  [e1, e2].forEach((el, i) => {
+    el.style.animationDelay = (i * .05) + 's';
     el.style.animation = 'none';
-    el.offsetHeight; // force reflow
+    el.offsetHeight;
     el.style.animation = '';
     el.className = 'hero-line-out';
   });
@@ -4764,15 +5175,14 @@ function setHeroLines(lines, animate) {
   setTimeout(() => {
     e1.textContent = lines[0];
     e2.textContent = lines[1];
-    e3.textContent = lines[2];
-    [e1, e2, e3].forEach((el, i) => {
-      el.style.animationDelay = (i * .07) + 's';
+    [e1, e2].forEach((el, i) => {
+      el.style.animationDelay = (i * .09) + 's';
       el.style.animation = 'none';
       el.offsetHeight;
       el.style.animation = '';
       el.className = 'hero-line-in';
     });
-  }, 300);
+  }, 280);
 }
 
 function startHeroRotation() {
@@ -4883,10 +5293,10 @@ const Notifs = {
 // ═══════════════════════════════════════════════
 async function aiResearchCompany(name, location) {
   try {
-    const response = await fetch('/api/research', {
+    const response = await fetch('/api/company-score', {
       method: 'POST',
       headers: {'Content-Type':'application/json'},
-      body: JSON.stringify({company:name, location:location||''})
+      body: JSON.stringify({action:'research', company:name, location:location||''})
     });
     if(!response.ok) throw new Error('API error');
     return await response.json();
@@ -5007,9 +5417,10 @@ async function submitReport(){
   const safeCo=Mod.sanitize(normalizeCompanyName(co)),safeTi=Mod.sanitize(ti),safeExp=finalExp?Mod.sanitize(finalExp):'';
 
   try{
-    const repRes=await fetch('/api/submit-report',{
+    const repRes=await fetch('/api/reports',{
       method:'POST',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({
+        action:'submit',
         company:safeCo,role:safeTi,location:finalLoc,
         platform:document.getElementById('rPl')?.value||'',
         outcome:document.querySelector('input[name="resp"]:checked')?.value||'waiting',
@@ -5298,6 +5709,7 @@ function openJobDetailModal(jobId) {
          style="flex:1;background:var(--green);color:var(--ink);border:none;border-radius:8px;padding:.65rem 1rem;font-family:var(--display);font-weight:800;font-size:.82rem;cursor:pointer">Apply &amp; Optimize →</button>
      </div>`;
 
+  _applyModalGlow(risk);
   document.getElementById('applyModal').classList.add('open');
 }
 
@@ -5596,6 +6008,13 @@ function jlApplyClick() {
   setTimeout(() => openApplyModal(sid, co, title, loc, score, risk, waste, email), 50);
 }
 
+function _modalGlow(selector, risk) {
+  const c = risk==='safe' ? '16,185,129' : risk==='danger' ? '239,68,68' : '245,158,11';
+  const el = document.querySelector(selector);
+  if (el) el.style.boxShadow = `0 0 70px rgba(${c},0.35),0 0 140px rgba(${c},0.14),0 40px 120px rgba(0,0,0,0.78)`;
+}
+function _applyModalGlow(risk) { _modalGlow('#applyModal .modal', risk); }
+
 function openApplyModal(jobId, company, role, location, score, risk, waste, applyEmail) {
   const job = JOBS.find(j => j.id == jobId);
   const wl = Score.wasteLabel(waste);
@@ -5619,6 +6038,7 @@ function openApplyModal(jobId, company, role, location, score, risk, waste, appl
         <button class="btn btn-ghost" style="width:100%;justify-content:center" onclick="proceedAsGuest('${jobId}','${company}','${role}','${location}',${score},'${risk}',${waste},'${applyEmail||''}')">Continue as guest</button>
       </div>
       <div style="font-family:var(--mono);font-size:.6rem;color:var(--muted);text-align:center;line-height:1.65">Guest applications are sent but not tracked.<br>Sign up free — takes 60 seconds.</div>`;
+    _applyModalGlow(risk);
     document.getElementById('applyModal').classList.add('open');
     return;
   }
@@ -5644,6 +6064,7 @@ function openApplyModal(jobId, company, role, location, score, risk, waste, appl
     </div>
     <button class="btn btn-ghost" style="width:100%;justify-content:center;font-size:.78rem" onclick="closeApplyModalDirect()">Cancel</button>`;
 
+  _applyModalGlow(risk);
   document.getElementById('applyModal').classList.add('open');
 }
 
@@ -6853,11 +7274,21 @@ async function removeApp(id) {
 }
 
 async function markAppStatus(id, status) {
-  await AppStore.update(id, { status });
+  const apps = AppStore.loadSync();
+  const app = apps.find(a => a.id === id);
+  const days = app ? Math.floor((Date.now() - app.appliedAt) / 86400000) : 0;
+  await AppStore.update(id, { status, responseTimeDays: days, resolvedAt: Date.now() });
   await renderTracker();
   await renderSeekerDash();
-  const msgs = { ghosted:'👻 Marked ghosted. Consider reporting it.', hired:'🎉 Congrats!', rejected:'Marked as rejected.' };
+  const msgs = {
+    ghosted: `👻 Ghosted after ${days}d. Report it so others know.`,
+    hired: '🎉 You got the job. Report it — they deserve the credit.',
+    rejected: `Marked rejected (${days}d).`
+  };
   showToast(msgs[status] || 'Updated.');
+  if (app && (status === 'ghosted' || status === 'hired')) {
+    setTimeout(() => _promptOutcomeReport(app, status, days), 900);
+  }
 }
 
 // Re-sync all user data when tab becomes visible (catches changes made on other devices)
@@ -6880,15 +7311,25 @@ window.addEventListener('pageshow', e => {
   if (e.persisted) _syncAllAndRefresh();
 });
 
-// ── SHARED LINK ROUTING ──
+// ── SHARED LINK + SESSION RESTORE ROUTING ──
 function _handleSharedLink(){
   const h=window.location.hash;
-  if(!h.startsWith('#company/'))return;
-  const raw=decodeURIComponent(h.slice(9));
-  if(!raw)return;
-  // Proper-case the name for display (amazon → Amazon, mcdonald's → McDonald's)
-  const displayName=raw.split(/\s+/).map(w=>w.charAt(0).toUpperCase()+w.slice(1)).join(' ');
-  setTimeout(()=>openModal(displayName,''),450);
+  if(h.startsWith('#company/')){
+    const parts=decodeURIComponent(h.slice(9)).split('/');
+    const raw=parts[0];
+    if(!raw)return;
+    const toTitle=s=>s.split(/\s+/).map(w=>w.charAt(0).toUpperCase()+w.slice(1)).join(' ');
+    const displayName=toTitle(raw);
+    const loc=parts[1]?toTitle(parts[1]):'';
+    // Small delay so auth/data init finishes first
+    setTimeout(()=>viewCompany(null,displayName,loc),500);
+    return;
+  }
+  // Non-company page restore via sessionStorage
+  const sp=sessionStorage.getItem('sp');
+  if(sp&&sp!=='company'&&sp!=='landing'){
+    setTimeout(()=>go(sp),100);
+  }
 }
 
 // ── INIT ──
@@ -6897,8 +7338,9 @@ startHeroRotation();
 if(db){
   Auth.init().then(()=>{
     updateNav();
-    if(Auth.isSeeker()){renderSeekerDash();go('seeker-dash');}
-    else if(Auth.isEmployer()){goToEmployerDashboard();}
+    const _restoring=window.location.hash.startsWith('#company/')||!!sessionStorage.getItem('sp');
+    if(Auth.isSeeker()){renderSeekerDash();if(!_restoring)go('seeker-dash');}
+    else if(Auth.isEmployer()&&!_restoring){goToEmployerDashboard();}
     _handleSharedLink();
   }).catch(e=>{console.warn('Auth init:',e);_handleSharedLink();});
 } else {
@@ -6913,6 +7355,21 @@ if(db){
   document.querySelectorAll('.modal-ov').forEach(function(ov) {
     new MutationObserver(_syncBodyScroll).observe(ov, { attributes: true, attributeFilter: ['class'] });
   });
+})();
+
+// Nav Liquid Glass scroll effect — deepen blur + opacity as page scrolls
+(function(){
+  var _nav = document.querySelector('nav');
+  var _ticking = false;
+  window.addEventListener('scroll', function(){
+    if (!_ticking) {
+      requestAnimationFrame(function(){
+        _nav.classList.toggle('nav-scrolled', window.scrollY > 24);
+        _ticking = false;
+      });
+      _ticking = true;
+    }
+  }, { passive: true });
 })();
 </script>
 </body>

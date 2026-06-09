@@ -185,5 +185,20 @@ export default async function handler(req, res) {
     return res.status(200).json({ ok: true });
   }
 
+  // ── DELETE ACCOUNT ──────────────────────────────────────────────────────────
+  if (action === 'delete_account') {
+    await db(`applications?user_id=eq.${uid}`, { method: 'DELETE', headers: { Prefer: 'return=minimal' } });
+    await db(`profiles?id=eq.${uid}`, { method: 'DELETE', headers: { Prefer: 'return=minimal' } });
+    const delRes = await fetch(`${SUPABASE_URL}/auth/v1/admin/users/${uid}`, {
+      method: 'DELETE',
+      headers: { apikey: SERVICE_KEY, Authorization: `Bearer ${SERVICE_KEY}` },
+    });
+    if (!delRes.ok && delRes.status !== 404) {
+      const err = await delRes.text();
+      return res.status(500).json({ error: `Auth delete failed: ${err.slice(0, 100)}` });
+    }
+    return res.status(200).json({ ok: true });
+  }
+
   return res.status(400).json({ error: 'Unknown action: ' + action });
 }

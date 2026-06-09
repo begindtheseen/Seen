@@ -46,14 +46,125 @@ function rowToScore(row) {
 
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Methods', 'POST, GET, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
   if (req.method === 'OPTIONS') return res.status(200).end();
-  if (req.method !== 'POST') return res.status(405).end('Method not allowed');
 
   let body = req.body;
   if (typeof body === 'string') try { body = JSON.parse(body); } catch(e) { body = {}; }
-  const { name, force_refresh = false } = body || {};
+  body = body || {};
+
+  // ── Research mode (replaces research.js) ─────────────────────────────────────
+  if (body.action === 'research') {
+    const ANTHROPIC_KEY = process.env.ANTHROPIC_KEY;
+    if (!ANTHROPIC_KEY) return res.status(500).json({ error: 'ANTHROPIC_KEY missing' });
+    const { company: co, location } = body;
+    if (!co) return res.status(400).json({ error: 'company required' });
+    const locationStr = location ? ` in ${location}` : '';
+    try {
+      const apiRes = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-api-key': ANTHROPIC_KEY, 'anthropic-version': '2023-06-01', 'anthropic-beta': 'web-search-2025-03-05' },
+        body: JSON.stringify({
+          model: 'claude-haiku-4-5-20251001', max_tokens: 1500,
+          tools: [{ type: 'web_search_20250305', name: 'web_search' }],
+          system: `You are a hiring transparency researcher. Search Reddit (r/jobs, r/recruitinghell, r/cscareerquestions), Glassdoor, and news for real hiring data. Return ONLY valid JSON, no markdown.`,
+          messages: [{ role: 'user', content: `Research hiring practices for: ${co}${locationStr}. Return ONLY this JSON: {"summary":"2-3 sentences","ghost_rate_estimate":0-100 or null,"response_rate_estimate":0-100 or null,"avg_rounds_estimate":number or null,"known_issues":["up to 5 real complaints"],"known_positives":["up to 3 positives"],"process_notes":"string or null","data_confidence":"high|medium|low","sources_note":"string","reddit_mentions":number,"glassdoor_rating":number or null}` }],
+        })
+      });
+      if (!apiRes.ok) throw new Error(`Claude ${apiRes.status}`);
+      const d = await apiRes.json();
+      const txt = (d.content || []).filter(b => b.type === 'text').map(b => b.text).join('');
+      const clean = txt.replace(/```json|```/g, '').trim();
+      let parsed; try { parsed = JSON.parse(clean); } catch(e) { const m = clean.match(/\{[\s\S]*\}/); parsed = m ? JSON.parse(m[0]) : { error: 'Parse failed', summary: 'Could not parse results.', data_confidence: 'low', known_issues: [], known_positives: [], sources_note: 'Search completed.' }; }
+      return res.json(parsed);
+    } catch(err) { return res.status(500).json({ error: err.message }); }
+  }
+
+  // ── Populate mode: bulk-generate reviews for companies missing them ─────────
+  if (body.action === 'populate' || req.method === 'GET') {
+    const SUPABASE_URL = process.env.SUPABASE_URL;
+    const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY;
+    const ANTHROPIC_KEY = process.env.ANTHROPIC_KEY;
+    if (!ANTHROPIC_KEY || !SUPABASE_URL || !SUPABASE_SERVICE_KEY)
+      return res.status(500).json({ error: 'Missing env vars' });
+
+    const dbH = {
+      apikey: SUPABASE_SERVICE_KEY,
+      Authorization: `Bearer ${SUPABASE_SERVICE_KEY}`,
+      'Content-Type': 'application/json',
+    };
+
+    // Find companies missing web_reviews — newest row per company wins
+    const listRes = await fetch(
+      `${SUPABASE_URL}/rest/v1/company_scores?select=company_name,web_reviews&order=created_at.desc&limit=200`,
+      { headers: dbH }
+    );
+    if (!listRes.ok) return res.status(502).json({ error: 'DB list failed', detail: await listRes.text() });
+    const rows = await listRes.json();
+    // Deduplicate: first occurrence per company_name is the newest (desc order)
+    const seen = new Set();
+    const deduped = (rows || []).filter(r => { if (!r.company_name || seen.has(r.company_name)) return false; seen.add(r.company_name); return true; });
+    const targets = deduped.filter(r => {
+      if (!r.web_reviews) return true;
+      try { const v = typeof r.web_reviews === 'string' ? JSON.parse(r.web_reviews) : r.web_reviews; return !Array.isArray(v) || v.length === 0; } catch(_e) { return true; }
+    }).map(r => r.company_name).filter(Boolean);
+
+    if (!targets.length) return res.json({ ok: true, message: 'All done — every company has reviews!', remaining: 0 });
+
+    const batch = targets.slice(0, 3);
+    const remaining = targets.length - batch.length;
+    const results = [];
+
+    for (const co of batch) {
+      try {
+        const apiRes = await fetch('https://api.anthropic.com/v1/messages', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'x-api-key': ANTHROPIC_KEY, 'anthropic-version': '2023-06-01', 'anthropic-beta': 'web-search-2025-03-05' },
+          body: JSON.stringify({
+            model: 'claude-haiku-4-5-20251001', max_tokens: 2000,
+            tools: [{ type: 'web_search_20250305', name: 'web_search' }],
+            system: 'You are a hiring transparency researcher. Search Reddit, Glassdoor, and Blind for real applicant experiences. Return ONLY valid JSON — no markdown.',
+            messages: [{ role: 'user', content: `Research hiring experience at "${co}". Find 4-6 real applicant quotes from Reddit/Glassdoor/Blind (2023-2025). Return ONLY this JSON: {"ghost_rate":0.0-1.0,"response_rate":0.0-1.0,"avg_rounds":1-8,"avg_wait_days":5-120,"unpaid_rate":0.0-1.0,"report_count":number,"data_quality":"high|medium|low","industry":"string","summary":"2-3 sentences","reviews":[{"text":"quote","sentiment":"positive|negative|mixed","source":"Reddit r/...","year":"2024"}]}` }],
+          })
+        });
+        if (!apiRes.ok) throw new Error(`Claude ${apiRes.status}`);
+        const d = await apiRes.json();
+        const txt = (d.content || []).filter(b => b.type === 'text').map(b => b.text).join('');
+        const m = txt.replace(/```json\n?/g,'').replace(/```\n?/g,'').trim().match(/\{[\s\S]*\}/);
+        if (!m) throw new Error('no JSON');
+        const p = JSON.parse(m[0]);
+
+        const gr = Math.max(0,Math.min(1,Number(p.ghost_rate)||0));
+        const rr = Math.max(0,Math.min(1,Number(p.response_rate)||0));
+        const wait = Math.max(1,Math.min(180,Number(p.avg_wait_days)||30));
+        const rounds = Math.max(1,Math.min(10,Number(p.avg_rounds)||3));
+        const unpaid = Math.max(0,Math.min(1,Number(p.unpaid_rate)||0));
+        const cnt = Math.max(1,Number(p.report_count)||5);
+        const overall = calcScore(rr,gr,wait,cnt);
+        const waste = calcWaste(gr,rounds,unpaid);
+        const revs = Array.isArray(p.reviews) ? p.reviews.slice(0,6).map(r=>({text:(r.text||'').slice(0,400),sentiment:['positive','negative','mixed'].includes(r.sentiment)?r.sentiment:'mixed',source:(r.source||'').slice(0,80),year:(r.year||'').slice(0,4)})) : [];
+
+        const row = { company_name:co, overall_score:overall, ghost_rate:gr, response_rate:rr, avg_wait_days:Math.round(wait), avg_rounds:Math.round(rounds*10)/10, waste_score:waste, unpaid_rate:unpaid, report_count:cnt, data_quality:p.data_quality||'medium', data_source:'web_search', industry:(p.industry||'').slice(0,80), raw_summary:(p.summary||'').slice(0,500), expires_at:new Date(Date.now()+SCORE_TTL_MS).toISOString(), web_reviews:revs };
+        const sv = await fetch(`${SUPABASE_URL}/rest/v1/company_scores`, { method:'POST', headers:{...dbH,Prefer:'resolution=merge-duplicates,return=minimal'}, body:JSON.stringify(row) });
+        results.push({ company:co, score:overall, reviews:revs.length, saved:sv.ok });
+        console.log(`POPULATE: "${co}" → ${overall}, ${revs.length} reviews, saved:${sv.ok}`);
+      } catch(e) {
+        // Mark as attempted with empty reviews so it stops blocking the queue
+        try {
+          await fetch(`${SUPABASE_URL}/rest/v1/company_scores`, { method:'POST', headers:{...dbH,Prefer:'resolution=merge-duplicates,return=minimal'}, body:JSON.stringify({company_name:co, web_reviews:[]}) });
+        } catch(_e) {}
+        results.push({ company:co, error:e.message });
+        console.error(`POPULATE: "${co}" failed:`, e.message);
+      }
+      if (batch.indexOf(co) < batch.length - 1) await new Promise(r => setTimeout(r, 2000));
+    }
+
+    return res.json({ ok:true, processed:results, remaining, message: remaining > 0 ? `Refresh to process next ${Math.min(3,remaining)}` : 'All done!' });
+  }
+
+  if (req.method !== 'POST') return res.status(405).end('Method not allowed');
+  const { name, force_refresh = false } = body;
   if (!name) return res.status(400).json({ error: 'name required' });
 
   const SUPABASE_URL = process.env.SUPABASE_URL;
