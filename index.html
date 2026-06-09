@@ -4631,15 +4631,20 @@ const EventStore = {
 
   // Merge local events into a computeScoresFromData-compatible report array
   toReports(company) {
-    const evts = this.forCompany(company).filter(e => e.type === 'outcome_check' && e.data);
-    return evts.map(e => {
+    const all = this.forCompany(company);
+    const outcomes = all.filter(e => e.type === 'outcome_check' && e.data);
+    // Index rounds_detail events by appId so they enrich the outcome row
+    const roundsMap = {};
+    all.filter(e => e.type === 'rounds_detail').forEach(e => { if (e.appId) roundsMap[e.appId] = e.data; });
+    const outcomeMap = { offer: 'hired', rejected: 'human', ghosted: 'ghosted', withdrew: 'human' };
+    return outcomes.map(e => {
       const d = e.data;
-      const outcomeMap = { offer: 'hired', rejected: 'human', ghosted: 'ghosted', withdrew: 'human' };
+      const rd = roundsMap[e.appId] || {};
       return {
         outcome: outcomeMap[d.outcome] || 'waiting',
-        rounds: d.rounds || 0,
+        rounds: rd.rounds || d.rounds || 0,
         wait_days: d.daysToResponse || 0,
-        unpaid_work: 'na',
+        unpaid_work: rd.unpaid_work || 'na',
         _source: 'first_party',
       };
     }).filter(r => r.outcome !== 'waiting');
@@ -4744,7 +4749,7 @@ async function handleCheckAnswer(appId, checkType, data, btn) {
     if (stageMap[data.outcome]) changes.stage = stageMap[data.outcome];
     await AppStore.update(appId, changes);
     // Offer: ask for rounds
-    if (data.outcome === 'offer') setTimeout(() => _showRoundsPrompt(appId, checkType), 300);
+    if (data.outcome === 'offer') setTimeout(() => _showRoundsPrompt(appId), 400);
   }
 
   // Remove card from UI, refresh
@@ -4755,11 +4760,71 @@ async function handleCheckAnswer(appId, checkType, data, btn) {
   }, 350);
 }
 
-function _showRoundsPrompt(appId, checkType) {
+let _roundsSel = { rounds: null, unpaid: null };
+
+function _showRoundsPrompt(appId) {
   const app = AppStore.loadSync().find(a => a.id === appId);
   if (!app) return;
-  // Quick inline toast-style prompt for rounds
-  showToast(`🎉 Congrats! How many rounds did it take? (helps improve data)`);
+  _roundsSel = { rounds: null, unpaid: null };
+  const existing = document.getElementById('_roundsPromptOv');
+  if (existing) existing.remove();
+  const ov = document.createElement('div');
+  ov.id = '_roundsPromptOv';
+  ov.style.cssText = 'position:fixed;bottom:0;left:0;right:0;z-index:9998;background:var(--card);border-top:1px solid var(--line);border-radius:20px 20px 0 0;padding:1.5rem 1.25rem 2rem;max-width:520px;margin:0 auto;box-shadow:0 -24px 80px rgba(0,0,0,0.65);transform:translateY(100%);transition:transform .35s cubic-bezier(.16,1,.3,1)';
+  const safeCo = (app.company||'').replace(/'/g,"\\'");
+  ov.innerHTML = `
+    <div style="text-align:center;margin-bottom:1.35rem">
+      <div style="font-size:2rem;margin-bottom:.35rem">🎉</div>
+      <div style="font-family:var(--display);font-size:1.05rem;font-weight:800;color:var(--white);margin-bottom:.2rem">You got an offer!</div>
+      <div style="font-family:var(--mono);font-size:.6rem;color:var(--muted)">Help others understand ${app.company}'s process</div>
+    </div>
+    <div style="margin-bottom:.95rem">
+      <div style="font-family:var(--mono);font-size:.58rem;text-transform:uppercase;letter-spacing:.08em;color:var(--dim);margin-bottom:.45rem">How many rounds?</div>
+      <div style="display:flex;gap:.35rem;flex-wrap:wrap" id="_rpRoundsRow">
+        ${[['1','1'],['2','2'],['3','3'],['4','4'],['5-6','5–6'],['7+','7+']].map(([v,l]) =>
+          `<button class="btn btn-ghost" style="font-size:.7rem;padding:.38rem .7rem;flex:1;min-width:62px" onclick="_rpPickRounds(this,'${v}')">${l}</button>`
+        ).join('')}
+      </div>
+    </div>
+    <div style="margin-bottom:1.1rem">
+      <div style="font-family:var(--mono);font-size:.58rem;text-transform:uppercase;letter-spacing:.08em;color:var(--dim);margin-bottom:.45rem">Any unpaid work? (case study / take-home)</div>
+      <div style="display:flex;gap:.35rem" id="_rpUnpaidRow">
+        <button class="btn btn-ghost" style="font-size:.7rem;padding:.38rem .7rem;flex:1" onclick="_rpPickUnpaid(this,'yes')">Yes</button>
+        <button class="btn btn-ghost" style="font-size:.7rem;padding:.38rem .7rem;flex:1" onclick="_rpPickUnpaid(this,'no')">No</button>
+      </div>
+    </div>
+    <button class="btn btn-solid" style="width:100%;justify-content:center;font-size:.78rem;margin-bottom:.4rem" onclick="_submitRoundsData('${appId}','${safeCo}')">Submit → help others 🙏</button>
+    <button onclick="document.getElementById('_roundsPromptOv')?.remove()" style="background:none;border:none;width:100%;font-family:var(--mono);font-size:.6rem;color:var(--muted);cursor:pointer;padding:.35rem">Skip</button>`;
+  document.body.appendChild(ov);
+  requestAnimationFrame(() => requestAnimationFrame(() => { ov.style.transform = 'translateY(0)'; }));
+}
+
+function _rpPickRounds(btn, val) {
+  btn.closest('#_rpRoundsRow').querySelectorAll('.btn').forEach(b => { b.style.borderColor=''; b.style.color=''; });
+  btn.style.borderColor = 'var(--green)'; btn.style.color = 'var(--green)';
+  _roundsSel.rounds = val;
+}
+
+function _rpPickUnpaid(btn, val) {
+  btn.closest('#_rpUnpaidRow').querySelectorAll('.btn').forEach(b => { b.style.borderColor=''; b.style.color=''; });
+  btn.style.borderColor = 'var(--green)'; btn.style.color = 'var(--green)';
+  _roundsSel.unpaid = val;
+}
+
+function _submitRoundsData(appId, company) {
+  const app = AppStore.loadSync().find(a => a.id === appId);
+  if (!app) { document.getElementById('_roundsPromptOv')?.remove(); return; }
+  const roundsNum = _roundsSel.rounds === '7+' ? 7 : _roundsSel.rounds === '5-6' ? 6 : parseInt(_roundsSel.rounds) || null;
+  EventStore.add({
+    type: 'rounds_detail',
+    appId,
+    company: app.company,
+    role: app.role,
+    data: { rounds: roundsNum, unpaid_work: _roundsSel.unpaid || 'no', outcome: 'offer' },
+  });
+  _roundsSel = { rounds: null, unpaid: null };
+  document.getElementById('_roundsPromptOv')?.remove();
+  showToast('Thanks! This improves scores for everyone 🙏');
 }
 
 function updateCheckBadge() {
@@ -7239,6 +7304,13 @@ function approveAndContinue() {
     }
     window._applyResumeText = optimized;
     window._resumeWasOptimized = true;
+  }
+  // Emit resume_tailored event — links this action to the tracked application
+  if (p.company) {
+    const trackedApp = AppStore.loadSync().find(a => a.company?.toLowerCase() === (p.company||'').toLowerCase() && a.status === 'active');
+    if (trackedApp && !EventStore.hasCheck(trackedApp.id, 'resume_tailored')) {
+      EventStore.add({ type: 'resume_tailored', appId: trackedApp.id, company: p.company, role: p.role || trackedApp.role, data: { tailored_at: Date.now(), changes: p.data?.optimized_bullets?.length || 0 } });
+    }
   }
   showFullApplyForm(p.jobId, p.company, p.role, p.location, p.score, p.risk, p.waste, p.applyEmail, job, Score.wasteLabel(p.waste));
 }
