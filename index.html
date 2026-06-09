@@ -1700,10 +1700,43 @@ nav.nav-scrolled{background:rgba(6,6,8,0.82);backdrop-filter:blur(60px) saturate
 
 <script>
 const SUPABASE_URL='https://tmngmmofrplsldvlobfx.supabase.co';
+// Supabase anon key is intentionally public — this is by Supabase design.
+// Security is enforced by Row Level Security (RLS) policies on the database,
+// not by hiding this key. Never put the service_role key here.
 const SUPABASE_ANON_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRtbmdtbW9mcnBsc2xkdmxvYmZ4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc3OTk3ODYsImV4cCI6MjA5MzM3NTc4Nn0.kAL3GbMilYTM3z7Ct4YM2nTh3n-f1UXXqiDHOl3fsRc';
 let db = null;
 try { if(typeof supabase!=='undefined') db = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY); } catch(e) {}
 const DEMO = !db;
+
+// ── ABUSE PROTECTION & COST CONTROLS ─────────────────────────────────────────
+// Per-day per-device limits on expensive AI endpoints.
+// Resets at local midnight. Logged-in users get higher limits server-side too.
+const UsageLimits = {
+  L: { scanner:8, hiring_manager:5, insider_intel:5, coach:4, proposal:3 },
+  _k() { return 'seen_ul_' + new Date().toDateString(); },
+  _get() { try { return JSON.parse(localStorage.getItem(this._k())||'{}'); } catch(e) { return {}; } },
+  remaining(t) { const d=this._get(); return Math.max(0,(this.L[t]||5)-(d[t]||0)); },
+  consume(t) { const d=this._get(); d[t]=(d[t]||0)+1; localStorage.setItem(this._k(),JSON.stringify(d)); },
+  check(t) {
+    if (this.remaining(t) <= 0) {
+      showToast('Daily limit reached — resets at midnight.');
+      return false;
+    }
+    this.consume(t);
+    return true;
+  },
+};
+
+// In-flight dedup — prevents a double-click or rapid navigation from firing
+// the same expensive request twice concurrently.
+const _inflight = new Set();
+function _guard(key) { if (_inflight.has(key)) return false; _inflight.add(key); return true; }
+function _unguard(key) { _inflight.delete(key); }
+
+// Session-level company data cache — once a company is fetched in a session,
+// subsequent views (modal re-open, tab switch, etc.) are instant and free.
+const _compScoreCache = new Map();
+const _compScoreInflight = new Map(); // key → Promise, so concurrent callers share one request
 
 // ── REAL AUTH ──
 const Auth = {
@@ -2025,6 +2058,21 @@ function isFranchise(name) {
 // ── REAL COMPANY DATA PIPELINE ────────────────────────────────────────────────
 async function loadRealCompanyData(companyName, cityHint) {
   if (!db) return null;
+  const _ck = ((companyName||'').toLowerCase().trim()) + '|' + ((cityHint||'').toLowerCase().trim());
+  // Session cache: return immediately without any network call
+  if (_compScoreCache.has(_ck)) return _compScoreCache.get(_ck);
+  // In-flight dedup: multiple callers for the same company share one promise
+  if (_compScoreInflight.has(_ck)) return _compScoreInflight.get(_ck);
+  const _p = _doLoadRealCompanyData(companyName, cityHint).then(r => {
+    _compScoreCache.set(_ck, r);
+    _compScoreInflight.delete(_ck);
+    return r;
+  }).catch(() => { _compScoreInflight.delete(_ck); return null; });
+  _compScoreInflight.set(_ck, _p);
+  return _p;
+}
+
+async function _doLoadRealCompanyData(companyName, cityHint) {
   try {
     const canonical = normalizeCompanyName(companyName);
     // Use first significant word for the DB search so we catch variants like
@@ -3310,6 +3358,7 @@ function loadDemand(){
 // RESUME AI
 // ═══════════════════════════════════════════════
 async function analyzeResume(){
+  if (!UsageLimits.check('scanner')) return;
   // Auto-load stored resume
   let resumeText = document.getElementById('aiResume')?.value?.trim();
   if (!resumeText) {
@@ -4021,13 +4070,16 @@ async function viewCompany(id,name,loc){
       <div style="background:var(--gdim);border:1px solid var(--gmid);border-radius:8px;padding:.75rem 1rem;font-family:var(--mono);font-size:.62rem;color:var(--green)">This feature is exclusive to Seen. No other job board tracks which stage companies ghost at.</div>`;
   })();
 
-  // Web reviews — independent fetch, outside the scoring pipeline
+  // Web reviews — piggybacks on the session cache so no extra API call is made
   (async () => {
     const wrEl = document.getElementById('ctc-web-reviews');
     if (!wrEl) return;
     wrEl.innerHTML = '';
     try {
-      const r = await fetch('/api/company-score', {
+      const _wcKey = (normalizeCompanyName(co?.name||name)).toLowerCase()+'|';
+      const cached = _compScoreCache.get(_wcKey);
+      const r_mock = cached?.webScore?.web_reviews ? { ok:true, json: async()=>({ ok:true, score: cached.webScore }) } : null;
+      const r = r_mock || await fetch('/api/company-score', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name: normalizeCompanyName(co?.name || name) }),
@@ -5148,6 +5200,7 @@ function buildAppCard(app) {
 }
 
 async function loadTrackerIntel(appId, company, role) {
+  if (!UsageLimits.check('hiring_manager')) return;
   const btn = document.getElementById('intelBtn_' + appId);
   const content = document.getElementById('intelContent_' + appId);
   if (!content) return;
@@ -8059,6 +8112,7 @@ async function runAdvantageCoach() {
   const jd=document.getElementById('coachJD')?.value?.trim();
   const background=document.getElementById('coachBackground')?.value?.trim();
   if(!job||!company||!jd){showToast('Fill in job title, company, and job description.');return;}
+  if (!UsageLimits.check('coach')) return;
   const btn=document.getElementById('coachBtn');
   const out=document.getElementById('coachOut');
   if(btn){btn.textContent='Building playbook...';btn.disabled=true;}
@@ -8096,6 +8150,7 @@ async function generateProposal() {
   const jd=document.getElementById('propJD')?.value?.trim();
   const background=document.getElementById('propBackground')?.value?.trim();
   if(!job||!company||!jd){showToast('Fill in job title, company, and job description.');return;}
+  if (!UsageLimits.check('proposal')) return;
   const btn=document.getElementById('propBtn');
   const out=document.getElementById('propOut');
   if(btn){btn.textContent='Generating...';btn.disabled=true;}
