@@ -774,16 +774,17 @@ nav.nav-scrolled{background:rgba(6,6,8,0.82);backdrop-filter:blur(60px) saturate
       47,000+ companies scored · updated live
     </div>
 
-    <!-- HEADLINE — 2-line rotating headline + static sub -->
+    <!-- HEADLINE — fixed-height container, subtitle sits BELOW it in flow -->
     <div style="width:100%;max-width:680px;margin:0 auto;animation:fadeUp .5s .08s ease both">
-      <div id="heroHeadlineWrap" style="height:clamp(150px,34vw,280px);display:flex;flex-direction:column;justify-content:center;align-items:center;overflow:visible">
-        <h1 id="rotatingHero" style="font-family:var(--display);font-size:clamp(2.2rem,7vw,5.2rem);font-weight:800;line-height:1.07;letter-spacing:-.035em;color:var(--white);text-shadow:0 2px 20px rgba(0,0,0,.5);margin:0 0 .6rem;width:100%">
+      <div id="heroHeadlineWrap" style="height:clamp(96px,22vw,190px);display:flex;flex-direction:column;justify-content:center;align-items:center">
+        <h1 id="rotatingHero" style="font-family:var(--display);font-size:clamp(1.75rem,5.8vw,4.8rem);font-weight:800;line-height:1.08;letter-spacing:-.035em;color:var(--white);text-shadow:0 2px 20px rgba(0,0,0,.5);margin:0;width:100%">
           <span id="heroLine1" style="display:block"></span>
           <span id="heroLine2" style="display:block;background:linear-gradient(135deg,#a5b4fc,#c084fc,#e879f9);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;font-style:italic"></span>
         </h1>
-        <div id="heroSub" style="font-family:var(--mono);font-size:clamp(.72rem,1.5vw,.9rem);color:rgba(255,255,255,.5);letter-spacing:.01em;line-height:1.5">Ghost rates · response times · hiring scores · 47,000+ companies</div>
       </div>
     </div>
+    <!-- Subtitle — in normal flow, never overlaps anything -->
+    <div id="heroSub" style="font-family:var(--mono);font-size:clamp(.65rem,1.4vw,.82rem);color:rgba(255,255,255,.42);letter-spacing:.02em;line-height:1.5;margin:.5rem 0 1.5rem;animation:fadeUp .5s .12s ease both">Ghost rates · response times · hiring scores · 47,000+ companies</div>
 
     <!-- Search — fixed position below headline, never moves -->
     <div style="width:100%;max-width:520px;margin:0 auto 1.1rem;animation:fadeUp .5s .16s ease both">
@@ -2091,6 +2092,25 @@ const COS={
   notion:{id:'11',name:'Notion',ind:'Productivity',logo:'N',ver:false,sc:{overall_score:71,response_rate:.58,ghost_rate:.26,avg_wait_days:16,report_count:55,risk_level:'safe',waste:18,avg_rounds:3.1,process_score:74}},
   deloitte:{id:'9',name:'Deloitte',ind:'Consulting',logo:'D',ver:false,sc:{overall_score:33,response_rate:.12,ghost_rate:.76,avg_wait_days:68,report_count:178,risk_level:'danger',waste:78,avg_rounds:5.8,process_score:19}},
   indeed:{id:'10',name:'Indeed',ind:'HR Tech',logo:'IN',ver:false,sc:{overall_score:31,response_rate:.14,ghost_rate:.74,avg_wait_days:61,report_count:89,risk_level:'danger',waste:72,avg_rounds:2.8,process_score:24}},
+  apple:{id:'12',name:'Apple',ind:'Consumer Tech',logo:'',ver:false,sc:{overall_score:72,response_rate:.74,ghost_rate:.22,avg_wait_days:18,report_count:203,risk_level:'safe',waste:18,avg_rounds:4.2,process_score:70}},
+  google:{id:'13',name:'Google',ind:'Search / Cloud',logo:'G',ver:false,sc:{overall_score:67,response_rate:.66,ghost_rate:.30,avg_wait_days:22,report_count:318,risk_level:'safe',waste:26,avg_rounds:5.1,process_score:64}},
+  microsoft:{id:'14',name:'Microsoft',ind:'Enterprise Tech',logo:'MS',ver:false,sc:{overall_score:76,response_rate:.78,ghost_rate:.18,avg_wait_days:14,report_count:241,risk_level:'safe',waste:16,avg_rounds:3.8,process_score:78}},
+  netflix:{id:'15',name:'Netflix',ind:'Entertainment Tech',logo:'N',ver:false,sc:{overall_score:74,response_rate:.76,ghost_rate:.20,avg_wait_days:16,report_count:87,risk_level:'safe',waste:18,avg_rounds:4.0,process_score:72}},
+  uber:{id:'16',name:'Uber',ind:'Mobility Tech',logo:'U',ver:false,sc:{overall_score:51,response_rate:.52,ghost_rate:.44,avg_wait_days:26,report_count:134,risk_level:'warn',waste:44,avg_rounds:3.6,process_score:48}},
+  airbnb:{id:'17',name:'Airbnb',ind:'Travel Tech',logo:'AB',ver:false,sc:{overall_score:80,response_rate:.82,ghost_rate:.12,avg_wait_days:12,report_count:62,risk_level:'safe',waste:12,avg_rounds:3.4,process_score:83}},
+  'x (twitter)':{id:'18',name:'X (Twitter)',ind:'Social Media',logo:'X',ver:false,sc:{overall_score:27,response_rate:.22,ghost_rate:.76,avg_wait_days:44,report_count:156,risk_level:'danger',waste:78,avg_rounds:2.8,process_score:21}},
+  salesforce:{id:'19',name:'Salesforce',ind:'CRM SaaS',logo:'SF',ver:false,sc:{overall_score:57,response_rate:.60,ghost_rate:.36,avg_wait_days:22,report_count:112,risk_level:'warn',waste:38,avg_rounds:4.2,process_score:54}},
+  oracle:{id:'20',name:'Oracle',ind:'Enterprise Software',logo:'O',ver:false,sc:{overall_score:39,response_rate:.40,ghost_rate:.56,avg_wait_days:38,report_count:147,risk_level:'danger',waste:58,avg_rounds:5.6,process_score:35}},
+  ibm:{id:'21',name:'IBM',ind:'Enterprise Tech',logo:'I',ver:false,sc:{overall_score:33,response_rate:.32,ghost_rate:.64,avg_wait_days:54,report_count:189,risk_level:'danger',waste:66,avg_rounds:5.8,process_score:28}},
+  tesla:{id:'22',name:'Tesla',ind:'EV / Energy',logo:'T',ver:false,sc:{overall_score:44,response_rate:.46,ghost_rate:.50,avg_wait_days:31,report_count:143,risk_level:'warn',waste:52,avg_rounds:3.4,process_score:40}},
+  mckinsey:{id:'23',name:'McKinsey',ind:'Management Consulting',logo:'MK',ver:false,sc:{overall_score:84,response_rate:.86,ghost_rate:.10,avg_wait_days:12,report_count:78,risk_level:'safe',waste:10,avg_rounds:5.2,process_score:88}},
+  pwc:{id:'24',name:'PwC',ind:'Professional Services',logo:'PW',ver:false,sc:{overall_score:53,response_rate:.56,ghost_rate:.40,avg_wait_days:24,report_count:134,risk_level:'warn',waste:42,avg_rounds:4.8,process_score:50}},
+  walmart:{id:'25',name:'Walmart',ind:'Retail',logo:'W',ver:false,sc:{overall_score:35,response_rate:.30,ghost_rate:.66,avg_wait_days:16,report_count:267,risk_level:'danger',waste:68,avg_rounds:2.6,process_score:31}},
+  target:{id:'26',name:'Target',ind:'Retail',logo:'TG',ver:false,sc:{overall_score:62,response_rate:.64,ghost_rate:.28,avg_wait_days:10,report_count:182,risk_level:'safe',waste:28,avg_rounds:2.4,process_score:65}},
+  lyft:{id:'27',name:'Lyft',ind:'Mobility Tech',logo:'LY',ver:false,sc:{overall_score:48,response_rate:.48,ghost_rate:.48,avg_wait_days:28,report_count:98,risk_level:'warn',waste:48,avg_rounds:3.4,process_score:45}},
+  coinbase:{id:'28',name:'Coinbase',ind:'Crypto / Fintech',logo:'CB',ver:false,sc:{overall_score:61,response_rate:.62,ghost_rate:.32,avg_wait_days:18,report_count:74,risk_level:'safe',waste:30,avg_rounds:4.0,process_score:58}},
+  figma:{id:'29',name:'Figma',ind:'Design Tools',logo:'FG',ver:true,sc:{overall_score:85,response_rate:.84,ghost_rate:.08,avg_wait_days:10,report_count:41,risk_level:'safe',waste:8,avg_rounds:3.6,process_score:88}},
+  vercel:{id:'30',name:'Vercel',ind:'Developer Infra',logo:'V',ver:true,sc:{overall_score:89,response_rate:.88,ghost_rate:.05,avg_wait_days:7,report_count:29,risk_level:'safe',waste:5,avg_rounds:3.0,process_score:92}},
 };
 
 const LOC_SCORES={
@@ -2109,6 +2129,25 @@ const VIBES={
   linear:['🏆 Best process in tech','✅ Respectful responses','📅 Told timeline upfront'],
   accenture:['👻 Ghosts after round 3','📋 5+ rounds avg','💸 Unpaid work reported','🤖 Mostly auto-replies'],
   notion:['✅ Usually responds','⏳ Takes 2-3 weeks','💬 Genuine feedback'],
+  apple:['📋 4–6 rounds typical','⏳ 3-week avg wait','✅ Usually responds','🍎 High bar — worth applying'],
+  google:['📋 5+ rounds','⏳ Slow pipeline','🤖 Auto-reject common','✅ Responds eventually'],
+  microsoft:['✅ Responds reliably','⚡ Faster than most FAANG','📅 Clear timeline given','💬 Human recruiters'],
+  netflix:['💸 Top-of-market comp','✅ Direct communication','⏳ 2–4 week process','🎯 Very selective'],
+  uber:['⚠ High ghost rate','📋 Multi-round process','⏳ Slow to follow up','🔁 Roles reposted often'],
+  airbnb:['✅ Communicates well','⚡ Faster process','💬 Thoughtful feedback','📅 Timeline shared early'],
+  'x (twitter)':['👻 High ghost rate','🤖 Mostly automated','⚠ Post-acquisition chaos','⏳ Long waits or no response'],
+  salesforce:['📋 4+ rounds','⏳ Moderate wait','✅ Usually responds','🤝 Structured process'],
+  oracle:['👻 Frequent ghosting','📋 5–6 rounds','⏳ Very slow pipeline','🤖 Lots of automated replies'],
+  ibm:['👻 High ghost rate','📋 6+ rounds typical','⏳ 2-month avg pipeline','🤖 Heavy automation'],
+  tesla:['⚠ Mixed responses','⏳ Unpredictable timeline','📋 3–4 rounds','🔁 Listings stay open forever'],
+  mckinsey:['✅ Very responsive','📋 5 rounds (case-heavy)','💬 Detailed feedback','🏆 Respectful even when rejecting'],
+  pwc:['📋 4–5 rounds','⏳ 3-4 week process','⚠ Ghost rate after final round','🤖 Some automation'],
+  walmart:['👻 High ghost rate','🤖 Fully automated pipeline','⏳ No follow-up typical','📋 Low rounds but silent'],
+  target:['✅ Responds within a week','⚡ Shorter process','📅 Clear next steps','💼 Straightforward HR'],
+  lyft:['⚠ Moderate ghost rate','⏳ Slow pipeline','📋 3–4 rounds','🔁 Roles open/close quickly'],
+  coinbase:['✅ Communicates well','📋 4 rounds','⏳ 2-week avg','🔐 Crypto-focused culture'],
+  figma:['🏆 Excellent process','✅ Very responsive','📅 Timeline shared','💬 Genuine feedback given'],
+  vercel:['🏆 Best-in-class process','✅ Fast responses','⚡ Short timeline','💬 Specific feedback always'],
   default:['📊 Data still loading','🔍 Add a report'],
 };
 
@@ -2447,7 +2486,15 @@ function populateTicker(){
   const el=document.getElementById('tickerTrack');
   if(!el)return;
   // Industry → readable city hint
-  const cityHint={amazon:'Seattle',stripe:'Remote',linear:'Remote',shopify:'Remote',meta:'Menlo Park',accenture:'Chicago',notion:'Remote',deloitte:'New York',indeed:'Austin'};
+  const cityHint={
+    amazon:'Seattle',stripe:'Remote',linear:'Remote',shopify:'Remote',meta:'Menlo Park',
+    accenture:'Chicago',notion:'Remote',deloitte:'New York',indeed:'Austin',
+    apple:'Cupertino',google:'Mountain View',microsoft:'Redmond',netflix:'Los Gatos',
+    uber:'San Francisco',airbnb:'San Francisco','x (twitter)':'San Francisco',
+    salesforce:'San Francisco',oracle:'Austin',ibm:'Armonk',tesla:'Austin',
+    mckinsey:'New York',pwc:'New York',walmart:'Bentonville',target:'Minneapolis',
+    lyft:'San Francisco',coinbase:'Remote',figma:'San Francisco',vercel:'Remote',
+  };
   const entries=Object.entries(COS).map(([key,c])=>{
     const s=c.sc.overall_score,risk=c.sc.risk_level,loc=cityHint[key]||c.ind;
     return`<span class="tick"><span class="tco">${c.name.toUpperCase()}</span><span class="tloc">${loc}</span><span class="ts ${risk}">${s}</span></span><span class="tdiv">·</span>`;
@@ -2700,6 +2747,10 @@ function renderJobResults(jobs, l) {
     }
     const applyAction = "openApplyModal('" + safeId + "','" + safeCompany + "','" + safeTitle + "','" + safeLoc + "'," + score + ",'" + Score.risk(score) + "'," + waste + ",'')";
     const vibesHtml = _jobVibes(job).map(v => '<span class="vibe ' + v.cls + '">' + v.txt + '</span>').join('');
+    const ck = safeCompany.toLowerCase().trim();
+    const coData = COS[ck] || Object.values(COS).find(c => c.name.toLowerCase() === ck);
+    const ghostRate = coData ? Math.round((coData.sc.ghost_rate || 0) * 100) : null;
+    const ghostBadge = ghostRate !== null ? '<span class="vibe ' + (ghostRate > 50 ? 'v-r' : ghostRate > 30 ? 'v-y' : 'v-g') + '">👻 ' + ghostRate + '% ghost</span>' : '';
     const logoLetter = (safeCompany || '?')[0].toUpperCase();
     const isSaved = SavedJobs.isSaved(safeId);
     return '<div class="jlc">' +
@@ -2720,6 +2771,7 @@ function renderJobResults(jobs, l) {
         '</div>' +
         '<div style="display:flex;align-items:center;gap:.35rem;flex-wrap:wrap;margin:.35rem 0">' +
           '<span class="' + wl.cls + ' waste-badge">' + wl.txt + '</span>' +
+          ghostBadge +
           vibesHtml +
         '</div>' +
         (job.description ? '<div style="font-size:.72rem;color:var(--muted);margin:.25rem 0;line-height:1.55;text-align:left">' + job.description.slice(0,120) + '...</div>' : '') +
@@ -3201,6 +3253,32 @@ function shareCompanyReport(name) {
   }
 }
 
+function shareToReddit(name) {
+  const ctx = (_shareCtx && _shareCtx.name && _shareCtx.name.toLowerCase() === (name||'').toLowerCase()) ? _shareCtx : null;
+  const url = 'https://seenjobs.io/#company/' + encodeURIComponent((name||'').toLowerCase().trim());
+  const score = ctx?.score || '?';
+  const ghost = ctx?.ghost ?? '?';
+  const waste = ctx?.waste ?? '?';
+  const title = ctx
+    ? (ctx.risk === 'danger'
+      ? `${name} ghosts ${ghost}% of applicants — ${score}/100 hiring score [data from Seen]`
+      : ctx.risk === 'warn'
+      ? `Just checked ${name}'s hiring transparency score: ${score}/100 — ${ghost}% ghost rate`
+      : `${name} actually has a good hiring score: ${score}/100, ${ghost}% ghost rate`)
+    : `${name} hiring transparency check — full breakdown`;
+  const body = ctx
+    ? `Ran ${name} through Seen (hiring transparency tracker built on real applicant data).\n\n**Score: ${score}/100 | Ghost rate: ${ghost}% | Waste risk: ${waste}%**\n\nThis is based on community reports + web research from Reddit, Glassdoor, and Blind.\n\n→ Full breakdown (free): ${url}\n\nHas anyone else applied here recently? Curious if the data matches your experience.`
+    : `Ran ${name} through Seen — a free tool that tracks ghost rates, response times, and hiring scores for thousands of companies.\n\n→ See the full report: ${url}\n\nThe data comes from real applicants. Worth checking before you spend a Sunday on an application.`;
+  const redditUrl = 'https://www.reddit.com/r/jobs/submit?title=' + encodeURIComponent(title) + '&text=' + encodeURIComponent(body);
+  const copied = title + '\n\n' + body;
+  if (navigator.clipboard) {
+    navigator.clipboard.writeText(copied).then(() => {
+      showToast('Reddit post copied! Paste it in r/jobs, r/recruitinghell, or r/cscareerquestions 🚀');
+    });
+  }
+  window.open(redditUrl, '_blank', 'noopener');
+}
+
 function _updateMetaTags(name, sc) {
   const score = sc?.overall_score;
   const ghost = sc?.ghost_rate ? Math.round(sc.ghost_rate * 100) : null;
@@ -3320,7 +3398,8 @@ async function viewCompany(id,name,loc){
   // Meta row — live viewers + share
   document.getElementById('coMeta').innerHTML=`
     <span class="co-live">${viewers.toLocaleString()} checked this week</span>
-    <button class="co-share-btn" onclick="shareCompanyReport('${(name||'').replace(/'/g,"\\'")}')">↗ Share report</button>`;
+    <button class="co-share-btn" onclick="shareCompanyReport('${(name||'').replace(/'/g,"\\'")}')">↗ Share</button>
+    <button class="co-share-btn" style="background:rgba(255,69,0,0.12);border-color:rgba(255,69,0,0.3);color:#ff6314" onclick="shareToReddit('${(name||'').replace(/'/g,"\\'")}')">🔴 Reddit</button>`;
 
   // Metrics — alarming stats pop red
   document.getElementById('coMets').innerHTML=`
@@ -3355,24 +3434,7 @@ async function viewCompany(id,name,loc){
     <div style="background:var(--raised);border-radius:7px;padding:.7rem .95rem;font-family:var(--mono);font-size:.58rem;color:var(--muted);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.5rem">
       <span>📊 Based on ${sc.report_count||0} verified reports · Public hiring data · Seen analysis</span>
       <a href="#" onclick="prefillReport('${name}');go('report');return false" style="color:var(--green);text-decoration:none;white-space:nowrap">+ Add your report →</a>
-    </div>
-    ${(sc.web_reviews&&sc.web_reviews.length)?`<div style="margin-top:1.25rem">
-      <div style="font-family:var(--mono);font-size:.56rem;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:.75rem">What applicants are saying online</div>
-      <div style="display:flex;flex-direction:column;gap:.6rem">
-        ${sc.web_reviews.map(r=>{
-          const sColor=r.sentiment==='positive'?'var(--green)':r.sentiment==='negative'?'var(--red)':'var(--amber)';
-          const sLabel=r.sentiment==='positive'?'✓ Positive':r.sentiment==='negative'?'✗ Negative':'~ Mixed';
-          return `<div style="background:var(--card);border:1px solid var(--line);border-radius:8px;padding:.85rem 1rem">
-            <div style="font-family:var(--mono);font-size:.65rem;color:var(--dim);line-height:1.55;margin-bottom:.5rem">"${r.text.replace(/"/g,'&quot;')}"</div>
-            <div style="display:flex;align-items:center;gap:.5rem;flex-wrap:wrap">
-              <span style="font-family:var(--mono);font-size:.54rem;font-weight:600;color:${sColor}">${sLabel}</span>
-              ${r.source?`<span style="font-family:var(--mono);font-size:.52rem;color:var(--muted)">${r.source.replace(/</g,'&lt;')}</span>`:''}
-              ${r.year?`<span style="font-family:var(--mono);font-size:.52rem;color:var(--muted)">${r.year}</span>`:''}
-            </div>
-          </div>`;
-        }).join('')}
-      </div>
-    </div>`:''}` ;
+    </div>`;
 
   // Process score tab — unique to Seen
   document.getElementById('ctc-process').innerHTML=`
@@ -3462,7 +3524,6 @@ async function viewCompany(id,name,loc){
   (async () => {
     const realData = await loadRealCompanyData(co?.name || name, loc);
     const rsc = realData ? computeScoresFromData(realData.reports, realData.jobs, realData.webScore) : null;
-    if (rsc && realData?.webScore?.web_reviews?.length) rsc.web_reviews = realData.webScore.web_reviews;
     // Store score context so shareCompanyReport can build a rich message
     if (rsc) {
       _shareCtx = { name: co?.name||name, score: rsc.overall_score, ghost: Math.round((rsc.ghost_rate||0)*100), waste: rsc.waste||0, risk: rsc.risk_level };
@@ -3553,24 +3614,7 @@ async function viewCompany(id,name,loc){
       <div style="background:var(--raised);border-radius:7px;padding:.7rem .95rem;font-family:var(--mono);font-size:.58rem;color:var(--muted);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.5rem">
         <span>📊 Based on ${rsc.report_count} ${dq === 'jobs_only' ? 'job listings' : 'community reports'} · ${dq === 'strong' ? 'High confidence' : dq === 'moderate' ? 'Moderate confidence' : dq === 'limited' ? 'Limited data — add yours' : 'Job data only'}</span>
         <a href="#" onclick="prefillReport('${name}');go('report');return false" style="color:var(--green);text-decoration:none;white-space:nowrap">+ Add your report →</a>
-      </div>
-      ${(rsc.web_reviews&&rsc.web_reviews.length)?`<div style="margin-top:1.25rem">
-        <div style="font-family:var(--mono);font-size:.56rem;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:.75rem">What applicants are saying online</div>
-        <div style="display:flex;flex-direction:column;gap:.6rem">
-          ${rsc.web_reviews.map(r=>{
-            const sColor=r.sentiment==='positive'?'var(--green)':r.sentiment==='negative'?'var(--red)':'var(--amber)';
-            const sLabel=r.sentiment==='positive'?'✓ Positive':r.sentiment==='negative'?'✗ Negative':'~ Mixed';
-            return `<div style="background:var(--card);border:1px solid var(--line);border-radius:8px;padding:.85rem 1rem">
-              <div style="font-family:var(--mono);font-size:.65rem;color:var(--dim);line-height:1.55;margin-bottom:.5rem">"${r.text.replace(/"/g,'&quot;')}"</div>
-              <div style="display:flex;align-items:center;gap:.5rem;flex-wrap:wrap">
-                <span style="font-family:var(--mono);font-size:.54rem;font-weight:600;color:${sColor}">${sLabel}</span>
-                ${r.source?`<span style="font-family:var(--mono);font-size:.52rem;color:var(--muted)">${r.source.replace(/</g,'&lt;')}</span>`:''}
-                ${r.year?`<span style="font-family:var(--mono);font-size:.52rem;color:var(--muted)">${r.year}</span>`:''}
-              </div>
-            </div>`;
-          }).join('')}
-        </div>
-      </div>`:''}` ;
+      </div>`;
 
     document.getElementById('ctc-process').innerHTML = `
       <div style="display:grid;grid-template-columns:${window.innerWidth<600?'1fr':'1fr 1fr'};gap:1rem;margin-bottom:1rem">
@@ -5160,12 +5204,12 @@ function setHeroLines(lines, animate) {
     e1.textContent = lines[0];
     e2.textContent = lines[1];
     e1.className = 'hero-line-in';
-    e2.style.animationDelay = '.08s'; e2.className = 'hero-line-in';
+    e2.style.animationDelay = '.06s'; e2.className = 'hero-line-in';
     return;
   }
 
   [e1, e2].forEach((el, i) => {
-    el.style.animationDelay = (i * .05) + 's';
+    el.style.animationDelay = (i * .04) + 's';
     el.style.animation = 'none';
     el.offsetHeight;
     el.style.animation = '';
@@ -5176,7 +5220,7 @@ function setHeroLines(lines, animate) {
     e1.textContent = lines[0];
     e2.textContent = lines[1];
     [e1, e2].forEach((el, i) => {
-      el.style.animationDelay = (i * .09) + 's';
+      el.style.animationDelay = (i * .07) + 's';
       el.style.animation = 'none';
       el.offsetHeight;
       el.style.animation = '';
