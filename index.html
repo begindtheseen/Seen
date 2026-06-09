@@ -2,8 +2,16 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>Seen — The job board that holds companies accountable.</title>
-<meta name="description" content="Seen is the only job board with real process scores, waste probability, hiring timeline predictions, and enforcement on every listing. Built for job seekers, not employers."/>
+<title>Seen — Know before you apply.</title>
+<meta name="description" content="Check any company's ghost rate, response time, and hiring score before you apply. 47,000+ companies scored by real applicants. Free for job seekers."/>
+<meta property="og:title" id="ogTitle" content="Seen — Know before you apply."/>
+<meta property="og:description" id="ogDesc" content="Ghost rates. Response times. Hiring scores. For 47,000+ companies — from real applicants."/>
+<meta property="og:type" content="website"/>
+<meta property="og:url" id="ogUrl" content="https://seenjobs.io/"/>
+<meta property="og:site_name" content="Seen"/>
+<meta name="twitter:card" content="summary"/>
+<meta name="twitter:title" id="twTitle" content="Seen — Know before you apply."/>
+<meta name="twitter:description" id="twDesc" content="Ghost rates. Response times. Hiring scores. For 47,000+ companies — from real applicants."/>
 <meta name="keywords" content="ghost job detector, hiring transparency, process score, job board accountability, waste score jobs, honest hiring 2025"/>
 <meta name="robots" content="index, follow"/>
 <link rel="canonical" href="https://tryseen.io/"/>
@@ -766,14 +774,14 @@ nav.nav-scrolled{background:rgba(6,6,8,0.82);backdrop-filter:blur(60px) saturate
       47,000+ companies scored · updated live
     </div>
 
-    <!-- HEADLINE — fixed height container, text swaps inside it -->
+    <!-- HEADLINE — 2-line rotating headline + static sub -->
     <div style="width:100%;max-width:680px;margin:0 auto;animation:fadeUp .5s .08s ease both">
-      <div id="heroHeadlineWrap" style="height:clamp(140px,38vw,300px);display:flex;flex-direction:column;justify-content:center;align-items:center;overflow:hidden">
-        <h1 id="rotatingHero" style="font-family:var(--display);font-size:clamp(1.9rem,5.5vw,4.8rem);font-weight:800;line-height:1.05;letter-spacing:-.03em;color:var(--white);text-shadow:0 2px 20px rgba(0,0,0,.5);margin:0;width:100%">
+      <div id="heroHeadlineWrap" style="display:flex;flex-direction:column;justify-content:center;align-items:center;padding:.25rem 0">
+        <h1 id="rotatingHero" style="font-family:var(--display);font-size:clamp(2.2rem,7vw,5.2rem);font-weight:800;line-height:1.07;letter-spacing:-.035em;color:var(--white);text-shadow:0 2px 20px rgba(0,0,0,.5);margin:0 0 .6rem;width:100%">
           <span id="heroLine1" style="display:block"></span>
-          <span id="heroLine2" style="display:block"></span>
-          <span id="heroLine3" style="display:block;color:var(--blue);font-style:italic"></span>
+          <span id="heroLine2" style="display:block;background:linear-gradient(135deg,#a5b4fc,#c084fc,#e879f9);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;font-style:italic"></span>
         </h1>
+        <div id="heroSub" style="font-family:var(--mono);font-size:clamp(.72rem,1.5vw,.9rem);color:rgba(255,255,255,.5);letter-spacing:.01em;line-height:1.5">Ghost rates · response times · hiring scores · 47,000+ companies</div>
       </div>
     </div>
 
@@ -960,6 +968,7 @@ nav.nav-scrolled{background:rgba(6,6,8,0.82);backdrop-filter:blur(60px) saturate
         <div style="font-family:var(--display);font-size:.9rem;font-weight:700;color:var(--white);letter-spacing:-.02em">Active applications</div>
         <button class="btn btn-ghost" style="font-size:.7rem" onclick="go('tracker')">View all →</button>
       </div>
+      <div id="dashPipelineInsight" style="display:none"></div>
       <div id="dashActiveApps"></div>
       <button class="btn btn-green" style="width:100%;justify-content:center;font-size:.82rem;margin-top:.85rem" onclick="go('jobs')">Find more jobs →</button>
     </div>
@@ -2238,6 +2247,20 @@ function showTrackRoleInput(name, loc, containerId) {
 }
 
 async function quickTrackApplication(name, loc, role, containerId) {
+  // Soft paywall — guests capped at 5 tracked apps
+  if (!Auth.isLoggedIn()) {
+    const existing = AppStore.loadSync();
+    if (existing.length >= 5) {
+      const cid = containerId || 'modalTrackRow';
+      const row = document.getElementById(cid);
+      if (row) row.innerHTML = `<div style="background:var(--gdim);border:1px solid var(--gmid);border-radius:10px;padding:.85rem 1rem;text-align:center">
+        <div style="font-family:var(--mono);font-size:.65rem;font-weight:500;color:var(--green);margin-bottom:.3rem">Free limit reached (5 apps)</div>
+        <div style="font-family:var(--mono);font-size:.57rem;color:var(--dim);margin-bottom:.6rem">Sign in free for unlimited tracking + timeline predictions</div>
+        <button class="btn btn-solid" style="width:100%;justify-content:center;font-size:.72rem" onclick="if(document.getElementById('modalOv')?.classList.contains('open'))closeModDirect();go('login')">Sign in free →</button>
+      </div>`;
+      return;
+    }
+  }
   const ck = name.toLowerCase().trim();
   const known = COS[ck] || Object.values(COS).find(c => c.name.toLowerCase().includes(ck));
   const lk = loc ? `${ck}|${loc.toLowerCase()}` : null;
@@ -2269,6 +2292,26 @@ async function quickTrackApplication(name, loc, role, containerId) {
     </div>`;
   }
   showToast(`Tracking: ${roleLabel} at ${name}`);
+  // Offer browser notifications on first track
+  if ('Notification' in window && Notification.permission === 'default') {
+    setTimeout(() => _offerNotifications(name, avgWait), 2500);
+  }
+}
+
+function _offerNotifications(company, avgWait) {
+  const banner = document.createElement('div');
+  banner.id = 'notifBanner';
+  banner.style.cssText = 'position:fixed;bottom:1.25rem;left:50%;transform:translateX(-50%);z-index:9001;background:var(--card);border:1px solid rgba(99,102,241,0.3);border-radius:14px;padding:.95rem 1.1rem;max-width:380px;width:calc(100vw - 1.5rem);box-shadow:0 12px 48px rgba(0,0,0,0.65);transition:opacity .3s';
+  banner.innerHTML = `
+    <div style="font-family:var(--mono);font-size:.65rem;font-weight:600;color:var(--white);margin-bottom:.25rem">Get notified when it's time to follow up</div>
+    <div style="font-family:var(--mono);font-size:.58rem;color:var(--dim);margin-bottom:.65rem;line-height:1.6">We'll remind you if ${company} hasn't responded after ${avgWait} days. No spam — just the nudge you need.</div>
+    <div style="display:flex;gap:.4rem">
+      <button class="btn btn-ghost" style="flex:1;justify-content:center;font-size:.65rem" onclick="document.getElementById('notifBanner')?.remove()">Not now</button>
+      <button class="btn btn-solid" style="flex:2;justify-content:center;font-size:.65rem" onclick="Notification.requestPermission().then(p=>{document.getElementById('notifBanner')?.remove();if(p==='granted')showToast('Notifications on — we\\'ll remind you when it matters.')})">Enable notifications</button>
+    </div>`;
+  document.body.appendChild(banner);
+  setTimeout(() => { if(banner.parentNode){banner.style.opacity='0';} }, 12000);
+  setTimeout(() => banner.remove(), 12400);
 }
 
 function openModal(name,loc){
@@ -3158,6 +3201,44 @@ function shareCompanyReport(name) {
   }
 }
 
+function _updateMetaTags(name, sc) {
+  const score = sc?.overall_score;
+  const ghost = sc?.ghost_rate ? Math.round(sc.ghost_rate * 100) : null;
+  const risk = sc?.risk_level || 'warn';
+  const riskLabel = risk === 'safe' ? 'Good' : risk === 'danger' ? 'High risk' : 'Moderate';
+  const title = score ? `${name} · ${score}/100 · ${riskLabel} — Seen` : `${name} Hiring Score — Seen`;
+  const desc = score
+    ? `${name} scores ${score}/100 on Seen.${ghost !== null ? ` ${ghost}% ghost rate.` : ''} Check hiring transparency, response times, and waste risk before you apply.`
+    : `Check ${name}'s hiring transparency score, ghost rate, and response time on Seen before you apply.`;
+  const url = `https://seenjobs.io/#company/${encodeURIComponent((name||'').toLowerCase().trim())}`;
+  const setMeta = (id, val) => { const el = document.getElementById(id); if (el) el.setAttribute('content', val); };
+  document.title = title;
+  setMeta('ogTitle', title); setMeta('ogDesc', desc); setMeta('ogUrl', url);
+  setMeta('twTitle', title); setMeta('twDesc', desc);
+}
+
+function _buildExpectedTimeline(sc, risk, safeName, loc) {
+  if (!sc) return '';
+  const avgWait = sc.avg_wait_days || 30;
+  const rr = Math.round((sc.response_rate||0)*100);
+  const gr = Math.round((sc.ghost_rate||0)*100);
+  const w = sc.waste || 40;
+  const wColor = w > 60 ? 'var(--red)' : w > 30 ? 'var(--amber)' : 'var(--green)';
+  const rrColor = Score.color(risk);
+  const safeLoc = (loc||'').replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+  return `<div style="background:rgba(99,102,241,0.07);border:1px solid rgba(99,102,241,0.18);border-radius:12px;padding:1rem 1.1rem;margin-bottom:1rem">
+    <div style="font-family:var(--mono);font-size:.56rem;text-transform:uppercase;letter-spacing:.08em;color:var(--indigo);margin-bottom:.75rem">📅 If you applied today</div>
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:.75rem;margin-bottom:.85rem">
+      <div><div style="font-family:var(--mono);font-size:1.3rem;font-weight:500;color:var(--white);line-height:1;margin-bottom:.15rem">${avgWait}d</div><div style="font-family:var(--mono);font-size:.52rem;color:var(--muted)">avg response</div></div>
+      <div><div style="font-family:var(--mono);font-size:1.3rem;font-weight:500;color:${rrColor};line-height:1;margin-bottom:.15rem">${rr}%</div><div style="font-family:var(--mono);font-size:.52rem;color:var(--muted)">hear back</div></div>
+      <div><div style="font-family:var(--mono);font-size:1.3rem;font-weight:500;color:${wColor};line-height:1;margin-bottom:.15rem">${w}%</div><div style="font-family:var(--mono);font-size:.52rem;color:var(--muted)">waste risk</div></div>
+    </div>
+    <div id="coTrackBarExpected">
+      <button class="btn btn-solid" style="width:100%;justify-content:center;font-size:.75rem;background:linear-gradient(135deg,rgba(16,185,129,0.15),rgba(99,102,241,0.15));border-color:rgba(16,185,129,0.3);color:var(--green)" onclick="showTrackRoleInput('${safeName}','${safeLoc}','coTrackBarExpected')">I'm applying here — track it</button>
+    </div>
+  </div>`;
+}
+
 function _renderCoTrackBar(name, loc, sc) {
   const bar = document.getElementById('coTrackBar');
   if (!bar) return;
@@ -3215,6 +3296,7 @@ async function viewCompany(id,name,loc){
   if(loc){const lt=document.getElementById('coLocTag');lt.textContent='📍 '+loc;lt.style.display='inline-flex';}
   document.getElementById('aggBar').style.display='flex';
   _renderCoTrackBar(co?.name||name, loc, sc);
+  _updateMetaTags(co?.name||name, sc);
 
   document.getElementById('coSB').innerHTML=`
     <div class="co-grade-bar ${risk}">
@@ -3250,7 +3332,10 @@ async function viewCompany(id,name,loc){
     <div class="co-m"><span class="co-mn">${sc.report_count||0}</span><span class="co-ml">Reports</span></div>`;
 
   // Overview
+  const _coN = co?.name||name;
+  const _coNSafe = _coN.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
   document.getElementById('ctc-ov').innerHTML=`
+    ${_buildExpectedTimeline(sc, risk, _coNSafe, loc)}
     <div style="display:grid;grid-template-columns:${window.innerWidth<600?'1fr':'1fr 1fr'};gap:1rem;margin-bottom:1rem">
       <div style="background:var(--card);border:1px solid var(--line);border-radius:10px;padding:1.2rem">
         <div style="font-family:var(--mono);font-size:.56rem;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:.85rem">Score breakdown${loc?' ('+loc+')':''}</div>
@@ -3379,7 +3464,10 @@ async function viewCompany(id,name,loc){
     const rsc = realData ? computeScoresFromData(realData.reports, realData.jobs, realData.webScore) : null;
     if (rsc && realData?.webScore?.web_reviews?.length) rsc.web_reviews = realData.webScore.web_reviews;
     // Store score context so shareCompanyReport can build a rich message
-    if (rsc) _shareCtx = { name: co?.name||name, score: rsc.overall_score, ghost: Math.round((rsc.ghost_rate||0)*100), waste: rsc.waste||0, risk: rsc.risk_level };
+    if (rsc) {
+      _shareCtx = { name: co?.name||name, score: rsc.overall_score, ghost: Math.round((rsc.ghost_rate||0)*100), waste: rsc.waste||0, risk: rsc.risk_level };
+      _updateMetaTags(co?.name||name, rsc);
+    }
 
     if (!rsc) {
       if (isUnknown) {
@@ -3445,6 +3533,7 @@ async function viewCompany(id,name,loc){
     const rsp = Math.round((rsc.response_rate || 0) * 100);
     const rgp = Math.round((rsc.ghost_rate || 0) * 100);
     document.getElementById('ctc-ov').innerHTML = `
+      ${_buildExpectedTimeline(rsc, rr2, (co?.name||name).replace(/\\/g,'\\\\').replace(/'/g,"\\'"), loc)}
       <div style="display:grid;grid-template-columns:${window.innerWidth<600?'1fr':'1fr 1fr'};gap:1rem;margin-bottom:1rem">
         <div style="background:var(--card);border:1px solid var(--line);border-radius:10px;padding:1.2rem">
           <div style="font-family:var(--mono);font-size:.56rem;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:.85rem">Score breakdown${loc ? ' (' + loc + ')' : ''}</div>
@@ -3933,6 +4022,69 @@ const AppStore = {
 };
 
 // ═══════════════════════════════════════════════
+// APPLICATION TIMELINE BUILDER
+// Visual day-progress bar for tracker cards
+// ═══════════════════════════════════════════════
+function _buildTimeline(app) {
+  const co = Object.values(COS).find(c => c.name.toLowerCase() === app.company.toLowerCase());
+  const avgWait = co?.sc?.avg_wait_days || 30;
+  const days = Math.floor((Date.now() - app.appliedAt) / 86400000);
+  const pct = Math.min(100, (days / avgWait) * 100);
+  const color = pct < 75 ? 'var(--green)' : pct < 115 ? 'var(--amber)' : 'var(--red)';
+  const statusLbl = pct < 75 ? 'On track' : pct < 115 ? 'In the window' : '⚠ Past window';
+  const dotPct = Math.min(97, pct);
+  const appliedLbl = new Date(app.appliedAt).toLocaleDateString('en-US',{month:'short',day:'numeric'});
+  const expectedDate = new Date(app.appliedAt + avgWait * 86400000).toLocaleDateString('en-US',{month:'short',day:'numeric'});
+  return `<div style="margin:.6rem 0 .85rem">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.38rem">
+      <span style="font-family:var(--mono);font-size:.54rem;color:var(--muted)">${appliedLbl}</span>
+      <span style="font-family:var(--mono);font-size:.6rem;font-weight:600;color:${color}">Day ${days} · ${statusLbl}</span>
+      <span style="font-family:var(--mono);font-size:.54rem;color:var(--muted)">Avg: ${expectedDate}</span>
+    </div>
+    <div style="height:5px;background:var(--line);border-radius:3px;position:relative;overflow:visible;margin:0 4px">
+      <div style="height:100%;width:${pct}%;background:linear-gradient(to right,var(--green),${color});border-radius:3px"></div>
+      <div style="position:absolute;top:50%;left:${dotPct}%;transform:translate(-50%,-50%);width:12px;height:12px;border-radius:50%;background:${color};box-shadow:0 0 8px ${color},0 0 20px ${color}55;border:2px solid var(--void)"></div>
+    </div>
+    <div style="display:flex;justify-content:space-between;font-family:var(--mono);font-size:.5rem;color:var(--muted);margin-top:.28rem">
+      <span>Day 0</span><span>← typical response window →</span><span>Day ${avgWait}</span>
+    </div>
+  </div>`;
+}
+
+// ═══════════════════════════════════════════════
+// OUTCOME REPORT PROMPT
+// After marking ghosted/hired, gently ask user
+// to convert outcome into a community report
+// ═══════════════════════════════════════════════
+function _promptOutcomeReport(app, status, days) {
+  const existing = document.getElementById('outcomeReportBanner');
+  if (existing) existing.remove();
+  const isGhosted = status === 'ghosted';
+  const isHired = status === 'hired';
+  if (!isGhosted && !isHired) return;
+  const banner = document.createElement('div');
+  banner.id = 'outcomeReportBanner';
+  banner.style.cssText = 'position:fixed;bottom:1.25rem;left:50%;transform:translateX(-50%);z-index:9000;background:var(--card);border:1px solid '+(isHired?'rgba(16,185,129,0.35)':'rgba(239,68,68,0.3)')+';border-radius:14px;padding:.95rem 1.1rem;max-width:380px;width:calc(100vw - 1.5rem);box-shadow:0 12px 48px rgba(0,0,0,0.65),0 0 40px rgba(99,102,241,0.08);transition:opacity .3s';
+  const safeId = (app.id||'').replace(/'/g,"\\'");
+  const safeName = (app.company||'').replace(/'/g,"\\'");
+  banner.innerHTML = `
+    <div style="font-family:var(--mono);font-size:.65rem;font-weight:600;color:${isHired?'var(--green)':'var(--red)'};margin-bottom:.25rem">
+      ${isHired ? `🎉 You got the job at ${app.company}` : `👻 ${app.company} ghosted you after ${days} days`}
+    </div>
+    <div style="font-family:var(--mono);font-size:.58rem;color:var(--dim);margin-bottom:.65rem;line-height:1.6">
+      Your experience tells the next applicant what to expect. It takes 60 seconds and moves their score.
+    </div>
+    <div style="display:flex;gap:.4rem">
+      <button class="btn btn-ghost" style="flex:1;justify-content:center;font-size:.65rem" onclick="document.getElementById('outcomeReportBanner')?.remove()">Skip</button>
+      <button class="btn btn-solid" style="flex:2;justify-content:center;font-size:.65rem;${isHired?'background:rgba(16,185,129,0.2);border-color:rgba(16,185,129,0.4);color:var(--green)':''}"
+        onclick="document.getElementById('outcomeReportBanner')?.remove();prefillReportFromApp('${safeId}')">Report my experience →</button>
+    </div>`;
+  document.body.appendChild(banner);
+  setTimeout(() => { if(banner.parentNode){banner.style.opacity='0';} }, 14000);
+  setTimeout(() => banner.remove(), 14400);
+}
+
+// ═══════════════════════════════════════════════
 // SMART NUDGE ENGINE
 // Calculates what the silence probably means
 // based on the company's known ghost patterns
@@ -4061,6 +4213,9 @@ function buildAppCard(app) {
         <div style="margin-top:.3rem"><span class="${wl.cls}" style="font-size:.55rem">${wl.txt}</span></div>
       </div>
     </div>
+
+    <!-- Timeline (active apps only) -->
+    ${app.status === 'active' ? _buildTimeline(app) : ''}
 
     <!-- Stage pipeline -->
     ${app.status === 'active' ? `
@@ -4704,11 +4859,30 @@ async function renderSeekerDash(){
     </div>`;
   }
   // Stats
-  const rr=apps.length?Math.round((responded.filter(a=>a.status==='hired').length/apps.length)*100)+'%':'—';
   if(_('dStatActive'))_('dStatActive').textContent=active.length;
   if(_('dStatRR'))_('dStatRR').textContent=apps.length?Math.round((apps.filter(a=>a.status!=='active'&&a.status!=='ghosted').length/apps.length)*100)+'%':'—';
   if(_('dStatGhosted'))_('dStatGhosted').textContent=ghosted.length;
   if(_('dStatHired'))_('dStatHired').textContent=hired.length;
+
+  // Pipeline intelligence — aggregate insights from resolved apps
+  const insightBand = _('dashPipelineInsight');
+  if (insightBand && apps.length >= 2) {
+    const resolved = apps.filter(a => a.status !== 'active');
+    const withTiming = resolved.filter(a => a.responseTimeDays > 0);
+    const avgRT = withTiming.length ? Math.round(withTiming.reduce((s,a) => s+a.responseTimeDays, 0) / withTiming.length) : null;
+    const personalRR = apps.length ? Math.round((apps.filter(a => a.status==='hired'||a.status==='rejected').length / apps.length) * 100) : null;
+    const overdue = active.filter(a => { const d=Math.floor((Date.now()-a.appliedAt)/86400000); const co=Object.values(COS).find(c=>c.name.toLowerCase()===a.company.toLowerCase()); return d>(co?.sc?.avg_wait_days||30)*1.1; });
+    const parts = [];
+    if (overdue.length) parts.push(`<span style="color:var(--red)">⚠ ${overdue.length} app${overdue.length>1?'s':''} past response window</span>`);
+    if (avgRT) parts.push(`avg response: ${avgRT}d`);
+    if (personalRR !== null && resolved.length >= 2) parts.push(`your response rate: ${personalRR}%`);
+    if (ghosted.length) parts.push(`${ghosted.length} ghosted`);
+    if (hired.length) parts.push(`${hired.length} hired 🎉`);
+    if (parts.length) {
+      insightBand.style.display = 'block';
+      insightBand.innerHTML = `<div style="background:var(--raised);border:1px solid var(--line2);border-radius:9px;padding:.65rem .95rem;font-family:var(--mono);font-size:.6rem;color:var(--dim);display:flex;flex-wrap:wrap;gap:.55rem;align-items:center;margin-bottom:1rem"><span style="color:var(--muted);font-size:.54rem;text-transform:uppercase;letter-spacing:.07em">Your pipeline</span>${parts.map(p=>`<span>${p}</span>`).join('<span style="color:var(--line2)">·</span>')}</div>`;
+    }
+  }
   // Active apps preview
   const appsEl=_('dashActiveApps');
   if(appsEl){
@@ -4964,14 +5138,14 @@ document.addEventListener('click', e => {
 });
 
 const HERO_LINES = [
-  ['stop applying',      'to ghost',            'jobs.'],
-  ['they ghosted you.',  'not you.',             'them.'],
-  ['your next job',      'actually',             'responds.'],
-  ['a job board',        "that's on",            'your side.'],
-  ['check the score',    'before you waste',     'your sunday.'],
-  ['no more take-homes', 'for jobs already',     'filled.'],
-  ['the receipt on',     'every company',        'that ghosts.'],
-  ['you applied.',       'they saw it.',         "they're just..."],
+  ['know before',        'you apply.'],
+  ['does this company',  'actually respond?'],
+  ['see who ghosts.',    'see who hires.'],
+  ['check the score.',   'skip the waste.'],
+  ['your time matters.', 'spend it wisely.'],
+  ['the hiring data',    'companies hide.'],
+  ['stop guessing.',     'start knowing.'],
+  ['47,000+ companies.', 'all scored. free.'],
 ];
 
 let _heroIdx = 0;
@@ -4980,24 +5154,20 @@ let _heroTimer = null;
 function setHeroLines(lines, animate) {
   const e1 = document.getElementById('heroLine1');
   const e2 = document.getElementById('heroLine2');
-  const e3 = document.getElementById('heroLine3');
   if (!e1) return;
 
   if (!animate) {
     e1.textContent = lines[0];
     e2.textContent = lines[1];
-    e3.textContent = lines[2];
     e1.className = 'hero-line-in';
-    e2.style.animationDelay = '.06s'; e2.className = 'hero-line-in';
-    e3.style.animationDelay = '.12s'; e3.className = 'hero-line-in';
+    e2.style.animationDelay = '.08s'; e2.className = 'hero-line-in';
     return;
   }
 
-  // Fade out all three staggered upward
-  [e1, e2, e3].forEach((el, i) => {
-    el.style.animationDelay = (i * .04) + 's';
+  [e1, e2].forEach((el, i) => {
+    el.style.animationDelay = (i * .05) + 's';
     el.style.animation = 'none';
-    el.offsetHeight; // force reflow
+    el.offsetHeight;
     el.style.animation = '';
     el.className = 'hero-line-out';
   });
@@ -5005,15 +5175,14 @@ function setHeroLines(lines, animate) {
   setTimeout(() => {
     e1.textContent = lines[0];
     e2.textContent = lines[1];
-    e3.textContent = lines[2];
-    [e1, e2, e3].forEach((el, i) => {
-      el.style.animationDelay = (i * .07) + 's';
+    [e1, e2].forEach((el, i) => {
+      el.style.animationDelay = (i * .09) + 's';
       el.style.animation = 'none';
       el.offsetHeight;
       el.style.animation = '';
       el.className = 'hero-line-in';
     });
-  }, 300);
+  }, 280);
 }
 
 function startHeroRotation() {
@@ -7105,11 +7274,21 @@ async function removeApp(id) {
 }
 
 async function markAppStatus(id, status) {
-  await AppStore.update(id, { status });
+  const apps = AppStore.loadSync();
+  const app = apps.find(a => a.id === id);
+  const days = app ? Math.floor((Date.now() - app.appliedAt) / 86400000) : 0;
+  await AppStore.update(id, { status, responseTimeDays: days, resolvedAt: Date.now() });
   await renderTracker();
   await renderSeekerDash();
-  const msgs = { ghosted:'👻 Marked ghosted. Consider reporting it.', hired:'🎉 Congrats!', rejected:'Marked as rejected.' };
+  const msgs = {
+    ghosted: `👻 Ghosted after ${days}d. Report it so others know.`,
+    hired: '🎉 You got the job. Report it — they deserve the credit.',
+    rejected: `Marked rejected (${days}d).`
+  };
   showToast(msgs[status] || 'Updated.');
+  if (app && (status === 'ghosted' || status === 'hired')) {
+    setTimeout(() => _promptOutcomeReport(app, status, days), 900);
+  }
 }
 
 // Re-sync all user data when tab becomes visible (catches changes made on other devices)
