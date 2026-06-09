@@ -1326,6 +1326,7 @@ nav.nav-scrolled{background:rgba(6,6,8,0.82);backdrop-filter:blur(60px) saturate
       <div class="co-mets" id="coMets"></div>
     </div>
     <div class="agg-bar" id="aggBar" style="display:none"><div class="agg-item"><div class="agg-dot"></div>Live aggregating</div></div>
+    <div id="coTrackBar" style="margin:0 0 .75rem"></div>
     <div class="co-tabs">
       <button class="ctab active" onclick="switchTab('ov',this)">Overview</button>
       <button class="ctab" onclick="switchTab('process',this)">Process Score</button>
@@ -2213,19 +2214,40 @@ function _modalTrackCTA(name, loc, sc) {
   }
   const safeName = name.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
   const safeLoc = (loc||'').replace(/\\/g,'\\\\').replace(/'/g,"\\'");
-  return `<button class="btn btn-solid" style="width:100%;justify-content:center;font-size:.75rem;background:linear-gradient(135deg,rgba(16,185,129,0.18),rgba(99,102,241,0.18));border-color:rgba(16,185,129,0.35);color:var(--green)" onclick="quickTrackApplication('${safeName}','${safeLoc}')">+ Track application to ${name}</button>`;
+  return `<button class="btn btn-solid" style="width:100%;justify-content:center;font-size:.75rem;background:linear-gradient(135deg,rgba(16,185,129,0.18),rgba(99,102,241,0.18));border-color:rgba(16,185,129,0.35);color:var(--green)" onclick="showTrackRoleInput('${safeName}','${safeLoc}','modalTrackRow')">+ Track application to ${name}</button>`;
 }
 
-async function quickTrackApplication(name, loc) {
+function showTrackRoleInput(name, loc, containerId) {
+  const row = document.getElementById(containerId);
+  if (!row) return;
+  const safeName = name.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+  const safeLoc = (loc||'').replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+  row.innerHTML = `<div style="background:rgba(99,102,241,0.07);border:1px solid rgba(99,102,241,0.22);border-radius:10px;padding:.75rem 1rem">
+    <div style="font-family:var(--mono);font-size:.6rem;color:var(--dim);margin-bottom:.5rem">What role did you apply for?</div>
+    <div style="display:flex;gap:.4rem">
+      <input type="text" id="trackRoleInput_${containerId}" placeholder="e.g. Software Engineer" autocomplete="off"
+        style="flex:1;background:var(--surface);border:1px solid var(--line2);border-radius:7px;padding:.5rem .75rem;font-family:var(--mono);font-size:.7rem;color:var(--text);outline:none;-webkit-appearance:none"
+        onkeydown="if(event.key==='Enter'){event.preventDefault();quickTrackApplication('${safeName}','${safeLoc}',this.value,'${containerId}')}"
+      />
+      <button class="btn btn-solid" style="font-size:.72rem;flex-shrink:0;background:linear-gradient(135deg,rgba(16,185,129,0.25),rgba(99,102,241,0.2));border-color:rgba(16,185,129,0.4);color:var(--green)"
+        onclick="quickTrackApplication('${safeName}','${safeLoc}',document.getElementById('trackRoleInput_${containerId}').value||'','${containerId}')">Track →</button>
+    </div>
+    <div style="font-family:var(--mono);font-size:.52rem;color:var(--muted);margin-top:.35rem">Leave blank to skip · you can update it later</div>
+  </div>`;
+  setTimeout(() => document.getElementById('trackRoleInput_' + containerId)?.focus(), 60);
+}
+
+async function quickTrackApplication(name, loc, role, containerId) {
   const ck = name.toLowerCase().trim();
   const known = COS[ck] || Object.values(COS).find(c => c.name.toLowerCase().includes(ck));
   const lk = loc ? `${ck}|${loc.toLowerCase()}` : null;
   const sc = (lk ? LOC_SCORES[lk] : null) || known?.sc || {avg_wait_days:30, ghost_rate:0.4, response_rate:0.5};
   const pct = Math.round((1 - (sc.ghost_rate || 0.4)) * 100);
   const avgWait = sc.avg_wait_days || 30;
+  const roleLabel = role?.trim() || name;
   await AppStore.add({
     company: name,
-    role: loc ? `Role at ${name} (${loc})` : `Role at ${name}`,
+    role: role?.trim() || name,
     location: loc || '',
     platform: 'seen',
     score: sc.overall_score,
@@ -2233,18 +2255,20 @@ async function quickTrackApplication(name, loc) {
     stage: 'Applied',
     status: 'active'
   });
-  const row = document.getElementById('modalTrackRow');
+  const cid = containerId || 'modalTrackRow';
+  const row = document.getElementById(cid);
   if (row) {
+    const highGhost = (sc.ghost_rate || 0) > 0.5;
     row.innerHTML = `<div style="background:rgba(16,185,129,0.08);border:1px solid rgba(16,185,129,0.25);border-radius:9px;padding:.75rem 1rem">
-      <div style="font-family:var(--mono);font-size:.65rem;font-weight:500;color:var(--green);margin-bottom:.3rem">✓ Application tracked</div>
-      <div style="font-family:var(--mono);font-size:.57rem;color:var(--dim);line-height:1.65">${pct}% of applicants hear back · avg wait <strong style="color:var(--white)">${avgWait} days</strong>${sc.ghost_rate > 0.5 ? ` · <span style="color:var(--red)">⚠ high ghost rate — set a reminder</span>` : ''}</div>
+      <div style="font-family:var(--mono);font-size:.65rem;font-weight:500;color:var(--green);margin-bottom:.25rem">✓ Tracking — ${roleLabel} at ${name}</div>
+      <div style="font-family:var(--mono);font-size:.57rem;color:var(--dim);line-height:1.65">${pct}% of applicants hear back · avg response <strong style="color:var(--white)">${avgWait} days</strong>${highGhost ? ` · <span style="color:var(--red)">⚠ high ghost rate</span>` : ''}</div>
       <div style="display:flex;gap:.35rem;margin-top:.6rem">
-        <button class="btn btn-ghost" style="font-size:.62rem;padding:.38rem .75rem" onclick="closeModDirect();go('tracker')">View tracker →</button>
-        <button class="btn btn-ghost" style="font-size:.62rem;padding:.38rem .75rem" onclick="closeModDirect();prefillReport('${name.replace(/'/g,"\\'")}');go('report')">+ Report experience</button>
+        <button class="btn btn-ghost" style="font-size:.62rem;padding:.38rem .75rem" onclick="if(document.getElementById('modalOv')?.classList.contains('open'))closeModDirect();go('tracker')">View tracker →</button>
+        <button class="btn btn-ghost" style="font-size:.62rem;padding:.38rem .75rem" onclick="if(document.getElementById('modalOv')?.classList.contains('open'))closeModDirect();prefillReport('${name.replace(/'/g,"\\'")}');go('report')">+ Report experience</button>
       </div>
     </div>`;
   }
-  showToast(`Tracking application to ${name}`);
+  showToast(`Tracking: ${roleLabel} at ${name}`);
 }
 
 function openModal(name,loc){
@@ -3134,6 +3158,33 @@ function shareCompanyReport(name) {
   }
 }
 
+function _renderCoTrackBar(name, loc, sc) {
+  const bar = document.getElementById('coTrackBar');
+  if (!bar) return;
+  const existing = AppStore.loadSync().find(a => a.company.toLowerCase() === name.toLowerCase() && a.status === 'active');
+  const safeName = name.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+  const safeLoc = (loc||'').replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+  if (existing) {
+    const days = Math.floor((Date.now() - existing.appliedAt) / 86400000);
+    const avgWait = sc?.avg_wait_days || 30;
+    const overdue = days > avgWait * 1.1;
+    bar.innerHTML = `<div style="background:${overdue?'var(--rdim)':'rgba(16,185,129,0.07)'};border:1px solid ${overdue?'rgba(239,68,68,0.22)':'rgba(16,185,129,0.2)'};border-radius:10px;padding:.75rem 1rem;display:flex;align-items:center;justify-content:space-between;gap:.75rem;flex-wrap:wrap">
+      <div>
+        <div style="font-family:var(--mono);font-size:.65rem;font-weight:500;color:${overdue?'var(--red)':'var(--green)'};margin-bottom:.15rem">${overdue?`⚠ ${days}d — past typical response window`:`✓ You're tracking this · ${days}d since applied`}</div>
+        <div style="font-family:var(--mono);font-size:.57rem;color:var(--muted)">${existing.role}${overdue?' · consider marking ghosted or moving on':` · avg response ${avgWait}d`}</div>
+      </div>
+      <div style="display:flex;gap:.4rem;flex-shrink:0">
+        ${overdue?`<button class="btn btn-ghost" style="font-size:.62rem;padding:.35rem .7rem;color:var(--red);border-color:rgba(239,68,68,0.3)" onclick="markAppStatus('${existing.id}','ghosted');_renderCoTrackBar('${safeName}','${safeLoc}',null)">Mark ghosted</button>`:''}
+        <button class="btn btn-ghost" style="font-size:.62rem;padding:.35rem .7rem" onclick="go('tracker')">View tracker →</button>
+      </div>
+    </div>`;
+  } else {
+    bar.innerHTML = `<div id="coTrackBarInner">
+      <button class="btn btn-solid" style="width:100%;justify-content:center;font-size:.78rem;padding:.75rem;background:linear-gradient(135deg,rgba(16,185,129,0.15),rgba(99,102,241,0.15));border-color:rgba(16,185,129,0.3);color:var(--green)" onclick="showTrackRoleInput('${safeName}','${safeLoc}','coTrackBarInner')">+ I applied here — track this application</button>
+    </div>`;
+  }
+}
+
 async function viewCompany(id,name,loc){
   go('company');
   // Encode current company into the URL hash so Safari can restore after page discard
@@ -3163,6 +3214,7 @@ async function viewCompany(id,name,loc){
   document.getElementById('coInd').textContent=co?.ind||'';
   if(loc){const lt=document.getElementById('coLocTag');lt.textContent='📍 '+loc;lt.style.display='inline-flex';}
   document.getElementById('aggBar').style.display='flex';
+  _renderCoTrackBar(co?.name||name, loc, sc);
 
   document.getElementById('coSB').innerHTML=`
     <div class="co-grade-bar ${risk}">
@@ -3998,7 +4050,7 @@ function buildAppCard(app) {
         <div class="app-card-logo">${(app.company||'?')[0].toUpperCase()}</div>
         <div>
           <div class="app-card-co">${app.company}</div>
-          <div class="app-card-title">${app.role}</div>
+          <div class="app-card-title" style="display:flex;align-items:center;gap:.4rem">${app.role}<button onclick="editAppRole('${app.id}')" title="Edit role" style="background:none;border:none;font-family:var(--mono);font-size:.55rem;color:var(--muted);cursor:pointer;padding:0;line-height:1;opacity:.5" onmouseover="this.style.opacity=1" onmouseout="this.style.opacity=.5">✎</button></div>
           <div class="app-card-loc">📍 ${app.location}</div>
           ${app.employerStage && app.employerStage !== 'New' ? `<div style="margin-top:.3rem;display:inline-flex;align-items:center;gap:.3rem;background:${app.employerStage==='Rejected'?'var(--rdim)':app.employerStage==='Interview'?'var(--bdim)':'var(--gdim)'};border:1px solid ${app.employerStage==='Rejected'?'#ff3b5c28':app.employerStage==='Interview'?'#4b9eff28':'var(--gmid)'};border-radius:5px;padding:.18rem .5rem;font-family:var(--mono);font-size:.58rem;color:${app.employerStage==='Rejected'?'var(--red)':app.employerStage==='Interview'?'var(--blue)':'var(--green)'}">🏢 Employer: ${app.employerStage}</div>` : ''}
         </div>
@@ -4144,6 +4196,28 @@ async function loadTrackerIntel(appId, company, role) {
 function scrollToApp(id) {
   const el = document.getElementById('app_' + id);
   if (el) { el.scrollIntoView({ behavior: 'smooth', block: 'center' }); el.style.boxShadow = '0 0 0 2px var(--green)'; setTimeout(() => el.style.boxShadow = '', 1500); }
+}
+
+function editAppRole(appId) {
+  const apps = AppStore.loadSync();
+  const app = apps.find(a => a.id === appId);
+  if (!app) return;
+  const titleEl = document.querySelector(`#app_${appId} .app-card-title`);
+  if (!titleEl) return;
+  const current = app.role || '';
+  titleEl.innerHTML = `<input type="text" value="${current.replace(/"/g,'&quot;')}" id="roleEditInput_${appId}"
+    style="background:var(--surface);border:1px solid var(--indigo);border-radius:5px;padding:.22rem .55rem;font-family:var(--mono);font-size:.75rem;color:var(--text);outline:none;width:100%;-webkit-appearance:none"
+    onblur="saveAppRole('${appId}',this.value)"
+    onkeydown="if(event.key==='Enter'){event.preventDefault();this.blur();}if(event.key==='Escape'){renderTracker();}"
+  />`;
+  const inp = document.getElementById('roleEditInput_' + appId);
+  if (inp) { inp.focus(); inp.select(); }
+}
+
+async function saveAppRole(appId, newRole) {
+  const trimmed = newRole.trim();
+  if (trimmed) { await AppStore.update(appId, { role: trimmed }); }
+  renderTracker();
 }
 
 async function clearAllApplications() {
@@ -4644,10 +4718,16 @@ async function renderSeekerDash(){
       appsEl.innerHTML=active.slice(0,4).map(app=>{
         const days=Math.floor((Date.now()-app.appliedAt)/86400000);
         const rc=Score.risk(app.score);
+        const nudge=getNudge(app);
+        const isOverdue=nudge.type==='danger-nudge';
+        const borderC=isOverdue?'rgba(239,68,68,0.25)':'var(--line)';
         const dc=days<7?'var(--green)':days<21?'var(--sub)':days<35?'var(--amber)':'var(--red)';
-        return`<div style="background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:.95rem 1.1rem;margin-bottom:.55rem;display:flex;align-items:center;justify-content:space-between;gap:.85rem;cursor:pointer;transition:border-color .15s" onmouseover="this.style.borderColor='var(--line2)'" onmouseout="this.style.borderColor='var(--line)'" onclick="go('tracker')">
-          <div style="flex:1;min-width:0"><div style="font-family:var(--display);font-size:.88rem;font-weight:700;color:var(--white);letter-spacing:-.01em;margin-bottom:.12rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${app.role}</div><div style="font-size:.72rem;color:var(--dim);margin-bottom:.28rem">${app.company} · 📍 ${app.location}</div><div style="font-family:var(--mono);font-size:.58rem;background:var(--raised);border:1px solid var(--line2);border-radius:4px;display:inline-block;padding:.1rem .42rem;color:var(--sub)">${app.stage||'Applied'}</div></div>
-          <div style="text-align:right;flex-shrink:0"><div style="font-family:var(--mono);font-size:.9rem;font-weight:500;color:${Score.color(rc)};margin-bottom:.18rem">${app.score}</div><div style="font-family:var(--mono);font-size:.58rem;color:${dc}">${days===0?'Today':days+'d ago'}</div></div>
+        return`<div style="background:var(--surface);border:1px solid ${borderC};border-radius:10px;padding:.95rem 1.1rem;margin-bottom:.55rem;cursor:pointer;transition:border-color .15s" onmouseover="this.style.borderColor='var(--line2)'" onmouseout="this.style.borderColor='${borderC}'" onclick="go('tracker')">
+          <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:.85rem;margin-bottom:${nudge.msg?'.55rem':'0'}">
+            <div style="flex:1;min-width:0"><div style="font-family:var(--display);font-size:.88rem;font-weight:700;color:var(--white);letter-spacing:-.01em;margin-bottom:.12rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${app.role}</div><div style="font-size:.72rem;color:var(--dim);margin-bottom:.28rem">${app.company}${app.location?' · 📍 '+app.location:''}</div><div style="font-family:var(--mono);font-size:.58rem;background:var(--raised);border:1px solid var(--line2);border-radius:4px;display:inline-block;padding:.1rem .42rem;color:var(--sub)">${app.stage||'Applied'}</div></div>
+            <div style="text-align:right;flex-shrink:0"><div style="font-family:var(--mono);font-size:.9rem;font-weight:500;color:${Score.color(rc)};margin-bottom:.18rem">${app.score}</div><div style="font-family:var(--mono);font-size:.58rem;color:${dc}">${days===0?'Today':days+'d ago'}</div></div>
+          </div>
+          ${nudge.msg?`<div style="font-family:var(--mono);font-size:.58rem;color:${isOverdue?'var(--red)':'var(--dim)'};padding:${isOverdue?'.4rem .6rem':'0'};background:${isOverdue?'var(--rdim)':'transparent'};border-radius:6px;border:${isOverdue?'1px solid rgba(239,68,68,0.15)':'none'}">${isOverdue?'⚠ ':''}${nudge.msg}</div>`:''}
         </div>`;
       }).join('');
     }
