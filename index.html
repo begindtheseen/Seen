@@ -3423,27 +3423,54 @@ function shareCompanyReport(name) {
   }
 }
 
-// Open Reddit immediately (must be synchronous — browser blocks window.open after async)
-// then generate and share the card image
-function shareToReddit(name) {
-  window.open('https://www.reddit.com/r/jobs/submit?type=image', '_blank', 'noopener');
-  _generateAndShareCard(name);
-}
+let _pendingCardBlob = null;
 
-async function _generateAndShareCard(name) {
+function shareToReddit(name) {
   const d = (_shareCtx && _shareCtx.name?.toLowerCase() === (name||'').toLowerCase()) ? _shareCtx : null;
   if (!d) { showToast('No data loaded yet — open the company first.'); return; }
+  _buildCardPreview(name, d);
+}
+
+async function _buildCardPreview(name, d) {
   showToast('Building card…');
-  await document.fonts.ready; // ensure Syne + DM Mono are rendered
+  await document.fonts.ready;
   const canvas = _drawSeenCard(name, d);
   const blob = await new Promise(r => canvas.toBlob(r, 'image/png'));
+  _pendingCardBlob = { blob, name };
+  const dataUrl = canvas.toDataURL('image/png');
+
+  const existing = document.getElementById('_cardPreviewOv');
+  if (existing) existing.remove();
+  const ov = document.createElement('div');
+  ov.id = '_cardPreviewOv';
+  ov.style.cssText = 'position:fixed;inset:0;z-index:9999;background:rgba(2,4,10,0.95);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:.9rem;padding:1.25rem;overflow-y:auto;-webkit-overflow-scrolling:touch';
+  ov.innerHTML = `
+    <div style="font-family:var(--mono);font-size:.55rem;color:rgba(255,255,255,0.35);letter-spacing:.1em;text-transform:uppercase">Company card ready</div>
+    <img src="${dataUrl}" style="max-width:min(100%,560px);width:100%;border-radius:12px;box-shadow:0 24px 80px rgba(0,0,0,0.9)"/>
+    <div style="display:flex;gap:.6rem;flex-wrap:wrap;justify-content:center;width:100%;max-width:420px">
+      <button style="flex:1;min-width:160px;background:rgba(255,69,0,0.15);border:1px solid rgba(255,69,0,0.4);color:#ff6314;font-family:var(--mono);font-size:.72rem;font-weight:600;padding:.75rem 1.1rem;border-radius:9px;cursor:pointer" onclick="saveCardAndOpenReddit()">🔴 Save &amp; Open Reddit</button>
+      <button style="flex:0 0 auto;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);color:rgba(255,255,255,0.4);font-family:var(--mono);font-size:.72rem;padding:.75rem 1rem;border-radius:9px;cursor:pointer" onclick="document.getElementById('_cardPreviewOv')?.remove();_pendingCardBlob=null">Cancel</button>
+    </div>
+    <div style="font-family:var(--mono);font-size:.54rem;color:rgba(255,255,255,0.22);text-align:center;max-width:300px;line-height:1.9">① Save the image &nbsp;·&nbsp; ② Go to Reddit &nbsp;·&nbsp; ③ Attach it to your post</div>`;
+  document.body.appendChild(ov);
+}
+
+function saveCardAndOpenReddit() {
+  if (!_pendingCardBlob) return;
+  const { blob, name } = _pendingCardBlob;
   const safeName = (name||'company').replace(/[^a-z0-9]/gi,'_');
   const file = new File([blob], safeName + '_seen.png', { type: 'image/png' });
-  if (navigator.share && navigator.canShare?.({ files:[file] })) {
-    navigator.share({ files:[file] }).catch(e => { if(e.name!=='AbortError') _downloadCard(blob, file.name); });
+  // Open Reddit first — synchronous in user gesture handler, so no popup block
+  window.open('https://www.reddit.com/r/jobs/submit?type=image', '_blank', 'noopener');
+  // Then save the image: native share sheet on iOS, download link on desktop
+  if (navigator.share && navigator.canShare?.({ files: [file] })) {
+    navigator.share({ files: [file] }).catch(e => { if (e.name !== 'AbortError') _downloadCard(blob, file.name); });
   } else {
     _downloadCard(blob, file.name);
   }
+  document.getElementById('_cardPreviewOv')?.remove();
+  _pendingCardBlob = null;
+  showToast('Image saved! Attach it to your Reddit post 📎');
 }
 
 function _downloadCard(blob, filename) {
@@ -3844,10 +3871,13 @@ async function viewCompany(id,name,loc){
   (async () => {
     const realData = await loadRealCompanyData(co?.name || name, loc);
     const rsc = realData ? computeScoresWithEvents(co?.name||name, realData.reports, realData.jobs, realData.webScore) : null;
-    // Store score context so shareCompanyReport can build a rich message
-    if (rsc) {
-      _shareCtx = { name: co?.name||name, score: rsc.overall_score, ghost: Math.round((rsc.ghost_rate||0)*100), resp: Math.round((rsc.response_rate||0)*100), wait: rsc.avg_wait_days||null, waste: rsc.waste||0, risk: rsc.risk_level, grade: typeof letterGrade === 'function' ? letterGrade(rsc.overall_score) : '' };
-      _updateMetaTags(co?.name||name, rsc);
+    // Apply same COS-authoritative rule as the quick modal: when real data has <3 community
+    // reports (web/AI estimate only), prefer the curated COS seed data for display.
+    const displaySc = locSc || (rsc?.report_count >= 3 ? rsc : null) || (co?.sc) || rsc;
+    // Store score context so shareCompanyReport / canvas card uses the displayed score
+    if (displaySc) {
+      _shareCtx = { name: co?.name||name, score: displaySc.overall_score, ghost: Math.round((displaySc.ghost_rate||0)*100), resp: Math.round((displaySc.response_rate||0)*100), wait: displaySc.avg_wait_days||null, waste: displaySc.waste||0, risk: displaySc.risk_level, grade: typeof letterGrade === 'function' ? letterGrade(displaySc.overall_score) : '' };
+      _updateMetaTags(co?.name||name, displaySc);
     }
 
     if (!rsc) {
@@ -3863,13 +3893,13 @@ async function viewCompany(id,name,loc){
       return;
     }
 
-    const rr2 = rsc.risk_level;
-    const gh2 = (rsc.ghost_rate || 0) > .5;
-    const gp2 = rsc.ghost_rate !== null ? Math.round((rsc.ghost_rate || 0) * 100) : null;
-    const rp2 = rsc.response_rate !== null ? Math.round((rsc.response_rate || 0) * 100) : null;
-    const gc2 = gh2 ? 'var(--red)' : (rsc.ghost_rate || 0) > .3 ? 'var(--amber)' : 'var(--green)';
-    const wc2 = (rsc.avg_wait_days || 0) > 21 ? 'var(--amber)' : 'var(--text)';
-    const wac = (rsc.waste || 0) > 60 ? 'var(--red)' : (rsc.waste || 0) > 30 ? 'var(--amber)' : 'var(--green)';
+    const rr2 = displaySc.risk_level || Score.risk(displaySc.overall_score);
+    const gh2 = (displaySc.ghost_rate || 0) > .5;
+    const gp2 = displaySc.ghost_rate != null ? Math.round((displaySc.ghost_rate || 0) * 100) : null;
+    const rp2 = displaySc.response_rate != null ? Math.round((displaySc.response_rate || 0) * 100) : null;
+    const gc2 = gh2 ? 'var(--red)' : (displaySc.ghost_rate || 0) > .3 ? 'var(--amber)' : 'var(--green)';
+    const wc2 = (displaySc.avg_wait_days || 0) > 21 ? 'var(--amber)' : 'var(--text)';
+    const wac = (displaySc.waste || 0) > 60 ? 'var(--red)' : (displaySc.waste || 0) > 30 ? 'var(--amber)' : 'var(--green)';
     const dq = rsc.data_quality;
     const dqBadge = dq === 'strong' ? `<span class="vibe v-g" style="font-size:.52rem;margin-top:.25rem">✓ ${rsc.report_count} verified reports</span>`
       : dq === 'moderate' ? `<span class="vibe v-y" style="font-size:.52rem;margin-top:.25rem">~ ${rsc.report_count} community reports</span>`
@@ -3879,10 +3909,10 @@ async function viewCompany(id,name,loc){
 
     document.getElementById('coSB').innerHTML = `
       <div class="co-grade-bar ${rr2}">
-        <span class="co-grade-letter ${rr2}">${letterGrade(rsc.overall_score)}</span>
+        <span class="co-grade-letter ${rr2}">${letterGrade(displaySc.overall_score)}</span>
         <div style="flex:1">
           <span class="co-grade-lbl">Seen Grade</span>
-          <span class="co-grade-score">${rsc.overall_score} / 100</span>
+          <span class="co-grade-score">${displaySc.overall_score} / 100</span>
         </div>
         <div style="display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;justify-content:flex-end">
           ${dqBadge}
@@ -3891,16 +3921,16 @@ async function viewCompany(id,name,loc){
       </div>`;
 
     document.getElementById('coMets').innerHTML = `
-      <div class="co-m"><span class="co-mn" style="color:${Score.color(rr2)}">${rsc.overall_score}</span><span class="co-ml">Score</span></div>
+      <div class="co-m"><span class="co-mn" style="color:${Score.color(rr2)}">${displaySc.overall_score}</span><span class="co-ml">Score</span></div>
       <div class="co-m"><span class="co-mn" style="color:var(--blue)">${rp2 !== null ? rp2 + '%' : '—'}</span><span class="co-ml">Response rate</span></div>
       <div class="co-m ${gh2 ? 'co-alarm' : ''}"><span class="co-mn" style="color:${gc2}">${gh2 ? '👻 ' : ''}${gp2 !== null ? gp2 + '%' : '—'}</span><span class="co-ml">Ghost rate</span></div>
-      <div class="co-m"><span class="co-mn" style="color:${wc2}">${rsc.avg_wait_days !== null ? rsc.avg_wait_days + 'd' : '—'}</span><span class="co-ml">Avg wait</span></div>
-      <div class="co-m"><span class="co-mn" style="color:${wac}">${rsc.waste !== null ? rsc.waste + '%' : '—'}</span><span class="co-ml">Waste risk</span></div>
+      <div class="co-m"><span class="co-mn" style="color:${wc2}">${displaySc.avg_wait_days != null ? displaySc.avg_wait_days + 'd' : '—'}</span><span class="co-ml">Avg wait</span></div>
+      <div class="co-m"><span class="co-mn" style="color:${wac}">${displaySc.waste != null ? displaySc.waste + '%' : '—'}</span><span class="co-ml">Waste risk</span></div>
       <div class="co-m"><span class="co-mn">${rsc.report_count > 0 ? rsc.report_count : (rsc.web_report_count ? '~'+rsc.web_report_count : '0')}</span><span class="co-ml">${rsc.report_count > 0 ? 'Reports' : rsc.web_report_count ? 'Web est.' : 'Reports'}</span></div>`;
 
     document.getElementById('coTags').innerHTML = [
       locSc ? `<span class="vibe v-b">📍 Location-specific</span>` : '',
-      rsc.waste !== null ? `<span class="${Score.wasteLabel(rsc.waste).cls} waste-badge">${Score.wasteLabel(rsc.waste).txt}</span>` : '',
+      displaySc.waste != null ? `<span class="${Score.wasteLabel(displaySc.waste).cls} waste-badge">${Score.wasteLabel(displaySc.waste).txt}</span>` : '',
       gh2 ? `<span class="vibe v-r">👻 ${gp2}% ghost rate</span>` : '',
       co?.ver ? `<span class="co-verified">✓ Seen Verified</span>` : '',
       dq === 'strong' ? `<span class="vibe v-g">✓ ${rsc.report_count} verified reports</span>`
@@ -3911,16 +3941,16 @@ async function viewCompany(id,name,loc){
       ...vibeList.slice(0, 2).map(v => `<span class="vibe v-n">${v}</span>`),
     ].filter(Boolean).join('');
 
-    const rsp = Math.round((rsc.response_rate || 0) * 100);
-    const rgp = Math.round((rsc.ghost_rate || 0) * 100);
+    const rsp = Math.round((displaySc.response_rate || 0) * 100);
+    const rgp = Math.round((displaySc.ghost_rate || 0) * 100);
     document.getElementById('ctc-ov').innerHTML = `
-      ${_buildExpectedTimeline(rsc, rr2, (co?.name||name).replace(/\\/g,'\\\\').replace(/'/g,"\\'"), loc)}
+      ${_buildExpectedTimeline(displaySc, rr2, (co?.name||name).replace(/\\/g,'\\\\').replace(/'/g,"\\'"), loc)}
       <div style="display:grid;grid-template-columns:${window.innerWidth<600?'1fr':'1fr 1fr'};gap:1rem;margin-bottom:1rem">
         <div style="background:var(--card);border:1px solid var(--line);border-radius:10px;padding:1.2rem">
           <div style="font-family:var(--mono);font-size:.56rem;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:.85rem">Score breakdown${loc ? ' (' + loc + ')' : ''}</div>
           <div class="mbar"><div class="mbar-lbl" style="width:110px">Response rate</div><div class="mbar-track"><div class="mbar-fill" style="width:${rsp}%;background:${Score.color(rr2)}"></div></div><div class="mbar-val">${rsp}%</div></div>
           <div class="mbar"><div class="mbar-lbl" style="width:110px">Ghost rate</div><div class="mbar-track"><div class="mbar-fill mf-r" style="width:${rgp}%"></div></div><div class="mbar-val">${rgp}%</div></div>
-          <div class="mbar"><div class="mbar-lbl" style="width:110px">Waste risk</div><div class="mbar-track"><div class="mbar-fill" style="width:${rsc.waste || 0}%;background:${wac}"></div></div><div class="mbar-val">${rsc.waste !== null ? rsc.waste + '%' : '—'}</div></div>
+          <div class="mbar"><div class="mbar-lbl" style="width:110px">Waste risk</div><div class="mbar-track"><div class="mbar-fill" style="width:${displaySc.waste || 0}%;background:${wac}"></div></div><div class="mbar-val">${displaySc.waste != null ? displaySc.waste + '%' : '—'}</div></div>
         </div>
         <div style="background:var(--card);border:1px solid var(--line);border-radius:10px;padding:1.2rem">
           <div style="font-family:var(--mono);font-size:.56rem;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:.85rem">Vibe check</div>
