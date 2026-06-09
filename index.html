@@ -620,6 +620,69 @@ nav.nav-scrolled{background:rgba(6,6,8,0.82);backdrop-filter:blur(60px) saturate
 /* RESPONSIVE */
 @media(max-width:1024px){.hero{grid-template-columns:1fr;gap:2.5rem}.hero-terminal{display:none}.jgrid{grid-template-columns:1fr 1fr}.ldr-grid{grid-template-columns:repeat(3,1fr)}.how-grid{grid-template-columns:1fr 1fr}.diff-grid{grid-template-columns:1fr 1fr}.resume-layout{grid-template-columns:1fr}.demand-grid{grid-template-columns:1fr}.pgrid{grid-template-columns:1fr}.co-mets{grid-template-columns:repeat(3,1fr)}}
 @media(max-width:768px){nav{padding:0 1rem}.ntab{padding:.28rem .42rem;font-size:.65rem}.hero{padding:3rem 1.25rem 2.5rem}.jgrid{grid-template-columns:1fr}.ldr-grid{grid-template-columns:repeat(2,1fr)}.jlay{grid-template-columns:1fr}.filts{display:none}.how-grid{grid-template-columns:1fr}.f2{grid-template-columns:1fr}.demand-stat-row{grid-template-columns:repeat(2,1fr)}}
+
+/* ═══════════════════════════════════════
+   VERDICT FEED — live audit terminal
+═══════════════════════════════════════ */
+/* Corner tick viewfinder — feels like a real data instrument */
+.vfeed-panel{background:rgba(255,255,255,0.018);border:1px solid rgba(59,130,246,0.22);border-radius:2px;overflow:visible;position:relative;
+  box-shadow:0 0 0 1px rgba(2,4,10,.9),0 0 0 6px rgba(59,130,246,0.04),0 24px 64px -24px rgba(59,130,246,0.2),inset 0 1px 0 rgba(255,255,255,0.06)}
+.vfeed-panel::before{content:'';position:absolute;inset:-6px;background:
+  linear-gradient(var(--blue),var(--blue)) 0 0/16px 1px no-repeat,
+  linear-gradient(var(--blue),var(--blue)) 0 0/1px 16px no-repeat,
+  linear-gradient(var(--blue),var(--blue)) 100% 100%/16px 1px no-repeat,
+  linear-gradient(var(--blue),var(--blue)) 100% 100%/1px 16px no-repeat,
+  linear-gradient(var(--blue),var(--blue)) 100% 0/16px 1px no-repeat,
+  linear-gradient(var(--blue),var(--blue)) 100% 0/1px 16px no-repeat,
+  linear-gradient(var(--blue),var(--blue)) 0 100%/16px 1px no-repeat,
+  linear-gradient(var(--blue),var(--blue)) 0 100%/1px 16px no-repeat;
+  pointer-events:none;opacity:.4}
+.vfeed-inner{border-radius:2px;overflow:hidden}
+.vfeed-hdr{padding:.65rem 1.1rem;border-bottom:1px solid rgba(255,255,255,0.05);display:flex;align-items:center;justify-content:space-between;background:rgba(255,255,255,0.02)}
+.vfeed-hdr-l{display:flex;align-items:center;gap:.42rem;font-family:var(--mono);font-size:.55rem;text-transform:uppercase;letter-spacing:.14em;color:rgba(255,255,255,.45)}
+/* steps() blink — instruments don't breathe, they fire */
+.vfeed-live{width:5px;height:5px;border-radius:50%;background:var(--green);animation:vfeedBlink 1.4s steps(2) infinite;flex-shrink:0}
+@keyframes vfeedBlink{0%,100%{opacity:1}50%{opacity:0}}
+.vfeed-clock{font-family:var(--mono);font-size:.52rem;color:rgba(255,255,255,.28);font-variant-numeric:tabular-nums;letter-spacing:.03em}
+.vfeed-list{overflow:hidden}
+.vfeed-row{display:flex;align-items:center;gap:.85rem;padding:.58rem 1.1rem;border-bottom:1px solid rgba(255,255,255,0.038);cursor:pointer;transition:background .15s}
+.vfeed-row:hover{background:rgba(255,255,255,0.04)}
+@keyframes vfeedIn{from{opacity:0;transform:translateY(-10px)}to{opacity:1;transform:translateY(0)}}
+.vfeed-grade{font-family:var(--display);font-weight:800;font-size:1.5rem;line-height:1;width:26px;text-align:center;flex-shrink:0;letter-spacing:-.04em}
+.vfeed-grade.safe{color:var(--green)}.vfeed-grade.warn{color:var(--amber)}.vfeed-grade.danger{color:var(--red)}
+.vfeed-info{flex:1;min-width:0}
+.vfeed-co{font-size:.79rem;color:var(--white);font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.vfeed-detail{font-family:var(--mono);font-size:.53rem;color:var(--muted);margin-top:.05rem}
+.vfeed-ts{font-family:var(--mono);font-size:.51rem;color:var(--dim);flex-shrink:0}
+.vfeed-foot{padding:.55rem 1.1rem;text-align:center;font-family:var(--mono);font-size:.52rem;color:var(--dim);border-top:1px solid rgba(255,255,255,0.038);background:rgba(255,255,255,0.01)}
+
+/* ═══ LANDING 2-COLUMN GRID ═══ */
+.l-grid{display:grid;grid-template-columns:1fr 310px;gap:3.5rem;align-items:center;width:100%;max-width:1080px;margin:0 auto;padding:0 2.5rem}
+@media(max-width:900px){.l-grid{grid-template-columns:1fr;max-width:600px;padding:0 1.5rem;gap:0}.vfeed-panel{display:none!important}}
+@media(max-width:540px){.l-grid{padding:0 1.25rem}}
+
+/* ═══ HERO STAT STRIP ═══ */
+.hstat-strip{display:flex;gap:1.8rem;margin-bottom:1.6rem;animation:fadeUp .5s .1s ease both}
+.hstat-n{font-family:var(--mono);font-size:1rem;font-weight:500;color:var(--white);display:block;line-height:1;letter-spacing:-.02em}
+.hstat-l{font-family:var(--mono);font-size:.5rem;color:var(--muted);margin-top:.18rem;text-transform:uppercase;letter-spacing:.07em}
+.hstat-div{width:1px;background:var(--line);align-self:stretch}
+
+/* ═══ VERDICT TAG (landing quick tags) ═══ */
+.vtag{display:inline-flex;align-items:center;gap:.38rem;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);border-radius:7px;padding:.3rem .65rem;cursor:pointer;transition:all .15s;font-family:var(--body);font-size:.72rem;color:var(--sub)}
+.vtag:hover{background:rgba(255,255,255,0.08);border-color:rgba(255,255,255,0.18);color:var(--white)}
+.vtag-grade{font-family:var(--mono);font-size:.6rem;font-weight:700;border-radius:3px;padding:.05rem .28rem;line-height:1.3}
+.vtag-grade.safe{color:var(--green);background:rgba(16,185,129,0.12)}
+.vtag-grade.warn{color:var(--amber);background:rgba(245,158,11,0.12)}
+.vtag-grade.danger{color:var(--red);background:rgba(239,68,68,0.12)}
+
+/* ═══ EYEBROW / INDEX HEADER ═══ */
+.idx-eyebrow{font-family:var(--mono);font-size:.58rem;font-weight:600;text-transform:uppercase;letter-spacing:.3em;color:var(--green);margin-bottom:1.5rem;display:flex;align-items:center;gap:14px;animation:fadeUp .5s ease both}
+.idx-eyebrow::before{content:'';width:32px;height:1px;background:var(--green);flex-shrink:0}
+.idx-eyebrow::after{content:attr(data-count);color:rgba(255,255,255,.28);letter-spacing:.16em;font-weight:400}
+
+/* ═══ SCANNING AUDIT BAND ═══ */
+@keyframes auditScan{0%{left:-160px}100%{left:100vw}}
+.audit-scan{position:absolute;inset-block:0;width:140px;background:linear-gradient(90deg,transparent,rgba(16,185,129,.05) 40%,rgba(59,130,246,.04) 60%,transparent);animation:auditScan 42s linear infinite;pointer-events:none;z-index:1}
 </style>
 </head>
 <body>
@@ -759,16 +822,19 @@ nav.nav-scrolled{background:rgba(6,6,8,0.82);backdrop-filter:blur(60px) saturate
 ═══════════════════════════════════════ -->
 <div class="page-full active" id="page-landing" style="position:relative">
 
-  <!-- DEEP COSMOS MESH BACKGROUND -->
-  <div style="position:absolute;inset:0;z-index:0;pointer-events:none;background:
-    radial-gradient(ellipse at 18% 65%,rgba(29,78,216,0.38) 0%,transparent 52%),
-    radial-gradient(ellipse at 82% 28%,rgba(124,58,237,0.32) 0%,transparent 48%),
-    radial-gradient(ellipse at 55% 92%,rgba(8,145,178,0.16) 0%,transparent 42%),
-    radial-gradient(ellipse at 8% 12%,rgba(99,102,241,0.22) 0%,transparent 38%),
-    radial-gradient(ellipse at 72% 78%,rgba(139,92,246,0.14) 0%,transparent 40%),
-    #02040a">
-    <!-- Bottom fade to page background -->
-    <div style="position:absolute;inset:0;pointer-events:none;background:linear-gradient(to bottom,rgba(2,4,10,0.1) 0%,transparent 35%,transparent 60%,rgba(2,4,10,0.85) 88%,#02040a 100%)"></div>
+  <!-- PRECISION FIELD BACKGROUND -->
+  <div style="position:absolute;inset:0;z-index:0;pointer-events:none;background:#020205">
+    <!-- Subtle ambient — green=safe companies exist, red=danger exists -->
+    <div style="position:absolute;inset:0;background:
+      radial-gradient(ellipse at 8% 85%,rgba(16,185,129,0.09) 0%,transparent 45%),
+      radial-gradient(ellipse at 92% 12%,rgba(239,68,68,0.07) 0%,transparent 42%),
+      radial-gradient(ellipse at 45% 35%,rgba(59,130,246,0.04) 0%,transparent 55%)"></div>
+    <!-- Precision grid — structural, not decorative -->
+    <div style="position:absolute;inset:0;background-image:linear-gradient(rgba(255,255,255,.016) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.016) 1px,transparent 1px);background-size:56px 56px;-webkit-mask-image:radial-gradient(ellipse 120% 65% at 50% 0%,black 0%,transparent 100%);mask-image:radial-gradient(ellipse 120% 65% at 50% 0%,black 0%,transparent 100%)"></div>
+    <!-- Fade to void at bottom -->
+    <div style="position:absolute;inset:0;background:linear-gradient(to bottom,transparent 40%,rgba(2,2,5,0.7) 80%,#020205 100%)"></div>
+    <!-- Audit scan band — confirms data is live -->
+    <div class="audit-scan"></div>
   </div>
 
   <!-- TICKER — pinned to top below nav -->
@@ -776,71 +842,112 @@ nav.nav-scrolled{background:rgba(6,6,8,0.82);backdrop-filter:blur(60px) saturate
     <div class="ticker-track" id="tickerTrack"></div>
   </div>
 
-  <!-- MAIN CONTENT — fixed layout, nothing shifts -->
-  <div style="position:relative;z-index:2;flex:1;display:flex;flex-direction:column;justify-content:center;align-items:center;padding:0 1.5rem;text-align:center">
+  <!-- MAIN CONTENT — editorial 2-column -->
+  <div style="position:relative;z-index:2;flex:1;display:flex;align-items:center;overflow:hidden;padding:2rem 0 1rem">
+    <div class="l-grid">
 
-    <!-- Kicker pill -->
-    <div style="display:inline-flex;align-items:center;gap:.4rem;background:rgba(59,130,246,0.1);border:1px solid rgba(59,130,246,0.2);color:var(--blue);font-family:var(--mono);font-size:.63rem;padding:.25rem .85rem;border-radius:100px;margin-bottom:2rem;animation:fadeUp .5s ease both">
-      <span style="width:5px;height:5px;border-radius:50%;background:var(--blue);animation:pulse 2s infinite;display:inline-block"></span>
-      47,000+ companies scored · updated live
-    </div>
+      <!-- LEFT COLUMN — the verdict -->
+      <div>
 
-    <!-- HEADLINE — fixed-height container, subtitle sits BELOW it in flow -->
-    <div style="width:100%;max-width:680px;margin:0 auto;animation:fadeUp .5s .08s ease both">
-      <div id="heroHeadlineWrap" style="height:clamp(72px,18vw,190px);display:flex;flex-direction:column;justify-content:center;align-items:center">
-        <h1 id="rotatingHero" style="font-family:var(--display);font-size:clamp(1.2rem,5.6vw,4.8rem);font-weight:800;line-height:1.1;letter-spacing:-.035em;color:var(--white);text-shadow:0 2px 20px rgba(0,0,0,.5);margin:0;width:100%">
-          <span id="heroLine1" style="display:block"></span>
-          <span id="heroLine2" style="display:block;background:linear-gradient(135deg,#a5b4fc,#c084fc,#e879f9);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;font-style:italic"></span>
-        </h1>
-      </div>
-    </div>
-    <!-- Subtitle — in normal flow, never overlaps anything -->
-    <div id="heroSub" style="font-family:var(--mono);font-size:clamp(.65rem,1.4vw,.82rem);color:rgba(255,255,255,.62);letter-spacing:.02em;line-height:1.5;margin:.5rem 0 1.5rem;animation:fadeUp .5s .12s ease both">Ghost rates · response times · hiring scores · 47,000+ companies</div>
+        <!-- Eyebrow: The Index -->
+        <div class="idx-eyebrow" data-count="/ 47,000+ COMPANIES INDEXED">The Hiring Transparency Index</div>
 
-    <!-- Search — fixed position below headline, never moves -->
-    <div style="width:100%;max-width:520px;margin:0 auto 1.1rem;animation:fadeUp .5s .16s ease both;position:relative">
-      <div class="search-wrap">
-        <div class="search-row">
-          <div class="search-field">
-            <span class="search-field-icon">🔍</span>
-            <input class="search-inp" id="heroInp" type="text" placeholder="Company or job title..." autocomplete="off" oninput="debounceCompanySuggest(this.value)" onkeydown="handleCompanyKey(event)"/>
-          </div>
-          <div class="search-loc-row" style="display:flex;flex:0 0 auto">
-            <div class="search-loc" style="position:relative">
-              <span style="color:var(--muted);font-size:.8rem;flex-shrink:0">📍</span>
-              <input class="loc-inp" id="heroLoc" type="text" placeholder="City or zip" autocomplete="off" oninput="debounceLocationSuggest(this.value,'heroLocSuggestions')" onkeydown="if(event.key==='Enter')doSearch()"/>
-              <div id="heroLocSuggestions" style="position:absolute;z-index:200;background:var(--surface);border:1px solid var(--line2);border-radius:8px;width:240px;display:none;box-shadow:0 8px 24px rgba(0,0,0,.4);top:100%;left:0"></div>
-            </div>
-            <button class="search-btn" onclick="doSearch()">Check →</button>
+        <!-- Headline — rotating, left-aligned -->
+        <div style="animation:fadeUp .5s .06s ease both">
+          <div id="heroHeadlineWrap" style="height:clamp(68px,16vw,180px);display:flex;flex-direction:column;justify-content:center;align-items:flex-start">
+            <h1 id="rotatingHero" style="font-family:var(--display);font-size:clamp(2.4rem,5.8vw,5.2rem);font-weight:800;line-height:1.0;letter-spacing:-.04em;color:var(--white);margin:0;width:100%;text-align:left">
+              <span id="heroLine1" style="display:block"></span>
+              <span id="heroLine2" style="display:block;background:linear-gradient(135deg,#a5b4fc,#c084fc,#e879f9);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;font-style:italic"></span>
+            </h1>
           </div>
         </div>
+
+        <!-- Stat strip — credibility data -->
+        <div class="hstat-strip">
+          <div>
+            <span class="hstat-n">47K+</span>
+            <div class="hstat-l">Companies scored</div>
+          </div>
+          <div class="hstat-div"></div>
+          <div>
+            <span class="hstat-n">124K+</span>
+            <div class="hstat-l">Community reports</div>
+          </div>
+          <div class="hstat-div"></div>
+          <div>
+            <span class="hstat-n" style="color:var(--red)">47%</span>
+            <div class="hstat-l">Avg ghost rate</div>
+          </div>
+        </div>
+
+        <!-- Search -->
+        <div style="margin-bottom:1rem;animation:fadeUp .5s .18s ease both;position:relative">
+          <div class="search-wrap">
+            <div class="search-row">
+              <div class="search-field">
+                <span class="search-field-icon">🔍</span>
+                <input class="search-inp" id="heroInp" type="text" placeholder="Company or job title..." autocomplete="off" oninput="debounceCompanySuggest(this.value)" onkeydown="handleCompanyKey(event)"/>
+              </div>
+              <div class="search-loc-row" style="display:flex;flex:0 0 auto">
+                <div class="search-loc" style="position:relative">
+                  <span style="color:var(--muted);font-size:.8rem;flex-shrink:0">📍</span>
+                  <input class="loc-inp" id="heroLoc" type="text" placeholder="City or zip" autocomplete="off" oninput="debounceLocationSuggest(this.value,'heroLocSuggestions')" onkeydown="if(event.key==='Enter')doSearch()"/>
+                  <div id="heroLocSuggestions" style="position:absolute;z-index:200;background:var(--surface);border:1px solid var(--line2);border-radius:8px;width:240px;display:none;box-shadow:0 8px 24px rgba(0,0,0,.4);top:100%;left:0"></div>
+                </div>
+                <button class="search-btn" onclick="doSearch()">Check →</button>
+              </div>
+            </div>
+          </div>
+          <div id="heroCompSuggestions" style="position:absolute;z-index:200;background:var(--surface);border:1px solid var(--line2);border-radius:8px;width:100%;display:none;box-shadow:0 8px 24px rgba(0,0,0,.4);top:calc(100% + 4px);left:0;overflow:hidden"></div>
+        </div>
+
+        <!-- Recent searches -->
+        <div id="heroRecent" style="display:none;margin-bottom:.55rem;animation:fadeUp .5s .2s ease both">
+          <div style="font-family:var(--mono);font-size:.5rem;text-transform:uppercase;letter-spacing:.1em;color:rgba(255,255,255,.25);margin-bottom:.35rem">Recent</div>
+          <div id="heroRecentItems" style="display:flex;align-items:center;gap:.4rem;flex-wrap:wrap"></div>
+        </div>
+
+        <!-- Quick verdict tags — dynamically rendered from COS -->
+        <div id="heroQuickTags" style="display:flex;align-items:center;gap:.4rem;margin-bottom:1.6rem;flex-wrap:wrap;animation:fadeUp .5s .22s ease both">
+          <button class="vtag" onclick="qs('Amazon','Seattle, WA')">Amazon <span class="vtag-grade danger">F</span></button>
+          <button class="vtag" onclick="qs('Stripe','')">Stripe <span class="vtag-grade safe">A</span></button>
+          <button class="vtag" onclick="qs('Meta','Menlo Park, CA')">Meta <span class="vtag-grade danger">F</span></button>
+        </div>
+
+        <!-- CTAs -->
+        <div style="display:flex;align-items:center;gap:1rem;flex-wrap:wrap;animation:fadeUp .5s .28s ease both">
+          <button class="btn btn-green btn-lg" onclick="go('login')" style="font-size:.88rem;padding:.78rem 1.85rem">Get started free →</button>
+          <button onclick="go('jobs')" style="background:none;border:none;font-family:var(--mono);font-size:.68rem;color:rgba(255,255,255,.38);cursor:pointer;padding:.2rem 0;transition:color .15s;letter-spacing:.02em" onmouseover="this.style.color='rgba(255,255,255,.65)'" onmouseout="this.style.color='rgba(255,255,255,.38)'">browse jobs →</button>
+        </div>
+
       </div>
-      <div id="heroCompSuggestions" style="position:absolute;z-index:200;background:var(--surface);border:1px solid var(--line2);border-radius:8px;width:100%;display:none;box-shadow:0 8px 24px rgba(0,0,0,.4);top:calc(100% + 4px);left:0;overflow:hidden"></div>
-    </div>
 
-    <!-- Recent searches — shown if localStorage has history -->
-    <div id="heroRecent" style="display:none;margin-bottom:.6rem;animation:fadeUp .5s .2s ease both">
-      <div style="font-family:var(--mono);font-size:.52rem;text-transform:uppercase;letter-spacing:.08em;color:rgba(255,255,255,.3);margin-bottom:.4rem">Recent</div>
-      <div id="heroRecentItems" style="display:flex;align-items:center;justify-content:center;gap:.4rem;flex-wrap:wrap"></div>
-    </div>
+      <!-- RIGHT COLUMN — live verdict feed -->
+      <div class="vfeed-panel" style="animation:fadeUp .6s .3s ease both">
+        <div class="vfeed-inner">
+          <div class="vfeed-hdr">
+            <div class="vfeed-hdr-l">
+              <span class="vfeed-live"></span>
+              Recent verdicts
+            </div>
+            <div class="vfeed-clock" id="vfeedClock">00:00:00 UTC</div>
+          </div>
+          <div class="vfeed-list" id="vfeedList"></div>
+          <div class="vfeed-foot">Updated from community reports</div>
+        </div>
+      </div>
 
-    <!-- Quick tags — dynamically rendered from COS by renderQuickTags() -->
-    <div id="heroQuickTags" style="display:flex;align-items:center;justify-content:center;gap:.65rem;margin-bottom:2rem;flex-wrap:wrap;animation:fadeUp .5s .22s ease both">
-      <button class="qtag" onclick="qs('Amazon','Seattle, WA')">👻 Amazon</button>
-      <button class="qtag" onclick="qs('X (Twitter)','San Francisco, CA')">👻 X (Twitter)</button>
-      <button class="qtag" onclick="qs('Stripe','')">✅ Stripe</button>
-    </div>
-
-    <!-- CTAs -->
-    <div style="display:flex;flex-direction:column;align-items:center;gap:.65rem;animation:fadeUp .5s .28s ease both">
-      <button class="btn btn-green btn-lg" onclick="go('login')" style="min-width:220px;justify-content:center;font-size:.95rem;padding:.85rem 2rem">Get started free →</button>
-      <button onclick="go('jobs')" style="background:none;border:none;font-family:var(--mono);font-size:.7rem;color:rgba(255,255,255,.45);cursor:pointer;padding:.25rem .5rem;transition:color .15s" onmouseover="this.style.color='rgba(255,255,255,.75)'" onmouseout="this.style.color='rgba(255,255,255,.45)'">or browse jobs without an account →</button>
     </div>
   </div>
 
   <!-- Bottom disclaimer — pinned -->
-  <div style="position:relative;z-index:2;text-align:center;padding:.85rem;font-family:var(--mono);font-size:.58rem;color:rgba(255,255,255,.3)">
-    Free for job seekers · No account required to search · <a href="#" onclick="go('legal');return false" style="color:rgba(255,255,255,.3);text-decoration:underline">Legal</a>
+  <div style="position:relative;z-index:2;padding:.7rem 2.5rem;font-family:var(--mono);font-size:.54rem;color:rgba(255,255,255,.22);display:flex;align-items:center;gap:1.2rem;flex-wrap:wrap">
+    <span>Free for job seekers</span>
+    <span style="color:rgba(255,255,255,.12)">·</span>
+    <span>No account required to search</span>
+    <span style="color:rgba(255,255,255,.12)">·</span>
+    <a href="#" onclick="go('legal');return false" style="color:rgba(255,255,255,.22);text-decoration:underline;transition:color .15s" onmouseover="this.style.color='rgba(255,255,255,.45)'" onmouseout="this.style.color='rgba(255,255,255,.22)'">Legal</a>
+    <span style="margin-left:auto;color:rgba(255,255,255,.15)">© 2025 Seen. All rights reserved.</span>
   </div>
 </div>
 
@@ -2518,8 +2625,6 @@ async function runSearch(name,loc){
   const risk=sc.risk_level||Score.risk(sc.overall_score);
   _modalGlow('#modalOv .modal', risk);
   const grade=letterGrade(sc.overall_score);
-  // Set share context from modal so share/Reddit/Threads work without opening full report
-  _shareCtx = { name: known?.name||name, score: sc.overall_score, ghost: Math.round((sc.ghost_rate||0)*100), resp: Math.round((sc.response_rate||0)*100), wait: sc.avg_wait_days||null, waste: sc.waste||0, risk, grade, vibes: VIBES[ck]||VIBES.default };
   const vibeList=VIBES[ck]||VIBES.default;
   const ghostPct=Math.round((sc.ghost_rate||0)*100);
   const respPct=Math.round((sc.response_rate||0)*100);
@@ -2544,8 +2649,9 @@ async function runSearch(name,loc){
         ${(()=>{const n=sc.report_count||0;const pct=Math.min(100,n>=50?100:n>=10?70:n>=5?45:n>=1?25:8);const col=pct>=70?'var(--green)':pct>=40?'var(--amber)':'var(--muted)';return`<div style="margin-top:.5rem;display:flex;align-items:center;gap:.5rem"><div style="flex:1;height:3px;background:var(--raised);border-radius:2px;overflow:hidden"><div style="height:100%;width:${pct}%;background:${col};border-radius:2px;transition:width .6s ease"></div></div><span style="font-family:var(--mono);font-size:.5rem;color:${col};white-space:nowrap">${pct>=70?'High confidence':pct>=40?'Moderate':'Estimated'}</span></div>`;})()}
       </div>
       <div style="flex-shrink:0;text-align:right">
-        <div style="font-family:var(--display);font-weight:800;font-size:3.6rem;line-height:1;letter-spacing:-.04em;color:${Score.color(risk)};text-shadow:0 0 32px ${Score.color(risk)}55">${grade}</div>
-        <div style="font-family:var(--mono);font-size:.62rem;color:var(--muted);margin-top:.15rem">${sc.overall_score} / 100</div>
+        <div style="font-family:var(--display);font-weight:800;font-size:3.8rem;line-height:.9;letter-spacing:-.05em;color:${Score.color(risk)};text-shadow:0 0 40px ${Score.color(risk)}55,0 0 80px ${Score.color(risk)}22">${grade}</div>
+        <div style="font-family:var(--mono);font-size:.58rem;color:var(--muted);margin-top:.2rem;letter-spacing:.04em">${sc.overall_score}<span style="color:var(--dim)"> /100</span></div>
+        <div style="font-family:var(--mono);font-size:.46rem;color:var(--dim);text-transform:uppercase;letter-spacing:.14em;margin-top:.08rem">Seen Grade</div>
       </div>
     </div>
 
@@ -2557,17 +2663,10 @@ async function runSearch(name,loc){
       </div>
     </div>`:''}
 
-    ${(()=>{
-      const w=sc.waste||40;
-      const wc=w>60?'var(--red)':w>30?'var(--amber)':'var(--green)';
-      const wbg=w>60?'var(--rdim)':w>30?'var(--adim)':'var(--gdim)';
-      const wborder=w>60?'#ff3b5c20':w>30?'#f59e0b20':'#10b98120';
-      const wlabel=w>60?'High time risk':w>30?'Moderate risk':'Low risk';
-      return`<div style="background:${wbg};border:1px solid ${wborder};border-radius:8px;padding:.7rem 1rem;display:flex;align-items:center;justify-content:space-between;margin-bottom:.85rem">
-        <div><div style="font-family:var(--mono);font-size:.58rem;color:${wc};text-transform:uppercase;letter-spacing:.08em">Time risk · ${wlabel}</div><div style="font-family:var(--mono);font-size:.55rem;color:${wc};opacity:.55;margin-top:.1rem">Chance this application wastes your time</div></div>
-        <div style="font-family:var(--mono);font-size:1.4rem;font-weight:500;color:${wc}">${w}%</div>
-      </div>`;
-    })()}
+    <div style="background:var(--rdim);border:1px solid #ff3b5c20;border-radius:8px;padding:.7rem 1rem;display:flex;align-items:center;justify-content:space-between;margin-bottom:.85rem">
+      <div><div style="font-family:var(--mono);font-size:.58rem;color:var(--red);text-transform:uppercase;letter-spacing:.08em">⚡ Waste probability</div><div style="font-family:var(--mono);font-size:.55rem;color:rgba(255,59,92,.5);margin-top:.1rem">Chance this application wastes your time</div></div>
+      <div style="font-family:var(--mono);font-size:1.4rem;font-weight:500;color:var(--red)">${sc.waste||'—'}%</div>
+    </div>
 
     <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--line);border:1px solid var(--line);border-radius:8px;overflow:hidden;margin-bottom:.85rem">
       ${mbox(respPct+'%','Response rate',Score.color(risk))}
@@ -2581,16 +2680,12 @@ async function runSearch(name,loc){
     <div class="mbar"><div class="mbar-lbl" style="width:85px">Ghost rate</div><div class="mbar-track"><div class="mbar-fill mf-r" style="width:${ghostPct}%"></div></div><div class="mbar-val">${ghostPct}%</div></div>
 
     <div id="modalTrackRow" style="margin-top:1rem">${_modalTrackCTA(known?.name||name, loc, sc)}</div>
-    <div style="display:flex;flex-direction:column;gap:.5rem;margin-top:.55rem">
-      <div style="display:flex;gap:.45rem">
-        <button class="btn btn-solid" style="flex:1;justify-content:center;font-size:.8rem;padding:.72rem 1rem" onclick="closeModDirect();viewCompany('${known?.id||'x'}','${known?.name||name}','${loc}')">Full report →</button>
-        <button class="btn btn-ghost" style="flex:1;justify-content:center;font-size:.78rem;padding:.72rem 1rem" onclick="closeModDirect();prefillReport('${(name||'').replace(/'/g,"\\'")}');go('report')">+ Report experience</button>
-      </div>
-      <div style="display:flex;gap:.35rem">
-        <button style="flex:1;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.1);border-radius:8px;padding:.5rem;font-family:var(--mono);font-size:.65rem;color:var(--sub);cursor:pointer;transition:all .15s;display:flex;align-items:center;justify-content:center;gap:.3rem" onclick="shareCompanyReport('${(name||'').replace(/'/g,"\\'")}')">↗ Share</button>
-        <button style="flex:1;background:rgba(255,69,0,0.07);border:1px solid rgba(255,69,0,0.2);border-radius:8px;padding:.5rem;font-family:var(--mono);font-size:.65rem;color:#ff6314;cursor:pointer;transition:all .15s;display:flex;align-items:center;justify-content:center;gap:.3rem" onclick="shareToReddit('${(name||'').replace(/'/g,"\\'")}')">🔴 Reddit</button>
-        <button style="flex:1;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.1);border-radius:8px;padding:.5rem;font-family:var(--mono);font-size:.65rem;color:var(--text);cursor:pointer;transition:all .15s;display:flex;align-items:center;justify-content:center;gap:.3rem" onclick="shareToThreads('${(name||'').replace(/'/g,"\\'")}')">🧵 Threads</button>
-      </div>
+    <div style="display:flex;gap:.45rem;margin-top:.45rem;flex-wrap:wrap">
+      <button class="btn btn-solid" style="flex:1;min-width:120px;justify-content:center;font-size:.75rem" onclick="closeModDirect();viewCompany('${known?.id||'x'}','${known?.name||name}','${loc}')">Full report →</button>
+      <button class="btn btn-ghost" style="padding:.65rem .9rem;font-size:.75rem;flex-shrink:0" onclick="shareCompanyReport('${(name||'').replace(/'/g,"\\'")}')">↗ Share</button>
+      <button class="btn btn-ghost" style="padding:.65rem .9rem;font-size:.72rem;flex-shrink:0;background:rgba(255,69,0,0.1);border-color:rgba(255,69,0,0.25);color:#ff6314" onclick="shareToReddit('${(name||'').replace(/'/g,"\\'")}')">🔴 Reddit</button>
+      <button class="btn btn-ghost" style="padding:.65rem .9rem;font-size:.72rem;flex-shrink:0;background:rgba(255,255,255,0.06);border-color:rgba(255,255,255,0.15);color:var(--text)" onclick="shareToThreads('${(name||'').replace(/'/g,"\\'")}')">🧵 Threads</button>
+      <button class="btn btn-ghost" style="padding:.65rem .9rem;font-size:.75rem;flex-shrink:0" onclick="closeModDirect();prefillReport('${(name||'').replace(/'/g,"\\'")}');go('report')">+ Report</button>
     </div>
     ${!Auth.isLoggedIn()?`<div style="margin-top:.85rem;padding:.65rem .95rem;background:var(--raised);border-radius:9px;border:1px solid var(--line2);display:flex;align-items:center;justify-content:space-between;gap:.75rem">
       <div>
@@ -2720,19 +2815,79 @@ function renderQuickTags() {
     lyft:'San Francisco, CA',coinbase:'Remote',figma:'San Francisco, CA',vercel:'Remote',
   };
   const entries = Object.entries(COS);
+  // Top 3 worst by ghost rate, top 2 best by overall score, plus 1 mid-tier interesting one
   const byGhost = [...entries].sort((a,b) => (b[1].sc.ghost_rate||0)-(a[1].sc.ghost_rate||0));
   const byScore = [...entries].sort((a,b) => (b[1].sc.overall_score||0)-(a[1].sc.overall_score||0));
   const worst3 = byGhost.slice(0, 3);
   const best2 = byScore.slice(0, 2);
+  const shown = new Set([...worst3.map(e=>e[0]), ...best2.map(e=>e[0])]);
   const picks = [...worst3.map(([k,c]) => ({k,c,type:'bad'})), ...best2.map(([k,c]) => ({k,c,type:'good'}))];
   el.innerHTML = picks.map(({k,c,type}) => {
     const loc = cityHint[k] || '';
     const grade = letterGrade(c.sc.overall_score);
     const risk = c.sc.risk_level || Score.risk(c.sc.overall_score);
-    const gradeColor = risk==='safe'?'var(--green)':risk==='warn'?'var(--amber)':'var(--red)';
-    const gradeBg = risk==='safe'?'rgba(16,185,129,0.12)':risk==='warn'?'rgba(245,158,11,0.12)':'rgba(239,68,68,0.12)';
-    return `<button onclick="qs('${c.name.replace(/'/g,"\\'")}','${loc}')" style="display:inline-flex;align-items:center;gap:.45rem;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);border-radius:8px;padding:.35rem .7rem;cursor:pointer;transition:all .15s;font-family:var(--body);font-size:.72rem;color:var(--text)" onmouseover="this.style.background='rgba(255,255,255,0.09)';this.style.borderColor='rgba(255,255,255,0.2)'" onmouseout="this.style.background='rgba(255,255,255,0.05)';this.style.borderColor='rgba(255,255,255,0.1)'">${c.name}<span style="font-family:var(--mono);font-size:.65rem;font-weight:700;color:${gradeColor};background:${gradeBg};border-radius:4px;padding:.05rem .35rem">${grade}</span></button>`;
+    return `<button class="vtag" onclick="qs('${c.name.replace(/'/g,"\\'")}','${loc}')">${c.name} <span class="vtag-grade ${risk}">${grade}</span></button>`;
   }).join('');
+}
+
+// ═══════════════════════════════════════════════
+// VERDICT FEED — live audit terminal on landing
+// ═══════════════════════════════════════════════
+let _vfeedIdx = 0, _vfeedPool = [], _vfeedTimer2 = null, _vfeedClockTimer = null;
+
+function startVerdictFeed() {
+  const el = document.getElementById('vfeedList');
+  const clockEl = document.getElementById('vfeedClock');
+  if (!el) return;
+
+  // Live UTC clock — seconds tick (tabular-nums set in CSS)
+  if (clockEl) {
+    function tickClock() {
+      const now = new Date();
+      const hh = String(now.getUTCHours()).padStart(2,'0');
+      const mm = String(now.getUTCMinutes()).padStart(2,'0');
+      const ss = String(now.getUTCSeconds()).padStart(2,'0');
+      clockEl.textContent = `${hh}:${mm}:${ss} UTC`;
+    }
+    tickClock();
+    _vfeedClockTimer = setInterval(tickClock, 1000);
+  }
+
+  const entries = Object.entries(COS);
+  if (entries.length < 3) return;
+
+  _vfeedPool = [...entries].sort(() => Math.random() - .5);
+  _vfeedIdx = 0;
+
+  const AGO = ['just now','1m ago','2m ago','4m ago','6m ago','9m ago','14m ago','21m ago','31m ago','44m ago','58m ago','1h ago','1h 22m ago','2h ago','3h ago'];
+
+  function makeRow(i) {
+    const [, c] = _vfeedPool[i % _vfeedPool.length];
+    const grade = letterGrade(c.sc.overall_score);
+    const risk = c.sc.risk_level || Score.risk(c.sc.overall_score);
+    const ghostPct = Math.round((c.sc.ghost_rate || 0) * 100);
+    const respPct = Math.round((c.sc.response_rate || 0) * 100);
+    const detail = ghostPct > 55 ? `${ghostPct}% ghost rate`
+      : respPct > 65 ? `${respPct}% response rate`
+      : c.ind ? c.ind.split('/')[0].trim() : 'scored';
+    const ts = i < AGO.length ? AGO[i] : `${Math.floor(Math.random() * 180 + 30)}m ago`;
+    const row = document.createElement('div');
+    row.className = 'vfeed-row';
+    row.onclick = () => qs(c.name, '');
+    row.innerHTML = `<div class="vfeed-grade ${risk}">${grade}</div><div class="vfeed-info"><div class="vfeed-co">${c.name}</div><div class="vfeed-detail">${detail}</div></div><div class="vfeed-ts">${ts}</div>`;
+    return row;
+  }
+
+  for (let i = 0; i < 9; i++) el.appendChild(makeRow(i));
+  _vfeedIdx = 9;
+
+  _vfeedTimer2 = setInterval(() => {
+    const row = makeRow(_vfeedIdx++);
+    row.style.animation = 'vfeedIn .35s ease both';
+    el.prepend(row);
+    const rows = el.querySelectorAll('.vfeed-row');
+    if (rows.length > 9) rows[rows.length - 1].remove();
+  }, 3800);
 }
 
 // ═══════════════════════════════════════════════
@@ -4377,6 +4532,7 @@ function goToEmployerDashboard(){
   loadFeatured();
   populateTicker();
   renderQuickTags();
+  startVerdictFeed();
   RecentSearches.render();
   // Show check badge on nav if there are pending checks
   setTimeout(updateCheckBadge, 600);
