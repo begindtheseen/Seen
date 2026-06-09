@@ -172,7 +172,8 @@ export default async function handler(req, res) {
     jobs = jobs.map(j => ({ ...j, score: scoreJob(j), waste_score: wasteScore(j) }));
     jobs.sort((a, b) => b.score - a.score);
 
-    // Save under the canonical key so all equivalent queries hit this cache
+    // Save under the canonical key so all equivalent queries hit this cache.
+    // merge-duplicates: re-searched jobs get expires_at refreshed (not just ignored).
     if (SUPABASE_URL && SUPABASE_SERVICE_KEY && jobs.length) {
       const expires = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
       const rows = jobs.map(j => ({
@@ -193,7 +194,7 @@ export default async function handler(req, res) {
       try {
         const saveRes = await fetch(`${SUPABASE_URL}/rest/v1/jobs`, {
           method: 'POST',
-          headers: { ...dbHeaders, Prefer: 'resolution=ignore-duplicates,return=minimal' },
+          headers: { ...dbHeaders, Prefer: 'resolution=merge-duplicates,return=minimal' },
           body: JSON.stringify(rows),
         });
         if (saveRes.ok) {
@@ -203,6 +204,9 @@ export default async function handler(req, res) {
           console.error(`CACHE SAVE FAILED: ${saveRes.status}`, errText.slice(0, 300));
         }
       } catch(e) { console.error('CACHE SAVE ERROR:', e.message); }
+
+      // Log every search that hits the API (cache miss → real fetch)
+      _logSearch(canonical, loc, jobs.length, SUPABASE_URL, dbHeaders);
     }
 
     return res.status(200).json({ ok: true, jobs, query, location: loc });
@@ -211,6 +215,15 @@ export default async function handler(req, res) {
     console.error('Jobs error:', err.message);
     return res.status(500).json({ error: err.message, jobs: [] });
   }
+}
+
+// Fire-and-forget search log — if search_logs table doesn't exist yet, fails silently
+function _logSearch(query, location, resultCount, supabaseUrl, headers) {
+  fetch(`${supabaseUrl}/rest/v1/search_logs`, {
+    method: 'POST',
+    headers: { ...headers, Prefer: 'return=minimal' },
+    body: JSON.stringify({ query, location: location || '', result_count: resultCount, source: 'api' }),
+  }).catch(() => {});
 }
 
 // ── Keyword fallback filter ───────────────────────────────────────────────────

@@ -703,6 +703,27 @@ nav.nav-scrolled{background:rgba(6,6,8,0.82);backdrop-filter:blur(60px) saturate
 /* ═══ SCANNING AUDIT BAND ═══ */
 @keyframes auditScan{0%{left:-160px}100%{left:100vw}}
 .audit-scan{position:absolute;inset-block:0;width:140px;background:linear-gradient(90deg,transparent,rgba(16,185,129,.05) 40%,rgba(59,130,246,.04) 60%,transparent);animation:auditScan 42s linear infinite;pointer-events:none;z-index:1}
+
+/* ═══ ADMIN STATS PAGE ═══ */
+.adm-wrap{max-width:960px;margin:0 auto;padding:1.5rem 1.25rem 4rem}
+.adm-kpi-row{display:grid;grid-template-columns:repeat(4,1fr);gap:.65rem;margin-bottom:1.5rem}
+@media(max-width:680px){.adm-kpi-row{grid-template-columns:1fr 1fr}}
+.adm-kpi{background:linear-gradient(160deg,rgba(255,255,255,.055) 0%,rgba(255,255,255,.018) 100%);border:1px solid rgba(255,255,255,.1);border-radius:10px;padding:.9rem 1rem;backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);transition:transform .2s,box-shadow .2s}
+.adm-kpi:hover{transform:translateY(-2px);box-shadow:0 8px 24px rgba(0,0,0,.4)}
+.adm-kpi-l{font-family:var(--mono);font-size:.5rem;text-transform:uppercase;letter-spacing:.12em;color:var(--muted);margin-bottom:.4rem}
+.adm-kpi-n{font-family:var(--mono);font-size:1.8rem;font-weight:500;line-height:1;color:var(--white)}
+.adm-kpi-sub{font-family:var(--mono);font-size:.52rem;color:var(--dim);margin-top:.25rem}
+.adm-panel{background:rgba(255,255,255,.025);border:1px solid rgba(255,255,255,.08);border-radius:12px;overflow:hidden;margin-bottom:1rem}
+.adm-panel-hdr{padding:.75rem 1rem;border-bottom:1px solid rgba(255,255,255,.06);font-family:var(--mono);font-size:.6rem;text-transform:uppercase;letter-spacing:.12em;color:var(--sub);display:flex;align-items:center;justify-content:space-between}
+.adm-row{display:flex;align-items:center;padding:.6rem 1rem;border-bottom:1px solid rgba(255,255,255,.04);gap:.75rem;transition:background .12s}
+.adm-row:last-child{border-bottom:none}
+.adm-row:hover{background:rgba(255,255,255,.03)}
+.adm-bar-wrap{flex:1;height:4px;background:rgba(255,255,255,.06);border-radius:2px;overflow:hidden}
+.adm-bar{height:100%;border-radius:2px;background:linear-gradient(90deg,var(--blue),var(--indigo));transition:width .6s ease}
+.adm-bar.green{background:linear-gradient(90deg,var(--green),#34d399)}
+.adm-chart-row{display:flex;align-items:flex-end;gap:3px;height:48px;padding:0 1rem 0}
+.adm-chart-bar{flex:1;background:rgba(59,130,246,.35);border-radius:2px 2px 0 0;transition:background .15s;cursor:default;min-width:8px}
+.adm-chart-bar:hover{background:rgba(59,130,246,.7)}
 </style>
 </head>
 <body>
@@ -1838,6 +1859,88 @@ nav.nav-scrolled{background:rgba(6,6,8,0.82);backdrop-filter:blur(60px) saturate
         <button id="jlSaveBtn" type="button" data-saved="0" onclick="jlSaveToggle(this)" style="background:none;border:1px solid var(--line2);border-radius:8px;padding:.65rem 1rem;font-size:1.1rem;cursor:pointer;color:var(--muted);flex-shrink:0;transition:all .15s">♡</button>
         <button type="button" onclick="jlApplyClick()" style="flex:1;background:var(--green);color:var(--ink);border:none;border-radius:8px;padding:.65rem 1rem;font-family:var(--display);font-weight:800;font-size:.85rem;cursor:pointer">Apply &amp; Optimize →</button>
       </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ ADMIN STATS PAGE ═══ -->
+<div class="page" id="page-admin" style="background:radial-gradient(ellipse at 10% 0%,rgba(29,78,216,0.1) 0%,transparent 50%),radial-gradient(ellipse at 90% 10%,rgba(124,58,237,0.07) 0%,transparent 45%)">
+  <div class="adm-wrap">
+    <div style="font-family:var(--mono);font-size:.52rem;text-transform:uppercase;letter-spacing:.22em;color:var(--green);margin-bottom:.65rem;display:flex;align-items:center;gap:12px">
+      <span style="width:22px;height:1px;background:var(--green);display:inline-block;flex-shrink:0"></span>
+      Seen Admin
+    </div>
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:.75rem;margin-bottom:1.5rem">
+      <div>
+        <h1 style="font-family:var(--display);font-size:2rem;font-weight:800;color:var(--white);letter-spacing:-.04em;line-height:1.05;margin-bottom:.25rem">Platform stats</h1>
+        <p style="font-size:.8rem;color:var(--sub);font-weight:300" id="admLastUpdated">Loading…</p>
+      </div>
+      <button onclick="renderAdminPage()" style="background:none;border:1px solid var(--line2);border-radius:8px;padding:.5rem 1rem;font-family:var(--mono);font-size:.65rem;color:var(--sub);cursor:pointer;transition:all .15s;flex-shrink:0" onmouseover="this.style.borderColor='var(--blue)';this.style.color='var(--white)'" onmouseout="this.style.borderColor='var(--line2)';this.style.color='var(--sub)'">↻ Refresh</button>
+    </div>
+
+    <!-- KPI tiles -->
+    <div class="adm-kpi-row" id="admKpiRow">
+      <div class="adm-kpi"><div class="adm-kpi-l">Total active jobs</div><div class="adm-kpi-n" id="admTotalJobs">—</div><div class="adm-kpi-sub">in database now</div></div>
+      <div class="adm-kpi"><div class="adm-kpi-l">Added last 24h</div><div class="adm-kpi-n" id="admFreshJobs">—</div><div class="adm-kpi-sub">approx, from expiry</div></div>
+      <div class="adm-kpi"><div class="adm-kpi-l">Searches today</div><div class="adm-kpi-n" id="admSearchesToday">—</div><div class="adm-kpi-sub" id="admSearchTodaySub">API cache misses</div></div>
+      <div class="adm-kpi"><div class="adm-kpi-l">Searches this week</div><div class="adm-kpi-n" id="admSearchesWeek">—</div><div class="adm-kpi-sub">last 7 days</div></div>
+    </div>
+
+    <!-- Search volume chart (only shown when search_logs table exists) -->
+    <div class="adm-panel" id="admChartPanel" style="display:none">
+      <div class="adm-panel-hdr">
+        Search volume — last 7 days
+        <span style="font-family:var(--mono);font-size:.5rem;color:var(--dim)">one bar = one day</span>
+      </div>
+      <div style="padding:.75rem 1rem .5rem">
+        <div class="adm-chart-row" id="admChart"></div>
+        <div style="display:flex;justify-content:space-between;padding:.25rem 0 0;font-family:var(--mono);font-size:.44rem;color:var(--dim)" id="admChartLabels"></div>
+      </div>
+    </div>
+
+    <!-- Two-column: top job queries + top locations -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:.65rem;margin-bottom:1rem" id="admTwoCol">
+      <div class="adm-panel">
+        <div class="adm-panel-hdr">Top job queries in DB</div>
+        <div id="admTopQueries"><div style="padding:.85rem 1rem;font-family:var(--mono);font-size:.62rem;color:var(--dim)">Loading…</div></div>
+      </div>
+      <div class="adm-panel">
+        <div class="adm-panel-hdr">Top locations in DB</div>
+        <div id="admTopLocations"><div style="padding:.85rem 1rem;font-family:var(--mono);font-size:.62rem;color:var(--dim)">Loading…</div></div>
+      </div>
+    </div>
+
+    <!-- Most-searched queries (from live search logs, if available) -->
+    <div class="adm-panel" id="admLiveSearchPanel" style="display:none">
+      <div class="adm-panel-hdr">Most searched this week <span style="color:var(--green)">live</span></div>
+      <div id="admLiveSearches"></div>
+    </div>
+
+    <!-- Setup note for search_logs -->
+    <div id="admSetupNote" style="display:none;background:rgba(245,158,11,.06);border:1px solid rgba(245,158,11,.2);border-radius:10px;padding:1rem 1.1rem;margin-top:1rem">
+      <div style="font-family:var(--mono);font-size:.6rem;color:var(--amber);text-transform:uppercase;letter-spacing:.1em;margin-bottom:.5rem">Action needed — enable search tracking</div>
+      <p style="font-size:.78rem;color:var(--sub);margin-bottom:.75rem;line-height:1.6">Run this SQL in your <a href="https://app.supabase.com" target="_blank" style="color:var(--blue);text-decoration:none">Supabase SQL editor</a> to unlock live search volume tracking:</p>
+      <pre style="background:rgba(0,0,0,.35);border:1px solid rgba(255,255,255,.08);border-radius:6px;padding:.75rem 1rem;font-family:var(--mono);font-size:.65rem;color:var(--white);overflow-x:auto;line-height:1.7;margin:0">CREATE TABLE IF NOT EXISTS search_logs (
+  id bigserial PRIMARY KEY,
+  query text NOT NULL,
+  location text DEFAULT '',
+  result_count int DEFAULT 0,
+  source text DEFAULT 'api',
+  created_at timestamptz DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_search_logs_created
+  ON search_logs(created_at DESC);
+ALTER TABLE search_logs ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "service only" ON search_logs
+  FOR ALL USING (false);</pre>
+      <p style="font-size:.72rem;color:var(--dim);margin-top:.5rem">The last two lines lock the table down to service-key only (no public reads). Once created, every search that hits the API will be logged automatically.</p>
+    </div>
+
+    <!-- Auth / access error state -->
+    <div id="admAuthError" style="display:none;text-align:center;padding:3rem 1rem">
+      <div style="font-size:2rem;margin-bottom:1rem">🔒</div>
+      <div style="font-family:var(--display);font-size:1.1rem;font-weight:700;color:var(--white);margin-bottom:.4rem">Access restricted</div>
+      <div style="font-size:.8rem;color:var(--sub)" id="admAuthMsg">This page requires an admin account.</div>
     </div>
   </div>
 </div>
@@ -4690,6 +4793,139 @@ Our total liability for any claim shall not exceed $100 USD.
 // ═══════════════════════════════════════════════
 // RENDER FAQ
 // ═══════════════════════════════════════════════
+async function renderAdminPage() {
+  const errEl = document.getElementById('admAuthError');
+  const errMsg = document.getElementById('admAuthMsg');
+  const setupNote = document.getElementById('admSetupNote');
+  const chartPanel = document.getElementById('admChartPanel');
+  const livePanel = document.getElementById('admLiveSearchPanel');
+  const lastUpdated = document.getElementById('admLastUpdated');
+
+  // Hide error, show loading state
+  if (errEl) errEl.style.display = 'none';
+  if (setupNote) setupNote.style.display = 'none';
+  if (lastUpdated) lastUpdated.textContent = 'Loading…';
+
+  const set = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
+
+  // Must be logged in — use the async token getter so we always get a fresh JWT
+  const token = await Auth.token();
+  if (!token) {
+    if (errEl) errEl.style.display = 'block';
+    if (errMsg) errMsg.textContent = 'Sign in to access this page.';
+    return;
+  }
+
+  try {
+    const res = await fetch('/api/admin-stats', {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+
+    if (res.status === 401) {
+      if (errEl) errEl.style.display = 'block';
+      if (errMsg) errMsg.textContent = 'Session expired. Please sign in again.';
+      return;
+    }
+    if (res.status === 403) {
+      if (errEl) errEl.style.display = 'block';
+      if (errMsg) errMsg.textContent = 'This page is restricted to Seen admin accounts.';
+      return;
+    }
+    if (!res.ok) throw new Error('API error ' + res.status);
+
+    const data = await res.json();
+
+    // KPI tiles
+    set('admTotalJobs', (data.jobs?.total ?? '—').toLocaleString());
+    set('admFreshJobs', (data.jobs?.added_last_24h_approx ?? '—').toLocaleString());
+
+    const searchesToday = data.searches?.today;
+    const searchesWeek = data.searches?.week_total;
+    set('admSearchesToday', searchesToday !== null && searchesToday !== undefined ? searchesToday.toLocaleString() : '—');
+    set('admSearchesWeek', searchesWeek !== null && searchesWeek !== undefined ? searchesWeek.toLocaleString() : '—');
+
+    // If search logging not set up yet, show the setup note and mark stats as N/A
+    const hasSearchLogs = searchesToday !== null;
+    if (!hasSearchLogs) {
+      set('admSearchesToday', 'N/A');
+      set('admSearchesWeek', 'N/A');
+      set('admSearchTodaySub', 'not yet tracked');
+      if (setupNote) setupNote.style.display = 'block';
+    }
+
+    // Search volume chart
+    const chart = data.searches?.chart;
+    if (chart && chart.length && chartPanel) {
+      chartPanel.style.display = 'block';
+      const max = Math.max(...chart.map(d => d.count), 1);
+      const chartEl = document.getElementById('admChart');
+      const labelsEl = document.getElementById('admChartLabels');
+      if (chartEl) {
+        chartEl.innerHTML = chart.map(d => {
+          const pct = Math.round((d.count / max) * 100);
+          return `<div class="adm-chart-bar" style="height:${pct}%" title="${d.date}: ${d.count} searches"></div>`;
+        }).join('');
+      }
+      if (labelsEl) {
+        labelsEl.innerHTML = chart.map(d => {
+          const dt = new Date(d.date + 'T12:00:00');
+          return `<span>${dt.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>`;
+        }).join('');
+      }
+    }
+
+    // Live search top queries (from search_logs)
+    const liveQ = data.searches?.top_queries;
+    if (liveQ && liveQ.length && livePanel) {
+      livePanel.style.display = 'block';
+      const max2 = liveQ[0].count;
+      document.getElementById('admLiveSearches').innerHTML = liveQ.map(({ query, count }) => `
+        <div class="adm-row">
+          <div style="font-family:var(--mono);font-size:.68rem;color:var(--white);min-width:0;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${query}</div>
+          <div class="adm-bar-wrap"><div class="adm-bar" style="width:${Math.round(count/max2*100)}%"></div></div>
+          <div style="font-family:var(--mono);font-size:.62rem;color:var(--sub);min-width:2.5rem;text-align:right">${count}</div>
+        </div>`).join('');
+    }
+
+    // Top job queries (from DB job tags)
+    const topQ = data.top_job_queries || [];
+    const maxQ = topQ[0]?.count || 1;
+    document.getElementById('admTopQueries').innerHTML = topQ.length
+      ? topQ.map(({ query, count }) => `
+        <div class="adm-row">
+          <div style="font-family:var(--mono);font-size:.62rem;color:var(--white);min-width:0;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${query}</div>
+          <div class="adm-bar-wrap"><div class="adm-bar" style="width:${Math.round(count/maxQ*100)}%"></div></div>
+          <div style="font-family:var(--mono);font-size:.62rem;color:var(--sub);min-width:2.5rem;text-align:right">${count}</div>
+        </div>`).join('')
+      : '<div style="padding:.85rem 1rem;font-family:var(--mono);font-size:.62rem;color:var(--dim)">No data yet</div>';
+
+    // Top locations
+    const topL = data.top_locations || [];
+    const maxL = topL[0]?.count || 1;
+    document.getElementById('admTopLocations').innerHTML = topL.length
+      ? topL.map(({ location, count }) => `
+        <div class="adm-row">
+          <div style="font-family:var(--mono);font-size:.62rem;color:var(--white);min-width:0;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${location}</div>
+          <div class="adm-bar-wrap"><div class="adm-bar green" style="width:${Math.round(count/maxL*100)}%"></div></div>
+          <div style="font-family:var(--mono);font-size:.62rem;color:var(--sub);min-width:2.5rem;text-align:right">${count}</div>
+        </div>`).join('')
+      : '<div style="padding:.85rem 1rem;font-family:var(--mono);font-size:.62rem;color:var(--dim)">No data yet</div>';
+
+    // Two-col grid collapses to single col on mobile
+    const twoCol = document.getElementById('admTwoCol');
+    if (twoCol && window.innerWidth < 600) twoCol.style.gridTemplateColumns = '1fr';
+
+    // Updated timestamp
+    if (lastUpdated && data.generated_at) {
+      lastUpdated.textContent = 'Last updated ' + new Date(data.generated_at).toLocaleTimeString();
+    }
+
+  } catch (e) {
+    if (lastUpdated) lastUpdated.textContent = 'Failed to load — ' + e.message;
+    console.warn('renderAdminPage:', e);
+  }
+}
+
 function renderFAQ(){
   const c=document.getElementById('faqList');if(!c)return;
   c.innerHTML=FAQ_DATA.map(s=>`
@@ -6236,6 +6472,7 @@ function go(page){
     if(page==='demand')loadDemand();
     if(page==='faq')renderFAQ();
     if(page==='legal')renderLegal();
+    if(page==='admin')renderAdminPage();
     if(page==='tracker')renderTracker().catch(e=>console.warn('tracker render:',e));
     if(page==='companies')loadLdr();
     if(page==='seeker-dash'){renderSeekerDash();loadDashResumeState();}
@@ -8605,6 +8842,7 @@ function _handleSharedLink(){
     setTimeout(()=>viewCompany(null,displayName,loc),500);
     return;
   }
+  if(h==='#admin'){setTimeout(()=>go('admin'),300);return;}
   // Non-company page restore — sessionStorage first, localStorage fallback (survives iOS tab discard)
   let sp = sessionStorage.getItem('sp');
   if (!sp) {
