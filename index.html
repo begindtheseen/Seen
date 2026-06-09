@@ -1252,13 +1252,13 @@ nav.nav-scrolled{background:rgba(6,6,8,0.82);backdrop-filter:blur(60px) saturate
           <button title="Use my location" onclick="_requestGpsLocation('jobSearchLocation')" style="position:absolute;right:.5rem;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;font-size:1rem;color:var(--muted);padding:0;line-height:1;transition:color .15s" onmouseenter="this.style.color='var(--green)'" onmouseleave="this.style.color='var(--muted)'">📍</button>
           <div id="jobLocSuggestions" style="position:absolute;z-index:200;background:var(--surface);border:1px solid var(--line2);border-radius:8px;width:280px;display:none;box-shadow:0 8px 24px rgba(0,0,0,.4);top:100%;left:0;margin-top:.25rem"></div>
         </div>
-        <select id="jobSearchRadius" style="background:var(--surface);border:1.5px solid var(--line2);border-radius:8px;padding:.65rem .75rem;color:var(--white);font-family:var(--mono);font-size:.72rem;outline:none;appearance:none;cursor:pointer">
+        <select id="jobSearchRadius" onchange="loadJobs()" style="background:var(--surface);border:1.5px solid var(--line2);border-radius:8px;padding:.65rem .75rem;color:var(--white);font-family:var(--mono);font-size:.72rem;outline:none;appearance:none;cursor:pointer">
           <option value="10">10 mi</option>
           <option value="25" selected>25 mi</option>
           <option value="50">50 mi</option>
           <option value="100">100 mi</option>
-          <option value="0">Remote</option>
         </select>
+        <button id="includeRemoteBtn" onclick="toggleIncludeRemote()" style="padding:.65rem .85rem;background:var(--surface);border:1.5px solid var(--line2);border-radius:8px;font-family:var(--mono);font-size:.68rem;color:var(--sub);cursor:pointer;white-space:nowrap;transition:all .15s" title="Toggle remote jobs">+ Remote</button>
         <button onclick="searchJobs()" style="padding:.65rem 1.25rem;background:linear-gradient(135deg,#3b82f6 0%,#8b5cf6 100%);color:#fff;border:none;border-radius:8px;font-family:var(--display);font-weight:800;font-size:.84rem;cursor:pointer;white-space:nowrap;box-shadow:0 0 20px rgba(59,130,246,0.3)">Search →</button>
       </div>
       <!-- Filter bar — DB only, no API calls -->
@@ -3593,6 +3593,19 @@ const CITY_COORDS={
   'westminster':[33.753,-118.000],'westminster ca':[33.753,-118.000],
 };
 
+let _includeRemote = false;
+function toggleIncludeRemote(){
+  _includeRemote = !_includeRemote;
+  const btn = document.getElementById('includeRemoteBtn');
+  if(btn){
+    btn.style.background = _includeRemote ? 'var(--bdim)' : 'var(--surface)';
+    btn.style.borderColor = _includeRemote ? 'var(--blue)' : 'var(--line2)';
+    btn.style.color = _includeRemote ? 'var(--blue)' : 'var(--sub)';
+    btn.textContent = _includeRemote ? '✓ Remote' : '+ Remote';
+  }
+  loadJobs();
+}
+
 function _cityCoords(locStr){
   if(!locStr)return null;
   const key=locStr.toLowerCase().trim().replace(/\s*,\s*/g,' ').replace(/\.\s*/g,'').replace(/\s+/g,' ');
@@ -3670,10 +3683,10 @@ async function applyJobFilters(){
     if(level && _inferLevel(j) !== level) return false;
     if(type  && j.type && !j.type.toLowerCase().includes(type.toLowerCase()))  return false;
     if(cutoffMs && j.created_at && new Date(j.created_at).getTime() < cutoffMs) return false;
-    // Radius: skip remote jobs when a location is set; enforce actual Haversine distance
+    // Radius: enforce Haversine distance; remote jobs follow the toggle
     if(userCoords && radiusVal>0){
       const jl=j.loc||j.location||'';
-      if(jl.toLowerCase().includes('remote'))return false;
+      if(jl.toLowerCase().includes('remote')) return _includeRemote;
       if(!_withinRadius(jl,userCoords,radiusVal))return false;
     }
     return true;
@@ -3759,7 +3772,8 @@ async function loadJobs(){
     const userCoords=_cityCoords(effectiveLoc);
     if(userCoords){
       const filtered=jobs.filter(j=>{
-        if((j.loc||j.location||'').toLowerCase().includes('remote'))return false;
+        const loc=(j.loc||j.location||'').toLowerCase();
+        if(loc.includes('remote')) return _includeRemote; // honour toggle
         return _withinRadius(j.loc||j.location,userCoords,radiusVal);
       });
       // Only apply if we got reasonable results — avoid wiping list for unknown cities
