@@ -2518,6 +2518,8 @@ async function runSearch(name,loc){
   const risk=sc.risk_level||Score.risk(sc.overall_score);
   _modalGlow('#modalOv .modal', risk);
   const grade=letterGrade(sc.overall_score);
+  // Set share context from modal so share/Reddit/Threads work without opening full report
+  _shareCtx = { name: known?.name||name, score: sc.overall_score, ghost: Math.round((sc.ghost_rate||0)*100), resp: Math.round((sc.response_rate||0)*100), wait: sc.avg_wait_days||null, waste: sc.waste||0, risk, grade, vibes: VIBES[ck]||VIBES.default };
   const vibeList=VIBES[ck]||VIBES.default;
   const ghostPct=Math.round((sc.ghost_rate||0)*100);
   const respPct=Math.round((sc.response_rate||0)*100);
