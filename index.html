@@ -724,6 +724,24 @@ nav.nav-scrolled{background:rgba(6,6,8,0.82);backdrop-filter:blur(60px) saturate
 .adm-chart-row{display:flex;align-items:flex-end;gap:3px;height:48px;padding:0 1rem 0}
 .adm-chart-bar{flex:1;background:rgba(59,130,246,.35);border-radius:2px 2px 0 0;transition:background .15s;cursor:default;min-width:8px}
 .adm-chart-bar:hover{background:rgba(59,130,246,.7)}
+/* ── Job Search Health Score ─────────────────────────────────── */
+.hs-card{background:linear-gradient(160deg,rgba(255,255,255,.05) 0%,rgba(255,255,255,.015) 100%);border:1px solid rgba(255,255,255,.1);border-radius:14px;padding:1.25rem 1.4rem;position:relative;overflow:hidden}
+.hs-card::before{content:'';position:absolute;top:-40px;right:-40px;width:160px;height:160px;background:radial-gradient(circle,rgba(16,185,129,0.08) 0%,transparent 70%);pointer-events:none}
+.hs-hdr{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:.85rem;gap:1rem}
+.hs-num{font-family:var(--mono);font-size:2.6rem;font-weight:700;line-height:1;letter-spacing:-.04em}
+.hs-grade{font-family:var(--mono);font-size:.95rem;font-weight:600;opacity:.65;margin-left:.15rem}
+.hs-title{font-family:var(--mono);font-size:.5rem;text-transform:uppercase;letter-spacing:.2em;color:var(--muted);margin-bottom:.25rem}
+.hs-verdict{font-family:var(--display);font-size:.9rem;font-weight:700;color:var(--white)}
+.hs-bar-bg{height:3px;background:rgba(255,255,255,.08);border-radius:2px;margin-bottom:1.1rem;overflow:hidden}
+.hs-bar-fill{height:100%;border-radius:2px;transition:width .8s cubic-bezier(.4,0,.2,1)}
+.hs-metrics{display:grid;grid-template-columns:repeat(4,1fr);gap:.45rem;margin-bottom:.9rem}
+@media(max-width:500px){.hs-metrics{grid-template-columns:1fr 1fr}}
+.hs-metric{background:rgba(255,255,255,.025);border:1px solid rgba(255,255,255,.055);border-radius:8px;padding:.5rem .55rem;text-align:center}
+.hs-m-lbl{font-family:var(--mono);font-size:.44rem;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin-bottom:.28rem;line-height:1.3}
+.hs-m-val{font-family:var(--mono);font-size:1rem;font-weight:600;line-height:1;margin-bottom:.18rem}
+.hs-m-avg{font-family:var(--mono);font-size:.46rem;color:var(--dim)}
+.hs-recs{display:flex;flex-direction:column;gap:.38rem;padding-top:.15rem}
+.hs-rec{display:flex;align-items:flex-start;gap:.5rem;font-size:.7rem;color:var(--sub);font-weight:300;line-height:1.4}
 </style>
 </head>
 <body>
@@ -1140,6 +1158,9 @@ nav.nav-scrolled{background:rgba(6,6,8,0.82);backdrop-filter:blur(60px) saturate
       </div>
       <button class="btn btn-ghost" onclick="doSignOut()" style="font-size:.75rem;flex-shrink:0">Sign out</button>
     </div>
+
+    <!-- Job Search Health Score (hidden until ≥3 apps tracked) -->
+    <div id="seekerHealthScore" style="display:none;margin-bottom:1.25rem"></div>
 
     <!-- Stat row — mission control tiles: 2x2 on mobile, 4 across on desktop -->
     <div class="dstat-row" id="seekerStatRow">
@@ -6309,6 +6330,51 @@ async function generateWeeklyDigest() {
 // ═══════════════════════════════════════════════
 // SEEKER DASHBOARD
 // ═══════════════════════════════════════════════
+function calcJobSearchHealth(apps) {
+  if (!apps || apps.length < 3) return null;
+  const total = apps.length;
+  const ghosted     = apps.filter(a => (a.status||'') === 'ghosted');
+  const responded   = apps.filter(a => { const s=a.status||''; return s!=='active'&&s!=='ghosted'; });
+  const interviewed = apps.filter(a => {
+    const st=(a.stage||'').toLowerCase();
+    return st.includes('interview')||st.includes('phone')||st.includes('offer')||(a.status||'')==='hired';
+  });
+  const avgCo = apps.reduce((s,a) => s+(a.score||65), 0) / total;
+  const responseRate  = responded.length   / total * 100;
+  const ghostRate     = ghosted.length     / total * 100;
+  const interviewRate = interviewed.length / total * 100;
+  // Points: response(35) + ghost-inverse(25) + interview(25) + co-quality(15) = 100
+  const rrPts = Math.min(35, responseRate  / 25 * 35);
+  const grPts = Math.max(0,  (1 - ghostRate/100) * 25);
+  const irPts = Math.min(25, interviewRate / 10 * 25);
+  const cqPts = Math.min(15, Math.max(0, (avgCo-40)/50 * 15));
+  return {
+    score: Math.round(rrPts+grPts+irPts+cqPts),
+    responseRate:   Math.round(responseRate),
+    ghostRate:      Math.round(ghostRate),
+    interviewRate:  Math.round(interviewRate * 10) / 10,
+    avgCompanyScore: Math.round(avgCo),
+    total
+  };
+}
+
+function getHealthRecs(h) {
+  const recs = [];
+  if (h.ghostRate > 50)
+    recs.push({ icon: '👻', text: `${h.ghostRate}% ghost rate — filter for companies with Seen scores above 70 before applying.` });
+  if (h.responseRate < 15)
+    recs.push({ icon: '📬', text: `Only ${h.responseRate}% response rate. Use Resume AI to tailor each application and improve callbacks.` });
+  else if (h.responseRate < 25)
+    recs.push({ icon: '📬', text: `${h.responseRate}% response rate — above average, but personalizing further can push it higher.` });
+  if (h.interviewRate < 4 && h.total >= 5)
+    recs.push({ icon: '🎤', text: `${h.interviewRate}% interview rate. Try fewer, better-matched roles instead of mass applying.` });
+  if (h.avgCompanyScore < 60)
+    recs.push({ icon: '🏢', text: `Avg company score ${h.avgCompanyScore} — you're targeting many low-rated companies. Quality over quantity.` });
+  if (!recs.length)
+    recs.push({ icon: '🔥', text: `Strong pipeline — you're outperforming most job seekers. Keep tracking every application.` });
+  return recs.slice(0, 2);
+}
+
 async function renderSeekerDash(){
   // Ensure profile is loaded — if it's null here (race with auth init) load it now
   if (!Auth._profile && Auth.isLoggedIn()) {
@@ -6365,6 +6431,63 @@ async function renderSeekerDash(){
   if(_('dStatRR'))_('dStatRR').textContent=apps.length?Math.round((apps.filter(a=>a.status!=='active'&&a.status!=='ghosted').length/apps.length)*100)+'%':'—';
   if(_('dStatGhosted'))_('dStatGhosted').textContent=ghosted.length;
   if(_('dStatHired'))_('dStatHired').textContent=hired.length;
+
+  // Job Search Health Score
+  const hsEl=_('seekerHealthScore');
+  if(hsEl){
+    const health=calcJobSearchHealth(apps);
+    if(health){
+      const s=health.score;
+      const grade   = s>=85?'A':s>=70?'B':s>=55?'C':s>=40?'D':'F';
+      const verdict = s>=85?'Excellent':s>=70?'Good':s>=55?'Fair':s>=40?'Needs work':'Critical';
+      const color   = s>=85?'var(--green)':s>=70?'var(--blue)':s>=55?'#f59e0b':s>=40?'#f97316':'var(--red)';
+      const barGrad = s>=70?'linear-gradient(90deg,var(--blue),var(--green))':s>=55?'linear-gradient(90deg,#f59e0b,#fbbf24)':'linear-gradient(90deg,var(--red),#f97316)';
+      const rrC = health.responseRate>=20?'var(--green)':health.responseRate>=10?'#f59e0b':'var(--red)';
+      const grC = health.ghostRate<=30?'var(--green)':health.ghostRate<=55?'#f59e0b':'var(--red)';
+      const irC = health.interviewRate>=5?'var(--green)':health.interviewRate>=2?'#f59e0b':'var(--red)';
+      const cqC = health.avgCompanyScore>=70?'var(--green)':health.avgCompanyScore>=55?'#f59e0b':'var(--red)';
+      const recs=getHealthRecs(health);
+      hsEl.style.display='block';
+      hsEl.innerHTML=`<div class="hs-card">
+        <div class="hs-hdr">
+          <div>
+            <div class="hs-title">Job Search Health</div>
+            <div class="hs-verdict">${verdict}</div>
+          </div>
+          <div style="text-align:right;flex-shrink:0">
+            <span class="hs-num" style="color:${color}">${s}</span><span class="hs-grade" style="color:${color}">${grade}</span>
+            <div style="font-family:var(--mono);font-size:.5rem;color:var(--dim);margin-top:.15rem">out of 100 · ${health.total} apps</div>
+          </div>
+        </div>
+        <div class="hs-bar-bg"><div class="hs-bar-fill" style="width:${s}%;background:${barGrad}"></div></div>
+        <div class="hs-metrics">
+          <div class="hs-metric">
+            <div class="hs-m-lbl">Response rate</div>
+            <div class="hs-m-val" style="color:${rrC}">${health.responseRate}%</div>
+            <div class="hs-m-avg">vs 20% avg</div>
+          </div>
+          <div class="hs-metric">
+            <div class="hs-m-lbl">Ghost rate</div>
+            <div class="hs-m-val" style="color:${grC}">${health.ghostRate}%</div>
+            <div class="hs-m-avg">vs 47% avg</div>
+          </div>
+          <div class="hs-metric">
+            <div class="hs-m-lbl">Interview rate</div>
+            <div class="hs-m-val" style="color:${irC}">${health.interviewRate}%</div>
+            <div class="hs-m-avg">vs 5% avg</div>
+          </div>
+          <div class="hs-metric">
+            <div class="hs-m-lbl">Co. quality</div>
+            <div class="hs-m-val" style="color:${cqC}">${health.avgCompanyScore}</div>
+            <div class="hs-m-avg">avg score</div>
+          </div>
+        </div>
+        ${recs.length?`<div class="hs-recs">${recs.map(r=>`<div class="hs-rec"><span>${r.icon}</span><span>${r.text}</span></div>`).join('')}</div>`:''}
+      </div>`;
+    }else{
+      hsEl.style.display='none';
+    }
+  }
 
   // Pipeline intelligence — aggregate insights from resolved apps
   const insightBand = _('dashPipelineInsight');
