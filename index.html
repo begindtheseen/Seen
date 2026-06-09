@@ -3423,35 +3423,169 @@ function shareCompanyReport(name) {
   }
 }
 
+// Open Reddit immediately (must be synchronous — browser blocks window.open after async)
+// then generate and share the card image
 function shareToReddit(name) {
-  const ctx = (_shareCtx && _shareCtx.name && _shareCtx.name.toLowerCase() === (name||'').toLowerCase()) ? _shareCtx : null;
-  const url = 'https://seenjobs.io/#company/' + encodeURIComponent((name||'').toLowerCase().trim());
-  const score = ctx?.score ?? '–';
-  const ghost = ctx?.ghost != null ? ctx.ghost + '%' : '–';
-  const resp = ctx?.resp != null ? ctx.resp + '%' : '–';
-  const wait = ctx?.wait != null ? ctx.wait + 'd' : '–';
-  const grade = ctx?.grade || '';
-  // Clean card text — no pitch, just data
-  const card = [
-    name + (grade ? '  ' + grade : ''),
-    '─'.repeat(28),
-    'Score         ' + score + '/100',
-    'Ghost rate    ' + ghost,
-    'Response rate ' + resp,
-    'Avg wait      ' + wait,
-    '─'.repeat(28),
-    url,
-  ].join('\n');
-  // Use native share on mobile (iOS share sheet), fall back to reddit submit
-  if (navigator.share) {
-    navigator.share({ text: card }).catch(() => {});
+  window.open('https://www.reddit.com/r/jobs/submit?type=image', '_blank', 'noopener');
+  _generateAndShareCard(name);
+}
+
+async function _generateAndShareCard(name) {
+  const d = (_shareCtx && _shareCtx.name?.toLowerCase() === (name||'').toLowerCase()) ? _shareCtx : null;
+  if (!d) { showToast('No data loaded yet — open the company first.'); return; }
+  showToast('Building card…');
+  await document.fonts.ready; // ensure Syne + DM Mono are rendered
+  const canvas = _drawSeenCard(name, d);
+  const blob = await new Promise(r => canvas.toBlob(r, 'image/png'));
+  const safeName = (name||'company').replace(/[^a-z0-9]/gi,'_');
+  const file = new File([blob], safeName + '_seen.png', { type: 'image/png' });
+  if (navigator.share && navigator.canShare?.({ files:[file] })) {
+    navigator.share({ files:[file] }).catch(e => { if(e.name!=='AbortError') _downloadCard(blob, file.name); });
   } else {
-    const redditUrl = 'https://www.reddit.com/r/jobs/submit?title='
-      + encodeURIComponent(name + ' hiring stats')
-      + '&text=' + encodeURIComponent(card);
-    window.open(redditUrl, '_blank', 'noopener');
+    _downloadCard(blob, file.name);
   }
-  if (navigator.clipboard) navigator.clipboard.writeText(card).catch(() => {});
+}
+
+function _downloadCard(blob, filename) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename; a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 2000);
+  showToast('Card saved! Upload it on Reddit 👆');
+}
+
+function _rr(c, x, y, w, h, r) {
+  c.beginPath();
+  if (c.roundRect) { c.roundRect(x, y, w, h, r); return; }
+  c.moveTo(x+r,y); c.lineTo(x+w-r,y); c.quadraticCurveTo(x+w,y,x+w,y+r);
+  c.lineTo(x+w,y+h-r); c.quadraticCurveTo(x+w,y+h,x+w-r,y+h);
+  c.lineTo(x+r,y+h); c.quadraticCurveTo(x,y+h,x,y+h-r);
+  c.lineTo(x,y+r); c.quadraticCurveTo(x,y,x+r,y); c.closePath();
+}
+
+function _drawSeenCard(name, d) {
+  const W = 1200, H = 675;
+  const canvas = document.createElement('canvas');
+  canvas.width = W; canvas.height = H;
+  const c = canvas.getContext('2d');
+
+  const risk = d.risk || 'warn';
+  const RC = { safe:'#10b981', warn:'#f59e0b', danger:'#ef4444' };
+  const riskColor = RC[risk] || '#6366f1';
+  const grade = d.grade || letterGrade(d.score||50);
+  const coKey = Object.keys(COS).find(k => COS[k].name.toLowerCase()===(name||'').toLowerCase()) || '';
+  const ind = COS[coKey]?.ind || '';
+
+  // ── Background ──────────────────────────────────────────────────────────────
+  const bg = c.createLinearGradient(0,0,W,H);
+  bg.addColorStop(0,'#02040a'); bg.addColorStop(1,'#080b1a');
+  c.fillStyle = bg; c.fillRect(0,0,W,H);
+
+  // Accent glows
+  const g1 = c.createRadialGradient(W-160,100,0,W-160,100,480);
+  g1.addColorStop(0,'rgba(124,58,237,0.22)'); g1.addColorStop(1,'rgba(0,0,0,0)');
+  c.fillStyle = g1; c.fillRect(0,0,W,H);
+  const g2 = c.createRadialGradient(140,H-100,0,140,H-100,380);
+  g2.addColorStop(0,'rgba(29,78,216,0.14)'); g2.addColorStop(1,'rgba(0,0,0,0)');
+  c.fillStyle = g2; c.fillRect(0,0,W,H);
+
+  // Subtle border
+  _rr(c,1,1,W-2,H-2,20); c.strokeStyle='rgba(255,255,255,0.07)'; c.lineWidth=1.5; c.stroke();
+
+  const PAD = 60;
+
+  // ── Seen eyebrow ─────────────────────────────────────────────────────────────
+  c.font = '700 15px "Syne",sans-serif';
+  c.fillStyle = 'rgba(255,255,255,0.25)';
+  c.textAlign = 'left'; c.textBaseline = 'top';
+  c.fillText('SEEN  ·  HIRING TRANSPARENCY', PAD, PAD-2);
+
+  // ── Company logo box ─────────────────────────────────────────────────────────
+  const LS = 72, LY = PAD+32;
+  _rr(c,PAD,LY,LS,LS,14); c.fillStyle='rgba(255,255,255,0.07)'; c.fill();
+  _rr(c,PAD,LY,LS,LS,14); c.strokeStyle='rgba(255,255,255,0.12)'; c.lineWidth=1; c.stroke();
+  c.font = `700 ${Math.min(30,Math.floor(LS*.44))}px "Syne",sans-serif`;
+  c.fillStyle='#ffffff'; c.textAlign='center'; c.textBaseline='middle';
+  c.fillText((name||'?')[0].toUpperCase(), PAD+LS/2, LY+LS/2);
+
+  // ── Company name + industry ──────────────────────────────────────────────────
+  c.textAlign='left'; c.textBaseline='top';
+  c.font='800 40px "Syne",sans-serif';
+  c.fillStyle='#ffffff';
+  c.fillText(name||'—', PAD+LS+20, LY+4);
+  c.font='400 16px "DM Mono",monospace';
+  c.fillStyle='rgba(255,255,255,0.4)';
+  c.fillText(ind, PAD+LS+20, LY+52);
+
+  // ── Grade ────────────────────────────────────────────────────────────────────
+  c.textAlign='right'; c.textBaseline='top';
+  c.font='800 96px "Syne",sans-serif';
+  c.fillStyle=riskColor;
+  c.fillText(grade, W-PAD, LY-10);
+  c.font='500 18px "DM Mono",monospace';
+  c.fillStyle='rgba(255,255,255,0.35)';
+  c.fillText(`${d.score??'—'}/100`, W-PAD, LY+82);
+
+  // ── Divider ──────────────────────────────────────────────────────────────────
+  const divY = LY+LS+36;
+  c.strokeStyle='rgba(255,255,255,0.08)'; c.lineWidth=1;
+  c.beginPath(); c.moveTo(PAD,divY); c.lineTo(W-PAD,divY); c.stroke();
+
+  // ── Metric tiles ─────────────────────────────────────────────────────────────
+  const metrics = [
+    { lbl:'GHOST RATE',    val: d.ghost!=null ? d.ghost+'%'  : '—', col: d.ghost>50?'#ef4444':d.ghost>25?'#f59e0b':'#10b981' },
+    { lbl:'RESPONSE RATE', val: d.resp!=null  ? d.resp+'%'   : '—', col: d.resp>60?'#10b981':d.resp>30?'#f59e0b':'#ef4444'  },
+    { lbl:'AVG WAIT',      val: d.wait!=null  ? d.wait+'d'   : '—', col: d.wait<14?'#10b981':d.wait<30?'#f59e0b':'#ef4444'  },
+    { lbl:'WASTE RISK',    val: d.waste!=null ? d.waste+'%'  : '—', col: d.waste<25?'#10b981':d.waste<55?'#f59e0b':'#ef4444' },
+  ];
+  const tileW = Math.floor((W - PAD*2 - 24) / 4);
+  const tileH = 130, tileY = divY+28;
+  metrics.forEach((m, i) => {
+    const tx = PAD + i*(tileW+8);
+    _rr(c,tx,tileY,tileW,tileH,14);
+    c.fillStyle='rgba(255,255,255,0.04)'; c.fill();
+    _rr(c,tx,tileY,tileW,tileH,14);
+    c.strokeStyle='rgba(255,255,255,0.07)'; c.lineWidth=1; c.stroke();
+    c.font='700 44px "Syne",sans-serif';
+    c.fillStyle=m.col; c.textAlign='center'; c.textBaseline='middle';
+    c.fillText(m.val, tx+tileW/2, tileY+54);
+    c.font='500 12px "DM Mono",monospace';
+    c.fillStyle='rgba(255,255,255,0.38)'; c.textBaseline='bottom';
+    c.fillText(m.lbl, tx+tileW/2, tileY+tileH-14);
+  });
+
+  // ── VIBES tags ───────────────────────────────────────────────────────────────
+  const vibes = VIBES[coKey] || VIBES[(name||'').toLowerCase()] || [];
+  const vibeY = tileY + tileH + 30;
+  if (vibes.length) {
+    c.font='400 14px "DM Mono",monospace';
+    let vx = PAD;
+    vibes.slice(0,5).forEach(v => {
+      const tw = c.measureText(v).width + 24;
+      if (vx+tw > W-PAD) return;
+      _rr(c,vx,vibeY,tw,30,7);
+      c.fillStyle='rgba(255,255,255,0.06)'; c.fill();
+      _rr(c,vx,vibeY,tw,30,7);
+      c.strokeStyle='rgba(255,255,255,0.1)'; c.lineWidth=1; c.stroke();
+      c.fillStyle='rgba(255,255,255,0.6)'; c.textAlign='center'; c.textBaseline='middle';
+      c.fillText(v, vx+tw/2, vibeY+15);
+      vx += tw+8;
+    });
+  }
+
+  // ── Bottom bar ───────────────────────────────────────────────────────────────
+  const botY = H-52;
+  c.strokeStyle='rgba(255,255,255,0.07)'; c.lineWidth=1;
+  c.beginPath(); c.moveTo(PAD,botY); c.lineTo(W-PAD,botY); c.stroke();
+  c.font='700 18px "Syne",sans-serif'; c.fillStyle='#ffffff';
+  c.textAlign='left'; c.textBaseline='middle';
+  c.fillText('Seen', PAD, botY+26);
+  c.font='400 13px "DM Mono",monospace'; c.fillStyle='rgba(255,255,255,0.3)';
+  c.fillText('seenjobs.io  ·  community hiring data', PAD+54, botY+26);
+  c.textAlign='right'; c.fillStyle='rgba(255,255,255,0.2)';
+  c.fillText('scores based on real applicant reports', W-PAD, botY+26);
+
+  return canvas;
 }
 
 function _updateMetaTags(name, sc) {
