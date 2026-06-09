@@ -562,6 +562,8 @@ nav.nav-scrolled{background:rgba(6,6,8,0.82);backdrop-filter:blur(60px) saturate
 .toast.show{transform:translateX(-50%) translateY(0);opacity:1}
 
 /* ═══ TRACKER ═══ */
+.check-card{background:rgba(245,158,11,.04);border:1px solid rgba(245,158,11,.2);border-radius:12px;padding:1rem 1.1rem;transition:opacity .2s}
+.check-card:hover{border-color:rgba(245,158,11,.38)}
 .app-card{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:1.35rem;margin-bottom:.75rem;transition:border-color .15s,box-shadow .15s;position:relative}
 .app-card:hover{border-color:var(--line2);box-shadow:0 4px 24px rgba(0,0,0,.25)}
 .app-card.ghosted{border-left:3px solid var(--red);opacity:.75}
@@ -719,7 +721,7 @@ nav.nav-scrolled{background:rgba(6,6,8,0.82);backdrop-filter:blur(60px) saturate
     <button class="ntab" onclick="go('jobs')" id="nt-jobs">Jobs</button>
     <button class="ntab" onclick="go('demand')" id="nt-demand">Demand</button>
     <button class="ntab" onclick="go('resume')" id="nt-resume">Resume AI</button>
-    <button class="ntab" onclick="go('tracker')" id="nt-tracker">Track <span class="ntab-new" id="trackerBadge" style="display:none;background:var(--amber);color:var(--ink)">0</span></button>
+    <button class="ntab" onclick="go('tracker')" id="nt-tracker">Track <span class="ntab-new" id="trackerBadge" style="display:none;background:var(--amber);color:var(--ink)">0</span><span class="ntab-new" id="trackerCheckBadge" style="display:none;background:var(--red);color:#fff;margin-left:.15rem">!</span></button>
   </div>
   <div class="nav-right" id="navRight">
     <button id="backToDashBtn" onclick="renderSeekerDash();go('seeker-dash')" style="display:none;background:none;border:1px solid var(--line2);color:var(--sub);border-radius:8px;padding:.32rem .75rem;font-family:var(--mono);font-size:.62rem;cursor:pointer;white-space:nowrap">← Dashboard</button>
@@ -1640,6 +1642,9 @@ nav.nav-scrolled{background:rgba(6,6,8,0.82);backdrop-filter:blur(60px) saturate
       <button class="btn btn-green" onclick="go('jobs')">Browse jobs →</button>
     </div>
 
+    <!-- CHECK PROMPTS — due response/interview/outcome checks -->
+    <div id="trackerCheckPrompts" style="display:none"></div>
+
     <div id="trackerList"></div>
   </div>
 </div>
@@ -2459,7 +2464,7 @@ async function runSearch(name,loc){
   L(`<span style="color:var(--green)">✓</span> Done`);await sleep(180);
 
   const realData=await realDataPromise;
-  const realSc=realData?computeScoresFromData(realData.reports,realData.jobs,realData.webScore):null;
+  const realSc=realData?computeScoresWithEvents(name,realData.reports,realData.jobs,realData.webScore):null;
   // COS is authoritative when realSc has <3 community reports (web estimate / AI data)
   const sc=locSc||(realSc?.report_count>=3?realSc:null)||(known?.sc)||realSc||{overall_score:50,risk_level:'warn',response_rate:.5,ghost_rate:.3,avg_wait_days:30,report_count:0,waste:40};
   const risk=sc.risk_level||Score.risk(sc.overall_score);
@@ -3704,7 +3709,7 @@ async function viewCompany(id,name,loc){
   // Load real scores from community reports + job listings, overwrite initial render
   (async () => {
     const realData = await loadRealCompanyData(co?.name || name, loc);
-    const rsc = realData ? computeScoresFromData(realData.reports, realData.jobs, realData.webScore) : null;
+    const rsc = realData ? computeScoresWithEvents(co?.name||name, realData.reports, realData.jobs, realData.webScore) : null;
     // Store score context so shareCompanyReport can build a rich message
     if (rsc) {
       _shareCtx = { name: co?.name||name, score: rsc.overall_score, ghost: Math.round((rsc.ghost_rate||0)*100), resp: Math.round((rsc.response_rate||0)*100), wait: rsc.avg_wait_days||null, waste: rsc.waste||0, risk: rsc.risk_level, grade: typeof letterGrade === 'function' ? letterGrade(rsc.overall_score) : '' };
@@ -4111,6 +4116,8 @@ function goToEmployerDashboard(){
   populateTicker();
   renderQuickTags();
   RecentSearches.render();
+  // Show check badge on nav if there are pending checks
+  setTimeout(updateCheckBadge, 600);
 })();
 
 // ═══════════════════════════════════════════════
@@ -4341,6 +4348,263 @@ const AppStore = {
 };
 
 // ═══════════════════════════════════════════════
+// HIRING EVENT LOOP
+// Structured first-party data collection:
+// applied → 7d response check → 14d interview check → 30d outcome check
+// Events feed company metrics and confidence scores
+// ═══════════════════════════════════════════════
+
+const CHECK_SCHEDULE = [
+  { type: 'response_check',  day: 7,  label: 'Response check',  q: 'Did they respond to your application?' },
+  { type: 'interview_check', day: 14, label: 'Interview check', q: 'Did they schedule any interviews?' },
+  { type: 'outcome_check',   day: 30, label: 'Outcome check',   q: 'What\'s the final outcome?' },
+];
+
+const EventStore = {
+  KEY: 'seen_hevents_v1',
+
+  get()  { try { return JSON.parse(localStorage.getItem(this.KEY)||'[]'); } catch(e) { return []; } },
+
+  add(evt) {
+    const e = { ...evt, id: evt.id || ('hev_' + Date.now() + '_' + Math.random().toString(36).slice(2,6)), createdAt: Date.now() };
+    const all = this.get();
+    if (!all.find(x => x.id === e.id)) { all.unshift(e); localStorage.setItem(this.KEY, JSON.stringify(all)); }
+    if (e.type === 'outcome_check' && e.data?.outcome && e.data.outcome !== 'active') this._submitAsReport(e);
+    return e;
+  },
+
+  forApp(appId)     { return this.get().filter(e => e.appId === appId); },
+  forCompany(co)    { const k = (co||'').toLowerCase(); return this.get().filter(e => (e.company||'').toLowerCase() === k); },
+  hasCheck(appId, checkType) { return this.get().some(e => e.appId === appId && e.type === checkType); },
+
+  // Returns due checks sorted by urgency (most overdue first)
+  dueChecks() {
+    const apps = AppStore.loadSync().filter(a => a.status === 'active' || a.status === 'ghosted');
+    const due = [];
+    const snoozed = this._getSnoozed();
+    for (const app of apps) {
+      const days = Math.floor((Date.now() - app.appliedAt) / 86400000);
+      for (const chk of CHECK_SCHEDULE) {
+        if (days < chk.day) continue;
+        if (this.hasCheck(app.id, chk.type)) continue;
+        const snoozeKey = app.id + ':' + chk.type;
+        if (snoozed[snoozeKey] && Date.now() < snoozed[snoozeKey]) continue;
+        due.push({ app, checkType: chk.type, day: chk.day, daysElapsed: days, label: chk.label, q: chk.q, overdue: days - chk.day });
+      }
+    }
+    return due.sort((a, b) => b.overdue - a.overdue);
+  },
+
+  snooze(appId, checkType, hours = 24) {
+    const s = this._getSnoozed();
+    s[appId + ':' + checkType] = Date.now() + hours * 3600000;
+    try { localStorage.setItem('seen_check_snooze', JSON.stringify(s)); } catch(_e) {}
+  },
+
+  _getSnoozed() { try { return JSON.parse(localStorage.getItem('seen_check_snooze')||'{}'); } catch(e) { return {}; } },
+
+  // Map outcome events → /api/reports so they feed server-side scoring
+  async _submitAsReport(evt) {
+    if (!Auth.isLoggedIn()) return;
+    const d = evt.data;
+    const outcomeMap = { offer: 'hired', rejected: 'human', ghosted: 'ghosted', withdrew: 'human', active: null };
+    const outcome = outcomeMap[d.outcome];
+    if (!outcome) return;
+    try {
+      await fetch('/api/reports', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'submit',
+          company: (evt.company||'').toLowerCase(),
+          role: evt.role || '',
+          location: evt.location || '',
+          platform: evt.platform || '',
+          outcome,
+          ghost_stage: d.ghostStage || null,
+          rounds: d.rounds || 0,
+          unpaid_work: 'na',
+          wait_days: d.daysToResponse || null,
+          report_text: d.notes || null,
+          source: 'event_loop',
+        }),
+      });
+    } catch(_e) {}
+  },
+
+  // Merge local events into a computeScoresFromData-compatible report array
+  toReports(company) {
+    const evts = this.forCompany(company).filter(e => e.type === 'outcome_check' && e.data);
+    return evts.map(e => {
+      const d = e.data;
+      const outcomeMap = { offer: 'hired', rejected: 'human', ghosted: 'ghosted', withdrew: 'human' };
+      return {
+        outcome: outcomeMap[d.outcome] || 'waiting',
+        rounds: d.rounds || 0,
+        wait_days: d.daysToResponse || 0,
+        unpaid_work: 'na',
+        _source: 'first_party',
+      };
+    }).filter(r => r.outcome !== 'waiting');
+  },
+};
+
+// ── Check prompt UI ──────────────────────────────────────────────────────────
+function renderCheckPrompts(containerId) {
+  const el = document.getElementById(containerId);
+  if (!el) return;
+  const due = EventStore.dueChecks();
+  if (!due.length) { el.innerHTML = ''; el.style.display = 'none'; return; }
+  el.style.display = 'block';
+  el.innerHTML = `
+    <div style="margin-bottom:1.5rem">
+      <div style="font-family:var(--mono);font-size:.6rem;text-transform:uppercase;letter-spacing:.09em;color:var(--amber);margin-bottom:.75rem;display:flex;align-items:center;gap:.5rem">
+        <span style="width:6px;height:6px;border-radius:50%;background:var(--amber);display:inline-block;animation:pulse 2s infinite"></span>
+        ${due.length} application check${due.length>1?'s':''} due
+      </div>
+      <div style="display:flex;flex-direction:column;gap:.65rem" id="checkPromptList">
+        ${due.map(d => _buildCheckCard(d)).join('')}
+      </div>
+    </div>`;
+}
+
+function _buildCheckCard(d) {
+  const { app, checkType, daysElapsed, label, q } = d;
+  const answers = _checkAnswers(checkType, app);
+  return `<div class="check-card" id="chk_${app.id}_${checkType}">
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:.5rem">
+      <div>
+        <div style="font-family:var(--display);font-weight:700;font-size:.85rem;color:var(--white)">${app.company}</div>
+        <div style="font-family:var(--mono);font-size:.6rem;color:var(--muted)">${app.role} · Day ${daysElapsed}</div>
+      </div>
+      <div style="display:flex;align-items:center;gap:.4rem;flex-shrink:0">
+        <span style="font-family:var(--mono);font-size:.58rem;color:var(--amber);background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.2);border-radius:4px;padding:.15rem .45rem">${label}</span>
+        <button onclick="EventStore.snooze('${app.id}','${checkType}');document.getElementById('chk_${app.id}_${checkType}')?.remove();updateCheckBadge()" style="background:none;border:none;font-family:var(--mono);font-size:.6rem;color:var(--muted);cursor:pointer;padding:.1rem .3rem" title="Remind me tomorrow">✕</button>
+      </div>
+    </div>
+    <div style="font-size:.78rem;color:var(--sub);margin-bottom:.65rem">${q}</div>
+    <div style="display:flex;flex-wrap:wrap;gap:.45rem">
+      ${answers.map(a => `<button onclick="handleCheckAnswer('${app.id}','${checkType}',${JSON.stringify(a.data).replace(/"/g,'&quot;')},this)" class="btn btn-ghost" style="font-size:.7rem;padding:.38rem .75rem;${a.highlight?'border-color:var(--green);color:var(--green)':''}">${a.label}</button>`).join('')}
+    </div>
+  </div>`;
+}
+
+function _checkAnswers(checkType, app) {
+  const days = Math.floor((Date.now() - app.appliedAt) / 86400000);
+  if (checkType === 'response_check') return [
+    { label: '✅ Got a response', data: { got_response: true, response_type: 'unknown', days_to_response: days }, highlight: true },
+    { label: '📅 Interview scheduled', data: { got_response: true, response_type: 'interview', days_to_response: days }, highlight: true },
+    { label: '❌ Rejected', data: { got_response: true, response_type: 'rejection', days_to_response: days } },
+    { label: '👻 Ghosted', data: { got_response: false, response_type: 'ghosted', days_to_response: days } },
+  ];
+  if (checkType === 'interview_check') return [
+    { label: '✅ Had an interview', data: { had_interview: true, interview_type: 'interview' }, highlight: true },
+    { label: '📞 Phone screen only', data: { had_interview: true, interview_type: 'phone_screen' }, highlight: true },
+    { label: '❌ Rejected', data: { had_interview: false, ended: true, outcome: 'rejected' } },
+    { label: '👻 Still no response', data: { had_interview: false, ended: false } },
+  ];
+  if (checkType === 'outcome_check') return [
+    { label: '🎉 Got an offer!', data: { outcome: 'offer' }, highlight: true },
+    { label: '❌ Rejected', data: { outcome: 'rejected' } },
+    { label: '👻 Ghosted (never heard back)', data: { outcome: 'ghosted' } },
+    { label: '🔄 Still in process', data: { outcome: 'active' } },
+    { label: '↩ I withdrew', data: { outcome: 'withdrew' } },
+  ];
+  return [];
+}
+
+async function handleCheckAnswer(appId, checkType, data, btn) {
+  // Dim the card to prevent double-submits
+  const card = document.getElementById('chk_' + appId + '_' + checkType);
+  if (card) { card.style.opacity = '.5'; card.style.pointerEvents = 'none'; }
+
+  // Save the event
+  const app = AppStore.loadSync().find(a => a.id === appId);
+  EventStore.add({
+    type: checkType,
+    appId,
+    company: app?.company || '',
+    role: app?.role || '',
+    location: app?.location || '',
+    platform: app?.platform || '',
+    data,
+  });
+
+  // Update AppStore status based on outcome answers
+  if (checkType === 'response_check') {
+    if (data.response_type === 'rejection') await AppStore.update(appId, { status: 'rejected', stage: 'Rejected' });
+    if (data.response_type === 'interview') await AppStore.update(appId, { stage: 'Interview' });
+    if (data.response_type === 'ghosted') await AppStore.update(appId, { status: 'ghosted', stage: 'Ghosted' });
+  }
+  if (checkType === 'interview_check') {
+    if (data.ended && data.outcome === 'rejected') await AppStore.update(appId, { status: 'rejected', stage: 'Rejected' });
+    if (data.had_interview) await AppStore.update(appId, { stage: data.interview_type === 'phone_screen' ? 'Phone Screen' : 'Interview' });
+  }
+  if (checkType === 'outcome_check') {
+    const stageMap = { offer: 'Offer', rejected: 'Rejected', ghosted: 'Ghosted', withdrew: 'Withdrew' };
+    const statusMap = { offer: 'hired', rejected: 'rejected', ghosted: 'ghosted', withdrew: 'rejected', active: 'active' };
+    const changes = { status: statusMap[data.outcome] || 'active' };
+    if (stageMap[data.outcome]) changes.stage = stageMap[data.outcome];
+    await AppStore.update(appId, changes);
+    // Offer: ask for rounds
+    if (data.outcome === 'offer') setTimeout(() => _showRoundsPrompt(appId, checkType), 300);
+  }
+
+  // Remove card from UI, refresh
+  setTimeout(() => {
+    if (card) card.remove();
+    updateCheckBadge();
+    renderTracker().catch(() => {});
+  }, 350);
+}
+
+function _showRoundsPrompt(appId, checkType) {
+  const app = AppStore.loadSync().find(a => a.id === appId);
+  if (!app) return;
+  // Quick inline toast-style prompt for rounds
+  showToast(`🎉 Congrats! How many rounds did it take? (helps improve data)`);
+}
+
+function updateCheckBadge() {
+  const due = EventStore.dueChecks();
+  const badge = document.getElementById('trackerBadge');
+  const checkBadge = document.getElementById('trackerCheckBadge');
+  if (badge) {
+    const active = AppStore.loadSync().filter(a => a.status === 'active').length;
+    badge.textContent = active;
+    badge.style.display = active > 0 ? 'inline' : 'none';
+  }
+  if (checkBadge) {
+    checkBadge.textContent = due.length;
+    checkBadge.style.display = due.length > 0 ? 'inline' : 'none';
+  }
+}
+
+// ── Auto-event on AppStore.add ───────────────────────────────────────────────
+// Wrap AppStore.add to always emit an 'applied' event
+const _origAdd = AppStore.add.bind(AppStore);
+AppStore.add = async function(app) {
+  const result = await _origAdd(app);
+  const id = app.id || AppStore.loadSync().find(a => a.company === app.company && a.role === app.role)?.id;
+  if (id && !EventStore.hasCheck(id, 'applied')) {
+    EventStore.add({ type: 'applied', appId: id, company: app.company, role: app.role, location: app.location||'', platform: app.platform||'', data: { ts: app.appliedAt || Date.now() } });
+  }
+  return result;
+};
+
+// ── Merge first-party events into company score computation ─────────────────
+function computeScoresWithEvents(company, dbReports, jobs, webScore) {
+  const localReports = EventStore.toReports(company);
+  const allReports = [...(dbReports||[]), ...localReports];
+  const sc = computeScoresFromData(allReports, jobs||[], webScore);
+  if (sc && localReports.length) {
+    sc.first_party_count = localReports.length;
+    sc.data_quality = allReports.length >= 10 ? 'strong' : allReports.length >= 5 ? 'moderate' : 'limited';
+  }
+  return sc;
+}
+
+// ═══════════════════════════════════════════════
 // APPLICATION TIMELINE BUILDER
 // Visual day-progress bar for tracker cards
 // ═══════════════════════════════════════════════
@@ -4523,6 +4787,10 @@ async function renderTracker() {
   } else if (pipeEl) {
     pipeEl.innerHTML = '';
   }
+
+  // Check prompts — response/interview/outcome checks due
+  renderCheckPrompts('trackerCheckPrompts');
+  updateCheckBadge();
 
   // Full application list
   if (listEl) {
@@ -5276,6 +5544,8 @@ async function renderSeekerDash(){
     const personalRR = apps.length ? Math.round((apps.filter(a => a.status==='hired'||a.status==='rejected').length / apps.length) * 100) : null;
     const overdue = active.filter(a => { const d=Math.floor((Date.now()-a.appliedAt)/86400000); const co=Object.values(COS).find(c=>c.name.toLowerCase()===a.company.toLowerCase()); return d>(co?.sc?.avg_wait_days||30)*1.1; });
     const parts = [];
+    const dueChecks = EventStore.dueChecks();
+    if (dueChecks.length) parts.push(`<span style="color:var(--amber);cursor:pointer" onclick="go('tracker')">${dueChecks.length} check${dueChecks.length>1?'s':''} due →</span>`);
     if (overdue.length) parts.push(`<span style="color:var(--red)">⚠ ${overdue.length} app${overdue.length>1?'s':''} past response window</span>`);
     if (avgRT) parts.push(`avg response: ${avgRT}d`);
     if (personalRR !== null && resolved.length >= 2) parts.push(`your response rate: ${personalRR}%`);
