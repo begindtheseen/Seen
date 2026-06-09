@@ -1626,21 +1626,6 @@ nav.nav-scrolled{background:rgba(6,6,8,0.82);backdrop-filter:blur(60px) saturate
       </div>
     </div>
 
-    <!-- Job preferences -->
-    <div style="background:var(--surface);border:1px solid var(--line);border-radius:14px;overflow:hidden;margin-bottom:1.5rem">
-      <div style="padding:.85rem 1.25rem;border-bottom:1px solid var(--line);font-family:var(--mono);font-size:.62rem;color:var(--dim);text-transform:uppercase;letter-spacing:.08em">Job preferences</div>
-      <div style="padding:1.25rem">
-        <label style="font-family:var(--mono);font-size:.6rem;text-transform:uppercase;letter-spacing:.08em;color:var(--dim);display:block;margin-bottom:.4rem">Experience level</label>
-        <select id="profExperience" style="width:100%;background:var(--raised);border:1.5px solid var(--line2);border-radius:8px;padding:.7rem 1rem;color:var(--white);font-family:var(--body);font-size:.875rem;outline:none;appearance:none;cursor:pointer;box-sizing:border-box" onfocus="this.style.borderColor='var(--green)'" onblur="this.style.borderColor='var(--line2)'">
-          <option value="">— Select level —</option>
-          <option value="entry">🌱 Entry level (0–2 yrs)</option>
-          <option value="mid">📈 Mid level (3–6 yrs)</option>
-          <option value="senior">⭐ Senior (7+ yrs)</option>
-        </select>
-        <div style="font-family:var(--mono);font-size:.6rem;color:var(--muted);margin-top:.5rem">Use the search filter on the Jobs page to filter by industry.</div>
-      </div>
-    </div>
-
     <!-- Account & Security -->
     <div style="background:var(--surface);border:1px solid var(--line);border-radius:14px;overflow:hidden;margin-bottom:1.5rem">
       <div style="padding:.85rem 1.25rem;border-bottom:1px solid var(--line);font-family:var(--mono);font-size:.62rem;color:var(--dim);text-transform:uppercase;letter-spacing:.08em">Account &amp; Security</div>
@@ -8753,14 +8738,33 @@ function _handleSharedLink(){
   if (!sp) {
     try {
       const saved = JSON.parse(localStorage.getItem('seen_last_page') || '{}');
-      // Only restore if within 2 hours
-      if (saved.page && saved.ts && (Date.now() - saved.ts) < 2 * 60 * 60 * 1000) sp = saved.page;
+      // Restore within 8 hours — covers typical browsing session gaps
+      if (saved.page && saved.ts && (Date.now() - saved.ts) < 8 * 60 * 60 * 1000) sp = saved.page;
     } catch(_e) {}
   }
   if(sp&&sp!=='company'&&sp!=='landing'){
     setTimeout(()=>go(sp),150);
   }
 }
+
+// ── IMMEDIATE PRE-AUTH RESTORE ──
+// Safari discards backgrounded tabs — on reload, auth init takes 0.5-2s during which
+// the landing page shows. Fix: if localStorage has a recent session token AND a saved page,
+// immediately swap to that page before the network round-trip completes.
+(function _immediateRestore() {
+  try {
+    // Supabase stores its session token in localStorage under a key containing "supabase"
+    const hasSession = Object.keys(localStorage).some(k => k.includes('supabase') && k.includes('auth'));
+    if (!hasSession) return;
+    const saved = JSON.parse(localStorage.getItem('seen_last_page') || '{}');
+    if (!saved.page || !saved.ts || (Date.now() - saved.ts) > 7200000) return;
+    if (saved.page === 'landing' || saved.page === 'login') return;
+    // Swap page immediately — no animation, no data yet, just shows the shell
+    document.querySelectorAll('.page, .page-full').forEach(p => p.classList.remove('active'));
+    const el = document.getElementById('page-' + saved.page);
+    if (el) { el.classList.add('active'); window.scrollTo(0, 0); }
+  } catch(e) {}
+})();
 
 // ── INIT ──
 updateNav();
