@@ -35,21 +35,28 @@ async function fetchHNPosts() {
 
   const cutoff = Math.floor((now - 365 * 24 * 3600 * 1000) / 1000);
 
-  // Tight, first-person queries — "story" tag excludes Show HN / Ask HN product posts
+  // Each entry: [query, fallback outcome if classify() can't determine one]
+  // The fallback ensures posts aren't dropped just because story_text is empty
   const queries = [
-    '"got ghosted" job recruiter',
-    '"ghosted after" interview application',
-    '"rejected after" interview rounds job',
-    '"got the offer" job hired',
-    '"never heard back" job application',
-    '"job offer" accepted "start date"',
+    ['"got ghosted" job recruiter',           'ghosted'],
+    ['"ghosted after" interview application', 'ghosted'],
+    ['"never heard back" job application',    'ghosted'],
+    ['"no response" job application recruiter','ghosted'],
+    ['"rejected after" interview rounds',     'autoreject'],
+    ['"not moving forward" job application',  'autoreject'],
+    ['"unfortunately" "not selected" interview','autoreject'],
+    ['"got the offer" job hired',             'hired'],
+    ['"accepted the offer" job',              'hired'],
+    ['"signed the offer" job',                'hired'],
+    ['"phone screen" interview experience job','human'],
+    ['"final round" interview job',           'human'],
   ];
 
-  const fetchOne = q => {
+  const fetchOne = ([q]) => {
     const ctrl = new AbortController();
     const tid = setTimeout(() => ctrl.abort(), 7000);
     return fetch(
-      `https://hn.algolia.com/api/v1/search?query=${encodeURIComponent(q)}&tags=story&hitsPerPage=30&numericFilters=created_at_i%3E${cutoff}`,
+      `https://hn.algolia.com/api/v1/search?query=${encodeURIComponent(q)}&tags=story&hitsPerPage=40&numericFilters=created_at_i%3E${cutoff}`,
       { signal: ctrl.signal }
     )
       .then(r => { clearTimeout(tid); return r.ok ? r.json() : null; })
@@ -66,46 +73,45 @@ async function fetchHNPosts() {
     console.error('FEED: HN fetch timed out');
     return _hnCache || [];
   }
-  const results = raceResult;
 
   const seen = new Set();
-  const posts = results.flat().filter(h => {
-    if (!h || seen.has(h.objectID)) return false;
-    seen.add(h.objectID);
-    const clean = stripPrefix(h.title || '');
-    // Must be a real story with some substance
-    if (clean.length < 20) return false;
-    // Hard reject product promotions
-    if (isPromo(clean, h.story_text || '')) return false;
-    return true;
-  }).map(h => {
-    const cleanTitle = stripPrefix(h.title);
-    const oc = classify(cleanTitle, h.story_text || '');
-    if (!oc) return null;
-    const body = h.story_text
-      ? h.story_text
-          .replace(/<[^>]+>/g, ' ')
-          .replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#x27;/g, "'")
-          .replace(/\s+/g, ' ')
-          .trim()
-          .slice(0, 450)
-      : '';
-    return {
-      id: `hn-${h.objectID}`,
-      source: 'hn',
-      company_name: extractCo(cleanTitle),
-      role: cleanTitle.slice(0, 120),
-      outcome: oc,
-      ghost_stage: null,
-      rounds: 0,
-      report_text: body,
-      platform: 'Hacker News',
-      experience_level: '',
-      created_at: h.created_at,
-      url: h.url || `https://news.ycombinator.com/item?id=${h.objectID}`,
-      subreddit: null,
-    };
-  }).filter(Boolean);
+  const posts = raceResult.flatMap((hits, i) => {
+    const fallbackOc = queries[i][1];
+    return hits.filter(h => {
+      if (!h || seen.has(h.objectID)) return false;
+      seen.add(h.objectID);
+      const clean = stripPrefix(h.title || '');
+      if (clean.length < 20) return false;
+      if (isPromo(clean, h.story_text || '')) return false;
+      return true;
+    }).map(h => {
+      const cleanTitle = stripPrefix(h.title);
+      const oc = classify(cleanTitle, h.story_text || '') || fallbackOc;
+      const body = h.story_text
+        ? h.story_text
+            .replace(/<[^>]+>/g, ' ')
+            .replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#x27;/g, "'")
+            .replace(/\s+/g, ' ')
+            .trim()
+            .slice(0, 450)
+        : '';
+      return {
+        id: `hn-${h.objectID}`,
+        source: 'hn',
+        company_name: extractCo(cleanTitle),
+        role: cleanTitle.slice(0, 120),
+        outcome: oc,
+        ghost_stage: null,
+        rounds: 0,
+        report_text: body,
+        platform: 'Hacker News',
+        experience_level: '',
+        created_at: h.created_at,
+        url: h.url || `https://news.ycombinator.com/item?id=${h.objectID}`,
+        subreddit: null,
+      };
+    });
+  });
 
   console.log(`FEED: HN fetched ${posts.length} classified posts`);
   _hnCache = posts;
