@@ -1107,12 +1107,17 @@ nav.nav-scrolled{background:rgba(6,6,8,0.82);backdrop-filter:blur(60px) saturate
           <div class="hstat-div"></div>
           <div>
             <span class="hstat-n">124K+</span>
-            <div class="hstat-l">Community reports</div>
+            <div class="hstat-l">Real reports</div>
           </div>
           <div class="hstat-div"></div>
           <div>
             <span class="hstat-n" style="color:var(--red)">47%</span>
             <div class="hstat-l">Avg ghost rate</div>
+          </div>
+          <div class="hstat-div"></div>
+          <div>
+            <span class="hstat-n" style="color:var(--green)">Free</span>
+            <div class="hstat-l">Forever</div>
           </div>
         </div>
 
@@ -1382,9 +1387,14 @@ nav.nav-scrolled{background:rgba(6,6,8,0.82);backdrop-filter:blur(60px) saturate
     <div style="background:var(--surface);border:1px solid var(--line);border-radius:12px;overflow:hidden;margin-bottom:1.25rem">
       <div style="padding:.85rem 1.1rem;border-bottom:1px solid var(--line);font-family:var(--display);font-size:.82rem;font-weight:700;color:var(--white);display:flex;align-items:center;justify-content:space-between">
         Alerts
-        <span id="dashAlertCount" style="font-family:var(--mono);font-size:.58rem;background:var(--rdim);color:var(--red);border:1px solid #ff3b5c28;border-radius:100px;padding:.1rem .45rem">0</span>
+        <span id="dashAlertCount" style="font-family:var(--mono);font-size:.58rem;background:var(--rdim);color:var(--red);border:1px solid #ff3b5c28;border-radius:100px;padding:.1rem .45rem;display:none">0</span>
       </div>
       <div id="dashAlerts"><div style="padding:.85rem 1.1rem;font-family:var(--mono);font-size:.65rem;color:var(--muted);text-align:center">All clear ✓</div></div>
+      <!-- Pro ghost alert upsell — always shown for non-Pro users -->
+      <div style="padding:.65rem 1.1rem;border-top:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;gap:.75rem;background:rgba(239,68,68,.03)">
+        <div style="font-family:var(--mono);font-size:.58rem;color:var(--muted);line-height:1.55">👻 Get <strong style="color:var(--text)">ghost surge email alerts</strong> before you apply</div>
+        <button onclick="showProModal()" style="font-family:var(--mono);font-size:.58rem;color:var(--white);background:rgba(239,68,68,.18);border:1px solid rgba(239,68,68,.3);border-radius:100px;padding:.22rem .65rem;cursor:pointer;white-space:nowrap;transition:all .15s;flex-shrink:0" onmouseover="this.style.background='rgba(239,68,68,.32)'" onmouseout="this.style.background='rgba(239,68,68,.18)'">Pro →</button>
+      </div>
     </div>
 
     <!-- Quick actions — horizontal scroll on mobile -->
@@ -7312,6 +7322,32 @@ async function renderSeekerDash(){
         const days=Math.floor((Date.now()-a.appliedAt)/86400000);
         return`<div style="padding:.65rem 1.1rem;border-bottom:1px solid var(--line);display:flex;align-items:flex-start;gap:.55rem;cursor:pointer" onclick="go('tracker')"><span style="color:var(--amber);font-size:.75rem;flex-shrink:0">⚠</span><div><div style="font-size:.75rem;font-weight:500;color:var(--text);margin-bottom:.1rem">${a.company} — ${a.role}</div><div style="font-family:var(--mono);font-size:.6rem;color:var(--muted)">${days}d no update · past expected window</div></div></div>`;
       }).join('');
+  }
+  // Ghost surge check for tracked companies (async — appends to alerts)
+  if(db&&alertsEl&&apps.length){
+    const trackedCos=[...new Set(apps.filter(a=>a.status!=='ghosted').map(a=>a.company).filter(Boolean))].slice(0,4);
+    if(trackedCos.length){
+      const cutoff=new Date(Date.now()-7*24*60*60*1000).toISOString();
+      db.from('reports').select('company_name').eq('outcome','ghosted').gte('created_at',cutoff).limit(300)
+        .then(({data})=>{
+          if(!data||!data.length)return;
+          const counts={};
+          data.forEach(r=>{if(r.company_name)counts[r.company_name.toLowerCase()]=(counts[r.company_name.toLowerCase()]||0)+1;});
+          const surgers=trackedCos.filter(co=>{
+            const ck=co.toLowerCase();
+            return Object.entries(counts).some(([k,c])=>(k.includes(ck)||ck.includes(k))&&c>=3);
+          });
+          if(!surgers.length)return;
+          // Prepend ghost surge alerts to alert section
+          const surgeHTML=surgers.map(co=>`<div style="padding:.65rem 1.1rem;border-bottom:1px solid var(--line);display:flex;align-items:flex-start;gap:.55rem;cursor:pointer;background:rgba(239,68,68,.04)" onclick="openModal('${co.replace(/'/g,"\\'")}','')"><span style="font-size:.75rem;flex-shrink:0">👻</span><div><div style="font-size:.75rem;font-weight:500;color:var(--red);margin-bottom:.1rem">${co} — ghost surge</div><div style="font-family:var(--mono);font-size:.6rem;color:var(--muted)">3+ ghost reports this week · check before you follow up</div></div></div>`).join('');
+          const prev=alertsEl.innerHTML.includes('All clear')?'':alertsEl.innerHTML;
+          alertsEl.innerHTML=surgeHTML+prev;
+          if(alertCount){
+            const total=(parseInt(alertCount.textContent)||0)+surgers.length;
+            alertCount.textContent=total;alertCount.style.display='inline';
+          }
+        }).catch(()=>{});
+    }
   }
 
   // Saved jobs
