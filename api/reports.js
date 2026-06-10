@@ -23,24 +23,37 @@ async function fetchHNPosts() {
     return m?.[1]?.trim() || '';
   };
 
-  // Multiple queries to cover all outcome types
+  const cutoff = Math.floor((now - 365 * 24 * 3600 * 1000) / 1000);
   const queries = [
     'ghosted job interview hiring',
     'rejected job application interview',
     'job offer accepted hired',
     'job interview experience technical',
-    'recruiting ghosted no response',
-    'job search application rejected offer',
   ];
 
-  const results = await Promise.all(queries.map(q =>
-    fetch(`https://hn.algolia.com/api/v1/search?query=${encodeURIComponent(q)}&tags=story&hitsPerPage=50&numericFilters=created_at_i%3E${Math.floor((now - 365*24*3600*1000)/1000)}`, {
-      signal: AbortSignal.timeout(8000),
-    })
-    .then(r => r.ok ? r.json() : null)
-    .then(d => d?.hits || [])
-    .catch(() => [])
-  ));
+  const fetchOne = q => {
+    const ctrl = new AbortController();
+    const tid = setTimeout(() => ctrl.abort(), 7000);
+    return fetch(
+      `https://hn.algolia.com/api/v1/search?query=${encodeURIComponent(q)}&tags=story&hitsPerPage=50&numericFilters=created_at_i%3E${cutoff}`,
+      { signal: ctrl.signal }
+    )
+      .then(r => { clearTimeout(tid); return r.ok ? r.json() : null; })
+      .then(d => d?.hits || [])
+      .catch(() => { clearTimeout(tid); return []; });
+  };
+
+  // Hard cap: if all HN fetches take more than 10s combined, bail out
+  const raceResult = await Promise.race([
+    Promise.all(queries.map(fetchOne)),
+    new Promise(resolve => setTimeout(() => resolve(null), 10000)),
+  ]).catch(() => null);
+
+  if (!raceResult) {
+    console.error('FEED: HN fetch timed out');
+    return _hnCache || [];
+  }
+  const results = raceResult;
 
   const seen = new Set();
   const posts = results.flat().filter(h => {
@@ -67,6 +80,7 @@ async function fetchHNPosts() {
     };
   }).filter(Boolean);
 
+  console.log(`FEED: HN fetched ${posts.length} classified posts`);
   _hnCache = posts;
   _hnCacheTime = now;
   return posts;
