@@ -41,31 +41,131 @@ export default async function handler(req, res) {
     return res.json({ ok: locResult.valid && modResult.ok, issues, corrected_experience: modResult.corrected_experience || null, normalized_location: locResult.normalized || mLoc });
   }
 
-  // ── Community feed (recent reports, no company filter) ──────────────────────
+  // ── Community feed — Seen reports + Reddit aggregation ──────────────────────
   if (body.action === 'feed') {
     const { outcome, offset = 0, limit = 20 } = body;
     const safeLimit = Math.min(50, Math.max(1, parseInt(limit) || 20));
     const safeOffset = Math.max(0, parseInt(offset) || 0);
+
     const outcomeMap = {
-      ghosted: ['ghosted'],
-      rejected: ['autoreject', 'rejected'],
+      ghosted:      ['ghosted'],
+      rejected:     ['autoreject', 'rejected'],
       interviewing: ['human', 'interview', 'interviewing'],
-      hired: ['hired', 'offer'],
+      hired:        ['hired', 'offer'],
     };
     const outcomes = outcomeMap[outcome] || null;
-    let url = `${SUPABASE_URL}/rest/v1/reports`
-      + `?select=id,role,outcome,ghost_stage,rounds,report_text,platform,created_at,experience_level,company_name`
-      + `&order=created_at.desc`
-      + `&limit=${safeLimit}&offset=${safeOffset}`;
-    if (outcomes) url += `&outcome=in.(${outcomes.join(',')})`;
-    try {
+
+    // ── Fetch Seen reports ──────────────────────────────────────────────────
+    const seenPromise = (async () => {
+      let url = `${SUPABASE_URL}/rest/v1/reports`
+        + `?select=id,role,outcome,ghost_stage,rounds,report_text,platform,created_at,experience_level,company_name`
+        + `&order=created_at.desc&limit=100`;
+      if (outcomes) url += `&outcome=in.(${outcomes.join(',')})`;
       const r = await fetch(url, { headers: hdrsBase });
-      if (!r.ok) return res.status(200).json({ ok: true, reports: [] });
+      if (!r.ok) return [];
       const rows = await r.json();
-      return res.status(200).json({ ok: true, reports: rows || [] });
-    } catch(e) {
-      return res.status(200).json({ ok: true, reports: [] });
-    }
+      return (rows || []).map(r => ({
+        id: `seen-${r.id}`,
+        source: 'seen',
+        company_name: r.company_name || '',
+        role: r.role || '',
+        outcome: r.outcome || 'waiting',
+        ghost_stage: r.ghost_stage || null,
+        rounds: r.rounds || 0,
+        report_text: r.report_text || '',
+        platform: r.platform || '',
+        experience_level: r.experience_level || '',
+        created_at: r.created_at,
+        url: null,
+        subreddit: null,
+      }));
+    })().catch(() => []);
+
+    // ── Fetch Reddit posts ──────────────────────────────────────────────────
+    // Subreddits: recruitinghell (ghosting/rejections), cscareerquestions (tech), jobs (general)
+    const redditHeaders = {
+      'User-Agent': 'Seen/1.0 (seenjobs.io; community feed aggregator)',
+      'Accept': 'application/json',
+    };
+
+    // Query terms matched to outcome filter
+    const redditQuery = {
+      ghosted:      'ghosted OR "no response" OR "never heard back" OR "complete silence"',
+      rejected:     'rejected OR rejection OR "turned down" OR "didn\'t get"',
+      interviewing: 'interview OR "phone screen" OR "technical round" OR "got an interview"',
+      hired:        'offer OR hired OR "got the job" OR "accepted offer" OR "start date"',
+      all:          'ghosted OR rejected OR interview OR offer OR hired OR "job application"',
+    }[outcome || 'all'];
+
+    const subs = outcome === 'ghosted' || outcome === 'rejected'
+      ? ['recruitinghell', 'jobs', 'cscareerquestions']
+      : outcome === 'interviewing' || outcome === 'hired'
+      ? ['cscareerquestions', 'interviews', 'jobs']
+      : ['recruitinghell', 'cscareerquestions', 'jobs'];
+
+    const redditPromises = subs.map(sub =>
+      fetch(
+        `https://www.reddit.com/r/${sub}/search.json?q=${encodeURIComponent(redditQuery)}&sort=new&restrict_sr=1&limit=50&t=month`,
+        { headers: redditHeaders, signal: AbortSignal.timeout(8000) }
+      )
+      .then(r => r.ok ? r.json() : null)
+      .then(d => (d?.data?.children || []).map(c => c.data).filter(p => p && !p.stickied && p.selftext && p.selftext.length > 80))
+      .catch(() => [])
+    );
+
+    const classifyOutcome = (title, text) => {
+      const t = (title + ' ' + text).toLowerCase();
+      if (/ghosted|no response|never heard|complete silence|heard nothing|disappeared|radio silence/.test(t)) return 'ghosted';
+      if (/rejected|rejection|turned down|didn.t get|not moving forward|not selected|position.*filled/.test(t)) return 'autoreject';
+      if (/got.*offer|accepted.*offer|start date|hired|got the job|signed|onboarding/.test(t)) return 'hired';
+      if (/interview|phone screen|technical|coding round|final round|offer stage/.test(t)) return 'human';
+      return null;
+    };
+
+    const extractCompany = (title, text) => {
+      // Look for "at [Company]" or "[Company] ghosted" patterns
+      const patterns = [
+        /(?:at|from|with|by)\s+([A-Z][A-Za-z0-9&\s.,']+?)(?:\s+(?:ghosted|rejected|interview|offer|hiring|HR|recruiter|job|position|role))/,
+        /^([A-Z][A-Za-z0-9&\s.,]+?)\s+(?:ghosted|rejected|offered|hired)/,
+      ];
+      for (const p of patterns) {
+        const m = title.match(p);
+        if (m?.[1] && m[1].trim().length < 60) return m[1].trim();
+      }
+      return '';
+    };
+
+    const [seenReports, ...redditResults] = await Promise.all([seenPromise, ...redditPromises]);
+
+    const redditPosts = redditResults.flat().map(p => {
+      const detectedOutcome = classifyOutcome(p.title, p.selftext);
+      if (outcomes && detectedOutcome && !outcomes.includes(detectedOutcome)) return null;
+      if (!detectedOutcome && outcomes) return null;
+      return {
+        id: `reddit-${p.id}`,
+        source: 'reddit',
+        company_name: extractCompany(p.title, p.selftext),
+        role: '',
+        outcome: detectedOutcome || 'waiting',
+        ghost_stage: null,
+        rounds: 0,
+        report_text: p.title + (p.selftext ? '\n\n' + p.selftext.slice(0, 400) : ''),
+        platform: `r/${p.subreddit}`,
+        experience_level: '',
+        created_at: new Date(p.created_utc * 1000).toISOString(),
+        url: `https://reddit.com${p.permalink}`,
+        subreddit: p.subreddit,
+        ups: p.ups || 0,
+      };
+    }).filter(Boolean);
+
+    // Merge: interleave Seen + Reddit, sorted by date, then paginate
+    const all = [...seenReports, ...redditPosts].sort(
+      (a, b) => new Date(b.created_at) - new Date(a.created_at)
+    );
+    const page = all.slice(safeOffset, safeOffset + safeLimit);
+
+    return res.status(200).json({ ok: true, reports: page, total: all.length });
   }
 
   // ── Submit report (merged from submit-report.js) ────────────────────────────

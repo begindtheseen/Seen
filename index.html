@@ -7507,26 +7507,37 @@ function renderFeedCards(listEl, rows, replace = true) {
 
   const html = rows.map(r => {
     const oc = r.outcome || 'waiting';
-    const co = (r.company_name || 'Unknown company').replace(/</g,'&lt;');
-    const role = (r.role || 'Unknown role').replace(/</g,'&lt;');
+    const co = (r.company_name || '').replace(/</g,'&lt;');
+    const role = (r.role || '').replace(/</g,'&lt;');
     const text = r.report_text ? r.report_text.replace(/</g,'&lt;').replace(/>/g,'&gt;') : '';
     const stage = r.ghost_stage ? `<span style="color:var(--muted)"> · ghosted at ${r.ghost_stage.replace(/</g,'&lt;')}</span>` : '';
     const rounds = r.rounds ? `${r.rounds} round${r.rounds!==1?'s':''} · ` : '';
-    const platform = r.platform && r.platform !== 'Select...' ? `via ${r.platform.replace(/</g,'&lt;')} · ` : '';
-    return `<div class="feed-card ${outcomeClass[oc]||''}" onclick="openCompanySearch();document.getElementById('coSearchInp').value='${co.replace(/'/g,"\\'")}';searchCompanies('${co.replace(/'/g,"\\'")}')">
+    const isReddit = r.source === 'reddit';
+    const sourceBadge = isReddit
+      ? `<span style="font-family:var(--mono);font-size:.52rem;color:var(--muted);background:rgba(255,69,0,0.1);border:1px solid rgba(255,69,0,0.2);border-radius:4px;padding:.1rem .4rem">r/${r.subreddit||'reddit'}</span>`
+      : `<span style="font-family:var(--mono);font-size:.52rem;color:var(--blue);background:rgba(59,130,246,0.1);border:1px solid rgba(59,130,246,0.2);border-radius:4px;padding:.1rem .4rem">Seen</span>`;
+    const clickAction = isReddit && r.url
+      ? `window.open('${r.url}','_blank')`
+      : co ? `openCompanySearch();document.getElementById('coSearchInp').value='${co.replace(/'/g,"\\'")}';searchCompanies('${co.replace(/'/g,"\\'")}')` : '';
+    const displayText = isReddit ? text.slice(0, 280) : text.slice(0, 220);
+    return `<div class="feed-card ${outcomeClass[oc]||''}" onclick="${clickAction}" style="${isReddit?'':''}">
       <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:.75rem;margin-bottom:.3rem">
-        <div>
-          <div class="feed-co">${co}</div>
-          <div class="feed-role">${role}${stage}</div>
+        <div style="flex:1;min-width:0">
+          ${co ? `<div class="feed-co">${co}</div>` : ''}
+          ${role ? `<div class="feed-role">${role}${stage}</div>` : ''}
         </div>
         <span class="vibe ${oc==='ghosted'?'v-r':oc==='hired'||oc==='offer'?'v-g':oc==='autoreject'||oc==='rejected'?'v-y':'v-b'}" style="white-space:nowrap;flex-shrink:0">${outcomeLabel[oc]||oc}</span>
       </div>
-      ${text?`<div class="feed-body">"${text.slice(0,220)}${text.length>220?'…':''}"</div>`:''}
-      <div class="feed-meta">${platform}${rounds}${r.experience_level||''}${r.experience_level?` · `:''}${ago(r.created_at)}</div>
+      ${displayText?`<div class="feed-body">${isReddit?'':'"'}${displayText}${text.length>displayText.length?'…':''}${isReddit?'':'"'}</div>`:''}
+      <div class="feed-meta" style="justify-content:space-between">
+        <span>${rounds}${r.experience_level||''}${r.experience_level?' · ':''}${ago(r.created_at)}</span>
+        <span style="display:flex;align-items:center;gap:.35rem">${sourceBadge}${isReddit?`<span style="font-family:var(--mono);font-size:.52rem;color:var(--muted)">↗</span>`:''}</span>
+      </div>
     </div>`;
   }).join('');
 
-  if (replace) listEl.innerHTML = html; else listEl.insertAdjacentHTML('beforeend', html);
+  if (replace) listEl.innerHTML = html || '<div style="text-align:center;padding:2rem;font-family:var(--mono);font-size:.65rem;color:var(--muted)">No results for this filter.</div>';
+  else listEl.insertAdjacentHTML('beforeend', html);
 }
 
 function setFeedFilter(filter, btn) {
