@@ -2076,10 +2076,15 @@ nav.nav-scrolled{background:rgba(6,6,8,0.82);backdrop-filter:blur(60px) saturate
   <div style="max-width:780px;margin:0 auto">
     <div class="eyebrow">Legal</div>
     <h1 style="font-family:var(--display);font-size:2.2rem;font-weight:800;color:var(--white);letter-spacing:-.035em;margin-bottom:.5rem">Terms, Privacy & Disclaimers</h1>
-    <p style="color:var(--sub);font-size:.875rem;font-weight:300;margin-bottom:.75rem">Last updated: May 2025. By using Seen, you agree to these terms.</p>
+    <p style="color:var(--sub);font-size:.875rem;font-weight:300;margin-bottom:.75rem">Last updated: June 2025. By using Seen, you agree to these terms.</p>
 
-    <div style="background:#ffb83015;border:1px solid #ffb83025;border-radius:10px;padding:1rem 1.25rem;font-family:var(--mono);font-size:.72rem;color:var(--amber);margin-bottom:2.5rem;line-height:1.75">
-      ⚠ <strong>Important:</strong> Seen is not a law firm and nothing on this platform constitutes legal advice. If you have a dispute with an employer, consult a licensed attorney.
+    <div style="background:#ffb83015;border:1px solid #ffb83025;border-radius:10px;padding:1rem 1.25rem;font-family:var(--mono);font-size:.72rem;color:var(--amber);margin-bottom:1.5rem;line-height:1.75">
+      ⚠ <strong>Important:</strong> Seen is not a law firm and nothing on this platform constitutes legal advice. Company scores and ghost surge indicators are <strong>expressions of community opinion</strong>, not verified facts. If you have a dispute with an employer, consult a licensed employment attorney.
+    </div>
+
+    <div style="background:rgba(99,102,241,.08);border:1px solid rgba(99,102,241,.2);border-radius:10px;padding:.85rem 1.25rem;font-family:var(--mono);font-size:.65rem;color:rgba(165,180,252,.8);margin-bottom:2rem;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.75rem">
+      <span>🔒 We do not sell your personal data. Ever.</span>
+      <a href="mailto:hello@tryseen.io?subject=Privacy Request" style="color:rgba(165,180,252,.8);text-decoration:underline">Privacy request → hello@tryseen.io</a>
     </div>
 
     <div id="legalSections"></div>
@@ -5379,57 +5384,99 @@ const FAQ_DATA=[
 // LEGAL SECTIONS
 // ═══════════════════════════════════════════════
 const LEGAL=[
-  {t:'1. Terms of Service',c:`By using Seen you agree to these terms. You must be 18+.
+  {t:'1. Terms of Service',c:`<strong>Agreement.</strong> By accessing or using Seen ("Platform," "we," "us"), you agree to these Terms. If you do not agree, stop using the Platform. You must be 18 or older.
 
-<strong>Permitted use.</strong> Seen is for personal job search research. Commercial use, scraping, or using our data to build competing products requires written permission.
+<strong>Permitted use.</strong> Seen is for personal, non-commercial job search research. Commercial use, automated scraping, bulk data extraction, or using Platform data to build competing products is strictly prohibited without prior written permission.
 
-<strong>Prohibited conduct.</strong> You agree not to: submit false or fabricated reports; target specific individuals with personal information; submit coordinated inauthentic content to manipulate scores; use automated tools to access the platform; impersonate any person or entity; submit content that violates any applicable law.
+<strong>Account.</strong> You are responsible for maintaining the security of your account credentials and for all activity under your account. Notify hello@tryseen.io immediately of any unauthorized use.
 
-<strong>Enforcement.</strong> We reserve the right to block access from users who violate these terms, including banning accounts and IP addresses associated with abuse.`},
-  {t:'2. Section 230 & User Content',c:`Seen operates as an interactive computer service under 47 U.S.C. § 230 (the Communications Decency Act). Under this federal law, Seen is <strong>not liable for content posted by third-party users</strong>. We are a publisher of user-generated content, not the author of it.
+<strong>Prohibited conduct.</strong> You agree not to: (a) submit false, fabricated, or materially misleading reports; (b) include personal identifying information about named individuals; (c) submit coordinated inauthentic content to artificially inflate or deflate scores; (d) use automated bots, scrapers, or scripts to access the Platform; (e) impersonate any person or entity; (f) submit content that constitutes harassment, defamation, or violates any applicable law; (g) reverse-engineer or attempt to extract underlying data models.
 
-<strong>Your responsibility.</strong> By submitting a report, you represent that: the experience described is your genuine first-hand experience; the content is truthful to the best of your knowledge; you are not submitting on behalf of a competitor or with intent to harm; the content does not contain private personal information about identifiable individuals.
+<strong>Enforcement.</strong> We reserve the right to suspend, terminate, or restrict access for users who violate these terms. Violations may be reported to law enforcement where appropriate.
 
-<strong>Content moderation.</strong> We reserve the right to remove content that violates these terms, contains personal information, constitutes harassment, or is clearly fabricated. Removal decisions do not waive Section 230 protections.
+<strong>Changes to terms.</strong> We may update these terms at any time. Continued use after changes constitutes acceptance. Material changes will be noted by updating the "Last updated" date.`},
 
-<strong>Reporting abuse.</strong> Contact hello@tryseen.io with specific content, the reason it violates our terms, and supporting evidence.`},
-  {t:'3. Data Disclaimer',c:`<strong>Not a definitive claim.</strong> All scores on Seen are estimates based on aggregated user reports and publicly available data. They are not definitive statements of fact about any employer.
+  {t:'2. Section 230 & User-Generated Content',c:`<strong>Platform as intermediary.</strong> Seen operates as an interactive computer service under 47 U.S.C. § 230 (the Communications Decency Act). Under this federal law, Seen is <strong>not the publisher or speaker of user-submitted content</strong> and is not liable for content posted by third-party users. Users who submit content are solely responsible for it.
 
-<strong>Accuracy.</strong> Seen makes no warranty about the accuracy, completeness, or timeliness of any data. Scores reflect reported experiences and may not represent current employer behavior. Companies change.
+<strong>Your representations.</strong> By submitting a report, you represent and warrant that: (a) the experience described is your genuine, first-hand hiring experience with that company; (b) the content is truthful to the best of your knowledge; (c) you are not acting on behalf of a competitor or with intent to harm; (d) the content does not include private personal information about named individuals; (e) you have the legal right to share the information.
 
-<strong>Not employment advice.</strong> Nothing on Seen constitutes employment advice or legal advice. Use scores as one signal in your job search, not the only one.
+<strong>License.</strong> By submitting content, you grant Seen a perpetual, irrevocable, royalty-free, worldwide license to publish, display, aggregate, analyze, and use that content as part of the Platform.
 
-<strong>AI-generated content.</strong> Some summaries and reports are generated by AI and clearly labeled as such. AI-generated content is estimated and should not be relied upon as factual.`},
-  {t:'4. Privacy Policy',c:`<strong>What we collect.</strong> When you submit a report: the report text, company and location, submission timestamp, and a hashed session ID for spam prevention. We do not collect your name, email, or IP address.
+<strong>Content moderation.</strong> We reserve the right—but have no obligation—to remove content that violates these terms, includes personal information, constitutes harassment, or is clearly fabricated. Moderation decisions are discretionary and do not waive Section 230 immunity.
 
-<strong>What we do not collect.</strong> We do not require account creation. We do not collect emails unless you contact us. We do not use behavioral advertising or sell your data. Ever.
+<strong>Abuse reporting.</strong> To report violating content: email hello@tryseen.io with the specific content URL or identifier, the reason it violates our guidelines, and any supporting evidence. We review reports within 14 business days.`},
 
-<strong>Cookies.</strong> Minimal functional cookies only — no advertising cookies, no cross-site tracking.
+  {t:'3. Scores, Ratings & Data Disclaimer',c:`<strong>Opinion, not fact.</strong> All scores, ratings, ghost rates, response speed indices, surge alerts, and company grades on Seen are <em>expressions of opinion</em> based on aggregated user-submitted reports. They are not factual statements, endorsements, or definitive characterizations of any employer. A company labeled with any score does not necessarily reflect that company's current, past, or future hiring practices.
 
-<strong>Third-party services.</strong> Seen uses Supabase (database) and Anthropic (AI features). We do not share personal data beyond what is necessary for platform operation.
+<strong>Ghost surge alerts.</strong> "Ghost surge" indicators reflect a statistical increase in ghosting reports submitted to our platform within a rolling time window. They are not accusations of wrongdoing. A surge indicator means our community submitted more ghosting reports than usual — nothing more. Surges may reflect seasonal patterns, a single coordinated submission, or genuine increases in ghosting. Treat them as one data signal among many.
 
-<strong>Children's privacy.</strong> Seen is not directed at children under 18. We do not knowingly collect data from minors.
+<strong>Sample size limitations.</strong> Scores for smaller companies may be based on very few reports. Low sample sizes reduce statistical reliability. We display report counts where available.
 
-<strong>Contact.</strong> For privacy requests: hello@tryseen.io`},
-  {t:'5. Limitation of Liability',c:`The Platform is provided "as is" without warranty of any kind. To the maximum extent permitted by law, Seen and its operators shall not be liable for any indirect, incidental, special, or consequential damages arising from your use of the Platform.
+<strong>No warranty.</strong> Seen makes no warranty — express or implied — about the accuracy, completeness, or timeliness of any data on the Platform. Scores reflect submitted experiences and may not represent current employer behavior. Companies evolve; old data may not reflect present reality.
 
-Our total liability for any claim shall not exceed $100 USD.
+<strong>Not professional advice.</strong> Nothing on Seen constitutes employment advice, legal advice, financial advice, or any other professional advice. Use Platform data as one input in your decision-making, not the sole determinant.
 
-<strong>Indemnification.</strong> You agree to indemnify Seen from claims arising from your violation of these terms, content you submit, or your violation of any third-party rights.`},
-  {t:'6. Employer Dispute Process',c:`<strong>How to dispute.</strong> Email hello@tryseen.io with: your name and role at the company; the specific content you're disputing; the reason (factual inaccuracy, personal information, guideline violation); supporting evidence.
+<strong>AI-generated content.</strong> Some summaries, analyses, or labels are generated or assisted by artificial intelligence. AI-generated content is clearly labeled where applicable. AI content is inherently estimated and probabilistic — do not rely on it as authoritative.
 
-<strong>Review process.</strong> We review disputes within 14 business days. We will modify content only if it clearly violates our guidelines. We will <strong>not</strong> remove negative reports simply because they reflect poorly on an employer. Applicant experiences are protected speech.
+<strong>Trademark notice.</strong> Company names, logos, and trademarks referenced on Seen belong to their respective owners. Their presence does not imply any affiliation with or endorsement by Seen.`},
 
-<strong>Response option.</strong> Employers may submit an official response to reports, displayed alongside the disputed content.
+  {t:'4. Privacy Policy',c:`<strong>What we collect.</strong>
+• <em>Anonymous users:</em> Report text, company name, location, submission timestamp, and a hashed session identifier for spam prevention. No name, email, or IP address is stored.
+• <em>Registered users:</em> Email address, display name (optional), application tracking data you enter, and authentication tokens. Your email is used solely for account authentication and product notifications you request.
+• <em>Pro waitlist:</em> If you join the Pro waitlist, your email address is stored solely to notify you when Pro launches. We do not share it with third parties.
+• <em>Usage data:</em> Aggregated, anonymized page view statistics. No individual-level behavioral tracking.
 
-<strong>Legal demands.</strong> We respond to valid legal process but will vigorously defend our Section 230 protections and users' rights to share genuine employment experiences.`},
-  {t:'7. Content Guidelines',c:`<strong>Reports must:</strong> describe your genuine first-hand hiring experience; focus on the company's process, not specific named individuals; be based on events you personally witnessed.
+<strong>What we never do.</strong> We do not sell, rent, or lease your personal information to any third party. We do not use behavioral advertising networks. We do not build advertising profiles. We do not sell "Do Not Sell" data — there is nothing to sell.
 
-<strong>Reports must not:</strong> include personal information (phone numbers, emails, addresses) of individuals; make claims you know to be false; contain threats, hate speech, or discriminatory language; include URLs or promotional content; be coordinated fake submissions.
+<strong>Cookies &amp; local storage.</strong> We use minimal functional browser storage (session tokens, search history) necessary for Platform operation. No advertising cookies. No cross-site tracking pixels.
 
-<strong>Will be removed:</strong> Personal information; threats; clearly fabricated content; coordinated inauthentic submissions; hate speech.
+<strong>Third-party processors.</strong> We use Supabase Inc. (database and authentication) and Anthropic PBC (AI features). These processors receive only the minimum data necessary. We maintain data processing agreements with each. We do not use ad tech or analytics platforms that profile individuals.
 
-<strong>Will NOT be removed just because negative:</strong> Accurate descriptions of ghosting; reports of unpaid work demands; misleading job description accounts; descriptions of disrespectful hiring; any honest negative experience with a company's hiring process.`},
+<strong>Data retention.</strong> Anonymous reports are retained indefinitely as part of the aggregate database. Registered account data is retained until you delete your account. Pro waitlist emails are deleted within 30 days of Pro launch or upon your request.
+
+<strong>Children.</strong> Seen is not directed at individuals under 18. We do not knowingly collect data from minors. If you believe a minor has submitted data, contact hello@tryseen.io and we will delete it promptly.
+
+<strong>Contact.</strong> Privacy requests, deletion requests, or concerns: hello@tryseen.io`},
+
+  {t:'5. CCPA & GDPR Rights',c:`<strong>California residents (CCPA).</strong> Under the California Consumer Privacy Act, you have the right to: (a) know what personal information we have collected about you; (b) request deletion of your personal information; (c) opt out of the "sale" of personal information (note: we do not sell personal information); (d) non-discrimination for exercising your rights. To exercise any right, email hello@tryseen.io with the subject line "CCPA Request."
+
+<strong>European residents (GDPR).</strong> If you are in the European Economic Area or United Kingdom, the lawful basis for processing your personal data is your consent (for optional features) and legitimate interest (for Platform security and spam prevention). You have the right to: (a) access your personal data; (b) rectify inaccurate data; (c) erasure ("right to be forgotten"); (d) restrict processing; (e) data portability; (f) object to processing; (g) withdraw consent at any time without affecting prior processing. To exercise GDPR rights, email hello@tryseen.io with the subject line "GDPR Request." Response within 30 days.
+
+<strong>Data transfers.</strong> Seen is operated from the United States. If you are accessing the Platform from outside the US, your data may be transferred to and processed in the US, which may have different data protection laws than your country.
+
+<strong>"Do Not Sell My Personal Information."</strong> We do not sell personal information. This right is effectively moot for Seen, but if you wish to formally assert it, email hello@tryseen.io.`},
+
+  {t:'6. Arbitration & Limitation of Liability',c:`<strong>MANDATORY ARBITRATION.</strong> EXCEPT WHERE PROHIBITED BY LAW, ANY DISPUTE ARISING FROM YOUR USE OF THE PLATFORM SHALL BE RESOLVED BY BINDING INDIVIDUAL ARBITRATION ADMINISTERED BY THE AMERICAN ARBITRATION ASSOCIATION (AAA) UNDER ITS CONSUMER ARBITRATION RULES. YOU WAIVE ANY RIGHT TO A JURY TRIAL OR TO PARTICIPATE IN A CLASS ACTION.
+
+<strong>Exception.</strong> Either party may bring individual claims in small claims court if the claim qualifies. Either party may seek injunctive relief in court to prevent irreparable harm.
+
+<strong>Limitation of liability.</strong> THE PLATFORM IS PROVIDED "AS IS" AND "AS AVAILABLE" WITHOUT WARRANTY OF ANY KIND. TO THE MAXIMUM EXTENT PERMITTED BY APPLICABLE LAW, SEEN, ITS OPERATORS, EMPLOYEES, AND AFFILIATES SHALL NOT BE LIABLE FOR ANY INDIRECT, INCIDENTAL, SPECIAL, CONSEQUENTIAL, EXEMPLARY, OR PUNITIVE DAMAGES, INCLUDING BUT NOT LIMITED TO LOST PROFITS, LOST DATA, OR BUSINESS INTERRUPTION, ARISING FROM YOUR USE OF OR INABILITY TO USE THE PLATFORM, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGES.
+
+<strong>Liability cap.</strong> Our total aggregate liability for any claim shall not exceed the greater of: (a) the amount you paid us in the 12 months preceding the claim, or (b) $100 USD.
+
+<strong>Indemnification.</strong> You agree to indemnify, defend, and hold harmless Seen and its operators from any claims, damages, losses, or expenses (including reasonable attorneys' fees) arising from: (a) your violation of these terms; (b) content you submit to the Platform; (c) your violation of any third-party right, including privacy or intellectual property rights; (d) your use of the Platform in violation of applicable law.
+
+<strong>Governing law.</strong> These terms are governed by the laws of the State of California, without regard to conflict of law principles. Any court proceedings not subject to arbitration shall be brought in Los Angeles County, California.`},
+
+  {t:'7. Employer & Company Dispute Process',c:`<strong>How to dispute content.</strong> If you are an employer or authorized representative and believe content on Seen is inaccurate, contains personal information, or violates our guidelines, email hello@tryseen.io with: (a) your name, title, and company; (b) the specific content (URL or exact text); (c) the reason for the dispute (factual inaccuracy, personal information, guideline violation — not merely "this is negative"); (d) supporting evidence.
+
+<strong>Review timeline.</strong> We review disputes within 14 business days. We may request additional information.
+
+<strong>What we will and won't do.</strong> We will modify or remove content that: contains personal identifying information; constitutes a clear threat; is demonstrably fabricated (not just disputed). We will <strong>not</strong> remove content solely because it is negative, critical, or unflattering to an employer. Honest descriptions of hiring experiences — including ghosting, misleading job postings, and poor process — are protected expression and central to our platform's purpose.
+
+<strong>Employer response option.</strong> Employers may submit an official verified response that will be displayed alongside disputed content, giving companies the opportunity to provide context.
+
+<strong>Legal demands.</strong> We comply with valid, properly-served legal process. However, we will vigorously contest demands that seek to suppress legitimate user speech or circumvent Section 230. Attempting to weaponize legal process to silence users may itself be reported as abuse.`},
+
+  {t:'8. Content Guidelines',c:`<strong>Reports must:</strong> describe your genuine, first-hand hiring experience with a specific company; focus on the company's process and culture rather than named individuals; be based on events you personally experienced or directly witnessed.
+
+<strong>Reports must not:</strong> include personal contact information (phone numbers, emails, home addresses) of any individual; assert as fact something you have no direct knowledge of; contain threats, hate speech, slurs, or discriminatory language; include promotional URLs or affiliate links; represent coordinated inauthentic activity (e.g., organized submission campaigns by competitors or PR firms).
+
+<strong>Content that will be removed:</strong> Personal identifying information about individuals; explicit threats; content that is demonstrably fabricated or part of a coordinated inauthentic campaign; hate speech targeting protected characteristics.
+
+<strong>Content that will NOT be removed merely because it is negative:</strong> Accurate accounts of being ghosted after applying; reports of misleading job descriptions; descriptions of disrespectful, dismissive, or unprofessional hiring behavior; honest subjective assessments of the hiring experience; any first-hand account of a genuine applicant experience.
+
+<strong>Anonymous reports.</strong> To protect submitters, reports may be published without identifying the submitter. This anonymity does not reduce your legal responsibility for what you submit.`},
 ];
 
 // ═══════════════════════════════════════════════
