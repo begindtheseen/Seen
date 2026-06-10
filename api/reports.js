@@ -41,6 +41,33 @@ export default async function handler(req, res) {
     return res.json({ ok: locResult.valid && modResult.ok, issues, corrected_experience: modResult.corrected_experience || null, normalized_location: locResult.normalized || mLoc });
   }
 
+  // ── Community feed (recent reports, no company filter) ──────────────────────
+  if (body.action === 'feed') {
+    const { outcome, offset = 0, limit = 20 } = body;
+    const safeLimit = Math.min(50, Math.max(1, parseInt(limit) || 20));
+    const safeOffset = Math.max(0, parseInt(offset) || 0);
+    const outcomeMap = {
+      ghosted: ['ghosted'],
+      rejected: ['autoreject', 'rejected'],
+      interviewing: ['human', 'interview', 'interviewing'],
+      hired: ['hired', 'offer'],
+    };
+    const outcomes = outcomeMap[outcome] || null;
+    let url = `${SUPABASE_URL}/rest/v1/reports`
+      + `?select=id,role,outcome,ghost_stage,rounds,report_text,platform,created_at,experience_level,company_name`
+      + `&order=created_at.desc`
+      + `&limit=${safeLimit}&offset=${safeOffset}`;
+    if (outcomes) url += `&outcome=in.(${outcomes.join(',')})`;
+    try {
+      const r = await fetch(url, { headers: hdrsBase });
+      if (!r.ok) return res.status(200).json({ ok: true, reports: [] });
+      const rows = await r.json();
+      return res.status(200).json({ ok: true, reports: rows || [] });
+    } catch(e) {
+      return res.status(200).json({ ok: true, reports: [] });
+    }
+  }
+
   // ── Submit report (merged from submit-report.js) ────────────────────────────
   if (body.action === 'submit') {
     const { company: co, role, location, platform, outcome, ghost_stage, rounds, unpaid_work, experience_level, report_text } = body;
