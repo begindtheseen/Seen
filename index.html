@@ -4534,6 +4534,238 @@ async function _buildCardPreview(name, d) {
   document.body.appendChild(ov);
 }
 
+// ═══════════════════════════════════════════════════════════════════
+// OUTCOME CARDS — shareable hiring journey artifacts
+// ═══════════════════════════════════════════════════════════════════
+
+function _drawOutcomeCard(app) {
+  const W = 1080, H = 1080;
+  const canvas = document.createElement('canvas');
+  canvas.width = W; canvas.height = H;
+  const c = canvas.getContext('2d');
+  const PAD = 64;
+
+  const events = app.events || [];
+  const appliedEvt = events.find(e => e.type === 'application_submitted');
+  const offerEvt   = events.find(e => e.type === 'offer_received');
+  const rejEvt     = events.find(e => e.type === 'rejected');
+  const ghostEvt   = events.find(e => e.type === 'ghosted');
+  const intEvt     = events.find(e => e.type === 'interview_received');
+
+  const appliedMs  = appliedEvt?.date || app.appliedAt || Date.now();
+  const outcomeMs  = (offerEvt || rejEvt || ghostEvt)?.date || Date.now();
+  const daysElapsed = Math.max(1, Math.round((outcomeMs - appliedMs) / 86400000));
+
+  const status    = app.status || 'active';
+  const isHired   = status === 'hired' || !!offerEvt;
+  const isGhosted = status === 'ghosted' || !!ghostEvt;
+
+  const OUTCOME_COLOR = isHired ? '#10b981' : isGhosted ? '#6b7280' : '#ef4444';
+  const OUTCOME_LABEL = isHired ? 'HIRED' : isGhosted ? 'GHOSTED' : 'REJECTED';
+
+  const roundsEvt = EventStore.get().find(e => e.appId === app.id && e.type === 'rounds_detail');
+  const rounds    = roundsEvt?.data?.rounds ?? null;
+
+  // Background
+  c.fillStyle = '#02040a'; c.fillRect(0, 0, W, H);
+  const glowG = c.createRadialGradient(W/2, 460, 0, W/2, 460, 520);
+  glowG.addColorStop(0, OUTCOME_COLOR + '1F'); glowG.addColorStop(1, 'rgba(0,0,0,0)');
+  c.fillStyle = glowG; c.fillRect(0, 0, W, H);
+  const ga = c.createRadialGradient(W, 0, 0, W, 0, 480);
+  ga.addColorStop(0,'rgba(124,58,237,0.17)'); ga.addColorStop(1,'rgba(0,0,0,0)');
+  c.fillStyle = ga; c.fillRect(0, 0, W, H);
+  const gb = c.createRadialGradient(0, H, 0, 0, H, 380);
+  gb.addColorStop(0,'rgba(29,78,216,0.10)'); gb.addColorStop(1,'rgba(0,0,0,0)');
+  c.fillStyle = gb; c.fillRect(0, 0, W, H);
+  _rr(c,1,1,W-2,H-2,24); c.strokeStyle='rgba(255,255,255,0.07)'; c.lineWidth=1.5; c.stroke();
+
+  // Eyebrow
+  c.font='600 13px "DM Mono",monospace'; c.fillStyle='rgba(255,255,255,0.22)';
+  c.textAlign='left'; c.textBaseline='top';
+  c.fillText('SEEN  ·  HIRING OUTCOME CARD', PAD, PAD);
+  c.textAlign='right'; c.fillText('seenjobs.io', W-PAD, PAD);
+
+  // Company row
+  const compY = PAD + 52;
+  const LS = 72;
+  _rr(c,PAD,compY,LS,LS,16); c.fillStyle='rgba(255,255,255,0.07)'; c.fill();
+  _rr(c,PAD,compY,LS,LS,16); c.strokeStyle=OUTCOME_COLOR+'4D'; c.lineWidth=1.5; c.stroke();
+  c.font='800 26px "Syne",sans-serif'; c.fillStyle=OUTCOME_COLOR;
+  c.textAlign='center'; c.textBaseline='middle';
+  c.fillText((app.company||'?')[0].toUpperCase(), PAD+LS/2, compY+LS/2);
+
+  c.textAlign='left'; c.textBaseline='top';
+  const maxNW = W - PAD - LS - 24 - PAD;
+  c.font='800 40px "Syne",sans-serif'; c.fillStyle='#fff';
+  let dispN = app.company || 'Company';
+  while(c.measureText(dispN).width > maxNW && dispN.length > 3) dispN = dispN.slice(0,-1);
+  if (dispN !== (app.company||'Company')) dispN += '…';
+  c.fillText(dispN, PAD+LS+22, compY+4);
+  c.font='400 16px "DM Mono",monospace'; c.fillStyle='rgba(255,255,255,0.40)';
+  let dispR = app.role || 'Role';
+  while(c.measureText(dispR).width > maxNW && dispR.length > 3) dispR = dispR.slice(0,-1);
+  if (dispR !== (app.role||'Role')) dispR += '…';
+  c.fillText(dispR, PAD+LS+22, compY+54);
+
+  // Divider 1
+  const d1Y = compY + LS + 44;
+  c.strokeStyle='rgba(255,255,255,0.07)'; c.lineWidth=1;
+  c.beginPath(); c.moveTo(PAD,d1Y); c.lineTo(W-PAD,d1Y); c.stroke();
+
+  // Outcome hero
+  c.font='600 13px "DM Mono",monospace'; c.fillStyle=OUTCOME_COLOR+'99';
+  c.textAlign='center'; c.textBaseline='top';
+  c.fillText('OUTCOME', W/2, d1Y+28);
+  let outcomeFs = 160;
+  c.font=`800 ${outcomeFs}px "Syne",sans-serif`;
+  while(c.measureText(OUTCOME_LABEL).width > W-PAD*2-20 && outcomeFs > 80) {
+    outcomeFs -= 4; c.font=`800 ${outcomeFs}px "Syne",sans-serif`;
+  }
+  c.fillStyle=OUTCOME_COLOR; c.textAlign='center'; c.textBaseline='top';
+  c.fillText(OUTCOME_LABEL, W/2, d1Y+52);
+
+  // Timeline line
+  const tlY = d1Y + 52 + outcomeFs + 28;
+  const appliedLbl = new Date(appliedMs).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
+  c.font='500 14px "DM Mono",monospace'; c.fillStyle='rgba(255,255,255,0.32)';
+  c.textAlign='center'; c.textBaseline='top';
+  if (isGhosted) {
+    c.fillText(`Applied  ${appliedLbl}  ·  Response: Never`, W/2, tlY);
+  } else {
+    const outcomeLbl = new Date(outcomeMs).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
+    c.fillText(`Applied  ${appliedLbl}  →  ${isHired?'Offer':'Rejected'}  ${outcomeLbl}`, W/2, tlY);
+  }
+
+  // Stats tiles
+  const statsY = tlY + 44;
+  let stats;
+  if (isHired) {
+    stats = [
+      { lbl:'DAYS TO OFFER', val:String(daysElapsed), col:'#10b981' },
+      rounds !== null ? { lbl:'ROUNDS', val:String(rounds), col:'#6366f1' } : { lbl:'OFFER', val:'✓', col:'#10b981' },
+    ];
+  } else if (isGhosted) {
+    stats = [
+      { lbl:'DAYS WAITING', val:String(daysElapsed), col:'#ef4444' },
+      { lbl:'RESPONSE', val:'NEVER', col:'#6b7280' },
+    ];
+  } else {
+    stats = [
+      { lbl:'DAYS IN PROCESS', val:String(daysElapsed), col:'#ef4444' },
+      { lbl:'INTERVIEW', val:intEvt?'YES':'NO', col:intEvt?'#f59e0b':'#6b7280' },
+    ];
+  }
+  const tileW = Math.floor((W - PAD*2 - 20) / 2);
+  const tileH = 138;
+  stats.forEach((s, i) => {
+    const tx = PAD + i*(tileW+20);
+    _rr(c,tx,statsY,tileW,tileH,16); c.fillStyle='rgba(255,255,255,0.04)'; c.fill();
+    _rr(c,tx,statsY,tileW,tileH,16); c.strokeStyle='rgba(255,255,255,0.08)'; c.lineWidth=1; c.stroke();
+    let valFs = 72;
+    c.font=`700 ${valFs}px "Syne",sans-serif`;
+    while(c.measureText(s.val).width > tileW-32 && valFs > 32) { valFs -= 2; c.font=`700 ${valFs}px "Syne",sans-serif`; }
+    c.fillStyle=s.col; c.textAlign='center'; c.textBaseline='middle';
+    c.fillText(s.val, tx+tileW/2, statsY+60);
+    c.font='500 12px "DM Mono",monospace'; c.fillStyle='rgba(255,255,255,0.28)';
+    c.textBaseline='bottom'; c.fillText(s.lbl, tx+tileW/2, statsY+tileH-14);
+  });
+
+  // Footer
+  const fY = H - 70;
+  c.strokeStyle='rgba(255,255,255,0.07)'; c.lineWidth=1;
+  c.beginPath(); c.moveTo(PAD,fY-8); c.lineTo(W-PAD,fY-8); c.stroke();
+  c.font='700 16px "Syne",sans-serif'; c.fillStyle='#fff';
+  c.textAlign='left'; c.textBaseline='middle';
+  c.fillText('Seen', PAD, fY+20);
+  c.font='400 12px "DM Mono",monospace'; c.fillStyle='rgba(255,255,255,0.28)';
+  c.fillText('seenjobs.io  ·  real applicant outcomes', PAD+50, fY+20);
+  c.textAlign='right'; c.fillStyle='rgba(255,255,255,0.18)';
+  c.fillText('from real candidates, for real job seekers', W-PAD, fY+20);
+
+  return canvas;
+}
+
+async function showOutcomeCard(appId) {
+  const app = AppStore.loadSync().find(a => a.id === appId);
+  if (!app) return;
+  const status = app.status || 'active';
+  if (!['hired','rejected','ghosted'].includes(status)) return;
+
+  const existing = document.getElementById('_outcomeCardOv');
+  if (existing) existing.remove();
+
+  await document.fonts.ready;
+  const canvas = _drawOutcomeCard(app);
+  const blob   = await new Promise(r => canvas.toBlob(r, 'image/png'));
+  const dataUrl = canvas.toDataURL('image/png');
+
+  const OC = status === 'hired' ? '#10b981' : status === 'ghosted' ? '#9ca3af' : '#ef4444';
+  const OL = status === 'hired' ? '🎉 Hired' : status === 'ghosted' ? '👻 Ghosted' : '❌ Rejected';
+  const safeName = (app.company||'company').replace(/[^a-z0-9]/gi,'_');
+  window._pendingOutcomeCard = { blob, name: safeName, appId };
+
+  const ov = document.createElement('div');
+  ov.id = '_outcomeCardOv';
+  ov.style.cssText = 'position:fixed;inset:0;z-index:9999;background:rgba(2,4,10,0.97);display:flex;flex-direction:column;align-items:center;padding:1.5rem 1.25rem 2.5rem;overflow-y:auto;-webkit-overflow-scrolling:touch';
+  ov.innerHTML = `
+    <div style="width:100%;max-width:480px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem">
+        <div style="font-family:var(--mono);font-size:.58rem;color:${OC};text-transform:uppercase;letter-spacing:.1em;font-weight:600">${OL} — ${app.company}</div>
+        <button onclick="document.getElementById('_outcomeCardOv')?.remove();window._pendingOutcomeCard=null" style="background:none;border:none;font-family:var(--mono);font-size:.65rem;color:rgba(255,255,255,0.3);cursor:pointer;padding:.2rem .4rem">✕ close</button>
+      </div>
+      <div style="font-family:var(--display);font-size:1.1rem;font-weight:800;color:#fff;margin-bottom:.2rem">Your outcome card is ready</div>
+      <div style="font-family:var(--mono);font-size:.6rem;color:rgba(255,255,255,0.35);margin-bottom:1.1rem">Share your experience — help the next applicant know what to expect.</div>
+      <img src="${dataUrl}" style="width:100%;border-radius:12px;box-shadow:0 24px 80px rgba(0,0,0,0.9);margin-bottom:1rem"/>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:.55rem;margin-bottom:.7rem">
+        <button style="background:rgba(255,69,0,0.15);border:1px solid rgba(255,69,0,0.4);color:#ff6314;font-family:var(--mono);font-size:.68rem;font-weight:600;padding:.75rem .9rem;border-radius:9px;cursor:pointer" onclick="_shareOutcomeCard('reddit')">🔴 Reddit</button>
+        <button style="background:rgba(255,255,255,0.07);border:1px solid rgba(255,255,255,0.18);color:#fff;font-family:var(--mono);font-size:.68rem;font-weight:600;padding:.75rem .9rem;border-radius:9px;cursor:pointer" onclick="_shareOutcomeCard('threads')">🧵 Threads</button>
+        <button style="background:rgba(29,161,242,0.1);border:1px solid rgba(29,161,242,0.3);color:rgba(150,210,255,0.9);font-family:var(--mono);font-size:.68rem;font-weight:600;padding:.75rem .9rem;border-radius:9px;cursor:pointer" onclick="_shareOutcomeCard('twitter')">𝕏 Twitter / X</button>
+        <button style="background:rgba(99,102,241,0.1);border:1px solid rgba(99,102,241,0.25);color:rgba(180,180,255,0.85);font-family:var(--mono);font-size:.68rem;padding:.75rem .9rem;border-radius:9px;cursor:pointer" onclick="_shareOutcomeCard('download')">↓ Save Image</button>
+      </div>
+      <button onclick="document.getElementById('_outcomeCardOv')?.remove();window._pendingOutcomeCard=null" style="background:none;border:none;width:100%;font-family:var(--mono);font-size:.6rem;color:rgba(255,255,255,0.25);cursor:pointer;padding:.5rem;text-align:center">Skip — don't share</button>
+    </div>`;
+  document.body.appendChild(ov);
+}
+
+function _shareOutcomeCard(dest) {
+  const ctx = window._pendingOutcomeCard;
+  if (!ctx) return;
+  const { blob, name, appId } = ctx;
+  const app = AppStore.loadSync().find(a => a.id === appId);
+  const status = app?.status || 'ghosted';
+  const co     = app?.company || 'a company';
+  const role   = app?.role || '';
+  const days   = Math.max(1, Math.round((Date.now() - (app?.appliedAt||Date.now())) / 86400000));
+
+  const file = new File([blob], name+'_outcome_'+Date.now()+'.png', { type:'image/png' });
+
+  if (dest === 'reddit') {
+    window.open('https://www.reddit.com/r/cscareerquestions/', '_blank', 'noopener');
+  } else if (dest === 'threads') {
+    const msgs = { hired:`got an offer from ${co} 🎉 tracked my hiring timeline on Seen`, ghosted:`${co} ghosted me after ${days} days 👻 tracked on Seen`, rejected:`rejected by ${co} for ${role} — tracked on Seen` };
+    const txt = encodeURIComponent((msgs[status]||`my job application at ${co}`) + '\n\nseenjobs.io');
+    window.open('https://www.threads.net/intent/post?text='+txt, '_blank', 'noopener');
+  } else if (dest === 'twitter') {
+    const msgs = { hired:`Got the offer at ${co} 🎉 tracked my whole hiring timeline on @seenjobs`, ghosted:`${co} ghosted me after ${days} days 👻 — via @seenjobs`, rejected:`Rejected by ${co} — full timeline tracked on @seenjobs` };
+    const txt = encodeURIComponent((msgs[status]||`My job search outcome`) + '\n\nseenjobs.io');
+    window.open('https://twitter.com/intent/tweet?text='+txt, '_blank', 'noopener');
+  }
+
+  if (navigator.share && navigator.canShare?.({ files:[file] })) {
+    navigator.share({ files:[file] }).catch(e => { if(e.name!=='AbortError') _downloadCard(blob, file.name); });
+  } else {
+    _downloadCard(blob, file.name);
+  }
+
+  if (dest !== 'download') {
+    document.getElementById('_outcomeCardOv')?.remove();
+    window._pendingOutcomeCard = null;
+    showToast('Image saved — attach it to your post 📎');
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════
+
 function saveCardAndOpen(dest) {
   if (!_pendingCardBlob) return;
   const { blob, name } = _pendingCardBlob;
@@ -6247,16 +6479,21 @@ async function handleCheckAnswer(appId, checkType, data, btn) {
 
   // Update AppStore status based on outcome answers
   if (checkType === 'response_check') {
-    if (data.response_type === 'rejection') await AppStore.update(appId, { status: 'rejected', stage: 'Rejected' });
+    if (data.response_type === 'rejection') {
+      await AppStore.update(appId, { status: 'rejected', stage: 'Rejected' });
+      setTimeout(() => showOutcomeCard(appId), 600);
+    }
     if (data.response_type === 'interview') await AppStore.update(appId, { stage: 'Interview' });
     if (data.response_type === 'ghosted') {
       await AppStore.update(appId, { status: 'ghosted', stage: 'Ghosted' });
-      const _app = AppStore.loadSync().find(a => a.id === appId);
-      setTimeout(() => _showReportNudge(_app?.company || '', 'ghosted'), 600);
+      setTimeout(() => showOutcomeCard(appId), 600);
     }
   }
   if (checkType === 'interview_check') {
-    if (data.ended && data.outcome === 'rejected') await AppStore.update(appId, { status: 'rejected', stage: 'Rejected' });
+    if (data.ended && data.outcome === 'rejected') {
+      await AppStore.update(appId, { status: 'rejected', stage: 'Rejected' });
+      setTimeout(() => showOutcomeCard(appId), 600);
+    }
     if (data.had_interview) await AppStore.update(appId, { stage: data.interview_type === 'phone_screen' ? 'Phone Screen' : 'Interview' });
   }
   if (checkType === 'outcome_check') {
@@ -6265,13 +6502,10 @@ async function handleCheckAnswer(appId, checkType, data, btn) {
     const changes = { status: statusMap[data.outcome] || 'active' };
     if (stageMap[data.outcome]) changes.stage = stageMap[data.outcome];
     await AppStore.update(appId, changes);
-    // Offer: ask for rounds
+    // Offer: collect round count first, then show outcome card from rounds prompt
     if (data.outcome === 'offer') setTimeout(() => _showRoundsPrompt(appId), 400);
-    // Terminal outcomes: nudge to report — highest-quality moment to capture real data
-    if (['ghosted','rejected','offer'].includes(data.outcome)) {
-      const _app = AppStore.loadSync().find(a => a.id === appId);
-      setTimeout(() => _showReportNudge(_app?.company || '', data.outcome), data.outcome === 'offer' ? 1800 : 600);
-    }
+    // Non-offer terminal outcomes: show outcome card directly
+    if (['ghosted','rejected'].includes(data.outcome)) setTimeout(() => showOutcomeCard(appId), 600);
   }
 
   // Remove card from UI, refresh
@@ -6316,7 +6550,7 @@ function _showRoundsPrompt(appId) {
       </div>
     </div>
     <button class="btn btn-solid" style="width:100%;justify-content:center;font-size:.78rem;margin-bottom:.4rem" onclick="_submitRoundsData('${appId}','${safeCo}')">Submit → help others 🙏</button>
-    <button onclick="document.getElementById('_roundsPromptOv')?.remove()" style="background:none;border:none;width:100%;font-family:var(--mono);font-size:.6rem;color:var(--muted);cursor:pointer;padding:.35rem">Skip</button>`;
+    <button onclick="document.getElementById('_roundsPromptOv')?.remove();setTimeout(()=>showOutcomeCard('${appId}'),200)" style="background:none;border:none;width:100%;font-family:var(--mono);font-size:.6rem;color:var(--muted);cursor:pointer;padding:.35rem">Skip — show my card</button>`;
   document.body.appendChild(ov);
   requestAnimationFrame(() => requestAnimationFrame(() => { ov.style.transform = 'translateY(0)'; }));
 }
@@ -6346,7 +6580,8 @@ function _submitRoundsData(appId, company) {
   });
   _roundsSel = { rounds: null, unpaid: null };
   document.getElementById('_roundsPromptOv')?.remove();
-  showToast('Thanks! This improves scores for everyone 🙏');
+  showToast('Thanks! Building your outcome card… 🎉');
+  setTimeout(() => showOutcomeCard(appId), 600);
 }
 
 function updateCheckBadge() {
