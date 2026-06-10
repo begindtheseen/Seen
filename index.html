@@ -2556,7 +2556,17 @@ const Auth = {
           if(this.isSeeker()) {
             SavedJobs.syncFromDb().catch(()=>{});
             AppStore.syncFromDb().catch(()=>{});
-            renderSeekerDash(); go('seeker-dash');
+            renderSeekerDash();
+            // Respect where the user already was — only redirect to dash on a true fresh sign-in.
+            // SIGNED_IN also fires when iOS Safari discards and reloads the tab; in that case the
+            // URL hash and the last-page store both point at the page they were on, so we must not
+            // override that with a blind go('seeker-dash').
+            const _curHash = window.location.hash.startsWith('#') ? window.location.hash.slice(1) : '';
+            const _knownTaskPages = ['jobs','feed','demand','resume','tracker','report','companies','faq','legal','pricing','profile'];
+            const _savedPage = (()=>{try{const s=JSON.parse(localStorage.getItem('seen_last_page')||'{}');return(s.page&&s.ts&&(Date.now()-s.ts)<7200000&&s.page!=='seeker-dash')?s.page:null;}catch(e){return null;}})();
+            const _alreadyOnPage = _knownTaskPages.includes(_curHash) || !!_savedPage;
+            if (!_alreadyOnPage) go('seeker-dash');
+            else if (_savedPage && !_knownTaskPages.includes(_curHash)) go(_savedPage);
           } else if(this.isEmployer()) goToEmployerDashboard();
 
         } else if(event === 'TOKEN_REFRESHED' && session?.user) {
@@ -7825,7 +7835,7 @@ function go(page){
       }
       loadJobs();
     }
-    if(page==='report')loadCommunityReports();
+    if(page==='report'){loadCommunityReports();_reportDraftAttachListeners();setTimeout(_reportDraftRestore,0);}
     if(page==='feed')loadFeed();
     if(page==='profile')renderProfilePage();
     if(page==='demand')loadDemand();
@@ -8551,6 +8561,68 @@ async function loadCommunityReports() {
   }
 }
 
+// ── REPORT FORM DRAFT PERSISTENCE ──
+// Saves every field to localStorage as the user types so that tab switches,
+// iOS page discards, or accidental navigations never destroy in-progress work.
+const _REPORT_DRAFT_KEY = 'seen_report_draft_v1';
+
+function _reportDraftSave() {
+  const get = id => document.getElementById(id);
+  const respEl = document.querySelector('input[name="resp"]:checked');
+  const stageEl = document.querySelector('input[name="stage"]:checked');
+  try {
+    localStorage.setItem(_REPORT_DRAFT_KEY, JSON.stringify({
+      co:   get('rCo')?.value   || '',
+      ti:   get('rTi')?.value   || '',
+      loc:  get('rLoc')?.value  || '',
+      pl:   get('rPl')?.value   || '',
+      exp:  get('rExp')?.value  || '',
+      dt:   get('rDt')?.value   || '',
+      rounds: get('rRounds')?.value || '',
+      up:   get('rUp')?.value   || '',
+      ex:   get('rEx')?.value   || '',
+      resp:  respEl?.value  || '',
+      stage: stageEl?.value || '',
+      ts: Date.now(),
+    }));
+  } catch(_) {}
+}
+
+function _reportDraftRestore() {
+  try {
+    const d = JSON.parse(localStorage.getItem(_REPORT_DRAFT_KEY) || '{}');
+    // Only restore drafts written in the last 24 hours
+    if (!d.ts || Date.now() - d.ts > 86400000) return;
+    const set = (id, val) => { const el = document.getElementById(id); if (el && val) el.value = val; };
+    set('rCo',  d.co);  if (d.co)  _rCoHint(d.co);
+    set('rTi',  d.ti);
+    set('rLoc', d.loc);
+    set('rPl',  d.pl);
+    set('rExp', d.exp);
+    set('rDt',  d.dt);
+    set('rRounds', d.rounds);
+    set('rUp',  d.up);
+    set('rEx',  d.ex);
+    if (d.resp) { const r = document.querySelector(`input[name="resp"][value="${CSS.escape(d.resp)}"]`); if (r) { r.checked = true; r.dispatchEvent(new Event('change')); } }
+    if (d.stage) { const s = document.querySelector(`input[name="stage"][value="${CSS.escape(d.stage)}"]`); if (s) s.checked = true; }
+  } catch(_) {}
+}
+
+function _reportDraftClear() {
+  try { localStorage.removeItem(_REPORT_DRAFT_KEY); } catch(_) {}
+}
+
+// Attach draft-save listeners once the DOM is ready (called on first go('report'))
+let _reportDraftListening = false;
+function _reportDraftAttachListeners() {
+  if (_reportDraftListening) return;
+  _reportDraftListening = true;
+  const form = document.getElementById('page-report');
+  if (!form) return;
+  form.addEventListener('input',  _reportDraftSave);
+  form.addEventListener('change', _reportDraftSave);
+}
+
 // ── REAL submitReport ──
 // Company name hint — shows canonical name when user types a variant
 function _rCoHint(val) {
@@ -8634,6 +8706,7 @@ async function submitReport(){
   ['rCo','rTi','rLoc','rEx'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
   ['rCoHint','rLocHint'].forEach(id=>{const el=document.getElementById(id);if(el)el.textContent='';});
   document.querySelectorAll('input[name="resp"],input[name="stage"]').forEach(r=>r.checked=false);
+  _reportDraftClear();
   showToast('Submitted. Score updated. You just helped someone.');
   if(btn){btn.textContent='Submit anonymously →';btn.disabled=false;}
   loadCommunityReports();
