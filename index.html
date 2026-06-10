@@ -1586,6 +1586,8 @@ nav.nav-scrolled{background:rgba(6,6,8,0.82);backdrop-filter:blur(60px) saturate
       </div>
     </div>
 
+    <!-- Recently checked companies -->
+    <div id="dashRecentCos" style="display:none;margin-bottom:1.25rem"></div>
 
     <!-- Saved Jobs -->
     <div style="background:var(--surface);border:1px solid var(--line);border-radius:12px;overflow:hidden;margin-bottom:1.25rem">
@@ -7674,6 +7676,41 @@ async function renderSeekerDash(){
 
   // Saved jobs
   await _refreshDashSaved();
+
+  // Recently checked companies
+  (function() {
+    const el = document.getElementById('dashRecentCos');
+    if (!el) return;
+    const recent = RecentSearches.get().slice(0, 4);
+    if (!recent.length) { el.style.display = 'none'; return; }
+    el.style.display = 'block';
+    el.innerHTML = `<div style="background:var(--surface);border:1px solid var(--line);border-radius:12px;overflow:hidden">
+      <div style="padding:.85rem 1.1rem;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between">
+        <div style="font-family:var(--display);font-size:.82rem;font-weight:700;color:var(--white)">Recently checked</div>
+        <button onclick="go('companies')" style="background:none;border:none;font-family:var(--mono);font-size:.6rem;color:var(--blue);cursor:pointer">All companies →</button>
+      </div>
+      <div>${recent.map(r => {
+        const ck = r.name.toLowerCase().trim();
+        const co = COS[ck] || Object.values(COS).find(c => c.name.toLowerCase().includes(ck));
+        const sc = co?.sc;
+        const score = sc?.overall_score || null;
+        const risk = score ? Score.risk(score) : 'warn';
+        const grade = score ? letterGrade(score) : '?';
+        const ghostPct = sc ? Math.round((sc.ghost_rate||0)*100) : null;
+        const scoreTxt = score ? `<span style="font-family:var(--mono);font-size:.65rem;font-weight:700;color:${Score.color(risk)}">${grade} · ${score}</span>` : `<span style="font-family:var(--mono);font-size:.6rem;color:var(--muted)">No data yet</span>`;
+        const nameEsc = (r.name||'').replace(/'/g,"\\'");
+        const locEsc = (r.loc||'').replace(/'/g,"\\'");
+        return `<div onclick="openModal('${nameEsc}','${locEsc}')" style="display:flex;align-items:center;gap:.85rem;padding:.8rem 1.1rem;cursor:pointer;border-bottom:1px solid rgba(255,255,255,.04);transition:background .12s" onmouseover="this.style.background='var(--raised)'" onmouseout="this.style.background='transparent'">
+          <div style="width:34px;height:34px;border-radius:8px;background:var(--raised);border:1px solid var(--line2);display:flex;align-items:center;justify-content:center;font-family:var(--display);font-weight:800;font-size:.85rem;color:var(--white);flex-shrink:0">${(r.name||'?')[0].toUpperCase()}</div>
+          <div style="flex:1;min-width:0">
+            <div style="font-size:.8rem;font-weight:600;color:var(--white);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${r.name}</div>
+            ${r.loc ? `<div style="font-family:var(--mono);font-size:.56rem;color:var(--muted)">📍 ${r.loc}</div>` : ''}
+          </div>
+          <div style="text-align:right;flex-shrink:0">${scoreTxt}${ghostPct!=null?`<div style="font-family:var(--mono);font-size:.54rem;color:var(--muted)">${ghostPct}% ghosts</div>`:''}</div>
+        </div>`;
+      }).join('')}</div>
+    </div>`;
+  })();
 
   // Check resume and gate AI features
   checkResumeGate();
