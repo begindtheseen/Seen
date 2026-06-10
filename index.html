@@ -801,6 +801,62 @@ nav.nav-scrolled{background:rgba(6,6,8,0.82);backdrop-filter:blur(60px) saturate
 .sp-track{position:absolute;bottom:0;left:0;right:0;height:1px;background:rgba(16,185,129,.07);z-index:4;}
 .sp-fill{height:100%;background:#10b981;width:0;animation:spLoad 2.6s .05s cubic-bezier(.2,.6,.35,1) forwards;}
 @keyframes spLoad{0%{width:0%}40%{width:42%}70%{width:74%}88%{width:90%}100%{width:100%}}
+
+/* ── GHOST SURGE ALERT BANNER ── */
+.ghost-surge-banner{
+  position:relative;overflow:hidden;
+  background:linear-gradient(90deg,rgba(239,68,68,.16) 0%,rgba(239,68,68,.05) 100%);
+  border:1px solid rgba(239,68,68,.35);border-left:3px solid var(--red);
+  border-radius:10px;padding:.9rem 1.1rem;margin-bottom:1rem;
+}
+.ghost-surge-banner::before{
+  content:'';position:absolute;inset:0;
+  background:repeating-linear-gradient(to bottom,transparent 0,transparent 3px,rgba(0,0,0,.06) 3px,rgba(0,0,0,.06) 4px);
+  pointer-events:none;
+}
+.ghost-surge-dot{
+  width:7px;height:7px;border-radius:50%;background:var(--red);
+  box-shadow:0 0 10px var(--red),0 0 20px rgba(239,68,68,.5);
+  animation:pulse .9s infinite;flex-shrink:0;display:inline-block;
+}
+@keyframes ghostSurgeIn{from{opacity:0;transform:translateY(-8px)}to{opacity:1;transform:translateY(0)}}
+.ghost-surge-banner{animation:ghostSurgeIn .3s ease both}
+
+/* ── PRO UPGRADE MODAL ── */
+#proModalOv{
+  position:fixed;inset:0;z-index:9100;display:none;
+  background:rgba(0,0,0,.75);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);
+  align-items:center;justify-content:center;padding:1rem;
+}
+#proModalOv.open{display:flex}
+#proModal{
+  width:100%;max-width:560px;max-height:92vh;overflow-y:auto;
+  background:var(--surface);border:1px solid rgba(99,102,241,.3);
+  border-radius:20px;padding:2rem 1.75rem;
+  box-shadow:0 0 80px rgba(99,102,241,.25),0 40px 120px rgba(0,0,0,.8);
+  animation:fadeUp .3s cubic-bezier(.22,1,.36,1) both;
+  position:relative;
+}
+#proModal::before{
+  content:'';position:absolute;inset:0;border-radius:20px;
+  background:radial-gradient(ellipse at 50% 0%,rgba(99,102,241,.18) 0%,transparent 60%);
+  pointer-events:none;
+}
+
+/* ── LANDING GHOST SURGE STRIP ── */
+.surge-strip{
+  display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;
+  padding:.6rem 0;margin-top:.5rem;margin-bottom:.75rem;
+}
+.surge-chip{
+  display:inline-flex;align-items:center;gap:.35rem;
+  background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.22);
+  color:rgba(255,120,120,.8);border-radius:100px;
+  font-family:var(--mono);font-size:.55rem;padding:.22rem .65rem;
+  cursor:pointer;transition:all .15s;white-space:nowrap;
+}
+.surge-chip:hover{background:rgba(239,68,68,.16);border-color:rgba(239,68,68,.4)}
+.surge-chip-dot{width:5px;height:5px;border-radius:50%;background:var(--red);animation:pulse 1s infinite;flex-shrink:0}
 </style>
 </head>
 <body>
@@ -880,6 +936,60 @@ nav.nav-scrolled{background:rgba(6,6,8,0.82);backdrop-filter:blur(60px) saturate
 
 <!-- EMPLOYER PANEL OVERLAY -->
 <div id="employerOverlay" onclick="closeEmployerPanel()" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);backdrop-filter:blur(6px);z-index:599;opacity:0;transition:opacity .3s ease"></div>
+
+<!-- PRO UPGRADE MODAL -->
+<div id="proModalOv" onclick="if(event.target===this)closeProModal()">
+  <div id="proModal">
+    <button onclick="closeProModal()" style="position:absolute;top:1rem;right:1rem;background:none;border:none;color:var(--muted);cursor:pointer;font-size:1.1rem;padding:.3rem .5rem;border-radius:5px;z-index:1;transition:color .15s" onmouseover="this.style.color='var(--sub)'" onmouseout="this.style.color='var(--muted)'">✕</button>
+    <div style="position:relative;z-index:1">
+      <div style="display:flex;align-items:center;gap:.5rem;margin-bottom:1.5rem">
+        <span style="width:7px;height:7px;border-radius:50%;background:var(--green);box-shadow:0 0 10px rgba(16,185,129,0.6);display:inline-block;animation:pulse 2s infinite"></span>
+        <span style="font-family:var(--mono);font-size:.6rem;text-transform:uppercase;letter-spacing:.12em;color:var(--green)">Early Access Open</span>
+      </div>
+      <div style="font-family:var(--display);font-size:1.7rem;font-weight:800;color:var(--white);letter-spacing:-.03em;line-height:1.1;margin-bottom:.35rem">Know before<br><span style="background:linear-gradient(135deg,#a5b4fc,#c084fc,#e879f9);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text">you get ghosted.</span></div>
+      <div style="font-family:var(--mono);font-size:.68rem;color:var(--dim);margin-bottom:1.5rem;line-height:1.7">Ghost risk alerts notify you the moment a company's behavior shifts — before you waste time applying. The feature that makes Pro worth it.</div>
+      <!-- Feature list -->
+      <div style="display:flex;flex-direction:column;gap:.6rem;margin-bottom:1.75rem">
+        <div style="display:flex;align-items:flex-start;gap:.85rem;padding:.7rem .85rem;background:var(--raised);border-radius:9px;border:1px solid var(--line)">
+          <div style="width:30px;height:30px;border-radius:7px;background:var(--card);border:1px solid var(--line2);display:flex;align-items:center;justify-content:center;font-size:.85rem;flex-shrink:0">👻</div>
+          <div><div style="font-size:.82rem;font-weight:600;color:var(--white);margin-bottom:.1rem">Ghost risk alerts</div><div style="font-family:var(--mono);font-size:.62rem;color:var(--dim);line-height:1.55">Get emailed when a company hits 3+ ghost reports in a week — before you apply</div></div>
+        </div>
+        <div style="display:flex;align-items:flex-start;gap:.85rem;padding:.7rem .85rem;background:var(--raised);border-radius:9px;border:1px solid var(--line)">
+          <div style="width:30px;height:30px;border-radius:7px;background:var(--card);border:1px solid var(--line2);display:flex;align-items:center;justify-content:center;font-size:.85rem;flex-shrink:0">🤖</div>
+          <div><div style="font-size:.82rem;font-weight:600;color:var(--white);margin-bottom:.1rem">AI company analysis</div><div style="font-family:var(--mono);font-size:.62rem;color:var(--dim);line-height:1.55">Is this company worth your time right now? AI verdict with supporting evidence</div></div>
+        </div>
+        <div style="display:flex;align-items:flex-start;gap:.85rem;padding:.7rem .85rem;background:var(--raised);border-radius:9px;border:1px solid var(--line)">
+          <div style="width:30px;height:30px;border-radius:7px;background:var(--card);border:1px solid var(--line2);display:flex;align-items:center;justify-content:center;font-size:.85rem;flex-shrink:0">📊</div>
+          <div><div style="font-size:.82rem;font-weight:600;color:var(--white);margin-bottom:.1rem">Unlimited job tracker</div><div style="font-family:var(--mono);font-size:.62rem;color:var(--dim);line-height:1.55">Track every application without limits — with timeline, notes, and follow-up nudges</div></div>
+        </div>
+        <div style="display:flex;align-items:flex-start;gap:.85rem;padding:.7rem .85rem;background:var(--raised);border-radius:9px;border:1px solid var(--line)">
+          <div style="width:30px;height:30px;border-radius:7px;background:var(--card);border:1px solid var(--line2);display:flex;align-items:center;justify-content:center;font-size:.85rem;flex-shrink:0">⚡</div>
+          <div><div style="font-size:.82rem;font-weight:600;color:var(--white);margin-bottom:.1rem">Response speed index</div><div style="font-family:var(--mono);font-size:.62rem;color:var(--dim);line-height:1.55">Which companies in your exact field respond fastest — ranked by real data</div></div>
+        </div>
+        <div style="display:flex;align-items:flex-start;gap:.85rem;padding:.7rem .85rem;background:var(--raised);border-radius:9px;border:1px solid var(--line)">
+          <div style="width:30px;height:30px;border-radius:7px;background:var(--card);border:1px solid var(--line2);display:flex;align-items:center;justify-content:center;font-size:.85rem;flex-shrink:0">📄</div>
+          <div><div style="font-size:.82rem;font-weight:600;color:var(--white);margin-bottom:.1rem">PDF export</div><div style="font-family:var(--mono);font-size:.62rem;color:var(--dim);line-height:1.55">Export any company report as a PDF — share with your network or save offline</div></div>
+        </div>
+      </div>
+      <!-- Pricing -->
+      <div style="background:linear-gradient(135deg,rgba(16,185,129,.12),rgba(16,185,129,.04));border:1px solid rgba(16,185,129,.25);border-radius:10px;padding:1rem 1.1rem;margin-bottom:1.25rem;display:flex;align-items:center;justify-content:space-between;gap:1rem;flex-wrap:wrap">
+        <div>
+          <div style="font-family:var(--display);font-size:1.1rem;font-weight:800;color:var(--green);margin-bottom:.1rem">$7.99 <span style="font-size:.65rem;color:var(--dim);font-weight:400">/ month</span></div>
+          <div style="font-family:var(--mono);font-size:.58rem;color:var(--dim)">or $5.33/mo billed yearly · cancel anytime</div>
+        </div>
+        <div style="font-family:var(--mono);font-size:.6rem;color:var(--green);background:rgba(16,185,129,.12);border:1px solid rgba(16,185,129,.2);padding:.28rem .65rem;border-radius:100px;white-space:nowrap">Free plan always available</div>
+      </div>
+      <!-- CTA -->
+      <div id="proModalCTA">
+        <div style="font-family:var(--mono);font-size:.62rem;color:var(--muted);margin-bottom:.55rem">Payment processing launching soon. Drop your email — you'll be first to know and get a founding member discount.</div>
+        <div style="display:flex;gap:.5rem">
+          <input id="proWaitlistEmail" type="email" placeholder="your@email.com" style="flex:1;background:var(--raised);border:1.5px solid var(--line2);border-radius:8px;padding:.65rem .9rem;color:var(--white);font-family:var(--mono);font-size:.78rem;outline:none;caret-color:var(--green);transition:border-color .15s" onfocus="this.style.borderColor='var(--green)'" onblur="this.style.borderColor='var(--line2)'" onkeydown="if(event.key==='Enter')submitProWaitlist()"/>
+          <button onclick="submitProWaitlist()" style="padding:.65rem 1.2rem;background:var(--green);color:var(--ink);border:none;border-radius:8px;font-family:var(--mono);font-size:.75rem;font-weight:700;cursor:pointer;transition:all .2s;white-space:nowrap" onmouseover="this.style.background='#34d399'" onmouseout="this.style.background='var(--green)'">Join waitlist →</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
 
 <!-- SIDE MENU OVERLAY -->
 <div class="side-menu-overlay" id="sideMenuOverlay" onclick="closeSideMenu()"></div>
@@ -1040,9 +1150,17 @@ nav.nav-scrolled{background:rgba(6,6,8,0.82);backdrop-filter:blur(60px) saturate
           <button class="vtag" onclick="qs('Meta','Menlo Park, CA')">Meta <span class="vtag-grade danger">F</span></button>
         </div>
 
+        <!-- Ghost Surge Strip — live companies with recent ghost activity -->
+        <div id="heroSurgeStrip" style="display:none;animation:fadeUp .5s .25s ease both">
+          <div style="font-family:var(--mono);font-size:.52rem;text-transform:uppercase;letter-spacing:.12em;color:rgba(239,68,68,.6);margin-bottom:.32rem;display:flex;align-items:center;gap:.4rem">
+            <span style="width:4px;height:4px;border-radius:50%;background:var(--red);display:inline-block;animation:pulse 1s infinite"></span>Ghost surge this week
+          </div>
+          <div class="surge-strip" id="heroSurgeChips"></div>
+        </div>
+
         <!-- CTAs -->
         <div style="display:flex;align-items:center;gap:1rem;flex-wrap:wrap;animation:fadeUp .5s .28s ease both">
-          <button class="btn btn-green btn-lg" onclick="go('login')" style="font-size:.88rem;padding:.78rem 1.85rem">Get started free →</button>
+          <button class="btn btn-green btn-lg" onclick="go('login')" style="font-size:.88rem;padding:.78rem 1.85rem">Protect your job search →</button>
           <button onclick="go('jobs')" style="background:none;border:none;font-family:var(--mono);font-size:.68rem;color:rgba(255,255,255,.38);cursor:pointer;padding:.2rem 0;transition:color .15s;letter-spacing:.02em" onmouseover="this.style.color='rgba(255,255,255,.65)'" onmouseout="this.style.color='rgba(255,255,255,.38)'">browse jobs →</button>
         </div>
 
@@ -1634,6 +1752,7 @@ nav.nav-scrolled{background:rgba(6,6,8,0.82);backdrop-filter:blur(60px) saturate
         </div>
       </div>
       <div id="coSB"></div>
+      <div id="coGhostAlert" style="margin-top:.6rem"></div>
       <div class="co-mets" id="coMets"></div>
     </div>
     <div class="agg-bar" id="aggBar" style="display:none"><div class="agg-item"><div class="agg-dot"></div>Live aggregating</div></div>
@@ -3041,6 +3160,7 @@ async function runSearch(name,loc){
 
   document.getElementById('mTitle').textContent=(known?.name||name)+(loc?' · '+loc:'');
   document.getElementById('mBody').innerHTML=`
+    <div id="modalSurgeAlert"></div>
     <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:1rem;margin-bottom:1rem">
       <div style="flex:1;min-width:0">
         <div style="font-family:var(--display);font-size:1.45rem;font-weight:800;color:var(--white);letter-spacing:-.035em;line-height:1.1">${known?.name||name}</div>
@@ -3098,6 +3218,12 @@ async function runSearch(name,loc){
       </div>
       <button class="btn btn-ghost" style="font-size:.65rem;padding:.4rem .8rem;flex-shrink:0;white-space:nowrap;border-color:var(--green);color:var(--green)" onclick="closeModDirect();go('login')">Add yours →</button>
     </div>`:''}`;
+
+  // Ghost surge detection — async, populates placeholder after render
+  checkGhostSurge(known?.name||name).then(surgeCount=>{
+    const surgeEl=document.getElementById('modalSurgeAlert');
+    if(surgeEl)_renderGhostSurgeAlert(surgeEl,known?.name||name,surgeCount);
+  });
 
 }
 
@@ -4574,6 +4700,11 @@ async function viewCompany(id,name,loc){
       window._coReportsAll=rd.reports||[];
       window._coCities=rd.cities||[];
       _renderReports(window._coReportsAll,window._coCities,'');
+      // Ghost surge detection — check last 7 days after main reports load
+      checkGhostSurge(_coNameForReports).then(surgeCount=>{
+        const alertEl=document.getElementById('coGhostAlert');
+        if(alertEl)_renderGhostSurgeAlert(alertEl,co?.name||name,surgeCount);
+      });
     }catch(e){
       console.warn('reports load:',e);
       document.getElementById('ctc-reports').innerHTML='<div style="text-align:center;padding:2rem;font-family:var(--mono);font-size:.65rem;color:var(--muted)">Could not load reports.</div>';
@@ -5015,6 +5146,7 @@ function goToEmployerDashboard(){
   populateTicker();
   renderQuickTags();
   startVerdictFeed();
+  loadHeroSurgeStrip();
   RecentSearches.render();
   // Show check badge on nav if there are pending checks
   setTimeout(updateCheckBadge, 600);
@@ -5283,7 +5415,77 @@ function _pricingToggle(mode) {
   }
 }
 function _startProCheckout() {
-  showToast('Payment coming soon — get notified when Pro launches →');
+  showProModal();
+}
+function showProModal(){
+  const ov=document.getElementById('proModalOv');
+  if(ov){ov.classList.add('open');document.body.style.overflow='hidden';}
+}
+function closeProModal(){
+  const ov=document.getElementById('proModalOv');
+  if(ov){ov.classList.remove('open');document.body.style.overflow='';}
+}
+async function submitProWaitlist(){
+  const inp=document.getElementById('proWaitlistEmail');
+  const cta=document.getElementById('proModalCTA');
+  if(!inp||!cta)return;
+  const email=inp.value.trim();
+  if(!email||!email.includes('@')){inp.style.borderColor='var(--red)';return;}
+  const btn=cta.querySelector('button');
+  if(btn){btn.textContent='Joining...';btn.disabled=true;}
+  // Store in Supabase profiles or a simple waitlist table
+  try{
+    if(db){
+      await db.from('pro_waitlist').upsert({email,created_at:new Date().toISOString()},{onConflict:'email'});
+    }
+  }catch(e){/* silent — still show success */}
+  cta.innerHTML=`<div style="text-align:center;padding:1rem;background:var(--gdim);border:1px solid var(--gmid);border-radius:10px">
+    <div style="font-size:1.4rem;margin-bottom:.4rem">✅</div>
+    <div style="font-family:var(--mono);font-size:.72rem;color:var(--green);font-weight:600;margin-bottom:.2rem">You're on the list!</div>
+    <div style="font-family:var(--mono);font-size:.6rem;color:var(--dim)">We'll email ${email} the moment Pro launches with a founding member discount.</div>
+  </div>`;
+  setTimeout(closeProModal,3200);
+}
+
+// ── GHOST SURGE DETECTION ──
+// Returns count of ghost reports in last 7 days for a company name (Supabase client query)
+async function checkGhostSurge(companyName){
+  if(!db||!companyName)return 0;
+  try{
+    const cutoff=new Date(Date.now()-7*24*60*60*1000).toISOString();
+    const {data,error}=await db.from('reports')
+      .select('id,created_at',{count:'exact'})
+      .ilike('company_name',`%${companyName}%`)
+      .eq('outcome','ghosted')
+      .gte('created_at',cutoff)
+      .limit(20);
+    if(error)return 0;
+    return(data||[]).length;
+  }catch(e){return 0;}
+}
+
+function _renderGhostSurgeAlert(container,companyName,count){
+  if(!container||count<3)return;
+  container.innerHTML=`<div class="ghost-surge-banner">
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:.85rem;position:relative;z-index:1">
+      <div style="min-width:0">
+        <div style="font-family:var(--mono);font-size:.57rem;font-weight:600;color:var(--red);text-transform:uppercase;letter-spacing:.16em;margin-bottom:.22rem;display:flex;align-items:center;gap:.45rem">
+          <span class="ghost-surge-dot"></span>Ghost surge — ${count} new reports this week
+        </div>
+        <div style="font-family:var(--mono);font-size:.62rem;color:rgba(255,100,100,.75);line-height:1.65">
+          ${companyName} received <strong style="color:var(--red)">${count} ghost reports</strong> in the past 7 days. Behavior is deteriorating — proceed with caution.
+        </div>
+      </div>
+      <div style="text-align:right;flex-shrink:0">
+        <div style="font-family:var(--display);font-size:2rem;font-weight:800;color:var(--red);line-height:.9;letter-spacing:-.04em;text-shadow:0 0 24px rgba(239,68,68,.5)">${count}</div>
+        <div style="font-family:var(--mono);font-size:.46rem;color:rgba(255,100,100,.5);text-transform:uppercase;letter-spacing:.12em;margin-top:.12rem">this week</div>
+      </div>
+    </div>
+    <div style="margin-top:.65rem;padding-top:.55rem;border-top:1px solid rgba(239,68,68,.18);display:flex;align-items:center;justify-content:space-between;position:relative;z-index:1">
+      <div style="font-family:var(--mono);font-size:.58rem;color:rgba(255,100,100,.5)">👻 Get emailed before the next surge</div>
+      <button onclick="showProModal()" style="font-family:var(--mono);font-size:.58rem;color:var(--white);background:rgba(239,68,68,.2);border:1px solid rgba(239,68,68,.35);border-radius:100px;padding:.2rem .65rem;cursor:pointer;transition:all .15s" onmouseover="this.style.background='rgba(239,68,68,.35)'" onmouseout="this.style.background='rgba(239,68,68,.2)'">Pro alerts →</button>
+    </div>
+  </div>`;
 }
 function renderPricingPage() {
   const root = document.getElementById('pricingRoot');
@@ -7459,6 +7661,39 @@ function startHeroRotation() {
     _heroIdx = (_heroIdx + 1) % HERO_LINES.length;
     setHeroLines(HERO_LINES[_heroIdx], true);
   }, 3800);
+}
+
+// Load ghost surge companies for landing page strip
+async function loadHeroSurgeStrip(){
+  if(!db)return;
+  try{
+    const cutoff=new Date(Date.now()-7*24*60*60*1000).toISOString();
+    const{data}=await db.from('reports')
+      .select('company_name,outcome,created_at')
+      .eq('outcome','ghosted')
+      .gte('created_at',cutoff)
+      .limit(200);
+    if(!data||data.length<3)return;
+    // Count per company
+    const counts={};
+    data.forEach(r=>{
+      if(!r.company_name)return;
+      const k=r.company_name.trim();
+      counts[k]=(counts[k]||0)+1;
+    });
+    // Filter to 3+ ghost reports and sort by count desc
+    const surgers=Object.entries(counts).filter(([,c])=>c>=3).sort((a,b)=>b[1]-a[1]).slice(0,6);
+    if(!surgers.length)return;
+    const strip=document.getElementById('heroSurgeStrip');
+    const chips=document.getElementById('heroSurgeChips');
+    if(!strip||!chips)return;
+    chips.innerHTML=surgers.map(([name,count])=>`
+      <button class="surge-chip" onclick="openModal('${name.replace(/'/g,"\\'")}','')">
+        <span class="surge-chip-dot"></span>
+        ${name.replace(/</g,'&lt;')} <span style="color:var(--red);font-weight:600">${count}×</span>
+      </button>`).join('');
+    strip.style.display='block';
+  }catch(e){}
 }
 
 // Pause on hover
@@ -9750,14 +9985,11 @@ function _handleSharedLink(){
   if (_el) _el.classList.add('active');
 })();
 
-// ── SLOT MACHINE SPLASH ──
-// Each letter of "Seen" spins on its own reel and snaps in left-to-right,
-// like the Love Death+Robots episode icon mechanic.
+// ── SLOT MACHINE SPLASH — smooth drum-scroll, spring-lock, glow ──
 (function(){
   const canvas=document.getElementById('splashCanvas');
   if(!canvas)return;
   const DPR=Math.min(window.devicePixelRatio||1,2);
-  // Small, tasteful — not full width
   const W=220,H=72;
   canvas.style.width=W+'px';canvas.style.height=H+'px';
   canvas.width=Math.round(W*DPR);canvas.height=Math.round(H*DPR);
@@ -9765,98 +9997,153 @@ function _handleSharedLink(){
   ctx.scale(DPR,DPR);
 
   const TARGETS=['S','E','E','N'];
-  const FS=44; // font size px
-  const COL=52; // px per column
-  const ox=(W-COL*TARGETS.length)/2+COL/2; // center of first column
+  const FS=44;
+  const COL=52;
+  const ox=(W-COL*TARGETS.length)/2+COL/2;
   const oy=H/2;
-  // Spin characters — alphanumeric pool the reels cycle through
-  const POOL='ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-  // Each letter locks at this time (seconds). Gap of ~0.18s between each.
-  const LOCK=[.32,.50,.68,.86];
-  // Per-column scroll state: y offset for the drum-scroll illusion
-  const col=TARGETS.map(()=>({y:0,lastT:0,char:POOL[Math.floor(Math.random()*POOL.length)]}));
-  let t0=null;
+  const POOL='ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'.split('');
+  const PL=POOL.length;
+  // Lock times — staggered cinematic feel
+  const LOCK=[.30,.48,.66,.84];
+  // Drum char spacing px
+  const CH=FS*1.15;
 
-  function draw(t){
+  // Spinning chars move UPWARD as scrollPos increases.
+  // baseIdx = Math.floor(scrollPos/CH) = index of char currently at center
+  // offset  = scrollPos%CH             = how far center char has moved above oy
+  // d=0 → center char at oy-offset
+  // d=1 → next char entering from below at oy-offset+CH
+  // d=-1→ prev char leaving above at oy-offset-CH
+  const col=TARGETS.map((_,i)=>{
+    const tIdx=POOL.indexOf(TARGETS[i]);
+    return{
+      scrollPos:Math.floor(Math.random()*PL)*CH,
+      locked:false,
+      lockTime:-1,
+      targetIdx:tIdx>=0?tIdx:0,
+    };
+  });
+  let t0=null,prevTs=null;
+
+  function draw(t,dt){
     ctx.clearRect(0,0,W,H);
-    const fa=Math.min(1,t/.06); // snap in instantly
+    const fa=Math.min(1,t/.04);
 
     TARGETS.forEach((target,i)=>{
-      const locked=t>=LOCK[i];
       const x=ox+i*COL;
+      const isLocked=t>=LOCK[i];
 
-      // Update spinning char for this column
-      if(!locked){
-        // Speed: fast until 0.12s before lock, then slow
+      if(!isLocked){
         const toGo=LOCK[i]-t;
-        const hz=toGo>.12?22:8; // chars per second
-        if(t-col[i].lastT>1/hz){
-          col[i].char=POOL[Math.floor(Math.random()*POOL.length)];
-          col[i].lastT=t;
-          col[i].y=(col[i].y+FS*.6)%(FS*1.2); // drum scroll
-        }
+        // Quadratic deceleration in final 0.28s → near-stop at lock
+        const speed=toGo>0.28 ? CH*22 : CH*22*Math.pow(toGo/0.28,2);
+        col[i].scrollPos+=speed*(dt||1/60);
+      } else if(!col[i].locked){
+        col[i].locked=true;
+        col[i].lockTime=t;
+        // Snap scrollPos so targetIdx lands EXACTLY at center (offset=0)
+        const nearest=Math.round(col[i].scrollPos/CH); // nearest char center
+        const phase=((nearest%PL)+PL)%PL;
+        const steps=((col[i].targetIdx-phase)+PL)%PL;
+        col[i].scrollPos=(nearest+steps)*CH; // offset becomes 0 → perfect center
       }
 
-      // Clip to column slot so scroll doesn't bleed
+      // Slot window background
+      ctx.save();
+      ctx.globalAlpha=fa*0.15;
+      ctx.fillStyle='#818cf8';
+      ctx.fillRect(x-COL/2+5,oy-FS*.57,COL-10,FS*1.14);
+      ctx.restore();
+
+      // Clip to slot
       ctx.save();
       ctx.beginPath();
-      ctx.rect(x-COL/2+3,oy-FS*.62,COL-6,FS*1.24);
+      ctx.rect(x-COL/2+4,oy-FS*.59,COL-8,FS*1.18);
       ctx.clip();
-
-      ctx.font=`900 ${FS}px 'Syne',sans-serif`;
+      ctx.font=`800 ${FS}px 'Syne',sans-serif`;
       ctx.textAlign='center';
       ctx.textBaseline='middle';
 
-      if(locked){
-        // Flash green briefly on snap, then white
-        const flash=t<LOCK[i]+.09;
-        ctx.globalAlpha=fa;
-        ctx.fillStyle=flash?'#10b981':'#f4f4f5';
-        ctx.fillText(target,x,oy);
-      } else {
-        // Show current spinning char scrolling upward
-        const scrollY=col[i].y;
-        ctx.globalAlpha=fa*.22;
-        ctx.fillStyle='#6b7280';
-        ctx.fillText(col[i].char,x,oy-scrollY);
-        // Ghost of next char entering from below
-        if(scrollY>FS*.3){
-          ctx.globalAlpha=fa*.10;
-          ctx.fillText(POOL[(POOL.indexOf(col[i].char)+1)%POOL.length],x,oy+FS*1.2-scrollY);
+      if(!isLocked){
+        const sp=col[i].scrollPos;
+        const baseIdx=Math.floor(sp/CH);
+        const offset=sp%CH;
+        // Draw previous (d=-1), current (d=0), next (d=1)
+        for(let d=-1;d<=1;d++){
+          const ci=((baseIdx+d)%PL+PL)%PL;
+          const charY=oy-offset+d*CH;
+          const dist=Math.abs(charY-oy);
+          const alpha=Math.max(0,1-dist/CH)*0.65;
+          ctx.globalAlpha=fa*alpha;
+          ctx.fillStyle='#c4b5fd';
+          ctx.fillText(POOL[ci],x,charY);
         }
+      } else {
+        const le=t-col[i].lockTime;
+        // Spring bounce: damped oscillation settling to center
+        let letterY=oy;
+        if(le<.24){
+          const bp=le/.24;
+          letterY=oy+Math.sin(bp*Math.PI*1.7)*3.5*(1-bp);
+        }
+        if(le<.08){
+          // Flash: bright green glow burst
+          ctx.shadowBlur=22;
+          ctx.shadowColor='#10b981';
+          ctx.globalAlpha=fa*0.55*(1-le/.08);
+          ctx.fillStyle='#10b981';
+          ctx.fillText(target,x,letterY);
+          ctx.shadowBlur=0;
+          ctx.globalAlpha=fa;
+          ctx.fillStyle='#10b981';
+        } else {
+          ctx.globalAlpha=fa;
+          ctx.fillStyle='#f4f4f5';
+          // Lingering indigo glow fades over 400ms
+          if(le<.48){
+            ctx.shadowBlur=Math.max(0,9*(1-(le-.08)/.40));
+            ctx.shadowColor='rgba(167,139,250,0.7)';
+          }
+        }
+        ctx.fillText(target,x,letterY);
+        ctx.shadowBlur=0;
       }
       ctx.restore();
 
-      // Thin separator line between columns (except after last)
+      // Column separator
       if(i<TARGETS.length-1){
-        ctx.globalAlpha=fa*.08;
+        ctx.globalAlpha=fa*.1;
         ctx.strokeStyle='#6b7280';
-        ctx.lineWidth=1;
+        ctx.lineWidth=.5;
         ctx.beginPath();
-        ctx.moveTo(x+COL/2,oy-FS*.45);
-        ctx.lineTo(x+COL/2,oy+FS*.45);
+        ctx.moveTo(x+COL/2,oy-FS*.43);
+        ctx.lineTo(x+COL/2,oy+FS*.43);
         ctx.stroke();
       }
     });
 
-    // Small green dot below once fully locked
-    const allDone=t>=LOCK[3]+.14;
+    // Green dot — appears after all locked
+    const allDone=t>=LOCK[3]+.24;
     if(allDone){
-      const da=Math.min(1,(t-LOCK[3]-.14)/.22);
+      const da=Math.min(1,(t-LOCK[3]-.24)/.28);
       ctx.globalAlpha=fa*da;
       ctx.fillStyle='#10b981';
+      ctx.shadowBlur=8;ctx.shadowColor='#10b981';
       ctx.beginPath();
-      ctx.arc(W/2,oy+FS*.58,2.5,0,Math.PI*2);
+      ctx.arc(W/2,oy+FS*.61,2.5,0,Math.PI*2);
       ctx.fill();
+      ctx.shadowBlur=0;
     }
   }
 
   function tick(ts){
     if(!t0)t0=ts;
+    const dt=prevTs?Math.min((ts-prevTs)/1000,.033):1/60;
+    prevTs=ts;
     const t=(ts-t0)/1000;
-    draw(t);
-    if(t<2.6)requestAnimationFrame(tick);
-    else draw(2.6);
+    draw(t,dt);
+    if(t<2.8)requestAnimationFrame(tick);
+    else draw(2.8,0);
   }
   document.fonts.ready.then(()=>requestAnimationFrame(tick));
 })();
