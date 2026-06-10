@@ -1790,11 +1790,20 @@ nav.nav-scrolled{background:rgba(6,6,8,0.82);backdrop-filter:blur(60px) saturate
 <!-- ═══ COMMUNITY FEED ═══ -->
 <div class="page" id="page-feed">
   <div style="max-width:720px;margin:0 auto;padding:2rem 1.25rem">
-    <div style="margin-bottom:1.75rem">
+    <div style="margin-bottom:1.5rem">
       <div class="eyebrow">Live feed</div>
       <h1 style="font-family:var(--display);font-size:1.75rem;font-weight:800;color:var(--white);letter-spacing:-.03em;margin-bottom:.35rem">Fresh from the community</h1>
       <p style="color:var(--sub);font-size:.82rem;font-weight:300;margin:0">Real experiences — every report shapes the score for that company.</p>
     </div>
+
+    <!-- Ghost surge banner — populated from cached data when page loads -->
+    <div id="feedSurgeBanner" style="display:none;background:linear-gradient(90deg,rgba(239,68,68,.1),rgba(239,68,68,.03));border:1px solid rgba(239,68,68,.25);border-radius:10px;padding:.75rem 1rem;margin-bottom:1.25rem">
+      <div style="font-family:var(--mono);font-size:.55rem;text-transform:uppercase;letter-spacing:.14em;color:var(--red);margin-bottom:.5rem;display:flex;align-items:center;gap:.4rem">
+        <span style="width:5px;height:5px;border-radius:50%;background:var(--red);display:inline-block;animation:pulse 1s infinite"></span>Companies with ghost surges this week
+      </div>
+      <div id="feedSurgeChips" class="surge-strip" style="margin:0"></div>
+    </div>
+
     <!-- Filters -->
     <div style="display:flex;gap:.5rem;flex-wrap:wrap;margin-bottom:1.5rem" id="feedFilters">
       <button class="feed-filter-btn active" data-filter="all" onclick="setFeedFilter('all',this)">All</button>
@@ -3676,7 +3685,10 @@ function renderJobResults(jobs, l) {
     const ck = safeCompany.toLowerCase().trim();
     const coData = COS[ck] || Object.values(COS).find(c => c.name.toLowerCase() === ck);
     const ghostRate = coData ? Math.round((coData.sc.ghost_rate || 0) * 100) : null;
-    const ghostBadge = ghostRate !== null ? '<span class="vibe ' + (ghostRate > 50 ? 'v-r' : ghostRate > 30 ? 'v-y' : 'v-g') + '">👻 ' + ghostRate + '% ghost</span>' : '';
+    const isSurge = _isGhostSurge(safeCompany);
+    const ghostBadge = isSurge
+      ? '<span class="vibe v-r" style="animation:pulse .9s infinite">⚡ surge this week</span>'
+      : ghostRate !== null ? '<span class="vibe ' + (ghostRate > 50 ? 'v-r' : ghostRate > 30 ? 'v-y' : 'v-g') + '">👻 ' + ghostRate + '% ghost</span>' : '';
     const logoLetter = (safeCompany || '?')[0].toUpperCase();
     const isSaved = SavedJobs.isSaved(safeId);
     return '<div class="jlc">' +
@@ -7699,7 +7711,10 @@ function startHeroRotation() {
   }, 3800);
 }
 
-// Load ghost surge companies for landing page strip
+// Ghost surge company set — populated once, used everywhere (job cards, feed, etc.)
+window._ghostSurgeSet = new Set(); // lowercase company names with active surge
+
+// Load ghost surge companies for landing page strip + global cache
 async function loadHeroSurgeStrip(){
   if(!db)return;
   try{
@@ -7718,18 +7733,31 @@ async function loadHeroSurgeStrip(){
       counts[k]=(counts[k]||0)+1;
     });
     // Filter to 3+ ghost reports and sort by count desc
-    const surgers=Object.entries(counts).filter(([,c])=>c>=3).sort((a,b)=>b[1]-a[1]).slice(0,6);
+    const surgers=Object.entries(counts).filter(([,c])=>c>=3).sort((a,b)=>b[1]-a[1]).slice(0,8);
     if(!surgers.length)return;
+    // Populate global cache (lowercase for fuzzy matching)
+    surgers.forEach(([name])=>window._ghostSurgeSet.add(name.toLowerCase()));
     const strip=document.getElementById('heroSurgeStrip');
     const chips=document.getElementById('heroSurgeChips');
-    if(!strip||!chips)return;
-    chips.innerHTML=surgers.map(([name,count])=>`
-      <button class="surge-chip" onclick="openModal('${name.replace(/'/g,"\\'")}','')">
-        <span class="surge-chip-dot"></span>
-        ${name.replace(/</g,'&lt;')} <span style="color:var(--red);font-weight:600">${count}×</span>
-      </button>`).join('');
-    strip.style.display='block';
+    if(strip&&chips){
+      chips.innerHTML=surgers.slice(0,6).map(([name,count])=>`
+        <button class="surge-chip" onclick="openModal('${name.replace(/'/g,"\\'")}','')">
+          <span class="surge-chip-dot"></span>
+          ${name.replace(/</g,'&lt;')} <span style="color:var(--red);font-weight:600">${count}×</span>
+        </button>`).join('');
+      strip.style.display='block';
+    }
   }catch(e){}
+}
+
+// Returns true if a company name matches any ghost-surge company
+function _isGhostSurge(companyName){
+  if(!window._ghostSurgeSet.size)return false;
+  const ck=companyName.toLowerCase();
+  for(const k of window._ghostSurgeSet){
+    if(k.includes(ck)||ck.includes(k))return true;
+  }
+  return false;
 }
 
 // Pause on hover
@@ -7877,6 +7905,23 @@ async function loadFeed(reset = true) {
   const listEl = document.getElementById('feedList');
   const moreEl = document.getElementById('feedLoadMore');
   if (!listEl || !db) return;
+
+  // Populate ghost surge banner from cache (or load if not yet loaded)
+  const surgeBanner = document.getElementById('feedSurgeBanner');
+  const surgeChips = document.getElementById('feedSurgeChips');
+  if (surgeBanner && surgeChips && reset) {
+    const renderSurgeBanner = () => {
+      if (!window._ghostSurgeSet.size) return;
+      const surgers = [...window._ghostSurgeSet].slice(0, 5);
+      surgeChips.innerHTML = surgers.map(name => {
+        const display = name.charAt(0).toUpperCase() + name.slice(1);
+        return `<button class="surge-chip" onclick="openModal('${display.replace(/'/g,"\\'")}','')"><span class="surge-chip-dot"></span>${display.replace(/</g,'&lt;')}</button>`;
+      }).join('');
+      surgeBanner.style.display = 'block';
+    };
+    if (window._ghostSurgeSet.size) renderSurgeBanner();
+    else loadHeroSurgeStrip().then(renderSurgeBanner);
+  }
 
   if (reset) {
     _feedOffset = 0;
