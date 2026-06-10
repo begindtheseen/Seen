@@ -26,6 +26,21 @@ export default async function handler(req, res) {
     'Content-Type': 'application/json',
   };
 
+  // ── Moderation (merged from moderate-report.js) ─────────────────────────────
+  if (body.action === 'moderate') {
+    const { company: mCo, role: mRole, location: mLoc, experience: mExp } = body;
+    if (!mCo || !mRole) return res.status(400).json({ ok: false, issues: ['Company and role are required.'] });
+    const [locResult, modResult] = await Promise.all([
+      checkLocation(mLoc).catch(() => ({ valid: true, normalized: mLoc })),
+      moderateContent(mCo, mRole, mExp).catch(() => ({ ok: true, issues: [], corrected_experience: null })),
+    ]);
+    const issues = [
+      ...(!locResult.valid ? ['Location not recognized — enter a real city (e.g. "Austin, TX" or "Chicago, IL").'] : []),
+      ...(modResult.issues || []),
+    ];
+    return res.json({ ok: locResult.valid && modResult.ok, issues, corrected_experience: modResult.corrected_experience || null, normalized_location: locResult.normalized || mLoc });
+  }
+
   // ── Submit report (merged from submit-report.js) ────────────────────────────
   if (body.action === 'submit') {
     const { company: co, role, location, platform, outcome, ghost_stage, rounds, unpaid_work, experience_level, report_text } = body;
@@ -167,6 +182,48 @@ export default async function handler(req, res) {
   } catch(e) {
     console.error('REPORTS error:', e.message);
     return res.status(500).json({ error: e.message });
+  }
+}
+
+// ── Moderation helpers ────────────────────────────────────────────────────────
+
+async function checkLocation(location) {
+  if (!location || location.trim().length < 3) return { valid: false, normalized: null };
+  try {
+    const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(location)}&limit=1&addressdetails=1`;
+    const res = await fetch(url, { headers: { 'User-Agent': 'Seen/1.0 (seenjobs.io)' }, signal: AbortSignal.timeout(6000) });
+    if (!res.ok) return { valid: true, normalized: location };
+    const places = await res.json();
+    if (!places?.length) return { valid: false, normalized: null };
+    const addr = places[0].address || {};
+    const city  = addr.city || addr.town || addr.village || addr.municipality || addr.county || '';
+    const state = addr.state || '';
+    return { valid: true, normalized: city && state ? `${city}, ${state}` : city || state || location };
+  } catch(e) {
+    return { valid: true, normalized: location };
+  }
+}
+
+async function moderateContent(company, role, experience) {
+  const ANTHROPIC_KEY = process.env.ANTHROPIC_KEY;
+  if (!ANTHROPIC_KEY) return { ok: true, issues: [], corrected_experience: null };
+  const exp = (experience || '').trim();
+  const prompt = `You moderate reports on a job-application transparency platform. Review this submission:\n\nCompany: "${company}"\nJob title: "${role}"\nExperience: "${exp || '(not provided)'}"\n\nFlag ANY of the following — be strict:\n1. Profanity or slurs (even mild)\n2. Hate speech or discrimination\n3. Personal attacks on named individuals\n4. Doxxing or private information\n5. Obviously fake content (gibberish, keyboard mashing, lorem ipsum)\n6. Job title that is not a real position name\n\nFor the experience text, also correct any genuine spelling mistakes (not slang or informal phrasing).\n\nReturn ONLY valid JSON, no extra text:\n{\n  "ok": true,\n  "issues": [],\n  "corrected_experience": null\n}\n\nIf there are problems set ok:false and fill issues[]. If spelling was fixed set corrected_experience to the cleaned text, otherwise null.`;
+  try {
+    const apiRes = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-api-key': ANTHROPIC_KEY, 'anthropic-version': '2023-06-01' },
+      body: JSON.stringify({ model: 'claude-haiku-4-5-20251001', max_tokens: 400, messages: [{ role: 'user', content: prompt }] }),
+      signal: AbortSignal.timeout(12000),
+    });
+    if (!apiRes.ok) return { ok: true, issues: [], corrected_experience: null };
+    const data = await apiRes.json();
+    const text = (data.content || []).filter(b => b.type === 'text').map(b => b.text).join('');
+    const match = text.match(/\{[\s\S]*\}/);
+    if (!match) return { ok: true, issues: [], corrected_experience: null };
+    return JSON.parse(match[0]);
+  } catch(e) {
+    return { ok: true, issues: [], corrected_experience: null };
   }
 }
 

@@ -3825,7 +3825,7 @@ async function loadDemand(){
   if (!_demandApiLoaded) {
     _demandApiLoaded = true;
     try {
-      const r = await fetch('/api/demand-data');
+      const r = await fetch('/api/demand');
       if (r.ok) {
         const d = await r.json();
         if (Array.isArray(d.demand) && d.demand.length > 0) {
@@ -7471,9 +7471,9 @@ async function submitReport(){
   // ── AI moderation + location validation ────────────────────────────────────
   let finalLoc=loc, finalExp=exp;
   try {
-    const modRes=await fetch('/api/moderate-report',{
+    const modRes=await fetch('/api/reports',{
       method:'POST', headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({company:normalizeCompanyName(co),role:ti,location:loc,experience:exp}),
+      body:JSON.stringify({action:'moderate',company:normalizeCompanyName(co),role:ti,location:loc,experience:exp}),
     });
     if(modRes.ok){
       const mod=await modRes.json();
