@@ -7530,10 +7530,10 @@ function renderFeedCards(listEl, rows, replace = true) {
         </div>
         <span class="vibe ${oc==='ghosted'?'v-r':oc==='hired'||oc==='offer'?'v-g':oc==='autoreject'||oc==='rejected'?'v-y':'v-b'}" style="white-space:nowrap;flex-shrink:0">${outcomeLabel[oc]||oc}</span>
       </div>
-      ${displayText?`<div class="feed-body">${isReddit?'':'"'}${displayText}${text.length>displayText.length?'…':''}${isReddit?'':'"'}</div>`:''}
+      ${displayText?`<div class="feed-body">${isExternal?'':'"'}${displayText}${text.length>displayText.length?'…':''}${isExternal?'':'"'}</div>`:''}
       <div class="feed-meta" style="justify-content:space-between">
         <span>${rounds}${r.experience_level||''}${r.experience_level?' · ':''}${ago(r.created_at)}</span>
-        <span style="display:flex;align-items:center;gap:.35rem">${sourceBadge}${isReddit?`<span style="font-family:var(--mono);font-size:.52rem;color:var(--muted)">↗</span>`:''}</span>
+        <span style="display:flex;align-items:center;gap:.35rem">${sourceBadge}${isExternal?`<span style="font-family:var(--mono);font-size:.52rem;color:var(--muted)">↗</span>`:''}</span>
       </div>
     </div>`;
   }).join('');
