@@ -723,7 +723,9 @@ nav.nav-scrolled{background:rgba(6,6,8,0.82);backdrop-filter:blur(60px) saturate
 .lp-3col{display:grid;grid-template-columns:repeat(3,1fr);gap:2rem}
 .lp-3stat{display:grid;grid-template-columns:repeat(3,1fr);gap:1.5rem;max-width:600px;margin:0 auto}
 .lp-2col{display:grid;grid-template-columns:repeat(2,1fr);gap:1rem;max-width:680px;margin:0 auto 2.5rem}
+.pc-grid{display:grid;grid-template-columns:1fr 1fr;gap:1.25rem;margin-bottom:2rem}
 @media(max-width:680px){.lp-3col{grid-template-columns:1fr;gap:1.5rem}.lp-3stat{grid-template-columns:repeat(3,1fr);gap:.75rem}.lp-2col{grid-template-columns:1fr}}
+@media(max-width:580px){.pc-grid{grid-template-columns:1fr}}
 
 /* ═══ HERO STAT STRIP ═══ */
 .hstat-strip{display:flex;gap:1.8rem;margin-bottom:1.6rem;animation:fadeUp .5s .1s ease both;margin-top:.35rem}
@@ -5790,7 +5792,7 @@ function renderPricingPage() {
       </div>
     </div>
 
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.25rem;margin-bottom:2rem">
+    <div class="pc-grid">
       <div style="background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:1.75rem 1.5rem">
         <div style="font-family:var(--mono);font-size:.55rem;text-transform:uppercase;letter-spacing:.15em;color:var(--muted);margin-bottom:.5rem">Free forever</div>
         <div style="font-family:var(--display);font-size:2.6rem;font-weight:900;color:var(--white);letter-spacing:-.04em;line-height:1;margin-bottom:.25rem">$0</div>
