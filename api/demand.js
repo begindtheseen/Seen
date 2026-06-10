@@ -34,7 +34,7 @@ async function handleGet(req, res) {
   res.setHeader('Cache-Control', 'public, max-age=21600, stale-while-revalidate=86400');
 
   const SUPABASE_URL  = process.env.SUPABASE_URL;
-  const SUPABASE_ANON = process.env.SUPABASE_ANON_KEY;
+  const SUPABASE_ANON = process.env.SUPABASE_ANON_KEY || process.env.SUPABASE_SERVICE_KEY;
 
   if (!SUPABASE_URL || !SUPABASE_ANON) {
     return res.status(200).json({ ok: true, demand: [], generated_at: new Date().toISOString() });
