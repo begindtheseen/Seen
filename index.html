@@ -2212,8 +2212,31 @@ nav.nav-scrolled{background:rgba(6,6,8,0.82);backdrop-filter:blur(60px) saturate
     <div style="background:var(--surface);border:1px solid var(--line);border-radius:14px;overflow:hidden;margin-bottom:1.5rem">
       <div style="padding:.85rem 1.25rem;border-bottom:1px solid var(--line);font-family:var(--mono);font-size:.62rem;color:var(--dim);text-transform:uppercase;letter-spacing:.08em">Account &amp; Security</div>
       <div style="padding:1.25rem">
-        <div style="font-size:.78rem;color:var(--sub);margin-bottom:.75rem;line-height:1.6">To change your password, sign out and use "Forgot password" on the sign-in screen.</div>
-        <button onclick="doSignOut()" style="background:none;border:1px solid var(--line2);color:var(--muted);border-radius:8px;padding:.6rem 1.25rem;font-family:var(--mono);font-size:.72rem;cursor:pointer;width:100%">Sign out</button>
+        <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.5rem;margin-bottom:.75rem">
+          <div>
+            <div style="font-size:.82rem;font-weight:500;color:var(--white)">Change password</div>
+            <div style="font-family:var(--mono);font-size:.62rem;color:var(--muted)">A reset link is sent to your email</div>
+          </div>
+          <button class="btn btn-ghost" style="font-size:.75rem" onclick="initProfPasswordReset(this)">Send link →</button>
+        </div>
+        <div id="profCodeEntry" style="display:none;border-top:1px solid var(--line);padding-top:.85rem;margin-bottom:.85rem">
+          <div style="font-family:var(--mono);font-size:.62rem;color:var(--blue);margin-bottom:.75rem">✓ Link sent — click it in your email, then come back and set your new password here</div>
+          <div style="margin-bottom:.65rem">
+            <label style="font-family:var(--mono);font-size:.58rem;text-transform:uppercase;letter-spacing:.07em;color:var(--dim);display:block;margin-bottom:.32rem">New password</label>
+            <input id="profNewPass" type="password" placeholder="Min 8 characters" style="width:100%;background:var(--raised);border:1.5px solid var(--line2);border-radius:8px;padding:.65rem .9rem;color:var(--white);font-family:var(--body);font-size:.84rem;outline:none;caret-color:var(--blue)" onfocus="this.style.borderColor='var(--blue)'" onblur="this.style.borderColor='var(--line2)'"/>
+          </div>
+          <div style="margin-bottom:.85rem">
+            <label style="font-family:var(--mono);font-size:.58rem;text-transform:uppercase;letter-spacing:.07em;color:var(--dim);display:block;margin-bottom:.32rem">Confirm new password</label>
+            <input id="profConfirmPass" type="password" placeholder="Confirm password" style="width:100%;background:var(--raised);border:1.5px solid var(--line2);border-radius:8px;padding:.65rem .9rem;color:var(--white);font-family:var(--body);font-size:.84rem;outline:none;caret-color:var(--blue)" onfocus="this.style.borderColor='var(--blue)'" onblur="this.style.borderColor='var(--line2)'"/>
+          </div>
+          <div style="display:flex;gap:.5rem">
+            <button class="btn btn-ghost" style="flex:1;justify-content:center;font-size:.78rem" onclick="document.getElementById('profCodeEntry').style.display='none'">Cancel</button>
+            <button class="btn btn-green" id="profUpdatePassBtn" style="flex:2;justify-content:center;font-weight:800;font-size:.78rem" onclick="verifyProfPasswordReset()">Update password →</button>
+          </div>
+        </div>
+        <div style="border-top:1px solid var(--line);padding-top:.75rem">
+          <button onclick="doSignOut()" style="background:none;border:1px solid var(--line2);color:var(--muted);border-radius:8px;padding:.6rem 1.25rem;font-family:var(--mono);font-size:.72rem;cursor:pointer;width:100%">Sign out</button>
+        </div>
       </div>
     </div>
 
@@ -3367,6 +3390,9 @@ async function runSearch(name,loc){
   const risk=sc.risk_level||Score.risk(sc.overall_score);
   _modalGlow('#modalOv .modal', risk);
   const grade=letterGrade(sc.overall_score);
+  // Set share context here so Reddit/Threads canvas cards work from the quick modal
+  // (previously only set in viewCompany, making these buttons useless in the popup)
+  _shareCtx = { name: known?.name||name, score: sc.overall_score, ghost: Math.round((sc.ghost_rate||0)*100), resp: Math.round((sc.response_rate||0)*100), wait: sc.avg_wait_days||null, waste: sc.waste||0, risk, grade };
   const vibeList=VIBES[ck]||VIBES.default;
   const ghostPct=Math.round((sc.ghost_rate||0)*100);
   const respPct=Math.round((sc.response_rate||0)*100);
@@ -9961,6 +9987,37 @@ async function verifySeekerPasswordReset() {
     const el = document.getElementById(id); if (el) el.value = '';
   });
   showToast('Password updated successfully 🔒');
+}
+
+// Profile page password change (separate IDs from the seeker-dash version)
+async function initProfPasswordReset(btn) {
+  if (!db) { showToast('Connection error.'); return; }
+  const authRes = await db.auth.getUser().catch(() => null);
+  const user = authRes?.data?.user;
+  if (!user?.email) { showToast('No email on file.'); return; }
+  if (btn) { btn.textContent = 'Sending...'; btn.disabled = true; }
+  const { error } = await db.auth.resetPasswordForEmail(user.email, { redirectTo: window.location.origin + '/?reset=true' });
+  if (btn) { btn.textContent = 'Send link →'; btn.disabled = false; }
+  if (error) { showToast(error.message); return; }
+  const entry = document.getElementById('profCodeEntry');
+  if (entry) entry.style.display = 'block';
+  showToast('Link sent — click it in your email, then come back to set your new password.');
+}
+
+async function verifyProfPasswordReset() {
+  const newPass = document.getElementById('profNewPass')?.value?.trim();
+  const confirmPass = document.getElementById('profConfirmPass')?.value?.trim();
+  if (!newPass || newPass.length < 8) { showToast('Password must be at least 8 characters.'); return; }
+  if (newPass !== confirmPass) { showToast("Passwords don't match."); return; }
+  const btn = document.getElementById('profUpdatePassBtn');
+  if (btn) { btn.textContent = 'Updating...'; btn.disabled = true; }
+  const { error } = await db.auth.updateUser({ password: newPass });
+  if (btn) { btn.textContent = 'Update password →'; btn.disabled = false; }
+  if (error) { showToast(error.message); return; }
+  const entry = document.getElementById('profCodeEntry');
+  if (entry) entry.style.display = 'none';
+  ['profNewPass','profConfirmPass'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+  showToast('Password updated 🔒');
 }
 
 // ═══════════════════════════════════════════════
