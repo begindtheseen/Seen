@@ -770,9 +770,52 @@ nav.nav-scrolled{background:rgba(6,6,8,0.82);backdrop-filter:blur(60px) saturate
 .hs-m-avg{font-family:var(--mono);font-size:.46rem;color:var(--dim)}
 .hs-recs{display:flex;flex-direction:column;gap:.38rem;padding-top:.15rem}
 .hs-rec{display:flex;align-items:flex-start;gap:.5rem;font-size:.7rem;color:var(--sub);font-weight:300;line-height:1.4}
+
+/* ── INTRO SPLASH ── */
+#introSplash{
+  position:fixed;inset:0;z-index:99999;
+  background:var(--void);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:0;
+  pointer-events:all;
+  transition:opacity .45s cubic-bezier(.4,0,.2,1);
+}
+#introSplash.out{opacity:0;pointer-events:none;}
+#introSplash .sp-dot{
+  width:8px;height:8px;border-radius:50%;background:var(--green);
+  animation:spDotPulse 1.2s ease-in-out infinite;
+  margin-bottom:1.1rem;
+}
+#introSplash .sp-logo{
+  font-family:var(--display);font-size:3rem;font-weight:900;
+  color:var(--white);letter-spacing:-.05em;line-height:1;
+  opacity:0;transform:translateY(10px);
+  animation:spLogoIn .5s .1s cubic-bezier(.22,1,.36,1) forwards;
+  margin-bottom:.55rem;
+}
+#introSplash .sp-tag{
+  font-family:var(--mono);font-size:.68rem;color:var(--muted);letter-spacing:.05em;
+  opacity:0;
+  animation:spTagIn .45s .45s ease forwards;
+}
+#introSplash .sp-bar{
+  position:absolute;bottom:0;left:0;height:2px;background:var(--green);
+  width:0%;animation:spBar 1.6s .1s cubic-bezier(.4,0,.2,1) forwards;
+  opacity:.6;
+}
+@keyframes spDotPulse{0%,100%{opacity:.4;transform:scale(.8)}50%{opacity:1;transform:scale(1.15)}}
+@keyframes spLogoIn{to{opacity:1;transform:translateY(0)}}
+@keyframes spTagIn{to{opacity:1}}
+@keyframes spBar{0%{width:0%}70%{width:85%}100%{width:100%}}
 </style>
 </head>
 <body>
+<div id="introSplash" aria-hidden="true">
+  <div class="sp-dot"></div>
+  <div class="sp-logo">Seen</div>
+  <div class="sp-tag">Know before you apply.</div>
+  <div class="sp-bar"></div>
+</div>
 <div class="aurora"><div class="aurora-3"></div></div>
 
 <!-- EMPLOYER SIDE PANEL -->
@@ -9707,6 +9750,22 @@ function _handleSharedLink(){
 })();
 
 // ── INIT ──
+function _hideSplash(){
+  const sp=document.getElementById('introSplash');
+  if(!sp||sp.dataset.gone)return;
+  sp.dataset.gone='1';
+  // Let the bar animation finish (≥1.7s total) before fading out
+  const elapsed=performance.now();
+  const minShow=1700;
+  const delay=Math.max(0,minShow-elapsed);
+  setTimeout(()=>{
+    sp.classList.add('out');
+    setTimeout(()=>sp.remove(),500);
+  },delay);
+}
+// Safety net — hide after 3s no matter what
+setTimeout(_hideSplash,3000);
+
 updateNav();
 startHeroRotation();
 if(db){
@@ -9719,9 +9778,11 @@ if(db){
     if(Auth.isSeeker()){renderSeekerDash();if(!_restoring)go('seeker-dash');}
     else if(Auth.isEmployer()&&!_restoring){goToEmployerDashboard();}
     _handleSharedLink();
-  }).catch(e=>{console.warn('Auth init:',e);_handleSharedLink();});
+    _hideSplash();
+  }).catch(e=>{console.warn('Auth init:',e);_handleSharedLink();_hideSplash();});
 } else {
   setTimeout(_handleSharedLink, 500);
+  _hideSplash();
 }
 
 // Lock body scroll when any modal is open — prevents background page scroll on iOS
