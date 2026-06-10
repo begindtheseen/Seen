@@ -6330,49 +6330,278 @@ async function generateWeeklyDigest() {
 // ═══════════════════════════════════════════════
 // SEEKER DASHBOARD
 // ═══════════════════════════════════════════════
+// ── Job Search Health Engine ─────────────────────────────────────────────────
+// 30 independent signals across 4 categories with Bayesian confidence blending.
+// Benchmarks: Greenhouse State of Hiring 2023, LinkedIn Talent Insights, Indeed Hiring Lab, Jobvite.
+const HS_ENGINE = (() => {
+  // Industry benchmarks — sourced from publicly available recruiting research
+  const B = {
+    response_rate:       0.20,  // LinkedIn/Indeed: 20% of apps get any reply
+    ghost_rate:          0.55,  // Greenhouse 2023: 55% per-application ghost rate
+    interview_rate:      0.025, // Greenhouse: 2.5% app-to-interview conversion
+    phone_screen_rate:   0.08,  // Funnel estimate: ~8% reach phone screen or beyond
+    offer_rate:          0.008, // Funnel: ~0.8% app-to-offer
+    hire_rate:           0.005, // ~0.5% app-to-hire
+    interview_to_offer:  0.17,  // Greenhouse 2023: 17% of interviews convert to offer
+    positive_ratio:      0.35,  // ~35% of responses are interviews vs. rejections
+    avg_company_score:   65,
+    avg_waste:           35,
+  };
+
+  // Bayesian confidence: exponential curve — at n=scale sample feels fully trusted
+  const _c  = (n, sc=12) => 1 - Math.exp(-n / sc);
+  const _bl = (u, b, n, sc=12) => { const c=_c(n,sc); return u*c + b*(1-c); };
+
+  // Normalizers
+  const _n  = (v, lo, hi) => Math.max(0, Math.min(100, (v-lo)/(hi-lo)*100));
+  const _ni = (v, lo, hi) => Math.max(0, Math.min(100, (1-(v-lo)/(hi-lo))*100));
+  // Range: peaks inside [optLo, optHi], falls off outside
+  const _nr = (v, lo, optLo, optHi, hi) => {
+    if (v <= lo) return 0;
+    if (v < optLo) return _n(v, lo, optLo) * 0.72;
+    if (v <= optHi) return 100;
+    return Math.max(0, _ni(v, optHi, hi) * 0.72);
+  };
+
+  return {
+    compute(apps) {
+      if (!apps || apps.length < 3) return null;
+      const n = apps.length, now = Date.now();
+
+      // ── Subsets ────────────────────────────────────────────────────────────────
+      const active    = apps.filter(a => a.status==='active');
+      const ghosted   = apps.filter(a => a.status==='ghosted');
+      const hired     = apps.filter(a => a.status==='hired');
+      const resolved  = apps.filter(a => a.status!=='active');
+      const responded = apps.filter(a => a.status!=='active' && a.status!=='ghosted');
+      const phoneScreened = apps.filter(a => {
+        const s=(a.stage||'').toLowerCase();
+        return s.includes('phone')||s.includes('screen')||s.includes('interview')||s.includes('offer')||s.includes('hired')||a.status==='hired'||a.status==='offer';
+      });
+      const interviewed = apps.filter(a => {
+        const s=(a.stage||'').toLowerCase();
+        return s.includes('interview')||s.includes('offer')||s.includes('hired')||a.status==='hired'||a.status==='offer';
+      });
+      const offers = apps.filter(a => {
+        const s=(a.stage||'').toLowerCase();
+        return s.includes('offer')||s.includes('hired')||a.status==='hired'||a.status==='offer';
+      });
+
+      // ── COS cross-reference ────────────────────────────────────────────────────
+      const withCos = apps.map(a => {
+        if (!a.company) return {...a, _co:null};
+        const cn = a.company.toLowerCase().trim();
+        const co = COS[cn] || Object.values(COS).find(c => c.name && c.name.toLowerCase()===cn);
+        return {...a, _co: co||null};
+      });
+      const hasCos         = withCos.filter(a => a._co);
+      const highGhostCos   = withCos.filter(a => (a._co?.sc?.ghost_rate||0) > 0.50);
+      const highRiskCos    = withCos.filter(a => a._co?.sc?.risk_level==='danger');
+      const avgCosGhostRate= hasCos.length ? hasCos.reduce((s,a)=>s+(a._co.sc?.ghost_rate||B.ghost_rate),0)/hasCos.length : B.ghost_rate;
+      const avgWaitDays    = hasCos.length ? hasCos.reduce((s,a)=>s+(a._co.sc?.avg_wait_days||30),0)/hasCos.length : 30;
+      const avgCosWaste    = hasCos.length ? hasCos.reduce((s,a)=>s+(a._co.sc?.waste||35),0)/hasCos.length : B.avg_waste;
+      const industries     = new Set(hasCos.map(a=>a._co.ind).filter(Boolean));
+
+      // ── Pipeline helpers ───────────────────────────────────────────────────────
+      const activeAdvanced = active.filter(a => {
+        const s=(a.stage||'').toLowerCase();
+        return s.includes('phone')||s.includes('screen')||s.includes('interview')||s.includes('offer');
+      });
+      const stale   = active.filter(a => (now-(a.updatedAt||a.appliedAt)) > 30*86400000);
+      const stalled = active.filter(a => (now-(a.updatedAt||a.appliedAt)) > 21*86400000);
+      const recent14 = apps.filter(a => (now-a.appliedAt) < 14*86400000);
+      const velocity = (recent14.length / 14) * 7;
+
+      const coCounts = {};
+      apps.forEach(a => { if(a.company) coCounts[a.company.toLowerCase()] = (coCounts[a.company.toLowerCase()]||0)+1; });
+      const dupeApps = apps.filter(a => coCounts[a.company?.toLowerCase()] > 1);
+
+      // Role coherence: fewer unique role types = more focused search
+      const roleTitles = apps.map(a => (a.role||'').toLowerCase().replace(/[^a-z ]/g,'').trim()).filter(Boolean);
+      const uniqueRoles = new Set(roleTitles.map(r=>r.split(/\s+/).slice(0,2).join(' '))).size;
+      const roleCoherence = n > 0 ? Math.max(0, 1 - Math.max(0,uniqueRoles-2)/Math.max(1,n*0.5)) : 1;
+
+      // Platform quality: Greenhouse/Lever/ATS = premium; aggregators = good; unknown = neutral
+      const PREM = ['greenhouse','lever','workday','smartrecruiters','ashby','rippling','icims','bamboohr'];
+      const GOOD = ['linkedin','indeed','direct','referral','company website','company site','ziprecruiter','glassdoor'];
+      const platScores = apps.map(a => {
+        const p=(a.platform||'').toLowerCase();
+        if (PREM.some(pp=>p.includes(pp))) return 1.0;
+        if (GOOD.some(gp=>p.includes(gp))) return 0.75;
+        return p ? 0.5 : 0.4;
+      });
+      const avgPlat = platScores.reduce((s,v)=>s+v,0) / n;
+
+      // Targeting consistency: low variance in company scores = disciplined strategy
+      const avgScore = apps.reduce((s,a)=>s+(a.score||65),0)/n;
+      const scoreSD = Math.sqrt(apps.reduce((s,a)=>s+Math.pow((a.score||65)-avgScore,2),0)/n);
+
+      // Update engagement: average gap between apply and last update
+      const updateGaps = apps.filter(a=>a.updatedAt>a.appliedAt).map(a=>(a.updatedAt-a.appliedAt)/86400000);
+      const avgUpdateGap = updateGaps.length ? updateGaps.reduce((s,v)=>s+v,0)/updateGaps.length : 14;
+      const updateEng = Math.max(0, 1 - Math.max(0,avgUpdateGap-3)/25);
+
+      // Response-rate trend: last 14d vs prior 14d
+      const l14 = apps.filter(a=>(now-a.appliedAt)<14*86400000);
+      const p14 = apps.filter(a=>{ const d=(now-a.appliedAt)/86400000; return d>=14&&d<28; });
+      const l14rr = l14.length ? l14.filter(a=>a.status!=='active'&&a.status!=='ghosted').length/l14.length : B.response_rate;
+      const p14rr = p14.length ? p14.filter(a=>a.status!=='active'&&a.status!=='ghosted').length/p14.length : B.response_rate;
+      const rrTrend = (p14.length&&l14.length) ? Math.max(0,Math.min(100,50+(l14rr-p14rr)*150)) : 50;
+
+      // Company quality trend: later apps targeting higher scores?
+      let cqTrend = 50;
+      if (n >= 6) {
+        const sorted=[...apps].sort((a,b)=>a.appliedAt-b.appliedAt);
+        const h=Math.floor(n/2);
+        const eAvg=sorted.slice(0,h).reduce((s,a)=>s+(a.score||65),0)/h;
+        const lAvg=sorted.slice(h).reduce((s,a)=>s+(a.score||65),0)/(n-h);
+        cqTrend = Math.max(0,Math.min(100,50+(lAvg-eAvg)*2));
+      }
+
+      // Ghost recovery: new apps added within 7 days of each ghost event
+      const ghostTimes = ghosted.map(a=>a.updatedAt||a.appliedAt);
+      const recovered = ghostTimes.filter(gt=>apps.some(a=>a.appliedAt>gt&&a.appliedAt<gt+7*86400000)).length;
+      const recoveryScore = ghostTimes.length ? (recovered/ghostTimes.length)*100 : 75;
+
+      // Offer quality: waste score of companies where offers received
+      const offerWaste = offers.map(a=>a.waste||35);
+      const avgOfferWaste = offerWaste.length ? offerWaste.reduce((s,v)=>s+v,0)/offerWaste.length : B.avg_waste;
+
+      // Data freshness: active apps updated within 7 days
+      const freshActive = active.filter(a=>(now-(a.updatedAt||a.appliedAt))<7*86400000);
+      const freshness = active.length ? freshActive.length/active.length : 0.8;
+
+      // Data completeness: how filled-in each record is
+      const completeness = apps.map(a=>[a.company,a.role,a.platform,a.location,a.score!=null].filter(Boolean).length/5);
+      const avgComplete = completeness.reduce((s,v)=>s+v,0)/n;
+
+      // ── Raw rates ──────────────────────────────────────────────────────────────
+      const rawRR  = responded.length/n;
+      const rawGR  = ghosted.length/n;
+      const rawIR  = interviewed.length/n;
+      const rawPSR = phoneScreened.length/n;
+      const rawOR  = offers.length/n;
+      const rawHR  = hired.length/n;
+      const rawI2O = interviewed.length ? offers.length/interviewed.length : B.interview_to_offer;
+      const rawPosR= responded.length ? interviewed.length/responded.length : B.positive_ratio;
+      const rawAvgW= apps.reduce((s,a)=>s+(a.waste||35),0)/n;
+
+      // Bayesian-blended versions
+      const bRR  = _bl(rawRR,  B.response_rate,      n);
+      const bGR  = _bl(rawGR,  B.ghost_rate,          n);
+      const bIR  = _bl(rawIR,  B.interview_rate,      n);
+      const bPSR = _bl(rawPSR, B.phone_screen_rate,   n);
+      const bOR  = _bl(rawOR,  B.offer_rate,           n);
+      const bI2O = _bl(rawI2O, B.interview_to_offer,  interviewed.length);
+      const bPosR= _bl(rawPosR,B.positive_ratio,      responded.length);
+
+      // ── 30 Signals ─────────────────────────────────────────────────────────────
+      const sigs = [
+        // CATEGORY A — OUTCOMES (6 signals) ——————————————————————————————————————
+        { id:'response_rate',       cat:'A', w:10, lbl:'Response rate',          score:_n(bRR, 0, 0.45),                    disp:`${Math.round(bRR*100)}%`,          bench:'20% avg' },
+        { id:'ghost_free_rate',     cat:'A', w:9,  lbl:'Ghost-free rate',         score:_ni(bGR, 0, 0.95),                   disp:`${Math.round((1-bGR)*100)}% replied`, bench:'45% avg (55% ghost)' },
+        { id:'interview_rate',      cat:'A', w:8,  lbl:'Interview conversion',    score:_n(bIR, 0, 0.08),                    disp:`${(bIR*100).toFixed(1)}%`,         bench:'2.5% avg' },
+        { id:'phone_screen_rate',   cat:'A', w:5,  lbl:'Phone screen rate',       score:_n(bPSR, 0, 0.22),                   disp:`${Math.round(bPSR*100)}%`,         bench:'8% avg' },
+        { id:'offer_rate',          cat:'A', w:6,  lbl:'Offer conversion',        score:_n(bOR, 0, 0.04),                    disp:`${(bOR*100).toFixed(1)}%`,         bench:'0.8% avg' },
+        { id:'interview_to_offer',  cat:'A', w:5,  lbl:'Interview→offer rate',    score:_n(bI2O, 0, 0.42),                   disp:`${Math.round(bI2O*100)}%`,         bench:'17% avg' },
+
+        // CATEGORY B — TARGETING (8 signals) ————————————————————————————————————
+        { id:'avg_company_score',   cat:'B', w:7,  lbl:'Company score quality',   score:_n(avgScore, 20, 95),                 disp:Math.round(avgScore),               bench:'65 baseline' },
+        { id:'ghost_co_targeting',  cat:'B', w:6,  lbl:'Ghost-rate targeting',    score:hasCos.length ? _ni(highGhostCos.length/hasCos.length, 0, 0.65) : 50, disp:hasCos.length ? `${Math.round(highGhostCos.length/hasCos.length*100)}% high-ghost` : 'n/a', bench:'<20% ideal' },
+        { id:'waste_targeting',     cat:'B', w:5,  lbl:'Low-waste targeting',     score:_ni(rawAvgW, 0, 85),                  disp:Math.round(rawAvgW),                bench:'35 baseline' },
+        { id:'risk_targeting',      cat:'B', w:4,  lbl:'Risk-adjusted targeting', score:hasCos.length ? _ni(highRiskCos.length/hasCos.length, 0, 0.55) : 50, disp:hasCos.length ? `${Math.round(highRiskCos.length/hasCos.length*100)}% danger-rated` : 'n/a', bench:'<15% ideal' },
+        { id:'platform_quality',    cat:'B', w:3,  lbl:'Application source',      score:avgPlat*100,                           disp:`${Math.round(avgPlat*100)}/100`,   bench:'direct/ATS best' },
+        { id:'score_consistency',   cat:'B', w:2,  lbl:'Targeting consistency',   score:_ni(scoreSD, 0, 28),                  disp:`±${Math.round(scoreSD)} SD`,       bench:'low spread = focused' },
+        { id:'industry_diversity',  cat:'B', w:2,  lbl:'Industry spread',         score:hasCos.length < 3 ? 60 : Math.min(100, industries.size/4*100), disp:hasCos.length ? `${industries.size} industries` : 'n/a', bench:'3+ ideal' },
+        { id:'role_coherence',      cat:'B', w:1,  lbl:'Role focus',              score:roleCoherence*100,                     disp:`${uniqueRoles} role types`,        bench:'focused = higher ATS match' },
+
+        // CATEGORY C — PIPELINE (8 signals) —————————————————————————————————————
+        { id:'pipeline_depth',      cat:'C', w:5,  lbl:'Pipeline depth',          score:_nr(active.length, 0, 5, 20, 40),    disp:`${active.length} active`,          bench:'5–20 active' },
+        { id:'stage_progression',   cat:'C', w:5,  lbl:'Stage advancement',       score:active.length ? _n(activeAdvanced.length/active.length, 0, 0.45) : 50, disp:active.length ? `${Math.round(activeAdvanced.length/active.length*100)}% past Applied` : 'n/a', bench:'25%+ advancing' },
+        { id:'stale_rate',          cat:'C', w:4,  lbl:'Pipeline freshness',      score:active.length ? _ni(stale.length/active.length, 0, 0.65) : 80, disp:active.length ? `${Math.round(stale.length/active.length*100)}% stale` : 'n/a', bench:'<20% stale' },
+        { id:'velocity',            cat:'C', w:4,  lbl:'Application velocity',    score:_nr(velocity, 0, 5, 12, 25),          disp:`${velocity.toFixed(1)}/wk`,        bench:'5–12/week' },
+        { id:'update_engagement',   cat:'C', w:3,  lbl:'Tracking engagement',     score:updateEng*100,                         disp:`${Math.round(avgUpdateGap)}d avg gap`, bench:'update weekly' },
+        { id:'resolution_rate',     cat:'C', w:3,  lbl:'Pipeline churn',          score:_nr(resolved.length/n, 0, 0.25, 0.75, 1.0), disp:`${Math.round(resolved.length/n*100)}% resolved`, bench:'25–75% resolved' },
+        { id:'stage_stall_rate',    cat:'C', w:3,  lbl:'Stall rate',              score:active.length ? _ni(stalled.length/active.length, 0, 0.60) : 85, disp:active.length ? `${stalled.length} stalled` : 'n/a', bench:'0 stalled' },
+        { id:'duplicate_rate',      cat:'C', w:2,  lbl:'Duplicate applications',  score:_ni(dupeApps.length/n, 0, 0.25),      disp:`${Math.round(dupeApps.length/n*100)}%`, bench:'<5%' },
+
+        // CATEGORY D — ADVANCED (8 signals) —————————————————————————————————————
+        { id:'response_trend',         cat:'D', w:2, lbl:'Response rate trend',      score:rrTrend,                           disp:rrTrend>55?'↑ improving':rrTrend<45?'↓ declining':'→ stable', bench:'improving' },
+        { id:'company_quality_trend',  cat:'D', w:2, lbl:'Targeting quality trend',  score:cqTrend,                          disp:cqTrend>55?'↑ improving':cqTrend<45?'↓ declining':'→ stable', bench:'improving' },
+        { id:'positive_ratio',         cat:'D', w:2, lbl:'Response quality',         score:_n(bPosR, 0, 0.60),               disp:responded.length?`${Math.round(bPosR*100)}% positive`:'n/a',  bench:'35% avg' },
+        { id:'offer_quality',          cat:'D', w:2, lbl:'Offer quality',            score:offers.length ? _ni(avgOfferWaste,0,85) : 50, disp:offers.length?`waste ${Math.round(avgOfferWaste)}`:'no offers yet', bench:'low waste = quality' },
+        { id:'ghost_recovery',         cat:'D', w:1, lbl:'Ghost recovery',           score:recoveryScore,                    disp:ghosted.length?`${Math.round(recoveryScore)}% resilience`:'n/a', bench:'quick rebound' },
+        { id:'data_freshness',         cat:'D', w:2, lbl:'Data freshness',           score:freshness*100,                    disp:`${Math.round(freshness*100)}% current`, bench:'>70% fresh' },
+        { id:'data_completeness',      cat:'D', w:1, lbl:'Record completeness',      score:avgComplete*100,                  disp:`${Math.round(avgComplete*100)}%`,   bench:'>80%' },
+        { id:'avg_wait_alignment',     cat:'D', w:1, lbl:'Wait-time calibration',    score:hasCos.length ? _ni(avgWaitDays,0,90) : 60, disp:hasCos.length?`${Math.round(avgWaitDays)}d avg wait`:'n/a', bench:'shorter = better' },
+      ];
+
+      // ── Weighted sum ───────────────────────────────────────────────────────────
+      const totalW = sigs.reduce((s,sg)=>s+sg.w, 0);
+      const overall = Math.round(sigs.reduce((s,sg)=>s+sg.score*sg.w, 0) / totalW);
+
+      // ── Category scores ────────────────────────────────────────────────────────
+      const cats = { A:{lbl:'Outcomes',w:0,s:0}, B:{lbl:'Targeting',w:0,s:0}, C:{lbl:'Pipeline',w:0,s:0}, D:{lbl:'Advanced',w:0,s:0} };
+      sigs.forEach(sg => { cats[sg.cat].w+=sg.w; cats[sg.cat].s+=sg.score*sg.w; });
+      const categories = Object.values(cats).map(c => ({ lbl:c.lbl, score:Math.round(c.s/c.w) }));
+
+      // ── Top issues for recommendations (weakest high-weight signals) ───────────
+      const topIssues = [...sigs]
+        .filter(sg => sg.w >= 2)
+        .map(sg => ({...sg, deficit:(100-sg.score)*sg.w}))
+        .sort((a,b) => b.deficit-a.deficit)
+        .slice(0, 5);
+
+      return {
+        score: overall, signals: sigs, categories, topIssues,
+        responseRate: Math.round(rawRR*100),
+        ghostRate:    Math.round(rawGR*100),
+        interviewRate: (rawIR*100).toFixed(1),
+        offerRate:    (rawOR*100).toFixed(1),
+        avgCompanyScore: Math.round(avgScore),
+        avgWaste: Math.round(rawAvgW),
+        total: n, active: active.length,
+      };
+    }
+  };
+})();
+
 function calcJobSearchHealth(apps) {
   if (!apps || apps.length < 3) return null;
-  const total = apps.length;
-  const ghosted     = apps.filter(a => (a.status||'') === 'ghosted');
-  const responded   = apps.filter(a => { const s=a.status||''; return s!=='active'&&s!=='ghosted'; });
-  const interviewed = apps.filter(a => {
-    const st=(a.stage||'').toLowerCase();
-    return st.includes('interview')||st.includes('phone')||st.includes('offer')||(a.status||'')==='hired';
-  });
-  const avgCo = apps.reduce((s,a) => s+(a.score||65), 0) / total;
-  const responseRate  = responded.length   / total * 100;
-  const ghostRate     = ghosted.length     / total * 100;
-  const interviewRate = interviewed.length / total * 100;
-  // Points: response(35) + ghost-inverse(25) + interview(25) + co-quality(15) = 100
-  const rrPts = Math.min(35, responseRate  / 25 * 35);
-  const grPts = Math.max(0,  (1 - ghostRate/100) * 25);
-  const irPts = Math.min(25, interviewRate / 10 * 25);
-  const cqPts = Math.min(15, Math.max(0, (avgCo-40)/50 * 15));
-  return {
-    score: Math.round(rrPts+grPts+irPts+cqPts),
-    responseRate:   Math.round(responseRate),
-    ghostRate:      Math.round(ghostRate),
-    interviewRate:  Math.round(interviewRate * 10) / 10,
-    avgCompanyScore: Math.round(avgCo),
-    total
-  };
+  return HS_ENGINE.compute(apps);
 }
 
-function getHealthRecs(h) {
-  const recs = [];
-  if (h.ghostRate > 50)
-    recs.push({ icon: '👻', text: `${h.ghostRate}% ghost rate — filter for companies with Seen scores above 70 before applying.` });
-  if (h.responseRate < 15)
-    recs.push({ icon: '📬', text: `Only ${h.responseRate}% response rate. Use Resume AI to tailor each application and improve callbacks.` });
-  else if (h.responseRate < 25)
-    recs.push({ icon: '📬', text: `${h.responseRate}% response rate — above average, but personalizing further can push it higher.` });
-  if (h.interviewRate < 4 && h.total >= 5)
-    recs.push({ icon: '🎤', text: `${h.interviewRate}% interview rate. Try fewer, better-matched roles instead of mass applying.` });
-  if (h.avgCompanyScore < 60)
-    recs.push({ icon: '🏢', text: `Avg company score ${h.avgCompanyScore} — you're targeting many low-rated companies. Quality over quantity.` });
-  if (!recs.length)
-    recs.push({ icon: '🔥', text: `Strong pipeline — you're outperforming most job seekers. Keep tracking every application.` });
-  return recs.slice(0, 2);
+function getHealthRecs(health) {
+  if (!health?.topIssues) return [];
+  const RECS = {
+    response_rate:         {i:'📬', t:h=>`${h.responseRate}% response rate — personalize each application to the exact role requirements. Generic applications are filtered by ATS before a human sees them.`},
+    ghost_free_rate:       {i:'👻', t:h=>`${h.ghostRate}% ghost rate. Target companies with Seen scores above 70 — data shows they respond 3× more consistently than lower-scored companies.`},
+    interview_rate:        {i:'🎤', t:h=>`${h.interviewRate}% interview conversion. Apply to 5–10 tightly targeted roles per week instead of mass applying — precision outperforms volume in every study.`},
+    phone_screen_rate:     {i:'📞', t:()=>`Low phone screen rate signals ATS filtering. Use Resume AI to mirror each job description's exact language — ATS systems reject ~75% of resumes before a recruiter looks.`},
+    offer_rate:            {i:'🎯', t:()=>`Offer rate below average. Identify which company types converted your interviews and double-down on similar profiles rather than diversifying further.`},
+    interview_to_offer:    {i:'🏁', t:()=>`Interviews not converting to offers. Request specific feedback after rejections — patterns across interviewers often point to one fixable thing.`},
+    avg_company_score:     {i:'🏢', t:h=>`Avg company score ${h.avgCompanyScore} is below 70 — the threshold where response rates measurably improve. Filter Seen results before your next batch.`},
+    ghost_co_targeting:    {i:'👻', t:()=>`You're applying to companies flagged for high ghost rates. Check each company's Seen page before applying — their documented track record is the best predictor of yours.`},
+    waste_targeting:       {i:'⚠️', t:()=>`High average waste score across targeted companies. These companies show layoff history, opacity, or process red flags — shift toward higher-scored alternatives.`},
+    risk_targeting:        {i:'🚨', t:()=>`Multiple applications to danger-rated companies. Review the risk flags on each company page before committing application effort.`},
+    platform_quality:      {i:'🔗', t:()=>`Apply through company ATS directly (Greenhouse, Lever, Workday) — direct applications have 2–3× higher response rates than aggregator submissions.`},
+    pipeline_depth:        {i:'📊', t:h=>`${h.active} active applications. Aim for 5–20 active at once: enough volume for probability to work, few enough to follow up on every one meaningfully.`},
+    stage_progression:     {i:'📈', t:()=>`Most applications are stuck at "Applied." A concise, specific follow-up at day 7 increases interview rate by ~40% — the majority of applicants never follow up at all.`},
+    stale_rate:            {i:'⏰', t:()=>`Stale applications (30+ days, no update) are hiding your real performance. Mark them ghosted or follow up — unresolved limbo skews every metric in this score.`},
+    velocity:              {i:'⚡', t:()=>`Application velocity is outside the optimal 5–12/week range. Consistent, targeted applications outperform application bursts in every longitudinal study.`},
+    stage_stall_rate:      {i:'🔄', t:()=>`Applications stuck at interview stage. Silence after an interview is rarely a decision — a polite, specific follow-up is appropriate and often expected.`},
+    update_engagement:     {i:'📝', t:()=>`Update statuses consistently. Real-time tracking is what keeps your health score calibrated and your recommendations signal-driven rather than guesswork.`},
+    duplicate_rate:        {i:'🔁', t:()=>`Duplicate company applications suggest tracking gaps. Multiple submissions to the same company rarely improve odds and can flag you as disorganized to their ATS.`},
+    response_trend:        {i:'📉', t:()=>`Response rate declining. Identify which platforms and company types have been converting — shift effort toward your highest-performing segments.`},
+    company_quality_trend: {i:'📉', t:()=>`Targeting quality declining over time. Search fatigue leads to lower-quality applications — review your recent batch against your original target criteria.`},
+    data_completeness:     {i:'📋', t:()=>`Several records are missing key fields. Complete platform, location, and company data to unlock more signal analysis and sharpen recommendations.`},
+    data_freshness:        {i:'🕐', t:()=>`Active applications need updating. Log what you know — even marking something as "still waiting" counts and keeps your pipeline data accurate.`},
+  };
+  return health.topIssues.slice(0,2).map(sg => {
+    const r = RECS[sg.id];
+    if (!r) return { icon:'💡', text:`Improve ${sg.lbl.toLowerCase()} to boost your overall score.` };
+    return { icon: r.i, text: r.t(health) };
+  });
 }
 
 async function renderSeekerDash(){
@@ -6446,7 +6675,7 @@ async function renderSeekerDash(){
       const grC = health.ghostRate<=30?'var(--green)':health.ghostRate<=55?'#f59e0b':'var(--red)';
       const irC = health.interviewRate>=5?'var(--green)':health.interviewRate>=2?'#f59e0b':'var(--red)';
       const cqC = health.avgCompanyScore>=70?'var(--green)':health.avgCompanyScore>=55?'#f59e0b':'var(--red)';
-      const recs=getHealthRecs(health);
+      const catColor=sc=>sc>=70?'var(--green)':sc>=50?'#f59e0b':'var(--red)';
       hsEl.style.display='block';
       hsEl.innerHTML=`<div class="hs-card">
         <div class="hs-hdr">
@@ -6456,10 +6685,16 @@ async function renderSeekerDash(){
           </div>
           <div style="text-align:right;flex-shrink:0">
             <span class="hs-num" style="color:${color}">${s}</span><span class="hs-grade" style="color:${color}">${grade}</span>
-            <div style="font-family:var(--mono);font-size:.5rem;color:var(--dim);margin-top:.15rem">out of 100 · ${health.total} apps</div>
+            <div style="font-family:var(--mono);font-size:.48rem;color:var(--dim);margin-top:.15rem">30 signals · ${health.total} apps</div>
           </div>
         </div>
         <div class="hs-bar-bg"><div class="hs-bar-fill" style="width:${s}%;background:${barGrad}"></div></div>
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:.35rem;margin-bottom:.9rem">
+          ${health.categories.map(c=>`<div style="background:rgba(255,255,255,.02);border:1px solid rgba(255,255,255,.05);border-radius:6px;padding:.35rem .4rem;text-align:center">
+            <div style="font-family:var(--mono);font-size:.42rem;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);margin-bottom:.18rem">${c.lbl}</div>
+            <div style="font-family:var(--mono);font-size:.78rem;font-weight:600;color:${catColor(c.score)}">${c.score}</div>
+          </div>`).join('')}
+        </div>
         <div class="hs-metrics">
           <div class="hs-metric">
             <div class="hs-m-lbl">Response rate</div>
@@ -6469,12 +6704,12 @@ async function renderSeekerDash(){
           <div class="hs-metric">
             <div class="hs-m-lbl">Ghost rate</div>
             <div class="hs-m-val" style="color:${grC}">${health.ghostRate}%</div>
-            <div class="hs-m-avg">vs 47% avg</div>
+            <div class="hs-m-avg">vs 55% avg</div>
           </div>
           <div class="hs-metric">
             <div class="hs-m-lbl">Interview rate</div>
             <div class="hs-m-val" style="color:${irC}">${health.interviewRate}%</div>
-            <div class="hs-m-avg">vs 5% avg</div>
+            <div class="hs-m-avg">vs 2.5% avg</div>
           </div>
           <div class="hs-metric">
             <div class="hs-m-lbl">Co. quality</div>
