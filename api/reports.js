@@ -1,22 +1,21 @@
 // Server-side reports fetch — uses service key to bypass RLS.
 // Queries by company_name column directly — no company table join needed.
 
-// Module-level Reddit cache — persists across warm Vercel invocations
-let _redditCache = null;
-let _redditCacheTime = 0;
-const REDDIT_TTL = 60 * 60 * 1000; // 1 hour
+// Module-level HN cache — persists across warm Vercel invocations
+let _hnCache = null;
+let _hnCacheTime = 0;
+const HN_TTL = 60 * 60 * 1000; // 1 hour
 
-async function fetchRedditPosts() {
+async function fetchHNPosts() {
   const now = Date.now();
-  if (_redditCache && now - _redditCacheTime < REDDIT_TTL) return _redditCache;
+  if (_hnCache && now - _hnCacheTime < HN_TTL) return _hnCache;
 
-  const subs = ['recruitinghell', 'cscareerquestions', 'jobs'];
-  const classify = (title, body) => {
-    const t = (title + ' ' + body).toLowerCase();
+  const classify = (title, text) => {
+    const t = (title + ' ' + (text || '')).toLowerCase();
     if (/ghosted|no response|never heard|radio silence|heard nothing|disappeared/.test(t)) return 'ghosted';
-    if (/rejected|rejection|turned down|not moving forward|not selected/.test(t)) return 'autoreject';
-    if (/got.*offer|accepted.*offer|start date|got the job|signed.*offer|onboarding/.test(t)) return 'hired';
-    if (/interview|phone screen|technical round|coding round|final round/.test(t)) return 'human';
+    if (/rejected|rejection|turned down|not moving forward|not selected|didn.t get/.test(t)) return 'autoreject';
+    if (/got.*offer|accepted.*offer|start date|got the job|signed.*offer|new job|just started/.test(t)) return 'hired';
+    if (/interview|phone screen|technical round|coding round|final round|got.*interview/.test(t)) return 'human';
     return null;
   };
   const extractCo = title => {
@@ -24,38 +23,52 @@ async function fetchRedditPosts() {
     return m?.[1]?.trim() || '';
   };
 
-  const results = await Promise.all(subs.map(sub =>
-    fetch(`https://www.reddit.com/r/${sub}/new.json?limit=100`, {
-      headers: { 'User-Agent': 'Seen/1.0 (seenjobs.io job transparency platform)', Accept: 'application/json' },
-      signal: AbortSignal.timeout(10000),
+  // Multiple queries to cover all outcome types
+  const queries = [
+    'ghosted job interview hiring',
+    'rejected job application interview',
+    'job offer accepted hired',
+    'job interview experience technical',
+    'recruiting ghosted no response',
+    'job search application rejected offer',
+  ];
+
+  const results = await Promise.all(queries.map(q =>
+    fetch(`https://hn.algolia.com/api/v1/search?query=${encodeURIComponent(q)}&tags=story&hitsPerPage=50&numericFilters=created_at_i%3E${Math.floor((now - 365*24*3600*1000)/1000)}`, {
+      signal: AbortSignal.timeout(8000),
     })
     .then(r => r.ok ? r.json() : null)
-    .then(d => (d?.data?.children || []).map(c => c.data).filter(p => p && !p.stickied && (p.selftext?.length > 60 || p.title?.length > 40)))
+    .then(d => d?.hits || [])
     .catch(() => [])
   ));
 
-  const posts = results.flat().map(p => {
-    const oc = classify(p.title, p.selftext || '');
+  const seen = new Set();
+  const posts = results.flat().filter(h => {
+    if (seen.has(h.objectID)) return false;
+    seen.add(h.objectID);
+    return h.title && (h.story_text || h.title.length > 30);
+  }).map(h => {
+    const oc = classify(h.title, h.story_text || '');
     if (!oc) return null;
     return {
-      id: `reddit-${p.id}`,
-      source: 'reddit',
-      company_name: extractCo(p.title),
+      id: `hn-${h.objectID}`,
+      source: 'hn',
+      company_name: extractCo(h.title),
       role: '',
       outcome: oc,
       ghost_stage: null,
       rounds: 0,
-      report_text: p.title + (p.selftext ? '\n\n' + p.selftext.slice(0, 500) : ''),
-      platform: `r/${p.subreddit}`,
+      report_text: h.title + (h.story_text ? '\n\n' + h.story_text.replace(/<[^>]+>/g, '').slice(0, 500) : ''),
+      platform: 'Hacker News',
       experience_level: '',
-      created_at: new Date(p.created_utc * 1000).toISOString(),
-      url: `https://reddit.com${p.permalink}`,
-      subreddit: p.subreddit,
+      created_at: h.created_at,
+      url: h.url || `https://news.ycombinator.com/item?id=${h.objectID}`,
+      subreddit: null,
     };
   }).filter(Boolean);
 
-  _redditCache = posts;
-  _redditCacheTime = now;
+  _hnCache = posts;
+  _hnCacheTime = now;
   return posts;
 }
 
@@ -114,7 +127,7 @@ export default async function handler(req, res) {
     };
     const outcomes = outcomeMap[outcome] || null;
 
-    const [seenRows, redditPosts] = await Promise.all([
+    const [seenRows, hnPosts] = await Promise.all([
       (async () => {
         let url = `${SUPABASE_URL}/rest/v1/reports`
           + `?select=id,role,outcome,ghost_stage,rounds,report_text,platform,created_at,experience_level,company_name`
@@ -125,16 +138,16 @@ export default async function handler(req, res) {
         const rows = await r.json();
         return (rows || []).map(r => ({ ...r, source: 'seen' }));
       })().catch(() => []),
-      fetchRedditPosts().catch(() => []),
+      fetchHNPosts().catch(() => []),
     ]);
 
-    let reddit = redditPosts;
+    let external = hnPosts;
     if (outcomes) {
       const valid = new Set(outcomes);
-      reddit = reddit.filter(p => valid.has(p.outcome));
+      external = external.filter(p => valid.has(p.outcome));
     }
 
-    const all = [...seenRows, ...reddit].sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+    const all = [...seenRows, ...external].sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
     const page = all.slice(safeOffset, safeOffset + safeLimit);
 
     return res.status(200).json({ ok: true, reports: page, total: all.length });
