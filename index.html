@@ -7492,7 +7492,7 @@ async function loadFeed(reset = true) {
     renderFeedCards(listEl, reset ? _feedAllRows : rows, reset);
     if (moreEl) moreEl.style.display = rows.length === FEED_PAGE ? 'block' : 'none';
   } catch(e) {
-    if (reset) listEl.innerHTML = `<div style="text-align:center;padding:2rem;font-family:var(--mono);font-size:.65rem;color:var(--muted)">Couldn't load feed.</div>`;
+    if (reset) listEl.innerHTML = `<div style="text-align:center;padding:2rem;font-family:var(--mono);font-size:.65rem;color:var(--muted)">Couldn't load feed.<br><span style="font-size:.55rem;color:var(--red)">${e.message||String(e)}</span></div>`;
   }
 }
 
