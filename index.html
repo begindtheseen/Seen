@@ -910,6 +910,7 @@ nav.nav-scrolled{background:rgba(6,6,8,0.82);backdrop-filter:blur(60px) saturate
     <button class="ntab" onclick="go('feed')" id="nt-feed">Community</button>
     <button class="ntab" onclick="go('resume')" id="nt-resume">Resume AI</button>
     <button class="ntab" onclick="go('tracker')" id="nt-tracker">Track <span class="ntab-new" id="trackerBadge" style="display:none;background:var(--amber);color:var(--ink)">0</span><span class="ntab-new" id="trackerCheckBadge" style="display:none;background:var(--red);color:#fff;margin-left:.15rem">!</span></button>
+    <button class="ntab" onclick="go('pricing')" id="nt-pricing">Pricing</button>
   </div>
   <div class="nav-right" id="navRight">
     <button id="backToDashBtn" onclick="renderSeekerDash();go('seeker-dash')" style="display:none;background:none;border:1px solid var(--line2);color:var(--sub);border-radius:8px;padding:.32rem .75rem;font-family:var(--mono);font-size:.62rem;cursor:pointer;white-space:nowrap">← Dashboard</button>
@@ -7199,7 +7200,7 @@ function go(page){
     if(!el){ console.warn('Page not found: page-'+page); return; }
     el.classList.add('active');
     document.querySelectorAll('.ntab').forEach(t=>t.classList.remove('active'));
-    const tabMap={jobs:'nt-jobs',demand:'nt-demand',feed:'nt-feed',resume:'nt-resume',tracker:'nt-tracker'};
+    const tabMap={jobs:'nt-jobs',demand:'nt-demand',feed:'nt-feed',resume:'nt-resume',tracker:'nt-tracker',pricing:'nt-pricing'};
     if(tabMap[page]){const t=document.getElementById(tabMap[page]);if(t)t.classList.add('active');}
     const footer = document.getElementById('mainFooter');
     if (footer) footer.style.display = page === 'landing' ? '' : 'none';
