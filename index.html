@@ -1202,6 +1202,14 @@ nav.nav-scrolled{background:rgba(6,6,8,0.82);backdrop-filter:blur(60px) saturate
     </div>
   </div>
 
+  <!-- Scroll indicator — shown only on wide viewports to hint at below-fold content -->
+  <div style="position:relative;z-index:2;display:flex;justify-content:center;padding:.3rem 0;flex-shrink:0">
+    <button onclick="document.getElementById('page-landing').scrollBy({top:window.innerHeight,behavior:'smooth'})" style="background:none;border:none;cursor:pointer;padding:.4rem;display:flex;flex-direction:column;align-items:center;gap:.2rem;opacity:.3;transition:opacity .2s;animation:float 2.4s ease infinite" onmouseover="this.style.opacity='.65'" onmouseout="this.style.opacity='.3'" title="More below">
+      <div style="width:20px;height:1px;background:rgba(255,255,255,.4)"></div>
+      <div style="width:0;height:0;border-left:5px solid transparent;border-right:5px solid transparent;border-top:5px solid rgba(255,255,255,.5)"></div>
+    </button>
+  </div>
+
   <!-- Bottom disclaimer — pinned -->
   <div style="position:relative;z-index:2;padding:.7rem 2.5rem;font-family:var(--mono);font-size:.54rem;color:rgba(255,255,255,.22);display:flex;align-items:center;gap:1.2rem;flex-wrap:wrap">
     <span>Free for job seekers</span>
@@ -5246,6 +5254,35 @@ async function _doCompare(otherName) {
 function showToast(m){const t=document.getElementById('toast');if(!t)return;t.textContent=m;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),3200);}
 function sleep(ms){return new Promise(r=>setTimeout(r,ms));}
 
+// Report nudge — styled slide-up card at the best moment to capture real data
+function _showReportNudge(company, outcome) {
+  const existing = document.getElementById('_reportNudge');
+  if (existing) existing.remove();
+  const msgs = {
+    ghosted: { emoji:'👻', line1:'They ghosted. Help the next person.', line2:'Your report flags this company before others apply.', btn:'Report in 60s →', color:'var(--red)' },
+    rejected: { emoji:'📋', line1:'Quick — submit a report?', line2:'Rejection reports help others set realistic expectations.', btn:'Add report →', color:'var(--blue)' },
+    offer: { emoji:'🎉', line1:'You got the offer! Pass it on.', line2:'A positive report helps other applicants find good companies.', btn:'Share the experience →', color:'var(--green)' },
+  };
+  const m = msgs[outcome] || msgs.rejected;
+  const el = document.createElement('div');
+  el.id = '_reportNudge';
+  el.style.cssText = 'position:fixed;bottom:1.4rem;right:1.4rem;left:auto;width:min(340px,calc(100vw - 2rem));background:var(--surface);border:1px solid var(--line2);border-left:3px solid '+m.color+';border-radius:12px;padding:1rem 1.1rem;z-index:9990;box-shadow:0 12px 40px rgba(0,0,0,.5);transform:translateY(80px);opacity:0;transition:all .3s cubic-bezier(.22,1,.36,1)';
+  el.innerHTML = `<button onclick="document.getElementById('_reportNudge')?.remove()" style="position:absolute;top:.55rem;right:.65rem;background:none;border:none;color:var(--muted);cursor:pointer;font-size:1rem;line-height:1;padding:0">×</button>
+    <div style="display:flex;align-items:flex-start;gap:.75rem">
+      <div style="font-size:1.3rem;flex-shrink:0;margin-top:.05rem">${m.emoji}</div>
+      <div style="flex:1;min-width:0">
+        <div style="font-family:var(--display);font-size:.88rem;font-weight:700;color:var(--white);margin-bottom:.18rem">${m.line1}</div>
+        <div style="font-size:.74rem;color:var(--sub);line-height:1.55;margin-bottom:.75rem">${m.line2}</div>
+        <button onclick="document.getElementById('_reportNudge')?.remove();prefillReport('${(company||'').replace(/'/g,"\\'")}');go('report')" style="font-family:var(--mono);font-size:.68rem;background:rgba(255,255,255,.07);border:1px solid var(--line2);color:var(--white);border-radius:8px;padding:.42rem .9rem;cursor:pointer;transition:all .15s" onmouseover="this.style.background='rgba(255,255,255,.12)'" onmouseout="this.style.background='rgba(255,255,255,.07)'">${m.btn}</button>
+        <span style="font-family:var(--mono);font-size:.6rem;color:var(--muted);margin-left:.65rem">Anonymous · no login needed</span>
+      </div>
+    </div>`;
+  document.body.appendChild(el);
+  requestAnimationFrame(() => { el.style.transform = 'translateY(0)'; el.style.opacity = '1'; });
+  // Auto-dismiss after 8s
+  setTimeout(() => { if(el.parentNode){el.style.transform='translateY(80px)';el.style.opacity='0';setTimeout(()=>el.remove(),320);} }, 8000);
+}
+
 // Pre-fill company field in report form so reports attach to the right company
 function prefillReport(company) {
   const canonical = normalizeCompanyName(company || '');
@@ -6098,7 +6135,11 @@ async function handleCheckAnswer(appId, checkType, data, btn) {
   if (checkType === 'response_check') {
     if (data.response_type === 'rejection') await AppStore.update(appId, { status: 'rejected', stage: 'Rejected' });
     if (data.response_type === 'interview') await AppStore.update(appId, { stage: 'Interview' });
-    if (data.response_type === 'ghosted') await AppStore.update(appId, { status: 'ghosted', stage: 'Ghosted' });
+    if (data.response_type === 'ghosted') {
+      await AppStore.update(appId, { status: 'ghosted', stage: 'Ghosted' });
+      const _app = AppStore.loadSync().find(a => a.id === appId);
+      setTimeout(() => _showReportNudge(_app?.company || '', 'ghosted'), 600);
+    }
   }
   if (checkType === 'interview_check') {
     if (data.ended && data.outcome === 'rejected') await AppStore.update(appId, { status: 'rejected', stage: 'Rejected' });
@@ -6112,6 +6153,11 @@ async function handleCheckAnswer(appId, checkType, data, btn) {
     await AppStore.update(appId, changes);
     // Offer: ask for rounds
     if (data.outcome === 'offer') setTimeout(() => _showRoundsPrompt(appId), 400);
+    // Terminal outcomes: nudge to report — highest-quality moment to capture real data
+    if (['ghosted','rejected','offer'].includes(data.outcome)) {
+      const _app = AppStore.loadSync().find(a => a.id === appId);
+      setTimeout(() => _showReportNudge(_app?.company || '', data.outcome), data.outcome === 'offer' ? 1800 : 600);
+    }
   }
 
   // Remove card from UI, refresh
