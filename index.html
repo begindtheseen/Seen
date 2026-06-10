@@ -1741,103 +1741,9 @@ nav.nav-scrolled{background:rgba(6,6,8,0.82);backdrop-filter:blur(60px) saturate
 
 <!-- ═══ PRICING PAGE ═══ -->
 <div class="page" id="page-pricing">
-  <div style="max-width:860px;margin:0 auto;padding:3rem 1.25rem 5rem">
-    <div style="text-align:center;margin-bottom:3rem">
-      <div class="eyebrow">Pricing</div>
-      <h1 style="font-family:var(--display);font-size:2.4rem;font-weight:900;color:var(--white);letter-spacing:-.04em;margin-bottom:.75rem;line-height:1.1">Know before you apply.<br><span style="color:var(--green)">Or apply smarter.</span></h1>
-      <p style="color:var(--sub);font-size:.9rem;font-weight:300;max-width:480px;margin:0 auto;line-height:1.7">Most job boards charge recruiters. We work for you.</p>
-    </div>
-
-    <!-- Toggle: monthly / yearly -->
-    <div style="display:flex;justify-content:center;margin-bottom:2.5rem">
-      <div style="background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:.2rem;display:inline-flex;gap:.15rem">
-        <button id="pricingMonthly" onclick="_pricingToggle('monthly')" style="font-family:var(--mono);font-size:.7rem;padding:.45rem 1.1rem;border-radius:7px;border:none;cursor:pointer;background:var(--green);color:var(--ink);font-weight:600;transition:all .2s">Monthly</button>
-        <button id="pricingYearly" onclick="_pricingToggle('yearly')" style="font-family:var(--mono);font-size:.7rem;padding:.45rem 1.1rem;border-radius:7px;border:none;cursor:pointer;background:transparent;color:var(--muted);transition:all .2s">Yearly <span style="color:var(--green)">−33%</span></button>
-      </div>
-    </div>
-
-    <!-- Cards -->
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.25rem;margin-bottom:2rem">
-
-      <!-- FREE -->
-      <div style="background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:1.75rem 1.5rem">
-        <div style="font-family:var(--mono);font-size:.55rem;text-transform:uppercase;letter-spacing:.15em;color:var(--muted);margin-bottom:.5rem">Free forever</div>
-        <div style="font-family:var(--display);font-size:2.6rem;font-weight:900;color:var(--white);letter-spacing:-.04em;line-height:1;margin-bottom:.25rem">$0</div>
-        <div style="font-family:var(--mono);font-size:.62rem;color:var(--muted);margin-bottom:1.5rem">No card required</div>
-        <button onclick="go('login')" style="width:100%;padding:.75rem;border-radius:9px;border:1px solid var(--line);background:transparent;color:var(--white);font-family:var(--mono);font-size:.72rem;cursor:pointer;transition:all .2s;margin-bottom:1.5rem" onmouseover="this.style.borderColor='var(--sub)'" onmouseout="this.style.borderColor='var(--line)'">Get started →</button>
-        <div style="display:flex;flex-direction:column;gap:.7rem">
-          ${['Company ghost rates & scores','Community feed — live reports','Job listings filtered by trust','Basic job tracker (10 apps)','Report your own experience'].map(f=>`<div style="display:flex;align-items:flex-start;gap:.6rem;font-size:.78rem;color:var(--sub);font-weight:300"><span style="color:var(--green);flex-shrink:0;font-size:.7rem;margin-top:.1rem">✓</span>${f}</div>`).join('')}
-          ${['Ghost risk alerts','AI company analysis','Unlimited job tracker','Priority support'].map(f=>`<div style="display:flex;align-items:flex-start;gap:.6rem;font-size:.78rem;color:rgba(255,255,255,.18);font-weight:300"><span style="flex-shrink:0;font-size:.7rem;margin-top:.1rem">−</span>${f}</div>`).join('')}
-        </div>
-      </div>
-
-      <!-- PRO -->
-      <div style="background:linear-gradient(145deg,rgba(16,185,129,0.07) 0%,var(--surface) 60%);border:1px solid rgba(16,185,129,0.35);border-radius:16px;padding:1.75rem 1.5rem;position:relative;overflow:hidden">
-        <div style="position:absolute;top:0;right:0;background:var(--green);color:var(--ink);font-family:var(--mono);font-size:.52rem;font-weight:700;padding:.3rem .75rem;border-bottom-left-radius:10px;letter-spacing:.08em">POPULAR</div>
-        <div style="font-family:var(--mono);font-size:.55rem;text-transform:uppercase;letter-spacing:.15em;color:var(--green);margin-bottom:.5rem">Pro</div>
-        <div style="display:flex;align-items:baseline;gap:.4rem;margin-bottom:.25rem">
-          <span id="proPrice" style="font-family:var(--display);font-size:2.6rem;font-weight:900;color:var(--white);letter-spacing:-.04em;line-height:1">$7.99</span>
-          <span style="font-family:var(--mono);font-size:.65rem;color:var(--muted)">/month</span>
-        </div>
-        <div id="proBilling" style="font-family:var(--mono);font-size:.62rem;color:var(--muted);margin-bottom:1.5rem">billed monthly · cancel anytime</div>
-        <button onclick="_startProCheckout()" style="width:100%;padding:.75rem;border-radius:9px;border:none;background:var(--green);color:var(--ink);font-family:var(--mono);font-size:.72rem;font-weight:700;cursor:pointer;transition:all .2s;margin-bottom:1.5rem" onmouseover="this.style.opacity='.88'" onmouseout="this.style.opacity='1'">Go Pro →</button>
-        <div style="display:flex;flex-direction:column;gap:.7rem">
-          ${['Everything in Free','Ghost risk alerts — get notified when a company\'s behavior changes','AI company analysis — is this worth applying to right now?','Unlimited job tracker','Which companies respond fastest in your field','PDF export your reports','Priority support'].map(f=>`<div style="display:flex;align-items:flex-start;gap:.6rem;font-size:.78rem;color:var(--sub);font-weight:300"><span style="color:var(--green);flex-shrink:0;font-size:.7rem;margin-top:.1rem">✓</span>${f}</div>`).join('')}
-        </div>
-      </div>
-    </div>
-
-    <!-- Trust strip -->
-    <div style="display:flex;justify-content:center;flex-wrap:wrap;gap:1.5rem;padding:1.5rem;background:var(--surface);border:1px solid var(--line);border-radius:12px;margin-bottom:2.5rem">
-      ${[['⚡','Instant access','Pro activates the moment you pay'],['🔄','Cancel anytime','No contracts. No auto-traps.'],['🛡️','No recruiter data','We never sell your info to employers'],['💳','Stripe secure','We never see your card']].map(([icon,title,sub])=>`<div style="text-align:center;min-width:130px"><div style="font-size:1.1rem;margin-bottom:.3rem">${icon}</div><div style="font-family:var(--mono);font-size:.62rem;font-weight:600;color:var(--white);margin-bottom:.15rem">${title}</div><div style="font-family:var(--mono);font-size:.55rem;color:var(--muted)">${sub}</div></div>`).join('')}
-    </div>
-
-    <!-- Comparison table -->
-    <div style="margin-bottom:2.5rem">
-      <div style="font-family:var(--display);font-size:1.1rem;font-weight:800;color:var(--white);margin-bottom:1.25rem;text-align:center">Every feature. No surprises.</div>
-      <div style="background:var(--surface);border:1px solid var(--line);border-radius:12px;overflow:hidden">
-        <div style="display:grid;grid-template-columns:1fr auto auto;padding:.65rem 1.1rem;background:rgba(255,255,255,.03);border-bottom:1px solid var(--line)">
-          <div style="font-family:var(--mono);font-size:.58rem;text-transform:uppercase;letter-spacing:.1em;color:var(--muted)">Feature</div>
-          <div style="font-family:var(--mono);font-size:.58rem;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);text-align:center;min-width:52px">Free</div>
-          <div style="font-family:var(--mono);font-size:.58rem;text-transform:uppercase;letter-spacing:.1em;color:var(--green);text-align:center;min-width:52px">Pro</div>
-        </div>
-        ${[['Company scores & ghost rates','✓','✓'],['Community feed','✓','✓'],['Job listings','✓','✓'],['Report an experience','✓','✓'],['Job tracker','10 apps','Unlimited'],['Ghost risk alerts','−','✓'],['AI company analysis','−','✓'],['Fastest-responding companies','−','✓'],['PDF report export','−','✓'],['Priority support','−','✓']].map(([feat,free,pro],i)=>`<div style="display:grid;grid-template-columns:1fr auto auto;padding:.7rem 1.1rem;${i%2===0?'':'background:rgba(255,255,255,.018)'}border-bottom:1px solid rgba(255,255,255,.04)"><div style="font-size:.78rem;color:var(--sub);font-weight:300">${feat}</div><div style="text-align:center;min-width:52px;font-family:var(--mono);font-size:.7rem;color:${free==='✓'?'var(--green)':free==='−'?'rgba(255,255,255,.2)':'var(--sub)'}">${free}</div><div style="text-align:center;min-width:52px;font-family:var(--mono);font-size:.7rem;color:${pro==='✓'||pro!=='−'?'var(--green)':'rgba(255,255,255,.2)'}">${pro}</div></div>`).join('')}
-      </div>
-    </div>
-
-    <!-- FAQ -->
-    <div style="max-width:580px;margin:0 auto">
-      <div style="font-family:var(--display);font-size:1.1rem;font-weight:800;color:var(--white);margin-bottom:1.25rem;text-align:center">Common questions.</div>
-      ${[['Is this actually free?','Yes. Free forever means free forever — no trial period, no credit card. The core transparency tools are always free.'],['Can I cancel Pro?','Yes, anytime. No contracts. If you cancel, you keep Pro until the end of the billing period.'],['Do you share my data with employers?','Never. We work for job seekers, not recruiters. Your reports are anonymous and your email is never sold.'],['What\'s the "ghost risk alert"?','When a company\'s ghost rate changes significantly — say 3 new ghost reports in a week — Pro users get notified before they apply.'],['When does Pro activate?','Instantly after payment. No waiting.']].map(([q,a])=>`<div style="border-bottom:1px solid var(--line);padding:.9rem 0"><div style="font-size:.83rem;font-weight:600;color:var(--white);margin-bottom:.4rem">${q}</div><div style="font-size:.78rem;color:var(--sub);font-weight:300;line-height:1.7">${a}</div></div>`).join('')}
-    </div>
-  </div>
+  <div id="pricingRoot" style="max-width:860px;margin:0 auto;padding:3rem 1.25rem 5rem"></div>
 </div>
 
-<script>
-let _pricingBilling = 'monthly';
-function _pricingToggle(mode) {
-  _pricingBilling = mode;
-  const mBtn = document.getElementById('pricingMonthly');
-  const yBtn = document.getElementById('pricingYearly');
-  const price = document.getElementById('proPrice');
-  const billing = document.getElementById('proBilling');
-  if (!mBtn || !yBtn || !price || !billing) return;
-  if (mode === 'yearly') {
-    mBtn.style.cssText = 'font-family:var(--mono);font-size:.7rem;padding:.45rem 1.1rem;border-radius:7px;border:none;cursor:pointer;background:transparent;color:var(--muted);transition:all .2s';
-    yBtn.style.cssText = 'font-family:var(--mono);font-size:.7rem;padding:.45rem 1.1rem;border-radius:7px;border:none;cursor:pointer;background:var(--green);color:var(--ink);font-weight:600;transition:all .2s';
-    price.textContent = '$5.33';
-    billing.textContent = 'billed $63.99/year · cancel anytime';
-  } else {
-    yBtn.style.cssText = 'font-family:var(--mono);font-size:.7rem;padding:.45rem 1.1rem;border-radius:7px;border:none;cursor:pointer;background:transparent;color:var(--muted);transition:all .2s';
-    mBtn.style.cssText = 'font-family:var(--mono);font-size:.7rem;padding:.45rem 1.1rem;border-radius:7px;border:none;cursor:pointer;background:var(--green);color:var(--ink);font-weight:600;transition:all .2s';
-    price.textContent = '$7.99';
-    billing.textContent = 'billed monthly · cancel anytime';
-  }
-}
-function _startProCheckout() {
-  showToast('Payment coming soon — get notified when Pro launches →');
-}
-</script>
 
 <!-- ═══ LEGAL PAGE ═══ -->
 <div class="page" id="page-legal">
@@ -5318,6 +5224,102 @@ async function renderAdminPage() {
   }
 }
 
+let _pricingBilling = 'monthly';
+function _pricingToggle(mode) {
+  _pricingBilling = mode;
+  const mBtn = document.getElementById('pricingMonthly');
+  const yBtn = document.getElementById('pricingYearly');
+  const price = document.getElementById('proPrice');
+  const billing = document.getElementById('proBilling');
+  if (!mBtn || !yBtn || !price || !billing) return;
+  if (mode === 'yearly') {
+    mBtn.style.cssText = 'font-family:var(--mono);font-size:.7rem;padding:.45rem 1.1rem;border-radius:7px;border:none;cursor:pointer;background:transparent;color:var(--muted);transition:all .2s';
+    yBtn.style.cssText = 'font-family:var(--mono);font-size:.7rem;padding:.45rem 1.1rem;border-radius:7px;border:none;cursor:pointer;background:var(--green);color:var(--ink);font-weight:600;transition:all .2s';
+    price.textContent = '$5.33';
+    billing.textContent = 'billed $63.99/year · cancel anytime';
+  } else {
+    yBtn.style.cssText = 'font-family:var(--mono);font-size:.7rem;padding:.45rem 1.1rem;border-radius:7px;border:none;cursor:pointer;background:transparent;color:var(--muted);transition:all .2s';
+    mBtn.style.cssText = 'font-family:var(--mono);font-size:.7rem;padding:.45rem 1.1rem;border-radius:7px;border:none;cursor:pointer;background:var(--green);color:var(--ink);font-weight:600;transition:all .2s';
+    price.textContent = '$7.99';
+    billing.textContent = 'billed monthly · cancel anytime';
+  }
+}
+function _startProCheckout() {
+  showToast('Payment coming soon — get notified when Pro launches →');
+}
+function renderPricingPage() {
+  const root = document.getElementById('pricingRoot');
+  if (!root || root.dataset.rendered) return;
+  root.dataset.rendered = '1';
+
+  const freeFeatures = ['Company ghost rates & scores','Community feed — live reports','Job listings filtered by trust','Basic job tracker (10 apps)','Report your own experience'];
+  const freeLocked  = ['Ghost risk alerts','AI company analysis','Unlimited job tracker','Priority support'];
+  const proFeatures = ['Everything in Free','Ghost risk alerts — get notified when a company’s behavior changes','AI company analysis — is this worth applying to right now?','Unlimited job tracker','Which companies respond fastest in your field','PDF export your reports','Priority support'];
+  const trustItems  = [['&#9889;','Instant access','Pro activates the moment you pay'],['&#8635;','Cancel anytime','No contracts. No auto-traps.'],['&#128737;','No recruiter data','We never sell your info to employers'],['&#128179;','Stripe secure','We never see your card']];
+  const tableRows   = [['Company scores & ghost rates','✓','✓'],['Community feed','✓','✓'],['Job listings','✓','✓'],['Report an experience','✓','✓'],['Job tracker','10 apps','Unlimited'],['Ghost risk alerts','−','✓'],['AI company analysis','−','✓'],['Fastest-responding companies','−','✓'],['PDF report export','−','✓'],['Priority support','−','✓']];
+  const faqItems    = [['Is this actually free?','Yes. Free forever means free forever — no trial period, no credit card. The core transparency tools are always free.'],['Can I cancel Pro?','Yes, anytime. No contracts. If you cancel, you keep Pro until the end of the billing period.'],['Do you share my data with employers?','Never. We work for job seekers, not recruiters. Your reports are anonymous and your email is never sold.'],['What’s the “ghost risk alert”?','When a company’s ghost rate changes significantly — say 3 new ghost reports in a week — Pro users get notified before they apply.'],['When does Pro activate?','Instantly after payment. No waiting.']];
+
+  root.innerHTML = `
+    <div style="font-family:var(--mono);font-size:.6rem;text-transform:uppercase;letter-spacing:.15em;color:var(--green);text-align:center;margin-bottom:.75rem">Pricing</div>
+    <h1 style="font-family:var(--display);font-size:2.4rem;font-weight:900;color:var(--white);letter-spacing:-.04em;line-height:1.1;text-align:center;margin-bottom:.6rem">Transparent tools.<br>Transparent pricing.</h1>
+    <p style="font-family:var(--mono);font-size:.72rem;color:var(--muted);text-align:center;margin-bottom:2rem">No dark patterns. No bait-and-switch. Beat PortLume AI at half the price.</p>
+
+    <div style="display:flex;justify-content:center;margin-bottom:2rem">
+      <div style="display:flex;background:var(--surface);border:1px solid var(--line);border-radius:9px;padding:3px;gap:2px">
+        <button id="pricingMonthly" onclick="_pricingToggle('monthly')" style="font-family:var(--mono);font-size:.7rem;padding:.45rem 1.1rem;border-radius:7px;border:none;cursor:pointer;background:var(--green);color:var(--ink);font-weight:600;transition:all .2s">Monthly</button>
+        <button id="pricingYearly" onclick="_pricingToggle('yearly')" style="font-family:var(--mono);font-size:.7rem;padding:.45rem 1.1rem;border-radius:7px;border:none;cursor:pointer;background:transparent;color:var(--muted);transition:all .2s">Yearly <span style="color:var(--green)">-33%</span></button>
+      </div>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.25rem;margin-bottom:2rem">
+      <div style="background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:1.75rem 1.5rem">
+        <div style="font-family:var(--mono);font-size:.55rem;text-transform:uppercase;letter-spacing:.15em;color:var(--muted);margin-bottom:.5rem">Free forever</div>
+        <div style="font-family:var(--display);font-size:2.6rem;font-weight:900;color:var(--white);letter-spacing:-.04em;line-height:1;margin-bottom:.25rem">$0</div>
+        <div style="font-family:var(--mono);font-size:.62rem;color:var(--muted);margin-bottom:1.5rem">No card required</div>
+        <button onclick="go('login')" style="width:100%;padding:.75rem;border-radius:9px;border:1px solid var(--line);background:transparent;color:var(--white);font-family:var(--mono);font-size:.72rem;cursor:pointer;transition:all .2s;margin-bottom:1.5rem" onmouseover="this.style.borderColor='var(--sub)'" onmouseout="this.style.borderColor='var(--line)'">Get started →</button>
+        <div style="display:flex;flex-direction:column;gap:.7rem">
+          ${freeFeatures.map(f=>`<div style="display:flex;align-items:flex-start;gap:.6rem;font-size:.78rem;color:var(--sub);font-weight:300"><span style="color:var(--green);flex-shrink:0;font-size:.7rem;margin-top:.1rem">✓</span>${f}</div>`).join('')}
+          ${freeLocked.map(f=>`<div style="display:flex;align-items:flex-start;gap:.6rem;font-size:.78rem;color:rgba(255,255,255,.18);font-weight:300"><span style="flex-shrink:0;font-size:.7rem;margin-top:.1rem">−</span>${f}</div>`).join('')}
+        </div>
+      </div>
+      <div style="background:linear-gradient(145deg,rgba(16,185,129,0.07) 0%,var(--surface) 60%);border:1px solid rgba(16,185,129,0.35);border-radius:16px;padding:1.75rem 1.5rem;position:relative;overflow:hidden">
+        <div style="position:absolute;top:0;right:0;background:var(--green);color:var(--ink);font-family:var(--mono);font-size:.52rem;font-weight:700;padding:.3rem .75rem;border-bottom-left-radius:10px;letter-spacing:.08em">POPULAR</div>
+        <div style="font-family:var(--mono);font-size:.55rem;text-transform:uppercase;letter-spacing:.15em;color:var(--green);margin-bottom:.5rem">Pro</div>
+        <div style="display:flex;align-items:baseline;gap:.4rem;margin-bottom:.25rem">
+          <span id="proPrice" style="font-family:var(--display);font-size:2.6rem;font-weight:900;color:var(--white);letter-spacing:-.04em;line-height:1">$7.99</span>
+          <span style="font-family:var(--mono);font-size:.65rem;color:var(--muted)">/month</span>
+        </div>
+        <div id="proBilling" style="font-family:var(--mono);font-size:.62rem;color:var(--muted);margin-bottom:1.5rem">billed monthly · cancel anytime</div>
+        <button onclick="_startProCheckout()" style="width:100%;padding:.75rem;border-radius:9px;border:none;background:var(--green);color:var(--ink);font-family:var(--mono);font-size:.72rem;font-weight:700;cursor:pointer;transition:all .2s;margin-bottom:1.5rem" onmouseover="this.style.opacity='.88'" onmouseout="this.style.opacity='1'">Go Pro →</button>
+        <div style="display:flex;flex-direction:column;gap:.7rem">
+          ${proFeatures.map(f=>`<div style="display:flex;align-items:flex-start;gap:.6rem;font-size:.78rem;color:var(--sub);font-weight:300"><span style="color:var(--green);flex-shrink:0;font-size:.7rem;margin-top:.1rem">✓</span>${f}</div>`).join('')}
+        </div>
+      </div>
+    </div>
+
+    <div style="display:flex;justify-content:center;flex-wrap:wrap;gap:1.5rem;padding:1.5rem;background:var(--surface);border:1px solid var(--line);border-radius:12px;margin-bottom:2.5rem">
+      ${trustItems.map(([icon,title,sub])=>`<div style="text-align:center;min-width:130px"><div style="font-size:1.1rem;margin-bottom:.3rem">${icon}</div><div style="font-family:var(--mono);font-size:.62rem;font-weight:600;color:var(--white);margin-bottom:.15rem">${title}</div><div style="font-family:var(--mono);font-size:.55rem;color:var(--muted)">${sub}</div></div>`).join('')}
+    </div>
+
+    <div style="margin-bottom:2.5rem">
+      <div style="font-family:var(--display);font-size:1.1rem;font-weight:800;color:var(--white);margin-bottom:1.25rem;text-align:center">Every feature. No surprises.</div>
+      <div style="background:var(--surface);border:1px solid var(--line);border-radius:12px;overflow:hidden">
+        <div style="display:grid;grid-template-columns:1fr auto auto;padding:.65rem 1.1rem;background:rgba(255,255,255,.03);border-bottom:1px solid var(--line)">
+          <div style="font-family:var(--mono);font-size:.58rem;text-transform:uppercase;letter-spacing:.1em;color:var(--muted)">Feature</div>
+          <div style="font-family:var(--mono);font-size:.58rem;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);text-align:center;min-width:52px">Free</div>
+          <div style="font-family:var(--mono);font-size:.58rem;text-transform:uppercase;letter-spacing:.1em;color:var(--green);text-align:center;min-width:52px">Pro</div>
+        </div>
+        ${tableRows.map(([feat,free,pro],i)=>`<div style="display:grid;grid-template-columns:1fr auto auto;padding:.7rem 1.1rem;${i%2===1?'background:rgba(255,255,255,.018);':''}border-bottom:1px solid rgba(255,255,255,.04)"><div style="font-size:.78rem;color:var(--sub);font-weight:300">${feat}</div><div style="text-align:center;min-width:52px;font-family:var(--mono);font-size:.7rem;color:${free==='✓'?'var(--green)':free==='−'?'rgba(255,255,255,.2)':'var(--sub)'}">${free}</div><div style="text-align:center;min-width:52px;font-family:var(--mono);font-size:.7rem;color:${pro!=='−'?'var(--green)':'rgba(255,255,255,.2)'}">${pro}</div></div>`).join('')}
+      </div>
+    </div>
+
+    <div style="max-width:580px;margin:0 auto">
+      <div style="font-family:var(--display);font-size:1.1rem;font-weight:800;color:var(--white);margin-bottom:1.25rem;text-align:center">Common questions.</div>
+      ${faqItems.map(([q,a])=>`<div style="border-bottom:1px solid var(--line);padding:.9rem 0"><div style="font-size:.83rem;font-weight:600;color:var(--white);margin-bottom:.4rem">${q}</div><div style="font-size:.78rem;color:var(--sub);font-weight:300;line-height:1.7">${a}</div></div>`).join('')}
+    </div>
+  `;
+}
+
 function renderFAQ(){
   const c=document.getElementById('faqList');if(!c)return;
   c.innerHTML=FAQ_DATA.map(s=>`
@@ -7192,6 +7194,7 @@ function go(page){
     if(page==='demand')loadDemand();
     if(page==='faq')renderFAQ();
     if(page==='legal')renderLegal();
+    if(page==='pricing')renderPricingPage();
     if(page==='admin')renderAdminPage();
     if(page==='tracker')renderTracker().catch(e=>console.warn('tracker render:',e));
     if(page==='companies')loadLdr();
@@ -9690,6 +9693,18 @@ function _handleSharedLink(){
     go(sp); // immediate — no delay, auth is already resolved by the time _handleSharedLink runs
   }
 }
+
+// Immediately show the hash page before Auth.init() resolves — eliminates flash
+(function(){
+  const _h = window.location.hash;
+  if (!_h || _h === '#') return;
+  const _prePages = ['jobs','feed','demand','resume','tracker','report','companies','faq','legal','pricing','profile','seeker-dash'];
+  const _pg = _h.startsWith('#') ? _h.slice(1) : '';
+  if (!_prePages.includes(_pg)) return;
+  document.querySelectorAll('.page,.page-full').forEach(function(p){p.classList.remove('active');});
+  const _el = document.getElementById('page-' + _pg);
+  if (_el) _el.classList.add('active');
+})();
 
 // ── INIT ──
 updateNav();
