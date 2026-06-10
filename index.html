@@ -777,36 +777,36 @@ nav.nav-scrolled{background:rgba(6,6,8,0.82);backdrop-filter:blur(60px) saturate
   background:#02040a;
   display:flex;flex-direction:column;align-items:center;justify-content:center;
   overflow:hidden;will-change:opacity;
-  transition:opacity .6s ease;
+  transition:opacity .55s ease;
 }
 #introSplash.sp-out{opacity:0;pointer-events:none;}
 #introSplash::before{
   content:'';position:absolute;inset:0;pointer-events:none;z-index:1;
-  background:repeating-linear-gradient(to bottom,transparent 0,transparent 2px,rgba(0,0,0,.22) 2px,rgba(0,0,0,.22) 4px);
+  background:repeating-linear-gradient(to bottom,transparent 0,transparent 2px,rgba(0,0,0,.15) 2px,rgba(0,0,0,.15) 4px);
 }
 .sp-beam{
-  position:absolute;left:0;right:0;height:180px;z-index:2;pointer-events:none;top:-180px;
-  background:linear-gradient(to bottom,transparent,rgba(16,185,129,.03) 40%,rgba(16,185,129,.055) 50%,rgba(16,185,129,.03) 60%,transparent);
-  animation:spBeamMove 2.6s linear infinite;
+  position:absolute;left:0;right:0;height:140px;pointer-events:none;z-index:2;top:-140px;
+  background:linear-gradient(to bottom,transparent,rgba(16,185,129,.025) 45%,rgba(16,185,129,.04) 50%,rgba(16,185,129,.025) 55%,transparent);
+  animation:spBeamMove 3s linear infinite;
 }
 @keyframes spBeamMove{to{top:100%}}
-#splashCanvas{display:block;position:relative;z-index:3;max-width:88vw;}
+#splashCanvas{display:block;position:relative;z-index:3;}
 .sp-sub{
-  font-family:'DM Mono',monospace;font-size:.58rem;color:#1f2937;
-  letter-spacing:.12em;text-transform:uppercase;
-  margin-top:1rem;position:relative;z-index:3;
-  opacity:0;animation:spSubIn .4s 1.1s ease forwards;
+  font-family:'DM Mono',monospace;font-size:.55rem;color:#1f2937;
+  letter-spacing:.14em;text-transform:uppercase;
+  margin-top:.85rem;position:relative;z-index:3;
+  opacity:0;animation:spSubIn .35s 1.2s ease forwards;
 }
 @keyframes spSubIn{to{opacity:1;color:#374151}}
-.sp-track{position:absolute;bottom:0;left:0;right:0;height:2px;background:rgba(16,185,129,.08);z-index:4;}
-.sp-fill{height:100%;background:#10b981;width:0;animation:spLoad 2.5s .05s cubic-bezier(.22,.6,.36,1) forwards;}
-@keyframes spLoad{0%{width:0%}50%{width:55%}75%{width:80%}90%{width:93%}100%{width:100%}}
+.sp-track{position:absolute;bottom:0;left:0;right:0;height:1px;background:rgba(16,185,129,.07);z-index:4;}
+.sp-fill{height:100%;background:#10b981;width:0;animation:spLoad 2.6s .05s cubic-bezier(.2,.6,.35,1) forwards;}
+@keyframes spLoad{0%{width:0%}40%{width:42%}70%{width:74%}88%{width:90%}100%{width:100%}}
 </style>
 </head>
 <body>
 <div id="introSplash" aria-hidden="true">
   <div class="sp-beam"></div>
-  <canvas id="splashCanvas" width="500" height="160"></canvas>
+  <canvas id="splashCanvas" width="220" height="72"></canvas>
   <div class="sp-sub">Know before you apply</div>
   <div class="sp-track"><div class="sp-fill"></div></div>
 </div>
@@ -9743,69 +9743,115 @@ function _handleSharedLink(){
   if (_el) _el.classList.add('active');
 })();
 
-// ── GLITCH SPLASH CANVAS ──
+// ── SLOT MACHINE SPLASH ──
+// Each letter of "Seen" spins on its own reel and snaps in left-to-right,
+// like the Love Death+Robots episode icon mechanic.
 (function(){
   const canvas=document.getElementById('splashCanvas');
   if(!canvas)return;
   const DPR=Math.min(window.devicePixelRatio||1,2);
-  const W=Math.min(500,Math.floor(window.innerWidth*.88));
-  const H=Math.round(W*.32);
+  // Small, tasteful — not full width
+  const W=220,H=72;
   canvas.style.width=W+'px';canvas.style.height=H+'px';
   canvas.width=Math.round(W*DPR);canvas.height=Math.round(H*DPR);
   const ctx=canvas.getContext('2d');
   ctx.scale(DPR,DPR);
-  const cx=W/2,cy=H/2;
-  const FS=Math.round(W*.28);
-  // Glitch windows: [startSec, endSec, intensity 0-1]
-  const GW=[[.18,.42,1],[.85,1.05,.65],[1.55,1.72,.85]];
-  let t0=null,raf=null,done=false;
-  function drawFrame(t){
+
+  const TARGETS=['S','E','E','N'];
+  const FS=44; // font size px
+  const COL=52; // px per column
+  const ox=(W-COL*TARGETS.length)/2+COL/2; // center of first column
+  const oy=H/2;
+  // Spin characters — alphanumeric pool the reels cycle through
+  const POOL='ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+  // Each letter locks at this time (seconds). Gap of ~0.18s between each.
+  const LOCK=[.32,.50,.68,.86];
+  // Per-column scroll state: y offset for the drum-scroll illusion
+  const col=TARGETS.map(()=>({y:0,lastT:0,char:POOL[Math.floor(Math.random()*POOL.length)]}));
+  let t0=null;
+
+  function draw(t){
     ctx.clearRect(0,0,W,H);
-    const alpha=Math.min(1,Math.max(0,(t-.05)/.15));
-    if(alpha<=0)return;
-    ctx.font=`900 ${FS}px 'Syne',sans-serif`;
-    ctx.textAlign='center';ctx.textBaseline='middle';
-    let gi=-1,gIntensity=0;
-    for(let i=0;i<GW.length;i++){if(t>=GW[i][0]&&t<=GW[i][1]){gi=i;gIntensity=GW[i][2];break;}}
-    if(gi>=0){
-      // Slice glitch: divide into N horizontal bands, each displaced randomly
-      const N=5+Math.floor(Math.random()*4);
-      const bH=H/N;
-      for(let i=0;i<N;i++){
-        const y1=i*bH,y2=y1+bH+1;
-        const dx=(Math.random()-.5)*52*gIntensity;
-        const dy=(Math.random()-.5)*4*gIntensity;
-        ctx.save();
-        ctx.beginPath();ctx.rect(0,y1,W,y2-y1);ctx.clip();
-        // Red channel
-        ctx.globalAlpha=alpha*.88;ctx.fillStyle='#ff1a3c';
-        ctx.fillText('Seen',cx+dx-6+dy,cy+dy);
-        // Cyan channel
-        ctx.globalAlpha=alpha*.88;ctx.fillStyle='#00e5ff';
-        ctx.fillText('Seen',cx+dx+6-dy,cy-dy);
-        // White base (flickers)
-        ctx.globalAlpha=alpha*(.3+Math.random()*.7);ctx.fillStyle='#ffffff';
-        ctx.fillText('Seen',cx+dx*.15,cy);
-        ctx.restore();
+    const fa=Math.min(1,t/.06); // snap in instantly
+
+    TARGETS.forEach((target,i)=>{
+      const locked=t>=LOCK[i];
+      const x=ox+i*COL;
+
+      // Update spinning char for this column
+      if(!locked){
+        // Speed: fast until 0.12s before lock, then slow
+        const toGo=LOCK[i]-t;
+        const hz=toGo>.12?22:8; // chars per second
+        if(t-col[i].lastT>1/hz){
+          col[i].char=POOL[Math.floor(Math.random()*POOL.length)];
+          col[i].lastT=t;
+          col[i].y=(col[i].y+FS*.6)%(FS*1.2); // drum scroll
+        }
       }
-    } else {
-      // Clean with subtle chroma — aberration narrows over time
-      const chroma=Math.max(0,3.5-t*1.2);
-      ctx.globalAlpha=alpha*.5;
-      ctx.fillStyle='#ff1a3c';ctx.fillText('Seen',cx-chroma,cy);
-      ctx.fillStyle='#00e5ff';ctx.fillText('Seen',cx+chroma,cy);
-      ctx.globalAlpha=alpha;ctx.fillStyle='#f9fafb';
-      ctx.fillText('Seen',cx,cy);
+
+      // Clip to column slot so scroll doesn't bleed
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(x-COL/2+3,oy-FS*.62,COL-6,FS*1.24);
+      ctx.clip();
+
+      ctx.font=`900 ${FS}px 'Syne',sans-serif`;
+      ctx.textAlign='center';
+      ctx.textBaseline='middle';
+
+      if(locked){
+        // Flash green briefly on snap, then white
+        const flash=t<LOCK[i]+.09;
+        ctx.globalAlpha=fa;
+        ctx.fillStyle=flash?'#10b981':'#f4f4f5';
+        ctx.fillText(target,x,oy);
+      } else {
+        // Show current spinning char scrolling upward
+        const scrollY=col[i].y;
+        ctx.globalAlpha=fa*.22;
+        ctx.fillStyle='#6b7280';
+        ctx.fillText(col[i].char,x,oy-scrollY);
+        // Ghost of next char entering from below
+        if(scrollY>FS*.3){
+          ctx.globalAlpha=fa*.10;
+          ctx.fillText(POOL[(POOL.indexOf(col[i].char)+1)%POOL.length],x,oy+FS*1.2-scrollY);
+        }
+      }
+      ctx.restore();
+
+      // Thin separator line between columns (except after last)
+      if(i<TARGETS.length-1){
+        ctx.globalAlpha=fa*.08;
+        ctx.strokeStyle='#6b7280';
+        ctx.lineWidth=1;
+        ctx.beginPath();
+        ctx.moveTo(x+COL/2,oy-FS*.45);
+        ctx.lineTo(x+COL/2,oy+FS*.45);
+        ctx.stroke();
+      }
+    });
+
+    // Small green dot below once fully locked
+    const allDone=t>=LOCK[3]+.14;
+    if(allDone){
+      const da=Math.min(1,(t-LOCK[3]-.14)/.22);
+      ctx.globalAlpha=fa*da;
+      ctx.fillStyle='#10b981';
+      ctx.beginPath();
+      ctx.arc(W/2,oy+FS*.58,2.5,0,Math.PI*2);
+      ctx.fill();
     }
   }
+
   function tick(ts){
     if(!t0)t0=ts;
     const t=(ts-t0)/1000;
-    drawFrame(t);
-    if(t<2.6&&!done)raf=requestAnimationFrame(tick);
-    else{done=true;drawFrame(2.6);}
+    draw(t);
+    if(t<2.6)requestAnimationFrame(tick);
+    else draw(2.6);
   }
-  document.fonts.ready.then(()=>{ raf=requestAnimationFrame(tick); });
+  document.fonts.ready.then(()=>requestAnimationFrame(tick));
 })();
 
 // ── INIT ──
