@@ -7710,6 +7710,8 @@ function go(page){
     const footer = document.getElementById('mainFooter');
     if (footer) footer.style.display = page === 'landing' ? '' : 'none';
     window.scrollTo(0,0);
+    // page-landing scrolls internally — reset its scroll position too
+    if(page==='landing'){const lp=document.getElementById('page-landing');if(lp)lp.scrollTop=0;}
     if(page==='jobs'){
       // Pre-fill location from user profile if input is blank
       const locInp=document.getElementById('jobSearchLocation');
@@ -8116,6 +8118,23 @@ async function loadHeroSurgeStrip(){
           ${name.replace(/</g,'&lt;')} <span style="color:var(--red);font-weight:600">${count}×</span>
         </button>`).join('');
       strip.style.display='block';
+    }
+    // Inject surge alerts into the ticker so it feels live
+    const tickerEl=document.getElementById('tickerTrack');
+    if(tickerEl&&surgers.length){
+      const surgeItems=surgers.slice(0,4).map(([name,count])=>
+        `<span class="tick" style="cursor:pointer" onclick="openModal('${name.replace(/'/g,"\\'")}','')" title="Ghost surge">
+          <span style="color:var(--red);font-family:var(--mono);font-size:.48rem;margin-right:.2rem;animation:pulse .9s infinite">⚡</span>
+          <span class="tco" style="color:var(--red)">${name.replace(/</g,'&lt;').toUpperCase()}</span>
+          <span class="tloc" style="color:rgba(239,68,68,.7)">surge</span>
+          <span class="ts danger">${count}×</span>
+        </span><span class="tdiv">·</span>`).join('');
+      // Prepend surge items to both halves of the ticker
+      const current=tickerEl.innerHTML;
+      const half=current.length/2;
+      const firstHalf=current.slice(0,half);
+      const secondHalf=current.slice(half);
+      tickerEl.innerHTML=surgeItems+firstHalf+surgeItems+secondHalf;
     }
   }catch(e){}
 }
