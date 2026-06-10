@@ -1973,6 +1973,15 @@ nav.nav-scrolled{background:rgba(6,6,8,0.82);backdrop-filter:blur(60px) saturate
       <p style="color:var(--sub);font-size:.82rem;font-weight:300;margin:0">Real experiences — every report shapes the score for that company.</p>
     </div>
 
+    <!-- Report CTA strip -->
+    <div onclick="go('report')" style="display:flex;align-items:center;justify-content:space-between;gap:.75rem;background:rgba(16,185,129,.06);border:1px solid rgba(16,185,129,.18);border-radius:10px;padding:.75rem 1rem;margin-bottom:1.25rem;cursor:pointer;transition:background .15s" onmouseover="this.style.background='rgba(16,185,129,.11)'" onmouseout="this.style.background='rgba(16,185,129,.06)'">
+      <div>
+        <div style="font-family:var(--mono);font-size:.62rem;color:var(--green);font-weight:600;margin-bottom:.1rem">Your experience matters</div>
+        <div style="font-size:.72rem;color:var(--sub);font-weight:300">Had an interview? Got ghosted? Add your report — it shapes scores for every future applicant.</div>
+      </div>
+      <div style="font-family:var(--mono);font-size:.65rem;color:var(--green);flex-shrink:0;white-space:nowrap">Add yours →</div>
+    </div>
+
     <!-- Ghost surge banner — populated from cached data when page loads -->
     <div id="feedSurgeBanner" style="display:none;background:linear-gradient(90deg,rgba(239,68,68,.1),rgba(239,68,68,.03));border:1px solid rgba(239,68,68,.25);border-radius:10px;padding:.75rem 1rem;margin-bottom:1.25rem">
       <div style="font-family:var(--mono);font-size:.55rem;text-transform:uppercase;letter-spacing:.14em;color:var(--red);margin-bottom:.5rem;display:flex;align-items:center;gap:.4rem">
@@ -5291,10 +5300,11 @@ function _showReportNudge(company, outcome) {
 }
 
 // Pre-fill company field in report form so reports attach to the right company
-function prefillReport(company) {
+function prefillReport(company, loc) {
   const canonical = normalizeCompanyName(company || '');
   const f = document.getElementById('rCo');
   if (f) { f.value = canonical; _rCoHint(canonical); }
+  if (loc) { const lf = document.getElementById('rLoc'); if (lf) lf.value = loc; }
 }
 
 // ═══════════════════════════════════════════════
@@ -7567,7 +7577,39 @@ async function renderSeekerDash(){
   const appsEl=_('dashActiveApps');
   if(appsEl){
     if(!active.length){
-      appsEl.innerHTML=`<div style="background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:2rem;text-align:center"><div style="font-size:1.5rem;opacity:.35;margin-bottom:.6rem">📋</div><div style="font-family:var(--display);font-size:.88rem;font-weight:600;color:var(--sub);margin-bottom:.3rem">No active applications</div><div style="font-size:.75rem;color:var(--muted);font-weight:300">Hit "+ Track" on any job to start</div></div>`;
+      const totalAllTime = apps.length;
+      appsEl.innerHTML=`<div style="background:var(--surface);border:1px solid var(--line);border-radius:12px;overflow:hidden">
+        <div style="padding:1.25rem 1.35rem;border-bottom:1px solid var(--line)">
+          <div style="font-family:var(--display);font-size:.92rem;font-weight:700;color:var(--white);margin-bottom:.25rem">Get started</div>
+          <div style="font-size:.73rem;color:var(--muted);font-weight:300">Three things that unlock everything Seen can do for you.</div>
+        </div>
+        <div style="padding:.25rem 0">
+          <div onclick="go('jobs')" style="display:flex;align-items:center;gap:1rem;padding:1rem 1.35rem;cursor:pointer;transition:background .12s;border-bottom:1px solid rgba(255,255,255,.04)" onmouseover="this.style.background='rgba(255,255,255,.03)'" onmouseout="this.style.background='transparent'">
+            <div style="width:32px;height:32px;border-radius:8px;background:rgba(16,185,129,.12);border:1px solid rgba(16,185,129,.2);display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:.9rem">🔍</div>
+            <div style="flex:1;min-width:0">
+              <div style="font-size:.8rem;font-weight:600;color:var(--white);margin-bottom:.12rem">Browse jobs by trust score</div>
+              <div style="font-size:.68rem;color:var(--muted);font-weight:300">See which companies ghost, which respond fast, and which are worth your time.</div>
+            </div>
+            <div style="font-family:var(--mono);font-size:.65rem;color:var(--green);flex-shrink:0">→</div>
+          </div>
+          <div onclick="go('feed')" style="display:flex;align-items:center;gap:1rem;padding:1rem 1.35rem;cursor:pointer;transition:background .12s;border-bottom:1px solid rgba(255,255,255,.04)" onmouseover="this.style.background='rgba(255,255,255,.03)'" onmouseout="this.style.background='transparent'">
+            <div style="width:32px;height:32px;border-radius:8px;background:rgba(96,165,250,.1);border:1px solid rgba(96,165,250,.18);display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:.9rem">📡</div>
+            <div style="flex:1;min-width:0">
+              <div style="font-size:.8rem;font-weight:600;color:var(--white);margin-bottom:.12rem">See what the community is reporting</div>
+              <div style="font-size:.68rem;color:var(--muted);font-weight:300">Real hiring experiences — ghostings, offers, rejections — from people like you.</div>
+            </div>
+            <div style="font-family:var(--mono);font-size:.65rem;color:var(--blue);flex-shrink:0">→</div>
+          </div>
+          <div onclick="go('report')" style="display:flex;align-items:center;gap:1rem;padding:1rem 1.35rem;cursor:pointer;transition:background .12s" onmouseover="this.style.background='rgba(255,255,255,.03)'" onmouseout="this.style.background='transparent'">
+            <div style="width:32px;height:32px;border-radius:8px;background:rgba(168,85,247,.1);border:1px solid rgba(168,85,247,.18);display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:.9rem">✍️</div>
+            <div style="flex:1;min-width:0">
+              <div style="font-size:.8rem;font-weight:600;color:var(--white);margin-bottom:.12rem">Report a past experience</div>
+              <div style="font-size:.68rem;color:var(--muted);font-weight:300">${totalAllTime>0?`You've had ${totalAllTime} application${totalAllTime!==1?'s':''} total — every outcome you report helps the next person.'`:'Takes 60 seconds. Makes the data better for everyone.'}</div>
+            </div>
+            <div style="font-family:var(--mono);font-size:.65rem;color:rgba(168,85,247,.9);flex-shrink:0">→</div>
+          </div>
+        </div>
+      </div>`;
     } else {
       appsEl.innerHTML=active.slice(0,4).map(app=>{
         const days=Math.floor((Date.now()-app.appliedAt)/86400000);
@@ -8814,7 +8856,9 @@ function openJobDetailModal(jobId) {
          style="background:none;border:1px solid var(--line2);border-radius:8px;padding:.65rem 1rem;font-size:1rem;cursor:pointer;color:${saved?'var(--green)':'var(--muted)'};flex-shrink:0;transition:all .15s">${saved?'♥':'♡'}</button>
        <button type="button" onclick="jdApplyClick()"
          style="flex:1;background:var(--green);color:var(--ink);border:none;border-radius:8px;padding:.65rem 1rem;font-family:var(--display);font-weight:800;font-size:.82rem;cursor:pointer">Apply &amp; Optimize →</button>
-     </div>`;
+     </div>
+     <button type="button" onclick="closeApplyModalDirect();prefillReport('${coEsc}','${locEsc}');go('report')"
+       style="background:none;border:none;font-family:var(--mono);font-size:.6rem;color:var(--muted);cursor:pointer;padding:.1rem 0;text-decoration:underline;text-underline-offset:2px;transition:color .12s" onmouseover="this.style.color='var(--sub)'" onmouseout="this.style.color='var(--muted)'">Applied here before? Add a report →</button>`;
 
   _applyModalGlow(risk);
   document.getElementById('applyModal').classList.add('open');
