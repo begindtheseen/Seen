@@ -48,6 +48,19 @@ body{background:var(--ink);background-image:radial-gradient(ellipse at 30% 0%,rg
 @keyframes heroOut{from{opacity:1;transform:translateY(0)}to{opacity:0;transform:translateY(-14px)}}
 .hero-line-in{animation:heroIn .38s cubic-bezier(.22,1,.36,1) both}
 .hero-line-out{animation:heroOut .28s ease forwards}
+/* Word-slam entrance / kinetic exit */
+@keyframes wordInL{0%{opacity:0;transform:translateX(-.55em);filter:blur(7px);letter-spacing:.04em}55%{opacity:1;filter:blur(0)}100%{opacity:1;transform:translateX(0);filter:blur(0);letter-spacing:-.04em}}
+@keyframes wordInR{0%{opacity:0;transform:translateX(.55em);filter:blur(7px);letter-spacing:.04em}55%{opacity:1;filter:blur(0)}100%{opacity:1;transform:translateX(0);filter:blur(0);letter-spacing:-.04em}}
+@keyframes wordOutCont{from{opacity:1;transform:translateX(0);filter:blur(0)}to{opacity:0;transform:translateX(var(--exit-dir,.4em));filter:blur(5px)}}
+.hw{display:inline-block;white-space:pre;will-change:transform,filter}
+.hw.in-l{animation:wordInL .48s cubic-bezier(.16,1,.3,1) both}
+.hw.in-r{animation:wordInR .48s cubic-bezier(.16,1,.3,1) both}
+.hw.out{animation:wordOutCont .24s cubic-bezier(.4,0,1,1) forwards}
+@keyframes heroSweep{from{opacity:1;transform:translateX(-110%)}to{opacity:1;transform:translateX(110%)}}
+#rotatingHero{position:relative;overflow:hidden}
+#rotatingHero::after{content:'';position:absolute;inset:0;pointer-events:none;opacity:0;background:linear-gradient(105deg,transparent 38%,rgba(196,181,253,.11) 50%,transparent 62%);transform:translateX(-110%)}
+#rotatingHero.swept::after{animation:heroSweep .7s cubic-bezier(.3,.1,.3,1) both}
+@media(prefers-reduced-motion:reduce){.hw{animation:none!important;opacity:1!important;transform:none!important;filter:none!important}}
 @keyframes fadeIn{from{opacity:0}to{opacity:1}}
 @keyframes fadeUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
 @keyframes spin{to{transform:rotate(360deg)}}
@@ -7864,47 +7877,162 @@ const HERO_LINES = [
 let _heroIdx = 0;
 let _heroTimer = null;
 
+const _WORD_POOL = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'.split('');
+const _reducedMotion = window.matchMedia?.('(prefers-reduced-motion:reduce)')?.matches ?? false;
+
+// Build line1 innerHTML: split into alternating-direction word spans
+// wordDirs[i] tracks 'l' or 'r' so we can reverse on exit
+function _buildWordSpans(text, staggerStart, staggerStep) {
+  const words = text.split(/(\s+)/);
+  let html = '';
+  let wordIdx = 0;
+  words.forEach(part => {
+    if (!part) return;
+    const isSpace = /^\s+$/.test(part);
+    if (isSpace) { html += '<span class="hw" style="opacity:1">' + part + '</span>'; return; }
+    const dir = wordIdx % 2 === 0 ? 'in-l' : 'in-r';
+    const delay = (staggerStart + wordIdx * staggerStep).toFixed(0);
+    html += `<span class="hw ${dir}" style="animation-delay:${delay}ms">${part}</span>`;
+    wordIdx++;
+  });
+  return html;
+}
+
+// Decode line2 character-by-character (slot machine style), calls onDone when done
+function _decodeLine2(text, abbreviated, onDone) {
+  const el = document.getElementById('heroLine2');
+  if (!el) { if (onDone) onDone(); return; }
+  const LOCK_CADENCE = abbreviated ? 30 : 45;
+  const chars = text.split('');
+  // Build spans
+  const frag = document.createDocumentFragment();
+  const items = chars.map((ch, i) => {
+    const span = document.createElement('span');
+    span.style.cssText = 'display:inline-block;white-space:pre';
+    const isSpace = ch === ' ';
+    if (isSpace) { span.textContent = ' '; }
+    else { span.textContent = _WORD_POOL[Math.floor(Math.random() * _WORD_POOL.length)]; span.style.webkitTextFillColor = 'rgba(196,181,253,.55)'; }
+    frag.appendChild(span);
+    return { span, target: ch, locked: isSpace, lockAt: isSpace ? 0 : i * LOCK_CADENCE };
+  });
+  el.textContent = '';
+  el.appendChild(frag);
+  let t0 = null, lastCycleIdx = -1;
+  function tick(ts) {
+    if (!t0) t0 = ts;
+    const elapsed = ts - t0;
+    const cycleIdx = Math.floor(elapsed / 50);
+    if (cycleIdx !== lastCycleIdx) {
+      lastCycleIdx = cycleIdx;
+      items.forEach(item => {
+        if (item.locked) return;
+        if (elapsed >= item.lockAt) {
+          item.locked = true;
+          item.span.textContent = item.target;
+          item.span.style.webkitTextFillColor = '#10b981';
+          item.span.style.textShadow = '0 0 18px rgba(16,185,129,.6)';
+          setTimeout(() => { item.span.style.webkitTextFillColor = ''; item.span.style.textShadow = ''; }, 80);
+        } else {
+          item.span.textContent = _WORD_POOL[Math.floor(Math.random() * _WORD_POOL.length)];
+        }
+      });
+    }
+    if (items.every(it => it.locked)) { if (onDone) setTimeout(onDone, 80); }
+    else requestAnimationFrame(tick);
+  }
+  requestAnimationFrame(tick);
+}
+
+// First-load hero entrance — called from _hideSplash when splash starts fading
+function runHeroIntro() {
+  const e1 = document.getElementById('heroLine1');
+  if (!e1) { startHeroRotation(); return; }
+  if (_reducedMotion) { startHeroRotation(); return; }
+  const lines = HERO_LINES[0];
+  e1.innerHTML = _buildWordSpans(lines[0], 0, 70);
+  // Line2 decode starts 120ms after the last line1 word stagger begins
+  const line1Words = lines[0].trim().split(/\s+/).length;
+  const decodeDelay = line1Words * 70 + 120;
+  setTimeout(() => {
+    _decodeLine2(lines[1], false, () => {
+      // Killer: verified sweep after decode finishes
+      const hero = document.getElementById('rotatingHero');
+      if (hero) {
+        hero.classList.add('swept');
+        setTimeout(() => hero.classList.remove('swept'), 750);
+      }
+      // Now start rotation cycle
+      clearInterval(_heroTimer);
+      _heroTimer = setInterval(() => {
+        _heroIdx = (_heroIdx + 1) % HERO_LINES.length;
+        _setHeroRotation(HERO_LINES[_heroIdx]);
+      }, 4800);
+    });
+  }, decodeDelay);
+}
+
+// Rotation-cycle word transition (abbreviated version — not the full intro ceremony)
+function _setHeroRotation(lines) {
+  const e1 = document.getElementById('heroLine1');
+  const e2 = document.getElementById('heroLine2');
+  if (!e1 || !e2) return;
+  // Exit: each .hw word continues in its entry direction
+  const words = e1.querySelectorAll('.hw:not([style*="opacity:1"])');
+  words.forEach((w, i) => {
+    const isRight = w.classList.contains('in-r');
+    w.style.setProperty('--exit-dir', isRight ? '.4em' : '-.4em');
+    w.style.animationDelay = (i * 40) + 'ms';
+    w.classList.remove('in-l', 'in-r');
+    w.classList.add('out');
+  });
+  // Exit line2 with a quick fade
+  e2.style.transition = 'opacity .2s ease';
+  e2.style.opacity = '0';
+  setTimeout(() => {
+    e2.style.transition = '';
+    e2.style.opacity = '';
+    e1.innerHTML = _buildWordSpans(lines[0], 0, 55);
+    _decodeLine2(lines[1], true, null);
+  }, 240);
+}
+
 function setHeroLines(lines, animate) {
   const e1 = document.getElementById('heroLine1');
   const e2 = document.getElementById('heroLine2');
   if (!e1) return;
-
   if (!animate) {
-    e1.textContent = lines[0];
+    // Initial quiet set (before intro fires)
+    e1.innerHTML = _buildWordSpans(lines[0], 0, 70);
+    // Line2 as plain text while we wait for intro
     e2.textContent = lines[1];
-    e1.className = 'hero-line-in';
-    e2.style.animationDelay = '.06s'; e2.className = 'hero-line-in';
     return;
   }
-
-  [e1, e2].forEach((el, i) => {
-    el.style.animationDelay = (i * .04) + 's';
-    el.style.animation = 'none';
-    el.offsetHeight;
-    el.style.animation = '';
-    el.className = 'hero-line-out';
-  });
-
-  setTimeout(() => {
-    e1.textContent = lines[0];
-    e2.textContent = lines[1];
-    [e1, e2].forEach((el, i) => {
-      el.style.animationDelay = (i * .07) + 's';
-      el.style.animation = 'none';
-      el.offsetHeight;
-      el.style.animation = '';
-      el.className = 'hero-line-in';
-    });
-  }, 280);
+  _setHeroRotation(lines);
 }
 
 function startHeroRotation() {
-  setHeroLines(HERO_LINES[0], false);
-  clearInterval(_heroTimer);
-  _heroTimer = setInterval(() => {
-    _heroIdx = (_heroIdx + 1) % HERO_LINES.length;
-    setHeroLines(HERO_LINES[_heroIdx], true);
-  }, 3800);
+  if (_reducedMotion) {
+    const e1 = document.getElementById('heroLine1');
+    const e2 = document.getElementById('heroLine2');
+    if (e1) { e1.textContent = HERO_LINES[0][0]; e1.className = 'hero-line-in'; }
+    if (e2) { e2.textContent = HERO_LINES[0][1]; e2.style.animationDelay = '.06s'; e2.className = 'hero-line-in'; }
+    clearInterval(_heroTimer);
+    _heroTimer = setInterval(() => {
+      _heroIdx = (_heroIdx + 1) % HERO_LINES.length;
+      const lines = HERO_LINES[_heroIdx];
+      [e1, e2].forEach((el, i) => { if(el){el.style.animationDelay=(i*.04)+'s';el.className='hero-line-out';} });
+      setTimeout(() => {
+        if (e1) { e1.textContent = lines[0]; e1.style.animationDelay = '0s'; e1.className = 'hero-line-in'; }
+        if (e2) { e2.textContent = lines[1]; e2.style.animationDelay = '.07s'; e2.className = 'hero-line-in'; }
+      }, 280);
+    }, 4800);
+    return;
+  }
+  // Normal path: just ensure content is set; actual cycling started by runHeroIntro
+  const e1 = document.getElementById('heroLine1');
+  const e2 = document.getElementById('heroLine2');
+  if (e1 && !e1.innerHTML) e1.innerHTML = _buildWordSpans(HERO_LINES[0][0], 0, 70);
+  if (e2 && !e2.textContent) e2.textContent = HERO_LINES[0][1];
 }
 
 // Ghost surge company set — populated once, used everywhere (job cards, feed, etc.)
@@ -10435,6 +10563,8 @@ function _hideSplash(){
   const delay=Math.max(0,2400-elapsed); // show at minimum 2.4s
   setTimeout(()=>{
     sp.classList.add('sp-out');
+    // Hero entrance fires as splash starts fading — choreographed handoff
+    runHeroIntro();
     setTimeout(()=>{if(sp.parentNode)sp.parentNode.removeChild(sp);},600);
   },delay);
 }
@@ -10442,7 +10572,7 @@ function _hideSplash(){
 setTimeout(_hideSplash,4000);
 
 updateNav();
-startHeroRotation();
+startHeroRotation(); // sets initial content; cycling started by runHeroIntro after splash
 if(db){
   Auth.init().then(()=>{
     updateNav();
