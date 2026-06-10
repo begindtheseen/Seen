@@ -10,32 +10,46 @@ async function fetchHNPosts() {
   const now = Date.now();
   if (_hnCache && now - _hnCacheTime < HN_TTL) return _hnCache;
 
+  // Only match posts that read like a personal job-seeker narrative
   const classify = (title, text) => {
     const t = (title + ' ' + (text || '')).toLowerCase();
-    if (/ghosted|no response|never heard|radio silence|heard nothing|disappeared/.test(t)) return 'ghosted';
-    if (/rejected|rejection|turned down|not moving forward|not selected|didn.t get/.test(t)) return 'autoreject';
-    if (/got.*offer|accepted.*offer|start date|got the job|signed.*offer|new job|just started/.test(t)) return 'hired';
-    if (/interview|phone screen|technical round|coding round|final round|got.*interview/.test(t)) return 'human';
+    if (/got ghosted|was ghosted|they ghosted|recruiter ghosted|ghosted after|ghosted me|no response after|never heard back|radio silence|heard nothing back|disappeared after/.test(t)) return 'ghosted';
+    if (/got rejected|was rejected|they rejected|rejection email|rejection letter|turned down after|not moving forward|not selected|didn.t get the|unfortunately.*not|after \d+ rounds/.test(t)) return 'autoreject';
+    if (/got (the |an |a )?offer|accepted (the |an |a )?offer|signed (the |an |a )?offer|got the job|start(ing|ed) (at|on)|new job (at|starts)|just (got hired|started at|accepted)/.test(t)) return 'hired';
+    if (/had (a |my |an )?(phone|video|technical|onsite|virtual|in.person) (screen|interview|round)|went through (the |their )?(interview|hiring)|passed (the |a )?(technical|coding|screen)|final round (at|with)|got.{0,10}interview/.test(t)) return 'human';
     return null;
   };
+
+  // Reject anything that looks like a product launch or promotional post
+  const isPromo = (title, text) => {
+    const t = (title + ' ' + (text || '')).toLowerCase();
+    return /\bi (built|created|made|developed|launched|wrote|designed|coded)\b|\bwe (built|created|made|launched)\b|\bmy (app|tool|startup|product|service|platform|project|side project)\b|\b(open.?source|sign up|try it|check it out|product hunt|feedback welcome|open to feedback|looking for (beta|early|feedback)|built for job|built to help job|job search tool|job board|resume (builder|tool|parser)|portfolio (generator|builder)|chrome extension|npm|github\.com\/)/.test(t);
+  };
+
   const extractCo = title => {
     const m = title.match(/(?:at|from|with|by)\s+([A-Z][A-Za-z0-9&\s.,']{1,40}?)(?:\s+(?:ghosted|rejected|interview|offer|hiring|HR|recruiter|job|position|role|just|after|is|has))/);
     return m?.[1]?.trim() || '';
   };
 
+  const stripPrefix = t => t.replace(/^(?:Show|Ask|Tell|Launch|Discuss) HN:\s*/i, '').trim();
+
   const cutoff = Math.floor((now - 365 * 24 * 3600 * 1000) / 1000);
+
+  // Tight, first-person queries — "story" tag excludes Show HN / Ask HN product posts
   const queries = [
-    'ghosted job interview hiring',
-    'rejected job application interview',
-    'job offer accepted hired',
-    'job interview experience technical',
+    '"got ghosted" job recruiter',
+    '"ghosted after" interview application',
+    '"rejected after" interview rounds job',
+    '"got the offer" job hired',
+    '"never heard back" job application',
+    '"job offer" accepted "start date"',
   ];
 
   const fetchOne = q => {
     const ctrl = new AbortController();
     const tid = setTimeout(() => ctrl.abort(), 7000);
     return fetch(
-      `https://hn.algolia.com/api/v1/search?query=${encodeURIComponent(q)}&tags=story&hitsPerPage=50&numericFilters=created_at_i%3E${cutoff}`,
+      `https://hn.algolia.com/api/v1/search?query=${encodeURIComponent(q)}&tags=story&hitsPerPage=30&numericFilters=created_at_i%3E${cutoff}`,
       { signal: ctrl.signal }
     )
       .then(r => { clearTimeout(tid); return r.ok ? r.json() : null; })
@@ -43,7 +57,6 @@ async function fetchHNPosts() {
       .catch(() => { clearTimeout(tid); return []; });
   };
 
-  // Hard cap: if all HN fetches take more than 10s combined, bail out
   const raceResult = await Promise.race([
     Promise.all(queries.map(fetchOne)),
     new Promise(resolve => setTimeout(() => resolve(null), 10000)),
@@ -55,14 +68,16 @@ async function fetchHNPosts() {
   }
   const results = raceResult;
 
-  const stripPrefix = t => t.replace(/^(?:Show|Ask|Tell|Launch|Discuss) HN:\s*/i, '').trim();
-
   const seen = new Set();
   const posts = results.flat().filter(h => {
     if (!h || seen.has(h.objectID)) return false;
     seen.add(h.objectID);
     const clean = stripPrefix(h.title || '');
-    return clean.length > 20 && (h.story_text || clean.length > 35);
+    // Must be a real story with some substance
+    if (clean.length < 20) return false;
+    // Hard reject product promotions
+    if (isPromo(clean, h.story_text || '')) return false;
+    return true;
   }).map(h => {
     const cleanTitle = stripPrefix(h.title);
     const oc = classify(cleanTitle, h.story_text || '');
