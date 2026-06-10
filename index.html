@@ -4543,15 +4543,15 @@ function _drawOutcomeCard(app) {
   const canvas = document.createElement('canvas');
   canvas.width = W; canvas.height = H;
   const c = canvas.getContext('2d');
-  const PAD = 64;
+  const PAD = 72;
 
-  const events = app.events || [];
+  // ── Event data ───────────────────────────────────────────────────
+  const events    = app.events || [];
   const appliedEvt = events.find(e => e.type === 'application_submitted');
   const offerEvt   = events.find(e => e.type === 'offer_received');
   const rejEvt     = events.find(e => e.type === 'rejected');
   const ghostEvt   = events.find(e => e.type === 'ghosted');
   const intEvt     = events.find(e => e.type === 'interview_received');
-
   const appliedMs  = appliedEvt?.date || app.appliedAt || Date.now();
   const outcomeMs  = (offerEvt || rejEvt || ghostEvt)?.date || Date.now();
   const daysElapsed = Math.max(1, Math.round((outcomeMs - appliedMs) / 86400000));
@@ -4560,127 +4560,143 @@ function _drawOutcomeCard(app) {
   const isHired   = status === 'hired' || !!offerEvt;
   const isGhosted = status === 'ghosted' || !!ghostEvt;
 
-  const OUTCOME_COLOR = isHired ? '#10b981' : isGhosted ? '#6b7280' : '#ef4444';
-  const OUTCOME_LABEL = isHired ? 'HIRED' : isGhosted ? 'GHOSTED' : 'REJECTED';
+  // ── Company score data ───────────────────────────────────────────
+  const coKey   = Object.keys(COS||{}).find(k => (COS[k].name||'').toLowerCase() === (app.company||'').toLowerCase()) || '';
+  const sc      = COS[coKey]?.sc || null;
+  const avgWait = sc?.avg_wait_days || 14;
+  const ghostPct = sc?.ghost_rate != null ? Math.round(sc.ghost_rate * 100) : null;
+  const rptCount = sc?.report_count || null;
+  const grade    = sc ? letterGrade(sc.overall_score) : null;
+  const risk     = sc?.risk_level || null;
 
+  const gradeEmoji = risk === 'safe' ? '🟢' : risk === 'danger' ? '🔴' : '🟡';
+
+  // Percentile: formula tuned so 5d/28d avg ≈ 91%
+  const pctFaster = (isHired && avgWait)
+    ? Math.min(99, Math.max(5, Math.round(100 * (1 - daysElapsed / (avgWait * 2)))))
+    : null;
+
+  // Rounds from EventStore
   const roundsEvt = EventStore.get().find(e => e.appId === app.id && e.type === 'rounds_detail');
   const rounds    = roundsEvt?.data?.rounds ?? null;
 
-  // Background
-  c.fillStyle = '#02040a'; c.fillRect(0, 0, W, H);
-  const glowG = c.createRadialGradient(W/2, 460, 0, W/2, 460, 520);
-  glowG.addColorStop(0, OUTCOME_COLOR + '1F'); glowG.addColorStop(1, 'rgba(0,0,0,0)');
-  c.fillStyle = glowG; c.fillRect(0, 0, W, H);
-  const ga = c.createRadialGradient(W, 0, 0, W, 0, 480);
-  ga.addColorStop(0,'rgba(124,58,237,0.17)'); ga.addColorStop(1,'rgba(0,0,0,0)');
-  c.fillStyle = ga; c.fillRect(0, 0, W, H);
-  const gb = c.createRadialGradient(0, H, 0, 0, H, 380);
-  gb.addColorStop(0,'rgba(29,78,216,0.10)'); gb.addColorStop(1,'rgba(0,0,0,0)');
-  c.fillStyle = gb; c.fillRect(0, 0, W, H);
-  _rr(c,1,1,W-2,H-2,24); c.strokeStyle='rgba(255,255,255,0.07)'; c.lineWidth=1.5; c.stroke();
+  // ── Outcome config ───────────────────────────────────────────────
+  const OC    = isHired ? '#10b981' : isGhosted ? '#9ca3af' : '#ef4444';
+  const OWORD = isHired ? 'HIRED' : isGhosted ? 'GHOSTED' : 'REJECTED';
 
-  // Eyebrow
-  c.font='600 13px "DM Mono",monospace'; c.fillStyle='rgba(255,255,255,0.22)';
+  // ── Fact list (max 6) ────────────────────────────────────────────
+  let facts = [];
+  if (isHired) {
+    facts = [
+      { e:'✅', t:'Offer Received' },
+      { e:'⚡', t:`${daysElapsed} Days to Offer` },
+      pctFaster != null && pctFaster > 50 ? { e:'🏆', t:`Faster Than ${pctFaster}% of Applicants` } : null,
+      rounds != null ? { e:'🎯', t:`${rounds} Interview Round${rounds===1?'':'s'}` } : null,
+      { e:'📊', t:`Average Offer Time: ${avgWait} Days` },
+      grade ? { e:gradeEmoji, t:`${app.company} Hiring Grade: ${grade}` } : null,
+      rptCount ? { e:'📈', t:`Based on ${rptCount.toLocaleString()} Applicant Outcomes` } : null,
+    ].filter(Boolean).slice(0, 6);
+  } else if (isGhosted) {
+    facts = [
+      { e:'👻', t:`Ghosted After ${daysElapsed} Days` },
+      ghostPct != null ? { e:'📊', t:`Ghost Rate at ${app.company}: ${ghostPct}%` } : null,
+      { e:'⏱', t:`Industry Average Response: ${avgWait} Days` },
+      grade ? { e:gradeEmoji, t:`${app.company} Hiring Grade: ${grade}` } : null,
+      rptCount ? { e:'📈', t:`Based on ${rptCount.toLocaleString()} Applicant Outcomes` } : null,
+    ].filter(Boolean).slice(0, 6);
+  } else {
+    facts = [
+      { e:'❌', t:`Rejected After ${daysElapsed} Days` },
+      { e:'🗓', t:`Reached Interview: ${intEvt ? 'Yes' : 'No'}` },
+      { e:'📊', t:`Average Offer Time: ${avgWait} Days` },
+      grade ? { e:gradeEmoji, t:`${app.company} Hiring Grade: ${grade}` } : null,
+      rptCount ? { e:'📈', t:`Based on ${rptCount.toLocaleString()} Applicant Outcomes` } : null,
+    ].filter(Boolean).slice(0, 6);
+  }
+
+  // ── Background ───────────────────────────────────────────────────
+  c.fillStyle = '#02040a'; c.fillRect(0, 0, W, H);
+  const glowG = c.createRadialGradient(W*0.5, H*0.38, 0, W*0.5, H*0.38, 520);
+  glowG.addColorStop(0, OC+'1A'); glowG.addColorStop(1, 'rgba(0,0,0,0)');
+  c.fillStyle = glowG; c.fillRect(0, 0, W, H);
+  const ga = c.createRadialGradient(W, 0, 0, W, 0, 440);
+  ga.addColorStop(0,'rgba(124,58,237,0.13)'); ga.addColorStop(1,'rgba(0,0,0,0)');
+  c.fillStyle = ga; c.fillRect(0, 0, W, H);
+  _rr(c,1,1,W-2,H-2,24); c.strokeStyle='rgba(255,255,255,0.06)'; c.lineWidth=1.5; c.stroke();
+
+  // ── Eyebrow ──────────────────────────────────────────────────────
+  c.font='600 13px "DM Mono",monospace'; c.fillStyle='rgba(255,255,255,0.20)';
   c.textAlign='left'; c.textBaseline='top';
-  c.fillText('SEEN  ·  HIRING OUTCOME CARD', PAD, PAD);
+  c.fillText('SEEN  ·  HIRING OUTCOME', PAD, PAD);
   c.textAlign='right'; c.fillText('seenjobs.io', W-PAD, PAD);
 
-  // Company row
-  const compY = PAD + 52;
-  const LS = 72;
-  _rr(c,PAD,compY,LS,LS,16); c.fillStyle='rgba(255,255,255,0.07)'; c.fill();
-  _rr(c,PAD,compY,LS,LS,16); c.strokeStyle=OUTCOME_COLOR+'4D'; c.lineWidth=1.5; c.stroke();
-  c.font='800 26px "Syne",sans-serif'; c.fillStyle=OUTCOME_COLOR;
-  c.textAlign='center'; c.textBaseline='middle';
-  c.fillText((app.company||'?')[0].toUpperCase(), PAD+LS/2, compY+LS/2);
+  // ── Company name ─────────────────────────────────────────────────
+  const coY = PAD + 50;
+  let coFs = 58;
+  c.font=`800 ${coFs}px "Syne",sans-serif`;
+  while(c.measureText(app.company||'Company').width > W-PAD*2 && coFs > 32) {
+    coFs -= 2; c.font=`800 ${coFs}px "Syne",sans-serif`;
+  }
+  c.fillStyle='#fff'; c.textAlign='left'; c.textBaseline='top';
+  c.fillText(app.company||'Company', PAD, coY);
 
-  c.textAlign='left'; c.textBaseline='top';
-  const maxNW = W - PAD - LS - 24 - PAD;
-  c.font='800 40px "Syne",sans-serif'; c.fillStyle='#fff';
-  let dispN = app.company || 'Company';
-  while(c.measureText(dispN).width > maxNW && dispN.length > 3) dispN = dispN.slice(0,-1);
-  if (dispN !== (app.company||'Company')) dispN += '…';
-  c.fillText(dispN, PAD+LS+22, compY+4);
-  c.font='400 16px "DM Mono",monospace'; c.fillStyle='rgba(255,255,255,0.40)';
-  let dispR = app.role || 'Role';
-  while(c.measureText(dispR).width > maxNW && dispR.length > 3) dispR = dispR.slice(0,-1);
-  if (dispR !== (app.role||'Role')) dispR += '…';
-  c.fillText(dispR, PAD+LS+22, compY+54);
+  // ── Role ─────────────────────────────────────────────────────────
+  const roleY = coY + coFs + 10;
+  c.font='400 21px "DM Mono",monospace'; c.fillStyle='rgba(255,255,255,0.42)';
+  let dispR = app.role || '';
+  while(c.measureText(dispR).width > W-PAD*2 && dispR.length > 4) dispR = dispR.slice(0,-1);
+  if (dispR !== (app.role||'')) dispR += '…';
+  c.fillText(dispR, PAD, roleY);
 
-  // Divider 1
-  const d1Y = compY + LS + 44;
-  c.strokeStyle='rgba(255,255,255,0.07)'; c.lineWidth=1;
+  // ── Divider 1 ────────────────────────────────────────────────────
+  const d1Y = roleY + 42;
+  c.strokeStyle='rgba(255,255,255,0.09)'; c.lineWidth=1;
   c.beginPath(); c.moveTo(PAD,d1Y); c.lineTo(W-PAD,d1Y); c.stroke();
 
-  // Outcome hero
-  c.font='600 13px "DM Mono",monospace'; c.fillStyle=OUTCOME_COLOR+'99';
-  c.textAlign='center'; c.textBaseline='top';
-  c.fillText('OUTCOME', W/2, d1Y+28);
-  let outcomeFs = 160;
-  c.font=`800 ${outcomeFs}px "Syne",sans-serif`;
-  while(c.measureText(OUTCOME_LABEL).width > W-PAD*2-20 && outcomeFs > 80) {
-    outcomeFs -= 4; c.font=`800 ${outcomeFs}px "Syne",sans-serif`;
+  // ── Outcome word (left-aligned, big) ────────────────────────────
+  let oFs = 148;
+  c.font=`800 ${oFs}px "Syne",sans-serif`;
+  while(c.measureText(OWORD).width > W-PAD*2 && oFs > 80) {
+    oFs -= 4; c.font=`800 ${oFs}px "Syne",sans-serif`;
   }
-  c.fillStyle=OUTCOME_COLOR; c.textAlign='center'; c.textBaseline='top';
-  c.fillText(OUTCOME_LABEL, W/2, d1Y+52);
+  const oY = d1Y + 26;
+  c.fillStyle=OC; c.textAlign='left'; c.textBaseline='top';
+  c.fillText(OWORD, PAD, oY);
 
-  // Timeline line
-  const tlY = d1Y + 52 + outcomeFs + 28;
-  const appliedLbl = new Date(appliedMs).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
-  c.font='500 14px "DM Mono",monospace'; c.fillStyle='rgba(255,255,255,0.32)';
-  c.textAlign='center'; c.textBaseline='top';
-  if (isGhosted) {
-    c.fillText(`Applied  ${appliedLbl}  ·  Response: Never`, W/2, tlY);
-  } else {
-    const outcomeLbl = new Date(outcomeMs).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
-    c.fillText(`Applied  ${appliedLbl}  →  ${isHired?'Offer':'Rejected'}  ${outcomeLbl}`, W/2, tlY);
-  }
+  // ── Divider 2 ────────────────────────────────────────────────────
+  const d2Y = oY + oFs + 22;
+  c.strokeStyle='rgba(255,255,255,0.09)'; c.lineWidth=1;
+  c.beginPath(); c.moveTo(PAD,d2Y); c.lineTo(W-PAD,d2Y); c.stroke();
 
-  // Stats tiles
-  const statsY = tlY + 44;
-  let stats;
-  if (isHired) {
-    stats = [
-      { lbl:'DAYS TO OFFER', val:String(daysElapsed), col:'#10b981' },
-      rounds !== null ? { lbl:'ROUNDS', val:String(rounds), col:'#6366f1' } : { lbl:'OFFER', val:'✓', col:'#10b981' },
-    ];
-  } else if (isGhosted) {
-    stats = [
-      { lbl:'DAYS WAITING', val:String(daysElapsed), col:'#ef4444' },
-      { lbl:'RESPONSE', val:'NEVER', col:'#6b7280' },
-    ];
-  } else {
-    stats = [
-      { lbl:'DAYS IN PROCESS', val:String(daysElapsed), col:'#ef4444' },
-      { lbl:'INTERVIEW', val:intEvt?'YES':'NO', col:intEvt?'#f59e0b':'#6b7280' },
-    ];
-  }
-  const tileW = Math.floor((W - PAD*2 - 20) / 2);
-  const tileH = 138;
-  stats.forEach((s, i) => {
-    const tx = PAD + i*(tileW+20);
-    _rr(c,tx,statsY,tileW,tileH,16); c.fillStyle='rgba(255,255,255,0.04)'; c.fill();
-    _rr(c,tx,statsY,tileW,tileH,16); c.strokeStyle='rgba(255,255,255,0.08)'; c.lineWidth=1; c.stroke();
-    let valFs = 72;
-    c.font=`700 ${valFs}px "Syne",sans-serif`;
-    while(c.measureText(s.val).width > tileW-32 && valFs > 32) { valFs -= 2; c.font=`700 ${valFs}px "Syne",sans-serif`; }
-    c.fillStyle=s.col; c.textAlign='center'; c.textBaseline='middle';
-    c.fillText(s.val, tx+tileW/2, statsY+60);
-    c.font='500 12px "DM Mono",monospace'; c.fillStyle='rgba(255,255,255,0.28)';
-    c.textBaseline='bottom'; c.fillText(s.lbl, tx+tileW/2, statsY+tileH-14);
+  // ── Fact list ────────────────────────────────────────────────────
+  const footerDivY = H - 90;
+  const factStartY = d2Y + 30;
+  const lineH = Math.min(82, Math.max(56, Math.floor((footerDivY - factStartY) / facts.length)));
+
+  facts.forEach((f, i) => {
+    const fy = factStartY + i * lineH + lineH / 2;
+    const eFs = Math.round(lineH * 0.48);
+    // Emoji
+    c.font=`${eFs}px serif`;
+    c.textAlign='left'; c.textBaseline='middle'; c.fillStyle='#fff';
+    c.fillText(f.e, PAD, fy);
+    // Text
+    const textX = PAD + eFs + 18;
+    let tFs = 30;
+    c.font=`500 ${tFs}px "DM Mono",monospace`; c.fillStyle='rgba(255,255,255,0.90)';
+    while(c.measureText(f.t).width > W-textX-PAD && tFs > 18) {
+      tFs--; c.font=`500 ${tFs}px "DM Mono",monospace`;
+    }
+    c.textBaseline='middle';
+    c.fillText(f.t, textX, fy);
   });
 
-  // Footer
-  const fY = H - 70;
-  c.strokeStyle='rgba(255,255,255,0.07)'; c.lineWidth=1;
-  c.beginPath(); c.moveTo(PAD,fY-8); c.lineTo(W-PAD,fY-8); c.stroke();
-  c.font='700 16px "Syne",sans-serif'; c.fillStyle='#fff';
-  c.textAlign='left'; c.textBaseline='middle';
-  c.fillText('Seen', PAD, fY+20);
-  c.font='400 12px "DM Mono",monospace'; c.fillStyle='rgba(255,255,255,0.28)';
-  c.fillText('seenjobs.io  ·  real applicant outcomes', PAD+50, fY+20);
-  c.textAlign='right'; c.fillStyle='rgba(255,255,255,0.18)';
-  c.fillText('from real candidates, for real job seekers', W-PAD, fY+20);
+  // ── Footer ───────────────────────────────────────────────────────
+  c.strokeStyle='rgba(255,255,255,0.08)'; c.lineWidth=1;
+  c.beginPath(); c.moveTo(PAD,footerDivY); c.lineTo(W-PAD,footerDivY); c.stroke();
+  c.font='400 16px "DM Mono",monospace'; c.fillStyle='rgba(255,255,255,0.30)';
+  c.textAlign='center'; c.textBaseline='middle';
+  c.fillText('From real applicant outcomes  •  seenjobs.io', W/2, footerDivY + 28);
 
   return canvas;
 }
