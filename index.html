@@ -11000,8 +11000,8 @@ async function markAppStatus(id, status) {
     rejected: `Marked rejected (${days}d).`
   };
   showToast(msgs[status] || 'Updated.');
-  if (app && (status === 'ghosted' || status === 'hired')) {
-    setTimeout(() => _promptOutcomeReport(app, status, days), 900);
+  if (app && ['hired','ghosted','rejected'].includes(status)) {
+    setTimeout(() => showOutcomeCard(id), 900);
   }
 }
 
