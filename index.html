@@ -2282,6 +2282,8 @@ nav.nav-scrolled{background:rgba(6,6,8,0.82);backdrop-filter:blur(60px) saturate
     </div>
 
     <!-- CHECK PROMPTS — due response/interview/outcome checks -->
+    <div id="trackerNewAppSpotlight" style="display:none"></div>
+
     <div id="trackerCheckPrompts" style="display:none"></div>
 
     <div id="trackerList"></div>
@@ -5948,8 +5950,21 @@ const AppStore = {
       score:a.score, waste:a.waste_score,
       employerStage:a.employer_stage,
       appliedAt: a.created_at ? new Date(a.created_at).getTime() : Date.now(),
-      updatedAt: a.updated_at ? new Date(a.updated_at).getTime() : Date.now()
+      updatedAt: a.updated_at ? new Date(a.updated_at).getTime() : Date.now(),
+      events: a.events || [{ type:'application_submitted', date: a.created_at ? new Date(a.created_at).getTime() : Date.now(), source:'user', confidence:'low' }]
     };
+  },
+
+  // Add a structured event to an application's event history
+  addEvent(appId, event) {
+    const apps = this.loadSync();
+    const idx = apps.findIndex(a => a.id === appId);
+    if (idx === -1) return;
+    const evt = { ...event, id: 'ev_' + Date.now() + '_' + Math.random().toString(36).slice(2,5), date: event.date || Date.now(), source: event.source || 'user', confidence: event.confidence || 'low' };
+    apps[idx].events = [...(apps[idx].events || []), evt];
+    apps[idx].updatedAt = Date.now();
+    localStorage.setItem(this.KEY, JSON.stringify(apps));
+    return evt;
   },
   async load() {
     if (Auth.isLoggedIn()) {
@@ -5969,7 +5984,15 @@ const AppStore = {
   },
   async syncFromDb() { await this.load(); },
   async add(app) {
-    const entry = {...app, id: app.id||('app_'+Date.now()), appliedAt: app.appliedAt||Date.now(), updatedAt: app.updatedAt||Date.now()};
+    const now = Date.now();
+    const initialEvent = { id: 'ev_'+now, type: 'application_submitted', date: app.appliedAt||now, source: 'user', confidence: 'low' };
+    const entry = {
+      ...app,
+      id: app.id||('app_'+now),
+      appliedAt: app.appliedAt||now,
+      updatedAt: app.updatedAt||now,
+      events: app.events || [initialEvent],
+    };
     const apps = this.loadSync();
     // Dedup by id, jobId, or company+role (catches re-tracks and rapid double-clicks)
     const isDupe = apps.find(a =>
@@ -5993,7 +6016,37 @@ const AppStore = {
   async update(id, changes) {
     const apps = this.loadSync();
     const idx = apps.findIndex(a => a.id === id);
-    if(idx !== -1) { apps[idx] = {...apps[idx], ...changes, updatedAt: Date.now()}; localStorage.setItem(this.KEY, JSON.stringify(apps)); }
+    if (idx !== -1) {
+      const prev = apps[idx];
+      const updated = {...prev, ...changes, updatedAt: Date.now()};
+      // Auto-log timeline events for meaningful state transitions
+      const events = [...(updated.events || [])];
+      const now = Date.now();
+      const typeMap = {
+        'Applied':       null, // initial state, already logged
+        'Phone Screen':  'response_received',
+        'Interview':     'interview_received',
+        'Final Round':   'interview_received',
+        'Offer':         'offer_received',
+        'Rejected':      'rejected',
+        'Ghosted':       'ghosted',
+        'Withdrew':      'withdrawn',
+      };
+      const statusMap = {
+        'hired':     'offer_received',
+        'rejected':  'rejected',
+        'ghosted':   'ghosted',
+      };
+      let eventType = null;
+      if (changes.stage && changes.stage !== prev.stage) eventType = typeMap[changes.stage] || null;
+      if (!eventType && changes.status && changes.status !== prev.status) eventType = statusMap[changes.status] || null;
+      if (eventType && !events.find(e => e.type === eventType)) {
+        events.push({ id:'ev_'+now+'_'+Math.random().toString(36).slice(2,5), type:eventType, date:now, source:'user', confidence:'low' });
+      }
+      updated.events = events;
+      apps[idx] = updated;
+      localStorage.setItem(this.KEY, JSON.stringify(apps));
+    }
     if (Auth.isLoggedIn()) _sync('update_application', { id, changes });
   },
   async remove(id) {
@@ -6340,28 +6393,69 @@ function computeScoresWithEvents(company, dbReports, jobs, webScore) {
 // Visual day-progress bar for tracker cards
 // ═══════════════════════════════════════════════
 function _buildTimeline(app) {
-  const co = Object.values(COS).find(c => c.name.toLowerCase() === app.company.toLowerCase());
-  const avgWait = co?.sc?.avg_wait_days || 30;
+  const co = Object.values(COS||{}).find(c => c.name.toLowerCase() === (app.company||'').toLowerCase());
+  const avgWait = co?.sc?.avg_wait_days || 14;
   const days = Math.floor((Date.now() - app.appliedAt) / 86400000);
   const pct = Math.min(100, (days / avgWait) * 100);
   const color = pct < 75 ? 'var(--green)' : pct < 115 ? 'var(--amber)' : 'var(--red)';
-  const statusLbl = pct < 75 ? 'On track' : pct < 115 ? 'In the window' : '⚠ Past window';
-  const dotPct = Math.min(97, pct);
   const appliedLbl = new Date(app.appliedAt).toLocaleDateString('en-US',{month:'short',day:'numeric'});
   const expectedDate = new Date(app.appliedAt + avgWait * 86400000).toLocaleDateString('en-US',{month:'short',day:'numeric'});
-  return `<div style="margin:.6rem 0 .85rem">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.38rem">
-      <span style="font-family:var(--mono);font-size:.54rem;color:var(--muted)">${appliedLbl}</span>
-      <span style="font-family:var(--mono);font-size:.6rem;font-weight:600;color:${color}">Day ${days} · ${statusLbl}</span>
-      <span style="font-family:var(--mono);font-size:.54rem;color:var(--muted)">Avg: ${expectedDate}</span>
+  const nextCheckin = new Date(app.appliedAt + 7 * 86400000).toLocaleDateString('en-US',{month:'short',day:'numeric'});
+
+  // Build milestone timeline from actual events
+  const events = app.events || [];
+  const MILESTONES = [
+    { type:'application_submitted', icon:'📤', label:'Applied', color:'var(--blue)' },
+    { type:'response_received',    icon:'📬', label:'Response', color:'var(--green)' },
+    { type:'interview_received',   icon:'🗓', label:'Interview', color:'var(--purple)' },
+    { type:'offer_received',       icon:'🎉', label:'Offer', color:'var(--green)' },
+    { type:'rejected',             icon:'❌', label:'Rejected', color:'var(--red)' },
+    { type:'ghosted',              icon:'👻', label:'Ghosted', color:'var(--muted)' },
+    { type:'withdrawn',            icon:'↩', label:'Withdrew', color:'var(--dim)' },
+  ];
+
+  const fired = new Set(events.map(e => e.type));
+
+  // Show active milestones on the journey
+  const activeMilestones = MILESTONES.filter(m => fired.has(m.type) || m.type === 'application_submitted');
+  const milestoneHtml = activeMilestones.length > 1 ? `
+    <div style="display:flex;align-items:center;gap:0;margin:.5rem 0 .7rem;overflow-x:auto;scrollbar-width:none">
+      ${activeMilestones.map((m,i) => {
+        const evt = events.find(e => e.type === m.type);
+        const dt = evt ? new Date(evt.date).toLocaleDateString('en-US',{month:'short',day:'numeric'}) : '';
+        return `<div style="display:flex;flex-direction:column;align-items:center;flex-shrink:0;min-width:52px">
+          <div style="font-size:.85rem;margin-bottom:.2rem">${m.icon}</div>
+          <div style="font-family:var(--mono);font-size:.52rem;color:${m.color};font-weight:600">${m.label}</div>
+          ${dt?`<div style="font-family:var(--mono);font-size:.47rem;color:var(--muted)">${dt}</div>`:''}
+        </div>${i<activeMilestones.length-1?'<div style="flex:1;height:1px;background:var(--line2);min-width:12px;margin-bottom:16px"></div>':''}`;
+      }).join('')}
+    </div>` : '';
+
+  // Status row
+  const isTerminal = ['hired','rejected','ghosted'].includes(app.status);
+  const statusLabel = isTerminal
+    ? (app.status === 'hired' ? '🎉 Offer received' : app.status === 'rejected' ? '❌ Rejected' : '👻 Ghosted')
+    : (pct < 75 ? '⏳ Awaiting Response' : pct < 115 ? '📅 In response window' : '⚠ Past expected window');
+  const statusColor = isTerminal
+    ? (app.status === 'hired' ? 'var(--green)' : app.status === 'ghosted' ? 'var(--muted)' : 'var(--red)')
+    : color;
+
+  return `<div style="margin:.5rem 0 .9rem">
+    ${milestoneHtml}
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.35rem">
+      <div>
+        <span style="font-family:var(--mono);font-size:.6rem;font-weight:600;color:${statusColor}">${statusLabel}</span>
+      </div>
+      <span style="font-family:var(--mono);font-size:.52rem;color:var(--muted)">Day ${days}</span>
     </div>
-    <div style="height:5px;background:var(--line);border-radius:3px;position:relative;overflow:visible;margin:0 4px">
-      <div style="height:100%;width:${pct}%;background:linear-gradient(to right,var(--green),${color});border-radius:3px"></div>
-      <div style="position:absolute;top:50%;left:${dotPct}%;transform:translate(-50%,-50%);width:12px;height:12px;border-radius:50%;background:${color};box-shadow:0 0 8px ${color},0 0 20px ${color}55;border:2px solid var(--void)"></div>
+    ${!isTerminal ? `<div style="height:4px;background:var(--line);border-radius:3px;position:relative;overflow:visible;margin:0 4px 0">
+      <div style="height:100%;width:${Math.min(100,pct)}%;background:linear-gradient(to right,var(--blue),${color});border-radius:3px;transition:width 1s ease"></div>
     </div>
-    <div style="display:flex;justify-content:space-between;font-family:var(--mono);font-size:.5rem;color:var(--muted);margin-top:.28rem">
-      <span>Day 0</span><span>← typical response window →</span><span>Day ${avgWait}</span>
+    <div style="display:flex;justify-content:space-between;font-family:var(--mono);font-size:.5rem;color:var(--muted);margin-top:.25rem">
+      <span>Applied ${appliedLbl}</span>
+      <span>Expected by ${expectedDate}</span>
     </div>
+    <div style="font-family:var(--mono);font-size:.52rem;color:var(--dim);margin-top:.35rem">Next check-in: ${nextCheckin} · Industry avg: ${avgWait} days</div>` : ''}
   </div>`;
 }
 
@@ -6522,6 +6616,57 @@ async function renderTracker() {
   // Check prompts — response/interview/outcome checks due
   renderCheckPrompts('trackerCheckPrompts');
   updateCheckBadge();
+
+  // NEW APPLICATION SPOTLIGHT — shown immediately after apply
+  const spotlightEl = document.getElementById('trackerNewAppSpotlight');
+  if (spotlightEl) {
+    const newId = window._pendingNewAppId;
+    const newApp = newId ? apps.find(a => a.id === newId || a.id.startsWith(newId.slice(0,10))) : null;
+    if (newApp) {
+      window._pendingNewAppId = null;
+      const avgWait = 14;
+      const nextCheckin = new Date(newApp.appliedAt + 7 * 86400000).toLocaleDateString('en-US',{month:'short',day:'numeric'});
+      const expectedResp = new Date(newApp.appliedAt + avgWait * 86400000).toLocaleDateString('en-US',{month:'short',day:'numeric'});
+      spotlightEl.style.display = 'block';
+      spotlightEl.innerHTML = `
+        <div style="background:linear-gradient(135deg,rgba(59,130,246,0.06) 0%,rgba(124,58,237,0.06) 100%);border:1px solid rgba(99,102,241,0.25);border-radius:16px;padding:1.35rem 1.25rem;margin-bottom:1.5rem;animation:fadeUp .3s ease">
+          <div style="display:flex;align-items:center;gap:.5rem;margin-bottom:1rem">
+            <div style="width:8px;height:8px;border-radius:50%;background:var(--green);box-shadow:0 0 8px rgba(16,185,129,0.6);animation:pulse 2s infinite;flex-shrink:0"></div>
+            <div style="font-family:var(--mono);font-size:.6rem;text-transform:uppercase;letter-spacing:.09em;color:var(--green);font-weight:600">Hiring Timeline Started</div>
+          </div>
+          <div style="font-family:var(--display);font-size:1.1rem;font-weight:700;color:var(--white);margin-bottom:.2rem">${newApp.role}</div>
+          <div style="font-family:var(--mono);font-size:.72rem;color:var(--sub);margin-bottom:1.1rem">${newApp.company}${newApp.location?' · '+newApp.location:''}</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:.75rem;margin-bottom:1rem">
+            <div style="background:rgba(255,255,255,0.03);border:1px solid var(--line);border-radius:10px;padding:.65rem .75rem">
+              <div style="font-family:var(--mono);font-size:.52rem;color:var(--muted);margin-bottom:.25rem;text-transform:uppercase;letter-spacing:.06em">Applied</div>
+              <div style="font-family:var(--display);font-size:.82rem;font-weight:700;color:var(--white)">${new Date(newApp.appliedAt).toLocaleDateString('en-US',{month:'short',day:'numeric'})}</div>
+              <div style="font-family:var(--mono);font-size:.52rem;color:var(--muted)">Today</div>
+            </div>
+            <div style="background:rgba(255,255,255,0.03);border:1px solid var(--line);border-radius:10px;padding:.65rem .75rem">
+              <div style="font-family:var(--mono);font-size:.52rem;color:var(--muted);margin-bottom:.25rem;text-transform:uppercase;letter-spacing:.06em">Status</div>
+              <div style="font-family:var(--display);font-size:.82rem;font-weight:700;color:var(--blue)">Awaiting</div>
+              <div style="font-family:var(--mono);font-size:.52rem;color:var(--muted)">Response</div>
+            </div>
+            <div style="background:rgba(255,255,255,0.03);border:1px solid var(--line);border-radius:10px;padding:.65rem .75rem">
+              <div style="font-family:var(--mono);font-size:.52rem;color:var(--muted);margin-bottom:.25rem;text-transform:uppercase;letter-spacing:.06em">Expect By</div>
+              <div style="font-family:var(--display);font-size:.82rem;font-weight:700;color:var(--white)">${expectedResp}</div>
+              <div style="font-family:var(--mono);font-size:.52rem;color:var(--muted)">~${avgWait} days avg</div>
+            </div>
+          </div>
+          <div style="background:rgba(245,158,11,0.07);border:1px solid rgba(245,158,11,0.2);border-radius:9px;padding:.6rem .9rem;display:flex;align-items:center;justify-content:space-between;gap:.75rem">
+            <div>
+              <div style="font-family:var(--mono);font-size:.6rem;color:var(--amber);font-weight:600">📅 Check-in scheduled: ${nextCheckin}</div>
+              <div style="font-family:var(--mono);font-size:.55rem;color:var(--muted);margin-top:.18rem">We'll ask: "Did they respond?" One tap is all it takes.</div>
+            </div>
+            <button onclick="this.closest('#trackerNewAppSpotlight').style.display='none'" style="background:none;border:none;font-family:var(--mono);font-size:.6rem;color:var(--muted);cursor:pointer;flex-shrink:0;padding:.2rem .4rem;border-radius:5px">Got it ✓</button>
+          </div>
+        </div>`;
+      // Scroll to top of page
+      window.scrollTo({top:0,behavior:'smooth'});
+    } else {
+      spotlightEl.style.display = 'none';
+    }
+  }
 
   // Full application list
   if (listEl) {
@@ -9375,8 +9520,9 @@ async function confirmApply(jobId, company, role, location, score, risk, waste) 
   const btn = document.querySelector('#trackFormSection .btn-green');
   if (btn) { btn.textContent = 'Saving...'; btn.disabled = true; }
   try {
+    const newAppId = 'app_' + Date.now();
     await AppStore.add({
-      id: 'app_' + Date.now(),
+      id: newAppId,
       jobId, company, role, location, score,
       risk: risk || Score.risk(score),
       waste: waste || 25,
@@ -9389,7 +9535,9 @@ async function confirmApply(jobId, company, role, location, score, risk, waste) 
     const badge = document.getElementById('trackerBadge');
     if (badge) { const c = apps.filter(a => a.status === 'active').length; if (c > 0) { badge.textContent = c; badge.style.display = 'inline'; } }
     if (Auth.isSeeker()) renderSeekerDash().catch(() => {});
-    showToast('Application tracked! View it in your dashboard.');
+    // Go directly to the tracker and highlight the new application
+    window._pendingNewAppId = newAppId;
+    go('tracker');
   } catch(e) {
     console.error('confirmApply:', e);
     showToast('Failed to save. Please try again.');
