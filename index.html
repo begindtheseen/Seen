@@ -43,7 +43,6 @@
 }
 html{scroll-behavior:smooth;overflow-x:hidden}
 body{background:var(--ink);background-image:radial-gradient(ellipse at 30% 0%,rgba(99,102,241,0.07) 0%,transparent 50%),radial-gradient(ellipse at 80% 100%,rgba(124,58,237,0.05) 0%,transparent 50%);color:var(--text);font-family:var(--body);font-size:15px;line-height:1.6;overflow-x:hidden;-webkit-font-smoothing:antialiased;width:100%;max-width:100%}
-body::before{content:'';position:fixed;inset:0;background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.025'/%3E%3C/svg%3E");pointer-events:none;z-index:9998}
 
 @keyframes heroIn{from{opacity:0;transform:translateY(18px)}to{opacity:1;transform:translateY(0)}}
 @keyframes heroOut{from{opacity:1;transform:translateY(0)}to{opacity:0;transform:translateY(-14px)}}
@@ -495,6 +494,19 @@ nav.nav-scrolled{background:rgba(6,6,8,0.82);backdrop-filter:blur(60px) saturate
 .ctab.active{color:var(--white);border-bottom-color:var(--blue)}
 .ctc{display:none}.ctc.active{display:block;animation:fadeIn .18s ease}
 .rcard{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:1.15rem;margin-bottom:.65rem}
+.feed-filter-btn{background:var(--surface);border:1px solid var(--line2);color:var(--sub);border-radius:100px;padding:.38rem .9rem;font-family:var(--mono);font-size:.68rem;cursor:pointer;transition:all .15s;white-space:nowrap}
+.feed-filter-btn:hover{border-color:var(--muted);color:var(--text)}
+.feed-filter-btn.active{background:var(--blue);border-color:var(--blue);color:#fff}
+.feed-card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:1.1rem 1.25rem;margin-bottom:.75rem;cursor:pointer;transition:border-color .15s}
+.feed-card:hover{border-color:var(--line2)}
+.feed-card.outcome-ghosted{border-left:3px solid var(--red)}
+.feed-card.outcome-autoreject{border-left:3px solid var(--amber)}
+.feed-card.outcome-hired{border-left:3px solid var(--green)}
+.feed-card.outcome-human{border-left:3px solid var(--blue)}
+.feed-co{font-size:.88rem;font-weight:600;color:var(--white);margin-bottom:.18rem}
+.feed-role{font-family:var(--mono);font-size:.65rem;color:var(--sub)}
+.feed-body{font-size:.8rem;color:var(--text);line-height:1.55;margin:.6rem 0 .5rem;font-weight:300}
+.feed-meta{display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;font-family:var(--mono);font-size:.56rem;color:var(--muted)}
 .rc-hd{display:flex;align-items:center;gap:.65rem;margin-bottom:.65rem}
 .rc-av{width:28px;height:28px;border-radius:50%;background:var(--raised);border:1px solid var(--line2);display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:.62rem;color:var(--dim);flex-shrink:0}
 .rc-role{font-size:.82rem;font-weight:600;color:var(--white)}
@@ -858,6 +870,7 @@ nav.nav-scrolled{background:rgba(6,6,8,0.82);backdrop-filter:blur(60px) saturate
   <div class="nav-pills" id="navPills" style="display:none">
     <button class="ntab" onclick="go('jobs')" id="nt-jobs">Jobs</button>
     <button class="ntab" onclick="go('demand')" id="nt-demand">Demand</button>
+    <button class="ntab" onclick="go('feed')" id="nt-feed">Community</button>
     <button class="ntab" onclick="go('resume')" id="nt-resume">Resume AI</button>
     <button class="ntab" onclick="go('tracker')" id="nt-tracker">Track <span class="ntab-new" id="trackerBadge" style="display:none;background:var(--amber);color:var(--ink)">0</span><span class="ntab-new" id="trackerCheckBadge" style="display:none;background:var(--red);color:#fff;margin-left:.15rem">!</span></button>
   </div>
@@ -1605,6 +1618,31 @@ nav.nav-scrolled{background:rgba(6,6,8,0.82);backdrop-filter:blur(60px) saturate
     <div class="ctc" id="ctc-compare"></div>
   </div>
   <div id="ctc-web-reviews" style="padding:0 1rem 1.5rem"></div>
+</div>
+
+<!-- ═══ COMMUNITY FEED ═══ -->
+<div class="page" id="page-feed">
+  <div style="max-width:720px;margin:0 auto;padding:2rem 1.25rem">
+    <div style="margin-bottom:1.75rem">
+      <div class="eyebrow">Live feed</div>
+      <h1 style="font-family:var(--display);font-size:1.75rem;font-weight:800;color:var(--white);letter-spacing:-.03em;margin-bottom:.35rem">Fresh from the community</h1>
+      <p style="color:var(--sub);font-size:.82rem;font-weight:300;margin:0">Real experiences — every report shapes the score for that company.</p>
+    </div>
+    <!-- Filters -->
+    <div style="display:flex;gap:.5rem;flex-wrap:wrap;margin-bottom:1.5rem" id="feedFilters">
+      <button class="feed-filter-btn active" data-filter="all" onclick="setFeedFilter('all',this)">All</button>
+      <button class="feed-filter-btn" data-filter="interviewing" onclick="setFeedFilter('interviewing',this)">📞 Interviewing</button>
+      <button class="feed-filter-btn" data-filter="ghosted" onclick="setFeedFilter('ghosted',this)">👻 Ghosted</button>
+      <button class="feed-filter-btn" data-filter="rejected" onclick="setFeedFilter('rejected',this)">❌ Rejected</button>
+      <button class="feed-filter-btn" data-filter="hired" onclick="setFeedFilter('hired',this)">🎉 Hired</button>
+    </div>
+    <!-- Feed list -->
+    <div id="feedList"><div style="text-align:center;padding:3rem;font-family:var(--mono);font-size:.65rem;color:var(--muted)"><div class="spinner" style="margin:0 auto .75rem;width:16px;height:16px"></div>Loading...</div></div>
+    <!-- Load more -->
+    <div style="text-align:center;margin-top:1.5rem" id="feedLoadMore" style="display:none">
+      <button class="btn btn-ghost" style="font-size:.75rem" onclick="loadMoreFeed()">Load more →</button>
+    </div>
+  </div>
 </div>
 
 <!-- ═══ REPORT ═══ -->
@@ -7017,7 +7055,7 @@ function go(page){
     if(!el){ console.warn('Page not found: page-'+page); return; }
     el.classList.add('active');
     document.querySelectorAll('.ntab').forEach(t=>t.classList.remove('active'));
-    const tabMap={jobs:'nt-jobs',demand:'nt-demand',resume:'nt-resume',tracker:'nt-tracker'};
+    const tabMap={jobs:'nt-jobs',demand:'nt-demand',feed:'nt-feed',resume:'nt-resume',tracker:'nt-tracker'};
     if(tabMap[page]){const t=document.getElementById(tabMap[page]);if(t)t.classList.add('active');}
     const footer = document.getElementById('mainFooter');
     if (footer) footer.style.display = page === 'landing' ? '' : 'none';
@@ -7044,6 +7082,7 @@ function go(page){
       loadJobs();
     }
     if(page==='report')loadCommunityReports();
+    if(page==='feed')loadFeed();
     if(page==='profile')renderProfilePage();
     if(page==='demand')loadDemand();
     if(page==='faq')renderFAQ();
@@ -7408,6 +7447,108 @@ function renderAIResearch(container, r, name) {
         <button class="btn btn-ghost" style="font-size:.68rem" onclick="go('report')">Add your experience →</button>
       </div>
     </div>`;
+}
+
+// ── Community feed ────────────────────────────────────────────────────────────
+
+let _feedAllRows = [];
+let _feedFilter  = 'all';
+let _feedOffset  = 0;
+const FEED_PAGE  = 20;
+
+async function loadFeed(reset = true) {
+  const listEl = document.getElementById('feedList');
+  const moreEl = document.getElementById('feedLoadMore');
+  if (!listEl) return;
+
+  if (reset) {
+    _feedOffset = 0;
+    _feedAllRows = [];
+    listEl.innerHTML = '<div style="text-align:center;padding:3rem;font-family:var(--mono);font-size:.65rem;color:var(--muted)"><div class="spinner" style="margin:0 auto .75rem;width:16px;height:16px"></div>Loading...</div>';
+    if (moreEl) moreEl.style.display = 'none';
+  }
+
+  if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
+    listEl.innerHTML = '<div style="text-align:center;padding:2rem;font-family:var(--mono);font-size:.65rem;color:var(--muted)">Connect to view community reports.</div>';
+    return;
+  }
+
+  try {
+    // Map filter to outcome values
+    const outcomeMap = {
+      all: null,
+      ghosted: ['ghosted'],
+      rejected: ['autoreject','rejected'],
+      interviewing: ['human','interview','interviewing'],
+      hired: ['hired','offer'],
+    };
+    const outcomes = outcomeMap[_feedFilter];
+    let url = `${SUPABASE_URL}/rest/v1/reports?select=id,role,outcome,ghost_stage,rounds,report_text,platform,created_at,experience_level,company_name&order=created_at.desc&limit=${FEED_PAGE}&offset=${_feedOffset}`;
+    if (outcomes) url += `&outcome=in.(${outcomes.join(',')})`;
+
+    const r = await fetch(url, {
+      headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` },
+    });
+    if (!r.ok) throw new Error(`${r.status}`);
+    const rows = await r.json();
+
+    if (!Array.isArray(rows) || (!rows.length && !_feedAllRows.length)) {
+      listEl.innerHTML = '<div style="text-align:center;padding:3rem;font-family:var(--mono);font-size:.7rem;color:var(--muted)">No reports yet.<br><br><button class="btn btn-ghost" style="font-size:.72rem" onclick="go(\'report\')">Be the first to share →</button></div>';
+      return;
+    }
+
+    _feedAllRows = reset ? rows : [..._feedAllRows, ...rows];
+    _feedOffset += rows.length;
+    renderFeedCards(listEl, _feedAllRows, reset);
+    if (moreEl) moreEl.style.display = rows.length === FEED_PAGE ? 'block' : 'none';
+
+  } catch(e) {
+    if (reset) listEl.innerHTML = `<div style="text-align:center;padding:2rem;font-family:var(--mono);font-size:.65rem;color:var(--muted)">Couldn't load feed.</div>`;
+  }
+}
+
+function renderFeedCards(listEl, rows, replace = true) {
+  const ago = dt => {
+    if (!dt) return '';
+    const d = Math.floor((Date.now() - new Date(dt)) / 86400000);
+    return d === 0 ? 'today' : d === 1 ? '1d ago' : `${d}d ago`;
+  };
+  const outcomeClass = { ghosted:'outcome-ghosted', autoreject:'outcome-autoreject', rejected:'outcome-autoreject', hired:'outcome-hired', offer:'outcome-hired', human:'outcome-human', interview:'outcome-human', interviewing:'outcome-human' };
+  const outcomeLabel = { ghosted:'👻 Ghosted', autoreject:'🤖 Auto-rejected', rejected:'❌ Rejected', hired:'🎉 Hired', offer:'🎉 Hired', human:'📞 Got response', interview:'📞 Interviewing', interviewing:'📞 Interviewing', waiting:'⏳ Waiting' };
+
+  const html = rows.map(r => {
+    const oc = r.outcome || 'waiting';
+    const co = (r.company_name || 'Unknown company').replace(/</g,'&lt;');
+    const role = (r.role || 'Unknown role').replace(/</g,'&lt;');
+    const text = r.report_text ? r.report_text.replace(/</g,'&lt;').replace(/>/g,'&gt;') : '';
+    const stage = r.ghost_stage ? `<span style="color:var(--muted)"> · ghosted at ${r.ghost_stage.replace(/</g,'&lt;')}</span>` : '';
+    const rounds = r.rounds ? `${r.rounds} round${r.rounds!==1?'s':''} · ` : '';
+    const platform = r.platform && r.platform !== 'Select...' ? `via ${r.platform.replace(/</g,'&lt;')} · ` : '';
+    return `<div class="feed-card ${outcomeClass[oc]||''}" onclick="openCompanySearch();document.getElementById('coSearchInp').value='${co.replace(/'/g,"\\'")}';searchCompanies('${co.replace(/'/g,"\\'")}')">
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:.75rem;margin-bottom:.3rem">
+        <div>
+          <div class="feed-co">${co}</div>
+          <div class="feed-role">${role}${stage}</div>
+        </div>
+        <span class="vibe ${oc==='ghosted'?'v-r':oc==='hired'||oc==='offer'?'v-g':oc==='autoreject'||oc==='rejected'?'v-y':'v-b'}" style="white-space:nowrap;flex-shrink:0">${outcomeLabel[oc]||oc}</span>
+      </div>
+      ${text?`<div class="feed-body">"${text.slice(0,220)}${text.length>220?'…':''}"</div>`:''}
+      <div class="feed-meta">${platform}${rounds}${r.experience_level||''}${r.experience_level?` · `:''}${ago(r.created_at)}</div>
+    </div>`;
+  }).join('');
+
+  if (replace) listEl.innerHTML = html; else listEl.insertAdjacentHTML('beforeend', html);
+}
+
+function setFeedFilter(filter, btn) {
+  _feedFilter = filter;
+  document.querySelectorAll('.feed-filter-btn').forEach(b => b.classList.remove('active'));
+  if (btn) btn.classList.add('active');
+  loadFeed(true);
+}
+
+function loadMoreFeed() {
+  loadFeed(false);
 }
 
 async function loadCommunityReports() {
@@ -8899,6 +9040,7 @@ function renderSideMenu() {
       { icon: '🤖', label: 'Resume AI', page: 'resume' },
       { icon: '📋', label: 'My Applications', page: 'tracker' },
       { icon: '🏆', label: 'Company Rankings', page: 'companies' },
+      { icon: '💬', label: 'Community Feed', page: 'feed' },
       { icon: '🏢', label: 'Check a Company', page: 'company', action: () => openCompanySearch() },
       { icon: '📝', label: 'Report Experience', page: 'report' },
       { icon: '⚙️', label: 'Profile Settings', page: 'profile' },
@@ -8912,6 +9054,7 @@ function renderSideMenu() {
       { icon: '💼', label: 'Browse Jobs', page: 'jobs' },
       { icon: '📊', label: 'Job Demand', page: 'demand' },
       { icon: '🏆', label: 'Company Rankings', page: 'companies' },
+      { icon: '💬', label: 'Community Feed', page: 'feed' },
       { icon: '🔍', label: 'Check a Company', page: 'company', action: () => openCompanySearch() },
       { icon: '📝', label: 'Report Experience', page: 'report' },
       { icon: '🔑', label: 'Sign In', page: 'login' },
