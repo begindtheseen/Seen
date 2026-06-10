@@ -20,7 +20,9 @@
     "api/admin-stats.js": { "maxDuration": 15 },
     "api/user-sync.js": { "maxDuration": 15 },
     "api/company-score.js": { "maxDuration": 45 },
-    "api/moderate-report.js": { "maxDuration": 20 }
+    "api/moderate-report.js": { "maxDuration": 20 },
+    "api/refresh-demand.js": { "maxDuration": 30 },
+    "api/demand-data.js": { "maxDuration": 10 }
   },
   "crons": [
     { "path": "/api/refresh-jobs", "schedule": "0 2 * * *" },
@@ -28,6 +30,7 @@
     { "path": "/api/refresh-jobs", "schedule": "0 10 * * *" },
     { "path": "/api/refresh-jobs", "schedule": "0 14 * * *" },
     { "path": "/api/refresh-jobs", "schedule": "0 18 * * *" },
-    { "path": "/api/refresh-jobs", "schedule": "0 22 * * *" }
+    { "path": "/api/refresh-jobs", "schedule": "0 22 * * *" },
+    { "path": "/api/refresh-demand", "schedule": "0 4 1 * *" }
   ]
 }
