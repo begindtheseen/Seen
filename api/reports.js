@@ -55,23 +55,35 @@ async function fetchHNPosts() {
   }
   const results = raceResult;
 
+  const stripPrefix = t => t.replace(/^(?:Show|Ask|Tell|Launch|Discuss) HN:\s*/i, '').trim();
+
   const seen = new Set();
   const posts = results.flat().filter(h => {
-    if (seen.has(h.objectID)) return false;
+    if (!h || seen.has(h.objectID)) return false;
     seen.add(h.objectID);
-    return h.title && (h.story_text || h.title.length > 30);
+    const clean = stripPrefix(h.title || '');
+    return clean.length > 20 && (h.story_text || clean.length > 35);
   }).map(h => {
-    const oc = classify(h.title, h.story_text || '');
+    const cleanTitle = stripPrefix(h.title);
+    const oc = classify(cleanTitle, h.story_text || '');
     if (!oc) return null;
+    const body = h.story_text
+      ? h.story_text
+          .replace(/<[^>]+>/g, ' ')
+          .replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#x27;/g, "'")
+          .replace(/\s+/g, ' ')
+          .trim()
+          .slice(0, 450)
+      : '';
     return {
       id: `hn-${h.objectID}`,
       source: 'hn',
-      company_name: extractCo(h.title),
-      role: '',
+      company_name: extractCo(cleanTitle),
+      role: cleanTitle.slice(0, 120),
       outcome: oc,
       ghost_stage: null,
       rounds: 0,
-      report_text: h.title + (h.story_text ? '\n\n' + h.story_text.replace(/<[^>]+>/g, '').slice(0, 500) : ''),
+      report_text: body,
       platform: 'Hacker News',
       experience_level: '',
       created_at: h.created_at,
