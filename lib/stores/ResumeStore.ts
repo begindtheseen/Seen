@@ -1,0 +1,84 @@
+'use client'
+
+import { _sync } from '../sync'
+import type { ResumeData } from '../types'
+
+function getKey(userId?: string): string {
+  return `seen_resume_${userId || 'guest'}`
+}
+
+function getMetaKey(userId?: string): string {
+  return `seen_resume_meta_${userId || 'guest'}`
+}
+
+function isReadable(text: string): boolean {
+  if (!text || text.length < 50) return false
+  const readable = (text.match(/[A-Za-z][A-Za-z\s]{2,}/g) || []).join('').length
+  return readable / text.length >= 0.4
+}
+
+export const ResumeStore = {
+  isReadable,
+
+  async save(text: string, fileName: string, wordCount: number, userId?: string, loggedIn = false): Promise<void> {
+    const key = getKey(userId)
+    const metaKey = getMetaKey(userId)
+    localStorage.setItem(key, text)
+    localStorage.setItem(metaKey, JSON.stringify({ fileName, wordCount }))
+    if (loggedIn) {
+      _sync('save_resume', { text, fileName, wordCount }).catch(e =>
+        console.warn('Resume DB save (non-fatal):', e)
+      )
+    }
+  },
+
+  async load(userId?: string, loggedIn = false): Promise<ResumeData | null> {
+    if (loggedIn) {
+      try {
+        const result = await _sync('load_profile') as { profile?: Record<string, unknown> } | null
+        const data = result?.profile
+        if (data) {
+          if (data.resume_text) {
+            const key = getKey(userId)
+            const metaKey = getMetaKey(userId)
+            localStorage.setItem(key, data.resume_text as string)
+            localStorage.setItem(metaKey, JSON.stringify({
+              fileName: data.resume_file_name || 'Resume',
+              wordCount: data.resume_word_count || 0,
+            }))
+            return {
+              text: data.resume_text as string,
+              fileName: (data.resume_file_name as string) || 'Resume',
+              wordCount: (data.resume_word_count as number) || 0,
+            }
+          } else {
+            // DB says no resume — clear local cache
+            localStorage.removeItem(getKey(userId))
+            localStorage.removeItem(getMetaKey(userId))
+            return null
+          }
+        }
+      } catch {}
+    }
+
+    // Fallback to localStorage
+    const key = getKey(userId)
+    const text = localStorage.getItem(key)
+    if (text) {
+      const meta = JSON.parse(localStorage.getItem(getMetaKey(userId)) || '{}')
+      if (loggedIn) {
+        _sync('save_resume', { text, fileName: meta.fileName || 'Resume', wordCount: meta.wordCount || 0 }).catch(() => {})
+      }
+      return { text, fileName: meta.fileName || 'Resume', wordCount: meta.wordCount || 0 }
+    }
+    return null
+  },
+
+  clear(userId?: string, loggedIn = false): void {
+    localStorage.removeItem(getKey(userId))
+    localStorage.removeItem(getMetaKey(userId))
+    if (loggedIn) {
+      _sync('clear_resume').catch(e => console.warn('ResumeStore.clear:', e))
+    }
+  },
+}
