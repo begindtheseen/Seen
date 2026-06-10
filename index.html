@@ -773,48 +773,49 @@ nav.nav-scrolled{background:rgba(6,6,8,0.82);backdrop-filter:blur(60px) saturate
 
 /* ── INTRO SPLASH ── */
 #introSplash{
-  position:fixed;inset:0;z-index:99999;
-  background:var(--void);
+  position:fixed;top:0;left:0;right:0;bottom:0;z-index:2147483647;
+  background:#05070f;
   display:flex;flex-direction:column;align-items:center;justify-content:center;
-  gap:0;
-  pointer-events:all;
-  transition:opacity .45s cubic-bezier(.4,0,.2,1);
+  will-change:opacity;
+  transition:opacity .55s cubic-bezier(.4,0,.2,1);
 }
-#introSplash.out{opacity:0;pointer-events:none;}
-#introSplash .sp-dot{
-  width:8px;height:8px;border-radius:50%;background:var(--green);
-  animation:spDotPulse 1.2s ease-in-out infinite;
-  margin-bottom:1.1rem;
+#introSplash.sp-out{opacity:0;pointer-events:none;}
+.sp-ring{
+  width:48px;height:48px;border-radius:50%;
+  border:1.5px solid rgba(16,185,129,.15);
+  border-top-color:#10b981;
+  animation:spSpin .9s linear infinite;
+  margin-bottom:2rem;
 }
-#introSplash .sp-logo{
-  font-family:var(--display);font-size:3rem;font-weight:900;
-  color:var(--white);letter-spacing:-.05em;line-height:1;
-  opacity:0;transform:translateY(10px);
-  animation:spLogoIn .5s .1s cubic-bezier(.22,1,.36,1) forwards;
-  margin-bottom:.55rem;
+.sp-wordmark{
+  font-family:'Syne',sans-serif;font-size:2.75rem;font-weight:900;
+  color:#f9fafb;letter-spacing:-.05em;line-height:1;
+  opacity:0;transform:translateY(12px);
+  animation:spUp .5s .15s cubic-bezier(.22,1,.36,1) forwards;
+  margin-bottom:.6rem;
 }
-#introSplash .sp-tag{
-  font-family:var(--mono);font-size:.68rem;color:var(--muted);letter-spacing:.05em;
-  opacity:0;
-  animation:spTagIn .45s .45s ease forwards;
+.sp-sub{
+  font-family:'DM Mono',monospace;font-size:.65rem;color:#4b5563;
+  letter-spacing:.06em;text-transform:uppercase;
+  opacity:0;animation:spFade .4s .5s ease forwards;
 }
-#introSplash .sp-bar{
-  position:absolute;bottom:0;left:0;height:2px;background:var(--green);
-  width:0%;animation:spBar 1.6s .1s cubic-bezier(.4,0,.2,1) forwards;
-  opacity:.6;
+.sp-track{position:absolute;bottom:0;left:0;right:0;height:2px;background:rgba(16,185,129,.12)}
+.sp-fill{
+  height:100%;background:#10b981;width:0;
+  animation:spLoad 2.2s .1s cubic-bezier(.25,.46,.45,.94) forwards;
 }
-@keyframes spDotPulse{0%,100%{opacity:.4;transform:scale(.8)}50%{opacity:1;transform:scale(1.15)}}
-@keyframes spLogoIn{to{opacity:1;transform:translateY(0)}}
-@keyframes spTagIn{to{opacity:1}}
-@keyframes spBar{0%{width:0%}70%{width:85%}100%{width:100%}}
+@keyframes spSpin{to{transform:rotate(360deg)}}
+@keyframes spUp{to{opacity:1;transform:translateY(0)}}
+@keyframes spFade{to{opacity:1}}
+@keyframes spLoad{0%{width:0%}60%{width:70%}85%{width:90%}100%{width:100%}}
 </style>
 </head>
 <body>
 <div id="introSplash" aria-hidden="true">
-  <div class="sp-dot"></div>
-  <div class="sp-logo">Seen</div>
-  <div class="sp-tag">Know before you apply.</div>
-  <div class="sp-bar"></div>
+  <div class="sp-ring"></div>
+  <div class="sp-wordmark">Seen</div>
+  <div class="sp-sub">Know before you apply</div>
+  <div class="sp-track"><div class="sp-fill"></div></div>
 </div>
 <div class="aurora"><div class="aurora-3"></div></div>
 
@@ -9750,21 +9751,20 @@ function _handleSharedLink(){
 })();
 
 // ── INIT ──
+const _splashT0=Date.now();
 function _hideSplash(){
   const sp=document.getElementById('introSplash');
   if(!sp||sp.dataset.gone)return;
   sp.dataset.gone='1';
-  // Let the bar animation finish (≥1.7s total) before fading out
-  const elapsed=performance.now();
-  const minShow=1700;
-  const delay=Math.max(0,minShow-elapsed);
+  const elapsed=Date.now()-_splashT0;
+  const delay=Math.max(0,2400-elapsed); // show at minimum 2.4s
   setTimeout(()=>{
-    sp.classList.add('out');
-    setTimeout(()=>sp.remove(),500);
+    sp.classList.add('sp-out');
+    setTimeout(()=>{if(sp.parentNode)sp.parentNode.removeChild(sp);},600);
   },delay);
 }
-// Safety net — hide after 3s no matter what
-setTimeout(_hideSplash,3000);
+// Safety net — hide after 4s no matter what
+setTimeout(_hideSplash,4000);
 
 updateNav();
 startHeroRotation();
