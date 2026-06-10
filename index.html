@@ -1529,6 +1529,12 @@ nav.nav-scrolled{background:rgba(6,6,8,0.82);backdrop-filter:blur(60px) saturate
     <!-- Job Search Health Score (hidden until ≥3 apps tracked) -->
     <div id="seekerHealthScore" style="display:none;margin-bottom:1.25rem"></div>
 
+    <!-- Career Benchmarks (shown when ≥3 apps with outcomes) -->
+    <div id="dashBenchmarks" style="display:none;margin-bottom:1.25rem"></div>
+
+    <!-- Career Badges (shown when user has earned achievements) -->
+    <div id="dashBadges" style="display:none;margin-bottom:1.25rem"></div>
+
     <!-- Stat row — mission control tiles: 2x2 on mobile, 4 across on desktop -->
     <div class="dstat-row" id="seekerStatRow">
       <div class="dstat ds-blue">
@@ -5265,11 +5271,17 @@ async function viewCompany(id,name,loc){
     const wc2 = (displaySc.avg_wait_days || 0) > 21 ? 'var(--amber)' : 'var(--text)';
     const wac = (displaySc.waste || 0) > 60 ? 'var(--red)' : (displaySc.waste || 0) > 30 ? 'var(--amber)' : 'var(--green)';
     const dq = rsc.data_quality;
-    const dqBadge = dq === 'strong' ? `<span class="vibe v-g" style="font-size:.52rem;margin-top:.25rem">✓ ${rsc.report_count} verified reports</span>`
-      : dq === 'moderate' ? `<span class="vibe v-y" style="font-size:.52rem;margin-top:.25rem">~ ${rsc.report_count} community reports</span>`
-      : dq === 'limited' ? `<span class="vibe v-y" style="font-size:.52rem;margin-top:.25rem">~ ${rsc.report_count} reports — add yours</span>`
-      : rsc.data_source === 'community' ? `<span class="vibe v-y" style="font-size:.52rem;margin-top:.25rem">Web research · be first to report</span>`
-      : `<span class="vibe v-n" style="font-size:.52rem;margin-top:.25rem">Job listing data only</span>`;
+    // Confidence language from strategy: never present weak data as fact
+    const confLabel = dq === 'strong'
+      ? { cls:'v-g', txt:`🟢 High confidence · ${rsc.report_count.toLocaleString()} candidate reports`, sub:'Candidate-reported · large sample · consistent data' }
+      : dq === 'moderate'
+      ? { cls:'v-y', txt:`🟡 Moderate confidence · ${rsc.report_count} reports`, sub:'Candidate-reported · growing dataset' }
+      : dq === 'limited'
+      ? { cls:'v-y', txt:`🟡 Low confidence · ${rsc.report_count} reports`, sub:'Limited data — add yours to improve this' }
+      : rsc.data_source === 'community'
+      ? { cls:'v-n', txt:'🔴 Estimated · public signal only', sub:'No Seen reports yet — candidate-reported data pending' }
+      : { cls:'v-n', txt:'🔴 Estimated · job listing data only', sub:'Not enough data — be first to report' };
+    const dqBadge = `<div style="display:flex;flex-direction:column;align-items:flex-end;gap:.1rem"><span class="vibe ${confLabel.cls}" style="font-size:.52rem">${confLabel.txt}</span><span style="font-family:var(--mono);font-size:.48rem;color:var(--muted)">${confLabel.sub}</span></div>`;
 
     document.getElementById('coSB').innerHTML = `
       <div class="co-grade-bar ${rr2}">
@@ -6289,7 +6301,15 @@ const AppStore = {
       if (changes.stage && changes.stage !== prev.stage) eventType = typeMap[changes.stage] || null;
       if (!eventType && changes.status && changes.status !== prev.status) eventType = statusMap[changes.status] || null;
       if (eventType && !events.find(e => e.type === eventType)) {
-        events.push({ id:'ev_'+now+'_'+Math.random().toString(36).slice(2,5), type:eventType, date:now, source:'user', confidence:'low' });
+        const daysFromApply = (now - (updated.appliedAt||now)) / 86400000;
+        const isImpossible = ['offer_received','rejected'].includes(eventType) && daysFromApply < 2;
+        events.push({
+          id: 'ev_'+now+'_'+Math.random().toString(36).slice(2,5),
+          type: eventType, date: now, source: 'user',
+          confidence: isImpossible ? 0 : 'low',
+          trust_weight: isImpossible ? 0 : 1,
+          anomaly_flags: isImpossible ? ['impossible_timeline'] : [],
+        });
       }
       updated.events = events;
       apps[idx] = updated;
@@ -6324,7 +6344,11 @@ const EventStore = {
   get()  { try { return JSON.parse(localStorage.getItem(this.KEY)||'[]'); } catch(e) { return []; } },
 
   add(evt) {
-    const e = { ...evt, id: evt.id || ('hev_' + Date.now() + '_' + Math.random().toString(36).slice(2,6)), createdAt: Date.now() };
+    const now = Date.now();
+    const e = { ...evt, id: evt.id || ('hev_' + now + '_' + Math.random().toString(36).slice(2,6)), createdAt: now };
+    // Anti-gaming: detect mass submissions (>5 from same source in 1 hour)
+    const recentCount = this.get().filter(x => x.createdAt > now - 3600000).length;
+    if (recentCount >= 10) { e.anomaly_flags = [...(e.anomaly_flags||[]), 'rate_exceeded']; e.trust_weight = 0; }
     const all = this.get();
     if (!all.find(x => x.id === e.id)) { all.unshift(e); localStorage.setItem(this.KEY, JSON.stringify(all)); }
     if (e.type === 'outcome_check' && e.data?.outcome && e.data.outcome !== 'active') this._submitAsReport(e);
@@ -7881,6 +7905,79 @@ function getHealthRecs(health) {
   });
 }
 
+// ═══════════════════════════════════════════════════════════════════
+// BADGE SYSTEM — career achievements (not gamification)
+// ═══════════════════════════════════════════════════════════════════
+
+const BadgeStore = {
+  compute(apps) {
+    const b = [];
+    const hired    = apps.filter(a => a.status === 'hired');
+    const ghosted  = apps.filter(a => a.status === 'ghosted');
+    const rejected = apps.filter(a => a.status === 'rejected');
+    const terminal = hired.length + ghosted.length + rejected.length;
+    const allChecks = EventStore.get();
+
+    const hasInterview = a => (a.events||[]).some(e => ['interview_received','interview_completed'].includes(e.type));
+    const offerDays = a => {
+      const oe = (a.events||[]).find(e => e.type === 'offer_received');
+      return oe ? Math.max(1, Math.round((oe.date - a.appliedAt) / 86400000)) : null;
+    };
+
+    // First Offer
+    if (hired.length >= 1) {
+      b.push({ id:'first_offer', icon:'🎉', label:'First Offer', desc:'Received a job offer tracked through Seen' });
+    }
+
+    // Offer Streak (2+ offers)
+    if (hired.length >= 2) {
+      b.push({ id:'offer_streak', icon:'🔥', label:`Offer Streak ×${hired.length}`, desc:`Received ${hired.length} job offers` });
+    }
+
+    // Fast Hire (offer in ≤14 days)
+    const fastApp = hired.find(a => { const d = offerDays(a); return d !== null && d <= 14; });
+    if (fastApp) {
+      const d = offerDays(fastApp);
+      b.push({ id:'fast_hire', icon:'⚡', label:'Fast Hire', desc:`Offer received in just ${d} days` });
+    }
+
+    // Consistent Tracker (5+ apps)
+    if (apps.length >= 5) {
+      b.push({ id:'consistent_tracker', icon:'📊', label:'Consistent Tracker', desc:`Actively tracked ${apps.length}+ applications` });
+    }
+
+    // Transparency Contributor (3+ apps with final outcomes)
+    if (terminal >= 3) {
+      b.push({ id:'transparency_contributor', icon:'🔬', label:'Transparency Contributor', desc:`Contributed ${terminal} hiring outcomes to the community` });
+    }
+
+    // High Interview Rate (≥40% interview rate, min 5 apps)
+    if (apps.length >= 5) {
+      const ir = apps.filter(hasInterview).length / apps.length;
+      if (ir >= 0.4) b.push({ id:'high_interview_rate', icon:'🗓', label:'High Interview Rate', desc:`${Math.round(ir*100)}% interview rate — top tier` });
+    }
+
+    // Strong Converter (≥10% offer rate, min 5 apps)
+    if (apps.length >= 5 && hired.length >= 1) {
+      const or = hired.length / apps.length;
+      if (or >= 0.1) b.push({ id:'strong_conversion', icon:'🏆', label:'Strong Converter', desc:`${Math.round(or*100)}% offer rate — outstanding` });
+    }
+
+    // Early Responder (completed 3+ check-ins within 24h of due date)
+    const earlyCount = apps.filter(a => {
+      return CHECK_SCHEDULE.some(chk => {
+        const evt = allChecks.find(e => e.appId === a.id && e.type === chk.type);
+        if (!evt || !evt.createdAt) return false;
+        const dueAt = a.appliedAt + chk.day * 86400000;
+        return evt.createdAt <= dueAt + 86400000;
+      });
+    }).length;
+    if (earlyCount >= 3) b.push({ id:'early_responder', icon:'⏱', label:'Early Responder', desc:'Completed 3+ outcome check-ins within 24 hours of being due' });
+
+    return b;
+  }
+};
+
 async function renderSeekerDash(){
   // Ensure profile is loaded — if it's null here (race with auth init) load it now
   if (!Auth._profile && Auth.isLoggedIn()) {
@@ -8143,6 +8240,90 @@ async function renderSeekerDash(){
       }).join('')}</div>
     </div>`;
   })();
+
+  // ── Career Benchmarks ─────────────────────────────────────────────
+  const benchEl = _('dashBenchmarks');
+  if (benchEl) {
+    const terminal2 = apps.filter(a => ['hired','rejected','ghosted'].includes(a.status));
+    const withInt   = apps.filter(a => (a.events||[]).some(e => ['interview_received','interview_completed'].includes(e.type)));
+    const hiredB    = apps.filter(a => a.status === 'hired');
+    const ghostedB  = apps.filter(a => a.status === 'ghosted');
+    const n = apps.length;
+
+    if (n >= 3 && terminal2.length >= 2) {
+      const rr = Math.round((terminal2.length / n) * 100);
+      const ir = Math.round((withInt.length   / n) * 100);
+      const or = Math.round((hiredB.length    / n) * 100);
+      const gr = Math.round((ghostedB.length  / n) * 100);
+
+      // Industry averages — used as benchmark baseline
+      const AVG = { rr:22, ir:10, or:4, gr:55 };
+
+      // Simple percentile: relative to average, capped 1-99
+      const pct = (v, avg, higherGood) => {
+        if (v === 0 && higherGood) return 5;
+        const ratio = higherGood ? v / Math.max(avg, 1) : avg / Math.max(v, 1);
+        return Math.min(99, Math.max(1, Math.round(50 * ratio)));
+      };
+      const col = (v, avg, hi) => v === 0 ? 'var(--muted)' : (hi ? (v >= avg ? 'var(--green)' : 'var(--amber)') : (v <= avg ? 'var(--green)' : v < avg * 1.4 ? 'var(--amber)' : 'var(--red)'));
+
+      const metrics = [
+        { lbl:'Response Rate', val:`${rr}%`, pct:pct(rr,AVG.rr,true),  avg:`${AVG.rr}% avg`, col:col(rr,AVG.rr,true) },
+        { lbl:'Interview Rate', val:`${ir}%`, pct:pct(ir,AVG.ir,true), avg:`${AVG.ir}% avg`, col:col(ir,AVG.ir,true) },
+        { lbl:'Offer Rate',    val:`${or}%`, pct:pct(or,AVG.or,true),  avg:`${AVG.or}% avg`, col:col(or,AVG.or,true) },
+        { lbl:'Ghost Rate',    val:`${gr}%`, pct:pct(gr,AVG.gr,false), avg:`${AVG.gr}% avg`, col:col(gr,AVG.gr,false) },
+      ];
+
+      benchEl.style.display = 'block';
+      benchEl.innerHTML = `
+        <div style="background:var(--surface);border:1px solid var(--line);border-radius:12px;overflow:hidden">
+          <div style="padding:.85rem 1.1rem;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between">
+            <div style="font-family:var(--display);font-size:.82rem;font-weight:700;color:var(--white)">Career Benchmarks</div>
+            <div style="font-family:var(--mono);font-size:.54rem;color:var(--muted)">${n} app${n!==1?'s':''} · vs industry avg</div>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:0">
+            ${metrics.map((m,i) => `
+              <div style="padding:.85rem 1rem;${i%2===0?'border-right:1px solid var(--line)':''};${i<2?'border-bottom:1px solid var(--line)':''}">
+                <div style="font-family:var(--mono);font-size:.52rem;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);margin-bottom:.3rem">${m.lbl}</div>
+                <div style="font-family:var(--display);font-size:1.45rem;font-weight:800;color:${m.col};line-height:1">${m.val}</div>
+                <div style="font-family:var(--mono);font-size:.54rem;color:var(--dim);margin-top:.2rem">Top ${m.pct}% · ${m.avg}</div>
+              </div>
+            `).join('')}
+          </div>
+        </div>`;
+    } else {
+      benchEl.style.display = 'none';
+    }
+  }
+
+  // ── Career Badges ──────────────────────────────────────────────
+  const badgesEl = _('dashBadges');
+  if (badgesEl) {
+    const badges = BadgeStore.compute(apps);
+    if (badges.length) {
+      badgesEl.style.display = 'block';
+      badgesEl.innerHTML = `
+        <div style="background:var(--surface);border:1px solid var(--line);border-radius:12px;overflow:hidden">
+          <div style="padding:.85rem 1.1rem;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between">
+            <div style="font-family:var(--display);font-size:.82rem;font-weight:700;color:var(--white)">Career Achievements</div>
+            <div style="font-family:var(--mono);font-size:.54rem;color:var(--muted)">${badges.length} earned</div>
+          </div>
+          <div style="padding:.75rem 1rem;display:flex;flex-wrap:wrap;gap:.5rem">
+            ${badges.map(b => `
+              <div style="background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.1);border-radius:10px;padding:.55rem .85rem;display:flex;align-items:center;gap:.6rem;flex-shrink:0">
+                <span style="font-size:1rem;flex-shrink:0">${b.icon}</span>
+                <div>
+                  <div style="font-family:var(--mono);font-size:.62rem;font-weight:600;color:var(--white)">${b.label}</div>
+                  <div style="font-family:var(--mono);font-size:.52rem;color:var(--muted);margin-top:.08rem">${b.desc}</div>
+                </div>
+              </div>
+            `).join('')}
+          </div>
+        </div>`;
+    } else {
+      badgesEl.style.display = 'none';
+    }
+  }
 
   // Check resume and gate AI features
   checkResumeGate();
