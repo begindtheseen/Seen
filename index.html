@@ -1616,18 +1616,9 @@ nav.nav-scrolled{background:rgba(6,6,8,0.82);backdrop-filter:blur(60px) saturate
         <button class="btn btn-ghost" style="width:100%;justify-content:center;font-size:.78rem" onclick="initSeekerPasswordReset()">Send reset link →</button>
       </div>
       <div id="seekerCodeEntry" style="display:none;border-top:1px solid var(--line);padding-top:.85rem;margin-bottom:1rem">
-        <div style="font-family:var(--mono);font-size:.62rem;color:var(--blue);margin-bottom:.75rem">✓ Reset link sent — check your email</div>
-        <div style="margin-bottom:.65rem">
-          <label style="font-family:var(--mono);font-size:.58rem;text-transform:uppercase;letter-spacing:.07em;color:var(--dim);display:block;margin-bottom:.32rem">New password</label>
-          <input id="seekerNewPass" type="password" placeholder="Min 8 characters" style="width:100%;background:var(--raised);border:1.5px solid var(--line2);border-radius:8px;padding:.65rem .9rem;color:var(--white);font-family:var(--body);font-size:.84rem;outline:none;caret-color:var(--blue)" onfocus="this.style.borderColor='var(--blue)'" onblur="this.style.borderColor='var(--line2)'"/>
-        </div>
-        <div style="margin-bottom:.85rem">
-          <label style="font-family:var(--mono);font-size:.58rem;text-transform:uppercase;letter-spacing:.07em;color:var(--dim);display:block;margin-bottom:.32rem">Confirm new password</label>
-          <input id="seekerConfirmPass" type="password" placeholder="Confirm password" style="width:100%;background:var(--raised);border:1.5px solid var(--line2);border-radius:8px;padding:.65rem .9rem;color:var(--white);font-family:var(--body);font-size:.84rem;outline:none;caret-color:var(--blue)" onfocus="this.style.borderColor='var(--blue)'" onblur="this.style.borderColor='var(--line2)'"/>
-        </div>
-        <div style="display:flex;gap:.5rem">
-          <button class="btn btn-ghost" style="flex:1;justify-content:center;font-size:.78rem" onclick="document.getElementById('seekerCodeEntry').style.display='none'">Cancel</button>
-          <button class="btn btn-green" id="seekerUpdatePassBtn" style="flex:2;justify-content:center;font-weight:800;font-size:.78rem" onclick="verifySeekerPasswordReset()">Update password →</button>
+        <div style="background:var(--bdim);border:1px solid var(--bmid);border-radius:8px;padding:.75rem 1rem;font-family:var(--mono);font-size:.62rem;color:var(--blue);line-height:1.65">
+          ✓ Reset link sent — check your email.<br>
+          <span style="color:var(--sub)">Click the link in the email to set your new password.</span>
         </div>
       </div>
       <div style="border-top:1px solid var(--line);padding-top:.85rem">
@@ -1811,9 +1802,15 @@ nav.nav-scrolled{background:rgba(6,6,8,0.82);backdrop-filter:blur(60px) saturate
           <div style="font-family:var(--mono);font-size:.6rem;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:1rem">Your information</div>
           <div style="margin-bottom:.75rem"><label style="font-family:var(--mono);font-size:.6rem;text-transform:uppercase;letter-spacing:.07em;color:var(--dim);display:block;margin-bottom:.32rem">Job title you're applying for</label><input id="aiJob" type="text" placeholder="e.g. Marketing Manager" style="width:100%;background:var(--surface);border:1.5px solid var(--line2);border-radius:8px;padding:.65rem .9rem;color:var(--white);font-family:var(--body);font-size:.84rem;outline:none;caret-color:var(--blue)"/></div>
           <div style="margin-bottom:.75rem"><label style="font-family:var(--mono);font-size:.6rem;text-transform:uppercase;letter-spacing:.07em;color:var(--dim);display:block;margin-bottom:.32rem">Company + location</label><input id="aiCo" type="text" placeholder="e.g. Netflix · Los Angeles, CA" style="width:100%;background:var(--surface);border:1.5px solid var(--line2);border-radius:8px;padding:.65rem .9rem;color:var(--white);font-family:var(--body);font-size:.84rem;outline:none;caret-color:var(--blue)"/></div>
-          <div style="margin-bottom:.75rem"><label style="font-family:var(--mono);font-size:.6rem;text-transform:uppercase;letter-spacing:.07em;color:var(--dim);display:block;margin-bottom:.32rem">Your resume</label>
-          <div id="resumeAIStatus" style="background:var(--bdim);border:1px solid var(--bmid);border-radius:7px;padding:.55rem .85rem;font-family:var(--mono);font-size:.62rem;color:var(--blue);margin-bottom:.5rem;display:none">✓ Using resume from your profile</div>
-          <textarea id="aiResume" placeholder="Paste your resume here, or upload one in your dashboard to auto-fill..." style="width:100%;background:var(--surface);border:1.5px solid var(--line2);border-radius:8px;padding:.65rem .9rem;color:var(--white);font-family:var(--body);font-size:.82rem;outline:none;min-height:120px;resize:vertical;caret-color:var(--blue)"></textarea></div>
+          <div style="margin-bottom:.75rem">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.32rem">
+              <label style="font-family:var(--mono);font-size:.6rem;text-transform:uppercase;letter-spacing:.07em;color:var(--dim)">Your resume</label>
+              <label for="resumePageUpload" style="font-family:var(--mono);font-size:.58rem;color:var(--blue);background:var(--bdim);border:1px solid var(--bmid);border-radius:5px;padding:.2rem .55rem;cursor:pointer;transition:background .15s" onmouseover="this.style.background='rgba(59,130,246,.18)'" onmouseout="this.style.background='var(--bdim)'">↑ Upload PDF/Word</label>
+              <input id="resumePageUpload" type="file" accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document" style="display:none" onchange="handleResumePageUpload(this.files[0])"/>
+            </div>
+            <div id="resumeAIStatus" style="background:var(--bdim);border:1px solid var(--bmid);border-radius:7px;padding:.55rem .85rem;font-family:var(--mono);font-size:.62rem;color:var(--blue);margin-bottom:.5rem;display:none">✓ Resume saved — auto-used here and on job applications</div>
+            <textarea id="aiResume" placeholder="Paste your resume text here..." style="width:100%;background:var(--surface);border:1.5px solid var(--line2);border-radius:8px;padding:.65rem .9rem;color:var(--white);font-family:var(--body);font-size:.82rem;outline:none;min-height:120px;resize:vertical;caret-color:var(--blue)"></textarea>
+          </div>
           <div style="margin-bottom:1rem"><label style="font-family:var(--mono);font-size:.6rem;text-transform:uppercase;letter-spacing:.07em;color:var(--dim);display:block;margin-bottom:.32rem">Job description</label><textarea id="aiJD" placeholder="Paste the full job description..." style="width:100%;background:var(--surface);border:1.5px solid var(--line2);border-radius:8px;padding:.65rem .9rem;color:var(--white);font-family:var(--body);font-size:.82rem;outline:none;min-height:120px;resize:vertical;caret-color:var(--blue)"></textarea></div>
           <button id="analyzeBtn" onclick="analyzeResume()" style="width:100%;padding:.85rem;background:linear-gradient(135deg,#3b82f6 0%,#8b5cf6 100%);color:#fff;border:none;border-radius:8px;font-family:var(--display);font-weight:800;font-size:.9rem;cursor:pointer;box-shadow:0 0 20px rgba(59,130,246,0.3)">Analyze my odds →</button>
         </div>
@@ -4349,7 +4346,7 @@ async function analyzeResume(){
   const job=document.getElementById('aiJob')?.value?.trim();
   const co=document.getElementById('aiCo')?.value?.trim();
   const jd=document.getElementById('aiJD')?.value?.trim();
-  if(!resumeText){showToast('Upload your resume in your dashboard first.');go('seeker-dash');return;}
+  if(!resumeText){showToast('Paste your resume text above or upload a file.');return;}
   if(!job||!jd){showToast('Fill in the job title and job description.');return;}
   const btn=document.getElementById('analyzeBtn');
   const out=document.getElementById('resumeOut');
@@ -8432,16 +8429,11 @@ async function checkResumeGate() {
   const unlocked = document.getElementById('resumeTeaserUnlocked');
   if (locked) locked.style.display = hasResume ? 'none' : 'block';
   if (unlocked) unlocked.style.display = hasResume ? 'block' : 'none';
-  // Grey out Resume AI nav pill if no resume
+  // Nav pill is always active — upload happens on the Resume AI page itself
   const resumePill = document.getElementById('nt-resume');
   if (resumePill) {
-    if (!hasResume) {
-      resumePill.style.opacity = '.45';
-      resumePill.onclick = () => showToast('Upload your resume in My Dashboard to unlock Resume AI.');
-    } else {
-      resumePill.style.opacity = '1';
-      resumePill.onclick = () => go('resume');
-    }
+    resumePill.style.opacity = '1';
+    resumePill.onclick = () => go('resume');
   }
   return hasResume;
 }
@@ -8450,8 +8442,8 @@ async function checkResumeGate() {
 async function requireResume(onHasResume) {
   const has = await checkResumeGate();
   if (!has) {
-    showToast('Upload your resume in My Dashboard to unlock AI features.');
-    go('seeker-dash');
+    showToast('Upload your resume to unlock AI features.');
+    go('resume');
     return false;
   }
   if (onHasResume) onHasResume();
@@ -9977,7 +9969,7 @@ async function runAIOptimize(jobId, company, role, location, score, risk, waste,
   }
 
   if (!resume || resume.length < 50) {
-    showToast('Upload your resume in My Dashboard first.');
+    showToast('Upload or paste your resume in Resume AI first.');
     return;
   }
 
@@ -10196,7 +10188,7 @@ function showFullApplyForm(jobId, company, role, location, score, risk, waste, a
 
       <div style="margin-bottom:1rem"><label style="font-family:var(--mono);font-size:.58rem;text-transform:uppercase;letter-spacing:.07em;color:var(--dim);display:block;margin-bottom:.32rem">Cover note (optional)</label><textarea id="appNote" placeholder="Why you're a fit (2-3 sentences max)..." style="width:100%;background:var(--raised);border:1.5px solid var(--line2);border-radius:8px;padding:.65rem .9rem;color:var(--white);font-family:var(--body);font-size:.84rem;outline:none;caret-color:var(--green);min-height:72px;resize:vertical" onfocus="this.style.borderColor='var(--green)'" onblur="this.style.borderColor='var(--line2)'"></textarea></div>
       <div style="background:${loggedIn?'var(--gdim)':'var(--raised)'};border:1px solid ${loggedIn?'var(--gmid)':'var(--line2)'};border-radius:7px;padding:.6rem .9rem;font-family:var(--mono);font-size:.6rem;color:${loggedIn?'var(--green)':'var(--muted)'};margin-bottom:1rem;line-height:1.65">
-        ${loggedIn?'✓ Resume sent to Seen · Saved to your dashboard and tracked':'ℹ Guest application — not tracked. Sign in to track.'}
+        ${loggedIn?'✓ Application tracked · Timeline started in your tracker':'ℹ Guest application — not tracked. Sign in to track.'}
       </div>
       <div style="display:flex;gap:.5rem;margin-bottom:${isExternal?'.6rem':'0'}">
         <button class="btn btn-ghost" style="flex:1;justify-content:center" onclick="closeApplyModalDirect()">Cancel</button>
@@ -10805,6 +10797,31 @@ function _fileToBase64(file) {
     reader.onerror = reject;
     reader.readAsDataURL(file);
   });
+}
+
+async function handleResumePageUpload(file) {
+  if (!file) return;
+  const label = document.querySelector('label[for="resumePageUpload"]');
+  if (label) label.textContent = 'Uploading...';
+  try {
+    const base64 = await _fileToBase64(file);
+    const res = await fetch('/api/parse-resume', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ base64, fileName: file.name, mimeType: file.type })
+    });
+    const data = await res.json();
+    if (!res.ok || data.error) throw new Error(data.error || 'Parse failed');
+    await ResumeStore.save(data.text, data.fileName, data.wordCount);
+    const ta = document.getElementById('aiResume');
+    const status = document.getElementById('resumeAIStatus');
+    if (ta) ta.style.display = 'none';
+    if (status) { status.style.display = 'block'; status.textContent = '✓ Resume saved — auto-used here and on job applications'; }
+    showToast('Resume saved!');
+  } catch(e) {
+    showToast('Upload failed: ' + (e.message || 'Try a different file.'));
+  }
+  if (label) label.textContent = '↑ Upload PDF/Word';
 }
 
 async function handleDashResumeUpload(file) {
