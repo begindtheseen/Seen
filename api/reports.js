@@ -115,42 +115,51 @@ export default async function handler(req, res) {
 
   // ── Community feed — Seen reports + cached Reddit posts ─────────────────────
   if (body.action === 'feed') {
-    const { outcome, offset = 0, limit = 20 } = body;
-    const safeLimit = Math.min(50, Math.max(1, parseInt(limit) || 20));
-    const safeOffset = Math.max(0, parseInt(offset) || 0);
+    try {
+      const { outcome, offset = 0, limit = 20 } = body;
+      const safeLimit = Math.min(50, Math.max(1, parseInt(limit) || 20));
+      const safeOffset = Math.max(0, parseInt(offset) || 0);
 
-    const outcomeMap = {
-      ghosted:      ['ghosted'],
-      rejected:     ['autoreject', 'rejected'],
-      interviewing: ['human', 'interview', 'interviewing'],
-      hired:        ['hired', 'offer'],
-    };
-    const outcomes = outcomeMap[outcome] || null;
+      const outcomeMap = {
+        ghosted:      ['ghosted'],
+        rejected:     ['autoreject', 'rejected'],
+        interviewing: ['human', 'interview', 'interviewing'],
+        hired:        ['hired', 'offer'],
+      };
+      const outcomes = outcomeMap[outcome] || null;
 
-    const [seenRows, hnPosts] = await Promise.all([
-      (async () => {
-        let url = `${SUPABASE_URL}/rest/v1/reports`
-          + `?select=id,role,outcome,ghost_stage,rounds,report_text,platform,created_at,experience_level,company_name`
-          + `&order=created_at.desc&limit=200`;
-        if (outcomes) url += `&outcome=in.(${outcomes.join(',')})`;
-        const r = await fetch(url, { headers: hdrsBase });
-        if (!r.ok) return [];
-        const rows = await r.json();
-        return (rows || []).map(r => ({ ...r, source: 'seen' }));
-      })().catch(() => []),
-      fetchHNPosts().catch(() => []),
-    ]);
+      const [seenRows, hnPosts] = await Promise.all([
+        (async () => {
+          let url = `${SUPABASE_URL}/rest/v1/reports`
+            + `?select=id,role,outcome,ghost_stage,rounds,report_text,platform,created_at,experience_level,company_name`
+            + `&order=created_at.desc&limit=200`;
+          if (outcomes) url += `&outcome=in.(${outcomes.join(',')})`;
+          const r = await fetch(url, { headers: hdrsBase });
+          if (!r.ok) { console.error('FEED: supabase error', r.status); return []; }
+          const rows = await r.json();
+          console.log(`FEED: seen rows=${rows?.length || 0}`);
+          return (rows || []).map(row => ({ ...row, source: 'seen' }));
+        })().catch(e => { console.error('FEED: seen fetch threw:', e.message); return []; }),
+        fetchHNPosts().catch(e => { console.error('FEED: hn threw:', e.message); return []; }),
+      ]);
 
-    let external = hnPosts;
-    if (outcomes) {
-      const valid = new Set(outcomes);
-      external = external.filter(p => valid.has(p.outcome));
+      console.log(`FEED: hnPosts=${hnPosts.length}`);
+
+      let external = hnPosts;
+      if (outcomes) {
+        const valid = new Set(outcomes);
+        external = external.filter(p => valid.has(p.outcome));
+      }
+
+      const all = [...seenRows, ...external].sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+      const page = all.slice(safeOffset, safeOffset + safeLimit);
+
+      console.log(`FEED: total=${all.length} page=${page.length}`);
+      return res.status(200).json({ ok: true, reports: page, total: all.length });
+    } catch(e) {
+      console.error('FEED: unhandled error:', e.message, e.stack);
+      return res.status(500).json({ error: 'feed error', detail: e.message });
     }
-
-    const all = [...seenRows, ...external].sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
-    const page = all.slice(safeOffset, safeOffset + safeLimit);
-
-    return res.status(200).json({ ok: true, reports: page, total: all.length });
   }
 
   // ── Submit report (merged from submit-report.js) ────────────────────────────
