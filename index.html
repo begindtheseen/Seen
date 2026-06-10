@@ -7048,7 +7048,11 @@ function go(page){
       }
     } catch(_e){}
     if(!_navSkipHistory){
-      history.pushState({page}, '', window.location.pathname + window.location.search);
+      const _noHashPages=['landing','company','job-detail','reset','login','home','recruiters'];
+      const _newUrl=_noHashPages.includes(page)
+        ?(page==='landing'?window.location.pathname:window.location.pathname+window.location.search)
+        :'#'+page;
+      history.pushState({page},'',_newUrl);
     }
     document.querySelectorAll('.page, .page-full').forEach(p=>p.classList.remove('active'));
     const el=document.getElementById('page-'+page);
@@ -9568,6 +9572,10 @@ function _handleSharedLink(){
     return;
   }
   if(h==='#admin'){setTimeout(()=>go('admin'),300);return;}
+  // Direct hash navigation — URL contains the page name (e.g. seenjobs.io/#feed)
+  const _knownPages=['jobs','feed','demand','resume','tracker','report','companies','faq','legal','profile','seeker-dash'];
+  const _hashPage=h.startsWith('#')?h.slice(1):'';
+  if(_knownPages.includes(_hashPage)){go(_hashPage);return;}
   // Non-company page restore — sessionStorage first, localStorage fallback (survives iOS tab discard)
   let sp = sessionStorage.getItem('sp');
   if (!sp) {
@@ -9578,7 +9586,7 @@ function _handleSharedLink(){
     } catch(_e) {}
   }
   if(sp&&sp!=='company'&&sp!=='landing'){
-    setTimeout(()=>go(sp),150);
+    go(sp); // immediate — no delay, auth is already resolved by the time _handleSharedLink runs
   }
 }
 
@@ -9589,7 +9597,9 @@ if(db){
   Auth.init().then(()=>{
     updateNav();
     const _lsPage=(()=>{try{const s=JSON.parse(localStorage.getItem('seen_last_page')||'{}');return(s.page&&s.ts&&(Date.now()-s.ts)<7200000)?s.page:null;}catch(e){return null;}})();
-    const _restoring=window.location.hash.startsWith('#company/')||!!sessionStorage.getItem('sp')||!!_lsPage;
+    const _knownHashPages=['jobs','feed','demand','resume','tracker','report','companies','faq','legal','profile','seeker-dash'];
+    const _hashPage=window.location.hash.startsWith('#')?window.location.hash.slice(1):'';
+    const _restoring=window.location.hash.startsWith('#company/')||_knownHashPages.includes(_hashPage)||!!sessionStorage.getItem('sp')||!!_lsPage;
     if(Auth.isSeeker()){renderSeekerDash();if(!_restoring)go('seeker-dash');}
     else if(Auth.isEmployer()&&!_restoring){goToEmployerDashboard();}
     _handleSharedLink();
