@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from 'next'
 import { AuthProvider } from '@/lib/auth'
+import Nav from '@/components/Nav'
 import './globals.css'
 
 export const metadata: Metadata = {
@@ -26,6 +27,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="en">
       <body>
         <AuthProvider>
+          <Nav />
           {children}
           <div id="toast" />
         </AuthProvider>
