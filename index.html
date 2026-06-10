@@ -8160,12 +8160,20 @@ function _isGhostSurge(companyName){
   return false;
 }
 
-// Pause on hover
+// Pause on hover — resume rotation cycle (don't restart full intro)
 document.addEventListener('DOMContentLoaded', () => {
   const wrap = document.getElementById('heroHeadlineWrap');
   if (wrap) {
     wrap.addEventListener('mouseenter', () => clearInterval(_heroTimer));
-    wrap.addEventListener('mouseleave', startHeroRotation);
+    wrap.addEventListener('mouseleave', () => {
+      clearInterval(_heroTimer);
+      if (_reducedMotion) { startHeroRotation(); return; }
+      // Only resume if runHeroIntro has already started the cycle (i.e., _heroIdx was set)
+      _heroTimer = setInterval(() => {
+        _heroIdx = (_heroIdx + 1) % HERO_LINES.length;
+        _setHeroRotation(HERO_LINES[_heroIdx]);
+      }, 4800);
+    });
   }
 });
 
