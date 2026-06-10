@@ -1,5 +1,64 @@
 // Server-side reports fetch — uses service key to bypass RLS.
 // Queries by company_name column directly — no company table join needed.
+
+// Module-level Reddit cache — persists across warm Vercel invocations
+let _redditCache = null;
+let _redditCacheTime = 0;
+const REDDIT_TTL = 60 * 60 * 1000; // 1 hour
+
+async function fetchRedditPosts() {
+  const now = Date.now();
+  if (_redditCache && now - _redditCacheTime < REDDIT_TTL) return _redditCache;
+
+  const subs = ['recruitinghell', 'cscareerquestions', 'jobs'];
+  const classify = (title, body) => {
+    const t = (title + ' ' + body).toLowerCase();
+    if (/ghosted|no response|never heard|radio silence|heard nothing|disappeared/.test(t)) return 'ghosted';
+    if (/rejected|rejection|turned down|not moving forward|not selected/.test(t)) return 'autoreject';
+    if (/got.*offer|accepted.*offer|start date|got the job|signed.*offer|onboarding/.test(t)) return 'hired';
+    if (/interview|phone screen|technical round|coding round|final round/.test(t)) return 'human';
+    return null;
+  };
+  const extractCo = title => {
+    const m = title.match(/(?:at|from|with|by)\s+([A-Z][A-Za-z0-9&\s.,']{1,40}?)(?:\s+(?:ghosted|rejected|interview|offer|hiring|HR|recruiter|job|position|role|just|after|is|has))/);
+    return m?.[1]?.trim() || '';
+  };
+
+  const results = await Promise.all(subs.map(sub =>
+    fetch(`https://www.reddit.com/r/${sub}/new.json?limit=100`, {
+      headers: { 'User-Agent': 'Seen/1.0 (seenjobs.io job transparency platform)', Accept: 'application/json' },
+      signal: AbortSignal.timeout(10000),
+    })
+    .then(r => r.ok ? r.json() : null)
+    .then(d => (d?.data?.children || []).map(c => c.data).filter(p => p && !p.stickied && (p.selftext?.length > 60 || p.title?.length > 40)))
+    .catch(() => [])
+  ));
+
+  const posts = results.flat().map(p => {
+    const oc = classify(p.title, p.selftext || '');
+    if (!oc) return null;
+    return {
+      id: `reddit-${p.id}`,
+      source: 'reddit',
+      company_name: extractCo(p.title),
+      role: '',
+      outcome: oc,
+      ghost_stage: null,
+      rounds: 0,
+      report_text: p.title + (p.selftext ? '\n\n' + p.selftext.slice(0, 500) : ''),
+      platform: `r/${p.subreddit}`,
+      experience_level: '',
+      created_at: new Date(p.created_utc * 1000).toISOString(),
+      url: `https://reddit.com${p.permalink}`,
+      subreddit: p.subreddit,
+    };
+  }).filter(Boolean);
+
+  _redditCache = posts;
+  _redditCacheTime = now;
+  return posts;
+}
+
 export default async function handler(req, res) {
   const _o=req.headers.origin||'';
   const _devO=!_o||_o.includes('localhost')||_o.includes('127.0.0.1');
@@ -41,9 +100,12 @@ export default async function handler(req, res) {
     return res.json({ ok: locResult.valid && modResult.ok, issues, corrected_experience: modResult.corrected_experience || null, normalized_location: locResult.normalized || mLoc });
   }
 
-  // ── Community feed — Seen reports only (Reddit fetched client-side) ─────────
+  // ── Community feed — Seen reports + cached Reddit posts ─────────────────────
   if (body.action === 'feed') {
-    const { outcome } = body;
+    const { outcome, offset = 0, limit = 20 } = body;
+    const safeLimit = Math.min(50, Math.max(1, parseInt(limit) || 20));
+    const safeOffset = Math.max(0, parseInt(offset) || 0);
+
     const outcomeMap = {
       ghosted:      ['ghosted'],
       rejected:     ['autoreject', 'rejected'],
@@ -51,21 +113,31 @@ export default async function handler(req, res) {
       hired:        ['hired', 'offer'],
     };
     const outcomes = outcomeMap[outcome] || null;
-    let url = `${SUPABASE_URL}/rest/v1/reports`
-      + `?select=id,role,outcome,ghost_stage,rounds,report_text,platform,created_at,experience_level,company_name`
-      + `&order=created_at.desc&limit=100`;
-    if (outcomes) url += `&outcome=in.(${outcomes.join(',')})`;
-    try {
-      const r = await fetch(url, { headers: hdrsBase });
-      if (!r.ok) return res.status(200).json({ ok: true, reports: [] });
-      const rows = await r.json();
-      return res.status(200).json({
-        ok: true,
-        reports: (rows || []).map(r => ({ ...r, source: 'seen' })),
-      });
-    } catch(e) {
-      return res.status(200).json({ ok: true, reports: [] });
+
+    const [seenRows, redditPosts] = await Promise.all([
+      (async () => {
+        let url = `${SUPABASE_URL}/rest/v1/reports`
+          + `?select=id,role,outcome,ghost_stage,rounds,report_text,platform,created_at,experience_level,company_name`
+          + `&order=created_at.desc&limit=200`;
+        if (outcomes) url += `&outcome=in.(${outcomes.join(',')})`;
+        const r = await fetch(url, { headers: hdrsBase });
+        if (!r.ok) return [];
+        const rows = await r.json();
+        return (rows || []).map(r => ({ ...r, source: 'seen' }));
+      })().catch(() => []),
+      fetchRedditPosts().catch(() => []),
+    ]);
+
+    let reddit = redditPosts;
+    if (outcomes) {
+      const valid = new Set(outcomes);
+      reddit = reddit.filter(p => valid.has(p.outcome));
     }
+
+    const all = [...seenRows, ...reddit].sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+    const page = all.slice(safeOffset, safeOffset + safeLimit);
+
+    return res.status(200).json({ ok: true, reports: page, total: all.length });
   }
 
   // ── Submit report (merged from submit-report.js) ────────────────────────────
