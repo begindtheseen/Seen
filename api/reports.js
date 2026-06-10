@@ -1,124 +1,6 @@
 // Server-side reports fetch — uses service key to bypass RLS.
 // Queries by company_name column directly — no company table join needed.
 
-// Module-level HN cache — persists across warm Vercel invocations
-let _hnCache = null;
-let _hnCacheTime = 0;
-const HN_TTL = 60 * 60 * 1000; // 1 hour
-
-async function fetchHNPosts() {
-  const now = Date.now();
-  if (_hnCache && now - _hnCacheTime < HN_TTL) return _hnCache;
-
-  // Only match posts that read like a personal job-seeker narrative
-  const classify = (title, text) => {
-    const t = (title + ' ' + (text || '')).toLowerCase();
-    if (/got ghosted|was ghosted|they ghosted|recruiter ghosted|ghosted after|ghosted me|no response after|never heard back|radio silence|heard nothing back|disappeared after/.test(t)) return 'ghosted';
-    if (/got rejected|was rejected|they rejected|rejection email|rejection letter|turned down after|not moving forward|not selected|didn.t get the|unfortunately.*not|after \d+ rounds/.test(t)) return 'autoreject';
-    if (/got (the |an |a )?offer|accepted (the |an |a )?offer|signed (the |an |a )?offer|got the job|start(ing|ed) (at|on)|new job (at|starts)|just (got hired|started at|accepted)/.test(t)) return 'hired';
-    if (/had (a |my |an )?(phone|video|technical|onsite|virtual|in.person) (screen|interview|round)|went through (the |their )?(interview|hiring)|passed (the |a )?(technical|coding|screen)|final round (at|with)|got.{0,10}interview/.test(t)) return 'human';
-    return null;
-  };
-
-  // Reject anything that looks like a product launch or promotional post
-  const isPromo = (title, text) => {
-    const t = (title + ' ' + (text || '')).toLowerCase();
-    return /\bi (built|created|made|developed|launched|wrote|designed|coded)\b|\bwe (built|created|made|launched)\b|\bmy (app|tool|startup|product|service|platform|project|side project)\b|\b(open.?source|sign up|try it|check it out|product hunt|feedback welcome|open to feedback|looking for (beta|early|feedback)|built for job|built to help job|job search tool|job board|resume (builder|tool|parser)|portfolio (generator|builder)|chrome extension|npm|github\.com\/)/.test(t);
-  };
-
-  const extractCo = title => {
-    const m = title.match(/(?:at|from|with|by)\s+([A-Z][A-Za-z0-9&\s.,']{1,40}?)(?:\s+(?:ghosted|rejected|interview|offer|hiring|HR|recruiter|job|position|role|just|after|is|has))/);
-    return m?.[1]?.trim() || '';
-  };
-
-  const stripPrefix = t => t.replace(/^(?:Show|Ask|Tell|Launch|Discuss) HN:\s*/i, '').trim();
-
-  const cutoff = Math.floor((now - 365 * 24 * 3600 * 1000) / 1000);
-
-  // Each entry: [query, fallback outcome if classify() can't determine one]
-  // The fallback ensures posts aren't dropped just because story_text is empty
-  const queries = [
-    ['"got ghosted" job recruiter',           'ghosted'],
-    ['"ghosted after" interview application', 'ghosted'],
-    ['"never heard back" job application',    'ghosted'],
-    ['"no response" job application recruiter','ghosted'],
-    ['"rejected after" interview rounds',     'autoreject'],
-    ['"not moving forward" job application',  'autoreject'],
-    ['"unfortunately" "not selected" interview','autoreject'],
-    ['"got the offer" job hired',             'hired'],
-    ['"accepted the offer" job',              'hired'],
-    ['"signed the offer" job',                'hired'],
-    ['"phone screen" interview experience job','human'],
-    ['"final round" interview job',           'human'],
-  ];
-
-  const fetchOne = ([q]) => {
-    const ctrl = new AbortController();
-    const tid = setTimeout(() => ctrl.abort(), 7000);
-    return fetch(
-      `https://hn.algolia.com/api/v1/search?query=${encodeURIComponent(q)}&tags=story&hitsPerPage=40&numericFilters=created_at_i%3E${cutoff}`,
-      { signal: ctrl.signal }
-    )
-      .then(r => { clearTimeout(tid); return r.ok ? r.json() : null; })
-      .then(d => d?.hits || [])
-      .catch(() => { clearTimeout(tid); return []; });
-  };
-
-  const raceResult = await Promise.race([
-    Promise.all(queries.map(fetchOne)),
-    new Promise(resolve => setTimeout(() => resolve(null), 10000)),
-  ]).catch(() => null);
-
-  if (!raceResult) {
-    console.error('FEED: HN fetch timed out');
-    return _hnCache || [];
-  }
-
-  const seen = new Set();
-  const posts = raceResult.flatMap((hits, i) => {
-    const fallbackOc = queries[i][1];
-    return hits.filter(h => {
-      if (!h || seen.has(h.objectID)) return false;
-      seen.add(h.objectID);
-      const clean = stripPrefix(h.title || '');
-      if (clean.length < 20) return false;
-      if (isPromo(clean, h.story_text || '')) return false;
-      return true;
-    }).map(h => {
-      const cleanTitle = stripPrefix(h.title);
-      const oc = classify(cleanTitle, h.story_text || '') || fallbackOc;
-      const body = h.story_text
-        ? h.story_text
-            .replace(/<[^>]+>/g, ' ')
-            .replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#x27;/g, "'")
-            .replace(/\s+/g, ' ')
-            .trim()
-            .slice(0, 450)
-        : '';
-      return {
-        id: `hn-${h.objectID}`,
-        source: 'hn',
-        company_name: extractCo(cleanTitle),
-        role: cleanTitle.slice(0, 120),
-        outcome: oc,
-        ghost_stage: null,
-        rounds: 0,
-        report_text: body,
-        platform: 'Hacker News',
-        experience_level: '',
-        created_at: h.created_at,
-        url: h.url || `https://news.ycombinator.com/item?id=${h.objectID}`,
-        subreddit: null,
-      };
-    });
-  });
-
-  console.log(`FEED: HN fetched ${posts.length} classified posts`);
-  _hnCache = posts;
-  _hnCacheTime = now;
-  return posts;
-}
-
 export default async function handler(req, res) {
   const _o=req.headers.origin||'';
   const _devO=!_o||_o.includes('localhost')||_o.includes('127.0.0.1');
@@ -160,7 +42,7 @@ export default async function handler(req, res) {
     return res.json({ ok: locResult.valid && modResult.ok, issues, corrected_experience: modResult.corrected_experience || null, normalized_location: locResult.normalized || mLoc });
   }
 
-  // ── Community feed — Seen reports + cached Reddit posts ─────────────────────
+  // ── Community feed — real Seen reports only ──────────────────────────────────
   if (body.action === 'feed') {
     try {
       const { outcome, offset = 0, limit = 20 } = body;
@@ -175,36 +57,20 @@ export default async function handler(req, res) {
       };
       const outcomes = outcomeMap[outcome] || null;
 
-      const [seenRows, hnPosts] = await Promise.all([
-        (async () => {
-          let url = `${SUPABASE_URL}/rest/v1/reports`
-            + `?select=id,role,outcome,ghost_stage,rounds,report_text,platform,created_at,experience_level,company_name`
-            + `&order=created_at.desc&limit=200`;
-          if (outcomes) url += `&outcome=in.(${outcomes.join(',')})`;
-          const r = await fetch(url, { headers: hdrsBase });
-          if (!r.ok) { console.error('FEED: supabase error', r.status); return []; }
-          const rows = await r.json();
-          console.log(`FEED: seen rows=${rows?.length || 0}`);
-          return (rows || []).map(row => ({ ...row, source: 'seen' }));
-        })().catch(e => { console.error('FEED: seen fetch threw:', e.message); return []; }),
-        fetchHNPosts().catch(e => { console.error('FEED: hn threw:', e.message); return []; }),
-      ]);
-
-      console.log(`FEED: hnPosts=${hnPosts.length}`);
-
-      let external = hnPosts;
-      if (outcomes) {
-        const valid = new Set(outcomes);
-        external = external.filter(p => valid.has(p.outcome));
-      }
-
-      const all = [...seenRows, ...external].sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+      let url = `${SUPABASE_URL}/rest/v1/reports`
+        + `?select=id,role,outcome,ghost_stage,rounds,report_text,platform,created_at,experience_level,company_name`
+        + `&order=created_at.desc&limit=200`;
+      if (outcomes) url += `&outcome=in.(${outcomes.join(',')})`;
+      const r = await fetch(url, { headers: hdrsBase });
+      if (!r.ok) { console.error('FEED: supabase error', r.status); return res.status(500).json({ error: 'feed error' }); }
+      const rows = await r.json();
+      const all = (rows || []).map(row => ({ ...row, source: 'seen' }));
       const page = all.slice(safeOffset, safeOffset + safeLimit);
 
       console.log(`FEED: total=${all.length} page=${page.length}`);
       return res.status(200).json({ ok: true, reports: page, total: all.length });
     } catch(e) {
-      console.error('FEED: unhandled error:', e.message, e.stack);
+      console.error('FEED: unhandled error:', e.message);
       return res.status(500).json({ error: 'feed error', detail: e.message });
     }
   }

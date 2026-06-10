@@ -7658,28 +7658,19 @@ function renderFeedCards(listEl, rows, replace = true) {
     const text = r.report_text ? r.report_text.replace(/</g,'&lt;').replace(/>/g,'&gt;') : '';
     const stage = r.ghost_stage ? `<span style="color:var(--muted)"> · ${r.ghost_stage.replace(/</g,'&lt;')}</span>` : '';
     const rounds = r.rounds ? `${r.rounds} round${r.rounds!==1?'s':''} · ` : '';
-    const isHN = r.source === 'hn';
-    const isExternal = isHN || r.source === 'reddit';
-    const sourceBadge = isHN
-      ? `<span style="font-family:var(--mono);font-size:.52rem;color:#ff6600;background:rgba(255,102,0,0.1);border:1px solid rgba(255,102,0,0.25);border-radius:4px;padding:.1rem .4rem">Hacker News ↗</span>`
-      : r.source === 'reddit'
-      ? `<span style="font-family:var(--mono);font-size:.52rem;color:var(--muted);background:rgba(255,69,0,0.1);border:1px solid rgba(255,69,0,0.2);border-radius:4px;padding:.1rem .4rem">r/${r.subreddit||'reddit'} ↗</span>`
-      : `<span style="font-family:var(--mono);font-size:.52rem;color:var(--blue);background:rgba(59,130,246,0.1);border:1px solid rgba(59,130,246,0.2);border-radius:4px;padding:.1rem .4rem">Seen</span>`;
-    const safeUrl = (r.url||'').replace(/'/g,'%27');
-    const clickAction = isExternal && safeUrl
-      ? `window.open('${safeUrl}','_blank')`
-      : co ? `openCompanySearch();document.getElementById('coSearchInp').value='${co.replace(/'/g,"\\'")}';searchCompanies('${co.replace(/'/g,"\\'")}')` : '';
-    const displayText = text.slice(0, isExternal ? 300 : 220);
-    const truncated = text.length > displayText.length;
-    return `<div class="feed-card ${outcomeClass[oc]||''}" onclick="${clickAction}" style="${isExternal?'cursor:pointer':''}">
+    const sourceBadge = `<span style="font-family:var(--mono);font-size:.52rem;color:var(--blue);background:rgba(59,130,246,0.1);border:1px solid rgba(59,130,246,0.2);border-radius:4px;padding:.1rem .4rem">Seen</span>`;
+    const clickAction = co ? `openCompanySearch();document.getElementById('coSearchInp').value='${co.replace(/'/g,"\\'")}';searchCompanies('${co.replace(/'/g,"\\'")}')` : '';
+    const displayText = text.slice(0, 220);
+    const truncated = text.length > 220;
+    return `<div class="feed-card ${outcomeClass[oc]||''}" onclick="${clickAction}" style="${clickAction?'cursor:pointer':''}">
       <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:.75rem;margin-bottom:.4rem">
         <div style="flex:1;min-width:0">
           ${co ? `<div class="feed-co">${co}</div>` : ''}
-          ${role ? `<div class="feed-role" style="${isHN?'font-weight:600;color:var(--white)':''}">${role}${stage}</div>` : ''}
+          ${role ? `<div class="feed-role">${role}${stage}</div>` : ''}
         </div>
         <span class="vibe ${oc==='ghosted'?'v-r':oc==='hired'||oc==='offer'?'v-g':oc==='autoreject'||oc==='rejected'?'v-y':'v-b'}" style="white-space:nowrap;flex-shrink:0">${outcomeLabel[oc]||oc}</span>
       </div>
-      ${displayText?`<div class="feed-body" style="color:var(--sub);font-style:${isHN?'normal':'italic'}">${isHN?'':'"'}${displayText}${truncated?'…':''}${isHN?'':'"'}</div>`:''}
+      ${displayText?`<div class="feed-body">"${displayText}${truncated?'…':'"'}</div>`:''}
       <div class="feed-meta" style="justify-content:space-between;margin-top:.5rem">
         <span style="color:var(--muted)">${rounds}${r.experience_level||''}${r.experience_level?' · ':''}${ago(r.created_at)}</span>
         <span>${sourceBadge}</span>
