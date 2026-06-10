@@ -7468,32 +7468,84 @@ async function loadFeed(reset = true) {
     if (moreEl) moreEl.style.display = 'none';
   }
 
-  try {
-    const body = { action: 'feed', limit: FEED_PAGE, offset: _feedOffset };
-    if (_feedFilter !== 'all') body.outcome = _feedFilter;
+  // Fetch Seen reports (server-side — bypasses RLS) + Reddit (client-side — browser IPs work, datacenter IPs get blocked)
+  const seenPromise = fetch('/api/reports', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action: 'feed', limit: 100, offset: 0, outcome: _feedFilter !== 'all' ? _feedFilter : undefined }),
+  }).then(r => r.ok ? r.json() : { reports: [] }).then(d => d.reports || []).catch(() => []);
 
-    const r = await fetch('/api/reports', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-    });
-    if (!r.ok) throw new Error(`${r.status}`);
-    const d = await r.json();
-    const rows = d.reports || [];
+  const redditQuery = {
+    ghosted:      'ghosted OR "no response" OR "never heard back" OR "radio silence"',
+    rejected:     'rejected OR "rejection email" OR "turned down" OR "not moving forward"',
+    interviewing: 'interview OR "phone screen" OR "technical round" OR "final round"',
+    hired:        '"got an offer" OR hired OR "accepted offer" OR "start date" OR "got the job"',
+    all:          'ghosted OR rejected OR interview OR offer OR hired',
+  }[_feedFilter] || 'ghosted OR rejected OR interview OR offer OR hired';
 
-    if (!Array.isArray(rows) || (!rows.length && !_feedAllRows.length)) {
-      listEl.innerHTML = '<div style="text-align:center;padding:3rem;font-family:var(--mono);font-size:.7rem;color:var(--muted)">No reports yet.<br><br><button class="btn btn-ghost" style="font-size:.72rem" onclick="go(\'report\')">Be the first to share →</button></div>';
-      return;
-    }
+  const subs = _feedFilter === 'ghosted' || _feedFilter === 'rejected'
+    ? ['recruitinghell', 'jobs', 'cscareerquestions']
+    : _feedFilter === 'interviewing' || _feedFilter === 'hired'
+    ? ['cscareerquestions', 'interviews', 'jobs']
+    : ['recruitinghell', 'cscareerquestions', 'jobs'];
 
-    _feedAllRows = reset ? rows : [..._feedAllRows, ...rows];
-    _feedOffset += rows.length;
-    renderFeedCards(listEl, _feedAllRows, reset);
-    if (moreEl) moreEl.style.display = rows.length === FEED_PAGE ? 'block' : 'none';
+  const classifyOutcome = (title, text) => {
+    const t = (title + ' ' + text).toLowerCase();
+    if (/ghosted|no response|never heard|complete silence|heard nothing|disappeared|radio silence/.test(t)) return 'ghosted';
+    if (/rejected|rejection|turned down|didn.t get|not moving forward|not selected|position.*filled/.test(t)) return 'autoreject';
+    if (/got.*offer|accepted.*offer|start date|hired|got the job|signed|onboarding/.test(t)) return 'hired';
+    if (/interview|phone screen|technical|coding round|final round|offer stage/.test(t)) return 'human';
+    return 'waiting';
+  };
 
-  } catch(e) {
-    if (reset) listEl.innerHTML = `<div style="text-align:center;padding:2rem;font-family:var(--mono);font-size:.65rem;color:var(--muted)">Couldn't load feed.</div>`;
+  const extractCompany = (title) => {
+    const m = title.match(/(?:at|from|with|by)\s+([A-Z][A-Za-z0-9&\s.,']{1,40}?)(?:\s+(?:ghosted|rejected|interview|offer|hiring|HR|recruiter|job|position|role|just|after|is|has|are))/);
+    return m?.[1]?.trim() || '';
+  };
+
+  const redditPromises = subs.map(sub =>
+    fetch(`https://www.reddit.com/r/${sub}/search.json?q=${encodeURIComponent(redditQuery)}&sort=new&restrict_sr=1&limit=50&t=month`, {
+      headers: { 'Accept': 'application/json' },
+      signal: AbortSignal.timeout(10000),
+    })
+    .then(r => r.ok ? r.json() : null)
+    .then(d => (d?.data?.children || []).map(c => c.data).filter(p => p && !p.stickied && p.selftext && p.selftext.length > 60))
+    .catch(() => [])
+  );
+
+  const [seenReports, ...redditResults] = await Promise.all([seenPromise, ...redditPromises]);
+
+  const redditPosts = redditResults.flat().map(p => {
+    const oc = classifyOutcome(p.title, p.selftext);
+    return {
+      id: `reddit-${p.id}`,
+      source: 'reddit',
+      company_name: extractCompany(p.title),
+      role: '',
+      outcome: oc,
+      ghost_stage: null,
+      rounds: 0,
+      report_text: p.title + (p.selftext ? '\n\n' + p.selftext.slice(0, 400) : ''),
+      platform: `r/${p.subreddit}`,
+      experience_level: '',
+      created_at: new Date(p.created_utc * 1000).toISOString(),
+      url: `https://reddit.com${p.permalink}`,
+      subreddit: p.subreddit,
+    };
+  });
+
+  const combined = [...seenReports, ...redditPosts].sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+  _feedAllRows = reset ? combined : [..._feedAllRows, ...combined];
+
+  if (!_feedAllRows.length) {
+    listEl.innerHTML = '<div style="text-align:center;padding:3rem;font-family:var(--mono);font-size:.7rem;color:var(--muted)">No reports yet.<br><br><button class="btn btn-ghost" style="font-size:.72rem" onclick="go(\'report\')">Be the first to share →</button></div>';
+    return;
   }
+
+  const page = _feedAllRows.slice(_feedOffset, _feedOffset + FEED_PAGE);
+  _feedOffset += page.length;
+  renderFeedCards(listEl, page, reset);
+  if (moreEl) moreEl.style.display = _feedOffset < _feedAllRows.length ? 'block' : 'none';
 }
 
 function renderFeedCards(listEl, rows, replace = true) {
