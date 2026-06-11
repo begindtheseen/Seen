@@ -1,6 +1,9 @@
 import { getQueryExpansion } from './_utils/expand.js';
 import { applyRateLimit } from './_utils/ratelimit.js';
 
+// Per-instance request coalescing: concurrent identical searches share one Claude call
+const _inflight = new Map();
+
 export default async function handler(req, res) {
   const _o=req.headers.origin||'';
   const _devO=!_o||_o.includes('localhost')||_o.includes('127.0.0.1');
@@ -108,6 +111,21 @@ export default async function handler(req, res) {
       } catch(e) { console.warn('Cache check error:', e.message); }
       console.log(`CACHE MISS: "${query}" → "${canonical}" @ "${loc}" — calling Claude API`);
     }
+
+    // Coalesce concurrent identical searches into one Claude API call
+    const inflightKey = `${canonical}::${loc}`;
+    if (_inflight.has(inflightKey)) {
+      console.log(`COALESCED: "${canonical}" @ "${loc}" — waiting on in-flight request`);
+      try {
+        const coalesced = await _inflight.get(inflightKey);
+        return res.status(200).json({ ok: true, ...coalesced, _src: 'coalesced' });
+      } catch(e) { /* fall through to make our own call */ }
+    }
+
+    let _inflightResolve, _inflightReject;
+    const inflightPromise = new Promise((resolve, reject) => { _inflightResolve = resolve; _inflightReject = reject; });
+    _inflight.set(inflightKey, inflightPromise);
+    setTimeout(() => _inflight.delete(inflightKey), 90_000);
 
     let apiRes;
     for (let attempt = 0; attempt < 3; attempt++) {
@@ -218,10 +236,14 @@ export default async function handler(req, res) {
       _logSearch(canonical, loc, jobs.length, SUPABASE_URL, dbHeaders);
     }
 
+    _inflightResolve?.({ jobs, query, location: loc });
+    _inflight.delete(inflightKey);
     return res.status(200).json({ ok: true, jobs, query, location: loc });
 
   } catch(err) {
     console.error('Jobs error:', err.message);
+    _inflightReject?.(err);
+    _inflight.delete(inflightKey);
     return res.status(500).json({ error: err.message, jobs: [] });
   }
 }
