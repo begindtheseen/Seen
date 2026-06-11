@@ -134,10 +134,13 @@ nav.nav-scrolled{background:rgba(6,6,8,0.82);backdrop-filter:blur(60px) saturate
 
 /* PAGES */
 .page{display:none;min-height:100vh;padding-top:58px;box-sizing:border-box;overflow-x:hidden;width:100%}
-.page.active{display:block;animation:pageIn 0.25s cubic-bezier(0.22,1,0.36,1) both}
-@keyframes pageIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+.page.active{display:block;animation:pageEnter .32s cubic-bezier(0.22,1,0.36,1) both}
+@keyframes pageEnter{from{opacity:0;transform:translateY(11px)}to{opacity:1;transform:translateY(0)}}
+@keyframes pageExit{from{opacity:1;transform:translateY(0)}to{opacity:0;transform:translateY(-7px)}}
+.page.page-exiting{display:block!important;position:fixed!important;top:58px;left:0;right:0;bottom:0;overflow:hidden;pointer-events:none;z-index:5;animation:pageExit .2s ease forwards}
 .page-full{display:none;min-height:100vh;overflow-x:hidden;padding-top:58px;box-sizing:border-box;width:100%}
-.page-full.active{display:flex;flex-direction:column;animation:fadeIn .2s ease}
+.page-full.active{display:flex;flex-direction:column;animation:pageEnter .32s cubic-bezier(0.22,1,0.36,1) both}
+.page-full.page-exiting{display:flex!important;flex-direction:column;position:fixed!important;top:58px;left:0;right:0;bottom:0;overflow:hidden;pointer-events:none;z-index:5;animation:pageExit .2s ease forwards}
 .wrap{max-width:1300px;margin:0 auto;padding:0 1.25rem}
 
 /* SHARED COMPONENTS */
@@ -8933,7 +8936,14 @@ function go(page){
         :'#'+page;
       history.pushState({page},'',_newUrl);
     }
-    document.querySelectorAll('.page, .page-full').forEach(p=>p.classList.remove('active'));
+    const _leaving=document.querySelector('.page.active,.page-full.active');
+    if(_leaving&&_leaving.id!=='page-'+page){
+      _leaving.classList.remove('active');
+      _leaving.classList.add('page-exiting');
+      setTimeout(()=>_leaving.classList.remove('page-exiting'),220);
+    } else {
+      document.querySelectorAll('.page,.page-full').forEach(p=>p.classList.remove('active'));
+    }
     const el=document.getElementById('page-'+page);
     if(!el){ console.warn('Page not found: page-'+page); return; }
     el.classList.add('active');
@@ -12139,7 +12149,7 @@ function _handleSharedLink(){
   const _prePages = ['jobs','feed','demand','resume','tracker','report','companies','faq','legal','pricing','profile','seeker-dash'];
   const _pg = _h.startsWith('#') ? _h.slice(1) : '';
   if (!_prePages.includes(_pg)) return;
-  document.querySelectorAll('.page,.page-full').forEach(function(p){p.classList.remove('active');});
+  document.querySelectorAll('.page,.page-full').forEach(function(p){p.classList.remove('active','page-exiting');});
   const _el = document.getElementById('page-' + _pg);
   if (_el) _el.classList.add('active');
 })();
