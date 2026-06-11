@@ -144,6 +144,7 @@ async function _handler(req, res) {
       coScoredRes, issuesRes, creditListRes,
       errTodayRes, errWeekRes,
       dauRes, dupClustersRes, flagsRes,
+      staleJobsRes, zeroSearchesRes, jobReportsRes,
     ] = await Promise.all([
       db(`profiles?select=id`, { headers: { Prefer: 'count=exact', 'Range-Unit': 'items', Range: '0-0' } }),
       db(`profiles?created_at=gte.${todayISO}&select=id`, { headers: { Prefer: 'count=exact', 'Range-Unit': 'items', Range: '0-0' } }),
@@ -162,6 +163,9 @@ async function _handler(req, res) {
       db(`login_signals?created_at=gte.${todayISO}&select=user_id`),
       db(`duplicate_clusters?status=eq.suspected&order=risk_score.desc&limit=10`),
       db(`feature_flags?select=flag_name,status,percentage,description,updated_by,updated_at&order=flag_name.asc`),
+      db(`jobs?availability_status=in.(stale,expired)&select=id`, { headers: { Prefer: 'count=exact', 'Range-Unit': 'items', Range: '0-0' } }),
+      db(`search_events?result_count=eq.0&created_at=gte.${weekISO}&select=query&order=created_at.desc&limit=20`),
+      db(`job_availability_reports?reported_at=gte.${weekISO}&select=job_id,status&limit=200`),
     ]);
 
     const usersTotal = ct(usersTotalRes);
@@ -173,12 +177,15 @@ async function _handler(req, res) {
     const errToday = errTodayRes.ok ? await errTodayRes.json() : [];
     const dupClusters = dupClustersRes.ok ? await dupClustersRes.json() : [];
     const flags = flagsRes.ok ? await flagsRes.json() : [];
-    // DAU = distinct users who loaded the app today
     const dauRows = dauRes.ok ? await dauRes.json() : [];
     const dau = new Set(dauRows.map(r => r.user_id)).size;
-    // Error summary by endpoint
     const errByRoute = {};
     errToday.forEach(e => { errByRoute[e.endpoint] = (errByRoute[e.endpoint] || 0) + 1; });
+    // Job trust signals
+    const zeroSearchRows = zeroSearchesRes.ok ? await zeroSearchesRes.json() : [];
+    const jobReportRows = jobReportsRes.ok ? await jobReportsRes.json() : [];
+    const jobReportsByStatus = { active: 0, expired: 0, unknown: 0 };
+    jobReportRows.forEach(r => { jobReportsByStatus[r.status] = (jobReportsByStatus[r.status] || 0) + 1; });
 
     return res.status(200).json({
       users: { total: usersTotal, new_today: ct(usersTodayRes), new_this_week: ct(usersWeekRes), dau },
@@ -190,6 +197,13 @@ async function _handler(req, res) {
       issues: { open: issues.length, items: issues },
       duplicate_clusters: { suspected: dupClusters.length, items: dupClusters },
       feature_flags: flags,
+      jobs: {
+        stale_or_expired: ct(staleJobsRes),
+        zero_result_searches_7d: zeroSearchRows.length,
+        top_zero_queries: [...new Set(zeroSearchRows.map(r => r.query))].slice(0, 10),
+        availability_reports_7d: jobReportRows.length,
+        reports_by_status: jobReportsByStatus,
+      },
     });
   }
 

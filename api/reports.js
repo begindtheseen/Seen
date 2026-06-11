@@ -76,7 +76,7 @@ export default async function handler(req, res) {
       const r = await fetch(`${SUPABASE_URL}/rest/v1/reports`, {
         method: 'POST',
         headers: { ...hdrsBase, Prefer: 'return=minimal' },
-        body: JSON.stringify({ company_name: safeCompany, outcome, role: safeRole, city: safeCity, platform: 'Seen', experience_level: 'Unknown' }),
+        body: JSON.stringify({ company_name: safeCompany, outcome, role: safeRole, city: safeCity, platform: 'Seen', experience_level: 'Unknown', outcome_weight: 1.0, trust_reason: 'direct_submission' }),
       });
       if (!r.ok) { const e = await r.text().catch(() => ''); console.error('quick_submit failed:', r.status, e.slice(0, 150)); return res.status(400).json({ error: 'Submit failed' }); }
       return res.status(200).json({ ok: true, submitted: true });
@@ -197,7 +197,7 @@ export default async function handler(req, res) {
       if (!lid) { const lr2 = await fetch(`${SUPABASE_URL}/rest/v1/company_locations?company_id=eq.${cid}&select=id&limit=1`, { headers: hdrs }); if (lr2.ok) { const r2 = await lr2.json(); lid = r2?.[0]?.id || null; } }
     }
 
-    const reportBase = { company_id: cid, location_id: lid || null, role: (role||'').trim().slice(0,200), platform: (platform||'').trim().slice(0,100), outcome: outcome||'waiting', ghost_stage: ghost_stage||null, rounds: parseInt(rounds)||0, wait_days: null, unpaid_work: unpaid_work||'na', experience_level: (experience_level||'').trim().slice(0,50), report_text: report_text ? report_text.slice(0,2000) : null, source: 'direct', needs_review: false };
+    const reportBase = { company_id: cid, location_id: lid || null, role: (role||'').trim().slice(0,200), platform: (platform||'').trim().slice(0,100), outcome: outcome||'waiting', ghost_stage: ghost_stage||null, rounds: parseInt(rounds)||0, wait_days: null, unpaid_work: unpaid_work||'na', experience_level: (experience_level||'').trim().slice(0,50), report_text: report_text ? report_text.slice(0,2000) : null, source: 'direct', needs_review: false, outcome_weight: 1.0, trust_reason: 'direct_submission' };
     let repRes = await fetch(`${SUPABASE_URL}/rest/v1/reports`, { method: 'POST', headers: { ...hdrs, Prefer: 'return=minimal' }, body: JSON.stringify({ ...reportBase, company_name: safeCo }) });
     if (!repRes.ok && repRes.status === 400) {
       const errText = await repRes.text();

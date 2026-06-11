@@ -278,6 +278,46 @@ export default async function handler(req, res) {
     return res.status(200).json({ ok: true });
   }
 
+  // ── LOG SEARCH EVENT ──────────────────────────────────────────────────────────
+  if (action === 'log_search_event') {
+    const { query, result_count, match_confidence, confirmed, stale_click } = body;
+    if (!query) return res.status(400).json({ error: 'query required' });
+    db('search_events', {
+      method: 'POST',
+      body: JSON.stringify({
+        user_id: uid,
+        query: String(query).slice(0, 200),
+        result_count: parseInt(result_count) || 0,
+        match_confidence: parseInt(match_confidence) || 100,
+        confirmed: !!confirmed,
+        stale_click: !!stale_click,
+      }),
+      headers: { Prefer: 'return=minimal' },
+    }).catch(() => {});
+    return res.status(200).json({ ok: true });
+  }
+
+  // ── REPORT JOB AVAILABILITY ───────────────────────────────────────────────────
+  if (action === 'report_job_availability') {
+    const { job_id, status: avStatus } = body;
+    if (!job_id || !['active','expired','unknown'].includes(avStatus)) {
+      return res.status(400).json({ error: 'job_id and valid status required' });
+    }
+    // Upsert report (one per user per job)
+    await db('job_availability_reports?on_conflict=user_id,job_id', {
+      method: 'POST',
+      body: JSON.stringify({ job_id: String(job_id), user_id: uid, status: avStatus, reported_at: new Date().toISOString() }),
+      headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
+    });
+    // Increment report count on the job itself (fire-and-forget)
+    db(`jobs?id=eq.${encodeURIComponent(String(job_id))}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ availability_report_count: 1, last_checked_at: new Date().toISOString() }),
+      headers: { Prefer: 'return=minimal' },
+    }).catch(() => {});
+    return res.status(200).json({ ok: true });
+  }
+
   // ── GET CREDITS ──────────────────────────────────────────────────────────────
   if (action === 'get_credits') {
     const today = new Date().toISOString().split('T')[0];

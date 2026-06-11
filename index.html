@@ -3680,6 +3680,25 @@ async function runSearch(name,loc){
   const verifBadge  = _getVerifBadge(matchConf, dataConf, _isFromCOS);
   const _cosSuggest = !known ? _cosFuzzyMatch(name) : null;
 
+  // Fuzzy match gate: 60-79 confidence requires user confirmation before revealing scores
+  if (known && matchConf >= 60 && matchConf < 80 && name.toLowerCase().trim() !== (known.name||'').toLowerCase().trim()) {
+    const _safeKn = (known.name||'').replace(/'/g,"\\'");
+    const _dispKn = (known.name||'').replace(/</g,'&lt;');
+    const _safeLoc = (loc||'').replace(/'/g,"\\'");
+    document.getElementById('mTitle').textContent = `Match check: ${name}`;
+    document.getElementById('mBody').innerHTML = `
+      <div style="text-align:center;padding:1.2rem 0">
+        <div style="font-size:1.4rem;margin-bottom:.6rem">🤔</div>
+        <div style="font-family:var(--display);font-size:1rem;font-weight:700;color:var(--white);margin-bottom:.38rem">Did you mean <span style="color:var(--blue)">${_dispKn}</span>?</div>
+        <div style="font-family:var(--mono);font-size:.6rem;color:var(--sub);line-height:1.65;max-width:270px;margin:0 auto .9rem">You searched for "<strong>${(name||'').replace(/</g,'&lt;')}</strong>". We found a close match — confirm to see the score.</div>
+        <div style="display:flex;gap:.45rem;justify-content:center;flex-wrap:wrap">
+          <button class="btn btn-solid" onclick="runSearch('${_safeKn}','${_safeLoc}')">Yes, show ${_dispKn} →</button>
+          <button class="btn btn-ghost" onclick="document.getElementById('modalOv').classList.remove('open')">Not what I meant</button>
+        </div>
+      </div>`;
+    return;
+  }
+
   // Detect "no real data" — all signals point to a company we know nothing about.
   // Instead of showing fake default values, show an honest empty state.
   const _noData = !locSc && !_isFromCOS
@@ -3688,6 +3707,7 @@ async function runSearch(name,loc){
     && dataConf < 20;
 
   if (_noData) {
+    _sync('log_search_event', { query: name, result_count: 0, match_confidence: matchConf }).catch(()=>{});
     const _safeN  = (name||'').replace(/'/g,"\\'");
     const _dispN  = (name||'').replace(/</g,'&lt;');
     document.getElementById('mTitle').textContent = name;
@@ -3712,8 +3732,8 @@ async function runSearch(name,loc){
   // ── Normal scored state ─────────────────────────────────────────────────────
   const risk=sc.risk_level||Score.risk(sc.overall_score);
   _modalGlow('#modalOv .modal', risk);
-  // Withhold grade letter when data confidence is too low — show "—" instead
-  const grade = dataConf >= 28 ? letterGrade(sc.overall_score) : '—';
+  // Withhold grade when data or match confidence is too low
+  const grade = (matchConf >= 60 && dataConf >= 28) ? letterGrade(sc.overall_score) : '—';
   _shareCtx = { name: known?.name||name, score: sc.overall_score, ghost: Math.round((sc.ghost_rate||0)*100), resp: Math.round((sc.response_rate||0)*100), wait: sc.avg_wait_days||null, waste: sc.waste||0, risk, grade };
   const vibeList=VIBES[ck]||VIBES.default;
   const ghostPct=Math.round((sc.ghost_rate||0)*100);
@@ -4297,10 +4317,13 @@ function renderJobResults(jobs, l) {
     const wl = Score.wasteLabel(waste);
     // Register job in JOBS so the optimizer and modal can look it up by ID
     if (!JOBS.find(j => j.id === safeId)) {
-      JOBS.push({ id: safeId, _url: job.apply_url || job.url || job._url || null, co: safeCompany, title: safeTitle, city: safeLoc, score, waste, lvl: levelLabel, sal: job.salary || null, type: job.type || 'Full-time', source: job.source || 'Job board', description: job.description || '', vibes: [job.description ? job.description.slice(0,80) : ('via ' + (job.source||'Job board'))] });
+      JOBS.push({ id: safeId, _url: job.apply_url || job.url || job._url || null, co: safeCompany, title: safeTitle, city: safeLoc, score, waste, lvl: levelLabel, sal: job.salary || null, type: job.type || 'Full-time', source: job.source || 'Job board', description: job.description || '', vibes: [job.description ? job.description.slice(0,80) : ('via ' + (job.source||'Job board'))], avail: job.availability_status || 'unknown', last_seen_at: job.last_seen_at || null });
     }
     const applyAction = "openApplyModal('" + safeId + "','" + safeCompany + "','" + safeTitle + "','" + safeLoc + "'," + score + ",'" + Score.risk(score) + "'," + waste + ",'')";
     const vibesHtml = _jobVibes(job).map(v => '<span class="vibe ' + v.cls + '">' + v.txt + '</span>').join('');
+    const avail = job.availability_status || 'unknown';
+    const availBadge = avail === 'stale' ? '<span class="vibe v-y">⚠ may be closed</span>'
+      : avail === 'expired' ? '<span class="vibe v-r">✕ likely closed</span>' : '';
     const ck = safeCompany.toLowerCase().trim();
     const coData = COS[ck] || Object.values(COS).find(c => c.name.toLowerCase() === ck);
     const ghostRate = coData ? Math.round((coData.sc.ghost_rate || 0) * 100) : null;
@@ -4329,6 +4352,7 @@ function renderJobResults(jobs, l) {
         '<div style="display:flex;align-items:center;gap:.35rem;flex-wrap:wrap;margin:.35rem 0">' +
           '<span class="' + wl.cls + ' waste-badge">' + wl.txt + '</span>' +
           ghostBadge +
+          availBadge +
           vibesHtml +
         '</div>' +
         (job.description ? '<div style="font-size:.72rem;color:var(--muted);margin:.25rem 0;line-height:1.55;text-align:left">' + job.description.slice(0,120) + '...</div>' : '') +
@@ -10574,6 +10598,7 @@ function openJobDetailModal(jobId) {
   const sal    = j ? (j.sal && j.sal !== '—' ? j.sal : '') : '';
   const source = j ? (j.source || 'Job board')             : 'Job board';
   const desc   = j ? (j.description || (j.vibes && j.vibes[0]) || '') : '';
+  const avail  = j ? (j.avail || 'unknown') : 'unknown';
   const wl     = Score.wasteLabel(waste);
   const wasteColor = waste < 35 ? 'var(--green)' : waste < 65 ? 'var(--amber)' : 'var(--red)';
   const jForVibes = { source, score, waste_score: waste, salary: sal, location: loc, type };
@@ -10611,7 +10636,9 @@ function openJobDetailModal(jobId) {
        <div class="jd-stat"><span class="jd-sn" style="color:var(--green);font-size:.78rem">${(sal||'—').replace(/</g,'&lt;')}</span><span class="jd-sl">Salary</span></div>
        <div class="jd-stat"><span class="jd-sn" style="font-size:.68rem;color:var(--blue)">${source.replace(/</g,'&lt;')}</span><span class="jd-sl">Source</span></div>
      </div>
-     ${desc ? `<div style="color:var(--sub);font-size:.78rem;line-height:1.75;white-space:pre-wrap">${desc.replace(/</g,'&lt;')}</div>` : '<div style="color:var(--muted);font-size:.75rem;font-family:var(--mono);text-align:center;padding:.5rem 0">No description available.</div>'}`;
+     ${desc ? `<div style="color:var(--sub);font-size:.78rem;line-height:1.75;white-space:pre-wrap">${desc.replace(/</g,'&lt;')}</div>` : '<div style="color:var(--muted);font-size:.75rem;font-family:var(--mono);text-align:center;padding:.5rem 0">No description available.</div>'}
+     ${avail === 'stale' ? `<div style="margin-top:.85rem;padding:.55rem .8rem;background:var(--amber)12;border:1px solid var(--amber)33;border-radius:8px;font-family:var(--mono);font-size:.62rem;color:var(--amber);line-height:1.55">⚠ This listing hasn't been seen in 7+ days and may be closed. Verify before applying.</div>` : ''}
+     ${avail === 'expired' ? `<div style="margin-top:.85rem;padding:.55rem .8rem;background:var(--red)12;border:1px solid var(--red)33;border-radius:8px;font-family:var(--mono);font-size:.62rem;color:var(--red);line-height:1.55">✕ This listing is likely closed — it hasn't been seen in 14+ days. Check the company's careers page directly.</div>` : ''}`;
 
   const coEsc = co.replace(/'/g,"\\'");
   const locEsc = loc.replace(/'/g,"\\'");
@@ -10626,6 +10653,7 @@ function openJobDetailModal(jobId) {
 
   // Footer — view full listing + save + apply
   const saved = SavedJobs.isSaved(sid);
+  const isExpired = avail === 'expired';
   const foot = document.getElementById('applyModalFoot');
   foot.style.cssText = 'display:flex;flex-direction:column;gap:.5rem;padding:.75rem 1.5rem 1.25rem;border-top:1px solid var(--line);flex-shrink:0;background:var(--card);border-radius:0 0 16px 16px';
   foot.innerHTML =
@@ -10634,11 +10662,15 @@ function openJobDetailModal(jobId) {
      <div style="display:flex;gap:.5rem">
        <button id="jdSaveBtn" type="button" data-saved="${saved?'1':'0'}" onclick="jdSaveToggle(this)"
          style="background:none;border:1px solid var(--line2);border-radius:8px;padding:.65rem 1rem;font-size:1rem;cursor:pointer;color:${saved?'var(--green)':'var(--muted)'};flex-shrink:0;transition:all .15s">${saved?'♥':'♡'}</button>
-       <button type="button" onclick="jdApplyClick()"
-         style="flex:1;background:var(--green);color:var(--ink);border:none;border-radius:8px;padding:.65rem 1rem;font-family:var(--display);font-weight:800;font-size:.82rem;cursor:pointer">Apply &amp; Optimize →</button>
+       <button type="button" onclick="jdApplyClick()" ${isExpired ? 'title="This listing may be closed"' : ''}
+         style="flex:1;background:${isExpired?'var(--muted)':'var(--green)'};color:var(--ink);border:none;border-radius:8px;padding:.65rem 1rem;font-family:var(--display);font-weight:800;font-size:.82rem;cursor:pointer;opacity:${isExpired?.65:1}">${isExpired ? 'Apply anyway →' : 'Apply &amp; Optimize →'}</button>
      </div>
-     <button type="button" onclick="closeApplyModalDirect();prefillReport('${coEsc}','${locEsc}');go('report')"
-       style="background:none;border:none;font-family:var(--mono);font-size:.6rem;color:var(--muted);cursor:pointer;padding:.1rem 0;text-decoration:underline;text-underline-offset:2px;transition:color .12s" onmouseover="this.style.color='var(--sub)'" onmouseout="this.style.color='var(--muted)'">Applied here before? Add a report →</button>`;
+     <div style="display:flex;justify-content:space-between;align-items:center">
+       <button type="button" onclick="closeApplyModalDirect();prefillReport('${coEsc}','${locEsc}');go('report')"
+         style="background:none;border:none;font-family:var(--mono);font-size:.6rem;color:var(--muted);cursor:pointer;padding:.1rem 0;text-decoration:underline;text-underline-offset:2px;transition:color .12s" onmouseover="this.style.color='var(--sub)'" onmouseout="this.style.color='var(--muted)'">Applied here before? Add a report →</button>
+       <button type="button" onclick="_reportListingAvail('${sid}','${avail}')"
+         style="background:none;border:none;font-family:var(--mono);font-size:.58rem;color:var(--dim);cursor:pointer;padding:.1rem 0;transition:color .12s" onmouseover="this.style.color='var(--sub)'" onmouseout="this.style.color='var(--dim)'">Report listing status</button>
+     </div>`;
 
   _applyModalGlow(risk);
   document.getElementById('applyModal').classList.add('open');
@@ -10696,6 +10728,31 @@ function closeJobDetailModal() {
   const foot = document.getElementById('applyModalFoot');
   if (foot) foot.style.display = 'none';
   closeApplyModalDirect();
+}
+
+function _reportListingAvail(jobId, currentAvail) {
+  const opts = [
+    { label: 'Still active — I can see it', val: 'active' },
+    { label: 'It\'s closed / position filled', val: 'expired' },
+    { label: 'Not sure', val: 'unknown' },
+  ];
+  const html = opts.map(o =>
+    `<button onclick="_submitListingReport('${jobId}','${o.val}')" style="display:block;width:100%;text-align:left;padding:.55rem .8rem;margin-bottom:.35rem;background:var(--raised);border:1px solid var(--line2);border-radius:8px;font-family:var(--mono);font-size:.7rem;color:var(--sub);cursor:pointer">${o.label}</button>`
+  ).join('');
+  showToast(''); // clear any existing toast
+  const container = document.getElementById('applyModalBody');
+  if (container) {
+    const prev = container.innerHTML;
+    container.innerHTML = `<div style="padding:.5rem 0"><div style="font-family:var(--mono);font-size:.62rem;color:var(--muted);margin-bottom:.65rem;text-transform:uppercase;letter-spacing:.07em">Is this listing still open?</div>${html}<button onclick="this.closest('#applyModalBody').innerHTML=_prevReportHtml" style="background:none;border:none;font-family:var(--mono);font-size:.62rem;color:var(--dim);cursor:pointer;padding:.1rem 0">Cancel</button></div>`;
+    window._prevReportHtml = prev;
+  }
+}
+
+function _submitListingReport(jobId, status) {
+  _sync('report_job_availability', { job_id: String(jobId), status });
+  const container = document.getElementById('applyModalBody');
+  if (container && window._prevReportHtml) container.innerHTML = window._prevReportHtml;
+  showToast('Thanks — your report helps keep listings accurate.');
 }
 
 // ═══════════════════════════════════════════════
