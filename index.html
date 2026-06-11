@@ -6232,7 +6232,7 @@ async function renderAdminPage() {
   const lastUpdated = document.getElementById('admLastUpdated');
 
   if (!AdminSession.getToken()) { _admShowLogin(); return; }
-  if (loginForm) loginForm.style.display = 'none';
+  _admHideLogin();
   if (setupNote) setupNote.style.display = 'none';
   if (lastUpdated) lastUpdated.textContent = 'Loading…';
 
@@ -8182,12 +8182,13 @@ function updateNav(){
   const empBtn=document.getElementById('navEmployerBtn');
   const bell=document.getElementById('notifBell');
   const backBtn=document.getElementById('backToDashBtn');
+  const creditBadge=document.getElementById('navCreditBadge');
   if(Auth.isSeeker()){
     if(pills)pills.style.display='flex';
     if(loginBtn)loginBtn.style.display='none';
     if(empBtn)empBtn.style.display='none';
     if(bell)bell.style.display='block';
-    if(backBtn)backBtn.style.display='none'; // hidden by default, shown by go()
+    if(backBtn)backBtn.style.display='none';
     updateNotifBadge();
     CreditStore.init();
   } else if(Auth.isEmployer()){
@@ -8196,12 +8197,14 @@ function updateNav(){
     if(empBtn)empBtn.style.display='none';
     if(bell)bell.style.display='none';
     if(backBtn)backBtn.style.display='none';
+    CreditStore._balance=null;if(creditBadge)creditBadge.style.display='none';
   } else {
     if(pills)pills.style.display='none';
     if(loginBtn){loginBtn.style.display='inline-flex';loginBtn.textContent='Sign in';loginBtn.onclick=()=>go('login');}
     if(empBtn)empBtn.style.display='inline-flex';
     if(bell)bell.style.display='none';
     if(backBtn)backBtn.style.display='none';
+    CreditStore._balance=null;if(creditBadge)creditBadge.style.display='none';
   }
 }
 
