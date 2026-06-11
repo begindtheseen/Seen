@@ -19,7 +19,12 @@ CREATE INDEX IF NOT EXISTS idx_user_issues_created ON user_issues(created_at DES
 ALTER TABLE user_issues ENABLE ROW LEVEL SECURITY;
 
 -- Anonymous users can submit issues
-CREATE POLICY IF NOT EXISTS "anon_insert" ON user_issues
-  FOR INSERT WITH CHECK (true);
+DO $$ BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies WHERE tablename = 'user_issues' AND policyname = 'anon_insert'
+  ) THEN
+    CREATE POLICY "anon_insert" ON user_issues FOR INSERT WITH CHECK (true);
+  END IF;
+END $$;
 
 -- Reads/updates only via service key (bypasses RLS automatically)
