@@ -117,7 +117,7 @@ export default function CompaniesPage() {
             {search ? 'No companies match that search.' : 'No company data yet. Be the first to submit a report.'}
           </div>
         ) : (
-          <div className="ldr-grid">
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,1fr)', gap: '.75rem' }}>
             {filtered.map((co, i) => {
               const risk = Score.risk(co.score.overall_score)
               const g = grade(co.score.overall_score)
@@ -128,19 +128,19 @@ export default function CompaniesPage() {
                   href={`/company/${encodeURIComponent(co.name.toLowerCase().replace(/\s+/g, '-'))}`}
                   style={{ textDecoration: 'none' }}
                 >
-                  <div className={`ldr-item ${risk}`}>
-                    <div className="ldr-rank">#{i + 1}</div>
+                  <div style={{ background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 12, padding: '1.1rem 1.25rem', cursor: 'pointer', transition: 'background .15s', position: 'relative' }} className={risk}>
+                    <div style={{ position: 'absolute', top: '.6rem', left: '.7rem', fontFamily: 'var(--mono)', fontSize: '.55rem', color: 'var(--muted)' }}>#{i + 1}</div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '.75rem', flex: 1, minWidth: 0 }}>
                       <div className="jrc-logo">{logoLetter}</div>
                       <div style={{ flex: 1, minWidth: 0 }}>
-                        <div className="ldr-name">
+                        <div style={{ fontFamily: 'var(--display)', fontSize: '.9rem', fontWeight: 700, color: 'var(--white)', letterSpacing: '-.01em' }}>
                           {co.name}
                           {co.verified && <span className="co-verified" style={{ marginLeft: '.4rem', fontSize: '.52rem', padding: '.1rem .4rem' }}>✓</span>}
                         </div>
-                        {co.industry && <div className="ldr-loc">{co.industry}</div>}
+                        {co.industry && <div style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', color: 'var(--muted)' }}>{co.industry}</div>}
                       </div>
                       <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                        <div className={`ldr-score ${risk}`}>{g}</div>
+                        <div style={{ fontFamily: 'var(--mono)', fontSize: '1.75rem', fontWeight: 500, color: risk === 'safe' ? 'var(--green)' : risk === 'warn' ? 'var(--amber)' : 'var(--red)', lineHeight: 1 }}>{g}</div>
                         <div style={{ fontFamily: 'var(--mono)', fontSize: '.52rem', color: 'var(--muted)' }}>{co.score.overall_score}/100</div>
                       </div>
                     </div>
