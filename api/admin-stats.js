@@ -63,13 +63,11 @@ export default async function handler(req, res) {
     } catch { return []; }
   };
 
-  // Check whether search_logs table exists (probe with limit=0)
-  const searchLogsReady = await (async () => {
-    try {
-      const r = await fetch(`${SUPABASE_URL}/rest/v1/search_logs?limit=0&select=id`, { headers: svc });
-      return r.ok;
-    } catch { return false; }
-  })();
+  // Check whether optional tables exist (probe with limit=0)
+  const [searchLogsReady, errorsReady] = await Promise.all([
+    fetch(`${SUPABASE_URL}/rest/v1/search_logs?limit=0&select=id`, { headers: svc }).then(r => r.ok).catch(() => false),
+    fetch(`${SUPABASE_URL}/rest/v1/api_errors?limit=0&select=id`, { headers: svc }).then(r => r.ok).catch(() => false),
+  ]);
 
   // Run all queries in parallel
   const [
@@ -90,6 +88,15 @@ export default async function handler(req, res) {
     companySearchesToday, // from search_logs where source='company'
     companySearchesWeek,
     companySearchRows,    // for top searched companies
+
+    jobSearchesToday,
+    jobSearchesWeek,
+    jobSearchRows,
+
+    activeRateLimitKeys,
+
+    errorRowsToday,
+    errorRowsWeek,
   ] = await Promise.all([
     // ── Users ──────────────────────────────────────────────────────────────
     count('profiles'),
@@ -113,6 +120,18 @@ export default async function handler(req, res) {
     searchLogsReady ? count('search_logs', `source=eq.company&created_at=gt.${oneDayAgo}`) : Promise.resolve(null),
     searchLogsReady ? count('search_logs', `source=eq.company&created_at=gt.${sevenDaysAgo}`) : Promise.resolve(null),
     searchLogsReady ? rows('search_logs', `source=eq.company&created_at=gt.${sevenDaysAgo}`, 'query,created_at', 5000) : Promise.resolve([]),
+
+    // ── Job searches (search_logs source='api') ──────────────────────────────
+    searchLogsReady ? count('search_logs', `source=eq.api&created_at=gt.${oneDayAgo}`) : Promise.resolve(null),
+    searchLogsReady ? count('search_logs', `source=eq.api&created_at=gt.${sevenDaysAgo}`) : Promise.resolve(null),
+    searchLogsReady ? rows('search_logs', `source=eq.api&created_at=gt.${sevenDaysAgo}`, 'query,result_count,created_at', 2000) : Promise.resolve([]),
+
+    // ── Rate limit hits ──────────────────────────────────────────────────────
+    count('rate_limits', `expires_at=gt.${now}`),
+
+    // ── API errors ───────────────────────────────────────────────────────────
+    errorsReady ? rows('api_errors', `created_at=gt.${oneDayAgo}`, 'endpoint,error_msg,created_at', 500) : Promise.resolve([]),
+    errorsReady ? rows('api_errors', `created_at=gt.${sevenDaysAgo}`, 'endpoint,created_at', 2000) : Promise.resolve([]),
   ]);
 
   // ── Reports: daily chart (last 30 days) ─────────────────────────────────
@@ -167,6 +186,20 @@ export default async function handler(req, res) {
     .slice(0, 15)
     .map(([company, count]) => ({ company, count }));
 
+  // ── Job searches: top queries, zero-result searches ──────────────────────
+  const jobQueryCounts = {};
+  let zeroResultSearches = 0;
+  for (const r of jobSearchRows) {
+    const q = (r.query || '').trim();
+    if (!q) continue;
+    jobQueryCounts[q] = (jobQueryCounts[q] || 0) + 1;
+    if ((r.result_count || 0) === 0) zeroResultSearches++;
+  }
+  const topJobQueries = Object.entries(jobQueryCounts)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 15)
+    .map(([query, count]) => ({ query, count }));
+
   return res.status(200).json({
     ok: true,
     generated_at: now,
@@ -203,5 +236,32 @@ export default async function handler(req, res) {
       this_week: companySearchesWeek,
       top: topSearchedCompanies.length ? topSearchedCompanies : null,
     },
+
+    job_searches: {
+      ready: searchLogsReady,
+      today: jobSearchesToday,
+      this_week: jobSearchesWeek,
+      zero_result_7d: zeroResultSearches,
+      top_queries: topJobQueries.length ? topJobQueries : null,
+    },
+
+    rate_limits: {
+      active_keys: activeRateLimitKeys,
+    },
+
+    api_errors: (() => {
+      if (!errorsReady) return { ready: false };
+      const byEndpoint = {};
+      for (const e of errorRowsWeek) {
+        byEndpoint[e.endpoint] = (byEndpoint[e.endpoint] || 0) + 1;
+      }
+      return {
+        ready: true,
+        today: errorRowsToday.length,
+        this_week: errorRowsWeek.length,
+        by_endpoint: Object.entries(byEndpoint).sort((a,b)=>b[1]-a[1]).map(([endpoint,count])=>({endpoint,count})),
+        recent: errorRowsToday.slice(0, 20).map(e => ({ endpoint: e.endpoint, msg: e.error_msg, at: e.created_at })),
+      };
+    })(),
   });
 }

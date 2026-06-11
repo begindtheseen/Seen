@@ -1,4 +1,5 @@
 import { applyRateLimit } from './_utils/ratelimit.js';
+import { logError } from './_utils/errlog.js';
 
 export default async function handler(req, res) {
   // Rate limit keyed per tool so each tool has its own bucket
@@ -143,6 +144,7 @@ JOB DESCRIPTION:\n${(jobDescription||'').slice(0,2500)}${background?'\nCANDIDATE
 
   } catch(err) {
     console.error('Resume API error:', err.message);
+    logError('resume', err.message);
     return res.status(500).json({ error: err.message });
   }
 }

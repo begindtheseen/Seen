@@ -1,5 +1,6 @@
 import { getQueryExpansion } from './_utils/expand.js';
 import { applyRateLimit } from './_utils/ratelimit.js';
+import { logError } from './_utils/errlog.js';
 
 // Per-instance request coalescing: concurrent identical searches share one Claude call
 const _inflight = new Map();
@@ -242,6 +243,7 @@ export default async function handler(req, res) {
 
   } catch(err) {
     console.error('Jobs error:', err.message);
+    logError('jobs', err.message, { query: safeQuery, loc });
     _inflightReject?.(err);
     _inflight.delete(inflightKey);
     return res.status(500).json({ error: err.message, jobs: [] });

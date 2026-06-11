@@ -3778,8 +3778,21 @@ async function searchJobs(query, location) {
 
   } catch(e) {
     console.error('searchJobs:', e);
-    if (listEl) listEl.innerHTML = `<div style="text-align:center;padding:2rem;font-family:var(--mono);font-size:.7rem;color:var(--red)">Search failed — ${e.message}</div>`;
-    if (countEl) countEl.textContent = 'Error';
+    const isRateLimit = e.message?.includes('429') || e.message?.toLowerCase().includes('too many');
+    const isDown = e.message?.includes('500') || e.message?.includes('unavailable') || e.message?.includes('fetch');
+    const msg = isRateLimit
+      ? 'You\'ve searched a lot — wait a few minutes and try again.'
+      : isDown
+        ? 'Search is temporarily unavailable. Try again in a moment.'
+        : e.message || 'Search failed';
+    if (listEl) listEl.innerHTML = `
+      <div style="text-align:center;padding:2.5rem 1rem">
+        <div style="font-size:1.5rem;margin-bottom:.75rem">${isRateLimit ? '⏳' : '⚠️'}</div>
+        <div style="font-family:var(--display);font-size:.88rem;font-weight:700;color:var(--white);margin-bottom:.4rem">${isRateLimit ? 'Slow down a bit' : 'Search unavailable'}</div>
+        <div style="font-size:.78rem;color:var(--sub);margin-bottom:1.25rem;max-width:320px;margin-left:auto;margin-right:auto">${msg}</div>
+        ${!isRateLimit ? `<button onclick="searchJobs('${q.replace(/'/g,"\\'")}'${l?`,'${l.replace(/'/g,"\\'")}''`:''?? ''})" style="padding:.5rem 1.25rem;background:var(--blue);color:#fff;border:none;border-radius:8px;font-family:var(--display);font-weight:700;font-size:.78rem;cursor:pointer">Try again →</button>` : ''}
+      </div>`;
+    if (countEl) countEl.textContent = isRateLimit ? 'Rate limited' : 'Error';
   }
 }
 
@@ -9029,7 +9042,13 @@ async function loadFeed(reset = true) {
     if (moreEl) moreEl.style.display = rows.length === FEED_PAGE ? 'block' : 'none';
   } catch(e) {
     console.error('loadFeed error:', e);
-    if (reset) listEl.innerHTML = `<div style="text-align:center;padding:2rem;font-family:var(--mono);font-size:.65rem;color:var(--muted)">Couldn't load feed.</div>`;
+    if (reset) listEl.innerHTML = `
+      <div style="text-align:center;padding:2.5rem 1rem">
+        <div style="font-size:1.5rem;margin-bottom:.6rem">⚠️</div>
+        <div style="font-family:var(--display);font-size:.85rem;font-weight:700;color:var(--white);margin-bottom:.35rem">Couldn't load feed</div>
+        <div style="font-size:.75rem;color:var(--sub);margin-bottom:1rem">Check your connection and try again.</div>
+        <button onclick="loadFeed(true)" style="padding:.45rem 1.1rem;background:var(--surface);border:1px solid var(--line2);color:var(--text);border-radius:8px;font-family:var(--mono);font-size:.7rem;cursor:pointer">Retry</button>
+      </div>`;
   }
 }
 
