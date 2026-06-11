@@ -520,6 +520,26 @@ nav.nav-scrolled{background:rgba(6,6,8,0.82);backdrop-filter:blur(60px) saturate
 .feed-card.oc-pride{background:linear-gradient(135deg,rgba(16,185,129,.07) 0%,rgba(255,255,255,.02) 65%)}
 .feed-card.oc-outrage{background:linear-gradient(135deg,rgba(239,68,68,.08) 0%,rgba(255,255,255,.02) 65%)}
 .feed-card.oc-validation{background:linear-gradient(135deg,rgba(59,130,246,.07) 0%,rgba(255,255,255,.02) 65%)}
+/* Headline — the FIRST emotional hit */
+.oc-headline{font-family:var(--display);font-size:1.05rem;font-weight:800;line-height:1.2;letter-spacing:-.03em;margin:.2rem 0 .45rem;color:var(--white)}
+/* Comparison line — the contextualized stat */
+.oc-comp{font-family:var(--mono);font-size:.58rem;color:var(--sub);line-height:1.55;margin-bottom:.3rem}
+.oc-comp strong{color:var(--white);font-weight:600}
+/* Trust signature — always visible */
+.oc-trust-sig{font-family:var(--mono);font-size:.5rem;color:var(--dim);margin:.25rem 0 .5rem;display:flex;align-items:center;gap:.35rem;flex-wrap:wrap}
+.oc-trust-sig span{color:var(--muted)}
+/* Action row */
+.oc-actions{display:flex;gap:.32rem;flex-wrap:wrap;align-items:center;margin-top:.45rem}
+.oc-btn{font-family:var(--mono);font-size:.57rem;padding:.26rem .7rem;border-radius:100px;border:1px solid;background:transparent;cursor:pointer;transition:all .16s;white-space:nowrap;line-height:1.4}
+.oc-btn-ghost{border-color:rgba(239,68,68,.35);color:rgba(239,68,68,.8)}
+.oc-btn-ghost:hover{background:rgba(239,68,68,.1)}
+.oc-btn-green{border-color:rgba(16,185,129,.35);color:rgba(16,185,129,.85)}
+.oc-btn-green:hover{background:rgba(16,185,129,.1)}
+.oc-btn-blue{border-color:rgba(59,130,246,.3);color:rgba(59,130,246,.8)}
+.oc-btn-blue:hover{background:rgba(59,130,246,.08)}
+.oc-btn-share{border-color:rgba(255,255,255,.1);color:var(--dim);margin-left:auto}
+.oc-btn-share:hover{border-color:rgba(255,255,255,.2);color:var(--sub)}
+/* Legacy (still used in modal outcome dist) */
 .oc-stat{font-family:var(--display);font-size:1.6rem;font-weight:800;line-height:1;letter-spacing:-.04em}
 .oc-benchmark{font-family:var(--mono);font-size:.54rem;color:var(--muted);margin-top:.14rem;line-height:1.5}
 .oc-bar{height:3px;background:var(--raised);border-radius:2px;overflow:hidden;margin:.3rem 0}
@@ -9573,125 +9593,230 @@ function renderFeedCards(listEl, rows, replace = true, companyStats = {}) {
 const _OC_INDUSTRY_GHOST = 0.55; // Greenhouse 2023
 
 function renderOutcomeCard(r, cs) {
+  // ── Helpers ───────────────────────────────────────────────────────────────
   const ago = dt => {
     if (!dt) return '';
     const d = Math.floor((Date.now() - new Date(dt)) / 86400000);
     return d === 0 ? 'today' : d === 1 ? '1d ago' : `${d}d ago`;
   };
-  const OC_CLASS = { ghosted:'outcome-ghosted', autoreject:'outcome-autoreject', rejected:'outcome-autoreject', hired:'outcome-hired', offer:'outcome-hired', human:'outcome-human', interview:'outcome-human', interviewing:'outcome-human' };
-  const OC_LABEL = { ghosted:'👻 Ghosted', autoreject:'🤖 Auto-rejected', rejected:'❌ Rejected', hired:'🎉 Hired', offer:'🎉 Hired', human:'📞 Got response', interview:'📞 Interviewing', interviewing:'📞 Interviewing', waiting:'⏳ Waiting' };
+  const IND_GHOST = _OC_INDUSTRY_GHOST || 0.55; // 55% industry avg
+  const IND_WAIT  = 21; // days
 
-  const oc     = r.outcome || 'waiting';
-  const co     = (r.company_name || '').replace(/</g,'&lt;');
-  const coRaw  = (r.company_name || '').replace(/'/g,"\\'");
-  const role   = (r.role || '').replace(/</g,'&lt;');
-  const text   = r.report_text ? r.report_text.replace(/</g,'&lt;').replace(/>/g,'&gt;') : '';
+  const oc    = r.outcome || 'waiting';
+  const co    = (r.company_name || '').replace(/</g,'&lt;');
+  const coRaw = (r.company_name || '').replace(/'/g,"\\'");
+  const role  = (r.role || '').replace(/</g,'&lt;');
+  const text  = r.report_text ? r.report_text.replace(/</g,'&lt;').replace(/>/g,'&gt;') : '';
   const rounds = r.rounds || 0;
   const clickAction = co ? `openCompanySearch();document.getElementById('coSearchInp').value='${coRaw}';searchCompanies('${coRaw}')` : '';
 
-  // ── Choose psychological variant ───────────────────────────────────────────
-  let variant = '';
-  let insightHtml = '';
-  const gr = cs?.ghost_rate;
-  const reportCount = cs?.report_count || 0;
-  const isHired     = oc === 'hired' || oc === 'offer';
-  const isGhosted   = oc === 'ghosted';
-  const isRejected  = oc === 'autoreject' || oc === 'rejected';
-  const isResponse  = oc === 'human' || oc === 'interview' || oc === 'interviewing';
+  const gr   = cs?.ghost_rate;
+  const rc   = cs?.report_count || 0;
+  const grPct = gr != null ? Math.round(gr * 100) : null;
+  const indPct = Math.round(IND_GHOST * 100);
+  const mult = gr != null ? (gr / IND_GHOST).toFixed(1) : null;
+  const waitDays = cs?.avg_wait_days;
 
-  if (isHired && cs && gr != null) {
-    // PRIDE: hired at a company with a known ghost rate
-    variant = 'oc-pride';
-    const grPct = Math.round(gr * 100);
-    const score = cs.overall_score;
-    if (grPct >= 30) {
-      insightHtml = `<div style="display:flex;align-items:flex-end;gap:.65rem;margin:.5rem 0 .3rem">
-        <div style="flex-shrink:0">
-          <div class="oc-stat" style="color:var(--green)">${grPct}%</div>
-          <div class="oc-benchmark">ghost rate at ${co || 'this company'}</div>
-        </div>
-        <div style="flex:1;padding-bottom:.48rem">
-          <div style="font-family:var(--mono);font-size:.58rem;color:rgba(16,185,129,.7);line-height:1.4;margin-bottom:.22rem">You beat the odds.</div>
-          <div class="oc-bar"><div class="oc-bar-fill" style="width:${grPct}%;background:var(--green)"></div></div>
-        </div>
-      </div>
-      <div class="oc-trust">✓ ${reportCount >= 5 ? reportCount + ' reports' : 'Company data'} · Industry avg: ${Math.round(_OC_INDUSTRY_GHOST*100)}% ghost</div>`;
-    } else if (score != null) {
-      const grade = score >= 70 ? 'A' : score >= 55 ? 'B' : score >= 40 ? 'C' : 'D';
-      insightHtml = `<div style="margin:.5rem 0 .28rem">
-        <div class="oc-stat" style="color:var(--green)">${grade}</div>
-        <div class="oc-benchmark">Seen grade · ${score}/100 transparency</div>
-      </div>`;
-    }
-  } else if (isGhosted && cs && gr != null) {
-    // OUTRAGE: ghosted at a company with known ghost rate
+  const isHired    = oc === 'hired' || oc === 'offer';
+  const isGhosted  = oc === 'ghosted';
+  const isRejected = oc === 'autoreject' || oc === 'rejected';
+  const isAuto     = oc === 'autoreject';
+  const isInterview= oc === 'human' || oc === 'interview' || oc === 'interviewing';
+
+  // trust signature — always rendered when we have data
+  const trustSig = rc >= 3
+    ? `<div class="oc-trust-sig"><span>Based on</span> ${rc.toLocaleString()} applicant outcomes${waitDays?` · avg wait ${waitDays}d`:''}</div>`
+    : rc > 0
+    ? `<div class="oc-trust-sig"><span>Based on</span> ${rc} outcome${rc!==1?'s':''} — limited data</div>`
+    : '';
+
+  // share button — generates platform-appropriate copy
+  const shareBtn = co
+    ? `<button class="oc-btn oc-btn-share" onclick="event.stopPropagation();_ocShare('${coRaw}','${oc}',${grPct},${rc})" title="Share">↗ Share</button>`
+    : '';
+
+  // ── VARIANT SELECTION + CARD BUILD ────────────────────────────────────────
+  let variant = '';
+  let headline = '';
+  let compLine = '';
+  let actionsHtml = '';
+
+  // ─── GHOSTED + company data ───────────────────────────────────────────────
+  if (isGhosted && grPct != null) {
     variant = 'oc-outrage';
-    const grPct = Math.round(gr * 100);
-    const indPct = Math.round(_OC_INDUSTRY_GHOST * 100);
-    const isWorse = gr > _OC_INDUSTRY_GHOST;
-    const statColor = isWorse ? 'var(--red)' : 'var(--amber)';
-    const mult = (gr / _OC_INDUSTRY_GHOST).toFixed(1);
-    const subline = isWorse
-      ? `${mult}× the industry average`
-      : `vs ${indPct}% industry avg`;
-    insightHtml = `<div style="display:flex;align-items:flex-end;gap:.65rem;margin:.5rem 0 .3rem">
-      <div style="flex-shrink:0">
-        <div class="oc-stat" style="color:${statColor}">${grPct}%</div>
-        <div class="oc-benchmark">ghost rate here<br>${subline}</div>
-      </div>
-      <div style="flex:1;padding-bottom:.55rem">
-        <div style="font-family:var(--mono);font-size:.57rem;color:rgba(239,68,68,.62);line-height:1.4;margin-bottom:.2rem">${isWorse ? "You're not the exception." : "Above average ghosting."}</div>
-        <div class="oc-bar"><div class="oc-bar-fill" style="width:${Math.min(100,grPct)}%;background:var(--red)"></div></div>
-        <div style="font-family:var(--mono);font-size:.47rem;color:var(--dim)">Industry avg: ${indPct}%</div>
-      </div>
-    </div>
-    <button class="oc-cta" style="border-color:rgba(239,68,68,.3);color:rgba(239,68,68,.75)" onclick="event.stopPropagation();quickSubmitOutcome('${coRaw}','ghosted',this)">Did they ghost you too? →</button>`;
-  } else if (isRejected && cs && reportCount >= 5) {
-    // VALIDATION: rejected with peer data
+    const isWorstThanAvg = gr > IND_GHOST;
+    headline = `Ghosted alongside <strong style="color:var(--red)">${grPct}%</strong> of ${co||'applicants'}`;
+    compLine = isWorstThanAvg
+      ? `<strong>${mult}×</strong> the industry ghost rate &nbsp;·&nbsp; industry avg: ${indPct}%`
+      : `Above industry average &nbsp;·&nbsp; industry avg: ${indPct}%`;
+    actionsHtml = `<div class="oc-actions">
+      <button class="oc-btn oc-btn-ghost" onclick="event.stopPropagation();quickSubmitOutcome('${coRaw}','ghosted',this)">👻 This happened to me too</button>
+      <button class="oc-btn oc-btn-ghost" style="opacity:.6" onclick="event.stopPropagation();${clickAction}">See their grade →</button>
+      ${shareBtn}
+    </div>`;
+
+  // ─── GHOSTED + no data ────────────────────────────────────────────────────
+  } else if (isGhosted) {
+    variant = 'oc-outrage';
+    headline = co ? `Ghosted by <strong style="color:var(--red)">${co}</strong>` : `Ghosted — no response`;
+    compLine = rc > 0
+      ? `<strong>${rc}</strong> other applicants reported this company`
+      : `Report your outcome to help others know what to expect`;
+    actionsHtml = `<div class="oc-actions">
+      <button class="oc-btn oc-btn-ghost" onclick="event.stopPropagation();quickSubmitOutcome('${coRaw}','ghosted',this)">👻 They ghosted me too</button>
+      ${shareBtn}
+    </div>`;
+
+  // ─── HIRED/OFFER + high ghost rate ────────────────────────────────────────
+  } else if (isHired && grPct != null && grPct >= 30) {
+    variant = 'oc-pride';
+    headline = `Hired while <strong style="color:var(--green)">${grPct}%</strong> never heard back`;
+    compLine = `${co||'This company'} ghosts <strong>${mult}×</strong> more than average — you made it through`;
+    actionsHtml = `<div class="oc-actions">
+      <button class="oc-btn oc-btn-green" onclick="event.stopPropagation();${clickAction}">See ${co||'company'}'s full grade →</button>
+      ${shareBtn}
+    </div>`;
+
+  // ─── HIRED/OFFER + good company ───────────────────────────────────────────
+  } else if (isHired && grPct != null) {
+    variant = 'oc-pride';
+    const respPct = cs?.response_rate != null ? Math.round(cs.response_rate * 100) : null;
+    headline = co ? `Hired at <strong style="color:var(--green)">${co}</strong>` : `Hired 🎉`;
+    compLine = respPct
+      ? `${respPct}% response rate — above average for hiring transparency`
+      : `One of the ${100 - grPct}% of applicants who heard back`;
+    actionsHtml = `<div class="oc-actions">
+      <button class="oc-btn oc-btn-green" onclick="event.stopPropagation();${clickAction}">How does your company compare? →</button>
+      ${shareBtn}
+    </div>`;
+
+  // ─── HIRED + no company data ─────────────────────────────────────────────
+  } else if (isHired) {
+    variant = 'oc-pride';
+    headline = co ? `Hired at <strong style="color:var(--green)">${co}</strong>` : `Hired 🎉`;
+    compLine = `Add your outcome data — help others know what to expect`;
+    actionsHtml = `<div class="oc-actions">${shareBtn}</div>`;
+
+  // ─── AUTO-REJECT ─────────────────────────────────────────────────────────
+  } else if (isAuto) {
+    variant = 'oc-outrage';
+    headline = co
+      ? `Auto-rejected by <strong style="color:var(--amber)">${co}</strong> before anyone read your resume`
+      : `Auto-rejected — no human reviewed this application`;
+    compLine = rc >= 5
+      ? `<strong>${rc}</strong> applicants reported outcomes here — automated screening is common at this company`
+      : `Automated screening filtered out your application`;
+    actionsHtml = `<div class="oc-actions">
+      <button class="oc-btn oc-btn-ghost" style="border-color:rgba(245,158,11,.35);color:rgba(245,158,11,.8)" onclick="event.stopPropagation();quickSubmitOutcome('${coRaw}','autoreject',this)">Same thing happened to me</button>
+      ${shareBtn}
+    </div>`;
+
+  // ─── REJECTED + peer data + ghost context ────────────────────────────────
+  } else if (isRejected && grPct != null && rc >= 5) {
     variant = 'oc-validation';
-    const grPct = gr != null ? `${Math.round(gr*100)}% ghost rate` : '';
-    insightHtml = `<div style="margin:.5rem 0 .25rem">
-      <div class="oc-stat" style="color:var(--blue)">${reportCount}</div>
-      <div class="oc-benchmark">reports at ${co || 'this company'}${grPct ? ' · ' + grPct : ''}</div>
-    </div>
-    <div class="oc-trust" style="color:rgba(59,130,246,.6)">You're not the only one.</div>
-    <button class="oc-cta" style="border-color:rgba(59,130,246,.28);color:rgba(59,130,246,.72)" onclick="event.stopPropagation();quickSubmitOutcome('${coRaw}','rejected',this)">Add your voice →</button>`;
-  } else if (isResponse && cs && gr != null) {
-    // PRIDE: got a response despite high ghost rate
-    const grPct = Math.round(gr * 100);
-    if (grPct >= 35) {
-      variant = 'oc-pride';
-      insightHtml = `<div style="margin:.5rem 0 .28rem">
-        <div class="oc-stat" style="color:var(--green)">${100 - grPct}%</div>
-        <div class="oc-benchmark">of applicants here get a response — you're in that group</div>
-      </div>`;
-    }
+    // Silver lining: at least you heard back
+    headline = `Rejected by ${co||'this company'} — <strong style="color:var(--blue)">${grPct}%</strong> were ghosted outright`;
+    compLine = `You're in the minority who got a response — most applicants never hear a word`;
+    actionsHtml = `<div class="oc-actions">
+      <button class="oc-btn oc-btn-blue" onclick="event.stopPropagation();${clickAction}">See who else got through →</button>
+      <button class="oc-btn oc-btn-blue" style="opacity:.65" onclick="event.stopPropagation();quickSubmitOutcome('${coRaw}','rejected',this)">I was rejected too</button>
+      ${shareBtn}
+    </div>`;
+
+  // ─── REJECTED + peer count, no ghost data ────────────────────────────────
+  } else if (isRejected && rc >= 5) {
+    variant = 'oc-validation';
+    headline = `Rejected by ${co||'this company'}`;
+    compLine = `<strong>${rc}</strong> other applicants reported outcomes here — you're not alone`;
+    actionsHtml = `<div class="oc-actions">
+      <button class="oc-btn oc-btn-blue" onclick="event.stopPropagation();quickSubmitOutcome('${coRaw}','rejected',this)">I was rejected too</button>
+      ${shareBtn}
+    </div>`;
+
+  // ─── REJECTED alone ───────────────────────────────────────────────────────
+  } else if (isRejected) {
+    variant = 'oc-validation';
+    headline = co ? `Rejected by <strong style="color:var(--blue)">${co}</strong>` : `Rejected`;
+    compLine = `Report your outcome to help others who apply here`;
+    actionsHtml = `<div class="oc-actions">${shareBtn}</div>`;
+
+  // ─── INTERVIEW + low response rate (selective company) ────────────────────
+  } else if (isInterview && grPct != null && grPct >= 35) {
+    variant = 'oc-pride';
+    const passedPct = 100 - grPct;
+    headline = `Interview at ${co||'this company'} — you're in the <strong style="color:var(--green)">${passedPct}%</strong> who made it`;
+    compLine = `${grPct}% of applicants here never receive a response`;
+    actionsHtml = `<div class="oc-actions">
+      <button class="oc-btn oc-btn-green" onclick="event.stopPropagation();${clickAction}">See ${co||'company'}'s grade →</button>
+      ${shareBtn}
+    </div>`;
+
+  // ─── INTERVIEW (general) ──────────────────────────────────────────────────
+  } else if (isInterview) {
+    variant = 'oc-pride';
+    headline = co ? `Interview at <strong style="color:var(--green)">${co}</strong>` : `Moving to interview stage`;
+    compLine = rc >= 3 ? `<strong>${rc}</strong> applicants reported outcomes here` : `Update your outcome once it's resolved`;
+    actionsHtml = `<div class="oc-actions">${shareBtn}</div>`;
+
+  // ─── WAITING ─────────────────────────────────────────────────────────────
+  } else {
+    headline = co ? `Waiting on <strong style="color:var(--muted)">${co}</strong>` : `Application in progress`;
+    compLine = waitDays
+      ? `Avg wait at this company: <strong>${waitDays} days</strong> &nbsp;·&nbsp; industry avg: ${IND_WAIT}d`
+      : `Most companies respond within ${IND_WAIT} days`;
   }
 
-  // ── Build card HTML ────────────────────────────────────────────────────────
-  const baseClass = OC_CLASS[oc] || '';
-  const cardClass = ['feed-card', baseClass, variant].filter(Boolean).join(' ');
-  const vibeClass = isGhosted ? 'v-r' : (isHired ? 'v-g' : (isRejected ? 'v-y' : 'v-b'));
-  const displayText = text.slice(0, insightHtml ? 150 : 220);
-  const truncated   = text.length > (insightHtml ? 150 : 220);
-  const stageHtml   = r.ghost_stage ? `<span style="color:var(--muted)"> · ${r.ghost_stage.replace(/</g,'&lt;')}</span>` : '';
-  const metaRounds  = rounds ? `${rounds} round${rounds!==1?'s':''} · ` : '';
+  // ── Assemble card ──────────────────────────────────────────────────────────
+  const baseClass  = { ghosted:'outcome-ghosted', autoreject:'outcome-autoreject', rejected:'outcome-autoreject', hired:'outcome-hired', offer:'outcome-hired', human:'outcome-human', interview:'outcome-human', interviewing:'outcome-human' }[oc] || '';
+  const cardClass  = ['feed-card', baseClass, variant].filter(Boolean).join(' ');
+  const stageNote  = r.ghost_stage ? ` · ${r.ghost_stage.replace(/</g,'&lt;')}` : '';
+  const metaRounds = rounds ? `${rounds} round${rounds!==1?'s':''} · ` : '';
+  const displayText = text.slice(0, 160);
+  const truncated   = text.length > 160;
 
   return `<div class="${cardClass}" onclick="${clickAction}" style="${clickAction?'cursor:pointer':''}">
-    <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:.75rem;margin-bottom:.3rem">
-      <div style="flex:1;min-width:0">
-        ${co ? `<div class="feed-co">${co}</div>` : ''}
-        ${role ? `<div class="feed-role">${role}${stageHtml}</div>` : ''}
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:.65rem;margin-bottom:.22rem">
+      <div style="min-width:0;flex:1">
+        ${role ? `<div class="feed-role" style="margin-bottom:.05rem">${role}${stageNote?`<span style="color:var(--dim)">${stageNote}</span>`:''}</div>` : ''}
       </div>
-      <span class="vibe ${vibeClass}" style="white-space:nowrap;flex-shrink:0">${OC_LABEL[oc]||oc}</span>
+      <span style="font-family:var(--mono);font-size:.48rem;color:var(--dim);flex-shrink:0;padding-top:.1rem">${ago(r.created_at)}</span>
     </div>
-    ${insightHtml}
-    ${displayText ? `<div class="${insightHtml ? 'feed-meta' : 'feed-body'}" style="${insightHtml ? 'color:var(--dim);font-size:.58rem;margin-top:.3rem;font-family:var(--mono)' : ''}">${insightHtml ? '"' : '"'}${displayText}${truncated ? '…' : '"'}</div>` : ''}
-    <div class="feed-meta" style="justify-content:space-between;margin-top:.45rem">
-      <span style="color:var(--muted)">${r.city?r.city+' · ':''}${metaRounds}${r.experience_level||''}${r.experience_level?' · ':''}${ago(r.created_at)}</span>
-      <span style="font-family:var(--mono);font-size:.52rem;color:var(--blue);background:rgba(59,130,246,0.1);border:1px solid rgba(59,130,246,0.2);border-radius:4px;padding:.1rem .4rem">Seen</span>
+    <div class="oc-headline">${headline}</div>
+    ${compLine ? `<div class="oc-comp">${compLine}</div>` : ''}
+    ${trustSig}
+    ${displayText ? `<div class="feed-meta" style="color:var(--dim);font-size:.57rem;margin:.2rem 0 .35rem;font-family:var(--mono);line-height:1.55">"${displayText}${truncated?'…':'"'}</div>` : ''}
+    ${actionsHtml}
+    <div class="feed-meta" style="margin-top:.4rem">
+      <span style="color:var(--dim);font-size:.5rem">${r.city?r.city+' · ':''}${metaRounds}${r.experience_level||''}</span>
     </div>
   </div>`;
+}
+
+// Share an outcome card to Threads / Twitter / copy
+function _ocShare(company, outcome, ghostPct, reportCount) {
+  const TEXTS = {
+    ghosted: ghostPct != null
+      ? `${company} ghosted me — and ${ghostPct}% of applicants according to Seen data. This needs to be talked about. seenjobs.io`
+      : `${company} ghosted me. Seen tracks hiring transparency so this doesn't stay hidden. seenjobs.io`,
+    autoreject: `Auto-rejected by ${company} before any human saw my resume. ${reportCount>0?reportCount+' applicants tracked this. ':''} seenjobs.io`,
+    rejected: `Rejected by ${company}. Seen shows ${reportCount>0?reportCount+' tracked outcomes':'hiring data'} for this company — transparency matters. seenjobs.io`,
+    hired: ghostPct != null && ghostPct >= 30
+      ? `Just got hired at ${company} — a company that ghosts ${ghostPct}% of applicants. The hiring process is broken, but I made it through. seenjobs.io`
+      : `Hired at ${company}. Seen grades hiring transparency so job seekers know what to expect. seenjobs.io`,
+    offer: ghostPct != null && ghostPct >= 30
+      ? `Offer from ${company} — a company where ${ghostPct}% of applicants never hear back. Glad I made it. seenjobs.io`
+      : `Got an offer from ${company}. Check their Seen grade before you apply anywhere. seenjobs.io`,
+    interview: `Interview at ${company}. Seen shows ${ghostPct!=null?ghostPct+'% of applicants never get this far — hiring transparency data at ':'hiring transparency data at '}seenjobs.io`,
+    default: `Applied to ${company}. Check Seen for hiring transparency data before you apply. seenjobs.io`,
+  };
+  const shareText = TEXTS[outcome] || TEXTS.default;
+  const encoded = encodeURIComponent(shareText);
+  // Open Threads share (falls back gracefully to Twitter)
+  const threadsUrl = `https://www.threads.net/intent/post?text=${encoded}`;
+  const twitterUrl = `https://twitter.com/intent/tweet?text=${encoded}`;
+  // Show a mini picker
+  const choice = window.confirm('Share to Threads?\n\nClick OK for Threads, Cancel for X/Twitter');
+  window.open(choice ? threadsUrl : twitterUrl, '_blank', 'width=550,height=420');
 }
 
 // Batch-fetch company_scores for a list of report rows — one DB query for the whole page
