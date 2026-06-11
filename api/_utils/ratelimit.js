@@ -27,6 +27,7 @@ const LIMITS = {
   'job-search':           10,   // each miss calls Claude API — expensive
   'parse-resume':          8,   // large file uploads + Claude
   'report-submit':        15,   // DB writes per hour per IP
+  'benchmarks':           40,   // company stats lookups — cheap DB reads
 };
 
 /**

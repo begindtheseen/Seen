@@ -516,6 +516,22 @@ nav.nav-scrolled{background:rgba(6,6,8,0.82);backdrop-filter:blur(60px) saturate
 .feed-card.outcome-autoreject{border-left:3px solid var(--amber)}
 .feed-card.outcome-hired{border-left:3px solid var(--green)}
 .feed-card.outcome-human{border-left:3px solid var(--blue)}
+/* ═══ PSYCHOLOGICAL OUTCOME CARD VARIANTS ═══ */
+.feed-card.oc-pride{background:linear-gradient(135deg,rgba(16,185,129,.07) 0%,rgba(255,255,255,.02) 65%)}
+.feed-card.oc-outrage{background:linear-gradient(135deg,rgba(239,68,68,.08) 0%,rgba(255,255,255,.02) 65%)}
+.feed-card.oc-validation{background:linear-gradient(135deg,rgba(59,130,246,.07) 0%,rgba(255,255,255,.02) 65%)}
+.oc-stat{font-family:var(--display);font-size:1.6rem;font-weight:800;line-height:1;letter-spacing:-.04em}
+.oc-benchmark{font-family:var(--mono);font-size:.54rem;color:var(--muted);margin-top:.14rem;line-height:1.5}
+.oc-bar{height:3px;background:var(--raised);border-radius:2px;overflow:hidden;margin:.3rem 0}
+.oc-bar-fill{height:100%;border-radius:2px;transition:width .8s cubic-bezier(.22,1,.36,1)}
+.oc-trust{font-family:var(--mono);font-size:.51rem;color:var(--dim);margin-top:.4rem;display:flex;align-items:center;gap:.3rem}
+.oc-cta{display:inline-flex;align-items:center;gap:.3rem;font-family:var(--mono);font-size:.57rem;padding:.22rem .58rem;border-radius:100px;border:1px solid;cursor:pointer;transition:all .18s;background:none;white-space:nowrap;margin-top:.45rem}
+.oc-cta:hover{transform:scale(1.04)}
+.oc-dist{display:flex;height:6px;border-radius:3px;overflow:hidden;gap:1px;margin:.5rem 0 .25rem}
+.oc-dist-seg{height:100%;transition:flex .6s ease;border-radius:1px;min-width:2px}
+.qs-row{display:flex;gap:.28rem;flex-wrap:wrap;padding:.55rem .75rem;background:var(--raised);border-radius:8px;border:1px solid var(--line2);margin-bottom:.7rem;align-items:center}
+.qs-btn{font-family:var(--mono);font-size:.58rem;padding:.28rem .65rem;border-radius:100px;border:1px solid rgba(255,255,255,.12);background:none;color:var(--sub);cursor:pointer;transition:all .16s;white-space:nowrap}
+.qs-btn:hover{background:var(--card);color:var(--text);transform:scale(1.04)}
 .feed-co{font-size:.88rem;font-weight:600;color:var(--white);margin-bottom:.18rem}
 .feed-role{font-family:var(--mono);font-size:.65rem;color:var(--sub)}
 .feed-body{font-size:.8rem;color:var(--text);line-height:1.55;margin:.6rem 0 .5rem;font-weight:300}
@@ -3404,6 +3420,33 @@ async function runSearch(name,loc){
 
     <div style="display:flex;gap:.28rem;flex-wrap:wrap;margin-bottom:.85rem">${vibeList.slice(0,4).map(v=>`<span class="vibe v-n">${v}</span>`).join('')}</div>
 
+    ${(()=>{
+      const reps = realData?.reports || [];
+      if (reps.length < 3) return '';
+      const d = {};
+      reps.forEach(r => { const oc = r.outcome||'unknown'; d[oc] = (d[oc]||0) + 1; });
+      const total = reps.length;
+      const merged = [
+        { label:'Ghosted',   count:(d.ghosted||0),                              color:'#ef4444' },
+        { label:'Rejected',  count:(d.rejected||0)+(d.autoreject||0),           color:'#f59e0b' },
+        { label:'Interview', count:(d.interview||0)+(d.human||0)+(d.interviewing||0), color:'#3b82f6' },
+        { label:'Hired',     count:(d.hired||0)+(d.offer||0),                   color:'#10b981' },
+        { label:'Waiting',   count:(d.waiting||0),                              color:'#6b7280' },
+      ].filter(s => s.count > 0);
+      const segs = merged.map(s => '<div class="oc-dist-seg" style="flex:'+s.count+';background:'+s.color+'"></div>').join('');
+      const lbls = merged.map(s => '<span style="font-family:var(--mono);font-size:.48rem;color:var(--dim)">'+s.label+' '+Math.round(s.count/total*100)+'%</span>').join('<span style="color:var(--line2);margin:0 .18rem">·</span>');
+      return '<div style="margin-bottom:.8rem"><div style="font-family:var(--mono);font-size:.5rem;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin-bottom:.3rem">Outcome distribution · '+total+' community reports</div><div class="oc-dist">'+segs+'</div><div style="display:flex;align-items:center;gap:.25rem;flex-wrap:wrap;margin-top:.18rem">'+lbls+'</div></div>';
+    })()}
+
+    <div class="qs-row" id="modalQsRow">
+      <span style="font-family:var(--mono);font-size:.54rem;color:var(--dim);flex-shrink:0">Your outcome:</span>
+      <button class="qs-btn" onclick="quickSubmitFromModal('${(known?.name||name).replace(/'/g,"\\'")}','ghosted',this)">👻 Ghosted</button>
+      <button class="qs-btn" onclick="quickSubmitFromModal('${(known?.name||name).replace(/'/g,"\\'")}','rejected',this)">❌ Rejected</button>
+      <button class="qs-btn" onclick="quickSubmitFromModal('${(known?.name||name).replace(/'/g,"\\'")}','interview',this)">📞 Interview</button>
+      <button class="qs-btn" onclick="quickSubmitFromModal('${(known?.name||name).replace(/'/g,"\\'")}','offer',this)">🎁 Offer</button>
+      <button class="qs-btn" onclick="quickSubmitFromModal('${(known?.name||name).replace(/'/g,"\\'")}','hired',this)">🎉 Hired</button>
+    </div>
+
     <div class="mbar"><div class="mbar-lbl" style="width:85px">Transparency</div><div class="mbar-track"><div class="mbar-fill" style="width:${sc.overall_score}%;background:${Score.color(risk)}"></div></div><div class="mbar-val" style="color:${Score.color(risk)}">${sc.overall_score}</div></div>
     <div class="mbar"><div class="mbar-lbl" style="width:85px">Ghost rate</div><div class="mbar-track"><div class="mbar-fill mf-r" style="width:${ghostPct}%"></div></div><div class="mbar-val">${ghostPct}%</div></div>
 
@@ -3413,7 +3456,7 @@ async function runSearch(name,loc){
       <button class="btn btn-ghost" style="padding:.65rem .9rem;font-size:.75rem;flex-shrink:0" onclick="shareCompanyReport('${(name||'').replace(/'/g,"\\'")}')">↗ Share</button>
       <button class="btn btn-ghost" style="padding:.65rem .9rem;font-size:.72rem;flex-shrink:0;background:rgba(255,69,0,0.1);border-color:rgba(255,69,0,0.25);color:#ff6314" onclick="shareToReddit('${(name||'').replace(/'/g,"\\'")}')">🔴 Reddit</button>
       <button class="btn btn-ghost" style="padding:.65rem .9rem;font-size:.72rem;flex-shrink:0;background:rgba(255,255,255,0.06);border-color:rgba(255,255,255,0.15);color:var(--text)" onclick="shareToThreads('${(name||'').replace(/'/g,"\\'")}')">🧵 Threads</button>
-      <button class="btn btn-ghost" style="padding:.65rem .9rem;font-size:.75rem;flex-shrink:0" onclick="closeModDirect();prefillReport('${(name||'').replace(/'/g,"\\'")}');go('report')">+ Report</button>
+      <button class="btn btn-ghost" style="padding:.65rem .9rem;font-size:.75rem;flex-shrink:0" onclick="closeModDirect();prefillReport('${(name||'').replace(/'/g,"\\'")}');go('report')">+ Full report</button>
     </div>
     ${!Auth.isLoggedIn()?`<div style="margin-top:.85rem;padding:.65rem .95rem;background:var(--raised);border-radius:9px;border:1px solid var(--line2);display:flex;align-items:center;justify-content:space-between;gap:.75rem">
       <div>
@@ -3434,6 +3477,25 @@ async function runSearch(name,loc){
 function mbox(v,l,c){return`<div style="background:var(--raised);padding:.82rem .6rem;text-align:center"><span style="font-family:var(--mono);font-size:1rem;font-weight:500;color:${c};display:block;margin-bottom:.18rem">${v}</span><span style="font-family:var(--mono);font-size:.5rem;text-transform:uppercase;letter-spacing:.07em;color:var(--muted)">${l}</span></div>`;}
 function closeMod(e){if(e.target===document.getElementById('modalOv'))closeModDirect();}
 function closeModDirect(){document.getElementById('modalOv').classList.remove('open');}
+
+async function quickSubmitFromModal(company, outcome, btn) {
+  if (!btn) return;
+  const row = document.getElementById('modalQsRow');
+  if (row) {
+    row.querySelectorAll('.qs-btn').forEach(b => { b.disabled = true; b.style.opacity = '.4'; });
+    btn.style.opacity = '1';
+    btn.textContent = btn.textContent.split(' ')[0] + ' Submitted ✓';
+    btn.style.borderColor = 'rgba(16,185,129,.4)';
+    btn.style.color = 'var(--green)';
+  }
+  try {
+    await fetch('/api/benchmarks', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'quick_submit', company, outcome }),
+    });
+  } catch(e) { console.warn('quickSubmitFromModal:', e.message); }
+}
 
 // ═══════════════════════════════════════════════
 // LEADERBOARD
@@ -9038,7 +9100,9 @@ async function loadFeed(reset = true) {
       return;
     }
 
-    renderFeedCards(listEl, reset ? _feedAllRows : rows, reset);
+    // Batch-fetch company stats for psychological card copy — runs in parallel with render
+    const companyStats = await _batchFetchCompanyStats(rows);
+    renderFeedCards(listEl, reset ? _feedAllRows : rows, reset, companyStats);
     if (moreEl) moreEl.style.display = rows.length === FEED_PAGE ? 'block' : 'none';
   } catch(e) {
     console.error('loadFeed error:', e);
@@ -9052,44 +9116,170 @@ async function loadFeed(reset = true) {
   }
 }
 
-function renderFeedCards(listEl, rows, replace = true) {
+function renderFeedCards(listEl, rows, replace = true, companyStats = {}) {
+  const html = rows.map(r => {
+    const cs = companyStats[(r.company_name || '').toLowerCase()] || null;
+    return renderOutcomeCard(r, cs);
+  }).join('');
+  if (replace) listEl.innerHTML = html || '<div style="text-align:center;padding:2rem;font-family:var(--mono);font-size:.65rem;color:var(--muted)">No results for this filter.</div>';
+  else listEl.insertAdjacentHTML('beforeend', html);
+}
+
+// ═══════════════════════════════════════════════
+// PSYCHOLOGICAL OUTCOME CARDS
+// ═══════════════════════════════════════════════
+const _OC_INDUSTRY_GHOST = 0.55; // Greenhouse 2023
+
+function renderOutcomeCard(r, cs) {
   const ago = dt => {
     if (!dt) return '';
     const d = Math.floor((Date.now() - new Date(dt)) / 86400000);
     return d === 0 ? 'today' : d === 1 ? '1d ago' : `${d}d ago`;
   };
-  const outcomeClass = { ghosted:'outcome-ghosted', autoreject:'outcome-autoreject', rejected:'outcome-autoreject', hired:'outcome-hired', offer:'outcome-hired', human:'outcome-human', interview:'outcome-human', interviewing:'outcome-human' };
-  const outcomeLabel = { ghosted:'👻 Ghosted', autoreject:'🤖 Auto-rejected', rejected:'❌ Rejected', hired:'🎉 Hired', offer:'🎉 Hired', human:'📞 Got response', interview:'📞 Interviewing', interviewing:'📞 Interviewing', waiting:'⏳ Waiting' };
+  const OC_CLASS = { ghosted:'outcome-ghosted', autoreject:'outcome-autoreject', rejected:'outcome-autoreject', hired:'outcome-hired', offer:'outcome-hired', human:'outcome-human', interview:'outcome-human', interviewing:'outcome-human' };
+  const OC_LABEL = { ghosted:'👻 Ghosted', autoreject:'🤖 Auto-rejected', rejected:'❌ Rejected', hired:'🎉 Hired', offer:'🎉 Hired', human:'📞 Got response', interview:'📞 Interviewing', interviewing:'📞 Interviewing', waiting:'⏳ Waiting' };
 
-  const html = rows.map(r => {
-    const oc = r.outcome || 'waiting';
-    const co = (r.company_name || '').replace(/</g,'&lt;');
-    const role = (r.role || '').replace(/</g,'&lt;');
-    const text = r.report_text ? r.report_text.replace(/</g,'&lt;').replace(/>/g,'&gt;') : '';
-    const stage = r.ghost_stage ? `<span style="color:var(--muted)"> · ${r.ghost_stage.replace(/</g,'&lt;')}</span>` : '';
-    const rounds = r.rounds ? `${r.rounds} round${r.rounds!==1?'s':''} · ` : '';
-    const sourceBadge = `<span style="font-family:var(--mono);font-size:.52rem;color:var(--blue);background:rgba(59,130,246,0.1);border:1px solid rgba(59,130,246,0.2);border-radius:4px;padding:.1rem .4rem">Seen</span>`;
-    const clickAction = co ? `openCompanySearch();document.getElementById('coSearchInp').value='${co.replace(/'/g,"\\'")}';searchCompanies('${co.replace(/'/g,"\\'")}')` : '';
-    const displayText = text.slice(0, 220);
-    const truncated = text.length > 220;
-    return `<div class="feed-card ${outcomeClass[oc]||''}" onclick="${clickAction}" style="${clickAction?'cursor:pointer':''}">
-      <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:.75rem;margin-bottom:.4rem">
-        <div style="flex:1;min-width:0">
-          ${co ? `<div class="feed-co">${co}</div>` : ''}
-          ${role ? `<div class="feed-role">${role}${stage}</div>` : ''}
+  const oc     = r.outcome || 'waiting';
+  const co     = (r.company_name || '').replace(/</g,'&lt;');
+  const coRaw  = (r.company_name || '').replace(/'/g,"\\'");
+  const role   = (r.role || '').replace(/</g,'&lt;');
+  const text   = r.report_text ? r.report_text.replace(/</g,'&lt;').replace(/>/g,'&gt;') : '';
+  const rounds = r.rounds || 0;
+  const clickAction = co ? `openCompanySearch();document.getElementById('coSearchInp').value='${coRaw}';searchCompanies('${coRaw}')` : '';
+
+  // ── Choose psychological variant ───────────────────────────────────────────
+  let variant = '';
+  let insightHtml = '';
+  const gr = cs?.ghost_rate;
+  const reportCount = cs?.report_count || 0;
+  const isHired     = oc === 'hired' || oc === 'offer';
+  const isGhosted   = oc === 'ghosted';
+  const isRejected  = oc === 'autoreject' || oc === 'rejected';
+  const isResponse  = oc === 'human' || oc === 'interview' || oc === 'interviewing';
+
+  if (isHired && cs && gr != null) {
+    // PRIDE: hired at a company with a known ghost rate
+    variant = 'oc-pride';
+    const grPct = Math.round(gr * 100);
+    const score = cs.overall_score;
+    if (grPct >= 30) {
+      insightHtml = `<div style="display:flex;align-items:flex-end;gap:.65rem;margin:.5rem 0 .3rem">
+        <div style="flex-shrink:0">
+          <div class="oc-stat" style="color:var(--green)">${grPct}%</div>
+          <div class="oc-benchmark">ghost rate at ${co || 'this company'}</div>
         </div>
-        <span class="vibe ${oc==='ghosted'?'v-r':oc==='hired'||oc==='offer'?'v-g':oc==='autoreject'||oc==='rejected'?'v-y':'v-b'}" style="white-space:nowrap;flex-shrink:0">${outcomeLabel[oc]||oc}</span>
+        <div style="flex:1;padding-bottom:.48rem">
+          <div style="font-family:var(--mono);font-size:.58rem;color:rgba(16,185,129,.7);line-height:1.4;margin-bottom:.22rem">You beat the odds.</div>
+          <div class="oc-bar"><div class="oc-bar-fill" style="width:${grPct}%;background:var(--green)"></div></div>
+        </div>
       </div>
-      ${displayText?`<div class="feed-body">"${displayText}${truncated?'…':'"'}</div>`:''}
-      <div class="feed-meta" style="justify-content:space-between;margin-top:.5rem">
-        <span style="color:var(--muted)">${r.city?r.city+' · ':''}${rounds}${r.experience_level||''}${r.experience_level?' · ':''}${ago(r.created_at)}</span>
-        <span>${sourceBadge}</span>
+      <div class="oc-trust">✓ ${reportCount >= 5 ? reportCount + ' reports' : 'Company data'} · Industry avg: ${Math.round(_OC_INDUSTRY_GHOST*100)}% ghost</div>`;
+    } else if (score != null) {
+      const grade = score >= 70 ? 'A' : score >= 55 ? 'B' : score >= 40 ? 'C' : 'D';
+      insightHtml = `<div style="margin:.5rem 0 .28rem">
+        <div class="oc-stat" style="color:var(--green)">${grade}</div>
+        <div class="oc-benchmark">Seen grade · ${score}/100 transparency</div>
+      </div>`;
+    }
+  } else if (isGhosted && cs && gr != null) {
+    // OUTRAGE: ghosted at a company with known ghost rate
+    variant = 'oc-outrage';
+    const grPct = Math.round(gr * 100);
+    const indPct = Math.round(_OC_INDUSTRY_GHOST * 100);
+    const isWorse = gr > _OC_INDUSTRY_GHOST;
+    const statColor = isWorse ? 'var(--red)' : 'var(--amber)';
+    const mult = (gr / _OC_INDUSTRY_GHOST).toFixed(1);
+    const subline = isWorse
+      ? `${mult}× the industry average`
+      : `vs ${indPct}% industry avg`;
+    insightHtml = `<div style="display:flex;align-items:flex-end;gap:.65rem;margin:.5rem 0 .3rem">
+      <div style="flex-shrink:0">
+        <div class="oc-stat" style="color:${statColor}">${grPct}%</div>
+        <div class="oc-benchmark">ghost rate here<br>${subline}</div>
       </div>
-    </div>`;
-  }).join('');
+      <div style="flex:1;padding-bottom:.55rem">
+        <div style="font-family:var(--mono);font-size:.57rem;color:rgba(239,68,68,.62);line-height:1.4;margin-bottom:.2rem">${isWorse ? "You're not the exception." : "Above average ghosting."}</div>
+        <div class="oc-bar"><div class="oc-bar-fill" style="width:${Math.min(100,grPct)}%;background:var(--red)"></div></div>
+        <div style="font-family:var(--mono);font-size:.47rem;color:var(--dim)">Industry avg: ${indPct}%</div>
+      </div>
+    </div>
+    <button class="oc-cta" style="border-color:rgba(239,68,68,.3);color:rgba(239,68,68,.75)" onclick="event.stopPropagation();quickSubmitOutcome('${coRaw}','ghosted',this)">Did they ghost you too? →</button>`;
+  } else if (isRejected && cs && reportCount >= 5) {
+    // VALIDATION: rejected with peer data
+    variant = 'oc-validation';
+    const grPct = gr != null ? `${Math.round(gr*100)}% ghost rate` : '';
+    insightHtml = `<div style="margin:.5rem 0 .25rem">
+      <div class="oc-stat" style="color:var(--blue)">${reportCount}</div>
+      <div class="oc-benchmark">reports at ${co || 'this company'}${grPct ? ' · ' + grPct : ''}</div>
+    </div>
+    <div class="oc-trust" style="color:rgba(59,130,246,.6)">You're not the only one.</div>
+    <button class="oc-cta" style="border-color:rgba(59,130,246,.28);color:rgba(59,130,246,.72)" onclick="event.stopPropagation();quickSubmitOutcome('${coRaw}','rejected',this)">Add your voice →</button>`;
+  } else if (isResponse && cs && gr != null) {
+    // PRIDE: got a response despite high ghost rate
+    const grPct = Math.round(gr * 100);
+    if (grPct >= 35) {
+      variant = 'oc-pride';
+      insightHtml = `<div style="margin:.5rem 0 .28rem">
+        <div class="oc-stat" style="color:var(--green)">${100 - grPct}%</div>
+        <div class="oc-benchmark">of applicants here get a response — you're in that group</div>
+      </div>`;
+    }
+  }
 
-  if (replace) listEl.innerHTML = html || '<div style="text-align:center;padding:2rem;font-family:var(--mono);font-size:.65rem;color:var(--muted)">No results for this filter.</div>';
-  else listEl.insertAdjacentHTML('beforeend', html);
+  // ── Build card HTML ────────────────────────────────────────────────────────
+  const baseClass = OC_CLASS[oc] || '';
+  const cardClass = ['feed-card', baseClass, variant].filter(Boolean).join(' ');
+  const vibeClass = isGhosted ? 'v-r' : (isHired ? 'v-g' : (isRejected ? 'v-y' : 'v-b'));
+  const displayText = text.slice(0, insightHtml ? 150 : 220);
+  const truncated   = text.length > (insightHtml ? 150 : 220);
+  const stageHtml   = r.ghost_stage ? `<span style="color:var(--muted)"> · ${r.ghost_stage.replace(/</g,'&lt;')}</span>` : '';
+  const metaRounds  = rounds ? `${rounds} round${rounds!==1?'s':''} · ` : '';
+
+  return `<div class="${cardClass}" onclick="${clickAction}" style="${clickAction?'cursor:pointer':''}">
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:.75rem;margin-bottom:.3rem">
+      <div style="flex:1;min-width:0">
+        ${co ? `<div class="feed-co">${co}</div>` : ''}
+        ${role ? `<div class="feed-role">${role}${stageHtml}</div>` : ''}
+      </div>
+      <span class="vibe ${vibeClass}" style="white-space:nowrap;flex-shrink:0">${OC_LABEL[oc]||oc}</span>
+    </div>
+    ${insightHtml}
+    ${displayText ? `<div class="${insightHtml ? 'feed-meta' : 'feed-body'}" style="${insightHtml ? 'color:var(--dim);font-size:.58rem;margin-top:.3rem;font-family:var(--mono)' : ''}">${insightHtml ? '"' : '"'}${displayText}${truncated ? '…' : '"'}</div>` : ''}
+    <div class="feed-meta" style="justify-content:space-between;margin-top:.45rem">
+      <span style="color:var(--muted)">${r.city?r.city+' · ':''}${metaRounds}${r.experience_level||''}${r.experience_level?' · ':''}${ago(r.created_at)}</span>
+      <span style="font-family:var(--mono);font-size:.52rem;color:var(--blue);background:rgba(59,130,246,0.1);border:1px solid rgba(59,130,246,0.2);border-radius:4px;padding:.1rem .4rem">Seen</span>
+    </div>
+  </div>`;
+}
+
+// Batch-fetch company_scores for a list of report rows — one DB query for the whole page
+async function _batchFetchCompanyStats(rows) {
+  if (!db || !rows.length) return {};
+  const names = [...new Set(rows.map(r => r.company_name).filter(Boolean))].slice(0, 25);
+  if (!names.length) return {};
+  try {
+    const orFilter = names.map(n => `company_name.ilike.${n}`).join(',');
+    const now = new Date().toISOString();
+    const { data } = await db.from('company_scores')
+      .select('company_name,overall_score,ghost_rate,response_rate,avg_wait_days,report_count,waste_score,data_quality')
+      .or(orFilter)
+      .gt('expires_at', now);
+    const map = {};
+    (data || []).forEach(cs => { map[cs.company_name.toLowerCase()] = cs; });
+    return map;
+  } catch(e) { return {}; }
+}
+
+// One-click outcome submission from feed cards — no login required
+async function quickSubmitOutcome(company, outcome, btn) {
+  if (btn) { btn.disabled = true; btn.textContent = 'Submitted ✓'; btn.style.color = 'var(--green)'; btn.style.borderColor = 'rgba(16,185,129,.3)'; }
+  try {
+    await fetch('/api/benchmarks', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'quick_submit', company, outcome }),
+    });
+  } catch(e) { console.warn('quickSubmit:', e.message); }
 }
 
 function setFeedFilter(filter, btn) {
