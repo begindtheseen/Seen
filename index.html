@@ -6342,9 +6342,7 @@ async function renderAdminPage() {
     const twoCol = document.getElementById('admTwoCol');
     if (twoCol && window.innerWidth < 600) twoCol.style.gridTemplateColumns = '1fr';
 
-    if (lastUpdated && d.generated_at) {
-      lastUpdated.textContent = 'Updated ' + new Date(d.generated_at).toLocaleTimeString();
-    }
+    if (lastUpdated) lastUpdated.textContent = 'Updated ' + new Date().toLocaleTimeString();
 
   } catch (e) {
     if (lastUpdated) lastUpdated.textContent = 'Failed to load — ' + e.message;
