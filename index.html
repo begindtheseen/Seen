@@ -12001,11 +12001,13 @@ function _handleSharedLink(){
   if(_knownPages.includes(_hashPage)){go(_hashPage);return;}
   // Non-company page restore — sessionStorage first, localStorage fallback (survives iOS tab discard)
   let sp = sessionStorage.getItem('sp');
+  if (sp === 'admin') { sessionStorage.removeItem('sp'); sp = null; }
   if (!sp) {
     try {
       const saved = JSON.parse(localStorage.getItem('seen_last_page') || '{}');
+      if (saved.page === 'admin') { localStorage.removeItem('seen_last_page'); }
       // Only restore if within 2 hours
-      if (saved.page && saved.ts && (Date.now() - saved.ts) < 2 * 60 * 60 * 1000) sp = saved.page;
+      else if (saved.page && saved.ts && (Date.now() - saved.ts) < 2 * 60 * 60 * 1000) sp = saved.page;
     } catch(_e) {}
   }
   if(sp&&sp!=='company'&&sp!=='landing'&&sp!=='login'&&sp!=='reset'&&sp!=='admin'){
