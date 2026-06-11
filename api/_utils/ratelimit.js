@@ -28,6 +28,9 @@ const LIMITS = {
   'parse-resume':          8,   // large file uploads + Claude
   'report-submit':        15,   // DB writes per hour per IP
   'benchmarks':           40,   // company stats lookups — cheap DB reads
+  'fetch-location-jobs':  30,   // Adzuna API calls — protect quota
+  'user-sync':           500,   // all user data actions — generous for normal use
+  'demand':              120,   // public demand data reads
 };
 
 /**

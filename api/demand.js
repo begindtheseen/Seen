@@ -1,3 +1,5 @@
+import { rateLimit } from './_utils/ratelimit.js';
+
 // /api/demand — Demand data hub.
 //
 // GET  /api/demand  — Public read. Returns demand_data grouped by city.
@@ -21,6 +23,9 @@ export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   if (req.method === 'OPTIONS') return res.status(200).end();
+
+  const { allowed: rlOk } = await rateLimit(req, 'demand');
+  if (!rlOk) return res.status(429).json({ error: 'Too many requests — slow down.' });
 
   if (req.method === 'GET') return handleGet(req, res);
   if (req.method === 'POST') return handlePost(req, res);

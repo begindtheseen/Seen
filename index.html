@@ -811,6 +811,7 @@ nav.nav-scrolled{background:rgba(6,6,8,0.82);backdrop-filter:blur(60px) saturate
 .adm-chart-row{display:flex;align-items:flex-end;gap:3px;height:48px;padding:0 1rem 0}
 .adm-btn:hover{border-color:var(--blue)!important;color:var(--white)!important}
 .adm-btn-danger:hover{border-color:var(--red)!important;color:var(--red)!important}
+.rc-row{transition:background .12s}.rc-row:hover{background:var(--raised)!important}
 .adm-chart-bar{flex:1;background:rgba(59,130,246,.35);border-radius:2px 2px 0 0;transition:background .15s;cursor:default;min-width:8px}
 .adm-chart-bar:hover{background:rgba(59,130,246,.7)}
 /* Issue report modal */
@@ -2645,6 +2646,12 @@ const CreditStore = {
     }
     if (typeof data.balance === 'number') { this._balance = data.balance; this._updateBadge(); }
     return true;
+  },
+  _applyIfNull(data) {
+    // Called by AppStore.load() when credits are bundled — avoids a separate get_credits call
+    if (this._balance !== null || !data) return;
+    this._balance = data.balance;
+    this._updateBadge();
   },
   _updateBadge() {
     const badge = document.getElementById('navCreditBadge');
@@ -6813,6 +6820,7 @@ const STAGES = ['Applied','Viewed','Phone Screen','Interview','Final Round','Off
 
 const AppStore = {
   KEY: 'seen_applications_v1',
+  _recentCos: null,  // cached per-session from load — avoids a separate API call
   _mapRow(a) {
     return {
       id:a.id, jobId:a.job_id, company:a.company_name, role:a.role,
@@ -6848,6 +6856,9 @@ const AppStore = {
         if (unsynced.length) unsynced.forEach(a => _sync('add_application', { application: a }));
         const merged = [...mapped, ...unsynced];
         localStorage.setItem(this.KEY, JSON.stringify(merged));
+        // Cache bundled data so other components skip extra round-trips
+        if (result.recent_cos) this._recentCos = result.recent_cos;
+        if (result.credits) CreditStore._applyIfNull(result.credits);
         return merged;
       }
     }
@@ -8846,14 +8857,13 @@ async function renderSeekerDash(){
   // Saved jobs
   await _refreshDashSaved();
 
-  // Recently checked companies — server-side for logged-in users
-  (async function() {
+  // Recently checked companies — reads from AppStore cache (populated by load, zero extra calls)
+  (function() {
     const el = document.getElementById('dashRecentCos');
     if (!el) return;
     let recent = [];
-    if (Auth.isSeeker()) {
-      const data = await _sync('get_recent_cos').catch(() => null);
-      recent = (data?.recent || []).slice(0, 4).map(r => ({ name: r.company_name, loc: r.location }));
+    if (Auth.isSeeker() && AppStore._recentCos) {
+      recent = AppStore._recentCos.slice(0, 4).map(r => ({ name: r.company_name, loc: r.location }));
     }
     if (!recent.length) recent = RecentSearches.get().slice(0, 4);
     if (!recent.length) { el.style.display = 'none'; return; }
@@ -8874,7 +8884,7 @@ async function renderSeekerDash(){
         const scoreTxt = score ? `<span style="font-family:var(--mono);font-size:.65rem;font-weight:700;color:${Score.color(risk)}">${grade} · ${score}</span>` : `<span style="font-family:var(--mono);font-size:.6rem;color:var(--muted)">No data yet</span>`;
         const nameEsc = (r.name||'').replace(/'/g,"\\'");
         const locEsc = (r.loc||'').replace(/'/g,"\\'");
-        return `<div onclick="openModal('${nameEsc}','${locEsc}')" style="display:flex;align-items:center;gap:.85rem;padding:.8rem 1.1rem;cursor:pointer;border-bottom:1px solid rgba(255,255,255,.04);transition:background .12s" onmouseover="this.style.background='var(--raised)'" onmouseout="this.style.background='transparent'">
+        return `<div class="rc-row" onclick="openModal('${nameEsc}','${locEsc}')" style="display:flex;align-items:center;gap:.85rem;padding:.8rem 1.1rem;cursor:pointer;border-bottom:1px solid rgba(255,255,255,.04);background:transparent">
           <div style="width:34px;height:34px;border-radius:8px;background:var(--raised);border:1px solid var(--line2);display:flex;align-items:center;justify-content:center;font-family:var(--display);font-weight:800;font-size:.85rem;color:var(--white);flex-shrink:0">${(r.name||'?')[0].toUpperCase()}</div>
           <div style="flex:1;min-width:0">
             <div style="font-size:.8rem;font-weight:600;color:var(--white);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${r.name}</div>

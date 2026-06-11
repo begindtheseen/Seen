@@ -1,3 +1,5 @@
+import { rateLimit } from './_utils/ratelimit.js';
+
 function toBase64(str) {
   return Buffer.from(str, 'utf-8').toString('base64');
 }
@@ -159,6 +161,9 @@ export default async function handler(req, res) {
 
   if (req.method === 'OPTIONS') return res.status(200).end();
   if (req.method !== 'POST') return res.status(405).end('Method not allowed');
+
+  const { allowed: rlOk } = await rateLimit(req, 'apply');
+  if (!rlOk) return res.status(429).json({ error: 'Too many requests — slow down.' });
 
   try {
     const {

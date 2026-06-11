@@ -2,6 +2,26 @@
 // The client sends its Supabase access token; we validate it here, then use the
 // service key to talk to the DB. No RLS policies required on the client side.
 
+import { createHmac, timingSafeEqual } from 'crypto';
+import { rateLimit } from './_utils/ratelimit.js';
+
+// Verify a Supabase JWT locally (HS256) — no network round-trip.
+// Returns the payload (with .sub = user UUID) on success, null on failure.
+// Requires SUPABASE_JWT_SECRET env var from Supabase Dashboard → Settings → API.
+function verifyJWTLocal(token, secret) {
+  try {
+    const parts = token.split('.');
+    if (parts.length !== 3) return null;
+    const mac = createHmac('sha256', secret).update(`${parts[0]}.${parts[1]}`).digest('base64url');
+    const sigBuf = Buffer.from(parts[2], 'base64url');
+    const macBuf = Buffer.from(mac, 'base64url');
+    if (sigBuf.length !== macBuf.length || !timingSafeEqual(sigBuf, macBuf)) return null;
+    const payload = JSON.parse(Buffer.from(parts[1], 'base64url').toString('utf8'));
+    if (!payload.sub || payload.exp < Math.floor(Date.now() / 1000)) return null;
+    return payload;
+  } catch { return null; }
+}
+
 export default async function handler(req, res) {
   const _o=req.headers.origin||'';
   const _devO=!_o||_o.includes('localhost')||_o.includes('127.0.0.1');
@@ -20,12 +40,27 @@ export default async function handler(req, res) {
   const token = (req.headers.authorization || '').replace(/^Bearer\s+/i, '').trim();
   if (!token) return res.status(401).json({ error: 'No auth token' });
 
-  const userRes = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
-    headers: { apikey: SERVICE_KEY, Authorization: `Bearer ${token}` },
-  });
-  if (!userRes.ok) return res.status(401).json({ error: 'Invalid token' });
-  const { id: uid } = await userRes.json();
-  if (!uid) return res.status(401).json({ error: 'Could not identify user' });
+  // IP-level gate — blocks flood attempts before any DB or auth work
+  const { allowed: ipOk } = await rateLimit(req, 'user-sync');
+  if (!ipOk) return res.status(429).json({ error: 'Too many requests — slow down.' });
+
+  let uid;
+  const JWT_SECRET = process.env.SUPABASE_JWT_SECRET;
+  if (JWT_SECRET) {
+    // Fast path: verify locally — no Supabase round-trip, scales to any concurrency
+    const payload = verifyJWTLocal(token, JWT_SECRET);
+    if (!payload) return res.status(401).json({ error: 'Invalid token' });
+    uid = payload.sub;
+  } else {
+    // Fallback: validate via Supabase auth API (slower, one extra network call per request)
+    const userRes = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
+      headers: { apikey: SERVICE_KEY, Authorization: `Bearer ${token}` },
+    });
+    if (!userRes.ok) return res.status(401).json({ error: 'Invalid token' });
+    const { id } = await userRes.json();
+    if (!id) return res.status(401).json({ error: 'Could not identify user' });
+    uid = id;
+  }
 
   // ── All DB calls use service key — bypasses RLS ─────────────────────────────
   const db = (path, opts = {}) => fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
@@ -62,18 +97,29 @@ export default async function handler(req, res) {
     } catch(_) { /* fail open */ }
   }
 
-  // ── LOAD — return all applications + saved jobs for this user ───────────────
+  // ── LOAD — return all applications + saved jobs + recent cos + credits ───────
   if (action === 'load') {
     const appsLimit = Math.min(500, Math.max(1, parseInt(body.apps_limit) || 200));
     const appsOffset = Math.max(0, parseInt(body.apps_offset) || 0);
-    const [appsRes, savedRes] = await Promise.all([
+    const today = new Date().toISOString().split('T')[0];
+    const [appsRes, savedRes, recentRes, credRes] = await Promise.all([
       db(`applications?user_id=eq.${uid}&order=created_at.desc&limit=${appsLimit}&offset=${appsOffset}`, { headers: { Prefer: 'count=estimated' } }),
       db(`saved_jobs?user_id=eq.${uid}&order=saved_at.desc&limit=500`),
+      db(`user_recent_cos?user_id=eq.${uid}&order=viewed_at.desc&limit=6`),
+      db(`ai_credits?user_id=eq.${uid}&limit=1`),
     ]);
-    const apps  = appsRes.ok  ? await appsRes.json()  : [];
-    const saved = savedRes.ok ? await savedRes.json() : [];
+    const apps   = appsRes.ok   ? await appsRes.json()   : [];
+    const saved  = savedRes.ok  ? await savedRes.json()  : [];
+    const recent = recentRes.ok ? await recentRes.json() : [];
+    let cred = credRes.ok ? (await credRes.json())[0] : null;
+    if (cred && cred.last_reset !== today) {
+      const nb = cred.pro ? 999 : 3;
+      db(`ai_credits?user_id=eq.${uid}`, { method: 'PATCH', body: JSON.stringify({ balance: nb, daily_earned: 0, last_reset: today }), headers: { Prefer: 'return=minimal' } });
+      cred = { ...cred, balance: nb, daily_earned: 0, last_reset: today };
+    }
+    const credits = cred ? { balance: cred.balance, pro: cred.pro || false, daily_earned: cred.daily_earned || 0 } : null;
     const appsTotal = parseInt((appsRes.headers?.get('content-range') || '').split('/')[1]) || apps.length;
-    return res.status(200).json({ applications: apps, saved_jobs: saved, apps_total: appsTotal, apps_offset: appsOffset });
+    return res.status(200).json({ applications: apps, saved_jobs: saved, apps_total: appsTotal, apps_offset: appsOffset, recent_cos: recent, credits });
   }
 
   // ── ADD APPLICATION ─────────────────────────────────────────────────────────
