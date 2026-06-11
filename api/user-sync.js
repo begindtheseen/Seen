@@ -44,6 +44,24 @@ export default async function handler(req, res) {
   const { action } = body || {};
   console.log(`[user-sync] action=${action} uid=${uid}`);
 
+  // Rate-limit mutating actions per user (not reads — those are cheap DB fetches)
+  const WRITE_ACTIONS = new Set(['add_application','update_application','remove_application','save_job','unsave_job','save_profile','save_resume','delete_account']);
+  if (WRITE_ACTIONS.has(action)) {
+    const windowHour = Math.floor(Date.now() / 3_600_000);
+    const rlKey = `${uid}:user-sync:${windowHour}`;
+    try {
+      const rlRes = await fetch(`${SUPABASE_URL}/rest/v1/rpc/increment_rate_limit`, {
+        method: 'POST',
+        headers: { apikey: SERVICE_KEY, Authorization: `Bearer ${SERVICE_KEY}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ p_key: rlKey, p_ttl_seconds: 3600 }),
+      });
+      if (rlRes.ok) {
+        const count = await rlRes.json();
+        if (count > 300) return res.status(429).json({ error: 'Too many requests — slow down.' });
+      }
+    } catch(_) { /* fail open */ }
+  }
+
   // ── LOAD — return all applications + saved jobs for this user ───────────────
   if (action === 'load') {
     const appsLimit = Math.min(500, Math.max(1, parseInt(body.apps_limit) || 200));

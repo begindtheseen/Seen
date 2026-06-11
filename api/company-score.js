@@ -255,8 +255,25 @@ Return ONLY this JSON:
   }
 
   if (!apiRes.ok) {
-    const err = await apiRes.text();
-    return res.status(502).json({ error: 'Claude API error', detail: err.slice(0, 150) });
+    const errText = await apiRes.text();
+    // On rate limit or outage, serve stale cache rather than failing hard
+    if ((apiRes.status === 429 || apiRes.status === 529 || apiRes.status >= 500) && SUPABASE_URL && SUPABASE_SERVICE_KEY) {
+      try {
+        const nameEnc = encodeURIComponent(name.toLowerCase().trim());
+        const staleRes = await fetch(
+          `${SUPABASE_URL}/rest/v1/company_scores?company_name=ilike.${nameEnc}&order=created_at.desc&limit=1`,
+          { headers: dbHeaders }
+        );
+        if (staleRes.ok) {
+          const staleRows = await staleRes.json();
+          if (staleRows?.[0]) {
+            console.warn(`COMPANY SCORE STALE FALLBACK: "${name}" — Claude ${apiRes.status}`);
+            return res.json({ ok: true, score: rowToScore(staleRows[0]), _src: 'stale-cache' });
+          }
+        }
+      } catch(_) {}
+    }
+    return res.status(502).json({ error: 'Score service temporarily unavailable', retry_after: '60' });
   }
 
   const data = await apiRes.json();
