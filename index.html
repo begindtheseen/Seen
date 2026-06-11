@@ -8351,8 +8351,11 @@ function go(page){
       if(page==='seeker-dash')renderSeekerDash();
     }
     // Persist last page so we can restore after Safari discards the page (localStorage survives tab discard)
+    // Exclude auth-flow pages (login, reset) and company (already hash-encoded separately)
+    // so they never interfere with post-login redirect or _restoring flag.
     try {
-      if(page!=='landing'&&page!=='home') {
+      const _noSave=['landing','home','login','reset','company','job-detail'];
+      if(!_noSave.includes(page)) {
         sessionStorage.setItem('sp',page);
         localStorage.setItem('seen_last_page', JSON.stringify({page, ts: Date.now()}));
       }
@@ -11229,7 +11232,7 @@ function _handleSharedLink(){
       if (saved.page && saved.ts && (Date.now() - saved.ts) < 2 * 60 * 60 * 1000) sp = saved.page;
     } catch(_e) {}
   }
-  if(sp&&sp!=='company'&&sp!=='landing'){
+  if(sp&&sp!=='company'&&sp!=='landing'&&sp!=='login'&&sp!=='reset'){
     // Never restore auth-required pages for signed-out users
     const _authRequiredPages=['profile','seeker-dash','tracker','resume','report','demand','feed'];
     if(_authRequiredPages.includes(sp)&&!Auth.isLoggedIn()) return;
@@ -11435,7 +11438,7 @@ startHeroRotation(); // sets initial content; cycling started by runHeroIntro af
 if(db){
   Auth.init().then(()=>{
     updateNav();
-    const _lsPage=(()=>{try{const s=JSON.parse(localStorage.getItem('seen_last_page')||'{}');return(s.page&&s.ts&&(Date.now()-s.ts)<7200000)?s.page:null;}catch(e){return null;}})();
+    const _lsPage=(()=>{try{const s=JSON.parse(localStorage.getItem('seen_last_page')||'{}');return(s.page&&s.ts&&(Date.now()-s.ts)<7200000&&s.page!=='login'&&s.page!=='reset')?s.page:null;}catch(e){return null;}})();
     const _knownHashPages=['jobs','feed','demand','resume','tracker','report','companies','faq','legal','pricing','profile','seeker-dash'];
     const _hashPage=window.location.hash.startsWith('#')?window.location.hash.slice(1):'';
     const _restoring=window.location.hash.startsWith('#company/')||_knownHashPages.includes(_hashPage)||!!sessionStorage.getItem('sp')||!!_lsPage;
