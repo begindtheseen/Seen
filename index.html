@@ -1102,6 +1102,7 @@ nav.nav-scrolled{background:rgba(6,6,8,0.82);backdrop-filter:blur(60px) saturate
     <button id="notifBell" onclick="toggleNotifPanel()" style="display:none;background:none;border:none;cursor:pointer;position:relative;padding:.35rem;color:var(--sub);font-size:1rem" title="Notifications">
       🔔<span id="notifBadge" style="display:none;position:absolute;top:0;right:0;background:var(--red);color:#fff;border-radius:50%;width:16px;height:16px;font-family:var(--mono);font-size:.55rem;align-items:center;justify-content:center;font-weight:700"></span>
     </button>
+    <button id="navCreditBadge" onclick="openEarnCreditsModal()" style="display:none;background:var(--blue);color:#fff;border:none;border-radius:20px;padding:.2rem .65rem;font-family:var(--mono);font-size:.6rem;font-weight:700;cursor:pointer;transition:background .15s;line-height:1.5" title="AI credits remaining today">3</button>
     <button class="btn btn-ghost" onclick="go('login')" id="navLoginBtn">Sign in</button>
     <button class="btn btn-solid" onclick="openEmployerPanel()" id="navEmployerBtn">For employers →</button>
   </div>
@@ -2389,6 +2390,7 @@ nav.nav-scrolled{background:rgba(6,6,8,0.82);backdrop-filter:blur(60px) saturate
 <!-- ═══ ADMIN STATS PAGE ═══ -->
 <div class="page" id="page-admin" style="background:radial-gradient(ellipse at 10% 0%,rgba(29,78,216,0.1) 0%,transparent 50%),radial-gradient(ellipse at 90% 10%,rgba(124,58,237,0.07) 0%,transparent 45%)">
   <div class="adm-wrap">
+    <div id="admDashboard">
     <div style="font-family:var(--mono);font-size:.52rem;text-transform:uppercase;letter-spacing:.22em;color:var(--green);margin-bottom:.65rem;display:flex;align-items:center;gap:12px">
       <span style="width:22px;height:1px;background:var(--green);display:inline-block;flex-shrink:0"></span>
       Seen Admin
@@ -2398,7 +2400,10 @@ nav.nav-scrolled{background:rgba(6,6,8,0.82);backdrop-filter:blur(60px) saturate
         <h1 style="font-family:var(--display);font-size:2rem;font-weight:800;color:var(--white);letter-spacing:-.04em;line-height:1.05;margin-bottom:.25rem">Data flywheel</h1>
         <p style="font-size:.8rem;color:var(--sub);font-weight:300" id="admLastUpdated">Loading…</p>
       </div>
-      <button onclick="renderAdminPage()" style="background:none;border:1px solid var(--line2);border-radius:8px;padding:.5rem 1rem;font-family:var(--mono);font-size:.65rem;color:var(--sub);cursor:pointer;transition:all .15s;flex-shrink:0" onmouseover="this.style.borderColor='var(--blue)';this.style.color='var(--white)'" onmouseout="this.style.borderColor='var(--line2)';this.style.color='var(--sub)'">↻ Refresh</button>
+      <div style="display:flex;gap:.5rem;flex-shrink:0">
+        <button onclick="renderAdminPage()" style="background:none;border:1px solid var(--line2);border-radius:8px;padding:.5rem 1rem;font-family:var(--mono);font-size:.65rem;color:var(--sub);cursor:pointer;transition:all .15s" onmouseover="this.style.borderColor='var(--blue)';this.style.color='var(--white)'" onmouseout="this.style.borderColor='var(--line2)';this.style.color='var(--sub)'">↻ Refresh</button>
+        <button onclick="adminLogout()" style="background:none;border:1px solid var(--line2);border-radius:8px;padding:.5rem 1rem;font-family:var(--mono);font-size:.65rem;color:var(--dim);cursor:pointer;transition:all .15s" onmouseover="this.style.borderColor='var(--red)';this.style.color='var(--red)'" onmouseout="this.style.borderColor='var(--line2)';this.style.color='var(--dim)'">Sign out</button>
+      </div>
     </div>
 
     <!-- Row 1: Users + Reports (the two primary growth metrics) -->
@@ -2568,11 +2573,19 @@ CREATE POLICY "no reads" ON search_logs FOR SELECT USING (false);</pre>
       </div>
     </div>
 
-    <!-- Auth / access error -->
-    <div id="admAuthError" style="display:none;text-align:center;padding:3rem 1rem">
-      <div style="font-size:2rem;margin-bottom:1rem">🔒</div>
-      <div style="font-family:var(--display);font-size:1.1rem;font-weight:700;color:var(--white);margin-bottom:.4rem">Access restricted</div>
-      <div style="font-size:.8rem;color:var(--sub)" id="admAuthMsg">This page requires an admin account.</div>
+    </div><!-- /admDashboard -->
+
+    <!-- Admin login form — shown when no valid session token -->
+    <div id="admLoginForm" style="display:none;max-width:360px;margin:3rem auto">
+      <div style="font-size:2rem;margin-bottom:1rem;text-align:center">🔒</div>
+      <div style="font-family:var(--display);font-size:1.25rem;font-weight:800;color:var(--white);margin-bottom:.25rem;text-align:center">Admin login</div>
+      <div style="font-size:.78rem;color:var(--sub);margin-bottom:1.5rem;text-align:center">Separate from your Seen account</div>
+      <div style="display:flex;flex-direction:column;gap:.65rem">
+        <input id="admUsername" type="text" placeholder="Username" autocomplete="username" style="background:var(--raised);border:1px solid var(--line2);border-radius:9px;padding:.7rem 1rem;font-family:var(--mono);font-size:.8rem;color:var(--white);outline:none" onkeydown="if(event.key==='Enter')adminLogin()"/>
+        <input id="admPassword" type="password" placeholder="Password" autocomplete="current-password" style="background:var(--raised);border:1px solid var(--line2);border-radius:9px;padding:.7rem 1rem;font-family:var(--mono);font-size:.8rem;color:var(--white);outline:none" onkeydown="if(event.key==='Enter')adminLogin()"/>
+        <button onclick="adminLogin()" style="background:var(--blue);color:#fff;border:none;border-radius:9px;padding:.75rem;font-family:var(--display);font-size:.88rem;font-weight:700;cursor:pointer;transition:opacity .15s" id="admLoginBtn">Sign in →</button>
+        <div id="admLoginError" style="font-family:var(--mono);font-size:.65rem;color:var(--red);text-align:center;min-height:1em"></div>
+      </div>
     </div>
   </div>
 </div>
@@ -2603,6 +2616,62 @@ const UsageLimits = {
     }
     this.consume(t);
     return true;
+  },
+};
+
+// ── AI CREDIT STORE ──────────────────────────────────────────────────────────
+const CreditStore = {
+  _balance: null,
+  async init() {
+    if (!Auth.isSeeker()) return;
+    const data = await _sync('get_credits');
+    if (data && typeof data.balance === 'number') {
+      this._balance = data.balance;
+      this._updateBadge();
+    }
+  },
+  canUse() { return !Auth.isSeeker() || this._balance === null || this._balance > 0; },
+  async consume(reason) {
+    if (!Auth.isSeeker()) return true;
+    const data = await _sync('consume_credit', { reason });
+    if (!data) return false;
+    if (data.error === 'no_credits') {
+      this._balance = 0;
+      this._updateBadge();
+      openEarnCreditsModal();
+      return false;
+    }
+    if (typeof data.balance === 'number') { this._balance = data.balance; this._updateBadge(); }
+    return true;
+  },
+  _updateBadge() {
+    const badge = document.getElementById('navCreditBadge');
+    if (!badge) return;
+    const b = this._balance;
+    if (b === null) { badge.style.display = 'none'; return; }
+    badge.style.display = 'inline-flex';
+    badge.textContent = b >= 999 ? '∞' : String(b);
+    badge.style.background = b === 0 ? 'var(--red)' : b <= 1 ? 'var(--amber)' : 'var(--blue)';
+    badge.title = b === 0 ? '0 AI credits — click to earn more' : `${b} AI credits remaining today`;
+  },
+};
+
+async function _guardAI(tool) {
+  if (Auth.isSeeker()) return await CreditStore.consume(tool);
+  return UsageLimits.check(tool);
+}
+
+// ── ADMIN SESSION ─────────────────────────────────────────────────────────────
+// Admin auth is completely separate from Supabase auth.
+// Token stored in sessionStorage (cleared when browser tab closes).
+const AdminSession = {
+  _key: 'seen_admin_tok',
+  getToken() { try { return sessionStorage.getItem(this._key) || null; } catch { return null; } },
+  setToken(tok) { try { sessionStorage.setItem(this._key, tok); } catch {} },
+  clear() { try { sessionStorage.removeItem(this._key); } catch {} },
+  headers() {
+    const tok = this.getToken();
+    return tok ? { 'Content-Type': 'application/json', 'X-Admin-Token': tok } : { 'Content-Type': 'application/json' };
   },
 };
 
@@ -4635,7 +4704,7 @@ function _demandOpenCompanies(city, niche) {
 // RESUME AI
 // ═══════════════════════════════════════════════
 async function analyzeResume(){
-  if (!UsageLimits.check('scanner')) return;
+  if (!await _guardAI('scanner')) return;
   // Auto-load stored resume
   let resumeText = document.getElementById('aiResume')?.value?.trim();
   if (!resumeText) {
@@ -6105,30 +6174,75 @@ const LEGAL=[
 // ═══════════════════════════════════════════════
 // RENDER FAQ
 // ═══════════════════════════════════════════════
+function _admShowLogin(msg) {
+  const dash = document.getElementById('admDashboard');
+  const form = document.getElementById('admLoginForm');
+  if (dash) dash.style.display = 'none';
+  if (form) form.style.display = 'block';
+  const errEl = document.getElementById('admLoginError');
+  if (errEl) errEl.textContent = msg || '';
+}
+
+function _admHideLogin() {
+  const dash = document.getElementById('admDashboard');
+  const form = document.getElementById('admLoginForm');
+  if (dash) dash.style.display = '';
+  if (form) form.style.display = 'none';
+}
+
+async function adminLogin() {
+  const username = document.getElementById('admUsername')?.value?.trim();
+  const password = document.getElementById('admPassword')?.value;
+  const btn = document.getElementById('admLoginBtn');
+  const errEl = document.getElementById('admLoginError');
+  if (!username || !password) { if (errEl) errEl.textContent = 'Enter username and password'; return; }
+  if (btn) { btn.textContent = 'Signing in…'; btn.disabled = true; }
+  if (errEl) errEl.textContent = '';
+  try {
+    const res = await fetch('/api/admin-stats', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'admin_login', username, password }),
+    });
+    const d = await res.json();
+    if (!res.ok || !d.token) throw new Error(d.error || 'Login failed');
+    AdminSession.setToken(d.token);
+    if (document.getElementById('admPassword')) document.getElementById('admPassword').value = '';
+    _admHideLogin();
+    renderAdminPage();
+  } catch(e) {
+    if (errEl) errEl.textContent = e.message;
+  } finally {
+    if (btn) { btn.textContent = 'Sign in →'; btn.disabled = false; }
+  }
+}
+
+async function adminLogout() {
+  const tok = AdminSession.getToken();
+  if (tok) {
+    fetch('/api/admin-stats', { method: 'POST', headers: AdminSession.headers(), body: JSON.stringify({ action: 'admin_logout' }) }).catch(() => {});
+    AdminSession.clear();
+  }
+  _admShowLogin('Signed out.');
+}
+
 async function renderAdminPage() {
-  const errEl = document.getElementById('admAuthError');
-  const errMsg = document.getElementById('admAuthMsg');
+  const loginForm = document.getElementById('admLoginForm');
   const setupNote = document.getElementById('admSetupNote');
   const lastUpdated = document.getElementById('admLastUpdated');
 
-  if (errEl) errEl.style.display = 'none';
+  if (!AdminSession.getToken()) { _admShowLogin(); return; }
+  if (loginForm) loginForm.style.display = 'none';
   if (setupNote) setupNote.style.display = 'none';
   if (lastUpdated) lastUpdated.textContent = 'Loading…';
 
   const set = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
 
-  const token = await Auth.token();
-  if (!token) {
-    if (errEl) errEl.style.display = 'block';
-    if (errMsg) errMsg.textContent = 'Sign in to access this page.';
-    return;
-  }
-
   try {
-    const res = await fetch('/api/admin-stats', { headers: { Authorization: `Bearer ${token}` } });
+    const res = await fetch('/api/admin-stats', { headers: AdminSession.headers() });
 
-    if (res.status === 401) { if (errEl) errEl.style.display = 'block'; if (errMsg) errMsg.textContent = 'Session expired — sign in again.'; return; }
-    if (res.status === 403) { if (errEl) errEl.style.display = 'block'; if (errMsg) errMsg.textContent = 'Restricted to Seen admin accounts.'; return; }
+    if (res.status === 401) { AdminSession.clear(); _admShowLogin('Session expired — sign in again.'); return; }
+    if (res.status === 403) { AdminSession.clear(); _admShowLogin('Access denied.'); return; }
     if (!res.ok) throw new Error('API error ' + res.status);
 
     const d = await res.json();
@@ -6242,11 +6356,10 @@ async function adminScanDupes() {
   const btn = document.getElementById('admScanBtn');
   const listEl = document.getElementById('admDupesList');
   if (btn) { btn.disabled = true; btn.textContent = 'Scanning…'; }
-  const token = await Auth.token();
   try {
     const res = await fetch('/api/admin-stats', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      headers: AdminSession.headers(),
       body: JSON.stringify({ action: 'find_duplicates' }),
     });
     const d = await res.json();
@@ -6289,11 +6402,10 @@ async function adminManualMerge() {
   if (!primary || !secondary) { if (statusEl) statusEl.innerHTML = '<span style="color:var(--red)">Both fields required</span>'; return; }
   if (primary.toLowerCase() === secondary.toLowerCase()) { if (statusEl) statusEl.innerHTML = '<span style="color:var(--red)">Cannot merge a company with itself</span>'; return; }
   if (statusEl) statusEl.innerHTML = '<span style="color:var(--dim)">Merging…</span>';
-  const token = await Auth.token();
   try {
     const res = await fetch('/api/admin-stats', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      headers: AdminSession.headers(),
       body: JSON.stringify({ action: 'merge', primary, secondary }),
     });
     const d = await res.json();
@@ -6312,11 +6424,10 @@ async function adminAutoMerge() {
   const statusEl = document.getElementById('admMergeStatus');
   if (btn) { btn.disabled = true; btn.textContent = 'Running…'; }
   if (statusEl) statusEl.innerHTML = '<span style="color:var(--dim)">Scanning and merging…</span>';
-  const token = await Auth.token();
   try {
     const res = await fetch('/api/admin-stats', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      headers: AdminSession.headers(),
       body: JSON.stringify({ action: 'auto_merge' }),
     });
     const d = await res.json();
@@ -6408,13 +6519,10 @@ function adminLoadIssues(issueData) {
   if (!listEl) return;
 
   if (!issueData) {
-    // Called standalone — fetch fresh data
-    Auth.token().then(token => {
-      fetch('/api/admin-stats', { headers: { Authorization: `Bearer ${token}` } })
-        .then(r => r.json())
-        .then(d => adminLoadIssues(d.issues))
-        .catch(e => { listEl.innerHTML = `<div style="padding:.85rem 1rem;font-family:var(--mono);font-size:.62rem;color:var(--red)">Error: ${e.message}</div>`; });
-    });
+    fetch('/api/admin-stats', { headers: AdminSession.headers() })
+      .then(r => r.json())
+      .then(d => adminLoadIssues(d.issues))
+      .catch(e => { listEl.innerHTML = `<div style="padding:.85rem 1rem;font-family:var(--mono);font-size:.62rem;color:var(--red)">Error: ${e.message}</div>`; });
     return;
   }
 
@@ -6465,11 +6573,10 @@ function adminLoadIssues(issueData) {
 
 async function adminActIssue(id, action, btn) {
   if (btn) btn.disabled = true;
-  const token = await Auth.token();
   try {
     const res = await fetch('/api/admin-stats', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      headers: AdminSession.headers(),
       body: JSON.stringify({ action, id }),
     });
     const d = await res.json();
@@ -7540,7 +7647,7 @@ function buildAppCard(app) {
 }
 
 async function loadTrackerIntel(appId, company, role) {
-  if (!UsageLimits.check('hiring_manager')) return;
+  if (!await _guardAI('hiring_manager')) return;
   const btn = document.getElementById('intelBtn_' + appId);
   const content = document.getElementById('intelContent_' + appId);
   if (!content) return;
@@ -8082,6 +8189,7 @@ function updateNav(){
     if(bell)bell.style.display='block';
     if(backBtn)backBtn.style.display='none'; // hidden by default, shown by go()
     updateNotifBadge();
+    CreditStore.init();
   } else if(Auth.isEmployer()){
     if(pills)pills.style.display='none';
     if(loginBtn){loginBtn.style.display='inline-flex';loginBtn.textContent='My dashboard';loginBtn.onclick=goToEmployerDashboard;}
@@ -11719,6 +11827,7 @@ async function handleResumePageUpload(file) {
     const data = await res.json();
     if (!res.ok || data.error) throw new Error(data.error || 'Parse failed');
     await ResumeStore.save(data.text, data.fileName, data.wordCount);
+    if (data.employment?.length) _sync('save_employment', { employment: data.employment }).catch(() => {});
     const ta = document.getElementById('aiResume');
     const status = document.getElementById('resumeAIStatus');
     if (ta) ta.style.display = 'none';
@@ -11749,6 +11858,7 @@ async function handleDashResumeUpload(file) {
     if (!res.ok || data.error) throw new Error(data.error || 'Parse failed');
 
     await ResumeStore.save(data.text, data.fileName, data.wordCount);
+    if (data.employment?.length) _sync('save_employment', { employment: data.employment }).catch(() => {});
     showResumeUploaded(data.fileName, data.wordCount);
     showToast('Resume saved! It\'ll be used automatically everywhere on Seen.');
 
@@ -11834,7 +11944,7 @@ async function runAdvantageCoach() {
   const jd=document.getElementById('coachJD')?.value?.trim();
   const background=document.getElementById('coachBackground')?.value?.trim();
   if(!job||!company||!jd){showToast('Fill in job title, company, and job description.');return;}
-  if (!UsageLimits.check('coach')) return;
+  if (!await _guardAI('coach')) return;
   const btn=document.getElementById('coachBtn');
   const out=document.getElementById('coachOut');
   if(btn){btn.textContent='Building playbook...';btn.disabled=true;}
@@ -11872,7 +11982,7 @@ async function generateProposal() {
   const jd=document.getElementById('propJD')?.value?.trim();
   const background=document.getElementById('propBackground')?.value?.trim();
   if(!job||!company||!jd){showToast('Fill in job title, company, and job description.');return;}
-  if (!UsageLimits.check('proposal')) return;
+  if (!await _guardAI('proposal')) return;
   const btn=document.getElementById('propBtn');
   const out=document.getElementById('propOut');
   if(btn){btn.textContent='Generating...';btn.disabled=true;}
@@ -12378,6 +12488,95 @@ if(db){
     }
   }, { passive: true });
 })();
+
+// ── EARN CREDITS MODAL ────────────────────────────────────────────────────────
+function openEarnCreditsModal() {
+  const modal = document.getElementById('earnCreditsModal');
+  if (!modal) return;
+  modal.style.display = 'flex';
+  document.body.style.overflow = 'hidden';
+  const bal = document.getElementById('earnCreditBalance');
+  if (bal) {
+    const b = CreditStore._balance;
+    if (b !== null) bal.textContent = b >= 999 ? 'You have unlimited credits (Pro)' : `You have ${b} credit${b === 1 ? '' : 's'} remaining today`;
+    else bal.textContent = '';
+  }
+  const qEl = document.getElementById('earnCreditQuestion');
+  const mEl = document.getElementById('earnCreditMethods');
+  if (qEl) qEl.style.display = 'none';
+  if (mEl) mEl.style.display = 'block';
+}
+
+function closeEarnCreditsModal() {
+  const modal = document.getElementById('earnCreditsModal');
+  if (modal) { modal.style.display = 'none'; document.body.style.overflow = ''; }
+}
+
+async function loadEarnQuestion() {
+  const qEl = document.getElementById('earnCreditQuestion');
+  const mEl = document.getElementById('earnCreditMethods');
+  if (!qEl || !mEl) return;
+  qEl.style.display = 'block';
+  mEl.style.display = 'none';
+  qEl.innerHTML = '<div style="text-align:center;padding:1.5rem"><div class="spinner" style="width:18px;height:18px;margin:0 auto"></div></div>';
+  const data = await _sync('get_question');
+  if (!data || data.error || !data.key) {
+    qEl.innerHTML = '<div style="font-family:var(--mono);font-size:.72rem;color:var(--muted);text-align:center;padding:1rem">No questions available right now.</div><button onclick="document.getElementById(\'earnCreditQuestion\').style.display=\'none\';document.getElementById(\'earnCreditMethods\').style.display=\'block\'" style="display:block;margin:.75rem auto 0;background:none;border:none;font-family:var(--mono);font-size:.6rem;color:var(--muted);cursor:pointer">← Back</button>';
+    return;
+  }
+  const opts = (data.options || []).map(opt => `<button onclick="submitEarnAnswer(${JSON.stringify(data.key)},${JSON.stringify(opt)})" style="background:var(--raised);border:1px solid var(--line2);border-radius:10px;padding:.65rem .85rem;text-align:left;font-size:.78rem;color:var(--sub);cursor:pointer;transition:all .15s;font-family:var(--body);width:100%" onmouseover="this.style.borderColor='var(--blue)';this.style.color='var(--white)'" onmouseout="this.style.borderColor='var(--line2)';this.style.color='var(--sub)'">${opt}</button>`).join('');
+  qEl.innerHTML = `<div style="margin-bottom:1rem"><div style="font-family:var(--mono);font-size:.5rem;text-transform:uppercase;letter-spacing:.15em;color:var(--muted);margin-bottom:.5rem">${data.company || 'General'} · +${data.credit_value||1} credit</div><div style="font-size:.88rem;color:var(--white);font-weight:600;line-height:1.5;margin-bottom:1rem">${data.text}</div><div style="display:flex;flex-direction:column;gap:.45rem">${opts}</div></div><button onclick="document.getElementById('earnCreditQuestion').style.display='none';document.getElementById('earnCreditMethods').style.display='block'" style="background:none;border:none;font-family:var(--mono);font-size:.6rem;color:var(--muted);cursor:pointer">← Back</button>`;
+}
+
+async function submitEarnAnswer(questionKey, answer) {
+  const qEl = document.getElementById('earnCreditQuestion');
+  if (qEl) qEl.innerHTML = '<div style="text-align:center;padding:1.5rem"><div class="spinner" style="width:18px;height:18px;margin:0 auto"></div></div>';
+  const data = await _sync('submit_answer', { question_key: questionKey, answer });
+  if (data?.ok) {
+    CreditStore._balance = data.balance;
+    CreditStore._updateBadge();
+    if (qEl) qEl.innerHTML = `<div style="text-align:center;padding:1.5rem"><div style="font-size:2rem;margin-bottom:.75rem">✓</div><div style="font-family:var(--display);font-size:1rem;font-weight:700;color:var(--green);margin-bottom:.35rem">+1 credit earned!</div><div style="font-family:var(--mono);font-size:.62rem;color:var(--muted)">${data.balance >= 999 ? 'Unlimited (Pro)' : data.balance + ' credits'} · Earned today: ${data.earned_today}/5</div><div style="margin-top:1rem;display:flex;gap:.65rem;justify-content:center"><button onclick="loadEarnQuestion()" style="background:var(--blue);color:#fff;border:none;border-radius:8px;padding:.5rem 1rem;font-family:var(--mono);font-size:.65rem;cursor:pointer;font-weight:600">Answer another</button><button onclick="closeEarnCreditsModal()" style="background:none;border:1px solid var(--line2);color:var(--sub);border-radius:8px;padding:.5rem 1rem;font-family:var(--mono);font-size:.65rem;cursor:pointer">Done</button></div></div>`;
+  } else {
+    if (qEl) qEl.innerHTML = `<div style="font-family:var(--mono);font-size:.72rem;color:var(--amber);text-align:center;padding:1rem">Already answered, or daily earn cap reached (5/day).</div><button onclick="document.getElementById('earnCreditQuestion').style.display='none';document.getElementById('earnCreditMethods').style.display='block'" style="display:block;margin:.5rem auto 0;background:none;border:none;font-family:var(--mono);font-size:.6rem;color:var(--muted);cursor:pointer">← Back</button>`;
+  }
+}
 </script>
+
+<!-- ── EARN CREDITS MODAL ──────────────────────────────────────────────────── -->
+<div id="earnCreditsModal" style="display:none;position:fixed;inset:0;z-index:10000;background:rgba(0,0,0,.75);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);align-items:center;justify-content:center" onclick="if(event.target===this)closeEarnCreditsModal()">
+  <div style="background:var(--surface);border:1px solid var(--line2);border-radius:18px;padding:1.5rem;width:min(440px,92vw);max-height:88vh;overflow-y:auto;position:relative">
+    <button onclick="closeEarnCreditsModal()" style="position:absolute;top:1rem;right:1rem;background:none;border:none;color:var(--dim);cursor:pointer;font-size:1.1rem;line-height:1">✕</button>
+    <div style="font-family:var(--mono);font-size:.5rem;text-transform:uppercase;letter-spacing:.2em;color:var(--blue);margin-bottom:.65rem">AI Credits</div>
+    <h2 style="font-family:var(--display);font-size:1.35rem;font-weight:800;color:var(--white);margin-bottom:.25rem">Earn more credits</h2>
+    <p style="font-size:.78rem;color:var(--sub);margin-bottom:1.25rem">Each credit powers one AI analysis. Earn by contributing data that helps every job seeker.</p>
+    <div id="earnCreditQuestion" style="display:none"></div>
+    <div id="earnCreditMethods">
+      <div style="display:flex;flex-direction:column;gap:.65rem">
+        <div onclick="loadEarnQuestion()" style="background:var(--raised);border:1px solid var(--line2);border-radius:12px;padding:1rem;cursor:pointer;transition:border-color .15s" onmouseover="this.style.borderColor='var(--blue)'" onmouseout="this.style.borderColor='var(--line2)'">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.3rem">
+            <div style="font-family:var(--display);font-size:.82rem;font-weight:700;color:var(--white)">Answer a question</div>
+            <div style="font-family:var(--mono);font-size:.6rem;font-weight:700;color:var(--green)">+1 credit</div>
+          </div>
+          <div style="font-size:.73rem;color:var(--sub)">Share what you know about a company's hiring process — takes 10 seconds.</div>
+        </div>
+        <div onclick="go('tracker');closeEarnCreditsModal()" style="background:var(--raised);border:1px solid var(--line2);border-radius:12px;padding:1rem;cursor:pointer;transition:border-color .15s" onmouseover="this.style.borderColor='var(--blue)'" onmouseout="this.style.borderColor='var(--line2)'">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.3rem">
+            <div style="font-family:var(--display);font-size:.82rem;font-weight:700;color:var(--white)">Submit an outcome</div>
+            <div style="font-family:var(--mono);font-size:.6rem;font-weight:700;color:var(--green)">+1 credit</div>
+          </div>
+          <div style="font-size:.73rem;color:var(--sub)">Mark an application as Hired, Rejected, or Ghosted in your tracker.</div>
+        </div>
+        <div onclick="go('pricing');closeEarnCreditsModal()" style="background:var(--gdim);border:1px solid var(--gmid);border-radius:12px;padding:1rem;cursor:pointer;transition:border-color .15s" onmouseover="this.style.borderColor='var(--green)'" onmouseout="this.style.borderColor='var(--gmid)'">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.3rem">
+            <div style="font-family:var(--display);font-size:.82rem;font-weight:700;color:var(--white)">Go Pro</div>
+            <div style="font-family:var(--mono);font-size:.6rem;font-weight:700;color:var(--green)">Unlimited</div>
+          </div>
+          <div style="font-size:.73rem;color:var(--sub)">Unlimited AI credits, priority analysis, and ghost risk alerts.</div>
+        </div>
+      </div>
+    </div>
+    <div id="earnCreditBalance" style="margin-top:1rem;font-family:var(--mono);font-size:.62rem;color:var(--muted);text-align:center"></div>
+  </div>
+</div>
 </body>
 </html>

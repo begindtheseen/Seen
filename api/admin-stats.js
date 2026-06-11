@@ -1,445 +1,239 @@
-export default async function handler(req, res) {
-  const origin = req.headers.origin || '';
-  const allowed = !origin || origin.includes('localhost') || origin.includes('127.0.0.1') ||
-    ['https://seenjobs.io', 'https://www.seenjobs.io'].includes(origin);
-  res.setHeader('Access-Control-Allow-Origin', allowed ? (origin || '*') : 'https://seenjobs.io');
+// Internal Admin API — username/password auth + all platform operations.
+// ALL endpoints except admin_login require X-Admin-Token session header.
+// Passwords hashed with scrypt (Node built-in). No plaintext credentials stored.
+
+import { randomBytes, scryptSync, timingSafeEqual } from 'crypto';
+
+const ALLOWED = ['https://seenjobs.io', 'https://www.seenjobs.io'];
+
+function cors(req, res) {
+  const o = req.headers.origin || '';
+  const ok = !o || o.includes('localhost') || o.includes('127.0.0.1') || ALLOWED.includes(o);
+  res.setHeader('Access-Control-Allow-Origin', ok ? (o || '*') : ALLOWED[0]);
   res.setHeader('Vary', 'Origin');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, X-Admin-Token');
+}
+
+function hashPw(password, salt) {
+  return scryptSync(password, salt, 64).toString('hex');
+}
+function verifyPw(password, salt, hash) {
+  try {
+    const derived = scryptSync(password, salt, 64).toString('hex');
+    return timingSafeEqual(Buffer.from(derived, 'hex'), Buffer.from(hash, 'hex'));
+  } catch { return false; }
+}
+
+export default async function handler(req, res) {
+  cors(req, res);
   if (req.method === 'OPTIONS') return res.status(200).end();
   if (req.method !== 'GET' && req.method !== 'POST') return res.status(405).end();
 
-  const SUPABASE_URL = process.env.SUPABASE_URL;
-  const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY;
-  const ADMIN_EMAIL = process.env.ADMIN_EMAIL;
+  const SB = process.env.SUPABASE_URL;
+  const SK = process.env.SUPABASE_SERVICE_KEY;
+  if (!SB || !SK) return res.status(500).json({ error: 'Not configured' });
 
-  if (!SUPABASE_URL || !SUPABASE_SERVICE_KEY) {
-    return res.status(500).json({ error: 'Not configured' });
-  }
-
-  // Verify JWT and check admin email
-  const token = (req.headers.authorization || '').replace(/^Bearer /i, '');
-  if (!token) return res.status(401).json({ error: 'No token' });
-
-  try {
-    const userRes = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
-      headers: { apikey: SUPABASE_SERVICE_KEY, Authorization: `Bearer ${token}` },
-    });
-    if (!userRes.ok) return res.status(401).json({ error: 'Invalid token' });
-    const user = await userRes.json();
-    if (ADMIN_EMAIL && user.email !== ADMIN_EMAIL) {
-      return res.status(403).json({ error: 'Forbidden' });
-    }
-  } catch (e) {
-    return res.status(401).json({ error: 'Auth failed' });
-  }
-
-  const svc = {
-    apikey: SUPABASE_SERVICE_KEY,
-    Authorization: `Bearer ${SUPABASE_SERVICE_KEY}`,
-  };
-
-  // ── POST: company merge / dedup actions ────────────────────────────────────
-  if (req.method === 'POST') {
-    let body;
-    try { body = await req.json(); } catch { return res.status(400).json({ error: 'Bad JSON' }); }
-
-    const dbH = { ...svc, 'Content-Type': 'application/json', Prefer: 'return=minimal' };
-    const SFXRE = /[\s,]+(inc\.?|llc\.?|corp\.?|ltd\.?|co\.|plc\.?|group|holdings|enterprises|solutions|technologies)\.?$/i;
-    const norm = n => n ? n.toLowerCase().trim().replace(SFXRE, '').trim() : '';
-
-    if (body.action === 'find_duplicates') {
-      const r = await fetch(
-        `${SUPABASE_URL}/rest/v1/company_scores?select=company_name,report_count,overall_score&limit=2000`,
-        { headers: svc }
-      );
-      if (!r.ok) return res.status(502).json({ error: 'DB error' });
-      const scores = await r.json();
-      const groups = {};
-      for (const s of scores) {
-        const key = norm(s.company_name);
-        if (!groups[key]) groups[key] = [];
-        groups[key].push(s);
-      }
-      const duplicates = Object.entries(groups)
-        .filter(([, g]) => g.length > 1)
-        .map(([key, companies]) => ({
-          key,
-          companies: companies.sort((a, b) => (b.report_count || 0) - (a.report_count || 0)),
-        }))
-        .sort((a, b) => {
-          const ta = a.companies.reduce((s, c) => s + (c.report_count || 0), 0);
-          const tb = b.companies.reduce((s, c) => s + (c.report_count || 0), 0);
-          return tb - ta;
-        });
-      return res.status(200).json({ ok: true, duplicates });
-    }
-
-    if (body.action === 'merge') {
-      const { primary, secondary } = body;
-      if (!primary || !secondary) return res.status(400).json({ error: 'primary and secondary required' });
-      if (primary === secondary) return res.status(400).json({ error: 'Cannot merge a company with itself' });
-
-      const enc = s => encodeURIComponent(s);
-      const [pRes, sRes] = await Promise.all([
-        fetch(`${SUPABASE_URL}/rest/v1/company_scores?company_name=eq.${enc(primary)}&select=*&limit=1`, { headers: svc }),
-        fetch(`${SUPABASE_URL}/rest/v1/company_scores?company_name=eq.${enc(secondary)}&select=*&limit=1`, { headers: svc }),
-      ]);
-      const [pRows, sRows] = await Promise.all([pRes.json(), sRes.json()]);
-      const pRow = pRows[0], sRow = sRows[0];
-      if (!pRow) return res.status(404).json({ error: `Primary company not found: "${primary}"` });
-      if (!sRow) return res.status(404).json({ error: `Secondary company not found: "${secondary}"` });
-
-      const pC = pRow.report_count || 0;
-      const sC = sRow.report_count || 0;
-      const total = pC + sC;
-      const wa = (a, b) => total > 0 ? ((a || 0) * (pC || 1) + (b || 0) * (sC || 1)) / (pC + sC || 1) : a || 0;
-
-      await Promise.all([
-        // Update primary with merged weighted-average stats
-        fetch(`${SUPABASE_URL}/rest/v1/company_scores?company_name=eq.${enc(primary)}`, {
-          method: 'PATCH', headers: dbH,
-          body: JSON.stringify({
-            report_count: total,
-            overall_score: Math.round(wa(pRow.overall_score, sRow.overall_score)),
-            ghost_rate:    parseFloat(wa(pRow.ghost_rate, sRow.ghost_rate).toFixed(3)),
-            response_rate: parseFloat(wa(pRow.response_rate, sRow.response_rate).toFixed(3)),
-            avg_wait_days: (pRow.avg_wait_days != null || sRow.avg_wait_days != null)
-              ? Math.round(wa(pRow.avg_wait_days || 0, sRow.avg_wait_days || 0)) : null,
-            data_quality: Math.max(pRow.data_quality || 0, sRow.data_quality || 0),
-          }),
-        }),
-        // Redirect all reports from secondary → primary
-        fetch(`${SUPABASE_URL}/rest/v1/reports?company_name=eq.${enc(secondary)}`, {
-          method: 'PATCH', headers: dbH,
-          body: JSON.stringify({ company_name: primary }),
-        }),
-        // Register secondary as an alias of primary
-        fetch(`${SUPABASE_URL}/rest/v1/company_aliases`, {
-          method: 'POST',
-          headers: { ...dbH, Prefer: 'resolution=ignore-duplicates,return=minimal' },
-          body: JSON.stringify({ canonical: primary, alias: secondary.toLowerCase(), source: 'admin_merge' }),
-        }),
-      ]);
-
-      // Delete secondary score row last
-      await fetch(`${SUPABASE_URL}/rest/v1/company_scores?company_name=eq.${enc(secondary)}`, {
-        method: 'DELETE', headers: dbH,
-      });
-
-      return res.status(200).json({ ok: true, primary, secondary, merged_report_count: total });
-    }
-
-    if (body.action === 'auto_merge') {
-      const r = await fetch(
-        `${SUPABASE_URL}/rest/v1/company_scores?select=company_name,report_count,overall_score,ghost_rate,response_rate,avg_wait_days,data_quality&limit=2000`,
-        { headers: svc }
-      );
-      if (!r.ok) return res.status(502).json({ error: 'DB error' });
-      const scores = await r.json();
-
-      const groups = {};
-      for (const s of scores) {
-        const key = norm(s.company_name);
-        if (!groups[key]) groups[key] = [];
-        groups[key].push(s);
-      }
-
-      let mergedCount = 0;
-      const mergedGroups = [];
-      const enc = s => encodeURIComponent(s);
-      const dbH2 = { ...svc, 'Content-Type': 'application/json', Prefer: 'return=minimal' };
-
-      for (const [, group] of Object.entries(groups)) {
-        if (group.length <= 1) continue;
-        group.sort((a, b) => (b.report_count || 0) - (a.report_count || 0));
-        const primary = group[0];
-        const dupes = group.slice(1);
-        const totalCount = group.reduce((s, c) => s + (c.report_count || 0), 0);
-
-        for (const dup of dupes) {
-          await fetch(`${SUPABASE_URL}/rest/v1/reports?company_name=eq.${enc(dup.company_name)}`, {
-            method: 'PATCH', headers: dbH2, body: JSON.stringify({ company_name: primary.company_name }),
-          });
-          await fetch(`${SUPABASE_URL}/rest/v1/company_aliases`, {
-            method: 'POST',
-            headers: { ...dbH2, Prefer: 'resolution=ignore-duplicates,return=minimal' },
-            body: JSON.stringify({ canonical: primary.company_name, alias: dup.company_name.toLowerCase(), source: 'auto_merge' }),
-          });
-          await fetch(`${SUPABASE_URL}/rest/v1/company_scores?company_name=eq.${enc(dup.company_name)}`, {
-            method: 'DELETE', headers: dbH2,
-          });
-          mergedCount++;
-        }
-
-        if (totalCount !== (primary.report_count || 0)) {
-          await fetch(`${SUPABASE_URL}/rest/v1/company_scores?company_name=eq.${enc(primary.company_name)}`, {
-            method: 'PATCH', headers: dbH2, body: JSON.stringify({ report_count: totalCount }),
-          });
-        }
-
-        mergedGroups.push({ canonical: primary.company_name, absorbed: dupes.map(d => d.company_name) });
-      }
-
-      return res.status(200).json({ ok: true, merged: mergedCount, groups: mergedGroups });
-    }
-
-    if (body.action === 'resolve_issue' || body.action === 'dismiss_issue') {
-      const { id, resolver_note } = body;
-      if (!id) return res.status(400).json({ error: 'id required' });
-      const newStatus = body.action === 'resolve_issue' ? 'resolved' : 'dismissed';
-      const r = await fetch(
-        `${SUPABASE_URL}/rest/v1/user_issues?id=eq.${parseInt(id, 10)}`,
-        {
-          method: 'PATCH', headers: dbH,
-          body: JSON.stringify({ status: newStatus, resolved_at: new Date().toISOString(), resolver_note: resolver_note || null }),
-        }
-      );
-      if (!r.ok) return res.status(502).json({ error: 'DB error updating issue' });
-      return res.status(200).json({ ok: true, id, status: newStatus });
-    }
-
-    return res.status(400).json({ error: 'Unknown action' });
-  }
-
-  const now = new Date().toISOString();
-  const oneDayAgo  = new Date(Date.now() - 86400000).toISOString();
-  const sevenDaysAgo = new Date(Date.now() - 7 * 86400000).toISOString();
-  const thirtyDaysAgo = new Date(Date.now() - 30 * 86400000).toISOString();
-
-  // Count rows from a table with optional filter. Returns integer. Never throws.
-  const count = async (table, filter = '') => {
-    try {
-      const url = `${SUPABASE_URL}/rest/v1/${table}?select=id${filter ? '&' + filter : ''}`;
-      const r = await fetch(url, { headers: { ...svc, Prefer: 'count=exact', Range: '0-0' } });
-      if (!r.ok) return 0;
-      return parseInt(r.headers?.get('Content-Range')?.split('/')?.[1] ?? '0') || 0;
-    } catch { return 0; }
-  };
-
-  // Fetch JSON rows. Returns array. Never throws.
-  const rows = async (table, filter = '', select = '*', limit = 1000) => {
-    try {
-      const url = `${SUPABASE_URL}/rest/v1/${table}?select=${select}&limit=${limit}${filter ? '&' + filter : ''}`;
-      const r = await fetch(url, { headers: svc });
-      return r.ok ? (await r.json() || []) : [];
-    } catch { return []; }
-  };
-
-  // Check whether optional tables exist (probe with limit=0)
-  const [searchLogsReady, errorsReady, issuesReady] = await Promise.all([
-    fetch(`${SUPABASE_URL}/rest/v1/search_logs?limit=0&select=id`, { headers: svc }).then(r => r.ok).catch(() => false),
-    fetch(`${SUPABASE_URL}/rest/v1/api_errors?limit=0&select=id`, { headers: svc }).then(r => r.ok).catch(() => false),
-    fetch(`${SUPABASE_URL}/rest/v1/user_issues?limit=0&select=id`, { headers: svc }).then(r => r.ok).catch(() => false),
-  ]);
-
-  // Run all queries in parallel
-  const [
-    totalUsers,
-    newUsersToday,
-    newUsersWeek,
-
-    totalReports,
-    reportsToday,
-    reportsWeek,
-    recentReports,        // for daily chart + top companies
-
-    totalApplications,
-    recentApplications,   // for ghost rate + stage breakdown
-
-    companiesWithScores,
-
-    companySearchesToday, // from search_logs where source='company'
-    companySearchesWeek,
-    companySearchRows,    // for top searched companies
-
-    jobSearchesToday,
-    jobSearchesWeek,
-    jobSearchRows,
-
-    activeRateLimitKeys,
-
-    errorRowsToday,
-    errorRowsWeek,
-  ] = await Promise.all([
-    // ── Users ──────────────────────────────────────────────────────────────
-    count('profiles'),
-    count('profiles', `created_at=gt.${oneDayAgo}`),
-    count('profiles', `created_at=gt.${sevenDaysAgo}`),
-
-    // ── Community reports ───────────────────────────────────────────────────
-    count('reports'),
-    count('reports', `created_at=gt.${oneDayAgo}`),
-    count('reports', `created_at=gt.${sevenDaysAgo}`),
-    rows('reports', `created_at=gt.${thirtyDaysAgo}`, 'company_name,outcome,created_at', 5000),
-
-    // ── Application tracking ────────────────────────────────────────────────
-    count('applications'),
-    rows('applications', `created_at=gt.${thirtyDaysAgo}`, 'company_name,stage,status,created_at', 5000),
-
-    // ── Company data coverage ────────────────────────────────────────────────
-    count('company_scores'),
-
-    // ── Company lookups (search_logs source='company') ───────────────────────
-    searchLogsReady ? count('search_logs', `source=eq.company&created_at=gt.${oneDayAgo}`) : Promise.resolve(null),
-    searchLogsReady ? count('search_logs', `source=eq.company&created_at=gt.${sevenDaysAgo}`) : Promise.resolve(null),
-    searchLogsReady ? rows('search_logs', `source=eq.company&created_at=gt.${sevenDaysAgo}`, 'query,created_at', 5000) : Promise.resolve([]),
-
-    // ── Job searches (search_logs source='api') ──────────────────────────────
-    searchLogsReady ? count('search_logs', `source=eq.api&created_at=gt.${oneDayAgo}`) : Promise.resolve(null),
-    searchLogsReady ? count('search_logs', `source=eq.api&created_at=gt.${sevenDaysAgo}`) : Promise.resolve(null),
-    searchLogsReady ? rows('search_logs', `source=eq.api&created_at=gt.${sevenDaysAgo}`, 'query,result_count,created_at', 2000) : Promise.resolve([]),
-
-    // ── Rate limit hits ──────────────────────────────────────────────────────
-    count('rate_limits', `expires_at=gt.${now}`),
-
-    // ── API errors ───────────────────────────────────────────────────────────
-    errorsReady ? rows('api_errors', `created_at=gt.${oneDayAgo}`, 'endpoint,error_msg,created_at', 500) : Promise.resolve([]),
-    errorsReady ? rows('api_errors', `created_at=gt.${sevenDaysAgo}`, 'endpoint,created_at', 2000) : Promise.resolve([]),
-  ]);
-
-  // ── User issues queue ────────────────────────────────────────────────────────
-  const [openIssueCount, openIssues] = issuesReady
-    ? await Promise.all([
-        count('user_issues', 'status=eq.open'),
-        rows('user_issues', 'status=eq.open&order=created_at.desc', 'id,type,target_type,target_name,notes,created_at', 100),
-      ])
-    : [0, []];
-
-  // ── Reports: daily chart (last 30 days) ─────────────────────────────────
-  const reportsByDay = {};
-  for (const r of recentReports) {
-    const day = (r.created_at || '').slice(0, 10);
-    if (day) reportsByDay[day] = (reportsByDay[day] || 0) + 1;
-  }
-  const reportChart = Object.entries(reportsByDay)
-    .sort(([a], [b]) => a.localeCompare(b))
-    .slice(-30)
-    .map(([date, count]) => ({ date, count }));
-
-  // ── Reports: top companies by report count ───────────────────────────────
-  const reportCoCounts = {};
-  for (const r of recentReports) {
-    const co = (r.company_name || '').trim();
-    if (co) reportCoCounts[co] = (reportCoCounts[co] || 0) + 1;
-  }
-  const topReportedCompanies = Object.entries(reportCoCounts)
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 15)
-    .map(([company, count]) => ({ company, count }));
-
-  // ── Reports: outcome breakdown ───────────────────────────────────────────
-  const outcomes = { ghosted: 0, rejected: 0, offer: 0, interview: 0, waiting: 0 };
-  for (const r of recentReports) {
-    const o = (r.outcome || '').toLowerCase();
-    if (o === 'ghosted' || r.ghost_stage) outcomes.ghosted++;
-    else if (outcomes[o] !== undefined) outcomes[o]++;
-  }
-
-  // ── Applications: ghost rate ─────────────────────────────────────────────
-  let ghostedApps = 0, hiredApps = 0;
-  for (const a of recentApplications) {
-    const s = (a.status || a.stage || '').toLowerCase();
-    if (s.includes('ghost') || s.includes('no response')) ghostedApps++;
-    if (s.includes('hired') || s.includes('offer') || s.includes('accepted')) hiredApps++;
-  }
-  const ghostRate = recentApplications.length > 0
-    ? Math.round((ghostedApps / recentApplications.length) * 100)
-    : null;
-
-  // ── Company searches: top companies being researched ─────────────────────
-  const coSearchCounts = {};
-  for (const r of companySearchRows) {
-    const q = (r.query || '').trim();
-    if (q) coSearchCounts[q] = (coSearchCounts[q] || 0) + 1;
-  }
-  const topSearchedCompanies = Object.entries(coSearchCounts)
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 15)
-    .map(([company, count]) => ({ company, count }));
-
-  // ── Job searches: top queries, zero-result searches ──────────────────────
-  const jobQueryCounts = {};
-  let zeroResultSearches = 0;
-  for (const r of jobSearchRows) {
-    const q = (r.query || '').trim();
-    if (!q) continue;
-    jobQueryCounts[q] = (jobQueryCounts[q] || 0) + 1;
-    if ((r.result_count || 0) === 0) zeroResultSearches++;
-  }
-  const topJobQueries = Object.entries(jobQueryCounts)
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 15)
-    .map(([query, count]) => ({ query, count }));
-
-  return res.status(200).json({
-    ok: true,
-    generated_at: now,
-
-    users: {
-      total: totalUsers,
-      new_today: newUsersToday,
-      new_this_week: newUsersWeek,
-    },
-
-    reports: {
-      total: totalReports,
-      today: reportsToday,
-      this_week: reportsWeek,
-      chart: reportChart.length ? reportChart : null,
-      top_companies: topReportedCompanies,
-      outcome_breakdown: outcomes,
-    },
-
-    applications: {
-      total: totalApplications,
-      ghost_rate_pct: ghostRate,
-      ghosted_30d: ghostedApps,
-      hired_30d: hiredApps,
-    },
-
-    companies: {
-      with_scores: companiesWithScores,
-    },
-
-    company_lookups: {
-      ready: searchLogsReady,
-      today: companySearchesToday,
-      this_week: companySearchesWeek,
-      top: topSearchedCompanies.length ? topSearchedCompanies : null,
-    },
-
-    job_searches: {
-      ready: searchLogsReady,
-      today: jobSearchesToday,
-      this_week: jobSearchesWeek,
-      zero_result_7d: zeroResultSearches,
-      top_queries: topJobQueries.length ? topJobQueries : null,
-    },
-
-    rate_limits: {
-      active_keys: activeRateLimitKeys,
-    },
-
-    api_errors: (() => {
-      if (!errorsReady) return { ready: false };
-      const byEndpoint = {};
-      for (const e of errorRowsWeek) {
-        byEndpoint[e.endpoint] = (byEndpoint[e.endpoint] || 0) + 1;
-      }
-      return {
-        ready: true,
-        today: errorRowsToday.length,
-        this_week: errorRowsWeek.length,
-        by_endpoint: Object.entries(byEndpoint).sort((a,b)=>b[1]-a[1]).map(([endpoint,count])=>({endpoint,count})),
-        recent: errorRowsToday.slice(0, 20).map(e => ({ endpoint: e.endpoint, msg: e.error_msg, at: e.created_at })),
-      };
-    })(),
-
-    issues: {
-      ready: issuesReady,
-      open: openIssueCount,
-      items: openIssues,
+  const db = (path, opts = {}) => fetch(`${SB}/rest/v1/${path}`, {
+    ...opts,
+    headers: {
+      apikey: SK, Authorization: `Bearer ${SK}`,
+      'Content-Type': 'application/json',
+      Prefer: 'return=representation',
+      ...(opts.headers || {}),
     },
   });
+
+  let body = req.body;
+  if (typeof body === 'string') { try { body = JSON.parse(body); } catch { body = {}; } }
+  body = body || {};
+
+  // ── ADMIN LOGIN (unauthenticated) ────────────────────────────────────────────
+  if (req.method === 'POST' && body.action === 'admin_login') {
+    const { username, password } = body;
+    if (!username || !password) return res.status(400).json({ error: 'Username and password required' });
+    const ip = (req.headers['x-forwarded-for'] || '').split(',')[0].trim() || '';
+
+    // Bootstrap: if no admin accounts exist, create one from env vars
+    const listRes = await db('admin_accounts?select=id&limit=1');
+    const list = listRes.ok ? await listRes.json() : [];
+    if (!list.length) {
+      const EU = process.env.ADMIN_USERNAME, EP = process.env.ADMIN_PASSWORD;
+      if (!EU || !EP) return res.status(503).json({ error: 'No admin accounts. Set ADMIN_USERNAME and ADMIN_PASSWORD env vars.' });
+      if (username !== EU || password !== EP) return res.status(401).json({ error: 'Invalid credentials' });
+      const salt = randomBytes(16).toString('hex');
+      await db('admin_accounts', {
+        method: 'POST',
+        body: JSON.stringify({ username: EU, password_hash: hashPw(EP, salt), salt, role: 'super_admin' }),
+        headers: { Prefer: 'return=minimal' },
+      });
+    }
+
+    const acctRes = await db(`admin_accounts?username=eq.${encodeURIComponent(username)}&limit=1`);
+    const acct = acctRes.ok ? (await acctRes.json())[0] : null;
+    if (!acct) return res.status(401).json({ error: 'Invalid credentials' });
+    if (!acct.is_active) return res.status(401).json({ error: 'Account disabled' });
+    if (acct.locked_until && new Date(acct.locked_until) > new Date()) return res.status(429).json({ error: 'Too many failed attempts — try again in 15 minutes' });
+
+    if (!verifyPw(password, acct.salt, acct.password_hash)) {
+      const attempts = (acct.login_attempts || 0) + 1;
+      const patch = { login_attempts: attempts };
+      if (attempts >= 5) patch.locked_until = new Date(Date.now() + 15 * 60 * 1000).toISOString();
+      await db(`admin_accounts?id=eq.${acct.id}`, { method: 'PATCH', body: JSON.stringify(patch), headers: { Prefer: 'return=minimal' } });
+      return res.status(401).json({ error: 'Invalid credentials' });
+    }
+
+    const token = randomBytes(32).toString('hex');
+    await db('admin_sessions', {
+      method: 'POST',
+      body: JSON.stringify({ token, admin_id: acct.id, role: acct.role, expires_at: new Date(Date.now() + 8 * 3600000).toISOString(), ip_address: ip }),
+      headers: { Prefer: 'return=minimal' },
+    });
+    await db(`admin_accounts?id=eq.${acct.id}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ login_attempts: 0, locked_until: null, last_login: new Date().toISOString() }),
+      headers: { Prefer: 'return=minimal' },
+    });
+    await db('admin_audit_log', { method: 'POST', body: JSON.stringify({ admin_id: acct.id, username: acct.username, action: 'login', metadata: { ip } }), headers: { Prefer: 'return=minimal' } });
+
+    return res.status(200).json({ token, role: acct.role, username: acct.username });
+  }
+
+  // ── VERIFY SESSION (all other requests) ──────────────────────────────────────
+  const adminToken = (req.headers['x-admin-token'] || body.admin_token || '').trim();
+  if (!adminToken) return res.status(401).json({ error: 'Admin token required' });
+
+  const sessRes = await db(`admin_sessions?token=eq.${encodeURIComponent(adminToken)}&limit=1`);
+  const sess = sessRes.ok ? (await sessRes.json())[0] : null;
+  if (!sess || new Date(sess.expires_at) < new Date()) return res.status(401).json({ error: 'Session expired — log in again' });
+  const adminRole = sess.role;
+
+  // ── GET: dashboard stats ─────────────────────────────────────────────────────
+  if (req.method === 'GET') {
+    const now = new Date();
+    const todayISO = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
+    const weekISO  = new Date(Date.now() - 7 * 86400000).toISOString();
+    const monthISO = new Date(Date.now() - 30 * 86400000).toISOString();
+
+    const ct = r => parseInt((r?.headers?.get('content-range') || '').split('/')[1]) || 0;
+
+    const [
+      usersAuthRes,
+      usersTodayRes, usersWeekRes,
+      reportsAllRes, reportsTodayRes, reportsWeekRes,
+      appsAllRes, appsGhostedRes, appsHiredRes,
+      coScoredRes, issuesRes, creditListRes,
+      searchLogRes, errLogRes,
+    ] = await Promise.all([
+      fetch(`${SB}/auth/v1/admin/users?per_page=1`, { headers: { apikey: SK, Authorization: `Bearer ${SK}` } }),
+      db(`profiles?created_at=gte.${todayISO}&select=id`, { headers: { Prefer: 'count=exact', 'Range-Unit': 'items', Range: '0-0' } }),
+      db(`profiles?created_at=gte.${weekISO}&select=id`,  { headers: { Prefer: 'count=exact', 'Range-Unit': 'items', Range: '0-0' } }),
+      db(`reports?select=id`, { headers: { Prefer: 'count=exact', 'Range-Unit': 'items', Range: '0-0' } }),
+      db(`reports?created_at=gte.${todayISO}&select=id`, { headers: { Prefer: 'count=exact', 'Range-Unit': 'items', Range: '0-0' } }),
+      db(`reports?created_at=gte.${weekISO}&select=id`,  { headers: { Prefer: 'count=exact', 'Range-Unit': 'items', Range: '0-0' } }),
+      db(`applications?select=id`, { headers: { Prefer: 'count=exact', 'Range-Unit': 'items', Range: '0-0' } }),
+      db(`applications?status=eq.ghosted&updated_at=gte.${monthISO}&select=id`, { headers: { Prefer: 'count=exact', 'Range-Unit': 'items', Range: '0-0' } }),
+      db(`applications?status=eq.hired&updated_at=gte.${monthISO}&select=id`,   { headers: { Prefer: 'count=exact', 'Range-Unit': 'items', Range: '0-0' } }),
+      db(`company_scores?select=id`, { headers: { Prefer: 'count=exact', 'Range-Unit': 'items', Range: '0-0' } }),
+      db(`user_issues?status=eq.open&order=created_at.desc&limit=20`),
+      db(`ai_credits?select=balance,pro&limit=2000`),
+      db(`search_logs?select=id&limit=1`),
+      db(`api_errors?select=id&limit=1`),
+    ]);
+
+    const usersTotal = usersAuthRes.ok ? (await usersAuthRes.json())?.total || 0 : 0;
+    const issues = issuesRes.ok ? await issuesRes.json() : [];
+    const creditRows = creditListRes.ok ? await creditListRes.json() : [];
+    const proCount = creditRows.filter(r => r.pro).length;
+    const ghosted = ct(appsGhostedRes);
+    const totalApps = ct(appsAllRes);
+
+    return res.status(200).json({
+      users: { total: usersTotal, new_today: ct(usersTodayRes), new_this_week: ct(usersWeekRes) },
+      reports: { total: ct(reportsAllRes), today: ct(reportsTodayRes), this_week: ct(reportsWeekRes) },
+      applications: { total: totalApps, ghosted_30d: ghosted, hired_30d: ct(appsHiredRes), ghost_rate_pct: totalApps > 0 ? Math.round(ghosted / totalApps * 100) : null },
+      companies: { with_scores: ct(coScoredRes) },
+      credits: { total_users: creditRows.length, pro_users: proCount },
+      company_lookups: { ready: searchLogRes.ok },
+      errors: { ready: errLogRes.ok },
+      issues: { ready: issuesRes.ok, open: issues.length, items: issues },
+    });
+  }
+
+  // ── POST: admin actions ──────────────────────────────────────────────────────
+  const { action } = body;
+
+  if (action === 'admin_logout') {
+    await db(`admin_sessions?token=eq.${encodeURIComponent(adminToken)}`, { method: 'DELETE', headers: { Prefer: 'return=minimal' } });
+    return res.status(200).json({ ok: true });
+  }
+
+  if (action === 'find_duplicates') {
+    const r = await db('company_scores?select=id,name,report_count,overall_score&order=report_count.desc&limit=500');
+    if (!r.ok) return res.status(500).json({ error: 'Query failed' });
+    const rows = await r.json();
+    const norm = n => n ? n.toLowerCase().trim().replace(/[\s,]+(inc\.?|llc\.?|corp\.?|ltd\.?|co\.|plc\.?|group|holdings|enterprises|solutions|technologies)\.?$/i, '').trim() : '';
+    const groups = {};
+    rows.forEach(r => { const k = norm(r.name); (groups[k] = groups[k] || []).push(r); });
+    return res.status(200).json({ duplicates: Object.values(groups).filter(g => g.length > 1) });
+  }
+
+  if (action === 'merge') {
+    const { primary_id, secondary_id } = body;
+    if (!primary_id || !secondary_id) return res.status(400).json({ error: 'primary_id and secondary_id required' });
+    const [pArr, sArr] = await Promise.all([
+      db(`company_scores?id=eq.${primary_id}&limit=1`).then(r => r.json()),
+      db(`company_scores?id=eq.${secondary_id}&limit=1`).then(r => r.json()),
+    ]);
+    const p = pArr[0]; const s = sArr[0];
+    if (!p || !s) return res.status(404).json({ error: 'Company not found' });
+    const pC = p.report_count || 1, sC = s.report_count || 1, total = pC + sC;
+    const wa = (a, b) => Math.round(((a || 50) * pC + (b || 50) * sC) / total);
+    await db(`company_scores?id=eq.${primary_id}`, { method: 'PATCH', body: JSON.stringify({ report_count: total, overall_score: wa(p.overall_score, s.overall_score), ghost_rate: wa(p.ghost_rate, s.ghost_rate), response_rate: wa(p.response_rate, s.response_rate), aliases: [...(p.aliases||[]), s.name, ...(s.aliases||[])].filter((v,i,a)=>v&&a.indexOf(v)===i) }), headers: { Prefer: 'return=minimal' } });
+    await db(`reports?company_name=eq.${encodeURIComponent(s.name)}`, { method: 'PATCH', body: JSON.stringify({ company_name: p.name }), headers: { Prefer: 'return=minimal' } });
+    await db(`company_aliases?on_conflict=alias`, { method: 'POST', body: JSON.stringify({ canonical: p.name, alias: s.name.toLowerCase() }), headers: { Prefer: 'resolution=merge-duplicates,return=minimal' } });
+    await db(`company_scores?id=eq.${secondary_id}`, { method: 'DELETE', headers: { Prefer: 'return=minimal' } });
+    await db('admin_audit_log', { method: 'POST', body: JSON.stringify({ admin_id: sess.admin_id, username: 'admin', action: 'merge_companies', target_type: 'company', target_id: String(primary_id), metadata: { secondary_id } }), headers: { Prefer: 'return=minimal' } });
+    return res.status(200).json({ ok: true });
+  }
+
+  if (action === 'auto_merge') {
+    const r = await db('company_scores?select=id,name,report_count,overall_score,ghost_rate,response_rate&order=report_count.desc&limit=500');
+    if (!r.ok) return res.status(500).json({ error: 'Query failed' });
+    const rows = await r.json();
+    const norm = n => n ? n.toLowerCase().trim().replace(/[\s,]+(inc\.?|llc\.?|corp\.?|ltd\.?|co\.|plc\.?|group|holdings|enterprises|solutions|technologies)\.?$/i, '').trim() : '';
+    const groups = {};
+    rows.forEach(row => { const k = norm(row.name); (groups[k] = groups[k] || []).push(row); });
+    let merged = 0;
+    for (const group of Object.values(groups).filter(g => g.length > 1)) {
+      const primary = group.reduce((b, r) => (r.report_count||0) > (b.report_count||0) ? r : b);
+      for (const sec of group.filter(r => r.id !== primary.id)) {
+        const pC = primary.report_count||1, sC = sec.report_count||1, total = pC+sC;
+        const wa = (a,b) => Math.round(((a||50)*pC + (b||50)*sC)/total);
+        await db(`company_scores?id=eq.${primary.id}`, { method: 'PATCH', body: JSON.stringify({ report_count: total, overall_score: wa(primary.overall_score,sec.overall_score), ghost_rate: wa(primary.ghost_rate,sec.ghost_rate) }), headers: { Prefer: 'return=minimal' } });
+        await db(`company_scores?id=eq.${sec.id}`, { method: 'DELETE', headers: { Prefer: 'return=minimal' } });
+        merged++;
+      }
+    }
+    return res.status(200).json({ ok: true, merged });
+  }
+
+  if (action === 'resolve_issue' || action === 'dismiss_issue') {
+    const { id } = body;
+    if (!id) return res.status(400).json({ error: 'id required' });
+    await db(`user_issues?id=eq.${id}`, { method: 'PATCH', body: JSON.stringify({ status: action === 'resolve_issue' ? 'resolved' : 'dismissed', resolved_at: new Date().toISOString() }), headers: { Prefer: 'return=minimal' } });
+    await db('admin_audit_log', { method: 'POST', body: JSON.stringify({ admin_id: sess.admin_id, username: 'admin', action, target_type: 'issue', target_id: String(id) }), headers: { Prefer: 'return=minimal' } });
+    return res.status(200).json({ ok: true });
+  }
+
+  if (action === 'set_pro') {
+    if (adminRole === 'moderator') return res.status(403).json({ error: 'Insufficient role' });
+    const { user_id, pro } = body;
+    if (!user_id) return res.status(400).json({ error: 'user_id required' });
+    await db(`ai_credits?on_conflict=user_id`, { method: 'POST', body: JSON.stringify({ user_id, pro: !!pro, balance: pro ? 999 : 3, daily_earned: 0, last_reset: new Date().toISOString().split('T')[0] }), headers: { Prefer: 'resolution=merge-duplicates,return=minimal' } });
+    await db('admin_audit_log', { method: 'POST', body: JSON.stringify({ admin_id: sess.admin_id, username: 'admin', action: 'set_pro', target_type: 'user', target_id: user_id, metadata: { pro } }), headers: { Prefer: 'return=minimal' } });
+    return res.status(200).json({ ok: true });
+  }
+
+  return res.status(400).json({ error: 'Unknown action' });
 }

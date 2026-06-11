@@ -224,5 +224,174 @@ export default async function handler(req, res) {
     return res.status(200).json({ ok: true });
   }
 
+  // ── GET CREDITS ──────────────────────────────────────────────────────────────
+  if (action === 'get_credits') {
+    const today = new Date().toISOString().split('T')[0];
+    const cRes = await db(`ai_credits?user_id=eq.${uid}&limit=1`);
+    let cred = cRes.ok ? (await cRes.json())[0] : null;
+    if (!cred) {
+      const ins = await db('ai_credits', { method: 'POST', body: JSON.stringify({ user_id: uid, balance: 3, daily_earned: 0, last_reset: today, pro: false }), headers: { Prefer: 'return=representation' } });
+      cred = ins.ok ? (await ins.json())[0] : { balance: 3, daily_earned: 0, last_reset: today, pro: false };
+    } else if (cred.last_reset !== today) {
+      const nb = cred.pro ? 999 : 3;
+      await db(`ai_credits?user_id=eq.${uid}`, { method: 'PATCH', body: JSON.stringify({ balance: nb, daily_earned: 0, last_reset: today }), headers: { Prefer: 'return=minimal' } });
+      cred = { ...cred, balance: nb, daily_earned: 0, last_reset: today };
+    }
+    return res.status(200).json({ balance: cred.balance, pro: cred.pro, daily_earned: cred.daily_earned, max_daily_earn: 5 });
+  }
+
+  // ── CONSUME CREDIT ────────────────────────────────────────────────────────────
+  if (action === 'consume_credit') {
+    const today = new Date().toISOString().split('T')[0];
+    const cRes = await db(`ai_credits?user_id=eq.${uid}&limit=1`);
+    let cred = cRes.ok ? (await cRes.json())[0] : null;
+    if (!cred) { await db('ai_credits', { method: 'POST', body: JSON.stringify({ user_id: uid, balance: 2, daily_earned: 0, last_reset: today, pro: false }), headers: { Prefer: 'return=minimal' } }); return res.status(200).json({ ok: true, balance: 2 }); }
+    if (cred.pro) return res.status(200).json({ ok: true, balance: 999, pro: true });
+    if (cred.last_reset !== today) {
+      await db(`ai_credits?user_id=eq.${uid}`, { method: 'PATCH', body: JSON.stringify({ balance: 2, daily_earned: 0, last_reset: today }), headers: { Prefer: 'return=minimal' } });
+      await db('credit_transactions', { method: 'POST', body: JSON.stringify({ user_id: uid, delta: -1, reason: body.reason || 'ai_tool' }), headers: { Prefer: 'return=minimal' } });
+      return res.status(200).json({ ok: true, balance: 2 });
+    }
+    if (cred.balance <= 0) return res.status(200).json({ ok: false, error: 'no_credits', balance: 0 });
+    const nb = cred.balance - 1;
+    await db(`ai_credits?user_id=eq.${uid}`, { method: 'PATCH', body: JSON.stringify({ balance: nb }), headers: { Prefer: 'return=minimal' } });
+    await db('credit_transactions', { method: 'POST', body: JSON.stringify({ user_id: uid, delta: -1, reason: body.reason || 'ai_tool' }), headers: { Prefer: 'return=minimal' } });
+    return res.status(200).json({ ok: true, balance: nb });
+  }
+
+  // ── GET QUESTION (earn a credit) ──────────────────────────────────────────────
+  if (action === 'get_question') {
+    const today = new Date().toISOString().split('T')[0];
+    // Check daily earn cap
+    const cRes = await db(`ai_credits?user_id=eq.${uid}&limit=1`);
+    const cred = cRes.ok ? (await cRes.json())[0] : null;
+    if (cred?.pro) return res.status(200).json({ question: null, reason: 'pro_unlimited' });
+    const dailyEarned = (cred?.last_reset === today ? cred?.daily_earned : 0) || 0;
+    if (dailyEarned >= 5) return res.status(200).json({ question: null, reason: 'daily_cap', earned_today: dailyEarned });
+
+    // Load answered question keys
+    const aqRes = await db(`answered_questions?user_id=eq.${uid}&select=question_key&limit=200`);
+    const answered = new Set(aqRes.ok ? (await aqRes.json()).map(r => r.question_key) : []);
+
+    // Priority 1: Resume-based company questions
+    const empRes = await db(`resume_employment?user_id=eq.${uid}&select=company,title&limit=10`);
+    const employment = empRes.ok ? await empRes.json() : [];
+    const Q_TYPES = [
+      { type: 'ghost', q: (co) => `Did ${co} respond to your application?`, opts: ['Yes, they responded','No, was ghosted','Haven\'t applied there'] },
+      { type: 'timeline', q: (co) => `How long did ${co} take to first contact you?`, opts: ['Same day','1–3 days','4–7 days','1–2 weeks','2–4 weeks','Never heard back'] },
+      { type: 'rounds', q: (co) => `How many interview rounds did ${co} put you through?`, opts: ['None / auto-rejected','1 round','2 rounds','3 rounds','4+ rounds'] },
+      { type: 'return', q: (co) => `Would you apply to ${co} again?`, opts: ['Definitely yes','Probably yes','Probably not','Never again'] },
+    ];
+    for (const emp of employment) {
+      for (const qt of Q_TYPES) {
+        const key = `${qt.type}|${emp.company.toLowerCase()}`;
+        if (!answered.has(key)) {
+          return res.status(200).json({ question: { key, company: emp.company, prompt: `We noticed ${emp.company} on your resume.`, text: qt.q(emp.company), options: qt.opts, credit_value: 1, source: 'resume' } });
+        }
+      }
+    }
+
+    // Priority 2: Tracker companies (apps without outcomes)
+    const appsRes = await db(`applications?user_id=eq.${uid}&status=eq.active&select=company_name&limit=10`);
+    const trackerApps = appsRes.ok ? await appsRes.json() : [];
+    for (const app of trackerApps) {
+      const co = app.company_name; if (!co) continue;
+      const key = `tracker_outcome|${co.toLowerCase()}`;
+      if (!answered.has(key)) {
+        return res.status(200).json({ question: { key, company: co, prompt: `You applied to ${co}.`, text: `What happened with your application at ${co}?`, options: ['Hired 🎉','Got an interview','Rejected','Ghosted','Still waiting'], credit_value: 1, source: 'tracker' } });
+      }
+    }
+
+    // Priority 3: Data verification (low-confidence companies)
+    const coRes = await db(`company_scores?report_count=lt.5&ghost_rate=not.is.null&select=name,ghost_rate&order=report_count.asc&limit=10`);
+    const lowCos = coRes.ok ? await coRes.json() : [];
+    for (const co of lowCos) {
+      const key = `verify_ghost|${co.name.toLowerCase()}`;
+      if (!answered.has(key)) {
+        const pct = Math.round(co.ghost_rate || 0);
+        return res.status(200).json({ question: { key, company: co.name, prompt: `Our data shows ${co.name} has a ${pct}% ghost rate.`, text: `Did ${co.name} respond to your application?`, options: ['Yes, they responded','No, was ghosted','I haven\'t applied there'], credit_value: 1, source: 'verification' } });
+      }
+    }
+
+    // Fallback: generic
+    const generics = [
+      { key: 'generic|response_time', text: 'On average, how long do companies take to respond to you?', options: ['Under a week','1–2 weeks','2–4 weeks','Over a month','They rarely respond'] },
+      { key: 'generic|ghosting_stage', text: 'At what stage are you ghosted most often?', options: ['After applying','After phone screen','After interview','After final round','Rarely get ghosted'] },
+      { key: 'generic|apps_per_week', text: 'How many applications do you send per week?', options: ['1–5','6–10','11–20','20+','I\'m between searches'] },
+    ];
+    for (const g of generics) {
+      if (!answered.has(g.key)) return res.status(200).json({ question: { ...g, company: null, prompt: null, credit_value: 1, source: 'generic' } });
+    }
+
+    return res.status(200).json({ question: null, reason: 'no_questions' });
+  }
+
+  // ── SUBMIT ANSWER ─────────────────────────────────────────────────────────────
+  if (action === 'submit_answer') {
+    const { question_key, answer } = body;
+    if (!question_key || !answer) return res.status(400).json({ error: 'question_key and answer required' });
+    const today = new Date().toISOString().split('T')[0];
+
+    // Check daily earn cap
+    const cRes = await db(`ai_credits?user_id=eq.${uid}&limit=1`);
+    let cred = cRes.ok ? (await cRes.json())[0] : null;
+    if (!cred) { await db('ai_credits', { method: 'POST', body: JSON.stringify({ user_id: uid, balance: 3, daily_earned: 0, last_reset: today, pro: false }), headers: { Prefer: 'return=minimal' } }); cred = { balance: 3, daily_earned: 0, last_reset: today, pro: false }; }
+    const resetToday = cred.last_reset !== today;
+    const dailyEarned = resetToday ? 0 : (cred.daily_earned || 0);
+    if (dailyEarned >= 5 && !cred.pro) return res.status(200).json({ ok: false, error: 'daily_cap', earned_today: dailyEarned });
+
+    // Store answer (dedup via PK)
+    const aqIns = await db('answered_questions', { method: 'POST', body: JSON.stringify({ user_id: uid, question_key, answer }), headers: { Prefer: 'resolution=ignore-duplicates,return=minimal' } });
+    // If duplicate (already answered), don't grant credit
+    if (aqIns.status === 409) return res.status(200).json({ ok: false, error: 'already_answered' });
+
+    // Grant +1 credit
+    const newBalance = resetToday ? 3 + 1 : (cred.pro ? 999 : Math.min((cred.balance || 0) + 1, 999));
+    const newEarned = resetToday ? 1 : dailyEarned + 1;
+    const patch = cred.pro ? {} : { balance: newBalance, daily_earned: newEarned };
+    if (resetToday && !cred.pro) { patch.last_reset = today; patch.daily_earned = 1; patch.balance = 4; }
+    if (Object.keys(patch).length) await db(`ai_credits?user_id=eq.${uid}`, { method: 'PATCH', body: JSON.stringify(patch), headers: { Prefer: 'return=minimal' } });
+    await db('credit_transactions', { method: 'POST', body: JSON.stringify({ user_id: uid, delta: 1, reason: 'earned_question', metadata: { question_key, answer } }), headers: { Prefer: 'return=minimal' } });
+
+    // Feed answer back into company intelligence (best-effort)
+    const [qtype, company] = question_key.split('|');
+    if (company && (qtype === 'ghost' || qtype === 'verify_ghost' || qtype === 'tracker_outcome')) {
+      const wasGhosted = answer.toLowerCase().includes('ghost') || answer.toLowerCase().includes('never');
+      const responded = answer.toLowerCase().includes('respond') || answer.toLowerCase().includes('interview') || answer.toLowerCase().includes('hired') || answer.toLowerCase().includes('rejected');
+      if (wasGhosted || responded) {
+        const outcome = wasGhosted ? 'ghosted' : 'human';
+        await db('reports', { method: 'POST', body: JSON.stringify({ company_name: company, outcome, experience_level: 'unspecified', platform: 'seen_intel', report_text: `[Intel] ${answer}` }), headers: { Prefer: 'return=minimal' } }).catch(() => {});
+      }
+    }
+
+    return res.status(200).json({ ok: true, balance: cred.pro ? 999 : (resetToday ? 4 : newBalance), earned_today: newEarned });
+  }
+
+  // ── SAVE EMPLOYMENT HISTORY ────────────────────────────────────────────────────
+  if (action === 'save_employment') {
+    const { employment } = body;
+    if (!Array.isArray(employment) || !employment.length) return res.status(200).json({ ok: true });
+    // Clear old entries first
+    await db(`resume_employment?user_id=eq.${uid}`, { method: 'DELETE', headers: { Prefer: 'return=minimal' } });
+    // Insert new entries (max 15)
+    const rows = employment.slice(0, 15).map(e => ({
+      user_id: uid,
+      company: (e.company || '').slice(0, 120),
+      title: (e.title || '').slice(0, 120),
+      start_date: (e.start_date || '').slice(0, 20),
+      end_date: (e.end_date || '').slice(0, 20),
+    })).filter(r => r.company);
+    if (rows.length) await db('resume_employment', { method: 'POST', body: JSON.stringify(rows), headers: { Prefer: 'return=minimal' } });
+    return res.status(200).json({ ok: true, count: rows.length });
+  }
+
+  // ── GET EMPLOYMENT HISTORY ────────────────────────────────────────────────────
+  if (action === 'get_employment') {
+    const r = await db(`resume_employment?user_id=eq.${uid}&order=id.desc&limit=15`);
+    const rows = r.ok ? await r.json() : [];
+    return res.status(200).json({ employment: rows });
+  }
+
   return res.status(400).json({ error: 'Unknown action: ' + action });
 }
+

@@ -124,8 +124,38 @@ export default async function handler(req, res) {
       return res.status(422).json({ error: 'Could not extract readable text. Make sure the file has selectable text (not a scanned image). Try exporting as PDF.' });
     }
 
+    // Extract structured employment history via Haiku (best-effort, no retry needed)
+    let employment = [];
+    try {
+      const empRes = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': process.env.ANTHROPIC_KEY,
+          'anthropic-version': '2023-06-01',
+        },
+        body: JSON.stringify({
+          model: 'claude-haiku-4-5-20251001',
+          max_tokens: 800,
+          messages: [{
+            role: 'user',
+            content: `Extract employment history from this resume. Return ONLY a JSON array, no commentary. Each object: {"company":"","title":"","start_date":"","end_date":""}. Use "" for unknown fields. Max 15 entries. end_date="Present" if still employed there.\n\nResume:\n${extractedText.slice(0, 6000)}`
+          }]
+        })
+      });
+      if (empRes.ok) {
+        const empData = await empRes.json();
+        const empText = empData.content?.[0]?.text || '';
+        const jsonMatch = empText.match(/\[[\s\S]*?\]/);
+        if (jsonMatch) {
+          const parsed = JSON.parse(jsonMatch[0]);
+          employment = parsed.slice(0, 15).filter(e => e && e.company);
+        }
+      }
+    } catch(_) { /* best-effort — don't fail the upload */ }
+
     const wordCount = extractedText.split(/\s+/).filter(w => w.length > 0).length;
-    return res.status(200).json({ ok: true, text: extractedText, fileName, fileType: isPDF ? 'pdf' : 'word', wordCount });
+    return res.status(200).json({ ok: true, text: extractedText, fileName, fileType: isPDF ? 'pdf' : 'word', wordCount, employment });
 
   } catch(err) {
     console.error('Parse resume error:', err.message);
