@@ -6717,11 +6717,6 @@ function adminLoadIssues(issueData) {
     return;
   }
 
-  if (!issueData.ready) {
-    listEl.innerHTML = '<div style="padding:.85rem 1rem;font-family:var(--mono);font-size:.62rem;color:var(--dim)">Run migration 007 to enable the issues queue.</div>';
-    return;
-  }
-
   const items = issueData.items || [];
   if (countEl) {
     if (items.length > 0) { countEl.textContent = items.length; countEl.style.display = 'inline'; }
