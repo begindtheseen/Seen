@@ -2445,6 +2445,38 @@ CREATE POLICY "insert only" ON search_logs FOR INSERT WITH CHECK (true);
 CREATE POLICY "no reads" ON search_logs FOR SELECT USING (false);</pre>
     </div>
 
+    <!-- Company deduplication tool -->
+    <div class="adm-panel" style="margin-top:.65rem" id="admMergePanel">
+      <div class="adm-panel-hdr">
+        Company deduplication
+        <div style="display:flex;gap:.45rem">
+          <button id="admScanBtn" onclick="adminScanDupes()" style="font-family:var(--mono);font-size:.55rem;padding:.3rem .75rem;border-radius:6px;border:1px solid var(--line2);background:transparent;color:var(--sub);cursor:pointer">Scan for dupes</button>
+          <button id="admAutoMergeBtn" onclick="adminAutoMerge()" style="font-family:var(--mono);font-size:.55rem;padding:.3rem .75rem;border-radius:6px;border:1px solid rgba(16,185,129,.3);background:rgba(16,185,129,.08);color:var(--green);cursor:pointer">Auto-merge</button>
+        </div>
+      </div>
+      <!-- Manual merge form -->
+      <div style="padding:.75rem 1rem;border-bottom:1px solid rgba(255,255,255,.05)">
+        <div style="font-family:var(--mono);font-size:.48rem;text-transform:uppercase;letter-spacing:.12em;color:var(--dim);margin-bottom:.5rem">Manual merge</div>
+        <div style="display:flex;gap:.5rem;align-items:flex-end;flex-wrap:wrap">
+          <div style="flex:1;min-width:110px">
+            <div style="font-family:var(--mono);font-size:.48rem;color:var(--muted);margin-bottom:.22rem">Keep (primary)</div>
+            <input id="admMergePrimary" placeholder="e.g. Amazon" style="width:100%;background:var(--raised);border:1px solid var(--line2);border-radius:7px;padding:.42rem .65rem;font-family:var(--mono);font-size:.65rem;color:var(--white);outline:none;box-sizing:border-box">
+          </div>
+          <div style="font-family:var(--mono);font-size:.8rem;color:var(--dim);flex-shrink:0;padding-bottom:.45rem">←</div>
+          <div style="flex:1;min-width:110px">
+            <div style="font-family:var(--mono);font-size:.48rem;color:var(--muted);margin-bottom:.22rem">Absorb (secondary)</div>
+            <input id="admMergeSecondary" placeholder="e.g. amazon.com" style="width:100%;background:var(--raised);border:1px solid var(--line2);border-radius:7px;padding:.42rem .65rem;font-family:var(--mono);font-size:.65rem;color:var(--white);outline:none;box-sizing:border-box">
+          </div>
+          <button onclick="adminManualMerge()" style="font-family:var(--mono);font-size:.6rem;padding:.42rem .9rem;border-radius:7px;border:1px solid rgba(239,68,68,.3);background:rgba(239,68,68,.08);color:var(--red);cursor:pointer;flex-shrink:0">Merge →</button>
+        </div>
+        <div id="admMergeStatus" style="font-family:var(--mono);font-size:.58rem;margin-top:.45rem;min-height:1.2em"></div>
+      </div>
+      <!-- Detected duplicates list -->
+      <div id="admDupesList">
+        <div style="padding:.85rem 1rem;font-family:var(--mono);font-size:.62rem;color:var(--dim)">Click "Scan for dupes" to detect company name duplicates.</div>
+      </div>
+    </div>
+
     <!-- Auth / access error -->
     <div id="admAuthError" style="display:none;text-align:center;padding:3rem 1rem">
       <div style="font-size:2rem;margin-bottom:1rem">🔒</div>
@@ -6106,6 +6138,105 @@ async function renderAdminPage() {
   } catch (e) {
     if (lastUpdated) lastUpdated.textContent = 'Failed to load — ' + e.message;
     console.warn('renderAdminPage:', e);
+  }
+}
+
+async function adminScanDupes() {
+  const btn = document.getElementById('admScanBtn');
+  const listEl = document.getElementById('admDupesList');
+  if (btn) { btn.disabled = true; btn.textContent = 'Scanning…'; }
+  const token = await Auth.token();
+  try {
+    const res = await fetch('/api/admin-stats', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ action: 'find_duplicates' }),
+    });
+    const d = await res.json();
+    if (!d.ok) throw new Error(d.error || res.status);
+    if (!d.duplicates.length) {
+      listEl.innerHTML = '<div style="padding:.85rem 1rem;font-family:var(--mono);font-size:.62rem;color:var(--green)">✓ No duplicates detected</div>';
+      return;
+    }
+    listEl.innerHTML = d.duplicates.map(({ key, companies }) => {
+      const primary = companies[0];
+      const rest = companies.slice(1);
+      return `<div style="padding:.65rem 1rem;border-bottom:1px solid rgba(255,255,255,.05)">
+        <div style="font-family:var(--mono);font-size:.5rem;text-transform:uppercase;letter-spacing:.1em;color:var(--amber);margin-bottom:.3rem">${companies.length} entries match "${key}"</div>
+        <div style="display:flex;align-items:center;gap:.35rem;flex-wrap:wrap">
+          <span style="font-family:var(--mono);font-size:.6rem;padding:.18rem .55rem;border-radius:4px;background:rgba(16,185,129,.12);color:var(--green);border:1px solid rgba(16,185,129,.2)">${primary.company_name} <span style="opacity:.6">(${primary.report_count||0})</span></span>
+          ${rest.map(c => `<span style="font-family:var(--mono);font-size:.6rem;padding:.18rem .55rem;border-radius:4px;background:rgba(239,68,68,.08);color:var(--red);border:1px solid rgba(239,68,68,.15)">${c.company_name} <span style="opacity:.6">(${c.report_count||0})</span></span>`).join('')}
+          <button onclick="adminSetMerge('${primary.company_name.replace(/'/g,"\\'")}','${rest[0].company_name.replace(/'/g,"\\'")}',this)" style="font-family:var(--mono);font-size:.52rem;padding:.18rem .55rem;border-radius:5px;border:1px solid var(--line2);background:transparent;color:var(--sub);cursor:pointer;margin-left:auto">Set to merge</button>
+        </div>
+      </div>`;
+    }).join('');
+  } catch(e) {
+    listEl.innerHTML = `<div style="padding:.85rem 1rem;font-family:var(--mono);font-size:.62rem;color:var(--red)">Error: ${e.message}</div>`;
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = 'Scan for dupes'; }
+  }
+}
+
+function adminSetMerge(primary, secondary) {
+  const p = document.getElementById('admMergePrimary');
+  const s = document.getElementById('admMergeSecondary');
+  if (p) p.value = primary;
+  if (s) s.value = secondary;
+  p?.focus();
+}
+
+async function adminManualMerge() {
+  const primary = document.getElementById('admMergePrimary')?.value?.trim();
+  const secondary = document.getElementById('admMergeSecondary')?.value?.trim();
+  const statusEl = document.getElementById('admMergeStatus');
+  if (!primary || !secondary) { if (statusEl) statusEl.innerHTML = '<span style="color:var(--red)">Both fields required</span>'; return; }
+  if (primary.toLowerCase() === secondary.toLowerCase()) { if (statusEl) statusEl.innerHTML = '<span style="color:var(--red)">Cannot merge a company with itself</span>'; return; }
+  if (statusEl) statusEl.innerHTML = '<span style="color:var(--dim)">Merging…</span>';
+  const token = await Auth.token();
+  try {
+    const res = await fetch('/api/admin-stats', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ action: 'merge', primary, secondary }),
+    });
+    const d = await res.json();
+    if (!d.ok) throw new Error(d.error || res.status);
+    if (statusEl) statusEl.innerHTML = `<span style="color:var(--green)">✓ "${secondary}" merged into "${primary}" — ${d.merged_report_count} total reports</span>`;
+    document.getElementById('admMergePrimary').value = '';
+    document.getElementById('admMergeSecondary').value = '';
+    adminScanDupes();
+  } catch(e) {
+    if (statusEl) statusEl.innerHTML = `<span style="color:var(--red)">Error: ${e.message}</span>`;
+  }
+}
+
+async function adminAutoMerge() {
+  const btn = document.getElementById('admAutoMergeBtn');
+  const statusEl = document.getElementById('admMergeStatus');
+  if (btn) { btn.disabled = true; btn.textContent = 'Running…'; }
+  if (statusEl) statusEl.innerHTML = '<span style="color:var(--dim)">Scanning and merging…</span>';
+  const token = await Auth.token();
+  try {
+    const res = await fetch('/api/admin-stats', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ action: 'auto_merge' }),
+    });
+    const d = await res.json();
+    if (!d.ok) throw new Error(d.error || res.status);
+    if (statusEl) {
+      if (!d.merged) {
+        statusEl.innerHTML = '<span style="color:var(--green)">✓ Auto-merge complete — no duplicates found</span>';
+      } else {
+        const summary = d.groups.map(g => `"${g.absorbed.join('", "')}" → "${g.canonical}"`).join(' · ');
+        statusEl.innerHTML = `<span style="color:var(--green)">✓ Merged ${d.merged} duplicate${d.merged!==1?'s':''}:</span> <span style="color:var(--dim)">${summary}</span>`;
+      }
+    }
+    adminScanDupes();
+  } catch(e) {
+    if (statusEl) statusEl.innerHTML = `<span style="color:var(--red)">Auto-merge failed: ${e.message}</span>`;
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = 'Auto-merge'; }
   }
 }
 
