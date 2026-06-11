@@ -46,13 +46,16 @@ export default async function handler(req, res) {
 
   // ── LOAD — return all applications + saved jobs for this user ───────────────
   if (action === 'load') {
+    const appsLimit = Math.min(500, Math.max(1, parseInt(body.apps_limit) || 200));
+    const appsOffset = Math.max(0, parseInt(body.apps_offset) || 0);
     const [appsRes, savedRes] = await Promise.all([
-      db(`applications?user_id=eq.${uid}&order=created_at.desc`),
-      db(`saved_jobs?user_id=eq.${uid}&order=saved_at.desc`),
+      db(`applications?user_id=eq.${uid}&order=created_at.desc&limit=${appsLimit}&offset=${appsOffset}`, { headers: { Prefer: 'count=estimated' } }),
+      db(`saved_jobs?user_id=eq.${uid}&order=saved_at.desc&limit=500`),
     ]);
     const apps  = appsRes.ok  ? await appsRes.json()  : [];
     const saved = savedRes.ok ? await savedRes.json() : [];
-    return res.status(200).json({ applications: apps, saved_jobs: saved });
+    const appsTotal = parseInt((appsRes.headers?.get('content-range') || '').split('/')[1]) || apps.length;
+    return res.status(200).json({ applications: apps, saved_jobs: saved, apps_total: appsTotal, apps_offset: appsOffset });
   }
 
   // ── ADD APPLICATION ─────────────────────────────────────────────────────────
