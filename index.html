@@ -2556,7 +2556,10 @@ const Auth = {
           updateNav();
 
         } else if(event === 'SIGNED_OUT') {
-          this._user=null; this._profile=null; updateNav(); go('landing');
+          this._user=null; this._profile=null; updateNav();
+          // Clear page-restore stores so a refresh after sign-out doesn't land on an auth page
+          try { sessionStorage.removeItem('sp'); localStorage.removeItem('seen_last_page'); } catch(_e) {}
+          go('landing');
         }
       });
     } catch(e) { console.warn('Auth init:', e); }
@@ -11227,6 +11230,9 @@ function _handleSharedLink(){
     } catch(_e) {}
   }
   if(sp&&sp!=='company'&&sp!=='landing'){
+    // Never restore auth-required pages for signed-out users
+    const _authRequiredPages=['profile','seeker-dash','tracker','resume','report','demand','feed'];
+    if(_authRequiredPages.includes(sp)&&!Auth.isLoggedIn()) return;
     go(sp); // immediate — no delay, auth is already resolved by the time _handleSharedLink runs
   }
 }
