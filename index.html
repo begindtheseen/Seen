@@ -1089,7 +1089,6 @@ nav.nav-scrolled{background:rgba(6,6,8,0.82);backdrop-filter:blur(60px) saturate
   <a href="#" class="logo" onclick="go('landing');return false"><span class="logo-pulse"></span>Seen</a>
   <div class="nav-pills" id="navPills" style="display:none">
     <button class="ntab" onclick="go('jobs')" id="nt-jobs">Jobs</button>
-    <button class="ntab" onclick="go('demand')" id="nt-demand">Demand</button>
     <button class="ntab" onclick="go('feed')" id="nt-feed">Community</button>
     <button class="ntab" onclick="go('resume')" id="nt-resume">Resume AI</button>
     <button class="ntab" onclick="go('tracker')" id="nt-tracker">Track <span class="ntab-new" id="trackerBadge" style="display:none;background:var(--amber);color:var(--ink)">0</span><span class="ntab-new" id="trackerCheckBadge" style="display:none;background:var(--red);color:#fff;margin-left:.15rem">!</span></button>
@@ -2044,6 +2043,18 @@ nav.nav-scrolled{background:rgba(6,6,8,0.82);backdrop-filter:blur(60px) saturate
     <div class="eyebrow">Community report</div>
     <h1>Report a listing.</h1>
     <p>60 seconds. Fully anonymous. Your report updates the score for your exact location — and tells the next applicant what stage the company ghosts at.</p>
+    <!-- Step progress indicator -->
+    <div style="display:flex;align-items:center;gap:.5rem;margin-bottom:1.75rem">
+      <div style="display:flex;align-items:center;gap:.42rem;padding:.38rem .85rem;background:var(--bdim);border:1px solid var(--bmid);border-radius:100px">
+        <span style="width:16px;height:16px;border-radius:50%;background:var(--blue);display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:.5rem;color:#fff;font-weight:700;flex-shrink:0">1</span>
+        <span style="font-family:var(--mono);font-size:.6rem;color:var(--blue);white-space:nowrap">The listing</span>
+      </div>
+      <div style="flex:1;max-width:36px;height:1px;background:var(--line2)"></div>
+      <div style="display:flex;align-items:center;gap:.42rem;padding:.38rem .85rem;background:var(--raised);border:1px solid var(--line);border-radius:100px">
+        <span style="width:16px;height:16px;border-radius:50%;background:var(--line2);display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:.5rem;color:var(--muted);font-weight:700;flex-shrink:0">2</span>
+        <span style="font-family:var(--mono);font-size:.6rem;color:var(--muted);white-space:nowrap">What happened</span>
+      </div>
+    </div>
     <div class="fblock">
       <div class="fb-hd">01 — The listing</div>
       <div class="f2">
@@ -2292,8 +2303,9 @@ nav.nav-scrolled{background:rgba(6,6,8,0.82);backdrop-filter:blur(60px) saturate
         <h1 style="font-family:var(--display);font-size:1.9rem;font-weight:800;color:var(--white);letter-spacing:-.03em;margin-bottom:.3rem">My applications</h1>
         <p style="color:var(--sub);font-size:.82rem;font-weight:300">Synced to your account across all devices.</p>
       </div>
-      <div style="display:flex;align-items:center;gap:.5rem">
+      <div style="display:flex;align-items:center;gap:.5rem;flex-wrap:wrap">
         <div id="trackerStats" style="display:flex;gap:1rem"></div>
+        <button class="btn btn-green" onclick="trackManually()" style="font-size:.75rem">+ Track manually</button>
         <button class="btn btn-ghost" onclick="clearDuplicateApplications()" style="font-size:.72rem">Clear dupes</button>
         <button class="btn btn-ghost" onclick="clearAllApplications()" style="font-size:.72rem">Clear all</button>
       </div>
@@ -2306,8 +2318,11 @@ nav.nav-scrolled{background:rgba(6,6,8,0.82);backdrop-filter:blur(60px) saturate
     <div id="trackerEmpty" style="display:none;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:4rem 2rem;text-align:center">
       <div style="font-size:2.5rem;opacity:.35;margin-bottom:.85rem">📋</div>
       <div style="font-family:var(--display);font-size:1rem;font-weight:700;color:var(--white);margin-bottom:.4rem">No applications tracked yet</div>
-      <p style="color:var(--sub);font-size:.82rem;font-weight:300;max-width:320px;margin:0 auto 1.5rem;line-height:1.7">When you click "Apply & Track" on any job, it shows up here. Fully anonymous — nothing leaves your device.</p>
-      <button class="btn btn-green" onclick="go('jobs')">Browse jobs →</button>
+      <p style="color:var(--sub);font-size:.82rem;font-weight:300;max-width:320px;margin:0 auto 1.5rem;line-height:1.7">Browse jobs and click "Apply & Track" — or add past applications manually to start your timeline.</p>
+      <div style="display:flex;gap:.65rem;justify-content:center;flex-wrap:wrap">
+        <button class="btn btn-green" onclick="go('jobs')">Browse jobs →</button>
+        <button class="btn btn-ghost" onclick="trackManually()">Track manually</button>
+      </div>
     </div>
 
     <!-- CHECK PROMPTS — due response/interview/outcome checks -->
@@ -8525,11 +8540,25 @@ async function renderSeekerDash(){
       <div><div style="font-family:var(--mono);font-size:.62rem;color:var(--green);font-weight:600;margin-bottom:.1rem">${f.label}</div><div style="font-size:.72rem;color:var(--sub);font-weight:300">${f.desc}</div></div>
     </div>`;
   }
-  // Stats
-  if(_('dStatActive'))_('dStatActive').textContent=active.length;
-  if(_('dStatRR'))_('dStatRR').textContent=apps.length?Math.round((apps.filter(a=>a.status!=='active'&&a.status!=='ghosted').length/apps.length)*100)+'%':'—';
-  if(_('dStatGhosted'))_('dStatGhosted').textContent=ghosted.length;
-  if(_('dStatHired'))_('dStatHired').textContent=hired.length;
+  // Stats — hide zero-state noise for new users; show onboarding card instead
+  const statRow = _('seekerStatRow');
+  if (apps.length === 0 && statRow) {
+    statRow.innerHTML = `<div style="grid-column:1/-1;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:1.35rem 1.5rem;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:1rem">
+      <div>
+        <div style="font-family:var(--display);font-size:.9rem;font-weight:700;color:var(--white);margin-bottom:.2rem">Ready to start tracking?</div>
+        <div style="font-family:var(--mono);font-size:.6rem;color:var(--muted);line-height:1.65">Browse jobs and apply, or manually add past applications.</div>
+      </div>
+      <div style="display:flex;gap:.5rem;flex-shrink:0">
+        <button class="btn btn-green" onclick="go('jobs')" style="font-size:.78rem">Browse jobs →</button>
+        <button class="btn btn-ghost" onclick="trackManually()" style="font-size:.78rem">Track manually</button>
+      </div>
+    </div>`;
+  } else {
+    if(_('dStatActive'))_('dStatActive').textContent=active.length;
+    if(_('dStatRR'))_('dStatRR').textContent=apps.length?Math.round((apps.filter(a=>a.status!=='active'&&a.status!=='ghosted').length/apps.length)*100)+'%':'—';
+    if(_('dStatGhosted'))_('dStatGhosted').textContent=ghosted.length;
+    if(_('dStatHired'))_('dStatHired').textContent=hired.length;
+  }
 
   // ── Job Search Health Score ──────────────────────────────────────────────
   const hsEl=_('seekerHealthScore');
@@ -9583,7 +9612,15 @@ function renderFeedCards(listEl, rows, replace = true, companyStats = {}) {
     const cs = companyStats[(r.company_name || '').toLowerCase()] || null;
     return renderOutcomeCard(r, cs);
   }).join('');
-  if (replace) listEl.innerHTML = html || '<div style="text-align:center;padding:2rem;font-family:var(--mono);font-size:.65rem;color:var(--muted)">No results for this filter.</div>';
+  if (replace) listEl.innerHTML = html || `<div style="text-align:center;padding:3rem 1rem">
+    <div style="font-size:1.5rem;margin-bottom:.5rem">🔍</div>
+    <div style="font-family:var(--display);font-size:.88rem;font-weight:700;color:var(--white);margin-bottom:.35rem">No ${_feedFilter==='all'?'':_feedFilter+' '}reports yet</div>
+    <div style="font-family:var(--mono);font-size:.6rem;color:var(--muted);margin-bottom:1rem;line-height:1.65">${_feedFilter!=='all'?'Try a different filter, or ':''}be the first to share an experience.</div>
+    <div style="display:flex;gap:.5rem;justify-content:center;flex-wrap:wrap">
+      ${_feedFilter!=='all'?'<button class="btn btn-ghost" style="font-size:.72rem" onclick="clearFeedFilter()">Clear filter</button>':''}
+      <button class="btn btn-ghost" style="font-size:.72rem" onclick="go(\'report\')">Share experience →</button>
+    </div>
+  </div>`;
   else listEl.insertAdjacentHTML('beforeend', html);
 }
 
@@ -10708,6 +10745,83 @@ async function confirmApply(jobId, company, role, location, score, risk, waste) 
     showToast('Failed to save. Please try again.');
     if (btn) { btn.textContent = 'Log application →'; btn.disabled = false; }
   }
+}
+
+// ─── Manual application tracking ───────────────────────────────────────────
+function trackManually() {
+  const modal = document.getElementById('applyModal');
+  const titleEl = document.getElementById('applyModalTitle');
+  const subEl = document.getElementById('applyModalSub');
+  const bodyEl = document.getElementById('applyModalBody');
+  const footEl = document.getElementById('applyModalFoot');
+  if (!modal || !bodyEl) return;
+
+  if (!Auth.isLoggedIn()) {
+    if (titleEl) titleEl.textContent = 'Track application';
+    if (subEl) subEl.textContent = 'Sign in to save your tracker';
+    bodyEl.innerHTML = `<div style="text-align:center;padding:.5rem 0 1rem">
+      <div style="font-size:2rem;margin-bottom:.75rem">📋</div>
+      <div style="font-family:var(--display);font-size:1rem;font-weight:700;color:var(--white);margin-bottom:.35rem">Sign in to track</div>
+      <div style="font-size:.82rem;color:var(--sub);font-weight:300;line-height:1.7;margin-bottom:1.25rem">Your applications sync across devices and trigger follow-up reminders.</div>
+      <button class="btn btn-green" style="width:100%;justify-content:center" onclick="closeApplyModalDirect();go('login')">Sign in →</button>
+    </div>`;
+    if (footEl) footEl.style.display = 'none';
+    modal.classList.add('open');
+    return;
+  }
+
+  if (titleEl) titleEl.textContent = 'Track application';
+  if (subEl) subEl.textContent = 'Add a past or current application';
+  if (footEl) footEl.style.display = 'none';
+  const iStyle = 'width:100%;background:var(--raised);border:1.5px solid var(--line2);border-radius:8px;padding:.65rem .9rem;color:var(--white);font-family:var(--body);font-size:.84rem;outline:none;caret-color:var(--green);box-sizing:border-box';
+  const lStyle = 'font-family:var(--mono);font-size:.58rem;text-transform:uppercase;letter-spacing:.07em;color:var(--dim);display:block;margin-bottom:.32rem';
+  bodyEl.innerHTML = `
+    <div style="margin-bottom:.75rem"><label style="${lStyle}">Company *</label><input id="mtCo" type="text" placeholder="e.g. Amazon" style="${iStyle}" onfocus="this.style.borderColor='var(--green)'" onblur="this.style.borderColor='var(--line2)'"/></div>
+    <div style="margin-bottom:.75rem"><label style="${lStyle}">Job title *</label><input id="mtRole" type="text" placeholder="e.g. Operations Manager" style="${iStyle}" onfocus="this.style.borderColor='var(--green)'" onblur="this.style.borderColor='var(--line2)'"/></div>
+    <div style="margin-bottom:.75rem"><label style="${lStyle}">City <span style="color:var(--muted);text-transform:none;letter-spacing:0">(optional)</span></label><input id="mtCity" type="text" placeholder="e.g. Austin, TX" style="${iStyle}" onfocus="this.style.borderColor='var(--green)'" onblur="this.style.borderColor='var(--line2)'"/></div>
+    <div style="margin-bottom:1.1rem"><label style="${lStyle}">Platform <span style="color:var(--muted);text-transform:none;letter-spacing:0">(optional)</span></label><select id="mtPlatform" style="${iStyle}"><option value="">Select...</option><option>Indeed</option><option>LinkedIn</option><option>Glassdoor</option><option>Company website</option><option>Other</option></select></div>
+    <div style="display:flex;gap:.5rem">
+      <button class="btn btn-ghost" style="flex:1;justify-content:center" onclick="closeApplyModalDirect()">Cancel</button>
+      <button class="btn btn-green" id="mtSubmitBtn" style="flex:2;justify-content:center;font-weight:800" onclick="confirmManualTrack()">Save application →</button>
+    </div>`;
+  modal.classList.add('open');
+  setTimeout(() => document.getElementById('mtCo')?.focus(), 80);
+}
+
+async function confirmManualTrack() {
+  const company = (document.getElementById('mtCo')?.value || '').trim();
+  const role = (document.getElementById('mtRole')?.value || '').trim();
+  const city = (document.getElementById('mtCity')?.value || '').trim();
+  const platform = document.getElementById('mtPlatform')?.value || 'Other';
+  if (!company || !role) { showToast('Company and job title are required.'); return; }
+  const btn = document.getElementById('mtSubmitBtn');
+  if (btn) { btn.textContent = 'Saving...'; btn.disabled = true; }
+  try {
+    const newAppId = 'app_' + Date.now();
+    await AppStore.add({
+      id: newAppId, company, role, location: city,
+      platform: platform || 'Other', score: 50, risk: 'neutral', waste: 25,
+      stage: 'Applied', status: 'active',
+      appliedAt: Date.now(), updatedAt: Date.now(),
+    });
+    closeApplyModalDirect();
+    const apps = await AppStore.load();
+    const badge = document.getElementById('trackerBadge');
+    if (badge) { const c = apps.filter(a => a.status === 'active').length; if (c > 0) { badge.textContent = c; badge.style.display = 'inline'; } }
+    if (Auth.isSeeker()) renderSeekerDash().catch(() => {});
+    window._pendingNewAppId = newAppId;
+    go('tracker');
+  } catch(e) {
+    console.error('confirmManualTrack:', e);
+    showToast('Failed to save. Please try again.');
+    if (btn) { btn.textContent = 'Save application →'; btn.disabled = false; }
+  }
+}
+
+function clearFeedFilter() {
+  _feedFilter = 'all';
+  document.querySelectorAll('.feed-filter-btn').forEach(b => b.classList.toggle('active', b.dataset.filter === 'all'));
+  loadFeed(true);
 }
 
 async function showAIOptimizeFlow(jobId, company, role, location, score, risk, waste, applyEmail) {
