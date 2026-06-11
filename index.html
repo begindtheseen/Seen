@@ -3228,15 +3228,16 @@ function computeScoresFromData(reports, jobs, webScore) {
 
   // Priority 1: Community reports ≥3 — real user submissions, highest accuracy
   if (n >= 3) {
-    const ghosted = reports.filter(r => r.outcome === 'ghosted').length;
-    const human   = reports.filter(r => r.outcome === 'human' || r.outcome === 'hired').length;
-    const unpaid  = reports.filter(r => r.unpaid_work === 'yes').length;
-    const gr = ghosted / n, rr = human / n;
+    const totalW = reports.reduce((s, r) => s + (r.outcome_weight ?? 1.0), 0);
+    const ghosted = reports.reduce((s, r) => r.outcome === 'ghosted' ? s + (r.outcome_weight ?? 1.0) : s, 0);
+    const human   = reports.reduce((s, r) => (r.outcome === 'human' || r.outcome === 'hired') ? s + (r.outcome_weight ?? 1.0) : s, 0);
+    const unpaid  = reports.reduce((s, r) => r.unpaid_work === 'yes' ? s + (r.outcome_weight ?? 1.0) : s, 0);
+    const gr = ghosted / totalW, rr = human / totalW;
     const roundsArr = reports.filter(r => r.rounds > 0).map(r => r.rounds);
     const avgRounds = roundsArr.length ? roundsArr.reduce((s, v) => s + v, 0) / roundsArr.length : 3;
     const waitArr = reports.filter(r => r.wait_days > 0).map(r => r.wait_days);
     const avgWait = waitArr.length ? waitArr.reduce((s, v) => s + v, 0) / waitArr.length : 30;
-    const waste = Score.waste(gr, avgRounds, unpaid / n);
+    const waste = Score.waste(gr, avgRounds, unpaid / totalW);
     const overall = Score.calc(rr, gr, avgWait, n);
     return { overall_score: overall, risk_level: Score.risk(overall), ghost_rate: gr, response_rate: rr,
       avg_wait_days: Math.round(avgWait), avg_rounds: Math.round(avgRounds * 10) / 10,
@@ -5784,10 +5785,23 @@ async function viewCompany(id,name,loc){
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name: normalizeCompanyName(co?.name || name) }),
       });
-      if (!r.ok) return;
-      const d = await r.json();
-      const reviews = d?.score?.web_reviews;
-      if (!Array.isArray(reviews) || !reviews.length) return;
+      const d = r?.ok ? await r.json() : null;
+      const webReviews = d?.score?.web_reviews;
+
+      // Mix in DB reports that carry a platform label (Reddit, Glassdoor, etc.)
+      const realData = await loadRealCompanyData(co?.name || name, loc);
+      const platformReviews = (realData?.reports || [])
+        .filter(rp => rp.platform && rp.platform !== 'Seen' && rp.report_text && rp.report_text.trim().length > 20)
+        .map(rp => ({
+          text: rp.report_text,
+          sentiment: (rp.outcome === 'ghosted' || rp.outcome === 'autoreject' || rp.outcome === 'rejected') ? 'negative'
+                   : (rp.outcome === 'hired' || rp.outcome === 'offer') ? 'positive' : 'neutral',
+          source: `From ${rp.platform}`,
+          year: rp.created_at ? new Date(rp.created_at).getFullYear() : null,
+        }));
+
+      const reviews = [...(Array.isArray(webReviews) ? webReviews : []), ...platformReviews];
+      if (!reviews.length) return;
       const sentColor = s => s === 'positive' ? 'var(--green)' : s === 'negative' ? 'var(--red)' : 'var(--amber)';
       const sentLabel = s => s === 'positive' ? '✓ Positive' : s === 'negative' ? '✗ Negative' : '~ Mixed';
       wrEl.innerHTML = `

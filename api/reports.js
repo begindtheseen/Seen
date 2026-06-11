@@ -230,7 +230,7 @@ export default async function handler(req, res) {
     const nameEnc = encodeURIComponent(`*${firstWord}*`);
     const url = `${SUPABASE_URL}/rest/v1/reports`
       + `?company_name=ilike.${nameEnc}`
-      + `&select=id,role,outcome,ghost_stage,rounds,report_text,platform,created_at,experience_level,location_id,company_name,company_id`
+      + `&select=id,role,outcome,ghost_stage,rounds,report_text,platform,outcome_weight,trust_reason,created_at,experience_level,location_id,company_name,company_id`
       + `&order=created_at.desc`
       + `&limit=100`;
 
@@ -261,7 +261,7 @@ export default async function handler(req, res) {
 
       const fbUrl = `${SUPABASE_URL}/rest/v1/reports`
         + `?company_id=in.(${ids.join(',')})`
-        + `&select=id,role,outcome,ghost_stage,rounds,report_text,platform,created_at,experience_level,location_id,company_id`
+        + `&select=id,role,outcome,ghost_stage,rounds,report_text,platform,outcome_weight,trust_reason,created_at,experience_level,location_id,company_id`
         + `&order=created_at.desc&limit=100`;
       const fbRes = await fetch(fbUrl, { headers: hdrs });
       const fbRows = fbRes.ok ? await fbRes.json() : [];
@@ -288,7 +288,7 @@ export default async function handler(req, res) {
         const knownIds = new Set((rows || []).map(r => r.id));
         const fbUrl2 = `${SUPABASE_URL}/rest/v1/reports`
           + `?company_id=in.(${ids2.join(',')})`
-          + `&select=id,role,outcome,ghost_stage,rounds,report_text,platform,created_at,experience_level,location_id,company_id`
+          + `&select=id,role,outcome,ghost_stage,rounds,report_text,platform,outcome_weight,trust_reason,created_at,experience_level,location_id,company_id`
           + `&order=created_at.desc&limit=100`;
         const fb2 = await fetch(fbUrl2, { headers: hdrs });
         if (fb2.ok) {
