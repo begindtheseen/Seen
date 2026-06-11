@@ -8891,7 +8891,7 @@ function go(page){
     // Exclude auth-flow pages (login, reset) and company (already hash-encoded separately)
     // so they never interfere with post-login redirect or _restoring flag.
     try {
-      const _noSave=['landing','home','login','reset','company','job-detail'];
+      const _noSave=['landing','home','login','reset','company','job-detail','admin'];
       if(!_noSave.includes(page)) {
         sessionStorage.setItem('sp',page);
         localStorage.setItem('seen_last_page', JSON.stringify({page, ts: Date.now()}));
@@ -12008,7 +12008,7 @@ function _handleSharedLink(){
       if (saved.page && saved.ts && (Date.now() - saved.ts) < 2 * 60 * 60 * 1000) sp = saved.page;
     } catch(_e) {}
   }
-  if(sp&&sp!=='company'&&sp!=='landing'&&sp!=='login'&&sp!=='reset'){
+  if(sp&&sp!=='company'&&sp!=='landing'&&sp!=='login'&&sp!=='reset'&&sp!=='admin'){
     // Never restore auth-required pages for signed-out users
     const _authRequiredPages=['profile','seeker-dash','tracker','resume','report','demand','feed'];
     if(_authRequiredPages.includes(sp)&&!Auth.isLoggedIn()) return;
