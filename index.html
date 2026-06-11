@@ -2740,6 +2740,7 @@ const Auth = {
 
           if(!surveyDone && this.isSeeker()) { go('login'); startSurvey(); return; }
           if(this.isSeeker()) {
+            try { localStorage.removeItem(RecentSearches.KEY); } catch(_e) {}
             SavedJobs.syncFromDb().catch(()=>{});
             AppStore.syncFromDb().catch(()=>{});
             renderSeekerDash();
@@ -2767,8 +2768,7 @@ const Auth = {
 
         } else if(event === 'SIGNED_OUT') {
           this._user=null; this._profile=null; updateNav();
-          // Clear page-restore stores so a refresh after sign-out doesn't land on an auth page
-          try { sessionStorage.removeItem('sp'); localStorage.removeItem('seen_last_page'); } catch(_e) {}
+          try { sessionStorage.removeItem('sp'); localStorage.removeItem('seen_last_page'); localStorage.removeItem(RecentSearches.KEY); } catch(_e) {}
           go('landing');
         }
       });
