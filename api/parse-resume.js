@@ -1,5 +1,6 @@
 import zlib from 'zlib';
 import { promisify } from 'util';
+import { applyRateLimit } from './_utils/ratelimit.js';
 const inflateRaw = promisify(zlib.inflateRaw);
 
 export default async function handler(req, res) {
@@ -12,6 +13,9 @@ export default async function handler(req, res) {
 
   if (req.method === 'OPTIONS') return res.status(200).end();
   if (req.method !== 'POST') return res.status(405).end('Method not allowed');
+
+  const limited = await applyRateLimit(req, res, 'parse-resume');
+  if (limited) return;
 
   try {
     let body = req.body;

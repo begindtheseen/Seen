@@ -1,6 +1,8 @@
 // Server-side reports fetch — uses service key to bypass RLS.
 // Queries by company_name column directly — no company table join needed.
 
+import { applyRateLimit } from './_utils/ratelimit.js';
+
 export default async function handler(req, res) {
   const _o=req.headers.origin||'';
   const _devO=!_o||_o.includes('localhost')||_o.includes('127.0.0.1');
@@ -20,6 +22,12 @@ export default async function handler(req, res) {
   let body = req.body;
   if (typeof body === 'string') try { body = JSON.parse(body); } catch(e) { body = {}; }
   body = body || {};
+
+  // Rate-limit only write actions — reads are cheap and public
+  if (body.action === 'submit' || body.action === 'moderate') {
+    const limited = await applyRateLimit(req, res, 'report-submit');
+    if (limited) return;
+  }
 
   const hdrsBase = {
     apikey: SUPABASE_SERVICE_KEY,
