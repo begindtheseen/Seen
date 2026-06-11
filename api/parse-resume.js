@@ -1,6 +1,7 @@
 import zlib from 'zlib';
 import { promisify } from 'util';
 import { applyRateLimit } from './_utils/ratelimit.js';
+import { logError } from './_utils/errlog.js';
 const inflateRaw = promisify(zlib.inflateRaw);
 
 export default async function handler(req, res) {
@@ -128,6 +129,7 @@ export default async function handler(req, res) {
 
   } catch(err) {
     console.error('Parse resume error:', err.message);
+    logError('parse-resume', err.message);
     return res.status(500).json({ error: err.message });
   }
 }

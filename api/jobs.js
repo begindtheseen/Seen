@@ -19,6 +19,12 @@ export default async function handler(req, res) {
   const limited = await applyRateLimit(req, res, 'job-search');
   if (limited) return;
 
+  // Declare catch-block variables in outer scope so the catch handler can access them
+  let safeQuery = '';
+  let loc = '';
+  let inflightKey = '';
+  let _inflightResolve, _inflightReject;
+
   try {
     let body = req.body;
     if (typeof body === 'string') { try { body = JSON.parse(body); } catch(e) { body = {}; } }
@@ -29,9 +35,9 @@ export default async function handler(req, res) {
     const rawQuery = String(query).trim().slice(0, 200);
     if (!rawQuery) return res.status(400).json({ error: 'No query' });
     // Strip characters that could abuse prompt injection
-    const safeQuery = rawQuery.replace(/[<>`\\]/g, '').trim();
+    safeQuery = rawQuery.replace(/[<>`\\]/g, '').trim();
 
-    const loc = (location || '').trim();
+    loc = (location || '').trim();
     const radiusMiles = radius || 25;
 
     const systemPrompt = [
@@ -114,7 +120,7 @@ export default async function handler(req, res) {
     }
 
     // Coalesce concurrent identical searches into one Claude API call
-    const inflightKey = `${canonical}::${loc}`;
+    inflightKey = `${canonical}::${loc}`;
     if (_inflight.has(inflightKey)) {
       console.log(`COALESCED: "${canonical}" @ "${loc}" — waiting on in-flight request`);
       try {
@@ -123,7 +129,6 @@ export default async function handler(req, res) {
       } catch(e) { /* fall through to make our own call */ }
     }
 
-    let _inflightResolve, _inflightReject;
     const inflightPromise = new Promise((resolve, reject) => { _inflightResolve = resolve; _inflightReject = reject; });
     _inflight.set(inflightKey, inflightPromise);
     setTimeout(() => _inflight.delete(inflightKey), 90_000);
