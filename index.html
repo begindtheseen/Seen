@@ -809,6 +809,8 @@ nav.nav-scrolled{background:rgba(6,6,8,0.82);backdrop-filter:blur(60px) saturate
 .adm-bar{height:100%;border-radius:2px;background:linear-gradient(90deg,var(--blue),var(--indigo));transition:width .6s ease}
 .adm-bar.green{background:linear-gradient(90deg,var(--green),#34d399)}
 .adm-chart-row{display:flex;align-items:flex-end;gap:3px;height:48px;padding:0 1rem 0}
+.adm-btn:hover{border-color:var(--blue)!important;color:var(--white)!important}
+.adm-btn-danger:hover{border-color:var(--red)!important;color:var(--red)!important}
 .adm-chart-bar{flex:1;background:rgba(59,130,246,.35);border-radius:2px 2px 0 0;transition:background .15s;cursor:default;min-width:8px}
 .adm-chart-bar:hover{background:rgba(59,130,246,.7)}
 /* Issue report modal */
@@ -2401,8 +2403,8 @@ nav.nav-scrolled{background:rgba(6,6,8,0.82);backdrop-filter:blur(60px) saturate
         <p style="font-size:.8rem;color:var(--sub);font-weight:300" id="admLastUpdated">Loading…</p>
       </div>
       <div style="display:flex;gap:.5rem;flex-shrink:0">
-        <button onclick="renderAdminPage()" style="background:none;border:1px solid var(--line2);border-radius:8px;padding:.5rem 1rem;font-family:var(--mono);font-size:.65rem;color:var(--sub);cursor:pointer;transition:all .15s" onmouseover="this.style.borderColor='var(--blue)';this.style.color='var(--white)'" onmouseout="this.style.borderColor='var(--line2)';this.style.color='var(--sub)'">↻ Refresh</button>
-        <button onclick="adminLogout()" style="background:none;border:1px solid var(--line2);border-radius:8px;padding:.5rem 1rem;font-family:var(--mono);font-size:.65rem;color:var(--dim);cursor:pointer;transition:all .15s" onmouseover="this.style.borderColor='var(--red)';this.style.color='var(--red)'" onmouseout="this.style.borderColor='var(--line2)';this.style.color='var(--dim)'">Sign out</button>
+        <button onclick="renderAdminPage()" style="background:none;border:1px solid var(--line2);border-radius:8px;padding:.5rem 1rem;font-family:var(--mono);font-size:.65rem;color:var(--sub);cursor:pointer;transition:all .15s" class="adm-btn">↻ Refresh</button>
+        <button onclick="adminLogout()" style="background:none;border:1px solid var(--line2);border-radius:8px;padding:.5rem 1rem;font-family:var(--mono);font-size:.65rem;color:var(--dim);cursor:pointer;transition:all .15s" class="adm-btn-danger">Sign out</button>
       </div>
     </div>
 

@@ -29,6 +29,11 @@ export default async function handler(req, res) {
   cors(req, res);
   if (req.method === 'OPTIONS') return res.status(200).end();
   if (req.method !== 'GET' && req.method !== 'POST') return res.status(405).end();
+  try { return await _handler(req, res); }
+  catch(e) { console.error('[admin-stats]', e); return res.status(500).json({ error: e.message }); }
+}
+
+async function _handler(req, res) {
 
   const SB = process.env.SUPABASE_URL;
   const SK = process.env.SUPABASE_SERVICE_KEY;
@@ -118,14 +123,14 @@ export default async function handler(req, res) {
     const ct = r => parseInt((r?.headers?.get('content-range') || '').split('/')[1]) || 0;
 
     const [
-      usersAuthRes,
+      usersTotalRes,
       usersTodayRes, usersWeekRes,
       reportsAllRes, reportsTodayRes, reportsWeekRes,
       appsAllRes, appsGhostedRes, appsHiredRes,
       coScoredRes, issuesRes, creditListRes,
       searchLogRes, errLogRes,
     ] = await Promise.all([
-      fetch(`${SB}/auth/v1/admin/users?per_page=1`, { headers: { apikey: SK, Authorization: `Bearer ${SK}` } }),
+      db(`profiles?select=id`, { headers: { Prefer: 'count=exact', 'Range-Unit': 'items', Range: '0-0' } }),
       db(`profiles?created_at=gte.${todayISO}&select=id`, { headers: { Prefer: 'count=exact', 'Range-Unit': 'items', Range: '0-0' } }),
       db(`profiles?created_at=gte.${weekISO}&select=id`,  { headers: { Prefer: 'count=exact', 'Range-Unit': 'items', Range: '0-0' } }),
       db(`reports?select=id`, { headers: { Prefer: 'count=exact', 'Range-Unit': 'items', Range: '0-0' } }),
@@ -141,7 +146,7 @@ export default async function handler(req, res) {
       db(`api_errors?select=id&limit=1`),
     ]);
 
-    const usersTotal = usersAuthRes.ok ? (await usersAuthRes.json())?.total || 0 : 0;
+    const usersTotal = ct(usersTotalRes);
     const issues = issuesRes.ok ? await issuesRes.json() : [];
     const creditRows = creditListRes.ok ? await creditListRes.json() : [];
     const proCount = creditRows.filter(r => r.pro).length;
