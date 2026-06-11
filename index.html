@@ -3431,7 +3431,7 @@ function doSearch(){
 }
 function qs(name,loc=''){document.getElementById('heroInp').value=name;document.getElementById('heroLoc').value=loc;RecentSearches.push(name,loc);openModal(name,loc);}
 
-// Recent searches — persisted in localStorage
+// Recent searches — localStorage for guests, server-side for logged-in users
 const RecentSearches = {
   KEY: 'seen_recent_v1',
   get() { try { return JSON.parse(localStorage.getItem(this.KEY) || '[]'); } catch(e) { return []; } },
@@ -3439,6 +3439,7 @@ const RecentSearches = {
     const list = this.get().filter(r => r.name.toLowerCase() !== name.toLowerCase());
     list.unshift({ name, loc });
     localStorage.setItem(this.KEY, JSON.stringify(list.slice(0, 6)));
+    if (Auth.isSeeker()) _sync('log_recent_co', { company: name, location: loc || '' }).catch(() => {});
     this.render();
   },
   render() {
@@ -8845,11 +8846,16 @@ async function renderSeekerDash(){
   // Saved jobs
   await _refreshDashSaved();
 
-  // Recently checked companies
-  (function() {
+  // Recently checked companies — server-side for logged-in users
+  (async function() {
     const el = document.getElementById('dashRecentCos');
     if (!el) return;
-    const recent = RecentSearches.get().slice(0, 4);
+    let recent = [];
+    if (Auth.isSeeker()) {
+      const data = await _sync('get_recent_cos').catch(() => null);
+      recent = (data?.recent || []).slice(0, 4).map(r => ({ name: r.company_name, loc: r.location }));
+    }
+    if (!recent.length) recent = RecentSearches.get().slice(0, 4);
     if (!recent.length) { el.style.display = 'none'; return; }
     el.style.display = 'block';
     el.innerHTML = `<div style="background:var(--surface);border:1px solid var(--line);border-radius:12px;overflow:hidden">

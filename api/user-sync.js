@@ -392,6 +392,25 @@ export default async function handler(req, res) {
     return res.status(200).json({ employment: rows });
   }
 
+  // ── LOG RECENT COMPANY VIEW ───────────────────────────────────────────────────
+  if (action === 'log_recent_co') {
+    const { company, location } = body;
+    if (!company) return res.status(400).json({ error: 'company required' });
+    await db('user_recent_cos', {
+      method: 'POST',
+      body: JSON.stringify({ user_id: uid, company_name: company.slice(0, 100), location: (location || '').slice(0, 100), viewed_at: new Date().toISOString() }),
+      headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
+    });
+    return res.status(200).json({ ok: true });
+  }
+
+  // ── GET RECENT COMPANY VIEWS ──────────────────────────────────────────────────
+  if (action === 'get_recent_cos') {
+    const r = await db(`user_recent_cos?user_id=eq.${uid}&order=viewed_at.desc&limit=6`);
+    const rows = r.ok ? await r.json() : [];
+    return res.status(200).json({ recent: rows });
+  }
+
   return res.status(400).json({ error: 'Unknown action: ' + action });
 }
 
