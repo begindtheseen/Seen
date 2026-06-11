@@ -1,4 +1,5 @@
 import { getQueryExpansion } from './_utils/expand.js';
+import { applyRateLimit } from './_utils/ratelimit.js';
 
 export default async function handler(req, res) {
   const _o=req.headers.origin||'';
@@ -11,12 +12,20 @@ export default async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(200).end();
   if (req.method !== 'POST') return res.status(405).end('Method not allowed');
 
+  const limited = await applyRateLimit(req, res, 'job-search');
+  if (limited) return;
+
   try {
     let body = req.body;
     if (typeof body === 'string') { try { body = JSON.parse(body); } catch(e) { body = {}; } }
     if (!body || typeof body !== 'object') body = {};
     const { query, location, radius } = body;
     if (!query) return res.status(400).json({ error: 'No query' });
+
+    const rawQuery = String(query).trim().slice(0, 200);
+    if (!rawQuery) return res.status(400).json({ error: 'No query' });
+    // Strip characters that could abuse prompt injection
+    const safeQuery = rawQuery.replace(/[<>`\\]/g, '').trim();
 
     const loc = (location || '').trim();
     const radiusMiles = radius || 25;
@@ -30,8 +39,8 @@ export default async function handler(req, res) {
     ].join('\n');
 
     const userPrompt = loc
-      ? `Find open ${query} jobs within ${radiusMiles} miles of ${loc}. Search LinkedIn, Indeed, Greenhouse, Lever, Workday. Do multiple searches. Return at least 8 results. If not enough nearby, include remote options.`
-      : `Find open ${query} jobs in the US or remote. Search LinkedIn, Indeed, Greenhouse, Lever. Return at least 8 results.`;
+      ? `Find open ${safeQuery} jobs within ${radiusMiles} miles of ${loc}. Search LinkedIn, Indeed, Greenhouse, Lever, Workday. Do multiple searches. Return at least 8 results. If not enough nearby, include remote options.`
+      : `Find open ${safeQuery} jobs in the US or remote. Search LinkedIn, Indeed, Greenhouse, Lever. Return at least 8 results.`;
 
     const ANTHROPIC_KEY = process.env.ANTHROPIC_KEY;
     if (!ANTHROPIC_KEY) return res.status(500).json({ error: 'ANTHROPIC_KEY not configured', jobs: [] });
@@ -44,7 +53,7 @@ export default async function handler(req, res) {
       'Content-Type': 'application/json',
     };
 
-    const qNorm = query.toLowerCase().trim();
+    const qNorm = safeQuery.toLowerCase();
 
     // canonical stays in outer scope so the save section can use it
     let canonical = qNorm;

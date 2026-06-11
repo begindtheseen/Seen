@@ -59,16 +59,22 @@ export default async function handler(req, res) {
 
       let url = `${SUPABASE_URL}/rest/v1/reports`
         + `?select=id,role,outcome,ghost_stage,rounds,report_text,platform,created_at,experience_level,company_name`
-        + `&order=created_at.desc&limit=200`;
+        + `&order=created_at.desc`
+        + `&limit=${safeLimit}&offset=${safeOffset}`;
       if (outcomes) url += `&outcome=in.(${outcomes.join(',')})`;
-      const r = await fetch(url, { headers: hdrsBase });
+
+      // Prefer= count to get total without a second query
+      const r = await fetch(url, { headers: { ...hdrsBase, 'Prefer': 'count=estimated' } });
       if (!r.ok) { console.error('FEED: supabase error', r.status); return res.status(500).json({ error: 'feed error' }); }
       const rows = await r.json();
-      const all = (rows || []).map(row => ({ ...row, source: 'seen' }));
-      const page = all.slice(safeOffset, safeOffset + safeLimit);
+      const page = (rows || []).map(row => ({ ...row, source: 'seen' }));
 
-      console.log(`FEED: total=${all.length} page=${page.length}`);
-      return res.status(200).json({ ok: true, reports: page, total: all.length });
+      // Content-Range: 0-19/1234
+      const contentRange = r.headers.get('content-range') || '';
+      const total = parseInt(contentRange.split('/')[1]) || page.length;
+
+      console.log(`FEED: offset=${safeOffset} page=${page.length} total=${total}`);
+      return res.status(200).json({ ok: true, reports: page, total });
     } catch(e) {
       console.error('FEED: unhandled error:', e.message);
       return res.status(500).json({ error: 'feed error', detail: e.message });
