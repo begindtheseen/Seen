@@ -3489,7 +3489,7 @@ async function quickSubmitFromModal(company, outcome, btn) {
     btn.style.color = 'var(--green)';
   }
   try {
-    await fetch('/api/benchmarks', {
+    await fetch('/api/reports', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ action: 'quick_submit', company, outcome }),
@@ -9274,7 +9274,7 @@ async function _batchFetchCompanyStats(rows) {
 async function quickSubmitOutcome(company, outcome, btn) {
   if (btn) { btn.disabled = true; btn.textContent = 'Submitted ✓'; btn.style.color = 'var(--green)'; btn.style.borderColor = 'rgba(16,185,129,.3)'; }
   try {
-    await fetch('/api/benchmarks', {
+    await fetch('/api/reports', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ action: 'quick_submit', company, outcome }),
