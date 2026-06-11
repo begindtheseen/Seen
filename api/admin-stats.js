@@ -184,6 +184,21 @@ export default async function handler(req, res) {
       return res.status(200).json({ ok: true, merged: mergedCount, groups: mergedGroups });
     }
 
+    if (body.action === 'resolve_issue' || body.action === 'dismiss_issue') {
+      const { id, resolver_note } = body;
+      if (!id) return res.status(400).json({ error: 'id required' });
+      const newStatus = body.action === 'resolve_issue' ? 'resolved' : 'dismissed';
+      const r = await fetch(
+        `${SUPABASE_URL}/rest/v1/user_issues?id=eq.${parseInt(id, 10)}`,
+        {
+          method: 'PATCH', headers: dbH,
+          body: JSON.stringify({ status: newStatus, resolved_at: new Date().toISOString(), resolver_note: resolver_note || null }),
+        }
+      );
+      if (!r.ok) return res.status(502).json({ error: 'DB error updating issue' });
+      return res.status(200).json({ ok: true, id, status: newStatus });
+    }
+
     return res.status(400).json({ error: 'Unknown action' });
   }
 
@@ -212,9 +227,10 @@ export default async function handler(req, res) {
   };
 
   // Check whether optional tables exist (probe with limit=0)
-  const [searchLogsReady, errorsReady] = await Promise.all([
+  const [searchLogsReady, errorsReady, issuesReady] = await Promise.all([
     fetch(`${SUPABASE_URL}/rest/v1/search_logs?limit=0&select=id`, { headers: svc }).then(r => r.ok).catch(() => false),
     fetch(`${SUPABASE_URL}/rest/v1/api_errors?limit=0&select=id`, { headers: svc }).then(r => r.ok).catch(() => false),
+    fetch(`${SUPABASE_URL}/rest/v1/user_issues?limit=0&select=id`, { headers: svc }).then(r => r.ok).catch(() => false),
   ]);
 
   // Run all queries in parallel
@@ -281,6 +297,14 @@ export default async function handler(req, res) {
     errorsReady ? rows('api_errors', `created_at=gt.${oneDayAgo}`, 'endpoint,error_msg,created_at', 500) : Promise.resolve([]),
     errorsReady ? rows('api_errors', `created_at=gt.${sevenDaysAgo}`, 'endpoint,created_at', 2000) : Promise.resolve([]),
   ]);
+
+  // ── User issues queue ────────────────────────────────────────────────────────
+  const [openIssueCount, openIssues] = issuesReady
+    ? await Promise.all([
+        count('user_issues', 'status=eq.open'),
+        rows('user_issues', 'status=eq.open&order=created_at.desc', 'id,type,target_type,target_name,notes,created_at', 100),
+      ])
+    : [0, []];
 
   // ── Reports: daily chart (last 30 days) ─────────────────────────────────
   const reportsByDay = {};
@@ -411,5 +435,11 @@ export default async function handler(req, res) {
         recent: errorRowsToday.slice(0, 20).map(e => ({ endpoint: e.endpoint, msg: e.error_msg, at: e.created_at })),
       };
     })(),
+
+    issues: {
+      ready: issuesReady,
+      open: openIssueCount,
+      items: openIssues,
+    },
   });
 }

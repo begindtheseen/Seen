@@ -57,7 +57,7 @@ export default async function handler(req, res) {
   body = body || {};
 
   // Rate-limit only write actions — reads are cheap and public
-  if (body.action === 'submit' || body.action === 'moderate' || body.action === 'quick_submit') {
+  if (['submit','moderate','quick_submit','report_issue'].includes(body.action)) {
     const limited = await applyRateLimit(req, res, 'report-submit');
     if (limited) return;
   }
@@ -91,6 +91,23 @@ export default async function handler(req, res) {
     Authorization: `Bearer ${SUPABASE_SERVICE_KEY}`,
     'Content-Type': 'application/json',
   };
+
+  // ── User-reported issue (wrong data, duplicate, broken listing, etc.) ─────────
+  if (body.action === 'report_issue') {
+    const VALID_TYPES = new Set(['wrong_data','duplicate','broken_listing','spam','other']);
+    const { type, target_type, target_name, notes } = body;
+    if (!type || !VALID_TYPES.has(type)) return res.status(400).json({ error: 'Invalid issue type' });
+    const safeTargetType = ['company','job','feed','other'].includes(target_type) ? target_type : 'other';
+    const safeName  = target_name ? String(target_name).slice(0, 200).replace(/[<>`]/g, '').trim() : null;
+    const safeNotes = notes ? String(notes).slice(0, 500).replace(/[<>`]/g, '').trim() : null;
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/user_issues`, {
+      method: 'POST',
+      headers: { ...hdrsBase, Prefer: 'return=minimal' },
+      body: JSON.stringify({ type, target_type: safeTargetType, target_name: safeName, notes: safeNotes }),
+    });
+    if (!r.ok) return res.status(500).json({ error: 'Failed to save issue' });
+    return res.status(200).json({ ok: true });
+  }
 
   // ── Moderation (merged from moderate-report.js) ─────────────────────────────
   if (body.action === 'moderate') {

@@ -788,6 +788,23 @@ nav.nav-scrolled{background:rgba(6,6,8,0.82);backdrop-filter:blur(60px) saturate
 .adm-chart-row{display:flex;align-items:flex-end;gap:3px;height:48px;padding:0 1rem 0}
 .adm-chart-bar{flex:1;background:rgba(59,130,246,.35);border-radius:2px 2px 0 0;transition:background .15s;cursor:default;min-width:8px}
 .adm-chart-bar:hover{background:rgba(59,130,246,.7)}
+/* Issue report modal */
+.issue-ov{position:fixed;inset:0;background:rgba(0,0,0,.7);backdrop-filter:blur(6px);z-index:9999;display:flex;align-items:center;justify-content:center;padding:1rem;opacity:0;pointer-events:none;transition:opacity .18s}
+.issue-ov.open{opacity:1;pointer-events:all}
+.issue-box{background:#111;border:1px solid rgba(255,255,255,.1);border-radius:16px;padding:1.4rem 1.25rem 1.15rem;width:100%;max-width:360px;box-shadow:0 24px 80px rgba(0,0,0,.7)}
+.issue-type-grid{display:flex;flex-wrap:wrap;gap:.35rem;margin:.65rem 0 .75rem}
+.issue-chip{font-family:var(--mono);font-size:.58rem;padding:.3rem .72rem;border-radius:6px;border:1px solid var(--line2);background:transparent;color:var(--sub);cursor:pointer;transition:all .14s}
+.issue-chip:hover{border-color:var(--blue);color:var(--white)}
+.issue-chip.selected{background:rgba(59,130,246,.15);border-color:var(--blue);color:var(--white)}
+/* Admin issues queue */
+.issue-row{display:flex;align-items:flex-start;gap:.65rem;padding:.65rem 1rem;border-bottom:1px solid rgba(255,255,255,.04)}
+.issue-row:last-child{border-bottom:none}
+.issue-badge{font-family:var(--mono);font-size:.48rem;text-transform:uppercase;letter-spacing:.1em;padding:.18rem .5rem;border-radius:4px;flex-shrink:0;margin-top:.12rem}
+.issue-badge.wrong_data{background:rgba(245,158,11,.12);color:var(--amber)}
+.issue-badge.duplicate{background:rgba(239,68,68,.1);color:var(--red)}
+.issue-badge.broken_listing{background:rgba(107,114,128,.15);color:var(--sub)}
+.issue-badge.spam{background:rgba(239,68,68,.1);color:var(--red)}
+.issue-badge.other{background:rgba(255,255,255,.06);color:var(--dim)}
 /* ── Job Search Health Score ─────────────────────────────────── */
 .hs-card{background:linear-gradient(160deg,rgba(255,255,255,.05) 0%,rgba(255,255,255,.015) 100%);border:1px solid rgba(255,255,255,.1);border-radius:14px;padding:1.25rem 1.4rem;position:relative;overflow:hidden}
 .hs-card::before{content:'';position:absolute;top:-40px;right:-40px;width:160px;height:160px;background:radial-gradient(circle,rgba(16,185,129,0.08) 0%,transparent 70%);pointer-events:none}
@@ -1081,6 +1098,31 @@ nav.nav-scrolled{background:rgba(6,6,8,0.82);backdrop-filter:blur(60px) saturate
 </nav>
 
 <!-- MODAL -->
+<!-- ── Report Issue mini-modal ── -->
+<div class="issue-ov" id="issueOv" onclick="if(event.target===this)closeIssueMod()">
+  <div class="issue-box">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.35rem">
+      <div style="font-family:var(--display);font-size:1rem;font-weight:800;color:var(--white)">Report an issue</div>
+      <button onclick="closeIssueMod()" style="background:none;border:none;color:var(--muted);font-size:1.1rem;cursor:pointer;line-height:1;padding:.15rem .3rem">✕</button>
+    </div>
+    <div id="issueTarget" style="font-family:var(--mono);font-size:.58rem;color:var(--muted);margin-bottom:.55rem"></div>
+    <div style="font-family:var(--mono);font-size:.5rem;text-transform:uppercase;letter-spacing:.1em;color:var(--dim);margin-bottom:.1rem">What's wrong?</div>
+    <div class="issue-type-grid" id="issueTypeGrid">
+      <button class="issue-chip" data-type="wrong_data" onclick="issueSelectType(this)">Wrong data</button>
+      <button class="issue-chip" data-type="duplicate" onclick="issueSelectType(this)">Duplicate</button>
+      <button class="issue-chip" data-type="broken_listing" onclick="issueSelectType(this)">Broken listing</button>
+      <button class="issue-chip" data-type="spam" onclick="issueSelectType(this)">Spam / fake</button>
+      <button class="issue-chip" data-type="other" onclick="issueSelectType(this)">Other</button>
+    </div>
+    <textarea id="issueNotes" placeholder="Optional: add details…" style="width:100%;background:var(--raised);border:1px solid var(--line2);border-radius:8px;padding:.55rem .7rem;font-family:var(--mono);font-size:.65rem;color:var(--white);resize:vertical;min-height:60px;outline:none;box-sizing:border-box;margin-bottom:.75rem"></textarea>
+    <div style="display:flex;gap:.5rem;justify-content:flex-end">
+      <button onclick="closeIssueMod()" style="font-family:var(--mono);font-size:.65rem;padding:.45rem .9rem;border-radius:8px;border:1px solid var(--line2);background:transparent;color:var(--sub);cursor:pointer">Cancel</button>
+      <button id="issueSubmitBtn" onclick="submitIssue()" disabled style="font-family:var(--mono);font-size:.65rem;padding:.45rem .9rem;border-radius:8px;border:none;background:var(--blue);color:#fff;cursor:pointer;opacity:.4;transition:opacity .15s">Submit →</button>
+    </div>
+    <div id="issueStatus" style="font-family:var(--mono);font-size:.56rem;margin-top:.45rem;min-height:1.1em;text-align:right"></div>
+  </div>
+</div>
+
 <div class="modal-ov" id="modalOv" onclick="closeMod(event)">
   <div class="modal">
     <div class="m-hdr"><div class="m-ti" id="mTitle">Analyzing...</div><button class="m-cl" onclick="closeModDirect()">✕</button></div>
@@ -2445,6 +2487,17 @@ CREATE POLICY "insert only" ON search_logs FOR INSERT WITH CHECK (true);
 CREATE POLICY "no reads" ON search_logs FOR SELECT USING (false);</pre>
     </div>
 
+    <!-- User-reported issues queue -->
+    <div class="adm-panel" style="margin-top:.65rem">
+      <div class="adm-panel-hdr">
+        <span>Reported issues <span id="admIssueCount" style="display:none;font-size:.55rem;padding:.12rem .45rem;border-radius:10px;background:rgba(239,68,68,.15);color:var(--red);margin-left:.4rem;font-weight:600"></span></span>
+        <button onclick="adminLoadIssues()" style="font-family:var(--mono);font-size:.55rem;padding:.3rem .75rem;border-radius:6px;border:1px solid var(--line2);background:transparent;color:var(--sub);cursor:pointer">↻ Refresh</button>
+      </div>
+      <div id="admIssuesList">
+        <div style="padding:.85rem 1rem;font-family:var(--mono);font-size:.62rem;color:var(--dim)">Loading…</div>
+      </div>
+    </div>
+
     <!-- Company deduplication tool -->
     <div class="adm-panel" style="margin-top:.65rem" id="admMergePanel">
       <div class="adm-panel-hdr">
@@ -3590,6 +3643,9 @@ async function runSearch(name,loc){
       <button class="btn btn-ghost" style="padding:.65rem .9rem;font-size:.72rem;flex-shrink:0;background:rgba(255,69,0,0.1);border-color:rgba(255,69,0,0.25);color:#ff6314" onclick="shareToReddit('${(name||'').replace(/'/g,"\\'")}')">🔴 Reddit</button>
       <button class="btn btn-ghost" style="padding:.65rem .9rem;font-size:.72rem;flex-shrink:0;background:rgba(255,255,255,0.06);border-color:rgba(255,255,255,0.15);color:var(--text)" onclick="shareToThreads('${(name||'').replace(/'/g,"\\'")}')">🧵 Threads</button>
       <button class="btn btn-ghost" style="padding:.65rem .9rem;font-size:.75rem;flex-shrink:0" onclick="closeModDirect();prefillReport('${(name||'').replace(/'/g,"\\'")}');go('report')">+ Full report</button>
+    </div>
+    <div style="text-align:right;margin-top:.55rem">
+      <button onclick="reportIssue('company','${(known?.name||name).replace(/'/g,"\\'")}',null)" style="background:none;border:none;font-family:var(--mono);font-size:.52rem;color:var(--dim);cursor:pointer;padding:.1rem 0;text-decoration:underline;text-underline-offset:2px">⚑ Report issue with this data</button>
     </div>
     ${!Auth.isLoggedIn()?`<div style="margin-top:.85rem;padding:.65rem .95rem;background:var(--raised);border-radius:9px;border:1px solid var(--line2);display:flex;align-items:center;justify-content:space-between;gap:.75rem">
       <div>
@@ -6127,6 +6183,9 @@ async function renderAdminPage() {
           </div>`).join('') || '<div style="font-family:var(--mono);font-size:.62rem;color:var(--dim)">No report data yet</div>';
     }
 
+    // ── Issues queue ─────────────────────────────────────────────────────────
+    adminLoadIssues(d.issues);
+
     // Mobile: collapse two-col to single
     const twoCol = document.getElementById('admTwoCol');
     if (twoCol && window.innerWidth < 600) twoCol.style.gridTemplateColumns = '1fr';
@@ -6237,6 +6296,157 @@ async function adminAutoMerge() {
     if (statusEl) statusEl.innerHTML = `<span style="color:var(--red)">Auto-merge failed: ${e.message}</span>`;
   } finally {
     if (btn) { btn.disabled = false; btn.textContent = 'Auto-merge'; }
+  }
+}
+
+// ── Issue report modal ────────────────────────────────────────────────────────
+let _issueCtx = { targetType: 'other', targetName: null };
+
+function reportIssue(targetType, targetName, prefillType) {
+  _issueCtx = { targetType: targetType || 'other', targetName: targetName || null };
+  const targetEl = document.getElementById('issueTarget');
+  if (targetEl) targetEl.textContent = targetName ? `${targetType === 'company' ? 'Company' : targetType === 'job' ? 'Listing' : 'Item'}: ${targetName}` : '';
+  document.querySelectorAll('.issue-chip').forEach(c => c.classList.remove('selected'));
+  if (prefillType) {
+    const chip = document.querySelector(`.issue-chip[data-type="${prefillType}"]`);
+    if (chip) { chip.classList.add('selected'); }
+  }
+  const btn = document.getElementById('issueSubmitBtn');
+  if (btn) btn.disabled = !prefillType;
+  if (btn) btn.style.opacity = prefillType ? '1' : '.4';
+  const notes = document.getElementById('issueNotes');
+  if (notes) notes.value = '';
+  const status = document.getElementById('issueStatus');
+  if (status) status.textContent = '';
+  document.getElementById('issueOv').classList.add('open');
+}
+
+function issueSelectType(chip) {
+  document.querySelectorAll('.issue-chip').forEach(c => c.classList.remove('selected'));
+  chip.classList.add('selected');
+  const btn = document.getElementById('issueSubmitBtn');
+  if (btn) { btn.disabled = false; btn.style.opacity = '1'; }
+}
+
+function closeIssueMod() {
+  document.getElementById('issueOv').classList.remove('open');
+}
+
+async function submitIssue() {
+  const selectedChip = document.querySelector('.issue-chip.selected');
+  if (!selectedChip) return;
+  const type = selectedChip.dataset.type;
+  const notes = document.getElementById('issueNotes')?.value?.trim() || null;
+  const btn = document.getElementById('issueSubmitBtn');
+  const statusEl = document.getElementById('issueStatus');
+  if (btn) { btn.disabled = true; btn.textContent = 'Sending…'; }
+  try {
+    const res = await fetch('/api/reports', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        action: 'report_issue',
+        type,
+        target_type: _issueCtx.targetType,
+        target_name: _issueCtx.targetName,
+        notes,
+      }),
+    });
+    const d = await res.json();
+    if (!d.ok) throw new Error(d.error || 'Server error');
+    if (statusEl) statusEl.innerHTML = '<span style="color:var(--green)">✓ Reported — thanks for helping keep data accurate</span>';
+    if (btn) { btn.textContent = 'Sent ✓'; }
+    setTimeout(closeIssueMod, 1800);
+  } catch(e) {
+    if (statusEl) statusEl.innerHTML = `<span style="color:var(--red)">Failed: ${e.message}</span>`;
+    if (btn) { btn.disabled = false; btn.textContent = 'Submit →'; }
+  }
+}
+
+// ── Admin issues queue ────────────────────────────────────────────────────────
+function adminLoadIssues(issueData) {
+  const listEl = document.getElementById('admIssuesList');
+  const countEl = document.getElementById('admIssueCount');
+  if (!listEl) return;
+
+  if (!issueData) {
+    // Called standalone — fetch fresh data
+    Auth.token().then(token => {
+      fetch('/api/admin-stats', { headers: { Authorization: `Bearer ${token}` } })
+        .then(r => r.json())
+        .then(d => adminLoadIssues(d.issues))
+        .catch(e => { listEl.innerHTML = `<div style="padding:.85rem 1rem;font-family:var(--mono);font-size:.62rem;color:var(--red)">Error: ${e.message}</div>`; });
+    });
+    return;
+  }
+
+  if (!issueData.ready) {
+    listEl.innerHTML = '<div style="padding:.85rem 1rem;font-family:var(--mono);font-size:.62rem;color:var(--dim)">Run migration 007 to enable the issues queue.</div>';
+    return;
+  }
+
+  const items = issueData.items || [];
+  if (countEl) {
+    if (items.length > 0) { countEl.textContent = items.length; countEl.style.display = 'inline'; }
+    else countEl.style.display = 'none';
+  }
+
+  if (!items.length) {
+    listEl.innerHTML = '<div style="padding:.85rem 1rem;font-family:var(--mono);font-size:.62rem;color:var(--green)">✓ No open issues</div>';
+    return;
+  }
+
+  const typeLabel = { wrong_data: 'Wrong data', duplicate: 'Duplicate', broken_listing: 'Broken listing', spam: 'Spam', other: 'Other' };
+  const timeAgo = d => {
+    const s = Math.round((Date.now() - new Date(d)) / 1000);
+    if (s < 60) return s + 's ago';
+    if (s < 3600) return Math.round(s/60) + 'm ago';
+    if (s < 86400) return Math.round(s/3600) + 'h ago';
+    return Math.round(s/86400) + 'd ago';
+  };
+
+  listEl.innerHTML = items.map(issue => `
+    <div class="issue-row" id="adminIssue-${issue.id}">
+      <div style="flex:1;min-width:0">
+        <div style="display:flex;align-items:center;gap:.4rem;flex-wrap:wrap;margin-bottom:.2rem">
+          <span class="issue-badge ${issue.type}">${typeLabel[issue.type] || issue.type}</span>
+          ${issue.target_name ? `<span style="font-family:var(--mono);font-size:.6rem;color:var(--white);font-weight:600">${issue.target_name}</span>` : ''}
+          <span style="font-family:var(--mono);font-size:.48rem;color:var(--dim);margin-left:auto;flex-shrink:0">${timeAgo(issue.created_at)}</span>
+        </div>
+        ${issue.notes ? `<div style="font-family:var(--mono);font-size:.58rem;color:var(--sub);line-height:1.5;margin-top:.18rem">${issue.notes}</div>` : ''}
+        ${issue.type === 'duplicate' && issue.target_name
+          ? `<button onclick="adminSetMerge('${issue.target_name.replace(/'/g,"\\'")}','')" style="font-family:var(--mono);font-size:.5rem;margin-top:.3rem;padding:.18rem .5rem;border-radius:4px;border:1px solid var(--line2);background:transparent;color:var(--sub);cursor:pointer">Open in merge tool ↓</button>`
+          : ''}
+      </div>
+      <div style="display:flex;flex-direction:column;gap:.3rem;flex-shrink:0">
+        <button onclick="adminActIssue(${issue.id},'resolve_issue',this)" style="font-family:var(--mono);font-size:.52rem;padding:.22rem .6rem;border-radius:5px;border:1px solid rgba(16,185,129,.3);background:rgba(16,185,129,.08);color:var(--green);cursor:pointer">Resolve</button>
+        <button onclick="adminActIssue(${issue.id},'dismiss_issue',this)" style="font-family:var(--mono);font-size:.52rem;padding:.22rem .6rem;border-radius:5px;border:1px solid var(--line2);background:transparent;color:var(--dim);cursor:pointer">Dismiss</button>
+      </div>
+    </div>`).join('');
+}
+
+async function adminActIssue(id, action, btn) {
+  if (btn) btn.disabled = true;
+  const token = await Auth.token();
+  try {
+    const res = await fetch('/api/admin-stats', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ action, id }),
+    });
+    const d = await res.json();
+    if (!d.ok) throw new Error(d.error || res.status);
+    const row = document.getElementById(`adminIssue-${id}`);
+    if (row) { row.style.opacity = '.3'; row.style.pointerEvents = 'none'; setTimeout(() => row.remove(), 400); }
+    // Update badge count
+    const listEl = document.getElementById('admIssuesList');
+    const remaining = listEl ? listEl.querySelectorAll('.issue-row:not([style*="opacity"])').length - 1 : 0;
+    const countEl = document.getElementById('admIssueCount');
+    if (countEl && remaining <= 0) countEl.style.display = 'none';
+    else if (countEl) countEl.textContent = remaining;
+  } catch(e) {
+    if (btn) { btn.disabled = false; }
+    alert('Error: ' + e.message);
   }
 }
 
