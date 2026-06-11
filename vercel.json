@@ -1,16 +1,10 @@
 {
   "redirects": [
-    { "source": "/feed",       "destination": "/#feed",      "permanent": false },
-    { "source": "/jobs",       "destination": "/#jobs",      "permanent": false },
-    { "source": "/demand",     "destination": "/#demand",    "permanent": false },
-    { "source": "/resume",     "destination": "/#resume",    "permanent": false },
-    { "source": "/tracker",    "destination": "/#tracker",   "permanent": false },
-    { "source": "/report",     "destination": "/#report",    "permanent": false },
-    { "source": "/companies",  "destination": "/#companies", "permanent": false },
-    { "source": "/faq",        "destination": "/#faq",       "permanent": false },
-    { "source": "/legal",      "destination": "/#legal",     "permanent": false },
-    { "source": "/pricing",    "destination": "/#pricing",   "permanent": false },
-    { "source": "/profile",    "destination": "/#profile",   "permanent": false }
+    {
+      "source": "/((?!api(?:/|$))(?!index\\.html$).+)",
+      "destination": "/#$1",
+      "permanent": false
+    }
   ],
   "headers": [
     {
