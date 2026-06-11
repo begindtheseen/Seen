@@ -1,4 +1,5 @@
 import { rateLimit } from './_utils/ratelimit.js';
+import { logError } from './_utils/errlog.js';
 
 // /api/demand — Demand data hub.
 //
@@ -85,6 +86,7 @@ async function handleGet(req, res) {
     });
   } catch (e) {
     console.error('demand GET error:', e.message);
+    logError('demand', e.message, { method: 'GET' });
     return res.status(200).json({ ok: true, demand: [], generated_at: new Date().toISOString() });
   }
 }

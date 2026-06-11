@@ -1,6 +1,7 @@
 // On-demand Adzuna fetch for a user's specific city
 // Called when the user's city has no results in Supabase
 import { rateLimit } from './_utils/ratelimit.js';
+import { logError } from './_utils/errlog.js';
 
 const STATE_ABBR = {
   'Alabama':'AL','Alaska':'AK','Arizona':'AZ','Arkansas':'AR','California':'CA',
@@ -175,6 +176,7 @@ export default async function handler(req, res) {
     return res.status(200).json({ ok: true, jobs: allJobs, location });
   } catch (err) {
     console.error('fetch-location-jobs error:', err.message);
+    logError('fetch-location-jobs', err.message);
     return res.status(500).json({ error: err.message, jobs: [] });
   }
 }

@@ -97,16 +97,17 @@ export default async function handler(req, res) {
     } catch(_) { /* fail open */ }
   }
 
-  // ── LOAD — return all applications + saved jobs + recent cos + credits ───────
+  // ── LOAD — applications + saved jobs + recent cos + credits + feature flags ──
   if (action === 'load') {
     const appsLimit = Math.min(500, Math.max(1, parseInt(body.apps_limit) || 200));
     const appsOffset = Math.max(0, parseInt(body.apps_offset) || 0);
     const today = new Date().toISOString().split('T')[0];
-    const [appsRes, savedRes, recentRes, credRes] = await Promise.all([
+    const [appsRes, savedRes, recentRes, credRes, flagsRes] = await Promise.all([
       db(`applications?user_id=eq.${uid}&order=created_at.desc&limit=${appsLimit}&offset=${appsOffset}`, { headers: { Prefer: 'count=estimated' } }),
       db(`saved_jobs?user_id=eq.${uid}&order=saved_at.desc&limit=500`),
       db(`user_recent_cos?user_id=eq.${uid}&order=viewed_at.desc&limit=6`),
       db(`ai_credits?user_id=eq.${uid}&limit=1`),
+      db(`feature_flags?select=flag_name,status,percentage`),
     ]);
     const apps   = appsRes.ok   ? await appsRes.json()   : [];
     const saved  = savedRes.ok  ? await savedRes.json()  : [];
@@ -118,8 +119,15 @@ export default async function handler(req, res) {
       cred = { ...cred, balance: nb, daily_earned: 0, last_reset: today };
     }
     const credits = cred ? { balance: cred.balance, pro: cred.pro || false, daily_earned: cred.daily_earned || 0 } : null;
+    const flagRows = flagsRes.ok ? await flagsRes.json() : [];
+    const flags = {};
+    flagRows.forEach(f => { flags[f.flag_name] = { status: f.status, percentage: f.percentage || 0 }; });
+    // Collect login signal for duplicate detection (fire-and-forget — never blocks response)
+    const ip = (req.headers['x-forwarded-for'] || '').split(',')[0].trim().slice(0, 45) || 'unknown';
+    const ua = (req.headers['user-agent'] || '').slice(0, 200);
+    db('login_signals', { method: 'POST', body: JSON.stringify({ user_id: uid, ip_address: ip, user_agent: ua }), headers: { Prefer: 'return=minimal' } }).catch(() => {});
     const appsTotal = parseInt((appsRes.headers?.get('content-range') || '').split('/')[1]) || apps.length;
-    return res.status(200).json({ applications: apps, saved_jobs: saved, apps_total: appsTotal, apps_offset: appsOffset, recent_cos: recent, credits });
+    return res.status(200).json({ applications: apps, saved_jobs: saved, apps_total: appsTotal, apps_offset: appsOffset, recent_cos: recent, credits, flags });
   }
 
   // ── ADD APPLICATION ─────────────────────────────────────────────────────────

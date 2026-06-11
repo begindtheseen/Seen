@@ -1,4 +1,5 @@
 import { applyRateLimit } from './_utils/ratelimit.js';
+import { logError } from './_utils/errlog.js';
 
 export default async function handler(req, res) {
   if (await applyRateLimit(req, res, 'job-insights')) return;
@@ -93,7 +94,9 @@ JOB DESCRIPTION:\n${descInput}`;
   }
 
   if (!apiRes?.ok) {
-    console.error('job-insights claude error:', apiRes?.status);
+    const errMsg = `claude ${apiRes?.status}`;
+    console.error('job-insights claude error:', errMsg);
+    logError('job-insights', errMsg, { jobId, status: apiRes?.status });
     return res.status(200).json({ what_they_want: [], hidden_requirements: [], insider_tip: '', description_summary: '', _src: 'api_err' });
   }
 

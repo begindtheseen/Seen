@@ -2576,6 +2576,29 @@ CREATE POLICY "no reads" ON search_logs FOR SELECT USING (false);</pre>
       </div>
     </div>
 
+    <!-- Feature Flags -->
+    <div style="background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:1.1rem;margin-bottom:1rem">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.85rem">
+        <div style="font-family:var(--mono);font-size:.58rem;text-transform:uppercase;letter-spacing:.14em;color:var(--dim)">Feature Flags</div>
+      </div>
+      <div id="admFlagsPanel"><div style="font-family:var(--mono);font-size:.62rem;color:var(--dim)">Loading…</div></div>
+    </div>
+
+    <!-- Duplicate Account Clusters -->
+    <div style="background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:1.1rem;margin-bottom:1rem">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.85rem">
+        <div style="font-family:var(--mono);font-size:.58rem;text-transform:uppercase;letter-spacing:.14em;color:var(--dim)">Duplicate Account Clusters</div>
+        <button onclick="adminDetectDuplicates()" style="background:none;border:1px solid var(--line2);border-radius:6px;padding:.3rem .7rem;font-family:var(--mono);font-size:.58rem;color:var(--sub);cursor:pointer" class="adm-btn">Scan signals</button>
+      </div>
+      <div id="admClustersPanel"><div style="font-family:var(--mono);font-size:.62rem;color:var(--dim)">Loading…</div></div>
+    </div>
+
+    <!-- API Health -->
+    <div style="background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:1.1rem;margin-bottom:1rem">
+      <div style="font-family:var(--mono);font-size:.58rem;text-transform:uppercase;letter-spacing:.14em;color:var(--dim);margin-bottom:.85rem">API Health (Today)</div>
+      <div id="admHealthPanel"><div style="font-family:var(--mono);font-size:.62rem;color:var(--dim)">Loading…</div></div>
+    </div>
+
     </div><!-- /admDashboard -->
 
     <!-- Admin login form — shown when no valid session token -->
@@ -2622,11 +2645,41 @@ const UsageLimits = {
   },
 };
 
+// ── FEATURE FLAGS ────────────────────────────────────────────────────────────
+// Loaded from server via AppStore.load() — zero extra API call.
+// Default: everything off until flags are loaded (safe fail-closed behavior).
+const FeatureFlags = {
+  _flags: {},
+  _uid: null,
+  apply(flags, uid) {
+    if (!flags || typeof flags !== 'object') return;
+    this._flags = flags;
+    this._uid = uid || null;
+  },
+  is(name) {
+    const f = this._flags[name];
+    if (!f) return false;
+    if (f.status === 'fully_on') return true;
+    if (f.status === 'off') return false;
+    if (f.status === 'admin_only') return false; // admins never use seeker JWT, so off for all
+    if (f.status === 'beta_users' || f.status === 'percentage_rollout') {
+      if (!this._uid) return false;
+      // Deterministic bucket: same user always gets same result
+      let hash = 0;
+      for (let i = 0; i < this._uid.length; i++) hash = (hash * 31 + this._uid.charCodeAt(i)) >>> 0;
+      const pct = f.status === 'beta_users' ? 20 : (f.percentage || 0);
+      return (hash % 100) < pct;
+    }
+    return false;
+  },
+};
+
 // ── AI CREDIT STORE ──────────────────────────────────────────────────────────
 const CreditStore = {
   _balance: null,
   async init() {
     if (!Auth.isSeeker()) return;
+    if (this._balance !== null) return; // already loaded by AppStore.load() — skip extra call
     const data = await _sync('get_credits');
     if (data && typeof data.balance === 'number') {
       this._balance = data.balance;
@@ -6348,6 +6401,68 @@ async function renderAdminPage() {
     // ── Issues queue ─────────────────────────────────────────────────────────
     adminLoadIssues(d.issues);
 
+    // ── Feature Flags ─────────────────────────────────────────────────────────
+    const flagsEl = document.getElementById('admFlagsPanel');
+    if (flagsEl) {
+      const flags = d.feature_flags || [];
+      const STATUS_LABELS = { off:'Off', admin_only:'Admin only', beta_users:'Beta (20%)', percentage_rollout:'% rollout', fully_on:'Live' };
+      const STATUS_COLORS = { off:'var(--muted)', admin_only:'var(--amber)', beta_users:'var(--blue)', percentage_rollout:'var(--indigo)', fully_on:'var(--green)' };
+      flagsEl.innerHTML = flags.length ? flags.map(f => `
+        <div style="display:flex;align-items:center;gap:.65rem;padding:.55rem 0;border-bottom:1px solid rgba(255,255,255,.04)">
+          <div style="flex:1;font-family:var(--mono);font-size:.62rem;color:var(--white)">${f.flag_name}</div>
+          <div style="font-family:var(--mono);font-size:.58rem;color:${STATUS_COLORS[f.status]||'var(--muted)'}">${STATUS_LABELS[f.status]||f.status}</div>
+          <select onchange="adminSetFlag('${f.flag_name}',this.value)" style="background:var(--raised);border:1px solid var(--line2);border-radius:5px;padding:.18rem .4rem;font-family:var(--mono);font-size:.58rem;color:var(--sub);cursor:pointer">
+            ${['off','admin_only','beta_users','percentage_rollout','fully_on'].map(s => `<option value="${s}"${s===f.status?' selected':''}>${STATUS_LABELS[s]}</option>`).join('')}
+          </select>
+        </div>`).join('') : '<div style="font-family:var(--mono);font-size:.62rem;color:var(--dim)">No flags — run migration 010</div>';
+    }
+
+    // ── Duplicate Clusters ────────────────────────────────────────────────────
+    const clustersEl = document.getElementById('admClustersPanel');
+    if (clustersEl) {
+      const clusters = d.duplicate_clusters?.items || [];
+      const CLUSTER_COLORS = { suspected:'var(--amber)', watching:'var(--blue)', limited:'var(--red)', frozen:'var(--red)', suspended:'var(--red)', safe:'var(--green)' };
+      clustersEl.innerHTML = clusters.length ? clusters.map(c => `
+        <div style="padding:.6rem 0;border-bottom:1px solid rgba(255,255,255,.04)">
+          <div style="display:flex;align-items:center;gap:.65rem;margin-bottom:.3rem">
+            <span style="font-family:var(--mono);font-size:.6rem;font-weight:700;color:${CLUSTER_COLORS[c.status]||'var(--sub)'}">Risk ${c.risk_score}/100</span>
+            <span style="font-family:var(--mono);font-size:.58rem;color:var(--dim)">${c.user_ids?.length || 0} accounts · ${(c.signals||[]).join(', ')}</span>
+            <select onchange="adminUpdateCluster(${c.id},this.value)" style="background:var(--raised);border:1px solid var(--line2);border-radius:5px;padding:.18rem .4rem;font-family:var(--mono);font-size:.58rem;color:var(--sub);cursor:pointer;margin-left:auto">
+              ${['suspected','safe','watching','limited','frozen','suspended'].map(s => `<option value="${s}"${s===c.status?' selected':''}>${s}</option>`).join('')}
+            </select>
+          </div>
+        </div>`).join('') : '<div style="font-family:var(--mono);font-size:.62rem;color:var(--dim)">No suspected clusters — click "Scan signals" to detect</div>';
+      if (d.duplicate_clusters?.suspected > 0) {
+        clustersEl.innerHTML = `<div style="font-family:var(--mono);font-size:.6rem;color:var(--amber);margin-bottom:.6rem">${d.duplicate_clusters.suspected} suspected cluster${d.duplicate_clusters.suspected===1?'':'s'}</div>` + clustersEl.innerHTML;
+      }
+    }
+
+    // ── API Health ────────────────────────────────────────────────────────────
+    const healthEl = document.getElementById('admHealthPanel');
+    if (healthEl) {
+      const errs = d.errors;
+      const byRoute = errs?.by_route || {};
+      const recent = errs?.recent || [];
+      const dau = d.users?.dau || 0;
+      healthEl.innerHTML = `
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:.5rem;margin-bottom:.75rem">
+          <div style="background:var(--raised);border-radius:8px;padding:.6rem .8rem;text-align:center">
+            <div style="font-family:var(--mono);font-size:1rem;font-weight:700;color:${(errs?.today||0)>10?'var(--red)':'var(--white)'}">${errs?.today||0}</div>
+            <div style="font-family:var(--mono);font-size:.52rem;color:var(--muted)">Errors today</div>
+          </div>
+          <div style="background:var(--raised);border-radius:8px;padding:.6rem .8rem;text-align:center">
+            <div style="font-family:var(--mono);font-size:1rem;font-weight:700;color:var(--white)">${errs?.this_week||0}</div>
+            <div style="font-family:var(--mono);font-size:.52rem;color:var(--muted)">This week</div>
+          </div>
+          <div style="background:var(--raised);border-radius:8px;padding:.6rem .8rem;text-align:center">
+            <div style="font-family:var(--mono);font-size:1rem;font-weight:700;color:var(--blue)">${dau}</div>
+            <div style="font-family:var(--mono);font-size:.52rem;color:var(--muted)">DAU</div>
+          </div>
+        </div>
+        ${Object.keys(byRoute).length ? '<div style="font-family:var(--mono);font-size:.58rem;color:var(--dim);margin-bottom:.35rem">Errors by route:</div>' + Object.entries(byRoute).sort((a,b)=>b[1]-a[1]).map(([route, count]) => `<div style="display:flex;justify-content:space-between;font-family:var(--mono);font-size:.58rem;padding:.2rem 0;border-bottom:1px solid rgba(255,255,255,.03)"><span style="color:var(--sub)">${route}</span><span style="color:var(--red)">${count}</span></div>`).join('') : ''}
+        ${recent.length ? '<div style="font-family:var(--mono);font-size:.58rem;color:var(--dim);margin-top:.65rem;margin-bottom:.35rem">Recent:</div>' + recent.map(e => `<div style="font-family:var(--mono);font-size:.55rem;color:var(--muted);margin-bottom:.2rem">${new Date(e.created_at).toLocaleTimeString()} <span style="color:var(--sub)">${e.endpoint}</span> — ${(e.error_msg||'').slice(0,60)}</div>`).join('') : ''}`;
+    }
+
     // Mobile: collapse two-col to single
     const twoCol = document.getElementById('admTwoCol');
     if (twoCol && window.innerWidth < 600) twoCol.style.gridTemplateColumns = '1fr';
@@ -6453,6 +6568,50 @@ async function adminAutoMerge() {
     if (statusEl) statusEl.innerHTML = `<span style="color:var(--red)">Auto-merge failed: ${e.message}</span>`;
   } finally {
     if (btn) { btn.disabled = false; btn.textContent = 'Auto-merge'; }
+  }
+}
+
+// ── Feature flag management ───────────────────────────────────────────────────
+async function adminSetFlag(flagName, status) {
+  try {
+    const res = await fetch('/api/admin-stats', {
+      method: 'POST',
+      headers: AdminSession.headers(),
+      body: JSON.stringify({ action: 'set_flag', flag_name: flagName, status }),
+    });
+    const d = await res.json();
+    if (!d.ok) throw new Error(d.error || res.status);
+  } catch(e) { alert('Failed to update flag: ' + e.message); }
+}
+
+// ── Duplicate cluster management ──────────────────────────────────────────────
+async function adminUpdateCluster(clusterId, status) {
+  try {
+    const res = await fetch('/api/admin-stats', {
+      method: 'POST',
+      headers: AdminSession.headers(),
+      body: JSON.stringify({ action: 'update_cluster', cluster_id: clusterId, status }),
+    });
+    const d = await res.json();
+    if (!d.ok) throw new Error(d.error || res.status);
+  } catch(e) { alert('Failed to update cluster: ' + e.message); }
+}
+
+async function adminDetectDuplicates() {
+  const panel = document.getElementById('admClustersPanel');
+  if (panel) panel.innerHTML = '<div style="font-family:var(--mono);font-size:.62rem;color:var(--dim)">Scanning login signals…</div>';
+  try {
+    const res = await fetch('/api/admin-stats', {
+      method: 'POST',
+      headers: AdminSession.headers(),
+      body: JSON.stringify({ action: 'detect_duplicates_by_signals' }),
+    });
+    const d = await res.json();
+    if (!d.ok) throw new Error(d.error || res.status);
+    if (panel) panel.innerHTML = `<div style="font-family:var(--mono);font-size:.62rem;color:var(--green)">✓ Found ${d.suspects} suspect groups — created ${d.clusters_created} new clusters</div>`;
+    setTimeout(renderAdminPage, 1200);
+  } catch(e) {
+    if (panel) panel.innerHTML = `<div style="font-family:var(--mono);font-size:.62rem;color:var(--red)">Error: ${e.message}</div>`;
   }
 }
 
@@ -6859,6 +7018,7 @@ const AppStore = {
         // Cache bundled data so other components skip extra round-trips
         if (result.recent_cos) this._recentCos = result.recent_cos;
         if (result.credits) CreditStore._applyIfNull(result.credits);
+        if (result.flags) FeatureFlags.apply(result.flags, Auth.get()?.id || null);
         return merged;
       }
     }

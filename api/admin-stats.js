@@ -59,6 +59,21 @@ async function _handler(req, res) {
     if (!username || !password) return res.status(400).json({ error: 'Username and password required' });
     const ip = (req.headers['x-forwarded-for'] || '').split(',')[0].trim() || '';
 
+    // IP rate limit: 5 attempts per 15 minutes per IP
+    const rlWindow = Math.floor(Date.now() / (15 * 60000));
+    const rlKey = `${ip}:admin_login:${rlWindow}`;
+    try {
+      const rlRes = await fetch(`${SB}/rest/v1/rpc/increment_rate_limit`, {
+        method: 'POST',
+        headers: { apikey: SK, Authorization: `Bearer ${SK}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ p_key: rlKey, p_ttl_seconds: 900 }),
+      });
+      if (rlRes.ok) {
+        const count = await rlRes.json();
+        if (count > 5) return res.status(429).json({ error: 'Too many login attempts — try again in 15 minutes' });
+      }
+    } catch(_) { /* fail open */ }
+
     // Bootstrap: if no admin accounts exist, create one from env vars
     const listRes = await db('admin_accounts?select=id&limit=1');
     const list = listRes.ok ? await listRes.json() : [];
@@ -123,12 +138,12 @@ async function _handler(req, res) {
     const ct = r => parseInt((r?.headers?.get('content-range') || '').split('/')[1]) || 0;
 
     const [
-      usersTotalRes,
-      usersTodayRes, usersWeekRes,
+      usersTotalRes, usersTodayRes, usersWeekRes,
       reportsAllRes, reportsTodayRes, reportsWeekRes,
       appsAllRes, appsGhostedRes, appsHiredRes,
       coScoredRes, issuesRes, creditListRes,
-      searchLogRes, errLogRes,
+      errTodayRes, errWeekRes,
+      dauRes, dupClustersRes, flagsRes,
     ] = await Promise.all([
       db(`profiles?select=id`, { headers: { Prefer: 'count=exact', 'Range-Unit': 'items', Range: '0-0' } }),
       db(`profiles?created_at=gte.${todayISO}&select=id`, { headers: { Prefer: 'count=exact', 'Range-Unit': 'items', Range: '0-0' } }),
@@ -142,8 +157,11 @@ async function _handler(req, res) {
       db(`company_scores?select=id`, { headers: { Prefer: 'count=exact', 'Range-Unit': 'items', Range: '0-0' } }),
       db(`user_issues?status=eq.open&order=created_at.desc&limit=20`),
       db(`ai_credits?select=balance,pro&limit=2000`),
-      db(`search_logs?select=id&limit=1`),
-      db(`api_errors?select=id&limit=1`),
+      db(`api_errors?created_at=gte.${todayISO}&select=endpoint,error_msg,created_at&order=created_at.desc&limit=50`),
+      db(`api_errors?created_at=gte.${weekISO}&select=id`, { headers: { Prefer: 'count=exact', 'Range-Unit': 'items', Range: '0-0' } }),
+      db(`login_signals?created_at=gte.${todayISO}&select=user_id`),
+      db(`duplicate_clusters?status=eq.suspected&order=risk_score.desc&limit=10`),
+      db(`feature_flags?select=flag_name,status,percentage,description,updated_by,updated_at&order=flag_name.asc`),
     ]);
 
     const usersTotal = ct(usersTotalRes);
@@ -152,16 +170,26 @@ async function _handler(req, res) {
     const proCount = creditRows.filter(r => r.pro).length;
     const ghosted = ct(appsGhostedRes);
     const totalApps = ct(appsAllRes);
+    const errToday = errTodayRes.ok ? await errTodayRes.json() : [];
+    const dupClusters = dupClustersRes.ok ? await dupClustersRes.json() : [];
+    const flags = flagsRes.ok ? await flagsRes.json() : [];
+    // DAU = distinct users who loaded the app today
+    const dauRows = dauRes.ok ? await dauRes.json() : [];
+    const dau = new Set(dauRows.map(r => r.user_id)).size;
+    // Error summary by endpoint
+    const errByRoute = {};
+    errToday.forEach(e => { errByRoute[e.endpoint] = (errByRoute[e.endpoint] || 0) + 1; });
 
     return res.status(200).json({
-      users: { total: usersTotal, new_today: ct(usersTodayRes), new_this_week: ct(usersWeekRes) },
+      users: { total: usersTotal, new_today: ct(usersTodayRes), new_this_week: ct(usersWeekRes), dau },
       reports: { total: ct(reportsAllRes), today: ct(reportsTodayRes), this_week: ct(reportsWeekRes) },
       applications: { total: totalApps, ghosted_30d: ghosted, hired_30d: ct(appsHiredRes), ghost_rate_pct: totalApps > 0 ? Math.round(ghosted / totalApps * 100) : null },
       companies: { with_scores: ct(coScoredRes) },
       credits: { total_users: creditRows.length, pro_users: proCount },
-      company_lookups: { ready: searchLogRes.ok },
-      errors: { ready: errLogRes.ok },
-      issues: { ready: issuesRes.ok, open: issues.length, items: issues },
+      errors: { today: errToday.length, this_week: ct(errWeekRes), by_route: errByRoute, recent: errToday.slice(0, 5) },
+      issues: { open: issues.length, items: issues },
+      duplicate_clusters: { suspected: dupClusters.length, items: dupClusters },
+      feature_flags: flags,
     });
   }
 
@@ -236,8 +264,78 @@ async function _handler(req, res) {
     const { user_id, pro } = body;
     if (!user_id) return res.status(400).json({ error: 'user_id required' });
     await db(`ai_credits?on_conflict=user_id`, { method: 'POST', body: JSON.stringify({ user_id, pro: !!pro, balance: pro ? 999 : 3, daily_earned: 0, last_reset: new Date().toISOString().split('T')[0] }), headers: { Prefer: 'resolution=merge-duplicates,return=minimal' } });
-    await db('admin_audit_log', { method: 'POST', body: JSON.stringify({ admin_id: sess.admin_id, username: 'admin', action: 'set_pro', target_type: 'user', target_id: user_id, metadata: { pro } }), headers: { Prefer: 'return=minimal' } });
+    await db('admin_audit_log', { method: 'POST', body: JSON.stringify({ admin_id: sess.admin_id, username: sess.username || 'admin', action: 'set_pro', target_type: 'user', target_id: user_id, metadata: { pro } }), headers: { Prefer: 'return=minimal' } });
     return res.status(200).json({ ok: true });
+  }
+
+  // ── FEATURE FLAG MANAGEMENT ───────────────────────────────────────────────────
+  if (action === 'set_flag') {
+    if (adminRole === 'moderator') return res.status(403).json({ error: 'Insufficient role' });
+    const { flag_name, status, percentage } = body;
+    const VALID_STATUSES = ['off','admin_only','beta_users','percentage_rollout','fully_on'];
+    if (!flag_name || !VALID_STATUSES.includes(status)) return res.status(400).json({ error: 'flag_name and valid status required' });
+    const acctRes = await db(`admin_sessions?token=eq.${encodeURIComponent(adminToken)}&select=admin_id&limit=1`);
+    const acctRows = acctRes.ok ? await acctRes.json() : [];
+    const adminIdForFlag = acctRows[0]?.admin_id || 'unknown';
+    await db(`feature_flags?flag_name=eq.${encodeURIComponent(flag_name)}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ status, percentage: status === 'percentage_rollout' ? (parseInt(percentage) || 0) : 0, updated_by: adminIdForFlag, updated_at: new Date().toISOString() }),
+      headers: { Prefer: 'return=minimal' },
+    });
+    await db('admin_audit_log', { method: 'POST', body: JSON.stringify({ admin_id: sess.admin_id, username: 'admin', action: 'set_flag', target_type: 'feature_flag', target_id: flag_name, metadata: { status, percentage } }), headers: { Prefer: 'return=minimal' } });
+    return res.status(200).json({ ok: true });
+  }
+
+  // ── DUPLICATE CLUSTER MANAGEMENT ──────────────────────────────────────────────
+  if (action === 'update_cluster') {
+    const { cluster_id, status: clusterStatus, admin_note } = body;
+    const VALID = ['suspected','safe','watching','limited','frozen','suspended'];
+    if (!cluster_id || !VALID.includes(clusterStatus)) return res.status(400).json({ error: 'cluster_id and valid status required' });
+    await db(`duplicate_clusters?id=eq.${encodeURIComponent(cluster_id)}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ status: clusterStatus, admin_note: admin_note || null, updated_at: new Date().toISOString() }),
+      headers: { Prefer: 'return=minimal' },
+    });
+    await db('admin_audit_log', { method: 'POST', body: JSON.stringify({ admin_id: sess.admin_id, username: 'admin', action: 'update_cluster', target_type: 'duplicate_cluster', target_id: String(cluster_id), metadata: { status: clusterStatus } }), headers: { Prefer: 'return=minimal' } });
+    return res.status(200).json({ ok: true });
+  }
+
+  if (action === 'detect_duplicates_by_signals') {
+    if (adminRole === 'moderator') return res.status(403).json({ error: 'Insufficient role' });
+    // Find IPs shared by 2+ distinct users in the last 30 days
+    const monthISO = new Date(Date.now() - 30 * 86400000).toISOString();
+    const signalsRes = await db(`login_signals?created_at=gte.${monthISO}&select=user_id,ip_address&limit=5000`);
+    if (!signalsRes.ok) return res.status(500).json({ error: 'Could not query signals' });
+    const signals = await signalsRes.json();
+    // Group by IP
+    const ipGroups = {};
+    signals.forEach(s => {
+      if (!s.ip_address || s.ip_address === 'unknown') return;
+      if (!ipGroups[s.ip_address]) ipGroups[s.ip_address] = new Set();
+      ipGroups[s.ip_address].add(s.user_id);
+    });
+    // Find shared IPs with 2-10 distinct users (>10 = likely NAT/campus, skip)
+    const suspects = [];
+    for (const [ip, users] of Object.entries(ipGroups)) {
+      if (users.size >= 2 && users.size <= 10) {
+        suspects.push({ ip, user_ids: [...users], count: users.size });
+      }
+    }
+    // Upsert clusters for new suspect groups
+    let created = 0;
+    for (const s of suspects.slice(0, 50)) {
+      const userArray = `{${s.user_ids.map(u => `"${u}"`).join(',')}}`;
+      const existing = await db(`duplicate_clusters?signals=cs.{"ip:${s.ip}"}&limit=1`);
+      if (existing.ok && (await existing.json()).length > 0) continue;
+      const riskScore = Math.min(100, 20 + s.count * 10);
+      await db('duplicate_clusters', {
+        method: 'POST',
+        body: JSON.stringify({ user_ids: s.user_ids, signals: [`ip:${s.ip}`], risk_score: riskScore, status: 'suspected' }),
+        headers: { Prefer: 'return=minimal' },
+      });
+      created++;
+    }
+    return res.status(200).json({ ok: true, suspects: suspects.length, clusters_created: created });
   }
 
   return res.status(400).json({ error: 'Unknown action' });
