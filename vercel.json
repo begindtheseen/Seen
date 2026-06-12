@@ -29,7 +29,7 @@
     "api/company-score.js": { "maxDuration": 45 },
     "api/demand.js": { "maxDuration": 60 },
     "api/reports.js": { "maxDuration": 20 },
-    "api/reddit-import.js": { "maxDuration": 60 }
+    "api/reddit-import.js": { "maxDuration": 300 }
   },
   "crons": [
     { "path": "/api/refresh-jobs", "schedule": "0 2 * * *" },

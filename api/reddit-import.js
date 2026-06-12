@@ -247,7 +247,7 @@ export default async function handler(req, res) {
   const { companies = DEFAULT_COMPANIES, dry_run = false } = req.body || {};
   const results = {};
 
-  for (const company of companies.slice(0, 5)) { // max 5 per cron run to stay under Vercel timeout
+  for (const company of companies.slice(0, 12)) { // max 12 per cron run
     results[company] = await processCompany(company, dry_run);
   }
 
