@@ -12,7 +12,6 @@
     "api/fetch-location-jobs.js": { "maxDuration": 30 },
     "api/resume.js": { "maxDuration": 30 },
     "api/apply.js": { "maxDuration": 30 },
-    "api/parse-resume.js": { "maxDuration": 30 },
     "api/jobs.js": { "maxDuration": 60 },
     "api/admin-stats.js": { "maxDuration": 15 },
     "api/user-sync.js": { "maxDuration": 15 },

@@ -162,10 +162,10 @@ export default function ResumePage() {
     reader.onload = async (ev) => {
       const b64 = (ev.target?.result as string).split(',')[1]
       try {
-        const res = await fetch('/api/parse-resume', {
+        const res = await fetch('/api/resume', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ file: b64, filename: file.name }),
+          body: JSON.stringify({ action: 'parse', base64: b64, fileName: file.name, mimeType: file.type }),
         })
         const data = await res.json() as { text?: string }
         if (data.text) {
