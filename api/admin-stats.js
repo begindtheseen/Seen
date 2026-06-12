@@ -168,7 +168,7 @@ async function _handler(req, res) {
       db(`search_events?result_count=eq.0&created_at=gte.${weekISO}&select=query&order=created_at.desc&limit=20`),
       db(`job_availability_reports?reported_at=gte.${weekISO}&select=job_id,status&limit=200`),
       db(`search_logs?created_at=gte.${todayISO}&select=id`, { headers: { Prefer: 'count=exact', 'Range-Unit': 'items', Range: '0-0' } }),
-      db(`reports?select=id,company_name,outcome,role,city,platform,created_at,report_text,outcome_weight,trust_reason&order=created_at.desc&limit=25`),
+      db(`reports?select=id,company_name,outcome,role,city,platform,created_at,report_text,outcome_weight,trust_reason,needs_review&order=created_at.desc&limit=25`),
       db(`applications?select=id,company_name,role,city,status,stage,platform,created_at&order=created_at.desc&limit=25`),
       db(`jobs?created_at=gte.${todayISO}&select=id`, { headers: { Prefer: 'count=exact', 'Range-Unit': 'items', Range: '0-0' } }),
       db(`job_availability_reports?status=eq.expired&select=id,job_id,reported_at&order=reported_at.desc&limit=50`),
@@ -427,6 +427,30 @@ async function _handler(req, res) {
       headers: { Prefer: 'return=minimal' },
     });
     await db('admin_audit_log', { method: 'POST', body: JSON.stringify({ admin_id: sess.admin_id, username: 'admin', action: 'deny_report', target_type: 'job', target_id: String(job_id) }), headers: { Prefer: 'return=minimal' } });
+    return res.status(200).json({ ok: true });
+  }
+
+  if (action === 'approve_report') {
+    const { id } = body;
+    if (!id) return res.status(400).json({ error: 'id required' });
+    await db(`reports?id=eq.${encodeURIComponent(id)}`, { method: 'PATCH', body: JSON.stringify({ needs_review: false, outcome_weight: 1.0 }), headers: { Prefer: 'return=minimal' } });
+    await db('admin_audit_log', { method: 'POST', body: JSON.stringify({ admin_id: sess.admin_id, username: 'admin', action: 'approve_report', target_type: 'report', target_id: String(id) }), headers: { Prefer: 'return=minimal' } });
+    return res.status(200).json({ ok: true });
+  }
+
+  if (action === 'investigate_report') {
+    const { id } = body;
+    if (!id) return res.status(400).json({ error: 'id required' });
+    await db(`reports?id=eq.${encodeURIComponent(id)}`, { method: 'PATCH', body: JSON.stringify({ needs_review: true }), headers: { Prefer: 'return=minimal' } });
+    await db('admin_audit_log', { method: 'POST', body: JSON.stringify({ admin_id: sess.admin_id, username: 'admin', action: 'investigate_report', target_type: 'report', target_id: String(id) }), headers: { Prefer: 'return=minimal' } });
+    return res.status(200).json({ ok: true });
+  }
+
+  if (action === 'deny_hiring_report') {
+    const { id } = body;
+    if (!id) return res.status(400).json({ error: 'id required' });
+    await db(`reports?id=eq.${encodeURIComponent(id)}`, { method: 'PATCH', body: JSON.stringify({ outcome_weight: 0, needs_review: false }), headers: { Prefer: 'return=minimal' } });
+    await db('admin_audit_log', { method: 'POST', body: JSON.stringify({ admin_id: sess.admin_id, username: 'admin', action: 'deny_hiring_report', target_type: 'report', target_id: String(id) }), headers: { Prefer: 'return=minimal' } });
     return res.status(200).json({ ok: true });
   }
 
