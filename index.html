@@ -2563,6 +2563,21 @@ END $$;</pre>
       <div id="admRecentApps"><div style="padding:.85rem 1rem;font-family:var(--mono);font-size:.62rem;color:var(--dim)">Loading…</div></div>
     </div>
 
+    <!-- New job listings browser -->
+    <div class="adm-panel" style="margin-top:.65rem">
+      <div class="adm-panel-hdr">
+        <span>New job listings <span id="admJobsListCount" style="font-size:.55rem;color:var(--dim);font-weight:400"></span></span>
+        <div style="display:flex;gap:.35rem">
+          <button onclick="adminLoadRecentJobs('today',this)" class="adm-period-btn" data-period="today" style="font-family:var(--mono);font-size:.55rem;padding:.28rem .65rem;border-radius:6px;border:1px solid var(--blue);background:rgba(59,130,246,.15);color:var(--blue);cursor:pointer">Today</button>
+          <button onclick="adminLoadRecentJobs('week',this)" class="adm-period-btn" data-period="week" style="font-family:var(--mono);font-size:.55rem;padding:.28rem .65rem;border-radius:6px;border:1px solid var(--line2);background:transparent;color:var(--sub);cursor:pointer">This Week</button>
+          <button onclick="adminLoadRecentJobs('month',this)" class="adm-period-btn" data-period="month" style="font-family:var(--mono);font-size:.55rem;padding:.28rem .65rem;border-radius:6px;border:1px solid var(--line2);background:transparent;color:var(--sub);cursor:pointer">This Month</button>
+        </div>
+      </div>
+      <div id="admJobsList">
+        <div style="padding:.85rem 1rem;font-family:var(--mono);font-size:.62rem;color:var(--dim)">Click a period above to load listings.</div>
+      </div>
+    </div>
+
     <!-- Reported inactive listings -->
     <div class="adm-panel" style="margin-top:.65rem">
       <div class="adm-panel-hdr">
@@ -2621,6 +2636,7 @@ END $$;</pre>
     <div style="background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:1.1rem;margin-bottom:1rem">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.85rem">
         <div style="font-family:var(--mono);font-size:.58rem;text-transform:uppercase;letter-spacing:.14em;color:var(--dim)">Feature Flags</div>
+        <button onclick="adminSeedFlags(this)" style="background:none;border:1px solid var(--line2);border-radius:6px;padding:.3rem .7rem;font-family:var(--mono);font-size:.58rem;color:var(--sub);cursor:pointer">+ Seed defaults</button>
       </div>
       <div id="admFlagsPanel"><div style="font-family:var(--mono);font-size:.62rem;color:var(--dim)">Loading…</div></div>
     </div>
@@ -6635,12 +6651,12 @@ async function renderAdminPage() {
       const STATUS_COLORS = { off:'var(--muted)', admin_only:'var(--amber)', beta_users:'var(--blue)', percentage_rollout:'var(--indigo)', fully_on:'var(--green)' };
       flagsEl.innerHTML = flags.length ? flags.map(f => `
         <div style="display:flex;align-items:center;gap:.65rem;padding:.55rem 0;border-bottom:1px solid rgba(255,255,255,.04)">
-          <div style="flex:1;font-family:var(--mono);font-size:.62rem;color:var(--white)">${f.flag_name}</div>
-          <div style="font-family:var(--mono);font-size:.58rem;color:${STATUS_COLORS[f.status]||'var(--muted)'}">${STATUS_LABELS[f.status]||f.status}</div>
+          <div style="flex:1;font-family:var(--mono);font-size:.62rem;color:var(--white)">${f.flag_name}${f.description ? `<div style="font-family:var(--mono);font-size:.48rem;color:var(--dim);margin-top:.1rem">${f.description}</div>` : ''}</div>
+          <div style="font-family:var(--mono);font-size:.58rem;color:${STATUS_COLORS[f.status]||'var(--muted)'};white-space:nowrap;margin-right:.25rem">${STATUS_LABELS[f.status]||f.status}</div>
           <select onchange="adminSetFlag('${f.flag_name}',this.value,this)" style="background:var(--raised);border:1px solid var(--line2);border-radius:5px;padding:.18rem .4rem;font-family:var(--mono);font-size:.58rem;color:var(--sub);cursor:pointer">
             ${['off','admin_only','beta_users','percentage_rollout','fully_on'].map(s => `<option value="${s}"${s===f.status?' selected':''}>${STATUS_LABELS[s]}</option>`).join('')}
           </select>
-        </div>`).join('') : '<div style="font-family:var(--mono);font-size:.62rem;color:var(--dim)">No flags — run migration 010</div>';
+        </div>`).join('') : `<div style="padding:.75rem 1rem;display:flex;align-items:center;justify-content:space-between"><div style="font-family:var(--mono);font-size:.62rem;color:var(--dim)">No flags in database</div><button onclick="adminSeedFlags(this)" style="font-family:var(--mono);font-size:.58rem;padding:.3rem .75rem;border-radius:6px;border:1px solid rgba(59,130,246,.4);background:rgba(59,130,246,.1);color:var(--blue);cursor:pointer">Initialize default flags →</button></div>`;
     }
 
     // ── Duplicate Clusters ────────────────────────────────────────────────────
@@ -6799,8 +6815,11 @@ async function adminAutoMerge() {
 
 // ── Feature flag management ───────────────────────────────────────────────────
 async function adminSetFlag(flagName, status, selectEl) {
-  const row = selectEl ? selectEl.closest('div[style*="border-bottom"]') : null;
-  const statusLabel = row ? row.querySelector('div[style*="font-size:.58rem"]') : null;
+  const STATUS_LABELS = { off:'Off', admin_only:'Admin only', beta_users:'Beta (20%)', percentage_rollout:'% rollout', fully_on:'Live' };
+  const STATUS_COLORS = { off:'var(--muted)', admin_only:'var(--amber)', beta_users:'var(--blue)', percentage_rollout:'var(--indigo)', fully_on:'var(--green)' };
+  // Find status label: it's the sibling element before the select
+  const statusLabel = selectEl ? selectEl.previousElementSibling : null;
+  const origLabelText = statusLabel ? statusLabel.textContent : '';
   if (statusLabel) statusLabel.textContent = 'Saving…';
   try {
     const res = await fetch('/api/admin-stats', {
@@ -6809,14 +6828,16 @@ async function adminSetFlag(flagName, status, selectEl) {
       body: JSON.stringify({ action: 'set_flag', flag_name: flagName, status }),
     });
     const d = await res.json();
-    if (!d.ok) throw new Error(d.error || res.status);
-    const STATUS_LABELS = { off:'Off', admin_only:'Admin only', beta_users:'Beta (20%)', percentage_rollout:'% rollout', fully_on:'Live' };
-    const STATUS_COLORS = { off:'var(--muted)', admin_only:'var(--amber)', beta_users:'var(--blue)', percentage_rollout:'var(--indigo)', fully_on:'var(--green)' };
+    if (!d.ok) throw new Error(d.error || String(res.status));
     if (statusLabel) { statusLabel.textContent = STATUS_LABELS[status]||status; statusLabel.style.color = STATUS_COLORS[status]||'var(--muted)'; }
-    showToast('Flag updated: ' + flagName + ' → ' + (STATUS_LABELS[status]||status));
+    // Update in-memory feature flags so the change takes effect immediately in this session
+    if (typeof FeatureFlags !== 'undefined' && FeatureFlags._flags) {
+      FeatureFlags._flags[flagName] = { status, percentage: 0 };
+    }
+    showToast('✓ Flag: ' + flagName + ' → ' + (STATUS_LABELS[status]||status));
   } catch(e) {
-    if (statusLabel) statusLabel.textContent = '✗ Failed';
-    alert('Failed to update flag: ' + e.message);
+    if (statusLabel) { statusLabel.textContent = origLabelText; }
+    showToast('✗ Failed to update flag: ' + e.message);
   }
 }
 
@@ -6831,6 +6852,78 @@ async function adminUpdateCluster(clusterId, status) {
     const d = await res.json();
     if (!d.ok) throw new Error(d.error || res.status);
   } catch(e) { alert('Failed to update cluster: ' + e.message); }
+}
+
+async function adminSeedFlags(btnEl) {
+  if (btnEl) { btnEl.textContent = 'Creating…'; btnEl.disabled = true; }
+  try {
+    const res = await fetch('/api/admin-stats', {
+      method: 'POST',
+      headers: AdminSession.headers(),
+      body: JSON.stringify({ action: 'seed_flags' }),
+    });
+    const d = await res.json();
+    if (!d.ok) throw new Error(d.error || res.status);
+    showToast(`✓ Created ${d.created} default flags. Refreshing…`);
+    setTimeout(renderAdminPage, 800);
+  } catch(e) {
+    if (btnEl) { btnEl.textContent = 'Initialize default flags →'; btnEl.disabled = false; }
+    showToast('✗ ' + e.message);
+  }
+}
+
+async function adminLoadRecentJobs(period, clickedBtn) {
+  // Update button styles
+  document.querySelectorAll('.adm-period-btn').forEach(b => {
+    const active = b.dataset.period === period;
+    b.style.borderColor = active ? 'var(--blue)' : 'var(--line2)';
+    b.style.background  = active ? 'rgba(59,130,246,.15)' : 'transparent';
+    b.style.color       = active ? 'var(--blue)' : 'var(--sub)';
+  });
+
+  const listEl = document.getElementById('admJobsList');
+  const countEl = document.getElementById('admJobsListCount');
+  if (listEl) listEl.innerHTML = '<div style="padding:.85rem 1rem;font-family:var(--mono);font-size:.62rem;color:var(--dim)">Loading…</div>';
+
+  try {
+    const res = await fetch('/api/admin-stats', {
+      method: 'POST',
+      headers: AdminSession.headers(),
+      body: JSON.stringify({ action: 'get_recent_jobs', period }),
+    });
+    if (res.status === 401) { AdminSession.clear(); _admShowLogin('Session expired.'); return; }
+    const d = await res.json();
+    if (!d.ok) throw new Error(d.error || res.status);
+
+    const jobs = d.jobs || [];
+    const PERIOD_LABELS = { today: 'today', week: 'this week', month: 'this month' };
+    if (countEl) countEl.textContent = `— ${d.total || jobs.length} ${PERIOD_LABELS[period] || ''}`;
+
+    if (!jobs.length) {
+      listEl.innerHTML = '<div style="padding:.85rem 1rem;font-family:var(--mono);font-size:.62rem;color:var(--dim)">No new listings for this period.</div>';
+      return;
+    }
+
+    const _ago = dt => { const s = Math.round((Date.now() - new Date(dt)) / 1000); if (s < 60) return 'just now'; if (s < 3600) return Math.round(s/60) + 'm'; if (s < 86400) return Math.round(s/3600) + 'h'; return Math.round(s/86400) + 'd'; };
+    const AVAIL_COLORS = { active: 'var(--green)', stale: 'var(--amber)', expired: 'var(--red)', removed: 'var(--dim)' };
+
+    listEl.innerHTML = jobs.map(j => {
+      const url = j.apply_url || j.url || '';
+      const avail = j.availability_status || 'active';
+      return `<div style="display:flex;align-items:center;gap:.75rem;padding:.5rem 1rem;border-bottom:1px solid rgba(255,255,255,.04)">
+        <div style="flex:1;min-width:0">
+          <div style="font-family:var(--mono);font-size:.62rem;color:var(--white);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${j.title||'—'} · <span style="color:var(--sub)">${j.company||'—'}</span></div>
+          <div style="font-family:var(--mono);font-size:.52rem;color:var(--dim);margin-top:.1rem">${j.city||''} · ${j.source||'—'} · <span style="color:${AVAIL_COLORS[avail]||'var(--sub)'}">${avail}</span></div>
+        </div>
+        <div style="display:flex;align-items:center;gap:.5rem;flex-shrink:0">
+          <span style="font-family:var(--mono);font-size:.52rem;color:var(--dim)">${_ago(j.created_at)}</span>
+          ${url ? `<a href="${url}" target="_blank" rel="noopener" style="font-family:var(--mono);font-size:.55rem;color:var(--blue);text-decoration:none">↗</a>` : ''}
+        </div>
+      </div>`;
+    }).join('');
+  } catch(e) {
+    if (listEl) listEl.innerHTML = `<div style="padding:.85rem 1rem;font-family:var(--mono);font-size:.62rem;color:var(--red)">✗ ${e.message}</div>`;
+  }
 }
 
 async function adminRemoveListing(jobId, btnEl) {

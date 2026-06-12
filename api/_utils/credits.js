@@ -55,6 +55,15 @@ export async function gateAI(req, reason = 'ai_tool') {
     headers: { apikey: SERVICE_KEY, Authorization: `Bearer ${SERVICE_KEY}`, 'Content-Type': 'application/json', ...(opts.headers || {}) },
   });
 
+  // Check feature flag — if ai_credit_system_enabled is off, bypass entirely
+  const flagRes = await db(`feature_flags?flag_name=eq.ai_credit_system_enabled&select=status&limit=1`);
+  if (flagRes.ok) {
+    const flagRow = (await flagRes.json())?.[0];
+    if (!flagRow || flagRow.status === 'off') {
+      return { ok: true, uid, balance: 999, pro: false };
+    }
+  }
+
   const today = new Date().toISOString().slice(0, 10);
 
   // Fetch or create credit row

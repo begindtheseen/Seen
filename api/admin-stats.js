@@ -328,13 +328,49 @@ async function _handler(req, res) {
     const acctRes = await db(`admin_sessions?token=eq.${encodeURIComponent(adminToken)}&select=admin_id&limit=1`);
     const acctRows = acctRes.ok ? await acctRes.json() : [];
     const adminIdForFlag = acctRows[0]?.admin_id || 'unknown';
-    await db(`feature_flags?flag_name=eq.${encodeURIComponent(flag_name)}`, {
-      method: 'PATCH',
-      body: JSON.stringify({ status, percentage: status === 'percentage_rollout' ? (parseInt(percentage) || 0) : 0, updated_by: adminIdForFlag, updated_at: new Date().toISOString() }),
-      headers: { Prefer: 'return=minimal' },
+    // UPSERT — creates the row if it doesn't exist yet, updates otherwise
+    await db(`feature_flags?on_conflict=flag_name`, {
+      method: 'POST',
+      body: JSON.stringify({ flag_name, status, percentage: status === 'percentage_rollout' ? (parseInt(percentage) || 0) : 0, updated_by: adminIdForFlag, updated_at: new Date().toISOString() }),
+      headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
     });
     await db('admin_audit_log', { method: 'POST', body: JSON.stringify({ admin_id: sess.admin_id, username: 'admin', action: 'set_flag', target_type: 'feature_flag', target_id: flag_name, metadata: { status, percentage } }), headers: { Prefer: 'return=minimal' } });
     return res.status(200).json({ ok: true });
+  }
+
+  // ── SEED DEFAULT FLAGS ────────────────────────────────────────────────────────
+  if (action === 'seed_flags') {
+    if (adminRole === 'moderator') return res.status(403).json({ error: 'Insufficient role' });
+    const defaultFlags = [
+      { flag_name: 'ai_credit_system_enabled', status: 'fully_on', percentage: 0, description: 'Enables the daily AI credit system. When off, all users get unlimited AI.' },
+      { flag_name: 'reddit_import_enabled',    status: 'off',      percentage: 0, description: 'Enables automatic Reddit report import via cron.' },
+      { flag_name: 'job_refresh_enabled',      status: 'fully_on', percentage: 0, description: 'Enables the Adzuna job refresh cron job.' },
+    ];
+    let created = 0;
+    for (const f of defaultFlags) {
+      const r = await db(`feature_flags?on_conflict=flag_name`, {
+        method: 'POST',
+        body: JSON.stringify({ ...f, updated_at: new Date().toISOString() }),
+        headers: { Prefer: 'resolution=ignore-duplicates,return=minimal' },
+      });
+      if (r.ok && r.status !== 409) created++;
+    }
+    return res.status(200).json({ ok: true, created, total: defaultFlags.length });
+  }
+
+  // ── GET RECENT JOBS ───────────────────────────────────────────────────────────
+  if (action === 'get_recent_jobs') {
+    const { period } = body;
+    const now = new Date();
+    const todayISO2  = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
+    const weekISO2   = new Date(Date.now() - 7 * 86400000).toISOString();
+    const monthISO2  = new Date(Date.now() - 30 * 86400000).toISOString();
+    const cutoff = period === 'today' ? todayISO2 : period === 'month' ? monthISO2 : weekISO2;
+    const r = await db(`jobs?created_at=gte.${cutoff}&select=id,company,title,city,url,apply_url,created_at,availability_status,source&order=created_at.desc&limit=200`, { headers: { Prefer: 'count=estimated', 'Range-Unit': 'items', Range: '0-199' } });
+    if (!r.ok) return res.status(500).json({ error: 'Query failed' });
+    const jobs = await r.json();
+    const total = parseInt((r.headers.get('content-range') || '').split('/')[1]) || jobs.length;
+    return res.status(200).json({ ok: true, jobs: jobs || [], total, period });
   }
 
   // ── DUPLICATE CLUSTER MANAGEMENT ──────────────────────────────────────────────
