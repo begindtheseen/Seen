@@ -2403,8 +2403,9 @@ nav.nav-scrolled{background:rgba(6,6,8,0.82);backdrop-filter:blur(60px) saturate
         <h1 style="font-family:var(--display);font-size:2rem;font-weight:800;color:var(--white);letter-spacing:-.04em;line-height:1.05;margin-bottom:.25rem">Data flywheel</h1>
         <p style="font-size:.8rem;color:var(--sub);font-weight:300" id="admLastUpdated">Loading…</p>
       </div>
-      <div style="display:flex;gap:.5rem;flex-shrink:0">
+      <div style="display:flex;gap:.5rem;flex-shrink:0;flex-wrap:wrap">
         <button onclick="renderAdminPage()" style="background:none;border:1px solid var(--line2);border-radius:8px;padding:.5rem 1rem;font-family:var(--mono);font-size:.65rem;color:var(--sub);cursor:pointer;transition:all .15s" class="adm-btn">↻ Refresh</button>
+        <button id="admRedditBtn" onclick="adminRunReddit()" style="background:none;border:1px solid var(--green);border-radius:8px;padding:.5rem 1rem;font-family:var(--mono);font-size:.65rem;color:var(--green);cursor:pointer;transition:all .15s">▶ Reddit import</button>
         <button onclick="adminLogout()" style="background:none;border:1px solid var(--line2);border-radius:8px;padding:.5rem 1rem;font-family:var(--mono);font-size:.65rem;color:var(--dim);cursor:pointer;transition:all .15s" class="adm-btn-danger">Sign out</button>
       </div>
     </div>
@@ -6321,6 +6322,28 @@ async function adminLogin() {
     if (errEl) errEl.textContent = e.message;
   } finally {
     if (btn) { btn.textContent = 'Sign in →'; btn.disabled = false; }
+  }
+}
+
+async function adminRunReddit() {
+  const btn = document.getElementById('admRedditBtn');
+  if (!btn) return;
+  btn.textContent = '⏳ Running…';
+  btn.disabled = true;
+  try {
+    const res = await fetch('/api/reports', {
+      method: 'POST',
+      headers: AdminSession.headers(),
+      body: JSON.stringify({ action: 'reddit_import' }),
+    });
+    const d = await res.json();
+    if (!res.ok) throw new Error(d.error || res.status);
+    const total = Object.values(d.results || {}).reduce((s, r) => s + (r.imported || 0), 0);
+    btn.textContent = `✓ ${total} imported`;
+    setTimeout(() => { btn.textContent = '▶ Reddit import'; btn.disabled = false; }, 4000);
+  } catch(e) {
+    btn.textContent = '✗ ' + e.message.slice(0, 30);
+    setTimeout(() => { btn.textContent = '▶ Reddit import'; btn.disabled = false; }, 4000);
   }
 }
 

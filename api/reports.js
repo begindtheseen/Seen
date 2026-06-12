@@ -208,12 +208,19 @@ export default async function handler(req, res) {
     return res.status(200).json({ ok: true, company_id: cid });
   }
 
-  // ── Reddit import (cron or manual, service-key required) ────────────────────
+  // ── Reddit import (cron or admin panel) ──────────────────────────────────────
   if (body.action === 'reddit_import') {
     const isCron = req.headers['x-vercel-cron'] === '1';
     if (!isCron) {
-      const auth = req.headers.authorization || '';
-      if (!auth.includes(SUPABASE_SERVICE_KEY)) return res.status(401).json({ error: 'unauthorized' });
+      // Validate X-Admin-Token against admin_sessions table
+      const adminToken = (req.headers['x-admin-token'] || '').trim();
+      if (!adminToken) return res.status(401).json({ error: 'unauthorized' });
+      const sessRes = await fetch(
+        `${SUPABASE_URL}/rest/v1/admin_sessions?token=eq.${encodeURIComponent(adminToken)}&select=expires_at&limit=1`,
+        { headers: { apikey: SUPABASE_SERVICE_KEY, Authorization: `Bearer ${SUPABASE_SERVICE_KEY}` } },
+      );
+      const sess = sessRes.ok ? (await sessRes.json())?.[0] : null;
+      if (!sess || new Date(sess.expires_at) < new Date()) return res.status(401).json({ error: 'unauthorized' });
     }
     const ANTHROPIC_KEY = process.env.ANTHROPIC_KEY || process.env.ANTHROPIC_API_KEY;
     if (!ANTHROPIC_KEY) return res.status(500).json({ error: 'ANTHROPIC_KEY not configured' });
