@@ -259,18 +259,27 @@ export default async function handler(req, res) {
 
     const fetchDebug = {};
     async function redditFetch(sub) {
-      try {
-        // RSS feeds bypass the JSON API IP blocks — feed readers hit these from datacenters constantly
-        const r = await fetch(`https://www.reddit.com/r/${sub}/new/.rss?limit=100`, {
-          headers: { 'User-Agent': 'SeenJobs/1.0 RSS reader (+https://seenjobs.io)', Accept: 'application/rss+xml, application/atom+xml, text/xml' },
-        });
-        fetchDebug[sub] = { status: r.status, method: 'rss' };
-        if (!r.ok) { fetchDebug[sub].error = `HTTP ${r.status}`; return []; }
-        const xml   = await r.text();
-        const posts = parseRedditAtom(xml, sub);
-        fetchDebug[sub].posts = posts.length;
-        return posts;
-      } catch(e) { fetchDebug[sub] = { error: e.message }; return []; }
+      const sleep = ms => new Promise(res => setTimeout(res, ms));
+      for (let attempt = 0; attempt < 3; attempt++) {
+        try {
+          const r = await fetch(`https://www.reddit.com/r/${sub}/new/.rss?limit=100`, {
+            headers: { 'User-Agent': 'SeenJobs/1.0 RSS reader (+https://seenjobs.io)', Accept: 'application/rss+xml, application/atom+xml, text/xml' },
+          });
+          if (r.status === 429) {
+            fetchDebug[sub] = { status: 429, attempt };
+            await sleep(2000 * (attempt + 1)); // 2s, 4s, 6s
+            continue;
+          }
+          fetchDebug[sub] = { status: r.status, method: 'rss' };
+          if (!r.ok) { fetchDebug[sub].error = `HTTP ${r.status}`; return []; }
+          const xml   = await r.text();
+          const posts = parseRedditAtom(xml, sub);
+          fetchDebug[sub].posts = posts.length;
+          return posts;
+        } catch(e) { fetchDebug[sub] = { error: e.message }; return []; }
+      }
+      fetchDebug[sub] = { error: '429 after 3 retries' };
+      return [];
     }
 
     // Fetch top comments for a single post — single-post JSON endpoints are far less restricted than subreddit browsing
@@ -365,7 +374,7 @@ Return ONLY a valid JSON array. Return [] if there are genuinely no hiring exper
         });
         postsByCompany[company].push(...matching);
       }
-      await new Promise(r => setTimeout(r, 400));
+      await new Promise(r => setTimeout(r, 2000));
     }
 
     const results = {};
