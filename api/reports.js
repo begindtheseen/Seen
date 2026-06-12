@@ -209,6 +209,11 @@ export default async function handler(req, res) {
   }
 
   // ── Reddit import (cron or admin panel) ──────────────────────────────────────
+  // Crons are GET requests and pass subreddit as query param: /api/reports?reddit_cron=recruitinghell
+  if (req.method === 'GET' && req.query.reddit_cron) {
+    body = { action: 'reddit_import', subreddit: req.query.reddit_cron };
+  }
+
   if (body.action === 'reddit_import') {
     const isCron = req.headers['x-vercel-cron'] === '1';
     if (!isCron) {
@@ -231,10 +236,11 @@ export default async function handler(req, res) {
       'Goldman Sachs','JPMorgan','Bank of America','Salesforce',
       'Oracle','IBM','Accenture','Lockheed Martin',
     ];
-    const SUBREDDITS    = ['recruitinghell','jobs','cscareerquestions','careerguidance'];
-    const REDDIT_WEIGHT = 0.3;
-    const companies     = Array.isArray(body.companies) ? body.companies : DEFAULT_COMPANIES;
-    const dryRun        = !!body.dry_run;
+    const ALL_SUBREDDITS = ['recruitinghell', 'jobs', 'cscareerquestions', 'careerguidance'];
+    const SUBREDDITS     = body.subreddit ? [body.subreddit] : ALL_SUBREDDITS.slice(0, 1); // default to recruitinghell only; crons pass one each
+    const REDDIT_WEIGHT  = 0.3;
+    const companies      = Array.isArray(body.companies) ? body.companies : DEFAULT_COMPANIES;
+    const dryRun         = !!body.dry_run;
 
     // Reddit RSS/Atom feeds — designed for programmatic consumption, not blocked like the JSON API
     function parseRedditAtom(xml, sub) {

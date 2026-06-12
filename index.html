@@ -6441,6 +6441,26 @@ async function adminRunJob(job, btn) {
   const body = job === 'reddit_import' ? { action: 'reddit_import' } : {};
 
   try {
+    // Reddit import: fire each subreddit as a separate request to avoid burst rate limiting
+    if (job === 'reddit_import') {
+      const subs = ['recruitinghell', 'jobs', 'cscareerquestions', 'careerguidance'];
+      let totalImported = 0, subResults = [];
+      if (resultEl) resultEl.textContent = 'Running…';
+      for (const sub of subs) {
+        const r = await fetch(url, { method, headers: AdminSession.headers(), body: JSON.stringify({ action: 'reddit_import', subreddit: sub }) });
+        const d = await r.json().catch(() => ({}));
+        const n = d.results ? Object.values(d.results).reduce((s, v) => s + (v.imported || 0), 0) : 0;
+        const posts = d.debug?.subreddits?.[sub]?.posts ?? d.debug?.subreddits?.[sub]?.error ?? '?';
+        totalImported += n;
+        subResults.push(`${sub}:${posts}(+${n})`);
+        if (resultEl) resultEl.textContent = `Running… ${subResults.join(' ')}`;
+      }
+      btn.textContent = '✓ Done';
+      if (resultEl) resultEl.textContent = `✓ Reddit: ${totalImported} imported | ${subResults.join(' ')}`;
+      setTimeout(() => { btn.textContent = orig; btn.disabled = false; }, 5000);
+      return;
+    }
+
     const res = await fetch(url, {
       method,
       headers: AdminSession.headers(),
@@ -6450,12 +6470,7 @@ async function adminRunJob(job, btn) {
     if (!res.ok) throw new Error(d.error || String(res.status));
 
     let msg = `✓ ${job} complete`;
-    if (job === 'reddit_import' && d.results) {
-      const total = Object.values(d.results).reduce((s, r) => s + (r.imported || 0), 0);
-      const totalFetched = Object.values(d.results).reduce((s, r) => s + (r.fetched || 0), 0);
-      const subInfo = d.debug?.subreddits ? Object.entries(d.debug.subreddits).map(([s,v]) => `${s}:${v.posts??v.error??v.status}`).join(' ') : '';
-      msg = `✓ Reddit: ${total} imported, ${totalFetched} matched${subInfo ? ` | ${subInfo}` : ''}`;
-    } else if (job === 'refresh_jobs' && d.inserted != null) {
+    if (job === 'refresh_jobs' && d.inserted != null) {
       msg = `✓ Jobs: ${d.inserted} inserted, ${d.updated ?? 0} updated`;
     } else if (job === 'refresh_demand' && d.rows_upserted != null) {
       msg = `✓ Demand: ${d.rows_upserted} rows updated`;

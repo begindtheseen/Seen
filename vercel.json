@@ -37,6 +37,10 @@
     { "path": "/api/refresh-jobs", "schedule": "0 14 * * *" },
     { "path": "/api/refresh-jobs", "schedule": "0 18 * * *" },
     { "path": "/api/refresh-jobs", "schedule": "0 22 * * *" },
-    { "path": "/api/demand", "schedule": "0 4 1 * *" }
+    { "path": "/api/demand", "schedule": "0 4 1 * *" },
+    { "path": "/api/reports?reddit_cron=recruitinghell",    "schedule": "0 3 * * *" },
+    { "path": "/api/reports?reddit_cron=jobs",              "schedule": "0 9 * * *" },
+    { "path": "/api/reports?reddit_cron=cscareerquestions", "schedule": "0 15 * * *" },
+    { "path": "/api/reports?reddit_cron=careerguidance",    "schedule": "0 21 * * *" }
   ]
 }
