@@ -223,12 +223,12 @@ export default function AdminPage() {
           <div style={{ background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 12, padding: '1.25rem' }}>
             <div style={{ fontFamily: 'var(--mono)', fontSize: '.6rem', textTransform: 'uppercase', letterSpacing: '.1em', color: 'var(--dim)', marginBottom: '1rem' }}>Outcome breakdown (30d)</div>
             {[
-              { label: '👻 Ghosted', value: stats.reports.outcome_breakdown.ghosted, color: 'var(--red)' },
-              { label: '🤖 Rejected', value: stats.reports.outcome_breakdown.rejected, color: 'var(--amber)' },
-              { label: '💬 Interview', value: stats.reports.outcome_breakdown.interview, color: 'var(--blue)' },
-              { label: '✅ Offer', value: stats.reports.outcome_breakdown.offer, color: 'var(--green)' },
+              { label: '👻 Ghosted', value: stats.reports.outcome_breakdown?.ghosted ?? 0, color: 'var(--red)' },
+              { label: '🤖 Rejected', value: stats.reports.outcome_breakdown?.rejected ?? 0, color: 'var(--amber)' },
+              { label: '💬 Interview', value: stats.reports.outcome_breakdown?.interview ?? 0, color: 'var(--blue)' },
+              { label: '✅ Offer', value: stats.reports.outcome_breakdown?.offer ?? 0, color: 'var(--green)' },
             ].map(item => {
-              const total = Object.values(stats.reports.outcome_breakdown).reduce((a, b) => a + b, 0)
+              const total = Object.values(stats.reports.outcome_breakdown ?? {}).reduce((a: number, b) => a + (b as number), 0)
               const pct = total > 0 ? Math.round((item.value / total) * 100) : 0
               return (
                 <div key={item.label} style={{ display: 'flex', alignItems: 'center', gap: '.75rem', marginBottom: '.5rem' }}>
