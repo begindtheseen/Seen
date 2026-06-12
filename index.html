@@ -6452,7 +6452,9 @@ async function adminRunJob(job, btn) {
     let msg = `✓ ${job} complete`;
     if (job === 'reddit_import' && d.results) {
       const total = Object.values(d.results).reduce((s, r) => s + (r.imported || 0), 0);
-      msg = `✓ Reddit: ${total} reports imported`;
+      const totalFetched = Object.values(d.results).reduce((s, r) => s + (r.fetched || 0), 0);
+      const subInfo = d.debug?.subreddits ? Object.entries(d.debug.subreddits).map(([s,v]) => `${s}:${v.posts??v.error??v.status}`).join(' ') : '';
+      msg = `✓ Reddit: ${total} imported, ${totalFetched} matched${subInfo ? ` | ${subInfo}` : ''}`;
     } else if (job === 'refresh_jobs' && d.inserted != null) {
       msg = `✓ Jobs: ${d.inserted} inserted, ${d.updated ?? 0} updated`;
     } else if (job === 'refresh_demand' && d.rows_upserted != null) {
@@ -6739,9 +6741,9 @@ async function adminScanDupes() {
       return `<div style="padding:.65rem 1rem;border-bottom:1px solid rgba(255,255,255,.05)">
         <div style="font-family:var(--mono);font-size:.5rem;text-transform:uppercase;letter-spacing:.1em;color:var(--amber);margin-bottom:.3rem">${companies.length} entries match "${key}"</div>
         <div style="display:flex;align-items:center;gap:.35rem;flex-wrap:wrap">
-          <span style="font-family:var(--mono);font-size:.6rem;padding:.18rem .55rem;border-radius:4px;background:rgba(16,185,129,.12);color:var(--green);border:1px solid rgba(16,185,129,.2)">${primary.company_name} <span style="opacity:.6">(${primary.report_count||0})</span></span>
-          ${rest.map(c => `<span style="font-family:var(--mono);font-size:.6rem;padding:.18rem .55rem;border-radius:4px;background:rgba(239,68,68,.08);color:var(--red);border:1px solid rgba(239,68,68,.15)">${c.company_name} <span style="opacity:.6">(${c.report_count||0})</span></span>`).join('')}
-          <button onclick="adminSetMerge('${primary.company_name.replace(/'/g,"\\'")}','${rest[0].company_name.replace(/'/g,"\\'")}',this)" style="font-family:var(--mono);font-size:.52rem;padding:.18rem .55rem;border-radius:5px;border:1px solid var(--line2);background:transparent;color:var(--sub);cursor:pointer;margin-left:auto">Set to merge</button>
+          <span style="font-family:var(--mono);font-size:.6rem;padding:.18rem .55rem;border-radius:4px;background:rgba(16,185,129,.12);color:var(--green);border:1px solid rgba(16,185,129,.2)">${primary.name} <span style="opacity:.6">(${primary.report_count||0})</span></span>
+          ${rest.map(c => `<span style="font-family:var(--mono);font-size:.6rem;padding:.18rem .55rem;border-radius:4px;background:rgba(239,68,68,.08);color:var(--red);border:1px solid rgba(239,68,68,.15)">${c.name} <span style="opacity:.6">(${c.report_count||0})</span></span>`).join('')}
+          <button onclick="adminSetMerge('${primary.name.replace(/'/g,"\\'")}','${rest[0].name.replace(/'/g,"\\'")}',this)" style="font-family:var(--mono);font-size:.52rem;padding:.18rem .55rem;border-radius:5px;border:1px solid var(--line2);background:transparent;color:var(--sub);cursor:pointer;margin-left:auto">Set to merge</button>
         </div>
       </div>`;
     }).join('');

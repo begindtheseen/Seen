@@ -237,20 +237,28 @@ export default async function handler(req, res) {
     const dryRun        = !!body.dry_run;
 
     // Browse new posts (no OAuth required unlike search) — filter client-side per company
+    const fetchDebug = {};
     async function redditFetch(sub) {
       try {
-        const r = await fetch(`https://www.reddit.com/r/${sub}/new.json?limit=100&sort=new`, {
-          headers: { 'User-Agent': 'Mozilla/5.0 (compatible; SeenJobs/1.0; +https://seenjobs.io)' },
+        const r = await fetch(`https://www.reddit.com/r/${sub}/new.json?limit=100&raw_json=1`, {
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+            'Accept': 'application/json, text/javascript, */*; q=0.01',
+            'Accept-Language': 'en-US,en;q=0.9',
+          },
         });
-        if (!r.ok) return [];
+        fetchDebug[sub] = { status: r.status };
+        if (!r.ok) { fetchDebug[sub].error = `HTTP ${r.status}`; return []; }
         const d = await r.json();
-        return (d?.data?.children || []).map(c => ({
+        const posts = (d?.data?.children || []).map(c => ({
           id: c.data.name,
           title: (c.data.title || '').slice(0, 300),
           body:  (c.data.selftext || '').slice(0, 1200),
           subreddit: c.data.subreddit || sub,
         }));
-      } catch { return []; }
+        fetchDebug[sub].posts = posts.length;
+        return posts;
+      } catch(e) { fetchDebug[sub] = { error: e.message }; return []; }
     }
 
     async function alreadyImported(ids) {
@@ -334,7 +342,7 @@ export default async function handler(req, res) {
       }
       results[company] = { imported, skipped, fetched: posts.length };
     }
-    return res.status(200).json({ ok: true, results });
+    return res.status(200).json({ ok: true, results, debug: { subreddits: fetchDebug } });
   }
 
   // ── Fetch reports ───────────────────────────────────────────────────────────

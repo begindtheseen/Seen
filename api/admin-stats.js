@@ -258,8 +258,11 @@ async function _handler(req, res) {
     const rows = await r.json();
     const norm = n => n ? n.toLowerCase().trim().replace(/[\s,]+(inc\.?|llc\.?|corp\.?|ltd\.?|co\.|plc\.?|group|holdings|enterprises|solutions|technologies)\.?$/i, '').trim() : '';
     const groups = {};
-    rows.forEach(r => { const k = norm(r.name); (groups[k] = groups[k] || []).push(r); });
-    return res.status(200).json({ duplicates: Object.values(groups).filter(g => g.length > 1) });
+    rows.forEach(row => { const k = norm(row.name); (groups[k] = groups[k] || []).push(row); });
+    const duplicates = Object.entries(groups)
+      .filter(([, g]) => g.length > 1)
+      .map(([key, companies]) => ({ key, companies }));
+    return res.status(200).json({ ok: true, duplicates });
   }
 
   if (action === 'merge') {
