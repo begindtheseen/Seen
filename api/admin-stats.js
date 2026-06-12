@@ -145,6 +145,7 @@ async function _handler(req, res) {
       errTodayRes, errWeekRes,
       dauRes, dupClustersRes, flagsRes,
       staleJobsRes, zeroSearchesRes, jobReportsRes, searchLogsTodayRes,
+      recentReportsRes, recentAppsRes,
     ] = await Promise.all([
       db(`profiles?select=id`, { headers: { Prefer: 'count=exact', 'Range-Unit': 'items', Range: '0-0' } }),
       db(`profiles?created_at=gte.${todayISO}&select=id`, { headers: { Prefer: 'count=exact', 'Range-Unit': 'items', Range: '0-0' } }),
@@ -167,6 +168,8 @@ async function _handler(req, res) {
       db(`search_events?result_count=eq.0&created_at=gte.${weekISO}&select=query&order=created_at.desc&limit=20`),
       db(`job_availability_reports?reported_at=gte.${weekISO}&select=job_id,status&limit=200`),
       db(`search_logs?created_at=gte.${todayISO}&select=id`, { headers: { Prefer: 'count=exact', 'Range-Unit': 'items', Range: '0-0' } }),
+      db(`reports?select=id,company_name,outcome,role,city,platform,created_at,report_text,outcome_weight,trust_reason&order=created_at.desc&limit=25`),
+      db(`applications?select=id,company_name,role,city,status,stage,platform,created_at&order=created_at.desc&limit=25`),
     ]);
 
     const usersTotal = ct(usersTotalRes);
@@ -188,10 +191,13 @@ async function _handler(req, res) {
     const jobReportsByStatus = { active: 0, expired: 0, unknown: 0 };
     jobReportRows.forEach(r => { jobReportsByStatus[r.status] = (jobReportsByStatus[r.status] || 0) + 1; });
 
+    const recentReports = recentReportsRes.ok ? await recentReportsRes.json() : [];
+    const recentApps    = recentAppsRes.ok    ? await recentAppsRes.json()    : [];
+
     return res.status(200).json({
       users: { total: usersTotal, new_today: ct(usersTodayRes), new_this_week: ct(usersWeekRes), dau },
-      reports: { total: ct(reportsAllRes), today: ct(reportsTodayRes), this_week: ct(reportsWeekRes) },
-      applications: { total: totalApps, ghosted_30d: ghosted, hired_30d: ct(appsHiredRes), ghost_rate_pct: totalApps > 0 ? Math.round(ghosted / totalApps * 100) : null },
+      reports: { total: ct(reportsAllRes), today: ct(reportsTodayRes), this_week: ct(reportsWeekRes), recent: recentReports },
+      applications: { total: totalApps, ghosted_30d: ghosted, hired_30d: ct(appsHiredRes), ghost_rate_pct: totalApps > 0 ? Math.round(ghosted / totalApps * 100) : null, recent: recentApps },
       companies: { with_scores: ct(coScoredRes) },
       credits: { total_users: creditRows.length, pro_users: proCount },
       errors: { today: errToday.length, this_week: ct(errWeekRes), by_route: errByRoute, recent: errToday.slice(0, 5) },

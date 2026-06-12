@@ -2546,11 +2546,23 @@ DO $$ BEGIN
 END $$;</pre>
     </div>
 
+    <!-- Recent submissions feed -->
+    <div class="adm-panel" style="margin-top:.65rem">
+      <div class="adm-panel-hdr">Recent submissions <span style="color:var(--dim);font-weight:400">(last 25)</span></div>
+      <div id="admRecentReports"><div style="padding:.85rem 1rem;font-family:var(--mono);font-size:.62rem;color:var(--dim)">Loading…</div></div>
+    </div>
+
+    <!-- Recent tracker applications -->
+    <div class="adm-panel" style="margin-top:.65rem">
+      <div class="adm-panel-hdr">Recent tracker applications <span style="color:var(--dim);font-weight:400">(last 25)</span></div>
+      <div id="admRecentApps"><div style="padding:.85rem 1rem;font-family:var(--mono);font-size:.62rem;color:var(--dim)">Loading…</div></div>
+    </div>
+
     <!-- User-reported issues queue -->
     <div class="adm-panel" style="margin-top:.65rem">
       <div class="adm-panel-hdr">
-        <span>Reported issues <span id="admIssueCount" style="display:none;font-size:.55rem;padding:.12rem .45rem;border-radius:10px;background:rgba(239,68,68,.15);color:var(--red);margin-left:.4rem;font-weight:600"></span></span>
-        <button onclick="adminLoadIssues()" style="font-family:var(--mono);font-size:.55rem;padding:.3rem .75rem;border-radius:6px;border:1px solid var(--line2);background:transparent;color:var(--sub);cursor:pointer">↻ Refresh</button>
+        <span>Data quality issues <span id="admIssueCount" style="display:none;font-size:.55rem;padding:.12rem .45rem;border-radius:10px;background:rgba(239,68,68,.15);color:var(--red);margin-left:.4rem;font-weight:600"></span></span>
+        <button id="admIssuesRefreshBtn" onclick="adminLoadIssues()" style="font-family:var(--mono);font-size:.55rem;padding:.3rem .75rem;border-radius:6px;border:1px solid var(--line2);background:transparent;color:var(--sub);cursor:pointer">↻ Refresh</button>
       </div>
       <div id="admIssuesList">
         <div style="padding:.85rem 1rem;font-family:var(--mono);font-size:.62rem;color:var(--dim)">Loading…</div>
@@ -2756,6 +2768,8 @@ const CreditStore = {
     const badge = document.getElementById('navCreditBadge');
     const count = document.getElementById('navCreditCount');
     if (!badge) return;
+    // If ai_credit_system_enabled flag is off, hide badge entirely (unlimited mode)
+    if (!FeatureFlags.is('ai_credit_system_enabled')) { badge.style.display = 'none'; return; }
     const b = this._balance;
     if (b === null) { badge.style.display = 'none'; return; }
     badge.style.display = 'inline-flex';
@@ -2766,6 +2780,8 @@ const CreditStore = {
 };
 
 async function _guardAI(tool) {
+  // If credit system is disabled via feature flag, all AI features are free
+  if (!FeatureFlags.is('ai_credit_system_enabled')) return true;
   if (Auth.isSeeker()) return await CreditStore.consume(tool);
   return UsageLimits.check(tool);
 }
@@ -6535,6 +6551,26 @@ async function renderAdminPage() {
     }
 
     // ── Issues queue ─────────────────────────────────────────────────────────
+    // ── Recent submissions ────────────────────────────────────────────────
+    const recentRep = document.getElementById('admRecentReports');
+    if (recentRep) {
+      const rows = d.reports?.recent || [];
+      const _oc = { ghosted:'var(--red)', rejected:'var(--amber)', autoreject:'var(--amber)', hired:'var(--green)', offer:'var(--green)', interview:'var(--blue)', human:'var(--blue)', waiting:'var(--dim)' };
+      const _ago = dt => { const s = Math.round((Date.now() - new Date(dt)) / 1000); if (s < 60) return s + 's'; if (s < 3600) return Math.round(s/60) + 'm'; if (s < 86400) return Math.round(s/3600) + 'h'; return Math.round(s/86400) + 'd'; };
+      recentRep.innerHTML = rows.length ? rows.map(r => '<div style="display:flex;align-items:flex-start;gap:.75rem;padding:.55rem 1rem;border-bottom:1px solid rgba(255,255,255,.04)"><span style="font-family:var(--mono);font-size:.58rem;font-weight:700;color:'+(_oc[r.outcome]||'var(--sub)')+';min-width:62px;flex-shrink:0;padding-top:.1rem">'+( r.outcome||'?')+'</span><div style="flex:1;min-width:0"><div style="font-family:var(--mono);font-size:.62rem;color:var(--white);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+(r.company_name||'—')+(r.role?' · <span style="color:var(--sub)">'+r.role+'</span>':'')+'</div>'+(r.report_text?'<div style="font-family:var(--mono);font-size:.55rem;color:var(--dim);margin-top:.15rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+r.report_text.slice(0,90)+'</div>':'')+'</div><div style="display:flex;flex-direction:column;align-items:flex-end;gap:.1rem;flex-shrink:0"><span style="font-family:var(--mono);font-size:.5rem;color:var(--dim)">'+_ago(r.created_at)+' ago</span><span style="font-family:var(--mono);font-size:.48rem;color:var(--muted)">'+((r.outcome_weight||1)<1?'community · ':'')+( r.trust_reason||r.platform||'')+'</span></div></div>').join('')
+        : '<div style="padding:.85rem 1rem;font-family:var(--mono);font-size:.62rem;color:var(--dim)">No submissions yet</div>';
+    }
+
+    // ── Recent tracker applications ──────────────────────────────────────────
+    const recentAppsEl = document.getElementById('admRecentApps');
+    if (recentAppsEl) {
+      const appRows = d.applications?.recent || [];
+      const _sc = { Applied:'var(--blue)', Screening:'var(--blue)', Interview:'var(--amber)', Offer:'var(--green)', Hired:'var(--green)', Rejected:'var(--red)', Ghosted:'var(--dim)' };
+      const _ago2 = dt => { const s = Math.round((Date.now() - new Date(dt)) / 1000); if (s < 60) return s + 's'; if (s < 3600) return Math.round(s/60) + 'm'; if (s < 86400) return Math.round(s/3600) + 'h'; return Math.round(s/86400) + 'd'; };
+      recentAppsEl.innerHTML = appRows.length ? appRows.map(a => '<div style="display:flex;align-items:center;gap:.75rem;padding:.5rem 1rem;border-bottom:1px solid rgba(255,255,255,.04)"><span style="font-family:var(--mono);font-size:.55rem;color:'+(_sc[a.stage]||'var(--sub)')+';min-width:62px;flex-shrink:0">'+(a.stage||a.status||'?')+'</span><div style="flex:1;font-family:var(--mono);font-size:.62rem;color:var(--white);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+(a.company_name||'—')+(a.role?' · <span style="color:var(--sub)">'+a.role+'</span>':'')+'</div><span style="font-family:var(--mono);font-size:.5rem;color:var(--dim);flex-shrink:0">'+_ago2(a.created_at)+' ago</span></div>').join('')
+        : '<div style="padding:.85rem 1rem;font-family:var(--mono);font-size:.62rem;color:var(--dim)">No tracked applications yet</div>';
+    }
+
     adminLoadIssues(d.issues);
 
     // ── Feature Flags ─────────────────────────────────────────────────────────
@@ -6547,7 +6583,7 @@ async function renderAdminPage() {
         <div style="display:flex;align-items:center;gap:.65rem;padding:.55rem 0;border-bottom:1px solid rgba(255,255,255,.04)">
           <div style="flex:1;font-family:var(--mono);font-size:.62rem;color:var(--white)">${f.flag_name}</div>
           <div style="font-family:var(--mono);font-size:.58rem;color:${STATUS_COLORS[f.status]||'var(--muted)'}">${STATUS_LABELS[f.status]||f.status}</div>
-          <select onchange="adminSetFlag('${f.flag_name}',this.value)" style="background:var(--raised);border:1px solid var(--line2);border-radius:5px;padding:.18rem .4rem;font-family:var(--mono);font-size:.58rem;color:var(--sub);cursor:pointer">
+          <select onchange="adminSetFlag('${f.flag_name}',this.value,this)" style="background:var(--raised);border:1px solid var(--line2);border-radius:5px;padding:.18rem .4rem;font-family:var(--mono);font-size:.58rem;color:var(--sub);cursor:pointer">
             ${['off','admin_only','beta_users','percentage_rollout','fully_on'].map(s => `<option value="${s}"${s===f.status?' selected':''}>${STATUS_LABELS[s]}</option>`).join('')}
           </select>
         </div>`).join('') : '<div style="font-family:var(--mono);font-size:.62rem;color:var(--dim)">No flags — run migration 010</div>';
@@ -6708,7 +6744,10 @@ async function adminAutoMerge() {
 }
 
 // ── Feature flag management ───────────────────────────────────────────────────
-async function adminSetFlag(flagName, status) {
+async function adminSetFlag(flagName, status, selectEl) {
+  const row = selectEl ? selectEl.closest('div[style*="border-bottom"]') : null;
+  const statusLabel = row ? row.querySelector('div[style*="font-size:.58rem"]') : null;
+  if (statusLabel) statusLabel.textContent = 'Saving…';
   try {
     const res = await fetch('/api/admin-stats', {
       method: 'POST',
@@ -6717,7 +6756,14 @@ async function adminSetFlag(flagName, status) {
     });
     const d = await res.json();
     if (!d.ok) throw new Error(d.error || res.status);
-  } catch(e) { alert('Failed to update flag: ' + e.message); }
+    const STATUS_LABELS = { off:'Off', admin_only:'Admin only', beta_users:'Beta (20%)', percentage_rollout:'% rollout', fully_on:'Live' };
+    const STATUS_COLORS = { off:'var(--muted)', admin_only:'var(--amber)', beta_users:'var(--blue)', percentage_rollout:'var(--indigo)', fully_on:'var(--green)' };
+    if (statusLabel) { statusLabel.textContent = STATUS_LABELS[status]||status; statusLabel.style.color = STATUS_COLORS[status]||'var(--muted)'; }
+    showToast('Flag updated: ' + flagName + ' → ' + (STATUS_LABELS[status]||status));
+  } catch(e) {
+    if (statusLabel) statusLabel.textContent = '✗ Failed';
+    alert('Failed to update flag: ' + e.message);
+  }
 }
 
 // ── Duplicate cluster management ──────────────────────────────────────────────
@@ -6822,10 +6868,17 @@ function adminLoadIssues(issueData) {
   if (!listEl) return;
 
   if (!issueData) {
+    listEl.innerHTML = '<div style="padding:.85rem 1rem;font-family:var(--mono);font-size:.62rem;color:var(--dim)">Refreshing…</div>';
+    const btn = document.getElementById('admIssuesRefreshBtn');
+    if (btn) { btn.textContent = '…'; btn.disabled = true; }
     fetch('/api/admin-stats', { headers: AdminSession.headers() })
-      .then(r => r.json())
-      .then(d => adminLoadIssues(d.issues))
-      .catch(e => { listEl.innerHTML = `<div style="padding:.85rem 1rem;font-family:var(--mono);font-size:.62rem;color:var(--red)">Error: ${e.message}</div>`; });
+      .then(r => {
+        if (r.status === 401 || r.status === 403) { AdminSession.clear(); _admShowLogin('Session expired — sign in again.'); return null; }
+        return r.json();
+      })
+      .then(d => { if (d) adminLoadIssues(d.issues); })
+      .catch(e => { listEl.innerHTML = `<div style="padding:.85rem 1rem;font-family:var(--mono);font-size:.62rem;color:var(--red)">Error: ${e.message}</div>`; })
+      .finally(() => { if (btn) { btn.textContent = '↻ Refresh'; btn.disabled = false; } });
     return;
   }
 
