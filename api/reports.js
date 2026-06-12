@@ -542,6 +542,62 @@ Return ONLY a valid JSON array. Return [] if there are genuinely no hiring exper
     return res.status(200).json({ ok: true, results, debug: { subreddits: fetchDebug } });
   }
 
+  // ── n8n / external ingest webhook ────────────────────────────────────────────
+  // n8n POSTs here with action:'ingest' to push data from Glassdoor, Indeed,
+  // LinkedIn, Blind, or any other source n8n can reach.
+  // Body: { action:'ingest', source:'glassdoor', reports:[{company,outcome,role,report_text,platform,source},...] }
+  if (body.action === 'ingest') {
+    const tok = (req.headers['x-admin-token'] || '').trim();
+    if (!tok) return res.status(401).json({ error: 'unauthorized' });
+    const s = await fetch(`${SUPABASE_URL}/rest/v1/admin_sessions?token=eq.${encodeURIComponent(tok)}&select=expires_at&limit=1`, { headers: { apikey: SUPABASE_SERVICE_KEY, Authorization: `Bearer ${SUPABASE_SERVICE_KEY}` } });
+    const sess = s.ok ? (await s.json())?.[0] : null;
+    if (!sess || new Date(sess.expires_at) < new Date()) return res.status(401).json({ error: 'unauthorized' });
+
+    const reports = Array.isArray(body.reports) ? body.reports : [];
+    if (!reports.length) return res.status(400).json({ error: 'reports array required' });
+
+    const SOURCE_WEIGHTS = { glassdoor: 0.7, indeed: 0.6, linkedin: 0.5, blind: 0.6, trustpilot: 0.4, news: 0.3, other: 0.3 };
+    const VALID_OUTCOMES = new Set(['ghosted','rejected','hired','offer','interview','applied','unknown','waiting','autoreject','human']);
+
+    let imported = 0, skipped = 0, errors = [];
+    for (const rpt of reports.slice(0, 500)) {
+      try {
+        if (!rpt.company || !rpt.outcome) { skipped++; continue; }
+        const outcome = VALID_OUTCOMES.has(rpt.outcome) ? rpt.outcome : 'unknown';
+        const src = (rpt.source || body.source || 'other').toLowerCase().split('/')[0];
+        const weight = SOURCE_WEIGHTS[src] || 0.3;
+
+        // Resolve company id
+        const coR = await fetch(`${SUPABASE_URL}/rest/v1/companies?name=ilike.${encodeURIComponent(String(rpt.company).slice(0,120))}&select=id&limit=1`, { headers: hdrsBase });
+        const coRows = coR.ok ? await coR.json() : [];
+        let cid = coRows?.[0]?.id || null;
+        if (!cid) {
+          const ins = await fetch(`${SUPABASE_URL}/rest/v1/companies`, { method: 'POST', headers: { ...hdrsBase, Prefer: 'return=representation' }, body: JSON.stringify({ name: String(rpt.company).slice(0, 120) }) });
+          cid = ins.ok ? (await ins.json())?.[0]?.id || null : null;
+        }
+
+        const row = {
+          company_name:     String(rpt.company).slice(0, 120),
+          platform:         String(rpt.platform || body.source || 'External').slice(0, 100),
+          outcome,
+          role:             rpt.role ? String(rpt.role).slice(0, 200) : null,
+          report_text:      rpt.report_text ? String(rpt.report_text).slice(0, 2000) : null,
+          source:           src,
+          outcome_weight:   weight,
+          trust_reason:     'external_import',
+          needs_review:     true, // flag for admin review since it's external
+          rounds:           Number.isInteger(rpt.rounds) ? rpt.rounds : 0,
+          unpaid_work:      'na',
+          experience_level: rpt.experience_level ? String(rpt.experience_level).slice(0, 50) : 'Unknown',
+        };
+        if (cid) row.company_id = cid;
+        const ins = await fetch(`${SUPABASE_URL}/rest/v1/reports`, { method: 'POST', headers: { ...hdrsBase, Prefer: 'return=minimal' }, body: JSON.stringify(row) });
+        if (ins.ok) imported++; else skipped++;
+      } catch(e) { errors.push(e.message); skipped++; }
+    }
+    return res.status(200).json({ ok: true, imported, skipped, errors: errors.slice(0, 5) });
+  }
+
   // ── Fetch reports ───────────────────────────────────────────────────────────
   const { company, city } = body;
   if (!company) return res.status(400).json({ error: 'company required' });
