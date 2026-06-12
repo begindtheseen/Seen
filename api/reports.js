@@ -299,29 +299,58 @@ export default async function handler(req, res) {
       } catch { return new Set(); }
     }
 
-    async function classify(posts) {
-      const system = `Classify Reddit posts about hiring. Comments from the post thread are included after COMMENTS: — use them. For each post return one JSON object: {outcome:"ghosted"|"rejected"|"hired"|"offer"|"interview"|"applied"|"unknown",role:string|null,is_hiring_experience:boolean,sentiment:"positive"|"negative"|"neutral"|"mixed",summary:string|null}. Return ONLY a JSON array, same order. No markdown.`;
-      const input = posts.map((p,i)=>`[${i}] TITLE: ${p.title}\nBODY: ${p.body||'(none)'}${p.comments?.length ? `\nCOMMENTS:\n${p.comments.join('\n---\n')}` : ''}`).join('\n\n===\n\n');
+    // Extract ALL hiring experiences from a batch of threads for one company.
+    // Comments responding to a company thread don't need to name the company —
+    // Claude infers the subject from thread context (OP establishes who, replies extend it).
+    async function extractReports(posts, company) {
+      if (!posts.length) return [];
+      const system = `You are extracting hiring experience reports from Reddit threads. The company being analyzed is "${company}".
+
+Rules:
+- The OP establishes the company context. Comments responding to the thread are about the same company even if they don't name it.
+- Extract EVERY distinct hiring experience mentioned — OP's experience AND each commenter's experience separately.
+- Only skip a comment if it's clearly unrelated (meme, off-topic question, mod note).
+- A comment saying "same thing happened to me, ghosted after final round" with no company name = valid report about ${company}.
+
+For each experience return: {"outcome":"ghosted"|"rejected"|"hired"|"offer"|"interview"|"applied"|"unknown","role":string|null,"sentiment":"positive"|"negative"|"neutral"|"mixed","summary":string,"post_idx":number}
+"summary" should be a 1-2 sentence description of what happened, written as if it's a review.
+Return ONLY a valid JSON array. Return [] if there are genuinely no hiring experiences.`;
+
+      const input = posts.map((p, i) =>
+        `[POST ${i}] r/${p.subreddit}\nTITLE: ${p.title}\nBODY: ${p.body || '(none)'}${
+          p.comments?.length
+            ? `\nCOMMENTS (${p.comments.length}):\n${p.comments.map((c, ci) => `  [C${ci + 1}] ${c}`).join('\n')}`
+            : ''
+        }`
+      ).join('\n\n===\n\n');
+
       try {
         const r = await fetch('https://api.anthropic.com/v1/messages', {
           method: 'POST',
-          headers: { 'Content-Type':'application/json','x-api-key':ANTHROPIC_KEY,'anthropic-version':'2023-06-01' },
-          body: JSON.stringify({ model:'claude-haiku-4-5-20251001', max_tokens:1024, system, messages:[{role:'user',content:`Classify ${posts.length} posts:\n\n${input}`}] }),
+          headers: { 'Content-Type': 'application/json', 'x-api-key': ANTHROPIC_KEY, 'anthropic-version': '2023-06-01' },
+          body: JSON.stringify({
+            model: 'claude-haiku-4-5-20251001',
+            max_tokens: 2048,
+            system,
+            messages: [{ role: 'user', content: `Extract hiring experiences about ${company}:\n\n${input}` }],
+          }),
         });
-        if (!r.ok) return posts.map(()=>({is_hiring_experience:false}));
+        if (!r.ok) return [];
         const d = await r.json();
-        return JSON.parse(d.content?.[0]?.text || '[]');
-      } catch { return posts.map(()=>({is_hiring_experience:false})); }
+        const text = (d.content?.[0]?.text || '').replace(/```json\n?/g, '').replace(/```\n?/g, '');
+        const match = text.match(/\[[\s\S]*\]/);
+        return match ? JSON.parse(match[0]) : [];
+      } catch { return []; }
     }
 
     async function upsertCo(name) {
       const r = await fetch(`${SUPABASE_URL}/rest/v1/companies?name=ilike.${encodeURIComponent(name)}&select=id&limit=1`, { headers: hdrsBase });
       if (r.ok) { const rows = await r.json(); if (rows?.[0]?.id) return rows[0].id; }
-      const ins = await fetch(`${SUPABASE_URL}/rest/v1/companies`, { method:'POST', headers:{...hdrsBase,Prefer:'return=representation'}, body:JSON.stringify({name}) });
+      const ins = await fetch(`${SUPABASE_URL}/rest/v1/companies`, { method: 'POST', headers: { ...hdrsBase, Prefer: 'return=representation' }, body: JSON.stringify({ name }) });
       return (ins.ok ? (await ins.json())?.[0]?.id : null) || null;
     }
 
-    // Fetch each subreddit once, then fan out across companies (fewer requests to Reddit)
+    // Fetch each subreddit once, fan out across companies
     const postsByCompany = {};
     for (const company of companies.slice(0, 12)) postsByCompany[company] = [];
 
@@ -329,7 +358,7 @@ export default async function handler(req, res) {
       const subPosts = await redditFetch(sub);
       for (const company of companies.slice(0, 12)) {
         const cl = company.toLowerCase();
-        const keywords = ['hiring','interview','ghosted','rejected','offer','recruiter','application','applied'];
+        const keywords = ['hiring', 'interview', 'ghosted', 'rejected', 'offer', 'recruiter', 'application', 'applied', 'onsite', 'phone screen', 'final round', 'heard back', 'never heard'];
         const matching = subPosts.filter(p => {
           const txt = `${p.title} ${p.body}`.toLowerCase();
           return txt.includes(cl) && keywords.some(k => txt.includes(k));
@@ -344,41 +373,65 @@ export default async function handler(req, res) {
       let imported = 0, skipped = 0;
       const posts = postsByCompany[company];
       if (!posts.length) { results[company] = { imported: 0, skipped: 0, fetched: 0 }; continue; }
-      const seen = await alreadyImported(posts.map(p=>p.id));
-      const fresh = posts.filter(p=>!seen.has(p.id));
+
+      const seen = await alreadyImported(posts.map(p => p.id));
+      const fresh = posts.filter(p => !seen.has(p.id));
       if (!fresh.length) { results[company] = { imported: 0, skipped: 0, fetched: posts.length, note: 'all_seen' }; continue; }
 
-      // Enrich fresh posts with comments — cap at 8 posts to keep latency reasonable
-      const toEnrich = fresh.slice(0, 8);
-      await Promise.all(toEnrich.map(async post => {
+      // Fetch comments for all fresh posts in parallel (capped at 10)
+      await Promise.all(fresh.slice(0, 10).map(async post => {
         const comments = await fetchComments(post.id, post.subreddit);
         if (comments.length) post.comments = comments;
       }));
 
-      for (let i = 0; i < fresh.length; i += 20) {
-        const batch = fresh.slice(i, i+20);
-        const cls   = await classify(batch);
-        for (let j = 0; j < batch.length; j++) {
-          const post = batch[j];
-          const c    = Array.isArray(cls) ? (cls[j]||{}) : {};
-          if (!c.is_hiring_experience) {
-            if (!dryRun) await fetch(`${SUPABASE_URL}/rest/v1/reddit_imports`,{method:'POST',headers:{...hdrsBase,Prefer:'return=minimal'},body:JSON.stringify({reddit_post_id:post.id,company_name:company,subreddit:post.subreddit,skipped:true,skip_reason:'not_hiring_experience'})});
-            skipped++; continue;
-          }
-          if (dryRun) { imported++; continue; }
-          const cid = await upsertCo(company);
-          const commentSnippet = post.comments?.length ? `\n\nTop comments:\n${post.comments.slice(0,3).join('\n---\n')}` : '';
-          const reportText = (c.summary || post.title).slice(0, 500) + commentSnippet.slice(0, 800);
-          const rpt = { company_name:company, platform:`Reddit r/${post.subreddit}`, outcome:c.outcome||'unknown', role:c.role||null, report_text:reportText, source:'reddit', outcome_weight:REDDIT_WEIGHT, trust_reason:'community_signal', needs_review:false, rounds:0, unpaid_work:'na', experience_level:'Unknown' };
-          if (cid) rpt.company_id = cid;
-          const repR = await fetch(`${SUPABASE_URL}/rest/v1/reports`,{method:'POST',headers:{...hdrsBase,Prefer:'return=representation'},body:JSON.stringify(rpt)});
-          const repId = repR.ok ? (await repR.json())?.[0]?.id : null;
-          await fetch(`${SUPABASE_URL}/rest/v1/reddit_imports`,{method:'POST',headers:{...hdrsBase,Prefer:'return=minimal'},body:JSON.stringify({reddit_post_id:post.id,company_name:company,subreddit:post.subreddit,report_id:repId||null,skipped:!repId,skip_reason:repId?null:'insert_failed'})});
-          if (repId) imported++; else skipped++;
+      // Extract all experiences from this company's threads in one Claude call
+      const experiences = await extractReports(fresh, company);
+
+      if (!experiences.length) {
+        // Mark posts as seen so we don't re-process them
+        if (!dryRun) {
+          await Promise.all(fresh.map(post =>
+            fetch(`${SUPABASE_URL}/rest/v1/reddit_imports`, { method: 'POST', headers: { ...hdrsBase, Prefer: 'return=minimal' }, body: JSON.stringify({ reddit_post_id: post.id, company_name: company, subreddit: post.subreddit, skipped: true, skip_reason: 'no_experiences_extracted' }) })
+          ));
         }
-        if (i+20 < fresh.length) await new Promise(r=>setTimeout(r,600));
+        results[company] = { imported: 0, skipped: fresh.length, fetched: posts.length };
+        continue;
       }
-      results[company] = { imported, skipped, fetched: posts.length };
+
+      if (dryRun) {
+        results[company] = { imported: experiences.length, skipped: 0, fetched: posts.length, dry_run: true };
+        continue;
+      }
+
+      const cid = await upsertCo(company);
+
+      for (const exp of experiences) {
+        const sourcePost = fresh[exp.post_idx] || fresh[0];
+        const rpt = {
+          company_name: company,
+          platform: `Reddit r/${sourcePost.subreddit}`,
+          outcome: exp.outcome || 'unknown',
+          role: exp.role || null,
+          report_text: exp.summary || sourcePost.title.slice(0, 500),
+          source: 'reddit',
+          outcome_weight: REDDIT_WEIGHT,
+          trust_reason: 'community_signal',
+          needs_review: false,
+          rounds: 0,
+          unpaid_work: 'na',
+          experience_level: 'Unknown',
+        };
+        if (cid) rpt.company_id = cid;
+        const repR = await fetch(`${SUPABASE_URL}/rest/v1/reports`, { method: 'POST', headers: { ...hdrsBase, Prefer: 'return=representation' }, body: JSON.stringify(rpt) });
+        if (repR.ok) imported++; else skipped++;
+      }
+
+      // Mark source posts as imported
+      await Promise.all(fresh.map(post =>
+        fetch(`${SUPABASE_URL}/rest/v1/reddit_imports`, { method: 'POST', headers: { ...hdrsBase, Prefer: 'return=minimal' }, body: JSON.stringify({ reddit_post_id: post.id, company_name: company, subreddit: post.subreddit, skipped: false, skip_reason: null }) })
+      ));
+
+      results[company] = { imported, skipped, fetched: posts.length, experiences: experiences.length };
     }
     return res.status(200).json({ ok: true, results, debug: { subreddits: fetchDebug } });
   }
