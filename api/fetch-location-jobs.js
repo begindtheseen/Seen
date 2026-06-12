@@ -1,5 +1,7 @@
 // On-demand Adzuna fetch for a user's specific city
 // Called when the user's city has no results in Supabase
+import { rateLimit } from './_utils/ratelimit.js';
+import { logError } from './_utils/errlog.js';
 
 const STATE_ABBR = {
   'Alabama':'AL','Alaska':'AK','Arizona':'AZ','Arkansas':'AR','California':'CA',
@@ -121,6 +123,9 @@ export default async function handler(req, res) {
 
   if (req.method === 'OPTIONS') return res.status(200).end();
 
+  const { allowed: rlOk } = await rateLimit(req, 'fetch-location-jobs');
+  if (!rlOk) return res.status(429).json({ error: 'Too many requests — slow down.', jobs: [] });
+
   const APP_ID = process.env.ADZUNA_APP_ID;
   const APP_KEY = process.env.ADZUNA_APP_KEY;
   const SUPABASE_URL = process.env.SUPABASE_URL;
@@ -171,6 +176,7 @@ export default async function handler(req, res) {
     return res.status(200).json({ ok: true, jobs: allJobs, location });
   } catch (err) {
     console.error('fetch-location-jobs error:', err.message);
+    logError('fetch-location-jobs', err.message);
     return res.status(500).json({ error: err.message, jobs: [] });
   }
 }

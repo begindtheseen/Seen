@@ -1,3 +1,6 @@
+import { rateLimit } from './_utils/ratelimit.js';
+import { logError } from './_utils/errlog.js';
+
 // /api/demand — Demand data hub.
 //
 // GET  /api/demand  — Public read. Returns demand_data grouped by city.
@@ -21,6 +24,9 @@ export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   if (req.method === 'OPTIONS') return res.status(200).end();
+
+  const { allowed: rlOk } = await rateLimit(req, 'demand');
+  if (!rlOk) return res.status(429).json({ error: 'Too many requests — slow down.' });
 
   if (req.method === 'GET') return handleGet(req, res);
   if (req.method === 'POST') return handlePost(req, res);
@@ -80,6 +86,7 @@ async function handleGet(req, res) {
     });
   } catch (e) {
     console.error('demand GET error:', e.message);
+    logError('demand', e.message, { method: 'GET' });
     return res.status(200).json({ ok: true, demand: [], generated_at: new Date().toISOString() });
   }
 }
@@ -99,9 +106,15 @@ async function handlePost(req, res) {
   const authHeader = req.headers.authorization || '';
   const token = authHeader.replace(/^Bearer /i, '').trim();
   let authed = false;
+  const adminToken = req.headers['x-admin-token'] || '';
+  const isCron     = req.headers['x-vercel-cron'] === '1';
 
-  if (CRON_SECRET && token === CRON_SECRET) {
+  if (isCron || (CRON_SECRET && token === CRON_SECRET)) {
     authed = true;
+  } else if (adminToken) {
+    const sr = await fetch(`${SUPABASE_URL}/rest/v1/admin_sessions?token=eq.${encodeURIComponent(adminToken)}&select=expires_at&limit=1`, { headers: { apikey: SUPABASE_SERVICE_KEY, Authorization: `Bearer ${SUPABASE_SERVICE_KEY}` } });
+    const sess = sr.ok ? (await sr.json())?.[0] : null;
+    if (sess && new Date(sess.expires_at) > new Date()) authed = true;
   } else if (token) {
     try {
       const userRes = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
@@ -336,7 +349,7 @@ async function handlePost(req, res) {
   let upsertError = null;
 
   try {
-    const upsertRes = await fetch(`${SUPABASE_URL}/rest/v1/demand_data`, {
+    const upsertRes = await fetch(`${SUPABASE_URL}/rest/v1/demand_data?on_conflict=city,role_title`, {
       method: 'POST',
       headers: { ...svc, Prefer: 'resolution=merge-duplicates,return=minimal' },
       body: JSON.stringify(rows),

@@ -1,4 +1,9 @@
 import { getQueryExpansion } from './_utils/expand.js';
+import { applyRateLimit } from './_utils/ratelimit.js';
+import { logError } from './_utils/errlog.js';
+
+// Per-instance request coalescing: concurrent identical searches share one Claude call
+const _inflight = new Map();
 
 export default async function handler(req, res) {
   const _o=req.headers.origin||'';
@@ -11,6 +16,15 @@ export default async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(200).end();
   if (req.method !== 'POST') return res.status(405).end('Method not allowed');
 
+  const limited = await applyRateLimit(req, res, 'job-search');
+  if (limited) return;
+
+  // Declare catch-block variables in outer scope so the catch handler can access them
+  let safeQuery = '';
+  let loc = '';
+  let inflightKey = '';
+  let _inflightResolve, _inflightReject;
+
   try {
     let body = req.body;
     if (typeof body === 'string') { try { body = JSON.parse(body); } catch(e) { body = {}; } }
@@ -18,7 +32,12 @@ export default async function handler(req, res) {
     const { query, location, radius } = body;
     if (!query) return res.status(400).json({ error: 'No query' });
 
-    const loc = (location || '').trim();
+    const rawQuery = String(query).trim().slice(0, 200);
+    if (!rawQuery) return res.status(400).json({ error: 'No query' });
+    // Strip characters that could abuse prompt injection
+    safeQuery = rawQuery.replace(/[<>`\\]/g, '').trim();
+
+    loc = (location || '').trim();
     const radiusMiles = radius || 25;
 
     const systemPrompt = [
@@ -30,8 +49,8 @@ export default async function handler(req, res) {
     ].join('\n');
 
     const userPrompt = loc
-      ? `Find open ${query} jobs within ${radiusMiles} miles of ${loc}. Search LinkedIn, Indeed, Greenhouse, Lever, Workday. Do multiple searches. Return at least 8 results. If not enough nearby, include remote options.`
-      : `Find open ${query} jobs in the US or remote. Search LinkedIn, Indeed, Greenhouse, Lever. Return at least 8 results.`;
+      ? `Find open ${safeQuery} jobs within ${radiusMiles} miles of ${loc}. Search LinkedIn, Indeed, Greenhouse, Lever, Workday. Do multiple searches. Return at least 8 results. If not enough nearby, include remote options.`
+      : `Find open ${safeQuery} jobs in the US or remote. Search LinkedIn, Indeed, Greenhouse, Lever. Return at least 8 results.`;
 
     const ANTHROPIC_KEY = process.env.ANTHROPIC_KEY;
     if (!ANTHROPIC_KEY) return res.status(500).json({ error: 'ANTHROPIC_KEY not configured', jobs: [] });
@@ -44,7 +63,7 @@ export default async function handler(req, res) {
       'Content-Type': 'application/json',
     };
 
-    const qNorm = query.toLowerCase().trim();
+    const qNorm = safeQuery.toLowerCase();
 
     // canonical stays in outer scope so the save section can use it
     let canonical = qNorm;
@@ -99,6 +118,20 @@ export default async function handler(req, res) {
       } catch(e) { console.warn('Cache check error:', e.message); }
       console.log(`CACHE MISS: "${query}" → "${canonical}" @ "${loc}" — calling Claude API`);
     }
+
+    // Coalesce concurrent identical searches into one Claude API call
+    inflightKey = `${canonical}::${loc}`;
+    if (_inflight.has(inflightKey)) {
+      console.log(`COALESCED: "${canonical}" @ "${loc}" — waiting on in-flight request`);
+      try {
+        const coalesced = await _inflight.get(inflightKey);
+        return res.status(200).json({ ok: true, ...coalesced, _src: 'coalesced' });
+      } catch(e) { /* fall through to make our own call */ }
+    }
+
+    const inflightPromise = new Promise((resolve, reject) => { _inflightResolve = resolve; _inflightReject = reject; });
+    _inflight.set(inflightKey, inflightPromise);
+    setTimeout(() => _inflight.delete(inflightKey), 90_000);
 
     let apiRes;
     for (let attempt = 0; attempt < 3; attempt++) {
@@ -209,10 +242,15 @@ export default async function handler(req, res) {
       _logSearch(canonical, loc, jobs.length, SUPABASE_URL, dbHeaders);
     }
 
+    _inflightResolve?.({ jobs, query, location: loc });
+    _inflight.delete(inflightKey);
     return res.status(200).json({ ok: true, jobs, query, location: loc });
 
   } catch(err) {
     console.error('Jobs error:', err.message);
+    logError('jobs', err.message, { query: safeQuery, loc });
+    _inflightReject?.(err);
+    _inflight.delete(inflightKey);
     return res.status(500).json({ error: err.message, jobs: [] });
   }
 }

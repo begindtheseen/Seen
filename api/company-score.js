@@ -80,6 +80,48 @@ export default async function handler(req, res) {
     } catch(err) { return res.status(500).json({ error: err.message }); }
   }
 
+  // ── Resolve: find best matching company with confidence score ───────────────
+  // Pure DB lookup — never calls Claude. Used for "Did you mean X?" and alias resolution.
+  if (body.action === 'resolve') {
+    const { query } = body;
+    if (!query) return res.status(400).json({ error: 'query required' });
+    const SUPABASE_URL = process.env.SUPABASE_URL;
+    const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY;
+    if (!SUPABASE_URL || !SUPABASE_SERVICE_KEY) return res.status(200).json({ ok: true, candidates: [] });
+    const dbH = { apikey: SUPABASE_SERVICE_KEY, Authorization: `Bearer ${SUPABASE_SERVICE_KEY}`, 'Content-Type': 'application/json' };
+    const q = String(query).slice(0, 100).toLowerCase().trim();
+    const qWord = q.split(/\s+/)[0];
+    try {
+      // Query 1: aliases table exact match
+      const [aliasRes, scoresRes] = await Promise.all([
+        fetch(`${SUPABASE_URL}/rest/v1/company_aliases?alias=ilike.${encodeURIComponent(q)}&select=canonical,alias&limit=3`, { headers: dbH }),
+        fetch(`${SUPABASE_URL}/rest/v1/company_scores?company_name=ilike.*${encodeURIComponent(qWord)}*&select=company_name,overall_score,ghost_rate,report_count,data_quality,verification_status&order=report_count.desc&limit=8`, { headers: dbH }),
+      ]);
+      const aliases = aliasRes.ok ? await aliasRes.json() : [];
+      const scores  = scoresRes.ok ? await scoresRes.json() : [];
+
+      const candidates = [];
+      // Alias matches get highest confidence
+      (Array.isArray(aliases) ? aliases : []).forEach(a => {
+        candidates.push({ name: a.canonical, match_confidence: 97, via_alias: true, data_source: 'alias' });
+      });
+      // DB score matches — compute confidence from name similarity
+      (Array.isArray(scores) ? scores : []).forEach(s => {
+        const cn = (s.company_name || '').toLowerCase();
+        let conf = cn === q ? 99 : cn.includes(q) || q.includes(cn)
+          ? Math.round(Math.min(q.length, cn.length) / Math.max(q.length, cn.length) * 90)
+          : Math.round([...q.split(' ')].filter(w => w.length > 1 && cn.includes(w)).length / Math.max(q.split(' ').length, 1) * 80);
+        if (!candidates.find(c => c.name.toLowerCase() === cn)) {
+          candidates.push({ name: s.company_name, match_confidence: conf, overall_score: s.overall_score, report_count: s.report_count, data_quality: s.data_quality, verification_status: s.verification_status });
+        }
+      });
+      candidates.sort((a, b) => b.match_confidence - a.match_confidence);
+      return res.status(200).json({ ok: true, query, candidates: candidates.slice(0, 5) });
+    } catch(e) {
+      return res.status(200).json({ ok: true, candidates: [] });
+    }
+  }
+
   // ── Populate mode: bulk-generate reviews for companies missing them ─────────
   if (body.action === 'populate' || req.method === 'GET') {
     const SUPABASE_URL = process.env.SUPABASE_URL;
@@ -255,8 +297,25 @@ Return ONLY this JSON:
   }
 
   if (!apiRes.ok) {
-    const err = await apiRes.text();
-    return res.status(502).json({ error: 'Claude API error', detail: err.slice(0, 150) });
+    const errText = await apiRes.text();
+    // On rate limit or outage, serve stale cache rather than failing hard
+    if ((apiRes.status === 429 || apiRes.status === 529 || apiRes.status >= 500) && SUPABASE_URL && SUPABASE_SERVICE_KEY) {
+      try {
+        const nameEnc = encodeURIComponent(name.toLowerCase().trim());
+        const staleRes = await fetch(
+          `${SUPABASE_URL}/rest/v1/company_scores?company_name=ilike.${nameEnc}&order=created_at.desc&limit=1`,
+          { headers: dbHeaders }
+        );
+        if (staleRes.ok) {
+          const staleRows = await staleRes.json();
+          if (staleRows?.[0]) {
+            console.warn(`COMPANY SCORE STALE FALLBACK: "${name}" — Claude ${apiRes.status}`);
+            return res.json({ ok: true, score: rowToScore(staleRows[0]), _src: 'stale-cache' });
+          }
+        }
+      } catch(_) {}
+    }
+    return res.status(502).json({ error: 'Score service temporarily unavailable', retry_after: '60' });
   }
 
   const data = await apiRes.json();

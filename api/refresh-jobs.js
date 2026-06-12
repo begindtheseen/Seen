@@ -388,6 +388,7 @@ async function fetchAdzuna(what, where, appId, appKey) {
     clearTimeout(timeout);
     if (!res.ok) return [];
     const data = await res.json();
+    const now = new Date().toISOString();
     return (data.results || []).map(j => ({
       title: j.title || what,
       company: normalizeCompany(j.company?.display_name) || 'Unknown',
@@ -401,6 +402,9 @@ async function fetchAdzuna(what, where, appId, appKey) {
       score: scoreJob(normalizeCompany(j.company?.display_name), j.salary_min),
       waste_score: wasteScore(normalizeCompany(j.company?.display_name)),
       expires_at: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(),
+      availability_status: 'active',
+      last_seen_at: now,
+      last_checked_at: now,
     })).filter(j => j.company !== 'Unknown' && j.apply_url && j.description && j.description.length > 80);
   } catch (e) {
     clearTimeout(timeout);
@@ -569,6 +573,22 @@ async function deleteExpired(supabaseUrl, serviceKey) {
   });
 }
 
+async function markStaleJobs(supabaseUrl, serviceKey) {
+  const h = { apikey: serviceKey, Authorization: `Bearer ${serviceKey}`, 'Content-Type': 'application/json', Prefer: 'return=minimal' };
+  const staleISO = new Date(Date.now() - 7 * 86400000).toISOString();
+  const expiredISO = new Date(Date.now() - 14 * 86400000).toISOString();
+  await Promise.all([
+    // active jobs not seen in 7+ days → stale
+    fetch(`${supabaseUrl}/rest/v1/jobs?availability_status=eq.active&last_seen_at=lt.${staleISO}`, {
+      method: 'PATCH', headers: h, body: JSON.stringify({ availability_status: 'stale' }),
+    }),
+    // stale/active jobs not seen in 14+ days → expired
+    fetch(`${supabaseUrl}/rest/v1/jobs?availability_status=in.(active,stale)&last_seen_at=lt.${expiredISO}`, {
+      method: 'PATCH', headers: h, body: JSON.stringify({ availability_status: 'expired' }),
+    }),
+  ]).catch(e => console.error('markStaleJobs error (non-fatal):', e.message));
+}
+
 // Scan every active listing and immediately remove any that fail quality standards.
 // Runs every cron hit — cheap (only fetches id + description + apply_url).
 async function deleteJunk(supabaseUrl, serviceKey) {
@@ -613,11 +633,20 @@ export default async function handler(req, res) {
   const headers = { 'Content-Type': 'application/json' };
 
   const cronSecret = process.env.CRON_SECRET;
-  if (cronSecret) {
-    const authHeader = req.headers['authorization'] || '';
+  const adminToken = req.headers['x-admin-token'] || '';
+  const isCron     = req.headers['x-vercel-cron'] === '1';
+  if (!isCron && cronSecret) {
+    const authHeader  = req.headers['authorization'] || '';
     const querySecret = new URL(req.url, 'https://x').searchParams.get('secret') || '';
-    if (authHeader !== `Bearer ${cronSecret}` && querySecret !== cronSecret) {
-      return res.status(401).json({ error: 'Unauthorized' });
+    const cronOk = authHeader === `Bearer ${cronSecret}` || querySecret === cronSecret;
+    if (!cronOk && !adminToken) return res.status(401).json({ error: 'Unauthorized' });
+    if (!cronOk && adminToken) {
+      // Validate admin session token
+      const SB = process.env.SUPABASE_URL, SK = process.env.SUPABASE_SERVICE_KEY;
+      if (!SB || !SK) return res.status(401).json({ error: 'Unauthorized' });
+      const sr = await fetch(`${SB}/rest/v1/admin_sessions?token=eq.${encodeURIComponent(adminToken)}&select=expires_at&limit=1`, { headers: { apikey: SK, Authorization: `Bearer ${SK}` } });
+      const sess = sr.ok ? (await sr.json())?.[0] : null;
+      if (!sess || new Date(sess.expires_at) < new Date()) return res.status(401).json({ error: 'Unauthorized' });
     }
   }
 
@@ -637,6 +666,7 @@ export default async function handler(req, res) {
     const [, junkResult] = await Promise.all([
       deleteExpired(SUPABASE_URL, SUPABASE_SERVICE_KEY),
       deleteJunk(SUPABASE_URL, SUPABASE_SERVICE_KEY),
+      markStaleJobs(SUPABASE_URL, SUPABASE_SERVICE_KEY),
     ]);
 
     // Pick which batch of 10 to run based on current UTC hour

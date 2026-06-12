@@ -1,7 +1,12 @@
 import { applyRateLimit } from './_utils/ratelimit.js';
+import { logError } from './_utils/errlog.js';
+import { gateAI } from './_utils/credits.js';
 
 export default async function handler(req, res) {
-  // Rate limit keyed per tool so each tool has its own bucket
+  res.setHeader('Access-Control-Allow-Origin', req.headers.origin?.includes('localhost') ? (req.headers.origin || '*') : 'https://seenjobs.io');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  if (req.method === 'OPTIONS') return res.status(200).end();
+
   let body = req.body;
   if (typeof body === 'string') { try { body = JSON.parse(body); } catch(e) { body = {}; } }
   if (!body || typeof body !== 'object') body = {};
@@ -10,6 +15,10 @@ export default async function handler(req, res) {
   if (await applyRateLimit(req, res, endpoint)) return;
 
   if (req.method !== 'POST') return res.status(405).end('Method not allowed');
+
+  // Credit gate — requires auth and 1 credit per call
+  const gate = await gateAI(req, `resume_${tool || 'tool'}`);
+  if (!gate.ok) return res.status(gate.status).json({ error: gate.error, credits_required: gate.credits_required, balance: gate.balance ?? 0 });
 
   try {
     if (!tool) return res.status(400).json({ error: 'Missing tool parameter' });
@@ -143,6 +152,7 @@ JOB DESCRIPTION:\n${(jobDescription||'').slice(0,2500)}${background?'\nCANDIDATE
 
   } catch(err) {
     console.error('Resume API error:', err.message);
+    logError('resume', err.message);
     return res.status(500).json({ error: err.message });
   }
 }

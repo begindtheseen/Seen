@@ -14,15 +14,23 @@ const ALLOWED_ORIGINS = [
 
 /** Per-hour limits by endpoint key */
 const LIMITS = {
-  'company-score': 20,
-  'resume-scanner': 10,
-  'resume-coach': 5,
-  'resume-proposal': 5,
+  'company-score':        20,
+  'resume-scanner':       10,
+  'resume-coach':          5,
+  'resume-proposal':       5,
   'resume-hiring_manager': 6,
-  'resume-insider_intel': 6,
-  'job-insights': 20,
-  'reports': 30,
-  'apply': 10,
+  'resume-insider_intel':  6,
+  'job-insights':         20,
+  'reports':              30,
+  'apply':                10,
+  // Added for 10k scale
+  'job-search':           10,   // each miss calls Claude API — expensive
+  'parse-resume':          8,   // large file uploads + Claude
+  'report-submit':        15,   // DB writes per hour per IP
+  'benchmarks':           40,   // company stats lookups — cheap DB reads
+  'fetch-location-jobs':  30,   // Adzuna API calls — protect quota
+  'user-sync':           500,   // all user data actions — generous for normal use
+  'demand':              120,   // public demand data reads
 };
 
 /**
