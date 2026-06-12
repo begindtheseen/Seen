@@ -2405,8 +2405,7 @@ nav.nav-scrolled{background:rgba(6,6,8,0.82);backdrop-filter:blur(60px) saturate
       </div>
       <div style="display:flex;gap:.5rem;flex-shrink:0;flex-wrap:wrap">
         <button onclick="renderAdminPage()" style="background:none;border:1px solid var(--line2);border-radius:8px;padding:.5rem 1rem;font-family:var(--mono);font-size:.65rem;color:var(--sub);cursor:pointer;transition:all .15s" class="adm-btn">↻ Refresh</button>
-        <button id="admRedditBtn" onclick="adminRunReddit()" style="background:none;border:1px solid var(--green);border-radius:8px;padding:.5rem 1rem;font-family:var(--mono);font-size:.65rem;color:var(--green);cursor:pointer;transition:all .15s">▶ Reddit import</button>
-        <button onclick="adminLogout()" style="background:none;border:1px solid var(--line2);border-radius:8px;padding:.5rem 1rem;font-family:var(--mono);font-size:.65rem;color:var(--dim);cursor:pointer;transition:all .15s" class="adm-btn-danger">Sign out</button>
+<button onclick="adminLogout()" style="background:none;border:1px solid var(--line2);border-radius:8px;padding:.5rem 1rem;font-family:var(--mono);font-size:.65rem;color:var(--dim);cursor:pointer;transition:all .15s" class="adm-btn-danger">Sign out</button>
       </div>
     </div>
 
@@ -2598,6 +2597,39 @@ CREATE POLICY "no reads" ON search_logs FOR SELECT USING (false);</pre>
     <div style="background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:1.1rem;margin-bottom:1rem">
       <div style="font-family:var(--mono);font-size:.58rem;text-transform:uppercase;letter-spacing:.14em;color:var(--dim);margin-bottom:.85rem">API Health (Today)</div>
       <div id="admHealthPanel"><div style="font-family:var(--mono);font-size:.62rem;color:var(--dim)">Loading…</div></div>
+    </div>
+
+    <!-- Background Jobs -->
+    <div style="background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:1.1rem;margin-bottom:1rem">
+      <div style="font-family:var(--mono);font-size:.58rem;text-transform:uppercase;letter-spacing:.14em;color:var(--dim);margin-bottom:.85rem">Background Jobs</div>
+      <div style="display:flex;flex-direction:column;gap:.5rem">
+
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:.6rem .75rem;background:var(--bg2);border-radius:8px">
+          <div>
+            <div style="font-family:var(--mono);font-size:.65rem;color:var(--white)">Refresh job listings</div>
+            <div style="font-family:var(--mono);font-size:.55rem;color:var(--dim)">Pulls new openings from job boards · runs 6×/day</div>
+          </div>
+          <button id="jobBtnRefreshJobs" onclick="adminRunJob('refresh_jobs',this)" style="background:none;border:1px solid var(--line2);border-radius:7px;padding:.35rem .8rem;font-family:var(--mono);font-size:.6rem;color:var(--sub);cursor:pointer;white-space:nowrap;flex-shrink:0">▶ Run</button>
+        </div>
+
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:.6rem .75rem;background:var(--bg2);border-radius:8px">
+          <div>
+            <div style="font-family:var(--mono);font-size:.65rem;color:var(--white)">Refresh demand data</div>
+            <div style="font-family:var(--mono);font-size:.55rem;color:var(--dim)">Pulls BLS JOLTS + CES, updates demand index · runs monthly</div>
+          </div>
+          <button id="jobBtnRefreshDemand" onclick="adminRunJob('refresh_demand',this)" style="background:none;border:1px solid var(--line2);border-radius:7px;padding:.35rem .8rem;font-family:var(--mono);font-size:.6rem;color:var(--sub);cursor:pointer;white-space:nowrap;flex-shrink:0">▶ Run</button>
+        </div>
+
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:.6rem .75rem;background:var(--bg2);border-radius:8px">
+          <div>
+            <div style="font-family:var(--mono);font-size:.65rem;color:var(--white)">Reddit import</div>
+            <div style="font-family:var(--mono);font-size:.55rem;color:var(--dim)">Classifies hiring posts from r/recruitinghell + 3 others · runs nightly</div>
+          </div>
+          <button id="jobBtnRedditImport" onclick="adminRunJob('reddit_import',this)" style="background:none;border:1px solid var(--green);border-radius:7px;padding:.35rem .8rem;font-family:var(--mono);font-size:.6rem;color:var(--green);cursor:pointer;white-space:nowrap;flex-shrink:0">▶ Run</button>
+        </div>
+
+      </div>
+      <div id="admJobResult" style="font-family:var(--mono);font-size:.6rem;color:var(--sub);margin-top:.6rem;min-height:1em"></div>
     </div>
 
     </div><!-- /admDashboard -->
@@ -6325,26 +6357,37 @@ async function adminLogin() {
   }
 }
 
-async function adminRunReddit() {
-  const btn = document.getElementById('admRedditBtn');
+async function adminRunJob(job, btn) {
   if (!btn) return;
+  const orig = btn.textContent;
   btn.textContent = '⏳ Running…';
   btn.disabled = true;
+  const resultEl = document.getElementById('admJobResult');
+  if (resultEl) resultEl.textContent = '';
   try {
-    const res = await fetch('/api/reports', {
+    const res = await fetch('/api/admin-stats', {
       method: 'POST',
       headers: AdminSession.headers(),
-      body: JSON.stringify({ action: 'reddit_import' }),
+      body: JSON.stringify({ action: 'run_job', job }),
     });
     const d = await res.json();
     if (!res.ok) throw new Error(d.error || res.status);
-    const total = Object.values(d.results || {}).reduce((s, r) => s + (r.imported || 0), 0);
-    btn.textContent = `✓ ${total} imported`;
-    setTimeout(() => { btn.textContent = '▶ Reddit import'; btn.disabled = false; }, 4000);
+    let msg = `✓ ${job} complete`;
+    if (job === 'reddit_import' && d.results) {
+      const total = Object.values(d.results).reduce((s, r) => s + (r.imported || 0), 0);
+      msg = `✓ Reddit: ${total} reports imported`;
+    } else if (job === 'refresh_jobs' && d.inserted != null) {
+      msg = `✓ Jobs: ${d.inserted} inserted, ${d.updated ?? 0} updated`;
+    } else if (job === 'refresh_demand' && d.rows_upserted != null) {
+      msg = `✓ Demand: ${d.rows_upserted} rows updated`;
+    }
+    btn.textContent = '✓ Done';
+    if (resultEl) resultEl.textContent = msg;
   } catch(e) {
-    btn.textContent = '✗ ' + e.message.slice(0, 30);
-    setTimeout(() => { btn.textContent = '▶ Reddit import'; btn.disabled = false; }, 4000);
+    btn.textContent = '✗ Error';
+    if (resultEl) resultEl.textContent = '✗ ' + e.message.slice(0, 80);
   }
+  setTimeout(() => { btn.textContent = orig; btn.disabled = false; }, 5000);
 }
 
 async function adminLogout() {
