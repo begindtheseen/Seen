@@ -37,6 +37,21 @@ Build Seen as a hiring intelligence platform where the application tracker is th
 - The Next.js runtime itself uses 1 slot because `/company/[slug]` is a dynamic (ƒ) route
 - If `/company/[slug]` is ever converted to fully static (no dynamic routing), the Next.js slot goes away and you can have 12 api/*.js again
 
+### Vercel deploy trigger problem (discovered 2026-06-12, Session B):
+- **Vercel does NOT create deployments for commits authored by the `claude` bot.**
+  Evidence: the only next-migration deployments Vercel ever created were the owner's two
+  GitHub web-UI commits (f85fd9c "Update package.json", f9ab769 "Delete package-lock.json").
+  Every claude-authored push (Session A's empty "force redeploy" commit, all of Session B's
+  pushes) produced NO deployment — not even a failed one.
+- Session A hit this same wall and tried a GitHub Actions fallback (`.github/workflows/deploy.yml`,
+  `npx vercel --prod --token`). Both runs FAILED: secrets `VERCEL_TOKEN`, `VERCEL_ORG_ID`,
+  `VERCEL_PROJECT_ID` are NOT configured in the repo. The workflow was then deleted.
+- **To trigger a deployment after a claude push, the owner must do ONE of:**
+  1. Make any trivial commit to next-migration from their own GitHub account (web UI edit) — Vercel builds the full tree
+  2. Create a Vercel Deploy Hook (Project Settings → Git → Deploy Hooks, branch next-migration) and curl it
+  3. Add VERCEL_TOKEN / VERCEL_ORG_ID / VERCEL_PROJECT_ID repo secrets and restore an Actions workflow
+- `"type": "module"` is set in package.json (fixes Vercel's ESM→CJS compile warning)
+
 ### What the next session needs to do:
 1. Confirm Vercel picked up the next-migration push and triggered a preview build
 2. Verify the preview deployment is green (no vulnerability block, no build errors)
