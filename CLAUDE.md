@@ -21,6 +21,10 @@ Build Seen as a hiring intelligence platform where the application tracker is th
 - **All api/ files**: synced from main to next-migration (50 commits of production fixes)
 - **Supabase migrations 004–012**: added to next-migration (were missing)
 - **vercel.json**: updated on next-migration to match production (Reddit crons, reports.js maxDuration 300s)
+- **Serverless function cap fix**: `api/parse-resume.js` folded into `api/resume.js` as `action: 'parse'` branch
+  - REASON: framework:nextjs adds the Next.js runtime as 1 additional function, pushing total from 12→13 (over limit)
+  - FIX: merged parse-resume into resume.js, reducing declared functions from 12→11. Total is now 11+1=12 (at limit)
+  - `app/resume/page.tsx` fetch updated: `/api/parse-resume` → `/api/resume` with `{action:'parse', base64, fileName, mimeType}`
 - **Build verified**: `npm run build` succeeds — `✓ Compiled successfully`, all 19 pages build, zero TypeScript errors
 
 ### Critical Architecture Facts:
@@ -28,7 +32,10 @@ Build Seen as a hiring intelligence platform where the application tracker is th
 - Do NOT run `git merge origin/main` on next-migration — it requires `--allow-unrelated-histories` and will create mass conflicts
 - To sync specific changes from main → next-migration: copy individual files with `git show origin/main:path > path`
 - Production API files live in `api/*.js` (Vercel serverless), NOT `app/api/` (there are no Next.js App Router API routes yet)
-- Serverless function count: exactly 12 (Vercel Hobby limit). Do not add new functions without consolidating.
+- **Serverless function count: 11 declared + 1 Next.js runtime = 12 total (at plan limit)**
+- NEVER add a new api/*.js file without first removing or merging an existing one
+- The Next.js runtime itself uses 1 slot because `/company/[slug]` is a dynamic (ƒ) route
+- If `/company/[slug]` is ever converted to fully static (no dynamic routing), the Next.js slot goes away and you can have 12 api/*.js again
 
 ### What the next session needs to do:
 1. Confirm Vercel picked up the next-migration push and triggered a preview build
