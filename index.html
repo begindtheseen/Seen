@@ -2493,14 +2493,14 @@ nav.nav-scrolled{background:rgba(6,6,8,0.82);backdrop-filter:blur(60px) saturate
     <div style="font-family:var(--mono);font-size:.5rem;text-transform:uppercase;letter-spacing:.14em;color:var(--dim);margin-bottom:.4rem">Jobs</div>
     <div class="adm-kpi-row" style="margin-bottom:1.5rem">
       <div class="adm-kpi" style="border-left:2px solid var(--blue)">
-        <div class="adm-kpi-l">Total jobs in DB</div>
+        <div class="adm-kpi-l">Active listings</div>
         <div class="adm-kpi-n" id="admTotalJobs" style="color:var(--blue)">—</div>
-        <div class="adm-kpi-sub">all listings ever stored</div>
+        <div class="adm-kpi-sub">live jobs users see</div>
       </div>
       <div class="adm-kpi" style="border-left:2px solid var(--green)">
-        <div class="adm-kpi-l">Jobs added today</div>
+        <div class="adm-kpi-l">New today</div>
         <div class="adm-kpi-n" id="admJobsAddedToday" style="color:var(--green)">—</div>
-        <div class="adm-kpi-sub">new listings posted</div>
+        <div class="adm-kpi-sub">never-seen-before jobs</div>
       </div>
     </div>
 
@@ -6662,8 +6662,8 @@ async function renderAdminPage() {
     }
 
     // ── Jobs KPIs ─────────────────────────────────────────────────────────────
-    set('admTotalJobs', (d.jobs?.total ?? 0).toLocaleString());
-    set('admJobsAddedToday', (d.jobs?.added_today ?? 0).toLocaleString());
+    set('admTotalJobs', (d.jobs?.active ?? 0).toLocaleString());
+    set('admJobsAddedToday', (d.jobs?.new_today ?? 0).toLocaleString());
 
     // ── Inactive listing reports ──────────────────────────────────────────────
     const inactiveListEl = document.getElementById('admInactiveList');
