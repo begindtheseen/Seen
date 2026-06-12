@@ -1,4 +1,4 @@
-import { rateLimit } from './_utils/ratelimit.js';
+import { rateLimit } from '../lib/server/ratelimit.js';
 
 function toBase64(str) {
   return Buffer.from(str, 'utf-8').toString('base64');

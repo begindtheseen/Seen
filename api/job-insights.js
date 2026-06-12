@@ -1,6 +1,6 @@
-import { applyRateLimit } from './_utils/ratelimit.js';
-import { logError } from './_utils/errlog.js';
-import { gateAI } from './_utils/credits.js';
+import { applyRateLimit } from '../lib/server/ratelimit.js';
+import { logError } from '../lib/server/errlog.js';
+import { gateAI } from '../lib/server/credits.js';
 
 export default async function handler(req, res) {
   const _o = req.headers.origin || '';

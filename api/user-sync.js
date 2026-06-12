@@ -3,7 +3,7 @@
 // service key to talk to the DB. No RLS policies required on the client side.
 
 import { createHmac, timingSafeEqual } from 'crypto';
-import { rateLimit } from './_utils/ratelimit.js';
+import { rateLimit } from '../lib/server/ratelimit.js';
 
 // Verify a Supabase JWT locally (HS256) — no network round-trip.
 // Returns the payload (with .sub = user UUID) on success, null on failure.

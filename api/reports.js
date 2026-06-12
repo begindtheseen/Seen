@@ -1,8 +1,8 @@
 // Server-side reports fetch — uses service key to bypass RLS.
 // Queries by company_name column directly — no company table join needed.
 
-import { applyRateLimit } from './_utils/ratelimit.js';
-import { logError } from './_utils/errlog.js';
+import { applyRateLimit } from '../lib/server/ratelimit.js';
+import { logError } from '../lib/server/errlog.js';
 
 // Industry baseline benchmarks (Greenhouse 2023, LinkedIn Talent Insights)
 const INDUSTRY_BENCHMARKS = {
@@ -55,6 +55,12 @@ export default async function handler(req, res) {
   let body = req.body;
   if (typeof body === 'string') try { body = JSON.parse(body); } catch(e) { body = {}; }
   body = body || {};
+
+  // ── Company-score: merged from api/company-score.js ─────────────────────────
+  if (body.action === 'company_score' || body.action === 'research' || body.action === 'resolve' || body.action === 'populate' || body.name) {
+    if (await applyRateLimit(req, res, 'company-score')) return;
+    return handleCompanyScore(req, res, body);
+  }
 
   // Rate-limit only write actions — reads are cheap and public
   if (['submit','moderate','quick_submit','report_issue'].includes(body.action)) {
@@ -806,4 +812,188 @@ async function buildResponse(res, reports, hdrs, SUPABASE_URL, city) {
   const cities = [...new Set(enriched.map(r => r.city).filter(Boolean))].sort();
 
   return res.status(200).json({ ok: true, reports: filtered, cities, total: enriched.length });
+}
+
+// ── handleCompanyScore: merged from api/company-score.js ──────────────────────
+const _SCORE_TTL_MS = 30 * 24 * 60 * 60 * 1000;
+
+function _calcScore(rr, gr, wait, cnt) {
+  return Math.max(0, Math.min(100, Math.round(
+    50 + (rr * 40) + (gr * -30) + (Math.min(wait / 60, 1) * -15) + (Math.log(cnt + 1) * 5)
+  )));
+}
+
+function _calcWaste(ghostRate, avgRounds, unpaidRate) {
+  return Math.max(0, Math.min(100, Math.round(
+    ghostRate * 60 + unpaidRate * 25 + (avgRounds > 4 ? 15 : 0)
+  )));
+}
+
+function _rowToScore(row) {
+  const s = row.overall_score;
+  let reviews = [];
+  if (row.web_reviews) {
+    try { reviews = typeof row.web_reviews === 'string' ? JSON.parse(row.web_reviews) : row.web_reviews; } catch(_e) {}
+  }
+  return {
+    overall_score: s, ghost_rate: row.ghost_rate, response_rate: row.response_rate,
+    avg_wait_days: row.avg_wait_days, avg_rounds: row.avg_rounds, waste: row.waste_score,
+    unpaid_rate: row.unpaid_rate, report_count: row.report_count || 0,
+    data_quality: row.data_quality || 'medium', data_source: 'web_research',
+    risk_level: s >= 70 ? 'safe' : s >= 40 ? 'warn' : 'danger',
+    industry: row.industry || '', summary: row.raw_summary || '',
+    process_score: s, web_reviews: reviews,
+  };
+}
+
+async function handleCompanyScore(req, res, body) {
+  const SUPABASE_URL = process.env.SUPABASE_URL;
+  const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY;
+  const ANTHROPIC_KEY = process.env.ANTHROPIC_KEY;
+  const dbH = SUPABASE_URL && SUPABASE_SERVICE_KEY ? { apikey: SUPABASE_SERVICE_KEY, Authorization: `Bearer ${SUPABASE_SERVICE_KEY}`, 'Content-Type': 'application/json' } : null;
+
+  if (body.action === 'research') {
+    if (!ANTHROPIC_KEY) return res.status(500).json({ error: 'ANTHROPIC_KEY missing' });
+    const { company: co, location } = body;
+    if (!co) return res.status(400).json({ error: 'company required' });
+    const locationStr = location ? ` in ${location}` : '';
+    try {
+      const apiRes = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-api-key': ANTHROPIC_KEY, 'anthropic-version': '2023-06-01', 'anthropic-beta': 'web-search-2025-03-05' },
+        body: JSON.stringify({
+          model: 'claude-haiku-4-5-20251001', max_tokens: 1500,
+          tools: [{ type: 'web_search_20250305', name: 'web_search' }],
+          system: 'You are a hiring transparency researcher. Search Reddit (r/jobs, r/recruitinghell, r/cscareerquestions), Glassdoor, and news for real hiring data. Return ONLY valid JSON, no markdown.',
+          messages: [{ role: 'user', content: `Research hiring practices for: ${co}${locationStr}. Return ONLY this JSON: {"summary":"2-3 sentences","ghost_rate_estimate":0-100 or null,"response_rate_estimate":0-100 or null,"avg_rounds_estimate":number or null,"known_issues":["up to 5 real complaints"],"known_positives":["up to 3 positives"],"process_notes":"string or null","data_confidence":"high|medium|low","sources_note":"string","reddit_mentions":number,"glassdoor_rating":number or null}` }],
+        })
+      });
+      if (!apiRes.ok) throw new Error(`Claude ${apiRes.status}`);
+      const d = await apiRes.json();
+      const txt = (d.content || []).filter(b => b.type === 'text').map(b => b.text).join('');
+      const clean = txt.replace(/```json|```/g, '').trim();
+      let parsed; try { parsed = JSON.parse(clean); } catch(e) { const m = clean.match(/\{[\s\S]*\}/); parsed = m ? JSON.parse(m[0]) : { error: 'Parse failed', summary: 'Could not parse results.', data_confidence: 'low', known_issues: [], known_positives: [], sources_note: 'Search completed.' }; }
+      return res.json(parsed);
+    } catch(err) { return res.status(500).json({ error: err.message }); }
+  }
+
+  if (body.action === 'resolve') {
+    const { query } = body;
+    if (!query) return res.status(400).json({ error: 'query required' });
+    if (!SUPABASE_URL || !SUPABASE_SERVICE_KEY) return res.status(200).json({ ok: true, candidates: [] });
+    const q = String(query).slice(0, 100).toLowerCase().trim();
+    const qWord = q.split(/\s+/)[0];
+    try {
+      const [aliasRes, scoresRes] = await Promise.all([
+        fetch(`${SUPABASE_URL}/rest/v1/company_aliases?alias=ilike.${encodeURIComponent(q)}&select=canonical,alias&limit=3`, { headers: dbH }),
+        fetch(`${SUPABASE_URL}/rest/v1/company_scores?company_name=ilike.*${encodeURIComponent(qWord)}*&select=company_name,overall_score,ghost_rate,report_count,data_quality,verification_status&order=report_count.desc&limit=8`, { headers: dbH }),
+      ]);
+      const aliases = aliasRes.ok ? await aliasRes.json() : [];
+      const scores = scoresRes.ok ? await scoresRes.json() : [];
+      const candidates = [];
+      (Array.isArray(aliases) ? aliases : []).forEach(a => { candidates.push({ name: a.canonical, match_confidence: 97, via_alias: true, data_source: 'alias' }); });
+      (Array.isArray(scores) ? scores : []).forEach(s => {
+        const cn = (s.company_name || '').toLowerCase();
+        let conf = cn === q ? 99 : cn.includes(q) || q.includes(cn) ? Math.round(Math.min(q.length, cn.length) / Math.max(q.length, cn.length) * 90) : Math.round([...q.split(' ')].filter(w => w.length > 1 && cn.includes(w)).length / Math.max(q.split(' ').length, 1) * 80);
+        if (!candidates.find(c => c.name.toLowerCase() === cn)) candidates.push({ name: s.company_name, match_confidence: conf, overall_score: s.overall_score, report_count: s.report_count, data_quality: s.data_quality, verification_status: s.verification_status });
+      });
+      candidates.sort((a, b) => b.match_confidence - a.match_confidence);
+      return res.status(200).json({ ok: true, query, candidates: candidates.slice(0, 5) });
+    } catch(e) { return res.status(200).json({ ok: true, candidates: [] }); }
+  }
+
+  if (body.action === 'populate') {
+    if (!ANTHROPIC_KEY || !SUPABASE_URL || !SUPABASE_SERVICE_KEY) return res.status(500).json({ error: 'Missing env vars' });
+    const listRes = await fetch(`${SUPABASE_URL}/rest/v1/company_scores?select=company_name,web_reviews&order=created_at.desc&limit=200`, { headers: dbH });
+    if (!listRes.ok) return res.status(502).json({ error: 'DB list failed', detail: await listRes.text() });
+    const rows = await listRes.json();
+    const seen = new Set();
+    const deduped = (rows || []).filter(r => { if (!r.company_name || seen.has(r.company_name)) return false; seen.add(r.company_name); return true; });
+    const targets = deduped.filter(r => { if (!r.web_reviews) return true; try { const v = typeof r.web_reviews === 'string' ? JSON.parse(r.web_reviews) : r.web_reviews; return !Array.isArray(v) || v.length === 0; } catch(_e) { return true; } }).map(r => r.company_name).filter(Boolean);
+    if (!targets.length) return res.json({ ok: true, message: 'All done — every company has reviews!', remaining: 0 });
+    const batch = targets.slice(0, 3);
+    const remaining = targets.length - batch.length;
+    const results = [];
+    for (const co of batch) {
+      try {
+        const apiRes = await fetch('https://api.anthropic.com/v1/messages', { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-api-key': ANTHROPIC_KEY, 'anthropic-version': '2023-06-01', 'anthropic-beta': 'web-search-2025-03-05' }, body: JSON.stringify({ model: 'claude-haiku-4-5-20251001', max_tokens: 2000, tools: [{ type: 'web_search_20250305', name: 'web_search' }], system: 'You are a hiring transparency researcher. Search Reddit, Glassdoor, and Blind for real applicant experiences. Return ONLY valid JSON — no markdown.', messages: [{ role: 'user', content: `Research hiring experience at "${co}". Find 4-6 real applicant quotes from Reddit/Glassdoor/Blind (2023-2025). Return ONLY this JSON: {"ghost_rate":0.0-1.0,"response_rate":0.0-1.0,"avg_rounds":1-8,"avg_wait_days":5-120,"unpaid_rate":0.0-1.0,"report_count":number,"data_quality":"high|medium|low","industry":"string","summary":"2-3 sentences","reviews":[{"text":"quote","sentiment":"positive|negative|mixed","source":"Reddit r/...","year":"2024"}]}` }] }) });
+        if (!apiRes.ok) throw new Error(`Claude ${apiRes.status}`);
+        const d = await apiRes.json();
+        const txt = (d.content || []).filter(b => b.type === 'text').map(b => b.text).join('');
+        const m = txt.replace(/```json\n?/g,'').replace(/```\n?/g,'').trim().match(/\{[\s\S]*\}/);
+        if (!m) throw new Error('no JSON');
+        const p = JSON.parse(m[0]);
+        const gr = Math.max(0,Math.min(1,Number(p.ghost_rate)||0)), rr = Math.max(0,Math.min(1,Number(p.response_rate)||0)), wait = Math.max(1,Math.min(180,Number(p.avg_wait_days)||30)), rounds = Math.max(1,Math.min(10,Number(p.avg_rounds)||3)), unpaid = Math.max(0,Math.min(1,Number(p.unpaid_rate)||0)), cnt = Math.max(1,Number(p.report_count)||5);
+        const overall = _calcScore(rr,gr,wait,cnt), waste = _calcWaste(gr,rounds,unpaid);
+        const revs = Array.isArray(p.reviews) ? p.reviews.slice(0,6).map(r=>({text:(r.text||'').slice(0,400),sentiment:['positive','negative','mixed'].includes(r.sentiment)?r.sentiment:'mixed',source:(r.source||'').slice(0,80),year:(r.year||'').slice(0,4)})) : [];
+        const row = { company_name:co, overall_score:overall, ghost_rate:gr, response_rate:rr, avg_wait_days:Math.round(wait), avg_rounds:Math.round(rounds*10)/10, waste_score:waste, unpaid_rate:unpaid, report_count:cnt, data_quality:p.data_quality||'medium', data_source:'web_search', industry:(p.industry||'').slice(0,80), raw_summary:(p.summary||'').slice(0,500), expires_at:new Date(Date.now()+_SCORE_TTL_MS).toISOString(), web_reviews:revs };
+        const sv = await fetch(`${SUPABASE_URL}/rest/v1/company_scores`, { method:'POST', headers:{...dbH,Prefer:'resolution=merge-duplicates,return=minimal'}, body:JSON.stringify(row) });
+        results.push({ company:co, score:overall, reviews:revs.length, saved:sv.ok });
+      } catch(e) {
+        try { await fetch(`${SUPABASE_URL}/rest/v1/company_scores`, { method:'POST', headers:{...dbH,Prefer:'resolution=merge-duplicates,return=minimal'}, body:JSON.stringify({company_name:co, web_reviews:[]}) }); } catch(_e) {}
+        results.push({ company:co, error:e.message });
+      }
+      if (batch.indexOf(co) < batch.length - 1) await new Promise(r => setTimeout(r, 2000));
+    }
+    return res.json({ ok:true, processed:results, remaining, message: remaining > 0 ? `Refresh to process next ${Math.min(3,remaining)}` : 'All done!' });
+  }
+
+  // Default: compute/fetch company score by name
+  if (!ANTHROPIC_KEY) return res.status(500).json({ error: 'ANTHROPIC_KEY missing' });
+  const { name, force_refresh = false } = body;
+  if (!name) return res.status(400).json({ error: 'name required' });
+
+  if (!force_refresh && SUPABASE_URL && SUPABASE_SERVICE_KEY) {
+    try {
+      const now = encodeURIComponent(new Date().toISOString());
+      const nameEnc = encodeURIComponent(name.toLowerCase().trim());
+      const cacheRes = await fetch(`${SUPABASE_URL}/rest/v1/company_scores?company_name=ilike.${nameEnc}&expires_at=gt.${now}&order=created_at.desc&limit=1`, { headers: dbH });
+      if (cacheRes.ok) { const rows = await cacheRes.json(); if (rows?.[0]) return res.json({ ok: true, score: _rowToScore(rows[0]), _src: 'cache' }); }
+    } catch(e) { console.warn('Cache check:', e.message); }
+  }
+
+  let apiRes;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    if (attempt > 0) await new Promise(r => setTimeout(r, attempt * 4000));
+    apiRes = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-api-key': ANTHROPIC_KEY, 'anthropic-version': '2023-06-01', 'anthropic-beta': 'web-search-2025-03-05' },
+      body: JSON.stringify({ model: 'claude-haiku-4-5-20251001', max_tokens: 2000, tools: [{ type: 'web_search_20250305', name: 'web_search' }], system: 'You are a hiring transparency researcher. Search Reddit (r/recruitinghell, r/jobs, r/cscareerquestions), Glassdoor interview reviews, Blind, and LinkedIn for real applicant experiences at the company. Focus on posts from 2023-2025. Return ONLY a valid JSON object — no markdown, no explanation.', messages: [{ role: 'user', content: `Research the hiring process and applicant experience at "${name}". Search for: ghosting complaints, interview timelines, number of rounds, unpaid take-home tests, and overall process reputation. Find 4-6 specific quotes or close paraphrases from real applicants on Reddit, Glassdoor, or Blind.\n\nReturn ONLY this JSON:\n{"ghost_rate":0.0-1.0,"response_rate":0.0-1.0,"avg_rounds":1-8,"avg_wait_days":5-120,"unpaid_rate":0.0-1.0,"report_count":number,"data_quality":"high|medium|low","industry":"e.g. E-Commerce, Fintech","summary":"2-3 sentences","reviews":[{"text":"quote","sentiment":"positive|negative|mixed","source":"Reddit r/...","year":"2024"}]}` }] })
+    });
+    if (apiRes.status !== 429 && apiRes.status !== 529) break;
+  }
+
+  if (!apiRes.ok) {
+    if ((apiRes.status === 429 || apiRes.status === 529 || apiRes.status >= 500) && SUPABASE_URL && SUPABASE_SERVICE_KEY) {
+      try {
+        const nameEnc = encodeURIComponent(name.toLowerCase().trim());
+        const staleRes = await fetch(`${SUPABASE_URL}/rest/v1/company_scores?company_name=ilike.${nameEnc}&order=created_at.desc&limit=1`, { headers: dbH });
+        if (staleRes.ok) { const staleRows = await staleRes.json(); if (staleRows?.[0]) return res.json({ ok: true, score: _rowToScore(staleRows[0]), _src: 'stale-cache' }); }
+      } catch(_) {}
+    }
+    return res.status(502).json({ error: 'Score service temporarily unavailable', retry_after: '60' });
+  }
+
+  const data = await apiRes.json();
+  const text = (data.content || []).filter(b => b.type === 'text').map(b => b.text).join('');
+  let parsed;
+  try { const clean = text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim(); const match = clean.match(/\{[\s\S]*\}/); if (!match) throw new Error('no JSON found'); parsed = JSON.parse(match[0]); }
+  catch(e) { return res.status(502).json({ error: 'Could not parse response', raw: text.slice(0, 200) }); }
+
+  const gr = Math.max(0, Math.min(1, Number(parsed.ghost_rate)||0)), rr = Math.max(0, Math.min(1, Number(parsed.response_rate)||0)), wait = Math.max(1, Math.min(180, Number(parsed.avg_wait_days)||30)), rounds = Math.max(1, Math.min(10, Number(parsed.avg_rounds)||3)), unpaid = Math.max(0, Math.min(1, Number(parsed.unpaid_rate)||0)), cnt = Math.max(1, Number(parsed.report_count)||5);
+  const overall = _calcScore(rr, gr, wait, cnt), waste = _calcWaste(gr, rounds, unpaid);
+  const reviews = Array.isArray(parsed.reviews) ? parsed.reviews.slice(0, 6).map(r => ({ text:(r.text||'').slice(0,400), sentiment:['positive','negative','mixed'].includes(r.sentiment)?r.sentiment:'mixed', source:(r.source||'').slice(0,80), year:(r.year||'').slice(0,4) })) : [];
+  const score = { overall_score:overall, ghost_rate:gr, response_rate:rr, avg_wait_days:Math.round(wait), avg_rounds:Math.round(rounds*10)/10, waste, unpaid_rate:unpaid, report_count:cnt, data_quality:parsed.data_quality||'medium', data_source:'web_research', risk_level:overall>=70?'safe':overall>=40?'warn':'danger', industry:(parsed.industry||'').slice(0,80), summary:(parsed.summary||'').slice(0,500), process_score:overall, web_reviews:reviews };
+
+  if (SUPABASE_URL && SUPABASE_SERVICE_KEY) {
+    const expires = new Date(Date.now() + _SCORE_TTL_MS).toISOString();
+    const rowBase = { company_name:name.toLowerCase().trim(), overall_score:overall, ghost_rate:gr, response_rate:rr, avg_wait_days:Math.round(wait), avg_rounds:Math.round(rounds*10)/10, waste_score:waste, unpaid_rate:unpaid, report_count:cnt, data_quality:score.data_quality, data_source:'web_search', industry:score.industry, raw_summary:score.summary, expires_at:expires };
+    try {
+      const prefer = force_refresh ? 'resolution=merge-duplicates,return=minimal' : 'resolution=ignore-duplicates,return=minimal';
+      let saveRes = await fetch(`${SUPABASE_URL}/rest/v1/company_scores`, { method:'POST', headers:{...dbH,Prefer:prefer}, body:JSON.stringify({...rowBase,web_reviews:reviews}) });
+      if (!saveRes.ok && saveRes.status === 400) { const errText = await saveRes.text(); if (errText.includes('web_reviews') || errText.includes('column')) saveRes = await fetch(`${SUPABASE_URL}/rest/v1/company_scores`, { method:'POST', headers:{...dbH,Prefer:prefer}, body:JSON.stringify(rowBase) }); }
+    } catch(e) { console.error('Save error:', e.message); }
+  }
+
+  return res.json({ ok: true, score, _src: 'fresh' });
 }

@@ -1,8 +1,8 @@
 import zlib from 'zlib';
 import { promisify } from 'util';
-import { applyRateLimit } from './_utils/ratelimit.js';
-import { logError } from './_utils/errlog.js';
-import { gateAI } from './_utils/credits.js';
+import { applyRateLimit } from '../lib/server/ratelimit.js';
+import { logError } from '../lib/server/errlog.js';
+import { gateAI } from '../lib/server/credits.js';
 const inflateRaw = promisify(zlib.inflateRaw);
 
 export default async function handler(req, res) {

@@ -1,5 +1,5 @@
-import { rateLimit } from './_utils/ratelimit.js';
-import { logError } from './_utils/errlog.js';
+import { rateLimit } from '../lib/server/ratelimit.js';
+import { logError } from '../lib/server/errlog.js';
 
 // /api/demand — Demand data hub.
 //

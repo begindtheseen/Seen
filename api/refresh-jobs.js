@@ -1,5 +1,5 @@
-import { getQueryExpansion } from './_utils/expand.js';
-import { mergeCompanies } from './_utils/merge.js';
+import { getQueryExpansion } from '../lib/server/expand.js';
+import { mergeCompanies } from '../lib/server/merge.js';
 
 // Canonical company name aliases — keeps all subsidiaries/variants under one brand
 // so job listings roll up correctly to the same company insights page.

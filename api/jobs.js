@@ -1,6 +1,6 @@
-import { getQueryExpansion } from './_utils/expand.js';
-import { applyRateLimit } from './_utils/ratelimit.js';
-import { logError } from './_utils/errlog.js';
+import { getQueryExpansion } from '../lib/server/expand.js';
+import { applyRateLimit, rateLimit } from '../lib/server/ratelimit.js';
+import { logError } from '../lib/server/errlog.js';
 
 // Per-instance request coalescing: concurrent identical searches share one Claude call
 const _inflight = new Map();
@@ -16,6 +16,18 @@ export default async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(200).end();
   if (req.method !== 'POST') return res.status(405).end('Method not allowed');
 
+  // Parse body early so we can route before rate limiting
+  let _body = req.body;
+  if (typeof _body === 'string') { try { _body = JSON.parse(_body); } catch(e) { _body = {}; } }
+  if (!_body || typeof _body !== 'object') _body = {};
+
+  // ── Location-jobs: merged from api/fetch-location-jobs.js ──────────────────
+  if (_body.action === 'location' || (_body.location && !_body.query)) {
+    const { allowed: rlOk } = await rateLimit(req, 'fetch-location-jobs');
+    if (!rlOk) return res.status(429).json({ error: 'Too many requests — slow down.', jobs: [] });
+    return handleLocationJobs(req, res, _body);
+  }
+
   const limited = await applyRateLimit(req, res, 'job-search');
   if (limited) return;
 
@@ -26,9 +38,7 @@ export default async function handler(req, res) {
   let _inflightResolve, _inflightReject;
 
   try {
-    let body = req.body;
-    if (typeof body === 'string') { try { body = JSON.parse(body); } catch(e) { body = {}; } }
-    if (!body || typeof body !== 'object') body = {};
+    let body = _body;
     const { query, location, radius } = body;
     if (!query) return res.status(400).json({ error: 'No query' });
 
@@ -321,4 +331,65 @@ function wasteScore(job) {
   const co = (job.company || '').toLowerCase();
   if (['amazon','accenture','cognizant','infosys','wipro'].some(g => co.includes(g))) w += 35;
   return Math.min(85, w);
+}
+
+// ── handleLocationJobs: merged from api/fetch-location-jobs.js ────────────────
+const _STATE_ABBR = {'Alabama':'AL','Alaska':'AK','Arizona':'AZ','Arkansas':'AR','California':'CA','Colorado':'CO','Connecticut':'CT','Delaware':'DE','Florida':'FL','Georgia':'GA','Hawaii':'HI','Idaho':'ID','Illinois':'IL','Indiana':'IN','Iowa':'IA','Kansas':'KS','Kentucky':'KY','Louisiana':'LA','Maine':'ME','Maryland':'MD','Massachusetts':'MA','Michigan':'MI','Minnesota':'MN','Mississippi':'MS','Missouri':'MO','Montana':'MT','Nebraska':'NE','Nevada':'NV','New Hampshire':'NH','New Jersey':'NJ','New Mexico':'NM','New York':'NY','North Carolina':'NC','North Dakota':'ND','Ohio':'OH','Oklahoma':'OK','Oregon':'OR','Pennsylvania':'PA','Rhode Island':'RI','South Carolina':'SC','South Dakota':'SD','Tennessee':'TN','Texas':'TX','Utah':'UT','Vermont':'VT','Virginia':'VA','Washington':'WA','West Virginia':'WV','Wisconsin':'WI','Wyoming':'WY','District of Columbia':'DC'};
+
+function _normalizeLoc(loc) {
+  if (!loc) return loc;
+  const parts = loc.split(',').map(p => p.trim());
+  const abbr = _STATE_ABBR[parts[1] || ''] || (parts[1] || '');
+  return abbr ? `${parts[0]}, ${abbr}` : parts[0];
+}
+
+const _CATS_BY_INDUSTRY = {
+  tech: ['Software Engineer','Data Analyst','Product Manager','DevOps Engineer','UX Designer'],
+  healthcare: ['Registered Nurse','Medical Assistant','Physical Therapist','LVN','CNA'],
+  finance: ['Financial Analyst','Accountant','Business Analyst','Operations Manager','Project Manager'],
+  logistics: ['Warehouse Associate','CDL Truck Driver','Operations Manager','Supply Chain Analyst','Logistics Coordinator'],
+  retail: ['Customer Service Representative','Restaurant Manager','Retail Manager','Sales Representative','Store Manager'],
+  other: ['Project Manager','Operations Manager','Customer Service Representative','Marketing Manager','HR Manager'],
+  default: ['Customer Service Representative','Registered Nurse','Software Engineer','Sales Representative','Project Manager','Data Analyst','Accountant','Operations Manager'],
+};
+
+async function _fetchAdzuna(what, where, appId, appKey, distKm) {
+  const url = new URL('https://api.adzuna.com/v1/api/jobs/us/search/1');
+  url.searchParams.set('app_id', appId); url.searchParams.set('app_key', appKey);
+  url.searchParams.set('what', what); url.searchParams.set('results_per_page', '50'); url.searchParams.set('sort_by', 'date');
+  if (where && where.toLowerCase() !== 'remote') { url.searchParams.set('where', where); if (distKm) url.searchParams.set('distance', distKm.toString()); }
+  const ctrl = new AbortController(); const tmo = setTimeout(() => ctrl.abort(), 8000);
+  try {
+    const res = await fetch(url.toString(), { headers: { Accept: 'application/json' }, signal: ctrl.signal });
+    clearTimeout(tmo); if (!res.ok) return [];
+    const data = await res.json();
+    const expires = new Date(Date.now() + 7*24*60*60*1000).toISOString();
+    return (data.results||[]).map(j => ({ title:j.title||what, company:j.company?.display_name||'Unknown', location:j.location?.display_name||where, salary:j.salary_min||j.salary_max?(j.salary_min>=10000?`$${Math.round(j.salary_min/1000)}k`:j.salary_min>0?`$${j.salary_min}/hr`:null):null, description:(j.description||'').replace(/<[^>]*>/g,'').replace(/\s+/g,' ').trim().slice(0,8000), apply_url:j.redirect_url||null, source:'Adzuna', type:j.contract_time==='part_time'?'Part-time':'Full-time', level:(/\b(senior|sr\b|lead|principal|staff|architect)\b/i.test(j.title||''))?'Senior':(/\b(junior|jr\b|entry.level|associate|intern)\b/i.test(j.title||''))?'Entry level':(/\b(director|vp\b|vice president|head of|chief)\b/i.test(j.title||''))?'Director+':'Mid level', search_query:what, score:65+(j.salary_min>0?8:0), waste_score:25, expires_at:expires })).filter(j=>j.company!=='Unknown'&&j.apply_url);
+  } catch(e) { clearTimeout(tmo); return []; }
+}
+
+async function handleLocationJobs(req, res, body) {
+  const APP_ID = process.env.ADZUNA_APP_ID, APP_KEY = process.env.ADZUNA_APP_KEY;
+  const SUPABASE_URL = process.env.SUPABASE_URL, SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY;
+  if (!APP_ID || !APP_KEY) return res.status(200).json({ error: 'Adzuna not configured', jobs: [] });
+  try {
+    const { location, industry, radius } = body;
+    if (!location) return res.status(400).json({ error: 'No location', jobs: [] });
+    const cats = _CATS_BY_INDUSTRY[industry] || _CATS_BY_INDUSTRY.default;
+    const distKm = radius ? Math.round(parseInt(radius) * 1.609) : 40;
+    const normLoc = _normalizeLoc(location), cityOnly = normLoc.split(',')[0].trim();
+    let results = await Promise.allSettled(cats.slice(0,6).map(cat => _fetchAdzuna(cat, normLoc, APP_ID, APP_KEY, distKm)));
+    let allJobs = results.filter(r=>r.status==='fulfilled').flatMap(r=>r.value);
+    if (!allJobs.length && cityOnly !== normLoc) {
+      results = await Promise.allSettled(cats.slice(0,4).map(cat => _fetchAdzuna(cat, cityOnly, APP_ID, APP_KEY, distKm)));
+      allJobs = results.filter(r=>r.status==='fulfilled').flatMap(r=>r.value);
+    }
+    if (SUPABASE_URL && SUPABASE_SERVICE_KEY && allJobs.length) {
+      await fetch(`${SUPABASE_URL}/rest/v1/jobs`, { method:'POST', headers:{apikey:SUPABASE_SERVICE_KEY,Authorization:`Bearer ${SUPABASE_SERVICE_KEY}`,'Content-Type':'application/json',Prefer:'resolution=merge-duplicates,return=minimal'}, body:JSON.stringify(allJobs) });
+    }
+    return res.status(200).json({ ok:true, jobs:allJobs, location });
+  } catch(err) {
+    logError('fetch-location-jobs', err.message);
+    return res.status(500).json({ error: err.message, jobs: [] });
+  }
 }
