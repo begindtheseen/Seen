@@ -4,7 +4,7 @@ import ScrollIndicator from '@/components/ScrollIndicator'
 
 export default function LandingPage() {
   return (
-    <div className="page-full" style={{ position: 'relative' }}>
+    <div className="page-full active" style={{ position: 'relative' }}>
 
       {/* COSMOS BACKGROUND */}
       <div style={{ position: 'absolute', inset: 0, zIndex: 0, pointerEvents: 'none', background: `

@@ -114,8 +114,7 @@ nav.nav-scrolled{background:rgba(6,6,8,0.82);backdrop-filter:blur(60px) saturate
 .page{display:none;min-height:100vh;padding-top:58px;box-sizing:border-box;overflow-x:hidden;width:100%}
 .page.active{display:block;animation:pageIn 0.25s cubic-bezier(0.22,1,0.36,1) both}
 @keyframes pageIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
-.page-full{display:none;min-height:100vh;overflow-x:hidden;padding-top:58px;box-sizing:border-box;width:100%}
-.page-full.active{display:flex;flex-direction:column;animation:fadeIn .2s ease}
+.page-full{display:flex;flex-direction:column;min-height:100vh;overflow-x:hidden;padding-top:58px;box-sizing:border-box;width:100%;animation:fadeIn .2s ease}
 .wrap{max-width:1300px;margin:0 auto;padding:0 1.25rem}
 
 /* SHARED COMPONENTS */
