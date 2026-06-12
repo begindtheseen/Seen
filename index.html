@@ -2488,6 +2488,11 @@ nav.nav-scrolled{background:rgba(6,6,8,0.82);backdrop-filter:blur(60px) saturate
         <div class="adm-kpi-n" id="admCoLookupToday">—</div>
         <div class="adm-kpi-sub">company pages viewed</div>
       </div>
+      <div class="adm-kpi" style="border-left:2px solid var(--green)">
+        <div class="adm-kpi-l">Jobs added today</div>
+        <div class="adm-kpi-n" id="admJobsAddedToday" style="color:var(--green)">—</div>
+        <div class="adm-kpi-sub">new listings posted</div>
+      </div>
     </div>
 
     <!-- Reports per day chart -->
@@ -2556,6 +2561,17 @@ END $$;</pre>
     <div class="adm-panel" style="margin-top:.65rem">
       <div class="adm-panel-hdr">Recent tracker applications <span style="color:var(--dim);font-weight:400">(last 25)</span></div>
       <div id="admRecentApps"><div style="padding:.85rem 1rem;font-family:var(--mono);font-size:.62rem;color:var(--dim)">Loading…</div></div>
+    </div>
+
+    <!-- Reported inactive listings -->
+    <div class="adm-panel" style="margin-top:.65rem">
+      <div class="adm-panel-hdr">
+        <span>Reported inactive listings <span id="admInactiveCount" style="display:none;font-size:.55rem;padding:.12rem .45rem;border-radius:10px;background:rgba(245,158,11,.15);color:var(--amber);margin-left:.4rem;font-weight:600"></span></span>
+        <span style="font-family:var(--mono);font-size:.48rem;color:var(--dim)">User reports that a listing is no longer active</span>
+      </div>
+      <div id="admInactiveList">
+        <div style="padding:.85rem 1rem;font-family:var(--mono);font-size:.62rem;color:var(--dim)">Loading…</div>
+      </div>
     </div>
 
     <!-- User-reported issues queue -->
@@ -4446,6 +4462,9 @@ function renderJobResults(jobs, l) {
       '<div class="jlc-actions">' +
         '<button class="jlc-save" data-saved="' + (isSaved ? '1' : '0') + '" id="save_' + safeId + '" onclick="toggleSaveJob(\'' + safeId + '\',\'' + safeCompany + '\',\'' + safeTitle + '\',\'' + safeLoc + '\',' + score + ')">' + (isSaved ? '♥' : '♡') + '</button>' +
         '<button class="jlc-apply" onclick="' + applyAction + '">Apply &amp; Optimize →</button>' +
+      '</div>' +
+      '<div style="text-align:right;margin-top:.25rem">' +
+        '<button id="inactive_' + safeId + '" onclick="reportJobInactive(\'' + safeId + '\',this)" style="background:none;border:none;font-family:var(--mono);font-size:.55rem;color:var(--dim);cursor:pointer;padding:.1rem 0;opacity:.55;transition:opacity .15s" onmouseover="this.style.opacity=1" onmouseout="this.style.opacity=.55">⚑ Not active? Report it</button>' +
       '</div>' +
     '</div>';
   }).join('');
@@ -6571,6 +6590,41 @@ async function renderAdminPage() {
         : '<div style="padding:.85rem 1rem;font-family:var(--mono);font-size:.62rem;color:var(--dim)">No tracked applications yet</div>';
     }
 
+    // ── Jobs added today ──────────────────────────────────────────────────────
+    set('admJobsAddedToday', (d.jobs?.added_today ?? 0).toLocaleString());
+
+    // ── Inactive listing reports ──────────────────────────────────────────────
+    const inactiveListEl = document.getElementById('admInactiveList');
+    const inactiveCountEl = document.getElementById('admInactiveCount');
+    if (inactiveListEl) {
+      const reports = d.jobs?.inactive_reports || [];
+      if (reports.length) {
+        if (inactiveCountEl) { inactiveCountEl.textContent = reports.length; inactiveCountEl.style.display = 'inline'; }
+        const _ago3 = dt => { const s = Math.round((Date.now() - new Date(dt)) / 1000); if (s < 3600) return Math.round(s/60) + 'm'; if (s < 86400) return Math.round(s/3600) + 'h'; return Math.round(s/86400) + 'd'; };
+        inactiveListEl.innerHTML = reports.map(r => {
+          const j = r.job || {};
+          const jobUrl = j.url || j.apply_url || '';
+          const id = r.job_id || '';
+          return `<div style="padding:.7rem 1rem;border-bottom:1px solid rgba(255,255,255,.04)">
+            <div style="display:flex;align-items:flex-start;gap:.75rem">
+              <div style="flex:1;min-width:0">
+                <div style="font-family:var(--mono);font-size:.65rem;color:var(--white);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${j.title||'Unknown title'} · <span style="color:var(--sub)">${j.company||'Unknown company'}</span></div>
+                <div style="font-family:var(--mono);font-size:.55rem;color:var(--dim);margin-top:.15rem">${j.city||''} · ${r.report_count} report${r.report_count===1?'':'s'} · latest ${_ago3(r.latest_reported_at)} ago</div>
+                ${jobUrl ? `<a href="${jobUrl}" target="_blank" rel="noopener" style="font-family:var(--mono);font-size:.55rem;color:var(--blue);text-decoration:none;margin-top:.2rem;display:inline-block">↗ Verify listing →</a>` : ''}
+              </div>
+              <div style="display:flex;gap:.45rem;flex-shrink:0;margin-top:.1rem">
+                <button onclick="adminRemoveListing('${id}',this)" style="font-family:var(--mono);font-size:.58rem;padding:.3rem .65rem;border-radius:6px;border:1px solid rgba(239,68,68,.4);background:rgba(239,68,68,.08);color:var(--red);cursor:pointer">Remove listing</button>
+                <button onclick="adminDenyReport('${id}',this)" style="font-family:var(--mono);font-size:.58rem;padding:.3rem .65rem;border-radius:6px;border:1px solid var(--line2);background:transparent;color:var(--sub);cursor:pointer">Keep active</button>
+              </div>
+            </div>
+          </div>`;
+        }).join('');
+      } else {
+        if (inactiveCountEl) inactiveCountEl.style.display = 'none';
+        inactiveListEl.innerHTML = '<div style="padding:.85rem 1rem;font-family:var(--mono);font-size:.62rem;color:var(--dim)">No inactive reports this week</div>';
+      }
+    }
+
     adminLoadIssues(d.issues);
 
     // ── Feature Flags ─────────────────────────────────────────────────────────
@@ -6777,6 +6831,46 @@ async function adminUpdateCluster(clusterId, status) {
     const d = await res.json();
     if (!d.ok) throw new Error(d.error || res.status);
   } catch(e) { alert('Failed to update cluster: ' + e.message); }
+}
+
+async function adminRemoveListing(jobId, btnEl) {
+  if (!jobId) return;
+  if (!confirm('Remove this job listing? It will be hidden from job seekers.')) return;
+  if (btnEl) { btnEl.textContent = 'Removing…'; btnEl.disabled = true; }
+  try {
+    const res = await fetch('/api/admin-stats', {
+      method: 'POST',
+      headers: AdminSession.headers(),
+      body: JSON.stringify({ action: 'remove_listing', job_id: jobId }),
+    });
+    const d = await res.json();
+    if (!d.ok) throw new Error(d.error || res.status);
+    const row = btnEl?.closest('div[style*="border-bottom"]');
+    if (row) row.innerHTML = '<div style="padding:.5rem 1rem;font-family:var(--mono);font-size:.58rem;color:var(--green)">✓ Listing removed</div>';
+    showToast('Listing removed.');
+  } catch(e) {
+    if (btnEl) { btnEl.textContent = 'Remove listing'; btnEl.disabled = false; }
+    showToast('Error: ' + e.message);
+  }
+}
+
+async function adminDenyReport(jobId, btnEl) {
+  if (!jobId) return;
+  if (btnEl) { btnEl.textContent = 'Saving…'; btnEl.disabled = true; }
+  try {
+    const res = await fetch('/api/admin-stats', {
+      method: 'POST',
+      headers: AdminSession.headers(),
+      body: JSON.stringify({ action: 'deny_report', job_id: jobId }),
+    });
+    const d = await res.json();
+    if (!d.ok) throw new Error(d.error || res.status);
+    const row = btnEl?.closest('div[style*="border-bottom"]');
+    if (row) row.innerHTML = '<div style="padding:.5rem 1rem;font-family:var(--mono);font-size:.58rem;color:var(--dim)">✓ Marked as still active</div>';
+  } catch(e) {
+    if (btnEl) { btnEl.textContent = 'Keep active'; btnEl.disabled = false; }
+    showToast('Error: ' + e.message);
+  }
 }
 
 async function adminDetectDuplicates() {
@@ -10897,6 +10991,19 @@ function closeJobDetailModal() {
   closeApplyModalDirect();
 }
 
+function reportJobInactive(jobId, btnEl) {
+  if (!Auth.isSeeker()) { showToast('Sign in to report listings.'); return; }
+  if (btnEl) { btnEl.textContent = 'Reporting…'; btnEl.disabled = true; }
+  _sync('report_job_availability', { job_id: String(jobId), status: 'expired' })
+    .then(() => {
+      if (btnEl) { btnEl.textContent = '✓ Reported'; btnEl.style.color = 'var(--amber)'; }
+      showToast('Thanks — flagged as possibly inactive. We\'ll review it.');
+    })
+    .catch(() => {
+      if (btnEl) { btnEl.textContent = '⚑ Not active? Report it'; btnEl.disabled = false; }
+    });
+}
+
 function _reportListingAvail(jobId, currentAvail) {
   const opts = [
     { label: 'Still active — I can see it', val: 'active' },
@@ -12956,6 +13063,63 @@ async function loadEarnQuestion() {
   qEl.innerHTML = `<div style="margin-bottom:1rem"><div style="font-family:var(--mono);font-size:.5rem;text-transform:uppercase;letter-spacing:.15em;color:var(--muted);margin-bottom:.5rem">${q.company || 'General'} · +${q.credit_value||1} credit</div><div style="font-size:.88rem;color:var(--white);font-weight:600;line-height:1.5;margin-bottom:1rem">${q.text}</div><div style="display:flex;flex-direction:column;gap:.45rem">${opts}</div></div><button onclick="document.getElementById('earnCreditQuestion').style.display='none';document.getElementById('earnCreditMethods').style.display='block'" style="background:none;border:none;font-family:var(--mono);font-size:.6rem;color:var(--muted);cursor:pointer">← Back</button>`;
 }
 
+async function loadCreditHistory() {
+  const histEl = document.getElementById('earnCreditHistory');
+  const methodsEl = document.getElementById('earnCreditMethods');
+  const listEl = document.getElementById('earnCreditHistoryList');
+  if (!histEl || !methodsEl || !listEl) return;
+  histEl.style.display = 'block';
+  methodsEl.style.display = 'none';
+  listEl.innerHTML = '<div style="text-align:center;padding:1rem"><div class="spinner" style="width:16px;height:16px;margin:0 auto"></div></div>';
+
+  const data = await _sync('credit_history').catch(() => null);
+  if (!data) {
+    listEl.innerHTML = '<div style="font-family:var(--mono);font-size:.65rem;color:var(--muted);text-align:center;padding:1rem">Could not load history.</div>';
+    return;
+  }
+
+  const REASON_LABELS = {
+    resume_scan: 'Resume scan',
+    resume_optimize: 'Resume optimizer',
+    resume_coach: 'Advantage coach',
+    resume_proposal: 'Pre-proposal',
+    scanner: 'Application scanner',
+    job_insights: 'Job insights',
+    ai_tool: 'AI feature',
+    hiring_manager: 'HM Intel',
+    earned_question: 'Answered a question',
+  };
+  const txs = data.transactions || [];
+  const _ago = dt => { const s = Math.round((Date.now() - new Date(dt)) / 1000); if (s < 60) return 'just now'; if (s < 3600) return Math.round(s/60) + 'm ago'; if (s < 86400) return Math.round(s/3600) + 'h ago'; return Math.round(s/86400) + 'd ago'; };
+
+  if (!txs.length) {
+    listEl.innerHTML = '<div style="font-family:var(--mono);font-size:.65rem;color:var(--muted);text-align:center;padding:1rem">No credit activity yet.</div>';
+    return;
+  }
+
+  listEl.innerHTML = txs.map(tx => {
+    const isEarn = tx.delta > 0;
+    const label = REASON_LABELS[tx.reason] || tx.reason || 'AI feature';
+    return `<div style="display:flex;align-items:center;justify-content:space-between;padding:.45rem 0;border-bottom:1px solid rgba(255,255,255,.05)">
+      <div>
+        <div style="font-family:var(--mono);font-size:.65rem;color:var(--white)">${label}</div>
+        <div style="font-family:var(--mono);font-size:.52rem;color:var(--dim);margin-top:.1rem">${_ago(tx.created_at)}</div>
+      </div>
+      <div style="font-family:var(--mono);font-size:.72rem;font-weight:700;color:${isEarn ? 'var(--green)' : 'var(--sub)'}">${isEarn ? '+' + tx.delta : tx.delta}</div>
+    </div>`;
+  }).join('');
+
+  // Summary at top
+  const earned = txs.filter(t => t.delta > 0).reduce((s, t) => s + t.delta, 0);
+  const used = Math.abs(txs.filter(t => t.delta < 0).reduce((s, t) => s + t.delta, 0));
+  const summary = `<div style="background:rgba(255,255,255,.04);border-radius:8px;padding:.65rem .85rem;margin-bottom:.75rem;display:flex;justify-content:space-around">
+    <div style="text-align:center"><div style="font-family:var(--mono);font-size:.52rem;color:var(--dim);margin-bottom:.2rem">Balance</div><div style="font-family:var(--mono);font-size:.88rem;font-weight:700;color:var(--white)">${data.balance >= 999 ? '∞' : data.balance}</div></div>
+    <div style="text-align:center"><div style="font-family:var(--mono);font-size:.52rem;color:var(--dim);margin-bottom:.2rem">Earned</div><div style="font-family:var(--mono);font-size:.88rem;font-weight:700;color:var(--green)">+${earned}</div></div>
+    <div style="text-align:center"><div style="font-family:var(--mono);font-size:.52rem;color:var(--dim);margin-bottom:.2rem">Used</div><div style="font-family:var(--mono);font-size:.88rem;font-weight:700;color:var(--sub)">${used}</div></div>
+  </div>`;
+  listEl.innerHTML = summary + listEl.innerHTML;
+}
+
 async function submitEarnAnswer(questionKey, answer) {
   const qEl = document.getElementById('earnCreditQuestion');
   if (qEl) qEl.innerHTML = '<div style="text-align:center;padding:1.5rem"><div class="spinner" style="width:18px;height:18px;margin:0 auto"></div></div>';
@@ -12995,7 +13159,17 @@ async function submitEarnAnswer(questionKey, answer) {
           </div>
           <div style="font-size:.73rem;color:var(--sub)">Unlimited AI credits, priority analysis, and ghost risk alerts.</div>
         </div>
+        <div style="text-align:center;padding-top:.25rem">
+          <button onclick="loadCreditHistory()" style="background:none;border:none;font-family:var(--mono);font-size:.6rem;color:var(--dim);cursor:pointer;text-decoration:underline;text-underline-offset:2px">View credit history →</button>
+        </div>
       </div>
+    </div>
+    <div id="earnCreditHistory" style="display:none">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.75rem">
+        <div style="font-family:var(--mono);font-size:.52rem;text-transform:uppercase;letter-spacing:.15em;color:var(--sub)">Credit history</div>
+        <button onclick="document.getElementById('earnCreditHistory').style.display='none';document.getElementById('earnCreditMethods').style.display='block'" style="background:none;border:none;font-family:var(--mono);font-size:.6rem;color:var(--dim);cursor:pointer">← Back</button>
+      </div>
+      <div id="earnCreditHistoryList"><div style="text-align:center;padding:1rem"><div class="spinner" style="width:16px;height:16px;margin:0 auto"></div></div></div>
     </div>
   </div>
 </div>

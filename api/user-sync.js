@@ -461,6 +461,28 @@ export default async function handler(req, res) {
     return res.status(200).json({ ok: true, balance: cred.pro ? 999 : (resetToday ? 4 : newBalance), earned_today: newEarned });
   }
 
+  // ── CREDIT HISTORY ────────────────────────────────────────────────────────────
+  if (action === 'credit_history') {
+    const today = new Date().toISOString().split('T')[0];
+    const [credRes, txRes] = await Promise.all([
+      db(`ai_credits?user_id=eq.${uid}&limit=1`),
+      db(`credit_transactions?user_id=eq.${uid}&order=created_at.desc&limit=30`),
+    ]);
+    let cred = credRes.ok ? (await credRes.json())[0] : null;
+    if (cred && cred.last_reset !== today) {
+      const nb = cred.pro ? 999 : 3;
+      db(`ai_credits?user_id=eq.${uid}`, { method: 'PATCH', body: JSON.stringify({ balance: nb, daily_earned: 0, last_reset: today }), headers: { Prefer: 'return=minimal' } }).catch(() => {});
+      cred = { ...cred, balance: nb, daily_earned: 0, last_reset: today };
+    }
+    const transactions = txRes.ok ? await txRes.json() : [];
+    return res.status(200).json({
+      balance: cred?.balance ?? 3,
+      pro: cred?.pro ?? false,
+      daily_earned: cred?.daily_earned ?? 0,
+      transactions,
+    });
+  }
+
   // ── SAVE EMPLOYMENT HISTORY ────────────────────────────────────────────────────
   if (action === 'save_employment') {
     const { employment } = body;

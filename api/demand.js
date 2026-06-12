@@ -349,7 +349,7 @@ async function handlePost(req, res) {
   let upsertError = null;
 
   try {
-    const upsertRes = await fetch(`${SUPABASE_URL}/rest/v1/demand_data`, {
+    const upsertRes = await fetch(`${SUPABASE_URL}/rest/v1/demand_data?on_conflict=city,role_title`, {
       method: 'POST',
       headers: { ...svc, Prefer: 'resolution=merge-duplicates,return=minimal' },
       body: JSON.stringify(rows),

@@ -236,11 +236,11 @@ export default async function handler(req, res) {
     const companies     = Array.isArray(body.companies) ? body.companies : DEFAULT_COMPANIES;
     const dryRun        = !!body.dry_run;
 
-    async function redditFetch(company, sub) {
-      const q = encodeURIComponent(`"${company}" hiring OR interview OR ghosted OR rejected OR offer`);
+    // Browse new posts (no OAuth required unlike search) — filter client-side per company
+    async function redditFetch(sub) {
       try {
-        const r = await fetch(`https://www.reddit.com/r/${sub}/search.json?q=${q}&sort=new&t=year&limit=25&restrict_sr=1`, {
-          headers: { 'User-Agent': 'SeenJobs-HiringIntelligence/1.0' },
+        const r = await fetch(`https://www.reddit.com/r/${sub}/new.json?limit=100&sort=new`, {
+          headers: { 'User-Agent': 'Mozilla/5.0 (compatible; SeenJobs/1.0; +https://seenjobs.io)' },
         });
         if (!r.ok) return [];
         const d = await r.json();
@@ -285,38 +285,54 @@ export default async function handler(req, res) {
       return (ins.ok ? (await ins.json())?.[0]?.id : null) || null;
     }
 
+    // Fetch each subreddit once, then fan out across companies (fewer requests to Reddit)
+    const postsByCompany = {};
+    for (const company of companies.slice(0, 12)) postsByCompany[company] = [];
+
+    for (const sub of SUBREDDITS) {
+      const subPosts = await redditFetch(sub);
+      for (const company of companies.slice(0, 12)) {
+        const cl = company.toLowerCase();
+        const keywords = ['hiring','interview','ghosted','rejected','offer','recruiter','application','applied'];
+        const matching = subPosts.filter(p => {
+          const txt = `${p.title} ${p.body}`.toLowerCase();
+          return txt.includes(cl) && keywords.some(k => txt.includes(k));
+        });
+        postsByCompany[company].push(...matching);
+      }
+      await new Promise(r => setTimeout(r, 400));
+    }
+
     const results = {};
     for (const company of companies.slice(0, 12)) {
       let imported = 0, skipped = 0;
-      for (const sub of SUBREDDITS) {
-        const posts = await redditFetch(company, sub);
-        if (!posts.length) continue;
-        const seen = await alreadyImported(posts.map(p=>p.id));
-        const fresh = posts.filter(p=>!seen.has(p.id));
-        if (!fresh.length) continue;
-        for (let i = 0; i < fresh.length; i += 20) {
-          const batch = fresh.slice(i, i+20);
-          const cls   = await classify(batch);
-          for (let j = 0; j < batch.length; j++) {
-            const post = batch[j];
-            const c    = Array.isArray(cls) ? (cls[j]||{}) : {};
-            if (!c.is_hiring_experience) {
-              if (!dryRun) await fetch(`${SUPABASE_URL}/rest/v1/reddit_imports`,{method:'POST',headers:{...hdrsBase,Prefer:'return=minimal'},body:JSON.stringify({reddit_post_id:post.id,company_name:company,subreddit:post.subreddit,skipped:true,skip_reason:'not_hiring_experience'})});
-              skipped++; continue;
-            }
-            if (dryRun) { imported++; continue; }
-            const cid = await upsertCo(company);
-            const rpt = { company_name:company, platform:`Reddit r/${post.subreddit}`, outcome:c.outcome||'unknown', role:c.role||null, report_text:c.summary||post.title.slice(0,500), source:'reddit', outcome_weight:REDDIT_WEIGHT, trust_reason:'community_signal', needs_review:false, rounds:0, unpaid_work:'na', experience_level:'Unknown' };
-            if (cid) rpt.company_id = cid;
-            const repR = await fetch(`${SUPABASE_URL}/rest/v1/reports`,{method:'POST',headers:{...hdrsBase,Prefer:'return=representation'},body:JSON.stringify(rpt)});
-            const repId = repR.ok ? (await repR.json())?.[0]?.id : null;
-            await fetch(`${SUPABASE_URL}/rest/v1/reddit_imports`,{method:'POST',headers:{...hdrsBase,Prefer:'return=minimal'},body:JSON.stringify({reddit_post_id:post.id,company_name:company,subreddit:post.subreddit,report_id:repId||null,skipped:!repId,skip_reason:repId?null:'insert_failed'})});
-            if (repId) imported++; else skipped++;
+      const posts = postsByCompany[company];
+      if (!posts.length) { results[company] = { imported: 0, skipped: 0, fetched: 0 }; continue; }
+      const seen = await alreadyImported(posts.map(p=>p.id));
+      const fresh = posts.filter(p=>!seen.has(p.id));
+      if (!fresh.length) { results[company] = { imported: 0, skipped: 0, fetched: posts.length, note: 'all_seen' }; continue; }
+      for (let i = 0; i < fresh.length; i += 20) {
+        const batch = fresh.slice(i, i+20);
+        const cls   = await classify(batch);
+        for (let j = 0; j < batch.length; j++) {
+          const post = batch[j];
+          const c    = Array.isArray(cls) ? (cls[j]||{}) : {};
+          if (!c.is_hiring_experience) {
+            if (!dryRun) await fetch(`${SUPABASE_URL}/rest/v1/reddit_imports`,{method:'POST',headers:{...hdrsBase,Prefer:'return=minimal'},body:JSON.stringify({reddit_post_id:post.id,company_name:company,subreddit:post.subreddit,skipped:true,skip_reason:'not_hiring_experience'})});
+            skipped++; continue;
           }
-          if (i+20 < fresh.length) await new Promise(r=>setTimeout(r,600));
+          if (dryRun) { imported++; continue; }
+          const cid = await upsertCo(company);
+          const rpt = { company_name:company, platform:`Reddit r/${post.subreddit}`, outcome:c.outcome||'unknown', role:c.role||null, report_text:c.summary||post.title.slice(0,500), source:'reddit', outcome_weight:REDDIT_WEIGHT, trust_reason:'community_signal', needs_review:false, rounds:0, unpaid_work:'na', experience_level:'Unknown' };
+          if (cid) rpt.company_id = cid;
+          const repR = await fetch(`${SUPABASE_URL}/rest/v1/reports`,{method:'POST',headers:{...hdrsBase,Prefer:'return=representation'},body:JSON.stringify(rpt)});
+          const repId = repR.ok ? (await repR.json())?.[0]?.id : null;
+          await fetch(`${SUPABASE_URL}/rest/v1/reddit_imports`,{method:'POST',headers:{...hdrsBase,Prefer:'return=minimal'},body:JSON.stringify({reddit_post_id:post.id,company_name:company,subreddit:post.subreddit,report_id:repId||null,skipped:!repId,skip_reason:repId?null:'insert_failed'})});
+          if (repId) imported++; else skipped++;
         }
+        if (i+20 < fresh.length) await new Promise(r=>setTimeout(r,600));
       }
-      results[company] = { imported, skipped };
+      results[company] = { imported, skipped, fetched: posts.length };
     }
     return res.status(200).json({ ok: true, results });
   }

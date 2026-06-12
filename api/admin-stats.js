@@ -145,7 +145,7 @@ async function _handler(req, res) {
       errTodayRes, errWeekRes,
       dauRes, dupClustersRes, flagsRes,
       staleJobsRes, zeroSearchesRes, jobReportsRes, searchLogsTodayRes,
-      recentReportsRes, recentAppsRes,
+      recentReportsRes, recentAppsRes, jobsTodayRes, inactiveReportsRes,
     ] = await Promise.all([
       db(`profiles?select=id`, { headers: { Prefer: 'count=exact', 'Range-Unit': 'items', Range: '0-0' } }),
       db(`profiles?created_at=gte.${todayISO}&select=id`, { headers: { Prefer: 'count=exact', 'Range-Unit': 'items', Range: '0-0' } }),
@@ -170,6 +170,8 @@ async function _handler(req, res) {
       db(`search_logs?created_at=gte.${todayISO}&select=id`, { headers: { Prefer: 'count=exact', 'Range-Unit': 'items', Range: '0-0' } }),
       db(`reports?select=id,company_name,outcome,role,city,platform,created_at,report_text,outcome_weight,trust_reason&order=created_at.desc&limit=25`),
       db(`applications?select=id,company_name,role,city,status,stage,platform,created_at&order=created_at.desc&limit=25`),
+      db(`jobs?created_at=gte.${todayISO}&select=id`, { headers: { Prefer: 'count=exact', 'Range-Unit': 'items', Range: '0-0' } }),
+      db(`job_availability_reports?status=eq.expired&select=id,job_id,reported_at&order=reported_at.desc&limit=50`),
     ]);
 
     const usersTotal = ct(usersTotalRes);
@@ -193,6 +195,29 @@ async function _handler(req, res) {
 
     const recentReports = recentReportsRes.ok ? await recentReportsRes.json() : [];
     const recentApps    = recentAppsRes.ok    ? await recentAppsRes.json()    : [];
+    const inactiveReportRows = inactiveReportsRes.ok ? await inactiveReportsRes.json() : [];
+
+    // Enrich inactive reports with job details
+    let inactiveReports = [];
+    if (inactiveReportRows.length) {
+      const jobIds = [...new Set(inactiveReportRows.map(r => r.job_id).filter(Boolean))];
+      if (jobIds.length) {
+        const jobsRes = await db(`jobs?id=in.(${jobIds.map(id => encodeURIComponent(id)).join(',')})&select=id,company,title,city,url,apply_url,availability_status&limit=50`);
+        const jobRows = jobsRes.ok ? await jobsRes.json() : [];
+        const jobMap = Object.fromEntries((jobRows || []).map(j => [j.id, j]));
+        // Group reports by job_id, count them
+        const grouped = {};
+        inactiveReportRows.forEach(r => {
+          if (!grouped[r.job_id]) grouped[r.job_id] = { job_id: r.job_id, report_count: 0, latest_reported_at: r.reported_at };
+          grouped[r.job_id].report_count++;
+          if (r.reported_at > grouped[r.job_id].latest_reported_at) grouped[r.job_id].latest_reported_at = r.reported_at;
+        });
+        inactiveReports = Object.values(grouped)
+          .sort((a, b) => b.report_count - a.report_count)
+          .map(g => ({ ...g, job: jobMap[g.job_id] || null }))
+          .filter(g => g.job);
+      }
+    }
 
     return res.status(200).json({
       users: { total: usersTotal, new_today: ct(usersTodayRes), new_this_week: ct(usersWeekRes), dau },
@@ -208,11 +233,13 @@ async function _handler(req, res) {
         ? { ready: true, today: ct(searchLogsTodayRes) }
         : { ready: false },
       jobs: {
+        added_today: ct(jobsTodayRes),
         stale_or_expired: ct(staleJobsRes),
         zero_result_searches_7d: zeroSearchRows.length,
         top_zero_queries: [...new Set(zeroSearchRows.map(r => r.query))].slice(0, 10),
         availability_reports_7d: jobReportRows.length,
         reports_by_status: jobReportsByStatus,
+        inactive_reports: inactiveReports,
       },
     });
   }
@@ -321,6 +348,43 @@ async function _handler(req, res) {
       headers: { Prefer: 'return=minimal' },
     });
     await db('admin_audit_log', { method: 'POST', body: JSON.stringify({ admin_id: sess.admin_id, username: 'admin', action: 'update_cluster', target_type: 'duplicate_cluster', target_id: String(cluster_id), metadata: { status: clusterStatus } }), headers: { Prefer: 'return=minimal' } });
+    return res.status(200).json({ ok: true });
+  }
+
+  if (action === 'remove_listing') {
+    if (adminRole === 'moderator') return res.status(403).json({ error: 'Insufficient role' });
+    const { job_id } = body;
+    if (!job_id) return res.status(400).json({ error: 'job_id required' });
+    await db(`jobs?id=eq.${encodeURIComponent(job_id)}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ availability_status: 'removed' }),
+      headers: { Prefer: 'return=minimal' },
+    });
+    // Mark all expired reports for this job as resolved
+    await db(`job_availability_reports?job_id=eq.${encodeURIComponent(job_id)}&status=eq.expired`, {
+      method: 'PATCH',
+      body: JSON.stringify({ status: 'confirmed_expired' }),
+      headers: { Prefer: 'return=minimal' },
+    });
+    await db('admin_audit_log', { method: 'POST', body: JSON.stringify({ admin_id: sess.admin_id, username: 'admin', action: 'remove_listing', target_type: 'job', target_id: String(job_id) }), headers: { Prefer: 'return=minimal' } });
+    return res.status(200).json({ ok: true });
+  }
+
+  if (action === 'deny_report') {
+    const { job_id } = body;
+    if (!job_id) return res.status(400).json({ error: 'job_id required' });
+    // Mark job as confirmed active and dismiss reports
+    await db(`jobs?id=eq.${encodeURIComponent(job_id)}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ availability_status: 'active', last_checked_at: new Date().toISOString() }),
+      headers: { Prefer: 'return=minimal' },
+    });
+    await db(`job_availability_reports?job_id=eq.${encodeURIComponent(job_id)}&status=eq.expired`, {
+      method: 'PATCH',
+      body: JSON.stringify({ status: 'denied' }),
+      headers: { Prefer: 'return=minimal' },
+    });
+    await db('admin_audit_log', { method: 'POST', body: JSON.stringify({ admin_id: sess.admin_id, username: 'admin', action: 'deny_report', target_type: 'job', target_id: String(job_id) }), headers: { Prefer: 'return=minimal' } });
     return res.status(200).json({ ok: true });
   }
 
