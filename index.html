@@ -1887,13 +1887,21 @@ nav.nav-scrolled{background:rgba(6,6,8,0.82);backdrop-filter:blur(60px) saturate
           <div style="margin-bottom:.75rem"><label style="font-family:var(--mono);font-size:.6rem;text-transform:uppercase;letter-spacing:.07em;color:var(--dim);display:block;margin-bottom:.32rem">Job title you're applying for</label><input id="aiJob" type="text" placeholder="e.g. Marketing Manager" style="width:100%;background:var(--surface);border:1.5px solid var(--line2);border-radius:8px;padding:.65rem .9rem;color:var(--white);font-family:var(--body);font-size:.84rem;outline:none;caret-color:var(--blue)"/></div>
           <div style="margin-bottom:.75rem"><label style="font-family:var(--mono);font-size:.6rem;text-transform:uppercase;letter-spacing:.07em;color:var(--dim);display:block;margin-bottom:.32rem">Company + location</label><input id="aiCo" type="text" placeholder="e.g. Netflix · Los Angeles, CA" style="width:100%;background:var(--surface);border:1.5px solid var(--line2);border-radius:8px;padding:.65rem .9rem;color:var(--white);font-family:var(--body);font-size:.84rem;outline:none;caret-color:var(--blue)"/></div>
           <div style="margin-bottom:.75rem">
-            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.32rem">
-              <label style="font-family:var(--mono);font-size:.6rem;text-transform:uppercase;letter-spacing:.07em;color:var(--dim)">Your resume</label>
-              <label for="resumePageUpload" style="font-family:var(--mono);font-size:.58rem;color:var(--blue);background:var(--bdim);border:1px solid var(--bmid);border-radius:5px;padding:.2rem .55rem;cursor:pointer;transition:background .15s" onmouseover="this.style.background='rgba(59,130,246,.18)'" onmouseout="this.style.background='var(--bdim)'">↑ Upload PDF/Word</label>
-              <input id="resumePageUpload" type="file" accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document" style="display:none" onchange="handleResumePageUpload(this.files[0])"/>
+            <label style="font-family:var(--mono);font-size:.6rem;text-transform:uppercase;letter-spacing:.07em;color:var(--dim);display:block;margin-bottom:.32rem">Your resume</label>
+            <div id="scannerResumeEmpty" onclick="document.getElementById('resumePageUpload').click()" ondragover="event.preventDefault();this.style.borderColor='var(--blue)'" ondragleave="this.style.borderColor='var(--line2)'" ondrop="event.preventDefault();handleResumePageUpload(event.dataTransfer.files[0])" style="border:1.5px dashed var(--line2);border-radius:8px;padding:1.25rem;text-align:center;cursor:pointer;transition:border-color .15s">
+              <div style="font-size:1.4rem;margin-bottom:.35rem">📄</div>
+              <div style="font-family:var(--display);font-size:.82rem;font-weight:700;color:var(--white);margin-bottom:.2rem">Upload your resume</div>
+              <div style="font-family:var(--mono);font-size:.6rem;color:var(--muted)">PDF or Word · drag & drop or tap</div>
             </div>
-            <div id="resumeAIStatus" style="background:var(--bdim);border:1px solid var(--bmid);border-radius:7px;padding:.55rem .85rem;font-family:var(--mono);font-size:.62rem;color:var(--blue);margin-bottom:.5rem;display:none">✓ Resume saved — auto-used here and on job applications</div>
-            <textarea id="aiResume" placeholder="Paste your resume text here..." style="width:100%;background:var(--surface);border:1.5px solid var(--line2);border-radius:8px;padding:.65rem .9rem;color:var(--white);font-family:var(--body);font-size:.82rem;outline:none;min-height:120px;resize:vertical;caret-color:var(--blue)"></textarea>
+            <div id="scannerResumeOnFile" style="display:none;background:var(--bdim);border:1px solid var(--bmid);border-radius:8px;padding:.65rem .9rem;align-items:center;gap:.65rem">
+              <span style="font-size:1rem;flex-shrink:0">📄</span>
+              <div style="flex:1;min-width:0">
+                <div style="font-family:var(--display);font-size:.78rem;font-weight:700;color:var(--white);overflow:hidden;text-overflow:ellipsis;white-space:nowrap" id="scannerResumeFileName">My Resume</div>
+                <div style="font-family:var(--mono);font-size:.58rem;color:var(--muted)">Auto-loaded · <label for="resumePageUpload" style="color:var(--blue);cursor:pointer" onclick="event.stopPropagation()">Replace →</label></div>
+              </div>
+              <span style="font-family:var(--mono);font-size:.58rem;color:var(--green);flex-shrink:0">✓ Ready</span>
+            </div>
+            <input id="resumePageUpload" type="file" accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document" style="display:none" onchange="handleResumePageUpload(this.files[0])"/>
           </div>
           <div style="margin-bottom:1rem"><label style="font-family:var(--mono);font-size:.6rem;text-transform:uppercase;letter-spacing:.07em;color:var(--dim);display:block;margin-bottom:.32rem">Job description</label><textarea id="aiJD" placeholder="Paste the full job description..." style="width:100%;background:var(--surface);border:1.5px solid var(--line2);border-radius:8px;padding:.65rem .9rem;color:var(--white);font-family:var(--body);font-size:.82rem;outline:none;min-height:120px;resize:vertical;caret-color:var(--blue)"></textarea></div>
           <button id="analyzeBtn" onclick="analyzeResume()" style="width:100%;padding:.85rem;background:linear-gradient(135deg,#3b82f6 0%,#8b5cf6 100%);color:#fff;border:none;border-radius:8px;font-family:var(--display);font-weight:800;font-size:.9rem;cursor:pointer;box-shadow:0 0 20px rgba(59,130,246,0.3)">Analyze my odds →</button>
@@ -4845,22 +4853,12 @@ function _demandOpenCompanies(city, niche) {
 // ═══════════════════════════════════════════════
 async function analyzeResume(){
   if (!await _guardAI('scanner')) return;
-  // Auto-load stored resume
-  let resumeText = document.getElementById('aiResume')?.value?.trim();
-  if (!resumeText) {
-    const stored = await ResumeStore.load();
-    if (stored?.text) {
-      resumeText = stored.text;
-      const ta = document.getElementById('aiResume');
-      if (ta) { ta.style.display = 'none'; } // hide the textarea, text is in memory
-      const status = document.getElementById('resumeAIStatus');
-      if (status) status.style.display = 'block';
-    }
-  }
+  const stored = await ResumeStore.load();
+  const resumeText = stored?.text || '';
   const job=document.getElementById('aiJob')?.value?.trim();
   const co=document.getElementById('aiCo')?.value?.trim();
   const jd=document.getElementById('aiJD')?.value?.trim();
-  if(!resumeText){showToast('Paste your resume text above or upload a file.');return;}
+  if(!resumeText){showToast('Upload your resume first — tap the upload zone above.');return;}
   if(!job||!jd){showToast('Fill in the job title and job description.');return;}
   const btn=document.getElementById('analyzeBtn');
   const out=document.getElementById('resumeOut');
@@ -9410,11 +9408,16 @@ function go(page){
     if(page==='seeker-dash'){renderSeekerDash();loadDashResumeState();}
     if(page==='resume'){
       ResumeStore.load().then(stored => {
+        const empty = document.getElementById('scannerResumeEmpty');
+        const onFile = document.getElementById('scannerResumeOnFile');
+        const fname = document.getElementById('scannerResumeFileName');
         if (stored?.text) {
-          const ta = document.getElementById('aiResume');
-          const status = document.getElementById('resumeAIStatus');
-          if (status) status.style.display = 'block';
-          if (ta) { ta.style.display = 'none'; }
+          if (empty) empty.style.display = 'none';
+          if (onFile) { onFile.style.display = 'flex'; }
+          if (fname) fname.textContent = stored.fileName || 'My Resume';
+        } else {
+          if (empty) empty.style.display = 'block';
+          if (onFile) onFile.style.display = 'none';
         }
       }).catch(e => console.warn('resume load:', e));
     }
@@ -11307,9 +11310,10 @@ async function showAIOptimizeFlow(jobId, company, role, location, score, risk, w
         '<div style="font-family:var(--mono);font-size:.58rem;color:var(--muted)">Auto-loaded from your profile</div></div>' +
       '</div>'
       :
-      '<div style="margin-bottom:.85rem">' +
-        '<label style="font-family:var(--mono);font-size:.58rem;text-transform:uppercase;letter-spacing:.07em;color:var(--dim);display:block;margin-bottom:.32rem">Your resume</label>' +
-        '<textarea id="aiOptResume" placeholder="Paste your resume here..." style="width:100%;background:var(--raised);border:1.5px solid var(--line2);border-radius:8px;padding:.65rem .9rem;color:var(--white);font-family:var(--body);font-size:.8rem;outline:none;min-height:100px;resize:vertical;caret-color:var(--green)"></textarea>' +
+      '<div style="margin-bottom:.85rem;background:var(--raised);border:1.5px dashed var(--line2);border-radius:8px;padding:1.25rem;text-align:center;cursor:pointer" onclick="closeApplyModal();go(\'resume\')">' +
+        '<div style="font-size:1.2rem;margin-bottom:.35rem">📄</div>' +
+        '<div style="font-family:var(--display);font-size:.82rem;font-weight:700;color:var(--white);margin-bottom:.2rem">Upload your resume first</div>' +
+        '<div style="font-family:var(--mono);font-size:.6rem;color:var(--muted)">Tap to go to Resume AI → upload once → auto-used everywhere</div>' +
       '</div>'
     ) +
     '<div style="display:flex;gap:.5rem">' +
@@ -11320,17 +11324,12 @@ async function showAIOptimizeFlow(jobId, company, role, location, score, risk, w
 
 async function runAIOptimize(jobId, company, role, location, score, risk, waste, applyEmail) {
   // Load resume — stored profile is source of truth
-  let resume = null;
   const stored = await ResumeStore.load();
-  if (stored?.text) {
-    resume = stored.text;
-    window._applyResumeText = stored.text; // ensure it's set
-  } else {
-    resume = document.getElementById('aiOptResume')?.value?.trim();
-  }
+  const resume = stored?.text || null;
+  if (stored?.text) window._applyResumeText = stored.text;
 
   if (!resume || resume.length < 50) {
-    showToast('Upload or paste your resume in Resume AI first.');
+    showToast('Upload your resume in Resume AI first — it only takes a second.');
     return;
   }
 
@@ -12178,15 +12177,16 @@ async function handleResumePageUpload(file) {
     if (!res.ok || data.error) throw new Error(data.error || 'Parse failed');
     await ResumeStore.save(data.text, data.fileName, data.wordCount);
     if (data.employment?.length) _sync('save_employment', { employment: data.employment }).catch(() => {});
-    const ta = document.getElementById('aiResume');
-    const status = document.getElementById('resumeAIStatus');
-    if (ta) ta.style.display = 'none';
-    if (status) { status.style.display = 'block'; status.textContent = '✓ Resume saved — auto-used here and on job applications'; }
+    const empty = document.getElementById('scannerResumeEmpty');
+    const onFile = document.getElementById('scannerResumeOnFile');
+    const fname = document.getElementById('scannerResumeFileName');
+    if (empty) empty.style.display = 'none';
+    if (onFile) { onFile.style.display = 'flex'; }
+    if (fname) fname.textContent = data.fileName || file.name;
     showToast('Resume saved!');
   } catch(e) {
-    showToast('Upload failed: ' + (e.message || 'Try a different file.'));
+    showToast(e.message === 'credits' ? '' : 'Upload failed: ' + (e.message || 'Try a different file.'));
   }
-  if (label) label.textContent = '↑ Upload PDF/Word';
 }
 
 async function handleDashResumeUpload(file) {
@@ -12848,12 +12848,32 @@ function openEarnCreditsModal() {
   if (!modal) return;
   modal.style.display = 'flex';
   document.body.style.overflow = 'hidden';
+
+  const b = CreditStore._balance;
+  const title = document.getElementById('earnCreditsTitle');
+  const subtitle = document.getElementById('earnCreditsSubtitle');
   const bal = document.getElementById('earnCreditBalance');
+
+  // Dynamic title
+  if (title) title.textContent = b === 0 ? 'Out of credits' : b >= 999 ? 'Unlimited AI' : 'Your AI credits';
+
+  // Balance line with reset time
   if (bal) {
-    const b = CreditStore._balance;
-    if (b !== null) bal.textContent = b >= 999 ? 'You have unlimited credits (Pro)' : `You have ${b} credit${b === 1 ? '' : 's'} remaining today`;
-    else bal.textContent = '';
+    if (b === null) { bal.textContent = ''; }
+    else if (b >= 999) { bal.textContent = 'Pro · unlimited AI credits'; }
+    else {
+      const now = new Date();
+      const midnight = new Date(); midnight.setHours(24, 0, 0, 0);
+      const hoursLeft = Math.ceil((midnight - now) / 3600000);
+      bal.textContent = `${b} credit${b === 1 ? '' : 's'} left today · resets in ${hoursLeft}h`;
+    }
   }
+
+  // Subtitle
+  if (subtitle) subtitle.textContent = b === 0
+    ? 'Earn a free credit in 10 seconds, or go Pro for unlimited.'
+    : 'Each credit powers one AI analysis. Earn more by sharing what you know.';
+
   const qEl = document.getElementById('earnCreditQuestion');
   const mEl = document.getElementById('earnCreditMethods');
   if (qEl) qEl.style.display = 'none';
@@ -12873,12 +12893,13 @@ async function loadEarnQuestion() {
   mEl.style.display = 'none';
   qEl.innerHTML = '<div style="text-align:center;padding:1.5rem"><div class="spinner" style="width:18px;height:18px;margin:0 auto"></div></div>';
   const data = await _sync('get_question');
-  if (!data || data.error || !data.key) {
-    qEl.innerHTML = '<div style="font-family:var(--mono);font-size:.72rem;color:var(--muted);text-align:center;padding:1rem">No questions available right now.</div><button onclick="document.getElementById(\'earnCreditQuestion\').style.display=\'none\';document.getElementById(\'earnCreditMethods\').style.display=\'block\'" style="display:block;margin:.75rem auto 0;background:none;border:none;font-family:var(--mono);font-size:.6rem;color:var(--muted);cursor:pointer">← Back</button>';
+  const q = data?.question;
+  if (!data || data.error || !q?.key) {
+    qEl.innerHTML = '<div style="font-family:var(--mono);font-size:.72rem;color:var(--muted);text-align:center;padding:1rem">No questions available right now — check back later.</div><button onclick="document.getElementById(\'earnCreditQuestion\').style.display=\'none\';document.getElementById(\'earnCreditMethods\').style.display=\'block\'" style="display:block;margin:.75rem auto 0;background:none;border:none;font-family:var(--mono);font-size:.6rem;color:var(--muted);cursor:pointer">← Back</button>';
     return;
   }
-  const opts = (data.options || []).map(opt => `<button onclick="submitEarnAnswer(${JSON.stringify(data.key)},${JSON.stringify(opt)})" style="background:var(--raised);border:1px solid var(--line2);border-radius:10px;padding:.65rem .85rem;text-align:left;font-size:.78rem;color:var(--sub);cursor:pointer;transition:all .15s;font-family:var(--body);width:100%" onmouseover="this.style.borderColor='var(--blue)';this.style.color='var(--white)'" onmouseout="this.style.borderColor='var(--line2)';this.style.color='var(--sub)'">${opt}</button>`).join('');
-  qEl.innerHTML = `<div style="margin-bottom:1rem"><div style="font-family:var(--mono);font-size:.5rem;text-transform:uppercase;letter-spacing:.15em;color:var(--muted);margin-bottom:.5rem">${data.company || 'General'} · +${data.credit_value||1} credit</div><div style="font-size:.88rem;color:var(--white);font-weight:600;line-height:1.5;margin-bottom:1rem">${data.text}</div><div style="display:flex;flex-direction:column;gap:.45rem">${opts}</div></div><button onclick="document.getElementById('earnCreditQuestion').style.display='none';document.getElementById('earnCreditMethods').style.display='block'" style="background:none;border:none;font-family:var(--mono);font-size:.6rem;color:var(--muted);cursor:pointer">← Back</button>`;
+  const opts = (q.options || []).map(opt => `<button onclick="submitEarnAnswer(${JSON.stringify(q.key)},${JSON.stringify(opt)})" style="background:var(--raised);border:1px solid var(--line2);border-radius:10px;padding:.65rem .85rem;text-align:left;font-size:.78rem;color:var(--sub);cursor:pointer;transition:all .15s;font-family:var(--body);width:100%" onmouseover="this.style.borderColor='var(--blue)';this.style.color='var(--white)'" onmouseout="this.style.borderColor='var(--line2)';this.style.color='var(--sub)'">${opt}</button>`).join('');
+  qEl.innerHTML = `<div style="margin-bottom:1rem"><div style="font-family:var(--mono);font-size:.5rem;text-transform:uppercase;letter-spacing:.15em;color:var(--muted);margin-bottom:.5rem">${q.company || 'General'} · +${q.credit_value||1} credit</div><div style="font-size:.88rem;color:var(--white);font-weight:600;line-height:1.5;margin-bottom:1rem">${q.text}</div><div style="display:flex;flex-direction:column;gap:.45rem">${opts}</div></div><button onclick="document.getElementById('earnCreditQuestion').style.display='none';document.getElementById('earnCreditMethods').style.display='block'" style="background:none;border:none;font-family:var(--mono);font-size:.6rem;color:var(--muted);cursor:pointer">← Back</button>`;
 }
 
 async function submitEarnAnswer(questionKey, answer) {
