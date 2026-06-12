@@ -2528,9 +2528,14 @@ CREATE INDEX IF NOT EXISTS idx_search_logs_created
   ON search_logs(created_at DESC);
 ALTER TABLE search_logs ENABLE ROW LEVEL SECURITY;
 -- Allow anon INSERT only (so frontend can log company views)
-CREATE POLICY "insert only" ON search_logs FOR INSERT WITH CHECK (true);
--- Block all reads from the client side
-CREATE POLICY "no reads" ON search_logs FOR SELECT USING (false);</pre>
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename='search_logs' AND policyname='insert only') THEN
+    CREATE POLICY "insert only" ON search_logs FOR INSERT WITH CHECK (true);
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename='search_logs' AND policyname='no reads') THEN
+    CREATE POLICY "no reads" ON search_logs FOR SELECT USING (false);
+  END IF;
+END $$;</pre>
     </div>
 
     <!-- User-reported issues queue -->
@@ -6364,14 +6369,27 @@ async function adminRunJob(job, btn) {
   btn.disabled = true;
   const resultEl = document.getElementById('admJobResult');
   if (resultEl) resultEl.textContent = '';
+
+  // Call each endpoint directly with admin token — avoids server-to-server proxy issues
+  const endpoints = {
+    refresh_jobs:   ['/api/refresh-jobs',  'POST'],
+    refresh_demand: ['/api/demand',         'POST'],
+    reddit_import:  ['/api/reports',        'POST'],
+  };
+  const [url, method] = endpoints[job] || [];
+  if (!url) { btn.textContent = '✗ Unknown job'; return; }
+
+  const body = job === 'reddit_import' ? { action: 'reddit_import' } : {};
+
   try {
-    const res = await fetch('/api/admin-stats', {
-      method: 'POST',
+    const res = await fetch(url, {
+      method,
       headers: AdminSession.headers(),
-      body: JSON.stringify({ action: 'run_job', job }),
+      body: JSON.stringify(body),
     });
-    const d = await res.json();
-    if (!res.ok) throw new Error(d.error || res.status);
+    const d = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(d.error || String(res.status));
+
     let msg = `✓ ${job} complete`;
     if (job === 'reddit_import' && d.results) {
       const total = Object.values(d.results).reduce((s, r) => s + (r.imported || 0), 0);

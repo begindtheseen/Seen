@@ -106,9 +106,15 @@ async function handlePost(req, res) {
   const authHeader = req.headers.authorization || '';
   const token = authHeader.replace(/^Bearer /i, '').trim();
   let authed = false;
+  const adminToken = req.headers['x-admin-token'] || '';
+  const isCron     = req.headers['x-vercel-cron'] === '1';
 
-  if (CRON_SECRET && token === CRON_SECRET) {
+  if (isCron || (CRON_SECRET && token === CRON_SECRET)) {
     authed = true;
+  } else if (adminToken) {
+    const sr = await fetch(`${SUPABASE_URL}/rest/v1/admin_sessions?token=eq.${encodeURIComponent(adminToken)}&select=expires_at&limit=1`, { headers: { apikey: SUPABASE_SERVICE_KEY, Authorization: `Bearer ${SUPABASE_SERVICE_KEY}` } });
+    const sess = sr.ok ? (await sr.json())?.[0] : null;
+    if (sess && new Date(sess.expires_at) > new Date()) authed = true;
   } else if (token) {
     try {
       const userRes = await fetch(`${SUPABASE_URL}/auth/v1/user`, {

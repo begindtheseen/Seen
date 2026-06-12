@@ -144,7 +144,7 @@ async function _handler(req, res) {
       coScoredRes, issuesRes, creditListRes,
       errTodayRes, errWeekRes,
       dauRes, dupClustersRes, flagsRes,
-      staleJobsRes, zeroSearchesRes, jobReportsRes,
+      staleJobsRes, zeroSearchesRes, jobReportsRes, searchLogsTodayRes,
     ] = await Promise.all([
       db(`profiles?select=id`, { headers: { Prefer: 'count=exact', 'Range-Unit': 'items', Range: '0-0' } }),
       db(`profiles?created_at=gte.${todayISO}&select=id`, { headers: { Prefer: 'count=exact', 'Range-Unit': 'items', Range: '0-0' } }),
@@ -166,6 +166,7 @@ async function _handler(req, res) {
       db(`jobs?availability_status=in.(stale,expired)&select=id`, { headers: { Prefer: 'count=exact', 'Range-Unit': 'items', Range: '0-0' } }),
       db(`search_events?result_count=eq.0&created_at=gte.${weekISO}&select=query&order=created_at.desc&limit=20`),
       db(`job_availability_reports?reported_at=gte.${weekISO}&select=job_id,status&limit=200`),
+      db(`search_logs?created_at=gte.${todayISO}&select=id`, { headers: { Prefer: 'count=exact', 'Range-Unit': 'items', Range: '0-0' } }),
     ]);
 
     const usersTotal = ct(usersTotalRes);
@@ -197,6 +198,9 @@ async function _handler(req, res) {
       issues: { open: issues.length, items: issues },
       duplicate_clusters: { suspected: dupClusters.length, items: dupClusters },
       feature_flags: flags,
+      company_lookups: searchLogsTodayRes.ok
+        ? { ready: true, today: ct(searchLogsTodayRes) }
+        : { ready: false },
       jobs: {
         stale_or_expired: ct(staleJobsRes),
         zero_result_searches_7d: zeroSearchRows.length,
@@ -350,45 +354,6 @@ async function _handler(req, res) {
       created++;
     }
     return res.status(200).json({ ok: true, suspects: suspects.length, clusters_created: created });
-  }
-
-  // ── run_job: proxy cron-triggered endpoints with CRON_SECRET ────────────────
-  if (action === 'run_job') {
-    const CRON_SECRET   = process.env.CRON_SECRET;
-    const ANTHROPIC_KEY = process.env.ANTHROPIC_KEY || process.env.ANTHROPIC_API_KEY;
-    const base = process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'https://seenjobs.io';
-    const { job } = body;
-
-    const cronHeaders = {
-      'Content-Type': 'application/json',
-      ...(CRON_SECRET ? { Authorization: `Bearer ${CRON_SECRET}` } : {}),
-    };
-
-    if (job === 'refresh_jobs') {
-      const r = await fetch(`${base}/api/refresh-jobs`, { method: 'POST', headers: cronHeaders });
-      const d = r.ok ? await r.json().catch(() => ({})) : {};
-      return res.status(r.status).json({ ok: r.ok, job, ...d });
-    }
-
-    if (job === 'refresh_demand') {
-      const r = await fetch(`${base}/api/demand`, { method: 'POST', headers: cronHeaders });
-      const d = r.ok ? await r.json().catch(() => ({})) : {};
-      return res.status(r.status).json({ ok: r.ok, job, ...d });
-    }
-
-    if (job === 'reddit_import') {
-      if (!ANTHROPIC_KEY) return res.status(500).json({ error: 'ANTHROPIC_KEY not set' });
-      // Call reports.js reddit_import action — pass admin token so it validates
-      const r = await fetch(`${base}/api/reports`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'X-Admin-Token': adminToken },
-        body: JSON.stringify({ action: 'reddit_import', companies: body.companies }),
-      });
-      const d = r.ok ? await r.json().catch(() => ({})) : {};
-      return res.status(r.status).json({ ok: r.ok, job, ...d });
-    }
-
-    return res.status(400).json({ error: 'Unknown job: ' + job });
   }
 
   return res.status(400).json({ error: 'Unknown action' });
