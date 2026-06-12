@@ -236,47 +236,38 @@ export default async function handler(req, res) {
     const companies     = Array.isArray(body.companies) ? body.companies : DEFAULT_COMPANIES;
     const dryRun        = !!body.dry_run;
 
-    // Reddit OAuth — script app client credentials flow
-    const REDDIT_CLIENT_ID     = process.env.REDDIT_CLIENT_ID;
-    const REDDIT_CLIENT_SECRET = process.env.REDDIT_CLIENT_SECRET;
-    const REDDIT_USERNAME      = process.env.REDDIT_USERNAME || 'seenjobs_bot';
-    const REDDIT_UA            = `web:seenjobs:1.0 (by /u/${REDDIT_USERNAME})`;
-
-    let redditToken = null;
-    async function getRedditToken() {
-      if (!REDDIT_CLIENT_ID || !REDDIT_CLIENT_SECRET) return null;
-      const creds = Buffer.from(`${REDDIT_CLIENT_ID}:${REDDIT_CLIENT_SECRET}`).toString('base64');
-      const r = await fetch('https://www.reddit.com/api/v1/access_token', {
-        method: 'POST',
-        headers: { Authorization: `Basic ${creds}`, 'User-Agent': REDDIT_UA, 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: 'grant_type=client_credentials',
-      });
-      if (!r.ok) return null;
-      const d = await r.json();
-      return d.access_token || null;
+    // Reddit RSS/Atom feeds — designed for programmatic consumption, not blocked like the JSON API
+    function parseRedditAtom(xml, sub) {
+      const posts = [];
+      const entryRx = /<entry>([\s\S]*?)<\/entry>/g;
+      const unescape = s => s.replace(/&amp;/g,'&').replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&quot;/g,'"').replace(/&#39;/g,"'").replace(/&#x27;/g,"'");
+      let m;
+      while ((m = entryRx.exec(xml)) !== null) {
+        const block = m[1];
+        const link  = /<link[^>]+href="([^"]+)"/.exec(block)?.[1] || '';
+        const idM   = /\/comments\/([a-z0-9]+)\//i.exec(link);
+        if (!idM) continue;
+        const id    = `t3_${idM[1]}`;
+        const title = unescape(/<title[^>]*>(?:<!\[CDATA\[)?([\s\S]*?)(?:\]\]>)?<\/title>/.exec(block)?.[1] || '').trim().slice(0, 300);
+        // content:encoded or content tag holds the post body as HTML — strip tags
+        const rawBody = /<content[^>]*>(?:<!\[CDATA\[)?([\s\S]*?)(?:\]\]>)?<\/content>/i.exec(block)?.[1] || '';
+        const body  = unescape(rawBody.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ')).trim().slice(0, 1200);
+        posts.push({ id, title, body, subreddit: sub });
+      }
+      return posts;
     }
 
     const fetchDebug = {};
     async function redditFetch(sub) {
       try {
-        if (!redditToken) redditToken = await getRedditToken();
-        const useOAuth = !!redditToken;
-        const url = useOAuth
-          ? `https://oauth.reddit.com/r/${sub}/new?limit=100&raw_json=1`
-          : `https://www.reddit.com/r/${sub}/new.json?limit=100&raw_json=1`;
-        const headers = useOAuth
-          ? { Authorization: `Bearer ${redditToken}`, 'User-Agent': REDDIT_UA }
-          : { 'User-Agent': REDDIT_UA };
-        const r = await fetch(url, { headers });
-        fetchDebug[sub] = { status: r.status, oauth: useOAuth };
+        // RSS feeds bypass the JSON API IP blocks — feed readers hit these from datacenters constantly
+        const r = await fetch(`https://www.reddit.com/r/${sub}/new/.rss?limit=100`, {
+          headers: { 'User-Agent': 'SeenJobs/1.0 RSS reader (+https://seenjobs.io)', Accept: 'application/rss+xml, application/atom+xml, text/xml' },
+        });
+        fetchDebug[sub] = { status: r.status, method: 'rss' };
         if (!r.ok) { fetchDebug[sub].error = `HTTP ${r.status}`; return []; }
-        const d = await r.json();
-        const posts = (d?.data?.children || []).map(c => ({
-          id: c.data.name,
-          title: (c.data.title || '').slice(0, 300),
-          body:  (c.data.selftext || '').slice(0, 1200),
-          subreddit: c.data.subreddit || sub,
-        }));
+        const xml   = await r.text();
+        const posts = parseRedditAtom(xml, sub);
         fetchDebug[sub].posts = posts.length;
         return posts;
       } catch(e) { fetchDebug[sub] = { error: e.message }; return []; }
