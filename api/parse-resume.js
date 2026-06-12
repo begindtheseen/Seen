@@ -2,6 +2,7 @@ import zlib from 'zlib';
 import { promisify } from 'util';
 import { applyRateLimit } from './_utils/ratelimit.js';
 import { logError } from './_utils/errlog.js';
+import { gateAI } from './_utils/credits.js';
 const inflateRaw = promisify(zlib.inflateRaw);
 
 export default async function handler(req, res) {
@@ -10,13 +11,16 @@ export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin',(_devO||['https://seenjobs.io','https://www.seenjobs.io'].includes(_o))?(_o||'*'):'https://seenjobs.io');
   res.setHeader('Vary','Origin');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
 
   if (req.method === 'OPTIONS') return res.status(200).end();
   if (req.method !== 'POST') return res.status(405).end('Method not allowed');
 
   const limited = await applyRateLimit(req, res, 'parse-resume');
   if (limited) return;
+
+  const gate = await gateAI(req, 'parse_resume');
+  if (!gate.ok) return res.status(gate.status).json({ error: gate.error, credits_required: gate.credits_required, balance: gate.balance ?? 0 });
 
   try {
     let body = req.body;

@@ -1,7 +1,12 @@
 import { applyRateLimit } from './_utils/ratelimit.js';
 import { logError } from './_utils/errlog.js';
+import { gateAI } from './_utils/credits.js';
 
 export default async function handler(req, res) {
+  const _o = req.headers.origin || '';
+  res.setHeader('Access-Control-Allow-Origin', !_o || _o.includes('localhost') || ['https://seenjobs.io','https://www.seenjobs.io'].includes(_o) ? (_o || '*') : 'https://seenjobs.io');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  if (req.method === 'OPTIONS') return res.status(200).end();
   if (await applyRateLimit(req, res, 'job-insights')) return;
   if (req.method !== 'POST') return res.status(405).end('Method not allowed');
 
@@ -51,6 +56,10 @@ export default async function handler(req, res) {
   if (!job || !company || !jobDescription || jobDescription.length < 80 || !ANTHROPIC_KEY) {
     return res.status(200).json({ what_they_want: [], hidden_requirements: [], insider_tip: '', description_summary: '', _src: 'empty' });
   }
+
+  // Cache miss → costs 1 credit (shared cache means most users never pay)
+  const gate = await gateAI(req, 'job_insights');
+  if (!gate.ok) return res.status(gate.status).json({ error: gate.error, credits_required: gate.credits_required, balance: gate.balance ?? 0, _src: 'no_credits' });
 
   // ── One Claude Haiku call — insights only, or insights + summary if clipped ──
   // 2000 chars of input is plenty for accurate insights (~500 tokens).

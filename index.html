@@ -2917,6 +2917,14 @@ const Auth = {
   isEmployer() { return !!this._user && this._profile?.type === 'employer'; },
 };
 
+// Returns headers for AI endpoint calls (JWT auth + content-type)
+async function _aiHeaders() {
+  const token = await Auth.token();
+  return token
+    ? { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }
+    : { 'Content-Type': 'application/json' };
+}
+
 // Central proxy for all user data DB operations — bypasses Supabase RLS entirely.
 // Service key lives only on the server; client sends its JWT for identity verification.
 async function _sync(action, payload = {}) {
@@ -4861,8 +4869,9 @@ async function analyzeResume(){
   if(live)live.style.display='inline';
   if(out)out.innerHTML=`<div style="display:flex;flex-direction:column;gap:.75rem">${[1,2,3,4].map(()=>'<div style="height:80px;background:var(--raised);border-radius:8px;animation:pulse 1.5s infinite"></div>').join('')}</div>`;
   try {
-    const res=await fetch('/api/resume',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({tool:'scanner',job,company:co,resume:resumeText,jobDescription:jd})});
+    const res=await fetch('/api/resume',{method:'POST',headers:await _aiHeaders(),body:JSON.stringify({tool:'scanner',job,company:co,resume:resumeText,jobDescription:jd})});
     const data=await res.json();
+    if(data.credits_required){CreditStore._balance=data.balance??0;CreditStore._updateBadge();openEarnCreditsModal();throw new Error('credits');}
     if(data.error)throw new Error(data.error);
     renderScannerResults(out,data);
   } catch(e) {
@@ -7951,21 +7960,22 @@ async function loadTrackerIntel(appId, company, role) {
   content.innerHTML = `<div style="font-family:var(--mono);font-size:.62rem;color:var(--muted);padding:.5rem 0">Searching Google for ${company} hiring manager and insider tips...</div>`;
 
   // Run both searches in parallel
+  const aiHdrs = await _aiHeaders();
   const [hmRes, intelRes] = await Promise.allSettled([
-    fetch('/api/resume', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ tool: 'hiring_manager', job: role, company })
-    }).then(r => r.json()),
-    fetch('/api/resume', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ tool: 'insider_intel', job: role, company })
-    }).then(r => r.json())
+    fetch('/api/resume', { method: 'POST', headers: aiHdrs, body: JSON.stringify({ tool: 'hiring_manager', job: role, company }) }).then(r => r.json()),
+    fetch('/api/resume', { method: 'POST', headers: aiHdrs, body: JSON.stringify({ tool: 'insider_intel', job: role, company }) }).then(r => r.json())
   ]);
 
   const hm = hmRes.status === 'fulfilled' ? hmRes.value : null;
   const intel = intelRes.status === 'fulfilled' ? intelRes.value : null;
+
+  if (hm?.credits_required || intel?.credits_required) {
+    const bal = hm?.balance ?? intel?.balance ?? 0;
+    CreditStore._balance = bal; CreditStore._updateBadge(); openEarnCreditsModal();
+    content.innerHTML = `<div style="font-family:var(--mono);font-size:.62rem;color:var(--amber)">No AI credits — earn more to unlock Intel.</div>`;
+    if (btn) { btn.textContent = 'Get Intel'; btn.disabled = false; }
+    return;
+  }
 
   if (btn) btn.style.display = 'none';
 
@@ -8444,10 +8454,11 @@ async function handleOnboardResumeUpload(file) {
     const base64 = await _fileToBase64(file);
     const res = await fetch('/api/parse-resume', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: await _aiHeaders(),
       body: JSON.stringify({ base64, fileName: file.name, mimeType: file.type })
     });
     const data = await res.json();
+    if (data.credits_required) { CreditStore._balance = data.balance ?? 0; CreditStore._updateBadge(); openEarnCreditsModal(); throw new Error('credits'); }
     if (!res.ok || data.error) throw new Error(data.error || 'Parse failed');
 
     await ResumeStore.save(data.text, data.fileName, data.wordCount);
@@ -11027,13 +11038,14 @@ async function openJobListing(jobId) {
     } else {
       // L2: dedicated endpoint — checks DB first, generates on miss, stores for all users
       // needsSummary: true — always generate AI summary so raw Adzuna text never shows
-      fetch('/api/job-insights', {
+      _aiHeaders().then(hdrs => fetch('/api/job-insights', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: hdrs,
         body: JSON.stringify({ jobId: sid, job: title, company: co, jobDescription: desc, needsSummary: true })
-      })
+      }))
       .then(r => r.json())
       .then(data => {
+        if (data.credits_required) { CreditStore._balance = data.balance ?? 0; CreditStore._updateBadge(); openEarnCreditsModal(); return; }
         if (data.what_they_want?.length) {
           try { localStorage.setItem(cacheKey, JSON.stringify({ ts: Date.now(), data })); } catch(e) {}
         }
@@ -11348,12 +11360,13 @@ async function runAIOptimize(jobId, company, role, location, score, risk, waste,
   try {
     const res = await fetch('/api/resume', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: await _aiHeaders(),
       body: JSON.stringify({ tool: 'optimize', job: role, company, resume, jobDescription: jd })
     });
 
     const data = await res.json();
 
+    if (data.credits_required) { CreditStore._balance = data.balance ?? 0; CreditStore._updateBadge(); openEarnCreditsModal(); throw new Error('credits'); }
     if (!res.ok) throw new Error('API error ' + res.status + ': ' + (data.error || 'unknown'));
     if (data.error) throw new Error(data.error);
 
@@ -11597,10 +11610,11 @@ async function handleApplyResumeOverride(file) {
     const base64 = await _fileToBase64(file);
     const res = await fetch('/api/parse-resume', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: await _aiHeaders(),
       body: JSON.stringify({ base64, fileName: file.name, mimeType: file.type })
     });
     const data = await res.json();
+    if (data.credits_required) { CreditStore._balance = data.balance ?? 0; CreditStore._updateBadge(); openEarnCreditsModal(); throw new Error('credits'); }
     if (!res.ok || data.error) throw new Error(data.error || 'Parse failed');
 
     // Use this resume for this application only
@@ -12156,10 +12170,11 @@ async function handleResumePageUpload(file) {
     const base64 = await _fileToBase64(file);
     const res = await fetch('/api/parse-resume', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: await _aiHeaders(),
       body: JSON.stringify({ base64, fileName: file.name, mimeType: file.type })
     });
     const data = await res.json();
+    if (data.credits_required) { CreditStore._balance = data.balance ?? 0; CreditStore._updateBadge(); openEarnCreditsModal(); throw new Error('credits'); }
     if (!res.ok || data.error) throw new Error(data.error || 'Parse failed');
     await ResumeStore.save(data.text, data.fileName, data.wordCount);
     if (data.employment?.length) _sync('save_employment', { employment: data.employment }).catch(() => {});
@@ -12185,11 +12200,12 @@ async function handleDashResumeUpload(file) {
     const base64 = await _fileToBase64(file);
     const res = await fetch('/api/parse-resume', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: await _aiHeaders(),
       body: JSON.stringify({ base64, fileName: file.name, mimeType: file.type })
     });
     const data = await res.json();
 
+    if (data.credits_required) { CreditStore._balance = data.balance ?? 0; CreditStore._updateBadge(); openEarnCreditsModal(); throw new Error('credits'); }
     if (!res.ok || data.error) throw new Error(data.error || 'Parse failed');
 
     await ResumeStore.save(data.text, data.fileName, data.wordCount);
@@ -12285,8 +12301,9 @@ async function runAdvantageCoach() {
   if(btn){btn.textContent='Building playbook...';btn.disabled=true;}
   if(out)out.innerHTML=`<div style="display:flex;flex-direction:column;gap:.75rem">${[1,2,3,4,5].map(()=>'<div style="height:60px;background:var(--raised);border-radius:8px;animation:pulse 1.5s infinite"></div>').join('')}</div>`;
   try {
-    const res=await fetch('/api/resume',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({tool:'coach',job,company,jobDescription:jd,background})});
+    const res=await fetch('/api/resume',{method:'POST',headers:await _aiHeaders(),body:JSON.stringify({tool:'coach',job,company,jobDescription:jd,background})});
     const data=await res.json();
+    if(data.credits_required){CreditStore._balance=data.balance??0;CreditStore._updateBadge();openEarnCreditsModal();throw new Error('credits');}
     if(data.error)throw new Error(data.error);
     renderCoachResults(out,data,job,company);
   } catch(e) { if(out)out.innerHTML=`<div style="padding:1.25rem;background:var(--rdim);border-radius:8px;font-family:var(--mono);font-size:.72rem;color:var(--red)">Failed. Try again.</div>`; }
@@ -12323,8 +12340,9 @@ async function generateProposal() {
   if(btn){btn.textContent='Generating...';btn.disabled=true;}
   if(out)out.innerHTML=`<div style="display:flex;flex-direction:column;gap:.75rem">${[1,2,3].map(()=>'<div style="height:100px;background:var(--raised);border-radius:8px;animation:pulse 1.5s infinite"></div>').join('')}</div>`;
   try {
-    const res=await fetch('/api/resume',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({tool:'proposal',job,company,jobDescription:jd,background})});
+    const res=await fetch('/api/resume',{method:'POST',headers:await _aiHeaders(),body:JSON.stringify({tool:'proposal',job,company,jobDescription:jd,background})});
     const data=await res.json();
+    if(data.credits_required){CreditStore._balance=data.balance??0;CreditStore._updateBadge();openEarnCreditsModal();throw new Error('credits');}
     if(data.error)throw new Error(data.error);
     renderProposalResults(out,data,job,company);
   } catch(e) { if(out)out.innerHTML=`<div style="padding:1.25rem;background:var(--rdim);border-radius:8px;font-family:var(--mono);font-size:.72rem;color:var(--red)">Failed. Try again.</div>`; }
