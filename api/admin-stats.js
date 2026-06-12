@@ -366,11 +366,14 @@ async function _handler(req, res) {
     const weekISO2   = new Date(Date.now() - 7 * 86400000).toISOString();
     const monthISO2  = new Date(Date.now() - 30 * 86400000).toISOString();
     const cutoff = period === 'today' ? todayISO2 : period === 'month' ? monthISO2 : weekISO2;
-    const r = await db(`jobs?created_at=gte.${cutoff}&select=id,company,title,city,url,apply_url,created_at,availability_status,source&order=created_at.desc&limit=200`, { headers: { Prefer: 'count=estimated', 'Range-Unit': 'items', Range: '0-199' } });
-    if (!r.ok) return res.status(500).json({ error: 'Query failed' });
+    const r = await db(`jobs?created_at=gte.${encodeURIComponent(cutoff)}&select=id,company,title,city,url,apply_url,created_at,availability_status,source&order=created_at.desc&limit=200`);
+    if (!r.ok) {
+      const errBody = await r.text().catch(() => '');
+      console.error('[get_recent_jobs] DB error', r.status, errBody);
+      return res.status(500).json({ error: 'Query failed', detail: errBody.slice(0, 200) });
+    }
     const jobs = await r.json();
-    const total = parseInt((r.headers.get('content-range') || '').split('/')[1]) || jobs.length;
-    return res.status(200).json({ ok: true, jobs: jobs || [], total, period });
+    return res.status(200).json({ ok: true, jobs: Array.isArray(jobs) ? jobs : [], total: Array.isArray(jobs) ? jobs.length : 0, period });
   }
 
   // ── DUPLICATE CLUSTER MANAGEMENT ──────────────────────────────────────────────
