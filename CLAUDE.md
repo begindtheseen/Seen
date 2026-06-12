@@ -8,17 +8,41 @@ Every code change must serve the strategy. When in doubt, re-read it.
 Build Seen as a hiring intelligence platform where the application tracker is the primary data acquisition engine, outcome cards drive virality, and trust/confidence systems keep data quality high.
 
 ## Active Development Branch
-- Feature branch: `claude/index-file-stability-LrIfU`
-- Push to BOTH:
-  1. `git push -u origin claude/index-file-stability-LrIfU`
-  2. `git push origin claude/index-file-stability-LrIfU:main`
+- Migration work is on: `next-migration`
+- Production is: `main` — DO NOT merge into main, DO NOT push to main
+- Do not open a PR until next-migration has a green preview deployment
+
+## Migration Status (as of 2026-06-12)
+
+### What was fixed in this session (Session B / claude/seenjobs-migration-audit-pgszu3):
+- **Next.js version**: upgraded 15.3.7 → 15.3.9 on next-migration (15.3.7 was flagged vulnerable by npm and blocked by Vercel)
+- **package-lock.json**: restored on next-migration (was deleted by Session A, needed for deterministic Vercel builds)
+- **api/_utils/credits.js, errlog.js**: added to next-migration (were missing, required by production API files)
+- **All api/ files**: synced from main to next-migration (50 commits of production fixes)
+- **Supabase migrations 004–012**: added to next-migration (were missing)
+- **vercel.json**: updated on next-migration to match production (Reddit crons, reports.js maxDuration 300s)
+- **Build verified**: `npm run build` succeeds — `✓ Compiled successfully`, all 19 pages build, zero TypeScript errors
+
+### Critical Architecture Facts:
+- `main` and `next-migration` have NO common git ancestor — they are unrelated histories
+- Do NOT run `git merge origin/main` on next-migration — it requires `--allow-unrelated-histories` and will create mass conflicts
+- To sync specific changes from main → next-migration: copy individual files with `git show origin/main:path > path`
+- Production API files live in `api/*.js` (Vercel serverless), NOT `app/api/` (there are no Next.js App Router API routes yet)
+- Serverless function count: exactly 12 (Vercel Hobby limit). Do not add new functions without consolidating.
+
+### What the next session needs to do:
+1. Confirm Vercel picked up the next-migration push and triggered a preview build
+2. Verify the preview deployment is green (no vulnerability block, no build errors)
+3. Check environment variables are configured in Vercel for the next-migration preview
+4. Begin evaluating what Next.js App Router pages need real data connections (currently most pages are ported UI only, calling the same `/api/` endpoints as the HTML version)
 
 ## Architecture
-- **Framework**: Next.js 15 with React 19, App Router
+- **Framework**: Next.js 15.3.9 with React 19, App Router — MIGRATION IN PROGRESS
+- **Current production**: Still running from `main` (HTML/JS single-page app with Vercel serverless)
+- **API**: Vercel serverless functions in `api/*.js` — NOT `app/api/` (no App Router API routes exist yet)
 - **Auth & DB**: Supabase (anon key is public, service key is server-only — NEVER in frontend)
 - **Styling**: Custom CSS variables in app/globals.css — no Tailwind
 - **State**: React Context (auth), localStorage stores (apps, saved jobs)
-- **API routes**: app/api/*/route.ts (Next.js App Router format)
 - **Deploy**: Vercel
 
 ## Code Principles
