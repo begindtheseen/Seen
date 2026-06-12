@@ -1105,7 +1105,7 @@ nav.nav-scrolled{background:rgba(6,6,8,0.82);backdrop-filter:blur(60px) saturate
     <button id="notifBell" onclick="toggleNotifPanel()" style="display:none;background:none;border:none;cursor:pointer;position:relative;padding:.35rem;color:var(--sub);font-size:1rem" title="Notifications">
       🔔<span id="notifBadge" style="display:none;position:absolute;top:0;right:0;background:var(--red);color:#fff;border-radius:50%;width:16px;height:16px;font-family:var(--mono);font-size:.55rem;align-items:center;justify-content:center;font-weight:700"></span>
     </button>
-    <button id="navCreditBadge" onclick="openEarnCreditsModal()" style="display:none;background:var(--blue);color:#fff;border:none;border-radius:20px;padding:.2rem .65rem;font-family:var(--mono);font-size:.6rem;font-weight:700;cursor:pointer;transition:background .15s;line-height:1.5" title="AI credits remaining today">3</button>
+    <button id="navCreditBadge" onclick="openEarnCreditsModal()" style="display:none;background:var(--blue);color:#fff;border:none;border-radius:20px;padding:.2rem .65rem;font-family:var(--mono);font-size:.6rem;font-weight:700;cursor:pointer;transition:background .15s;line-height:1.5" title="AI credits remaining today — click to earn more"><span id="navCreditCount">3</span> AI</button>
     <button class="btn btn-ghost" onclick="go('login')" id="navLoginBtn">Sign in</button>
     <button class="btn btn-solid" onclick="openEmployerPanel()" id="navEmployerBtn">For employers →</button>
   </div>
@@ -1904,7 +1904,7 @@ nav.nav-scrolled{background:rgba(6,6,8,0.82);backdrop-filter:blur(60px) saturate
             <input id="resumePageUpload" type="file" accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document" style="display:none" onchange="handleResumePageUpload(this.files[0])"/>
           </div>
           <div style="margin-bottom:1rem"><label style="font-family:var(--mono);font-size:.6rem;text-transform:uppercase;letter-spacing:.07em;color:var(--dim);display:block;margin-bottom:.32rem">Job description</label><textarea id="aiJD" placeholder="Paste the full job description..." style="width:100%;background:var(--surface);border:1.5px solid var(--line2);border-radius:8px;padding:.65rem .9rem;color:var(--white);font-family:var(--body);font-size:.82rem;outline:none;min-height:120px;resize:vertical;caret-color:var(--blue)"></textarea></div>
-          <button id="analyzeBtn" onclick="analyzeResume()" style="width:100%;padding:.85rem;background:linear-gradient(135deg,#3b82f6 0%,#8b5cf6 100%);color:#fff;border:none;border-radius:8px;font-family:var(--display);font-weight:800;font-size:.9rem;cursor:pointer;box-shadow:0 0 20px rgba(59,130,246,0.3)">Analyze my odds →</button>
+          <button id="analyzeBtn" onclick="analyzeResume()" style="width:100%;padding:.85rem;background:linear-gradient(135deg,#3b82f6 0%,#8b5cf6 100%);color:#fff;border:none;border-radius:8px;font-family:var(--display);font-weight:800;font-size:.9rem;cursor:pointer;box-shadow:0 0 20px rgba(59,130,246,0.3)">Analyze my odds <span style="font-size:.62rem;font-weight:400;opacity:.75;font-family:var(--mono)">· 1 credit</span> →</button>
         </div>
         <div>
           <div style="font-family:var(--mono);font-size:.6rem;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:1rem">AI analysis <span id="rpLive" style="display:none;color:var(--blue);animation:pulse 1s infinite">● Generating</span></div>
@@ -1927,7 +1927,7 @@ nav.nav-scrolled{background:rgba(6,6,8,0.82);backdrop-filter:blur(60px) saturate
           <div style="margin-bottom:.75rem"><label style="font-family:var(--mono);font-size:.6rem;text-transform:uppercase;letter-spacing:.07em;color:var(--dim);display:block;margin-bottom:.32rem">Company</label><input id="coachCompany" type="text" placeholder="e.g. Spotify" style="width:100%;background:var(--surface);border:1.5px solid var(--line2);border-radius:8px;padding:.65rem .9rem;color:var(--white);font-family:var(--body);font-size:.84rem;outline:none;caret-color:var(--blue)"/></div>
           <div style="margin-bottom:1rem"><label style="font-family:var(--mono);font-size:.6rem;text-transform:uppercase;letter-spacing:.07em;color:var(--dim);display:block;margin-bottom:.32rem">Job description (paste)</label><textarea id="coachJD" placeholder="Paste the job description..." style="width:100%;background:var(--surface);border:1.5px solid var(--line2);border-radius:8px;padding:.65rem .9rem;color:var(--white);font-family:var(--body);font-size:.82rem;outline:none;min-height:140px;resize:vertical;caret-color:var(--blue)"></textarea></div>
           <div style="margin-bottom:1rem"><label style="font-family:var(--mono);font-size:.6rem;text-transform:uppercase;letter-spacing:.07em;color:var(--dim);display:block;margin-bottom:.32rem">Your background (brief)</label><textarea id="coachBackground" placeholder="e.g. 3 years in marketing, B2B SaaS focus, strong in content strategy..." style="width:100%;background:var(--surface);border:1.5px solid var(--line2);border-radius:8px;padding:.65rem .9rem;color:var(--white);font-family:var(--body);font-size:.82rem;outline:none;min-height:80px;resize:vertical;caret-color:var(--blue)"></textarea></div>
-          <button onclick="runAdvantageCoach()" style="width:100%;padding:.85rem;background:linear-gradient(135deg,#3b82f6 0%,#8b5cf6 100%);color:#fff;border:none;border-radius:8px;font-family:var(--display);font-weight:800;font-size:.9rem;cursor:pointer;box-shadow:0 0 20px rgba(59,130,246,0.3)" id="coachBtn">Get my playbook →</button>
+          <button onclick="runAdvantageCoach()" style="width:100%;padding:.85rem;background:linear-gradient(135deg,#3b82f6 0%,#8b5cf6 100%);color:#fff;border:none;border-radius:8px;font-family:var(--display);font-weight:800;font-size:.9rem;cursor:pointer;box-shadow:0 0 20px rgba(59,130,246,0.3)" id="coachBtn">Get my playbook <span style="font-size:.62rem;font-weight:400;opacity:.75;font-family:var(--mono)">· 1 credit</span> →</button>
         </div>
         <div>
           <div style="font-family:var(--mono);font-size:.6rem;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:1rem">Your playbook</div>
@@ -1951,7 +1951,7 @@ nav.nav-scrolled{background:rgba(6,6,8,0.82);backdrop-filter:blur(60px) saturate
           <div style="margin-bottom:.75rem"><label style="font-family:var(--mono);font-size:.6rem;text-transform:uppercase;letter-spacing:.07em;color:var(--dim);display:block;margin-bottom:.32rem">Company</label><input id="propCompany" type="text" placeholder="e.g. DoorDash" style="width:100%;background:var(--surface);border:1.5px solid var(--line2);border-radius:8px;padding:.65rem .9rem;color:var(--white);font-family:var(--body);font-size:.84rem;outline:none;caret-color:var(--blue)"/></div>
           <div style="margin-bottom:1rem"><label style="font-family:var(--mono);font-size:.6rem;text-transform:uppercase;letter-spacing:.07em;color:var(--dim);display:block;margin-bottom:.32rem">Job description</label><textarea id="propJD" placeholder="Paste the job description..." style="width:100%;background:var(--surface);border:1.5px solid var(--line2);border-radius:8px;padding:.65rem .9rem;color:var(--white);font-family:var(--body);font-size:.82rem;outline:none;min-height:120px;resize:vertical;caret-color:var(--blue)"></textarea></div>
           <div style="margin-bottom:1rem"><label style="font-family:var(--mono);font-size:.6rem;text-transform:uppercase;letter-spacing:.07em;color:var(--dim);display:block;margin-bottom:.32rem">Your relevant experience</label><textarea id="propBackground" placeholder="What do you bring to this role?" style="width:100%;background:var(--surface);border:1.5px solid var(--line2);border-radius:8px;padding:.65rem .9rem;color:var(--white);font-family:var(--body);font-size:.82rem;outline:none;min-height:80px;resize:vertical;caret-color:var(--blue)"></textarea></div>
-          <button onclick="generateProposal()" style="width:100%;padding:.85rem;background:linear-gradient(135deg,#3b82f6 0%,#8b5cf6 100%);color:#fff;border:none;border-radius:8px;font-family:var(--display);font-weight:800;font-size:.9rem;cursor:pointer;box-shadow:0 0 20px rgba(59,130,246,0.3)" id="propBtn">Generate pre-proposal →</button>
+          <button onclick="generateProposal()" style="width:100%;padding:.85rem;background:linear-gradient(135deg,#3b82f6 0%,#8b5cf6 100%);color:#fff;border:none;border-radius:8px;font-family:var(--display);font-weight:800;font-size:.9rem;cursor:pointer;box-shadow:0 0 20px rgba(59,130,246,0.3)" id="propBtn">Generate pre-proposal <span style="font-size:.62rem;font-weight:400;opacity:.75;font-family:var(--mono)">· 1 credit</span> →</button>
         </div>
         <div>
           <div style="font-family:var(--mono);font-size:.6rem;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:1rem">Your pre-proposal</div>
@@ -2754,11 +2754,12 @@ const CreditStore = {
   },
   _updateBadge() {
     const badge = document.getElementById('navCreditBadge');
+    const count = document.getElementById('navCreditCount');
     if (!badge) return;
     const b = this._balance;
     if (b === null) { badge.style.display = 'none'; return; }
     badge.style.display = 'inline-flex';
-    badge.textContent = b >= 999 ? '∞' : String(b);
+    if (count) count.textContent = b >= 999 ? '∞' : String(b);
     badge.style.background = b === 0 ? 'var(--red)' : b <= 1 ? 'var(--amber)' : 'var(--blue)';
     badge.title = b === 0 ? '0 AI credits — click to earn more' : `${b} AI credits remaining today`;
   },
@@ -12920,9 +12921,10 @@ async function submitEarnAnswer(questionKey, answer) {
 <div id="earnCreditsModal" style="display:none;position:fixed;inset:0;z-index:10000;background:rgba(0,0,0,.75);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);align-items:center;justify-content:center" onclick="if(event.target===this)closeEarnCreditsModal()">
   <div style="background:var(--surface);border:1px solid var(--line2);border-radius:18px;padding:1.5rem;width:min(440px,92vw);max-height:88vh;overflow-y:auto;position:relative">
     <button onclick="closeEarnCreditsModal()" style="position:absolute;top:1rem;right:1rem;background:none;border:none;color:var(--dim);cursor:pointer;font-size:1.1rem;line-height:1">✕</button>
-    <div style="font-family:var(--mono);font-size:.5rem;text-transform:uppercase;letter-spacing:.2em;color:var(--blue);margin-bottom:.65rem">AI Credits</div>
-    <h2 style="font-family:var(--display);font-size:1.35rem;font-weight:800;color:var(--white);margin-bottom:.25rem">Earn more credits</h2>
-    <p style="font-size:.78rem;color:var(--sub);margin-bottom:1.25rem">Each credit powers one AI analysis. Earn by contributing data that helps every job seeker.</p>
+    <div style="font-family:var(--mono);font-size:.5rem;text-transform:uppercase;letter-spacing:.2em;color:var(--blue);margin-bottom:.5rem">AI Credits</div>
+    <h2 id="earnCreditsTitle" style="font-family:var(--display);font-size:1.35rem;font-weight:800;color:var(--white);margin-bottom:.2rem">Your AI credits</h2>
+    <div id="earnCreditBalance" style="font-family:var(--mono);font-size:.65rem;color:var(--blue);margin-bottom:.5rem;font-weight:600"></div>
+    <p id="earnCreditsSubtitle" style="font-size:.78rem;color:var(--sub);margin-bottom:1.25rem">Each credit powers one AI analysis. Earn more by sharing what you know.</p>
     <div id="earnCreditQuestion" style="display:none"></div>
     <div id="earnCreditMethods">
       <div style="display:flex;flex-direction:column;gap:.65rem">
@@ -12931,14 +12933,7 @@ async function submitEarnAnswer(questionKey, answer) {
             <div style="font-family:var(--display);font-size:.82rem;font-weight:700;color:var(--white)">Answer a question</div>
             <div style="font-family:var(--mono);font-size:.6rem;font-weight:700;color:var(--green)">+1 credit</div>
           </div>
-          <div style="font-size:.73rem;color:var(--sub)">Share what you know about a company's hiring process — takes 10 seconds.</div>
-        </div>
-        <div onclick="go('tracker');closeEarnCreditsModal()" style="background:var(--raised);border:1px solid var(--line2);border-radius:12px;padding:1rem;cursor:pointer;transition:border-color .15s" onmouseover="this.style.borderColor='var(--blue)'" onmouseout="this.style.borderColor='var(--line2)'">
-          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.3rem">
-            <div style="font-family:var(--display);font-size:.82rem;font-weight:700;color:var(--white)">Submit an outcome</div>
-            <div style="font-family:var(--mono);font-size:.6rem;font-weight:700;color:var(--green)">+1 credit</div>
-          </div>
-          <div style="font-size:.73rem;color:var(--sub)">Mark an application as Hired, Rejected, or Ghosted in your tracker.</div>
+          <div style="font-size:.73rem;color:var(--sub)">Share what you know about a company's hiring process — takes 10 seconds. Up to 5/day.</div>
         </div>
         <div onclick="go('pricing');closeEarnCreditsModal()" style="background:var(--gdim);border:1px solid var(--gmid);border-radius:12px;padding:1rem;cursor:pointer;transition:border-color .15s" onmouseover="this.style.borderColor='var(--green)'" onmouseout="this.style.borderColor='var(--gmid)'">
           <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.3rem">
@@ -12949,7 +12944,6 @@ async function submitEarnAnswer(questionKey, answer) {
         </div>
       </div>
     </div>
-    <div id="earnCreditBalance" style="margin-top:1rem;font-family:var(--mono);font-size:.62rem;color:var(--muted);text-align:center"></div>
   </div>
 </div>
 </body>
