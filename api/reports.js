@@ -260,25 +260,30 @@ export default async function handler(req, res) {
     const fetchDebug = {};
     async function redditFetch(sub) {
       const sleep = ms => new Promise(res => setTimeout(res, ms));
-      for (let attempt = 0; attempt < 3; attempt++) {
-        try {
-          const r = await fetch(`https://www.reddit.com/r/${sub}/new/.rss?limit=100`, {
-            headers: { 'User-Agent': 'SeenJobs/1.0 RSS reader (+https://seenjobs.io)', Accept: 'application/rss+xml, application/atom+xml, text/xml' },
-          });
-          if (r.status === 429) {
-            fetchDebug[sub] = { status: 429, attempt };
-            await sleep(2000 * (attempt + 1)); // 2s, 4s, 6s
-            continue;
-          }
-          fetchDebug[sub] = { status: r.status, method: 'rss' };
-          if (!r.ok) { fetchDebug[sub].error = `HTTP ${r.status}`; return []; }
-          const xml   = await r.text();
-          const posts = parseRedditAtom(xml, sub);
-          fetchDebug[sub].posts = posts.length;
-          return posts;
-        } catch(e) { fetchDebug[sub] = { error: e.message }; return []; }
+      const hosts = ['https://www.reddit.com', 'https://old.reddit.com'];
+      const delays = [8000, 20000, 35000]; // 8s, 20s, 35s — long enough for Reddit's rate limit window to reset
+      let attempt = 0;
+      for (const host of hosts) {
+        for (let retry = 0; retry <= 1; retry++) {
+          try {
+            const r = await fetch(`${host}/r/${sub}/new/.rss?limit=100`, {
+              headers: { 'User-Agent': 'SeenJobs/1.0 RSS reader (+https://seenjobs.io)', Accept: 'application/rss+xml, application/atom+xml, text/xml' },
+            });
+            if (r.status === 429) {
+              fetchDebug[sub] = { status: 429, attempt, host };
+              if (attempt < delays.length) await sleep(delays[attempt++]);
+              continue;
+            }
+            fetchDebug[sub] = { status: r.status, host, method: 'rss' };
+            if (!r.ok) { fetchDebug[sub].error = `HTTP ${r.status}`; break; }
+            const xml   = await r.text();
+            const posts = parseRedditAtom(xml, sub);
+            fetchDebug[sub].posts = posts.length;
+            return posts;
+          } catch(e) { fetchDebug[sub] = { error: e.message }; return []; }
+        }
       }
-      fetchDebug[sub] = { error: '429 after 3 retries' };
+      fetchDebug[sub] = { ...(fetchDebug[sub] || {}), error: 'rate limited on all hosts' };
       return [];
     }
 
@@ -374,7 +379,7 @@ Return ONLY a valid JSON array. Return [] if there are genuinely no hiring exper
         });
         postsByCompany[company].push(...matching);
       }
-      await new Promise(r => setTimeout(r, 2000));
+      await new Promise(r => setTimeout(r, 4000));
     }
 
     const results = {};
