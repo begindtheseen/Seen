@@ -9,8 +9,16 @@ Build Seen as a hiring intelligence platform where the application tracker is th
 
 ## Active Development Branch
 - Migration work is on: `next-migration`
-- Production is: `main` — DO NOT merge into main, DO NOT push to main
-- Do not open a PR until next-migration has a green preview deployment
+- `main` is the OLD production HTML app — now the SOURCE OF TRUTH for design/functionality parity. DO NOT merge into main, DO NOT push to main, DO NOT delete it.
+- **seenjobs.io now serves the Next.js app from next-migration** (deployed via Vercel CLI from owner's Mac)
+
+## CURRENT MISSION: Full parity restoration (as of 2026-06-12 evening)
+We are NOT adding features. The Next.js migration lost design and functionality vs the old site.
+- Read `CLAUDE_HANDOFF.md` for deployment workflow + constraints
+- Work through `SITE_PARITY_CHECKLIST.md` and `ADMIN_PARITY_CHECKLIST.md` page by page
+- Source of truth: `origin/main:index.html` and `origin/main:employer.html` (extract with `git show origin/main:index.html`)
+- Do not redesign, simplify, or invent UI. Port the old design exactly.
+- A page is complete only when: visual match + all old functionality + APIs work + mobile works + build passes + checklist updated.
 
 ## Migration Status (as of 2026-06-12)
 
