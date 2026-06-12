@@ -273,6 +273,22 @@ export default async function handler(req, res) {
       } catch(e) { fetchDebug[sub] = { error: e.message }; return []; }
     }
 
+    // Fetch top comments for a single post — single-post JSON endpoints are far less restricted than subreddit browsing
+    async function fetchComments(postId, sub) {
+      try {
+        const base = postId.replace(/^t3_/, '');
+        const r = await fetch(`https://www.reddit.com/r/${sub}/comments/${base}.json?limit=20&depth=1&sort=top`, {
+          headers: { 'User-Agent': 'SeenJobs/1.0 RSS reader (+https://seenjobs.io)', Accept: 'application/json' },
+        });
+        if (!r.ok) return [];
+        const d = await r.json();
+        return (d?.[1]?.data?.children || [])
+          .filter(c => c.kind === 't1' && c.data?.body && c.data.body !== '[deleted]' && c.data.body !== '[removed]')
+          .slice(0, 10)
+          .map(c => c.data.body.slice(0, 500).replace(/\n{3,}/g, '\n\n'));
+      } catch { return []; }
+    }
+
     async function alreadyImported(ids) {
       if (!ids.length) return new Set();
       const filter = ids.map(id => `reddit_post_id.eq.${encodeURIComponent(id)}`).join(',');
@@ -284,8 +300,8 @@ export default async function handler(req, res) {
     }
 
     async function classify(posts) {
-      const system = `Classify Reddit posts about hiring. For each return one JSON object: {outcome:"ghosted"|"rejected"|"hired"|"offer"|"interview"|"applied"|"unknown",role:string|null,is_hiring_experience:boolean,sentiment:"positive"|"negative"|"neutral"|"mixed",summary:string|null}. Return ONLY a JSON array, same order. No markdown.`;
-      const input = posts.map((p,i)=>`[${i}] TITLE: ${p.title}\nBODY: ${p.body||'(none)'}`).join('\n\n---\n\n');
+      const system = `Classify Reddit posts about hiring. Comments from the post thread are included after COMMENTS: — use them. For each post return one JSON object: {outcome:"ghosted"|"rejected"|"hired"|"offer"|"interview"|"applied"|"unknown",role:string|null,is_hiring_experience:boolean,sentiment:"positive"|"negative"|"neutral"|"mixed",summary:string|null}. Return ONLY a JSON array, same order. No markdown.`;
+      const input = posts.map((p,i)=>`[${i}] TITLE: ${p.title}\nBODY: ${p.body||'(none)'}${p.comments?.length ? `\nCOMMENTS:\n${p.comments.join('\n---\n')}` : ''}`).join('\n\n===\n\n');
       try {
         const r = await fetch('https://api.anthropic.com/v1/messages', {
           method: 'POST',
@@ -331,6 +347,14 @@ export default async function handler(req, res) {
       const seen = await alreadyImported(posts.map(p=>p.id));
       const fresh = posts.filter(p=>!seen.has(p.id));
       if (!fresh.length) { results[company] = { imported: 0, skipped: 0, fetched: posts.length, note: 'all_seen' }; continue; }
+
+      // Enrich fresh posts with comments — cap at 8 posts to keep latency reasonable
+      const toEnrich = fresh.slice(0, 8);
+      await Promise.all(toEnrich.map(async post => {
+        const comments = await fetchComments(post.id, post.subreddit);
+        if (comments.length) post.comments = comments;
+      }));
+
       for (let i = 0; i < fresh.length; i += 20) {
         const batch = fresh.slice(i, i+20);
         const cls   = await classify(batch);
@@ -343,7 +367,9 @@ export default async function handler(req, res) {
           }
           if (dryRun) { imported++; continue; }
           const cid = await upsertCo(company);
-          const rpt = { company_name:company, platform:`Reddit r/${post.subreddit}`, outcome:c.outcome||'unknown', role:c.role||null, report_text:c.summary||post.title.slice(0,500), source:'reddit', outcome_weight:REDDIT_WEIGHT, trust_reason:'community_signal', needs_review:false, rounds:0, unpaid_work:'na', experience_level:'Unknown' };
+          const commentSnippet = post.comments?.length ? `\n\nTop comments:\n${post.comments.slice(0,3).join('\n---\n')}` : '';
+          const reportText = (c.summary || post.title).slice(0, 500) + commentSnippet.slice(0, 800);
+          const rpt = { company_name:company, platform:`Reddit r/${post.subreddit}`, outcome:c.outcome||'unknown', role:c.role||null, report_text:reportText, source:'reddit', outcome_weight:REDDIT_WEIGHT, trust_reason:'community_signal', needs_review:false, rounds:0, unpaid_work:'na', experience_level:'Unknown' };
           if (cid) rpt.company_id = cid;
           const repR = await fetch(`${SUPABASE_URL}/rest/v1/reports`,{method:'POST',headers:{...hdrsBase,Prefer:'return=representation'},body:JSON.stringify(rpt)});
           const repId = repR.ok ? (await repR.json())?.[0]?.id : null;
