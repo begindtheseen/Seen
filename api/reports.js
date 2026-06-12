@@ -208,6 +208,112 @@ export default async function handler(req, res) {
     return res.status(200).json({ ok: true, company_id: cid });
   }
 
+  // ── Reddit import (cron or manual, service-key required) ────────────────────
+  if (body.action === 'reddit_import') {
+    const isCron = req.headers['x-vercel-cron'] === '1';
+    if (!isCron) {
+      const auth = req.headers.authorization || '';
+      if (!auth.includes(SUPABASE_SERVICE_KEY)) return res.status(401).json({ error: 'unauthorized' });
+    }
+    const ANTHROPIC_KEY = process.env.ANTHROPIC_KEY || process.env.ANTHROPIC_API_KEY;
+    if (!ANTHROPIC_KEY) return res.status(500).json({ error: 'ANTHROPIC_KEY not configured' });
+
+    const DEFAULT_COMPANIES = [
+      'Amazon','Google','Meta','Microsoft','Apple','Netflix',
+      'Walmart','Target','UPS','FedEx','Deloitte','McKinsey',
+      'Goldman Sachs','JPMorgan','Bank of America','Salesforce',
+      'Oracle','IBM','Accenture','Lockheed Martin',
+    ];
+    const SUBREDDITS    = ['recruitinghell','jobs','cscareerquestions','careerguidance'];
+    const REDDIT_WEIGHT = 0.3;
+    const companies     = Array.isArray(body.companies) ? body.companies : DEFAULT_COMPANIES;
+    const dryRun        = !!body.dry_run;
+
+    async function redditFetch(company, sub) {
+      const q = encodeURIComponent(`"${company}" hiring OR interview OR ghosted OR rejected OR offer`);
+      try {
+        const r = await fetch(`https://www.reddit.com/r/${sub}/search.json?q=${q}&sort=new&t=year&limit=25&restrict_sr=1`, {
+          headers: { 'User-Agent': 'SeenJobs-HiringIntelligence/1.0' },
+        });
+        if (!r.ok) return [];
+        const d = await r.json();
+        return (d?.data?.children || []).map(c => ({
+          id: c.data.name,
+          title: (c.data.title || '').slice(0, 300),
+          body:  (c.data.selftext || '').slice(0, 1200),
+          subreddit: c.data.subreddit || sub,
+        }));
+      } catch { return []; }
+    }
+
+    async function alreadyImported(ids) {
+      if (!ids.length) return new Set();
+      const filter = ids.map(id => `reddit_post_id.eq.${encodeURIComponent(id)}`).join(',');
+      try {
+        const r = await fetch(`${SUPABASE_URL}/rest/v1/reddit_imports?or=(${filter})&select=reddit_post_id`, { headers: hdrsBase });
+        if (!r.ok) return new Set();
+        return new Set((await r.json() || []).map(x => x.reddit_post_id));
+      } catch { return new Set(); }
+    }
+
+    async function classify(posts) {
+      const system = `Classify Reddit posts about hiring. For each return one JSON object: {outcome:"ghosted"|"rejected"|"hired"|"offer"|"interview"|"applied"|"unknown",role:string|null,is_hiring_experience:boolean,sentiment:"positive"|"negative"|"neutral"|"mixed",summary:string|null}. Return ONLY a JSON array, same order. No markdown.`;
+      const input = posts.map((p,i)=>`[${i}] TITLE: ${p.title}\nBODY: ${p.body||'(none)'}`).join('\n\n---\n\n');
+      try {
+        const r = await fetch('https://api.anthropic.com/v1/messages', {
+          method: 'POST',
+          headers: { 'Content-Type':'application/json','x-api-key':ANTHROPIC_KEY,'anthropic-version':'2023-06-01' },
+          body: JSON.stringify({ model:'claude-haiku-4-5-20251001', max_tokens:1024, system, messages:[{role:'user',content:`Classify ${posts.length} posts:\n\n${input}`}] }),
+        });
+        if (!r.ok) return posts.map(()=>({is_hiring_experience:false}));
+        const d = await r.json();
+        return JSON.parse(d.content?.[0]?.text || '[]');
+      } catch { return posts.map(()=>({is_hiring_experience:false})); }
+    }
+
+    async function upsertCo(name) {
+      const r = await fetch(`${SUPABASE_URL}/rest/v1/companies?name=ilike.${encodeURIComponent(name)}&select=id&limit=1`, { headers: hdrsBase });
+      if (r.ok) { const rows = await r.json(); if (rows?.[0]?.id) return rows[0].id; }
+      const ins = await fetch(`${SUPABASE_URL}/rest/v1/companies`, { method:'POST', headers:{...hdrsBase,Prefer:'return=representation'}, body:JSON.stringify({name}) });
+      return (ins.ok ? (await ins.json())?.[0]?.id : null) || null;
+    }
+
+    const results = {};
+    for (const company of companies.slice(0, 12)) {
+      let imported = 0, skipped = 0;
+      for (const sub of SUBREDDITS) {
+        const posts = await redditFetch(company, sub);
+        if (!posts.length) continue;
+        const seen = await alreadyImported(posts.map(p=>p.id));
+        const fresh = posts.filter(p=>!seen.has(p.id));
+        if (!fresh.length) continue;
+        for (let i = 0; i < fresh.length; i += 20) {
+          const batch = fresh.slice(i, i+20);
+          const cls   = await classify(batch);
+          for (let j = 0; j < batch.length; j++) {
+            const post = batch[j];
+            const c    = Array.isArray(cls) ? (cls[j]||{}) : {};
+            if (!c.is_hiring_experience) {
+              if (!dryRun) await fetch(`${SUPABASE_URL}/rest/v1/reddit_imports`,{method:'POST',headers:{...hdrsBase,Prefer:'return=minimal'},body:JSON.stringify({reddit_post_id:post.id,company_name:company,subreddit:post.subreddit,skipped:true,skip_reason:'not_hiring_experience'})});
+              skipped++; continue;
+            }
+            if (dryRun) { imported++; continue; }
+            const cid = await upsertCo(company);
+            const rpt = { company_name:company, platform:`Reddit r/${post.subreddit}`, outcome:c.outcome||'unknown', role:c.role||null, report_text:c.summary||post.title.slice(0,500), source:'reddit', outcome_weight:REDDIT_WEIGHT, trust_reason:'community_signal', needs_review:false, rounds:0, unpaid_work:'na', experience_level:'Unknown' };
+            if (cid) rpt.company_id = cid;
+            const repR = await fetch(`${SUPABASE_URL}/rest/v1/reports`,{method:'POST',headers:{...hdrsBase,Prefer:'return=representation'},body:JSON.stringify(rpt)});
+            const repId = repR.ok ? (await repR.json())?.[0]?.id : null;
+            await fetch(`${SUPABASE_URL}/rest/v1/reddit_imports`,{method:'POST',headers:{...hdrsBase,Prefer:'return=minimal'},body:JSON.stringify({reddit_post_id:post.id,company_name:company,subreddit:post.subreddit,report_id:repId||null,skipped:!repId,skip_reason:repId?null:'insert_failed'})});
+            if (repId) imported++; else skipped++;
+          }
+          if (i+20 < fresh.length) await new Promise(r=>setTimeout(r,600));
+        }
+      }
+      results[company] = { imported, skipped };
+    }
+    return res.status(200).json({ ok: true, results });
+  }
+
   // ── Fetch reports ───────────────────────────────────────────────────────────
   const { company, city } = body;
   if (!company) return res.status(400).json({ error: 'company required' });
