@@ -1,8 +1,6 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
-import { supabase } from '@/lib/supabase'
 
 interface AdminStats {
   users: { total: number; new_today: number; new_this_week: number }
@@ -43,23 +41,41 @@ function BarChart({ items, max }: { items: { label: string; value: number }[]; m
   )
 }
 
+const TOKEN_KEY = 'admin_token'
+
 export default function AdminPage() {
-  const router = useRouter()
   const [stats, setStats] = useState<AdminStats | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [token, setToken] = useState<string | null>(null)
+  const [username, setUsername] = useState('')
+  const [password, setPassword] = useState('')
+  const [loginError, setLoginError] = useState('')
+  const [loggingIn, setLoggingIn] = useState(false)
 
-  async function load() {
+  useEffect(() => {
+    const stored = sessionStorage.getItem(TOKEN_KEY)
+    if (stored) {
+      setToken(stored)
+    } else {
+      setLoading(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (token) load(token)
+  }, [token]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  async function load(t: string) {
     setLoading(true)
     setError('')
     try {
-      const { data: { session } } = await supabase.auth.getSession()
-      if (!session) { router.replace('/login'); return }
       const res = await fetch('/api/admin-stats', {
-        headers: { Authorization: `Bearer ${session.access_token}` },
+        headers: { 'X-Admin-Token': t },
       })
-      if (res.status === 401 || res.status === 403) {
-        setError('Access denied. Admin only.')
+      if (res.status === 401) {
+        sessionStorage.removeItem(TOKEN_KEY)
+        setToken(null)
         setLoading(false)
         return
       }
@@ -72,7 +88,54 @@ export default function AdminPage() {
     setLoading(false)
   }
 
-  useEffect(() => { load() }, []) // eslint-disable-line react-hooks/exhaustive-deps
+  async function login(e: React.FormEvent) {
+    e.preventDefault()
+    setLoggingIn(true)
+    setLoginError('')
+    try {
+      const res = await fetch('/api/admin-stats', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'admin_login', username, password }),
+      })
+      const json = await res.json()
+      if (!res.ok) { setLoginError(json.error || 'Login failed'); setLoggingIn(false); return }
+      sessionStorage.setItem(TOKEN_KEY, json.token)
+      setToken(json.token)
+    } catch {
+      setLoginError('Network error')
+    }
+    setLoggingIn(false)
+  }
+
+  function logout() {
+    sessionStorage.removeItem(TOKEN_KEY)
+    setToken(null)
+    setStats(null)
+  }
+
+  if (!token) return (
+    <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <form onSubmit={login} style={{ background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 12, padding: '2rem', width: 320 }}>
+        <div style={{ fontFamily: 'var(--mono)', fontSize: '.52rem', textTransform: 'uppercase', letterSpacing: '.22em', color: 'var(--green)', marginBottom: '.5rem' }}>Admin</div>
+        <div style={{ fontFamily: 'var(--display)', fontSize: '1.4rem', fontWeight: 800, color: 'var(--white)', marginBottom: '1.5rem' }}>Sign in</div>
+        <input
+          type="text" placeholder="Username" autoComplete="username" required value={username}
+          onChange={e => setUsername(e.target.value)}
+          style={{ width: '100%', background: 'var(--surface)', border: '1px solid var(--line2)', borderRadius: 7, padding: '.6rem .85rem', color: 'var(--white)', fontFamily: 'var(--mono)', fontSize: '.72rem', outline: 'none', marginBottom: '.65rem', boxSizing: 'border-box' }}
+        />
+        <input
+          type="password" placeholder="Password" autoComplete="current-password" required value={password}
+          onChange={e => setPassword(e.target.value)}
+          style={{ width: '100%', background: 'var(--surface)', border: '1px solid var(--line2)', borderRadius: 7, padding: '.6rem .85rem', color: 'var(--white)', fontFamily: 'var(--mono)', fontSize: '.72rem', outline: 'none', marginBottom: '1rem', boxSizing: 'border-box' }}
+        />
+        {loginError && <div style={{ fontFamily: 'var(--mono)', fontSize: '.65rem', color: 'var(--red)', marginBottom: '.75rem' }}>{loginError}</div>}
+        <button type="submit" disabled={loggingIn} style={{ width: '100%', background: 'var(--blue)', border: 'none', borderRadius: 7, padding: '.65rem', color: '#fff', fontFamily: 'var(--mono)', fontSize: '.72rem', fontWeight: 600, cursor: 'pointer' }}>
+          {loggingIn ? 'Signing in…' : 'Sign in →'}
+        </button>
+      </form>
+    </div>
+  )
 
   if (loading) return (
     <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'var(--mono)', fontSize: '.72rem', color: 'var(--muted)' }}>
@@ -84,7 +147,7 @@ export default function AdminPage() {
     <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
       <div style={{ textAlign: 'center' }}>
         <div style={{ fontFamily: 'var(--mono)', fontSize: '.72rem', color: 'var(--red)', marginBottom: '1rem' }}>{error}</div>
-        <button onClick={load} style={{ background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 6, padding: '.45rem .9rem', fontFamily: 'var(--mono)', fontSize: '.65rem', color: 'var(--sub)', cursor: 'pointer' }}>Retry</button>
+        <button onClick={() => token && load(token)} style={{ background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 6, padding: '.45rem .9rem', fontFamily: 'var(--mono)', fontSize: '.65rem', color: 'var(--sub)', cursor: 'pointer' }}>Retry</button>
       </div>
     </div>
   )
@@ -93,7 +156,6 @@ export default function AdminPage() {
 
   const topReportedMax = Math.max(...(stats.reports.top_companies || []).map(c => c.count), 1)
   const topLookupMax = Math.max(...(stats.company_lookups?.top || []).map(c => c.count), 1)
-
   const chartMax = Math.max(...(stats.reports.chart || []).map(d => d.count), 1)
 
   return (
@@ -112,8 +174,11 @@ export default function AdminPage() {
             <span style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', color: 'var(--muted)' }}>
               {new Date(stats.generated_at).toLocaleTimeString()}
             </span>
-            <button onClick={load} style={{ background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 6, padding: '.4rem .85rem', fontFamily: 'var(--mono)', fontSize: '.62rem', color: 'var(--sub)', cursor: 'pointer' }}>
+            <button onClick={() => token && load(token)} style={{ background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 6, padding: '.4rem .85rem', fontFamily: 'var(--mono)', fontSize: '.62rem', color: 'var(--sub)', cursor: 'pointer' }}>
               ↻ Refresh
+            </button>
+            <button onClick={logout} style={{ background: 'none', border: '1px solid var(--line)', borderRadius: 6, padding: '.4rem .85rem', fontFamily: 'var(--mono)', fontSize: '.62rem', color: 'var(--muted)', cursor: 'pointer' }}>
+              Sign out
             </button>
           </div>
         </div>
@@ -146,7 +211,6 @@ export default function AdminPage() {
         </div>
 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.25rem', marginBottom: '2rem' }}>
-          {/* 30-day chart */}
           <div style={{ background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 12, padding: '1.25rem' }}>
             <div style={{ fontFamily: 'var(--mono)', fontSize: '.6rem', textTransform: 'uppercase', letterSpacing: '.1em', color: 'var(--dim)', marginBottom: '1rem' }}>Reports submitted (30d)</div>
             <div style={{ display: 'flex', alignItems: 'flex-end', gap: 2, height: 80 }}>
@@ -156,7 +220,6 @@ export default function AdminPage() {
             </div>
           </div>
 
-          {/* Outcome breakdown */}
           <div style={{ background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 12, padding: '1.25rem' }}>
             <div style={{ fontFamily: 'var(--mono)', fontSize: '.6rem', textTransform: 'uppercase', letterSpacing: '.1em', color: 'var(--dim)', marginBottom: '1rem' }}>Outcome breakdown (30d)</div>
             {[
@@ -181,7 +244,6 @@ export default function AdminPage() {
         </div>
 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.25rem' }}>
-          {/* Top reported */}
           <div style={{ background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 12, padding: '1.25rem' }}>
             <div style={{ fontFamily: 'var(--mono)', fontSize: '.6rem', textTransform: 'uppercase', letterSpacing: '.1em', color: 'var(--dim)', marginBottom: '1rem' }}>Most reported companies (30d)</div>
             <BarChart
@@ -190,7 +252,6 @@ export default function AdminPage() {
             />
           </div>
 
-          {/* Top lookups */}
           <div style={{ background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 12, padding: '1.25rem' }}>
             <div style={{ fontFamily: 'var(--mono)', fontSize: '.6rem', textTransform: 'uppercase', letterSpacing: '.1em', color: 'var(--dim)', marginBottom: '1rem' }}>Most researched companies (7d)</div>
             <BarChart
