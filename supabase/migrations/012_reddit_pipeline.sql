@@ -16,7 +16,7 @@ CREATE TABLE IF NOT EXISTS reddit_imports (
   reddit_post_id text        NOT NULL UNIQUE,
   company_name   text        NOT NULL,
   subreddit      text        NOT NULL,
-  report_id      bigint      REFERENCES reports(id) ON DELETE SET NULL,
+  report_id      uuid        REFERENCES reports(id) ON DELETE SET NULL,
   skipped        boolean     NOT NULL DEFAULT false,
   skip_reason    text,
   created_at     timestamptz NOT NULL DEFAULT now()
