@@ -236,8 +236,19 @@ export default async function handler(req, res) {
       'Goldman Sachs','JPMorgan','Bank of America','Salesforce',
       'Oracle','IBM','Accenture','Lockheed Martin',
     ];
-    const ALL_SUBREDDITS = ['recruitinghell', 'jobs', 'cscareerquestions', 'careerguidance'];
-    const SUBREDDITS     = body.subreddit ? [body.subreddit] : ALL_SUBREDDITS.slice(0, 1); // default to recruitinghell only; crons pass one each
+    const ALL_SUBREDDITS = [
+      'recruitinghell',    // hiring horror stories — highest signal
+      'jobs',              // general job seeking
+      'cscareerquestions', // tech careers
+      'careerguidance',    // career advice
+      'antiwork',          // employer complaints, ghosting stories
+      'AskHR',             // HR insider view on hiring
+      'interviews',        // interview experiences specifically
+      'ExperiencedDevs',   // experienced tech hiring
+      'humanresources',    // employer-side hiring intel
+      'WorkReform',        // employer accountability
+    ];
+    const SUBREDDITS = body.subreddit ? [body.subreddit] : ALL_SUBREDDITS.slice(0, 1);
     const REDDIT_WEIGHT  = 0.3;
     const companies      = Array.isArray(body.companies) ? body.companies : DEFAULT_COMPANIES;
     const dryRun         = !!body.dry_run;
@@ -291,6 +302,58 @@ export default async function handler(req, res) {
       }
       fetchDebug[sub] = { ...(fetchDebug[sub] || {}), error: 'rate limited on all hosts' };
       return [];
+    }
+
+    // Reddit search RSS — targeted by company name, surfaces older posts that /new misses
+    async function redditSearchFetch(sub, company) {
+      try {
+        const q = encodeURIComponent(`"${company}"`);
+        const r = await fetch(`https://www.reddit.com/r/${sub}/search/.rss?q=${q}&restrict_sr=on&sort=new&t=month&limit=25`, {
+          headers: { 'User-Agent': 'SeenJobs/1.0 RSS reader (+https://seenjobs.io)', Accept: 'application/rss+xml, application/atom+xml, text/xml' },
+        });
+        if (!r.ok) return [];
+        const xml = await r.text();
+        return parseRedditAtom(xml, sub);
+      } catch { return []; }
+    }
+
+    // Pullpush.io — Pushshift archive mirror, indexes Reddit posts + comments over time
+    // Lets us search by company name across months of data, not just /new
+    async function pullpushFetch(sub, company) {
+      try {
+        const q = encodeURIComponent(company);
+        const [postRes, commentRes] = await Promise.all([
+          fetch(`https://api.pullpush.io/reddit/search/submission/?q=${q}&subreddit=${sub}&size=25&sort=created_utc&order=desc`, {
+            headers: { 'User-Agent': 'SeenJobs/1.0 (+https://seenjobs.io)' },
+          }),
+          fetch(`https://api.pullpush.io/reddit/search/comment/?q=${q}&subreddit=${sub}&size=50&sort=created_utc&order=desc`, {
+            headers: { 'User-Agent': 'SeenJobs/1.0 (+https://seenjobs.io)' },
+          }),
+        ]);
+        const posts    = postRes.ok    ? (await postRes.json())?.data    || [] : [];
+        const comments = commentRes.ok ? (await commentRes.json())?.data || [] : [];
+
+        // Normalise posts to our format
+        const normPosts = posts.map(p => ({
+          id:        `t3_${p.id}`,
+          title:     (p.title    || '').slice(0, 300),
+          body:      (p.selftext || '').replace(/\n{3,}/g, '\n\n').slice(0, 1200),
+          subreddit: p.subreddit || sub,
+          source:    'pullpush',
+        }));
+
+        // Group comments by their parent post id, attach as comment arrays
+        // Comments without a known post become standalone entries with blank title
+        const commentMap = {};
+        for (const c of comments) {
+          const pid = `t3_${c.link_id?.replace(/^t3_/, '') || c.id}`;
+          if (!commentMap[pid]) commentMap[pid] = { id: pid, title: `[comment thread in r/${sub}]`, body: '', subreddit: sub, source: 'pullpush', comments: [] };
+          const text = (c.body || '').replace(/\n{3,}/g, '\n\n').slice(0, 500);
+          if (text && text !== '[deleted]' && text !== '[removed]') commentMap[pid].comments.push(text);
+        }
+
+        return [...normPosts, ...Object.values(commentMap).filter(e => e.comments?.length)];
+      } catch { return []; }
     }
 
     // Fetch top comments for a single post — single-post JSON endpoints are far less restricted than subreddit browsing
@@ -370,28 +433,51 @@ Return ONLY a valid JSON array. Return [] if there are genuinely no hiring exper
       return (ins.ok ? (await ins.json())?.[0]?.id : null) || null;
     }
 
+    const keywords = ['hiring', 'interview', 'ghosted', 'rejected', 'offer', 'recruiter', 'application', 'applied', 'onsite', 'phone screen', 'final round', 'heard back', 'never heard', 'no response', 'background check', 'offer letter', 'laid off', 'let go'];
+    const sleep = ms => new Promise(r => setTimeout(r, ms));
+
     // Fetch each subreddit once, fan out across companies
     const postsByCompany = {};
-    for (const company of companies.slice(0, 12)) postsByCompany[company] = [];
+    for (const company of companies) postsByCompany[company] = [];
 
     for (const sub of SUBREDDITS) {
-      const subPosts = await redditFetch(sub);
-      for (const company of companies.slice(0, 12)) {
+      // Source 1: /new RSS — catches fresh activity and implicit company mentions via thread context
+      const newPosts = await redditFetch(sub);
+      for (const company of companies) {
         const cl = company.toLowerCase();
-        const keywords = ['hiring', 'interview', 'ghosted', 'rejected', 'offer', 'recruiter', 'application', 'applied', 'onsite', 'phone screen', 'final round', 'heard back', 'never heard'];
-        const matching = subPosts.filter(p => {
+        const matching = newPosts.filter(p => {
           const txt = `${p.title} ${p.body}`.toLowerCase();
           return txt.includes(cl) && keywords.some(k => txt.includes(k));
         });
         postsByCompany[company].push(...matching);
       }
-      await new Promise(r => setTimeout(r, 4000));
+
+      await sleep(3000);
+
+      // Source 2: Reddit search RSS per company — surfaces older posts /new misses, staggered to avoid 429
+      for (const company of companies) {
+        const searchPosts = await redditSearchFetch(sub, company);
+        postsByCompany[company].push(...searchPosts);
+        await sleep(1500);
+      }
+
+      await sleep(3000);
+
+      // Source 3: Pullpush archive — historical posts + direct comment search, different infrastructure so no Reddit rate limit
+      for (const company of companies) {
+        const archivePosts = await pullpushFetch(sub, company);
+        postsByCompany[company].push(...archivePosts);
+      }
+
+      await sleep(2000);
     }
 
     const results = {};
-    for (const company of companies.slice(0, 12)) {
+    for (const company of companies) {
       let imported = 0, skipped = 0;
-      const posts = postsByCompany[company];
+      // Dedup across sources by post ID
+      const seen_ids = new Set();
+      const posts = postsByCompany[company].filter(p => { if (seen_ids.has(p.id)) return false; seen_ids.add(p.id); return true; });
       if (!posts.length) { results[company] = { imported: 0, skipped: 0, fetched: 0 }; continue; }
 
       const seen = await alreadyImported(posts.map(p => p.id));
