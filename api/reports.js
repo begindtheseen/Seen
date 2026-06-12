@@ -230,27 +230,45 @@ export default async function handler(req, res) {
     const ANTHROPIC_KEY = process.env.ANTHROPIC_KEY || process.env.ANTHROPIC_API_KEY;
     if (!ANTHROPIC_KEY) return res.status(500).json({ error: 'ANTHROPIC_KEY not configured' });
 
-    const DEFAULT_COMPANIES = [
-      'Amazon','Google','Meta','Microsoft','Apple','Netflix',
-      'Walmart','Target','UPS','FedEx','Deloitte','McKinsey',
-      'Goldman Sachs','JPMorgan','Bank of America','Salesforce',
-      'Oracle','IBM','Accenture','Lockheed Martin',
-    ];
     const ALL_SUBREDDITS = [
-      'recruitinghell',    // hiring horror stories — highest signal
-      'jobs',              // general job seeking
-      'cscareerquestions', // tech careers
-      'careerguidance',    // career advice
-      'antiwork',          // employer complaints, ghosting stories
-      'AskHR',             // HR insider view on hiring
-      'interviews',        // interview experiences specifically
-      'ExperiencedDevs',   // experienced tech hiring
-      'humanresources',    // employer-side hiring intel
-      'WorkReform',        // employer accountability
+      'recruitinghell','jobs','cscareerquestions','careerguidance',
+      'antiwork','AskHR','interviews','ExperiencedDevs','humanresources','WorkReform',
     ];
-    const SUBREDDITS = body.subreddit ? [body.subreddit] : ALL_SUBREDDITS.slice(0, 1);
-    const REDDIT_WEIGHT  = 0.3;
-    const companies      = Array.isArray(body.companies) ? body.companies : DEFAULT_COMPANIES;
+    const SUBREDDITS    = body.subreddit ? [body.subreddit] : ALL_SUBREDDITS.slice(0, 1);
+    const REDDIT_WEIGHT = 0.3;
+    const BATCH_SIZE    = 25; // companies per cron run — 10 crons/day = 250 companies/day
+
+    // Pull companies from DB, cycling through all of them via offset.
+    // Each subreddit cron run processes the next BATCH_SIZE companies.
+    // With thousands of companies and 10 daily crons, full coverage cycles every few days.
+    let companies;
+    if (Array.isArray(body.companies)) {
+      companies = body.companies;
+    } else {
+      // Get current offset from feature_flags, advance it for next run
+      const flagKey = `reddit_offset_${body.subreddit || 'default'}`;
+      const flagRes = await fetch(`${SUPABASE_URL}/rest/v1/feature_flags?flag_name=eq.${encodeURIComponent(flagKey)}&select=percentage&limit=1`, { headers: hdrsBase });
+      const flagRow = flagRes.ok ? (await flagRes.json())?.[0] : null;
+      const offset  = flagRow ? (Number(flagRow.percentage) || 0) : 0;
+
+      // Fetch BATCH_SIZE companies starting at offset
+      const coRes = await fetch(`${SUPABASE_URL}/rest/v1/companies?select=name&order=name.asc&limit=${BATCH_SIZE}&offset=${offset}`, { headers: hdrsBase });
+      const coRows = coRes.ok ? await coRes.json() : [];
+      companies = coRows.map(r => r.name).filter(Boolean);
+
+      if (!companies.length) {
+        // Wrapped around — reset offset and grab first batch
+        companies = (await fetch(`${SUPABASE_URL}/rest/v1/companies?select=name&order=name.asc&limit=${BATCH_SIZE}&offset=0`, { headers: hdrsBase }).then(r => r.ok ? r.json() : [])).map(r => r.name).filter(Boolean);
+        await fetch(`${SUPABASE_URL}/rest/v1/feature_flags?on_conflict=flag_name`, { method: 'POST', headers: { ...hdrsBase, Prefer: 'resolution=merge-duplicates,return=minimal' }, body: JSON.stringify({ flag_name: flagKey, status: 'off', percentage: 0, description: 'Reddit import batch offset' }) });
+      } else {
+        // Advance offset for next run
+        const nextOffset = offset + companies.length;
+        await fetch(`${SUPABASE_URL}/rest/v1/feature_flags?on_conflict=flag_name`, { method: 'POST', headers: { ...hdrsBase, Prefer: 'resolution=merge-duplicates,return=minimal' }, body: JSON.stringify({ flag_name: flagKey, status: 'off', percentage: nextOffset, description: 'Reddit import batch offset' }) });
+      }
+
+      // If still nothing, fall back to known active companies
+      if (!companies.length) companies = ['Amazon','Google','Meta','Microsoft','Apple','Walmart','Target','UPS','FedEx','Deloitte'];
+    }
     const dryRun         = !!body.dry_run;
 
     // Reddit RSS/Atom feeds — designed for programmatic consumption, not blocked like the JSON API
