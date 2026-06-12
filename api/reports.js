@@ -236,18 +236,39 @@ export default async function handler(req, res) {
     const companies     = Array.isArray(body.companies) ? body.companies : DEFAULT_COMPANIES;
     const dryRun        = !!body.dry_run;
 
-    // Browse new posts (no OAuth required unlike search) — filter client-side per company
+    // Reddit OAuth — script app client credentials flow
+    const REDDIT_CLIENT_ID     = process.env.REDDIT_CLIENT_ID;
+    const REDDIT_CLIENT_SECRET = process.env.REDDIT_CLIENT_SECRET;
+    const REDDIT_USERNAME      = process.env.REDDIT_USERNAME || 'seenjobs_bot';
+    const REDDIT_UA            = `web:seenjobs:1.0 (by /u/${REDDIT_USERNAME})`;
+
+    let redditToken = null;
+    async function getRedditToken() {
+      if (!REDDIT_CLIENT_ID || !REDDIT_CLIENT_SECRET) return null;
+      const creds = Buffer.from(`${REDDIT_CLIENT_ID}:${REDDIT_CLIENT_SECRET}`).toString('base64');
+      const r = await fetch('https://www.reddit.com/api/v1/access_token', {
+        method: 'POST',
+        headers: { Authorization: `Basic ${creds}`, 'User-Agent': REDDIT_UA, 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: 'grant_type=client_credentials',
+      });
+      if (!r.ok) return null;
+      const d = await r.json();
+      return d.access_token || null;
+    }
+
     const fetchDebug = {};
     async function redditFetch(sub) {
       try {
-        const r = await fetch(`https://www.reddit.com/r/${sub}/new.json?limit=100&raw_json=1`, {
-          headers: {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
-            'Accept': 'application/json, text/javascript, */*; q=0.01',
-            'Accept-Language': 'en-US,en;q=0.9',
-          },
-        });
-        fetchDebug[sub] = { status: r.status };
+        if (!redditToken) redditToken = await getRedditToken();
+        const useOAuth = !!redditToken;
+        const url = useOAuth
+          ? `https://oauth.reddit.com/r/${sub}/new?limit=100&raw_json=1`
+          : `https://www.reddit.com/r/${sub}/new.json?limit=100&raw_json=1`;
+        const headers = useOAuth
+          ? { Authorization: `Bearer ${redditToken}`, 'User-Agent': REDDIT_UA }
+          : { 'User-Agent': REDDIT_UA };
+        const r = await fetch(url, { headers });
+        fetchDebug[sub] = { status: r.status, oauth: useOAuth };
         if (!r.ok) { fetchDebug[sub].error = `HTTP ${r.status}`; return []; }
         const d = await r.json();
         const posts = (d?.data?.children || []).map(c => ({
