@@ -3228,10 +3228,16 @@ function computeScoresFromData(reports, jobs, webScore) {
 
   // Priority 1: Community reports ≥3 — real user submissions, highest accuracy
   if (n >= 3) {
-    const totalW = reports.reduce((s, r) => s + (r.outcome_weight ?? 1.0), 0);
-    const ghosted = reports.reduce((s, r) => r.outcome === 'ghosted' ? s + (r.outcome_weight ?? 1.0) : s, 0);
-    const human   = reports.reduce((s, r) => (r.outcome === 'human' || r.outcome === 'hired') ? s + (r.outcome_weight ?? 1.0) : s, 0);
-    const unpaid  = reports.reduce((s, r) => r.unpaid_work === 'yes' ? s + (r.outcome_weight ?? 1.0) : s, 0);
+    // Cap community-signal (Reddit etc) weight so it never exceeds direct submission weight.
+    // Without this, 200 Reddit posts at 0.3 each (totalW=60) would swamp 3 direct reports (totalW=3).
+    const directW  = reports.reduce((s, r) => (r.outcome_weight ?? 1.0) >= 1.0 ? s + (r.outcome_weight ?? 1.0) : s, 0);
+    const signalW  = reports.reduce((s, r) => (r.outcome_weight ?? 1.0) <  1.0 ? s + (r.outcome_weight ?? 1.0) : s, 0);
+    const capRatio = directW > 0 && signalW > directW ? directW / signalW : 1.0;
+    const w = r => (r.outcome_weight ?? 1.0) < 1.0 ? (r.outcome_weight ?? 1.0) * capRatio : (r.outcome_weight ?? 1.0);
+    const totalW = reports.reduce((s, r) => s + w(r), 0);
+    const ghosted = reports.reduce((s, r) => r.outcome === 'ghosted' ? s + w(r) : s, 0);
+    const human   = reports.reduce((s, r) => (r.outcome === 'human' || r.outcome === 'hired') ? s + w(r) : s, 0);
+    const unpaid  = reports.reduce((s, r) => r.unpaid_work === 'yes' ? s + w(r) : s, 0);
     const gr = ghosted / totalW, rr = human / totalW;
     const roundsArr = reports.filter(r => r.rounds > 0).map(r => r.rounds);
     const avgRounds = roundsArr.length ? roundsArr.reduce((s, v) => s + v, 0) / roundsArr.length : 3;
