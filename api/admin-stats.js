@@ -146,6 +146,7 @@ async function _handler(req, res) {
       dauRes, dupClustersRes, flagsRes,
       staleJobsRes, zeroSearchesRes, jobReportsRes, searchLogsTodayRes,
       recentReportsRes, recentAppsRes, jobsTodayRes, inactiveReportsRes,
+      jobsTotalRes,
     ] = await Promise.all([
       db(`profiles?select=id`, { headers: { Prefer: 'count=exact', 'Range-Unit': 'items', Range: '0-0' } }),
       db(`profiles?created_at=gte.${todayISO}&select=id`, { headers: { Prefer: 'count=exact', 'Range-Unit': 'items', Range: '0-0' } }),
@@ -172,6 +173,7 @@ async function _handler(req, res) {
       db(`applications?select=id,company_name,role,city,status,stage,platform,created_at&order=created_at.desc&limit=25`),
       db(`jobs?created_at=gte.${todayISO}&select=id`, { headers: { Prefer: 'count=exact', 'Range-Unit': 'items', Range: '0-0' } }),
       db(`job_availability_reports?status=eq.expired&select=id,job_id,reported_at&order=reported_at.desc&limit=50`),
+      db(`jobs?select=id`, { headers: { Prefer: 'count=exact', 'Range-Unit': 'items', Range: '0-0' } }),
     ]);
 
     const usersTotal = ct(usersTotalRes);
@@ -233,6 +235,7 @@ async function _handler(req, res) {
         ? { ready: true, today: ct(searchLogsTodayRes) }
         : { ready: false },
       jobs: {
+        total: ct(jobsTotalRes),
         added_today: ct(jobsTodayRes),
         stale_or_expired: ct(staleJobsRes),
         zero_result_searches_7d: zeroSearchRows.length,
