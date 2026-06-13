@@ -17,7 +17,7 @@ Fix = swap inline styles for the correct CSS classes + add missing structural el
 |---|---|---|---|
 | G1 | Add `<div className="aurora"><div className="aurora-3" /></div>` to root layout | `app/layout.tsx` | ✅ |
 | G2 | Nav scroll handler: add `nav-scrolled` class on scroll >10px | `components/Nav.tsx` | ✅ |
-| G3 | Nav-pills mask gradient on horizontal scroll | `components/Nav.tsx` | ⬜ |
+| G3 | Nav-pills mask gradient on horizontal scroll | `components/Nav.tsx` | ✅ |
 
 ---
 
@@ -49,8 +49,8 @@ Fix = swap inline styles for the correct CSS classes + add missing structural el
 | # | Fix | Source | Status |
 |---|---|---|---|
 | JD1 | Apply `hero-terminal` class to job header card | globals.css:225 | ✅ |
-| JD2 | Waste score panel with `.rdim` red tint | globals.css | ⬜ |
-| JD3 | Status bar with pulsing blue indicator | index.html ~L5900 | ⬜ |
+| JD2 | Waste score panel with `.rdim` red tint | globals.css | ✅ |
+| JD3 | Status bar with pulsing blue indicator | index.html ~L5900 | ✅ |
 
 ---
 
@@ -68,9 +68,9 @@ Fix = swap inline styles for the correct CSS classes + add missing structural el
 
 | # | Fix | Source | Status |
 |---|---|---|---|
-| CD1 | Grade bar full glow shadow (`.co-grade-bar.safe/warn/danger`) | globals.css:461 | ⬜ |
-| CD2 | Header bottom gradient overlay (`::after` pseudo) | globals.css | ⬜ |
-| CD3 | Feed card outcome border width: 3px not 1px | globals.css | ⬜ |
+| CD1 | Grade bar full glow shadow (`.co-grade-bar.safe/warn/danger`) | globals.css:461 | ✅ |
+| CD2 | Header bottom gradient overlay (`::after` pseudo) | globals.css | ✅ |
+| CD3 | Feed card outcome border width: 3px not 1px | globals.css | ✅ |
 
 ---
 

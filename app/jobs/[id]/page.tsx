@@ -177,6 +177,22 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
           )}
         </div>
 
+        {/* Waste score panel — shown when company has high waste risk */}
+        {job.waste > 40 && (
+          <div className="waste-panel" style={{ animation: 'fadeUp .4s .1s ease both' }}>
+            <span className="wp-label">⚠ {job.waste}% Waste risk</span>
+            <span style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', color: 'var(--muted)' }}>High chance of no response</span>
+          </div>
+        )}
+
+        {/* Status indicator — pulsing blue if listing was recently seen */}
+        {avail === 'active' && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: '.45rem', marginBottom: '.85rem', fontFamily: 'var(--mono)', fontSize: '.58rem', color: 'var(--blue)', animation: 'fadeUp .4s .08s ease both' }}>
+            <span style={{ width: 5, height: 5, borderRadius: '50%', background: 'var(--blue)', display: 'inline-block', animation: 'pulse 2s infinite', flexShrink: 0 }} />
+            Active listing — seen recently
+          </div>
+        )}
+
         {/* Availability warning — only when the field exists (no invented data) */}
         {avail === 'stale' && (
           <div style={{ marginTop: '.85rem', padding: '.55rem .8rem', background: 'rgba(245,158,11,.07)', border: '1px solid rgba(245,158,11,.2)', borderRadius: 8, fontFamily: 'var(--mono)', fontSize: '.62rem', color: 'var(--amber)', lineHeight: 1.55 }}>⚠ This listing hasn&apos;t been seen in 7+ days and may be closed. Verify before applying.</div>
