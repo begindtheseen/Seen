@@ -861,8 +861,8 @@ nav.nav-scrolled{background:rgba(6,6,8,0.82);backdrop-filter:blur(60px) saturate
 
 /* ── ADMIN RESPONSIVE ── */
 @media(max-width:700px){
-  .adm-wrap{overflow-x:hidden}
-  .adm-kpi-row{gap:.35rem!important;margin-bottom:.85rem!important}
+  .adm-wrap{overflow-x:hidden;padding:1rem .75rem 3rem!important}
+  .adm-kpi-row{grid-template-columns:repeat(2,1fr)!important;gap:.35rem!important;margin-bottom:.85rem!important}
   .adm-kpi{padding:.6rem .55rem!important;border-radius:8px!important}
   .adm-kpi-n{font-size:.95rem!important;line-height:1.1!important}
   .adm-kpi-l{font-size:.42rem!important}
