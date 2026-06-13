@@ -55,7 +55,7 @@ function KpiCard({ l, n, sub, borderColor, numColor }: { l: string; n: string | 
   return (
     <div className="adm-kpi" style={borderColor ? { borderLeft: `2px solid ${borderColor}` } : undefined}>
       <div className="adm-kpi-l">{l}</div>
-      <div className="adm-kpi-n" style={{ fontSize: 'clamp(.85rem, 4vw, 1.8rem)', ...(numColor ? { color: numColor } : {}) }}>{n}</div>
+      <div className="adm-kpi-n" style={{ fontSize: 'clamp(1.3rem, 6vw, 1.8rem)', ...(numColor ? { color: numColor } : {}) }}>{n}</div>
       {sub && <div className="adm-kpi-sub">{sub}</div>}
     </div>
   )
@@ -151,6 +151,15 @@ export default function AdminPage() {
   const [loginError, setLoginError] = useState('')
   const [loggingIn, setLoggingIn] = useState(false)
   const [mergePrefill, setMergePrefill] = useState<MergePrefill | null>(null)
+  const [mob, setMob] = useState(false)
+
+  useEffect(() => {
+    const mq = window.matchMedia('(max-width:700px)')
+    const fn = (e: MediaQueryList | MediaQueryListEvent) => setMob(e.matches)
+    fn(mq)
+    mq.addEventListener('change', fn as (e: MediaQueryListEvent) => void)
+    return () => mq.removeEventListener('change', fn as (e: MediaQueryListEvent) => void)
+  }, [])
 
   useEffect(() => {
     const stored = sessionStorage.getItem(TOKEN_KEY)
@@ -270,6 +279,7 @@ export default function AdminPage() {
   const topLookupMax = Math.max(...(stats.company_lookups?.top || []).map(c => c.count), 1)
   const chartMax = Math.max(...(stats.reports.chart || []).map(d => d.count), 1)
   const needsReviewCount = (stats.reports.recent || []).filter(r => r.needs_review).length
+  const kpiCols = mob ? 'repeat(2,1fr)' : 'repeat(4,1fr)'
 
   return (
     <div className="page-full" style={{ background: 'radial-gradient(ellipse at 10% 0%,rgba(29,78,216,0.1) 0%,transparent 50%),radial-gradient(ellipse at 90% 10%,rgba(124,58,237,0.07) 0%,transparent 45%)' }}>
@@ -293,7 +303,7 @@ export default function AdminPage() {
 
         {/* Users KPIs */}
         <div style={{ fontFamily: 'var(--mono)', fontSize: '.5rem', textTransform: 'uppercase', letterSpacing: '.14em', color: 'var(--dim)', marginBottom: '.4rem' }}>Users</div>
-        <div className="adm-kpi-row" style={{ marginBottom: '1.25rem' }}>
+        <div className="adm-kpi-row" style={{ marginBottom: '1.25rem', gridTemplateColumns: kpiCols }}>
           <KpiCard l="Total accounts" n={stats.users.total.toLocaleString()} sub="all time" />
           <KpiCard l="New today" n={stats.users.new_today} sub="last 24h" />
           <KpiCard l="New this week" n={stats.users.new_this_week} sub="last 7 days" />
@@ -302,7 +312,7 @@ export default function AdminPage() {
 
         {/* Community KPIs */}
         <div style={{ fontFamily: 'var(--mono)', fontSize: '.5rem', textTransform: 'uppercase', letterSpacing: '.14em', color: 'var(--dim)', marginBottom: '.4rem' }}>Community data</div>
-        <div className="adm-kpi-row" style={{ marginBottom: '1.25rem' }}>
+        <div className="adm-kpi-row" style={{ marginBottom: '1.25rem', gridTemplateColumns: kpiCols }}>
           <KpiCard l="Total reports" n={stats.reports.total.toLocaleString()} sub="all time" borderColor="var(--green)" numColor="var(--green)" />
           <KpiCard l="Reports today" n={stats.reports.today} sub="last 24h" />
           <KpiCard l="Reports this week" n={stats.reports.this_week} sub="last 7 days" />
@@ -311,7 +321,7 @@ export default function AdminPage() {
 
         {/* Application tracking KPIs */}
         <div style={{ fontFamily: 'var(--mono)', fontSize: '.5rem', textTransform: 'uppercase', letterSpacing: '.14em', color: 'var(--dim)', marginBottom: '.4rem' }}>Application tracking</div>
-        <div className="adm-kpi-row" style={{ marginBottom: '1.5rem' }}>
+        <div className="adm-kpi-row" style={{ marginBottom: '1.5rem', gridTemplateColumns: kpiCols }}>
           <KpiCard l="Apps tracked total" n={stats.applications.total.toLocaleString()} sub="across all users" />
           <KpiCard l="Ghosted (30d)" n={stats.applications.ghosted_30d} sub="tracked as ghosted" numColor="var(--amber)" />
           <KpiCard l="Hired (30d)" n={stats.applications.hired_30d} sub="tracked as hired" numColor="var(--green)" />
@@ -335,9 +345,9 @@ export default function AdminPage() {
 
         {/* Jobs KPIs */}
         <div style={{ fontFamily: 'var(--mono)', fontSize: '.5rem', textTransform: 'uppercase', letterSpacing: '.14em', color: 'var(--dim)', marginBottom: '.4rem' }}>Jobs</div>
-        <div className="adm-kpi-row" style={{ marginBottom: '1.5rem' }}>
+        <div className="adm-kpi-row" style={{ marginBottom: '1.5rem', gridTemplateColumns: kpiCols }}>
           <KpiCard l="Active listings" n={(stats.jobs?.active ?? 0).toLocaleString()} sub="live jobs users see" borderColor="var(--blue)" numColor="var(--blue)" />
-          <KpiCard l="New today" n={stats.jobs?.new_today ?? 0} sub="never-seen-before jobs" borderColor="var(--green)" numColor="var(--green)" />
+          <KpiCard l="Jobs added today" n={stats.jobs?.new_today ?? 0} sub="new listings posted" borderColor="var(--green)" numColor="var(--green)" />
         </div>
 
         {/* Reports chart */}
