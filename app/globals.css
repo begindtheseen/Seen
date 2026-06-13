@@ -942,3 +942,6 @@ nav.nav-scrolled{background:rgba(6,6,8,0.82);backdrop-filter:blur(60px) saturate
 
 /* ── FIX: deduplicate .glow-card:hover (T2-22) ── */
 /* Merge of both duplicate rules (lines 77-78) — handled above; mark resolved */
+
+/* ── T2-20: verdict feed row click navigation ── */
+.vfeed-row{cursor:pointer;}

@@ -17,6 +17,23 @@ const HERO_LINES: [string, string][] = [
 
 const JOB_KEYWORDS = ['engineer', 'developer', 'manager', 'analyst', 'designer', 'nurse', 'coordinator', 'specialist', 'director', 'associate', 'assistant', 'recruiter', 'sales', 'marketing', 'accountant', 'therapist', 'technician']
 
+const MAJOR_COMPANIES = [
+  'Google', 'Amazon', 'Apple', 'Microsoft', 'Meta', 'Netflix', 'Tesla', 'Uber', 'Lyft', 'Airbnb',
+  'Stripe', 'Linear', 'Figma', 'Notion', 'Shopify', 'Salesforce', 'Oracle', 'IBM', 'Coinbase', 'Vercel',
+  'Twitter', 'LinkedIn', 'Snap', 'Pinterest', 'Reddit', 'Spotify', 'Dropbox', 'Twilio', 'Datadog', 'Atlassian',
+  'Adobe', 'Intuit', 'PayPal', 'Square', 'Robinhood', 'DoorDash', 'Instacart', 'Grubhub', 'Peloton', 'Zoom',
+  'Slack', 'HubSpot', 'Zendesk', 'ServiceNow', 'Workday', 'Okta', 'Cloudflare', 'Snowflake', 'MongoDB', 'Palantir',
+]
+
+const US_CITIES = [
+  'New York, NY', 'Los Angeles, CA', 'Chicago, IL', 'Houston, TX', 'Phoenix, AZ',
+  'Philadelphia, PA', 'San Antonio, TX', 'San Diego, CA', 'Dallas, TX', 'San Jose, CA',
+  'Austin, TX', 'Seattle, WA', 'Denver, CO', 'Boston, MA', 'Atlanta, GA',
+  'Miami, FL', 'Portland, OR', 'Las Vegas, NV', 'Minneapolis, MN', 'Nashville, TN',
+  'San Francisco, CA', 'Washington, DC', 'Baltimore, MD', 'Charlotte, NC', 'Raleigh, NC',
+  'Pittsburgh, PA', 'Detroit, MI', 'Sacramento, CA', 'Salt Lake City, UT', 'New Orleans, LA',
+]
+
 const QUICK_TAGS = [
   { label: 'Amazon', loc: 'Seattle, WA', grade: 'F', cls: 'danger' },
   { label: 'Stripe', loc: '', grade: 'A', cls: 'safe' },
@@ -50,6 +67,14 @@ export default function LandingHero() {
   const [query, setQuery] = useState('')
   const [location, setLocation] = useState('')
   const [recentSearches, setRecentSearches] = useState<Array<{ name: string; loc?: string }>>([])
+
+  // Company autocomplete state (T1-11)
+  const [companySuggs, setCompanySuggs] = useState<string[]>([])
+  const [showCompSuggs, setShowCompSuggs] = useState(false)
+
+  // Location autocomplete state (T1-12)
+  const [locSuggs, setLocSuggs] = useState<string[]>([])
+  const [showLocSuggs, setShowLocSuggs] = useState(false)
 
   // Animation state
   const [phase, setPhase] = useState<Phase>('entering')
@@ -262,6 +287,41 @@ export default function LandingHero() {
     router.push(`/company/${encodeURIComponent(name.toLowerCase().replace(/\s+/g, '-'))}`)
   }
 
+  // Handle query change — update company suggestions (T1-11)
+  const handleQueryChange = (val: string) => {
+    setQuery(val)
+    if (val.trim().length >= 2) {
+      const lower = val.trim().toLowerCase()
+      const isJobKw = JOB_KEYWORDS.some(k => lower.includes(k))
+      if (!isJobKw) {
+        const matches = MAJOR_COMPANIES.filter(c =>
+          c.toLowerCase().startsWith(lower) || c.toLowerCase().includes(lower)
+        )
+        setCompanySuggs(matches)
+        setShowCompSuggs(matches.length > 0)
+      } else {
+        setShowCompSuggs(false)
+      }
+    } else {
+      setShowCompSuggs(false)
+    }
+  }
+
+  // Handle location change — update city suggestions (T1-12)
+  const handleLocationChange = (val: string) => {
+    setLocation(val)
+    if (val.trim().length >= 2) {
+      const lower = val.trim().toLowerCase()
+      const matches = US_CITIES.filter(c =>
+        c.toLowerCase().startsWith(lower) || c.toLowerCase().includes(lower)
+      )
+      setLocSuggs(matches)
+      setShowLocSuggs(matches.length > 0)
+    } else {
+      setShowLocSuggs(false)
+    }
+  }
+
   // Suppress unused variable warning — heroIdx used to key renders
   void heroIdx
   void phase
@@ -319,36 +379,77 @@ export default function LandingHero() {
 
           {/* Search */}
           <div style={{ marginBottom: '1rem', animation: 'fadeUp .5s .18s ease both', position: 'relative' }}>
-            <div className="search-wrap">
-              <div className="search-row">
-                <div className="search-field">
-                  <span className="search-field-icon">🔍</span>
-                  <input
-                    className="search-inp"
-                    type="text"
-                    placeholder="Company or job title..."
-                    autoComplete="off"
-                    value={query}
-                    onChange={e => setQuery(e.target.value)}
-                    onKeyDown={e => e.key === 'Enter' && doSearch()}
-                  />
-                </div>
-                <div className="search-loc-row" style={{ display: 'flex', flex: '0 0 auto' }}>
-                  <div className="search-loc">
-                    <span style={{ color: 'var(--muted)', fontSize: '.8rem', flexShrink: 0 }}>📍</span>
+            {/* Wrap search-wrap in position:relative so dropdowns position correctly */}
+            <div style={{ position: 'relative' }}>
+              <div className="search-wrap">
+                <div className="search-row">
+                  {/* Company search field */}
+                  <div className="search-field">
+                    <span className="search-field-icon">🔍</span>
                     <input
-                      className="loc-inp"
+                      className="search-inp"
                       type="text"
-                      placeholder="City or zip"
+                      placeholder="Company or job title..."
                       autoComplete="off"
-                      value={location}
-                      onChange={e => setLocation(e.target.value)}
+                      value={query}
+                      onChange={e => handleQueryChange(e.target.value)}
                       onKeyDown={e => e.key === 'Enter' && doSearch()}
+                      onBlur={() => setTimeout(() => setShowCompSuggs(false), 150)}
                     />
                   </div>
-                  <button className="search-btn" onClick={doSearch}>Check →</button>
+                  {/* Location field wrapped for dropdown positioning */}
+                  <div style={{ position: 'relative', display: 'flex', flex: '0 0 auto' }}>
+                    <div className="search-loc-row" style={{ display: 'flex', flex: '0 0 auto' }}>
+                      <div className="search-loc">
+                        <span style={{ color: 'var(--muted)', fontSize: '.8rem', flexShrink: 0 }}>📍</span>
+                        <input
+                          className="loc-inp"
+                          type="text"
+                          placeholder="City or zip"
+                          autoComplete="off"
+                          value={location}
+                          onChange={e => handleLocationChange(e.target.value)}
+                          onKeyDown={e => e.key === 'Enter' && doSearch()}
+                          onBlur={() => setTimeout(() => setShowLocSuggs(false), 150)}
+                        />
+                      </div>
+                      <button className="search-btn" onClick={doSearch}>Check →</button>
+                    </div>
+                    {/* Location autocomplete dropdown (T1-12) */}
+                    {showLocSuggs && locSuggs.length > 0 && (
+                      <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 50, background: 'var(--card)', border: '1px solid var(--line2)', borderRadius: 8, maxHeight: 200, overflowY: 'auto', backdropFilter: 'blur(12px)', backgroundColor: '#0c0f1a' }}>
+                        {locSuggs.map(city => (
+                          <div
+                            key={city}
+                            style={{ padding: '.4rem .8rem', cursor: 'pointer', fontFamily: 'var(--mono)', fontSize: '.72rem', color: 'var(--white)' }}
+                            onMouseDown={() => { setLocation(city); setShowLocSuggs(false) }}
+                          >
+                            {city}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
+              {/* Company autocomplete dropdown (T1-11) */}
+              {showCompSuggs && companySuggs.length > 0 && (
+                <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 50, background: 'var(--card)', border: '1px solid var(--line2)', borderRadius: 8, maxHeight: 200, overflowY: 'auto', backdropFilter: 'blur(12px)', backgroundColor: '#0c0f1a' }}>
+                  {companySuggs.map(co => (
+                    <div
+                      key={co}
+                      style={{ padding: '.4rem .8rem', cursor: 'pointer', fontFamily: 'var(--mono)', fontSize: '.72rem', color: 'var(--white)' }}
+                      onMouseDown={() => {
+                        setQuery(co)
+                        setShowCompSuggs(false)
+                        router.push(`/company/${co.toLowerCase().replace(/\s+/g, '-')}`)
+                      }}
+                    >
+                      {co}
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
 
@@ -365,6 +466,19 @@ export default function LandingHero() {
               </div>
             </div>
           )}
+
+          {/* Ghost surge strip (T2-19) */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '.5rem', marginBottom: '.9rem', flexWrap: 'wrap', animation: 'fadeUp .5s .2s ease both' }}>
+            <span style={{ fontFamily: 'var(--mono)', fontSize: '.52rem', textTransform: 'uppercase', letterSpacing: '.1em', color: 'var(--red)', display: 'flex', alignItems: 'center', gap: '.35rem', flexShrink: 0 }}>
+              <span style={{ width: 5, height: 5, borderRadius: '50%', background: 'var(--red)', animation: 'pulse 1.2s infinite', display: 'inline-block' }} />
+              Ghost surge
+            </span>
+            {['Amazon', 'Deloitte', 'Oracle', 'Indeed', 'IBM'].map(co => (
+              <a key={co} href={`/company/${co.toLowerCase()}`} style={{ fontFamily: 'var(--mono)', fontSize: '.6rem', background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.25)', color: 'var(--red)', borderRadius: 5, padding: '.15rem .5rem', textDecoration: 'none', transition: 'background .15s' }}>
+                {co}
+              </a>
+            ))}
+          </div>
 
           {/* Quick tags */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '.4rem', marginBottom: '1.6rem', flexWrap: 'wrap', animation: 'fadeUp .5s .22s ease both' }}>
@@ -427,13 +541,13 @@ function VerdictFeed() {
       </div>
       <div className="vfeed-list">
         {verdicts.map((v, i) => (
-          <div key={i} className="vfeed-row">
+          <a key={i} className="vfeed-row" href={`/company/${v.company.toLowerCase().replace(/\s+/g, '-')}`} style={{ textDecoration: 'none', display: 'flex' }}>
             <div className="vfeed-co">{v.company}</div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '.5rem', flexShrink: 0 }}>
               <span style={{ fontFamily: 'var(--mono)', fontSize: '.75rem', fontWeight: 600, color: v.risk === 'safe' ? 'var(--green)' : v.risk === 'warn' ? 'var(--amber)' : 'var(--red)' }}>{v.score}</span>
               <span style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', color: 'var(--muted)' }}>{v.reports.toLocaleString()} reports</span>
             </div>
-          </div>
+          </a>
         ))}
       </div>
       <div className="vfeed-foot">Updated from community reports</div>

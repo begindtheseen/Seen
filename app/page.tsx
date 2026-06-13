@@ -54,6 +54,11 @@ export default function LandingPage() {
   return (
     <div className="page-full active" style={{ position: 'relative' }}>
 
+      {/* Cosmos background overlay (T2-21) */}
+      <div aria-hidden style={{ position: 'absolute', inset: 0, pointerEvents: 'none', zIndex: 0, overflow: 'hidden' }}>
+        <div style={{ position: 'absolute', inset: 0, background: 'radial-gradient(ellipse at 20% 20%, rgba(59,130,246,0.08) 0%, transparent 50%), radial-gradient(ellipse at 80% 10%, rgba(139,92,246,0.07) 0%, transparent 45%), radial-gradient(ellipse at 50% 80%, rgba(16,185,129,0.04) 0%, transparent 55%), radial-gradient(ellipse at 10% 90%, rgba(99,102,241,0.06) 0%, transparent 40%), radial-gradient(ellipse at 90% 60%, rgba(124,58,237,0.05) 0%, transparent 45%)' }} />
+      </div>
+
       {/* TICKER */}
       <div className="ticker-wrap" style={{ position: 'relative', zIndex: 2, flexShrink: 0 }}>
         <div className="ticker-track">
