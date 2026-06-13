@@ -254,6 +254,37 @@ export default function TrackerPage() {
           ))}
         </div>
 
+        {/* Funnel visualization */}
+        {apps.length >= 2 && (
+          <div style={{ marginBottom: '1.5rem', background: 'var(--raised)', border: '1px solid var(--line2)', borderRadius: 12, padding: '1rem 1.25rem' }}>
+            <div style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', textTransform: 'uppercase', letterSpacing: '.09em', color: 'var(--dim)', marginBottom: '.85rem' }}>Application Funnel</div>
+            <div className="funnel">
+              {(() => {
+                const stageLevel = (s: string) => ['Applied', 'Viewed', 'Phone Screen', 'Interview', 'Final Round', 'Offer'].indexOf(s)
+                const screened = apps.filter(a => stageLevel(a.stage) >= 1 || a.status !== 'active').length
+                const interviewed = apps.filter(a => stageLevel(a.stage) >= 3 || a.status === 'hired').length
+                return [
+                  { label: 'Applied', n: apps.length, color: 'var(--blue)' },
+                  { label: 'Screened', n: screened, color: '#6366f1' },
+                  { label: 'Interview', n: interviewed, color: 'var(--amber)' },
+                  { label: 'Hired', n: hired.length, color: 'var(--green)' },
+                ].map(s => (
+                  <div className="funnel-stage" key={s.label}>
+                    <div className="funnel-label">{s.label}</div>
+                    <div className="funnel-bar-wrap">
+                      <div className="funnel-bar-fill" style={{ width: apps.length ? `${Math.round(s.n / apps.length * 100)}%` : '0%', background: s.color }} />
+                    </div>
+                    <div className="funnel-pct">{s.n}</div>
+                  </div>
+                ))
+              })()}
+            </div>
+            {ghosted.length > 0 && (
+              <div className="funnel-ghost-note" style={{ marginTop: '.5rem' }}>👻 {ghosted.length} ghosted before responding</div>
+            )}
+          </div>
+        )}
+
         {/* Pipeline (active apps, desktop) */}
         {active.length > 0 && (
           <div className="tracker-pipeline-wrap" style={{ marginBottom: '1.5rem' }}>

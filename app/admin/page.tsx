@@ -52,9 +52,16 @@ interface FeatureFlag {
 }
 
 function StatBox({ n, label, highlight, color }: { n: string | number; label: string; highlight?: boolean; color?: string }) {
+  const c = color || 'var(--blue)'
   return (
-    <div style={{ background: 'var(--card)', border: `1px solid ${highlight ? (color || 'var(--blue)') : 'var(--line)'}`, borderRadius: 10, padding: '1.1rem', textAlign: 'center' }}>
-      <div style={{ fontFamily: 'var(--mono)', fontSize: '1.55rem', fontWeight: 500, color: highlight ? (color || 'var(--blue)') : 'var(--white)', lineHeight: 1 }}>{n}</div>
+    <div style={{
+      background: highlight ? `${c}0c` : 'var(--card)',
+      border: `1px solid ${highlight ? `${c}55` : 'var(--line)'}`,
+      borderRadius: 10, padding: '1.1rem', textAlign: 'center',
+      boxShadow: highlight ? `0 0 24px ${c}18, 0 4px 24px rgba(0,0,0,.45)` : '0 4px 24px rgba(0,0,0,.3)',
+      transition: 'box-shadow .2s',
+    }}>
+      <div style={{ fontFamily: 'var(--mono)', fontSize: '1.55rem', fontWeight: 500, color: highlight ? c : 'var(--white)', lineHeight: 1 }}>{n}</div>
       <div style={{ fontFamily: 'var(--mono)', fontSize: '.52rem', textTransform: 'uppercase', letterSpacing: '.08em', color: 'var(--muted)', marginTop: '.3rem' }}>{label}</div>
     </div>
   )
@@ -62,7 +69,10 @@ function StatBox({ n, label, highlight, color }: { n: string | number; label: st
 
 function SectionHeader({ title }: { title: string }) {
   return (
-    <div style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', textTransform: 'uppercase', letterSpacing: '.1em', color: 'var(--dim)', marginBottom: '.65rem' }}>{title}</div>
+    <div style={{ display: 'flex', alignItems: 'center', gap: '.65rem', marginBottom: '.85rem', marginTop: '.25rem' }}>
+      <div style={{ fontFamily: 'var(--mono)', fontSize: '.55rem', textTransform: 'uppercase', letterSpacing: '.14em', color: 'var(--blue)', fontWeight: 600 }}>{title}</div>
+      <div style={{ flex: 1, height: 1, background: 'linear-gradient(to right, var(--line2), transparent)' }} />
+    </div>
   )
 }
 
@@ -277,7 +287,7 @@ export default function AdminPage() {
   const needsReviewCount = (stats.reports.recent || []).filter(r => r.needs_review).length
 
   return (
-    <div style={{ minHeight: '100vh', background: 'radial-gradient(ellipse at 10% 0%,rgba(29,78,216,0.1) 0%,transparent 50%),radial-gradient(ellipse at 90% 10%,rgba(124,58,237,0.07) 0%,transparent 45%)' }}>
+    <div style={{ minHeight: '100vh', background: 'radial-gradient(ellipse at 10% 0%,rgba(29,78,216,0.18) 0%,transparent 50%),radial-gradient(ellipse at 90% 10%,rgba(124,58,237,0.14) 0%,transparent 45%),radial-gradient(ellipse at 50% 100%,rgba(8,145,178,0.08) 0%,transparent 55%)' }}>
       <div style={{ maxWidth: 1100, margin: '0 auto', padding: '2.5rem 2rem' }}>
 
         {/* Header */}
@@ -439,7 +449,7 @@ export default function AdminPage() {
           {(stats.applications.recent || []).length === 0
             ? <div style={{ fontFamily: 'var(--mono)', fontSize: '.62rem', color: 'var(--muted)' }}>No applications tracked yet</div>
             : (stats.applications.recent || []).map(a => (
-              <div key={a.id} style={{ display: 'flex', alignItems: 'center', gap: '.75rem', padding: '.5rem 0', borderBottom: '1px solid var(--line2)' }}>
+              <div key={a.id} style={{ display: 'flex', alignItems: 'center', gap: '.75rem', padding: '.5rem 0 .5rem .65rem', borderBottom: '1px solid var(--line2)', borderLeft: `3px solid ${stageColor(a.stage)}`, marginLeft: '-.1rem' }}>
                 <span style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', color: stageColor(a.stage), background: stageColor(a.stage) + '18', border: `1px solid ${stageColor(a.stage)}30`, borderRadius: 4, padding: '.1rem .4rem', flexShrink: 0 }}>{a.stage}</span>
                 <span style={{ fontFamily: 'var(--mono)', fontSize: '.65rem', color: 'var(--white)', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{a.company_name} · {a.role}</span>
                 <span style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', color: 'var(--muted)', flexShrink: 0 }}>{relTime(a.created_at)}</span>
@@ -646,8 +656,9 @@ function ReportRow({ report: r, token, onRefresh }: { report: RecentReport; toke
   }
 
   const isDenied = localStatus === 'denied' || (r.outcome_weight === 0 && !r.needs_review)
+  const oc = outcomeColor(r.outcome)
   return (
-    <div style={{ padding: '.6rem 0', borderBottom: '1px solid var(--line2)', opacity: isDenied ? 0.45 : 1 }}>
+    <div style={{ padding: '.6rem 0 .6rem .65rem', borderBottom: '1px solid var(--line2)', borderLeft: `3px solid ${oc}`, paddingLeft: '.75rem', marginLeft: '-.1rem', opacity: isDenied ? 0.45 : 1 }}>
       <div style={{ display: 'flex', alignItems: 'flex-start', gap: '.6rem' }}>
         <span style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', color: outcomeColor(r.outcome), background: outcomeColor(r.outcome) + '18', border: `1px solid ${outcomeColor(r.outcome)}30`, borderRadius: 4, padding: '.1rem .4rem', flexShrink: 0, marginTop: 1 }}>{r.outcome}</span>
         <div style={{ flex: 1 }}>

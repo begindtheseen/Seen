@@ -45,7 +45,7 @@ function ScoreRing({ score }: { score: number }) {
   )
 }
 
-function JobCard({ job, onSaveToggle, onOpen }: { job: Job; onSaveToggle: (id: string) => void; onOpen: (id: string) => void }) {
+function JobCard({ job, index, onSaveToggle, onOpen }: { job: Job; index: number; onSaveToggle: (id: string) => void; onOpen: (id: string) => void }) {
   const risk = Score.risk(job.score)
   const wl = Score.wasteLabel(job.waste)
   const vibes = jobVibes(job)
@@ -65,7 +65,7 @@ function JobCard({ job, onSaveToggle, onOpen }: { job: Job; onSaveToggle: (id: s
   }
 
   return (
-    <div className={`jlc ${risk}`}>
+    <div className={`jlc ${risk}`} style={{ animation: `fadeUp .4s ${Math.min(index, 12) * 0.06}s ease both` }}>
       <div
         className="jlc-top"
         onClick={() => onOpen(job.id)}
@@ -385,8 +385,8 @@ export default function JobsPage() {
         {/* Results list */}
         {filtered.length > 0 ? (
           <div className="jlist" key={saveVersion}>
-            {filtered.map(job => (
-              <JobCard key={job.id} job={job} onSaveToggle={handleSaveToggle} onOpen={id => router.push(`/jobs/${encodeURIComponent(id)}`)} />
+            {filtered.map((job, i) => (
+              <JobCard key={job.id} job={job} index={i} onSaveToggle={handleSaveToggle} onOpen={id => router.push(`/jobs/${encodeURIComponent(id)}`)} />
             ))}
           </div>
         ) : status === 'idle' ? (

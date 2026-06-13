@@ -153,27 +153,29 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
       <div style={{ maxWidth: 720, margin: '0 auto', padding: '1.25rem 1rem 7rem' }}>
         {backBtn}
 
-        {/* Header */}
-        <div style={{ display: 'flex', alignItems: 'flex-start', gap: '1rem', marginBottom: '1rem' }}>
-          <div style={{ width: 52, height: 52, borderRadius: 10, background: 'var(--raised)', border: '1px solid var(--line2)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'var(--display)', fontWeight: 800, fontSize: '1.3rem', color: 'var(--white)', flexShrink: 0 }}>
-            {(job.company || '?')[0].toUpperCase()}
+        {/* Header card — glassmorphism glass panel */}
+        <div className="hero-terminal" style={{ display: 'block', marginBottom: '1.5rem', padding: '1.25rem' }}>
+          <div style={{ display: 'flex', alignItems: 'flex-start', gap: '1rem', marginBottom: chips.length > 0 ? '.85rem' : 0 }}>
+            <div style={{ width: 52, height: 52, borderRadius: 10, background: 'var(--raised)', border: '1px solid var(--line2)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'var(--display)', fontWeight: 800, fontSize: '1.3rem', color: 'var(--white)', flexShrink: 0 }}>
+              {(job.company || '?')[0].toUpperCase()}
+            </div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <h1 style={{ fontFamily: 'var(--display)', fontSize: '1.25rem', fontWeight: 800, color: 'var(--white)', letterSpacing: '-.025em', lineHeight: 1.2, marginBottom: '.3rem' }}>{job.title}</h1>
+              <div style={{ fontFamily: 'var(--mono)', fontSize: '.65rem', color: 'var(--dim)' }}>{job.company}{job.location ? ` · 📍 ${job.location}` : ''}</div>
+            </div>
+            <div style={{ textAlign: 'center', flexShrink: 0 }}>
+              <div className={`sring ${risk}`} style={{ width: 44, height: 44 }}><div className="sring-n" style={{ fontSize: '.85rem' }}>{job.score}</div></div>
+              <div style={{ fontFamily: 'var(--mono)', fontSize: '.45rem', color: 'var(--muted)', marginTop: '.15rem' }}>score</div>
+            </div>
           </div>
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <h1 style={{ fontFamily: 'var(--display)', fontSize: '1.25rem', fontWeight: 800, color: 'var(--white)', letterSpacing: '-.025em', lineHeight: 1.2, marginBottom: '.3rem' }}>{job.title}</h1>
-            <div style={{ fontFamily: 'var(--mono)', fontSize: '.65rem', color: 'var(--dim)' }}>{job.company}{job.location ? ` · 📍 ${job.location}` : ''}</div>
-          </div>
-          <div style={{ textAlign: 'center', flexShrink: 0 }}>
-            <div className={`sring ${risk}`} style={{ width: 44, height: 44 }}><div className="sring-n" style={{ fontSize: '.85rem' }}>{job.score}</div></div>
-            <div style={{ fontFamily: 'var(--mono)', fontSize: '.45rem', color: 'var(--muted)', marginTop: '.15rem' }}>score</div>
-          </div>
+          {chips.length > 0 && (
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '.4rem' }}>
+              {chips.map((c, i) => (
+                <span key={i} style={{ background: 'var(--raised)', border: '1px solid var(--line2)', borderRadius: 5, padding: '.2rem .55rem', fontSize: '.65rem', fontFamily: 'var(--mono)', color: 'var(--sub)' }}>{c}</span>
+              ))}
+            </div>
+          )}
         </div>
-        {chips.length > 0 && (
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '.4rem' }}>
-            {chips.map((c, i) => (
-              <span key={i} style={{ background: 'var(--raised)', border: '1px solid var(--line2)', borderRadius: 5, padding: '.2rem .55rem', fontSize: '.65rem', fontFamily: 'var(--mono)', color: 'var(--sub)' }}>{c}</span>
-            ))}
-          </div>
-        )}
 
         {/* Availability warning — only when the field exists (no invented data) */}
         {avail === 'stale' && (
@@ -184,7 +186,7 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
         )}
 
         {/* AI insights */}
-        <div style={{ marginTop: '1.5rem', background: 'var(--gdim)', border: '1px solid var(--line)', borderRadius: 12, padding: '1.25rem' }}>
+        <div style={{ marginTop: '1.5rem', background: 'var(--gdim)', border: '1px solid var(--line)', borderRadius: 12, padding: '1.25rem', animation: 'fadeUp .4s .15s ease both' }}>
           <div style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', textTransform: 'uppercase', letterSpacing: '.08em', color: 'var(--dim)', marginBottom: '.85rem' }}>
             WHAT {(job.company || 'THIS COMPANY').toUpperCase()} IS HIRING FOR
           </div>
@@ -231,7 +233,7 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
         </div>
 
         {/* Description */}
-        <div style={{ marginTop: '1.5rem' }}>
+        <div style={{ marginTop: '1.5rem', animation: 'fadeUp .4s .25s ease both' }}>
           <div style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', textTransform: 'uppercase', letterSpacing: '.08em', color: 'var(--dim)', marginBottom: '.75rem' }}>ABOUT THIS ROLE</div>
           {insightsState === 'loading'
             ? <Skeleton widths={[95, 82, 90, 70, 86, 75, 92, 65, 80, 88]} h={9} />

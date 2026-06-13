@@ -483,7 +483,11 @@ nav.nav-scrolled{background:rgba(6,6,8,0.82);backdrop-filter:blur(60px) saturate
 .ctab:hover{color:var(--sub)}
 .ctab.active{color:var(--white);border-bottom-color:var(--blue)}
 .ctc{display:none}.ctc.active{display:block;animation:fadeIn .18s ease}
-.rcard{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:1.15rem;margin-bottom:.65rem}
+.rcard{background:var(--card);border:1px solid var(--line);border-left:3px solid var(--line);border-radius:10px;padding:1.15rem;margin-bottom:.65rem}
+.rcard.outcome-ghosted{border-left-color:var(--red)}
+.rcard.outcome-autoreject{border-left-color:var(--amber)}
+.rcard.outcome-human{border-left-color:var(--blue)}
+.rcard.outcome-hired{border-left-color:var(--green)}
 .feed-filter-btn{background:var(--surface);border:1px solid var(--line2);color:var(--sub);border-radius:100px;padding:.38rem .9rem;font-family:var(--mono);font-size:.68rem;cursor:pointer;transition:all .15s;white-space:nowrap}
 .feed-filter-btn:hover{border-color:var(--muted);color:var(--text)}
 .feed-filter-btn.active{background:var(--blue);border-color:var(--blue);color:#fff}

@@ -78,7 +78,7 @@ export default function LandingHero() {
             <div style={{ height: 'clamp(115px,18vw,200px)', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'flex-start', overflow: 'hidden' }}>
               <h1 style={{ fontFamily: 'var(--display)', fontSize: 'clamp(2rem,8.5vw,5.2rem)', fontWeight: 800, lineHeight: 1.05, letterSpacing: '-.04em', color: 'var(--white)', margin: 0, width: '100%', textAlign: 'left' }}>
                 <span className="hero-line-in" key={`l1-${heroIdx}`} style={{ display: 'block' }}>{lines[0]}</span>
-                <span className="hero-line-in" key={`l2-${heroIdx}`} style={{ display: 'block', background: 'linear-gradient(135deg,#a5b4fc,#c084fc,#e879f9)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text', fontStyle: 'italic', animationDelay: '.06s' }}>{lines[1]}</span>
+                <span className="hero-line-in grad-text" key={`l2-${heroIdx}`} style={{ display: 'block', fontStyle: 'italic', animationDelay: '.06s' }}>{lines[1]}</span>
               </h1>
             </div>
           </div>
