@@ -66,7 +66,7 @@ export default function LandingHero() {
       <div className="l-grid">
 
         {/* LEFT COLUMN */}
-        <div>
+        <div style={{ containerType: 'inline-size' }}>
           {/* Kicker pill */}
           <div style={{ display: 'inline-flex', alignItems: 'center', gap: '.4rem', background: 'rgba(59,130,246,0.1)', border: '1px solid rgba(59,130,246,0.2)', color: 'var(--blue)', fontFamily: 'var(--mono)', fontSize: '.63rem', padding: '.25rem .85rem', borderRadius: 100, marginBottom: '1.75rem', animation: 'fadeUp .5s ease both' }}>
             <span style={{ width: 5, height: 5, borderRadius: '50%', background: 'var(--blue)', animation: 'pulse 2s infinite', display: 'inline-block' }} />
@@ -75,10 +75,10 @@ export default function LandingHero() {
 
           {/* Rotating headline */}
           <div style={{ animation: 'fadeUp .5s .06s ease both' }}>
-            <div style={{ height: 'clamp(115px,18vw,200px)', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'flex-start', overflow: 'hidden' }}>
-              <h1 style={{ fontFamily: 'var(--display)', fontSize: 'clamp(2rem,8.5vw,5.2rem)', fontWeight: 800, lineHeight: 1.05, letterSpacing: '-.04em', color: 'var(--white)', margin: 0, width: '100%', textAlign: 'left' }}>
-                <span className="hero-line-in" key={`l1-${heroIdx}`} style={{ display: 'block' }}>{lines[0]}</span>
-                <span className="hero-line-in grad-text" key={`l2-${heroIdx}`} style={{ display: 'block', fontStyle: 'italic', animationDelay: '.06s' }}>{lines[1]}</span>
+            <div style={{ height: 'clamp(92px,13vw,150px)', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'flex-start', overflow: 'hidden' }}>
+              <h1 style={{ fontFamily: 'var(--display)', fontSize: 'clamp(1.7rem,9.6cqw,3.9rem)', fontWeight: 800, lineHeight: 1.06, letterSpacing: '-.04em', color: 'var(--white)', margin: 0, width: '100%', textAlign: 'left' }}>
+                <span className="hero-line-in" key={`l1-${heroIdx}`} style={{ display: 'block', whiteSpace: 'nowrap' }}>{lines[0]}</span>
+                <span className="hero-line-in grad-text" key={`l2-${heroIdx}`} style={{ display: 'block', whiteSpace: 'nowrap', fontStyle: 'italic', animationDelay: '.06s' }}>{lines[1]}</span>
               </h1>
             </div>
           </div>
