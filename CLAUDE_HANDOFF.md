@@ -205,22 +205,23 @@ GitHub web-UI dummy commits are an emergency fallback only. The working flow:
 **Phase 3 — Companies (C1-C3) ✅**
 - `app/companies/page.tsx`: Restructured to `ldr-grid` (5→3→2 col responsive tiles) with `ldr-item/ldr-rank/ldr-score/ldr-name/ldr-waste/ldr-bar/ldr-fill` CSS classes; stagger fadeUp animations; live "Updated from community reports" indicator
 
-### What's remaining (resume here)
+**Phase 4 — Job detail waste panel + homepage (JD2/JD3/H1) ✅**
+- `app/jobs/[id]/page.tsx`: `.waste-panel` shown when waste>40%; pulsing blue status indicator for active listings
+- `app/page.tsx`: Removed redundant inline cosmos bg (global aurora in layout.tsx handles it)
 
-| Item | Status | File |
-|------|--------|------|
-| H1: Homepage cosmos bg → aurora class | ⬜ | `app/page.tsx` |
-| H2-H3: vfeed-panel already uses CSS class | ✅ (was already correct) | - |
-| H5: Word-slam animations | ⬜ | `components/LandingHero.tsx` |
-| H6/H7: Entrance animations (already in place) | ✅ | - |
-| JD2: Waste score panel `.rdim` | ⬜ | `app/jobs/[id]/page.tsx` |
-| JD3: Status bar pulsing indicator | ⬜ | `app/jobs/[id]/page.tsx` |
-| CD1-CD3: Already done via CSS | ✅ | - |
-| R1: countUp animation on resume score | ⬜ | `app/resume/page.tsx` |
-| R2: Colored icons (green/red/amber) | ⬜ | `app/resume/page.tsx` |
-| T7: RoundsPrompt bottom sheet after offer | ⬜ | to be created |
-| G3: Nav-pills scroll mask gradient | ⬜ | `components/Nav.tsx` |
-| A5: Full admin premium feel (in progress) | 🟡 | `app/admin/page.tsx` |
+**Phase 5 — Tracker T7, RoundsPrompt ✅**
+- `components/RoundsPrompt.tsx`: Created bottom-sheet after offer — round count 1-7+ picker, optional notes, share to community button
+- `app/tracker/page.tsx`: Wired RoundsPrompt (shows after OutcomeCard closes on hired status); handleCheckAnswer now handles withdrew correctly
+
+### What's remaining
+
+| Item | Status | Notes |
+|------|--------|-------|
+| H5: Word-slam animations | ⬜ | Complex JS word-by-word animation; low priority |
+| J2: Suggestion/proposal chips | ⬜ | Feature not ported yet (requires AI endpoint) |
+| R1: countUp on resume score | ⬜ | Requires structured AI response parsing |
+| R2: Colored icons in resume | ⬜ | Requires structured AI response parsing |
+| A5: Full admin premium feel | 🟡 | Gradient + glows + section separators done; card glass effects could be further enhanced |
 
 ### Build status
-✅ PASSING — 19 routes, all clean (last verified: Session A Phase 3)
+✅ PASSING — 19 routes, all clean (last verified: Session A Phase 5)

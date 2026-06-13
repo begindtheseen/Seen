@@ -8,6 +8,7 @@ import { EventStore } from '@/lib/stores/EventStore'
 import { STAGES } from '@/lib/constants'
 import type { Application } from '@/lib/types'
 import OutcomeCard from '@/components/OutcomeCard'
+import RoundsPrompt from '@/components/RoundsPrompt'
 
 const STATUS_MAP: Record<string, string> = {
   active: '',
@@ -157,6 +158,7 @@ export default function TrackerPage() {
   const [apps, setApps] = useState<Application[]>([])
   const [loading, setLoading] = useState(true)
   const [outcomeApp, setOutcomeApp] = useState<Application | null>(null)
+  const [roundsApp, setRoundsApp] = useState<Application | null>(null)
 
   useEffect(() => {
     if (!isLoggedIn) { router.replace('/login'); return }
@@ -181,7 +183,11 @@ export default function TrackerPage() {
       const updated = await AppStore.load(isLoggedIn)
       setApps(updated)
       const app = updated.find(a => a.id === id)
-      if (app) setOutcomeApp({ ...app, ...changes })
+      if (app) {
+        const merged = { ...app, ...changes }
+        setOutcomeApp(merged)
+        if (changes.status === 'hired') setRoundsApp(merged)
+      }
     } else {
       loadApps()
     }
@@ -251,6 +257,16 @@ export default function TrackerPage() {
   return (
     <>
     {outcomeApp && <OutcomeCard app={outcomeApp} onClose={() => setOutcomeApp(null)} />}
+    {roundsApp && !outcomeApp && (
+      <RoundsPrompt
+        app={roundsApp}
+        onSubmit={(rounds, notes) => {
+          EventStore.add({ appId: roundsApp.id, type: 'rounds_reported', data: { rounds, notes } })
+          setRoundsApp(null)
+        }}
+        onSkip={() => setRoundsApp(null)}
+      />
+    )}
     <div className="page">
       <div style={{ maxWidth: 1000, margin: '0 auto', padding: '2.5rem 2rem' }}>
 

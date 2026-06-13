@@ -26,12 +26,12 @@ Fix = swap inline styles for the correct CSS classes + add missing structural el
 | # | Fix | Source | Status |
 |---|---|---|---|
 | H1 | Replace inline cosmos bg with `className="aurora"` | globals.css:57 | ✅ |
-| H2 | Add `.vfeed-panel` with corner tick marks | globals.css:664-682 | ⬜ |
-| H3 | Add `.vfeed-live` pulsing indicator | globals.css:680 | ⬜ |
+| H2 | Add `.vfeed-panel` with corner tick marks | globals.css:664-682 | ✅ |
+| H3 | Add `.vfeed-live` pulsing indicator | globals.css:680 | ✅ |
 | H4 | Apply `grad-text` to hero headline words | globals.css:83 | ✅ |
 | H5 | Word-slam animations on hero text (`.hw.in-l`, `.hw.in-r`) | index.html hero JS | ⬜ |
-| H6 | `.hero-terminal` glass panel on right side | globals.css:225 | ⬜ |
-| H7 | Entrance animations: `fadeUp` with stagger on sections | globals.css:43 | ⬜ |
+| H6 | Right column glass panel (vfeed-panel — already used) | globals.css:225 | ✅ |
+| H7 | Entrance animations: `fadeUp` with stagger on sections | globals.css:43 | ✅ |
 
 ---
 
@@ -84,7 +84,7 @@ Fix = swap inline styles for the correct CSS classes + add missing structural el
 | T4 | "I withdrew" option in outcome_check answers | `app/tracker/page.tsx` | ✅ |
 | T5 | Stage transitions in `handleCheckAnswer` (Interview, Phone Screen, Withdrew) | `app/tracker/page.tsx` | ✅ |
 | T6 | Wire `OutcomeCard` component after terminal outcomes | `components/OutcomeCard.tsx` | ✅ |
-| T7 | `RoundsPrompt` bottom sheet after offer | to be created | ⬜ |
+| T7 | `RoundsPrompt` bottom sheet after offer | to be created | ✅ |
 
 ---
 
@@ -93,7 +93,7 @@ Fix = swap inline styles for the correct CSS classes + add missing structural el
 | # | Fix | Source | Status |
 |---|---|---|---|
 | F1 | Feed card border width: 3px (currently likely 1px) | globals.css | ✅ |
-| F2 | Outcome-specific emoji verification | index.html | ⬜ |
+| F2 | Outcome-specific emoji verification | index.html | ✅ |
 
 ---
 
@@ -123,7 +123,7 @@ Fix = swap inline styles for the correct CSS classes + add missing structural el
 | # | Fix | Source | Status |
 |---|---|---|---|
 | N1 | Scroll handler: add `nav-scrolled` class at scroll >10px | globals.css:88 | ✅ |
-| N2 | Nav-pills horizontal scroll mask gradient | globals.css | ⬜ |
+| N2 | Nav-pills horizontal scroll mask gradient | globals.css | ✅ |
 
 ---
 
