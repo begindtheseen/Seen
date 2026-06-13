@@ -288,7 +288,7 @@ export default function AdminPage() {
 
   return (
     <div className="page-full">
-      <div style={{ maxWidth: 1100, margin: '0 auto', padding: '2.5rem 2rem' }}>
+      <div className="admin-wrap" style={{ maxWidth: 1100, margin: '0 auto', padding: '2.5rem 2rem' }}>
 
         {/* Header */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
@@ -312,7 +312,7 @@ export default function AdminPage() {
 
         {/* Users KPIs */}
         <SectionHeader title="Users" />
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: '.75rem', marginBottom: '2rem' }}>
+        <div className="admin-g4">
           <StatBox n={stats.users.total.toLocaleString()} label="Total accounts" highlight />
           <StatBox n={stats.users.new_today} label="New today" />
           <StatBox n={stats.users.new_this_week} label="New this week" />
@@ -321,7 +321,7 @@ export default function AdminPage() {
 
         {/* Community KPIs */}
         <SectionHeader title="Community data" />
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: '.75rem', marginBottom: '2rem' }}>
+        <div className="admin-g4">
           <StatBox n={stats.reports.total.toLocaleString()} label="Total reports" highlight />
           <StatBox n={stats.reports.today} label="Reports today" />
           <StatBox n={stats.reports.this_week} label="Reports this week" />
@@ -330,7 +330,7 @@ export default function AdminPage() {
 
         {/* Application tracking KPIs */}
         <SectionHeader title="Application tracking" />
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: '.75rem', marginBottom: '2rem' }}>
+        <div className="admin-g4">
           <StatBox n={stats.applications.total.toLocaleString()} label="Apps tracked" />
           <StatBox n={stats.applications.ghosted_30d} label="Ghosted (30d)" />
           <StatBox n={stats.applications.hired_30d} label="Hired (30d)" />
@@ -355,7 +355,7 @@ export default function AdminPage() {
 
         {/* Jobs KPIs */}
         <SectionHeader title="Jobs" />
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: '.75rem', marginBottom: '2rem' }}>
+        <div className="admin-g4">
           <StatBox n={(stats.jobs?.active ?? 0).toLocaleString()} label="Active listings" highlight color="var(--blue)" />
           <StatBox n={stats.jobs?.new_today ?? 0} label="New today" highlight color="var(--green)" />
           <StatBox n={stats.jobs?.stale_or_expired ?? 0} label="Stale / expired" />
@@ -363,7 +363,7 @@ export default function AdminPage() {
         </div>
 
         {/* Reports chart + outcome breakdown */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.25rem', marginBottom: '2rem' }}>
+        <div className="admin-g2">
           <Card>
             <CardHeader title="Reports submitted (30d)" />
             <div style={{ display: 'flex', alignItems: 'flex-end', gap: 2, height: 80 }}>
@@ -411,7 +411,7 @@ export default function AdminPage() {
         </div>
 
         {/* Top reported + most researched */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.25rem', marginBottom: '2rem' }}>
+        <div className="admin-g2">
           <Card>
             <CardHeader title="Most reported companies (30d)" />
             <BarChart
@@ -516,7 +516,7 @@ export default function AdminPage() {
         {/* API Health */}
         <Card style={{ marginBottom: '1.25rem' }}>
           <CardHeader title="API health" />
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: '.75rem', marginBottom: '1rem' }}>
+          <div className="admin-g3">
             <StatBox n={stats.errors?.today ?? 0} label="Errors today" highlight={stats.errors?.today > 10} color="var(--red)" />
             <StatBox n={stats.errors?.this_week ?? 0} label="Errors this week" />
             <StatBox n={stats.users?.dau ?? 0} label="DAU" />

@@ -52,6 +52,7 @@ export default function Nav() {
           {isSeeker && <Link href="/resume" className={`ntab${isActive('/resume') ? ' active' : ''}`}>Resume AI</Link>}
           {isSeeker && <Link href="/tracker" className={`ntab${isActive('/tracker') ? ' active' : ''}`}>Track</Link>}
           <Link href="/pricing" className={`ntab${isActive('/pricing') ? ' active' : ''}`}>Pricing</Link>
+          <Link href="/admin" className={`ntab${isActive('/admin') ? ' active' : ''}`}>Admin</Link>
         </div>
 
         <div className="nav-right">

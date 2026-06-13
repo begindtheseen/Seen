@@ -858,3 +858,14 @@ nav.nav-scrolled{background:rgba(6,6,8,0.82);backdrop-filter:blur(60px) saturate
 }
 .surge-chip:hover{background:rgba(239,68,68,.16);border-color:rgba(239,68,68,.4)}
 .surge-chip-dot{width:5px;height:5px;border-radius:50%;background:var(--red);animation:pulse 1s infinite;flex-shrink:0}
+
+/* ── ADMIN RESPONSIVE GRIDS ── */
+.admin-g4{display:grid;grid-template-columns:repeat(4,1fr);gap:.75rem;margin-bottom:2rem}
+.admin-g2{display:grid;grid-template-columns:1fr 1fr;gap:1.25rem;margin-bottom:2rem}
+.admin-g3{display:grid;grid-template-columns:repeat(3,1fr);gap:.75rem;margin-bottom:1rem}
+@media(max-width:700px){
+  .admin-g4{grid-template-columns:repeat(2,1fr)}
+  .admin-g2{grid-template-columns:1fr}
+  .admin-g3{grid-template-columns:repeat(2,1fr)}
+  .admin-wrap{padding:1.25rem 1rem!important}
+}
