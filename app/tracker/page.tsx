@@ -246,7 +246,7 @@ export default function TrackerPage() {
   }
 
   if (!isLoggedIn || !isSeeker) return null
-  if (loading) return <div className="page"><div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '60vh' }}><div className="spinner" /></div></div>
+  if (loading) return <div className="page-full"><div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '60vh' }}><div className="spinner" /></div></div>
 
   const active = apps.filter(a => a.status === 'active')
   const ghosted = apps.filter(a => a.status === 'ghosted')
@@ -267,7 +267,7 @@ export default function TrackerPage() {
         onSkip={() => setRoundsApp(null)}
       />
     )}
-    <div className="page">
+    <div className="page-full">
       <div style={{ maxWidth: 1000, margin: '0 auto', padding: '2.5rem 2rem' }}>
 
         {/* Header */}

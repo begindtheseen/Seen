@@ -287,7 +287,7 @@ export default function AdminPage() {
   const needsReviewCount = (stats.reports.recent || []).filter(r => r.needs_review).length
 
   return (
-    <div style={{ minHeight: '100vh', background: 'radial-gradient(ellipse at 10% 0%,rgba(29,78,216,0.18) 0%,transparent 50%),radial-gradient(ellipse at 90% 10%,rgba(124,58,237,0.14) 0%,transparent 45%),radial-gradient(ellipse at 50% 100%,rgba(8,145,178,0.08) 0%,transparent 55%)' }}>
+    <div className="page-full">
       <div style={{ maxWidth: 1100, margin: '0 auto', padding: '2.5rem 2rem' }}>
 
         {/* Header */}

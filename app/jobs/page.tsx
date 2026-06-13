@@ -278,7 +278,7 @@ export default function JobsPage() {
   }
 
   return (
-    <div style={{ minHeight: '100vh', background: 'radial-gradient(ellipse at 80% 0%,rgba(16,185,129,0.06) 0%,transparent 45%),radial-gradient(ellipse at 15% 10%,rgba(29,78,216,0.07) 0%,transparent 40%)' }}>
+    <div className="page-full">
       <div className="jpage">
         <div className="jpage-hdr">
           <div style={{ fontFamily: 'var(--mono)', fontSize: '.52rem', textTransform: 'uppercase', letterSpacing: '.22em', color: 'var(--green)', marginBottom: '.6rem', display: 'flex', alignItems: 'center', gap: 12 }}>

@@ -157,8 +157,7 @@ export default function DashboardPage() {
 
   return (
     <div
-      className="page"
-      style={{ background: 'radial-gradient(ellipse at 18% 0%,rgba(29,78,216,0.1) 0%,transparent 48%),radial-gradient(ellipse at 82% 8%,rgba(124,58,237,0.07) 0%,transparent 42%)' }}
+      className="page-full"
     >
       <div style={{ maxWidth: 900, margin: '0 auto', padding: '1.5rem 1.25rem 3rem' }}>
 

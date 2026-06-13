@@ -198,7 +198,7 @@ export default function DemandPage() {
   }
 
   return (
-    <div style={{ minHeight: '100vh', background: 'radial-gradient(ellipse at 50% 0%,rgba(59,130,246,0.07) 0%,transparent 50%)' }}>
+    <div className="page-full">
       <div className="demand-page">
         {/* Header */}
         <div className="demand-hdr">

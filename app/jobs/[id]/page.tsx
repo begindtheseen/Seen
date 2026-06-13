@@ -128,7 +128,7 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
   // Direct-link / refresh fallback — job not in this session's cache
   if (resolved && !job) {
     return (
-      <div style={{ minHeight: '100vh', paddingTop: 58, background: 'radial-gradient(ellipse at 80% 0%,rgba(16,185,129,0.06) 0%,transparent 45%)' }}>
+      <div className="page-full">
         <div style={{ maxWidth: 720, margin: '0 auto', padding: '1.25rem 1rem 7rem' }}>
           {backBtn}
           <div style={{ background: 'var(--raised)', border: '1px solid var(--line2)', borderRadius: 12, padding: '1.5rem', textAlign: 'center' }}>
@@ -141,7 +141,7 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
     )
   }
 
-  if (!job) return <div style={{ minHeight: '100vh', paddingTop: 58 }}><div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '60vh' }}><div className="spinner" /></div></div>
+  if (!job) return <div className="page-full"><div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '60vh' }}><div className="spinner" /></div></div>
 
   const risk = Score.risk(job.score)
   const chips = [job.type, job.level, job.salary && job.salary !== '—' ? job.salary : ''].filter(Boolean) as string[]
@@ -149,7 +149,7 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
   const descParas = formatDesc(insights?.description_summary || job.description || '')
 
   return (
-    <div style={{ minHeight: '100vh', paddingTop: 58, background: 'radial-gradient(ellipse at 80% 0%,rgba(16,185,129,0.06) 0%,transparent 45%),radial-gradient(ellipse at 15% 10%,rgba(29,78,216,0.07) 0%,transparent 40%)' }}>
+    <div className="page-full">
       <div style={{ maxWidth: 720, margin: '0 auto', padding: '1.25rem 1rem 7rem' }}>
         {backBtn}
 

@@ -273,7 +273,7 @@ export default function ResumePage() {
   )
 
   return (
-    <div style={{ minHeight: '100vh' }}>
+    <div className="page-full">
       <div className="resume-page">
         <div className="resume-hdr">
           <div style={{ fontFamily: 'var(--mono)', fontSize: '.52rem', textTransform: 'uppercase', letterSpacing: '.22em', color: 'var(--blue)', marginBottom: '.6rem', display: 'flex', alignItems: 'center', gap: 12 }}>

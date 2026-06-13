@@ -117,7 +117,7 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
   const logoLetter = (companyName[0] || '?').toUpperCase()
 
   return (
-    <div style={{ minHeight: '100vh' }}>
+    <div className="page-full">
       <div style={{ maxWidth: 1000, margin: '0 auto', padding: '2.5rem 2rem' }}>
 
         {/* Header */}

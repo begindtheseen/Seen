@@ -78,7 +78,7 @@ export default function CompaniesPage() {
   )
 
   return (
-    <div style={{ minHeight: '100vh' }}>
+    <div className="page-full">
       <div style={{ maxWidth: 1100, margin: '0 auto', padding: '2.5rem 2rem' }}>
         <div style={{ fontFamily: 'var(--mono)', fontSize: '.52rem', textTransform: 'uppercase', letterSpacing: '.22em', color: 'var(--amber)', marginBottom: '.6rem', display: 'flex', alignItems: 'center', gap: 12 }}>
           <span style={{ width: 22, height: 1, background: 'var(--amber)', display: 'inline-block' }} />

@@ -109,7 +109,7 @@ export default function ProfilePage() {
   }
 
   return (
-    <div style={{ minHeight: '100vh' }}>
+    <div className="page-full">
       <div style={{ maxWidth: 620, margin: '0 auto', padding: '2.5rem 2rem' }}>
         <h1 style={{ fontFamily: 'var(--display)', fontSize: '1.75rem', fontWeight: 800, color: 'var(--white)', letterSpacing: '-.03em', marginBottom: '2rem' }}>
           Profile settings

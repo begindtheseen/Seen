@@ -95,7 +95,7 @@ export default function FeedPage() {
   const hasMore = offset + PAGE_SIZE < total
 
   return (
-    <div style={{ minHeight: '100vh' }}>
+    <div className="page-full">
       <div style={{ maxWidth: 720, margin: '0 auto', padding: '2.5rem 2rem' }}>
         {/* Header */}
         <div style={{ marginBottom: '1.75rem' }}>

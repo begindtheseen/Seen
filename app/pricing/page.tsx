@@ -65,7 +65,7 @@ export default function PricingPage() {
   }
 
   return (
-    <div style={{ minHeight: '100vh' }}>
+    <div className="page-full">
       <div style={{ maxWidth: 900, margin: '0 auto', padding: '4rem 2rem' }}>
         <div style={{ textAlign: 'center', marginBottom: '3rem' }}>
           <div style={{ fontFamily: 'var(--mono)', fontSize: '.52rem', textTransform: 'uppercase', letterSpacing: '.22em', color: 'var(--green)', marginBottom: '.6rem' }}>
