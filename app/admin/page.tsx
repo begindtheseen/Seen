@@ -55,7 +55,7 @@ function KpiCard({ l, n, sub, borderColor, numColor }: { l: string; n: string | 
   return (
     <div className="adm-kpi" style={borderColor ? { borderLeft: `2px solid ${borderColor}` } : undefined}>
       <div className="adm-kpi-l">{l}</div>
-      <div className="adm-kpi-n" style={numColor ? { color: numColor } : undefined}>{n}</div>
+      <div className="adm-kpi-n" style={{ fontSize: 'clamp(.85rem, 4vw, 1.8rem)', ...(numColor ? { color: numColor } : {}) }}>{n}</div>
       {sub && <div className="adm-kpi-sub">{sub}</div>}
     </div>
   )
@@ -282,7 +282,7 @@ export default function AdminPage() {
         </div>
         <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: '.75rem', marginBottom: '1.5rem' }}>
           <div>
-            <h1 style={{ fontFamily: 'var(--display)', fontSize: '2rem', fontWeight: 800, color: 'var(--white)', letterSpacing: '-.04em', lineHeight: 1.05, marginBottom: '.25rem' }}>Data flywheel</h1>
+            <h1 style={{ fontFamily: 'var(--display)', fontSize: 'clamp(1.35rem, 6vw, 2rem)', fontWeight: 800, color: 'var(--white)', letterSpacing: '-.04em', lineHeight: 1.05, marginBottom: '.25rem' }}>Data flywheel</h1>
             <p style={{ fontSize: '.8rem', color: 'var(--sub)', fontWeight: 300 }}>Last updated just now</p>
           </div>
           <div style={{ display: 'flex', gap: '.5rem', flexShrink: 0, flexWrap: 'wrap' }}>
