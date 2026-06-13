@@ -78,7 +78,7 @@ function SectionHeader({ title }: { title: string }) {
 
 function Card({ children, style }: { children: React.ReactNode; style?: React.CSSProperties }) {
   return (
-    <div className="adm-card" style={{ background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 12, padding: '1.25rem', ...style }}>
+    <div className="adm-card" style={{ background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 12, padding: '1.25rem', overflow: 'hidden', minWidth: 0, ...style }}>
       {children}
     </div>
   )
@@ -86,12 +86,12 @@ function Card({ children, style }: { children: React.ReactNode; style?: React.CS
 
 function CardHeader({ title, badge, action }: { title: string; badge?: React.ReactNode; action?: React.ReactNode }) {
   return (
-    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '.5rem' }}>
-        <span style={{ fontFamily: 'var(--mono)', fontSize: '.6rem', textTransform: 'uppercase', letterSpacing: '.1em', color: 'var(--dim)' }}>{title}</span>
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '.35rem', marginBottom: '.75rem' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '.5rem', minWidth: 0 }}>
+        <span style={{ fontFamily: 'var(--mono)', fontSize: '.6rem', textTransform: 'uppercase', letterSpacing: '.1em', color: 'var(--dim)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{title}</span>
         {badge}
       </div>
-      {action}
+      {action && <div style={{ flexShrink: 0, display: 'flex', gap: '.35rem', flexWrap: 'wrap' }}>{action}</div>}
     </div>
   )
 }
@@ -108,7 +108,7 @@ function BarChart({ items, max, color = 'var(--blue)' }: { items: { label: strin
     <div>
       {items.map(item => (
         <div key={item.label} style={{ display: 'flex', alignItems: 'center', gap: '.75rem', marginBottom: '.4rem' }}>
-          <span style={{ fontFamily: 'var(--mono)', fontSize: '.6rem', color: 'var(--dim)', width: 110, maxWidth: '40%', flexShrink: 0, textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>{item.label}</span>
+          <span style={{ fontFamily: 'var(--mono)', fontSize: '.6rem', color: 'var(--dim)', width: '30%', flexShrink: 0, textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>{item.label}</span>
           <div style={{ flex: 1, height: 5, background: 'var(--line2)', borderRadius: 3, overflow: 'hidden' }}>
             <div style={{ width: `${max > 0 ? (item.value / max) * 100 : 0}%`, height: '100%', background: color, borderRadius: 3 }} />
           </div>
@@ -288,7 +288,7 @@ export default function AdminPage() {
 
   return (
     <div className="page-full">
-      <div className="admin-wrap" style={{ maxWidth: 1100, margin: '0 auto', padding: '2.5rem 2rem' }}>
+      <div className="admin-wrap" style={{ maxWidth: 1100, margin: '0 auto', padding: '2.5rem 2rem', width: '100%', boxSizing: 'border-box' }}>
 
         {/* Header */}
         <div className="admin-head">
@@ -614,10 +614,10 @@ function JobRunner({ token }: { token: string }) {
       <CardHeader title="Background jobs" />
       <div style={{ display: 'flex', flexDirection: 'column', gap: '.5rem' }}>
         {JOB_DEFS.map(j => (
-          <div key={j.key} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '.6rem .75rem', background: 'var(--surface)', borderRadius: 8 }}>
-            <div>
-              <div style={{ fontFamily: 'var(--mono)', fontSize: '.65rem', color: 'var(--white)' }}>{j.name}</div>
-              <div style={{ fontFamily: 'var(--mono)', fontSize: '.55rem', color: 'var(--dim)' }}>{j.desc}</div>
+          <div key={j.key} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '.5rem', padding: '.6rem .75rem', background: 'var(--surface)', borderRadius: 8 }}>
+            <div style={{ minWidth: 0, overflow: 'hidden' }}>
+              <div style={{ fontFamily: 'var(--mono)', fontSize: '.65rem', color: 'var(--white)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{j.name}</div>
+              <div style={{ fontFamily: 'var(--mono)', fontSize: '.55rem', color: 'var(--dim)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{j.desc}</div>
             </div>
             <button
               onClick={() => run(j.key)}
@@ -1001,22 +1001,24 @@ function FlagsPanel({ flags, token, onRefresh }: { flags: FeatureFlag[]; token: 
         : flags.map(f => {
           const status = effectiveStatus(f)
           return (
-            <div key={f.flag_name} style={{ display: 'flex', alignItems: 'center', gap: '.65rem', padding: '.55rem 0', borderBottom: '1px solid var(--line2)' }}>
-              <div style={{ flex: 1, fontFamily: 'var(--mono)', fontSize: '.62rem', color: 'var(--white)' }}>
-                {f.flag_name}
-                {f.description && <div style={{ fontFamily: 'var(--mono)', fontSize: '.48rem', color: 'var(--dim)', marginTop: '.1rem' }}>{f.description}</div>}
+            <div key={f.flag_name} style={{ display: 'flex', alignItems: 'center', gap: '.5rem', padding: '.55rem 0', borderBottom: '1px solid var(--line2)', flexWrap: 'wrap' }}>
+              <div style={{ flex: 1, minWidth: 0, fontFamily: 'var(--mono)', fontSize: '.62rem', color: 'var(--white)', overflow: 'hidden' }}>
+                <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{f.flag_name}</div>
+                {f.description && <div style={{ fontFamily: 'var(--mono)', fontSize: '.48rem', color: 'var(--dim)', marginTop: '.1rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{f.description}</div>}
               </div>
-              <div style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', color: FLAG_STATUS_COLORS[status] || 'var(--muted)', whiteSpace: 'nowrap', marginRight: '.25rem' }}>
-                {saving === f.flag_name ? 'Saving…' : (FLAG_STATUS_LABELS[status] || status)}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '.35rem', flexShrink: 0 }}>
+                <div style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', color: FLAG_STATUS_COLORS[status] || 'var(--muted)', whiteSpace: 'nowrap' }}>
+                  {saving === f.flag_name ? 'Saving…' : (FLAG_STATUS_LABELS[status] || status)}
+                </div>
+                <select
+                  value={status}
+                  disabled={saving === f.flag_name}
+                  onChange={e => setFlag(f.flag_name, e.target.value)}
+                  style={{ background: 'var(--raised)', border: '1px solid var(--line2)', borderRadius: 5, padding: '.18rem .4rem', fontFamily: 'var(--mono)', fontSize: '.58rem', color: 'var(--sub)', cursor: 'pointer' }}
+                >
+                  {FLAG_STATUSES.map(s => <option key={s} value={s}>{FLAG_STATUS_LABELS[s]}</option>)}
+                </select>
               </div>
-              <select
-                value={status}
-                disabled={saving === f.flag_name}
-                onChange={e => setFlag(f.flag_name, e.target.value)}
-                style={{ background: 'var(--raised)', border: '1px solid var(--line2)', borderRadius: 5, padding: '.18rem .4rem', fontFamily: 'var(--mono)', fontSize: '.58rem', color: 'var(--sub)', cursor: 'pointer' }}
-              >
-                {FLAG_STATUSES.map(s => <option key={s} value={s}>{FLAG_STATUS_LABELS[s]}</option>)}
-              </select>
             </div>
           )
         })
