@@ -45,7 +45,7 @@ A page is COMPLETE only when: visual match + all old functionality + working API
 | Stat row (Active / Response rate / Ghosted / Hired) | ✅ | |
 | Health score panel | 🟡 | Exists; old version has a more detailed callout with `seekerHealthScore` |
 | Active applications list | ✅ | |
-| Alerts / follow-up prompts (`dashAlerts`) | ❌ | Old has a dedicated alerts panel with count badge |
+| Alerts / follow-up prompts (`dashAlerts`) | ✅ | Dynamic alerts panel: stale apps (flat >30d) + ghost-surge (Supabase `reports` read, graceful RLS fallback) + red count badge + "All clear ✓" empty state. "N checks due →" indicator added to greeting → `/tracker`. (Follow-up Q&A prompts themselves already live in the tracker.) |
 | Survey insight (`dashSurveyInsight`) | ❌ | Contextual prompt based on app history |
 | Benchmarks panel (`dashBenchmarks`) | ❌ | Industry comparison data |
 | Badges panel (`dashBadges`) | 🟡 | BadgeStore exists in lib; verify rendering |
@@ -54,7 +54,7 @@ A page is COMPLETE only when: visual match + all old functionality + working API
 | Sign out button on dashboard | 🟡 | Verify present |
 | "Find more jobs →" CTA | ✅ | |
 
-**Status: 🟡 — missing alerts panel, survey insight, benchmarks, pipeline insight**
+**Status: 🟡 — alerts panel + checks-due indicator DONE; still missing survey insight, benchmarks, pipeline insight**
 
 ---
 

@@ -59,8 +59,21 @@ Remaining admin work is cosmetic/optional only: §2 minor (`ready:false` N/A —
   (`openApplyModal`) not yet ported; (2) Tier A quick-preview modal intentionally skipped;
   (3) `/api/jobs` doesn't surface `availability_status`, so stale/expired warnings stay dormant.
 
+### Dashboard alerts/follow-ups — ✅ PORTED (this commit)
+- `app/dashboard/page.tsx` only. Added: "N checks due →" indicator in greeting → /tracker
+  (reads `EventStore.dueChecks(apps)`); dynamic Alerts panel replacing the static placeholder —
+  stale apps (flat >30d threshold, top 3, → /tracker) + ghost-surge alerts (anon `supabase`
+  read of public `reports`, ≥3 ghosted/7d for tracked companies, → /company/[slug], graceful
+  RLS/empty fallback to stale-only) + red count badge + "All clear ✓" empty state. Kept the
+  existing "Pro" email-alerts upsell footer row. No API/serverless changes.
+- NOTE: the Day 7/14/30 follow-up Q&A *prompts* were already ported in the **tracker**
+  (`app/tracker/page.tsx` CheckCard/handleCheckAnswer) — this task was the dashboard surfacing.
+- Follow-up gaps (tracker-side, tracked): tracker `handleCheckAnswer` omits old stage updates
+  (Interview/Phone Screen), the viral `showOutcomeCard`, offer `_showRoundsPrompt`, and the
+  "↩ I withdrew" outcome option.
+
 ### Next up (SITE_PARITY_CHECKLIST.md — Phase 2 IMPORTANT)
-- Dashboard alerts/follow-ups (Day 7/14/30), benchmarks, pipeline insight
+- Dashboard survey insight, benchmarks, pipeline insight (still missing)
 - Legal page completeness; account settings
 - Per-page functional audit (most pages 🟡 unverified)
 

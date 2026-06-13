@@ -4,10 +4,15 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { useAuth } from '@/lib/auth'
+import { supabase } from '@/lib/supabase'
 import { AppStore } from '@/lib/stores/AppStore'
 import { EventStore } from '@/lib/stores/EventStore'
 import { BadgeStore } from '@/lib/stores/BadgeStore'
 import type { Application } from '@/lib/types'
+
+function companySlug(name: string) {
+  return encodeURIComponent(name.toLowerCase().replace(/\s+/g, '-'))
+}
 
 function calcJobSearchHealth(apps: Application[]) {
   if (apps.length < 3) return null
@@ -24,6 +29,7 @@ export default function DashboardPage() {
   const { user, profile, isLoggedIn, isSeeker } = useAuth()
   const [apps, setApps] = useState<Application[]>([])
   const [loading, setLoading] = useState(true)
+  const [surges, setSurges] = useState<string[]>([])
 
   useEffect(() => {
     if (!isLoggedIn) { router.replace('/login'); return }
@@ -35,12 +41,41 @@ export default function DashboardPage() {
     AppStore.load(true).then(data => { setApps(data); setLoading(false) })
   }, [isLoggedIn])
 
+  // Ghost-surge alerts — read public reports via the anon client (parity: index.html:9447).
+  // Degrades gracefully (stale-only alerts) if the read is blocked by RLS or returns empty.
+  useEffect(() => {
+    if (!isLoggedIn || apps.length === 0) return
+    const tracked = [...new Set(apps.filter(a => a.status !== 'ghosted').map(a => a.company).filter(Boolean))].slice(0, 4)
+    if (!tracked.length) return
+    const cutoff = new Date(Date.now() - 7 * 86400000).toISOString()
+    ;(async () => {
+      try {
+        const { data, error } = await supabase
+          .from('reports').select('company_name').eq('outcome', 'ghosted').gte('created_at', cutoff).limit(300)
+        if (error || !data?.length) return
+        const counts: Record<string, number> = {}
+        for (const r of data as { company_name: string | null }[]) {
+          if (r.company_name) { const k = r.company_name.toLowerCase(); counts[k] = (counts[k] || 0) + 1 }
+        }
+        const found = tracked.filter(co => {
+          const ck = co.toLowerCase()
+          return Object.entries(counts).some(([k, c]) => (k.includes(ck) || ck.includes(k)) && c >= 3)
+        })
+        if (found.length) setSurges(found)
+      } catch { /* RLS / network — stale-only fallback */ }
+    })()
+  }, [isLoggedIn, apps])
+
   if (!isLoggedIn || !isSeeker) return null
   if (loading) return <div className="page"><div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '60vh' }}><div className="spinner" /></div></div>
 
   const active = apps.filter(a => a.status === 'active')
   const ghosted = apps.filter(a => a.status === 'ghosted')
   const hired = apps.filter(a => a.status === 'hired')
+  const dueChecks = EventStore.dueChecks(apps)
+  // Stale: active apps with no update for 30+ days (flat threshold — no per-company wait data client-side)
+  const staleApps = active.filter(a => Math.floor((Date.now() - a.appliedAt) / 86400000) > 30)
+  const alertCount = staleApps.length + surges.length
   const allEvents = EventStore.get()
   const badges = BadgeStore.compute(apps, allEvents)
   const health = calcJobSearchHealth(apps)
@@ -71,6 +106,17 @@ export default function DashboardPage() {
             </h1>
             <p style={{ fontSize: '.8rem', color: 'var(--sub)', fontWeight: 300, marginBottom: '.75rem' }}>
               {active.length ? `You have ${active.length} active application${active.length !== 1 ? 's' : ''}.` : "No applications tracked yet. Hit 'Apply' on any job."}
+              {dueChecks.length > 0 && (
+                <>
+                  {' '}
+                  <button
+                    onClick={() => router.push('/tracker')}
+                    style={{ background: 'none', border: 'none', padding: 0, fontFamily: 'inherit', fontSize: 'inherit', color: 'var(--amber)', cursor: 'pointer' }}
+                  >
+                    {dueChecks.length} check{dueChecks.length > 1 ? 's' : ''} due →
+                  </button>
+                </>
+              )}
             </p>
           </div>
         </div>
@@ -158,9 +204,50 @@ export default function DashboardPage() {
         {/* Alerts */}
         <div style={{ background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 12, overflow: 'hidden', marginBottom: '1.25rem' }}>
           <div style={{ padding: '.85rem 1.1rem', borderBottom: '1px solid var(--line)', fontFamily: 'var(--display)', fontSize: '.82rem', fontWeight: 700, color: 'var(--white)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            Alerts
+            <span>Alerts</span>
+            {alertCount > 0 && (
+              <span style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', background: 'var(--rdim)', color: 'var(--red)', border: '1px solid #ff3b5c28', borderRadius: 100, padding: '.1rem .45rem' }}>{alertCount}</span>
+            )}
           </div>
-          <div style={{ padding: '.85rem 1.1rem', fontFamily: 'var(--mono)', fontSize: '.65rem', color: 'var(--muted)', textAlign: 'center' }}>All clear ✓</div>
+
+          {alertCount === 0 ? (
+            <div style={{ padding: '.85rem 1.1rem', fontFamily: 'var(--mono)', fontSize: '.65rem', color: 'var(--muted)', textAlign: 'center' }}>All clear ✓</div>
+          ) : (
+            <div>
+              {/* Ghost-surge alerts first (parity: prepended in old) */}
+              {surges.map(co => (
+                <button
+                  key={`surge-${co}`}
+                  onClick={() => router.push(`/company/${companySlug(co)}`)}
+                  style={{ width: '100%', textAlign: 'left', padding: '.65rem 1.1rem', borderBottom: '1px solid var(--line)', display: 'flex', alignItems: 'flex-start', gap: '.55rem', cursor: 'pointer', background: 'rgba(239,68,68,.04)', border: 'none', borderTop: 'none', borderLeft: 'none', borderRight: 'none' }}
+                >
+                  <span style={{ fontSize: '.75rem', flexShrink: 0 }}>👻</span>
+                  <span>
+                    <span style={{ display: 'block', fontSize: '.75rem', fontWeight: 500, color: 'var(--red)', marginBottom: '.1rem' }}>{co} — ghost surge</span>
+                    <span style={{ display: 'block', fontFamily: 'var(--mono)', fontSize: '.6rem', color: 'var(--muted)' }}>3+ ghost reports this week · check before you follow up</span>
+                  </span>
+                </button>
+              ))}
+              {/* Stale application alerts (top 3) */}
+              {staleApps.slice(0, 3).map(a => {
+                const days = Math.floor((Date.now() - a.appliedAt) / 86400000)
+                return (
+                  <button
+                    key={`stale-${a.id}`}
+                    onClick={() => router.push('/tracker')}
+                    style={{ width: '100%', textAlign: 'left', padding: '.65rem 1.1rem', borderBottom: '1px solid var(--line)', display: 'flex', alignItems: 'flex-start', gap: '.55rem', cursor: 'pointer', background: 'none', border: 'none' }}
+                  >
+                    <span style={{ color: 'var(--amber)', fontSize: '.75rem', flexShrink: 0 }}>⚠</span>
+                    <span>
+                      <span style={{ display: 'block', fontSize: '.75rem', fontWeight: 500, color: 'var(--text)', marginBottom: '.1rem' }}>{a.company} — {a.role}</span>
+                      <span style={{ display: 'block', fontFamily: 'var(--mono)', fontSize: '.6rem', color: 'var(--muted)' }}>{days}d no update · past expected window</span>
+                    </span>
+                  </button>
+                )
+              })}
+            </div>
+          )}
+
           <div style={{ padding: '.65rem 1.1rem', borderTop: '1px solid var(--line)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '.75rem', background: 'rgba(239,68,68,.03)' }}>
             <div style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', color: 'var(--muted)', lineHeight: 1.55 }}>👻 Get <strong style={{ color: 'var(--text)' }}>ghost surge email alerts</strong> before you apply</div>
             <button style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', color: 'var(--white)', background: 'rgba(239,68,68,.18)', border: '1px solid rgba(239,68,68,.3)', borderRadius: 100, padding: '.22rem .65rem', cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0 }}>Pro →</button>
