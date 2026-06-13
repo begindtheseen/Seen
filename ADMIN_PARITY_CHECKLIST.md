@@ -107,8 +107,8 @@ The current GET handler (lines 132–254) returns `reports: {total, today, this_
 - **Old source**: HTML 2601–2610 (`#admIssuesList`, `#admIssueCount`, `#admIssuesRefreshBtn`); `adminLoadIssues(issueData)` 7108–7166; `adminActIssue(id, action, btn)` 7168–7190. (User-side submission modal `reportIssue`/`submitIssue` 7044–7105 posts to `/api/reports` — out of admin scope but feeds this queue.)
 - **API calls**: GET → `issues.items` (open `user_issues`, limit 20); refresh button re-fetches full GET; POST `resolve_issue` / `dismiss_issue` `{id}`.
 - **UI elements**: red count badge; per-issue type badge (`wrong_data`/`duplicate`/`broken_listing`/`spam`/`other`, CSS 828–833), target name, notes, relative age; **Resolve** (green) / **Dismiss** buttons (row fades and is removed, badge decremented); duplicate-type issues get an extra **"Open in merge tool ↓"** button that prefills the merge form via `adminSetMerge(target, '')`.
-- **Status in Next.js**: ❌ missing.
-- **Files to change**: `app/admin/page.tsx`
+- **Status in Next.js**: ✅ **ported** (recovery branch). `IssueRow` component: type badge with parity colors, target name, notes, relative age, red count badge in header, Refresh button, Resolve/Dismiss actions (row → "✓ Resolved"/"✓ Dismissed" then refetch). Verifies `d.ok`. ⏳ The duplicate-type "Open in merge tool ↓" button is deferred to §11 (merge tool not built yet) — code comment marks the wire point.
+- **Files to change**: `app/admin/page.tsx` ✅ done
 
 ### 11. Company deduplication (scan, auto-merge, manual merge)
 - **Old source**: HTML 2612–2642 (`#admMergePanel`, `#admScanBtn`, `#admAutoMergeBtn`, `#admMergePrimary`, `#admMergeSecondary`, `#admMergeStatus`, `#admDupesList`); `adminScanDupes` 6776–6809; `adminSetMerge` 6811–6817; `adminManualMerge` 6819–6841; `adminAutoMerge` 6843–6870.
@@ -167,7 +167,7 @@ The current GET handler (lines 132–254) returns `reports: {total, today, this_
 | 7 | Recent tracker applications | ❌ | S |
 | 8 | Recent jobs browser (period tabs) | ❌ | M |
 | 9 | Reported inactive listings (remove/keep) | ❌ | M |
-| 10 | Data quality issues queue | ❌ | M |
+| 10 | Data quality issues queue | ✅ (merge-tool prefill deferred to §11) | M |
 | 11 | Company dedup (scan/auto/manual merge) | ❌ (+ API contract drift) | L |
 | 12 | Feature flags | ❌ | M |
 | 13 | Duplicate account clusters | ❌ | M |

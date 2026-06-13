@@ -127,6 +127,16 @@ function stageColor(s: string) {
   return 'var(--dim)'
 }
 
+const ISSUE_TYPE_LABEL: Record<string, string> = {
+  wrong_data: 'Wrong data', duplicate: 'Duplicate', broken_listing: 'Broken listing', spam: 'Spam', other: 'Other',
+}
+function issueBadgeColor(type: string) {
+  if (type === 'wrong_data') return 'var(--amber)'
+  if (type === 'duplicate' || type === 'spam') return 'var(--red)'
+  if (type === 'broken_listing') return 'var(--sub)'
+  return 'var(--dim)'
+}
+
 const TOKEN_KEY = 'admin_token'
 
 export default function AdminPage() {
@@ -430,6 +440,23 @@ export default function AdminPage() {
           }
         </Card>
 
+        {/* Data quality issues queue */}
+        <Card style={{ marginBottom: '1.25rem' }}>
+          <CardHeader
+            title="Data quality issues"
+            badge={stats.issues?.open > 0 ? <Badge n={stats.issues.open} /> : undefined}
+            action={
+              <button onClick={() => token && load(token)} style={{ fontFamily: 'var(--mono)', fontSize: '.55rem', padding: '.3rem .75rem', borderRadius: 6, border: '1px solid var(--line2)', background: 'transparent', color: 'var(--sub)', cursor: 'pointer' }}>↻ Refresh</button>
+            }
+          />
+          {(stats.issues?.items || []).length === 0
+            ? <div style={{ fontFamily: 'var(--mono)', fontSize: '.62rem', color: 'var(--green)' }}>✓ No open issues</div>
+            : (stats.issues.items || []).map(issue => (
+              <IssueRow key={issue.id} issue={issue} token={token!} onRefresh={() => load(token!)} />
+            ))
+          }
+        </Card>
+
         {/* API Health */}
         <Card style={{ marginBottom: '1.25rem' }}>
           <CardHeader title="API health" />
@@ -511,6 +538,56 @@ function ReportRow({ report: r, token, onRefresh }: { report: RecentReport; toke
           <button onClick={() => act('investigate_report')} disabled={acting} title="Investigate" style={{ background: 'var(--amber)', border: 'none', borderRadius: 5, width: 26, height: 26, color: '#fff', fontSize: '.75rem', cursor: 'pointer' }}>?</button>
           <button onClick={() => act('deny_hiring_report')} disabled={acting} title="Deny" style={{ background: 'var(--red)', border: 'none', borderRadius: 5, width: 26, height: 26, color: '#fff', fontSize: '.75rem', cursor: 'pointer' }}>✗</button>
         </div>
+      </div>
+    </div>
+  )
+}
+
+function IssueRow({ issue, token, onRefresh }: { issue: Issue; token: string; onRefresh: () => void }) {
+  const [acting, setActing] = useState(false)
+  const [done, setDone] = useState<'resolve' | 'dismiss' | null>(null)
+  const color = issueBadgeColor(issue.type)
+
+  async function act(action: 'resolve_issue' | 'dismiss_issue') {
+    setActing(true)
+    try {
+      const res = await fetch('/api/admin-stats', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Admin-Token': token },
+        body: JSON.stringify({ action, id: issue.id }),
+      })
+      const d = await res.json()
+      if (!d.ok) throw new Error(d.error || res.status)
+      setDone(action === 'resolve_issue' ? 'resolve' : 'dismiss')
+      setTimeout(onRefresh, 1000)
+    } catch (e) {
+      setActing(false)
+      alert('Error: ' + (e as Error).message)
+    }
+  }
+
+  if (done) return (
+    <div style={{ padding: '.65rem 0', borderBottom: '1px solid var(--line2)', opacity: 0.4, fontFamily: 'var(--mono)', fontSize: '.6rem', color: done === 'resolve' ? 'var(--green)' : 'var(--dim)' }}>
+      {done === 'resolve' ? '✓ Resolved' : '✓ Dismissed'} — {issue.target_name || ISSUE_TYPE_LABEL[issue.type] || issue.type}
+    </div>
+  )
+
+  return (
+    <div style={{ display: 'flex', alignItems: 'flex-start', gap: '.65rem', padding: '.65rem 0', borderBottom: '1px solid var(--line2)' }}>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '.4rem', flexWrap: 'wrap', marginBottom: '.2rem' }}>
+          <span style={{ fontFamily: 'var(--mono)', fontSize: '.48rem', textTransform: 'uppercase', letterSpacing: '.1em', padding: '.18rem .5rem', borderRadius: 4, flexShrink: 0, color, background: color + '1f' }}>
+            {ISSUE_TYPE_LABEL[issue.type] || issue.type}
+          </span>
+          {issue.target_name && <span style={{ fontFamily: 'var(--mono)', fontSize: '.6rem', color: 'var(--white)', fontWeight: 600 }}>{issue.target_name}</span>}
+          <span style={{ fontFamily: 'var(--mono)', fontSize: '.5rem', color: 'var(--dim)', marginLeft: 'auto', flexShrink: 0 }}>{relTime(issue.created_at)}</span>
+        </div>
+        {issue.notes && <div style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', color: 'var(--sub)', lineHeight: 1.5, marginTop: '.18rem' }}>{issue.notes}</div>}
+        {/* NOTE: duplicate-type "Open in merge tool" button wired when §11 company-dedup lands */}
+      </div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '.3rem', flexShrink: 0 }}>
+        <button onClick={() => act('resolve_issue')} disabled={acting} style={{ fontFamily: 'var(--mono)', fontSize: '.52rem', padding: '.22rem .6rem', borderRadius: 5, border: '1px solid rgba(16,185,129,.3)', background: 'rgba(16,185,129,.08)', color: 'var(--green)', cursor: 'pointer' }}>Resolve</button>
+        <button onClick={() => act('dismiss_issue')} disabled={acting} style={{ fontFamily: 'var(--mono)', fontSize: '.52rem', padding: '.22rem .6rem', borderRadius: 5, border: '1px solid var(--line2)', background: 'transparent', color: 'var(--dim)', cursor: 'pointer' }}>Dismiss</button>
       </div>
     </div>
   )

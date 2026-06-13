@@ -19,7 +19,7 @@ Last updated: 2026-06-13 (Session C, recovery)
 2. `Sync package-lock.json version to 0.1.1`
 
 ### Admin sections remaining (priority order — see ADMIN_PARITY_CHECKLIST.md)
-- §10 Data quality issues queue (resolve/dismiss)
+- ✅ §10 Data quality issues queue (resolve/dismiss) — ported; merge-tool prefill deferred to §11
 - §9 Reported inactive listings (remove_listing/deny_report + confirm)
 - §8 Recent jobs browser (period tabs, get_recent_jobs)
 - §12 Feature flags (set_flag/seed_flags)
