@@ -7,6 +7,43 @@
 
 ---
 
+## ✅ PHASE 1 ADMIN — COMPLETE (2026-06-13)
+
+All 16 admin sections + auth ported. API regressions restored (chart, top_companies,
+outcome_breakdown, company_lookups.top). Contract drift resolved (merge names/ids, auto_merge groups).
+See ADMIN_PARITY_CHECKLIST.md milestone table. 10 commits, build green, ahead 10 / behind 0, unmerged.
+
+## ▶ NEXT — ranked site-wide parity gaps (drives the next phase)
+
+### CRITICAL — missing user-facing functionality
+- **Job detail route + AI insights** — `app/jobs/[id]/page.tsx` does NOT exist. Old `page-job-detail`
+  (index.html:2274–2293) + `openJobListing` (11213) renders header, "WHAT [CO] IS HIRING FOR" AI panel
+  (`/api/job-insights`, L1 localStorage 24h + L2 DB 7d cache, costs 1 credit on miss, needs Bearer token),
+  "ABOUT THIS ROLE" AI summary, report placeholder, sticky footer (Check company / Save / Apply).
+  `/api/job-insights` is referenced NOWHERE in the Next.js app → AI insights entirely inaccessible.
+  Architecture decided: a sessionStorage `JobCache` (Next.js equivalent of old global `JOBS` array)
+  populated by `/jobs` search results; detail route looks up job by id. Source already extracted (see handoff).
+
+### IMPORTANT — missing workflows / routes / API behaviors (verify each against origin/main)
+- Dashboard alerts/follow-up prompts (Day 7/14/30) — `#dashAlerts` (core data-acquisition loop), missing.
+- Dashboard benchmarks + pipeline insight — `#dashBenchmarks`, `#dashPipelineInsight`, missing.
+- Account settings (dashboard ⚙ `openAccountSettings`) — verify presence.
+- Legal page (`app/legal/page.tsx` 68 lines) — likely truncated vs index.html:2064–2108.
+- Per-page functional audit (jobs filters/sort/pagination, tracker follow-up system + outcome cards,
+  company profile reports/research, feed filters, report submission flow, resume optimize, demand charts,
+  profile change-password/delete, employer.html content) — all 🟡 unverified in SITE_PARITY_CHECKLIST.md.
+
+### COSMETIC — design regressions (Phase 2/3)
+- Glow/glass system, neon borders, gradient backgrounds — audit `app/globals.css` vs index.html stylesheet.
+- Dashboard density, original spacing, typography hierarchy.
+- Mobile layouts at 375px across all pages.
+- Page transition animations (`fadeIn`/`fadeUp`).
+
+**Rule for next phase:** work CRITICAL → IMPORTANT → COSMETIC. Extract from source, port, build,
+update SITE_PARITY_CHECKLIST.md, commit. Do not merge/deploy without owner approval.
+
+---
+
 ## Session context
 
 - Live site: seenjobs.io serves from `next-migration` (deployed via `npx vercel --prod` from owner's Mac)

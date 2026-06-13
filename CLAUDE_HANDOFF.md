@@ -32,6 +32,19 @@ Last updated: 2026-06-13 (Session C, recovery)
 **MILESTONE: Admin parity 16/16 sections functionally complete.** Auth (login/logout/401/403) complete.
 Remaining admin work is cosmetic/optional only: §2 minor (`ready:false` N/A — done), §16 (credits/set_pro/audit viewer — API-only, missing in old too, NOT a parity blocker).
 
+### Preview-deploy readiness (as of admin milestone)
+- **Safe for PREVIEW?** Yes — `npm run build` passes (19 routes); all admin changes are additive;
+  the one API change (`admin-stats.js`) only ADDS GET fields + widens `merge` input (back-compatible).
+  No user-facing page was modified in the admin sprint. Do NOT promote to production without owner sign-off.
+- **Risks remaining:** admin sections are code-verified but NOT runtime-tested against a live admin
+  session + Supabase (no creds in this env). Need to confirm: login bootstrap, X-Admin-Token round-trip,
+  each POST action against real tables, reddit_import sequential calls, and that the restored GET
+  aggregations match real data volumes (chart query caps at 2000 rows / 30d; top_searched at 500).
+- **Admin functionality still needing live testing:** all 16 sections end-to-end, especially
+  destructive/role-gated ones (merge, remove_listing, set_flag, detect_duplicates, job runners).
+- **User-facing parity NOT yet restored** (next phase): Job detail route + AI insights (still missing),
+  plus the page-by-page audit in SITE_PARITY_CHECKLIST.md (most pages 🟡 unverified).
+
 ### Next up (per PRIORITY ORDER — Phase 1 items 11–12, then site pages)
 - Job detail page route (`app/jobs/[id]`) — MISSING; old `page-job-detail` (index.html:2274–2293)
 - AI job insights (`/api/job-insights`) — inaccessible without job detail route

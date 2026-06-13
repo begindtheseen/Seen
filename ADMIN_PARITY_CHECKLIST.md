@@ -1,5 +1,41 @@
 # Admin Parity Checklist
 
+## ✅ MILESTONE 2026-06-13 — Admin parity 16/16 functionally complete
+
+All 16 admin sections + auth (login/logout/401/403) are ported on
+`claude/seenjobs-next-migration-recovery-ia9w59`. `npm run build` passes.
+Branch is ahead 10 / behind 0 vs `next-migration`. NOT merged, NOT deployed.
+
+| # | Section | Status | Implemented in |
+|---|---------|--------|----------------|
+| — | Auth (login/logout/401/403) | ✅ Complete | `app/admin/page.tsx` (admin_logout POST, 403→re-login) |
+| 1 | Header (refresh/sign out/updated-at) | ✅ Complete | `app/admin/page.tsx` |
+| 2 | KPI boxes (users/community/apps) | ✅ Complete | `app/admin/page.tsx` (incl. `ready:false`→N/A) |
+| 3 | Jobs KPI row | ✅ Complete | `app/admin/page.tsx` |
+| 4 | search_logs setup note | ✅ Complete | `app/admin/page.tsx` |
+| 5 | Chart / top reported / researched / outcomes | ✅ Complete | `api/admin-stats.js` (GET payload) + `app/admin/page.tsx` |
+| 6 | Recent hiring reports + moderation (✓/?/✗) | ✅ Complete | `app/admin/page.tsx` (`ReportRow`) |
+| 7 | Recent tracker applications | ✅ Complete | `app/admin/page.tsx` |
+| 8 | Recent jobs browser (period tabs) | ✅ Complete | `app/admin/page.tsx` (`RecentJobsBrowser`) |
+| 9 | Reported inactive listings (remove/keep) | ✅ Complete | `app/admin/page.tsx` (`InactiveRow`) |
+| 10 | Data quality issues queue | ✅ Complete | `app/admin/page.tsx` (`IssueRow`) |
+| 11 | Company dedup (scan/auto/manual merge) | ✅ Complete | `app/admin/page.tsx` (`MergePanel`) + `api/admin-stats.js` (drift fixed) |
+| 12 | Feature flags | ✅ Complete | `app/admin/page.tsx` (`FlagsPanel`) |
+| 13 | Duplicate account clusters | ✅ Complete | `app/admin/page.tsx` (`ClustersPanel`) |
+| 14 | API Health | ✅ Complete | `app/admin/page.tsx` |
+| 15 | Background job runner | ✅ Complete | `app/admin/page.tsx` (`JobRunner`) |
+| 16 | Credits/set_pro/audit viewer | ⚪ Optional — API-only, **absent in old too** (NOT a parity blocker) | — |
+
+**Restored API regressions (all confirmed in GET response, `api/admin-stats.js`):**
+`reports.chart` ✅ · `reports.top_companies` ✅ · `reports.outcome_breakdown` ✅ · `company_lookups.top` ✅
+**Resolved contract drift:** `merge` accepts names OR ids + returns `merged_report_count`; `auto_merge` returns `groups[]`.
+
+**Remaining admin gaps:** none that are parity blockers. §16 (credits KPI / set_pro tool / audit-log
+viewer) is optional net-new tooling that never existed in old production. Live functional testing
+against a real admin session + Supabase is still recommended before production (see handoff).
+
+---
+
 Feature-parity audit of the admin dashboard: old production SPA (`/tmp/old/index.html`, 13,354 lines) vs the Next.js port (`/home/user/Seen/app/admin/page.tsx`, 266 lines) and the live backend (`/home/user/Seen/api/admin-stats.js`, 506 lines).
 Verified source ranges: admin HTML `index.html:2402–2716` (`div id="page-admin"`), admin CSS `index.html:795–833` (`.adm-*`, `.issue-*`), `AdminSession` helper `index.html:2835–2844`, login show/hide helpers `index.html:6392–6406`, admin JS `index.html:6408–7217`, nav hook `index.html:9729` (`if(page==='admin')renderAdminPage()`), deep-link `index.html:12921` (`#admin`).
 
