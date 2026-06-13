@@ -50,6 +50,14 @@ export default function DashboardPage() {
   const [apps, setApps] = useState<Application[]>([])
   const [loading, setLoading] = useState(true)
   const [surges, setSurges] = useState<string[]>([])
+  const [recentCos, setRecentCos] = useState<Array<{name: string; slug: string}>>([])
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem('seen_recent_cos')
+      if (raw) setRecentCos(JSON.parse(raw).slice(0, 5))
+    } catch {}
+  }, [])
 
   useEffect(() => {
     if (!isLoggedIn) { router.replace('/login'); return }
@@ -275,6 +283,22 @@ export default function DashboardPage() {
             <div className="dstat-n" style={{ color: 'var(--green)' }}>{hired.length}</div>
           </div>
         </div>
+
+        {/* Recently checked companies */}
+        {recentCos.length > 0 && (
+          <div style={{ marginBottom: '1.5rem' }}>
+            <div style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', textTransform: 'uppercase', letterSpacing: '.1em', color: 'var(--dim)', marginBottom: '.6rem' }}>
+              Recently checked
+            </div>
+            <div style={{ display: 'flex', gap: '.5rem', flexWrap: 'wrap' }}>
+              {recentCos.map((co, i) => (
+                <a key={i} href={`/company/${co.slug}`} style={{ fontFamily: 'var(--mono)', fontSize: '.65rem', background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 7, padding: '.3rem .75rem', color: 'var(--sub)', textDecoration: 'none', transition: 'border-color .15s' }}>
+                  {co.name}
+                </a>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Active applications */}
         <div style={{ marginBottom: '1.25rem' }}>

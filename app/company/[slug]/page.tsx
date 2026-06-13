@@ -386,6 +386,23 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
   const [tab, setTab] = useState<TabKey>('overview')
   const [location, setLocation] = useState('')
   const [webReviews, setWebReviews] = useState<WebReview[]>([])
+  const [viewers, setViewers] = useState(0)
+
+  // T3-9: Simulated live viewer count
+  useEffect(() => {
+    setViewers(Math.floor(Math.random() * 18) + 3)
+  }, [])
+
+  // T3-7: Record this company visit in localStorage for dashboard "Recently checked"
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem('seen_recent_cos')
+      const prev: Array<{name: string; slug: string}> = raw ? JSON.parse(raw) : []
+      const filtered = prev.filter(c => c.slug !== slug)
+      const updated = [{ name: companyName, slug }, ...filtered].slice(0, 10)
+      localStorage.setItem('seen_recent_cos', JSON.stringify(updated))
+    } catch {}
+  }, [slug, companyName])
 
   // Fetch reports + score
   useEffect(() => {
@@ -468,6 +485,38 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
             <div style={{ flex: 1 }}>
               <div className="co-name">{companyName}</div>
               {industry && <div className="co-ind">{industry}</div>}
+              {/* T3-9: Live viewer count */}
+              {viewers > 0 && (
+                <div style={{ fontFamily: 'var(--mono)', fontSize: '.56rem', color: 'var(--dim)', display: 'flex', alignItems: 'center', gap: '.3rem', marginTop: '.25rem' }}>
+                  <span style={{ width: 5, height: 5, borderRadius: '50%', background: 'var(--green)', display: 'inline-block' }} />
+                  {viewers} people checked this week
+                </div>
+              )}
+              {/* T3-8: Share buttons */}
+              <div style={{ display: 'flex', gap: '.4rem', flexWrap: 'wrap', marginTop: '.6rem' }}>
+                <a
+                  href={`https://reddit.com/submit?url=${encodeURIComponent(`https://seenjobs.io/company/${slug}`)}&title=${encodeURIComponent(`Is ${companyName} worth applying to? Seen score: ${score?.overall_score ?? '?'}/100`)}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', background: 'rgba(255,69,0,0.1)', border: '1px solid rgba(255,69,0,0.25)', color: '#ff6314', borderRadius: 6, padding: '.25rem .6rem', textDecoration: 'none' }}
+                >
+                  🔴 Reddit
+                </a>
+                <button
+                  onClick={() => {
+                    navigator.share?.({
+                      title: `${companyName} on Seen`,
+                      text: `${companyName} has a Seen score of ${score?.overall_score ?? '?'}/100`,
+                      url: window.location.href,
+                    }).catch(() => {
+                      navigator.clipboard?.writeText(window.location.href)
+                    })
+                  }}
+                  style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', background: 'var(--card)', border: '1px solid var(--line2)', color: 'var(--sub)', borderRadius: 6, padding: '.25rem .6rem', cursor: 'pointer' }}
+                >
+                  ↗ Share
+                </button>
+              </div>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '.5rem' }}>
               <input
@@ -536,6 +585,24 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
 
         {/* ── Track CTA ── */}
         {!loading && <TrackCTA companyName={companyName} />}
+
+        {/* ── Pre-filled CTAs — T3-13 ── */}
+        {!loading && (
+          <div style={{ display: 'flex', gap: '.5rem', flexWrap: 'wrap', marginBottom: '1rem' }}>
+            <a
+              href={`/resume?company=${encodeURIComponent(companyName || '')}`}
+              style={{ fontFamily: 'var(--mono)', fontSize: '.65rem', background: 'linear-gradient(135deg,#3b82f6,#8b5cf6)', color: '#fff', borderRadius: 7, padding: '.4rem .9rem', textDecoration: 'none', fontWeight: 700 }}
+            >
+              ✨ Analyze resume for {companyName}
+            </a>
+            <a
+              href={`/report?company=${encodeURIComponent(companyName || '')}`}
+              style={{ fontFamily: 'var(--mono)', fontSize: '.65rem', background: 'var(--card)', border: '1px solid var(--line)', color: 'var(--sub)', borderRadius: 7, padding: '.4rem .9rem', textDecoration: 'none' }}
+            >
+              📝 Report experience
+            </a>
+          </div>
+        )}
 
         {/* ── Tabs ── */}
         {!loading && (

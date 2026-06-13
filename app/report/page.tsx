@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 
 type Outcome = 'ghosted' | 'autoreject' | 'human' | 'waiting' | ''
 type Stage = 'application' | 'phone' | 'interview' | 'final' | ''
@@ -91,6 +91,20 @@ export default function ReportPage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [done, setDone] = useState(false)
+  const [recentReports, setRecentReports] = useState<Array<{id:string;outcome:string;company_name?:string;role?:string;created_at:string}>>([])
+
+  useEffect(() => {
+    fetch('/api/reports', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'feed', limit: 5, offset: 0 }),
+    })
+      .then(r => r.json())
+      .then((d: { reports?: Array<{id:string;outcome:string;company_name?:string;role?:string;created_at:string}> }) => {
+        if (d.reports?.length) setRecentReports(d.reports)
+      })
+      .catch(() => {})
+  }, [])
 
   async function submit() {
     if (!company.trim() || !role.trim() || !location.trim()) {
@@ -182,9 +196,23 @@ export default function ReportPage() {
         <h1 style={{ fontFamily: 'var(--display)', fontSize: '1.75rem', fontWeight: 800, color: 'var(--white)', letterSpacing: '-.03em', marginBottom: '.25rem' }}>
           Report your experience
         </h1>
-        <p style={{ color: 'var(--sub)', fontSize: '.82rem', fontWeight: 300, marginBottom: '2rem' }}>
+        <p style={{ color: 'var(--sub)', fontSize: '.82rem', fontWeight: 300, marginBottom: '1.5rem' }}>
           Takes 60 seconds. Helps thousands of job seekers tonight. 100% anonymous.
         </p>
+
+        {/* Step progress indicator */}
+        {(() => { const step = outcome ? 2 : 1; return (
+          <div style={{ display: 'flex', gap: '.5rem', marginBottom: '1.5rem', alignItems: 'center' }}>
+            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '.3rem' }}>
+              <div style={{ height: 3, background: 'var(--blue)', borderRadius: 2, width: '100%' }} />
+              <div style={{ fontFamily: 'var(--mono)', fontSize: '.52rem', color: 'var(--blue)', fontWeight: 700 }}>The listing</div>
+            </div>
+            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '.3rem' }}>
+              <div style={{ height: 3, background: step >= 2 ? 'var(--blue)' : 'var(--line2)', borderRadius: 2, width: '100%' }} />
+              <div style={{ fontFamily: 'var(--mono)', fontSize: '.52rem', color: step >= 2 ? 'var(--blue)' : 'var(--dim)' }}>What happened</div>
+            </div>
+          </div>
+        )})()}
 
         {error && (
           <div style={{ background: 'var(--rdim)', border: '1px solid rgba(239,68,68,0.25)', borderRadius: 8, padding: '.72rem 1rem', fontFamily: 'var(--mono)', fontSize: '.72rem', color: 'var(--red)', marginBottom: '1rem' }}>
@@ -309,6 +337,26 @@ export default function ReportPage() {
             100% anonymous · No account required · No personal data stored
           </p>
         </div>
+
+        {recentReports.length > 0 && (
+          <div style={{ marginTop: '2.5rem', borderTop: '1px solid var(--line)', paddingTop: '1.5rem' }}>
+            <div style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', textTransform: 'uppercase', letterSpacing: '.1em', color: 'var(--dim)', marginBottom: '1rem' }}>
+              Recent community reports
+            </div>
+            {recentReports.map(r => (
+              <div key={r.id} style={{ background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 8, padding: '.75rem 1rem', marginBottom: '.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '1rem' }}>
+                <div>
+                  <div style={{ fontFamily: 'var(--mono)', fontSize: '.68rem', color: 'var(--white)', fontWeight: 600 }}>{r.outcome}</div>
+                  {r.company_name && <div style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', color: 'var(--blue)', marginTop: '.15rem' }}>@ {r.company_name}</div>}
+                  {r.role && <div style={{ fontFamily: 'var(--mono)', fontSize: '.56rem', color: 'var(--dim)', marginTop: '.1rem' }}>{r.role}</div>}
+                </div>
+                <span style={{ fontFamily: 'var(--mono)', fontSize: '.52rem', color: 'var(--muted)', flexShrink: 0 }}>
+                  {new Date(r.created_at).toLocaleDateString()}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   )

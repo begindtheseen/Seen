@@ -111,6 +111,11 @@ export default function ProfilePage() {
   return (
     <div className="page-full">
       <div style={{ maxWidth: 620, margin: '0 auto', padding: '2.5rem 2rem' }}>
+        <div style={{ marginBottom: '1.25rem' }}>
+          <a href="/dashboard" style={{ fontFamily: 'var(--mono)', fontSize: '.65rem', color: 'var(--sub)', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '.35rem' }}>
+            ← Dashboard
+          </a>
+        </div>
         <h1 style={{ fontFamily: 'var(--display)', fontSize: '1.75rem', fontWeight: 800, color: 'var(--white)', letterSpacing: '-.03em', marginBottom: '2rem' }}>
           Profile settings
         </h1>

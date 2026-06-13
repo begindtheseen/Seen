@@ -75,14 +75,17 @@ function ResumeInput({
   resumeMeta,
   onUpload,
   onClear,
+  onFileDrop,
 }: {
   resumeText: string
   setResumeText: (t: string) => void
   resumeMeta: { fileName: string; wordCount: number } | null
   onUpload: (e: React.ChangeEvent<HTMLInputElement>) => void
   onClear: () => void
+  onFileDrop: (file: File) => void
 }) {
   const fileRef = useRef<HTMLInputElement>(null)
+  const [isDragging, setIsDragging] = useState(false)
 
   return (
     <div>
@@ -106,13 +109,30 @@ function ResumeInput({
           ✓ {resumeMeta.fileName} · {resumeMeta.wordCount} words saved
         </div>
       ) : (
-        <textarea
-          placeholder="Paste your resume text here..."
-          value={resumeText}
-          onChange={e => setResumeText(e.target.value)}
-          rows={8}
-          style={areaStyle}
-        />
+        <div
+          onDragOver={(e) => { e.preventDefault(); setIsDragging(true) }}
+          onDragLeave={() => setIsDragging(false)}
+          onDrop={(e) => {
+            e.preventDefault()
+            setIsDragging(false)
+            const file = e.dataTransfer.files[0]
+            if (file) onFileDrop(file)
+          }}
+          style={{
+            border: isDragging ? '2px dashed var(--blue)' : '2px dashed var(--line2)',
+            background: isDragging ? 'rgba(59,130,246,0.05)' : 'transparent',
+            borderRadius: 8,
+            transition: 'all .15s',
+          }}
+        >
+          <textarea
+            placeholder="Paste your resume text here, or drag & drop a PDF/Word file..."
+            value={resumeText}
+            onChange={e => setResumeText(e.target.value)}
+            rows={8}
+            style={{ ...areaStyle, border: 'none', background: 'transparent' }}
+          />
+        </div>
       )}
     </div>
   )
@@ -156,9 +176,7 @@ export default function ResumePage() {
     })
   }, [user?.id, isLoggedIn])
 
-  async function handleUpload(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0]
-    if (!file) return
+  async function uploadFile(file: File) {
     const reader = new FileReader()
     reader.onload = async (ev) => {
       const b64 = (ev.target?.result as string).split(',')[1]
@@ -184,6 +202,12 @@ export default function ResumePage() {
       }
     }
     reader.readAsDataURL(file)
+  }
+
+  async function handleUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    await uploadFile(file)
   }
 
   function clearResume() {
@@ -268,6 +292,7 @@ export default function ResumePage() {
       setResumeText={setResumeText}
       resumeMeta={resumeMeta}
       onUpload={handleUpload}
+      onFileDrop={uploadFile}
       onClear={clearResume}
     />
   )

@@ -141,6 +141,23 @@ export default function CompaniesPage() {
                       {co.name}
                       {co.verified && <span style={{ marginLeft: '.3rem', color: 'var(--green)', fontSize: '.55rem' }}>✓</span>}
                     </div>
+                    {co.industry && (
+                      <div style={{ fontFamily: 'var(--mono)', fontSize: '.52rem', color: 'var(--dim)', marginTop: '.15rem', letterSpacing: '.03em' }}>
+                        {co.industry}
+                      </div>
+                    )}
+                    <div style={{ display: 'flex', gap: '.3rem', flexWrap: 'wrap', marginTop: '.25rem', marginBottom: '.2rem' }}>
+                      {co.score.ghost_rate > 0 && (
+                        <span style={{ fontFamily: 'var(--mono)', fontSize: '.5rem', background: co.score.ghost_rate > 0.5 ? 'rgba(239,68,68,0.12)' : 'rgba(245,158,11,0.1)', color: co.score.ghost_rate > 0.5 ? 'var(--red)' : 'var(--amber)', border: `1px solid ${co.score.ghost_rate > 0.5 ? 'rgba(239,68,68,0.25)' : 'rgba(245,158,11,0.2)'}`, borderRadius: 4, padding: '.1rem .35rem' }}>
+                          {Math.round(co.score.ghost_rate * 100)}% ghost
+                        </span>
+                      )}
+                      {co.score.response_rate > 0 && (
+                        <span style={{ fontFamily: 'var(--mono)', fontSize: '.5rem', background: 'rgba(16,185,129,0.08)', color: 'var(--green)', border: '1px solid rgba(16,185,129,0.2)', borderRadius: 4, padding: '.1rem .35rem' }}>
+                          {Math.round(co.score.response_rate * 100)}% response
+                        </span>
+                      )}
+                    </div>
                     {co.score.waste > 0 && (
                       <div className="ldr-waste">⚠ {co.score.waste}% waste risk</div>
                     )}
