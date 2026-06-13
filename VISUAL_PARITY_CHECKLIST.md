@@ -15,8 +15,8 @@ Fix = swap inline styles for the correct CSS classes + add missing structural el
 
 | # | Fix | CSS/Location | Status |
 |---|---|---|---|
-| G1 | Add `<div className="aurora"><div className="aurora-3" /></div>` to root layout | `app/layout.tsx` | ⬜ |
-| G2 | Nav scroll handler: add `nav-scrolled` class on scroll >10px | `components/Nav.tsx` | ⬜ |
+| G1 | Add `<div className="aurora"><div className="aurora-3" /></div>` to root layout | `app/layout.tsx` | ✅ |
+| G2 | Nav scroll handler: add `nav-scrolled` class on scroll >10px | `components/Nav.tsx` | ✅ |
 | G3 | Nav-pills mask gradient on horizontal scroll | `components/Nav.tsx` | ⬜ |
 
 ---
@@ -28,7 +28,7 @@ Fix = swap inline styles for the correct CSS classes + add missing structural el
 | H1 | Replace inline cosmos bg with `className="aurora"` | globals.css:57 | ⬜ |
 | H2 | Add `.vfeed-panel` with corner tick marks | globals.css:664-682 | ⬜ |
 | H3 | Add `.vfeed-live` pulsing indicator | globals.css:680 | ⬜ |
-| H4 | Apply `grad-text` to hero headline words | globals.css:83 | ⬜ |
+| H4 | Apply `grad-text` to hero headline words | globals.css:83 | ✅ |
 | H5 | Word-slam animations on hero text (`.hw.in-l`, `.hw.in-r`) | index.html hero JS | ⬜ |
 | H6 | `.hero-terminal` glass panel on right side | globals.css:225 | ⬜ |
 | H7 | Entrance animations: `fadeUp` with stagger on sections | globals.css:43 | ⬜ |
@@ -39,7 +39,7 @@ Fix = swap inline styles for the correct CSS classes + add missing structural el
 
 | # | Fix | Source | Status |
 |---|---|---|---|
-| J1 | Job card entrance stagger: `animation: fadeUp .4s ${i*0.06}s ease both` | globals.css:43 | ⬜ |
+| J1 | Job card entrance stagger: `animation: fadeUp .4s ${i*0.06}s ease both` | globals.css:43 | ✅ |
 | J2 | Suggestion/proposal chips visual styling | globals.css | ⬜ |
 
 ---
@@ -48,7 +48,7 @@ Fix = swap inline styles for the correct CSS classes + add missing structural el
 
 | # | Fix | Source | Status |
 |---|---|---|---|
-| JD1 | Apply `hero-terminal` class to job header card | globals.css:225 | ⬜ |
+| JD1 | Apply `hero-terminal` class to job header card | globals.css:225 | ✅ |
 | JD2 | Waste score panel with `.rdim` red tint | globals.css | ⬜ |
 | JD3 | Status bar with pulsing blue indicator | index.html ~L5900 | ⬜ |
 
@@ -58,9 +58,9 @@ Fix = swap inline styles for the correct CSS classes + add missing structural el
 
 | # | Fix | Source | Status |
 |---|---|---|---|
-| C1 | Grid: 5-col → 3-col → 2-col (`.ldr-grid`) responsive | globals.css | ⬜ |
-| C2 | Waste badge (`.ldr-waste`) below company name | globals.css | ⬜ |
-| C3 | Live "updated" indicator | index.html | ⬜ |
+| C1 | Grid: 5-col → 3-col → 2-col (`.ldr-grid`) responsive | globals.css | ✅ |
+| C2 | Waste badge (`.ldr-waste`) below company name | globals.css | ✅ |
+| C3 | Live "updated" indicator | index.html | ✅ |
 
 ---
 
@@ -78,9 +78,9 @@ Fix = swap inline styles for the correct CSS classes + add missing structural el
 
 | # | Fix | Source | Status |
 |---|---|---|---|
-| T1 | Funnel visualization — apply `.funnel`, `.funnel-stage`, `.funnel-bar-fill` | globals.css:167 | ⬜ |
-| T2 | Funnel bar color-coding (blue/amber/red/green per stage) | globals.css:171 | ⬜ |
-| T3 | Ghost-note `.funnel-ghost-note` in red italic | globals.css:173 | ⬜ |
+| T1 | Funnel visualization — apply `.funnel`, `.funnel-stage`, `.funnel-bar-fill` | globals.css:167 | ✅ |
+| T2 | Funnel bar color-coding (blue/amber/red/green per stage) | globals.css:171 | ✅ |
+| T3 | Ghost-note `.funnel-ghost-note` in red italic | globals.css:173 | ✅ |
 | T4 | "I withdrew" option in outcome_check answers | `app/tracker/page.tsx` | ⬜ |
 | T5 | Stage transitions in `handleCheckAnswer` (Interview, Phone Screen, Withdrew) | `app/tracker/page.tsx` | ⬜ |
 | T6 | Wire `OutcomeCard` component after terminal outcomes | `components/OutcomeCard.tsx` | ⬜ |
@@ -92,7 +92,7 @@ Fix = swap inline styles for the correct CSS classes + add missing structural el
 
 | # | Fix | Source | Status |
 |---|---|---|---|
-| F1 | Feed card border width: 3px (currently likely 1px) | globals.css | ⬜ |
+| F1 | Feed card border width: 3px (currently likely 1px) | globals.css | ✅ |
 | F2 | Outcome-specific emoji verification | index.html | ⬜ |
 
 ---
@@ -110,11 +110,11 @@ Fix = swap inline styles for the correct CSS classes + add missing structural el
 
 | # | Fix | Source | Status |
 |---|---|---|---|
-| A1 | Background gradient (blue/purple radial) | index.html | ⬜ |
-| A2 | KPI cards: colored borders + glow shadows per type | index.html | ⬜ |
-| A3 | Report cards: outcome-based left border 3px | globals.css | ⬜ |
-| A4 | Section separators: stronger visual grouping | index.html | ⬜ |
-| A5 | Full admin visual redo — premium control center feel | index.html | ⬜ |
+| A1 | Background gradient (blue/purple radial) | index.html | ✅ |
+| A2 | KPI cards: colored borders + glow shadows per type | index.html | ✅ |
+| A3 | Report cards: outcome-based left border 3px | globals.css | ✅ |
+| A4 | Section separators: stronger visual grouping | index.html | ✅ |
+| A5 | Full admin visual redo — premium control center feel | index.html | 🟡 |
 
 ---
 
@@ -122,7 +122,7 @@ Fix = swap inline styles for the correct CSS classes + add missing structural el
 
 | # | Fix | Source | Status |
 |---|---|---|---|
-| N1 | Scroll handler: add `nav-scrolled` class at scroll >10px | globals.css:88 | ⬜ |
+| N1 | Scroll handler: add `nav-scrolled` class at scroll >10px | globals.css:88 | ✅ |
 | N2 | Nav-pills horizontal scroll mask gradient | globals.css | ⬜ |
 
 ---

@@ -84,9 +84,14 @@ export default function CompaniesPage() {
           <span style={{ width: 22, height: 1, background: 'var(--amber)', display: 'inline-block' }} />
           Hiring transparency · scoreboard
         </div>
-        <h1 style={{ fontFamily: 'var(--display)', fontSize: '2rem', fontWeight: 800, color: 'var(--white)', letterSpacing: '-.03em', marginBottom: '.25rem' }}>
-          Company scores
-        </h1>
+        <div style={{ display: 'flex', alignItems: 'baseline', gap: '1rem', flexWrap: 'wrap', marginBottom: '.25rem' }}>
+          <h1 style={{ fontFamily: 'var(--display)', fontSize: '2rem', fontWeight: 800, color: 'var(--white)', letterSpacing: '-.03em', margin: 0 }}>
+            Company scores
+          </h1>
+          <span className="co-live" style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', color: 'var(--green)', display: 'flex', alignItems: 'center', gap: '.35rem' }}>
+            Updated from community reports
+          </span>
+        </div>
         <p style={{ color: 'var(--sub)', fontSize: '.82rem', fontWeight: 300, marginBottom: '1.5rem' }}>
           Ranked by how well companies actually treat applicants.
         </p>
@@ -117,57 +122,31 @@ export default function CompaniesPage() {
             {search ? 'No companies match that search.' : 'No company data yet. Be the first to submit a report.'}
           </div>
         ) : (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,1fr)', gap: '.75rem' }}>
+          <div className="ldr-grid">
             {filtered.map((co, i) => {
               const risk = Score.risk(co.score.overall_score)
               const g = grade(co.score.overall_score)
-              const logoLetter = (co.name[0] || '?').toUpperCase()
+              const fillPct = Math.max(4, co.score.overall_score)
+              const fillColor = risk === 'safe' ? 'var(--green)' : risk === 'warn' ? 'var(--amber)' : 'var(--red)'
               return (
                 <a
                   key={co.id || co.name}
                   href={`/company/${encodeURIComponent(co.name.toLowerCase().replace(/\s+/g, '-'))}`}
-                  style={{ textDecoration: 'none' }}
+                  style={{ textDecoration: 'none', animation: `fadeUp .4s ${Math.min(i, 14) * 0.04}s ease both` }}
                 >
-                  <div style={{ background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 12, padding: '1.1rem 1.25rem', cursor: 'pointer', transition: 'background .15s', position: 'relative' }} className={risk}>
-                    <div style={{ position: 'absolute', top: '.6rem', left: '.7rem', fontFamily: 'var(--mono)', fontSize: '.55rem', color: 'var(--muted)' }}>#{i + 1}</div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '.75rem', flex: 1, minWidth: 0 }}>
-                      <div className="jrc-logo">{logoLetter}</div>
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontFamily: 'var(--display)', fontSize: '.9rem', fontWeight: 700, color: 'var(--white)', letterSpacing: '-.01em' }}>
-                          {co.name}
-                          {co.verified && <span className="co-verified" style={{ marginLeft: '.4rem', fontSize: '.52rem', padding: '.1rem .4rem' }}>✓</span>}
-                        </div>
-                        {co.industry && <div style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', color: 'var(--muted)' }}>{co.industry}</div>}
-                      </div>
-                      <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                        <div style={{ fontFamily: 'var(--mono)', fontSize: '1.75rem', fontWeight: 500, color: risk === 'safe' ? 'var(--green)' : risk === 'warn' ? 'var(--amber)' : 'var(--red)', lineHeight: 1 }}>{g}</div>
-                        <div style={{ fontFamily: 'var(--mono)', fontSize: '.52rem', color: 'var(--muted)' }}>{co.score.overall_score}/100</div>
-                      </div>
+                  <div className="ldr-item">
+                    <div className="ldr-rank">#{i + 1}</div>
+                    <div className={`ldr-score ${risk}`}>{g}</div>
+                    <div className="ldr-name">
+                      {co.name}
+                      {co.verified && <span style={{ marginLeft: '.3rem', color: 'var(--green)', fontSize: '.55rem' }}>✓</span>}
                     </div>
-                    <div style={{ display: 'flex', gap: '1rem', marginTop: '.6rem', paddingTop: '.6rem', borderTop: '1px solid var(--line)' }}>
-                      <div style={{ textAlign: 'center' }}>
-                        <div style={{ fontFamily: 'var(--mono)', fontSize: '.72rem', color: co.score.ghost_rate > 0.5 ? 'var(--red)' : 'var(--sub)' }}>
-                          {Math.round(co.score.ghost_rate * 100)}%
-                        </div>
-                        <div style={{ fontFamily: 'var(--mono)', fontSize: '.5rem', color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '.06em' }}>Ghost</div>
-                      </div>
-                      <div style={{ textAlign: 'center' }}>
-                        <div style={{ fontFamily: 'var(--mono)', fontSize: '.72rem', color: 'var(--sub)' }}>
-                          {Math.round(co.score.response_rate * 100)}%
-                        </div>
-                        <div style={{ fontFamily: 'var(--mono)', fontSize: '.5rem', color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '.06em' }}>Response</div>
-                      </div>
-                      <div style={{ textAlign: 'center' }}>
-                        <div style={{ fontFamily: 'var(--mono)', fontSize: '.72rem', color: 'var(--sub)' }}>
-                          {co.score.avg_wait_days}d
-                        </div>
-                        <div style={{ fontFamily: 'var(--mono)', fontSize: '.5rem', color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '.06em' }}>Wait</div>
-                      </div>
-                      <div style={{ textAlign: 'center', marginLeft: 'auto' }}>
-                        <div style={{ fontFamily: 'var(--mono)', fontSize: '.6rem', color: 'var(--muted)' }}>
-                          {co.score.report_count} report{co.score.report_count !== 1 ? 's' : ''}
-                        </div>
-                      </div>
+                    {co.score.waste > 0 && (
+                      <div className="ldr-waste">⚠ {co.score.waste}% waste risk</div>
+                    )}
+                    <div className="ldr-label">{co.score.overall_score}/100 · {co.score.report_count}r</div>
+                    <div className="ldr-bar">
+                      <div className="ldr-fill" style={{ width: `${fillPct}%`, background: fillColor }} />
                     </div>
                   </div>
                 </a>
