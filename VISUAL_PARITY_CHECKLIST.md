@@ -25,7 +25,7 @@ Fix = swap inline styles for the correct CSS classes + add missing structural el
 
 | # | Fix | Source | Status |
 |---|---|---|---|
-| H1 | Replace inline cosmos bg with `className="aurora"` | globals.css:57 | ⬜ |
+| H1 | Replace inline cosmos bg with `className="aurora"` | globals.css:57 | ✅ |
 | H2 | Add `.vfeed-panel` with corner tick marks | globals.css:664-682 | ⬜ |
 | H3 | Add `.vfeed-live` pulsing indicator | globals.css:680 | ⬜ |
 | H4 | Apply `grad-text` to hero headline words | globals.css:83 | ✅ |
