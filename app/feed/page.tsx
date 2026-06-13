@@ -111,6 +111,17 @@ export default function FeedPage() {
           </p>
         </div>
 
+        {/* CTA strip — T2-2 */}
+        <div style={{ background: 'rgba(16,185,129,.05)', border: '1px solid rgba(16,185,129,.2)', borderRadius: 10, padding: '.85rem 1.1rem', marginBottom: '1.25rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem', flexWrap: 'wrap' }}>
+          <div>
+            <div style={{ fontFamily: 'var(--display)', fontSize: '.82rem', fontWeight: 700, color: 'var(--white)', marginBottom: '.1rem' }}>Had a notable experience?</div>
+            <div style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', color: 'var(--sub)' }}>Takes 60 seconds. Helps thousands of job seekers tonight.</div>
+          </div>
+          <a href="/report" style={{ flexShrink: 0, display: 'inline-block', background: 'var(--green)', border: 'none', borderRadius: 7, padding: '.45rem 1rem', fontFamily: 'var(--mono)', fontWeight: 700, fontSize: '.65rem', color: '#fff', textDecoration: 'none', whiteSpace: 'nowrap' }}>
+            Submit report →
+          </a>
+        </div>
+
         {/* Filters */}
         <div style={{ display: 'flex', gap: '.4rem', flexWrap: 'wrap', marginBottom: '1.5rem' }}>
           {FILTERS.map(f => (

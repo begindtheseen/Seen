@@ -315,6 +315,7 @@ export default function ResumePage() {
                 <textarea placeholder="Paste the job description..." value={scanJD} onChange={e => setScanJD(e.target.value)} rows={5} style={{ ...areaStyle, marginBottom: '.75rem' }} />
                 <button style={{ ...btnPrimary, opacity: loading ? 0.6 : 1, cursor: loading ? 'not-allowed' : 'pointer' }} onClick={runScanner} disabled={loading}>
                   {loading && tool === 'scanner' ? 'Analyzing...' : 'Scan resume →'}
+                  <span style={{ marginLeft: '.5rem', fontSize: '.55rem', opacity: .65, fontFamily: 'var(--mono)', fontWeight: 400 }}>· 1 credit</span>
                 </button>
               </div>
             </div>
@@ -347,6 +348,7 @@ export default function ResumePage() {
                 <textarea placeholder="What draws you to this role? Any unique experience?" value={coachBackground} onChange={e => setCoachBackground(e.target.value)} rows={3} style={{ ...areaStyle, marginBottom: '.75rem' }} />
                 <button style={{ ...btnPrimary, opacity: loading ? 0.6 : 1, cursor: loading ? 'not-allowed' : 'pointer' }} onClick={runCoach} disabled={loading}>
                   {loading && tool === 'coach' ? 'Building playbook...' : 'Get advantage playbook →'}
+                  <span style={{ marginLeft: '.5rem', fontSize: '.55rem', opacity: .65, fontFamily: 'var(--mono)', fontWeight: 400 }}>· 1 credit</span>
                 </button>
               </div>
             </div>
@@ -379,6 +381,7 @@ export default function ResumePage() {
                 <textarea placeholder="Briefly describe your most relevant experience for this role..." value={propBackground} onChange={e => setPropBackground(e.target.value)} rows={3} style={{ ...areaStyle, marginBottom: '.75rem' }} />
                 <button style={{ ...btnPrimary, opacity: loading ? 0.6 : 1, cursor: loading ? 'not-allowed' : 'pointer' }} onClick={runProposal} disabled={loading}>
                   {loading && tool === 'proposal' ? 'Generating proposal...' : 'Generate 30/60/90-day plan →'}
+                  <span style={{ marginLeft: '.5rem', fontSize: '.55rem', opacity: .65, fontFamily: 'var(--mono)', fontWeight: 400 }}>· 1 credit</span>
                 </button>
               </div>
             </div>
