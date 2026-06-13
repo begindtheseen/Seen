@@ -21,7 +21,7 @@ Last updated: 2026-06-13 (Session C, recovery)
 ### Admin sections remaining (priority order — see ADMIN_PARITY_CHECKLIST.md)
 - ✅ §10 Data quality issues queue (resolve/dismiss) — ported; merge-tool prefill deferred to §11
 - ✅ §9 Reported inactive listings (remove_listing/deny_report + confirm) — ported
-- §8 Recent jobs browser (period tabs, get_recent_jobs)
+- ✅ §8 Recent jobs browser (period tabs, get_recent_jobs) — ported (lazy load, 401/403 re-login)
 - §12 Feature flags (set_flag/seed_flags)
 - §13 Duplicate account clusters (update_cluster/detect_duplicates_by_signals)
 - §11 Company deduplication (find_duplicates/merge/auto_merge — has API contract drift)

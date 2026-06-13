@@ -40,6 +40,10 @@ interface InactiveReport {
 interface DupCluster {
   id: string; risk_score: number; status: string; signals: string[]
 }
+interface RecentJob {
+  id: string; company: string; title: string; city: string; url: string
+  apply_url: string; created_at: string; availability_status: string; source: string
+}
 interface FeatureFlag {
   flag_name: string; status: string; percentage: number | null; description: string
 }
@@ -440,6 +444,9 @@ export default function AdminPage() {
           }
         </Card>
 
+        {/* New job listings browser */}
+        <RecentJobsBrowser token={token!} onUnauthorized={() => { sessionStorage.removeItem(TOKEN_KEY); setToken(null); setStats(null); setLoginError('Session expired') }} />
+
         {/* Reported inactive listings */}
         <Card style={{ marginBottom: '1.25rem' }}>
           <CardHeader
@@ -656,5 +663,89 @@ function InactiveRow({ report: r, token }: { report: InactiveReport; token: stri
         </div>
       </div>
     </div>
+  )
+}
+
+const PERIOD_LABELS: Record<string, string> = { today: 'today', week: 'this week', month: 'this month' }
+function availColor(a: string) {
+  if (a === 'active') return 'var(--green)'
+  if (a === 'stale') return 'var(--amber)'
+  if (a === 'expired') return 'var(--red)'
+  if (a === 'removed') return 'var(--dim)'
+  return 'var(--sub)'
+}
+
+function RecentJobsBrowser({ token, onUnauthorized }: { token: string; onUnauthorized: () => void }) {
+  const [period, setPeriod] = useState<string | null>(null)
+  const [jobs, setJobs] = useState<RecentJob[]>([])
+  const [total, setTotal] = useState(0)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
+
+  async function loadPeriod(p: string) {
+    setPeriod(p)
+    setLoading(true)
+    setError('')
+    try {
+      const res = await fetch('/api/admin-stats', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Admin-Token': token },
+        body: JSON.stringify({ action: 'get_recent_jobs', period: p }),
+      })
+      if (res.status === 401 || res.status === 403) { onUnauthorized(); return }
+      const d = await res.json()
+      if (!d.ok) throw new Error(d.error || res.status)
+      setJobs(d.jobs || [])
+      setTotal(d.total ?? (d.jobs || []).length)
+    } catch (e) {
+      setError((e as Error).message)
+    }
+    setLoading(false)
+  }
+
+  const tabStyle = (p: string) => ({
+    fontFamily: 'var(--mono)', fontSize: '.55rem', padding: '.28rem .65rem', borderRadius: 6,
+    border: `1px solid ${period === p ? 'var(--blue)' : 'var(--line2)'}`,
+    background: period === p ? 'rgba(59,130,246,.15)' : 'transparent',
+    color: period === p ? 'var(--blue)' : 'var(--sub)', cursor: 'pointer',
+  } as React.CSSProperties)
+
+  return (
+    <Card style={{ marginBottom: '1.25rem' }}>
+      <CardHeader
+        title={`New job listings${period ? ` — ${total} ${PERIOD_LABELS[period] || ''}` : ''}`}
+        action={
+          <div style={{ display: 'flex', gap: '.35rem' }}>
+            <button onClick={() => loadPeriod('today')} style={tabStyle('today')}>Today</button>
+            <button onClick={() => loadPeriod('week')} style={tabStyle('week')}>This Week</button>
+            <button onClick={() => loadPeriod('month')} style={tabStyle('month')}>This Month</button>
+          </div>
+        }
+      />
+      {!period && <div style={{ fontFamily: 'var(--mono)', fontSize: '.62rem', color: 'var(--dim)' }}>Click a period above to load listings.</div>}
+      {period && loading && <div style={{ fontFamily: 'var(--mono)', fontSize: '.62rem', color: 'var(--dim)' }}>Loading…</div>}
+      {period && !loading && error && <div style={{ fontFamily: 'var(--mono)', fontSize: '.62rem', color: 'var(--red)' }}>✗ {error}</div>}
+      {period && !loading && !error && jobs.length === 0 && <div style={{ fontFamily: 'var(--mono)', fontSize: '.62rem', color: 'var(--dim)' }}>No new listings for this period.</div>}
+      {period && !loading && !error && jobs.map(j => {
+        const url = j.apply_url || j.url || ''
+        const avail = j.availability_status || 'active'
+        return (
+          <div key={j.id} style={{ display: 'flex', alignItems: 'center', gap: '.75rem', padding: '.5rem 0', borderBottom: '1px solid var(--line2)' }}>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontFamily: 'var(--mono)', fontSize: '.62rem', color: 'var(--white)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {j.title || '—'} · <span style={{ color: 'var(--sub)' }}>{j.company || '—'}</span>
+              </div>
+              <div style={{ fontFamily: 'var(--mono)', fontSize: '.52rem', color: 'var(--dim)', marginTop: '.1rem' }}>
+                {j.city || ''} · {j.source || '—'} · <span style={{ color: availColor(avail) }}>{avail}</span>
+              </div>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '.5rem', flexShrink: 0 }}>
+              <span style={{ fontFamily: 'var(--mono)', fontSize: '.52rem', color: 'var(--dim)' }}>{relTime(j.created_at)}</span>
+              {url && <a href={url} target="_blank" rel="noopener noreferrer" style={{ fontFamily: 'var(--mono)', fontSize: '.55rem', color: 'var(--blue)', textDecoration: 'none' }}>↗</a>}
+            </div>
+          </div>
+        )
+      })}
+    </Card>
   )
 }

@@ -93,8 +93,8 @@ The current GET handler (lines 132–254) returns `reports: {total, today, this_
 - **Old source**: HTML 2575–2588 (`#admJobsList`, `#admJobsListCount`, `.adm-period-btn`); `adminLoadRecentJobs(period, clickedBtn)` 6931–6983.
 - **API calls**: POST `get_recent_jobs` `{period: 'today'|'week'|'month'}`.
 - **UI elements**: 3 tab buttons (active tab styled blue), count label "— N today", rows of title · company / city · source · availability status (colored: active green, stale amber, expired red, removed dim), relative age, "↗" external link to `apply_url || url`. Handles 401 by forcing re-login. Lazy: nothing loads until a tab is clicked.
-- **Status in Next.js**: ❌ missing.
-- **Files to change**: `app/admin/page.tsx`
+- **Status in Next.js**: ✅ **ported** (recovery branch). `RecentJobsBrowser` component: 3 period tabs (active = blue), header count "— N {period}", per-row title · company / city · source · availability (parity colors), relative age, "↗" link to `apply_url||url`. Lazy — nothing loads until a tab is clicked; POSTs `get_recent_jobs {period}`; 401/403 → `onUnauthorized` forces re-login. Verifies `d.ok`.
+- **Files to change**: `app/admin/page.tsx` ✅ done
 
 ### 9. Reported inactive listings (remove listing / keep active)
 - **Old source**: HTML 2590–2599 (`#admInactiveList`, `#admInactiveCount`); render JS 6668–6698; `adminRemoveListing` 6985–7004; `adminDenyReport` 7006–7023.
@@ -165,7 +165,7 @@ The current GET handler (lines 132–254) returns `reports: {total, today, this_
 | 5 | Chart / top reported / researched / outcomes | 🟡 UI exists, API fields missing | M (API + UI) |
 | 6 | Recent hiring reports + moderation (✓/?/✗) | ❌ | M |
 | 7 | Recent tracker applications | ❌ | S |
-| 8 | Recent jobs browser (period tabs) | ❌ | M |
+| 8 | Recent jobs browser (period tabs) | ✅ | M |
 | 9 | Reported inactive listings (remove/keep) | ✅ | M |
 | 10 | Data quality issues queue | ✅ (merge-tool prefill deferred to §11) | M |
 | 11 | Company dedup (scan/auto/manual merge) | ❌ (+ API contract drift) | L |
