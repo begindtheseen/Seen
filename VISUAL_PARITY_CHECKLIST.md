@@ -81,9 +81,9 @@ Fix = swap inline styles for the correct CSS classes + add missing structural el
 | T1 | Funnel visualization — apply `.funnel`, `.funnel-stage`, `.funnel-bar-fill` | globals.css:167 | ✅ |
 | T2 | Funnel bar color-coding (blue/amber/red/green per stage) | globals.css:171 | ✅ |
 | T3 | Ghost-note `.funnel-ghost-note` in red italic | globals.css:173 | ✅ |
-| T4 | "I withdrew" option in outcome_check answers | `app/tracker/page.tsx` | ⬜ |
-| T5 | Stage transitions in `handleCheckAnswer` (Interview, Phone Screen, Withdrew) | `app/tracker/page.tsx` | ⬜ |
-| T6 | Wire `OutcomeCard` component after terminal outcomes | `components/OutcomeCard.tsx` | ⬜ |
+| T4 | "I withdrew" option in outcome_check answers | `app/tracker/page.tsx` | ✅ |
+| T5 | Stage transitions in `handleCheckAnswer` (Interview, Phone Screen, Withdrew) | `app/tracker/page.tsx` | ✅ |
+| T6 | Wire `OutcomeCard` component after terminal outcomes | `components/OutcomeCard.tsx` | ✅ |
 | T7 | `RoundsPrompt` bottom sheet after offer | to be created | ⬜ |
 
 ---

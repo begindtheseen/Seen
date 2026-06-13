@@ -7,6 +7,7 @@ import { AppStore } from '@/lib/stores/AppStore'
 import { EventStore } from '@/lib/stores/EventStore'
 import { STAGES } from '@/lib/constants'
 import type { Application } from '@/lib/types'
+import OutcomeCard from '@/components/OutcomeCard'
 
 const STATUS_MAP: Record<string, string> = {
   active: '',
@@ -111,16 +112,19 @@ function CheckCard({ check, onAnswer, onSnooze }: {
     answers.push({ label: '📅 Interview scheduled', data: { got_response: true, response_type: 'interview', days_to_response: daysElapsed }, highlight: true })
     answers.push({ label: '❌ Rejected', data: { got_response: true, response_type: 'rejection', days_to_response: daysElapsed } })
     answers.push({ label: '👻 Ghosted', data: { got_response: false, response_type: 'ghosted', days_to_response: daysElapsed } })
+    answers.push({ label: '↩ I withdrew', data: { got_response: false, response_type: 'withdrew', withdrew: true, days_to_response: daysElapsed } })
   } else if (checkType === 'interview_check') {
     answers.push({ label: '✅ Had an interview', data: { had_interview: true, interview_type: 'interview' }, highlight: true })
     answers.push({ label: '📞 Phone screen only', data: { had_interview: true, interview_type: 'phone_screen' }, highlight: true })
     answers.push({ label: '❌ Rejected', data: { had_interview: false, ended: true, outcome: 'rejected' } })
     answers.push({ label: '👻 Still no response', data: { had_interview: false, ended: false } })
+    answers.push({ label: '↩ I withdrew', data: { had_interview: false, ended: true, outcome: 'withdrew', withdrew: true } })
   } else {
     answers.push({ label: '🎉 Got an offer!', data: { outcome: 'offer' }, highlight: true })
     answers.push({ label: '❌ Rejected', data: { outcome: 'rejected' } })
     answers.push({ label: '👻 Ghosted', data: { outcome: 'ghosted' } })
     answers.push({ label: '🔄 Still active', data: { outcome: 'active' } })
+    answers.push({ label: '↩ I withdrew', data: { outcome: 'withdrew', withdrew: true } })
   }
 
   return (
@@ -152,6 +156,7 @@ export default function TrackerPage() {
   const { isLoggedIn, isSeeker } = useAuth()
   const [apps, setApps] = useState<Application[]>([])
   const [loading, setLoading] = useState(true)
+  const [outcomeApp, setOutcomeApp] = useState<Application | null>(null)
 
   useEffect(() => {
     if (!isLoggedIn) { router.replace('/login'); return }
@@ -171,7 +176,15 @@ export default function TrackerPage() {
 
   const handleUpdate = async (id: string, changes: Partial<Application>) => {
     await AppStore.update(id, changes, isLoggedIn)
-    loadApps()
+    const terminalStatuses = ['hired', 'ghosted', 'rejected']
+    if (changes.status && terminalStatuses.includes(changes.status)) {
+      const updated = await AppStore.load(isLoggedIn)
+      setApps(updated)
+      const app = updated.find(a => a.id === id)
+      if (app) setOutcomeApp({ ...app, ...changes })
+    } else {
+      loadApps()
+    }
   }
 
   const handleRemove = async (id: string) => {
@@ -181,16 +194,28 @@ export default function TrackerPage() {
 
   const handleCheckAnswer = (appId: string, checkType: string, data: Record<string, unknown>) => {
     EventStore.add({ appId, type: checkType, data })
-    // Update app status if terminal outcome
+    if (data.withdrew) {
+      handleUpdate(appId, { status: 'rejected', stage: 'Rejected' })
+      return
+    }
     if (checkType === 'outcome_check') {
       const outcome = data.outcome as string
       if (outcome === 'offer') handleUpdate(appId, { status: 'hired', stage: 'Offer' })
-      else if (outcome === 'rejected') handleUpdate(appId, { status: 'rejected' })
+      else if (outcome === 'rejected') handleUpdate(appId, { status: 'rejected', stage: 'Rejected' })
       else if (outcome === 'ghosted') handleUpdate(appId, { status: 'ghosted' })
-    } else if (checkType === 'response_check' && data.response_type === 'ghosted') {
-      handleUpdate(appId, { status: 'ghosted' })
-    } else if (checkType === 'response_check' && data.response_type === 'rejection') {
-      handleUpdate(appId, { status: 'rejected' })
+      else loadApps()
+    } else if (checkType === 'response_check') {
+      const rt = data.response_type as string
+      if (rt === 'ghosted') handleUpdate(appId, { status: 'ghosted' })
+      else if (rt === 'rejection') handleUpdate(appId, { status: 'rejected', stage: 'Rejected' })
+      else if (rt === 'interview') handleUpdate(appId, { stage: 'Interview' })
+      else loadApps()
+    } else if (checkType === 'interview_check') {
+      const it = data.interview_type as string
+      if (data.ended && (data.outcome as string) === 'rejected') handleUpdate(appId, { status: 'rejected', stage: 'Rejected' })
+      else if (it === 'phone_screen') handleUpdate(appId, { stage: 'Phone Screen' })
+      else if (it === 'interview') handleUpdate(appId, { stage: 'Interview' })
+      else loadApps()
     } else {
       loadApps()
     }
@@ -224,6 +249,8 @@ export default function TrackerPage() {
   const dueChecks = EventStore.dueChecks(apps)
 
   return (
+    <>
+    {outcomeApp && <OutcomeCard app={outcomeApp} onClose={() => setOutcomeApp(null)} />}
     <div className="page">
       <div style={{ maxWidth: 1000, margin: '0 auto', padding: '2.5rem 2rem' }}>
 
@@ -346,5 +373,6 @@ export default function TrackerPage() {
 
       </div>
     </div>
+    </>
   )
 }
