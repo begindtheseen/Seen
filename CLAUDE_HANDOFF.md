@@ -90,10 +90,23 @@ Remaining admin work is cosmetic/optional only: §2 minor (`ready:false` N/A —
 - Tracker `handleCheckAnswer`: old stage updates (Interview/Phone Screen), `showOutcomeCard`,
   offer `_showRoundsPrompt`, "↩ I withdrew" option.
 
+### Jobs + Resume AI client parity — ✅ FIXED (this commit)
+- See JOBS_AI_PARITY_REPORT.md. Two CRITICAL migration regressions resolved:
+  - **C1**: `app/jobs/page.tsx` was GET `/api/jobs?q=` vs POST-only server → 405.
+    Now POSTs `{query, location, radius}`; client-side filters/sort preserved;
+    DB-first→online→cache/save path reachable again.
+  - **C2**: `app/resume/page.tsx` sent no `Authorization` → gateAI 401. Added shared
+    `lib/aiHeaders.ts` (Next.js parity of old `_aiHeaders()`); used in resume parse +
+    optimize/scanner/coach/proposal; `credits_required` surfaced (sign-in / out-of-credits).
+  - Also migrated `app/jobs/[id]/page.tsx` (job-insights) onto `aiHeaders()` (dropped inline getSession).
+- `api/jobs.js` and `api/resume.js` NOT modified. Build green.
+- Note: only verifiable at runtime (live 405/401 → 200) on a preview deploy.
+
 ### Next up (SITE_PARITY_CHECKLIST.md — Phase 2 IMPORTANT)
+- (Low) surface `availability_status` in `/api/jobs` result mapping (stale/expired labels)
 - Legal page completeness; account settings
-- Per-page functional audit (jobs filters/sort, tracker, company, feed, report, resume,
-  demand, profile, employer.html — most pages 🟡 unverified)
+- Per-page functional audit (tracker, company, feed, report, demand, profile, employer.html
+  — still 🟡 unverified)
 
 ### Working agreement this session
 - Admin parity only, one section at a time, small commits.

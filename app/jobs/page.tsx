@@ -201,16 +201,14 @@ export default function JobsPage() {
     setFiltered([])
 
     try {
-      const params = new URLSearchParams({
-        q: query.trim(),
-        location: location.trim(),
-        radius,
-        ...(niche && { niche }),
-        ...(level && { level }),
-        ...(jobType && { type: jobType }),
-        ...(posted && { posted }),
+      // POST {query, location, radius} — matches api/jobs.js (POST-only, reads body.query).
+      // Filters (niche/level/type/posted) + sort are applied client-side in updateDisplay.
+      const res = await fetch('/api/jobs', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query: query.trim(), location: location.trim(), radius }),
+        signal: abortRef.current.signal,
       })
-      const res = await fetch(`/api/jobs?${params}`, { signal: abortRef.current.signal })
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
       const data = await res.json() as { jobs?: unknown[]; results?: unknown[] }
       const raw: Job[] = (data.jobs || data.results || []).map((item: unknown) => {

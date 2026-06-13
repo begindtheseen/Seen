@@ -9,12 +9,12 @@ Read-only audit — **no code modified.**
 
 The **server-side** jobs + AI logic is intact and matches production (same DB-first search flow, query expansion, coalescing, caching, stale fallback, scoring formulas, AI gating). The regressions are in the **Next.js client contract** — two endpoints are called in a way the (unchanged, production-correct) serverless functions reject:
 
-| # | Severity | What | Effect |
-|---|----------|------|--------|
-| **C1** | 🔴 CRITICAL | `app/jobs/page.tsx` calls `/api/jobs` via **GET `?q=`**; `api/jobs.js` is **POST-only** and reads `body.query` | Every job search → **HTTP 405** → "Search failed." Job search is **entirely broken**. |
-| **C2** | 🔴 CRITICAL | `app/resume/page.tsx` calls `/api/resume` **without an `Authorization: Bearer` header**; `gateAI` requires it | Resume parse + optimize → **HTTP 401** "Sign in to use AI features" for all users. Both AI resume features **entirely broken**. |
+| # | Severity | What | Effect | Status |
+|---|----------|------|--------|--------|
+| **C1** | 🔴 CRITICAL | `app/jobs/page.tsx` called `/api/jobs` via **GET `?q=`**; `api/jobs.js` is **POST-only** and reads `body.query` | Every job search → **HTTP 405** → "Search failed." | ✅ **FIXED** — client now POSTs `{query, location, radius}` |
+| **C2** | 🔴 CRITICAL | `app/resume/page.tsx` called `/api/resume` **without an `Authorization: Bearer` header**; `gateAI` requires it | Resume parse + optimize → **HTTP 401** for all users | ✅ **FIXED** — shared `lib/aiHeaders.ts` attaches the Bearer token; `credits_required` handled |
 
-Both are **migration regressions** (old SPA POSTed `{query}` to `/api/jobs`, and used `_aiHeaders()` to attach the token). Job-insights (job detail) is **already correct** — fixed earlier this session to send the token.
+Both were **migration regressions** (old SPA POSTed `{query}` to `/api/jobs`, and used `_aiHeaders()` to attach the token). **Resolved 2026-06-13** in commit "Fix jobs + resume AI client parity": added `lib/aiHeaders.ts` (Next.js parity of `_aiHeaders()`), used by resume parse/optimize and job-insights (migrated off its inline token logic). Job search now POSTs the correct body and reaches the DB-first → online → cache/save path. `api/jobs.js` and `api/resume.js` were **not** modified.
 
 ---
 
@@ -122,10 +122,10 @@ All server-side protections are **fully intact**. (They simply aren't being exer
 
 ## Recommended fix order
 
-1. **C1 — Job search contract (highest impact).** `app/jobs/page.tsx`: change `searchJobs` to `fetch('/api/jobs', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ query, location, radius }) })` (param `query`, not `q`). Keep client-side filters/sort. Verify cache hit/miss + save in logs.
-2. **Shared AI auth helper.** Add `lib/aiHeaders.ts` (`supabase.auth.getSession()` → `{ 'Content-Type', Authorization? }`) — the Next.js parity of old `_aiHeaders()`.
-3. **C2 — Resume parse + optimize.** `app/resume/page.tsx`: attach the AI auth header (from step 2) to both `/api/resume` calls; handle `credits_required` (sign-in / out-of-credits messaging) like the job-detail page.
-4. **(Low) Surface `availability_status`** in the `/api/jobs` result mapping (or search select) so stale/expired labels render on cards + detail.
+1. ✅ **C1 — Job search contract.** Done — `app/jobs/page.tsx` now POSTs `{query, location, radius}`; client-side filters/sort preserved.
+2. ✅ **Shared AI auth helper.** Done — `lib/aiHeaders.ts` (`supabase.auth.getSession()` → `{ 'Content-Type', Authorization? }`).
+3. ✅ **C2 — Resume parse + optimize.** Done — both `/api/resume` calls use `aiHeaders()`; `credits_required` surfaced (sign-in / out-of-credits). job-insights migrated to the same helper.
+4. **(Low, open) Surface `availability_status`** in the `/api/jobs` result mapping (or search select) so stale/expired labels render on cards + detail.
 5. **(Tracking, non-blocking)** persist `responseTimeDays` on app resolve (pipeline `avgRT`); Apply & Optimize modal flow; tracker stage updates/outcome cards.
 
 ---

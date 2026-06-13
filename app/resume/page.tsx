@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { ResumeStore } from '@/lib/stores/ResumeStore'
 import { useAuth } from '@/lib/auth'
+import { aiHeaders } from '@/lib/aiHeaders'
 
 type Tool = 'scanner' | 'coach' | 'proposal'
 
@@ -164,10 +165,14 @@ export default function ResumePage() {
       try {
         const res = await fetch('/api/resume', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: await aiHeaders(),
           body: JSON.stringify({ action: 'parse', base64: b64, fileName: file.name, mimeType: file.type }),
         })
-        const data = await res.json() as { text?: string }
+        const data = await res.json() as { text?: string; credits_required?: boolean; error?: string }
+        if (data.credits_required) {
+          setError(isLoggedIn ? "You're out of AI credits — try again later." : 'Sign in to use AI resume features.')
+          return
+        }
         if (data.text) {
           const wc = data.text.trim().split(/\s+/).length
           await ResumeStore.save(data.text, file.name, wc, user?.id, isLoggedIn)
@@ -187,14 +192,18 @@ export default function ResumePage() {
     setResumeMeta(null)
   }
 
+  // Thrown when the AI endpoint reports no credits / not signed in — callers show a friendly message.
+  class CreditsError extends Error {}
+
   async function callApi(payload: Record<string, unknown>): Promise<string> {
     const res = await fetch('/api/resume', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: await aiHeaders(),
       body: JSON.stringify(payload),
     })
+    const data = await res.json().catch(() => ({})) as { result?: string; output?: string; text?: string; credits_required?: boolean; error?: string }
+    if (data.credits_required) throw new CreditsError(isLoggedIn ? "You're out of AI credits — try again later." : 'Sign in to use AI resume features.')
     if (!res.ok) throw new Error(`HTTP ${res.status}`)
-    const data = await res.json() as { result?: string; output?: string; text?: string }
     return data.result || data.output || data.text || ''
   }
 
@@ -206,7 +215,7 @@ export default function ResumePage() {
     try {
       const out = await callApi({ tool: 'scanner', resume: text, job: scanJob, company: scanCompany, jd: scanJD })
       setScanResult(out)
-    } catch { setError('Analysis failed. Please try again.') }
+    } catch (e) { setError(e instanceof CreditsError ? e.message : 'Analysis failed. Please try again.') }
     setLoading(false)
   }
 
@@ -218,7 +227,7 @@ export default function ResumePage() {
     try {
       const out = await callApi({ tool: 'coach', resume: text, job: coachJob, company: coachCompany, jd: coachJD, background: coachBackground })
       setCoachResult(out)
-    } catch { setError('Coach failed. Please try again.') }
+    } catch (e) { setError(e instanceof CreditsError ? e.message : 'Coach failed. Please try again.') }
     setLoading(false)
   }
 
@@ -230,7 +239,7 @@ export default function ResumePage() {
     try {
       const out = await callApi({ tool: 'proposal', resume: text, job: propJob, company: propCompany, jd: propJD, background: propBackground })
       setPropResult(out)
-    } catch { setError('Proposal failed. Please try again.') }
+    } catch (e) { setError(e instanceof CreditsError ? e.message : 'Proposal failed. Please try again.') }
     setLoading(false)
   }
 

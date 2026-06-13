@@ -63,7 +63,7 @@ A page is COMPLETE only when: visual match + all old functionality + working API
 
 | Element | Status | Notes |
 |---------|--------|-------|
-| Search bar (query + location) | ✅ | 407-line file suggests substantial implementation |
+| Search bar (query + location) | ✅ | **Fixed 2026-06-13**: client now POSTs `{query,location,radius}` (was GET `?q=` → 405). DB-first→online→cache path now reachable. |
 | Job cards with company, role, city, source | ✅ | |
 | Save job (♡) | ✅ | SavedJobs store |
 | Apply & Optimize CTA | ✅ | |
@@ -170,11 +170,11 @@ A page is COMPLETE only when: visual match + all old functionality + working API
 
 | Element | Status | Notes |
 |---------|--------|-------|
-| Resume upload (PDF) | 🟡 | 391-line file |
-| AI parse → structured data | 🟡 | POST `/api/resume` action:parse |
+| Resume upload (PDF) | ✅ | **Fixed 2026-06-13**: parse call now sends `Authorization: Bearer` via `lib/aiHeaders.ts` (was 401) |
+| AI parse → structured data | ✅ | POST `/api/resume` action:parse + Bearer token; `credits_required` handled |
 | Employment history display | 🟡 | |
 | Skills section | 🟡 | |
-| Resume-optimize for job (AI) | 🟡 | |
+| Resume-optimize for job (AI) | ✅ | scanner/coach/proposal tools now send Bearer token; `credits_required` surfaced |
 | Credit cost label | 🟡 | |
 | Download optimized resume | 🟡 | |
 

@@ -9,7 +9,7 @@ import { useRouter } from 'next/navigation'
 import { Score } from '@/lib/score'
 import { JobCache } from '@/lib/stores/JobCache'
 import { SavedJobsStore } from '@/lib/stores/SavedJobs'
-import { supabase } from '@/lib/supabase'
+import { aiHeaders } from '@/lib/aiHeaders'
 import { useAuth } from '@/lib/auth'
 import type { Job } from '@/lib/types'
 
@@ -81,13 +81,9 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
 
     // L2: /api/job-insights (DB cache 7d → Claude on miss). Bearer token if signed in.
     try {
-      const { data } = await supabase.auth.getSession()
-      const token = data?.session?.access_token
-      const headers: Record<string, string> = { 'Content-Type': 'application/json' }
-      if (token) headers.Authorization = `Bearer ${token}`
       const res = await fetch('/api/job-insights', {
         method: 'POST',
-        headers,
+        headers: await aiHeaders(),
         body: JSON.stringify({ jobId: j.id, job: j.title, company: j.company, jobDescription: desc, needsSummary: true }),
       })
       const d = await res.json()
