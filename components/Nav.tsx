@@ -57,7 +57,6 @@ export default function Nav() {
           {isSeeker && <Link href="/resume" className={`ntab${isActive('/resume') ? ' active' : ''}`}>Resume AI</Link>}
           {isSeeker && <Link href="/tracker" className={`ntab${isActive('/tracker') ? ' active' : ''}`}>Track</Link>}
           <Link href="/pricing" className={`ntab${isActive('/pricing') ? ' active' : ''}`}>Pricing</Link>
-          <Link href="/admin" className={`ntab${isActive('/admin') ? ' active' : ''}`}>Admin</Link>
         </div>
 
         <div className="nav-right">
@@ -99,7 +98,6 @@ export default function Nav() {
         {isSeeker && <Link href="/tracker" className={`side-menu-item${isActive('/tracker') ? ' active' : ''}`}><span className="side-menu-icon">✓</span>Track</Link>}
         {isSeeker && <Link href="/dashboard" className={`side-menu-item${isActive('/dashboard') ? ' active' : ''}`}><span className="side-menu-icon">▦</span>Dashboard</Link>}
         <Link href="/pricing" className={`side-menu-item${isActive('/pricing') ? ' active' : ''}`}><span className="side-menu-icon">◈</span>Pricing</Link>
-        <Link href="/admin" className={`side-menu-item${isActive('/admin') ? ' active' : ''}`}><span className="side-menu-icon">⚙</span>Admin</Link>
         <div style={{ marginTop: 'auto', padding: '1rem 1.25rem 0', borderTop: '1px solid var(--line)' }}>
           {isSeeker ? (
             <button onClick={() => { setShowAccountModal(true); setMenuOpen(false) }} style={{ background: 'none', border: '1px solid var(--line2)', color: 'var(--sub)', borderRadius: 8, padding: '.5rem 1rem', fontFamily: 'var(--mono)', fontSize: '.65rem', cursor: 'pointer', width: '100%' }}>Account settings</button>

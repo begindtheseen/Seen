@@ -63,8 +63,8 @@ body{background:var(--ink);background-image:radial-gradient(ellipse at 30% 0%,rg
 .aurora-3{position:absolute;top:20%;left:30%;width:50vw;height:55vh;border-radius:50%;background:radial-gradient(ellipse at center,rgba(99,102,241,0.14) 0%,rgba(124,58,237,0.06) 50%,transparent 75%);filter:blur(100px);animation:auroraFloat3 22s ease-in-out infinite}
 
 /* GLASS */
-.glass{background:rgba(255,255,255,0.04);backdrop-filter:blur(24px) saturate(160%);border:1px solid rgba(255,255,255,0.1);border-radius:16px;box-shadow:0 8px 40px rgba(0,0,0,0.5),0 0 0 1px rgba(255,255,255,0.03),inset 0 1px 0 rgba(255,255,255,0.06);transition:box-shadow 0.25s ease,transform 0.2s ease}
-.glass:hover{box-shadow:0 16px 56px rgba(0,0,0,0.6),0 0 48px rgba(59,130,246,0.2),0 0 80px rgba(139,92,246,0.1),0 0 0 1px rgba(255,255,255,0.08);transform:translateY(-2px)}
+.glass{background:rgba(255,255,255,.055);backdrop-filter:blur(28px) saturate(180%);-webkit-backdrop-filter:blur(28px) saturate(180%);border:1px solid rgba(255,255,255,.13);border-radius:16px;box-shadow:0 8px 40px rgba(0,0,0,.5),inset 0 1.5px 0 rgba(255,255,255,.2),inset 0 -1px 0 rgba(0,0,0,.12),0 0 0 1px rgba(255,255,255,.04);transition:box-shadow .25s ease,transform .2s ease}
+.glass:hover{box-shadow:0 16px 56px rgba(0,0,0,.6),0 0 48px rgba(59,130,246,.22),0 0 80px rgba(139,92,246,.12),inset 0 1.5px 0 rgba(255,255,255,.28),0 0 0 1px rgba(255,255,255,.1);transform:translateY(-2px)}
 .glass-blue{box-shadow:0 8px 40px rgba(0,0,0,0.5),0 0 60px rgba(59,130,246,0.2),inset 0 1px 0 rgba(59,130,246,0.1)}
 .glass-purple{box-shadow:0 8px 40px rgba(0,0,0,0.5),0 0 60px rgba(139,92,246,0.18),inset 0 1px 0 rgba(139,92,246,0.1)}
 
@@ -89,13 +89,13 @@ nav.nav-scrolled{background:rgba(6,6,8,0.82);backdrop-filter:blur(60px) saturate
 .logo{font-family:var(--display);font-size:1.2rem;font-weight:800;color:var(--white);text-decoration:none;letter-spacing:-.02em;display:flex;align-items:center;gap:.5rem;flex-shrink:0}
 .logo-pulse{width:8px;height:8px;border-radius:50%;background:var(--blue);box-shadow:0 0 10px rgba(59,130,246,0.6);animation:pulse 2s infinite;flex-shrink:0}
 /* Nav tabs — no container, each tab stands alone */
-.nav-pills{display:flex;gap:.08rem;background:none;border:none;border-radius:0;padding:0;overflow-x:auto;overflow-y:hidden;flex-shrink:1;min-width:0;scrollbar-width:none;box-shadow:none;-webkit-mask-image:linear-gradient(to right,transparent 0,#000 12px,#000 calc(100% - 12px),transparent 100%);mask-image:linear-gradient(to right,transparent 0,#000 12px,#000 calc(100% - 12px),transparent 100%)}
+.nav-pills{display:flex;gap:.15rem;background:rgba(255,255,255,.07);backdrop-filter:blur(24px) saturate(180%);-webkit-backdrop-filter:blur(24px) saturate(180%);border:1px solid rgba(255,255,255,.13);border-radius:12px;padding:3px;overflow-x:auto;overflow-y:hidden;flex-shrink:1;min-width:0;scrollbar-width:none;box-shadow:inset 0 1.5px 0 rgba(255,255,255,.22),inset 0 -1px 0 rgba(0,0,0,.15),0 4px 16px rgba(0,0,0,.3)}
 .nav-pills::-webkit-scrollbar{display:none}
 /* Inactive — clean text, no box */
 .ntab{background:none;border:none;padding:.35rem .62rem;font-family:var(--body);font-size:.73rem;font-weight:500;color:rgba(255,255,255,0.38);cursor:pointer;border-radius:10px;transition:color .18s ease;white-space:nowrap;letter-spacing:.005em;text-decoration:none}
-.ntab:hover{color:rgba(255,255,255,0.68)}
+.ntab:hover{color:rgba(255,255,255,.78);background:rgba(255,255,255,.07);border-radius:9px}
 /* Active — individual Liquid Glass capsule, not a container */
-.ntab.active{color:#fff;font-weight:600;background:rgba(255,255,255,0.1);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border-radius:10px;box-shadow:0 1px 0 rgba(255,255,255,0) inset,0 2px 10px rgba(0,0,0,0.35);outline:1px solid rgba(255,255,255,0.12)}
+.ntab.active{color:#fff;font-weight:600;background:rgba(255,255,255,.18);backdrop-filter:blur(40px) saturate(200%);-webkit-backdrop-filter:blur(40px) saturate(200%);border-radius:9px;box-shadow:inset 0 1.5px 0 rgba(255,255,255,.45),inset 0 -1px 0 rgba(0,0,0,.18),0 2px 8px rgba(0,0,0,.45),0 0 0 .5px rgba(255,255,255,.2)}
 .ntab-new{font-family:var(--mono);font-size:.5rem;background:var(--blue);color:#fff;border-radius:3px;padding:.1rem .3rem;font-weight:700;letter-spacing:.04em}
 .nav-right{display:flex;align-items:center;gap:.45rem;flex-shrink:0}
 .btn{display:inline-flex;align-items:center;gap:.32rem;padding:.44rem 1rem;border-radius:8px;font-family:var(--body);font-weight:600;font-size:.76rem;cursor:pointer;text-decoration:none;transition:all .15s;border:none;white-space:nowrap}
