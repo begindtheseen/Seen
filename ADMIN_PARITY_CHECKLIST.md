@@ -114,8 +114,9 @@ The current GET handler (lines 132–254) returns `reports: {total, today, this_
 - **Old source**: HTML 2612–2642 (`#admMergePanel`, `#admScanBtn`, `#admAutoMergeBtn`, `#admMergePrimary`, `#admMergeSecondary`, `#admMergeStatus`, `#admDupesList`); `adminScanDupes` 6776–6809; `adminSetMerge` 6811–6817; `adminManualMerge` 6819–6841; `adminAutoMerge` 6843–6870.
 - **API calls**: POST `find_duplicates`; POST `merge` — ⚠️ old UI sends `{primary, secondary}` **names** but the current API (admin-stats.js:277–279) requires `{primary_id, secondary_id}` and doesn't return `merged_report_count`; POST `auto_merge` — old UI reads `d.groups` which API doesn't return. **The Next.js port must target the current API contract (IDs), not the old UI's payload — resolve this drift when porting (either fix the API to accept names or have the UI pass the IDs from `find_duplicates` results).**
 - **UI elements**: "Scan for dupes" / "Auto-merge" (green) header buttons; manual-merge form: "Keep (primary)" + "Absorb (secondary)" inputs, "Merge →" red button, status line (validates both fields, blocks self-merge); dupes list groups: "N entries match \"key\"", primary chip green with report count, others red, "Set to merge" button prefills the form; rescans after every merge.
-- **Status in Next.js**: ❌ missing.
-- **Files to change**: `app/admin/page.tsx`; possibly `api/admin-stats.js` (merge contract + missing response fields)
+- **Status in Next.js**: ✅ **ported** (recovery branch). `MergePanel` component: Scan / Auto-merge buttons, manual-merge form (primary/secondary inputs, Merge → red, status line, validates both fields + blocks self-merge), dupes list ("N entries match key", green primary chip w/ count, red others, "Set to merge" prefills form), rescans after every merge. Also wires §10 issues-queue "Open in merge tool ↓" → prefills primary (state lifted to AdminPage via `mergePrefill`).
+- **⚠️ Contract drift RESOLVED** (`api/admin-stats.js`, in place — no new function): `merge` now accepts **either** `{primary_id, secondary_id}` **or** `{primary, secondary}` names (resolved to IDs server-side via `ilike`), blocks self-merge, and returns `merged_report_count` — restores old manual-merge-by-name UX. `auto_merge` now returns `groups:[{canonical, absorbed[]}]` again so the summary line renders.
+- **Files to change**: `app/admin/page.tsx` ✅ done; `api/admin-stats.js` ✅ done (merge name-resolution + merged_report_count; auto_merge groups)
 
 ### 12. Feature flags (set flag, seed defaults)
 - **Old source**: HTML 2644–2651 (`#admFlagsPanel`); render JS 6702–6716; `adminSetFlag(flagName, status, selectEl)` 6873–6898; `adminSeedFlags(btnEl)` 6913–6929. Runtime consumer: `FeatureFlags` object 2750+.
@@ -167,8 +168,8 @@ The current GET handler (lines 132–254) returns `reports: {total, today, this_
 | 7 | Recent tracker applications | ❌ | S |
 | 8 | Recent jobs browser (period tabs) | ✅ | M |
 | 9 | Reported inactive listings (remove/keep) | ✅ | M |
-| 10 | Data quality issues queue | ✅ (merge-tool prefill deferred to §11) | M |
-| 11 | Company dedup (scan/auto/manual merge) | ❌ (+ API contract drift) | L |
+| 10 | Data quality issues queue | ✅ (merge-tool prefill now wired in §11) | M |
+| 11 | Company dedup (scan/auto/manual merge) | ✅ (contract drift resolved) | L |
 | 12 | Feature flags | ✅ | M |
 | 13 | Duplicate account clusters | ✅ | M |
 | 14 | API Health | ❌ | S |

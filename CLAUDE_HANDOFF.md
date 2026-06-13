@@ -24,7 +24,7 @@ Last updated: 2026-06-13 (Session C, recovery)
 - ✅ §8 Recent jobs browser (period tabs, get_recent_jobs) — ported (lazy load, 401/403 re-login)
 - ✅ §12 Feature flags (set_flag/seed_flags) — ported (optimistic select, seed defaults)
 - ✅ §13 Duplicate account clusters (update_cluster/detect_duplicates_by_signals) — ported
-- §11 Company deduplication (find_duplicates/merge/auto_merge — has API contract drift)
+- ✅ §11 Company deduplication (find_duplicates/merge/auto_merge) — ported; **API contract drift resolved**: merge accepts names OR ids + returns merged_report_count; auto_merge returns groups again. Also wired §10 "Open in merge tool" prefill.
 - §15 Background job runner (X-Admin-Token → /api/refresh-jobs, /api/demand, /api/reports)
 
 ### Working agreement this session

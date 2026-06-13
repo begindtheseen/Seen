@@ -314,8 +314,23 @@ async function _handler(req, res) {
   }
 
   if (action === 'merge') {
-    const { primary_id, secondary_id } = body;
-    if (!primary_id || !secondary_id) return res.status(400).json({ error: 'primary_id and secondary_id required' });
+    // Accept either {primary_id, secondary_id} (from the scan list) or
+    // {primary, secondary} names (from the manual-merge text form). Names are
+    // resolved to IDs server-side — restores the old production manual-merge UX.
+    let { primary_id, secondary_id } = body;
+    const { primary, secondary } = body;
+    if ((!primary_id || !secondary_id) && primary && secondary) {
+      const [pLookup, sLookup] = await Promise.all([
+        db(`company_scores?name=ilike.${encodeURIComponent(primary)}&select=id&limit=1`).then(r => r.json()),
+        db(`company_scores?name=ilike.${encodeURIComponent(secondary)}&select=id&limit=1`).then(r => r.json()),
+      ]);
+      if (!pLookup[0]) return res.status(404).json({ error: `Company not found: ${primary}` });
+      if (!sLookup[0]) return res.status(404).json({ error: `Company not found: ${secondary}` });
+      primary_id = pLookup[0].id;
+      secondary_id = sLookup[0].id;
+    }
+    if (!primary_id || !secondary_id) return res.status(400).json({ error: 'primary_id and secondary_id (or primary/secondary names) required' });
+    if (String(primary_id) === String(secondary_id)) return res.status(400).json({ error: 'Cannot merge a company with itself' });
     const [pArr, sArr] = await Promise.all([
       db(`company_scores?id=eq.${primary_id}&limit=1`).then(r => r.json()),
       db(`company_scores?id=eq.${secondary_id}&limit=1`).then(r => r.json()),
@@ -329,7 +344,7 @@ async function _handler(req, res) {
     await db(`company_aliases?on_conflict=alias`, { method: 'POST', body: JSON.stringify({ canonical: p.name, alias: s.name.toLowerCase() }), headers: { Prefer: 'resolution=merge-duplicates,return=minimal' } });
     await db(`company_scores?id=eq.${secondary_id}`, { method: 'DELETE', headers: { Prefer: 'return=minimal' } });
     await db('admin_audit_log', { method: 'POST', body: JSON.stringify({ admin_id: sess.admin_id, username: 'admin', action: 'merge_companies', target_type: 'company', target_id: String(primary_id), metadata: { secondary_id } }), headers: { Prefer: 'return=minimal' } });
-    return res.status(200).json({ ok: true });
+    return res.status(200).json({ ok: true, merged_report_count: total });
   }
 
   if (action === 'auto_merge') {
@@ -340,17 +355,21 @@ async function _handler(req, res) {
     const groups = {};
     rows.forEach(row => { const k = norm(row.name); (groups[k] = groups[k] || []).push(row); });
     let merged = 0;
+    const groupSummaries = [];
     for (const group of Object.values(groups).filter(g => g.length > 1)) {
       const primary = group.reduce((b, r) => (r.report_count||0) > (b.report_count||0) ? r : b);
+      const absorbed = [];
       for (const sec of group.filter(r => r.id !== primary.id)) {
         const pC = primary.report_count||1, sC = sec.report_count||1, total = pC+sC;
         const wa = (a,b) => Math.round(((a||50)*pC + (b||50)*sC)/total);
         await db(`company_scores?id=eq.${primary.id}`, { method: 'PATCH', body: JSON.stringify({ report_count: total, overall_score: wa(primary.overall_score,sec.overall_score), ghost_rate: wa(primary.ghost_rate,sec.ghost_rate) }), headers: { Prefer: 'return=minimal' } });
         await db(`company_scores?id=eq.${sec.id}`, { method: 'DELETE', headers: { Prefer: 'return=minimal' } });
+        absorbed.push(sec.name);
         merged++;
       }
+      if (absorbed.length) groupSummaries.push({ canonical: primary.name, absorbed });
     }
-    return res.status(200).json({ ok: true, merged });
+    return res.status(200).json({ ok: true, merged, groups: groupSummaries });
   }
 
   if (action === 'resolve_issue' || action === 'dismiss_issue') {

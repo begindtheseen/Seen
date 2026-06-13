@@ -44,6 +44,9 @@ interface RecentJob {
   id: string; company: string; title: string; city: string; url: string
   apply_url: string; created_at: string; availability_status: string; source: string
 }
+interface DupCompany { id: string; name: string; report_count: number; overall_score: number }
+interface DupGroup { key: string; companies: DupCompany[] }
+interface MergePrefill { primary: string; secondary: string; nonce: number }
 interface FeatureFlag {
   flag_name: string; status: string; percentage: number | null; description: string
 }
@@ -152,6 +155,7 @@ export default function AdminPage() {
   const [password, setPassword] = useState('')
   const [loginError, setLoginError] = useState('')
   const [loggingIn, setLoggingIn] = useState(false)
+  const [mergePrefill, setMergePrefill] = useState<MergePrefill | null>(null)
 
   useEffect(() => {
     const stored = sessionStorage.getItem(TOKEN_KEY)
@@ -474,10 +478,19 @@ export default function AdminPage() {
           {(stats.issues?.items || []).length === 0
             ? <div style={{ fontFamily: 'var(--mono)', fontSize: '.62rem', color: 'var(--green)' }}>✓ No open issues</div>
             : (stats.issues.items || []).map(issue => (
-              <IssueRow key={issue.id} issue={issue} token={token!} onRefresh={() => load(token!)} />
+              <IssueRow
+                key={issue.id}
+                issue={issue}
+                token={token!}
+                onRefresh={() => load(token!)}
+                onOpenMerge={name => setMergePrefill({ primary: name, secondary: '', nonce: Date.now() })}
+              />
             ))
           }
         </Card>
+
+        {/* Company deduplication */}
+        <MergePanel token={token!} prefill={mergePrefill} />
 
         {/* Feature flags */}
         <FlagsPanel flags={stats.feature_flags || []} token={token!} onRefresh={() => load(token!)} />
@@ -576,7 +589,7 @@ function ReportRow({ report: r, token, onRefresh }: { report: RecentReport; toke
   )
 }
 
-function IssueRow({ issue, token, onRefresh }: { issue: Issue; token: string; onRefresh: () => void }) {
+function IssueRow({ issue, token, onRefresh, onOpenMerge }: { issue: Issue; token: string; onRefresh: () => void; onOpenMerge: (name: string) => void }) {
   const [acting, setActing] = useState(false)
   const [done, setDone] = useState<'resolve' | 'dismiss' | null>(null)
   const color = issueBadgeColor(issue.type)
@@ -616,7 +629,9 @@ function IssueRow({ issue, token, onRefresh }: { issue: Issue; token: string; on
           <span style={{ fontFamily: 'var(--mono)', fontSize: '.5rem', color: 'var(--dim)', marginLeft: 'auto', flexShrink: 0 }}>{relTime(issue.created_at)}</span>
         </div>
         {issue.notes && <div style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', color: 'var(--sub)', lineHeight: 1.5, marginTop: '.18rem' }}>{issue.notes}</div>}
-        {/* NOTE: duplicate-type "Open in merge tool" button wired when §11 company-dedup lands */}
+        {issue.type === 'duplicate' && issue.target_name && (
+          <button onClick={() => onOpenMerge(issue.target_name)} style={{ fontFamily: 'var(--mono)', fontSize: '.5rem', marginTop: '.3rem', padding: '.18rem .5rem', borderRadius: 4, border: '1px solid var(--line2)', background: 'transparent', color: 'var(--sub)', cursor: 'pointer' }}>Open in merge tool ↓</button>
+        )}
       </div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: '.3rem', flexShrink: 0 }}>
         <button onClick={() => act('resolve_issue')} disabled={acting} style={{ fontFamily: 'var(--mono)', fontSize: '.52rem', padding: '.22rem .6rem', borderRadius: 5, border: '1px solid rgba(16,185,129,.3)', background: 'rgba(16,185,129,.08)', color: 'var(--green)', cursor: 'pointer' }}>Resolve</button>
@@ -674,6 +689,149 @@ function InactiveRow({ report: r, token }: { report: InactiveReport; token: stri
         </div>
       </div>
     </div>
+  )
+}
+
+function MergePanel({ token, prefill }: { token: string; prefill: MergePrefill | null }) {
+  const [primary, setPrimary] = useState('')
+  const [secondary, setSecondary] = useState('')
+  const [status, setStatus] = useState<{ text: string; color: string } | null>(null)
+  const [scanning, setScanning] = useState(false)
+  const [autoMerging, setAutoMerging] = useState(false)
+  const [merging, setMerging] = useState(false)
+  const [dupes, setDupes] = useState<DupGroup[] | null>(null)
+
+  // Prefill from issues queue "Open in merge tool"
+  useEffect(() => {
+    if (prefill) {
+      setPrimary(prefill.primary)
+      setSecondary(prefill.secondary)
+    }
+  }, [prefill])
+
+  async function scan() {
+    setScanning(true)
+    try {
+      const res = await fetch('/api/admin-stats', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Admin-Token': token },
+        body: JSON.stringify({ action: 'find_duplicates' }),
+      })
+      const d = await res.json()
+      if (!d.ok) throw new Error(d.error || res.status)
+      setDupes(d.duplicates || [])
+    } catch (e) {
+      setStatus({ text: 'Error: ' + (e as Error).message, color: 'var(--red)' })
+    }
+    setScanning(false)
+  }
+
+  async function manualMerge() {
+    const p = primary.trim(), s = secondary.trim()
+    if (!p || !s) { setStatus({ text: 'Both fields required', color: 'var(--red)' }); return }
+    if (p.toLowerCase() === s.toLowerCase()) { setStatus({ text: 'Cannot merge a company with itself', color: 'var(--red)' }); return }
+    setMerging(true)
+    setStatus({ text: 'Merging…', color: 'var(--dim)' })
+    try {
+      const res = await fetch('/api/admin-stats', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Admin-Token': token },
+        body: JSON.stringify({ action: 'merge', primary: p, secondary: s }),
+      })
+      const d = await res.json()
+      if (!d.ok) throw new Error(d.error || res.status)
+      setStatus({ text: `✓ "${s}" merged into "${p}" — ${d.merged_report_count} total reports`, color: 'var(--green)' })
+      setPrimary(''); setSecondary('')
+      scan()
+    } catch (e) {
+      setStatus({ text: 'Error: ' + (e as Error).message, color: 'var(--red)' })
+    }
+    setMerging(false)
+  }
+
+  async function autoMerge() {
+    setAutoMerging(true)
+    setStatus({ text: 'Scanning and merging…', color: 'var(--dim)' })
+    try {
+      const res = await fetch('/api/admin-stats', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Admin-Token': token },
+        body: JSON.stringify({ action: 'auto_merge' }),
+      })
+      const d = await res.json()
+      if (!d.ok) throw new Error(d.error || res.status)
+      if (!d.merged) {
+        setStatus({ text: '✓ Auto-merge complete — no duplicates found', color: 'var(--green)' })
+      } else {
+        const summary = (d.groups || []).map((g: { canonical: string; absorbed: string[] }) => `"${g.absorbed.join('", "')}" → "${g.canonical}"`).join(' · ')
+        setStatus({ text: `✓ Merged ${d.merged} duplicate${d.merged !== 1 ? 's' : ''}: ${summary}`, color: 'var(--green)' })
+      }
+      scan()
+    } catch (e) {
+      setStatus({ text: 'Auto-merge failed: ' + (e as Error).message, color: 'var(--red)' })
+    }
+    setAutoMerging(false)
+  }
+
+  function setMerge(p: string, s: string) { setPrimary(p); setSecondary(s) }
+
+  const inputStyle: React.CSSProperties = { width: '100%', background: 'var(--raised)', border: '1px solid var(--line2)', borderRadius: 7, padding: '.42rem .65rem', fontFamily: 'var(--mono)', fontSize: '.65rem', color: 'var(--white)', outline: 'none', boxSizing: 'border-box' }
+
+  return (
+    <Card style={{ marginBottom: '1.25rem' }}>
+      <CardHeader
+        title="Company deduplication"
+        action={
+          <div style={{ display: 'flex', gap: '.45rem' }}>
+            <button onClick={scan} disabled={scanning} style={{ fontFamily: 'var(--mono)', fontSize: '.55rem', padding: '.3rem .75rem', borderRadius: 6, border: '1px solid var(--line2)', background: 'transparent', color: 'var(--sub)', cursor: 'pointer' }}>
+              {scanning ? 'Scanning…' : 'Scan for dupes'}
+            </button>
+            <button onClick={autoMerge} disabled={autoMerging} style={{ fontFamily: 'var(--mono)', fontSize: '.55rem', padding: '.3rem .75rem', borderRadius: 6, border: '1px solid rgba(16,185,129,.3)', background: 'rgba(16,185,129,.08)', color: 'var(--green)', cursor: 'pointer' }}>
+              {autoMerging ? 'Running…' : 'Auto-merge'}
+            </button>
+          </div>
+        }
+      />
+      {/* Manual merge form */}
+      <div style={{ paddingBottom: '.75rem', borderBottom: '1px solid var(--line2)', marginBottom: '.75rem' }}>
+        <div style={{ fontFamily: 'var(--mono)', fontSize: '.48rem', textTransform: 'uppercase', letterSpacing: '.12em', color: 'var(--dim)', marginBottom: '.5rem' }}>Manual merge</div>
+        <div style={{ display: 'flex', gap: '.5rem', alignItems: 'flex-end', flexWrap: 'wrap' }}>
+          <div style={{ flex: 1, minWidth: 110 }}>
+            <div style={{ fontFamily: 'var(--mono)', fontSize: '.48rem', color: 'var(--muted)', marginBottom: '.22rem' }}>Keep (primary)</div>
+            <input value={primary} onChange={e => setPrimary(e.target.value)} placeholder="e.g. Amazon" style={inputStyle} />
+          </div>
+          <div style={{ fontFamily: 'var(--mono)', fontSize: '.8rem', color: 'var(--dim)', flexShrink: 0, paddingBottom: '.45rem' }}>←</div>
+          <div style={{ flex: 1, minWidth: 110 }}>
+            <div style={{ fontFamily: 'var(--mono)', fontSize: '.48rem', color: 'var(--muted)', marginBottom: '.22rem' }}>Absorb (secondary)</div>
+            <input value={secondary} onChange={e => setSecondary(e.target.value)} placeholder="e.g. amazon.com" style={inputStyle} />
+          </div>
+          <button onClick={manualMerge} disabled={merging} style={{ fontFamily: 'var(--mono)', fontSize: '.6rem', padding: '.42rem .9rem', borderRadius: 7, border: '1px solid rgba(239,68,68,.3)', background: 'rgba(239,68,68,.08)', color: 'var(--red)', cursor: 'pointer', flexShrink: 0 }}>Merge →</button>
+        </div>
+        {status && <div style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', marginTop: '.45rem', color: status.color }}>{status.text}</div>}
+      </div>
+      {/* Detected duplicates list */}
+      {dupes === null
+        ? <div style={{ fontFamily: 'var(--mono)', fontSize: '.62rem', color: 'var(--dim)' }}>Click &quot;Scan for dupes&quot; to detect company name duplicates.</div>
+        : dupes.length === 0
+          ? <div style={{ fontFamily: 'var(--mono)', fontSize: '.62rem', color: 'var(--green)' }}>✓ No duplicates detected</div>
+          : dupes.map(({ key, companies }) => {
+            const prim = companies[0]
+            const rest = companies.slice(1)
+            return (
+              <div key={key} style={{ padding: '.65rem 0', borderBottom: '1px solid var(--line2)' }}>
+                <div style={{ fontFamily: 'var(--mono)', fontSize: '.5rem', textTransform: 'uppercase', letterSpacing: '.1em', color: 'var(--amber)', marginBottom: '.3rem' }}>{companies.length} entries match &quot;{key}&quot;</div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '.35rem', flexWrap: 'wrap' }}>
+                  <span style={{ fontFamily: 'var(--mono)', fontSize: '.6rem', padding: '.18rem .55rem', borderRadius: 4, background: 'rgba(16,185,129,.12)', color: 'var(--green)', border: '1px solid rgba(16,185,129,.2)' }}>{prim.name} <span style={{ opacity: .6 }}>({prim.report_count || 0})</span></span>
+                  {rest.map(c => (
+                    <span key={c.id} style={{ fontFamily: 'var(--mono)', fontSize: '.6rem', padding: '.18rem .55rem', borderRadius: 4, background: 'rgba(239,68,68,.08)', color: 'var(--red)', border: '1px solid rgba(239,68,68,.15)' }}>{c.name} <span style={{ opacity: .6 }}>({c.report_count || 0})</span></span>
+                  ))}
+                  <button onClick={() => setMerge(prim.name, rest[0].name)} style={{ fontFamily: 'var(--mono)', fontSize: '.52rem', padding: '.18rem .55rem', borderRadius: 5, border: '1px solid var(--line2)', background: 'transparent', color: 'var(--sub)', cursor: 'pointer', marginLeft: 'auto' }}>Set to merge</button>
+                </div>
+              </div>
+            )
+          })
+      }
+    </Card>
   )
 }
 
