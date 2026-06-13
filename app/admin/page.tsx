@@ -38,7 +38,7 @@ interface InactiveReport {
   job: { id: string; company: string; title: string; city: string; url: string; apply_url: string; availability_status: string } | null
 }
 interface DupCluster {
-  id: string; risk_score: number; status: string; signals: string[]
+  id: string; risk_score: number; status: string; signals: string[]; user_ids: string[]
 }
 interface RecentJob {
   id: string; company: string; title: string; city: string; url: string
@@ -482,6 +482,14 @@ export default function AdminPage() {
         {/* Feature flags */}
         <FlagsPanel flags={stats.feature_flags || []} token={token!} onRefresh={() => load(token!)} />
 
+        {/* Duplicate account clusters */}
+        <ClustersPanel
+          clusters={stats.duplicate_clusters?.items || []}
+          suspected={stats.duplicate_clusters?.suspected || 0}
+          token={token!}
+          onRefresh={() => load(token!)}
+        />
+
         {/* API Health */}
         <Card style={{ marginBottom: '1.25rem' }}>
           <CardHeader title="API health" />
@@ -759,6 +767,94 @@ function FlagsPanel({ flags, token, onRefresh }: { flags: FeatureFlag[]; token: 
               >
                 {FLAG_STATUSES.map(s => <option key={s} value={s}>{FLAG_STATUS_LABELS[s]}</option>)}
               </select>
+            </div>
+          )
+        })
+      }
+    </Card>
+  )
+}
+
+const CLUSTER_STATUSES = ['suspected', 'safe', 'watching', 'limited', 'frozen', 'suspended']
+const CLUSTER_COLORS: Record<string, string> = {
+  suspected: 'var(--amber)', watching: 'var(--blue)', limited: 'var(--red)',
+  frozen: 'var(--red)', suspended: 'var(--red)', safe: 'var(--green)',
+}
+
+function ClustersPanel({ clusters, suspected, token, onRefresh }: { clusters: DupCluster[]; suspected: number; token: string; onRefresh: () => void }) {
+  const [scanning, setScanning] = useState(false)
+  const [scanMsg, setScanMsg] = useState('')
+  const [localStatus, setLocalStatus] = useState<Record<string, string>>({})
+
+  async function updateCluster(clusterId: string, status: string) {
+    const prev = localStatus[clusterId]
+    setLocalStatus(s => ({ ...s, [clusterId]: status }))
+    try {
+      const res = await fetch('/api/admin-stats', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Admin-Token': token },
+        body: JSON.stringify({ action: 'update_cluster', cluster_id: clusterId, status }),
+      })
+      const d = await res.json()
+      if (!d.ok) throw new Error(d.error || res.status)
+    } catch (e) {
+      setLocalStatus(s => ({ ...s, [clusterId]: prev ?? '' }))
+      alert('Failed to update cluster: ' + (e as Error).message)
+    }
+  }
+
+  async function scan() {
+    setScanning(true)
+    setScanMsg('Scanning login signals…')
+    try {
+      const res = await fetch('/api/admin-stats', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Admin-Token': token },
+        body: JSON.stringify({ action: 'detect_duplicates_by_signals' }),
+      })
+      const d = await res.json()
+      if (!d.ok) throw new Error(d.error || res.status)
+      setScanMsg(`✓ Found ${d.suspects} suspect groups — created ${d.clusters_created} new clusters`)
+      setTimeout(onRefresh, 1200)
+    } catch (e) {
+      setScanMsg('Error: ' + (e as Error).message)
+      setScanning(false)
+    }
+  }
+
+  return (
+    <Card style={{ marginBottom: '1.25rem' }}>
+      <CardHeader
+        title="Duplicate account clusters"
+        action={
+          <button onClick={scan} disabled={scanning} style={{ background: 'none', border: '1px solid var(--line2)', borderRadius: 6, padding: '.3rem .7rem', fontFamily: 'var(--mono)', fontSize: '.58rem', color: 'var(--sub)', cursor: 'pointer' }}>
+            Scan signals
+          </button>
+        }
+      />
+      {scanMsg && <div style={{ fontFamily: 'var(--mono)', fontSize: '.62rem', color: scanMsg.startsWith('✓') ? 'var(--green)' : scanMsg.startsWith('Error') ? 'var(--red)' : 'var(--dim)', marginBottom: '.6rem' }}>{scanMsg}</div>}
+      {suspected > 0 && (
+        <div style={{ fontFamily: 'var(--mono)', fontSize: '.6rem', color: 'var(--amber)', marginBottom: '.6rem' }}>
+          {suspected} suspected cluster{suspected === 1 ? '' : 's'}
+        </div>
+      )}
+      {clusters.length === 0
+        ? <div style={{ fontFamily: 'var(--mono)', fontSize: '.62rem', color: 'var(--dim)' }}>No suspected clusters — click &quot;Scan signals&quot; to detect</div>
+        : clusters.map(c => {
+          const status = localStatus[c.id] || c.status
+          return (
+            <div key={c.id} style={{ padding: '.6rem 0', borderBottom: '1px solid var(--line2)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '.65rem' }}>
+                <span style={{ fontFamily: 'var(--mono)', fontSize: '.6rem', fontWeight: 700, color: CLUSTER_COLORS[status] || 'var(--sub)' }}>Risk {c.risk_score}/100</span>
+                <span style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', color: 'var(--dim)' }}>{c.user_ids?.length || 0} accounts · {(c.signals || []).join(', ')}</span>
+                <select
+                  value={status}
+                  onChange={e => updateCluster(c.id, e.target.value)}
+                  style={{ background: 'var(--raised)', border: '1px solid var(--line2)', borderRadius: 5, padding: '.18rem .4rem', fontFamily: 'var(--mono)', fontSize: '.58rem', color: 'var(--sub)', cursor: 'pointer', marginLeft: 'auto' }}
+                >
+                  {CLUSTER_STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
+                </select>
+              </div>
             </div>
           )
         })
