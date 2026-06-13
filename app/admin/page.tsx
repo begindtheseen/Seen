@@ -440,6 +440,21 @@ export default function AdminPage() {
           }
         </Card>
 
+        {/* Reported inactive listings */}
+        <Card style={{ marginBottom: '1.25rem' }}>
+          <CardHeader
+            title="Reported inactive listings"
+            badge={(stats.jobs?.inactive_reports || []).length > 0 ? <Badge n={stats.jobs.inactive_reports.length} color="var(--amber)" /> : undefined}
+            action={<span style={{ fontFamily: 'var(--mono)', fontSize: '.48rem', color: 'var(--dim)' }}>User reports that a listing is no longer active</span>}
+          />
+          {(stats.jobs?.inactive_reports || []).length === 0
+            ? <div style={{ fontFamily: 'var(--mono)', fontSize: '.62rem', color: 'var(--dim)' }}>No inactive reports this week</div>
+            : (stats.jobs.inactive_reports || []).map(r => (
+              <InactiveRow key={r.job_id} report={r} token={token!} />
+            ))
+          }
+        </Card>
+
         {/* Data quality issues queue */}
         <Card style={{ marginBottom: '1.25rem' }}>
           <CardHeader
@@ -588,6 +603,57 @@ function IssueRow({ issue, token, onRefresh }: { issue: Issue; token: string; on
       <div style={{ display: 'flex', flexDirection: 'column', gap: '.3rem', flexShrink: 0 }}>
         <button onClick={() => act('resolve_issue')} disabled={acting} style={{ fontFamily: 'var(--mono)', fontSize: '.52rem', padding: '.22rem .6rem', borderRadius: 5, border: '1px solid rgba(16,185,129,.3)', background: 'rgba(16,185,129,.08)', color: 'var(--green)', cursor: 'pointer' }}>Resolve</button>
         <button onClick={() => act('dismiss_issue')} disabled={acting} style={{ fontFamily: 'var(--mono)', fontSize: '.52rem', padding: '.22rem .6rem', borderRadius: 5, border: '1px solid var(--line2)', background: 'transparent', color: 'var(--dim)', cursor: 'pointer' }}>Dismiss</button>
+      </div>
+    </div>
+  )
+}
+
+function InactiveRow({ report: r, token }: { report: InactiveReport; token: string }) {
+  const [acting, setActing] = useState(false)
+  const [done, setDone] = useState<'removed' | 'kept' | null>(null)
+  const j = r.job || ({} as NonNullable<InactiveReport['job']>)
+  const jobUrl = j.url || j.apply_url || ''
+
+  async function act(action: 'remove_listing' | 'deny_report') {
+    if (action === 'remove_listing' && !confirm('Remove this job listing? It will be hidden from job seekers.')) return
+    setActing(true)
+    try {
+      const res = await fetch('/api/admin-stats', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Admin-Token': token },
+        body: JSON.stringify({ action, job_id: r.job_id }),
+      })
+      const d = await res.json()
+      if (!d.ok) throw new Error(d.error || res.status)
+      setDone(action === 'remove_listing' ? 'removed' : 'kept')
+    } catch (e) {
+      setActing(false)
+      alert('Error: ' + (e as Error).message)
+    }
+  }
+
+  if (done) return (
+    <div style={{ padding: '.5rem 0', borderBottom: '1px solid var(--line2)', fontFamily: 'var(--mono)', fontSize: '.58rem', color: done === 'removed' ? 'var(--green)' : 'var(--dim)' }}>
+      {done === 'removed' ? '✓ Listing removed' : '✓ Marked as still active'}
+    </div>
+  )
+
+  return (
+    <div style={{ padding: '.7rem 0', borderBottom: '1px solid var(--line2)' }}>
+      <div style={{ display: 'flex', alignItems: 'flex-start', gap: '.75rem' }}>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontFamily: 'var(--mono)', fontSize: '.65rem', color: 'var(--white)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            {j.title || 'Unknown title'} · <span style={{ color: 'var(--sub)' }}>{j.company || 'Unknown company'}</span>
+          </div>
+          <div style={{ fontFamily: 'var(--mono)', fontSize: '.55rem', color: 'var(--dim)', marginTop: '.15rem' }}>
+            {j.city || ''} · {r.report_count} report{r.report_count === 1 ? '' : 's'} · latest {relTime(r.latest_reported_at)}
+          </div>
+          {jobUrl && <a href={jobUrl} target="_blank" rel="noopener noreferrer" style={{ fontFamily: 'var(--mono)', fontSize: '.55rem', color: 'var(--blue)', textDecoration: 'none', marginTop: '.2rem', display: 'inline-block' }}>↗ Verify listing →</a>}
+        </div>
+        <div style={{ display: 'flex', gap: '.45rem', flexShrink: 0, marginTop: '.1rem' }}>
+          <button onClick={() => act('remove_listing')} disabled={acting} style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', padding: '.3rem .65rem', borderRadius: 6, border: '1px solid rgba(239,68,68,.4)', background: 'rgba(239,68,68,.08)', color: 'var(--red)', cursor: 'pointer' }}>Remove listing</button>
+          <button onClick={() => act('deny_report')} disabled={acting} style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', padding: '.3rem .65rem', borderRadius: 6, border: '1px solid var(--line2)', background: 'transparent', color: 'var(--sub)', cursor: 'pointer' }}>Keep active</button>
+        </div>
       </div>
     </div>
   )

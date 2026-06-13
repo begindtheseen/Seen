@@ -100,8 +100,8 @@ The current GET handler (lines 132–254) returns `reports: {total, today, this_
 - **Old source**: HTML 2590–2599 (`#admInactiveList`, `#admInactiveCount`); render JS 6668–6698; `adminRemoveListing` 6985–7004; `adminDenyReport` 7006–7023.
 - **API calls**: GET → `jobs.inactive_reports` (grouped per job with `report_count`, `latest_reported_at`, embedded `job`); POST `remove_listing` `{job_id}` (confirm() first), POST `deny_report` `{job_id}`.
 - **UI elements**: amber count badge in header; per-row job title · company, city · "N reports · latest Xh ago", "↗ Verify listing →" link; buttons **"Remove listing"** (red, confirm dialog, row → "✓ Listing removed") and **"Keep active"** (row → "✓ Marked as still active").
-- **Status in Next.js**: ❌ missing.
-- **Files to change**: `app/admin/page.tsx`
+- **Status in Next.js**: ✅ **ported** (recovery branch). `InactiveRow` component: amber count badge, job title · company, city · "N reports · latest Xh ago", "↗ Verify listing →" link, Remove listing (red, `confirm()` dialog → "✓ Listing removed") + Keep active (→ "✓ Marked as still active"). Reads `stats.jobs.inactive_reports`; POSTs `remove_listing`/`deny_report` `{job_id}`. Verifies `d.ok`.
+- **Files to change**: `app/admin/page.tsx` ✅ done
 
 ### 10. Data quality issues queue (user-reported issues)
 - **Old source**: HTML 2601–2610 (`#admIssuesList`, `#admIssueCount`, `#admIssuesRefreshBtn`); `adminLoadIssues(issueData)` 7108–7166; `adminActIssue(id, action, btn)` 7168–7190. (User-side submission modal `reportIssue`/`submitIssue` 7044–7105 posts to `/api/reports` — out of admin scope but feeds this queue.)
@@ -166,7 +166,7 @@ The current GET handler (lines 132–254) returns `reports: {total, today, this_
 | 6 | Recent hiring reports + moderation (✓/?/✗) | ❌ | M |
 | 7 | Recent tracker applications | ❌ | S |
 | 8 | Recent jobs browser (period tabs) | ❌ | M |
-| 9 | Reported inactive listings (remove/keep) | ❌ | M |
+| 9 | Reported inactive listings (remove/keep) | ✅ | M |
 | 10 | Data quality issues queue | ✅ (merge-tool prefill deferred to §11) | M |
 | 11 | Company dedup (scan/auto/manual merge) | ❌ (+ API contract drift) | L |
 | 12 | Feature flags | ❌ | M |
