@@ -538,8 +538,89 @@ export default function AdminPage() {
           )}
         </Card>
 
+        {/* Background job runner */}
+        <JobRunner token={token!} />
+
       </div>
     </div>
+  )
+}
+
+const REDDIT_SUBS = ['recruitinghell', 'jobs', 'cscareerquestions', 'careerguidance']
+const JOB_DEFS = [
+  { key: 'refresh_jobs', name: 'Refresh job listings', desc: 'Pulls new openings from job boards · runs 6×/day', green: false },
+  { key: 'refresh_demand', name: 'Refresh demand data', desc: 'Pulls BLS JOLTS + CES, updates demand index · runs monthly', green: false },
+  { key: 'reddit_import', name: 'Reddit import', desc: 'Classifies hiring posts from r/recruitinghell + 3 others · runs nightly', green: true },
+] as const
+
+function JobRunner({ token }: { token: string }) {
+  const [running, setRunning] = useState<string | null>(null)
+  const [label, setLabel] = useState<Record<string, string>>({})
+  const [result, setResult] = useState('')
+
+  function hdrs() { return { 'Content-Type': 'application/json', 'X-Admin-Token': token } }
+
+  async function run(job: string) {
+    setRunning(job)
+    setLabel(l => ({ ...l, [job]: '⏳ Running…' }))
+    setResult('')
+    try {
+      if (job === 'reddit_import') {
+        let totalImported = 0
+        const subResults: string[] = []
+        setResult('Running…')
+        for (const sub of REDDIT_SUBS) {
+          const r = await fetch('/api/reports', { method: 'POST', headers: hdrs(), body: JSON.stringify({ action: 'reddit_import', subreddit: sub }) })
+          const d = await r.json().catch(() => ({}))
+          const n = d.results ? Object.values(d.results).reduce((s: number, v) => s + ((v as { imported?: number }).imported || 0), 0) : 0
+          const posts = d.debug?.subreddits?.[sub]?.posts ?? d.debug?.subreddits?.[sub]?.error ?? '?'
+          totalImported += n
+          subResults.push(`${sub}:${posts}(+${n})`)
+          setResult(`Running… ${subResults.join(' ')}`)
+        }
+        setLabel(l => ({ ...l, [job]: '✓ Done' }))
+        setResult(`✓ Reddit: ${totalImported} imported | ${subResults.join(' ')}`)
+      } else {
+        const url = job === 'refresh_jobs' ? '/api/refresh-jobs' : '/api/demand'
+        const res = await fetch(url, { method: 'POST', headers: hdrs(), body: JSON.stringify({}) })
+        const d = await res.json().catch(() => ({}))
+        if (!res.ok) throw new Error(d.error || String(res.status))
+        let msg = `✓ ${job} complete`
+        if (job === 'refresh_jobs' && d.inserted != null) msg = `✓ Jobs: ${d.inserted} inserted, ${d.updated ?? 0} updated`
+        else if (job === 'refresh_demand' && d.rows_upserted != null) msg = `✓ Demand: ${d.rows_upserted} rows updated`
+        setLabel(l => ({ ...l, [job]: '✓ Done' }))
+        setResult(msg)
+      }
+    } catch (e) {
+      setLabel(l => ({ ...l, [job]: '✗ Error' }))
+      setResult('✗ ' + (e as Error).message.slice(0, 80))
+    }
+    setRunning(null)
+    setTimeout(() => setLabel(l => ({ ...l, [job]: '' })), 5000)
+  }
+
+  return (
+    <Card style={{ marginBottom: '1.25rem' }}>
+      <CardHeader title="Background jobs" />
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '.5rem' }}>
+        {JOB_DEFS.map(j => (
+          <div key={j.key} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '.6rem .75rem', background: 'var(--surface)', borderRadius: 8 }}>
+            <div>
+              <div style={{ fontFamily: 'var(--mono)', fontSize: '.65rem', color: 'var(--white)' }}>{j.name}</div>
+              <div style={{ fontFamily: 'var(--mono)', fontSize: '.55rem', color: 'var(--dim)' }}>{j.desc}</div>
+            </div>
+            <button
+              onClick={() => run(j.key)}
+              disabled={running === j.key}
+              style={{ background: 'none', border: `1px solid ${j.green ? 'var(--green)' : 'var(--line2)'}`, borderRadius: 7, padding: '.35rem .8rem', fontFamily: 'var(--mono)', fontSize: '.6rem', color: j.green ? 'var(--green)' : 'var(--sub)', cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0 }}
+            >
+              {label[j.key] || '▶ Run'}
+            </button>
+          </div>
+        ))}
+      </div>
+      {result && <div style={{ fontFamily: 'var(--mono)', fontSize: '.6rem', color: 'var(--sub)', marginTop: '.6rem' }}>{result}</div>}
+    </Card>
   )
 }
 

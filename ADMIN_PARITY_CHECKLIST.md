@@ -146,8 +146,8 @@ The current GET handler (lines 132–254) returns `reports: {total, today, this_
   - `refresh_demand` → POST `/api/demand` `{}` → reads `{rows_upserted}`
   - `reddit_import` → POST `/api/reports` `{action:'reddit_import', subreddit}` once per subreddit (`recruitinghell`, `jobs`, `cscareerquestions`, `careerguidance`) sequentially to dodge rate limits; sums `results[].imported`, shows per-sub progress `sub:posts(+imported)`.
 - **UI elements**: 3 job cards (name + description + cadence note), "▶ Run" buttons (→ "⏳ Running…" → "✓ Done"/"✗ Error", restored after 5s), shared result line `#admJobResult`.
-- **Status in Next.js**: ❌ missing.
-- **Files to change**: `app/admin/page.tsx`
+- **Status in Next.js**: ✅ **ported** (recovery branch). `JobRunner` component: 3 job cards (name + cadence desc), "▶ Run" → "⏳ Running…" → "✓ Done"/"✗ Error" (label cleared after 5s), shared result line. refresh_jobs → `/api/refresh-jobs` (reads `{inserted,updated}`); refresh_demand → `/api/demand` (reads `{rows_upserted}`); reddit_import → `/api/reports {action:'reddit_import',subreddit}` per subreddit sequentially, sums `results[].imported`, shows `sub:posts(+imported)` progress. All send `X-Admin-Token`. **Verified** all 3 endpoints accept X-Admin-Token on this branch (refresh-jobs.js:636, demand.js:109, reports.js:227).
+- **Files to change**: `app/admin/page.tsx` ✅ done
 
 ### 16. Credit/pro coverage & admin audit (API-only, no UI in old app)
 - **Old source**: none — GET returns `credits: {total_users, pro_users}` (admin-stats.js:234) which the old dashboard never displays; `set_pro` (line 325) has no caller anywhere in index.html (verified by grep); every admin mutation writes `admin_audit_log` (lines 117, 292, 321, 330, 349, 401, 420, 438, 446, 454, 462) but there is no audit-viewer UI or read endpoint.
@@ -173,7 +173,7 @@ The current GET handler (lines 132–254) returns `reports: {total, today, this_
 | 12 | Feature flags | ✅ | M |
 | 13 | Duplicate account clusters | ✅ | M |
 | 14 | API Health | ❌ | S |
-| 15 | Background job runner | ❌ | M |
+| 15 | Background job runner | ✅ | M |
 | 16 | Credits/set_pro/audit viewer (API-only) | ❌ in both — optional | M (optional) |
 
 ## Porting order recommendation

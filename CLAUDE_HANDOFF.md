@@ -18,14 +18,24 @@ Last updated: 2026-06-13 (Session C, recovery)
      API Health panel; chart date labels; zero-value outcome bars filtered.
 2. `Sync package-lock.json version to 0.1.1`
 
-### Admin sections remaining (priority order — see ADMIN_PARITY_CHECKLIST.md)
-- ✅ §10 Data quality issues queue (resolve/dismiss) — ported; merge-tool prefill deferred to §11
-- ✅ §9 Reported inactive listings (remove_listing/deny_report + confirm) — ported
-- ✅ §8 Recent jobs browser (period tabs, get_recent_jobs) — ported (lazy load, 401/403 re-login)
-- ✅ §12 Feature flags (set_flag/seed_flags) — ported (optimistic select, seed defaults)
-- ✅ §13 Duplicate account clusters (update_cluster/detect_duplicates_by_signals) — ported
-- ✅ §11 Company deduplication (find_duplicates/merge/auto_merge) — ported; **API contract drift resolved**: merge accepts names OR ids + returns merged_report_count; auto_merge returns groups again. Also wired §10 "Open in merge tool" prefill.
-- §15 Background job runner (X-Admin-Token → /api/refresh-jobs, /api/demand, /api/reports)
+### Admin sections — ALL 16 PORTED ✅ (see ADMIN_PARITY_CHECKLIST.md)
+- ✅ §1 Header, §2 KPI boxes, §3 Jobs KPI, §4 setup note (earlier commits)
+- ✅ §5 chart/top/outcomes (+ API GET payload restored), §6 recent reports + moderation, §7 recent apps, §14 API health (earlier commits)
+- ✅ §10 Data quality issues queue (resolve/dismiss)
+- ✅ §9 Reported inactive listings (remove_listing/deny_report + confirm)
+- ✅ §8 Recent jobs browser (period tabs, get_recent_jobs; lazy load, 401/403 re-login)
+- ✅ §12 Feature flags (set_flag/seed_flags; optimistic select, seed defaults)
+- ✅ §13 Duplicate account clusters (update_cluster/detect_duplicates_by_signals)
+- ✅ §11 Company deduplication (find_duplicates/merge/auto_merge) — **API contract drift resolved**: merge accepts names OR ids + returns merged_report_count; auto_merge returns groups again. Wired §10 "Open in merge tool" prefill.
+- ✅ §15 Background job runner (X-Admin-Token → /api/refresh-jobs, /api/demand, /api/reports) — endpoints verified to accept X-Admin-Token
+
+**MILESTONE: Admin parity 16/16 sections functionally complete.** Auth (login/logout/401/403) complete.
+Remaining admin work is cosmetic/optional only: §2 minor (`ready:false` N/A — done), §16 (credits/set_pro/audit viewer — API-only, missing in old too, NOT a parity blocker).
+
+### Next up (per PRIORITY ORDER — Phase 1 items 11–12, then site pages)
+- Job detail page route (`app/jobs/[id]`) — MISSING; old `page-job-detail` (index.html:2274–2293)
+- AI job insights (`/api/job-insights`) — inaccessible without job detail route
+- Then SITE_PARITY_CHECKLIST.md page-by-page audit (Phase 2)
 
 ### Working agreement this session
 - Admin parity only, one section at a time, small commits.
