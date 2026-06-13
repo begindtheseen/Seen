@@ -97,11 +97,14 @@ export default async function handler(req, res) {
         const searchTerms = [canonical, ...expansion.related].filter(Boolean);
 
         // Run ALL expansion-term DB lookups in parallel
+        // Search both search_query and title columns so cached jobs under
+        // different query keys still surface for synonymous searches.
         const termRows = await Promise.all(
-          searchTerms.map(term =>
-            fetch(`${SUPABASE_URL}/rest/v1/jobs?search_query=ilike.${encodeURIComponent(term)}&expires_at=gt.${now}&limit=25`, { headers: dbHeaders })
-              .then(r => r.ok ? r.json() : []).catch(() => [])
-          )
+          searchTerms.map(term => {
+            const orFilter = `or=${encodeURIComponent(`(search_query.ilike.*${term}*,title.ilike.*${term}*)`)}`;
+            return fetch(`${SUPABASE_URL}/rest/v1/jobs?${orFilter}&expires_at=gt.${now}&limit=25`, { headers: dbHeaders })
+              .then(r => r.ok ? r.json() : []).catch(() => []);
+          })
         );
 
         // Pick best result: expansion terms first (most specific), then keyword fallback
@@ -181,7 +184,8 @@ export default async function handler(req, res) {
           return [];
         })())].filter(Boolean);
         for (const term of searchTerms) {
-          const r = await fetch(`${SUPABASE_URL}/rest/v1/jobs?search_query=ilike.${encodeURIComponent(term)}&limit=25`, { headers: dbHeaders });
+          const staleFilter = `or=${encodeURIComponent(`(search_query.ilike.*${term}*,title.ilike.*${term}*)`)}`;
+          const r = await fetch(`${SUPABASE_URL}/rest/v1/jobs?${staleFilter}&limit=25`, { headers: dbHeaders });
           if (r.ok) {
             const rows = await r.json();
             if (Array.isArray(rows) && rows.length >= 3) {
@@ -299,19 +303,24 @@ function buildFallbackFilter(q) {
   const words = q.split(/\s+/)
     .map(w => w.replace(/[^a-z0-9]/g, ''))
     .filter(w => w.length > 1 && !STOP.has(w))
-    .slice(0, 4);
+    .slice(0, 5);
 
   if (!words.length) return null;
 
-  const conditions = words.map(w =>
-    COMPANIES.has(w) ? `company.ilike.*${w}*` : `title.ilike.*${w}*`
-  );
+  const conditions = [];
+  // Full phrase match first (most specific — catches "machine learning engineer" as a unit)
+  if (words.length > 1) conditions.push(`title.ilike.*${words.join(' ')}*`);
+
+  // Individual word matches (OR — any word is a useful signal)
+  for (const w of words) {
+    conditions.push(COMPANIES.has(w) ? `company.ilike.*${w}*` : `title.ilike.*${w}*`);
+  }
 
   if (conditions.length === 1) {
     const [col, op, val] = conditions[0].split('.');
     return `${col}=${op}.${val}`;
   }
-  return `and=${encodeURIComponent(`(${conditions.join(',')})`)}`;
+  return `or=${encodeURIComponent(`(${conditions.join(',')})`)}`;
 }
 
 function scoreJob(job) {
