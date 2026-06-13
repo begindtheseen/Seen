@@ -154,6 +154,7 @@ export default function JobsPage() {
   const [location, setLocation] = useState('')
   const [locSuggs, setLocSuggs] = useState<string[]>([])
   const [showLocSuggs, setShowLocSuggs] = useState(false)
+  const [gpsLoading, setGpsLoading] = useState(false)
   const [radius, setRadius] = useState('25')
   const [niche, setNiche] = useState<NicheFilter>('')
   const [level, setLevel] = useState<LevelFilter>('')
@@ -203,6 +204,28 @@ export default function JobsPage() {
   useEffect(() => {
     if (jobs.length > 0) updateDisplay(jobs, sort)
   }, [niche, level, jobType, posted, sort]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  async function requestGpsLocation() {
+    if (!navigator.geolocation || location.trim()) return
+    setGpsLoading(true)
+    try {
+      const pos = await new Promise<GeolocationPosition>((res, rej) =>
+        navigator.geolocation.getCurrentPosition(res, rej, { timeout: 8000, maximumAge: 300000 })
+      )
+      const { latitude: lat, longitude: lon } = pos.coords
+      const r = await fetch(
+        `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}`,
+        { headers: { 'User-Agent': 'seenjobs.io/1.0', 'Accept-Language': 'en' } }
+      )
+      if (!r.ok) throw new Error('geocode')
+      const geo = await r.json() as { address: Record<string, string> }
+      const city = geo.address.city || geo.address.town || geo.address.village || geo.address.county || ''
+      const state = geo.address.state || ''
+      const loc = city && state ? `${city}, ${state}` : city || state
+      if (loc) setLocation(loc)
+    } catch { /* silently fail */ }
+    finally { setGpsLoading(false) }
+  }
 
   async function searchJobs() {
     if (!query.trim() && !location.trim()) {
@@ -331,8 +354,16 @@ export default function JobsPage() {
                 }}
                 onKeyDown={e => e.key === 'Enter' && searchJobs()}
                 onBlur={() => setTimeout(() => setShowLocSuggs(false), 150)}
-                style={{ ...inputStyle, flex: 'unset', minWidth: 'unset', width: '100%' }}
+                style={{ ...inputStyle, flex: 'unset', minWidth: 'unset', width: '100%', paddingRight: '2rem' }}
               />
+              <button
+                onClick={requestGpsLocation}
+                title="Use my location"
+                disabled={gpsLoading || !!location.trim()}
+                style={{ position: 'absolute', right: '.5rem', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: gpsLoading || location.trim() ? 'default' : 'pointer', fontSize: '.9rem', color: gpsLoading ? 'var(--blue)' : 'var(--muted)', padding: 0, lineHeight: 1, opacity: location.trim() ? 0.3 : 1, transition: 'color .15s' }}
+              >
+                {gpsLoading ? '⏳' : '📍'}
+              </button>
               {showLocSuggs && locSuggs.length > 0 && (
                 <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 50, background: 'var(--card)', border: '1px solid var(--line2)', borderRadius: 8, marginTop: 2, overflow: 'hidden', boxShadow: '0 8px 24px rgba(0,0,0,.4)' }}>
                   {locSuggs.map(city => (

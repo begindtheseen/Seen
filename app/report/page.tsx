@@ -299,10 +299,10 @@ export default function ReportPage() {
               <div>
                 {lbl('Unpaid work?')}
                 <select value={unpaid} onChange={e => setUnpaid(e.target.value)} style={selectStyle}>
-                  <option value="na">None</option>
-                  <option value="take-home">Take-home test</option>
-                  <option value="project">Full project</option>
-                  <option value="presentation">Presentation</option>
+                  <option value="na">N/A</option>
+                  <option value="yes">Yes — unpaid test</option>
+                  <option value="paid">Yes — but paid</option>
+                  <option value="no">No</option>
                 </select>
               </div>
               <div>

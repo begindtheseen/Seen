@@ -327,7 +327,7 @@ export default function TrackerPage() {
           </div>
           <div style={{ display: 'flex', gap: '.5rem', flexWrap: 'wrap' }}>
             <button className="btn btn-green" style={{ fontSize: '.72rem' }} onClick={() => setShowManual(true)}>+ Track manually</button>
-            {apps.length > 1 && <button className="btn btn-ghost" style={{ fontSize: '.72rem' }} onClick={clearDupes}>Clear dupes</button>}
+            {<button className="btn btn-ghost" style={{ fontSize: '.72rem' }} onClick={clearDupes}>Clear dupes</button>}
             {apps.length > 0 && <button className="btn btn-ghost" style={{ fontSize: '.72rem', color: 'var(--muted)' }} onClick={() => { if (confirm('Remove all applications? This cannot be undone.')) { AppStore.clear(); setApps([]) } }}>Clear all</button>}
           </div>
         </div>
