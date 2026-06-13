@@ -51,18 +51,19 @@ interface FeatureFlag {
   flag_name: string; status: string; percentage: number | null; description: string
 }
 
-function StatBox({ n, label, highlight, color }: { n: string | number; label: string; highlight?: boolean; color?: string }) {
+function StatBox({ n, label, sub, highlight, color }: { n: string | number; label: string; sub?: string; highlight?: boolean; color?: string }) {
   const c = color || 'var(--blue)'
   return (
     <div className="statbox-box" style={{
       background: highlight ? `${c}0c` : 'var(--card)',
       border: `1px solid ${highlight ? `${c}55` : 'var(--line)'}`,
-      borderRadius: 10, padding: '1.1rem', textAlign: 'center',
-      boxShadow: highlight ? `0 0 24px ${c}18, 0 4px 24px rgba(0,0,0,.45)` : '0 4px 24px rgba(0,0,0,.3)',
-      transition: 'box-shadow .2s', minWidth: 0,
+      borderRadius: 10, padding: '1rem .9rem', textAlign: 'center',
+      boxShadow: highlight ? `0 0 20px ${c}14, 0 4px 20px rgba(0,0,0,.4)` : '0 2px 12px rgba(0,0,0,.25)',
+      transition: 'box-shadow .2s', minWidth: 0, display: 'flex', flexDirection: 'column', alignItems: 'center',
     }}>
-      <div className="statbox-n" style={{ fontFamily: 'var(--mono)', fontSize: '1.55rem', fontWeight: 500, color: highlight ? c : 'var(--white)', lineHeight: 1, overflow: 'hidden', textOverflow: 'ellipsis' }}>{n}</div>
-      <div style={{ fontFamily: 'var(--mono)', fontSize: '.52rem', textTransform: 'uppercase', letterSpacing: '.08em', color: 'var(--muted)', marginTop: '.3rem' }}>{label}</div>
+      <div style={{ fontFamily: 'var(--mono)', fontSize: '.48rem', textTransform: 'uppercase', letterSpacing: '.1em', color: 'var(--dim)', lineHeight: 1.3, marginBottom: '.3rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', width: '100%' }}>{label}</div>
+      <div className="statbox-n" style={{ fontFamily: 'var(--mono)', fontSize: '1.55rem', fontWeight: 500, color: highlight ? c : 'var(--white)', lineHeight: 1, overflow: 'hidden', textOverflow: 'ellipsis', width: '100%' }}>{n}</div>
+      {sub && <div style={{ fontFamily: 'var(--mono)', fontSize: '.44rem', color: 'var(--muted)', marginTop: '.28rem', lineHeight: 1.2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', width: '100%' }}>{sub}</div>}
     </div>
   )
 }
@@ -313,28 +314,28 @@ export default function AdminPage() {
         {/* Users KPIs */}
         <SectionHeader title="Users" />
         <div className="admin-g4">
-          <StatBox n={stats.users.total.toLocaleString()} label="Total accounts" highlight />
-          <StatBox n={stats.users.new_today} label="New today" />
-          <StatBox n={stats.users.new_this_week} label="New this week" />
-          <StatBox n={stats.users.dau ?? 0} label="DAU" />
+          <StatBox n={stats.users.total.toLocaleString()} label="Total accounts" sub="all users" highlight color="var(--blue)" />
+          <StatBox n={stats.users.new_today} label="New today" sub="last 24h" />
+          <StatBox n={stats.users.new_this_week} label="New this week" sub="last 7 days" />
+          <StatBox n={stats.companies.with_scores} label="Companies scored" sub="with AI scores" />
         </div>
 
         {/* Community KPIs */}
         <SectionHeader title="Community data" />
         <div className="admin-g4">
-          <StatBox n={stats.reports.total.toLocaleString()} label="Total reports" highlight />
-          <StatBox n={stats.reports.today} label="Reports today" />
-          <StatBox n={stats.reports.this_week} label="Reports this week" />
-          <StatBox n={stats.applications.ghost_rate_pct != null ? `${stats.applications.ghost_rate_pct}%` : 'N/A'} label="Ghost rate (30d)" />
+          <StatBox n={stats.reports.total.toLocaleString()} label="Total reports" sub="all time" highlight color="var(--green)" />
+          <StatBox n={stats.reports.today} label="Reports today" sub="last 24h" />
+          <StatBox n={stats.reports.this_week} label="Reports this week" sub="last 7 days" />
+          <StatBox n={stats.applications.ghost_rate_pct != null ? `${stats.applications.ghost_rate_pct}%` : '—'} label="Ghost rate (30d)" sub="of tracked apps" highlight color="var(--red)" />
         </div>
 
         {/* Application tracking KPIs */}
         <SectionHeader title="Application tracking" />
         <div className="admin-g4">
-          <StatBox n={stats.applications.total.toLocaleString()} label="Apps tracked" />
-          <StatBox n={stats.applications.ghosted_30d} label="Ghosted (30d)" />
-          <StatBox n={stats.applications.hired_30d} label="Hired (30d)" />
-          <StatBox n={stats.company_lookups?.ready ? stats.company_lookups.today : 'N/A'} label="Co. lookups today" />
+          <StatBox n={stats.applications.total.toLocaleString()} label="Apps tracked" sub="across all users" />
+          <StatBox n={stats.applications.ghosted_30d} label="Ghosted (30d)" sub="tracked as ghosted" color="var(--amber)" highlight={stats.applications.ghosted_30d > 0} />
+          <StatBox n={stats.applications.hired_30d} label="Hired (30d)" sub="tracked as hired" color="var(--green)" highlight={stats.applications.hired_30d > 0} />
+          <StatBox n={stats.company_lookups?.ready ? stats.company_lookups.today : '—'} label="Co. lookups today" sub="company pages viewed" />
         </div>
 
         {/* Company lookups setup note */}
@@ -356,10 +357,10 @@ export default function AdminPage() {
         {/* Jobs KPIs */}
         <SectionHeader title="Jobs" />
         <div className="admin-g4">
-          <StatBox n={(stats.jobs?.active ?? 0).toLocaleString()} label="Active listings" highlight color="var(--blue)" />
-          <StatBox n={stats.jobs?.new_today ?? 0} label="New today" highlight color="var(--green)" />
-          <StatBox n={stats.jobs?.stale_or_expired ?? 0} label="Stale / expired" />
-          <StatBox n={stats.jobs?.inactive_reports?.length ?? 0} label="Reported inactive" />
+          <StatBox n={stats.jobs?.new_today ?? 0} label="Jobs added today" sub="new listings posted" highlight color="var(--green)" />
+          <StatBox n={(stats.jobs?.active ?? 0).toLocaleString()} label="Active listings" sub="live on Seen" highlight color="var(--blue)" />
+          <StatBox n={stats.jobs?.stale_or_expired ?? 0} label="Stale / expired" sub="needs cleanup" />
+          <StatBox n={stats.jobs?.inactive_reports?.length ?? 0} label="Reported inactive" sub="user reports" />
         </div>
 
         {/* Reports chart + outcome breakdown */}
@@ -517,9 +518,9 @@ export default function AdminPage() {
         <Card style={{ marginBottom: '1.25rem' }}>
           <CardHeader title="API health" />
           <div className="admin-g3">
-            <StatBox n={stats.errors?.today ?? 0} label="Errors today" highlight={stats.errors?.today > 10} color="var(--red)" />
-            <StatBox n={stats.errors?.this_week ?? 0} label="Errors this week" />
-            <StatBox n={stats.users?.dau ?? 0} label="DAU" />
+            <StatBox n={stats.errors?.today ?? 0} label="Errors today" sub="last 24h" highlight={stats.errors?.today > 10} color="var(--red)" />
+            <StatBox n={stats.errors?.this_week ?? 0} label="Errors this week" sub="last 7 days" />
+            <StatBox n={stats.users?.dau ?? 0} label="DAU" sub="active today" />
           </div>
           {stats.errors?.by_route && Object.keys(stats.errors.by_route).length > 0 && (
             <div style={{ marginBottom: '.75rem' }}>
