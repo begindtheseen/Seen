@@ -2,13 +2,64 @@ import LandingHero from '@/components/LandingHero'
 import LandingMarketingSections from '@/components/LandingMarketingSections'
 import ScrollIndicator from '@/components/ScrollIndicator'
 
+const TICKER_DATA = [
+  { name: 'AMAZON',    loc: 'Seattle',        score: 24, risk: 'danger' },
+  { name: 'META',      loc: 'Menlo Park',     score: 38, risk: 'danger' },
+  { name: 'STRIPE',    loc: 'Remote',         score: 88, risk: 'safe'   },
+  { name: 'LINEAR',    loc: 'Remote',         score: 91, risk: 'safe'   },
+  { name: 'SHOPIFY',   loc: 'Remote',         score: 82, risk: 'safe'   },
+  { name: 'ACCENTURE', loc: 'Chicago',        score: 29, risk: 'danger' },
+  { name: 'NOTION',    loc: 'Remote',         score: 71, risk: 'safe'   },
+  { name: 'DELOITTE',  loc: 'New York',       score: 33, risk: 'danger' },
+  { name: 'INDEED',    loc: 'Austin',         score: 31, risk: 'danger' },
+  { name: 'APPLE',     loc: 'Cupertino',      score: 72, risk: 'safe'   },
+  { name: 'GOOGLE',    loc: 'Mountain View',  score: 67, risk: 'safe'   },
+  { name: 'MICROSOFT', loc: 'Redmond',        score: 76, risk: 'safe'   },
+  { name: 'NETFLIX',   loc: 'Los Gatos',      score: 74, risk: 'safe'   },
+  { name: 'UBER',      loc: 'San Francisco',  score: 51, risk: 'warn'   },
+  { name: 'AIRBNB',    loc: 'San Francisco',  score: 80, risk: 'safe'   },
+  { name: 'X (TWITTER)', loc: 'San Francisco', score: 27, risk: 'danger' },
+  { name: 'SALESFORCE', loc: 'San Francisco', score: 57, risk: 'warn'   },
+  { name: 'ORACLE',    loc: 'Austin',         score: 39, risk: 'danger' },
+  { name: 'IBM',       loc: 'Armonk',         score: 33, risk: 'danger' },
+  { name: 'TESLA',     loc: 'Austin',         score: 44, risk: 'warn'   },
+  { name: 'MCKINSEY',  loc: 'New York',       score: 84, risk: 'safe'   },
+  { name: 'PWC',       loc: 'New York',       score: 53, risk: 'warn'   },
+  { name: 'WALMART',   loc: 'Bentonville',    score: 35, risk: 'danger' },
+  { name: 'TARGET',    loc: 'Minneapolis',    score: 62, risk: 'safe'   },
+  { name: 'LYFT',      loc: 'San Francisco',  score: 48, risk: 'warn'   },
+  { name: 'COINBASE',  loc: 'Remote',         score: 61, risk: 'safe'   },
+  { name: 'FIGMA',     loc: 'San Francisco',  score: 85, risk: 'safe'   },
+  { name: 'VERCEL',    loc: 'Remote',         score: 89, risk: 'safe'   },
+]
+
+function TickerItems() {
+  return (
+    <>
+      {TICKER_DATA.map((item, i) => (
+        <span key={i}>
+          <span className="tick">
+            <span className="tco">{item.name}</span>
+            <span className="tloc">{item.loc}</span>
+            <span className={`ts ${item.risk}`}>{item.score}</span>
+          </span>
+          <span className="tdiv">·</span>
+        </span>
+      ))}
+    </>
+  )
+}
+
 export default function LandingPage() {
   return (
     <div className="page-full active" style={{ position: 'relative' }}>
 
       {/* TICKER */}
       <div className="ticker-wrap" style={{ position: 'relative', zIndex: 2, flexShrink: 0 }}>
-        <div className="ticker-track" id="tickerTrack" />
+        <div className="ticker-track">
+          <TickerItems />
+          <TickerItems />
+        </div>
       </div>
 
       {/* MAIN CONTENT — interactive client component */}
