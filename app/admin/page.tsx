@@ -51,35 +51,19 @@ interface FeatureFlag {
   flag_name: string; status: string; percentage: number | null; description: string
 }
 
-function StatBox({ n, label, sub, highlight, color }: { n: string | number; label: string; sub?: string; highlight?: boolean; color?: string }) {
-  const c = color || 'var(--blue)'
+function KpiCard({ l, n, sub, borderColor, numColor }: { l: string; n: string | number; sub?: string; borderColor?: string; numColor?: string }) {
   return (
-    <div className="statbox-box" style={{
-      background: highlight ? `${c}0c` : 'var(--card)',
-      border: `1px solid ${highlight ? `${c}55` : 'var(--line)'}`,
-      borderRadius: 10, padding: '1rem .9rem', textAlign: 'center',
-      boxShadow: highlight ? `0 0 20px ${c}14, 0 4px 20px rgba(0,0,0,.4)` : '0 2px 12px rgba(0,0,0,.25)',
-      transition: 'box-shadow .2s', minWidth: 0, display: 'flex', flexDirection: 'column', alignItems: 'center',
-    }}>
-      <div style={{ fontFamily: 'var(--mono)', fontSize: '.48rem', textTransform: 'uppercase', letterSpacing: '.1em', color: 'var(--dim)', lineHeight: 1.3, marginBottom: '.3rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', width: '100%' }}>{label}</div>
-      <div className="statbox-n" style={{ fontFamily: 'var(--mono)', fontSize: '1.55rem', fontWeight: 500, color: highlight ? c : 'var(--white)', lineHeight: 1, overflow: 'hidden', textOverflow: 'ellipsis', width: '100%' }}>{n}</div>
-      {sub && <div style={{ fontFamily: 'var(--mono)', fontSize: '.44rem', color: 'var(--muted)', marginTop: '.28rem', lineHeight: 1.2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', width: '100%' }}>{sub}</div>}
-    </div>
-  )
-}
-
-function SectionHeader({ title }: { title: string }) {
-  return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: '.65rem', marginBottom: '.85rem', marginTop: '.25rem' }}>
-      <div style={{ fontFamily: 'var(--mono)', fontSize: '.55rem', textTransform: 'uppercase', letterSpacing: '.14em', color: 'var(--blue)', fontWeight: 600 }}>{title}</div>
-      <div style={{ flex: 1, height: 1, background: 'linear-gradient(to right, var(--line2), transparent)' }} />
+    <div className="adm-kpi" style={borderColor ? { borderLeft: `2px solid ${borderColor}` } : undefined}>
+      <div className="adm-kpi-l">{l}</div>
+      <div className="adm-kpi-n" style={numColor ? { color: numColor } : undefined}>{n}</div>
+      {sub && <div className="adm-kpi-sub">{sub}</div>}
     </div>
   )
 }
 
 function Card({ children, style }: { children: React.ReactNode; style?: React.CSSProperties }) {
   return (
-    <div className="adm-card" style={{ background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 12, padding: '1.25rem', overflow: 'hidden', minWidth: 0, ...style }}>
+    <div className="adm-panel" style={{ padding: '0 1rem 1rem', ...style }}>
       {children}
     </div>
   )
@@ -87,11 +71,11 @@ function Card({ children, style }: { children: React.ReactNode; style?: React.CS
 
 function CardHeader({ title, badge, action }: { title: string; badge?: React.ReactNode; action?: React.ReactNode }) {
   return (
-    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '.35rem', marginBottom: '.75rem' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '.5rem', minWidth: 0 }}>
-        <span style={{ fontFamily: 'var(--mono)', fontSize: '.6rem', textTransform: 'uppercase', letterSpacing: '.1em', color: 'var(--dim)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{title}</span>
+    <div className="adm-panel-hdr" style={{ margin: '0 -1rem .85rem' }}>
+      <span style={{ display: 'flex', alignItems: 'center', gap: '.5rem', overflow: 'hidden', flexShrink: 1, minWidth: 0 }}>
+        {title}
         {badge}
-      </div>
+      </span>
       {action && <div style={{ flexShrink: 0, display: 'flex', gap: '.35rem', flexWrap: 'wrap' }}>{action}</div>}
     </div>
   )
@@ -100,20 +84,20 @@ function CardHeader({ title, badge, action }: { title: string; badge?: React.Rea
 function Badge({ n, color = 'var(--red)' }: { n: number; color?: string }) {
   if (!n) return null
   return (
-    <span style={{ fontFamily: 'var(--mono)', fontSize: '.55rem', background: color + '22', color, border: `1px solid ${color}44`, borderRadius: 100, padding: '.1rem .4rem' }}>{n}</span>
+    <span style={{ fontFamily: 'var(--mono)', fontSize: '.52rem', background: color + '22', color, border: `1px solid ${color}44`, borderRadius: 100, padding: '.1rem .4rem', flexShrink: 0 }}>{n}</span>
   )
 }
 
-function BarChart({ items, max, color = 'var(--blue)' }: { items: { label: string; value: number }[]; max: number; color?: string }) {
+function BarChart({ items, max, green }: { items: { label: string; value: number }[]; max: number; green?: boolean }) {
   return (
     <div>
       {items.map(item => (
-        <div key={item.label} style={{ display: 'flex', alignItems: 'center', gap: '.75rem', marginBottom: '.4rem' }}>
-          <span style={{ fontFamily: 'var(--mono)', fontSize: '.6rem', color: 'var(--dim)', width: '30%', flexShrink: 0, textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>{item.label}</span>
-          <div style={{ flex: 1, height: 5, background: 'var(--line2)', borderRadius: 3, overflow: 'hidden' }}>
-            <div style={{ width: `${max > 0 ? (item.value / max) * 100 : 0}%`, height: '100%', background: color, borderRadius: 3 }} />
+        <div key={item.label} className="adm-row">
+          <span style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', color: 'var(--sub)', width: '40%', flexShrink: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.label}</span>
+          <div className="adm-bar-wrap">
+            <div className={green ? 'adm-bar green' : 'adm-bar'} style={{ width: `${max > 0 ? (item.value / max) * 100 : 0}%` }} />
           </div>
-          <span style={{ fontFamily: 'var(--mono)', fontSize: '.6rem', color: 'var(--sub)', width: 32, textAlign: 'right', flexShrink: 0 }}>{item.value}</span>
+          <span style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', color: 'var(--dim)', width: 28, textAlign: 'right', flexShrink: 0 }}>{item.value}</span>
         </div>
       ))}
     </div>
@@ -288,66 +272,61 @@ export default function AdminPage() {
   const needsReviewCount = (stats.reports.recent || []).filter(r => r.needs_review).length
 
   return (
-    <div className="page-full">
-      <div className="admin-wrap" style={{ maxWidth: 1100, margin: '0 auto', padding: '2.5rem 2rem', width: '100%', boxSizing: 'border-box' }}>
+    <div className="page-full" style={{ background: 'radial-gradient(ellipse at 10% 0%,rgba(29,78,216,0.1) 0%,transparent 50%),radial-gradient(ellipse at 90% 10%,rgba(124,58,237,0.07) 0%,transparent 45%)' }}>
+      <div className="adm-wrap">
 
         {/* Header */}
-        <div className="admin-head">
+        <div style={{ fontFamily: 'var(--mono)', fontSize: '.52rem', textTransform: 'uppercase', letterSpacing: '.22em', color: 'var(--green)', marginBottom: '.65rem', display: 'flex', alignItems: 'center', gap: 12 }}>
+          <span style={{ width: 22, height: 1, background: 'var(--green)', display: 'inline-block', flexShrink: 0 }} />
+          Seen Admin
+        </div>
+        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: '.75rem', marginBottom: '1.5rem' }}>
           <div>
-            <div style={{ fontFamily: 'var(--mono)', fontSize: '.52rem', textTransform: 'uppercase', letterSpacing: '.22em', color: 'var(--green)', marginBottom: '.3rem' }}>
-              Admin · Data flywheel
-            </div>
-            <h1 style={{ fontFamily: 'var(--display)', fontSize: '1.75rem', fontWeight: 800, color: 'var(--white)', letterSpacing: '-.03em' }}>
-              Platform metrics
-            </h1>
+            <h1 style={{ fontFamily: 'var(--display)', fontSize: '2rem', fontWeight: 800, color: 'var(--white)', letterSpacing: '-.04em', lineHeight: 1.05, marginBottom: '.25rem' }}>Data flywheel</h1>
+            <p style={{ fontSize: '.8rem', color: 'var(--sub)', fontWeight: 300 }}>Last updated just now</p>
           </div>
-          <div style={{ display: 'flex', gap: '.5rem', alignItems: 'center' }}>
-            <button onClick={() => token && load(token)} style={{ background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 6, padding: '.4rem .85rem', fontFamily: 'var(--mono)', fontSize: '.62rem', color: 'var(--sub)', cursor: 'pointer' }}>
-              ↻ Refresh
-            </button>
-            <button onClick={logout} style={{ background: 'none', border: '1px solid var(--line)', borderRadius: 6, padding: '.4rem .85rem', fontFamily: 'var(--mono)', fontSize: '.62rem', color: 'var(--muted)', cursor: 'pointer' }}>
-              Sign out
-            </button>
+          <div style={{ display: 'flex', gap: '.5rem', flexShrink: 0, flexWrap: 'wrap' }}>
+            <button onClick={() => token && load(token)} className="adm-btn" style={{ background: 'none', border: '1px solid var(--line2)', borderRadius: 8, padding: '.5rem 1rem', fontFamily: 'var(--mono)', fontSize: '.65rem', color: 'var(--sub)', cursor: 'pointer', transition: 'all .15s' }}>↻ Refresh</button>
+            <button onClick={logout} className="adm-btn-danger" style={{ background: 'none', border: '1px solid var(--line2)', borderRadius: 8, padding: '.5rem 1rem', fontFamily: 'var(--mono)', fontSize: '.65rem', color: 'var(--dim)', cursor: 'pointer', transition: 'all .15s' }}>Sign out</button>
           </div>
         </div>
 
         {/* Users KPIs */}
-        <SectionHeader title="Users" />
-        <div className="admin-g4">
-          <StatBox n={stats.users.total.toLocaleString()} label="Total accounts" sub="all users" highlight color="var(--blue)" />
-          <StatBox n={stats.users.new_today} label="New today" sub="last 24h" />
-          <StatBox n={stats.users.new_this_week} label="New this week" sub="last 7 days" />
-          <StatBox n={stats.companies.with_scores} label="Companies scored" sub="with AI scores" />
+        <div style={{ fontFamily: 'var(--mono)', fontSize: '.5rem', textTransform: 'uppercase', letterSpacing: '.14em', color: 'var(--dim)', marginBottom: '.4rem' }}>Users</div>
+        <div className="adm-kpi-row" style={{ marginBottom: '1.25rem' }}>
+          <KpiCard l="Total accounts" n={stats.users.total.toLocaleString()} sub="all time" />
+          <KpiCard l="New today" n={stats.users.new_today} sub="last 24h" />
+          <KpiCard l="New this week" n={stats.users.new_this_week} sub="last 7 days" />
+          <KpiCard l="Companies scored" n={stats.companies.with_scores} sub="with AI scores" />
         </div>
 
         {/* Community KPIs */}
-        <SectionHeader title="Community data" />
-        <div className="admin-g4">
-          <StatBox n={stats.reports.total.toLocaleString()} label="Total reports" sub="all time" highlight color="var(--green)" />
-          <StatBox n={stats.reports.today} label="Reports today" sub="last 24h" />
-          <StatBox n={stats.reports.this_week} label="Reports this week" sub="last 7 days" />
-          <StatBox n={stats.applications.ghost_rate_pct != null ? `${stats.applications.ghost_rate_pct}%` : '—'} label="Ghost rate (30d)" sub="of tracked apps" highlight color="var(--red)" />
+        <div style={{ fontFamily: 'var(--mono)', fontSize: '.5rem', textTransform: 'uppercase', letterSpacing: '.14em', color: 'var(--dim)', marginBottom: '.4rem' }}>Community data</div>
+        <div className="adm-kpi-row" style={{ marginBottom: '1.25rem' }}>
+          <KpiCard l="Total reports" n={stats.reports.total.toLocaleString()} sub="all time" borderColor="var(--green)" numColor="var(--green)" />
+          <KpiCard l="Reports today" n={stats.reports.today} sub="last 24h" />
+          <KpiCard l="Reports this week" n={stats.reports.this_week} sub="last 7 days" />
+          <KpiCard l="Ghost rate (30d)" n={stats.applications.ghost_rate_pct != null ? `${stats.applications.ghost_rate_pct}%` : '—'} sub="of tracked apps" borderColor="var(--red)" numColor="var(--red)" />
         </div>
 
         {/* Application tracking KPIs */}
-        <SectionHeader title="Application tracking" />
-        <div className="admin-g4">
-          <StatBox n={stats.applications.total.toLocaleString()} label="Apps tracked" sub="across all users" />
-          <StatBox n={stats.applications.ghosted_30d} label="Ghosted (30d)" sub="tracked as ghosted" color="var(--amber)" highlight={stats.applications.ghosted_30d > 0} />
-          <StatBox n={stats.applications.hired_30d} label="Hired (30d)" sub="tracked as hired" color="var(--green)" highlight={stats.applications.hired_30d > 0} />
-          <StatBox n={stats.company_lookups?.ready ? stats.company_lookups.today : '—'} label="Co. lookups today" sub="company pages viewed" />
+        <div style={{ fontFamily: 'var(--mono)', fontSize: '.5rem', textTransform: 'uppercase', letterSpacing: '.14em', color: 'var(--dim)', marginBottom: '.4rem' }}>Application tracking</div>
+        <div className="adm-kpi-row" style={{ marginBottom: '1.5rem' }}>
+          <KpiCard l="Apps tracked total" n={stats.applications.total.toLocaleString()} sub="across all users" />
+          <KpiCard l="Ghosted (30d)" n={stats.applications.ghosted_30d} sub="tracked as ghosted" numColor="var(--amber)" />
+          <KpiCard l="Hired (30d)" n={stats.applications.hired_30d} sub="tracked as hired" numColor="var(--green)" />
+          <KpiCard l="Co. lookups today" n={stats.company_lookups?.ready ? stats.company_lookups.today : '—'} sub="company pages viewed" />
         </div>
 
         {/* Company lookups setup note */}
         {stats.company_lookups && !stats.company_lookups.ready && (
-          <div style={{ background: 'rgba(245,158,11,0.07)', border: '1px solid rgba(245,158,11,0.25)', borderRadius: 10, padding: '1rem 1.25rem', marginBottom: '2rem' }}>
-            <div style={{ fontFamily: 'var(--mono)', fontSize: '.65rem', color: 'var(--amber)', fontWeight: 600, marginBottom: '.4rem' }}>⚠ Company lookup tracking not set up</div>
-            <div style={{ fontFamily: 'var(--mono)', fontSize: '.6rem', color: 'var(--sub)', marginBottom: '.6rem' }}>Run this SQL in Supabase to enable search_logs tracking:</div>
-            <pre style={{ fontFamily: 'var(--mono)', fontSize: '.6rem', background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 6, padding: '.65rem .85rem', color: 'var(--dim)', overflowX: 'auto', margin: 0 }}>
+          <div id="admSetupNote" style={{ background: 'rgba(245,158,11,.06)', border: '1px solid rgba(245,158,11,.2)', borderRadius: 10, padding: '1rem 1.1rem', marginBottom: '1rem' }}>
+            <div style={{ fontFamily: 'var(--mono)', fontSize: '.6rem', color: 'var(--amber)', textTransform: 'uppercase', letterSpacing: '.1em', marginBottom: '.5rem' }}>Enable company lookup tracking</div>
+            <p style={{ fontSize: '.78rem', color: 'var(--sub)', marginBottom: '.75rem', lineHeight: 1.6 }}>Run this SQL in your Supabase SQL editor once to track which companies users are researching:</p>
+            <pre style={{ background: 'rgba(0,0,0,.35)', border: '1px solid rgba(255,255,255,.08)', borderRadius: 6, padding: '.75rem 1rem', fontFamily: 'var(--mono)', fontSize: '.65rem', color: 'var(--white)', overflowX: 'auto', lineHeight: 1.7, margin: 0 }}>
               {`CREATE TABLE IF NOT EXISTS search_logs (
   id bigserial PRIMARY KEY,
-  query text,
-  user_id uuid REFERENCES auth.users,
+  query text NOT NULL,
   created_at timestamptz DEFAULT now()
 );`}
             </pre>
@@ -355,89 +334,77 @@ export default function AdminPage() {
         )}
 
         {/* Jobs KPIs */}
-        <SectionHeader title="Jobs" />
-        <div className="admin-g4">
-          <StatBox n={stats.jobs?.new_today ?? 0} label="Jobs added today" sub="new listings posted" highlight color="var(--green)" />
-          <StatBox n={(stats.jobs?.active ?? 0).toLocaleString()} label="Active listings" sub="live on Seen" highlight color="var(--blue)" />
-          <StatBox n={stats.jobs?.stale_or_expired ?? 0} label="Stale / expired" sub="needs cleanup" />
-          <StatBox n={stats.jobs?.inactive_reports?.length ?? 0} label="Reported inactive" sub="user reports" />
+        <div style={{ fontFamily: 'var(--mono)', fontSize: '.5rem', textTransform: 'uppercase', letterSpacing: '.14em', color: 'var(--dim)', marginBottom: '.4rem' }}>Jobs</div>
+        <div className="adm-kpi-row" style={{ marginBottom: '1.5rem' }}>
+          <KpiCard l="Active listings" n={(stats.jobs?.active ?? 0).toLocaleString()} sub="live jobs users see" borderColor="var(--blue)" numColor="var(--blue)" />
+          <KpiCard l="New today" n={stats.jobs?.new_today ?? 0} sub="never-seen-before jobs" borderColor="var(--green)" numColor="var(--green)" />
         </div>
 
-        {/* Reports chart + outcome breakdown */}
-        <div className="admin-g2">
-          <Card>
-            <CardHeader title="Reports submitted (30d)" />
-            <div style={{ display: 'flex', alignItems: 'flex-end', gap: 2, height: 80 }}>
-              {(stats.reports.chart || []).map((d, i) => (
+        {/* Reports chart */}
+        <div className="adm-panel" style={{ marginBottom: '.65rem' }}>
+          <div className="adm-panel-hdr">
+            Reports submitted — last 30 days
+            <span style={{ fontFamily: 'var(--mono)', fontSize: '.5rem', color: 'var(--dim)' }}>one bar = one day</span>
+          </div>
+          <div style={{ padding: '.85rem 1rem .6rem' }}>
+            <div className="adm-chart-row">
+              {(stats.reports.chart || []).map(d => (
                 <div
                   key={d.date}
-                  style={{ flex: 1, background: 'var(--blue)', opacity: 0.7, borderRadius: '2px 2px 0 0', height: `${chartMax > 0 ? (d.count / chartMax) * 100 : 0}%`, minHeight: d.count > 0 ? 2 : 0, transition: 'height .3s' }}
+                  className="adm-chart-bar"
+                  style={{ height: `${chartMax > 0 ? (d.count / chartMax) * 100 : 0}%` }}
                   title={`${d.date}: ${d.count}`}
                 />
               ))}
             </div>
             {stats.reports.chart && stats.reports.chart.length > 0 && (
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '.4rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', padding: '.3rem 0 0', fontFamily: 'var(--mono)', fontSize: '.44rem', color: 'var(--dim)' }}>
                 {[0, 7, 14, 21, 29].map(i => (
-                  <span key={i} style={{ fontFamily: 'var(--mono)', fontSize: '.5rem', color: 'var(--muted)' }}>
-                    {stats.reports.chart[i]?.date?.slice(5) || ''}
-                  </span>
+                  <span key={i}>{stats.reports.chart[i]?.date?.slice(5) || ''}</span>
                 ))}
               </div>
             )}
-          </Card>
-
-          <Card>
-            <CardHeader title="Outcome breakdown (30d)" />
-            {[
-              { label: '👻 Ghosted', value: stats.reports.outcome_breakdown?.ghosted ?? 0, color: 'var(--red)' },
-              { label: '🤖 Rejected', value: stats.reports.outcome_breakdown?.rejected ?? 0, color: 'var(--amber)' },
-              { label: '💬 Interview', value: stats.reports.outcome_breakdown?.interview ?? 0, color: 'var(--blue)' },
-              { label: '✅ Offer', value: stats.reports.outcome_breakdown?.offer ?? 0, color: 'var(--green)' },
-              { label: '⏳ Waiting', value: stats.reports.outcome_breakdown?.waiting ?? 0, color: 'var(--dim)' },
-            ].filter(item => item.value > 0).map(item => {
-              const total = Object.values(stats.reports.outcome_breakdown ?? {}).reduce((a: number, b) => a + (b as number), 0)
-              const pct = total > 0 ? Math.round((item.value / total) * 100) : 0
-              return (
-                <div key={item.label} style={{ display: 'flex', alignItems: 'center', gap: '.75rem', marginBottom: '.5rem' }}>
-                  <span style={{ fontFamily: 'var(--mono)', fontSize: '.6rem', color: 'var(--dim)', width: 90, flexShrink: 0 }}>{item.label}</span>
-                  <div style={{ flex: 1, height: 5, background: 'var(--line2)', borderRadius: 3, overflow: 'hidden' }}>
-                    <div style={{ width: `${pct}%`, height: '100%', background: item.color, borderRadius: 3 }} />
-                  </div>
-                  <span style={{ fontFamily: 'var(--mono)', fontSize: '.6rem', color: 'var(--sub)', width: 50, textAlign: 'right', flexShrink: 0 }}>{item.value} ({pct}%)</span>
-                </div>
-              )
-            })}
-          </Card>
+          </div>
         </div>
 
-        {/* Top reported + most researched */}
-        <div className="admin-g2">
-          <Card>
-            <CardHeader title="Most reported companies (30d)" />
+        {/* Two-column: most reported + most researched */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '.65rem', marginBottom: '.65rem' }}>
+          <div className="adm-panel">
+            <div className="adm-panel-hdr">Most reported companies <span style={{ color: 'var(--dim)', fontWeight: 400 }}>(30d)</span></div>
             <BarChart
               items={(stats.reports.top_companies || []).slice(0, 8).map(c => ({ label: c.company, value: c.count }))}
               max={topReportedMax}
             />
-          </Card>
-
-          <Card>
-            <CardHeader title="Most researched companies (7d)" />
+          </div>
+          <div className="adm-panel">
+            <div className="adm-panel-hdr">Most researched companies <span style={{ color: 'var(--dim)', fontWeight: 400 }}>(7d)</span></div>
             {stats.company_lookups?.ready
-              ? <BarChart items={(stats.company_lookups.top || []).slice(0, 8).map(c => ({ label: c.company, value: c.count }))} max={topLookupMax} color="var(--green)" />
-              : <div style={{ fontFamily: 'var(--mono)', fontSize: '.62rem', color: 'var(--muted)' }}>search_logs not set up</div>
+              ? <BarChart items={(stats.company_lookups.top || []).slice(0, 8).map(c => ({ label: c.company, value: c.count }))} max={topLookupMax} green />
+              : <div style={{ padding: '.85rem 1rem', fontFamily: 'var(--mono)', fontSize: '.62rem', color: 'var(--dim)' }}>search_logs not set up</div>
             }
-          </Card>
+          </div>
+        </div>
+
+        {/* Outcome breakdown */}
+        <div className="adm-panel" style={{ marginBottom: '.65rem' }}>
+          <div className="adm-panel-hdr">Report outcome breakdown <span style={{ color: 'var(--dim)', fontWeight: 400 }}>(30d)</span></div>
+          <div style={{ display: 'flex', gap: '.5rem', flexWrap: 'wrap', padding: '.75rem 1rem' }}>
+            {Object.entries(stats.reports.outcome_breakdown ?? {}).filter(([, v]) => (v as number) > 0).map(([outcome, count]) => (
+              <div key={outcome} style={{ fontFamily: 'var(--mono)', fontSize: '.62rem', padding: '.35rem .75rem', borderRadius: 6, background: outcomeColor(outcome) + '18', color: outcomeColor(outcome), border: `1px solid ${outcomeColor(outcome)}30` }}>
+                {outcome}: {count as number}
+              </div>
+            ))}
+          </div>
         </div>
 
         {/* Recent hiring reports */}
-        <Card style={{ marginBottom: '1.25rem' }}>
+        <Card style={{ marginTop: '.65rem' }}>
           <CardHeader
-            title="Recent hiring reports"
+            title="Recent hiring reports (last 25)"
             badge={needsReviewCount > 0 ? <Badge n={needsReviewCount} /> : undefined}
           />
           {(stats.reports.recent || []).length === 0
-            ? <div style={{ fontFamily: 'var(--mono)', fontSize: '.62rem', color: 'var(--muted)' }}>No reports yet</div>
+            ? <div style={{ fontFamily: 'var(--mono)', fontSize: '.62rem', color: 'var(--dim)' }}>No reports yet</div>
             : (stats.reports.recent || []).map(r => (
               <ReportRow key={r.id} report={r} token={token!} onRefresh={() => load(token!)} />
             ))
@@ -445,15 +412,15 @@ export default function AdminPage() {
         </Card>
 
         {/* Recent tracker applications */}
-        <Card style={{ marginBottom: '1.25rem' }}>
-          <CardHeader title="Recent tracker applications" />
+        <Card style={{ marginTop: '.65rem' }}>
+          <CardHeader title="Recent tracker applications (last 25)" />
           {(stats.applications.recent || []).length === 0
             ? <div style={{ fontFamily: 'var(--mono)', fontSize: '.62rem', color: 'var(--muted)' }}>No applications tracked yet</div>
             : (stats.applications.recent || []).map(a => (
-              <div key={a.id} style={{ display: 'flex', alignItems: 'center', gap: '.75rem', padding: '.5rem 0 .5rem .65rem', borderBottom: '1px solid var(--line2)', borderLeft: `3px solid ${stageColor(a.stage)}`, marginLeft: '-.1rem' }}>
-                <span style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', color: stageColor(a.stage), background: stageColor(a.stage) + '18', border: `1px solid ${stageColor(a.stage)}30`, borderRadius: 4, padding: '.1rem .4rem', flexShrink: 0 }}>{a.stage}</span>
-                <span style={{ fontFamily: 'var(--mono)', fontSize: '.65rem', color: 'var(--white)', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{a.company_name} · {a.role}</span>
-                <span style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', color: 'var(--muted)', flexShrink: 0 }}>{relTime(a.created_at)}</span>
+              <div key={a.id} className="adm-row" style={{ margin: '0 -1rem', borderLeft: `3px solid ${stageColor(a.stage)}`, gap: '.6rem' }}>
+                <span style={{ fontFamily: 'var(--mono)', fontSize: '.55rem', color: stageColor(a.stage), background: stageColor(a.stage) + '18', border: `1px solid ${stageColor(a.stage)}30`, borderRadius: 4, padding: '.1rem .4rem', flexShrink: 0 }}>{a.stage}</span>
+                <span style={{ fontFamily: 'var(--mono)', fontSize: '.62rem', color: 'var(--white)', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{a.company_name} · {a.role}</span>
+                <span style={{ fontFamily: 'var(--mono)', fontSize: '.55rem', color: 'var(--muted)', flexShrink: 0 }}>{relTime(a.created_at)}</span>
               </div>
             ))
           }
@@ -463,7 +430,7 @@ export default function AdminPage() {
         <RecentJobsBrowser token={token!} onUnauthorized={() => { sessionStorage.removeItem(TOKEN_KEY); setToken(null); setStats(null); setLoginError('Session expired') }} />
 
         {/* Reported inactive listings */}
-        <Card style={{ marginBottom: '1.25rem' }}>
+        <Card style={{ marginTop: '.65rem' }}>
           <CardHeader
             title="Reported inactive listings"
             badge={(stats.jobs?.inactive_reports || []).length > 0 ? <Badge n={stats.jobs.inactive_reports.length} color="var(--amber)" /> : undefined}
@@ -478,13 +445,11 @@ export default function AdminPage() {
         </Card>
 
         {/* Data quality issues queue */}
-        <Card style={{ marginBottom: '1.25rem' }}>
+        <Card style={{ marginTop: '.65rem' }}>
           <CardHeader
             title="Data quality issues"
             badge={stats.issues?.open > 0 ? <Badge n={stats.issues.open} /> : undefined}
-            action={
-              <button onClick={() => token && load(token)} style={{ fontFamily: 'var(--mono)', fontSize: '.55rem', padding: '.3rem .75rem', borderRadius: 6, border: '1px solid var(--line2)', background: 'transparent', color: 'var(--sub)', cursor: 'pointer' }}>↻ Refresh</button>
-            }
+            action={<button onClick={() => token && load(token)} style={{ fontFamily: 'var(--mono)', fontSize: '.55rem', padding: '.3rem .75rem', borderRadius: 6, border: '1px solid var(--line2)', background: 'transparent', color: 'var(--sub)', cursor: 'pointer' }}>↻ Refresh</button>}
           />
           {(stats.issues?.items || []).length === 0
             ? <div style={{ fontFamily: 'var(--mono)', fontSize: '.62rem', color: 'var(--green)' }}>✓ No open issues</div>
@@ -515,18 +480,18 @@ export default function AdminPage() {
         />
 
         {/* API Health */}
-        <Card style={{ marginBottom: '1.25rem' }}>
-          <CardHeader title="API health" />
-          <div className="admin-g3">
-            <StatBox n={stats.errors?.today ?? 0} label="Errors today" sub="last 24h" highlight={stats.errors?.today > 10} color="var(--red)" />
-            <StatBox n={stats.errors?.this_week ?? 0} label="Errors this week" sub="last 7 days" />
-            <StatBox n={stats.users?.dau ?? 0} label="DAU" sub="active today" />
+        <div style={{ background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 12, padding: '1.1rem', marginBottom: '1rem' }}>
+          <div style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', textTransform: 'uppercase', letterSpacing: '.14em', color: 'var(--dim)', marginBottom: '.85rem' }}>API Health (Today)</div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: '.65rem', marginBottom: '.75rem' }}>
+            <KpiCard l="Errors today" n={stats.errors?.today ?? 0} sub="last 24h" borderColor={stats.errors?.today > 10 ? 'var(--red)' : undefined} numColor={stats.errors?.today > 10 ? 'var(--red)' : undefined} />
+            <KpiCard l="Errors this week" n={stats.errors?.this_week ?? 0} sub="last 7 days" />
+            <KpiCard l="DAU" n={stats.users?.dau ?? 0} sub="active today" />
           </div>
           {stats.errors?.by_route && Object.keys(stats.errors.by_route).length > 0 && (
             <div style={{ marginBottom: '.75rem' }}>
-              <div style={{ fontFamily: 'var(--mono)', fontSize: '.55rem', textTransform: 'uppercase', letterSpacing: '.08em', color: 'var(--dim)', marginBottom: '.4rem' }}>Errors by route</div>
+              <div style={{ fontFamily: 'var(--mono)', fontSize: '.5rem', textTransform: 'uppercase', letterSpacing: '.1em', color: 'var(--dim)', marginBottom: '.4rem' }}>Errors by route</div>
               {Object.entries(stats.errors.by_route).sort((a, b) => b[1] - a[1]).map(([route, count]) => (
-                <div key={route} style={{ display: 'flex', justifyContent: 'space-between', fontFamily: 'var(--mono)', fontSize: '.62rem', color: 'var(--sub)', padding: '.2rem 0' }}>
+                <div key={route} style={{ display: 'flex', justifyContent: 'space-between', fontFamily: 'var(--mono)', fontSize: '.6rem', color: 'var(--sub)', padding: '.2rem 0' }}>
                   <span style={{ color: 'var(--dim)' }}>{route}</span>
                   <span style={{ color: 'var(--red)' }}>{count as number}</span>
                 </div>
@@ -535,7 +500,7 @@ export default function AdminPage() {
           )}
           {(stats.errors?.recent || []).length > 0 && (
             <div>
-              <div style={{ fontFamily: 'var(--mono)', fontSize: '.55rem', textTransform: 'uppercase', letterSpacing: '.08em', color: 'var(--dim)', marginBottom: '.4rem' }}>Recent</div>
+              <div style={{ fontFamily: 'var(--mono)', fontSize: '.5rem', textTransform: 'uppercase', letterSpacing: '.1em', color: 'var(--dim)', marginBottom: '.4rem' }}>Recent</div>
               {stats.errors.recent.map((e, i) => (
                 <div key={i} style={{ fontFamily: 'var(--mono)', fontSize: '.6rem', color: 'var(--muted)', padding: '.2rem 0', borderBottom: '1px solid var(--line2)' }}>
                   <span style={{ color: 'var(--dim)' }}>{relTime(e.created_at)}</span>
@@ -547,7 +512,7 @@ export default function AdminPage() {
               ))}
             </div>
           )}
-        </Card>
+        </div>
 
         {/* Background job runner */}
         <JobRunner token={token!} />
@@ -659,7 +624,7 @@ function ReportRow({ report: r, token, onRefresh }: { report: RecentReport; toke
   const isDenied = localStatus === 'denied' || (r.outcome_weight === 0 && !r.needs_review)
   const oc = outcomeColor(r.outcome)
   return (
-    <div style={{ padding: '.6rem 0 .6rem .65rem', borderBottom: '1px solid var(--line2)', borderLeft: `3px solid ${oc}`, paddingLeft: '.75rem', marginLeft: '-.1rem', opacity: isDenied ? 0.45 : 1 }}>
+    <div style={{ padding: '.6rem 1rem', borderBottom: '1px solid var(--line2)', borderLeft: `3px solid ${oc}`, margin: '0 -1rem', opacity: isDenied ? 0.45 : 1 }}>
       <div style={{ display: 'flex', alignItems: 'flex-start', gap: '.6rem' }}>
         <span style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', color: outcomeColor(r.outcome), background: outcomeColor(r.outcome) + '18', border: `1px solid ${outcomeColor(r.outcome)}30`, borderRadius: 4, padding: '.1rem .4rem', flexShrink: 0, marginTop: 1 }}>{r.outcome}</span>
         <div style={{ flex: 1 }}>
@@ -706,13 +671,13 @@ function IssueRow({ issue, token, onRefresh, onOpenMerge }: { issue: Issue; toke
   }
 
   if (done) return (
-    <div style={{ padding: '.65rem 0', borderBottom: '1px solid var(--line2)', opacity: 0.4, fontFamily: 'var(--mono)', fontSize: '.6rem', color: done === 'resolve' ? 'var(--green)' : 'var(--dim)' }}>
+    <div style={{ padding: '.65rem 0', borderBottom: '1px solid rgba(255,255,255,.04)', opacity: 0.4, fontFamily: 'var(--mono)', fontSize: '.6rem', color: done === 'resolve' ? 'var(--green)' : 'var(--dim)' }}>
       {done === 'resolve' ? '✓ Resolved' : '✓ Dismissed'} — {issue.target_name || ISSUE_TYPE_LABEL[issue.type] || issue.type}
     </div>
   )
 
   return (
-    <div style={{ display: 'flex', alignItems: 'flex-start', gap: '.65rem', padding: '.65rem 0', borderBottom: '1px solid var(--line2)' }}>
+    <div style={{ display: 'flex', alignItems: 'flex-start', gap: '.65rem', padding: '.65rem 0', borderBottom: '1px solid rgba(255,255,255,.04)' }}>
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '.4rem', flexWrap: 'wrap', marginBottom: '.2rem' }}>
           <span style={{ fontFamily: 'var(--mono)', fontSize: '.48rem', textTransform: 'uppercase', letterSpacing: '.1em', padding: '.18rem .5rem', borderRadius: 4, flexShrink: 0, color, background: color + '1f' }}>

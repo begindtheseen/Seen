@@ -859,22 +859,16 @@ nav.nav-scrolled{background:rgba(6,6,8,0.82);backdrop-filter:blur(60px) saturate
 .surge-chip:hover{background:rgba(239,68,68,.16);border-color:rgba(239,68,68,.4)}
 .surge-chip-dot{width:5px;height:5px;border-radius:50%;background:var(--red);animation:pulse 1s infinite;flex-shrink:0}
 
-/* ── ADMIN RESPONSIVE GRIDS ── */
-.admin-wrap{overflow-x:hidden}
-.admin-g4{display:grid;grid-template-columns:repeat(4,1fr);gap:.75rem;margin-bottom:2rem}
-.admin-g2{display:grid;grid-template-columns:1fr 1fr;gap:1.25rem;margin-bottom:2rem}
-.admin-g3{display:grid;grid-template-columns:repeat(3,1fr);gap:.75rem;margin-bottom:1rem}
-.admin-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:2rem;gap:1rem}
+/* ── ADMIN RESPONSIVE ── */
 @media(max-width:700px){
-  .admin-g4{grid-template-columns:repeat(2,1fr);gap:.35rem;margin-bottom:.85rem}
-  .admin-g2{grid-template-columns:1fr;gap:.55rem;margin-bottom:1rem}
-  .admin-g3{grid-template-columns:repeat(3,1fr);gap:.3rem}
-  .admin-wrap{padding:.65rem .5rem!important;overflow-x:hidden}
-  .admin-wrap .statbox-n{font-size:.95rem!important;line-height:1.1!important}
-  .admin-wrap .statbox-box{padding:.65rem .5rem!important;border-radius:8px!important}
-  .admin-head{flex-direction:column;align-items:flex-start;gap:.5rem;margin-bottom:1rem}
-  .admin-head h1{font-size:.95rem!important}
-  .admin-wrap .adm-card{padding:.55rem!important;border-radius:8px!important;overflow:hidden}
+  .adm-wrap{overflow-x:hidden}
+  .adm-kpi-row{gap:.35rem!important;margin-bottom:.85rem!important}
+  .adm-kpi{padding:.6rem .55rem!important;border-radius:8px!important}
+  .adm-kpi-n{font-size:.95rem!important;line-height:1.1!important}
+  .adm-kpi-l{font-size:.42rem!important}
+  .adm-kpi-sub{font-size:.42rem!important}
+  .adm-panel{border-radius:8px!important;margin-bottom:.65rem!important}
+  .adm-wrap h1{font-size:1.4rem!important}
 }
 
 /* ── MOBILE SIDE MENU (ported from original) ── */
