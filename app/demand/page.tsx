@@ -114,6 +114,13 @@ function DemandBar({ di }: { di: number }) {
   )
 }
 
+function diLabel(di: number): { label: string; color: string } {
+  if (di >= 80) return { label: 'Critical', color: 'var(--red)' }
+  if (di >= 65) return { label: 'High', color: 'var(--amber)' }
+  if (di >= 45) return { label: 'Active', color: 'var(--blue)' }
+  return { label: 'Moderate', color: 'var(--dim)' }
+}
+
 function CityCard({ city }: { city: DemandCity }) {
   const cfg = URG_CFG[city.urg]
   return (
@@ -123,16 +130,33 @@ function CityCard({ city }: { city: DemandCity }) {
           <div className="dc-city">{city.city}</div>
           <div style={{ fontFamily: 'var(--mono)', fontSize: '.55rem', color: 'var(--muted)', marginTop: '.15rem' }}>{city.src}</div>
         </div>
-        <span className={`dc-urg ${cfg.cls}`}>{cfg.label}</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '.6rem', flexShrink: 0 }}>
+          <a
+            href="/companies"
+            style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', color: 'var(--green)', textDecoration: 'none' }}
+          >
+            Best companies ↗
+          </a>
+          <span className={`dc-urg ${cfg.cls}`}>{cfg.label}</span>
+        </div>
       </div>
       <div className="dc-body">
         {city.jobs.map((job, i) => (
           <div key={i} className="dc-row" title={job.note}>
             <div style={{ flex: 1, minWidth: 0 }}>
-              <div className="dc-job">{job.t}</div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '.5rem' }}>
+                <div className="dc-job">{job.t}</div>
+                <a
+                  href={`/jobs?q=${encodeURIComponent(job.t)}&loc=${encodeURIComponent(city.city)}`}
+                  style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', color: 'var(--blue)', textDecoration: 'none', whiteSpace: 'nowrap', flexShrink: 0 }}
+                >
+                  Find these jobs →
+                </a>
+              </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '.5rem', marginTop: '.25rem' }}>
                 <DemandBar di={job.di} />
                 <span style={{ fontFamily: 'var(--mono)', fontSize: '.55rem', color: 'var(--muted)', flexShrink: 0 }}>{job.l}</span>
+                {(() => { const dl = diLabel(job.di); return <span style={{ fontFamily: 'var(--mono)', fontSize: '.52rem', color: dl.color, marginLeft: '.4rem', fontWeight: 700 }}>{dl.label}</span>; })()}
               </div>
             </div>
             <div className="dc-count" style={{ marginLeft: '.75rem', flexShrink: 0 }}>{job.count.toLocaleString()}</div>

@@ -111,6 +111,22 @@ export default function FeedPage() {
           </p>
         </div>
 
+        {/* Ghost surge banner — T2-1 */}
+        <div style={{ background: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.2)', borderRadius: 10, padding: '.7rem 1rem', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '.75rem', flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '.4rem', flexShrink: 0 }}>
+            <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--red)', animation: 'pulse 1.2s infinite', display: 'inline-block' }} />
+            <span style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', fontWeight: 700, color: 'var(--red)', textTransform: 'uppercase', letterSpacing: '.1em' }}>Ghost surge this week</span>
+          </div>
+          <div style={{ display: 'flex', gap: '.4rem', flexWrap: 'wrap' }}>
+            {['Amazon', 'Deloitte', 'Oracle', 'Indeed', 'IBM'].map(co => (
+              <a key={co} href={`/company/${co.toLowerCase()}`} style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)', color: 'var(--red)', borderRadius: 5, padding: '.12rem .45rem', textDecoration: 'none' }}>
+                {co}
+              </a>
+            ))}
+          </div>
+          <span style={{ fontFamily: 'var(--mono)', fontSize: '.54rem', color: 'var(--muted)', marginLeft: 'auto' }}>Based on recent reports</span>
+        </div>
+
         {/* CTA strip — T2-2 */}
         <div style={{ background: 'rgba(16,185,129,.05)', border: '1px solid rgba(16,185,129,.2)', borderRadius: 10, padding: '.85rem 1.1rem', marginBottom: '1.25rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem', flexWrap: 'wrap' }}>
           <div>
