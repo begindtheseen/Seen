@@ -147,6 +147,7 @@ async function _handler(req, res) {
       staleJobsRes, zeroSearchesRes, jobReportsRes, searchLogsTodayRes,
       recentReportsRes, recentAppsRes, jobsTodayRes, inactiveReportsRes,
       jobsActiveRes, jobsNewTodayRes,
+      reportsMonthRes, searchLogsWeekRes,
     ] = await Promise.all([
       db(`profiles?select=id`, { headers: { Prefer: 'count=exact', 'Range-Unit': 'items', Range: '0-0' } }),
       db(`profiles?created_at=gte.${todayISO}&select=id`, { headers: { Prefer: 'count=exact', 'Range-Unit': 'items', Range: '0-0' } }),
@@ -175,6 +176,8 @@ async function _handler(req, res) {
       db(`job_availability_reports?status=eq.expired&select=id,job_id,reported_at&order=reported_at.desc&limit=50`),
       db(`jobs?select=count&availability_status=eq.active`),
       db(`jobs?select=count&created_at=gte.${encodeURIComponent(todayISO)}`),
+      db(`reports?created_at=gte.${monthISO}&select=created_at,company_name,outcome&order=created_at.asc&limit=2000`),
+      db(`search_logs?created_at=gte.${weekISO}&select=query&limit=500`),
     ]);
 
     const usersTotal = ct(usersTotalRes);
@@ -204,6 +207,42 @@ async function _handler(req, res) {
     const recentApps    = recentAppsRes.ok    ? await recentAppsRes.json()    : [];
     const inactiveReportRows = inactiveReportsRes.ok ? await inactiveReportsRes.json() : [];
 
+    // Chart + top companies + outcome breakdown from 30d reports
+    const reportsMonth = reportsMonthRes.ok ? await reportsMonthRes.json() : [];
+    // Build 30-day daily chart
+    const chartDays = [];
+    for (let i = 29; i >= 0; i--) {
+      const d = new Date(now); d.setDate(d.getDate() - i);
+      chartDays.push(d.toISOString().slice(0, 10));
+    }
+    const chartMap = {};
+    reportsMonth.forEach(r => { const d = r.created_at?.slice(0, 10); if (d) chartMap[d] = (chartMap[d] || 0) + 1; });
+    const reportsChart = chartDays.map(date => ({ date, count: chartMap[date] || 0 }));
+    // Top companies
+    const companyCountMap = {};
+    reportsMonth.forEach(r => { if (r.company_name) companyCountMap[r.company_name] = (companyCountMap[r.company_name] || 0) + 1; });
+    const topCompanies = Object.entries(companyCountMap)
+      .sort((a, b) => b[1] - a[1]).slice(0, 10)
+      .map(([company, count]) => ({ company, count }));
+    // Outcome breakdown
+    const outcomeMap = { ghosted: 0, rejected: 0, interview: 0, offer: 0, waiting: 0 };
+    reportsMonth.forEach(r => {
+      const o = r.outcome;
+      if (o === 'ghosted') outcomeMap.ghosted++;
+      else if (o === 'rejected' || o === 'autoreject') outcomeMap.rejected++;
+      else if (o === 'interview' || o === 'human') outcomeMap.interview++;
+      else if (o === 'offer' || o === 'hired') outcomeMap.offer++;
+      else outcomeMap.waiting++;
+    });
+
+    // Most researched companies (7d) from search_logs
+    const searchLogsWeek = searchLogsWeekRes.ok ? await searchLogsWeekRes.json() : [];
+    const searchCountMap = {};
+    searchLogsWeek.forEach(r => { if (r.query) searchCountMap[r.query] = (searchCountMap[r.query] || 0) + 1; });
+    const topSearched = Object.entries(searchCountMap)
+      .sort((a, b) => b[1] - a[1]).slice(0, 10)
+      .map(([company, count]) => ({ company, count }));
+
     // Enrich inactive reports with job details
     let inactiveReports = [];
     if (inactiveReportRows.length) {
@@ -228,7 +267,7 @@ async function _handler(req, res) {
 
     return res.status(200).json({
       users: { total: usersTotal, new_today: ct(usersTodayRes), new_this_week: ct(usersWeekRes), dau },
-      reports: { total: ct(reportsAllRes), today: ct(reportsTodayRes), this_week: ct(reportsWeekRes), recent: recentReports },
+      reports: { total: ct(reportsAllRes), today: ct(reportsTodayRes), this_week: ct(reportsWeekRes), recent: recentReports, chart: reportsChart, top_companies: topCompanies, outcome_breakdown: outcomeMap },
       applications: { total: totalApps, ghosted_30d: ghosted, hired_30d: ct(appsHiredRes), ghost_rate_pct: totalApps > 0 ? Math.round(ghosted / totalApps * 100) : null, recent: recentApps },
       companies: { with_scores: ct(coScoredRes) },
       credits: { total_users: creditRows.length, pro_users: proCount },
@@ -237,7 +276,7 @@ async function _handler(req, res) {
       duplicate_clusters: { suspected: dupClusters.length, items: dupClusters },
       feature_flags: flags,
       company_lookups: searchLogsTodayRes.ok
-        ? { ready: true, today: ct(searchLogsTodayRes) }
+        ? { ready: true, today: ct(searchLogsTodayRes), top: topSearched }
         : { ready: false },
       jobs: {
         active: jobsActive,
