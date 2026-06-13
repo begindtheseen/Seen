@@ -27,6 +27,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="en">
       <body>
         <AuthProvider>
+          {/* Global aurora background orbs — renders on all pages */}
+          <div className="aurora" aria-hidden="true">
+            <div className="aurora-3" />
+          </div>
           <Nav />
           {children}
           <div id="toast" />
