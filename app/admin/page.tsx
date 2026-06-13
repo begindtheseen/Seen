@@ -54,14 +54,14 @@ interface FeatureFlag {
 function StatBox({ n, label, highlight, color }: { n: string | number; label: string; highlight?: boolean; color?: string }) {
   const c = color || 'var(--blue)'
   return (
-    <div style={{
+    <div className="statbox-box" style={{
       background: highlight ? `${c}0c` : 'var(--card)',
       border: `1px solid ${highlight ? `${c}55` : 'var(--line)'}`,
       borderRadius: 10, padding: '1.1rem', textAlign: 'center',
       boxShadow: highlight ? `0 0 24px ${c}18, 0 4px 24px rgba(0,0,0,.45)` : '0 4px 24px rgba(0,0,0,.3)',
-      transition: 'box-shadow .2s',
+      transition: 'box-shadow .2s', minWidth: 0,
     }}>
-      <div style={{ fontFamily: 'var(--mono)', fontSize: '1.55rem', fontWeight: 500, color: highlight ? c : 'var(--white)', lineHeight: 1 }}>{n}</div>
+      <div className="statbox-n" style={{ fontFamily: 'var(--mono)', fontSize: '1.55rem', fontWeight: 500, color: highlight ? c : 'var(--white)', lineHeight: 1, overflow: 'hidden', textOverflow: 'ellipsis' }}>{n}</div>
       <div style={{ fontFamily: 'var(--mono)', fontSize: '.52rem', textTransform: 'uppercase', letterSpacing: '.08em', color: 'var(--muted)', marginTop: '.3rem' }}>{label}</div>
     </div>
   )
@@ -78,7 +78,7 @@ function SectionHeader({ title }: { title: string }) {
 
 function Card({ children, style }: { children: React.ReactNode; style?: React.CSSProperties }) {
   return (
-    <div style={{ background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 12, padding: '1.25rem', ...style }}>
+    <div className="adm-card" style={{ background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 12, padding: '1.25rem', ...style }}>
       {children}
     </div>
   )
@@ -108,7 +108,7 @@ function BarChart({ items, max, color = 'var(--blue)' }: { items: { label: strin
     <div>
       {items.map(item => (
         <div key={item.label} style={{ display: 'flex', alignItems: 'center', gap: '.75rem', marginBottom: '.4rem' }}>
-          <span style={{ fontFamily: 'var(--mono)', fontSize: '.6rem', color: 'var(--dim)', width: 120, flexShrink: 0, textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>{item.label}</span>
+          <span style={{ fontFamily: 'var(--mono)', fontSize: '.6rem', color: 'var(--dim)', width: 110, maxWidth: '40%', flexShrink: 0, textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>{item.label}</span>
           <div style={{ flex: 1, height: 5, background: 'var(--line2)', borderRadius: 3, overflow: 'hidden' }}>
             <div style={{ width: `${max > 0 ? (item.value / max) * 100 : 0}%`, height: '100%', background: color, borderRadius: 3 }} />
           </div>
@@ -291,7 +291,7 @@ export default function AdminPage() {
       <div className="admin-wrap" style={{ maxWidth: 1100, margin: '0 auto', padding: '2.5rem 2rem' }}>
 
         {/* Header */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
+        <div className="admin-head">
           <div>
             <div style={{ fontFamily: 'var(--mono)', fontSize: '.52rem', textTransform: 'uppercase', letterSpacing: '.22em', color: 'var(--green)', marginBottom: '.3rem' }}>
               Admin · Data flywheel

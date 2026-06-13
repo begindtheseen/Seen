@@ -13,6 +13,10 @@ export default function Nav() {
   const [showAccountModal, setShowAccountModal] = useState(false)
   const [resetSent, setResetSent] = useState(false)
   const [scrolled, setScrolled] = useState(false)
+  const [menuOpen, setMenuOpen] = useState(false)
+
+  // Close the mobile drawer whenever the route changes
+  useEffect(() => { setMenuOpen(false) }, [pathname])
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 10)
@@ -39,6 +43,7 @@ export default function Nav() {
   return (
     <>
       <nav id="mainNav" className={scrolled ? 'nav-scrolled' : ''}>
+        <button className="side-menu-toggle" onClick={() => setMenuOpen(true)} aria-label="Menu" title="Menu">☰</button>
         <Link href="/" className="logo">
           <span className="logo-pulse" />
           Seen
@@ -77,6 +82,32 @@ export default function Nav() {
           )}
         </div>
       </nav>
+
+      {/* Mobile slide-out menu */}
+      <div className={`side-menu-overlay${menuOpen ? ' open' : ''}`} onClick={() => setMenuOpen(false)} />
+      <div className={`side-menu${menuOpen ? ' open' : ''}`}>
+        <div className="side-menu-logo">
+          <span className="logo-pulse" />
+          <span style={{ fontFamily: 'var(--display)', fontWeight: 800, fontSize: '1.2rem', color: 'var(--white)', letterSpacing: '-.02em' }}>Seen</span>
+          <button onClick={() => setMenuOpen(false)} style={{ marginLeft: 'auto', background: 'none', border: 'none', color: 'var(--muted)', cursor: 'pointer', fontSize: '1rem' }}>✕</button>
+        </div>
+        <Link href="/jobs" className={`side-menu-item${isActive('/jobs') ? ' active' : ''}`}><span className="side-menu-icon">💼</span>Jobs</Link>
+        <Link href="/companies" className={`side-menu-item${isActive('/companies') ? ' active' : ''}`}><span className="side-menu-icon">🏢</span>Companies</Link>
+        <Link href="/demand" className={`side-menu-item${isActive('/demand') ? ' active' : ''}`}><span className="side-menu-icon">📊</span>Demand</Link>
+        <Link href="/feed" className={`side-menu-item${isActive('/feed') ? ' active' : ''}`}><span className="side-menu-icon">📡</span>Feed</Link>
+        {isSeeker && <Link href="/resume" className={`side-menu-item${isActive('/resume') ? ' active' : ''}`}><span className="side-menu-icon">📄</span>Resume AI</Link>}
+        {isSeeker && <Link href="/tracker" className={`side-menu-item${isActive('/tracker') ? ' active' : ''}`}><span className="side-menu-icon">✓</span>Track</Link>}
+        {isSeeker && <Link href="/dashboard" className={`side-menu-item${isActive('/dashboard') ? ' active' : ''}`}><span className="side-menu-icon">▦</span>Dashboard</Link>}
+        <Link href="/pricing" className={`side-menu-item${isActive('/pricing') ? ' active' : ''}`}><span className="side-menu-icon">◈</span>Pricing</Link>
+        <Link href="/admin" className={`side-menu-item${isActive('/admin') ? ' active' : ''}`}><span className="side-menu-icon">⚙</span>Admin</Link>
+        <div style={{ marginTop: 'auto', padding: '1rem 1.25rem 0', borderTop: '1px solid var(--line)' }}>
+          {isSeeker ? (
+            <button onClick={() => { setShowAccountModal(true); setMenuOpen(false) }} style={{ background: 'none', border: '1px solid var(--line2)', color: 'var(--sub)', borderRadius: 8, padding: '.5rem 1rem', fontFamily: 'var(--mono)', fontSize: '.65rem', cursor: 'pointer', width: '100%' }}>Account settings</button>
+          ) : (
+            <Link href="/login" className="btn btn-ghost" style={{ width: '100%', justifyContent: 'center' }}>Sign in</Link>
+          )}
+        </div>
+      </div>
 
       {/* Account Settings Modal */}
       {showAccountModal && (
