@@ -45,10 +45,24 @@ Remaining admin work is cosmetic/optional only: §2 minor (`ready:false` N/A —
 - **User-facing parity NOT yet restored** (next phase): Job detail route + AI insights (still missing),
   plus the page-by-page audit in SITE_PARITY_CHECKLIST.md (most pages 🟡 unverified).
 
-### Next up (per PRIORITY ORDER — Phase 1 items 11–12, then site pages)
-- Job detail page route (`app/jobs/[id]`) — MISSING; old `page-job-detail` (index.html:2274–2293)
-- AI job insights (`/api/job-insights`) — inaccessible without job detail route
-- Then SITE_PARITY_CHECKLIST.md page-by-page audit (Phase 2)
+### Job detail route + AI insights — ✅ PORTED
+- NEW `app/jobs/[id]/page.tsx` (parity of old `page-job-detail` + `openJobListing`):
+  header, AI insights ("WHAT {CO} IS HIRING FOR"), AI/raw description, report placeholder,
+  sticky footer (Check company → /company/[slug], Save, external Apply), back button.
+- NEW `lib/stores/JobCache.ts` — sessionStorage cache = Next.js equivalent of old global `JOBS`.
+- `app/jobs/page.tsx`: stores results in JobCache; cards route to `/jobs/[id]` (click + "View details" link).
+- `lib/types.ts`: promoted shared `Job` interface (was local to jobs page).
+- AI: `/api/job-insights` unchanged; Bearer token via `supabase.auth.getSession()`; L1 localStorage 24h.
+- CSS note: used inline `minHeight:100vh; paddingTop:58` (NOT `className="page"`, which is `display:none`
+  without `.active` — see globals.css:114). Fixed footer bg `--bg`(nonexistent)→`--ink`.
+- **Follow-up parity items:** (1) `Apply & Optimize` keeps external link — resume-optimize modal flow
+  (`openApplyModal`) not yet ported; (2) Tier A quick-preview modal intentionally skipped;
+  (3) `/api/jobs` doesn't surface `availability_status`, so stale/expired warnings stay dormant.
+
+### Next up (SITE_PARITY_CHECKLIST.md — Phase 2 IMPORTANT)
+- Dashboard alerts/follow-ups (Day 7/14/30), benchmarks, pipeline insight
+- Legal page completeness; account settings
+- Per-page functional audit (most pages 🟡 unverified)
 
 ### Working agreement this session
 - Admin parity only, one section at a time, small commits.

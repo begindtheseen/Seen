@@ -56,6 +56,24 @@ export interface SavedJob {
   saved_at: string
 }
 
+// A job listing as normalized from /api/jobs search results.
+// Shared by the /jobs search page, JobCache, and the /jobs/[id] detail route.
+export interface Job {
+  id: string
+  title: string
+  company: string
+  location: string
+  score: number
+  waste: number
+  level: string
+  type: string
+  source: string
+  description: string
+  salary: string | null
+  apply_url: string | null
+  availability_status?: string
+}
+
 export interface CheckScheduleItem {
   type: CheckType
   day: number

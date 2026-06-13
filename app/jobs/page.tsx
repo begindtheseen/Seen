@@ -1,24 +1,12 @@
 'use client'
 
 import { useState, useCallback, useRef, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import { Score } from '@/lib/score'
 import { SavedJobsStore } from '@/lib/stores/SavedJobs'
+import { JobCache } from '@/lib/stores/JobCache'
 import { useAuth } from '@/lib/auth'
-
-interface Job {
-  id: string
-  title: string
-  company: string
-  location: string
-  score: number
-  waste: number
-  level: string
-  type: string
-  source: string
-  description: string
-  salary: string | null
-  apply_url: string | null
-}
+import type { Job } from '@/lib/types'
 
 type SortMode = 'transparency' | 'waste' | 'recent'
 type NicheFilter = '' | 'tech' | 'healthcare' | 'retail' | 'logistics' | 'finance' | 'other'
@@ -57,7 +45,7 @@ function ScoreRing({ score }: { score: number }) {
   )
 }
 
-function JobCard({ job, onSaveToggle }: { job: Job; onSaveToggle: (id: string) => void }) {
+function JobCard({ job, onSaveToggle, onOpen }: { job: Job; onSaveToggle: (id: string) => void; onOpen: (id: string) => void }) {
   const risk = Score.risk(job.score)
   const wl = Score.wasteLabel(job.waste)
   const vibes = jobVibes(job)
@@ -78,7 +66,14 @@ function JobCard({ job, onSaveToggle }: { job: Job; onSaveToggle: (id: string) =
 
   return (
     <div className={`jlc ${risk}`}>
-      <div className="jlc-top">
+      <div
+        className="jlc-top"
+        onClick={() => onOpen(job.id)}
+        role="button"
+        tabIndex={0}
+        onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onOpen(job.id) } }}
+        style={{ cursor: 'pointer' }}
+      >
         <div className="jrc-logo">{logoLetter}</div>
         <div style={{ flex: 1, minWidth: 0 }}>
           <div className="jlc-title">{job.title}</div>
@@ -120,18 +115,26 @@ function JobCard({ job, onSaveToggle }: { job: Job; onSaveToggle: (id: string) =
           {saved ? '♥' : '♡'}
         </button>
         {job.apply_url ? (
-          <a href={job.apply_url} target="_blank" rel="noopener noreferrer" className="jlc-apply">
+          <a href={job.apply_url} target="_blank" rel="noopener noreferrer" className="jlc-apply" onClick={e => e.stopPropagation()}>
             Apply &amp; Optimize →
           </a>
         ) : (
           <button className="jlc-apply">Apply &amp; Optimize →</button>
         )}
       </div>
+
+      <button
+        onClick={() => onOpen(job.id)}
+        style={{ display: 'block', width: '100%', textAlign: 'center', background: 'none', border: 'none', borderTop: '1px solid var(--line)', marginTop: '.6rem', paddingTop: '.6rem', fontFamily: 'var(--mono)', fontSize: '.62rem', color: 'var(--green)', cursor: 'pointer' }}
+      >
+        View details + AI insights →
+      </button>
     </div>
   )
 }
 
 export default function JobsPage() {
+  const router = useRouter()
   const { isLoggedIn } = useAuth()
   const [query, setQuery] = useState('')
   const [location, setLocation] = useState('')
@@ -227,6 +230,7 @@ export default function JobsPage() {
           apply_url: j.apply_url ? String(j.apply_url) : (j.url ? String(j.url) : null),
         }
       })
+      JobCache.setMany(raw)
       setJobs(raw)
       updateDisplay(raw, sort)
       setStatus('done')
@@ -384,7 +388,7 @@ export default function JobsPage() {
         {filtered.length > 0 ? (
           <div className="jlist" key={saveVersion}>
             {filtered.map(job => (
-              <JobCard key={job.id} job={job} onSaveToggle={handleSaveToggle} />
+              <JobCard key={job.id} job={job} onSaveToggle={handleSaveToggle} onOpen={id => router.push(`/jobs/${encodeURIComponent(id)}`)} />
             ))}
           </div>
         ) : status === 'idle' ? (

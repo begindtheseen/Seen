@@ -83,17 +83,21 @@ A page is COMPLETE only when: visual match + all old functionality + working API
 
 | Element | Status | Notes |
 |---------|--------|-------|
-| Job title, company, city, source | ❌ | Old had a full detail page with header + insights + description + report |
-| AI job insights panel (`jlInsights`) | ❌ | Called `/api/job-insights` |
-| Job description (`jlDesc`) | ❌ | |
-| Report a listing section (`jlReport`) | ❌ | |
-| "Check company →" link | ❌ | |
-| Save (♡) + Apply button sticky footer | ❌ | |
-| Back to jobs nav | ❌ | |
+| Job title, company, city, source | ✅ | Header: logo, title, company · 📍location, score ring, type/level/salary chips |
+| AI job insights panel (`jlInsights`) | ✅ | `/api/job-insights` with Bearer token; L1 localStorage 24h cache; what_they_want/hidden_requirements/insider_tip; credits + unavailable fallbacks |
+| Job description (`jlDesc`) | ✅ | AI `description_summary` or formatted raw text (`formatDesc`), paragraph split, strips leading "Category:" |
+| Report a listing section (`jlReport`) | ✅ | "Report Your Experience — COMING SOON" placeholder (parity with old) |
+| "Check company →" link | ✅ | Links to `/company/[slug]` |
+| Save (♡) + Apply button sticky footer | ✅ | Save toggle (SavedJobsStore) + external Apply link |
+| Back to jobs nav | ✅ | `router.back()` → fallback `/jobs` |
+| Availability stale/expired warnings | ✅ | Rendered only if `availability_status` present (no invented data) |
 
-**Status: ❌ — Job detail was a full SPA "page". Next.js may handle this as a modal within `/jobs` or as a route `/jobs/[id]`. Currently missing as a distinct route.**
+**Status: ✅ — implemented as `app/jobs/[id]/page.tsx` (new route).** Job data flows via `lib/stores/JobCache.ts` (sessionStorage — Next.js equivalent of the old global `JOBS` array), populated by `/jobs` search results. Cards route to the detail page on click + a "View details + AI insights →" link. Direct-link/refresh shows a graceful "run a search" fallback.
 
-**Decision needed**: Implement as `/jobs/[id]/page.tsx` (new route) or as an expanded view within `/jobs`.
+**Follow-up parity items (tracked, not blocking):**
+- `Apply & Optimize` keeps the existing external-link behavior; the full resume-optimize modal flow (old `jlApplyClick` → `openApplyModal`) is NOT yet ported.
+- Tier A quick-preview modal (`openJobDetailModal`) intentionally skipped — card goes straight to the full detail page.
+- `availability_status` isn't yet returned by `/api/jobs` search mapping, so warnings stay dormant until that field is surfaced.
 
 ---
 
@@ -343,7 +347,7 @@ A page is COMPLETE only when: visual match + all old functionality + working API
 | 1 | Landing | page-landing | `/` | 🟡 |
 | 2 | Dashboard | page-seeker-dash | `/dashboard` | 🟡 |
 | 3 | Jobs | page-jobs | `/jobs` | 🟡 |
-| 4 | Job detail | page-job-detail | *(missing)* | ❌ |
+| 4 | Job detail | page-job-detail | `/jobs/[id]` | ✅ (Apply-optimize modal = follow-up) |
 | 5 | Company profile | page-company | `/company/[slug]` | 🟡 |
 | 6 | Companies | page-companies | `/companies` | 🟡 |
 | 7 | Feed | page-feed | `/feed` | 🟡 |
