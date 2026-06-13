@@ -85,6 +85,12 @@ function JobCard({ job, index, onSaveToggle, onOpen }: { job: Job; index: number
 
       <div style={{ display: 'flex', alignItems: 'center', gap: '.35rem', flexWrap: 'wrap', margin: '.35rem 0' }}>
         <span className={`${wl.cls} waste-badge`}>{wl.txt}</span>
+        {job.waste >= 55 && (
+          <span className="vibe v-r" style={{ display: 'inline-flex', alignItems: 'center', gap: '.25rem' }}>
+            <span style={{ width: 5, height: 5, borderRadius: '50%', background: 'var(--red)', animation: 'pulse 1.2s infinite', display: 'inline-block', flexShrink: 0 }} />
+            👻 high ghost risk
+          </span>
+        )}
         {vibes.map((v, i) => (
           <span key={i} className={`vibe ${v.cls}`}>{v.txt}</span>
         ))}

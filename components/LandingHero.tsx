@@ -23,20 +23,223 @@ const QUICK_TAGS = [
   { label: 'Meta', loc: 'Menlo Park, CA', grade: 'F', cls: 'danger' },
 ]
 
+const WORD_POOL = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'.split('')
+
+// Build word spans for line 1 — alternating in-l / in-r per word
+function buildWordSpans(text: string, staggerStep: number): React.ReactNode[] {
+  const parts = text.split(/(\s+)/)
+  let wordIdx = 0
+  return parts.map((part, i) => {
+    if (!part) return null
+    const isSpace = /^\s+$/.test(part)
+    if (isSpace) {
+      return <span key={i} className="hw" style={{ opacity: 1 }}>{part}</span>
+    }
+    const dir = wordIdx % 2 === 0 ? 'in-l' : 'in-r'
+    const delay = (wordIdx * staggerStep).toFixed(0)
+    wordIdx++
+    return <span key={i} className={`hw ${dir}`} style={{ animationDelay: `${delay}ms` }}>{part}</span>
+  })
+}
+
+type Phase = 'idle' | 'exiting' | 'entering'
+
 export default function LandingHero() {
   const router = useRouter()
   const [heroIdx, setHeroIdx] = useState(0)
   const [query, setQuery] = useState('')
   const [location, setLocation] = useState('')
   const [recentSearches, setRecentSearches] = useState<Array<{ name: string; loc?: string }>>([])
-  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
+  // Animation state
+  const [phase, setPhase] = useState<Phase>('entering')
+  // line1Words tracks the currently-rendered word spans (so we can animate them out)
+  const [line1Nodes, setLine1Nodes] = useState<React.ReactNode[]>(() => buildWordSpans(HERO_LINES[0][0], 70))
+  // line2Content is the text displayed in line 2 (updated after exit animation)
+  const [line2Idx, setLine2Idx] = useState(0)
+  // swept state for heroSweep shimmer
+  const [swept, setSwept] = useState(false)
+
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const decodeRafRef = useRef<number | null>(null)
+  const heroIdxRef = useRef(0)
+  const line2Ref = useRef<HTMLSpanElement>(null)
+  const reducedMotion = useRef(false)
+
+  // Decode line2 using rAF slot-machine animation
+  const decodeLine2 = useCallback((text: string, abbreviated: boolean, onDone?: () => void) => {
+    const el = line2Ref.current
+    if (!el) { onDone?.(); return }
+
+    // Cancel any running decode
+    if (decodeRafRef.current !== null) {
+      cancelAnimationFrame(decodeRafRef.current)
+      decodeRafRef.current = null
+    }
+
+    const LOCK_CADENCE = abbreviated ? 30 : 45
+    const chars = text.split('')
+
+    // Build span elements inside the DOM node directly (imperative for rAF perf)
+    el.textContent = ''
+    const items: { span: HTMLSpanElement; target: string; locked: boolean; lockAt: number }[] = chars.map((ch) => {
+      const span = document.createElement('span')
+      span.style.cssText = 'display:inline-block;white-space:pre'
+      const isSpace = ch === ' '
+      if (isSpace) {
+        span.textContent = ' '
+      } else {
+        span.textContent = WORD_POOL[Math.floor(Math.random() * WORD_POOL.length)]
+        span.style.webkitTextFillColor = 'rgba(196,181,253,.55)'
+      }
+      el.appendChild(span)
+      return { span, target: ch, locked: isSpace, lockAt: isSpace ? 0 : chars.indexOf(ch) * LOCK_CADENCE }
+    })
+
+    // Recalculate lockAt properly (indexOf is wrong for repeated chars) — rebuild
+    let charWordIdx = 0
+    chars.forEach((ch, i) => {
+      if (ch !== ' ') {
+        items[i].lockAt = charWordIdx * LOCK_CADENCE
+        charWordIdx++
+      }
+    })
+
+    let t0: number | null = null
+    let lastCycleIdx = -1
+
+    function tick(ts: number) {
+      if (!t0) t0 = ts
+      const elapsed = ts - t0
+      const cycleIdx = Math.floor(elapsed / 50)
+      if (cycleIdx !== lastCycleIdx) {
+        lastCycleIdx = cycleIdx
+        items.forEach(item => {
+          if (item.locked) return
+          if (elapsed >= item.lockAt) {
+            item.locked = true
+            item.span.textContent = item.target
+            item.span.style.webkitTextFillColor = '#10b981'
+            item.span.style.textShadow = '0 0 18px rgba(16,185,129,.6)'
+            setTimeout(() => {
+              item.span.style.webkitTextFillColor = ''
+              item.span.style.textShadow = ''
+            }, 80)
+          } else {
+            item.span.textContent = WORD_POOL[Math.floor(Math.random() * WORD_POOL.length)]
+          }
+        })
+      }
+      if (items.every(it => it.locked)) {
+        decodeRafRef.current = null
+        if (onDone) setTimeout(onDone, 80)
+      } else {
+        decodeRafRef.current = requestAnimationFrame(tick)
+      }
+    }
+    decodeRafRef.current = requestAnimationFrame(tick)
+  }, [])
+
+  // Animate line1 words out (they keep their in-l/in-r direction for exit)
+  const exitLine1 = useCallback((line1El: HTMLElement) => {
+    const words = line1El.querySelectorAll<HTMLElement>('.hw:not([style*="opacity: 1"]):not([style*="opacity:1"])')
+    words.forEach((w, i) => {
+      const isRight = w.classList.contains('in-r')
+      w.style.setProperty('--exit-dir', isRight ? '.4em' : '-.4em')
+      w.style.animationDelay = `${i * 40}ms`
+      w.classList.remove('in-l', 'in-r')
+      w.classList.add('out')
+    })
+  }, [])
+
+  const line1Ref = useRef<HTMLSpanElement>(null)
+
+  // Trigger a rotation: exit → swap content → enter
+  const doRotation = useCallback(() => {
+    if (reducedMotion.current) {
+      // Simplified fallback for prefers-reduced-motion
+      const nextIdx = (heroIdxRef.current + 1) % HERO_LINES.length
+      heroIdxRef.current = nextIdx
+      setHeroIdx(nextIdx)
+      setLine1Nodes(buildWordSpans(HERO_LINES[nextIdx][0], 55))
+      setLine2Idx(nextIdx)
+      return
+    }
+
+    setPhase('exiting')
+    // Exit line1 words
+    if (line1Ref.current) {
+      exitLine1(line1Ref.current)
+    }
+    // Fade out line2
+    if (line2Ref.current) {
+      line2Ref.current.style.transition = 'opacity .2s ease'
+      line2Ref.current.style.opacity = '0'
+    }
+
+    setTimeout(() => {
+      const nextIdx = (heroIdxRef.current + 1) % HERO_LINES.length
+      heroIdxRef.current = nextIdx
+      setHeroIdx(nextIdx)
+
+      // Reset line2 opacity then decode new text
+      if (line2Ref.current) {
+        line2Ref.current.style.transition = ''
+        line2Ref.current.style.opacity = ''
+      }
+
+      // Set new line1 nodes
+      setLine1Nodes(buildWordSpans(HERO_LINES[nextIdx][0], 55))
+      setPhase('entering')
+
+      // Decode new line2
+      decodeLine2(HERO_LINES[nextIdx][1], true, undefined)
+    }, 240)
+  }, [exitLine1, decodeLine2])
+
+  // Initial mount: run intro animation sequence
+  useEffect(() => {
+    reducedMotion.current = window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches ?? false
+
+    if (reducedMotion.current) {
+      // Simple rotation without word-slam
+      timerRef.current = setInterval(doRotation, 4800)
+      return () => { if (timerRef.current) clearInterval(timerRef.current) }
+    }
+
+    setRecentSearches(RecentSearchesStore.get())
+
+    // Build initial line1
+    setLine1Nodes(buildWordSpans(HERO_LINES[0][0], 70))
+    setPhase('entering')
+
+    // After last line1 word stagger, start line2 decode
+    const line1Words = HERO_LINES[0][0].trim().split(/\s+/).length
+    const decodeDelay = line1Words * 70 + 120
+
+    const decodeTimeout = setTimeout(() => {
+      decodeLine2(HERO_LINES[0][1], false, () => {
+        // Shimmer sweep after first decode
+        setSwept(true)
+        setTimeout(() => setSwept(false), 750)
+
+        // Start rotation cycle
+        clearInterval(timerRef.current ?? undefined)
+        timerRef.current = setInterval(doRotation, 4800)
+      })
+    }, decodeDelay)
+
+    return () => {
+      clearTimeout(decodeTimeout)
+      if (timerRef.current) clearInterval(timerRef.current)
+      if (decodeRafRef.current !== null) cancelAnimationFrame(decodeRafRef.current)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  // Keep recentSearches in sync (separate from animation effect)
   useEffect(() => {
     setRecentSearches(RecentSearchesStore.get())
-    timerRef.current = setInterval(() => {
-      setHeroIdx(i => (i + 1) % HERO_LINES.length)
-    }, 4800)
-    return () => { if (timerRef.current) clearInterval(timerRef.current) }
   }, [])
 
   const doSearch = useCallback(() => {
@@ -59,7 +262,10 @@ export default function LandingHero() {
     router.push(`/company/${encodeURIComponent(name.toLowerCase().replace(/\s+/g, '-'))}`)
   }
 
-  const lines = HERO_LINES[heroIdx]
+  // Suppress unused variable warning — heroIdx used to key renders
+  void heroIdx
+  void phase
+  void line2Idx
 
   return (
     <div style={{ position: 'relative', zIndex: 2, flex: 1, display: 'flex', alignItems: 'center', overflow: 'hidden', padding: '2rem 0 1rem' }}>
@@ -75,10 +281,27 @@ export default function LandingHero() {
 
           {/* Rotating headline */}
           <div style={{ animation: 'fadeUp .5s .06s ease both' }}>
-            <div style={{ height: 'clamp(92px,13vw,150px)', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'flex-start', overflow: 'hidden' }}>
+            <div
+              id="rotatingHero"
+              className={swept ? 'swept' : ''}
+              style={{ height: 'clamp(92px,13vw,150px)', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'flex-start', overflow: 'hidden' }}
+            >
               <h1 style={{ fontFamily: 'var(--display)', fontSize: 'clamp(1.7rem,9.6cqw,3.9rem)', fontWeight: 800, lineHeight: 1.06, letterSpacing: '-.04em', color: 'var(--white)', margin: 0, width: '100%', textAlign: 'left' }}>
-                <span className="hero-line-in" key={`l1-${heroIdx}`} style={{ display: 'block', whiteSpace: 'nowrap' }}>{lines[0]}</span>
-                <span className="hero-line-in grad-text" key={`l2-${heroIdx}`} style={{ display: 'block', whiteSpace: 'nowrap', fontStyle: 'italic', animationDelay: '.06s' }}>{lines[1]}</span>
+                {/* Line 1: word-slam animated spans */}
+                <span
+                  ref={line1Ref}
+                  id="heroLine1"
+                  style={{ display: 'block', whiteSpace: 'nowrap' }}
+                >
+                  {line1Nodes}
+                </span>
+                {/* Line 2: slot-machine decode (managed imperatively via ref) */}
+                <span
+                  ref={line2Ref}
+                  id="heroLine2"
+                  className="grad-text"
+                  style={{ display: 'block', whiteSpace: 'nowrap', fontStyle: 'italic' }}
+                />
               </h1>
             </div>
           </div>

@@ -159,6 +159,8 @@ export default function TrackerPage() {
   const [loading, setLoading] = useState(true)
   const [outcomeApp, setOutcomeApp] = useState<Application | null>(null)
   const [roundsApp, setRoundsApp] = useState<Application | null>(null)
+  const [showManual, setShowManual] = useState(false)
+  const [manualForm, setManualForm] = useState({ company: '', role: '', location: '', platform: 'Direct' })
 
   useEffect(() => {
     if (!isLoggedIn) { router.replace('/login'); return }
@@ -254,8 +256,55 @@ export default function TrackerPage() {
   const rejected = apps.filter(a => a.status === 'rejected')
   const dueChecks = EventStore.dueChecks(apps)
 
+  const handleManualAdd = async () => {
+    if (!manualForm.company.trim() || !manualForm.role.trim()) return
+    await AppStore.add({ company: manualForm.company.trim(), role: manualForm.role.trim(), location: manualForm.location.trim(), platform: manualForm.platform, stage: 'Applied', status: 'active' }, isLoggedIn)
+    setApps(AppStore.loadSync())
+    setManualForm({ company: '', role: '', location: '', platform: 'Direct' })
+    setShowManual(false)
+  }
+
   return (
     <>
+    {/* Manual add modal */}
+    {showManual && (
+      <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.8)', zIndex: 9000, backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+        onClick={e => { if (e.target === e.currentTarget) setShowManual(false) }}>
+        <div style={{ width: 'calc(100% - 2rem)', maxWidth: 440, background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 14, overflow: 'hidden' }}>
+          <div style={{ padding: '.9rem 1.1rem', borderBottom: '1px solid var(--line)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <span style={{ fontFamily: 'var(--display)', fontSize: '.88rem', fontWeight: 700, color: 'var(--white)' }}>Track application</span>
+            <button onClick={() => setShowManual(false)} style={{ background: 'none', border: 'none', color: 'var(--dim)', cursor: 'pointer', fontSize: '1rem' }}>✕</button>
+          </div>
+          <div style={{ padding: '1rem 1.1rem', display: 'flex', flexDirection: 'column', gap: '.65rem' }}>
+            {[
+              { key: 'company', label: 'Company *', placeholder: 'e.g. Stripe' },
+              { key: 'role', label: 'Role *', placeholder: 'e.g. Software Engineer' },
+              { key: 'location', label: 'Location', placeholder: 'e.g. Remote' },
+              { key: 'platform', label: 'Applied via', placeholder: 'e.g. LinkedIn, Direct' },
+            ].map(f => (
+              <div key={f.key}>
+                <div style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', color: 'var(--muted)', marginBottom: '.25rem', textTransform: 'uppercase', letterSpacing: '.06em' }}>{f.label}</div>
+                <input
+                  value={manualForm[f.key as keyof typeof manualForm]}
+                  onChange={e => setManualForm(prev => ({ ...prev, [f.key]: e.target.value }))}
+                  onKeyDown={e => e.key === 'Enter' && handleManualAdd()}
+                  placeholder={f.placeholder}
+                  style={{ width: '100%', background: 'var(--card)', border: '1.5px solid var(--line2)', borderRadius: 8, padding: '.5rem .75rem', color: 'var(--white)', fontFamily: 'var(--body)', fontSize: '.82rem', outline: 'none', boxSizing: 'border-box' }}
+                />
+              </div>
+            ))}
+            <button
+              className="btn btn-green"
+              style={{ width: '100%', justifyContent: 'center', marginTop: '.25rem' }}
+              onClick={handleManualAdd}
+              disabled={!manualForm.company.trim() || !manualForm.role.trim()}
+            >
+              Add to tracker →
+            </button>
+          </div>
+        </div>
+      </div>
+    )}
     {outcomeApp && <OutcomeCard app={outcomeApp} onClose={() => setOutcomeApp(null)} />}
     {roundsApp && !outcomeApp && (
       <RoundsPrompt
@@ -276,8 +325,10 @@ export default function TrackerPage() {
             <h1 style={{ fontFamily: 'var(--display)', fontSize: '1.6rem', fontWeight: 800, color: 'var(--white)', letterSpacing: '-.03em', marginBottom: '.3rem' }}>My applications</h1>
             <p style={{ color: 'var(--sub)', fontSize: '.78rem', fontWeight: 300 }}>Synced across devices when signed in</p>
           </div>
-          <div style={{ display: 'flex', gap: '.5rem' }}>
+          <div style={{ display: 'flex', gap: '.5rem', flexWrap: 'wrap' }}>
+            <button className="btn btn-green" style={{ fontSize: '.72rem' }} onClick={() => setShowManual(true)}>+ Track manually</button>
             {apps.length > 1 && <button className="btn btn-ghost" style={{ fontSize: '.72rem' }} onClick={clearDupes}>Clear dupes</button>}
+            {apps.length > 0 && <button className="btn btn-ghost" style={{ fontSize: '.72rem', color: 'var(--muted)' }} onClick={() => { if (confirm('Remove all applications? This cannot be undone.')) { AppStore.clear(); setApps([]) } }}>Clear all</button>}
           </div>
         </div>
 
