@@ -150,9 +150,9 @@ export default function FeedPage() {
                     <div>
                       <span style={{ fontFamily: 'var(--mono)', fontSize: '.7rem', fontWeight: 600, color: 'var(--white)' }}>{oc.label}</span>
                       {r.company_name && (
-                        <span style={{ fontFamily: 'var(--mono)', fontSize: '.62rem', color: 'var(--blue)', marginLeft: '.5rem' }}>
+                        <a href={`/company/${encodeURIComponent(r.company_name.toLowerCase().replace(/\s+/g, '-'))}`} style={{ fontFamily: 'var(--mono)', fontSize: '.62rem', color: 'var(--blue)', marginLeft: '.5rem', textDecoration: 'none' }}>
                           @ {r.company_name}
-                        </span>
+                        </a>
                       )}
                     </div>
                     <span style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', color: 'var(--muted)', flexShrink: 0 }}>
