@@ -46,15 +46,15 @@ A page is COMPLETE only when: visual match + all old functionality + working API
 | Health score panel | 🟡 | Exists; old version has a more detailed callout with `seekerHealthScore` |
 | Active applications list | ✅ | |
 | Alerts / follow-up prompts (`dashAlerts`) | ✅ | Dynamic alerts panel: stale apps (flat >30d) + ghost-surge (Supabase `reports` read, graceful RLS fallback) + red count badge + "All clear ✓" empty state. "N checks due →" indicator added to greeting → `/tracker`. (Follow-up Q&A prompts themselves already live in the tracker.) |
-| Survey insight (`dashSurveyInsight`) | ❌ | Contextual prompt based on app history |
-| Benchmarks panel (`dashBenchmarks`) | ❌ | Industry comparison data |
+| Survey insight (`dashSurveyInsight`) | ✅ | Green "✓ {feature} on" card from `profile.onboarding_survey.frustration` (5 frustration→feature mappings) |
+| Benchmarks panel (`dashBenchmarks`) | ✅ | "Career Benchmarks" 2×2 grid (Response/Interview/Offer/Ghost rate vs industry avg, percentile + color); gated n≥3 & terminal≥2 |
 | Badges panel (`dashBadges`) | 🟡 | BadgeStore exists in lib; verify rendering |
-| Pipeline insight (`dashPipelineInsight`) | ❌ | Smart insight on current pipeline stage |
+| Pipeline insight (`dashPipelineInsight`) | ✅ | "Your pipeline" band (checks due → / overdue / personal RR / ghosted / hired); gated apps≥2. `avgRT` omitted (responseTimeDays not tracked); overdue uses flat >33d |
 | Account settings button | 🟡 | Old has ⚙ button; new may lack it |
 | Sign out button on dashboard | 🟡 | Verify present |
 | "Find more jobs →" CTA | ✅ | |
 
-**Status: 🟡 — alerts panel + checks-due indicator DONE; still missing survey insight, benchmarks, pipeline insight**
+**Status: 🟢 — alerts, checks-due indicator, survey insight, benchmarks, pipeline insight all DONE.** Remaining minor follow-ups: account settings (⚙), and `responseTimeDays` tracking on resolve (so pipeline `avgRT` can return).
 
 ---
 
@@ -345,7 +345,7 @@ A page is COMPLETE only when: visual match + all old functionality + working API
 | # | Page | Old ID | Next.js route | Status |
 |---|------|--------|---------------|--------|
 | 1 | Landing | page-landing | `/` | 🟡 |
-| 2 | Dashboard | page-seeker-dash | `/dashboard` | 🟡 |
+| 2 | Dashboard | page-seeker-dash | `/dashboard` | 🟢 (account settings = follow-up) |
 | 3 | Jobs | page-jobs | `/jobs` | 🟡 |
 | 4 | Job detail | page-job-detail | `/jobs/[id]` | ✅ (Apply-optimize modal = follow-up) |
 | 5 | Company profile | page-company | `/company/[slug]` | 🟡 |

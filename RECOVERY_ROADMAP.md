@@ -25,9 +25,10 @@ See ADMIN_PARITY_CHECKLIST.md milestone table. 10 commits, build green, ahead 10
   populated by `/jobs` search results; detail route looks up job by id. Source already extracted (see handoff).
 
 ### IMPORTANT — missing workflows / routes / API behaviors (verify each against origin/main)
-- Dashboard alerts/follow-up prompts (Day 7/14/30) — `#dashAlerts` (core data-acquisition loop), missing.
-- Dashboard benchmarks + pipeline insight — `#dashBenchmarks`, `#dashPipelineInsight`, missing.
-- Account settings (dashboard ⚙ `openAccountSettings`) — verify presence.
+- ✅ Dashboard alerts/follow-up prompts (Day 7/14/30) — `#dashAlerts` + checks-due indicator DONE.
+- ✅ Dashboard survey insight, benchmarks, pipeline insight — `#dashSurveyInsight`/`#dashBenchmarks`/`#dashPipelineInsight` DONE.
+- Account settings (dashboard ⚙ `openAccountSettings`) — verify presence (still open).
+- Follow-up: persist `responseTimeDays` on app resolve (so pipeline `avgRT` part returns; tracker stage updates / outcome cards / withdrew option).
 - Legal page (`app/legal/page.tsx` 68 lines) — likely truncated vs index.html:2064–2108.
 - Per-page functional audit (jobs filters/sort/pagination, tracker follow-up system + outcome cards,
   company profile reports/research, feed filters, report submission flow, resume optimize, demand charts,

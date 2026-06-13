@@ -72,10 +72,28 @@ Remaining admin work is cosmetic/optional only: §2 minor (`ready:false` N/A —
   (Interview/Phone Screen), the viral `showOutcomeCard`, offer `_showRoundsPrompt`, and the
   "↩ I withdrew" outcome option.
 
+### Dashboard insights — ✅ PORTED (this commit)
+- `app/dashboard/page.tsx` only. Added 3 panels (parity of index.html 9272/9355/9516):
+  - `dashSurveyInsight`: green "✓ {feature} on" card from `profile.onboarding_survey.frustration`
+    (5 mappings: ghosting/fake/salary/rounds/all). Hidden if no frustration key.
+  - `dashBenchmarks`: "Career Benchmarks" 2×2 grid (Response/Interview/Offer/Ghost rate vs
+    industry AVG {22,10,4,55}, percentile + color). Gated n≥3 && terminal≥2. Pure local.
+  - `dashPipelineInsight`: "Your pipeline" band (checks due → / overdue / personal RR /
+    ghosted / hired). Gated apps≥2. **avgRT OMITTED** (responseTimeDays not tracked);
+    overdue uses flat >33d (no COS client data).
+- No API/serverless/store changes.
+- DASHBOARD PARITY NOW 🟢 (alerts + checks-due + survey + benchmarks + pipeline all done).
+
+### Dashboard follow-up gaps (tracked, not blocking)
+- Account settings (⚙ `openAccountSettings`) — not yet present.
+- Persist `responseTimeDays` on app resolve → unlocks pipeline `avgRT` "avg response: Nd".
+- Tracker `handleCheckAnswer`: old stage updates (Interview/Phone Screen), `showOutcomeCard`,
+  offer `_showRoundsPrompt`, "↩ I withdrew" option.
+
 ### Next up (SITE_PARITY_CHECKLIST.md — Phase 2 IMPORTANT)
-- Dashboard survey insight, benchmarks, pipeline insight (still missing)
 - Legal page completeness; account settings
-- Per-page functional audit (most pages 🟡 unverified)
+- Per-page functional audit (jobs filters/sort, tracker, company, feed, report, resume,
+  demand, profile, employer.html — most pages 🟡 unverified)
 
 ### Working agreement this session
 - Admin parity only, one section at a time, small commits.

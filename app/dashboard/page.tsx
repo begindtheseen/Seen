@@ -14,6 +14,26 @@ function companySlug(name: string) {
   return encodeURIComponent(name.toLowerCase().replace(/\s+/g, '-'))
 }
 
+// Survey insight — maps onboarding survey frustration → enabled-feature card (index.html:9272)
+const FRUSTRATION_MAP: Record<string, { label: string; desc: string }> = {
+  ghosting: { label: 'Ghosting alerts on', desc: "We'll flag companies with high ghost rates before you apply." },
+  fake: { label: 'Fake listing detection on', desc: 'AI research fires automatically on companies with sparse data.' },
+  salary: { label: 'Salary transparency on', desc: 'We show salary ranges upfront. No more guessing.' },
+  rounds: { label: 'Process transparency on', desc: 'We track how many rounds each company typically runs.' },
+  all: { label: 'Full transparency mode on', desc: 'Everything Seen has is working for you.' },
+}
+
+function surveyFrustration(onboarding: string | Record<string, unknown> | undefined): string | null {
+  if (!onboarding) return null
+  try {
+    const o = typeof onboarding === 'string' ? JSON.parse(onboarding) : onboarding
+    const f = o?.frustration
+    return typeof f === 'string' && FRUSTRATION_MAP[f] ? f : null
+  } catch {
+    return null
+  }
+}
+
 function calcJobSearchHealth(apps: Application[]) {
   if (apps.length < 3) return null
   const terminal = apps.filter(a => a.status !== 'active')
@@ -77,6 +97,54 @@ export default function DashboardPage() {
   const staleApps = active.filter(a => Math.floor((Date.now() - a.appliedAt) / 86400000) > 30)
   const alertCount = staleApps.length + surges.length
   const allEvents = EventStore.get()
+
+  // Survey insight (index.html:9272)
+  const frustration = surveyFrustration(profile?.onboarding_survey)
+  const surveyInsight = frustration ? FRUSTRATION_MAP[frustration] : null
+
+  // Career Benchmarks (index.html:9516) — gated n>=3 && terminal>=2
+  const benchmarks = (() => {
+    const n = apps.length
+    const terminal = apps.filter(a => ['hired', 'rejected', 'ghosted'].includes(a.status))
+    if (n < 3 || terminal.length < 2) return null
+    const withInt = apps.filter(a => (a.events || []).some(e => e.type === 'interview_received' || e.type === 'interview_completed'))
+    const rr = Math.round((terminal.length / n) * 100)
+    const ir = Math.round((withInt.length / n) * 100)
+    const or = Math.round((hired.length / n) * 100)
+    const gr = Math.round((ghosted.length / n) * 100)
+    const AVG = { rr: 22, ir: 10, or: 4, gr: 55 }
+    const pct = (v: number, avg: number, hi: boolean) => {
+      if (v === 0 && hi) return 5
+      const ratio = hi ? v / Math.max(avg, 1) : avg / Math.max(v, 1)
+      return Math.min(99, Math.max(1, Math.round(50 * ratio)))
+    }
+    const col = (v: number, avg: number, hi: boolean) => v === 0 ? 'var(--muted)' : (hi ? (v >= avg ? 'var(--green)' : 'var(--amber)') : (v <= avg ? 'var(--green)' : v < avg * 1.4 ? 'var(--amber)' : 'var(--red)'))
+    return {
+      n,
+      metrics: [
+        { lbl: 'Response Rate', val: `${rr}%`, pct: pct(rr, AVG.rr, true), avg: `${AVG.rr}% avg`, col: col(rr, AVG.rr, true) },
+        { lbl: 'Interview Rate', val: `${ir}%`, pct: pct(ir, AVG.ir, true), avg: `${AVG.ir}% avg`, col: col(ir, AVG.ir, true) },
+        { lbl: 'Offer Rate', val: `${or}%`, pct: pct(or, AVG.or, true), avg: `${AVG.or}% avg`, col: col(or, AVG.or, true) },
+        { lbl: 'Ghost Rate', val: `${gr}%`, pct: pct(gr, AVG.gr, false), avg: `${AVG.gr}% avg`, col: col(gr, AVG.gr, false) },
+      ],
+    }
+  })()
+
+  // Pipeline insight (index.html:9355) — gated apps>=2. avgRT omitted (responseTimeDays not tracked);
+  // overdue uses flat >33d threshold (30*1.1 — no COS client data).
+  const pipelineParts: { text: string; color?: string; onClick?: () => void }[] = (() => {
+    if (apps.length < 2) return []
+    const resolved = apps.filter(a => a.status !== 'active')
+    const personalRR = apps.length ? Math.round((apps.filter(a => a.status === 'hired' || a.status === 'rejected').length / apps.length) * 100) : null
+    const overdue = active.filter(a => Math.floor((Date.now() - a.appliedAt) / 86400000) > 33)
+    const parts: { text: string; color?: string; onClick?: () => void }[] = []
+    if (dueChecks.length) parts.push({ text: `${dueChecks.length} check${dueChecks.length > 1 ? 's' : ''} due →`, color: 'var(--amber)', onClick: () => router.push('/tracker') })
+    if (overdue.length) parts.push({ text: `⚠ ${overdue.length} app${overdue.length > 1 ? 's' : ''} past response window`, color: 'var(--red)' })
+    if (personalRR !== null && resolved.length >= 2) parts.push({ text: `your response rate: ${personalRR}%` })
+    if (ghosted.length) parts.push({ text: `${ghosted.length} ghosted` })
+    if (hired.length) parts.push({ text: `${hired.length} hired 🎉` })
+    return parts
+  })()
   const badges = BadgeStore.compute(apps, allEvents)
   const health = calcJobSearchHealth(apps)
 
@@ -121,6 +189,17 @@ export default function DashboardPage() {
           </div>
         </div>
 
+        {/* Survey insight */}
+        {surveyInsight && (
+          <div style={{ background: 'var(--gdim)', border: '1px solid var(--gmid)', borderRadius: 8, padding: '.65rem .9rem', display: 'flex', alignItems: 'flex-start', gap: '.65rem', marginBottom: '1rem' }}>
+            <span style={{ color: 'var(--green)', fontSize: '.9rem', flexShrink: 0 }}>✓</span>
+            <div>
+              <div style={{ fontFamily: 'var(--mono)', fontSize: '.62rem', color: 'var(--green)', fontWeight: 600, marginBottom: '.1rem' }}>{surveyInsight.label}</div>
+              <div style={{ fontSize: '.72rem', color: 'var(--sub)', fontWeight: 300 }}>{surveyInsight.desc}</div>
+            </div>
+          </div>
+        )}
+
         {/* Health Score */}
         {health && (
           <div style={{ marginBottom: '1.25rem', background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 12, padding: '1rem 1.25rem' }}>
@@ -131,6 +210,25 @@ export default function DashboardPage() {
             </div>
             <div style={{ height: 4, background: 'var(--line2)', borderRadius: 2, overflow: 'hidden' }}>
               <div style={{ height: '100%', width: `${health.score}%`, borderRadius: 2, background: health.score >= 75 ? 'var(--green)' : health.score >= 55 ? 'var(--amber)' : 'var(--red)', transition: 'width .6s ease' }} />
+            </div>
+          </div>
+        )}
+
+        {/* Career Benchmarks */}
+        {benchmarks && (
+          <div style={{ marginBottom: '1.25rem', background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 12, overflow: 'hidden' }}>
+            <div style={{ padding: '.85rem 1.1rem', borderBottom: '1px solid var(--line)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <div style={{ fontFamily: 'var(--display)', fontSize: '.82rem', fontWeight: 700, color: 'var(--white)' }}>Career Benchmarks</div>
+              <div style={{ fontFamily: 'var(--mono)', fontSize: '.54rem', color: 'var(--muted)' }}>{benchmarks.n} app{benchmarks.n !== 1 ? 's' : ''} · vs industry avg</div>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr' }}>
+              {benchmarks.metrics.map((m, i) => (
+                <div key={m.lbl} style={{ padding: '.85rem 1rem', ...(i % 2 === 0 ? { borderRight: '1px solid var(--line)' } : {}), ...(i < 2 ? { borderBottom: '1px solid var(--line)' } : {}) }}>
+                  <div style={{ fontFamily: 'var(--mono)', fontSize: '.52rem', textTransform: 'uppercase', letterSpacing: '.07em', color: 'var(--muted)', marginBottom: '.3rem' }}>{m.lbl}</div>
+                  <div style={{ fontFamily: 'var(--display)', fontSize: '1.45rem', fontWeight: 800, color: m.col, lineHeight: 1 }}>{m.val}</div>
+                  <div style={{ fontFamily: 'var(--mono)', fontSize: '.54rem', color: 'var(--dim)', marginTop: '.2rem' }}>Top {m.pct}% · {m.avg}</div>
+                </div>
+              ))}
             </div>
           </div>
         )}
@@ -174,6 +272,22 @@ export default function DashboardPage() {
             <div style={{ fontFamily: 'var(--display)', fontSize: '.9rem', fontWeight: 700, color: 'var(--white)', letterSpacing: '-.02em' }}>Active applications</div>
             <Link href="/tracker" className="btn btn-ghost" style={{ fontSize: '.7rem', textDecoration: 'none' }}>View all →</Link>
           </div>
+
+          {/* Pipeline insight */}
+          {pipelineParts.length > 0 && (
+            <div style={{ background: 'var(--raised)', border: '1px solid var(--line2)', borderRadius: 9, padding: '.65rem .95rem', fontFamily: 'var(--mono)', fontSize: '.6rem', color: 'var(--dim)', display: 'flex', flexWrap: 'wrap', gap: '.55rem', alignItems: 'center', marginBottom: '.85rem' }}>
+              <span style={{ color: 'var(--muted)', fontSize: '.54rem', textTransform: 'uppercase', letterSpacing: '.07em' }}>Your pipeline</span>
+              {pipelineParts.map((p, i) => (
+                <span key={i} style={{ display: 'flex', alignItems: 'center', gap: '.55rem' }}>
+                  {i > 0 && <span style={{ color: 'var(--line2)' }}>·</span>}
+                  {p.onClick
+                    ? <button onClick={p.onClick} style={{ background: 'none', border: 'none', padding: 0, fontFamily: 'inherit', fontSize: 'inherit', color: p.color || 'inherit', cursor: 'pointer' }}>{p.text}</button>
+                    : <span style={{ color: p.color || 'inherit' }}>{p.text}</span>
+                  }
+                </span>
+              ))}
+            </div>
+          )}
 
           {active.length === 0 ? (
             <div style={{ padding: '1.5rem', background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 10, textAlign: 'center', fontFamily: 'var(--mono)', fontSize: '.7rem', color: 'var(--muted)' }}>
