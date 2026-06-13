@@ -121,8 +121,8 @@ The current GET handler (lines 132–254) returns `reports: {total, today, this_
 - **Old source**: HTML 2644–2651 (`#admFlagsPanel`); render JS 6702–6716; `adminSetFlag(flagName, status, selectEl)` 6873–6898; `adminSeedFlags(btnEl)` 6913–6929. Runtime consumer: `FeatureFlags` object 2750+.
 - **API calls**: GET → `feature_flags[]`; POST `set_flag` `{flag_name, status}`; POST `seed_flags`.
 - **UI elements**: "+ Seed defaults" header button; per-flag row: name + description, colored status label (Off/Admin only/Beta (20%)/% rollout/Live), `<select>` with the 5 statuses (optimistic "Saving…" label, toast on success/failure, also updates in-memory `FeatureFlags._flags`); empty state shows "Initialize default flags →" button.
-- **Status in Next.js**: ❌ missing.
-- **Files to change**: `app/admin/page.tsx`
+- **Status in Next.js**: ✅ **ported** (recovery branch). `FlagsPanel` component: "+ Seed defaults" header button, per-flag name + description, colored status label (parity colors), 5-option `<select>` with optimistic local override + "Saving…" label (reverts on failure), empty state "Initialize default flags →". POSTs `set_flag {flag_name, status}` / `seed_flags` (seed → refetch). Verifies `d.ok`. NOTE: old SPA also patched in-memory `FeatureFlags._flags` for instant single-page effect; in Next.js, runtime flag consumption re-reads server state on navigation, so no in-memory sync needed in the admin page.
+- **Files to change**: `app/admin/page.tsx` ✅ done
 
 ### 13. Duplicate account clusters / login signals
 - **Old source**: HTML 2653–2660 (`#admClustersPanel`); render JS 6718–6736; `adminUpdateCluster(clusterId, status)` 6901–6911; `adminDetectDuplicates()` 7025–7041.
@@ -169,7 +169,7 @@ The current GET handler (lines 132–254) returns `reports: {total, today, this_
 | 9 | Reported inactive listings (remove/keep) | ✅ | M |
 | 10 | Data quality issues queue | ✅ (merge-tool prefill deferred to §11) | M |
 | 11 | Company dedup (scan/auto/manual merge) | ❌ (+ API contract drift) | L |
-| 12 | Feature flags | ❌ | M |
+| 12 | Feature flags | ✅ | M |
 | 13 | Duplicate account clusters | ❌ | M |
 | 14 | API Health | ❌ | S |
 | 15 | Background job runner | ❌ | M |

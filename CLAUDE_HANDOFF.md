@@ -22,7 +22,7 @@ Last updated: 2026-06-13 (Session C, recovery)
 - ✅ §10 Data quality issues queue (resolve/dismiss) — ported; merge-tool prefill deferred to §11
 - ✅ §9 Reported inactive listings (remove_listing/deny_report + confirm) — ported
 - ✅ §8 Recent jobs browser (period tabs, get_recent_jobs) — ported (lazy load, 401/403 re-login)
-- §12 Feature flags (set_flag/seed_flags)
+- ✅ §12 Feature flags (set_flag/seed_flags) — ported (optimistic select, seed defaults)
 - §13 Duplicate account clusters (update_cluster/detect_duplicates_by_signals)
 - §11 Company deduplication (find_duplicates/merge/auto_merge — has API contract drift)
 - §15 Background job runner (X-Admin-Token → /api/refresh-jobs, /api/demand, /api/reports)

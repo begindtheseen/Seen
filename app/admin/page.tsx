@@ -479,6 +479,9 @@ export default function AdminPage() {
           }
         </Card>
 
+        {/* Feature flags */}
+        <FlagsPanel flags={stats.feature_flags || []} token={token!} onRefresh={() => load(token!)} />
+
         {/* API Health */}
         <Card style={{ marginBottom: '1.25rem' }}>
           <CardHeader title="API health" />
@@ -663,6 +666,104 @@ function InactiveRow({ report: r, token }: { report: InactiveReport; token: stri
         </div>
       </div>
     </div>
+  )
+}
+
+const FLAG_STATUS_LABELS: Record<string, string> = {
+  off: 'Off', admin_only: 'Admin only', beta_users: 'Beta (20%)', percentage_rollout: '% rollout', fully_on: 'Live',
+}
+const FLAG_STATUS_COLORS: Record<string, string> = {
+  off: 'var(--muted)', admin_only: 'var(--amber)', beta_users: 'var(--blue)', percentage_rollout: 'var(--indigo)', fully_on: 'var(--green)',
+}
+const FLAG_STATUSES = ['off', 'admin_only', 'beta_users', 'percentage_rollout', 'fully_on']
+
+function FlagsPanel({ flags, token, onRefresh }: { flags: FeatureFlag[]; token: string; onRefresh: () => void }) {
+  const [saving, setSaving] = useState<string | null>(null)
+  const [seeding, setSeeding] = useState(false)
+  // Optimistic local status overrides keyed by flag_name
+  const [localStatus, setLocalStatus] = useState<Record<string, string>>({})
+
+  async function setFlag(flagName: string, status: string) {
+    setSaving(flagName)
+    const prev = localStatus[flagName]
+    setLocalStatus(s => ({ ...s, [flagName]: status }))
+    try {
+      const res = await fetch('/api/admin-stats', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Admin-Token': token },
+        body: JSON.stringify({ action: 'set_flag', flag_name: flagName, status }),
+      })
+      const d = await res.json()
+      if (!d.ok) throw new Error(d.error || String(res.status))
+    } catch (e) {
+      setLocalStatus(s => ({ ...s, [flagName]: prev ?? '' }))
+      alert('✗ Failed to update flag: ' + (e as Error).message)
+    }
+    setSaving(null)
+  }
+
+  async function seed() {
+    setSeeding(true)
+    try {
+      const res = await fetch('/api/admin-stats', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Admin-Token': token },
+        body: JSON.stringify({ action: 'seed_flags' }),
+      })
+      const d = await res.json()
+      if (!d.ok) throw new Error(d.error || String(res.status))
+      setTimeout(onRefresh, 600)
+    } catch (e) {
+      setSeeding(false)
+      alert('✗ ' + (e as Error).message)
+    }
+  }
+
+  function effectiveStatus(f: FeatureFlag) { return localStatus[f.flag_name] || f.status }
+
+  return (
+    <Card style={{ marginBottom: '1.25rem' }}>
+      <CardHeader
+        title="Feature flags"
+        action={
+          <button onClick={seed} disabled={seeding} style={{ background: 'none', border: '1px solid var(--line2)', borderRadius: 6, padding: '.3rem .7rem', fontFamily: 'var(--mono)', fontSize: '.58rem', color: 'var(--sub)', cursor: 'pointer' }}>
+            {seeding ? 'Creating…' : '+ Seed defaults'}
+          </button>
+        }
+      />
+      {flags.length === 0
+        ? (
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '.75rem' }}>
+            <div style={{ fontFamily: 'var(--mono)', fontSize: '.62rem', color: 'var(--dim)' }}>No flags in database</div>
+            <button onClick={seed} disabled={seeding} style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', padding: '.3rem .75rem', borderRadius: 6, border: '1px solid rgba(59,130,246,.4)', background: 'rgba(59,130,246,.1)', color: 'var(--blue)', cursor: 'pointer' }}>
+              {seeding ? 'Creating…' : 'Initialize default flags →'}
+            </button>
+          </div>
+        )
+        : flags.map(f => {
+          const status = effectiveStatus(f)
+          return (
+            <div key={f.flag_name} style={{ display: 'flex', alignItems: 'center', gap: '.65rem', padding: '.55rem 0', borderBottom: '1px solid var(--line2)' }}>
+              <div style={{ flex: 1, fontFamily: 'var(--mono)', fontSize: '.62rem', color: 'var(--white)' }}>
+                {f.flag_name}
+                {f.description && <div style={{ fontFamily: 'var(--mono)', fontSize: '.48rem', color: 'var(--dim)', marginTop: '.1rem' }}>{f.description}</div>}
+              </div>
+              <div style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', color: FLAG_STATUS_COLORS[status] || 'var(--muted)', whiteSpace: 'nowrap', marginRight: '.25rem' }}>
+                {saving === f.flag_name ? 'Saving…' : (FLAG_STATUS_LABELS[status] || status)}
+              </div>
+              <select
+                value={status}
+                disabled={saving === f.flag_name}
+                onChange={e => setFlag(f.flag_name, e.target.value)}
+                style={{ background: 'var(--raised)', border: '1px solid var(--line2)', borderRadius: 5, padding: '.18rem .4rem', fontFamily: 'var(--mono)', fontSize: '.58rem', color: 'var(--sub)', cursor: 'pointer' }}
+              >
+                {FLAG_STATUSES.map(s => <option key={s} value={s}>{FLAG_STATUS_LABELS[s]}</option>)}
+              </select>
+            </div>
+          )
+        })
+      }
+    </Card>
   )
 }
 
