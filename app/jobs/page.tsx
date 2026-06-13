@@ -91,6 +91,12 @@ function JobCard({ job, index, onSaveToggle, onOpen }: { job: Job; index: number
             👻 high ghost risk
           </span>
         )}
+        {job.availability_status === 'stale' && (
+          <span className="vibe v-a" style={{ fontSize: '.57rem' }}>⚠ may be closed</span>
+        )}
+        {(job.availability_status === 'expired' || job.availability_status === 'closed') && (
+          <span className="vibe v-r" style={{ fontSize: '.57rem' }}>✕ likely closed</span>
+        )}
         {vibes.map((v, i) => (
           <span key={i} className={`vibe ${v.cls}`}>{v.txt}</span>
         ))}
@@ -139,11 +145,15 @@ function JobCard({ job, index, onSaveToggle, onOpen }: { job: Job; index: number
   )
 }
 
+const US_CITIES = ['New York, NY','Los Angeles, CA','Chicago, IL','Houston, TX','Phoenix, AZ','San Antonio, TX','San Diego, CA','Dallas, TX','San Jose, CA','Austin, TX','Seattle, WA','Denver, CO','Boston, MA','Atlanta, GA','Miami, FL','Portland, OR','Las Vegas, NV','San Francisco, CA','Washington, DC','Charlotte, NC','Nashville, TN','Minneapolis, MN','Raleigh, NC','Detroit, MI','Sacramento, CA']
+
 export default function JobsPage() {
   const router = useRouter()
   const { isLoggedIn } = useAuth()
   const [query, setQuery] = useState('')
   const [location, setLocation] = useState('')
+  const [locSuggs, setLocSuggs] = useState<string[]>([])
+  const [showLocSuggs, setShowLocSuggs] = useState(false)
   const [radius, setRadius] = useState('25')
   const [niche, setNiche] = useState<NicheFilter>('')
   const [level, setLevel] = useState<LevelFilter>('')
@@ -304,14 +314,37 @@ export default function JobsPage() {
               onKeyDown={e => e.key === 'Enter' && searchJobs()}
               style={inputStyle}
             />
-            <input
-              type="text"
-              placeholder="City or state..."
-              value={location}
-              onChange={e => setLocation(e.target.value)}
-              onKeyDown={e => e.key === 'Enter' && searchJobs()}
-              style={inputStyle}
-            />
+            <div style={{ position: 'relative', flex: 1, minWidth: 160 }}>
+              <input
+                type="text"
+                placeholder="City or state..."
+                value={location}
+                onChange={e => {
+                  const val = e.target.value
+                  setLocation(val)
+                  if (val.length >= 2) {
+                    setLocSuggs(US_CITIES.filter(c => c.toLowerCase().includes(val.toLowerCase())).slice(0, 6))
+                    setShowLocSuggs(true)
+                  } else {
+                    setShowLocSuggs(false)
+                  }
+                }}
+                onKeyDown={e => e.key === 'Enter' && searchJobs()}
+                onBlur={() => setTimeout(() => setShowLocSuggs(false), 150)}
+                style={{ ...inputStyle, flex: 'unset', minWidth: 'unset', width: '100%' }}
+              />
+              {showLocSuggs && locSuggs.length > 0 && (
+                <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 50, background: 'var(--card)', border: '1px solid var(--line2)', borderRadius: 8, marginTop: 2, overflow: 'hidden', boxShadow: '0 8px 24px rgba(0,0,0,.4)' }}>
+                  {locSuggs.map(city => (
+                    <div key={city} onMouseDown={() => { setLocation(city); setShowLocSuggs(false) }}
+                      style={{ padding: '.45rem .8rem', fontFamily: 'var(--mono)', fontSize: '.68rem', color: 'var(--sub)', cursor: 'pointer' }}
+                      onMouseEnter={e => (e.currentTarget.style.background = 'var(--surface)')}
+                      onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+                    >{city}</div>
+                  ))}
+                </div>
+              )}
+            </div>
             <select value={radius} onChange={e => setRadius(e.target.value)} style={selectStyle}>
               <option value="10">10 mi</option>
               <option value="25">25 mi</option>

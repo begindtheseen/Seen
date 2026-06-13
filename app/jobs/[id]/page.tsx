@@ -53,6 +53,7 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
   const [saved, setSaved] = useState(false)
   const [insights, setInsights] = useState<Insights | null>(null)
   const [insightsState, setInsightsState] = useState<'loading' | 'done' | 'unavailable' | 'no_desc' | 'credits'>('loading')
+  const [showApplyModal, setShowApplyModal] = useState(false)
 
   // Resolve the job from the session cache (Next.js equivalent of old global JOBS array)
   useEffect(() => {
@@ -259,13 +260,38 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
           }
         </div>
 
-        {/* Report placeholder */}
-        <div style={{ marginTop: '1.5rem', background: 'var(--raised)', border: '1px solid var(--line2)', borderRadius: 12, padding: '1.25rem', opacity: .6 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '.65rem', marginBottom: '.45rem' }}>
-            <div style={{ fontFamily: 'var(--display)', fontSize: '.9rem', fontWeight: 700, color: 'var(--muted)' }}>Report Your Experience</div>
-            <span style={{ background: 'var(--line)', color: 'var(--dim)', fontFamily: 'var(--mono)', fontSize: '.5rem', padding: '.15rem .45rem', borderRadius: 4, letterSpacing: '.06em' }}>COMING SOON</span>
+        {/* Report Your Experience — T1-15 */}
+        <div style={{ marginTop: '1.5rem', background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 12, padding: '1.25rem' }}>
+          <div style={{ fontFamily: 'var(--display)', fontSize: '.9rem', fontWeight: 700, color: 'var(--white)', marginBottom: '.3rem' }}>Report your experience</div>
+          <p style={{ fontFamily: 'var(--mono)', fontSize: '.65rem', color: 'var(--sub)', marginBottom: '1rem', lineHeight: 1.6 }}>
+            Applied here? Share how it went — takes 60 seconds and helps thousands of job seekers.
+          </p>
+          <div style={{ display: 'flex', gap: '.5rem', flexWrap: 'wrap' }}>
+            <a
+              href={`/report?company=${encodeURIComponent(job?.company || '')}&role=${encodeURIComponent(job?.title || '')}&outcome=ghosted`}
+              style={{ fontFamily: 'var(--mono)', fontSize: '.65rem', background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)', color: 'var(--red)', borderRadius: 7, padding: '.4rem .85rem', textDecoration: 'none' }}
+            >
+              👻 Got ghosted
+            </a>
+            <a
+              href={`/report?company=${encodeURIComponent(job?.company || '')}&role=${encodeURIComponent(job?.title || '')}&outcome=rejected`}
+              style={{ fontFamily: 'var(--mono)', fontSize: '.65rem', background: 'rgba(99,102,241,0.1)', border: '1px solid rgba(99,102,241,0.3)', color: 'var(--blue)', borderRadius: 7, padding: '.4rem .85rem', textDecoration: 'none' }}
+            >
+              🤝 Rejected
+            </a>
+            <a
+              href={`/report?company=${encodeURIComponent(job?.company || '')}&role=${encodeURIComponent(job?.title || '')}&outcome=interviewing`}
+              style={{ fontFamily: 'var(--mono)', fontSize: '.65rem', background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.3)', color: 'var(--green)', borderRadius: 7, padding: '.4rem .85rem', textDecoration: 'none' }}
+            >
+              📅 Got an interview
+            </a>
+            <a
+              href={`/report?company=${encodeURIComponent(job?.company || '')}&role=${encodeURIComponent(job?.title || '')}&outcome=hired`}
+              style={{ fontFamily: 'var(--mono)', fontSize: '.65rem', background: 'rgba(16,185,129,0.08)', border: '1px solid rgba(16,185,129,0.2)', color: 'var(--green)', borderRadius: 7, padding: '.4rem .85rem', textDecoration: 'none' }}
+            >
+              ✅ Got an offer
+            </a>
           </div>
-          <div style={{ fontSize: '.75rem', color: 'var(--muted)', fontWeight: 300, lineHeight: 1.65 }}>Applied here? Share how it went — response rate, interview process, offer outcome. Help the community cut through the noise.</div>
         </div>
       </div>
 
@@ -278,11 +304,44 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
           <div style={{ display: 'flex', gap: '.75rem' }}>
             <button onClick={toggleSave} aria-label={saved ? 'Unsave' : 'Save'} style={{ background: 'none', border: '1px solid var(--line2)', borderRadius: 8, padding: '.65rem 1rem', fontSize: '1.1rem', cursor: 'pointer', color: saved ? 'var(--green)' : 'var(--muted)', flexShrink: 0 }}>{saved ? '♥' : '♡'}</button>
             {job.apply_url
-              ? <a href={job.apply_url} target="_blank" rel="noopener noreferrer" style={{ flex: 1, textAlign: 'center', background: 'var(--green)', color: 'var(--ink)', borderRadius: 8, padding: '.65rem 1rem', fontFamily: 'var(--display)', fontWeight: 800, fontSize: '.85rem', textDecoration: 'none' }}>Apply &amp; Optimize →</a>
+              ? <button
+                  onClick={() => setShowApplyModal(true)}
+                  style={{ flex: 1, textAlign: 'center', background: 'var(--green)', color: 'var(--ink)', borderRadius: 8, padding: '.65rem 1rem', fontFamily: 'var(--display)', fontWeight: 800, fontSize: '.85rem', border: 'none', cursor: 'pointer' }}
+                >
+                  Apply &amp; Optimize →
+                </button>
               : <button disabled style={{ flex: 1, background: 'var(--muted)', color: 'var(--ink)', border: 'none', borderRadius: 8, padding: '.65rem 1rem', fontFamily: 'var(--display)', fontWeight: 800, fontSize: '.85rem', opacity: .65 }}>No apply link</button>
             }
           </div>
         </div>
+        {showApplyModal && job && (
+          <div style={{ position: 'fixed', inset: 0, zIndex: 1000, background: 'rgba(0,0,0,.7)', display: 'flex', alignItems: 'flex-end', justifyContent: 'center', padding: '0 0 0 0' }} onClick={() => setShowApplyModal(false)}>
+            <div style={{ position: 'relative', background: 'var(--surface)', borderRadius: '14px 14px 0 0', padding: '1.5rem', width: '100%', maxWidth: 520, animation: 'fadeUp .25s ease both' }} onClick={e => e.stopPropagation()}>
+              <div style={{ fontFamily: 'var(--display)', fontSize: '1.1rem', fontWeight: 800, color: 'var(--white)', marginBottom: '.4rem' }}>Ready to apply?</div>
+              <p style={{ fontFamily: 'var(--mono)', fontSize: '.68rem', color: 'var(--sub)', marginBottom: '1.25rem', lineHeight: 1.65 }}>
+                Optimize your resume for this role before you apply — it takes 60 seconds and can significantly improve your chances.
+              </p>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '.65rem' }}>
+                <a
+                  href={`/resume?company=${encodeURIComponent(job.company)}&role=${encodeURIComponent(job.title)}`}
+                  style={{ display: 'block', textAlign: 'center', background: 'linear-gradient(135deg,#3b82f6 0%,#8b5cf6 100%)', color: '#fff', borderRadius: 9, padding: '.75rem', fontFamily: 'var(--display)', fontWeight: 800, fontSize: '.9rem', textDecoration: 'none' }}
+                >
+                  ✨ Optimize resume first →
+                </a>
+                <a
+                  href={job.apply_url || '#'}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{ display: 'block', textAlign: 'center', background: 'var(--card)', border: '1px solid var(--line2)', color: 'var(--sub)', borderRadius: 9, padding: '.75rem', fontFamily: 'var(--mono)', fontSize: '.72rem', textDecoration: 'none' }}
+                  onClick={() => setShowApplyModal(false)}
+                >
+                  Skip optimization — apply directly
+                </a>
+              </div>
+              <button onClick={() => setShowApplyModal(false)} style={{ position: 'absolute', top: '1rem', right: '1rem', background: 'none', border: 'none', color: 'var(--muted)', fontSize: '1.2rem', cursor: 'pointer' }}>×</button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   )
