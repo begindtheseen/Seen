@@ -1,6 +1,37 @@
 # Claude Handoff — Seen / SeenJobs
 
-Last updated: 2026-06-12 (Session B, post-launch)
+Last updated: 2026-06-13 (Session C, recovery)
+
+## Active recovery branch: `claude/seenjobs-next-migration-recovery-ia9w59`
+
+- Branched from `origin/next-migration`. **Ahead by 2 commits, behind by 0.**
+- NOT yet merged into `next-migration`. NOT yet deployed. Awaiting owner review.
+- `RECOVERY_ROADMAP.md` (new) drives the work: CRITICAL / IMPORTANT / COSMETIC, Phases 1–4.
+- `SITE_PARITY_CHECKLIST.md` (new) tracks all 19 pages/components.
+
+### Recovery commits so far
+1. `Phase 1 admin recovery: GET payload, auth fixes, 6 new sections`
+   - `api/admin-stats.js`: GET now returns `reports.chart` (30d daily), `reports.top_companies`,
+     `reports.outcome_breakdown`, `company_lookups.top` — all were missing (live regression).
+   - `app/admin/page.tsx`: `admin_logout` POST on sign-out; 403 handling; Jobs KPI row;
+     company-lookup setup note; Recent hiring reports + ✓/?/✗ moderation; Recent tracker apps;
+     API Health panel; chart date labels; zero-value outcome bars filtered.
+2. `Sync package-lock.json version to 0.1.1`
+
+### Admin sections remaining (priority order — see ADMIN_PARITY_CHECKLIST.md)
+- §10 Data quality issues queue (resolve/dismiss)
+- §9 Reported inactive listings (remove_listing/deny_report + confirm)
+- §8 Recent jobs browser (period tabs, get_recent_jobs)
+- §12 Feature flags (set_flag/seed_flags)
+- §13 Duplicate account clusters (update_cluster/detect_duplicates_by_signals)
+- §11 Company deduplication (find_duplicates/merge/auto_merge — has API contract drift)
+- §15 Background job runner (X-Admin-Token → /api/refresh-jobs, /api/demand, /api/reports)
+
+### Working agreement this session
+- Admin parity only, one section at a time, small commits.
+- Before each section: name old section, source lines, files, API endpoints, risk.
+- After each section: `npm run build`, update ADMIN_PARITY_CHECKLIST.md + this file, commit.
+- Do NOT merge into next-migration. Do NOT deploy. Owner reviews first.
 
 ## Current state (verified)
 
