@@ -92,7 +92,7 @@ nav.nav-scrolled{background:rgba(6,6,8,0.82);backdrop-filter:blur(60px) saturate
 .nav-pills{display:flex;gap:.08rem;background:none;border:none;border-radius:0;padding:0;overflow-x:auto;overflow-y:hidden;flex-shrink:1;min-width:0;scrollbar-width:none;box-shadow:none;-webkit-mask-image:linear-gradient(to right,transparent 0,#000 12px,#000 calc(100% - 12px),transparent 100%);mask-image:linear-gradient(to right,transparent 0,#000 12px,#000 calc(100% - 12px),transparent 100%)}
 .nav-pills::-webkit-scrollbar{display:none}
 /* Inactive — clean text, no box */
-.ntab{background:none;border:none;padding:.35rem .62rem;font-family:var(--body);font-size:.73rem;font-weight:500;color:rgba(255,255,255,0.38);cursor:pointer;border-radius:10px;transition:color .18s ease;white-space:nowrap;letter-spacing:.005em}
+.ntab{background:none;border:none;padding:.35rem .62rem;font-family:var(--body);font-size:.73rem;font-weight:500;color:rgba(255,255,255,0.38);cursor:pointer;border-radius:10px;transition:color .18s ease;white-space:nowrap;letter-spacing:.005em;text-decoration:none}
 .ntab:hover{color:rgba(255,255,255,0.68)}
 /* Active — individual Liquid Glass capsule, not a container */
 .ntab.active{color:#fff;font-weight:600;background:rgba(255,255,255,0.1);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border-radius:10px;box-shadow:0 1px 0 rgba(255,255,255,0) inset,0 2px 10px rgba(0,0,0,0.35);outline:1px solid rgba(255,255,255,0.12)}
