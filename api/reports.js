@@ -62,6 +62,35 @@ export default async function handler(req, res) {
     return handleCompanyScore(req, res, body);
   }
 
+  // ── Company leaderboard ───────────────────────────────────────────────────────
+  if (body.action === 'leaderboard') {
+    if (!SUPABASE_URL || !SUPABASE_SERVICE_KEY) return res.status(200).json({ companies: [] });
+    try {
+      const r = await fetch(
+        `${SUPABASE_URL}/rest/v1/company_scores?select=company_name,overall_score,ghost_rate,response_rate,avg_wait_days,waste_score,report_count,data_quality,verification_status,industry&order=report_count.desc&limit=150`,
+        { headers: dbH }
+      );
+      if (!r.ok) return res.status(200).json({ companies: [] });
+      const rows = await r.json();
+      const overall = s => s || 0;
+      const companies = (Array.isArray(rows) ? rows : []).map(c => ({
+        name: c.company_name,
+        industry: c.industry || '',
+        verified: c.verification_status === 'verified',
+        score: {
+          overall_score: overall(c.overall_score),
+          ghost_rate: c.ghost_rate || 0,
+          response_rate: c.response_rate || 0,
+          avg_wait_days: c.avg_wait_days || 0,
+          report_count: c.report_count || 0,
+          risk_level: overall(c.overall_score) >= 70 ? 'safe' : overall(c.overall_score) >= 40 ? 'warn' : 'danger',
+          waste: c.waste_score || 0,
+        },
+      }));
+      return res.status(200).json({ ok: true, companies });
+    } catch(e) { return res.status(200).json({ companies: [] }); }
+  }
+
   // Rate-limit only write actions — reads are cheap and public
   if (['submit','moderate','quick_submit','report_issue'].includes(body.action)) {
     const limited = await applyRateLimit(req, res, 'report-submit');
