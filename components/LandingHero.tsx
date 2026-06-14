@@ -510,25 +510,87 @@ export default function LandingHero() {
   )
 }
 
+interface VerdictRow { company: string; score: number; risk: string; reports: number }
+
+const FALLBACK_VERDICTS: VerdictRow[] = [
+  { company: 'Stripe', score: 91, risk: 'safe', reports: 2847 },
+  { company: 'Amazon', score: 18, risk: 'danger', reports: 15203 },
+  { company: 'Linear', score: 88, risk: 'safe', reports: 412 },
+  { company: 'Deloitte', score: 34, risk: 'danger', reports: 6721 },
+  { company: 'Shopify', score: 79, risk: 'safe', reports: 1893 },
+  { company: 'Google', score: 62, risk: 'warn', reports: 9423 },
+  { company: 'Meta', score: 22, risk: 'danger', reports: 11892 },
+  { company: 'Notion', score: 84, risk: 'safe', reports: 731 },
+  { company: 'Palantir', score: 29, risk: 'danger', reports: 3201 },
+]
+
+const AGO = ['just now', '1m ago', '2m ago', '4m ago', '6m ago', '9m ago', '14m ago', '21m ago', '31m ago']
+
 function VerdictFeed() {
   const [clock, setClock] = useState('')
-  const [verdicts] = useState([
-    { company: 'Stripe', score: 91, risk: 'safe', reports: 2847 },
-    { company: 'Amazon', score: 18, risk: 'danger', reports: 15203 },
-    { company: 'Linear', score: 88, risk: 'safe', reports: 412 },
-    { company: 'Deloitte', score: 34, risk: 'danger', reports: 6721 },
-    { company: 'Shopify', score: 79, risk: 'safe', reports: 1893 },
-  ])
+  const [pool, setPool] = useState<VerdictRow[]>([])
+  const [visible, setVisible] = useState<Array<VerdictRow & { ts: string; key: number }>>([])
+  const poolRef = useRef<VerdictRow[]>([])
+  const idxRef = useRef(0)
+  const keyRef = useRef(0)
 
+  // UTC clock
   useEffect(() => {
     const tick = () => {
       const now = new Date()
-      setClock(now.toUTCString().split(' ').slice(4).join(' ').split(' ')[0] + ' UTC')
+      const hh = String(now.getUTCHours()).padStart(2, '0')
+      const mm = String(now.getUTCMinutes()).padStart(2, '0')
+      const ss = String(now.getUTCSeconds()).padStart(2, '0')
+      setClock(`${hh}:${mm}:${ss} UTC`)
     }
     tick()
     const t = setInterval(tick, 1000)
     return () => clearInterval(t)
   }, [])
+
+  // Fetch real company leaderboard data
+  useEffect(() => {
+    fetch('/api/reports', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'leaderboard' }),
+    })
+      .then(r => r.json())
+      .then((d: { companies?: Array<{ name: string; score: { overall_score: number; risk_level: string; report_count: number } }> }) => {
+        if (d.companies && d.companies.length >= 3) {
+          const rows: VerdictRow[] = d.companies.map(c => ({
+            company: c.name,
+            score: Math.round(c.score.overall_score),
+            risk: c.score.risk_level,
+            reports: c.score.report_count,
+          }))
+          setPool(rows)
+        } else {
+          setPool(FALLBACK_VERDICTS)
+        }
+      })
+      .catch(() => setPool(FALLBACK_VERDICTS))
+  }, [])
+
+  // Once we have pool data, build initial visible list and start ticker
+  useEffect(() => {
+    if (!pool.length) return
+    const shuffled = [...pool].sort(() => Math.random() - 0.5)
+    poolRef.current = shuffled
+    idxRef.current = 0
+
+    const initial = shuffled.slice(0, 9).map((v, i) => ({ ...v, ts: AGO[i] || `${30 + i * 5}m ago`, key: keyRef.current++ }))
+    setVisible(initial)
+    idxRef.current = 9
+
+    const ticker = setInterval(() => {
+      const next = poolRef.current[idxRef.current % poolRef.current.length]
+      idxRef.current++
+      const newKey = keyRef.current++
+      setVisible(prev => [{ ...next, ts: 'just now', key: newKey }, ...prev.slice(0, 8)])
+    }, 3800)
+    return () => clearInterval(ticker)
+  }, [pool])
 
   return (
     <div className="vfeed-inner">
@@ -540,13 +602,16 @@ function VerdictFeed() {
         <div className="vfeed-clock">{clock}</div>
       </div>
       <div className="vfeed-list">
-        {verdicts.map((v, i) => (
-          <a key={i} className="vfeed-row" href={`/company/${v.company.toLowerCase().replace(/\s+/g, '-')}`} style={{ textDecoration: 'none', display: 'flex' }}>
-            <div className="vfeed-co">{v.company}</div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '.5rem', flexShrink: 0 }}>
-              <span style={{ fontFamily: 'var(--mono)', fontSize: '.75rem', fontWeight: 600, color: v.risk === 'safe' ? 'var(--green)' : v.risk === 'warn' ? 'var(--amber)' : 'var(--red)' }}>{v.score}</span>
-              <span style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', color: 'var(--muted)' }}>{v.reports.toLocaleString()} reports</span>
+        {(visible.length ? visible : FALLBACK_VERDICTS.map((v, i) => ({ ...v, ts: AGO[i] || '', key: i }))).map((v) => (
+          <a key={v.key} className="vfeed-row" href={`/company/${v.company.toLowerCase().replace(/\s+/g, '-')}`} style={{ textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '.85rem' }}>
+            <div className="vfeed-grade" style={{ color: v.risk === 'safe' ? 'var(--green)' : v.risk === 'warn' ? 'var(--amber)' : 'var(--red)' }}>
+              {v.score >= 80 ? 'A' : v.score >= 65 ? 'B' : v.score >= 50 ? 'C' : v.score >= 35 ? 'D' : 'F'}
             </div>
+            <div className="vfeed-info">
+              <div className="vfeed-co">{v.company}</div>
+              <div className="vfeed-detail">{v.reports.toLocaleString()} reports</div>
+            </div>
+            <div className="vfeed-ts">{v.ts}</div>
           </a>
         ))}
       </div>

@@ -9,11 +9,31 @@ import { supabase } from '@/lib/supabase'
 export default function Nav() {
   const pathname = usePathname()
   const router = useRouter()
-  const { isLoggedIn, isSeeker } = useAuth()
+  const { isLoggedIn, isSeeker, token } = useAuth()
   const [showAccountModal, setShowAccountModal] = useState(false)
   const [resetSent, setResetSent] = useState(false)
   const [scrolled, setScrolled] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
+  const [creditBalance, setCreditBalance] = useState<number | null>(null)
+
+  useEffect(() => {
+    if (!isSeeker) { setCreditBalance(null); return }
+    let cancelled = false
+    token().then(async (tok) => {
+      if (!tok || cancelled) return
+      try {
+        const res = await fetch('/api/user-sync', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${tok}` },
+          body: JSON.stringify({ action: 'get_credits' }),
+        })
+        if (!res.ok || cancelled) return
+        const data = await res.json() as { balance?: number; pro?: boolean }
+        if (!cancelled) setCreditBalance(data.pro ? 999 : (data.balance ?? null))
+      } catch { /* ignore */ }
+    })
+    return () => { cancelled = true }
+  }, [isSeeker, token])
 
   // Close the mobile drawer whenever the route changes
   useEffect(() => { setMenuOpen(false) }, [pathname])
@@ -60,6 +80,15 @@ export default function Nav() {
         </div>
 
         <div className="nav-right">
+          {isSeeker && creditBalance !== null && (
+            <button
+              title={creditBalance === 999 ? 'Pro — unlimited AI credits' : `${creditBalance} AI credits remaining today`}
+              style={{ background: 'var(--blue)', color: '#fff', border: 'none', borderRadius: 20, padding: '.2rem .65rem', fontFamily: 'var(--mono)', fontSize: '.6rem', fontWeight: 700, cursor: 'pointer', lineHeight: 1.5 }}
+              onClick={() => setShowAccountModal(true)}
+            >
+              {creditBalance === 999 ? '∞' : creditBalance} AI
+            </button>
+          )}
           {isSeeker && !isDashboard && (
             <Link href="/dashboard" style={{ display: 'inline-flex', alignItems: 'center', background: 'none', border: '1px solid var(--line2)', color: 'var(--sub)', borderRadius: 8, padding: '.32rem .75rem', fontFamily: 'var(--mono)', fontSize: '.62rem', cursor: 'pointer', whiteSpace: 'nowrap', textDecoration: 'none' }}>
               ← Dashboard

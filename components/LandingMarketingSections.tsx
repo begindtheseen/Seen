@@ -1,8 +1,43 @@
+'use client'
+
+import { useEffect, useRef } from 'react'
+
 export default function LandingMarketingSections() {
+  const wrapRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    const sections = wrapRef.current?.querySelectorAll<HTMLElement>('[data-reveal]')
+    if (!sections || !('IntersectionObserver' in window)) {
+      // No observer support — show all immediately
+      sections?.forEach(el => { el.style.opacity = '1'; el.style.transform = 'none' })
+      return
+    }
+    const obs = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          const el = entry.target as HTMLElement
+          const delay = el.dataset.delay || '0'
+          el.style.transitionDelay = `${delay}ms`
+          el.style.opacity = '1'
+          el.style.transform = 'translateY(0)'
+          obs.unobserve(el)
+        }
+      })
+    }, { threshold: 0.1, rootMargin: '0px 0px -60px 0px' })
+
+    sections.forEach(el => {
+      el.style.opacity = '0'
+      el.style.transform = 'translateY(28px)'
+      el.style.transition = 'opacity .55s ease, transform .55s ease'
+      obs.observe(el)
+    })
+    return () => obs.disconnect()
+  }, [])
+
   return (
-    <>
+    <div ref={wrapRef}>
       {/* SECTION 1: The problem */}
-      <div style={{ position: 'relative', zIndex: 2, borderTop: '1px solid rgba(255,255,255,.06)', background: 'linear-gradient(to bottom,rgba(2,4,10,.6),rgba(2,4,10,.92))', padding: '5rem 2.5rem 4.5rem' }}>
+      <div data-reveal style={{ position: 'relative', zIndex: 2, borderTop: '1px solid rgba(255,255,255,.06)', background: 'linear-gradient(to bottom,rgba(2,4,10,.6),rgba(2,4,10,.92))', padding: '5rem 2.5rem 4.5rem' }}>
         <div style={{ maxWidth: 820, margin: '0 auto', textAlign: 'center' }}>
           <div style={{ fontFamily: 'var(--mono)', fontSize: '.55rem', textTransform: 'uppercase', letterSpacing: '.18em', color: 'rgba(239,68,68,.7)', marginBottom: '1.2rem' }}>The problem</div>
           <h2 style={{ fontFamily: 'var(--display)', fontSize: 'clamp(2rem,6vw,3.8rem)', fontWeight: 800, lineHeight: 1.06, letterSpacing: '-.04em', color: 'var(--white)', margin: '0 0 1.5rem' }}>
@@ -32,7 +67,7 @@ export default function LandingMarketingSections() {
       </div>
 
       {/* SECTION 2: How it works */}
-      <div style={{ position: 'relative', zIndex: 2, background: 'rgba(2,4,10,.88)', padding: '5rem 2.5rem' }}>
+      <div data-reveal data-delay="80" style={{ position: 'relative', zIndex: 2, background: 'rgba(2,4,10,.88)', padding: '5rem 2.5rem' }}>
         <div style={{ maxWidth: 900, margin: '0 auto' }}>
           <div style={{ textAlign: 'center', marginBottom: '3.5rem' }}>
             <div style={{ fontFamily: 'var(--mono)', fontSize: '.55rem', textTransform: 'uppercase', letterSpacing: '.18em', color: 'rgba(99,102,241,.8)', marginBottom: '.8rem' }}>How it works</div>
@@ -59,7 +94,7 @@ export default function LandingMarketingSections() {
       </div>
 
       {/* SECTION 3: Features */}
-      <div style={{ position: 'relative', zIndex: 2, background: 'linear-gradient(to bottom,rgba(2,4,10,.88),rgba(4,8,20,.96))', padding: '5rem 2.5rem', borderTop: '1px solid rgba(255,255,255,.05)' }}>
+      <div data-reveal data-delay="0" style={{ position: 'relative', zIndex: 2, background: 'linear-gradient(to bottom,rgba(2,4,10,.88),rgba(4,8,20,.96))', padding: '5rem 2.5rem', borderTop: '1px solid rgba(255,255,255,.05)' }}>
         <div style={{ maxWidth: 900, margin: '0 auto' }}>
           <div style={{ textAlign: 'center', marginBottom: '3rem' }}>
             <div style={{ fontFamily: 'var(--mono)', fontSize: '.55rem', textTransform: 'uppercase', letterSpacing: '.18em', color: 'rgba(16,185,129,.8)', marginBottom: '.8rem' }}>What you get — free</div>
@@ -91,7 +126,7 @@ export default function LandingMarketingSections() {
       </div>
 
       {/* SECTION 4: Social proof + CTA */}
-      <div style={{ position: 'relative', zIndex: 2, background: 'rgba(4,8,20,.96)', padding: '4.5rem 2.5rem', borderTop: '1px solid rgba(255,255,255,.05)' }}>
+      <div data-reveal data-delay="0" style={{ position: 'relative', zIndex: 2, background: 'rgba(4,8,20,.96)', padding: '4.5rem 2.5rem', borderTop: '1px solid rgba(255,255,255,.05)' }}>
         <div style={{ maxWidth: 820, margin: '0 auto', textAlign: 'center' }}>
           <div style={{ fontFamily: 'var(--mono)', fontSize: '.55rem', textTransform: 'uppercase', letterSpacing: '.18em', color: 'rgba(255,255,255,.35)', marginBottom: '2rem' }}>From the community</div>
           <div className="lp-3col" style={{ textAlign: 'left', marginBottom: '3.5rem' }}>
@@ -119,6 +154,6 @@ export default function LandingMarketingSections() {
           </div>
         </div>
       </div>
-    </>
+    </div>
   )
 }
