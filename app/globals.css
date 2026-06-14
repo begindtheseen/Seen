@@ -737,7 +737,7 @@ nav.nav-scrolled{background:rgba(6,6,8,0.82);backdrop-filter:blur(60px) saturate
 .audit-scan{position:absolute;inset-block:0;width:140px;background:linear-gradient(90deg,transparent,rgba(16,185,129,.05) 40%,rgba(59,130,246,.04) 60%,transparent);animation:auditScan 42s linear infinite;pointer-events:none;z-index:1}
 
 /* ═══ ADMIN STATS PAGE ═══ */
-.adm-wrap{max-width:960px;margin:0 auto;padding:1.5rem 1.25rem 4rem;box-sizing:border-box}
+.adm-wrap{max-width:960px;width:100%;margin:0 auto;padding:1.5rem 1.25rem 4rem;box-sizing:border-box}
 /* 2 columns on any phone (including zoomed-out), 4 on desktop ≥900px */
 .adm-kpi-row{display:grid;grid-template-columns:1fr 1fr;gap:.65rem;margin-bottom:1.5rem}
 @media(min-width:900px){.adm-kpi-row{grid-template-columns:repeat(4,1fr)}}
