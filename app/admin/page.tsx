@@ -522,6 +522,9 @@ export default function AdminPage() {
         {/* Background job runner */}
         <JobRunner token={token!} />
 
+        {/* Deploy trigger */}
+        <DeployPanel />
+
       </div>
     </div>
   )
@@ -1166,6 +1169,124 @@ function RecentJobsBrowser({ token, onUnauthorized }: { token: string; onUnautho
           </div>
         )
       })}
+    </Card>
+  )
+}
+
+const DEPLOY_HOOK_KEY = 'seen_deploy_hook_url'
+
+function DeployPanel() {
+  const [hookUrl, setHookUrl] = useState('')
+  const [saved, setSaved] = useState('')
+  const [input, setInput] = useState('')
+  const [deploying, setDeploying] = useState(false)
+  const [status, setStatus] = useState<{ text: string; color: string } | null>(null)
+  const [showInput, setShowInput] = useState(false)
+
+  useEffect(() => {
+    const stored = localStorage.getItem(DEPLOY_HOOK_KEY) || ''
+    setSaved(stored)
+    setHookUrl(stored)
+  }, [])
+
+  function saveHook() {
+    const url = input.trim()
+    if (!url.startsWith('https://')) { setStatus({ text: 'Paste the full Vercel deploy hook URL', color: 'var(--red)' }); return }
+    localStorage.setItem(DEPLOY_HOOK_KEY, url)
+    setSaved(url)
+    setHookUrl(url)
+    setInput('')
+    setShowInput(false)
+    setStatus({ text: '✓ Deploy hook saved', color: 'var(--green)' })
+    setTimeout(() => setStatus(null), 3000)
+  }
+
+  async function deploy() {
+    if (!hookUrl) { setShowInput(true); return }
+    setDeploying(true)
+    setStatus({ text: 'Triggering deploy…', color: 'var(--dim)' })
+    try {
+      await fetch(hookUrl, { method: 'POST' })
+      setStatus({ text: '✓ Deploy triggered — Vercel is building next-migration now', color: 'var(--green)' })
+    } catch {
+      setStatus({ text: '✗ Failed to reach Vercel. Check the hook URL.', color: 'var(--red)' })
+    }
+    setDeploying(false)
+  }
+
+  const masked = saved ? saved.slice(0, 40) + '…' : ''
+
+  return (
+    <Card style={{ marginBottom: '1.25rem', border: '1px solid rgba(99,102,241,.25)' }}>
+      <CardHeader
+        title="Deploy to production"
+        action={
+          saved ? (
+            <button
+              onClick={() => { setShowInput(s => !s); setStatus(null) }}
+              style={{ fontFamily: 'var(--mono)', fontSize: '.52rem', padding: '.25rem .6rem', borderRadius: 5, border: '1px solid var(--line2)', background: 'transparent', color: 'var(--dim)', cursor: 'pointer' }}
+            >
+              {showInput ? 'Cancel' : 'Change hook'}
+            </button>
+          ) : undefined
+        }
+      />
+
+      {(!saved || showInput) && (
+        <div style={{ marginBottom: '1rem' }}>
+          <div style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', color: 'var(--sub)', lineHeight: 1.65, marginBottom: '.65rem' }}>
+            In Vercel → Seen project → Settings → find <span style={{ color: 'var(--white)' }}>Deploy Hooks</span> → create one for branch <span style={{ color: 'var(--blue)' }}>next-migration</span> → paste the URL below.
+          </div>
+          <div style={{ display: 'flex', gap: '.5rem', flexWrap: 'wrap' }}>
+            <input
+              type="text"
+              value={input}
+              onChange={e => setInput(e.target.value)}
+              placeholder="https://api.vercel.com/v1/integrations/deploy/…"
+              style={{ flex: 1, minWidth: 200, background: 'var(--raised)', border: '1px solid var(--line2)', borderRadius: 7, padding: '.42rem .65rem', fontFamily: 'var(--mono)', fontSize: '.6rem', color: 'var(--white)', outline: 'none' }}
+            />
+            <button
+              onClick={saveHook}
+              disabled={!input.trim()}
+              style={{ background: 'rgba(99,102,241,.15)', border: '1px solid rgba(99,102,241,.35)', borderRadius: 7, padding: '.42rem .9rem', fontFamily: 'var(--mono)', fontSize: '.6rem', color: '#a5b4fc', cursor: 'pointer', flexShrink: 0 }}
+            >
+              Save →
+            </button>
+          </div>
+        </div>
+      )}
+
+      {saved && !showInput && (
+        <div style={{ fontFamily: 'var(--mono)', fontSize: '.52rem', color: 'var(--dim)', marginBottom: '.85rem' }}>
+          Hook: {masked}
+        </div>
+      )}
+
+      <button
+        onClick={deploy}
+        disabled={deploying}
+        style={{
+          width: '100%',
+          background: saved ? 'linear-gradient(135deg,rgba(99,102,241,.2),rgba(16,185,129,.15))' : 'var(--raised)',
+          border: `1px solid ${saved ? 'rgba(99,102,241,.4)' : 'var(--line2)'}`,
+          borderRadius: 9, padding: '.85rem 1.25rem',
+          fontFamily: 'var(--display)', fontWeight: 800, fontSize: '.95rem',
+          color: saved ? '#a5b4fc' : 'var(--sub)',
+          cursor: deploying ? 'not-allowed' : 'pointer', opacity: deploying ? 0.7 : 1,
+          letterSpacing: '-.01em', textAlign: 'left' as const,
+        }}
+      >
+        {deploying ? '⏳ Deploying…' : saved ? '🚀 Deploy latest Claude changes →' : '⚙ Paste deploy hook URL above to enable'}
+        {saved && !deploying && (
+          <div style={{ fontFamily: 'var(--mono)', fontSize: '.56rem', fontWeight: 400, color: 'rgba(165,180,252,.55)', marginTop: '.2rem' }}>
+            Pushes all Claude commits live in ~1 min
+          </div>
+        )}
+      </button>
+
+      {status && (
+        <div style={{ fontFamily: 'var(--mono)', fontSize: '.62rem', color: status.color, marginTop: '.65rem' }}>{status.text}</div>
+      )}
     </Card>
   )
 }
