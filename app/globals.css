@@ -738,8 +738,9 @@ nav.nav-scrolled{background:rgba(6,6,8,0.82);backdrop-filter:blur(60px) saturate
 
 /* ═══ ADMIN STATS PAGE ═══ */
 .adm-wrap{max-width:960px;margin:0 auto;padding:1.5rem 1.25rem 4rem;box-sizing:border-box}
-/* auto-fit: 2 columns at ~375px, 4 columns at ~700px+ — no breakpoint needed */
-.adm-kpi-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:.65rem;margin-bottom:1.5rem}
+/* 2 columns on any phone (including zoomed-out), 4 on desktop ≥900px */
+.adm-kpi-row{display:grid;grid-template-columns:1fr 1fr;gap:.65rem;margin-bottom:1.5rem}
+@media(min-width:900px){.adm-kpi-row{grid-template-columns:repeat(4,1fr)}}
 .adm-kpi{background:linear-gradient(160deg,rgba(255,255,255,.055) 0%,rgba(255,255,255,.018) 100%);border:1px solid rgba(255,255,255,.1);border-radius:10px;padding:.85rem 1rem;backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);box-shadow:inset 0 1px 0 rgba(255,255,255,.12),0 2px 12px rgba(0,0,0,.22);transition:transform .2s,box-shadow .2s}
 .adm-kpi:hover{transform:translateY(-2px);box-shadow:0 8px 24px rgba(0,0,0,.4)}
 .adm-kpi-l{font-family:var(--mono);font-size:.5rem;text-transform:uppercase;letter-spacing:.12em;color:var(--muted);margin-bottom:.4rem}
