@@ -41,7 +41,7 @@ interface DupCluster {
   id: string; risk_score: number; status: string; signals: string[]; user_ids: string[]
 }
 interface RecentJob {
-  id: string; company: string; title: string; city: string; url: string
+  id: string; company: string; title: string; city: string
   apply_url: string; created_at: string; availability_status: string; source: string
 }
 interface DupCompany { id: string; name: string; report_count: number; overall_score: number }
@@ -433,6 +433,9 @@ export default function AdminPage() {
 
         {/* New job listings browser */}
         <RecentJobsBrowser token={token!} onUnauthorized={() => { sessionStorage.removeItem(TOKEN_KEY); setToken(null); setStats(null); setLoginError('Session expired') }} />
+
+        {/* Job deduplication */}
+        <JobDedupePanel token={token!} />
 
         {/* Reported inactive listings */}
         <Card style={{ marginTop: '.65rem' }}>
@@ -1098,6 +1101,72 @@ function availColor(a: string) {
   return 'var(--sub)'
 }
 
+function JobDedupePanel({ token }: { token: string }) {
+  const [scanning, setScanning] = useState(false)
+  const [deduping, setDeduping] = useState(false)
+  const [suspected, setSuspected] = useState<number | null>(null)
+  const [deleted, setDeleted] = useState<number | null>(null)
+  const [msg, setMsg] = useState('')
+
+  async function scan() {
+    setScanning(true); setMsg(''); setSuspected(null); setDeleted(null)
+    try {
+      const r = await fetch('/api/admin-stats', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Admin-Token': token },
+        body: JSON.stringify({ action: 'scan_job_dupes' }),
+      })
+      const d = await r.json()
+      if (!d.ok) throw new Error(d.error || 'Scan failed')
+      setSuspected(d.suspected)
+      setMsg(d.suspected === 0 ? '✓ No duplicates found' : `Found ${d.suspected} duplicate${d.suspected !== 1 ? 's' : ''} (exact apply_url match)`)
+    } catch(e) { setMsg(`✗ ${(e as Error).message}`) }
+    setScanning(false)
+  }
+
+  async function dedupe() {
+    if (!confirm(`Remove ${suspected} duplicate job listing${suspected !== 1 ? 's' : ''}? This keeps the newest copy of each duplicate set and deletes the rest. Cannot be undone.`)) return
+    setDeduping(true); setMsg('')
+    try {
+      const r = await fetch('/api/admin-stats', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Admin-Token': token },
+        body: JSON.stringify({ action: 'dedupe_jobs' }),
+      })
+      const d = await r.json()
+      if (!d.ok) throw new Error(d.error || 'Dedupe failed')
+      setDeleted(d.deleted); setSuspected(0)
+      setMsg(d.deleted === 0 ? '✓ No duplicates to remove' : `✓ Removed ${d.deleted} duplicate listing${d.deleted !== 1 ? 's' : ''}`)
+    } catch(e) { setMsg(`✗ ${(e as Error).message}`) }
+    setDeduping(false)
+  }
+
+  const btnBase: React.CSSProperties = { background: 'none', border: '1px solid var(--line2)', color: 'var(--sub)', borderRadius: 8, padding: '.4rem .9rem', fontFamily: 'var(--mono)', fontSize: '.6rem', cursor: 'pointer', transition: 'all .15s', whiteSpace: 'nowrap' }
+
+  return (
+    <Card style={{ marginBottom: '1.25rem' }}>
+      <CardHeader
+        title="Job deduplication"
+        action={<span style={{ fontFamily: 'var(--mono)', fontSize: '.48rem', color: 'var(--dim)' }}>Exact match on apply_url — keeps newest copy</span>}
+      />
+      <div style={{ display: 'flex', gap: '.5rem', flexWrap: 'wrap', marginBottom: msg ? '.65rem' : 0 }}>
+        <button onClick={scan} disabled={scanning || deduping} style={{ ...btnBase, borderColor: 'var(--blue)', color: 'var(--blue)' }}>
+          {scanning ? '⏳ Scanning…' : '⟳ Scan for dupes'}
+        </button>
+        {suspected !== null && suspected > 0 && (
+          <button onClick={dedupe} disabled={deduping || scanning} style={{ ...btnBase, borderColor: 'var(--red)', color: 'var(--red)' }}>
+            {deduping ? '⏳ Removing…' : `✕ Remove ${suspected} dupe${suspected !== 1 ? 's' : ''}`}
+          </button>
+        )}
+      </div>
+      {msg && <div style={{ fontFamily: 'var(--mono)', fontSize: '.62rem', color: deleted != null && deleted > 0 ? 'var(--green)' : suspected === 0 ? 'var(--green)' : msg.startsWith('✗') ? 'var(--red)' : 'var(--amber)' }}>{msg}</div>}
+      <div style={{ fontFamily: 'var(--mono)', fontSize: '.5rem', color: 'var(--dim)', marginTop: '.5rem' }}>
+        Scan first to preview. Delete keeps the most recently seen copy. Run the SQL migration in <code style={{ color: 'var(--sub)' }}>014_job_dedup.sql</code> after deduping to block future dupes.
+      </div>
+    </Card>
+  )
+}
+
 function RecentJobsBrowser({ token, onUnauthorized }: { token: string; onUnauthorized: () => void }) {
   const [period, setPeriod] = useState<string | null>(null)
   const [jobs, setJobs] = useState<RecentJob[]>([])
@@ -1150,7 +1219,7 @@ function RecentJobsBrowser({ token, onUnauthorized }: { token: string; onUnautho
       {period && !loading && error && <div style={{ fontFamily: 'var(--mono)', fontSize: '.62rem', color: 'var(--red)' }}>✗ {error}</div>}
       {period && !loading && !error && jobs.length === 0 && <div style={{ fontFamily: 'var(--mono)', fontSize: '.62rem', color: 'var(--dim)' }}>No new listings for this period.</div>}
       {period && !loading && !error && jobs.map(j => {
-        const url = j.apply_url || j.url || ''
+        const url = j.apply_url || ''
         const avail = j.availability_status || 'active'
         return (
           <div key={j.id} style={{ display: 'flex', alignItems: 'center', gap: '.75rem', padding: '.5rem 0', borderBottom: '1px solid var(--line2)' }}>

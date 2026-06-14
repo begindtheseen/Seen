@@ -441,7 +441,7 @@ async function _handler(req, res) {
     const weekISO2   = new Date(Date.now() - 7 * 86400000).toISOString();
     const monthISO2  = new Date(Date.now() - 30 * 86400000).toISOString();
     const cutoff = period === 'today' ? todayISO2 : period === 'month' ? monthISO2 : weekISO2;
-    const r = await db(`jobs?created_at=gte.${encodeURIComponent(cutoff)}&select=id,company,title,city,url,apply_url,created_at,availability_status,source&order=created_at.desc&limit=200`);
+    const r = await db(`jobs?created_at=gte.${encodeURIComponent(cutoff)}&select=id,company,title,city,apply_url,created_at,availability_status,source&order=created_at.desc&limit=200`);
     if (!r.ok) {
       const errBody = await r.text().catch(() => '');
       console.error('[get_recent_jobs] DB error', r.status, errBody);
@@ -482,6 +482,51 @@ async function _handler(req, res) {
     });
     await db('admin_audit_log', { method: 'POST', body: JSON.stringify({ admin_id: sess.admin_id, username: 'admin', action: 'remove_listing', target_type: 'job', target_id: String(job_id) }), headers: { Prefer: 'return=minimal' } });
     return res.status(200).json({ ok: true });
+  }
+
+  // ── JOB DEDUPLICATION ────────────────────────────────────────────────────────
+  if (action === 'scan_job_dupes') {
+    const r = await db('jobs?availability_status=not.eq.removed&apply_url=not.is.null&select=id,apply_url&limit=50000');
+    if (!r.ok) return res.status(500).json({ error: 'Query failed' });
+    const jobs = await r.json();
+    const seen = new Map();
+    let dupeCount = 0;
+    for (const j of (jobs || [])) {
+      const key = (j.apply_url || '').toLowerCase().trim();
+      if (!key) continue;
+      seen.set(key, (seen.get(key) || 0) + 1);
+    }
+    for (const count of seen.values()) if (count > 1) dupeCount += count - 1;
+    return res.status(200).json({ ok: true, suspected: dupeCount, total: (jobs || []).length });
+  }
+
+  if (action === 'dedupe_jobs') {
+    if (adminRole === 'moderator') return res.status(403).json({ error: 'Insufficient role' });
+    const r = await db('jobs?availability_status=not.eq.removed&apply_url=not.is.null&select=id,apply_url,last_seen_at,created_at&limit=50000');
+    if (!r.ok) return res.status(500).json({ error: 'Query failed' });
+    const jobs = await r.json();
+    // Group by normalized apply_url, keep newest per group
+    const byUrl = new Map();
+    for (const j of (jobs || [])) {
+      const key = (j.apply_url || '').toLowerCase().trim();
+      if (!key) continue;
+      if (!byUrl.has(key)) byUrl.set(key, []);
+      byUrl.get(key).push(j);
+    }
+    const toDelete = [];
+    for (const group of byUrl.values()) {
+      if (group.length <= 1) continue;
+      group.sort((a, b) => ((b.last_seen_at || b.created_at) > (a.last_seen_at || a.created_at) ? 1 : -1));
+      toDelete.push(...group.slice(1).map(j => j.id));
+    }
+    if (!toDelete.length) return res.status(200).json({ ok: true, deleted: 0 });
+    let deleted = 0;
+    for (let i = 0; i < toDelete.length; i += 100) {
+      const batch = toDelete.slice(i, i + 100);
+      const dr = await db(`jobs?id=in.(${batch.join(',')})`, { method: 'DELETE', headers: { Prefer: 'return=minimal' } });
+      if (dr.ok) deleted += batch.length;
+    }
+    return res.status(200).json({ ok: true, deleted });
   }
 
   if (action === 'deny_report') {
