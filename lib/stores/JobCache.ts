@@ -30,4 +30,13 @@ export const JobCache = {
       return null
     }
   },
+
+  set(job: Job): void {
+    try {
+      const raw = sessionStorage.getItem(KEY)
+      const map = raw ? JSON.parse(raw) as Record<string, Job> : {}
+      map[String(job.id)] = job
+      sessionStorage.setItem(KEY, JSON.stringify(map))
+    } catch {}
+  },
 }

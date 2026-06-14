@@ -28,6 +28,26 @@ export default async function handler(req, res) {
     return handleLocationJobs(req, res, _body);
   }
 
+  // ── Get single job by ID — direct link / refresh fallback ──────────────────
+  if (_body.action === 'get_by_id') {
+    const { id } = _body;
+    if (!id || typeof id !== 'string') return res.status(400).json({ error: 'id required' });
+    const U = process.env.SUPABASE_URL, K = process.env.SUPABASE_SERVICE_KEY;
+    if (!U || !K) return res.status(503).json({ error: 'DB unavailable' });
+    try {
+      const r = await fetch(
+        `${U}/rest/v1/jobs?id=eq.${encodeURIComponent(id)}&select=id,title,company,location,salary,apply_url,url,description,type,level,source,score,waste_score,availability_status&limit=1`,
+        { headers: { apikey: K, Authorization: `Bearer ${K}` } }
+      );
+      const rows = r.ok ? await r.json() : [];
+      if (!Array.isArray(rows) || !rows.length) return res.status(404).json({ error: 'Not found' });
+      return res.status(200).json({ job: rows[0] });
+    } catch (e) {
+      logError('jobs/get_by_id', e.message);
+      return res.status(500).json({ error: 'DB error' });
+    }
+  }
+
   const limited = await applyRateLimit(req, res, 'job-search');
   if (limited) return;
 

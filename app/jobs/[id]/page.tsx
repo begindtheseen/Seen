@@ -55,12 +55,45 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
   const [insightsState, setInsightsState] = useState<'loading' | 'done' | 'unavailable' | 'no_desc' | 'credits'>('loading')
   const [showApplyModal, setShowApplyModal] = useState(false)
 
-  // Resolve the job from the session cache (Next.js equivalent of old global JOBS array)
+  // Resolve the job — session cache first (fast path), then DB fallback for direct links / refreshes
   useEffect(() => {
     const j = JobCache.get(id)
-    setJob(j)
-    setResolved(true)
-    if (j) setSaved(SavedJobsStore.isSaved(j.id))
+    if (j) {
+      setJob(j)
+      setSaved(SavedJobsStore.isSaved(j.id))
+      setResolved(true)
+      return
+    }
+    fetch('/api/jobs', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'get_by_id', id }),
+    })
+      .then(r => r.json())
+      .then((d: { job?: Record<string, unknown> }) => {
+        if (!d.job) return
+        const r = d.job
+        const mapped: Job = {
+          id: String(r.id ?? id),
+          title: String(r.title ?? ''),
+          company: String(r.company ?? ''),
+          location: String(r.location ?? ''),
+          score: Number(r.score) || 65,
+          waste: Number(r.waste_score ?? r.waste) || 25,
+          level: String(r.level ?? 'Mid level'),
+          type: String(r.type ?? 'Full-time'),
+          source: String(r.source ?? 'Job board'),
+          description: String(r.description ?? ''),
+          salary: r.salary ? String(r.salary) : null,
+          apply_url: r.apply_url ? String(r.apply_url) : (r.url ? String(r.url) : null),
+          availability_status: r.availability_status ? String(r.availability_status) : undefined,
+        }
+        JobCache.set(mapped)
+        setJob(mapped)
+        setSaved(SavedJobsStore.isSaved(id))
+      })
+      .catch(() => {})
+      .finally(() => setResolved(true))
   }, [id])
 
   const loadInsights = useCallback(async (j: Job) => {
