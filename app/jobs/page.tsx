@@ -766,6 +766,7 @@ export default function JobsPage() {
     setApplying(false)
     if (applyJob.apply_url) window.open(applyJob.apply_url, '_blank', 'noopener,noreferrer')
     setApplyJob(null)
+    if (isLoggedIn) router.push('/tracker?new=1')
   }
 
   const inputStyle: React.CSSProperties = {
@@ -1013,32 +1014,52 @@ export default function JobsPage() {
               </>
             ) : (
               <>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '.65rem', marginBottom: '1.25rem' }}>
+                {/* Incentive strip — shown first, most important */}
+                <div style={{ background: 'rgba(16,185,129,0.07)', border: '1px solid rgba(16,185,129,0.2)', borderRadius: 10, padding: '.75rem .95rem', marginBottom: '1rem' }}>
+                  <div style={{ fontFamily: 'var(--mono)', fontSize: '.52rem', textTransform: 'uppercase', letterSpacing: '.1em', color: 'var(--green)', fontWeight: 700, marginBottom: '.5rem' }}>When you track this application</div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '.28rem' }}>
+                    {[
+                      { icon: '📅', text: 'Day 7 — "Did they respond?" reminder' },
+                      { icon: '📅', text: 'Day 14 — "Got an interview?" check-in' },
+                      { icon: '📅', text: 'Day 30 — Final outcome prompt' },
+                      { icon: '👻', text: 'Ghost alert if they go silent' },
+                      { icon: '🎉', text: 'Outcome card to share when you land it' },
+                    ].map(({ icon, text }) => (
+                      <div key={text} style={{ display: 'flex', alignItems: 'center', gap: '.5rem', fontFamily: 'var(--mono)', fontSize: '.62rem', color: 'rgba(52,211,153,0.85)' }}>
+                        <span style={{ flexShrink: 0 }}>{icon}</span>
+                        <span>{text}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Apply method */}
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '.6rem', marginBottom: '1rem' }}>
                   <a
                     href={`/resume?company=${encodeURIComponent(applyJob.company)}&role=${encodeURIComponent(applyJob.title)}`}
-                    style={{ display: 'block', padding: '1rem', background: 'var(--gdim, rgba(16,185,129,0.08))', border: '1.5px solid var(--gmid, rgba(16,185,129,0.2))', borderRadius: 10, cursor: 'pointer', textAlign: 'center', textDecoration: 'none' }}
+                    style={{ display: 'block', padding: '.85rem', background: 'var(--gdim, rgba(16,185,129,0.08))', border: '1.5px solid var(--gmid, rgba(16,185,129,0.2))', borderRadius: 10, cursor: 'pointer', textAlign: 'center', textDecoration: 'none' }}
                     onClick={() => setApplyJob(null)}
                   >
-                    <div style={{ fontSize: '1.5rem', marginBottom: '.4rem' }}>🧠</div>
-                    <div style={{ fontFamily: 'var(--display)', fontSize: '.82rem', fontWeight: 700, color: 'var(--green)', marginBottom: '.2rem' }}>AI-Optimized</div>
-                    <div style={{ fontSize: '.68rem', color: 'var(--green)', opacity: .8 }}>Rewrite for ATS first</div>
+                    <div style={{ fontSize: '1.3rem', marginBottom: '.3rem' }}>🧠</div>
+                    <div style={{ fontFamily: 'var(--display)', fontSize: '.78rem', fontWeight: 700, color: 'var(--green)', marginBottom: '.15rem' }}>AI-Optimized</div>
+                    <div style={{ fontSize: '.62rem', color: 'var(--green)', opacity: .75 }}>Rewrite for ATS first</div>
                   </a>
                   <div
-                    style={{ padding: '1rem', background: 'var(--card)', border: '1.5px solid var(--line2)', borderRadius: 10, cursor: 'pointer', textAlign: 'center' }}
+                    style={{ padding: '.85rem', background: 'var(--card)', border: '1.5px solid var(--line2)', borderRadius: 10, cursor: 'pointer', textAlign: 'center' }}
                     onClick={() => document.getElementById('apply-platform-section')?.scrollIntoView()}
                   >
-                    <div style={{ fontSize: '1.5rem', marginBottom: '.4rem' }}>📋</div>
-                    <div style={{ fontFamily: 'var(--display)', fontSize: '.82rem', fontWeight: 700, color: 'var(--white)', marginBottom: '.2rem' }}>Standard Apply</div>
-                    <div style={{ fontSize: '.68rem', color: 'var(--dim)' }}>Track &amp; go</div>
+                    <div style={{ fontSize: '1.3rem', marginBottom: '.3rem' }}>📋</div>
+                    <div style={{ fontFamily: 'var(--display)', fontSize: '.78rem', fontWeight: 700, color: 'var(--white)', marginBottom: '.15rem' }}>Standard Apply</div>
+                    <div style={{ fontSize: '.62rem', color: 'var(--dim)' }}>Track &amp; go</div>
                   </div>
                 </div>
 
                 <div id="apply-platform-section">
-                  <div style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', textTransform: 'uppercase', letterSpacing: '.07em', color: 'var(--dim)', marginBottom: '.35rem' }}>Platform</div>
+                  <div style={{ fontFamily: 'var(--mono)', fontSize: '.55rem', textTransform: 'uppercase', letterSpacing: '.07em', color: 'var(--dim)', marginBottom: '.3rem' }}>Where are you applying?</div>
                   <select
                     value={applyPlatform}
                     onChange={e => setApplyPlatform(e.target.value)}
-                    style={{ width: '100%', background: 'var(--card)', border: '1.5px solid var(--line2)', borderRadius: 8, padding: '.62rem .9rem', color: 'var(--white)', fontFamily: 'var(--body)', fontSize: '.84rem', outline: 'none', marginBottom: '1rem' }}
+                    style={{ width: '100%', background: 'var(--card)', border: '1.5px solid var(--line2)', borderRadius: 8, padding: '.6rem .9rem', color: 'var(--white)', fontFamily: 'var(--body)', fontSize: '.84rem', outline: 'none', marginBottom: '.85rem' }}
                   >
                     <option value="Seen">Seen</option>
                     <option value="LinkedIn">LinkedIn</option>
@@ -1047,9 +1068,6 @@ export default function JobsPage() {
                     <option value="Company website">Company website</option>
                     <option value="Other">Other</option>
                   </select>
-                  <div style={{ fontFamily: 'var(--mono)', fontSize: '.6rem', color: 'var(--green)', background: 'var(--gdim, rgba(16,185,129,0.08))', border: '1px solid var(--gmid, rgba(16,185,129,0.2))', borderRadius: 7, padding: '.55rem .85rem', marginBottom: '1rem', lineHeight: 1.65 }}>
-                    ✓ Application tracked · Timeline started in your tracker
-                  </div>
                   <div style={{ display: 'flex', gap: '.5rem' }}>
                     <button className="btn btn-ghost" style={{ flex: 1, justifyContent: 'center' }} onClick={() => setApplyJob(null)}>Cancel</button>
                     <button
@@ -1058,8 +1076,11 @@ export default function JobsPage() {
                       onClick={handleConfirmApply}
                       disabled={applying}
                     >
-                      {applying ? 'Saving...' : 'Track & Apply →'}
+                      {applying ? 'Tracking...' : 'Track & Apply →'}
                     </button>
+                  </div>
+                  <div style={{ textAlign: 'center', fontFamily: 'var(--mono)', fontSize: '.52rem', color: 'var(--muted)', marginTop: '.55rem' }}>
+                    Opens job in new tab · takes you to your tracker
                   </div>
                 </div>
               </>

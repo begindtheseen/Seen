@@ -1,7 +1,7 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
-import { useRouter } from 'next/navigation'
+import { useEffect, useState, useCallback, useRef } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { useAuth } from '@/lib/auth'
 import { AppStore } from '@/lib/stores/AppStore'
 import { EventStore } from '@/lib/stores/EventStore'
@@ -154,6 +154,7 @@ function CheckCard({ check, onAnswer, onSnooze }: {
 
 export default function TrackerPage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const { isLoggedIn, isSeeker } = useAuth()
   const [apps, setApps] = useState<Application[]>([])
   const [loading, setLoading] = useState(true)
@@ -161,6 +162,8 @@ export default function TrackerPage() {
   const [roundsApp, setRoundsApp] = useState<Application | null>(null)
   const [showManual, setShowManual] = useState(false)
   const [manualForm, setManualForm] = useState({ company: '', role: '', location: '', platform: 'Direct' })
+  const [highlightNew, setHighlightNew] = useState(false)
+  const highlightedRef = useRef(false)
 
   useEffect(() => {
     if (!isLoggedIn) { router.replace('/login'); return }
@@ -171,7 +174,16 @@ export default function TrackerPage() {
     const data = await AppStore.load(isLoggedIn)
     setApps(data)
     setLoading(false)
-  }, [isLoggedIn])
+    if (searchParams?.get('new') === '1' && !highlightedRef.current && data.length > 0) {
+      highlightedRef.current = true
+      setHighlightNew(true)
+      setTimeout(() => {
+        const el = document.getElementById(`app_${data[0].id}`)
+        if (el) { el.scrollIntoView({ behavior: 'smooth', block: 'center' }) }
+        setTimeout(() => setHighlightNew(false), 2800)
+      }, 300)
+    }
+  }, [isLoggedIn, searchParams])
 
   useEffect(() => {
     if (!isLoggedIn) return
@@ -433,8 +445,10 @@ export default function TrackerPage() {
         {/* Application cards */}
         {apps.length > 0 && (
           <div id="trackerList" style={{ display: 'flex', flexDirection: 'column', gap: '.75rem' }}>
-            {apps.map(app => (
-              <AppCard key={app.id} app={app} onUpdate={handleUpdate} onRemove={handleRemove} />
+            {apps.map((app, i) => (
+              <div key={app.id} style={highlightNew && i === 0 ? { borderRadius: 12, boxShadow: '0 0 0 2px var(--green), 0 0 30px rgba(16,185,129,0.3)', transition: 'box-shadow 2.5s ease' } : undefined}>
+                <AppCard app={app} onUpdate={handleUpdate} onRemove={handleRemove} />
+              </div>
             ))}
           </div>
         )}
