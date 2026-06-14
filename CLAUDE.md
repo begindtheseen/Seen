@@ -20,9 +20,19 @@ We are NOT adding features. The Next.js migration lost design and functionality 
 - Do not redesign, simplify, or invent UI. Port the old design exactly.
 - A page is complete only when: visual match + all old functionality + APIs work + mobile works + build passes + checklist updated.
 
-## Migration Status (as of 2026-06-12)
+## Migration Status (as of 2026-06-14)
 
-### What was fixed in this session (Session B / claude/seenjobs-migration-audit-pgszu3):
+### What was fixed in Session G (claude/index-file-stability-LrIfU):
+- **HiringProbability component**: new `components/HiringProbability.tsx` — compact/full modes, calculates 3–70% probability from ghost/response rates + level match multiplier
+- **SurveyModal component**: new `components/SurveyModal.tsx` — 4-phase survey (loading→intro→question→done/no-surveys), Zeigarnik effect, credit pop animation, dispatches `seen:credits-updated` event
+- **Nav.tsx**: credit balance auto-refreshes on `seen:credits-updated` event via `useCallback` + `window.addEventListener`
+- **company/[slug]/page.tsx**: Locations tab shows real city breakdown, Compare tab is functional, viewer count is stable hash (not random)
+- **apply/page.tsx**: handleNotYetReason shows company risk intel when reason is comparing/unsure
+- **admin/page.tsx**: 2-column KPI grid, colored left borders on cards, large numbers, section labels, build SHA stamp, DeployPanel
+- **vercel.json**: Cache-Control no-store on /admin and /admin/(.*) to prevent stale CDN caching
+- **DeployPanel in admin**: paste Vercel Deploy Hook URL once → deploy from admin UI going forward
+
+### What was fixed in Session B (claude/seenjobs-migration-audit-pgszu3):
 - **Next.js version**: upgraded 15.3.7 → 15.3.9 on next-migration (15.3.7 was flagged vulnerable by npm and blocked by Vercel)
 - **package-lock.json**: restored on next-migration (was deleted by Session A, needed for deterministic Vercel builds)
 - **api/_utils/credits.js, errlog.js**: added to next-migration (were missing, required by production API files)
