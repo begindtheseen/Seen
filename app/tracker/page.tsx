@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useCallback, useRef } from 'react'
+import { useEffect, useState, useCallback, useRef, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useAuth } from '@/lib/auth'
 import { AppStore } from '@/lib/stores/AppStore'
@@ -152,7 +152,7 @@ function CheckCard({ check, onAnswer, onSnooze }: {
   )
 }
 
-export default function TrackerPage() {
+function TrackerPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const { isLoggedIn, isSeeker } = useAuth()
@@ -456,5 +456,13 @@ export default function TrackerPage() {
       </div>
     </div>
     </>
+  )
+}
+
+export default function TrackerPageWrapper() {
+  return (
+    <Suspense fallback={<div className="page-full"><div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '60vh' }}><div className="spinner" /></div></div>}>
+      <TrackerPage />
+    </Suspense>
   )
 }
