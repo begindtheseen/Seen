@@ -1,5 +1,6 @@
 import zlib from 'zlib';
 import { promisify } from 'util';
+import { createClient } from '@supabase/supabase-js';
 import { applyRateLimit } from '../lib/server/ratelimit.js';
 import { logError } from '../lib/server/errlog.js';
 import { gateAI } from '../lib/server/credits.js';
@@ -301,6 +302,13 @@ async function handleParseResume(req, res, body) {
     } catch(_) { /* best-effort */ }
 
     const wordCount = extractedText.split(/\s+/).filter(w => w.length > 0).length;
+
+    // Fire-and-forget signal extraction — runs in background, never blocks parse response
+    Promise.race([
+      storeCareerSignals(extractedText, employment, req),
+      new Promise(r => setTimeout(r, 3000)),
+    ]).catch(() => {});
+
     return res.status(200).json({ ok: true, text: extractedText, fileName, fileType: isPDF ? 'pdf' : 'word', wordCount, employment });
 
   } catch(err) {
@@ -377,6 +385,98 @@ async function handleEmailAnalysis(req, res, body) {
     console.error('email_analysis error:', err.message);
     logError('email-analysis', err.message);
     return res.status(500).json({ error: 'Failed to send email' });
+  }
+}
+
+// ── Career signal extraction — builds the proprietary data moat ────────────────
+// Extracts anonymized career signals from a parsed resume and stores them in
+// two layers: resume_skills (per-user, private) and career_signals (anonymized).
+async function storeCareerSignals(resumeText, employment, req) {
+  const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL;
+  const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const ANTHROPIC_KEY = process.env.ANTHROPIC_KEY;
+  if (!SUPABASE_URL || !SUPABASE_SERVICE_KEY || !ANTHROPIC_KEY) return;
+
+  // Get user_id from JWT if available
+  let userId = null;
+  try {
+    const auth = req.headers.authorization;
+    if (auth?.startsWith('Bearer ')) {
+      const supaUser = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
+      const { data } = await supaUser.auth.getUser(auth.slice(7));
+      userId = data?.user?.id || null;
+    }
+  } catch (_) {}
+
+  // Extract skills, seniority, function, years_exp from resume text
+  let signal = null;
+  try {
+    const sigRes = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-api-key': ANTHROPIC_KEY, 'anthropic-version': '2023-06-01' },
+      body: JSON.stringify({
+        model: 'claude-haiku-4-5-20251001',
+        max_tokens: 400,
+        messages: [{
+          role: 'user',
+          content: `Extract career signal from this resume. Return ONLY JSON, no commentary:
+{"skills":["<top 8 technical/domain skills>"],"seniority":"<junior|mid|senior|staff|principal|executive>","function":"<engineering|design|product|marketing|sales|ops|data|finance|legal|other>","years_exp":<int or null>}
+
+Resume (first 3000 chars):\n${resumeText.slice(0, 3000)}`
+        }],
+      })
+    });
+    if (sigRes.ok) {
+      const sigData = await sigRes.json();
+      const txt = sigData.content?.[0]?.text || '';
+      const m = txt.match(/\{[\s\S]*\}/);
+      if (m) signal = JSON.parse(m[0]);
+    }
+  } catch (_) {}
+  if (!signal?.skills?.length) return;
+
+  const sb = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
+
+  // Layer 1: per-user resume_skills (private, with user_id)
+  if (userId) {
+    const topTitles = employment.slice(0, 3).map(e => e.title).filter(Boolean);
+    await sb.from('resume_skills').upsert({
+      user_id: userId,
+      skills: signal.skills,
+      seniority: signal.seniority,
+      function: signal.function,
+      years_exp: signal.years_exp,
+      top_titles: topTitles,
+      updated_at: new Date().toISOString(),
+    }, { onConflict: 'user_id' }).catch(() => {});
+  }
+
+  // Layer 2: anonymized career_signals (no user_id — pure market signal)
+  const { data: signalRow } = await sb.from('career_signals').insert({
+    skills: signal.skills,
+    seniority: signal.seniority,
+    function: signal.function,
+    years_exp: signal.years_exp,
+  }).select('id').single();
+
+  // Layer 2b: career transitions (anonymized, from employment history)
+  if (signalRow?.id && employment.length >= 2) {
+    const transitions = [];
+    for (let i = 0; i < employment.length - 1; i++) {
+      const from = employment[i + 1]; // older role
+      const to   = employment[i];     // newer role
+      if (from.title && to.title) {
+        // Estimate years in prior role (best-effort, not surfaced to user)
+        let yearsInPrior = null;
+        if (from.start_date && from.end_date && from.end_date !== 'Present') {
+          const yr = s => parseInt(s.replace(/\D/g, '').slice(0, 4));
+          const diff = yr(from.end_date) - yr(from.start_date);
+          if (!isNaN(diff) && diff >= 0 && diff <= 40) yearsInPrior = diff;
+        }
+        transitions.push({ from_title: from.title, to_title: to.title, function: signal.function, years_in_prior_role: yearsInPrior });
+      }
+    }
+    if (transitions.length) await sb.from('career_transitions').insert(transitions).catch(() => {});
   }
 }
 

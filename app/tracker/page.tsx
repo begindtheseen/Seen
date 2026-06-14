@@ -29,10 +29,16 @@ function AppCard({ app, onUpdate, onRemove }: {
   const days = getDaysSince(app.appliedAt)
   const statusClass = STATUS_MAP[app.status] || ''
   const isActive = app.status === 'active'
+  const [expanded, setExpanded] = useState(false)
 
   return (
     <div className={`app-card ${statusClass}`} id={`app_${app.id}`}>
-      <div className="app-card-head">
+      {/* Clickable header — tap to expand/collapse update actions */}
+      <div
+        className="app-card-head"
+        onClick={() => { if (isActive) setExpanded(e => !e) }}
+        style={{ cursor: isActive ? 'pointer' : 'default' }}
+      >
         <div className="app-logo">{app.company.charAt(0)}</div>
         <div style={{ flex: 1, minWidth: 0 }}>
           <div className="app-co">{app.company}</div>
@@ -44,11 +50,14 @@ function AppCard({ app, onUpdate, onRemove }: {
             <span style={{ fontFamily: 'var(--mono)', fontSize: '.65rem', color: app.score >= 70 ? 'var(--green)' : app.score >= 40 ? 'var(--amber)' : 'var(--red)', fontWeight: 600 }}>{app.score}</span>
           )}
           <span style={{ fontFamily: 'var(--mono)', fontSize: '.55rem', color: 'var(--muted)', background: 'var(--raised)', border: '1px solid var(--line)', borderRadius: 4, padding: '.1rem .35rem' }}>Day {days}</span>
+          {isActive && (
+            <span style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', color: 'var(--blue)', marginTop: '.1rem' }}>{expanded ? '▲' : 'Update ▼'}</span>
+          )}
         </div>
       </div>
 
-      {/* Stage pipeline (active only) */}
-      {isActive && (
+      {/* Stage pipeline (active only, collapsed when expanded to save space) */}
+      {isActive && !expanded && (
         <div className="app-stages" style={{ marginTop: '.65rem' }}>
           <div style={{ display: 'flex', gap: '.25rem', alignItems: 'center', overflowX: 'auto' }}>
             {STAGES.map((s, i) => {
@@ -76,20 +85,30 @@ function AppCard({ app, onUpdate, onRemove }: {
       <div style={{ display: 'flex', gap: '.6rem', flexWrap: 'wrap', marginTop: '.5rem', alignItems: 'center' }}>
         <span style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', color: 'var(--muted)' }}>Applied {new Date(app.appliedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
         {app.platform && <span style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', color: 'var(--muted)' }}>via {app.platform}</span>}
-        {app.jobUrl && <a href={app.jobUrl} target="_blank" rel="noopener noreferrer" style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', color: 'var(--blue)', textDecoration: 'none' }}>View listing →</a>}
+        {app.jobUrl && <a href={app.jobUrl} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()} style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', color: 'var(--blue)', textDecoration: 'none' }}>View listing →</a>}
       </div>
 
-      {/* Actions */}
-      {isActive && (
-        <div className="app-actions" style={{ marginTop: '.75rem', display: 'flex', flexWrap: 'wrap', gap: '.4rem' }}>
+      {/* Actions — shown when expanded */}
+      {isActive && expanded && (
+        <div className="app-actions" style={{ marginTop: '.85rem', borderTop: '1px solid var(--line)', paddingTop: '.75rem' }}>
+          <div style={{ fontFamily: 'var(--mono)', fontSize: '.52rem', textTransform: 'uppercase', letterSpacing: '.09em', color: 'var(--dim)', marginBottom: '.5rem' }}>What happened?</div>
+          <div style={{ display: 'flex', gap: '.4rem', flexWrap: 'wrap' }}>
+            <button className="btn btn-ghost" style={{ fontSize: '.68rem', padding: '.4rem .85rem', borderColor: 'var(--green)', color: 'var(--green)', fontWeight: 600 }} onClick={e => { e.stopPropagation(); onUpdate(app.id, { status: 'hired', stage: 'Offer' }); setExpanded(false) }}>🎉 Got the job</button>
+            <button className="btn btn-ghost" style={{ fontSize: '.68rem', padding: '.4rem .85rem', borderColor: 'rgba(239,68,68,.3)', color: 'var(--red)' }} onClick={e => { e.stopPropagation(); onUpdate(app.id, { status: 'ghosted' }); setExpanded(false) }}>👻 Ghosted</button>
+            <button className="btn btn-ghost" style={{ fontSize: '.68rem', padding: '.4rem .85rem', color: 'var(--muted)' }} onClick={e => { e.stopPropagation(); onUpdate(app.id, { status: 'rejected' }); setExpanded(false) }}>❌ Rejected</button>
+          </div>
+          <div style={{ fontFamily: 'var(--mono)', fontSize: '.52rem', textTransform: 'uppercase', letterSpacing: '.09em', color: 'var(--dim)', marginBottom: '.4rem', marginTop: '.65rem' }}>Move stage</div>
           <div style={{ display: 'flex', gap: '.35rem', flexWrap: 'wrap' }}>
             {STAGES.filter(s => s !== app.stage && s !== 'Offer').map(s => (
-              <button key={s} className="btn btn-ghost" style={{ fontSize: '.62rem', padding: '.28rem .65rem' }} onClick={() => onUpdate(app.id, { stage: s })}>→ {s}</button>
+              <button key={s} className="btn btn-ghost" style={{ fontSize: '.62rem', padding: '.28rem .65rem' }} onClick={e => { e.stopPropagation(); onUpdate(app.id, { stage: s }); setExpanded(false) }}>→ {s}</button>
             ))}
-            <button className="btn btn-ghost" style={{ fontSize: '.62rem', padding: '.28rem .65rem', borderColor: 'var(--green)', color: 'var(--green)' }} onClick={() => onUpdate(app.id, { status: 'hired', stage: 'Offer' })}>🎉 Got the job</button>
-            <button className="btn btn-ghost" style={{ fontSize: '.62rem', padding: '.28rem .65rem', borderColor: 'rgba(239,68,68,.3)', color: 'var(--red)' }} onClick={() => onUpdate(app.id, { status: 'ghosted' })}>👻 Ghosted</button>
-            <button className="btn btn-ghost" style={{ fontSize: '.62rem', padding: '.28rem .65rem', color: 'var(--muted)' }} onClick={() => onUpdate(app.id, { status: 'rejected' })}>Rejected</button>
           </div>
+          <button
+            onClick={e => { e.stopPropagation(); setExpanded(false) }}
+            style={{ marginTop: '.65rem', background: 'none', border: 'none', fontFamily: 'var(--mono)', fontSize: '.6rem', color: 'var(--muted)', cursor: 'pointer', padding: '0' }}
+          >
+            ✕ collapse
+          </button>
         </div>
       )}
       {!isActive && (
