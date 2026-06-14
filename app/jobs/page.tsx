@@ -460,7 +460,7 @@ function CoPreviewModal({ company, onClose }: { company: string; onClose: () => 
   )
 }
 
-function JobCard({ job, index, onSaveToggle, onOpen, onApply, onCheckCompany }: { job: Job; index: number; onSaveToggle: (id: string) => void; onOpen: (job: Job) => void; onApply: (job: Job) => void; onCheckCompany: (company: string) => void }) {
+function JobCard({ job, index, onSaveToggle, onOpen, onApply, onCheckCompany, alreadyApplied }: { job: Job; index: number; onSaveToggle: (id: string) => void; onOpen: (job: Job) => void; onApply: (job: Job) => void; onCheckCompany: (company: string) => void; alreadyApplied?: boolean }) {
   const risk = Score.risk(job.score)
   const wl = Score.wasteLabel(job.waste)
   const vibes = jobVibes(job)
@@ -515,6 +515,9 @@ function JobCard({ job, index, onSaveToggle, onOpen, onApply, onCheckCompany }: 
         {vibes.map((v, i) => (
           <span key={i} className={`vibe ${v.cls}`}>{v.txt}</span>
         ))}
+        {alreadyApplied && (
+          <span style={{ fontFamily: 'var(--mono)', fontSize: '.57rem', background: 'rgba(99,102,241,.1)', border: '1px solid rgba(99,102,241,.22)', borderRadius: 5, padding: '.12rem .4rem', color: 'var(--indigo)' }}>✓ Applied</span>
+        )}
       </div>
 
       {job.description && (
@@ -845,6 +848,7 @@ export default function JobsPage() {
   const [swipeCount, setSwipeCount] = useState(0)
   const [deckDone, setDeckDone] = useState(false)
   const [coScores, setCoScores] = useState<Record<string, {ghost_rate: number; overall_score: number}>>({})
+  const [appliedCos, setAppliedCos] = useState<Set<string>>(new Set())
   const abortRef = useRef<AbortController | null>(null)
 
   const hasFilters = !!(niche || level || jobType || posted)
@@ -952,6 +956,25 @@ export default function JobsPage() {
       })
       .catch(() => {})
   }, [recommended])
+
+  useEffect(() => {
+    try {
+      const apps = AppStore.loadSync()
+      setAppliedCos(new Set(apps.map(a => a.company.toLowerCase().trim())))
+    } catch {}
+  }, [])
+
+  useEffect(() => {
+    if (!profile?.experience || level) return // don't override if user already set it
+    const exp = profile.experience.toLowerCase()
+    if (exp.includes('entry') || exp.includes('0-1') || exp.includes('junior') || exp.includes('intern')) {
+      setLevel('entry')
+    } else if (exp.includes('senior') || exp.includes('5+') || exp.includes('lead') || exp.includes('staff') || exp.includes('principal')) {
+      setLevel('senior')
+    } else if (exp.includes('mid') || exp.includes('2-') || exp.includes('3-') || exp.includes('4-')) {
+      setLevel('mid')
+    }
+  }, [profile?.experience]) // eslint-disable-line react-hooks/exhaustive-deps
 
   async function requestGpsLocation() {
     if (!navigator.geolocation || location.trim()) return
@@ -1271,7 +1294,7 @@ export default function JobsPage() {
         {filtered.length > 0 ? (
           <div className="jlist" key={saveVersion}>
             {filtered.map((job, i) => (
-              <JobCard key={job.id} job={job} index={i} onSaveToggle={handleSaveToggle} onOpen={j => setDetailJob(j)} onApply={j => { setApplyJob(j); setApplyPlatform('Seen') }} onCheckCompany={co => setCheckCompany(co)} />
+              <JobCard key={job.id} job={job} index={i} onSaveToggle={handleSaveToggle} onOpen={j => setDetailJob(j)} onApply={j => { setApplyJob(j); setApplyPlatform('Seen') }} onCheckCompany={co => setCheckCompany(co)} alreadyApplied={appliedCos.has(job.company.toLowerCase().trim())} />
             ))}
           </div>
         ) : status === 'idle' ? (

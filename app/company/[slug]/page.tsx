@@ -2,6 +2,7 @@
 
 import { useState, useEffect, use } from 'react'
 import { Score } from '@/lib/score'
+import { AppStore } from '@/lib/stores/AppStore'
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -459,6 +460,30 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
   const [jobsFetched, setJobsFetched] = useState(false)
   const [displayScore, setDisplayScore] = useState(0)
   const [scoreRevealed, setScoreRevealed] = useState(false)
+  const [myApp, setMyApp] = useState<{company: string; role: string; status: string; stage: string; appliedAt: number; daysSince: number} | null>(null)
+
+  // Load matching tracker entry for this company
+  useEffect(() => {
+    try {
+      const apps = AppStore.loadSync()
+      // Match by slug: normalize app.company to slug format and compare
+      const match = apps.find(a => {
+        const appSlug = a.company.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '')
+        const pageSlug = slug.replace(/[^a-z0-9-]/g, '')
+        return appSlug === pageSlug || a.company.toLowerCase().includes(slug.replace(/-/g, ' ')) || slug.replace(/-/g, ' ').includes(a.company.toLowerCase())
+      })
+      if (match) {
+        setMyApp({
+          company: match.company,
+          role: match.role,
+          status: match.status,
+          stage: match.stage,
+          appliedAt: match.appliedAt,
+          daysSince: Math.floor((Date.now() - match.appliedAt) / 86400000),
+        })
+      }
+    } catch {}
+  }, [slug])
 
   // T3-9: Simulated live viewer count
   useEffect(() => {
@@ -602,6 +627,27 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
   return (
     <div className="page-full">
       <div style={{ maxWidth: 1000, margin: '0 auto', padding: '2.5rem 2rem' }}>
+
+        {/* ── "You applied here" context strip ── */}
+        {myApp && (
+          <div style={{ background: 'rgba(99,102,241,.08)', border: '1px solid rgba(99,102,241,.22)', borderRadius: 10, padding: '.65rem 1rem', marginBottom: '.85rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '.75rem', flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '.5rem' }}>
+              <span style={{ fontFamily: 'var(--mono)', fontSize: '.55rem', color: 'var(--indigo)', textTransform: 'uppercase', letterSpacing: '.1em' }}>Your application</span>
+              <span style={{ fontFamily: 'var(--mono)', fontSize: '.6rem', color: 'var(--sub)' }}>
+                {myApp.role} · Day {myApp.daysSince}
+              </span>
+              <span style={{
+                fontFamily: 'var(--mono)', fontSize: '.52rem', borderRadius: 4, padding: '.08rem .28rem',
+                color: myApp.status === 'ghosted' ? 'var(--muted)' : myApp.status === 'hired' ? 'var(--green)' : myApp.status === 'rejected' ? 'var(--red)' : 'var(--amber)',
+                background: myApp.status === 'ghosted' ? 'rgba(156,163,175,.1)' : myApp.status === 'hired' ? 'rgba(16,185,129,.1)' : myApp.status === 'rejected' ? 'rgba(239,68,68,.1)' : 'rgba(245,158,11,.1)',
+                border: `1px solid ${myApp.status === 'ghosted' ? 'rgba(156,163,175,.2)' : myApp.status === 'hired' ? 'rgba(16,185,129,.2)' : myApp.status === 'rejected' ? 'rgba(239,68,68,.2)' : 'rgba(245,158,11,.2)'}`,
+              }}>
+                {myApp.status === 'active' ? myApp.stage : myApp.status}
+              </span>
+            </div>
+            <a href="/tracker" style={{ fontFamily: 'var(--mono)', fontSize: '.6rem', color: 'var(--indigo)', textDecoration: 'none', flexShrink: 0 }}>View in tracker →</a>
+          </div>
+        )}
 
         {/* ── Company header ── */}
         <div className="co-hdr">

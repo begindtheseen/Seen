@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { Score } from '@/lib/score'
+import { AppStore } from '@/lib/stores/AppStore'
 
 interface Company {
   id: string
@@ -37,6 +38,14 @@ export default function CompaniesPage() {
   const [search, setSearch] = useState('')
   const [sort, setSort] = useState<SortKey>('score')
   const [lookup, setLookup] = useState('')
+  const [appliedCos, setAppliedCos] = useState<Set<string>>(new Set())
+
+  useEffect(() => {
+    try {
+      const apps = AppStore.loadSync()
+      setAppliedCos(new Set(apps.map(a => a.company.toLowerCase().trim())))
+    } catch {}
+  }, [])
 
   useEffect(() => {
     fetch('/api/reports', {
@@ -340,6 +349,9 @@ export default function CompaniesPage() {
                         >
                           ✓
                         </span>
+                      )}
+                      {appliedCos.has(co.name.toLowerCase().trim()) && (
+                        <span style={{ fontFamily: 'var(--mono)', fontSize: '.48rem', background: 'rgba(99,102,241,.12)', border: '1px solid rgba(99,102,241,.25)', borderRadius: 4, padding: '.06rem .28rem', color: 'var(--indigo)', marginLeft: '.35rem', verticalAlign: 'middle', flexShrink: 0 }}>Applied</span>
                       )}
                     </div>
                     {co.industry && (

@@ -119,8 +119,12 @@ export default function DashboardPage() {
   const ghosted = apps.filter(a => a.status === 'ghosted')
   const hired = apps.filter(a => a.status === 'hired')
   const dueChecks = EventStore.dueChecks(apps)
-  // Stale: active apps with no update for 30+ days (flat threshold — no per-company wait data client-side)
-  const staleApps = active.filter(a => Math.floor((Date.now() - a.appliedAt) / 86400000) > 30)
+  // Stale: active apps past per-company expected response window (avg_wait_days * 1.4), fallback 30d
+  const staleApps = active.filter(a => {
+    const sc = coScores[a.company.toLowerCase()]
+    const threshold = sc?.avg_wait_days ? Math.round(sc.avg_wait_days * 1.4) : 30
+    return Math.floor((Date.now() - a.appliedAt) / 86400000) > threshold
+  })
   const alertCount = staleApps.length + surges.length
   const allEvents = EventStore.get()
 
@@ -173,6 +177,14 @@ export default function DashboardPage() {
   })()
   const badges = BadgeStore.compute(apps, allEvents)
   const health = calcJobSearchHealth(apps)
+  if (health && Object.keys(coScores).length > 0) {
+    const appliedScores = active
+      .map(a => coScores[a.company.toLowerCase()]?.overall_score)
+      .filter((s): s is number => typeof s === 'number')
+    if (appliedScores.length) {
+      health.avgCompanyScore = Math.round(appliedScores.reduce((a, b) => a + b, 0) / appliedScores.length)
+    }
+  }
 
   const hour = new Date().getHours()
   const greet = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening'

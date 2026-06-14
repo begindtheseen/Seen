@@ -3,6 +3,8 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { RecentSearchesStore } from '@/lib/stores/RecentSearches'
+import { useAuth } from '@/lib/auth'
+import { AppStore } from '@/lib/stores/AppStore'
 
 const HERO_LINES: [string, string][] = [
   ['know before',        'you apply.'],
@@ -63,10 +65,12 @@ type Phase = 'idle' | 'exiting' | 'entering'
 
 export default function LandingHero() {
   const router = useRouter()
+  const { isLoggedIn } = useAuth()
   const [heroIdx, setHeroIdx] = useState(0)
   const [query, setQuery] = useState('')
   const [location, setLocation] = useState('')
   const [recentSearches, setRecentSearches] = useState<Array<{ name: string; loc?: string }>>([])
+  const [userStats, setUserStats] = useState<{ active: number; ghosted: number; avgScore: number } | null>(null)
 
   // Company autocomplete state (T1-11)
   const [companySuggs, setCompanySuggs] = useState<string[]>([])
@@ -267,6 +271,19 @@ export default function LandingHero() {
     setRecentSearches(RecentSearchesStore.get())
   }, [])
 
+  // Load personalized stats from AppStore on mount
+  useEffect(() => {
+    try {
+      const apps = AppStore.loadSync()
+      if (!apps.length) return
+      const active = apps.filter(a => a.status === 'active').length
+      const ghosted = apps.filter(a => a.status === 'ghosted').length
+      const scores = apps.map(a => (a as { score?: number }).score).filter((s): s is number => typeof s === 'number')
+      const avgScore = scores.length ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length) : 0
+      setUserStats({ active, ghosted, avgScore })
+    } catch {}
+  }, [])
+
   const doSearch = useCallback(() => {
     const q = query.trim()
     const l = location.trim()
@@ -365,6 +382,25 @@ export default function LandingHero() {
               </h1>
             </div>
           </div>
+
+          {/* Personalized stats — shown when user has tracked applications */}
+          {userStats && (
+            <div style={{ display: 'flex', gap: '1.5rem', flexWrap: 'wrap', padding: '.75rem 1rem', background: 'rgba(99,102,241,.06)', border: '1px solid rgba(99,102,241,.18)', borderRadius: 10, marginBottom: '.85rem' }}>
+              <div>
+                <div style={{ fontFamily: 'var(--mono)', fontSize: '.55rem', color: 'var(--dim)', textTransform: 'uppercase', letterSpacing: '.08em' }}>Your active apps</div>
+                <div style={{ fontFamily: 'var(--display)', fontSize: '1.3rem', fontWeight: 700, color: 'var(--white)', lineHeight: 1 }}>{userStats.active}</div>
+              </div>
+              {userStats.ghosted > 0 && (
+                <div>
+                  <div style={{ fontFamily: 'var(--mono)', fontSize: '.55rem', color: 'var(--dim)', textTransform: 'uppercase', letterSpacing: '.08em' }}>Ghosted</div>
+                  <div style={{ fontFamily: 'var(--display)', fontSize: '1.3rem', fontWeight: 700, color: 'var(--muted)', lineHeight: 1 }}>{userStats.ghosted}</div>
+                </div>
+              )}
+              <div style={{ marginLeft: 'auto' }}>
+                <a href="/tracker" style={{ fontFamily: 'var(--mono)', fontSize: '.62rem', color: 'var(--indigo)', textDecoration: 'none' }}>View tracker →</a>
+              </div>
+            </div>
+          )}
 
           {/* Stat strip */}
           <div className="hstat-strip">

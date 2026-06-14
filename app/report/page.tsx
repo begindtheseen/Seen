@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { AppStore } from '@/lib/stores/AppStore'
 
 type Outcome = 'ghosted' | 'autoreject' | 'human' | 'waiting' | ''
 type Stage = 'application' | 'phone' | 'interview' | 'final' | ''
@@ -92,6 +93,26 @@ export default function ReportPage() {
   const [error, setError] = useState('')
   const [done, setDone] = useState(false)
   const [recentReports, setRecentReports] = useState<Array<{id:string;outcome:string;company_name?:string;role?:string;created_at:string}>>([])
+  const [matchedAppId, setMatchedAppId] = useState<string | null>(null)
+  const [trackerUpdated, setTrackerUpdated] = useState(false)
+
+  useEffect(() => {
+    try {
+      const apps = AppStore.loadSync()
+      if (apps.length) {
+        // Prefer most recent terminal app (the user is probably reporting on it)
+        const terminal = apps.filter(a => a.status === 'ghosted' || a.status === 'rejected' || a.status === 'hired')
+        const source = terminal.length ? terminal[0] : apps[0]
+        if (source.company) setCompany(source.company)
+        if (source.role) setRole(source.role)
+        if (source.location) setLocation(source.location)
+        if (source.platform) setPlatform(source.platform)
+        // Map status to outcome (no 'hired' in Outcome type — leave blank so user picks)
+        if (source.status === 'ghosted') setOutcome('ghosted')
+        else if (source.status === 'rejected') setOutcome('autoreject')
+      }
+    } catch {}
+  }, [])
 
   useEffect(() => {
     fetch('/api/reports', {
@@ -156,6 +177,12 @@ export default function ReportPage() {
       })
       if (!res.ok) throw new Error('Submit failed')
       setDone(true)
+      // Find matching tracker app to offer update
+      try {
+        const apps = AppStore.loadSync()
+        const match = apps.find(a => a.company.toLowerCase().trim() === company.trim().toLowerCase())
+        if (match && match.status === 'active') setMatchedAppId(match.id)
+      } catch {}
     } catch {
       setError('Submission failed. Please try again.')
     }
@@ -181,6 +208,27 @@ export default function ReportPage() {
               See {company} score →
             </a>
           </div>
+          {matchedAppId && !trackerUpdated && (
+            <div style={{ marginTop: '1.5rem', background: 'rgba(99,102,241,.08)', border: '1px solid rgba(99,102,241,.2)', borderRadius: 10, padding: '1rem 1.15rem', textAlign: 'left' }}>
+              <div style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', color: 'var(--indigo)', marginBottom: '.35rem' }}>Your tracker still shows this as active</div>
+              <div style={{ fontSize: '.72rem', color: 'var(--sub)', marginBottom: '.75rem' }}>Update it to match your report?</div>
+              <div style={{ display: 'flex', gap: '.5rem', flexWrap: 'wrap' }}>
+                {outcome === 'ghosted' && (
+                  <button onClick={() => { AppStore.update(matchedAppId, { status: 'ghosted' }, false); setTrackerUpdated(true) }} style={{ fontFamily: 'var(--mono)', fontSize: '.65rem', background: 'rgba(239,68,68,.1)', border: '1px solid rgba(239,68,68,.3)', borderRadius: 7, padding: '.35rem .8rem', color: 'var(--red)', cursor: 'pointer' }}>Mark as ghosted in tracker</button>
+                )}
+                {(outcome === 'autoreject' || outcome === 'human') && (
+                  <button onClick={() => { AppStore.update(matchedAppId, { status: 'rejected', stage: 'Rejected' }, false); setTrackerUpdated(true) }} style={{ fontFamily: 'var(--mono)', fontSize: '.65rem', background: 'rgba(239,68,68,.1)', border: '1px solid rgba(239,68,68,.3)', borderRadius: 7, padding: '.35rem .8rem', color: 'var(--red)', cursor: 'pointer' }}>Mark as rejected in tracker</button>
+                )}
+                {(outcome === 'waiting' || outcome === '') && (
+                  <button onClick={() => { AppStore.update(matchedAppId, { status: 'hired', stage: 'Offer' }, false); setTrackerUpdated(true) }} style={{ fontFamily: 'var(--mono)', fontSize: '.65rem', background: 'rgba(16,185,129,.1)', border: '1px solid rgba(16,185,129,.3)', borderRadius: 7, padding: '.35rem .8rem', color: 'var(--green)', cursor: 'pointer' }}>Mark as hired in tracker</button>
+                )}
+                <button onClick={() => setMatchedAppId(null)} style={{ fontFamily: 'var(--mono)', fontSize: '.65rem', background: 'none', border: '1px solid var(--line2)', borderRadius: 7, padding: '.35rem .8rem', color: 'var(--dim)', cursor: 'pointer' }}>Skip</button>
+              </div>
+            </div>
+          )}
+          {trackerUpdated && (
+            <div style={{ marginTop: '1.5rem', fontFamily: 'var(--mono)', fontSize: '.62rem', color: 'var(--green)', textAlign: 'center' }}>✓ Tracker updated</div>
+          )}
         </div>
       </div>
     )
