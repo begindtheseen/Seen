@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { Score } from '@/lib/score'
 import { SavedJobsStore } from '@/lib/stores/SavedJobs'
 import { JobCache } from '@/lib/stores/JobCache'
+import { AppStore } from '@/lib/stores/AppStore'
 import { useAuth } from '@/lib/auth'
 import type { Job } from '@/lib/types'
 
@@ -45,7 +46,7 @@ function ScoreRing({ score }: { score: number }) {
   )
 }
 
-function JobCard({ job, index, onSaveToggle, onOpen }: { job: Job; index: number; onSaveToggle: (id: string) => void; onOpen: (id: string) => void }) {
+function JobCard({ job, index, onSaveToggle, onOpen, onApply }: { job: Job; index: number; onSaveToggle: (id: string) => void; onOpen: (id: string) => void; onApply: (job: Job) => void }) {
   const risk = Score.risk(job.score)
   const wl = Score.wasteLabel(job.waste)
   const vibes = jobVibes(job)
@@ -134,13 +135,13 @@ function JobCard({ job, index, onSaveToggle, onOpen }: { job: Job; index: number
         >
           {saved ? '♥' : '♡'}
         </button>
-        {job.apply_url ? (
-          <a href={job.apply_url} target="_blank" rel="noopener noreferrer" className="jlc-apply" onClick={e => e.stopPropagation()}>
-            Apply &amp; Optimize →
-          </a>
-        ) : (
-          <button className="jlc-apply">Apply &amp; Optimize →</button>
-        )}
+        <button
+          className="jlc-apply"
+          onClick={e => { e.stopPropagation(); onApply(job) }}
+          disabled={!job.apply_url}
+        >
+          Apply &amp; Optimize →
+        </button>
       </div>
 
       <button
@@ -157,9 +158,10 @@ const US_CITIES = ['New York, NY','Los Angeles, CA','Chicago, IL','Houston, TX',
 
 export default function JobsPage() {
   const router = useRouter()
-  const { isLoggedIn } = useAuth()
+  const { isLoggedIn, profile } = useAuth()
   const [query, setQuery] = useState('')
   const [location, setLocation] = useState('')
+  const autoSearchedRef = useRef(false)
   const [locSuggs, setLocSuggs] = useState<string[]>([])
   const [showLocSuggs, setShowLocSuggs] = useState(false)
   const [gpsLoading, setGpsLoading] = useState(false)
@@ -171,6 +173,9 @@ export default function JobsPage() {
   const [sort, setSort] = useState<SortMode>('transparency')
   const [jobs, setJobs] = useState<Job[]>([])
   const [filtered, setFiltered] = useState<Job[]>([])
+  const [applyJob, setApplyJob] = useState<Job | null>(null)
+  const [applyPlatform, setApplyPlatform] = useState('Seen')
+  const [applying, setApplying] = useState(false)
   const [status, setStatus] = useState<'idle' | 'loading' | 'done' | 'error'>('idle')
   const [statusMsg, setStatusMsg] = useState('Enter a search above →')
   const [saveVersion, setSaveVersion] = useState(0)
@@ -213,12 +218,24 @@ export default function JobsPage() {
     if (jobs.length > 0) updateDisplay(jobs, sort)
   }, [niche, level, jobType, posted, sort]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Auto-request location on mount if field is empty
+  // Auto-request GPS on mount; fall back to profile city if GPS denied
   useEffect(() => {
     if (typeof navigator !== 'undefined' && navigator.geolocation) {
       requestGpsLocation()
+    } else if (profile?.city) {
+      setLocation(profile.city)
+      if (!autoSearchedRef.current) { autoSearchedRef.current = true; searchJobs(undefined, profile.city) }
     }
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Once profile loads, if location still empty, pre-fill and auto-search
+  useEffect(() => {
+    if (!autoSearchedRef.current && !location.trim() && profile?.city && !gpsLoading) {
+      autoSearchedRef.current = true
+      setLocation(profile.city)
+      searchJobs(undefined, profile.city)
+    }
+  }, [profile?.city]) // eslint-disable-line react-hooks/exhaustive-deps
 
   async function requestGpsLocation() {
     if (!navigator.geolocation || location.trim()) return
@@ -237,14 +254,25 @@ export default function JobsPage() {
       const city = geo.address.city || geo.address.town || geo.address.village || geo.address.county || ''
       const state = geo.address.state || ''
       const loc = city && state ? `${city}, ${state}` : city || state
-      if (loc) setLocation(loc)
-    } catch { /* silently fail */ }
+      if (loc) {
+        setLocation(loc)
+        if (!autoSearchedRef.current) { autoSearchedRef.current = true; searchJobs(undefined, loc) }
+      }
+    } catch {
+      // GPS failed — fall back to profile city
+      if (profile?.city && !autoSearchedRef.current) {
+        autoSearchedRef.current = true
+        setLocation(profile.city)
+        searchJobs(undefined, profile.city)
+      }
+    }
     finally { setGpsLoading(false) }
   }
 
-  async function searchJobs(queryOverride?: string) {
+  async function searchJobs(queryOverride?: string, locationOverride?: string) {
     const q = (queryOverride ?? query).trim()
-    if (!q && !location.trim()) {
+    const loc = locationOverride ?? location
+    if (!q && !loc.trim()) {
       setStatusMsg('Enter a job title or location to search.')
       return
     }
@@ -259,7 +287,7 @@ export default function JobsPage() {
       const res = await fetch('/api/jobs', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ query: q, location: location.trim(), radius }),
+        body: JSON.stringify({ query: q, location: loc.trim(), radius }),
         signal: abortRef.current.signal,
       })
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
@@ -270,7 +298,7 @@ export default function JobsPage() {
         id: String(j.id || 'srch_' + Math.random().toString(36).slice(2, 8)),
         title: String(j.title || ''),
         company: String(j.company || j.co || ''),
-        location: String(j.location || j.loc || j.city || location || 'US'),
+        location: String(j.location || j.loc || j.city || loc || 'US'),
         score: Number(j.score) || 65,
         waste: Number(j.waste_score ?? j.waste) || 25,
         level: String(j.level || j.lvl || 'Mid level'),
@@ -305,6 +333,26 @@ export default function JobsPage() {
     setSaveVersion(v => v + 1)
   }
 
+  async function handleConfirmApply() {
+    if (!applyJob) return
+    setApplying(true)
+    await AppStore.add({
+      company: applyJob.company,
+      role: applyJob.title,
+      location: applyJob.location,
+      jobId: applyJob.id,
+      jobUrl: applyJob.apply_url ?? undefined,
+      platform: applyPlatform || 'Seen',
+      score: applyJob.score,
+      waste: applyJob.waste,
+      stage: 'Applied',
+      status: 'active',
+    }, isLoggedIn)
+    setApplying(false)
+    if (applyJob.apply_url) window.open(applyJob.apply_url, '_blank', 'noopener,noreferrer')
+    setApplyJob(null)
+  }
+
   const inputStyle: React.CSSProperties = {
     flex: 1, minWidth: 160,
     background: 'var(--surface)',
@@ -331,6 +379,7 @@ export default function JobsPage() {
   }
 
   return (
+    <>
     <div className="page-full">
       <div className="jpage">
         <div className="jpage-hdr">
@@ -470,7 +519,7 @@ export default function JobsPage() {
         {filtered.length > 0 ? (
           <div className="jlist" key={saveVersion}>
             {filtered.map((job, i) => (
-              <JobCard key={job.id} job={job} index={i} onSaveToggle={handleSaveToggle} onOpen={id => router.push(`/jobs/${encodeURIComponent(id)}`)} />
+              <JobCard key={job.id} job={job} index={i} onSaveToggle={handleSaveToggle} onOpen={id => router.push(`/jobs/${encodeURIComponent(id)}`)} onApply={j => { setApplyJob(j); setApplyPlatform('Seen') }} />
             ))}
           </div>
         ) : status === 'idle' ? (
@@ -496,5 +545,100 @@ export default function JobsPage() {
         )}
       </div>
     </div>
+
+    {/* Apply & Optimize modal */}
+
+    {applyJob && (
+      <div
+        style={{ position: 'fixed', inset: 0, zIndex: 9000, background: 'rgba(0,0,0,.75)', backdropFilter: 'blur(4px)' }}
+        onClick={() => setApplyJob(null)}
+      >
+        <div
+          style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', width: 'calc(100% - 2rem)', maxWidth: 480, background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 14, overflow: 'hidden' }}
+          onClick={e => e.stopPropagation()}
+        >
+          <div style={{ padding: '.9rem 1.1rem', borderBottom: '1px solid var(--line)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div>
+              <div style={{ fontFamily: 'var(--display)', fontSize: '.9rem', fontWeight: 700, color: 'var(--white)' }}>{applyJob.title}</div>
+              <div style={{ fontFamily: 'var(--mono)', fontSize: '.6rem', color: 'var(--muted)' }}>{applyJob.company} · {applyJob.location}</div>
+            </div>
+            <button onClick={() => setApplyJob(null)} style={{ background: 'none', border: 'none', color: 'var(--dim)', cursor: 'pointer', fontSize: '1rem', padding: '.2rem .3rem' }}>✕</button>
+          </div>
+
+          <div style={{ padding: '1.1rem' }}>
+            {!isLoggedIn ? (
+              <>
+                <div style={{ textAlign: 'center', padding: '.5rem 0 1rem' }}>
+                  <div style={{ fontSize: '2rem', marginBottom: '.75rem' }}>👋</div>
+                  <div style={{ fontFamily: 'var(--display)', fontSize: '1rem', fontWeight: 700, color: 'var(--white)', marginBottom: '.35rem' }}>Sign in to apply &amp; track</div>
+                  <div style={{ fontSize: '.82rem', color: 'var(--sub)', fontWeight: 300, lineHeight: 1.7, marginBottom: '1.25rem' }}>Your application gets saved to your dashboard so you can track responses and get notified when companies ghost.</div>
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '.5rem' }}>
+                  <button className="btn btn-green" style={{ width: '100%', justifyContent: 'center', fontWeight: 800, fontSize: '.88rem' }} onClick={() => { setApplyJob(null); router.push('/login') }}>Sign in to apply →</button>
+                  {applyJob.apply_url && (
+                    <a href={applyJob.apply_url} target="_blank" rel="noopener noreferrer" style={{ display: 'block', textAlign: 'center', background: 'none', border: '1px solid var(--line2)', color: 'var(--muted)', borderRadius: 8, padding: '.6rem 1rem', fontFamily: 'var(--mono)', fontSize: '.65rem', textDecoration: 'none' }} onClick={() => setApplyJob(null)}>
+                      Continue as guest (not tracked)
+                    </a>
+                  )}
+                </div>
+              </>
+            ) : (
+              <>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '.65rem', marginBottom: '1.25rem' }}>
+                  <a
+                    href={`/resume?company=${encodeURIComponent(applyJob.company)}&role=${encodeURIComponent(applyJob.title)}`}
+                    style={{ display: 'block', padding: '1rem', background: 'var(--gdim, rgba(16,185,129,0.08))', border: '1.5px solid var(--gmid, rgba(16,185,129,0.2))', borderRadius: 10, cursor: 'pointer', textAlign: 'center', textDecoration: 'none' }}
+                    onClick={() => setApplyJob(null)}
+                  >
+                    <div style={{ fontSize: '1.5rem', marginBottom: '.4rem' }}>🧠</div>
+                    <div style={{ fontFamily: 'var(--display)', fontSize: '.82rem', fontWeight: 700, color: 'var(--green)', marginBottom: '.2rem' }}>AI-Optimized</div>
+                    <div style={{ fontSize: '.68rem', color: 'var(--green)', opacity: .8 }}>Rewrite for ATS first</div>
+                  </a>
+                  <div
+                    style={{ padding: '1rem', background: 'var(--card)', border: '1.5px solid var(--line2)', borderRadius: 10, cursor: 'pointer', textAlign: 'center' }}
+                    onClick={() => document.getElementById('apply-platform-section')?.scrollIntoView()}
+                  >
+                    <div style={{ fontSize: '1.5rem', marginBottom: '.4rem' }}>📋</div>
+                    <div style={{ fontFamily: 'var(--display)', fontSize: '.82rem', fontWeight: 700, color: 'var(--white)', marginBottom: '.2rem' }}>Standard Apply</div>
+                    <div style={{ fontSize: '.68rem', color: 'var(--dim)' }}>Track &amp; go</div>
+                  </div>
+                </div>
+
+                <div id="apply-platform-section">
+                  <div style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', textTransform: 'uppercase', letterSpacing: '.07em', color: 'var(--dim)', marginBottom: '.35rem' }}>Platform</div>
+                  <select
+                    value={applyPlatform}
+                    onChange={e => setApplyPlatform(e.target.value)}
+                    style={{ width: '100%', background: 'var(--card)', border: '1.5px solid var(--line2)', borderRadius: 8, padding: '.62rem .9rem', color: 'var(--white)', fontFamily: 'var(--body)', fontSize: '.84rem', outline: 'none', marginBottom: '1rem' }}
+                  >
+                    <option value="Seen">Seen</option>
+                    <option value="LinkedIn">LinkedIn</option>
+                    <option value="Indeed">Indeed</option>
+                    <option value="Glassdoor">Glassdoor</option>
+                    <option value="Company website">Company website</option>
+                    <option value="Other">Other</option>
+                  </select>
+                  <div style={{ fontFamily: 'var(--mono)', fontSize: '.6rem', color: 'var(--green)', background: 'var(--gdim, rgba(16,185,129,0.08))', border: '1px solid var(--gmid, rgba(16,185,129,0.2))', borderRadius: 7, padding: '.55rem .85rem', marginBottom: '1rem', lineHeight: 1.65 }}>
+                    ✓ Application tracked · Timeline started in your tracker
+                  </div>
+                  <div style={{ display: 'flex', gap: '.5rem' }}>
+                    <button className="btn btn-ghost" style={{ flex: 1, justifyContent: 'center' }} onClick={() => setApplyJob(null)}>Cancel</button>
+                    <button
+                      className="btn btn-green"
+                      style={{ flex: 2, justifyContent: 'center', fontWeight: 800 }}
+                      onClick={handleConfirmApply}
+                      disabled={applying}
+                    >
+                      {applying ? 'Saving...' : 'Track & Apply →'}
+                    </button>
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      </div>
+    )}
+    </>
   )
 }
