@@ -7,8 +7,10 @@ import { AppStore } from '@/lib/stores/AppStore'
 import { EventStore } from '@/lib/stores/EventStore'
 import { STAGES } from '@/lib/constants'
 import type { Application } from '@/lib/types'
+import dynamic from 'next/dynamic'
 import OutcomeCard from '@/components/OutcomeCard'
 import RoundsPrompt from '@/components/RoundsPrompt'
+const SurveyModal = dynamic(() => import('@/components/SurveyModal'), { ssr: false })
 
 const STATUS_MAP: Record<string, string> = {
   active: '',
@@ -186,6 +188,8 @@ function TrackerPage() {
   const [outcomeApp, setOutcomeApp] = useState<Application | null>(null)
   const [roundsApp, setRoundsApp] = useState<Application | null>(null)
   const [showManual, setShowManual] = useState(false)
+  const [showSurvey, setShowSurvey] = useState(false)
+  const [creditsEarned, setCreditsEarned] = useState(0)
   const [manualForm, setManualForm] = useState({ company: '', role: '', location: '', platform: 'Direct' })
   const [highlightNew, setHighlightNew] = useState(false)
   const highlightedRef = useRef(false)
@@ -577,6 +581,42 @@ function TrackerPage() {
           </div>
         )}
 
+        {/* Survey CTA — show when user has apps with data to contribute */}
+        {apps.length >= 1 && !showSurvey && (
+          <div
+            onClick={() => setShowSurvey(true)}
+            style={{
+              background: 'linear-gradient(90deg, rgba(99,102,241,.1), rgba(124,58,237,.06))',
+              border: '1px solid rgba(99,102,241,.22)',
+              borderRadius: 10,
+              padding: '.65rem 1rem',
+              marginBottom: '.75rem',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: '.75rem',
+              cursor: 'pointer',
+              transition: 'background .15s',
+            }}
+          >
+            <div>
+              <div style={{ fontFamily: 'var(--mono)', fontSize: '.55rem', color: 'var(--indigo)', fontWeight: 600, marginBottom: '.12rem', display: 'flex', alignItems: 'center', gap: '.35rem' }}>
+                <span style={{ fontSize: '.7rem' }}>✦</span>
+                {creditsEarned > 0 ? `You earned ${creditsEarned} credit${creditsEarned !== 1 ? 's' : ''} — keep going` : 'Earn up to 5 credits today'}
+              </div>
+              <div style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', color: 'var(--sub)' }}>
+                Share what happened with your applications — 90 sec, helps future job seekers
+              </div>
+            </div>
+            <span style={{ fontFamily: 'var(--mono)', fontSize: '.65rem', color: 'var(--indigo)', flexShrink: 0 }}>Start →</span>
+          </div>
+        )}
+        {creditsEarned > 0 && !showSurvey && (
+          <div style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', color: 'var(--green)', textAlign: 'center', marginBottom: '.65rem' }}>
+            ✓ +{creditsEarned} credits earned this session
+          </div>
+        )}
+
         {/* Application cards */}
         {apps.length > 0 && (
           <div id="trackerList" style={{ display: 'flex', flexDirection: 'column', gap: '.75rem' }}>
@@ -590,6 +630,13 @@ function TrackerPage() {
 
       </div>
     </div>
+    {showSurvey && (
+      <SurveyModal
+        apps={apps}
+        onClose={() => setShowSurvey(false)}
+        onCreditsEarned={(n) => { setCreditsEarned(n); setShowSurvey(false) }}
+      />
+    )}
     </>
   )
 }

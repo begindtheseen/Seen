@@ -528,6 +528,98 @@ export default async function handler(req, res) {
     return res.status(200).json({ recent: rows });
   }
 
+  // ── COMPANY SURVEY — 5 focused questions about one application ───────────────
+  if (action === 'company_survey') {
+    const { company, role, status } = body;
+    if (!company) return res.status(400).json({ error: 'company required' });
+    const co = String(company).slice(0, 120).trim();
+    const coKey = co.toLowerCase();
+
+    // Check what's already been answered for this company
+    const aqRes = await db(`answered_questions?user_id=eq.${uid}&question_key=like.survey_*%7C${encodeURIComponent(coKey)}&select=question_key&limit=20`);
+    const answered = new Set(aqRes.ok ? (await aqRes.json()).map(r => r.question_key) : []);
+
+    const roleStr = role ? ` for ${role}` : '';
+    const isGhosted = status === 'ghosted';
+    const isHired   = status === 'hired';
+
+    const allQ = [];
+
+    // Q1: Response/outcome
+    const k1 = `survey_response|${coKey}`;
+    if (!answered.has(k1)) allQ.push({
+      key: k1, company: co,
+      prompt: `${co}${role ? ` · ${role}` : ''}`,
+      text: isGhosted
+        ? `Did ${co} ever officially close your application?`
+        : isHired
+        ? `Congrats on ${co}! How quickly did they move you through the process?`
+        : `Did ${co} respond to your application${roleStr}?`,
+      options: isGhosted
+        ? ['Sent a formal rejection', 'Complete silence', 'Got a vague follow-up']
+        : isHired
+        ? ['Very fast — under 2 weeks', '2–4 weeks', '1–2 months', 'Over 2 months']
+        : ['Yes, they responded', 'No response yet (ghosted)', 'Still waiting'],
+      credit_value: 1, source: 'survey',
+    });
+
+    // Q2: Timeline
+    const k2 = `survey_timeline|${coKey}`;
+    if (!answered.has(k2)) allQ.push({
+      key: k2, company: co,
+      prompt: `${co} — timing`,
+      text: isGhosted
+        ? `How long before ${co} went silent?`
+        : `How long did ${co} take to first contact you?`,
+      options: ['Under a week', '1–2 weeks', '2–4 weeks', '1–2 months', 'Over 2 months'],
+      credit_value: 1, source: 'survey',
+    });
+
+    // Q3: Stage reached
+    const k3 = `survey_stage|${coKey}`;
+    if (!answered.has(k3)) allQ.push({
+      key: k3, company: co,
+      prompt: `${co} — process`,
+      text: `What was the furthest stage you reached at ${co}?`,
+      options: ['Application only — no contact', 'Recruiter / phone screen', 'Skills test or take-home', 'Panel or on-site interview', 'Final round or offer'],
+      credit_value: 1, source: 'survey',
+    });
+
+    // Q4: Process transparency
+    const k4 = `survey_process|${coKey}`;
+    if (!answered.has(k4)) allQ.push({
+      key: k4, company: co,
+      prompt: `${co} — your take`,
+      text: `How transparent was ${co}'s hiring process?`,
+      options: ['Very clear — great communication', 'Mostly clear, minor gaps', 'Somewhat unclear', 'Poor communication throughout', 'Total black hole'],
+      credit_value: 1, source: 'survey',
+    });
+
+    // Q5: Would apply again
+    const k5 = `survey_return|${coKey}`;
+    if (!answered.has(k5)) allQ.push({
+      key: k5, company: co,
+      prompt: `${co} — overall`,
+      text: `Would you apply to ${co} again based on this experience?`,
+      options: ['Definitely yes', 'Probably yes', 'Neutral', 'Probably not', 'Definitely not'],
+      credit_value: 1, source: 'survey',
+    });
+
+    // Also check daily cap so UI knows if credits are still earnable
+    const today = new Date().toISOString().split('T')[0];
+    const cRes = await db(`ai_credits?user_id=eq.${uid}&limit=1`);
+    const cred = cRes.ok ? (await cRes.json())[0] : null;
+    const dailyEarned = (cred?.last_reset === today ? cred?.daily_earned : 0) || 0;
+    const creditsLeft = Math.max(0, 5 - dailyEarned);
+
+    return res.status(200).json({
+      ok: true,
+      questions: allQ.slice(0, 5),
+      credits_left: creditsLeft,
+      balance: cred?.balance ?? 3,
+    });
+  }
+
   return res.status(400).json({ error: 'Unknown action: ' + action });
 }
 

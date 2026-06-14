@@ -9,6 +9,7 @@ import { AppStore } from '@/lib/stores/AppStore'
 import { useAuth } from '@/lib/auth'
 import { aiHeaders } from '@/lib/aiHeaders'
 import type { Job } from '@/lib/types'
+import HiringProbability from '@/components/HiringProbability'
 
 type SortMode = 'transparency' | 'waste' | 'recent'
 type NicheFilter = '' | 'tech' | 'healthcare' | 'retail' | 'logistics' | 'finance' | 'other'
@@ -577,7 +578,7 @@ function SwipeJobDeck({ jobs, onOpen, onDismiss, onSave, coScores }: {
   onOpen: (job: Job) => void
   onDismiss: () => void
   onSave?: () => void
-  coScores?: Record<string, {ghost_rate: number; overall_score: number}>
+  coScores?: Record<string, {ghost_rate: number; overall_score: number; response_rate?: number}>
 }) {
   const [stack, setStack] = useState<Job[]>(() => [...jobs])
   const [deltaX, setDeltaX] = useState(0)
@@ -806,6 +807,19 @@ function SwipeJobDeck({ jobs, onOpen, onDismiss, onSave, coScores }: {
           )
         })()}
 
+        {(() => {
+          const sc = coScores?.[topJob.company.toLowerCase()]
+          if (!sc) return null
+          return (
+            <HiringProbability
+              responseRate={sc.response_rate ?? (sc.overall_score ? sc.overall_score / 100 * 0.45 : 0.20)}
+              ghostRate={sc.ghost_rate || 0.55}
+              jobLevel={topJob.level}
+              compact
+            />
+          )
+        })()}
+
         <div style={{ position: 'absolute', bottom: '.9rem', left: '1.15rem', right: '1.15rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <span style={{ fontFamily: 'var(--mono)', fontSize: '.52rem', color: 'var(--muted)' }}>{topJob.source || 'Job board'}</span>
           <span style={{ fontFamily: 'var(--mono)', fontSize: '.52rem', color: 'var(--dim)' }}>{stack.length} left · drag or tap</span>
@@ -847,7 +861,7 @@ export default function JobsPage() {
   const [recStatus, setRecStatus] = useState<'idle' | 'loading' | 'done'>('idle')
   const [swipeCount, setSwipeCount] = useState(0)
   const [deckDone, setDeckDone] = useState(false)
-  const [coScores, setCoScores] = useState<Record<string, {ghost_rate: number; overall_score: number}>>({})
+  const [coScores, setCoScores] = useState<Record<string, {ghost_rate: number; overall_score: number; response_rate?: number}>>({})
   const [appliedCos, setAppliedCos] = useState<Set<string>>(new Set())
   const abortRef = useRef<AbortController | null>(null)
 
@@ -951,7 +965,7 @@ export default function JobsPage() {
       body: JSON.stringify({ action: 'batch_scores', names: cos }),
     })
       .then(r => r.ok ? r.json() : { scores: {} })
-      .then((d: { scores?: Record<string, {ghost_rate: number; overall_score: number}> }) => {
+      .then((d: { scores?: Record<string, {ghost_rate: number; overall_score: number; response_rate?: number}> }) => {
         if (d.scores) setCoScores(d.scores)
       })
       .catch(() => {})

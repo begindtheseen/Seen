@@ -3,6 +3,7 @@
 import { useState, useEffect, use } from 'react'
 import { Score } from '@/lib/score'
 import { AppStore } from '@/lib/stores/AppStore'
+import HiringProbability from '@/components/HiringProbability'
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -815,6 +816,11 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
             {tab === 'overview' && score && (
               <div>
                 <ExpectedTimeline sc={score} risk={risk} />
+                <HiringProbability
+                  responseRate={score.response_rate}
+                  ghostRate={score.ghost_rate}
+                  overallScore={score.overall_score}
+                />
                 <OutcomeDistribution reports={reports} />
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
                   <div style={{ background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 10, padding: '1.2rem' }}>
