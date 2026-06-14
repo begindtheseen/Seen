@@ -284,6 +284,9 @@ export default function AdminPage() {
           <div>
             <h1 style={{ fontFamily: 'var(--display)', fontSize: 'clamp(1.35rem, 6vw, 2rem)', fontWeight: 800, color: 'var(--white)', letterSpacing: '-.04em', lineHeight: 1.05, marginBottom: '.25rem' }}>Data flywheel</h1>
             <p style={{ fontSize: '.8rem', color: 'var(--sub)', fontWeight: 300 }}>Last updated just now</p>
+            <p style={{ fontFamily: 'var(--mono)', fontSize: '.48rem', color: 'var(--dim)', marginTop: '.2rem', letterSpacing: '.04em' }}>
+              build {process.env.NEXT_PUBLIC_VERCEL_GIT_COMMIT_SHA?.slice(0,7) ?? 'local'} · {process.env.NEXT_PUBLIC_VERCEL_GIT_COMMIT_MESSAGE?.slice(0,40) ?? 'dev'}
+            </p>
           </div>
           <div style={{ display: 'flex', gap: '.5rem', flexWrap: 'wrap' }}>
             <button onClick={() => token && load(token)} className="adm-btn">↻ Refresh</button>
