@@ -78,6 +78,7 @@ export default async function handler(req, res) {
   // ── Company-score: merged from api/company-score.js ─────────────────────────
   if (body.action === 'company_score' || body.action === 'research' || body.action === 'resolve' || body.action === 'populate' || body.name) {
     if (await applyRateLimit(req, res, 'company-score')) return;
+    res.setHeader('Cache-Control', 'public, s-maxage=600, stale-while-revalidate=1200');
     return handleCompanyScore(req, res, body);
   }
 

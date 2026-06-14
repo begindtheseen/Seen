@@ -6,12 +6,16 @@ import { Score } from '@/lib/score'
 import { SavedJobsStore } from '@/lib/stores/SavedJobs'
 import { JobCache } from '@/lib/stores/JobCache'
 import { AppStore } from '@/lib/stores/AppStore'
+import { RecentSearchesStore } from '@/lib/stores/RecentSearches'
 import { useAuth } from '@/lib/auth'
 import { aiHeaders } from '@/lib/aiHeaders'
 import type { Job } from '@/lib/types'
 import HiringProbability from '@/components/HiringProbability'
 import ApplyCheckpoint from '@/components/ApplyCheckpoint'
 import ApplyOptimizeModal from '@/components/ApplyOptimizeModal'
+
+// In-memory search cache: `${query}|${location}` → { jobs, ts }
+const searchCache = new Map<string, { jobs: Job[]; ts: number }>()
 
 type SortMode = 'transparency' | 'waste' | 'recent'
 type NicheFilter = '' | 'tech' | 'healthcare' | 'retail' | 'logistics' | 'finance' | 'other'
@@ -956,6 +960,7 @@ export default function JobsPage() {
   const [coScores, setCoScores] = useState<Record<string, {ghost_rate: number; overall_score: number; response_rate?: number}>>({})
   const [appliedCos, setAppliedCos] = useState<Set<string>>(new Set())
   const abortRef = useRef<AbortController | null>(null)
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const hasFilters = !!(niche || level || jobType || posted)
 
@@ -1002,6 +1007,22 @@ export default function JobsPage() {
       setLocation(profile.city)
       if (!autoSearchedRef.current) { autoSearchedRef.current = true; searchJobs(undefined, profile.city) }
     }
+    // Pre-load last search from recent history (delayed to not conflict with GPS)
+    const t = setTimeout(() => {
+      if (!autoSearchedRef.current) {
+        try {
+          const recent = RecentSearchesStore.get()
+          if (recent.length > 0) {
+            const last = recent[0]
+            setQuery(last.name)
+            if (last.loc) setLocation(last.loc)
+            autoSearchedRef.current = true
+            searchJobs(last.name, last.loc)
+          }
+        } catch {}
+      }
+    }, 1200)
+    return () => clearTimeout(t)
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Once profile loads, if location still empty, pre-fill and auto-search
@@ -1116,48 +1137,63 @@ export default function JobsPage() {
 
   async function searchJobs(queryOverride?: string, locationOverride?: string) {
     const q = (queryOverride ?? query).trim()
-    const loc = locationOverride ?? location
-    if (!q && !loc.trim()) {
+    const loc = (locationOverride ?? location).trim()
+    if (!q && !loc) {
       setStatusMsg('Enter a job title or location to search.')
       return
     }
-    if (abortRef.current) abortRef.current.abort()
-    abortRef.current = new AbortController()
-    setStatus('loading')
-    setStatusMsg('Searching...')
-    setJobs([])
-    setFiltered([])
+
+    const cacheKey = `${q}|${loc}|${radius}`
+    const cached = searchCache.get(cacheKey)
+    const CACHE_TTL = 5 * 60 * 1000 // 5 min
+    if (cached && Date.now() - cached.ts < CACHE_TTL) {
+      // Serve cached results immediately, then silently refresh in background
+      setJobs(cached.jobs)
+      updateDisplay(cached.jobs, sort)
+      setStatus('done')
+      setStatusMsg(`${cached.jobs.length} result${cached.jobs.length !== 1 ? 's' : ''} (from cache — refreshing…)`)
+    } else {
+      if (abortRef.current) abortRef.current.abort()
+      abortRef.current = new AbortController()
+      setStatus('loading')
+      setStatusMsg('Searching...')
+      if (!cached) { setJobs([]); setFiltered([]) }
+    }
 
     try {
+      const ctrl = new AbortController()
+      abortRef.current = ctrl
       const res = await fetch('/api/jobs', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ query: q, location: loc.trim(), radius }),
-        signal: abortRef.current.signal,
+        body: JSON.stringify({ query: q, location: loc, radius }),
+        signal: ctrl.signal,
       })
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
       const data = await res.json() as { jobs?: unknown[]; results?: unknown[] }
       const raw: Job[] = (data.jobs || data.results || []).map((item: unknown) => {
         const j = item as Record<string, unknown>
         return {
-        id: String(j.id || 'srch_' + Math.random().toString(36).slice(2, 8)),
-        title: String(j.title || ''),
-        company: String(j.company || j.co || ''),
-        location: String(j.location || j.loc || j.city || loc || 'US'),
-        score: Number(j.score) || 65,
-        waste: Number(j.waste_score ?? j.waste) || 25,
-        level: String(j.level || j.lvl || 'Mid level'),
-        type: String(j.type || 'Full-time'),
-        source: String(j.source || 'Job board'),
-        description: String(j.description || ''),
-        salary: j.salary ? String(j.salary) : null,
+          id: String(j.id || 'srch_' + Math.random().toString(36).slice(2, 8)),
+          title: String(j.title || ''),
+          company: String(j.company || j.co || ''),
+          location: String(j.location || j.loc || j.city || loc || 'US'),
+          score: Number(j.score) || 65,
+          waste: Number(j.waste_score ?? j.waste) || 25,
+          level: String(j.level || j.lvl || 'Mid level'),
+          type: String(j.type || 'Full-time'),
+          source: String(j.source || 'Job board'),
+          description: String(j.description || ''),
+          salary: j.salary ? String(j.salary) : null,
           apply_url: j.apply_url ? String(j.apply_url) : (j.url ? String(j.url) : null),
         }
       })
+      searchCache.set(cacheKey, { jobs: raw, ts: Date.now() })
       JobCache.setMany(raw)
       setJobs(raw)
       updateDisplay(raw, sort)
       setStatus('done')
+      if (q) try { RecentSearchesStore.push(q, loc || undefined) } catch {}
     } catch (err) {
       if ((err as Error).name === 'AbortError') return
       setStatus('error')
@@ -1221,8 +1257,15 @@ export default function JobsPage() {
               type="text"
               placeholder="Job title or role..."
               value={query}
-              onChange={e => setQuery(e.target.value)}
-              onKeyDown={e => e.key === 'Enter' && searchJobs()}
+              onChange={e => {
+                const val = e.target.value
+                setQuery(val)
+                if (debounceRef.current) clearTimeout(debounceRef.current)
+                if (val.trim().length >= 2 || location.trim().length >= 2) {
+                  debounceRef.current = setTimeout(() => searchJobs(val, undefined), 450)
+                }
+              }}
+              onKeyDown={e => { if (e.key === 'Enter') { if (debounceRef.current) clearTimeout(debounceRef.current); searchJobs() } }}
               style={inputStyle}
             />
             <div style={{ position: 'relative', flex: 1, minWidth: 160 }}>
@@ -1425,9 +1468,19 @@ export default function JobsPage() {
             )}
           </div>
         ) : status === 'loading' ? (
-          <div style={{ textAlign: 'center', padding: '4rem 2rem', color: 'var(--muted)', fontFamily: 'var(--mono)', fontSize: '.75rem' }}>
-            <div style={{ marginBottom: '.75rem', fontSize: '1.5rem' }}>🔍</div>
-            Searching across the web...
+          <div className="jlist">
+            {[0, 1, 2, 3, 4].map(i => (
+              <div key={i} style={{ background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 12, padding: '1rem 1.1rem', display: 'flex', gap: '.75rem', alignItems: 'flex-start' }}>
+                <div style={{ width: 46, height: 46, borderRadius: 9, background: 'var(--raised)', flexShrink: 0, animation: `pulse 1.4s ${i * 0.12}s ease infinite` }} />
+                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '.55rem' }}>
+                  <div style={{ height: 14, borderRadius: 4, background: 'var(--raised)', width: `${55 + (i % 3) * 15}%`, animation: `pulse 1.4s ${i * 0.12}s ease infinite` }} />
+                  <div style={{ height: 11, borderRadius: 4, background: 'var(--raised)', width: '40%', animation: `pulse 1.4s ${i * 0.12}s ease infinite` }} />
+                  <div style={{ display: 'flex', gap: '.35rem' }}>
+                    {[0, 1, 2].map(j => <div key={j} style={{ height: 20, width: 60, borderRadius: 5, background: 'var(--raised)', animation: `pulse 1.4s ${(i + j) * 0.09}s ease infinite` }} />)}
+                  </div>
+                </div>
+              </div>
+            ))}
           </div>
         ) : (
           <div style={{ textAlign: 'center', padding: '4rem 2rem', color: 'var(--muted)', fontFamily: 'var(--mono)', fontSize: '.75rem' }}>
