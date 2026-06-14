@@ -25,8 +25,10 @@ Last updated: **2026-06-14 (Session F)**
 | `0d974a2` | Fix hero text clipped on mobile — removed `white-space: nowrap` from hero spans |
 | `6999d70` | Jobs page: empty state illustration + "Check company" link in job cards |
 | `e95ef21` | Visual parity batch: resume results render real API JSON (typed ScannerResult/CoachResult/ProposalResult), nav credit balance badge (blue pill, anon-safe), VerdictFeed live leaderboard data + 3.8s ticker, LandingMarketingSections scroll-reveal via IntersectionObserver, admin KPI layout fix (removed mob state + inline gridTemplateColumns that fought CSS media queries) |
+| `ee6b416` | Admin: jobs total count (API + 4-card row), section labels → adm-section-lbl class, API Health → adm-panel glass card, 2-col panels → adm-2col responsive class, chart height 56px, adm-2col mobile stacking |
+| `47c303a` | Admin mobile polish: KPI numbers 0.95→1.4rem, taller card padding, header buttons wrap not clip, InactiveRow/ReportRow flex-wrap overflow guards, clusters signal text truncation |
 
-**Build status**: ✅ PASSING after e95ef21 — 19 routes, zero TS errors
+**Build status**: ✅ PASSING after 47c303a — 19 routes, zero TS errors
 
 ---
 
