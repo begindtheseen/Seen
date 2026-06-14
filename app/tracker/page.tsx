@@ -164,6 +164,7 @@ function TrackerPage() {
   const [manualForm, setManualForm] = useState({ company: '', role: '', location: '', platform: 'Direct' })
   const [highlightNew, setHighlightNew] = useState(false)
   const highlightedRef = useRef(false)
+  const [updateInsight, setUpdateInsight] = useState<{ title: string; body: string; color: string } | null>(null)
 
   useEffect(() => {
     if (!isLoggedIn) { router.replace('/login'); return }
@@ -207,6 +208,68 @@ function TrackerPage() {
     }
   }
 
+  const handleCheckInsight = async (app: Application, checkType: string, data: Record<string, unknown>) => {
+    // Fetch company score for context-aware insight
+    let score: { ghost_rate: number; avg_wait_days: number; overall_score: number } | null = null
+    try {
+      const r = await fetch('/api/reports', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: app.company }),
+      })
+      const d = await r.json()
+      if (d.score) score = d.score
+    } catch {}
+
+    const days = Math.floor((Date.now() - app.appliedAt) / 86400000)
+
+    if (checkType === 'response_check') {
+      const rt = data.response_type as string
+      if (rt === 'ghosted') {
+        const ghostPct = score ? Math.round(score.ghost_rate * 100) : null
+        setUpdateInsight({
+          title: '👻 Ghost documented',
+          body: ghostPct != null
+            ? `${app.company} has a ${ghostPct}% ghost rate. You're not alone — this data helps warn other applicants.`
+            : `Ghosting logged after ${days} days. This adds to the public record for ${app.company}.`,
+          color: 'rgba(156,163,175,0.15)',
+        })
+      } else if (rt === 'interview') {
+        const avgWait = score?.avg_wait_days ?? 21
+        setUpdateInsight({
+          title: '📞 Interview unlocked — you\'re ahead',
+          body: `You reached the interview stage at ${app.company} in ${days} days. The average applicant waits ${avgWait} days just for a first response.`,
+          color: 'rgba(99,102,241,0.12)',
+        })
+      } else if (rt !== 'withdrew') {
+        const avgWait = score?.avg_wait_days ?? 21
+        setUpdateInsight({
+          title: '✅ Response received',
+          body: days <= avgWait
+            ? `${app.company} responded in ${days} days — faster than their ${avgWait}-day average.`
+            : `Response took ${days} days vs their ${avgWait}-day average. Logged.`,
+          color: 'rgba(16,185,129,0.1)',
+        })
+      }
+    } else if (checkType === 'interview_check') {
+      if (data.interview_type) {
+        setUpdateInsight({
+          title: '🗓 Interview stage confirmed',
+          body: `You\'re in the interview stage at ${app.company} after ${days} days. Top 20-30% of applicants reach this point.`,
+          color: 'rgba(99,102,241,0.12)',
+        })
+      }
+    } else if (checkType === 'outcome_check') {
+      const outcome = data.outcome as string
+      if (outcome === 'ghosted') {
+        setUpdateInsight({
+          title: '👻 Final outcome: Ghosted',
+          body: `${app.company} went silent after ${days} days. Outcome card coming next — your experience will be visible to future applicants.`,
+          color: 'rgba(156,163,175,0.12)',
+        })
+      }
+    }
+  }
+
   const handleRemove = async (id: string) => {
     await AppStore.remove(id, isLoggedIn)
     loadApps()
@@ -214,6 +277,8 @@ function TrackerPage() {
 
   const handleCheckAnswer = (appId: string, checkType: string, data: Record<string, unknown>) => {
     EventStore.add({ appId, type: checkType, data })
+    const app = apps.find(a => a.id === appId)
+    if (app) handleCheckInsight(app, checkType, data)
     if (data.withdrew) {
       handleUpdate(appId, { status: 'rejected', stage: 'Rejected' })
       return
@@ -414,6 +479,17 @@ function TrackerPage() {
                 )
               })}
             </div>
+          </div>
+        )}
+
+        {/* Update insight — shown after answering a check card */}
+        {updateInsight && (
+          <div style={{ marginBottom: '1.25rem', background: updateInsight.color, border: '1px solid rgba(255,255,255,0.1)', borderRadius: 12, padding: '1rem 1.1rem', animation: 'fadeUp .3s ease both', display: 'flex', gap: '.85rem', alignItems: 'flex-start' }}>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontFamily: 'var(--display)', fontSize: '.82rem', fontWeight: 700, color: 'var(--white)', marginBottom: '.3rem' }}>{updateInsight.title}</div>
+              <div style={{ fontFamily: 'var(--mono)', fontSize: '.65rem', color: 'var(--sub)', lineHeight: 1.7 }}>{updateInsight.body}</div>
+            </div>
+            <button onClick={() => setUpdateInsight(null)} style={{ background: 'none', border: 'none', color: 'var(--muted)', cursor: 'pointer', fontSize: '.75rem', padding: '.1rem', flexShrink: 0 }}>✕</button>
           </div>
         )}
 

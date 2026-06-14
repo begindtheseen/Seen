@@ -69,6 +69,28 @@ export const BadgeStore = {
       b.push({ id: 'early_responder', icon: '⏱', label: 'Early Responder', desc: 'Completed 3+ outcome check-ins within 24 hours of being due' })
     }
 
+    // Ghost Hunter — confirmed a ghosting with timeline data
+    if (ghosted.length >= 1) {
+      b.push({ id: 'ghost_hunter', icon: '👻', label: 'Ghost Hunter', desc: 'Documented a ghosting with full timeline — helping warn others' })
+    }
+
+    // Interview Survivor — reached interview stage at least once
+    const interviewReached = apps.filter(hasInterview)
+    if (interviewReached.length >= 1) {
+      b.push({ id: 'interview_survivor', icon: '🗓', label: 'Interview Survivor', desc: 'Reached the interview stage — tracked and verified' })
+    }
+
+    // Data Champion — submitted 5+ terminal outcomes
+    if (terminal >= 5) {
+      b.push({ id: 'data_champion', icon: '📊', label: 'Data Champion', desc: `${terminal} outcomes logged — top data contributor` })
+    }
+
+    // Hiring Detective — updated an application 3+ times (multiple events per app)
+    const deepTrackers = apps.filter(a => (a.events || []).length >= 3)
+    if (deepTrackers.length >= 1) {
+      b.push({ id: 'hiring_detective', icon: '🔍', label: 'Hiring Detective', desc: 'Tracked a full application journey from apply to outcome' })
+    }
+
     return b
   },
 }

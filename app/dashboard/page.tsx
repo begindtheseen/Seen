@@ -218,6 +218,36 @@ export default function DashboardPage() {
           </div>
         )}
 
+        {/* Open loops — unfinished intelligence */}
+        {(dueChecks.length > 0 || staleApps.length > 0) && (
+          <div style={{ background: 'rgba(245,158,11,0.05)', border: '1px solid rgba(245,158,11,0.2)', borderRadius: 12, padding: '.85rem 1rem', marginBottom: '1.25rem' }}>
+            <div style={{ fontFamily: 'var(--mono)', fontSize: '.55rem', textTransform: 'uppercase', letterSpacing: '.12em', color: 'var(--amber)', fontWeight: 700, marginBottom: '.6rem', display: 'flex', alignItems: 'center', gap: '.5rem' }}>
+              <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--amber)', display: 'inline-block', animation: 'pulse 2s infinite' }} />
+              Open loops
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '.45rem' }}>
+              {dueChecks.length > 0 && (
+                <button onClick={() => router.push('/tracker')} style={{ background: 'none', border: 'none', display: 'flex', alignItems: 'center', gap: '.65rem', cursor: 'pointer', textAlign: 'left', padding: '.3rem 0' }}>
+                  <span style={{ fontSize: '.85rem', flexShrink: 0 }}>📅</span>
+                  <div>
+                    <div style={{ fontFamily: 'var(--mono)', fontSize: '.65rem', color: 'var(--white)', fontWeight: 600 }}>{dueChecks.length} check-in{dueChecks.length > 1 ? 's' : ''} due</div>
+                    <div style={{ fontFamily: 'var(--mono)', fontSize: '.55rem', color: 'var(--amber)' }}>Answer to unlock your timeline insight →</div>
+                  </div>
+                </button>
+              )}
+              {staleApps.length > 0 && (
+                <button onClick={() => router.push('/tracker')} style={{ background: 'none', border: 'none', display: 'flex', alignItems: 'center', gap: '.65rem', cursor: 'pointer', textAlign: 'left', padding: '.3rem 0' }}>
+                  <span style={{ fontSize: '.85rem', flexShrink: 0 }}>⏰</span>
+                  <div>
+                    <div style={{ fontFamily: 'var(--mono)', fontSize: '.65rem', color: 'var(--white)', fontWeight: 600 }}>{staleApps.length} app{staleApps.length > 1 ? 's' : ''} past response window</div>
+                    <div style={{ fontFamily: 'var(--mono)', fontSize: '.55rem', color: 'var(--amber)' }}>Ghost risk rising — update what happened →</div>
+                  </div>
+                </button>
+              )}
+            </div>
+          </div>
+        )}
+
         {/* Health Score */}
         {health && (
           <div style={{ marginBottom: '1.25rem', background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 12, padding: '1rem 1.25rem' }}>
@@ -253,11 +283,16 @@ export default function DashboardPage() {
 
         {/* Badges */}
         {badges.length > 0 && (
-          <div style={{ display: 'none', marginBottom: '1.25rem' }}>
+          <div style={{ marginBottom: '1.25rem' }}>
+            <div style={{ fontFamily: 'var(--mono)', fontSize: '.6rem', textTransform: 'uppercase', letterSpacing: '.09em', color: 'var(--dim)', marginBottom: '.65rem' }}>Earned badges</div>
             <div style={{ display: 'flex', gap: '.5rem', flexWrap: 'wrap' }}>
               {badges.map(b => (
-                <div key={b.id} style={{ background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 8, padding: '.4rem .75rem', display: 'flex', alignItems: 'center', gap: '.35rem', fontSize: '.75rem', color: 'var(--sub)' }}>
-                  <span>{b.icon}</span> {b.label}
+                <div key={b.id} style={{ background: 'var(--surface)', border: '1px solid var(--line2)', borderRadius: 8, padding: '.5rem .85rem', display: 'flex', alignItems: 'center', gap: '.4rem' }}>
+                  <span style={{ fontSize: '1rem' }}>{b.icon}</span>
+                  <div>
+                    <div style={{ fontFamily: 'var(--display)', fontSize: '.72rem', fontWeight: 700, color: 'var(--white)', lineHeight: 1.2 }}>{b.label}</div>
+                    <div style={{ fontFamily: 'var(--mono)', fontSize: '.52rem', color: 'var(--muted)' }}>{b.desc}</div>
+                  </div>
                 </div>
               ))}
             </div>
