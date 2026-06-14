@@ -1,15 +1,17 @@
 'use client'
 
 import { useState } from 'react'
-import { aiHeaders } from '@/lib/aiHeaders'
+import { useRouter } from 'next/navigation'
+import { useAuth } from '@/lib/auth'
+import { AppStore } from '@/lib/stores/AppStore'
 
 interface ApplyCheckpointProps {
-  job: { id: string; title: string; company: string }
+  job: { id: string; title: string; company: string; location?: string; apply_url?: string | null }
   optimized?: boolean
   onClose: () => void
 }
 
-type Step = 'main' | 'not_yet' | 'declined' | 'confirmed'
+type Step = 'main' | 'not_yet' | 'declined' | 'confirmed' | 'not_yet_confirmed'
 
 const NOT_YET_REASONS = [
   'I want to edit the resume first',
@@ -26,44 +28,52 @@ const DECLINED_REASONS = [
   'Found a better option',
 ]
 
-export default function ApplyCheckpoint({ job, optimized, onClose }: ApplyCheckpointProps) {
+function saveSkipReason(
+  company: string,
+  role: string,
+  reason: string,
+  type: 'not_yet' | 'declined',
+) {
+  try {
+    const key = 'seen_skip_reasons'
+    const existing: Array<{
+      company: string
+      role: string
+      reason: string
+      type: 'not_yet' | 'declined'
+      timestamp: number
+    }> = JSON.parse(localStorage.getItem(key) || '[]')
+    existing.push({ company, role, reason, type, timestamp: Date.now() })
+    localStorage.setItem(key, JSON.stringify(existing))
+  } catch {
+    // localStorage unavailable — ignore
+  }
+}
+
+export default function ApplyCheckpoint({ job, optimized: _optimized, onClose }: ApplyCheckpointProps) {
+  const router = useRouter()
+  const { isLoggedIn } = useAuth()
   const [step, setStep] = useState<Step>('main')
   const [loading, setLoading] = useState(false)
 
   async function handleApplied() {
     setLoading(true)
     try {
-      const headers = await aiHeaders()
-      await fetch('/api/user-sync', {
-        method: 'POST',
-        headers,
-        body: JSON.stringify({
-          action: 'create_application',
+      await AppStore.add(
+        {
           company: job.company,
           role: job.title,
-          job_id: job.id,
-          resume_optimized: optimized || false,
-        }),
-      })
+          jobId: job.id,
+          jobUrl: job.apply_url ?? undefined,
+          location: job.location,
+          stage: 'Applied',
+          status: 'active',
+        },
+        isLoggedIn,
+      )
     } catch {
       // Non-fatal — still show confirmed step
     }
-
-    try {
-      const key = 'seen_tracked_apps'
-      const existing: Array<{ company: string; role: string; job_id: string; applied_at: string }> =
-        JSON.parse(localStorage.getItem(key) || '[]')
-      existing.push({
-        company: job.company,
-        role: job.title,
-        job_id: job.id,
-        applied_at: new Date().toISOString(),
-      })
-      localStorage.setItem(key, JSON.stringify(existing))
-    } catch {
-      // localStorage unavailable — ignore
-    }
-
     setLoading(false)
     setStep('confirmed')
   }
@@ -288,6 +298,23 @@ export default function ApplyCheckpoint({ job, optimized, onClose }: ApplyCheckp
     transition: 'border-color .15s, color .15s',
   }
 
+  const trackerBtnStyle: React.CSSProperties = {
+    display: 'block',
+    width: '100%',
+    padding: '13px 20px',
+    background: 'rgba(16,185,129,.12)',
+    color: 'var(--green)',
+    border: '1px solid var(--green)',
+    borderRadius: 11,
+    fontFamily: 'var(--mono)',
+    fontSize: 14,
+    fontWeight: 600,
+    cursor: 'pointer',
+    textAlign: 'center',
+    marginBottom: 10,
+    transition: 'background .15s',
+  }
+
   // ── Render ──────────────────────────────────────────────────────────────────
 
   return (
@@ -338,19 +365,41 @@ export default function ApplyCheckpoint({ job, optimized, onClose }: ApplyCheckp
               ← back
             </button>
 
-            <div style={headingStyle}>What's holding you back?</div>
+            <div style={headingStyle}>What&apos;s holding you back?</div>
 
             <div style={{ marginTop: 18 }}>
               {NOT_YET_REASONS.map(reason => (
                 <button
                   key={reason}
                   style={reasonBtnStyle}
-                  onClick={onClose}
+                  onClick={() => {
+                    saveSkipReason(job.company, job.title, reason, 'not_yet')
+                    setStep('not_yet_confirmed')
+                  }}
                 >
                   {reason}
                 </button>
               ))}
             </div>
+          </div>
+        )}
+
+        {/* ── NOT YET CONFIRMED ── */}
+        {step === 'not_yet_confirmed' && (
+          <div style={innerStyle}>
+            <div style={{ ...confirmedCheckStyle, fontSize: 36 }}>Got it.</div>
+            <div style={{
+              fontFamily: 'var(--mono)',
+              fontSize: 14,
+              color: 'var(--sub)',
+              lineHeight: 1.6,
+              marginBottom: 24,
+            }}>
+              We&apos;ll remind you to check back on {job.company} — {job.title}.
+            </div>
+            <button style={closeFullBtnStyle} onClick={onClose}>
+              Close
+            </button>
           </div>
         )}
 
@@ -368,7 +417,10 @@ export default function ApplyCheckpoint({ job, optimized, onClose }: ApplyCheckp
                 <button
                   key={reason}
                   style={reasonBtnStyle}
-                  onClick={onClose}
+                  onClick={() => {
+                    saveSkipReason(job.company, job.title, reason, 'declined')
+                    onClose()
+                  }}
                 >
                   {reason}
                 </button>
@@ -389,7 +441,7 @@ export default function ApplyCheckpoint({ job, optimized, onClose }: ApplyCheckp
               lineHeight: 1.6,
               marginBottom: 4,
             }}>
-              We'll tell you when {job.company} usually responds — and when silence becomes a signal.
+              We&apos;ll tell you when {job.company} usually responds — and when silence becomes a signal.
             </div>
 
             <div style={statsRowStyle}>
@@ -406,6 +458,10 @@ export default function ApplyCheckpoint({ job, optimized, onClose }: ApplyCheckp
             <div style={ghostRiskStyle}>
               Ghost risk if no response by day 21: <span style={{ color: 'var(--white)' }}>Moderate</span>
             </div>
+
+            <button style={trackerBtnStyle} onClick={() => router.push('/tracker')}>
+              Go to tracker →
+            </button>
 
             <button style={closeFullBtnStyle} onClick={onClose}>
               Close

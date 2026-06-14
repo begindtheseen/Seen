@@ -1,24 +1,15 @@
--- Application tracking tables for SeenJobs behavioral flywheel. Safe to run multiple times.
+-- Migration 016: Add new columns to existing applications table and create application_events.
+-- Safe to run multiple times.
 
--- ── applications ────────────────────────────────────────────────────────────
+-- ── applications (table already exists — add new columns only) ────────────────
 
-CREATE TABLE IF NOT EXISTS applications (
-  id                uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id           uuid        NOT NULL REFERENCES auth.users,
-  company           text        NOT NULL,
-  role              text        NOT NULL,
-  job_id            text,
-  applied_at        timestamptz,
-  source            text        DEFAULT 'seen',
-  resume_optimized  boolean     DEFAULT false,
-  stage             text        DEFAULT 'considering',
-  status            text        DEFAULT 'active',
-  next_check_due_at timestamptz,
-  closed_at         timestamptz,
-  final_outcome     text,
-  created_at        timestamptz DEFAULT now(),
-  updated_at        timestamptz DEFAULT now()
-);
+ALTER TABLE applications ADD COLUMN IF NOT EXISTS job_id            text;
+ALTER TABLE applications ADD COLUMN IF NOT EXISTS applied_at        timestamptz;
+ALTER TABLE applications ADD COLUMN IF NOT EXISTS source            text        DEFAULT 'seen';
+ALTER TABLE applications ADD COLUMN IF NOT EXISTS resume_optimized  boolean     DEFAULT false;
+ALTER TABLE applications ADD COLUMN IF NOT EXISTS next_check_due_at timestamptz;
+ALTER TABLE applications ADD COLUMN IF NOT EXISTS closed_at         timestamptz;
+ALTER TABLE applications ADD COLUMN IF NOT EXISTS final_outcome     text;
 
 DO $$ BEGIN
   IF NOT EXISTS (
@@ -40,21 +31,17 @@ DO $$ BEGIN
   END IF;
 END $$;
 
-ALTER TABLE applications ENABLE ROW LEVEL SECURITY;
-
 DO $$ BEGIN
   IF NOT EXISTS (
-    SELECT 1 FROM pg_policies
+    SELECT 1 FROM pg_indexes
     WHERE tablename = 'applications'
-      AND policyname = 'own_applications'
+      AND indexname  = 'idx_applications_job_id'
   ) THEN
-    CREATE POLICY own_applications ON applications
-      USING (auth.uid() = user_id)
-      WITH CHECK (auth.uid() = user_id);
+    CREATE INDEX idx_applications_job_id ON applications (job_id);
   END IF;
 END $$;
 
--- ── application_events ───────────────────────────────────────────────────────
+-- ── application_events (new table) ───────────────────────────────────────────
 
 CREATE TABLE IF NOT EXISTS application_events (
   id              bigserial   PRIMARY KEY,

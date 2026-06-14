@@ -298,25 +298,18 @@ export default async function handler(req, res) {
     return res.status(200).json({ ok: true });
   }
 
-  // ── REPORT JOB AVAILABILITY ───────────────────────────────────────────────────
+  // ── CREATE APPLICATION ────────────────────────────────────────────────────────
   if (action === 'create_application') {
-    const { company, role, job_id, resume_optimized } = body;
-    if (!company || !role) return res.status(400).json({ error: 'company and role required' });
-    const now = new Date().toISOString();
-    const nextCheck = new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString();
+    const { company_name, role } = body;
+    if (!company_name || !role) return res.status(400).json({ error: 'company_name and role required' });
     const r = await db('applications', {
       method: 'POST',
       body: JSON.stringify({
         user_id: uid,
-        company: String(company).slice(0, 200),
+        company_name: String(company_name).slice(0, 200),
         role: String(role).slice(0, 200),
-        job_id: job_id ? String(job_id).slice(0, 100) : null,
-        applied_at: now,
-        resume_optimized: resume_optimized || false,
-        stage: 'applied',
+        stage: 'Applied',
         status: 'active',
-        next_check_due_at: nextCheck,
-        source: 'seen',
       }),
       headers: { Prefer: 'return=minimal' },
     });

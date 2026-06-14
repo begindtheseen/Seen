@@ -5,7 +5,6 @@ import { useRouter } from 'next/navigation'
 import { useAuth } from '@/lib/auth'
 import { aiHeaders } from '@/lib/aiHeaders'
 import { ResumeStore } from '@/lib/stores/ResumeStore'
-import { AppStore } from '@/lib/stores/AppStore'
 import type { Job } from '@/lib/types'
 
 interface OptimizeBullet {
@@ -188,19 +187,7 @@ export default function ApplyOptimizeModal({
     setStep('done')
   }
 
-  async function applyWithoutOptimize() {
-    await AppStore.add({
-      company: job.company,
-      role: job.title,
-      location: job.location,
-      jobId: job.id,
-      jobUrl: job.apply_url ?? undefined,
-      platform: 'Seen',
-      score: job.score,
-      waste: job.waste,
-      stage: 'Applied',
-      status: 'active',
-    }, isLoggedIn)
+  function applyWithoutOptimize() {
     if (job.apply_url) window.open(job.apply_url, '_blank', 'noopener,noreferrer')
     onApplied()
     onClose()
