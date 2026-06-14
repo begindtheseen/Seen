@@ -11,6 +11,7 @@
   "dependencies": {
     "@supabase/supabase-js": "^2.49.2",
     "next": "15.3.9",
+    "pdfkit": "^0.19.1",
     "react": "19.0.0",
     "react-dom": "19.0.0"
   },

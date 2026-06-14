@@ -163,16 +163,6 @@ export default function ApplyOptimizeModal({
     const bullets = result?.optimized_bullets || []
     const kwds = result?.keywords_added || []
 
-    // Build a rich text summary with actual bullet rewrites for the email
-    const bulletLines = bullets.map((b, i) =>
-      `${i + 1}. BEFORE: ${b.original}\n   AFTER: ${b.optimized}\n   (${b.addresses})`
-    ).join('\n\n')
-    const summary = [
-      `${bullets.length} bullet${bullets.length !== 1 ? 's' : ''} rewritten for ${job.title} at ${job.company}.`,
-      kwds.length > 0 ? `Keywords added: ${kwds.join(', ')}.` : '',
-      bullets.length > 0 ? `\n\nYour optimized bullets:\n\n${bulletLines}` : '',
-    ].filter(Boolean).join(' ')
-
     try {
       const headers = await aiHeaders()
       await fetch('/api/resume', {
@@ -185,8 +175,8 @@ export default function ApplyOptimizeModal({
           role: job.title,
           jid: job.id,
           jobUrl: job.apply_url,
-          summary,
-          matchScore: null,
+          bullets,
+          keywords: kwds,
         }),
       })
     } catch (_) {
