@@ -567,6 +567,236 @@ function JobCard({ job, index, onSaveToggle, onOpen, onApply, onCheckCompany }: 
   )
 }
 
+// ── SwipeJobDeck ──────────────────────────────────────────────────────────────
+
+function SwipeJobDeck({ jobs, onOpen, onDismiss, onSave }: {
+  jobs: Job[]
+  onOpen: (job: Job) => void
+  onDismiss: () => void
+  onSave?: () => void
+}) {
+  const [stack, setStack] = useState<Job[]>(() => [...jobs])
+  const [deltaX, setDeltaX] = useState(0)
+  const [isDragging, setIsDragging] = useState(false)
+  const [flyDir, setFlyDir] = useState<'left' | 'right' | null>(null)
+  const [savedCount, setSavedCount] = useState(0)
+  const startXRef = useRef(0)
+  const startYRef = useRef(0)
+  const hasMoved = useRef(false)
+  const cardRef = useRef<HTMLDivElement>(null)
+
+  // Keep stack in sync when jobs prop changes (e.g. initial load)
+  useEffect(() => { setStack([...jobs]) }, [jobs])
+
+  const topJob = stack[0] ?? null
+  const secondJob = stack[1] ?? null
+  const thirdJob = stack[2] ?? null
+
+  const badgeOpacity = Math.min(1, Math.abs(deltaX) / 80)
+  const showLeft = deltaX < -40
+  const showRight = deltaX > 40
+
+  async function saveJob(job: Job) {
+    try {
+      await fetch('/api/user-sync', {
+        method: 'POST',
+        headers: await aiHeaders(),
+        body: JSON.stringify({
+          action: 'save_application',
+          company: job.company,
+          role: job.title,
+          stage: 'Applied',
+          platform: job.source || 'Seen',
+        }),
+      })
+    } catch { /* ignore */ }
+  }
+
+  function advance(dir: 'left' | 'right') {
+    if (!topJob) return
+    if (dir === 'right') {
+      saveJob(topJob)
+      setSavedCount(c => c + 1)
+      onSave?.()
+    }
+    setFlyDir(dir)
+    setTimeout(() => {
+      setStack(prev => {
+        const next = prev.slice(1)
+        if (next.length === 0) onDismiss()
+        return next
+      })
+      setFlyDir(null)
+      setDeltaX(0)
+      setIsDragging(false)
+    }, 300)
+  }
+
+  function onPointerStart(clientX: number, clientY: number) {
+    if (flyDir) return
+    startXRef.current = clientX
+    startYRef.current = clientY
+    hasMoved.current = false
+    setIsDragging(true)
+    setDeltaX(0)
+  }
+
+  function onPointerMove(clientX: number) {
+    if (!isDragging || flyDir) return
+    const dx = clientX - startXRef.current
+    if (Math.abs(dx) > 4) hasMoved.current = true
+    setDeltaX(dx)
+  }
+
+  function onPointerEnd() {
+    if (!isDragging || flyDir) return
+    if (!hasMoved.current && topJob) {
+      // Tap: open drawer
+      setIsDragging(false)
+      setDeltaX(0)
+      onOpen(topJob)
+      return
+    }
+    if (Math.abs(deltaX) > 80) {
+      advance(deltaX > 0 ? 'right' : 'left')
+    } else {
+      // Snap back
+      if (cardRef.current) cardRef.current.classList.add('snap-back')
+      setDeltaX(0)
+      setIsDragging(false)
+      setTimeout(() => {
+        if (cardRef.current) cardRef.current.classList.remove('snap-back')
+      }, 350)
+    }
+  }
+
+  // Mouse event handlers
+  function onMouseDown(e: React.MouseEvent) {
+    e.preventDefault()
+    onPointerStart(e.clientX, e.clientY)
+
+    function onMouseMove(e: MouseEvent) { onPointerMove(e.clientX) }
+    function onMouseUp() {
+      window.removeEventListener('mousemove', onMouseMove)
+      window.removeEventListener('mouseup', onMouseUp)
+      onPointerEnd()
+    }
+    window.addEventListener('mousemove', onMouseMove)
+    window.addEventListener('mouseup', onMouseUp)
+  }
+
+  // Touch event handlers
+  function onTouchStart(e: React.TouchEvent) {
+    const t = e.touches[0]
+    onPointerStart(t.clientX, t.clientY)
+  }
+
+  function onTouchMove(e: React.TouchEvent) {
+    const t = e.touches[0]
+    onPointerMove(t.clientX)
+  }
+
+  function onTouchEnd() { onPointerEnd() }
+
+  if (stack.length === 0) {
+    return (
+      <div style={{ textAlign: 'center', padding: '1.5rem 1rem', background: 'rgba(99,102,241,.06)', border: '1px solid rgba(99,102,241,.18)', borderRadius: 14 }}>
+        <div style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', color: 'var(--green)', textTransform: 'uppercase', letterSpacing: '.1em', marginBottom: '.4rem' }}>Deck cleared</div>
+        <div style={{ fontFamily: 'var(--display)', fontSize: '1rem', fontWeight: 700, color: 'var(--white)', letterSpacing: '-.02em', marginBottom: '.3rem' }}>
+          You matched {savedCount} job{savedCount !== 1 ? 's' : ''}
+        </div>
+        <div style={{ fontFamily: 'var(--mono)', fontSize: '.6rem', color: 'var(--sub)', marginBottom: '1rem' }}>
+          Saved applications are in your tracker
+        </div>
+        <div style={{ display: 'flex', gap: '.5rem', justifyContent: 'center', flexWrap: 'wrap' }}>
+          <a href="/resume" style={{ fontFamily: 'var(--mono)', fontSize: '.62rem', padding: '.35rem .8rem', background: 'rgba(99,102,241,.15)', border: '1px solid rgba(99,102,241,.35)', borderRadius: 7, color: 'var(--indigo)', textDecoration: 'none' }}>See all matches →</a>
+          <button onClick={() => setStack([...jobs])} style={{ fontFamily: 'var(--mono)', fontSize: '.62rem', padding: '.35rem .8rem', background: 'none', border: '1px solid var(--line2)', borderRadius: 7, color: 'var(--dim)', cursor: 'pointer' }}>Replay deck</button>
+        </div>
+      </div>
+    )
+  }
+
+  // Top card transform
+  let topTransform = ''
+  let topOpacity = 1
+  if (flyDir === 'left') {
+    topTransform = 'translateX(-120%) rotate(-18deg)'
+    topOpacity = 0
+  } else if (flyDir === 'right') {
+    topTransform = 'translateX(120%) rotate(18deg)'
+    topOpacity = 0
+  } else if (isDragging) {
+    topTransform = `translateX(${deltaX}px) rotate(${deltaX * 0.05}deg)`
+  }
+
+  // Second card scale animates toward 1.0 as user drags
+  const dragProgress = Math.min(1, Math.abs(deltaX) / 80)
+  const secondScale = 0.96 + dragProgress * 0.04
+  const secondY = 8 - dragProgress * 8
+
+  const scoreRisk = (score: number) => score >= 75 ? 'good' : score >= 50 ? 'mid' : 'bad'
+  const scoreColor = (score: number) => score >= 75 ? 'var(--green)' : score >= 50 ? 'var(--amber)' : 'var(--red)'
+
+  return (
+    <div className="swipe-deck" aria-label="Swipe job cards — drag right to save, left to pass">
+      {/* Third peek card */}
+      {thirdJob && (
+        <div className="swipe-peek" style={{ transform: 'scale(0.92) translateY(16px)', transformOrigin: 'bottom center', zIndex: 1 }} />
+      )}
+      {/* Second peek card */}
+      {secondJob && (
+        <div className="swipe-peek" style={{ transform: `scale(${secondScale}) translateY(${secondY}px)`, transformOrigin: 'bottom center', zIndex: 2, transition: isDragging ? 'none' : 'transform .2s ease' }} />
+      )}
+      {/* Top card */}
+      <div
+        ref={cardRef}
+        className="swipe-card"
+        style={{ transform: topTransform, opacity: topOpacity, zIndex: 3, transition: flyDir ? 'transform .3s ease, opacity .3s ease' : undefined }}
+        onMouseDown={onMouseDown}
+        onTouchStart={onTouchStart}
+        onTouchMove={onTouchMove}
+        onTouchEnd={onTouchEnd}
+      >
+        {/* PASS badge */}
+        <span className="swipe-badge swipe-badge-l" style={{ opacity: showLeft ? badgeOpacity : 0 }}>✕ Pass</span>
+        {/* SAVE badge */}
+        <span className="swipe-badge swipe-badge-r" style={{ opacity: showRight ? badgeOpacity : 0 }}>→ Save</span>
+
+        {/* Card content */}
+        <div style={{ display: 'flex', alignItems: 'flex-start', gap: '.75rem', marginBottom: '.55rem' }}>
+          <div style={{ width: 40, height: 40, borderRadius: 9, background: 'var(--raised)', border: '1px solid var(--line2)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'var(--display)', fontWeight: 800, fontSize: '1rem', color: 'var(--white)', flexShrink: 0 }}>
+            {(topJob.company || '?')[0].toUpperCase()}
+          </div>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontFamily: 'var(--display)', fontSize: '.9rem', fontWeight: 700, color: 'var(--white)', letterSpacing: '-.02em', lineHeight: 1.25, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{topJob.title}</div>
+            <div style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', color: 'var(--dim)', marginTop: '.1rem' }}>{topJob.company}{topJob.location ? ` · ${topJob.location}` : ''}</div>
+          </div>
+          <div className={`sring ${scoreRisk(topJob.score)}`} style={{ width: 38, height: 38, flexShrink: 0 }}>
+            <div className="sring-n" style={{ fontSize: '.78rem', color: scoreColor(topJob.score) }}>{topJob.score}</div>
+          </div>
+        </div>
+
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '.3rem', marginBottom: '.5rem' }}>
+          {topJob.salary && <span style={{ background: 'rgba(16,185,129,.1)', border: '1px solid rgba(16,185,129,.25)', borderRadius: 5, padding: '.15rem .45rem', fontSize: '.58rem', fontFamily: 'var(--mono)', color: 'var(--green)' }}>{topJob.salary}</span>}
+          {topJob.type && <span style={{ background: 'var(--raised)', border: '1px solid var(--line)', borderRadius: 5, padding: '.15rem .45rem', fontSize: '.58rem', fontFamily: 'var(--mono)', color: 'var(--sub)' }}>{topJob.type}</span>}
+          {topJob.level && <span style={{ background: 'var(--raised)', border: '1px solid var(--line)', borderRadius: 5, padding: '.15rem .45rem', fontSize: '.58rem', fontFamily: 'var(--mono)', color: 'var(--sub)' }}>{topJob.level}</span>}
+        </div>
+
+        {topJob.description && (
+          <div style={{ fontFamily: 'var(--body)', fontSize: '.7rem', color: 'var(--muted)', lineHeight: 1.55, overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>
+            {topJob.description}
+          </div>
+        )}
+
+        <div style={{ position: 'absolute', bottom: '.9rem', left: '1.15rem', right: '1.15rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <span style={{ fontFamily: 'var(--mono)', fontSize: '.52rem', color: 'var(--muted)' }}>{topJob.source || 'Job board'}</span>
+          <span style={{ fontFamily: 'var(--mono)', fontSize: '.52rem', color: 'var(--dim)' }}>{stack.length} left · drag or tap</span>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 const US_CITIES = ['New York, NY','Los Angeles, CA','Chicago, IL','Houston, TX','Phoenix, AZ','San Antonio, TX','San Diego, CA','Dallas, TX','San Jose, CA','Austin, TX','Seattle, WA','Denver, CO','Boston, MA','Atlanta, GA','Miami, FL','Portland, OR','Las Vegas, NV','San Francisco, CA','Washington, DC','Charlotte, NC','Nashville, TN','Minneapolis, MN','Raleigh, NC','Detroit, MI','Sacramento, CA']
 
 export default function JobsPage() {
@@ -597,6 +827,8 @@ export default function JobsPage() {
   const [recommended, setRecommended] = useState<Job[]>([])
   const [recSkills, setRecSkills] = useState<string[]>([])
   const [recStatus, setRecStatus] = useState<'idle' | 'loading' | 'done'>('idle')
+  const [swipeCount, setSwipeCount] = useState(0)
+  const [deckDone, setDeckDone] = useState(false)
   const abortRef = useRef<AbortController | null>(null)
 
   const hasFilters = !!(niche || level || jobType || posted)
@@ -965,6 +1197,11 @@ export default function JobsPage() {
                   · {recSkills.slice(0, 3).join(', ')}
                 </span>
               )}
+              {deckDone && swipeCount > 0 && (
+                <span style={{ color: 'var(--green)', letterSpacing: 'normal', textTransform: 'none' as const, marginLeft: 2, fontSize: '.6rem' }}>
+                  · {swipeCount} saved today
+                </span>
+              )}
             </div>
             {recStatus === 'loading' ? (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '.65rem' }}>
@@ -973,11 +1210,12 @@ export default function JobsPage() {
                 ))}
               </div>
             ) : (
-              <div className="jlist" key={'rec_' + saveVersion}>
-                {recommended.map((job, i) => (
-                  <JobCard key={job.id} job={job} index={i} onSaveToggle={handleSaveToggle} onOpen={j => setDetailJob(j)} onApply={j => { setApplyJob(j); setApplyPlatform('Seen') }} onCheckCompany={co => setCheckCompany(co)} />
-                ))}
-              </div>
+              <SwipeJobDeck
+                jobs={recommended}
+                onOpen={j => setDetailJob(j)}
+                onDismiss={() => setDeckDone(true)}
+                onSave={() => setSwipeCount(c => c + 1)}
+              />
             )}
           </div>
         )}
