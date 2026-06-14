@@ -79,19 +79,11 @@ export default function CompaniesPage() {
 
   return (
     <div className="page-full">
-      <div style={{ maxWidth: 1100, margin: '0 auto', padding: '2.5rem 2rem' }}>
-        <div style={{ fontFamily: 'var(--mono)', fontSize: '.52rem', textTransform: 'uppercase', letterSpacing: '.22em', color: 'var(--amber)', marginBottom: '.6rem', display: 'flex', alignItems: 'center', gap: 12 }}>
-          <span style={{ width: 22, height: 1, background: 'var(--amber)', display: 'inline-block' }} />
-          Hiring transparency · scoreboard
-        </div>
-        <div style={{ display: 'flex', alignItems: 'baseline', gap: '1rem', flexWrap: 'wrap', marginBottom: '.25rem' }}>
-          <h1 style={{ fontFamily: 'var(--display)', fontSize: '2rem', fontWeight: 800, color: 'var(--white)', letterSpacing: '-.03em', margin: 0 }}>
-            Company scores
-          </h1>
-          <span className="co-live" style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', color: 'var(--green)', display: 'flex', alignItems: 'center', gap: '.35rem' }}>
-            Updated from community reports
-          </span>
-        </div>
+      <div style={{ maxWidth: 960, margin: '0 auto', padding: '2.5rem 2rem' }}>
+        <div className="eyebrow">Transparency rankings</div>
+        <h1 style={{ fontFamily: 'var(--display)', fontSize: '1.9rem', fontWeight: 800, color: 'var(--white)', letterSpacing: '-.03em', marginBottom: '.35rem' }}>
+          Company scoreboard
+        </h1>
         <p style={{ color: 'var(--sub)', fontSize: '.82rem', fontWeight: 300, marginBottom: '1.5rem' }}>
           Ranked by how well companies actually treat applicants.
         </p>

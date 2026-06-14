@@ -322,8 +322,9 @@ export default function TrackerPage() {
         {/* Header */}
         <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: '1rem', marginBottom: '1.5rem' }}>
           <div>
-            <h1 style={{ fontFamily: 'var(--display)', fontSize: '1.6rem', fontWeight: 800, color: 'var(--white)', letterSpacing: '-.03em', marginBottom: '.3rem' }}>My applications</h1>
-            <p style={{ color: 'var(--sub)', fontSize: '.78rem', fontWeight: 300 }}>Synced across devices when signed in</p>
+            <div className="eyebrow">Application tracker</div>
+            <h1 style={{ fontFamily: 'var(--display)', fontSize: '1.9rem', fontWeight: 800, color: 'var(--white)', letterSpacing: '-.03em', marginBottom: '.3rem' }}>My applications</h1>
+            <p style={{ color: 'var(--sub)', fontSize: '.82rem', fontWeight: 300 }}>Synced to your account across all devices.</p>
           </div>
           <div style={{ display: 'flex', gap: '.5rem', flexWrap: 'wrap' }}>
             <button className="btn btn-green" style={{ fontSize: '.72rem' }} onClick={() => setShowManual(true)}>+ Track manually</button>

@@ -178,6 +178,16 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
           )}
         </div>
 
+        {/* Stat grid — Score / Waste / Type / Level / Salary / Source */}
+        <div className="jd-grid">
+          <div className="jd-stat"><span className="jd-sn" style={{ color: Score.color(risk) }}>{job.score}</span><span className="jd-sl">Score</span></div>
+          <div className="jd-stat"><span className="jd-sn" style={{ color: job.waste > 55 ? 'var(--red)' : job.waste > 35 ? 'var(--amber)' : 'var(--green)' }}>{job.waste}%</span><span className="jd-sl">Waste risk</span></div>
+          <div className="jd-stat"><span className="jd-sn" style={{ fontSize: '.75rem' }}>{job.type || 'Full-time'}</span><span className="jd-sl">Type</span></div>
+          <div className="jd-stat"><span className="jd-sn" style={{ fontSize: '.75rem' }}>{job.level || 'Mid level'}</span><span className="jd-sl">Level</span></div>
+          <div className="jd-stat"><span className="jd-sn" style={{ color: 'var(--green)', fontSize: '.78rem' }}>{job.salary || '—'}</span><span className="jd-sl">Salary</span></div>
+          <div className="jd-stat"><span className="jd-sn" style={{ fontSize: '.68rem', color: 'var(--blue)' }}>{job.source || 'Job board'}</span><span className="jd-sl">Source</span></div>
+        </div>
+
         {/* Waste score panel — shown when company has high waste risk */}
         {job.waste > 40 && (
           <div className="waste-panel" style={{ animation: 'fadeUp .4s .1s ease both' }}>

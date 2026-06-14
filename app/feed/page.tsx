@@ -55,6 +55,7 @@ export default function FeedPage() {
   const [total, setTotal] = useState(0)
   const [loading, setLoading] = useState(true)
   const [loadingMore, setLoadingMore] = useState(false)
+  const [ghostCos, setGhostCos] = useState<string[]>([])
 
   const loadFeed = useCallback(async (newFilter: Filter, newOffset: number, append = false) => {
     if (newOffset === 0) setLoading(true); else setLoadingMore(true)
@@ -74,6 +75,14 @@ export default function FeedPage() {
       const rows = data.reports || []
       setTotal(data.total || 0)
       setReports(prev => append ? [...prev, ...rows] : rows)
+      // Derive ghost surge companies from first load
+      if (!append && newFilter === 'all') {
+        const ghosted = rows
+          .filter(r => r.outcome === 'ghosted' && r.company_name)
+          .map(r => r.company_name as string)
+        const unique = [...new Set(ghosted)].slice(0, 5)
+        if (unique.length >= 2) setGhostCos(unique)
+      }
     } catch {
       if (!append) setReports([])
     }
@@ -98,60 +107,49 @@ export default function FeedPage() {
     <div className="page-full">
       <div style={{ maxWidth: 720, margin: '0 auto', padding: '2.5rem 2rem' }}>
         {/* Header */}
-        <div style={{ marginBottom: '1.75rem' }}>
-          <div style={{ fontFamily: 'var(--mono)', fontSize: '.52rem', textTransform: 'uppercase', letterSpacing: '.22em', color: 'var(--blue)', marginBottom: '.6rem', display: 'flex', alignItems: 'center', gap: 12 }}>
-            <span style={{ width: 22, height: 1, background: 'var(--blue)', display: 'inline-block' }} />
-            Community feed · live reports
-          </div>
-          <h1 style={{ fontFamily: 'var(--display)', fontSize: '1.75rem', fontWeight: 800, color: 'var(--white)', letterSpacing: '-.03em', marginBottom: '.25rem' }}>
-            What&apos;s actually happening out there
+        <div style={{ marginBottom: '1.5rem' }}>
+          <div className="eyebrow">Live feed</div>
+          <h1 style={{ fontFamily: 'var(--display)', fontSize: '1.75rem', fontWeight: 800, color: 'var(--white)', letterSpacing: '-.03em', marginBottom: '.35rem' }}>
+            Fresh from the community
           </h1>
-          <p style={{ color: 'var(--sub)', fontSize: '.82rem', fontWeight: 300 }}>
-            Real reports from real applicants. Updated as they happen.
+          <p style={{ color: 'var(--sub)', fontSize: '.82rem', fontWeight: 300, margin: 0 }}>
+            Real experiences — every report shapes the score for that company.
           </p>
         </div>
 
-        {/* Ghost surge banner — T2-1 */}
-        <div style={{ background: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.2)', borderRadius: 10, padding: '.7rem 1rem', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '.75rem', flexWrap: 'wrap' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '.4rem', flexShrink: 0 }}>
-            <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--red)', animation: 'pulse 1.2s infinite', display: 'inline-block' }} />
-            <span style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', fontWeight: 700, color: 'var(--red)', textTransform: 'uppercase', letterSpacing: '.1em' }}>Ghost surge this week</span>
+        {/* CTA strip — old HTML order: report CTA comes first */}
+        <div style={{ background: 'rgba(16,185,129,.05)', border: '1px solid rgba(16,185,129,.2)', borderRadius: 10, padding: '.85rem 1.1rem', marginBottom: '1.25rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem', flexWrap: 'wrap', cursor: 'pointer' }} onClick={() => window.location.href = '/report'}>
+          <div>
+            <div style={{ fontFamily: 'var(--mono)', fontSize: '.62rem', color: 'var(--green)', fontWeight: 600, marginBottom: '.1rem' }}>Your experience matters</div>
+            <div style={{ fontSize: '.72rem', color: 'var(--sub)', fontWeight: 300 }}>Had an interview? Got ghosted? Add your report — it shapes scores for every future applicant.</div>
           </div>
-          <div style={{ display: 'flex', gap: '.4rem', flexWrap: 'wrap' }}>
-            {['Amazon', 'Deloitte', 'Oracle', 'Indeed', 'IBM'].map(co => (
-              <a key={co} href={`/company/${co.toLowerCase()}`} style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)', color: 'var(--red)', borderRadius: 5, padding: '.12rem .45rem', textDecoration: 'none' }}>
-                {co}
-              </a>
-            ))}
-          </div>
-          <span style={{ fontFamily: 'var(--mono)', fontSize: '.54rem', color: 'var(--muted)', marginLeft: 'auto' }}>Based on recent reports</span>
+          <div style={{ fontFamily: 'var(--mono)', fontSize: '.65rem', color: 'var(--green)', flexShrink: 0, whiteSpace: 'nowrap' }}>Add yours →</div>
         </div>
 
-        {/* CTA strip — T2-2 */}
-        <div style={{ background: 'rgba(16,185,129,.05)', border: '1px solid rgba(16,185,129,.2)', borderRadius: 10, padding: '.85rem 1.1rem', marginBottom: '1.25rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem', flexWrap: 'wrap' }}>
-          <div>
-            <div style={{ fontFamily: 'var(--display)', fontSize: '.82rem', fontWeight: 700, color: 'var(--white)', marginBottom: '.1rem' }}>Had a notable experience?</div>
-            <div style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', color: 'var(--sub)' }}>Takes 60 seconds. Helps thousands of job seekers tonight.</div>
+        {/* Ghost surge banner — shown only when ghost companies detected from feed data */}
+        {ghostCos.length >= 2 && (
+          <div style={{ background: 'linear-gradient(90deg, rgba(239,68,68,0.1), rgba(239,68,68,0.03))', border: '1px solid rgba(239,68,68,0.25)', borderRadius: 10, padding: '.75rem 1rem', marginBottom: '1.25rem' }}>
+            <div style={{ fontFamily: 'var(--mono)', fontSize: '.55rem', textTransform: 'uppercase', letterSpacing: '.14em', color: 'var(--red)', marginBottom: '.5rem', display: 'flex', alignItems: 'center', gap: '.4rem' }}>
+              <span style={{ width: 5, height: 5, borderRadius: '50%', background: 'var(--red)', display: 'inline-block', animation: 'pulse 1s infinite' }} />
+              Companies with ghost surges this week
+            </div>
+            <div className="surge-strip" style={{ margin: 0 }}>
+              {ghostCos.map(co => (
+                <a key={co} href={`/company/${encodeURIComponent(co.toLowerCase().replace(/\s+/g, '-'))}`} className="surge-chip">
+                  {co}
+                </a>
+              ))}
+            </div>
           </div>
-          <a href="/report" style={{ flexShrink: 0, display: 'inline-block', background: 'var(--green)', border: 'none', borderRadius: 7, padding: '.45rem 1rem', fontFamily: 'var(--mono)', fontWeight: 700, fontSize: '.65rem', color: '#fff', textDecoration: 'none', whiteSpace: 'nowrap' }}>
-            Submit report →
-          </a>
-        </div>
+        )}
 
         {/* Filters */}
-        <div style={{ display: 'flex', gap: '.4rem', flexWrap: 'wrap', marginBottom: '1.5rem' }}>
+        <div style={{ display: 'flex', gap: '.5rem', flexWrap: 'wrap', marginBottom: '1.5rem' }}>
           {FILTERS.map(f => (
             <button
               key={f.key}
               onClick={() => setFilter(f.key)}
-              style={{
-                background: filter === f.key ? 'var(--blue)' : 'var(--card)',
-                border: `1px solid ${filter === f.key ? 'var(--blue)' : 'var(--line)'}`,
-                color: filter === f.key ? '#fff' : 'var(--sub)',
-                borderRadius: 6, padding: '.3rem .75rem',
-                fontFamily: 'var(--mono)', fontSize: '.65rem',
-                cursor: 'pointer', transition: 'all .15s',
-              }}
+              className={`feed-filter-btn${filter === f.key ? ' active' : ''}`}
             >
               {f.label}
             </button>
