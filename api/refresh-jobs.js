@@ -416,8 +416,25 @@ async function fetchAdzuna(what, where, appId, appKey) {
 // Cache company name → id within a single cron run to avoid duplicate lookups
 const _companyIdCache = {};
 
+// Blocks placeholder/garbage values from entering the companies table.
+function isValidCompanyName(name) {
+  if (!name || typeof name !== 'string') return false;
+  const n = name.trim();
+  if (n.length < 2 || n.length > 200) return false;
+  if (!/[a-zA-Z]/.test(n)) return false;
+  if (n.startsWith('#')) return false;
+  const lower = n.toLowerCase();
+  const BLOCKED = new Set([
+    'unknown','n/a','na','none','test','company','employer','null','undefined',
+    'other','various','multiple','anonymous','private','confidential','tbd','tba',
+    'not specified','not listed','not provided','see description',
+  ]);
+  if (BLOCKED.has(lower)) return false;
+  return true;
+}
+
 async function getOrCreateCompanyId(name, supabaseUrl, serviceKey) {
-  if (!name) return null;
+  if (!name || !isValidCompanyName(name)) return null;
   const canon = normalizeCompany(name);
   if (_companyIdCache[canon]) return _companyIdCache[canon];
   const h = {

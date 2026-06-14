@@ -4,6 +4,25 @@
 import { applyRateLimit } from '../lib/server/ratelimit.js';
 import { logError } from '../lib/server/errlog.js';
 
+// Blocks placeholder/garbage values from ever entering the companies table.
+// Must contain at least one letter, no hash-prefixed IDs, no pure numerics,
+// not a known placeholder word, min 2 chars.
+function isValidCompanyName(name) {
+  if (!name || typeof name !== 'string') return false;
+  const n = name.trim();
+  if (n.length < 2 || n.length > 200) return false;
+  if (!/[a-zA-Z]/.test(n)) return false;
+  if (n.startsWith('#')) return false;
+  const lower = n.toLowerCase();
+  const BLOCKED = new Set([
+    'unknown','n/a','na','none','test','company','employer','null','undefined',
+    'other','various','multiple','anonymous','private','confidential','tbd','tba',
+    'not specified','not listed','not provided','see description',
+  ]);
+  if (BLOCKED.has(lower)) return false;
+  return true;
+}
+
 // Industry baseline benchmarks (Greenhouse 2023, LinkedIn Talent Insights)
 const INDUSTRY_BENCHMARKS = {
   ghost_rate: 0.55,
@@ -508,6 +527,7 @@ Return ONLY a valid JSON array. Return [] if there are genuinely no hiring exper
     }
 
     async function upsertCo(name) {
+      if (!isValidCompanyName(name)) return null;
       const r = await fetch(`${SUPABASE_URL}/rest/v1/companies?name=ilike.${encodeURIComponent(name)}&select=id&limit=1`, { headers: hdrsBase });
       if (r.ok) { const rows = await r.json(); if (rows?.[0]?.id) return rows[0].id; }
       const ins = await fetch(`${SUPABASE_URL}/rest/v1/companies`, { method: 'POST', headers: { ...hdrsBase, Prefer: 'return=representation' }, body: JSON.stringify({ name }) });
@@ -651,7 +671,7 @@ Return ONLY a valid JSON array. Return [] if there are genuinely no hiring exper
     let imported = 0, skipped = 0, errors = [];
     for (const rpt of reports.slice(0, 500)) {
       try {
-        if (!rpt.company || !rpt.outcome) { skipped++; continue; }
+        if (!rpt.company || !rpt.outcome || !isValidCompanyName(rpt.company)) { skipped++; continue; }
         const outcome = VALID_OUTCOMES.has(rpt.outcome) ? rpt.outcome : 'unknown';
         const src = (rpt.source || body.source || 'other').toLowerCase().split('/')[0];
         const weight = SOURCE_WEIGHTS[src] || 0.3;
