@@ -296,7 +296,7 @@ export default function AdminPage() {
 
         {/* Users KPIs */}
         <div className="adm-section-lbl">Users</div>
-        <div className="adm-kpi-row" style={{ marginBottom: '1.25rem' }}>
+        <div className="adm-kpi-row">
           <KpiCard l="Total accounts" n={stats.users.total.toLocaleString()} sub="all time" />
           <KpiCard l="New today" n={stats.users.new_today} sub="last 24h" />
           <KpiCard l="New this week" n={stats.users.new_this_week} sub="last 7 days" />
@@ -305,7 +305,7 @@ export default function AdminPage() {
 
         {/* Community KPIs */}
         <div className="adm-section-lbl">Community data</div>
-        <div className="adm-kpi-row" style={{ marginBottom: '1.25rem' }}>
+        <div className="adm-kpi-row">
           <KpiCard l="Total reports" n={stats.reports.total.toLocaleString()} sub="all time" borderColor="var(--green)" numColor="var(--green)" />
           <KpiCard l="Reports today" n={stats.reports.today} sub="last 24h" />
           <KpiCard l="Reports this week" n={stats.reports.this_week} sub="last 7 days" />
@@ -314,7 +314,7 @@ export default function AdminPage() {
 
         {/* Application tracking KPIs */}
         <div className="adm-section-lbl">Application tracking</div>
-        <div className="adm-kpi-row" style={{ marginBottom: '1.5rem' }}>
+        <div className="adm-kpi-row">
           <KpiCard l="Apps tracked total" n={stats.applications.total.toLocaleString()} sub="across all users" />
           <KpiCard l="Ghosted (30d)" n={stats.applications.ghosted_30d} sub="tracked as ghosted" numColor="var(--amber)" />
           <KpiCard l="Hired (30d)" n={stats.applications.hired_30d} sub="tracked as hired" numColor="var(--green)" />

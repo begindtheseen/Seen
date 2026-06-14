@@ -869,13 +869,12 @@ nav.nav-scrolled{background:rgba(6,6,8,0.82);backdrop-filter:blur(60px) saturate
 /* ── ADMIN RESPONSIVE ── */
 /* 900px catches both true mobile AND zoomed-out-to-50% states */
 @media(max-width:900px){
-  .adm-wrap{padding:1rem 1rem 3rem!important}
-  .adm-kpi{padding:.7rem .6rem!important;border-radius:8px!important}
-  .adm-kpi-n{font-size:1.4rem!important;line-height:1.1!important}
-  .adm-kpi-l{font-size:.42rem!important}
-  .adm-kpi-sub{font-size:.42rem!important}
+  .adm-wrap{padding:.9rem .9rem 3rem!important}
+  .adm-kpi-row{gap:.65rem!important;margin-bottom:1.25rem!important}
+  .adm-section-lbl{margin-bottom:.3rem!important}
   .adm-panel{border-radius:8px!important;margin-bottom:.65rem!important;max-width:100%;box-sizing:border-box}
-  .adm-wrap h1{font-size:1.4rem!important}
+  .adm-panel-hdr{padding:.5rem .75rem!important;font-size:.52rem!important}
+  .adm-wrap h1{font-size:1.3rem!important}
   .adm-2col{grid-template-columns:1fr!important}
 }
 
