@@ -737,9 +737,9 @@ nav.nav-scrolled{background:rgba(6,6,8,0.82);backdrop-filter:blur(60px) saturate
 .audit-scan{position:absolute;inset-block:0;width:140px;background:linear-gradient(90deg,transparent,rgba(16,185,129,.05) 40%,rgba(59,130,246,.04) 60%,transparent);animation:auditScan 42s linear infinite;pointer-events:none;z-index:1}
 
 /* ═══ ADMIN STATS PAGE ═══ */
-.adm-wrap{max-width:960px;margin:0 auto;padding:1.5rem 1.25rem 4rem}
-.adm-kpi-row{display:grid;grid-template-columns:repeat(4,1fr);gap:.65rem;margin-bottom:1.5rem}
-@media(max-width:680px){.adm-kpi-row{grid-template-columns:1fr 1fr}}
+.adm-wrap{max-width:960px;margin:0 auto;padding:1.5rem 1.25rem 4rem;overflow-x:hidden;box-sizing:border-box}
+/* auto-fit: 2 columns at ~375px, 4 columns at ~700px+ — no breakpoint needed */
+.adm-kpi-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:.65rem;margin-bottom:1.5rem}
 .adm-kpi{background:linear-gradient(160deg,rgba(255,255,255,.055) 0%,rgba(255,255,255,.018) 100%);border:1px solid rgba(255,255,255,.1);border-radius:10px;padding:.85rem 1rem;backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);box-shadow:inset 0 1px 0 rgba(255,255,255,.12),0 2px 12px rgba(0,0,0,.22);transition:transform .2s,box-shadow .2s}
 .adm-kpi:hover{transform:translateY(-2px);box-shadow:0 8px 24px rgba(0,0,0,.4)}
 .adm-kpi-l{font-family:var(--mono);font-size:.5rem;text-transform:uppercase;letter-spacing:.12em;color:var(--muted);margin-bottom:.4rem}
@@ -866,14 +866,14 @@ nav.nav-scrolled{background:rgba(6,6,8,0.82);backdrop-filter:blur(60px) saturate
 .surge-chip-dot{width:5px;height:5px;border-radius:50%;background:var(--red);animation:pulse 1s infinite;flex-shrink:0}
 
 /* ── ADMIN RESPONSIVE ── */
-@media(max-width:700px){
-  .adm-wrap{overflow-x:hidden;padding:1rem .75rem 3rem!important}
-  .adm-kpi-row{grid-template-columns:repeat(2,1fr)!important;gap:.35rem!important;margin-bottom:.85rem!important}
+/* 900px catches both true mobile AND zoomed-out-to-50% states */
+@media(max-width:900px){
+  .adm-wrap{padding:1rem .75rem 3rem!important}
   .adm-kpi{padding:.7rem .6rem!important;border-radius:8px!important}
   .adm-kpi-n{font-size:1.4rem!important;line-height:1.1!important}
   .adm-kpi-l{font-size:.42rem!important}
   .adm-kpi-sub{font-size:.42rem!important}
-  .adm-panel{border-radius:8px!important;margin-bottom:.65rem!important;max-width:100%}
+  .adm-panel{border-radius:8px!important;margin-bottom:.65rem!important;max-width:100%;box-sizing:border-box}
   .adm-wrap h1{font-size:1.4rem!important}
   .adm-2col{grid-template-columns:1fr!important}
 }
