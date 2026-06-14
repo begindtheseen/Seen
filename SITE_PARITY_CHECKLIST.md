@@ -302,24 +302,26 @@ A page is COMPLETE only when: visual match + all old functionality + working API
 ### 18. Admin (`page-admin` → `app/admin/page.tsx`)
 **See ADMIN_PARITY_CHECKLIST.md for full audit.**
 
+> ⚠️ **STALE TABLE BELOW — superseded 2026-06-14.** The rows below were written before admin recovery commits merged. Admin is now **16/16 functionally complete** on `next-migration`. Do not act on the ❌ rows. See `ADMIN_PARITY_CHECKLIST.md` milestone section for the authoritative current state.
+
 | Element | Status |
 |---------|--------|
-| Auth (login/logout) | 🟡 |
-| Header + KPI boxes | 🟡 |
-| Jobs KPI | ❌ |
-| Reports chart + outcomes | 🟡 (API gap) |
-| Recent hiring reports + moderation | ❌ |
-| Recent tracker apps | ❌ |
-| Recent jobs browser | ❌ |
-| Reported inactive listings | ❌ |
-| Data quality issues queue | ❌ |
-| Company deduplication | ❌ |
-| Feature flags | ❌ |
-| Duplicate account clusters | ❌ |
-| API Health | ❌ |
-| Background job runner | ❌ |
+| Auth (login/logout) | ✅ |
+| Header + KPI boxes | ✅ |
+| Jobs KPI | ✅ |
+| Reports chart + outcomes | ✅ |
+| Recent hiring reports + moderation | ✅ |
+| Recent tracker apps | ✅ |
+| Recent jobs browser | ✅ |
+| Reported inactive listings | ✅ |
+| Data quality issues queue | ✅ |
+| Company deduplication | ✅ |
+| Feature flags | ✅ |
+| Duplicate account clusters | ✅ |
+| API Health | ✅ |
+| Background job runner | ✅ |
 
-**Status: ❌ — 12 of 16 sections missing. See ADMIN_PARITY_CHECKLIST.md.**
+**Status: ✅ — 16/16 sections complete. Remaining work is visual polish only. See ADMIN_PARITY_CHECKLIST.md.**
 
 ---
 
@@ -361,10 +363,10 @@ A page is COMPLETE only when: visual match + all old functionality + working API
 | 15 | Pricing | page-pricing | `/pricing` | 🟡 |
 | 16 | Legal | page-legal | `/legal` | 🟡 |
 | 17 | Login/Auth | page-login + page-reset | `/login` | 🟡 |
-| 18 | Admin | page-admin | `/admin` | ❌ |
+| 18 | Admin | page-admin | `/admin` | ✅ 16/16 complete |
 | 19 | Nav | `<nav>` | `components/Nav.tsx` | 🟡 |
 
-**1 page missing entirely (Job detail). 17 pages exist but need verification. Admin critically incomplete.**
+**Job detail page now exists at `/jobs/[id]`. Admin 16/16 functionally complete. All other pages exist; visual/behavioral verification remains.**
 
 ---
 

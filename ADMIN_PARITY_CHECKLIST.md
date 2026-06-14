@@ -192,6 +192,8 @@ The current GET handler (lines 132–254) returns `reports: {total, today, this_
 
 ## Summary table
 
+> ⚠️ **STALE — superseded 2026-06-14.** This table reflects pre-recovery state (written during the porting analysis before the recovery branch was merged). All sections marked ❌ or 🟡 below are now ✅ complete on `next-migration`. See the **MILESTONE** section at the top of this file for the authoritative current state. The table is preserved for historical reference only — do not use it to guide implementation.
+
 | # | Section | Status | Effort |
 |---|---------|--------|--------|
 | — | Auth (login/logout/401/403) | 🟡 logout API call + 403 handling missing | S |
@@ -213,6 +215,8 @@ The current GET handler (lines 132–254) returns `reports: {total, today, this_
 | 16 | Credits/set_pro/audit viewer (API-only) | ❌ in both — optional | M (optional) |
 
 ## Porting order recommendation
+
+> ⚠️ **COMPLETED — superseded 2026-06-14.** All items below are done on `next-migration`. This section is preserved for historical reference only.
 
 1. **Auth completion** (§Auth, §1) — add `admin_logout` POST on sign-out and 403 handling; consider extracting a shared `adminFetch(token, body?)` helper + `AdminStats` types into `app/admin/lib.ts` so every later section reuses it. Everything else depends on this.
 2. **Fix the GET payload gap** in `api/admin-stats.js` (§5) — restore `reports.chart`, `reports.top_companies`, `reports.outcome_breakdown`, `company_lookups.top`; this instantly fixes the already-ported chart/bars panels in `page.tsx` and unblocks the old-parity panels. Edit the existing file only (serverless cap: 11 declared + 1 runtime = 12, at limit).
