@@ -812,9 +812,27 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
 
             {/* ── REDDIT TAB ── */}
             {tab === 'reddit' && (
-              <div style={{ textAlign: 'center', padding: '2.5rem', color: 'var(--muted)', fontFamily: 'var(--mono)', fontSize: '.7rem' }}>
-                Reddit aggregation coming soon.<br />
-                <span style={{ fontSize: '.6rem', opacity: .6 }}>Reddit loads server-side — community data appears in the reports tab.</span>
+              <div>
+                {loading && (
+                  <div style={{ textAlign: 'center', padding: '2.5rem', color: 'var(--muted)', fontFamily: 'var(--mono)', fontSize: '.7rem' }}>
+                    Loading community insights…
+                  </div>
+                )}
+                {!loading && webReviews.length > 0 && (
+                  <>
+                    <div style={{ fontFamily: 'var(--mono)', fontSize: '.52rem', color: 'var(--dim)', letterSpacing: '.06em', textTransform: 'uppercase', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '.5rem' }}>
+                      <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--red)', display: 'inline-block', flexShrink: 0 }} />
+                      Community insights from Reddit, Glassdoor &amp; Blind · updated every 30 days
+                    </div>
+                    <WebReviewsSection reviews={webReviews} />
+                  </>
+                )}
+                {!loading && webReviews.length === 0 && (
+                  <div style={{ textAlign: 'center', padding: '2.5rem', color: 'var(--muted)', fontFamily: 'var(--mono)', fontSize: '.7rem' }}>
+                    No community data yet for {companyName}.<br />
+                    <span style={{ fontSize: '.6rem', opacity: .6 }}>Data populates automatically on first company lookup.</span>
+                  </div>
+                )}
               </div>
             )}
 
