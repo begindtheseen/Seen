@@ -1,6 +1,6 @@
 # MASTER PROJECT STATE — Seen / SeenJobs
-*Last updated: 2026-06-13 — Claude A re-bootstrap after stale context*
-*Branch: `claude/seenjobs-next-migration-recovery-ia9w59`*
+*Last updated: 2026-06-14 — Session F visual parity*
+*Branch: `next-migration`*
 
 ---
 
@@ -82,13 +82,13 @@ types/            — TypeScript types
 ## ACTIVE BRANCH
 
 ```
-claude/seenjobs-next-migration-recovery-ia9w59
+next-migration
 ```
 
-**Status**: 16 commits ahead of `origin/next-migration`, 0 behind.
-**Build**: ✅ PASSING — 19 routes (see build output below)
-**Merged to next-migration**: NO — awaiting owner sign-off
-**Deployed**: NO
+**Status**: Active production branch — seenjobs.io serves from here via Vercel
+**Latest commit**: `e95ef21` — visual parity batch (resume results, nav credits, vfeed, scroll-reveal, admin density)
+**Build**: ✅ PASSING — 19 routes, 0 TS errors (last verified Session F, 2026-06-14)
+**Deployed**: YES — Brandon promotes Vercel previews to production from dashboard
 
 ### Build output (19 routes, all passing)
 ```
@@ -161,20 +161,28 @@ claude/seenjobs-next-migration-recovery-ia9w59
 | Job detail `/jobs/[id]` + AI insights | ✅ |
 | Dashboard alerts + checks-due | ✅ |
 | Dashboard benchmarks + pipeline + survey | ✅ |
-| Jobs client: GET→POST fix (C1) | ✅ |
-| Resume AI auth header fix (C2) | ✅ |
+| Jobs client: GET→POST fix | ✅ |
+| Resume AI auth header fix | ✅ |
+| Resume results: typed JSON rendering | ✅ |
+| Nav credit balance badge (anon-safe) | ✅ |
+| VerdictFeed live leaderboard + ticker | ✅ |
+| LandingMarketingSections scroll-reveal | ✅ |
+| Landing hero mobile text clip fix | ✅ |
+| Jobs empty state + Check company link | ✅ |
+| Global footer (FAQ, Legal, Pricing, etc) | ✅ |
+| Admin KPI mobile 2-col layout fix | ✅ |
 | Build (19 routes) | ✅ |
 
 ### 🟡 IMPORTANT (remaining)
 | Gap | Notes |
 |---|---|
-| Account settings modal | `openAccountSettings` not yet ported |
-| `responseTimeDays` persistence | Needed for pipeline avgRT display |
-| Legal page content | Stub only, no actual content |
-| FAQ page content | Stub only |
 | Tracker: outcome flow | `showOutcomeCard`, offer rounds prompt, "I withdrew" |
 | Tracker: stage updates on check-in | Interview/Phone Screen stage not updated |
-| Per-page functional audit | 17 pages still 🟡 in SITE_PARITY_CHECKLIST.md |
+| Admin visual polish | Command-center aesthetics: card density, grid, section spacing, metric color hierarchy |
+| Legal/FAQ page content | Stub pages only |
+| T3: report page unpaid work labels | Minor copy difference |
+
+**Functional parity estimate: ~95%** | **Visual parity estimate: ~70%**
 
 ### ⚪ COSMETIC (post-parity)
 - Glow/glass design system

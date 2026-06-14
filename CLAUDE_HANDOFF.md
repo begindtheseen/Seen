@@ -3,7 +3,7 @@
 > **Read this first. Every session. No exceptions.**
 > Then read SEEN_STRATEGY.md. Then `git status`. Then pick up exactly where this doc ends.
 
-Last updated: **2026-06-14 (Session E)**
+Last updated: **2026-06-14 (Session F)**
 
 ---
 
@@ -14,6 +14,19 @@ Last updated: **2026-06-14 (Session E)**
 - Active branch: `next-migration` — push here, Vercel auto-builds a preview
 - Brandon promotes previews to production from the Vercel dashboard
 - Mission: **full visual + functional parity** with `origin/main:index.html`
+
+---
+
+## What Session F shipped (latest push, branch `next-migration`)
+
+| Commit | What shipped |
+|--------|-------------|
+| `0f10a8b` | Docs: added PREVIEW_DEPLOY_CHECKLIST, SMOKE_TEST_RUNBOOK |
+| `0d974a2` | Fix hero text clipped on mobile — removed `white-space: nowrap` from hero spans |
+| `6999d70` | Jobs page: empty state illustration + "Check company" link in job cards |
+| `e95ef21` | Visual parity batch: resume results render real API JSON (typed ScannerResult/CoachResult/ProposalResult), nav credit balance badge (blue pill, anon-safe), VerdictFeed live leaderboard data + 3.8s ticker, LandingMarketingSections scroll-reveal via IntersectionObserver, admin KPI layout fix (removed mob state + inline gridTemplateColumns that fought CSS media queries) |
+
+**Build status**: ✅ PASSING after e95ef21 — 19 routes, zero TS errors
 
 ---
 
@@ -137,4 +150,4 @@ curl -X POST "https://api.vercel.com/v1/integrations/deploy/prj_P2SoPxsy9RpdoJfV
 
 ## Build status
 
-✅ PASSING — 19 routes, zero TypeScript errors (last verified: Session D, commit `a685441`)
+✅ PASSING — 19 routes, zero TypeScript errors (last verified: Session F, commit `e95ef21`)

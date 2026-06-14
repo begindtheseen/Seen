@@ -23,7 +23,7 @@ interface AdminStats {
   }
   applications: { total: number; ghosted_30d: number; hired_30d: number; ghost_rate_pct: number | null; recent: RecentApp[] }
   company_lookups?: { ready: boolean; today: number; top: { company: string; count: number }[] }
-  jobs: { active: number; new_today: number; added_today: number; stale_or_expired: number; inactive_reports: InactiveReport[] }
+  jobs: { total?: number; active: number; new_today: number; added_today: number; stale_or_expired: number; inactive_reports: InactiveReport[] }
   errors: { today: number; this_week: number; by_route: Record<string, number>; recent: { endpoint: string; error_msg: string; created_at: string }[] }
   issues: { open: number; items: Issue[] }
   duplicate_clusters: { suspected: number; items: DupCluster[] }
@@ -292,7 +292,7 @@ export default function AdminPage() {
         </div>
 
         {/* Users KPIs */}
-        <div style={{ fontFamily: 'var(--mono)', fontSize: '.5rem', textTransform: 'uppercase', letterSpacing: '.14em', color: 'var(--dim)', marginBottom: '.4rem' }}>Users</div>
+        <div className="adm-section-lbl">Users</div>
         <div className="adm-kpi-row" style={{ marginBottom: '1.25rem' }}>
           <KpiCard l="Total accounts" n={stats.users.total.toLocaleString()} sub="all time" />
           <KpiCard l="New today" n={stats.users.new_today} sub="last 24h" />
@@ -301,7 +301,7 @@ export default function AdminPage() {
         </div>
 
         {/* Community KPIs */}
-        <div style={{ fontFamily: 'var(--mono)', fontSize: '.5rem', textTransform: 'uppercase', letterSpacing: '.14em', color: 'var(--dim)', marginBottom: '.4rem' }}>Community data</div>
+        <div className="adm-section-lbl">Community data</div>
         <div className="adm-kpi-row" style={{ marginBottom: '1.25rem' }}>
           <KpiCard l="Total reports" n={stats.reports.total.toLocaleString()} sub="all time" borderColor="var(--green)" numColor="var(--green)" />
           <KpiCard l="Reports today" n={stats.reports.today} sub="last 24h" />
@@ -310,7 +310,7 @@ export default function AdminPage() {
         </div>
 
         {/* Application tracking KPIs */}
-        <div style={{ fontFamily: 'var(--mono)', fontSize: '.5rem', textTransform: 'uppercase', letterSpacing: '.14em', color: 'var(--dim)', marginBottom: '.4rem' }}>Application tracking</div>
+        <div className="adm-section-lbl">Application tracking</div>
         <div className="adm-kpi-row" style={{ marginBottom: '1.5rem' }}>
           <KpiCard l="Apps tracked total" n={stats.applications.total.toLocaleString()} sub="across all users" />
           <KpiCard l="Ghosted (30d)" n={stats.applications.ghosted_30d} sub="tracked as ghosted" numColor="var(--amber)" />
@@ -334,10 +334,12 @@ export default function AdminPage() {
         )}
 
         {/* Jobs KPIs */}
-        <div style={{ fontFamily: 'var(--mono)', fontSize: '.5rem', textTransform: 'uppercase', letterSpacing: '.14em', color: 'var(--dim)', marginBottom: '.4rem' }}>Jobs</div>
+        <div className="adm-section-lbl">Jobs</div>
         <div className="adm-kpi-row" style={{ marginBottom: '1.5rem' }}>
+          <KpiCard l="Total stored" n={(stats.jobs?.total ?? 0).toLocaleString()} sub="all statuses" />
           <KpiCard l="Active listings" n={(stats.jobs?.active ?? 0).toLocaleString()} sub="live jobs users see" borderColor="var(--blue)" numColor="var(--blue)" />
-          <KpiCard l="Jobs added today" n={stats.jobs?.new_today ?? 0} sub="new listings posted" borderColor="var(--green)" numColor="var(--green)" />
+          <KpiCard l="Added today" n={stats.jobs?.new_today ?? 0} sub="new listings posted" borderColor="var(--green)" numColor="var(--green)" />
+          <KpiCard l="Stale / expired" n={(stats.jobs?.stale_or_expired ?? 0).toLocaleString()} sub="flagged unavailable" borderColor={stats.jobs?.stale_or_expired > 500 ? 'var(--amber)' : undefined} numColor={stats.jobs?.stale_or_expired > 500 ? 'var(--amber)' : undefined} />
         </div>
 
         {/* Reports chart */}
@@ -368,7 +370,7 @@ export default function AdminPage() {
         </div>
 
         {/* Two-column: most reported + most researched */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '.65rem', marginBottom: '.65rem' }}>
+        <div className="adm-2col">
           <div className="adm-panel">
             <div className="adm-panel-hdr">Most reported companies <span style={{ color: 'var(--dim)', fontWeight: 400 }}>(30d)</span></div>
             <BarChart
@@ -480,9 +482,9 @@ export default function AdminPage() {
         />
 
         {/* API Health */}
-        <div style={{ background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 12, padding: '1.1rem', marginBottom: '1rem' }}>
-          <div style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', textTransform: 'uppercase', letterSpacing: '.14em', color: 'var(--dim)', marginBottom: '.85rem' }}>API Health (Today)</div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: '.65rem', marginBottom: '.75rem' }}>
+        <Card>
+          <CardHeader title="API Health" />
+          <div className="adm-kpi-row" style={{ gridTemplateColumns: 'repeat(3,1fr)', marginBottom: '.75rem' }}>
             <KpiCard l="Errors today" n={stats.errors?.today ?? 0} sub="last 24h" borderColor={stats.errors?.today > 10 ? 'var(--red)' : undefined} numColor={stats.errors?.today > 10 ? 'var(--red)' : undefined} />
             <KpiCard l="Errors this week" n={stats.errors?.this_week ?? 0} sub="last 7 days" />
             <KpiCard l="DAU" n={stats.users?.dau ?? 0} sub="active today" />
@@ -512,7 +514,7 @@ export default function AdminPage() {
               ))}
             </div>
           )}
-        </div>
+        </Card>
 
         {/* Background job runner */}
         <JobRunner token={token!} />

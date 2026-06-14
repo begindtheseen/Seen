@@ -148,6 +148,7 @@ async function _handler(req, res) {
       recentReportsRes, recentAppsRes, jobsTodayRes, inactiveReportsRes,
       jobsActiveRes, jobsNewTodayRes,
       reportsMonthRes, searchLogsWeekRes,
+      jobsTotalRes,
     ] = await Promise.all([
       db(`profiles?select=id`, { headers: { Prefer: 'count=exact', 'Range-Unit': 'items', Range: '0-0' } }),
       db(`profiles?created_at=gte.${todayISO}&select=id`, { headers: { Prefer: 'count=exact', 'Range-Unit': 'items', Range: '0-0' } }),
@@ -178,14 +179,17 @@ async function _handler(req, res) {
       db(`jobs?select=count&created_at=gte.${encodeURIComponent(todayISO)}`),
       db(`reports?created_at=gte.${monthISO}&select=created_at,company_name,outcome&order=created_at.asc&limit=2000`),
       db(`search_logs?created_at=gte.${weekISO}&select=query&limit=500`),
+      db(`jobs?select=count`),
     ]);
 
     const usersTotal = ct(usersTotalRes);
     const issues = issuesRes.ok ? await issuesRes.json() : [];
     const jobsActiveData  = jobsActiveRes.ok   ? await jobsActiveRes.json()   : [];
     const jobsNewTodayData = jobsNewTodayRes.ok ? await jobsNewTodayRes.json() : [];
+    const jobsTotalData   = jobsTotalRes.ok    ? await jobsTotalRes.json()    : [];
     const jobsActive  = parseInt(jobsActiveData[0]?.count)   || 0;
     const jobsNewToday = parseInt(jobsNewTodayData[0]?.count) || 0;
+    const jobsTotal   = parseInt(jobsTotalData[0]?.count)    || 0;
     const creditRows = creditListRes.ok ? await creditListRes.json() : [];
     const proCount = creditRows.filter(r => r.pro).length;
     const ghosted = ct(appsGhostedRes);
@@ -279,6 +283,7 @@ async function _handler(req, res) {
         ? { ready: true, today: ct(searchLogsTodayRes), top: topSearched }
         : { ready: false },
       jobs: {
+        total: jobsTotal,
         active: jobsActive,
         new_today: jobsNewToday,
         added_today: ct(jobsTodayRes),

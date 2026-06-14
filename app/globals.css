@@ -751,9 +751,12 @@ nav.nav-scrolled{background:rgba(6,6,8,0.82);backdrop-filter:blur(60px) saturate
 .adm-bar-wrap{flex:1;height:4px;background:rgba(255,255,255,.06);border-radius:2px;overflow:hidden}
 .adm-bar{height:100%;border-radius:2px;background:linear-gradient(90deg,var(--blue),var(--indigo));transition:width .6s ease}
 .adm-bar.green{background:linear-gradient(90deg,var(--green),#34d399)}
-.adm-chart-row{display:flex;align-items:flex-end;gap:3px;height:48px;padding:0 1rem 0}
+.adm-chart-row{display:flex;align-items:flex-end;gap:3px;height:56px;padding:0 1rem 0}
 .adm-chart-bar{flex:1;background:rgba(59,130,246,.35);border-radius:2px 2px 0 0;transition:background .15s;cursor:default;min-width:8px}
 .adm-chart-bar:hover{background:rgba(59,130,246,.7)}
+.adm-section-lbl{font-family:var(--mono);font-size:.5rem;text-transform:uppercase;letter-spacing:.14em;color:var(--dim);margin-bottom:.4rem;display:flex;align-items:center;gap:.5rem}
+.adm-section-lbl::before{content:'';display:inline-block;width:14px;height:1px;background:currentColor;opacity:.35;flex-shrink:0}
+.adm-2col{display:grid;grid-template-columns:1fr 1fr;gap:.65rem;margin-bottom:.65rem}
 /* ── Job Search Health Score ─────────────────────────────────── */
 .hs-card{background:linear-gradient(160deg,rgba(255,255,255,.05) 0%,rgba(255,255,255,.015) 100%);border:1px solid rgba(255,255,255,.1);border-radius:14px;padding:1.25rem 1.4rem;position:relative;overflow:hidden}
 .hs-card::before{content:'';position:absolute;top:-40px;right:-40px;width:160px;height:160px;background:radial-gradient(circle,rgba(16,185,129,0.08) 0%,transparent 70%);pointer-events:none}
@@ -870,6 +873,7 @@ nav.nav-scrolled{background:rgba(6,6,8,0.82);backdrop-filter:blur(60px) saturate
   .adm-kpi-sub{font-size:.42rem!important}
   .adm-panel{border-radius:8px!important;margin-bottom:.65rem!important}
   .adm-wrap h1{font-size:1.4rem!important}
+  .adm-2col{grid-template-columns:1fr!important}
 }
 
 /* ── MOBILE SIDE MENU (ported from original) ── */
