@@ -213,6 +213,13 @@ export default function JobsPage() {
     if (jobs.length > 0) updateDisplay(jobs, sort)
   }, [niche, level, jobType, posted, sort]) // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Auto-request location on mount if field is empty
+  useEffect(() => {
+    if (typeof navigator !== 'undefined' && navigator.geolocation) {
+      requestGpsLocation()
+    }
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
   async function requestGpsLocation() {
     if (!navigator.geolocation || location.trim()) return
     setGpsLoading(true)
