@@ -43,7 +43,7 @@ Work happens exclusively on `next-migration` or branches from it.
 - **State**: React Context (`AuthProvider`), localStorage stores (`lib/stores/`)
 - **API routes**: `api/*.js` — Vercel serverless functions (plain JS, not Next.js routes)
 - **Deploy**: Vercel — `"framework": "nextjs"` in `vercel.json`
-- **Function limit**: Vercel Hobby = 12 max. Current: 9 (parse-resume merged into resume.js, fetch-location-jobs + company-score + user-sync removed or merged to stay under limit)
+- **Function limit**: Vercel Pro = 500 max. Current: 9 declared (parse-resume was merged into resume.js historically — can be split back out if cleaner). No constraint on adding new api/*.js files.
 
 ### Directory structure (Next.js app)
 ```
@@ -235,7 +235,7 @@ Vercel connects to `next-migration` branch via GitHub integration.
 
 **vercel.json** (on this branch):
 - `"framework": "nextjs"` ✅
-- 9 serverless functions (within Hobby plan 12-function limit)
+- 9 serverless functions (Vercel Pro — no meaningful limit)
 - Proper cron schedules
 
 ---
@@ -287,6 +287,6 @@ Every event: `source`, `confidence`, `trust_weight`, `timestamp`, `anomaly_flags
 
 - Merge `main` into `next-migration` (incompatible histories)
 - Push to `claude/index-file-stability-LrIfU` or `main` (old static HTML app)
-- Create new Vercel serverless function files (stay under 12-function limit)
+- Add api/*.js files carelessly without considering the clean separation of concerns (but the 12-function cap is NOT a constraint — Vercel Pro allows 500)
 - Put service_role key in any frontend/client code
 - Start new features before parity is complete

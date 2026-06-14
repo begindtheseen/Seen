@@ -167,7 +167,7 @@ curl -X POST "https://api.vercel.com/v1/integrations/deploy/prj_P2SoPxsy9RpdoJfV
 ## Architecture facts (know these cold)
 
 - **API**: `api/*.js` Vercel serverless — NOT `app/api/`. No App Router API routes exist.
-- **Serverless cap**: 11 declared + 1 Next.js runtime (dynamic `/company/[slug]`) = 12 (at Vercel Pro limit). Never add a new `api/*.js` without merging one.
+- **Serverless cap**: **Vercel Pro — 500 function limit. No constraint.** Currently 9 declared api/*.js files. New files can be added freely. parse-resume was merged into resume.js historically to work around what was thought to be a Hobby plan — it can be split back out for cleaner code if needed.
 - **Merged endpoints**:
   - parse-resume → `POST /api/resume` `{action:'parse', base64, fileName, mimeType}`
   - company-score → `POST /api/reports` (action: company_score | research | resolve | populate)
