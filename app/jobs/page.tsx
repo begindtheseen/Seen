@@ -150,7 +150,7 @@ function JobDetailDrawer({ job, isLoggedIn, onClose, onApply, onCheckCompany }: 
         width: 'min(540px, 100vw)',
         background: 'var(--surface)',
         borderLeft: '1px solid var(--line)',
-        boxShadow: '-12px 0 48px rgba(0,0,0,.5)',
+        boxShadow: '-12px 0 48px rgba(0,0,0,.55),-40px 0 80px rgba(99,102,241,.12),-60px 0 120px rgba(124,58,237,.06)',
         transform: `translateX(${visible ? '0' : '100%'})`,
         transition: 'transform .3s cubic-bezier(.32,.72,0,1)',
         display: 'flex', flexDirection: 'column',
@@ -1056,7 +1056,7 @@ export default function JobsPage() {
         onClick={() => setApplyJob(null)}
       >
         <div
-          style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', width: 'calc(100% - 2rem)', maxWidth: 480, background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 14, overflow: 'hidden' }}
+          style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', width: 'calc(100% - 2rem)', maxWidth: 480, background: 'var(--surface)', border: '1px solid rgba(99,102,241,.25)', borderRadius: 14, overflow: 'hidden', boxShadow: '0 40px 120px rgba(0,0,0,.75),0 0 80px rgba(99,102,241,.18),0 0 160px rgba(124,58,237,.08)' }}
           onClick={e => e.stopPropagation()}
         >
           <div style={{ padding: '.9rem 1.1rem', borderBottom: '1px solid var(--line)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>

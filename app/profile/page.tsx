@@ -50,7 +50,7 @@ type LocResult = { display: string }
 
 export default function ProfilePage() {
   const router = useRouter()
-  const { isLoggedIn, user } = useAuth()
+  const { isLoggedIn, user, loadProfile } = useAuth()
   const [name, setName] = useState('')
   const [city, setCity] = useState('')
   const [experience, setExperience] = useState('')
@@ -137,6 +137,7 @@ export default function ProfilePage() {
       } catch { /* ignore */ }
       setSaveMsg('Profile saved.')
       setSaveMsgOk(true)
+      loadProfile()
     } catch {
       setSaveMsg('Save failed. Please try again.')
       setSaveMsgOk(false)
@@ -376,9 +377,11 @@ export default function ProfilePage() {
             <div style={{ borderTop: '1px solid var(--line)', paddingTop: '.75rem' }}>
               <button
                 onClick={signOut}
-                style={{ background: 'none', border: '1px solid var(--line2)', color: 'var(--muted)', borderRadius: 8, padding: '.6rem 1.25rem', fontFamily: 'var(--mono)', fontSize: '.72rem', cursor: 'pointer', width: '100%' }}
+                style={{ background: 'rgba(239,68,68,0.07)', border: '1px solid rgba(239,68,68,0.25)', color: 'var(--red)', borderRadius: 8, padding: '.65rem 1.25rem', fontFamily: 'var(--mono)', fontSize: '.74rem', fontWeight: 600, cursor: 'pointer', width: '100%', transition: 'background .15s,border-color .15s' }}
+                onMouseOver={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(239,68,68,0.14)' }}
+                onMouseOut={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(239,68,68,0.07)' }}
               >
-                Sign out
+                Sign out of Seen
               </button>
             </div>
           </div>
