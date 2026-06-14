@@ -610,6 +610,32 @@ async function _handler(req, res) {
     return res.status(200).json({ ok: true, suspects: suspects.length, clusters_created: created });
   }
 
+  // ── get_jobs_grouped: all jobs by company for admin browser ───────────────────
+  if (action === 'get_jobs_grouped') {
+    const r = await db('jobs?select=id,company,availability_status&limit=10000');
+    if (!r.ok) return res.status(500).json({ error: 'Query failed' });
+    const jobs = await r.json();
+    const groups = {};
+    for (const j of (jobs || [])) {
+      const co = j.company || 'Unknown';
+      if (!groups[co]) groups[co] = { company: co, total: 0, active: 0 };
+      groups[co].total++;
+      if (j.availability_status === 'active') groups[co].active++;
+    }
+    const sorted = Object.values(groups).sort((a, b) => b.total - a.total);
+    return res.status(200).json({ ok: true, groups: sorted, total_jobs: (jobs || []).length });
+  }
+
+  // ── get_company_jobs: all listings for one company ────────────────────────────
+  if (action === 'get_company_jobs') {
+    const { company } = body;
+    if (!company) return res.status(400).json({ error: 'company required' });
+    const r = await db(`jobs?company=eq.${encodeURIComponent(company)}&select=id,title,city,apply_url,source,availability_status,created_at,last_seen_at&order=created_at.desc&limit=500`);
+    if (!r.ok) return res.status(500).json({ error: 'Query failed' });
+    const jobs = await r.json();
+    return res.status(200).json({ ok: true, jobs: jobs || [], company });
+  }
+
   // ── get_kpi_detail: return raw rows behind a KPI card ─────────────────────
   if (body.action === 'get_kpi_detail') {
     const metric = body.metric;

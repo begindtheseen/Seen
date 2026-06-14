@@ -44,6 +44,7 @@ interface RecentJob {
   id: string; company: string; title: string; city: string
   apply_url: string; created_at: string; availability_status: string; source: string
 }
+interface JobGroup { company: string; total: number; active: number }
 interface DupCompany { id: string; name: string; report_count: number; overall_score: number }
 interface DupGroup { key: string; companies: DupCompany[] }
 interface MergePrefill { primary: string; secondary: string; nonce: number }
@@ -592,7 +593,7 @@ export default function AdminPage() {
         </Card>
 
         {/* New job listings browser */}
-        <RecentJobsBrowser token={token!} onUnauthorized={() => { sessionStorage.removeItem(TOKEN_KEY); setToken(null); setStats(null); setLoginError('Session expired') }} />
+        <AllJobsBrowser token={token!} onUnauthorized={() => { sessionStorage.removeItem(TOKEN_KEY); setToken(null); setStats(null); setLoginError('Session expired') }} />
 
         {/* Job deduplication */}
         <JobDedupePanel token={token!} />
@@ -1261,7 +1262,6 @@ function ClustersPanel({ clusters, suspected, token, onRefresh }: { clusters: Du
   )
 }
 
-const PERIOD_LABELS: Record<string, string> = { today: 'today', week: 'this week', month: 'this month' }
 function availColor(a: string) {
   if (a === 'active') return 'var(--green)'
   if (a === 'stale') return 'var(--amber)'
@@ -1336,74 +1336,127 @@ function JobDedupePanel({ token }: { token: string }) {
   )
 }
 
-function RecentJobsBrowser({ token, onUnauthorized }: { token: string; onUnauthorized: () => void }) {
-  const [period, setPeriod] = useState<string | null>(null)
-  const [jobs, setJobs] = useState<RecentJob[]>([])
-  const [total, setTotal] = useState(0)
-  const [loading, setLoading] = useState(false)
+function AllJobsBrowser({ token, onUnauthorized }: { token: string; onUnauthorized: () => void }) {
+  const [groups, setGroups] = useState<JobGroup[]>([])
+  const [totalJobs, setTotalJobs] = useState(0)
+  const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [search, setSearch] = useState('')
+  const [expanded, setExpanded] = useState<string | null>(null)
+  const [companyJobs, setCompanyJobs] = useState<Record<string, RecentJob[]>>({})
+  const [companyLoading, setCompanyLoading] = useState<string | null>(null)
 
-  async function loadPeriod(p: string) {
-    setPeriod(p)
-    setLoading(true)
-    setError('')
+  useEffect(() => {
+    async function load() {
+      try {
+        const res = await fetch('/api/admin-stats', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'X-Admin-Token': token },
+          body: JSON.stringify({ action: 'get_jobs_grouped' }),
+        })
+        if (res.status === 401 || res.status === 403) { onUnauthorized(); return }
+        const d = await res.json()
+        if (!d.ok) throw new Error(d.error || String(res.status))
+        setGroups(d.groups || [])
+        setTotalJobs(d.total_jobs || 0)
+      } catch (e) {
+        setError((e as Error).message)
+      }
+      setLoading(false)
+    }
+    load()
+  }, [token, onUnauthorized])
+
+  async function toggleCompany(company: string) {
+    if (expanded === company) { setExpanded(null); return }
+    setExpanded(company)
+    if (companyJobs[company]) return
+    setCompanyLoading(company)
     try {
       const res = await fetch('/api/admin-stats', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'X-Admin-Token': token },
-        body: JSON.stringify({ action: 'get_recent_jobs', period: p }),
+        body: JSON.stringify({ action: 'get_company_jobs', company }),
       })
       if (res.status === 401 || res.status === 403) { onUnauthorized(); return }
       const d = await res.json()
-      if (!d.ok) throw new Error(d.error || res.status)
-      setJobs(d.jobs || [])
-      setTotal(d.total ?? (d.jobs || []).length)
+      if (!d.ok) throw new Error(d.error)
+      setCompanyJobs(prev => ({ ...prev, [company]: d.jobs || [] }))
     } catch (e) {
-      setError((e as Error).message)
+      setCompanyJobs(prev => ({ ...prev, [company]: [] }))
     }
-    setLoading(false)
+    setCompanyLoading(null)
   }
 
-  const tabStyle = (p: string) => ({
-    fontFamily: 'var(--mono)', fontSize: '.55rem', padding: '.28rem .65rem', borderRadius: 6,
-    border: `1px solid ${period === p ? 'var(--blue)' : 'var(--line2)'}`,
-    background: period === p ? 'rgba(59,130,246,.15)' : 'transparent',
-    color: period === p ? 'var(--blue)' : 'var(--sub)', cursor: 'pointer',
-  } as React.CSSProperties)
+  const filtered = search.trim()
+    ? groups.filter(g => g.company.toLowerCase().includes(search.toLowerCase()))
+    : groups
 
   return (
     <Card style={{ marginBottom: '1.25rem' }}>
-      <CardHeader
-        title={`New job listings${period ? ` — ${total} ${PERIOD_LABELS[period] || ''}` : ''}`}
-        action={
-          <div style={{ display: 'flex', gap: '.35rem' }}>
-            <button onClick={() => loadPeriod('today')} style={tabStyle('today')}>Today</button>
-            <button onClick={() => loadPeriod('week')} style={tabStyle('week')}>This Week</button>
-            <button onClick={() => loadPeriod('month')} style={tabStyle('month')}>This Month</button>
-          </div>
-        }
-      />
-      {!period && <div style={{ fontFamily: 'var(--mono)', fontSize: '.62rem', color: 'var(--dim)' }}>Click a period above to load listings.</div>}
-      {period && loading && <div style={{ fontFamily: 'var(--mono)', fontSize: '.62rem', color: 'var(--dim)' }}>Loading…</div>}
-      {period && !loading && error && <div style={{ fontFamily: 'var(--mono)', fontSize: '.62rem', color: 'var(--red)' }}>✗ {error}</div>}
-      {period && !loading && !error && jobs.length === 0 && <div style={{ fontFamily: 'var(--mono)', fontSize: '.62rem', color: 'var(--dim)' }}>No new listings for this period.</div>}
-      {period && !loading && !error && jobs.map(j => {
-        const url = j.apply_url || ''
-        const avail = j.availability_status || 'active'
+      <CardHeader title={`All job listings${totalJobs ? ` — ${totalJobs.toLocaleString()} total` : ''}`} />
+      <div style={{ marginBottom: '.75rem' }}>
+        <input
+          type="text"
+          placeholder="Filter by company…"
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+          style={{
+            width: '100%', boxSizing: 'border-box',
+            fontFamily: 'var(--mono)', fontSize: '.62rem',
+            padding: '.35rem .6rem', borderRadius: 6,
+            border: '1px solid var(--line2)', background: 'var(--bg2)',
+            color: 'var(--white)', outline: 'none',
+          }}
+        />
+      </div>
+      {loading && <div style={{ fontFamily: 'var(--mono)', fontSize: '.62rem', color: 'var(--dim)' }}>Loading…</div>}
+      {!loading && error && <div style={{ fontFamily: 'var(--mono)', fontSize: '.62rem', color: 'var(--red)' }}>✗ {error}</div>}
+      {!loading && !error && filtered.length === 0 && (
+        <div style={{ fontFamily: 'var(--mono)', fontSize: '.62rem', color: 'var(--dim)' }}>No companies match.</div>
+      )}
+      {!loading && !error && filtered.map(g => {
+        const isOpen = expanded === g.company
+        const jobs = companyJobs[g.company] || []
+        const isLoadingJobs = companyLoading === g.company
         return (
-          <div key={j.id} style={{ display: 'flex', alignItems: 'center', gap: '.75rem', padding: '.5rem 0', borderBottom: '1px solid var(--line2)' }}>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontFamily: 'var(--mono)', fontSize: '.62rem', color: 'var(--white)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                {j.title || '—'} · <span style={{ color: 'var(--sub)' }}>{j.company || '—'}</span>
-              </div>
-              <div style={{ fontFamily: 'var(--mono)', fontSize: '.52rem', color: 'var(--dim)', marginTop: '.1rem' }}>
-                {j.city || ''} · {j.source || '—'} · <span style={{ color: availColor(avail) }}>{avail}</span>
-              </div>
+          <div key={g.company} style={{ borderBottom: '1px solid var(--line2)' }}>
+            <div
+              onClick={() => toggleCompany(g.company)}
+              style={{ display: 'flex', alignItems: 'center', gap: '.6rem', padding: '.45rem 0', cursor: 'pointer' }}
+            >
+              <span style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', color: 'var(--sub)', width: '.8rem', flexShrink: 0 }}>
+                {isOpen ? '▾' : '▸'}
+              </span>
+              <span style={{ fontFamily: 'var(--mono)', fontSize: '.65rem', color: 'var(--white)', flex: 1 }}>{g.company}</span>
+              <span style={{ fontFamily: 'var(--mono)', fontSize: '.55rem', color: 'var(--dim)', flexShrink: 0 }}>
+                {g.total} total · <span style={{ color: g.active > 0 ? 'var(--green)' : 'var(--dim)' }}>{g.active} active</span>
+              </span>
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '.5rem', flexShrink: 0 }}>
-              <span style={{ fontFamily: 'var(--mono)', fontSize: '.52rem', color: 'var(--dim)' }}>{relTime(j.created_at)}</span>
-              {url && <a href={url} target="_blank" rel="noopener noreferrer" style={{ fontFamily: 'var(--mono)', fontSize: '.55rem', color: 'var(--blue)', textDecoration: 'none' }}>↗</a>}
-            </div>
+            {isOpen && (
+              <div style={{ paddingLeft: '1.4rem', paddingBottom: '.5rem' }}>
+                {isLoadingJobs && <div style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', color: 'var(--dim)' }}>Loading…</div>}
+                {!isLoadingJobs && jobs.length === 0 && <div style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', color: 'var(--dim)' }}>No listings found.</div>}
+                {!isLoadingJobs && jobs.map(j => {
+                  const avail = j.availability_status || 'active'
+                  return (
+                    <div key={j.id} style={{ display: 'flex', alignItems: 'center', gap: '.6rem', padding: '.3rem 0', borderBottom: '1px solid var(--line2)' }}>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontFamily: 'var(--mono)', fontSize: '.6rem', color: 'var(--white)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {j.title || '—'}
+                        </div>
+                        <div style={{ fontFamily: 'var(--mono)', fontSize: '.52rem', color: 'var(--dim)', marginTop: '.08rem' }}>
+                          {j.city || '—'} · <span style={{ color: availColor(avail) }}>{avail}</span> · {relTime(j.created_at)}
+                        </div>
+                      </div>
+                      {j.apply_url && (
+                        <a href={j.apply_url} target="_blank" rel="noopener noreferrer" style={{ fontFamily: 'var(--mono)', fontSize: '.55rem', color: 'var(--blue)', textDecoration: 'none', flexShrink: 0 }}>↗</a>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
+            )}
           </div>
         )
       })}
