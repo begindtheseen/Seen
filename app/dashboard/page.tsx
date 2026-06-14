@@ -51,6 +51,7 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true)
   const [surges, setSurges] = useState<string[]>([])
   const [recentCos, setRecentCos] = useState<Array<{name: string; slug: string}>>([])
+  const [coScores, setCoScores] = useState<Record<string, {ghost_rate: number; overall_score: number; avg_wait_days: number}>>({})
 
   useEffect(() => {
     try {
@@ -93,6 +94,23 @@ export default function DashboardPage() {
       } catch { /* RLS / network — stale-only fallback */ }
     })()
   }, [isLoggedIn, apps])
+
+  // Batch-fetch company scores for active applications
+  useEffect(() => {
+    if (!apps.length) return
+    const cos = [...new Set(apps.filter(a => a.status === 'active').map(a => a.company.toLowerCase().trim()).filter(Boolean))].slice(0, 20)
+    if (!cos.length) return
+    fetch('/api/reports', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'batch_scores', names: cos }),
+    })
+      .then(r => r.ok ? r.json() : { scores: {} })
+      .then((d: { scores?: Record<string, {ghost_rate: number; overall_score: number; avg_wait_days: number}> }) => {
+        if (d.scores) setCoScores(d.scores)
+      })
+      .catch(() => {})
+  }, [apps])
 
   if (!isLoggedIn || !isSeeker) return null
   if (loading) return <div className="page"><div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '60vh' }}><div className="spinner" /></div></div>
@@ -355,6 +373,29 @@ export default function DashboardPage() {
                   }
                 </span>
               ))}
+            </div>
+          )}
+
+          {/* Company ghost rate intel */}
+          {active.length > 0 && Object.keys(coScores).length > 0 && (
+            <div style={{ marginBottom: '1.25rem' }}>
+              <div style={{ fontFamily: 'var(--mono)', fontSize: '.5rem', textTransform: 'uppercase', letterSpacing: '.14em', color: 'var(--muted)', marginBottom: '.5rem' }}>Company intel · your active applications</div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '.35rem' }}>
+                {active.slice(0, 8).map(app => {
+                  const sc = coScores[app.company.toLowerCase()]
+                  if (!sc) return null
+                  const ghostPct = Math.round(sc.ghost_rate * 100)
+                  const col = sc.ghost_rate > 0.55 ? 'var(--red)' : sc.ghost_rate > 0.35 ? 'var(--amber)' : 'var(--green)'
+                  return (
+                    <div key={app.id} style={{ display: 'flex', alignItems: 'center', gap: '.5rem', justifyContent: 'space-between' }}>
+                      <span style={{ fontFamily: 'var(--mono)', fontSize: '.62rem', color: 'var(--sub)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{app.company}</span>
+                      <span style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', color: col, flexShrink: 0 }}>
+                        {ghostPct}% ghost · {sc.overall_score}/100
+                      </span>
+                    </div>
+                  )
+                }).filter(Boolean)}
+              </div>
             </div>
           )}
 

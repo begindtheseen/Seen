@@ -127,6 +127,34 @@ export default async function handler(req, res) {
     'Content-Type': 'application/json',
   };
 
+  // ── Batch score lookup — DB-only, no AI, cached scores for up to 50 companies ──
+  if (body.action === 'batch_scores') {
+    try {
+      const names = body.names;
+      if (!Array.isArray(names) || !names.length) return res.json({ ok: true, scores: {} });
+      const nameList = names.slice(0, 50).map(n => String(n).toLowerCase().trim()).filter(Boolean);
+      if (!nameList.length) return res.json({ ok: true, scores: {} });
+      const inFilter = nameList.map(n => `"${n}"`).join(',');
+      const r = await fetch(
+        `${SUPABASE_URL}/rest/v1/company_scores?company_name=in.(${inFilter})&select=company_name,overall_score,ghost_rate,response_rate,avg_wait_days,waste_score,report_count&limit=50`,
+        { headers: hdrsBase }
+      );
+      const rows = r.ok ? await r.json() : [];
+      const scores = {};
+      (Array.isArray(rows) ? rows : []).forEach(row => {
+        scores[row.company_name.toLowerCase()] = {
+          overall_score: row.overall_score,
+          ghost_rate: row.ghost_rate,
+          response_rate: row.response_rate,
+          avg_wait_days: row.avg_wait_days,
+          waste: row.waste_score,
+          report_count: row.report_count,
+        };
+      });
+      return res.json({ ok: true, scores });
+    } catch { return res.json({ ok: true, scores: {} }); }
+  }
+
   // ── User-reported issue (wrong data, duplicate, broken listing, etc.) ─────────
   if (body.action === 'report_issue') {
     const VALID_TYPES = new Set(['wrong_data','duplicate','broken_listing','spam','other']);

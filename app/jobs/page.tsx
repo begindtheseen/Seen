@@ -569,11 +569,12 @@ function JobCard({ job, index, onSaveToggle, onOpen, onApply, onCheckCompany }: 
 
 // ── SwipeJobDeck ──────────────────────────────────────────────────────────────
 
-function SwipeJobDeck({ jobs, onOpen, onDismiss, onSave }: {
+function SwipeJobDeck({ jobs, onOpen, onDismiss, onSave, coScores }: {
   jobs: Job[]
   onOpen: (job: Job) => void
   onDismiss: () => void
   onSave?: () => void
+  coScores?: Record<string, {ghost_rate: number; overall_score: number}>
 }) {
   const [stack, setStack] = useState<Job[]>(() => [...jobs])
   const [deltaX, setDeltaX] = useState(0)
@@ -788,6 +789,20 @@ function SwipeJobDeck({ jobs, onOpen, onDismiss, onSave }: {
           </div>
         )}
 
+        {(() => {
+          const sc = coScores?.[topJob.company.toLowerCase()]
+          if (!sc || sc.ghost_rate <= 0.3) return null
+          const ghostPct = Math.round(sc.ghost_rate * 100)
+          const isHigh = sc.ghost_rate > 0.55
+          return (
+            <div style={{ marginTop: '.45rem', display: 'flex', alignItems: 'center', gap: '.3rem' }}>
+              <span style={{ fontFamily: 'var(--mono)', fontSize: '.52rem', color: isHigh ? 'var(--red)' : 'var(--amber)', background: isHigh ? 'rgba(239,68,68,.1)' : 'rgba(245,158,11,.1)', border: `1px solid ${isHigh ? 'rgba(239,68,68,.25)' : 'rgba(245,158,11,.25)'}`, borderRadius: 5, padding: '.12rem .4rem' }}>
+                {isHigh ? '👻' : '⚠'} {ghostPct}% of applicants never hear back
+              </span>
+            </div>
+          )
+        })()}
+
         <div style={{ position: 'absolute', bottom: '.9rem', left: '1.15rem', right: '1.15rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <span style={{ fontFamily: 'var(--mono)', fontSize: '.52rem', color: 'var(--muted)' }}>{topJob.source || 'Job board'}</span>
           <span style={{ fontFamily: 'var(--mono)', fontSize: '.52rem', color: 'var(--dim)' }}>{stack.length} left · drag or tap</span>
@@ -829,6 +844,7 @@ export default function JobsPage() {
   const [recStatus, setRecStatus] = useState<'idle' | 'loading' | 'done'>('idle')
   const [swipeCount, setSwipeCount] = useState(0)
   const [deckDone, setDeckDone] = useState(false)
+  const [coScores, setCoScores] = useState<Record<string, {ghost_rate: number; overall_score: number}>>({})
   const abortRef = useRef<AbortController | null>(null)
 
   const hasFilters = !!(niche || level || jobType || posted)
@@ -920,6 +936,22 @@ export default function JobsPage() {
     .catch(() => {})
     .finally(() => setRecStatus('done'))
   }, [isLoggedIn]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Fetch ghost rates for companies in the swipe deck
+  useEffect(() => {
+    if (!recommended.length) return
+    const cos = [...new Set(recommended.map(j => j.company.toLowerCase().trim()).filter(Boolean))].slice(0, 30)
+    fetch('/api/reports', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'batch_scores', names: cos }),
+    })
+      .then(r => r.ok ? r.json() : { scores: {} })
+      .then((d: { scores?: Record<string, {ghost_rate: number; overall_score: number}> }) => {
+        if (d.scores) setCoScores(d.scores)
+      })
+      .catch(() => {})
+  }, [recommended])
 
   async function requestGpsLocation() {
     if (!navigator.geolocation || location.trim()) return
@@ -1215,6 +1247,7 @@ export default function JobsPage() {
                 onOpen={j => setDetailJob(j)}
                 onDismiss={() => setDeckDone(true)}
                 onSave={() => setSwipeCount(c => c + 1)}
+                coScores={coScores}
               />
             )}
           </div>

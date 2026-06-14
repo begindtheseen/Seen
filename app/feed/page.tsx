@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
+import { AppStore } from '@/lib/stores/AppStore'
 
 type Filter = 'all' | 'ghosted' | 'rejected' | 'interviewing' | 'hired'
 
@@ -56,6 +57,7 @@ export default function FeedPage() {
   const [loading, setLoading] = useState(true)
   const [loadingMore, setLoadingMore] = useState(false)
   const [ghostCos, setGhostCos] = useState<string[]>([])
+  const [appliedCos, setAppliedCos] = useState<Set<string>>(new Set())
 
   const loadFeed = useCallback(async (newFilter: Filter, newOffset: number, append = false) => {
     if (newOffset === 0) setLoading(true); else setLoadingMore(true)
@@ -88,6 +90,13 @@ export default function FeedPage() {
     }
     setLoading(false)
     setLoadingMore(false)
+  }, [])
+
+  useEffect(() => {
+    try {
+      const apps = AppStore.loadSync()
+      setAppliedCos(new Set(apps.map(a => a.company.toLowerCase().trim())))
+    } catch {}
   }, [])
 
   useEffect(() => {
@@ -178,6 +187,11 @@ export default function FeedPage() {
                         <a href={`/company/${encodeURIComponent(r.company_name.toLowerCase().replace(/\s+/g, '-'))}`} style={{ fontFamily: 'var(--mono)', fontSize: '.62rem', color: 'var(--blue)', marginLeft: '.5rem', textDecoration: 'none' }}>
                           @ {r.company_name}
                         </a>
+                      )}
+                      {r.company_name && appliedCos.has(r.company_name.toLowerCase().trim()) && (
+                        <span style={{ fontFamily: 'var(--mono)', fontSize: '.52rem', background: 'rgba(99,102,241,.12)', border: '1px solid rgba(99,102,241,.25)', borderRadius: 4, padding: '.1rem .35rem', color: 'var(--indigo)', marginLeft: '.3rem', verticalAlign: 'middle' }}>
+                          You applied
+                        </span>
                       )}
                     </div>
                     <span style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', color: 'var(--muted)', flexShrink: 0 }}>

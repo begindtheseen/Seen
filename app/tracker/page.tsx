@@ -21,10 +21,11 @@ function getDaysSince(ts: number): number {
   return Math.floor((Date.now() - ts) / 86400000)
 }
 
-function AppCard({ app, onUpdate, onRemove }: {
+function AppCard({ app, onUpdate, onRemove, ghostRate }: {
   app: Application
   onUpdate: (id: string, changes: Partial<Application>) => void
   onRemove: (id: string) => void
+  ghostRate?: number
 }) {
   const days = getDaysSince(app.appliedAt)
   const statusClass = STATUS_MAP[app.status] || ''
@@ -48,6 +49,11 @@ function AppCard({ app, onUpdate, onRemove }: {
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '.25rem', flexShrink: 0 }}>
           {app.score != null && (
             <span style={{ fontFamily: 'var(--mono)', fontSize: '.65rem', color: app.score >= 70 ? 'var(--green)' : app.score >= 40 ? 'var(--amber)' : 'var(--red)', fontWeight: 600 }}>{app.score}</span>
+          )}
+          {ghostRate != null && ghostRate > 0.3 && (
+            <span style={{ fontFamily: 'var(--mono)', fontSize: '.52rem', color: ghostRate > 0.55 ? 'var(--red)' : 'var(--amber)', background: ghostRate > 0.55 ? 'rgba(239,68,68,.08)' : 'rgba(245,158,11,.08)', border: `1px solid ${ghostRate > 0.55 ? 'rgba(239,68,68,.2)' : 'rgba(245,158,11,.2)'}`, borderRadius: 4, padding: '.1rem .3rem', marginTop: '.1rem' }}>
+              {ghostRate > 0.55 ? '👻' : '⚠'} {Math.round(ghostRate * 100)}% ghost
+            </span>
           )}
           <span style={{ fontFamily: 'var(--mono)', fontSize: '.55rem', color: 'var(--muted)', background: 'var(--raised)', border: '1px solid var(--line)', borderRadius: 4, padding: '.1rem .35rem' }}>Day {days}</span>
           {isActive && (
@@ -184,6 +190,7 @@ function TrackerPage() {
   const [highlightNew, setHighlightNew] = useState(false)
   const highlightedRef = useRef(false)
   const [updateInsight, setUpdateInsight] = useState<{ title: string; body: string; color: string } | null>(null)
+  const [companyScores, setCompanyScores] = useState<Record<string, {ghost_rate: number; overall_score: number; report_count: number}>>({})
 
   useEffect(() => {
     if (!isLoggedIn) { router.replace('/login'); return }
@@ -210,8 +217,41 @@ function TrackerPage() {
     loadApps()
   }, [isLoggedIn, loadApps])
 
+  useEffect(() => {
+    if (!apps.length) return
+    const cos = [...new Set(apps.map(a => a.company.toLowerCase().trim()).filter(Boolean))].slice(0, 50)
+    fetch('/api/reports', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'batch_scores', names: cos }),
+    })
+      .then(r => r.ok ? r.json() : { scores: {} })
+      .then((d: { scores?: Record<string, {ghost_rate: number; overall_score: number; report_count: number}> }) => {
+        if (d.scores) setCompanyScores(d.scores)
+      })
+      .catch(() => {})
+  }, [apps])
+
   const handleUpdate = async (id: string, changes: Partial<Application>) => {
     await AppStore.update(id, changes, isLoggedIn)
+    // Auto-submit community report when user confirms terminal outcome
+    if (changes.status === 'ghosted' || changes.status === 'rejected') {
+      const origApp = apps.find(a => a.id === id)
+      if (origApp) {
+        const outcome = changes.status === 'ghosted' ? 'ghosted' : 'rejected'
+        fetch('/api/reports', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            action: 'quick_submit',
+            company: origApp.company,
+            outcome,
+            role: origApp.role,
+            city: origApp.location || '',
+          }),
+        }).catch(() => {})
+      }
+    }
     const terminalStatuses = ['hired', 'ghosted', 'rejected']
     if (changes.status && terminalStatuses.includes(changes.status)) {
       const updated = await AppStore.load(isLoggedIn)
@@ -542,7 +582,7 @@ function TrackerPage() {
           <div id="trackerList" style={{ display: 'flex', flexDirection: 'column', gap: '.75rem' }}>
             {apps.map((app, i) => (
               <div key={app.id} style={highlightNew && i === 0 ? { borderRadius: 12, boxShadow: '0 0 0 2px var(--green), 0 0 30px rgba(16,185,129,0.3)', transition: 'box-shadow 2.5s ease' } : undefined}>
-                <AppCard app={app} onUpdate={handleUpdate} onRemove={handleRemove} />
+                <AppCard app={app} onUpdate={handleUpdate} onRemove={handleRemove} ghostRate={companyScores[app.company.toLowerCase().trim()]?.ghost_rate} />
               </div>
             ))}
           </div>
