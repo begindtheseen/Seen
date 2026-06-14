@@ -33,6 +33,11 @@ export default async function handler(req, res) {
     return handleCompanyJobs(req, res, _body);
   }
 
+  // ── Recommended jobs: personalized from resume_skills ────────────────────
+  if (_body.action === 'recommended') {
+    return handleRecommended(req, res, _body);
+  }
+
   // ── Get single job by ID — direct link / refresh fallback ──────────────────
   if (_body.action === 'get_by_id') {
     const { id } = _body;
@@ -440,6 +445,111 @@ async function handleCompanyJobs(req, res, body) {
   } catch(e) {
     logError('company_jobs', e.message, { company: safeName });
     return res.status(200).json({ ok: true, jobs: [], _src: 'error' });
+  }
+}
+
+// ── handleRecommended: personalized jobs from resume_skills ──────────────────
+async function handleRecommended(req, res, _body) {
+  const SUPABASE_URL = process.env.SUPABASE_URL;
+  const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY;
+  if (!SUPABASE_URL || !SUPABASE_SERVICE_KEY) return res.status(503).json({ error: 'DB unavailable', jobs: [] });
+
+  // Decode user_id from JWT (base64url → base64)
+  const token = (req.headers.authorization || '').replace(/^Bearer\s+/, '');
+  if (!token) return res.status(401).json({ error: 'Auth required', jobs: [] });
+  let user_id;
+  try {
+    const b64 = token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
+    user_id = JSON.parse(Buffer.from(b64, 'base64').toString('utf-8')).sub;
+  } catch (e) {
+    return res.status(401).json({ error: 'Invalid token', jobs: [] });
+  }
+  if (!user_id) return res.status(401).json({ error: 'No user', jobs: [] });
+
+  const dbHeaders = {
+    apikey: SUPABASE_SERVICE_KEY,
+    Authorization: `Bearer ${SUPABASE_SERVICE_KEY}`,
+    'Content-Type': 'application/json',
+  };
+
+  try {
+    // Fetch this user's extracted resume skills
+    const skillsRes = await fetch(
+      `${SUPABASE_URL}/rest/v1/resume_skills?user_id=eq.${encodeURIComponent(user_id)}&select=skills,seniority,function,years_exp,top_titles&limit=1`,
+      { headers: dbHeaders }
+    );
+    const skillsRows = skillsRes.ok ? await skillsRes.json() : [];
+    if (!Array.isArray(skillsRows) || !skillsRows.length || !skillsRows[0]?.skills?.length) {
+      return res.status(200).json({ ok: true, jobs: [], reason: 'no_resume' });
+    }
+
+    const { skills = [], seniority, function: fn } = skillsRows[0];
+    const topSkills = skills.slice(0, 5);
+    const now = encodeURIComponent(new Date().toISOString());
+
+    // Map resume seniority to job level filter terms
+    const levelTerms = { junior: 'entry', mid: 'mid', senior: 'senior', staff: 'senior', principal: 'senior', executive: 'director' };
+    const levelFilter = seniority ? levelTerms[seniority] : null;
+
+    // Parallel queries: title matches (strong signal) + description matches (weak signal)
+    const titleQueries = topSkills.slice(0, 3).map(skill => {
+      const safe = skill.replace(/[^a-zA-Z0-9\s\-+#.]/g, '').trim().slice(0, 40);
+      if (!safe) return Promise.resolve([]);
+      const url = `${SUPABASE_URL}/rest/v1/jobs?title=ilike.*${encodeURIComponent(safe)}*&expires_at=gt.${now}&select=id,title,company,location,salary,apply_url,description,type,level,source,score,waste_score&order=score.desc&limit=8`;
+      return fetch(url, { headers: dbHeaders }).then(r => r.ok ? r.json() : []).catch(() => []);
+    });
+
+    const descQueries = topSkills.slice(0, 2).map(skill => {
+      const safe = skill.replace(/[^a-zA-Z0-9\s\-+#.]/g, '').trim().slice(0, 40);
+      if (!safe) return Promise.resolve([]);
+      const url = `${SUPABASE_URL}/rest/v1/jobs?description=ilike.*${encodeURIComponent(safe)}*&expires_at=gt.${now}&select=id,title,company,location,salary,apply_url,description,type,level,source,score,waste_score&order=score.desc&limit=5`;
+      return fetch(url, { headers: dbHeaders }).then(r => r.ok ? r.json() : []).catch(() => []);
+    });
+
+    const allResults = await Promise.all([...titleQueries, ...descQueries]);
+
+    // Deduplicate
+    const seenIds = new Set();
+    const unique = allResults.flat().filter(j => {
+      if (!j?.id || seenIds.has(j.id)) return false;
+      seenIds.add(j.id);
+      return true;
+    });
+
+    // Rank by skill overlap relevance
+    const skillsLower = skills.map(s => s.toLowerCase());
+    const ranked = unique.map(j => {
+      const titleL = (j.title || '').toLowerCase();
+      const descL = (j.description || '').toLowerCase();
+      let matchScore = j.score || 65;
+      for (const s of skillsLower.slice(0, 5)) { if (titleL.includes(s)) matchScore += 10; }
+      let descHits = 0;
+      for (const s of skillsLower) { if (descL.includes(s)) descHits++; }
+      matchScore += Math.min(descHits * 2, 12);
+      if (levelFilter && (j.level || '').toLowerCase().includes(levelFilter)) matchScore += 5;
+      return { ...j, _matchScore: matchScore };
+    });
+    ranked.sort((a, b) => b._matchScore - a._matchScore);
+
+    const jobs = ranked.slice(0, 8).map(j => ({
+      id: j.id,
+      title: j.title,
+      company: j.company,
+      location: j.location,
+      salary: j.salary,
+      apply_url: j.apply_url,
+      description: j.description,
+      type: j.type || 'Full-time',
+      level: j.level || 'Mid level',
+      source: j.source || 'Seen',
+      score: j.score || 65,
+      waste_score: j.waste_score || 25,
+    }));
+
+    return res.status(200).json({ ok: true, jobs, skills: topSkills.slice(0, 3), seniority, function: fn });
+  } catch (e) {
+    logError('jobs/recommended', e.message, { user_id });
+    return res.status(500).json({ error: e.message, jobs: [] });
   }
 }
 

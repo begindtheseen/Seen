@@ -594,6 +594,9 @@ export default function JobsPage() {
   const [status, setStatus] = useState<'idle' | 'loading' | 'done' | 'error'>('idle')
   const [statusMsg, setStatusMsg] = useState('Enter a search above →')
   const [saveVersion, setSaveVersion] = useState(0)
+  const [recommended, setRecommended] = useState<Job[]>([])
+  const [recSkills, setRecSkills] = useState<string[]>([])
+  const [recStatus, setRecStatus] = useState<'idle' | 'loading' | 'done'>('idle')
   const abortRef = useRef<AbortController | null>(null)
 
   const hasFilters = !!(niche || level || jobType || posted)
@@ -651,6 +654,40 @@ export default function JobsPage() {
       searchJobs(undefined, profile.city)
     }
   }, [profile?.city]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Fetch resume-powered recommendations when logged in
+  useEffect(() => {
+    if (!isLoggedIn) return
+    setRecStatus('loading')
+    aiHeaders().then(hdrs => fetch('/api/jobs', {
+      method: 'POST',
+      headers: hdrs,
+      body: JSON.stringify({ action: 'recommended' }),
+    }))
+    .then(r => r.ok ? r.json() : {})
+    .then((data: { jobs?: unknown[]; skills?: string[] }) => {
+      if (Array.isArray(data.jobs) && data.jobs.length) {
+        const raw: Job[] = (data.jobs as Record<string, unknown>[]).map(j => ({
+          id: String(j.id || 'rec_' + Math.random().toString(36).slice(2, 8)),
+          title: String(j.title || ''),
+          company: String(j.company || ''),
+          location: String(j.location || 'US'),
+          score: Number(j.score) || 65,
+          waste: Number(j.waste_score ?? j.waste) || 25,
+          level: String(j.level || 'Mid level'),
+          type: String(j.type || 'Full-time'),
+          source: String(j.source || 'Seen'),
+          description: String(j.description || ''),
+          salary: j.salary ? String(j.salary) : null,
+          apply_url: j.apply_url ? String(j.apply_url) : (j.url ? String(j.url) : null),
+        }))
+        setRecommended(raw)
+        setRecSkills(Array.isArray(data.skills) ? data.skills : [])
+      }
+    })
+    .catch(() => {})
+    .finally(() => setRecStatus('done'))
+  }, [isLoggedIn]) // eslint-disable-line react-hooks/exhaustive-deps
 
   async function requestGpsLocation() {
     if (!navigator.geolocation || location.trim()) return
@@ -917,6 +954,34 @@ export default function JobsPage() {
           </div>
         </div>
 
+        {/* Recommended section — powered by resume intelligence */}
+        {isLoggedIn && (recStatus === 'loading' || recommended.length > 0) && (
+          <div style={{ marginBottom: '1.5rem', paddingBottom: '1.5rem', borderBottom: '1px solid var(--line)' }}>
+            <div style={{ fontFamily: 'var(--mono)', fontSize: '.52rem', textTransform: 'uppercase' as const, letterSpacing: '.12em', color: 'var(--green)', marginBottom: '.75rem', display: 'flex', alignItems: 'center', gap: 10 }}>
+              <span style={{ width: 20, height: 1.5, background: 'linear-gradient(90deg, var(--green), #8b5cf6)', display: 'inline-block', flexShrink: 0 }} />
+              Matched to your resume
+              {recSkills.length > 0 && (
+                <span style={{ color: 'var(--dim)', letterSpacing: 'normal', textTransform: 'none' as const, marginLeft: 2, fontSize: '.6rem' }}>
+                  · {recSkills.slice(0, 3).join(', ')}
+                </span>
+              )}
+            </div>
+            {recStatus === 'loading' ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '.65rem' }}>
+                {[0, 1, 2].map(i => (
+                  <div key={i} style={{ height: 110, background: 'var(--raised)', borderRadius: 12, animation: `pulse 1.4s ${i * 0.15}s ease infinite` }} />
+                ))}
+              </div>
+            ) : (
+              <div className="jlist" key={'rec_' + saveVersion}>
+                {recommended.map((job, i) => (
+                  <JobCard key={job.id} job={job} index={i} onSaveToggle={handleSaveToggle} onOpen={j => setDetailJob(j)} onApply={j => { setApplyJob(j); setApplyPlatform('Seen') }} onCheckCompany={co => setCheckCompany(co)} />
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
         {/* Results header */}
         <div className="jtb">
           <div className="jct">{statusMsg}</div>
@@ -948,6 +1013,13 @@ export default function JobsPage() {
                 <button key={role} className="sugg-chip" onClick={() => { setQuery(role); searchJobs(role) }}>{role}</button>
               ))}
             </div>
+            {isLoggedIn && recStatus === 'done' && recommended.length === 0 && (
+              <div style={{ marginTop: '1.5rem', padding: '.85rem 1.1rem', background: 'rgba(139,92,246,0.07)', border: '1px solid rgba(139,92,246,0.2)', borderRadius: 10, maxWidth: 340, margin: '1.5rem auto 0', textAlign: 'left' }}>
+                <div style={{ fontFamily: 'var(--display)', fontSize: '.82rem', fontWeight: 700, color: 'var(--white)', marginBottom: '.22rem' }}>Get personalized matches</div>
+                <div style={{ fontFamily: 'var(--mono)', fontSize: '.6rem', color: 'var(--sub)', lineHeight: 1.6, marginBottom: '.65rem' }}>Upload your resume and we&apos;ll surface jobs that match your skills and experience level automatically.</div>
+                <a href="/resume" style={{ fontFamily: 'var(--mono)', fontSize: '.62rem', color: '#a78bfa', textDecoration: 'none' }}>Upload resume →</a>
+              </div>
+            )}
           </div>
         ) : status === 'loading' ? (
           <div style={{ textAlign: 'center', padding: '4rem 2rem', color: 'var(--muted)', fontFamily: 'var(--mono)', fontSize: '.75rem' }}>
