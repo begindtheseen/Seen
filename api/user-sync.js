@@ -305,11 +305,16 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: 'job_id and valid status required' });
     }
     // Upsert report (one per user per job)
-    await db('job_availability_reports?on_conflict=user_id,job_id', {
+    const rr = await db('job_availability_reports?on_conflict=user_id,job_id', {
       method: 'POST',
       body: JSON.stringify({ job_id: String(job_id), user_id: uid, status: avStatus, reported_at: new Date().toISOString() }),
       headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
     });
+    if (!rr.ok) {
+      const errText = await rr.text().catch(() => rr.status);
+      console.error('report_job_availability insert failed:', errText);
+      return res.status(500).json({ error: 'Failed to save report' });
+    }
     // Increment report count on the job itself (fire-and-forget)
     db(`jobs?id=eq.${encodeURIComponent(String(job_id))}`, {
       method: 'PATCH',
