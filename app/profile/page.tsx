@@ -128,20 +128,20 @@ export default function ProfilePage() {
   async function saveProfile() {
     setSaving(true)
     setSaveMsg('')
-    try {
-      await _sync('save_profile', { profile: { name: name.trim(), city: city.trim(), experience } })
-      // Also persist to localStorage for quick access
-      try {
-        const existing = JSON.parse(localStorage.getItem('seen_profile_local') || '{}')
-        localStorage.setItem('seen_profile_local', JSON.stringify({ ...existing, name: name.trim(), city: city.trim(), experience, savedAt: Date.now() }))
-      } catch { /* ignore */ }
-      setSaveMsg('Profile saved.')
-      setSaveMsgOk(true)
-      loadProfile()
-    } catch {
-      setSaveMsg('Save failed. Please try again.')
+    const result = await _sync('save_profile', { profile: { name: name.trim(), city: city.trim(), experience } }) as { ok?: boolean } | null
+    if (!result || result.ok === false) {
+      setSaveMsg('Save failed — please try again.')
       setSaveMsgOk(false)
+      setSaving(false)
+      return
     }
+    try {
+      const existing = JSON.parse(localStorage.getItem('seen_profile_local') || '{}')
+      localStorage.setItem('seen_profile_local', JSON.stringify({ ...existing, name: name.trim(), city: city.trim(), experience, savedAt: Date.now() }))
+    } catch { /* ignore */ }
+    setSaveMsg('Saved!')
+    setSaveMsgOk(true)
+    loadProfile()
     setSaving(false)
   }
 

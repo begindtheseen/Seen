@@ -20,7 +20,7 @@ interface SurveyModalProps {
   onCreditsEarned: (total: number) => void
 }
 
-type Phase = 'loading' | 'intro' | 'question' | 'credit-pop' | 'done' | 'no-surveys'
+type Phase = 'loading' | 'intro' | 'question' | 'credit-pop' | 'done' | 'no-surveys' | 'error'
 
 function pickBestApp(apps: Application[], exclude?: string): Application | null {
   const pool = exclude ? apps.filter(a => a.id !== exclude) : apps
@@ -57,30 +57,38 @@ export default function SurveyModal({ apps, onClose, onCreditsEarned }: SurveyMo
     setQuestions([])
     setTargetApp(app)
 
-    const r = await fetch('/api/user-sync', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${tokenRef.current}`,
-      },
-      body: JSON.stringify({
-        action: 'company_survey',
-        company: app.company,
-        role: app.role,
-        status: app.status,
-        stage: app.stage,
-        days_since_apply: Math.floor((Date.now() - app.appliedAt) / 86400000),
-      }),
-    })
-    const d = await r.json()
-    if (!d.questions?.length) {
-      setPhase('no-surveys')
-      return
+    try {
+      const r = await fetch('/api/user-sync', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${tokenRef.current}`,
+        },
+        body: JSON.stringify({
+          action: 'company_survey',
+          company: app.company,
+          role: app.role,
+          status: app.status,
+          stage: app.stage,
+          days_since_apply: Math.floor((Date.now() - app.appliedAt) / 86400000),
+        }),
+      })
+      const d = await r.json()
+      if (!r.ok || d.error || !Array.isArray(d.questions)) {
+        setPhase('error')
+        return
+      }
+      if (!d.questions.length) {
+        setPhase('no-surveys')
+        return
+      }
+      setQuestions(d.questions)
+      setBalance(d.balance || 0)
+      setCreditsLeft(d.credits_left || 5)
+      setPhase('intro')
+    } catch {
+      setPhase('error')
     }
-    setQuestions(d.questions)
-    setBalance(d.balance || 0)
-    setCreditsLeft(d.credits_left || 5)
-    setPhase('intro')
   }
 
   useEffect(() => {
@@ -99,7 +107,11 @@ export default function SurveyModal({ apps, onClose, onCreditsEarned }: SurveyMo
         return
       }
 
-      await loadSurvey(pick)
+      try {
+        await loadSurvey(pick)
+      } catch {
+        setPhase('error')
+      }
     }
     init()
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -627,6 +639,26 @@ export default function SurveyModal({ apps, onClose, onCreditsEarned }: SurveyMo
                 You've answered all available questions for your applications.<br/>Check back after new applications are added.
               </div>
               <button onClick={onClose} style={{ background: 'var(--raised)', border: '1px solid var(--line2)', color: 'var(--sub)', fontFamily: 'var(--mono)', fontSize: '.72rem', borderRadius: 8, padding: '.6rem 1.25rem', cursor: 'pointer' }}>
+                Close
+              </button>
+            </div>
+          )}
+
+          {/* ── ERROR ── */}
+          {phase === 'error' && (
+            <div style={{ padding: '2rem 1.5rem', textAlign: 'center' }}>
+              <div style={{ fontSize: '2rem', marginBottom: '1rem' }}>⚠️</div>
+              <div style={{ fontFamily: 'var(--display)', fontSize: '.95rem', fontWeight: 700, color: 'var(--white)', marginBottom: '.5rem' }}>Couldn't load survey</div>
+              <div style={{ fontFamily: 'var(--mono)', fontSize: '.68rem', color: 'var(--sub)', lineHeight: 1.65, marginBottom: '1.5rem' }}>
+                Something went wrong — tap retry to try again.
+              </div>
+              <button
+                onClick={() => targetApp && loadSurvey(targetApp)}
+                style={{ background: 'var(--indigo)', border: 'none', color: '#fff', fontFamily: 'var(--body)', fontWeight: 600, fontSize: '.8rem', borderRadius: 8, padding: '.6rem 1.25rem', cursor: 'pointer', marginBottom: '0.5rem', width: '100%' }}
+              >
+                Retry →
+              </button>
+              <button onClick={onClose} style={{ background: 'var(--raised)', border: '1px solid var(--line2)', color: 'var(--sub)', fontFamily: 'var(--mono)', fontSize: '.72rem', borderRadius: 8, padding: '.6rem 1.25rem', cursor: 'pointer', width: '100%' }}>
                 Close
               </button>
             </div>

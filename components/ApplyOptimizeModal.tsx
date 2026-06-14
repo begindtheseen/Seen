@@ -119,14 +119,16 @@ export default function ApplyOptimizeModal({
     ResumeStore.load(user?.id, isLoggedIn).then(data => {
       if (data?.text && data.text.length > 50) {
         setResumeText(data.text)
-        setStep('choose')
+        // Skip the choose step — user already picked "Apply & Optimize"
+        runOptimize(data.text)
       } else {
         setStep('no-resume')
       }
     })
-  }, [isLoggedIn, user?.id])
+  }, [isLoggedIn, user?.id]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  async function runOptimize() {
+  async function runOptimize(resumeOverride?: string) {
+    const text = resumeOverride ?? resumeText
     setStep('optimizing')
     setError('')
     try {
@@ -138,7 +140,7 @@ export default function ApplyOptimizeModal({
           tool: 'optimize',
           job: job.title,
           company: job.company,
-          resume: resumeText,
+          resume: text,
           jobDescription: job.description || '',
         }),
       })
@@ -160,9 +162,15 @@ export default function ApplyOptimizeModal({
     const email = user?.email || profile?.email || ''
     const bullets = result?.optimized_bullets || []
     const kwds = result?.keywords_added || []
+
+    // Build a rich text summary with actual bullet rewrites for the email
+    const bulletLines = bullets.map((b, i) =>
+      `${i + 1}. BEFORE: ${b.original}\n   AFTER: ${b.optimized}\n   (${b.addresses})`
+    ).join('\n\n')
     const summary = [
-      `${bullets.length} bullet${bullets.length !== 1 ? 's' : ''} optimized for ${job.title} at ${job.company}.`,
-      kwds.length > 0 ? `Keywords added: ${kwds.slice(0, 5).join(', ')}.` : '',
+      `${bullets.length} bullet${bullets.length !== 1 ? 's' : ''} rewritten for ${job.title} at ${job.company}.`,
+      kwds.length > 0 ? `Keywords added: ${kwds.join(', ')}.` : '',
+      bullets.length > 0 ? `\n\nYour optimized bullets:\n\n${bulletLines}` : '',
     ].filter(Boolean).join(' ')
 
     try {
@@ -298,7 +306,7 @@ export default function ApplyOptimizeModal({
               )}
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: '.5rem' }}>
-                <button style={btnPrimary} onClick={runOptimize}>
+                <button style={btnPrimary} onClick={() => runOptimize()}>
                   🧠 Optimize &amp; Apply · 1 credit
                 </button>
                 <button style={btnGhost} onClick={applyWithoutOptimize}>
@@ -312,9 +320,12 @@ export default function ApplyOptimizeModal({
           {step === 'optimizing' && (
             <div style={{ textAlign: 'center', paddingBottom: '1rem' }}>
               <LoadingDots />
-              <div style={{ fontFamily: 'var(--mono)', fontSize: '.7rem', color: 'var(--sub)' }}>
+              <div style={{ fontFamily: 'var(--mono)', fontSize: '.7rem', color: 'var(--sub)', marginBottom: '.75rem' }}>
                 Reading your resume and rewriting bullets for this role…
               </div>
+              <button style={{ background: 'none', border: 'none', color: 'var(--dim)', fontFamily: 'var(--mono)', fontSize: '.62rem', cursor: 'pointer', textDecoration: 'underline' }} onClick={applyWithoutOptimize}>
+                Skip — just apply directly
+              </button>
             </div>
           )}
 
