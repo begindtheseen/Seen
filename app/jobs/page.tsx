@@ -466,7 +466,26 @@ function JobCard({ job, index, onSaveToggle, onOpen, onApply, onCheckCompany, al
   const wl = Score.wasteLabel(job.waste)
   const vibes = jobVibes(job)
   const [saved, setSaved] = useState(() => SavedJobsStore.isSaved(job.id))
+  const [reportedInactive, setReportedInactive] = useState(false)
+  const [reportingInactive, setReportingInactive] = useState(false)
+  const { user } = useAuth()
   const logoLetter = (job.company || '?')[0].toUpperCase()
+
+  async function reportInactive(e: React.MouseEvent) {
+    e.stopPropagation()
+    if (!user) { alert('Sign in to report listings.'); return }
+    setReportingInactive(true)
+    try {
+      await fetch('/api/user-sync', {
+        method: 'POST',
+        headers: await aiHeaders(),
+        body: JSON.stringify({ action: 'report_job_availability', job_id: String(job.id), status: 'expired' }),
+      })
+      setReportedInactive(true)
+    } catch { /* silent */ } finally {
+      setReportingInactive(false)
+    }
+  }
 
   function toggleSave(e: React.MouseEvent) {
     e.stopPropagation()
@@ -567,6 +586,20 @@ function JobCard({ job, index, onSaveToggle, onOpen, onApply, onCheckCompany, al
       >
         View details + AI insights →
       </button>
+
+      {!reportedInactive ? (
+        <button
+          onClick={reportInactive}
+          disabled={reportingInactive}
+          style={{ background: 'none', border: 'none', fontFamily: 'var(--mono)', fontSize: '.55rem', color: 'var(--dim)', cursor: 'pointer', padding: '.1rem 0', opacity: .55, transition: 'opacity .15s', display: 'block' }}
+          onMouseOver={e => (e.currentTarget.style.opacity = '1')}
+          onMouseOut={e => (e.currentTarget.style.opacity = '.55')}
+        >
+          {reportingInactive ? 'Reporting…' : '⚑ Not active? Report it'}
+        </button>
+      ) : (
+        <span style={{ fontFamily: 'var(--mono)', fontSize: '.55rem', color: 'var(--amber)', display: 'block', padding: '.1rem 0' }}>✓ Reported — thanks</span>
+      )}
     </div>
   )
 }

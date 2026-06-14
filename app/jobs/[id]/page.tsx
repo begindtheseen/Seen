@@ -54,6 +54,23 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
   const [insights, setInsights] = useState<Insights | null>(null)
   const [insightsState, setInsightsState] = useState<'loading' | 'done' | 'unavailable' | 'no_desc' | 'credits'>('loading')
   const [showApplyModal, setShowApplyModal] = useState(false)
+  const [reportedInactive, setReportedInactive] = useState(false)
+  const [reportingInactive, setReportingInactive] = useState(false)
+
+  async function reportInactive() {
+    if (!isLoggedIn) { alert('Sign in to report listings.'); return }
+    setReportingInactive(true)
+    try {
+      await fetch('/api/user-sync', {
+        method: 'POST',
+        headers: await aiHeaders(),
+        body: JSON.stringify({ action: 'report_job_availability', job_id: String(id), status: 'expired' }),
+      })
+      setReportedInactive(true)
+    } catch { /* silent */ } finally {
+      setReportingInactive(false)
+    }
+  }
 
   // Resolve the job — session cache first (fast path), then DB fallback for direct links / refreshes
   useEffect(() => {
@@ -244,6 +261,23 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
         {avail === 'expired' && (
           <div style={{ marginTop: '.85rem', padding: '.55rem .8rem', background: 'rgba(239,68,68,.07)', border: '1px solid rgba(239,68,68,.2)', borderRadius: 8, fontFamily: 'var(--mono)', fontSize: '.62rem', color: 'var(--red)', lineHeight: 1.55 }}>✕ This listing is likely closed — it hasn&apos;t been seen in 14+ days. Check the company&apos;s careers page directly.</div>
         )}
+
+        {/* Report inactive */}
+        <div style={{ marginTop: '.4rem' }}>
+          {!reportedInactive ? (
+            <button
+              onClick={reportInactive}
+              disabled={reportingInactive}
+              style={{ background: 'none', border: 'none', fontFamily: 'var(--mono)', fontSize: '.55rem', color: 'var(--dim)', cursor: 'pointer', padding: '.1rem 0', opacity: .55, transition: 'opacity .15s' }}
+              onMouseOver={e => (e.currentTarget.style.opacity = '1')}
+              onMouseOut={e => (e.currentTarget.style.opacity = '.55')}
+            >
+              {reportingInactive ? 'Reporting…' : '⚑ Not active? Report it'}
+            </button>
+          ) : (
+            <span style={{ fontFamily: 'var(--mono)', fontSize: '.55rem', color: 'var(--amber)' }}>✓ Reported — thanks</span>
+          )}
+        </div>
 
         {/* AI insights */}
         <div style={{ marginTop: '1.5rem', background: 'var(--gdim)', border: '1px solid var(--line)', borderRadius: 12, padding: '1.25rem', animation: 'fadeUp .4s .15s ease both' }}>
