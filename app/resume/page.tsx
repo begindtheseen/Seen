@@ -1,6 +1,7 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, Suspense } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { ResumeStore } from '@/lib/stores/ResumeStore'
 import { useAuth } from '@/lib/auth'
 import { aiHeaders } from '@/lib/aiHeaders'
@@ -258,15 +259,74 @@ function ResumeInput({
   )
 }
 
-export default function ResumePage() {
+function EmailCTA({ company, role, matchScore, summary, user }: { company: string; role: string; matchScore: number | null; summary: string; user: { email?: string } | null }) {
+  const [email, setEmail] = useState(user?.email ?? '')
+  const [sent, setSent] = useState(false)
+  const [sending, setSending] = useState(false)
+  const [open, setOpen] = useState(false)
+
+  async function send() {
+    if (!email.trim()) return
+    setSending(true)
+    try {
+      await fetch('/api/resume', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'email_analysis', email: email.trim(), co: company, role, matchScore, summary }),
+      })
+      setSent(true)
+    } catch { /* fail silently */ }
+    setSending(false)
+  }
+
+  if (!company || !role) return null
+
+  return (
+    <div style={{ background: 'rgba(16,185,129,0.06)', border: '1px solid rgba(16,185,129,0.2)', borderRadius: 12, padding: '1rem 1.1rem', marginTop: '1rem' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer' }} onClick={() => setOpen(o => !o)}>
+        <div>
+          <div style={{ fontFamily: 'var(--display)', fontSize: '.82rem', fontWeight: 700, color: 'var(--green)' }}>📧 Email this analysis + apply reminder</div>
+          <div style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', color: 'rgba(52,211,153,0.6)', marginTop: '.15rem' }}>Get a link to track your application after you apply</div>
+        </div>
+        <span style={{ color: 'var(--green)', fontSize: '.75rem' }}>{open ? '▲' : '▼'}</span>
+      </div>
+      {open && !sent && (
+        <div style={{ marginTop: '.85rem', display: 'flex', gap: '.5rem', flexWrap: 'wrap' }}>
+          <input
+            type="email"
+            value={email}
+            onChange={e => setEmail(e.target.value)}
+            placeholder="your@email.com"
+            style={{ flex: 1, minWidth: 180, background: 'var(--surface)', border: '1.5px solid rgba(16,185,129,0.3)', borderRadius: 8, padding: '.5rem .75rem', color: 'var(--white)', fontFamily: 'var(--mono)', fontSize: '.72rem', outline: 'none', caretColor: 'var(--green)' }}
+          />
+          <button
+            onClick={send}
+            disabled={sending || !email.trim()}
+            style={{ background: 'rgba(16,185,129,0.15)', border: '1px solid rgba(16,185,129,0.4)', color: 'var(--green)', fontFamily: 'var(--mono)', fontSize: '.72rem', fontWeight: 600, padding: '.5rem .9rem', borderRadius: 8, cursor: sending ? 'not-allowed' : 'pointer', opacity: sending ? 0.7 : 1 }}
+          >
+            {sending ? 'Sending…' : 'Send →'}
+          </button>
+        </div>
+      )}
+      {open && sent && (
+        <div style={{ marginTop: '.75rem', fontFamily: 'var(--mono)', fontSize: '.7rem', color: 'var(--green)' }}>
+          ✓ Sent! Check your email — click the link after you apply to start tracking.
+        </div>
+      )}
+    </div>
+  )
+}
+
+function ResumePageInner() {
   const { isLoggedIn, user } = useAuth()
+  const params = useSearchParams()
   const [tool, setTool] = useState<Tool>('scanner')
   const [resumeText, setResumeText] = useState('')
   const [resumeMeta, setResumeMeta] = useState<{ fileName: string; wordCount: number } | null>(null)
 
-  // Scanner fields
-  const [scanJob, setScanJob] = useState('')
-  const [scanCompany, setScanCompany] = useState('')
+  // Scanner fields — pre-filled from query params when coming from jobs page
+  const [scanJob, setScanJob] = useState(params?.get('role') ?? '')
+  const [scanCompany, setScanCompany] = useState(params?.get('company') ?? '')
   const [scanJD, setScanJD] = useState('')
   const [scanResult, setScanResult] = useState<ScannerResult | null>(null)
 
@@ -466,7 +526,16 @@ export default function ResumePage() {
             </div>
             <div>
               {scanResult ? (
-                <ScannerResultView d={scanResult} />
+                <>
+                  <ScannerResultView d={scanResult} />
+                  <EmailCTA
+                    company={scanCompany}
+                    role={scanJob}
+                    matchScore={scanResult.match_score}
+                    summary={scanResult.score_summary ?? ''}
+                    user={user}
+                  />
+                </>
               ) : (
                 <ResultEmpty icon="🎯" text={'ATS match score, missing keywords,\nand line-by-line rewrites appear here.'} />
               )}
@@ -535,5 +604,13 @@ export default function ResumePage() {
         )}
       </div>
     </div>
+  )
+}
+
+export default function ResumePage() {
+  return (
+    <Suspense fallback={<div className="page-full"><div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '60vh' }}><div className="spinner" /></div></div>}>
+      <ResumePageInner />
+    </Suspense>
   )
 }

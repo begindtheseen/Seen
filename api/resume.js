@@ -17,6 +17,13 @@ export default async function handler(req, res) {
   if (typeof body === 'string') { try { body = JSON.parse(body); } catch(e) { body = {}; } }
   if (!body || typeof body !== 'object') body = {};
 
+  // ── Route: email_analysis — send resume analysis + apply link via Resend ──────
+  if (body.action === 'email_analysis') {
+    if (req.method !== 'POST') return res.status(405).end();
+    if (await applyRateLimit(req, res, 'email-analysis')) return;
+    return handleEmailAnalysis(req, res, body);
+  }
+
   // ── Route: parse — formerly api/parse-resume.js, folded in to stay at 11 functions ──
   if (body.action === 'parse' || body.base64) {
     if (req.method !== 'POST') return res.status(405).end('Method not allowed');
@@ -300,6 +307,76 @@ async function handleParseResume(req, res, body) {
     console.error('Parse resume error:', err.message);
     logError('parse-resume', err.message);
     return res.status(500).json({ error: err.message });
+  }
+}
+
+// ── Email analysis handler ─────────────────────────────────────────────────────
+async function handleEmailAnalysis(req, res, body) {
+  try {
+    const RESEND_KEY = process.env.RESEND_KEY;
+    if (!RESEND_KEY) return res.status(500).json({ error: 'Email not configured' });
+
+    const { email, co, role, jid, jobUrl, summary, matchScore } = body;
+    if (!email || !co || !role) return res.status(400).json({ error: 'Missing required fields' });
+
+    // Build the apply link — leads to the forced "did you apply?" prompt
+    const applyParams = new URLSearchParams({
+      co,
+      role,
+      ...(jid ? { jid } : {}),
+      ...(jobUrl ? { jobUrl } : {}),
+    });
+    const applyLink = `https://seenjobs.io/apply?${applyParams.toString()}`;
+
+    const scoreHtml = matchScore != null
+      ? `<div style="font-size:32px;font-weight:bold;color:${matchScore >= 75 ? '#10b981' : matchScore >= 50 ? '#f59e0b' : '#ef4444'};margin-bottom:4px;">${matchScore}%</div><div style="font-size:13px;color:#6b7280;margin-bottom:20px;">ATS match score</div>`
+      : '';
+
+    const html = `
+<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="margin:0;padding:0;background:#02040a;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;">
+<div style="max-width:560px;margin:0 auto;padding:40px 24px;">
+  <div style="font-size:11px;letter-spacing:.2em;text-transform:uppercase;color:#3b82f6;margin-bottom:24px;">SEEN · Resume Optimizer</div>
+  <h1 style="font-size:24px;font-weight:800;color:#ffffff;margin:0 0 8px;letter-spacing:-.02em;">Your resume analysis is ready</h1>
+  <p style="font-size:14px;color:#9ca3af;margin:0 0 28px;">For <strong style="color:#fff">${role}</strong> at <strong style="color:#fff">${co}</strong></p>
+  <div style="background:#0c0f1a;border:1px solid #1f2937;border-radius:12px;padding:24px;margin-bottom:28px;text-align:center;">
+    ${scoreHtml}
+    ${summary ? `<p style="font-size:14px;color:#d1d5db;margin:0;line-height:1.6;">${summary}</p>` : '<p style="font-size:14px;color:#6b7280;margin:0;">Open Seen to review your full analysis, keyword gaps, and line-by-line rewrites.</p>'}
+  </div>
+  <a href="${applyLink}" style="display:block;background:linear-gradient(135deg,rgba(16,185,129,0.2),rgba(16,185,129,0.1));border:1.5px solid rgba(16,185,129,0.5);color:#10b981;text-decoration:none;font-weight:700;font-size:15px;text-align:center;padding:16px 24px;border-radius:12px;margin-bottom:16px;letter-spacing:-.01em;">
+    ✅ I applied — track my application →
+  </a>
+  <p style="font-size:12px;color:#374151;text-align:center;margin:0 0 24px;">Click above after you submit your application to start tracking your timeline, ghost alerts, and Day 7/14/30 check-ins.</p>
+  <div style="border-top:1px solid #1f2937;padding-top:20px;font-size:11px;color:#374151;text-align:center;">
+    <a href="https://seenjobs.io" style="color:#3b82f6;text-decoration:none;">seenjobs.io</a> · You're receiving this because you used Resume Optimizer on Seen.
+  </div>
+</div>
+</body>
+</html>`;
+
+    const emailRes = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${RESEND_KEY}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        from: 'Seen <noreply@seenjobs.io>',
+        to: [email],
+        subject: `Your resume analysis for ${role} at ${co}`,
+        html,
+      }),
+    });
+
+    if (!emailRes.ok) {
+      const errText = await emailRes.text();
+      throw new Error('Resend error: ' + errText.slice(0, 100));
+    }
+
+    return res.status(200).json({ ok: true });
+  } catch (err) {
+    console.error('email_analysis error:', err.message);
+    logError('email-analysis', err.message);
+    return res.status(500).json({ error: 'Failed to send email' });
   }
 }
 
