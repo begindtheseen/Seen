@@ -4,7 +4,26 @@
 > **Read this first. Every session. No exceptions.**
 > Then read SEEN_STRATEGY.md. Then `git status`. Then pick up exactly where this doc ends.
 
-Last updated: **2026-06-14 (Session G)**
+Last updated: **2026-06-14 (Session G — Flywheel)**
+
+---
+
+## ⚠️ PRIORITY SHIFT — READ THIS FIRST
+
+**SEENJOBS_BEHAVIORAL_FLYWHEEL.md now exists and is CORE BUSINESS ARCHITECTURE.**
+
+The flywheel document defines the apply checkpoint, update loop, outcome card system, credit rewards, and Pro conversion. It is not a marketing idea. It is the data engine that makes SeenJobs valuable long-term.
+
+**Before starting any session, read:**
+1. This file
+2. `SEEN_STRATEGY.md`
+3. `SEENJOBS_BEHAVIORAL_FLYWHEEL.md` (new — session G)
+4. `git status`
+
+**Current implementation priority order:**
+1. ~~Parity restoration~~ — functional parity is ~95% done
+2. **Flywheel Phase 2: Apply Checkpoint MVP** — the critical missing loop
+3. Visual parity remaining items (tracker handleCheckAnswer, minor gaps)
 
 ---
 
@@ -14,7 +33,7 @@ Last updated: **2026-06-14 (Session G)**
 - `main` = old HTML SPA. Source of truth for design parity. **Never touch it.**
 - Active branch: `next-migration` — push here, Vercel auto-builds a preview
 - Brandon promotes previews to production from the Vercel dashboard
-- Mission: **full visual + functional parity** with `origin/main:index.html`
+- Mission: **apply checkpoint + flywheel loop + outcome cards** (parity is ~done)
 
 ---
 
@@ -23,8 +42,16 @@ Last updated: **2026-06-14 (Session G)**
 | Commit | What shipped |
 |--------|-------------|
 | `cd35710` | Intro splash animation: rolling-letter SEEN canvas port from origin/main — spring bounce, green glow lock, scanning beam, progress bar, first-visit-only localStorage gate |
+| `72cecc8` | HiringProbability component, SurveyModal, Nav credit auto-refresh, company/[slug] locations tab, apply/page.tsx company risk intel, admin 2-col KPI grid |
+| `6d7e84a` | AllJobsBrowser replaces RecentJobsBrowser — company-grouped, lazy-load per company, all 5k+ jobs, search filter; api/admin-stats.js: get_jobs_grouped + get_company_jobs |
+| `26e4e9e` | Supabase migration 015: job_availability_reports table (was missing — reports were silently failing); user-sync.js error handling for insert failures |
+| (docs) | **SEENJOBS_BEHAVIORAL_FLYWHEEL.md** — full product architecture spec for apply checkpoint, update loop, outcome cards, credit rewards, Pro conversion |
 
-**Build status**: ✅ PASSING after cd35710 — 19 routes, zero TS errors
+**Build status**: ✅ PASSING — 19 routes, zero TS errors
+
+**Supabase migrations needed (run in SQL Editor):**
+- `015_job_availability_reports.sql` — creates job_availability_reports table
+- `014_job_dedup.sql` — run AFTER cleaning up duplicate jobs
 
 ---
 

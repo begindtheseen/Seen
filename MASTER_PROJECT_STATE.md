@@ -1,6 +1,24 @@
 # MASTER PROJECT STATE — Seen / SeenJobs
-*Last updated: 2026-06-14 — Session F visual parity*
+*Last updated: 2026-06-14 — Session G: flywheel architecture + admin completions*
 *Branch: `next-migration`*
+
+---
+
+## ⚠️ BUSINESS ENGINE PRIORITY (as of Session G)
+
+**`SEENJOBS_BEHAVIORAL_FLYWHEEL.md` is now core product architecture.**
+
+The apply checkpoint, update loop, outcome cards, and credit reward system are NOT optional growth features. They are the data engine that makes SeenJobs valuable. Without them, there is no moat, no virality, no outcome data.
+
+**Next implementation block (Phase 2): Apply Checkpoint MVP**
+
+Files to create:
+- `components/ApplyCheckpoint.tsx` — "Did you apply?" modal
+- `api/user-sync.js` — add create_application + update_application actions
+- `supabase/migrations/016_applications.sql` — applications + application_events tables
+- Dashboard reminder cards in `app/dashboard/page.tsx`
+
+Do not start this without reading `SEENJOBS_BEHAVIORAL_FLYWHEEL.md` in full.
 
 ---
 
