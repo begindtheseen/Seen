@@ -486,37 +486,38 @@ async function _handler(req, res) {
 
   // ── JOB DEDUPLICATION ────────────────────────────────────────────────────────
   if (action === 'scan_job_dupes') {
-    const r = await db('jobs?availability_status=not.eq.removed&apply_url=not.is.null&select=id,apply_url&limit=50000');
+    // Adzuna uses different tracking params per search query, so apply_url varies
+    // for the same job matched by multiple searches. Use (title, company, city) instead.
+    const r = await db('jobs?select=id,title,company,city&limit=100000');
     if (!r.ok) return res.status(500).json({ error: 'Query failed' });
     const jobs = await r.json();
     const seen = new Map();
-    let dupeCount = 0;
     for (const j of (jobs || [])) {
-      const key = (j.apply_url || '').toLowerCase().trim();
-      if (!key) continue;
+      const key = `${(j.title || '').toLowerCase().trim()}|${(j.company || '').toLowerCase().trim()}|${(j.city || '').toLowerCase().trim()}`;
       seen.set(key, (seen.get(key) || 0) + 1);
     }
-    for (const count of seen.values()) if (count > 1) dupeCount += count - 1;
-    return res.status(200).json({ ok: true, suspected: dupeCount, total: (jobs || []).length });
+    let suspected = 0;
+    for (const count of seen.values()) if (count > 1) suspected += count - 1;
+    return res.status(200).json({ ok: true, suspected, total: (jobs || []).length });
   }
 
   if (action === 'dedupe_jobs') {
     if (adminRole === 'moderator') return res.status(403).json({ error: 'Insufficient role' });
-    const r = await db('jobs?availability_status=not.eq.removed&apply_url=not.is.null&select=id,apply_url,last_seen_at,created_at&limit=50000');
+    const r = await db('jobs?select=id,title,company,city,last_seen_at,created_at&limit=100000');
     if (!r.ok) return res.status(500).json({ error: 'Query failed' });
     const jobs = await r.json();
-    // Group by normalized apply_url, keep newest per group
-    const byUrl = new Map();
+    // Group by (title, company, city) case-insensitive
+    const byKey = new Map();
     for (const j of (jobs || [])) {
-      const key = (j.apply_url || '').toLowerCase().trim();
-      if (!key) continue;
-      if (!byUrl.has(key)) byUrl.set(key, []);
-      byUrl.get(key).push(j);
+      const key = `${(j.title || '').toLowerCase().trim()}|${(j.company || '').toLowerCase().trim()}|${(j.city || '').toLowerCase().trim()}`;
+      if (!byKey.has(key)) byKey.set(key, []);
+      byKey.get(key).push(j);
     }
     const toDelete = [];
-    for (const group of byUrl.values()) {
+    for (const group of byKey.values()) {
       if (group.length <= 1) continue;
-      group.sort((a, b) => ((b.last_seen_at || b.created_at) > (a.last_seen_at || a.created_at) ? 1 : -1));
+      // Keep newest by last_seen_at, then created_at
+      group.sort((a, b) => ((b.last_seen_at || b.created_at || '') > (a.last_seen_at || a.created_at || '') ? 1 : -1));
       toDelete.push(...group.slice(1).map(j => j.id));
     }
     if (!toDelete.length) return res.status(200).json({ ok: true, deleted: 0 });

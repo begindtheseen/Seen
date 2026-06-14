@@ -1,13 +1,10 @@
--- Prevent duplicate job listings by apply_url.
--- Run AFTER using the admin dedup panel to remove existing duplicates,
--- otherwise this index creation will fail on the current dupes.
+-- Prevent duplicate job listings.
+-- Run AFTER using the admin dedup panel to clean existing duplicates,
+-- otherwise the index creation will fail on current dupes.
 --
--- What this does:
---   Exact same apply_url = same job posting. Block re-insertion at DB level.
---   The refresh-jobs upsert uses "resolution=merge-duplicates" which will
---   now correctly update existing rows instead of inserting duplicates.
+-- Root cause: Adzuna returns different redirect_url tracking params per search,
+-- so the same job matched by multiple queries has different apply_url values.
+-- The true duplicate key is (title, company, city) case-insensitive.
 
-CREATE UNIQUE INDEX IF NOT EXISTS idx_jobs_apply_url_dedup
-  ON jobs(apply_url)
-  WHERE apply_url IS NOT NULL
-    AND availability_status NOT IN ('removed', 'expired');
+CREATE UNIQUE INDEX IF NOT EXISTS idx_jobs_title_company_city_dedup
+  ON jobs(lower(title), lower(company), lower(city));
