@@ -1,8 +1,6 @@
 # Deploy Notes
 
 ## 2026-06-14 (Session G)
-- adm-wrap width:100% fixes 2-col grid
-- get_recent_jobs: removed invalid 'url' column → fixes Query failed
-- Added scan_job_dupes + dedupe_jobs API actions
-- Added JobDedupePanel component in admin page
-- Added 014_job_dedup.sql migration (run after deduping)
+- Job dedup key fixed: now uses title+company+city (not apply_url)
+- Adzuna tracking params made apply_url differ per search — that's why scan found 0
+- Limit raised to 100k, no status filter — catches all dupes regardless of state
