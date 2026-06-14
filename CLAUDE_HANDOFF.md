@@ -3,7 +3,7 @@
 > **Read this first. Every session. No exceptions.**
 > Then read SEEN_STRATEGY.md. Then `git status`. Then pick up exactly where this doc ends.
 
-Last updated: **2026-06-13 (Session D)**
+Last updated: **2026-06-14 (Session E)**
 
 ---
 
@@ -14,6 +14,16 @@ Last updated: **2026-06-13 (Session D)**
 - Active branch: `next-migration` — push here, Vercel auto-builds a preview
 - Brandon promotes previews to production from the Vercel dashboard
 - Mission: **full visual + functional parity** with `origin/main:index.html`
+
+---
+
+## What Session E shipped (latest push, branch `next-migration`)
+
+| Commit | What shipped |
+|--------|-------------|
+| `68a1b91` | Visual parity: cosmos bg intensity restored, feed CTA order fixed, companies header/controls, `jd-grid` stat row, tracker eyebrow |
+| `bca94eb` | Visual parity pass 2: feed filter emojis, companies description copy, sort button CSS classes |
+| `22a5875` | Global footer component — restores nav links to FAQ, Legal, Employers, Pricing, Contact (was missing entirely from Next.js migration) |
 
 ---
 
@@ -47,6 +57,23 @@ Session D ran 5 parallel agents + direct edits to knock out the entire Tier 1–
 | `a685441` | Landing: ghost surge strip (pulsing red dot + 5 company pills) |
 | `a685441` | Landing: verdict feed rows → navigate to /company/[slug] |
 | `a685441` | Landing: 5-layer cosmos radial-gradient overlay |
+
+---
+
+## Admin parity reconciliation (2026-06-14)
+
+A contradiction existed between two checklist documents:
+
+- `VISUAL_PARITY_CHECKLIST.md` claimed admin was 12/16 sections missing
+- `ADMIN_PARITY_CHECKLIST.md` claimed admin was 16/16 complete
+
+**Resolution:** The VISUAL_PARITY_CHECKLIST.md was stale. It was written at commit `572b886` before the admin recovery commits were merged into `next-migration`. All 9 admin recovery commits (`6f79d84` through `9fff826`) are confirmed present on `next-migration`. `app/admin/page.tsx` is 1,176 lines and contains all 16 admin sections. No cherry-pick or merge was needed.
+
+**`ADMIN_PARITY_CHECKLIST.md` is authoritative for admin functionality.**
+
+Remaining admin work is **visual polish only** (command-center aesthetics, colored KPI borders, section separators) — not missing functionality.
+
+Functional parity estimate revised upward: **~95%** (was 88% before admin reconciliation). Visual parity remains ~65%.
 
 ---
 

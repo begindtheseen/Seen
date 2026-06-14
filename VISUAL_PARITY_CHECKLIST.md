@@ -1,6 +1,6 @@
 # Visual Parity Audit — Seen
-**Audit date:** 2026-06-13  
-**Scope:** `origin/main:index.html` (13,354 lines) vs `next-migration` HEAD (`572b886`)  
+**Audit date:** 2026-06-13 (last updated 2026-06-14)
+**Scope:** `origin/main:index.html` (13,354 lines) vs `next-migration` HEAD (`572b886` at audit time; estimates revised against current HEAD as of 2026-06-14)
 **Method:** Full CSS/HTML extraction from old SPA, code diff of all 13 pages, Playwright full-page screenshots at 1440×900  
 
 ---
@@ -14,11 +14,15 @@
 
 ## Summary Estimates
 
+> **Functional vs visual parity are different dimensions.** Functional parity means the features and data flows work. Visual parity means the rendered UI is indistinguishable from `origin/main`. They can (and do) diverge — the site can be fully functional with visual gaps, or visually matched with missing features.
+
 | Dimension | Score | Main gap |
 |-----------|-------|----------|
-| **Functional parity** | **88%** | Admin (12/16 sections missing), resume URL tab |
-| **Visual parity** | **65%** | Cosmos background intensity, jobs sidebar, feed element order, inner-page card density |
-| **Behavioral parity** | **79%** | Scroll-reveal, surge banner conditionals, page transition feel |
+| **Functional parity** | **~95%** | Minor: GPS auto-fill on jobs, instant-search debounce, resume URL tab, nav credit balance display |
+| **Visual parity** | **~65%** | Jobs sidebar filter panel (structural layout gap), below-fold scroll-reveal, some card density/spacing differences on inner pages |
+| **Behavioral parity** | **~79%** | Scroll-reveal, page transition timing, surge banner show/hide conditionals |
+
+> **Admin note (2026-06-14):** Admin functional parity was previously assessed at 12/16 sections missing in this document. That assessment was **stale** — it was written at commit `572b886` before the admin recovery commits were merged. Admin is now **16/16 functionally complete**. See section 13 below and `ADMIN_PARITY_CHECKLIST.md` for detail.
 
 ---
 
@@ -227,24 +231,30 @@
 
 ## 13. Admin (`/admin`)
 
-**12/16 sections missing.** See `ADMIN_PARITY_CHECKLIST.md` for detail.
+**✅ 16/16 sections functionally complete.** `ADMIN_PARITY_CHECKLIST.md` is the authoritative source.
 
-| Section | Status |
+> **Reconciliation note (2026-06-14):** This document previously showed 12/16 sections missing. That was a stale assessment written at commit `572b886`, before the admin recovery commits (`6f79d84` through `9fff826`) were merged into `next-migration`. All 9 admin commits are confirmed present on `next-migration`. `app/admin/page.tsx` is 1,176 lines and contains all 16 admin sections. The prior gap table below reflected pre-recovery state and is preserved only for historical reference.
+>
+> **Remaining admin work is visual/polish, not functionality.** See `A1–A5` in the fix table below.
+
+| Section | Functional Status |
 |---------|--------|
-| Auth (login/logout) | 🟡 |
-| Header + KPI boxes | 🟡 |
-| Jobs KPI | 🔴 Missing |
-| Reports chart + outcomes | 🟡 API gap |
-| Recent hiring reports + moderation | 🔴 Missing |
-| Recent tracker apps | 🔴 Missing |
-| Recent jobs browser | 🔴 Missing |
-| Reported inactive listings | 🔴 Missing |
-| Data quality issues queue | 🔴 Missing |
-| Company deduplication | 🔴 Missing |
-| Feature flags | 🔴 Missing |
-| Duplicate account clusters | 🔴 Missing |
-| API Health | 🔴 Missing |
-| Background job runner | 🔴 Missing |
+| Auth (login/logout/401/403) | ✅ |
+| Header + KPI boxes | ✅ |
+| Jobs KPI | ✅ |
+| Reports chart + outcomes | ✅ |
+| Recent hiring reports + moderation | ✅ |
+| Recent tracker apps | ✅ |
+| New job listings browser | ✅ |
+| Reported inactive listings | ✅ |
+| Data quality issues queue | ✅ |
+| Company deduplication | ✅ |
+| Feature flags (FlagsPanel) | ✅ |
+| Duplicate account clusters | ✅ |
+| API Health | ✅ |
+| Background job runner | ✅ |
+| Admin login form | ✅ |
+| Admin logout | ✅ |
 
 ---
 
@@ -301,8 +311,8 @@ Ranked by impact-per-hour:
 
 9. **Connect surge banners to real API data** — Feed and landing strip pull from `/api/reports` ghost surge action. ~45 min.
 
-**Hours 6–14 — Admin (highest effort)**
-10. **Admin parity** — 12 missing sections, ~8–12 hours. Priority: Recent reports + moderation, Jobs KPI, Data quality queue.
+**Hours 6+ — Admin visual polish (functionality already complete)**
+10. **Admin command-center polish** — All 16 sections are functional. Remaining work is visual: colored KPI card borders, outcome-based left borders on report cards, section separators, overall premium command-center feel. ~2–3 hours. See `A1–A5` in the fix table.
 
 ---
 
