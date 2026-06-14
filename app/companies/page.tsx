@@ -108,8 +108,34 @@ export default function CompaniesPage() {
             Loading scoreboard...
           </div>
         ) : filtered.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: '3rem', color: 'var(--muted)', fontFamily: 'var(--mono)', fontSize: '.72rem' }}>
-            {search ? 'No companies match that search.' : 'No company data yet. Be the first to submit a report.'}
+          <div style={{ textAlign: 'center', padding: '3rem 1.5rem' }}>
+            {search.trim() ? (
+              <>
+                <div style={{ color: 'var(--muted)', fontFamily: 'var(--mono)', fontSize: '.72rem', marginBottom: '1.25rem' }}>
+                  &ldquo;{search}&rdquo; isn&apos;t in the scoreboard yet.
+                </div>
+                <a
+                  href={`/company/${encodeURIComponent(search.trim().toLowerCase().replace(/\s+/g, '-'))}`}
+                  style={{
+                    display: 'inline-flex', alignItems: 'center', gap: '.4rem',
+                    background: 'rgba(99,102,241,0.1)', border: '1px solid rgba(99,102,241,0.3)',
+                    borderRadius: 9, padding: '.7rem 1.4rem',
+                    fontFamily: 'var(--mono)', fontSize: '.72rem', fontWeight: 600,
+                    color: 'var(--blue)', textDecoration: 'none',
+                    boxShadow: '0 0 24px rgba(99,102,241,0.1)',
+                  }}
+                >
+                  Look up &ldquo;{search.trim()}&rdquo; →
+                </a>
+                <div style={{ marginTop: '.75rem', fontFamily: 'var(--mono)', fontSize: '.58rem', color: 'var(--dim)' }}>
+                  We&apos;ll research this company and cache the score for everyone.
+                </div>
+              </>
+            ) : (
+              <div style={{ color: 'var(--muted)', fontFamily: 'var(--mono)', fontSize: '.72rem' }}>
+                No company data yet. Be the first to submit a report.
+              </div>
+            )}
           </div>
         ) : (
           <div className="ldr-grid">

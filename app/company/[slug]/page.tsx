@@ -418,6 +418,7 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
   const [industry, setIndustry] = useState('')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [notFound, setNotFound] = useState(false)
   const [tab, setTab] = useState<TabKey>('overview')
   const [location, setLocation] = useState('')
   const [webReviews, setWebReviews] = useState<WebReview[]>([])
@@ -466,8 +467,10 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
           body: JSON.stringify({ name: companyName }),
         })
         if (sRes.ok) {
-          const sJson = await sRes.json() as { score?: CompanyScore; ok?: boolean }
-          if (sJson.score) {
+          const sJson = await sRes.json() as { score?: CompanyScore; ok?: boolean; not_found?: boolean }
+          if (sJson.not_found) {
+            setNotFound(true)
+          } else if (sJson.score) {
             setScore(sJson.score)
             if (sJson.score.industry) setIndustry(sJson.score.industry)
             if (sJson.score.web_reviews?.length) setWebReviews(sJson.score.web_reviews)
@@ -525,6 +528,25 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
   const ocClass: Record<string, string> = {
     ghosted: 'v-r', autoreject: 'v-y', rejected: 'v-y',
     human: 'v-g', hired: 'v-g', offer: 'v-g', interview: 'v-b', waiting: 'v-n',
+  }
+
+  if (!loading && notFound) {
+    return (
+      <div className="page-full">
+        <div style={{ maxWidth: 600, margin: '0 auto', padding: '5rem 2rem', textAlign: 'center' }}>
+          <div style={{ fontFamily: 'var(--mono)', fontSize: '2.5rem', marginBottom: '1rem', opacity: .4 }}>?</div>
+          <h1 style={{ fontFamily: 'var(--display)', fontSize: '1.4rem', fontWeight: 800, color: 'var(--white)', marginBottom: '.6rem', letterSpacing: '-.02em' }}>
+            Can&apos;t verify &ldquo;{companyName}&rdquo;
+          </h1>
+          <p style={{ color: 'var(--sub)', fontFamily: 'var(--mono)', fontSize: '.72rem', lineHeight: 1.7, marginBottom: '1.75rem' }}>
+            We couldn&apos;t find this company online. Make sure you&apos;re using the official company name — we need to verify it exists before scoring.
+          </p>
+          <a href="/companies" style={{ display: 'inline-flex', alignItems: 'center', gap: '.4rem', background: 'rgba(99,102,241,0.1)', border: '1px solid rgba(99,102,241,0.3)', borderRadius: 9, padding: '.65rem 1.3rem', fontFamily: 'var(--mono)', fontSize: '.72rem', fontWeight: 600, color: 'var(--blue)', textDecoration: 'none' }}>
+            ← Back to company scoreboard
+          </a>
+        </div>
+      </div>
+    )
   }
 
   return (

@@ -844,7 +844,7 @@ async function buildResponse(res, reports, hdrs, SUPABASE_URL, city) {
 }
 
 // ── handleCompanyScore: merged from api/company-score.js ──────────────────────
-const _SCORE_TTL_MS = 30 * 24 * 60 * 60 * 1000;
+const _SCORE_TTL_MS = 365 * 24 * 60 * 60 * 1000;
 
 function _calcScore(rr, gr, wait, cnt) {
   return Math.max(0, Math.min(100, Math.round(
@@ -974,9 +974,8 @@ async function handleCompanyScore(req, res, body) {
 
   if (!force_refresh && SUPABASE_URL && SUPABASE_SERVICE_KEY) {
     try {
-      const now = encodeURIComponent(new Date().toISOString());
       const nameEnc = encodeURIComponent(name.toLowerCase().trim());
-      const cacheRes = await fetch(`${SUPABASE_URL}/rest/v1/company_scores?company_name=ilike.${nameEnc}&expires_at=gt.${now}&order=created_at.desc&limit=1`, { headers: dbH });
+      const cacheRes = await fetch(`${SUPABASE_URL}/rest/v1/company_scores?company_name=ilike.${nameEnc}&order=created_at.desc&limit=1`, { headers: dbH });
       if (cacheRes.ok) { const rows = await cacheRes.json(); if (rows?.[0]) return res.json({ ok: true, score: _rowToScore(rows[0]), _src: 'cache' }); }
     } catch(e) { console.warn('Cache check:', e.message); }
   }
@@ -987,7 +986,7 @@ async function handleCompanyScore(req, res, body) {
     apiRes = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'x-api-key': ANTHROPIC_KEY, 'anthropic-version': '2023-06-01', 'anthropic-beta': 'web-search-2025-03-05' },
-      body: JSON.stringify({ model: 'claude-haiku-4-5-20251001', max_tokens: 2000, tools: [{ type: 'web_search_20250305', name: 'web_search' }], system: 'You are a hiring transparency researcher. Search Reddit (r/recruitinghell, r/jobs, r/cscareerquestions), Glassdoor interview reviews, Blind, and LinkedIn for real applicant experiences at the company. Focus on posts from 2023-2025. Return ONLY a valid JSON object — no markdown, no explanation.', messages: [{ role: 'user', content: `Research the hiring process and applicant experience at "${name}". Search for: ghosting complaints, interview timelines, number of rounds, unpaid take-home tests, and overall process reputation. Find 4-6 specific quotes or close paraphrases from real applicants on Reddit, Glassdoor, or Blind.\n\nReturn ONLY this JSON:\n{"ghost_rate":0.0-1.0,"response_rate":0.0-1.0,"avg_rounds":1-8,"avg_wait_days":5-120,"unpaid_rate":0.0-1.0,"report_count":number,"data_quality":"high|medium|low","industry":"e.g. E-Commerce, Fintech","summary":"2-3 sentences","reviews":[{"text":"quote","sentiment":"positive|negative|mixed","source":"Reddit r/...","year":"2024"}]}` }] })
+      body: JSON.stringify({ model: 'claude-haiku-4-5-20251001', max_tokens: 2000, tools: [{ type: 'web_search_20250305', name: 'web_search' }], system: 'You are a hiring transparency researcher. First verify the company exists online, then search Reddit (r/recruitinghell, r/jobs, r/cscareerquestions), Glassdoor interview reviews, Blind, and LinkedIn for real applicant experiences. Focus on posts from 2023-2025. Return ONLY a valid JSON object — no markdown, no explanation.', messages: [{ role: 'user', content: `First, search online to verify that "${name}" is a real, findable company. If it does NOT appear to be a real company — it seems fictional, misspelled, has no web presence, or you cannot find any credible online results — return ONLY this JSON and nothing else: {"not_found":true,"reason":"one sentence explanation"}.\n\nOtherwise, research the hiring process and applicant experience at "${name}". Search for: ghosting complaints, interview timelines, number of rounds, unpaid take-home tests, and overall process reputation. Find 4-6 specific quotes or close paraphrases from real applicants on Reddit, Glassdoor, or Blind.\n\nReturn ONLY this JSON:\n{"ghost_rate":0.0-1.0,"response_rate":0.0-1.0,"avg_rounds":1-8,"avg_wait_days":5-120,"unpaid_rate":0.0-1.0,"report_count":number,"data_quality":"high|medium|low","industry":"e.g. E-Commerce, Fintech","summary":"2-3 sentences","reviews":[{"text":"quote","sentiment":"positive|negative|mixed","source":"Reddit r/...","year":"2024"}]}` }] })
     });
     if (apiRes.status !== 429 && apiRes.status !== 529) break;
   }
@@ -1008,6 +1007,10 @@ async function handleCompanyScore(req, res, body) {
   let parsed;
   try { const clean = text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim(); const match = clean.match(/\{[\s\S]*\}/); if (!match) throw new Error('no JSON found'); parsed = JSON.parse(match[0]); }
   catch(e) { return res.status(502).json({ error: 'Could not parse response', raw: text.slice(0, 200) }); }
+
+  if (parsed.not_found) {
+    return res.json({ ok: false, not_found: true, message: `"${name}" doesn't appear to be a real company — we couldn't find it online. Check the spelling or try a well-known company name.` });
+  }
 
   const gr = Math.max(0, Math.min(1, Number(parsed.ghost_rate)||0)), rr = Math.max(0, Math.min(1, Number(parsed.response_rate)||0)), wait = Math.max(1, Math.min(180, Number(parsed.avg_wait_days)||30)), rounds = Math.max(1, Math.min(10, Number(parsed.avg_rounds)||3)), unpaid = Math.max(0, Math.min(1, Number(parsed.unpaid_rate)||0)), cnt = Math.max(1, Number(parsed.report_count)||5);
   const overall = _calcScore(rr, gr, wait, cnt), waste = _calcWaste(gr, rounds, unpaid);
