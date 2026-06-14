@@ -893,6 +893,11 @@ nav.nav-scrolled{background:rgba(6,6,8,0.82);backdrop-filter:blur(60px) saturate
   .nav-pills{display:none}
   .side-menu-toggle{display:flex}
 }
+/* Hide "For employers →" button in nav on small phones — it overflows the nav bar at 375px */
+@media(max-width:480px){
+  nav .btn-solid{display:none}
+  .nav-right{gap:.25rem}
+}
 
 /* ── PAGE EXIT ANIMATION (T0-4) ── */
 @keyframes pageExit{to{opacity:0;transform:translateY(-7px)}}

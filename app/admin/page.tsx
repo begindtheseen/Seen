@@ -487,7 +487,7 @@ export default function AdminPage() {
         {/* API Health */}
         <Card>
           <CardHeader title="API Health" />
-          <div className="adm-kpi-row" style={{ gridTemplateColumns: 'repeat(3,1fr)', marginBottom: '.75rem' }}>
+          <div className="adm-kpi-row" style={{ marginBottom: '.75rem' }}>
             <KpiCard l="Errors today" n={stats.errors?.today ?? 0} sub="last 24h" borderColor={stats.errors?.today > 10 ? 'var(--red)' : undefined} numColor={stats.errors?.today > 10 ? 'var(--red)' : undefined} />
             <KpiCard l="Errors this week" n={stats.errors?.this_week ?? 0} sub="last 7 days" />
             <KpiCard l="DAU" n={stats.users?.dau ?? 0} sub="active today" />
