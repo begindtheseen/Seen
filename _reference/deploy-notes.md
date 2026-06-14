@@ -1,8 +1,8 @@
-# Deploy notes — session G
+# Deploy Notes
 
-- admin KPI grid: 1fr 1fr default, repeat(4,1fr) at min-width:900px
-  (auto-fit removed — was giving 4 cols at 50% zoom)
-- nav: hide For employers button at ≤480px
-- admin API health KPI row: removed gridTemplateColumns inline override
-- adm-wrap: removed overflow-x:hidden, bumped mobile padding to 1rem
-- old index.html / employer.html moved to _reference/
+## 2026-06-14 (Session G)
+- Admin KPI card sizing now matches pre-migration reference
+- 1.8rem numbers (prominent, reference-matching)
+- Mobile override matches old app proportions — no font-size reduction
+- Removed inline marginBottom overrides from KPI rows
+- Colored left borders, section labels, DeployPanel all preserved
