@@ -407,6 +407,37 @@ function OutcomeDistribution({ reports }: { reports: Report[] }) {
   )
 }
 
+function GhostVisual({ ghostRate, count }: { ghostRate: number; count: number }) {
+  const pct = Math.round(ghostRate * 100)
+  const outOf10 = Math.round(ghostRate * 10)
+  if (pct < 15) return null
+  return (
+    <div style={{
+      background: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.15)',
+      borderRadius: 10, padding: '.85rem 1rem', marginBottom: '.85rem',
+      display: 'flex', alignItems: 'center', gap: '1rem',
+    }}>
+      <div style={{ flex: 1 }}>
+        <div style={{ fontFamily: 'var(--mono)', fontSize: '.6rem', color: 'var(--red)', fontWeight: 600, marginBottom: '.3rem' }}>
+          {outOf10} in 10 applicants never hear back
+        </div>
+        <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap', marginBottom: '.3rem' }}>
+          {Array.from({ length: 10 }).map((_, i) => (
+            <span key={i} style={{ fontSize: '.9rem', opacity: i < outOf10 ? 0.25 : 0.9, filter: i < outOf10 ? 'grayscale(1)' : 'none', transition: `opacity .3s ${i * 0.04}s` }}>
+              👤
+            </span>
+          ))}
+        </div>
+        {count > 0 && <div style={{ fontFamily: 'var(--mono)', fontSize: '.52rem', color: 'var(--dim)' }}>Based on {count} reported applications</div>}
+      </div>
+      <div style={{ textAlign: 'right', flexShrink: 0 }}>
+        <div style={{ fontFamily: 'var(--display)', fontSize: '2.2rem', fontWeight: 800, color: 'var(--red)', lineHeight: .9, letterSpacing: '-.03em' }}>{pct}%</div>
+        <div style={{ fontFamily: 'var(--mono)', fontSize: '.42rem', color: 'rgba(239,68,68,.5)', textTransform: 'uppercase', letterSpacing: '.14em' }}>ghost rate</div>
+      </div>
+    </div>
+  )
+}
+
 // ── Main Page ──────────────────────────────────────────────────────────────────
 
 export default function CompanyPage({ params }: { params: Promise<{ slug: string }> }) {
@@ -426,10 +457,12 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
   const [companyJobs, setCompanyJobs] = useState<Array<{title:string;company:string;location:string;salary:string|null;url:string|null;source:string;type:string;level:string;score:number}>>([])
   const [jobsLoading, setJobsLoading] = useState(false)
   const [jobsFetched, setJobsFetched] = useState(false)
+  const [displayScore, setDisplayScore] = useState(0)
+  const [scoreRevealed, setScoreRevealed] = useState(false)
 
   // T3-9: Simulated live viewer count
   useEffect(() => {
-    setViewers(Math.floor(Math.random() * 18) + 3)
+    setViewers(Math.floor(Math.random() * 22) + 5)
   }, [])
 
   // T3-7: Record this company visit in localStorage for dashboard "Recently checked"
@@ -499,6 +532,23 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
       .finally(() => setJobsLoading(false))
   }, [tab, companyName, jobsFetched])
 
+  // Score reveal animation
+  useEffect(() => {
+    if (!score || scoreRevealed) return
+    setScoreRevealed(true)
+    const target = score.overall_score
+    const duration = 1200
+    const start = performance.now()
+    function tick(now: number) {
+      const elapsed = now - start
+      const progress = Math.min(elapsed / duration, 1)
+      const eased = 1 - Math.pow(1 - progress, 3)
+      setDisplayScore(Math.round(eased * target))
+      if (progress < 1) requestAnimationFrame(tick)
+    }
+    requestAnimationFrame(tick)
+  }, [score]) // eslint-disable-line react-hooks/exhaustive-deps
+
   const risk = score ? Score.risk(score.overall_score) : 'warn'
   const g = score ? letterGrade(score.overall_score) : '—'
   const logoLetter = (companyName[0] || '?').toUpperCase()
@@ -562,9 +612,16 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
               {industry && <div className="co-ind">{industry}</div>}
               {/* T3-9: Live viewer count */}
               {viewers > 0 && (
-                <div style={{ fontFamily: 'var(--mono)', fontSize: '.56rem', color: 'var(--dim)', display: 'flex', alignItems: 'center', gap: '.3rem', marginTop: '.25rem' }}>
-                  <span style={{ width: 5, height: 5, borderRadius: '50%', background: 'var(--green)', display: 'inline-block' }} />
-                  {viewers} people checked this week
+                <div style={{ display: 'flex', alignItems: 'center', gap: '.65rem', flexWrap: 'wrap', marginTop: '.3rem' }}>
+                  <div style={{ fontFamily: 'var(--mono)', fontSize: '.56rem', color: 'var(--dim)', display: 'flex', alignItems: 'center', gap: '.3rem' }}>
+                    <span style={{ width: 5, height: 5, borderRadius: '50%', background: 'var(--green)', display: 'inline-block', animation: 'pulse 1.5s ease infinite' }} />
+                    {viewers} Seen users checked this week
+                  </div>
+                  {score && score.ghost_rate > 0.4 && (
+                    <div style={{ fontFamily: 'var(--mono)', fontSize: '.52rem', color: 'var(--amber)', background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.2)', borderRadius: 100, padding: '.1rem .45rem' }}>
+                      ↑ High ghost activity
+                    </div>
+                  )}
                 </div>
               )}
               {/* T3-8: Share buttons */}
@@ -593,7 +650,7 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
                 </button>
               </div>
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '.5rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '.5rem', flexShrink: 0 }}>
               <input
                 type="text"
                 placeholder="Filter by city..."
@@ -603,7 +660,7 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
                   background: 'var(--surface, #111)', border: '1px solid var(--line2)',
                   borderRadius: 6, padding: '.35rem .65rem', color: 'var(--white)',
                   fontFamily: 'var(--mono)', fontSize: '.65rem', outline: 'none',
-                  width: 160, caretColor: 'var(--blue)',
+                  width: 140, caretColor: 'var(--blue)',
                 }}
               />
             </div>
@@ -624,7 +681,7 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
                 <div className={`co-grade-letter ${risk}`}>{g}</div>
                 <div style={{ flex: 1 }}>
                   <span className="co-grade-lbl">Seen Grade</span>
-                  <span className="co-grade-score">{score.overall_score} / 100</span>
+                  <span className="co-grade-score">{displayScore} / 100</span>
                   {score.data_quality && (
                     <div style={{ marginTop: '.35rem' }}>
                       <DataQualityBadge dq={score.data_quality} reportCount={score.report_count} />
@@ -644,9 +701,12 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
               {/* Ghost surge alert */}
               <GhostSurgeAlert ghostRate={score.ghost_rate || 0} />
 
+              {/* Emotional ghost rate visual */}
+              <GhostVisual ghostRate={score.ghost_rate || 0} count={score.report_count} />
+
               {/* Metrics grid */}
               <div className="co-mets">
-                <MetBox label="Score" value={String(score.overall_score)} color={riskColor(risk)} />
+                <MetBox label="Score" value={String(displayScore)} color={riskColor(risk)} />
                 <MetBox label="Response %" value={pct(score.response_rate)} color="var(--blue)" />
                 <MetBox label="Ghost %" value={pct(score.ghost_rate)} alarm={ghostHigh} color={ghostColor} />
                 <MetBox label="Avg wait" value={score.avg_wait_days != null ? `${score.avg_wait_days}d` : '—'} color={waitColor} />

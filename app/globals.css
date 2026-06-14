@@ -453,7 +453,6 @@ nav.nav-scrolled{background:rgba(6,6,8,0.82);backdrop-filter:blur(60px) saturate
 .co-hdr::after{content:'';position:absolute;bottom:0;left:0;right:0;height:50%;background:linear-gradient(to top,rgba(29,78,216,0.14) 0%,rgba(124,58,237,0.08) 35%,rgba(8,145,178,0.03) 65%,transparent 100%);pointer-events:none;z-index:0}
 .co-hdr>*{position:relative;z-index:1}
 .co-top{display:flex;align-items:flex-start;gap:1.25rem;margin-bottom:1.75rem}
-@media (max-width:640px){.co-top{flex-wrap:wrap}.co-name{font-size:1.5rem}.co-mets{grid-template-columns:repeat(3,1fr)}}
 .co-logo-lg{width:54px;height:54px;border-radius:11px;background:var(--raised);border:1px solid var(--line2);display:flex;align-items:center;justify-content:center;font-family:var(--display);font-size:1.3rem;font-weight:800;color:var(--sub);flex-shrink:0}
 .co-name{font-family:var(--display);font-size:2rem;font-weight:800;color:var(--white);letter-spacing:-.04em;margin-bottom:.12rem}
 .co-ind{font-family:var(--mono);font-size:.65rem;color:var(--dim);margin-bottom:.35rem}
