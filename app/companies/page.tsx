@@ -124,7 +124,11 @@ export default function CompaniesPage() {
                   href={`/company/${encodeURIComponent(co.name.toLowerCase().replace(/\s+/g, '-'))}`}
                   style={{ textDecoration: 'none', animation: `fadeUp .4s ${Math.min(i, 14) * 0.04}s ease both` }}
                 >
-                  <div className="ldr-item">
+                  <div className="ldr-item" style={{
+                    boxShadow: risk === 'safe' ? '0 0 24px rgba(16,185,129,0.12), inset 0 0 0 1px rgba(16,185,129,0.12)' :
+                                risk === 'danger' ? '0 0 24px rgba(239,68,68,0.12), inset 0 0 0 1px rgba(239,68,68,0.12)' :
+                                '0 0 24px rgba(245,158,11,0.08), inset 0 0 0 1px rgba(245,158,11,0.08)',
+                  }}>
                     <div className="ldr-rank">#{i + 1}</div>
                     <div className={`ldr-score ${risk}`}>{g}</div>
                     <div className="ldr-name">

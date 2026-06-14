@@ -111,6 +111,41 @@ function DataQualityBadge({ dq, reportCount }: { dq: string; reportCount: number
   )
 }
 
+function computeVibes(sc: CompanyScore): { label: string; cls: string }[] {
+  const vibes: { label: string; cls: string }[] = []
+  const ghost = sc.ghost_rate || 0
+  const wait = sc.avg_wait_days || 0
+  const rounds = sc.avg_rounds || 0
+  const waste = sc.waste || 0
+  const rr = sc.response_rate || 0
+  const score = sc.overall_score || 0
+
+  if (ghost > 0.65)       vibes.push({ label: '👻 Frequent ghosting',              cls: 'v-r' })
+  else if (ghost > 0.45)  vibes.push({ label: '👻 High ghost rate',                cls: 'v-r' })
+  if (wait > 30)          vibes.push({ label: `⏳ Very slow pipeline (${wait}d)`,  cls: 'v-y' })
+  else if (wait > 21)     vibes.push({ label: `⏳ Slow response (${wait}d avg)`,   cls: 'v-y' })
+  if (rounds >= 5)        vibes.push({ label: `📋 ${Math.round(rounds)} rounds avg`,       cls: 'v-b' })
+  else if (rounds >= 3.5) vibes.push({ label: `📋 ${rounds.toFixed(1)} rounds avg`,        cls: 'v-b' })
+  if (waste > 70)         vibes.push({ label: '⚠ Very high waste risk',            cls: 'v-y' })
+  else if (waste > 50)    vibes.push({ label: '⚠ High waste risk',                 cls: 'v-y' })
+  if (rr > 0.75)          vibes.push({ label: '✅ Highly responsive',               cls: 'v-g' })
+  if (score >= 80)        vibes.push({ label: '🌟 Strong hiring process',           cls: 'v-g' })
+  if (score < 35)         vibes.push({ label: '❌ Low transparency',                cls: 'v-r' })
+  return vibes.slice(0, 5)
+}
+
+function VibeTagList({ sc }: { sc: CompanyScore }) {
+  const vibes = computeVibes(sc)
+  if (vibes.length === 0) return null
+  return (
+    <div style={{ display: 'flex', gap: '.28rem', flexWrap: 'wrap', margin: '.55rem 0 .65rem' }}>
+      {vibes.map(v => (
+        <span key={v.label} className={`vibe ${v.cls}`}>{v.label}</span>
+      ))}
+    </div>
+  )
+}
+
 function GhostSurgeAlert({ ghostRate }: { ghostRate: number }) {
   if (ghostRate <= 0.6) return null
   const ghostPct = Math.round(ghostRate * 100)
@@ -580,6 +615,9 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
                   </div>
                 )}
               </div>
+
+              {/* Vibe / explanation tags */}
+              <VibeTagList sc={score} />
 
               {/* Ghost surge alert */}
               <GhostSurgeAlert ghostRate={score.ghost_rate || 0} />
