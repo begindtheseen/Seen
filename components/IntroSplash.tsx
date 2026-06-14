@@ -1,24 +1,28 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, memo } from 'react';
 
-export default function IntroSplash() {
-  const splashRef = useRef<HTMLDivElement>(null);
+type Phase = 'hidden' | 'in' | 'out';
+
+function IntroSplashInner() {
+  const [phase, setPhase] = useState<Phase>('hidden');
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
+  // Check sessionStorage once on mount — don't show on repeat visits in same session
   useEffect(() => {
-    // Only show on first visit
     try {
-      if (localStorage.getItem('seen_intro_shown')) return;
+      if (sessionStorage.getItem('seen_intro_shown')) return;
     } catch {}
+    setPhase('in');
+  }, []);
 
-    const splash = splashRef.current;
+  // Run canvas animation only when phase becomes 'in'
+  useEffect(() => {
+    if (phase !== 'in') return;
+
     const canvas = canvasRef.current;
-    if (!splash || !canvas) return;
+    if (!canvas) return;
 
-    splash.style.display = 'flex';
-
-    // ── Canvas setup ──
     const DPR = Math.min(window.devicePixelRatio || 1, 2);
     const W = 220, H = 72;
     canvas.style.width = W + 'px';
@@ -171,48 +175,39 @@ export default function IntroSplash() {
       }
     }
 
-    document.fonts.ready.then(() => {
+    let started = false;
+    const startAnimation = () => {
+      if (started) return;
+      started = true;
       rafId = requestAnimationFrame(tick);
-    });
-
-    // Hide splash after minimum 2.4s
-    const splashT0 = Date.now();
-    const hideSplash = () => {
-      if (!splash || splash.dataset.gone) return;
-      splash.dataset.gone = '1';
-      const elapsed = Date.now() - splashT0;
-      const delay = Math.max(0, 2400 - elapsed);
-      setTimeout(() => {
-        splash.classList.add('sp-out');
-        setTimeout(() => {
-          if (splash.parentNode) splash.parentNode.removeChild(splash);
-        }, 600);
-      }, delay);
-      try { localStorage.setItem('seen_intro_shown', '1'); } catch {}
     };
 
-    // Safety net — hide after 4s
-    const safetyTimer = setTimeout(hideSplash, 4000);
+    // Start immediately — don't wait for fonts (font fallback still renders)
+    startAnimation();
+    // Also start when fonts ready in case of slow font load
+    document.fonts?.ready?.then(startAnimation);
 
-    // Hide when page is interactive
-    if (document.readyState === 'complete') {
-      hideSplash();
-    } else {
-      window.addEventListener('load', hideSplash, { once: true });
-    }
+    // After minimum 2.4s, begin fade-out
+    const hideTimer = setTimeout(() => {
+      try { sessionStorage.setItem('seen_intro_shown', '1'); } catch {}
+      setPhase('out');
+      setTimeout(() => setPhase('hidden'), 580);
+    }, 2400);
 
     return () => {
-      clearTimeout(safetyTimer);
+      clearTimeout(hideTimer);
       if (rafId) cancelAnimationFrame(rafId);
     };
-  }, []);
+  }, [phase]);
+
+  // Not visible — not in DOM at all (React can't interfere)
+  if (phase === 'hidden') return null;
 
   return (
     <div
       id="introSplash"
-      ref={splashRef}
+      className={phase === 'out' ? 'sp-out' : ''}
       aria-hidden="true"
-      style={{ display: 'none' }}
     >
       <div className="sp-beam" />
       <canvas ref={canvasRef} id="splashCanvas" width={220} height={72} />
@@ -221,3 +216,5 @@ export default function IntroSplash() {
     </div>
   );
 }
+
+export default memo(IntroSplashInner);
