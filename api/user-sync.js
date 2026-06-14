@@ -299,6 +299,35 @@ export default async function handler(req, res) {
   }
 
   // ── REPORT JOB AVAILABILITY ───────────────────────────────────────────────────
+  if (action === 'create_application') {
+    const { company, role, job_id, resume_optimized } = body;
+    if (!company || !role) return res.status(400).json({ error: 'company and role required' });
+    const now = new Date().toISOString();
+    const nextCheck = new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString();
+    const r = await db('applications', {
+      method: 'POST',
+      body: JSON.stringify({
+        user_id: uid,
+        company: String(company).slice(0, 200),
+        role: String(role).slice(0, 200),
+        job_id: job_id ? String(job_id).slice(0, 100) : null,
+        applied_at: now,
+        resume_optimized: resume_optimized || false,
+        stage: 'applied',
+        status: 'active',
+        next_check_due_at: nextCheck,
+        source: 'seen',
+      }),
+      headers: { Prefer: 'return=minimal' },
+    });
+    if (!r.ok) {
+      const errText = await r.text().catch(() => r.status);
+      console.error('create_application failed:', errText);
+      return res.status(500).json({ error: 'Failed to create application' });
+    }
+    return res.status(200).json({ ok: true });
+  }
+
   if (action === 'report_job_availability') {
     const { job_id, status: avStatus } = body;
     if (!job_id || !['active','expired','unknown'].includes(avStatus)) {

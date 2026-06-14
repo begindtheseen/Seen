@@ -10,6 +10,7 @@ import { useAuth } from '@/lib/auth'
 import { aiHeaders } from '@/lib/aiHeaders'
 import type { Job } from '@/lib/types'
 import HiringProbability from '@/components/HiringProbability'
+import ApplyCheckpoint from '@/components/ApplyCheckpoint'
 
 type SortMode = 'transparency' | 'waste' | 'recent'
 type NicheFilter = '' | 'tech' | 'healthcare' | 'retail' | 'logistics' | 'finance' | 'other'
@@ -606,20 +607,23 @@ function JobCard({ job, index, onSaveToggle, onOpen, onApply, onCheckCompany, al
 
 // ── SwipeJobDeck ──────────────────────────────────────────────────────────────
 
-function SwipeJobDeck({ jobs, onOpen, onDismiss, onSave, coScores }: {
+function SwipeJobDeck({ jobs, onOpen, onDismiss, onSave, onApply, coScores }: {
   jobs: Job[]
   onOpen: (job: Job) => void
   onDismiss: () => void
   onSave?: () => void
+  onApply?: (job: Job) => void
   coScores?: Record<string, {ghost_rate: number; overall_score: number; response_rate?: number}>
 }) {
   const [stack, setStack] = useState<Job[]>(() => [...jobs])
   const [deltaX, setDeltaX] = useState(0)
+  const [deltaY, setDeltaY] = useState(0)
   const [isDragging, setIsDragging] = useState(false)
-  const [flyDir, setFlyDir] = useState<'left' | 'right' | null>(null)
+  const [flyDir, setFlyDir] = useState<'left' | 'right' | 'up' | null>(null)
   const [savedCount, setSavedCount] = useState(0)
   const startXRef = useRef(0)
   const startYRef = useRef(0)
+  const deltaYRef = useRef(0)
   const hasMoved = useRef(false)
   const cardRef = useRef<HTMLDivElement>(null)
 
@@ -631,8 +635,10 @@ function SwipeJobDeck({ jobs, onOpen, onDismiss, onSave, coScores }: {
   const thirdJob = stack[2] ?? null
 
   const badgeOpacity = Math.min(1, Math.abs(deltaX) / 80)
+  const applyBadgeOpacity = Math.min(1, Math.abs(deltaY) / 80)
   const showLeft = deltaX < -40
   const showRight = deltaX > 40
+  const showUp = deltaY < -30 && Math.abs(deltaX) < 80
 
   async function saveJob(job: Job) {
     try {
@@ -650,12 +656,15 @@ function SwipeJobDeck({ jobs, onOpen, onDismiss, onSave, coScores }: {
     } catch { /* ignore */ }
   }
 
-  function advance(dir: 'left' | 'right') {
+  function advance(dir: 'left' | 'right' | 'up') {
     if (!topJob) return
     if (dir === 'right') {
       saveJob(topJob)
       setSavedCount(c => c + 1)
       onSave?.()
+    }
+    if (dir === 'up') {
+      onApply?.(topJob)
     }
     setFlyDir(dir)
     setTimeout(() => {
@@ -666,6 +675,8 @@ function SwipeJobDeck({ jobs, onOpen, onDismiss, onSave, coScores }: {
       })
       setFlyDir(null)
       setDeltaX(0)
+      setDeltaY(0)
+      deltaYRef.current = 0
       setIsDragging(false)
     }, 300)
   }
@@ -677,30 +688,40 @@ function SwipeJobDeck({ jobs, onOpen, onDismiss, onSave, coScores }: {
     hasMoved.current = false
     setIsDragging(true)
     setDeltaX(0)
+    setDeltaY(0)
+    deltaYRef.current = 0
   }
 
-  function onPointerMove(clientX: number) {
+  function onPointerMove(clientX: number, clientY: number) {
     if (!isDragging || flyDir) return
     const dx = clientX - startXRef.current
-    if (Math.abs(dx) > 4) hasMoved.current = true
+    const dy = clientY - startYRef.current
+    if (Math.abs(dx) > 4 || Math.abs(dy) > 4) hasMoved.current = true
     setDeltaX(dx)
+    setDeltaY(dy)
+    deltaYRef.current = dy
   }
 
   function onPointerEnd() {
     if (!isDragging || flyDir) return
     if (!hasMoved.current && topJob) {
-      // Tap: open drawer
       setIsDragging(false)
       setDeltaX(0)
+      setDeltaY(0)
+      deltaYRef.current = 0
       onOpen(topJob)
       return
     }
-    if (Math.abs(deltaX) > 80) {
+    const dy = deltaYRef.current
+    if (dy < -80 && Math.abs(deltaX) < 80) {
+      advance('up')
+    } else if (Math.abs(deltaX) > 80) {
       advance(deltaX > 0 ? 'right' : 'left')
     } else {
-      // Snap back
       if (cardRef.current) cardRef.current.classList.add('snap-back')
       setDeltaX(0)
+      setDeltaY(0)
+      deltaYRef.current = 0
       setIsDragging(false)
       setTimeout(() => {
         if (cardRef.current) cardRef.current.classList.remove('snap-back')
@@ -713,7 +734,7 @@ function SwipeJobDeck({ jobs, onOpen, onDismiss, onSave, coScores }: {
     e.preventDefault()
     onPointerStart(e.clientX, e.clientY)
 
-    function onMouseMove(e: MouseEvent) { onPointerMove(e.clientX) }
+    function onMouseMove(ev: MouseEvent) { onPointerMove(ev.clientX, ev.clientY) }
     function onMouseUp() {
       window.removeEventListener('mousemove', onMouseMove)
       window.removeEventListener('mouseup', onMouseUp)
@@ -731,7 +752,7 @@ function SwipeJobDeck({ jobs, onOpen, onDismiss, onSave, coScores }: {
 
   function onTouchMove(e: React.TouchEvent) {
     const t = e.touches[0]
-    onPointerMove(t.clientX)
+    onPointerMove(t.clientX, t.clientY)
   }
 
   function onTouchEnd() { onPointerEnd() }
@@ -763,8 +784,11 @@ function SwipeJobDeck({ jobs, onOpen, onDismiss, onSave, coScores }: {
   } else if (flyDir === 'right') {
     topTransform = 'translateX(120%) rotate(18deg)'
     topOpacity = 0
+  } else if (flyDir === 'up') {
+    topTransform = 'translateY(-130%) scale(0.9)'
+    topOpacity = 0
   } else if (isDragging) {
-    topTransform = `translateX(${deltaX}px) rotate(${deltaX * 0.05}deg)`
+    topTransform = `translate(${deltaX}px, ${Math.min(0, deltaY)}px) rotate(${deltaX * 0.05}deg)`
   }
 
   // Second card scale animates toward 1.0 as user drags
@@ -776,7 +800,8 @@ function SwipeJobDeck({ jobs, onOpen, onDismiss, onSave, coScores }: {
   const scoreColor = (score: number) => score >= 75 ? 'var(--green)' : score >= 50 ? 'var(--amber)' : 'var(--red)'
 
   return (
-    <div className="swipe-deck" aria-label="Swipe job cards — drag right to save, left to pass">
+  <div>
+    <div className="swipe-deck" aria-label="Swipe job cards — drag right to save, left to pass" style={{ height: 320 }}>
       {/* Third peek card */}
       {thirdJob && (
         <div className="swipe-peek" style={{ transform: 'scale(0.92) translateY(16px)', transformOrigin: 'bottom center', zIndex: 1 }} />
@@ -798,7 +823,16 @@ function SwipeJobDeck({ jobs, onOpen, onDismiss, onSave, coScores }: {
         {/* PASS badge */}
         <span className="swipe-badge swipe-badge-l" style={{ opacity: showLeft ? badgeOpacity : 0 }}>✕ Pass</span>
         {/* SAVE badge */}
-        <span className="swipe-badge swipe-badge-r" style={{ opacity: showRight ? badgeOpacity : 0 }}>→ Save</span>
+        <span className="swipe-badge swipe-badge-r" style={{ opacity: showRight ? badgeOpacity : 0 }}>♡ Save</span>
+        {/* APPLY badge (up swipe) */}
+        <span style={{
+          position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)',
+          fontFamily: 'var(--mono)', fontSize: '.75rem', fontWeight: 700,
+          color: 'var(--blue)', background: 'rgba(59,130,246,.15)',
+          border: '1.5px solid rgba(59,130,246,.5)', borderRadius: 7,
+          padding: '.3rem .7rem', pointerEvents: 'none',
+          opacity: showUp ? applyBadgeOpacity : 0, transition: 'opacity .1s',
+        }}>↑ Apply Now</span>
 
         {/* Card content */}
         <div style={{ display: 'flex', alignItems: 'flex-start', gap: '.75rem', marginBottom: '.55rem' }}>
@@ -855,12 +889,36 @@ function SwipeJobDeck({ jobs, onOpen, onDismiss, onSave, coScores }: {
 
         <div style={{ position: 'absolute', bottom: '.9rem', left: '1.15rem', right: '1.15rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <span style={{ fontFamily: 'var(--mono)', fontSize: '.52rem', color: 'var(--muted)' }}>{topJob.source || 'Job board'}</span>
-          <span style={{ fontFamily: 'var(--mono)', fontSize: '.52rem', color: 'var(--dim)' }}>{stack.length} left · drag or tap</span>
+          <span style={{ fontFamily: 'var(--mono)', fontSize: '.52rem', color: 'var(--dim)' }}>{stack.length} left{savedCount > 0 ? ` · ♡ ${savedCount} saved` : ''}</span>
         </div>
       </div>
     </div>
+
+    {/* Action buttons */}
+    <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '1rem', marginTop: '1rem' }}>
+      <button
+        onClick={() => advance('left')}
+        title="Skip"
+        style={{ width: 50, height: 50, borderRadius: '50%', border: '1px solid var(--line2)', background: 'var(--card)', color: 'var(--dim)', fontSize: '1.1rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'var(--mono)' }}
+      >✕</button>
+      <button
+        onClick={() => advance('up')}
+        title="Apply now"
+        style={{ width: 62, height: 62, borderRadius: '50%', border: '1px solid rgba(59,130,246,.45)', background: 'rgba(59,130,246,.12)', color: 'var(--blue)', fontSize: '1.35rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700 }}
+      >↑</button>
+      <button
+        onClick={() => advance('right')}
+        title="Save"
+        style={{ width: 50, height: 50, borderRadius: '50%', border: '1px solid rgba(16,185,129,.45)', background: 'rgba(16,185,129,.12)', color: 'var(--green)', fontSize: '1.1rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+      >♡</button>
+    </div>
+    <div style={{ textAlign: 'center', marginTop: '.5rem', fontFamily: 'var(--mono)', fontSize: '.48rem', color: 'var(--dim)' }}>
+      ← pass · ↑ apply now · save →
+    </div>
+  </div>
   )
 }
+
 
 const US_CITIES = ['New York, NY','Los Angeles, CA','Chicago, IL','Houston, TX','Phoenix, AZ','San Antonio, TX','San Diego, CA','Dallas, TX','San Jose, CA','Austin, TX','Seattle, WA','Denver, CO','Boston, MA','Atlanta, GA','Miami, FL','Portland, OR','Las Vegas, NV','San Francisco, CA','Washington, DC','Charlotte, NC','Nashville, TN','Minneapolis, MN','Raleigh, NC','Detroit, MI','Sacramento, CA']
 
@@ -894,6 +952,8 @@ export default function JobsPage() {
   const [recStatus, setRecStatus] = useState<'idle' | 'loading' | 'done'>('idle')
   const [swipeCount, setSwipeCount] = useState(0)
   const [deckDone, setDeckDone] = useState(false)
+  const [swipeMode, setSwipeMode] = useState(true)
+  const [checkpointJob, setCheckpointJob] = useState<Job | null>(null)
   const [coScores, setCoScores] = useState<Record<string, {ghost_rate: number; overall_score: number; response_rate?: number}>>({})
   const [appliedCos, setAppliedCos] = useState<Set<string>>(new Set())
   const abortRef = useRef<AbortController | null>(null)
@@ -1317,6 +1377,7 @@ export default function JobsPage() {
                 onOpen={j => setDetailJob(j)}
                 onDismiss={() => setDeckDone(true)}
                 onSave={() => setSwipeCount(c => c + 1)}
+                onApply={j => { if (j.apply_url) window.open(j.apply_url, '_blank', 'noopener,noreferrer'); setCheckpointJob(j) }}
                 coScores={coScores}
               />
             )}
@@ -1326,19 +1387,42 @@ export default function JobsPage() {
         {/* Results header */}
         <div className="jtb">
           <div className="jct">{statusMsg}</div>
-          <select
-            className="jss"
-            value={sort}
-            onChange={e => setSort(e.target.value as SortMode)}
-          >
-            <option value="transparency">By transparency</option>
-            <option value="waste">Lowest waste risk</option>
-            <option value="recent">Most recent</option>
-          </select>
+          <div style={{ display: 'flex', gap: '.4rem', alignItems: 'center' }}>
+            {filtered.length > 0 && (
+              <div style={{ display: 'flex', borderRadius: 7, overflow: 'hidden', border: '1px solid var(--line2)' }}>
+                <button
+                  onClick={() => setSwipeMode(true)}
+                  style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', padding: '.28rem .6rem', background: swipeMode ? 'var(--surface)' : 'transparent', color: swipeMode ? 'var(--white)' : 'var(--dim)', border: 'none', cursor: 'pointer' }}
+                >⊕ Swipe</button>
+                <button
+                  onClick={() => setSwipeMode(false)}
+                  style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', padding: '.28rem .6rem', background: !swipeMode ? 'var(--surface)' : 'transparent', color: !swipeMode ? 'var(--white)' : 'var(--dim)', border: 'none', cursor: 'pointer' }}
+                >≡ List</button>
+              </div>
+            )}
+            <select
+              className="jss"
+              value={sort}
+              onChange={e => setSort(e.target.value as SortMode)}
+            >
+              <option value="transparency">By transparency</option>
+              <option value="waste">Lowest waste risk</option>
+              <option value="recent">Most recent</option>
+            </select>
+          </div>
         </div>
 
-        {/* Results list */}
-        {filtered.length > 0 ? (
+        {/* Results — swipe deck or list */}
+        {filtered.length > 0 && swipeMode ? (
+          <SwipeJobDeck
+            jobs={filtered}
+            onOpen={j => setDetailJob(j)}
+            onDismiss={() => setSwipeMode(false)}
+            onSave={() => setSaveVersion(v => v + 1)}
+            onApply={j => { if (j.apply_url) window.open(j.apply_url, '_blank', 'noopener,noreferrer'); setCheckpointJob(j) }}
+            coScores={coScores}
+          />
+        ) : filtered.length > 0 ? (
           <div className="jlist" key={saveVersion}>
             {filtered.map((job, i) => (
               <JobCard key={job.id} job={job} index={i} onSaveToggle={handleSaveToggle} onOpen={j => setDetailJob(j)} onApply={j => { setApplyJob(j); setApplyPlatform('Seen') }} onCheckCompany={co => setCheckCompany(co)} alreadyApplied={appliedCos.has(job.company.toLowerCase().trim())} />
@@ -1501,6 +1585,13 @@ export default function JobsPage() {
           </div>
         </div>
       </div>
+    )}
+
+    {checkpointJob && (
+      <ApplyCheckpoint
+        job={checkpointJob}
+        onClose={() => setCheckpointJob(null)}
+      />
     )}
     </>
   )
