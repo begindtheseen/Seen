@@ -157,13 +157,14 @@ async function handlePost(req, res) {
   const currentYear = new Date().getFullYear().toString();
   const prevYear    = (new Date().getFullYear() - 1).toString();
 
-  const blsRequest = async (seriesIds) => {
+  const blsRequest = async (seriesIds, signal) => {
     const body = { seriesid: seriesIds, startyear: prevYear, endyear: currentYear };
     if (BLS_API_KEY) body.registrationkey = BLS_API_KEY;
     const r = await fetch('https://api.bls.gov/publicAPI/v2/timeseries/data/', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
+      signal,
     });
     if (!r.ok) throw new Error(`BLS API HTTP ${r.status}`);
     return r.json();
@@ -185,7 +186,9 @@ async function handlePost(req, res) {
 
   try {
     const allSeriesIds = [...JOLTS_SERIES.map(s => s.id), ...CES_SERIES.map(s => s.id)];
-    const blsData = await blsRequest(allSeriesIds);
+    const blsCtrl = new AbortController();
+    const blsTimer = setTimeout(() => blsCtrl.abort(), 12000);
+    const blsData = await blsRequest(allSeriesIds, blsCtrl.signal).finally(() => clearTimeout(blsTimer));
     if (blsData.status !== 'REQUEST_SUCCEEDED') {
       throw new Error(`BLS status: ${blsData.status} — ${blsData.message?.[0] || ''}`);
     }

@@ -517,12 +517,19 @@ Return ONLY a valid JSON array. Return [] if there are genuinely no hiring exper
     const keywords = ['hiring', 'interview', 'ghosted', 'rejected', 'offer', 'recruiter', 'application', 'applied', 'onsite', 'phone screen', 'final round', 'heard back', 'never heard', 'no response', 'background check', 'offer letter', 'laid off', 'let go'];
     const sleep = ms => new Promise(r => setTimeout(r, ms));
 
+    // Run fn on each item with at most `n` concurrent in-flight at once
+    async function pMap(arr, fn, n) {
+      for (let i = 0; i < arr.length; i += n) {
+        await Promise.all(arr.slice(i, i + n).map(fn));
+      }
+    }
+
     // Fetch each subreddit once, fan out across companies
     const postsByCompany = {};
     for (const company of companies) postsByCompany[company] = [];
 
     for (const sub of SUBREDDITS) {
-      // Source 1: /new RSS — catches fresh activity and implicit company mentions via thread context
+      // Source 1: /new RSS — catches fresh activity and implicit company mentions
       const newPosts = await redditFetch(sub);
       for (const company of companies) {
         const cl = company.toLowerCase();
@@ -533,37 +540,37 @@ Return ONLY a valid JSON array. Return [] if there are genuinely no hiring exper
         postsByCompany[company].push(...matching);
       }
 
-      await sleep(3000);
+      await sleep(2000);
 
-      // Source 2: Reddit search RSS per company — surfaces older posts /new misses, staggered to avoid 429
-      for (const company of companies) {
+      // Source 2: Reddit search RSS per company — 5 concurrent instead of serial+1.5s sleep
+      await pMap(companies, async (company) => {
         const searchPosts = await redditSearchFetch(sub, company);
         postsByCompany[company].push(...searchPosts);
-        await sleep(1500);
-      }
+      }, 5);
 
-      await sleep(3000);
+      await sleep(1500);
 
-      // Source 3: Pullpush archive — historical posts + direct comment search, different infrastructure so no Reddit rate limit
-      for (const company of companies) {
+      // Source 3: Pullpush archive — separate infra, 8 concurrent (no Reddit rate limit)
+      await pMap(companies, async (company) => {
         const archivePosts = await pullpushFetch(sub, company);
         postsByCompany[company].push(...archivePosts);
-      }
+      }, 8);
 
-      await sleep(2000);
+      await sleep(1000);
     }
 
     const results = {};
-    for (const company of companies) {
+
+    // Process companies 5 at a time — parallel Claude calls + DB writes per company
+    await pMap(companies, async (company) => {
       let imported = 0, skipped = 0;
-      // Dedup across sources by post ID
       const seen_ids = new Set();
       const posts = postsByCompany[company].filter(p => { if (seen_ids.has(p.id)) return false; seen_ids.add(p.id); return true; });
-      if (!posts.length) { results[company] = { imported: 0, skipped: 0, fetched: 0 }; continue; }
+      if (!posts.length) { results[company] = { imported: 0, skipped: 0, fetched: 0 }; return; }
 
       const seen = await alreadyImported(posts.map(p => p.id));
       const fresh = posts.filter(p => !seen.has(p.id));
-      if (!fresh.length) { results[company] = { imported: 0, skipped: 0, fetched: posts.length, note: 'all_seen' }; continue; }
+      if (!fresh.length) { results[company] = { imported: 0, skipped: 0, fetched: posts.length, note: 'all_seen' }; return; }
 
       // Fetch comments for all fresh posts in parallel (capped at 10)
       await Promise.all(fresh.slice(0, 10).map(async post => {
@@ -575,24 +582,24 @@ Return ONLY a valid JSON array. Return [] if there are genuinely no hiring exper
       const experiences = await extractReports(fresh, company);
 
       if (!experiences.length) {
-        // Mark posts as seen so we don't re-process them
         if (!dryRun) {
           await Promise.all(fresh.map(post =>
             fetch(`${SUPABASE_URL}/rest/v1/reddit_imports`, { method: 'POST', headers: { ...hdrsBase, Prefer: 'return=minimal' }, body: JSON.stringify({ reddit_post_id: post.id, company_name: company, subreddit: post.subreddit, skipped: true, skip_reason: 'no_experiences_extracted' }) })
           ));
         }
         results[company] = { imported: 0, skipped: fresh.length, fetched: posts.length };
-        continue;
+        return;
       }
 
       if (dryRun) {
         results[company] = { imported: experiences.length, skipped: 0, fetched: posts.length, dry_run: true };
-        continue;
+        return;
       }
 
       const cid = await upsertCo(company);
 
-      for (const exp of experiences) {
+      // Insert all reports in parallel instead of serial loop
+      const insertResults = await Promise.all(experiences.map(exp => {
         const sourcePost = fresh[exp.post_idx] || fresh[0];
         const rpt = {
           company_name: company,
@@ -609,9 +616,9 @@ Return ONLY a valid JSON array. Return [] if there are genuinely no hiring exper
           experience_level: 'Unknown',
         };
         if (cid) rpt.company_id = cid;
-        const repR = await fetch(`${SUPABASE_URL}/rest/v1/reports`, { method: 'POST', headers: { ...hdrsBase, Prefer: 'return=representation' }, body: JSON.stringify(rpt) });
-        if (repR.ok) imported++; else skipped++;
-      }
+        return fetch(`${SUPABASE_URL}/rest/v1/reports`, { method: 'POST', headers: { ...hdrsBase, Prefer: 'return=representation' }, body: JSON.stringify(rpt) });
+      }));
+      for (const r of insertResults) { if (r.ok) imported++; else skipped++; }
 
       // Mark source posts as imported
       await Promise.all(fresh.map(post =>
@@ -619,7 +626,8 @@ Return ONLY a valid JSON array. Return [] if there are genuinely no hiring exper
       ));
 
       results[company] = { imported, skipped, fetched: posts.length, experiences: experiences.length };
-    }
+    }, 5);
+
     return res.status(200).json({ ok: true, results, debug: { subreddits: fetchDebug } });
   }
 

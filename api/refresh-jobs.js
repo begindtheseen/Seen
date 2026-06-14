@@ -703,19 +703,27 @@ export default async function handler(req, res) {
     );
     const allJobs = results.filter(r => r.status === 'fulfilled').flatMap(r => r.value);
 
-    // Upsert in batches of 25, collect returned rows for insight pre-gen
+    // Pre-warm company ID cache for all unique companies in this batch
+    // so parallel upserts below hit the in-memory cache instead of racing to create companies
+    const uniqueCompanies = [...new Set(allJobs.map(j => j.company).filter(Boolean))];
+    await Promise.all(uniqueCompanies.map(name => getOrCreateCompanyId(name, SUPABASE_URL, SUPABASE_SERVICE_KEY)));
+
+    // Upsert in batches of 100, 3 batches at a time — 4× fewer round trips than 25-per-batch serial
+    const UPSERT_BATCH = 100;
+    const upsertBatches = Array.from({ length: Math.ceil(allJobs.length / UPSERT_BATCH) }, (_, i) =>
+      allJobs.slice(i * UPSERT_BATCH, (i + 1) * UPSERT_BATCH)
+    );
     const upsertResults = [];
-    for (let i = 0; i < allJobs.length; i += 25) {
-      const result = await upsertJobs(allJobs.slice(i, i + 25), SUPABASE_URL, SUPABASE_SERVICE_KEY);
-      upsertResults.push(result);
+    for (let i = 0; i < upsertBatches.length; i += 3) {
+      const chunk = await Promise.all(upsertBatches.slice(i, i + 3).map(b => upsertJobs(b, SUPABASE_URL, SUPABASE_SERVICE_KEY)));
+      upsertResults.push(...chunk);
     }
 
-    // Pre-generate insights for new/uncached jobs — eliminates thundering herd.
-    // Awaited with a 30s cap so cron stays well within 60s maxDuration.
+    // Pre-generate insights for new/uncached jobs — capped at 12s to stay within 60s maxDuration
     const allRows = upsertResults.flatMap(r => r.rows || []);
     await Promise.race([
       pregenInsights(allRows, SUPABASE_URL, SUPABASE_SERVICE_KEY, ANTHROPIC_KEY),
-      new Promise(r => setTimeout(r, 30000)),
+      new Promise(r => setTimeout(r, 12000)),
     ]).catch(e => console.error('pregen error (non-fatal):', e.message));
 
     // Sunday only: backfill company_id on jobs that are missing it + merge duplicates
