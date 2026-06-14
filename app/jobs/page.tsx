@@ -117,6 +117,14 @@ function JobCard({ job, index, onSaveToggle, onOpen }: { job: Job; index: number
         <span className="jlc-mi" style={{ color: 'var(--blue)' }}>{job.source || 'Job board'}</span>
       </div>
 
+      <a
+        href={`/company/${encodeURIComponent(job.company.toLowerCase().replace(/\s+/g, '-'))}`}
+        onClick={e => e.stopPropagation()}
+        style={{ display: 'block', width: '100%', textAlign: 'left', fontFamily: 'var(--mono)', fontSize: '.62rem', color: 'var(--amber)', padding: '.1rem 0 .55rem', opacity: .8, textDecoration: 'none' }}
+      >
+        🏢 Check {job.company} →
+      </a>
+
       <div className="jlc-actions">
         <button
           className="jlc-save"
@@ -227,8 +235,9 @@ export default function JobsPage() {
     finally { setGpsLoading(false) }
   }
 
-  async function searchJobs() {
-    if (!query.trim() && !location.trim()) {
+  async function searchJobs(queryOverride?: string) {
+    const q = (queryOverride ?? query).trim()
+    if (!q && !location.trim()) {
       setStatusMsg('Enter a job title or location to search.')
       return
     }
@@ -240,12 +249,10 @@ export default function JobsPage() {
     setFiltered([])
 
     try {
-      // POST {query, location, radius} — matches api/jobs.js (POST-only, reads body.query).
-      // Filters (niche/level/type/posted) + sort are applied client-side in updateDisplay.
       const res = await fetch('/api/jobs', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ query: query.trim(), location: location.trim(), radius }),
+        body: JSON.stringify({ query: q, location: location.trim(), radius }),
         signal: abortRef.current.signal,
       })
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
@@ -384,7 +391,7 @@ export default function JobsPage() {
               <option value="0">Remote</option>
             </select>
             <button
-              onClick={searchJobs}
+              onClick={() => searchJobs()}
               disabled={status === 'loading'}
               style={{
                 background: 'linear-gradient(135deg,#3b82f6 0%,#8b5cf6 100%)',
@@ -460,8 +467,15 @@ export default function JobsPage() {
             ))}
           </div>
         ) : status === 'idle' ? (
-          <div style={{ textAlign: 'center', padding: '4rem 2rem', color: 'var(--muted)', fontFamily: 'var(--mono)', fontSize: '.75rem' }}>
-            Search for jobs above to get started.
+          <div style={{ textAlign: 'center', padding: '2.75rem 1.5rem 3.25rem' }}>
+            <div style={{ fontFamily: 'var(--mono)', fontSize: '.56rem', color: 'var(--green)', textTransform: 'uppercase', letterSpacing: '.16em', marginBottom: '.5rem' }}>Start a search</div>
+            <div style={{ fontFamily: 'var(--display)', fontSize: '1.1rem', fontWeight: 700, color: 'var(--white)', letterSpacing: '-.02em', marginBottom: '.4rem' }}>What role are you hunting?</div>
+            <div style={{ fontFamily: 'var(--mono)', fontSize: '.62rem', color: 'var(--muted)', marginBottom: '1.15rem' }}>Every result is transparency-scored before you waste a single application.</div>
+            <div style={{ display: 'flex', gap: '.45rem', flexWrap: 'wrap', justifyContent: 'center' }}>
+              {['Software Engineer', 'Product Manager', 'Data Analyst', 'Marketing'].map(role => (
+                <button key={role} className="sugg-chip" onClick={() => { setQuery(role); searchJobs(role) }}>{role}</button>
+              ))}
+            </div>
           </div>
         ) : status === 'loading' ? (
           <div style={{ textAlign: 'center', padding: '4rem 2rem', color: 'var(--muted)', fontFamily: 'var(--mono)', fontSize: '.75rem' }}>
