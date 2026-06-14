@@ -344,14 +344,14 @@ export default function LandingHero() {
             <div
               id="rotatingHero"
               className={swept ? 'swept' : ''}
-              style={{ height: 'clamp(92px,13vw,150px)', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'flex-start', overflow: 'hidden' }}
+              style={{ height: 'clamp(115px,18vw,200px)', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'flex-start', overflow: 'hidden' }}
             >
               <h1 style={{ fontFamily: 'var(--display)', fontSize: 'clamp(1.7rem,9.6cqw,3.9rem)', fontWeight: 800, lineHeight: 1.06, letterSpacing: '-.04em', color: 'var(--white)', margin: 0, width: '100%', textAlign: 'left' }}>
                 {/* Line 1: word-slam animated spans */}
                 <span
                   ref={line1Ref}
                   id="heroLine1"
-                  style={{ display: 'block', whiteSpace: 'nowrap' }}
+                  style={{ display: 'block' }}
                 >
                   {line1Nodes}
                 </span>
@@ -360,7 +360,7 @@ export default function LandingHero() {
                   ref={line2Ref}
                   id="heroLine2"
                   className="grad-text"
-                  style={{ display: 'block', whiteSpace: 'nowrap', fontStyle: 'italic' }}
+                  style={{ display: 'block', fontStyle: 'italic' }}
                 />
               </h1>
             </div>
