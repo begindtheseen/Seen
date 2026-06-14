@@ -610,5 +610,81 @@ async function _handler(req, res) {
     return res.status(200).json({ ok: true, suspects: suspects.length, clusters_created: created });
   }
 
+  // ── get_kpi_detail: return raw rows behind a KPI card ─────────────────────
+  if (body.action === 'get_kpi_detail') {
+    const metric = body.metric;
+    const now = new Date();
+    const todayISO = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
+    const weekISO  = new Date(Date.now() - 7 * 86400000).toISOString();
+    const monthISO = new Date(Date.now() - 30 * 86400000).toISOString();
+
+    let rows = [];
+
+    if (metric === 'total_accounts') {
+      const r = await db('profiles?select=id,email,created_at&order=created_at.desc&limit=100');
+      rows = await r.json();
+    } else if (metric === 'new_today') {
+      const r = await db(`profiles?created_at=gte.${todayISO}&select=id,email,created_at&order=created_at.desc&limit=100`);
+      rows = await r.json();
+    } else if (metric === 'new_this_week') {
+      const r = await db(`profiles?created_at=gte.${weekISO}&select=id,email,created_at&order=created_at.desc&limit=100`);
+      rows = await r.json();
+    } else if (metric === 'companies_scored') {
+      const r = await db('company_scores?select=company_id,score,ghost_rate,response_rate,updated_at&order=score.desc&limit=100');
+      const scores = await r.json();
+      if (Array.isArray(scores) && scores.length > 0) {
+        const ids = scores.map(s => s.company_id).filter(Boolean);
+        const cr = await db(`companies?id=in.(${ids.join(',')})&select=id,name`);
+        const companies = await cr.json();
+        const nameMap = {};
+        if (Array.isArray(companies)) companies.forEach(c => { nameMap[c.id] = c.name; });
+        rows = scores.map(s => ({ ...s, company: nameMap[s.company_id] || s.company_id }));
+      } else {
+        rows = Array.isArray(scores) ? scores : [];
+      }
+    } else if (metric === 'total_reports') {
+      const r = await db('reports?select=id,company_name,outcome,role,created_at&order=created_at.desc&limit=100');
+      rows = await r.json();
+    } else if (metric === 'reports_today') {
+      const r = await db(`reports?created_at=gte.${todayISO}&select=id,company_name,outcome,role,created_at&order=created_at.desc&limit=100`);
+      rows = await r.json();
+    } else if (metric === 'reports_week') {
+      const r = await db(`reports?created_at=gte.${weekISO}&select=id,company_name,outcome,role,created_at&order=created_at.desc&limit=100`);
+      rows = await r.json();
+    } else if (metric === 'ghost_rate') {
+      const r = await db(`applications?status=eq.ghosted&updated_at=gte.${monthISO}&select=id,company_name,role,city,stage,updated_at&order=updated_at.desc&limit=100`);
+      rows = await r.json();
+    } else if (metric === 'apps_total') {
+      const r = await db('applications?select=id,company_name,role,status,stage,created_at&order=created_at.desc&limit=100');
+      rows = await r.json();
+    } else if (metric === 'ghosted_30d') {
+      const r = await db(`applications?status=eq.ghosted&updated_at=gte.${monthISO}&select=id,company_name,role,city,stage,updated_at&order=updated_at.desc&limit=100`);
+      rows = await r.json();
+    } else if (metric === 'hired_30d') {
+      const r = await db(`applications?status=eq.hired&updated_at=gte.${monthISO}&select=id,company_name,role,city,updated_at&order=updated_at.desc&limit=100`);
+      rows = await r.json();
+    } else if (metric === 'co_lookups') {
+      const r = await db(`search_logs?created_at=gte.${todayISO}&select=query,created_at&order=created_at.desc&limit=100`);
+      rows = await r.json();
+    } else if (metric === 'jobs_total') {
+      const r = await db('jobs?select=company,title,city,availability_status,source,created_at&order=created_at.desc&limit=100');
+      rows = await r.json();
+    } else if (metric === 'jobs_active') {
+      const r = await db('jobs?availability_status=eq.active&select=company,title,city,source,last_seen_at&order=last_seen_at.desc&limit=100');
+      rows = await r.json();
+    } else if (metric === 'jobs_today') {
+      const r = await db(`jobs?created_at=gte.${todayISO}&select=company,title,city,source,created_at&order=created_at.desc&limit=100`);
+      rows = await r.json();
+    } else if (metric === 'jobs_stale') {
+      const r = await db('jobs?availability_status=in.(stale,expired)&select=company,title,city,availability_status,last_seen_at&order=last_seen_at.desc&limit=100');
+      rows = await r.json();
+    } else {
+      return res.status(400).json({ error: 'Unknown metric' });
+    }
+
+    if (!Array.isArray(rows)) rows = [];
+    return res.status(200).json({ ok: true, metric, rows });
+  }
+
   return res.status(400).json({ error: 'Unknown action' });
 }

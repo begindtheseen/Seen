@@ -51,10 +51,15 @@ interface FeatureFlag {
   flag_name: string; status: string; percentage: number | null; description: string
 }
 
-function KpiCard({ l, n, sub, borderColor, numColor }: { l: string; n: string | number; sub?: string; borderColor?: string; numColor?: string }) {
+function KpiCard({ l, n, sub, borderColor, numColor, onClick }: { l: string; n: string | number; sub?: string; borderColor?: string; numColor?: string; onClick?: () => void }) {
   return (
-    <div className="adm-kpi" style={borderColor ? { borderLeft: `3px solid ${borderColor}` } : undefined}>
-      <div className="adm-kpi-l">{l}</div>
+    <div
+      className="adm-kpi"
+      style={{ ...(borderColor ? { borderLeft: `3px solid ${borderColor}` } : {}), ...(onClick ? { cursor: 'pointer' } : {}) }}
+      onClick={onClick}
+      role={onClick ? 'button' : undefined}
+    >
+      <div className="adm-kpi-l">{l}{onClick && <span style={{ float: 'right', opacity: .4, fontSize: '.6em' }}>▸</span>}</div>
       <div className="adm-kpi-n" style={numColor ? { color: numColor } : undefined}>{n}</div>
       {sub && <div className="adm-kpi-sub">{sub}</div>}
     </div>
@@ -139,6 +144,159 @@ function issueBadgeColor(type: string) {
   return 'var(--dim)'
 }
 
+function KpiDetailRows({ metric, rows }: { metric: string; rows: Record<string, unknown>[] }) {
+  const cell = (txt: unknown, color?: string) => (
+    <span style={{ fontFamily: 'var(--mono)', fontSize: '.62rem', color: color || 'var(--sub)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{String(txt ?? '—')}</span>
+  )
+  const ts = (iso: unknown) => {
+    if (!iso) return '—'
+    const d = new Date(String(iso)), now = Date.now(), diff = now - d.getTime(), m = Math.floor(diff / 60000)
+    if (m < 60) return `${m}m ago`
+    const h = Math.floor(m / 60)
+    if (h < 24) return `${h}h ago`
+    return `${Math.floor(h / 24)}d ago`
+  }
+
+  // Users group
+  if (['total_accounts','new_today','new_this_week'].includes(metric)) {
+    return <div style={{ display: 'flex', flexDirection: 'column', gap: '.45rem' }}>
+      {rows.map((r, i) => (
+        <div key={i} style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: '.5rem', padding: '.5rem .6rem', background: 'var(--card)', borderRadius: 7, alignItems: 'center' }}>
+          {cell(r.email, 'var(--white)')}
+          {cell(ts(r.created_at))}
+        </div>
+      ))}
+    </div>
+  }
+
+  // Companies scored
+  if (metric === 'companies_scored') {
+    return <div style={{ display: 'flex', flexDirection: 'column', gap: '.45rem' }}>
+      {rows.map((r, i) => (
+        <div key={i} style={{ display: 'grid', gridTemplateColumns: '1fr auto auto', gap: '.5rem', padding: '.5rem .6rem', background: 'var(--card)', borderRadius: 7, alignItems: 'center' }}>
+          {cell(r.company, 'var(--white)')}
+          {cell(`${Math.round(Number(r.score || 0))}`, Number(r.score) > 65 ? 'var(--green)' : Number(r.score) > 40 ? 'var(--amber)' : 'var(--red)')}
+          {cell(ts(r.updated_at))}
+        </div>
+      ))}
+    </div>
+  }
+
+  // Reports group
+  if (['total_reports','reports_today','reports_week','ghost_rate'].includes(metric)) {
+    const outColor = (o: unknown) => {
+      const s = String(o)
+      if (s === 'ghosted') return 'var(--red)'
+      if (s === 'rejected' || s === 'autoreject') return 'var(--amber)'
+      if (s === 'interview' || s === 'human') return 'var(--blue)'
+      if (s === 'offer' || s === 'hired') return 'var(--green)'
+      return 'var(--dim)'
+    }
+    return <div style={{ display: 'flex', flexDirection: 'column', gap: '.45rem' }}>
+      {rows.map((r, i) => (
+        <div key={i} style={{ display: 'grid', gridTemplateColumns: '1fr auto auto', gap: '.5rem', padding: '.5rem .6rem', background: 'var(--card)', borderRadius: 7, alignItems: 'center' }}>
+          {cell(r.company_name || r.company, 'var(--white)')}
+          {cell(r.outcome, outColor(r.outcome))}
+          {cell(ts(r.created_at || r.updated_at))}
+        </div>
+      ))}
+    </div>
+  }
+
+  // Apps group
+  if (['apps_total','ghosted_30d','hired_30d'].includes(metric)) {
+    const statusColor = (s: unknown) => {
+      const v = String(s)
+      if (v === 'ghosted') return 'var(--red)'
+      if (v === 'hired') return 'var(--green)'
+      if (v === 'rejected') return 'var(--amber)'
+      return 'var(--sub)'
+    }
+    return <div style={{ display: 'flex', flexDirection: 'column', gap: '.45rem' }}>
+      {rows.map((r, i) => (
+        <div key={i} style={{ padding: '.5rem .6rem', background: 'var(--card)', borderRadius: 7 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: '.5rem', marginBottom: '.2rem' }}>
+            {cell(r.company_name, 'var(--white)')}
+            {cell(r.status, statusColor(r.status))}
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: '.5rem' }}>
+            {cell(r.role || '—')}
+            {cell(ts(r.created_at || r.updated_at))}
+          </div>
+        </div>
+      ))}
+    </div>
+  }
+
+  // Co. lookups
+  if (metric === 'co_lookups') {
+    return <div style={{ display: 'flex', flexDirection: 'column', gap: '.45rem' }}>
+      {rows.map((r, i) => (
+        <div key={i} style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: '.5rem', padding: '.5rem .6rem', background: 'var(--card)', borderRadius: 7, alignItems: 'center' }}>
+          {cell(r.query, 'var(--white)')}
+          {cell(ts(r.created_at))}
+        </div>
+      ))}
+    </div>
+  }
+
+  // Jobs group (total/active/today/stale)
+  return <div style={{ display: 'flex', flexDirection: 'column', gap: '.45rem' }}>
+    {rows.map((r, i) => (
+      <div key={i} style={{ padding: '.5rem .6rem', background: 'var(--card)', borderRadius: 7 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: '.5rem', marginBottom: '.2rem' }}>
+          {cell(r.company, 'var(--white)')}
+          {cell(r.availability_status || 'active', r.availability_status === 'stale' ? 'var(--amber)' : r.availability_status === 'expired' ? 'var(--red)' : 'var(--green)')}
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: '.5rem' }}>
+          {cell(r.title)}
+          {cell(ts(r.created_at || r.last_seen_at))}
+        </div>
+      </div>
+    ))}
+  </div>
+}
+
+function KpiModal({ metric, title, token, onClose }: { metric: string; title: string; token: string; onClose: () => void }) {
+  const [rows, setRows] = useState<Record<string, unknown>[] | null>(null)
+
+  useEffect(() => {
+    fetch('/api/admin-stats', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Admin-Token': token },
+      body: JSON.stringify({ action: 'get_kpi_detail', metric }),
+    }).then(r => r.json()).then(d => setRows(d.rows || [])).catch(() => setRows([]))
+  }, [metric, token])
+
+  return (
+    <div
+      style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.72)', zIndex: 300, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}
+      onClick={onClose}
+    >
+      <div
+        style={{ background: 'var(--surface)', borderRadius: '14px 14px 0 0', width: '100%', maxWidth: 640, maxHeight: '82vh', display: 'flex', flexDirection: 'column', animation: 'fadeUp .22s ease both' }}
+        onClick={e => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '1rem 1.25rem .75rem', borderBottom: '1px solid var(--line)', flexShrink: 0 }}>
+          <div style={{ fontFamily: 'var(--display)', fontWeight: 700, fontSize: '.95rem', color: 'var(--white)' }}>{title}</div>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'var(--dim)', cursor: 'pointer', fontFamily: 'var(--mono)', fontSize: '.9rem', padding: '.2rem .4rem', lineHeight: 1 }}>✕</button>
+        </div>
+        {/* Body */}
+        <div style={{ overflow: 'auto', flex: 1, padding: '.75rem 1.25rem 2rem' }}>
+          {rows === null ? (
+            <div style={{ textAlign: 'center', padding: '2.5rem', fontFamily: 'var(--mono)', fontSize: '.65rem', color: 'var(--dim)' }}>Loading…</div>
+          ) : !rows.length ? (
+            <div style={{ textAlign: 'center', padding: '2.5rem', fontFamily: 'var(--mono)', fontSize: '.65rem', color: 'var(--dim)' }}>No data yet</div>
+          ) : (
+            <KpiDetailRows metric={metric} rows={rows} />
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
 const TOKEN_KEY = 'admin_token'
 
 export default function AdminPage() {
@@ -151,6 +309,8 @@ export default function AdminPage() {
   const [loginError, setLoginError] = useState('')
   const [loggingIn, setLoggingIn] = useState(false)
   const [mergePrefill, setMergePrefill] = useState<MergePrefill | null>(null)
+  const [kpiModal, setKpiModal] = useState<{ metric: string; title: string } | null>(null)
+  function openKpi(metric: string, title: string) { setKpiModal({ metric, title }) }
 
   useEffect(() => {
     const stored = sessionStorage.getItem(TOKEN_KEY)
@@ -297,28 +457,28 @@ export default function AdminPage() {
         {/* Users KPIs */}
         <div className="adm-section-lbl">Users</div>
         <div className="adm-kpi-row">
-          <KpiCard l="Total accounts" n={stats.users.total.toLocaleString()} sub="all time" />
-          <KpiCard l="New today" n={stats.users.new_today} sub="last 24h" />
-          <KpiCard l="New this week" n={stats.users.new_this_week} sub="last 7 days" />
-          <KpiCard l="Companies scored" n={stats.companies.with_scores} sub="with AI scores" />
+          <KpiCard l="Total accounts" n={stats.users.total.toLocaleString()} sub="all time" onClick={() => openKpi('total_accounts', 'All accounts')} />
+          <KpiCard l="New today" n={stats.users.new_today} sub="last 24h" onClick={() => openKpi('new_today', 'New accounts today')} />
+          <KpiCard l="New this week" n={stats.users.new_this_week} sub="last 7 days" onClick={() => openKpi('new_this_week', 'New accounts this week')} />
+          <KpiCard l="Companies scored" n={stats.companies.with_scores} sub="with AI scores" onClick={() => openKpi('companies_scored', 'Companies with scores')} />
         </div>
 
         {/* Community KPIs */}
         <div className="adm-section-lbl">Community data</div>
         <div className="adm-kpi-row">
-          <KpiCard l="Total reports" n={stats.reports.total.toLocaleString()} sub="all time" borderColor="var(--green)" numColor="var(--green)" />
-          <KpiCard l="Reports today" n={stats.reports.today} sub="last 24h" />
-          <KpiCard l="Reports this week" n={stats.reports.this_week} sub="last 7 days" />
-          <KpiCard l="Ghost rate (30d)" n={stats.applications.ghost_rate_pct != null ? `${stats.applications.ghost_rate_pct}%` : '—'} sub="of tracked apps" borderColor="var(--red)" numColor="var(--red)" />
+          <KpiCard l="Total reports" n={stats.reports.total.toLocaleString()} sub="all time" borderColor="var(--green)" numColor="var(--green)" onClick={() => openKpi('total_reports', 'All reports')} />
+          <KpiCard l="Reports today" n={stats.reports.today} sub="last 24h" onClick={() => openKpi('reports_today', 'Reports today')} />
+          <KpiCard l="Reports this week" n={stats.reports.this_week} sub="last 7 days" onClick={() => openKpi('reports_week', 'Reports this week')} />
+          <KpiCard l="Ghost rate (30d)" n={stats.applications.ghost_rate_pct != null ? `${stats.applications.ghost_rate_pct}%` : '—'} sub="of tracked apps" borderColor="var(--red)" numColor="var(--red)" onClick={() => openKpi('ghost_rate', 'Ghosted applications (30d)')} />
         </div>
 
         {/* Application tracking KPIs */}
         <div className="adm-section-lbl">Application tracking</div>
         <div className="adm-kpi-row">
-          <KpiCard l="Apps tracked total" n={stats.applications.total.toLocaleString()} sub="across all users" />
-          <KpiCard l="Ghosted (30d)" n={stats.applications.ghosted_30d} sub="tracked as ghosted" numColor="var(--amber)" />
-          <KpiCard l="Hired (30d)" n={stats.applications.hired_30d} sub="tracked as hired" numColor="var(--green)" />
-          <KpiCard l="Co. lookups today" n={stats.company_lookups?.ready ? stats.company_lookups.today : '—'} sub="company pages viewed" />
+          <KpiCard l="Apps tracked total" n={stats.applications.total.toLocaleString()} sub="across all users" onClick={() => openKpi('apps_total', 'All tracked applications')} />
+          <KpiCard l="Ghosted (30d)" n={stats.applications.ghosted_30d} sub="tracked as ghosted" numColor="var(--amber)" onClick={() => openKpi('ghosted_30d', 'Ghosted (30d)')} />
+          <KpiCard l="Hired (30d)" n={stats.applications.hired_30d} sub="tracked as hired" numColor="var(--green)" onClick={() => openKpi('hired_30d', 'Hired (30d)')} />
+          <KpiCard l="Co. lookups today" n={stats.company_lookups?.ready ? stats.company_lookups.today : '—'} sub="company pages viewed" onClick={() => openKpi('co_lookups', 'Company lookups today')} />
         </div>
 
         {/* Company lookups setup note */}
@@ -339,10 +499,10 @@ export default function AdminPage() {
         {/* Jobs KPIs */}
         <div className="adm-section-lbl">Jobs</div>
         <div className="adm-kpi-row" style={{ marginBottom: '1.5rem' }}>
-          <KpiCard l="Total stored" n={(stats.jobs?.total ?? 0).toLocaleString()} sub="all statuses" />
-          <KpiCard l="Active listings" n={(stats.jobs?.active ?? 0).toLocaleString()} sub="live jobs users see" borderColor="var(--blue)" numColor="var(--blue)" />
-          <KpiCard l="Added today" n={stats.jobs?.new_today ?? 0} sub="new listings posted" borderColor="var(--green)" numColor="var(--green)" />
-          <KpiCard l="Stale / expired" n={(stats.jobs?.stale_or_expired ?? 0).toLocaleString()} sub="flagged unavailable" borderColor={stats.jobs?.stale_or_expired > 500 ? 'var(--amber)' : undefined} numColor={stats.jobs?.stale_or_expired > 500 ? 'var(--amber)' : undefined} />
+          <KpiCard l="Total stored" n={(stats.jobs?.total ?? 0).toLocaleString()} sub="all statuses" onClick={() => openKpi('jobs_total', 'All stored jobs')} />
+          <KpiCard l="Active listings" n={(stats.jobs?.active ?? 0).toLocaleString()} sub="live jobs users see" borderColor="var(--blue)" numColor="var(--blue)" onClick={() => openKpi('jobs_active', 'Active job listings')} />
+          <KpiCard l="Added today" n={stats.jobs?.new_today ?? 0} sub="new listings posted" borderColor="var(--green)" numColor="var(--green)" onClick={() => openKpi('jobs_today', 'Jobs added today')} />
+          <KpiCard l="Stale / expired" n={(stats.jobs?.stale_or_expired ?? 0).toLocaleString()} sub="flagged unavailable" borderColor={stats.jobs?.stale_or_expired > 500 ? 'var(--amber)' : undefined} numColor={stats.jobs?.stale_or_expired > 500 ? 'var(--amber)' : undefined} onClick={() => openKpi('jobs_stale', 'Stale & expired jobs')} />
         </div>
 
         {/* Reports chart */}
@@ -529,6 +689,15 @@ export default function AdminPage() {
         <DeployPanel />
 
       </div>
+
+      {kpiModal && (
+        <KpiModal
+          metric={kpiModal.metric}
+          title={kpiModal.title}
+          token={token!}
+          onClose={() => setKpiModal(null)}
+        />
+      )}
     </div>
   )
 }
