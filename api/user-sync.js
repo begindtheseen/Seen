@@ -103,7 +103,7 @@ export default async function handler(req, res) {
     const appsOffset = Math.max(0, parseInt(body.apps_offset) || 0);
     const today = new Date().toISOString().split('T')[0];
     const [appsRes, savedRes, recentRes, credRes, flagsRes] = await Promise.all([
-      db(`applications?user_id=eq.${uid}&order=created_at.desc&limit=${appsLimit}&offset=${appsOffset}`, { headers: { Prefer: 'count=estimated' } }),
+      db(`applications?user_id=eq.${uid}&select=id,company_name,role,city,platform,job_url,status,stage,score,waste_score,events,employer_stage,created_at,updated_at&order=created_at.desc&limit=${appsLimit}&offset=${appsOffset}`, { headers: { Prefer: 'count=estimated' } }),
       db(`saved_jobs?user_id=eq.${uid}&order=saved_at.desc&limit=500`),
       db(`user_recent_cos?user_id=eq.${uid}&order=viewed_at.desc&limit=6`),
       db(`ai_credits?user_id=eq.${uid}&limit=1`),
@@ -197,6 +197,7 @@ export default async function handler(req, res) {
     const allowed = {};
     if (changes.stage)  allowed.stage  = changes.stage;
     if (changes.status) allowed.status = changes.status;
+    if (changes.events && Array.isArray(changes.events)) allowed.events = changes.events;
     if (Object.keys(allowed).length) {
       await db(`applications?id=eq.${encodeURIComponent(id)}&user_id=eq.${uid}`, {
         method: 'PATCH', body: JSON.stringify({ ...allowed, updated_at: new Date().toISOString() }),

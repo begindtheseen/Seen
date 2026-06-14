@@ -40,7 +40,7 @@ export default function Footer() {
             Contact
           </a>
         </div>
-        <div style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', color: 'var(--muted)', flexShrink: 0 }}>Built by someone who lived this.</div>
+        <div style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', color: 'var(--muted)', flexShrink: 0 }}>© 2026 Seen</div>
       </div>
     </footer>
   )

@@ -74,6 +74,7 @@ export default function Nav() {
           <Link href="/companies" className={`ntab${isActive('/companies') ? ' active' : ''}`}>Companies</Link>
           <Link href="/demand" className={`ntab${isActive('/demand') ? ' active' : ''}`}>Demand</Link>
           <Link href="/feed" className={`ntab${isActive('/feed') ? ' active' : ''}`}>Feed</Link>
+          {isSeeker && <Link href="/dashboard" className={`ntab${isActive('/dashboard') ? ' active' : ''}`}>Dashboard</Link>}
           {isSeeker && <Link href="/resume" className={`ntab${isActive('/resume') ? ' active' : ''}`}>Resume AI</Link>}
           {isSeeker && <Link href="/tracker" className={`ntab${isActive('/tracker') ? ' active' : ''}`}>Track</Link>}
           <Link href="/pricing" className={`ntab${isActive('/pricing') ? ' active' : ''}`}>Pricing</Link>
@@ -88,11 +89,6 @@ export default function Nav() {
             >
               {creditBalance === 999 ? '∞' : creditBalance} AI
             </button>
-          )}
-          {isSeeker && !isDashboard && (
-            <Link href="/dashboard" style={{ display: 'inline-flex', alignItems: 'center', background: 'none', border: '1px solid var(--line2)', color: 'var(--sub)', borderRadius: 8, padding: '.32rem .75rem', fontFamily: 'var(--mono)', fontSize: '.62rem', cursor: 'pointer', whiteSpace: 'nowrap', textDecoration: 'none' }}>
-              ← Dashboard
-            </Link>
           )}
           {isSeeker && (
             <button

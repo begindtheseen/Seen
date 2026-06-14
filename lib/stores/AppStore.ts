@@ -175,7 +175,10 @@ export const AppStore = {
       apps[idx] = updated
       localStorage.setItem(KEY, JSON.stringify(apps))
     }
-    if (loggedIn) _sync('update_application', { id, changes })
+    const syncChanges = { ...changes }
+    const updatedApp = apps.find(a => a.id === id)
+    if (updatedApp?.events) syncChanges.events = updatedApp.events
+    if (loggedIn) _sync('update_application', { id, changes: syncChanges })
   },
 
   async remove(id: string, loggedIn: boolean): Promise<void> {
