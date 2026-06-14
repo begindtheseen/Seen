@@ -28,6 +28,11 @@ export default async function handler(req, res) {
     return handleLocationJobs(req, res, _body);
   }
 
+  // ── Company jobs: fetch/search jobs for a specific company ─────────────────
+  if (_body.action === 'company_jobs') {
+    return handleCompanyJobs(req, res, _body);
+  }
+
   // ── Get single job by ID — direct link / refresh fallback ──────────────────
   if (_body.action === 'get_by_id') {
     const { id } = _body;
@@ -360,6 +365,82 @@ function wasteScore(job) {
   const co = (job.company || '').toLowerCase();
   if (['amazon','accenture','cognizant','infosys','wipro'].some(g => co.includes(g))) w += 35;
   return Math.min(85, w);
+}
+
+// ── handleCompanyJobs: DB lookup + live search for a specific company ─────────
+async function handleCompanyJobs(req, res, body) {
+  const { company } = body;
+  if (!company || typeof company !== 'string') return res.status(400).json({ error: 'company required', jobs: [] });
+
+  const SUPABASE_URL = process.env.SUPABASE_URL;
+  const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY;
+  const ANTHROPIC_KEY = process.env.ANTHROPIC_KEY;
+  if (!SUPABASE_URL || !SUPABASE_SERVICE_KEY) return res.status(503).json({ error: 'DB unavailable', jobs: [] });
+
+  const dbHeaders = { apikey: SUPABASE_SERVICE_KEY, Authorization: `Bearer ${SUPABASE_SERVICE_KEY}`, 'Content-Type': 'application/json' };
+  const safeName = company.trim().slice(0, 100).replace(/[<>`\\]/g, '');
+  const now = encodeURIComponent(new Date().toISOString());
+
+  // Check DB first (non-expired listings for this company)
+  try {
+    const r = await fetch(
+      `${SUPABASE_URL}/rest/v1/jobs?company=ilike.*${encodeURIComponent(safeName)}*&expires_at=gt.${now}&select=id,title,company,location,salary,apply_url,source,type,level,score,waste_score&order=score.desc&limit=20`,
+      { headers: dbHeaders }
+    );
+    const cached = r.ok ? await r.json() : [];
+    if (Array.isArray(cached) && cached.length >= 3) {
+      const jobs = cached.map(j => ({ title: j.title, company: j.company, location: j.location, salary: j.salary, url: j.apply_url, source: j.source, type: j.type, level: j.level, score: j.score, waste_score: j.waste_score }));
+      return res.status(200).json({ ok: true, jobs, _src: 'cache' });
+    }
+  } catch(e) { console.warn('company_jobs cache:', e.message); }
+
+  // No cached jobs — live web search
+  if (!ANTHROPIC_KEY) return res.status(200).json({ ok: true, jobs: [], _src: 'no-api' });
+
+  try {
+    const apiRes = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-api-key': ANTHROPIC_KEY, 'anthropic-version': '2023-06-01', 'anthropic-beta': 'web-search-2025-03-05' },
+      body: JSON.stringify({
+        model: 'claude-haiku-4-5-20251001',
+        max_tokens: 2500,
+        tools: [{ type: 'web_search_20250305', name: 'web_search' }],
+        system: 'You are a job search assistant. Find current open job listings. Return ONLY a valid JSON array, no markdown:\n[{"title":"...","company":"...","location":"City, State or Remote","salary":"$Xk-$Yk or null","url":"direct apply URL","description":"3-4 sentences","type":"Full-time","level":"Mid level","source":"LinkedIn/Indeed/Greenhouse/etc"}]',
+        messages: [{ role: 'user', content: `Find 8-12 current open job listings at ${safeName}. Search their careers page, LinkedIn, Indeed, Greenhouse, and Lever. Return only real open roles.` }]
+      })
+    });
+    if (!apiRes.ok) return res.status(200).json({ ok: true, jobs: [], _src: 'api-error' });
+
+    const data = await apiRes.json();
+    const text = (data.content || []).filter(b => b.type === 'text').map(b => b.text).join('');
+    let jobs = [];
+    const m = text.replace(/```json\n?/g, '').replace(/```\n?/g, '').match(/\[[\s\S]*\]/);
+    if (m) { try { jobs = JSON.parse(m[0]); } catch(e) {} }
+    jobs = jobs.filter(j => j.title && j.company).map(j => ({ ...j, score: scoreJob(j), waste_score: wasteScore(j) }));
+
+    // Save to DB (fire-and-forget)
+    if (jobs.length) {
+      const expires = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+      const rows = jobs.map(j => ({
+        title: j.title, company: j.company, location: j.location || 'US',
+        salary: j.salary || null, description: (j.description || '').slice(0, 8000),
+        apply_url: j.url || null, source: j.source || 'Web search',
+        type: j.type || 'Full-time', level: j.level || 'Mid level',
+        search_query: safeName.toLowerCase(), score: j.score || 65, waste_score: j.waste_score || 25,
+        expires_at: expires,
+      }));
+      fetch(`${SUPABASE_URL}/rest/v1/jobs`, {
+        method: 'POST',
+        headers: { ...dbHeaders, Prefer: 'resolution=merge-duplicates,return=minimal' },
+        body: JSON.stringify(rows),
+      }).catch(e => console.error('company_jobs save error:', e.message));
+    }
+
+    return res.status(200).json({ ok: true, jobs, _src: 'live' });
+  } catch(e) {
+    logError('company_jobs', e.message, { company: safeName });
+    return res.status(200).json({ ok: true, jobs: [], _src: 'error' });
+  }
 }
 
 // ── handleLocationJobs: merged from api/fetch-location-jobs.js ────────────────

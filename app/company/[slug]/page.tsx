@@ -387,6 +387,9 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
   const [location, setLocation] = useState('')
   const [webReviews, setWebReviews] = useState<WebReview[]>([])
   const [viewers, setViewers] = useState(0)
+  const [companyJobs, setCompanyJobs] = useState<Array<{title:string;company:string;location:string;salary:string|null;url:string|null;source:string;type:string;level:string;score:number}>>([])
+  const [jobsLoading, setJobsLoading] = useState(false)
+  const [jobsFetched, setJobsFetched] = useState(false)
 
   // T3-9: Simulated live viewer count
   useEffect(() => {
@@ -442,6 +445,21 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
     }
     load()
   }, [companyName, location]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Fetch open roles when roles tab is first opened
+  useEffect(() => {
+    if (tab !== 'roles' || jobsFetched) return
+    setJobsLoading(true)
+    fetch('/api/jobs', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'company_jobs', company: companyName }),
+    })
+      .then(r => r.ok ? r.json() : { jobs: [] })
+      .then(d => { setCompanyJobs(d.jobs || []); setJobsFetched(true) })
+      .catch(() => setJobsFetched(true))
+      .finally(() => setJobsLoading(false))
+  }, [tab, companyName, jobsFetched])
 
   const risk = score ? Score.risk(score.overall_score) : 'warn'
   const g = score ? letterGrade(score.overall_score) : '—'
@@ -752,9 +770,43 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
 
             {/* ── OPEN ROLES TAB ── */}
             {tab === 'roles' && (
-              <div style={{ textAlign: 'center', padding: '2.5rem', color: 'var(--muted)', fontFamily: 'var(--mono)', fontSize: '.7rem' }}>
-                Open roles coming soon.<br />
-                <span style={{ fontSize: '.6rem', opacity: .6 }}>Search for &ldquo;{companyName}&rdquo; in Jobs to see current listings.</span>
+              <div>
+                {jobsLoading && (
+                  <div style={{ textAlign: 'center', padding: '2.5rem', color: 'var(--muted)', fontFamily: 'var(--mono)', fontSize: '.7rem' }}>
+                    Searching for open roles at {companyName}…
+                  </div>
+                )}
+                {!jobsLoading && companyJobs.length === 0 && (
+                  <div style={{ textAlign: 'center', padding: '2.5rem', color: 'var(--muted)', fontFamily: 'var(--mono)', fontSize: '.7rem' }}>
+                    No open roles found right now.<br />
+                    <a href={`/jobs?q=${encodeURIComponent(companyName)}`} style={{ color: 'var(--blue)', marginTop: '.6rem', display: 'inline-block' }}>Search jobs →</a>
+                  </div>
+                )}
+                {!jobsLoading && companyJobs.length > 0 && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '.65rem' }}>
+                    {companyJobs.map((j, i) => (
+                      <div key={i} className="jlc" style={{ display: 'flex', flexDirection: 'column', gap: '.35rem', padding: '.85rem 1rem', background: 'var(--card)', border: '1px solid var(--line)', borderRadius: '10px' }}>
+                        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '.5rem', flexWrap: 'wrap' }}>
+                          <span className="jlc-title" style={{ fontSize: '.95rem', fontWeight: 700, color: 'var(--white)', letterSpacing: '-.02em', flex: 1 }}>{j.title}</span>
+                          {j.salary && <span style={{ fontFamily: 'var(--mono)', fontSize: '.6rem', color: 'var(--green)', whiteSpace: 'nowrap' }}>{j.salary}</span>}
+                        </div>
+                        <div style={{ display: 'flex', gap: '.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
+                          <span style={{ fontFamily: 'var(--mono)', fontSize: '.55rem', color: 'var(--muted)' }}>{j.location || 'US'}</span>
+                          <span style={{ fontFamily: 'var(--mono)', fontSize: '.55rem', color: 'var(--dim)' }}>·</span>
+                          <span style={{ fontFamily: 'var(--mono)', fontSize: '.55rem', color: 'var(--dim)' }}>{j.type}</span>
+                          <span style={{ fontFamily: 'var(--mono)', fontSize: '.55rem', color: 'var(--dim)' }}>·</span>
+                          <span style={{ fontFamily: 'var(--mono)', fontSize: '.55rem', color: 'var(--dim)' }}>{j.level}</span>
+                          {j.source && <><span style={{ fontFamily: 'var(--mono)', fontSize: '.55rem', color: 'var(--dim)' }}>·</span><span style={{ fontFamily: 'var(--mono)', fontSize: '.55rem', color: 'var(--muted)' }}>{j.source}</span></>}
+                        </div>
+                        {j.url && (
+                          <a href={j.url} target="_blank" rel="noopener noreferrer" className="analyze-btn" style={{ display: 'inline-block', textAlign: 'center', padding: '.45rem 1rem', fontSize: '.7rem', marginTop: '.2rem', width: 'auto', alignSelf: 'flex-start' }}>
+                            Apply → 1 credit
+                          </a>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
 
