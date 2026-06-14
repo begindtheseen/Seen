@@ -1,6 +1,7 @@
 # Seen — Claude Handoff
 
 
+
 > **Read this first. Every session. No exceptions.**
 > Then read SEEN_STRATEGY.md. Then `git status`. Then pick up exactly where this doc ends.
 
