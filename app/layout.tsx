@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from 'next'
 import { AuthProvider } from '@/lib/auth'
 import Nav from '@/components/Nav'
 import Footer from '@/components/Footer'
+import IntroSplash from '@/components/IntroSplash'
 import './globals.css'
 
 export const metadata: Metadata = {
@@ -33,6 +34,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       </head>
       <body>
         <AuthProvider>
+          <IntroSplash />
           {/* Global aurora background orbs — renders on all pages */}
           <div className="aurora" aria-hidden="true">
             <div className="aurora-3" />
