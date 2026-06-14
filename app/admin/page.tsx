@@ -280,14 +280,14 @@ export default function AdminPage() {
           <span style={{ width: 22, height: 1, background: 'var(--green)', display: 'inline-block', flexShrink: 0 }} />
           Seen Admin
         </div>
-        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: '.75rem', marginBottom: '1.5rem' }}>
+        <div className="adm-hdr-row">
           <div>
             <h1 style={{ fontFamily: 'var(--display)', fontSize: 'clamp(1.35rem, 6vw, 2rem)', fontWeight: 800, color: 'var(--white)', letterSpacing: '-.04em', lineHeight: 1.05, marginBottom: '.25rem' }}>Data flywheel</h1>
             <p style={{ fontSize: '.8rem', color: 'var(--sub)', fontWeight: 300 }}>Last updated just now</p>
           </div>
-          <div style={{ display: 'flex', gap: '.5rem', flexShrink: 0, flexWrap: 'wrap' }}>
-            <button onClick={() => token && load(token)} className="adm-btn" style={{ background: 'none', border: '1px solid var(--line2)', borderRadius: 8, padding: '.5rem 1rem', fontFamily: 'var(--mono)', fontSize: '.65rem', color: 'var(--sub)', cursor: 'pointer', transition: 'all .15s' }}>↻ Refresh</button>
-            <button onClick={logout} className="adm-btn-danger" style={{ background: 'none', border: '1px solid var(--line2)', borderRadius: 8, padding: '.5rem 1rem', fontFamily: 'var(--mono)', fontSize: '.65rem', color: 'var(--dim)', cursor: 'pointer', transition: 'all .15s' }}>Sign out</button>
+          <div style={{ display: 'flex', gap: '.5rem', flexWrap: 'wrap' }}>
+            <button onClick={() => token && load(token)} className="adm-btn">↻ Refresh</button>
+            <button onClick={logout} className="adm-btn-danger">Sign out</button>
           </div>
         </div>
 
@@ -627,10 +627,10 @@ function ReportRow({ report: r, token, onRefresh }: { report: RecentReport; toke
   const oc = outcomeColor(r.outcome)
   return (
     <div style={{ padding: '.6rem 1rem', borderBottom: '1px solid var(--line2)', borderLeft: `3px solid ${oc}`, margin: '0 -1rem', opacity: isDenied ? 0.45 : 1 }}>
-      <div style={{ display: 'flex', alignItems: 'flex-start', gap: '.6rem' }}>
+      <div style={{ display: 'flex', alignItems: 'flex-start', gap: '.6rem', flexWrap: 'wrap' }}>
         <span style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', color: outcomeColor(r.outcome), background: outcomeColor(r.outcome) + '18', border: `1px solid ${outcomeColor(r.outcome)}30`, borderRadius: 4, padding: '.1rem .4rem', flexShrink: 0, marginTop: 1 }}>{r.outcome}</span>
-        <div style={{ flex: 1 }}>
-          <div style={{ fontFamily: 'var(--mono)', fontSize: '.65rem', color: 'var(--white)' }}>{r.company_name} · {r.role}</div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontFamily: 'var(--mono)', fontSize: '.65rem', color: 'var(--white)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.company_name} · {r.role}</div>
           <div style={{ fontFamily: 'var(--mono)', fontSize: '.6rem', color: 'var(--sub)', marginTop: '.15rem' }}>{r.report_text?.slice(0, 90)}{r.report_text?.length > 90 ? '…' : ''}</div>
           <div style={{ fontFamily: 'var(--mono)', fontSize: '.55rem', color: 'var(--muted)', marginTop: '.15rem' }}>
             {relTime(r.created_at)} · community · {r.trust_reason || r.platform}
@@ -733,7 +733,7 @@ function InactiveRow({ report: r, token }: { report: InactiveReport; token: stri
 
   return (
     <div style={{ padding: '.7rem 0', borderBottom: '1px solid var(--line2)' }}>
-      <div style={{ display: 'flex', alignItems: 'flex-start', gap: '.75rem' }}>
+      <div style={{ display: 'flex', alignItems: 'flex-start', gap: '.75rem', flexWrap: 'wrap' }}>
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ fontFamily: 'var(--mono)', fontSize: '.65rem', color: 'var(--white)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
             {j.title || 'Unknown title'} · <span style={{ color: 'var(--sub)' }}>{j.company || 'Unknown company'}</span>
@@ -743,8 +743,8 @@ function InactiveRow({ report: r, token }: { report: InactiveReport; token: stri
           </div>
           {jobUrl && <a href={jobUrl} target="_blank" rel="noopener noreferrer" style={{ fontFamily: 'var(--mono)', fontSize: '.55rem', color: 'var(--blue)', textDecoration: 'none', marginTop: '.2rem', display: 'inline-block' }}>↗ Verify listing →</a>}
         </div>
-        <div style={{ display: 'flex', gap: '.45rem', flexShrink: 0, marginTop: '.1rem' }}>
-          <button onClick={() => act('remove_listing')} disabled={acting} style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', padding: '.3rem .65rem', borderRadius: 6, border: '1px solid rgba(239,68,68,.4)', background: 'rgba(239,68,68,.08)', color: 'var(--red)', cursor: 'pointer' }}>Remove listing</button>
+        <div style={{ display: 'flex', gap: '.45rem', flexShrink: 0 }}>
+          <button onClick={() => act('remove_listing')} disabled={acting} style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', padding: '.3rem .65rem', borderRadius: 6, border: '1px solid rgba(239,68,68,.4)', background: 'rgba(239,68,68,.08)', color: 'var(--red)', cursor: 'pointer' }}>Remove</button>
           <button onClick={() => act('deny_report')} disabled={acting} style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', padding: '.3rem .65rem', borderRadius: 6, border: '1px solid var(--line2)', background: 'transparent', color: 'var(--sub)', cursor: 'pointer' }}>Keep active</button>
         </div>
       </div>
@@ -1064,9 +1064,9 @@ function ClustersPanel({ clusters, suspected, token, onRefresh }: { clusters: Du
           const status = localStatus[c.id] || c.status
           return (
             <div key={c.id} style={{ padding: '.6rem 0', borderBottom: '1px solid var(--line2)' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '.65rem' }}>
-                <span style={{ fontFamily: 'var(--mono)', fontSize: '.6rem', fontWeight: 700, color: CLUSTER_COLORS[status] || 'var(--sub)' }}>Risk {c.risk_score}/100</span>
-                <span style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', color: 'var(--dim)' }}>{c.user_ids?.length || 0} accounts · {(c.signals || []).join(', ')}</span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '.65rem', flexWrap: 'wrap' }}>
+                <span style={{ fontFamily: 'var(--mono)', fontSize: '.6rem', fontWeight: 700, color: CLUSTER_COLORS[status] || 'var(--sub)', flexShrink: 0 }}>Risk {c.risk_score}/100</span>
+                <span style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', color: 'var(--dim)', flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.user_ids?.length || 0} accounts · {(c.signals || []).join(', ')}</span>
                 <select
                   value={status}
                   onChange={e => updateCluster(c.id, e.target.value)}

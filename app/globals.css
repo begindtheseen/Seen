@@ -867,11 +867,11 @@ nav.nav-scrolled{background:rgba(6,6,8,0.82);backdrop-filter:blur(60px) saturate
 @media(max-width:700px){
   .adm-wrap{overflow-x:hidden;padding:1rem .75rem 3rem!important}
   .adm-kpi-row{grid-template-columns:repeat(2,1fr)!important;gap:.35rem!important;margin-bottom:.85rem!important}
-  .adm-kpi{padding:.6rem .55rem!important;border-radius:8px!important}
-  .adm-kpi-n{font-size:.95rem!important;line-height:1.1!important}
+  .adm-kpi{padding:.7rem .6rem!important;border-radius:8px!important}
+  .adm-kpi-n{font-size:1.4rem!important;line-height:1.1!important}
   .adm-kpi-l{font-size:.42rem!important}
   .adm-kpi-sub{font-size:.42rem!important}
-  .adm-panel{border-radius:8px!important;margin-bottom:.65rem!important}
+  .adm-panel{border-radius:8px!important;margin-bottom:.65rem!important;max-width:100%}
   .adm-wrap h1{font-size:1.4rem!important}
   .adm-2col{grid-template-columns:1fr!important}
 }
@@ -927,10 +927,11 @@ nav.nav-scrolled{background:rgba(6,6,8,0.82);backdrop-filter:blur(60px) saturate
 .qs-btn.active,.qs-btn:hover{background:var(--blue);border-color:var(--blue);color:#fff}
 
 /* ── ADMIN BUTTON HOVER STYLES (T2-23) ── */
-.adm-btn{background:var(--card);border:1px solid var(--line);color:var(--sub);border-radius:6px;padding:.35rem .75rem;font-family:var(--mono);font-size:.65rem;cursor:pointer;transition:all .15s}
-.adm-btn:hover{background:var(--surface);color:var(--white);border-color:var(--line2)}
-.adm-btn-danger{background:rgba(239,68,68,.06);border:1px solid rgba(239,68,68,.25);color:var(--red);border-radius:6px;padding:.35rem .75rem;font-family:var(--mono);font-size:.65rem;cursor:pointer;transition:all .15s}
-.adm-btn-danger:hover{background:rgba(239,68,68,.14);border-color:rgba(239,68,68,.5)}
+.adm-hdr-row{display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:.75rem;margin-bottom:1.5rem}
+.adm-btn{background:none;border:1px solid var(--line2);color:var(--sub);border-radius:8px;padding:.5rem 1rem;font-family:var(--mono);font-size:.65rem;cursor:pointer;transition:all .15s;white-space:nowrap}
+.adm-btn:hover{border-color:var(--blue)!important;color:var(--white)!important}
+.adm-btn-danger{background:none;border:1px solid var(--line2);color:var(--dim);border-radius:8px;padding:.5rem 1rem;font-family:var(--mono);font-size:.65rem;cursor:pointer;transition:all .15s;white-space:nowrap}
+.adm-btn-danger:hover{border-color:var(--red)!important;color:var(--red)!important}
 
 /* ── ADMIN ISSUE MODAL CLASSES (T0-3) ── */
 .issue-ov{position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:9000;backdrop-filter:blur(6px);display:flex;align-items:center;justify-content:center}
