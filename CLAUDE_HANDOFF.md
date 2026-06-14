@@ -3,7 +3,7 @@
 > **Read this first. Every session. No exceptions.**
 > Then read SEEN_STRATEGY.md. Then `git status`. Then pick up exactly where this doc ends.
 
-Last updated: **2026-06-14 (Session F)**
+Last updated: **2026-06-14 (Session G)**
 
 ---
 
@@ -14,6 +14,16 @@ Last updated: **2026-06-14 (Session F)**
 - Active branch: `next-migration` — push here, Vercel auto-builds a preview
 - Brandon promotes previews to production from the Vercel dashboard
 - Mission: **full visual + functional parity** with `origin/main:index.html`
+
+---
+
+## What Session G shipped (latest push, branch `next-migration`)
+
+| Commit | What shipped |
+|--------|-------------|
+| `cd35710` | Intro splash animation: rolling-letter SEEN canvas port from origin/main — spring bounce, green glow lock, scanning beam, progress bar, first-visit-only localStorage gate |
+
+**Build status**: ✅ PASSING after cd35710 — 19 routes, zero TS errors
 
 ---
 
@@ -105,6 +115,7 @@ Very few significant gaps remain after Session D. These are the known outstandin
 - T3-11: Jobs instant-search as you type (debounced, no explicit button)
 
 ### Visual
+- ~~Intro splash animation~~ ✅ Done — `components/IntroSplash.tsx`, mounted in layout.tsx
 - T3-6: Landing hero sweep (gradient flash after line 2 locks) — `swept` state is wired; `#rotatingHero.swept::after` CSS exists; just confirm the `heroSweep` keyframe is present
 - Company detail: `seen_recent_cos` localStorage write on visit (needed for dashboard "recently checked" to populate) — check if written in company/[slug]/page.tsx
 
