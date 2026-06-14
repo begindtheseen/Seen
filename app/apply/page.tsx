@@ -60,6 +60,7 @@ function ApplyContent() {
   const [answer, setAnswer] = useState<Answer>(null)
   const [saving, setSaving] = useState(false)
   const [insight, setInsight] = useState<string | null>(null)
+  const [notYetReason, setNotYetReason] = useState('')
 
   useEffect(() => {
     if (!co) return
@@ -132,9 +133,7 @@ function ApplyContent() {
   }
 
   function handleNotYetReason(id: string) {
-    if (id === 'comparing' || id === 'unsure') {
-      // Show the job URL + risk summary to help them decide
-    }
+    setNotYetReason(id)
     setPhase('done_other')
   }
 
@@ -375,7 +374,22 @@ function ApplyContent() {
         <>
           <div style={{ background: 'var(--raised)', border: '1px solid var(--line2)', borderRadius: 12, padding: '1rem 1.1rem', marginBottom: '1.25rem' }}>
             <div style={{ fontFamily: 'var(--mono)', fontSize: '.7rem', color: 'var(--sub)', lineHeight: 1.7 }}>
-              {answer === 'not_yet' && `Saved. ${jobUrl ? 'The job listing is still open above.' : 'Come back after you apply and we\'ll start tracking.'}`}
+              {answer === 'not_yet' && (
+                <div style={{ fontFamily: 'var(--mono)', fontSize: '.7rem', color: 'var(--sub)', lineHeight: 1.7 }}>
+                  {(notYetReason === 'comparing' || notYetReason === 'unsure') && score ? (
+                    <>
+                      <div style={{ marginBottom: '.5rem' }}>
+                        {co} hiring grade: <span style={{ color: riskColor, fontWeight: 700 }}>{grade(score.overall_score)}</span>
+                        {score.ghost_rate > 0 && <> · <span style={{ color: score.ghost_rate > 0.5 ? 'var(--red)' : 'var(--amber)' }}>{Math.round(score.ghost_rate * 100)}% ghost rate</span></>}
+                        {score.avg_wait_days > 0 && <> · avg {score.avg_wait_days}d to hear back</>}
+                      </div>
+                      <div>Saved. Come back after you&apos;ve decided — we&apos;ll track it from here.</div>
+                    </>
+                  ) : (
+                    `Saved. ${jobUrl ? 'The job listing is still open above.' : "Come back after you apply and we'll start tracking."}`
+                  )}
+                </div>
+              )}
               {answer === 'changed' && `Got it. We'll use your feedback to flag this type of issue for future applicants.`}
               {answer === 'remind' && `Saved. We'll keep this ready for when you come back. Check-in scheduled.`}
             </div>

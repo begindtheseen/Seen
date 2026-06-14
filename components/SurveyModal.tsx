@@ -20,7 +20,7 @@ interface SurveyModalProps {
   onCreditsEarned: (total: number) => void
 }
 
-type Phase = 'loading' | 'intro' | 'question' | 'credit-pop' | 'done'
+type Phase = 'loading' | 'intro' | 'question' | 'credit-pop' | 'done' | 'no-surveys'
 
 function pickBestApp(apps: Application[], exclude?: string): Application | null {
   const pool = exclude ? apps.filter(a => a.id !== exclude) : apps
@@ -74,7 +74,7 @@ export default function SurveyModal({ apps, onClose, onCreditsEarned }: SurveyMo
     })
     const d = await r.json()
     if (!d.questions?.length) {
-      onClose()
+      setPhase('no-surveys')
       return
     }
     setQuestions(d.questions)
@@ -143,6 +143,7 @@ export default function SurveyModal({ apps, onClose, onCreditsEarned }: SurveyMo
           const next = pickBestApp(apps, targetApp!.id)
           setNextApp(next)
           onCreditsEarned(earned)
+          window.dispatchEvent(new CustomEvent('seen:credits-updated'))
           setPhase('done')
         }
       }, 800)
@@ -613,6 +614,20 @@ export default function SurveyModal({ apps, onClose, onCreditsEarned }: SurveyMo
                 disabled={!selected || submitting}
               >
                 {submitting ? 'Submitting…' : 'Submit answer →'}
+              </button>
+            </div>
+          )}
+
+          {/* ── NO SURVEYS ── */}
+          {phase === 'no-surveys' && (
+            <div style={{ padding: '2rem 1.5rem', textAlign: 'center' }}>
+              <div style={{ fontSize: '2rem', marginBottom: '1rem' }}>✓</div>
+              <div style={{ fontFamily: 'var(--display)', fontSize: '.95rem', fontWeight: 700, color: 'var(--white)', marginBottom: '.5rem' }}>All caught up!</div>
+              <div style={{ fontFamily: 'var(--mono)', fontSize: '.68rem', color: 'var(--sub)', lineHeight: 1.65, marginBottom: '1.5rem' }}>
+                You've answered all available questions for your applications.<br/>Check back after new applications are added.
+              </div>
+              <button onClick={onClose} style={{ background: 'var(--raised)', border: '1px solid var(--line2)', color: 'var(--sub)', fontFamily: 'var(--mono)', fontSize: '.72rem', borderRadius: 8, padding: '.6rem 1.25rem', cursor: 'pointer' }}>
+                Close
               </button>
             </div>
           )}

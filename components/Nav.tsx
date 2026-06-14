@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useAuth } from '@/lib/auth'
 import { supabase } from '@/lib/supabase'
 
@@ -16,7 +16,7 @@ export default function Nav() {
   const [menuOpen, setMenuOpen] = useState(false)
   const [creditBalance, setCreditBalance] = useState<number | null>(null)
 
-  useEffect(() => {
+  const fetchBalance = useCallback(async () => {
     if (!isSeeker) { setCreditBalance(null); return }
     let cancelled = false
     token().then(async (tok) => {
@@ -34,6 +34,16 @@ export default function Nav() {
     })
     return () => { cancelled = true }
   }, [isSeeker, token])
+
+  useEffect(() => {
+    fetchBalance()
+  }, [fetchBalance])
+
+  useEffect(() => {
+    const handler = () => { fetchBalance() }
+    window.addEventListener('seen:credits-updated', handler)
+    return () => window.removeEventListener('seen:credits-updated', handler)
+  }, [fetchBalance])
 
   // Close the mobile drawer whenever the route changes
   useEffect(() => { setMenuOpen(false) }, [pathname])

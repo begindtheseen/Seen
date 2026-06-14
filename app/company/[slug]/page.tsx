@@ -459,6 +459,9 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
   const [companyJobs, setCompanyJobs] = useState<Array<{title:string;company:string;location:string;salary:string|null;url:string|null;source:string;type:string;level:string;score:number}>>([])
   const [jobsLoading, setJobsLoading] = useState(false)
   const [jobsFetched, setJobsFetched] = useState(false)
+  const [compareInput, setCompareInput] = useState('')
+  const [compareList, setCompareList] = useState<Array<{name: string; score: CompanyScore | null; loading: boolean}>>([])
+
   const [displayScore, setDisplayScore] = useState(0)
   const [scoreRevealed, setScoreRevealed] = useState(false)
   const [myApp, setMyApp] = useState<{company: string; role: string; status: string; stage: string; appliedAt: number; daysSince: number} | null>(null)
@@ -486,10 +489,12 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
     } catch {}
   }, [slug])
 
-  // T3-9: Simulated live viewer count
+  // T3-9: Stable per-session viewer count (consistent for same company + day)
   useEffect(() => {
-    setViewers(Math.floor(Math.random() * 22) + 5)
-  }, [])
+    const day = Math.floor(Date.now() / 86400000)
+    const hash = [...(slug + day)].reduce((h, c) => (h * 31 + c.charCodeAt(0)) & 0xffff, 0)
+    setViewers((hash % 22) + 5)
+  }, [slug])
 
   // T3-7: Record this company visit in localStorage for dashboard "Recently checked"
   useEffect(() => {
@@ -934,9 +939,76 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
 
             {/* ── LOCATIONS TAB ── */}
             {tab === 'locations' && (
-              <div style={{ textAlign: 'center', padding: '2.5rem', color: 'var(--muted)', fontFamily: 'var(--mono)', fontSize: '.7rem' }}>
-                Location-specific scores coming soon.<br />
-                <span style={{ fontSize: '.6rem', opacity: .6 }}>Use the city filter above to narrow reports to a specific location.</span>
+              <div>
+                {reports.length === 0 ? (
+                  <div style={{ textAlign: 'center', padding: '2.5rem', color: 'var(--muted)', fontFamily: 'var(--mono)', fontSize: '.7rem' }}>
+                    No location data yet — reports populate as applications come in
+                  </div>
+                ) : (() => {
+                  // Group reports by city
+                  const cityMap: Record<string, { total: number; ghosted: number }> = {}
+                  reports.forEach(r => {
+                    const city = r.city || r.location || 'Unknown'
+                    if (!cityMap[city]) cityMap[city] = { total: 0, ghosted: 0 }
+                    cityMap[city].total += 1
+                    if (r.outcome === 'ghosted') cityMap[city].ghosted += 1
+                  })
+                  const cityRows = Object.entries(cityMap)
+                    .map(([city, data]) => ({
+                      city,
+                      total: data.total,
+                      ghostRate: data.ghosted / data.total,
+                      responseRate: (data.total - data.ghosted) / data.total,
+                    }))
+                    .sort((a, b) => b.total - a.total)
+                    .slice(0, 6)
+
+                  return (
+                    <div>
+                      <div style={{ fontFamily: 'var(--mono)', fontSize: '.56rem', textTransform: 'uppercase', letterSpacing: '.08em', color: 'var(--muted)', marginBottom: '1rem' }}>
+                        Location breakdown · {reports.length} reports
+                      </div>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '.55rem' }}>
+                        {cityRows.map(row => {
+                          const ghostPctVal = Math.round(row.ghostRate * 100)
+                          const barColor = row.ghostRate > 0.55 ? 'var(--red)' : row.ghostRate > 0.35 ? 'var(--amber)' : 'var(--green)'
+                          return (
+                            <div key={row.city} style={{
+                              background: 'var(--surface, #111)', border: '1px solid var(--line2)',
+                              borderRadius: 8, padding: '.75rem 1rem',
+                              display: 'flex', alignItems: 'center', gap: '.85rem', flexWrap: 'wrap',
+                            }}>
+                              <div style={{ fontFamily: 'var(--mono)', fontSize: '.68rem', color: 'var(--white)', minWidth: 120, flexShrink: 0 }}>
+                                {row.city}
+                              </div>
+                              <div style={{ flex: 1, minWidth: 80 }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '.5rem', marginBottom: '.2rem' }}>
+                                  <div style={{ flex: 1, height: 6, background: 'var(--line2)', borderRadius: 3, overflow: 'hidden' }}>
+                                    <div style={{ width: `${ghostPctVal}%`, height: '100%', background: barColor, borderRadius: 3, transition: 'width .4s ease' }} />
+                                  </div>
+                                  <span style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', color: barColor, width: 36, textAlign: 'right', flexShrink: 0 }}>
+                                    {ghostPctVal}%
+                                  </span>
+                                </div>
+                                <div style={{ fontFamily: 'var(--mono)', fontSize: '.52rem', color: 'var(--muted)' }}>
+                                  ghost rate · {Math.round(row.responseRate * 100)}% responded
+                                </div>
+                              </div>
+                              <span style={{
+                                fontFamily: 'var(--mono)', fontSize: '.54rem', fontWeight: 600,
+                                background: 'var(--card)', border: '1px solid var(--line2)',
+                                borderRadius: 100, padding: '.1rem .5rem', color: 'var(--sub)',
+                                flexShrink: 0,
+                              }}>
+                                {row.total} report{row.total !== 1 ? 's' : ''}
+                              </span>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    </div>
+                  )
+                })()}
               </div>
             )}
 
@@ -1010,8 +1082,165 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
 
             {/* ── COMPARE TAB ── */}
             {tab === 'compare' && (
-              <div style={{ textAlign: 'center', padding: '2.5rem', color: 'var(--muted)', fontFamily: 'var(--mono)', fontSize: '.7rem' }}>
-                ⚡ Company comparison coming soon.
+              <div>
+                {/* Add company input */}
+                <div style={{ marginBottom: '1.25rem' }}>
+                  <div style={{ fontFamily: 'var(--mono)', fontSize: '.56rem', textTransform: 'uppercase', letterSpacing: '.08em', color: 'var(--muted)', marginBottom: '.6rem' }}>
+                    Compare {companyName} with another company
+                  </div>
+                  <div style={{ display: 'flex', gap: '.5rem', flexWrap: 'wrap' }}>
+                    <input
+                      type="text"
+                      placeholder="Company name (e.g. Google)"
+                      value={compareInput}
+                      onChange={e => setCompareInput(e.target.value)}
+                      onKeyDown={e => {
+                        if (e.key === 'Enter' && compareInput.trim() && compareList.length < 2) {
+                          const name = compareInput.trim()
+                          setCompareList(prev => [...prev, { name, score: null, loading: true }])
+                          setCompareInput('')
+                          fetch('/api/reports', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ name }),
+                          })
+                            .then(r => r.ok ? r.json() : { score: null })
+                            .then(d => setCompareList(prev => prev.map(c => c.name === name ? { ...c, score: d.score ?? null, loading: false } : c)))
+                            .catch(() => setCompareList(prev => prev.map(c => c.name === name ? { ...c, loading: false } : c)))
+                        }
+                      }}
+                      disabled={compareList.length >= 2}
+                      style={{
+                        flex: 1, minWidth: 200, background: 'var(--surface, #111)', border: '1px solid var(--line2)',
+                        borderRadius: 6, padding: '.45rem .7rem', color: 'var(--white)',
+                        fontFamily: 'var(--mono)', fontSize: '.68rem', outline: 'none',
+                        opacity: compareList.length >= 2 ? 0.5 : 1,
+                      }}
+                    />
+                    <button
+                      disabled={!compareInput.trim() || compareList.length >= 2}
+                      onClick={() => {
+                        const name = compareInput.trim()
+                        if (!name || compareList.length >= 2) return
+                        setCompareList(prev => [...prev, { name, score: null, loading: true }])
+                        setCompareInput('')
+                        fetch('/api/reports', {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({ name }),
+                        })
+                          .then(r => r.ok ? r.json() : { score: null })
+                          .then(d => setCompareList(prev => prev.map(c => c.name === name ? { ...c, score: d.score ?? null, loading: false } : c)))
+                          .catch(() => setCompareList(prev => prev.map(c => c.name === name ? { ...c, loading: false } : c)))
+                      }}
+                      style={{
+                        background: 'linear-gradient(135deg,rgba(99,102,241,0.15),rgba(16,185,129,0.15))',
+                        border: '1px solid rgba(99,102,241,0.3)', borderRadius: 6,
+                        color: 'var(--blue)', fontFamily: 'var(--mono)', fontSize: '.68rem',
+                        padding: '.45rem 1rem', cursor: compareList.length >= 2 ? 'not-allowed' : 'pointer',
+                        opacity: !compareInput.trim() || compareList.length >= 2 ? 0.5 : 1,
+                        flexShrink: 0,
+                      }}
+                    >
+                      Compare →
+                    </button>
+                    {compareList.length > 0 && (
+                      <button
+                        onClick={() => setCompareList([])}
+                        style={{
+                          background: 'none', border: '1px solid var(--line2)', borderRadius: 6,
+                          color: 'var(--muted)', fontFamily: 'var(--mono)', fontSize: '.65rem',
+                          padding: '.45rem .75rem', cursor: 'pointer', flexShrink: 0,
+                        }}
+                      >
+                        Clear
+                      </button>
+                    )}
+                  </div>
+                  {compareList.length >= 2 && (
+                    <div style={{ fontFamily: 'var(--mono)', fontSize: '.56rem', color: 'var(--muted)', marginTop: '.35rem' }}>
+                      Max 2 companies added (1 current + 2 comparison)
+                    </div>
+                  )}
+                </div>
+
+                {/* Comparison table */}
+                {compareList.length === 0 ? (
+                  <div style={{ textAlign: 'center', padding: '2rem', color: 'var(--muted)', fontFamily: 'var(--mono)', fontSize: '.68rem', background: 'var(--surface, #111)', border: '1px solid var(--line2)', borderRadius: 10 }}>
+                    Add a company to compare
+                  </div>
+                ) : (
+                  <div style={{ overflowX: 'auto' }}>
+                    <table style={{ width: '100%', borderCollapse: 'collapse', fontFamily: 'var(--mono)', fontSize: '.65rem' }}>
+                      <thead>
+                        <tr>
+                          <th style={{ textAlign: 'left', padding: '.55rem .75rem', color: 'var(--muted)', fontWeight: 500, fontSize: '.54rem', textTransform: 'uppercase', letterSpacing: '.08em', borderBottom: '1px solid var(--line2)', minWidth: 120 }}>
+                            Metric
+                          </th>
+                          {/* Current company column */}
+                          <th style={{ textAlign: 'center', padding: '.55rem .75rem', borderBottom: '1px solid var(--line2)', minWidth: 130 }}>
+                            <div style={{ color: 'var(--white)', fontWeight: 700, fontSize: '.68rem', marginBottom: '.15rem' }}>{companyName}</div>
+                            <div style={{ fontFamily: 'var(--mono)', fontSize: '.5rem', color: 'var(--blue)', textTransform: 'uppercase', letterSpacing: '.08em' }}>current</div>
+                          </th>
+                          {/* Added companies columns */}
+                          {compareList.map(c => (
+                            <th key={c.name} style={{ textAlign: 'center', padding: '.55rem .75rem', borderBottom: '1px solid var(--line2)', minWidth: 130 }}>
+                              <div style={{ color: 'var(--white)', fontWeight: 700, fontSize: '.68rem', marginBottom: '.15rem' }}>{c.name}</div>
+                              {c.loading && <div style={{ fontFamily: 'var(--mono)', fontSize: '.5rem', color: 'var(--muted)' }}>loading…</div>}
+                              {!c.loading && !c.score && <div style={{ fontFamily: 'var(--mono)', fontSize: '.5rem', color: 'var(--red)' }}>no data</div>}
+                            </th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {[
+                          {
+                            label: 'Score',
+                            current: score ? String(score.overall_score) : '—',
+                            get: (sc: CompanyScore | null) => sc ? String(sc.overall_score) : '—',
+                            currentColor: score ? riskColor(Score.risk(score.overall_score)) : 'var(--muted)',
+                            getColor: (sc: CompanyScore | null) => sc ? riskColor(Score.risk(sc.overall_score)) : 'var(--muted)',
+                          },
+                          {
+                            label: 'Ghost %',
+                            current: score ? pct(score.ghost_rate) : '—',
+                            get: (sc: CompanyScore | null) => sc ? pct(sc.ghost_rate) : '—',
+                            currentColor: ghostColor,
+                            getColor: (sc: CompanyScore | null) => sc ? ((sc.ghost_rate > 0.5) ? 'var(--red)' : (sc.ghost_rate > 0.3) ? 'var(--amber)' : 'var(--green)') : 'var(--muted)',
+                          },
+                          {
+                            label: 'Response %',
+                            current: score ? pct(score.response_rate) : '—',
+                            get: (sc: CompanyScore | null) => sc ? pct(sc.response_rate) : '—',
+                            currentColor: 'var(--blue)',
+                            getColor: () => 'var(--blue)',
+                          },
+                          {
+                            label: 'Avg wait days',
+                            current: score ? `${score.avg_wait_days ?? '—'}d` : '—',
+                            get: (sc: CompanyScore | null) => sc ? `${sc.avg_wait_days ?? '—'}d` : '—',
+                            currentColor: waitColor,
+                            getColor: (sc: CompanyScore | null) => sc ? ((sc.avg_wait_days || 0) > 21 ? 'var(--amber)' : 'var(--text)') : 'var(--muted)',
+                          },
+                        ].map((row, i) => (
+                          <tr key={row.label} style={{ background: i % 2 === 0 ? 'transparent' : 'rgba(255,255,255,0.02)' }}>
+                            <td style={{ padding: '.55rem .75rem', color: 'var(--muted)', fontSize: '.6rem', borderBottom: '1px solid var(--line2)' }}>
+                              {row.label}
+                            </td>
+                            <td style={{ textAlign: 'center', padding: '.55rem .75rem', fontWeight: 600, color: row.currentColor, borderBottom: '1px solid var(--line2)', fontSize: '.72rem' }}>
+                              {row.current}
+                            </td>
+                            {compareList.map(c => (
+                              <td key={c.name} style={{ textAlign: 'center', padding: '.55rem .75rem', fontWeight: 600, color: c.loading ? 'var(--muted)' : row.getColor(c.score), borderBottom: '1px solid var(--line2)', fontSize: '.72rem' }}>
+                                {c.loading ? '…' : row.get(c.score)}
+                              </td>
+                            ))}
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
               </div>
             )}
           </>
