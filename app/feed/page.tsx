@@ -31,10 +31,10 @@ const OUTCOME_LABELS: Record<string, { label: string; cls: string }> = {
 
 const FILTERS: { key: Filter; label: string }[] = [
   { key: 'all', label: 'All' },
-  { key: 'interviewing', label: 'Interviewing' },
-  { key: 'ghosted', label: 'Ghosted' },
-  { key: 'rejected', label: 'Rejected' },
-  { key: 'hired', label: 'Hired' },
+  { key: 'interviewing', label: '📞 Interviewing' },
+  { key: 'ghosted', label: '👻 Ghosted' },
+  { key: 'rejected', label: '❌ Rejected' },
+  { key: 'hired', label: '🎉 Hired' },
 ]
 
 const PAGE_SIZE = 15
@@ -105,7 +105,7 @@ export default function FeedPage() {
 
   return (
     <div className="page-full">
-      <div style={{ maxWidth: 720, margin: '0 auto', padding: '2.5rem 2rem' }}>
+      <div style={{ maxWidth: 720, margin: '0 auto', padding: '2rem 1.25rem' }}>
         {/* Header */}
         <div style={{ marginBottom: '1.5rem' }}>
           <div className="eyebrow">Live feed</div>
@@ -118,7 +118,7 @@ export default function FeedPage() {
         </div>
 
         {/* CTA strip — old HTML order: report CTA comes first */}
-        <div style={{ background: 'rgba(16,185,129,.05)', border: '1px solid rgba(16,185,129,.2)', borderRadius: 10, padding: '.85rem 1.1rem', marginBottom: '1.25rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem', flexWrap: 'wrap', cursor: 'pointer' }} onClick={() => window.location.href = '/report'}>
+        <div style={{ background: 'rgba(16,185,129,.06)', border: '1px solid rgba(16,185,129,.18)', borderRadius: 10, padding: '.75rem 1rem', marginBottom: '1.25rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '.75rem', flexWrap: 'wrap', cursor: 'pointer', transition: 'background .15s' }} onClick={() => window.location.href = '/report'}>
           <div>
             <div style={{ fontFamily: 'var(--mono)', fontSize: '.62rem', color: 'var(--green)', fontWeight: 600, marginBottom: '.1rem' }}>Your experience matters</div>
             <div style={{ fontSize: '.72rem', color: 'var(--sub)', fontWeight: 300 }}>Had an interview? Got ghosted? Add your report — it shapes scores for every future applicant.</div>

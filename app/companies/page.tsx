@@ -64,13 +64,10 @@ export default function CompaniesPage() {
   const sortBtn = (key: SortKey, label: string) => (
     <button
       onClick={() => setSort(key)}
+      className="btn btn-ghost"
       style={{
-        background: sort === key ? 'var(--blue)' : 'var(--card)',
-        border: `1px solid ${sort === key ? 'var(--blue)' : 'var(--line)'}`,
-        color: sort === key ? '#fff' : 'var(--sub)',
-        borderRadius: 6, padding: '.3rem .75rem',
-        fontFamily: 'var(--mono)', fontSize: '.62rem',
-        cursor: 'pointer', transition: 'all .15s',
+        fontSize: '.72rem', padding: '.45rem .85rem',
+        ...(sort === key ? { background: 'var(--bdim)', borderColor: 'var(--blue)' } : {}),
       }}
     >
       {label}
@@ -79,30 +76,31 @@ export default function CompaniesPage() {
 
   return (
     <div className="page-full">
-      <div style={{ maxWidth: 960, margin: '0 auto', padding: '2.5rem 2rem' }}>
-        <div className="eyebrow">Transparency rankings</div>
-        <h1 style={{ fontFamily: 'var(--display)', fontSize: '1.9rem', fontWeight: 800, color: 'var(--white)', letterSpacing: '-.03em', marginBottom: '.35rem' }}>
-          Company scoreboard
-        </h1>
-        <p style={{ color: 'var(--sub)', fontSize: '.82rem', fontWeight: 300, marginBottom: '1.5rem' }}>
-          Ranked by how well companies actually treat applicants.
-        </p>
+      <div style={{ maxWidth: 960, margin: '0 auto', padding: '2.5rem 1.5rem' }}>
+        <div style={{ marginBottom: '2rem' }}>
+          <div className="eyebrow">Transparency rankings</div>
+          <h1 style={{ fontFamily: 'var(--display)', fontSize: '1.9rem', fontWeight: 800, color: 'var(--white)', letterSpacing: '-.03em', marginBottom: '.35rem' }}>
+            Company scoreboard
+          </h1>
+          <p style={{ color: 'var(--sub)', fontSize: '.82rem', fontWeight: 300 }}>
+            Ranked by hiring transparency score. Ghost rate, response rate, and process quality — all in one place.
+          </p>
+        </div>
 
         {/* Controls */}
-        <div style={{ display: 'flex', gap: '.65rem', flexWrap: 'wrap', marginBottom: '1.25rem', alignItems: 'center' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '.65rem', flexWrap: 'wrap', marginBottom: '1.5rem' }}>
           <input
             type="text"
             placeholder="Search companies..."
             value={search}
             onChange={e => setSearch(e.target.value)}
-            style={{ flex: 1, minWidth: 200, background: 'var(--surface)', border: '1.5px solid var(--line2)', borderRadius: 8, padding: '.55rem .9rem', color: 'var(--white)', fontFamily: 'var(--body)', fontSize: '.875rem', outline: 'none', caretColor: 'var(--blue)' }}
+            onFocus={e => e.currentTarget.style.borderColor = 'var(--blue)'}
+            onBlur={e => e.currentTarget.style.borderColor = 'var(--line2)'}
+            style={{ flex: 1, minWidth: 180, maxWidth: 280, background: 'var(--surface)', border: '1.5px solid var(--line2)', borderRadius: 8, padding: '.55rem 1rem', color: 'var(--white)', fontFamily: 'var(--mono)', fontSize: '.78rem', outline: 'none', caretColor: 'var(--blue)' }}
           />
-          <div style={{ display: 'flex', gap: '.4rem' }}>
-            <span style={{ fontFamily: 'var(--mono)', fontSize: '.6rem', color: 'var(--muted)', display: 'flex', alignItems: 'center' }}>Sort:</span>
-            {sortBtn('score', '↑ Score')}
-            {sortBtn('ghost', '↓ Ghost %')}
-            {sortBtn('wait', '↓ Wait days')}
-          </div>
+          {sortBtn('score', 'Score ↓')}
+          {sortBtn('ghost', 'Ghost rate')}
+          {sortBtn('wait', 'Wait time')}
         </div>
 
         {loading ? (
