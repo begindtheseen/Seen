@@ -1,4 +1,12 @@
-import { rateLimit } from '../lib/server/ratelimit.js';
+// Foundation layer (see docs/ARCHITECTURE.md). Imported with explicit .ts
+// extensions so they resolve both under Vercel's serverless bundler and Node's
+// native TS loader. CORS, rate limiting, env access, and the response helper are
+// now centralized instead of re-implemented inline.
+import { handlePreflight } from '../lib/security/cors.ts';
+import { rateLimit } from '../lib/security/rateLimit.ts';
+import { ok } from '../lib/api/response.ts';
+import { serverEnv, optionalEnv } from '../lib/config/env.ts';
+import { groupDemandRows } from '../lib/demand/grouping.ts';
 import { logError } from '../lib/server/errlog.js';
 
 // /api/demand — Demand data hub.
@@ -16,17 +24,11 @@ import { logError } from '../lib/server/errlog.js';
 //   dtf_norm          = min(1, avg_days_to_fill / 90) × 100
 
 export default async function handler(req, res) {
-  const origin = req.headers.origin || '';
-  const allowed = !origin || origin.includes('localhost') || origin.includes('127.0.0.1') ||
-    ['https://seenjobs.io', 'https://www.seenjobs.io'].includes(origin);
-  res.setHeader('Access-Control-Allow-Origin', allowed ? (origin || '*') : 'https://seenjobs.io');
-  res.setHeader('Vary', 'Origin');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-  if (req.method === 'OPTIONS') return res.status(200).end();
+  // CORS + preflight via the shared policy (identical headers to before).
+  if (handlePreflight(req, res, { methods: 'GET, POST, OPTIONS' })) return;
 
-  const { allowed: rlOk } = await rateLimit(req, 'demand');
-  if (!rlOk) return res.status(429).json({ error: 'Too many requests — slow down.' });
+  const { allowed } = await rateLimit(req, 'demand');
+  if (!allowed) return res.status(429).json({ error: 'Too many requests — slow down.' });
 
   if (req.method === 'GET') return handleGet(req, res);
   if (req.method === 'POST') return handlePost(req, res);
@@ -39,12 +41,14 @@ async function handleGet(req, res) {
   // Cache for 6 hours — data refreshes monthly but this keeps reads fast
   res.setHeader('Cache-Control', 'public, max-age=21600, stale-while-revalidate=86400');
 
-  const SUPABASE_URL  = process.env.SUPABASE_URL;
-  const SUPABASE_ANON = process.env.SUPABASE_ANON_KEY || process.env.SUPABASE_SERVICE_KEY;
+  // Public read uses the anon key (RLS-protected), falling back to the service key
+  // exactly as before. Env is read through lib/config/env instead of process.env.
+  const SUPABASE_URL = serverEnv.supabaseUrl();
+  const SUPABASE_ANON = optionalEnv('SUPABASE_ANON_KEY') || serverEnv.supabaseServiceKey();
 
-  if (!SUPABASE_URL || !SUPABASE_ANON) {
-    return res.status(200).json({ ok: true, demand: [], generated_at: new Date().toISOString() });
-  }
+  const emptyPayload = () => ({ ok: true, demand: [], generated_at: new Date().toISOString() });
+
+  if (!SUPABASE_URL || !SUPABASE_ANON) return ok(res, emptyPayload());
 
   try {
     const url = `${SUPABASE_URL}/rest/v1/demand_data?select=*&order=city.asc,di.desc&limit=500`;
@@ -52,42 +56,23 @@ async function handleGet(req, res) {
       headers: { apikey: SUPABASE_ANON, Authorization: `Bearer ${SUPABASE_ANON}` },
     });
 
-    if (!r.ok) {
-      return res.status(200).json({ ok: true, demand: [], generated_at: new Date().toISOString() });
-    }
+    if (!r.ok) return ok(res, emptyPayload());
 
     const rawRows = await r.json();
-    if (!Array.isArray(rawRows) || !rawRows.length) {
-      return res.status(200).json({ ok: true, demand: [], generated_at: new Date().toISOString() });
-    }
+    if (!Array.isArray(rawRows) || !rawRows.length) return ok(res, emptyPayload());
 
-    const cityMap = new Map();
-    let latestUpdatedAt = null;
-    let blsPeriod = null;
-
-    for (const row of rawRows) {
-      if (!cityMap.has(row.city)) {
-        cityMap.set(row.city, { city: row.city, urg: row.urg, src: row.src, jobs: [] });
-      }
-      cityMap.get(row.city).jobs.push({
-        t: row.role_title, n: row.niche, l: row.level,
-        count: row.count, di: row.di, note: row.note || '',
-      });
-      if (!latestUpdatedAt || row.updated_at > latestUpdatedAt) latestUpdatedAt = row.updated_at;
-      if (row.bls_period && !blsPeriod) blsPeriod = row.bls_period;
-    }
-
-    return res.status(200).json({
+    const grouped = groupDemandRows(rawRows);
+    return ok(res, {
       ok: true,
-      demand: Array.from(cityMap.values()),
-      generated_at: latestUpdatedAt || new Date().toISOString(),
-      bls_period: blsPeriod,
-      row_count: rawRows.length,
+      demand: grouped.demand,
+      generated_at: grouped.generated_at || new Date().toISOString(),
+      bls_period: grouped.bls_period,
+      row_count: grouped.row_count,
     });
   } catch (e) {
     console.error('demand GET error:', e.message);
     logError('demand', e.message, { method: 'GET' });
-    return res.status(200).json({ ok: true, demand: [], generated_at: new Date().toISOString() });
+    return ok(res, emptyPayload());
   }
 }
 

@@ -74,8 +74,8 @@ helpers, add body validation, move domain logic into a `lib/<feature>` service,
 and add/verify parity tests **before** merging.
 
 Suggested order (lowest risk → highest):
-1. `api/demand.js` (public reads) — proves the pattern end to end.
-2. `api/user-sync.js` — auth + service-db heavy; high duplication payoff.
+1. `api/demand.js` (public reads) — proves the pattern end to end. ✅ **Done.**
+2. `api/user-sync.js` — auth + service-db heavy; high duplication payoff. ← _next_
 3. `api/admin-stats.js` — fold its inline rate limiter into the shared one (F-06).
 4. `api/reports.js` — largest file; split actions into `lib/reports/` services.
 5. `api/resume.js` — extract AI calls into `lib/ai/`; consider splitting
@@ -83,6 +83,32 @@ Suggested order (lowest risk → highest):
 6. `api/jobs.js` + `api/refresh-jobs.js` — extract `lib/jobs/` services.
 7. `api/stripe.js` → `lib/payments/` — **last and most carefully**; keep signature
    verification + idempotency byte-for-byte; cover with tests first.
+
+### Slice 3.1 — `api/demand.js` (done)
+
+First foundation-adoption slice. Scope was deliberately narrow: the public GET
+boundary only; the admin/cron POST path and `vercel.json` were left untouched.
+
+- **Migrated:** inline CORS → `lib/security/cors.ts` (`handlePreflight`); rate-limit
+  now imported from `lib/security/rateLimit.ts`; GET env reads → `lib/config/env.ts`
+  (`serverEnv` / `optionalEnv`); GET success/empty responses → `lib/api/response.ts`
+  (`ok`); GET grouping logic extracted to a pure, unit-tested service
+  `lib/demand/grouping.ts`.
+- **Kept as `api/demand.js` (not renamed to `.ts`)** so the `vercel.json` function
+  entry (`api/demand.js`, `maxDuration: 60`) stays valid — no production-settings
+  change. Foundation modules are imported with explicit `.ts` extensions so they
+  resolve under both Vercel's serverless bundler and Node's native TS loader.
+- **Hardened:** `lib/api/response.ts` now imports `./errors.ts` (explicit extension)
+  so it is resolvable from a plain-JS serverless function.
+- **Unchanged:** the entire POST/admin/BLS/upsert path; every response shape (200
+  grouped, 200 empty-degrade, 429, 405, OPTIONS); the `Cache-Control` header; the
+  anon-key read in GET.
+- **Tests added:** `tests/demand-grouping.test.ts` (grouping unit tests) and
+  `tests/demand-route.test.ts` (route integration tests with a mocked `fetch`).
+- **Not used here:** `createHandler` / `lib/api/errors` / `lib/security/validation`
+  — GET takes no params (nothing to validate) and intentionally degrades to a
+  `200` empty payload rather than erroring, so the error/validation helpers did
+  not apply. They remain the standard for routes that reject on bad input.
 
 ## Phase 4 — Giant page splitting
 

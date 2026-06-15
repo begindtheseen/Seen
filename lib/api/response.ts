@@ -3,7 +3,9 @@
 // consistent across the API.
 
 import type { ApiResponse } from './types'
-import { toApiError } from './errors'
+// Explicit .ts extension so this module resolves when imported from a plain-JS
+// Vercel serverless function (api/*.js) and under Node's native TS loader.
+import { toApiError } from './errors.ts'
 
 export function sendJson<T>(res: ApiResponse, status: number, body: T): void {
   res.status(status).json(body)
