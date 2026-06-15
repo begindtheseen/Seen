@@ -8,7 +8,10 @@
 // This centralizes the `db(path, opts)` PostgREST helper that is currently
 // copy-pasted across api/*.js.
 
-import { requireSupabaseServer } from '../config/env'
+// Explicit .ts extension so this value-import resolves when admin.ts is loaded at
+// runtime from a plain-JS serverless function (api/*.js) and under Node's native
+// TS loader (tests) — same hardening already applied to lib/api/response.ts.
+import { requireSupabaseServer } from '../config/env.ts'
 
 function assertServer(): void {
   if (typeof window !== 'undefined') {
