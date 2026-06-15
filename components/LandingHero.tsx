@@ -7,14 +7,14 @@ import { useAuth } from '@/lib/auth'
 import { AppStore } from '@/lib/stores/AppStore'
 
 const HERO_LINES: [string, string][] = [
-  ['know before',        'you apply.'],
-  ['does this company',  'actually respond?'],
-  ['see who ghosts.',    'see who hires.'],
-  ['check the score.',   'skip the waste.'],
-  ['your time matters.', 'spend it wisely.'],
-  ['the hiring data',    'companies hide.'],
-  ['stop guessing.',     'start knowing.'],
-  ['47,000+ companies.', 'all scored. free.'],
+  ["it's not you.",        "they ghost everyone."],
+  ["1 in 2 companies",     "never respond."],
+  ["they know everything.", "now so do you."],
+  ["before you apply,",    "check if they reply."],
+  ["not all companies",    "deserve your time."],
+  ["124,000 outcomes.",    "zero guesswork."],
+  ["see who hires.",       "expose who ghosts."],
+  ["applying blind",       "is over."],
 ]
 
 const JOB_KEYWORDS = ['engineer', 'developer', 'manager', 'analyst', 'designer', 'nurse', 'coordinator', 'specialist', 'director', 'associate', 'assistant', 'recruiter', 'sales', 'marketing', 'accountant', 'therapist', 'technician']
@@ -353,7 +353,7 @@ export default function LandingHero() {
           {/* Kicker pill */}
           <div style={{ display: 'inline-flex', alignItems: 'center', gap: '.4rem', background: 'rgba(59,130,246,0.1)', border: '1px solid rgba(59,130,246,0.2)', color: 'var(--blue)', fontFamily: 'var(--mono)', fontSize: '.63rem', padding: '.25rem .85rem', borderRadius: 100, marginBottom: '1.75rem', animation: 'fadeUp .5s ease both' }}>
             <span style={{ width: 5, height: 5, borderRadius: '50%', background: 'var(--blue)', animation: 'pulse 2s infinite', display: 'inline-block' }} />
-            47,000+ companies scored · updated live
+            real ghost rates · 124,000+ verified outcomes · free
           </div>
 
           {/* Rotating headline */}
@@ -528,7 +528,7 @@ export default function LandingHero() {
           {/* CTAs */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap', animation: 'fadeUp .5s .28s ease both' }}>
             <button className="btn btn-green btn-lg" onClick={() => router.push('/login')} style={{ fontSize: '.88rem', padding: '.78rem 1.85rem' }}>
-              Protect your job search →
+              Check who actually responds →
             </button>
             <button onClick={() => router.push('/jobs')} style={{ background: 'none', border: 'none', fontFamily: 'var(--mono)', fontSize: '.68rem', color: 'rgba(255,255,255,.38)', cursor: 'pointer', padding: '.2rem 0', transition: 'color .15s', letterSpacing: '.02em' }}>
               browse jobs →
