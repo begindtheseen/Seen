@@ -15,7 +15,7 @@ import { logError } from '../lib/server/errlog.js';
 //   growth_norm       = min(1, bls_10yr_growth_pct / 36) × 100
 //   dtf_norm          = min(1, avg_days_to_fill / 90) × 100
 
-export default async function handler(req, res) {
+async function route(req, res) {
   const origin = req.headers.origin || '';
   const allowed = !origin || origin.includes('localhost') || origin.includes('127.0.0.1') ||
     ['https://seenjobs.io', 'https://www.seenjobs.io'].includes(origin);
@@ -31,6 +31,25 @@ export default async function handler(req, res) {
   if (req.method === 'GET') return handleGet(req, res);
   if (req.method === 'POST') return handlePost(req, res);
   return res.status(405).end();
+}
+
+// Fail-open wrapper — /api/demand is non-critical and must NEVER return 500.
+// Any unexpected runtime error degrades to a safe 200 empty payload. (Module-load
+// is already safe: this route imports only plain .js, never .ts.)
+export default async function handler(req, res) {
+  try {
+    return await route(req, res);
+  } catch (e) {
+    try { console.error('[demand] unexpected error:', (e && e.message) || e); } catch (_) {}
+    if (!res.headersSent) {
+      try {
+        res.setHeader('Access-Control-Allow-Origin', 'https://seenjobs.io');
+        res.setHeader('Vary', 'Origin');
+        res.setHeader('Cache-Control', 'public, max-age=21600, stale-while-revalidate=86400');
+      } catch (_) {}
+      return res.status(200).json({ ok: true, demand: [], generated_at: new Date().toISOString() });
+    }
+  }
 }
 
 // ── GET: public read ──────────────────────────────────────────────────────────
