@@ -38,7 +38,9 @@ body{background:var(--ink);background-image:radial-gradient(ellipse at 30% 0%,rg
 #rotatingHero{position:relative;overflow:hidden}
 #rotatingHero::after{content:'';position:absolute;inset:0;pointer-events:none;opacity:0;background:linear-gradient(105deg,transparent 38%,rgba(196,181,253,.11) 50%,transparent 62%);transform:translateX(-110%)}
 #rotatingHero.swept::after{animation:heroSweep .7s cubic-bezier(.3,.1,.3,1) both}
-#heroLine2{white-space:nowrap;overflow:hidden}
+.hero-h1{font-size:clamp(1.7rem,9.6cqw,3.9rem)}
+@media(max-width:480px){.hero-h1{font-size:clamp(1rem,5.5cqw,1.7rem)}}
+#heroLine2{overflow:hidden}
 @media(prefers-reduced-motion:reduce){.hw{animation:none!important;opacity:1!important;transform:none!important;filter:none!important}}
 @keyframes fadeIn{from{opacity:0}to{opacity:1}}
 @keyframes tabPop{0%{transform:scale(.94)}60%{transform:scale(1.03)}100%{transform:scale(1)}}
@@ -116,7 +118,7 @@ nav.nav-scrolled{background:rgba(6,6,8,0.82);backdrop-filter:blur(60px) saturate
 .page{display:none;min-height:100vh;padding-top:58px;box-sizing:border-box;overflow-x:hidden;width:100%}
 .page.active{display:block;animation:pageIn 0.25s cubic-bezier(0.22,1,0.36,1) both}
 @keyframes pageIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
-.page-full{display:flex;flex-direction:column;min-height:100vh;overflow-x:hidden;padding-top:58px;box-sizing:border-box;width:100%;animation:fadeIn .2s ease}
+.page-full{display:flex;flex-direction:column;min-height:100vh;overflow-x:hidden;padding-top:58px;box-sizing:border-box;width:100%;animation:fadeIn .2s ease both}
 .wrap{max-width:1300px;margin:0 auto;padding:0 1.25rem}
 
 /* SHARED COMPONENTS */
@@ -704,7 +706,6 @@ nav.nav-scrolled{background:rgba(6,6,8,0.82);backdrop-filter:blur(60px) saturate
 .l-grid{display:grid;grid-template-columns:1fr 310px;gap:3.5rem;align-items:center;width:100%;max-width:1080px;margin:0 auto;padding:0 2.5rem}
 @media(max-width:900px){.l-grid{grid-template-columns:1fr;max-width:600px;padding:0 1.5rem;gap:0}.vfeed-panel{display:none!important}}
 @media(max-width:540px){.l-grid{padding:0 1.25rem}}
-@media(max-width:480px){#rotatingHero h1{font-size:clamp(1.2rem,6.5cqw,2rem)!important}#rotatingHero{height:clamp(92px,14vw,128px)!important}}
 /* Below-fold landing page section responsive */
 .lp-3col{display:grid;grid-template-columns:repeat(3,1fr);gap:2rem}
 .lp-3stat{display:grid;grid-template-columns:repeat(3,1fr);gap:1.5rem;max-width:600px;margin:0 auto}

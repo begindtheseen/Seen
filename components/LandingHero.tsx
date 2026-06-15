@@ -100,37 +100,38 @@ export default function LandingHero() {
     const el = line2Ref.current
     if (!el) { onDone?.(); return }
 
-    // Cancel any running decode
     if (decodeRafRef.current !== null) {
       cancelAnimationFrame(decodeRafRef.current)
       decodeRafRef.current = null
     }
 
     const LOCK_CADENCE = abbreviated ? 30 : 45
-    const chars = text.split('')
-
-    // Build span elements inside the DOM node directly (imperative for rAF perf)
     el.textContent = ''
-    const items: { span: HTMLSpanElement; target: string; locked: boolean; lockAt: number }[] = chars.map((ch) => {
-      const span = document.createElement('span')
-      span.style.cssText = 'display:inline-block;white-space:pre'
-      const isSpace = ch === ' '
-      if (isSpace) {
-        span.textContent = ' '
-      } else {
-        span.textContent = WORD_POOL[Math.floor(Math.random() * WORD_POOL.length)]
-        span.style.webkitTextFillColor = 'rgba(196,181,253,.55)'
-      }
-      el.appendChild(span)
-      return { span, target: ch, locked: isSpace, lockAt: isSpace ? 0 : chars.indexOf(ch) * LOCK_CADENCE }
-    })
 
-    // Recalculate lockAt properly (indexOf is wrong for repeated chars) — rebuild
-    let charWordIdx = 0
-    chars.forEach((ch, i) => {
-      if (ch !== ' ') {
-        items[i].lockAt = charWordIdx * LOCK_CADENCE
-        charWordIdx++
+    // Split into word and space tokens. Each word gets an inline-block wrapper so the
+    // browser breaks lines only between words, never mid-character during the animation.
+    const items: { span: HTMLSpanElement; target: string; locked: boolean; lockAt: number }[] = []
+    let charIdx = 0
+    text.split(/(\s+)/).forEach(token => {
+      if (!token) return
+      if (/^\s/.test(token)) {
+        const sp = document.createElement('span')
+        sp.style.cssText = 'display:inline;white-space:pre'
+        sp.textContent = token
+        el.appendChild(sp)
+        items.push({ span: sp, target: token, locked: true, lockAt: 0 })
+      } else {
+        const wordEl = document.createElement('span')
+        wordEl.style.cssText = 'display:inline-block;white-space:nowrap'
+        el.appendChild(wordEl)
+        token.split('').forEach(ch => {
+          const sp = document.createElement('span')
+          sp.style.cssText = 'display:inline-block;white-space:pre'
+          sp.textContent = WORD_POOL[Math.floor(Math.random() * WORD_POOL.length)]
+          sp.style.webkitTextFillColor = 'rgba(196,181,253,.55)'
+          wordEl.appendChild(sp)
+          items.push({ span: sp, target: ch, locked: false, lockAt: charIdx++ * LOCK_CADENCE })
+        })
       }
     })
 
@@ -363,7 +364,7 @@ export default function LandingHero() {
               className={swept ? 'swept' : ''}
               style={{ height: 'clamp(115px,18vw,200px)', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'flex-start', overflow: 'hidden' }}
             >
-              <h1 style={{ fontFamily: 'var(--display)', fontSize: 'clamp(1.7rem,9.6cqw,3.9rem)', fontWeight: 800, lineHeight: 1.06, letterSpacing: '-.04em', color: 'var(--white)', margin: 0, width: '100%', textAlign: 'left' }}>
+              <h1 className="hero-h1" style={{ fontFamily: 'var(--display)', fontWeight: 800, lineHeight: 1.06, letterSpacing: '-.04em', color: 'var(--white)', margin: 0, width: '100%', textAlign: 'left' }}>
                 {/* Line 1: word-slam animated spans */}
                 <span
                   ref={line1Ref}
