@@ -5,6 +5,7 @@ import { usePathname, useRouter } from 'next/navigation'
 import { useState, useEffect, useCallback } from 'react'
 import { useAuth } from '@/lib/auth'
 import { supabase } from '@/lib/supabase'
+import UpgradeModal from './UpgradeModal'
 
 export default function Nav() {
   const pathname = usePathname()
@@ -15,6 +16,7 @@ export default function Nav() {
   const [scrolled, setScrolled] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
   const [creditBalance, setCreditBalance] = useState<number | null>(null)
+  const [showUpgrade, setShowUpgrade] = useState(false)
 
   const fetchBalance = useCallback(async () => {
     if (!isSeeker) { setCreditBalance(null); return }
@@ -93,11 +95,18 @@ export default function Nav() {
         <div className="nav-right">
           {isSeeker && creditBalance !== null && (
             <button
-              title={creditBalance === 999 ? 'Pro — unlimited AI credits' : `${creditBalance} AI credits remaining today`}
-              style={{ background: 'var(--blue)', color: '#fff', border: 'none', borderRadius: 20, padding: '.2rem .65rem', fontFamily: 'var(--mono)', fontSize: '.6rem', fontWeight: 700, cursor: 'pointer', lineHeight: 1.5 }}
-              onClick={() => setShowAccountModal(true)}
+              title={creditBalance === 999 ? 'Pro — unlimited AI credits' : creditBalance === 0 ? 'Out of AI credits — upgrade or earn more' : `${creditBalance} AI credits remaining today`}
+              style={{
+                background: creditBalance === 0 ? 'rgba(239,68,68,.15)' : creditBalance === 999 ? 'rgba(16,185,129,.15)' : 'var(--blue)',
+                color: creditBalance === 0 ? 'var(--red)' : creditBalance === 999 ? 'var(--green)' : '#fff',
+                border: creditBalance === 0 ? '1px solid rgba(239,68,68,.35)' : creditBalance === 999 ? '1px solid rgba(16,185,129,.35)' : 'none',
+                borderRadius: 20, padding: '.2rem .65rem',
+                fontFamily: 'var(--mono)', fontSize: '.6rem', fontWeight: 700, cursor: 'pointer', lineHeight: 1.5,
+                animation: creditBalance === 0 ? 'pulse 2s ease-in-out infinite' : undefined,
+              }}
+              onClick={() => creditBalance === 0 ? setShowUpgrade(true) : setShowAccountModal(true)}
             >
-              {creditBalance === 999 ? '∞' : creditBalance} AI
+              {creditBalance === 999 ? '∞' : creditBalance} AI{creditBalance === 0 ? ' · Upgrade' : ''}
             </button>
           )}
           {isSeeker && (
@@ -144,6 +153,8 @@ export default function Nav() {
           )}
         </div>
       </div>
+
+      {showUpgrade && <UpgradeModal reason="credits" onClose={() => setShowUpgrade(false)} />}
 
       {/* Account Settings Modal */}
       {showAccountModal && (

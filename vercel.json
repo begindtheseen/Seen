@@ -23,7 +23,8 @@
     "api/admin-stats.js": { "maxDuration": 15 },
     "api/user-sync.js": { "maxDuration": 15 },
     "api/demand.js": { "maxDuration": 60 },
-    "api/reports.js": { "maxDuration": 300 }
+    "api/reports.js": { "maxDuration": 300 },
+    "api/stripe.js": { "maxDuration": 15 }
   },
   "crons": [
     { "path": "/api/refresh-jobs", "schedule": "0 2 * * *" },

@@ -42,9 +42,9 @@ export default async function handler(req, res) {
 
   if (req.method !== 'POST') return res.status(405).end('Method not allowed');
 
-  // Credit gate — humanize is Pro-only; everything else costs 1 credit
-  const gate = await gateAI(req, `resume_${tool || 'tool'}`, { proOnly: tool === 'humanize' });
-  if (!gate.ok) return res.status(gate.status).json({ error: gate.error, credits_required: gate.credits_required, pro_required: gate.pro_required, balance: gate.balance ?? 0 });
+  // Credit gate — 1 credit per call; Pro users get Stealth Mode baked into optimize at no extra cost
+  const gate = await gateAI(req, `resume_${tool || 'tool'}`);
+  if (!gate.ok) return res.status(gate.status).json({ error: gate.error, credits_required: gate.credits_required, balance: gate.balance ?? 0 });
 
   try {
     if (!tool) return res.status(400).json({ error: 'Missing tool parameter' });
@@ -80,6 +80,19 @@ RESUME:\n${(resume||'').slice(0,4000)}`;
     } else if (tool === 'optimize') {
       const { job, company, resume, jobDescription } = body;
       if (!resume) return res.status(400).json({ error: 'Resume required' });
+
+      // Pro users get Stealth Mode baked in — same call, no extra credit or API cost.
+      const stealthInstructions = gate.pro ? `
+
+STEALTH MODE (Pro): After rewriting each bullet for ATS alignment, apply human-voice polish so the
+output passes AI-detection tools (GPTZero, Originality.ai, etc.):
+- Vary sentence starters — no two bullets should begin with the same word or structure
+- Mix bullet lengths: some short and punchy, some longer with context
+- Avoid AI tells: no "leveraged", "spearheaded", "synergized", "holistic", uniform passive voice
+- Ground every claim in a specific detail or outcome ("roughly 40%", "a team of 5", "before the deadline")
+- Write as this specific person would describe their own work — not as a generic career advisor
+All keywords must still appear exactly as in the job description.` : '';
+
       systemPrompt = 'You are a career strategist who aligns candidate experience to specific job requirements. Return ONLY valid JSON with no markdown.';
       prompt = `Tailor this resume specifically for the ${job} role at ${company}.
 
@@ -91,49 +104,14 @@ Rules:
 - Never fabricate experience. Only rewrite based on what the candidate actually did.
 - Mirror the JD's vocabulary exactly (if JD says "pipeline management" don't write "sales tracking").
 - Each rewritten bullet must directly address one of the job's key requirements.
-- A recruiter should read each bullet and immediately see why it's relevant to THIS role.
+- A recruiter should read each bullet and immediately see why it's relevant to THIS role.${stealthInstructions}
 
 JOB: ${job} at ${company}
 JOB DESCRIPTION:\n${(jobDescription||'').slice(0,2500)}
 RESUME:\n${(resume||'').slice(0,4000)}
 
 Return ONLY this JSON:
-{"job_priorities":["<top requirement>","<second>","<third>","<fourth>","<fifth>"],"optimized_bullets":[{"original":"<exact text from resume>","optimized":"<rewritten to address JD requirement>","addresses":"<which priority in 3-5 words>"}],"keywords_added":["<exact JD term>"]}`;
-
-    } else if (tool === 'humanize') {
-      // Pro-only: take already-optimized bullets and rewrite them to evade AI-detection tools
-      // (GPTZero, Originality.ai, etc.) while preserving the keyword strategy.
-      const { bullets, keywords, job: jobTitle, company: jobCo } = body;
-      if (!bullets || !Array.isArray(bullets) || bullets.length === 0) {
-        return res.status(400).json({ error: 'bullets array required' });
-      }
-      systemPrompt = 'You are a professional resume writer with 20 years of experience. You write in a natural, human voice. Return ONLY valid JSON with no markdown.';
-      prompt = `These resume bullets were AI-optimized for a ${jobTitle || 'role'} at ${jobCo || 'a company'}. Your job is to rewrite each one so it reads as if a real person wrote it — not an AI.
-
-AI writing patterns to deliberately AVOID in each bullet:
-- Starting multiple bullets with the same word or structure ("Leveraged", "Spearheaded", "Demonstrated", "Utilized")
-- Overly formal or corporate tone (no "synergized", "leveraged cross-functional", "holistic approach")
-- Suspiciously uniform sentence length — mix short punchy statements with longer ones
-- Passive voice overuse
-- Stacking buzzwords without grounding them in a real outcome
-- Perfect symmetry between bullets (real resumes have stylistic variation)
-
-What GOOD human-written bullets look like:
-- They start with different action verbs: "Built", "Cut", "Managed", "Ran", "Helped grow", "Handled"
-- They have specific numbers when possible, or honest qualifiers like "roughly" or "about"
-- Some bullets are brief. Others are more detailed. Not all the same length.
-- Contractions are fine where they fit naturally
-- They sound like something this specific person would say about their own work
-
-CRITICAL: Keep every keyword from the optimized version. The ATS still needs to find them.
-Keep the "addresses" field from the original.
-
-Bullets to humanize:
-${JSON.stringify(bullets, null, 2)}
-${keywords?.length ? `\nKeywords that must stay: ${keywords.join(', ')}` : ''}
-
-Return ONLY this JSON (same structure as input):
-{"humanized_bullets":[{"original":"<original text>","optimized":"<keep this>","humanized":"<your natural rewrite>","addresses":"<keep this>"}],"keywords_preserved":["<confirm each keyword appears"]}`;
+{"job_priorities":["<top requirement>","<second>","<third>","<fourth>","<fifth>"],"optimized_bullets":[{"original":"<exact text from resume>","optimized":"<rewritten to address JD requirement>","addresses":"<which priority in 3-5 words>"}],"keywords_added":["<exact JD term>"]${gate.pro ? ',"stealth":true' : ''}}`;
 
     } else if (tool === 'coach') {
       const { job, company, jobDescription, background } = body;
