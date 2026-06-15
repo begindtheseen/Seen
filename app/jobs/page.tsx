@@ -803,14 +803,17 @@ function SwipeJobDeck({ jobs, onOpen, onDismiss, onSave, onApply, coScores }: {
 
   const scoreRisk = (score: number): 'safe' | 'warn' | 'danger' => score >= 75 ? 'safe' : score >= 50 ? 'warn' : 'danger'
   const scoreColor = (score: number) => score >= 75 ? 'var(--green)' : score >= 50 ? 'var(--amber)' : 'var(--red)'
-  const scoreGlow = (score: number) => score >= 75 ? 'rgba(16,185,129,.18)' : score >= 50 ? 'rgba(245,158,11,.15)' : 'rgba(239,68,68,.18)'
-  const scoreGradient = (score: number) => score >= 75
-    ? 'linear-gradient(145deg, rgba(16,185,129,.13) 0%, rgba(255,255,255,.04) 55%)'
-    : score >= 50
-    ? 'linear-gradient(145deg, rgba(99,102,241,.12) 0%, rgba(255,255,255,.04) 55%)'
-    : 'linear-gradient(145deg, rgba(239,68,68,.13) 0%, rgba(255,255,255,.04) 55%)'
-  const scoreBorder = (score: number) => score >= 75 ? 'rgba(16,185,129,.35)' : score >= 50 ? 'rgba(99,102,241,.3)' : 'rgba(239,68,68,.35)'
-  const scoreStripe = (score: number) => score >= 75 ? 'rgba(16,185,129,.7)' : score >= 50 ? 'rgba(99,102,241,.6)' : 'rgba(239,68,68,.7)'
+  // Continuous HSL scale: 25→0° (red), 60→60° (yellow), 95→120° (green)
+  const scoreHsl = (score: number, alpha: number) => {
+    const t = Math.max(0, Math.min(1, (score - 25) / 70))
+    const hue = Math.round(t * 120)
+    return `hsla(${hue}, 80%, 55%, ${alpha})`
+  }
+  const scoreGradient = (score: number) =>
+    `linear-gradient(145deg, ${scoreHsl(score, .15)} 0%, transparent 60%)`
+  const scoreBorder = (score: number) => scoreHsl(score, .45)
+  const scoreGlow = (score: number) => scoreHsl(score, .2)
+  const scoreStripe = (score: number) => scoreHsl(score, .75)
 
   return (
   <div>
@@ -857,11 +860,11 @@ function SwipeJobDeck({ jobs, onOpen, onDismiss, onSave, onApply, coScores }: {
         <div style={{ display: 'flex', alignItems: 'flex-start', gap: '.75rem', marginBottom: '.6rem' }}>
           <div style={{
             width: 42, height: 42, borderRadius: 10,
-            background: `linear-gradient(135deg, ${scoreGlow(topJob.score).replace('.18', '.25').replace('.15', '.22')}, rgba(255,255,255,.06))`,
+            background: `linear-gradient(135deg, ${scoreHsl(topJob.score, .25)}, rgba(255,255,255,.06))`,
             border: `1px solid ${scoreBorder(topJob.score)}`,
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             fontFamily: 'var(--display)', fontWeight: 800, fontSize: '1.05rem',
-            color: scoreColor(topJob.score), flexShrink: 0,
+            color: scoreHsl(topJob.score, 1), flexShrink: 0,
           }}>
             {(topJob.company || '?')[0].toUpperCase()}
           </div>
