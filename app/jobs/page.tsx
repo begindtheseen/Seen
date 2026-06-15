@@ -801,8 +801,16 @@ function SwipeJobDeck({ jobs, onOpen, onDismiss, onSave, onApply, coScores }: {
   const secondScale = 0.96 + dragProgress * 0.04
   const secondY = 8 - dragProgress * 8
 
-  const scoreRisk = (score: number) => score >= 75 ? 'good' : score >= 50 ? 'mid' : 'bad'
+  const scoreRisk = (score: number): 'safe' | 'warn' | 'danger' => score >= 75 ? 'safe' : score >= 50 ? 'warn' : 'danger'
   const scoreColor = (score: number) => score >= 75 ? 'var(--green)' : score >= 50 ? 'var(--amber)' : 'var(--red)'
+  const scoreGlow = (score: number) => score >= 75 ? 'rgba(16,185,129,.18)' : score >= 50 ? 'rgba(245,158,11,.15)' : 'rgba(239,68,68,.18)'
+  const scoreGradient = (score: number) => score >= 75
+    ? 'linear-gradient(145deg, rgba(16,185,129,.13) 0%, rgba(255,255,255,.04) 55%)'
+    : score >= 50
+    ? 'linear-gradient(145deg, rgba(99,102,241,.12) 0%, rgba(255,255,255,.04) 55%)'
+    : 'linear-gradient(145deg, rgba(239,68,68,.13) 0%, rgba(255,255,255,.04) 55%)'
+  const scoreBorder = (score: number) => score >= 75 ? 'rgba(16,185,129,.35)' : score >= 50 ? 'rgba(99,102,241,.3)' : 'rgba(239,68,68,.35)'
+  const scoreStripe = (score: number) => score >= 75 ? 'rgba(16,185,129,.7)' : score >= 50 ? 'rgba(99,102,241,.6)' : 'rgba(239,68,68,.7)'
 
   return (
   <div>
@@ -819,7 +827,13 @@ function SwipeJobDeck({ jobs, onOpen, onDismiss, onSave, onApply, coScores }: {
       <div
         ref={cardRef}
         className="swipe-card"
-        style={{ transform: topTransform, opacity: topOpacity, zIndex: 3, transition: flyDir ? 'transform .3s ease, opacity .3s ease' : undefined }}
+        style={{
+          transform: topTransform, opacity: topOpacity, zIndex: 3,
+          transition: flyDir ? 'transform .3s ease, opacity .3s ease' : undefined,
+          background: scoreGradient(topJob.score),
+          borderColor: scoreBorder(topJob.score),
+          boxShadow: `0 8px 32px rgba(0,0,0,.45), 0 0 48px ${scoreGlow(topJob.score)}, inset 0 2px 0 ${scoreStripe(topJob.score)}, inset 0 1px 0 rgba(255,255,255,.08)`,
+        }}
         onMouseDown={onMouseDown}
         onTouchStart={onTouchStart}
         onTouchMove={onTouchMove}
@@ -840,23 +854,30 @@ function SwipeJobDeck({ jobs, onOpen, onDismiss, onSave, onApply, coScores }: {
         }}>↑ Apply Now</span>
 
         {/* Card content */}
-        <div style={{ display: 'flex', alignItems: 'flex-start', gap: '.75rem', marginBottom: '.55rem' }}>
-          <div style={{ width: 40, height: 40, borderRadius: 9, background: 'var(--raised)', border: '1px solid var(--line2)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'var(--display)', fontWeight: 800, fontSize: '1rem', color: 'var(--white)', flexShrink: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'flex-start', gap: '.75rem', marginBottom: '.6rem' }}>
+          <div style={{
+            width: 42, height: 42, borderRadius: 10,
+            background: `linear-gradient(135deg, ${scoreGlow(topJob.score).replace('.18', '.25').replace('.15', '.22')}, rgba(255,255,255,.06))`,
+            border: `1px solid ${scoreBorder(topJob.score)}`,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            fontFamily: 'var(--display)', fontWeight: 800, fontSize: '1.05rem',
+            color: scoreColor(topJob.score), flexShrink: 0,
+          }}>
             {(topJob.company || '?')[0].toUpperCase()}
           </div>
           <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontFamily: 'var(--display)', fontSize: '.9rem', fontWeight: 700, color: 'var(--white)', letterSpacing: '-.02em', lineHeight: 1.25, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{topJob.title}</div>
-            <div style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', color: 'var(--dim)', marginTop: '.1rem' }}>{topJob.company}{topJob.location ? ` · ${topJob.location}` : ''}</div>
+            <div style={{ fontFamily: 'var(--display)', fontSize: '.92rem', fontWeight: 700, color: 'var(--white)', letterSpacing: '-.02em', lineHeight: 1.25, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{topJob.title}</div>
+            <div style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', color: 'var(--dim)', marginTop: '.12rem' }}>{topJob.company}{topJob.location ? ` · ${topJob.location}` : ''}</div>
           </div>
-          <div className={`sring ${scoreRisk(topJob.score)}`} style={{ width: 38, height: 38, flexShrink: 0 }}>
-            <div className="sring-n" style={{ fontSize: '.78rem', color: scoreColor(topJob.score) }}>{topJob.score}</div>
+          <div className={`sring ${scoreRisk(topJob.score)}`} style={{ width: 40, height: 40, flexShrink: 0 }}>
+            <div className="sring-n" style={{ fontSize: '.8rem' }}>{topJob.score}</div>
           </div>
         </div>
 
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '.3rem', marginBottom: '.5rem' }}>
-          {topJob.salary && <span style={{ background: 'rgba(16,185,129,.1)', border: '1px solid rgba(16,185,129,.25)', borderRadius: 5, padding: '.15rem .45rem', fontSize: '.58rem', fontFamily: 'var(--mono)', color: 'var(--green)' }}>{topJob.salary}</span>}
-          {topJob.type && <span style={{ background: 'var(--raised)', border: '1px solid var(--line)', borderRadius: 5, padding: '.15rem .45rem', fontSize: '.58rem', fontFamily: 'var(--mono)', color: 'var(--sub)' }}>{topJob.type}</span>}
-          {topJob.level && <span style={{ background: 'var(--raised)', border: '1px solid var(--line)', borderRadius: 5, padding: '.15rem .45rem', fontSize: '.58rem', fontFamily: 'var(--mono)', color: 'var(--sub)' }}>{topJob.level}</span>}
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '.3rem', marginBottom: '.55rem' }}>
+          {topJob.salary && <span style={{ background: 'rgba(16,185,129,.12)', border: '1px solid rgba(16,185,129,.3)', borderRadius: 5, padding: '.17rem .5rem', fontSize: '.6rem', fontFamily: 'var(--mono)', color: 'var(--green)', fontWeight: 600 }}>{topJob.salary}</span>}
+          {topJob.type && <span style={{ background: 'rgba(99,102,241,.1)', border: '1px solid rgba(99,102,241,.25)', borderRadius: 5, padding: '.17rem .5rem', fontSize: '.6rem', fontFamily: 'var(--mono)', color: '#a5b4fc' }}>{topJob.type}</span>}
+          {topJob.level && <span style={{ background: 'rgba(255,255,255,.06)', border: '1px solid rgba(255,255,255,.12)', borderRadius: 5, padding: '.17rem .5rem', fontSize: '.6rem', fontFamily: 'var(--mono)', color: 'var(--sub)' }}>{topJob.level}</span>}
         </div>
 
         {topJob.description && (
