@@ -22,3 +22,17 @@ export async function loadProfile(db: ServiceDb, uid: string): Promise<LoadProfi
   const profile = Array.isArray(rows) ? (rows[0] ?? null) : null
   return { profile: profile as Record<string, unknown> | null }
 }
+
+export interface GetEmploymentResult {
+  employment: unknown[]
+}
+
+// Loads the caller's own employment history (resume data). Ownership enforced by
+// the `user_id=eq.<uid>` filter; `uid` MUST come from verified auth. Faithful port
+// of the `get_employment` action:
+//   db('resume_employment?user_id=eq.${uid}&order=id.desc&limit=15') -> { employment: rows }
+export async function getEmployment(db: ServiceDb, uid: string): Promise<GetEmploymentResult> {
+  const r = await db(`resume_employment?user_id=eq.${uid}&order=id.desc&limit=15`)
+  const rows = (r.ok ? await r.json() : []) as unknown[]
+  return { employment: rows }
+}

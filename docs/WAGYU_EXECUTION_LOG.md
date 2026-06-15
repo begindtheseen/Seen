@@ -15,6 +15,41 @@ Conventions:
 
 ---
 
+## Slice H-1 — Migrate user-sync read actions: get_employment, get_recent_cos
+
+- **Date/time:** 2026-06-15 ~20:55 UTC
+- **Branch:** `claude/seenjobs-architecture-foundation-23bkjm`
+- **Slice name:** wagyu: migrate user-sync get_employment + get_recent_cos
+- **Goal:** Continue Phase E down the safest read-only actions, extracting logic to
+  services and keeping response shapes byte-for-byte.
+- **Files changed:** `lib/profile/service.ts` (+`getEmployment`),
+  `lib/companies/service.ts` (new, `getRecentCompanies`), `api/user-sync.js`
+  (two action bodies → service calls, using the in-scope verified `uid` + `db`),
+  `tests/user-sync-reads.test.ts` (new, 6 tests), `package.json` (format scope
+  +`lib/companies`).
+- **Behavior preserved:** Yes — exact response shapes: `get_employment` →
+  `{ employment: rows }`, `get_recent_cos` → `{ recent: rows }`; same queries
+  (`resume_employment …limit=15`, `user_recent_cos …limit=6`); same uid scoping;
+  `[]` fallback on DB failure. Used the existing top-level `uid`/`db` (no redundant
+  re-resolve). All other 21 actions and every write untouched.
+- **Why safe:** pure single-table reads of the caller's OWN data, scoped by the
+  verified uid — no writes, no money/credits, no cross-user exposure.
+- **Tests/checks run:** typecheck ✅, format ✅, test ✅ (64/64), build ✅,
+  check ✅, lint ⚠️ 24 legacy (unchanged, zero new). `api/user-sync.js` also
+  confirmed to load under Node (the `.js`→`.ts` imports resolve).
+- **Known risks:** Same single open gate as the rest of the branch — the
+  `.js`→`.ts` import pattern is unconfirmed on a real Vercel deploy.
+- **Deliberately NOT migrated:** `credit_history` / `get_credits` (touch the
+  credits/money table + have reset side-effects — need a credits audit), `load`
+  (multi-table + credit reset + login-signal write), and every write/destructive
+  action. These are STOP-gated.
+- **Next safest slice:** owner verifies the Vercel preview; then either continue
+  with low-risk writes (`save_job`/`unsave_job`/`log_search_event`) with parity
+  tests, or do the credits audit before any credits action.
+- **Stop condition hit:** No.
+
+---
+
 ## Slice G-1 — Consolidate session-2 user-sync wiring (branch merge)
 
 - **Date/time:** 2026-06-15 ~20:25 UTC

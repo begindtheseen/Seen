@@ -10,7 +10,8 @@ import { handlePreflight } from '../lib/security/cors.ts';
 import { rateLimit } from '../lib/security/rateLimit.ts';
 import { requireUser } from '../lib/auth/server.ts';
 import { createServiceDb } from '../lib/supabase/admin.ts';
-import { loadProfile } from '../lib/profile/service.ts';
+import { loadProfile, getEmployment } from '../lib/profile/service.ts';
+import { getRecentCompanies } from '../lib/companies/service.ts';
 
 // Verify a Supabase JWT locally (HS256) — no network round-trip.
 // Returns the payload (with .sub = user UUID) on success, null on failure.
@@ -580,9 +581,7 @@ export default async function handler(req, res) {
 
   // ── GET EMPLOYMENT HISTORY ────────────────────────────────────────────────────
   if (action === 'get_employment') {
-    const r = await db(`resume_employment?user_id=eq.${uid}&order=id.desc&limit=15`);
-    const rows = r.ok ? await r.json() : [];
-    return res.status(200).json({ employment: rows });
+    return res.status(200).json(await getEmployment(db, uid));
   }
 
   // ── LOG RECENT COMPANY VIEW ───────────────────────────────────────────────────
@@ -599,9 +598,7 @@ export default async function handler(req, res) {
 
   // ── GET RECENT COMPANY VIEWS ──────────────────────────────────────────────────
   if (action === 'get_recent_cos') {
-    const r = await db(`user_recent_cos?user_id=eq.${uid}&order=viewed_at.desc&limit=6`);
-    const rows = r.ok ? await r.json() : [];
-    return res.status(200).json({ recent: rows });
+    return res.status(200).json(await getRecentCompanies(db, uid));
   }
 
   // ── COMPANY SURVEY — 5 focused questions about one application ───────────────
