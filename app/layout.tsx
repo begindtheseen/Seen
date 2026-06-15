@@ -33,6 +33,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=DM+Mono:ital,wght@0,300;0,400;0,500;1,400&family=Instrument+Sans:ital,wght@0,300;0,400;0,500;0,600;1,300&display=swap" rel="stylesheet" />
       </head>
       <body>
+        {/* Static full-screen cover — present in the initial HTML before JS runs.
+            Prevents the flash of page content during React hydration.
+            IntroSplash removes it as soon as it mounts. */}
+        <div id="intro-guard" aria-hidden="true" style={{ position: 'fixed', inset: 0, zIndex: 2147483646, background: '#02040a' }} />
         <AuthProvider>
           <IntroSplash />
           {/* Global aurora background orbs — renders on all pages */}

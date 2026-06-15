@@ -11,14 +11,25 @@ function IntroSplashInner() {
   // Check sessionStorage once on mount — don't show on repeat visits in same session
   useEffect(() => {
     try {
-      if (sessionStorage.getItem('seen_intro_shown')) return;
+      if (sessionStorage.getItem('seen_intro_shown')) {
+        // Repeat visitor: fade the guard out and skip the intro entirely
+        const guard = document.getElementById('intro-guard')
+        if (guard) {
+          guard.style.transition = 'opacity 0.18s ease'
+          guard.style.opacity = '0'
+          setTimeout(() => guard.remove(), 200)
+        }
+        return
+      }
     } catch {}
-    setPhase('in');
+    setPhase('in')
   }, []);
 
   // Run canvas animation only when phase becomes 'in'
   useEffect(() => {
     if (phase !== 'in') return;
+    // Splash is now in the DOM — safe to remove the static guard
+    document.getElementById('intro-guard')?.remove();
 
     const canvas = canvasRef.current;
     if (!canvas) return;
