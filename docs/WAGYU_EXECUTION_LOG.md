@@ -15,6 +15,32 @@ Conventions:
 
 ---
 
+## Slice F-1 — Pre-flight audits: payments, admin, reports (Phase 5)
+
+- **Date/time:** 2026-06-15 ~20:00 UTC
+- **Branch:** `claude/seenjobs-architecture-foundation-23bkjm`
+- **Slice name:** wagyu: audit payments, admin, reports
+- **Goal:** Write the required pre-change audits for the three dangerous areas so
+  future migrations there are evidence-based. Pure documentation.
+- **Files changed:** `docs/PAYMENTS_AUDIT.md`, `docs/ADMIN_AUDIT.md`,
+  `docs/REPORTS_AUDIT.md` (new). No code touched.
+- **Behavior preserved:** Yes — docs only.
+- **Tests/checks run:** typecheck ✅, format ✅, test ✅ (56/56), build ✅,
+  check ✅, lint ⚠️ 24 legacy (unchanged, zero new).
+- **Result:** PASS. Each audit documents auth model, endpoints, security
+  invariants, risks, a safe (tests-first) migration plan, and STOP conditions.
+- **Why this work (not wiring):** the demand Vercel preview is still unverified
+  from this environment, so per the plan I did NOT wire any `.ts` code into
+  critical user-data routes. Audits are zero-runtime-risk and unblock later work.
+- **Concurrency note:** a second Claude session may be working this same branch.
+  This slice is isolated to three new files to minimize conflict surface; pushed
+  with fetch+rebase (no force-push). See session summary — recommend coordinating
+  one-session-per-branch before further slices.
+- **Stop condition hit:** Yes — pausing autonomous slicing pending (a) demand
+  preview confirmation and (b) concurrency coordination.
+
+---
+
 ## Slice E-0 — user-sync inventory + load_profile service (Phase E prep)
 
 - **Date/time:** 2026-06-15 ~20:05 UTC
