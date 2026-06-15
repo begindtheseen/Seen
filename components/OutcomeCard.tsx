@@ -235,13 +235,15 @@ export default function OutcomeCard({ app, onClose }: Props) {
     a.click()
   }
 
-  async function share(dest: 'reddit' | 'threads' | 'twitter' | 'download') {
+  async function share(dest: 'reddit' | 'threads' | 'twitter' | 'linkedin' | 'download') {
     if (dest === 'reddit') {
       window.open(`https://www.reddit.com/r/cscareerquestions/submit?type=image&title=${encodeURIComponent(shareText)}`, '_blank', 'noopener')
     } else if (dest === 'threads') {
       window.open(`https://www.threads.net/intent/post?text=${encodeURIComponent(shareText + '\n\nseenjobs.io')}`, '_blank', 'noopener')
     } else if (dest === 'twitter') {
       window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(shareText + '\n\nseenjobs.io')}`, '_blank', 'noopener')
+    } else if (dest === 'linkedin') {
+      window.open(`https://www.linkedin.com/feed/?shareActive=true&text=${encodeURIComponent(shareText + '\n\nTracked my whole job search on Seen → seenjobs.io')}`, '_blank', 'noopener')
     }
 
     const fileName = `seen_${status}_${(app.company || 'c').replace(/[^a-z0-9]/gi, '_')}_${Date.now()}.png`
@@ -311,21 +313,27 @@ export default function OutcomeCard({ app, onClose }: Props) {
         )}
 
         {/* Share buttons */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '.55rem', marginBottom: '.7rem' }}>
-          <button onClick={() => share('reddit')}
-            style={{ background: 'rgba(255,69,0,0.15)', border: '1px solid rgba(255,69,0,0.4)', color: '#ff6314', fontFamily: 'var(--mono)', fontSize: '.68rem', fontWeight: 600, padding: '.75rem .9rem', borderRadius: 9, cursor: 'pointer' }}>
-            🔴 Reddit
-          </button>
-          <button onClick={() => share('threads')}
-            style={{ background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.18)', color: '#fff', fontFamily: 'var(--mono)', fontSize: '.68rem', fontWeight: 600, padding: '.75rem .9rem', borderRadius: 9, cursor: 'pointer' }}>
-            🧵 Threads
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '.5rem', marginBottom: '.5rem' }}>
+          <button onClick={() => share('linkedin')}
+            style={{ background: 'rgba(10,102,194,0.15)', border: '1px solid rgba(10,102,194,0.4)', color: '#60a5fa', fontFamily: 'var(--mono)', fontSize: '.65rem', fontWeight: 600, padding: '.7rem .6rem', borderRadius: 9, cursor: 'pointer' }}>
+            💼 LinkedIn
           </button>
           <button onClick={() => share('twitter')}
-            style={{ background: 'rgba(29,161,242,0.1)', border: '1px solid rgba(29,161,242,0.3)', color: 'rgba(150,210,255,0.9)', fontFamily: 'var(--mono)', fontSize: '.68rem', fontWeight: 600, padding: '.75rem .9rem', borderRadius: 9, cursor: 'pointer' }}>
-            𝕏 Twitter / X
+            style={{ background: 'rgba(29,161,242,0.1)', border: '1px solid rgba(29,161,242,0.3)', color: 'rgba(150,210,255,0.9)', fontFamily: 'var(--mono)', fontSize: '.65rem', fontWeight: 600, padding: '.7rem .6rem', borderRadius: 9, cursor: 'pointer' }}>
+            𝕏 Twitter
+          </button>
+          <button onClick={() => share('reddit')}
+            style={{ background: 'rgba(255,69,0,0.15)', border: '1px solid rgba(255,69,0,0.4)', color: '#ff6314', fontFamily: 'var(--mono)', fontSize: '.65rem', fontWeight: 600, padding: '.7rem .6rem', borderRadius: 9, cursor: 'pointer' }}>
+            🔴 Reddit
+          </button>
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '.5rem', marginBottom: '.7rem' }}>
+          <button onClick={() => share('threads')}
+            style={{ background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.18)', color: '#fff', fontFamily: 'var(--mono)', fontSize: '.65rem', fontWeight: 600, padding: '.7rem .9rem', borderRadius: 9, cursor: 'pointer' }}>
+            🧵 Threads
           </button>
           <button onClick={() => share('download')} disabled={!dataUrl}
-            style={{ background: 'rgba(99,102,241,0.1)', border: '1px solid rgba(99,102,241,0.25)', color: 'rgba(180,180,255,0.85)', fontFamily: 'var(--mono)', fontSize: '.68rem', padding: '.75rem .9rem', borderRadius: 9, cursor: dataUrl ? 'pointer' : 'not-allowed', opacity: dataUrl ? 1 : 0.5 }}>
+            style={{ background: 'rgba(99,102,241,0.1)', border: '1px solid rgba(99,102,241,0.25)', color: 'rgba(180,180,255,0.85)', fontFamily: 'var(--mono)', fontSize: '.65rem', padding: '.7rem .9rem', borderRadius: 9, cursor: dataUrl ? 'pointer' : 'not-allowed', opacity: dataUrl ? 1 : 0.5 }}>
             ↓ Save Image
           </button>
         </div>

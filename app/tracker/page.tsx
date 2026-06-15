@@ -128,10 +128,12 @@ function AppCard({ app, onUpdate, onRemove, ghostRate }: {
   )
 }
 
-function CheckCard({ check, onAnswer, onSnooze }: {
+function CheckCard({ check, onAnswer, onSnooze, ghostRate, avgWaitDays }: {
   check: ReturnType<typeof EventStore.dueChecks>[0]
   onAnswer: (appId: string, checkType: string, data: Record<string, unknown>) => void
   onSnooze: (appId: string, checkType: string) => void
+  ghostRate?: number
+  avgWaitDays?: number
 }) {
   const { app, checkType, daysElapsed, label, q } = check
   const answers: Array<{ label: string; data: Record<string, unknown>; highlight?: boolean }> = []
@@ -167,7 +169,14 @@ function CheckCard({ check, onAnswer, onSnooze }: {
           <button onClick={() => onSnooze(app.id, checkType)} style={{ background: 'none', border: 'none', fontFamily: 'var(--mono)', fontSize: '.6rem', color: 'var(--muted)', cursor: 'pointer', padding: '.1rem .3rem' }} title="Remind me tomorrow">✕</button>
         </div>
       </div>
-      <div style={{ fontSize: '.78rem', color: 'var(--sub)', marginBottom: '.65rem' }}>{q}</div>
+      <div style={{ fontSize: '.78rem', color: 'var(--sub)', marginBottom: '.5rem' }}>{q}</div>
+      {ghostRate != null && ghostRate > 0.4 && checkType === 'response_check' && (
+        <div style={{ background: ghostRate > 0.6 ? 'rgba(239,68,68,.07)' : 'rgba(245,158,11,.06)', border: `1px solid ${ghostRate > 0.6 ? 'rgba(239,68,68,.2)' : 'rgba(245,158,11,.2)'}`, borderRadius: 7, padding: '.45rem .75rem', marginBottom: '.65rem', fontFamily: 'var(--mono)', fontSize: '.6rem', color: ghostRate > 0.6 ? 'var(--red)' : 'var(--amber)', lineHeight: 1.6 }}>
+          {ghostRate > 0.6 ? '👻' : '⚠'} {app.company} has a <strong>{Math.round(ghostRate * 100)}% ghost rate</strong>
+          {avgWaitDays ? ` · most non-responses happen around day ${avgWaitDays}` : ' · most non-responses happen within 3 weeks'}
+          {daysElapsed < (avgWaitDays || 21) ? ` — you're at day ${daysElapsed}` : ` — you're past day ${avgWaitDays || 21}`}
+        </div>
+      )}
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: '.45rem' }}>
         {answers.map(a => (
           <button key={a.label} className="btn btn-ghost" style={{ fontSize: '.7rem', padding: '.38rem .75rem', ...(a.highlight ? { borderColor: 'var(--green)', color: 'var(--green)' } : {}) }} onClick={() => onAnswer(app.id, checkType, a.data)}>
@@ -194,7 +203,7 @@ function TrackerPage() {
   const [highlightNew, setHighlightNew] = useState(false)
   const highlightedRef = useRef(false)
   const [updateInsight, setUpdateInsight] = useState<{ title: string; body: string; color: string } | null>(null)
-  const [companyScores, setCompanyScores] = useState<Record<string, {ghost_rate: number; overall_score: number; report_count: number}>>({})
+  const [companyScores, setCompanyScores] = useState<Record<string, {ghost_rate: number; overall_score: number; report_count: number; avg_wait_days?: number}>>({})
 
   useEffect(() => {
     if (!isLoggedIn) { router.replace('/login'); return }
@@ -545,6 +554,51 @@ function TrackerPage() {
           </div>
         )}
 
+        {/* Ghost risk alerts — proactive, shown before check prompts */}
+        {(() => {
+          const atRisk = active.filter(a => {
+            const score = companyScores[a.company.toLowerCase().trim()]
+            if (!score || score.ghost_rate < 0.5) return false
+            const days = getDaysSince(a.appliedAt)
+            const avgWait = score.avg_wait_days || 21
+            // In the danger window: past 7 days but not yet 2x avg wait
+            return days >= 7 && days < avgWait * 2
+          })
+          if (!atRisk.length) return null
+          return (
+            <div style={{ marginBottom: '1.25rem', background: 'rgba(239,68,68,.05)', border: '1px solid rgba(239,68,68,.2)', borderRadius: 12, padding: '1rem 1.1rem' }}>
+              <div style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', textTransform: 'uppercase', letterSpacing: '.09em', color: 'var(--red)', marginBottom: '.65rem', display: 'flex', alignItems: 'center', gap: '.5rem' }}>
+                <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--red)', display: 'inline-block', animation: 'pulse 2s infinite' }} />
+                {atRisk.length} application{atRisk.length > 1 ? 's' : ''} at ghost risk
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '.55rem' }}>
+                {atRisk.slice(0, 3).map(a => {
+                  const score = companyScores[a.company.toLowerCase().trim()]!
+                  const days = getDaysSince(a.appliedAt)
+                  const avgWait = score.avg_wait_days || 21
+                  const daysLeft = Math.max(0, avgWait - days)
+                  return (
+                    <div key={a.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '.75rem' }}>
+                      <div>
+                        <span style={{ fontFamily: 'var(--display)', fontSize: '.8rem', fontWeight: 700, color: 'var(--white)' }}>{a.company}</span>
+                        <span style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', color: 'var(--muted)', marginLeft: '.5rem' }}>{a.role}</span>
+                      </div>
+                      <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                        <div style={{ fontFamily: 'var(--mono)', fontSize: '.6rem', color: 'var(--red)', fontWeight: 600 }}>
+                          {Math.round(score.ghost_rate * 100)}% ghost rate
+                        </div>
+                        <div style={{ fontFamily: 'var(--mono)', fontSize: '.55rem', color: 'var(--muted)' }}>
+                          {daysLeft > 0 ? `~${daysLeft}d to ghost point` : `past ghost window (day ${days})`}
+                        </div>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          )
+        })()}
+
         {/* Update insight — shown after answering a check card */}
         {updateInsight && (
           <div style={{ marginBottom: '1.25rem', background: updateInsight.color, border: '1px solid rgba(255,255,255,0.1)', borderRadius: 12, padding: '1rem 1.1rem', animation: 'fadeUp .3s ease both', display: 'flex', gap: '.85rem', alignItems: 'flex-start' }}>
@@ -564,9 +618,12 @@ function TrackerPage() {
               {dueChecks.length} application check{dueChecks.length > 1 ? 's' : ''} due
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '.65rem' }}>
-              {dueChecks.map(d => (
-                <CheckCard key={`${d.app.id}_${d.checkType}`} check={d} onAnswer={handleCheckAnswer} onSnooze={handleSnooze} />
-              ))}
+              {dueChecks.map(d => {
+                const score = companyScores[d.app.company.toLowerCase().trim()]
+                return (
+                  <CheckCard key={`${d.app.id}_${d.checkType}`} check={d} onAnswer={handleCheckAnswer} onSnooze={handleSnooze} ghostRate={score?.ghost_rate} avgWaitDays={score?.avg_wait_days} />
+                )
+              })}
             </div>
           </div>
         )}
