@@ -1,24 +1,9 @@
-// @ts-nocheck — Ported JS serverless function. Renamed .js -> .ts so Vercel's
-// @vercel/node bundles it (esbuild) and inlines the typed `.ts` foundation imports.
-// A plain .js entry is NOT bundled by Vercel, so Node fails to load `.ts` deps at
-// runtime (same root cause as the /api/demand preview 500). This is a mechanical
-// runtime fix only — NO action behavior changed. The foundation/services are
-// type-checked in lib/**; this route stays untyped to avoid a large rewrite.
-//
 // Proxy all user data reads/writes through the service key so RLS never blocks them.
 // The client sends its Supabase access token; we validate it here, then use the
 // service key to talk to the DB. No RLS policies required on the client side.
 
 import { createHmac, timingSafeEqual } from 'crypto';
-// Foundation layer (see docs/ARCHITECTURE.md). Imported with explicit .ts
-// extensions so they resolve both under Vercel's serverless bundler and Node's
-// native TS loader (tests) — the same pattern already used by api/demand.js.
-import { handlePreflight } from '../lib/security/cors.ts';
-import { rateLimit } from '../lib/security/rateLimit.ts';
-import { requireUser } from '../lib/auth/server.ts';
-import { createServiceDb } from '../lib/supabase/admin.ts';
-import { loadProfile, getEmployment } from '../lib/profile/service.ts';
-import { getRecentCompanies } from '../lib/companies/service.ts';
+import { rateLimit } from '../lib/server/ratelimit.js';
 
 // Verify a Supabase JWT locally (HS256) — no network round-trip.
 // Returns the payload (with .sub = user UUID) on success, null on failure.
@@ -38,10 +23,13 @@ function verifyJWTLocal(token, secret) {
 }
 
 export default async function handler(req, res) {
-  // CORS + preflight via the shared policy. Default options are identical to the
-  // prior inline block (methods 'POST, OPTIONS', headers 'Content-Type,
-  // Authorization', same seenjobs.io / localhost origin rules).
-  if (handlePreflight(req, res)) return;
+  const _o=req.headers.origin||'';
+  const _devO=!_o||_o.includes('localhost')||_o.includes('127.0.0.1');
+  res.setHeader('Access-Control-Allow-Origin',(_devO||['https://seenjobs.io','https://www.seenjobs.io'].includes(_o))?(_o||'*'):'https://seenjobs.io');
+  res.setHeader('Vary','Origin');
+  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  if (req.method === 'OPTIONS') return res.status(200).end();
   if (req.method !== 'POST') return res.status(405).end('Method not allowed');
 
   const SUPABASE_URL = process.env.SUPABASE_URL;
@@ -220,14 +208,10 @@ export default async function handler(req, res) {
   }
 
   // ── LOAD PROFILE ────────────────────────────────────────────────────────────
-  // First action migrated onto the foundation layer. Identity comes from
-  // requireUser (the same local-HS256 / /auth/v1/user resolution the top-level
-  // boundary performs — a pure local verify when SUPABASE_JWT_SECRET is set), and
-  // the DB read goes through the shared service-role helper + profile service.
-  // The response shape is unchanged: { profile: rows[0] || null }.
   if (action === 'load_profile') {
-    const { uid: profileUid } = await requireUser(req);
-    return res.status(200).json(await loadProfile(createServiceDb(), profileUid));
+    const r = await db(`profiles?id=eq.${uid}&limit=1`);
+    const rows = r.ok ? await r.json() : [];
+    return res.status(200).json({ profile: rows[0] || null });
   }
 
   // ── SAVE PROFILE ────────────────────────────────────────────────────────────
@@ -588,7 +572,9 @@ export default async function handler(req, res) {
 
   // ── GET EMPLOYMENT HISTORY ────────────────────────────────────────────────────
   if (action === 'get_employment') {
-    return res.status(200).json(await getEmployment(db, uid));
+    const r = await db(`resume_employment?user_id=eq.${uid}&order=id.desc&limit=15`);
+    const rows = r.ok ? await r.json() : [];
+    return res.status(200).json({ employment: rows });
   }
 
   // ── LOG RECENT COMPANY VIEW ───────────────────────────────────────────────────
@@ -605,7 +591,9 @@ export default async function handler(req, res) {
 
   // ── GET RECENT COMPANY VIEWS ──────────────────────────────────────────────────
   if (action === 'get_recent_cos') {
-    return res.status(200).json(await getRecentCompanies(db, uid));
+    const r = await db(`user_recent_cos?user_id=eq.${uid}&order=viewed_at.desc&limit=6`);
+    const rows = r.ok ? await r.json() : [];
+    return res.status(200).json({ recent: rows });
   }
 
   // ── COMPANY SURVEY — 5 focused questions about one application ───────────────

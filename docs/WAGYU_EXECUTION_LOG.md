@@ -15,6 +15,44 @@ Conventions:
 
 ---
 
+## Slice J-1 — Make PR #36 deployable: revert route→foundation wiring (keep foundation)
+
+- **Date/time:** 2026-06-15 ~22:30 UTC
+- **Branch:** `claude/seenjobs-architecture-foundation-23bkjm`
+- **Slice name:** wagyu: revert api/demand + api/user-sync route wiring (Vercel-safe)
+- **Why:** the production incident proved that on this Vercel setup the legacy
+  `api/*` serverless functions **cannot import the `.ts` foundation at runtime** —
+  BOTH `.js`→`.ts` (`9c0bfb1`) AND `.ts`→`.ts` (the rename, `e17a943`) crashed at
+  module-load (`Unknown file extension ".ts"`) and 500'd in production. The only
+  proven-safe pattern is plain `.js`, self-contained, no `.ts` imports (the
+  `hotfix/demand-stabilize` route). Owner decision: revert route wiring, keep the
+  foundation; defer route adoption until a proven Vercel-safe strategy exists.
+- **Changes:**
+  - `api/demand.ts` removed; `api/demand.js` restored from `hotfix/demand-stabilize`
+    (fail-open wrapper; imports only plain `.js`). GET shape / OPTIONS / 405 /
+    Cache-Control / POST cron preserved.
+  - `api/user-sync.ts` removed; `api/user-sync.js` restored to the original
+    `next-migration` version (imports `crypto` + `lib/server/ratelimit.js` only).
+    All 24 actions back to their original inline implementations.
+  - `vercel.json` keys back to `api/demand.js` / `api/user-sync.js`.
+  - `tests/demand-route.test.ts` imports `../api/demand.js` (green).
+  - `tests/user-sync-load-profile.test.ts` removed (tested the reverted wiring).
+- **KEPT (foundation preserved):** all docs + audits + this log;
+  `lib/{api,auth,config,security,supabase,demand,profile,companies}` foundation +
+  services + their unit tests; quality gates + scripts. Services are library code
+  now (not imported by any route) → cannot affect Vercel runtime.
+- **Behavior preserved:** routes are the proven production code (+ demand fail-open
+  wrapper). No `.ts` in any request path.
+- **Tests/checks:** typecheck ✅, format ✅, test ✅ (62/62), build ✅, check ✅,
+  lint ⚠️ 24 legacy (unchanged, zero new). Both routes load under Node.
+- **PUSH HELD:** per owner instruction, not pushing until Vercel's **Production
+  Branch is confirmed = `next-migration`**. Committed locally, awaiting confirmation.
+- **Deferred:** foundation route adoption — to be redone via a proven Vercel-safe
+  path (App Router `app/api/*` or a foundation precompile step).
+- **Stop condition hit:** Yes — holding push pending the Vercel prod-branch fix.
+
+---
+
 ## Slice I-1 — Fix Vercel runtime 500 (bundle wired routes as `.ts`)
 
 - **Date/time:** 2026-06-15 ~21:25 UTC

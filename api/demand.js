@@ -1,18 +1,4 @@
-// @ts-nocheck — Ported JS serverless function. Renamed .js -> .ts so Vercel's
-// @vercel/node bundles it (esbuild) and inlines the typed `.ts` foundation imports.
-// A plain .js entry is NOT bundled by Vercel, so Node fails to load `.ts` deps at
-// runtime — that was the preview 500. The foundation modules are type-checked in
-// lib/**; this thin route stays untyped to avoid a large rewrite. Behavior is
-// unchanged and covered by tests/demand-route.test.ts.
-//
-// Foundation layer (see docs/ARCHITECTURE.md). Imported with explicit .ts
-// extensions so they resolve under Vercel's bundler, tsc, and Node's TS loader.
-// CORS, rate limiting, env access, and the response helper are centralized.
-import { handlePreflight } from '../lib/security/cors.ts';
-import { rateLimit } from '../lib/security/rateLimit.ts';
-import { ok } from '../lib/api/response.ts';
-import { serverEnv, optionalEnv } from '../lib/config/env.ts';
-import { groupDemandRows } from '../lib/demand/grouping.ts';
+import { rateLimit } from '../lib/server/ratelimit.js';
 import { logError } from '../lib/server/errlog.js';
 
 // /api/demand — Demand data hub.
@@ -29,16 +15,41 @@ import { logError } from '../lib/server/errlog.js';
 //   growth_norm       = min(1, bls_10yr_growth_pct / 36) × 100
 //   dtf_norm          = min(1, avg_days_to_fill / 90) × 100
 
-export default async function handler(req, res) {
-  // CORS + preflight via the shared policy (identical headers to before).
-  if (handlePreflight(req, res, { methods: 'GET, POST, OPTIONS' })) return;
+async function route(req, res) {
+  const origin = req.headers.origin || '';
+  const allowed = !origin || origin.includes('localhost') || origin.includes('127.0.0.1') ||
+    ['https://seenjobs.io', 'https://www.seenjobs.io'].includes(origin);
+  res.setHeader('Access-Control-Allow-Origin', allowed ? (origin || '*') : 'https://seenjobs.io');
+  res.setHeader('Vary', 'Origin');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  if (req.method === 'OPTIONS') return res.status(200).end();
 
-  const { allowed } = await rateLimit(req, 'demand');
-  if (!allowed) return res.status(429).json({ error: 'Too many requests — slow down.' });
+  const { allowed: rlOk } = await rateLimit(req, 'demand');
+  if (!rlOk) return res.status(429).json({ error: 'Too many requests — slow down.' });
 
   if (req.method === 'GET') return handleGet(req, res);
   if (req.method === 'POST') return handlePost(req, res);
   return res.status(405).end();
+}
+
+// Fail-open wrapper — /api/demand is non-critical and must NEVER return 500.
+// Any unexpected runtime error degrades to a safe 200 empty payload. (Module-load
+// is already safe: this route imports only plain .js, never .ts.)
+export default async function handler(req, res) {
+  try {
+    return await route(req, res);
+  } catch (e) {
+    try { console.error('[demand] unexpected error:', (e && e.message) || e); } catch (_) {}
+    if (!res.headersSent) {
+      try {
+        res.setHeader('Access-Control-Allow-Origin', 'https://seenjobs.io');
+        res.setHeader('Vary', 'Origin');
+        res.setHeader('Cache-Control', 'public, max-age=21600, stale-while-revalidate=86400');
+      } catch (_) {}
+      return res.status(200).json({ ok: true, demand: [], generated_at: new Date().toISOString() });
+    }
+  }
 }
 
 // ── GET: public read ──────────────────────────────────────────────────────────
@@ -47,14 +58,12 @@ async function handleGet(req, res) {
   // Cache for 6 hours — data refreshes monthly but this keeps reads fast
   res.setHeader('Cache-Control', 'public, max-age=21600, stale-while-revalidate=86400');
 
-  // Public read uses the anon key (RLS-protected), falling back to the service key
-  // exactly as before. Env is read through lib/config/env instead of process.env.
-  const SUPABASE_URL = serverEnv.supabaseUrl();
-  const SUPABASE_ANON = optionalEnv('SUPABASE_ANON_KEY') || serverEnv.supabaseServiceKey();
+  const SUPABASE_URL  = process.env.SUPABASE_URL;
+  const SUPABASE_ANON = process.env.SUPABASE_ANON_KEY || process.env.SUPABASE_SERVICE_KEY;
 
-  const emptyPayload = () => ({ ok: true, demand: [], generated_at: new Date().toISOString() });
-
-  if (!SUPABASE_URL || !SUPABASE_ANON) return ok(res, emptyPayload());
+  if (!SUPABASE_URL || !SUPABASE_ANON) {
+    return res.status(200).json({ ok: true, demand: [], generated_at: new Date().toISOString() });
+  }
 
   try {
     const url = `${SUPABASE_URL}/rest/v1/demand_data?select=*&order=city.asc,di.desc&limit=500`;
@@ -62,23 +71,42 @@ async function handleGet(req, res) {
       headers: { apikey: SUPABASE_ANON, Authorization: `Bearer ${SUPABASE_ANON}` },
     });
 
-    if (!r.ok) return ok(res, emptyPayload());
+    if (!r.ok) {
+      return res.status(200).json({ ok: true, demand: [], generated_at: new Date().toISOString() });
+    }
 
     const rawRows = await r.json();
-    if (!Array.isArray(rawRows) || !rawRows.length) return ok(res, emptyPayload());
+    if (!Array.isArray(rawRows) || !rawRows.length) {
+      return res.status(200).json({ ok: true, demand: [], generated_at: new Date().toISOString() });
+    }
 
-    const grouped = groupDemandRows(rawRows);
-    return ok(res, {
+    const cityMap = new Map();
+    let latestUpdatedAt = null;
+    let blsPeriod = null;
+
+    for (const row of rawRows) {
+      if (!cityMap.has(row.city)) {
+        cityMap.set(row.city, { city: row.city, urg: row.urg, src: row.src, jobs: [] });
+      }
+      cityMap.get(row.city).jobs.push({
+        t: row.role_title, n: row.niche, l: row.level,
+        count: row.count, di: row.di, note: row.note || '',
+      });
+      if (!latestUpdatedAt || row.updated_at > latestUpdatedAt) latestUpdatedAt = row.updated_at;
+      if (row.bls_period && !blsPeriod) blsPeriod = row.bls_period;
+    }
+
+    return res.status(200).json({
       ok: true,
-      demand: grouped.demand,
-      generated_at: grouped.generated_at || new Date().toISOString(),
-      bls_period: grouped.bls_period,
-      row_count: grouped.row_count,
+      demand: Array.from(cityMap.values()),
+      generated_at: latestUpdatedAt || new Date().toISOString(),
+      bls_period: blsPeriod,
+      row_count: rawRows.length,
     });
   } catch (e) {
     console.error('demand GET error:', e.message);
     logError('demand', e.message, { method: 'GET' });
-    return ok(res, emptyPayload());
+    return res.status(200).json({ ok: true, demand: [], generated_at: new Date().toISOString() });
   }
 }
 
