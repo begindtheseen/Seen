@@ -976,6 +976,8 @@ nav.nav-scrolled{background:rgba(6,6,8,0.82);backdrop-filter:blur(60px) saturate
   .co-name{font-size:1.5rem!important;letter-spacing:-.03em}
   .co-mets{grid-template-columns:repeat(3,1fr)!important}
   .co-tabs{overflow-x:auto;-webkit-overflow-scrolling:touch}
+  .co-hdr{padding:1rem!important}
+  .co-city-filter{display:none}
 }
 
 /* ── Score reveal animation ── */

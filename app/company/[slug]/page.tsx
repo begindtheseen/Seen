@@ -702,7 +702,7 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
                 </button>
               </div>
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '.5rem', flexShrink: 0 }}>
+            <div className="co-city-filter">
               <input
                 type="text"
                 placeholder="Filter by city..."
@@ -827,7 +827,7 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
                   overallScore={score.overall_score}
                 />
                 <OutcomeDistribution reports={reports} />
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(240px,1fr))', gap: '1rem', marginBottom: '1rem' }}>
                   <div style={{ background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 10, padding: '1.2rem' }}>
                     <div style={{ fontFamily: 'var(--mono)', fontSize: '.56rem', textTransform: 'uppercase', letterSpacing: '.08em', color: 'var(--muted)', marginBottom: '.85rem' }}>
                       Score breakdown
@@ -863,7 +863,7 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
             {/* ── PROCESS SCORE TAB ── */}
             {tab === 'process' && score && (
               <div>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(240px,1fr))', gap: '1rem', marginBottom: '1rem' }}>
                   <div style={{ background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 10, padding: '1.2rem' }}>
                     <div style={{ fontFamily: 'var(--mono)', fontSize: '.56rem', textTransform: 'uppercase', letterSpacing: '.08em', color: 'var(--muted)', marginBottom: '.85rem' }}>Process score</div>
                     <div style={{ fontFamily: 'var(--mono)', fontSize: '2.5rem', fontWeight: 500, color: riskColor(risk), lineHeight: 1, marginBottom: '.25rem' }}>
