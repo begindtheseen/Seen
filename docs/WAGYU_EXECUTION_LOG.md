@@ -22,12 +22,17 @@ Conventions:
 - **Slice name:** wagyu: add foundation helper tests
 - **Goal:** Lock in the behavior of the foundation layer with unit tests before
   it is wired into more routes. No production code behavior change.
-- **Files changed:** _(recorded on commit — see below)_
+- **Files changed:** `tests/api-response.test.ts`, `tests/security-cors.test.ts`,
+  `tests/security-validation.test.ts`, `tests/config-env.test.ts`,
+  `tests/security-rateLimit.test.ts` (new); `lib/security/validation.ts`
+  (`.ts` import-extension hardening only).
 - **Behavior preserved:** Yes — additive tests only, plus behavior-neutral `.ts`
   import-extension hardening on `lib/security/validation.ts` so it is loadable by
   the Node test runner and resolvable from `api/*.js`.
-- **Tests/checks run:** typecheck, format, test, build, check, lint.
-- **Result:** _(recorded on commit)_
+- **Tests/checks run:** typecheck ✅, format ✅, test ✅ (40/40), build ✅,
+  check ✅, lint ⚠️ 24 legacy (unchanged, zero new).
+- **Result:** PASS. 26 new tests covering response helpers, CORS, validation,
+  env access, and rate-limit fail-open.
 - **Known risks:** None — no runtime/route behavior touched.
 - **Next safest slice:** Auth helper tests (Phase D).
 - **Stop condition hit:** No.

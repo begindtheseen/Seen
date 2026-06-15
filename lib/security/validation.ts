@@ -5,7 +5,9 @@
 // docs/CODING_STANDARDS.md. Keeping it zero-dependency for now avoids adding a
 // runtime dependency before the validation surface is mapped out.
 
-import { BadRequestError } from '../api/errors'
+// Explicit .ts extension so this module is resolvable from a plain-JS serverless
+// function (api/*.js) and loadable under Node's native TS loader (tests).
+import { BadRequestError } from '../api/errors.ts'
 
 // Coerce a possibly-string request body into a plain object.
 export function parseJsonBody(body: unknown): Record<string, unknown> {
