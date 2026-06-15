@@ -15,6 +15,40 @@ Conventions:
 
 ---
 
+## Slice E-0 — user-sync inventory + load_profile service (Phase E prep)
+
+- **Date/time:** 2026-06-15 ~20:05 UTC
+- **Branch:** `claude/seenjobs-architecture-foundation-23bkjm`
+- **Slice name:** wagyu: inventory user-sync + build load_profile service (unwired)
+- **Goal:** Map every `api/user-sync.js` action and build the first (lowest-risk)
+  read action as a tested service — **without wiring it into the live route yet.**
+- **Files changed:** `docs/USER_SYNC_AUDIT.md` (new, inventory of 24 actions),
+  `lib/profile/service.ts` (new `loadProfile` service, unwired),
+  `tests/profile-service.test.ts` (new), `package.json` (format scope +
+  `lib/profile`). `api/user-sync.js` **NOT touched.**
+- **Behavior preserved:** Yes — additive only; the live route is byte-for-byte
+  unchanged.
+- **Tests/checks run:** typecheck ✅, format ✅, test ✅ (56/56), build ✅,
+  check ✅, lint ⚠️ 24 legacy (unchanged, zero new).
+- **Result:** PASS. `loadProfile(db, uid)` is a faithful port of the `load_profile`
+  action (`profiles?id=eq.${uid}&limit=1` → `{ profile: rows[0] || null }`), with
+  5 tests proving the query is uid-scoped (ownership) and the response shape.
+- **Known risks:** None to runtime — service is not imported by the route.
+- **Stop condition hit:** **Yes — deliberate soft stop on wiring.** Wiring the
+  `.ts` service into `api/user-sync.js` reuses the `.js`→`.ts` import pattern that
+  is **not yet proven on a real Vercel deploy** (the `api/demand.js` preview check,
+  Phase A5, is outstanding). Because `user-sync` is the critical user-data route
+  (a resolution failure would break ALL sync), wiring is held until the demand
+  preview confirms the pattern in a production-like deploy. See
+  STOP CONDITIONS / human-review note in the session summary.
+- **Next safest slice (after preview is green):** wire `loadProfile` into the
+  `load_profile` action behind `requireUser` + `createServiceDb` (or the existing
+  `db`), preserving the exact response shape; then proceed down the audit's read
+  actions. Do NOT touch `consume_credit`/`earn_credit`/`submit_answer` (money) or
+  `delete_account` (destructive) without dedicated, explicitly-approved slices.
+
+---
+
 ## Slice D-1 — Auth helper tests (Phase D)
 
 - **Date/time:** 2026-06-15 ~19:55 UTC
