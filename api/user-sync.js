@@ -273,8 +273,8 @@ export default async function handler(req, res) {
       headers: { apikey: SERVICE_KEY, Authorization: `Bearer ${SERVICE_KEY}` },
     });
     if (!delRes.ok && delRes.status !== 404) {
-      const err = await delRes.text();
-      return res.status(500).json({ error: `Auth delete failed: ${err.slice(0, 100)}` });
+      await delRes.text().catch(() => {});
+      return res.status(500).json({ error: 'Account deletion failed — contact support' });
     }
     return res.status(200).json({ ok: true });
   }

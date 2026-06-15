@@ -201,6 +201,9 @@ async function handleParseResume(req, res, body) {
   try {
     const { base64, fileName, mimeType } = body;
     if (!base64) return res.status(400).json({ error: 'No file data provided' });
+    if (typeof base64 !== 'string' || base64.length > 14_000_000) {
+      return res.status(400).json({ error: 'File too large. Max 10MB.' });
+    }
 
     const fileBuffer = Buffer.from(base64, 'base64');
     if (fileBuffer.length > 10 * 1024 * 1024) {

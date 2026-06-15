@@ -346,8 +346,10 @@ export default async function handler(req, res) {
   }
 
   if (body.action === 'reddit_import') {
+    const CRON_SECRET = process.env.CRON_SECRET;
     const isCron = req.headers['x-vercel-cron'] === '1';
-    if (!isCron) {
+    const hasCronSecret = CRON_SECRET && req.headers['x-cron-secret'] === CRON_SECRET;
+    if (!isCron && !hasCronSecret) {
       // Validate X-Admin-Token against admin_sessions table
       const adminToken = (req.headers['x-admin-token'] || '').trim();
       if (!adminToken) return res.status(401).json({ error: 'unauthorized' });
