@@ -236,7 +236,7 @@ export default function ReportPage() {
 
   return (
     <div className="page-full">
-      <div style={{ maxWidth: 680, margin: '0 auto', padding: '2.5rem 2rem' }}>
+      <div style={{ maxWidth: 680, margin: '0 auto', padding: '2.5rem 2rem', width: '100%', boxSizing: 'border-box' }}>
         <div style={{ fontFamily: 'var(--mono)', fontSize: '.52rem', textTransform: 'uppercase', letterSpacing: '.22em', color: 'var(--blue)', marginBottom: '.6rem', display: 'flex', alignItems: 'center', gap: 12 }}>
           <span style={{ width: 22, height: 1, background: 'var(--blue)', display: 'inline-block' }} />
           Anonymous report

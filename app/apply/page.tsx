@@ -157,7 +157,7 @@ function ApplyContent() {
   }
 
   return (
-    <div style={{ maxWidth: 460, margin: '0 auto', padding: '3rem 1.5rem 4rem' }}>
+    <div style={{ maxWidth: 460, margin: '0 auto', padding: '3rem 1.5rem 4rem', width: '100%', boxSizing: 'border-box' }}>
 
       {/* Eyebrow */}
       <div style={{ fontFamily: 'var(--mono)', fontSize: '.55rem', textTransform: 'uppercase', letterSpacing: '.14em', color: 'var(--blue)', marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: 8 }}>

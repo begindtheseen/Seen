@@ -114,7 +114,7 @@ export default function FeedPage() {
 
   return (
     <div className="page-full">
-      <div style={{ maxWidth: 720, margin: '0 auto', padding: '2rem 1.25rem' }}>
+      <div style={{ maxWidth: 720, margin: '0 auto', padding: '2rem 1.25rem', width: '100%', boxSizing: 'border-box' }}>
         {/* Header */}
         <div style={{ marginBottom: '1.5rem' }}>
           <div className="eyebrow">Live feed</div>

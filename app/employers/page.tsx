@@ -51,7 +51,7 @@ export default function EmployersPage() {
 
   return (
     <div style={{ minHeight: '100vh' }}>
-      <div style={{ maxWidth: 960, margin: '0 auto', padding: '4rem 2rem' }}>
+      <div style={{ maxWidth: 960, margin: '0 auto', padding: '4rem 2rem', width: '100%', boxSizing: 'border-box' }}>
         {/* Hero */}
         <div style={{ textAlign: 'center', marginBottom: '3.5rem' }}>
           <div style={{ fontFamily: 'var(--mono)', fontSize: '.52rem', textTransform: 'uppercase', letterSpacing: '.22em', color: 'var(--blue)', marginBottom: '.6rem' }}>

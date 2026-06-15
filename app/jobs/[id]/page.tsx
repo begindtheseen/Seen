@@ -180,7 +180,7 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
   if (resolved && !job) {
     return (
       <div className="page-full">
-        <div style={{ maxWidth: 720, margin: '0 auto', padding: '1.25rem 1rem 7rem' }}>
+        <div style={{ maxWidth: 720, margin: '0 auto', padding: '1.25rem 1rem 7rem', width: '100%', boxSizing: 'border-box' }}>
           {backBtn}
           <div style={{ background: 'var(--raised)', border: '1px solid var(--line2)', borderRadius: 12, padding: '1.5rem', textAlign: 'center' }}>
             <div style={{ fontFamily: 'var(--display)', fontSize: '1rem', fontWeight: 700, color: 'var(--white)', marginBottom: '.4rem' }}>This listing isn&apos;t loaded</div>
@@ -201,7 +201,7 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
 
   return (
     <div className="page-full">
-      <div style={{ maxWidth: 720, margin: '0 auto', padding: '1.25rem 1rem 7rem' }}>
+      <div style={{ maxWidth: 720, margin: '0 auto', padding: '1.25rem 1rem 7rem', width: '100%', boxSizing: 'border-box' }}>
         {backBtn}
 
         {/* Header card — glassmorphism glass panel */}
@@ -374,7 +374,7 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
 
       {/* Sticky footer */}
       <div style={{ position: 'sticky', bottom: 0, background: 'var(--ink)', borderTop: '1px solid var(--line2)', padding: '.9rem 1rem', zIndex: 10 }}>
-        <div style={{ maxWidth: 720, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '.5rem' }}>
+        <div style={{ maxWidth: 720, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '.5rem', width: '100%', boxSizing: 'border-box' }}>
           <a href={`/company/${companySlug(job.company)}`} style={{ display: 'block', width: '100%', textAlign: 'center', fontFamily: 'var(--mono)', fontSize: '.65rem', color: 'var(--amber)', textDecoration: 'none', padding: '.25rem 0 .5rem', opacity: .85 }}>
             🏢 Check {job.company || 'company'} →
           </a>

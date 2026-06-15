@@ -129,7 +129,7 @@ function PricingPageInner() {
 
   return (
     <div className="page-full">
-      <div style={{ maxWidth: 880, margin: '0 auto', padding: '4rem 1.5rem 5rem' }}>
+      <div style={{ maxWidth: 880, margin: '0 auto', padding: '4rem 1.5rem 5rem', width: '100%', boxSizing: 'border-box' }}>
 
         {/* Hero */}
         <div style={{ textAlign: 'center', marginBottom: '2.75rem' }}>

@@ -197,7 +197,7 @@ export default function DashboardPage() {
     <div
       className="page-full"
     >
-      <div style={{ maxWidth: 900, margin: '0 auto', padding: '1.5rem 1.25rem 3rem' }}>
+      <div style={{ maxWidth: 900, margin: '0 auto', padding: '1.5rem 1.25rem 3rem', width: '100%', boxSizing: 'border-box' }}>
 
         {/* Greeting */}
         <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: '.75rem', marginBottom: '1.75rem' }}>

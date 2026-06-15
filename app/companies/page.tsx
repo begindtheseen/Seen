@@ -105,7 +105,7 @@ export default function CompaniesPage() {
 
   return (
     <div className="page-full">
-      <div style={{ maxWidth: 960, margin: '0 auto', padding: '2.5rem 1.5rem' }}>
+      <div style={{ maxWidth: 960, margin: '0 auto', padding: '2.5rem 1.5rem', width: '100%', boxSizing: 'border-box' }}>
         <div style={{ marginBottom: '2rem' }}>
           <div className="eyebrow">Transparency rankings</div>
           <h1

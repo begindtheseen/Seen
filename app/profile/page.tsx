@@ -200,7 +200,7 @@ export default function ProfilePage() {
 
   return (
     <div className="page-full">
-      <div style={{ maxWidth: 520, margin: '0 auto', padding: '2rem 1.25rem 4rem' }}>
+      <div style={{ maxWidth: 520, margin: '0 auto', padding: '2rem 1.25rem 4rem', width: '100%', boxSizing: 'border-box' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '.75rem', marginBottom: '2rem' }}>
           <button onClick={() => router.push('/dashboard')} style={{ background: 'none', border: 'none', color: 'var(--muted)', cursor: 'pointer', fontSize: '1.1rem', padding: '.25rem', lineHeight: 1 }}>←</button>
           <div>

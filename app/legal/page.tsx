@@ -36,7 +36,7 @@ export default function LegalPage() {
 
   return (
     <div style={{ minHeight: '100vh' }}>
-      <div style={{ maxWidth: 760, margin: '0 auto', padding: '4rem 2rem' }}>
+      <div style={{ maxWidth: 760, margin: '0 auto', padding: '4rem 2rem', width: '100%', boxSizing: 'border-box' }}>
         <div style={{ background: 'var(--adim)', border: '1px solid rgba(245,158,11,0.25)', borderRadius: 10, padding: '1rem 1.25rem', marginBottom: '2rem', fontFamily: 'var(--mono)', fontSize: '.7rem', color: 'var(--amber)', lineHeight: 1.7 }}>
           ⚠ Important: Seen is not a law firm and nothing on this platform constitutes legal advice. Company scores and ghost surge indicators are expressions of community opinion, not verified facts. If you have a dispute with an employer, consult a licensed employment attorney.
         </div>

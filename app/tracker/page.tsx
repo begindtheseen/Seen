@@ -466,7 +466,7 @@ function TrackerPage() {
       />
     )}
     <div className="page-full">
-      <div style={{ maxWidth: 1000, margin: '0 auto', padding: '2.5rem 2rem' }}>
+      <div style={{ maxWidth: 1000, margin: '0 auto', padding: '2.5rem 2rem', width: '100%', boxSizing: 'border-box' }}>
 
         {/* Header */}
         <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: '1rem', marginBottom: '1.5rem' }}>
