@@ -614,7 +614,7 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
   if (!loading && notFound) {
     return (
       <div className="page-full">
-        <div style={{ maxWidth: 600, margin: '0 auto', padding: '5rem 2rem', textAlign: 'center' }}>
+        <div style={{ maxWidth: 600, margin: '0 auto', padding: '5rem 2rem', textAlign: 'center', width: '100%', boxSizing: 'border-box' }}>
           <div style={{ fontFamily: 'var(--mono)', fontSize: '2.5rem', marginBottom: '1rem', opacity: .4 }}>?</div>
           <h1 style={{ fontFamily: 'var(--display)', fontSize: '1.4rem', fontWeight: 800, color: 'var(--white)', marginBottom: '.6rem', letterSpacing: '-.02em' }}>
             Can&apos;t verify &ldquo;{companyName}&rdquo;
@@ -632,7 +632,7 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
 
   return (
     <div className="page-full">
-      <div style={{ maxWidth: 1000, margin: '0 auto', padding: '2.5rem 2rem' }}>
+      <div style={{ maxWidth: 1000, margin: '0 auto', padding: '2.5rem 2rem', width: '100%', boxSizing: 'border-box' }}>
 
         {/* ── "You applied here" context strip ── */}
         {myApp && (
