@@ -15,6 +15,44 @@ Conventions:
 
 ---
 
+## Slice G-1 — Consolidate session-2 user-sync wiring (branch merge)
+
+- **Date/time:** 2026-06-15 ~20:25 UTC
+- **Branch:** `claude/seenjobs-architecture-foundation-23bkjm` (merge commit `de8a930`)
+- **Slice name:** wagyu: consolidate session-2 user-sync load_profile wiring
+- **Goal:** Fold a parallel session's work back onto the single integration branch
+  so there is one source of truth. (A second session ran the "next-session" handoff
+  prompt and did the `load_profile` wiring this session had deferred.)
+- **What was merged (`architecture/auth-helper-tests-and-usersync-prep`, f63867b):**
+  - `api/user-sync.js` — `load_profile` action now: `requireUser(req)` →
+    `loadProfile(createServiceDb(), uid)`; boundary CORS/rate-limit via foundation.
+    Response shape unchanged: `{ profile: rows[0] || null }`. Other 23 actions and
+    all writes untouched.
+  - `lib/supabase/admin.ts` — `../config/env` → `../config/env.ts` (resolvability
+    hardening; no logic change).
+  - `tests/user-sync-load-profile.test.ts` — parity test (real handler + minted
+    HS256 JWT + mocked fetch).
+- **Merge safety:** merge base `c152300`; the two sides touched **disjoint files**
+  (session-2: user-sync/admin/test; this branch: the audit docs). Clean `ort` merge,
+  no conflicts, no force-push.
+- **Behavior preserved:** Yes — verified `load_profile` shape + verified-token
+  identity (not request body).
+- **Tests/checks run:** typecheck ✅, format ✅, test ✅ (58/58), build ✅,
+  check ✅, lint ⚠️ 24 legacy (unchanged, zero new).
+- **Result:** PASS. Single consolidated branch; one session continues from here.
+- **Known risks:** (1) `load_profile` now re-resolves identity inside the action via
+  `requireUser` in addition to the route's top-level auth gate — redundant but
+  behavior-equivalent (same verified uid); worth simplifying in a later slice.
+  (2) Both `api/demand.js` and the `user-sync` `load_profile` wiring still depend on
+  the `.js`→`.ts`-on-Vercel import pattern, **not yet confirmed on a real preview
+  deploy** — the single open gate before either is production-ready.
+- **Next safest slice:** confirm the Vercel preview (manual, owner) OR continue
+  additive work (more read-only user-sync services + parity tests, e.g.
+  `get_recent_cos` / `get_employment` / `credit_history`) without wiring.
+- **Stop condition hit:** No (consolidation complete; awaiting owner direction).
+
+---
+
 ## Slice F-1 — Pre-flight audits: payments, admin, reports (Phase 5)
 
 - **Date/time:** 2026-06-15 ~20:00 UTC
