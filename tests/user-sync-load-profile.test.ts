@@ -12,7 +12,7 @@ import assert from 'node:assert/strict'
 import { test, afterEach } from 'node:test'
 import { createHmac } from 'node:crypto'
 
-import handler from '../api/user-sync.js'
+import handler from '../api/user-sync.ts'
 
 const SECRET = 'test-jwt-secret'
 const UID = 'user-parity-123'

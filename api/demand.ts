@@ -1,7 +1,13 @@
+// @ts-nocheck — Ported JS serverless function. Renamed .js -> .ts so Vercel's
+// @vercel/node bundles it (esbuild) and inlines the typed `.ts` foundation imports.
+// A plain .js entry is NOT bundled by Vercel, so Node fails to load `.ts` deps at
+// runtime — that was the preview 500. The foundation modules are type-checked in
+// lib/**; this thin route stays untyped to avoid a large rewrite. Behavior is
+// unchanged and covered by tests/demand-route.test.ts.
+//
 // Foundation layer (see docs/ARCHITECTURE.md). Imported with explicit .ts
-// extensions so they resolve both under Vercel's serverless bundler and Node's
-// native TS loader. CORS, rate limiting, env access, and the response helper are
-// now centralized instead of re-implemented inline.
+// extensions so they resolve under Vercel's bundler, tsc, and Node's TS loader.
+// CORS, rate limiting, env access, and the response helper are centralized.
 import { handlePreflight } from '../lib/security/cors.ts';
 import { rateLimit } from '../lib/security/rateLimit.ts';
 import { ok } from '../lib/api/response.ts';

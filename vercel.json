@@ -21,8 +21,8 @@
     "api/apply.js": { "maxDuration": 30 },
     "api/jobs.js": { "maxDuration": 60 },
     "api/admin-stats.js": { "maxDuration": 15 },
-    "api/user-sync.js": { "maxDuration": 15 },
-    "api/demand.js": { "maxDuration": 60 },
+    "api/user-sync.ts": { "maxDuration": 15 },
+    "api/demand.ts": { "maxDuration": 60 },
     "api/reports.js": { "maxDuration": 300 },
     "api/stripe.js": { "maxDuration": 15 }
   },

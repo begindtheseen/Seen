@@ -6,7 +6,7 @@
 import assert from 'node:assert/strict'
 import { test, beforeEach, afterEach } from 'node:test'
 
-import handler from '../api/demand.js'
+import handler from '../api/demand.ts'
 
 interface MockRes {
   statusCode: number

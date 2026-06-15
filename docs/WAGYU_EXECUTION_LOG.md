@@ -15,6 +15,48 @@ Conventions:
 
 ---
 
+## Slice I-1 — Fix Vercel runtime 500 (bundle wired routes as `.ts`)
+
+- **Date/time:** 2026-06-15 ~21:25 UTC
+- **Branch:** `claude/seenjobs-architecture-foundation-23bkjm`
+- **Slice name:** wagyu: fix vercel runtime 500 — rename wired routes to .ts
+- **Symptom:** `GET /api/demand` returned **500** on the Vercel preview (build was
+  "Ready", but the function crashed). PR #36 preview.
+- **Diagnosis (logic-confirmed, Vercel runtime logs not accessible from here):**
+  the demand GET handler catches every internal failure and degrades to a `200`
+  empty payload — so a 500 can only be a **module-load crash**. Cause: a plain
+  **`.js`** Vercel serverless function is **not bundled** by `@vercel/node` (files
+  are traced/copied as-is), so at runtime Node tries to load the imported
+  `lib/**/*.ts` foundation modules and throws `Unknown file extension ".ts"`. It
+  worked locally only because Node 22's type-stripping loads `.ts`. **Category:
+  `.js` → `.ts` module resolution at Vercel runtime** (not env/Supabase/helper).
+- **Fix (smallest that addresses the root cause):** rename the two wired routes to
+  `.ts` so `@vercel/node` uses its TypeScript build path (esbuild **bundles** the
+  function, inlining the `.ts` imports → no runtime `.ts` loads):
+  - `git mv api/demand.js api/demand.ts`, `git mv api/user-sync.js api/user-sync.ts`
+  - Added `// @ts-nocheck` to each (ported-JS routes; never strict-typed as `.js`;
+    fully typing 700+ lines of admin/user code would be the forbidden broad rewrite).
+  - `vercel.json`: function keys `api/demand.js`→`api/demand.ts`,
+    `api/user-sync.js`→`api/user-sync.ts` (maxDuration values unchanged — required
+    so the function config still matches the files; explicitly authorized).
+  - Test imports updated to the `.ts` paths.
+- **Behavior preserved:** Yes — only filenames + a top comment changed; route logic
+  (GET shape, OPTIONS, 405, Cache-Control, POST/admin/cron, all user-sync actions)
+  is byte-for-byte unchanged. `user-sync` got the **identical mechanical runtime
+  fix only — no action migrated** (it already carried the same `.ts` imports and
+  would have 500'd too).
+- **Tests/checks run:** typecheck ✅, format ✅, test ✅ (64/64), build ✅,
+  check ✅, lint ⚠️ 24 legacy (unchanged, zero new). Both routes confirmed to load
+  under Node.
+- **Known risk / open gate:** the fix's correctness on Vercel can only be confirmed
+  by the NEW preview build for this push. Awaiting `GET /api/demand` → JSON + the
+  Cache-Control header on the new preview.
+- **Stop condition hit:** Yes — per instructions, stopping after the fix; will NOT
+  continue user-sync migration until the owner confirms the new demand preview is
+  green.
+
+---
+
 ## Slice H-1 — Migrate user-sync read actions: get_employment, get_recent_cos
 
 - **Date/time:** 2026-06-15 ~20:55 UTC

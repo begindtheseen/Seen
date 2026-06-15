@@ -1,3 +1,10 @@
+// @ts-nocheck — Ported JS serverless function. Renamed .js -> .ts so Vercel's
+// @vercel/node bundles it (esbuild) and inlines the typed `.ts` foundation imports.
+// A plain .js entry is NOT bundled by Vercel, so Node fails to load `.ts` deps at
+// runtime (same root cause as the /api/demand preview 500). This is a mechanical
+// runtime fix only — NO action behavior changed. The foundation/services are
+// type-checked in lib/**; this route stays untyped to avoid a large rewrite.
+//
 // Proxy all user data reads/writes through the service key so RLS never blocks them.
 // The client sends its Supabase access token; we validate it here, then use the
 // service key to talk to the DB. No RLS policies required on the client side.
