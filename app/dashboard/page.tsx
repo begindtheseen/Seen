@@ -225,9 +225,9 @@ export default function DashboardPage() {
             </p>
           </div>
           <div style={{ display: 'flex', gap: '.5rem', alignItems: 'center', flexShrink: 0 }}>
-            <a href="/profile" style={{ background: 'none', border: '1px solid var(--line2)', color: 'var(--sub)', borderRadius: 8, padding: '.32rem .7rem', fontFamily: 'var(--mono)', fontSize: '.62rem', cursor: 'pointer', textDecoration: 'none', whiteSpace: 'nowrap' }}>
+            <Link href="/profile" style={{ background: 'none', border: '1px solid var(--line2)', color: 'var(--sub)', borderRadius: 8, padding: '.32rem .7rem', fontFamily: 'var(--mono)', fontSize: '.62rem', cursor: 'pointer', textDecoration: 'none', whiteSpace: 'nowrap' }}>
               ⚙ Settings
-            </a>
+            </Link>
             <button
               onClick={async () => { await supabase.auth.signOut(); router.push('/') }}
               style={{ background: 'none', border: '1px solid var(--line2)', color: 'var(--muted)', borderRadius: 8, padding: '.32rem .7rem', fontFamily: 'var(--mono)', fontSize: '.62rem', cursor: 'pointer', whiteSpace: 'nowrap' }}

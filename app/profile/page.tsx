@@ -54,9 +54,14 @@ export default function ProfilePage() {
   const [name, setName] = useState('')
   const [city, setCity] = useState('')
   const [experience, setExperience] = useState('')
+  const [initName, setInitName] = useState('')
+  const [initCity, setInitCity] = useState('')
+  const [initExperience, setInitExperience] = useState('')
   const [saving, setSaving] = useState(false)
   const [saveMsg, setSaveMsg] = useState('')
   const [saveMsgOk, setSaveMsgOk] = useState(false)
+
+  const isDirty = name !== initName || city !== initCity || experience !== initExperience
 
   // City autocomplete
   const [citySuggs, setCitySuggs] = useState<LocResult[]>([])
@@ -81,9 +86,12 @@ export default function ProfilePage() {
     _sync('load_profile').then((res) => {
       const p = (res as { profile?: Record<string, unknown> } | null)?.profile
       if (p) {
-        setName((p.name as string) || '')
-        setCity((p.city as string) || '')
-        setExperience((p.experience as string) || '')
+        const n = (p.name as string) || ''
+        const c = (p.city as string) || ''
+        const e = (p.experience as string) || ''
+        setName(n); setInitName(n)
+        setCity(c); setInitCity(c)
+        setExperience(e); setInitExperience(e)
       }
     }).catch(() => {})
   }, [isLoggedIn, router])
@@ -141,6 +149,9 @@ export default function ProfilePage() {
     } catch { /* ignore */ }
     setSaveMsg('Saved!')
     setSaveMsgOk(true)
+    setInitName(name.trim())
+    setInitCity(city.trim())
+    setInitExperience(experience)
     loadProfile()
     setSaving(false)
   }
@@ -387,15 +398,17 @@ export default function ProfilePage() {
           </div>
         </div>
 
-        <button
-          onClick={saveProfile}
-          disabled={saving}
-          style={{ width: '100%', padding: '.9rem', background: 'var(--green)', color: 'var(--ink)', border: 'none', borderRadius: 10, fontFamily: 'var(--display)', fontWeight: 800, fontSize: '.9rem', cursor: saving ? 'not-allowed' : 'pointer', marginBottom: '2.5rem', opacity: saving ? 0.7 : 1 }}
-        >
-          {saving ? 'Saving...' : 'Save changes →'}
-        </button>
+        {isDirty && (
+          <button
+            onClick={saveProfile}
+            disabled={saving}
+            style={{ width: '100%', padding: '.9rem', background: 'var(--green)', color: 'var(--ink)', border: 'none', borderRadius: 10, fontFamily: 'var(--display)', fontWeight: 800, fontSize: '.9rem', cursor: saving ? 'not-allowed' : 'pointer', marginBottom: '1rem', opacity: saving ? 0.7 : 1 }}
+          >
+            {saving ? 'Saving...' : 'Save changes →'}
+          </button>
+        )}
         {saveMsg && (
-          <div style={{ fontFamily: 'var(--mono)', fontSize: '.65rem', color: saveMsgOk ? 'var(--green)' : 'var(--red)', textAlign: 'center', marginTop: '-.5rem', marginBottom: '1rem' }}>{saveMsg}</div>
+          <div style={{ fontFamily: 'var(--mono)', fontSize: '.65rem', color: saveMsgOk ? 'var(--green)' : 'var(--red)', textAlign: 'center', marginBottom: '1.5rem' }}>{saveMsg}</div>
         )}
 
         {/* Danger zone */}

@@ -963,7 +963,7 @@ nav.nav-scrolled{background:rgba(6,6,8,0.82);backdrop-filter:blur(60px) saturate
 .vfeed-row{cursor:pointer;}
 
 /* ── Swipe card deck (resume-matched jobs) ── */
-.swipe-deck{position:relative;height:220px;touch-action:none;user-select:none;}
+.swipe-deck{position:relative;height:340px;touch-action:none;user-select:none;}
 .swipe-card{position:absolute;inset:0;border-radius:16px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.12);padding:1.1rem 1.15rem;cursor:grab;box-shadow:0 8px 32px rgba(0,0,0,.4),0 0 40px rgba(99,102,241,.1),inset 0 1.5px 0 rgba(255,255,255,.12);backdrop-filter:blur(24px);transition:none;will-change:transform;}
 .swipe-card:active{cursor:grabbing;}
 .swipe-card.snap-back{transition:transform .35s cubic-bezier(.34,1.56,.64,1);}

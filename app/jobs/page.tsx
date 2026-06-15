@@ -806,7 +806,7 @@ function SwipeJobDeck({ jobs, onOpen, onDismiss, onSave, onApply, coScores }: {
 
   return (
   <div>
-    <div className="swipe-deck" aria-label="Swipe job cards — drag right to save, left to pass" style={{ height: 320 }}>
+    <div className="swipe-deck" aria-label="Swipe job cards — drag right to save, left to pass" style={{ height: 340 }}>
       {/* Third peek card */}
       {thirdJob && (
         <div className="swipe-peek" style={{ transform: 'scale(0.92) translateY(16px)', transformOrigin: 'bottom center', zIndex: 1 }} />
@@ -917,8 +917,8 @@ function SwipeJobDeck({ jobs, onOpen, onDismiss, onSave, onApply, coScores }: {
         style={{ width: 50, height: 50, borderRadius: '50%', border: '1px solid rgba(16,185,129,.45)', background: 'rgba(16,185,129,.12)', color: 'var(--green)', fontSize: '1.1rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
       >♡</button>
     </div>
-    <div style={{ textAlign: 'center', marginTop: '.5rem', fontFamily: 'var(--mono)', fontSize: '.48rem', color: 'var(--dim)' }}>
-      ← pass · ↑ apply now · save →
+    <div style={{ textAlign: 'center', marginTop: '.4rem', fontFamily: 'var(--mono)', fontSize: '.52rem', color: 'var(--muted)', letterSpacing: '.04em' }}>
+      drag or tap the buttons to decide
     </div>
   </div>
   )
@@ -955,7 +955,7 @@ export default function JobsPage() {
   const [recStatus, setRecStatus] = useState<'idle' | 'loading' | 'done'>('idle')
   const [swipeCount, setSwipeCount] = useState(0)
   const [deckDone, setDeckDone] = useState(false)
-  const [swipeMode, setSwipeMode] = useState(true)
+  const [swipeMode, setSwipeMode] = useState(false)
   const [checkpointJob, setCheckpointJob] = useState<Job | null>(null)
   const [coScores, setCoScores] = useState<Record<string, {ghost_rate: number; overall_score: number; response_rate?: number}>>({})
   const [appliedCos, setAppliedCos] = useState<Set<string>>(new Set())
@@ -1410,15 +1410,17 @@ export default function JobsPage() {
           <div className="jct">{statusMsg}</div>
           <div style={{ display: 'flex', gap: '.4rem', alignItems: 'center' }}>
             {filtered.length > 0 && (
-              <div style={{ display: 'flex', borderRadius: 7, overflow: 'hidden', border: '1px solid var(--line2)' }}>
-                <button
-                  onClick={() => setSwipeMode(true)}
-                  style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', padding: '.28rem .6rem', background: swipeMode ? 'var(--surface)' : 'transparent', color: swipeMode ? 'var(--white)' : 'var(--dim)', border: 'none', cursor: 'pointer' }}
-                >⊕ Swipe</button>
+              <div style={{ display: 'flex', borderRadius: 8, overflow: 'hidden', border: '1px solid var(--line2)', background: 'var(--card)' }}>
                 <button
                   onClick={() => setSwipeMode(false)}
-                  style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', padding: '.28rem .6rem', background: !swipeMode ? 'var(--surface)' : 'transparent', color: !swipeMode ? 'var(--white)' : 'var(--dim)', border: 'none', cursor: 'pointer' }}
-                >≡ List</button>
+                  title="List view"
+                  style={{ fontFamily: 'var(--mono)', fontSize: '.65rem', fontWeight: swipeMode ? 400 : 600, padding: '.35rem .75rem', background: swipeMode ? 'transparent' : 'var(--surface)', color: swipeMode ? 'var(--dim)' : 'var(--white)', border: 'none', borderRight: '1px solid var(--line2)', cursor: 'pointer', transition: 'background .12s,color .12s' }}
+                >☰ List</button>
+                <button
+                  onClick={() => setSwipeMode(true)}
+                  title="Swipe mode — drag right to save, left to pass"
+                  style={{ fontFamily: 'var(--mono)', fontSize: '.65rem', fontWeight: swipeMode ? 600 : 400, padding: '.35rem .75rem', background: swipeMode ? 'var(--surface)' : 'transparent', color: swipeMode ? 'var(--white)' : 'var(--dim)', border: 'none', cursor: 'pointer', transition: 'background .12s,color .12s' }}
+                >⚡ Swipe</button>
               </div>
             )}
             <select
