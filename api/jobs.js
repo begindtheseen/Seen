@@ -354,22 +354,75 @@ function buildFallbackFilter(q) {
 }
 
 function scoreJob(job) {
-  let s = 65;
-  const src = (job.source || '').toLowerCase();
-  const co = (job.company || '').toLowerCase();
-  if (src.includes('greenhouse') || src.includes('lever') || src.includes('workday')) s += 12;
-  if (src.includes('linkedin')) s += 5;
-  if (job.salary) s += 8;
-  if (['stripe','linear','figma','notion','vercel'].some(g => co.includes(g))) s += 15;
-  if (['amazon','accenture','cognizant','infosys'].some(g => co.includes(g))) s -= 15;
-  return Math.min(95, Math.max(25, s));
+  let s = 50; // neutral baseline — must earn a good score
+
+  const src   = (job.source || '').toLowerCase();
+  const co    = (job.company || '').toLowerCase();
+  const title = (job.title || '').toLowerCase();
+  const desc  = (job.description || '');
+
+  // ── ATS source quality (biggest single signal) ────────────────────────────
+  if (/greenhouse|lever|workday|ashby|rippling|bamboo/.test(src)) s += 18;
+  else if (/linkedin/.test(src)) s += 8;
+  else if (/indeed|glassdoor|ziprecruiter/.test(src)) s += 4;
+  // Adzuna/unknown = 0 bonus — neutral
+
+  // ── Salary transparency ───────────────────────────────────────────────────
+  const salary = job.salary || '';
+  const salaryMin = typeof job.salary_min === 'number' ? job.salary_min : 0;
+  if (salary || salaryMin > 0) s += 12;          // disclosed = big trust signal
+  if (salaryMin > 120000) s += 6;                // high comp = serious company
+
+  // ── Description quality ───────────────────────────────────────────────────
+  if (desc.length > 1200) s += 8;
+  else if (desc.length > 500) s += 4;
+  else if (desc.length < 120) s -= 8;             // suspiciously thin posting
+
+  // Description green flags
+  if (/\$\d+|\bsalary\b|\bcompensation\b|\bota\b|\bbase pay\b/i.test(desc)) s += 5;
+  if (/interview process|hiring process|rounds?:|technical screen/i.test(desc)) s += 6;
+  if (/\bremote\b|\bhybrid\b|\bwork from home\b/i.test(desc)) s += 3;
+  if (/401k|equity|pto|parental leave/i.test(desc)) s += 4;
+
+  // Description red flags
+  if (/staffing agency|on behalf of our client|recruiting firm/i.test(desc)) s -= 10;
+  if (/must be a team player|fast[- ]paced|wear many hats|self[- ]starter/i.test(desc)) s -= 4;
+  if (/unpaid|volunteer|commission only|1099 only/i.test(desc)) s -= 20;
+  if (/\$10.{0,5}hour|\$12.{0,5}hour|\$15.{0,5}hour/i.test(desc)) s -= 8; // poverty wages
+
+  // ── Company reputation ────────────────────────────────────────────────────
+  const KNOWN_GOOD = ['stripe','linear','figma','notion','vercel','anthropic','openai',
+    'databricks','retool','ramp','brex','plaid','airtable','coda','loom','pitch',
+    'segment','miro','intercom','hubspot','twilio','datadog'];
+  const KNOWN_BAD  = ['amazon','accenture','cognizant','infosys','wipro','tata consultancy',
+    'hcl tech','capgemini','tech mahindra','unison','staffmark','manpower','randstad',
+    'robert half','kelly services'];
+
+  if (KNOWN_GOOD.some(g => co.includes(g))) s += 15;
+  if (KNOWN_BAD.some(g => co.includes(g)))  s -= 14;
+
+  // ── Title red flags ───────────────────────────────────────────────────────
+  if (/\b(rockstar|ninja|guru|wizard|superhero|unicorn)\b/i.test(title)) s -= 6;
+  if (/commission|insurance agent|real estate agent|door.to.door/i.test(title)) s -= 12;
+
+  // ── Job type penalty ──────────────────────────────────────────────────────
+  if (/contract|temp|freelance|gig/i.test(job.type || '')) s -= 6;
+
+  return Math.min(95, Math.max(18, Math.round(s)));
 }
 
 function wasteScore(job) {
-  let w = 25;
-  const co = (job.company || '').toLowerCase();
-  if (['amazon','accenture','cognizant','infosys','wipro'].some(g => co.includes(g))) w += 35;
-  return Math.min(85, w);
+  let w = 20;
+  const co   = (job.company || '').toLowerCase();
+  const desc = (job.description || '');
+
+  if (/amazon|accenture|cognizant|infosys|wipro|tata|hcl/.test(co)) w += 35;
+  if (/staffing agency|on behalf of our client/.test(desc))           w += 20;
+  if (/unpaid|volunteer|commission only/.test(desc))                  w += 40;
+  if (/greenhouse|lever|workday|ashby/.test((job.source || '').toLowerCase())) w -= 10;
+  if (job.salary || (typeof job.salary_min === 'number' && job.salary_min > 0)) w -= 8;
+
+  return Math.min(90, Math.max(5, Math.round(w)));
 }
 
 // ── handleCompanyJobs: DB lookup + live search for a specific company ─────────
@@ -584,7 +637,24 @@ async function _fetchAdzuna(what, where, appId, appKey, distKm) {
     clearTimeout(tmo); if (!res.ok) return [];
     const data = await res.json();
     const expires = new Date(Date.now() + 7*24*60*60*1000).toISOString();
-    return (data.results||[]).map(j => ({ title:j.title||what, company:j.company?.display_name||'Unknown', location:j.location?.display_name||where, salary:j.salary_min||j.salary_max?(j.salary_min>=10000?`$${Math.round(j.salary_min/1000)}k`:j.salary_min>0?`$${j.salary_min}/hr`:null):null, description:(j.description||'').replace(/<[^>]*>/g,'').replace(/\s+/g,' ').trim().slice(0,8000), apply_url:j.redirect_url||null, source:'Adzuna', type:j.contract_time==='part_time'?'Part-time':'Full-time', level:(/\b(senior|sr\b|lead|principal|staff|architect)\b/i.test(j.title||''))?'Senior':(/\b(junior|jr\b|entry.level|associate|intern)\b/i.test(j.title||''))?'Entry level':(/\b(director|vp\b|vice president|head of|chief)\b/i.test(j.title||''))?'Director+':'Mid level', search_query:what, score:65+(j.salary_min>0?8:0), waste_score:25, expires_at:expires })).filter(j=>j.company!=='Unknown'&&j.apply_url);
+    return (data.results||[]).map(j => {
+      const salary = j.salary_min||j.salary_max ? (j.salary_min>=10000?`$${Math.round(j.salary_min/1000)}k`:j.salary_min>0?`$${j.salary_min}/hr`:null) : null;
+      const mapped = {
+        title: j.title||what,
+        company: j.company?.display_name||'Unknown',
+        location: j.location?.display_name||where,
+        salary,
+        salary_min: j.salary_min||0,
+        description: (j.description||'').replace(/<[^>]*>/g,'').replace(/\s+/g,' ').trim().slice(0,8000),
+        apply_url: j.redirect_url||null,
+        source: 'Adzuna',
+        type: j.contract_time==='part_time'?'Part-time':'Full-time',
+        level: (/\b(senior|sr\b|lead|principal|staff|architect)\b/i.test(j.title||''))?'Senior':(/\b(junior|jr\b|entry.level|associate|intern)\b/i.test(j.title||''))?'Entry level':(/\b(director|vp\b|vice president|head of|chief)\b/i.test(j.title||''))?'Director+':'Mid level',
+        search_query: what,
+        expires_at: expires,
+      };
+      return { ...mapped, score: scoreJob(mapped), waste_score: wasteScore(mapped) };
+    }).filter(j=>j.company!=='Unknown'&&j.apply_url);
   } catch(e) { clearTimeout(tmo); return []; }
 }
 
