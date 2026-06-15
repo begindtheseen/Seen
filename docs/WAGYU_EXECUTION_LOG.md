@@ -15,6 +15,35 @@ Conventions:
 
 ---
 
+## Slice D-1 — Auth helper tests (Phase D)
+
+- **Date/time:** 2026-06-15 ~19:55 UTC
+- **Branch:** `claude/seenjobs-architecture-foundation-23bkjm`
+- **Slice name:** wagyu: add auth helper tests
+- **Goal:** Prove the centralized server-auth helpers before any authenticated
+  route (user-sync) is migrated. No production behavior change.
+- **Files changed:** `tests/auth-server.test.ts` (new); `lib/auth/server.ts`
+  (`.ts` import-extension hardening only — behavior-neutral).
+- **Behavior preserved:** Yes — additive tests + import-extension hardening.
+- **Tests/checks run:** typecheck ✅, format ✅, test ✅ (51/51), build ✅,
+  check ✅, lint ⚠️ 24 legacy (unchanged, zero new).
+- **Result:** PASS. 11 new tests covering: missing auth rejected; tampered /
+  wrong-secret / expired / malformed tokens rejected; valid token accepted; the
+  `/auth/v1/user` fallback path; `requireUser` 401 vs success; and the security
+  invariant that **identity comes from the verified token, never from
+  `body.user_id`**.
+- **Known risks:** None. (Admin-blocking and paid/ownership helpers are NOT yet
+  implemented in the foundation — see Next slice — so those Phase-D items are
+  deferred until those helpers exist.)
+- **Next safest slice:** Phase E prep — inventory `api/user-sync.js` actions and
+  classify them (read-only / user-owned write / profile / credits / saved jobs /
+  applications / resume). Then migrate ONE low-risk read action (e.g.
+  `load_profile`) behind `requireUser` + a service, with an ownership test.
+  Do NOT migrate writes until ownership rules are proven.
+- **Stop condition hit:** No.
+
+---
+
 ## Slice B-1 — Foundation helper tests (Phase B)
 
 - **Date/time:** 2026-06-15 ~19:45 UTC

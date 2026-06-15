@@ -12,8 +12,10 @@
 
 import { createHmac, timingSafeEqual } from 'node:crypto'
 import type { ApiRequest } from '../api/types'
-import { serverEnv } from '../config/env'
-import { UnauthorizedError } from '../api/errors'
+// Explicit .ts extensions so this module is resolvable from a plain-JS serverless
+// function (api/*.js) and loadable under Node's native TS loader (tests).
+import { serverEnv } from '../config/env.ts'
+import { UnauthorizedError } from '../api/errors.ts'
 
 export interface AuthIdentity {
   uid: string | null
