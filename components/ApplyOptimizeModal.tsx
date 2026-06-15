@@ -10,6 +10,7 @@ import type { Job } from '@/lib/types'
 interface OptimizeBullet {
   original: string
   optimized: string
+  humanized?: string
   addresses: string
 }
 
@@ -19,12 +20,18 @@ interface OptimizeResult {
   keywords_added: string[]
 }
 
+interface HumanizeResult {
+  humanized_bullets: OptimizeBullet[]
+  keywords_preserved: string[]
+}
+
 type Step =
   | 'loading-resume'
   | 'not-logged-in'
   | 'no-resume'
   | 'choose'
   | 'optimizing'
+  | 'humanizing'
   | 'review'
   | 'sending'
   | 'done'
@@ -112,6 +119,7 @@ export default function ApplyOptimizeModal({
   const [step, setStep] = useState<Step>('loading-resume')
   const [resumeText, setResumeText] = useState('')
   const [result, setResult] = useState<OptimizeResult | null>(null)
+  const [humanized, setHumanized] = useState(false)
   const [error, setError] = useState('')
 
   useEffect(() => {
@@ -157,6 +165,48 @@ export default function ApplyOptimizeModal({
     }
   }
 
+  async function runHumanize() {
+    if (!result) return
+    setStep('humanizing')
+    setError('')
+    try {
+      const headers = await aiHeaders()
+      const r = await fetch('/api/resume', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          tool: 'humanize',
+          job: job.title,
+          company: job.company,
+          bullets: result.optimized_bullets,
+          keywords: result.keywords_added,
+        }),
+      })
+      if (!r.ok) {
+        const e = await r.json().catch(() => ({}))
+        if (e.pro_required) {
+          setError('Stealth Mode is a Pro feature. Upgrade at seenjobs.io/pricing.')
+        } else {
+          setError(e.error || `Error ${r.status}`)
+        }
+        setStep('review')
+        return
+      }
+      const data: HumanizeResult = await r.json()
+      if (data.humanized_bullets?.length) {
+        setResult(prev => prev ? {
+          ...prev,
+          optimized_bullets: data.humanized_bullets,
+        } : prev)
+        setHumanized(true)
+      }
+      setStep('review')
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : 'Stealth Mode failed — try again')
+      setStep('review')
+    }
+  }
+
   async function approveAndSend() {
     setStep('sending')
     const email = user?.email || profile?.email || ''
@@ -194,9 +244,10 @@ export default function ApplyOptimizeModal({
   const title = step === 'done'
     ? '🎉 You\'re ready to apply'
     : step === 'review'
-    ? 'Review your optimized resume'
-    : step === 'optimizing' || step === 'sending'
-    ? step === 'optimizing' ? 'Optimizing your resume…' : 'Sending to your email…'
+    ? humanized ? '🥷 Stealth Mode applied' : 'Review your optimized resume'
+    : step === 'optimizing' ? 'Optimizing your resume…'
+    : step === 'humanizing' ? 'Applying Stealth Mode…'
+    : step === 'sending' ? 'Sending to your email…'
     : 'Apply & Optimize'
 
   return (
@@ -306,6 +357,19 @@ export default function ApplyOptimizeModal({
             </>
           )}
 
+          {/* ── humanizing ── */}
+          {step === 'humanizing' && (
+            <div style={{ textAlign: 'center', paddingBottom: '1rem' }}>
+              <LoadingDots />
+              <div style={{ fontFamily: 'var(--mono)', fontSize: '.7rem', color: 'var(--sub)', marginBottom: '.5rem' }}>
+                Rewriting in a human voice…
+              </div>
+              <div style={{ fontFamily: 'var(--mono)', fontSize: '.6rem', color: 'var(--dim)' }}>
+                Varying sentence structure · removing AI patterns · preserving keywords
+              </div>
+            </div>
+          )}
+
           {/* ── optimizing ── */}
           {step === 'optimizing' && (
             <div style={{ textAlign: 'center', paddingBottom: '1rem' }}>
@@ -359,11 +423,33 @@ export default function ApplyOptimizeModal({
                 </div>
               </div>
 
+              {error && (
+                <div style={{ background: 'rgba(239,68,68,.08)', border: '1px solid rgba(239,68,68,.25)', borderRadius: 8, padding: '.6rem .85rem', marginBottom: '.75rem', fontFamily: 'var(--mono)', fontSize: '.65rem', color: 'var(--red)' }}>
+                  {error}
+                </div>
+              )}
+
               <div style={{ display: 'flex', flexDirection: 'column', gap: '.5rem' }}>
                 <button style={btnGreen} onClick={approveAndSend}>
                   ✓ Approve &amp; send to my email
                 </button>
-                <button style={btnGhost} onClick={() => setStep('choose')}>← Re-optimize</button>
+                {!humanized && (
+                  <button
+                    style={{
+                      width: '100%', padding: '.72rem 1rem',
+                      background: 'linear-gradient(135deg,rgba(139,92,246,.18),rgba(99,102,241,.1))',
+                      border: '1.5px solid rgba(139,92,246,.4)',
+                      color: '#a78bfa', borderRadius: 10,
+                      fontFamily: 'var(--display)', fontWeight: 700, fontSize: '.82rem',
+                      cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '.4rem',
+                    }}
+                    onClick={runHumanize}
+                  >
+                    🥷 Stealth Mode · Bypass AI detection
+                    <span style={{ fontFamily: 'var(--mono)', fontSize: '.5rem', background: 'rgba(139,92,246,.3)', borderRadius: 4, padding: '.1rem .35rem', color: '#c4b5fd' }}>PRO</span>
+                  </button>
+                )}
+                <button style={btnGhost} onClick={() => runOptimize()}>← Re-optimize</button>
               </div>
             </>
           )}

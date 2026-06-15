@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/lib/auth'
 import { AppStore } from '@/lib/stores/AppStore'
+import { aiHeaders } from '@/lib/aiHeaders'
 
 interface ApplyCheckpointProps {
   job: { id: string; title: string; company: string; location?: string; apply_url?: string | null }
@@ -56,6 +57,8 @@ export default function ApplyCheckpoint({ job, optimized: _optimized, onClose }:
   const [step, setStep] = useState<Step>('main')
   const [loading, setLoading] = useState(false)
 
+  const [creditEarned, setCreditEarned] = useState(false)
+
   async function handleApplied() {
     setLoading(true)
     try {
@@ -71,6 +74,22 @@ export default function ApplyCheckpoint({ job, optimized: _optimized, onClose }:
         },
         isLoggedIn,
       )
+      // Earn 1 AI credit back for tracking the application
+      if (isLoggedIn) {
+        try {
+          const hdrs = await aiHeaders()
+          const r = await fetch('/api/user-sync', {
+            method: 'POST',
+            headers: hdrs,
+            body: JSON.stringify({ action: 'earn_credit', reason: 'track_application', jid: job.id }),
+          })
+          const d = await r.json().catch(() => ({}))
+          if (d.earned) {
+            setCreditEarned(true)
+            window.dispatchEvent(new CustomEvent('seen:credits-updated'))
+          }
+        } catch { /* best-effort */ }
+      }
     } catch {
       // Non-fatal — still show confirmed step
     }
@@ -433,6 +452,17 @@ export default function ApplyCheckpoint({ job, optimized: _optimized, onClose }:
         {step === 'confirmed' && (
           <div style={innerStyle}>
             <div style={confirmedCheckStyle}>✓ Tracked.</div>
+
+            {creditEarned && (
+              <div style={{
+                background: 'rgba(16,185,129,.1)', border: '1px solid rgba(16,185,129,.25)',
+                borderRadius: 8, padding: '.5rem .85rem', marginBottom: '.75rem',
+                fontFamily: 'var(--mono)', fontSize: '.62rem', color: 'var(--green)',
+                display: 'flex', alignItems: 'center', gap: '.4rem',
+              }}>
+                +1 AI credit earned for tracking
+              </div>
+            )}
 
             <div style={{
               fontFamily: 'var(--mono)',

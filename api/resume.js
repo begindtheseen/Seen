@@ -42,9 +42,9 @@ export default async function handler(req, res) {
 
   if (req.method !== 'POST') return res.status(405).end('Method not allowed');
 
-  // Credit gate — requires auth and 1 credit per call
-  const gate = await gateAI(req, `resume_${tool || 'tool'}`);
-  if (!gate.ok) return res.status(gate.status).json({ error: gate.error, credits_required: gate.credits_required, balance: gate.balance ?? 0 });
+  // Credit gate — humanize is Pro-only; everything else costs 1 credit
+  const gate = await gateAI(req, `resume_${tool || 'tool'}`, { proOnly: tool === 'humanize' });
+  if (!gate.ok) return res.status(gate.status).json({ error: gate.error, credits_required: gate.credits_required, pro_required: gate.pro_required, balance: gate.balance ?? 0 });
 
   try {
     if (!tool) return res.status(400).json({ error: 'Missing tool parameter' });
@@ -100,6 +100,41 @@ RESUME:\n${(resume||'').slice(0,4000)}
 Return ONLY this JSON:
 {"job_priorities":["<top requirement>","<second>","<third>","<fourth>","<fifth>"],"optimized_bullets":[{"original":"<exact text from resume>","optimized":"<rewritten to address JD requirement>","addresses":"<which priority in 3-5 words>"}],"keywords_added":["<exact JD term>"]}`;
 
+    } else if (tool === 'humanize') {
+      // Pro-only: take already-optimized bullets and rewrite them to evade AI-detection tools
+      // (GPTZero, Originality.ai, etc.) while preserving the keyword strategy.
+      const { bullets, keywords, job: jobTitle, company: jobCo } = body;
+      if (!bullets || !Array.isArray(bullets) || bullets.length === 0) {
+        return res.status(400).json({ error: 'bullets array required' });
+      }
+      systemPrompt = 'You are a professional resume writer with 20 years of experience. You write in a natural, human voice. Return ONLY valid JSON with no markdown.';
+      prompt = `These resume bullets were AI-optimized for a ${jobTitle || 'role'} at ${jobCo || 'a company'}. Your job is to rewrite each one so it reads as if a real person wrote it — not an AI.
+
+AI writing patterns to deliberately AVOID in each bullet:
+- Starting multiple bullets with the same word or structure ("Leveraged", "Spearheaded", "Demonstrated", "Utilized")
+- Overly formal or corporate tone (no "synergized", "leveraged cross-functional", "holistic approach")
+- Suspiciously uniform sentence length — mix short punchy statements with longer ones
+- Passive voice overuse
+- Stacking buzzwords without grounding them in a real outcome
+- Perfect symmetry between bullets (real resumes have stylistic variation)
+
+What GOOD human-written bullets look like:
+- They start with different action verbs: "Built", "Cut", "Managed", "Ran", "Helped grow", "Handled"
+- They have specific numbers when possible, or honest qualifiers like "roughly" or "about"
+- Some bullets are brief. Others are more detailed. Not all the same length.
+- Contractions are fine where they fit naturally
+- They sound like something this specific person would say about their own work
+
+CRITICAL: Keep every keyword from the optimized version. The ATS still needs to find them.
+Keep the "addresses" field from the original.
+
+Bullets to humanize:
+${JSON.stringify(bullets, null, 2)}
+${keywords?.length ? `\nKeywords that must stay: ${keywords.join(', ')}` : ''}
+
+Return ONLY this JSON (same structure as input):
+{"humanized_bullets":[{"original":"<original text>","optimized":"<keep this>","humanized":"<your natural rewrite>","addresses":"<keep this>"}],"keywords_preserved":["<confirm each keyword appears"]}`;
+
     } else if (tool === 'coach') {
       const { job, company, jobDescription, background } = body;
       if (!job || !company || !jobDescription) return res.status(400).json({ error: 'Job, company, and job description required' });
@@ -126,7 +161,7 @@ JOB DESCRIPTION:\n${(jobDescription||'').slice(0,2500)}${background?'\nCANDIDATE
 
     const requestBody = JSON.stringify({
       model: 'claude-haiku-4-5-20251001',
-      max_tokens: tool === 'optimize' ? 2500 : 2000,
+      max_tokens: (tool === 'optimize' || tool === 'humanize') ? 2500 : 2000,
       system: systemPrompt,
       messages: [{ role: 'user', content: prompt }],
     });
@@ -460,22 +495,6 @@ async function handleEmailAnalysis(req, res, body) {
       </div>
     `).join('');
 
-    const keywordsHtml = keywords.length > 0
-      ? `<div style="margin-bottom:28px;">
-           <div style="font-size:10px;font-weight:700;letter-spacing:.08em;color:#4f46e5;text-transform:uppercase;margin-bottom:10px;">Keywords Added</div>
-           <div style="display:flex;flex-wrap:wrap;gap:6px;">
-             ${keywords.map(k => `<span style="display:inline-block;background:#ede9fe;color:#4f46e5;border-radius:20px;padding:3px 11px;font-size:12px;font-weight:600;">+${k}</span>`).join('')}
-           </div>
-         </div>`
-      : '';
-
-    const bulletsSection = bullets.length > 0
-      ? `<div style="margin-bottom:28px;">
-           <div style="font-size:10px;font-weight:700;letter-spacing:.08em;color:#4f46e5;text-transform:uppercase;margin-bottom:12px;">${bullets.length} Bullet${bullets.length !== 1 ? 's' : ''} Rewritten</div>
-           ${bulletRowsHtml}
-         </div>`
-      : '';
-
     const html = `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -484,45 +503,53 @@ async function handleEmailAnalysis(req, res, body) {
   <meta name="color-scheme" content="light">
 </head>
 <body style="margin:0;padding:0;background:#f3f4f6;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;">
-  <table width="100%" cellpadding="0" cellspacing="0" style="background:#f3f4f6;padding:32px 16px;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#f3f4f6;padding:40px 16px;">
     <tr><td align="center">
-      <table width="100%" cellpadding="0" cellspacing="0" style="max-width:580px;">
+      <table width="100%" cellpadding="0" cellspacing="0" style="max-width:520px;">
 
         <!-- Header -->
-        <tr><td style="background:#4f46e5;border-radius:12px 12px 0 0;padding:28px 32px;">
-          <div style="font-size:10px;font-weight:700;letter-spacing:.15em;color:rgba(255,255,255,.6);text-transform:uppercase;margin-bottom:10px;">Seen · Resume Optimizer</div>
-          <div style="font-size:22px;font-weight:800;color:#fff;letter-spacing:-.02em;margin-bottom:4px;">Your optimized resume is ready</div>
-          <div style="font-size:13px;color:rgba(255,255,255,.75);">For <strong style="color:#fff;">${role}</strong> at <strong style="color:#fff;">${co}</strong></div>
+        <tr><td style="background:#4f46e5;border-radius:12px 12px 0 0;padding:32px 36px 28px;">
+          <div style="font-size:10px;font-weight:700;letter-spacing:.18em;color:rgba(255,255,255,.55);text-transform:uppercase;margin-bottom:12px;">Seen</div>
+          <div style="font-size:24px;font-weight:800;color:#fff;letter-spacing:-.03em;line-height:1.15;margin-bottom:8px;">Your optimized resume<br>is attached.</div>
+          <div style="font-size:13px;color:rgba(255,255,255,.7);margin-top:4px;">${role} · ${co}</div>
         </td></tr>
 
         <!-- Body -->
-        <tr><td style="background:#fff;padding:32px 32px 24px;border-left:1px solid #e5e7eb;border-right:1px solid #e5e7eb;">
+        <tr><td style="background:#fff;padding:32px 36px;border-left:1px solid #e5e7eb;border-right:1px solid #e5e7eb;">
 
-          <p style="font-size:13px;color:#6b7280;margin:0 0 24px;line-height:1.7;">
-            The PDF attached to this email contains your full optimized resume. Copy the rewritten bullets into your resume before you apply.
+          <p style="font-size:14px;color:#374151;margin:0 0 8px;line-height:1.7;font-weight:500;">
+            Open the PDF attached to this email.
+          </p>
+          <p style="font-size:13px;color:#6b7280;margin:0 0 28px;line-height:1.7;">
+            Copy the rewritten bullets into your resume before you submit your application.
+            The PDF has your before/after rewrites and every keyword that was added.
           </p>
 
-          ${keywordsHtml}
-          ${bulletsSection}
+          <!-- Earn-credit nudge -->
+          <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;padding:16px 20px;margin-bottom:28px;">
+            <div style="font-size:13px;font-weight:700;color:#15803d;margin-bottom:4px;">Earn 1 AI credit back</div>
+            <div style="font-size:12px;color:#166534;line-height:1.6;">
+              Track your application below after you apply and we'll credit you back 1 AI credit — no strings.
+            </div>
+          </div>
 
-          <!-- Apply CTA -->
-          <div style="text-align:center;margin:28px 0 8px;">
-            <a href="${applyLink}"
-               style="display:inline-block;background:#4f46e5;color:#fff;text-decoration:none;font-weight:700;font-size:14px;padding:14px 32px;border-radius:8px;letter-spacing:-.01em;">
-              I Applied — Start Tracking →
+          <!-- CTA -->
+          <div style="text-align:center;margin-bottom:12px;">
+            <a href="${applyLink}" style="display:inline-block;background:#4f46e5;color:#fff;text-decoration:none;font-weight:700;font-size:15px;padding:15px 36px;border-radius:9px;letter-spacing:-.01em;">
+              I Applied — Track It →
             </a>
           </div>
-          <p style="font-size:11px;color:#9ca3af;text-align:center;margin:8px 0 0;line-height:1.6;">
-            Click after submitting your application to start your ghost alert timeline and Day 7/14/30 check-ins.
+          <p style="font-size:11px;color:#9ca3af;text-align:center;margin:0;line-height:1.6;">
+            Tracks your timeline, ghost alerts, and Day 7 / 14 / 30 check-ins.
           </p>
 
         </td></tr>
 
         <!-- Footer -->
-        <tr><td style="background:#f9fafb;border:1px solid #e5e7eb;border-top:none;border-radius:0 0 12px 12px;padding:18px 32px;text-align:center;">
+        <tr><td style="background:#f9fafb;border:1px solid #e5e7eb;border-top:none;border-radius:0 0 12px 12px;padding:16px 36px;text-align:center;">
           <p style="font-size:11px;color:#9ca3af;margin:0;line-height:1.6;">
             <a href="https://seenjobs.io" style="color:#4f46e5;text-decoration:none;font-weight:600;">seenjobs.io</a>
-            &nbsp;·&nbsp; You're receiving this because you used Resume Optimizer on Seen.
+            &nbsp;·&nbsp; Sent because you used Resume Optimizer.
           </p>
         </td></tr>
 
