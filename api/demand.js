@@ -122,8 +122,10 @@ async function handlePost(req, res) {
       });
       if (userRes.ok) {
         const user = await userRes.json();
+        // SECURITY: Require ADMIN_EMAIL to be configured — fail closed, not open.
+        // Without this check, any authenticated user could trigger demand data refresh.
         const ADMIN_EMAIL = process.env.ADMIN_EMAIL;
-        if (!ADMIN_EMAIL || user.email === ADMIN_EMAIL) authed = true;
+        if (ADMIN_EMAIL && user.email === ADMIN_EMAIL) authed = true;
       }
     } catch (_) {}
   }

@@ -182,15 +182,43 @@ export default async function handler(req, res) {
     const sigHeader = req.headers['stripe-signature'];
     const rawBody = typeof req.body === 'string' ? req.body : JSON.stringify(req.body);
 
-    let event;
-    if (WEBHOOK_SECRET && sigHeader) {
-      event = verifyStripeSignature(rawBody, sigHeader, WEBHOOK_SECRET);
-      if (!event) {
-        console.error('Stripe webhook signature verification failed');
-        return res.status(400).json({ error: 'Invalid signature' });
+    // SECURITY: Require signature verification — no unsigned fallback.
+    // If STRIPE_WEBHOOK_SECRET is not configured, return 503 rather than
+    // processing an unverified payload (which would allow anyone to grant Pro).
+    if (!WEBHOOK_SECRET) {
+      console.error('[stripe/webhook] STRIPE_WEBHOOK_SECRET not configured — refusing unsigned webhook');
+      return res.status(503).json({ error: 'Webhook not configured' });
+    }
+    if (!sigHeader) {
+      console.error('[stripe/webhook] Missing stripe-signature header');
+      return res.status(400).json({ error: 'Missing signature' });
+    }
+
+    const event = verifyStripeSignature(rawBody, sigHeader, WEBHOOK_SECRET);
+    if (!event) {
+      console.error('[stripe/webhook] Signature verification failed');
+      return res.status(400).json({ error: 'Invalid signature' });
+    }
+
+    // SECURITY: Idempotency — ignore already-processed events.
+    // Stripe can deliver the same event multiple times; processing it twice
+    // would double-grant Pro status or double-revoke subscriptions.
+    if (event.id && SUPABASE_URL && SERVICE_KEY) {
+      const q = db(SUPABASE_URL, SERVICE_KEY);
+      // Try to insert the event ID; if it already exists the insert will fail (UNIQUE constraint)
+      const idempotencyRes = await q('stripe_events_processed', {
+        method: 'POST',
+        headers: { Prefer: 'return=minimal', 'Content-Type': 'application/json' },
+        body: JSON.stringify({ event_id: event.id, event_type: event.type }),
+      });
+      if (idempotencyRes.status === 409 || idempotencyRes.status === 400) {
+        // 409 = UNIQUE violation (duplicate), 400 can also come from duplicate on some PostgREST versions
+        const body = await idempotencyRes.text().catch(() => '');
+        if (body.includes('duplicate') || body.includes('unique') || idempotencyRes.status === 409) {
+          console.log(`[stripe/webhook] Skipping duplicate event ${event.id}`);
+          return res.status(200).json({ received: true, duplicate: true });
+        }
       }
-    } else {
-      event = typeof req.body === 'object' ? req.body : JSON.parse(rawBody);
     }
 
     const getUid = (obj) => obj?.metadata?.uid || obj?.client_reference_id;

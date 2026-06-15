@@ -1,4 +1,46 @@
+import { createHmac, timingSafeEqual } from 'crypto';
 import { rateLimit } from '../lib/server/ratelimit.js';
+
+// Verify Supabase JWT locally. Returns payload or null.
+function verifyJWT(token, secret) {
+  try {
+    const [h, p, s] = token.split('.');
+    if (!h || !p || !s) return null;
+    const mac = createHmac('sha256', secret).update(`${h}.${p}`).digest('base64url');
+    const sig = Buffer.from(s, 'base64url');
+    const exp = Buffer.from(mac, 'base64url');
+    if (sig.length !== exp.length || !timingSafeEqual(sig, exp)) return null;
+    const payload = JSON.parse(Buffer.from(p, 'base64url').toString());
+    if (!payload.sub || payload.exp < Date.now() / 1000) return null;
+    return payload;
+  } catch { return null; }
+}
+
+async function resolveUid(req) {
+  const token = (req.headers.authorization || '').replace(/^Bearer\s+/i, '').trim();
+  if (!token) return null;
+  const JWT_SECRET = process.env.SUPABASE_JWT_SECRET;
+  if (JWT_SECRET) {
+    const p = verifyJWT(token, JWT_SECRET);
+    if (p) return p.sub;
+  }
+  const SUPABASE_URL = process.env.SUPABASE_URL;
+  const SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY;
+  if (SUPABASE_URL && SERVICE_KEY) {
+    try {
+      const r = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
+        headers: { apikey: SERVICE_KEY, Authorization: `Bearer ${token}` },
+      });
+      if (r.ok) return (await r.json())?.id || null;
+    } catch { /* ignore */ }
+  }
+  return null;
+}
+
+// Strict email format validation — prevents header injection via applyEmail.
+function isValidEmail(s) {
+  return typeof s === 'string' && /^[^\s@<>,"]+@[^\s@<>,"]+\.[^\s@<>,"]{2,}$/.test(s.trim()) && s.length < 254;
+}
 
 function toBase64(str) {
   return Buffer.from(str, 'utf-8').toString('base64');
@@ -162,6 +204,12 @@ export default async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(200).end();
   if (req.method !== 'POST') return res.status(405).end('Method not allowed');
 
+  // SECURITY: Require authentication to prevent anonymous email spam/impersonation.
+  // An unauthenticated caller could send arbitrary resumes to any employer email
+  // address with a forged applicant identity.
+  const uid = await resolveUid(req);
+  if (!uid) return res.status(401).json({ error: 'Sign in to apply' });
+
   const { allowed: rlOk } = await rateLimit(req, 'apply');
   if (!rlOk) return res.status(429).json({ error: 'Too many requests — slow down.' });
 
@@ -280,8 +328,8 @@ export default async function handler(req, res) {
       })
     }));
 
-    // 3. Forward to company email if provided
-    if (applyEmail && applyEmail.includes('@') && applyEmail !== NOTIFY_EMAIL) {
+    // 3. Forward to company email if provided (strict validation to prevent header injection)
+    if (applyEmail && isValidEmail(applyEmail) && applyEmail !== NOTIFY_EMAIL) {
       sends.push(fetch('https://api.resend.com/emails', {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${RESEND_KEY}`, 'Content-Type': 'application/json' },
@@ -315,7 +363,8 @@ ${coverNote ? `<p style="font-size:14px;color:#555;margin:0 0 6px"><strong style
     return res.status(200).json({ ok: true });
 
   } catch (err) {
-    console.error('Apply error:', err.message);
-    return res.status(500).json({ error: err.message });
+    // SECURITY: Do not expose internal error details to the client.
+    console.error('[apply] Unhandled error:', err.message);
+    return res.status(500).json({ error: 'Internal error — please try again' });
   }
 }

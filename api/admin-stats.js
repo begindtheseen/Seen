@@ -30,7 +30,12 @@ export default async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(200).end();
   if (req.method !== 'GET' && req.method !== 'POST') return res.status(405).end();
   try { return await _handler(req, res); }
-  catch(e) { console.error('[admin-stats]', e); return res.status(500).json({ error: e.message }); }
+  catch(e) {
+    // SECURITY: Do not expose internal error details to clients.
+    // Log the full error server-side but return only a generic message.
+    console.error('[admin-stats] Unhandled error:', e?.message || e);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
 }
 
 async function _handler(req, res) {
@@ -524,7 +529,9 @@ async function _handler(req, res) {
     let deleted = 0;
     for (let i = 0; i < toDelete.length; i += 100) {
       const batch = toDelete.slice(i, i + 100);
-      const dr = await db(`jobs?id=in.(${batch.join(',')})`, { method: 'DELETE', headers: { Prefer: 'return=minimal' } });
+      // SECURITY: Encode each ID to prevent injection via crafted job IDs.
+      const encodedIds = batch.map(id => encodeURIComponent(String(id))).join(',');
+      const dr = await db(`jobs?id=in.(${encodedIds})`, { method: 'DELETE', headers: { Prefer: 'return=minimal' } });
       if (dr.ok) deleted += batch.length;
     }
     return res.status(200).json({ ok: true, deleted });

@@ -1,8 +1,46 @@
 // Server-side reports fetch — uses service key to bypass RLS.
 // Queries by company_name column directly — no company table join needed.
 
+import { createHmac, timingSafeEqual } from 'crypto';
 import { applyRateLimit } from '../lib/server/ratelimit.js';
 import { logError } from '../lib/server/errlog.js';
+
+// Verify a Supabase JWT locally (HS256). Returns the payload or null.
+function verifyJWT(token, secret) {
+  try {
+    const [h, p, s] = token.split('.');
+    if (!h || !p || !s) return null;
+    const mac = createHmac('sha256', secret).update(`${h}.${p}`).digest('base64url');
+    const sig = Buffer.from(s, 'base64url');
+    const exp = Buffer.from(mac, 'base64url');
+    if (sig.length !== exp.length || !timingSafeEqual(sig, exp)) return null;
+    const payload = JSON.parse(Buffer.from(p, 'base64url').toString());
+    if (!payload.sub || payload.exp < Date.now() / 1000) return null;
+    return payload;
+  } catch { return null; }
+}
+
+// Extract authenticated user_id from the request, or return null for anonymous.
+async function resolveUid(req) {
+  const token = (req.headers.authorization || '').replace(/^Bearer\s+/i, '').trim();
+  if (!token) return null;
+  const JWT_SECRET = process.env.SUPABASE_JWT_SECRET;
+  if (JWT_SECRET) {
+    const p = verifyJWT(token, JWT_SECRET);
+    if (p) return p.sub;
+  }
+  const SUPABASE_URL = process.env.SUPABASE_URL;
+  const SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY;
+  if (SUPABASE_URL && SERVICE_KEY) {
+    try {
+      const r = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
+        headers: { apikey: SERVICE_KEY, Authorization: `Bearer ${token}` },
+      });
+      if (r.ok) return (await r.json())?.id || null;
+    } catch { /* ignore */ }
+  }
+  return null;
+}
 
 // Blocks placeholder/garbage values from ever entering the companies table.
 // Must contain at least one letter, no hash-prefixed IDs, no pure numerics,
@@ -117,8 +155,14 @@ export default async function handler(req, res) {
     if (limited) return;
   }
 
-  // ── Quick-submit: anonymous one-click outcome from feed cards / modals ───────
+  // ── Quick-submit: one-click outcome — requires auth to prevent data pollution ─
   if (body.action === 'quick_submit') {
+    // SECURITY: Require authentication. Anonymous submissions allow unlimited
+    // data pollution of company scores. Signed-in users are accountable and
+    // can be rate-limited per user, not just per IP.
+    const uid = await resolveUid(req);
+    if (!uid) return res.status(401).json({ error: 'Sign in to submit outcomes' });
+
     try {
       const { company, outcome, role, city } = body;
       if (!company || !outcome) return res.status(400).json({ error: 'company and outcome required' });
@@ -131,13 +175,17 @@ export default async function handler(req, res) {
       const r = await fetch(`${SUPABASE_URL}/rest/v1/reports`, {
         method: 'POST',
         headers: { ...hdrsBase, Prefer: 'return=minimal' },
-        body: JSON.stringify({ company_name: safeCompany, outcome, role: safeRole, city: safeCity, platform: 'Seen', experience_level: 'Unknown', outcome_weight: 1.0, trust_reason: 'direct_submission' }),
+        body: JSON.stringify({ company_name: safeCompany, outcome, role: safeRole, city: safeCity, platform: 'Seen', experience_level: 'Unknown', outcome_weight: 1.0, trust_reason: 'direct_submission', user_id: uid }),
       });
-      if (!r.ok) { const e = await r.text().catch(() => ''); console.error('quick_submit failed:', r.status, e.slice(0, 150)); return res.status(400).json({ error: 'Submit failed' }); }
+      if (!r.ok) {
+        const e = await r.text().catch(() => '');
+        console.error('[reports/quick_submit] DB error:', r.status, e.slice(0, 200));
+        return res.status(400).json({ error: 'Submit failed' });
+      }
       return res.status(200).json({ ok: true, submitted: true });
     } catch(err) {
       logError('reports/quick_submit', err.message);
-      return res.status(500).json({ error: err.message });
+      return res.status(500).json({ error: 'Internal error' });
     }
   }
 
