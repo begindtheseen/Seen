@@ -5,7 +5,7 @@
 // Built on the shared cardKit so it matches the outcome + listing cards exactly.
 
 import {
-  CARD_W, CARD_PAD, type Risk, riskColor, riskFromScore, letterGrade, riskHeadline,
+  type FormatKey, type Risk, riskColor, riskFromScore, letterGrade, riskHeadline,
   createCard, paintBackground, eyebrow, footer, fitText, drawTileGrid, drawTags, type Tile,
 } from '@/lib/cards/cardKit'
 import CardShareModal from './CardShareModal'
@@ -25,23 +25,25 @@ export interface CompanyScoreCardData {
 
 const pct = (v: number) => `${Math.round((v || 0) * 100)}%`
 
-export async function drawCompanyScoreCard(d: CompanyScoreCardData): Promise<HTMLCanvasElement> {
-  const { canvas, c } = createCard()
+export async function drawCompanyScoreCard(d: CompanyScoreCardData, format: FormatKey = 'square'): Promise<HTMLCanvasElement> {
+  const { canvas, ctx } = createCard(format)
+  const { c, W, PAD } = ctx
+  const maxW = W - PAD * 2
   const risk = d.risk ?? riskFromScore(d.overall_score)
   const accent = riskColor(risk)
 
-  paintBackground(c, accent)
-  eyebrow(c, 'HIRING TRANSPARENCY')
+  paintBackground(ctx, accent)
+  eyebrow(ctx, 'HIRING TRANSPARENCY')
 
   // Company name + industry
-  const nameY = CARD_PAD + 50
-  const nameFs = fitText(c, d.company || 'Company', CARD_W - CARD_PAD * 2, 62, 34, 800, 'Syne')
+  const nameY = PAD + 50
+  const nameFs = fitText(c, d.company || 'Company', maxW, 62, 34, 800, 'Syne')
   c.fillStyle = '#fff'; c.textAlign = 'left'; c.textBaseline = 'top'
-  c.fillText(d.company || 'Company', CARD_PAD, nameY)
+  c.fillText(d.company || 'Company', PAD, nameY)
   let cursor = nameY + nameFs + 8
   if (d.industry) {
     c.font = '400 19px "DM Mono",monospace'; c.fillStyle = 'rgba(255,255,255,0.40)'
-    c.fillText(d.industry, CARD_PAD, cursor)
+    c.fillText(d.industry, PAD, cursor)
     cursor += 26
   }
 
@@ -49,7 +51,7 @@ export async function drawCompanyScoreCard(d: CompanyScoreCardData): Promise<HTM
   cursor += 36
   c.font = '600 20px "DM Mono",monospace'; c.fillStyle = accent
   c.textAlign = 'center'; c.textBaseline = 'top'
-  c.fillText(riskHeadline(risk), CARD_W / 2, cursor)
+  c.fillText(riskHeadline(risk), W / 2, cursor)
 
   // Big letter grade (with glow)
   cursor += 40
@@ -57,14 +59,14 @@ export async function drawCompanyScoreCard(d: CompanyScoreCardData): Promise<HTM
   c.shadowBlur = 50; c.shadowColor = accent
   c.font = '800 186px "Syne",sans-serif'; c.fillStyle = accent
   c.textAlign = 'center'; c.textBaseline = 'top'
-  c.fillText(letterGrade(d.overall_score), CARD_W / 2, cursor)
+  c.fillText(letterGrade(d.overall_score), W / 2, cursor)
   c.restore()
   cursor += 196
 
   // score / 100
   c.font = '500 28px "DM Mono",monospace'; c.fillStyle = 'rgba(255,255,255,0.55)'
   c.textAlign = 'center'; c.textBaseline = 'top'
-  c.fillText(`${Math.round(d.overall_score)}  /  100`, CARD_W / 2, cursor)
+  c.fillText(`${Math.round(d.overall_score)}  /  100`, W / 2, cursor)
   cursor += 64
 
   // Metric tiles
@@ -74,12 +76,12 @@ export async function drawCompanyScoreCard(d: CompanyScoreCardData): Promise<HTM
     { value: `${Math.round(d.avg_wait_days || 0)}d`, label: 'Avg wait', color: '#fff' },
     { value: `${Math.round(d.waste || 0)}%`, label: 'Waste risk', color: (d.waste || 0) >= 50 ? '#ef4444' : '#fff' },
   ]
-  const afterTiles = drawTileGrid(c, tiles, cursor, 132)
+  const afterTiles = drawTileGrid(ctx, tiles, cursor, 132)
 
   // Vibe tags
-  if (d.tags?.length) drawTags(c, d.tags, afterTiles + 42)
+  if (d.tags?.length) drawTags(ctx, d.tags, afterTiles + 42)
 
-  footer(c, `Based on ${(d.report_count || 0).toLocaleString()} applicant reports  ·  seenjobs.io`)
+  footer(ctx, `Based on ${(d.report_count || 0).toLocaleString()} applicant reports  ·  seenjobs.io`)
   return canvas
 }
 
@@ -99,7 +101,7 @@ export default function CompanyScoreCard({ data, onClose }: { data: CompanyScore
       accent={riskColor(risk)}
       shareText={shareText}
       fileNameBase={`seen_grade_${(data.company || 'company').replace(/[^a-z0-9]/gi, '_')}`}
-      draw={() => drawCompanyScoreCard(data)}
+      draw={(fmt) => drawCompanyScoreCard(data, fmt)}
       onClose={onClose}
     />
   )

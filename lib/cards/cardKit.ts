@@ -1,14 +1,31 @@
 'use client'
 
-// Shared 1080×1080 social share-card graphics kit.
+// Shared social share-card graphics kit.
 //
 // Every Seen share card — outcome, company-score, listing — is drawn with these
-// primitives so they're visually identical. Native canvas, no libraries (same
-// technique as the original site's outcome cards in components/OutcomeCard.tsx).
+// primitives so they're visually identical. Native canvas, no libraries.
+//
+// Cards render at a per-platform FORMAT. Width is fixed at 1080 (so the absolute
+// type sizes look identical everywhere); only the height changes per platform:
+//   - square   1080×1080  → Facebook / Reddit feed (1:1)
+//   - portrait 1080×1350  → Instagram / Threads feed (4:5)
+// The layout is top-anchored with the footer pinned to the bottom, so it reflows
+// cleanly between the two heights.
 
-export const CARD_W = 1080
-export const CARD_H = 1080
-export const CARD_PAD = 72
+export type FormatKey = 'square' | 'portrait'
+
+export interface CardFormat { w: number; h: number; pad: number }
+export const FORMATS: Record<FormatKey, CardFormat> = {
+  square: { w: 1080, h: 1080, pad: 72 },
+  portrait: { w: 1080, h: 1350, pad: 72 },
+}
+
+// Back-compat constants (default square).
+export const CARD_W = FORMATS.square.w
+export const CARD_H = FORMATS.square.h
+export const CARD_PAD = FORMATS.square.pad
+
+export interface CardCtx { c: CanvasRenderingContext2D; W: number; H: number; PAD: number }
 
 export type Risk = 'safe' | 'warn' | 'danger'
 
@@ -35,12 +52,13 @@ export function riskHeadline(risk: Risk): string {
     : 'HIGH RISK — APPLY WITH CAUTION'
 }
 
-export function createCard(): { canvas: HTMLCanvasElement; c: CanvasRenderingContext2D } {
+export function createCard(format: FormatKey = 'square'): { canvas: HTMLCanvasElement; ctx: CardCtx } {
+  const fmt = FORMATS[format]
   const canvas = document.createElement('canvas')
-  canvas.width = CARD_W
-  canvas.height = CARD_H
+  canvas.width = fmt.w
+  canvas.height = fmt.h
   const c = canvas.getContext('2d')!
-  return { canvas, c }
+  return { canvas, ctx: { c, W: fmt.w, H: fmt.h, PAD: fmt.pad } }
 }
 
 export function rrPath(c: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number) {
@@ -52,38 +70,38 @@ export function rrPath(c: CanvasRenderingContext2D, x: number, y: number, w: num
 }
 
 // Dark base + accent glow + purple corner + hairline rounded border.
-export function paintBackground(c: CanvasRenderingContext2D, accent: string) {
-  c.fillStyle = '#02040a'; c.fillRect(0, 0, CARD_W, CARD_H)
-  const g1 = c.createRadialGradient(CARD_W * 0.5, CARD_H * 0.38, 0, CARD_W * 0.5, CARD_H * 0.38, 560)
+export function paintBackground({ c, W, H }: CardCtx, accent: string) {
+  c.fillStyle = '#02040a'; c.fillRect(0, 0, W, H)
+  const g1 = c.createRadialGradient(W * 0.5, H * 0.38, 0, W * 0.5, H * 0.38, Math.max(W, H) * 0.52)
   g1.addColorStop(0, accent + '1F'); g1.addColorStop(1, 'rgba(0,0,0,0)')
-  c.fillStyle = g1; c.fillRect(0, 0, CARD_W, CARD_H)
-  const g2 = c.createRadialGradient(CARD_W, 0, 0, CARD_W, 0, 440)
+  c.fillStyle = g1; c.fillRect(0, 0, W, H)
+  const g2 = c.createRadialGradient(W, 0, 0, W, 0, 440)
   g2.addColorStop(0, 'rgba(124,58,237,0.13)'); g2.addColorStop(1, 'rgba(0,0,0,0)')
-  c.fillStyle = g2; c.fillRect(0, 0, CARD_W, CARD_H)
-  rrPath(c, 1, 1, CARD_W - 2, CARD_H - 2, 24)
+  c.fillStyle = g2; c.fillRect(0, 0, W, H)
+  rrPath(c, 1, 1, W - 2, H - 2, 24)
   c.strokeStyle = 'rgba(255,255,255,0.06)'; c.lineWidth = 1.5; c.stroke()
 }
 
 // Top "SEEN · {label}" eyebrow with right-aligned seenjobs.io.
-export function eyebrow(c: CanvasRenderingContext2D, label: string) {
+export function eyebrow({ c, W, PAD }: CardCtx, label: string) {
   c.font = '600 13px "DM Mono",monospace'; c.fillStyle = 'rgba(255,255,255,0.20)'
   c.textAlign = 'left'; c.textBaseline = 'top'
-  c.fillText(`SEEN  ·  ${label}`, CARD_PAD, CARD_PAD)
-  c.textAlign = 'right'; c.fillText('seenjobs.io', CARD_W - CARD_PAD, CARD_PAD)
+  c.fillText(`SEEN  ·  ${label}`, PAD, PAD)
+  c.textAlign = 'right'; c.fillText('seenjobs.io', W - PAD, PAD)
 }
 
-export function footer(c: CanvasRenderingContext2D, text: string) {
-  const y = CARD_H - 90
+export function footer({ c, W, H, PAD }: CardCtx, text: string) {
+  const y = H - 90
   c.strokeStyle = 'rgba(255,255,255,0.08)'; c.lineWidth = 1
-  c.beginPath(); c.moveTo(CARD_PAD, y); c.lineTo(CARD_W - CARD_PAD, y); c.stroke()
+  c.beginPath(); c.moveTo(PAD, y); c.lineTo(W - PAD, y); c.stroke()
   c.font = '400 16px "DM Mono",monospace'; c.fillStyle = 'rgba(255,255,255,0.30)'
   c.textAlign = 'center'; c.textBaseline = 'middle'
-  c.fillText(text, CARD_W / 2, y + 28)
+  c.fillText(text, W / 2, y + 28)
 }
 
-export function divider(c: CanvasRenderingContext2D, y: number) {
+export function divider({ c, W, PAD }: CardCtx, y: number) {
   c.strokeStyle = 'rgba(255,255,255,0.09)'; c.lineWidth = 1
-  c.beginPath(); c.moveTo(CARD_PAD, y); c.lineTo(CARD_W - CARD_PAD, y); c.stroke()
+  c.beginPath(); c.moveTo(PAD, y); c.lineTo(W - PAD, y); c.stroke()
 }
 
 // Shrink the font until `text` fits `maxW`. Sets c.font and returns the size used.
@@ -108,18 +126,38 @@ export function ellipsize(c: CanvasRenderingContext2D, text: string, maxW: numbe
   return t + '…'
 }
 
-// A 2-column grid of metric tiles (value + label), matching the screenshot's
-// ghost/response/wait/waste tiles. Returns the y just below the grid.
+// Word-wrap `text` to at most `maxLines` lines that each fit `maxW` (current font).
+// Once on the last allowed line, remaining words are kept on it and the line is
+// ellipsized, so the text never overflows. Returns the lines.
+export function wrapLines(c: CanvasRenderingContext2D, text: string, maxW: number, maxLines: number): string[] {
+  const words = String(text || '').split(/\s+/).filter(Boolean)
+  const lines: string[] = []
+  let line = ''
+  for (let i = 0; i < words.length; i++) {
+    const test = line ? line + ' ' + words[i] : words[i]
+    if (c.measureText(test).width <= maxW || !line) {
+      line = test
+    } else if (lines.length < maxLines - 1) {
+      lines.push(line); line = words[i]
+    } else {
+      line = line + ' ' + words[i] // final line — let ellipsize trim the overflow
+    }
+  }
+  if (line) lines.push(line)
+  return lines.slice(0, maxLines).map(l => ellipsize(c, l, maxW))
+}
+
+// A 2-column grid of metric tiles (value + label).
 export interface Tile { value: string; label: string; color?: string }
 export function drawTileGrid(
-  c: CanvasRenderingContext2D, tiles: Tile[], top: number, rowH: number,
+  { c, W, PAD }: CardCtx, tiles: Tile[], top: number, rowH: number,
 ): number {
   const gap = 20
-  const colW = (CARD_W - CARD_PAD * 2 - gap) / 2
+  const colW = (W - PAD * 2 - gap) / 2
   tiles.forEach((t, i) => {
     const col = i % 2
     const row = Math.floor(i / 2)
-    const x = CARD_PAD + col * (colW + gap)
+    const x = PAD + col * (colW + gap)
     const y = top + row * (rowH + gap)
     rrPath(c, x, y, colW, rowH, 18)
     c.fillStyle = 'rgba(255,255,255,0.03)'; c.fill()
@@ -136,16 +174,16 @@ export function drawTileGrid(
   return top + rows * rowH + (rows - 1) * gap
 }
 
-// A row of pill tags (e.g. "👻 Ghosts after assessments").
-export function drawTags(c: CanvasRenderingContext2D, tags: string[], y: number) {
+// A row of pill tags.
+export function drawTags({ c, W, PAD }: CardCtx, tags: string[], y: number) {
   if (!tags.length) return
   c.font = '500 17px "DM Mono",monospace'
   c.textBaseline = 'middle'; c.textAlign = 'left'
   const padX = 16, gap = 12, h = 38
-  let x = CARD_PAD
+  let x = PAD
   for (const tag of tags) {
     const w = c.measureText(tag).width + padX * 2
-    if (x + w > CARD_W - CARD_PAD) break
+    if (x + w > W - PAD) break
     rrPath(c, x, y - h / 2, w, h, h / 2)
     c.fillStyle = 'rgba(255,255,255,0.04)'; c.fill()
     c.strokeStyle = 'rgba(255,255,255,0.10)'; c.lineWidth = 1; c.stroke()
