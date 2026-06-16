@@ -3,10 +3,12 @@
 import { useState, useEffect, useRef, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { ResumeStore } from '@/lib/stores/ResumeStore'
+import { SavedJobsStore } from '@/lib/stores/SavedJobs'
 import { useAuth } from '@/lib/auth'
 import { aiHeaders } from '@/lib/aiHeaders'
+import type { SavedJob } from '@/lib/types'
 
-type Tool = 'scanner' | 'coach' | 'proposal'
+type Tool = 'scanner' | 'advantage'
 
 interface ScannerResult {
   match_score: number
@@ -31,6 +33,9 @@ interface ProposalResult {
   day_60?: string
   day_90?: string
 }
+
+// The merged "Advantage" tool returns the playbook + the 30/60/90 plan together.
+type CombinedResult = CoachResult & ProposalResult
 
 const areaStyle: React.CSSProperties = {
   width: '100%',
@@ -155,9 +160,6 @@ function CoachResultView({ d }: { d: CoachResult }) {
           <div style={{ fontSize: '.8rem', color: 'var(--sub)', lineHeight: 1.75, whiteSpace: 'pre-wrap' }}>{s.content}</div>
         </div>
       ))}
-      <div style={{ background: 'var(--gdim)', border: '1px solid var(--gmid)', borderRadius: 8, padding: '.85rem', fontFamily: 'var(--mono)', fontSize: '.62rem', color: 'var(--green)', lineHeight: 1.65 }}>
-        → Use the Pre-Proposal tool to generate a 30/60/90 day plan to attach with your application.
-      </div>
     </div>
   )
 }
@@ -330,19 +332,17 @@ function ResumePageInner() {
   const [scanJD, setScanJD] = useState('')
   const [scanResult, setScanResult] = useState<ScannerResult | null>(null)
 
-  // Coach fields
-  const [coachJob, setCoachJob] = useState('')
-  const [coachCompany, setCoachCompany] = useState('')
-  const [coachJD, setCoachJD] = useState('')
-  const [coachBackground, setCoachBackground] = useState('')
-  const [coachResult, setCoachResult] = useState<CoachResult | null>(null)
+  // Advantage tool (merged Advantage Coach + Pre-Proposal) fields
+  const [advJob, setAdvJob] = useState('')
+  const [advCompany, setAdvCompany] = useState('')
+  const [advJD, setAdvJD] = useState('')
+  const [advBackground, setAdvBackground] = useState('')
+  const [advResult, setAdvResult] = useState<CombinedResult | null>(null)
 
-  // Proposal fields
-  const [propJob, setPropJob] = useState('')
-  const [propCompany, setPropCompany] = useState('')
-  const [propJD, setPropJD] = useState('')
-  const [propBackground, setPropBackground] = useState('')
-  const [propResult, setPropResult] = useState<ProposalResult | null>(null)
+  // Job source: choose from saved jobs (default) or reveal manual entry
+  const [savedJobs, setSavedJobs] = useState<SavedJob[]>([])
+  const [savedId, setSavedId] = useState('')
+  const [showManual, setShowManual] = useState(false)
 
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -355,6 +355,25 @@ function ResumePageInner() {
       }
     })
   }, [user?.id, isLoggedIn])
+
+  // Saved jobs power the "choose a saved job" picker so users don't have to paste.
+  useEffect(() => {
+    SavedJobsStore.load(isLoggedIn).then(setSavedJobs).catch(() => {})
+  }, [isLoggedIn])
+
+  // Pick a saved job → fill job title / company / description from its snapshot.
+  function pickSavedJob(jobId: string) {
+    setSavedId(jobId)
+    if (!jobId) return
+    const s = savedJobs.find(j => String(j.job_id) === jobId)
+    if (!s) return
+    const snap = s.snapshot
+    setAdvJob(s.role || snap?.title || '')
+    setAdvCompany(s.company || snap?.company || '')
+    setAdvJD(snap?.description || '')
+    setShowManual(false)
+    setError('')
+  }
 
   async function uploadFile(file: File) {
     const reader = new FileReader()
@@ -423,27 +442,16 @@ function ResumePageInner() {
     setLoading(false)
   }
 
-  async function runCoach() {
+  async function runAdvantage() {
     const text = resumeText
-    if (!text.trim()) { setError('Paste your resume first.'); return }
-    if (!coachJob.trim()) { setError('Enter the job title.'); return }
-    setLoading(true); setError(''); setCoachResult(null)
+    if (!text.trim()) { setError('Add your resume first.'); return }
+    if (!advJob.trim() || !advCompany.trim()) { setError('Pick a saved job, or enter the job title + company manually.'); return }
+    if (!advJD.trim()) { setError('A job description is required — pick a saved job or paste one manually.'); setShowManual(true); return }
+    setLoading(true); setError(''); setAdvResult(null)
     try {
-      const out = await callApi<CoachResult>({ tool: 'coach', resume: text, job: coachJob, company: coachCompany, jobDescription: coachJD, background: coachBackground })
-      setCoachResult(out)
-    } catch (e) { setError(e instanceof CreditsError ? e.message : 'Coach failed. Please try again.') }
-    setLoading(false)
-  }
-
-  async function runProposal() {
-    const text = resumeText
-    if (!text.trim()) { setError('Paste your resume first.'); return }
-    if (!propJob.trim()) { setError('Enter the job title.'); return }
-    setLoading(true); setError(''); setPropResult(null)
-    try {
-      const out = await callApi<ProposalResult>({ tool: 'proposal', resume: text, job: propJob, company: propCompany, jobDescription: propJD, background: propBackground })
-      setPropResult(out)
-    } catch (e) { setError(e instanceof CreditsError ? e.message : 'Proposal failed. Please try again.') }
+      const out = await callApi<CombinedResult>({ tool: 'advantage', resume: text, job: advJob, company: advCompany, jobDescription: advJD, background: advBackground })
+      setAdvResult(out)
+    } catch (e) { setError(e instanceof CreditsError ? e.message : 'Generation failed. Please try again.') }
     setLoading(false)
   }
 
@@ -489,15 +497,14 @@ function ResumePageInner() {
             Maximize every application
           </h1>
           <p style={{ color: 'var(--sub)', fontSize: '.85rem', fontWeight: 300 }}>
-            ATS scanner, advantage coach, and 30/60/90-day proposal generator — all from your resume.
+            ATS scanner and a full application-advantage playbook with a 30/60/90-day plan — all from your resume.
           </p>
         </div>
 
         {/* Tool tabs */}
         <div style={{ display: 'flex', gap: '.5rem', marginBottom: '1.5rem', flexWrap: 'wrap' }}>
           {toolBtn('scanner', '🎯 Resume Scanner')}
-          {toolBtn('coach', '🧠 Advantage Coach')}
-          {toolBtn('proposal', '📋 Pre-Proposal')}
+          {toolBtn('advantage', '🧠 Advantage + Plan')}
         </div>
 
         {error && (
@@ -543,61 +550,75 @@ function ResumePageInner() {
           </div>
         )}
 
-        {/* Coach */}
-        {tool === 'coach' && (
+        {/* Advantage + Plan (merged Advantage Coach + Pre-Proposal) */}
+        {tool === 'advantage' && (
           <div className="resume-layout">
             <div>
               {sharedResume}
               <div style={{ marginTop: '1rem' }}>
-                {label('Job title')}
-                <input type="text" placeholder="e.g. Engineering Manager" value={coachJob} onChange={e => setCoachJob(e.target.value)} style={inputStyle} />
-                {label('Company')}
-                <input type="text" placeholder="e.g. Notion" value={coachCompany} onChange={e => setCoachCompany(e.target.value)} style={inputStyle} />
-                {label('Job description')}
-                <textarea placeholder="Paste the job description..." value={coachJD} onChange={e => setCoachJD(e.target.value)} rows={4} style={{ ...areaStyle, marginBottom: '.75rem' }} />
-                {label('Your background (why you want this role)')}
-                <textarea placeholder="What draws you to this role? Any unique experience?" value={coachBackground} onChange={e => setCoachBackground(e.target.value)} rows={3} style={{ ...areaStyle, marginBottom: '.75rem' }} />
-                <button style={{ ...btnPrimary, opacity: loading ? 0.6 : 1, cursor: loading ? 'not-allowed' : 'pointer' }} onClick={runCoach} disabled={loading}>
-                  {loading && tool === 'coach' ? 'Building playbook...' : 'Get advantage playbook →'}
-                  <span style={{ marginLeft: '.5rem', fontSize: '.55rem', opacity: .65, fontFamily: 'var(--mono)', fontWeight: 400 }}>· 1 credit</span>
-                </button>
-              </div>
-            </div>
-            <div>
-              {coachResult ? (
-                <CoachResultView d={coachResult} />
-              ) : (
-                <ResultEmpty icon="🧠" text={'Hiring manager script, timing notes,\ncompany intel, and referral tactics appear here.'} />
-              )}
-            </div>
-          </div>
-        )}
+                {label('Which job?')}
+                {savedJobs.length > 0 ? (
+                  <select
+                    value={savedId}
+                    onChange={e => pickSavedJob(e.target.value)}
+                    style={{ ...inputStyle, fontFamily: 'var(--body)', cursor: 'pointer' }}
+                  >
+                    <option value="">📌 Choose a saved job…</option>
+                    {savedJobs.map(s => (
+                      <option key={String(s.job_id)} value={String(s.job_id)}>
+                        {(s.role || 'Role')}{s.company ? ' — ' + s.company : ''}
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <div style={{ fontFamily: 'var(--mono)', fontSize: '.62rem', color: 'var(--muted)', marginBottom: '.6rem', lineHeight: 1.6 }}>
+                    No saved jobs yet — save jobs from search, or enter the details below.
+                  </div>
+                )}
 
-        {/* Proposal */}
-        {tool === 'proposal' && (
-          <div className="resume-layout">
-            <div>
-              {sharedResume}
-              <div style={{ marginTop: '1rem' }}>
-                {label('Job title')}
-                <input type="text" placeholder="e.g. Head of Growth" value={propJob} onChange={e => setPropJob(e.target.value)} style={inputStyle} />
-                {label('Company')}
-                <input type="text" placeholder="e.g. Linear" value={propCompany} onChange={e => setPropCompany(e.target.value)} style={inputStyle} />
-                {label('Job description')}
-                <textarea placeholder="Paste the job description..." value={propJD} onChange={e => setPropJD(e.target.value)} rows={4} style={{ ...areaStyle, marginBottom: '.75rem' }} />
-                {label('Your relevant experience')}
-                <textarea placeholder="Briefly describe your most relevant experience for this role..." value={propBackground} onChange={e => setPropBackground(e.target.value)} rows={3} style={{ ...areaStyle, marginBottom: '.75rem' }} />
-                <button style={{ ...btnPrimary, opacity: loading ? 0.6 : 1, cursor: loading ? 'not-allowed' : 'pointer' }} onClick={runProposal} disabled={loading}>
-                  {loading && tool === 'proposal' ? 'Generating proposal...' : 'Generate 30/60/90-day plan →'}
+                {savedId && !showManual && (
+                  <div style={{ background: 'var(--gdim)', border: '1px solid var(--gmid)', borderRadius: 8, padding: '.6rem .85rem', fontFamily: 'var(--mono)', fontSize: '.66rem', color: 'var(--green)', marginBottom: '.6rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '.5rem' }}>
+                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>✓ {advJob}{advCompany ? ' · ' + advCompany : ''}</span>
+                    <button onClick={() => setShowManual(true)} style={{ background: 'none', border: 'none', color: 'var(--green)', fontFamily: 'var(--mono)', fontSize: '.6rem', cursor: 'pointer', textDecoration: 'underline', flexShrink: 0 }}>edit</button>
+                  </div>
+                )}
+
+                <button
+                  onClick={() => setShowManual(v => !v)}
+                  style={{ background: 'none', border: '1px solid var(--line2)', color: 'var(--dim)', borderRadius: 6, padding: '.4rem .8rem', fontFamily: 'var(--mono)', fontSize: '.62rem', cursor: 'pointer', marginBottom: (showManual || savedJobs.length === 0) ? '.75rem' : '1rem' }}
+                >
+                  {showManual ? '▲ Hide manual entry' : '✎ Enter job info manually'}
+                </button>
+
+                {(showManual || savedJobs.length === 0) && (
+                  <div>
+                    {label('Job title')}
+                    <input type="text" placeholder="e.g. Engineering Manager" value={advJob} onChange={e => setAdvJob(e.target.value)} style={inputStyle} />
+                    {label('Company')}
+                    <input type="text" placeholder="e.g. Notion" value={advCompany} onChange={e => setAdvCompany(e.target.value)} style={inputStyle} />
+                    {label('Job description')}
+                    <textarea placeholder="Paste the job description..." value={advJD} onChange={e => setAdvJD(e.target.value)} rows={4} style={{ ...areaStyle, marginBottom: '.75rem' }} />
+                  </div>
+                )}
+
+                {label('Your background (why you want this role) — optional')}
+                <textarea placeholder="What draws you to this role? Any unique experience?" value={advBackground} onChange={e => setAdvBackground(e.target.value)} rows={3} style={{ ...areaStyle, marginBottom: '.75rem' }} />
+
+                <button style={{ ...btnPrimary, opacity: loading ? 0.6 : 1, cursor: loading ? 'not-allowed' : 'pointer' }} onClick={runAdvantage} disabled={loading}>
+                  {loading ? 'Building your advantage...' : 'Get advantage + 30/60/90 plan →'}
                   <span style={{ marginLeft: '.5rem', fontSize: '.55rem', opacity: .65, fontFamily: 'var(--mono)', fontWeight: 400 }}>· 1 credit</span>
                 </button>
               </div>
             </div>
             <div>
-              {propResult ? (
-                <ProposalResultView d={propResult} />
+              {advResult ? (
+                <>
+                  <CoachResultView d={advResult} />
+                  <div style={{ height: '.75rem' }} />
+                  <ProposalResultView d={advResult} />
+                </>
               ) : (
-                <ResultEmpty icon="📋" text={'Your 30/60/90-day onboarding plan\nready to attach to your application.'} />
+                <ResultEmpty icon="🧠" text={'Hiring-manager script, timing, company intel,\nreferral tactics + a 30/60/90-day plan appear here.'} />
               )}
             </div>
           </div>
