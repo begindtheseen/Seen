@@ -6,6 +6,7 @@
 // and the same share modal. No shared kit — parity with the proven outcome card.
 
 import { useEffect, useState, useRef } from 'react'
+import { createPortal } from 'react-dom'
 
 export interface CompanyScoreCardData {
   company: string
@@ -141,7 +142,15 @@ async function drawCard(d: CompanyScoreCardData): Promise<HTMLCanvasElement> {
 export default function CompanyScoreCard({ data, onClose }: { data: CompanyScoreCardData; onClose: () => void }) {
   const [dataUrl, setDataUrl] = useState<string | null>(null)
   const [blob, setBlob] = useState<Blob | null>(null)
+  const [mounted, setMounted] = useState(false)
   const doneRef = useRef(false)
+
+  useEffect(() => {
+    setMounted(true)
+    const prev = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => { document.body.style.overflow = prev }
+  }, [])
 
   const score = Math.round(data.overall_score || 0)
   const risk = data.risk ?? (score >= 70 ? 'safe' : score >= 40 ? 'warn' : 'danger')
@@ -206,9 +215,10 @@ export default function CompanyScoreCard({ data, onClose }: { data: CompanyScore
     if (dest !== 'download') setTimeout(onClose, 400)
   }
 
-  return (
-    <div style={{ position: 'fixed', inset: 0, zIndex: 9999, background: 'rgba(2,4,10,0.97)', display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '1.5rem 1.25rem 2.5rem', overflowY: 'auto' }}>
-      <div style={{ width: '100%', maxWidth: 480 }}>
+  const overlay = (
+    <div style={{ position: 'fixed', inset: 0, zIndex: 2147483646, background: 'rgba(2,4,10,0.72)', backdropFilter: 'blur(22px)', WebkitBackdropFilter: 'blur(22px)', display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '1.5rem 1.25rem 2.5rem', overflowY: 'auto' }}>
+      <div aria-hidden style={{ position: 'fixed', inset: 0, pointerEvents: 'none', background: `radial-gradient(ellipse 90% 55% at 50% 28%, ${OC}33 0%, ${OC}12 38%, transparent 66%)` }} />
+      <div style={{ width: '100%', maxWidth: 480, position: 'relative', zIndex: 1 }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem' }}>
           <div style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', color: OC, textTransform: 'uppercase', letterSpacing: '.1em', fontWeight: 600 }}>Grade {grade} — {data.company}</div>
           <button onClick={onClose} style={{ background: 'none', border: 'none', fontFamily: 'var(--mono)', fontSize: '.65rem', color: 'rgba(255,255,255,0.3)', cursor: 'pointer', padding: '.2rem .4rem' }}>✕ close</button>
@@ -239,4 +249,6 @@ export default function CompanyScoreCard({ data, onClose }: { data: CompanyScore
       </div>
     </div>
   )
+
+  return mounted ? createPortal(overlay, document.body) : null
 }

@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState, useRef } from 'react'
+import { createPortal } from 'react-dom'
 import type { Application } from '@/lib/types'
 
 interface CompanyScore {
@@ -178,7 +179,15 @@ async function drawCard(app: Application, sc: CompanyScore | null): Promise<HTML
 export default function OutcomeCard({ app, onClose }: Props) {
   const [dataUrl, setDataUrl] = useState<string | null>(null)
   const [blob, setBlob] = useState<Blob | null>(null)
+  const [mounted, setMounted] = useState(false)
   const doneRef = useRef(false)
+
+  useEffect(() => {
+    setMounted(true)
+    const prev = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => { document.body.style.overflow = prev }
+  }, [])
 
   const status  = (app.status || 'ghosted') as 'hired' | 'rejected' | 'ghosted'
   const OC      = status === 'hired' ? '#10b981' : status === 'ghosted' ? '#9ca3af' : '#ef4444'
@@ -260,16 +269,18 @@ export default function OutcomeCard({ app, onClose }: Props) {
     if (dest !== 'download') setTimeout(onClose, 400)
   }
 
-  return (
+  const overlay = (
     <div
       style={{
-        position: 'fixed', inset: 0, zIndex: 9999,
-        background: 'rgba(2,4,10,0.97)',
+        position: 'fixed', inset: 0, zIndex: 2147483646,
+        background: 'rgba(2,4,10,0.72)',
+        backdropFilter: 'blur(22px)', WebkitBackdropFilter: 'blur(22px)',
         display: 'flex', flexDirection: 'column', alignItems: 'center',
         padding: '1.5rem 1.25rem 2.5rem', overflowY: 'auto',
       }}
     >
-      <div style={{ width: '100%', maxWidth: 480 }}>
+      <div aria-hidden style={{ position: 'fixed', inset: 0, pointerEvents: 'none', background: `radial-gradient(ellipse 90% 55% at 50% 28%, ${OC}33 0%, ${OC}12 38%, transparent 66%)` }} />
+      <div style={{ width: '100%', maxWidth: 480, position: 'relative', zIndex: 1 }}>
 
         {/* Header */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem' }}>
@@ -348,4 +359,6 @@ export default function OutcomeCard({ app, onClose }: Props) {
       </div>
     </div>
   )
+
+  return mounted ? createPortal(overlay, document.body) : null
 }
