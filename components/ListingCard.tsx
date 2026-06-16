@@ -1,12 +1,11 @@
 'use client'
 
-// Job-listing share card — new card type, same 1080×1080 graphics as the
-// outcome + company-score cards (shared cardKit). Lets a user share a specific
-// role with its Seen hiring grade + intel.
+// Job-listing share card — same graphics kit as the outcome + company-score cards.
+// Renders at a per-platform format (square for FB/Reddit, portrait for IG/Threads).
 
 import {
-  CARD_W, CARD_H, CARD_PAD, type Risk, riskColor, riskFromScore, letterGrade, riskHeadline,
-  createCard, paintBackground, eyebrow, footer, divider, fitText, ellipsize, drawTags,
+  type FormatKey, type Risk, riskColor, riskFromScore, letterGrade, riskHeadline,
+  createCard, paintBackground, eyebrow, footer, divider, fitText, ellipsize, wrapLines, drawTags,
 } from '@/lib/cards/cardKit'
 import CardShareModal from './CardShareModal'
 
@@ -22,54 +21,59 @@ export interface ListingCardData {
   insiderTip?: string
 }
 
-export async function drawListingCard(d: ListingCardData): Promise<HTMLCanvasElement> {
-  const { canvas, c } = createCard()
+export async function drawListingCard(d: ListingCardData, format: FormatKey = 'square'): Promise<HTMLCanvasElement> {
+  const { canvas, ctx } = createCard(format)
+  const { c, H, W, PAD } = ctx
+  const maxW = W - PAD * 2
   const risk = riskFromScore(d.score)
   const accent = riskColor(risk)
 
-  paintBackground(c, accent)
-  eyebrow(c, 'JOB LISTING')
+  paintBackground(ctx, accent)
+  eyebrow(ctx, 'JOB LISTING')
 
-  // Title
-  const titleY = CARD_PAD + 50
-  const titleFs = fitText(c, d.title || 'Role', CARD_W - CARD_PAD * 2, 60, 32, 800, 'Syne')
+  // Title — fit to a size, then wrap to at most 2 lines so it never overflows.
+  let y = PAD + 50
+  const titleFs = fitText(c, d.title || 'Role', maxW, 60, 40, 800, 'Syne')
+  c.font = `800 ${titleFs}px "Syne",sans-serif`
   c.fillStyle = '#fff'; c.textAlign = 'left'; c.textBaseline = 'top'
-  c.fillText(d.title || 'Role', CARD_PAD, titleY)
+  const lineH = Math.round(titleFs * 1.12)
+  for (const ln of wrapLines(c, d.title || 'Role', maxW, 2)) { c.fillText(ln, PAD, y); y += lineH }
+  y += 14
 
   // Company · location
-  let y = titleY + titleFs + 12
   c.font = '400 21px "DM Mono",monospace'; c.fillStyle = 'rgba(255,255,255,0.42)'
-  c.fillText(ellipsize(c, `${d.company}${d.location ? '  ·  ' + d.location : ''}`, CARD_W - CARD_PAD * 2), CARD_PAD, y)
+  c.textBaseline = 'top'
+  c.fillText(ellipsize(c, `${d.company}${d.location ? '  ·  ' + d.location : ''}`, maxW), PAD, y)
+  y += 54
 
   // Level / type pills
-  y += 56
-  drawTags(c, [d.level, d.type].filter(Boolean) as string[], y)
-
-  // Divider
+  drawTags(ctx, [d.level, d.type].filter(Boolean) as string[], y)
   y += 40
-  divider(c, y)
 
-  // Grade block — big letter on the left, label/score/headline stacked right
-  y += 40
+  divider(ctx, y)
+  y += 42
+
+  // Grade block — big letter on the left, label/score/headline stacked to its right.
+  const gradeStr = letterGrade(d.score)
   c.save()
   c.shadowBlur = 40; c.shadowColor = accent
   c.font = '800 132px "Syne",sans-serif'; c.fillStyle = accent
   c.textAlign = 'left'; c.textBaseline = 'top'
-  c.fillText(letterGrade(d.score), CARD_PAD, y)
+  c.fillText(gradeStr, PAD, y)
+  const gradeW = c.measureText(gradeStr).width // measured at the 132px font it was drawn with
   c.restore()
-  const gradeW = c.measureText(letterGrade(d.score)).width
-  const rx = CARD_PAD + gradeW + 44
-  c.font = '600 18px "DM Mono",monospace'; c.fillStyle = 'rgba(255,255,255,0.40)'
-  c.textBaseline = 'top'
-  c.fillText('SEEN HIRING GRADE', rx, y + 14)
-  c.font = '800 54px "Syne",sans-serif'; c.fillStyle = '#fff'
-  c.fillText(`${Math.round(d.score)} / 100`, rx, y + 40)
-  c.font = '500 16px "DM Mono",monospace'; c.fillStyle = accent
-  c.fillText(riskHeadline(risk), rx, y + 104)
-  y += 160
 
-  // Divider
-  divider(c, y)
+  const rx = PAD + gradeW + 48
+  c.textAlign = 'left'; c.textBaseline = 'top'
+  c.font = '600 18px "DM Mono",monospace'; c.fillStyle = 'rgba(255,255,255,0.40)'
+  c.fillText('SEEN HIRING GRADE', rx, y + 18)
+  c.font = '800 54px "Syne",sans-serif'; c.fillStyle = '#fff'
+  c.fillText(`${Math.round(d.score)} / 100`, rx, y + 44)
+  c.font = '500 16px "DM Mono",monospace'; c.fillStyle = accent
+  c.fillText(riskHeadline(risk), rx, y + 108)
+  y += 170
+
+  divider(ctx, y)
   y += 36
 
   // Intel bullets
@@ -82,14 +86,14 @@ export async function drawListingCard(d: ListingCardData): Promise<HTMLCanvasEle
   for (const b of bullets) {
     let fs = 24
     c.font = `500 ${fs}px "DM Mono",monospace`
-    while (c.measureText(b).width > CARD_W - CARD_PAD * 2 && fs > 15) { fs--; c.font = `500 ${fs}px "DM Mono",monospace` }
+    while (c.measureText(b).width > maxW && fs > 15) { fs--; c.font = `500 ${fs}px "DM Mono",monospace` }
     c.fillStyle = 'rgba(255,255,255,0.85)'; c.textBaseline = 'top'
-    if (y > CARD_H - 150) break
-    c.fillText(b, CARD_PAD, y)
+    if (y > H - 150) break
+    c.fillText(ellipsize(c, b, maxW), PAD, y)
     y += Math.max(44, fs + 18)
   }
 
-  footer(c, 'Job intel from Seen  ·  seenjobs.io')
+  footer(ctx, 'Job intel from Seen  ·  seenjobs.io')
   return canvas
 }
 
@@ -104,7 +108,7 @@ export default function ListingCard({ data, onClose }: { data: ListingCardData; 
       accent={riskColor(risk)}
       shareText={shareText}
       fileNameBase={`seen_listing_${(data.company || 'company').replace(/[^a-z0-9]/gi, '_')}`}
-      draw={() => drawListingCard(data)}
+      draw={(fmt) => drawListingCard(data, fmt)}
       onClose={onClose}
     />
   )
