@@ -34,6 +34,14 @@ function pickBestApp(apps: Application[], exclude?: string): Application | null 
   return ghosted[0] || rejected[0] || hired[0] || active[0] || null
 }
 
+// Synthetic "application" used when the modal is driven by the Opportunity Engine
+// (personalized + profile questions, not tied to one company). Keeps targetApp
+// non-null so the existing render needs no null-guards.
+const OPP_APP_ID = '__opportunities__'
+function makeOppApp(): Application {
+  return { id: OPP_APP_ID, company: 'Your job search', role: 'A few quick questions', stage: '', status: 'active', appliedAt: Date.now(), updatedAt: Date.now(), events: [] } as Application
+}
+
 export default function SurveyModal({ apps, onClose, onCreditsEarned }: SurveyModalProps) {
   const [phase, setPhase] = useState<Phase>('loading')
   const [questions, setQuestions] = useState<Question[]>([])
@@ -79,6 +87,7 @@ export default function SurveyModal({ apps, onClose, onCreditsEarned }: SurveyMo
         return
       }
       if (!d.questions.length) {
+        if (await loadOpportunities()) return
         setPhase('no-surveys')
         return
       }
@@ -88,6 +97,33 @@ export default function SurveyModal({ apps, onClose, onCreditsEarned }: SurveyMo
       setPhase('intro')
     } catch {
       setPhase('error')
+    }
+  }
+
+  // Opportunity Engine — personalized, ranked questions (the conversion/data layer).
+  // Returns true if it produced questions. On empty/error it returns false so the
+  // caller can fall back to the proven per-company survey.
+  async function loadOpportunities(): Promise<boolean> {
+    setPhase('loading')
+    setQIndex(0)
+    setSelected(null)
+    setQuestions([])
+    try {
+      const r = await fetch('/api/user-sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${tokenRef.current}` },
+        body: JSON.stringify({ action: 'get_opportunities' }),
+      })
+      const d = await r.json()
+      if (!r.ok || d.error || !Array.isArray(d.questions) || !d.questions.length) return false
+      setTargetApp(makeOppApp())
+      setQuestions(d.questions)
+      setBalance(d.balance || 0)
+      setCreditsLeft(d.credits_left ?? 5)
+      setPhase('intro')
+      return true
+    } catch {
+      return false
     }
   }
 
@@ -101,12 +137,14 @@ export default function SurveyModal({ apps, onClose, onCreditsEarned }: SurveyMo
       }
       tokenRef.current = tok
 
+      // Engine first; fall back to the per-company survey if it has nothing.
+      if (await loadOpportunities()) return
+
       const pick = pickBestApp(apps)
       if (!pick) {
         onClose()
         return
       }
-
       try {
         await loadSurvey(pick)
       } catch {
@@ -185,6 +223,7 @@ export default function SurveyModal({ apps, onClose, onCreditsEarned }: SurveyMo
   const daysAgo = targetApp
     ? Math.floor((Date.now() - targetApp.appliedAt) / 86400000)
     : 0
+  const isOpp = targetApp?.id === OPP_APP_ID
 
   const progress = questions.length > 0 ? (qIndex / questions.length) * 100 : 0
   const questionsLeft = questions.length - qIndex - 1
@@ -497,16 +536,22 @@ export default function SurveyModal({ apps, onClose, onCreditsEarned }: SurveyMo
               </div>
 
               <div style={metaRowStyle}>
-                <span>Applied {daysAgo === 0 ? 'today' : `${daysAgo}d ago`}</span>
-                <span style={{ color: 'var(--line)' }}>·</span>
-                <span style={{
-                  color: targetApp.status === 'ghosted' ? 'var(--amber)' :
-                    targetApp.status === 'rejected' ? 'var(--red)' :
-                      targetApp.status === 'hired' ? 'var(--green)' : 'var(--sub)',
-                  textTransform: 'capitalize',
-                }}>
-                  {targetApp.status}
-                </span>
+                {isOpp ? (
+                  <span>Personalized for you · Earn AI credits</span>
+                ) : (
+                  <>
+                    <span>Applied {daysAgo === 0 ? 'today' : `${daysAgo}d ago`}</span>
+                    <span style={{ color: 'var(--line)' }}>·</span>
+                    <span style={{
+                      color: targetApp.status === 'ghosted' ? 'var(--amber)' :
+                        targetApp.status === 'rejected' ? 'var(--red)' :
+                          targetApp.status === 'hired' ? 'var(--green)' : 'var(--sub)',
+                      textTransform: 'capitalize',
+                    }}>
+                      {targetApp.status}
+                    </span>
+                  </>
+                )}
               </div>
 
               <hr style={hrStyle} />
@@ -554,7 +599,9 @@ export default function SurveyModal({ apps, onClose, onCreditsEarned }: SurveyMo
                 fontFamily: 'var(--body)',
                 lineHeight: 1.5,
               }}>
-                Your experience at <strong style={{ color: 'var(--white)' }}>{targetApp.company}</strong> helps future applicants make better decisions. Real signal from real people.
+                {isOpp
+                  ? <>Answer a few quick questions to sharpen your job search — and earn an AI credit for each one.</>
+                  : <>Your experience at <strong style={{ color: 'var(--white)' }}>{targetApp.company}</strong> helps future applicants make better decisions. Real signal from real people.</>}
               </div>
 
               <button
@@ -714,7 +761,9 @@ export default function SurveyModal({ apps, onClose, onCreditsEarned }: SurveyMo
                 marginBottom: 22,
                 padding: '0 8px',
               }}>
-                Your intel is live — <strong style={{ color: 'var(--white)' }}>{targetApp?.company}</strong> applicants will see this data.
+                {isOpp
+                  ? <>Saved — your answers personalize your job search and unlock more from Seen.</>
+                  : <>Your intel is live — <strong style={{ color: 'var(--white)' }}>{targetApp?.company}</strong> applicants will see this data.</>}
               </div>
 
               {nextApp && (
