@@ -5,6 +5,7 @@ import { createHmac, timingSafeEqual } from 'crypto';
 import { applyRateLimit } from '../lib/server/ratelimit.js';
 import { logError } from '../lib/server/errlog.js';
 import { calcOverallScore, calcWaste, tenureAdjustment, scoreConfidence, confidenceLabel, aggregateTenure, MIN_TENURE_SAMPLE } from './_utils/companyScore.js';
+import { fuseCompanyIntel, classifyPlatform } from './_utils/companyIntel.js';
 
 // Verify a Supabase JWT locally (HS256). Returns the payload or null.
 function verifyJWT(token, secret) {
@@ -1042,6 +1043,28 @@ function _rowToScore(row) {
   };
 }
 
+// Fuse a web-research estimate with the company's REAL reported outcomes (direct user
+// reports + Reddit + ingest), so the stored score reflects all the intel we hold rather
+// than a single web guess. Returns the web estimate unchanged when we have no reports
+// (no regression). See api/_utils/companyIntel.js + SCORING.md §2.
+async function _fuseWithReports(name, web, SUPABASE_URL, dbH) {
+  if (!SUPABASE_URL || !dbH) return null;
+  try {
+    const enc = encodeURIComponent(String(name).toLowerCase().trim());
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/reports?company_name=ilike.${enc}&select=outcome,platform&limit=500`, { headers: dbH });
+    if (!r.ok) return null;
+    const reps = await r.json();
+    if (!Array.isArray(reps) || !reps.length) return null;
+    const byType = {};
+    for (const row of reps) {
+      const type = classifyPlatform(row.platform);
+      (byType[type] ||= []).push({ outcome: row.outcome });
+    }
+    const sources = Object.entries(byType).map(([type, outcomes]) => ({ type, outcomes }));
+    return fuseCompanyIntel({ web, sources });
+  } catch (_e) { return null; }
+}
+
 async function handleCompanyScore(req, res, body) {
   const SUPABASE_URL = process.env.SUPABASE_URL;
   const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY;
@@ -1120,9 +1143,11 @@ async function handleCompanyScore(req, res, body) {
         if (!m) throw new Error('no JSON');
         const p = JSON.parse(m[0]);
         const gr = Math.max(0,Math.min(1,Number(p.ghost_rate)||0)), rr = Math.max(0,Math.min(1,Number(p.response_rate)||0)), wait = Math.max(1,Math.min(180,Number(p.avg_wait_days)||30)), rounds = Math.max(1,Math.min(10,Number(p.avg_rounds)||3)), unpaid = Math.max(0,Math.min(1,Number(p.unpaid_rate)||0)), cnt = Math.max(1,Number(p.report_count)||5);
-        const overall = _calcScore(rr,gr,wait,cnt), waste = _calcWaste(gr,rounds,unpaid);
+        const fz = await _fuseWithReports(co, { ghost_rate:gr, response_rate:rr, avg_wait_days:wait, avg_rounds:rounds, unpaid_rate:unpaid, report_count:cnt }, SUPABASE_URL, dbH);
+        const eGr = fz?fz.ghost_rate:gr, eRr = fz?fz.response_rate:rr, eWait = Math.round(fz?fz.avg_wait_days:wait), eRounds = fz?fz.avg_rounds:Math.round(rounds*10)/10, eUnpaid = fz?fz.unpaid_rate:unpaid, eCnt = fz?fz.report_count:cnt;
+        const overall = fz?fz.overall_score:_calcScore(rr,gr,wait,cnt), waste = fz?fz.waste_score:_calcWaste(gr,rounds,unpaid);
         const revs = Array.isArray(p.reviews) ? p.reviews.slice(0,6).map(r=>({text:(r.text||'').slice(0,400),sentiment:['positive','negative','mixed'].includes(r.sentiment)?r.sentiment:'mixed',source:(r.source||'').slice(0,80),year:(r.year||'').slice(0,4)})) : [];
-        const row = { company_name:co, overall_score:overall, ghost_rate:gr, response_rate:rr, avg_wait_days:Math.round(wait), avg_rounds:Math.round(rounds*10)/10, waste_score:waste, unpaid_rate:unpaid, report_count:cnt, data_quality:p.data_quality||'medium', data_source:'web_search', industry:(p.industry||'').slice(0,80), raw_summary:(p.summary||'').slice(0,500), expires_at:new Date(Date.now()+_SCORE_TTL_MS).toISOString(), web_reviews:revs };
+        const row = { company_name:co, overall_score:overall, ghost_rate:eGr, response_rate:eRr, avg_wait_days:eWait, avg_rounds:eRounds, waste_score:waste, unpaid_rate:eUnpaid, report_count:eCnt, data_quality:p.data_quality||'medium', data_source:'web_search', industry:(p.industry||'').slice(0,80), raw_summary:(p.summary||'').slice(0,500), expires_at:new Date(Date.now()+_SCORE_TTL_MS).toISOString(), web_reviews:revs };
         const sv = await fetch(`${SUPABASE_URL}/rest/v1/company_scores`, { method:'POST', headers:{...dbH,Prefer:'resolution=merge-duplicates,return=minimal'}, body:JSON.stringify(row) });
         results.push({ company:co, score:overall, reviews:revs.length, saved:sv.ok });
       } catch(e) {
@@ -1180,13 +1205,16 @@ async function handleCompanyScore(req, res, body) {
   }
 
   const gr = Math.max(0, Math.min(1, Number(parsed.ghost_rate)||0)), rr = Math.max(0, Math.min(1, Number(parsed.response_rate)||0)), wait = Math.max(1, Math.min(180, Number(parsed.avg_wait_days)||30)), rounds = Math.max(1, Math.min(10, Number(parsed.avg_rounds)||3)), unpaid = Math.max(0, Math.min(1, Number(parsed.unpaid_rate)||0)), cnt = Math.max(1, Number(parsed.report_count)||5);
-  const overall = _calcScore(rr, gr, wait, cnt), waste = _calcWaste(gr, rounds, unpaid);
+  // Fuse the web estimate with our real reported outcomes (no-op when we have none).
+  const fused = await _fuseWithReports(name, { ghost_rate:gr, response_rate:rr, avg_wait_days:wait, avg_rounds:rounds, unpaid_rate:unpaid, report_count:cnt }, SUPABASE_URL, dbH);
+  const eGr = fused ? fused.ghost_rate : gr, eRr = fused ? fused.response_rate : rr, eWait = Math.round(fused ? fused.avg_wait_days : wait), eRounds = fused ? fused.avg_rounds : Math.round(rounds*10)/10, eUnpaid = fused ? fused.unpaid_rate : unpaid, eCnt = fused ? fused.report_count : cnt;
+  const overall = fused ? fused.overall_score : _calcScore(rr, gr, wait, cnt), waste = fused ? fused.waste_score : _calcWaste(gr, rounds, unpaid);
   const reviews = Array.isArray(parsed.reviews) ? parsed.reviews.slice(0, 6).map(r => ({ text:(r.text||'').slice(0,400), sentiment:['positive','negative','mixed'].includes(r.sentiment)?r.sentiment:'mixed', source:(r.source||'').slice(0,80), year:(r.year||'').slice(0,4) })) : [];
-  const score = { overall_score:overall, ghost_rate:gr, response_rate:rr, avg_wait_days:Math.round(wait), avg_rounds:Math.round(rounds*10)/10, waste, unpaid_rate:unpaid, report_count:cnt, data_quality:parsed.data_quality||'medium', data_source:'web_research', risk_level:overall>=70?'safe':overall>=40?'warn':'danger', industry:(parsed.industry||'').slice(0,80), summary:(parsed.summary||'').slice(0,500), process_score:overall, web_reviews:reviews };
+  const score = { overall_score:overall, ghost_rate:eGr, response_rate:eRr, avg_wait_days:eWait, avg_rounds:eRounds, waste, unpaid_rate:eUnpaid, report_count:eCnt, data_quality:parsed.data_quality||'medium', data_source:fused?'fused':'web_research', risk_level:overall>=70?'safe':overall>=40?'warn':'danger', industry:(parsed.industry||'').slice(0,80), summary:(parsed.summary||'').slice(0,500), process_score:overall, web_reviews:reviews, fused_sources:fused?fused.sources_used:[] };
 
   if (SUPABASE_URL && SUPABASE_SERVICE_KEY) {
     const expires = new Date(Date.now() + _SCORE_TTL_MS).toISOString();
-    const rowBase = { company_name:name.toLowerCase().trim(), overall_score:overall, ghost_rate:gr, response_rate:rr, avg_wait_days:Math.round(wait), avg_rounds:Math.round(rounds*10)/10, waste_score:waste, unpaid_rate:unpaid, report_count:cnt, data_quality:score.data_quality, data_source:'web_search', industry:score.industry, raw_summary:score.summary, expires_at:expires };
+    const rowBase = { company_name:name.toLowerCase().trim(), overall_score:overall, ghost_rate:eGr, response_rate:eRr, avg_wait_days:eWait, avg_rounds:eRounds, waste_score:waste, unpaid_rate:eUnpaid, report_count:eCnt, data_quality:score.data_quality, data_source:'web_search', industry:score.industry, raw_summary:score.summary, expires_at:expires };
     try {
       const prefer = force_refresh ? 'resolution=merge-duplicates,return=minimal' : 'resolution=ignore-duplicates,return=minimal';
       let saveRes = await fetch(`${SUPABASE_URL}/rest/v1/company_scores`, { method:'POST', headers:{...dbH,Prefer:prefer}, body:JSON.stringify({...rowBase,web_reviews:reviews}) });
