@@ -9,6 +9,7 @@ import { useRouter } from 'next/navigation'
 import { Score } from '@/lib/score'
 import { JobCache } from '@/lib/stores/JobCache'
 import { SavedJobsStore } from '@/lib/stores/SavedJobs'
+import ListingCard from '@/components/ListingCard'
 import { aiHeaders } from '@/lib/aiHeaders'
 import { useAuth } from '@/lib/auth'
 import type { Job } from '@/lib/types'
@@ -54,6 +55,7 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
   const [insights, setInsights] = useState<Insights | null>(null)
   const [insightsState, setInsightsState] = useState<'loading' | 'done' | 'unavailable' | 'no_desc' | 'credits'>('loading')
   const [showApplyModal, setShowApplyModal] = useState(false)
+  const [showShareCard, setShowShareCard] = useState(false)
   const [reportedInactive, setReportedInactive] = useState(false)
   const [reportingInactive, setReportingInactive] = useState(false)
 
@@ -380,6 +382,7 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
           </a>
           <div style={{ display: 'flex', gap: '.75rem' }}>
             <button onClick={toggleSave} aria-label={saved ? 'Unsave' : 'Save'} style={{ background: 'none', border: '1px solid var(--line2)', borderRadius: 8, padding: '.65rem 1rem', fontSize: '1.1rem', cursor: 'pointer', color: saved ? 'var(--green)' : 'var(--muted)', flexShrink: 0 }}>{saved ? '♥' : '♡'}</button>
+            <button onClick={() => setShowShareCard(true)} aria-label="Share listing" title="Share this listing" style={{ background: 'none', border: '1px solid var(--line2)', borderRadius: 8, padding: '.65rem 1rem', fontSize: '1.05rem', cursor: 'pointer', color: 'var(--muted)', flexShrink: 0 }}>🖼</button>
             {job.apply_url
               ? <button
                   onClick={() => setShowApplyModal(true)}
@@ -391,6 +394,16 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
             }
           </div>
         </div>
+        {showShareCard && job && (
+          <ListingCard
+            data={{
+              title: job.title, company: job.company, location: job.location,
+              level: job.level, type: job.type, score: job.score, waste: job.waste,
+              whatTheyWant: insights?.what_they_want, insiderTip: insights?.insider_tip,
+            }}
+            onClose={() => setShowShareCard(false)}
+          />
+        )}
         {showApplyModal && job && (
           <div style={{ position: 'fixed', inset: 0, zIndex: 1000, background: 'rgba(0,0,0,.7)', display: 'flex', alignItems: 'flex-end', justifyContent: 'center', padding: '0 0 0 0' }} onClick={() => setShowApplyModal(false)}>
             <div style={{ position: 'relative', background: 'var(--surface)', borderRadius: '14px 14px 0 0', padding: '1.5rem', width: '100%', maxWidth: 520, animation: 'fadeUp .25s ease both' }} onClick={e => e.stopPropagation()}>
