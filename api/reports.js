@@ -81,8 +81,26 @@ export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
   if (req.method === 'OPTIONS') return res.status(200).end();
 
-  // ── GET: benchmark stats (industry or company) ───────────────────────────────
+  // ── Env + body setup (shared by GET crons and POST) ──────────────────────────
+  const SUPABASE_URL = process.env.SUPABASE_URL;
+  const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY;
+
+  let body = req.body;
+  if (typeof body === 'string') try { body = JSON.parse(body); } catch(e) { body = {}; }
+  body = body || {};
+
+  // Vercel crons fire as GET requests with the action in the query string. Map them to
+  // the POST-style action handlers below. This MUST run before the benchmark GET block,
+  // which 400s on any GET without a recognized `type` — that ordering previously left
+  // every Reddit-import cron silently returning 400 (the routing was dead code).
   if (req.method === 'GET') {
+    if (req.query.reddit_cron) body = { action: 'reddit_import', subreddit: req.query.reddit_cron };
+    else if (req.query.action === 'update_tenure') body = { action: 'update_tenure' };
+  }
+  const isCronGet = req.method === 'GET' && !!body.action;
+
+  // ── GET: benchmark stats (industry or company) ───────────────────────────────
+  if (req.method === 'GET' && !isCronGet) {
     const limited = await applyRateLimit(req, res, 'benchmarks');
     if (limited) return;
     const { type, name, names } = req.query || {};
@@ -102,17 +120,11 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: 'type required: industry|company|batch' });
   }
 
-  if (req.method !== 'POST') return res.status(405).end('Method not allowed');
+  if (req.method !== 'POST' && !isCronGet) return res.status(405).end('Method not allowed');
 
-  const SUPABASE_URL = process.env.SUPABASE_URL;
-  const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY;
   if (!SUPABASE_URL || !SUPABASE_SERVICE_KEY) {
     return res.status(500).json({ error: 'DB not configured' });
   }
-
-  let body = req.body;
-  if (typeof body === 'string') try { body = JSON.parse(body); } catch(e) { body = {}; }
-  body = body || {};
 
   // Service-key headers for all DB reads/writes below. Declared once here, before
   // the first POST handler — previously it was declared further down, so the
@@ -390,11 +402,8 @@ export default async function handler(req, res) {
   }
 
   // ── Reddit import (cron or admin panel) ──────────────────────────────────────
-  // Crons are GET requests and pass subreddit as query param: /api/reports?reddit_cron=recruitinghell
-  if (req.method === 'GET' && req.query.reddit_cron) {
-    body = { action: 'reddit_import', subreddit: req.query.reddit_cron };
-  }
-
+  // Crons are GET requests passing the subreddit as ?reddit_cron=… — routed to this
+  // action at the top of the handler (before the benchmark GET block).
   if (body.action === 'reddit_import') {
     const CRON_SECRET = process.env.CRON_SECRET;
     const isCron = req.headers['x-vercel-cron'] === '1';
