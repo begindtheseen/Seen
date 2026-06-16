@@ -167,7 +167,7 @@ export default async function handler(req, res) {
   // ── SAVE JOB ────────────────────────────────────────────────────────────────
   if (action === 'save_job') {
     const j = body.job || {};
-    const row = {
+    const base = {
       user_id:  uid,
       job_id:   String(j.id || ''),
       company:  j.co    || '',
@@ -175,11 +175,14 @@ export default async function handler(req, res) {
       location: j.city  || '',
       score:    j.score || null,
     };
-    const r = await db('saved_jobs', {
-      method: 'POST',
-      body: JSON.stringify(row),
-      headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
-    });
+    // Persist the apply URL + full listing snapshot so a saved listing reopens to
+    // the exact role even from another device / after DB cache expiry.
+    const full = { ...base, apply_url: j.apply_url || null, snapshot: j.snapshot || null };
+    const opts = { method: 'POST', headers: { Prefer: 'resolution=merge-duplicates,return=minimal' } };
+    let r = await db('saved_jobs', { ...opts, body: JSON.stringify(full) });
+    // Self-heal: if the apply_url/snapshot columns don't exist yet (migration 018
+    // not applied), the insert 400s — retry with the base row so saving never breaks.
+    if (!r.ok) r = await db('saved_jobs', { ...opts, body: JSON.stringify(base) });
     return res.status(200).json({ ok: r.ok });
   }
 

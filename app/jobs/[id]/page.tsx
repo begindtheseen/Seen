@@ -74,12 +74,22 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
     }
   }
 
-  // Resolve the job — session cache first (fast path), then DB fallback for direct links / refreshes
+  // Resolve the job — session cache first (fast path), then the saved snapshot
+  // (so a SAVED listing always reopens to the exact thing saved, even in a new
+  // session or after it has aged out of the DB), then DB fallback for direct links.
   useEffect(() => {
     const j = JobCache.get(id)
     if (j) {
       setJob(j)
       setSaved(SavedJobsStore.isSaved(j.id))
+      setResolved(true)
+      return
+    }
+    const snap = SavedJobsStore.getSnapshot(id)
+    if (snap) {
+      JobCache.set(snap)
+      setJob(snap)
+      setSaved(true)
       setResolved(true)
       return
     }
@@ -164,7 +174,7 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
       SavedJobsStore.remove(job.id, isLoggedIn)
       setSaved(false)
     } else {
-      SavedJobsStore.save({ id: job.id, co: job.company, title: job.title, city: job.location, score: job.score }, isLoggedIn)
+      SavedJobsStore.save(job, isLoggedIn)
       setSaved(true)
     }
   }

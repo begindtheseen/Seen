@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { Score } from '@/lib/score'
 import { SavedJobsStore } from '@/lib/stores/SavedJobs'
 import { JobCache } from '@/lib/stores/JobCache'
+import { stableJobId } from '@/lib/jobId'
 import { AppStore } from '@/lib/stores/AppStore'
 import { RecentSearchesStore } from '@/lib/stores/RecentSearches'
 import { useAuth } from '@/lib/auth'
@@ -131,7 +132,7 @@ function JobDetailDrawer({ job, isLoggedIn, onClose, onApply, onCheckCompany }: 
 
   function toggleSave() {
     if (saved) { SavedJobsStore.remove(job.id, isLoggedIn); setSaved(false) }
-    else { SavedJobsStore.save({ id: job.id, co: job.company, title: job.title, city: job.location, score: job.score }, isLoggedIn); setSaved(true) }
+    else { SavedJobsStore.save(job, isLoggedIn); setSaved(true) }
   }
 
   const risk = Score.risk(job.score)
@@ -499,7 +500,7 @@ function JobCard({ job, index, onSaveToggle, onOpen, onApply, onCheckCompany, al
       SavedJobsStore.remove(job.id, false)
       setSaved(false)
     } else {
-      SavedJobsStore.save({ id: job.id, co: job.company, title: job.title, city: job.location, score: job.score }, false)
+      SavedJobsStore.save(job, false)
       setSaved(true)
     }
     onSaveToggle(job.id)
@@ -1197,11 +1198,17 @@ export default function JobsPage() {
       const data = await res.json() as { jobs?: unknown[]; results?: unknown[] }
       const raw: Job[] = (data.jobs || data.results || []).map((item: unknown) => {
         const j = item as Record<string, unknown>
+        const company = String(j.company || j.co || '')
+        const title = String(j.title || '')
+        const location = String(j.location || j.loc || j.city || loc || 'US')
+        const apply_url = j.apply_url ? String(j.apply_url) : (j.url ? String(j.url) : null)
         return {
-          id: String(j.id || 'srch_' + Math.random().toString(36).slice(2, 8)),
-          title: String(j.title || ''),
-          company: String(j.company || j.co || ''),
-          location: String(j.location || j.loc || j.city || loc || 'US'),
+          // Stable, content-derived id when the API has none — so the same listing
+          // keeps the same id across loads and saved listings reliably reopen.
+          id: String(j.id || stableJobId({ company, title, location, apply_url })),
+          title,
+          company,
+          location,
           score: Number(j.score) || 65,
           waste: Number(j.waste_score ?? j.waste) || 25,
           level: String(j.level || j.lvl || 'Mid level'),
@@ -1209,7 +1216,7 @@ export default function JobsPage() {
           source: String(j.source || 'Job board'),
           description: String(j.description || ''),
           salary: j.salary ? String(j.salary) : null,
-          apply_url: j.apply_url ? String(j.apply_url) : (j.url ? String(j.url) : null),
+          apply_url,
         }
       })
       searchCache.set(cacheKey, { jobs: raw, ts: Date.now() })
