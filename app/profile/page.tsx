@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/lib/auth'
 import { _sync } from '@/lib/sync'
+import { aiHeaders } from '@/lib/aiHeaders'
 
 const inp: React.CSSProperties = {
   width: '100%',
@@ -60,6 +61,8 @@ export default function ProfilePage() {
   const [saving, setSaving] = useState(false)
   const [saveMsg, setSaveMsg] = useState('')
   const [saveMsgOk, setSaveMsgOk] = useState(false)
+  const [isPro, setIsPro] = useState(false)
+  const [portalLoading, setPortalLoading] = useState(false)
 
   const isDirty = name !== initName || city !== initCity || experience !== initExperience
 
@@ -94,7 +97,22 @@ export default function ProfilePage() {
         setExperience(e); setInitExperience(e)
       }
     }).catch(() => {})
+    // Subscription status — gates the Billing section + Manage/Cancel button.
+    _sync('load').then((res) => {
+      setIsPro(!!(res as { credits?: { pro?: boolean } } | null)?.credits?.pro)
+    }).catch(() => {})
   }, [isLoggedIn, router])
+
+  // Open the Stripe customer portal (manage payment method, invoices, cancel).
+  async function handleManageSubscription() {
+    setPortalLoading(true)
+    try {
+      const r = await fetch('/api/stripe?action=portal', { method: 'POST', headers: await aiHeaders(), body: JSON.stringify({}) })
+      const d = await r.json().catch(() => ({}))
+      if (d?.url) { window.location.href = d.url; return }
+    } catch { /* ignore */ }
+    setPortalLoading(false)
+  }
 
   // Close suggestions on outside click
   useEffect(() => {
@@ -410,6 +428,47 @@ export default function ProfilePage() {
         {saveMsg && (
           <div style={{ fontFamily: 'var(--mono)', fontSize: '.65rem', color: saveMsgOk ? 'var(--green)' : 'var(--red)', textAlign: 'center', marginBottom: '1.5rem' }}>{saveMsg}</div>
         )}
+
+        {/* Billing & Subscription */}
+        <div style={card}>
+          <div style={sectionHead}>Billing &amp; Subscription</div>
+          <div style={{ padding: '1.25rem' }}>
+            {isPro ? (
+              <>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '.5rem', marginBottom: '.6rem' }}>
+                  <span style={{ fontFamily: 'var(--display)', fontWeight: 800, fontSize: '.95rem', color: 'var(--green)' }}>Seen Pro</span>
+                  <span style={{ fontFamily: 'var(--mono)', fontSize: '.52rem', color: 'var(--green)', border: '1px solid rgba(16,185,129,.35)', borderRadius: 20, padding: '.12rem .5rem', letterSpacing: '.06em' }}>ACTIVE</span>
+                </div>
+                <div style={{ fontFamily: 'var(--body)', fontSize: '.78rem', color: 'var(--sub)', lineHeight: 1.65, marginBottom: '1rem' }}>
+                  Your subscription renews automatically each billing period until you cancel. Update your payment method, view invoices, or cancel anytime — you keep Pro until the end of the current period.
+                </div>
+                <button
+                  onClick={handleManageSubscription}
+                  disabled={portalLoading}
+                  style={{ width: '100%', padding: '.8rem', background: 'var(--raised, var(--surface))', color: 'var(--white)', border: '1.5px solid var(--line2)', borderRadius: 10, fontFamily: 'var(--display)', fontWeight: 700, fontSize: '.85rem', cursor: portalLoading ? 'default' : 'pointer', opacity: portalLoading ? 0.7 : 1 }}
+                >
+                  {portalLoading ? 'Opening secure portal…' : 'Manage / Cancel subscription →'}
+                </button>
+              </>
+            ) : (
+              <>
+                <div style={{ fontFamily: 'var(--body)', fontSize: '.82rem', color: 'var(--white)', marginBottom: '.4rem' }}>You&apos;re on the <strong>Free</strong> plan.</div>
+                <div style={{ fontFamily: 'var(--body)', fontSize: '.76rem', color: 'var(--sub)', lineHeight: 1.65, marginBottom: '1rem' }}>
+                  Seen Pro is $9.99/month (or $6.99/month billed annually). It renews automatically until you cancel, and you can cancel anytime from this page.
+                </div>
+                <button
+                  onClick={() => router.push('/pricing')}
+                  style={{ width: '100%', padding: '.8rem', background: 'linear-gradient(135deg,#4f46e5 0%,#7c3aed 100%)', color: '#fff', border: 'none', borderRadius: 10, fontFamily: 'var(--display)', fontWeight: 800, fontSize: '.85rem', cursor: 'pointer' }}
+                >
+                  View Pro plans →
+                </button>
+              </>
+            )}
+            <div style={{ fontFamily: 'var(--mono)', fontSize: '.55rem', color: 'var(--dim)', marginTop: '.9rem', lineHeight: 1.6 }}>
+              See <a href="/legal" style={{ color: 'var(--sub)' }}>Subscription Terms</a> for renewal, cancellation, and refund details.
+            </div>
+          </div>
+        </div>
 
         {/* Danger zone */}
         <div style={{ background: 'var(--surface)', border: '1px solid #ff3b5c28', borderRadius: 14, overflow: 'hidden' }}>
