@@ -13,11 +13,24 @@
 
 const clamp100 = (n) => Math.max(0, Math.min(100, Math.round(n)));
 
-// Base hiring score — PARITY with the original _calcScore.
+// Volume bonus cap. Sample size is a *reliability* signal, not a quality one, so it
+// should give a bounded nudge — never swamp the outcome terms. Uncapped, ln(cnt+1)*5
+// reached ~+40 for high-volume companies (e.g. 3000+ reports), which buried the −30
+// ghost-rate penalty: Robert Half scored 98/100 despite a 42% ghost rate. Capped at
+// +10, the bonus saturates around ~7 reports and ghost rate dominates the score.
+export const VOLUME_BONUS_MAX = 10;
+
+// Diminishing-returns bonus for having more reports, bounded by VOLUME_BONUS_MAX.
+export function volumeBonus(cnt) {
+  return Math.min(VOLUME_BONUS_MAX, Math.log((cnt || 0) + 1) * 5);
+}
+
+// Base hiring score. Same shape as the original _calcScore (response/ghost/wait terms
+// unchanged) but with the report-count term capped so it can't dominate outcome quality.
 // rr = response rate (0–1), gr = ghost rate (0–1), wait = avg wait days, cnt = report count.
 export function calcOverallScore(rr, gr, wait, cnt) {
   return clamp100(
-    50 + (rr * 40) + (gr * -30) + (Math.min(wait / 60, 1) * -15) + (Math.log(cnt + 1) * 5)
+    50 + (rr * 40) + (gr * -30) + (Math.min(wait / 60, 1) * -15) + volumeBonus(cnt)
   );
 }
 

@@ -3,16 +3,30 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   calcOverallScore, calcWaste, tenureAdjustment, scoreConfidence, fuseScore, MIN_TENURE_SAMPLE,
-  parseMonthIndex, aggregateTenure,
+  parseMonthIndex, aggregateTenure, volumeBonus, VOLUME_BONUS_MAX,
 } from './companyScore.js';
 
-test('base formula matches the historical _calcScore', () => {
-  // Re-implements the original formula to lock parity.
+test('base formula = response/ghost/wait terms + capped volume bonus', () => {
+  // Reference re-implements the formula with the report-count term capped at
+  // VOLUME_BONUS_MAX. The response/ghost/wait terms are unchanged from the original.
   const ref = (rr, gr, wait, cnt) => Math.max(0, Math.min(100, Math.round(
-    50 + rr * 40 + gr * -30 + Math.min(wait / 60, 1) * -15 + Math.log(cnt + 1) * 5)));
+    50 + rr * 40 + gr * -30 + Math.min(wait / 60, 1) * -15
+    + Math.min(VOLUME_BONUS_MAX, Math.log(cnt + 1) * 5))));
   for (const [rr, gr, wait, cnt] of [[0.8, 0.06, 8, 47], [0.08, 0.86, 52, 1240], [0.5, 0.5, 30, 0]]) {
     assert.equal(calcOverallScore(rr, gr, wait, cnt), ref(rr, gr, wait, cnt));
   }
+});
+
+test('volume bonus is capped so ghost rate dominates (Robert Half regression)', () => {
+  // 42% ghost rate, 3038 reports: the uncapped ln(cnt+1)*5 term added ~+40 and pushed
+  // this to 98/100. Capped, the high ghost rate keeps it well out of "safe" (≥70).
+  const ghoster = calcOverallScore(0.58, 0.42, 12, 3038);
+  assert.ok(ghoster < 70, `high-ghost high-volume should not be safe, got ${ghoster}`);
+  // A low-ghost, high-response company with the same volume still scores well.
+  assert.ok(calcOverallScore(0.85, 0.15, 12, 3038) >= 70);
+  // The bonus never exceeds the cap, and extra volume past it changes nothing.
+  assert.ok(volumeBonus(10 ** 9) <= VOLUME_BONUS_MAX);
+  assert.equal(calcOverallScore(0.5, 0.3, 20, 50), calcOverallScore(0.5, 0.3, 20, 50000));
 });
 
 test('waste formula matches the historical _calcWaste', () => {

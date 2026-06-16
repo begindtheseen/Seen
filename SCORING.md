@@ -40,7 +40,7 @@ overall_base = clamp0..100( 50
   + response_rate * 40
   − ghost_rate    * 30
   − min(wait/60, 1) * 15
-  + log(report_count + 1) * 5 )
+  + min(VOLUME_BONUS_MAX, log(report_count + 1) * 5) )   // VOLUME_BONUS_MAX = 10
 
 waste = clamp0..100( ghost_rate * 60 + unpaid_rate * 25 + (avg_rounds > 4 ? 15 : 0) )
 
@@ -48,6 +48,15 @@ risk  = overall ≥ 70 → safe ; ≥ 40 → warn ; else danger
 ```
 
 (`_calcScore`/`_calcWaste` in `reports.js` now delegate here, so there is one source of truth.)
+
+**Why the volume term is capped (bug fix).** Report count is a *reliability* signal, not a
+*quality* one. Uncapped, `log(report_count + 1) * 5` reached ~+40 for high-volume companies
+(3000+ reports) and buried the −30 ghost-rate penalty — e.g. Robert Half scored **98/100**
+despite a **42% ghost rate**. Capping the term at **+10** (`VOLUME_BONUS_MAX`, saturating
+around ~7 reports) keeps volume a bounded nudge so outcome quality — especially ghost rate —
+dominates the score. With the cap, that same Robert Half row scores **68 (warn)**. The
+response/ghost/wait terms are unchanged, so low-volume scores barely move; only
+high-volume rows whose quality didn't justify the inflated bonus come down.
 
 ## 4. Tenure signal (NEW — bounded + gated)
 
@@ -96,7 +105,9 @@ Existing display thresholds still apply: computed rates require ≥ 5 reports;
 
 ## 7. What changed / improvements made
 
-- **Single source of truth** for the formulas (`companyScore.js`), unit-tested (12 tests).
+- **Single source of truth** for the formulas (`companyScore.js`), unit-tested (13 tests).
+- **Volume term capped** (`VOLUME_BONUS_MAX = 10`) so report count can't swamp ghost rate
+  (fixes high-volume companies scoring ~98 despite high ghost rates); existing rows backfilled.
 - **Résumé tenure** added as a real, bounded, sample-gated scoring signal.
 - **Confidence + sufficiency** attached to every score (was: none — 1 report looked like 100).
 - All sources continue to fuse through `reports` by trust weight; tenure layers on top.
