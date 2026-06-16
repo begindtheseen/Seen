@@ -1123,12 +1123,17 @@ async function handleCompanyScore(req, res, body) {
 
   if (body.action === 'populate') {
     if (!ANTHROPIC_KEY || !SUPABASE_URL || !SUPABASE_SERVICE_KEY) return res.status(500).json({ error: 'Missing env vars' });
-    const listRes = await fetch(`${SUPABASE_URL}/rest/v1/company_scores?select=company_name,web_reviews&order=created_at.desc&limit=200`, { headers: dbH });
+    const listRes = await fetch(`${SUPABASE_URL}/rest/v1/company_scores?select=company_name,web_reviews,data_source&order=created_at.desc&limit=200`, { headers: dbH });
     if (!listRes.ok) return res.status(502).json({ error: 'DB list failed', detail: await listRes.text() });
     const rows = await listRes.json();
     const seen = new Set();
     const deduped = (rows || []).filter(r => { if (!r.company_name || seen.has(r.company_name)) return false; seen.add(r.company_name); return true; });
-    const targets = deduped.filter(r => { if (!r.web_reviews) return true; try { const v = typeof r.web_reviews === 'string' ? JSON.parse(r.web_reviews) : r.web_reviews; return !Array.isArray(v) || v.length === 0; } catch(_e) { return true; } }).map(r => r.company_name).filter(Boolean);
+    // A company needs a research pass only if it has no reviews AND has never been
+    // web-researched. Once researched (data_source='web_search'), don't re-target it
+    // even when no reviews were found — otherwise populate loops forever on companies
+    // that simply have no online hiring chatter (and burns web-search calls each run).
+    const noReviews = (r) => { if (!r.web_reviews) return true; try { const v = typeof r.web_reviews === 'string' ? JSON.parse(r.web_reviews) : r.web_reviews; return !Array.isArray(v) || v.length === 0; } catch(_e) { return true; } };
+    const targets = deduped.filter(r => noReviews(r) && r.data_source !== 'web_search').map(r => r.company_name).filter(Boolean);
     if (!targets.length) return res.json({ ok: true, message: 'All done — every company has reviews!', remaining: 0 });
     const batch = targets.slice(0, 3);
     const remaining = targets.length - batch.length;
@@ -1148,10 +1153,10 @@ async function handleCompanyScore(req, res, body) {
         const overall = fz?fz.overall_score:_calcScore(rr,gr,wait,cnt), waste = fz?fz.waste_score:_calcWaste(gr,rounds,unpaid);
         const revs = Array.isArray(p.reviews) ? p.reviews.slice(0,6).map(r=>({text:(r.text||'').slice(0,400),sentiment:['positive','negative','mixed'].includes(r.sentiment)?r.sentiment:'mixed',source:(r.source||'').slice(0,80),year:(r.year||'').slice(0,4)})) : [];
         const row = { company_name:co, overall_score:overall, ghost_rate:eGr, response_rate:eRr, avg_wait_days:eWait, avg_rounds:eRounds, waste_score:waste, unpaid_rate:eUnpaid, report_count:eCnt, data_quality:p.data_quality||'medium', data_source:'web_search', industry:(p.industry||'').slice(0,80), raw_summary:(p.summary||'').slice(0,500), expires_at:new Date(Date.now()+_SCORE_TTL_MS).toISOString(), web_reviews:revs };
-        const sv = await fetch(`${SUPABASE_URL}/rest/v1/company_scores`, { method:'POST', headers:{...dbH,Prefer:'resolution=merge-duplicates,return=minimal'}, body:JSON.stringify(row) });
+        const sv = await fetch(`${SUPABASE_URL}/rest/v1/company_scores?on_conflict=company_name`, { method:'POST', headers:{...dbH,Prefer:'resolution=merge-duplicates,return=minimal'}, body:JSON.stringify(row) });
         results.push({ company:co, score:overall, reviews:revs.length, saved:sv.ok });
       } catch(e) {
-        try { await fetch(`${SUPABASE_URL}/rest/v1/company_scores`, { method:'POST', headers:{...dbH,Prefer:'resolution=merge-duplicates,return=minimal'}, body:JSON.stringify({company_name:co, web_reviews:[]}) }); } catch(_e) {}
+        try { await fetch(`${SUPABASE_URL}/rest/v1/company_scores?on_conflict=company_name`, { method:'POST', headers:{...dbH,Prefer:'resolution=merge-duplicates,return=minimal'}, body:JSON.stringify({company_name:co, web_reviews:[]}) }); } catch(_e) {}
         results.push({ company:co, error:e.message });
       }
       if (batch.indexOf(co) < batch.length - 1) await new Promise(r => setTimeout(r, 2000));
@@ -1217,8 +1222,8 @@ async function handleCompanyScore(req, res, body) {
     const rowBase = { company_name:name.toLowerCase().trim(), overall_score:overall, ghost_rate:eGr, response_rate:eRr, avg_wait_days:eWait, avg_rounds:eRounds, waste_score:waste, unpaid_rate:eUnpaid, report_count:eCnt, data_quality:score.data_quality, data_source:'web_search', industry:score.industry, raw_summary:score.summary, expires_at:expires };
     try {
       const prefer = force_refresh ? 'resolution=merge-duplicates,return=minimal' : 'resolution=ignore-duplicates,return=minimal';
-      let saveRes = await fetch(`${SUPABASE_URL}/rest/v1/company_scores`, { method:'POST', headers:{...dbH,Prefer:prefer}, body:JSON.stringify({...rowBase,web_reviews:reviews}) });
-      if (!saveRes.ok && saveRes.status === 400) { const errText = await saveRes.text(); if (errText.includes('web_reviews') || errText.includes('column')) saveRes = await fetch(`${SUPABASE_URL}/rest/v1/company_scores`, { method:'POST', headers:{...dbH,Prefer:prefer}, body:JSON.stringify(rowBase) }); }
+      let saveRes = await fetch(`${SUPABASE_URL}/rest/v1/company_scores?on_conflict=company_name`, { method:'POST', headers:{...dbH,Prefer:prefer}, body:JSON.stringify({...rowBase,web_reviews:reviews}) });
+      if (!saveRes.ok && saveRes.status === 400) { const errText = await saveRes.text(); if (errText.includes('web_reviews') || errText.includes('column')) saveRes = await fetch(`${SUPABASE_URL}/rest/v1/company_scores?on_conflict=company_name`, { method:'POST', headers:{...dbH,Prefer:prefer}, body:JSON.stringify(rowBase) }); }
     } catch(e) { console.error('Save error:', e.message); }
   }
 
