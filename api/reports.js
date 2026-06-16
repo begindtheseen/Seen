@@ -4,6 +4,7 @@
 import { createHmac, timingSafeEqual } from 'crypto';
 import { applyRateLimit } from '../lib/server/ratelimit.js';
 import { logError } from '../lib/server/errlog.js';
+import { calcOverallScore, calcWaste, tenureAdjustment, scoreConfidence, confidenceLabel, aggregateTenure, MIN_TENURE_SAMPLE } from './_utils/companyScore.js';
 
 // Verify a Supabase JWT locally (HS256). Returns the payload or null.
 function verifyJWT(token, secret) {
@@ -157,6 +158,51 @@ export default async function handler(req, res) {
       }));
       return res.status(200).json({ ok: true, companies });
     } catch(e) { return res.status(200).json({ companies: [] }); }
+  }
+
+  // ── Tenure aggregation — fold résumé-derived avg tenure into company_scores ──
+  // Cron/admin only. Averages employee tenure per company from resume_employment and
+  // PATCHes EXISTING company_scores rows (never creates). Additive + idempotent; if
+  // the tenure columns or table are absent the PATCH simply no-ops.
+  if (body.action === 'update_tenure') {
+    const CRON_SECRET = process.env.CRON_SECRET;
+    const isCron = req.headers['x-vercel-cron'] === '1';
+    const hasCronSecret = CRON_SECRET && req.headers['x-cron-secret'] === CRON_SECRET;
+    if (!isCron && !hasCronSecret) {
+      const adminToken = (req.headers['x-admin-token'] || '').trim();
+      if (!adminToken) return res.status(401).json({ error: 'unauthorized' });
+      const sessRes = await fetch(`${SUPABASE_URL}/rest/v1/admin_sessions?token=eq.${encodeURIComponent(adminToken)}&select=expires_at&limit=1`, { headers: hdrsBase });
+      const sess = sessRes.ok ? (await sessRes.json())?.[0] : null;
+      if (!sess || new Date(sess.expires_at) < new Date()) return res.status(401).json({ error: 'unauthorized' });
+    }
+    try {
+      // Light normalizer matching company_scores.company_name storage (lowercased + trimmed).
+      const norm = (n) => (n || '').toString().trim().toLowerCase();
+      const rows = [];
+      for (let offset = 0; offset < 20000; offset += 1000) {
+        const r = await fetch(`${SUPABASE_URL}/rest/v1/resume_employment?select=company,start_date,end_date&limit=1000&offset=${offset}`, { headers: hdrsBase });
+        if (!r.ok) break;
+        const batch = await r.json();
+        if (!Array.isArray(batch) || !batch.length) break;
+        rows.push(...batch);
+        if (batch.length < 1000) break;
+      }
+      const agg = aggregateTenure(rows, norm);
+      let updated = 0;
+      for (const [co, v] of Object.entries(agg)) {
+        if (v.sample < MIN_TENURE_SAMPLE) continue;
+        const patch = await fetch(`${SUPABASE_URL}/rest/v1/company_scores?company_name=eq.${encodeURIComponent(co)}`, {
+          method: 'PATCH',
+          headers: { ...hdrsBase, Prefer: 'return=minimal' },
+          body: JSON.stringify({ avg_tenure_months: v.avg_tenure_months, tenure_sample_count: v.sample }),
+        });
+        if (patch.ok) updated += 1;
+      }
+      return res.status(200).json({ ok: true, companies_aggregated: Object.keys(agg).length, companies_updated: updated });
+    } catch (e) {
+      logError('reports/update_tenure', e.message);
+      return res.status(500).json({ error: 'tenure aggregation failed' });
+    }
   }
 
   // Rate-limit only write actions — reads are cheap and public
@@ -957,28 +1003,29 @@ async function buildResponse(res, reports, hdrs, SUPABASE_URL, city) {
 // ── handleCompanyScore: merged from api/company-score.js ──────────────────────
 const _SCORE_TTL_MS = 365 * 24 * 60 * 60 * 1000;
 
-function _calcScore(rr, gr, wait, cnt) {
-  return Math.max(0, Math.min(100, Math.round(
-    50 + (rr * 40) + (gr * -30) + (Math.min(wait / 60, 1) * -15) + (Math.log(cnt + 1) * 5)
-  )));
-}
-
-function _calcWaste(ghostRate, avgRounds, unpaidRate) {
-  return Math.max(0, Math.min(100, Math.round(
-    ghostRate * 60 + unpaidRate * 25 + (avgRounds > 4 ? 15 : 0)
-  )));
-}
+// Canonical scoring lives in api/_utils/companyScore.js — these delegate to it.
+function _calcScore(rr, gr, wait, cnt) { return calcOverallScore(rr, gr, wait, cnt); }
+function _calcWaste(ghostRate, avgRounds, unpaidRate) { return calcWaste(ghostRate, avgRounds, unpaidRate); }
 
 function _rowToScore(row) {
-  const s = row.overall_score;
+  const base = row.overall_score;
   let reviews = [];
   if (row.web_reviews) {
     try { reviews = typeof row.web_reviews === 'string' ? JSON.parse(row.web_reviews) : row.web_reviews; } catch(_e) {}
   }
+  // Fold in résumé-derived tenure (gated; 0 when absent, so the score is unchanged
+  // for companies without tenure data) and attach a confidence signal.
+  const tAdj = tenureAdjustment(row.avg_tenure_months, row.tenure_sample_count);
+  const s = Math.max(0, Math.min(100, Math.round(base + tAdj)));
+  const ageDays = row.created_at ? Math.max(0, Math.floor((Date.now() - new Date(row.created_at).getTime()) / 86400000)) : 0;
+  const confidence = scoreConfidence({ reportCount: row.report_count || 0, tenureSample: row.tenure_sample_count || 0, dataAgeDays: ageDays });
   return {
-    overall_score: s, ghost_rate: row.ghost_rate, response_rate: row.response_rate,
+    overall_score: s, base_score: base, tenure_adjustment: tAdj,
+    ghost_rate: row.ghost_rate, response_rate: row.response_rate,
     avg_wait_days: row.avg_wait_days, avg_rounds: row.avg_rounds, waste: row.waste_score,
     unpaid_rate: row.unpaid_rate, report_count: row.report_count || 0,
+    avg_tenure_months: row.avg_tenure_months || null, tenure_sample_count: row.tenure_sample_count || 0,
+    confidence, confidence_label: confidenceLabel(confidence), sufficient: confidence >= 0.33,
     data_quality: row.data_quality || 'medium', data_source: 'web_research',
     risk_level: s >= 70 ? 'safe' : s >= 40 ? 'warn' : 'danger',
     industry: row.industry || '', summary: row.raw_summary || '',
