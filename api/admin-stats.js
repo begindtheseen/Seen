@@ -382,6 +382,28 @@ async function _handler(req, res) {
     return res.status(200).json({ ok: true, merged, groups: groupSummaries });
   }
 
+  // ── Job aggregation target — min related listings per search before topping
+  //    up from the live API. Stored in feature_flags.job_search_target.percentage.
+  if (action === 'get_job_target') {
+    const r = await db('feature_flags?flag_name=eq.job_search_target&select=percentage&limit=1');
+    const rows = r.ok ? await r.json() : [];
+    const p = parseInt(rows?.[0]?.percentage, 10);
+    return res.status(200).json({ ok: true, target: Number.isFinite(p) && p > 0 ? p : 20 });
+  }
+
+  if (action === 'set_job_target') {
+    const n = parseInt(body.target, 10);
+    if (!Number.isFinite(n) || n < 5 || n > 60) return res.status(400).json({ error: 'Target must be between 5 and 60' });
+    const up = await db('feature_flags?on_conflict=flag_name', {
+      method: 'POST',
+      body: JSON.stringify({ flag_name: 'job_search_target', status: 'fully_on', percentage: n, description: 'Min related listings per job search before topping up from the live API' }),
+      headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
+    });
+    if (!up.ok) return res.status(500).json({ error: 'Failed to save target' });
+    await db('admin_audit_log', { method: 'POST', body: JSON.stringify({ admin_id: sess.admin_id, username: 'admin', action: 'set_job_target', metadata: { target: n } }), headers: { Prefer: 'return=minimal' } });
+    return res.status(200).json({ ok: true, target: n });
+  }
+
   if (action === 'resolve_issue' || action === 'dismiss_issue') {
     const { id } = body;
     if (!id) return res.status(400).json({ error: 'id required' });
