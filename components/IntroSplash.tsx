@@ -17,7 +17,8 @@ function IntroSplashInner() {
         if (guard) {
           guard.style.transition = 'opacity 0.18s ease'
           guard.style.opacity = '0'
-          setTimeout(() => guard.remove(), 200)
+          // Hide (don't .remove()) — see note in the phase==='in' effect below.
+          setTimeout(() => { guard.style.display = 'none' }, 200)
         }
         return
       }
@@ -28,8 +29,14 @@ function IntroSplashInner() {
   // Run canvas animation only when phase becomes 'in'
   useEffect(() => {
     if (phase !== 'in') return;
-    // Splash is now in the DOM — safe to remove the static guard
-    document.getElementById('intro-guard')?.remove();
+    // Splash is now in the DOM — hide the static guard.
+    // IMPORTANT: never .remove() it. The #intro-guard node is rendered by React
+    // in the root layout, so deleting it out from under React corrupts the fiber
+    // tree; the next commit's insertBefore() then throws a DOMException and
+    // white-screens every page on first load (notably iOS Safari). Hiding keeps
+    // the node in the tree, so React's sibling pointers stay valid.
+    const introGuard = document.getElementById('intro-guard');
+    if (introGuard) introGuard.style.display = 'none';
 
     const canvas = canvasRef.current;
     if (!canvas) return;
