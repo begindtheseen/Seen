@@ -54,6 +54,13 @@ export interface SavedJob {
   location?: string
   score?: number
   saved_at: string
+  // Deep-link back to the original posting (parity: lets a saved listing reopen
+  // to the real job board page even if it has aged out of our cache).
+  apply_url?: string | null
+  // Full listing captured AT SAVE TIME. This is what makes a saved listing always
+  // reopen to the exact thing the user saved — independent of session cache or DB
+  // expiry. Defined after Job below (interface order doesn't matter in TS).
+  snapshot?: Job
 }
 
 // A job listing as normalized from /api/jobs search results.

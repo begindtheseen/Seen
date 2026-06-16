@@ -1,7 +1,7 @@
 'use client'
 
 import { _sync } from '../sync'
-import type { SavedJob } from '../types'
+import type { Job, SavedJob } from '../types'
 
 const KEY = 'seen_saved_v1'
 
@@ -14,21 +14,42 @@ export const SavedJobsStore = {
     return this.loadSync().some(s => String(s.job_id) === String(jobId))
   },
 
-  save(job: { id: string | number; co?: string; title?: string; city?: string; score?: number }, loggedIn: boolean): { ok: boolean } {
+  // The full listing captured at save time — this is what lets a saved listing
+  // reopen to the EXACT thing the user saved, regardless of session cache or DB expiry.
+  getSnapshot(jobId: string | number): Job | null {
+    const rec = this.loadSync().find(s => String(s.job_id) === String(jobId))
+    return (rec?.snapshot as Job | undefined) ?? null
+  },
+
+  save(job: Job, loggedIn: boolean): { ok: boolean } {
     const sid = String(job.id)
     const saved = this.loadSync()
     if (!saved.find(s => String(s.job_id) === sid)) {
       saved.unshift({
         job_id: sid,
-        company: job.co || '',
+        company: job.company || '',
         role: job.title || '',
-        location: job.city,
+        location: job.location,
         score: job.score,
+        apply_url: job.apply_url ?? null,
+        snapshot: job,
         saved_at: new Date().toISOString(),
       })
       localStorage.setItem(KEY, JSON.stringify(saved))
     }
-    if (loggedIn) _sync('save_job', { job })
+    if (loggedIn) {
+      _sync('save_job', {
+        job: {
+          id: sid,
+          co: job.company,
+          title: job.title,
+          city: job.location,
+          score: job.score,
+          apply_url: job.apply_url ?? null,
+          snapshot: job,
+        },
+      })
+    }
     return { ok: true }
   },
 
