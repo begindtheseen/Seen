@@ -1,6 +1,7 @@
 import { getQueryExpansion } from '../lib/server/expand.js';
 import { applyRateLimit, rateLimit } from '../lib/server/ratelimit.js';
 import { logError } from '../lib/server/errlog.js';
+import { filterAndRank } from './_utils/jobRelevance.js';
 
 // Per-instance request coalescing: concurrent identical searches share one Claude call
 const _inflight = new Map();
@@ -66,6 +67,8 @@ export default async function handler(req, res) {
   let loc = '';
   let inflightKey = '';
   let _inflightResolve, _inflightReject;
+  let dbMatches = []; // related listings already in our DB (merged with any API top-up)
+  let relevanceQuery = ''; // raw query + expansion terms — what we filter relevance against
 
   try {
     let body = _body;
@@ -76,6 +79,7 @@ export default async function handler(req, res) {
     if (!rawQuery) return res.status(400).json({ error: 'No query' });
     // Strip characters that could abuse prompt injection
     safeQuery = rawQuery.replace(/[<>`\\]/g, '').trim();
+    relevanceQuery = safeQuery;
 
     loc = (location || '').trim();
     const radiusMiles = radius || 25;
@@ -108,58 +112,77 @@ export default async function handler(req, res) {
     // canonical stays in outer scope so the save section can use it
     let canonical = qNorm;
 
-    // ── Smart DB cache check (parallel) ──────────────────────────────────────
+    // ── DB-FIRST search ──────────────────────────────────────────────────────
+    // Serve from our own jobs corpus, relevance-filtered to the query (and to the
+    // company, for company-name searches). Only top up from the live API when we
+    // have fewer than TARGET related listings — so as the corpus grows we API-call
+    // less and less. The fetched top-up is stored back, growing the corpus further.
     if (SUPABASE_URL && SUPABASE_SERVICE_KEY) {
       try {
         const now = encodeURIComponent(new Date().toISOString());
         const t3filter = buildFallbackFilter(qNorm);
+        const qEnc = encodeURIComponent(qNorm);
 
-        // Run expansion lookup AND keyword fallback in parallel — no serial waiting
-        const [expansion, kwRows] = await Promise.all([
+        const [expansion, kwRows, coRows, tgtRows] = await Promise.all([
           getQueryExpansion(qNorm, SUPABASE_URL, dbHeaders, ANTHROPIC_KEY),
           t3filter
-            ? fetch(`${SUPABASE_URL}/rest/v1/jobs?${t3filter}&expires_at=gt.${now}&limit=25`, { headers: dbHeaders })
+            ? fetch(`${SUPABASE_URL}/rest/v1/jobs?${t3filter}&expires_at=gt.${now}&limit=60`, { headers: dbHeaders })
                 .then(r => r.ok ? r.json() : []).catch(() => [])
             : Promise.resolve([]),
+          // Company-column match so ANY company name surfaces its listings — not
+          // just the hardcoded set in buildFallbackFilter.
+          fetch(`${SUPABASE_URL}/rest/v1/jobs?company=ilike.*${qEnc}*&expires_at=gt.${now}&limit=60`, { headers: dbHeaders })
+            .then(r => r.ok ? r.json() : []).catch(() => []),
+          // Admin-tunable aggregation target (feature_flags.job_search_target.percentage).
+          fetch(`${SUPABASE_URL}/rest/v1/feature_flags?flag_name=eq.job_search_target&select=percentage&limit=1`, { headers: dbHeaders })
+            .then(r => r.ok ? r.json() : []).catch(() => []),
         ]);
+
+        // Below TARGET related listings → top up from the live API. Admin lowers this
+        // to calm aggregation, raises it to aggregate harder. Clamped to a sane range.
+        const tp = parseInt(tgtRows?.[0]?.percentage, 10);
+        const TARGET = Number.isFinite(tp) && tp > 0 ? Math.min(60, Math.max(5, tp)) : 20;
 
         canonical = expansion.canonical;
         const searchTerms = [canonical, ...expansion.related].filter(Boolean);
+        // Filter relevance against the raw query AND its expansion terms, so synonym
+        // matches (e.g. "SWE" → "Software Engineer") are kept, not dropped.
+        relevanceQuery = [safeQuery, ...searchTerms].filter(Boolean).join(' ');
 
-        // Run ALL expansion-term DB lookups in parallel
-        // Search both search_query and title columns so cached jobs under
-        // different query keys still surface for synonymous searches.
+        // Search both search_query and title columns so jobs cached under different
+        // query keys still surface for synonymous searches.
         const termRows = await Promise.all(
           searchTerms.map(term => {
             const orFilter = `or=${encodeURIComponent(`(search_query.ilike.*${term}*,title.ilike.*${term}*)`)}`;
-            return fetch(`${SUPABASE_URL}/rest/v1/jobs?${orFilter}&expires_at=gt.${now}&limit=25`, { headers: dbHeaders })
+            return fetch(`${SUPABASE_URL}/rest/v1/jobs?${orFilter}&expires_at=gt.${now}&limit=60`, { headers: dbHeaders })
               .then(r => r.ok ? r.json() : []).catch(() => []);
           })
         );
 
-        // Pick best result: expansion terms first (most specific), then keyword fallback
-        let cached = [], hitTerm = '';
-        for (let i = 0; i < termRows.length; i++) {
-          if (Array.isArray(termRows[i]) && termRows[i].length > cached.length) {
-            cached = termRows[i]; hitTerm = searchTerms[i];
+        // Pool everything, dedup, then keep only listings RELATED to the query,
+        // ranked by relevance (title > company > description) then quality score.
+        const pool = [], seen = new Set();
+        for (const arr of [coRows, ...termRows, kwRows]) {
+          for (const row of (Array.isArray(arr) ? arr : [])) {
+            const key = row.id ?? `${(row.title||'').toLowerCase()}|${(row.company||'').toLowerCase()}|${(row.location||'').toLowerCase()}`;
+            if (seen.has(key)) continue;
+            seen.add(key);
+            pool.push(row);
           }
         }
-        if (cached.length < 3 && Array.isArray(kwRows) && kwRows.length >= 3) {
-          cached = kwRows; hitTerm = 'keyword-fallback';
-        }
+        dbMatches = filterAndRank(pool, relevanceQuery).map(j => ({
+          title: j.title, company: j.company, location: j.location || loc,
+          salary: j.salary, url: j.apply_url || j.url || null, description: j.description,
+          type: j.type || 'Full-time', level: j.level || 'Mid level',
+          source: j.source || 'Seen', score: j.score || 65, waste_score: j.waste_score || 25,
+        }));
 
-        if (cached.length >= 3) {
-          console.log(`CACHE HIT: "${query}" → "${canonical}" (matched "${hitTerm}") @ "${loc}" — ${cached.length} results`);
-          const jobs = cached.map(j => ({
-            title: j.title, company: j.company, location: j.location || loc,
-            salary: j.salary, url: j.apply_url, description: j.description,
-            type: j.type || 'Full-time', level: j.level || 'Mid level',
-            source: j.source || 'Seen', score: j.score || 65, waste_score: j.waste_score || 25,
-          }));
-          return res.status(200).json({ ok: true, jobs, query, location: loc, _src: 'cache' });
+        if (dbMatches.length >= TARGET) {
+          console.log(`DB HIT: "${query}" → "${canonical}" @ "${loc}" — ${dbMatches.length} related results (no API call)`);
+          return res.status(200).json({ ok: true, jobs: dbMatches.slice(0, 60), query, location: loc, _src: 'db' });
         }
-      } catch(e) { console.warn('Cache check error:', e.message); }
-      console.log(`CACHE MISS: "${query}" → "${canonical}" @ "${loc}" — calling Claude API`);
+      } catch(e) { console.warn('DB-first search error:', e.message); }
+      console.log(`DB TOP-UP: "${query}" → "${canonical}" @ "${loc}" — ${dbMatches.length} in DB, pulling more from API`);
     }
 
     // Coalesce concurrent identical searches into one Claude API call
@@ -247,7 +270,8 @@ export default async function handler(req, res) {
 
     jobs = jobs.filter(j => j.title && j.company && j.company !== 'Unknown');
     jobs = jobs.map(j => ({ ...j, score: scoreJob(j), waste_score: wasteScore(j) }));
-    jobs.sort((a, b) => b.score - a.score);
+    // Drop any web-search drift — keep only listings related to the query.
+    jobs = filterAndRank(jobs, relevanceQuery);
 
     // Save under the canonical key so all equivalent queries hit this cache.
     // merge-duplicates: re-searched jobs get expires_at refreshed (not just ignored).
@@ -286,9 +310,21 @@ export default async function handler(req, res) {
       _logSearch(canonical, loc, jobs.length, SUPABASE_URL, dbHeaders);
     }
 
-    _inflightResolve?.({ jobs, query, location: loc });
+    // Merge the listings already in our DB with the fresh API results
+    // (deduped, relevance-ranked) so the user always gets the fullest related set.
+    const mergedSeen = new Set();
+    const merged = [];
+    for (const j of [...dbMatches, ...jobs]) {
+      const key = `${(j.title||'').toLowerCase()}|${(j.company||'').toLowerCase()}|${(j.location||'').toLowerCase()}`;
+      if (mergedSeen.has(key)) continue;
+      mergedSeen.add(key);
+      merged.push(j);
+    }
+    const finalJobs = filterAndRank(merged, relevanceQuery).slice(0, 60);
+
+    _inflightResolve?.({ jobs: finalJobs, query, location: loc });
     _inflight.delete(inflightKey);
-    return res.status(200).json({ ok: true, jobs, query, location: loc });
+    return res.status(200).json({ ok: true, jobs: finalJobs, query, location: loc });
 
   } catch(err) {
     console.error('Jobs error:', err.message);

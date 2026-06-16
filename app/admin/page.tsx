@@ -1276,6 +1276,29 @@ function JobDedupePanel({ token }: { token: string }) {
   const [suspected, setSuspected] = useState<number | null>(null)
   const [deleted, setDeleted] = useState<number | null>(null)
   const [msg, setMsg] = useState('')
+  const [target, setTarget] = useState('20')
+  const [targetSaving, setTargetSaving] = useState(false)
+  const [targetMsg, setTargetMsg] = useState('')
+
+  useEffect(() => {
+    fetch('/api/admin-stats', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Admin-Token': token }, body: JSON.stringify({ action: 'get_job_target' }) })
+      .then(r => r.ok ? r.json() : null)
+      .then(d => { if (d?.target) setTarget(String(d.target)) })
+      .catch(() => {})
+  }, [token])
+
+  async function saveTarget() {
+    const n = parseInt(target, 10)
+    if (!Number.isFinite(n) || n < 5 || n > 60) { setTargetMsg('✗ Enter a number 5–60'); return }
+    setTargetSaving(true); setTargetMsg('')
+    try {
+      const r = await fetch('/api/admin-stats', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Admin-Token': token }, body: JSON.stringify({ action: 'set_job_target', target: n }) })
+      const d = await r.json()
+      if (!d.ok) throw new Error(d.error || 'Save failed')
+      setTargetMsg(`✓ Saved — searches now aggregate up to ${d.target}`)
+    } catch (e) { setTargetMsg(`✗ ${(e as Error).message}`) }
+    setTargetSaving(false)
+  }
 
   async function scan() {
     setScanning(true); setMsg(''); setSuspected(null); setDeleted(null)
@@ -1329,6 +1352,22 @@ function JobDedupePanel({ token }: { token: string }) {
         )}
       </div>
       {msg && <div style={{ fontFamily: 'var(--mono)', fontSize: '.62rem', color: deleted != null && deleted > 0 ? 'var(--green)' : suspected === 0 ? 'var(--green)' : msg.startsWith('✗') ? 'var(--red)' : 'var(--amber)' }}>{msg}</div>}
+
+      {/* Aggregation target */}
+      <div style={{ marginTop: '.85rem', paddingTop: '.75rem', borderTop: '1px solid var(--line2)' }}>
+        <div style={{ fontFamily: 'var(--mono)', fontSize: '.48rem', textTransform: 'uppercase', letterSpacing: '.12em', color: 'var(--dim)', marginBottom: '.4rem' }}>Aggregation target</div>
+        <div style={{ display: 'flex', gap: '.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
+          <span style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', color: 'var(--sub)' }}>Min listings per search</span>
+          <input type="number" min={5} max={60} value={target} onChange={e => setTarget(e.target.value)}
+            style={{ width: 64, background: 'var(--raised)', border: '1px solid var(--line2)', borderRadius: 6, padding: '.3rem .5rem', fontFamily: 'var(--mono)', fontSize: '.65rem', color: 'var(--white)', outline: 'none' }} />
+          <button onClick={saveTarget} disabled={targetSaving} style={{ ...btnBase, borderColor: 'var(--green)', color: 'var(--green)' }}>{targetSaving ? '⏳ Saving…' : 'Save'}</button>
+        </div>
+        <div style={{ fontFamily: 'var(--mono)', fontSize: '.5rem', color: 'var(--dim)', marginTop: '.4rem' }}>
+          If a search has fewer related listings than this, Seen pulls more from online and stores them. Higher = aggregate harder; lower = calm it down. (5–60)
+        </div>
+        {targetMsg && <div style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', marginTop: '.35rem', color: targetMsg.startsWith('✗') ? 'var(--red)' : 'var(--green)' }}>{targetMsg}</div>}
+      </div>
+
       <div style={{ fontFamily: 'var(--mono)', fontSize: '.5rem', color: 'var(--dim)', marginTop: '.5rem' }}>
         Scan first to preview. Delete keeps the most recently seen copy. Run the SQL migration in <code style={{ color: 'var(--sub)' }}>014_job_dedup.sql</code> after deduping to block future dupes.
       </div>
