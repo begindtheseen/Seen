@@ -28,7 +28,7 @@ interface AdminStats {
   issues: { open: number; items: Issue[] }
   duplicate_clusters: { suspected: number; items: DupCluster[] }
   feature_flags: FeatureFlag[]
-  credits: { total_users: number; pro_users: number }
+  credits: { total_users: number; pro_users: number; total_balance?: number; earned?: number; spent?: number }
 }
 interface Issue {
   id: string; type: string; target_name: string; notes: string; created_at: string; status: string
@@ -637,6 +637,9 @@ export default function AdminPage() {
         {/* Company deduplication */}
         <MergePanel token={token!} prefill={mergePrefill} />
 
+        {/* Credits overview + master toggle */}
+        <CreditsPanel credits={stats.credits} flags={stats.feature_flags || []} token={token!} onRefresh={() => load(token!)} />
+
         {/* Feature flags */}
         <FlagsPanel flags={stats.feature_flags || []} token={token!} onRefresh={() => load(token!)} />
 
@@ -1082,6 +1085,75 @@ const FLAG_STATUS_COLORS: Record<string, string> = {
 }
 const FLAG_STATUSES = ['off', 'admin_only', 'beta_users', 'percentage_rollout', 'fully_on']
 
+// Curated admin toggle layout. Internal batch cursors / tuning values are HIDDEN — they
+// aren't on/off product toggles and were the main source of confusion. Real toggles are
+// grouped, with one Reddit toggle and one credit toggle. Anything unrecognized and not
+// hidden still shows under "Other" so nothing silently disappears.
+const HIDDEN_FLAGS = new Set([
+  'reddit_offset_recruitinghell', 'reddit_offset_jobs', 'reddit_offset_cscareerquestions',
+  'reddit_offset_careerguidance', 'reddit_offset_antiwork', 'reddit_offset_askhr',
+  'reddit_offset_interviews', 'reddit_offset_experienceddevs', 'reddit_offset_ExperiencedDevs',
+  'reddit_offset_AskHR', 'job_search_target',
+])
+const FLAG_FRIENDLY: Record<string, string> = {
+  ai_credit_system_enabled: 'AI credit system',
+  reddit_import_enabled: 'Reddit import',
+  job_refresh_enabled: 'Job refresh',
+  admin_panel_enabled: 'Admin panel',
+  duplicate_detection_enabled: 'Duplicate detection',
+  hiring_forecast_enabled: 'Hiring forecast',
+  company_confidence_matching_enabled: 'Company match confidence',
+  outcome_cards_v2_enabled: 'Outcome cards v2',
+  resume_question_engine_enabled: 'Résumé credit questions',
+}
+const FLAG_GROUPS: { group: string; flags: string[] }[] = [
+  { group: 'Credits', flags: ['ai_credit_system_enabled'] },
+  { group: 'Data ingestion', flags: ['reddit_import_enabled', 'job_refresh_enabled'] },
+  { group: 'Features', flags: ['admin_panel_enabled', 'duplicate_detection_enabled', 'hiring_forecast_enabled', 'company_confidence_matching_enabled', 'outcome_cards_v2_enabled', 'resume_question_engine_enabled'] },
+]
+
+// Credits overview + a single master enable/disable for the whole credit system.
+function CreditsPanel({ credits, flags, token, onRefresh }: { credits: { total_users: number; pro_users: number; total_balance?: number; earned?: number; spent?: number }; flags: FeatureFlag[]; token: string; onRefresh: () => void }) {
+  const sysFlag = flags.find(f => f.flag_name === 'ai_credit_system_enabled')
+  const on = (sysFlag?.status || 'fully_on') !== 'off'
+  const [saving, setSaving] = useState(false)
+  async function toggle() {
+    setSaving(true)
+    try {
+      const res = await fetch('/api/admin-stats', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Admin-Token': token }, body: JSON.stringify({ action: 'set_flag', flag_name: 'ai_credit_system_enabled', status: on ? 'off' : 'fully_on' }) })
+      const d = await res.json(); if (!d.ok) throw new Error(d.error || String(res.status))
+      setTimeout(onRefresh, 400)
+    } catch (e) { alert('✗ ' + (e as Error).message) }
+    setSaving(false)
+  }
+  const Stat = ({ l, n, c }: { l: string; n: number | string; c?: string }) => (
+    <div style={{ flex: '1 1 30%', minWidth: 92, padding: '.55rem .6rem', border: '1px solid var(--line2)', borderRadius: 8 }}>
+      <div style={{ fontFamily: 'var(--mono)', fontSize: '.48rem', color: 'var(--dim)', textTransform: 'uppercase', letterSpacing: '.04em' }}>{l}</div>
+      <div style={{ fontFamily: 'var(--mono)', fontSize: '1.05rem', color: c || 'var(--white)', marginTop: '.15rem' }}>{typeof n === 'number' ? n.toLocaleString() : n}</div>
+    </div>
+  )
+  return (
+    <Card style={{ marginBottom: '1.25rem' }}>
+      <CardHeader
+        title="Credits"
+        action={
+          <button onClick={toggle} disabled={saving} style={{ background: on ? 'rgba(239,68,68,.1)' : 'rgba(34,197,94,.1)', border: `1px solid ${on ? 'rgba(239,68,68,.4)' : 'rgba(34,197,94,.4)'}`, borderRadius: 6, padding: '.3rem .7rem', fontFamily: 'var(--mono)', fontSize: '.58rem', color: on ? 'var(--red)' : 'var(--green)', cursor: 'pointer' }}>
+            {saving ? '…' : on ? 'Disable credit system' : 'Enable credit system'}
+          </button>
+        }
+      />
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '.5rem' }}>
+        <Stat l="Credits held" n={credits.total_balance ?? 0} />
+        <Stat l="Users w/ credits" n={credits.total_users} />
+        <Stat l="Pro users" n={credits.pro_users} />
+        <Stat l="Total earned" n={credits.earned ?? 0} c="var(--green)" />
+        <Stat l="Total spent" n={credits.spent ?? 0} c="var(--amber)" />
+        <Stat l="System" n={on ? 'On' : 'Off'} c={on ? 'var(--green)' : 'var(--muted)'} />
+      </div>
+    </Card>
+  )
+}
+
 function FlagsPanel({ flags, token, onRefresh }: { flags: FeatureFlag[]; token: string; onRefresh: () => void }) {
   const [saving, setSaving] = useState<string | null>(null)
   const [seeding, setSeeding] = useState(false)
@@ -1126,6 +1198,34 @@ function FlagsPanel({ flags, token, onRefresh }: { flags: FeatureFlag[]; token: 
 
   function effectiveStatus(f: FeatureFlag) { return localStatus[f.flag_name] || f.status }
 
+  function row(f: FeatureFlag) {
+    const status = effectiveStatus(f)
+    return (
+      <div key={f.flag_name} style={{ display: 'flex', alignItems: 'center', gap: '.5rem', padding: '.55rem 0', borderBottom: '1px solid var(--line2)', flexWrap: 'wrap' }}>
+        <div style={{ flex: 1, minWidth: 0, fontFamily: 'var(--mono)', fontSize: '.62rem', color: 'var(--white)', overflow: 'hidden' }}>
+          <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{FLAG_FRIENDLY[f.flag_name] || f.flag_name}</div>
+          {f.description && <div style={{ fontFamily: 'var(--mono)', fontSize: '.48rem', color: 'var(--dim)', marginTop: '.1rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{f.description}</div>}
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '.35rem', flexShrink: 0 }}>
+          <div style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', color: FLAG_STATUS_COLORS[status] || 'var(--muted)', whiteSpace: 'nowrap' }}>
+            {saving === f.flag_name ? 'Saving…' : (FLAG_STATUS_LABELS[status] || status)}
+          </div>
+          <select
+            value={status}
+            disabled={saving === f.flag_name}
+            onChange={e => setFlag(f.flag_name, e.target.value)}
+            style={{ background: 'var(--raised)', border: '1px solid var(--line2)', borderRadius: 5, padding: '.18rem .4rem', fontFamily: 'var(--mono)', fontSize: '.58rem', color: 'var(--sub)', cursor: 'pointer' }}
+          >
+            {FLAG_STATUSES.map(s => <option key={s} value={s}>{FLAG_STATUS_LABELS[s]}</option>)}
+          </select>
+        </div>
+      </div>
+    )
+  }
+
+  const grouped = new Set(FLAG_GROUPS.flatMap(g => g.flags))
+  const others = flags.filter(f => !grouped.has(f.flag_name) && !HIDDEN_FLAGS.has(f.flag_name))
+
   return (
     <Card style={{ marginBottom: '1.25rem' }}>
       <CardHeader
@@ -1145,30 +1245,26 @@ function FlagsPanel({ flags, token, onRefresh }: { flags: FeatureFlag[]; token: 
             </button>
           </div>
         )
-        : flags.map(f => {
-          const status = effectiveStatus(f)
-          return (
-            <div key={f.flag_name} style={{ display: 'flex', alignItems: 'center', gap: '.5rem', padding: '.55rem 0', borderBottom: '1px solid var(--line2)', flexWrap: 'wrap' }}>
-              <div style={{ flex: 1, minWidth: 0, fontFamily: 'var(--mono)', fontSize: '.62rem', color: 'var(--white)', overflow: 'hidden' }}>
-                <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{f.flag_name}</div>
-                {f.description && <div style={{ fontFamily: 'var(--mono)', fontSize: '.48rem', color: 'var(--dim)', marginTop: '.1rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{f.description}</div>}
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '.35rem', flexShrink: 0 }}>
-                <div style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', color: FLAG_STATUS_COLORS[status] || 'var(--muted)', whiteSpace: 'nowrap' }}>
-                  {saving === f.flag_name ? 'Saving…' : (FLAG_STATUS_LABELS[status] || status)}
+        : (
+          <>
+            {FLAG_GROUPS.map(grp => {
+              const rows = grp.flags.map(name => flags.find(f => f.flag_name === name)).filter(Boolean) as FeatureFlag[]
+              if (!rows.length) return null
+              return (
+                <div key={grp.group} style={{ marginBottom: '.4rem' }}>
+                  <div style={{ fontFamily: 'var(--mono)', fontSize: '.5rem', color: 'var(--dim)', textTransform: 'uppercase', letterSpacing: '.06em', margin: '.5rem 0 .15rem' }}>{grp.group}</div>
+                  {rows.map(row)}
                 </div>
-                <select
-                  value={status}
-                  disabled={saving === f.flag_name}
-                  onChange={e => setFlag(f.flag_name, e.target.value)}
-                  style={{ background: 'var(--raised)', border: '1px solid var(--line2)', borderRadius: 5, padding: '.18rem .4rem', fontFamily: 'var(--mono)', fontSize: '.58rem', color: 'var(--sub)', cursor: 'pointer' }}
-                >
-                  {FLAG_STATUSES.map(s => <option key={s} value={s}>{FLAG_STATUS_LABELS[s]}</option>)}
-                </select>
+              )
+            })}
+            {others.length > 0 && (
+              <div style={{ marginBottom: '.4rem' }}>
+                <div style={{ fontFamily: 'var(--mono)', fontSize: '.5rem', color: 'var(--dim)', textTransform: 'uppercase', letterSpacing: '.06em', margin: '.5rem 0 .15rem' }}>Other</div>
+                {others.map(row)}
               </div>
-            </div>
-          )
-        })
+            )}
+          </>
+        )
       }
     </Card>
   )
