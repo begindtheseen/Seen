@@ -4,6 +4,7 @@ import { useState, useEffect, use } from 'react'
 import { Score } from '@/lib/score'
 import { AppStore } from '@/lib/stores/AppStore'
 import HiringProbability from '@/components/HiringProbability'
+import CompanyScoreCard from '@/components/CompanyScoreCard'
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -463,6 +464,7 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
   const [compareList, setCompareList] = useState<Array<{name: string; score: CompanyScore | null; loading: boolean}>>([])
 
   const [displayScore, setDisplayScore] = useState(0)
+  const [showGradeCard, setShowGradeCard] = useState(false)
   const [scoreRevealed, setScoreRevealed] = useState(false)
   const [myApp, setMyApp] = useState<{company: string; role: string; status: string; stage: string; appliedAt: number; daysSince: number} | null>(null)
 
@@ -700,8 +702,38 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
                 >
                   ↗ Share
                 </button>
+                {score && (
+                  <button
+                    onClick={() => setShowGradeCard(true)}
+                    style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', background: 'rgba(99,102,241,0.1)', border: '1px solid rgba(99,102,241,0.3)', color: '#a5b4fc', borderRadius: 6, padding: '.25rem .6rem', cursor: 'pointer' }}
+                  >
+                    🖼 Share grade card
+                  </button>
+                )}
               </div>
             </div>
+            {showGradeCard && score && (
+              <CompanyScoreCard
+                data={{
+                  company: companyName,
+                  industry: industry || score.industry,
+                  overall_score: score.overall_score,
+                  ghost_rate: score.ghost_rate,
+                  response_rate: score.response_rate,
+                  avg_wait_days: score.avg_wait_days,
+                  waste: score.waste,
+                  report_count: score.report_count,
+                  risk: score.risk_level,
+                  tags: [
+                    score.ghost_rate >= 0.5 ? '👻 High ghost rate' : null,
+                    score.response_rate >= 0.5 ? '✅ Responsive' : null,
+                    (score.waste || 0) >= 50 ? '⚠ High waste risk' : null,
+                    (score.avg_wait_days || 0) >= 30 ? '⏳ Long wait times' : null,
+                  ].filter(Boolean) as string[],
+                }}
+                onClose={() => setShowGradeCard(false)}
+              />
+            )}
             <div className="co-city-filter">
               <input
                 type="text"
