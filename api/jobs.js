@@ -1,7 +1,7 @@
 import { getQueryExpansion } from '../lib/server/expand.js';
 import { applyRateLimit, rateLimit } from '../lib/server/ratelimit.js';
 import { logError } from '../lib/server/errlog.js';
-import { filterAndRank } from './_utils/jobRelevance.js';
+import { filterAndRank, filterByLocation, locationDbTerm } from './_utils/jobRelevance.js';
 
 // Per-instance request coalescing: concurrent identical searches share one Claude call
 const _inflight = new Map();
@@ -122,16 +122,20 @@ export default async function handler(req, res) {
         const now = encodeURIComponent(new Date().toISOString());
         const t3filter = buildFallbackFilter(qNorm);
         const qEnc = encodeURIComponent(qNorm);
+        // Pre-filter the pool to the searched place (city, else state) so we fetch
+        // location-relevant listings — not jobs from anywhere. '' for national searches.
+        const locTerm = locationDbTerm(loc);
+        const locClause = locTerm ? `&location=ilike.*${encodeURIComponent(locTerm)}*` : '';
 
         const [expansion, kwRows, coRows, tgtRows] = await Promise.all([
           getQueryExpansion(qNorm, SUPABASE_URL, dbHeaders, ANTHROPIC_KEY),
           t3filter
-            ? fetch(`${SUPABASE_URL}/rest/v1/jobs?${t3filter}&expires_at=gt.${now}&limit=60`, { headers: dbHeaders })
+            ? fetch(`${SUPABASE_URL}/rest/v1/jobs?${t3filter}${locClause}&expires_at=gt.${now}&limit=60`, { headers: dbHeaders })
                 .then(r => r.ok ? r.json() : []).catch(() => [])
             : Promise.resolve([]),
           // Company-column match so ANY company name surfaces its listings — not
           // just the hardcoded set in buildFallbackFilter.
-          fetch(`${SUPABASE_URL}/rest/v1/jobs?company=ilike.*${qEnc}*&expires_at=gt.${now}&limit=60`, { headers: dbHeaders })
+          fetch(`${SUPABASE_URL}/rest/v1/jobs?company=ilike.*${qEnc}*${locClause}&expires_at=gt.${now}&limit=60`, { headers: dbHeaders })
             .then(r => r.ok ? r.json() : []).catch(() => []),
           // Admin-tunable aggregation target (feature_flags.job_search_target.percentage).
           fetch(`${SUPABASE_URL}/rest/v1/feature_flags?flag_name=eq.job_search_target&select=percentage&limit=1`, { headers: dbHeaders })
@@ -154,7 +158,7 @@ export default async function handler(req, res) {
         const termRows = await Promise.all(
           searchTerms.map(term => {
             const orFilter = `or=${encodeURIComponent(`(search_query.ilike.*${term}*,title.ilike.*${term}*)`)}`;
-            return fetch(`${SUPABASE_URL}/rest/v1/jobs?${orFilter}&expires_at=gt.${now}&limit=60`, { headers: dbHeaders })
+            return fetch(`${SUPABASE_URL}/rest/v1/jobs?${orFilter}${locClause}&expires_at=gt.${now}&limit=60`, { headers: dbHeaders })
               .then(r => r.ok ? r.json() : []).catch(() => []);
           })
         );
@@ -176,6 +180,9 @@ export default async function handler(req, res) {
           type: j.type || 'Full-time', level: j.level || 'Mid level',
           source: j.source || 'Seen', score: j.score || 65, waste_score: j.waste_score || 25,
         }));
+        // Keep only listings in/near the searched place (city → state → remote),
+        // dropping cross-location leaks. No-op for national searches.
+        dbMatches = filterByLocation(dbMatches, loc);
 
         if (dbMatches.length >= TARGET) {
           console.log(`DB HIT: "${query}" → "${canonical}" @ "${loc}" — ${dbMatches.length} related results (no API call)`);
@@ -243,13 +250,13 @@ export default async function handler(req, res) {
             const rows = await r.json();
             if (Array.isArray(rows) && rows.length >= 3) {
               console.log(`STALE CACHE FALLBACK: "${query}" → "${term}" — ${rows.length} results`);
-              const jobs = rows.map(j => ({
+              const jobs = filterByLocation(rows.map(j => ({
                 title: j.title, company: j.company, location: j.location || loc,
                 salary: j.salary, url: j.apply_url, description: j.description,
                 type: j.type || 'Full-time', level: j.level || 'Mid level',
                 source: j.source || 'Seen', score: j.score || 65, waste_score: j.waste_score || 25,
-              }));
-              return res.status(200).json({ ok: true, jobs, query, location: loc, _src: 'stale-cache' });
+              })), loc);
+              if (jobs.length) return res.status(200).json({ ok: true, jobs, query, location: loc, _src: 'stale-cache' });
             }
           }
         }
@@ -320,7 +327,7 @@ export default async function handler(req, res) {
       mergedSeen.add(key);
       merged.push(j);
     }
-    const finalJobs = filterAndRank(merged, relevanceQuery).slice(0, 60);
+    const finalJobs = filterByLocation(filterAndRank(merged, relevanceQuery), loc).slice(0, 60);
 
     _inflightResolve?.({ jobs: finalJobs, query, location: loc });
     _inflight.delete(inflightKey);

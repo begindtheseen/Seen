@@ -75,3 +75,87 @@ export function filterAndRank(jobs, query, { minScore = 1 } = {}) {
   scored.sort((a, b) => (b.r - a.r) || ((b.j.score || 0) - (a.j.score || 0)));
   return scored.map((x) => x.j);
 }
+
+// ── Location matching ────────────────────────────────────────────────────────
+// Job locations are free-form strings ("Austin, Travis County", "Old Sixth Ward,
+// Houston", "Dallas, Texas", "US"). The searched city almost always appears in the
+// string, so we match on the city name (best signal), then same-state, then
+// remote/national. Cross-location listings are dropped.
+
+const US_STATES = {
+  al: 'alabama', ak: 'alaska', az: 'arizona', ar: 'arkansas', ca: 'california',
+  co: 'colorado', ct: 'connecticut', de: 'delaware', fl: 'florida', ga: 'georgia',
+  hi: 'hawaii', id: 'idaho', il: 'illinois', in: 'indiana', ia: 'iowa', ks: 'kansas',
+  ky: 'kentucky', la: 'louisiana', me: 'maine', md: 'maryland', ma: 'massachusetts',
+  mi: 'michigan', mn: 'minnesota', ms: 'mississippi', mo: 'missouri', mt: 'montana',
+  ne: 'nebraska', nv: 'nevada', nh: 'new hampshire', nj: 'new jersey', nm: 'new mexico',
+  ny: 'new york', nc: 'north carolina', nd: 'north dakota', oh: 'ohio', ok: 'oklahoma',
+  or: 'oregon', pa: 'pennsylvania', ri: 'rhode island', sc: 'south carolina',
+  sd: 'south dakota', tn: 'tennessee', tx: 'texas', ut: 'utah', vt: 'vermont',
+  va: 'virginia', wa: 'washington', wv: 'west virginia', wi: 'wisconsin', wy: 'wyoming',
+  dc: 'district of columbia',
+};
+const STATE_BY_NAME = Object.fromEntries(Object.entries(US_STATES).map(([a, n]) => [n, a]));
+
+// Parse a free-form location into { city, stateAbbr, stateName, remote }.
+export function parseLocation(loc) {
+  const s = String(loc || '').toLowerCase().replace(/\s+/g, ' ').trim();
+  if (!s) return null;
+  const remote = /\bremote\b/.test(s);
+  const cleaned = s.replace(/\bremote\b/g, ' ').replace(/\s+/g, ' ').replace(/^[,\s]+|[,\s]+$/g, '').trim();
+  if (!cleaned) return { city: '', stateAbbr: '', stateName: '', remote };
+
+  const parts = cleaned.split(',').map((p) => p.trim()).filter(Boolean);
+  let city = parts[0] || '';
+  let stateAbbr = '', stateName = '';
+  const setState = (tok) => {
+    if (US_STATES[tok]) { stateAbbr = tok; stateName = US_STATES[tok]; return true; }
+    if (STATE_BY_NAME[tok]) { stateAbbr = STATE_BY_NAME[tok]; stateName = tok; return true; }
+    return false;
+  };
+
+  if (parts.length > 1) {
+    setState(parts[parts.length - 1]);
+  } else if (city.includes(' ')) {
+    // "austin tx" — state as the trailing word.
+    const w = city.split(' ');
+    if (setState(w[w.length - 1])) city = w.slice(0, -1).join(' ');
+  }
+  // A bare state ("texas" / "tx") with no city.
+  if (parts.length === 1 && !city.includes(' ') && !stateAbbr && setState(city)) city = '';
+
+  return { city: city.length >= 2 ? city : '', stateAbbr, stateName, remote };
+}
+
+// Higher = better location match. 3 city · 2 same-state · 1 remote/national · 0 none.
+export function locationScore(jobLocation, parsed) {
+  if (!parsed) return 1;
+  const jl = String(jobLocation || '').toLowerCase().trim();
+  if (!jl) return 1; // unknown location — don't penalise
+  if (parsed.city && parsed.city.length >= 2 && jl.includes(parsed.city)) return 3;
+  if (parsed.stateName && jl.includes(parsed.stateName)) return 2;
+  if (parsed.stateAbbr && new RegExp(`(^|[^a-z])${parsed.stateAbbr}([^a-z]|$)`).test(jl)) return 2;
+  if (jl === 'us' || jl === 'usa' || jl === 'united states' || /\bremote\b/.test(jl)) return 1;
+  return 0;
+}
+
+// Keep only listings in/near the searched location, ranked city → state → remote,
+// preserving the input (relevance) order within each tier. No location → unchanged.
+export function filterByLocation(jobs, loc) {
+  const p = parseLocation(loc);
+  if (!p || (!p.city && !p.stateAbbr && !p.stateName && !p.remote)) return Array.isArray(jobs) ? jobs : [];
+  const kept = [];
+  (jobs || []).forEach((j, i) => {
+    const s = locationScore(j.location, p);
+    if (s > 0) kept.push({ j, s, i });
+  });
+  kept.sort((a, b) => (b.s - a.s) || (a.i - b.i));
+  return kept.map((k) => k.j);
+}
+
+// PostgREST ilike term to pre-filter the DB query to the searched place (city
+// preferred, else state name). '' when there's no usable location.
+export function locationDbTerm(loc) {
+  const p = parseLocation(loc);
+  return (p && (p.city || p.stateName)) || '';
+}
