@@ -1343,8 +1343,10 @@ function AllJobsBrowser({ token, onUnauthorized }: { token: string; onUnauthoriz
   const [error, setError] = useState('')
   const [search, setSearch] = useState('')
   const [expanded, setExpanded] = useState<string | null>(null)
+  const [showAll, setShowAll] = useState(false)
   const [companyJobs, setCompanyJobs] = useState<Record<string, RecentJob[]>>({})
   const [companyLoading, setCompanyLoading] = useState<string | null>(null)
+  const COLLAPSED_COUNT = 10
 
   useEffect(() => {
     async function load() {
@@ -1391,6 +1393,9 @@ function AllJobsBrowser({ token, onUnauthorized }: { token: string; onUnauthoriz
   const filtered = search.trim()
     ? groups.filter(g => g.company.toLowerCase().includes(search.toLowerCase()))
     : groups
+  // Keep the list short by default — show the first N, with a toggle to extend.
+  // When filtering, always show all matches.
+  const visible = (search.trim() || showAll) ? filtered : filtered.slice(0, COLLAPSED_COUNT)
 
   return (
     <Card style={{ marginBottom: '1.25rem' }}>
@@ -1415,7 +1420,7 @@ function AllJobsBrowser({ token, onUnauthorized }: { token: string; onUnauthoriz
       {!loading && !error && filtered.length === 0 && (
         <div style={{ fontFamily: 'var(--mono)', fontSize: '.62rem', color: 'var(--dim)' }}>No companies match.</div>
       )}
-      {!loading && !error && filtered.map(g => {
+      {!loading && !error && visible.map(g => {
         const isOpen = expanded === g.company
         const jobs = companyJobs[g.company] || []
         const isLoadingJobs = companyLoading === g.company
@@ -1460,6 +1465,14 @@ function AllJobsBrowser({ token, onUnauthorized }: { token: string; onUnauthoriz
           </div>
         )
       })}
+      {!loading && !error && !search.trim() && filtered.length > COLLAPSED_COUNT && (
+        <button
+          onClick={() => setShowAll(v => !v)}
+          style={{ marginTop: '.6rem', fontFamily: 'var(--mono)', fontSize: '.58rem', padding: '.4rem .8rem', borderRadius: 6, border: '1px solid var(--line2)', background: 'transparent', color: 'var(--sub)', cursor: 'pointer', width: '100%' }}
+        >
+          {showAll ? `▴ Show less` : `▾ Show all ${filtered.length} companies`}
+        </button>
+      )}
     </Card>
   )
 }

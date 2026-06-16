@@ -311,7 +311,7 @@ async function _handler(req, res) {
   }
 
   if (action === 'find_duplicates') {
-    const r = await db('company_scores?select=id,name,report_count,overall_score&order=report_count.desc&limit=500');
+    const r = await db('company_scores?select=id,name:company_name,report_count,overall_score&order=report_count.desc&limit=500');
     if (!r.ok) return res.status(500).json({ error: 'Query failed' });
     const rows = await r.json();
     const norm = n => n ? n.toLowerCase().trim().replace(/[\s,]+(inc\.?|llc\.?|corp\.?|ltd\.?|co\.|plc\.?|group|holdings|enterprises|solutions|technologies)\.?$/i, '').trim() : '';
@@ -331,8 +331,8 @@ async function _handler(req, res) {
     const { primary, secondary } = body;
     if ((!primary_id || !secondary_id) && primary && secondary) {
       const [pLookup, sLookup] = await Promise.all([
-        db(`company_scores?name=ilike.${encodeURIComponent(primary)}&select=id&limit=1`).then(r => r.json()),
-        db(`company_scores?name=ilike.${encodeURIComponent(secondary)}&select=id&limit=1`).then(r => r.json()),
+        db(`company_scores?company_name=ilike.${encodeURIComponent(primary)}&select=id&limit=1`).then(r => r.json()),
+        db(`company_scores?company_name=ilike.${encodeURIComponent(secondary)}&select=id&limit=1`).then(r => r.json()),
       ]);
       if (!pLookup[0]) return res.status(404).json({ error: `Company not found: ${primary}` });
       if (!sLookup[0]) return res.status(404).json({ error: `Company not found: ${secondary}` });
@@ -342,8 +342,8 @@ async function _handler(req, res) {
     if (!primary_id || !secondary_id) return res.status(400).json({ error: 'primary_id and secondary_id (or primary/secondary names) required' });
     if (String(primary_id) === String(secondary_id)) return res.status(400).json({ error: 'Cannot merge a company with itself' });
     const [pArr, sArr] = await Promise.all([
-      db(`company_scores?id=eq.${primary_id}&limit=1`).then(r => r.json()),
-      db(`company_scores?id=eq.${secondary_id}&limit=1`).then(r => r.json()),
+      db(`company_scores?id=eq.${primary_id}&select=id,name:company_name,report_count,overall_score,ghost_rate,response_rate,aliases&limit=1`).then(r => r.json()),
+      db(`company_scores?id=eq.${secondary_id}&select=id,name:company_name,report_count,overall_score,ghost_rate,response_rate,aliases&limit=1`).then(r => r.json()),
     ]);
     const p = pArr[0]; const s = sArr[0];
     if (!p || !s) return res.status(404).json({ error: 'Company not found' });
@@ -358,7 +358,7 @@ async function _handler(req, res) {
   }
 
   if (action === 'auto_merge') {
-    const r = await db('company_scores?select=id,name,report_count,overall_score,ghost_rate,response_rate&order=report_count.desc&limit=500');
+    const r = await db('company_scores?select=id,name:company_name,report_count,overall_score,ghost_rate,response_rate&order=report_count.desc&limit=500');
     if (!r.ok) return res.status(500).json({ error: 'Query failed' });
     const rows = await r.json();
     const norm = n => n ? n.toLowerCase().trim().replace(/[\s,]+(inc\.?|llc\.?|corp\.?|ltd\.?|co\.|plc\.?|group|holdings|enterprises|solutions|technologies)\.?$/i, '').trim() : '';
