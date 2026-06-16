@@ -632,6 +632,7 @@ function SwipeJobDeck({ jobs, onOpen, onDismiss, onSave, onApply, coScores }: {
   const deltaYRef = useRef(0)
   const hasMoved = useRef(false)
   const cardRef = useRef<HTMLDivElement>(null)
+  const { isLoggedIn } = useAuth()
 
   // Keep stack in sync when jobs prop changes (e.g. initial load)
   useEffect(() => { setStack([...jobs]) }, [jobs])
@@ -646,20 +647,10 @@ function SwipeJobDeck({ jobs, onOpen, onDismiss, onSave, onApply, coScores }: {
   const showRight = deltaX > 40
   const showUp = deltaY < -30 && Math.abs(deltaX) < 80
 
-  async function saveJob(job: Job) {
-    try {
-      await fetch('/api/user-sync', {
-        method: 'POST',
-        headers: await aiHeaders(),
-        body: JSON.stringify({
-          action: 'save_application',
-          company: job.company,
-          role: job.title,
-          stage: 'Applied',
-          platform: job.source || 'Seen',
-        }),
-      })
-    } catch { /* ignore */ }
+  // Swipe-right is the "♡ Save" gesture — it must add to Saved Jobs (same as the
+  // list-view heart), not create a tracker application. (Apply is the up-swipe.)
+  function saveJob(job: Job) {
+    SavedJobsStore.save(job, isLoggedIn)
   }
 
   function advance(dir: 'left' | 'right' | 'up') {
