@@ -4,6 +4,7 @@
 
 import { createHmac, timingSafeEqual } from 'crypto';
 import { rateLimit } from '../lib/server/ratelimit.js';
+import { buildOpportunities } from './_utils/opportunityEngine.js';
 
 // Verify a Supabase JWT locally (HS256) — no network round-trip.
 // Returns the payload (with .sub = user UUID) on success, null on failure.
@@ -684,6 +685,39 @@ export default async function handler(req, res) {
       ok: true,
       questions: allQ.slice(0, 5),
       credits_left: creditsLeft,
+      balance: cred?.balance ?? 3,
+    });
+  }
+
+  // ── OPPORTUNITY ENGINE — personalized data-point questions for the survey ─────
+  // Behind-the-scenes engine mines the user's apps/outcomes/profile to surface the
+  // highest-value missing data points as survey-shaped questions. Answers flow
+  // through the existing submit_answer pipeline (records + awards a credit).
+  if (action === 'get_opportunities') {
+    const today = new Date().toISOString().split('T')[0];
+    const [appsRes, aqRes, cRes] = await Promise.all([
+      db(`applications?user_id=eq.${uid}&select=company_name,role,status,stage,events,created_at,applied_at&order=created_at.desc&limit=100`),
+      db(`answered_questions?user_id=eq.${uid}&select=question_key&limit=1000`),
+      db(`ai_credits?user_id=eq.${uid}&limit=1`),
+    ]);
+    const appRows = appsRes.ok ? await appsRes.json() : [];
+    const apps = appRows.map(r => ({
+      company: r.company_name,
+      role: r.role,
+      status: r.status,
+      stage: r.stage,
+      appliedAt: Date.parse(r.applied_at || r.created_at) || Date.now(),
+      events: Array.isArray(r.events) ? r.events : [],
+    }));
+    const answeredKeys = aqRes.ok ? (await aqRes.json()).map(r => r.question_key) : [];
+    const cred = cRes.ok ? (await cRes.json())[0] : null;
+    const dailyEarned = (cred?.last_reset === today ? cred?.daily_earned : 0) || 0;
+
+    const questions = buildOpportunities({ apps, answeredKeys, dailyEarned, dailyCap: 5, maxQuestions: 6 });
+    return res.status(200).json({
+      ok: true,
+      questions,
+      credits_left: Math.max(0, 5 - dailyEarned),
       balance: cred?.balance ?? 3,
     });
   }
