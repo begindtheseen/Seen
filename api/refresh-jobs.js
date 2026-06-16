@@ -493,6 +493,20 @@ async function upsertJobs(jobs, supabaseUrl, serviceKey) {
   return { upserted: Array.isArray(rows) ? rows.length : 0, rows: Array.isArray(rows) ? rows : [] };
 }
 
+// Exact row count of the jobs table (via PostgREST count=exact Content-Range header).
+// Used to split a merge-duplicates upsert into NEW inserts vs updates of existing rows.
+async function jobCount(supabaseUrl, serviceKey) {
+  try {
+    const r = await fetch(`${supabaseUrl}/rest/v1/jobs?select=id`, {
+      method: 'HEAD',
+      headers: { apikey: serviceKey, Authorization: `Bearer ${serviceKey}`, Prefer: 'count=exact', Range: '0-0' },
+    });
+    const cr = r.headers.get('content-range'); // e.g. "0-0/5194"
+    const total = cr && cr.includes('/') ? parseInt(cr.split('/')[1], 10) : NaN;
+    return Number.isFinite(total) ? total : null;
+  } catch (_e) { return null; }
+}
+
 // Pre-generate insights for jobs that don't have them yet.
 // 5 concurrent Haiku calls, max 20 jobs per cron run (~8s total).
 // After the first pass the DB fills up and this becomes a near no-op.
@@ -730,11 +744,18 @@ export default async function handler(req, res) {
     const upsertBatches = Array.from({ length: Math.ceil(allJobs.length / UPSERT_BATCH) }, (_, i) =>
       allJobs.slice(i * UPSERT_BATCH, (i + 1) * UPSERT_BATCH)
     );
+    // Count before/after the upserts so we can report NEW listings vs updates of
+    // existing ones (a merge-duplicates upsert can't tell them apart on its own).
+    const countBefore = await jobCount(SUPABASE_URL, SUPABASE_SERVICE_KEY);
     const upsertResults = [];
     for (let i = 0; i < upsertBatches.length; i += 3) {
       const chunk = await Promise.all(upsertBatches.slice(i, i + 3).map(b => upsertJobs(b, SUPABASE_URL, SUPABASE_SERVICE_KEY)));
       upsertResults.push(...chunk);
     }
+    const countAfter = await jobCount(SUPABASE_URL, SUPABASE_SERVICE_KEY);
+    const upsertedTotal = upsertResults.reduce((sum, r) => sum + (r.upserted || 0), 0);
+    const inserted = (countBefore != null && countAfter != null) ? Math.max(0, countAfter - countBefore) : null;
+    const updated = inserted != null ? Math.max(0, upsertedTotal - inserted) : null;
 
     // Pre-generate insights for new/uncached jobs — capped at 12s to stay within 60s maxDuration
     const allRows = upsertResults.flatMap(r => r.rows || []);
@@ -779,7 +800,9 @@ export default async function handler(req, res) {
       batch: batchIndex,
       searches: searches.length,
       found: allJobs.length,
-      upserted: upsertResults.reduce((sum, r) => sum + (r.upserted || 0), 0),
+      upserted: upsertedTotal,
+      inserted,
+      updated,
       purged: junkResult.removed,
       merged,
     });

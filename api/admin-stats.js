@@ -153,7 +153,7 @@ async function _handler(req, res) {
       recentReportsRes, recentAppsRes, jobsTodayRes, inactiveReportsRes,
       jobsActiveRes, jobsNewTodayRes,
       reportsMonthRes, searchLogsWeekRes,
-      jobsTotalRes,
+      jobsTotalRes, creditTxnRes,
     ] = await Promise.all([
       db(`profiles?select=id`, { headers: { Prefer: 'count=exact', 'Range-Unit': 'items', Range: '0-0' } }),
       db(`profiles?created_at=gte.${todayISO}&select=id`, { headers: { Prefer: 'count=exact', 'Range-Unit': 'items', Range: '0-0' } }),
@@ -185,6 +185,7 @@ async function _handler(req, res) {
       db(`reports?created_at=gte.${monthISO}&select=created_at,company_name,outcome&order=created_at.asc&limit=2000`),
       db(`search_logs?created_at=gte.${weekISO}&select=query&limit=500`),
       db(`jobs?select=count`),
+      db(`credit_transactions?select=delta&limit=20000`),
     ]);
 
     const usersTotal = ct(usersTotalRes);
@@ -197,6 +198,13 @@ async function _handler(req, res) {
     const jobsTotal   = parseInt(jobsTotalData[0]?.count)    || 0;
     const creditRows = creditListRes.ok ? await creditListRes.json() : [];
     const proCount = creditRows.filter(r => r.pro).length;
+    const totalBalance = creditRows.reduce((s, r) => s + (Number(r.balance) || 0), 0);
+    const creditTxns = creditTxnRes && creditTxnRes.ok ? await creditTxnRes.json() : [];
+    let creditsEarned = 0, creditsSpent = 0;
+    for (const t of (Array.isArray(creditTxns) ? creditTxns : [])) {
+      const d = Number(t.delta) || 0;
+      if (d > 0) creditsEarned += d; else creditsSpent += -d;
+    }
     const ghosted = ct(appsGhostedRes);
     const totalApps = ct(appsAllRes);
     const errToday = errTodayRes.ok ? await errTodayRes.json() : [];
@@ -279,7 +287,7 @@ async function _handler(req, res) {
       reports: { total: ct(reportsAllRes), today: ct(reportsTodayRes), this_week: ct(reportsWeekRes), recent: recentReports, chart: reportsChart, top_companies: topCompanies, outcome_breakdown: outcomeMap },
       applications: { total: totalApps, ghosted_30d: ghosted, hired_30d: ct(appsHiredRes), ghost_rate_pct: totalApps > 0 ? Math.round(ghosted / totalApps * 100) : null, recent: recentApps },
       companies: { with_scores: ct(coScoredRes) },
-      credits: { total_users: creditRows.length, pro_users: proCount },
+      credits: { total_users: creditRows.length, pro_users: proCount, total_balance: totalBalance, earned: creditsEarned, spent: creditsSpent },
       errors: { today: errToday.length, this_week: ct(errWeekRes), by_route: errByRoute, recent: errToday.slice(0, 5) },
       issues: { open: issues.length, items: issues },
       duplicate_clusters: { suspected: dupClusters.length, items: dupClusters },
