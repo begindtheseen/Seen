@@ -231,6 +231,13 @@ function PricingPageInner() {
               <span style={{ fontFamily: 'var(--mono)', fontSize: '.52rem', color: 'var(--dim)' }}>💳 Stripe secure</span>
               <span style={{ fontFamily: 'var(--mono)', fontSize: '.52rem', color: 'var(--dim)' }}>⚡ Instant access</span>
             </div>
+            {/* Auto-renewal disclosure (FTC / state ARL compliance). */}
+            <div style={{ fontFamily: 'var(--body)', fontSize: '.62rem', color: 'var(--sub)', textAlign: 'center', lineHeight: 1.6, marginTop: '.65rem' }}>
+              {yearly
+                ? `Subscription auto-renews at $${(parseFloat(YEARLY) * 12).toFixed(2)}/year until canceled.`
+                : `Subscription auto-renews at ${MONTHLY}/month until canceled.`}
+              {' '}Cancel anytime in Profile → Billing.
+            </div>
           </div>
         </div>
 

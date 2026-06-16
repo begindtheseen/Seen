@@ -163,7 +163,15 @@ export default function UpgradeModal({ reason, onClose, featureName }: UpgradeMo
             {loading ? 'Redirecting to checkout…' : `Upgrade to Pro · ${plan === 'yearly' ? YEARLY_PRICE + '/mo' : MONTHLY_PRICE + '/mo'}`}
           </button>
 
-          <div style={{ display: 'flex', justifyContent: 'center', gap: '1.5rem', marginTop: '.85rem' }}>
+          {/* Auto-renewal disclosure — shown at the point of purchase (FTC / state ARL compliance). */}
+          <div style={{ fontFamily: 'var(--body)', fontSize: '.66rem', color: 'var(--sub)', textAlign: 'center', lineHeight: 1.6, marginTop: '.85rem' }}>
+            {plan === 'yearly'
+              ? `Billed $${(parseFloat(YEARLY_PRICE.replace(/[^0-9.]/g, '')) * 12).toFixed(2)} today, then automatically each year until you cancel.`
+              : `Billed ${MONTHLY_PRICE} today, then automatically each month until you cancel.`}
+            {' '}Cancel anytime in Profile → Billing. See <a href="/legal" style={{ color: 'var(--blue)' }}>Subscription Terms</a>.
+          </div>
+
+          <div style={{ display: 'flex', justifyContent: 'center', gap: '1.5rem', marginTop: '.75rem' }}>
             <span style={{ fontFamily: 'var(--mono)', fontSize: '.55rem', color: 'var(--dim)' }}>↩ Cancel anytime</span>
             <span style={{ fontFamily: 'var(--mono)', fontSize: '.55rem', color: 'var(--dim)' }}>💳 Stripe secure</span>
             <span style={{ fontFamily: 'var(--mono)', fontSize: '.55rem', color: 'var(--dim)' }}>⚡ Instant access</span>
