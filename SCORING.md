@@ -107,8 +107,37 @@ Existing display thresholds still apply: computed rates require ≥ 5 reports;
 2. Schedule `POST /api/reports {action:"update_tenure"}` (cron header or admin token),
    e.g. daily, to refresh tenure. Safe to run anytime; additive + idempotent.
 
-## 9. Next (fast follows)
+## 9. Multi-source fusion (NEW — `api/_utils/companyIntel.js`)
+
+Previously the web-research path computed the score purely from Claude's estimate and
+**ignored the real outcome data we already hold** (direct user reports, Reddit imports,
+ingest). `fuseCompanyIntel()` fixes that: the web estimate becomes a **prior**, and our
+real reported outcomes are **evidence**, weighted by source trust (§2). We shrink the
+prior toward the evidence as the trust-weighted sample grows:
+
+```
+weightEmpirical = effN / (effN + PRIOR_STRENGTH)        // PRIOR_STRENGTH = 8
+fused_rate      = weightEmpirical · empirical + (1 − weightEmpirical) · prior
+effN            = Σ over sources of  trust(source) · resolved_reports
+```
+
+So 2 reports barely move a researched prior, but 200 real reports dominate it. Trust:
+`direct`/`seen_intel` 1.0 · `ingest` 0.55 · `reddit` 0.3 (matches §2). Outcomes are
+bucketed into ghost vs human-response (`waiting` is non-terminal; `autoreject` is
+resolved-but-neither). `report_count` becomes real resolved reports + the web's claimed
+count, feeding the (capped) volume term + confidence.
+
+**Wiring:** `_fuseWithReports()` in `reports.js` pulls a company's `reports` rows,
+classifies each by `platform` (`classifyPlatform`), and fuses at **write time** — in the
+single-company `company_score` path (so any NEW company auto-fuses its reports the moment
+it's scored) and in the batch `populate` path. Reads stay cheap (the fused values are
+stored). With no reports, the fused result equals the web estimate exactly (no regression).
+Pure + unit-tested (10 tests).
+
+## 10. Next (fast follows)
 
 - Per-source sub-scores ("what Reddit says" vs "what users report").
 - Global company dedup via `company_aliases` so tenure/report data joins one canonical company.
-- Surface `confidence` in the UI (scoreboard + company page) as a data-strength badge.
+- Surface `confidence` + `fused_sources` in the UI (scoreboard + company page) as a data-strength badge.
+- Backfill: re-run `populate`/`company_score` so existing rows pick up fusion (after the
+  scoring-cap fix in PR #48 is live, so refreshes don't recompute with the uncapped formula).
