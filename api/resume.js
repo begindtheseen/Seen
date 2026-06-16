@@ -133,13 +133,25 @@ JOB DESCRIPTION:\n${(jobDescription||'').slice(0,2500)}${background?'\nCANDIDATE
 JOB: ${job} at ${company}
 JOB DESCRIPTION:\n${(jobDescription||'').slice(0,2500)}${background?'\nCANDIDATE:\n'+background.slice(0,1000):''}`;
 
+    } else if (tool === 'advantage') {
+      // Combined application-advantage tool: the outreach/positioning playbook AND the
+      // 30/60/90-day plan in one call (one credit). Merges the old 'coach' + 'proposal'.
+      const { job, company, jobDescription, background } = body;
+      if (!job || !company || !jobDescription) return res.status(400).json({ error: 'Job, company, and job description required' });
+      systemPrompt = 'You are a job application strategist and career coach. Return ONLY valid JSON.';
+      prompt = `Create a complete application-advantage package: a positioning/outreach playbook AND a 30/60/90 day onboarding plan to attach with the application. Return ONLY a JSON object:
+{"hiring_manager_script":"<LinkedIn message>","timing_note":"<why apply fast>","company_intel":"<2-3 things about ${company}>","cover_letter_framework":"<3 paragraph framework>","referral_strategy":"<how to get a referral>","opening_note":"<1 sentence intro to the plan>","day_30":"<first 30 days plan>","day_60":"<days 31-60 plan>","day_90":"<days 61-90 plan>"}
+
+JOB: ${job} at ${company}
+JOB DESCRIPTION:\n${(jobDescription||'').slice(0,2500)}${background?'\nCANDIDATE:\n'+background.slice(0,1000):''}`;
+
     } else {
       return res.status(400).json({ error: 'Unknown tool: ' + tool });
     }
 
     const requestBody = JSON.stringify({
       model: 'claude-haiku-4-5-20251001',
-      max_tokens: (tool === 'optimize' || tool === 'humanize') ? 2500 : 2000,
+      max_tokens: (tool === 'optimize' || tool === 'humanize') ? 2500 : tool === 'advantage' ? 3000 : 2000,
       system: systemPrompt,
       messages: [{ role: 'user', content: prompt }],
     });
