@@ -113,6 +113,16 @@ export default async function handler(req, res) {
   if (typeof body === 'string') try { body = JSON.parse(body); } catch(e) { body = {}; }
   body = body || {};
 
+  // Service-key headers for all DB reads/writes below. Declared once here, before
+  // the first POST handler — previously it was declared further down, so the
+  // leaderboard handler referenced an out-of-scope `dbH` and silently returned [],
+  // leaving the company scoreboard empty.
+  const hdrsBase = {
+    apikey: SUPABASE_SERVICE_KEY,
+    Authorization: `Bearer ${SUPABASE_SERVICE_KEY}`,
+    'Content-Type': 'application/json',
+  };
+
   // ── Company-score: merged from api/company-score.js ─────────────────────────
   if (body.action === 'company_score' || body.action === 'research' || body.action === 'resolve' || body.action === 'populate' || body.name) {
     if (await applyRateLimit(req, res, 'company-score')) return;
@@ -126,7 +136,7 @@ export default async function handler(req, res) {
     try {
       const r = await fetch(
         `${SUPABASE_URL}/rest/v1/company_scores?select=company_name,overall_score,ghost_rate,response_rate,avg_wait_days,waste_score,report_count,data_quality,verification_status,industry&order=report_count.desc&limit=150`,
-        { headers: dbH }
+        { headers: hdrsBase }
       );
       if (!r.ok) return res.status(200).json({ companies: [] });
       const rows = await r.json();
@@ -188,12 +198,6 @@ export default async function handler(req, res) {
       return res.status(500).json({ error: 'Internal error' });
     }
   }
-
-  const hdrsBase = {
-    apikey: SUPABASE_SERVICE_KEY,
-    Authorization: `Bearer ${SUPABASE_SERVICE_KEY}`,
-    'Content-Type': 'application/json',
-  };
 
   // ── Batch score lookup — DB-only, no AI, cached scores for up to 50 companies ──
   if (body.action === 'batch_scores') {
