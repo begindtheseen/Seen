@@ -37,6 +37,16 @@ interface ProposalResult {
 // The merged "Advantage" tool returns the playbook + the 30/60/90 plan together.
 type CombinedResult = CoachResult & ProposalResult
 
+// Read-only company intel (from our scores) folded into the AI prompts — the thing
+// only Seen has: how this company actually treats applicants.
+interface CompanyIntel {
+  ghost_rate?: number | null
+  response_rate?: number | null
+  avg_wait_days?: number | null
+  overall_score?: number | null
+  report_count?: number | null
+}
+
 const areaStyle: React.CSSProperties = {
   width: '100%',
   background: 'var(--surface)',
@@ -326,17 +336,14 @@ function ResumePageInner() {
   const [resumeText, setResumeText] = useState('')
   const [resumeMeta, setResumeMeta] = useState<{ fileName: string; wordCount: number } | null>(null)
 
-  // Scanner fields — pre-filled from query params when coming from jobs page
-  const [scanJob, setScanJob] = useState(params?.get('role') ?? '')
-  const [scanCompany, setScanCompany] = useState(params?.get('company') ?? '')
-  const [scanJD, setScanJD] = useState('')
+  // ONE shared job context feeds BOTH the Résumé-Fit scan and the Advantage tool —
+  // pre-filled from query params when arriving from a job page.
+  const [jobTitle, setJobTitle] = useState(params?.get('role') ?? '')
+  const [jobCompany, setJobCompany] = useState(params?.get('company') ?? '')
+  const [jobJD, setJobJD] = useState('')
+  const [background, setBackground] = useState('')
+  const [companyIntel, setCompanyIntel] = useState<CompanyIntel | null>(null)
   const [scanResult, setScanResult] = useState<ScannerResult | null>(null)
-
-  // Advantage tool (merged Advantage Coach + Pre-Proposal) fields
-  const [advJob, setAdvJob] = useState('')
-  const [advCompany, setAdvCompany] = useState('')
-  const [advJD, setAdvJD] = useState('')
-  const [advBackground, setAdvBackground] = useState('')
   const [advResult, setAdvResult] = useState<CombinedResult | null>(null)
 
   // Job source: choose from saved jobs (default) or reveal manual entry
@@ -361,18 +368,36 @@ function ResumePageInner() {
     SavedJobsStore.load(isLoggedIn).then(setSavedJobs).catch(() => {})
   }, [isLoggedIn])
 
-  // Pick a saved job → fill job title / company / description from its snapshot.
+  // Pull Seen intel once if the company was pre-filled (arriving from a job page).
+  useEffect(() => { if (jobCompany.trim()) fetchIntel(jobCompany) }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Read-only company intel (ghost/response from our scores) — no web research,
+  // so it's cheap and only returns when we actually have data on the company.
+  async function fetchIntel(company: string) {
+    setCompanyIntel(null)
+    if (!company.trim()) return
+    try {
+      const r = await fetch(`/api/reports?type=company&name=${encodeURIComponent(company.trim())}`)
+      const d = await r.json().catch(() => ({})) as { stats?: CompanyIntel }
+      if (d.stats && (d.stats.report_count || 0) > 0) setCompanyIntel(d.stats)
+    } catch { /* no intel — the tools still run, just without Seen data */ }
+  }
+
+  // Pick a saved job → fill job title / company / description from its snapshot,
+  // and pull this company's Seen intel to fold into the advice.
   function pickSavedJob(jobId: string) {
     setSavedId(jobId)
     if (!jobId) return
     const s = savedJobs.find(j => String(j.job_id) === jobId)
     if (!s) return
     const snap = s.snapshot
-    setAdvJob(s.role || snap?.title || '')
-    setAdvCompany(s.company || snap?.company || '')
-    setAdvJD(snap?.description || '')
+    const co = s.company || snap?.company || ''
+    setJobTitle(s.role || snap?.title || '')
+    setJobCompany(co)
+    setJobJD(snap?.description || '')
     setShowManual(false)
     setError('')
+    fetchIntel(co)
   }
 
   async function uploadFile(file: File) {
@@ -431,25 +456,23 @@ function ResumePageInner() {
   }
 
   async function runScanner() {
-    const text = resumeText
-    if (!text.trim()) { setError('Paste your resume first.'); return }
-    if (!scanJob.trim()) { setError('Enter the job title.'); return }
+    if (!resumeText.trim()) { setError('Add your résumé first.'); return }
+    if (!jobTitle.trim()) { setError('Pick a saved job, or enter the job title.'); return }
     setLoading(true); setError(''); setScanResult(null)
     try {
-      const out = await callApi<ScannerResult>({ tool: 'scanner', resume: text, job: scanJob, company: scanCompany, jobDescription: scanJD })
+      const out = await callApi<ScannerResult>({ tool: 'scanner', resume: resumeText, job: jobTitle, company: jobCompany, jobDescription: jobJD, companyIntel })
       setScanResult(out)
     } catch (e) { setError(e instanceof CreditsError ? e.message : 'Analysis failed. Please try again.') }
     setLoading(false)
   }
 
   async function runAdvantage() {
-    const text = resumeText
-    if (!text.trim()) { setError('Add your resume first.'); return }
-    if (!advJob.trim() || !advCompany.trim()) { setError('Pick a saved job, or enter the job title + company manually.'); return }
-    if (!advJD.trim()) { setError('A job description is required — pick a saved job or paste one manually.'); setShowManual(true); return }
+    if (!resumeText.trim()) { setError('Add your résumé first.'); return }
+    if (!jobTitle.trim() || !jobCompany.trim()) { setError('Pick a saved job, or enter the job title + company.'); setShowManual(true); return }
+    if (!jobJD.trim()) { setError('A job description is needed — pick a saved job or paste one (Enter manually).'); setShowManual(true); return }
     setLoading(true); setError(''); setAdvResult(null)
     try {
-      const out = await callApi<CombinedResult>({ tool: 'advantage', resume: text, job: advJob, company: advCompany, jobDescription: advJD, background: advBackground })
+      const out = await callApi<CombinedResult>({ tool: 'advantage', resume: resumeText, job: jobTitle, company: jobCompany, jobDescription: jobJD, background, companyIntel })
       setAdvResult(out)
     } catch (e) { setError(e instanceof CreditsError ? e.message : 'Generation failed. Please try again.') }
     setLoading(false)
@@ -497,14 +520,8 @@ function ResumePageInner() {
             Maximize every application
           </h1>
           <p style={{ color: 'var(--sub)', fontSize: '.85rem', fontWeight: 300 }}>
-            ATS scanner and a full application-advantage playbook with a 30/60/90-day plan — all from your resume.
+            One job, one résumé — get your ATS fit plus a full advantage playbook + 30/60/90 plan, sharpened with Seen&apos;s data on how the company actually treats applicants.
           </p>
-        </div>
-
-        {/* Tool tabs */}
-        <div style={{ display: 'flex', gap: '.5rem', marginBottom: '1.5rem', flexWrap: 'wrap' }}>
-          {toolBtn('scanner', '🎯 Resume Scanner')}
-          {toolBtn('advantage', '🧠 Advantage + Plan')}
         </div>
 
         {error && (
@@ -513,116 +530,111 @@ function ResumePageInner() {
           </div>
         )}
 
-        {/* Scanner */}
-        {tool === 'scanner' && (
-          <div className="resume-layout">
-            <div>
-              {sharedResume}
-              <div style={{ marginTop: '1rem' }}>
-                {label('Job title')}
-                <input type="text" placeholder="e.g. Senior Product Manager" value={scanJob} onChange={e => setScanJob(e.target.value)} style={inputStyle} />
-                {label('Company (optional)')}
-                <input type="text" placeholder="e.g. Stripe" value={scanCompany} onChange={e => setScanCompany(e.target.value)} style={inputStyle} />
-                {label('Job description (optional but recommended)')}
-                <textarea placeholder="Paste the job description..." value={scanJD} onChange={e => setScanJD(e.target.value)} rows={5} style={{ ...areaStyle, marginBottom: '.75rem' }} />
+        <div className="resume-layout">
+          {/* Left: shared inputs — one résumé, one job, two outputs */}
+          <div>
+            {sharedResume}
+
+            <div style={{ marginTop: '1rem' }}>
+              {label('Which job?')}
+              {savedJobs.length > 0 ? (
+                <select value={savedId} onChange={e => pickSavedJob(e.target.value)} style={{ ...inputStyle, fontFamily: 'var(--body)', cursor: 'pointer' }}>
+                  <option value="">📌 Choose a saved job…</option>
+                  {savedJobs.map(s => (
+                    <option key={String(s.job_id)} value={String(s.job_id)}>
+                      {(s.role || 'Role')}{s.company ? ' — ' + s.company : ''}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <div style={{ fontFamily: 'var(--mono)', fontSize: '.62rem', color: 'var(--muted)', marginBottom: '.6rem', lineHeight: 1.6 }}>
+                  No saved jobs yet — save jobs from search, or enter the details below.
+                </div>
+              )}
+
+              {savedId && !showManual && (
+                <div style={{ background: 'var(--gdim)', border: '1px solid var(--gmid)', borderRadius: 8, padding: '.6rem .85rem', fontFamily: 'var(--mono)', fontSize: '.66rem', color: 'var(--green)', marginBottom: '.6rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '.5rem' }}>
+                  <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>✓ {jobTitle}{jobCompany ? ' · ' + jobCompany : ''}</span>
+                  <button onClick={() => setShowManual(true)} style={{ background: 'none', border: 'none', color: 'var(--green)', fontFamily: 'var(--mono)', fontSize: '.6rem', cursor: 'pointer', textDecoration: 'underline', flexShrink: 0 }}>edit</button>
+                </div>
+              )}
+
+              {companyIntel && (
+                <div style={{ background: 'rgba(59,130,246,0.07)', border: '1px solid rgba(59,130,246,0.25)', borderRadius: 8, padding: '.55rem .8rem', fontFamily: 'var(--mono)', fontSize: '.6rem', color: '#7cb3ff', marginBottom: '.6rem', lineHeight: 1.6 }}>
+                  📊 Seen data on {jobCompany}: {Math.round((companyIntel.ghost_rate || 0) * 100)}% ghost · {Math.round((companyIntel.response_rate || 0) * 100)}% respond{companyIntel.overall_score != null ? ` · grade ${Math.round(companyIntel.overall_score)}/100` : ''} — folded into the advice below.
+                </div>
+              )}
+
+              <button
+                onClick={() => setShowManual(v => !v)}
+                style={{ background: 'none', border: '1px solid var(--line2)', color: 'var(--dim)', borderRadius: 6, padding: '.4rem .8rem', fontFamily: 'var(--mono)', fontSize: '.62rem', cursor: 'pointer', marginBottom: (showManual || savedJobs.length === 0) ? '.75rem' : '1rem' }}
+              >
+                {showManual ? '▲ Hide manual entry' : '✎ Enter job info manually'}
+              </button>
+
+              {(showManual || savedJobs.length === 0) && (
+                <div>
+                  {label('Job title')}
+                  <input type="text" placeholder="e.g. Engineering Manager" value={jobTitle} onChange={e => setJobTitle(e.target.value)} style={inputStyle} />
+                  {label('Company')}
+                  <input type="text" placeholder="e.g. Notion" value={jobCompany} onChange={e => setJobCompany(e.target.value)} onBlur={() => fetchIntel(jobCompany)} style={inputStyle} />
+                  {label('Job description')}
+                  <textarea placeholder="Paste the job description..." value={jobJD} onChange={e => setJobJD(e.target.value)} rows={4} style={{ ...areaStyle, marginBottom: '.75rem' }} />
+                </div>
+              )}
+
+              {/* Sub-tabs: which output */}
+              {label('What do you want?')}
+              <div style={{ display: 'flex', gap: '.5rem', marginBottom: '1rem', flexWrap: 'wrap' }}>
+                {toolBtn('scanner', '🎯 Résumé Fit')}
+                {toolBtn('advantage', '🧠 Advantage + Plan')}
+              </div>
+
+              {tool === 'advantage' && (
+                <>
+                  {label('Your background (why you want this role) — optional')}
+                  <textarea placeholder="What draws you to this role? Any unique experience?" value={background} onChange={e => setBackground(e.target.value)} rows={3} style={{ ...areaStyle, marginBottom: '.75rem' }} />
+                </>
+              )}
+
+              {tool === 'scanner' ? (
                 <button style={{ ...btnPrimary, opacity: loading ? 0.6 : 1, cursor: loading ? 'not-allowed' : 'pointer' }} onClick={runScanner} disabled={loading}>
-                  {loading && tool === 'scanner' ? 'Analyzing...' : 'Scan resume →'}
+                  {loading ? 'Analyzing...' : 'Scan résumé fit →'}
                   <span style={{ marginLeft: '.5rem', fontSize: '.55rem', opacity: .65, fontFamily: 'var(--mono)', fontWeight: 400 }}>· 1 credit</span>
                 </button>
-              </div>
-            </div>
-            <div>
-              {scanResult ? (
-                <>
-                  <ScannerResultView d={scanResult} />
-                  <EmailCTA
-                    company={scanCompany}
-                    role={scanJob}
-                    matchScore={scanResult.match_score}
-                    summary={scanResult.score_summary ?? ''}
-                    user={user}
-                  />
-                </>
               ) : (
-                <ResultEmpty icon="🎯" text={'ATS match score, missing keywords,\nand line-by-line rewrites appear here.'} />
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* Advantage + Plan (merged Advantage Coach + Pre-Proposal) */}
-        {tool === 'advantage' && (
-          <div className="resume-layout">
-            <div>
-              {sharedResume}
-              <div style={{ marginTop: '1rem' }}>
-                {label('Which job?')}
-                {savedJobs.length > 0 ? (
-                  <select
-                    value={savedId}
-                    onChange={e => pickSavedJob(e.target.value)}
-                    style={{ ...inputStyle, fontFamily: 'var(--body)', cursor: 'pointer' }}
-                  >
-                    <option value="">📌 Choose a saved job…</option>
-                    {savedJobs.map(s => (
-                      <option key={String(s.job_id)} value={String(s.job_id)}>
-                        {(s.role || 'Role')}{s.company ? ' — ' + s.company : ''}
-                      </option>
-                    ))}
-                  </select>
-                ) : (
-                  <div style={{ fontFamily: 'var(--mono)', fontSize: '.62rem', color: 'var(--muted)', marginBottom: '.6rem', lineHeight: 1.6 }}>
-                    No saved jobs yet — save jobs from search, or enter the details below.
-                  </div>
-                )}
-
-                {savedId && !showManual && (
-                  <div style={{ background: 'var(--gdim)', border: '1px solid var(--gmid)', borderRadius: 8, padding: '.6rem .85rem', fontFamily: 'var(--mono)', fontSize: '.66rem', color: 'var(--green)', marginBottom: '.6rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '.5rem' }}>
-                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>✓ {advJob}{advCompany ? ' · ' + advCompany : ''}</span>
-                    <button onClick={() => setShowManual(true)} style={{ background: 'none', border: 'none', color: 'var(--green)', fontFamily: 'var(--mono)', fontSize: '.6rem', cursor: 'pointer', textDecoration: 'underline', flexShrink: 0 }}>edit</button>
-                  </div>
-                )}
-
-                <button
-                  onClick={() => setShowManual(v => !v)}
-                  style={{ background: 'none', border: '1px solid var(--line2)', color: 'var(--dim)', borderRadius: 6, padding: '.4rem .8rem', fontFamily: 'var(--mono)', fontSize: '.62rem', cursor: 'pointer', marginBottom: (showManual || savedJobs.length === 0) ? '.75rem' : '1rem' }}
-                >
-                  {showManual ? '▲ Hide manual entry' : '✎ Enter job info manually'}
-                </button>
-
-                {(showManual || savedJobs.length === 0) && (
-                  <div>
-                    {label('Job title')}
-                    <input type="text" placeholder="e.g. Engineering Manager" value={advJob} onChange={e => setAdvJob(e.target.value)} style={inputStyle} />
-                    {label('Company')}
-                    <input type="text" placeholder="e.g. Notion" value={advCompany} onChange={e => setAdvCompany(e.target.value)} style={inputStyle} />
-                    {label('Job description')}
-                    <textarea placeholder="Paste the job description..." value={advJD} onChange={e => setAdvJD(e.target.value)} rows={4} style={{ ...areaStyle, marginBottom: '.75rem' }} />
-                  </div>
-                )}
-
-                {label('Your background (why you want this role) — optional')}
-                <textarea placeholder="What draws you to this role? Any unique experience?" value={advBackground} onChange={e => setAdvBackground(e.target.value)} rows={3} style={{ ...areaStyle, marginBottom: '.75rem' }} />
-
                 <button style={{ ...btnPrimary, opacity: loading ? 0.6 : 1, cursor: loading ? 'not-allowed' : 'pointer' }} onClick={runAdvantage} disabled={loading}>
                   {loading ? 'Building your advantage...' : 'Get advantage + 30/60/90 plan →'}
                   <span style={{ marginLeft: '.5rem', fontSize: '.55rem', opacity: .65, fontFamily: 'var(--mono)', fontWeight: 400 }}>· 1 credit</span>
                 </button>
-              </div>
+              )}
             </div>
-            <div>
-              {advResult ? (
+          </div>
+
+          {/* Right: the active output */}
+          <div>
+            {tool === 'scanner' ? (
+              scanResult ? (
+                <>
+                  <ScannerResultView d={scanResult} />
+                  <EmailCTA company={jobCompany} role={jobTitle} matchScore={scanResult.match_score} summary={scanResult.score_summary ?? ''} user={user} />
+                </>
+              ) : (
+                <ResultEmpty icon="🎯" text={"ATS fit score, missing keywords, line-by-line\nrewrites — plus this company's ghost risk."} />
+              )
+            ) : (
+              advResult ? (
                 <>
                   <CoachResultView d={advResult} />
                   <div style={{ height: '.75rem' }} />
                   <ProposalResultView d={advResult} />
                 </>
               ) : (
-                <ResultEmpty icon="🧠" text={'Hiring-manager script, timing, company intel,\nreferral tactics + a 30/60/90-day plan appear here.'} />
-              )}
-            </div>
+                <ResultEmpty icon="🧠" text={'Hiring-manager script, timing, referral tactics\n+ a 30/60/90-day plan appear here.'} />
+              )
+            )}
           </div>
-        )}
+        </div>
       </div>
     </div>
   )

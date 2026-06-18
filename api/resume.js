@@ -7,6 +7,15 @@ import { logError } from '../lib/server/errlog.js';
 import { gateAI } from '../lib/server/credits.js';
 const inflateRaw = promisify(zlib.inflateRaw);
 
+// One-line "Seen data" block from read-only company intel (ghost/response from our
+// scores), or '' when we have no data on the company. This is the differentiator —
+// only Seen knows how a company actually treats applicants.
+function _seenIntel(company, ci) {
+  if (!ci || !ci.report_count) return '';
+  const pct = (v) => Math.round((Number(v) || 0) * 100);
+  return `SEEN DATA on ${company} (from ${ci.report_count} real applicant reports): ${pct(ci.ghost_rate)}% were ghosted, ${pct(ci.response_rate)}% got a response, average wait ${Math.round(Number(ci.avg_wait_days) || 0)} days, Seen hiring grade ${Math.round(Number(ci.overall_score) || 0)}/100.`;
+}
+
 export default async function handler(req, res) {
   const _o = req.headers.origin || '';
   const _devO = !_o || _o.includes('localhost') || _o.includes('127.0.0.1');
@@ -69,13 +78,14 @@ export default async function handler(req, res) {
     if (tool === 'scanner') {
       const { job, company, resume, jobDescription } = body;
       if (!resume || !jobDescription) return res.status(400).json({ error: 'Resume and job description required' });
+      const intel = _seenIntel(company, body.companyIntel);
       systemPrompt = 'You are an ATS resume scanner. Analyze resume fit for a job and return ONLY valid JSON with no markdown.';
       prompt = `Analyze this resume against the job description. Return ONLY a JSON object:
 {"match_score":<0-100>,"score_summary":"<2 sentences>","missing_keywords":["..."],"strong_keywords":["..."],"specific_fixes":[{"current":"<bullet>","improved":"<rewrite>"}],"ghost_risk_note":"<1 sentence>"}
 
 JOB: ${job} at ${company}
 JOB DESCRIPTION:\n${(jobDescription||'').slice(0,3000)}
-RESUME:\n${(resume||'').slice(0,4000)}`;
+RESUME:\n${(resume||'').slice(0,4000)}${intel ? `\n${intel}\nFor ghost_risk_note, cite this company's real ghost rate and give one concrete tactic to avoid being ghosted here (not generic advice).` : ''}`;
 
     } else if (tool === 'optimize') {
       const { job, company, resume, jobDescription } = body;
@@ -138,12 +148,13 @@ JOB DESCRIPTION:\n${(jobDescription||'').slice(0,2500)}${background?'\nCANDIDATE
       // 30/60/90-day plan in one call (one credit). Merges the old 'coach' + 'proposal'.
       const { job, company, jobDescription, background } = body;
       if (!job || !company || !jobDescription) return res.status(400).json({ error: 'Job, company, and job description required' });
+      const intel = _seenIntel(company, body.companyIntel);
       systemPrompt = 'You are a job application strategist and career coach. Return ONLY valid JSON.';
       prompt = `Create a complete application-advantage package: a positioning/outreach playbook AND a 30/60/90 day onboarding plan to attach with the application. Return ONLY a JSON object:
 {"hiring_manager_script":"<LinkedIn message>","timing_note":"<why apply fast>","company_intel":"<2-3 things about ${company}>","cover_letter_framework":"<3 paragraph framework>","referral_strategy":"<how to get a referral>","opening_note":"<1 sentence intro to the plan>","day_30":"<first 30 days plan>","day_60":"<days 31-60 plan>","day_90":"<days 61-90 plan>"}
 
 JOB: ${job} at ${company}
-JOB DESCRIPTION:\n${(jobDescription||'').slice(0,2500)}${background?'\nCANDIDATE:\n'+background.slice(0,1000):''}`;
+JOB DESCRIPTION:\n${(jobDescription||'').slice(0,2500)}${background?'\nCANDIDATE:\n'+background.slice(0,1000):''}${intel ? `\n${intel}\nUse this real data: make company_intel lead with how they treat applicants, make timing_note reflect their ghost/response behavior, and have referral_strategy directly counter the ghost risk.` : ''}`;
 
     } else {
       return res.status(400).json({ error: 'Unknown tool: ' + tool });
