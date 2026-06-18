@@ -23,16 +23,32 @@ function getDaysSince(ts: number): number {
   return Math.floor((Date.now() - ts) / 86400000)
 }
 
-function AppCard({ app, onUpdate, onRemove, ghostRate }: {
+type Watch = { tone: 'ok' | 'warn' | 'danger'; text: string }
+// Time-aware "is this normal?" verdict — the insight only Seen can give: compare how
+// long an application has been silent against how this company ACTUALLY responds.
+function ghostWatch(days: number, intel?: { ghost_rate?: number; avg_wait_days?: number; report_count?: number }): Watch | null {
+  if (!intel || !intel.report_count || !intel.avg_wait_days) return null
+  const w = Math.round(intel.avg_wait_days)
+  if (w <= 0) return null
+  const gp = Math.round((intel.ghost_rate || 0) * 100)
+  if (days <= w) return { tone: 'ok', text: `Day ${days} · typical first response here is ~${w}d — still in the normal window.` }
+  if (days <= w * 2) return { tone: 'warn', text: `Day ${days} · past their ~${w}d average — a good time to follow up${gp >= 30 ? `; they ghost ${gp}%` : ''}.` }
+  const x = (days / w).toFixed(1)
+  return { tone: 'danger', text: `Day ${days} · ${x}× their ~${w}d average${gp >= 30 ? ` — they ghost ${gp}% of applicants here. Likely ghosted.` : ' — likely ghosted.'}` }
+}
+
+function AppCard({ app, onUpdate, onRemove, intel }: {
   app: Application
   onUpdate: (id: string, changes: Partial<Application>) => void
   onRemove: (id: string) => void
-  ghostRate?: number
+  intel?: { ghost_rate?: number; avg_wait_days?: number; report_count?: number; overall_score?: number }
 }) {
   const days = getDaysSince(app.appliedAt)
   const statusClass = STATUS_MAP[app.status] || ''
   const isActive = app.status === 'active'
   const [expanded, setExpanded] = useState(false)
+  const ghostRate = intel?.ghost_rate
+  const watch = isActive ? ghostWatch(days, intel) : null
 
   return (
     <div className={`app-card ${statusClass}`} id={`app_${app.id}`}>
@@ -79,6 +95,18 @@ function AppCard({ app, onUpdate, onRemove, ghostRate }: {
               )
             })}
           </div>
+        </div>
+      )}
+
+      {/* Ghost Watch — time-aware verdict from this company's real Seen data */}
+      {watch && (
+        <div style={{
+          marginTop: '.55rem', fontFamily: 'var(--mono)', fontSize: '.6rem', lineHeight: 1.6, borderRadius: 7, padding: '.45rem .7rem',
+          color: watch.tone === 'danger' ? 'var(--red)' : watch.tone === 'warn' ? 'var(--amber)' : 'var(--muted)',
+          background: watch.tone === 'danger' ? 'rgba(239,68,68,.07)' : watch.tone === 'warn' ? 'rgba(245,158,11,.06)' : 'var(--raised)',
+          border: `1px solid ${watch.tone === 'danger' ? 'rgba(239,68,68,.2)' : watch.tone === 'warn' ? 'rgba(245,158,11,.2)' : 'var(--line)'}`,
+        }}>
+          {watch.tone === 'danger' ? '👻 ' : watch.tone === 'warn' ? '⏰ ' : '✓ '}{watch.text}
         </div>
       )}
 
@@ -679,7 +707,7 @@ function TrackerPage() {
           <div id="trackerList" style={{ display: 'flex', flexDirection: 'column', gap: '.75rem' }}>
             {apps.map((app, i) => (
               <div key={app.id} style={highlightNew && i === 0 ? { borderRadius: 12, boxShadow: '0 0 0 2px var(--green), 0 0 30px rgba(16,185,129,0.3)', transition: 'box-shadow 2.5s ease' } : undefined}>
-                <AppCard app={app} onUpdate={handleUpdate} onRemove={handleRemove} ghostRate={companyScores[app.company.toLowerCase().trim()]?.ghost_rate} />
+                <AppCard app={app} onUpdate={handleUpdate} onRemove={handleRemove} intel={companyScores[app.company.toLowerCase().trim()]} />
               </div>
             ))}
           </div>
