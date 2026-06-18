@@ -67,11 +67,10 @@ async function drawCard(d: CompanyScoreCardData): Promise<HTMLCanvasElement> {
   rrPath(c, 1, 1, W - 2, H - 2, 24)
   c.strokeStyle = 'rgba(255,255,255,0.06)'; c.lineWidth = 1.5; c.stroke()
 
-  // Eyebrow
+  // Eyebrow (unbranded for now — no SEEN / seenjobs.io while pre-launch)
   c.font = '600 13px "DM Mono",monospace'; c.fillStyle = 'rgba(255,255,255,0.20)'
   c.textAlign = 'left'; c.textBaseline = 'top'
-  c.fillText('SEEN  ·  HIRING GRADE', PAD, PAD)
-  c.textAlign = 'right'; c.fillText('seenjobs.io', W - PAD, PAD)
+  c.fillText('HIRING GRADE', PAD, PAD)
 
   // Company name
   const coY = PAD + 50; let coFs = 58
@@ -133,7 +132,7 @@ async function drawCard(d: CompanyScoreCardData): Promise<HTMLCanvasElement> {
   c.beginPath(); c.moveTo(PAD, footerDivY); c.lineTo(W - PAD, footerDivY); c.stroke()
   c.font = '400 16px "DM Mono",monospace'; c.fillStyle = 'rgba(255,255,255,0.30)'
   c.textAlign = 'center'; c.textBaseline = 'middle'
-  c.fillText('Hiring transparency from real reports  ·  seenjobs.io', W / 2, footerDivY + 28)
+  c.fillText('Hiring transparency from real applicant reports', W / 2, footerDivY + 28)
 
   return canvas
 }
@@ -148,10 +147,10 @@ export default function CompanyScoreCard({ data, onClose }: { data: CompanyScore
   const OC = risk === 'safe' ? '#10b981' : risk === 'danger' ? '#ef4444' : '#f59e0b'
   const grade = letterGrade(score)
   const shareText = risk === 'danger'
-    ? `${data.company} scores ${score}/100 (${grade}) on Seen — ${Math.round((data.ghost_rate || 0) * 100)}% ghost rate. Research before you apply.`
+    ? `${data.company} hiring grade: ${grade} (${score}/100) — ${Math.round((data.ghost_rate || 0) * 100)}% ghost rate. Research before you apply.`
     : risk === 'warn'
-    ? `${data.company} scores ${score}/100 (${grade}) on Seen. Know before you apply.`
-    : `${data.company} scores ${score}/100 (${grade}) on Seen — strong hiring process.`
+    ? `${data.company} hiring grade: ${grade} (${score}/100). Know before you apply.`
+    : `${data.company} hiring grade: ${grade} (${score}/100) — strong hiring process.`
 
   useEffect(() => {
     if (doneRef.current) return
@@ -177,7 +176,7 @@ export default function CompanyScoreCard({ data, onClose }: { data: CompanyScore
     if (!dataUrl) return
     const a = document.createElement('a')
     a.href = dataUrl
-    a.download = `seen_grade_${(data.company || 'company').replace(/[^a-z0-9]/gi, '_')}_${Date.now()}.png`
+    a.download = `hiring_grade_${(data.company || 'company').replace(/[^a-z0-9]/gi, '_')}_${Date.now()}.png`
     a.click()
   }
 
@@ -185,14 +184,14 @@ export default function CompanyScoreCard({ data, onClose }: { data: CompanyScore
     if (dest === 'reddit') {
       window.open(`https://www.reddit.com/submit?type=image&title=${encodeURIComponent(shareText)}`, '_blank', 'noopener')
     } else if (dest === 'threads') {
-      window.open(`https://www.threads.net/intent/post?text=${encodeURIComponent(shareText + '\n\nseenjobs.io')}`, '_blank', 'noopener')
+      window.open(`https://www.threads.net/intent/post?text=${encodeURIComponent(shareText)}`, '_blank', 'noopener')
     } else if (dest === 'twitter') {
-      window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(shareText + '\n\nseenjobs.io')}`, '_blank', 'noopener')
+      window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(shareText)}`, '_blank', 'noopener')
     } else if (dest === 'linkedin') {
-      window.open(`https://www.linkedin.com/feed/?shareActive=true&text=${encodeURIComponent(shareText + '\n\nseenjobs.io')}`, '_blank', 'noopener')
+      window.open(`https://www.linkedin.com/feed/?shareActive=true&text=${encodeURIComponent(shareText)}`, '_blank', 'noopener')
     }
 
-    const fileName = `seen_grade_${(data.company || 'c').replace(/[^a-z0-9]/gi, '_')}_${Date.now()}.png`
+    const fileName = `hiring_grade_${(data.company || 'c').replace(/[^a-z0-9]/gi, '_')}_${Date.now()}.png`
     if (blob && navigator.share && navigator.canShare?.({ files: [new File([blob], fileName, { type: 'image/png' })] })) {
       try {
         await navigator.share({ files: [new File([blob], fileName, { type: 'image/png' })] })
