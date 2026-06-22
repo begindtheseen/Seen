@@ -169,6 +169,9 @@ export default async function handler(req, res) {
           waste: c.waste_score || 0,
         },
       }));
+      // Identical for every visitor and only changes when the score cron runs — let the
+      // CDN serve it so a popular leaderboard page doesn't hit the DB on every load.
+      res.setHeader('Cache-Control', 'public, s-maxage=300, stale-while-revalidate=600');
       return res.status(200).json({ ok: true, companies });
     } catch(e) { return res.status(200).json({ companies: [] }); }
   }
