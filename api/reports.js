@@ -265,7 +265,9 @@ export default async function handler(req, res) {
       if (!Array.isArray(names) || !names.length) return res.json({ ok: true, scores: {} });
       const nameList = names.slice(0, 50).map(n => String(n).toLowerCase().trim()).filter(Boolean);
       if (!nameList.length) return res.json({ ok: true, scores: {} });
-      const inFilter = nameList.map(n => `"${n}"`).join(',');
+      // Strip quotes/backslashes before wrapping — otherwise a crafted name could break out
+      // of the quoted PostgREST CSV value and alter which rows match (filter injection).
+      const inFilter = nameList.map(n => `"${n.replace(/["\\]/g, '')}"`).join(',');
       const r = await fetch(
         `${SUPABASE_URL}/rest/v1/company_scores?company_name=in.(${inFilter})&select=company_name,overall_score,ghost_rate,response_rate,avg_wait_days,waste_score,report_count&limit=50`,
         { headers: hdrsBase }
@@ -359,8 +361,17 @@ export default async function handler(req, res) {
 
   // ── Submit report (merged from submit-report.js) ────────────────────────────
   if (body.action === 'submit') {
+    // Per-IP throttle — this endpoint writes into the reports corpus that drives every
+    // company score, so it must never be a free-for-all firehose.
+    if (await applyRateLimit(req, res, 'report-submit')) return;
     const { company: co, role, location, platform, outcome, ghost_stage, rounds, unpaid_work, experience_level, report_text } = body;
     if (!co || !role || !location) return res.status(400).json({ error: 'company, role and location required' });
+    // Identify the submitter if a valid token is present. Anonymous submissions are still
+    // accepted (the public report page allows them) but enter at a low trust weight and are
+    // flagged for review, so they can't dominate or poison a company's score. Signed-in
+    // submissions are first-party and carry full weight.
+    const submitUid = await resolveUid(req);
+    const trusted = !!submitUid;
     const hdrs = { ...hdrsBase, Prefer: 'return=representation' };
     const safeCo = co.trim().slice(0, 200);
     const safeLoc = location.trim().slice(0, 200);
@@ -391,7 +402,12 @@ export default async function handler(req, res) {
       if (!lid) { const lr2 = await fetch(`${SUPABASE_URL}/rest/v1/company_locations?company_id=eq.${cid}&select=id&limit=1`, { headers: hdrs }); if (lr2.ok) { const r2 = await lr2.json(); lid = r2?.[0]?.id || null; } }
     }
 
-    const reportBase = { company_id: cid, location_id: lid || null, role: (role||'').trim().slice(0,200), platform: (platform||'').trim().slice(0,100), outcome: outcome||'waiting', ghost_stage: ghost_stage||null, rounds: parseInt(rounds)||0, wait_days: null, unpaid_work: unpaid_work||'na', experience_level: (experience_level||'').trim().slice(0,50), report_text: report_text ? report_text.slice(0,2000) : null, source: 'direct', needs_review: false, outcome_weight: 1.0, trust_reason: 'direct_submission' };
+    const reportBase = { company_id: cid, location_id: lid || null, role: (role||'').trim().slice(0,200), platform: (platform||'').trim().slice(0,100), outcome: outcome||'waiting', ghost_stage: ghost_stage||null, rounds: parseInt(rounds)||0, wait_days: null, unpaid_work: unpaid_work||'na', experience_level: (experience_level||'').trim().slice(0,50), report_text: report_text ? report_text.slice(0,2000) : null,
+      source:        trusted ? 'direct' : 'anonymous',
+      needs_review:  !trusted,
+      outcome_weight: trusted ? 1.0 : 0.3,
+      trust_reason:  trusted ? 'direct_submission' : 'anonymous_unverified',
+      user_id:       submitUid || null };
     let repRes = await fetch(`${SUPABASE_URL}/rest/v1/reports`, { method: 'POST', headers: { ...hdrs, Prefer: 'return=minimal' }, body: JSON.stringify({ ...reportBase, company_name: safeCo }) });
     if (!repRes.ok && repRes.status === 400) {
       const errText = await repRes.text();

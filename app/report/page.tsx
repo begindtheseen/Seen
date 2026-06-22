@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { AppStore } from '@/lib/stores/AppStore'
+import { supabase } from '@/lib/supabase'
 
 type Outcome = 'ghosted' | 'autoreject' | 'human' | 'waiting' | ''
 type Stage = 'application' | 'phone' | 'interview' | 'final' | ''
@@ -156,11 +157,13 @@ export default function ReportPage() {
       }
     } catch { /* moderate is non-blocking */ }
 
-    // Submit
+    // Submit — attach the auth token when signed in so the report is recorded as
+    // first-party (full trust weight); anonymous reports still go through, down-weighted.
     try {
+      const { data: { session } } = await supabase.auth.getSession()
       const res = await fetch('/api/reports', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...(session ? { Authorization: `Bearer ${session.access_token}` } : {}) },
         body: JSON.stringify({
           action: 'submit',
           company: company.trim().toLowerCase(),

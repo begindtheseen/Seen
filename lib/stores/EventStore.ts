@@ -130,7 +130,7 @@ export const EventStore = {
 
       await fetch('/api/reports', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
         body: JSON.stringify({
           action: 'submit',
           company: (evt.company || '').toLowerCase(),
