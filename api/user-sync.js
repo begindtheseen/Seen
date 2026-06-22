@@ -270,7 +270,20 @@ export default async function handler(req, res) {
 
   // ── DELETE ACCOUNT ──────────────────────────────────────────────────────────
   if (action === 'delete_account') {
-    await db(`applications?user_id=eq.${uid}`, { method: 'DELETE', headers: { Prefer: 'return=minimal' } });
+    // GDPR Art.17 (right to erasure): remove every row keyed to this user before deleting
+    // the auth record — previously only applications + profile were cleared, orphaning
+    // credits, events, resume data, saved jobs, etc. Best-effort per table (a missing
+    // table/column just no-ops) so one failure can't block the deletion.
+    const userTables = [
+      'applications', 'application_events', 'saved_jobs', 'ai_credits', 'credit_transactions',
+      'user_recent_cos', 'login_signals', 'answered_questions', 'resume_employment',
+      'resume_skills', 'job_availability_reports', 'search_events',
+    ];
+    await Promise.all(userTables.map(t =>
+      db(`${t}?user_id=eq.${uid}`, { method: 'DELETE', headers: { Prefer: 'return=minimal' } }).catch(() => {})
+    ));
+    // De-link the user from their public reports rather than deleting the anonymized signal.
+    await db(`reports?user_id=eq.${uid}`, { method: 'PATCH', body: JSON.stringify({ user_id: null }), headers: { Prefer: 'return=minimal' } }).catch(() => {});
     await db(`profiles?id=eq.${uid}`, { method: 'DELETE', headers: { Prefer: 'return=minimal' } });
     const delRes = await fetch(`${SUPABASE_URL}/auth/v1/admin/users/${uid}`, {
       method: 'DELETE',

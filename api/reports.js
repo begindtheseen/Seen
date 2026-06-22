@@ -1070,7 +1070,10 @@ async function _fuseWithReports(name, web, SUPABASE_URL, dbH) {
   if (!SUPABASE_URL || !dbH) return null;
   try {
     const enc = encodeURIComponent(String(name).toLowerCase().trim());
-    const r = await fetch(`${SUPABASE_URL}/rest/v1/reports?company_name=ilike.${enc}&select=outcome,platform&limit=500`, { headers: dbH });
+    // Exclude reports flagged for review (needs_review=true) — anonymous/unverified and
+    // external-import submissions are held out of the score until an admin clears them, so
+    // they can't poison a company's grade. `not.is.true` keeps legacy false/null rows.
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/reports?company_name=ilike.${enc}&needs_review=not.is.true&select=outcome,platform&limit=500`, { headers: dbH });
     if (!r.ok) return null;
     const reps = await r.json();
     if (!Array.isArray(reps) || !reps.length) return null;
