@@ -1,21 +1,17 @@
--- Migration 024: ON DELETE CASCADE foreign keys for user-linked tables.
+-- Migration 024: ON DELETE CASCADE foreign keys for user-linked tables that have NONE.
 --
--- WHY: account deletion (api/user-sync.js `delete_account`) was deleting rows table by
--- table in application code. If a delete is ever missed, or a user is removed directly via
--- the Supabase auth admin API, child rows are orphaned — a GDPR Art.17 (right-to-erasure)
--- gap and a data-integrity problem. These FKs make Postgres erase the children automatically
--- whenever the auth.users row goes away, so deletion can never be partial.
+-- WHY: account deletion (api/user-sync.js `delete_account`) deletes rows table-by-table in
+-- application code. If a delete is ever missed — or a user is removed directly via the Supabase
+-- auth admin API — child rows are orphaned (a GDPR Art.17 right-to-erasure gap). These FKs make
+-- Postgres erase the children automatically when the auth.users row goes away.
 --
--- SAFETY:
---   * `NOT VALID` adds the constraint for all FUTURE writes/deletes WITHOUT scanning or
---     locking the existing table, so applying this is fast and non-blocking even on large
---     tables. (Pre-existing orphan rows, if any, are left untouched; see the optional
---     VALIDATE step at the bottom to enforce retroactively after cleaning them up.)
---   * Idempotent: skips tables/columns that don't exist and constraints already present.
---   * Only touches tables that key on `user_id` referencing auth.users.
+-- SCOPE: only the tables that key on user_id and currently have NO FK to auth.users. The tables
+-- applications, saved_jobs, notifications, profiles, employer_profiles already have ON DELETE
+-- CASCADE FKs and are skipped automatically.
 --
--- REVIEW BEFORE APPLYING: authored without a live DB connection. Run in the Supabase SQL
--- editor on a branch/staging project first if you have one.
+-- SAFETY: NOT VALID adds the constraint without scanning/locking existing rows (the cascade
+-- trigger is active immediately regardless of validation). A follow-up pass validates once the
+-- table is known clean. Idempotent: skips tables/columns/constraints already present.
 
 DO $$
 DECLARE
@@ -28,20 +24,27 @@ DECLARE
     'answered_questions',
     'user_recent_cos',
     'login_signals',
-    'application_events',
-    'saved_jobs',
-    'job_availability_reports'
+    'job_availability_reports',
+    'search_events'
   ];
 BEGIN
   FOREACH t IN ARRAY tables LOOP
-    -- Table must exist
     IF to_regclass('public.' || t) IS NULL THEN CONTINUE; END IF;
-    -- Column must exist
     IF NOT EXISTS (
       SELECT 1 FROM information_schema.columns
       WHERE table_schema = 'public' AND table_name = t AND column_name = 'user_id'
     ) THEN CONTINUE; END IF;
-    -- Constraint must not already exist
+    -- Skip if any FK on user_id already references auth.users
+    IF EXISTS (
+      SELECT 1 FROM pg_constraint con
+      JOIN pg_class rel  ON rel.oid  = con.conrelid
+      JOIN pg_namespace nsp  ON nsp.oid  = rel.relnamespace
+      JOIN pg_class frel ON frel.oid = con.confrelid
+      JOIN pg_namespace fnsp ON fnsp.oid = frel.relnamespace
+      WHERE con.contype = 'f' AND nsp.nspname = 'public' AND rel.relname = t
+        AND fnsp.nspname = 'auth' AND frel.relname = 'users'
+    ) THEN CONTINUE; END IF;
+
     cname := 'fk_' || t || '_user';
     IF EXISTS (SELECT 1 FROM pg_constraint WHERE conname = cname) THEN CONTINUE; END IF;
 
@@ -52,21 +55,3 @@ BEGIN
     RAISE NOTICE 'Added ON DELETE CASCADE fk on %', t;
   END LOOP;
 END $$;
-
--- OPTIONAL (run later, off-peak): retroactively validate the constraints. This scans each
--- table once and will ERROR if orphan rows exist (user_id not present in auth.users) — clean
--- those up first, then uncomment and run.
---
--- DO $$
--- DECLARE t text; cname text;
---   tables text[] := ARRAY['ai_credits','credit_transactions','resume_employment',
---     'answered_questions','user_recent_cos','login_signals','application_events',
---     'saved_jobs','job_availability_reports'];
--- BEGIN
---   FOREACH t IN ARRAY tables LOOP
---     cname := 'fk_' || t || '_user';
---     IF EXISTS (SELECT 1 FROM pg_constraint WHERE conname = cname AND NOT convalidated) THEN
---       EXECUTE format('ALTER TABLE public.%I VALIDATE CONSTRAINT %I', t, cname);
---     END IF;
---   END LOOP;
--- END $$;

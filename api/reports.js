@@ -834,6 +834,7 @@ Return ONLY a valid JSON array. Return [] if there are genuinely no hiring exper
         if (ins.ok) imported++; else skipped++;
       } catch(e) { errors.push(e.message); skipped++; }
     }
+    if (errors.length) logError('reports/reddit_import', `${errors.length} errors`, { subreddit: body.subreddit || null, imported, skipped, sample: errors.slice(0, 3) });
     return res.status(200).json({ ok: true, imported, skipped, errors: errors.slice(0, 5) });
   }
 

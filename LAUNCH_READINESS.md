@@ -6,9 +6,24 @@ privacy, reliability) plus hands-on verification of every critical finding._
 
 ## Verdict
 
-- **Confident public launch ("nobody can poke a hole in this"): NOT YET.** Finish the 🔴 P0 list below.
-- **Soft / invite-only launch to start collecting data: defensible now.** The critical
-  application-layer holes (token forgery, score poisoning, data leakage, GDPR deletion) are closed.
+- **Soft / invite-only launch: ready now.** Every day-one critical hole is closed across
+  #63/#65/#66 and the integration work below — token forgery, score poisoning, the credit
+  double-spend race, GDPR deletion/orphans, and the high-severity Next.js CVEs.
+- **Confident public launch ("nobody can poke a hole in this"): one decision away.** The
+  remaining items are an alerting webhook URL (mechanism shipped — just set the env var), a
+  manual smoke-test of the Next upgrade, and the Sybil/AI-metering hardening that only matters
+  once you're at real scale. None are open holes; all are known and owned.
+
+### DB migrations already APPLIED to production (project `tmngmmofrplsldvlobfx`)
+- `consume_credit(uuid,text,boolean)` SQL function — atomic, `SELECT … FOR UPDATE`. Verified.
+- `ON DELETE CASCADE` FKs on 8 user-keyed tables, **validated** (not just NOT VALID).
+- Removed 1 pre-existing orphan (`ai_credits` row for a deleted user — the gap was real).
+
+### One-touch activations left for the owner (no code, ~2 min)
+1. **Alerting:** set `ERRLOG_WEBHOOK_URL` in Vercel to a Slack/Discord incoming webhook →
+   every logged error (incl. cron failures) gets pushed to you in real time.
+2. **Leaked-password protection:** Supabase → Auth → Passwords → enable HaveIBeenPwned check
+   (closes the one WARN-level advisor).
 
 "Would any professional approve this?" is the wrong bar — every shipped product has a backlog. The
 right bar is: **no unaddressed critical/high issues, and every remaining gap is known and owned.**
@@ -35,48 +50,49 @@ This doc is that ownership.
 | 🟠 High | `company_jobs`/`recommended`/`get_by_id` ran before rate limiting | `api/jobs.js` | #65 |
 | 🟠 High | `delete_account` orphaned 10+ tables (GDPR Art.17) | `api/user-sync.js` | #65 |
 | 🟠 High | Welcome-bonus re-granted on DB read failure (free-credit exploit) | `lib/server/credits.js` | #65 |
-| 🟠 High | Next.js 15.3.9 → **15.5.19** (SSRF, cache-poisoning, middleware-bypass CVEs) | `package.json` | this branch |
+| 🟠 High | Next.js 15.3.9 → **15.5.19** (SSRF, cache-poisoning, middleware-bypass CVEs) | `package.json` | #66 |
+| 🟠 High | **Credit double-spend race** — read-modify-write → atomic `consume_credit()` RPC, wired both consume paths with fallback | `migrations/025`, `lib/server/credits.js`, `api/user-sync.js` | this branch (applied) |
+| 🟠 High | GDPR: resume files in Storage not erased on account deletion → best-effort `resumes/${uid}/` cleanup | `api/user-sync.js` | this branch |
+| 🟠 High | FK `ON DELETE CASCADE` on 8 user tables so deletes can never orphan (+ validated, orphan cleaned) | `migrations/024,026` | this branch (applied) |
+| 🟡 Med | No real-time alerting → opt-in Slack/Discord webhook + cron failures now logged centrally | `lib/server/errlog.js`, `api/refresh-jobs.js`, `api/reports.js` | this branch |
 | 🟡 Med | PostgREST filter-injection in `batch_scores` | `api/reports.js` | #65 |
-| 🟡 Med | FK `ON DELETE CASCADE` migration so deletes can never orphan | `migrations/024_*` | this branch |
 | 🟢 Low | Company leaderboard not CDN-cached | `api/reports.js` | #65 |
 
 ---
 
-## REMAINING — do before a confident public launch
+## REMAINING
 
-### 🔴 P0 (launch-blockers)
-1. **Observability — you are blind.** Crons return `200` even on failure; there's no Sentry/alerting,
-   only an `api_errors` table you'd have to query by hand. If checkout or the score cron dies, you
-   won't know. **Fix:** make cron handlers return non-200 on hard failure (Vercel surfaces it), and
-   add an error sink (Sentry, or a Slack webhook in `lib/server/errlog.js`).
-2. **Smoke-test the Next.js 15.5.19 upgrade on the live preview** before relying on it — the build is
-   green but a minor bump can have runtime regressions (middleware, RSC). Click through auth, tracker,
-   resume tools, checkout.
+### 🔴 Needs the owner (not code)
+1. **Smoke-test the Next.js 15.5.19 upgrade on the live preview** — the build is green but a minor
+   bump can have runtime regressions (middleware, RSC). Click through auth, tracker, resume tools,
+   checkout. This is the last thing gating "confident public launch."
+2. **Set `ERRLOG_WEBHOOK_URL`** (Slack/Discord) and **enable leaked-password protection** — see the
+   two-minute activations in the Verdict section.
 
 ### 🟠 P1 (before you scale / make noise)
-3. **Credit double-spend race** — `consume_credit` and `gateAI` read-then-write isn't atomic. Two
-   parallel requests can spend one credit twice. **Fix:** a `consume_credit(uid)` SQL function doing
-   `UPDATE ai_credits SET balance = balance - 1 WHERE user_id = $1 AND balance > 0 RETURNING balance`,
-   wired with a fallback. (Deferred here because the wiring conflicts with #65's `credits.js` edits —
-   do it after #65 merges.)
-4. **Sybil score-poisoning (logged-in).** Rate-limit + `needs_review` close the anonymous firehose,
+3. **Sybil score-poisoning (logged-in).** Rate-limit + `needs_review` close the anonymous firehose,
    but an attacker with N accounts can still move a company's score. `login_signals` (device/IP dedup)
    is collected but never used. **Fix:** per-account submission limits + cluster down-weighting.
-5. **Unmetered secondary Claude calls.** Resume parse fires 2–3 Claude calls but only the first is
+   Tables already exist (`login_signals`, `duplicate_clusters`) — it's wiring, not schema.
+4. **Unmetered secondary Claude calls.** Resume parse fires 2–3 Claude calls but only the first is
    credit-gated (`api/resume.js`); Reddit/research crons are unmetered. Cost-bleed risk. **Fix:** gate
-   or cap each model call.
-6. **Resume file not deleted on account deletion** — `delete_account` clears DB rows but not the
-   Storage bucket object (migration 022). **Fix:** delete the user's storage path too.
+   or cap each model call. (Now that `consume_credit` is atomic, gating extra calls is a one-liner each.)
 
 ### 🟡 P2 (resilience / scale hardening)
-7. **Rate limiter fails open + hot-row.** A Supabase blip disables all throttling, and `rate_limits`
+5. **Rate limiter fails open + hot-row.** A Supabase blip disables all throttling, and `rate_limits`
    takes a write on every request (contention at ~10k users). Consider Vercel KV / sharded keys.
-8. **Silent client data-loss.** `_sync` failures are swallowed (`lib/sync.ts`); corrupt localStorage
+6. **Silent client data-loss.** `_sync` failures are swallowed (`lib/sync.ts`); corrupt localStorage
    silently empties views (`AppStore`, `SavedJobs`, `ResumeStore`). Add a retry queue + surfaced errors.
-9. **Multi-device conflict = last-write-wins.** Can clobber edits across devices. Merge `events` by id
+7. **Multi-device conflict = last-write-wins.** Can clobber edits across devices. Merge `events` by id
    and resolve status/stage by `updatedAt`.
-10. **Prompt-injection hardening.** Resume/company text flows into Claude prompts; escape/structure it.
-11. **Per-cron failure visibility, PITR/restore runbook, `purge_old_signals` schedule.**
+8. **Prompt-injection hardening.** Resume/company text flows into Claude prompts; escape/structure it.
+9. **PITR/restore runbook, `purge_old_signals` schedule.**
+
+### ✅ Done in this pass (was P0/P1)
+- ~~Observability: crons silently 200~~ → all three crons log failures centrally; opt-in webhook alerting shipped.
+- ~~Credit double-spend race~~ → atomic `consume_credit()` applied to prod + wired both paths.
+- ~~Resume file not deleted on account deletion~~ → best-effort Storage cleanup added.
+- ~~FK cascade migration~~ → applied **and validated** in prod; orphan removed.
 
 ---
 

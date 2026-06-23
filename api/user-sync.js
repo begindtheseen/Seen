@@ -282,6 +282,28 @@ export default async function handler(req, res) {
     await Promise.all(userTables.map(t =>
       db(`${t}?user_id=eq.${uid}`, { method: 'DELETE', headers: { Prefer: 'return=minimal' } }).catch(() => {})
     ));
+    // Best-effort: remove any resume files this user uploaded to the `resumes` Storage bucket.
+    // Uploads are keyed under a `${uid}/` prefix; list then delete. No-ops if the bucket is
+    // empty for this user or uses a different convention — never blocks the deletion.
+    try {
+      const listRes = await fetch(`${SUPABASE_URL}/storage/v1/object/list/resumes`, {
+        method: 'POST',
+        headers: { apikey: SERVICE_KEY, Authorization: `Bearer ${SERVICE_KEY}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prefix: `${uid}/`, limit: 100 }),
+      });
+      if (listRes.ok) {
+        const objects = await listRes.json();
+        const paths = (Array.isArray(objects) ? objects : []).map(o => `${uid}/${o.name}`);
+        if (paths.length) {
+          await fetch(`${SUPABASE_URL}/storage/v1/object/resumes`, {
+            method: 'DELETE',
+            headers: { apikey: SERVICE_KEY, Authorization: `Bearer ${SERVICE_KEY}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ prefixes: paths }),
+          }).catch(() => {});
+        }
+      }
+    } catch { /* storage cleanup is best-effort */ }
+
     // De-link the user from their public reports rather than deleting the anonymized signal.
     await db(`reports?user_id=eq.${uid}`, { method: 'PATCH', body: JSON.stringify({ user_id: null }), headers: { Prefer: 'return=minimal' } }).catch(() => {});
     await db(`profiles?id=eq.${uid}`, { method: 'DELETE', headers: { Prefer: 'return=minimal' } });
@@ -381,6 +403,20 @@ export default async function handler(req, res) {
 
   // ── CONSUME CREDIT ────────────────────────────────────────────────────────────
   if (action === 'consume_credit') {
+    // Atomic consume via SQL function (SELECT ... FOR UPDATE) — prevents two concurrent
+    // requests from spending the same credit. Falls back to the inline path below if the
+    // RPC isn't available (DB without migration 025_atomic_consume_credit).
+    try {
+      const rpc = await db('rpc/consume_credit', { method: 'POST', body: JSON.stringify({ p_uid: uid, p_reason: body.reason || 'ai_tool', p_pro_only: false }) });
+      if (rpc.ok) {
+        const row = (await rpc.json())?.[0];
+        if (row && row.status) {
+          if (row.status === 'no_credits') return res.status(200).json({ ok: false, error: 'no_credits', balance: 0 });
+          return res.status(200).json({ ok: true, balance: row.balance, pro: row.pro });
+        }
+      }
+    } catch { /* fall back to inline path */ }
+
     const today = new Date().toISOString().split('T')[0];
     const cRes = await db(`ai_credits?user_id=eq.${uid}&limit=1`);
     let cred = cRes.ok ? (await cRes.json())[0] : null;

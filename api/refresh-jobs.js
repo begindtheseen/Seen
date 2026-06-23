@@ -1,5 +1,6 @@
 import { getQueryExpansion } from '../lib/server/expand.js';
 import { mergeCompanies } from '../lib/server/merge.js';
+import { logError } from '../lib/server/errlog.js';
 
 // Canonical company name aliases — keeps all subsidiaries/variants under one brand
 // so job listings roll up correctly to the same company insights page.
@@ -809,6 +810,7 @@ export default async function handler(req, res) {
 
   } catch (err) {
     console.error('refresh-jobs error:', err.message);
+    logError('refresh-jobs', err.message, { isCron });
     return res.status(500).json({ error: err.message });
   }
 }
