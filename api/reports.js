@@ -44,6 +44,33 @@ async function resolveUid(req) {
   return null;
 }
 
+// Anti-Sybil trust assessment for a signed-in report submission. Returns the weight/reason/review
+// to store. Anonymous submits are already 0.3 + needs_review elsewhere; this neutralizes two cheap
+// signed-in manipulation patterns by dropping to 0.3 + needs_review (excluded from score fusion)
+// rather than rejecting — legit repeat reporting still records, it just can't double-count or flood:
+//   (a) the same user already reported this company in the last 30 days (duplicate), or
+//   (b) the user has exceeded a per-account daily submission cap (mass-submission farm).
+// `dupFilter` is a PostgREST predicate identifying the company (e.g. `company_id=eq.<uuid>`).
+// NOTE: cross-account device/IP clustering (the multi-account Sybil case) is the next step —
+// deferred because naive IP thresholds false-positive on corporate NAT / mobile carriers.
+async function assessSubmitTrust(SUPABASE_URL, hdrs, uid, dupFilter) {
+  const out = { weight: 1.0, reason: 'direct_submission', review: false };
+  const DAILY_CAP = 15;
+  const since30 = new Date(Date.now() - 30 * 864e5).toISOString();
+  const since1d = new Date(Date.now() - 864e5).toISOString();
+  try {
+    const [dupRes, volRes] = await Promise.all([
+      fetch(`${SUPABASE_URL}/rest/v1/reports?user_id=eq.${uid}&${dupFilter}&created_at=gte.${since30}&select=id&limit=1`, { headers: hdrs }),
+      fetch(`${SUPABASE_URL}/rest/v1/reports?user_id=eq.${uid}&created_at=gte.${since1d}&select=id&limit=${DAILY_CAP + 1}`, { headers: hdrs }),
+    ]);
+    const isDup    = dupRes.ok && ((await dupRes.json()) || []).length > 0;
+    const dayCount = volRes.ok ? ((await volRes.json()) || []).length : 0;
+    if (isDup)                      { out.weight = 0.3; out.reason = 'duplicate_user_company'; out.review = true; }
+    else if (dayCount >= DAILY_CAP) { out.weight = 0.3; out.reason = 'velocity_capped';        out.review = true; }
+  } catch { /* on failure, fall through at default trust */ }
+  return out;
+}
+
 // Blocks placeholder/garbage values from ever entering the companies table.
 // Must contain at least one letter, no hash-prefixed IDs, no pure numerics,
 // not a known placeholder word, min 2 chars.
@@ -169,6 +196,9 @@ export default async function handler(req, res) {
           waste: c.waste_score || 0,
         },
       }));
+      // Identical for every visitor and only changes when the score cron runs — let the
+      // CDN serve it so a popular leaderboard page doesn't hit the DB on every load.
+      res.setHeader('Cache-Control', 'public, s-maxage=300, stale-while-revalidate=600');
       return res.status(200).json({ ok: true, companies });
     } catch(e) { return res.status(200).json({ companies: [] }); }
   }
@@ -241,10 +271,12 @@ export default async function handler(req, res) {
       const safeRole    = role ? String(role).slice(0, 120).replace(/[<>`\\]/g, '').trim() : '';
       const safeCity    = city ? String(city).slice(0,  80).replace(/[<>`\\]/g, '').trim() : '';
       if (!safeCompany) return res.status(400).json({ error: 'company required' });
+      // Same anti-Sybil down-weighting as the full submit path (dedup + per-account daily cap).
+      const trust = await assessSubmitTrust(SUPABASE_URL, hdrsBase, uid, `company_name=ilike.${encodeURIComponent(safeCompany)}`);
       const r = await fetch(`${SUPABASE_URL}/rest/v1/reports`, {
         method: 'POST',
         headers: { ...hdrsBase, Prefer: 'return=minimal' },
-        body: JSON.stringify({ company_name: safeCompany, outcome, role: safeRole, city: safeCity, platform: 'Seen', experience_level: 'Unknown', outcome_weight: 1.0, trust_reason: 'direct_submission', user_id: uid }),
+        body: JSON.stringify({ company_name: safeCompany, outcome, role: safeRole, city: safeCity, platform: 'Seen', experience_level: 'Unknown', outcome_weight: trust.weight, needs_review: trust.review, trust_reason: trust.reason, user_id: uid }),
       });
       if (!r.ok) {
         const e = await r.text().catch(() => '');
@@ -265,7 +297,9 @@ export default async function handler(req, res) {
       if (!Array.isArray(names) || !names.length) return res.json({ ok: true, scores: {} });
       const nameList = names.slice(0, 50).map(n => String(n).toLowerCase().trim()).filter(Boolean);
       if (!nameList.length) return res.json({ ok: true, scores: {} });
-      const inFilter = nameList.map(n => `"${n}"`).join(',');
+      // Strip quotes/backslashes before wrapping — otherwise a crafted name could break out
+      // of the quoted PostgREST CSV value and alter which rows match (filter injection).
+      const inFilter = nameList.map(n => `"${n.replace(/["\\]/g, '')}"`).join(',');
       const r = await fetch(
         `${SUPABASE_URL}/rest/v1/company_scores?company_name=in.(${inFilter})&select=company_name,overall_score,ghost_rate,response_rate,avg_wait_days,waste_score,report_count&limit=50`,
         { headers: hdrsBase }
@@ -359,8 +393,17 @@ export default async function handler(req, res) {
 
   // ── Submit report (merged from submit-report.js) ────────────────────────────
   if (body.action === 'submit') {
+    // Per-IP throttle — this endpoint writes into the reports corpus that drives every
+    // company score, so it must never be a free-for-all firehose.
+    if (await applyRateLimit(req, res, 'report-submit')) return;
     const { company: co, role, location, platform, outcome, ghost_stage, rounds, unpaid_work, experience_level, report_text } = body;
     if (!co || !role || !location) return res.status(400).json({ error: 'company, role and location required' });
+    // Identify the submitter if a valid token is present. Anonymous submissions are still
+    // accepted (the public report page allows them) but enter at a low trust weight and are
+    // flagged for review, so they can't dominate or poison a company's score. Signed-in
+    // submissions are first-party and carry full weight.
+    const submitUid = await resolveUid(req);
+    const trusted = !!submitUid;
     const hdrs = { ...hdrsBase, Prefer: 'return=representation' };
     const safeCo = co.trim().slice(0, 200);
     const safeLoc = location.trim().slice(0, 200);
@@ -391,7 +434,18 @@ export default async function handler(req, res) {
       if (!lid) { const lr2 = await fetch(`${SUPABASE_URL}/rest/v1/company_locations?company_id=eq.${cid}&select=id&limit=1`, { headers: hdrs }); if (lr2.ok) { const r2 = await lr2.json(); lid = r2?.[0]?.id || null; } }
     }
 
-    const reportBase = { company_id: cid, location_id: lid || null, role: (role||'').trim().slice(0,200), platform: (platform||'').trim().slice(0,100), outcome: outcome||'waiting', ghost_stage: ghost_stage||null, rounds: parseInt(rounds)||0, wait_days: null, unpaid_work: unpaid_work||'na', experience_level: (experience_level||'').trim().slice(0,50), report_text: report_text ? report_text.slice(0,2000) : null, source: 'direct', needs_review: false, outcome_weight: 1.0, trust_reason: 'direct_submission' };
+    // Signed-in submits start at full trust but get down-weighted for duplicate/flooding patterns
+    // (see assessSubmitTrust). Anonymous submits stay at 0.3 + needs_review.
+    const trust = trusted
+      ? await assessSubmitTrust(SUPABASE_URL, hdrsBase, submitUid, `company_id=eq.${cid}`)
+      : { weight: 0.3, reason: 'anonymous_unverified', review: true };
+
+    const reportBase = { company_id: cid, location_id: lid || null, role: (role||'').trim().slice(0,200), platform: (platform||'').trim().slice(0,100), outcome: outcome||'waiting', ghost_stage: ghost_stage||null, rounds: parseInt(rounds)||0, wait_days: null, unpaid_work: unpaid_work||'na', experience_level: (experience_level||'').trim().slice(0,50), report_text: report_text ? report_text.slice(0,2000) : null,
+      source:        trusted ? 'direct' : 'anonymous',
+      needs_review:  trust.review,
+      outcome_weight: trust.weight,
+      trust_reason:  trust.reason,
+      user_id:       submitUid || null };
     let repRes = await fetch(`${SUPABASE_URL}/rest/v1/reports`, { method: 'POST', headers: { ...hdrs, Prefer: 'return=minimal' }, body: JSON.stringify({ ...reportBase, company_name: safeCo }) });
     if (!repRes.ok && repRes.status === 400) {
       const errText = await repRes.text();
@@ -815,6 +869,7 @@ Return ONLY a valid JSON array. Return [] if there are genuinely no hiring exper
         if (ins.ok) imported++; else skipped++;
       } catch(e) { errors.push(e.message); skipped++; }
     }
+    if (errors.length) logError('reports/reddit_import', `${errors.length} errors`, { subreddit: body.subreddit || null, imported, skipped, sample: errors.slice(0, 3) });
     return res.status(200).json({ ok: true, imported, skipped, errors: errors.slice(0, 5) });
   }
 
@@ -1051,7 +1106,10 @@ async function _fuseWithReports(name, web, SUPABASE_URL, dbH) {
   if (!SUPABASE_URL || !dbH) return null;
   try {
     const enc = encodeURIComponent(String(name).toLowerCase().trim());
-    const r = await fetch(`${SUPABASE_URL}/rest/v1/reports?company_name=ilike.${enc}&select=outcome,platform&limit=500`, { headers: dbH });
+    // Exclude reports flagged for review (needs_review=true) — anonymous/unverified and
+    // external-import submissions are held out of the score until an admin clears them, so
+    // they can't poison a company's grade. `not.is.true` keeps legacy false/null rows.
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/reports?company_name=ilike.${enc}&needs_review=not.is.true&select=outcome,platform&limit=500`, { headers: dbH });
     if (!r.ok) return null;
     const reps = await r.json();
     if (!Array.isArray(reps) || !reps.length) return null;

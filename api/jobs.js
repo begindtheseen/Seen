@@ -1,7 +1,39 @@
+import { createHmac, timingSafeEqual } from 'crypto';
 import { getQueryExpansion } from '../lib/server/expand.js';
 import { applyRateLimit, rateLimit } from '../lib/server/ratelimit.js';
 import { logError } from '../lib/server/errlog.js';
 import { filterAndRank, filterByLocation, locationDbTerm } from './_utils/jobRelevance.js';
+
+// Verify a Supabase JWT (HS256) and return the user id, or null. Decoding the payload
+// WITHOUT this check would let anyone forge a token and read another user's data.
+function _verifyJWT(token, secret) {
+  try {
+    const [h, p, s] = token.split('.');
+    if (!h || !p || !s) return null;
+    const mac = createHmac('sha256', secret).update(`${h}.${p}`).digest('base64url');
+    const sig = Buffer.from(s, 'base64url');
+    const exp = Buffer.from(mac, 'base64url');
+    if (sig.length !== exp.length || !timingSafeEqual(sig, exp)) return null;
+    const payload = JSON.parse(Buffer.from(p, 'base64url').toString());
+    if (!payload.sub || payload.exp < Date.now() / 1000) return null;
+    return payload.sub;
+  } catch { return null; }
+}
+async function _resolveUid(req) {
+  const token = (req.headers.authorization || '').replace(/^Bearer\s+/i, '').trim();
+  if (!token) return null;
+  const secret = process.env.SUPABASE_JWT_SECRET;
+  if (secret) { const uid = _verifyJWT(token, secret); if (uid) return uid; }
+  // Fallback: validate via Supabase auth API when the local secret is unset/mismatched.
+  const U = process.env.SUPABASE_URL, K = process.env.SUPABASE_SERVICE_KEY;
+  if (U && K) {
+    try {
+      const r = await fetch(`${U}/auth/v1/user`, { headers: { apikey: K, Authorization: `Bearer ${token}` } });
+      if (r.ok) return (await r.json())?.id || null;
+    } catch { /* ignore */ }
+  }
+  return null;
+}
 
 // Per-instance request coalescing: concurrent identical searches share one Claude call
 const _inflight = new Map();
@@ -31,16 +63,19 @@ export default async function handler(req, res) {
 
   // ── Company jobs: fetch/search jobs for a specific company ─────────────────
   if (_body.action === 'company_jobs') {
+    if (await applyRateLimit(req, res, 'job-search')) return;
     return handleCompanyJobs(req, res, _body);
   }
 
   // ── Recommended jobs: personalized from resume_skills ────────────────────
   if (_body.action === 'recommended') {
+    if (await applyRateLimit(req, res, 'job-search')) return;
     return handleRecommended(req, res, _body);
   }
 
   // ── Get single job by ID — direct link / refresh fallback ──────────────────
   if (_body.action === 'get_by_id') {
+    if (await applyRateLimit(req, res, 'job-search')) return;
     const { id } = _body;
     if (!id || typeof id !== 'string') return res.status(400).json({ error: 'id required' });
     const U = process.env.SUPABASE_URL, K = process.env.SUPABASE_SERVICE_KEY;
@@ -550,17 +585,10 @@ async function handleRecommended(req, res, _body) {
   const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY;
   if (!SUPABASE_URL || !SUPABASE_SERVICE_KEY) return res.status(503).json({ error: 'DB unavailable', jobs: [] });
 
-  // Decode user_id from JWT (base64url → base64)
-  const token = (req.headers.authorization || '').replace(/^Bearer\s+/, '');
-  if (!token) return res.status(401).json({ error: 'Auth required', jobs: [] });
-  let user_id;
-  try {
-    const b64 = token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
-    user_id = JSON.parse(Buffer.from(b64, 'base64').toString('utf-8')).sub;
-  } catch (e) {
-    return res.status(401).json({ error: 'Invalid token', jobs: [] });
-  }
-  if (!user_id) return res.status(401).json({ error: 'No user', jobs: [] });
+  // Verify the JWT signature before trusting its user_id (previously the payload was
+  // base64-decoded with no signature check — trivially forgeable).
+  const user_id = await _resolveUid(req);
+  if (!user_id) return res.status(401).json({ error: 'Auth required', jobs: [] });
 
   const dbHeaders = {
     apikey: SUPABASE_SERVICE_KEY,
