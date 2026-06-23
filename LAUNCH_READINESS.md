@@ -70,13 +70,15 @@ This doc is that ownership.
    two-minute activations in the Verdict section.
 
 ### 🟠 P1 (before you scale / make noise)
-3. **Sybil score-poisoning (logged-in).** Rate-limit + `needs_review` close the anonymous firehose,
-   but an attacker with N accounts can still move a company's score. `login_signals` (device/IP dedup)
-   is collected but never used. **Fix:** per-account submission limits + cluster down-weighting.
-   Tables already exist (`login_signals`, `duplicate_clusters`) — it's wiring, not schema.
-4. **Unmetered secondary Claude calls.** Resume parse fires 2–3 Claude calls but only the first is
-   credit-gated (`api/resume.js`); Reddit/research crons are unmetered. Cost-bleed risk. **Fix:** gate
-   or cap each model call. (Now that `consume_credit` is atomic, gating extra calls is a one-liner each.)
+3. **Sybil score-poisoning (logged-in)** — *first cut shipped.* Signed-in submits now down-weight to
+   0.3 + `needs_review` (excluded from scores) on (a) same-user/same-company duplicates within 30d and
+   (b) a per-account daily submission cap — applied to both `submit` and `quick_submit`. **Still open:**
+   cross-account device/IP clustering for the determined multi-account farm (deferred — naive IP
+   thresholds false-positive on corporate NAT / mobile carriers; needs the `duplicate_clusters` review
+   queue + account-age/verification signal).
+4. ~~Unmetered secondary Claude calls~~ — **assessed adequate.** Every AI call is credit-gated, inputs
+   are `.slice()`-capped (2.5–4k chars), `max_tokens` is bounded (2–3k), and the model is Haiku. The
+   multi-call parse is one gated logical op. No open cost-bleed; revisit only if usage patterns change.
 
 ### 🟡 P2 (resilience / scale hardening)
 5. **Rate limiter fails open + hot-row.** A Supabase blip disables all throttling, and `rate_limits`
