@@ -12,6 +12,21 @@ interface RecentApp {
   status: string; stage: string; platform: string; created_at: string
 }
 interface AdminStats {
+  monetization?: {
+    stripe_connected: boolean
+    total_accounts: number
+    pro_users: number
+    free_users: number
+    conversion_pct: number
+    trialing: number | null
+    active_paid: number | null
+    past_due: number | null
+    canceled: number | null
+    mrr: number | null
+    mrr_annualized: number | null
+    outcome_card_shares: number
+    shares_by_channel: Record<string, number>
+  }
   users: { total: number; new_today: number; new_this_week: number; dau: number }
   companies: { with_scores: number }
   reports: {
@@ -309,6 +324,7 @@ export default function AdminPage() {
   const [password, setPassword] = useState('')
   const [loginError, setLoginError] = useState('')
   const [loggingIn, setLoggingIn] = useState(false)
+  const [downloading, setDownloading] = useState(false)
   const [mergePrefill, setMergePrefill] = useState<MergePrefill | null>(null)
   const [kpiModal, setKpiModal] = useState<{ metric: string; title: string } | null>(null)
   function openKpi(metric: string, title: string) { setKpiModal({ metric, title }) }
@@ -386,6 +402,27 @@ export default function AdminPage() {
     }
   }
 
+  async function downloadCsv() {
+    if (!token) return
+    setDownloading(true)
+    try {
+      const res = await fetch('/api/admin-stats', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Admin-Token': token },
+        body: JSON.stringify({ action: 'export_csv' }),
+      })
+      const d = await res.json()
+      if (d?.csv) {
+        const blob = new Blob([d.csv], { type: 'text/csv;charset=utf-8' })
+        const url = URL.createObjectURL(blob)
+        const a = document.createElement('a')
+        a.href = url; a.download = d.filename || 'seen-metrics.csv'; a.click()
+        URL.revokeObjectURL(url)
+      }
+    } catch { /* ignore */ }
+    setDownloading(false)
+  }
+
   if (!token) return (
     <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
       <form onSubmit={login} style={{ background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 12, padding: '2rem', width: 320 }}
@@ -450,10 +487,33 @@ export default function AdminPage() {
             </p>
           </div>
           <div style={{ display: 'flex', gap: '.5rem', flexWrap: 'wrap' }}>
+            <button onClick={downloadCsv} disabled={downloading} className="adm-btn" style={{ borderColor: 'rgba(16,185,129,.4)', color: 'var(--green)' }}>{downloading ? 'Exporting…' : '⬇ Download data (CSV)'}</button>
             <button onClick={() => token && load(token)} className="adm-btn">↻ Refresh</button>
             <button onClick={logout} className="adm-btn-danger">Sign out</button>
           </div>
         </div>
+
+        {/* Growth & Monetization — conversion analytics */}
+        {stats.monetization && (() => {
+          const m = stats.monetization!
+          return (
+            <>
+              <div className="adm-section-lbl">Growth &amp; monetization</div>
+              <div className="adm-kpi-row">
+                <KpiCard l="MRR" n={m.mrr != null ? `$${m.mrr.toLocaleString()}` : '—'} sub={m.mrr_annualized != null ? `$${m.mrr_annualized.toLocaleString()}/yr` : (m.stripe_connected ? 'no active subs yet' : 'Stripe not connected')} borderColor="var(--green)" numColor="var(--green)" />
+                <KpiCard l="Pro users" n={m.pro_users.toLocaleString()} sub={`${m.conversion_pct}% of ${m.total_accounts.toLocaleString()} accounts`} borderColor="var(--green)" numColor="var(--green)" />
+                <KpiCard l="On free trial" n={m.trialing != null ? m.trialing : '—'} sub={m.stripe_connected ? 'trialing now' : 'Stripe not connected'} borderColor="var(--blue)" numColor="var(--blue)" />
+                <KpiCard l="Active (paid)" n={m.active_paid != null ? m.active_paid : '—'} sub="past their trial" numColor="var(--green)" />
+              </div>
+              <div className="adm-kpi-row">
+                <KpiCard l="Free users" n={m.free_users.toLocaleString()} sub="not yet upgraded" />
+                <KpiCard l="Canceled" n={m.canceled != null ? m.canceled : '—'} sub="churned subs" borderColor="var(--red)" numColor={m.canceled ? 'var(--red)' : undefined} />
+                <KpiCard l="Past due" n={m.past_due != null ? m.past_due : '—'} sub="payment failing" borderColor="var(--amber)" numColor={m.past_due ? 'var(--amber)' : undefined} />
+                <KpiCard l="Outcome cards shared" n={m.outcome_card_shares.toLocaleString()} sub="virality signal" borderColor="var(--blue)" numColor="var(--blue)" />
+              </div>
+            </>
+          )
+        })()}
 
         {/* Users KPIs */}
         <div className="adm-section-lbl">Users</div>

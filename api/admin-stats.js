@@ -18,6 +18,38 @@ function cors(req, res) {
 function hashPw(password, salt) {
   return scryptSync(password, salt, 64).toString('hex');
 }
+
+// Live subscription breakdown from Stripe (trial vs paid vs canceled) + a rough MRR.
+// Returns null when Stripe isn't configured so the dashboard degrades gracefully.
+async function stripeSubsBreakdown() {
+  const key = process.env.STRIPE_SECRET_KEY;
+  if (!key) return null;
+  try {
+    const r = await fetch('https://api.stripe.com/v1/subscriptions?status=all&limit=100&expand[]=data.items', {
+      headers: { Authorization: `Bearer ${key}` },
+    });
+    if (!r.ok) return null;
+    const d = await r.json();
+    const counts = { trialing: 0, active: 0, past_due: 0, canceled: 0, unpaid: 0, incomplete: 0 };
+    let mrrCents = 0;
+    for (const s of (d.data || [])) {
+      counts[s.status] = (counts[s.status] || 0) + 1;
+      if (s.status === 'active' || s.status === 'trialing') {
+        const item = s.items?.data?.[0];
+        const amt = item?.price?.unit_amount || 0;
+        const interval = item?.price?.recurring?.interval;
+        // Trials count toward "potential" MRR; only active toward realized — we track active.
+        if (s.status === 'active') mrrCents += interval === 'year' ? amt / 12 : amt;
+      }
+    }
+    return { counts, mrr: Math.round(mrrCents) / 100, has_more: !!d.has_more };
+  } catch { return null; }
+}
+
+function csvCell(v) {
+  const s = v == null ? '' : String(v);
+  return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+}
 function verifyPw(password, salt, hash) {
   try {
     const derived = scryptSync(password, salt, 64).toString('hex');
@@ -153,7 +185,7 @@ async function _handler(req, res) {
       recentReportsRes, recentAppsRes, jobsTodayRes, inactiveReportsRes,
       jobsActiveRes, jobsNewTodayRes,
       reportsMonthRes, searchLogsWeekRes,
-      jobsTotalRes, creditTxnRes,
+      jobsTotalRes, creditTxnRes, outcomeSharesRes, usersMonthRes,
     ] = await Promise.all([
       db(`profiles?select=id`, { headers: { Prefer: 'count=exact', 'Range-Unit': 'items', Range: '0-0' } }),
       db(`profiles?created_at=gte.${todayISO}&select=id`, { headers: { Prefer: 'count=exact', 'Range-Unit': 'items', Range: '0-0' } }),
@@ -186,6 +218,8 @@ async function _handler(req, res) {
       db(`search_logs?created_at=gte.${weekISO}&select=query&limit=500`),
       db(`jobs?select=count`),
       db(`credit_transactions?select=delta&limit=20000`),
+      db(`outcome_card_shares?select=shared_via,created_at&order=created_at.desc&limit=5000`),
+      db(`profiles?created_at=gte.${monthISO}&select=created_at&order=created_at.asc&limit=5000`),
     ]);
 
     const usersTotal = ct(usersTotalRes);
@@ -282,7 +316,39 @@ async function _handler(req, res) {
       }
     }
 
+    // ── Monetization / conversion analytics ──────────────────────────────────
+    const freeCount = Math.max(0, creditRows.length - proCount);
+    const convPct = creditRows.length ? Math.round((proCount / creditRows.length) * 1000) / 10 : 0;
+    const subs = await stripeSubsBreakdown();
+    const shareRows = outcomeSharesRes && outcomeSharesRes.ok ? await outcomeSharesRes.json() : [];
+    const sharesByChannel = {};
+    (Array.isArray(shareRows) ? shareRows : []).forEach(s => { sharesByChannel[s.shared_via] = (sharesByChannel[s.shared_via] || 0) + 1; });
+    // 30-day daily signups (alongside the existing reports chart) for the conversion view.
+    const usersMonth = usersMonthRes && usersMonthRes.ok ? await usersMonthRes.json() : [];
+    const signupMap = {};
+    (Array.isArray(usersMonth) ? usersMonth : []).forEach(u => { const d = u.created_at?.slice(0, 10); if (d) signupMap[d] = (signupMap[d] || 0) + 1; });
+    const signupsChart = chartDays.map(date => ({ date, count: signupMap[date] || 0 }));
+
+    const monetization = {
+      stripe_connected: !!process.env.STRIPE_SECRET_KEY,
+      total_accounts: creditRows.length,
+      pro_users: proCount,
+      free_users: freeCount,
+      conversion_pct: convPct,
+      // From Stripe (null if not connected): trial vs paid vs churned.
+      trialing: subs?.counts?.trialing ?? null,
+      active_paid: subs?.counts?.active ?? null,
+      past_due: subs?.counts?.past_due ?? null,
+      canceled: subs?.counts?.canceled ?? null,
+      mrr: subs ? subs.mrr : null,
+      mrr_annualized: subs ? Math.round(subs.mrr * 12 * 100) / 100 : null,
+      outcome_card_shares: Array.isArray(shareRows) ? shareRows.length : 0,
+      shares_by_channel: sharesByChannel,
+      signups_chart: signupsChart,
+    };
+
     return res.status(200).json({
+      monetization,
       users: { total: usersTotal, new_today: ct(usersTodayRes), new_this_week: ct(usersWeekRes), dau },
       reports: { total: ct(reportsAllRes), today: ct(reportsTodayRes), this_week: ct(reportsWeekRes), recent: recentReports, chart: reportsChart, top_companies: topCompanies, outcome_breakdown: outcomeMap },
       applications: { total: totalApps, ghosted_30d: ghosted, hired_30d: ct(appsHiredRes), ghost_rate_pct: totalApps > 0 ? Math.round(ghosted / totalApps * 100) : null, recent: recentApps },
@@ -316,6 +382,75 @@ async function _handler(req, res) {
   if (action === 'admin_logout') {
     await db(`admin_sessions?token=eq.${encodeURIComponent(adminToken)}`, { method: 'DELETE', headers: { Prefer: 'return=minimal' } });
     return res.status(200).json({ ok: true });
+  }
+
+  // ── EXPORT CSV — downloadable snapshot for conversion analysis ────────────────
+  // Returns { csv, filename }; the admin UI turns it into a file download. Includes a
+  // summary block + a 30-day daily time series (signups, reports, outcome-card shares).
+  if (action === 'export_csv') {
+    const now = new Date();
+    const ct2 = r => parseInt((r?.headers?.get('content-range') || '').split('/')[1]) || 0;
+    const todayISO = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
+    const weekISO = new Date(Date.now() - 7 * 86400000).toISOString();
+    const monthISO = new Date(Date.now() - 30 * 86400000).toISOString();
+
+    const [usersTotalRes, usersWeekRes, reportsAllRes, appsAllRes, coRes, creditRes, sharesRes, usersMonthRes, reportsMonthRes] = await Promise.all([
+      db('profiles?select=id', { headers: { Prefer: 'count=exact', 'Range-Unit': 'items', Range: '0-0' } }),
+      db(`profiles?created_at=gte.${weekISO}&select=id`, { headers: { Prefer: 'count=exact', 'Range-Unit': 'items', Range: '0-0' } }),
+      db('reports?select=id', { headers: { Prefer: 'count=exact', 'Range-Unit': 'items', Range: '0-0' } }),
+      db('applications?select=id', { headers: { Prefer: 'count=exact', 'Range-Unit': 'items', Range: '0-0' } }),
+      db('company_scores?select=id', { headers: { Prefer: 'count=exact', 'Range-Unit': 'items', Range: '0-0' } }),
+      db('ai_credits?select=pro&limit=20000'),
+      db(`outcome_card_shares?select=shared_via,created_at&limit=20000`),
+      db(`profiles?created_at=gte.${monthISO}&select=created_at&limit=20000`),
+      db(`reports?created_at=gte.${monthISO}&select=created_at&limit=20000`),
+    ]);
+    const creditRows = creditRes.ok ? await creditRes.json() : [];
+    const pro = creditRows.filter(r => r.pro).length;
+    const total = creditRows.length;
+    const shares = sharesRes.ok ? await sharesRes.json() : [];
+    const usersMonth = usersMonthRes.ok ? await usersMonthRes.json() : [];
+    const reportsMonth = reportsMonthRes.ok ? await reportsMonthRes.json() : [];
+    const subs = await stripeSubsBreakdown();
+
+    const byDay = (rows) => { const m = {}; (rows || []).forEach(x => { const d = x.created_at?.slice(0, 10); if (d) m[d] = (m[d] || 0) + 1; }); return m; };
+    const su = byDay(usersMonth), rp = byDay(reportsMonth), sh = byDay(shares);
+
+    const lines = [];
+    lines.push(['Seen metrics export', new Date().toISOString()]);
+    lines.push([]);
+    lines.push(['SUMMARY', 'metric', 'value']);
+    lines.push(['', 'Total accounts', total]);
+    lines.push(['', 'Pro users', pro]);
+    lines.push(['', 'Free users', Math.max(0, total - pro)]);
+    lines.push(['', 'Free→Pro conversion %', total ? Math.round((pro / total) * 1000) / 10 : 0]);
+    lines.push(['', 'Profiles (all)', ct2(usersTotalRes)]);
+    lines.push(['', 'New users (7d)', ct2(usersWeekRes)]);
+    lines.push(['', 'Reports (all)', ct2(reportsAllRes)]);
+    lines.push(['', 'Applications (all)', ct2(appsAllRes)]);
+    lines.push(['', 'Companies scored', ct2(coRes)]);
+    lines.push(['', 'Outcome-card shares (all)', Array.isArray(shares) ? shares.length : 0]);
+    lines.push([]);
+    lines.push(['STRIPE', 'metric', 'value']);
+    lines.push(['', 'Connected', !!process.env.STRIPE_SECRET_KEY]);
+    lines.push(['', 'Trialing', subs?.counts?.trialing ?? 'n/a']);
+    lines.push(['', 'Active (paid)', subs?.counts?.active ?? 'n/a']);
+    lines.push(['', 'Past due', subs?.counts?.past_due ?? 'n/a']);
+    lines.push(['', 'Canceled', subs?.counts?.canceled ?? 'n/a']);
+    lines.push(['', 'MRR ($)', subs ? subs.mrr : 'n/a']);
+    lines.push(['', 'ARR ($)', subs ? Math.round(subs.mrr * 12 * 100) / 100 : 'n/a']);
+    lines.push([]);
+    lines.push(['DAILY (last 30 days)', 'date', 'new_users', 'reports', 'card_shares']);
+    for (let i = 29; i >= 0; i--) {
+      const d = new Date(now); d.setDate(d.getDate() - i);
+      const k = d.toISOString().slice(0, 10);
+      lines.push(['', k, su[k] || 0, rp[k] || 0, sh[k] || 0]);
+    }
+
+    const csv = lines.map(row => row.map(csvCell).join(',')).join('\n');
+    const stamp = now.toISOString().slice(0, 10);
+    await db('admin_audit_log', { method: 'POST', body: JSON.stringify({ admin_id: sess.admin_id, username: 'admin', action: 'export_csv' }), headers: { Prefer: 'return=minimal' } }).catch(() => {});
+    return res.status(200).json({ ok: true, filename: `seen-metrics-${stamp}.csv`, csv });
   }
 
   if (action === 'find_duplicates') {
