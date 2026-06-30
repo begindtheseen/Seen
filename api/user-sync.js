@@ -115,7 +115,7 @@ export default async function handler(req, res) {
     const recent = recentRes.ok ? await recentRes.json() : [];
     let cred = credRes.ok ? (await credRes.json())[0] : null;
     if (cred && cred.last_reset !== today) {
-      const nb = cred.pro ? 999 : 3;
+      const nb = cred.pro ? 999 : 1;
       db(`ai_credits?user_id=eq.${uid}`, { method: 'PATCH', body: JSON.stringify({ balance: nb, daily_earned: 0, last_reset: today }), headers: { Prefer: 'return=minimal' } });
       cred = { ...cred, balance: nb, daily_earned: 0, last_reset: today };
     }
@@ -394,7 +394,7 @@ export default async function handler(req, res) {
       // No row means they haven't used AI yet — show welcome balance preview (don't create row here)
       return res.status(200).json({ balance: 10, pro: false, daily_earned: 0, max_daily_earn: 5, welcome: true });
     } else if (cred.last_reset !== today) {
-      const nb = cred.pro ? 999 : 3;
+      const nb = cred.pro ? 999 : 1;
       await db(`ai_credits?user_id=eq.${uid}`, { method: 'PATCH', body: JSON.stringify({ balance: nb, daily_earned: 0, last_reset: today }), headers: { Prefer: 'return=minimal' } });
       cred = { ...cred, balance: nb, daily_earned: 0, last_reset: today };
     }
@@ -429,10 +429,10 @@ export default async function handler(req, res) {
     }
     if (cred.pro) return res.status(200).json({ ok: true, balance: 999, pro: true });
     if (cred.last_reset !== today) {
-      // Daily reset: 3 credits, deduct 1 → 2
-      await db(`ai_credits?user_id=eq.${uid}`, { method: 'PATCH', body: JSON.stringify({ balance: 2, daily_earned: 0, last_reset: today }), headers: { Prefer: 'return=minimal' } });
+      // Daily reset: 1 credit/day (matches consume_credit RPC, migration 031), deduct 1 → 0
+      await db(`ai_credits?user_id=eq.${uid}`, { method: 'PATCH', body: JSON.stringify({ balance: 0, daily_earned: 0, last_reset: today }), headers: { Prefer: 'return=minimal' } });
       await db('credit_transactions', { method: 'POST', body: JSON.stringify({ user_id: uid, delta: -1, reason: body.reason || 'ai_tool' }), headers: { Prefer: 'return=minimal' } });
-      return res.status(200).json({ ok: true, balance: 2 });
+      return res.status(200).json({ ok: true, balance: 0 });
     }
     if (cred.balance <= 0) return res.status(200).json({ ok: false, error: 'no_credits', balance: 0 });
     const nb = cred.balance - 1;
@@ -551,7 +551,7 @@ export default async function handler(req, res) {
     // Check daily earn cap
     const cRes = await db(`ai_credits?user_id=eq.${uid}&limit=1`);
     let cred = cRes.ok ? (await cRes.json())[0] : null;
-    if (!cred) { await db('ai_credits', { method: 'POST', body: JSON.stringify({ user_id: uid, balance: 3, daily_earned: 0, last_reset: today, pro: false }), headers: { Prefer: 'return=minimal' } }); cred = { balance: 3, daily_earned: 0, last_reset: today, pro: false }; }
+    if (!cred) { await db('ai_credits', { method: 'POST', body: JSON.stringify({ user_id: uid, balance: 1, daily_earned: 0, last_reset: today, pro: false }), headers: { Prefer: 'return=minimal' } }); cred = { balance: 1, daily_earned: 0, last_reset: today, pro: false }; }
     const resetToday = cred.last_reset !== today;
     const dailyEarned = resetToday ? 0 : (cred.daily_earned || 0);
     if (dailyEarned >= 5 && !cred.pro) return res.status(200).json({ ok: false, error: 'daily_cap', earned_today: dailyEarned });
@@ -565,7 +565,7 @@ export default async function handler(req, res) {
     const newBalance = resetToday ? 3 + 1 : (cred.pro ? 999 : Math.min((cred.balance || 0) + 1, 999));
     const newEarned = resetToday ? 1 : dailyEarned + 1;
     const patch = cred.pro ? {} : { balance: newBalance, daily_earned: newEarned };
-    if (resetToday && !cred.pro) { patch.last_reset = today; patch.daily_earned = 1; patch.balance = 4; }
+    if (resetToday && !cred.pro) { patch.last_reset = today; patch.daily_earned = 1; patch.balance = 2; }
     if (Object.keys(patch).length) await db(`ai_credits?user_id=eq.${uid}`, { method: 'PATCH', body: JSON.stringify(patch), headers: { Prefer: 'return=minimal' } });
     await db('credit_transactions', { method: 'POST', body: JSON.stringify({ user_id: uid, delta: 1, reason: 'earned_question', metadata: { question_key, answer } }), headers: { Prefer: 'return=minimal' } });
 
@@ -592,7 +592,7 @@ export default async function handler(req, res) {
     ]);
     let cred = credRes.ok ? (await credRes.json())[0] : null;
     if (cred && cred.last_reset !== today) {
-      const nb = cred.pro ? 999 : 3;
+      const nb = cred.pro ? 999 : 1;
       db(`ai_credits?user_id=eq.${uid}`, { method: 'PATCH', body: JSON.stringify({ balance: nb, daily_earned: 0, last_reset: today }), headers: { Prefer: 'return=minimal' } }).catch(() => {});
       cred = { ...cred, balance: nb, daily_earned: 0, last_reset: today };
     }
