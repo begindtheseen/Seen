@@ -4,7 +4,9 @@ type ScoreRow = {
   overall_score?: number
   ghost_rate?: number
   response_rate?: number
+  avg_wait_days?: number
   report_count?: number
+  risk_level?: 'safe' | 'warn' | 'danger'
   industry?: string
 }
 
@@ -19,7 +21,7 @@ async function getScore(slug: string): Promise<ScoreRow | null> {
   try {
     const name = slug.replace(/-/g, ' ')
     const r = await fetch(
-      `${url}/rest/v1/company_scores?company_name=ilike.${encodeURIComponent(name)}&select=overall_score,ghost_rate,response_rate,report_count,industry&limit=1`,
+      `${url}/rest/v1/company_scores?company_name=ilike.${encodeURIComponent(name)}&select=overall_score,ghost_rate,response_rate,avg_wait_days,report_count,risk_level,industry&limit=1`,
       { headers: { apikey: key, Authorization: `Bearer ${key}` }, next: { revalidate: 3600 } }
     )
     if (!r.ok) return null
@@ -69,6 +71,19 @@ export async function generateMetadata(
   }
 }
 
+const accentFor = (risk?: string): string =>
+  risk === 'safe' ? 'var(--green)' : risk === 'danger' ? 'var(--red)' : 'var(--amber)'
+
+// One-sentence plain-English read on the data, for crawlers and humans alike.
+function interpret(s: ScoreRow): string {
+  const ghost = s.ghost_rate != null ? s.ghost_rate : null
+  const score = s.overall_score ?? 0
+  if (ghost != null && ghost >= 0.6) return 'Most applicants never hear back, so set expectations accordingly and keep applying elsewhere.'
+  if (score >= 80) return 'Applicants are largely kept in the loop, making this one of the more transparent hiring processes we track.'
+  if (score >= 50) return 'Outcomes are mixed — some applicants get timely responses while others are left waiting.'
+  return 'Hiring transparency here is below average based on the outcomes applicants have reported.'
+}
+
 export default async function CompanySlugLayout(
   { children, params }: { children: React.ReactNode; params: Promise<{ slug: string }> }
 ) {
@@ -108,9 +123,75 @@ export default async function CompanySlugLayout(
     ],
   }
 
+  // Server-rendered factual summary so AI answer engines (ChatGPT, Perplexity, Gemini) and
+  // Google can read and cite real hiring data from the initial HTML — the client UI below
+  // only hydrates after load. Rendered ONLY when we have a real score. Null-safe.
+  const hasFacts = s != null && s.overall_score != null
+  const accent = accentFor(s?.risk_level)
+  const ghostPct = s?.ghost_rate != null ? Math.round(s.ghost_rate * 100) : null
+  const respPct = s?.response_rate != null ? Math.round(s.response_rate * 100) : null
+  const waitDays = s?.avg_wait_days != null ? Math.round(s.avg_wait_days) : null
+  const reportCount = s?.report_count ?? 0
+  const dataPoints = reportCount > 0 ? `${reportCount} applicant report${reportCount === 1 ? '' : 's'}` : 'estimated data'
+
   return (
     <>
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
+      {hasFacts && s && (
+        <section
+          aria-label={`${name} hiring data summary`}
+          style={{
+            maxWidth: 880,
+            margin: '0 auto',
+            padding: '1.4rem 1.25rem 0',
+          }}
+        >
+          <div
+            style={{
+              background: 'var(--card)',
+              border: '1px solid var(--line)',
+              borderLeft: `3px solid ${accent}`,
+              borderRadius: 12,
+              padding: '1.1rem 1.25rem',
+            }}
+          >
+            <h1
+              style={{
+                fontFamily: 'var(--display)',
+                fontSize: '1.05rem',
+                fontWeight: 700,
+                color: 'var(--white)',
+                letterSpacing: '-.01em',
+                margin: '0 0 .55rem',
+                lineHeight: 1.3,
+              }}
+            >
+              {name} hiring data — Seen Grade {s.overall_score}/100
+            </h1>
+            <p
+              style={{
+                fontSize: '.86rem',
+                lineHeight: 1.65,
+                color: 'var(--sub)',
+                margin: 0,
+                fontWeight: 300,
+              }}
+            >
+              {name} has a Seen Grade of{' '}
+              <strong style={{ color: 'var(--white)', fontWeight: 600 }}>{s.overall_score}/100</strong>.{' '}
+              {ghostPct != null && (
+                <>Applicants report a{' '}
+                  <strong style={{ color: accent, fontWeight: 600 }}>{ghostPct}% ghost rate</strong>
+                  {respPct != null ? <> and a {respPct}% response rate</> : null}
+                  {waitDays != null ? <>, with an average wait of {waitDays} day{waitDays === 1 ? '' : 's'} to hear back</> : null}
+                  {' '}across {dataPoints}.{' '}
+                </>
+              )}
+              {interpret(s)}
+            </p>
+          </div>
+        </section>
+      )}
       {children}
     </>
   )
