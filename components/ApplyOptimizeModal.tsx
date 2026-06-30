@@ -149,7 +149,14 @@ export default function ApplyOptimizeModal({
         }),
       })
       if (!r.ok) {
-        const e = await r.json().catch(() => ({}))
+        const e = await r.json().catch(() => ({})) as { error?: string; credits_required?: boolean; pro_required?: boolean }
+        // Out of credits / Pro-only → surface the upgrade modal directly via a typed flag
+        // (don't rely on string-matching the error message).
+        if (r.status === 402 || e.credits_required || e.pro_required) {
+          setShowUpgrade(true)
+          setStep('choose')
+          return
+        }
         throw new Error(e.error || `Error ${r.status}`)
       }
       const data = await r.json()
@@ -157,13 +164,8 @@ export default function ApplyOptimizeModal({
       setStep('review')
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : 'Optimization failed — try again'
-      if (msg.toLowerCase().includes('credit') || msg.includes('402')) {
-        setShowUpgrade(true)
-        setStep('choose')
-      } else {
-        setError(msg)
-        setStep('choose')
-      }
+      setError(msg)
+      setStep('choose')
     }
   }
 

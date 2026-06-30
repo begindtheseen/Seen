@@ -7,6 +7,10 @@ import { aiHeaders } from '@/lib/aiHeaders'
 
 const MONTHLY = '$9.99'
 const YEARLY  = '$6.99'
+const MONTHLY_NUM = 9.99
+const YEARLY_NUM  = 6.99
+const YEARLY_TOTAL = +(YEARLY_NUM * 12).toFixed(2)              // 83.88
+const ANNUAL_SAVINGS = +(MONTHLY_NUM * 12 - YEARLY_TOTAL).toFixed(2) // ~35.99
 
 const FREE_FEATURES = [
   '3 AI credits per day — parse, optimize, score',
@@ -56,7 +60,7 @@ function PricingPageInner() {
   const router = useRouter()
   const params = useSearchParams()
   const { isLoggedIn } = useAuth()
-  const [yearly, setYearly] = useState(false)
+  const [yearly, setYearly] = useState(true) // annual is the recommended default
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [upgraded, setUpgraded] = useState(false)
@@ -145,18 +149,27 @@ function PricingPageInner() {
             Seen Pro gives you the tools that work the other way around.
           </p>
 
-          {/* Billing toggle */}
-          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '.75rem', background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 8, padding: '.4rem .85rem' }}>
-            <span style={{ fontFamily: 'var(--mono)', fontSize: '.68rem', color: yearly ? 'var(--muted)' : 'var(--white)' }}>Monthly</span>
-            <button
-              onClick={() => setYearly(!yearly)}
-              style={{ width: 38, height: 20, borderRadius: 10, background: yearly ? '#4f46e5' : 'var(--line2)', border: 'none', cursor: 'pointer', position: 'relative', transition: 'background .2s', flexShrink: 0 }}
-            >
-              <span style={{ position: 'absolute', top: 2, left: yearly ? 20 : 2, width: 16, height: 16, borderRadius: '50%', background: '#fff', transition: 'left .2s' }} />
-            </button>
-            <span style={{ fontFamily: 'var(--mono)', fontSize: '.68rem', color: yearly ? 'var(--white)' : 'var(--muted)' }}>
-              Yearly <span style={{ color: 'var(--green)' }}>save 30%</span>
-            </span>
+          {/* Billing toggle — annual is recommended */}
+          <div style={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'center', gap: '.55rem' }}>
+            <div style={{ display: 'inline-flex', alignItems: 'center', gap: '.75rem', background: 'var(--card)', border: `1px solid ${yearly ? 'rgba(99,102,241,.4)' : 'var(--line)'}`, borderRadius: 100, padding: '.4rem .95rem', transition: 'border-color .2s', boxShadow: yearly ? '0 0 22px rgba(99,102,241,.18)' : 'none' }}>
+              <span style={{ fontFamily: 'var(--mono)', fontSize: '.68rem', color: yearly ? 'var(--muted)' : 'var(--white)' }}>Monthly</span>
+              <button
+                onClick={() => setYearly(!yearly)}
+                aria-label="Toggle billing period"
+                style={{ width: 38, height: 20, borderRadius: 10, background: yearly ? '#4f46e5' : 'var(--line2)', border: 'none', cursor: 'pointer', position: 'relative', transition: 'background .2s', flexShrink: 0 }}
+              >
+                <span style={{ position: 'absolute', top: 2, left: yearly ? 20 : 2, width: 16, height: 16, borderRadius: '50%', background: '#fff', transition: 'left .2s' }} />
+              </button>
+              <span style={{ fontFamily: 'var(--mono)', fontSize: '.68rem', color: yearly ? 'var(--white)' : 'var(--muted)' }}>
+                Yearly
+              </span>
+              <span style={{ background: 'linear-gradient(90deg,#4f46e5,#7c3aed)', color: '#fff', fontFamily: 'var(--mono)', fontSize: '.52rem', fontWeight: 700, letterSpacing: '.05em', padding: '.18rem .55rem', borderRadius: 100, whiteSpace: 'nowrap' }}>
+                BEST VALUE · SAVE 30%
+              </span>
+            </div>
+            <div style={{ fontFamily: 'var(--mono)', fontSize: '.6rem', color: yearly ? 'var(--green)' : 'var(--muted)', minHeight: '.9rem' }}>
+              {yearly ? `$${YEARLY_TOTAL}/yr — save $${ANNUAL_SAVINGS} vs monthly` : `Switch to yearly and save $${ANNUAL_SAVINGS}/yr`}
+            </div>
           </div>
         </div>
 
@@ -195,9 +208,14 @@ function PricingPageInner() {
               </div>
               <div style={{ fontFamily: 'var(--mono)', fontSize: '.65rem', color: 'var(--muted)' }}>/mo</div>
             </div>
-            <div style={{ fontFamily: 'var(--mono)', fontSize: '.62rem', color: 'var(--muted)', marginBottom: '1.5rem' }}>
-              {yearly ? `billed ${parseFloat(YEARLY) * 12 % 1 === 0 ? `$${parseFloat(YEARLY) * 12}` : `$${(parseFloat(YEARLY) * 12).toFixed(2)}`}/year` : 'billed monthly'}
+            <div style={{ fontFamily: 'var(--mono)', fontSize: '.62rem', color: 'var(--muted)', marginBottom: yearly ? '.4rem' : '1.5rem' }}>
+              {yearly ? `billed $${YEARLY_TOTAL.toFixed(2)}/year` : 'billed monthly'}
             </div>
+            {yearly && (
+              <div style={{ display: 'inline-block', fontFamily: 'var(--mono)', fontSize: '.58rem', fontWeight: 700, color: 'var(--green)', background: 'rgba(16,185,129,.1)', border: '1px solid rgba(16,185,129,.25)', borderRadius: 6, padding: '.18rem .5rem', marginBottom: '1.5rem' }}>
+                Save ${ANNUAL_SAVINGS}/yr vs monthly
+              </div>
+            )}
             <div style={{ marginBottom: '1.5rem' }}>
               {PRO_FEATURES.map(f => (
                 <div key={f} style={{ display: 'flex', gap: '.5rem', marginBottom: '.45rem', fontFamily: 'var(--mono)', fontSize: '.65rem', color: 'rgba(165,180,252,.85)', lineHeight: 1.45 }}>
@@ -234,7 +252,7 @@ function PricingPageInner() {
             {/* Auto-renewal disclosure (FTC / state ARL compliance). */}
             <div style={{ fontFamily: 'var(--body)', fontSize: '.62rem', color: 'var(--sub)', textAlign: 'center', lineHeight: 1.6, marginTop: '.65rem' }}>
               {yearly
-                ? `Subscription auto-renews at $${(parseFloat(YEARLY) * 12).toFixed(2)}/year until canceled.`
+                ? `Subscription auto-renews at $${YEARLY_TOTAL.toFixed(2)}/year until canceled.`
                 : `Subscription auto-renews at ${MONTHLY}/month until canceled.`}
               {' '}Cancel anytime in Profile → Billing.
             </div>

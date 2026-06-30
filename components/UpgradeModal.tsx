@@ -8,23 +8,55 @@ import { aiHeaders } from '@/lib/aiHeaders'
 interface UpgradeModalProps {
   reason: 'credits' | 'pro' | 'generic'
   onClose: () => void
-  featureName?: string // e.g. "Stealth Mode"
+  featureName?: string // e.g. "Stealth Mode", "HumanProof"
 }
 
 const MONTHLY_PRICE = '$9.99'
-const YEARLY_PRICE = '$6.99'
+const YEARLY_PRICE = '$6.99'           // per-month, billed annually
+const MONTHLY_NUM = 9.99
+const YEARLY_NUM = 6.99
+const YEARLY_TOTAL = +(YEARLY_NUM * 12).toFixed(2)       // 83.88
+const ANNUAL_SAVINGS = +(MONTHLY_NUM * 12 - YEARLY_TOTAL).toFixed(2) // ~35.99
 
 const PRO_BULLETS = [
-  { icon: '∞', label: 'Unlimited AI credits', sub: 'No daily cap, ever' },
-  { icon: '🥷', label: 'Stealth Mode', sub: 'Rewrites that bypass AI detection' },
+  { icon: '∞', label: 'Unlimited AI credits', sub: 'No daily cap, optimize every application' },
+  { icon: '🥷', label: 'Stealth Mode', sub: 'Rewrites that read human, not AI-generated' },
   { icon: '📊', label: 'AI company insights', sub: 'Ghost risk, culture, hiring trends' },
   { icon: '⚡', label: 'Priority support', sub: 'Real humans, fast replies' },
 ]
 
+// Contextual headline + subcopy keyed off the trigger. Honest, benefit-led — no
+// "trick the ATS / beat the detector" framing.
+function copyFor(reason: UpgradeModalProps['reason'], featureName?: string) {
+  if (reason === 'credits') {
+    return {
+      headline: "You've used today's 3 free AI credits",
+      sub: 'Pro users optimize every application, every day — no daily cap. Free credits reset tomorrow.',
+    }
+  }
+  if (reason === 'pro') {
+    if (featureName === 'HumanProof') {
+      return {
+        headline: 'Your application is optimized. Now make it sound real.',
+        sub: 'Unlock HumanProof to remove generic AI tone, add truthful work context, and make your application interview-ready.',
+      }
+    }
+    return {
+      headline: `${featureName || 'This feature'} is a Pro feature`,
+      sub: `Upgrade to unlock ${featureName || 'this'} plus unlimited AI optimization on every application.`,
+    }
+  }
+  return {
+    headline: 'Unlock Seen Pro',
+    sub: 'Unlimited AI optimization and Stealth Mode — the serious job seeker’s edge.',
+  }
+}
+
 export default function UpgradeModal({ reason, onClose, featureName }: UpgradeModalProps) {
   const router = useRouter()
   const { isLoggedIn } = useAuth()
-  const [plan, setPlan] = useState<'monthly' | 'yearly'>('monthly')
+  // Annual is the recommended default.
+  const [plan, setPlan] = useState<'monthly' | 'yearly'>('yearly')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
@@ -69,22 +101,14 @@ export default function UpgradeModal({ reason, onClose, featureName }: UpgradeMo
     }
   }
 
-  const headline =
-    reason === 'credits' ? "You've used today's AI credits"
-    : reason === 'pro' ? `${featureName || 'This feature'} is Pro-only`
-    : 'Unlock Seen Pro'
-
-  const sub =
-    reason === 'credits' ? 'Pro removes the cap entirely. Optimize every application, every day.'
-    : reason === 'pro' ? 'Upgrade to access Stealth Mode and unlimited AI optimization.'
-    : 'The unfair advantage for serious job seekers.'
+  const { headline, sub } = copyFor(reason, featureName)
 
   return (
     <div
       style={{ position: 'fixed', inset: 0, zIndex: 9999, background: 'rgba(0,0,0,.82)', backdropFilter: 'blur(6px)', display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}
       onClick={e => { if (e.target === e.currentTarget) onClose() }}
     >
-      <div style={{ width: '100%', maxWidth: 480, background: 'var(--surface)', borderRadius: '18px 18px 0 0', border: '1px solid rgba(99,102,241,.25)', boxShadow: '0 -40px 120px rgba(0,0,0,.7), 0 0 80px rgba(99,102,241,.2)', overflow: 'hidden' }}>
+      <div style={{ width: '100%', maxWidth: 480, background: 'var(--surface)', borderRadius: '18px 18px 0 0', border: '1px solid rgba(99,102,241,.25)', boxShadow: '0 -40px 120px rgba(0,0,0,.7), 0 0 80px rgba(99,102,241,.2)', overflow: 'hidden', maxHeight: '94dvh', overflowY: 'auto' }}>
 
         {/* Handle */}
         <div style={{ display: 'flex', justifyContent: 'center', padding: '.6rem 0 .2rem' }}>
@@ -94,14 +118,14 @@ export default function UpgradeModal({ reason, onClose, featureName }: UpgradeMo
         {/* Header */}
         <div style={{ padding: '1rem 1.25rem .75rem', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
           <div>
-            <div style={{ fontFamily: 'var(--display)', fontSize: '1.05rem', fontWeight: 800, color: 'var(--white)', letterSpacing: '-.02em', marginBottom: '.25rem' }}>
+            <div style={{ fontFamily: 'var(--display)', fontSize: '1.05rem', fontWeight: 800, color: 'var(--white)', letterSpacing: '-.02em', marginBottom: '.25rem', lineHeight: 1.25 }}>
               {headline}
             </div>
             <div style={{ fontFamily: 'var(--mono)', fontSize: '.65rem', color: 'var(--sub)', lineHeight: 1.55 }}>
               {sub}
             </div>
           </div>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'var(--dim)', cursor: 'pointer', fontSize: '1rem', padding: '.2rem', lineHeight: 1, flexShrink: 0, marginLeft: '1rem' }}>✕</button>
+          <button onClick={onClose} aria-label="Close" style={{ background: 'none', border: 'none', color: 'var(--dim)', cursor: 'pointer', fontSize: '1rem', padding: '.2rem', lineHeight: 1, flexShrink: 0, marginLeft: '1rem' }}>✕</button>
         </div>
 
         <div style={{ padding: '0 1.25rem 1.5rem' }}>
@@ -119,29 +143,48 @@ export default function UpgradeModal({ reason, onClose, featureName }: UpgradeMo
             ))}
           </div>
 
-          {/* Plan toggle */}
-          <div style={{ display: 'flex', gap: '.5rem', marginBottom: '1rem' }}>
-            {(['monthly', 'yearly'] as const).map(p => (
-              <button
-                key={p}
-                onClick={() => setPlan(p)}
-                style={{
-                  flex: 1, padding: '.55rem', borderRadius: 9,
-                  background: plan === p ? 'rgba(99,102,241,.2)' : 'none',
-                  border: `1.5px solid ${plan === p ? 'rgba(99,102,241,.5)' : 'var(--line2)'}`,
-                  color: plan === p ? '#a5b4fc' : 'var(--muted)',
-                  fontFamily: 'var(--mono)', fontSize: '.62rem', fontWeight: 700,
-                  cursor: 'pointer', transition: 'all .15s',
-                }}
-              >
-                {p === 'monthly' ? `${MONTHLY_PRICE}/mo` : `${YEARLY_PRICE}/mo · yearly`}
-                {p === 'yearly' && <span style={{ display: 'block', fontSize: '.52rem', color: 'var(--green)', marginTop: '.1rem' }}>Save 30%</span>}
-              </button>
-            ))}
+          {/* Plan toggle — yearly is recommended + visually prominent */}
+          <div style={{ display: 'flex', gap: '.5rem', marginBottom: '.5rem', alignItems: 'stretch' }}>
+            {(['yearly', 'monthly'] as const).map(p => {
+              const active = plan === p
+              const isYear = p === 'yearly'
+              return (
+                <button
+                  key={p}
+                  onClick={() => setPlan(p)}
+                  style={{
+                    flex: isYear ? 1.25 : 1,
+                    position: 'relative',
+                    padding: isYear ? '.85rem .5rem .6rem' : '.6rem .5rem',
+                    borderRadius: 11,
+                    background: active
+                      ? (isYear ? 'linear-gradient(150deg,rgba(99,102,241,.28),rgba(124,58,237,.16))' : 'rgba(99,102,241,.2)')
+                      : 'none',
+                    border: `1.5px solid ${active ? 'rgba(129,140,248,.65)' : 'var(--line2)'}`,
+                    color: active ? '#c4b5fd' : 'var(--muted)',
+                    fontFamily: 'var(--mono)', fontWeight: 700,
+                    cursor: 'pointer', transition: 'all .15s', textAlign: 'center',
+                    boxShadow: active && isYear ? '0 0 22px rgba(99,102,241,.25)' : 'none',
+                  }}
+                >
+                  {isYear && (
+                    <span style={{ position: 'absolute', top: -10, left: '50%', transform: 'translateX(-50%)', background: 'linear-gradient(90deg,#4f46e5,#7c3aed)', color: '#fff', fontSize: '.5rem', fontWeight: 700, letterSpacing: '.06em', padding: '.18rem .55rem', borderRadius: 100, whiteSpace: 'nowrap' }}>
+                      BEST VALUE · SAVE 30%
+                    </span>
+                  )}
+                  <div style={{ fontSize: isYear ? '.78rem' : '.7rem', color: active ? 'var(--white)' : 'var(--sub)' }}>
+                    {isYear ? `${YEARLY_PRICE}/mo` : `${MONTHLY_PRICE}/mo`}
+                  </div>
+                  <div style={{ fontSize: '.52rem', color: isYear ? 'var(--green)' : 'var(--muted)', marginTop: '.15rem', lineHeight: 1.4 }}>
+                    {isYear ? `$${YEARLY_TOTAL}/yr · save $${ANNUAL_SAVINGS}` : 'billed monthly'}
+                  </div>
+                </button>
+              )
+            })}
           </div>
 
           {error && (
-            <div style={{ background: 'rgba(239,68,68,.08)', border: '1px solid rgba(239,68,68,.25)', borderRadius: 8, padding: '.55rem .85rem', marginBottom: '.85rem', fontFamily: 'var(--mono)', fontSize: '.62rem', color: 'var(--red)' }}>
+            <div style={{ background: 'rgba(239,68,68,.08)', border: '1px solid rgba(239,68,68,.25)', borderRadius: 8, padding: '.55rem .85rem', margin: '.75rem 0', fontFamily: 'var(--mono)', fontSize: '.62rem', color: 'var(--red)' }}>
               {error}
             </div>
           )}
@@ -151,7 +194,7 @@ export default function UpgradeModal({ reason, onClose, featureName }: UpgradeMo
             onClick={handleUpgrade}
             disabled={loading}
             style={{
-              width: '100%', padding: '.9rem',
+              width: '100%', padding: '.9rem', marginTop: '.6rem',
               background: loading ? 'var(--line)' : 'linear-gradient(135deg,#4f46e5 0%,#7c3aed 100%)',
               border: 'none', borderRadius: 11,
               fontFamily: 'var(--display)', fontWeight: 800, fontSize: '.9rem', color: '#fff',
@@ -166,7 +209,7 @@ export default function UpgradeModal({ reason, onClose, featureName }: UpgradeMo
           {/* Auto-renewal disclosure — shown at the point of purchase (FTC / state ARL compliance). */}
           <div style={{ fontFamily: 'var(--body)', fontSize: '.66rem', color: 'var(--sub)', textAlign: 'center', lineHeight: 1.6, marginTop: '.85rem' }}>
             {plan === 'yearly'
-              ? `Billed $${(parseFloat(YEARLY_PRICE.replace(/[^0-9.]/g, '')) * 12).toFixed(2)} today, then automatically each year until you cancel.`
+              ? `Billed $${YEARLY_TOTAL.toFixed(2)} today, then automatically each year until you cancel.`
               : `Billed ${MONTHLY_PRICE} today, then automatically each month until you cancel.`}
             {' '}Cancel anytime in Profile → Billing. See <a href="/legal" style={{ color: 'var(--blue)' }}>Subscription Terms</a>.
           </div>
@@ -178,12 +221,12 @@ export default function UpgradeModal({ reason, onClose, featureName }: UpgradeMo
           </div>
 
           {reason === 'credits' && (
-            <div style={{ textAlign: 'center', marginTop: '.75rem' }}>
+            <div style={{ textAlign: 'center', marginTop: '.85rem' }}>
               <button
                 onClick={() => { onClose(); window.dispatchEvent(new CustomEvent('seen:open-survey')) }}
                 style={{ background: 'none', border: 'none', fontFamily: 'var(--mono)', fontSize: '.6rem', color: 'var(--blue)', cursor: 'pointer', textDecoration: 'underline' }}
               >
-                Earn free credits by answering a quick survey →
+                Not ready? Earn free credits with a quick survey →
               </button>
             </div>
           )}
