@@ -12,21 +12,33 @@ type ScoreRow = {
 
 const titleCase = (slug: string) => slug.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
 
-// Server-side fetch of the cached score (service key, never shipped to client). Cached 1h, and
-// deduped across generateMetadata + the layout render within a request.
+// Fetch the score via the public /api/reports endpoint — the SAME path the client uses and the
+// one proven to work in production. (A direct Supabase REST call from this App Router server
+// component was returning null in the Vercel runtime, which silently degraded the SEO/GEO
+// description + summary; routing through the working serverless function fixes that.) Cached 1h
+// and deduped across generateMetadata + the layout render within a request.
 async function getScore(slug: string): Promise<ScoreRow | null> {
-  const url = process.env.SUPABASE_URL
-  const key = process.env.SUPABASE_SERVICE_KEY
-  if (!url || !key) return null
   try {
     const name = slug.replace(/-/g, ' ')
-    const r = await fetch(
-      `${url}/rest/v1/company_scores?company_name=ilike.${encodeURIComponent(name)}&select=overall_score,ghost_rate,response_rate,avg_wait_days,report_count,risk_level,industry&limit=1`,
-      { headers: { apikey: key, Authorization: `Bearer ${key}` }, next: { revalidate: 3600 } }
-    )
+    const r = await fetch('https://seenjobs.io/api/reports', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name }),
+      next: { revalidate: 3600 },
+    })
     if (!r.ok) return null
-    const rows = await r.json()
-    return (Array.isArray(rows) ? rows[0] : null) || null
+    const d = await r.json()
+    const s = d?.score
+    if (!s) return null
+    return {
+      overall_score: s.overall_score,
+      ghost_rate: s.ghost_rate,
+      response_rate: s.response_rate,
+      avg_wait_days: s.avg_wait_days,
+      report_count: s.report_count,
+      risk_level: s.risk_level,
+      industry: s.industry,
+    }
   } catch {
     return null
   }
