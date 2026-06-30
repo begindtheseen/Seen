@@ -10,6 +10,7 @@ import { Score } from '@/lib/score'
 import { JobCache } from '@/lib/stores/JobCache'
 import { SavedJobsStore } from '@/lib/stores/SavedJobs'
 import ListingCard from '@/components/ListingCard'
+import SeenFitPanel from '@/components/SeenFitPanel'
 import { aiHeaders } from '@/lib/aiHeaders'
 import { useAuth } from '@/lib/auth'
 import type { Job } from '@/lib/types'
@@ -348,6 +349,9 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
               : <p style={{ fontSize: '.84rem', color: 'var(--muted)', fontWeight: 300 }}>No description available.</p>
           }
         </div>
+
+        {/* SeenFit Engine — deterministic, keyless résumé/application optimizer */}
+        <SeenFitPanel job={job} />
 
         {/* Report Your Experience — T1-15 */}
         <div style={{ marginTop: '1.5rem', background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 12, padding: '1.25rem' }}>

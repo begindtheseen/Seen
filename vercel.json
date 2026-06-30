@@ -16,6 +16,7 @@
   ],
   "functions": {
     "api/job-insights.js": { "maxDuration": 20 },
+    "api/optimizer.js": { "maxDuration": 30 },
     "api/refresh-jobs.js": { "maxDuration": 60 },
     "api/resume.js": { "maxDuration": 30 },
     "api/apply.js": { "maxDuration": 30 },
