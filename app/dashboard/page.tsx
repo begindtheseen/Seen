@@ -46,12 +46,22 @@ function calcJobSearchHealth(apps: Application[]) {
 
 export default function DashboardPage() {
   const router = useRouter()
-  const { user, profile, isLoggedIn, isSeeker } = useAuth()
+  const { user, profile, isLoggedIn, isSeeker, token } = useAuth()
   const [apps, setApps] = useState<Application[]>([])
   const [loading, setLoading] = useState(true)
+  const [isPro, setIsPro] = useState(false)
   const [surges, setSurges] = useState<string[]>([])
   const [recentCos, setRecentCos] = useState<Array<{name: string; slug: string}>>([])
   const [coScores, setCoScores] = useState<Record<string, {ghost_rate: number; overall_score: number; avg_wait_days: number}>>({})
+
+  useEffect(() => {
+    if (!isSeeker) return
+    token().then(tok => {
+      if (!tok) return
+      fetch('/api/user-sync', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${tok}` }, body: JSON.stringify({ action: 'get_credits' }) })
+        .then(r => r.json()).then(d => setIsPro(!!d?.pro)).catch(() => {})
+    })
+  }, [isSeeker, token])
 
   useEffect(() => {
     try {
@@ -225,6 +235,15 @@ export default function DashboardPage() {
             </p>
           </div>
           <div style={{ display: 'flex', gap: '.5rem', alignItems: 'center', flexShrink: 0 }}>
+            {isPro && (
+              <Link
+                href="/pricing"
+                title="Seen Pro — manage membership"
+                style={{ display: 'inline-flex', alignItems: 'center', gap: '.3rem', background: 'linear-gradient(135deg,rgba(16,185,129,.18),rgba(99,102,241,.18))', border: '1px solid rgba(16,185,129,.4)', color: 'var(--green)', borderRadius: 8, padding: '.32rem .7rem', fontFamily: 'var(--mono)', fontSize: '.62rem', fontWeight: 700, letterSpacing: '.05em', textDecoration: 'none', whiteSpace: 'nowrap', boxShadow: '0 0 14px rgba(16,185,129,.18)' }}
+              >
+                ★ PRO
+              </Link>
+            )}
             <Link href="/profile" style={{ background: 'none', border: '1px solid var(--line2)', color: 'var(--sub)', borderRadius: 8, padding: '.32rem .7rem', fontFamily: 'var(--mono)', fontSize: '.62rem', cursor: 'pointer', textDecoration: 'none', whiteSpace: 'nowrap' }}>
               ⚙ Settings
             </Link>
