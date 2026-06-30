@@ -108,6 +108,8 @@ export default function HumanProofPanel({ job }: { job: Job }) {
         return
       }
       if (!res.ok || data.error) { setState('error'); return }
+      // Successful HumanProof run is credit-gated server-side — refresh the Nav balance.
+      window.dispatchEvent(new Event('seen:credits-updated'))
       setOut(data)
       setState('done')
     } catch {
