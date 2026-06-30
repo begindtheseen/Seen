@@ -16,8 +16,10 @@
 import { createHmac, timingSafeEqual } from 'crypto';
 import { applyRateLimit } from '../lib/server/ratelimit.js';
 import { logError } from '../lib/server/errlog.js';
+import { gateAI } from '../lib/server/credits.js';
 import { runOptimizer, ENGINE_VERSION } from '../lib/optimizer/index.ts';
 import { extractJobFacts } from '../lib/optimizer/extractJobFacts.ts';
+import { runHumanProof, HUMANPROOF_ENGINE_VERSION } from '../lib/humanizer/index.ts';
 
 // ── auth: derive the user id from the Supabase JWT (same pattern as api/apply.js) ──
 function verifyJWT(token, secret) {
@@ -69,6 +71,71 @@ async function seenfitEnabled(db) {
   } catch { /* default on */ }
   _flagCache = { ts: Date.now(), on };
   return on;
+}
+
+// ── HumanProof feature flags (env var wins; else feature_flags table) ──
+// Returns { enabled, paidOnly, localModel }. enabled defaults ON; paidOnly defaults OFF
+// (so it works before flags are seeded); localModel is the documented stub (always off
+// for any external call — it only ever gates FUTURE LOCAL polish).
+let _hpFlagCache = { ts: 0, flags: null };
+function envFlag(name) {
+  const v = process.env[name];
+  if (v == null || v === '') return null;
+  return /^(1|true|on|fully_on|yes)$/i.test(v);
+}
+async function humanproofFlags(db) {
+  const envEnabled = envFlag('HUMANPROOF_ENABLED');
+  const envPaid = envFlag('HUMANPROOF_PAID_ONLY');
+  const envLocal = envFlag('LOCAL_HUMANIZER_MODEL_ENABLED');
+  if (Date.now() - _hpFlagCache.ts < 60_000 && _hpFlagCache.flags) {
+    const f = _hpFlagCache.flags;
+    return {
+      enabled: envEnabled != null ? envEnabled : f.enabled,
+      paidOnly: envPaid != null ? envPaid : f.paidOnly,
+      localModel: envLocal != null ? envLocal : f.localModel,
+    };
+  }
+  let enabled = true, paidOnly = false, localModel = false;
+  try {
+    const r = await db(`feature_flags?flag_name=in.(humanproof_enabled,humanproof_paid_only,local_humanizer_model_enabled)&select=flag_name,status`);
+    if (r.ok) {
+      const on = (s) => ['fully_on', 'on', 'admin_only', 'beta_users', 'percentage_rollout'].includes(s);
+      for (const row of await r.json()) {
+        if (row.flag_name === 'humanproof_enabled') enabled = on(row.status);
+        if (row.flag_name === 'humanproof_paid_only') paidOnly = on(row.status);
+        if (row.flag_name === 'local_humanizer_model_enabled') localModel = on(row.status);
+      }
+    }
+  } catch { /* defaults */ }
+  _hpFlagCache = { ts: Date.now(), flags: { enabled, paidOnly, localModel } };
+  return {
+    enabled: envEnabled != null ? envEnabled : enabled,
+    paidOnly: envPaid != null ? envPaid : paidOnly,
+    localModel: envLocal != null ? envLocal : localModel,
+  };
+}
+
+// ── phrase_risk_rules loader: merge DB rules over the built-in dictionary ──
+let _ruleCache = { ts: 0, rules: null };
+async function loadPhraseRules(db) {
+  if (Date.now() - _ruleCache.ts < 5 * 60_000 && _ruleCache.rules) return _ruleCache.rules;
+  let rules = null;
+  try {
+    const r = await db(`phrase_risk_rules?active=eq.true&select=phrase,category,severity,replacement_hint&limit=1000`);
+    if (r.ok) {
+      const rows = await r.json();
+      if (rows?.length) {
+        rules = rows.map((row) => ({
+          phrase: String(row.phrase || '').toLowerCase(),
+          category: row.category,
+          severity: row.severity,
+          replacementHint: row.replacement_hint ?? null,
+        })).filter((x) => x.phrase);
+      }
+    }
+  } catch { /* fall back to built-in dictionary */ }
+  _ruleCache = { ts: Date.now(), rules };
+  return rules;
 }
 
 // ── taxonomy loader: merge DB skill_aliases / skill_relationships over built-ins ──
@@ -175,12 +242,14 @@ export default async function handler(req, res) {
     fetch(`${SUPABASE_URL}/rest/v1/${path}`, { ...opts, headers: { ...dbHeaders, ...(opts.headers || {}) } });
   const haveDb = !!(SUPABASE_URL && SERVICE_KEY);
 
-  // Feature gate.
-  if (haveDb && !(await seenfitEnabled(db))) {
+  const action = body.action || 'optimize';
+
+  // SeenFit feature gate — applies to optimize/feedback only. HumanProof actions carry
+  // their own feature flag (humanproofFlags), so a disabled SeenFit doesn't block them.
+  const isHumanProofAction = action === 'humanize' || action === 'humanize_feedback';
+  if (haveDb && !isHumanProofAction && !(await seenfitEnabled(db))) {
     return res.status(403).json({ error: 'SEENFIT_DISABLED', message: 'SeenFit Engine is currently disabled.' });
   }
-
-  const action = body.action || 'optimize';
 
   try {
     // ── feedback ──────────────────────────────────────────────────────────────
@@ -201,6 +270,125 @@ export default async function handler(req, res) {
             rating: Number.isInteger(rating) ? rating : null,
             user_action: user_action || null,
             outcome: outcome || null,
+          }),
+        });
+      }
+      return res.status(200).json({ ok: true });
+    }
+
+    // ── humanize (HumanProof) ─────────────────────────────────────────────────────
+    // Deterministic, keyless humanizer. Runs AFTER SeenFit. Paid-gated via gateAI when
+    // HUMANPROOF_PAID_ONLY is on (only ai_credits.pro = true users get the full feature).
+    if (action === 'humanize') {
+      const hpFlags = haveDb ? await humanproofFlags(db) : { enabled: true, paidOnly: false, localModel: false };
+      if (!hpFlags.enabled) {
+        return res.status(403).json({ error: 'HUMANPROOF_DISABLED', message: 'HumanProof is currently disabled.' });
+      }
+
+      const { text, mode, roleFamily, jobId, jobTitle, company, jobDescription, resumeText, optimizerOutput } = body;
+      if (!text || String(text).trim().length < 20) {
+        return res.status(400).json({ error: 'TEXT_REQUIRED', message: 'Provide text to humanize (at least 20 characters).' });
+      }
+
+      // Paid gating. When PAID_ONLY is on, resolve the caller's Pro status server-side via
+      // gateAI(proOnly:true). gateAI returns { pro } and 402 (pro_required) for non-Pro.
+      // When PAID_ONLY is off, we still resolve the uid for persistence (no hard gate).
+      let uid = null;
+      if (haveDb && hpFlags.paidOnly) {
+        const gate = await gateAI(req, 'humanproof', { proOnly: true });
+        if (!gate.ok) {
+          return res.status(gate.status).json({
+            error: gate.error,
+            pro_required: !!gate.pro_required,
+            credits_required: !!gate.credits_required,
+            locked: true,
+          });
+        }
+        uid = gate.uid;
+      } else if (haveDb) {
+        uid = await resolveUid(req, SUPABASE_URL, SERVICE_KEY);
+      }
+
+      // Job facts (cached → extracted) give the humanizer supported context.
+      let jobFacts = null;
+      if (haveDb && jobId) jobFacts = await getCachedJobFacts(db, jobId);
+      if (!jobFacts && jobDescription) {
+        jobFacts = extractJobFacts(jobDescription, { jobTitle });
+      }
+
+      const extraRules = haveDb ? await loadPhraseRules(db) : null;
+
+      const output = runHumanProof(
+        {
+          text: String(text),
+          mode: mode === 'message' ? 'message' : 'resume',
+          roleFamily: roleFamily || null,
+          jobTitle,
+          company,
+          resumeText: resumeText || '',
+          jobFacts: jobFacts || undefined,
+          optimizerOutput: optimizerOutput || null,
+        },
+        { extraRules }
+      );
+
+      // Persist the run + flags (best-effort). Never fail the response on persistence.
+      let runId = null;
+      if (haveDb) {
+        try {
+          const r = await db('humanizer_runs', {
+            method: 'POST',
+            headers: { Prefer: 'return=representation' },
+            body: JSON.stringify({
+              user_id: uid,
+              job_id: jobId || null,
+              optimizer_run_id: body.optimizer_run_id || null,
+              original_text: String(text).slice(0, 20000),
+              humanized_text: output.humanized_text,
+              humanproof_score: output.humanproof_score,
+              ai_slop_risk: output.ai_slop_risk,
+              output,
+              engine_version: output.engine_version,
+            }),
+          });
+          if (r.ok) { const rows = await r.json(); runId = rows?.[0]?.id || null; }
+          if (runId && output.flags?.length) {
+            await db('humanizer_flags', {
+              method: 'POST',
+              headers: { Prefer: 'return=minimal' },
+              body: JSON.stringify(output.flags.slice(0, 100).map((f) => ({
+                run_id: runId,
+                flag_type: f.flagType,
+                severity: f.severity,
+                original_phrase: f.originalPhrase,
+                explanation: f.explanation,
+                suggested_fix: f.suggestedFix,
+              }))),
+            });
+          }
+        } catch (e) { console.error('humanproof persist:', e.message); }
+      }
+
+      return res.status(200).json({ ...output, run_id: runId, _engine_version: HUMANPROOF_ENGINE_VERSION, _local_model: hpFlags.localModel });
+    }
+
+    // ── humanize_feedback ─────────────────────────────────────────────────────────
+    if (action === 'humanize_feedback') {
+      const { run_id, rating, user_action } = body;
+      const uid = haveDb ? await resolveUid(req, SUPABASE_URL, SERVICE_KEY) : null;
+      const allowedActions = ['copy', 'copy_bullets', 'copy_message', 'save', 'rate', 'view', 'apply'];
+      if (user_action && !allowedActions.includes(user_action)) {
+        return res.status(400).json({ error: 'INVALID_ACTION' });
+      }
+      if (haveDb) {
+        await db('humanizer_feedback', {
+          method: 'POST',
+          headers: { Prefer: 'return=minimal' },
+          body: JSON.stringify({
+            run_id: run_id || null,
+            user_id: uid,
+            action: user_action || null,
+            rating: Number.isInteger(rating) ? rating : null,
           }),
         });
       }
