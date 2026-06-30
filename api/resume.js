@@ -5,7 +5,7 @@ import { createClient } from '@supabase/supabase-js';
 import { applyRateLimit } from '../lib/server/ratelimit.js';
 import { logError } from '../lib/server/errlog.js';
 import { gateAI } from '../lib/server/credits.js';
-import { runScanner, runOptimize, runAdvantage, extractEmployment, extractCareerSignal } from '../lib/server/resumeAnalysis.js';
+import { runScanner, runOptimize, runAdvantage, extractEmployment, extractCareerSignal, buildResumeDocument, resumeFileName } from '../lib/server/resumeAnalysis.js';
 import { extractPdfText } from '../lib/server/pdfText.js';
 const inflateRaw = promisify(zlib.inflateRaw);
 
@@ -46,6 +46,16 @@ export default async function handler(req, res) {
     if (req.method !== 'POST') return res.status(405).end();
     if (await applyRateLimit(req, res, 'email-analysis')) return;
     return handleEmailAnalysis(req, res, body);
+  }
+
+  // ── Route: download_resume — return a complete, submittable résumé PDF ────────
+  // Built deterministically from the user's OWN parsed résumé text (header,
+  // summary, experience, skills, education). No credit gate — it only reformats
+  // the user's existing résumé, it doesn't run an AI tool.
+  if (body.action === 'download_resume') {
+    if (req.method !== 'POST') return res.status(405).end('Method not allowed');
+    if (await applyRateLimit(req, res, 'download-resume')) return;
+    return handleDownloadResume(req, res, body);
   }
 
   // ── Route: parse — formerly api/parse-resume.js, folded in to stay at 11 functions ──
@@ -211,137 +221,170 @@ async function handleParseResume(req, res, body) {
   }
 }
 
-// ── PDF generation helper ──────────────────────────────────────────────────────
-function buildResumePDF({ role, co, bullets, keywords, ghostNote, date }) {
-  bullets = Array.isArray(bullets) ? bullets : [];
-  keywords = Array.isArray(keywords) ? keywords : [];
+// ── Résumé PDF generation ────────────────────────────────────────────────────
+// Renders a COMPLETE, submittable, recruiter-grade one-page résumé (overflow to
+// a second page only when needed) from a structured document produced by
+// buildResumeDocument(). Premium typography: a centred name header, a hairline
+// rule, generous section spacing, right-aligned dates, hanging-indent bullets.
+// Every section is omitted when its data is empty — the renderer never
+// fabricates content. ATS-parseable: real selectable text, standard sections,
+// no text baked into images. `meta` may carry the target role/company for a
+// subtle context line; it is omitted when blank.
+export function buildResumePDF(document, meta = {}) {
+  const d = document || {};
+  const MARGIN = 60;
   return new Promise((resolve, reject) => {
-    const doc = new PDFDocument({ size: 'LETTER', margins: { top: 56, bottom: 56, left: 64, right: 64 } });
+    // bufferPages lets us draw footers on every page AFTER content is laid out,
+    // without the footer write itself triggering pagination.
+    const doc = new PDFDocument({ size: 'LETTER', bufferPages: true, margins: { top: MARGIN, bottom: 64, left: MARGIN, right: MARGIN } });
     const chunks = [];
     doc.on('data', c => chunks.push(c));
     doc.on('end', () => resolve(Buffer.concat(chunks)));
     doc.on('error', reject);
 
-    const W = doc.page.width - 128; // usable width
-    const INDIGO = '#4f46e5';
-    const DARK   = '#111827';
-    const GRAY   = '#6b7280';
-    const LGRAY  = '#9ca3af';
-    const LINE   = '#e5e7eb';
-    const GREEN  = '#059669';
+    const LEFT = MARGIN;
+    const RIGHT = doc.page.width - MARGIN;
+    const W = doc.page.width - MARGIN * 2; // usable width
+    const INK   = '#0f172a'; // near-black for primary text
+    const BODY  = '#334155'; // slate for body copy
+    const MUTE  = '#64748b'; // muted slate for meta
+    const FAINT = '#94a3b8'; // faint for footer / dates
+    const RULE  = '#e2e8f0'; // hairline rule
+    const ACCENT = '#4338ca'; // indigo accent (headings, bullets)
 
-    // ── Header ──
-    doc.rect(0, 0, doc.page.width, 80).fill('#f9fafb');
-    doc.fontSize(9).fillColor(INDIGO).font('Helvetica-Bold')
-       .text('SEEN · RESUME OPTIMIZER', 64, 26, { characterSpacing: 1.5 });
-    doc.fontSize(18).fillColor(DARK).font('Helvetica-Bold')
-       .text('Optimized Resume', 64, 40);
-    doc.moveDown(0.2);
+    // Keep content above the footer band; PDFKit auto-paginates on overflow.
+    const footerBand = 42;
+    doc.page.margins.bottom = footerBand + 16;
 
-    doc.rect(0, 80, doc.page.width, 1).fill(LINE);
-    doc.moveDown(1);
-
-    // ── Subheader: role + company ──
-    doc.y = 96;
-    doc.fontSize(11).fillColor(DARK).font('Helvetica-Bold')
-       .text(`${role}`, 64, doc.y);
-    doc.fontSize(11).fillColor(GRAY).font('Helvetica')
-       .text(`at ${co}`, { continued: false });
-    doc.fontSize(8).fillColor(LGRAY)
-       .text(`Generated ${date} · seenjobs.io`, 64, doc.y + 2);
-    doc.moveDown(1.4);
-
-    // ── Keywords added ──
-    if (keywords && keywords.length > 0) {
-      doc.rect(64, doc.y, W, 1).fill(LINE);
-      doc.moveDown(0.6);
-      doc.fontSize(7).fillColor(INDIGO).font('Helvetica-Bold')
-         .text('KEYWORDS ADDED', 64, doc.y, { characterSpacing: 1 });
-      doc.moveDown(0.35);
-      doc.fontSize(9).fillColor(DARK).font('Helvetica')
-         .text(keywords.join('  ·  '), 64, doc.y, { width: W });
-      doc.moveDown(1.2);
+    // Section heading: small-caps-styled label in accent, with a hairline rule
+    // spanning the column directly beneath it. Generous breathing room above.
+    function sectionHeading(text) {
+      doc.moveDown(0.95);
+      doc.fillColor(ACCENT).font('Helvetica-Bold').fontSize(10.5)
+         .text(text.toUpperCase(), LEFT, doc.y, { characterSpacing: 1.6 });
+      doc.moveDown(0.28);
+      doc.save().lineWidth(0.8).strokeColor(RULE)
+         .moveTo(LEFT, doc.y).lineTo(RIGHT, doc.y).stroke().restore();
+      doc.moveDown(0.55);
     }
 
-    // ── Bullets ──
-    if (bullets && bullets.length > 0) {
-      doc.rect(64, doc.y, W, 1).fill(LINE);
-      doc.moveDown(0.6);
-      doc.fontSize(7).fillColor(INDIGO).font('Helvetica-Bold')
-         .text(`OPTIMIZED BULLETS  (${bullets.length})`, 64, doc.y, { characterSpacing: 1 });
+    // ── Header: centred name + contact ──
+    const c = d.contact || {};
+    const contactBits = [c.phone, c.email, c.location, c.linkedin].filter(Boolean);
+    if (d.name) {
+      doc.fillColor(INK).font('Helvetica-Bold').fontSize(25)
+         .text(d.name, LEFT, doc.y, { width: W, align: 'center', characterSpacing: 0.5 });
+      doc.moveDown(0.32);
+    }
+    // Subtle target-role context line (only when we know it) — not a fabricated fact.
+    const targetLine = [meta.role, meta.company].filter(Boolean).join('  ·  ');
+    if (targetLine) {
+      doc.fillColor(ACCENT).font('Helvetica').fontSize(10.5)
+         .text(targetLine, LEFT, doc.y, { width: W, align: 'center', characterSpacing: 0.4 });
+      doc.moveDown(0.32);
+    }
+    if (contactBits.length) {
+      doc.fillColor(MUTE).font('Helvetica').fontSize(9.5)
+         .text(contactBits.join('     ·     '), LEFT, doc.y, { width: W, align: 'center' });
       doc.moveDown(0.5);
+    }
+    if (d.name || contactBits.length || targetLine) {
+      doc.save().lineWidth(1.4).strokeColor(INK)
+         .moveTo(LEFT, doc.y).lineTo(RIGHT, doc.y).stroke().restore();
+    }
 
-      for (const b of bullets) {
-        const startY = doc.y;
-        // Left accent bar
-        const BAR_X = 64;
-        const TEXT_X = 76;
-        const textW = W - 12;
+    // ── Professional summary ──
+    if (d.summary && d.summary.trim()) {
+      sectionHeading('Professional Summary');
+      doc.fillColor(BODY).font('Helvetica').fontSize(10)
+         .text(d.summary.trim(), LEFT, doc.y, { width: W, lineGap: 3, align: 'left' });
+    }
 
-        // BEFORE label + text
-        doc.fontSize(6.5).fillColor(LGRAY).font('Helvetica-Bold')
-           .text('BEFORE', TEXT_X, doc.y, { characterSpacing: 0.8 });
-        doc.moveDown(0.25);
-        doc.fontSize(9).fillColor(GRAY).font('Helvetica')
-           .text(b.original, TEXT_X, doc.y, { width: textW });
-        doc.moveDown(0.5);
+    // ── Experience ──
+    const experience = Array.isArray(d.experience) ? d.experience.filter(e => e.title || e.company) : [];
+    if (experience.length) {
+      sectionHeading('Experience');
+      for (let r = 0; r < experience.length; r++) {
+        const e = experience[r];
+        if (r > 0) doc.moveDown(0.75);
 
-        // AFTER label + text
-        doc.fontSize(6.5).fillColor(GREEN).font('Helvetica-Bold')
-           .text(`AFTER  ·  ${b.addresses || ''}`, TEXT_X, doc.y, { characterSpacing: 0.8 });
-        doc.moveDown(0.25);
-        doc.fontSize(9).fillColor(DARK).font('Helvetica-Bold')
-           .text(b.optimized, TEXT_X, doc.y, { width: textW });
+        const dateText = (e.dates || '').trim();
+        const lineY = doc.y;
 
-        // Optional guidance note (never baked into the bullet text itself)
-        if (b.note) {
-          doc.moveDown(0.35);
-          doc.fontSize(8).fillColor(GRAY).font('Helvetica-Oblique')
-             .text(b.note, TEXT_X, doc.y, { width: textW });
+        // Title in bold ink (left); dates right-aligned on the same baseline.
+        doc.fillColor(INK).font('Helvetica-Bold').fontSize(11.5)
+           .text(e.title || e.company || ' ', LEFT, lineY, {
+             width: dateText ? W - 140 : W, lineBreak: false, ellipsis: true,
+           });
+        if (dateText) {
+          doc.fillColor(MUTE).font('Helvetica').fontSize(9.5)
+             .text(dateText, LEFT, lineY + 1.5, { width: W, align: 'right' });
         }
+        doc.moveDown(0.12);
 
-        const endY = doc.y;
-        // Draw accent bar on the left
-        doc.rect(BAR_X, startY - 2, 2, endY - startY + 10).fill(INDIGO);
+        // Company · Location subline in accent.
+        const sub = [e.company, (e.location || '').trim()].filter(Boolean).join('   ·   ');
+        if (sub && (e.title || e.location)) {
+          doc.fillColor(ACCENT).font('Helvetica-Oblique').fontSize(10)
+             .text(sub, LEFT, doc.y, { width: W });
+        }
+        doc.moveDown(0.32);
 
-        doc.moveDown(1.1);
+        const bullets = Array.isArray(e.bullets) ? e.bullets.filter(Boolean) : [];
+        for (const b of bullets) drawBullet(doc, b, LEFT, W, ACCENT, BODY);
       }
     }
 
-    // ── Fallback when there are no bullet rewrites: never ship a blank doc ──
-    // Show the keyword + ghost guidance instead of an empty middle section.
-    if (bullets.length === 0) {
-      doc.rect(64, doc.y, W, 1).fill(LINE);
-      doc.moveDown(0.6);
-      doc.fontSize(7).fillColor(INDIGO).font('Helvetica-Bold')
-         .text('HOW TO STRENGTHEN YOUR RESUME', 64, doc.y, { characterSpacing: 1 });
-      doc.moveDown(0.5);
-      if (keywords.length > 0) {
-        doc.fontSize(9).fillColor(DARK).font('Helvetica')
-           .text(`Work these keywords into your resume where they reflect real experience: ${keywords.join(', ')}.`, 64, doc.y, { width: W });
-        doc.moveDown(0.6);
-      }
-      doc.fontSize(9).fillColor(DARK).font('Helvetica')
-         .text('Lead each bullet with a strong action verb (Led, Built, Drove, Delivered) and attach a number — a %, $, count, or timeframe — so each accomplishment is measurable.', 64, doc.y, { width: W });
-      if (ghostNote) {
-        doc.moveDown(0.6);
-        doc.fontSize(9).fillColor(GRAY).font('Helvetica-Oblique')
-           .text(ghostNote, 64, doc.y, { width: W });
-      }
-      doc.moveDown(1.1);
+    // ── Skills ──
+    const skills = Array.isArray(d.skills) ? d.skills.filter(Boolean) : [];
+    if (skills.length) {
+      sectionHeading('Skills');
+      doc.fillColor(BODY).font('Helvetica').fontSize(10)
+         .text(skills.join('     ·     '), LEFT, doc.y, { width: W, lineGap: 4 });
     }
 
-    // ── Footer ──
-    const footY = doc.page.height - 48;
-    doc.rect(0, footY - 1, doc.page.width, 1).fill(LINE);
-    doc.fontSize(7.5).fillColor(LGRAY).font('Helvetica')
-       .text(
-         'Generated by Seen · seenjobs.io · Copy these bullets into your resume before applying.',
-         64, footY + 8, { width: W, align: 'center' }
-       );
+    // ── Education ──
+    const education = Array.isArray(d.education) ? d.education.filter(Boolean) : [];
+    if (education.length) {
+      sectionHeading('Education');
+      for (const ed of education) drawBullet(doc, ed, LEFT, W, ACCENT, BODY);
+    }
+
+    // ── Footer on every page (drawn after content, via buffered pages) ──
+    const range = doc.bufferedPageRange();
+    for (let i = range.start; i < range.start + range.count; i++) {
+      doc.switchToPage(i);
+      drawFooter(doc, LEFT, W, RULE, FAINT, footerBand);
+    }
+    doc.flushPages();
 
     doc.end();
   });
+}
+
+// Draw a single hanging-indent bullet with a small accent marker.
+function drawBullet(doc, text, LEFT, W, ACCENT, BODY) {
+  const y = doc.y;
+  const INDENT = 15;
+  doc.fillColor(ACCENT).font('Helvetica-Bold').fontSize(10)
+     .text('•', LEFT + 2, y, { width: INDENT, lineBreak: false });
+  doc.fillColor(BODY).font('Helvetica').fontSize(10)
+     .text(text, LEFT + INDENT, y, { width: W - INDENT, lineGap: 2.5, align: 'left' });
+  doc.moveDown(0.3);
+}
+
+// Draw the tasteful Seen footer at the bottom of the current page. Temporarily
+// drops the bottom margin so the footer text (which sits inside the bottom band)
+// does not trigger auto-pagination.
+function drawFooter(doc, LEFT, W, RULE, FAINT, footerBand) {
+  const savedBottom = doc.page.margins.bottom;
+  doc.page.margins.bottom = 0;
+  const footY = doc.page.height - footerBand;
+  doc.save().lineWidth(0.8).strokeColor(RULE)
+     .moveTo(LEFT, footY).lineTo(LEFT + W, footY).stroke().restore();
+  doc.fillColor(FAINT).font('Helvetica').fontSize(8)
+     .text('Optimized with Seen  ·  seenjobs.io', LEFT, footY + 9, { width: W, align: 'center', characterSpacing: 0.3, lineBreak: false });
+  doc.page.margins.bottom = savedBottom;
 }
 
 // ── Email analysis handler ─────────────────────────────────────────────────────
@@ -350,7 +393,7 @@ async function handleEmailAnalysis(req, res, body) {
     const RESEND_KEY = process.env.RESEND_KEY;
     if (!RESEND_KEY) return res.status(500).json({ error: 'Email not configured' });
 
-    const { email, co, role, jid, jobUrl, bullets = [], keywords = [], ghostNote = '' } = body;
+    const { email, co, role, jid, jobUrl, bullets = [], keywords = [], ghostNote = '', resume = '', jobDescription = '' } = body;
     if (!email || !co || !role) return res.status(400).json({ error: 'Missing required fields' });
 
     const esc = (s) => String(s == null ? '' : s)
@@ -367,11 +410,24 @@ async function handleEmailAnalysis(req, res, body) {
 
     const date = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 
-    // ── Generate PDF attachment ──
+    // ── Generate the complete-résumé PDF attachment ──
+    // Build a real, submittable résumé from the user's OWN parsed résumé text
+    // (header, summary, experience, skills, education). The before/after tips
+    // live in the email body below — the attachment is a clean résumé.
     let pdfBase64 = null;
+    let attachName = `Seen Resume.pdf`;
     try {
-      const pdfBuf = await buildResumePDF({ role, co, bullets, keywords, ghostNote, date });
-      pdfBase64 = pdfBuf.toString('base64');
+      const resumeDoc = buildResumeDocument({ resume, jobDescription, job: role, company: co });
+      // Only attach a real document when we have actual content to render.
+      const hasContent = resumeDoc.name || resumeDoc.summary ||
+        (resumeDoc.experience && resumeDoc.experience.length) ||
+        (resumeDoc.skills && resumeDoc.skills.length) ||
+        (resumeDoc.education && resumeDoc.education.length);
+      if (hasContent) {
+        const pdfBuf = await buildResumePDF(resumeDoc, { role, company: co });
+        pdfBase64 = pdfBuf.toString('base64');
+        attachName = resumeFileName({ name: resumeDoc.name, role });
+      }
     } catch (pdfErr) {
       console.error('PDF generation error:', pdfErr.message);
       // PDF is best-effort — continue without it
@@ -476,7 +532,7 @@ async function handleEmailAnalysis(req, res, body) {
 
     if (pdfBase64) {
       payload.attachments = [{
-        filename: `seen-resume-${co.toLowerCase().replace(/[^a-z0-9]/g, '-')}-${role.toLowerCase().replace(/[^a-z0-9]/g, '-')}.pdf`,
+        filename: attachName,
         content: pdfBase64,
       }];
     }
@@ -497,6 +553,44 @@ async function handleEmailAnalysis(req, res, body) {
     console.error('email_analysis error:', err.message);
     logError('email-analysis', err.message);
     return res.status(500).json({ error: 'Failed to send email' });
+  }
+}
+
+// ── Download complete résumé handler ─────────────────────────────────────────
+// Streams a finished, submittable résumé PDF built from the user's OWN résumé
+// text. Sets a clean, professional Content-Disposition filename. Deterministic,
+// keyless — no AI, no credit gate (it reformats the user's existing résumé).
+async function handleDownloadResume(req, res, body) {
+  try {
+    const { resume = '', job = '', company = '', jobDescription = '' } = body;
+    if (!resume || String(resume).trim().length < 30) {
+      return res.status(400).json({ error: 'Add your résumé first.' });
+    }
+
+    const resumeDoc = buildResumeDocument({ resume, jobDescription, job, company });
+    const hasContent = resumeDoc.name || resumeDoc.summary ||
+      (resumeDoc.experience && resumeDoc.experience.length) ||
+      (resumeDoc.skills && resumeDoc.skills.length) ||
+      (resumeDoc.education && resumeDoc.education.length);
+    if (!hasContent) {
+      return res.status(422).json({ error: 'Could not read enough structure from this résumé to build a document. Make sure it has your roles and bullet points.' });
+    }
+
+    const pdfBuf = await buildResumePDF(resumeDoc, { role: job, company });
+    const filename = resumeFileName({ name: resumeDoc.name, role: job });
+
+    // RFC 5987 — a plain ASCII fallback plus a UTF-8 encoded name so the em-dash
+    // survives. asciiName strips non-ASCII for the fallback token.
+    const asciiName = filename.replace(/[^\x20-\x7E]/g, '-').replace(/"/g, '');
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition',
+      `attachment; filename="${asciiName}"; filename*=UTF-8''${encodeURIComponent(filename)}`);
+    res.setHeader('Cache-Control', 'no-store');
+    return res.status(200).send(pdfBuf);
+  } catch (err) {
+    console.error('download_resume error:', err.message);
+    logError('download-resume', err.message);
+    return res.status(500).json({ error: 'Failed to build résumé PDF.' });
   }
 }
 
