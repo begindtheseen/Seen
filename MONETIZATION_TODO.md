@@ -7,7 +7,17 @@ owner controls). Implement once the prerequisite decision is made.
 
 ---
 
-## 1. 7-day free trial
+## 1. 7-day free trial — ✅ BUILT (card-required, via Stripe)
+**Shipped:** `api/stripe.js` checkout now sets `subscription_data[trial_period_days]=7`, so the
+card is collected up front and Stripe auto-converts to a paid charge on day 7. The webhook
+handles the full trial lifecycle: `checkout.session.completed` grants Pro immediately, and
+`customer.subscription.updated` keeps entitlement in lockstep (trialing/active → Pro;
+canceled/unpaid/incomplete_expired → revoke; past_due/incomplete left alone for dunning grace).
+CTA copy ("Start 7-day free trial") + FTC/ARL trial disclosure added to `app/pricing/page.tsx`
+and `components/UpgradeModal.tsx`. No new infra/keys were needed — card-required trial reuses
+the existing Stripe subscription flow. Decision taken: **card-required** (higher paid
+conversion, cleaner implementation than a no-card grant-and-revoke).
+
 **Expected lift:** Large. Free trials on a $9.99–$83.88 SaaS commonly lift paid conversion
 2–4× by moving the payment decision *after* the user has felt Pro value (unlimited credits,
 Stealth Mode, HumanProof).

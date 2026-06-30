@@ -203,15 +203,15 @@ export default function UpgradeModal({ reason, onClose, featureName }: UpgradeMo
               transition: 'opacity .15s',
             }}
           >
-            {loading ? 'Redirecting to checkout…' : `Upgrade to Pro · ${plan === 'yearly' ? YEARLY_PRICE + '/mo' : MONTHLY_PRICE + '/mo'}`}
+            {loading ? 'Redirecting to checkout…' : `Start 7-day free trial · then ${plan === 'yearly' ? YEARLY_PRICE + '/mo' : MONTHLY_PRICE + '/mo'}`}
           </button>
 
           {/* Auto-renewal disclosure — shown at the point of purchase (FTC / state ARL compliance). */}
           <div style={{ fontFamily: 'var(--body)', fontSize: '.66rem', color: 'var(--sub)', textAlign: 'center', lineHeight: 1.6, marginTop: '.85rem' }}>
             {plan === 'yearly'
-              ? `Billed $${YEARLY_TOTAL.toFixed(2)} today, then automatically each year until you cancel.`
-              : `Billed ${MONTHLY_PRICE} today, then automatically each month until you cancel.`}
-            {' '}Cancel anytime in Profile → Billing. See <a href="/legal" style={{ color: 'var(--blue)' }}>Subscription Terms</a>.
+              ? `Free for 7 days, then $${YEARLY_TOTAL.toFixed(2)}/year automatically until you cancel.`
+              : `Free for 7 days, then ${MONTHLY_PRICE}/month automatically until you cancel.`}
+            {' '}Cancel before day 7 and you won’t be charged. Manage in Profile → Billing. See <a href="/legal" style={{ color: 'var(--blue)' }}>Subscription Terms</a>.
           </div>
 
           <div style={{ display: 'flex', justifyContent: 'center', gap: '1.5rem', marginTop: '.75rem' }}>
