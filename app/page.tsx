@@ -24,6 +24,10 @@ export default function LandingPage() {
           <span className="lp2-footer-sep">·</span>
           <span>No account required to search</span>
           <span className="lp2-footer-sep">·</span>
+          <a href="/compare">Compare</a>
+          <span className="lp2-footer-sep">·</span>
+          <a href="/reddit">Reddit outcomes</a>
+          <span className="lp2-footer-sep">·</span>
           <a href="/legal">Legal</a>
           <span className="lp2-footer-copy">© 2025 Seen. All rights reserved.</span>
         </div>

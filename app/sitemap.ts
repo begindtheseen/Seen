@@ -1,7 +1,9 @@
 import type { MetadataRoute } from 'next'
+import { SEED_COMPANIES, slugify as growthSlugify } from '@/lib/growth'
 
-// Dynamic sitemap: static routes + every scored company page. Refreshes hourly so newly
-// scored companies get indexed. Pulls names server-side (service key, never shipped to client).
+// Dynamic sitemap: static routes + every scored company page + the seeded growth surfaces
+// (FAQ long-tail, compare, reddit). Refreshes hourly so newly scored companies get indexed.
+// Pulls names server-side (service key, never shipped to client).
 export const revalidate = 3600
 
 const BASE = 'https://seenjobs.io'
@@ -36,7 +38,20 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { url: `${BASE}/resume`, lastModified: now, changeFrequency: 'weekly', priority: 0.6 },
     { url: `${BASE}/report`, lastModified: now, changeFrequency: 'weekly', priority: 0.6 },
     { url: `${BASE}/pricing`, lastModified: now, changeFrequency: 'monthly', priority: 0.5 },
+    { url: `${BASE}/faq`, lastModified: now, changeFrequency: 'monthly', priority: 0.5 },
+    { url: `${BASE}/compare`, lastModified: now, changeFrequency: 'weekly', priority: 0.7 },
+    { url: `${BASE}/reddit`, lastModified: now, changeFrequency: 'weekly', priority: 0.7 },
   ]
+
+  // Growth surfaces: long-tail FAQ pages for the seeded top companies. These are the high-intent
+  // queries ("does <x> ghost applicants", "<x> hiring process"). Other companies render on-demand.
+  const faqRoutes: MetadataRoute.Sitemap = SEED_COMPANIES.flatMap(name => {
+    const c = growthSlugify(name)
+    return [
+      { url: `${BASE}/faq/does-${c}-ghost-applicants`, lastModified: now, changeFrequency: 'weekly' as const, priority: 0.7 },
+      { url: `${BASE}/faq/${c}-hiring-process`, lastModified: now, changeFrequency: 'weekly' as const, priority: 0.7 },
+    ]
+  })
 
   const companies = await getCompanyNames()
   const companyRoutes: MetadataRoute.Sitemap = companies.map(name => ({
@@ -46,5 +61,5 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     priority: 0.8,
   }))
 
-  return [...staticRoutes, ...companyRoutes]
+  return [...staticRoutes, ...faqRoutes, ...companyRoutes]
 }
