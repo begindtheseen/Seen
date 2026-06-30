@@ -212,7 +212,9 @@ async function handleParseResume(req, res, body) {
 }
 
 // ── PDF generation helper ──────────────────────────────────────────────────────
-function buildResumePDF({ role, co, bullets, keywords, date }) {
+function buildResumePDF({ role, co, bullets, keywords, ghostNote, date }) {
+  bullets = Array.isArray(bullets) ? bullets : [];
+  keywords = Array.isArray(keywords) ? keywords : [];
   return new Promise((resolve, reject) => {
     const doc = new PDFDocument({ size: 'LETTER', margins: { top: 56, bottom: 56, left: 64, right: 64 } });
     const chunks = [];
@@ -291,12 +293,42 @@ function buildResumePDF({ role, co, bullets, keywords, date }) {
         doc.fontSize(9).fillColor(DARK).font('Helvetica-Bold')
            .text(b.optimized, TEXT_X, doc.y, { width: textW });
 
+        // Optional guidance note (never baked into the bullet text itself)
+        if (b.note) {
+          doc.moveDown(0.35);
+          doc.fontSize(8).fillColor(GRAY).font('Helvetica-Oblique')
+             .text(b.note, TEXT_X, doc.y, { width: textW });
+        }
+
         const endY = doc.y;
         // Draw accent bar on the left
         doc.rect(BAR_X, startY - 2, 2, endY - startY + 10).fill(INDIGO);
 
         doc.moveDown(1.1);
       }
+    }
+
+    // ── Fallback when there are no bullet rewrites: never ship a blank doc ──
+    // Show the keyword + ghost guidance instead of an empty middle section.
+    if (bullets.length === 0) {
+      doc.rect(64, doc.y, W, 1).fill(LINE);
+      doc.moveDown(0.6);
+      doc.fontSize(7).fillColor(INDIGO).font('Helvetica-Bold')
+         .text('HOW TO STRENGTHEN YOUR RESUME', 64, doc.y, { characterSpacing: 1 });
+      doc.moveDown(0.5);
+      if (keywords.length > 0) {
+        doc.fontSize(9).fillColor(DARK).font('Helvetica')
+           .text(`Work these keywords into your resume where they reflect real experience: ${keywords.join(', ')}.`, 64, doc.y, { width: W });
+        doc.moveDown(0.6);
+      }
+      doc.fontSize(9).fillColor(DARK).font('Helvetica')
+         .text('Lead each bullet with a strong action verb (Led, Built, Drove, Delivered) and attach a number — a %, $, count, or timeframe — so each accomplishment is measurable.', 64, doc.y, { width: W });
+      if (ghostNote) {
+        doc.moveDown(0.6);
+        doc.fontSize(9).fillColor(GRAY).font('Helvetica-Oblique')
+           .text(ghostNote, 64, doc.y, { width: W });
+      }
+      doc.moveDown(1.1);
     }
 
     // ── Footer ──
@@ -318,8 +350,12 @@ async function handleEmailAnalysis(req, res, body) {
     const RESEND_KEY = process.env.RESEND_KEY;
     if (!RESEND_KEY) return res.status(500).json({ error: 'Email not configured' });
 
-    const { email, co, role, jid, jobUrl, bullets = [], keywords = [] } = body;
+    const { email, co, role, jid, jobUrl, bullets = [], keywords = [], ghostNote = '' } = body;
     if (!email || !co || !role) return res.status(400).json({ error: 'Missing required fields' });
+
+    const esc = (s) => String(s == null ? '' : s)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 
     // Build the apply link — leads to the forced "did you apply?" prompt
     const applyParams = new URLSearchParams({
@@ -334,7 +370,7 @@ async function handleEmailAnalysis(req, res, body) {
     // ── Generate PDF attachment ──
     let pdfBase64 = null;
     try {
-      const pdfBuf = await buildResumePDF({ role, co, bullets, keywords, date });
+      const pdfBuf = await buildResumePDF({ role, co, bullets, keywords, ghostNote, date });
       pdfBase64 = pdfBuf.toString('base64');
     } catch (pdfErr) {
       console.error('PDF generation error:', pdfErr.message);
@@ -342,15 +378,27 @@ async function handleEmailAnalysis(req, res, body) {
     }
 
     // ── Bullet rows for email body ──
-    const bulletRowsHtml = bullets.map(b => `
+    const bulletRowsHtml = (Array.isArray(bullets) ? bullets : []).map(b => `
       <div style="margin-bottom:20px;padding:18px 20px;background:#fff;border:1px solid #e5e7eb;border-radius:10px;">
         <div style="font-size:10px;font-weight:700;letter-spacing:.08em;color:#9ca3af;text-transform:uppercase;margin-bottom:6px;">Before</div>
-        <div style="font-size:13px;color:#6b7280;line-height:1.6;margin-bottom:12px;">${b.original || ''}</div>
+        <div style="font-size:13px;color:#6b7280;line-height:1.6;margin-bottom:12px;">${esc(b.original)}</div>
         <div style="height:1px;background:#e5e7eb;margin-bottom:12px;"></div>
-        <div style="font-size:10px;font-weight:700;letter-spacing:.08em;color:#059669;text-transform:uppercase;margin-bottom:6px;">After · <span style="font-weight:500;">${b.addresses || ''}</span></div>
-        <div style="font-size:13px;color:#111827;line-height:1.6;font-weight:600;">${b.optimized || ''}</div>
+        <div style="font-size:10px;font-weight:700;letter-spacing:.08em;color:#059669;text-transform:uppercase;margin-bottom:6px;">After · <span style="font-weight:500;">${esc(b.addresses)}</span></div>
+        <div style="font-size:13px;color:#111827;line-height:1.6;font-weight:600;">${esc(b.optimized)}</div>
+        ${b.note ? `<div style="font-size:12px;color:#6b7280;line-height:1.55;margin-top:8px;font-style:italic;">💡 ${esc(b.note)}</div>` : ''}
       </div>
     `).join('');
+
+    // Fallback body when there are no bullet rewrites — never email a blank doc.
+    const keywordList = (Array.isArray(keywords) ? keywords : []).filter(Boolean);
+    const guidanceHtml = `
+      <div style="margin-bottom:20px;padding:18px 20px;background:#fff;border:1px solid #e5e7eb;border-radius:10px;">
+        <div style="font-size:10px;font-weight:700;letter-spacing:.08em;color:#4f46e5;text-transform:uppercase;margin-bottom:8px;">How to strengthen your resume</div>
+        ${keywordList.length ? `<div style="font-size:13px;color:#374151;line-height:1.6;margin-bottom:10px;">Work these keywords in where they reflect real experience: <strong>${keywordList.map(esc).join(', ')}</strong>.</div>` : ''}
+        <div style="font-size:13px;color:#374151;line-height:1.6;">Lead each bullet with a strong action verb (Led, Built, Drove, Delivered) and attach a number — a %, $, count, or timeframe — so every accomplishment is measurable.</div>
+        ${ghostNote ? `<div style="font-size:12px;color:#6b7280;line-height:1.55;margin-top:10px;font-style:italic;">${esc(ghostNote)}</div>` : ''}
+      </div>`;
+    const bodyRowsHtml = bulletRowsHtml || guidanceHtml;
 
     const html = `<!DOCTYPE html>
 <html lang="en">
@@ -368,7 +416,7 @@ async function handleEmailAnalysis(req, res, body) {
         <tr><td style="background:#4f46e5;border-radius:12px 12px 0 0;padding:32px 36px 28px;">
           <div style="font-size:10px;font-weight:700;letter-spacing:.18em;color:rgba(255,255,255,.55);text-transform:uppercase;margin-bottom:12px;">Seen</div>
           <div style="font-size:24px;font-weight:800;color:#fff;letter-spacing:-.03em;line-height:1.15;margin-bottom:8px;">Your optimized resume<br>is attached.</div>
-          <div style="font-size:13px;color:rgba(255,255,255,.7);margin-top:4px;">${role} · ${co}</div>
+          <div style="font-size:13px;color:rgba(255,255,255,.7);margin-top:4px;">${esc(role)} · ${esc(co)}</div>
         </td></tr>
 
         <!-- Body -->
@@ -377,10 +425,13 @@ async function handleEmailAnalysis(req, res, body) {
           <p style="font-size:14px;color:#374151;margin:0 0 8px;line-height:1.7;font-weight:500;">
             Open the PDF attached to this email.
           </p>
-          <p style="font-size:13px;color:#6b7280;margin:0 0 28px;line-height:1.7;">
+          <p style="font-size:13px;color:#6b7280;margin:0 0 24px;line-height:1.7;">
             Copy the rewritten bullets into your resume before you submit your application.
             The PDF has your before/after rewrites and every keyword that was added.
           </p>
+
+          <!-- Before/after rewrites (or guidance when there are none) -->
+          ${bodyRowsHtml}
 
           <!-- Earn-credit nudge -->
           <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;padding:16px 20px;margin-bottom:28px;">
