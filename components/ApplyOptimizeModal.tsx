@@ -160,6 +160,8 @@ export default function ApplyOptimizeModal({
         throw new Error(e.error || `Error ${r.status}`)
       }
       const data = await r.json()
+      // Optimize consumed a credit server-side — refresh the Nav balance.
+      window.dispatchEvent(new Event('seen:credits-updated'))
       setResult(data)
       setStep('review')
     } catch (e: unknown) {

@@ -140,6 +140,9 @@ export default function SurveyModal({ apps, onClose, onCreditsEarned }: SurveyMo
       const earned = creditsEarned + 1
       setCreditsEarned(earned)
       setBalance(d.balance || balance)
+      // Each answered question earns a credit — refresh the Nav balance immediately, not
+      // only when the whole survey completes.
+      window.dispatchEvent(new CustomEvent('seen:credits-updated'))
       setCreditPopVal(1)
       setCreditPopVisible(true)
       setPhase('credit-pop')

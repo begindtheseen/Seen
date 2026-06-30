@@ -44,8 +44,17 @@ export default function Nav() {
 
   useEffect(() => {
     const handler = () => { fetchBalance() }
+    // Re-fetch on the custom event (usage/earn) AND when the tab regains focus — the latter
+    // catches the daily reset for users who leave the tab open overnight.
+    const onFocus = () => { if (document.visibilityState !== 'hidden') fetchBalance() }
     window.addEventListener('seen:credits-updated', handler)
-    return () => window.removeEventListener('seen:credits-updated', handler)
+    window.addEventListener('focus', onFocus)
+    document.addEventListener('visibilitychange', onFocus)
+    return () => {
+      window.removeEventListener('seen:credits-updated', handler)
+      window.removeEventListener('focus', onFocus)
+      document.removeEventListener('visibilitychange', onFocus)
+    }
   }, [fetchBalance])
 
   // Close the mobile drawer whenever the route changes
@@ -98,33 +107,38 @@ export default function Nav() {
           {isSeeker && isPro && (
             <Link
               href="/pricing"
-              title="Seen Pro — manage your membership"
+              title="Seen Pro — unlimited AI credits. Manage your membership."
               style={{
-                display: 'inline-flex', alignItems: 'center', gap: '.28rem',
+                display: 'inline-flex', alignItems: 'center', gap: '.32rem',
                 background: 'linear-gradient(135deg,rgba(16,185,129,.18),rgba(99,102,241,.18))',
                 color: 'var(--green)', border: '1px solid rgba(16,185,129,.4)',
-                borderRadius: 20, padding: '.2rem .6rem',
-                fontFamily: 'var(--mono)', fontSize: '.6rem', fontWeight: 700, letterSpacing: '.06em',
-                textDecoration: 'none', lineHeight: 1.5, boxShadow: '0 0 14px rgba(16,185,129,.18)',
+                borderRadius: 20, padding: '.32rem .7rem',
+                fontFamily: 'var(--mono)', fontSize: '.62rem', fontWeight: 700, letterSpacing: '.04em',
+                textDecoration: 'none', lineHeight: 1, boxShadow: '0 0 14px rgba(16,185,129,.18)',
               }}
             >
-              ★ PRO
+              ★ Unlimited · PRO
             </Link>
           )}
           {isSeeker && !isPro && creditBalance !== null && (
             <button
-              title={creditBalance === 999 ? 'Pro — unlimited AI credits' : creditBalance === 0 ? 'Out of AI credits — upgrade or earn more' : `${creditBalance} AI credits remaining today`}
+              title={creditBalance === 0 ? 'Out of AI credits — upgrade or earn more by tracking applications and answering surveys' : `${creditBalance} AI credit${creditBalance === 1 ? '' : 's'} left today`}
               style={{
-                background: creditBalance === 0 ? 'rgba(239,68,68,.15)' : creditBalance === 999 ? 'rgba(16,185,129,.15)' : 'var(--blue)',
-                color: creditBalance === 0 ? 'var(--red)' : creditBalance === 999 ? 'var(--green)' : '#fff',
-                border: creditBalance === 0 ? '1px solid rgba(239,68,68,.35)' : creditBalance === 999 ? '1px solid rgba(16,185,129,.35)' : 'none',
-                borderRadius: 20, padding: '.2rem .65rem',
-                fontFamily: 'var(--mono)', fontSize: '.6rem', fontWeight: 700, cursor: 'pointer', lineHeight: 1.5,
+                display: 'inline-flex', alignItems: 'center', gap: '.34rem',
+                background: creditBalance === 0 ? 'rgba(239,68,68,.16)' : 'linear-gradient(135deg,rgba(59,130,246,.22),rgba(99,102,241,.22))',
+                color: creditBalance === 0 ? 'var(--red)' : 'var(--white)',
+                border: creditBalance === 0 ? '1px solid rgba(239,68,68,.4)' : '1px solid rgba(99,102,241,.45)',
+                borderRadius: 20, padding: '.32rem .72rem',
+                fontFamily: 'var(--mono)', fontSize: '.62rem', fontWeight: 700, cursor: 'pointer', lineHeight: 1,
+                whiteSpace: 'nowrap',
+                boxShadow: creditBalance === 0 ? '0 0 14px rgba(239,68,68,.18)' : '0 0 12px rgba(99,102,241,.16)',
                 animation: creditBalance === 0 ? 'pulse 2s ease-in-out infinite' : undefined,
               }}
               onClick={() => creditBalance === 0 ? setShowUpgrade(true) : setShowAccountModal(true)}
             >
-              {creditBalance === 999 ? '∞' : creditBalance} AI{creditBalance === 0 ? ' · Upgrade' : ''}
+              {creditBalance === 0
+                ? <>⚠️ Out of credits · Upgrade</>
+                : <>🪙 {creditBalance} credit{creditBalance === 1 ? '' : 's'} left</>}
             </button>
           )}
           {isSeeker && (
@@ -152,6 +166,41 @@ export default function Nav() {
           <span style={{ fontFamily: 'var(--display)', fontWeight: 800, fontSize: '1.2rem', color: 'var(--white)', letterSpacing: '-.02em' }}>Seen</span>
           <button onClick={() => setMenuOpen(false)} style={{ marginLeft: 'auto', background: 'none', border: 'none', color: 'var(--muted)', cursor: 'pointer', fontSize: '1rem' }}>✕</button>
         </div>
+        {/* Credit balance — always visible at the top of the mobile drawer for signed-in seekers */}
+        {isSeeker && isPro && (
+          <Link
+            href="/pricing"
+            onClick={() => setMenuOpen(false)}
+            style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '.5rem',
+              margin: '.25rem 1rem .6rem', padding: '.7rem .9rem', textDecoration: 'none',
+              background: 'linear-gradient(135deg,rgba(16,185,129,.16),rgba(99,102,241,.16))',
+              border: '1px solid rgba(16,185,129,.4)', borderRadius: 12,
+            }}
+          >
+            <span style={{ fontFamily: 'var(--mono)', fontSize: '.66rem', fontWeight: 700, color: 'var(--green)', letterSpacing: '.03em' }}>★ Seen Pro</span>
+            <span style={{ fontFamily: 'var(--mono)', fontSize: '.66rem', fontWeight: 700, color: 'var(--green)' }}>Unlimited AI</span>
+          </Link>
+        )}
+        {isSeeker && !isPro && creditBalance !== null && (
+          <button
+            onClick={() => { setMenuOpen(false); creditBalance === 0 ? setShowUpgrade(true) : setShowAccountModal(true) }}
+            style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '.5rem', width: 'calc(100% - 2rem)',
+              margin: '.25rem 1rem .6rem', padding: '.7rem .9rem', cursor: 'pointer', textAlign: 'left',
+              background: creditBalance === 0 ? 'rgba(239,68,68,.14)' : 'linear-gradient(135deg,rgba(59,130,246,.18),rgba(99,102,241,.18))',
+              border: creditBalance === 0 ? '1px solid rgba(239,68,68,.4)' : '1px solid rgba(99,102,241,.4)',
+              borderRadius: 12,
+            }}
+          >
+            <span style={{ fontFamily: 'var(--mono)', fontSize: '.66rem', fontWeight: 700, color: creditBalance === 0 ? 'var(--red)' : 'var(--white)' }}>
+              {creditBalance === 0 ? '⚠️ Out of AI credits' : `🪙 ${creditBalance} AI credit${creditBalance === 1 ? '' : 's'} left`}
+            </span>
+            <span style={{ fontFamily: 'var(--mono)', fontSize: '.6rem', fontWeight: 700, color: creditBalance === 0 ? 'var(--red)' : 'var(--blue)' }}>
+              {creditBalance === 0 ? 'Upgrade →' : 'Earn more →'}
+            </span>
+          </button>
+        )}
         <Link href="/jobs" className={`side-menu-item${isActive('/jobs') ? ' active' : ''}`}><span className="side-menu-icon">💼</span>Jobs</Link>
         <Link href="/companies" className={`side-menu-item${isActive('/companies') ? ' active' : ''}`}><span className="side-menu-icon">🏢</span>Companies</Link>
         <Link href="/demand" className={`side-menu-item${isActive('/demand') ? ' active' : ''}`}><span className="side-menu-icon">📊</span>Demand</Link>

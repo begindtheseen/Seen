@@ -121,6 +121,9 @@ function JobDetailDrawer({ job, isLoggedIn, onClose, onApply, onCheckCompany }: 
       })
       const d = await res.json()
       if (d.credits_required) { setInsightsState('credits'); return }
+      // A freshly generated insight ('generated') consumed a credit server-side; DB-cache
+      // hits are free. Only refresh the Nav balance when a credit was actually spent.
+      if (d._src === 'generated') window.dispatchEvent(new Event('seen:credits-updated'))
       if (d.what_they_want?.length) {
         try { localStorage.setItem(key, JSON.stringify({ ts: Date.now(), data: d })) } catch { /* ignore */ }
         setInsights(d); setInsightsState('done')

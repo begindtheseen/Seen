@@ -469,6 +469,8 @@ function ResumePageInner() {
           return
         }
         if (data.text) {
+          // Parsing the upload consumed a credit server-side — refresh the Nav balance.
+          window.dispatchEvent(new Event('seen:credits-updated'))
           const wc = data.text.trim().split(/\s+/).length
           await ResumeStore.save(data.text, file.name, wc, user?.id, isLoggedIn)
           setResumeText(data.text)
@@ -552,6 +554,8 @@ function ResumePageInner() {
       )
     }
     if (!res.ok) throw new Error(`HTTP ${res.status}`)
+    // Successful AI call consumed a credit server-side — tell the Nav to re-fetch the balance.
+    window.dispatchEvent(new Event('seen:credits-updated'))
     return data as T
   }
 
