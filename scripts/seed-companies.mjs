@@ -69,9 +69,18 @@ const COMPANIES = [
   'Indeed', 'LinkedIn', 'ZipRecruiter', 'Glassdoor',
 ];
 
+// Optionally merge in names from a file (one per line) — e.g. companies pulled from the DB.
+// The curated list goes FIRST so the best-known brands are seeded before the long tail.
+import { readFileSync } from 'node:fs';
+let FILE_NAMES = [];
+if (process.env.SEED_NAMES_FILE) {
+  try { FILE_NAMES = readFileSync(process.env.SEED_NAMES_FILE, 'utf8').split('\n').map(s => s.trim()).filter(Boolean); }
+  catch (e) { console.error('Could not read SEED_NAMES_FILE:', e.message); }
+}
+
 // De-dupe (case-insensitive) while preserving order.
 const SEEN = new Set();
-const LIST = COMPANIES.filter(c => {
+const LIST = [...COMPANIES, ...FILE_NAMES].filter(c => {
   const k = c.toLowerCase().trim();
   if (SEEN.has(k)) return false;
   SEEN.add(k);
