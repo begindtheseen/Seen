@@ -5,6 +5,8 @@ import { createClient } from '@supabase/supabase-js';
 import { applyRateLimit } from '../lib/server/ratelimit.js';
 import { logError } from '../lib/server/errlog.js';
 import { gateAI } from '../lib/server/credits.js';
+import { runScanner, runOptimize, runAdvantage, extractEmployment, extractCareerSignal } from '../lib/server/resumeAnalysis.js';
+import { extractPdfText } from '../lib/server/pdfText.js';
 const inflateRaw = promisify(zlib.inflateRaw);
 
 // One-line "Seen data" block from read-only company intel (ghost/response from our
@@ -14,6 +16,17 @@ function _seenIntel(company, ci) {
   if (!ci || !ci.report_count) return '';
   const pct = (v) => Math.round((Number(v) || 0) * 100);
   return `SEEN DATA on ${company} (from ${ci.report_count} real applicant reports): ${pct(ci.ghost_rate)}% were ghosted, ${pct(ci.response_rate)}% got a response, average wait ${Math.round(Number(ci.avg_wait_days) || 0)} days, Seen hiring grade ${Math.round(Number(ci.overall_score) || 0)}/100.`;
+}
+
+// Numeric company-intel rates for deterministic advice templates (or null).
+function _intelStats(ci) {
+  if (!ci || !ci.report_count) return null;
+  return {
+    ghost_rate: Number(ci.ghost_rate) || 0,
+    response_rate: Number(ci.response_rate) || 0,
+    avg_wait_days: Number(ci.avg_wait_days) || 0,
+    overall_score: Number(ci.overall_score) || 0,
+  };
 }
 
 export default async function handler(req, res) {
@@ -58,12 +71,7 @@ export default async function handler(req, res) {
   try {
     if (!tool) return res.status(400).json({ error: 'Missing tool parameter' });
 
-    const ANTHROPIC_KEY = process.env.ANTHROPIC_KEY;
-    if (!ANTHROPIC_KEY) return res.status(500).json({ error: 'ANTHROPIC_KEY not configured' });
-
-    let prompt, systemPrompt;
-
-    // Validate resume text is actually readable before sending to Claude
+    // Validate resume text is actually readable before analysing it.
     if (body.resume !== undefined) {
       const r = body.resume || '';
       // Count pure alphabetic words (3+ letters) — catches binary/base64 garbage
@@ -75,139 +83,57 @@ export default async function handler(req, res) {
       }
     }
 
+    // ── Deterministic, keyless analysis — no LLM, no API keys, free at scale ──
+    let parsed;
+
     if (tool === 'scanner') {
       const { job, company, resume, jobDescription } = body;
       if (!resume || !jobDescription) return res.status(400).json({ error: 'Resume and job description required' });
-      const intel = _seenIntel(company, body.companyIntel);
-      systemPrompt = 'You are an ATS resume scanner. Analyze resume fit for a job and return ONLY valid JSON with no markdown.';
-      prompt = `Analyze this resume against the job description. Return ONLY a JSON object:
-{"match_score":<0-100>,"score_summary":"<2 sentences>","missing_keywords":["..."],"strong_keywords":["..."],"specific_fixes":[{"current":"<bullet>","improved":"<rewrite>"}],"ghost_risk_note":"<1 sentence>"}
-
-JOB: ${job} at ${company}
-JOB DESCRIPTION:\n${(jobDescription||'').slice(0,3000)}
-RESUME:\n${(resume||'').slice(0,4000)}${intel ? `\n${intel}\nFor ghost_risk_note, cite this company's real ghost rate and give one concrete tactic to avoid being ghosted here (not generic advice).` : ''}`;
+      const intelNote = _seenIntel(company, body.companyIntel);
+      parsed = runScanner({ resume, jobDescription, job, company, intelNote });
 
     } else if (tool === 'optimize') {
       const { job, company, resume, jobDescription } = body;
       if (!resume) return res.status(400).json({ error: 'Resume required' });
-
-      // Pro users get Stealth Mode baked in — same call, no extra credit or API cost.
-      const stealthInstructions = gate.pro ? `
-
-STEALTH MODE (Pro): After rewriting each bullet for ATS alignment, apply human-voice polish so the
-output passes AI-detection tools (GPTZero, Originality.ai, etc.):
-- Vary sentence starters — no two bullets should begin with the same word or structure
-- Mix bullet lengths: some short and punchy, some longer with context
-- Avoid AI tells: no "leveraged", "spearheaded", "synergized", "holistic", uniform passive voice
-- Ground every claim in a specific detail or outcome ("roughly 40%", "a team of 5", "before the deadline")
-- Write as this specific person would describe their own work — not as a generic career advisor
-All keywords must still appear exactly as in the job description.` : '';
-
-      systemPrompt = 'You are a career strategist who aligns candidate experience to specific job requirements. Return ONLY valid JSON with no markdown.';
-      prompt = `Tailor this resume specifically for the ${job} role at ${company}.
-
-Step 1: Identify the 5-6 most important requirements, skills, or qualities this employer is actually hiring for.
-Step 2: Find which of the candidate's real experiences best match each of those requirements.
-Step 3: Rewrite 4-6 bullets to make the connection explicit — use the employer's exact language and terminology.
-
-Rules:
-- Never fabricate experience. Only rewrite based on what the candidate actually did.
-- Mirror the JD's vocabulary exactly (if JD says "pipeline management" don't write "sales tracking").
-- Each rewritten bullet must directly address one of the job's key requirements.
-- A recruiter should read each bullet and immediately see why it's relevant to THIS role.${stealthInstructions}
-
-JOB: ${job} at ${company}
-JOB DESCRIPTION:\n${(jobDescription||'').slice(0,2500)}
-RESUME:\n${(resume||'').slice(0,4000)}
-
-Return ONLY this JSON:
-{"job_priorities":["<top requirement>","<second>","<third>","<fourth>","<fifth>"],"optimized_bullets":[{"original":"<exact text from resume>","optimized":"<rewritten to address JD requirement>","addresses":"<which priority in 3-5 words>"}],"keywords_added":["<exact JD term>"]${gate.pro ? ',"stealth":true' : ''}}`;
+      // Pro users get Stealth Mode baked in — same call, no extra credit or cost.
+      parsed = runOptimize({ resume, jobDescription, job, company, pro: gate.pro });
 
     } else if (tool === 'coach') {
       const { job, company, jobDescription, background } = body;
       if (!job || !company || !jobDescription) return res.status(400).json({ error: 'Job, company, and job description required' });
-      systemPrompt = 'You are a job application strategist. Return ONLY valid JSON.';
-      prompt = `Create an application playbook. Return ONLY a JSON object:
-{"hiring_manager_script":"<LinkedIn message>","timing_note":"<why apply fast>","company_intel":"<2-3 things about ${company}>","cover_letter_framework":"<3 paragraph framework>","referral_strategy":"<how to get referral>"}
-
-JOB: ${job} at ${company}
-JOB DESCRIPTION:\n${(jobDescription||'').slice(0,2500)}${background?'\nCANDIDATE:\n'+background.slice(0,1000):''}`;
+      const intelNote = _seenIntel(company, body.companyIntel);
+      const full = runAdvantage({ job, company, jobDescription, background, intelNote, intelStats: _intelStats(body.companyIntel) });
+      // 'coach' historically returns only the playbook keys.
+      parsed = {
+        hiring_manager_script: full.hiring_manager_script,
+        timing_note: full.timing_note,
+        company_intel: full.company_intel,
+        cover_letter_framework: full.cover_letter_framework,
+        referral_strategy: full.referral_strategy,
+      };
 
     } else if (tool === 'proposal') {
       const { job, company, jobDescription, background } = body;
       if (!job || !company || !jobDescription) return res.status(400).json({ error: 'Job, company, and job description required' });
-      systemPrompt = 'You are a career strategist. Return ONLY valid JSON.';
-      prompt = `Write a 30/60/90 day plan. Return ONLY a JSON object:
-{"day_30":"<30 day plan>","day_60":"<60 day plan>","day_90":"<90 day plan>","opening_note":"<1 sentence>"}
-
-JOB: ${job} at ${company}
-JOB DESCRIPTION:\n${(jobDescription||'').slice(0,2500)}${background?'\nCANDIDATE:\n'+background.slice(0,1000):''}`;
+      const full = runAdvantage({ job, company, jobDescription, background });
+      // 'proposal' historically returns only the 30/60/90 plan keys.
+      parsed = {
+        opening_note: full.opening_note,
+        day_30: full.day_30,
+        day_60: full.day_60,
+        day_90: full.day_90,
+      };
 
     } else if (tool === 'advantage') {
       // Combined application-advantage tool: the outreach/positioning playbook AND the
       // 30/60/90-day plan in one call (one credit). Merges the old 'coach' + 'proposal'.
       const { job, company, jobDescription, background } = body;
       if (!job || !company || !jobDescription) return res.status(400).json({ error: 'Job, company, and job description required' });
-      const intel = _seenIntel(company, body.companyIntel);
-      systemPrompt = 'You are a job application strategist and career coach. Return ONLY valid JSON.';
-      prompt = `Create a complete application-advantage package: a positioning/outreach playbook AND a 30/60/90 day onboarding plan to attach with the application. Return ONLY a JSON object:
-{"hiring_manager_script":"<LinkedIn message>","timing_note":"<why apply fast>","company_intel":"<2-3 things about ${company}>","cover_letter_framework":"<3 paragraph framework>","referral_strategy":"<how to get a referral>","opening_note":"<1 sentence intro to the plan>","day_30":"<first 30 days plan>","day_60":"<days 31-60 plan>","day_90":"<days 61-90 plan>"}
-
-JOB: ${job} at ${company}
-JOB DESCRIPTION:\n${(jobDescription||'').slice(0,2500)}${background?'\nCANDIDATE:\n'+background.slice(0,1000):''}${intel ? `\n${intel}\nUse this real data: make company_intel lead with how they treat applicants, make timing_note reflect their ghost/response behavior, and have referral_strategy directly counter the ghost risk.` : ''}`;
+      const intelNote = _seenIntel(company, body.companyIntel);
+      parsed = runAdvantage({ job, company, jobDescription, background, intelNote, intelStats: _intelStats(body.companyIntel) });
 
     } else {
       return res.status(400).json({ error: 'Unknown tool: ' + tool });
-    }
-
-    const requestBody = JSON.stringify({
-      model: 'claude-haiku-4-5-20251001',
-      max_tokens: (tool === 'optimize' || tool === 'humanize') ? 2500 : tool === 'advantage' ? 3000 : 2000,
-      system: systemPrompt,
-      messages: [{ role: 'user', content: prompt }],
-    });
-
-    // Retry up to 5 times on 429 (rate limit) or 529 (overloaded) — both are transient
-    let apiRes;
-    for (let attempt = 0; attempt < 5; attempt++) {
-      if (attempt > 0) {
-        const retryAfter = apiRes?.headers?.get('retry-after');
-        const waitMs = retryAfter ? Math.min(parseInt(retryAfter) * 1000, 30000) : attempt * 6000;
-        await new Promise(r => setTimeout(r, waitMs));
-      }
-      apiRes = await fetch('https://api.anthropic.com/v1/messages', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-api-key': ANTHROPIC_KEY,
-          'anthropic-version': '2023-06-01',
-        },
-        body: requestBody,
-      });
-      if (apiRes.status !== 429 && apiRes.status !== 529) break;
-    }
-
-    if (!apiRes.ok) {
-      if (apiRes.status === 429 || apiRes.status === 529) {
-        return res.status(429).json({ error: 'The optimizer is busy right now — try again in a few seconds.' });
-      }
-      const errText = await apiRes.text();
-      throw new Error('Claude API ' + apiRes.status + ': ' + errText.slice(0, 200));
-    }
-
-    const apiData = await apiRes.json();
-    const text = (apiData.content || []).filter(b => b.type === 'text').map(b => b.text).join('');
-    const clean = text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
-    const objMatch = clean.match(/\{[\s\S]*\}/);
-    if (!objMatch) throw new Error('No JSON in response');
-
-    let parsed;
-    try { parsed = JSON.parse(objMatch[0]); }
-    catch(e) { throw new Error('Invalid JSON from model'); }
-
-    // If Claude itself returned an error object (e.g. couldn't parse the resume), surface it as 400
-    if (parsed.error) {
-      return res.status(400).json({ error: 'RESUME_CORRUPTED' });
     }
 
     return res.status(200).json(parsed);
@@ -245,101 +171,28 @@ async function handleParseResume(req, res, body) {
     let extractedText = '';
 
     if (isPDF) {
-      const b64 = fileBuffer.toString('base64');
-      let apiRes;
-      for (let attempt = 0; attempt < 3; attempt++) {
-        if (attempt > 0) {
-          const wait = apiRes?.headers?.get('retry-after');
-          await new Promise(r => setTimeout(r, wait ? Math.min(parseInt(wait) * 1000, 20000) : attempt * 6000));
-        }
-        apiRes = await fetch('https://api.anthropic.com/v1/messages', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'x-api-key': process.env.ANTHROPIC_KEY,
-            'anthropic-version': '2023-06-01',
-            'anthropic-beta': 'pdfs-2024-09-25',
-          },
-          body: JSON.stringify({
-            model: 'claude-haiku-4-5-20251001',
-            max_tokens: 3000,
-            messages: [{
-              role: 'user',
-              content: [
-                { type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: b64 } },
-                { type: 'text', text: 'Extract ALL text from this resume. Preserve structure — job titles, companies, dates, bullets, skills, education. Output the raw text only, no commentary.' }
-              ]
-            }]
-          })
-        });
-        if (apiRes.status !== 429) break;
-      }
-      if (!apiRes.ok) {
-        const errText = await apiRes.text();
-        throw new Error('PDF extraction failed: ' + apiRes.status + ' ' + errText.slice(0, 100));
-      }
-      const data = await apiRes.json();
-      extractedText = data.content?.[0]?.text || '';
+      // Keyless, native best-effort PDF text extraction — inflates content
+      // streams and pulls text-showing operators. Works for résumés with real
+      // selectable text (Word/Docs/Pages exports). Scanned-image PDFs return
+      // nothing here, and we fall through to a clean "paste your text" error.
+      extractedText = await extractPdfText(fileBuffer);
 
     } else if (isWord) {
       extractedText = await extractDocxText(fileBuffer);
-      if (!extractedText || extractedText.length < 150) {
-        const b64 = fileBuffer.toString('base64');
-        let apiRes;
-        for (let attempt = 0; attempt < 3; attempt++) {
-          if (attempt > 0) {
-            const wait = apiRes?.headers?.get('retry-after');
-            await new Promise(r => setTimeout(r, wait ? Math.min(parseInt(wait) * 1000, 20000) : attempt * 6000));
-          }
-          apiRes = await fetch('https://api.anthropic.com/v1/messages', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'x-api-key': process.env.ANTHROPIC_KEY,
-              'anthropic-version': '2023-06-01',
-            },
-            body: JSON.stringify({
-              model: 'claude-haiku-4-5-20251001',
-              max_tokens: 3000,
-              messages: [{ role: 'user', content: 'Extract all text from this Word document resume (base64). Return ONLY the extracted resume text with no commentary.\n\nBase64: ' + b64.slice(0, 8000) }]
-            })
-          });
-          if (apiRes.status !== 429) break;
-        }
-        if (apiRes?.ok) {
-          const data = await apiRes.json();
-          const result = data.content?.[0]?.text || '';
-          if (result && result.length > 100) extractedText = result;
-        }
-      }
     }
 
     if (!extractedText || extractedText.length < 50) {
-      return res.status(422).json({ error: 'Could not extract readable text. Make sure the file has selectable text (not a scanned image). Try exporting as PDF.' });
+      return res.status(422).json({
+        error: isPDF
+          ? 'Could not read selectable text from this PDF (it may be a scanned image, or use an unusual font encoding). Please copy your résumé text and paste it directly into the box instead.'
+          : 'Could not extract readable text. Make sure the file has selectable text (not a scanned image), or paste your résumé text directly.'
+      });
     }
 
-    // Extract structured employment history — best-effort, no retry
+    // Extract structured employment history — deterministic regex/heuristics.
     let employment = [];
-    try {
-      const empRes = await fetch('https://api.anthropic.com/v1/messages', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'x-api-key': process.env.ANTHROPIC_KEY, 'anthropic-version': '2023-06-01' },
-        body: JSON.stringify({
-          model: 'claude-haiku-4-5-20251001',
-          max_tokens: 800,
-          messages: [{ role: 'user', content: `Extract employment history from this resume. Return ONLY a JSON array, no commentary. Each object: {"company":"","title":"","start_date":"","end_date":""}. Use "" for unknown fields. Max 15 entries. end_date="Present" if still employed there.\n\nResume:\n${extractedText.slice(0, 6000)}` }]
-        })
-      });
-      if (empRes.ok) {
-        const empData = await empRes.json();
-        const empText = empData.content?.[0]?.text || '';
-        const jsonMatch = empText.match(/\[[\s\S]*?\]/);
-        if (jsonMatch) {
-          const parsed = JSON.parse(jsonMatch[0]);
-          employment = parsed.slice(0, 15).filter(e => e && e.company);
-        }
-      }
-    } catch(_) { /* best-effort */ }
+    try { employment = extractEmployment(extractedText); }
+    catch(_) { employment = []; }
 
     const wordCount = extractedText.split(/\s+/).filter(w => w.length > 0).length;
 
@@ -602,8 +455,7 @@ async function handleEmailAnalysis(req, res, body) {
 async function storeCareerSignals(resumeText, employment, req) {
   const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL;
   const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  const ANTHROPIC_KEY = process.env.ANTHROPIC_KEY;
-  if (!SUPABASE_URL || !SUPABASE_SERVICE_KEY || !ANTHROPIC_KEY) return;
+  if (!SUPABASE_URL || !SUPABASE_SERVICE_KEY) return;
 
   // Get user_id from JWT if available
   let userId = null;
@@ -616,31 +468,10 @@ async function storeCareerSignals(resumeText, employment, req) {
     }
   } catch (_) {}
 
-  // Extract skills, seniority, function, years_exp from resume text
+  // Extract skills, seniority, function, years_exp — deterministic, keyless.
   let signal = null;
-  try {
-    const sigRes = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-api-key': ANTHROPIC_KEY, 'anthropic-version': '2023-06-01' },
-      body: JSON.stringify({
-        model: 'claude-haiku-4-5-20251001',
-        max_tokens: 400,
-        messages: [{
-          role: 'user',
-          content: `Extract career signal from this resume. Return ONLY JSON, no commentary:
-{"skills":["<top 8 technical/domain skills>"],"seniority":"<junior|mid|senior|staff|principal|executive>","function":"<engineering|design|product|marketing|sales|ops|data|finance|legal|other>","years_exp":<int or null>}
-
-Resume (first 3000 chars):\n${resumeText.slice(0, 3000)}`
-        }],
-      })
-    });
-    if (sigRes.ok) {
-      const sigData = await sigRes.json();
-      const txt = sigData.content?.[0]?.text || '';
-      const m = txt.match(/\{[\s\S]*\}/);
-      if (m) signal = JSON.parse(m[0]);
-    }
-  } catch (_) {}
+  try { signal = extractCareerSignal(resumeText, employment); }
+  catch (_) { signal = null; }
   if (!signal?.skills?.length) return;
 
   const sb = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
