@@ -50,13 +50,16 @@ export default async function handler(req, res) {
 
   let uid;
   const JWT_SECRET = process.env.SUPABASE_JWT_SECRET;
-  if (JWT_SECRET) {
-    // Fast path: verify locally — no Supabase round-trip, scales to any concurrency
-    const payload = verifyJWTLocal(token, JWT_SECRET);
-    if (!payload) return res.status(401).json({ error: 'Invalid token' });
+  // Fast path: verify the HS256 JWT locally (no round-trip). Supabase has migrated projects
+  // to ASYMMETRIC signing keys (ES256/RS256), which this HS256 check can't verify — so when
+  // local verification fails we MUST fall back to the Supabase auth API rather than 401.
+  // (gateAI in lib/server/credits.js and api/stripe.js already do exactly this; user-sync was
+  // the one endpoint missing the fallback, which 401'd every request once tokens went ES256.)
+  const payload = JWT_SECRET ? verifyJWTLocal(token, JWT_SECRET) : null;
+  if (payload) {
     uid = payload.sub;
   } else {
-    // Fallback: validate via Supabase auth API (slower, one extra network call per request)
+    // Validate via the Supabase auth API (works for any signing algorithm).
     const userRes = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
       headers: { apikey: SERVICE_KEY, Authorization: `Bearer ${token}` },
     });
