@@ -14,6 +14,10 @@ interface CompanyScore {
 interface Props {
   app: Application
   onClose: () => void
+  // Fired once when the card is shared to a destination or downloaded. Used by the
+  // tracker→report→share loop to record a light outcome_card_shares analytics row.
+  // `via` is the destination: 'twitter' | 'reddit' | 'linkedin' | 'threads' | 'download'.
+  onShared?: (via: string) => void
 }
 
 function letterGrade(s: number) {
@@ -175,7 +179,7 @@ async function drawCard(app: Application, sc: CompanyScore | null): Promise<HTML
   return canvas
 }
 
-export default function OutcomeCard({ app, onClose }: Props) {
+export default function OutcomeCard({ app, onClose, onShared }: Props) {
   const [dataUrl, setDataUrl] = useState<string | null>(null)
   const [blob, setBlob] = useState<Blob | null>(null)
   const doneRef = useRef(false)
@@ -184,11 +188,10 @@ export default function OutcomeCard({ app, onClose }: Props) {
   const OC      = status === 'hired' ? '#10b981' : status === 'ghosted' ? '#9ca3af' : '#ef4444'
   const OL      = status === 'hired' ? '🎉 HIRED' : status === 'ghosted' ? '👻 GHOSTED' : '❌ REJECTED'
   const days    = Math.max(1, Math.round((app.updatedAt - app.appliedAt) / 86400000))
-  const shareText = {
-    hired:    `Got an offer from ${app.company} after ${days} days. Tracked my whole job search on Seen.`,
-    ghosted:  `${app.company} ghosted me after ${days} days. Full timeline tracked on Seen.`,
-    rejected: `Rejected by ${app.company} after ${days} days. Keeping the search going. Tracked on Seen.`,
-  }[status]
+  // Share copy carries the product's core hook — close the loop by inviting readers to
+  // check any company's ghost rate at seenjobs.io (the tracker→report→share virality loop).
+  const outcomeWord = status === 'hired' ? 'got an offer' : status === 'ghosted' ? 'got ghosted' : 'got rejected'
+  const shareText = `Tracked my ${app.company} application on Seen — ${outcomeWord} after ${days} days. Check any company's ghost rate at seenjobs.io`
 
   useEffect(() => {
     if (doneRef.current) return
@@ -236,14 +239,16 @@ export default function OutcomeCard({ app, onClose }: Props) {
   }
 
   async function share(dest: 'reddit' | 'threads' | 'twitter' | 'linkedin' | 'download') {
+    // Light virality analytics — record which outcome/channel drove the share. Non-blocking.
+    try { onShared?.(dest) } catch { /* never block the share UX */ }
     if (dest === 'reddit') {
       window.open(`https://www.reddit.com/r/cscareerquestions/submit?type=image&title=${encodeURIComponent(shareText)}`, '_blank', 'noopener')
     } else if (dest === 'threads') {
-      window.open(`https://www.threads.net/intent/post?text=${encodeURIComponent(shareText + '\n\nseenjobs.io')}`, '_blank', 'noopener')
+      window.open(`https://www.threads.net/intent/post?text=${encodeURIComponent(shareText)}`, '_blank', 'noopener')
     } else if (dest === 'twitter') {
-      window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(shareText + '\n\nseenjobs.io')}`, '_blank', 'noopener')
+      window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(shareText)}`, '_blank', 'noopener')
     } else if (dest === 'linkedin') {
-      window.open(`https://www.linkedin.com/feed/?shareActive=true&text=${encodeURIComponent(shareText + '\n\nTracked my whole job search on Seen → seenjobs.io')}`, '_blank', 'noopener')
+      window.open(`https://www.linkedin.com/feed/?shareActive=true&text=${encodeURIComponent(shareText)}`, '_blank', 'noopener')
     }
 
     const fileName = `seen_${status}_${(app.company || 'c').replace(/[^a-z0-9]/gi, '_')}_${Date.now()}.png`
