@@ -722,16 +722,20 @@ nav.nav-scrolled{background:rgba(6,6,8,0.82);backdrop-filter:blur(60px) saturate
    demoted below the action. Reorders the left column on phones only; desktop layout untouched. */
 @media(max-width:640px){
   .hero-left{display:flex;flex-direction:column}
-  .hl-pill{order:1;margin-bottom:1rem!important}
-  .hl-headline{order:2}
-  .hl-search{order:3;margin-top:.2rem}
-  .hl-quick{order:4;margin-bottom:1.15rem!important}
-  .hl-ctas{order:5;margin-bottom:1.4rem!important}
-  .hstat-strip{order:6}
-  .hl-ghost{order:7}
-  .hl-recent{order:8;margin-bottom:0!important}
+  .hl-pill{order:1;margin-bottom:.9rem!important}
+  .hl-headline{order:2;margin-bottom:.3rem}
+  .hl-search{order:3;margin-top:.1rem;margin-bottom:.7rem!important}
+  .hl-quick{order:4;margin-bottom:1.25rem!important}
+  .hstat-strip{order:5;margin-bottom:1.1rem!important}
+  .hl-ghost{order:6}
+  .hl-recent{order:7;margin-bottom:0!important}
   .hl-userstats{display:none!important}
-  #rotatingHero{height:clamp(82px,23vw,128px)!important}
+  /* Kill the redundant second giant CTA on mobile — the search box IS the primary action.
+     (browse-jobs lives in the nav.) Keeps one clear action above the fold. */
+  .hl-ctas{display:none!important}
+  #rotatingHero{height:clamp(80px,22vw,124px)!important}
+  /* A touch more breathing room + tighter, app-like hero padding */
+  .l-grid{padding:0 1.1rem!important}
 }
 .hstat-n{font-family:var(--mono);font-size:1rem;font-weight:500;color:var(--white);display:block;line-height:1;letter-spacing:-.02em}
 .hstat-l{font-family:var(--mono);font-size:.5rem;color:var(--muted);margin-top:.18rem;text-transform:uppercase;letter-spacing:.07em}
