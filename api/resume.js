@@ -222,21 +222,31 @@ async function handleParseResume(req, res, body) {
 }
 
 // ── Résumé PDF generation ────────────────────────────────────────────────────
-// Renders a COMPLETE, submittable, recruiter-grade one-page résumé (overflow to
-// a second page only when needed) from a structured document produced by
-// buildResumeDocument(). Premium typography: a centred name header, a hairline
-// rule, generous section spacing, right-aligned dates, hanging-indent bullets.
+// Renders a COMPLETE, submittable, recruiter-grade résumé from a structured
+// document produced by buildResumeDocument(). Classic black serif "Harvard"
+// template: a centred Times-Bold name, a contact line beneath, bold/uppercase
+// section headers each underlined by a full-width hairline rule, and Harvard
+// entry blocks (organization bold left + location right; position italic left +
+// dates italic right; then black round bullets with a hanging indent).
+//
+// Pagination is fully EXPLICIT and CONTINUOUS — PDFKit auto-pagination is
+// disabled and every unit (heading, entry line, bullet) is measured and a new
+// page is started ONLY when the very next line would overflow the printable
+// area. Content flows page→page with no blank gaps and no orphaned bullets.
+//
 // Every section is omitted when its data is empty — the renderer never
 // fabricates content. ATS-parseable: real selectable text, standard sections,
 // no text baked into images. `meta` may carry the target role/company for a
 // subtle context line; it is omitted when blank.
 export function buildResumePDF(document, meta = {}) {
   const d = document || {};
-  const MARGIN = 60;
+  const MARGIN = 58;
+  const FOOTER_BAND = 40;          // reserved band at page bottom for the footer
   return new Promise((resolve, reject) => {
-    // bufferPages lets us draw footers on every page AFTER content is laid out,
-    // without the footer write itself triggering pagination.
-    const doc = new PDFDocument({ size: 'LETTER', bufferPages: true, margins: { top: MARGIN, bottom: 64, left: MARGIN, right: MARGIN } });
+    // bufferPages lets us draw footers on every page AFTER content is laid out.
+    // We set a tiny bottom margin and drive ALL pagination ourselves so PDFKit
+    // never auto-breaks mid-bullet (the old cause of blank pages + stray "•").
+    const doc = new PDFDocument({ size: 'LETTER', bufferPages: true, margins: { top: MARGIN, bottom: 2, left: MARGIN, right: MARGIN } });
     const chunks = [];
     doc.on('data', c => chunks.push(c));
     doc.on('end', () => resolve(Buffer.concat(chunks)));
@@ -244,60 +254,81 @@ export function buildResumePDF(document, meta = {}) {
 
     const LEFT = MARGIN;
     const RIGHT = doc.page.width - MARGIN;
-    const W = doc.page.width - MARGIN * 2; // usable width
-    const INK   = '#0f172a'; // near-black for primary text
-    const BODY  = '#334155'; // slate for body copy
-    const MUTE  = '#64748b'; // muted slate for meta
-    const FAINT = '#94a3b8'; // faint for footer / dates
-    const RULE  = '#e2e8f0'; // hairline rule
-    const ACCENT = '#4338ca'; // indigo accent (headings, bullets)
+    const W = doc.page.width - MARGIN * 2;            // usable width
+    const TOP = MARGIN;
+    // Last y a line of content may occupy before we must start a new page.
+    const CONTENT_BOTTOM = doc.page.height - FOOTER_BAND - 14;
 
-    // Keep content above the footer band; PDFKit auto-paginates on overflow.
-    const footerBand = 42;
-    doc.page.margins.bottom = footerBand + 16;
+    // Conservative, professional palette: black ink everywhere, with one dark
+    // gray reserved for secondary meta (dates, location). No color accents.
+    const INK  = '#000000'; // primary text — pure black
+    const META = '#444444'; // dark gray — dates / location only
+    const RULE = '#999999'; // thin gray hairline under section headers
+    const FOOT = '#666666'; // muted gray footer
 
-    // Section heading: small-caps-styled label in accent, with a hairline rule
-    // spanning the column directly beneath it. Generous breathing room above.
-    function sectionHeading(text) {
-      doc.moveDown(0.95);
-      doc.fillColor(ACCENT).font('Helvetica-Bold').fontSize(10.5)
-         .text(text.toUpperCase(), LEFT, doc.y, { characterSpacing: 1.6 });
-      doc.moveDown(0.28);
-      doc.save().lineWidth(0.8).strokeColor(RULE)
-         .moveTo(LEFT, doc.y).lineTo(RIGHT, doc.y).stroke().restore();
-      doc.moveDown(0.55);
+    // ── Pagination primitives ────────────────────────────────────────────────
+    // Start a fresh page and reset the cursor to the top margin.
+    function newPage() {
+      doc.addPage();
+      doc.x = LEFT;
+      doc.y = TOP;
+    }
+    // Ensure `need` vertical points are available below the current cursor; if
+    // not, move to a new page. Returns nothing — callers draw right after.
+    function ensure(need) {
+      if (doc.y + need > CONTENT_BOTTOM) newPage();
+    }
+    // Add vertical space without ever overflowing into the footer band.
+    function gap(pts) {
+      doc.y = Math.min(doc.y + pts, CONTENT_BOTTOM);
     }
 
-    // ── Header: centred name + contact ──
+    // ── Section heading: BOLD UPPERCASE label + full-width hairline rule ──────
+    // Keeps the heading attached to whatever follows by reserving room for the
+    // heading line, its rule, and at least one following line before breaking.
+    function sectionHeading(text, followNeed = 26) {
+      gap(14);
+      ensure(18 + followNeed);
+      doc.fillColor(INK).font('Times-Bold').fontSize(11.5)
+         .text(text.toUpperCase(), LEFT, doc.y, { width: W, characterSpacing: 1.2, lineBreak: false });
+      doc.moveDown(0.18);
+      const ruleY = doc.y;
+      doc.save().lineWidth(0.9).strokeColor(RULE)
+         .moveTo(LEFT, ruleY).lineTo(RIGHT, ruleY).stroke().restore();
+      doc.y = ruleY + 7;
+    }
+
+    // ── Header: centred Times-Bold name + contact line ───────────────────────
     const c = d.contact || {};
     const contactBits = [c.phone, c.email, c.location, c.linkedin].filter(Boolean);
     if (d.name) {
-      doc.fillColor(INK).font('Helvetica-Bold').fontSize(25)
+      doc.fillColor(INK).font('Times-Bold').fontSize(20)
          .text(d.name, LEFT, doc.y, { width: W, align: 'center', characterSpacing: 0.5 });
-      doc.moveDown(0.32);
+      doc.moveDown(0.22);
     }
-    // Subtle target-role context line (only when we know it) — not a fabricated fact.
-    const targetLine = [meta.role, meta.company].filter(Boolean).join('  ·  ');
+    // Subtle target-role context line (only when we know it) — not fabricated.
+    const targetLine = [meta.role, meta.company].filter(Boolean).join('   ·   ');
     if (targetLine) {
-      doc.fillColor(ACCENT).font('Helvetica').fontSize(10.5)
-         .text(targetLine, LEFT, doc.y, { width: W, align: 'center', characterSpacing: 0.4 });
-      doc.moveDown(0.32);
+      doc.fillColor(META).font('Times-Italic').fontSize(10.5)
+         .text(targetLine, LEFT, doc.y, { width: W, align: 'center' });
+      doc.moveDown(0.22);
     }
     if (contactBits.length) {
-      doc.fillColor(MUTE).font('Helvetica').fontSize(9.5)
-         .text(contactBits.join('     ·     '), LEFT, doc.y, { width: W, align: 'center' });
-      doc.moveDown(0.5);
+      doc.fillColor(INK).font('Times-Roman').fontSize(10)
+         .text(contactBits.join('   ·   '), LEFT, doc.y, { width: W, align: 'center' });
+      doc.moveDown(0.4);
     }
     if (d.name || contactBits.length || targetLine) {
-      doc.save().lineWidth(1.4).strokeColor(INK)
-         .moveTo(LEFT, doc.y).lineTo(RIGHT, doc.y).stroke().restore();
+      const ruleY = doc.y;
+      doc.save().lineWidth(1.1).strokeColor(INK)
+         .moveTo(LEFT, ruleY).lineTo(RIGHT, ruleY).stroke().restore();
+      doc.y = ruleY + 2;
     }
 
     // ── Professional summary ──
     if (d.summary && d.summary.trim()) {
-      sectionHeading('Professional Summary');
-      doc.fillColor(BODY).font('Helvetica').fontSize(10)
-         .text(d.summary.trim(), LEFT, doc.y, { width: W, lineGap: 3, align: 'left' });
+      sectionHeading('Summary');
+      drawBody(doc, d.summary.trim(), LEFT, W, INK, CONTENT_BOTTOM, newPage);
     }
 
     // ── Experience ──
@@ -306,55 +337,74 @@ export function buildResumePDF(document, meta = {}) {
       sectionHeading('Experience');
       for (let r = 0; r < experience.length; r++) {
         const e = experience[r];
-        if (r > 0) doc.moveDown(0.75);
+        if (r > 0) gap(9);
 
+        const org = (e.company || '').trim();
+        const loc = (e.location || '').trim();
+        const title = (e.title || '').trim();
         const dateText = (e.dates || '').trim();
-        const lineY = doc.y;
 
-        // Title in bold ink (left); dates right-aligned on the same baseline.
-        doc.fillColor(INK).font('Helvetica-Bold').fontSize(11.5)
-           .text(e.title || e.company || ' ', LEFT, lineY, {
-             width: dateText ? W - 140 : W, lineBreak: false, ellipsis: true,
-           });
-        if (dateText) {
-          doc.fillColor(MUTE).font('Helvetica').fontSize(9.5)
-             .text(dateText, LEFT, lineY + 1.5, { width: W, align: 'right' });
+        // Line 1: Organization (bold, left) + Location (gray, right).
+        // We keep the org line with the title line and the first bullet so a
+        // role header never lands alone at the foot of a page.
+        const bullets = Array.isArray(e.bullets)
+          ? e.bullets.map(b => String(b || '').trim()).filter(b => b && /[a-z0-9]/i.test(b))
+          : [];
+        const firstBulletH = bullets.length
+          ? bulletHeight(doc, bullets[0], W) : 0;
+        ensure(15 + (title ? 14 : 0) + firstBulletH);
+
+        if (org) {
+          const y = doc.y;
+          doc.fillColor(INK).font('Times-Bold').fontSize(11)
+             .text(org, LEFT, y, { width: loc ? W - 150 : W, lineBreak: false, ellipsis: true });
+          if (loc) {
+            doc.fillColor(META).font('Times-Italic').fontSize(10)
+               .text(loc, LEFT, y, { width: W, align: 'right', lineBreak: false });
+          }
+          doc.y = y + 13.5;
         }
-        doc.moveDown(0.12);
 
-        // Company · Location subline in accent.
-        const sub = [e.company, (e.location || '').trim()].filter(Boolean).join('   ·   ');
-        if (sub && (e.title || e.location)) {
-          doc.fillColor(ACCENT).font('Helvetica-Oblique').fontSize(10)
-             .text(sub, LEFT, doc.y, { width: W });
+        // Line 2: Position title (italic, left) + Dates (gray italic, right).
+        if (title || dateText) {
+          const y = doc.y;
+          if (title) {
+            doc.fillColor(INK).font('Times-Italic').fontSize(10.5)
+               .text(title, LEFT, y, { width: dateText ? W - 150 : W, lineBreak: false, ellipsis: true });
+          }
+          if (dateText) {
+            doc.fillColor(META).font('Times-Italic').fontSize(10)
+               .text(dateText, LEFT, y, { width: W, align: 'right', lineBreak: false });
+          }
+          doc.y = y + 13;
         }
-        doc.moveDown(0.32);
 
-        const bullets = Array.isArray(e.bullets) ? e.bullets.filter(Boolean) : [];
-        for (const b of bullets) drawBullet(doc, b, LEFT, W, ACCENT, BODY);
+        gap(1.5);
+        for (const b of bullets) drawBullet(doc, b, LEFT, W, INK, CONTENT_BOTTOM, newPage);
       }
     }
 
-    // ── Skills ──
-    const skills = Array.isArray(d.skills) ? d.skills.filter(Boolean) : [];
-    if (skills.length) {
-      sectionHeading('Skills');
-      doc.fillColor(BODY).font('Helvetica').fontSize(10)
-         .text(skills.join('     ·     '), LEFT, doc.y, { width: W, lineGap: 4 });
-    }
-
     // ── Education ──
-    const education = Array.isArray(d.education) ? d.education.filter(Boolean) : [];
+    const education = Array.isArray(d.education)
+      ? d.education.map(s => String(s || '').trim()).filter(s => s && /[a-z0-9]/i.test(s)) : [];
     if (education.length) {
       sectionHeading('Education');
-      for (const ed of education) drawBullet(doc, ed, LEFT, W, ACCENT, BODY);
+      for (const ed of education) drawBullet(doc, ed, LEFT, W, INK, CONTENT_BOTTOM, newPage);
+    }
+
+    // ── Skills ──
+    const skills = Array.isArray(d.skills)
+      ? d.skills.map(s => String(s || '').trim()).filter(Boolean) : [];
+    if (skills.length) {
+      sectionHeading('Skills');
+      drawBody(doc, skills.join('   ·   '), LEFT, W, INK, CONTENT_BOTTOM, newPage);
     }
 
     // ── Footer on every page (drawn after content, via buffered pages) ──
     const range = doc.bufferedPageRange();
     for (let i = range.start; i < range.start + range.count; i++) {
       doc.switchToPage(i);
-      drawFooter(doc, LEFT, W, RULE, FAINT, footerBand);
+      drawFooter(doc, LEFT, W, RULE, FOOT, FOOTER_BAND);
     }
     doc.flushPages();
 
@@ -362,29 +412,73 @@ export function buildResumePDF(document, meta = {}) {
   });
 }
 
-// Draw a single hanging-indent bullet with a small accent marker.
-function drawBullet(doc, text, LEFT, W, ACCENT, BODY) {
-  const y = doc.y;
-  const INDENT = 15;
-  doc.fillColor(ACCENT).font('Helvetica-Bold').fontSize(10)
-     .text('•', LEFT + 2, y, { width: INDENT, lineBreak: false });
-  doc.fillColor(BODY).font('Helvetica').fontSize(10)
-     .text(text, LEFT + INDENT, y, { width: W - INDENT, lineGap: 2.5, align: 'left' });
-  doc.moveDown(0.3);
+// Measure how tall a single hanging-indent bullet will be at width W.
+function bulletHeight(doc, text, W) {
+  const INDENT = 14;
+  const h = doc.font('Times-Roman').fontSize(10.5)
+    .heightOfString(String(text || ''), { width: W - INDENT, lineGap: 2 });
+  return h + 4; // + inter-bullet spacing
 }
 
-// Draw the tasteful Seen footer at the bottom of the current page. Temporarily
-// drops the bottom margin so the footer text (which sits inside the bottom band)
-// does not trigger auto-pagination.
-function drawFooter(doc, LEFT, W, RULE, FAINT, footerBand) {
-  const savedBottom = doc.page.margins.bottom;
-  doc.page.margins.bottom = 0;
+// Draw a single hanging-indent bullet with a small black round marker. Measures
+// the bullet first and starts a new page when it would overflow the printable
+// area, so the marker and its text are ALWAYS drawn together on the same page —
+// never an orphaned "•" at the bottom of one page and text on the next.
+function drawBullet(doc, text, LEFT, W, INK, CONTENT_BOTTOM, newPage) {
+  const t = String(text || '').trim();
+  if (!t || !/[a-z0-9]/i.test(t)) return; // never draw an empty bullet
+  const INDENT = 14;
+  const h = doc.font('Times-Roman').fontSize(10.5)
+    .heightOfString(t, { width: W - INDENT, lineGap: 2 });
+  if (doc.y + h > CONTENT_BOTTOM) newPage();
+  const y = doc.y;
+  doc.fillColor(INK).font('Times-Roman').fontSize(10.5)
+     .text('•', LEFT + 2, y, { width: INDENT, lineBreak: false });
+  doc.fillColor(INK).font('Times-Roman').fontSize(10.5)
+     .text(t, LEFT + INDENT, y, { width: W - INDENT, lineGap: 2, align: 'left' });
+  doc.y = y + h + 4;
+}
+
+// Draw a flowing body paragraph (summary / skills line) with continuous
+// pagination. If the whole block fits, draw it; otherwise split it line-by-line
+// so it flows across the page boundary without leaving a blank gap.
+function drawBody(doc, text, LEFT, W, INK, CONTENT_BOTTOM, newPage) {
+  const t = String(text || '').trim();
+  if (!t) return;
+  doc.font('Times-Roman').fontSize(10.5);
+  const full = doc.heightOfString(t, { width: W, lineGap: 2.5, align: 'left' });
+  if (doc.y + full <= CONTENT_BOTTOM) {
+    doc.fillColor(INK).text(t, LEFT, doc.y, { width: W, lineGap: 2.5, align: 'left' });
+    doc.y += 0; // text() already advanced doc.y
+    return;
+  }
+  // Doesn't fit as one block — flow word by word, breaking pages as needed.
+  const words = t.split(/\s+/);
+  let line = '';
+  const lineH = doc.heightOfString('Mg', { width: W }) + 2.5;
+  const flush = () => {
+    if (!line) return;
+    if (doc.y + lineH > CONTENT_BOTTOM) newPage();
+    doc.fillColor(INK).text(line, LEFT, doc.y, { width: W, lineBreak: false });
+    doc.y += lineH;
+    line = '';
+  };
+  for (const word of words) {
+    const trial = line ? line + ' ' + word : word;
+    if (doc.widthOfString(trial) > W && line) { flush(); line = word; }
+    else line = trial;
+  }
+  flush();
+}
+
+// Draw the tasteful Seen footer at the bottom of the current page, inside the
+// reserved footer band so it never collides with content.
+function drawFooter(doc, LEFT, W, RULE, FOOT, footerBand) {
   const footY = doc.page.height - footerBand;
   doc.save().lineWidth(0.8).strokeColor(RULE)
      .moveTo(LEFT, footY).lineTo(LEFT + W, footY).stroke().restore();
-  doc.fillColor(FAINT).font('Helvetica').fontSize(8)
+  doc.fillColor(FOOT).font('Times-Roman').fontSize(8.5)
      .text('Optimized with Seen  ·  seenjobs.io', LEFT, footY + 9, { width: W, align: 'center', characterSpacing: 0.3, lineBreak: false });
-  doc.page.margins.bottom = savedBottom;
 }
 
 // ── Email analysis handler ─────────────────────────────────────────────────────
