@@ -8,6 +8,9 @@ import { useAuth } from '@/lib/auth'
 import { aiHeaders } from '@/lib/aiHeaders'
 import type { SavedJob } from '@/lib/types'
 import UpgradeModal from '@/components/UpgradeModal'
+import dynamic from 'next/dynamic'
+
+const ResumeSurveyModal = dynamic(() => import('@/components/ResumeSurveyModal'), { ssr: false })
 
 type Tool = 'scanner' | 'advantage'
 
@@ -405,6 +408,7 @@ function ResumePageInner() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [showUpgrade, setShowUpgrade] = useState(false)
+  const [showSurvey, setShowSurvey] = useState(false)
 
   useEffect(() => {
     ResumeStore.load(user?.id, isLoggedIn).then(data => {
@@ -622,6 +626,7 @@ function ResumePageInner() {
   return (
     <div className="page-full">
       {showUpgrade && <UpgradeModal reason="credits" onClose={() => setShowUpgrade(false)} />}
+      {showSurvey && <ResumeSurveyModal onClose={() => setShowSurvey(false)} />}
       <div className="resume-page">
         <div className="resume-hdr">
           <div style={{ fontFamily: 'var(--mono)', fontSize: '.52rem', textTransform: 'uppercase', letterSpacing: '.22em', color: 'var(--blue)', marginBottom: '.6rem', display: 'flex', alignItems: 'center', gap: 12 }}>
@@ -639,6 +644,26 @@ function ResumePageInner() {
         {error && (
           <div style={{ background: 'var(--rdim)', border: '1px solid rgba(239,68,68,0.25)', borderRadius: 8, padding: '.72rem 1rem', fontFamily: 'var(--mono)', fontSize: '.72rem', color: 'var(--red)', marginBottom: '1rem' }}>
             {error}
+          </div>
+        )}
+
+        {/* Résumé intel survey — earn AI credits by sharing what it was like applying to
+            companies from your work history. Only shown to signed-in users with a résumé. */}
+        {isLoggedIn && resumeText && (
+          <div
+            onClick={() => setShowSurvey(true)}
+            style={{ background: 'linear-gradient(90deg, rgba(99,102,241,.1), rgba(124,58,237,.06))', border: '1px solid rgba(99,102,241,.22)', borderRadius: 10, padding: '.65rem 1rem', marginBottom: '1rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '.75rem', cursor: 'pointer' }}
+          >
+            <div>
+              <div style={{ fontFamily: 'var(--mono)', fontSize: '.55rem', color: 'var(--indigo)', fontWeight: 600, marginBottom: '.12rem', display: 'flex', alignItems: 'center', gap: '.35rem' }}>
+                <span style={{ fontSize: '.7rem' }}>✦</span>
+                Earn AI credits — answer a few questions
+              </div>
+              <div style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', color: 'var(--sub)' }}>
+                Share what it was like applying to a company from your résumé — 60 sec, +2 credits
+              </div>
+            </div>
+            <span style={{ fontFamily: 'var(--mono)', fontSize: '.65rem', color: 'var(--indigo)', flexShrink: 0 }}>Start →</span>
           </div>
         )}
 
