@@ -15,7 +15,7 @@ interface ScannerResult {
   score_summary?: string
   missing_keywords?: string[]
   strong_keywords?: string[]
-  specific_fixes?: Array<{ current: string; improved: string }>
+  specific_fixes?: Array<{ current: string; improved: string; note?: string }>
   ghost_risk_note?: string
 }
 
@@ -134,6 +134,9 @@ function ScannerResultView({ d }: { d: ScannerResult }) {
               <div style={{ fontSize: '.78rem', color: 'var(--sub)', background: 'var(--raised)', padding: '.5rem .75rem', borderRadius: 6, marginBottom: '.4rem', lineHeight: 1.6 }}>{fix.current}</div>
               <div style={{ fontFamily: 'var(--mono)', fontSize: '.62rem', color: 'var(--green)', marginBottom: '.3rem' }}>✓ Rewrite</div>
               <div style={{ fontSize: '.78rem', color: 'var(--white)', background: 'var(--gdim)', padding: '.5rem .75rem', borderRadius: 6, lineHeight: 1.6, border: '1px solid var(--gmid)' }}>{fix.improved}</div>
+              {fix.note && (
+                <div style={{ fontSize: '.72rem', color: 'var(--amber)', marginTop: '.4rem', lineHeight: 1.55, fontStyle: 'italic' }}>💡 {fix.note}</div>
+              )}
             </div>
           ))}
         </div>
@@ -271,7 +274,24 @@ function ResumeInput({
   )
 }
 
-function EmailCTA({ company, role, matchScore, summary, user }: { company: string; role: string; matchScore: number | null; summary: string; user: { email?: string } | null }) {
+// Map a scanner result's rewrites into the {original, optimized, addresses}
+// shape the PDF/email builder expects. Scanner returns `specific_fixes` with
+// {current, improved, note?}; we translate that here so the exported doc is
+// never blank. Skips the additive "(No bullet…)" placeholders that have no real
+// original line to show as a before/after.
+function fixesToBullets(scan: ScannerResult): Array<{ original: string; optimized: string; addresses: string; note: string }> {
+  const fixes = scan.specific_fixes ?? []
+  return fixes
+    .filter(f => f.current && !/^\(/.test(f.current.trim()))
+    .map(f => ({
+      original: f.current,
+      optimized: f.improved,
+      addresses: 'Stronger lead verb',
+      note: f.note || '',
+    }))
+}
+
+function EmailCTA({ company, role, scan, user }: { company: string; role: string; scan: ScannerResult; user: { email?: string } | null }) {
   const [email, setEmail] = useState(user?.email ?? '')
   const [sent, setSent] = useState(false)
   const [sending, setSending] = useState(false)
@@ -281,10 +301,22 @@ function EmailCTA({ company, role, matchScore, summary, user }: { company: strin
     if (!email.trim()) return
     setSending(true)
     try {
+      const bullets = fixesToBullets(scan)
+      const keywords = (scan.missing_keywords ?? []).slice(0, 12)
       await fetch('/api/resume', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'email_analysis', email: email.trim(), co: company, role, matchScore, summary }),
+        body: JSON.stringify({
+          action: 'email_analysis',
+          email: email.trim(),
+          co: company,
+          role,
+          matchScore: scan.match_score,
+          summary: scan.score_summary ?? '',
+          bullets,
+          keywords,
+          ghostNote: scan.ghost_risk_note ?? '',
+        }),
       })
       setSent(true)
     } catch { /* fail silently */ }
@@ -617,7 +649,7 @@ function ResumePageInner() {
               scanResult ? (
                 <>
                   <ScannerResultView d={scanResult} />
-                  <EmailCTA company={jobCompany} role={jobTitle} matchScore={scanResult.match_score} summary={scanResult.score_summary ?? ''} user={user} />
+                  <EmailCTA company={jobCompany} role={jobTitle} scan={scanResult} user={user} />
                 </>
               ) : (
                 <ResultEmpty icon="🎯" text={"ATS fit score, missing keywords, line-by-line\nrewrites — plus this company's ghost risk."} />
