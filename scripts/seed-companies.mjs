@@ -97,28 +97,54 @@ async function seedOne(name) {
   }
 }
 
+// Normalize a name for dedupe (matches the server's lowercase + legal-suffix strip).
+const norm = s => String(s || '').trim().toLowerCase()
+  .replace(/[\s,]+(inc|llc|corp|ltd|co|plc|group|holdings|enterprises|solutions|technologies)\.?$/i, '').trim();
+
+// Pull the companies we ALREADY have scored (public leaderboard) so we never spend a cent
+// re-researching data we already hold. Returns a Set of normalized names.
+async function fetchExisting() {
+  try {
+    const res = await fetch(`${BASE}/api/reports`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'leaderboard' }), signal: AbortSignal.timeout(30000),
+    });
+    const data = await res.json().catch(() => ({}));
+    return new Set((data.companies || []).map(c => norm(c.name)).filter(Boolean));
+  } catch { return new Set(); }
+}
+
 async function main() {
-  console.log(`Seeding ${LIST.length} companies via ${BASE} (concurrency=${CONCURRENCY})\n`);
+  const have = await fetchExisting();
+  const todo = LIST.filter(c => !have.has(norm(c)));
+  const skipped = LIST.length - todo.length;
+  console.log(`${LIST.length} targets · ${skipped} already cached → SKIPPED ($0) · ${todo.length} to check via ${BASE}\n`);
+
+  if (process.env.SEED_DRY_RUN === '1') {
+    console.log('DRY RUN — companies that would be checked (only ones with NO reports cost an AI call):');
+    console.log(todo.join(', '));
+    console.log(`\nMax possible AI calls: ${todo.length} (fewer in practice — any with reports aggregate for free).`);
+    return;
+  }
+
   const results = [];
-  for (let i = 0; i < LIST.length; i += CONCURRENCY) {
-    const batch = LIST.slice(i, i + CONCURRENCY);
+  for (let i = 0; i < todo.length; i += CONCURRENCY) {
+    const batch = todo.slice(i, i + CONCURRENCY);
     const batchRes = await Promise.all(batch.map(seedOne));
     for (const r of batchRes) {
       results.push(r);
       const tag = r.score != null ? `grade ${r.score} (${r.src})` : r.status;
       console.log(`  ${r.name.padEnd(28)} ${tag}`);
     }
-    if (i + CONCURRENCY < LIST.length) await sleep(DELAY_MS);
+    if (i + CONCURRENCY < todo.length) await sleep(DELAY_MS);
   }
 
-  const scored = results.filter(r => r.score != null).length;
+  // The ONLY spend is companies that were actually web-researched (src not cache/reports).
+  const paid   = results.filter(r => r.src && r.src !== 'cache' && r.src !== 'reports').length;
+  const free   = results.filter(r => r.src === 'cache' || r.src === 'reports').length;
   const noData = results.filter(r => r.status === 'no_data').length;
-  const errors = results.filter(r => r.status === 'error' || r.status.startsWith('http_')).length;
-  console.log(`\nDone. ${scored} scored/cached · ${noData} no-data (need reports or AI seed) · ${errors} errors`);
-  if (noData > 0) {
-    console.log('Tip: to fill the no-data ones with real web-researched grades, flip the');
-    console.log('`anthropic_enabled` feature flag ON, re-run this, then flip it OFF.');
-  }
+  const errors = results.filter(r => r.status === 'error' || (r.status || '').startsWith('http_')).length;
+  console.log(`\nDone. ${skipped} already had ($0) · ${free} free aggregate/cache · ${paid} newly web-researched (the ONLY $) · ${noData} no-data · ${errors} errors`);
 }
 
 main();
