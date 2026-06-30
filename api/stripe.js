@@ -106,8 +106,48 @@ export default async function handler(req, res) {
   // moment STRIPE_SECRET_KEY + a price ID are set in Vercel, this flips to true
   // and the full upgrade flow (incl. the 7-day trial) activates with no redeploy.
   if (action === 'status') {
-    const priceId = process.env.STRIPE_PRICE_ID_MONTHLY || process.env.STRIPE_PRICE_ID_YEARLY;
-    return res.status(200).json({ payments_enabled: !!(STRIPE_KEY && priceId) });
+    // Just the secret key is enough now — prices are created inline (no pre-made price IDs
+    // required) and Pro is granted on the post-checkout return (no webhook required).
+    return res.status(200).json({ payments_enabled: !!STRIPE_KEY });
+  }
+
+  // ── CONFIRM CHECKOUT (grant Pro on return — no webhook needed) ─────────────
+  // The success page calls this with the Checkout session id. We retrieve the session
+  // from Stripe, verify it belongs to the signed-in user, and grant Pro if it produced a
+  // subscription (trialing/active). This makes the whole flow work with ONLY the secret
+  // key configured. The webhook (below) is still honored when present and handles the
+  // longer-term lifecycle (cancellations, renewals, failed payments).
+  if (action === 'confirm') {
+    if (req.method !== 'POST') return res.status(405).end();
+    if (!STRIPE_KEY || !SUPABASE_URL || !SERVICE_KEY) return res.status(503).json({ error: 'Payments not configured' });
+    const { uid } = await resolveUid(req, env);
+    if (!uid) return res.status(401).json({ error: 'Sign in first' });
+    const sessionId = (body.session_id || '').toString();
+    if (!sessionId.startsWith('cs_')) return res.status(400).json({ error: 'Invalid session' });
+    try {
+      const r = await fetch(`https://api.stripe.com/v1/checkout/sessions/${encodeURIComponent(sessionId)}`, {
+        headers: { Authorization: `Bearer ${STRIPE_KEY}` },
+      });
+      if (!r.ok) return res.status(502).json({ error: 'Could not verify session' });
+      const session = await r.json();
+      // SECURITY: the session must belong to THIS user (set at checkout creation).
+      const owner = session.metadata?.uid || session.client_reference_id;
+      if (owner !== uid) return res.status(403).json({ error: 'Session does not match account' });
+      // A subscription (incl. a $0 trial) means the upgrade succeeded.
+      const ok = !!session.subscription && (session.status === 'complete' || session.payment_status === 'paid' || session.payment_status === 'no_payment_required');
+      if (ok) {
+        await setPro(uid, true, env);
+        if (session.customer) {
+          const q = db(SUPABASE_URL, SERVICE_KEY);
+          await q(`ai_credits?user_id=eq.${uid}`, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ stripe_customer_id: session.customer }) });
+        }
+        return res.status(200).json({ ok: true, pro: true });
+      }
+      return res.status(200).json({ ok: false });
+    } catch (err) {
+      console.error('[stripe/confirm]', err.message);
+      return res.status(500).json({ error: 'Confirm failed' });
+    }
   }
 
   // ── CREATE CHECKOUT SESSION ───────────────────────────────────────────────
@@ -120,28 +160,40 @@ export default async function handler(req, res) {
     if (!uid) return res.status(401).json({ error: 'Sign in before upgrading' });
 
     const plan = body.plan === 'yearly' ? 'yearly' : 'monthly';
+    // Use a pre-made Stripe price ID if one is configured; otherwise create the price
+    // INLINE so no Products/prices setup is needed in the Stripe dashboard — the secret
+    // key alone is enough to take subscriptions.
     const priceId = plan === 'yearly' ? process.env.STRIPE_PRICE_ID_YEARLY : process.env.STRIPE_PRICE_ID_MONTHLY;
-    if (!priceId) return res.status(503).json({ error: 'Payments not yet configured' });
 
     const origin = req.headers.origin || 'https://seenjobs.io';
 
     const form = new URLSearchParams({
       mode: 'subscription',
       'payment_method_types[]': 'card',
-      'line_items[0][price]': priceId,
       'line_items[0][quantity]': '1',
       client_reference_id: uid,
-      success_url: `${origin}/pricing?upgraded=1`,
+      // Include the session id so the return page can confirm + grant Pro without a webhook.
+      success_url: `${origin}/pricing?upgraded=1&session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${origin}/pricing`,
       'metadata[uid]': uid,
       'subscription_data[metadata][uid]': uid,
       // 7-day free trial. Card is still collected up front (Checkout subscription mode),
       // so Stripe creates the subscription in `trialing` and auto-converts to a paid charge
-      // on day 7 — no manual entitlement bookkeeping. checkout.session.completed still fires
-      // immediately (no charge yet), granting Pro for the trial window below.
+      // on day 7 — no manual entitlement bookkeeping.
       'subscription_data[trial_period_days]': '7',
       allow_promotion_codes: 'true',
     });
+    if (priceId) {
+      form.set('line_items[0][price]', priceId);
+    } else {
+      // Inline price — Seen Pro $9.99/mo or $83.88/yr. No dashboard product needed.
+      const amount = plan === 'yearly' ? '8388' : '999';
+      const interval = plan === 'yearly' ? 'year' : 'month';
+      form.set('line_items[0][price_data][currency]', 'usd');
+      form.set('line_items[0][price_data][unit_amount]', amount);
+      form.set('line_items[0][price_data][recurring][interval]', interval);
+      form.set('line_items[0][price_data][product_data][name]', 'Seen Pro');
+    }
     if (email) form.set('customer_email', email);
 
     const stripeRes = await fetch('https://api.stripe.com/v1/checkout/sessions', {
