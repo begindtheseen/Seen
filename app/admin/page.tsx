@@ -39,6 +39,7 @@ interface AdminStats {
   applications: { total: number; ghosted_30d: number; hired_30d: number; ghost_rate_pct: number | null; recent: RecentApp[] }
   company_lookups?: { ready: boolean; today: number; top: { company: string; count: number }[] }
   jobs: { total?: number; active: number; new_today: number; added_today: number; stale_or_expired: number; inactive_reports: InactiveReport[] }
+  job_health?: { active: number; total: number; stale: number; active_pct: number; crisis: boolean }
   errors: { today: number; this_week: number; by_route: Record<string, number>; recent: { endpoint: string; error_msg: string; created_at: string }[] }
   issues: { open: number; items: Issue[] }
   duplicate_clusters: { suspected: number; items: DupCluster[] }
@@ -78,6 +79,97 @@ function KpiCard({ l, n, sub, borderColor, numColor, onClick }: { l: string; n: 
       <div className="adm-kpi-l">{l}{onClick && <span style={{ float: 'right', opacity: .4, fontSize: '.6em' }}>▸</span>}</div>
       <div className="adm-kpi-n" style={numColor ? { color: numColor } : undefined}>{n}</div>
       {sub && <div className="adm-kpi-sub">{sub}</div>}
+    </div>
+  )
+}
+
+// Prominent red alert + one-click auto-remediation when the job board collapses.
+// Calls the server-side emergency_job_refresh action, which in turn fires
+// /api/refresh-jobs?all=1 (all batches + sources) to backfill listings now.
+function JobCrisisBanner({
+  health,
+  token,
+  onRefresh,
+}: {
+  health: NonNullable<AdminStats['job_health']>
+  token: string
+  onRefresh: () => void
+}) {
+  const [running, setRunning] = useState(false)
+  const [result, setResult] = useState<{ ok: boolean; msg: string } | null>(null)
+  const stalePct = Math.max(0, 100 - (health.active_pct || 0))
+
+  async function runEmergencyRefresh() {
+    setRunning(true)
+    setResult(null)
+    try {
+      const res = await fetch('/api/admin-stats', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Admin-Token': token },
+        body: JSON.stringify({ action: 'emergency_job_refresh' }),
+      })
+      const d = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(d.error || `HTTP ${res.status}`)
+      const added = d.added != null ? d.added : (d.result?.upserted ?? d.result?.found ?? null)
+      setResult({ ok: true, msg: added != null ? `Refreshed — ${added} listings backfilled` : 'Refresh triggered' })
+      // Reload dashboard stats so the banner clears once the board recovers.
+      setTimeout(onRefresh, 1500)
+    } catch (e) {
+      setResult({ ok: false, msg: (e as Error).message.slice(0, 120) })
+    }
+    setRunning(false)
+  }
+
+  return (
+    <div
+      role="alert"
+      style={{
+        background: 'linear-gradient(90deg, rgba(239,68,68,.16), rgba(239,68,68,.06))',
+        border: '1px solid rgba(239,68,68,.5)',
+        borderLeft: '4px solid var(--red)',
+        borderRadius: 12,
+        padding: '1rem 1.15rem',
+        marginBottom: '1.25rem',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        gap: '1rem',
+        flexWrap: 'wrap',
+      }}
+    >
+      <div style={{ minWidth: 0, flex: 1 }}>
+        <div style={{ fontFamily: 'var(--display)', fontWeight: 800, fontSize: '.95rem', color: 'var(--red)', letterSpacing: '-.01em', marginBottom: '.25rem' }}>
+          ⚠️ JOB CRISIS — only {health.active.toLocaleString()} active listings
+        </div>
+        <div style={{ fontFamily: 'var(--mono)', fontSize: '.62rem', color: 'var(--sub)', lineHeight: 1.5 }}>
+          {health.stale.toLocaleString()} stale, {stalePct}% of corpus unavailable. Auto-refresh recommended.
+        </div>
+        {result && (
+          <div style={{ fontFamily: 'var(--mono)', fontSize: '.6rem', marginTop: '.4rem', color: result.ok ? 'var(--green)' : 'var(--red)' }}>
+            {result.ok ? '✓ ' : '✗ '}{result.msg}
+          </div>
+        )}
+      </div>
+      <button
+        onClick={runEmergencyRefresh}
+        disabled={running}
+        style={{
+          background: 'var(--red)',
+          border: 'none',
+          borderRadius: 8,
+          padding: '.6rem 1rem',
+          color: '#fff',
+          fontFamily: 'var(--mono)',
+          fontSize: '.65rem',
+          fontWeight: 700,
+          cursor: running ? 'wait' : 'pointer',
+          whiteSpace: 'nowrap',
+          flexShrink: 0,
+          opacity: running ? 0.7 : 1,
+        }}
+      >
+        {running ? '⏳ Refreshing…' : 'Run emergency refresh →'}
+      </button>
     </div>
   )
 }
@@ -493,6 +585,11 @@ export default function AdminPage() {
           </div>
         </div>
 
+        {/* Job crisis alert — prominent, above everything, with one-click remediation */}
+        {stats.job_health?.crisis && (
+          <JobCrisisBanner health={stats.job_health} token={token!} onRefresh={() => load(token!)} />
+        )}
+
         {/* Growth & Monetization — conversion analytics */}
         {stats.monetization && (() => {
           const m = stats.monetization!
@@ -565,6 +662,22 @@ export default function AdminPage() {
           <KpiCard l="Added today" n={stats.jobs?.new_today ?? 0} sub="new listings posted" borderColor="var(--green)" numColor="var(--green)" onClick={() => openKpi('jobs_today', 'Jobs added today')} />
           <KpiCard l="Stale / expired" n={(stats.jobs?.stale_or_expired ?? 0).toLocaleString()} sub="flagged unavailable" borderColor={stats.jobs?.stale_or_expired > 500 ? 'var(--amber)' : undefined} numColor={stats.jobs?.stale_or_expired > 500 ? 'var(--amber)' : undefined} onClick={() => openKpi('jobs_stale', 'Stale & expired jobs')} />
         </div>
+
+        {/* Job health — always visible, turns red in a crisis */}
+        {stats.job_health && (() => {
+          const h = stats.job_health!
+          const crisisColor = h.crisis ? 'var(--red)' : undefined
+          return (
+            <>
+              <div className="adm-section-lbl">Job health{h.crisis && <span style={{ color: 'var(--red)', marginLeft: '.4rem' }}>● crisis</span>}</div>
+              <div className="adm-kpi-row" style={{ marginBottom: '1.5rem' }}>
+                <KpiCard l="Active listings" n={h.active.toLocaleString()} sub="live jobs users see" borderColor={crisisColor || 'var(--blue)'} numColor={crisisColor || 'var(--blue)'} onClick={() => openKpi('jobs_active', 'Active job listings')} />
+                <KpiCard l="Stale listings" n={h.stale.toLocaleString()} sub="stale or expired" borderColor={crisisColor || 'var(--amber)'} numColor={crisisColor || 'var(--amber)'} onClick={() => openKpi('jobs_stale', 'Stale & expired jobs')} />
+                <KpiCard l="Active %" n={`${h.active_pct}%`} sub={`of ${h.total.toLocaleString()} stored`} borderColor={h.crisis ? 'var(--red)' : 'var(--green)'} numColor={h.crisis ? 'var(--red)' : 'var(--green)'} />
+              </div>
+            </>
+          )
+        })()}
 
         {/* Reports chart */}
         <div className="adm-panel" style={{ marginBottom: '.65rem' }}>

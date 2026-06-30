@@ -316,6 +316,31 @@ async function _handler(req, res) {
       }
     }
 
+    // ── Job-board health / crisis detection ───────────────────────────────────
+    // The job board is the primary data-acquisition engine. When active listings
+    // collapse (stale ones pile up, refresh cron falls behind) users see a dead
+    // board and the whole flywheel stalls. Surface an explicit crisis signal so
+    // the admin dashboard can alert + auto-remediate instead of silently rotting.
+    //
+    // Thresholds (tuned for the current corpus of ~900 jobs; adjust as it grows):
+    //   • active < 500           → board is too thin to feel alive (target ≥500 live)
+    //   • active / total < 0.40  → majority of the corpus is stale/expired (>60% rot)
+    // Either condition alone is enough to declare a crisis.
+    const JOB_HEALTH_MIN_ACTIVE = 500;   // floor of live listings before we alert
+    const JOB_HEALTH_MIN_RATIO  = 0.40;  // min share of corpus that must be active
+    const staleJobs = ct(staleJobsRes);
+    const activePct = jobsTotal > 0 ? Math.round((jobsActive / jobsTotal) * 100) : 0;
+    const jobCrisis =
+      jobsActive < JOB_HEALTH_MIN_ACTIVE ||
+      (jobsTotal > 0 && jobsActive / jobsTotal < JOB_HEALTH_MIN_RATIO);
+    const jobHealth = {
+      active: jobsActive,
+      total: jobsTotal,
+      stale: staleJobs,
+      active_pct: activePct,
+      crisis: jobCrisis,
+    };
+
     // ── Monetization / conversion analytics ──────────────────────────────────
     const freeCount = Math.max(0, creditRows.length - proCount);
     const convPct = creditRows.length ? Math.round((proCount / creditRows.length) * 1000) / 10 : 0;
@@ -358,6 +383,7 @@ async function _handler(req, res) {
       issues: { open: issues.length, items: issues },
       duplicate_clusters: { suspected: dupClusters.length, items: dupClusters },
       feature_flags: flags,
+      job_health: jobHealth,
       company_lookups: searchLogsTodayRes.ok
         ? { ready: true, today: ct(searchLogsTodayRes), top: topSearched }
         : { ready: false },
@@ -882,6 +908,45 @@ async function _handler(req, res) {
 
     if (!Array.isArray(rows)) rows = [];
     return res.status(200).json({ ok: true, metric, rows });
+  }
+
+  // ── EMERGENCY JOB REFRESH — server-side auto-remediation for a job crisis ─────
+  // Triggered from the admin crisis banner. Calls the refresh-jobs endpoint
+  // (owned by another module — we only CALL it, never edit it) with ?all=1 so it
+  // runs every batch + source in one shot to backfill the board immediately.
+  // We forward the cron secret server-side so this works even if the caller's
+  // admin token isn't accepted by refresh-jobs; if CRON_SECRET is unset we fall
+  // back to forwarding the admin session token (refresh-jobs validates either).
+  if (action === 'emergency_job_refresh') {
+    if (adminRole === 'moderator') return res.status(403).json({ error: 'Insufficient role' });
+    const proto = (req.headers['x-forwarded-proto'] || 'https').split(',')[0].trim();
+    const host  = (req.headers['x-forwarded-host'] || req.headers.host || '').split(',')[0].trim();
+    if (!host) return res.status(500).json({ error: 'Cannot resolve host for refresh' });
+    const cronSecret = process.env.CRON_SECRET;
+    const refreshHeaders = { 'Content-Type': 'application/json' };
+    if (cronSecret) refreshHeaders.Authorization = `Bearer ${cronSecret}`;
+    else refreshHeaders['X-Admin-Token'] = adminToken; // refresh-jobs validates admin sessions too
+    try {
+      const refreshRes = await fetch(`${proto}://${host}/api/refresh-jobs?all=1`, {
+        method: 'POST',
+        headers: refreshHeaders,
+        body: '{}',
+      });
+      const data = await refreshRes.json().catch(() => ({}));
+      if (!refreshRes.ok) {
+        return res.status(502).json({ error: data.error || `Refresh failed (${refreshRes.status})` });
+      }
+      await db('admin_audit_log', {
+        method: 'POST',
+        body: JSON.stringify({ admin_id: sess.admin_id, username: sess.username || 'admin', action: 'emergency_job_refresh', target_type: 'jobs', metadata: { upserted: data.upserted ?? null, found: data.found ?? null } }),
+        headers: { Prefer: 'return=minimal' },
+      }).catch(() => {});
+      // Normalize the count fields refresh-jobs may return across versions.
+      const added = data.upserted ?? data.inserted ?? data.found ?? null;
+      return res.status(200).json({ ok: true, added, result: data });
+    } catch (e) {
+      return res.status(502).json({ error: `Refresh request failed: ${e.message}` });
+    }
   }
 
   return res.status(400).json({ error: 'Unknown action' });
