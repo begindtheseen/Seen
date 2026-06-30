@@ -5,6 +5,9 @@
 import { createHmac, timingSafeEqual } from 'crypto';
 import { rateLimit } from '../lib/server/ratelimit.js';
 import { buildOpportunities } from './_utils/opportunityEngine.js';
+import { extractEmployment } from '../lib/server/resumeAnalysis.js';
+import { buildResumeSurvey, RESUME_SURVEY_KEYS, mapAnswersToReport } from './_utils/resumeSurvey.js';
+import { normalizeCompany, isValidCompanyName, resolveOrCreateCompany, assessSubmitTrust, writeReport } from './_utils/reportWrite.js';
 
 // Verify a Supabase JWT locally (HS256) — no network round-trip.
 // Returns the payload (with .sub = user UUID) on success, null on failure.
@@ -81,7 +84,7 @@ export default async function handler(req, res) {
   console.log(`[user-sync] action=${action} uid=${uid}`);
 
   // Rate-limit mutating actions per user (not reads — those are cheap DB fetches)
-  const WRITE_ACTIONS = new Set(['add_application','update_application','remove_application','save_job','unsave_job','save_profile','save_resume','delete_account']);
+  const WRITE_ACTIONS = new Set(['add_application','update_application','remove_application','save_job','unsave_job','save_profile','save_resume','delete_account','submit_resume_survey']);
   if (WRITE_ACTIONS.has(action)) {
     const windowHour = Math.floor(Date.now() / 3_600_000);
     const rlKey = `${uid}:user-sync:${windowHour}`;
@@ -771,6 +774,197 @@ export default async function handler(req, res) {
       questions,
       credits_left: Math.max(0, 5 - dailyEarned),
       balance: cred?.balance ?? 3,
+    });
+  }
+
+  // ── RESUME SURVEY — load a survey about ONE random unsurveyed past employer ───
+  // The data-currency engine: forces every signed-in user (especially free ones) to
+  // contribute real company hiring data in exchange for AI credits. Reads the user's
+  // résumé on file, parses employment history with the deterministic extractEmployment()
+  // parser (NO AI), and picks a random past (company, role) the user hasn't been surveyed
+  // about yet. Returns generic hiring-experience questions about THAT company.
+  if (action === 'resume_survey') {
+    const today = new Date().toISOString().split('T')[0];
+
+    // Daily-earn cap (mirrors submit_answer / get_question): pro = unlimited, free = 5/day.
+    const cRes = await db(`ai_credits?user_id=eq.${uid}&limit=1`);
+    const cred = cRes.ok ? (await cRes.json())[0] : null;
+    const isPro = !!cred?.pro;
+    const dailyEarned = (cred?.last_reset === today ? cred?.daily_earned : 0) || 0;
+    const creditsLeft = isPro ? 999 : Math.max(0, 5 - dailyEarned);
+
+    // Load the résumé on file (canonical store: profiles.resume_text — see ResumeStore/save_resume).
+    const pRes = await db(`profiles?id=eq.${uid}&select=resume_text&limit=1`);
+    const resumeText = pRes.ok ? ((await pRes.json())[0]?.resume_text || '') : '';
+    if (!resumeText || resumeText.length < 50) {
+      return res.status(200).json({ ok: true, survey: null, reason: 'no_resume', credits_left: creditsLeft, balance: cred?.balance ?? 0 });
+    }
+
+    // Deterministic employment parse → past positions with company + title.
+    let employment = [];
+    try { employment = extractEmployment(resumeText); } catch { employment = []; }
+    const positions = employment.filter(e => isValidCompanyName(e.company));
+    if (!positions.length) {
+      return res.status(200).json({ ok: true, survey: null, reason: 'no_employment', credits_left: creditsLeft, balance: cred?.balance ?? 0 });
+    }
+
+    // Exclude positions this user already completed (anti-farming ledger).
+    const surveyedRes = await db(`resume_surveys?user_id=eq.${uid}&select=company_norm&limit=200`);
+    const surveyed = new Set(surveyedRes.ok ? (await surveyedRes.json()).map(r => r.company_norm) : []);
+    const pool = positions.filter(p => !surveyed.has(normalizeCompany(p.company)));
+    if (!pool.length) {
+      return res.status(200).json({ ok: true, survey: null, reason: 'all_surveyed', credits_left: creditsLeft, balance: cred?.balance ?? 0 });
+    }
+    if (!isPro && creditsLeft <= 0) {
+      return res.status(200).json({ ok: true, survey: null, reason: 'daily_cap', credits_left: 0, balance: cred?.balance ?? 0 });
+    }
+
+    // Pick a random unsurveyed position.
+    const pick = pool[Math.floor(Math.random() * pool.length)];
+    const { questions } = buildResumeSurvey(pick.company, pick.title);
+
+    return res.status(200).json({
+      ok: true,
+      survey: {
+        company: pick.company,
+        role: pick.title || '',
+        company_norm: normalizeCompany(pick.company),
+        questions,
+      },
+      credits_left: creditsLeft,
+      balance: cred?.balance ?? 0,
+    });
+  }
+
+  // ── SUBMIT RESUME SURVEY — award credits + write a trust-weighted report ──────
+  // On completion we (1) record the survey to resume_surveys (prevents re-farming the same
+  // position), (2) award AI credits respecting the daily cap, and (3) write a first-party,
+  // trust-weighted report to the corresponding company — creating the company/location
+  // record if it doesn't exist — so the answers feed that company's score. source = 'resume_survey'.
+  if (action === 'submit_resume_survey') {
+    const { company, role, answers } = body;
+    if (!company || !answers || typeof answers !== 'object') {
+      return res.status(400).json({ error: 'company and answers required' });
+    }
+    if (!isValidCompanyName(company)) return res.status(400).json({ error: 'invalid company' });
+
+    // Require at least the core outcome/response answer so we never write an empty report.
+    const answeredKeys = RESUME_SURVEY_KEYS.filter(k => typeof answers[k] === 'string' && answers[k]);
+    if (!answeredKeys.length) return res.status(400).json({ error: 'no answers provided' });
+
+    const coNorm = normalizeCompany(company);
+    const today = new Date().toISOString().split('T')[0];
+
+    // ── Anti-farming: one completed survey per (user, company). Reserve the slot first via
+    // a unique-constrained insert; a duplicate (unique violation → 409) means it was already
+    // farmed → no credit. NOTE: we deliberately do NOT use resolution=ignore-duplicates here —
+    // that would swallow the conflict into a 2xx and let the same position be re-farmed.
+    const reserve = await db('resume_surveys', {
+      method: 'POST',
+      headers: { Prefer: 'return=minimal' },
+      body: JSON.stringify({
+        user_id: uid,
+        company_norm: coNorm,
+        company_name: String(company).slice(0, 200),
+        role: role ? String(role).slice(0, 200) : null,
+        answers,
+      }),
+    });
+    if (reserve.status === 409) {
+      return res.status(200).json({ ok: false, error: 'already_surveyed' });
+    }
+    if (!reserve.ok) {
+      const e = await reserve.text().catch(() => '');
+      console.error('[user-sync] resume_survey reserve failed:', reserve.status, e.slice(0, 200));
+      // If the table is missing (migration not applied), fail loud rather than silently mis-awarding.
+      return res.status(500).json({ error: 'Could not record survey' });
+    }
+
+    // ── Map answers → report schema (deterministic). ─────────────────────────────
+    const mapped = mapAnswersToReport(answers);
+
+    // ── Resolve / create the company (+ optional location) and write a trust-weighted report.
+    const hdrs = { apikey: SERVICE_KEY, Authorization: `Bearer ${SERVICE_KEY}`, 'Content-Type': 'application/json', Prefer: 'return=representation' };
+    let cid = null;
+    let reportWritten = false;
+    try {
+      cid = await resolveOrCreateCompany(SUPABASE_URL, hdrs, company);
+      if (cid) {
+        const trust = await assessSubmitTrust(SUPABASE_URL, hdrs, uid, `company_id=eq.${cid}`);
+        const reportBase = {
+          company_id: cid,
+          location_id: null,
+          role: role ? String(role).trim().slice(0, 200) : '',
+          platform: 'Seen Resume Survey',
+          outcome: mapped.outcome,
+          ghost_stage: mapped.ghost_stage,
+          rounds: mapped.rounds,
+          wait_days: mapped.wait_days,
+          unpaid_work: mapped.unpaid_work,
+          experience_level: '',
+          report_text: null,
+          source: 'resume_survey',
+          needs_review: trust.review,
+          outcome_weight: trust.weight,
+          trust_reason: trust.reason,
+          user_id: uid,
+        };
+        reportWritten = await writeReport(SUPABASE_URL, hdrs, reportBase, String(company).trim().slice(0, 200));
+      }
+    } catch (err) {
+      console.error('[user-sync] resume_survey report write failed:', err?.message);
+    }
+
+    // Record the resolved company_id + mapped outcome back onto the survey ledger row (best-effort).
+    db(`resume_surveys?user_id=eq.${uid}&company_norm=eq.${encodeURIComponent(coNorm)}`, {
+      method: 'PATCH',
+      headers: { Prefer: 'return=minimal' },
+      body: JSON.stringify({ company_id: cid, outcome: mapped.outcome }),
+    }).catch(() => {});
+
+    // ── Award AI credits (the freeloader incentive), respecting the daily earn cap. ──
+    const AWARD = 2;
+    const cRes = await db(`ai_credits?user_id=eq.${uid}&limit=1`);
+    let cr = cRes.ok ? (await cRes.json())[0] : null;
+    if (!cr) {
+      await db('ai_credits', { method: 'POST', body: JSON.stringify({ user_id: uid, balance: AWARD, daily_earned: AWARD, last_reset: today, pro: false }), headers: { Prefer: 'return=minimal' } });
+      cr = { balance: AWARD, daily_earned: AWARD, last_reset: today, pro: false };
+    }
+    let awarded = 0;
+    let balance = cr.balance;
+    if (cr.pro) {
+      balance = 999;
+    } else {
+      const resetToday = cr.last_reset !== today;
+      const dailyEarned = resetToday ? 0 : (cr.daily_earned || 0);
+      const room = Math.max(0, 5 - dailyEarned);     // daily earn cap = 5
+      awarded = Math.min(AWARD, room);
+      if (awarded > 0) {
+        const baseBalance = resetToday ? (cr.pro ? 999 : 1) : cr.balance; // daily reset baseline = 1 (migration 031)
+        balance = baseBalance + awarded;
+        const patch = { balance, daily_earned: dailyEarned + awarded };
+        if (resetToday) patch.last_reset = today;
+        await db(`ai_credits?user_id=eq.${uid}`, { method: 'PATCH', body: JSON.stringify(patch), headers: { Prefer: 'return=minimal' } });
+        await db('credit_transactions', { method: 'POST', body: JSON.stringify({ user_id: uid, delta: awarded, reason: 'resume_survey', metadata: { company: coNorm, outcome: mapped.outcome } }), headers: { Prefer: 'return=minimal' } }).catch(() => {});
+      } else {
+        balance = cr.balance;
+      }
+    }
+    // Update the ledger row with the credits actually awarded (best-effort).
+    if (awarded > 0) {
+      db(`resume_surveys?user_id=eq.${uid}&company_norm=eq.${encodeURIComponent(coNorm)}`, {
+        method: 'PATCH', headers: { Prefer: 'return=minimal' },
+        body: JSON.stringify({ credits_awarded: awarded }),
+      }).catch(() => {});
+    }
+
+    return res.status(200).json({
+      ok: true,
+      awarded,
+      balance,
+      report_written: reportWritten,
+      company_id: cid,
+      outcome: mapped.outcome,
     });
   }
 
