@@ -15,7 +15,7 @@ interface ScannerResult {
   score_summary?: string
   missing_keywords?: string[]
   strong_keywords?: string[]
-  specific_fixes?: Array<{ current: string; improved: string; note?: string }>
+  specific_fixes?: Array<{ current: string; improved: string; note?: string; unchanged?: boolean }>
   ghost_risk_note?: string
 }
 
@@ -92,7 +92,9 @@ const label = (text: string) => (
 )
 
 function chip(text: string, color: string, bg: string, border: string) {
-  return <span style={{ background: bg, border: `1px solid ${border}`, color, borderRadius: 5, padding: '.2rem .6rem', fontFamily: 'var(--mono)', fontSize: '.65rem' }}>{text}</span>
+  // maxWidth + overflowWrap keep a single very long keyword from forcing the row
+  // wider than the mobile viewport.
+  return <span style={{ background: bg, border: `1px solid ${border}`, color, borderRadius: 5, padding: '.2rem .6rem', fontFamily: 'var(--mono)', fontSize: '.65rem', maxWidth: '100%', overflowWrap: 'anywhere' }}>{text}</span>
 }
 
 function ScannerResultView({ d }: { d: ScannerResult }) {
@@ -131,9 +133,19 @@ function ScannerResultView({ d }: { d: ScannerResult }) {
           {d.specific_fixes.map((fix, i) => (
             <div key={i} style={{ marginBottom: '.85rem', paddingBottom: '.85rem', borderBottom: i < (d.specific_fixes?.length ?? 0) - 1 ? '1px solid var(--line)' : 'none' }}>
               <div style={{ fontFamily: 'var(--mono)', fontSize: '.62rem', color: 'var(--red)', marginBottom: '.3rem' }}>✗ Current</div>
-              <div style={{ fontSize: '.78rem', color: 'var(--sub)', background: 'var(--raised)', padding: '.5rem .75rem', borderRadius: 6, marginBottom: '.4rem', lineHeight: 1.6 }}>{fix.current}</div>
-              <div style={{ fontFamily: 'var(--mono)', fontSize: '.62rem', color: 'var(--green)', marginBottom: '.3rem' }}>✓ Rewrite</div>
-              <div style={{ fontSize: '.78rem', color: 'var(--white)', background: 'var(--gdim)', padding: '.5rem .75rem', borderRadius: 6, lineHeight: 1.6, border: '1px solid var(--gmid)' }}>{fix.improved}</div>
+              <div style={{ fontSize: '.78rem', color: 'var(--sub)', background: 'var(--raised)', padding: '.5rem .75rem', borderRadius: 6, marginBottom: '.4rem', lineHeight: 1.6, overflowWrap: 'anywhere' }}>{fix.current}</div>
+              {fix.unchanged ? (
+                // No safe automatic change available — don't show two identical
+                // boxes. Mark it honestly as already strong.
+                <div style={{ fontFamily: 'var(--mono)', fontSize: '.62rem', color: 'var(--green)', display: 'flex', alignItems: 'center', gap: '.35rem' }}>
+                  ✓ Already strong — no rewrite needed
+                </div>
+              ) : (
+                <>
+                  <div style={{ fontFamily: 'var(--mono)', fontSize: '.62rem', color: 'var(--green)', marginBottom: '.3rem' }}>✓ Rewrite</div>
+                  <div style={{ fontSize: '.78rem', color: 'var(--white)', background: 'var(--gdim)', padding: '.5rem .75rem', borderRadius: 6, lineHeight: 1.6, border: '1px solid var(--gmid)', overflowWrap: 'anywhere' }}>{fix.improved}</div>
+                </>
+              )}
               {fix.note && (
                 <div style={{ fontSize: '.72rem', color: 'var(--amber)', marginTop: '.4rem', lineHeight: 1.55, fontStyle: 'italic' }}>💡 {fix.note}</div>
               )}
@@ -170,7 +182,7 @@ function CoachResultView({ d }: { d: CoachResult }) {
               <div style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', color: 'var(--muted)' }}>{s.label}</div>
             </div>
           </div>
-          <div style={{ fontSize: '.8rem', color: 'var(--sub)', lineHeight: 1.75, whiteSpace: 'pre-wrap' }}>{s.content}</div>
+          <div style={{ fontSize: '.8rem', color: 'var(--sub)', lineHeight: 1.75, whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>{s.content}</div>
         </div>
       ))}
     </div>
@@ -189,7 +201,7 @@ function ProposalResultView({ d }: { d: ProposalResult }) {
       {phases.filter(p => p.content).map(p => (
         <div key={p.label} style={{ background: 'var(--surface)', border: '1px solid var(--line2)', borderRadius: 12, padding: '1.1rem', marginBottom: '.75rem' }}>
           <div style={{ fontFamily: 'var(--mono)', fontSize: '.6rem', textTransform: 'uppercase', letterSpacing: '.08em', color: p.color, marginBottom: '.65rem' }}>{p.label}</div>
-          <div style={{ fontSize: '.82rem', color: 'var(--sub)', lineHeight: 1.75, whiteSpace: 'pre-wrap' }}>{p.content}</div>
+          <div style={{ fontSize: '.82rem', color: 'var(--sub)', lineHeight: 1.75, whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>{p.content}</div>
         </div>
       ))}
     </div>
@@ -282,7 +294,9 @@ function ResumeInput({
 function fixesToBullets(scan: ScannerResult): Array<{ original: string; optimized: string; addresses: string; note: string }> {
   const fixes = scan.specific_fixes ?? []
   return fixes
-    .filter(f => f.current && !/^\(/.test(f.current.trim()))
+    // Skip placeholder rows and no-op "already strong" bullets — a before/after
+    // only makes sense when the rewrite actually changed the line.
+    .filter(f => f.current && !/^\(/.test(f.current.trim()) && !f.unchanged)
     .map(f => ({
       original: f.current,
       optimized: f.improved,
@@ -291,7 +305,7 @@ function fixesToBullets(scan: ScannerResult): Array<{ original: string; optimize
     }))
 }
 
-function EmailCTA({ company, role, scan, user }: { company: string; role: string; scan: ScannerResult; user: { email?: string } | null }) {
+function EmailCTA({ company, role, scan, resumeText, jobJD, user }: { company: string; role: string; scan: ScannerResult; resumeText: string; jobJD: string; user: { email?: string } | null }) {
   const [email, setEmail] = useState(user?.email ?? '')
   const [sent, setSent] = useState(false)
   const [sending, setSending] = useState(false)
@@ -316,6 +330,10 @@ function EmailCTA({ company, role, scan, user }: { company: string; role: string
           bullets,
           keywords,
           ghostNote: scan.ghost_risk_note ?? '',
+          // Send the résumé + JD so the attached PDF is a complete, submittable
+          // résumé built from the user's own text (not just a tips sheet).
+          resume: resumeText,
+          jobDescription: jobJD,
         }),
       })
       setSent(true)
@@ -470,6 +488,44 @@ function ResumePageInner() {
     ResumeStore.clear(user?.id, isLoggedIn)
     setResumeText('')
     setResumeMeta(null)
+  }
+
+  // Download a complete, submittable résumé PDF built deterministically from the
+  // user's own résumé text. Posts to /api/resume (action: download_resume) and
+  // saves the returned PDF with a clean, professional filename.
+  const [downloading, setDownloading] = useState(false)
+  async function downloadResume() {
+    if (!resumeText.trim()) { setError('Add your résumé first.'); return }
+    setDownloading(true); setError('')
+    try {
+      const res = await fetch('/api/resume', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'download_resume', resume: resumeText, job: jobTitle, company: jobCompany, jobDescription: jobJD }),
+      })
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({})) as { error?: string }
+        setError(d.error || 'Could not build your résumé PDF. Try pasting the full résumé text.')
+        return
+      }
+      const blob = await res.blob()
+      // Derive a clean filename: "First Last — Role Resume.pdf" → fallbacks.
+      const cleanName = (resumeText.split(/\r?\n/).map(l => l.trim()).find(Boolean) || '').replace(/[^\w .'-]/g, '').trim()
+      const cleanRole = jobTitle.replace(/[^\w .,'/&-]/g, '').trim()
+      const looksLikeName = /^[A-Z][\w.'-]*(\s+[A-Z][\w.'-]*){1,3}$/.test(cleanName)
+      const fileName = looksLikeName && cleanRole ? `${cleanName} — ${cleanRole} Resume.pdf`
+        : looksLikeName ? `${cleanName} — Resume.pdf`
+        : cleanRole ? `${cleanRole} Resume.pdf`
+        : 'Seen Resume.pdf'
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url; a.download = fileName
+      document.body.appendChild(a); a.click(); a.remove()
+      URL.revokeObjectURL(url)
+    } catch {
+      setError('Could not build your résumé PDF. Please try again.')
+    }
+    setDownloading(false)
   }
 
   // Thrown when the AI endpoint reports no credits / not signed in — callers show a friendly message.
@@ -649,7 +705,23 @@ function ResumePageInner() {
               scanResult ? (
                 <>
                   <ScannerResultView d={scanResult} />
-                  <EmailCTA company={jobCompany} role={jobTitle} scan={scanResult} user={user} />
+                  <button
+                    onClick={downloadResume}
+                    disabled={downloading}
+                    style={{
+                      width: '100%', marginTop: '1rem', boxSizing: 'border-box',
+                      background: 'var(--surface)', border: '1.5px solid var(--blue)',
+                      color: 'var(--blue)', borderRadius: 8, padding: '.7rem 1rem',
+                      fontFamily: 'var(--display)', fontWeight: 700, fontSize: '.8rem',
+                      cursor: downloading ? 'not-allowed' : 'pointer', opacity: downloading ? 0.6 : 1,
+                    }}
+                  >
+                    {downloading ? 'Building your résumé…' : '⬇ Download clean résumé (PDF)'}
+                    <span style={{ display: 'block', marginTop: '.2rem', fontSize: '.58rem', opacity: .7, fontFamily: 'var(--mono)', fontWeight: 400 }}>
+                      A complete, ATS-ready résumé built from your own text · free
+                    </span>
+                  </button>
+                  <EmailCTA company={jobCompany} role={jobTitle} scan={scanResult} resumeText={resumeText} jobJD={jobJD} user={user} />
                 </>
               ) : (
                 <ResultEmpty icon="🎯" text={"ATS fit score, missing keywords, line-by-line\nrewrites — plus this company's ghost risk."} />

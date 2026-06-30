@@ -409,9 +409,12 @@ nav.nav-scrolled{background:rgba(6,6,8,0.82);backdrop-filter:blur(60px) saturate
 .dc-count{font-family:var(--mono);font-size:.7rem;color:var(--green)}
 
 /* ═══ RESUME AI ═══ */
-.resume-page{max-width:1100px;margin:0 auto;padding:2.5rem 2rem}
-.resume-hdr{margin-bottom:2rem}
+.resume-page{max-width:1100px;width:100%;margin:0 auto;padding:2.5rem 2rem;box-sizing:border-box}
+.resume-hdr{margin-bottom:2rem;min-width:0}
+/* min-width:0 on grid children lets long content wrap instead of forcing the
+   grid (and the viewport) wider than the screen on mobile. */
 .resume-layout{display:grid;grid-template-columns:1fr 1fr;gap:1.25rem}
+.resume-layout>*{min-width:0}
 .rpanel{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:1.75rem}
 .rpanel-title{font-family:var(--mono);font-size:.6rem;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin-bottom:1.15rem;padding-bottom:.8rem;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between}
 .rp-live{display:flex;align-items:center;gap:.3rem;color:var(--blue);font-size:.58rem}
@@ -665,7 +668,7 @@ nav.nav-scrolled{background:rgba(6,6,8,0.82);backdrop-filter:blur(60px) saturate
 .hs-rec{display:flex;align-items:flex-start;gap:.5rem;font-size:.7rem;color:var(--sub);font-weight:300;line-height:1.4}
 /* RESPONSIVE */
 @media(max-width:1024px){.hero{grid-template-columns:1fr;gap:2.5rem}.hero-terminal{display:none}.jgrid{grid-template-columns:1fr 1fr}.ldr-grid{grid-template-columns:repeat(3,1fr)}.how-grid{grid-template-columns:1fr 1fr}.diff-grid{grid-template-columns:1fr 1fr}.resume-layout{grid-template-columns:1fr}.demand-grid{grid-template-columns:1fr}.pgrid{grid-template-columns:1fr}.co-mets{grid-template-columns:repeat(3,1fr)}}
-@media(max-width:768px){nav{padding:0 1rem}.ntab{padding:.28rem .42rem;font-size:.65rem}.hero{padding:3rem 1.25rem 2.5rem}.jgrid{grid-template-columns:1fr}.ldr-grid{grid-template-columns:repeat(2,1fr)}.jlay{grid-template-columns:1fr}.filts{display:none}.how-grid{grid-template-columns:1fr}.f2{grid-template-columns:1fr}.demand-stat-row{grid-template-columns:repeat(2,1fr)}.dstat-row{grid-template-columns:1fr 1fr}}
+@media(max-width:768px){nav{padding:0 1rem}.ntab{padding:.28rem .42rem;font-size:.65rem}.hero{padding:3rem 1.25rem 2.5rem}.jgrid{grid-template-columns:1fr}.ldr-grid{grid-template-columns:repeat(2,1fr)}.jlay{grid-template-columns:1fr}.filts{display:none}.how-grid{grid-template-columns:1fr}.f2{grid-template-columns:1fr}.demand-stat-row{grid-template-columns:repeat(2,1fr)}.dstat-row{grid-template-columns:1fr 1fr}.resume-page{padding:1.75rem 1.1rem}}
 
 /* ═══════════════════════════════════════
    VERDICT FEED — live audit terminal
