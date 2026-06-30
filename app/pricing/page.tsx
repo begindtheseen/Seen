@@ -69,7 +69,17 @@ function PricingPageInner() {
   const [paymentsEnabled, setPaymentsEnabled] = useState<boolean | null>(null)
 
   useEffect(() => {
-    if (params.get('upgraded') === '1') setUpgraded(true)
+    if (params.get('upgraded') === '1') {
+      setUpgraded(true)
+      // Grant Pro on return from Stripe Checkout without relying on a webhook: confirm the
+      // session server-side, which verifies ownership and flips the account to Pro.
+      const sid = params.get('session_id')
+      if (sid) {
+        aiHeaders()
+          .then(hdrs => fetch('/api/stripe?action=confirm', { method: 'POST', headers: hdrs, body: JSON.stringify({ session_id: sid }) }))
+          .catch(() => { /* webhook still covers it if confirm fails */ })
+      }
+    }
   }, [params])
 
   useEffect(() => {
