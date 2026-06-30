@@ -716,6 +716,22 @@ async function jobCount(supabaseUrl, serviceKey) {
   } catch (_e) { return null; }
 }
 
+// Count of ACTIVE listings only — drives the autonomous auto-heal trigger below.
+async function activeJobCount(supabaseUrl, serviceKey) {
+  try {
+    const r = await fetch(`${supabaseUrl}/rest/v1/jobs?select=id&availability_status=eq.active`, {
+      method: 'HEAD',
+      headers: { apikey: serviceKey, Authorization: `Bearer ${serviceKey}`, Prefer: 'count=exact', Range: '0-0' },
+    });
+    const cr = r.headers.get('content-range');
+    const total = cr && cr.includes('/') ? parseInt(cr.split('/')[1], 10) : NaN;
+    return Number.isFinite(total) ? total : null;
+  } catch (_e) { return null; }
+}
+
+// Crisis floor — keep in sync with admin-stats.js JOB_HEALTH_MIN_ACTIVE.
+const AUTO_HEAL_MIN_ACTIVE = 500;
+
 // Pre-generate insights for jobs that don't have them yet.
 // 5 concurrent Haiku calls, max 20 jobs per cron run (~8s total).
 // After the first pass the DB fills up and this becomes a near no-op.
@@ -913,7 +929,21 @@ export default async function handler(req, res) {
     // Adzuna searches AND every keyless source in one invocation. Capped so it stays
     // within the 60s maxDuration. Triggered by an admin "emergency refresh" button.
     const reqUrl = new URL(req.url, 'https://x');
-    const fullMode = reqUrl.searchParams.get('all') === '1' || reqUrl.searchParams.get('mode') === 'full';
+    let fullMode = reqUrl.searchParams.get('all') === '1' || reqUrl.searchParams.get('mode') === 'full';
+
+    // AUTO-HEAL (fully autonomous): if the live-listing pool has fallen into crisis — the SAME
+    // threshold the admin dashboard flags — automatically escalate THIS cron run to a full,
+    // all-sources backfill. No human click, no waiting: a crisis self-corrects on the very next
+    // scheduled run (≤4h away). The full path is already capped for the 60s maxDuration.
+    let autoHealed = false;
+    if (!fullMode) {
+      const activeNow = await activeJobCount(SUPABASE_URL, SUPABASE_SERVICE_KEY);
+      if (activeNow != null && activeNow < AUTO_HEAL_MIN_ACTIVE) {
+        fullMode = true;
+        autoHealed = true;
+        console.warn(`AUTO-HEAL: job crisis detected (${activeNow} active < ${AUTO_HEAL_MIN_ACTIVE}) → full all-sources backfill`);
+      }
+    }
 
     // Pick which batch to run based on current UTC hour.
     // Pass ?batch=N to override (useful for manually triggering a specific batch).
@@ -1027,6 +1057,7 @@ export default async function handler(req, res) {
       ok: true,
       date: new Date().toISOString(),
       mode: fullMode ? 'full' : 'batch',
+      auto_healed: autoHealed,
       batch: fullMode ? 'all' : batchIndex,
       searches: searches.length,
       found: allJobs.length,
