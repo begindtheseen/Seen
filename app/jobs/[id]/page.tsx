@@ -11,6 +11,7 @@ import { JobCache } from '@/lib/stores/JobCache'
 import { SavedJobsStore } from '@/lib/stores/SavedJobs'
 import ListingCard from '@/components/ListingCard'
 import SeenFitPanel from '@/components/SeenFitPanel'
+import HumanProofPanel from '@/components/HumanProofPanel'
 import { aiHeaders } from '@/lib/aiHeaders'
 import { useAuth } from '@/lib/auth'
 import type { Job } from '@/lib/types'
@@ -352,6 +353,9 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
 
         {/* SeenFit Engine — deterministic, keyless résumé/application optimizer */}
         <SeenFitPanel job={job} />
+
+        {/* HumanProof — runs AFTER SeenFit: removes generic AI tone, adds truthful work context */}
+        <HumanProofPanel job={job} />
 
         {/* Report Your Experience — T1-15 */}
         <div style={{ marginTop: '1.5rem', background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 12, padding: '1.25rem' }}>
