@@ -150,6 +150,52 @@ export default async function handler(req, res) {
     }
   }
 
+  // ── SUBSCRIPTION STATUS / CANCEL / RESUME (in-app, no Stripe portal needed) ──
+  // Powers "Manage membership": read the current plan + renewal date, cancel (at period
+  // end, so they keep access through the month they paid for), or resume a pending cancel.
+  if (action === 'subscription_status' || action === 'cancel_subscription' || action === 'resume_subscription') {
+    if (req.method !== 'POST') return res.status(405).end();
+    if (!STRIPE_KEY || !SUPABASE_URL || !SERVICE_KEY) return res.status(503).json({ error: 'Payments not configured' });
+    const { uid } = await resolveUid(req, env);
+    if (!uid) return res.status(401).json({ error: 'Sign in first' });
+    const q = db(SUPABASE_URL, SERVICE_KEY);
+    const credRes = await q(`ai_credits?user_id=eq.${uid}&select=stripe_customer_id&limit=1`);
+    const customerId = credRes.ok ? (await credRes.json())?.[0]?.stripe_customer_id : null;
+    if (!customerId) return res.status(200).json({ ok: true, subscription: null });
+    try {
+      const listRes = await fetch(`https://api.stripe.com/v1/subscriptions?customer=${encodeURIComponent(customerId)}&status=all&limit=10&expand[]=data.items`, { headers: { Authorization: `Bearer ${STRIPE_KEY}` } });
+      if (!listRes.ok) return res.status(502).json({ error: 'Could not read subscription' });
+      const subs = (await listRes.json())?.data || [];
+      const sub = subs.find(s => ['active', 'trialing', 'past_due'].includes(s.status)) || subs[0] || null;
+      if (!sub) return res.status(200).json({ ok: true, subscription: null });
+
+      if (action === 'cancel_subscription' && !sub.cancel_at_period_end) {
+        const r = await fetch(`https://api.stripe.com/v1/subscriptions/${sub.id}`, { method: 'POST', headers: { Authorization: `Bearer ${STRIPE_KEY}`, 'Content-Type': 'application/x-www-form-urlencoded' }, body: 'cancel_at_period_end=true' });
+        if (!r.ok) return res.status(502).json({ error: 'Cancel failed — try again' });
+      } else if (action === 'resume_subscription' && sub.cancel_at_period_end) {
+        const r = await fetch(`https://api.stripe.com/v1/subscriptions/${sub.id}`, { method: 'POST', headers: { Authorization: `Bearer ${STRIPE_KEY}`, 'Content-Type': 'application/x-www-form-urlencoded' }, body: 'cancel_at_period_end=false' });
+        if (!r.ok) return res.status(502).json({ error: 'Resume failed — try again' });
+      }
+
+      const freshRes = await fetch(`https://api.stripe.com/v1/subscriptions/${sub.id}?expand[]=items`, { headers: { Authorization: `Bearer ${STRIPE_KEY}` } });
+      const fresh = freshRes.ok ? await freshRes.json() : sub;
+      const item = fresh.items?.data?.[0];
+      return res.status(200).json({
+        ok: true,
+        subscription: {
+          status: fresh.status,
+          cancel_at_period_end: !!fresh.cancel_at_period_end,
+          current_period_end: fresh.current_period_end ? fresh.current_period_end * 1000 : null,
+          amount: item?.price?.unit_amount != null ? item.price.unit_amount / 100 : null,
+          interval: item?.price?.recurring?.interval || null,
+        },
+      });
+    } catch (err) {
+      console.error('[stripe/manage]', err.message);
+      return res.status(500).json({ error: 'Subscription action failed' });
+    }
+  }
+
   // ── CREATE CHECKOUT SESSION ───────────────────────────────────────────────
   if (action === 'checkout') {
     if (req.method !== 'POST') return res.status(405).end();
@@ -167,15 +213,12 @@ export default async function handler(req, res) {
 
     const origin = req.headers.origin || 'https://seenjobs.io';
 
-    // Anti-abuse: the 7-day trial is once per account. We persist the Stripe customer id on
-    // first checkout, so if this user already has one they've subscribed/trialed before →
-    // reuse that customer and DON'T grant another free trial (charges immediately instead).
+    // Reuse an existing Stripe customer when we already have one (no duplicate customers).
     let existingCustomer = null;
     try {
       const credRes = await db(SUPABASE_URL, SERVICE_KEY)(`ai_credits?user_id=eq.${uid}&select=stripe_customer_id&limit=1`);
       if (credRes.ok) existingCustomer = (await credRes.json())?.[0]?.stripe_customer_id || null;
-    } catch { /* fall through — treat as first-timer */ }
-    const grantTrial = !existingCustomer;
+    } catch { /* ignore — new customer */ }
 
     const form = new URLSearchParams({
       mode: 'subscription',
@@ -200,10 +243,7 @@ export default async function handler(req, res) {
       form.set('line_items[0][price_data][recurring][interval]', interval);
       form.set('line_items[0][price_data][product_data][name]', 'Seen Pro');
     }
-    // 7-day free trial — first-timers only. Card is collected up front; Stripe creates the
-    // subscription in `trialing` and auto-converts to a paid charge on day 7.
-    if (grantTrial) form.set('subscription_data[trial_period_days]', '7');
-    // Reuse the existing Stripe customer (prevents trial-recycling + duplicate customers).
+    // No free trial — the subscription is charged immediately (first month up front).
     if (existingCustomer) form.set('customer', existingCustomer);
     else if (email) form.set('customer_email', email);
 
