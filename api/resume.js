@@ -109,10 +109,10 @@ export default async function handler(req, res) {
       parsed = runOptimize({ resume, jobDescription, job, company, pro: gate.pro });
 
     } else if (tool === 'coach') {
-      const { job, company, jobDescription, background } = body;
+      const { job, company, resume, jobDescription, background } = body;
       if (!job || !company || !jobDescription) return res.status(400).json({ error: 'Job, company, and job description required' });
       const intelNote = _seenIntel(company, body.companyIntel);
-      const full = runAdvantage({ job, company, jobDescription, background, intelNote, intelStats: _intelStats(body.companyIntel) });
+      const full = runAdvantage({ job, company, resume, jobDescription, background, intelNote, intelStats: _intelStats(body.companyIntel) });
       // 'coach' historically returns only the playbook keys.
       parsed = {
         hiring_manager_script: full.hiring_manager_script,
@@ -123,9 +123,9 @@ export default async function handler(req, res) {
       };
 
     } else if (tool === 'proposal') {
-      const { job, company, jobDescription, background } = body;
+      const { job, company, resume, jobDescription, background } = body;
       if (!job || !company || !jobDescription) return res.status(400).json({ error: 'Job, company, and job description required' });
-      const full = runAdvantage({ job, company, jobDescription, background });
+      const full = runAdvantage({ job, company, resume, jobDescription, background });
       // 'proposal' historically returns only the 30/60/90 plan keys.
       parsed = {
         opening_note: full.opening_note,
@@ -137,10 +137,10 @@ export default async function handler(req, res) {
     } else if (tool === 'advantage') {
       // Combined application-advantage tool: the outreach/positioning playbook AND the
       // 30/60/90-day plan in one call (one credit). Merges the old 'coach' + 'proposal'.
-      const { job, company, jobDescription, background } = body;
+      const { job, company, resume, jobDescription, background } = body;
       if (!job || !company || !jobDescription) return res.status(400).json({ error: 'Job, company, and job description required' });
       const intelNote = _seenIntel(company, body.companyIntel);
-      parsed = runAdvantage({ job, company, jobDescription, background, intelNote, intelStats: _intelStats(body.companyIntel) });
+      parsed = runAdvantage({ job, company, resume, jobDescription, background, intelNote, intelStats: _intelStats(body.companyIntel) });
 
     } else {
       return res.status(400).json({ error: 'Unknown tool: ' + tool });
