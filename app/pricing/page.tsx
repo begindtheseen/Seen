@@ -69,6 +69,7 @@ function PricingPageInner() {
   const [paymentsEnabled, setPaymentsEnabled] = useState<boolean | null>(null)
   const [isPro, setIsPro] = useState(false)
   const [portalLoading, setPortalLoading] = useState(false)
+  const [sub, setSub] = useState<{ status: string; cancel_at_period_end: boolean; current_period_end: number | null; amount: number | null; interval: string | null } | null>(null)
 
   useEffect(() => {
     if (params.get('upgraded') === '1') {
@@ -91,26 +92,36 @@ function PricingPageInner() {
       .catch(() => setPaymentsEnabled(true)) // optimistic on network error — don't hide a working checkout
   }, [])
 
-  // Is this user already Pro? If so we show "Manage membership" instead of an upgrade CTA.
+  // Is this user already Pro? If so we show the membership-management view.
   useEffect(() => {
     if (!isLoggedIn) { setIsPro(false); return }
     aiHeaders()
       .then(h => fetch('/api/user-sync', { method: 'POST', headers: h, body: JSON.stringify({ action: 'get_credits' }) }))
       .then(r => r.json())
-      .then(d => setIsPro(!!d?.pro))
+      .then(d => { setIsPro(!!d?.pro); if (d?.pro) loadSub() })
       .catch(() => { /* assume not pro */ })
   }, [isLoggedIn])
 
-  // Open the Stripe customer portal — manage card, view invoices, or cancel/cancel-trial.
-  async function handleManage() {
+  // Pull the live subscription (plan, renewal date, cancel state) for the manage view.
+  async function loadSub() {
+    try {
+      const h = await aiHeaders()
+      const r = await fetch('/api/stripe?action=subscription_status', { method: 'POST', headers: h, body: '{}' })
+      const d = await r.json()
+      setSub(d?.subscription || null)
+    } catch { /* ignore */ }
+  }
+
+  // Cancel (at period end) or resume the membership — handled in-app, no Stripe portal.
+  async function manage(act: 'cancel_subscription' | 'resume_subscription') {
     setPortalLoading(true)
     setError('')
     try {
       const hdrs = await aiHeaders()
-      const r = await fetch('/api/stripe?action=portal', { method: 'POST', headers: hdrs, body: '{}' })
+      const r = await fetch(`/api/stripe?action=${act}`, { method: 'POST', headers: hdrs, body: '{}' })
       const d = await r.json()
-      if (d.url) { window.location.href = d.url; return }
-      setError(d.error || 'Could not open the billing portal — try again or email hello@seenjobs.io')
+      if (d?.ok) setSub(d.subscription || null)
+      else setError(d?.error || 'Could not update your membership — try again or email hello@seenjobs.io')
     } catch {
       setError('Network error — please try again')
     }
@@ -280,7 +291,7 @@ function PricingPageInner() {
 
             {isPro ? (
               <>
-                {/* Already Pro — manage the membership instead of upgrading again. */}
+                {/* Already Pro — manage the membership in-app (cancel / resume). */}
                 <div
                   style={{
                     width: '100%', boxSizing: 'border-box', textAlign: 'center',
@@ -292,22 +303,35 @@ function PricingPageInner() {
                 >
                   ★ You&apos;re on Seen Pro
                 </div>
-                <button
-                  onClick={handleManage}
-                  disabled={portalLoading}
-                  style={{
-                    width: '100%',
-                    background: portalLoading ? 'var(--line)' : 'linear-gradient(135deg,#4f46e5 0%,#7c3aed 100%)',
-                    border: 'none', borderRadius: 9, padding: '.85rem',
-                    fontFamily: 'var(--display)', fontWeight: 800, fontSize: '.88rem', color: '#fff',
-                    cursor: portalLoading ? 'default' : 'pointer',
-                    boxShadow: portalLoading ? 'none' : '0 0 32px rgba(99,102,241,.4)',
-                  }}
-                >
-                  {portalLoading ? 'Opening…' : 'Manage membership →'}
-                </button>
+                {sub && (
+                  <div style={{ fontFamily: 'var(--mono)', fontSize: '.62rem', color: 'var(--sub)', textAlign: 'center', marginBottom: '.7rem', lineHeight: 1.6 }}>
+                    {sub.amount != null ? `$${sub.amount}/${sub.interval === 'year' ? 'yr' : 'mo'}` : 'Active'}
+                    {sub.current_period_end ? (sub.cancel_at_period_end
+                      ? ` · ends ${new Date(sub.current_period_end).toLocaleDateString()}`
+                      : ` · renews ${new Date(sub.current_period_end).toLocaleDateString()}`) : ''}
+                  </div>
+                )}
+                {sub?.cancel_at_period_end ? (
+                  <button
+                    onClick={() => manage('resume_subscription')}
+                    disabled={portalLoading}
+                    style={{ width: '100%', background: portalLoading ? 'var(--line)' : 'linear-gradient(135deg,#4f46e5 0%,#7c3aed 100%)', border: 'none', borderRadius: 9, padding: '.85rem', fontFamily: 'var(--display)', fontWeight: 800, fontSize: '.88rem', color: '#fff', cursor: portalLoading ? 'default' : 'pointer', boxShadow: portalLoading ? 'none' : '0 0 32px rgba(99,102,241,.4)' }}
+                  >
+                    {portalLoading ? 'Working…' : 'Resume membership'}
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => manage('cancel_subscription')}
+                    disabled={portalLoading || !sub}
+                    style={{ width: '100%', background: 'none', border: '1px solid rgba(239,68,68,.4)', borderRadius: 9, padding: '.8rem', fontFamily: 'var(--mono)', fontWeight: 600, fontSize: '.72rem', color: 'var(--red)', cursor: (portalLoading || !sub) ? 'default' : 'pointer', opacity: (portalLoading || !sub) ? .55 : 1 }}
+                  >
+                    {portalLoading ? 'Working…' : 'Cancel membership'}
+                  </button>
+                )}
                 <div style={{ fontFamily: 'var(--body)', fontSize: '.66rem', color: 'var(--sub)', textAlign: 'center', lineHeight: 1.6, marginTop: '.7rem' }}>
-                  Update your card, view invoices, or cancel (incl. your free trial) anytime.
+                  {sub?.cancel_at_period_end
+                    ? 'Your membership is set to cancel — you keep Pro until the date above.'
+                    : "Cancel anytime — you keep Pro through the month you've already paid for."}
                 </div>
               </>
             ) : paymentsEnabled === false ? (
@@ -326,7 +350,7 @@ function PricingPageInner() {
                 </div>
                 <div style={{ fontFamily: 'var(--body)', fontSize: '.66rem', color: 'var(--sub)', textAlign: 'center', lineHeight: 1.6, marginTop: '.7rem' }}>
                   We&apos;re in early launch — <strong style={{ color: 'var(--white)' }}>every feature is unlocked and free</strong> right now.
-                  Paid plans (and the 7-day trial) turn on shortly; nothing to do.
+                  Paid plans turn on shortly; nothing to do.
                 </div>
               </>
             ) : (
@@ -343,19 +367,19 @@ function PricingPageInner() {
                     boxShadow: loading ? 'none' : '0 0 32px rgba(99,102,241,.4)',
                   }}
                 >
-                  {loading ? 'Redirecting…' : isLoggedIn ? 'Start 7-day free trial →' : 'Start free trial →'}
+                  {loading ? 'Redirecting…' : isLoggedIn ? 'Upgrade to Pro →' : 'Get Pro →'}
                 </button>
                 <div style={{ display: 'flex', justifyContent: 'center', gap: '1.25rem', marginTop: '.75rem' }}>
                   <span style={{ fontFamily: 'var(--mono)', fontSize: '.52rem', color: 'var(--dim)' }}>↩ Cancel anytime</span>
                   <span style={{ fontFamily: 'var(--mono)', fontSize: '.52rem', color: 'var(--dim)' }}>💳 Stripe secure</span>
                   <span style={{ fontFamily: 'var(--mono)', fontSize: '.52rem', color: 'var(--dim)' }}>⚡ Instant access</span>
                 </div>
-                {/* Free-trial + auto-renewal disclosure (FTC / state ARL compliance). */}
+                {/* Auto-renewal disclosure (FTC / state ARL compliance). */}
                 <div style={{ fontFamily: 'var(--body)', fontSize: '.62rem', color: 'var(--sub)', textAlign: 'center', lineHeight: 1.6, marginTop: '.65rem' }}>
                   {yearly
-                    ? `Free for 7 days, then auto-renews at $${YEARLY_TOTAL.toFixed(2)}/year until canceled.`
-                    : `Free for 7 days, then auto-renews at ${MONTHLY}/month until canceled.`}
-                  {' '}Cancel anytime before day 7 and you won’t be charged. Manage in Profile → Billing.
+                    ? `Billed $${YEARLY_TOTAL.toFixed(2)} today, then automatically each year until canceled.`
+                    : `Billed ${MONTHLY} today, then automatically each month until canceled.`}
+                  {' '}Cancel anytime — you keep Pro through the period you&apos;ve paid for.
                 </div>
               </>
             )}
