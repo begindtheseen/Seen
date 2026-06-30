@@ -6,6 +6,7 @@ import { applyRateLimit } from '../lib/server/ratelimit.js';
 import { logError } from '../lib/server/errlog.js';
 import { calcOverallScore, calcWaste, tenureAdjustment, scoreConfidence, confidenceLabel, aggregateTenure, MIN_TENURE_SAMPLE } from './_utils/companyScore.js';
 import { fuseCompanyIntel, classifyPlatform } from './_utils/companyIntel.js';
+import { anthropicEnabled } from '../lib/server/aiflag.js';
 
 // Verify a Supabase JWT locally (HS256). Returns the payload or null.
 function verifyJWT(token, secret) {
@@ -1222,8 +1223,11 @@ async function handleCompanyScore(req, res, body) {
     return res.json({ ok:true, processed:results, remaining, message: remaining > 0 ? `Refresh to process next ${Math.min(3,remaining)}` : 'All done!' });
   }
 
-  // Default: compute/fetch company score by name
-  if (!ANTHROPIC_KEY) return res.status(500).json({ error: 'ANTHROPIC_KEY missing' });
+  // ── Default: company score by name ──────────────────────────────────────────
+  // Data-first and LLM-free: serve from cache, else aggregate this company's REAL reports into a
+  // grade (deterministic, $0, scales without API limits). Anthropic web-research is OPTIONAL — it
+  // runs only when the `anthropic_enabled` feature flag is ON and a key is set, so the product
+  // fully works with Anthropic OFF (the default).
   const { name, force_refresh = false } = body;
   if (!name) return res.status(400).json({ error: 'name required' });
 
@@ -1233,6 +1237,31 @@ async function handleCompanyScore(req, res, body) {
       const cacheRes = await fetch(`${SUPABASE_URL}/rest/v1/company_scores?company_name=ilike.${nameEnc}&order=created_at.desc&limit=1`, { headers: dbH });
       if (cacheRes.ok) { const rows = await cacheRes.json(); if (rows?.[0]) return res.json({ ok: true, score: _rowToScore(rows[0]), _src: 'cache' }); }
     } catch(e) { console.warn('Cache check:', e.message); }
+  }
+
+  // 2. Reports aggregation — compute the grade from our own report corpus (deterministic, no LLM).
+  const repFused = await _fuseWithReports(name, {}, SUPABASE_URL, dbH);
+  if (repFused && repFused.report_count > 0) {
+    const score = {
+      overall_score: repFused.overall_score, ghost_rate: repFused.ghost_rate, response_rate: repFused.response_rate,
+      avg_wait_days: repFused.avg_wait_days ? Math.round(repFused.avg_wait_days) : null, avg_rounds: repFused.avg_rounds || null,
+      waste: repFused.waste_score, unpaid_rate: repFused.unpaid_rate, report_count: repFused.report_count,
+      data_quality: repFused.confidence_label || 'low', data_source: 'reports', risk_level: repFused.risk_level,
+      process_score: repFused.overall_score, industry: '', summary: '', web_reviews: [], fused_sources: repFused.sources_used || [],
+    };
+    if (SUPABASE_URL && SUPABASE_SERVICE_KEY) {
+      const expires = new Date(Date.now() + _SCORE_TTL_MS).toISOString();
+      const rowBase = { company_name:name.toLowerCase().trim(), overall_score:score.overall_score, ghost_rate:score.ghost_rate, response_rate:score.response_rate, avg_wait_days:score.avg_wait_days, avg_rounds:score.avg_rounds, waste_score:score.waste, unpaid_rate:score.unpaid_rate, report_count:score.report_count, data_quality:score.data_quality, data_source:'reports', industry:'', raw_summary:'', expires_at:expires };
+      try { await fetch(`${SUPABASE_URL}/rest/v1/company_scores?on_conflict=company_name`, { method:'POST', headers:{...dbH,Prefer:'resolution=merge-duplicates,return=minimal'}, body:JSON.stringify({...rowBase, web_reviews:[]}) }); } catch(_e) {}
+    }
+    return res.json({ ok: true, score, _src: 'reports' });
+  }
+
+  // 3. No reports yet. Anthropic web-research is the ONLY LLM path here, and it's gated: it runs
+  //    only when the admin flag is on AND a key exists. Otherwise return an honest empty state.
+  const aiOn = !!ANTHROPIC_KEY && await anthropicEnabled(SUPABASE_URL, SUPABASE_SERVICE_KEY);
+  if (!aiOn) {
+    return res.json({ ok: true, no_data: true, score: null, message: `No applicant reports yet for "${name}". Be the first to report your experience.` });
   }
 
   let apiRes;
