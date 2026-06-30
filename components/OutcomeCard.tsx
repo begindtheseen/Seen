@@ -9,6 +9,7 @@ import { useEffect, useState, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import type { Application } from '@/lib/types'
 import { drawOutcomeCard, type OutcomeCardData } from '@/lib/cardKit'
+import { shareCardImage, shareHint, type ShareDest } from '@/lib/shareCard'
 
 interface Props {
   app: Application
@@ -61,6 +62,7 @@ export default function OutcomeCard({ app, onClose, onShared }: Props) {
   const [dataUrl, setDataUrl] = useState<string | null>(null)
   const [blob, setBlob] = useState<Blob | null>(null)
   const [mounted, setMounted] = useState(false)
+  const [hint, setHint] = useState<string | null>(null)
   const doneRef = useRef(false)
 
   const status = (app.status || 'ghosted') as 'hired' | 'rejected' | 'ghosted'
@@ -68,6 +70,11 @@ export default function OutcomeCard({ app, onClose, onShared }: Props) {
   const days = Math.max(1, Math.round((app.updatedAt - app.appliedAt) / 86400000))
   const outcomeWord = status === 'hired' ? 'got an offer' : status === 'ghosted' ? 'got ghosted' : 'got rejected'
   const shareText = `Tracked my ${app.company} application on Seen — ${outcomeWord} after ${days} days. Check any company's ghost rate at seenjobs.io`
+
+  // No public per-outcome page exists, so unfurl the company page (which has a dynamic
+  // OG image) when we know the company, else the root site OG image.
+  const companySlug = (app.company || '').toLowerCase().trim().replace(/[^a-z0-9\s-]/g, '').replace(/\s+/g, '-').replace(/-+/g, '-')
+  const unfurlUrl = companySlug ? `https://seenjobs.io/company/${companySlug}` : 'https://seenjobs.io'
 
   useEffect(() => { setMounted(true) }, [])
 
@@ -92,37 +99,17 @@ export default function OutcomeCard({ app, onClose, onShared }: Props) {
     return () => window.removeEventListener('keydown', h)
   }, [onClose])
 
-  function download() {
-    if (!dataUrl) return
-    const a = document.createElement('a')
-    a.href = dataUrl
-    a.download = `seen_${status}_${(app.company || 'company').replace(/[^a-z0-9]/gi, '_')}_${Date.now()}.png`
-    a.click()
-  }
-
-  async function share(dest: 'reddit' | 'threads' | 'twitter' | 'linkedin' | 'download') {
+  async function share(dest: ShareDest) {
     try { onShared?.(dest) } catch { /* never block the share UX */ }
-    if (dest === 'reddit') {
-      window.open(`https://www.reddit.com/r/cscareerquestions/submit?type=image&title=${encodeURIComponent(shareText)}`, '_blank', 'noopener')
-    } else if (dest === 'threads') {
-      window.open(`https://www.threads.net/intent/post?text=${encodeURIComponent(shareText)}`, '_blank', 'noopener')
-    } else if (dest === 'twitter') {
-      window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(shareText)}`, '_blank', 'noopener')
-    } else if (dest === 'linkedin') {
-      window.open(`https://www.linkedin.com/feed/?shareActive=true&text=${encodeURIComponent(shareText)}`, '_blank', 'noopener')
-    }
-
     const fileName = `seen_${status}_${(app.company || 'c').replace(/[^a-z0-9]/gi, '_')}_${Date.now()}.png`
-    if (blob && navigator.share && navigator.canShare?.({ files: [new File([blob], fileName, { type: 'image/png' })] })) {
-      try {
-        await navigator.share({ files: [new File([blob], fileName, { type: 'image/png' })] })
-      } catch (e) {
-        if ((e as Error).name !== 'AbortError') download()
-      }
-    } else if (dest === 'download') {
-      download()
+    const result = await shareCardImage({ blob, dataUrl, fileName, text: shareText, url: unfurlUrl, dest })
+    const msg = shareHint(result, dest)
+    if (msg) {
+      setHint(msg)
+      // Clipboard/unfurl paths keep the modal open so the user can read the hint
+      // and finish the post; native/download/cancel close as before.
+      return
     }
-
     if (dest !== 'download') setTimeout(onClose, 400)
   }
 
@@ -159,6 +146,13 @@ export default function OutcomeCard({ app, onClose, onShared }: Props) {
           <button onClick={() => share('threads')} style={{ background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.18)', color: '#fff', fontFamily: 'var(--mono)', fontSize: '.65rem', fontWeight: 600, padding: '.7rem .9rem', borderRadius: 9, cursor: 'pointer' }}>Threads</button>
           <button onClick={() => share('download')} disabled={!dataUrl} style={{ background: 'rgba(99,102,241,0.1)', border: '1px solid rgba(99,102,241,0.25)', color: 'rgba(180,180,255,0.85)', fontFamily: 'var(--mono)', fontSize: '.65rem', padding: '.7rem .9rem', borderRadius: 9, cursor: dataUrl ? 'pointer' : 'not-allowed', opacity: dataUrl ? 1 : 0.5 }}>↓ Save Image</button>
         </div>
+
+        {hint && (
+          <div role="status" style={{ display: 'flex', alignItems: 'center', gap: '.5rem', background: 'rgba(16,185,129,0.12)', border: '1px solid rgba(16,185,129,0.35)', color: '#a7f3d0', fontFamily: 'var(--body)', fontSize: '.72rem', lineHeight: 1.5, padding: '.6rem .75rem', borderRadius: 9, marginBottom: '.7rem' }}>
+            <span style={{ flexShrink: 0 }}>📋</span>
+            <span>{hint}</span>
+          </div>
+        )}
 
         <button onClick={onClose} style={{ background: 'none', border: 'none', width: '100%', fontFamily: 'var(--mono)', fontSize: '.6rem', color: 'rgba(255,255,255,0.25)', cursor: 'pointer', padding: '.5rem', textAlign: 'center' }}>Skip — don&apos;t share</button>
       </div>
