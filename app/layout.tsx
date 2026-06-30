@@ -6,15 +6,36 @@ import IntroSplash from '@/components/IntroSplash'
 import './globals.css'
 
 export const metadata: Metadata = {
-  title: 'Seen — Job Search Intelligence',
-  description: 'Track applications, check company ghost rates, and get hiring intelligence before you apply.',
+  metadataBase: new URL('https://seenjobs.io'),
+  title: {
+    default: 'Seen — Company Ghost Rates & Hiring Transparency',
+    template: '%s | Seen',
+  },
+  description: 'Check any company’s ghost rate, response time, and real applicant outcomes before you apply. Hiring transparency aggregated from Reddit, Glassdoor, and verified job-seeker reports.',
+  keywords: ['company ghost rate', 'does company ghost applicants', 'hiring reviews reddit', 'interview process reviews', 'job application tracker', 'company response rate', 'glassdoor alternative'],
+  applicationName: 'Seen',
   icons: {
     icon: '/favicon.svg',
   },
+  alternates: {
+    canonical: '/',
+  },
   openGraph: {
-    title: 'Seen',
-    description: 'The hiring intelligence platform. Know before you apply.',
+    title: 'Seen — Company Ghost Rates & Hiring Transparency',
+    description: 'Know before you apply. Real ghost rates and applicant outcomes from Reddit and verified reports.',
     type: 'website',
+    siteName: 'Seen',
+    url: 'https://seenjobs.io',
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'Seen — Company Ghost Rates & Hiring Transparency',
+    description: 'Check any company’s ghost rate before you apply.',
+  },
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: { index: true, follow: true, 'max-image-preview': 'large', 'max-snippet': -1 },
   },
 }
 
