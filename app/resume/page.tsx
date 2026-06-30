@@ -7,6 +7,7 @@ import { SavedJobsStore } from '@/lib/stores/SavedJobs'
 import { useAuth } from '@/lib/auth'
 import { aiHeaders } from '@/lib/aiHeaders'
 import type { SavedJob } from '@/lib/types'
+import UpgradeModal from '@/components/UpgradeModal'
 
 type Tool = 'scanner' | 'advantage'
 
@@ -403,6 +404,7 @@ function ResumePageInner() {
 
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [showUpgrade, setShowUpgrade] = useState(false)
 
   useEffect(() => {
     ResumeStore.load(user?.id, isLoggedIn).then(data => {
@@ -462,7 +464,8 @@ function ResumePageInner() {
         })
         const data = await res.json() as { text?: string; credits_required?: boolean; error?: string }
         if (data.credits_required) {
-          setError(isLoggedIn ? "You're out of AI credits — try again later." : 'Sign in to use AI resume features.')
+          if (isLoggedIn) setShowUpgrade(true)
+          else setError('Sign in to use AI resume features.')
           return
         }
         if (data.text) {
@@ -528,8 +531,12 @@ function ResumePageInner() {
     setDownloading(false)
   }
 
-  // Thrown when the AI endpoint reports no credits / not signed in — callers show a friendly message.
-  class CreditsError extends Error {}
+  // Thrown when the AI endpoint reports no credits / not signed in — callers show a friendly
+  // message and, for signed-in users who are out of credits, surface the upgrade modal.
+  class CreditsError extends Error {
+    outOfCredits: boolean
+    constructor(message: string, outOfCredits = false) { super(message); this.outOfCredits = outOfCredits }
+  }
 
   async function callApi<T>(payload: Record<string, unknown>): Promise<T> {
     const res = await fetch('/api/resume', {
@@ -538,9 +545,25 @@ function ResumePageInner() {
       body: JSON.stringify(payload),
     })
     const data = await res.json().catch(() => ({})) as { credits_required?: boolean; error?: string } & T
-    if (data.credits_required) throw new CreditsError(isLoggedIn ? "You're out of AI credits — try again later." : 'Sign in to use AI resume features.')
+    if (data.credits_required) {
+      throw new CreditsError(
+        isLoggedIn ? "You're out of AI credits today." : 'Sign in to use AI resume features.',
+        isLoggedIn,
+      )
+    }
     if (!res.ok) throw new Error(`HTTP ${res.status}`)
     return data as T
+  }
+
+  // Centralized handling for the no-credits wall: signed-in users see the upgrade modal
+  // (credits context, which keeps the "earn free credits" option visible); guests get a
+  // sign-in prompt inline.
+  function handleCreditWall(e: unknown, fallback: string) {
+    if (e instanceof CreditsError) {
+      if (e.outOfCredits) { setShowUpgrade(true); return }
+      setError(e.message); return
+    }
+    setError(fallback)
   }
 
   async function runScanner() {
@@ -550,7 +573,7 @@ function ResumePageInner() {
     try {
       const out = await callApi<ScannerResult>({ tool: 'scanner', resume: resumeText, job: jobTitle, company: jobCompany, jobDescription: jobJD, companyIntel })
       setScanResult(out)
-    } catch (e) { setError(e instanceof CreditsError ? e.message : 'Analysis failed. Please try again.') }
+    } catch (e) { handleCreditWall(e, 'Analysis failed. Please try again.') }
     setLoading(false)
   }
 
@@ -562,7 +585,7 @@ function ResumePageInner() {
     try {
       const out = await callApi<CombinedResult>({ tool: 'advantage', resume: resumeText, job: jobTitle, company: jobCompany, jobDescription: jobJD, background, companyIntel })
       setAdvResult(out)
-    } catch (e) { setError(e instanceof CreditsError ? e.message : 'Generation failed. Please try again.') }
+    } catch (e) { handleCreditWall(e, 'Generation failed. Please try again.') }
     setLoading(false)
   }
 
@@ -598,6 +621,7 @@ function ResumePageInner() {
 
   return (
     <div className="page-full">
+      {showUpgrade && <UpgradeModal reason="credits" onClose={() => setShowUpgrade(false)} />}
       <div className="resume-page">
         <div className="resume-hdr">
           <div style={{ fontFamily: 'var(--mono)', fontSize: '.52rem', textTransform: 'uppercase', letterSpacing: '.22em', color: 'var(--blue)', marginBottom: '.6rem', display: 'flex', alignItems: 'center', gap: 12 }}>
