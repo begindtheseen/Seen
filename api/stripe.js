@@ -167,6 +167,16 @@ export default async function handler(req, res) {
 
     const origin = req.headers.origin || 'https://seenjobs.io';
 
+    // Anti-abuse: the 7-day trial is once per account. We persist the Stripe customer id on
+    // first checkout, so if this user already has one they've subscribed/trialed before →
+    // reuse that customer and DON'T grant another free trial (charges immediately instead).
+    let existingCustomer = null;
+    try {
+      const credRes = await db(SUPABASE_URL, SERVICE_KEY)(`ai_credits?user_id=eq.${uid}&select=stripe_customer_id&limit=1`);
+      if (credRes.ok) existingCustomer = (await credRes.json())?.[0]?.stripe_customer_id || null;
+    } catch { /* fall through — treat as first-timer */ }
+    const grantTrial = !existingCustomer;
+
     const form = new URLSearchParams({
       mode: 'subscription',
       'payment_method_types[]': 'card',
@@ -177,10 +187,6 @@ export default async function handler(req, res) {
       cancel_url: `${origin}/pricing`,
       'metadata[uid]': uid,
       'subscription_data[metadata][uid]': uid,
-      // 7-day free trial. Card is still collected up front (Checkout subscription mode),
-      // so Stripe creates the subscription in `trialing` and auto-converts to a paid charge
-      // on day 7 — no manual entitlement bookkeeping.
-      'subscription_data[trial_period_days]': '7',
       allow_promotion_codes: 'true',
     });
     if (priceId) {
@@ -194,7 +200,12 @@ export default async function handler(req, res) {
       form.set('line_items[0][price_data][recurring][interval]', interval);
       form.set('line_items[0][price_data][product_data][name]', 'Seen Pro');
     }
-    if (email) form.set('customer_email', email);
+    // 7-day free trial — first-timers only. Card is collected up front; Stripe creates the
+    // subscription in `trialing` and auto-converts to a paid charge on day 7.
+    if (grantTrial) form.set('subscription_data[trial_period_days]', '7');
+    // Reuse the existing Stripe customer (prevents trial-recycling + duplicate customers).
+    if (existingCustomer) form.set('customer', existingCustomer);
+    else if (email) form.set('customer_email', email);
 
     const stripeRes = await fetch('https://api.stripe.com/v1/checkout/sessions', {
       method: 'POST',

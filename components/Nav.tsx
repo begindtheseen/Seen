@@ -16,6 +16,7 @@ export default function Nav() {
   const [scrolled, setScrolled] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
   const [creditBalance, setCreditBalance] = useState<number | null>(null)
+  const [isPro, setIsPro] = useState(false)
   const [showUpgrade, setShowUpgrade] = useState(false)
 
   const fetchBalance = useCallback(async () => {
@@ -31,7 +32,7 @@ export default function Nav() {
         })
         if (!res.ok || cancelled) return
         const data = await res.json() as { balance?: number; pro?: boolean }
-        if (!cancelled) setCreditBalance(data.pro ? 999 : (data.balance ?? null))
+        if (!cancelled) { setCreditBalance(data.pro ? 999 : (data.balance ?? null)); setIsPro(!!data.pro) }
       } catch { /* ignore */ }
     })
     return () => { cancelled = true }
@@ -94,7 +95,23 @@ export default function Nav() {
         </div>
 
         <div className="nav-right">
-          {isSeeker && creditBalance !== null && (
+          {isSeeker && isPro && (
+            <Link
+              href="/pricing"
+              title="Seen Pro — manage your membership"
+              style={{
+                display: 'inline-flex', alignItems: 'center', gap: '.28rem',
+                background: 'linear-gradient(135deg,rgba(16,185,129,.18),rgba(99,102,241,.18))',
+                color: 'var(--green)', border: '1px solid rgba(16,185,129,.4)',
+                borderRadius: 20, padding: '.2rem .6rem',
+                fontFamily: 'var(--mono)', fontSize: '.6rem', fontWeight: 700, letterSpacing: '.06em',
+                textDecoration: 'none', lineHeight: 1.5, boxShadow: '0 0 14px rgba(16,185,129,.18)',
+              }}
+            >
+              ★ PRO
+            </Link>
+          )}
+          {isSeeker && !isPro && creditBalance !== null && (
             <button
               title={creditBalance === 999 ? 'Pro — unlimited AI credits' : creditBalance === 0 ? 'Out of AI credits — upgrade or earn more' : `${creditBalance} AI credits remaining today`}
               style={{

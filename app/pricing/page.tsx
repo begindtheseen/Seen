@@ -67,6 +67,8 @@ function PricingPageInner() {
   // null = unknown (optimistic), false = Stripe not wired up yet → show "launching soon"
   // instead of a broken checkout. Flips to true automatically once Stripe keys are set.
   const [paymentsEnabled, setPaymentsEnabled] = useState<boolean | null>(null)
+  const [isPro, setIsPro] = useState(false)
+  const [portalLoading, setPortalLoading] = useState(false)
 
   useEffect(() => {
     if (params.get('upgraded') === '1') {
@@ -88,6 +90,32 @@ function PricingPageInner() {
       .then(d => setPaymentsEnabled(!!d.payments_enabled))
       .catch(() => setPaymentsEnabled(true)) // optimistic on network error — don't hide a working checkout
   }, [])
+
+  // Is this user already Pro? If so we show "Manage membership" instead of an upgrade CTA.
+  useEffect(() => {
+    if (!isLoggedIn) { setIsPro(false); return }
+    aiHeaders()
+      .then(h => fetch('/api/user-sync', { method: 'POST', headers: h, body: JSON.stringify({ action: 'get_credits' }) }))
+      .then(r => r.json())
+      .then(d => setIsPro(!!d?.pro))
+      .catch(() => { /* assume not pro */ })
+  }, [isLoggedIn])
+
+  // Open the Stripe customer portal — manage card, view invoices, or cancel/cancel-trial.
+  async function handleManage() {
+    setPortalLoading(true)
+    setError('')
+    try {
+      const hdrs = await aiHeaders()
+      const r = await fetch('/api/stripe?action=portal', { method: 'POST', headers: hdrs, body: '{}' })
+      const d = await r.json()
+      if (d.url) { window.location.href = d.url; return }
+      setError(d.error || 'Could not open the billing portal — try again or email hello@seenjobs.io')
+    } catch {
+      setError('Network error — please try again')
+    }
+    setPortalLoading(false)
+  }
 
   async function handleUpgrade() {
     if (!isLoggedIn) {
@@ -250,7 +278,39 @@ function PricingPageInner() {
               </div>
             )}
 
-            {paymentsEnabled === false ? (
+            {isPro ? (
+              <>
+                {/* Already Pro — manage the membership instead of upgrading again. */}
+                <div
+                  style={{
+                    width: '100%', boxSizing: 'border-box', textAlign: 'center',
+                    background: 'rgba(16,185,129,.12)', border: '1px solid rgba(16,185,129,.3)',
+                    borderRadius: 9, padding: '.7rem',
+                    fontFamily: 'var(--display)', fontWeight: 800, fontSize: '.82rem', color: 'var(--green)',
+                    marginBottom: '.7rem',
+                  }}
+                >
+                  ★ You&apos;re on Seen Pro
+                </div>
+                <button
+                  onClick={handleManage}
+                  disabled={portalLoading}
+                  style={{
+                    width: '100%',
+                    background: portalLoading ? 'var(--line)' : 'linear-gradient(135deg,#4f46e5 0%,#7c3aed 100%)',
+                    border: 'none', borderRadius: 9, padding: '.85rem',
+                    fontFamily: 'var(--display)', fontWeight: 800, fontSize: '.88rem', color: '#fff',
+                    cursor: portalLoading ? 'default' : 'pointer',
+                    boxShadow: portalLoading ? 'none' : '0 0 32px rgba(99,102,241,.4)',
+                  }}
+                >
+                  {portalLoading ? 'Opening…' : 'Manage membership →'}
+                </button>
+                <div style={{ fontFamily: 'var(--body)', fontSize: '.66rem', color: 'var(--sub)', textAlign: 'center', lineHeight: 1.6, marginTop: '.7rem' }}>
+                  Update your card, view invoices, or cancel (incl. your free trial) anytime.
+                </div>
+              </>
+            ) : paymentsEnabled === false ? (
               <>
                 {/* Stripe not wired up yet — early-launch state. Everything's already unlocked
                     for signed-in users, so this is an honest "coming soon", not a wall. */}

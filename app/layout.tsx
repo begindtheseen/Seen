@@ -65,7 +65,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <div className="aurora-3" />
           </div>
           <Nav />
-          {children}
+          <div className="site-main">{children}</div>
           <Footer />
           <div id="toast" />
         </AuthProvider>
