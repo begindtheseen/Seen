@@ -125,6 +125,11 @@ export default async function handler(req, res) {
       cancel_url: `${origin}/pricing`,
       'metadata[uid]': uid,
       'subscription_data[metadata][uid]': uid,
+      // 7-day free trial. Card is still collected up front (Checkout subscription mode),
+      // so Stripe creates the subscription in `trialing` and auto-converts to a paid charge
+      // on day 7 — no manual entitlement bookkeeping. checkout.session.completed still fires
+      // immediately (no charge yet), granting Pro for the trial window below.
+      'subscription_data[trial_period_days]': '7',
       allow_promotion_codes: 'true',
     });
     if (email) form.set('customer_email', email);
@@ -250,6 +255,19 @@ export default async function handler(req, res) {
         const sub = event.data?.object || {};
         const uid = getUid(sub);
         if (uid) await setPro(uid, true, env);
+      }
+
+      // Keep entitlement in lockstep with the subscription lifecycle — critical for trials:
+      // a trial that converts moves trialing → active (keep Pro); a trial the user cancels,
+      // or a failed final charge, ends as canceled/unpaid (revoke). past_due / incomplete are
+      // left untouched so dunning retries don't yank Pro mid-grace-period.
+      if (event.type === 'customer.subscription.updated') {
+        const sub = event.data?.object || {};
+        const uid = getUid(sub);
+        if (uid) {
+          if (sub.status === 'trialing' || sub.status === 'active') await setPro(uid, true, env);
+          else if (sub.status === 'canceled' || sub.status === 'unpaid' || sub.status === 'incomplete_expired') await setPro(uid, false, env);
+        }
       }
     } catch (err) {
       console.error('Webhook handler error:', err.message);

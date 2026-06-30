@@ -242,19 +242,19 @@ function PricingPageInner() {
                 boxShadow: loading ? 'none' : '0 0 32px rgba(99,102,241,.4)',
               }}
             >
-              {loading ? 'Redirecting…' : isLoggedIn ? 'Upgrade to Pro →' : 'Get Pro →'}
+              {loading ? 'Redirecting…' : isLoggedIn ? 'Start 7-day free trial →' : 'Start free trial →'}
             </button>
             <div style={{ display: 'flex', justifyContent: 'center', gap: '1.25rem', marginTop: '.75rem' }}>
               <span style={{ fontFamily: 'var(--mono)', fontSize: '.52rem', color: 'var(--dim)' }}>↩ Cancel anytime</span>
               <span style={{ fontFamily: 'var(--mono)', fontSize: '.52rem', color: 'var(--dim)' }}>💳 Stripe secure</span>
               <span style={{ fontFamily: 'var(--mono)', fontSize: '.52rem', color: 'var(--dim)' }}>⚡ Instant access</span>
             </div>
-            {/* Auto-renewal disclosure (FTC / state ARL compliance). */}
+            {/* Free-trial + auto-renewal disclosure (FTC / state ARL compliance). */}
             <div style={{ fontFamily: 'var(--body)', fontSize: '.62rem', color: 'var(--sub)', textAlign: 'center', lineHeight: 1.6, marginTop: '.65rem' }}>
               {yearly
-                ? `Subscription auto-renews at $${YEARLY_TOTAL.toFixed(2)}/year until canceled.`
-                : `Subscription auto-renews at ${MONTHLY}/month until canceled.`}
-              {' '}Cancel anytime in Profile → Billing.
+                ? `Free for 7 days, then auto-renews at $${YEARLY_TOTAL.toFixed(2)}/year until canceled.`
+                : `Free for 7 days, then auto-renews at ${MONTHLY}/month until canceled.`}
+              {' '}Cancel anytime before day 7 and you won’t be charged. Manage in Profile → Billing.
             </div>
           </div>
         </div>
