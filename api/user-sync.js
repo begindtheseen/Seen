@@ -856,10 +856,12 @@ export default async function handler(req, res) {
     const today = new Date().toISOString().split('T')[0];
 
     // ── Anti-farming: one completed survey per (user, company). Reserve the slot first via
-    // a unique-constrained insert; a duplicate (409) means it was already farmed → no credit.
+    // a unique-constrained insert; a duplicate (unique violation → 409) means it was already
+    // farmed → no credit. NOTE: we deliberately do NOT use resolution=ignore-duplicates here —
+    // that would swallow the conflict into a 2xx and let the same position be re-farmed.
     const reserve = await db('resume_surveys', {
       method: 'POST',
-      headers: { Prefer: 'resolution=ignore-duplicates,return=minimal' },
+      headers: { Prefer: 'return=minimal' },
       body: JSON.stringify({
         user_id: uid,
         company_norm: coNorm,
