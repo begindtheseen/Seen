@@ -73,7 +73,9 @@ export async function generateMetadata(
       url: `https://seenjobs.io/company/${slug}`,
     },
     twitter: {
-      card: 'summary',
+      // summary_large_image so the dynamic 1200×630 opengraph-image.tsx renders full-bleed in
+      // shares. The image itself is auto-attached by Next.js's file-based metadata convention.
+      card: 'summary_large_image',
       title: `${name} Ghost Rate & Hiring Reviews`,
       description,
     },
@@ -201,6 +203,15 @@ export default async function CompanySlugLayout(
               )}
               {interpret(s)}
             </p>
+            {/* Crawlable internal links to the new growth surfaces — present in initial HTML. */}
+            <nav
+              aria-label={`Explore ${name} hiring`}
+              style={{ display: 'flex', flexWrap: 'wrap', gap: '.5rem 1rem', marginTop: '.85rem', paddingTop: '.85rem', borderTop: '1px solid var(--line)' }}
+            >
+              <a href={`/faq/does-${slug}-ghost-applicants`} style={{ fontFamily: 'var(--mono)', fontSize: '.62rem', color: 'var(--blue)', textDecoration: 'none' }}>Does {name} ghost applicants?</a>
+              <a href={`/faq/${slug}-hiring-process`} style={{ fontFamily: 'var(--mono)', fontSize: '.62rem', color: 'var(--blue)', textDecoration: 'none' }}>{name} hiring process</a>
+              <a href={`/compare?a=${encodeURIComponent(name)}`} style={{ fontFamily: 'var(--mono)', fontSize: '.62rem', color: 'var(--blue)', textDecoration: 'none' }}>Compare {name} vs another</a>
+            </nav>
           </div>
         </section>
       )}
