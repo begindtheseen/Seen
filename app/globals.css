@@ -718,6 +718,21 @@ nav.nav-scrolled{background:rgba(6,6,8,0.82);backdrop-filter:blur(60px) saturate
 .hstat-strip{display:flex;gap:1.8rem;margin-bottom:1.6rem;animation:fadeUp .5s .1s ease both;margin-top:.35rem}
 @media(max-width:600px){.hstat-strip{gap:1.2rem;margin-bottom:1.25rem}.hstat-n{font-size:.88rem!important}.hstat-l{font-size:.46rem!important}}
 @media(max-width:480px){.hstat-strip{display:grid;grid-template-columns:1fr 1fr;gap:.65rem 1.5rem;margin-bottom:1rem}.hstat-div{display:none!important}.hstat-l{white-space:nowrap}.hstat-n{font-size:.82rem!important}}
+/* Mobile hero declutter — search-first; personal "active apps" card hidden; stats/recent/ghost
+   demoted below the action. Reorders the left column on phones only; desktop layout untouched. */
+@media(max-width:640px){
+  .hero-left{display:flex;flex-direction:column}
+  .hl-pill{order:1;margin-bottom:1rem!important}
+  .hl-headline{order:2}
+  .hl-search{order:3;margin-top:.2rem}
+  .hl-quick{order:4;margin-bottom:1.15rem!important}
+  .hl-ctas{order:5;margin-bottom:1.4rem!important}
+  .hstat-strip{order:6}
+  .hl-ghost{order:7}
+  .hl-recent{order:8;margin-bottom:0!important}
+  .hl-userstats{display:none!important}
+  #rotatingHero{height:clamp(82px,23vw,128px)!important}
+}
 .hstat-n{font-family:var(--mono);font-size:1rem;font-weight:500;color:var(--white);display:block;line-height:1;letter-spacing:-.02em}
 .hstat-l{font-family:var(--mono);font-size:.5rem;color:var(--muted);margin-top:.18rem;text-transform:uppercase;letter-spacing:.07em}
 .hstat-div{width:1px;background:var(--line);align-self:stretch}

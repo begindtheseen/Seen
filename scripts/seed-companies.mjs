@@ -1,0 +1,124 @@
+#!/usr/bin/env node
+// Pre-warm the company_scores cache so launch-day pages are instant and non-empty.
+//
+// WHY: per-visitor scoring is now LLM-free — it serves cached rows or aggregates real reports,
+// and shows "be the first to report" when there's no data. This script fills the cache AHEAD of
+// launch for the companies real traffic will search, so those pages are rich and instant ($0 per
+// visit thereafter). It just calls the live /api/reports endpoint per company; the server decides
+// the data source:
+//   • company already cached            -> skipped (fast)
+//   • company has reports               -> aggregated grade, cached (no LLM)
+//   • no reports + `anthropic_enabled` ON -> web-researched grade, cached (one-time bounded cost)
+//   • no reports + flag OFF             -> stays "no data" (re-run after enabling the flag)
+//
+// To richly seed companies that have no reports yet, an admin flips the `anthropic_enabled`
+// feature flag ON, runs this once, then flips it OFF — Anthropic as a bounded launch-prep tool,
+// never a per-visitor dependency.
+//
+// Usage:
+//   SEED_BASE_URL=https://seenjobs.io node scripts/seed-companies.mjs
+//   SEED_CONCURRENCY=3 node scripts/seed-companies.mjs
+//
+// Audience note: this product serves ALL job seekers, so the list leans HARD into everyday
+// employers (retail, fast food, healthcare, logistics, call centers, gig) — not just big tech.
+
+const BASE = (process.env.SEED_BASE_URL || 'https://seenjobs.io').replace(/\/$/, '');
+const CONCURRENCY = Math.max(1, Math.min(6, parseInt(process.env.SEED_CONCURRENCY || '3', 10)));
+const DELAY_MS = parseInt(process.env.SEED_DELAY_MS || '400', 10);
+
+const COMPANIES = [
+  // ── Retail / grocery / big-box (highest everyday volume) ──
+  'Walmart', 'Target', 'Costco', 'Kroger', 'Albertsons', 'Safeway', 'Publix', 'Aldi', 'Trader Joe\'s',
+  'Whole Foods', 'Sam\'s Club', 'Home Depot', 'Lowe\'s', 'Best Buy', 'Macy\'s', 'Nordstrom', 'Kohl\'s',
+  'TJ Maxx', 'Ross Stores', 'Dollar General', 'Dollar Tree', 'Family Dollar', 'CVS', 'Walgreens',
+  'Rite Aid', 'Ulta Beauty', 'Sephora', 'IKEA', 'Wayfair', 'Gap', 'Old Navy', 'Nike', 'Lululemon',
+  // ── Fast food / restaurants ──
+  'McDonald\'s', 'Starbucks', 'Chick-fil-A', 'Chipotle', 'Taco Bell', 'Wendy\'s', 'Burger King',
+  'Subway', 'Dunkin', 'Domino\'s', 'Pizza Hut', 'Panera Bread', 'Olive Garden', 'Texas Roadmouse',
+  'In-N-Out', 'Raising Cane\'s', 'Panda Express', 'Sonic', 'Popeyes', 'KFC', 'Five Guys', 'Cheesecake Factory',
+  // ── Logistics / warehouse / delivery / gig ──
+  'Amazon', 'UPS', 'FedEx', 'USPS', 'DHL', 'XPO Logistics', 'Uber', 'Lyft', 'DoorDash', 'Instacart',
+  'Grubhub', 'Uber Eats', 'Shipt', 'Aramark', 'Sysco',
+  // ── Healthcare / pharmacy / senior care ──
+  'Kaiser Permanente', 'HCA Healthcare', 'CVS Health', 'UnitedHealth Group', 'Cigna', 'Humana',
+  'Anthem', 'Elevance Health', 'Tenet Healthcare', 'Encompass Health', 'DaVita', 'Fresenius',
+  'Brookdale Senior Living', 'Concentra', 'LabCorp', 'Quest Diagnostics',
+  // ── Call center / BPO / staffing ──
+  'Concentrix', 'Teleperformance', 'TTEC', 'Alorica', 'Sitel', 'Robert Half', 'Adecco', 'Randstad',
+  'Kelly Services', 'ManpowerGroup', 'Aerotek', 'Insight Global',
+  // ── Hospitality / travel ──
+  'Marriott', 'Hilton', 'Hyatt', 'Disney', 'Delta Air Lines', 'United Airlines', 'American Airlines',
+  'Southwest Airlines', 'Enterprise Rent-A-Car',
+  // ── Banks / finance / insurance ──
+  'JPMorgan Chase', 'Bank of America', 'Wells Fargo', 'Citi', 'Capital One', 'American Express',
+  'USAA', 'State Farm', 'Geico', 'Progressive', 'Allstate', 'Fidelity', 'Charles Schwab',
+  // ── Telecom / utilities ──
+  'AT&T', 'Verizon', 'T-Mobile', 'Comcast', 'Spectrum', 'Cox Communications',
+  // ── Manufacturing / auto / industrial ──
+  'Tesla', 'Ford', 'General Motors', 'Toyota', 'Boeing', 'Lockheed Martin', 'Caterpillar', 'John Deere',
+  'General Electric', '3M', 'Honeywell', 'Procter & Gamble', 'PepsiCo', 'Coca-Cola', 'Nestle',
+  // ── Consulting / professional services (high ghost-rate searches) ──
+  'Deloitte', 'PwC', 'EY', 'KPMG', 'Accenture', 'McKinsey', 'Boston Consulting Group', 'Bain',
+  'Booz Allen Hamilton', 'Cognizant', 'Infosys', 'TCS', 'Capgemini', 'Wipro',
+  // ── Big tech / software (still searched a lot) ──
+  'Google', 'Microsoft', 'Apple', 'Meta', 'Netflix', 'Amazon Web Services', 'Oracle', 'IBM', 'Intel',
+  'Salesforce', 'Adobe', 'SAP', 'Cisco', 'Dell', 'HP', 'Nvidia', 'Qualcomm', 'PayPal', 'Stripe',
+  'Shopify', 'Snowflake', 'Palantir', 'Uber', 'Airbnb', 'Coinbase', 'Robinhood', 'Snap', 'Pinterest',
+  'Reddit', 'Spotify', 'Zoom', 'Slack', 'Atlassian', 'ServiceNow', 'Workday', 'Intuit', 'Block',
+  // ── Job boards / staffing platforms (meta — people search these too) ──
+  'Indeed', 'LinkedIn', 'ZipRecruiter', 'Glassdoor',
+];
+
+// De-dupe (case-insensitive) while preserving order.
+const SEEN = new Set();
+const LIST = COMPANIES.filter(c => {
+  const k = c.toLowerCase().trim();
+  if (SEEN.has(k)) return false;
+  SEEN.add(k);
+  return true;
+});
+
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+async function seedOne(name) {
+  try {
+    const res = await fetch(`${BASE}/api/reports`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name }),
+      signal: AbortSignal.timeout(40000),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (data.no_data) return { name, status: 'no_data' };
+    if (data.score) return { name, status: data._src || 'ok', score: data.score.overall_score, src: data._src };
+    return { name, status: `http_${res.status}` };
+  } catch (e) {
+    return { name, status: 'error', error: e.message };
+  }
+}
+
+async function main() {
+  console.log(`Seeding ${LIST.length} companies via ${BASE} (concurrency=${CONCURRENCY})\n`);
+  const results = [];
+  for (let i = 0; i < LIST.length; i += CONCURRENCY) {
+    const batch = LIST.slice(i, i + CONCURRENCY);
+    const batchRes = await Promise.all(batch.map(seedOne));
+    for (const r of batchRes) {
+      results.push(r);
+      const tag = r.score != null ? `grade ${r.score} (${r.src})` : r.status;
+      console.log(`  ${r.name.padEnd(28)} ${tag}`);
+    }
+    if (i + CONCURRENCY < LIST.length) await sleep(DELAY_MS);
+  }
+
+  const scored = results.filter(r => r.score != null).length;
+  const noData = results.filter(r => r.status === 'no_data').length;
+  const errors = results.filter(r => r.status === 'error' || r.status.startsWith('http_')).length;
+  console.log(`\nDone. ${scored} scored/cached · ${noData} no-data (need reports or AI seed) · ${errors} errors`);
+  if (noData > 0) {
+    console.log('Tip: to fill the no-data ones with real web-researched grades, flip the');
+    console.log('`anthropic_enabled` feature flag ON, re-run this, then flip it OFF.');
+  }
+}
+
+main();

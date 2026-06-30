@@ -350,15 +350,15 @@ export default function LandingHero() {
       <div className="l-grid">
 
         {/* LEFT COLUMN */}
-        <div style={{ containerType: 'inline-size' }}>
+        <div className="hero-left" style={{ containerType: 'inline-size' }}>
           {/* Kicker pill */}
-          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '.4rem', background: 'rgba(59,130,246,0.1)', border: '1px solid rgba(59,130,246,0.2)', color: 'var(--blue)', fontFamily: 'var(--mono)', fontSize: '.63rem', padding: '.25rem .85rem', borderRadius: 100, marginBottom: '1.75rem', animation: 'fadeUp .5s ease both' }}>
+          <div className="hl-pill" style={{ display: 'inline-flex', alignItems: 'center', gap: '.4rem', background: 'rgba(59,130,246,0.1)', border: '1px solid rgba(59,130,246,0.2)', color: 'var(--blue)', fontFamily: 'var(--mono)', fontSize: '.63rem', padding: '.25rem .85rem', borderRadius: 100, marginBottom: '1.75rem', animation: 'fadeUp .5s ease both' }}>
             <span style={{ width: 5, height: 5, borderRadius: '50%', background: 'var(--blue)', animation: 'pulse 2s infinite', display: 'inline-block' }} />
             real ghost rates · 124,000+ verified outcomes · free
           </div>
 
           {/* Rotating headline */}
-          <div style={{ animation: 'fadeUp .5s .06s ease both' }}>
+          <div className="hl-headline" style={{ animation: 'fadeUp .5s .06s ease both' }}>
             <div
               id="rotatingHero"
               className={swept ? 'swept' : ''}
@@ -386,7 +386,7 @@ export default function LandingHero() {
 
           {/* Personalized stats — shown when user has tracked applications */}
           {userStats && (
-            <div style={{ display: 'flex', gap: '1.5rem', flexWrap: 'wrap', padding: '.75rem 1rem', background: 'rgba(99,102,241,.06)', border: '1px solid rgba(99,102,241,.18)', borderRadius: 10, marginBottom: '.85rem' }}>
+            <div className="hl-userstats" style={{ display: 'flex', gap: '1.5rem', flexWrap: 'wrap', padding: '.75rem 1rem', background: 'rgba(99,102,241,.06)', border: '1px solid rgba(99,102,241,.18)', borderRadius: 10, marginBottom: '.85rem' }}>
               <div>
                 <div style={{ fontFamily: 'var(--mono)', fontSize: '.55rem', color: 'var(--dim)', textTransform: 'uppercase', letterSpacing: '.08em' }}>Your active apps</div>
                 <div style={{ fontFamily: 'var(--display)', fontSize: '1.3rem', fontWeight: 700, color: 'var(--white)', lineHeight: 1 }}>{userStats.active}</div>
@@ -415,7 +415,7 @@ export default function LandingHero() {
           </div>
 
           {/* Search */}
-          <div style={{ marginBottom: '1rem', animation: 'fadeUp .5s .18s ease both', position: 'relative' }}>
+          <div className="hl-search" style={{ marginBottom: '1rem', animation: 'fadeUp .5s .18s ease both', position: 'relative' }}>
             {/* Wrap search-wrap in position:relative so dropdowns position correctly */}
             <div style={{ position: 'relative' }}>
               <div className="search-wrap">
@@ -492,7 +492,7 @@ export default function LandingHero() {
 
           {/* Recent searches */}
           {recentSearches.length > 0 && (
-            <div style={{ display: 'block', marginBottom: '.55rem', animation: 'fadeUp .5s .2s ease both' }}>
+            <div className="hl-recent" style={{ display: 'block', marginBottom: '.55rem', animation: 'fadeUp .5s .2s ease both' }}>
               <div style={{ fontFamily: 'var(--mono)', fontSize: '.5rem', textTransform: 'uppercase', letterSpacing: '.1em', color: 'rgba(255,255,255,.25)', marginBottom: '.35rem' }}>Recent</div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '.4rem', flexWrap: 'wrap' }}>
                 {recentSearches.map((r, i) => (
@@ -505,7 +505,7 @@ export default function LandingHero() {
           )}
 
           {/* Ghost surge strip (T2-19) */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '.5rem', marginBottom: '.9rem', flexWrap: 'wrap', animation: 'fadeUp .5s .2s ease both' }}>
+          <div className="hl-ghost" style={{ display: 'flex', alignItems: 'center', gap: '.5rem', marginBottom: '.9rem', flexWrap: 'wrap', animation: 'fadeUp .5s .2s ease both' }}>
             <span style={{ fontFamily: 'var(--mono)', fontSize: '.52rem', textTransform: 'uppercase', letterSpacing: '.1em', color: 'var(--red)', display: 'flex', alignItems: 'center', gap: '.35rem', flexShrink: 0 }}>
               <span style={{ width: 5, height: 5, borderRadius: '50%', background: 'var(--red)', animation: 'pulse 1.2s infinite', display: 'inline-block' }} />
               Ghost surge
@@ -518,7 +518,7 @@ export default function LandingHero() {
           </div>
 
           {/* Quick tags */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '.4rem', marginBottom: '1.6rem', flexWrap: 'wrap', animation: 'fadeUp .5s .22s ease both' }}>
+          <div className="hl-quick" style={{ display: 'flex', alignItems: 'center', gap: '.4rem', marginBottom: '1.6rem', flexWrap: 'wrap', animation: 'fadeUp .5s .22s ease both' }}>
             {QUICK_TAGS.map(t => (
               <button key={t.label} className="vtag" onClick={() => quickSearch(t.label, t.loc)}>
                 {t.label} <span className={`vtag-grade ${t.cls}`}>{t.grade}</span>
@@ -527,7 +527,7 @@ export default function LandingHero() {
           </div>
 
           {/* CTAs */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap', animation: 'fadeUp .5s .28s ease both' }}>
+          <div className="hl-ctas" style={{ display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap', animation: 'fadeUp .5s .28s ease both' }}>
             <button className="btn btn-green btn-lg" onClick={() => router.push('/login')} style={{ fontSize: '.88rem', padding: '.78rem 1.85rem' }}>
               Check who actually responds →
             </button>
