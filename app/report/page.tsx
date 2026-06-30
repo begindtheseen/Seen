@@ -1,8 +1,11 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, Suspense } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { AppStore } from '@/lib/stores/AppStore'
 import { supabase } from '@/lib/supabase'
+import OutcomeCard from '@/components/OutcomeCard'
+import type { Application } from '@/lib/types'
 
 type Outcome = 'ghosted' | 'autoreject' | 'human' | 'waiting' | ''
 type Stage = 'application' | 'phone' | 'interview' | 'final' | ''
@@ -79,7 +82,20 @@ function RadioGroup<T extends string>({
   )
 }
 
-export default function ReportPage() {
+// Map a tracker terminal status → the report form's Outcome enum.
+// hired has no slot in the anonymous Outcome union (it's an offer outcome the create_from_tracker
+// path records directly), so we leave the form blank for hired and rely on autoApp for the card.
+function statusToOutcome(status?: string): Outcome {
+  if (status === 'ghosted') return 'ghosted'
+  if (status === 'rejected') return 'autoreject'
+  return ''
+}
+
+function ReportPage() {
+  const searchParams = useSearchParams()
+  const appId = searchParams?.get('app_id') || null
+  const auto = searchParams?.get('auto') === '1'
+
   const [company, setCompany] = useState('')
   const [role, setRole] = useState('')
   const [location, setLocation] = useState('')
@@ -96,24 +112,71 @@ export default function ReportPage() {
   const [recentReports, setRecentReports] = useState<Array<{id:string;outcome:string;company_name?:string;role?:string;created_at:string}>>([])
   const [matchedAppId, setMatchedAppId] = useState<string | null>(null)
   const [trackerUpdated, setTrackerUpdated] = useState(false)
+  // The tracked app for one-click card mode (?app_id=&auto=1). When set, we render the
+  // OutcomeCard live over the prefilled form and record a first-party create_from_tracker report.
+  const [autoApp, setAutoApp] = useState<Application | null>(null)
+  const [trackerSubmitted, setTrackerSubmitted] = useState(false)
 
   useEffect(() => {
     try {
       const apps = AppStore.loadSync()
-      if (apps.length) {
-        // Prefer most recent terminal app (the user is probably reporting on it)
-        const terminal = apps.filter(a => a.status === 'ghosted' || a.status === 'rejected' || a.status === 'hired')
-        const source = terminal.length ? terminal[0] : apps[0]
-        if (source.company) setCompany(source.company)
-        if (source.role) setRole(source.role)
-        if (source.location) setLocation(source.location)
-        if (source.platform) setPlatform(source.platform)
-        // Map status to outcome (no 'hired' in Outcome type — leave blank so user picks)
-        if (source.status === 'ghosted') setOutcome('ghosted')
-        else if (source.status === 'rejected') setOutcome('autoreject')
-      }
+      if (!apps.length) return
+      // One-click mode: prefer the explicitly-passed tracked app.
+      const explicit = appId ? apps.find(a => a.id === appId) : null
+      // Otherwise prefer the most recent terminal app (the user is probably reporting on it).
+      const terminal = apps.filter(a => a.status === 'ghosted' || a.status === 'rejected' || a.status === 'hired')
+      const source = explicit || (terminal.length ? terminal[0] : apps[0])
+      if (!source) return
+      if (source.company) setCompany(source.company)
+      if (source.role) setRole(source.role)
+      if (source.location) setLocation(source.location)
+      if (source.platform) setPlatform(source.platform)
+      setOutcome(statusToOutcome(source.status))
+      // Auto card: a terminal tracked app + auto=1 → show the live OutcomeCard immediately.
+      const isTerminal = source.status === 'ghosted' || source.status === 'rejected' || source.status === 'hired'
+      if (auto && explicit && isTerminal) setAutoApp(source)
     } catch {}
-  }, [])
+  }, [appId, auto])
+
+  // Record the first-party report from real tracker data (full trust, anti-Sybil checked
+  // server-side) the moment the one-click card opens. Fires at most once per app.
+  useEffect(() => {
+    if (!autoApp || trackerSubmitted) return
+    setTrackerSubmitted(true)
+    const outcomeForStatus = autoApp.status === 'hired' ? 'hired' : autoApp.status === 'rejected' ? 'rejected' : 'ghosted'
+    ;(async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession()
+        if (!session) return // anonymous can't create a first-party tracker report; card still shows
+        await fetch('/api/reports', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
+          body: JSON.stringify({
+            action: 'create_from_tracker',
+            company: autoApp.company,
+            role: autoApp.role,
+            location: autoApp.location || '',
+            platform: autoApp.platform || '',
+            outcome: outcomeForStatus,
+          }),
+        })
+      } catch { /* non-blocking — the card is the user-facing win */ }
+    })()
+  }, [autoApp, trackerSubmitted])
+
+  // Record a light share/download analytics row (outcome_card_shares). Non-blocking.
+  const recordCardShare = async (via: string) => {
+    if (!autoApp) return
+    const outcomeForStatus = autoApp.status === 'hired' ? 'hired' : autoApp.status === 'rejected' ? 'rejected' : 'ghosted'
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      await fetch('/api/reports', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...(session ? { Authorization: `Bearer ${session.access_token}` } : {}) },
+        body: JSON.stringify({ action: 'record_card_share', company: autoApp.company, outcome: outcomeForStatus, shared_via: via }),
+      })
+    } catch { /* analytics is best-effort */ }
+  }
 
   useEffect(() => {
     fetch('/api/reports', {
@@ -238,8 +301,25 @@ export default function ReportPage() {
   }
 
   return (
+    <>
+    {/* One-click outcome card: live OutcomeCard rendered immediately over the prefilled form
+        from REAL tracked data. Closing it returns to the (prefilled) report form. */}
+    {autoApp && <OutcomeCard app={autoApp} onClose={() => setAutoApp(null)} onShared={recordCardShare} />}
     <div className="page-full">
       <div style={{ maxWidth: 680, margin: '0 auto', padding: '2.5rem 2rem', width: '100%', boxSizing: 'border-box' }}>
+        {appId && auto && !autoApp && (
+          <div style={{ background: 'rgba(99,102,241,.08)', border: '1px solid rgba(99,102,241,.22)', borderRadius: 10, padding: '.7rem 1rem', marginBottom: '1.25rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '.75rem', flexWrap: 'wrap' }}>
+            <div style={{ fontFamily: 'var(--mono)', fontSize: '.62rem', color: 'var(--sub)', lineHeight: 1.6 }}>
+              ✦ Prefilled from your tracker.{company ? ` Reporting your ${company} outcome.` : ''}
+            </div>
+            <button
+              onClick={() => { const apps = AppStore.loadSync(); const a = apps.find(x => x.id === appId); if (a) setAutoApp(a) }}
+              style={{ fontFamily: 'var(--mono)', fontSize: '.62rem', fontWeight: 700, color: '#fff', border: 'none', background: 'linear-gradient(135deg,#3b82f6 0%,#8b5cf6 100%)', borderRadius: 8, padding: '.45rem .9rem', cursor: 'pointer', flexShrink: 0 }}
+            >
+              ✦ Open share card
+            </button>
+          </div>
+        )}
         <div style={{ fontFamily: 'var(--mono)', fontSize: '.52rem', textTransform: 'uppercase', letterSpacing: '.22em', color: 'var(--blue)', marginBottom: '.6rem', display: 'flex', alignItems: 'center', gap: 12 }}>
           <span style={{ width: 22, height: 1, background: 'var(--blue)', display: 'inline-block' }} />
           Anonymous report
@@ -410,5 +490,14 @@ export default function ReportPage() {
         )}
       </div>
     </div>
+    </>
+  )
+}
+
+export default function ReportPageWrapper() {
+  return (
+    <Suspense fallback={<div className="page-full"><div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '60vh' }}><div className="spinner" /></div></div>}>
+      <ReportPage />
+    </Suspense>
   )
 }

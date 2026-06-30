@@ -37,10 +37,11 @@ function ghostWatch(days: number, intel?: { ghost_rate?: number; avg_wait_days?:
   return { tone: 'danger', text: `Day ${days} · ${x}× their ~${w}d average${gp >= 30 ? ` — they ghost ${gp}% of applicants here. Likely ghosted.` : ' — likely ghosted.'}` }
 }
 
-function AppCard({ app, onUpdate, onRemove, intel }: {
+function AppCard({ app, onUpdate, onRemove, onShare, intel }: {
   app: Application
   onUpdate: (id: string, changes: Partial<Application>) => void
   onRemove: (id: string) => void
+  onShare: (app: Application) => void
   intel?: { ghost_rate?: number; avg_wait_days?: number; report_count?: number; overall_score?: number }
 }) {
   const days = getDaysSince(app.appliedAt)
@@ -148,7 +149,14 @@ function AppCard({ app, onUpdate, onRemove, intel }: {
         </div>
       )}
       {!isActive && (
-        <div style={{ marginTop: '.75rem', display: 'flex', gap: '.4rem' }}>
+        <div style={{ marginTop: '.75rem', display: 'flex', gap: '.4rem', flexWrap: 'wrap', alignItems: 'center' }}>
+          <button
+            className="btn"
+            style={{ fontSize: '.66rem', padding: '.34rem .8rem', fontWeight: 700, color: '#fff', border: 'none', background: 'linear-gradient(135deg,#3b82f6 0%,#8b5cf6 100%)', boxShadow: '0 0 16px rgba(99,102,241,.3)' }}
+            onClick={() => onShare(app)}
+          >
+            ✦ Share outcome card
+          </button>
           <button className="btn btn-ghost" style={{ fontSize: '.62rem', padding: '.28rem .65rem', color: 'var(--muted)' }} onClick={() => onRemove(app.id)}>Remove</button>
         </div>
       )}
@@ -373,6 +381,13 @@ function TrackerPage() {
   const handleRemove = async (id: string) => {
     await AppStore.remove(id, isLoggedIn)
     loadApps()
+  }
+
+  // Route a terminal tracked app to the report page pre-loaded for one-click card creation.
+  // /report reads app_id + auto=1 and prefills + renders the OutcomeCard inline from real
+  // tracker data (no re-typing). This is the tracker→report→share virality loop.
+  const handleShare = (app: Application) => {
+    router.push(`/report?app_id=${encodeURIComponent(app.id)}&auto=1`)
   }
 
   const handleCheckAnswer = (appId: string, checkType: string, data: Record<string, unknown>) => {
@@ -707,7 +722,7 @@ function TrackerPage() {
           <div id="trackerList" style={{ display: 'flex', flexDirection: 'column', gap: '.75rem' }}>
             {apps.map((app, i) => (
               <div key={app.id} style={highlightNew && i === 0 ? { borderRadius: 12, boxShadow: '0 0 0 2px var(--green), 0 0 30px rgba(16,185,129,0.3)', transition: 'box-shadow 2.5s ease' } : undefined}>
-                <AppCard app={app} onUpdate={handleUpdate} onRemove={handleRemove} intel={companyScores[app.company.toLowerCase().trim()]} />
+                <AppCard app={app} onUpdate={handleUpdate} onRemove={handleRemove} onShare={handleShare} intel={companyScores[app.company.toLowerCase().trim()]} />
               </div>
             ))}
           </div>

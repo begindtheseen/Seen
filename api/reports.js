@@ -250,7 +250,7 @@ export default async function handler(req, res) {
   }
 
   // Rate-limit only write actions — reads are cheap and public
-  if (['submit','moderate','quick_submit','report_issue'].includes(body.action)) {
+  if (['submit','moderate','quick_submit','report_issue','create_from_tracker','record_card_share'].includes(body.action)) {
     const limited = await applyRateLimit(req, res, 'report-submit');
     if (limited) return;
   }
@@ -288,6 +288,113 @@ export default async function handler(req, res) {
     } catch(err) {
       logError('reports/quick_submit', err.message);
       return res.status(500).json({ error: 'Internal error' });
+    }
+  }
+
+  // ── Create-from-tracker: first-party outcome from a REAL tracked application ───
+  // Powers the "One-Click Outcome Card from the tracker" loop. The user reached a
+  // terminal status (hired / ghosted / rejected) on a tracked app and is now creating
+  // a shareable card; this records the same first-party report the /report submit path
+  // would, sourced from the tracker instead of a re-typed form. It resolves the company
+  // + location records (so the report feeds company_scores exactly like `submit`) and
+  // runs through the SAME anti-Sybil assessSubmitTrust dedup/velocity check — a signed-in
+  // tracker outcome is first-party (full trust) but still can't double-count or flood.
+  if (body.action === 'create_from_tracker') {
+    // SECURITY: signed-in only. The whole point is first-party trust from a real user's
+    // tracker — anonymous callers have no tracker and would just be re-poisoning scores.
+    const uid = await resolveUid(req);
+    if (!uid) return res.status(401).json({ error: 'Sign in to share a tracked outcome' });
+    try {
+      const { company: co, role, location, platform, outcome, rounds } = body;
+      if (!co || !outcome) return res.status(400).json({ error: 'company and outcome required' });
+      const VALID = new Set(['ghosted','rejected','autoreject','hired','offer','interview','human','waiting']);
+      if (!VALID.has(outcome)) return res.status(400).json({ error: 'invalid outcome' });
+
+      const hdrs = { ...hdrsBase, Prefer: 'return=representation' };
+      const safeCo  = String(co).trim().slice(0, 200);
+      const safeLoc = location ? String(location).trim().slice(0, 200) : '';
+      const normalize = n => n ? n.trim().toLowerCase().replace(/[\s,]+(inc\.?|llc\.?|corp\.?|ltd\.?|co\.|plc\.?|group|holdings|enterprises|solutions|technologies)\.?$/i, '').trim() : '';
+      const coNorm = normalize(safeCo);
+
+      // Resolve / create the company record (same path as `submit`).
+      const coWord = encodeURIComponent(safeCo.split(/\s+/)[0]);
+      const coSearch = await fetch(`${SUPABASE_URL}/rest/v1/companies?name=ilike.*${coWord}*&select=id,name&limit=20`, { headers: hdrs });
+      const coRows = coSearch.ok ? await coSearch.json() : [];
+      let cid = (coRows || []).find(c => normalize(c.name) === coNorm)?.id || (coRows || []).find(c => c.name.toLowerCase() === safeCo.toLowerCase())?.id || null;
+      if (!cid) {
+        const insRes = await fetch(`${SUPABASE_URL}/rest/v1/companies`, { method: 'POST', headers: hdrs, body: JSON.stringify({ name: safeCo, logo_letter: safeCo[0]?.toUpperCase() || '?' }) });
+        if (insRes.ok) { const insRows = await insRes.json(); cid = Array.isArray(insRows) ? insRows[0]?.id : insRows?.id; }
+        if (!cid) {
+          const retry = await fetch(`${SUPABASE_URL}/rest/v1/companies?name=ilike.${encodeURIComponent(safeCo)}&select=id&limit=1`, { headers: hdrs });
+          if (retry.ok) { const r = await retry.json(); cid = r?.[0]?.id || null; }
+        }
+      }
+      if (!cid) return res.status(500).json({ error: 'Could not resolve company record' });
+
+      // Resolve / create the location record when we have one.
+      let lid = null;
+      if (safeLoc) {
+        const locSearch = await fetch(`${SUPABASE_URL}/rest/v1/company_locations?company_id=eq.${cid}&city=ilike.${encodeURIComponent(safeLoc)}&select=id&limit=1`, { headers: hdrs });
+        const locRows = locSearch.ok ? await locSearch.json() : [];
+        lid = locRows?.[0]?.id || null;
+        if (!lid) {
+          const locIns = await fetch(`${SUPABASE_URL}/rest/v1/company_locations`, { method: 'POST', headers: hdrs, body: JSON.stringify({ company_id: cid, city: safeLoc }) });
+          if (locIns.ok) { const lr = await locIns.json(); lid = Array.isArray(lr) ? lr[0]?.id : lr?.id; }
+        }
+      }
+
+      // Signed-in → first-party full trust, down-weighted only for dedup/velocity patterns.
+      const trust = await assessSubmitTrust(SUPABASE_URL, hdrsBase, uid, `company_id=eq.${cid}`);
+      const reportBase = {
+        company_id: cid, location_id: lid || null,
+        role: (role || '').trim().slice(0, 200),
+        platform: (platform || '').trim().slice(0, 100) || 'Seen Tracker',
+        outcome,
+        rounds: parseInt(rounds) || 0,
+        unpaid_work: 'na',
+        experience_level: '',
+        source: 'tracker',
+        needs_review: trust.review,
+        outcome_weight: trust.weight,
+        trust_reason: trust.reason,
+        user_id: uid,
+      };
+      let repRes = await fetch(`${SUPABASE_URL}/rest/v1/reports`, { method: 'POST', headers: { ...hdrs, Prefer: 'return=minimal' }, body: JSON.stringify({ ...reportBase, company_name: safeCo }) });
+      if (!repRes.ok && repRes.status === 400) {
+        const errText = await repRes.text();
+        if (errText.includes('company_name') || errText.includes('column')) repRes = await fetch(`${SUPABASE_URL}/rest/v1/reports`, { method: 'POST', headers: { ...hdrs, Prefer: 'return=minimal' }, body: JSON.stringify(reportBase) });
+      }
+      if (!repRes.ok) { const e = await repRes.text().catch(() => ''); console.error('[reports/create_from_tracker] DB error:', repRes.status, e.slice(0, 200)); return res.status(500).json({ error: 'Failed to save report' }); }
+      return res.status(200).json({ ok: true, company_id: cid, trust_reason: trust.reason });
+    } catch(err) {
+      logError('reports/create_from_tracker', err.message);
+      return res.status(500).json({ error: 'Internal error' });
+    }
+  }
+
+  // ── Record an outcome-card share/download (light virality analytics) ──────────
+  // Fired once when a signed-in user shares or downloads their outcome card. Writes a
+  // single analytics row to outcome_card_shares (migration 030). Does NOT touch
+  // company_scores — that's the report's job. Failures are non-fatal to the share UX.
+  if (body.action === 'record_card_share') {
+    const uid = await resolveUid(req);
+    if (!uid) return res.status(200).json({ ok: true, recorded: false }); // anon shares still allowed in UI; just not logged
+    try {
+      const { company, outcome, shared_via } = body;
+      const VIA = new Set(['twitter','reddit','linkedin','threads','download','native']);
+      const safeCompany = company ? String(company).slice(0, 120).replace(/[<>`\\]/g, '').trim() : '';
+      const safeOutcome = outcome ? String(outcome).slice(0, 40).replace(/[<>`\\]/g, '').trim() : '';
+      const via = VIA.has(shared_via) ? shared_via : 'download';
+      if (!safeCompany || !safeOutcome) return res.status(400).json({ error: 'company and outcome required' });
+      const r = await fetch(`${SUPABASE_URL}/rest/v1/outcome_card_shares`, {
+        method: 'POST',
+        headers: { ...hdrsBase, Prefer: 'return=minimal' },
+        body: JSON.stringify({ user_id: uid, company_name: safeCompany, outcome: safeOutcome, shared_via: via }),
+      });
+      return res.status(200).json({ ok: true, recorded: r.ok });
+    } catch(err) {
+      logError('reports/record_card_share', err.message);
+      return res.status(200).json({ ok: true, recorded: false });
     }
   }
 
