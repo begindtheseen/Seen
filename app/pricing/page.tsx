@@ -64,10 +64,20 @@ function PricingPageInner() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [upgraded, setUpgraded] = useState(false)
+  // null = unknown (optimistic), false = Stripe not wired up yet → show "launching soon"
+  // instead of a broken checkout. Flips to true automatically once Stripe keys are set.
+  const [paymentsEnabled, setPaymentsEnabled] = useState<boolean | null>(null)
 
   useEffect(() => {
     if (params.get('upgraded') === '1') setUpgraded(true)
   }, [params])
+
+  useEffect(() => {
+    fetch('/api/stripe?action=status')
+      .then(r => r.json())
+      .then(d => setPaymentsEnabled(!!d.payments_enabled))
+      .catch(() => setPaymentsEnabled(true)) // optimistic on network error — don't hide a working checkout
+  }, [])
 
   async function handleUpgrade() {
     if (!isLoggedIn) {
@@ -230,32 +240,55 @@ function PricingPageInner() {
               </div>
             )}
 
-            <button
-              onClick={handleUpgrade}
-              disabled={loading}
-              style={{
-                width: '100%',
-                background: loading ? 'var(--line)' : 'linear-gradient(135deg,#4f46e5 0%,#7c3aed 100%)',
-                border: 'none', borderRadius: 9, padding: '.85rem',
-                fontFamily: 'var(--display)', fontWeight: 800, fontSize: '.88rem', color: '#fff',
-                cursor: loading ? 'default' : 'pointer',
-                boxShadow: loading ? 'none' : '0 0 32px rgba(99,102,241,.4)',
-              }}
-            >
-              {loading ? 'Redirecting…' : isLoggedIn ? 'Start 7-day free trial →' : 'Start free trial →'}
-            </button>
-            <div style={{ display: 'flex', justifyContent: 'center', gap: '1.25rem', marginTop: '.75rem' }}>
-              <span style={{ fontFamily: 'var(--mono)', fontSize: '.52rem', color: 'var(--dim)' }}>↩ Cancel anytime</span>
-              <span style={{ fontFamily: 'var(--mono)', fontSize: '.52rem', color: 'var(--dim)' }}>💳 Stripe secure</span>
-              <span style={{ fontFamily: 'var(--mono)', fontSize: '.52rem', color: 'var(--dim)' }}>⚡ Instant access</span>
-            </div>
-            {/* Free-trial + auto-renewal disclosure (FTC / state ARL compliance). */}
-            <div style={{ fontFamily: 'var(--body)', fontSize: '.62rem', color: 'var(--sub)', textAlign: 'center', lineHeight: 1.6, marginTop: '.65rem' }}>
-              {yearly
-                ? `Free for 7 days, then auto-renews at $${YEARLY_TOTAL.toFixed(2)}/year until canceled.`
-                : `Free for 7 days, then auto-renews at ${MONTHLY}/month until canceled.`}
-              {' '}Cancel anytime before day 7 and you won’t be charged. Manage in Profile → Billing.
-            </div>
+            {paymentsEnabled === false ? (
+              <>
+                {/* Stripe not wired up yet — early-launch state. Everything's already unlocked
+                    for signed-in users, so this is an honest "coming soon", not a wall. */}
+                <div
+                  style={{
+                    width: '100%', boxSizing: 'border-box', textAlign: 'center',
+                    background: 'rgba(99,102,241,.12)', border: '1px solid rgba(99,102,241,.3)',
+                    borderRadius: 9, padding: '.85rem',
+                    fontFamily: 'var(--display)', fontWeight: 800, fontSize: '.88rem', color: '#a5b4fc',
+                  }}
+                >
+                  ✦ Pro is launching soon
+                </div>
+                <div style={{ fontFamily: 'var(--body)', fontSize: '.66rem', color: 'var(--sub)', textAlign: 'center', lineHeight: 1.6, marginTop: '.7rem' }}>
+                  We&apos;re in early launch — <strong style={{ color: 'var(--white)' }}>every feature is unlocked and free</strong> right now.
+                  Paid plans (and the 7-day trial) turn on shortly; nothing to do.
+                </div>
+              </>
+            ) : (
+              <>
+                <button
+                  onClick={handleUpgrade}
+                  disabled={loading}
+                  style={{
+                    width: '100%',
+                    background: loading ? 'var(--line)' : 'linear-gradient(135deg,#4f46e5 0%,#7c3aed 100%)',
+                    border: 'none', borderRadius: 9, padding: '.85rem',
+                    fontFamily: 'var(--display)', fontWeight: 800, fontSize: '.88rem', color: '#fff',
+                    cursor: loading ? 'default' : 'pointer',
+                    boxShadow: loading ? 'none' : '0 0 32px rgba(99,102,241,.4)',
+                  }}
+                >
+                  {loading ? 'Redirecting…' : isLoggedIn ? 'Start 7-day free trial →' : 'Start free trial →'}
+                </button>
+                <div style={{ display: 'flex', justifyContent: 'center', gap: '1.25rem', marginTop: '.75rem' }}>
+                  <span style={{ fontFamily: 'var(--mono)', fontSize: '.52rem', color: 'var(--dim)' }}>↩ Cancel anytime</span>
+                  <span style={{ fontFamily: 'var(--mono)', fontSize: '.52rem', color: 'var(--dim)' }}>💳 Stripe secure</span>
+                  <span style={{ fontFamily: 'var(--mono)', fontSize: '.52rem', color: 'var(--dim)' }}>⚡ Instant access</span>
+                </div>
+                {/* Free-trial + auto-renewal disclosure (FTC / state ARL compliance). */}
+                <div style={{ fontFamily: 'var(--body)', fontSize: '.62rem', color: 'var(--sub)', textAlign: 'center', lineHeight: 1.6, marginTop: '.65rem' }}>
+                  {yearly
+                    ? `Free for 7 days, then auto-renews at $${YEARLY_TOTAL.toFixed(2)}/year until canceled.`
+                    : `Free for 7 days, then auto-renews at ${MONTHLY}/month until canceled.`}
+                  {' '}Cancel anytime before day 7 and you won’t be charged. Manage in Profile → Billing.
+                </div>
+              </>
+            )}
           </div>
         </div>
 

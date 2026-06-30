@@ -91,6 +91,11 @@ export default function UpgradeModal({ reason, onClose, featureName }: UpgradeMo
       const d = await r.json()
       if (d.url) {
         window.location.href = d.url
+      } else if (r.status === 503) {
+        // Stripe not wired up yet — early launch. Everything's already unlocked, so frame
+        // this as good news rather than a failed payment.
+        setError('✦ Seen Pro is launching soon — and during early launch every feature is unlocked free. Nothing to do.')
+        setLoading(false)
       } else {
         setError(d.error || 'Checkout unavailable — try again')
         setLoading(false)

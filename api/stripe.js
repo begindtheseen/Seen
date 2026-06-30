@@ -100,6 +100,16 @@ export default async function handler(req, res) {
 
   const action = (req.query?.action) || body.action;
 
+  // ── PAYMENTS STATUS (public) ──────────────────────────────────────────────
+  // Lets the UI know whether Stripe is wired up yet. When it isn't, the frontend
+  // shows a "Pro launching soon" state instead of a broken checkout error. The
+  // moment STRIPE_SECRET_KEY + a price ID are set in Vercel, this flips to true
+  // and the full upgrade flow (incl. the 7-day trial) activates with no redeploy.
+  if (action === 'status') {
+    const priceId = process.env.STRIPE_PRICE_ID_MONTHLY || process.env.STRIPE_PRICE_ID_YEARLY;
+    return res.status(200).json({ payments_enabled: !!(STRIPE_KEY && priceId) });
+  }
+
   // ── CREATE CHECKOUT SESSION ───────────────────────────────────────────────
   if (action === 'checkout') {
     if (req.method !== 'POST') return res.status(405).end();
