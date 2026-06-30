@@ -51,26 +51,19 @@ We are NOT adding features. The Next.js migration lost design and functionality 
 - **Vercel Pro — 500 serverless function limit. No constraint on adding new api/*.js files.**
 - Currently 9 declared api/*.js functions. Add new ones freely as needed.
 
-### Vercel deploy trigger problem (discovered 2026-06-12, Session B):
-- **Vercel does NOT create deployments for commits authored by the `claude` bot.**
-  Evidence: the only next-migration deployments Vercel ever created were the owner's two
-  GitHub web-UI commits (f85fd9c "Update package.json", f9ab769 "Delete package-lock.json").
-  Every claude-authored push (Session A's empty "force redeploy" commit, all of Session B's
-  pushes) produced NO deployment — not even a failed one.
-- Session A hit this same wall and tried a GitHub Actions fallback (`.github/workflows/deploy.yml`,
-  `npx vercel --prod --token`). Both runs FAILED: secrets `VERCEL_TOKEN`, `VERCEL_ORG_ID`,
-  `VERCEL_PROJECT_ID` are NOT configured in the repo. The workflow was then deleted.
-- **To trigger a deployment after a claude push, the owner must do ONE of:**
-  1. Make any trivial commit to next-migration from their own GitHub account (web UI edit) — Vercel builds the full tree
-  2. Create a Vercel Deploy Hook (Project Settings → Git → Deploy Hooks, branch next-migration) and curl it
-  3. Add VERCEL_TOKEN / VERCEL_ORG_ID / VERCEL_PROJECT_ID repo secrets and restore an Actions workflow
+### Vercel deploy: RESOLVED — auto-deploys are working (updated 2026-06-30):
+- The old "Vercel won't build claude-authored commits" problem (2026-06-12, Session B) is
+  **no longer true.** Vercel is now fully connected to the GitHub repo: every PR gets a
+  preview deployment, and **merging to `next-migration` auto-deploys to production
+  (seenjobs.io)** with no manual step. Do NOT tell the owner to manually trigger deploys —
+  merging the PR is the deploy.
+- Evidence: in the 2026-06-30 session, PRs #82–#87 each produced a green Vercel preview
+  ("Ready/DEPLOYED" status checks) and the owner confirmed merged changes were live on the site.
 - `"type": "module"` is set in package.json (fixes Vercel's ESM→CJS compile warning)
-
-### What the next session needs to do:
-1. Confirm Vercel picked up the next-migration push and triggered a preview build
-2. Verify the preview deployment is green (no vulnerability block, no build errors)
-3. Check environment variables are configured in Vercel for the next-migration preview
-4. Begin evaluating what Next.js App Router pages need real data connections (currently most pages are ported UI only, calling the same `/api/` endpoints as the HTML version)
+- Only genuinely-manual items left are dashboard settings, not deploys: e.g. confirming the
+  Stripe webhook endpoint subscribes to the events the code handles
+  (`customer.subscription.updated` for the trial flow), and Supabase migrations applied via
+  the Supabase MCP `apply_migration`.
 
 ## Architecture
 - **Framework**: Next.js 15.3.9 with React 19, App Router — MIGRATION IN PROGRESS
