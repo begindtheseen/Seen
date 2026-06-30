@@ -8,6 +8,7 @@
 import { useEffect, useState, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { drawCompanyCard, type CompanyCardData } from '@/lib/cardKit'
+import { shareCardImage, shareHint, type ShareDest } from '@/lib/shareCard'
 
 export interface CompanyScoreCardData {
   company: string
@@ -30,11 +31,17 @@ function letterGrade(s: number) {
   return 'F'
 }
 
-export default function CompanyScoreCard({ data, onClose }: { data: CompanyScoreCardData; onClose: () => void }) {
+export default function CompanyScoreCard({ data, shareUrl, onClose, onShared }: { data: CompanyScoreCardData; shareUrl?: string; onClose: () => void; onShared?: (via: string) => void }) {
   const [dataUrl, setDataUrl] = useState<string | null>(null)
   const [blob, setBlob] = useState<Blob | null>(null)
   const [mounted, setMounted] = useState(false)
+  const [hint, setHint] = useState<string | null>(null)
   const doneRef = useRef(false)
+
+  // The unfurl URL: the company page (which has a dynamic OG image) when known,
+  // else the root site. Pasting this into Reddit/X/etc renders an image preview card.
+  const unfurlUrl = shareUrl
+    || `https://seenjobs.io/company/${(data.company || '').toLowerCase().trim().replace(/[^a-z0-9\s-]/g, '').replace(/\s+/g, '-').replace(/-+/g, '-')}`
 
   const score = Math.round(data.overall_score || 0)
   const risk = data.risk ?? (score >= 70 ? 'safe' : score >= 40 ? 'warn' : 'danger')
@@ -80,36 +87,17 @@ export default function CompanyScoreCard({ data, onClose }: { data: CompanyScore
     return () => window.removeEventListener('keydown', h)
   }, [onClose])
 
-  function download() {
-    if (!dataUrl) return
-    const a = document.createElement('a')
-    a.href = dataUrl
-    a.download = `seen_grade_${(data.company || 'company').replace(/[^a-z0-9]/gi, '_')}_${Date.now()}.png`
-    a.click()
-  }
-
-  async function share(dest: 'reddit' | 'threads' | 'twitter' | 'linkedin' | 'download') {
-    if (dest === 'reddit') {
-      window.open(`https://www.reddit.com/submit?type=image&title=${encodeURIComponent(shareText)}`, '_blank', 'noopener')
-    } else if (dest === 'threads') {
-      window.open(`https://www.threads.net/intent/post?text=${encodeURIComponent(shareText + '\n\nseenjobs.io')}`, '_blank', 'noopener')
-    } else if (dest === 'twitter') {
-      window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(shareText + '\n\nseenjobs.io')}`, '_blank', 'noopener')
-    } else if (dest === 'linkedin') {
-      window.open(`https://www.linkedin.com/feed/?shareActive=true&text=${encodeURIComponent(shareText + '\n\nseenjobs.io')}`, '_blank', 'noopener')
-    }
-
+  async function share(dest: ShareDest) {
+    try { onShared?.(dest) } catch { /* never block the share UX */ }
     const fileName = `seen_grade_${(data.company || 'c').replace(/[^a-z0-9]/gi, '_')}_${Date.now()}.png`
-    if (blob && navigator.share && navigator.canShare?.({ files: [new File([blob], fileName, { type: 'image/png' })] })) {
-      try {
-        await navigator.share({ files: [new File([blob], fileName, { type: 'image/png' })] })
-      } catch (e) {
-        if ((e as Error).name !== 'AbortError') download()
-      }
-    } else if (dest === 'download') {
-      download()
+    const result = await shareCardImage({ blob, dataUrl, fileName, text: shareText, url: unfurlUrl, dest })
+    const msg = shareHint(result, dest)
+    if (msg) {
+      setHint(msg)
+      // Clipboard/unfurl paths keep the modal open so the user can read the hint
+      // and complete the post; native/download/cancel close as before.
+      return
     }
-
     if (dest !== 'download') setTimeout(onClose, 400)
   }
 
@@ -143,6 +131,13 @@ export default function CompanyScoreCard({ data, onClose }: { data: CompanyScore
           <button onClick={() => share('threads')} style={{ background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.18)', color: '#fff', fontFamily: 'var(--mono)', fontSize: '.65rem', fontWeight: 600, padding: '.7rem .9rem', borderRadius: 9, cursor: 'pointer' }}>Threads</button>
           <button onClick={() => share('download')} disabled={!dataUrl} style={{ background: 'rgba(99,102,241,0.1)', border: '1px solid rgba(99,102,241,0.25)', color: 'rgba(180,180,255,0.85)', fontFamily: 'var(--mono)', fontSize: '.65rem', padding: '.7rem .9rem', borderRadius: 9, cursor: dataUrl ? 'pointer' : 'not-allowed', opacity: dataUrl ? 1 : 0.5 }}>↓ Save Image</button>
         </div>
+
+        {hint && (
+          <div role="status" style={{ display: 'flex', alignItems: 'center', gap: '.5rem', background: 'rgba(16,185,129,0.12)', border: '1px solid rgba(16,185,129,0.35)', color: '#a7f3d0', fontFamily: 'var(--body)', fontSize: '.72rem', lineHeight: 1.5, padding: '.6rem .75rem', borderRadius: 9, marginBottom: '.7rem' }}>
+            <span style={{ flexShrink: 0 }}>📋</span>
+            <span>{hint}</span>
+          </div>
+        )}
 
         <button onClick={onClose} style={{ background: 'none', border: 'none', width: '100%', fontFamily: 'var(--mono)', fontSize: '.6rem', color: 'rgba(255,255,255,0.25)', cursor: 'pointer', padding: '.5rem', textAlign: 'center' }}>Skip</button>
       </div>

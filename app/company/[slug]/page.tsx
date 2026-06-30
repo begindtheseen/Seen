@@ -731,6 +731,7 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
                     (score.avg_wait_days || 0) >= 30 ? '⏳ Long wait times' : null,
                   ].filter(Boolean) as string[],
                 }}
+                shareUrl={`https://seenjobs.io/company/${slug}`}
                 onClose={() => setShowGradeCard(false)}
               />
             )}
