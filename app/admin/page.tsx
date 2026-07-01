@@ -103,14 +103,18 @@ function JobCrisisBanner({
     setRunning(true)
     setResult(null)
     try {
-      const res = await fetch('/api/admin-stats', {
+      // Call refresh-jobs DIRECTLY (same-origin, its own 60s budget). Going through
+      // /api/admin-stats used to time out: that function caps at 15s but the full
+      // all-sources backfill takes ~40s, so the middle-man aborted → "fetch failed".
+      // refresh-jobs validates this same admin-session token (X-Admin-Token) itself.
+      const res = await fetch('/api/refresh-jobs?all=1', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'X-Admin-Token': token },
-        body: JSON.stringify({ action: 'emergency_job_refresh' }),
+        body: '{}',
       })
       const d = await res.json().catch(() => ({}))
       if (!res.ok) throw new Error(d.error || `HTTP ${res.status}`)
-      const added = d.added != null ? d.added : (d.result?.upserted ?? d.result?.found ?? null)
+      const added = d.upserted ?? d.inserted ?? d.found ?? null
       setResult({ ok: true, msg: added != null ? `Refreshed — ${added} listings backfilled` : 'Refresh triggered' })
       // Reload dashboard stats so the banner clears once the board recovers.
       setTimeout(onRefresh, 1500)
