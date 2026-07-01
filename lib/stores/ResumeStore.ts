@@ -33,42 +33,44 @@ export const ResumeStore = {
   },
 
   async load(userId?: string, loggedIn = false): Promise<ResumeData | null> {
+    // SECURITY / DATA ISOLATION: for a signed-in user the DATABASE is the only source of
+    // truth for their résumé. We must NEVER resurrect a device-local (localStorage) résumé
+    // into their account — on a shared device that cache can belong to a previously
+    // signed-in person, which would leak their résumé (and survey data) into this account.
     if (loggedIn) {
       try {
         const result = await _sync('load_profile') as { profile?: Record<string, unknown> } | null
         const data = result?.profile
-        if (data) {
-          if (data.resume_text) {
-            const key = getKey(userId)
-            const metaKey = getMetaKey(userId)
-            localStorage.setItem(key, data.resume_text as string)
-            localStorage.setItem(metaKey, JSON.stringify({
-              fileName: data.resume_file_name || 'Resume',
-              wordCount: data.resume_word_count || 0,
-            }))
-            return {
-              text: data.resume_text as string,
-              fileName: (data.resume_file_name as string) || 'Resume',
-              wordCount: (data.resume_word_count as number) || 0,
-            }
-          } else {
-            // DB says no resume — clear local cache
-            localStorage.removeItem(getKey(userId))
-            localStorage.removeItem(getMetaKey(userId))
-            return null
+        if (data?.resume_text) {
+          const key = getKey(userId)
+          const metaKey = getMetaKey(userId)
+          localStorage.setItem(key, data.resume_text as string)
+          localStorage.setItem(metaKey, JSON.stringify({
+            fileName: data.resume_file_name || 'Resume',
+            wordCount: data.resume_word_count || 0,
+          }))
+          return {
+            text: data.resume_text as string,
+            fileName: (data.resume_file_name as string) || 'Resume',
+            wordCount: (data.resume_word_count as number) || 0,
           }
         }
-      } catch {}
+      } catch {
+        // On a load error, fail closed (no résumé) rather than falling back to a device cache.
+        return null
+      }
+      // Signed in but DB has no résumé → they have none. Clear any stale device cache and
+      // do NOT auto-import localStorage (that was the cross-user bleed vector).
+      localStorage.removeItem(getKey(userId))
+      localStorage.removeItem(getMetaKey(userId))
+      return null
     }
 
-    // Fallback to localStorage
+    // Guest (not signed in): device-local cache only, never written to any account.
     const key = getKey(userId)
     const text = localStorage.getItem(key)
     if (text) {
       const meta = JSON.parse(localStorage.getItem(getMetaKey(userId)) || '{}')
-      if (loggedIn) {
-        _sync('save_resume', { text, fileName: meta.fileName || 'Resume', wordCount: meta.wordCount || 0 }).catch(() => {})
-      }
       return { text, fileName: meta.fileName || 'Resume', wordCount: meta.wordCount || 0 }
     }
     return null
