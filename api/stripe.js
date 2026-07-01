@@ -85,6 +85,28 @@ async function setPro(uid, isPro, env) {
   }
 }
 
+// Resolve the user's Stripe customer id: use the stored value first, else look it up by
+// email (self-healing for accounts that subscribed before the id was persisted, or where
+// the confirm write failed) and store it back so future calls are instant.
+async function resolveCustomerId(uid, email, env) {
+  const { STRIPE_KEY, SUPABASE_URL, SERVICE_KEY } = env;
+  const q = db(SUPABASE_URL, SERVICE_KEY);
+  try {
+    const credRes = await q(`ai_credits?user_id=eq.${uid}&select=stripe_customer_id&limit=1`);
+    const stored = credRes.ok ? (await credRes.json())?.[0]?.stripe_customer_id : null;
+    if (stored) return stored;
+  } catch { /* fall through to email lookup */ }
+  if (!email || !STRIPE_KEY) return null;
+  try {
+    const r = await fetch(`https://api.stripe.com/v1/customers?email=${encodeURIComponent(email)}&limit=1`, { headers: { Authorization: `Bearer ${STRIPE_KEY}` } });
+    if (!r.ok) return null;
+    const cust = (await r.json())?.data?.[0];
+    if (!cust?.id) return null;
+    q(`ai_credits?user_id=eq.${uid}`, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ stripe_customer_id: cust.id }) }).catch(() => {});
+    return cust.id;
+  } catch { return null; }
+}
+
 export default async function handler(req, res) {
   if (CORS(req, res)) return;
 
@@ -156,11 +178,9 @@ export default async function handler(req, res) {
   if (action === 'subscription_status' || action === 'cancel_subscription' || action === 'resume_subscription') {
     if (req.method !== 'POST') return res.status(405).end();
     if (!STRIPE_KEY || !SUPABASE_URL || !SERVICE_KEY) return res.status(503).json({ error: 'Payments not configured' });
-    const { uid } = await resolveUid(req, env);
+    const { uid, email } = await resolveUid(req, env);
     if (!uid) return res.status(401).json({ error: 'Sign in first' });
-    const q = db(SUPABASE_URL, SERVICE_KEY);
-    const credRes = await q(`ai_credits?user_id=eq.${uid}&select=stripe_customer_id&limit=1`);
-    const customerId = credRes.ok ? (await credRes.json())?.[0]?.stripe_customer_id : null;
+    const customerId = await resolveCustomerId(uid, email, env);
     if (!customerId) return res.status(200).json({ ok: true, subscription: null });
     try {
       const listRes = await fetch(`https://api.stripe.com/v1/subscriptions?customer=${encodeURIComponent(customerId)}&status=all&limit=10&expand[]=data.items`, { headers: { Authorization: `Bearer ${STRIPE_KEY}` } });
@@ -267,13 +287,10 @@ export default async function handler(req, res) {
     if (req.method !== 'POST') return res.status(405).end();
     if (!STRIPE_KEY) return res.status(503).json({ error: 'Payments not configured' });
 
-    const { uid } = await resolveUid(req, env);
+    const { uid, email } = await resolveUid(req, env);
     if (!uid) return res.status(401).json({ error: 'Sign in first' });
 
-    const q = db(SUPABASE_URL, SERVICE_KEY);
-    const credRes = await q(`ai_credits?user_id=eq.${uid}&select=stripe_customer_id&limit=1`);
-    const cred = credRes.ok ? (await credRes.json())[0] : null;
-    const customerId = cred?.stripe_customer_id;
+    const customerId = await resolveCustomerId(uid, email, env);
 
     if (!customerId) {
       const origin = req.headers.origin || 'https://seenjobs.io';
