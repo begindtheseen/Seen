@@ -187,10 +187,14 @@ export default function DashboardPage() {
   const healthColor = health ? (health.score >= 75 ? 'var(--green)' : health.score >= 55 ? 'var(--amber)' : 'var(--red)') : 'var(--muted)'
   const healthDeg = health ? Math.round((health.score / 100) * 360) : 0
 
-  // Status line
+  // Status line — "open" = currently in-progress; distinct from "tracked total" (all-time).
   const statusLine = active.length
-    ? `${active.length} active application${active.length !== 1 ? 's' : ''}${dueChecks.length ? ` · ${dueChecks.length} check${dueChecks.length > 1 ? 's' : ''} due` : ''}`
-    : 'No active applications tracked yet'
+    ? `${active.length} open application${active.length !== 1 ? 's' : ''}${dueChecks.length ? ` · ${dueChecks.length} check${dueChecks.length > 1 ? 's' : ''} due` : ''}`
+    : 'No open applications right now'
+  // Historical context — only shown once the user has tracked anything.
+  const contextLine = apps.length
+    ? `${apps.length} tracked total · ${hired.length} hired · ${ghosted.length} ghosted`
+    : "Hit 'Apply' on any job to start tracking"
 
   // Next best move
   type Move = { icon: string; title: string; sub: string; go: () => void }
@@ -221,9 +225,12 @@ export default function DashboardPage() {
           </div>
 
           <h1 className="dhero-name">Hey, {name}.</h1>
-          <p className="dhero-status">{statusLine}</p>
+          <p className="dhero-status" style={{ marginBottom: apps.length ? '.25rem' : '1rem' }}>{statusLine}</p>
+          {apps.length > 0 && (
+            <p style={{ fontFamily: 'var(--mono)', fontSize: '.6rem', color: 'var(--dim)', marginBottom: '1rem' }}>{contextLine}</p>
+          )}
 
-          {/* Job Search Health — integrated ring */}
+          {/* Job Search Health — historical performance across all tracked apps */}
           <div className="dhealth">
             <div className="dring" style={{ background: `conic-gradient(${healthColor} ${healthDeg}deg, var(--line2) 0deg)` }}>
               <span style={{ color: healthColor }}>{health ? health.score : '—'}</span>
@@ -232,19 +239,24 @@ export default function DashboardPage() {
               <div style={{ fontFamily: 'var(--display)', fontSize: '.82rem', fontWeight: 700, color: 'var(--white)' }}>Job Search Health</div>
               <div style={{ fontFamily: 'var(--mono)', fontSize: '.6rem', color: 'var(--sub)', marginTop: '.15rem', lineHeight: 1.5 }}>
                 {health
-                  ? `${health.score >= 75 ? 'Strong' : health.score >= 55 ? 'On track' : 'Needs attention'} · ${health.responseRate}% response · ${health.ghostRate}% ghosted`
-                  : 'Track 3+ applications to unlock your score'}
+                  ? `${health.score >= 75 ? 'Performing above average' : health.score >= 55 ? 'On track' : 'Room to improve'} · based on ${apps.length} tracked app${apps.length !== 1 ? 's' : ''}`
+                  : `Track ${Math.max(1, 3 - apps.length)} more application${Math.max(1, 3 - apps.length) !== 1 ? 's' : ''} to unlock your score`}
               </div>
             </div>
           </div>
 
-          {/* Stat pills */}
+          {/* Stat pills — "Open" is current; Response/Hired/Ghosted are all-time (see caption) */}
           <div className="dpills">
-            <div className="dpill"><div className="dpill-l">Active</div><div className="dpill-n" style={{ color: 'var(--blue)' }}>{active.length}</div></div>
+            <div className="dpill"><div className="dpill-l">Open</div><div className="dpill-n" style={{ color: 'var(--blue)' }}>{active.length}</div></div>
             <div className="dpill"><div className="dpill-l">Response</div><div className="dpill-n" style={{ color: 'var(--indigo)' }}>{responseRate}</div></div>
             <div className="dpill"><div className="dpill-l">Hired</div><div className="dpill-n" style={{ color: 'var(--green)' }}>{hired.length}</div></div>
             <div className="dpill"><div className="dpill-l">Ghosted</div><div className="dpill-n" style={{ color: 'var(--red)' }}>{ghosted.length}</div></div>
           </div>
+          {apps.length > 0 && (
+            <div style={{ fontFamily: 'var(--mono)', fontSize: '.5rem', color: 'var(--muted)', textAlign: 'center', marginTop: '.45rem', letterSpacing: '.04em' }}>
+              Response · Hired · Ghosted based on {apps.length} tracked app{apps.length !== 1 ? 's' : ''}
+            </div>
+          )}
 
           {/* CTAs */}
           <div className="dhero-cta">
@@ -256,10 +268,15 @@ export default function DashboardPage() {
         {/* ── C. Next Best Move ──────────────────────────────────── */}
         <section>
           <div className="dsec-head"><div className="dsec-title">Next best move</div></div>
-          {apps.length === 0 ? (
+          {active.length === 0 ? (
             <div className="dcard dcard-pad">
-              <p style={{ fontSize: '.8rem', color: 'var(--sub)', lineHeight: 1.6, marginBottom: '.9rem' }}>
-                Start tracking applications to unlock your real response rate, ghost rate, and company benchmarks.
+              <div style={{ fontFamily: 'var(--display)', fontSize: '.92rem', fontWeight: 800, color: 'var(--white)', marginBottom: '.35rem', letterSpacing: '-.02em' }}>
+                {apps.length ? 'Start your next tracked application' : 'Start tracking applications'}
+              </div>
+              <p style={{ fontSize: '.78rem', color: 'var(--sub)', lineHeight: 1.6, marginBottom: '.9rem' }}>
+                {apps.length
+                  ? `You've tracked ${apps.length} application${apps.length !== 1 ? 's' : ''} and landed ${hired.length} hire${hired.length !== 1 ? 's' : ''}. Keep the streak going by adding your next role.`
+                  : 'Start tracking applications to unlock your real response rate, ghost rate, and company benchmarks.'}
               </p>
               <div style={{ display: 'flex', gap: '.5rem', flexWrap: 'wrap' }}>
                 <Link href="/jobs" className="dbtn dbtn-primary" style={{ flex: '1 1 auto' }}>Find jobs</Link>
@@ -292,9 +309,9 @@ export default function DashboardPage() {
           {active.length === 0 ? (
             <div className="dpipe-empty">
               <div style={{ fontSize: '1.6rem', marginBottom: '.4rem' }}>📋</div>
-              <div style={{ fontFamily: 'var(--display)', fontSize: '.85rem', fontWeight: 700, color: 'var(--white)', marginBottom: '.25rem' }}>No active applications yet</div>
-              <div style={{ fontFamily: 'var(--mono)', fontSize: '.6rem', color: 'var(--muted)', lineHeight: 1.6, marginBottom: '1rem' }}>When you hit Apply on a job, it&apos;ll appear here.</div>
-              <Link href="/jobs" className="dbtn dbtn-primary" style={{ display: 'inline-flex', flex: 'none', padding: '.6rem 1.2rem' }}>Find your first tracked job →</Link>
+              <div style={{ fontFamily: 'var(--display)', fontSize: '.85rem', fontWeight: 700, color: 'var(--white)', marginBottom: '.25rem' }}>No open applications</div>
+              <div style={{ fontFamily: 'var(--mono)', fontSize: '.6rem', color: 'var(--muted)', lineHeight: 1.6, marginBottom: '1rem' }}>When you apply to a new job, it&apos;ll appear here until you report the outcome.</div>
+              <Link href="/jobs" className="dbtn dbtn-primary" style={{ display: 'inline-flex', flex: 'none', padding: '.6rem 1.2rem' }}>Find your next tracked job →</Link>
             </div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '.5rem' }}>
@@ -391,7 +408,7 @@ export default function DashboardPage() {
         {/* ── H. Career Benchmarks ───────────────────────────────── */}
         {benchmarks && (
           <section>
-            <div className="dsec-head"><div className="dsec-title" style={{ fontSize: '.82rem' }}>Career benchmarks</div><span className="deyebrow">{benchmarks.n} apps · vs industry</span></div>
+            <div className="dsec-head"><div className="dsec-title" style={{ fontSize: '.82rem' }}>Career benchmarks</div><span className="deyebrow">Based on {benchmarks.n} tracked app{benchmarks.n !== 1 ? 's' : ''} · vs industry avg</span></div>
             <div className="dbench">
               {benchmarks.metrics.map(m => (
                 <div key={m.lbl} className="dbench-c">
@@ -407,7 +424,7 @@ export default function DashboardPage() {
         {/* ── I. Earned Badges ───────────────────────────────────── */}
         {badges.length > 0 && (
           <section>
-            <div className="dsec-head"><div className="dsec-title" style={{ fontSize: '.82rem' }}>Earned badges</div></div>
+            <div className="dsec-head"><div className="dsec-title" style={{ fontSize: '.82rem' }}>Earned badges</div><span className="deyebrow">Your achievements</span></div>
             <div style={{ display: 'flex', gap: '.5rem', flexWrap: 'wrap' }}>
               {badges.map(b => (
                 <div key={b.id} style={{ background: 'var(--surface)', border: '1px solid var(--line2)', borderRadius: 10, padding: '.5rem .75rem', display: 'flex', alignItems: 'center', gap: '.45rem' }}>
