@@ -834,6 +834,29 @@ async function _handler(req, res) {
     return res.status(200).json({ ok: true, jobs: jobs || [], company });
   }
 
+  // ── delete_user: permanently remove a user + all their data (full admins only) ──
+  if (body.action === 'delete_user') {
+    if (adminRole === 'moderator') return res.status(403).json({ error: 'Insufficient role' });
+    const userId = String(body.user_id || '').trim();
+    if (!/^[0-9a-f-]{36}$/i.test(userId)) return res.status(400).json({ error: 'Valid user_id required' });
+    // Remove their app data first (in case FKs aren't ON DELETE CASCADE), then the auth user.
+    const userTables = ['applications', 'saved_jobs', 'credit_transactions', 'answered_questions', 'resume_surveys', 'resume_employment', 'user_recent_cos', 'ai_credits'];
+    for (const t of userTables) {
+      await db(`${t}?user_id=eq.${userId}`, { method: 'DELETE', headers: { Prefer: 'return=minimal' } }).catch(() => {});
+    }
+    await db(`profiles?id=eq.${userId}`, { method: 'DELETE', headers: { Prefer: 'return=minimal' } }).catch(() => {});
+    // Delete the auth user via the admin API (removes login + auth-schema rows).
+    const authDel = await fetch(`${SB}/auth/v1/admin/users/${encodeURIComponent(userId)}`, {
+      method: 'DELETE', headers: { apikey: SK, Authorization: `Bearer ${SK}` },
+    });
+    if (!authDel.ok && authDel.status !== 404) {
+      const t = await authDel.text().catch(() => '');
+      return res.status(502).json({ error: `Auth delete failed (${authDel.status})`, detail: t.slice(0, 160) });
+    }
+    await db('admin_audit_log', { method: 'POST', body: JSON.stringify({ admin_id: sess.admin_id, username: 'admin', action: 'delete_user', target_type: 'user', target_id: userId }), headers: { Prefer: 'return=minimal' } }).catch(() => {});
+    return res.status(200).json({ ok: true, deleted: userId });
+  }
+
   // ── get_kpi_detail: return raw rows behind a KPI card ─────────────────────
   if (body.action === 'get_kpi_detail') {
     const metric = body.metric;

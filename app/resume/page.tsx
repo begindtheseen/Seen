@@ -479,6 +479,11 @@ function ResumePageInner() {
           await ResumeStore.save(data.text, file.name, wc, user?.id, isLoggedIn)
           setResumeText(data.text)
           setResumeMeta({ fileName: file.name, wordCount: wc })
+          setError('')
+        } else {
+          // Non-text response (e.g. 422 unreadable PDF, or any server error): surface it
+          // instead of silently doing nothing — otherwise the upload looks broken/"gone".
+          setError(data.error || 'Could not read this file. Paste your résumé text into the box instead.')
         }
       } catch {
         setError('Failed to parse file. Try pasting text instead.')
