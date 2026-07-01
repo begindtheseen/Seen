@@ -63,6 +63,8 @@ export default function ProfilePage() {
   const [saveMsgOk, setSaveMsgOk] = useState(false)
   const [isPro, setIsPro] = useState(false)
   const [portalLoading, setPortalLoading] = useState(false)
+  const [sub, setSub] = useState<{ status: string; cancel_at_period_end: boolean; current_period_end: number | null; amount: number | null; interval: string | null } | null>(null)
+  const [subMsg, setSubMsg] = useState('')
 
   const isDirty = name !== initName || city !== initCity || experience !== initExperience
 
@@ -99,18 +101,37 @@ export default function ProfilePage() {
     }).catch(() => {})
     // Subscription status — gates the Billing section + Manage/Cancel button.
     _sync('load').then((res) => {
-      setIsPro(!!(res as { credits?: { pro?: boolean } } | null)?.credits?.pro)
+      const pro = !!(res as { credits?: { pro?: boolean } } | null)?.credits?.pro
+      setIsPro(pro)
+      if (pro) loadSub()
     }).catch(() => {})
   }, [isLoggedIn, router])
 
-  // Open the Stripe customer portal (manage payment method, invoices, cancel).
-  async function handleManageSubscription() {
-    setPortalLoading(true)
+  // Pull the live subscription (plan, renewal date, cancel state) for the manage view.
+  async function loadSub() {
     try {
-      const r = await fetch('/api/stripe?action=portal', { method: 'POST', headers: await aiHeaders(), body: JSON.stringify({}) })
-      const d = await r.json().catch(() => ({}))
-      if (d?.url) { window.location.href = d.url; return }
+      const r = await fetch('/api/stripe?action=subscription_status', { method: 'POST', headers: await aiHeaders(), body: '{}' })
+      const d = await r.json()
+      setSub(d?.subscription || null)
     } catch { /* ignore */ }
+  }
+
+  // Cancel (at period end) or resume the membership in-app — no Stripe portal needed.
+  async function manageSubscription(act: 'cancel_subscription' | 'resume_subscription') {
+    setPortalLoading(true)
+    setSubMsg('')
+    try {
+      const r = await fetch(`/api/stripe?action=${act}`, { method: 'POST', headers: await aiHeaders(), body: '{}' })
+      const d = await r.json()
+      if (d?.ok) {
+        setSub(d.subscription || null)
+        setSubMsg(act === 'cancel_subscription' ? 'Your membership will cancel at the end of your billing period.' : 'Your membership is active again — thanks for staying!')
+      } else {
+        setSubMsg(d?.error || 'Could not update your membership — try again or email hello@seenjobs.io')
+      }
+    } catch {
+      setSubMsg('Network error — please try again')
+    }
     setPortalLoading(false)
   }
 
@@ -437,18 +458,44 @@ export default function ProfilePage() {
               <>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '.5rem', marginBottom: '.6rem' }}>
                   <span style={{ fontFamily: 'var(--display)', fontWeight: 800, fontSize: '.95rem', color: 'var(--green)' }}>Seen Pro</span>
-                  <span style={{ fontFamily: 'var(--mono)', fontSize: '.52rem', color: 'var(--green)', border: '1px solid rgba(16,185,129,.35)', borderRadius: 20, padding: '.12rem .5rem', letterSpacing: '.06em' }}>ACTIVE</span>
+                  <span style={{ fontFamily: 'var(--mono)', fontSize: '.52rem', color: sub?.cancel_at_period_end ? 'var(--red)' : 'var(--green)', border: `1px solid ${sub?.cancel_at_period_end ? 'rgba(239,68,68,.35)' : 'rgba(16,185,129,.35)'}`, borderRadius: 20, padding: '.12rem .5rem', letterSpacing: '.06em' }}>
+                    {sub?.cancel_at_period_end ? 'CANCELING' : 'ACTIVE'}
+                  </span>
                 </div>
+                {sub && (
+                  <div style={{ fontFamily: 'var(--mono)', fontSize: '.66rem', color: 'var(--sub)', marginBottom: '.6rem', lineHeight: 1.6 }}>
+                    {sub.amount != null ? `$${sub.amount}/${sub.interval === 'year' ? 'yr' : 'mo'}` : 'Active'}
+                    {sub.current_period_end ? (sub.cancel_at_period_end
+                      ? ` · ends ${new Date(sub.current_period_end).toLocaleDateString()}`
+                      : ` · renews ${new Date(sub.current_period_end).toLocaleDateString()}`) : ''}
+                  </div>
+                )}
                 <div style={{ fontFamily: 'var(--body)', fontSize: '.78rem', color: 'var(--sub)', lineHeight: 1.65, marginBottom: '1rem' }}>
-                  Your subscription renews automatically each billing period until you cancel. Update your payment method, view invoices, or cancel anytime — you keep Pro until the end of the current period.
+                  {sub?.cancel_at_period_end
+                    ? 'Your membership is set to cancel — you keep Pro until the date above. Change your mind anytime before then.'
+                    : 'Your subscription renews automatically each billing period until you cancel. Cancel anytime — you keep Pro through the month you’ve already paid for.'}
                 </div>
-                <button
-                  onClick={handleManageSubscription}
-                  disabled={portalLoading}
-                  style={{ width: '100%', padding: '.8rem', background: 'var(--raised, var(--surface))', color: 'var(--white)', border: '1.5px solid var(--line2)', borderRadius: 10, fontFamily: 'var(--display)', fontWeight: 700, fontSize: '.85rem', cursor: portalLoading ? 'default' : 'pointer', opacity: portalLoading ? 0.7 : 1 }}
-                >
-                  {portalLoading ? 'Opening secure portal…' : 'Manage / Cancel subscription →'}
-                </button>
+                {sub?.cancel_at_period_end ? (
+                  <button
+                    onClick={() => manageSubscription('resume_subscription')}
+                    disabled={portalLoading}
+                    style={{ width: '100%', padding: '.85rem', background: portalLoading ? 'var(--line)' : 'linear-gradient(135deg,#4f46e5 0%,#7c3aed 100%)', color: '#fff', border: 'none', borderRadius: 10, fontFamily: 'var(--display)', fontWeight: 800, fontSize: '.85rem', cursor: portalLoading ? 'default' : 'pointer' }}
+                  >
+                    {portalLoading ? 'Working…' : 'Resume membership'}
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => manageSubscription('cancel_subscription')}
+                    disabled={portalLoading || !sub}
+                    title={!sub ? 'No active Stripe subscription on file' : undefined}
+                    style={{ width: '100%', padding: '.8rem', background: 'none', color: 'var(--red)', border: '1px solid rgba(239,68,68,.4)', borderRadius: 10, fontFamily: 'var(--mono)', fontWeight: 600, fontSize: '.74rem', cursor: (portalLoading || !sub) ? 'default' : 'pointer', opacity: (portalLoading || !sub) ? 0.55 : 1 }}
+                  >
+                    {portalLoading ? 'Working…' : 'Cancel membership'}
+                  </button>
+                )}
+                {subMsg && (
+                  <div style={{ fontFamily: 'var(--mono)', fontSize: '.6rem', color: 'var(--sub)', marginTop: '.7rem', lineHeight: 1.6 }}>{subMsg}</div>
+                )}
               </>
             ) : (
               <>
