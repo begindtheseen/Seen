@@ -109,6 +109,9 @@ function PricingPageInner() {
       const r = await fetch('/api/stripe?action=subscription_status', { method: 'POST', headers: h, body: '{}' })
       const d = await r.json()
       setSub(d?.subscription || null)
+      // If Stripe says the subscription has ended, drop back to the non-Pro view so the
+      // manage buttons disappear (the server has already flipped the pro flag too).
+      if (typeof d?.pro === 'boolean') setIsPro(d.pro)
     } catch { /* ignore */ }
   }
 
@@ -120,7 +123,7 @@ function PricingPageInner() {
       const hdrs = await aiHeaders()
       const r = await fetch(`/api/stripe?action=${act}`, { method: 'POST', headers: hdrs, body: '{}' })
       const d = await r.json()
-      if (d?.ok) setSub(d.subscription || null)
+      if (d?.ok) { setSub(d.subscription || null); if (typeof d?.pro === 'boolean') setIsPro(d.pro) }
       else setError(d?.error || 'Could not update your membership — try again or email hello@seenjobs.io')
     } catch {
       setError('Network error — please try again')
