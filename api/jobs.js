@@ -3,7 +3,7 @@ import { getQueryExpansion } from '../lib/server/expand.js';
 import { applyRateLimit, rateLimit } from '../lib/server/ratelimit.js';
 import { logError } from '../lib/server/errlog.js';
 import { filterAndRank, filterByLocation, sortByProximity, locationDbTerm } from './_utils/jobRelevance.js';
-import { aggregateForQuery, upsertJobs } from '../lib/server/jobSources.js';
+import { aggregateForQuery, upsertJobs, inferLevel } from '../lib/server/jobSources.js';
 
 // Verify a Supabase JWT (HS256) and return the user id, or null. Decoding the payload
 // WITHOUT this check would let anyone forge a token and read another user's data.
@@ -199,7 +199,7 @@ export default async function handler(req, res) {
         dbMatches = filterAndRank(pool, relevanceQuery).map(j => ({
           title: j.title, company: j.company, location: j.location || loc,
           salary: j.salary, url: j.apply_url || j.url || null, description: j.description,
-          type: j.type || 'Full-time', level: j.level || 'Mid level',
+          type: j.type || 'Full-time', level: inferLevel(j.title || ''),
           source: j.source || 'Seen', score: j.score || 65, waste_score: j.waste_score || 25,
         }));
         // Keep only listings in/near the searched place (city → state → remote),
@@ -248,7 +248,7 @@ export default async function handler(req, res) {
       jobs = (agg.jobs || []).map(j => ({
         title: j.title, company: j.company, location: j.location || loc,
         salary: j.salary, url: j.apply_url || j.url || null, description: j.description,
-        type: j.type || 'Full-time', level: j.level || 'Mid level',
+        type: j.type || 'Full-time', level: inferLevel(j.title || ''),
         source: j.source || 'Seen', score: j.score || 65, waste_score: j.waste_score || 25,
       }));
       jobs = filterByLocation(filterAndRank(jobs, relevanceQuery), loc);
@@ -293,7 +293,7 @@ export default async function handler(req, res) {
         wideJobs = (wide.jobs || []).map(j => ({
           title: j.title, company: j.company, location: j.location || loc,
           salary: j.salary, url: j.apply_url || j.url || null, description: j.description,
-          type: j.type || 'Full-time', level: j.level || 'Mid level',
+          type: j.type || 'Full-time', level: inferLevel(j.title || ''),
           source: j.source || 'Seen', score: j.score || 65, waste_score: j.waste_score || 25,
         }));
         console.log(`WIDENED: "${query}" → "${canonical}" — national aggregate added ${wideJobs.length}`);
@@ -342,7 +342,7 @@ async function nearestListings(loc, supabaseUrl, dbHeaders) {
   const mapUi = rows => (Array.isArray(rows) ? rows : []).map(j => ({
     title: j.title, company: j.company, location: j.location,
     salary: j.salary, url: j.apply_url, description: j.description,
-    type: j.type || 'Full-time', level: j.level || 'Mid level',
+    type: j.type || 'Full-time', level: inferLevel(j.title || ''),
     source: j.source || 'Seen', score: j.score || 65, waste_score: j.waste_score || 25,
   }));
   try {
@@ -508,7 +508,7 @@ async function handleCompanyJobs(req, res, body) {
     );
     const cached = r.ok ? await r.json() : [];
     if (Array.isArray(cached) && cached.length >= 3) {
-      const jobs = cached.map(j => ({ title: j.title, company: j.company, location: j.location, salary: j.salary, url: j.apply_url, source: j.source, type: j.type, level: j.level, score: j.score, waste_score: j.waste_score }));
+      const jobs = cached.map(j => ({ title: j.title, company: j.company, location: j.location, salary: j.salary, url: j.apply_url, source: j.source, type: j.type, level: inferLevel(j.title || ''), score: j.score, waste_score: j.waste_score }));
       return res.status(200).json({ ok: true, jobs, _src: 'cache' });
     }
   } catch(e) { console.warn('company_jobs cache:', e.message); }
@@ -535,7 +535,7 @@ async function handleCompanyJobs(req, res, body) {
       .map(j => ({
         title: j.title, company: j.company, location: j.location,
         salary: j.salary, url: j.apply_url || j.url || null, description: j.description,
-        source: j.source, type: j.type, level: j.level,
+        source: j.source, type: j.type, level: inferLevel(j.title || ''),
         score: j.score || 65, waste_score: j.waste_score || 25,
       }));
     console.log(`COMPANY AGGREGATED: "${safeName}" — ${agg.jobs?.length || 0} fetched, ${agg.upserted || 0} saved, ${jobs.length} matched`);
@@ -631,7 +631,7 @@ async function handleRecommended(req, res, _body) {
       apply_url: j.apply_url,
       description: j.description,
       type: j.type || 'Full-time',
-      level: j.level || 'Mid level',
+      level: inferLevel(j.title || ''),
       source: j.source || 'Seen',
       score: j.score || 65,
       waste_score: j.waste_score || 25,
@@ -687,7 +687,7 @@ async function _fetchAdzuna(what, where, appId, appKey, distKm) {
         apply_url: j.redirect_url||null,
         source: 'Adzuna',
         type: j.contract_time==='part_time'?'Part-time':'Full-time',
-        level: (/\b(senior|sr\b|lead|principal|staff|architect)\b/i.test(j.title||''))?'Senior':(/\b(junior|jr\b|entry.level|associate|intern)\b/i.test(j.title||''))?'Entry level':(/\b(director|vp\b|vice president|head of|chief)\b/i.test(j.title||''))?'Director+':'Mid level',
+        level: inferLevel(j.title || ''),
         search_query: what,
         expires_at: expires,
       };
