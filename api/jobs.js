@@ -2,7 +2,7 @@ import { createHmac, timingSafeEqual } from 'crypto';
 import { getQueryExpansion } from '../lib/server/expand.js';
 import { applyRateLimit, rateLimit } from '../lib/server/ratelimit.js';
 import { logError } from '../lib/server/errlog.js';
-import { filterAndRank, filterByLocation, locationDbTerm } from './_utils/jobRelevance.js';
+import { filterAndRank, filterByLocation, sortByProximity, locationDbTerm } from './_utils/jobRelevance.js';
 import { aggregateForQuery, upsertJobs } from '../lib/server/jobSources.js';
 
 // Verify a Supabase JWT (HS256) and return the user id, or null. Decoding the payload
@@ -268,9 +268,58 @@ export default async function handler(req, res) {
       mergedSeen.add(key);
       merged.push(j);
     }
-    const finalJobs = filterByLocation(filterAndRank(merged, relevanceQuery), loc).slice(0, 60);
+    let finalJobs = filterByLocation(filterAndRank(merged, relevanceQuery), loc).slice(0, 60);
+    let widened = false;
 
-    const result = { jobs: finalJobs, query, location: loc, _src: jobs.length ? 'aggregated' : 'db' };
+    // ── NEVER return nothing ─────────────────────────────────────────────────────
+    // A location-strict search can come up thin for a sparse query (e.g. a specific
+    // employer in a small city) even though the role exists nearby or nationally.
+    // When that happens, WIDEN instead of showing "no results": aggregate the query
+    // nationally, then rank the full pool by proximity (nearest first) WITHOUT dropping
+    // far listings — so the user sees related roles closest to them.
+    if (finalJobs.length < 5) {
+      widened = true;
+      let wideJobs = [];
+      try {
+        const wide = await aggregateForQuery({
+          query: canonical,
+          location: '', // national — no where constraint
+          relatedTerms,
+          supabaseUrl: SUPABASE_URL,
+          serviceKey: SUPABASE_SERVICE_KEY,
+          adzunaAppId: process.env.ADZUNA_APP_ID,
+          adzunaAppKey: process.env.ADZUNA_APP_KEY,
+        });
+        wideJobs = (wide.jobs || []).map(j => ({
+          title: j.title, company: j.company, location: j.location || loc,
+          salary: j.salary, url: j.apply_url || j.url || null, description: j.description,
+          type: j.type || 'Full-time', level: j.level || 'Mid level',
+          source: j.source || 'Seen', score: j.score || 65, waste_score: j.waste_score || 25,
+        }));
+        console.log(`WIDENED: "${query}" → "${canonical}" — national aggregate added ${wideJobs.length}`);
+      } catch (e) { console.warn('widen aggregate error:', e.message); }
+
+      const widenSeen = new Set();
+      const widenPool = [];
+      for (const j of [...merged, ...wideJobs]) {
+        const key = `${(j.title||'').toLowerCase()}|${(j.company||'').toLowerCase()}|${(j.location||'').toLowerCase()}`;
+        if (widenSeen.has(key)) continue;
+        widenSeen.add(key);
+        widenPool.push(j);
+      }
+      finalJobs = sortByProximity(filterAndRank(widenPool, relevanceQuery), loc).slice(0, 60);
+    }
+
+    // ── Absolute last resort ─────────────────────────────────────────────────────
+    // The query matched nothing anywhere (typo/nonsense/brand-new niche). Show the
+    // nearest available listings regardless of query so the board is never empty.
+    if (!finalJobs.length) {
+      widened = true;
+      finalJobs = await nearestListings(loc, SUPABASE_URL, dbHeaders);
+      console.log(`NEAREST FALLBACK: "${query}" @ "${loc}" — ${finalJobs.length} nearby listings`);
+    }
+
+    const result = { jobs: finalJobs, query, location: loc, _src: widened ? 'widened' : (jobs.length ? 'aggregated' : 'db'), widened };
     _inflightResolve?.(result);
     _inflight.delete(inflightKey);
     return res.status(200).json({ ok: true, ...result });
@@ -281,6 +330,34 @@ export default async function handler(req, res) {
     _inflightReject?.(err);
     _inflight.delete(inflightKey);
     return res.status(500).json({ error: err.message, jobs: [] });
+  }
+}
+
+// Last-resort listings so a search is NEVER empty: nearest non-expired jobs regardless
+// of query (city → state), else the most recent quality listings anywhere.
+async function nearestListings(loc, supabaseUrl, dbHeaders) {
+  if (!supabaseUrl) return [];
+  const now = encodeURIComponent(new Date().toISOString());
+  const cols = 'title,company,location,salary,apply_url,description,type,level,source,score,waste_score';
+  const mapUi = rows => (Array.isArray(rows) ? rows : []).map(j => ({
+    title: j.title, company: j.company, location: j.location,
+    salary: j.salary, url: j.apply_url, description: j.description,
+    type: j.type || 'Full-time', level: j.level || 'Mid level',
+    source: j.source || 'Seen', score: j.score || 65, waste_score: j.waste_score || 25,
+  }));
+  try {
+    const term = locationDbTerm(loc);
+    if (term) {
+      const r = await fetch(`${supabaseUrl}/rest/v1/jobs?location=ilike.*${encodeURIComponent(term)}*&expires_at=gt.${now}&select=${cols}&order=score.desc&limit=24`, { headers: dbHeaders });
+      const rows = r.ok ? await r.json() : [];
+      if (Array.isArray(rows) && rows.length) return mapUi(rows);
+    }
+    // Nothing local — surface the most recently-seen quality listings anywhere.
+    const r2 = await fetch(`${supabaseUrl}/rest/v1/jobs?expires_at=gt.${now}&select=${cols}&order=last_seen_at.desc&limit=24`, { headers: dbHeaders });
+    return mapUi(r2.ok ? await r2.json() : []);
+  } catch (e) {
+    console.warn('nearestListings error:', e.message);
+    return [];
   }
 }
 

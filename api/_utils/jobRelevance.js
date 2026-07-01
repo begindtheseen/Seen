@@ -153,6 +153,18 @@ export function filterByLocation(jobs, loc) {
   return kept.map((k) => k.j);
 }
 
+// Rank by proximity (city → state → remote/national → unknown → far) WITHOUT dropping
+// anything. Used as a graceful widen: when strict filterByLocation would return too few,
+// we still surface the closest available listings first instead of showing nothing.
+export function sortByProximity(jobs, loc) {
+  const p = parseLocation(loc);
+  if (!p || (!p.city && !p.stateAbbr && !p.stateName && !p.remote)) return Array.isArray(jobs) ? jobs.slice() : [];
+  return (jobs || [])
+    .map((j, i) => ({ j, s: locationScore(j.location, p), i }))
+    .sort((a, b) => (b.s - a.s) || (a.i - b.i))
+    .map((x) => x.j);
+}
+
 // PostgREST ilike term to pre-filter the DB query to the searched place (city
 // preferred, else state name). '' when there's no usable location.
 export function locationDbTerm(loc) {
