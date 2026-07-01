@@ -336,7 +336,10 @@ export default async function handler(req, res) {
     };
 
     // Stage 1 — expand the radius around the SAME location (≈4× the radius, 60–250mi).
-    if (finalJobs.length < 5 && loc) {
+    // Only when there are ZERO in-radius matches: a radius search must honor its radius,
+    // so we never pad a real in-radius result set with farther listings. Widening is the
+    // never-empty safety net, not a top-up.
+    if (finalJobs.length === 0 && loc) {
       widened = true;
       const expandedMiles = Math.min(250, Math.max(radiusMiles * 4, 60));
       let wideJobs = [];
@@ -353,9 +356,9 @@ export default async function handler(req, res) {
       finalJobs = rankByDistanceKeepAll(filterAndRank(dedupJobs([...merged, ...wideJobs]), relevanceQuery)).slice(0, 60);
     }
 
-    // Stage 2 — national query (no location) that's thin, or nothing within the expanded
+    // Stage 2 — national query (no location) that's empty, or nothing within the expanded
     // radius: pull nationally as the last broadening step, still ranked nearest-first.
-    if (finalJobs.length < 5) {
+    if (finalJobs.length === 0) {
       widened = true;
       let wideJobs = [];
       try {
@@ -379,7 +382,7 @@ export default async function handler(req, res) {
       console.log(`NEAREST FALLBACK: "${query}" @ "${loc}" — ${finalJobs.length} nearby listings`);
     }
 
-    const result = { jobs: finalJobs, query, location: loc, _src: widened ? 'widened' : (jobs.length ? 'aggregated' : 'db'), widened };
+    const result = { jobs: finalJobs, query, location: loc, radius: radiusMiles, _src: widened ? 'widened' : (jobs.length ? 'aggregated' : 'db'), widened };
     _inflightResolve?.(result);
     _inflight.delete(inflightKey);
     return res.status(200).json({ ok: true, ...result });
