@@ -732,6 +732,22 @@ async function activeJobCount(supabaseUrl, serviceKey) {
 // Crisis floor — keep in sync with admin-stats.js JOB_HEALTH_MIN_ACTIVE.
 const AUTO_HEAL_MIN_ACTIVE = 500;
 
+// Bounded-concurrency map: runs at most `limit` tasks at once. Prevents the socket
+// exhaustion ("fetch failed") that full/auto-heal mode caused by firing hundreds of
+// fetches (Adzuna searches + company lookups) simultaneously.
+async function mapLimit(items, limit, fn) {
+  const out = new Array(items.length);
+  let idx = 0;
+  const runners = Array.from({ length: Math.min(limit, items.length) }, async () => {
+    while (idx < items.length) {
+      const i = idx++;
+      out[i] = await fn(items[i], i);
+    }
+  });
+  await Promise.all(runners);
+  return out;
+}
+
 
 async function deleteExpired(supabaseUrl, serviceKey) {
   await fetch(`${supabaseUrl}/rest/v1/jobs?expires_at=lt.${new Date().toISOString()}`, {
@@ -864,10 +880,12 @@ export default async function handler(req, res) {
     // Pass ?batch=N to override (useful for manually triggering a specific batch).
     const batchParam = reqUrl.searchParams.get('batch');
     const batchIndex = batchParam !== null ? parseInt(batchParam) : getCurrentBatch();
-    // In full mode, run every Adzuna search (capped at 240 to stay under the daily
-    // quota and within wall-clock); otherwise just this run's batch.
+    // Full/auto-heal mode: a heavy multi-source backfill capped at 72 Adzuna searches so it
+    // reliably completes inside the 60s function limit at 8-concurrent (240 was too many and
+    // threw "fetch failed"). Combined with all 5 secondary sources this adds ~600+ listings
+    // per run — plenty to clear the crisis floor; the next scheduled runs top up the rest.
     const searches = fullMode
-      ? ALL_SEARCHES.slice(0, 240)
+      ? ALL_SEARCHES.slice(0, 72)
       : ALL_SEARCHES.slice(batchIndex * BATCH_SIZE, (batchIndex + 1) * BATCH_SIZE);
 
     const dbHeaders = {
@@ -876,41 +894,40 @@ export default async function handler(req, res) {
       'Content-Type': 'application/json',
     };
 
-    // Resolve canonical form for each search term (DB cache → Haiku, runs once per term)
+    // Resolve canonical form for each search term (DB cache → LLM gateway, runs once per term).
+    // Bounded to 10 concurrent — in full/auto-heal mode this can be 72 terms, and firing them
+    // all at once contributed to the same socket exhaustion ("fetch failed") the mapLimit fix targets.
     const canonicalMap = Object.fromEntries(
-      await Promise.all(
-        searches.map(async s => {
-          const qNorm = s.what.toLowerCase().trim();
-          const { canonical } = await getQueryExpansion(qNorm, SUPABASE_URL, dbHeaders);
-          return [s.what, canonical];
-        })
-      )
+      await mapLimit(searches, 10, async s => {
+        const qNorm = s.what.toLowerCase().trim();
+        const { canonical } = await getQueryExpansion(qNorm, SUPABASE_URL, dbHeaders);
+        return [s.what, canonical];
+      })
     );
 
-    // Run all Adzuna searches AND every keyless secondary source concurrently.
-    // Promise.allSettled isolates failures so a bad source never breaks the others.
-    const [results, secondary] = await Promise.all([
-      Promise.allSettled(
-        searches.map(async s => {
-          const jobs = await fetchAdzuna(s.what, s.where, ADZUNA_APP_ID, ADZUNA_APP_KEY);
-          const canonical = canonicalMap[s.what] || s.what.toLowerCase().trim();
-          return jobs.map(j => ({ ...j, search_query: canonical }));
-        })
-      ),
+    // Run Adzuna searches (bounded to 8 concurrent) AND the keyless secondary sources.
+    // fetchAdzuna already isolates its own failures (returns []), so no listing can break
+    // the run; bounding concurrency prevents "fetch failed" from socket exhaustion.
+    const [adzunaArrays, secondary] = await Promise.all([
+      mapLimit(searches, 8, async s => {
+        const jobs = await fetchAdzuna(s.what, s.where, ADZUNA_APP_ID, ADZUNA_APP_KEY);
+        const canonical = canonicalMap[s.what] || s.what.toLowerCase().trim();
+        return jobs.map(j => ({ ...j, search_query: canonical }));
+      }),
       // Secondary sources self-tag their own search_query and isolate their own failures.
       fetchSecondarySources().catch(e => {
         console.warn('secondary sources error (non-fatal):', e.message);
         return { jobs: [], bySource: {} };
       }),
     ]);
-    const adzunaJobs = results.filter(r => r.status === 'fulfilled').flatMap(r => r.value);
+    const adzunaJobs = adzunaArrays.flat();
     const allJobs = [...adzunaJobs, ...secondary.jobs];
     const sourceCounts = { Adzuna: adzunaJobs.length, ...secondary.bySource };
 
-    // Pre-warm company ID cache for all unique companies in this batch
-    // so parallel upserts below hit the in-memory cache instead of racing to create companies
+    // Pre-warm the company-ID cache (bounded to 12 concurrent so a large full-mode batch
+    // can't open thousands of DB connections at once → "fetch failed").
     const uniqueCompanies = [...new Set(allJobs.map(j => j.company).filter(Boolean))];
-    await Promise.all(uniqueCompanies.map(name => getOrCreateCompanyId(name, SUPABASE_URL, SUPABASE_SERVICE_KEY)));
+    await mapLimit(uniqueCompanies, 12, name => getOrCreateCompanyId(name, SUPABASE_URL, SUPABASE_SERVICE_KEY));
 
     // Upsert in batches of 100, 3 batches at a time — 4× fewer round trips than 25-per-batch serial
     const UPSERT_BATCH = 100;
