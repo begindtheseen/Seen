@@ -21,8 +21,20 @@ const inp: React.CSSProperties = {
   boxSizing: 'border-box',
 }
 
-// A loading placeholder matching the input's footprint — shown until the profile loads so
-// the fields never flash empty first.
+// Per-user profile cache (keyed by user id → NO cross-user bleed on shared devices) so the
+// fields render instantly on every revisit instead of loading from scratch each time.
+type CachedProfile = { name: string; city: string; experience: string }
+function readProfileCache(uid?: string): CachedProfile | null {
+  if (!uid || typeof window === 'undefined') return null
+  try { return JSON.parse(localStorage.getItem(`seen_profile_v2_${uid}`) || 'null') } catch { return null }
+}
+function writeProfileCache(uid: string | undefined, p: CachedProfile) {
+  if (!uid || typeof window === 'undefined') return
+  try { localStorage.setItem(`seen_profile_v2_${uid}`, JSON.stringify(p)) } catch { /* quota — ignore */ }
+}
+
+// A loading placeholder matching the input's footprint — shown only on the very first load
+// (before any cache exists) so the fields never flash empty.
 const inpSkeleton: React.CSSProperties = {
   width: '100%',
   height: '2.6rem',
@@ -65,12 +77,15 @@ type LocResult = { display: string }
 export default function ProfilePage() {
   const router = useRouter()
   const { isLoggedIn, user, loadProfile } = useAuth()
-  const [name, setName] = useState('')
-  const [city, setCity] = useState('')
-  const [experience, setExperience] = useState('')
-  const [initName, setInitName] = useState('')
-  const [initCity, setInitCity] = useState('')
-  const [initExperience, setInitExperience] = useState('')
+  // Seed synchronously from the per-user cache so a returning user's fields are already
+  // filled on first paint — no empty flash, no skeleton, no "loading" feel.
+  const _cache = readProfileCache(user?.id)
+  const [name, setName] = useState(_cache?.name ?? '')
+  const [city, setCity] = useState(_cache?.city ?? '')
+  const [experience, setExperience] = useState(_cache?.experience ?? '')
+  const [initName, setInitName] = useState(_cache?.name ?? '')
+  const [initCity, setInitCity] = useState(_cache?.city ?? '')
+  const [initExperience, setInitExperience] = useState(_cache?.experience ?? '')
   const [saving, setSaving] = useState(false)
   const [saveMsg, setSaveMsg] = useState('')
   const [saveMsgOk, setSaveMsgOk] = useState(false)
@@ -78,9 +93,9 @@ export default function ProfilePage() {
   const [portalLoading, setPortalLoading] = useState(false)
   const [sub, setSub] = useState<{ status: string; cancel_at_period_end: boolean; current_period_end: number | null; amount: number | null; interval: string | null } | null>(null)
   const [subMsg, setSubMsg] = useState('')
-  // Gate the populated fields on a loaded flag so they never flash empty before load_profile
-  // resolves — an empty→filled flash reads as low quality.
-  const [loaded, setLoaded] = useState(false)
+  // Already "loaded" if we have a cached copy (instant render); otherwise show a skeleton
+  // for the one-time first load rather than an empty flash.
+  const [loaded, setLoaded] = useState(!!_cache)
 
   const isDirty = name !== initName || city !== initCity || experience !== initExperience
 
@@ -110,9 +125,11 @@ export default function ProfilePage() {
         const n = (p.name as string) || ''
         const c = (p.city as string) || ''
         const e = (p.experience as string) || ''
-        setName(n); setInitName(n)
-        setCity(c); setInitCity(c)
-        setExperience(e); setInitExperience(e)
+        // Only overwrite fields the user hasn't started editing (avoid clobbering typing).
+        setName(prev => prev === (_cache?.name ?? '') ? n : prev); setInitName(n)
+        setCity(prev => prev === (_cache?.city ?? '') ? c : prev); setInitCity(c)
+        setExperience(prev => prev === (_cache?.experience ?? '') ? e : prev); setInitExperience(e)
+        writeProfileCache(user?.id, { name: n, city: c, experience: e })
       }
     }).catch(() => {}).finally(() => setLoaded(true))
     // Subscription status — gates the Billing section + Manage/Cancel button.
@@ -202,10 +219,8 @@ export default function ProfilePage() {
       setSaving(false)
       return
     }
-    try {
-      const existing = JSON.parse(localStorage.getItem('seen_profile_local') || '{}')
-      localStorage.setItem('seen_profile_local', JSON.stringify({ ...existing, name: name.trim(), city: city.trim(), experience, savedAt: Date.now() }))
-    } catch { /* ignore */ }
+    // Per-user cache (no cross-user bleed) so the saved values render instantly next time.
+    writeProfileCache(user?.id, { name: name.trim(), city: city.trim(), experience })
     setSaveMsg('Saved!')
     setSaveMsgOk(true)
     setInitName(name.trim())
