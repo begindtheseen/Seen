@@ -21,6 +21,19 @@ const inp: React.CSSProperties = {
   boxSizing: 'border-box',
 }
 
+// A loading placeholder matching the input's footprint — shown until the profile loads so
+// the fields never flash empty first.
+const inpSkeleton: React.CSSProperties = {
+  width: '100%',
+  height: '2.6rem',
+  borderRadius: 8,
+  background: 'linear-gradient(90deg, var(--card) 25%, var(--raised, var(--surface)) 50%, var(--card) 75%)',
+  backgroundSize: '200% 100%',
+  border: '1.5px solid var(--line)',
+  boxSizing: 'border-box',
+  animation: 'pulse 1.3s ease-in-out infinite',
+}
+
 const sectionHead: React.CSSProperties = {
   padding: '.85rem 1.25rem',
   borderBottom: '1px solid var(--line)',
@@ -65,6 +78,9 @@ export default function ProfilePage() {
   const [portalLoading, setPortalLoading] = useState(false)
   const [sub, setSub] = useState<{ status: string; cancel_at_period_end: boolean; current_period_end: number | null; amount: number | null; interval: string | null } | null>(null)
   const [subMsg, setSubMsg] = useState('')
+  // Gate the populated fields on a loaded flag so they never flash empty before load_profile
+  // resolves — an empty→filled flash reads as low quality.
+  const [loaded, setLoaded] = useState(false)
 
   const isDirty = name !== initName || city !== initCity || experience !== initExperience
 
@@ -98,7 +114,7 @@ export default function ProfilePage() {
         setCity(c); setInitCity(c)
         setExperience(e); setInitExperience(e)
       }
-    }).catch(() => {})
+    }).catch(() => {}).finally(() => setLoaded(true))
     // Subscription status — gates the Billing section + Manage/Cancel button.
     _sync('load').then((res) => {
       const pro = !!(res as { credits?: { pro?: boolean } } | null)?.credits?.pro
@@ -269,15 +285,17 @@ export default function ProfilePage() {
           <div style={{ padding: '1.25rem' }}>
             <div style={{ marginBottom: '1rem' }}>
               <Label text="First name" />
-              <input
-                type="text"
-                value={name}
-                onChange={e => setName(e.target.value)}
-                onFocus={e => { e.target.style.borderColor = 'var(--green)' }}
-                onBlur={e => { e.target.style.borderColor = 'var(--line2)' }}
-                placeholder="Your first name"
-                style={inp}
-              />
+              {loaded ? (
+                <input
+                  type="text"
+                  value={name}
+                  onChange={e => setName(e.target.value)}
+                  onFocus={e => { e.target.style.borderColor = 'var(--green)' }}
+                  onBlur={e => { e.target.style.borderColor = 'var(--line2)' }}
+                  placeholder="Your first name"
+                  style={inp}
+                />
+              ) : <div style={inpSkeleton} />}
             </div>
             <div>
               <Label text="Email" />
@@ -292,6 +310,7 @@ export default function ProfilePage() {
           <div style={{ padding: '1.25rem' }}>
             <Label text="Your city" />
             <div style={{ position: 'relative' }} ref={cityContainerRef}>
+              {loaded ? (
               <input
                 type="text"
                 autoComplete="off"
@@ -302,6 +321,7 @@ export default function ProfilePage() {
                 placeholder="e.g. Los Angeles, CA"
                 style={inp}
               />
+              ) : <div style={inpSkeleton} />}
               {showCitySuggs && citySuggs.length > 0 && (
                 <div style={{ position: 'absolute', zIndex: 200, background: 'var(--surface)', border: '1px solid var(--line2)', borderRadius: 8, width: '100%', top: 'calc(100% + 4px)', left: 0, boxShadow: '0 8px 24px rgba(0,0,0,.4)' }}>
                   {citySuggs.map((s, i) => (
@@ -329,6 +349,7 @@ export default function ProfilePage() {
           <div style={sectionHead}>Job preferences</div>
           <div style={{ padding: '1.25rem' }}>
             <Label text="Experience level" />
+            {loaded ? (
             <select
               value={experience}
               onChange={e => setExperience(e.target.value)}
@@ -342,6 +363,7 @@ export default function ProfilePage() {
               <option value="senior">⭐ Senior (7+ yrs)</option>
               <option value="lead">🔷 Lead / Staff</option>
             </select>
+            ) : <div style={inpSkeleton} />}
             <div style={{ fontFamily: 'var(--mono)', fontSize: '.6rem', color: 'var(--muted)', marginTop: '.5rem' }}>
               Use the search filter on the Jobs page to filter by industry.
             </div>
