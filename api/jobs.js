@@ -4,6 +4,7 @@ import { applyRateLimit, rateLimit } from '../lib/server/ratelimit.js';
 import { logError } from '../lib/server/errlog.js';
 import { filterAndRank, filterByLocation, sortByProximity, locationDbTerm } from './_utils/jobRelevance.js';
 import { aggregateForQuery, upsertJobs, inferLevel } from '../lib/server/jobSources.js';
+import { geocodeLocation, haversineMiles, milesToKm } from '../lib/server/geo.js';
 
 // Verify a Supabase JWT (HS256) and return the user id, or null. Decoding the payload
 // WITHOUT this check would let anyone forge a token and read another user's data.
@@ -133,6 +134,41 @@ export default async function handler(req, res) {
     let canonical = qNorm;
     let relatedTerms = [];
 
+    // ── Radius ───────────────────────────────────────────────────────────────
+    // Real distance search: clamp the requested radius, geocode the searched place once
+    // (cached), and pass the distance to Adzuna so the live pull is already scoped. `center`
+    // is filled in during the DB-first Promise.all below (overlapped with the DB reads).
+    const radiusMiles = Math.min(500, Math.max(5, parseInt(radius, 10) || 25));
+    const distanceKm = milesToKm(radiusMiles);
+    let center = null; // { lat, lng } | null (null → geocode unavailable, fall back to city/state)
+
+    // Keep a listing if it's within the radius; rank the whole list nearest-first. Jobs with
+    // coordinates use true great-circle distance; legacy rows without coords fall back to the
+    // coarse city → state match so they're never wrongly dropped.
+    const applyRadius = (list) => {
+      if (!loc) return Array.isArray(list) ? list : [];
+      if (!center) return filterByLocation(list, loc); // geocode failed → coarse city/state
+      const withCoords = [], withoutCoords = [];
+      for (const j of (list || [])) {
+        if (j.lat != null && j.lng != null) withCoords.push(j); else withoutCoords.push(j);
+      }
+      const near = withCoords
+        .map(j => ({ j, d: haversineMiles(center, j) }))
+        .filter(x => x.d <= radiusMiles + 1) // 1mi buffer for border rounding
+        .sort((a, b) => a.d - b.d)
+        .map(x => x.j);
+      return [...near, ...filterByLocation(withoutCoords, loc)];
+    };
+    // Widen ranking (never-empty path): keep everything, nearest-first, no radius cap.
+    const rankByDistanceKeepAll = (list) => {
+      if (!loc) return Array.isArray(list) ? list : [];
+      if (!center) return sortByProximity(list, loc);
+      return (list || [])
+        .map((j, i) => ({ j, d: (j.lat != null && j.lng != null) ? haversineMiles(center, j) : Infinity, i }))
+        .sort((a, b) => (a.d - b.d) || (a.i - b.i))
+        .map(x => x.j);
+    };
+
     // ── DB-FIRST search ──────────────────────────────────────────────────────
     // Serve from our own jobs corpus, relevance-filtered to the query (and to the
     // company, for company-name searches). Only top up from the live API when we
@@ -148,7 +184,7 @@ export default async function handler(req, res) {
         const locTerm = locationDbTerm(loc);
         const locClause = locTerm ? `&location=ilike.*${encodeURIComponent(locTerm)}*` : '';
 
-        const [expansion, kwRows, coRows, tgtRows] = await Promise.all([
+        const [expansion, kwRows, coRows, tgtRows, centerResolved] = await Promise.all([
           getQueryExpansion(qNorm, SUPABASE_URL, dbHeaders),
           t3filter
             ? fetch(`${SUPABASE_URL}/rest/v1/jobs?${t3filter}${locClause}&expires_at=gt.${now}&limit=60`, { headers: dbHeaders })
@@ -161,7 +197,10 @@ export default async function handler(req, res) {
           // Admin-tunable aggregation target (feature_flags.job_search_target.percentage).
           fetch(`${SUPABASE_URL}/rest/v1/feature_flags?flag_name=eq.job_search_target&select=percentage&limit=1`, { headers: dbHeaders })
             .then(r => r.ok ? r.json() : []).catch(() => []),
+          // Geocode the searched place once (cached) — overlapped with the DB reads.
+          loc ? geocodeLocation(loc, SUPABASE_URL, SUPABASE_SERVICE_KEY) : Promise.resolve(null),
         ]);
+        center = centerResolved;
 
         // Below TARGET related listings → top up from the live API. Admin lowers this
         // to calm aggregation, raises it to aggregate harder. Clamped to a sane range.
@@ -201,13 +240,14 @@ export default async function handler(req, res) {
           salary: j.salary, url: j.apply_url || j.url || null, description: j.description,
           type: j.type || 'Full-time', level: inferLevel(j.title || ''),
           source: j.source || 'Seen', score: j.score || 65, waste_score: j.waste_score || 25,
+          lat: j.lat ?? null, lng: j.lng ?? null,
         }));
-        // Keep only listings in/near the searched place (city → state → remote),
-        // dropping cross-location leaks. No-op for national searches.
-        dbMatches = filterByLocation(dbMatches, loc);
+        // Keep only listings within the searched radius (true distance when we have
+        // coordinates, else coarse city → state), nearest first.
+        dbMatches = applyRadius(dbMatches);
 
         if (dbMatches.length >= TARGET) {
-          console.log(`DB HIT: "${query}" → "${canonical}" @ "${loc}" — ${dbMatches.length} related results (no API call)`);
+          console.log(`DB HIT: "${query}" → "${canonical}" @ "${loc}" (${radiusMiles}mi) — ${dbMatches.length} in-radius results (no API call)`);
           return res.status(200).json({ ok: true, jobs: dbMatches.slice(0, 60), query, location: loc, _src: 'db' });
         }
       } catch(e) { console.warn('DB-first search error:', e.message); }
@@ -243,15 +283,17 @@ export default async function handler(req, res) {
         serviceKey: SUPABASE_SERVICE_KEY,
         adzunaAppId: process.env.ADZUNA_APP_ID,
         adzunaAppKey: process.env.ADZUNA_APP_KEY,
+        distanceKm, // Adzuna scopes the live pull to the searched radius
       });
-      // Map the freshly-saved listings into the UI shape, then relevance/location filter.
+      // Map the freshly-saved listings into the UI shape, then relevance + radius filter.
       jobs = (agg.jobs || []).map(j => ({
         title: j.title, company: j.company, location: j.location || loc,
         salary: j.salary, url: j.apply_url || j.url || null, description: j.description,
         type: j.type || 'Full-time', level: inferLevel(j.title || ''),
         source: j.source || 'Seen', score: j.score || 65, waste_score: j.waste_score || 25,
+        lat: j.lat ?? null, lng: j.lng ?? null,
       }));
-      jobs = filterByLocation(filterAndRank(jobs, relevanceQuery), loc);
+      jobs = applyRadius(filterAndRank(jobs, relevanceQuery));
       console.log(`AGGREGATED: "${query}" → "${canonical}" @ "${loc}" — ${agg.jobs?.length || 0} fetched, ${agg.upserted || 0} saved, ${jobs.length} relevant`);
       if (SUPABASE_URL && SUPABASE_SERVICE_KEY) _logSearch(canonical, loc, jobs.length, SUPABASE_URL, dbHeaders);
     } catch (e) {
@@ -268,7 +310,7 @@ export default async function handler(req, res) {
       mergedSeen.add(key);
       merged.push(j);
     }
-    let finalJobs = filterByLocation(filterAndRank(merged, relevanceQuery), loc).slice(0, 60);
+    let finalJobs = applyRadius(filterAndRank(merged, relevanceQuery)).slice(0, 60);
     let widened = false;
 
     // ── NEVER return nothing ─────────────────────────────────────────────────────
@@ -295,6 +337,7 @@ export default async function handler(req, res) {
           salary: j.salary, url: j.apply_url || j.url || null, description: j.description,
           type: j.type || 'Full-time', level: inferLevel(j.title || ''),
           source: j.source || 'Seen', score: j.score || 65, waste_score: j.waste_score || 25,
+          lat: j.lat ?? null, lng: j.lng ?? null,
         }));
         console.log(`WIDENED: "${query}" → "${canonical}" — national aggregate added ${wideJobs.length}`);
       } catch (e) { console.warn('widen aggregate error:', e.message); }
@@ -307,7 +350,9 @@ export default async function handler(req, res) {
         widenSeen.add(key);
         widenPool.push(j);
       }
-      finalJobs = sortByProximity(filterAndRank(widenPool, relevanceQuery), loc).slice(0, 60);
+      // Keep everything, nearest-first — the widen path deliberately shows results beyond
+      // the radius so the board is never empty (surfaced to the user via the `widened` flag).
+      finalJobs = rankByDistanceKeepAll(filterAndRank(widenPool, relevanceQuery)).slice(0, 60);
     }
 
     // ── Absolute last resort ─────────────────────────────────────────────────────
