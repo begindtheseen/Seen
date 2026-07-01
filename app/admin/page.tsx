@@ -256,7 +256,42 @@ function issueBadgeColor(type: string) {
   return 'var(--dim)'
 }
 
-function KpiDetailRows({ metric, rows }: { metric: string; rows: Record<string, unknown>[] }) {
+// One user row in the KPI drill-down, with a two-step delete (full admins only).
+function UserRow({ r, token, onDeleted, ts }: { r: Record<string, unknown>; token: string; onDeleted: (id: string) => void; ts: (i: unknown) => string }) {
+  const [busy, setBusy] = useState(false)
+  const [confirm, setConfirm] = useState(false)
+  const id = String(r.id ?? '')
+  async function del() {
+    if (!id) return
+    setBusy(true)
+    try {
+      const res = await fetch('/api/admin-stats', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Admin-Token': token },
+        body: JSON.stringify({ action: 'delete_user', user_id: id }),
+      })
+      const d = await res.json().catch(() => ({}))
+      if (res.ok && d.ok) { onDeleted(id); return }
+      alert(d.error || 'Delete failed'); setBusy(false); setConfirm(false)
+    } catch { alert('Network error'); setBusy(false); setConfirm(false) }
+  }
+  return (
+    <div style={{ display: 'grid', gridTemplateColumns: '1fr auto auto', gap: '.5rem', padding: '.5rem .6rem', background: 'var(--card)', borderRadius: 7, alignItems: 'center' }}>
+      <span style={{ fontFamily: 'var(--mono)', fontSize: '.62rem', color: 'var(--white)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{String(r.email ?? '—')}</span>
+      <span style={{ fontFamily: 'var(--mono)', fontSize: '.62rem', color: 'var(--sub)' }}>{ts(r.created_at)}</span>
+      {confirm ? (
+        <span style={{ display: 'flex', gap: '.3rem' }}>
+          <button onClick={del} disabled={busy} style={{ background: 'var(--red)', border: 'none', borderRadius: 5, color: '#fff', fontFamily: 'var(--mono)', fontSize: '.55rem', padding: '.22rem .45rem', cursor: busy ? 'wait' : 'pointer' }}>{busy ? '…' : 'Delete'}</button>
+          <button onClick={() => setConfirm(false)} disabled={busy} style={{ background: 'none', border: '1px solid var(--line2)', borderRadius: 5, color: 'var(--dim)', fontFamily: 'var(--mono)', fontSize: '.55rem', padding: '.22rem .4rem', cursor: 'pointer' }}>×</button>
+        </span>
+      ) : (
+        <button onClick={() => setConfirm(true)} title="Permanently delete this user and all their data" style={{ background: 'none', border: '1px solid rgba(239,68,68,.35)', borderRadius: 5, color: 'var(--red)', fontFamily: 'var(--mono)', fontSize: '.6rem', padding: '.22rem .5rem', cursor: 'pointer' }}>🗑</button>
+      )}
+    </div>
+  )
+}
+
+function KpiDetailRows({ metric, rows, token, onDeleteRow }: { metric: string; rows: Record<string, unknown>[]; token: string; onDeleteRow: (id: string) => void }) {
   const cell = (txt: unknown, color?: string) => (
     <span style={{ fontFamily: 'var(--mono)', fontSize: '.62rem', color: color || 'var(--sub)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{String(txt ?? '—')}</span>
   )
@@ -269,14 +304,11 @@ function KpiDetailRows({ metric, rows }: { metric: string; rows: Record<string, 
     return `${Math.floor(h / 24)}d ago`
   }
 
-  // Users group
+  // Users group — with per-row delete (full admins only; server enforces role)
   if (['total_accounts','new_today','new_this_week'].includes(metric)) {
     return <div style={{ display: 'flex', flexDirection: 'column', gap: '.45rem' }}>
       {rows.map((r, i) => (
-        <div key={i} style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: '.5rem', padding: '.5rem .6rem', background: 'var(--card)', borderRadius: 7, alignItems: 'center' }}>
-          {cell(r.email, 'var(--white)')}
-          {cell(ts(r.created_at))}
-        </div>
+        <UserRow key={String(r.id ?? i)} r={r} token={token} onDeleted={onDeleteRow} ts={ts} />
       ))}
     </div>
   }
@@ -401,7 +433,7 @@ function KpiModal({ metric, title, token, onClose }: { metric: string; title: st
           ) : !rows.length ? (
             <div style={{ textAlign: 'center', padding: '2.5rem', fontFamily: 'var(--mono)', fontSize: '.65rem', color: 'var(--dim)' }}>No data yet</div>
           ) : (
-            <KpiDetailRows metric={metric} rows={rows} />
+            <KpiDetailRows metric={metric} rows={rows} token={token} onDeleteRow={(id) => setRows(rs => (rs || []).filter(r => String(r.id) !== id))} />
           )}
         </div>
       </div>
