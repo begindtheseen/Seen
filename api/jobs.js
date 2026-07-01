@@ -3,6 +3,7 @@ import { getQueryExpansion } from '../lib/server/expand.js';
 import { applyRateLimit, rateLimit } from '../lib/server/ratelimit.js';
 import { logError } from '../lib/server/errlog.js';
 import { filterAndRank, filterByLocation, locationDbTerm } from './_utils/jobRelevance.js';
+import { aggregateForQuery, upsertJobs } from '../lib/server/jobSources.js';
 
 // Verify a Supabase JWT (HS256) and return the user id, or null. Decoding the payload
 // WITHOUT this check would let anyone forge a token and read another user's data.
@@ -35,7 +36,7 @@ async function _resolveUid(req) {
   return null;
 }
 
-// Per-instance request coalescing: concurrent identical searches share one Claude call
+// Per-instance request coalescing: concurrent identical searches share one live aggregation
 const _inflight = new Map();
 
 export default async function handler(req, res) {
@@ -117,22 +118,6 @@ export default async function handler(req, res) {
     relevanceQuery = safeQuery;
 
     loc = (location || '').trim();
-    const radiusMiles = radius || 25;
-
-    const systemPrompt = [
-      'You are a job search assistant. Search for open job listings using web search.',
-      'Search multiple times if needed. Always return at least 8 results.',
-      'If the exact city has few results, include nearby cities or remote options.',
-      'Return ONLY a valid JSON array with no markdown, no explanation:',
-      '[{"title":"...","company":"...","location":"City, State","salary":"$Xk-$Yk or null","url":"apply URL","description":"3-5 sentences describing the role, key responsibilities, and requirements","type":"Full-time","level":"Mid level","source":"LinkedIn/Indeed/etc"}]'
-    ].join('\n');
-
-    const userPrompt = loc
-      ? `Find open ${safeQuery} jobs within ${radiusMiles} miles of ${loc}. Search LinkedIn, Indeed, Greenhouse, Lever, Workday. Do multiple searches. Return at least 8 results. If not enough nearby, include remote options.`
-      : `Find open ${safeQuery} jobs in the US or remote. Search LinkedIn, Indeed, Greenhouse, Lever. Return at least 8 results.`;
-
-    const ANTHROPIC_KEY = process.env.ANTHROPIC_KEY;
-    if (!ANTHROPIC_KEY) return res.status(500).json({ error: 'ANTHROPIC_KEY not configured', jobs: [] });
 
     const SUPABASE_URL = process.env.SUPABASE_URL;
     const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY;
@@ -144,8 +129,9 @@ export default async function handler(req, res) {
 
     const qNorm = safeQuery.toLowerCase();
 
-    // canonical stays in outer scope so the save section can use it
+    // canonical + expansion terms stay in outer scope so the aggregation step can use them
     let canonical = qNorm;
+    let relatedTerms = [];
 
     // ── DB-FIRST search ──────────────────────────────────────────────────────
     // Serve from our own jobs corpus, relevance-filtered to the query (and to the
@@ -163,7 +149,7 @@ export default async function handler(req, res) {
         const locClause = locTerm ? `&location=ilike.*${encodeURIComponent(locTerm)}*` : '';
 
         const [expansion, kwRows, coRows, tgtRows] = await Promise.all([
-          getQueryExpansion(qNorm, SUPABASE_URL, dbHeaders, ANTHROPIC_KEY),
+          getQueryExpansion(qNorm, SUPABASE_URL, dbHeaders),
           t3filter
             ? fetch(`${SUPABASE_URL}/rest/v1/jobs?${t3filter}${locClause}&expires_at=gt.${now}&limit=60`, { headers: dbHeaders })
                 .then(r => r.ok ? r.json() : []).catch(() => [])
@@ -183,6 +169,7 @@ export default async function handler(req, res) {
         const TARGET = Number.isFinite(tp) && tp > 0 ? Math.min(60, Math.max(5, tp)) : 20;
 
         canonical = expansion.canonical;
+        relatedTerms = expansion.related || [];
         const searchTerms = [canonical, ...expansion.related].filter(Boolean);
         // Filter relevance against the raw query AND its expansion terms, so synonym
         // matches (e.g. "SWE" → "Software Engineer") are kept, not dropped.
@@ -227,132 +214,51 @@ export default async function handler(req, res) {
       console.log(`DB TOP-UP: "${query}" → "${canonical}" @ "${loc}" — ${dbMatches.length} in DB, pulling more from API`);
     }
 
-    // Coalesce concurrent identical searches into one Claude API call
+    // ── Not enough in our corpus → aggregate LIVE from keyless sources ───────────
+    // Pull fresh listings from Adzuna for the canonical query (+ expansion terms) at
+    // this location, SAVE them — jobs AND their companies — to the DB, then merge with
+    // what we already had. Every under-served search grows the corpus, so popular
+    // searches get progressively faster (more DB hits) and our data compounds over time.
+    // Coalesce concurrent identical searches into one live aggregation.
     inflightKey = `${canonical}::${loc}`;
     if (_inflight.has(inflightKey)) {
-      console.log(`COALESCED: "${canonical}" @ "${loc}" — waiting on in-flight request`);
+      console.log(`COALESCED: "${canonical}" @ "${loc}" — waiting on in-flight aggregation`);
       try {
         const coalesced = await _inflight.get(inflightKey);
         return res.status(200).json({ ok: true, ...coalesced, _src: 'coalesced' });
-      } catch(e) { /* fall through to make our own call */ }
+      } catch(e) { /* fall through to run our own */ }
     }
 
     const inflightPromise = new Promise((resolve, reject) => { _inflightResolve = resolve; _inflightReject = reject; });
     _inflight.set(inflightKey, inflightPromise);
     setTimeout(() => _inflight.delete(inflightKey), 90_000);
 
-    let apiRes;
-    for (let attempt = 0; attempt < 3; attempt++) {
-      if (attempt > 0) {
-        const retryAfter = apiRes?.headers?.get('retry-after');
-        const waitMs = retryAfter ? Math.min(parseInt(retryAfter) * 1000, 20000) : attempt * 5000;
-        await new Promise(r => setTimeout(r, waitMs));
-      }
-      apiRes = await fetch('https://api.anthropic.com/v1/messages', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-api-key': ANTHROPIC_KEY,
-          'anthropic-version': '2023-06-01',
-          'anthropic-beta': 'web-search-2025-03-05',
-        },
-        body: JSON.stringify({
-          model: 'claude-haiku-4-5-20251001',
-          max_tokens: 2500,
-          tools: [{ type: 'web_search_20250305', name: 'web_search' }],
-          system: systemPrompt,
-          messages: [{ role: 'user', content: userPrompt }]
-        })
-      });
-      if (apiRes.status !== 429 && apiRes.status !== 529) break;
-    }
-    console.log(`API CALLED: "${query}" → "${canonical}" @ "${loc}"`);
-
-    if (!apiRes.ok) {
-      // Rate limited — try serving stale (expired) cache before failing
-      if ((apiRes.status === 429 || apiRes.status === 529) && SUPABASE_URL && SUPABASE_SERVICE_KEY) {
-        const searchTerms = [canonical, ...(await (async () => {
-          try {
-            const exp = await fetch(`${SUPABASE_URL}/rest/v1/query_expansions?raw_query=ilike.${encodeURIComponent(canonical)}&limit=1`, { headers: dbHeaders });
-            if (exp.ok) { const rows = await exp.json(); return rows[0]?.related || []; }
-          } catch(e) {}
-          return [];
-        })())].filter(Boolean);
-        for (const term of searchTerms) {
-          const staleFilter = `or=${encodeURIComponent(`(search_query.ilike.*${term}*,title.ilike.*${term}*)`)}`;
-          const r = await fetch(`${SUPABASE_URL}/rest/v1/jobs?${staleFilter}&limit=25`, { headers: dbHeaders });
-          if (r.ok) {
-            const rows = await r.json();
-            if (Array.isArray(rows) && rows.length >= 3) {
-              console.log(`STALE CACHE FALLBACK: "${query}" → "${term}" — ${rows.length} results`);
-              const jobs = filterByLocation(rows.map(j => ({
-                title: j.title, company: j.company, location: j.location || loc,
-                salary: j.salary, url: j.apply_url, description: j.description,
-                type: j.type || 'Full-time', level: j.level || 'Mid level',
-                source: j.source || 'Seen', score: j.score || 65, waste_score: j.waste_score || 25,
-              })), loc);
-              if (jobs.length) return res.status(200).json({ ok: true, jobs, query, location: loc, _src: 'stale-cache' });
-            }
-          }
-        }
-      }
-      const errText = await apiRes.text();
-      throw new Error('API ' + apiRes.status + ': ' + errText.slice(0, 150));
-    }
-
-    const data = await apiRes.json();
-    const text = (data.content || []).filter(b => b.type === 'text').map(b => b.text).join('');
-
     let jobs = [];
-    const clean = text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
-    const arrMatch = clean.match(/\[[\s\S]*\]/);
-    if (arrMatch) {
-      try { jobs = JSON.parse(arrMatch[0]); } catch(e) {}
-    }
-
-    jobs = jobs.filter(j => j.title && j.company && j.company !== 'Unknown');
-    jobs = jobs.map(j => ({ ...j, score: scoreJob(j), waste_score: wasteScore(j) }));
-    // Drop any web-search drift — keep only listings related to the query.
-    jobs = filterAndRank(jobs, relevanceQuery);
-
-    // Save under the canonical key so all equivalent queries hit this cache.
-    // merge-duplicates: re-searched jobs get expires_at refreshed (not just ignored).
-    if (SUPABASE_URL && SUPABASE_SERVICE_KEY && jobs.length) {
-      const expires = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
-      const rows = jobs.map(j => ({
-        title: j.title,
-        company: j.company,
-        location: j.location || loc || 'US',
-        salary: j.salary || null,
-        description: (j.description || '').slice(0, 8000),
-        apply_url: j.url || null,
-        source: j.source || 'Web search',
-        type: j.type || 'Full-time',
-        level: j.level || 'Mid level',
-        search_query: canonical,
-        score: j.score || 65,
-        waste_score: j.waste_score || 25,
-        expires_at: expires,
+    try {
+      const agg = await aggregateForQuery({
+        query: canonical,
+        location: loc,
+        relatedTerms,
+        supabaseUrl: SUPABASE_URL,
+        serviceKey: SUPABASE_SERVICE_KEY,
+        adzunaAppId: process.env.ADZUNA_APP_ID,
+        adzunaAppKey: process.env.ADZUNA_APP_KEY,
+      });
+      // Map the freshly-saved listings into the UI shape, then relevance/location filter.
+      jobs = (agg.jobs || []).map(j => ({
+        title: j.title, company: j.company, location: j.location || loc,
+        salary: j.salary, url: j.apply_url || j.url || null, description: j.description,
+        type: j.type || 'Full-time', level: j.level || 'Mid level',
+        source: j.source || 'Seen', score: j.score || 65, waste_score: j.waste_score || 25,
       }));
-      try {
-        const saveRes = await fetch(`${SUPABASE_URL}/rest/v1/jobs`, {
-          method: 'POST',
-          headers: { ...dbHeaders, Prefer: 'resolution=merge-duplicates,return=minimal' },
-          body: JSON.stringify(rows),
-        });
-        if (saveRes.ok) {
-          console.log(`CACHE SAVED: "${canonical}" @ "${loc}" — ${jobs.length} jobs`);
-        } else {
-          const errText = await saveRes.text();
-          console.error(`CACHE SAVE FAILED: ${saveRes.status}`, errText.slice(0, 300));
-        }
-      } catch(e) { console.error('CACHE SAVE ERROR:', e.message); }
-
-      // Log every search that hits the API (cache miss → real fetch)
-      _logSearch(canonical, loc, jobs.length, SUPABASE_URL, dbHeaders);
+      jobs = filterByLocation(filterAndRank(jobs, relevanceQuery), loc);
+      console.log(`AGGREGATED: "${query}" → "${canonical}" @ "${loc}" — ${agg.jobs?.length || 0} fetched, ${agg.upserted || 0} saved, ${jobs.length} relevant`);
+      if (SUPABASE_URL && SUPABASE_SERVICE_KEY) _logSearch(canonical, loc, jobs.length, SUPABASE_URL, dbHeaders);
+    } catch (e) {
+      console.warn('aggregateForQuery error:', e.message);
     }
 
-    // Merge the listings already in our DB with the fresh API results
+    // Merge the listings already in our DB with the fresh aggregated results
     // (deduped, relevance-ranked) so the user always gets the fullest related set.
     const mergedSeen = new Set();
     const merged = [];
@@ -364,9 +270,10 @@ export default async function handler(req, res) {
     }
     const finalJobs = filterByLocation(filterAndRank(merged, relevanceQuery), loc).slice(0, 60);
 
-    _inflightResolve?.({ jobs: finalJobs, query, location: loc });
+    const result = { jobs: finalJobs, query, location: loc, _src: jobs.length ? 'aggregated' : 'db' };
+    _inflightResolve?.(result);
     _inflight.delete(inflightKey);
-    return res.status(200).json({ ok: true, jobs: finalJobs, query, location: loc });
+    return res.status(200).json({ ok: true, ...result });
 
   } catch(err) {
     console.error('Jobs error:', err.message);
@@ -510,7 +417,6 @@ async function handleCompanyJobs(req, res, body) {
 
   const SUPABASE_URL = process.env.SUPABASE_URL;
   const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY;
-  const ANTHROPIC_KEY = process.env.ANTHROPIC_KEY;
   if (!SUPABASE_URL || !SUPABASE_SERVICE_KEY) return res.status(503).json({ error: 'DB unavailable', jobs: [] });
 
   const dbHeaders = { apikey: SUPABASE_SERVICE_KEY, Authorization: `Bearer ${SUPABASE_SERVICE_KEY}`, 'Content-Type': 'application/json' };
@@ -530,49 +436,33 @@ async function handleCompanyJobs(req, res, body) {
     }
   } catch(e) { console.warn('company_jobs cache:', e.message); }
 
-  // No cached jobs — live web search
-  if (!ANTHROPIC_KEY) return res.status(200).json({ ok: true, jobs: [], _src: 'no-api' });
-
+  // No cached jobs — aggregate LIVE from keyless sources (Adzuna), saving the jobs AND
+  // creating the company. Keyed by the company name so future visits hit the DB cache.
   try {
-    const apiRes = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-api-key': ANTHROPIC_KEY, 'anthropic-version': '2023-06-01', 'anthropic-beta': 'web-search-2025-03-05' },
-      body: JSON.stringify({
-        model: 'claude-haiku-4-5-20251001',
-        max_tokens: 2500,
-        tools: [{ type: 'web_search_20250305', name: 'web_search' }],
-        system: 'You are a job search assistant. Find current open job listings. Return ONLY a valid JSON array, no markdown:\n[{"title":"...","company":"...","location":"City, State or Remote","salary":"$Xk-$Yk or null","url":"direct apply URL","description":"3-4 sentences","type":"Full-time","level":"Mid level","source":"LinkedIn/Indeed/Greenhouse/etc"}]',
-        messages: [{ role: 'user', content: `Find 8-12 current open job listings at ${safeName}. Search their careers page, LinkedIn, Indeed, Greenhouse, and Lever. Return only real open roles.` }]
-      })
+    const agg = await aggregateForQuery({
+      query: safeName,
+      location: '',
+      supabaseUrl: SUPABASE_URL,
+      serviceKey: SUPABASE_SERVICE_KEY,
+      adzunaAppId: process.env.ADZUNA_APP_ID,
+      adzunaAppKey: process.env.ADZUNA_APP_KEY,
     });
-    if (!apiRes.ok) return res.status(200).json({ ok: true, jobs: [], _src: 'api-error' });
-
-    const data = await apiRes.json();
-    const text = (data.content || []).filter(b => b.type === 'text').map(b => b.text).join('');
-    let jobs = [];
-    const m = text.replace(/```json\n?/g, '').replace(/```\n?/g, '').match(/\[[\s\S]*\]/);
-    if (m) { try { jobs = JSON.parse(m[0]); } catch(e) {} }
-    jobs = jobs.filter(j => j.title && j.company).map(j => ({ ...j, score: scoreJob(j), waste_score: wasteScore(j) }));
-
-    // Save to DB (fire-and-forget)
-    if (jobs.length) {
-      const expires = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
-      const rows = jobs.map(j => ({
-        title: j.title, company: j.company, location: j.location || 'US',
-        salary: j.salary || null, description: (j.description || '').slice(0, 8000),
-        apply_url: j.url || null, source: j.source || 'Web search',
-        type: j.type || 'Full-time', level: j.level || 'Mid level',
-        search_query: safeName.toLowerCase(), score: j.score || 65, waste_score: j.waste_score || 25,
-        expires_at: expires,
+    // Adzuna's keyword match can surface adjacent roles — keep only listings actually
+    // at this company (normalized name overlaps either direction).
+    const target = safeName.toLowerCase();
+    const jobs = (agg.jobs || [])
+      .filter(j => {
+        const co = (j.company || '').toLowerCase();
+        return co && (co.includes(target) || target.includes(co));
+      })
+      .map(j => ({
+        title: j.title, company: j.company, location: j.location,
+        salary: j.salary, url: j.apply_url || j.url || null, description: j.description,
+        source: j.source, type: j.type, level: j.level,
+        score: j.score || 65, waste_score: j.waste_score || 25,
       }));
-      fetch(`${SUPABASE_URL}/rest/v1/jobs`, {
-        method: 'POST',
-        headers: { ...dbHeaders, Prefer: 'resolution=merge-duplicates,return=minimal' },
-        body: JSON.stringify(rows),
-      }).catch(e => console.error('company_jobs save error:', e.message));
-    }
-
-    return res.status(200).json({ ok: true, jobs, _src: 'live' });
+    console.log(`COMPANY AGGREGATED: "${safeName}" — ${agg.jobs?.length || 0} fetched, ${agg.upserted || 0} saved, ${jobs.length} matched`);
+    return res.status(200).json({ ok: true, jobs, _src: 'aggregated' });
   } catch(e) {
     logError('company_jobs', e.message, { company: safeName });
     return res.status(200).json({ ok: true, jobs: [], _src: 'error' });
@@ -746,7 +636,9 @@ async function handleLocationJobs(req, res, body) {
       allJobs = results.filter(r=>r.status==='fulfilled').flatMap(r=>r.value);
     }
     if (SUPABASE_URL && SUPABASE_SERVICE_KEY && allJobs.length) {
-      await fetch(`${SUPABASE_URL}/rest/v1/jobs`, { method:'POST', headers:{apikey:SUPABASE_SERVICE_KEY,Authorization:`Bearer ${SUPABASE_SERVICE_KEY}`,'Content-Type':'application/json',Prefer:'resolution=merge-duplicates,return=minimal'}, body:JSON.stringify(allJobs) });
+      // upsertJobs stamps company_id + creates any missing companies, so location
+      // browsing grows the companies table too (not just jobs).
+      await upsertJobs(allJobs, SUPABASE_URL, SUPABASE_SERVICE_KEY);
     }
     return res.status(200).json({ ok:true, jobs:allJobs, location });
   } catch(err) {
