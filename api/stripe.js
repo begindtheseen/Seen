@@ -181,31 +181,46 @@ export default async function handler(req, res) {
     const { uid, email } = await resolveUid(req, env);
     if (!uid) return res.status(401).json({ error: 'Sign in first' });
     const customerId = await resolveCustomerId(uid, email, env);
-    if (!customerId) return res.status(200).json({ ok: true, subscription: null });
+    // No Stripe customer → comped/never-subscribed; leave the pro flag untouched.
+    if (!customerId) return res.status(200).json({ ok: true, pro: null, subscription: null });
     try {
       const listRes = await fetch(`https://api.stripe.com/v1/subscriptions?customer=${encodeURIComponent(customerId)}&status=all&limit=10&expand[]=data.items`, { headers: { Authorization: `Bearer ${STRIPE_KEY}` } });
       if (!listRes.ok) return res.status(502).json({ error: 'Could not read subscription' });
       const subs = (await listRes.json())?.data || [];
-      const sub = subs.find(s => ['active', 'trialing', 'past_due'].includes(s.status)) || subs[0] || null;
-      if (!sub) return res.status(200).json({ ok: true, subscription: null });
+      // Only active / trialing / past_due grant access. A canceled/ended sub grants nothing.
+      let active = subs.find(s => ['active', 'trialing', 'past_due'].includes(s.status)) || null;
 
-      if (action === 'cancel_subscription' && !sub.cancel_at_period_end) {
-        const r = await fetch(`https://api.stripe.com/v1/subscriptions/${sub.id}`, { method: 'POST', headers: { Authorization: `Bearer ${STRIPE_KEY}`, 'Content-Type': 'application/x-www-form-urlencoded' }, body: 'cancel_at_period_end=true' });
+      if (active && action === 'cancel_subscription' && !active.cancel_at_period_end) {
+        const r = await fetch(`https://api.stripe.com/v1/subscriptions/${active.id}`, { method: 'POST', headers: { Authorization: `Bearer ${STRIPE_KEY}`, 'Content-Type': 'application/x-www-form-urlencoded' }, body: 'cancel_at_period_end=true' });
         if (!r.ok) return res.status(502).json({ error: 'Cancel failed — try again' });
-      } else if (action === 'resume_subscription' && sub.cancel_at_period_end) {
-        const r = await fetch(`https://api.stripe.com/v1/subscriptions/${sub.id}`, { method: 'POST', headers: { Authorization: `Bearer ${STRIPE_KEY}`, 'Content-Type': 'application/x-www-form-urlencoded' }, body: 'cancel_at_period_end=false' });
+      } else if (active && action === 'resume_subscription' && active.cancel_at_period_end) {
+        const r = await fetch(`https://api.stripe.com/v1/subscriptions/${active.id}`, { method: 'POST', headers: { Authorization: `Bearer ${STRIPE_KEY}`, 'Content-Type': 'application/x-www-form-urlencoded' }, body: 'cancel_at_period_end=false' });
         if (!r.ok) return res.status(502).json({ error: 'Resume failed — try again' });
       }
 
-      const freshRes = await fetch(`https://api.stripe.com/v1/subscriptions/${sub.id}?expand[]=items`, { headers: { Authorization: `Bearer ${STRIPE_KEY}` } });
-      const fresh = freshRes.ok ? await freshRes.json() : sub;
-      const item = fresh.items?.data?.[0];
+      // Refresh the active sub after any change so we return + reconcile on current state.
+      if (active) {
+        const freshRes = await fetch(`https://api.stripe.com/v1/subscriptions/${active.id}?expand[]=items`, { headers: { Authorization: `Bearer ${STRIPE_KEY}` } });
+        active = freshRes.ok ? await freshRes.json() : active;
+      }
+
+      // ── RECONCILE entitlement with Stripe on every read ──────────────────────
+      // This is what makes the lifecycle self-heal: when the subscription actually
+      // ends (period end reached, trial expired, payments failed), the next profile/
+      // pricing load flips Pro OFF and the manage buttons disappear — no webhook needed.
+      const entitled = !!active && ['active', 'trialing', 'past_due'].includes(active.status);
+      await setPro(uid, entitled, env);
+
+      if (!entitled) return res.status(200).json({ ok: true, pro: false, subscription: null });
+
+      const item = active.items?.data?.[0];
       return res.status(200).json({
         ok: true,
+        pro: true,
         subscription: {
-          status: fresh.status,
-          cancel_at_period_end: !!fresh.cancel_at_period_end,
-          current_period_end: fresh.current_period_end ? fresh.current_period_end * 1000 : null,
+          status: active.status,
+          cancel_at_period_end: !!active.cancel_at_period_end,
+          current_period_end: active.current_period_end ? active.current_period_end * 1000 : null,
           amount: item?.price?.unit_amount != null ? item.price.unit_amount / 100 : null,
           interval: item?.price?.recurring?.interval || null,
         },

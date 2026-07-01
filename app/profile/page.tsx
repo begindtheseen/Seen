@@ -113,6 +113,9 @@ export default function ProfilePage() {
       const r = await fetch('/api/stripe?action=subscription_status', { method: 'POST', headers: await aiHeaders(), body: '{}' })
       const d = await r.json()
       setSub(d?.subscription || null)
+      // Reconcile Pro with Stripe's truth: if the subscription has ended, this flips the
+      // Billing section to Free so the Cancel/Resume buttons disappear.
+      if (typeof d?.pro === 'boolean') setIsPro(d.pro)
     } catch { /* ignore */ }
   }
 
@@ -125,6 +128,7 @@ export default function ProfilePage() {
       const d = await r.json()
       if (d?.ok) {
         setSub(d.subscription || null)
+        if (typeof d?.pro === 'boolean') setIsPro(d.pro)
         setSubMsg(act === 'cancel_subscription' ? 'Your membership will cancel at the end of your billing period.' : 'Your membership is active again — thanks for staying!')
       } else {
         setSubMsg(d?.error || 'Could not update your membership — try again or email hello@seenjobs.io')
