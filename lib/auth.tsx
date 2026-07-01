@@ -44,34 +44,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const loadProfile = useCallback(async () => {
     const currentUser = user
     if (!currentUser) return
+    // The signup name lives on the user's own JWT (user_metadata) — safe, always this user.
     const metaName = currentUser.user_metadata?.name || ''
     try {
       const result = await _sync('load_profile') as { profile?: Record<string, unknown> } | null
       const data = (result?.profile || null) as UserProfile | null
-      const local = loadProfileLocal()
-      const localTs = local.savedAt || 0
-      const dbTs = data?.updated_at ? new Date(data.updated_at).getTime() : 0
-      const localWins = localTs > dbTs
+      // DATA ISOLATION: the DB is the source of truth for a signed-in user. Do NOT merge in the
+      // device-local cache (it can hold a previously signed-in person's name/city on a shared
+      // device) and never push a local cache into this account. Only fall back to metaName.
       const merged: UserProfile = {
         ...(data || {}),
-        name: (localWins && local.name) ? local.name : (data?.name || local.name || metaName),
-        city: (localWins && local.city) ? local.city : (data?.city || local.city || ''),
-        experience: (localWins && local.experience) ? local.experience : (data?.experience || local.experience || ''),
+        name: data?.name || metaName,
+        city: data?.city || '',
+        experience: data?.experience || '',
       }
       if (merged.survey_completed) localStorage.setItem('_seen_survey_done', '1')
       setProfile(merged)
 
-      // Push local fields to DB if DB is missing them
-      if (!data || (!data.name && merged.name) || (!data.city && merged.city)) {
-        const patch: Record<string, string> = { email: currentUser.email || '', type: 'seeker' }
-        if (merged.name) patch.name = merged.name
-        if (merged.city) patch.city = merged.city
-        if (merged.experience) patch.experience = merged.experience
-        _sync('save_profile', { profile: patch }).catch(() => {})
+      // Backfill the DB with the user's OWN signup name if the row is missing it — never
+      // from a shared local cache.
+      if (data && !data.name && metaName) {
+        _sync('save_profile', { profile: { email: currentUser.email || '', type: 'seeker', name: metaName } }).catch(() => {})
       }
     } catch {
-      const local = loadProfileLocal()
-      setProfile(prev => prev || { name: local.name || metaName, city: local.city || '', experience: local.experience || '' })
+      setProfile(prev => prev || { name: metaName, city: '', experience: '' })
     }
   }, [user])
 
