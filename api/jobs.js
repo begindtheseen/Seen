@@ -313,46 +313,61 @@ export default async function handler(req, res) {
     let finalJobs = applyRadius(filterAndRank(merged, relevanceQuery)).slice(0, 60);
     let widened = false;
 
-    // ── NEVER return nothing ─────────────────────────────────────────────────────
-    // A location-strict search can come up thin for a sparse query (e.g. a specific
-    // employer in a small city) even though the role exists nearby or nationally.
-    // When that happens, WIDEN instead of showing "no results": aggregate the query
-    // nationally, then rank the full pool by proximity (nearest first) WITHOUT dropping
-    // far listings — so the user sees related roles closest to them.
+    // ── NEVER return nothing — but widen GEOGRAPHICALLY, not nationwide ───────────
+    // A radius search can come up thin (a role that's sparse within, say, 10mi) even
+    // though it's plentiful a bit farther out. Rather than teleport to national results
+    // (jumping to jobs 100s–1000s of miles away), first EXPAND the radius around the same
+    // place, so "nearby" stays nearby. Only if that's still empty do we fall back to a
+    // national pull. rankByDistanceKeepAll always shows the closest listings first.
+    const toUi = j => ({
+      title: j.title, company: j.company, location: j.location || loc,
+      salary: j.salary, url: j.apply_url || j.url || null, description: j.description,
+      type: j.type || 'Full-time', level: inferLevel(j.title || ''),
+      source: j.source || 'Seen', score: j.score || 65, waste_score: j.waste_score || 25,
+      lat: j.lat ?? null, lng: j.lng ?? null,
+    });
+    const dedupJobs = arr => {
+      const s = new Set(), out = [];
+      for (const j of arr) {
+        const key = `${(j.title||'').toLowerCase()}|${(j.company||'').toLowerCase()}|${(j.location||'').toLowerCase()}`;
+        if (s.has(key)) continue; s.add(key); out.push(j);
+      }
+      return out;
+    };
+
+    // Stage 1 — expand the radius around the SAME location (≈4× the radius, 60–250mi).
+    if (finalJobs.length < 5 && loc) {
+      widened = true;
+      const expandedMiles = Math.min(250, Math.max(radiusMiles * 4, 60));
+      let wideJobs = [];
+      try {
+        const wide = await aggregateForQuery({
+          query: canonical, location: loc, relatedTerms,
+          supabaseUrl: SUPABASE_URL, serviceKey: SUPABASE_SERVICE_KEY,
+          adzunaAppId: process.env.ADZUNA_APP_ID, adzunaAppKey: process.env.ADZUNA_APP_KEY,
+          distanceKm: milesToKm(expandedMiles),
+        });
+        wideJobs = (wide.jobs || []).map(toUi);
+        console.log(`WIDENED (geo): "${query}" expanded ${radiusMiles}→${expandedMiles}mi, added ${wideJobs.length}`);
+      } catch (e) { console.warn('geo-widen error:', e.message); }
+      finalJobs = rankByDistanceKeepAll(filterAndRank(dedupJobs([...merged, ...wideJobs]), relevanceQuery)).slice(0, 60);
+    }
+
+    // Stage 2 — national query (no location) that's thin, or nothing within the expanded
+    // radius: pull nationally as the last broadening step, still ranked nearest-first.
     if (finalJobs.length < 5) {
       widened = true;
       let wideJobs = [];
       try {
         const wide = await aggregateForQuery({
-          query: canonical,
-          location: '', // national — no where constraint
-          relatedTerms,
-          supabaseUrl: SUPABASE_URL,
-          serviceKey: SUPABASE_SERVICE_KEY,
-          adzunaAppId: process.env.ADZUNA_APP_ID,
-          adzunaAppKey: process.env.ADZUNA_APP_KEY,
+          query: canonical, location: '', relatedTerms,
+          supabaseUrl: SUPABASE_URL, serviceKey: SUPABASE_SERVICE_KEY,
+          adzunaAppId: process.env.ADZUNA_APP_ID, adzunaAppKey: process.env.ADZUNA_APP_KEY,
         });
-        wideJobs = (wide.jobs || []).map(j => ({
-          title: j.title, company: j.company, location: j.location || loc,
-          salary: j.salary, url: j.apply_url || j.url || null, description: j.description,
-          type: j.type || 'Full-time', level: inferLevel(j.title || ''),
-          source: j.source || 'Seen', score: j.score || 65, waste_score: j.waste_score || 25,
-          lat: j.lat ?? null, lng: j.lng ?? null,
-        }));
-        console.log(`WIDENED: "${query}" → "${canonical}" — national aggregate added ${wideJobs.length}`);
-      } catch (e) { console.warn('widen aggregate error:', e.message); }
-
-      const widenSeen = new Set();
-      const widenPool = [];
-      for (const j of [...merged, ...wideJobs]) {
-        const key = `${(j.title||'').toLowerCase()}|${(j.company||'').toLowerCase()}|${(j.location||'').toLowerCase()}`;
-        if (widenSeen.has(key)) continue;
-        widenSeen.add(key);
-        widenPool.push(j);
-      }
-      // Keep everything, nearest-first — the widen path deliberately shows results beyond
-      // the radius so the board is never empty (surfaced to the user via the `widened` flag).
-      finalJobs = rankByDistanceKeepAll(filterAndRank(widenPool, relevanceQuery)).slice(0, 60);
+        wideJobs = (wide.jobs || []).map(toUi);
+        console.log(`WIDENED (national): "${query}" added ${wideJobs.length}`);
+      } catch (e) { console.warn('national-widen error:', e.message); }
+      finalJobs = rankByDistanceKeepAll(filterAndRank(dedupJobs([...merged, ...wideJobs]), relevanceQuery)).slice(0, 60);
     }
 
     // ── Absolute last resort ─────────────────────────────────────────────────────
