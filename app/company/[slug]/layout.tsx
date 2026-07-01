@@ -203,15 +203,19 @@ export default async function CompanySlugLayout(
               )}
               {interpret(s)}
             </p>
-            {/* Crawlable internal links to the new growth surfaces — present in initial HTML. */}
-            <nav
+            {/* Crawlable internal links to the new growth surfaces — present in initial HTML.
+                Uses a div (not <nav>) on purpose: the global CSS `nav{position:fixed}` rule is
+                for the site header only, and a <nav> here would get pinned to the top of the
+                viewport and overlap the page. role="navigation" keeps the a11y semantics. */}
+            <div
+              role="navigation"
               aria-label={`Explore ${name} hiring`}
               style={{ display: 'flex', flexWrap: 'wrap', gap: '.5rem 1rem', marginTop: '.85rem', paddingTop: '.85rem', borderTop: '1px solid var(--line)' }}
             >
               <a href={`/faq/does-${slug}-ghost-applicants`} style={{ fontFamily: 'var(--mono)', fontSize: '.62rem', color: 'var(--blue)', textDecoration: 'none' }}>Does {name} ghost applicants?</a>
               <a href={`/faq/${slug}-hiring-process`} style={{ fontFamily: 'var(--mono)', fontSize: '.62rem', color: 'var(--blue)', textDecoration: 'none' }}>{name} hiring process</a>
               <a href={`/compare?a=${encodeURIComponent(name)}`} style={{ fontFamily: 'var(--mono)', fontSize: '.62rem', color: 'var(--blue)', textDecoration: 'none' }}>Compare {name} vs another</a>
-            </nav>
+            </div>
           </div>
         </section>
       )}
