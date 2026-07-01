@@ -19,6 +19,9 @@ interface ResumeSurvey {
 interface ResumeSurveyModalProps {
   onClose: () => void
   onCreditsEarned?: (awarded: number) => void
+  // When there's no résumé survey to show (no résumé / no employers parsed / all done),
+  // the host can fall back to another survey source instead of the empty state.
+  onExhausted?: (reason: string) => void
 }
 
 type Phase = 'loading' | 'intro' | 'question' | 'credit-pop' | 'done' | 'none' | 'error'
@@ -31,7 +34,7 @@ const NONE_COPY: Record<string, { title: string; body: string }> = {
   daily_cap:     { title: "You've hit today's cap", body: "You've earned the max credits from surveys today. Come back tomorrow for more." },
 }
 
-export default function ResumeSurveyModal({ onClose, onCreditsEarned }: ResumeSurveyModalProps) {
+export default function ResumeSurveyModal({ onClose, onCreditsEarned, onExhausted }: ResumeSurveyModalProps) {
   const [phase, setPhase] = useState<Phase>('loading')
   const [survey, setSurvey] = useState<ResumeSurvey | null>(null)
   const [qIndex, setQIndex] = useState(0)
@@ -61,7 +64,11 @@ export default function ResumeSurveyModal({ onClose, onCreditsEarned }: ResumeSu
       setBalance(d.balance || 0)
       setCreditsLeft(d.credits_left ?? 5)
       if (!d.survey || !Array.isArray(d.survey.questions) || !d.survey.questions.length) {
-        setNoneReason(d.reason || 'all_surveyed')
+        const reason = d.reason || 'all_surveyed'
+        // If a host provided a fallback (e.g. the tracker), hand off rather than dead-ending —
+        // except on daily_cap, where any other survey would be capped too.
+        if (onExhausted && reason !== 'daily_cap') { onExhausted(reason); return }
+        setNoneReason(reason)
         setPhase('none')
         return
       }

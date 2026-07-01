@@ -11,6 +11,7 @@ import dynamic from 'next/dynamic'
 import OutcomeCard from '@/components/OutcomeCard'
 import RoundsPrompt from '@/components/RoundsPrompt'
 const SurveyModal = dynamic(() => import('@/components/SurveyModal'), { ssr: false })
+const ResumeSurveyModal = dynamic(() => import('@/components/ResumeSurveyModal'), { ssr: false })
 
 const STATUS_MAP: Record<string, string> = {
   active: '',
@@ -234,6 +235,9 @@ function TrackerPage() {
   const [roundsApp, setRoundsApp] = useState<Application | null>(null)
   const [showManual, setShowManual] = useState(false)
   const [showSurvey, setShowSurvey] = useState(false)
+  // Survey source: prefer the résumé-based survey (asks about the user's past employers from
+  // their résumé); fall back to the tracked-application survey only when there's no résumé data.
+  const [surveyMode, setSurveyMode] = useState<'resume' | 'tracker'>('resume')
   const [creditsEarned, setCreditsEarned] = useState(0)
   const [manualForm, setManualForm] = useState({ company: '', role: '', location: '', platform: 'Direct' })
   const [highlightNew, setHighlightNew] = useState(false)
@@ -684,7 +688,7 @@ function TrackerPage() {
         {/* Survey CTA — show when user has apps with data to contribute */}
         {apps.length >= 1 && !showSurvey && (
           <div
-            onClick={() => setShowSurvey(true)}
+            onClick={() => { setSurveyMode('resume'); setShowSurvey(true) }}
             style={{
               background: 'linear-gradient(90deg, rgba(99,102,241,.1), rgba(124,58,237,.06))',
               border: '1px solid rgba(99,102,241,.22)',
@@ -730,7 +734,16 @@ function TrackerPage() {
 
       </div>
     </div>
-    {showSurvey && (
+    {showSurvey && surveyMode === 'resume' && (
+      <ResumeSurveyModal
+        onClose={() => setShowSurvey(false)}
+        onCreditsEarned={(n) => { setCreditsEarned(n); setShowSurvey(false) }}
+        // No résumé / no parsed employers / all past employers surveyed → fall back to the
+        // tracked-application survey so the user can still earn.
+        onExhausted={() => setSurveyMode('tracker')}
+      />
+    )}
+    {showSurvey && surveyMode === 'tracker' && (
       <SurveyModal
         apps={apps}
         onClose={() => setShowSurvey(false)}
