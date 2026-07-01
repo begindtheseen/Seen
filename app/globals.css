@@ -649,6 +649,60 @@ nav.nav-scrolled{background:rgba(6,6,8,0.82);backdrop-filter:blur(60px) saturate
 /* Quick actions — icon chip presentation */
 .qact{display:flex;align-items:center;gap:.6rem;justify-content:flex-start;font-size:.78rem;padding:.55rem .7rem}
 .qact-ic{width:28px;height:28px;border-radius:8px;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.09);display:inline-flex;align-items:center;justify-content:center;font-size:.85rem;flex-shrink:0;box-shadow:inset 0 1px 0 rgba(255,255,255,0.06)}
+
+/* ═══ Dashboard — Command Center ══════════════════════════════════════ */
+.dash{max-width:880px;margin:0 auto;padding:1rem 1rem calc(2.25rem + env(safe-area-inset-bottom));width:100%;box-sizing:border-box;display:flex;flex-direction:column;gap:.95rem}
+.dcard{background:var(--surface);border:1px solid var(--line);border-radius:16px;overflow:hidden}
+.dcard-pad{padding:1rem 1.1rem}
+.dsec-head{display:flex;align-items:center;justify-content:space-between;gap:.5rem;margin-bottom:.7rem}
+.dsec-title{font-family:var(--display);font-size:.92rem;font-weight:800;color:var(--white);letter-spacing:-.02em}
+.dsec-link{font-family:var(--mono);font-size:.62rem;color:var(--blue);text-decoration:none;white-space:nowrap;flex-shrink:0}
+.deyebrow{font-family:var(--mono);font-size:.5rem;text-transform:uppercase;letter-spacing:.16em;color:var(--muted)}
+/* Hero */
+.dhero{position:relative;overflow:hidden;border-radius:20px;border:1px solid rgba(99,102,241,.24);background:linear-gradient(155deg,rgba(40,34,96,.5),rgba(12,13,22,.55));padding:1.3rem 1.2rem;box-shadow:inset 0 1px 0 rgba(255,255,255,.05),0 18px 50px rgba(0,0,0,.35)}
+.dhero::before{content:'';position:absolute;top:-55%;left:-15%;width:65%;height:150%;background:radial-gradient(circle,rgba(99,102,241,.32),transparent 62%);filter:blur(14px);pointer-events:none}
+.dhero::after{content:'';position:absolute;bottom:-60%;right:-12%;width:60%;height:150%;background:radial-gradient(circle,rgba(29,78,216,.26),transparent 62%);filter:blur(16px);pointer-events:none}
+.dhero>*{position:relative;z-index:1}
+.dhero-name{font-family:var(--display);font-size:1.85rem;font-weight:800;color:var(--white);letter-spacing:-.045em;line-height:1.02;margin-bottom:.22rem}
+.dhero-status{font-size:.76rem;color:var(--sub);font-weight:300;margin-bottom:1rem}
+.dhealth{display:flex;align-items:center;gap:.9rem;margin-bottom:1rem}
+.dring{width:66px;height:66px;flex-shrink:0;border-radius:50%;display:flex;align-items:center;justify-content:center;position:relative}
+.dring::after{content:'';position:absolute;inset:6px;border-radius:50%;background:var(--surface)}
+.dring>span{position:relative;z-index:1;font-family:var(--display);font-weight:800;font-size:1.25rem;line-height:1}
+.dpills{display:grid;grid-template-columns:repeat(4,1fr);gap:.4rem}
+.dpill{background:rgba(255,255,255,.045);border:1px solid rgba(255,255,255,.08);border-radius:12px;padding:.5rem .3rem;text-align:center;min-width:0}
+.dpill-l{font-family:var(--mono);font-size:.46rem;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);margin-bottom:.2rem;white-space:nowrap}
+.dpill-n{font-family:var(--display);font-size:1.1rem;font-weight:800;line-height:1}
+.dhero-cta{display:flex;gap:.5rem;margin-top:1rem}
+.dbtn{flex:1;display:inline-flex;align-items:center;justify-content:center;gap:.35rem;border-radius:11px;padding:.7rem;font-family:var(--display);font-weight:700;font-size:.8rem;cursor:pointer;text-decoration:none;border:none;white-space:nowrap;transition:transform .12s}
+.dbtn:active{transform:scale(.98)}
+.dbtn-primary{background:linear-gradient(135deg,#1d4ed8,#7c3aed);color:#fff;box-shadow:0 0 22px rgba(124,58,237,.3)}
+.dbtn-ghost{background:rgba(255,255,255,.05);border:1px solid var(--line2);color:var(--white)}
+/* Rows / moves */
+.dmove{display:flex;align-items:center;gap:.7rem;width:100%;text-align:left;background:rgba(255,255,255,.03);border:1px solid var(--line);border-radius:12px;padding:.7rem .8rem;cursor:pointer;transition:border-color .15s;text-decoration:none}
+.dmove:hover{border-color:rgba(99,102,241,.4)}
+.dmove-ic{width:34px;height:34px;border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:1rem;background:linear-gradient(135deg,rgba(99,102,241,.18),rgba(29,78,216,.1));border:1px solid rgba(99,102,241,.2);flex-shrink:0}
+.dmove-t{font-family:var(--display);font-size:.8rem;font-weight:700;color:var(--white);line-height:1.2}
+.dmove-s{font-family:var(--mono);font-size:.56rem;color:var(--muted);margin-top:.1rem}
+.dmove-x{margin-left:auto;color:var(--dim);flex-shrink:0;font-size:.9rem}
+/* Pipeline */
+.dpipe{display:flex;align-items:center;gap:.75rem;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:.7rem .85rem}
+.dpipe-logo{width:38px;height:38px;border-radius:10px;background:var(--raised);border:1px solid var(--line2);display:flex;align-items:center;justify-content:center;font-family:var(--display);font-weight:800;color:var(--sub);flex-shrink:0}
+.dpipe-empty{padding:1.6rem 1.2rem;text-align:center;border:1px dashed var(--line2);border-radius:14px;background:rgba(255,255,255,.015)}
+/* Quick actions */
+.dqa{display:grid;grid-template-columns:1fr 1fr;gap:.55rem}
+.dqa-tile{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:.8rem .85rem;text-decoration:none;display:block;transition:border-color .15s,transform .12s}
+.dqa-tile:hover{border-color:rgba(99,102,241,.4);transform:translateY(-2px)}
+.dqa-ic{font-size:1.05rem;margin-bottom:.4rem;display:block}
+.dqa-t{font-family:var(--display);font-size:.78rem;font-weight:700;color:var(--white);line-height:1.15}
+.dqa-s{font-family:var(--mono);font-size:.52rem;color:var(--muted);margin-top:.18rem}
+/* Chips */
+.dchip{font-family:var(--mono);font-size:.62rem;background:var(--card);border:1px solid var(--line);border-radius:100px;padding:.3rem .7rem;color:var(--sub);text-decoration:none;white-space:nowrap;transition:border-color .15s,color .15s}
+.dchip:hover{border-color:rgba(99,102,241,.4);color:var(--white)}
+/* Benchmarks */
+.dbench{display:grid;grid-template-columns:1fr 1fr;gap:.5rem}
+.dbench-c{background:rgba(255,255,255,.025);border:1px solid var(--line);border-radius:12px;padding:.7rem .8rem}
+@media(max-width:360px){.dpill-n{font-size:1rem}.dpill-l{font-size:.42rem}}
 /* Jobs empty state — suggested search chips */
 .sugg-chip{background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.12);border-radius:100px;padding:.5rem 1.05rem;font-family:var(--mono);font-size:.66rem;color:var(--sub);cursor:pointer;transition:all .18s ease}
 .sugg-chip:hover{border-color:var(--green);color:var(--green);background:var(--gdim);box-shadow:0 0 16px rgba(16,185,129,0.15);transform:translateY(-1px)}
