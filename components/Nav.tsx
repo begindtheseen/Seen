@@ -3,9 +3,13 @@
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { useState, useEffect, useCallback } from 'react'
+import dynamic from 'next/dynamic'
 import { useAuth } from '@/lib/auth'
 import { supabase } from '@/lib/supabase'
 import UpgradeModal from './UpgradeModal'
+
+// The earn-credits flow: the résumé survey (asks about the user's past employers).
+const ResumeSurveyModal = dynamic(() => import('./ResumeSurveyModal'), { ssr: false })
 
 export default function Nav() {
   const pathname = usePathname()
@@ -18,6 +22,7 @@ export default function Nav() {
   const [creditBalance, setCreditBalance] = useState<number | null>(null)
   const [isPro, setIsPro] = useState(false)
   const [showUpgrade, setShowUpgrade] = useState(false)
+  const [showSurvey, setShowSurvey] = useState(false)
 
   const fetchBalance = useCallback(async () => {
     if (!isSeeker) { setCreditBalance(null); return }
@@ -134,7 +139,7 @@ export default function Nav() {
                 boxShadow: creditBalance === 0 ? '0 0 14px rgba(239,68,68,.18)' : '0 0 12px rgba(99,102,241,.16)',
                 animation: creditBalance === 0 ? 'pulse 2s ease-in-out infinite' : undefined,
               }}
-              onClick={() => creditBalance === 0 ? setShowUpgrade(true) : setShowAccountModal(true)}
+              onClick={() => creditBalance === 0 ? setShowUpgrade(true) : setShowSurvey(true)}
             >
               {creditBalance === 0
                 ? <>⚠️ Out of credits · Upgrade</>
@@ -184,7 +189,7 @@ export default function Nav() {
         )}
         {isSeeker && !isPro && creditBalance !== null && (
           <button
-            onClick={() => { setMenuOpen(false); creditBalance === 0 ? setShowUpgrade(true) : setShowAccountModal(true) }}
+            onClick={() => { setMenuOpen(false); creditBalance === 0 ? setShowUpgrade(true) : setShowSurvey(true) }}
             style={{
               display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '.5rem', width: 'calc(100% - 2rem)',
               margin: '.25rem 1rem .6rem', padding: '.7rem .9rem', cursor: 'pointer', textAlign: 'left',
@@ -223,6 +228,12 @@ export default function Nav() {
       </div>
 
       {showUpgrade && <UpgradeModal reason="credits" onClose={() => setShowUpgrade(false)} />}
+      {showSurvey && (
+        <ResumeSurveyModal
+          onClose={() => setShowSurvey(false)}
+          onCreditsEarned={() => fetchBalance()}
+        />
+      )}
 
       {/* Account Settings Modal */}
       {showAccountModal && (
