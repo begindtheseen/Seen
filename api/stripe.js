@@ -231,6 +231,43 @@ export default async function handler(req, res) {
     }
   }
 
+  // ── RECONCILE ALL (cron safety net) ───────────────────────────────────────
+  // Belt-and-suspenders so NO user is ever left marked Pro after their subscription
+  // ends. The webhook is the real-time path and the on-read reconcile catches lapses on
+  // the next profile/pricing visit — this daily sweep catches the last edge: a user whose
+  // webhook misfired AND who never revisits. Checks every Pro account that has a Stripe
+  // customer against Stripe; if none of their subs are active/trialing/past_due, Pro is
+  // revoked. Comped accounts (no stripe_customer_id) are never touched.
+  if (action === 'reconcile_all') {
+    const cronSecret = process.env.CRON_SECRET;
+    const isCron = req.headers['x-vercel-cron'] === '1';
+    const authHeader = req.headers['authorization'] || '';
+    const qsecret = new URL(req.url, 'https://x').searchParams.get('secret') || '';
+    if (!isCron && cronSecret && authHeader !== `Bearer ${cronSecret}` && qsecret !== cronSecret) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+    if (!STRIPE_KEY || !SUPABASE_URL || !SERVICE_KEY) return res.status(503).json({ error: 'Payments not configured' });
+    const q = db(SUPABASE_URL, SERVICE_KEY);
+    const listRes = await q(`ai_credits?pro=eq.true&stripe_customer_id=not.is.null&select=user_id,stripe_customer_id&limit=500`);
+    const rows = listRes.ok ? await listRes.json() : [];
+    let checked = 0, revoked = 0;
+    // Bounded concurrency (8) so one Stripe call per user stays well within the function budget.
+    for (let i = 0; i < rows.length; i += 8) {
+      const batch = rows.slice(i, i + 8);
+      await Promise.all(batch.map(async (row) => {
+        checked++;
+        try {
+          const subRes = await fetch(`https://api.stripe.com/v1/subscriptions?customer=${encodeURIComponent(row.stripe_customer_id)}&status=all&limit=10`, { headers: { Authorization: `Bearer ${STRIPE_KEY}` } });
+          if (!subRes.ok) return;
+          const subs = (await subRes.json())?.data || [];
+          const entitled = subs.some(s => ['active', 'trialing', 'past_due'].includes(s.status));
+          if (!entitled) { await setPro(row.user_id, false, env); revoked++; }
+        } catch { /* skip this user; the next sweep retries */ }
+      }));
+    }
+    return res.status(200).json({ ok: true, checked, revoked });
+  }
+
   // ── CREATE CHECKOUT SESSION ───────────────────────────────────────────────
   if (action === 'checkout') {
     if (req.method !== 'POST') return res.status(405).end();
