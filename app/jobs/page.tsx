@@ -1009,6 +1009,14 @@ export default function JobsPage() {
 
   const updateDisplay = useCallback((list: Job[], sortMode: SortMode) => {
     const f = applyFilters(list)
+    // Never blank the board: if active filters zero out a non-empty result set, fall
+    // back to showing all nearby roles with a note, rather than "No results".
+    if (f.length === 0 && list.length > 0) {
+      const s = applySort(list, sortMode)
+      setFiltered(s)
+      setStatusMsg(`No exact filter matches — showing all ${s.length} nearby role${s.length !== 1 ? 's' : ''}`)
+      return
+    }
     const s = applySort(f, sortMode)
     setFiltered(s)
     setStatusMsg(s.length === 0 ? 'No results. Try a different title or wider radius.' : `${s.length} result${s.length !== 1 ? 's' : ''}`)
@@ -1179,50 +1187,57 @@ export default function JobsPage() {
       if (!cached) { setJobs([]); setFiltered([]) }
     }
 
-    try {
-      const ctrl = new AbortController()
-      abortRef.current = ctrl
-      const res = await fetch('/api/jobs', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ query: q, location: loc, radius }),
-        signal: ctrl.signal,
-      })
-      if (!res.ok) throw new Error(`HTTP ${res.status}`)
-      const data = await res.json() as { jobs?: unknown[]; results?: unknown[] }
-      const raw: Job[] = (data.jobs || data.results || []).map((item: unknown) => {
-        const j = item as Record<string, unknown>
-        const company = String(j.company || j.co || '')
-        const title = String(j.title || '')
-        const location = String(j.location || j.loc || j.city || loc || 'US')
-        const apply_url = j.apply_url ? String(j.apply_url) : (j.url ? String(j.url) : null)
-        return {
-          // Stable, content-derived id when the API has none — so the same listing
-          // keeps the same id across loads and saved listings reliably reopen.
-          id: String(j.id || stableJobId({ company, title, location, apply_url })),
-          title,
-          company,
-          location,
-          score: Number(j.score) || 65,
-          waste: Number(j.waste_score ?? j.waste) || 25,
-          level: String(j.level || j.lvl || 'Mid level'),
-          type: String(j.type || 'Full-time'),
-          source: String(j.source || 'Job board'),
-          description: String(j.description || ''),
-          salary: j.salary ? String(j.salary) : null,
-          apply_url,
-        }
-      })
-      searchCache.set(cacheKey, { jobs: raw, ts: Date.now() })
-      JobCache.setMany(raw)
-      setJobs(raw)
-      updateDisplay(raw, sort)
-      setStatus('done')
-      if (q) try { RecentSearchesStore.push(q, loc || undefined) } catch {}
-    } catch (err) {
-      if ((err as Error).name === 'AbortError') return
-      setStatus('error')
-      setStatusMsg('Search failed. Please try again.')
+    // One automatic retry on a transient failure (cold start, flaky network) before
+    // ever showing an error — a single blip should never surface as "Search failed".
+    for (let attempt = 0; ; attempt++) {
+      try {
+        const ctrl = new AbortController()
+        abortRef.current = ctrl
+        const res = await fetch('/api/jobs', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ query: q, location: loc, radius }),
+          signal: ctrl.signal,
+        })
+        if (!res.ok) throw new Error(`HTTP ${res.status}`)
+        const data = await res.json() as { jobs?: unknown[]; results?: unknown[] }
+        const raw: Job[] = (data.jobs || data.results || []).map((item: unknown) => {
+          const j = item as Record<string, unknown>
+          const company = String(j.company || j.co || '')
+          const title = String(j.title || '')
+          const location = String(j.location || j.loc || j.city || loc || 'US')
+          const apply_url = j.apply_url ? String(j.apply_url) : (j.url ? String(j.url) : null)
+          return {
+            // Stable, content-derived id when the API has none — so the same listing
+            // keeps the same id across loads and saved listings reliably reopen.
+            id: String(j.id || stableJobId({ company, title, location, apply_url })),
+            title,
+            company,
+            location,
+            score: Number(j.score) || 65,
+            waste: Number(j.waste_score ?? j.waste) || 25,
+            level: String(j.level || j.lvl || 'Mid level'),
+            type: String(j.type || 'Full-time'),
+            source: String(j.source || 'Job board'),
+            description: String(j.description || ''),
+            salary: j.salary ? String(j.salary) : null,
+            apply_url,
+          }
+        })
+        searchCache.set(cacheKey, { jobs: raw, ts: Date.now() })
+        JobCache.setMany(raw)
+        setJobs(raw)
+        updateDisplay(raw, sort)
+        setStatus('done')
+        if (q) try { RecentSearchesStore.push(q, loc || undefined) } catch {}
+        return
+      } catch (err) {
+        if ((err as Error).name === 'AbortError') return // superseded by a newer search
+        if (attempt < 1) { await new Promise(r => setTimeout(r, 1200)); continue }
+        setStatus('error')
+        setStatusMsg('Search failed. Please try again.')
+        return
+      }
     }
   }
 
