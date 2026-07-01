@@ -1200,7 +1200,7 @@ export default function JobsPage() {
           signal: ctrl.signal,
         })
         if (!res.ok) throw new Error(`HTTP ${res.status}`)
-        const data = await res.json() as { jobs?: unknown[]; results?: unknown[] }
+        const data = await res.json() as { jobs?: unknown[]; results?: unknown[]; widened?: boolean; radius?: number }
         const raw: Job[] = (data.jobs || data.results || []).map((item: unknown) => {
           const j = item as Record<string, unknown>
           const company = String(j.company || j.co || '')
@@ -1229,6 +1229,11 @@ export default function JobsPage() {
         setJobs(raw)
         updateDisplay(raw, sort)
         setStatus('done')
+        // When we had to widen past the requested radius (nothing within it), say so —
+        // otherwise nearby-but-outside-radius results look like the radius is broken.
+        if (data.widened && loc && raw.length) {
+          setStatusMsg(`No jobs within ${data.radius || radius} mi of ${loc} — showing the ${raw.length} nearest matches`)
+        }
         if (q) try { RecentSearchesStore.push(q, loc || undefined) } catch {}
         return
       } catch (err) {
