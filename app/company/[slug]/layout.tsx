@@ -157,7 +157,10 @@ export default async function CompanySlugLayout(
           style={{
             maxWidth: 880,
             margin: '0 auto',
-            padding: '1.4rem 1.25rem 0',
+            // Clear the fixed 58px site header (nav is position:fixed) so the heading
+            // isn't cut off — this section renders above the .page-full children that
+            // normally provide that offset.
+            padding: 'calc(58px + 1.4rem) 1.25rem 0',
           }}
         >
           <div
