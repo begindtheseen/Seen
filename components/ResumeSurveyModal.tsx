@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
+import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 
 interface SurveyQuestion {
@@ -35,6 +36,7 @@ const NONE_COPY: Record<string, { title: string; body: string }> = {
 }
 
 export default function ResumeSurveyModal({ onClose, onCreditsEarned, onExhausted }: ResumeSurveyModalProps) {
+  const router = useRouter()
   const [phase, setPhase] = useState<Phase>('loading')
   const [survey, setSurvey] = useState<ResumeSurvey | null>(null)
   const [qIndex, setQIndex] = useState(0)
@@ -66,8 +68,10 @@ export default function ResumeSurveyModal({ onClose, onCreditsEarned, onExhauste
       if (!d.survey || !Array.isArray(d.survey.questions) || !d.survey.questions.length) {
         const reason = d.reason || 'all_surveyed'
         // If a host provided a fallback (e.g. the tracker), hand off rather than dead-ending —
-        // except on daily_cap, where any other survey would be capped too.
-        if (onExhausted && reason !== 'daily_cap') { onExhausted(reason); return }
+        // EXCEPT when the user simply has no résumé on file: uploading it is the highest-value
+        // action, so we stop and prompt for it (with a button) instead of silently falling back
+        // to the site-app survey. daily_cap also shows its own message (any survey is capped).
+        if (onExhausted && reason !== 'daily_cap' && reason !== 'no_resume') { onExhausted(reason); return }
         setNoneReason(reason)
         setPhase('none')
         return
@@ -281,6 +285,14 @@ export default function ResumeSurveyModal({ onClose, onCreditsEarned, onExhauste
               <div style={{ fontFamily: 'var(--mono)', fontSize: '.68rem', color: 'var(--sub)', lineHeight: 1.65, marginBottom: '1.5rem' }}>
                 {(NONE_COPY[noneReason] || NONE_COPY.all_surveyed).body}
               </div>
+              {(noneReason === 'no_resume' || noneReason === 'no_employment') && (
+                <button
+                  onClick={() => { onClose(); router.push('/resume') }}
+                  style={{ display: 'block', width: '100%', background: 'var(--indigo)', border: 'none', color: '#fff', fontFamily: 'var(--body)', fontWeight: 600, fontSize: '.85rem', borderRadius: 10, padding: '.7rem 1.25rem', cursor: 'pointer', marginBottom: '.6rem' }}
+                >
+                  Upload your résumé →
+                </button>
+              )}
               <button onClick={onClose} style={{ background: 'var(--raised)', border: '1px solid var(--line2)', color: 'var(--sub)', fontFamily: 'var(--mono)', fontSize: '.72rem', borderRadius: 8, padding: '.6rem 1.25rem', cursor: 'pointer' }}>Close</button>
             </div>
           )}
