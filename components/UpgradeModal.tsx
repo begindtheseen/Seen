@@ -126,7 +126,7 @@ export default function UpgradeModal({ reason, onClose, featureName }: UpgradeMo
             <div style={{ fontFamily: 'var(--display)', fontSize: '1.05rem', fontWeight: 800, color: 'var(--white)', letterSpacing: '-.02em', marginBottom: '.25rem', lineHeight: 1.25 }}>
               {headline}
             </div>
-            <div style={{ fontFamily: 'var(--mono)', fontSize: '.65rem', color: 'var(--sub)', lineHeight: 1.55 }}>
+            <div style={{ fontFamily: 'var(--body)', fontSize: '.72rem', color: 'var(--sub)', lineHeight: 1.55 }}>
               {sub}
             </div>
           </div>

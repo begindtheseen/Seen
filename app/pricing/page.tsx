@@ -170,7 +170,7 @@ function PricingPageInner() {
         <div style={{ textAlign: 'center', maxWidth: 420, padding: '2rem' }}>
           <div style={{ fontSize: '3.5rem', marginBottom: '1rem' }}>🎉</div>
           <h1 style={{ fontFamily: 'var(--display)', fontSize: '1.8rem', fontWeight: 800, color: 'var(--white)', marginBottom: '.5rem' }}>You're Pro.</h1>
-          <p style={{ color: 'var(--sub)', fontFamily: 'var(--mono)', fontSize: '.78rem', lineHeight: 1.7, marginBottom: '1.75rem' }}>
+          <p style={{ color: 'var(--sub)', fontFamily: 'var(--body)', fontSize: '.78rem', lineHeight: 1.7, marginBottom: '1.75rem' }}>
             Unlimited AI credits and Human Voice are live on your account right now.
             No setup needed.
           </p>
@@ -244,7 +244,7 @@ function PricingPageInner() {
             <div style={{ fontFamily: 'var(--mono)', fontSize: '.62rem', color: 'var(--muted)', marginBottom: '1.5rem' }}>forever — no card required</div>
             <div style={{ marginBottom: '1.5rem' }}>
               {FREE_FEATURES.map(f => (
-                <div key={f} style={{ display: 'flex', gap: '.5rem', marginBottom: '.45rem', fontFamily: 'var(--mono)', fontSize: '.65rem', color: 'var(--sub)', lineHeight: 1.45 }}>
+                <div key={f} style={{ display: 'flex', gap: '.5rem', marginBottom: '.45rem', fontFamily: 'var(--body)', fontSize: '.72rem', color: 'var(--sub)', lineHeight: 1.45 }}>
                   <span style={{ color: 'var(--dim)', flexShrink: 0 }}>✓</span>{f}
                 </div>
               ))}
@@ -279,7 +279,7 @@ function PricingPageInner() {
             )}
             <div style={{ marginBottom: '1.5rem' }}>
               {PRO_FEATURES.map(f => (
-                <div key={f} style={{ display: 'flex', gap: '.5rem', marginBottom: '.45rem', fontFamily: 'var(--mono)', fontSize: '.65rem', color: 'rgba(165,180,252,.85)', lineHeight: 1.45 }}>
+                <div key={f} style={{ display: 'flex', gap: '.5rem', marginBottom: '.45rem', fontFamily: 'var(--body)', fontSize: '.72rem', color: 'rgba(165,180,252,.85)', lineHeight: 1.45 }}>
                   <span style={{ color: '#818cf8', flexShrink: 0 }}>✓</span>{f}
                 </div>
               ))}
@@ -424,7 +424,7 @@ function PricingPageInner() {
             <summary style={{ padding: '.85rem 1.25rem', fontFamily: 'var(--display)', fontSize: '.82rem', fontWeight: 700, color: 'var(--white)', cursor: 'pointer', listStyle: 'none' }}>
               {item.q}
             </summary>
-            <div style={{ padding: '0 1.25rem .85rem', fontFamily: 'var(--mono)', fontSize: '.68rem', color: 'var(--sub)', lineHeight: 1.75 }}>
+            <div style={{ padding: '0 1.25rem .85rem', fontFamily: 'var(--body)', fontSize: '.72rem', color: 'var(--sub)', lineHeight: 1.75 }}>
               {item.a}
             </div>
           </details>
