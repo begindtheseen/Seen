@@ -25,10 +25,10 @@ const FREE_FEATURES = [
 
 const PRO_FEATURES = [
   'Unlimited AI credits — no daily cap',
-  '🥷 Stealth Mode — rewrites that bypass AI detection tools',
-  'AI job insights per listing',
   'Ghost risk alerts when companies change behavior',
   'AI company deep-dive analysis',
+  'AI job insights per listing',
+  'Human Voice — rewrites that sound like you, not a bot',
   'Priority support',
   'Early access to every new feature',
 ]
@@ -37,11 +37,11 @@ const COMPARISON: [string, string | boolean, string | boolean][] = [
   ['AI credits',                '3/day',     'Unlimited'],
   ['Resume AI — parse & scan',  true,         true],
   ['Resume AI — optimize',      true,         true],
-  ['🥷 Stealth Mode (AI-safe rewrite)', false,  true],
   ['AI job insights',           false,        true],
   ['Company ghost rates',       true,         true],
   ['Ghost risk alerts',         false,        true],
   ['AI company analysis',       false,        true],
+  ['Human Voice (natural rewrite)', false,    true],
   ['Job tracker',               'Unlimited',  'Unlimited'],
   ['Community feed',            true,         true],
   ['Priority support',          false,        true],
@@ -203,12 +203,11 @@ function PricingPageInner() {
             Transparent pricing
           </div>
           <h1 style={{ fontFamily: 'var(--display)', fontSize: 'clamp(1.8rem,5vw,2.6rem)', fontWeight: 900, color: 'var(--white)', letterSpacing: '-.04em', marginBottom: '.5rem', lineHeight: 1.1 }}>
-            The system is rigged.<br />
-            <span style={{ color: '#818cf8' }}>We help you game it.</span>
+            You already know who ghosts.<br />
+            <span style={{ color: '#818cf8' }}>Now get through to the ones who don't.</span>
           </h1>
           <p style={{ color: 'var(--sub)', fontSize: '.85rem', lineHeight: 1.7, maxWidth: 480, margin: '0 auto 1.75rem' }}>
-            Companies use AI to reject your resume. ATS filters keyword-match before a human sees it.
-            Seen Pro gives you the tools that work the other way around.
+            Seen shows you which companies actually respond — free. Pro gives you the résumé edge to land the ones worth your time.
           </p>
 
           {/* Billing toggle — annual is recommended */}
