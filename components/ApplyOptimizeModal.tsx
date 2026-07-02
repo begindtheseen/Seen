@@ -6,7 +6,10 @@ import { useAuth } from '@/lib/auth'
 import { aiHeaders } from '@/lib/aiHeaders'
 import { ResumeStore } from '@/lib/stores/ResumeStore'
 import UpgradeModal from './UpgradeModal'
+import { FREE_DAILY_CREDITS } from '@/lib/creditRules'
 import type { Job } from '@/lib/types'
+
+const CREDIT_WORD = FREE_DAILY_CREDITS === 1 ? 'credit' : 'credits'
 
 interface OptimizeBullet {
   original: string
@@ -415,7 +418,7 @@ export default function ApplyOptimizeModal({
                     onClick={() => { setUpgradeReason('generic'); setShowUpgrade(true) }}
                     style={{ flex: 1, textAlign: 'left', background: 'none', border: 'none', padding: 0, cursor: 'pointer', fontFamily: 'var(--body)', fontSize: '.66rem', color: 'var(--sub)', lineHeight: 1.5 }}
                   >
-                    That used 1 of your 3 daily credits · <span style={{ color: '#a5b4fc', fontWeight: 700 }}>Pro removes the cap →</span>
+                    That used 1 of your {FREE_DAILY_CREDITS} daily {CREDIT_WORD} · <span style={{ color: '#a5b4fc', fontWeight: 700 }}>Pro removes the cap →</span>
                   </button>
                   <button
                     onClick={() => setUpsellDismissed(true)}

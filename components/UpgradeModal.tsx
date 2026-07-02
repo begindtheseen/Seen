@@ -4,6 +4,9 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/lib/auth'
 import { aiHeaders } from '@/lib/aiHeaders'
+import { FREE_DAILY_CREDITS } from '@/lib/creditRules'
+
+const OPT_WORD = FREE_DAILY_CREDITS === 1 ? 'optimization' : 'optimizations'
 
 interface UpgradeModalProps {
   reason: 'credits' | 'pro' | 'generic'
@@ -31,7 +34,7 @@ function copyFor(reason: UpgradeModalProps['reason'], featureName?: string) {
   if (reason === 'credits') {
     return {
       headline: "You're out of credits for today.",
-      sub: "Free gives you 3 AI optimizations a day. Pro removes the cap — tune every application while the role's still open.",
+      sub: `Free gives you ${FREE_DAILY_CREDITS} AI ${OPT_WORD} a day. Pro removes the cap — tune every application while the role's still open.`,
     }
   }
   if (reason === 'pro') {

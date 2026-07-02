@@ -8,7 +8,10 @@ import { useAuth } from '@/lib/auth'
 import { aiHeaders } from '@/lib/aiHeaders'
 import type { SavedJob } from '@/lib/types'
 import UpgradeModal from '@/components/UpgradeModal'
+import { FREE_DAILY_CREDITS } from '@/lib/creditRules'
 import dynamic from 'next/dynamic'
+
+const CREDIT_WORD = FREE_DAILY_CREDITS === 1 ? 'credit' : 'credits'
 
 const ResumeSurveyModal = dynamic(() => import('@/components/ResumeSurveyModal'), { ssr: false })
 
@@ -253,7 +256,7 @@ function ResumeInput({
             </button>
           )}
         </div>
-        <input ref={fileRef} type="file" accept=".pdf,.doc,.docx,.txt" onChange={onUpload} style={{ display: 'none' }} />
+        <input ref={fileRef} type="file" accept=".pdf,.doc,.docx,.txt,.md,text/plain" onChange={onUpload} style={{ display: 'none' }} />
       </div>
 
       {resumeMeta ? (
@@ -820,7 +823,7 @@ function ResumePageInner() {
                   onClick={() => { setUpgradeReason('generic'); setShowUpgrade(true) }}
                   style={{ flex: 1, textAlign: 'left', background: 'none', border: 'none', padding: 0, cursor: 'pointer', fontFamily: 'var(--body)', fontSize: '.68rem', color: 'var(--sub)', lineHeight: 1.5 }}
                 >
-                  That used 1 of your 3 daily credits · <span style={{ color: '#a5b4fc', fontWeight: 700 }}>Pro removes the cap →</span>
+                  That used 1 of your {FREE_DAILY_CREDITS} daily {CREDIT_WORD} · <span style={{ color: '#a5b4fc', fontWeight: 700 }}>Pro removes the cap →</span>
                 </button>
                 <button
                   onClick={() => setUpsellDismissed(true)}
