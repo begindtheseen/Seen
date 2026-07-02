@@ -530,6 +530,11 @@ async function handleEmailAnalysis(req, res, body) {
         const pdfBuf = await buildResumePDF(resumeDoc, { role, company: co });
         pdfBase64 = pdfBuf.toString('base64');
         attachName = resumeFileName({ name: resumeDoc.name, role });
+      } else {
+        // Honest degradation: the email still sends (best-effort), but log why the
+        // résumé attachment is missing so a caller that forgot `resume`/`jobDescription`
+        // in the email_analysis payload is visible instead of silently attachment-less.
+        console.warn('email_analysis: no résumé content — attachment skipped (missing resume/jobDescription in payload?)');
       }
     } catch (pdfErr) {
       console.error('PDF generation error:', pdfErr.message);
@@ -651,7 +656,7 @@ async function handleEmailAnalysis(req, res, body) {
       throw new Error('Resend error: ' + errText.slice(0, 100));
     }
 
-    return res.status(200).json({ ok: true });
+    return res.status(200).json({ ok: true, attached: !!pdfBase64 });
   } catch (err) {
     console.error('email_analysis error:', err.message);
     logError('email-analysis', err.message);
