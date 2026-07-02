@@ -587,17 +587,20 @@ export function MergePanel({ token, prefill }: { token: string; prefill: MergePr
 // downloads it as JSON. Built for legal defensibility + showing exactly how a grade was derived.
 export function CompanyExportPanel({ token }: { token: string }) {
   const [company, setCompany] = useState('')
-  const [busy, setBusy] = useState(false)
+  const [busy, setBusy] = useState<'' | 'json' | 'pdf'>('')
   const [status, setStatus] = useState<{ text: string; color: string } | null>(null)
-  // Two-step (prepare → download) so the save fires inside the user gesture on iOS.
-  const [ready, setReady] = useState<{ filename: string; content: string } | null>(null)
+  // Two-step (prepare → download) so the save fires inside the user gesture on iOS. `ready`
+  // holds whichever artifact was last prepared (JSON bundle or the legal PDF blob).
+  const [ready, setReady] = useState<{ filename: string; mime: string; content: string | Blob; label: string } | null>(null)
 
   const inputStyle: React.CSSProperties = { width: '100%', background: 'var(--raised)', border: '1px solid var(--line2)', borderRadius: 7, padding: '.42rem .65rem', fontFamily: 'var(--mono)', fontSize: '.65rem', color: 'var(--white)', outline: 'none', boxSizing: 'border-box' }
+  const slugDate = (name: string) => ({ slug: name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'company', date: new Date().toISOString().slice(0, 10) })
 
-  async function prepareExport() {
+  // Raw JSON audit bundle (unchanged contract).
+  async function prepareJson() {
     const name = company.trim()
     if (name.length < 2) { setStatus({ text: 'Enter a company name', color: 'var(--red)' }); return }
-    setBusy(true); setReady(null)
+    setBusy('json'); setReady(null)
     setStatus({ text: 'Assembling audit bundle…', color: 'var(--dim)' })
     try {
       const res = await fetch('/api/admin-stats', {
@@ -610,41 +613,70 @@ export function CompanyExportPanel({ token }: { token: string }) {
       const b = d.bundle
       const t = b?.totals || {}
       const cs = b?.computed_score || {}
-      const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'company'
-      const date = new Date().toISOString().slice(0, 10)
-      setReady({ filename: `seen-company-audit-${slug}-${date}.json`, content: JSON.stringify(b, null, 2) })
-      setStatus({ text: `✓ Ready — ${t.total_reports ?? 0} reports (${t.included_in_score ?? 0} in score · ${t.excluded_needs_review ?? 0} held) · ${t.distinct_submitters ?? 0} submitters · grade ${cs.overall_score ?? 'n/a'}. Tap Download.`, color: 'var(--green)' })
+      const { slug, date } = slugDate(name)
+      setReady({ filename: `seen-company-audit-${slug}-${date}.json`, mime: 'application/json', content: JSON.stringify(b, null, 2), label: 'JSON' })
+      setStatus({ text: `✓ JSON ready — ${t.total_reports ?? 0} reports (${t.included_in_score ?? 0} in score · ${t.excluded_needs_review ?? 0} held) · ${t.distinct_submitters ?? 0} submitters · grade ${cs.overall_score ?? 'n/a'}. Tap Download.`, color: 'var(--green)' })
     } catch (e) {
       setStatus({ text: 'Export failed: ' + (e as Error).message, color: 'var(--red)' })
     }
-    setBusy(false)
+    setBusy('')
+  }
+
+  // Legal Audit PDF — professional, legal-protection methodology + evidence packet. Rendered
+  // server-side from the SAME bundle the JSON export uses; the PDF embeds the source JSON SHA-256.
+  async function preparePdf() {
+    const name = company.trim()
+    if (name.length < 2) { setStatus({ text: 'Enter a company name', color: 'var(--red)' }); return }
+    setBusy('pdf'); setReady(null)
+    setStatus({ text: 'Generating legal audit PDF…', color: 'var(--dim)' })
+    try {
+      const res = await fetch('/api/admin-company-audit-pdf', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Admin-Token': token },
+        body: JSON.stringify({ company: name }),
+      })
+      if (!res.ok) { const d = await res.json().catch(() => ({})); throw new Error(d.error || res.status) }
+      const blob = await res.blob()
+      const hash = res.headers.get('X-Source-Json-Sha256') || ''
+      const { slug, date } = slugDate(name)
+      setReady({ filename: `seen-legal-audit-${slug}-${date}.pdf`, mime: 'application/pdf', content: blob, label: 'PDF' })
+      setStatus({ text: `✓ Legal PDF ready${hash ? ` — source SHA-256 ${hash.slice(0, 12)}…` : ''}. Tap Download.`, color: 'var(--green)' })
+    } catch (e) {
+      setStatus({ text: 'PDF failed: ' + (e as Error).message, color: 'var(--red)' })
+    }
+    setBusy('')
   }
 
   function download() {
     if (!ready) return
     // No await before this call — keeps the iOS share sheet inside the user gesture.
-    saveFile(ready.filename, 'application/json', ready.content)
+    saveFile(ready.filename, ready.mime, ready.content)
   }
 
   return (
     <Card style={{ marginBottom: '1.25rem' }}>
-      <CardHeader title="Company data export" />
+      <CardHeader title="Company score audit" />
       <div style={{ fontFamily: 'var(--mono)', fontSize: '.55rem', color: 'var(--dim)', marginBottom: '.6rem', lineHeight: 1.5 }}>
-        Full evidentiary bundle for one company — every contributing &amp; held-out report with its source and trust weight, the per-source aggregation, the live-recomputed grade with all inputs, and the scoring methodology. Submitters are pseudonymized. Downloads as JSON.
+        Full evidentiary record for one company — every contributing &amp; held-out report with its source and trust weight, the per-source aggregation, the live-recomputed grade with all inputs, and the scoring methodology. Submitters are pseudonymized. Export the raw <strong>JSON</strong> bundle, or generate a professional <strong>Legal Audit PDF</strong> (methodology + evidence packet with the source JSON SHA-256 embedded) for a company, attorney, or regulator.
       </div>
       <div style={{ display: 'flex', gap: '.5rem', alignItems: 'flex-end', flexWrap: 'wrap' }}>
         <div style={{ flex: 1, minWidth: 140 }}>
           <div style={{ fontFamily: 'var(--mono)', fontSize: '.48rem', color: 'var(--muted)', marginBottom: '.22rem' }}>Company name</div>
-          <input value={company} onChange={e => { setCompany(e.target.value); setReady(null) }} onKeyDown={e => { if (e.key === 'Enter') prepareExport() }} placeholder="e.g. FedEx" style={inputStyle} />
+          <input value={company} onChange={e => { setCompany(e.target.value); setReady(null) }} onKeyDown={e => { if (e.key === 'Enter') prepareJson() }} placeholder="e.g. FedEx" style={inputStyle} />
         </div>
         {ready ? (
           <button onClick={download} style={{ fontFamily: 'var(--mono)', fontSize: '.6rem', padding: '.42rem .9rem', borderRadius: 7, border: '1px solid rgba(16,185,129,.5)', background: 'rgba(16,185,129,.12)', color: 'var(--green)', cursor: 'pointer', flexShrink: 0 }}>
-            ⬇ Download JSON
+            ⬇ Download {ready.label}
           </button>
         ) : (
-          <button onClick={prepareExport} disabled={busy} style={{ fontFamily: 'var(--mono)', fontSize: '.6rem', padding: '.42rem .9rem', borderRadius: 7, border: '1px solid rgba(59,130,246,.3)', background: 'rgba(59,130,246,.08)', color: 'var(--blue)', cursor: 'pointer', flexShrink: 0 }}>
-            {busy ? 'Assembling…' : 'Prepare export'}
-          </button>
+          <>
+            <button onClick={prepareJson} disabled={!!busy} style={{ fontFamily: 'var(--mono)', fontSize: '.6rem', padding: '.42rem .9rem', borderRadius: 7, border: '1px solid rgba(59,130,246,.3)', background: 'rgba(59,130,246,.08)', color: 'var(--blue)', cursor: 'pointer', flexShrink: 0 }}>
+              {busy === 'json' ? 'Assembling…' : 'Export JSON'}
+            </button>
+            <button onClick={preparePdf} disabled={!!busy} style={{ fontFamily: 'var(--mono)', fontSize: '.6rem', padding: '.42rem .9rem', borderRadius: 7, border: '1px solid rgba(124,58,237,.4)', background: 'rgba(124,58,237,.12)', color: 'var(--indigo, #a78bfa)', cursor: 'pointer', flexShrink: 0 }}>
+              {busy === 'pdf' ? 'Generating…' : 'Generate Legal Audit PDF'}
+            </button>
+          </>
         )}
       </div>
       {status && <div style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', marginTop: '.5rem', color: status.color, lineHeight: 1.5 }}>{status.text}</div>}
