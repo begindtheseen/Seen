@@ -546,8 +546,9 @@ export default async function handler(req, res) {
 
     return res.status(200).json({ ...output, run_id: runId, _facts_source: factsSource, _engine_version: ENGINE_VERSION });
   } catch (e) {
-    console.error('optimizer error:', e.message);
-    logError('optimizer', e.message, { action });
-    return res.status(500).json({ error: 'OPTIMIZER_ERROR', message: 'Failed to run optimization.' });
+    // Pass the Error (not just .message) so the stack is captured; surface the ref to the
+    // client so a user-reported failure maps to the exact logged row (stack + action).
+    const ref = logError('optimizer', e, { action, method: req.method });
+    return res.status(500).json({ error: 'OPTIMIZER_ERROR', message: 'Failed to run optimization.', ref });
   }
 }
