@@ -29,24 +29,50 @@ async function stripeSubsBreakdown() {
   const key = process.env.STRIPE_SECRET_KEY;
   if (!key) return null;
   try {
-    const r = await fetch('https://api.stripe.com/v1/subscriptions?status=all&limit=100&expand[]=data.items', {
+    // NOTE: `items` is a default-included list on every subscription object — it is NOT
+    // expandable. Passing expand[]=data.items 400s the whole request (the same bug #124
+    // removed from api/stripe.js — this was the missed copy). We read s.items.data[0]
+    // directly for the MRR price lookup; no expand needed.
+    const r = await fetch('https://api.stripe.com/v1/subscriptions?status=all&limit=100', {
       headers: { Authorization: `Bearer ${key}` },
     });
     if (!r.ok) return null;
     const d = await r.json();
     const counts = { trialing: 0, active: 0, past_due: 0, canceled: 0, unpaid: 0, incomplete: 0 };
+    // A sub the user cancelled keeps its live status (trialing / active) with
+    // cancel_at_period_end=true until the period actually ends — so a cancelled trial
+    // otherwise still shows as an active trial. Track the churning set separately.
+    let canceling = 0;          // any live sub flagged cancel_at_period_end
+    let trialingCanceling = 0;  // trials already cancelled (status still 'trialing')
+    let activeCanceling = 0;    // paid subs set to cancel at period end
     let mrrCents = 0;
     for (const s of (d.data || [])) {
       counts[s.status] = (counts[s.status] || 0) + 1;
-      if (s.status === 'active' || s.status === 'trialing') {
+      if (s.cancel_at_period_end) {
+        canceling++;
+        if (s.status === 'trialing') trialingCanceling++;
+        else if (s.status === 'active') activeCanceling++;
+      }
+      // Realized MRR = active AND not-canceling only. A trial contributes nothing (not
+      // yet paying); a paid sub set to cancel at period end is churning, so it's excluded
+      // from retained MRR.
+      if (s.status === 'active' && !s.cancel_at_period_end) {
         const item = s.items?.data?.[0];
         const amt = item?.price?.unit_amount || 0;
         const interval = item?.price?.recurring?.interval;
-        // Trials count toward "potential" MRR; only active toward realized — we track active.
-        if (s.status === 'active') mrrCents += interval === 'year' ? amt / 12 : amt;
+        mrrCents += interval === 'year' ? amt / 12 : amt;
       }
     }
-    return { counts, mrr: Math.round(mrrCents) / 100, has_more: !!d.has_more };
+    return {
+      counts,
+      canceling,
+      // Live counts that EXCLUDE already-cancelled subs — so a cancelled trial drops to 0
+      // the moment it's cancelled, not only when the trial period finally ends.
+      trialing_active: Math.max(0, counts.trialing - trialingCanceling),
+      active_paid_active: Math.max(0, counts.active - activeCanceling),
+      mrr: Math.round(mrrCents) / 100,
+      has_more: !!d.has_more,
+    };
   } catch { return null; }
 }
 
@@ -190,6 +216,7 @@ async function _handler(req, res) {
       jobsActiveRes, jobsNewTodayRes,
       reportsMonthRes, searchLogsWeekRes,
       jobsTotalRes, creditTxnRes, outcomeSharesRes, usersMonthRes,
+      searchEvents30Res, resumeScans30Res,
     ] = await Promise.all([
       db(`profiles?select=id`, { headers: { Prefer: 'count=exact', 'Range-Unit': 'items', Range: '0-0' } }),
       db(`profiles?created_at=gte.${todayISO}&select=id`, { headers: { Prefer: 'count=exact', 'Range-Unit': 'items', Range: '0-0' } }),
@@ -224,6 +251,10 @@ async function _handler(req, res) {
       db(`credit_transactions?select=delta&limit=20000`),
       db(`outcome_card_shares?select=shared_via,created_at&order=created_at.desc&limit=5000`),
       db(`profiles?created_at=gte.${monthISO}&select=created_at&order=created_at.asc&limit=5000`),
+      // ADDITIVE (admin command-center Data Flywheel panel): 30-day activity counts.
+      // Both tables are service-key accessed (RLS bypassed). Never a constant.
+      db(`search_events?created_at=gte.${monthISO}&select=id`, { headers: { Prefer: 'count=exact', 'Range-Unit': 'items', Range: '0-0' } }),
+      db(`resume_surveys?created_at=gte.${monthISO}&select=id`, { headers: { Prefer: 'count=exact', 'Range-Unit': 'items', Range: '0-0' } }),
     ]);
 
     const usersTotal = ct(usersTotalRes);
@@ -346,8 +377,11 @@ async function _handler(req, res) {
     };
 
     // ── Monetization / conversion analytics ──────────────────────────────────
-    const freeCount = Math.max(0, creditRows.length - proCount);
-    const convPct = creditRows.length ? Math.round((proCount / creditRows.length) * 1000) / 10 : 0;
+    // Denominator is REAL signups (usersTotal = profiles count), not ai_credits rows: a
+    // user who never ran an AI tool has no ai_credits row, so counting creditRows
+    // undercounted accounts and inflated conversion. free = total − paid.
+    const freeCount = Math.max(0, usersTotal - proCount);
+    const convPct = usersTotal ? Math.round((proCount / usersTotal) * 1000) / 10 : 0;
     const subs = await stripeSubsBreakdown();
     const shareRows = outcomeSharesRes && outcomeSharesRes.ok ? await outcomeSharesRes.json() : [];
     const sharesByChannel = {};
@@ -360,13 +394,16 @@ async function _handler(req, res) {
 
     const monetization = {
       stripe_connected: !!process.env.STRIPE_SECRET_KEY,
-      total_accounts: creditRows.length,
+      total_accounts: usersTotal,
       pro_users: proCount,
       free_users: freeCount,
       conversion_pct: convPct,
-      // From Stripe (null if not connected): trial vs paid vs churned.
-      trialing: subs?.counts?.trialing ?? null,
-      active_paid: subs?.counts?.active ?? null,
+      // From Stripe (null if not connected): trial vs paid vs churned. trialing / active_paid
+      // are the LIVE, not-yet-cancelled counts (a cancelled-but-not-expired sub is reported
+      // under `canceling`, never as an active trial/paid sub).
+      trialing: subs ? subs.trialing_active : null,
+      active_paid: subs ? subs.active_paid_active : null,
+      canceling: subs?.canceling ?? null,
       past_due: subs?.counts?.past_due ?? null,
       canceled: subs?.counts?.canceled ?? null,
       mrr: subs ? subs.mrr : null,
@@ -383,6 +420,8 @@ async function _handler(req, res) {
       applications: { total: totalApps, ghosted_30d: ghosted, hired_30d: ct(appsHiredRes), ghost_rate_pct: totalApps > 0 ? Math.round(ghosted / totalApps * 100) : null, recent: recentApps },
       companies: { with_scores: ct(coScoredRes) },
       credits: { total_users: creditRows.length, pro_users: proCount, total_balance: totalBalance, earned: creditsEarned, spent: creditsSpent },
+      // ADDITIVE: real 30-day activity counts for the Data Flywheel panel.
+      flywheel: { job_searches_30d: ct(searchEvents30Res), resume_scans_30d: ct(resumeScans30Res) },
       errors: { today: errToday.length, this_week: ct(errWeekRes), by_route: errByRoute, recent: errToday.slice(0, 5) },
       issues: { open: issues.length, items: issues },
       duplicate_clusters: { suspected: dupClusters.length, items: dupClusters },
@@ -463,8 +502,9 @@ async function _handler(req, res) {
     lines.push([]);
     lines.push(['STRIPE', 'metric', 'value']);
     lines.push(['', 'Connected', !!process.env.STRIPE_SECRET_KEY]);
-    lines.push(['', 'Trialing', subs?.counts?.trialing ?? 'n/a']);
-    lines.push(['', 'Active (paid)', subs?.counts?.active ?? 'n/a']);
+    lines.push(['', 'Trialing (live)', subs ? subs.trialing_active : 'n/a']);
+    lines.push(['', 'Active (paid, live)', subs ? subs.active_paid_active : 'n/a']);
+    lines.push(['', 'Canceling (at period end)', subs?.canceling ?? 'n/a']);
     lines.push(['', 'Past due', subs?.counts?.past_due ?? 'n/a']);
     lines.push(['', 'Canceled', subs?.counts?.canceled ?? 'n/a']);
     lines.push(['', 'MRR ($)', subs ? subs.mrr : 'n/a']);
@@ -915,6 +955,39 @@ async function _handler(req, res) {
     return res.status(200).json({ ok: true, balance: newBalance });
   }
 
+  // ── list_subscriptions: read-only Stripe subscription list for the Trials drill-down ──
+  // Full admins only, audited as a read. Stripe items are default-included on each object —
+  // we pass NO expand[] (expanding the items list 400s the whole request; the same bug #124
+  // removed elsewhere). Returns a trimmed shape only; no secret is ever exposed to the client.
+  // Stripe unset → honest empty payload with stripe_connected:false (dashboard degrades).
+  if (body.action === 'list_subscriptions') {
+    if (adminRole === 'moderator') return res.status(403).json({ error: 'Insufficient role' });
+    await db('admin_audit_log', { method: 'POST', body: JSON.stringify({ admin_id: sess.admin_id, username: sess.username || 'admin', action: 'list_subscriptions', target_type: 'stripe' }), headers: { Prefer: 'return=minimal' } }).catch(() => {});
+    const key = process.env.STRIPE_SECRET_KEY;
+    if (!key) return res.status(200).json({ ok: true, subscriptions: [], stripe_connected: false });
+    try {
+      const r = await fetch('https://api.stripe.com/v1/subscriptions?status=all&limit=100', {
+        headers: { Authorization: `Bearer ${key}` },
+      });
+      if (!r.ok) return res.status(200).json({ ok: true, subscriptions: [], stripe_connected: true, error: `Stripe HTTP ${r.status}` });
+      const d = await r.json();
+      const subscriptions = (d.data || []).map(s => ({
+        id: s.id,
+        status: s.status,
+        cancel_at_period_end: !!s.cancel_at_period_end,
+        trial_end: s.trial_end || null,
+        current_period_end: s.current_period_end || null,
+        // customer is a bare id unless expanded (we don't expand it); email only present
+        // if Stripe happens to inline the customer object — otherwise fall back to the id.
+        customer: typeof s.customer === 'string' ? s.customer : (s.customer?.id || null),
+        email: (typeof s.customer === 'object' ? s.customer?.email : null) || null,
+      }));
+      return res.status(200).json({ ok: true, subscriptions, stripe_connected: true, has_more: !!d.has_more });
+    } catch {
+      return res.status(200).json({ ok: true, subscriptions: [], stripe_connected: true, error: 'Stripe request failed' });
+    }
+  }
+
   // ── export_company: full evidentiary audit bundle for ONE company ─────────────
   // Assembles the complete "how the grade was computed" chain for a company — every
   // contributing AND excluded report, each with its source/trust weight, the per-source
@@ -1110,7 +1183,47 @@ async function _handler(req, res) {
     }
 
     if (!Array.isArray(rows)) rows = [];
+
+    // Stitch the Pro flag (from ai_credits.pro) onto account rows so the Manage Accounts
+    // modal can filter Pro/Free and Grant/Revoke Pro inline. One cheap query keyed on the
+    // ≤100 user ids we just fetched. Accounts with no ai_credits row are Free by definition.
+    if (['total_accounts', 'new_today', 'new_this_week'].includes(metric) && rows.length) {
+      const ids = rows.map(r => r.id).filter(Boolean);
+      let proMap = new Map();
+      if (ids.length) {
+        const cr = await db(`ai_credits?user_id=in.(${ids.join(',')})&select=user_id,pro,balance`);
+        const credits = cr.ok ? await cr.json() : [];
+        proMap = new Map((Array.isArray(credits) ? credits : []).map(c => [c.user_id, c]));
+      }
+      rows = rows.map(r => ({ ...r, pro: !!proMap.get(r.id)?.pro, balance: proMap.get(r.id)?.balance ?? null }));
+    }
     return res.status(200).json({ ok: true, metric, rows });
+  }
+
+  // ── PURGE STALE/EXPIRED LISTINGS — the "clear stale" half of a manual refresh ─────
+  // Why this exists: the refresh cron backfills fresh ACTIVE listings but can NOT un-stale
+  // jobs the sources no longer return. Adzuna is date-sorted, so a listing not re-seen in 7+
+  // days goes 'stale' and never resurfaces on a re-search — yet it still SERVES to users
+  // (the job search filters on expires_at>now, not availability_status) until its expires_at
+  // passes (up to 14 days later). Result: after a refresh the admin "Stale/expired" count
+  // never drops → the button looks dead. This explicit, admin-gated, audited action
+  // SOFT-RETIRES those unconfirmed-stale rows (does NOT delete them): it sets
+  // expires_at=now() so they immediately fall out of the user search (which gates on
+  // expires_at>now) AND out of the "Stale/expired" count, while the row itself SURVIVES so
+  // saved_jobs/applications foreign keys and /jobs/[id] permalinks (get_by_id resolves by
+  // id, no expires_at filter) still resolve for anyone holding a shared/saved link. Full
+  // admins only; the fresh backfill from refresh-jobs replaces the cleared inventory.
+  if (action === 'purge_stale_jobs') {
+    if (adminRole === 'moderator') return res.status(403).json({ error: 'Insufficient role' });
+    const cnt = r => parseInt((r?.headers?.get('content-range') || '').split('/')[1]) || 0;
+    const beforeRes = await db(`jobs?availability_status=in.(stale,expired)&select=id`, { headers: { Prefer: 'count=exact', 'Range-Unit': 'items', Range: '0-0' } });
+    const removed = cnt(beforeRes);
+    if (removed > 0) {
+      const patch = await db(`jobs?availability_status=in.(stale,expired)`, { method: 'PATCH', body: JSON.stringify({ availability_status: 'expired', expires_at: new Date().toISOString() }), headers: { Prefer: 'return=minimal' } });
+      if (!patch.ok) return res.status(500).json({ error: 'Failed to retire stale listings' });
+    }
+    await db('admin_audit_log', { method: 'POST', body: JSON.stringify({ admin_id: sess.admin_id, username: sess.username || 'admin', action: 'purge_stale_jobs', target_type: 'jobs', metadata: { removed } }), headers: { Prefer: 'return=minimal' } }).catch(() => {});
+    return res.status(200).json({ ok: true, removed });
   }
 
   // ── EMERGENCY JOB REFRESH — server-side auto-remediation for a job crisis ─────
