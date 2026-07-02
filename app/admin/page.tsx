@@ -259,14 +259,18 @@ function issueBadgeColor(type: string) {
 // One user row in the KPI drill-down, with a two-step delete (full admins only).
 function UserRow({ r, token, onDeleted, ts }: { r: Record<string, unknown>; token: string; onDeleted: (id: string) => void; ts: (i: unknown) => string }) {
   const [busy, setBusy] = useState(false)
-  const [confirm, setConfirm] = useState(false)
+  const [showModal, setShowModal] = useState(false)
+  const [typed, setTyped] = useState('')
   const id = String(r.id ?? '')
+  const email = String(r.email ?? '—')
+  const canDelete = email !== '—' && typed.trim().toLowerCase() === email.trim().toLowerCase()
   // Grant-credits state
   const [grantAmt, setGrantAmt] = useState(5)
   const [granting, setGranting] = useState(false)
   const [grantMsg, setGrantMsg] = useState('')
+  function closeModal() { if (!busy) { setShowModal(false); setTyped('') } }
   async function del() {
-    if (!id) return
+    if (!id || !canDelete) return
     setBusy(true)
     try {
       const res = await fetch('/api/admin-stats', {
@@ -276,8 +280,8 @@ function UserRow({ r, token, onDeleted, ts }: { r: Record<string, unknown>; toke
       })
       const d = await res.json().catch(() => ({}))
       if (res.ok && d.ok) { onDeleted(id); return }
-      alert(d.error || 'Delete failed'); setBusy(false); setConfirm(false)
-    } catch { alert('Network error'); setBusy(false); setConfirm(false) }
+      alert(d.error || 'Delete failed'); setBusy(false)
+    } catch { alert('Network error'); setBusy(false) }
   }
   async function grant() {
     if (!id || granting) return
@@ -298,7 +302,7 @@ function UserRow({ r, token, onDeleted, ts }: { r: Record<string, unknown>; toke
   }
   return (
     <div style={{ display: 'grid', gridTemplateColumns: '1fr auto auto auto', gap: '.5rem', padding: '.5rem .6rem', background: 'var(--card)', borderRadius: 7, alignItems: 'center' }}>
-      <span style={{ fontFamily: 'var(--mono)', fontSize: '.62rem', color: 'var(--white)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{String(r.email ?? '—')}</span>
+      <span style={{ fontFamily: 'var(--mono)', fontSize: '.62rem', color: 'var(--white)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{email}</span>
       <span style={{ fontFamily: 'var(--mono)', fontSize: '.62rem', color: 'var(--sub)' }}>{ts(r.created_at)}</span>
       {grantMsg && grantMsg.startsWith('✓') ? (
         <span style={{ fontFamily: 'var(--mono)', fontSize: '.55rem', color: 'var(--green)', whiteSpace: 'nowrap' }}>{grantMsg}</span>
@@ -309,13 +313,22 @@ function UserRow({ r, token, onDeleted, ts }: { r: Record<string, unknown>; toke
           {grantMsg && <span style={{ fontFamily: 'var(--mono)', fontSize: '.5rem', color: 'var(--red)', whiteSpace: 'nowrap' }}>{grantMsg}</span>}
         </span>
       )}
-      {confirm ? (
-        <span style={{ display: 'flex', gap: '.3rem' }}>
-          <button onClick={del} disabled={busy} style={{ background: 'var(--red)', border: 'none', borderRadius: 5, color: '#fff', fontFamily: 'var(--mono)', fontSize: '.55rem', padding: '.22rem .45rem', cursor: busy ? 'wait' : 'pointer' }}>{busy ? '…' : 'Delete'}</button>
-          <button onClick={() => setConfirm(false)} disabled={busy} style={{ background: 'none', border: '1px solid var(--line2)', borderRadius: 5, color: 'var(--dim)', fontFamily: 'var(--mono)', fontSize: '.55rem', padding: '.22rem .4rem', cursor: 'pointer' }}>×</button>
-        </span>
-      ) : (
-        <button onClick={() => setConfirm(true)} title="Permanently delete this user and all their data" style={{ background: 'none', border: '1px solid rgba(239,68,68,.35)', borderRadius: 5, color: 'var(--red)', fontFamily: 'var(--mono)', fontSize: '.6rem', padding: '.22rem .5rem', cursor: 'pointer' }}>🗑</button>
+      <button onClick={() => setShowModal(true)} title="Permanently delete this user and all their data" style={{ background: 'none', border: '1px solid rgba(239,68,68,.35)', borderRadius: 5, color: 'var(--red)', fontFamily: 'var(--mono)', fontSize: '.6rem', padding: '.22rem .5rem', cursor: 'pointer' }}>🗑</button>
+      {showModal && (
+        <div onClick={closeModal} onKeyDown={e => { if (e.key === 'Escape') closeModal() }} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '1rem' }}>
+          <div onClick={e => e.stopPropagation()} style={{ background: 'var(--card)', border: '1px solid var(--line2)', borderRadius: 10, padding: '1.1rem 1.2rem', maxWidth: 380, width: '100%' }}>
+            <div style={{ fontFamily: 'var(--mono)', fontSize: '.72rem', color: 'var(--red)', fontWeight: 700, marginBottom: '.5rem' }}>Delete account</div>
+            <p style={{ fontSize: '.68rem', color: 'var(--sub)', lineHeight: 1.5, margin: '0 0 .8rem' }}>
+              This permanently deletes the account, applications, saved jobs, and credits. Reports and survey intel they contributed are kept and anonymized.
+            </p>
+            <p style={{ fontFamily: 'var(--mono)', fontSize: '.6rem', color: 'var(--dim)', margin: '0 0 .3rem' }}>Type <span style={{ color: 'var(--white)' }}>{email}</span> to confirm:</p>
+            <input autoFocus value={typed} onChange={e => setTyped(e.target.value)} onKeyDown={e => { if (e.key === 'Escape') closeModal() }} disabled={busy} placeholder={email} style={{ width: '100%', background: 'var(--bg)', border: '1px solid var(--line2)', borderRadius: 6, color: 'var(--white)', fontFamily: 'var(--mono)', fontSize: '.65rem', padding: '.4rem .5rem', marginBottom: '.9rem', boxSizing: 'border-box' }} />
+            <div style={{ display: 'flex', gap: '.5rem', justifyContent: 'flex-end' }}>
+              <button onClick={closeModal} disabled={busy} style={{ background: 'none', border: '1px solid var(--line2)', borderRadius: 6, color: 'var(--dim)', fontFamily: 'var(--mono)', fontSize: '.62rem', padding: '.35rem .7rem', cursor: 'pointer' }}>Cancel</button>
+              <button onClick={del} disabled={busy || !canDelete} style={{ background: canDelete ? 'var(--red)' : 'var(--line2)', border: 'none', borderRadius: 6, color: '#fff', fontFamily: 'var(--mono)', fontSize: '.62rem', padding: '.35rem .8rem', cursor: busy ? 'wait' : canDelete ? 'pointer' : 'not-allowed', opacity: canDelete ? 1 : .6 }}>{busy ? '…' : 'Delete'}</button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   )

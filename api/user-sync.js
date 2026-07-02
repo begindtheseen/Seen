@@ -342,8 +342,10 @@ export default async function handler(req, res) {
       }
     } catch { /* storage cleanup is best-effort */ }
 
-    // De-link the user from their public reports rather than deleting the anonymized signal.
+    // Contributed company intel outlives the account: de-link the user from their public
+    // reports AND résumé-survey answers (user_id → null) rather than deleting the signal.
     await db(`reports?user_id=eq.${uid}`, { method: 'PATCH', body: JSON.stringify({ user_id: null }), headers: { Prefer: 'return=minimal' } }).catch(() => {});
+    await db(`resume_surveys?user_id=eq.${uid}`, { method: 'PATCH', body: JSON.stringify({ user_id: null }), headers: { Prefer: 'return=minimal' } }).catch(() => {});
     await db(`profiles?id=eq.${uid}`, { method: 'DELETE', headers: { Prefer: 'return=minimal' } });
     const delRes = await fetch(`${SUPABASE_URL}/auth/v1/admin/users/${uid}`, {
       method: 'DELETE',
