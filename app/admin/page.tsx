@@ -846,6 +846,9 @@ export default function AdminPage() {
         {/* Company deduplication */}
         <MergePanel token={token!} prefill={mergePrefill} />
 
+        {/* Per-company evidentiary export */}
+        <CompanyExportPanel token={token!} />
+
         {/* Credits overview + master toggle */}
         <CreditsPanel credits={stats.credits} flags={stats.feature_flags || []} token={token!} onRefresh={() => load(token!)} />
 
@@ -1282,6 +1285,71 @@ function MergePanel({ token, prefill }: { token: string; prefill: MergePrefill |
             )
           })
       }
+    </Card>
+  )
+}
+
+// Per-company evidentiary export — pulls the full audit bundle (every report + source/trust
+// weight, the per-source aggregation, the live-recomputed grade, and a methodology key) and
+// downloads it as JSON. Built for legal defensibility + showing exactly how a grade was derived.
+function CompanyExportPanel({ token }: { token: string }) {
+  const [company, setCompany] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [status, setStatus] = useState<{ text: string; color: string } | null>(null)
+
+  const inputStyle: React.CSSProperties = { width: '100%', background: 'var(--raised)', border: '1px solid var(--line2)', borderRadius: 7, padding: '.42rem .65rem', fontFamily: 'var(--mono)', fontSize: '.65rem', color: 'var(--white)', outline: 'none', boxSizing: 'border-box' }
+
+  async function exportCompany() {
+    const name = company.trim()
+    if (name.length < 2) { setStatus({ text: 'Enter a company name', color: 'var(--red)' }); return }
+    setBusy(true)
+    setStatus({ text: 'Assembling audit bundle…', color: 'var(--dim)' })
+    try {
+      const res = await fetch('/api/admin-stats', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Admin-Token': token },
+        body: JSON.stringify({ action: 'export_company', company: name }),
+      })
+      const d = await res.json()
+      if (!d.ok) throw new Error(d.error || res.status)
+      const b = d.bundle
+      const t = b?.totals || {}
+      const cs = b?.computed_score || {}
+      // Trigger a client-side JSON download.
+      const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'company'
+      const date = new Date().toISOString().slice(0, 10)
+      const blob = new Blob([JSON.stringify(b, null, 2)], { type: 'application/json' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `seen-company-audit-${slug}-${date}.json`
+      document.body.appendChild(a)
+      a.click()
+      a.remove()
+      URL.revokeObjectURL(url)
+      setStatus({ text: `✓ Exported — ${t.total_reports ?? 0} reports (${t.included_in_score ?? 0} in score · ${t.excluded_needs_review ?? 0} held) · ${t.distinct_submitters ?? 0} submitters · grade ${cs.overall_score ?? 'n/a'}`, color: 'var(--green)' })
+    } catch (e) {
+      setStatus({ text: 'Export failed: ' + (e as Error).message, color: 'var(--red)' })
+    }
+    setBusy(false)
+  }
+
+  return (
+    <Card style={{ marginBottom: '1.25rem' }}>
+      <CardHeader title="Company data export" />
+      <div style={{ fontFamily: 'var(--mono)', fontSize: '.55rem', color: 'var(--dim)', marginBottom: '.6rem', lineHeight: 1.5 }}>
+        Full evidentiary bundle for one company — every contributing &amp; held-out report with its source and trust weight, the per-source aggregation, the live-recomputed grade with all inputs, and the scoring methodology. Submitters are pseudonymized. Downloads as JSON.
+      </div>
+      <div style={{ display: 'flex', gap: '.5rem', alignItems: 'flex-end', flexWrap: 'wrap' }}>
+        <div style={{ flex: 1, minWidth: 140 }}>
+          <div style={{ fontFamily: 'var(--mono)', fontSize: '.48rem', color: 'var(--muted)', marginBottom: '.22rem' }}>Company name</div>
+          <input value={company} onChange={e => setCompany(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') exportCompany() }} placeholder="e.g. FedEx" style={inputStyle} />
+        </div>
+        <button onClick={exportCompany} disabled={busy} style={{ fontFamily: 'var(--mono)', fontSize: '.6rem', padding: '.42rem .9rem', borderRadius: 7, border: '1px solid rgba(59,130,246,.3)', background: 'rgba(59,130,246,.08)', color: 'var(--blue)', cursor: 'pointer', flexShrink: 0 }}>
+          {busy ? 'Exporting…' : 'Export JSON ↓'}
+        </button>
+      </div>
+      {status && <div style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', marginTop: '.5rem', color: status.color, lineHeight: 1.5 }}>{status.text}</div>}
     </Card>
   )
 }
