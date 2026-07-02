@@ -212,6 +212,11 @@ export default function ApplyOptimizeModal({
           jobUrl: job.apply_url,
           bullets,
           keywords: kwds,
+          // Send the SAME résumé text that was optimized (+ the JD) so the server
+          // can build the complete, submittable résumé PDF attachment. Without
+          // these the attachment silently drops (empty doc → hasContent false).
+          resume: resumeText,
+          jobDescription: job.description || '',
         }),
       })
     } catch (_) {
