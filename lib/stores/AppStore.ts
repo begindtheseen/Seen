@@ -26,7 +26,8 @@ function mapRow(a: Record<string, unknown>): Application {
     score: a.score as number | undefined,
     waste: a.waste_score as number | undefined,
     employerStage: a.employer_stage as string | undefined,
-    appliedAt: a.created_at ? new Date(a.created_at as string).getTime() : Date.now(),
+    // applied_at is the user's real apply date; created_at is only the row-insert time.
+    appliedAt: (a.applied_at || a.created_at) ? new Date((a.applied_at || a.created_at) as string).getTime() : Date.now(),
     updatedAt: a.updated_at ? new Date(a.updated_at as string).getTime() : Date.now(),
     events: (a.events as HiringEvent[]) || [
       {
@@ -51,8 +52,25 @@ export const AppStore = {
       if (result?.applications) {
         const mapped = result.applications.map(mapRow)
         const dbIds = new Set(mapped.map(a => String(a.id)))
-        const unsynced = this.loadSync().filter(a => a.id.startsWith('app_') && !dbIds.has(a.id))
-        if (unsynced.length) unsynced.forEach(a => _sync('add_application', { application: a }))
+        // A local app is unsynced only if it still carries a client 'app_' id AND isn't
+        // already in the DB under the same job / company+role (belt-and-braces: id swap
+        // can be lost if the tab closed mid-add).
+        const dbKeys = new Set(mapped.map(a => `${(a.company || '').toLowerCase()}|${(a.role || '').toLowerCase()}`))
+        const dbJobIds = new Set(mapped.map(a => a.jobId).filter(Boolean))
+        const unsynced = this.loadSync().filter(a =>
+          a.id.startsWith('app_') && !dbIds.has(a.id) &&
+          !(a.jobId && dbJobIds.has(a.jobId)) &&
+          !dbKeys.has(`${(a.company || '').toLowerCase()}|${(a.role || '').toLowerCase()}`)
+        )
+        // CRITICAL: capture the returned DB id and swap it onto the local record — the old
+        // fire-and-forget version never did, so the same app was "unsynced" on every load
+        // and re-inserted forever (39 duplicate DB rows per app were found in prod).
+        for (const a of unsynced) {
+          try {
+            const r = await _sync('add_application', { application: a }) as { id?: string } | null
+            if (r?.id) a.id = r.id
+          } catch { /* keep local id; retried next load */ }
+        }
         const merged = [...mapped, ...unsynced]
         localStorage.setItem(KEY, JSON.stringify(merged))
         return merged
@@ -186,7 +204,10 @@ export const AppStore = {
     if (loggedIn) _sync('remove_application', { id })
   },
 
-  async clear(): Promise<void> {
+  async clear(loggedIn = false): Promise<void> {
     localStorage.removeItem(KEY)
+    // "Clear all" must clear the account too — otherwise the DB rows resurrect
+    // everything on the next load/device.
+    if (loggedIn) await _sync('clear_applications').catch(() => {})
   },
 }

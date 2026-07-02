@@ -52,11 +52,16 @@ export default function Nav() {
     // Re-fetch on the custom event (usage/earn) AND when the tab regains focus — the latter
     // catches the daily reset for users who leave the tab open overnight.
     const onFocus = () => { if (document.visibilityState !== 'hidden') fetchBalance() }
+    // UpgradeModal's "Earn free credits with a quick survey →" dispatches this — without a
+    // listener the button closed the modal and did nothing.
+    const onOpenSurvey = () => setShowSurvey(true)
     window.addEventListener('seen:credits-updated', handler)
+    window.addEventListener('seen:open-survey', onOpenSurvey)
     window.addEventListener('focus', onFocus)
     document.addEventListener('visibilitychange', onFocus)
     return () => {
       window.removeEventListener('seen:credits-updated', handler)
+      window.removeEventListener('seen:open-survey', onOpenSurvey)
       window.removeEventListener('focus', onFocus)
       document.removeEventListener('visibilitychange', onFocus)
     }

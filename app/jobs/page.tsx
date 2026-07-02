@@ -1007,6 +1007,16 @@ export default function JobsPage() {
     })
     if (level) out = out.filter(j => (j.level || '').toLowerCase().includes(level))
     if (jobType) out = out.filter(j => j.type === jobType)
+    // Posted-within filter (1/7/30 days). Listings without a posted date are kept —
+    // dropping them would blank fresh live-aggregated results that haven't round-tripped
+    // the DB yet. (This filter was previously rendered but never applied at all.)
+    if (posted) {
+      const days = parseInt(posted, 10)
+      if (Number.isFinite(days) && days > 0) {
+        const cutoff = Date.now() - days * 86400000
+        out = out.filter(j => !j.posted_at || new Date(j.posted_at).getTime() >= cutoff)
+      }
+    }
     return out
   }
 
@@ -1028,6 +1038,24 @@ export default function JobsPage() {
   useEffect(() => {
     if (jobs.length > 0) updateDisplay(jobs, sort)
   }, [niche, level, jobType, posted, sort]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Honor inbound search params — the Demand page links here with ?q=<title>&loc=<city>
+  // ("Find these jobs →"). These were silently ignored; the user got the default page.
+  // Runs before the GPS/recent-search effects and claims autoSearchedRef so they don't
+  // stomp the explicit intent. (window.location avoids the useSearchParams Suspense req.)
+  useEffect(() => {
+    try {
+      const sp = new URLSearchParams(window.location.search)
+      const urlQ = (sp.get('q') || '').trim().slice(0, 200)
+      const urlLoc = (sp.get('loc') || '').trim().slice(0, 200)
+      if (urlQ) {
+        autoSearchedRef.current = true
+        setQuery(urlQ)
+        if (urlLoc) setLocation(urlLoc)
+        searchJobs(urlQ, urlLoc || undefined)
+      }
+    } catch {}
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Auto-request GPS on mount; fall back to profile city if GPS denied
   useEffect(() => {
@@ -1098,10 +1126,13 @@ export default function JobsPage() {
     .finally(() => setRecStatus('done'))
   }, [isLoggedIn]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Fetch ghost rates for companies in the swipe deck
+  // Fetch ghost rates for BOTH decks' companies — recommended AND search results. The old
+  // effect only covered `recommended` (login + résumé required), so the intel badges and
+  // hiring-probability strip never rendered on the main searched-jobs swipe deck.
   useEffect(() => {
-    if (!recommended.length) return
-    const cos = [...new Set(recommended.map(j => j.company.toLowerCase().trim()).filter(Boolean))].slice(0, 30)
+    const pool = [...recommended, ...jobs]
+    if (!pool.length) return
+    const cos = [...new Set(pool.map(j => j.company.toLowerCase().trim()).filter(Boolean))].slice(0, 40)
     fetch('/api/reports', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -1109,10 +1140,10 @@ export default function JobsPage() {
     })
       .then(r => r.ok ? r.json() : { scores: {} })
       .then((d: { scores?: Record<string, {ghost_rate: number; overall_score: number; response_rate?: number}> }) => {
-        if (d.scores) setCoScores(d.scores)
+        if (d.scores) setCoScores(prev => ({ ...prev, ...d.scores }))
       })
       .catch(() => {})
-  }, [recommended])
+  }, [recommended, jobs])
 
   useEffect(() => {
     try {
@@ -1225,6 +1256,7 @@ export default function JobsPage() {
             description: String(j.description || ''),
             salary: j.salary ? String(j.salary) : null,
             apply_url,
+            posted_at: j.posted_at ? String(j.posted_at) : null,
           }
         })
         searchCache.set(cacheKey, { jobs: raw, ts: Date.now() })

@@ -47,7 +47,7 @@ function calcJobSearchHealth(apps: Application[]) {
 
 export default function DashboardPage() {
   const router = useRouter()
-  const { user, profile, isLoggedIn, isSeeker, token } = useAuth()
+  const { user, profile, isLoggedIn, isSeeker, ready, token } = useAuth()
   const [apps, setApps] = useState<Application[]>([])
   const [loading, setLoading] = useState(true)
   const [isPro, setIsPro] = useState(false)
@@ -80,9 +80,10 @@ export default function DashboardPage() {
   }, [])
 
   useEffect(() => {
+    if (!ready) return // wait for the session to resolve — redirecting early bounced signed-in users
     if (!isLoggedIn) { router.replace('/login'); return }
     if (isLoggedIn && !isSeeker) { router.replace('/'); return }
-  }, [isLoggedIn, isSeeker, router])
+  }, [ready, isLoggedIn, isSeeker, router])
 
   useEffect(() => {
     if (!isLoggedIn) return

@@ -506,7 +506,9 @@ export default async function handler(req, res) {
     // company score, so it must never be a free-for-all firehose.
     if (await applyRateLimit(req, res, 'report-submit')) return;
     const { company: co, role, location, platform, outcome, ghost_stage, rounds, unpaid_work, experience_level, report_text } = body;
-    if (!co || !role || !location) return res.status(400).json({ error: 'company, role and location required' });
+    // location is optional — tracker-originated submissions (day-30 check-ins, /apply-tracked
+    // apps) legitimately have no city. Requiring it silently killed that whole intel path.
+    if (!co || !role) return res.status(400).json({ error: 'company and role required' });
     // Identify the submitter if a valid token is present. Anonymous submissions are still
     // accepted (the public report page allows them) but enter at a low trust weight and are
     // flagged for review, so they can't dominate or poison a company's score. Signed-in
@@ -515,7 +517,7 @@ export default async function handler(req, res) {
     const trusted = !!submitUid;
     const hdrs = { ...hdrsBase, Prefer: 'return=representation' };
     const safeCo = co.trim().slice(0, 200);
-    const safeLoc = location.trim().slice(0, 200);
+    const safeLoc = (location || '').trim().slice(0, 200);
     const normalize = n => n ? n.trim().toLowerCase().replace(/[\s,]+(inc\.?|llc\.?|corp\.?|ltd\.?|co\.|plc\.?|group|holdings|enterprises|solutions|technologies)\.?$/i, '').trim() : '';
     const coNorm = normalize(safeCo);
 
@@ -534,13 +536,16 @@ export default async function handler(req, res) {
     }
     if (!cid) return res.status(500).json({ error: 'Could not resolve company record' });
 
-    const locSearch = await fetch(`${SUPABASE_URL}/rest/v1/company_locations?company_id=eq.${cid}&city=ilike.${encodeURIComponent(safeLoc)}&select=id&limit=1`, { headers: hdrs });
-    const locRows = locSearch.ok ? await locSearch.json() : [];
-    let lid = locRows?.[0]?.id || null;
-    if (!lid) {
-      const locIns = await fetch(`${SUPABASE_URL}/rest/v1/company_locations`, { method: 'POST', headers: hdrs, body: JSON.stringify({ company_id: cid, city: safeLoc }) });
-      if (locIns.ok) { const lr = await locIns.json(); lid = Array.isArray(lr) ? lr[0]?.id : lr?.id; }
-      if (!lid) { const lr2 = await fetch(`${SUPABASE_URL}/rest/v1/company_locations?company_id=eq.${cid}&select=id&limit=1`, { headers: hdrs }); if (lr2.ok) { const r2 = await lr2.json(); lid = r2?.[0]?.id || null; } }
+    let lid = null;
+    if (safeLoc) {
+      const locSearch = await fetch(`${SUPABASE_URL}/rest/v1/company_locations?company_id=eq.${cid}&city=ilike.${encodeURIComponent(safeLoc)}&select=id&limit=1`, { headers: hdrs });
+      const locRows = locSearch.ok ? await locSearch.json() : [];
+      lid = locRows?.[0]?.id || null;
+      if (!lid) {
+        const locIns = await fetch(`${SUPABASE_URL}/rest/v1/company_locations`, { method: 'POST', headers: hdrs, body: JSON.stringify({ company_id: cid, city: safeLoc }) });
+        if (locIns.ok) { const lr = await locIns.json(); lid = Array.isArray(lr) ? lr[0]?.id : lr?.id; }
+        if (!lid) { const lr2 = await fetch(`${SUPABASE_URL}/rest/v1/company_locations?company_id=eq.${cid}&select=id&limit=1`, { headers: hdrs }); if (lr2.ok) { const r2 = await lr2.json(); lid = r2?.[0]?.id || null; } }
+      }
     }
 
     // Signed-in submits start at full trust but get down-weighted for duplicate/flooding patterns
@@ -549,7 +554,10 @@ export default async function handler(req, res) {
       ? await assessSubmitTrust(SUPABASE_URL, hdrsBase, submitUid, `company_id=eq.${cid}`)
       : { weight: 0.3, reason: 'anonymous_unverified', review: true };
 
-    const reportBase = { company_id: cid, location_id: lid || null, role: (role||'').trim().slice(0,200), platform: (platform||'').trim().slice(0,100), outcome: outcome||'waiting', ghost_stage: ghost_stage||null, rounds: parseInt(rounds)||0, wait_days: null, unpaid_work: unpaid_work||'na', experience_level: (experience_level||'').trim().slice(0,50), report_text: report_text ? report_text.slice(0,2000) : null,
+    // wait_days: accept the client's value when plausible (0–365) — it feeds response-time
+    // intel; the old hardcoded null discarded it even on successful submits.
+    const waitDays = Number.isFinite(parseInt(body.wait_days)) ? Math.max(0, Math.min(365, parseInt(body.wait_days))) : null;
+    const reportBase = { company_id: cid, location_id: lid || null, role: (role||'').trim().slice(0,200), platform: (platform||'').trim().slice(0,100), outcome: outcome||'waiting', ghost_stage: ghost_stage||null, rounds: parseInt(rounds)||0, wait_days: waitDays, unpaid_work: unpaid_work||'na', experience_level: (experience_level||'').trim().slice(0,50), report_text: report_text ? report_text.slice(0,2000) : null,
       source:        trusted ? 'direct' : 'anonymous',
       needs_review:  trust.review,
       outcome_weight: trust.weight,
@@ -1215,6 +1223,13 @@ function _rowToScore(row) {
 // reports + Reddit + ingest), so the stored score reflects all the intel we hold rather
 // than a single web guess. Returns the web estimate unchanged when we have no reports
 // (no regression). See api/_utils/companyIntel.js + SCORING.md §2.
+// Company slugs decode hyphens to spaces, so "Coca-Cola" arrives as "coca cola" and an
+// exact ilike misses it. Fallback pattern: wildcard between tokens ("coca*cola"), still
+// anchored at both ends so it can't over-match unrelated companies.
+function _fuzzyNamePattern(name) {
+  return encodeURIComponent(String(name).toLowerCase().trim().replace(/[\s-]+/g, '*'));
+}
+
 async function _fuseWithReports(name, web, SUPABASE_URL, dbH) {
   if (!SUPABASE_URL || !dbH) return null;
   try {
@@ -1222,9 +1237,12 @@ async function _fuseWithReports(name, web, SUPABASE_URL, dbH) {
     // Exclude reports flagged for review (needs_review=true) — anonymous/unverified and
     // external-import submissions are held out of the score until an admin clears them, so
     // they can't poison a company's grade. `not.is.true` keeps legacy false/null rows.
-    const r = await fetch(`${SUPABASE_URL}/rest/v1/reports?company_name=ilike.${enc}&needs_review=not.is.true&select=outcome,platform&limit=500`, { headers: dbH });
-    if (!r.ok) return null;
-    const reps = await r.json();
+    let r = await fetch(`${SUPABASE_URL}/rest/v1/reports?company_name=ilike.${enc}&needs_review=not.is.true&select=outcome,platform&limit=500`, { headers: dbH });
+    let reps = r.ok ? await r.json() : null;
+    if ((!Array.isArray(reps) || !reps.length) && /[\s-]/.test(String(name))) {
+      r = await fetch(`${SUPABASE_URL}/rest/v1/reports?company_name=ilike.${_fuzzyNamePattern(name)}&needs_review=not.is.true&select=outcome,platform&limit=500`, { headers: dbH });
+      reps = r.ok ? await r.json() : null;
+    }
     if (!Array.isArray(reps) || !reps.length) return null;
     const byType = {};
     for (const row of reps) {
@@ -1346,8 +1364,15 @@ async function handleCompanyScore(req, res, body) {
   if (!force_refresh && SUPABASE_URL && SUPABASE_SERVICE_KEY) {
     try {
       const nameEnc = encodeURIComponent(name.toLowerCase().trim());
-      const cacheRes = await fetch(`${SUPABASE_URL}/rest/v1/company_scores?company_name=ilike.${nameEnc}&order=created_at.desc&limit=1`, { headers: dbH });
-      if (cacheRes.ok) { const rows = await cacheRes.json(); if (rows?.[0]) return res.json({ ok: true, score: _rowToScore(rows[0]), _src: 'cache' }); }
+      let cacheRes = await fetch(`${SUPABASE_URL}/rest/v1/company_scores?company_name=ilike.${nameEnc}&order=created_at.desc&limit=1`, { headers: dbH });
+      let rows = cacheRes.ok ? await cacheRes.json() : null;
+      // Slug decoding turns hyphens into spaces ("coca cola") — retry with token wildcards
+      // so hyphenated/punctuated company names still hit their cached score.
+      if ((!rows || !rows[0]) && /[\s-]/.test(String(name))) {
+        cacheRes = await fetch(`${SUPABASE_URL}/rest/v1/company_scores?company_name=ilike.${_fuzzyNamePattern(name)}&order=created_at.desc&limit=1`, { headers: dbH });
+        rows = cacheRes.ok ? await cacheRes.json() : null;
+      }
+      if (rows?.[0]) return res.json({ ok: true, score: _rowToScore(rows[0]), _src: 'cache' });
     } catch(e) { console.warn('Cache check:', e.message); }
   }
 

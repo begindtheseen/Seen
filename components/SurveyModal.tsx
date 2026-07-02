@@ -84,7 +84,7 @@ export default function SurveyModal({ apps, onClose, onCreditsEarned }: SurveyMo
       }
       setQuestions(d.questions)
       setBalance(d.balance || 0)
-      setCreditsLeft(d.credits_left || 5)
+      setCreditsLeft(d.credits_left ?? 5) // ?? not || — a real 0 must show 0, not '5 left'
       setPhase('intro')
     } catch {
       setPhase('error')

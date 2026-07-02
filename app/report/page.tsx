@@ -4,6 +4,7 @@ import { useState, useEffect, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { AppStore } from '@/lib/stores/AppStore'
 import { supabase } from '@/lib/supabase'
+import { useAuth } from '@/lib/auth'
 import OutcomeCard from '@/components/OutcomeCard'
 import type { Application } from '@/lib/types'
 
@@ -93,6 +94,7 @@ function statusToOutcome(status?: string): Outcome {
 
 function ReportPage() {
   const searchParams = useSearchParams()
+  const { isLoggedIn } = useAuth()
   const appId = searchParams?.get('app_id') || null
   const auto = searchParams?.get('auto') === '1'
 
@@ -119,6 +121,25 @@ function ReportPage() {
 
   useEffect(() => {
     try {
+      // EXPLICIT URL params win over any tracker guess. Job pages and company pages link
+      // here with ?company=&role=&outcome= — ignoring them prefilled the form with a
+      // DIFFERENT company from the user's tracker, one click away from a wrong-company report.
+      const urlCompany = searchParams?.get('company') || ''
+      const urlRole = searchParams?.get('role') || ''
+      const urlOutcomeRaw = (searchParams?.get('outcome') || '').toLowerCase()
+      if (urlCompany) {
+        setCompany(urlCompany)
+        if (urlRole) setRole(urlRole)
+        // Map caller vocab onto the form's outcome union ('human' = a person responded).
+        const OUTCOME_MAP: Record<string, Outcome> = {
+          ghosted: 'ghosted', autoreject: 'autoreject', rejected: 'autoreject',
+          interview: 'human', interviewing: 'human', hired: 'human', offer: 'human',
+          waiting: 'waiting',
+        }
+        if (OUTCOME_MAP[urlOutcomeRaw]) setOutcome(OUTCOME_MAP[urlOutcomeRaw])
+        return // do NOT overwrite explicit intent with tracker data
+      }
+
       const apps = AppStore.loadSync()
       if (!apps.length) return
       // One-click mode: prefer the explicitly-passed tracked app.
@@ -136,7 +157,7 @@ function ReportPage() {
       const isTerminal = source.status === 'ghosted' || source.status === 'rejected' || source.status === 'hired'
       if (auto && explicit && isTerminal) setAutoApp(source)
     } catch {}
-  }, [appId, auto])
+  }, [appId, auto, searchParams])
 
   // Record the first-party report from real tracker data (full trust, anti-Sybil checked
   // server-side) the moment the one-click card opens. Fires at most once per app.
@@ -279,14 +300,18 @@ function ReportPage() {
               <div style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', color: 'var(--indigo)', marginBottom: '.35rem' }}>Your tracker still shows this as active</div>
               <div style={{ fontSize: '.72rem', color: 'var(--sub)', marginBottom: '.75rem' }}>Update it to match your report?</div>
               <div style={{ display: 'flex', gap: '.5rem', flexWrap: 'wrap' }}>
+                {/* Pass the real login state — hardcoding false meant the change never synced
+                    to the DB and quietly reverted on the next load for signed-in users. */}
                 {outcome === 'ghosted' && (
-                  <button onClick={() => { AppStore.update(matchedAppId, { status: 'ghosted' }, false); setTrackerUpdated(true) }} style={{ fontFamily: 'var(--mono)', fontSize: '.65rem', background: 'rgba(239,68,68,.1)', border: '1px solid rgba(239,68,68,.3)', borderRadius: 7, padding: '.35rem .8rem', color: 'var(--red)', cursor: 'pointer' }}>Mark as ghosted in tracker</button>
+                  <button onClick={() => { AppStore.update(matchedAppId, { status: 'ghosted' }, isLoggedIn); setTrackerUpdated(true) }} style={{ fontFamily: 'var(--mono)', fontSize: '.65rem', background: 'rgba(239,68,68,.1)', border: '1px solid rgba(239,68,68,.3)', borderRadius: 7, padding: '.35rem .8rem', color: 'var(--red)', cursor: 'pointer' }}>Mark as ghosted in tracker</button>
                 )}
                 {(outcome === 'autoreject' || outcome === 'human') && (
-                  <button onClick={() => { AppStore.update(matchedAppId, { status: 'rejected', stage: 'Rejected' }, false); setTrackerUpdated(true) }} style={{ fontFamily: 'var(--mono)', fontSize: '.65rem', background: 'rgba(239,68,68,.1)', border: '1px solid rgba(239,68,68,.3)', borderRadius: 7, padding: '.35rem .8rem', color: 'var(--red)', cursor: 'pointer' }}>Mark as rejected in tracker</button>
+                  <button onClick={() => { AppStore.update(matchedAppId, { status: 'rejected', stage: 'Rejected' }, isLoggedIn); setTrackerUpdated(true) }} style={{ fontFamily: 'var(--mono)', fontSize: '.65rem', background: 'rgba(239,68,68,.1)', border: '1px solid rgba(239,68,68,.3)', borderRadius: 7, padding: '.35rem .8rem', color: 'var(--red)', cursor: 'pointer' }}>Mark as rejected in tracker</button>
                 )}
-                {(outcome === 'waiting' || outcome === '') && (
-                  <button onClick={() => { AppStore.update(matchedAppId, { status: 'hired', stage: 'Offer' }, false); setTrackerUpdated(true) }} style={{ fontFamily: 'var(--mono)', fontSize: '.65rem', background: 'rgba(16,185,129,.1)', border: '1px solid rgba(16,185,129,.3)', borderRadius: 7, padding: '.35rem .8rem', color: 'var(--green)', cursor: 'pointer' }}>Mark as hired in tracker</button>
+                {/* "Mark as hired" only makes sense when a human responded — offering it on a
+                    "Still waiting" report was contradictory. */}
+                {outcome === 'human' && (
+                  <button onClick={() => { AppStore.update(matchedAppId, { status: 'hired', stage: 'Offer' }, isLoggedIn); setTrackerUpdated(true) }} style={{ fontFamily: 'var(--mono)', fontSize: '.65rem', background: 'rgba(16,185,129,.1)', border: '1px solid rgba(16,185,129,.3)', borderRadius: 7, padding: '.35rem .8rem', color: 'var(--green)', cursor: 'pointer' }}>Mark as hired in tracker</button>
                 )}
                 <button onClick={() => setMatchedAppId(null)} style={{ fontFamily: 'var(--mono)', fontSize: '.65rem', background: 'none', border: '1px solid var(--line2)', borderRadius: 7, padding: '.35rem .8rem', color: 'var(--dim)', cursor: 'pointer' }}>Skip</button>
               </div>

@@ -76,7 +76,7 @@ type LocResult = { display: string }
 
 export default function ProfilePage() {
   const router = useRouter()
-  const { isLoggedIn, user, loadProfile } = useAuth()
+  const { isLoggedIn, user, ready, loadProfile } = useAuth()
   // Seed synchronously from the per-user cache so a returning user's fields are already
   // filled on first paint — no empty flash, no skeleton, no "loading" feel.
   const _cache = readProfileCache(user?.id)
@@ -118,6 +118,7 @@ export default function ProfilePage() {
   const [deleting, setDeleting] = useState(false)
 
   useEffect(() => {
+    if (!ready) return // wait for the session to resolve — redirecting early bounced signed-in users
     if (!isLoggedIn) { router.replace('/login'); return }
     _sync('load_profile').then((res) => {
       const p = (res as { profile?: Record<string, unknown> } | null)?.profile
@@ -138,7 +139,7 @@ export default function ProfilePage() {
       setIsPro(pro)
       if (pro) loadSub()
     }).catch(() => {})
-  }, [isLoggedIn, router])
+  }, [ready, isLoggedIn, router])
 
   // Pull the live subscription (plan, renewal date, cancel state) for the manage view.
   async function loadSub() {

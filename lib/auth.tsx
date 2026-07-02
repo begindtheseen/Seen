@@ -12,6 +12,10 @@ interface AuthState {
   isLoggedIn: boolean
   isSeeker: boolean
   isEmployer: boolean
+  /** True once the initial getSession() has resolved. Pages MUST wait for this before
+   *  redirecting on !isLoggedIn — otherwise a signed-in user deep-linking /tracker gets
+   *  bounced to /login (which forwards to /dashboard) while the session is still loading. */
+  ready: boolean
   token: () => Promise<string | null>
   loadProfile: () => Promise<void>
 }
@@ -22,17 +26,29 @@ const AuthContext = createContext<AuthState>({
   isLoggedIn: false,
   isSeeker: false,
   isEmployer: false,
+  ready: false,
   token: async () => null,
   loadProfile: async () => {},
 })
 
-function loadProfileLocal(): Partial<UserProfile> {
-  try { return JSON.parse(localStorage.getItem('seen_profile_local') || '{}') } catch { return {} }
+// Device-local data written during a signed-in session that must NOT survive into the
+// next account/guest on this device. Cleared on sign-out — leaving it caused a previous
+// user's applications/saved jobs/check-in history to bleed into whoever used the device
+// next (and AppStore's sync loop would even upload them into the next account).
+const SESSION_LOCAL_KEYS = [
+  'seen_applications_v1', 'seen_saved_v1', 'seen_hevents_v1', 'seen_check_snooze',
+  'seen_apply_reminders', 'seen_avoided_apps', 'seen_skip_reasons', 'seen_recent_cos',
+  '_seen_survey_done',
+]
+
+function clearSessionLocalData() {
+  try { SESSION_LOCAL_KEYS.forEach(k => localStorage.removeItem(k)) } catch { /* ignore */ }
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [profile, setProfile] = useState<UserProfile | null>(null)
+  const [ready, setReady] = useState(false)
 
   const getToken = useCallback(async (): Promise<string | null> => {
     try {
@@ -76,7 +92,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (session?.user) {
         setUser(session.user)
       }
-    })
+      setReady(true)
+    }).catch(() => setReady(true))
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (event === 'SIGNED_IN' && session?.user) {
@@ -88,6 +105,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       } else if (event === 'SIGNED_OUT') {
         setUser(null)
         setProfile(null)
+        // Wipe this session's device-local data so it can't bleed into (or be uploaded
+        // by) the next account or guest on this device.
+        clearSessionLocalData()
       }
     })
 
@@ -104,7 +124,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const isEmployer = isLoggedIn && profile?.type === 'employer'
 
   return (
-    <AuthContext.Provider value={{ user, profile, isLoggedIn, isSeeker, isEmployer, token: getToken, loadProfile }}>
+    <AuthContext.Provider value={{ user, profile, isLoggedIn, isSeeker, isEmployer, ready, token: getToken, loadProfile }}>
       {children}
     </AuthContext.Provider>
   )

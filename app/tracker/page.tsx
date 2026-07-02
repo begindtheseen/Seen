@@ -228,7 +228,7 @@ function CheckCard({ check, onAnswer, onSnooze, ghostRate, avgWaitDays }: {
 function TrackerPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
-  const { isLoggedIn, isSeeker } = useAuth()
+  const { isLoggedIn, isSeeker, ready, token } = useAuth()
   const [apps, setApps] = useState<Application[]>([])
   const [loading, setLoading] = useState(true)
   const [outcomeApp, setOutcomeApp] = useState<Application | null>(null)
@@ -246,9 +246,10 @@ function TrackerPage() {
   const [companyScores, setCompanyScores] = useState<Record<string, {ghost_rate: number; overall_score: number; report_count: number; avg_wait_days?: number}>>({})
 
   useEffect(() => {
+    if (!ready) return // wait for the session to resolve — redirecting early bounced signed-in users
     if (!isLoggedIn) { router.replace('/login'); return }
     if (isLoggedIn && !isSeeker) { router.replace('/'); return }
-  }, [isLoggedIn, isSeeker, router])
+  }, [ready, isLoggedIn, isSeeker, router])
 
   const loadApps = useCallback(async () => {
     const data = await AppStore.load(isLoggedIn)
@@ -292,16 +293,21 @@ function TrackerPage() {
       const origApp = apps.find(a => a.id === id)
       if (origApp) {
         const outcome = changes.status === 'ghosted' ? 'ghosted' : 'rejected'
-        fetch('/api/reports', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            action: 'quick_submit',
-            company: origApp.company,
-            outcome,
-            role: origApp.role,
-            city: origApp.location || '',
-          }),
+        // quick_submit requires a signed-in user — without the Bearer token every one of
+        // these community reports 401'd silently and the tracker→intel flywheel fed nothing.
+        token().then(tok => {
+          if (!tok) return
+          fetch('/api/reports', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${tok}` },
+            body: JSON.stringify({
+              action: 'quick_submit',
+              company: origApp.company,
+              outcome,
+              role: origApp.role,
+              city: origApp.location || '',
+            }),
+          }).catch(() => {})
         }).catch(() => {})
       }
     }
@@ -395,8 +401,13 @@ function TrackerPage() {
   }
 
   const handleCheckAnswer = (appId: string, checkType: string, data: Record<string, unknown>) => {
-    EventStore.add({ appId, type: checkType, data })
     const app = apps.find(a => a.id === appId)
+    // Pass the app's identity onto the event — _submitAsReport files a community report
+    // from it, and without company/role the server rejected every day-30 outcome.
+    EventStore.add({
+      appId, type: checkType, data,
+      company: app?.company, role: app?.role, location: app?.location, platform: app?.platform,
+    })
     if (app) handleCheckInsight(app, checkType, data)
     if (data.withdrew) {
       handleUpdate(appId, { status: 'rejected', stage: 'Rejected' })
@@ -433,13 +444,17 @@ function TrackerPage() {
   const clearDupes = () => {
     const seen = new Set<string>()
     const local = AppStore.loadSync()
+    const removed: Application[] = []
     const deduped = local.filter(a => {
       const key = `${a.company.toLowerCase()}|${a.role.toLowerCase()}`
-      if (seen.has(key)) return false
+      if (seen.has(key)) { removed.push(a); return false }
       seen.add(key)
       return true
     })
     localStorage.setItem('seen_applications_v1', JSON.stringify(deduped))
+    // Also delete the dropped duplicates from the DB — dedupe-in-localStorage-only just
+    // let them resurrect on the next load.
+    if (isLoggedIn) removed.forEach(a => { if (!a.id.startsWith('app_')) AppStore.remove(a.id, true).catch(() => {}) })
     loadApps()
   }
 
@@ -525,7 +540,7 @@ function TrackerPage() {
           <div style={{ display: 'flex', gap: '.5rem', flexWrap: 'wrap' }}>
             <button className="btn btn-green" style={{ fontSize: '.72rem' }} onClick={() => setShowManual(true)}>+ Track manually</button>
             {<button className="btn btn-ghost" style={{ fontSize: '.72rem' }} onClick={clearDupes}>Clear dupes</button>}
-            {apps.length > 0 && <button className="btn btn-ghost" style={{ fontSize: '.72rem', color: 'var(--muted)' }} onClick={() => { if (confirm('Remove all applications? This cannot be undone.')) { AppStore.clear(); setApps([]) } }}>Clear all</button>}
+            {apps.length > 0 && <button className="btn btn-ghost" style={{ fontSize: '.72rem', color: 'var(--muted)' }} onClick={() => { if (confirm('Remove all applications? This cannot be undone.')) { AppStore.clear(isLoggedIn); setApps([]) } }}>Clear all</button>}
           </div>
         </div>
 

@@ -110,7 +110,7 @@ export default async function handler(req, res) {
     const appsOffset = Math.max(0, parseInt(body.apps_offset) || 0);
     const today = new Date().toISOString().split('T')[0];
     const [appsRes, savedRes, recentRes, credRes, flagsRes] = await Promise.all([
-      db(`applications?user_id=eq.${uid}&select=id,company_name,role,city,platform,job_url,status,stage,score,waste_score,events,employer_stage,created_at,updated_at&order=created_at.desc&limit=${appsLimit}&offset=${appsOffset}`, { headers: { Prefer: 'count=estimated' } }),
+      db(`applications?user_id=eq.${uid}&select=id,job_id,company_name,role,city,platform,job_url,status,stage,score,waste_score,events,applied_at,employer_stage,created_at,updated_at&order=created_at.desc&limit=${appsLimit}&offset=${appsOffset}`, { headers: { Prefer: 'count=estimated' } }),
       db(`saved_jobs?user_id=eq.${uid}&order=saved_at.desc&limit=500`),
       db(`user_recent_cos?user_id=eq.${uid}&order=viewed_at.desc&limit=6`),
       db(`ai_credits?user_id=eq.${uid}&limit=1`),
@@ -140,8 +140,19 @@ export default async function handler(req, res) {
   // ── ADD APPLICATION ─────────────────────────────────────────────────────────
   if (action === 'add_application') {
     const a = body.application || {};
+    // Sanitize the client event history: array of small objects, capped, required fields only.
+    const events = Array.isArray(a.events)
+      ? a.events.slice(0, 50).map(e => ({
+          id: String(e?.id || '').slice(0, 40),
+          type: String(e?.type || '').slice(0, 40),
+          date: Number(e?.date) || Date.now(),
+          source: String(e?.source || 'user').slice(0, 20),
+          confidence: e?.confidence ?? 'low',
+        })).filter(e => e.type)
+      : [];
     const row = {
       user_id:      uid,
+      job_id:       a.jobId ? String(a.jobId).slice(0, 80) : null,
       company_name: a.company   || '',
       role:         a.role      || '',
       city:         a.location  || '',
@@ -151,6 +162,8 @@ export default async function handler(req, res) {
       stage:        a.stage     || 'Applied',
       score:        a.score     || null,
       waste_score:  a.waste     || null,
+      applied_at:   a.appliedAt ? new Date(a.appliedAt).toISOString() : new Date().toISOString(),
+      events,
     };
     const r = await db('applications', { method: 'POST', body: JSON.stringify(row), headers: { Prefer: 'return=representation' } });
     if (!r.ok) {
@@ -185,11 +198,13 @@ export default async function handler(req, res) {
     // Persist the apply URL + full listing snapshot so a saved listing reopens to
     // the exact role even from another device / after DB cache expiry.
     const full = { ...base, apply_url: j.apply_url || null, snapshot: j.snapshot || null };
+    // on_conflict must name the (user_id, job_id) unique index — without it PostgREST
+    // resolves merge-duplicates against the PK, so re-saving from another device 409s.
     const opts = { method: 'POST', headers: { Prefer: 'resolution=merge-duplicates,return=minimal' } };
-    let r = await db('saved_jobs', { ...opts, body: JSON.stringify(full) });
+    let r = await db('saved_jobs?on_conflict=user_id,job_id', { ...opts, body: JSON.stringify(full) });
     // Self-heal: if the apply_url/snapshot columns don't exist yet (migration 018
     // not applied), the insert 400s — retry with the base row so saving never breaks.
-    if (!r.ok) r = await db('saved_jobs', { ...opts, body: JSON.stringify(base) });
+    if (!r.ok) r = await db('saved_jobs?on_conflict=user_id,job_id', { ...opts, body: JSON.stringify(base) });
     return res.status(200).json({ ok: r.ok });
   }
 
@@ -204,17 +219,34 @@ export default async function handler(req, res) {
   if (action === 'update_application') {
     const { id, changes } = body;
     if (!id || !changes) return res.status(400).json({ error: 'id and changes required' });
+    // The id column is uuid — a legacy client-local 'app_...' id can never match a DB row.
+    // Report that honestly so the client knows the update did NOT persist (instead of the
+    // old behavior: PostgREST 400s on the uuid cast and we still said ok:true).
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(id))) {
+      return res.status(200).json({ ok: false, reason: 'not_synced' });
+    }
     const allowed = {};
     if (changes.stage)  allowed.stage  = changes.stage;
     if (changes.status) allowed.status = changes.status;
-    if (changes.events && Array.isArray(changes.events)) allowed.events = changes.events;
+    if (changes.events && Array.isArray(changes.events)) allowed.events = changes.events.slice(0, 50);
     if (Object.keys(allowed).length) {
-      await db(`applications?id=eq.${encodeURIComponent(id)}&user_id=eq.${uid}`, {
+      const r = await db(`applications?id=eq.${encodeURIComponent(id)}&user_id=eq.${uid}`, {
         method: 'PATCH', body: JSON.stringify({ ...allowed, updated_at: new Date().toISOString() }),
         headers: { Prefer: 'return=minimal' },
       });
+      if (!r.ok) {
+        const e = await r.text().catch(() => '');
+        console.error('[user-sync] update_application failed:', r.status, e.slice(0, 200));
+        return res.status(200).json({ ok: false, reason: 'patch_failed' });
+      }
     }
     return res.status(200).json({ ok: true });
+  }
+
+  // ── CLEAR ALL APPLICATIONS (tracker "Clear all") ─────────────────────────────
+  if (action === 'clear_applications') {
+    const r = await db(`applications?user_id=eq.${uid}`, { method: 'DELETE', headers: { Prefer: 'return=minimal' } });
+    return res.status(200).json({ ok: r.ok });
   }
 
   // ── LOAD PROFILE ────────────────────────────────────────────────────────────
@@ -452,29 +484,44 @@ export default async function handler(req, res) {
     const { jid } = body;
     const today = new Date().toISOString().split('T')[0];
     const cRes = await db(`ai_credits?user_id=eq.${uid}&limit=1`);
-    const cred = cRes.ok ? (await cRes.json())[0] : null;
-    if (!cred || cred.pro) return res.status(200).json({ ok: false, reason: cred?.pro ? 'pro' : 'no_row' });
+    let cred = cRes.ok ? (await cRes.json())[0] : null;
+    if (cred?.pro) return res.status(200).json({ ok: false, reason: 'pro' });
+    // A brand-new user has no ai_credits row yet — create one (like submit_answer does)
+    // so their FIRST tracked application still earns. Refusing here was a silent dead end.
+    if (!cred) {
+      const ins = await db('ai_credits?on_conflict=user_id', {
+        method: 'POST',
+        body: JSON.stringify({ user_id: uid, balance: 1, pro: false, daily_earned: 0, last_reset: today }),
+        headers: { Prefer: 'resolution=merge-duplicates,return=representation' },
+      });
+      cred = ins.ok ? (await ins.json())[0] : null;
+      if (!cred) return res.status(200).json({ ok: false, reason: 'no_row' });
+    }
 
     const resetToday = cred.last_reset !== today;
     const dailyEarned = resetToday ? 0 : (cred.daily_earned || 0);
     if (dailyEarned >= 5) return res.status(200).json({ ok: false, reason: 'daily_cap', balance: cred.balance });
 
-    // Max 3 tracking earns per day (prevent spam)
-    if (!resetToday) {
-      const trackRes = await db(`credit_transactions?user_id=eq.${uid}&reason=eq.track_application&select=metadata&limit=20`);
-      if (trackRes.ok) {
-        const txns = await trackRes.json();
-        // Filter to today's transactions (no created_at filter in REST, check length after assuming recent)
-        if (txns.length >= 3) return res.status(200).json({ ok: false, reason: 'track_cap', balance: cred.balance });
-        // Prevent double-earn for same job
-        if (jid && txns.some(t => t.metadata?.jid === jid)) {
-          return res.status(200).json({ ok: false, reason: 'already_earned', balance: cred.balance });
-        }
+    // Per-job dedupe FIRST, across all days — the same tracked job never earns twice.
+    // (Previously this check was skipped entirely on the first earn of a new day.)
+    if (jid) {
+      const dupRes = await db(`credit_transactions?user_id=eq.${uid}&reason=eq.track_application&metadata->>jid=eq.${encodeURIComponent(String(jid))}&select=id&limit=1`);
+      if (dupRes.ok && ((await dupRes.json()) || []).length) {
+        return res.status(200).json({ ok: false, reason: 'already_earned', balance: cred.balance });
       }
     }
 
-    const baseBalance = resetToday ? 3 : cred.balance;
-    const newBalance = Math.min(baseBalance + 1, 8); // cap: 3 daily + up to 5 earned = 8 max
+    // Max 3 tracking earns per DAY (prevent spam). The old query had no date filter, so
+    // it counted LIFETIME earns and permanently killed the incentive after 3.
+    const sinceMidnight = `${today}T00:00:00Z`;
+    const trackRes = await db(`credit_transactions?user_id=eq.${uid}&reason=eq.track_application&created_at=gte.${sinceMidnight}&select=id&limit=4`);
+    if (trackRes.ok && ((await trackRes.json()) || []).length >= 3) {
+      return res.status(200).json({ ok: false, reason: 'track_cap', balance: cred.balance });
+    }
+
+    // Daily reset baseline is 1 free credit (migration 031) — not the legacy 3.
+    const baseBalance = resetToday ? 1 : (cred.balance || 0);
+    const newBalance = Math.min(baseBalance + 1, 8);
     const newEarned = dailyEarned + 1;
     await db(`ai_credits?user_id=eq.${uid}`, { method: 'PATCH', body: JSON.stringify({ balance: newBalance, daily_earned: newEarned, ...(resetToday ? { last_reset: today } : {}) }), headers: { Prefer: 'return=minimal' } });
     await db('credit_transactions', { method: 'POST', body: JSON.stringify({ user_id: uid, delta: 1, reason: 'track_application', metadata: { jid: jid || null } }), headers: { Prefer: 'return=minimal' } });
@@ -524,8 +571,9 @@ export default async function handler(req, res) {
       }
     }
 
-    // Priority 3: Data verification (low-confidence companies)
-    const coRes = await db(`company_scores?report_count=lt.5&ghost_rate=not.is.null&select=name,ghost_rate&order=report_count.asc&limit=10`);
+    // Priority 3: Data verification (low-confidence companies). The column is
+    // company_name — the bare `name` select 400'd and this tier never served a question.
+    const coRes = await db(`company_scores?report_count=lt.5&ghost_rate=not.is.null&select=name:company_name,ghost_rate&order=report_count.asc&limit=10`);
     const lowCos = coRes.ok ? await coRes.json() : [];
     for (const co of lowCos) {
       const key = `verify_ghost|${co.name.toLowerCase()}`;
@@ -567,11 +615,13 @@ export default async function handler(req, res) {
     // If duplicate (already answered), don't grant credit
     if (aqIns.status === 409) return res.status(200).json({ ok: false, error: 'already_answered' });
 
-    // Grant +1 credit
-    const newBalance = resetToday ? 3 + 1 : (cred.pro ? 999 : Math.min((cred.balance || 0) + 1, 999));
+    // Grant +1 credit. Daily reset baseline is 1 free credit (migration 031), so the first
+    // earn of a new day lands on 2. The response must report the SAME number we persist —
+    // the old code PATCHed balance:2 but told the client 4, so the modal and the Nav chip
+    // showed different balances at the same time.
+    const newBalance = cred.pro ? 999 : Math.min((resetToday ? 1 : (cred.balance || 0)) + 1, 999);
     const newEarned = resetToday ? 1 : dailyEarned + 1;
-    const patch = cred.pro ? {} : { balance: newBalance, daily_earned: newEarned };
-    if (resetToday && !cred.pro) { patch.last_reset = today; patch.daily_earned = 1; patch.balance = 2; }
+    const patch = cred.pro ? {} : { balance: newBalance, daily_earned: newEarned, ...(resetToday ? { last_reset: today } : {}) };
     if (Object.keys(patch).length) await db(`ai_credits?user_id=eq.${uid}`, { method: 'PATCH', body: JSON.stringify(patch), headers: { Prefer: 'return=minimal' } });
     await db('credit_transactions', { method: 'POST', body: JSON.stringify({ user_id: uid, delta: 1, reason: 'earned_question', metadata: { question_key, answer } }), headers: { Prefer: 'return=minimal' } });
 
@@ -586,7 +636,7 @@ export default async function handler(req, res) {
       }
     }
 
-    return res.status(200).json({ ok: true, balance: cred.pro ? 999 : (resetToday ? 4 : newBalance), earned_today: newEarned });
+    return res.status(200).json({ ok: true, balance: newBalance, earned_today: newEarned });
   }
 
   // ── CREDIT HISTORY ────────────────────────────────────────────────────────────

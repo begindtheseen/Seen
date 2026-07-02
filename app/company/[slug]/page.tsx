@@ -2,6 +2,7 @@
 
 import { useState, useEffect, use } from 'react'
 import { Score } from '@/lib/score'
+import { useAuth } from '@/lib/auth'
 import { AppStore } from '@/lib/stores/AppStore'
 import HiringProbability from '@/components/HiringProbability'
 import CompanyScoreCard from '@/components/CompanyScoreCard'
@@ -281,6 +282,7 @@ interface TrackCTAProps {
   companyName: string
 }
 function TrackCTA({ companyName }: TrackCTAProps) {
+  const { isLoggedIn } = useAuth()
   const [state, setState] = useState<'idle' | 'loading' | 'success' | 'error'>('idle')
   const [role, setRole] = useState('')
   const [showInput, setShowInput] = useState(false)
@@ -289,19 +291,17 @@ function TrackCTA({ companyName }: TrackCTAProps) {
     if (!role.trim()) { setShowInput(true); return }
     setState('loading')
     try {
-      const res = await fetch('/api/user-sync', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action: 'add_application',
-          company: companyName,
-          role: role.trim(),
-          status: 'active',
-          stage: 'Applied',
-          addedAt: new Date().toISOString(),
-        }),
-      })
-      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      // AppStore.add handles both worlds correctly: local tracking for guests, and the
+      // authed add_application sync (wrapped payload + Bearer token) for signed-in users.
+      // The old raw fetch sent no auth and a flat body the handler couldn't read — this
+      // button had never once succeeded.
+      await AppStore.add({
+        company: companyName,
+        role: role.trim(),
+        platform: 'Seen',
+        status: 'active',
+        stage: 'Applied',
+      }, isLoggedIn)
       setState('success')
     } catch {
       setState('error')

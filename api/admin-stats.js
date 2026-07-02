@@ -1010,18 +1010,11 @@ async function _handler(req, res) {
       const r = await db(`profiles?created_at=gte.${weekISO}&select=id,email,created_at&order=created_at.desc&limit=100`);
       rows = await r.json();
     } else if (metric === 'companies_scored') {
-      const r = await db('company_scores?select=company_id,score,ghost_rate,response_rate,updated_at&order=score.desc&limit=100');
-      const scores = await r.json();
-      if (Array.isArray(scores) && scores.length > 0) {
-        const ids = scores.map(s => s.company_id).filter(Boolean);
-        const cr = await db(`companies?id=in.(${ids.join(',')})&select=id,name`);
-        const companies = await cr.json();
-        const nameMap = {};
-        if (Array.isArray(companies)) companies.forEach(c => { nameMap[c.id] = c.name; });
-        rows = scores.map(s => ({ ...s, company: nameMap[s.company_id] || s.company_id }));
-      } else {
-        rows = Array.isArray(scores) ? scores : [];
-      }
+      // company_scores keys on company_name / overall_score — the old select asked for
+      // company_id / score (columns that don't exist), so this KPI drill-down was always empty.
+      const r = await db('company_scores?select=company_name,overall_score,ghost_rate,response_rate,report_count,created_at&order=overall_score.desc&limit=100');
+      const scores = r.ok ? await r.json() : [];
+      rows = (Array.isArray(scores) ? scores : []).map(s => ({ company: s.company_name, score: s.overall_score, ghost_rate: s.ghost_rate, response_rate: s.response_rate, report_count: s.report_count, created_at: s.created_at }));
     } else if (metric === 'total_reports') {
       const r = await db('reports?select=id,company_name,outcome,role,created_at&order=created_at.desc&limit=100');
       rows = await r.json();
