@@ -12,15 +12,37 @@ Build Seen as a hiring intelligence platform where the application tracker is th
 - `main` is the OLD production HTML app — now the SOURCE OF TRUTH for design/functionality parity. DO NOT merge into main, DO NOT push to main, DO NOT delete it.
 - **seenjobs.io now serves the Next.js app from next-migration** (deployed via Vercel CLI from owner's Mac)
 
-## CURRENT MISSION: Full parity restoration (as of 2026-06-12 evening)
-We are NOT adding features. The Next.js migration lost design and functionality vs the old site.
-- Read `CLAUDE_HANDOFF.md` for deployment workflow + constraints
-- Work through `SITE_PARITY_CHECKLIST.md` and `ADMIN_PARITY_CHECKLIST.md` page by page
-- Source of truth: `origin/main:index.html` and `origin/main:employer.html` (extract with `git show origin/main:index.html`)
-- Do not redesign, simplify, or invent UI. Port the old design exactly.
-- A page is complete only when: visual match + all old functionality + APIs work + mobile works + build passes + checklist updated.
+## MISSION HISTORY: parity restoration is DONE — feature/growth era since 2026-06-30
+The "full parity restoration" mission (2026-06-12 → ~06-23) is complete. Since 2026-06-30
+the work has been feature, growth, monetization, and reliability development on
+`next-migration` — 50 PRs (#75–#124) landed 2026-06-30 → 07-02. The landing page (PR #77)
+and dashboard (PRs #122/#123) were intentionally REDESIGNED beyond the old site; do NOT
+"restore" them back to `origin/main` parity. `origin/main` remains useful history but is no
+longer the design source of truth for redesigned pages. `SITE_PARITY_CHECKLIST.md` /
+`ADMIN_PARITY_CHECKLIST.md` are frozen pre-06-30 records, not an active work queue.
 
-## Session 2026-07-02 (PR #124): full-app audit — READ THIS, it corrects older notes below
+## Session 2026-07-02 B (claude/codebase-review-o344hb): review + merge of PR #124
+
+- Full independent review of PR #124 (all 31 files read, build + 44/44 tests re-run
+  locally, claims traced to code). Verdict: solid; merged as squash `7e2b274`.
+- **Discovery: production had been running the PR #124 preview build since ~03:46 UTC
+  (promoted via Vercel) while the PR sat unmerged** — merging closed the git/prod
+  divergence. Lesson recorded: if a preview is promoted to production, merge the PR
+  immediately, or the next unrelated merge to next-migration will silently roll prod back.
+- Live-site audit of seenjobs.io: all 19 routes 200 with correct SSR titles;
+  /company/coca-cola resolves (hyphenated-slug fix verified live); /api/jobs,
+  batch_scores, demand, leaderboard, feed, sitemap, llms.txt all healthy.
+- Added migration 037: codifies the 2026-07-02 hand-applied prod schema repairs
+  (applications.events jsonb; job_id uuid→text + FK drop) idempotently — prod already
+  matches; this is for fresh/restored environments.
+- Fixed a follow-up gap in the PR #124 permalink fix: freshly-aggregated search results
+  and nearestListings fallbacks still returned id:null (verified live — 49/49 results).
+  aggregateForQuery now stitches upsert-returned DB ids/created_at back onto results;
+  nearestListings selects id,created_at and maps posted_at.
+- Restored the \x00 (NUL) strip in pdfText.js cleanupText (Postgres text columns reject
+  NULs) alongside the newer \xa0→space normalize.
+
+## Session 2026-07-02 A (PR #124): full-app audit — corrects older notes below
 
 Six parallel audits swept every frontend→API contract, data round-trip, page flow, cron,
 and import graph; 30 confirmed breaks fixed. Ground truth established this session:
@@ -59,7 +81,7 @@ and import graph; 30 confirmed breaks fixed. Ground truth established this sessi
 - Deferred (known, acceptable): EventStore check-in ledger is device-local only (re-prompts
   on a new device); RLS-no-policy INFO lints are intentional (server-only tables).
 
-## Migration Status (as of 2026-06-14)
+## Migration Status (as of 2026-06-14 — HISTORICAL; see sessions above for current state)
 
 ### What was fixed in Session G (claude/index-file-stability-LrIfU):
 - **HiringProbability component**: new `components/HiringProbability.tsx` — compact/full modes, calculates 3–70% probability from ghost/response rates + level match multiplier
