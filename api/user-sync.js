@@ -121,7 +121,7 @@ export default async function handler(req, res) {
     const recent = recentRes.ok ? await recentRes.json() : [];
     let cred = credRes.ok ? (await credRes.json())[0] : null;
     if (cred && cred.last_reset !== today) {
-      const nb = cred.pro ? 999 : 1;
+      const nb = cred.pro ? 999 : 3;
       db(`ai_credits?user_id=eq.${uid}`, { method: 'PATCH', body: JSON.stringify({ balance: nb, daily_earned: 0, last_reset: today }), headers: { Prefer: 'return=minimal' } });
       cred = { ...cred, balance: nb, daily_earned: 0, last_reset: today };
     }
@@ -342,8 +342,10 @@ export default async function handler(req, res) {
       }
     } catch { /* storage cleanup is best-effort */ }
 
-    // De-link the user from their public reports rather than deleting the anonymized signal.
+    // Contributed company intel outlives the account: de-link the user from their public
+    // reports AND résumé-survey answers (user_id → null) rather than deleting the signal.
     await db(`reports?user_id=eq.${uid}`, { method: 'PATCH', body: JSON.stringify({ user_id: null }), headers: { Prefer: 'return=minimal' } }).catch(() => {});
+    await db(`resume_surveys?user_id=eq.${uid}`, { method: 'PATCH', body: JSON.stringify({ user_id: null }), headers: { Prefer: 'return=minimal' } }).catch(() => {});
     await db(`profiles?id=eq.${uid}`, { method: 'DELETE', headers: { Prefer: 'return=minimal' } });
     const delRes = await fetch(`${SUPABASE_URL}/auth/v1/admin/users/${uid}`, {
       method: 'DELETE',
@@ -432,7 +434,7 @@ export default async function handler(req, res) {
       // No row means they haven't used AI yet — show welcome balance preview (don't create row here)
       return res.status(200).json({ balance: 10, pro: false, daily_earned: 0, max_daily_earn: 5, welcome: true });
     } else if (cred.last_reset !== today) {
-      const nb = cred.pro ? 999 : 1;
+      const nb = cred.pro ? 999 : 3;
       await db(`ai_credits?user_id=eq.${uid}`, { method: 'PATCH', body: JSON.stringify({ balance: nb, daily_earned: 0, last_reset: today }), headers: { Prefer: 'return=minimal' } });
       cred = { ...cred, balance: nb, daily_earned: 0, last_reset: today };
     }
@@ -467,10 +469,10 @@ export default async function handler(req, res) {
     }
     if (cred.pro) return res.status(200).json({ ok: true, balance: 999, pro: true });
     if (cred.last_reset !== today) {
-      // Daily reset: 1 credit/day (matches consume_credit RPC, migration 031), deduct 1 → 0
-      await db(`ai_credits?user_id=eq.${uid}`, { method: 'PATCH', body: JSON.stringify({ balance: 0, daily_earned: 0, last_reset: today }), headers: { Prefer: 'return=minimal' } });
+      // Daily reset: 3 free credits/day (code resets daily; DB DEFAULT stays 1 per migration 031), deduct 1 → 2
+      await db(`ai_credits?user_id=eq.${uid}`, { method: 'PATCH', body: JSON.stringify({ balance: 2, daily_earned: 0, last_reset: today }), headers: { Prefer: 'return=minimal' } });
       await db('credit_transactions', { method: 'POST', body: JSON.stringify({ user_id: uid, delta: -1, reason: body.reason || 'ai_tool' }), headers: { Prefer: 'return=minimal' } });
-      return res.status(200).json({ ok: true, balance: 0 });
+      return res.status(200).json({ ok: true, balance: 2 });
     }
     if (cred.balance <= 0) return res.status(200).json({ ok: false, error: 'no_credits', balance: 0 });
     const nb = cred.balance - 1;
@@ -491,7 +493,7 @@ export default async function handler(req, res) {
     if (!cred) {
       const ins = await db('ai_credits?on_conflict=user_id', {
         method: 'POST',
-        body: JSON.stringify({ user_id: uid, balance: 1, pro: false, daily_earned: 0, last_reset: today }),
+        body: JSON.stringify({ user_id: uid, balance: 3, pro: false, daily_earned: 0, last_reset: today }),
         headers: { Prefer: 'resolution=merge-duplicates,return=representation' },
       });
       cred = ins.ok ? (await ins.json())[0] : null;
@@ -519,8 +521,8 @@ export default async function handler(req, res) {
       return res.status(200).json({ ok: false, reason: 'track_cap', balance: cred.balance });
     }
 
-    // Daily reset baseline is 1 free credit (migration 031) — not the legacy 3.
-    const baseBalance = resetToday ? 1 : (cred.balance || 0);
+    // Daily reset baseline is 3 free credits (code resets daily; DB DEFAULT stays 1 per migration 031).
+    const baseBalance = resetToday ? 3 : (cred.balance || 0);
     const newBalance = Math.min(baseBalance + 1, 8);
     const newEarned = dailyEarned + 1;
     await db(`ai_credits?user_id=eq.${uid}`, { method: 'PATCH', body: JSON.stringify({ balance: newBalance, daily_earned: newEarned, ...(resetToday ? { last_reset: today } : {}) }), headers: { Prefer: 'return=minimal' } });
@@ -605,7 +607,7 @@ export default async function handler(req, res) {
     // Check daily earn cap
     const cRes = await db(`ai_credits?user_id=eq.${uid}&limit=1`);
     let cred = cRes.ok ? (await cRes.json())[0] : null;
-    if (!cred) { await db('ai_credits', { method: 'POST', body: JSON.stringify({ user_id: uid, balance: 1, daily_earned: 0, last_reset: today, pro: false }), headers: { Prefer: 'return=minimal' } }); cred = { balance: 1, daily_earned: 0, last_reset: today, pro: false }; }
+    if (!cred) { await db('ai_credits', { method: 'POST', body: JSON.stringify({ user_id: uid, balance: 3, daily_earned: 0, last_reset: today, pro: false }), headers: { Prefer: 'return=minimal' } }); cred = { balance: 3, daily_earned: 0, last_reset: today, pro: false }; }
     const resetToday = cred.last_reset !== today;
     const dailyEarned = resetToday ? 0 : (cred.daily_earned || 0);
     if (dailyEarned >= 5 && !cred.pro) return res.status(200).json({ ok: false, error: 'daily_cap', earned_today: dailyEarned });
@@ -615,11 +617,11 @@ export default async function handler(req, res) {
     // If duplicate (already answered), don't grant credit
     if (aqIns.status === 409) return res.status(200).json({ ok: false, error: 'already_answered' });
 
-    // Grant +1 credit. Daily reset baseline is 1 free credit (migration 031), so the first
-    // earn of a new day lands on 2. The response must report the SAME number we persist —
-    // the old code PATCHed balance:2 but told the client 4, so the modal and the Nav chip
-    // showed different balances at the same time.
-    const newBalance = cred.pro ? 999 : Math.min((resetToday ? 1 : (cred.balance || 0)) + 1, 999);
+    // Grant +1 credit. Daily reset baseline is 3 free credits (code resets daily; DB DEFAULT
+    // stays 1 per migration 031), so the first earn of a new day lands on 4. The response must
+    // report the SAME number we persist — the old code PATCHed one balance but told the client
+    // another, so the modal and the Nav chip showed different balances at the same time.
+    const newBalance = cred.pro ? 999 : Math.min((resetToday ? 3 : (cred.balance || 0)) + 1, 999);
     const newEarned = resetToday ? 1 : dailyEarned + 1;
     const patch = cred.pro ? {} : { balance: newBalance, daily_earned: newEarned, ...(resetToday ? { last_reset: today } : {}) };
     if (Object.keys(patch).length) await db(`ai_credits?user_id=eq.${uid}`, { method: 'PATCH', body: JSON.stringify(patch), headers: { Prefer: 'return=minimal' } });
@@ -648,7 +650,7 @@ export default async function handler(req, res) {
     ]);
     let cred = credRes.ok ? (await credRes.json())[0] : null;
     if (cred && cred.last_reset !== today) {
-      const nb = cred.pro ? 999 : 1;
+      const nb = cred.pro ? 999 : 3;
       db(`ai_credits?user_id=eq.${uid}`, { method: 'PATCH', body: JSON.stringify({ balance: nb, daily_earned: 0, last_reset: today }), headers: { Prefer: 'return=minimal' } }).catch(() => {});
       cred = { ...cred, balance: nb, daily_earned: 0, last_reset: today };
     }
@@ -1000,7 +1002,7 @@ export default async function handler(req, res) {
       const room = Math.max(0, 5 - dailyEarned);     // daily earn cap = 5
       awarded = Math.min(AWARD, room);
       if (awarded > 0) {
-        const baseBalance = resetToday ? (cr.pro ? 999 : 1) : cr.balance; // daily reset baseline = 1 (migration 031)
+        const baseBalance = resetToday ? (cr.pro ? 999 : 3) : cr.balance; // daily reset baseline = 3 free (code resets daily; DB DEFAULT 1 per migration 031)
         balance = baseBalance + awarded;
         const patch = { balance, daily_earned: dailyEarned + awarded };
         if (resetToday) patch.last_reset = today;

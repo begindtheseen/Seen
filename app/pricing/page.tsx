@@ -25,10 +25,10 @@ const FREE_FEATURES = [
 
 const PRO_FEATURES = [
   'Unlimited AI credits — no daily cap',
-  '🥷 Stealth Mode — rewrites that bypass AI detection tools',
-  'AI job insights per listing',
   'Ghost risk alerts when companies change behavior',
   'AI company deep-dive analysis',
+  'AI job insights per listing',
+  'Human Voice — rewrites that sound like you, not a bot',
   'Priority support',
   'Early access to every new feature',
 ]
@@ -37,18 +37,18 @@ const COMPARISON: [string, string | boolean, string | boolean][] = [
   ['AI credits',                '3/day',     'Unlimited'],
   ['Resume AI — parse & scan',  true,         true],
   ['Resume AI — optimize',      true,         true],
-  ['🥷 Stealth Mode (AI-safe rewrite)', false,  true],
   ['AI job insights',           false,        true],
   ['Company ghost rates',       true,         true],
   ['Ghost risk alerts',         false,        true],
   ['AI company analysis',       false,        true],
+  ['Human Voice (natural rewrite)', false,    true],
   ['Job tracker',               'Unlimited',  'Unlimited'],
   ['Community feed',            true,         true],
   ['Priority support',          false,        true],
 ]
 
 const FAQ = [
-  { q: 'What is Stealth Mode?', a: 'Companies increasingly use AI-detection tools (GPTZero, Originality.ai) to auto-reject resumes that look AI-generated. Stealth Mode runs your optimized bullets through a second pass that varies sentence structure, avoids AI writing patterns, and keeps every keyword — so you pass ATS filters AND human review.' },
+  { q: 'What is Human Voice?', a: 'AI-optimized résumés often sound generic — and some companies auto-filter applications that read as machine-written. Human Voice rewrites your optimized bullets so they sound like you: varied sentence structure, natural rhythm, every keyword kept. Your words, your voice, still ATS-ready.' },
   { q: 'How do free AI credits work?', a: 'Every day you get 3 AI credits that reset at midnight. Each credit covers one AI action: parse a resume, optimize bullets for a job, or run the ATS scanner. You can earn more credits by tracking your applications and answering quick surveys about companies you\'ve worked with.' },
   { q: 'Can I cancel Pro?', a: 'Yes, anytime — no contracts. You keep Pro until the end of your billing period. We don\'t trap you.' },
   { q: 'Is my data sold to employers?', a: 'Never. We work for job seekers. Your resume content is processed in-memory to generate your optimization and immediately discarded. We never sell, share, or expose your info to recruiters or employers.' },
@@ -170,8 +170,8 @@ function PricingPageInner() {
         <div style={{ textAlign: 'center', maxWidth: 420, padding: '2rem' }}>
           <div style={{ fontSize: '3.5rem', marginBottom: '1rem' }}>🎉</div>
           <h1 style={{ fontFamily: 'var(--display)', fontSize: '1.8rem', fontWeight: 800, color: 'var(--white)', marginBottom: '.5rem' }}>You're Pro.</h1>
-          <p style={{ color: 'var(--sub)', fontFamily: 'var(--mono)', fontSize: '.78rem', lineHeight: 1.7, marginBottom: '1.75rem' }}>
-            Unlimited AI credits and Stealth Mode are live on your account right now.
+          <p style={{ color: 'var(--sub)', fontFamily: 'var(--body)', fontSize: '.78rem', lineHeight: 1.7, marginBottom: '1.75rem' }}>
+            Unlimited AI credits and Human Voice are live on your account right now.
             No setup needed.
           </p>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '.65rem' }}>
@@ -203,12 +203,11 @@ function PricingPageInner() {
             Transparent pricing
           </div>
           <h1 style={{ fontFamily: 'var(--display)', fontSize: 'clamp(1.8rem,5vw,2.6rem)', fontWeight: 900, color: 'var(--white)', letterSpacing: '-.04em', marginBottom: '.5rem', lineHeight: 1.1 }}>
-            The system is rigged.<br />
-            <span style={{ color: '#818cf8' }}>We help you game it.</span>
+            You already know who ghosts.<br />
+            <span style={{ color: '#818cf8' }}>Now get through to the ones who don't.</span>
           </h1>
           <p style={{ color: 'var(--sub)', fontSize: '.85rem', lineHeight: 1.7, maxWidth: 480, margin: '0 auto 1.75rem' }}>
-            Companies use AI to reject your resume. ATS filters keyword-match before a human sees it.
-            Seen Pro gives you the tools that work the other way around.
+            Seen shows you which companies actually respond — free. Pro gives you the résumé edge to land the ones worth your time.
           </p>
 
           {/* Billing toggle — annual is recommended */}
@@ -245,7 +244,7 @@ function PricingPageInner() {
             <div style={{ fontFamily: 'var(--mono)', fontSize: '.62rem', color: 'var(--muted)', marginBottom: '1.5rem' }}>forever — no card required</div>
             <div style={{ marginBottom: '1.5rem' }}>
               {FREE_FEATURES.map(f => (
-                <div key={f} style={{ display: 'flex', gap: '.5rem', marginBottom: '.45rem', fontFamily: 'var(--mono)', fontSize: '.65rem', color: 'var(--sub)', lineHeight: 1.45 }}>
+                <div key={f} style={{ display: 'flex', gap: '.5rem', marginBottom: '.45rem', fontFamily: 'var(--body)', fontSize: '.72rem', color: 'var(--sub)', lineHeight: 1.45 }}>
                   <span style={{ color: 'var(--dim)', flexShrink: 0 }}>✓</span>{f}
                 </div>
               ))}
@@ -280,7 +279,7 @@ function PricingPageInner() {
             )}
             <div style={{ marginBottom: '1.5rem' }}>
               {PRO_FEATURES.map(f => (
-                <div key={f} style={{ display: 'flex', gap: '.5rem', marginBottom: '.45rem', fontFamily: 'var(--mono)', fontSize: '.65rem', color: 'rgba(165,180,252,.85)', lineHeight: 1.45 }}>
+                <div key={f} style={{ display: 'flex', gap: '.5rem', marginBottom: '.45rem', fontFamily: 'var(--body)', fontSize: '.72rem', color: 'rgba(165,180,252,.85)', lineHeight: 1.45 }}>
                   <span style={{ color: '#818cf8', flexShrink: 0 }}>✓</span>{f}
                 </div>
               ))}
@@ -389,15 +388,14 @@ function PricingPageInner() {
           </div>
         </div>
 
-        {/* Stealth Mode callout */}
+        {/* Human Voice callout */}
         <div style={{ background: 'linear-gradient(135deg,rgba(124,58,237,.12),rgba(79,70,229,.08))', border: '1px solid rgba(124,58,237,.3)', borderRadius: 14, padding: '1.5rem 1.75rem', marginBottom: '3rem', display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '1.25rem', alignItems: 'center' }}>
-          <div style={{ fontSize: '2.5rem' }}>🥷</div>
+          <div style={{ fontSize: '2.5rem' }}>🗣</div>
           <div>
-            <div style={{ fontFamily: 'var(--display)', fontSize: '1rem', fontWeight: 800, color: 'var(--white)', marginBottom: '.25rem' }}>Stealth Mode — Pro exclusive</div>
-            <div style={{ fontFamily: 'var(--mono)', fontSize: '.68rem', color: 'var(--sub)', lineHeight: 1.65 }}>
-              After optimizing your resume, Stealth Mode rewrites every bullet to evade AI-detection software. Same keywords,
-              same meaning — but varied sentence structure, natural rhythm, no AI tells. The companies screening for AI
-              won't see it coming.
+            <div style={{ fontFamily: 'var(--display)', fontSize: '1rem', fontWeight: 800, color: 'var(--white)', marginBottom: '.25rem' }}>Human Voice — Pro exclusive</div>
+            <div style={{ fontFamily: 'var(--body)', fontSize: '.72rem', color: 'var(--sub)', lineHeight: 1.65 }}>
+              Human Voice rewrites your optimized bullets so they sound like you — varied sentence structure, natural
+              rhythm, every keyword kept. Your words, your voice, still ATS-ready.
             </div>
           </div>
         </div>
@@ -426,7 +424,7 @@ function PricingPageInner() {
             <summary style={{ padding: '.85rem 1.25rem', fontFamily: 'var(--display)', fontSize: '.82rem', fontWeight: 700, color: 'var(--white)', cursor: 'pointer', listStyle: 'none' }}>
               {item.q}
             </summary>
-            <div style={{ padding: '0 1.25rem .85rem', fontFamily: 'var(--mono)', fontSize: '.68rem', color: 'var(--sub)', lineHeight: 1.75 }}>
+            <div style={{ padding: '0 1.25rem .85rem', fontFamily: 'var(--body)', fontSize: '.72rem', color: 'var(--sub)', lineHeight: 1.75 }}>
               {item.a}
             </div>
           </details>

@@ -8,7 +8,7 @@ import { aiHeaders } from '@/lib/aiHeaders'
 interface UpgradeModalProps {
   reason: 'credits' | 'pro' | 'generic'
   onClose: () => void
-  featureName?: string // e.g. "Stealth Mode", "HumanProof"
+  featureName?: string // e.g. "Human Voice", "HumanProof"
 }
 
 const MONTHLY_PRICE = '$9.99'
@@ -20,8 +20,8 @@ const ANNUAL_SAVINGS = +(MONTHLY_NUM * 12 - YEARLY_TOTAL).toFixed(2) // ~35.99
 
 const PRO_BULLETS = [
   { icon: '∞', label: 'Unlimited AI credits', sub: 'No daily cap, optimize every application' },
-  { icon: '🥷', label: 'Stealth Mode', sub: 'Rewrites that read human, not AI-generated' },
   { icon: '📊', label: 'AI company insights', sub: 'Ghost risk, culture, hiring trends' },
+  { icon: '🗣', label: 'Human Voice', sub: 'Rewrites that sound like you, not a bot' },
   { icon: '⚡', label: 'Priority support', sub: 'Real humans, fast replies' },
 ]
 
@@ -30,8 +30,8 @@ const PRO_BULLETS = [
 function copyFor(reason: UpgradeModalProps['reason'], featureName?: string) {
   if (reason === 'credits') {
     return {
-      headline: "You've used today's 3 free AI credits",
-      sub: 'Pro users optimize every application, every day — no daily cap. Free credits reset tomorrow.',
+      headline: "You're out of credits for today.",
+      sub: "Free gives you 3 AI optimizations a day. Pro removes the cap — tune every application while the role's still open.",
     }
   }
   if (reason === 'pro') {
@@ -43,12 +43,12 @@ function copyFor(reason: UpgradeModalProps['reason'], featureName?: string) {
     }
     return {
       headline: `${featureName || 'This feature'} is a Pro feature`,
-      sub: `Upgrade to unlock ${featureName || 'this'} plus unlimited AI optimization on every application.`,
+      sub: `Upgrade to unlock ${featureName || 'this'} — plus unlimited optimization, ghost-risk alerts, and deep company intel.`,
     }
   }
   return {
-    headline: 'Unlock Seen Pro',
-    sub: 'Unlimited AI optimization and Stealth Mode — the serious job seeker’s edge.',
+    headline: 'Stop guessing. Start getting responses.',
+    sub: 'Unlimited résumé optimization, ghost-risk alerts before you apply, and deep company intel — for less than one week of coffee.',
   }
 }
 
@@ -126,7 +126,7 @@ export default function UpgradeModal({ reason, onClose, featureName }: UpgradeMo
             <div style={{ fontFamily: 'var(--display)', fontSize: '1.05rem', fontWeight: 800, color: 'var(--white)', letterSpacing: '-.02em', marginBottom: '.25rem', lineHeight: 1.25 }}>
               {headline}
             </div>
-            <div style={{ fontFamily: 'var(--mono)', fontSize: '.65rem', color: 'var(--sub)', lineHeight: 1.55 }}>
+            <div style={{ fontFamily: 'var(--body)', fontSize: '.72rem', color: 'var(--sub)', lineHeight: 1.55 }}>
               {sub}
             </div>
           </div>

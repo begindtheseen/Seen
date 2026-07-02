@@ -21,6 +21,39 @@ and dashboard (PRs #122/#123) were intentionally REDESIGNED beyond the old site;
 longer the design source of truth for redesigned pages. `SITE_PARITY_CHECKLIST.md` /
 `ADMIN_PARITY_CHECKLIST.md` are frozen pre-06-30 records, not an active work queue.
 
+## Session 2026-07-02 C (PR #127): conversion pass + jobs-page extraction (all facts verified)
+
+Owner decisions taken this session (rule 6 — decided BEFORE building):
+- **Free tier = 3 AI credits/day.** Code had reset to 1 (migration 031) while every copy
+  surface promised 3. All daily-reset baselines now 3: api/user-sync.js (load, get_credits,
+  earn_credit, submit_answer, credit_history, resume_survey, and consume_credit's inline
+  reset-then-deduct → 2) + lib/server/credits.js. DB DEFAULT intentionally untouched —
+  resets converge in code within a day.
+- **"Stealth Mode" is renamed "Human Voice" in ALL UI strings** (authenticity framing —
+  never use evade/bypass/detection language). The `stealth` API field, code identifiers,
+  and the separate HumanProof feature keep their names. Do not reintroduce "Stealth" copy.
+- Paywall hero: "You already know who ghosts. Now get through to the ones who don't."
+  Pro features are ordered intel-first (ghost alerts, company analysis) before Human Voice.
+- Post-win upsell: non-Pro users see a dismissible "1 of your 3 daily credits" strip on
+  optimize RESULTS (ApplyOptimizeModal review step + resume page) — tri-state pro gating.
+
+Structure: **app/jobs/page.tsx is extracted** (1,608 → 347 lines): search state machine
+lives in `lib/hooks/useJobSearch.ts`; UI in `components/jobs/` (JobCard, JobDetailDrawer,
+SwipeJobDeck, JobFilters, CoPreviewModal). Effect ORDER inside useJobSearch is
+load-bearing (URL-params effect claims autoSearchedRef before GPS/recent-search) — do not
+reorder. The radius select (incl. Remote value="0") stays in the page's search bar.
+
+Delegation lesson (recorded after a caught failure): **worktree subagents start on the
+repo's DEFAULT branch (`main` = old HTML app), NOT your working branch.** An extraction
+agent silently built on a 22-PR-stale tree and would have reverted the #124/#125 jobs
+fixes — green build + 44/44 tests did NOT catch it. When delegating: pin the EXACT base
+sha, and give the agent marker strings that must exist in the source before it starts and
+in its output when done. Verify the markers yourself in the merged result.
+
+Doc corrections: MONETIZATION_TODO.md item 1 falsely said the 7-day trial was "✅ BUILT" —
+it was deleted in #93 (verified: no trial_period_days in api/stripe.js, no trial copy).
+Corrected. Grep before trusting any feature-status claim in docs.
+
 ## Session 2026-07-02 B (claude/codebase-review-o344hb): review + merge of PR #124
 
 - Full independent review of PR #124 (all 31 files read, build + 44/44 tests re-run

@@ -123,28 +123,22 @@ export default function ApplyCheckpoint({ job, optimized: _optimized, autoConfir
     WebkitBackdropFilter: 'blur(4px)',
     zIndex: 9900,
     display: 'flex',
-    alignItems: 'flex-end',
+    alignItems: 'center',
     justifyContent: 'center',
+    padding: '1rem',
   }
 
   const sheetStyle: React.CSSProperties = {
     width: '100%',
     maxWidth: 480,
+    maxHeight: '85dvh',
+    overflowY: 'auto',
     background: 'var(--card)',
-    borderRadius: '20px 20px 0 0',
+    borderRadius: 20,
     border: '1px solid var(--line2)',
-    borderBottom: 'none',
     padding: '0 0 env(safe-area-inset-bottom, 16px)',
     animation: 'fadeUp .25s ease both',
     position: 'relative',
-  }
-
-  const handleStyle: React.CSSProperties = {
-    width: 40,
-    height: 4,
-    borderRadius: 2,
-    background: 'var(--line2)',
-    margin: '12px auto 0',
   }
 
   const innerStyle: React.CSSProperties = {
@@ -358,8 +352,6 @@ export default function ApplyCheckpoint({ job, optimized: _optimized, autoConfir
       onClick={e => { if (e.target === e.currentTarget) onClose() }}
     >
       <div style={sheetStyle}>
-        <div style={handleStyle} />
-
         {/* ── MAIN ── */}
         {step === 'main' && (
           <div style={innerStyle}>
