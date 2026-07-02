@@ -261,6 +261,10 @@ function UserRow({ r, token, onDeleted, ts }: { r: Record<string, unknown>; toke
   const [busy, setBusy] = useState(false)
   const [confirm, setConfirm] = useState(false)
   const id = String(r.id ?? '')
+  // Grant-credits state
+  const [grantAmt, setGrantAmt] = useState(5)
+  const [granting, setGranting] = useState(false)
+  const [grantMsg, setGrantMsg] = useState('')
   async function del() {
     if (!id) return
     setBusy(true)
@@ -275,10 +279,36 @@ function UserRow({ r, token, onDeleted, ts }: { r: Record<string, unknown>; toke
       alert(d.error || 'Delete failed'); setBusy(false); setConfirm(false)
     } catch { alert('Network error'); setBusy(false); setConfirm(false) }
   }
+  async function grant() {
+    if (!id || granting) return
+    const amt = Math.round(Number(grantAmt))
+    if (!Number.isInteger(amt) || amt < 1 || amt > 500) { setGrantMsg('1–500'); return }
+    setGranting(true); setGrantMsg('')
+    try {
+      const res = await fetch('/api/admin-stats', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Admin-Token': token },
+        body: JSON.stringify({ action: 'grant_credits', user_id: id, amount: amt }),
+      })
+      const d = await res.json().catch(() => ({}))
+      if (res.ok && d.ok) setGrantMsg(`✓ +${amt} (balance ${d.balance})`)
+      else setGrantMsg(d.error || 'Failed')
+    } catch { setGrantMsg('Network error') }
+    setGranting(false)
+  }
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: '1fr auto auto', gap: '.5rem', padding: '.5rem .6rem', background: 'var(--card)', borderRadius: 7, alignItems: 'center' }}>
+    <div style={{ display: 'grid', gridTemplateColumns: '1fr auto auto auto', gap: '.5rem', padding: '.5rem .6rem', background: 'var(--card)', borderRadius: 7, alignItems: 'center' }}>
       <span style={{ fontFamily: 'var(--mono)', fontSize: '.62rem', color: 'var(--white)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{String(r.email ?? '—')}</span>
       <span style={{ fontFamily: 'var(--mono)', fontSize: '.62rem', color: 'var(--sub)' }}>{ts(r.created_at)}</span>
+      {grantMsg && grantMsg.startsWith('✓') ? (
+        <span style={{ fontFamily: 'var(--mono)', fontSize: '.55rem', color: 'var(--green)', whiteSpace: 'nowrap' }}>{grantMsg}</span>
+      ) : (
+        <span style={{ display: 'flex', gap: '.25rem', alignItems: 'center' }}>
+          <input type="number" min={1} max={500} value={grantAmt} onChange={e => setGrantAmt(Number(e.target.value))} disabled={granting} style={{ width: 42, background: 'var(--bg)', border: '1px solid var(--line2)', borderRadius: 5, color: 'var(--white)', fontFamily: 'var(--mono)', fontSize: '.55rem', padding: '.2rem .3rem', textAlign: 'center' }} />
+          <button onClick={grant} disabled={granting} title="Grant AI credits to this account" style={{ background: 'none', border: '1px solid rgba(52,211,153,.4)', borderRadius: 5, color: 'var(--green)', fontFamily: 'var(--mono)', fontSize: '.55rem', padding: '.22rem .45rem', cursor: granting ? 'wait' : 'pointer', whiteSpace: 'nowrap' }}>{granting ? '…' : '＋ Credits'}</button>
+          {grantMsg && <span style={{ fontFamily: 'var(--mono)', fontSize: '.5rem', color: 'var(--red)', whiteSpace: 'nowrap' }}>{grantMsg}</span>}
+        </span>
+      )}
       {confirm ? (
         <span style={{ display: 'flex', gap: '.3rem' }}>
           <button onClick={del} disabled={busy} style={{ background: 'var(--red)', border: 'none', borderRadius: 5, color: '#fff', fontFamily: 'var(--mono)', fontSize: '.55rem', padding: '.22rem .45rem', cursor: busy ? 'wait' : 'pointer' }}>{busy ? '…' : 'Delete'}</button>

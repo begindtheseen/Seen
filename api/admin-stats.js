@@ -861,6 +861,40 @@ async function _handler(req, res) {
     return res.status(200).json({ ok: true, deleted: userId });
   }
 
+  // ── grant_credits: top up a specific account's AI-credit balance (full admins only) ──
+  if (body.action === 'grant_credits') {
+    if (adminRole === 'moderator') return res.status(403).json({ error: 'Insufficient role' });
+    const userId = String(body.user_id || '').trim();
+    if (!/^[0-9a-f-]{36}$/i.test(userId)) return res.status(400).json({ error: 'Valid user_id required' });
+    const amount = Number(body.amount);
+    if (!Number.isInteger(amount) || amount < 1 || amount > 500) return res.status(400).json({ error: 'amount must be an integer between 1 and 500' });
+
+    // Read-modify-write: add to the existing balance, or create a fresh free-tier row.
+    const curRes = await db(`ai_credits?user_id=eq.${userId}&select=balance&limit=1`);
+    const curRows = curRes.ok ? await curRes.json() : [];
+    let newBalance;
+    if (curRows.length) {
+      newBalance = (Number(curRows[0].balance) || 0) + amount;
+      const up = await db(`ai_credits?user_id=eq.${userId}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ balance: newBalance }),
+        headers: { Prefer: 'return=minimal' },
+      });
+      if (!up.ok) return res.status(500).json({ error: 'Failed to update balance' });
+    } else {
+      newBalance = amount;
+      const ins = await db(`ai_credits?on_conflict=user_id`, {
+        method: 'POST',
+        body: JSON.stringify({ user_id: userId, balance: amount, pro: false, daily_earned: 0, last_reset: new Date().toISOString().split('T')[0] }),
+        headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
+      });
+      if (!ins.ok) return res.status(500).json({ error: 'Failed to create credit balance' });
+    }
+    await db('credit_transactions', { method: 'POST', body: JSON.stringify({ user_id: userId, delta: amount, reason: 'admin_grant' }), headers: { Prefer: 'return=minimal' } }).catch(() => {});
+    await db('admin_audit_log', { method: 'POST', body: JSON.stringify({ admin_id: sess.admin_id, username: sess.username || 'admin', action: 'grant_credits', target_type: 'user', target_id: userId, metadata: { amount, new_balance: newBalance } }), headers: { Prefer: 'return=minimal' } }).catch(() => {});
+    return res.status(200).json({ ok: true, balance: newBalance });
+  }
+
   // ── export_company: full evidentiary audit bundle for ONE company ─────────────
   // Assembles the complete "how the grade was computed" chain for a company — every
   // contributing AND excluded report, each with its source/trust weight, the per-source
