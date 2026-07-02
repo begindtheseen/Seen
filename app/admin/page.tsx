@@ -20,6 +20,7 @@ interface AdminStats {
     conversion_pct: number
     trialing: number | null
     active_paid: number | null
+    canceling: number | null
     past_due: number | null
     canceled: number | null
     mrr: number | null
@@ -103,24 +104,17 @@ function JobCrisisBanner({
   async function runEmergencyRefresh() {
     setRunning(true)
     setResult(null)
-    try {
-      // Call refresh-jobs DIRECTLY (same-origin, its own 60s budget). Going through
-      // /api/admin-stats used to time out: that function caps at 15s but the full
-      // all-sources backfill takes ~40s, so the middle-man aborted → "fetch failed".
-      // refresh-jobs validates this same admin-session token (X-Admin-Token) itself.
-      const res = await fetch('/api/refresh-jobs?all=1', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'X-Admin-Token': token },
-        body: '{}',
-      })
-      const d = await res.json().catch(() => ({}))
-      if (!res.ok) throw new Error(d.error || `HTTP ${res.status}`)
-      const added = d.upserted ?? d.inserted ?? d.found ?? null
-      setResult({ ok: true, msg: added != null ? `Refreshed — ${added} listings backfilled` : 'Refresh triggered' })
+    // Call refresh-jobs DIRECTLY (same-origin, its own 60s budget). Going through
+    // /api/admin-stats used to time out: that function caps at 15s but the full
+    // all-sources backfill takes ~40s, so the middle-man aborted → "fetch failed".
+    // refresh-jobs validates this same admin-session token (X-Admin-Token) itself.
+    const r = await runRefreshAndClear(token)
+    if (r.ok) {
+      setResult({ ok: true, msg: refreshResultMsg(r) })
       // Reload dashboard stats so the banner clears once the board recovers.
       setTimeout(onRefresh, 1500)
-    } catch (e) {
-      setResult({ ok: false, msg: (e as Error).message.slice(0, 120) })
+    } else {
+      setResult({ ok: false, msg: (r.error || 'Refresh failed').slice(0, 120) })
     }
     setRunning(false)
   }
@@ -368,7 +362,7 @@ function KpiDetailRows({ metric, rows, token, onDeleteRow }: { metric: string; r
         <div key={i} style={{ display: 'grid', gridTemplateColumns: '1fr auto auto', gap: '.5rem', padding: '.5rem .6rem', background: 'var(--card)', borderRadius: 7, alignItems: 'center' }}>
           {cell(r.company, 'var(--white)')}
           {cell(`${Math.round(Number(r.score || 0))}`, Number(r.score) > 65 ? 'var(--green)' : Number(r.score) > 40 ? 'var(--amber)' : 'var(--red)')}
-          {cell(ts(r.updated_at))}
+          {cell(ts(r.created_at))}
         </div>
       ))}
     </div>
@@ -609,21 +603,49 @@ function ManageAccountsModal({ token, onClose }: { token: string; onClose: () =>
   )
 }
 
-// Real, wired stale-job remediation for the Jobs & Companies panel — same call the crisis
+// Shared job-board remediation: (1) backfill fresh ACTIVE listings via refresh-jobs?all=1
+// (it validates this admin session token itself), then (2) clear the unconfirmed-stale rows
+// the sources couldn't re-confirm so the admin "Stale/expired" count actually drops. Both
+// halves are needed for the button's outcome to observably match the number beside it.
+async function runRefreshAndClear(token: string): Promise<{ ok: boolean; added: number | null; cleared: number | null; error?: string }> {
+  try {
+    const res = await fetch('/api/refresh-jobs?all=1', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Admin-Token': token }, body: '{}' })
+    const d = await res.json().catch(() => ({}))
+    if (!res.ok) return { ok: false, added: null, cleared: null, error: d.error || `HTTP ${res.status}` }
+    const added = d.upserted ?? d.inserted ?? d.found ?? null
+    let cleared: number | null = null
+    try {
+      const pres = await fetch('/api/admin-stats', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Admin-Token': token }, body: JSON.stringify({ action: 'purge_stale_jobs' }) })
+      const pd = await pres.json().catch(() => ({}))
+      if (pres.ok && pd.ok) cleared = pd.removed ?? 0
+    } catch { /* purge is best-effort; the backfill already succeeded */ }
+    return { ok: true, added, cleared }
+  } catch (e) {
+    return { ok: false, added: null, cleared: null, error: (e as Error).message }
+  }
+}
+
+function refreshResultMsg(r: { added: number | null; cleared: number | null }): string {
+  const parts: string[] = []
+  if (r.added != null) parts.push(`+${r.added} fresh`)
+  if (r.cleared != null) parts.push(`cleared ${r.cleared} stale`)
+  return parts.length ? parts.join(' · ') : 'refresh triggered'
+}
+
+// Real, wired stale-job remediation for the Jobs & Companies panel — same flow the crisis
 // banner uses (refresh-jobs validates the admin session token itself).
 function JobRefreshButton({ token, onDone }: { token: string; onDone: () => void }) {
   const [busy, setBusy] = useState(false)
   const [msg, setMsg] = useState('')
   async function run() {
     setBusy(true); setMsg('')
-    try {
-      const res = await fetch('/api/refresh-jobs?all=1', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Admin-Token': token }, body: '{}' })
-      const d = await res.json().catch(() => ({}))
-      if (!res.ok) throw new Error(d.error || `HTTP ${res.status}`)
-      const added = d.upserted ?? d.inserted ?? d.found ?? null
-      setMsg(added != null ? `✓ ${added} backfilled` : '✓ triggered')
+    const r = await runRefreshAndClear(token)
+    if (r.ok) {
+      setMsg('✓ ' + refreshResultMsg(r))
       setTimeout(onDone, 1500)
-    } catch (e) { setMsg('✗ ' + (e as Error).message.slice(0, 40)) }
+    } else {
+      setMsg('✗ ' + (r.error || 'failed').slice(0, 40))
+    }
     setBusy(false)
   }
   return (
@@ -648,6 +670,7 @@ export default function AdminPage() {
   const [kpiModal, setKpiModal] = useState<{ metric: string; title: string } | null>(null)
   const [manageOpen, setManageOpen] = useState(false)
   const [emgBusy, setEmgBusy] = useState(false)
+  const [emgMsg, setEmgMsg] = useState<{ ok: boolean; text: string } | null>(null)
   function openKpi(metric: string, title: string) { setKpiModal({ metric, title }) }
 
   useEffect(() => {
@@ -744,16 +767,19 @@ export default function AdminPage() {
     setDownloading(false)
   }
 
-  // Shared job-board remediation used by the crisis banner AND Needs Attention rows.
-  // Calls refresh-jobs directly (it validates this admin session token), then reloads.
+  // Shared job-board remediation used by the Needs Attention rows. Backfills fresh listings
+  // AND clears unconfirmed-stale rows, then surfaces a clear result (never a silent no-op)
+  // and reloads so the stale count visibly drops.
   async function runEmergencyRefresh() {
     if (!token) return
-    setEmgBusy(true)
-    try {
-      const res = await fetch('/api/refresh-jobs?all=1', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Admin-Token': token }, body: '{}' })
-      await res.json().catch(() => ({}))
+    setEmgBusy(true); setEmgMsg(null)
+    const r = await runRefreshAndClear(token)
+    if (r.ok) {
+      setEmgMsg({ ok: true, text: refreshResultMsg(r) })
       setTimeout(() => load(token), 1500)
-    } catch { /* surfaced by next refresh */ }
+    } else {
+      setEmgMsg({ ok: false, text: (r.error || 'refresh failed').slice(0, 120) })
+    }
     setEmgBusy(false)
   }
 
@@ -832,7 +858,8 @@ export default function AdminPage() {
   if (errToday > 10) attn.push({ key: 'errs', sev: 'red', title: `${errToday} API errors today`, detail: 'Error volume is elevated — see System Health for the failing routes.' })
   if (stripeOn && paidUsers === 0) attn.push({ key: 'norev', sev: 'amber', title: '0 paid users — revenue not activated yet', detail: 'Stripe is connected but there are no active paid subscriptions. Conversion has not started.' })
   if ((m?.past_due ?? 0) > 0) attn.push({ key: 'pastdue', sev: 'amber', title: `${m!.past_due} subscription${m!.past_due === 1 ? '' : 's'} past due`, detail: 'Payment is failing — these accounts may churn without follow-up.' })
-  if ((m?.trialing ?? 0) > 0) attn.push({ key: 'trials', sev: 'blue', title: `${m!.trialing} user${m!.trialing === 1 ? '' : 's'} trialing — watch conversion`, detail: 'Active trials in flight. Nudge them before the trial ends.' })
+  if ((m?.trialing ?? 0) > 0) attn.push({ key: 'trials', sev: 'blue', title: `${m!.trialing} user${m!.trialing === 1 ? '' : 's'} trialing — watch conversion`, detail: 'Active trials in flight (cancelled trials excluded). Nudge them before the trial ends.' })
+  if ((m?.canceling ?? 0) > 0) attn.push({ key: 'canceling', sev: 'amber', title: `${m!.canceling} subscription${m!.canceling === 1 ? '' : 's'} set to cancel`, detail: 'Cancelled but still live until period end — these will churn. Win them back before then.' })
   if (shares === 0) attn.push({ key: 'noshare', sev: 'blue', title: 'No outcome cards shared — flywheel not moving', detail: 'Outcome cards are the virality engine. Nothing has been shared yet.' })
   if (needsReviewCount > 0) attn.push({ key: 'review', sev: 'amber', title: `${needsReviewCount} report${needsReviewCount === 1 ? '' : 's'} need review`, detail: 'Flagged community reports are held out of scoring until cleared (Advanced tools → moderation).' })
   if (dupSuspected > 0) attn.push({ key: 'dup', sev: 'amber', title: `${dupSuspected} suspected duplicate account cluster${dupSuspected === 1 ? '' : 's'}`, detail: 'Shared-signal groups flagged for anti-Sybil review (Advanced tools → clusters).' })
@@ -874,6 +901,11 @@ export default function AdminPage() {
 
         {/* 3. Needs Attention */}
         <Panel title="Needs Attention" right={attn.length ? <span className="ac-badge" style={{ background: 'rgba(245,158,11,.15)', color: 'var(--amber)' }}>{attn.length}</span> : undefined}>
+          {emgMsg && (
+            <div style={{ fontFamily: 'var(--mono)', fontSize: '.6rem', marginBottom: '.5rem', color: emgMsg.ok ? 'var(--green)' : 'var(--red)' }}>
+              {emgMsg.ok ? '✓ ' : '✗ '}{emgMsg.text}
+            </div>
+          )}
           {attn.length === 0
             ? <div className="ac-allclear">✓ All clear — nothing needs action right now.</div>
             : attn.map(a => <AttnRow key={a.key} item={a} />)}
@@ -885,6 +917,7 @@ export default function AdminPage() {
             <MetricRow label="MRR" value={mrr != null ? `$${mrr.toLocaleString()}` : '$0'} status={m?.mrr_annualized != null ? `$${m.mrr_annualized.toLocaleString()}/yr` : (stripeOn ? 'no active subs' : 'Stripe not connected')} tone={mrr ? 'green' : 'dim'} />
             <MetricRow label="Paid users" value={paidUsers.toLocaleString()} status={m ? `${m.conversion_pct}% of ${m.total_accounts.toLocaleString()}` : ''} tone={paidUsers ? 'green' : 'dim'} />
             <MetricRow label="On trial" value={stripeOn ? (m?.trialing ?? 0) : '—'} status="trialing now" tone={(m?.trialing ?? 0) > 0 ? 'blue' : 'dim'} />
+            <MetricRow label="Canceling" value={stripeOn ? (m?.canceling ?? 0) : '—'} status="cancels at period end" tone={(m?.canceling ?? 0) > 0 ? 'amber' : 'dim'} />
             <MetricRow label="Past due" value={stripeOn ? (m?.past_due ?? 0) : '—'} status="payment failing" tone={(m?.past_due ?? 0) > 0 ? 'amber' : 'dim'} />
             <MetricRow label="Canceled" value={stripeOn ? (m?.canceled ?? 0) : '—'} status="churned" tone={(m?.canceled ?? 0) > 0 ? 'red' : 'dim'} />
             <MetricRow label="Conversion" value={m ? `${m.conversion_pct}%` : '—'} status="free → paid" tone="sub" />

@@ -29,24 +29,50 @@ async function stripeSubsBreakdown() {
   const key = process.env.STRIPE_SECRET_KEY;
   if (!key) return null;
   try {
-    const r = await fetch('https://api.stripe.com/v1/subscriptions?status=all&limit=100&expand[]=data.items', {
+    // NOTE: `items` is a default-included list on every subscription object — it is NOT
+    // expandable. Passing expand[]=data.items 400s the whole request (the same bug #124
+    // removed from api/stripe.js — this was the missed copy). We read s.items.data[0]
+    // directly for the MRR price lookup; no expand needed.
+    const r = await fetch('https://api.stripe.com/v1/subscriptions?status=all&limit=100', {
       headers: { Authorization: `Bearer ${key}` },
     });
     if (!r.ok) return null;
     const d = await r.json();
     const counts = { trialing: 0, active: 0, past_due: 0, canceled: 0, unpaid: 0, incomplete: 0 };
+    // A sub the user cancelled keeps its live status (trialing / active) with
+    // cancel_at_period_end=true until the period actually ends — so a cancelled trial
+    // otherwise still shows as an active trial. Track the churning set separately.
+    let canceling = 0;          // any live sub flagged cancel_at_period_end
+    let trialingCanceling = 0;  // trials already cancelled (status still 'trialing')
+    let activeCanceling = 0;    // paid subs set to cancel at period end
     let mrrCents = 0;
     for (const s of (d.data || [])) {
       counts[s.status] = (counts[s.status] || 0) + 1;
-      if (s.status === 'active' || s.status === 'trialing') {
+      if (s.cancel_at_period_end) {
+        canceling++;
+        if (s.status === 'trialing') trialingCanceling++;
+        else if (s.status === 'active') activeCanceling++;
+      }
+      // Realized MRR = active AND not-canceling only. A trial contributes nothing (not
+      // yet paying); a paid sub set to cancel at period end is churning, so it's excluded
+      // from retained MRR.
+      if (s.status === 'active' && !s.cancel_at_period_end) {
         const item = s.items?.data?.[0];
         const amt = item?.price?.unit_amount || 0;
         const interval = item?.price?.recurring?.interval;
-        // Trials count toward "potential" MRR; only active toward realized — we track active.
-        if (s.status === 'active') mrrCents += interval === 'year' ? amt / 12 : amt;
+        mrrCents += interval === 'year' ? amt / 12 : amt;
       }
     }
-    return { counts, mrr: Math.round(mrrCents) / 100, has_more: !!d.has_more };
+    return {
+      counts,
+      canceling,
+      // Live counts that EXCLUDE already-cancelled subs — so a cancelled trial drops to 0
+      // the moment it's cancelled, not only when the trial period finally ends.
+      trialing_active: Math.max(0, counts.trialing - trialingCanceling),
+      active_paid_active: Math.max(0, counts.active - activeCanceling),
+      mrr: Math.round(mrrCents) / 100,
+      has_more: !!d.has_more,
+    };
   } catch { return null; }
 }
 
@@ -369,9 +395,12 @@ async function _handler(req, res) {
       pro_users: proCount,
       free_users: freeCount,
       conversion_pct: convPct,
-      // From Stripe (null if not connected): trial vs paid vs churned.
-      trialing: subs?.counts?.trialing ?? null,
-      active_paid: subs?.counts?.active ?? null,
+      // From Stripe (null if not connected): trial vs paid vs churned. trialing / active_paid
+      // are the LIVE, not-yet-cancelled counts (a cancelled-but-not-expired sub is reported
+      // under `canceling`, never as an active trial/paid sub).
+      trialing: subs ? subs.trialing_active : null,
+      active_paid: subs ? subs.active_paid_active : null,
+      canceling: subs?.canceling ?? null,
       past_due: subs?.counts?.past_due ?? null,
       canceled: subs?.counts?.canceled ?? null,
       mrr: subs ? subs.mrr : null,
@@ -470,8 +499,9 @@ async function _handler(req, res) {
     lines.push([]);
     lines.push(['STRIPE', 'metric', 'value']);
     lines.push(['', 'Connected', !!process.env.STRIPE_SECRET_KEY]);
-    lines.push(['', 'Trialing', subs?.counts?.trialing ?? 'n/a']);
-    lines.push(['', 'Active (paid)', subs?.counts?.active ?? 'n/a']);
+    lines.push(['', 'Trialing (live)', subs ? subs.trialing_active : 'n/a']);
+    lines.push(['', 'Active (paid, live)', subs ? subs.active_paid_active : 'n/a']);
+    lines.push(['', 'Canceling (at period end)', subs?.canceling ?? 'n/a']);
     lines.push(['', 'Past due', subs?.counts?.past_due ?? 'n/a']);
     lines.push(['', 'Canceled', subs?.counts?.canceled ?? 'n/a']);
     lines.push(['', 'MRR ($)', subs ? subs.mrr : 'n/a']);
@@ -1118,6 +1148,29 @@ async function _handler(req, res) {
 
     if (!Array.isArray(rows)) rows = [];
     return res.status(200).json({ ok: true, metric, rows });
+  }
+
+  // ── PURGE STALE/EXPIRED LISTINGS — the "clear stale" half of a manual refresh ─────
+  // Why this exists: the refresh cron backfills fresh ACTIVE listings but can NOT un-stale
+  // jobs the sources no longer return. Adzuna is date-sorted, so a listing not re-seen in 7+
+  // days goes 'stale' and never resurfaces on a re-search — yet it still SERVES to users
+  // (the job search filters on expires_at>now, not availability_status) until its expires_at
+  // passes (up to 14 days later). Result: after a refresh the admin "Stale/expired" count
+  // never drops → the button looks dead. This explicit, admin-gated, audited action retires
+  // those unconfirmed-stale rows so the count observably matches the button beside it, and
+  // stops serving week-old, likely-filled listings to seekers (a data-quality win). Full
+  // admins only; the fresh backfill from refresh-jobs replaces the cleared inventory.
+  if (action === 'purge_stale_jobs') {
+    if (adminRole === 'moderator') return res.status(403).json({ error: 'Insufficient role' });
+    const cnt = r => parseInt((r?.headers?.get('content-range') || '').split('/')[1]) || 0;
+    const beforeRes = await db(`jobs?availability_status=in.(stale,expired)&select=id`, { headers: { Prefer: 'count=exact', 'Range-Unit': 'items', Range: '0-0' } });
+    const removed = cnt(beforeRes);
+    if (removed > 0) {
+      const del = await db(`jobs?availability_status=in.(stale,expired)`, { method: 'DELETE', headers: { Prefer: 'return=minimal' } });
+      if (!del.ok) return res.status(500).json({ error: 'Failed to purge stale listings' });
+    }
+    await db('admin_audit_log', { method: 'POST', body: JSON.stringify({ admin_id: sess.admin_id, username: sess.username || 'admin', action: 'purge_stale_jobs', target_type: 'jobs', metadata: { removed } }), headers: { Prefer: 'return=minimal' } }).catch(() => {});
+    return res.status(200).json({ ok: true, removed });
   }
 
   // ── EMERGENCY JOB REFRESH — server-side auto-remediation for a job crisis ─────
