@@ -392,6 +392,7 @@ function ResumePageInner() {
   // Fit / SeenFit (anchor analysis)
   const [fitOut, setFitOut] = useState<OptimizerOutput | null>(null)
   const [fitState, setFitState] = useState<'idle' | 'loading' | 'done' | 'error' | 'disabled'>('idle')
+  const [fitErrRef, setFitErrRef] = useState('') // server error ref for a failed optimize (traceable in api_errors)
 
   // HumanProof
   const [hp, setHp] = useState<HumanProofResult | null>(null)
@@ -524,15 +525,15 @@ function ResumePageInner() {
   }
 
   async function runFit() {
-    setFitState('loading')
+    setFitState('loading'); setFitErrRef('')
     try {
       const res = await fetch('/api/optimizer', {
         method: 'POST', headers: await aiHeaders(),
         body: JSON.stringify({ action: 'optimize', resumeText, jobId: jobIdFor(), jobTitle, company: jobCompany, jobDescription: jobJD, remoteOk: /remote/i.test(jobJD) }),
       })
       if (res.status === 403) { setFitState('disabled'); return }
-      const data = await res.json()
-      if (!res.ok || data.error) { setFitState('error'); return }
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok || data.error) { setFitErrRef(data?.ref || ''); setFitState('error'); return }
       setFitOut(data as OptimizerOutput); setFitState('done')
     } catch { setFitState('error') }
   }
@@ -791,7 +792,7 @@ function ResumePageInner() {
                 {tab === 'fit' && (
                   fitState === 'loading' ? <ResultEmpty icon="⏳" text={'Scoring your fit…'} />
                   : fitState === 'disabled' ? <ResultEmpty icon="🚧" text={'SeenFit is temporarily unavailable.'} />
-                  : fitState === 'error' ? <div><ResultEmpty icon="⚠️" text={'Could not score your fit. Try again.'} /><button onClick={runFit} style={{ ...btnPrimary, marginTop: '.5rem' }}>Retry</button></div>
+                  : fitState === 'error' ? <div><ResultEmpty icon="⚠️" text={'Could not score your fit. Try again.'} />{fitErrRef && <div style={{ fontFamily: 'var(--mono)', fontSize: '.55rem', color: 'var(--dim)', marginTop: '.35rem' }}>Error ref: {fitErrRef} — share this if it keeps happening.</div>}<button onClick={runFit} style={{ ...btnPrimary, marginTop: '.5rem' }}>Retry</button></div>
                   : fitOut ? <FitView out={fitOut} intel={companyIntel} jobCompany={jobCompany} insights={insights} /> : null
                 )}
 

@@ -171,9 +171,8 @@ export default async function handler(req, res) {
     return res.status(200).json(parsed);
 
   } catch(err) {
-    console.error('Resume API error:', err.message);
-    logError('resume', err.message);
-    return res.status(500).json({ error: err.message });
+    const ref = logError('resume', err, { method: req.method, tool: body?.tool, action: body?.action });
+    return res.status(500).json({ error: err.message, ref });
   }
 }
 
@@ -200,9 +199,8 @@ async function handleParseResume(req, res, body) {
     return res.status(200).json({ ok: true, text: extractedText, fileName, fileType, wordCount, employment });
 
   } catch(err) {
-    console.error('Parse resume error:', err.message);
-    logError('parse-resume', err.message);
-    return res.status(500).json({ error: err.message });
+    const ref = logError('parse-resume', err, { method: req.method });
+    return res.status(500).json({ error: err.message, ref });
   }
 }
 
