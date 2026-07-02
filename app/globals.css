@@ -1381,3 +1381,19 @@ nav.nav-scrolled{background:rgba(6,6,8,0.82);backdrop-filter:blur(60px) saturate
    softer separators (fewer hard glowing borders) inside tab panels. */
 .a2-tabpanel .ac-panel,.a2-tabpanel .adm-panel{border-color:rgba(255,255,255,.06)}
 .a2-tabpanel .ac-grid2{gap:.85rem}
+
+/* ═══ APPLICATION INTELLIGENCE (SeenFit / HumanProof UI) ═══ */
+/* Reusable primitives shared by the /resume hub + ApplyOptimizeModal. Keep the
+   vertical rhythm and overflow-safety in ONE place so 375px stays clean. */
+.ai-stack{display:flex;flex-direction:column;gap:1rem;min-width:0}
+.ai-stack>*{min-width:0}
+.ai-btn-row{display:flex;gap:.5rem;flex-wrap:wrap}
+.ai-btn-row>*{flex:1 1 auto;min-width:0}
+/* Truncate a long single-line token (company/role/skill) rather than push the row wide. */
+.ai-trunc{min-width:0;overflow-wrap:anywhere}
+/* Horizontal tab strip that scrolls instead of overflowing the viewport. */
+.ai-tabs{display:flex;gap:.4rem;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none;padding-bottom:.15rem;margin-bottom:1rem}
+.ai-tabs::-webkit-scrollbar{display:none}
+.ai-tab{flex:0 0 auto;white-space:nowrap;background:none;border:1.5px solid var(--line2);color:var(--sub);border-radius:8px;padding:.5rem .85rem;font-family:var(--mono);font-size:.68rem;cursor:pointer;transition:all .15s}
+.ai-tab.active{border-color:var(--green);color:var(--green);background:linear-gradient(135deg,rgba(16,185,129,.15) 0%,rgba(59,130,246,.15) 100%);font-weight:600}
+.ai-card{background:var(--surface);border:1px solid var(--line2);border-radius:12px;padding:1.1rem;min-width:0}
