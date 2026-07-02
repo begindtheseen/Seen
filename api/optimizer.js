@@ -20,6 +20,7 @@ import { gateAI } from '../lib/server/credits.js';
 import { runOptimizer, ENGINE_VERSION } from '../lib/optimizer/index.ts';
 import { extractJobFacts } from '../lib/optimizer/extractJobFacts.ts';
 import { runHumanProof, HUMANPROOF_ENGINE_VERSION } from '../lib/humanizer/index.ts';
+import { buildHumanProofPackage, normalizeBulletList } from '../lib/server/humanizePackage.js';
 
 // ── auth: derive the user id from the Supabase JWT (same pattern as api/apply.js) ──
 function verifyJWT(token, secret) {
@@ -285,9 +286,19 @@ export default async function handler(req, res) {
         return res.status(403).json({ error: 'HUMANPROOF_DISABLED', message: 'HumanProof is currently disabled.' });
       }
 
+      // Two input modes (additive — the single-`text` mode is unchanged):
+      //   1. text  → humanize one blob (résumé section or application message). Legacy shape.
+      //   2. bullets[] (+ optional applicationMessage) → an OPTIMIZED PACKAGE straight from
+      //      SeenFit. We humanize each optimized item, return per-item human-signal scores,
+      //      and CARRY THROUGH + re-flag every unsupported-claim warning (never launder them).
       const { text, mode, roleFamily, jobId, jobTitle, company, jobDescription, resumeText, optimizerOutput } = body;
-      if (!text || String(text).trim().length < 20) {
-        return res.status(400).json({ error: 'TEXT_REQUIRED', message: 'Provide text to humanize (at least 20 characters).' });
+      const packageBullets = normalizeBulletList(body.bullets);
+      const applicationMessage = typeof body.applicationMessage === 'string' && body.applicationMessage.trim()
+        ? body.applicationMessage : null;
+      const isPackage = packageBullets.length > 0 || !!applicationMessage;
+
+      if (!isPackage && (!text || String(text).trim().length < 20)) {
+        return res.status(400).json({ error: 'TEXT_REQUIRED', message: 'Provide text to humanize (at least 20 characters), or an optimized package (bullets/applicationMessage).' });
       }
 
       // Paid gating. When PAID_ONLY is on, resolve the caller's Pro status server-side via
@@ -317,7 +328,80 @@ export default async function handler(req, res) {
       }
 
       const extraRules = haveDb ? await loadPhraseRules(db) : null;
+      // Evidence used to ground truthfulness: an explicit résumé-evidence blob wins, else
+      // resumeText (the SeenFit optimizer output can further ground it inside the engine).
+      const evidenceText = (typeof body.resumeEvidence === 'string' && body.resumeEvidence) || resumeText || '';
 
+      // ── PACKAGE MODE (COMMIT 3) ──────────────────────────────────────────────────
+      // Chain SeenFit → HumanProof: humanize each optimized item, carry through + re-flag
+      // every unsupported-claim warning. Pure logic lives in lib/server/humanizePackage.js.
+      if (isPackage) {
+        const result = buildHumanProofPackage(
+          {
+            bullets: packageBullets,
+            applicationMessage,
+            warnings: body.warnings,
+            roleFamily: roleFamily || null,
+            jobTitle,
+            company,
+            resumeText: evidenceText,
+            jobFacts: jobFacts || undefined,
+            optimizerOutput: optimizerOutput || null,
+          },
+          { extraRules }
+        );
+
+        // Persist ONE aggregate run (best-effort). Never fail the response on persistence.
+        let runId = null;
+        if (haveDb) {
+          try {
+            const r = await db('humanizer_runs', {
+              method: 'POST',
+              headers: { Prefer: 'return=representation' },
+              body: JSON.stringify({
+                user_id: uid,
+                job_id: jobId || null,
+                optimizer_run_id: body.optimizer_run_id || null,
+                original_text: result._originalJoined,
+                humanized_text: result._humanizedJoined,
+                humanproof_score: result.humanproof_score,
+                ai_slop_risk: result.ai_slop_risk,
+                output: result.package,
+                engine_version: result.engine_version,
+              }),
+            });
+            if (r.ok) { const rows = await r.json(); runId = rows?.[0]?.id || null; }
+            if (runId && result.flags.length) {
+              await db('humanizer_flags', {
+                method: 'POST',
+                headers: { Prefer: 'return=minimal' },
+                body: JSON.stringify(result.flags.slice(0, 100).map((f) => ({
+                  run_id: runId,
+                  flag_type: f.flagType,
+                  severity: f.severity,
+                  original_phrase: f.originalPhrase,
+                  explanation: f.explanation,
+                  suggested_fix: f.suggestedFix,
+                }))),
+              });
+            }
+          } catch (e) { console.error('humanproof package persist:', e.message); }
+        }
+
+        return res.status(200).json({
+          package: result.package,
+          humanproof_score: result.humanproof_score,
+          before_score: result.before_score,
+          after_score: result.after_score,
+          ai_slop_risk: result.ai_slop_risk,
+          flags: result.flags,
+          run_id: runId,
+          _engine_version: HUMANPROOF_ENGINE_VERSION,
+          _local_model: hpFlags.localModel,
+        });
+      }
+
+      // ── TEXT MODE (legacy shape, unchanged) ──────────────────────────────────────
       const output = runHumanProof(
         {
           text: String(text),
@@ -325,7 +409,7 @@ export default async function handler(req, res) {
           roleFamily: roleFamily || null,
           jobTitle,
           company,
-          resumeText: resumeText || '',
+          resumeText: evidenceText,
           jobFacts: jobFacts || undefined,
           optimizerOutput: optimizerOutput || null,
         },
