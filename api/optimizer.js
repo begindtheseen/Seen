@@ -17,9 +17,9 @@ import { createHmac, timingSafeEqual } from 'crypto';
 import { applyRateLimit } from '../lib/server/ratelimit.js';
 import { logError } from '../lib/server/errlog.js';
 import { gateAI } from '../lib/server/credits.js';
-import { runOptimizer, ENGINE_VERSION } from '../lib/optimizer/index.ts';
-import { extractJobFacts } from '../lib/optimizer/extractJobFacts.ts';
-import { runHumanProof, HUMANPROOF_ENGINE_VERSION } from '../lib/humanizer/index.ts';
+import { runOptimizer, ENGINE_VERSION } from '../lib/optimizer/index.js';
+import { extractJobFacts } from '../lib/optimizer/extractJobFacts.js';
+import { runHumanProof, HUMANPROOF_ENGINE_VERSION } from '../lib/humanizer/index.js';
 import { buildHumanProofPackage, normalizeBulletList } from '../lib/server/humanizePackage.js';
 
 // ── auth: derive the user id from the Supabase JWT (same pattern as api/apply.js) ──
