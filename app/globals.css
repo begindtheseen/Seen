@@ -1295,3 +1295,89 @@ nav.nav-scrolled{background:rgba(6,6,8,0.82);backdrop-filter:blur(60px) saturate
   .ac-panel{padding:.8rem .85rem .9rem;border-radius:11px}
   .ac-tile-n{font-size:1.25rem}
 }
+
+/* ══ ADMIN V2 — .a2-* (command center: hero, operating cards, attention queue) ══ */
+.a2-hero{display:flex;align-items:flex-start;justify-content:space-between;gap:1.25rem;flex-wrap:wrap;margin-bottom:1.5rem}
+.a2-hero-main{min-width:0;flex:1 1 320px}
+.a2-hero-top{display:flex;align-items:center;gap:.7rem;flex-wrap:wrap;margin-bottom:.55rem}
+.a2-eyebrow{font-family:var(--mono);font-size:.56rem;font-weight:600;text-transform:uppercase;letter-spacing:.24em;color:var(--sub)}
+.a2-title{font-family:var(--display);font-size:clamp(1.5rem,6vw,2.35rem);font-weight:800;color:var(--white);letter-spacing:-.045em;line-height:1;margin:0}
+.a2-summary{font-family:var(--display);font-size:clamp(.82rem,2.4vw,1rem);color:var(--sub);line-height:1.5;margin:.7rem 0 0;max-width:52ch;font-weight:400}
+.a2-build{font-family:var(--mono);font-size:.5rem;color:var(--dim);margin-top:.7rem;letter-spacing:.03em}
+.a2-hero-actions{display:flex;gap:.45rem;flex-wrap:wrap;flex-shrink:0}
+/* Status pill */
+.a2-pill{display:inline-flex;align-items:center;gap:.4rem;font-family:var(--mono);font-size:.56rem;font-weight:600;text-transform:uppercase;letter-spacing:.1em;padding:.28rem .6rem;border-radius:100px;border:1px solid}
+.a2-pill-dot{width:6px;height:6px;border-radius:50%;background:currentColor;box-shadow:0 0 8px currentColor}
+.a2-pill.ok{color:var(--green);background:rgba(16,185,129,.1);border-color:rgba(16,185,129,.35)}
+.a2-pill.warn{color:var(--amber);background:rgba(245,158,11,.1);border-color:rgba(245,158,11,.35)}
+.a2-pill.crit{color:var(--red);background:rgba(239,68,68,.12);border-color:rgba(239,68,68,.45)}
+
+/* 5 operating cards */
+.a2-cards{display:grid;grid-template-columns:1fr;gap:.7rem;margin-bottom:1.5rem}
+@media(min-width:440px){.a2-cards{grid-template-columns:1fr 1fr}}
+@media(min-width:720px){.a2-cards{grid-template-columns:repeat(3,1fr)}}
+@media(min-width:1040px){.a2-cards{grid-template-columns:repeat(5,1fr)}}
+.a2-card{background:linear-gradient(165deg,rgba(255,255,255,.045),rgba(255,255,255,.015));border:1px solid rgba(255,255,255,.08);border-radius:14px;padding:1rem 1.05rem 1.1rem;min-width:0;box-sizing:border-box;box-shadow:inset 0 1px 0 rgba(255,255,255,.05);display:flex;flex-direction:column}
+.a2-card-btn{cursor:pointer;transition:transform .15s,border-color .15s,background .15s}
+.a2-card-btn:hover{transform:translateY(-2px);border-color:rgba(255,255,255,.18);background:linear-gradient(165deg,rgba(255,255,255,.07),rgba(255,255,255,.02))}
+.a2-card-btn:focus-visible{outline:2px solid var(--blue);outline-offset:2px}
+.a2-card-l{font-family:var(--mono);font-size:.5rem;text-transform:uppercase;letter-spacing:.12em;color:var(--muted);margin-bottom:.7rem;display:flex;align-items:center;justify-content:space-between;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.a2-card-caret{color:var(--dim);font-size:.9rem;line-height:1;opacity:.5;margin-left:.4rem;flex-shrink:0}
+.a2-card-btn:hover .a2-card-caret{color:var(--blue);opacity:1}
+.a2-card-n{font-family:var(--mono);font-size:1.85rem;font-weight:500;line-height:1;letter-spacing:-.03em;color:var(--white);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.a2-card-p{font-family:var(--mono);font-size:.55rem;color:var(--dim);margin-top:.5rem;line-height:1.4;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.a2-card-sec{font-family:var(--mono);font-size:.55rem;color:var(--sub);margin-top:.7rem;padding-top:.6rem;border-top:1px solid rgba(255,255,255,.06);line-height:1.5;overflow:hidden;text-overflow:ellipsis}
+.a2-sublink{background:none;border:none;padding:0;font:inherit;color:var(--blue);cursor:pointer;text-decoration:underline;text-underline-offset:2px;text-decoration-color:rgba(59,130,246,.4)}
+.a2-sublink:hover{text-decoration-color:var(--blue)}
+
+/* Attention queue */
+.a2-queue{background:linear-gradient(165deg,rgba(255,255,255,.035),rgba(255,255,255,.012));border:1px solid rgba(255,255,255,.08);border-radius:14px;padding:1.1rem 1.15rem;margin-bottom:1.5rem;box-sizing:border-box}
+.a2-queue-hdr{display:flex;align-items:center;gap:.5rem;margin-bottom:.85rem}
+.a2-queue-ttl{font-family:var(--mono);font-size:.6rem;text-transform:uppercase;letter-spacing:.14em;color:var(--sub)}
+.a2-queue-count{font-family:var(--mono);font-size:.5rem;color:var(--amber);background:rgba(245,158,11,.15);border-radius:100px;padding:.12rem .45rem}
+.a2-queue-empty{font-family:var(--mono);font-size:.7rem;color:var(--green);padding:.4rem 0}
+.a2-attn{display:flex;align-items:flex-start;gap:.7rem;padding:.7rem 0;border-bottom:1px solid rgba(255,255,255,.05)}
+.a2-attn:last-child{border-bottom:none}
+.a2-attn:first-of-type{padding-top:0}
+.a2-attn-sev{flex-shrink:0;font-family:var(--mono);font-size:.46rem;font-weight:600;text-transform:uppercase;letter-spacing:.08em;padding:.2rem .45rem;border-radius:5px;border:1px solid;margin-top:.1rem;min-width:3.6rem;text-align:center}
+.a2-attn-body{flex:1;min-width:0}
+.a2-attn-t{font-family:var(--mono);font-size:.66rem;color:var(--white);font-weight:500;line-height:1.35}
+.a2-attn-d{font-family:var(--mono);font-size:.55rem;color:var(--dim);margin-top:.2rem;line-height:1.45}
+.a2-attn-act{flex-shrink:0;background:none;border:1px solid var(--line2);border-radius:7px;padding:.32rem .7rem;font-family:var(--mono);font-size:.56rem;color:var(--sub);cursor:pointer;white-space:nowrap;transition:all .15s;margin-top:.05rem}
+.a2-attn-act:hover{border-color:var(--blue);color:var(--white)}
+
+@media(max-width:600px){
+  .a2-hero-actions{width:100%}
+  .a2-hero-actions .adm-btn,.a2-hero-actions .adm-btn-danger{flex:1;text-align:center}
+  .a2-attn-sev{min-width:3.2rem}
+}
+
+/* Admin V2 tabs */
+.a2-tabs{display:flex;gap:.35rem;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none;margin-bottom:1.25rem;padding-bottom:.3rem;border-bottom:1px solid rgba(255,255,255,.07)}
+.a2-tabs::-webkit-scrollbar{display:none}
+.a2-tab{flex:0 0 auto;background:none;border:1px solid transparent;border-radius:8px;padding:.45rem .85rem;font-family:var(--mono);font-size:.62rem;letter-spacing:.02em;color:var(--dim);cursor:pointer;white-space:nowrap;transition:color .15s,background .15s,border-color .15s}
+.a2-tab:hover{color:var(--sub);background:rgba(255,255,255,.03)}
+.a2-tab.active{color:var(--white);background:rgba(59,130,246,.14);border-color:rgba(59,130,246,.4)}
+.a2-tabpanel{animation:fadeIn .18s ease both}
+.a2-overview-hint{font-family:var(--mono);font-size:.62rem;color:var(--dim);text-align:center;padding:1.5rem 1rem;line-height:1.6}
+
+/* Admin V2 — visual polish + 375px hard requirement (no horizontal overflow) */
+.adm-wrap{overflow-x:hidden}
+.a2-card-n{max-width:100%}
+@media(max-width:430px){
+  .a2-title{font-size:1.75rem}
+  .a2-summary{font-size:.82rem}
+  .a2-card{padding:.85rem .9rem .95rem}
+  .a2-card-n{font-size:1.6rem}
+  .a2-hero-actions{width:100%}
+  .a2-hero-actions .adm-btn,.a2-hero-actions .adm-btn-danger{flex:1 1 auto;text-align:center;padding:.5rem .6rem}
+  .a2-attn{gap:.5rem}
+  .a2-attn-sev{min-width:2.9rem;font-size:.44rem;padding:.18rem .35rem}
+  .a2-attn-act{padding:.3rem .55rem}
+  .a2-tab{padding:.42rem .7rem;font-size:.58rem}
+  .a2-queue{padding:.95rem .9rem}
+}
+/* Detail panels sit calmer under the command center: a touch more breathing room,
+   softer separators (fewer hard glowing borders) inside tab panels. */
+.a2-tabpanel .ac-panel,.a2-tabpanel .adm-panel{border-color:rgba(255,255,255,.06)}
+.a2-tabpanel .ac-grid2{gap:.85rem}
