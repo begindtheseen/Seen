@@ -8,6 +8,7 @@ import { buildOpportunities } from './_utils/opportunityEngine.js';
 import { extractEmployment } from '../lib/server/resumeAnalysis.js';
 import { buildResumeSurvey, RESUME_SURVEY_KEYS, mapAnswersToReport } from './_utils/resumeSurvey.js';
 import { normalizeCompany, isValidCompanyName, resolveOrCreateCompany, assessSubmitTrust, writeReport, recomputeCompanyScoreFromReports } from './_utils/reportWrite.js';
+import { WELCOME_CREDITS, FREE_DAILY_CREDITS, PRO_DAILY_CREDITS, RESUME_OPTIMIZE_COST, RESUME_SURVEY_AWARD, TRACK_APPLICATION_AWARD, MAX_DAILY_EARN, MAX_FREE_BALANCE } from '../lib/server/creditRules.js';
 
 // Verify a Supabase JWT locally (HS256) — no network round-trip.
 // Returns the payload (with .sub = user UUID) on success, null on failure.
@@ -121,7 +122,7 @@ export default async function handler(req, res) {
     const recent = recentRes.ok ? await recentRes.json() : [];
     let cred = credRes.ok ? (await credRes.json())[0] : null;
     if (cred && cred.last_reset !== today) {
-      const nb = cred.pro ? 999 : 3;
+      const nb = cred.pro ? PRO_DAILY_CREDITS : FREE_DAILY_CREDITS;
       db(`ai_credits?user_id=eq.${uid}`, { method: 'PATCH', body: JSON.stringify({ balance: nb, daily_earned: 0, last_reset: today }), headers: { Prefer: 'return=minimal' } });
       cred = { ...cred, balance: nb, daily_earned: 0, last_reset: today };
     }
@@ -432,13 +433,13 @@ export default async function handler(req, res) {
     let cred = cRes.ok ? (await cRes.json())[0] : null;
     if (!cred) {
       // No row means they haven't used AI yet — show welcome balance preview (don't create row here)
-      return res.status(200).json({ balance: 10, pro: false, daily_earned: 0, max_daily_earn: 5, welcome: true });
+      return res.status(200).json({ balance: WELCOME_CREDITS, pro: false, daily_earned: 0, max_daily_earn: MAX_DAILY_EARN, welcome: true });
     } else if (cred.last_reset !== today) {
-      const nb = cred.pro ? 999 : 3;
+      const nb = cred.pro ? PRO_DAILY_CREDITS : FREE_DAILY_CREDITS;
       await db(`ai_credits?user_id=eq.${uid}`, { method: 'PATCH', body: JSON.stringify({ balance: nb, daily_earned: 0, last_reset: today }), headers: { Prefer: 'return=minimal' } });
       cred = { ...cred, balance: nb, daily_earned: 0, last_reset: today };
     }
-    return res.status(200).json({ balance: cred.balance, pro: cred.pro, daily_earned: cred.daily_earned, max_daily_earn: 3 });
+    return res.status(200).json({ balance: cred.balance, pro: cred.pro, daily_earned: cred.daily_earned, max_daily_earn: MAX_DAILY_EARN });
   }
 
   // ── CONSUME CREDIT ────────────────────────────────────────────────────────────
@@ -461,18 +462,20 @@ export default async function handler(req, res) {
     const cRes = await db(`ai_credits?user_id=eq.${uid}&limit=1`);
     let cred = cRes.ok ? (await cRes.json())[0] : null;
     if (!cred) {
-      // First use: welcome bonus 10, deduct 1 → 9
-      await db('ai_credits', { method: 'POST', body: JSON.stringify({ user_id: uid, balance: 9, daily_earned: 0, last_reset: today, pro: false }), headers: { Prefer: 'return=minimal' } });
-      await db('credit_transactions', { method: 'POST', body: JSON.stringify({ user_id: uid, delta: 10, reason: 'welcome_bonus' }), headers: { Prefer: 'return=minimal' } });
+      // First use: welcome bonus, deduct one credit for this call.
+      const welcomeBalance = WELCOME_CREDITS - RESUME_OPTIMIZE_COST;
+      await db('ai_credits', { method: 'POST', body: JSON.stringify({ user_id: uid, balance: welcomeBalance, daily_earned: 0, last_reset: today, pro: false }), headers: { Prefer: 'return=minimal' } });
+      await db('credit_transactions', { method: 'POST', body: JSON.stringify({ user_id: uid, delta: WELCOME_CREDITS, reason: 'welcome_bonus' }), headers: { Prefer: 'return=minimal' } });
       await db('credit_transactions', { method: 'POST', body: JSON.stringify({ user_id: uid, delta: -1, reason: body.reason || 'ai_tool' }), headers: { Prefer: 'return=minimal' } });
-      return res.status(200).json({ ok: true, balance: 9 });
+      return res.status(200).json({ ok: true, balance: welcomeBalance });
     }
-    if (cred.pro) return res.status(200).json({ ok: true, balance: 999, pro: true });
+    if (cred.pro) return res.status(200).json({ ok: true, balance: PRO_DAILY_CREDITS, pro: true });
     if (cred.last_reset !== today) {
-      // Daily reset: 3 free credits/day (code resets daily; DB DEFAULT stays 1 per migration 031), deduct 1 → 2
-      await db(`ai_credits?user_id=eq.${uid}`, { method: 'PATCH', body: JSON.stringify({ balance: 2, daily_earned: 0, last_reset: today }), headers: { Prefer: 'return=minimal' } });
+      // Daily reset to FREE_DAILY_CREDITS (DB DEFAULT stays 1 per migration 031), then deduct this call.
+      const afterReset = Math.max(0, FREE_DAILY_CREDITS - 1);
+      await db(`ai_credits?user_id=eq.${uid}`, { method: 'PATCH', body: JSON.stringify({ balance: afterReset, daily_earned: 0, last_reset: today }), headers: { Prefer: 'return=minimal' } });
       await db('credit_transactions', { method: 'POST', body: JSON.stringify({ user_id: uid, delta: -1, reason: body.reason || 'ai_tool' }), headers: { Prefer: 'return=minimal' } });
-      return res.status(200).json({ ok: true, balance: 2 });
+      return res.status(200).json({ ok: true, balance: afterReset });
     }
     if (cred.balance <= 0) return res.status(200).json({ ok: false, error: 'no_credits', balance: 0 });
     const nb = cred.balance - 1;
@@ -493,7 +496,7 @@ export default async function handler(req, res) {
     if (!cred) {
       const ins = await db('ai_credits?on_conflict=user_id', {
         method: 'POST',
-        body: JSON.stringify({ user_id: uid, balance: 3, pro: false, daily_earned: 0, last_reset: today }),
+        body: JSON.stringify({ user_id: uid, balance: FREE_DAILY_CREDITS, pro: false, daily_earned: 0, last_reset: today }),
         headers: { Prefer: 'resolution=merge-duplicates,return=representation' },
       });
       cred = ins.ok ? (await ins.json())[0] : null;
@@ -502,7 +505,7 @@ export default async function handler(req, res) {
 
     const resetToday = cred.last_reset !== today;
     const dailyEarned = resetToday ? 0 : (cred.daily_earned || 0);
-    if (dailyEarned >= 5) return res.status(200).json({ ok: false, reason: 'daily_cap', balance: cred.balance });
+    if (dailyEarned >= MAX_DAILY_EARN) return res.status(200).json({ ok: false, reason: 'daily_cap', balance: cred.balance });
 
     // Per-job dedupe FIRST, across all days — the same tracked job never earns twice.
     // (Previously this check was skipped entirely on the first earn of a new day.)
@@ -521,10 +524,10 @@ export default async function handler(req, res) {
       return res.status(200).json({ ok: false, reason: 'track_cap', balance: cred.balance });
     }
 
-    // Daily reset baseline is 3 free credits (code resets daily; DB DEFAULT stays 1 per migration 031).
-    const baseBalance = resetToday ? 3 : (cred.balance || 0);
-    const newBalance = Math.min(baseBalance + 1, 8);
-    const newEarned = dailyEarned + 1;
+    // Daily reset baseline is FREE_DAILY_CREDITS (code resets daily; DB DEFAULT stays 1 per migration 031).
+    const baseBalance = resetToday ? FREE_DAILY_CREDITS : (cred.balance || 0);
+    const newBalance = Math.min(baseBalance + TRACK_APPLICATION_AWARD, MAX_FREE_BALANCE);
+    const newEarned = dailyEarned + TRACK_APPLICATION_AWARD;
     await db(`ai_credits?user_id=eq.${uid}`, { method: 'PATCH', body: JSON.stringify({ balance: newBalance, daily_earned: newEarned, ...(resetToday ? { last_reset: today } : {}) }), headers: { Prefer: 'return=minimal' } });
     await db('credit_transactions', { method: 'POST', body: JSON.stringify({ user_id: uid, delta: 1, reason: 'track_application', metadata: { jid: jid || null } }), headers: { Prefer: 'return=minimal' } });
     return res.status(200).json({ ok: true, balance: newBalance, earned: true });
@@ -538,7 +541,7 @@ export default async function handler(req, res) {
     const cred = cRes.ok ? (await cRes.json())[0] : null;
     if (cred?.pro) return res.status(200).json({ question: null, reason: 'pro_unlimited' });
     const dailyEarned = (cred?.last_reset === today ? cred?.daily_earned : 0) || 0;
-    if (dailyEarned >= 5) return res.status(200).json({ question: null, reason: 'daily_cap', earned_today: dailyEarned });
+    if (dailyEarned >= MAX_DAILY_EARN) return res.status(200).json({ question: null, reason: 'daily_cap', earned_today: dailyEarned });
 
     // Load answered question keys
     const aqRes = await db(`answered_questions?user_id=eq.${uid}&select=question_key&limit=200`);
@@ -607,22 +610,22 @@ export default async function handler(req, res) {
     // Check daily earn cap
     const cRes = await db(`ai_credits?user_id=eq.${uid}&limit=1`);
     let cred = cRes.ok ? (await cRes.json())[0] : null;
-    if (!cred) { await db('ai_credits', { method: 'POST', body: JSON.stringify({ user_id: uid, balance: 3, daily_earned: 0, last_reset: today, pro: false }), headers: { Prefer: 'return=minimal' } }); cred = { balance: 3, daily_earned: 0, last_reset: today, pro: false }; }
+    if (!cred) { await db('ai_credits', { method: 'POST', body: JSON.stringify({ user_id: uid, balance: FREE_DAILY_CREDITS, daily_earned: 0, last_reset: today, pro: false }), headers: { Prefer: 'return=minimal' } }); cred = { balance: FREE_DAILY_CREDITS, daily_earned: 0, last_reset: today, pro: false }; }
     const resetToday = cred.last_reset !== today;
     const dailyEarned = resetToday ? 0 : (cred.daily_earned || 0);
-    if (dailyEarned >= 5 && !cred.pro) return res.status(200).json({ ok: false, error: 'daily_cap', earned_today: dailyEarned });
+    if (dailyEarned >= MAX_DAILY_EARN && !cred.pro) return res.status(200).json({ ok: false, error: 'daily_cap', earned_today: dailyEarned });
 
     // Store answer (dedup via PK)
     const aqIns = await db('answered_questions', { method: 'POST', body: JSON.stringify({ user_id: uid, question_key, answer }), headers: { Prefer: 'resolution=ignore-duplicates,return=minimal' } });
     // If duplicate (already answered), don't grant credit
     if (aqIns.status === 409) return res.status(200).json({ ok: false, error: 'already_answered' });
 
-    // Grant +1 credit. Daily reset baseline is 3 free credits (code resets daily; DB DEFAULT
-    // stays 1 per migration 031), so the first earn of a new day lands on 4. The response must
-    // report the SAME number we persist — the old code PATCHed one balance but told the client
-    // another, so the modal and the Nav chip showed different balances at the same time.
-    const newBalance = cred.pro ? 999 : Math.min((resetToday ? 3 : (cred.balance || 0)) + 1, 999);
-    const newEarned = resetToday ? 1 : dailyEarned + 1;
+    // Grant one credit. Daily reset baseline is FREE_DAILY_CREDITS (code resets daily; DB
+    // DEFAULT stays 1 per migration 031). The response must report the SAME number we persist —
+    // the old code PATCHed one balance but told the client another, so the modal and the Nav
+    // chip showed different balances at the same time.
+    const newBalance = cred.pro ? PRO_DAILY_CREDITS : Math.min((resetToday ? FREE_DAILY_CREDITS : (cred.balance || 0)) + TRACK_APPLICATION_AWARD, MAX_FREE_BALANCE);
+    const newEarned = resetToday ? TRACK_APPLICATION_AWARD : dailyEarned + TRACK_APPLICATION_AWARD;
     const patch = cred.pro ? {} : { balance: newBalance, daily_earned: newEarned, ...(resetToday ? { last_reset: today } : {}) };
     if (Object.keys(patch).length) await db(`ai_credits?user_id=eq.${uid}`, { method: 'PATCH', body: JSON.stringify(patch), headers: { Prefer: 'return=minimal' } });
     await db('credit_transactions', { method: 'POST', body: JSON.stringify({ user_id: uid, delta: 1, reason: 'earned_question', metadata: { question_key, answer } }), headers: { Prefer: 'return=minimal' } });
@@ -650,13 +653,13 @@ export default async function handler(req, res) {
     ]);
     let cred = credRes.ok ? (await credRes.json())[0] : null;
     if (cred && cred.last_reset !== today) {
-      const nb = cred.pro ? 999 : 3;
+      const nb = cred.pro ? PRO_DAILY_CREDITS : FREE_DAILY_CREDITS;
       db(`ai_credits?user_id=eq.${uid}`, { method: 'PATCH', body: JSON.stringify({ balance: nb, daily_earned: 0, last_reset: today }), headers: { Prefer: 'return=minimal' } }).catch(() => {});
       cred = { ...cred, balance: nb, daily_earned: 0, last_reset: today };
     }
     const transactions = txRes.ok ? await txRes.json() : [];
     return res.status(200).json({
-      balance: cred?.balance ?? 3,
+      balance: cred?.balance ?? FREE_DAILY_CREDITS,
       pro: cred?.pro ?? false,
       daily_earned: cred?.daily_earned ?? 0,
       transactions,
@@ -789,7 +792,7 @@ export default async function handler(req, res) {
     const cRes = await db(`ai_credits?user_id=eq.${uid}&limit=1`);
     const cred = cRes.ok ? (await cRes.json())[0] : null;
     const dailyEarned = (cred?.last_reset === today ? cred?.daily_earned : 0) || 0;
-    const creditsLeft = Math.max(0, 5 - dailyEarned);
+    const creditsLeft = Math.max(0, MAX_DAILY_EARN - dailyEarned);
 
     return res.status(200).json({
       ok: true,
@@ -841,12 +844,12 @@ export default async function handler(req, res) {
   if (action === 'resume_survey') {
     const today = new Date().toISOString().split('T')[0];
 
-    // Daily-earn cap (mirrors submit_answer / get_question): pro = unlimited, free = 5/day.
+    // Daily-earn cap (mirrors submit_answer / get_question): pro = unlimited, free = MAX_DAILY_EARN/day.
     const cRes = await db(`ai_credits?user_id=eq.${uid}&limit=1`);
     const cred = cRes.ok ? (await cRes.json())[0] : null;
     const isPro = !!cred?.pro;
     const dailyEarned = (cred?.last_reset === today ? cred?.daily_earned : 0) || 0;
-    const creditsLeft = isPro ? 999 : Math.max(0, 5 - dailyEarned);
+    const creditsLeft = isPro ? PRO_DAILY_CREDITS : Math.max(0, MAX_DAILY_EARN - dailyEarned);
 
     // Load the résumé on file (canonical store: profiles.resume_text — see ResumeStore/save_resume).
     const pRes = await db(`profiles?id=eq.${uid}&select=resume_text&limit=1`);
@@ -985,7 +988,7 @@ export default async function handler(req, res) {
     }).catch(() => {});
 
     // ── Award AI credits (the freeloader incentive), respecting the daily earn cap. ──
-    const AWARD = 2;
+    const AWARD = RESUME_SURVEY_AWARD;
     const cRes = await db(`ai_credits?user_id=eq.${uid}&limit=1`);
     let cr = cRes.ok ? (await cRes.json())[0] : null;
     if (!cr) {
@@ -995,14 +998,14 @@ export default async function handler(req, res) {
     let awarded = 0;
     let balance = cr.balance;
     if (cr.pro) {
-      balance = 999;
+      balance = PRO_DAILY_CREDITS;
     } else {
       const resetToday = cr.last_reset !== today;
       const dailyEarned = resetToday ? 0 : (cr.daily_earned || 0);
-      const room = Math.max(0, 5 - dailyEarned);     // daily earn cap = 5
+      const room = Math.max(0, MAX_DAILY_EARN - dailyEarned);     // daily earn cap
       awarded = Math.min(AWARD, room);
       if (awarded > 0) {
-        const baseBalance = resetToday ? (cr.pro ? 999 : 3) : cr.balance; // daily reset baseline = 3 free (code resets daily; DB DEFAULT 1 per migration 031)
+        const baseBalance = resetToday ? (cr.pro ? PRO_DAILY_CREDITS : FREE_DAILY_CREDITS) : cr.balance; // daily reset baseline (code resets daily; DB DEFAULT 1 per migration 031)
         balance = baseBalance + awarded;
         const patch = { balance, daily_earned: dailyEarned + awarded };
         if (resetToday) patch.last_reset = today;
