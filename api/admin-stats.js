@@ -955,6 +955,39 @@ async function _handler(req, res) {
     return res.status(200).json({ ok: true, balance: newBalance });
   }
 
+  // ── list_subscriptions: read-only Stripe subscription list for the Trials drill-down ──
+  // Full admins only, audited as a read. Stripe items are default-included on each object —
+  // we pass NO expand[] (expanding the items list 400s the whole request; the same bug #124
+  // removed elsewhere). Returns a trimmed shape only; no secret is ever exposed to the client.
+  // Stripe unset → honest empty payload with stripe_connected:false (dashboard degrades).
+  if (body.action === 'list_subscriptions') {
+    if (adminRole === 'moderator') return res.status(403).json({ error: 'Insufficient role' });
+    await db('admin_audit_log', { method: 'POST', body: JSON.stringify({ admin_id: sess.admin_id, username: sess.username || 'admin', action: 'list_subscriptions', target_type: 'stripe' }), headers: { Prefer: 'return=minimal' } }).catch(() => {});
+    const key = process.env.STRIPE_SECRET_KEY;
+    if (!key) return res.status(200).json({ ok: true, subscriptions: [], stripe_connected: false });
+    try {
+      const r = await fetch('https://api.stripe.com/v1/subscriptions?status=all&limit=100', {
+        headers: { Authorization: `Bearer ${key}` },
+      });
+      if (!r.ok) return res.status(200).json({ ok: true, subscriptions: [], stripe_connected: true, error: `Stripe HTTP ${r.status}` });
+      const d = await r.json();
+      const subscriptions = (d.data || []).map(s => ({
+        id: s.id,
+        status: s.status,
+        cancel_at_period_end: !!s.cancel_at_period_end,
+        trial_end: s.trial_end || null,
+        current_period_end: s.current_period_end || null,
+        // customer is a bare id unless expanded (we don't expand it); email only present
+        // if Stripe happens to inline the customer object — otherwise fall back to the id.
+        customer: typeof s.customer === 'string' ? s.customer : (s.customer?.id || null),
+        email: (typeof s.customer === 'object' ? s.customer?.email : null) || null,
+      }));
+      return res.status(200).json({ ok: true, subscriptions, stripe_connected: true, has_more: !!d.has_more });
+    } catch {
+      return res.status(200).json({ ok: true, subscriptions: [], stripe_connected: true, error: 'Stripe request failed' });
+    }
+  }
+
   // ── export_company: full evidentiary audit bundle for ONE company ─────────────
   // Assembles the complete "how the grade was computed" chain for a company — every
   // contributing AND excluded report, each with its source/trust weight, the per-source
@@ -1150,6 +1183,20 @@ async function _handler(req, res) {
     }
 
     if (!Array.isArray(rows)) rows = [];
+
+    // Stitch the Pro flag (from ai_credits.pro) onto account rows so the Manage Accounts
+    // modal can filter Pro/Free and Grant/Revoke Pro inline. One cheap query keyed on the
+    // ≤100 user ids we just fetched. Accounts with no ai_credits row are Free by definition.
+    if (['total_accounts', 'new_today', 'new_this_week'].includes(metric) && rows.length) {
+      const ids = rows.map(r => r.id).filter(Boolean);
+      let proMap = new Map();
+      if (ids.length) {
+        const cr = await db(`ai_credits?user_id=in.(${ids.join(',')})&select=user_id,pro,balance`);
+        const credits = cr.ok ? await cr.json() : [];
+        proMap = new Map((Array.isArray(credits) ? credits : []).map(c => [c.user_id, c]));
+      }
+      rows = rows.map(r => ({ ...r, pro: !!proMap.get(r.id)?.pro, balance: proMap.get(r.id)?.balance ?? null }));
+    }
     return res.status(200).json({ ok: true, metric, rows });
   }
 

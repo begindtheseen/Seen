@@ -1220,6 +1220,12 @@ nav.nav-scrolled{background:rgba(6,6,8,0.82);backdrop-filter:blur(60px) saturate
 .ac-tile-l{font-family:var(--mono);font-size:.46rem;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin-bottom:.28rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .ac-tile-n{font-family:var(--mono);font-size:1.4rem;font-weight:500;line-height:1;color:var(--white);letter-spacing:-.02em}
 .ac-tile-p{font-family:var(--mono);font-size:.5rem;color:var(--dim);margin-top:.3rem;line-height:1.35;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ac-tile-btn{display:block;width:100%;text-align:left;cursor:pointer;font:inherit;transition:background .15s,border-color .15s}
+.ac-tile-btn:hover{background:rgba(255,255,255,.06);border-color:rgba(255,255,255,.16)}
+.ac-tile-btn:focus-visible{outline:2px solid var(--blue);outline-offset:2px}
+.ac-tile-btn .ac-tile-l{display:flex;align-items:center;justify-content:space-between}
+.ac-tile-caret{color:var(--dim);font-size:.85rem;line-height:1;opacity:.55;margin-left:.4rem}
+.ac-tile-btn:hover .ac-tile-caret{color:var(--blue);opacity:1}
 
 /* Metric rows */
 .ac-mrow{display:flex;align-items:center;gap:.6rem;padding:.5rem 0;border-bottom:1px solid rgba(255,255,255,.05)}

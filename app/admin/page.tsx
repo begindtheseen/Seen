@@ -69,6 +69,11 @@ interface MergePrefill { primary: string; secondary: string; nonce: number }
 interface FeatureFlag {
   flag_name: string; status: string; percentage: number | null; description: string
 }
+interface Sub {
+  id: string; status: string; cancel_at_period_end: boolean
+  trial_end: number | null; current_period_end: number | null
+  customer: string | null; email: string | null
+}
 
 function KpiCard({ l, n, sub, borderColor, numColor, onClick }: { l: string; n: string | number; sub?: string; borderColor?: string; numColor?: string; onClick?: () => void }) {
   return (
@@ -263,7 +268,27 @@ function UserRow({ r, token, onDeleted, ts }: { r: Record<string, unknown>; toke
   const [grantAmt, setGrantAmt] = useState(5)
   const [granting, setGranting] = useState(false)
   const [grantMsg, setGrantMsg] = useState('')
+  // Pro (subscription access) state — mirrors ai_credits.pro; set_pro flips it (full admins only).
+  const [pro, setPro] = useState(Boolean(r.pro))
+  const [proBusy, setProBusy] = useState(false)
+  const [proMsg, setProMsg] = useState('')
   function closeModal() { if (!busy) { setShowModal(false); setTyped('') } }
+  async function togglePro() {
+    if (!id || proBusy) return
+    const next = !pro
+    setProBusy(true); setProMsg('')
+    try {
+      const res = await fetch('/api/admin-stats', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Admin-Token': token },
+        body: JSON.stringify({ action: 'set_pro', user_id: id, pro: next }),
+      })
+      const d = await res.json().catch(() => ({}))
+      if (res.ok && d.ok) { setPro(next); setProMsg(next ? '✓ Pro' : '✓ Free') }
+      else setProMsg(d.error || 'Failed')
+    } catch { setProMsg('Network error') }
+    setProBusy(false)
+  }
   async function del() {
     if (!id || !canDelete) return
     setBusy(true)
@@ -298,10 +323,12 @@ function UserRow({ r, token, onDeleted, ts }: { r: Record<string, unknown>; toke
   return (
     <div className="ac-acct">
       <div className="ac-acct-top">
-        <span className="ac-acct-email">{email}</span>
+        <span className="ac-acct-email">{email}{pro && <span style={{ marginLeft: '.4rem', fontFamily: 'var(--mono)', fontSize: '.48rem', color: 'var(--green)', background: 'rgba(52,211,153,.14)', border: '1px solid rgba(52,211,153,.35)', borderRadius: 100, padding: '.05rem .35rem', verticalAlign: 'middle' }}>PRO</span>}</span>
         <span className="ac-acct-age">{ts(r.created_at)}</span>
       </div>
       <div className="ac-acct-actions">
+        <button onClick={togglePro} disabled={proBusy} title={pro ? 'Revoke Pro subscription access for this account' : 'Grant Pro subscription access to this account'} style={{ background: 'none', border: `1px solid ${pro ? 'rgba(245,158,11,.4)' : 'rgba(52,211,153,.4)'}`, borderRadius: 5, color: pro ? 'var(--amber)' : 'var(--green)', fontFamily: 'var(--mono)', fontSize: '.55rem', padding: '.28rem .5rem', cursor: proBusy ? 'wait' : 'pointer', whiteSpace: 'nowrap' }}>{proBusy ? '…' : pro ? '★ Revoke Pro' : '☆ Grant Pro'}</button>
+        {proMsg && <span style={{ fontFamily: 'var(--mono)', fontSize: '.5rem', color: proMsg.startsWith('✓') ? 'var(--green)' : 'var(--red)', whiteSpace: 'nowrap' }}>{proMsg}</span>}
         {grantMsg && grantMsg.startsWith('✓') ? (
           <span style={{ fontFamily: 'var(--mono)', fontSize: '.55rem', color: 'var(--green)', whiteSpace: 'nowrap' }}>{grantMsg}</span>
         ) : (
@@ -501,14 +528,25 @@ function Panel({ title, right, hero, children, style }: { title: string; right?:
 }
 
 // A compact command-center tile: big number + a status PHRASE (never a bare number).
-function PulseTile({ label, value, phrase, tone = 'white' }: { label: string; value: React.ReactNode; phrase: string; tone?: Tone }) {
-  return (
-    <div className="ac-tile">
-      <div className="ac-tile-l">{label}</div>
+// When onClick is passed the whole tile becomes a button (pointer, hover, a "›" caret,
+// aria-label) that opens the matching drill-down / management door.
+function PulseTile({ label, value, phrase, tone = 'white', onClick }: { label: string; value: React.ReactNode; phrase: string; tone?: Tone; onClick?: () => void }) {
+  const inner = (
+    <>
+      <div className="ac-tile-l">{label}{onClick && <span className="ac-tile-caret" aria-hidden>›</span>}</div>
       <div className={`ac-tile-n ac-tone-${tone}`}>{value}</div>
       <div className="ac-tile-p" title={phrase}>{phrase}</div>
-    </div>
+    </>
   )
+  if (onClick) {
+    const vtxt = (typeof value === 'string' || typeof value === 'number') ? String(value) : ''
+    return (
+      <button type="button" className="ac-tile ac-tile-btn" onClick={onClick} aria-label={`${label} ${vtxt} — ${phrase}. Open details.`}>
+        {inner}
+      </button>
+    )
+  }
+  return <div className="ac-tile">{inner}</div>
 }
 
 // label · optional status text · value, optionally clickable (opens a KPI drill-down).
@@ -550,9 +588,10 @@ interface AttnItem {
 // Manage accounts — reuses the get_kpi_detail(total_accounts) fetch (same data that powers
 // the users drill-down) + the existing UserRow (grant-credits input + type-to-confirm delete).
 // Adds an email search filter. Own scroll area, iPhone safe-area aware, mobile mini-cards.
-function ManageAccountsModal({ token, onClose }: { token: string; onClose: () => void }) {
+function ManageAccountsModal({ token, initialFilter = 'all', onClose }: { token: string; initialFilter?: 'all' | 'pro' | 'free'; onClose: () => void }) {
   const [rows, setRows] = useState<Record<string, unknown>[] | null>(null)
   const [q, setQ] = useState('')
+  const [filter, setFilter] = useState<'all' | 'pro' | 'free'>(initialFilter)
 
   useEffect(() => {
     fetch('/api/admin-stats', {
@@ -572,7 +611,15 @@ function ManageAccountsModal({ token, onClose }: { token: string; onClose: () =>
   }
 
   const needle = q.trim().toLowerCase()
-  const filtered = (rows || []).filter(r => !needle || String(r.email ?? '').toLowerCase().includes(needle))
+  const proCount = (rows || []).filter(r => r.pro).length
+  const filtered = (rows || []).filter(r =>
+    (!needle || String(r.email ?? '').toLowerCase().includes(needle)) &&
+    (filter === 'all' || (filter === 'pro' ? !!r.pro : !r.pro))
+  )
+  const segStyle = (active: boolean): React.CSSProperties => ({
+    flex: 1, background: active ? 'rgba(59,130,246,.18)' : 'transparent', border: `1px solid ${active ? 'rgba(59,130,246,.5)' : 'var(--line2)'}`,
+    borderRadius: 6, padding: '.32rem .5rem', fontFamily: 'var(--mono)', fontSize: '.56rem', color: active ? 'var(--blue)' : 'var(--dim)', cursor: 'pointer', whiteSpace: 'nowrap',
+  })
 
   return (
     <div className="ac-modal" onClick={onClose}>
@@ -580,18 +627,23 @@ function ManageAccountsModal({ token, onClose }: { token: string; onClose: () =>
         <div className="ac-modal-hdr">
           <div>
             <div className="ac-modal-ttl">Manage accounts</div>
-            <div className="ac-modal-sub">{rows === null ? 'Loading…' : `${rows.length} account${rows.length === 1 ? '' : 's'}${needle ? ` · ${filtered.length} match` : ''} · newest 100`}</div>
+            <div className="ac-modal-sub">{rows === null ? 'Loading…' : `${rows.length} account${rows.length === 1 ? '' : 's'} · ${proCount} Pro${needle || filter !== 'all' ? ` · ${filtered.length} shown` : ''} · newest 100`}</div>
           </div>
           <button className="ac-modal-x" onClick={onClose}>✕</button>
         </div>
         <div className="ac-modal-search">
           <input value={q} onChange={e => setQ(e.target.value)} placeholder="Filter by email…" autoComplete="off" />
+          <div style={{ display: 'flex', gap: '.4rem', marginTop: '.5rem' }}>
+            <button type="button" style={segStyle(filter === 'all')} onClick={() => setFilter('all')}>All</button>
+            <button type="button" style={segStyle(filter === 'pro')} onClick={() => setFilter('pro')}>Pro</button>
+            <button type="button" style={segStyle(filter === 'free')} onClick={() => setFilter('free')}>Free</button>
+          </div>
         </div>
         <div className="ac-modal-body">
           {rows === null ? (
             <div style={{ textAlign: 'center', padding: '2rem', fontFamily: 'var(--mono)', fontSize: '.65rem', color: 'var(--dim)' }}>Loading accounts…</div>
           ) : !filtered.length ? (
-            <div style={{ textAlign: 'center', padding: '2rem', fontFamily: 'var(--mono)', fontSize: '.65rem', color: 'var(--dim)' }}>{needle ? 'No accounts match that email.' : 'No accounts yet.'}</div>
+            <div style={{ textAlign: 'center', padding: '2rem', fontFamily: 'var(--mono)', fontSize: '.65rem', color: 'var(--dim)' }}>{needle ? 'No accounts match that email.' : filter === 'pro' ? 'No Pro accounts yet.' : filter === 'free' ? 'No free accounts.' : 'No accounts yet.'}</div>
           ) : (
             filtered.map((r, i) => (
               <UserRow key={String(r.id ?? i)} r={r} token={token} ts={ts} onDeleted={id => setRows(rs => (rs || []).filter(x => String(x.id) !== id))} />
@@ -600,6 +652,167 @@ function ManageAccountsModal({ token, onClose }: { token: string; onClose: () =>
         </div>
       </div>
     </div>
+  )
+}
+
+// Shared shell for the read-only Pulse drill-down modals (Revenue, Trials, Cards, API).
+// Reuses the .ac-modal chrome (own scroll, safe-area-aware body) — same look as Manage
+// Accounts but without the search/filter bar.
+function DetailModal({ title, sub, onClose, children }: { title: string; sub?: string; onClose: () => void; children: React.ReactNode }) {
+  return (
+    <div className="ac-modal" onClick={onClose}>
+      <div className="ac-modal-card" onClick={e => e.stopPropagation()}>
+        <div className="ac-modal-hdr">
+          <div>
+            <div className="ac-modal-ttl">{title}</div>
+            {sub && <div className="ac-modal-sub">{sub}</div>}
+          </div>
+          <button className="ac-modal-x" onClick={onClose}>✕</button>
+        </div>
+        <div className="ac-modal-body">{children}</div>
+      </div>
+    </div>
+  )
+}
+
+// A read-only label · status · value row (mirrors MetricRow, no click).
+function DetailStat({ label, value, status, tone = 'white' }: { label: string; value: React.ReactNode; status?: string; tone?: Tone }) {
+  return (
+    <div className="ac-mrow">
+      <span className="ac-mrow-l">{label}</span>
+      <span className="ac-mrow-mid">{status}</span>
+      <span className={`ac-mrow-n ac-tone-${tone}`}>{value}</span>
+    </div>
+  )
+}
+
+const STRIPE_SUBS_URL = 'https://dashboard.stripe.com/subscriptions'
+function stripeLinkStyle(): React.CSSProperties {
+  return { display: 'inline-flex', alignItems: 'center', gap: '.35rem', marginTop: '.9rem', fontFamily: 'var(--mono)', fontSize: '.6rem', color: 'var(--blue)', textDecoration: 'none', border: '1px solid rgba(59,130,246,.35)', borderRadius: 7, padding: '.45rem .7rem', background: 'rgba(59,130,246,.08)' }
+}
+
+// MRR tile → revenue breakdown from stats.monetization (NO new fetch) + Stripe deep link.
+function RevenueDetailModal({ m, onClose }: { m: AdminStats['monetization']; onClose: () => void }) {
+  const stripeOn = !!m?.stripe_connected
+  const money = (n: number | null | undefined) => (n != null ? `$${n.toLocaleString()}` : '—')
+  return (
+    <DetailModal title="Revenue" sub={stripeOn ? 'Live from Stripe' : 'Stripe not connected'} onClose={onClose}>
+      {!stripeOn ? (
+        <div style={{ textAlign: 'center', padding: '2rem', fontFamily: 'var(--mono)', fontSize: '.65rem', color: 'var(--dim)' }}>Stripe not connected — revenue breakdown unavailable.</div>
+      ) : (
+        <>
+          <DetailStat label="MRR" value={money(m?.mrr)} status="monthly recurring" tone={m?.mrr ? 'green' : 'dim'} />
+          <DetailStat label="Annualized" value={money(m?.mrr_annualized)} status="run rate / yr" tone={m?.mrr_annualized ? 'green' : 'dim'} />
+          <DetailStat label="Active paid" value={(m?.active_paid ?? 0).toLocaleString()} status="paying now" tone={(m?.active_paid ?? 0) > 0 ? 'green' : 'dim'} />
+          <DetailStat label="Trialing" value={(m?.trialing ?? 0).toLocaleString()} status="in trial" tone={(m?.trialing ?? 0) > 0 ? 'blue' : 'dim'} />
+          <DetailStat label="Canceling" value={(m?.canceling ?? 0).toLocaleString()} status="cancels at period end" tone={(m?.canceling ?? 0) > 0 ? 'amber' : 'dim'} />
+          <DetailStat label="Past due" value={(m?.past_due ?? 0).toLocaleString()} status="payment failing" tone={(m?.past_due ?? 0) > 0 ? 'amber' : 'dim'} />
+          <DetailStat label="Canceled" value={(m?.canceled ?? 0).toLocaleString()} status="churned" tone={(m?.canceled ?? 0) > 0 ? 'red' : 'dim'} />
+          <DetailStat label="Conversion" value={m ? `${m.conversion_pct}%` : '—'} status="free → paid" tone="sub" />
+          <a href={STRIPE_SUBS_URL} target="_blank" rel="noopener noreferrer" style={stripeLinkStyle()}>Manage in Stripe ↗</a>
+        </>
+      )}
+    </DetailModal>
+  )
+}
+
+// Trials tile → real subscription list (list_subscriptions). Read-only + per-row Stripe link.
+function TrialsDetailModal({ token, onClose }: { token: string; onClose: () => void }) {
+  const [data, setData] = useState<{ subscriptions: Sub[]; stripe_connected: boolean; error?: string } | null>(null)
+  useEffect(() => {
+    fetch('/api/admin-stats', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Admin-Token': token },
+      body: JSON.stringify({ action: 'list_subscriptions' }),
+    }).then(r => r.json()).then(d => setData({ subscriptions: d.subscriptions || [], stripe_connected: !!d.stripe_connected, error: d.error })).catch(() => setData({ subscriptions: [], stripe_connected: false, error: 'Network error' }))
+  }, [token])
+
+  const statusTone = (s: string): Tone => s === 'trialing' ? 'blue' : s === 'active' ? 'green' : s === 'past_due' || s === 'unpaid' ? 'amber' : s === 'canceled' ? 'red' : 'sub'
+  const fmtDate = (unix: number | null) => unix ? new Date(unix * 1000).toLocaleDateString() : '—'
+  // Trialing subs first (this is the Trials door), then the rest.
+  const subs = (data?.subscriptions || []).slice().sort((a, b) => (a.status === 'trialing' ? -1 : 0) - (b.status === 'trialing' ? -1 : 0))
+  const trialCount = subs.filter(s => s.status === 'trialing').length
+
+  return (
+    <DetailModal title="Trials & subscriptions" sub={data === null ? 'Loading…' : data.stripe_connected ? `${trialCount} trialing · ${subs.length} total` : 'Stripe not connected'} onClose={onClose}>
+      {data === null ? (
+        <div style={{ textAlign: 'center', padding: '2rem', fontFamily: 'var(--mono)', fontSize: '.65rem', color: 'var(--dim)' }}>Loading subscriptions…</div>
+      ) : !data.stripe_connected ? (
+        <div style={{ textAlign: 'center', padding: '2rem', fontFamily: 'var(--mono)', fontSize: '.65rem', color: 'var(--dim)' }}>Stripe not connected — no subscriptions to show.</div>
+      ) : !subs.length ? (
+        <div style={{ textAlign: 'center', padding: '2rem', fontFamily: 'var(--mono)', fontSize: '.65rem', color: 'var(--dim)' }}>{data.error ? `Stripe error: ${data.error}` : 'No subscriptions yet.'}</div>
+      ) : (
+        subs.map(s => (
+          <div key={s.id} className="ac-acct">
+            <div className="ac-acct-top">
+              <span className="ac-acct-email">{s.email || s.customer || s.id}</span>
+              <span className="ac-acct-age" style={{ color: `var(--${statusTone(s.status) === 'white' ? 'sub' : statusTone(s.status)})` }}>{s.status}{s.cancel_at_period_end ? ' · canceling' : ''}</span>
+            </div>
+            <div className="ac-acct-actions" style={{ justifyContent: 'space-between' }}>
+              <span style={{ fontFamily: 'var(--mono)', fontSize: '.52rem', color: 'var(--dim)' }}>
+                {s.status === 'trialing' ? `trial ends ${fmtDate(s.trial_end)}` : `renews ${fmtDate(s.current_period_end)}`}
+              </span>
+              <a href={`${STRIPE_SUBS_URL}/${s.id}`} target="_blank" rel="noopener noreferrer" style={{ fontFamily: 'var(--mono)', fontSize: '.52rem', color: 'var(--blue)', textDecoration: 'none', border: '1px solid rgba(59,130,246,.3)', borderRadius: 5, padding: '.22rem .45rem' }}>Open in Stripe ↗</a>
+            </div>
+          </div>
+        ))
+      )}
+    </DetailModal>
+  )
+}
+
+// Cards-shared tile → per-channel share breakdown from stats.monetization (NO new fetch).
+function SharesDetailModal({ m, onClose }: { m: AdminStats['monetization']; onClose: () => void }) {
+  const total = m?.outcome_card_shares ?? 0
+  const channels = Object.entries(m?.shares_by_channel || {}).sort((a, b) => (b[1] as number) - (a[1] as number))
+  return (
+    <DetailModal title="Outcome cards shared" sub={`${total.toLocaleString()} total`} onClose={onClose}>
+      {!channels.length ? (
+        <div style={{ textAlign: 'center', padding: '2rem', fontFamily: 'var(--mono)', fontSize: '.65rem', color: 'var(--dim)' }}>No outcome cards shared yet — the virality flywheel has not started.</div>
+      ) : (
+        channels.map(([ch, n]) => (
+          <DetailStat key={ch} label={ch} value={(n as number).toLocaleString()} status="shares" tone={(n as number) > 0 ? 'blue' : 'dim'} />
+        ))
+      )}
+    </DetailModal>
+  )
+}
+
+// API tile → recent errors + by-route breakdown from stats.errors (NO new fetch).
+function ErrorsDetailModal({ errors, onClose }: { errors: AdminStats['errors']; onClose: () => void }) {
+  const recent = errors?.recent || []
+  const byRoute = Object.entries(errors?.by_route || {}).sort((a, b) => (b[1] as number) - (a[1] as number))
+  return (
+    <DetailModal title="API errors" sub={`${errors?.today ?? 0} today · ${errors?.this_week ?? 0} this week`} onClose={onClose}>
+      {!recent.length && !byRoute.length ? (
+        <div style={{ textAlign: 'center', padding: '2rem', fontFamily: 'var(--mono)', fontSize: '.65rem', color: 'var(--green)' }}>✓ No API errors logged.</div>
+      ) : (
+        <>
+          {byRoute.length > 0 && (
+            <>
+              <div style={{ fontFamily: 'var(--mono)', fontSize: '.52rem', color: 'var(--sub)', textTransform: 'uppercase', letterSpacing: '.1em', margin: '.2rem 0 .35rem' }}>By route</div>
+              {byRoute.map(([route, n]) => (
+                <DetailStat key={route} label={route} value={(n as number).toLocaleString()} status="errors" tone={(n as number) > 10 ? 'red' : 'amber'} />
+              ))}
+            </>
+          )}
+          {recent.length > 0 && (
+            <>
+              <div style={{ fontFamily: 'var(--mono)', fontSize: '.52rem', color: 'var(--sub)', textTransform: 'uppercase', letterSpacing: '.1em', margin: '.9rem 0 .35rem' }}>Recent</div>
+              {recent.map((e, i) => (
+                <div key={i} style={{ padding: '.5rem .6rem', background: 'var(--card)', borderRadius: 7, marginBottom: '.4rem' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: '.5rem' }}>
+                    <span style={{ fontFamily: 'var(--mono)', fontSize: '.6rem', color: 'var(--white)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{e.endpoint}</span>
+                    <span style={{ fontFamily: 'var(--mono)', fontSize: '.52rem', color: 'var(--dim)', flexShrink: 0 }}>{relTime(e.created_at)}</span>
+                  </div>
+                  <div style={{ fontFamily: 'var(--mono)', fontSize: '.54rem', color: 'var(--red)', marginTop: '.2rem', lineHeight: 1.4 }}>{e.error_msg}</div>
+                </div>
+              ))}
+            </>
+          )}
+        </>
+      )}
+    </DetailModal>
   )
 }
 
@@ -669,9 +882,12 @@ export default function AdminPage() {
   const [mergePrefill, setMergePrefill] = useState<MergePrefill | null>(null)
   const [kpiModal, setKpiModal] = useState<{ metric: string; title: string } | null>(null)
   const [manageOpen, setManageOpen] = useState(false)
+  const [manageFilter, setManageFilter] = useState<'all' | 'pro' | 'free'>('all')
+  const [detail, setDetail] = useState<null | 'revenue' | 'trials' | 'shares' | 'errors'>(null)
   const [emgBusy, setEmgBusy] = useState(false)
   const [emgMsg, setEmgMsg] = useState<{ ok: boolean; text: string } | null>(null)
   function openKpi(metric: string, title: string) { setKpiModal({ metric, title }) }
+  function openManage(f: 'all' | 'pro' | 'free') { setManageFilter(f); setManageOpen(true) }
 
   useEffect(() => {
     const stored = sessionStorage.getItem(TOKEN_KEY)
@@ -890,12 +1106,12 @@ export default function AdminPage() {
         {/* 2. Seen Pulse — command center */}
         <Panel title="Seen Pulse" hero right={<span className="ac-panel-status">what matters today</span>}>
           <div className="ac-pulse">
-            <PulseTile label="Accounts" value={stats.users.total.toLocaleString()} phrase={stats.users.new_today > 0 ? `${stats.users.new_today} new today` : 'no new today'} tone="white" />
-            <PulseTile label="Paid users" value={paidUsers.toLocaleString()} phrase={paidUsers > 0 ? 'converting' : 'none yet'} tone={paidUsers > 0 ? 'green' : 'dim'} />
-            <PulseTile label="MRR" value={mrr != null ? `$${mrr.toLocaleString()}` : '$0'} phrase={mrr ? 'revenue moving' : stripeOn ? 'not activated yet' : 'Stripe off'} tone={mrr ? 'green' : 'dim'} />
-            <PulseTile label="Trials" value={stripeOn ? (m?.trialing ?? 0) : '—'} phrase={stripeOn ? `${m?.trialing ?? 0} trialing now` : 'Stripe not connected'} tone={(m?.trialing ?? 0) > 0 ? 'blue' : 'dim'} />
-            <PulseTile label="Cards shared" value={shares.toLocaleString()} phrase={shares > 0 ? 'flywheel moving' : 'none shared yet'} tone={shares > 0 ? 'blue' : 'dim'} />
-            <PulseTile label="API" value={errToday} phrase={errToday === 0 ? 'No API incidents' : `${errToday} errors today`} tone={errToday > 10 ? 'red' : errToday > 0 ? 'amber' : 'green'} />
+            <PulseTile label="Accounts" value={stats.users.total.toLocaleString()} phrase={stats.users.new_today > 0 ? `${stats.users.new_today} new today` : 'no new today'} tone="white" onClick={() => openManage('all')} />
+            <PulseTile label="Paid users" value={paidUsers.toLocaleString()} phrase={paidUsers > 0 ? 'converting' : 'none yet'} tone={paidUsers > 0 ? 'green' : 'dim'} onClick={() => openManage('pro')} />
+            <PulseTile label="MRR" value={mrr != null ? `$${mrr.toLocaleString()}` : '$0'} phrase={mrr ? 'revenue moving' : stripeOn ? 'not activated yet' : 'Stripe off'} tone={mrr ? 'green' : 'dim'} onClick={() => setDetail('revenue')} />
+            <PulseTile label="Trials" value={stripeOn ? (m?.trialing ?? 0) : '—'} phrase={stripeOn ? `${m?.trialing ?? 0} trialing now` : 'Stripe not connected'} tone={(m?.trialing ?? 0) > 0 ? 'blue' : 'dim'} onClick={() => setDetail('trials')} />
+            <PulseTile label="Cards shared" value={shares.toLocaleString()} phrase={shares > 0 ? 'flywheel moving' : 'none shared yet'} tone={shares > 0 ? 'blue' : 'dim'} onClick={() => setDetail('shares')} />
+            <PulseTile label="API" value={errToday} phrase={errToday === 0 ? 'No API incidents' : `${errToday} errors today`} tone={errToday > 10 ? 'red' : errToday > 0 ? 'amber' : 'green'} onClick={() => setDetail('errors')} />
           </div>
         </Panel>
 
@@ -1131,8 +1347,12 @@ export default function AdminPage() {
         <KpiModal metric={kpiModal.metric} title={kpiModal.title} token={token!} onClose={() => setKpiModal(null)} />
       )}
       {manageOpen && (
-        <ManageAccountsModal token={token!} onClose={() => setManageOpen(false)} />
+        <ManageAccountsModal token={token!} initialFilter={manageFilter} onClose={() => setManageOpen(false)} />
       )}
+      {detail === 'revenue' && <RevenueDetailModal m={stats.monetization} onClose={() => setDetail(null)} />}
+      {detail === 'trials' && <TrialsDetailModal token={token!} onClose={() => setDetail(null)} />}
+      {detail === 'shares' && <SharesDetailModal m={stats.monetization} onClose={() => setDetail(null)} />}
+      {detail === 'errors' && <ErrorsDetailModal errors={stats.errors} onClose={() => setDetail(null)} />}
     </div>
   )
 }
