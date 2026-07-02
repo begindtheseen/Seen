@@ -63,8 +63,23 @@ export const SavedJobsStore = {
     if (loggedIn) {
       const result = await _sync('load') as { saved_jobs?: SavedJob[] } | null
       if (result?.saved_jobs) {
-        localStorage.setItem(KEY, JSON.stringify(result.saved_jobs))
-        return result.saved_jobs
+        // Merge up any guest-era saves before adopting the DB list — overwriting local
+        // with DB used to silently discard everything saved before signing in. Safe from
+        // cross-user bleed: sign-out clears this key, so local content is this device's
+        // current guest data. save_job upserts on (user_id, job_id), so re-sends are no-ops.
+        const dbIds = new Set(result.saved_jobs.map(s => String(s.job_id)))
+        const guestOnly = this.loadSync().filter(s => s.job_id && !dbIds.has(String(s.job_id)))
+        for (const s of guestOnly) {
+          _sync('save_job', {
+            job: {
+              id: String(s.job_id), co: s.company, title: s.role, city: s.location,
+              score: s.score, apply_url: s.apply_url ?? null, snapshot: s.snapshot ?? null,
+            },
+          }).catch(() => {})
+        }
+        const merged = [...result.saved_jobs, ...guestOnly]
+        localStorage.setItem(KEY, JSON.stringify(merged))
+        return merged
       }
     }
     return this.loadSync()

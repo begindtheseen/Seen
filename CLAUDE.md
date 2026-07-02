@@ -20,6 +20,45 @@ We are NOT adding features. The Next.js migration lost design and functionality 
 - Do not redesign, simplify, or invent UI. Port the old design exactly.
 - A page is complete only when: visual match + all old functionality + APIs work + mobile works + build passes + checklist updated.
 
+## Session 2026-07-02 (PR #124): full-app audit — READ THIS, it corrects older notes below
+
+Six parallel audits swept every frontend→API contract, data round-trip, page flow, cron,
+and import graph; 30 confirmed breaks fixed. Ground truth established this session:
+
+- **`applications` schema (prod, verified by SQL)**: has `events jsonb` (added 2026-07-02 —
+  its absence had been 400ing the tracker `load` for every signed-in user), `job_id` is
+  **text** (was uuid + unusable FK), `applied_at` exists. `add_application` persists
+  job_id/applied_at/events; the `load` select returns them.
+- **Credits gate lives at `lib/server/credits.js`** — the `api/_utils/credits.js` path in
+  the Session B notes below does NOT exist. `api/_utils/` holds companyIntel/companyScore/
+  reportWrite/resumeSurvey/opportunityEngine.
+- **Auth pattern**: `useAuth()` exposes `ready`. Any page that redirects on `!isLoggedIn`
+  MUST wait for `ready` first, or it bounces signed-in deep-links while the session loads.
+- **Sign-out data isolation**: `lib/auth.tsx` clears SESSION_LOCAL_KEYS (applications,
+  saved, events, recent-cos, …) on SIGNED_OUT. Never re-introduce auto-import of
+  device-local data into a signed-in account — that was the cross-user bleed vector.
+- **Company slugs**: ONE scheme everywhere — `encodeURIComponent(name.toLowerCase()
+  .replace(/\s+/g,'-'))`, decoded by /company/[slug] as decodeURIComponent + hyphens→spaces.
+  Server name lookups in api/reports.js have a token-wildcard fallback for hyphenated names.
+  Do not add punctuation-stripping slug functions.
+- **Scoring weights** (api/_utils/companyIntel.js SOURCE_TRUST): direct 1.0 · survey
+  (seen_intel) 1.0 · ingest 0.55 · reddit 0.3 · web prior 0.5. Fusion classifies by
+  `platform` string, not the stored `source` column. Survey/report writes trigger
+  recomputeCompanyScoreFromReports (reportWrite.js) so the company page updates instantly.
+- **Vercel crons fire as GET** — any cron handler must route GET (x-vercel-cron header)
+  into its refresh logic (see api/demand.js and api/reports.js patterns).
+- **Stripe**: api/stripe.js disables the body parser and reads the raw stream (webhook
+  HMAC needs the exact signed bytes); subscription reads must NOT use expand[]=items
+  (invalid — 502'd all subscription management until 2026-07-02).
+- **PDF extraction** (lib/server/pdfText.js): parses ToUnicode CMaps for subset fonts;
+  looksLikeGarbledText() gates unreadable extractions with an honest 422.
+- **Résumé employment parser** (lib/server/resumeAnalysis.js): COMMON_TITLE_WORDS must
+  stay \b-anchored; company = single segment, cleaned by cleanCompany(). Tests:
+  `node --test lib/server/*.test.mjs api/_utils/*.test.mjs` (44 tests — keep green).
+- Remaining manual dashboard item: enable Auth leaked-password protection (HaveIBeenPwned).
+- Deferred (known, acceptable): EventStore check-in ledger is device-local only (re-prompts
+  on a new device); RLS-no-policy INFO lints are intentional (server-only tables).
+
 ## Migration Status (as of 2026-06-14)
 
 ### What was fixed in Session G (claude/index-file-stability-LrIfU):
