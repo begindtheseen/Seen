@@ -4,6 +4,12 @@ import { useState, useEffect, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useAuth } from '@/lib/auth'
 import { aiHeaders } from '@/lib/aiHeaders'
+import { FREE_DAILY_CREDITS, WELCOME_CREDITS, MAX_DAILY_EARN } from '@/lib/creditRules'
+
+// UI copy is generated from the SAME constants the server enforces — never a hand-typed
+// number that drifts. Free tier is 1 AI credit/day (owner decision 2026-07-02).
+const CREDIT_WORD = FREE_DAILY_CREDITS === 1 ? 'credit' : 'credits'
+const FREE_DAILY_LABEL = `${FREE_DAILY_CREDITS} AI ${CREDIT_WORD} per day`
 
 const MONTHLY = '$9.99'
 const YEARLY  = '$6.99'
@@ -13,7 +19,7 @@ const YEARLY_TOTAL = +(YEARLY_NUM * 12).toFixed(2)              // 83.88
 const ANNUAL_SAVINGS = +(MONTHLY_NUM * 12 - YEARLY_TOTAL).toFixed(2) // ~35.99
 
 const FREE_FEATURES = [
-  '3 AI credits per day — parse, optimize, score',
+  `${FREE_DAILY_LABEL} — parse, optimize, score`,
   'Resume parse + bullet scanner',
   'Earn credits by tracking apps & surveys',
   'Company ghost rates & trust scores',
@@ -34,7 +40,7 @@ const PRO_FEATURES = [
 ]
 
 const COMPARISON: [string, string | boolean, string | boolean][] = [
-  ['AI credits',                '3/day',     'Unlimited'],
+  ['AI credits',                `${FREE_DAILY_CREDITS}/day`, 'Unlimited'],
   ['Resume AI — parse & scan',  true,         true],
   ['Resume AI — optimize',      true,         true],
   ['AI job insights',           false,        true],
@@ -49,11 +55,11 @@ const COMPARISON: [string, string | boolean, string | boolean][] = [
 
 const FAQ = [
   { q: 'What is Human Voice?', a: 'AI-optimized résumés often sound generic — and some companies auto-filter applications that read as machine-written. Human Voice rewrites your optimized bullets so they sound like you: varied sentence structure, natural rhythm, every keyword kept. Your words, your voice, still ATS-ready.' },
-  { q: 'How do free AI credits work?', a: 'Every day you get 3 AI credits that reset at midnight. Each credit covers one AI action: parse a resume, optimize bullets for a job, or run the ATS scanner. You can earn more credits by tracking your applications and answering quick surveys about companies you\'ve worked with.' },
+  { q: 'How do free AI credits work?', a: `You start with a ${WELCOME_CREDITS}-credit welcome bonus, then get ${FREE_DAILY_CREDITS} AI ${CREDIT_WORD} that reset each day at midnight. Each credit covers one AI action: parse a resume, optimize bullets for a job, or run the ATS scanner. You can earn up to ${MAX_DAILY_EARN} more credits a day by tracking your applications and answering quick surveys about companies you've worked with.` },
   { q: 'Can I cancel Pro?', a: 'Yes, anytime — no contracts. You keep Pro until the end of your billing period. We don\'t trap you.' },
   { q: 'Is my data sold to employers?', a: 'Never. We work for job seekers. Your resume content is processed in-memory to generate your optimization and immediately discarded. We never sell, share, or expose your info to recruiters or employers.' },
   { q: 'When does Pro activate?', a: 'Instantly after payment. Credits update in real-time — no waiting, no manual activation.' },
-  { q: 'What if I hit the daily limit?', a: 'Free users get 3 credits/day. Track an application to earn one back. Answer a 10-second survey to earn another. Or upgrade to Pro for unlimited.' },
+  { q: 'What if I hit the daily limit?', a: `Free users get ${FREE_DAILY_CREDITS} ${CREDIT_WORD}/day. Track an application to earn one back. Answer a 10-second survey to earn more — up to ${MAX_DAILY_EARN} a day. Or upgrade to Pro for unlimited.` },
 ]
 
 function PricingPageInner() {

@@ -4,6 +4,9 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/lib/auth'
 import { aiHeaders } from '@/lib/aiHeaders'
+import { FREE_DAILY_CREDITS } from '@/lib/creditRules'
+
+const OPT_WORD = FREE_DAILY_CREDITS === 1 ? 'optimization' : 'optimizations'
 
 interface UpgradeModalProps {
   reason: 'credits' | 'pro' | 'generic'
@@ -31,7 +34,7 @@ function copyFor(reason: UpgradeModalProps['reason'], featureName?: string) {
   if (reason === 'credits') {
     return {
       headline: "You're out of credits for today.",
-      sub: "Free gives you 3 AI optimizations a day. Pro removes the cap — tune every application while the role's still open.",
+      sub: `Free gives you ${FREE_DAILY_CREDITS} AI ${OPT_WORD} a day. Pro removes the cap — tune every application while the role's still open.`,
     }
   }
   if (reason === 'pro') {
@@ -133,7 +136,7 @@ export default function UpgradeModal({ reason, onClose, featureName }: UpgradeMo
           <button onClick={onClose} aria-label="Close" style={{ background: 'none', border: 'none', color: 'var(--dim)', cursor: 'pointer', fontSize: '1rem', padding: '.2rem', lineHeight: 1, flexShrink: 0, marginLeft: '1rem' }}>✕</button>
         </div>
 
-        <div style={{ padding: '0 1.25rem 1.5rem' }}>
+        <div style={{ padding: '0 1.25rem', paddingBottom: 'calc(1.5rem + env(safe-area-inset-bottom))' }}>
 
           {/* Feature list */}
           <div style={{ background: 'rgba(99,102,241,.07)', border: '1px solid rgba(99,102,241,.18)', borderRadius: 12, padding: '.85rem 1rem', marginBottom: '1.1rem' }}>

@@ -1,13 +1,11 @@
-import zlib from 'zlib';
-import { promisify } from 'util';
 import PDFDocument from 'pdfkit';
 import { createClient } from '@supabase/supabase-js';
 import { applyRateLimit } from '../lib/server/ratelimit.js';
 import { logError } from '../lib/server/errlog.js';
 import { gateAI } from '../lib/server/credits.js';
-import { runScanner, runOptimize, runAdvantage, extractEmployment, extractCareerSignal, buildResumeDocument, resumeFileName } from '../lib/server/resumeAnalysis.js';
-import { extractPdfText, looksLikeGarbledText } from '../lib/server/pdfText.js';
-const inflateRaw = promisify(zlib.inflateRaw);
+import { runAdvantage, extractEmployment, extractCareerSignal, buildResumeDocument, resumeFileName } from '../lib/server/resumeAnalysis.js';
+import { scannerFromSeenFit, optimizeFromSeenFit } from '../lib/server/seenfitCompat.js';
+import { extractUploadText } from '../lib/server/resumeUpload.js';
 
 // One-line "Seen data" block from read-only company intel (ghost/response from our
 // scores), or '' when we have no data on the company. This is the differentiator —
@@ -26,6 +24,28 @@ function _intelStats(ci) {
     response_rate: Number(ci.response_rate) || 0,
     avg_wait_days: Number(ci.avg_wait_days) || 0,
     overall_score: Number(ci.overall_score) || 0,
+  };
+}
+
+// Normalize the OPTIONAL optimized-package fields that download_resume / email_analysis may
+// receive. Returns null when none are present (→ behavior identical to today). Never touches
+// the base résumé — these only feed the clearly-separated "Optimized for …" export section.
+function _normalizeOptimizedPackage(body) {
+  const strOf = (x) => (typeof x === 'string' ? x : (x && (x.optimized || x.humanized || x.text || x.original || x.warning || x.reason)) || '');
+  const toList = (arr) => (Array.isArray(arr) ? arr.map(strOf).map((s) => String(s || '').trim()).filter(Boolean) : []);
+  // HumanProof (humanized) bullets win over raw optimized bullets when both are present.
+  const bullets = toList(Array.isArray(body.humanproofBullets) && body.humanproofBullets.length ? body.humanproofBullets : body.optimizedBullets);
+  const confirmItems = toList(body.confirmWarnings);
+  const message = typeof body.applicationMessage === 'string' ? body.applicationMessage.trim() : '';
+  const fitScore = body.fitScore != null && !Number.isNaN(Number(body.fitScore)) ? Number(body.fitScore) : null;
+  if (!bullets.length && !confirmItems.length && !message) return null;
+  return {
+    role: body.jobTitle || body.role || body.job || '',
+    company: body.company || body.co || '',
+    fitScore,
+    bullets,
+    confirmItems,
+    message,
   };
 }
 
@@ -100,13 +120,15 @@ export default async function handler(req, res) {
       const { job, company, resume, jobDescription } = body;
       if (!resume || !jobDescription) return res.status(400).json({ error: 'Resume and job description required' });
       const intelNote = _seenIntel(company, body.companyIntel);
-      parsed = runScanner({ resume, jobDescription, job, company, intelNote });
+      // Canonical SeenFit pipeline, adapted to the legacy scanner shape (keyless/deterministic).
+      parsed = scannerFromSeenFit({ resume, jobDescription, job, company, intelNote });
 
     } else if (tool === 'optimize') {
       const { job, company, resume, jobDescription } = body;
       if (!resume) return res.status(400).json({ error: 'Resume required' });
-      // Pro users get Stealth Mode baked in — same call, no extra credit or cost.
-      parsed = runOptimize({ resume, jobDescription, job, company, pro: gate.pro });
+      // Canonical SeenFit pipeline, adapted to the legacy optimize shape. Pro users get
+      // "Human Voice" (stealth field) baked in — same call, no extra credit or cost.
+      parsed = optimizeFromSeenFit({ resume, jobDescription, job, company, pro: gate.pro });
 
     } else if (tool === 'coach') {
       const { job, company, resume, jobDescription, background } = body;
@@ -159,61 +181,15 @@ export default async function handler(req, res) {
 async function handleParseResume(req, res, body) {
   try {
     const { base64, fileName, mimeType } = body;
-    if (!base64) return res.status(400).json({ error: 'No file data provided' });
-    if (typeof base64 !== 'string' || base64.length > 14_000_000) {
-      return res.status(400).json({ error: 'File too large. Max 10MB.' });
-    }
-
-    const fileBuffer = Buffer.from(base64, 'base64');
-    if (fileBuffer.length > 10 * 1024 * 1024) {
-      return res.status(400).json({ error: 'File too large. Max 10MB.' });
-    }
-
-    const nameLower = (fileName || '').toLowerCase();
-    const isPDF = nameLower.endsWith('.pdf') || (mimeType || '').includes('pdf');
-    const isWord = nameLower.endsWith('.docx') || nameLower.endsWith('.doc') ||
-                   (mimeType || '').includes('word') || (mimeType || '').includes('officedocument');
-
-    if (!isPDF && !isWord) {
-      return res.status(400).json({ error: 'Only PDF and Word documents (.pdf, .doc, .docx) are supported.' });
-    }
-
-    let extractedText = '';
-
-    if (isPDF) {
-      // Keyless, native best-effort PDF text extraction — inflates content
-      // streams and pulls text-showing operators. Works for résumés with real
-      // selectable text (Word/Docs/Pages exports). Scanned-image PDFs return
-      // nothing here, and we fall through to a clean "paste your text" error.
-      extractedText = await extractPdfText(fileBuffer);
-
-    } else if (isWord) {
-      extractedText = await extractDocxText(fileBuffer);
-    }
-
-    if (!extractedText || extractedText.length < 50) {
-      return res.status(422).json({
-        error: isPDF
-          ? 'Could not read selectable text from this PDF (it may be a scanned image, or use an unusual font encoding). Please copy your résumé text and paste it directly into the box instead.'
-          : 'Could not extract readable text. Make sure the file has selectable text (not a scanned image), or paste your résumé text directly.'
-      });
-    }
-
-    // A subset font with no usable ToUnicode extracts as scrambled glyph codes — long
-    // enough to pass the length gate but useless downstream (the résumé survey then finds
-    // "no work history"). Reject it honestly rather than storing gibberish.
-    if (isPDF && looksLikeGarbledText(extractedText)) {
-      return res.status(422).json({
-        error: 'This PDF uses a font we can’t read as text (the extracted characters come out scrambled). Please copy your résumé text and paste it directly into the box, or re-export the PDF from Word/Google Docs/Pages.'
-      });
-    }
+    // Keyless file→text extraction + quality gates (PDF / Word / plain-text). See resumeUpload.js.
+    const extracted = await extractUploadText({ base64, fileName, mimeType });
+    if (!extracted.ok) return res.status(extracted.status).json({ error: extracted.error });
+    const { text: extractedText, fileType, wordCount } = extracted;
 
     // Extract structured employment history — deterministic regex/heuristics.
     let employment = [];
     try { employment = extractEmployment(extractedText); }
     catch(_) { employment = []; }
-
-    const wordCount = extractedText.split(/\s+/).filter(w => w.length > 0).length;
 
     // Fire-and-forget signal extraction — runs in background, never blocks parse response
     Promise.race([
@@ -221,7 +197,7 @@ async function handleParseResume(req, res, body) {
       new Promise(r => setTimeout(r, 3000)),
     ]).catch(() => {});
 
-    return res.status(200).json({ ok: true, text: extractedText, fileName, fileType: isPDF ? 'pdf' : 'word', wordCount, employment });
+    return res.status(200).json({ ok: true, text: extractedText, fileName, fileType, wordCount, employment });
 
   } catch(err) {
     console.error('Parse resume error:', err.message);
@@ -409,6 +385,35 @@ export function buildResumePDF(document, meta = {}) {
       drawBody(doc, skills.join('   ·   '), LEFT, W, INK, CONTENT_BOTTOM, newPage);
     }
 
+    // ── Optimized-for appendix (ONLY when an optimized package is supplied) ──
+    // A clearly-separated section at the END of the résumé. It NEVER edits the base résumé
+    // body above — SeenFit-optimized bullets, a fit summary, an application message, and
+    // any "confirm before using" items are surfaced here so the user reviews and copies
+    // them deliberately. Confirm items carry an explicit textual marker (no color needed).
+    const opt = meta.optimized || null;
+    if (opt && ((opt.bullets && opt.bullets.length) || (opt.confirmItems && opt.confirmItems.length) || opt.message)) {
+      const roleLine = [opt.role, opt.company ? `at ${opt.company}` : ''].filter(Boolean).join(' ');
+      sectionHeading(roleLine ? `Optimized for ${roleLine}` : 'Optimized for this role');
+      if (opt.fitScore != null && !Number.isNaN(Number(opt.fitScore))) {
+        drawBody(doc, `SeenFit match: ${Math.round(Number(opt.fitScore))}/100. The bullets below are tailored to this role and grounded in your résumé — review, then copy the ones that fit.`, LEFT, W, META, CONTENT_BOTTOM, newPage);
+      }
+      for (const b of (opt.bullets || [])) drawBullet(doc, b, LEFT, W, INK, CONTENT_BOTTOM, newPage);
+      if (opt.confirmItems && opt.confirmItems.length) {
+        gap(6);
+        doc.fillColor(META).font('Times-Bold').fontSize(10).text('CONFIRM BEFORE USING', LEFT, doc.y, { width: W, characterSpacing: 0.5, lineBreak: false });
+        doc.y += 13;
+        doc.fillColor(META).font('Times-Italic').fontSize(9.5).text('These add specifics we could not verify from your résumé. Only use them if they are true — fill in the real detail first.', LEFT, doc.y, { width: W, lineGap: 1.5 });
+        doc.moveDown(0.2);
+        for (const c of opt.confirmItems) drawBullet(doc, `⚠ ${c}`, LEFT, W, META, CONTENT_BOTTOM, newPage);
+      }
+      if (opt.message && String(opt.message).trim()) {
+        gap(6);
+        doc.fillColor(INK).font('Times-Bold').fontSize(10).text('APPLICATION MESSAGE', LEFT, doc.y, { width: W, characterSpacing: 0.5, lineBreak: false });
+        doc.y += 13;
+        drawBody(doc, String(opt.message).trim(), LEFT, W, INK, CONTENT_BOTTOM, newPage);
+      }
+    }
+
     // ── Footer on every page (drawn after content, via buffered pages) ──
     const range = doc.bufferedPageRange();
     for (let i = range.start; i < range.start + range.count; i++) {
@@ -527,7 +532,9 @@ async function handleEmailAnalysis(req, res, body) {
         (resumeDoc.skills && resumeDoc.skills.length) ||
         (resumeDoc.education && resumeDoc.education.length);
       if (hasContent) {
-        const pdfBuf = await buildResumePDF(resumeDoc, { role, company: co });
+        // Optional optimized-package appendix (additive) — never edits the base résumé body.
+        const optimized = _normalizeOptimizedPackage(body);
+        const pdfBuf = await buildResumePDF(resumeDoc, { role, company: co, optimized });
         pdfBase64 = pdfBuf.toString('base64');
         attachName = resumeFileName({ name: resumeDoc.name, role });
       } else {
@@ -564,6 +571,32 @@ async function handleEmailAnalysis(req, res, body) {
       </div>`;
     const bodyRowsHtml = bulletRowsHtml || guidanceHtml;
 
+    // ── Optional optimized-package block (additive) ──
+    // Fit summary, humanized bullets, an application message, and clearly-marked
+    // "confirm before using" items. Rendered ONLY when the caller sends the package fields.
+    const _opt = _normalizeOptimizedPackage(body);
+    let optimizedBlockHtml = '';
+    if (_opt) {
+      const roleLine = [_opt.role, _opt.company ? `at ${_opt.company}` : ''].filter(Boolean).join(' ');
+      const fitHtml = _opt.fitScore != null
+        ? `<div style="font-size:12px;color:#4f46e5;font-weight:700;margin-bottom:10px;">SeenFit match · ${Math.round(_opt.fitScore)}/100</div>` : '';
+      const bulletsHtml = _opt.bullets.length
+        ? `<ul style="margin:0 0 12px;padding-left:18px;">${_opt.bullets.map(b => `<li style="font-size:13px;color:#111827;line-height:1.6;margin-bottom:6px;">${esc(b)}</li>`).join('')}</ul>` : '';
+      const msgHtml = _opt.message
+        ? `<div style="font-size:10px;font-weight:700;letter-spacing:.08em;color:#4f46e5;text-transform:uppercase;margin:6px 0;">Application message</div><div style="font-size:13px;color:#374151;line-height:1.65;margin-bottom:12px;">${esc(_opt.message)}</div>` : '';
+      const confirmHtml = _opt.confirmItems.length
+        ? `<div style="background:#fffbeb;border:1px solid #fde68a;border-radius:8px;padding:12px 14px;margin-top:6px;">
+             <div style="font-size:11px;font-weight:700;color:#b45309;text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px;">⚠ Confirm before using</div>
+             <div style="font-size:12px;color:#92400e;line-height:1.55;margin-bottom:8px;">These add specifics we couldn't verify from your résumé. Only use them if they're true — fill in the real detail first.</div>
+             <ul style="margin:0;padding-left:18px;">${_opt.confirmItems.map(c => `<li style="font-size:12px;color:#92400e;line-height:1.55;margin-bottom:4px;">${esc(c)}</li>`).join('')}</ul>
+           </div>` : '';
+      optimizedBlockHtml = `
+        <div style="margin-bottom:20px;padding:18px 20px;background:#fff;border:1px solid #e5e7eb;border-radius:10px;">
+          <div style="font-size:10px;font-weight:700;letter-spacing:.08em;color:#059669;text-transform:uppercase;margin-bottom:8px;">Optimized${roleLine ? ` for ${esc(roleLine)}` : ''}</div>
+          ${fitHtml}${bulletsHtml}${msgHtml}${confirmHtml}
+        </div>`;
+    }
+
     const html = `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -596,6 +629,9 @@ async function handleEmailAnalysis(req, res, body) {
 
           <!-- Before/after rewrites (or guidance when there are none) -->
           ${bodyRowsHtml}
+
+          <!-- Optimized package (fit summary, bullets, message, confirm-before-using) -->
+          ${optimizedBlockHtml}
 
           <!-- Earn-credit nudge -->
           <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;padding:16px 20px;margin-bottom:28px;">
@@ -684,7 +720,9 @@ async function handleDownloadResume(req, res, body) {
       return res.status(422).json({ error: 'Could not read enough structure from this résumé to build a document. Make sure it has your roles and bullet points.' });
     }
 
-    const pdfBuf = await buildResumePDF(resumeDoc, { role: job, company });
+    // Optional optimized-package appendix (additive) — never edits the base résumé body.
+    const optimized = _normalizeOptimizedPackage(body);
+    const pdfBuf = await buildResumePDF(resumeDoc, { role: job, company, optimized });
     const filename = resumeFileName({ name: resumeDoc.name, role: job });
 
     // RFC 5987 — a plain ASCII fallback plus a UTF-8 encoded name so the em-dash
@@ -770,43 +808,4 @@ async function storeCareerSignals(resumeText, employment, req) {
     }
     if (transitions.length) await sb.from('career_transitions').insert(transitions).catch(() => {});
   }
-}
-
-async function extractDocxText(buffer) {
-  try {
-    const xml = await readZipEntry(buffer, 'word/document.xml');
-    if (!xml) return '';
-    let result = '';
-    const paragraphs = xml.split(/<\/w:p>/);
-    for (const para of paragraphs) {
-      const tMatches = para.match(/<w:t[^>]*>([^<]*)<\/w:t>/g) || [];
-      const paraText = tMatches
-        .map(m => m.replace(/<[^>]+>/g, '').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&apos;/g, "'").replace(/&quot;/g, '"'))
-        .join('').trim();
-      if (paraText) result += paraText + '\n';
-    }
-    return result.trim();
-  } catch(e) { return ''; }
-}
-
-async function readZipEntry(buffer, targetName) {
-  let offset = 0;
-  while (offset < buffer.length - 30) {
-    if (buffer[offset] !== 0x50 || buffer[offset+1] !== 0x4B || buffer[offset+2] !== 0x03 || buffer[offset+3] !== 0x04) { offset++; continue; }
-    const compression  = buffer.readUInt16LE(offset + 8);
-    const compressedSz = buffer.readUInt32LE(offset + 18);
-    const nameLen      = buffer.readUInt16LE(offset + 26);
-    const extraLen     = buffer.readUInt16LE(offset + 28);
-    const entryName    = buffer.slice(offset + 30, offset + 30 + nameLen).toString('utf8');
-    const dataStart    = offset + 30 + nameLen + extraLen;
-    if (entryName === targetName) {
-      const compressed = buffer.slice(dataStart, dataStart + compressedSz);
-      if (compression === 0) return compressed.toString('utf8');
-      if (compression === 8) return (await inflateRaw(compressed)).toString('utf8');
-      return null;
-    }
-    offset = dataStart + compressedSz;
-    if (compressedSz === 0 && nameLen === 0) offset++;
-  }
-  return null;
 }
