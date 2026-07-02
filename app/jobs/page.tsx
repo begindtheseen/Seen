@@ -976,6 +976,9 @@ export default function JobsPage() {
   const [deckDone, setDeckDone] = useState(false)
   const [swipeMode, setSwipeMode] = useState(false)
   const [checkpointJob, setCheckpointJob] = useState<Job | null>(null)
+  // When the checkpoint is opened AFTER the user already confirmed applying (the Apply &
+  // Optimize funnel), it should record the application immediately rather than re-ask.
+  const [checkpointAuto, setCheckpointAuto] = useState(false)
   const [coScores, setCoScores] = useState<Record<string, {ghost_rate: number; overall_score: number; response_rate?: number}>>({})
   const [appliedCos, setAppliedCos] = useState<Set<string>>(new Set())
   const abortRef = useRef<AbortController | null>(null)
@@ -1557,14 +1560,15 @@ export default function JobsPage() {
       <ApplyOptimizeModal
         job={applyJob}
         onClose={() => setApplyJob(null)}
-        onApplied={() => setCheckpointJob(applyJob)}
+        onApplied={() => { setCheckpointAuto(true); setCheckpointJob(applyJob) }}
       />
     )}
 
     {checkpointJob && (
       <ApplyCheckpoint
         job={checkpointJob}
-        onClose={() => setCheckpointJob(null)}
+        autoConfirm={checkpointAuto}
+        onClose={() => { setCheckpointJob(null); setCheckpointAuto(false) }}
       />
     )}
     </>
