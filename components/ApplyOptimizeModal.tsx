@@ -35,17 +35,18 @@ type Step =
 const overlay: React.CSSProperties = {
   position: 'fixed', inset: 0, zIndex: 9000,
   background: 'rgba(0,0,0,.8)', backdropFilter: 'blur(6px)',
-  display: 'flex', alignItems: 'flex-end', justifyContent: 'center',
+  display: 'flex', alignItems: 'center', justifyContent: 'center',
+  padding: '1rem',
 }
 
 const sheet: React.CSSProperties = {
   width: '100%', maxWidth: 520,
   background: 'var(--surface)',
   border: '1px solid rgba(99,102,241,.22)',
-  borderRadius: '16px 16px 0 0',
+  borderRadius: 20,
   overflow: 'hidden',
-  boxShadow: '0 -40px 120px rgba(0,0,0,.7), 0 0 80px rgba(99,102,241,.15)',
-  maxHeight: '92dvh',
+  boxShadow: '0 40px 120px rgba(0,0,0,.7), 0 0 80px rgba(99,102,241,.15)',
+  maxHeight: '85dvh',
   overflowY: 'auto',
 }
 
@@ -251,7 +252,7 @@ export default function ApplyOptimizeModal({
           <button style={btnClose} onClick={onClose}>✕</button>
         </div>
 
-        <div style={{ padding: '1.1rem' }}>
+        <div style={{ padding: '1.1rem', minHeight: 240 }}>
 
           {/* ── loading-resume ── */}
           {step === 'loading-resume' && <LoadingDots />}
