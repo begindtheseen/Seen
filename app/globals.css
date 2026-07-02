@@ -1397,3 +1397,13 @@ nav.nav-scrolled{background:rgba(6,6,8,0.82);backdrop-filter:blur(60px) saturate
 .ai-tab{flex:0 0 auto;white-space:nowrap;background:none;border:1.5px solid var(--line2);color:var(--sub);border-radius:8px;padding:.5rem .85rem;font-family:var(--mono);font-size:.68rem;cursor:pointer;transition:all .15s}
 .ai-tab.active{border-color:var(--green);color:var(--green);background:linear-gradient(135deg,rgba(16,185,129,.15) 0%,rgba(59,130,246,.15) 100%);font-weight:600}
 .ai-card{background:var(--surface);border:1px solid var(--line2);border-radius:12px;padding:1.1rem;min-width:0}
+/* Bottom padding that clears the iOS home indicator inside scrollable modal bodies. */
+.ai-safe-bottom{padding-bottom:calc(1.1rem + env(safe-area-inset-bottom))}
+/* 375px hardening: tighter gutters, wrap-friendly cards + tabs, no horizontal overflow. */
+@media(max-width:430px){
+  .resume-page{padding:1.4rem .85rem}
+  .ai-card{padding:.9rem}
+  .ai-stack{gap:.85rem}
+  .ai-tab{padding:.45rem .7rem;font-size:.64rem}
+  .ai-btn-row>*{flex:1 1 100%}
+}

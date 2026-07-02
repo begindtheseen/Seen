@@ -136,7 +136,7 @@ export default function UpgradeModal({ reason, onClose, featureName }: UpgradeMo
           <button onClick={onClose} aria-label="Close" style={{ background: 'none', border: 'none', color: 'var(--dim)', cursor: 'pointer', fontSize: '1rem', padding: '.2rem', lineHeight: 1, flexShrink: 0, marginLeft: '1rem' }}>✕</button>
         </div>
 
-        <div style={{ padding: '0 1.25rem 1.5rem' }}>
+        <div style={{ padding: '0 1.25rem', paddingBottom: 'calc(1.5rem + env(safe-area-inset-bottom))' }}>
 
           {/* Feature list */}
           <div style={{ background: 'rgba(99,102,241,.07)', border: '1px solid rgba(99,102,241,.18)', borderRadius: 12, padding: '.85rem 1rem', marginBottom: '1.1rem' }}>

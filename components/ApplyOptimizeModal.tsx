@@ -471,7 +471,7 @@ export default function ApplyOptimizeModal({
           <button style={btnClose} onClick={onClose}>✕</button>
         </div>
 
-        <div style={{ padding: '1.1rem', minHeight: 240 }}>
+        <div className="ai-safe-bottom" style={{ paddingTop: '1.1rem', paddingLeft: '1.1rem', paddingRight: '1.1rem', minHeight: 240 }}>
 
           {/* ── loading-resume ── */}
           {step === 'loading-resume' && <LoadingDots />}
@@ -660,6 +660,7 @@ export default function ApplyOptimizeModal({
               )}
 
               {/* ── HumanProof step ── */}
+              {realBullets.length > 0 && (
               <div style={{ borderTop: '1px solid var(--line)', paddingTop: '.9rem' }}>
                 {hpState === 'idle' && (
                   <div style={{ background: 'var(--gdim)', border: '1px solid var(--line)', borderRadius: 12, padding: '.95rem 1rem' }}>
@@ -734,6 +735,7 @@ export default function ApplyOptimizeModal({
                   </div>
                 )}
               </div>
+              )}
 
               {/* Post-win upsell */}
               {pro === false && !upsellDismissed && (

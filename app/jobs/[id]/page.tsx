@@ -396,7 +396,7 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
       </div>
 
       {/* Sticky footer */}
-      <div style={{ position: 'sticky', bottom: 0, background: 'var(--ink)', borderTop: '1px solid var(--line2)', padding: '.9rem 1rem', zIndex: 10 }}>
+      <div style={{ position: 'sticky', bottom: 0, background: 'var(--ink)', borderTop: '1px solid var(--line2)', padding: '.9rem 1rem', paddingBottom: 'calc(.9rem + env(safe-area-inset-bottom))', zIndex: 10 }}>
         <div style={{ maxWidth: 720, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '.5rem', width: '100%', boxSizing: 'border-box' }}>
           <a href={`/company/${companySlug(job.company)}`} style={{ display: 'block', width: '100%', textAlign: 'center', fontFamily: 'var(--mono)', fontSize: '.65rem', color: 'var(--amber)', textDecoration: 'none', padding: '.25rem 0 .5rem', opacity: .85 }}>
             🏢 Check {job.company || 'company'} →
