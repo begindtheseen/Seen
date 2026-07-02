@@ -66,6 +66,7 @@ interface JobGroup { company: string; total: number; active: number }
 interface DupCompany { id: string; name: string; report_count: number; overall_score: number }
 interface DupGroup { key: string; companies: DupCompany[] }
 interface MergePrefill { primary: string; secondary: string; nonce: number }
+interface MergeLog { id: string; created_at: string; primary_name: string; secondary_name: string; moved_reports: number; undone_at: string | null }
 interface FeatureFlag {
   flag_name: string; status: string; percentage: number | null; description: string
 }
@@ -1593,6 +1594,9 @@ function MergePanel({ token, prefill }: { token: string; prefill: MergePrefill |
   const [autoMerging, setAutoMerging] = useState(false)
   const [merging, setMerging] = useState(false)
   const [dupes, setDupes] = useState<DupGroup[] | null>(null)
+  const [merges, setMerges] = useState<MergeLog[] | null>(null)
+  const [confirmUndo, setConfirmUndo] = useState<string | null>(null)
+  const [undoing, setUndoing] = useState<string | null>(null)
 
   // Prefill from issues queue "Open in merge tool"
   useEffect(() => {
@@ -1601,6 +1605,41 @@ function MergePanel({ token, prefill }: { token: string; prefill: MergePrefill |
       setSecondary(prefill.secondary)
     }
   }, [prefill])
+
+  const loadMerges = useCallback(async () => {
+    try {
+      const res = await fetch('/api/admin-stats', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Admin-Token': token },
+        body: JSON.stringify({ action: 'list_merges' }),
+      })
+      const d = await res.json()
+      if (d.ok) setMerges(d.merges || [])
+    } catch { /* history is non-critical — leave prior state */ }
+  }, [token])
+
+  useEffect(() => { loadMerges() }, [loadMerges])
+
+  async function undoMerge(id: string) {
+    setUndoing(id)
+    setStatus({ text: 'Undoing merge…', color: 'var(--dim)' })
+    try {
+      const res = await fetch('/api/admin-stats', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Admin-Token': token },
+        body: JSON.stringify({ action: 'undo_merge', merge_id: id }),
+      })
+      const d = await res.json()
+      if (!d.ok) throw new Error(d.error || res.status)
+      setStatus({ text: `✓ Undone — "${d.restored?.secondary_name}" split back out (${d.restored?.reports ?? 0} reports restored)`, color: 'var(--green)' })
+      setConfirmUndo(null)
+      loadMerges()
+      scan()
+    } catch (e) {
+      setStatus({ text: 'Undo failed: ' + (e as Error).message, color: 'var(--red)' })
+    }
+    setUndoing(null)
+  }
 
   async function scan() {
     setScanning(true)
@@ -1633,9 +1672,10 @@ function MergePanel({ token, prefill }: { token: string; prefill: MergePrefill |
       })
       const d = await res.json()
       if (!d.ok) throw new Error(d.error || res.status)
-      setStatus({ text: `✓ "${s}" merged into "${p}" — ${d.merged_report_count} total reports`, color: 'var(--green)' })
+      setStatus({ text: `✓ "${s}" merged into "${p}" — ${d.merged_report_count} total reports${d.logged === false ? ' (not logged — history table unapplied)' : ''}`, color: 'var(--green)' })
       setPrimary(''); setSecondary('')
       scan()
+      loadMerges()
     } catch (e) {
       setStatus({ text: 'Error: ' + (e as Error).message, color: 'var(--red)' })
     }
@@ -1660,6 +1700,7 @@ function MergePanel({ token, prefill }: { token: string; prefill: MergePrefill |
         setStatus({ text: `✓ Merged ${d.merged} duplicate${d.merged !== 1 ? 's' : ''}: ${summary}`, color: 'var(--green)' })
       }
       scan()
+      loadMerges()
     } catch (e) {
       setStatus({ text: 'Auto-merge failed: ' + (e as Error).message, color: 'var(--red)' })
     }
@@ -1667,6 +1708,15 @@ function MergePanel({ token, prefill }: { token: string; prefill: MergePrefill |
   }
 
   function setMerge(p: string, s: string) { setPrimary(p); setSecondary(s) }
+
+  const ts = (iso: unknown) => {
+    if (!iso) return '—'
+    const d = new Date(String(iso)), m = Math.floor((Date.now() - d.getTime()) / 60000)
+    if (m < 60) return `${m}m ago`
+    const h = Math.floor(m / 60)
+    if (h < 24) return `${h}h ago`
+    return `${Math.floor(h / 24)}d ago`
+  }
 
   const inputStyle: React.CSSProperties = { width: '100%', background: 'var(--raised)', border: '1px solid var(--line2)', borderRadius: 7, padding: '.42rem .65rem', fontFamily: 'var(--mono)', fontSize: '.65rem', color: 'var(--white)', outline: 'none', boxSizing: 'border-box' }
 
@@ -1724,6 +1774,41 @@ function MergePanel({ token, prefill }: { token: string; prefill: MergePrefill |
             )
           })
       }
+
+      {/* ── Merge history (undo) ── */}
+      <div style={{ marginTop: '1rem', paddingTop: '.85rem', borderTop: '1px solid var(--line2)' }}>
+        <div style={{ fontFamily: 'var(--mono)', fontSize: '.48rem', textTransform: 'uppercase', letterSpacing: '.12em', color: 'var(--dim)', marginBottom: '.5rem' }}>Merge history</div>
+        {merges === null
+          ? <div style={{ fontFamily: 'var(--mono)', fontSize: '.6rem', color: 'var(--dim)' }}>Loading…</div>
+          : merges.length === 0
+            ? <div style={{ fontFamily: 'var(--mono)', fontSize: '.6rem', color: 'var(--dim)' }}>No merges recorded yet — history starts with the next merge.</div>
+            : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '.3rem' }}>
+                {merges.map(m => (
+                  <div key={m.id} style={{ display: 'flex', alignItems: 'center', gap: '.5rem', flexWrap: 'wrap', padding: '.4rem 0', borderBottom: '1px solid var(--line2)' }}>
+                    <span style={{ fontFamily: 'var(--mono)', fontSize: '.6rem', color: 'var(--white)', minWidth: 0, flex: 1, wordBreak: 'break-word' }}>
+                      <span style={{ color: 'var(--red)' }}>{m.secondary_name}</span>
+                      <span style={{ color: 'var(--dim)' }}> → </span>
+                      <span style={{ color: 'var(--green)' }}>{m.primary_name}</span>
+                      <span style={{ color: 'var(--dim)' }}> · {ts(m.created_at)}{m.moved_reports ? ` · ${m.moved_reports} report${m.moved_reports === 1 ? '' : 's'}` : ''}</span>
+                    </span>
+                    {m.undone_at
+                      ? <span style={{ fontFamily: 'var(--mono)', fontSize: '.5rem', color: 'var(--dim)', flexShrink: 0 }}>undone {ts(m.undone_at)}</span>
+                      : confirmUndo === m.id
+                        ? (
+                          <span style={{ display: 'flex', gap: '.3rem', flexShrink: 0 }}>
+                            <button onClick={() => undoMerge(m.id)} disabled={undoing === m.id} style={{ fontFamily: 'var(--mono)', fontSize: '.5rem', padding: '.18rem .5rem', borderRadius: 5, border: '1px solid rgba(239,68,68,.4)', background: 'rgba(239,68,68,.12)', color: 'var(--red)', cursor: 'pointer' }}>{undoing === m.id ? '…' : 'Confirm undo'}</button>
+                            <button onClick={() => setConfirmUndo(null)} disabled={undoing === m.id} style={{ fontFamily: 'var(--mono)', fontSize: '.5rem', padding: '.18rem .5rem', borderRadius: 5, border: '1px solid var(--line2)', background: 'transparent', color: 'var(--sub)', cursor: 'pointer' }}>Cancel</button>
+                          </span>
+                        )
+                        : <button onClick={() => setConfirmUndo(m.id)} style={{ fontFamily: 'var(--mono)', fontSize: '.5rem', padding: '.18rem .5rem', borderRadius: 5, border: '1px solid var(--line2)', background: 'transparent', color: 'var(--sub)', cursor: 'pointer', flexShrink: 0 }}>Undo</button>
+                    }
+                  </div>
+                ))}
+              </div>
+            )
+        }
+      </div>
     </Card>
   )
 }

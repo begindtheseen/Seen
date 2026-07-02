@@ -934,7 +934,12 @@ Return ONLY a valid JSON array. Return [] if there are genuinely no hiring exper
       results[company] = { imported, skipped, fetched: posts.length, experiences: experiences.length };
     }, 5);
 
-    return res.status(200).json({ ok: true, results, debug: { subreddits: fetchDebug } });
+    // Move the grades: ingested reddit intel is otherwise trapped behind the 365-day score
+    // cache. Recompute each company that actually got a report this run (bounded to 25).
+    const wroteReddit = Object.entries(results).filter(([, v]) => (v?.imported || 0) > 0).map(([c]) => c).slice(0, 25);
+    for (const c of wroteReddit) { await recomputeCompanyScoreFromReports(SUPABASE_URL, hdrsBase, c); }
+
+    return res.status(200).json({ ok: true, results, debug: { subreddits: fetchDebug }, recomputed: wroteReddit.length });
   }
 
   // ── n8n / external ingest webhook ────────────────────────────────────────────
@@ -955,6 +960,7 @@ Return ONLY a valid JSON array. Return [] if there are genuinely no hiring exper
     const VALID_OUTCOMES = new Set(['ghosted','rejected','hired','offer','interview','applied','unknown','waiting','autoreject','human']);
 
     let imported = 0, skipped = 0, errors = [];
+    const wroteCompanies = new Set();
     for (const rpt of reports.slice(0, 500)) {
       try {
         if (!rpt.company || !rpt.outcome || !isValidCompanyName(rpt.company)) { skipped++; continue; }
@@ -987,11 +993,16 @@ Return ONLY a valid JSON array. Return [] if there are genuinely no hiring exper
         };
         if (cid) row.company_id = cid;
         const ins = await fetch(`${SUPABASE_URL}/rest/v1/reports`, { method: 'POST', headers: { ...hdrsBase, Prefer: 'return=minimal' }, body: JSON.stringify(row) });
-        if (ins.ok) imported++; else skipped++;
+        if (ins.ok) { imported++; wroteCompanies.add(row.company_name); } else skipped++;
       } catch(e) { errors.push(e.message); skipped++; }
     }
+    // Recompute each company that got a report so ingested intel actually moves grades
+    // (otherwise trapped behind the 365-day score cache). Bounded to 25 per run.
+    // NOTE: ingest reports are needs_review:true — held out of recompute until an admin
+    // clears them — so this only refreshes the confidence/label off the existing cleared corpus.
+    for (const c of [...wroteCompanies].slice(0, 25)) { await recomputeCompanyScoreFromReports(SUPABASE_URL, hdrsBase, c); }
     if (errors.length) logError('reports/reddit_import', `${errors.length} errors`, { subreddit: body.subreddit || null, imported, skipped, sample: errors.slice(0, 3) });
-    return res.status(200).json({ ok: true, imported, skipped, errors: errors.slice(0, 5) });
+    return res.status(200).json({ ok: true, imported, skipped, errors: errors.slice(0, 5), recomputed: Math.min(wroteCompanies.size, 25) });
   }
 
   // ── Fetch reports ───────────────────────────────────────────────────────────
@@ -1273,7 +1284,7 @@ async function handleCompanyScore(req, res, body) {
           model: 'claude-haiku-4-5-20251001', max_tokens: 1500,
           tools: [{ type: 'web_search_20250305', name: 'web_search' }],
           system: 'You are a hiring transparency researcher. Search Reddit (r/jobs, r/recruitinghell, r/cscareerquestions), Glassdoor, and news for real hiring data. Return ONLY valid JSON, no markdown.',
-          messages: [{ role: 'user', content: `Research hiring practices for: ${co}${locationStr}. Return ONLY this JSON: {"summary":"2-3 sentences","ghost_rate_estimate":0-100 or null,"response_rate_estimate":0-100 or null,"avg_rounds_estimate":number or null,"known_issues":["up to 5 real complaints"],"known_positives":["up to 3 positives"],"process_notes":"string or null","data_confidence":"high|medium|low","sources_note":"string","reddit_mentions":number,"glassdoor_rating":number or null}` }],
+          messages: [{ role: 'user', content: `Research hiring practices for: ${co}${locationStr}. Return ONLY this JSON: {"summary":"2-3 sentences","ghost_rate_estimate":0.0-1.0 or null,"response_rate_estimate":0.0-1.0 or null,"avg_rounds_estimate":number or null,"known_issues":["up to 5 real complaints"],"known_positives":["up to 3 positives"],"process_notes":"string or null","data_confidence":"high|medium|low","sources_note":"string","reddit_mentions":number,"glassdoor_rating":number or null}` }],
         })
       });
       if (!apiRes.ok) throw new Error(`Claude ${apiRes.status}`);

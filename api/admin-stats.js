@@ -7,6 +7,7 @@ import {
   SOURCE_TRUST, PRIOR_STRENGTH, classifyPlatform, fuseCompanyIntel, aggregateOutcomes,
   GHOST_OUTCOMES, RESPONSE_OUTCOMES, NONTERMINAL_OUTCOMES,
 } from './_utils/companyIntel.js';
+import { recomputeCompanyScoreFromReports, normalizeCompany } from './_utils/reportWrite.js';
 
 const ALLOWED = ['https://seenjobs.io', 'https://www.seenjobs.io'];
 
@@ -536,6 +537,90 @@ async function _handler(req, res) {
     return res.status(200).json({ ok: true, duplicates });
   }
 
+  // ── Shared single-merge routine ──────────────────────────────────────────────
+  // Log-first, identity-complete, recompute-based. Used by BOTH `merge` (manual /
+  // scan-list) and `auto_merge` (per pair) so they can never drift apart. NO hand math:
+  // the surviving score is DERIVED from the merged report corpus by recompute, and every
+  // reversible fact is snapshotted to company_merges BEFORE anything is mutated.
+  const svcHdrs = { apikey: SK, Authorization: `Bearer ${SK}`, 'Content-Type': 'application/json' };
+  const jsonOrEmpty = (r) => (r && r.ok ? r.json().catch(() => []) : []);
+  async function mergeCompanyPair(primaryId, secondaryId) {
+    // 1. Load FULL primary + secondary rows (select=*)
+    const [pArr, sArr] = await Promise.all([
+      db(`company_scores?id=eq.${primaryId}&select=*&limit=1`).then(jsonOrEmpty),
+      db(`company_scores?id=eq.${secondaryId}&select=*&limit=1`).then(jsonOrEmpty),
+    ]);
+    const primary = pArr[0], secondary = sArr[0];
+    if (!primary || !secondary) return { ok: false, status: 404, error: 'Company not found' };
+    const primaryName = primary.company_name, secondaryName = secondary.company_name;
+    const secNorm = normalizeCompany(secondaryName), priNorm = normalizeCompany(primaryName);
+
+    // 2. Resolve the secondary's companies-table ids (normalized-name match; may be several)
+    const secWord = encodeURIComponent(String(secondaryName).split(/\s+/)[0] || secondaryName);
+    const secCoRows = await db(`companies?name=ilike.*${secWord}*&select=id,name&limit=50`).then(jsonOrEmpty);
+    const secondaryCompanyIds = (secCoRows || []).filter(c => normalizeCompany(c.name) === secNorm).map(c => c.id);
+    // Resolve the primary's companies-table id so remapped reports get the right company_id
+    const priWord = encodeURIComponent(String(primaryName).split(/\s+/)[0] || primaryName);
+    const priCoRows = await db(`companies?name=ilike.*${priWord}*&select=id,name&limit=50`).then(jsonOrEmpty);
+    const primaryCompanyId = (priCoRows || []).find(c => normalizeCompany(c.name) === priNorm)?.id || null;
+
+    // 3. Collect moved_report_ids FIRST — case-INSENSITIVE name OR company_id membership
+    //    (the old case-sensitive eq missed "amazon.com" vs "Amazon.com" variants).
+    const byName = await db(`reports?company_name=ilike.${encodeURIComponent(secondaryName)}&select=id&limit=5000`).then(jsonOrEmpty);
+    const byId = secondaryCompanyIds.length
+      ? await db(`reports?company_id=in.(${secondaryCompanyIds.join(',')})&select=id&limit=5000`).then(jsonOrEmpty)
+      : [];
+    const movedReportIds = [...new Set([...(byName || []), ...(byId || [])].map(r => r.id).filter(Boolean))];
+    const aliasAdded = String(secondaryName).toLowerCase();
+
+    // 4. INSERT the company_merges log row BEFORE mutating anything. If the table is
+    //    missing (migration 040 unapplied), degrade gracefully with logged:false.
+    let logged = true, mergeId = null;
+    try {
+      const logRes = await db('company_merges', {
+        method: 'POST',
+        headers: { Prefer: 'return=representation' },
+        body: JSON.stringify({
+          admin_id: sess.admin_id,
+          primary_score_id: primaryId, primary_name: primaryName,
+          secondary_score_id: secondaryId, secondary_name: secondaryName,
+          secondary_row: secondary, primary_row_before: primary,
+          moved_report_ids: movedReportIds,
+          secondary_company_ids: secondaryCompanyIds,
+          aliases_added: [aliasAdded],
+        }),
+      });
+      if (logRes.ok) { const j = await logRes.json().catch(() => null); mergeId = Array.isArray(j) ? j[0]?.id : j?.id; }
+      else logged = false;
+    } catch { logged = false; }
+
+    // 5. Remap: reports (by id list, batched) → primary; resume_surveys → primary norm;
+    //    upsert the alias (canonical=primary, alias=secondary lower).
+    for (let i = 0; i < movedReportIds.length; i += 100) {
+      const chunk = movedReportIds.slice(i, i + 100);
+      const patch = { company_name: primaryName };
+      if (primaryCompanyId) patch.company_id = primaryCompanyId;
+      await db(`reports?id=in.(${chunk.join(',')})`, { method: 'PATCH', body: JSON.stringify(patch), headers: { Prefer: 'return=minimal' } }).catch(() => {});
+    }
+    {
+      const patch = { company_norm: priNorm, company_name: primaryName };
+      if (primaryCompanyId) patch.company_id = primaryCompanyId;
+      await db(`resume_surveys?company_norm=eq.${encodeURIComponent(secNorm)}`, { method: 'PATCH', body: JSON.stringify(patch), headers: { Prefer: 'return=minimal' } }).catch(() => {});
+    }
+    await db('company_aliases?on_conflict=alias', { method: 'POST', body: JSON.stringify({ canonical: primaryName, alias: aliasAdded }), headers: { Prefer: 'resolution=merge-duplicates,return=minimal' } }).catch(() => {});
+
+    // 6. NO hand math — derive the true post-merge score from the (now-merged) corpus.
+    await recomputeCompanyScoreFromReports(SB, svcHdrs, primaryName);
+
+    // 7. DELETE the secondary score row (snapshot already logged).
+    await db(`company_scores?id=eq.${secondaryId}`, { method: 'DELETE', headers: { Prefer: 'return=minimal' } });
+
+    // report_count comes from the recompute, never pC+sC of claimed counts.
+    const finalArr = await db(`company_scores?id=eq.${primaryId}&select=report_count,overall_score&limit=1`).then(jsonOrEmpty);
+    const report_count = finalArr[0]?.report_count ?? null;
+    return { ok: true, merge_id: mergeId, logged, primary_name: primaryName, secondary_name: secondaryName, moved_reports: movedReportIds.length, report_count };
+  }
+
   if (action === 'merge') {
     // Accept either {primary_id, secondary_id} (from the scan list) or
     // {primary, secondary} names (from the manual-merge text form). Names are
@@ -554,24 +639,14 @@ async function _handler(req, res) {
     }
     if (!primary_id || !secondary_id) return res.status(400).json({ error: 'primary_id and secondary_id (or primary/secondary names) required' });
     if (String(primary_id) === String(secondary_id)) return res.status(400).json({ error: 'Cannot merge a company with itself' });
-    const [pArr, sArr] = await Promise.all([
-      db(`company_scores?id=eq.${primary_id}&select=id,name:company_name,report_count,overall_score,ghost_rate,response_rate,aliases&limit=1`).then(r => r.json()),
-      db(`company_scores?id=eq.${secondary_id}&select=id,name:company_name,report_count,overall_score,ghost_rate,response_rate,aliases&limit=1`).then(r => r.json()),
-    ]);
-    const p = pArr[0]; const s = sArr[0];
-    if (!p || !s) return res.status(404).json({ error: 'Company not found' });
-    const pC = p.report_count || 1, sC = s.report_count || 1, total = pC + sC;
-    const wa = (a, b) => Math.round(((a || 50) * pC + (b || 50) * sC) / total);
-    await db(`company_scores?id=eq.${primary_id}`, { method: 'PATCH', body: JSON.stringify({ report_count: total, overall_score: wa(p.overall_score, s.overall_score), ghost_rate: wa(p.ghost_rate, s.ghost_rate), response_rate: wa(p.response_rate, s.response_rate), aliases: [...(p.aliases||[]), s.name, ...(s.aliases||[])].filter((v,i,a)=>v&&a.indexOf(v)===i) }), headers: { Prefer: 'return=minimal' } });
-    await db(`reports?company_name=eq.${encodeURIComponent(s.name)}`, { method: 'PATCH', body: JSON.stringify({ company_name: p.name }), headers: { Prefer: 'return=minimal' } });
-    await db(`company_aliases?on_conflict=alias`, { method: 'POST', body: JSON.stringify({ canonical: p.name, alias: s.name.toLowerCase() }), headers: { Prefer: 'resolution=merge-duplicates,return=minimal' } });
-    await db(`company_scores?id=eq.${secondary_id}`, { method: 'DELETE', headers: { Prefer: 'return=minimal' } });
-    await db('admin_audit_log', { method: 'POST', body: JSON.stringify({ admin_id: sess.admin_id, username: 'admin', action: 'merge_companies', target_type: 'company', target_id: String(primary_id), metadata: { secondary_id } }), headers: { Prefer: 'return=minimal' } });
-    return res.status(200).json({ ok: true, merged_report_count: total });
+    const r = await mergeCompanyPair(primary_id, secondary_id);
+    if (!r.ok) return res.status(r.status || 500).json({ error: r.error || 'Merge failed' });
+    await db('admin_audit_log', { method: 'POST', body: JSON.stringify({ admin_id: sess.admin_id, username: 'admin', action: 'merge_companies', target_type: 'company', target_id: String(primary_id), metadata: { secondary_id, merge_id: r.merge_id, moved_reports: r.moved_reports, logged: r.logged } }), headers: { Prefer: 'return=minimal' } });
+    return res.status(200).json({ ok: true, merged_report_count: r.report_count, moved_reports: r.moved_reports, merge_id: r.merge_id, logged: r.logged });
   }
 
   if (action === 'auto_merge') {
-    const r = await db('company_scores?select=id,name:company_name,report_count,overall_score,ghost_rate,response_rate&order=report_count.desc&limit=500');
+    const r = await db('company_scores?select=id,name:company_name,report_count&order=report_count.desc&limit=500');
     if (!r.ok) return res.status(500).json({ error: 'Query failed' });
     const rows = await r.json();
     const norm = n => n ? n.toLowerCase().trim().replace(/[\s,]+(inc\.?|llc\.?|corp\.?|ltd\.?|co\.|plc\.?|group|holdings|enterprises|solutions|technologies)\.?$/i, '').trim() : '';
@@ -583,16 +658,91 @@ async function _handler(req, res) {
       const primary = group.reduce((b, r) => (r.report_count||0) > (b.report_count||0) ? r : b);
       const absorbed = [];
       for (const sec of group.filter(r => r.id !== primary.id)) {
-        const pC = primary.report_count||1, sC = sec.report_count||1, total = pC+sC;
-        const wa = (a,b) => Math.round(((a||50)*pC + (b||50)*sC)/total);
-        await db(`company_scores?id=eq.${primary.id}`, { method: 'PATCH', body: JSON.stringify({ report_count: total, overall_score: wa(primary.overall_score,sec.overall_score), ghost_rate: wa(primary.ghost_rate,sec.ghost_rate) }), headers: { Prefer: 'return=minimal' } });
-        await db(`company_scores?id=eq.${sec.id}`, { method: 'DELETE', headers: { Prefer: 'return=minimal' } });
-        absorbed.push(sec.name);
-        merged++;
+        // SAME single-merge routine per pair — fixes auto_merge's old defects
+        // (no response_rate write, no report remap → the resurrection bug, no per-merge log).
+        const mr = await mergeCompanyPair(primary.id, sec.id);
+        if (mr.ok) { absorbed.push(sec.name); merged++; }
       }
       if (absorbed.length) groupSummaries.push({ canonical: primary.name, absorbed });
     }
+    await db('admin_audit_log', { method: 'POST', body: JSON.stringify({ admin_id: sess.admin_id, username: 'admin', action: 'auto_merge_companies', metadata: { merged, groups: groupSummaries.length } }), headers: { Prefer: 'return=minimal' } }).catch(() => {});
     return res.status(200).json({ ok: true, merged, groups: groupSummaries });
+  }
+
+  // ── list_merges: latest 50 merge-log rows (trimmed for the admin history UI) ──
+  if (action === 'list_merges') {
+    const r = await db('company_merges?select=id,created_at,primary_name,secondary_name,moved_report_ids,undone_at&order=created_at.desc&limit=50');
+    if (!r.ok) return res.status(200).json({ ok: true, merges: [] }); // table may be unapplied
+    const rows = await r.json().catch(() => []);
+    const merges = (Array.isArray(rows) ? rows : []).map(m => ({
+      id: m.id,
+      created_at: m.created_at,
+      primary_name: m.primary_name,
+      secondary_name: m.secondary_name,
+      moved_reports: Array.isArray(m.moved_report_ids) ? m.moved_report_ids.length : 0,
+      undone_at: m.undone_at || null,
+    }));
+    return res.status(200).json({ ok: true, merges });
+  }
+
+  // ── undo_merge: reverse a logged merge from its snapshot (full admins only) ──
+  if (action === 'undo_merge') {
+    if (adminRole === 'moderator') return res.status(403).json({ error: 'Insufficient role' });
+    const { merge_id } = body;
+    if (!merge_id) return res.status(400).json({ error: 'merge_id required' });
+    const logArr = await db(`company_merges?id=eq.${encodeURIComponent(merge_id)}&limit=1`).then(jsonOrEmpty);
+    const log = logArr[0];
+    if (!log) return res.status(404).json({ error: 'Merge log not found' });
+    if (log.undone_at) return res.status(400).json({ error: 'This merge has already been undone' });
+
+    // 1. Re-INSERT the secondary company_scores row from the snapshot. Keep the original
+    //    id if it is still free; if a fresh row reclaimed the company_name, merge onto it.
+    const secRow = { ...(log.secondary_row || {}) };
+    let restoredSecondary = false;
+    if (secRow.company_name) {
+      const ins = await db('company_scores', { method: 'POST', body: JSON.stringify(secRow), headers: { Prefer: 'return=minimal' } });
+      restoredSecondary = ins.ok;
+      if (!ins.ok) {
+        const secRow2 = { ...secRow }; delete secRow2.id;
+        const up = await db('company_scores?on_conflict=company_name', { method: 'POST', body: JSON.stringify(secRow2), headers: { Prefer: 'resolution=merge-duplicates,return=minimal' } });
+        restoredSecondary = up.ok;
+      }
+    }
+
+    // 2. Re-point the moved reports back to the secondary (name + original company_id).
+    const movedIds = Array.isArray(log.moved_report_ids) ? log.moved_report_ids : [];
+    const origCid = (Array.isArray(log.secondary_company_ids) && log.secondary_company_ids[0]) || null;
+    for (let i = 0; i < movedIds.length; i += 100) {
+      const chunk = movedIds.slice(i, i + 100);
+      const patch = { company_name: log.secondary_name };
+      if (origCid) patch.company_id = origCid;
+      await db(`reports?id=in.(${chunk.join(',')})`, { method: 'PATCH', body: JSON.stringify(patch), headers: { Prefer: 'return=minimal' } }).catch(() => {});
+    }
+
+    // 3. Delete the alias row(s) the merge created.
+    for (const a of (Array.isArray(log.aliases_added) ? log.aliases_added : [])) {
+      await db(`company_aliases?alias=eq.${encodeURIComponent(a)}`, { method: 'DELETE', headers: { Prefer: 'return=minimal' } }).catch(() => {});
+    }
+
+    // 4. Restore the primary row's web-context fields from the pre-merge snapshot, then
+    //    recompute BOTH names from the (restored) report corpus. Only fields present in
+    //    the snapshot are patched, so a missing column is simply skipped.
+    const before = log.primary_row_before || {};
+    const restoreFields = {};
+    for (const f of ['industry', 'raw_summary', 'web_reviews']) {
+      if (f in before) restoreFields[f] = before[f];
+    }
+    if (Object.keys(restoreFields).length) {
+      await db(`company_scores?id=eq.${log.primary_score_id}`, { method: 'PATCH', body: JSON.stringify(restoreFields), headers: { Prefer: 'return=minimal' } }).catch(() => {});
+    }
+    await recomputeCompanyScoreFromReports(SB, svcHdrs, log.primary_name);
+    await recomputeCompanyScoreFromReports(SB, svcHdrs, log.secondary_name);
+
+    // 5. Mark undone + audit.
+    await db(`company_merges?id=eq.${encodeURIComponent(merge_id)}`, { method: 'PATCH', body: JSON.stringify({ undone_at: new Date().toISOString(), undone_by: sess.admin_id }), headers: { Prefer: 'return=minimal' } });
+    await db('admin_audit_log', { method: 'POST', body: JSON.stringify({ admin_id: sess.admin_id, username: 'admin', action: 'undo_merge', target_type: 'company', target_id: String(log.primary_score_id || ''), metadata: { merge_id, restored_reports: movedIds.length } }), headers: { Prefer: 'return=minimal' } });
+
+    return res.status(200).json({ ok: true, restored: { secondary_name: log.secondary_name, primary_name: log.primary_name, reports: movedIds.length, secondary_score_restored: restoredSecondary, aliases_removed: (Array.isArray(log.aliases_added) ? log.aliases_added.length : 0) } });
   }
 
   // ── Job aggregation target — min related listings per search before topping

@@ -580,7 +580,7 @@ export default async function handler(req, res) {
     for (const co of lowCos) {
       const key = `verify_ghost|${co.name.toLowerCase()}`;
       if (!answered.has(key)) {
-        const pct = Math.round(co.ghost_rate || 0);
+        const pct = Math.round((co.ghost_rate || 0) * 100);
         return res.status(200).json({ question: { key, company: co.name, prompt: `Our data shows ${co.name} has a ${pct}% ghost rate.`, text: `Did ${co.name} respond to your application?`, options: ['Yes, they responded','No, was ghosted','I haven\'t applied there'], credit_value: 1, source: 'verification' } });
       }
     }
