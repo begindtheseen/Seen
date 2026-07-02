@@ -416,13 +416,16 @@ export default async function handler(req, res) {
 async function nearestListings(loc, supabaseUrl, dbHeaders) {
   if (!supabaseUrl) return [];
   const now = encodeURIComponent(new Date().toISOString());
-  const cols = 'title,company,location,salary,apply_url,description,type,level,source,score,waste_score';
+  // id + created_at must be in the select — without them mapUi's id was always null and
+  // /jobs/<id> permalinks from this fallback path could never resolve.
+  const cols = 'id,created_at,title,company,location,salary,apply_url,description,type,level,source,score,waste_score';
   const mapUi = rows => (Array.isArray(rows) ? rows : []).map(j => ({
     id: j.id || null,
     title: j.title, company: j.company, location: j.location,
     salary: j.salary, url: j.apply_url, description: j.description,
     type: j.type || 'Full-time', level: inferLevel(j.title || ''),
     source: j.source || 'Seen', score: j.score || 65, waste_score: j.waste_score || 25,
+    posted_at: j.created_at || null,
   }));
   try {
     const term = locationDbTerm(loc);

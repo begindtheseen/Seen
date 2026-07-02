@@ -1,5 +1,12 @@
 # Site Parity Checklist
 
+> **⚠️ FROZEN (2026-07-02): this checklist reflects the pre-2026-06-30 state and is no
+> longer an active work queue.** The parity mission ended; 50 feature/growth PRs
+> (#75–#124) have landed since. The landing page (PR #77) and dashboard (PRs #122/#123)
+> were intentionally redesigned BEYOND the old site — treat 🟡 rows for those pages as
+> obsolete, not as gaps to re-port from `main`. Kept for historical reference only.
+> See CLAUDE_HANDOFF.md "CURRENT STATE" for what matters now.
+
 Full parity audit: old production SPA (`main:index.html` + `main:employer.html`) vs Next.js port (`next-migration`).
 
 Source of truth: `origin/main:index.html` (13,354 lines), `origin/main:employer.html` (2,647 lines).

@@ -1,5 +1,11 @@
 # Admin Parity Checklist
 
+> **⚠️ FROZEN (2026-07-02): parity was achieved and this is now a historical record, not
+> a work queue.** The admin page has since gained post-parity features (conversion
+> analytics PR #92, job-crisis tools PRs #100–#103, user deletion PR #119, per-company
+> evidentiary export PR #124) that have no counterpart in the old site.
+> See CLAUDE_HANDOFF.md "CURRENT STATE" for what matters now.
+
 ## ✅ MILESTONE 2026-06-13 — Admin parity 16/16 functionally complete
 
 All 16 admin sections + auth (login/logout/401/403) are ported on

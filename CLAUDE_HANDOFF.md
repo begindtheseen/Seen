@@ -5,36 +5,64 @@
 > **Read this first. Every session. No exceptions.**
 > Then read SEEN_STRATEGY.md. Then `git status`. Then pick up exactly where this doc ends.
 
-Last updated: **2026-06-14 (Session G — Flywheel)**
+Last updated: **2026-07-02 (Session B — PR #124 review/merge + live audit)**
 
 ---
 
-## ⚠️ PRIORITY SHIFT — READ THIS FIRST
+## ⚠️ CURRENT STATE (2026-07-02) — supersedes all sections below
 
-**SEENJOBS_BEHAVIORAL_FLYWHEEL.md now exists and is CORE BUSINESS ARCHITECTURE.**
+**The parity era is over.** Between 2026-06-30 and 07-02, 50 PRs (#75–#124) landed on
+`next-migration`: SeenFit/HumanProof résumé engines, landing + dashboard redesigns
+(intentional — do NOT restore these pages to old-site parity), SEO/GEO growth surfaces,
+Stripe subscriptions (no trial — charge immediately, in-app cancel), keyless job
+aggregation (all Anthropic removed from the job pipeline), credit-farming RLS lockdown
+(migrations 035/036), and the PR #124 full-app repair (tracker sync, intel flywheel,
+auth flows, slugs, Stripe webhook raw-body).
 
-The flywheel document defines the apply checkpoint, update loop, outcome card system, credit rewards, and Pro conversion. It is not a marketing idea. It is the data engine that makes SeenJobs valuable long-term.
+**Flywheel status: BUILT.** ApplyCheckpoint, OutcomeCard, SurveyModal, ResumeSurveyModal,
+credit rewards, day-7/14/30 check-ins, and quick_submit → community-report intel all
+exist and were repaired end-to-end in PR #124. "Apply Checkpoint MVP" below is stale.
 
-**Before starting any session, read:**
-1. This file
-2. `SEEN_STRATEGY.md`
-3. `SEENJOBS_BEHAVIORAL_FLYWHEEL.md` (new — session G)
-4. `git status`
+**Deploys are automatic.** Merging a PR into `next-migration` auto-deploys production
+(seenjobs.io). There is NO manual promote step anymore. Corollary learned 2026-07-02:
+if a PR *preview* gets promoted to production from the Vercel dashboard, MERGE THAT PR
+immediately — otherwise the next unrelated merge to next-migration rolls production back.
 
-**Current implementation priority order:**
-1. ~~Parity restoration~~ — functional parity is ~95% done
-2. **Flywheel Phase 2: Apply Checkpoint MVP** — the critical missing loop
-3. Visual parity remaining items (tracker handleCheckAnswer, minor gaps)
+### Session 2026-07-02 B (Claude B, branch `claude/codebase-review-o344hb`)
+- Independently reviewed PR #124 (all 31 files, local build + 44/44 tests) and merged it
+  (squash `7e2b274`) after discovering production was ALREADY serving its preview build —
+  merging closed a git/prod divergence; it did not change site behavior.
+- Live audit of seenjobs.io: 19/19 routes healthy (SSR titles correct, /company/coca-cola
+  slug resolves, jobs/demand/feed/batch_scores APIs all good).
+- Migration `037_applications_events_jobid_text.sql`: codifies the hand-applied prod
+  schema repairs (applications.events jsonb, job_id→text + FK drop) for fresh environments.
+  **Prod already matches — do not re-run there; apply only to new/restored environments.**
+- Follow-up fix to PR #124: freshly-aggregated search results + nearestListings returned
+  `id:null` (verified live — 49/49 results on a fresh query), so /jobs/<id> permalinks
+  from those paths couldn't resolve. aggregateForQuery now stitches upsert-returned
+  ids/created_at back onto results; nearestListings selects id/created_at and maps
+  posted_at. Also restored the NUL-strip in pdfText.js cleanupText (Postgres rejects \x00).
+- Doc refresh: this file, CLAUDE.md (mission history corrected), staleness banners on
+  SITE_PARITY_CHECKLIST.md and ADMIN_PARITY_CHECKLIST.md.
+
+**Read order now:** this file → CLAUDE.md session notes (2026-07-02 A + B) →
+`SEEN_STRATEGY.md` → `git status`.
 
 ---
 
-## Current reality
+## Historical sections below (pre-2026-06-30) — context only, NOT current priorities
+
+**~~Current~~ implementation priority order (STALE — see CURRENT STATE above):**
+1. ~~Parity restoration~~ — done
+2. ~~Flywheel Phase 2: Apply Checkpoint MVP~~ — BUILT (see above)
+3. ~~Visual parity remaining items~~ — landing/dashboard since redesigned intentionally
+
+## Current reality (as of 2026-06-14 — partially stale)
 
 - **seenjobs.io is LIVE** on the Next.js app, deployed from `next-migration` via Vercel
-- `main` = old HTML SPA. Source of truth for design parity. **Never touch it.**
-- Active branch: `next-migration` — push here, Vercel auto-builds a preview
-- Brandon promotes previews to production from the Vercel dashboard
-- Mission: **apply checkpoint + flywheel loop + outcome cards** (parity is ~done)
+- `main` = old HTML SPA. Historical reference only (redesigned pages moved past it). **Never touch it.**
+- Active branch: `next-migration` — merging a PR to it auto-deploys production
+- ~~Brandon promotes previews to production from the Vercel dashboard~~ (no longer needed)
 
 ---
 
