@@ -5,7 +5,8 @@ import { createClient } from '@supabase/supabase-js';
 import { applyRateLimit } from '../lib/server/ratelimit.js';
 import { logError } from '../lib/server/errlog.js';
 import { gateAI } from '../lib/server/credits.js';
-import { runScanner, runOptimize, runAdvantage, extractEmployment, extractCareerSignal, buildResumeDocument, resumeFileName } from '../lib/server/resumeAnalysis.js';
+import { runAdvantage, extractEmployment, extractCareerSignal, buildResumeDocument, resumeFileName } from '../lib/server/resumeAnalysis.js';
+import { scannerFromSeenFit, optimizeFromSeenFit } from '../lib/server/seenfitCompat.js';
 import { extractPdfText, looksLikeGarbledText } from '../lib/server/pdfText.js';
 const inflateRaw = promisify(zlib.inflateRaw);
 
@@ -100,13 +101,15 @@ export default async function handler(req, res) {
       const { job, company, resume, jobDescription } = body;
       if (!resume || !jobDescription) return res.status(400).json({ error: 'Resume and job description required' });
       const intelNote = _seenIntel(company, body.companyIntel);
-      parsed = runScanner({ resume, jobDescription, job, company, intelNote });
+      // Canonical SeenFit pipeline, adapted to the legacy scanner shape (keyless/deterministic).
+      parsed = scannerFromSeenFit({ resume, jobDescription, job, company, intelNote });
 
     } else if (tool === 'optimize') {
       const { job, company, resume, jobDescription } = body;
       if (!resume) return res.status(400).json({ error: 'Resume required' });
-      // Pro users get Stealth Mode baked in — same call, no extra credit or cost.
-      parsed = runOptimize({ resume, jobDescription, job, company, pro: gate.pro });
+      // Canonical SeenFit pipeline, adapted to the legacy optimize shape. Pro users get
+      // "Human Voice" (stealth field) baked in — same call, no extra credit or cost.
+      parsed = optimizeFromSeenFit({ resume, jobDescription, job, company, pro: gate.pro });
 
     } else if (tool === 'coach') {
       const { job, company, resume, jobDescription, background } = body;
