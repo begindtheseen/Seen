@@ -9,6 +9,33 @@ import { fuseCompanyIntel, classifyPlatform } from './_utils/companyIntel.js';
 import { recomputeCompanyScoreFromReports } from './_utils/reportWrite.js';
 import { anthropicEnabled } from '../lib/server/aiflag.js';
 
+// Authorize admin/cron-only actions (the Anthropic web-research endpoints). Accepts a Vercel
+// cron header, a shared CRON_SECRET, or a valid admin_sessions token. Everything Anthropic in
+// this file is gated behind this — no anonymous caller can spend a web-search credit.
+export async function isAdminOrCron(req, SUPABASE_URL, SERVICE_KEY) {
+  if (req.headers['x-vercel-cron'] === '1') return true;
+  const CRON_SECRET = process.env.CRON_SECRET;
+  if (CRON_SECRET && req.headers['x-cron-secret'] === CRON_SECRET) return true;
+  const adminToken = (req.headers['x-admin-token'] || '').trim();
+  if (!adminToken || !SUPABASE_URL || !SERVICE_KEY) return false;
+  try {
+    const sessRes = await fetch(
+      `${SUPABASE_URL}/rest/v1/admin_sessions?token=eq.${encodeURIComponent(adminToken)}&select=expires_at&limit=1`,
+      { headers: { apikey: SERVICE_KEY, Authorization: `Bearer ${SERVICE_KEY}` } },
+    );
+    const sess = sessRes.ok ? (await sessRes.json())?.[0] : null;
+    return !!(sess && new Date(sess.expires_at) >= new Date());
+  } catch { return false; }
+}
+
+// True only when Anthropic is BOTH configured (key present) AND enabled by the admin flag.
+// Every Anthropic call site checks this and degrades gracefully when it's false.
+export async function anthropicUsable(SUPABASE_URL, SERVICE_KEY) {
+  const key = process.env.ANTHROPIC_KEY || process.env.ANTHROPIC_API_KEY;
+  if (!key) return false;
+  return anthropicEnabled(SUPABASE_URL, SERVICE_KEY);
+}
+
 // Verify a Supabase JWT locally (HS256). Returns the payload or null.
 function verifyJWT(token, secret) {
   try {
@@ -596,7 +623,12 @@ export default async function handler(req, res) {
       if (!sess || new Date(sess.expires_at) < new Date()) return res.status(401).json({ error: 'unauthorized' });
     }
     const ANTHROPIC_KEY = process.env.ANTHROPIC_KEY || process.env.ANTHROPIC_API_KEY;
-    if (!ANTHROPIC_KEY) return res.status(500).json({ error: 'ANTHROPIC_KEY not configured' });
+    // Reddit ingestion is an OPTIONAL enrichment layer. When Anthropic is unconfigured or the
+    // admin flag is off, no-op gracefully (200) so the cron doesn't error-spam — the product
+    // runs fully on its first-party reports without it.
+    if (!(await anthropicUsable(SUPABASE_URL, SUPABASE_SERVICE_KEY))) {
+      return res.status(200).json({ ok: true, skipped: true, reason: 'anthropic_disabled', imported: 0 });
+    }
 
     const ALL_SUBREDDITS = [
       'recruitinghell','jobs','cscareerquestions','careerguidance',
@@ -1125,7 +1157,12 @@ async function checkLocation(location) {
 
 async function moderateContent(company, role, experience) {
   const ANTHROPIC_KEY = process.env.ANTHROPIC_KEY;
-  if (!ANTHROPIC_KEY) return { ok: true, issues: [], corrected_experience: null };
+  // Flag-gated + key-gated: LLM moderation is OPTIONAL. When Anthropic is unconfigured or the
+  // admin flag is off, degrade gracefully to allowing the submission (ok:true) — the report
+  // still flows through the deterministic trust/needs-review pipeline downstream.
+  if (!(await anthropicUsable(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY))) {
+    return { ok: true, issues: [], corrected_experience: null };
+  }
   const exp = (experience || '').trim();
   const prompt = `You moderate reports on a job-application transparency platform. Review this submission:\n\nCompany: "${company}"\nJob title: "${role}"\nExperience: "${exp || '(not provided)'}"\n\nFlag ANY of the following — be strict:\n1. Profanity or slurs (even mild)\n2. Hate speech or discrimination\n3. Personal attacks on named individuals\n4. Doxxing or private information\n5. Obviously fake content (gibberish, keyboard mashing, lorem ipsum)\n6. Job title that is not a real position name\n\nFor the experience text, also correct any genuine spelling mistakes (not slang or informal phrasing).\n\nReturn ONLY valid JSON, no extra text:\n{\n  "ok": true,\n  "issues": [],\n  "corrected_experience": null\n}\n\nIf there are problems set ok:false and fill issues[]. If spelling was fixed set corrected_experience to the cleaned text, otherwise null.`;
   try {
@@ -1272,7 +1309,15 @@ async function handleCompanyScore(req, res, body) {
   const dbH = SUPABASE_URL && SUPABASE_SERVICE_KEY ? { apikey: SUPABASE_SERVICE_KEY, Authorization: `Bearer ${SUPABASE_SERVICE_KEY}`, 'Content-Type': 'application/json' } : null;
 
   if (body.action === 'research') {
-    if (!ANTHROPIC_KEY) return res.status(500).json({ error: 'ANTHROPIC_KEY missing' });
+    // Admin/cron only — this spends an Anthropic web-search call.
+    if (!(await isAdminOrCron(req, SUPABASE_URL, SUPABASE_SERVICE_KEY))) {
+      return res.status(401).json({ error: 'unauthorized' });
+    }
+    // Degrade gracefully when Anthropic is unconfigured or the admin flag is off — the product
+    // never REQUIRES Anthropic; return an honest empty research result instead of a 500.
+    if (!(await anthropicUsable(SUPABASE_URL, SUPABASE_SERVICE_KEY))) {
+      return res.status(200).json({ summary: '', known_issues: [], known_positives: [], data_confidence: 'low', sources_note: 'Web research is disabled.', disabled: true });
+    }
     const { company: co, location } = body;
     if (!co) return res.status(400).json({ error: 'company required' });
     const locationStr = location ? ` in ${location}` : '';
@@ -1322,7 +1367,15 @@ async function handleCompanyScore(req, res, body) {
   }
 
   if (body.action === 'populate') {
-    if (!ANTHROPIC_KEY || !SUPABASE_URL || !SUPABASE_SERVICE_KEY) return res.status(500).json({ error: 'Missing env vars' });
+    // Admin/cron only — this batch-spends Anthropic web-search calls.
+    if (!(await isAdminOrCron(req, SUPABASE_URL, SUPABASE_SERVICE_KEY))) {
+      return res.status(401).json({ error: 'unauthorized' });
+    }
+    if (!SUPABASE_URL || !SUPABASE_SERVICE_KEY) return res.status(500).json({ error: 'Missing env vars' });
+    // Degrade gracefully when Anthropic is unconfigured or the admin flag is off.
+    if (!(await anthropicUsable(SUPABASE_URL, SUPABASE_SERVICE_KEY))) {
+      return res.status(200).json({ ok: true, message: 'Web research is disabled — nothing to populate.', remaining: 0, disabled: true });
+    }
     const listRes = await fetch(`${SUPABASE_URL}/rest/v1/company_scores?select=company_name,web_reviews,data_source&order=created_at.desc&limit=200`, { headers: dbH });
     if (!listRes.ok) return res.status(502).json({ error: 'DB list failed', detail: await listRes.text() });
     const rows = await listRes.json();
@@ -1407,7 +1460,7 @@ async function handleCompanyScore(req, res, body) {
 
   // 3. No reports yet. Anthropic web-research is the ONLY LLM path here, and it's gated: it runs
   //    only when the admin flag is on AND a key exists. Otherwise return an honest empty state.
-  const aiOn = !!ANTHROPIC_KEY && await anthropicEnabled(SUPABASE_URL, SUPABASE_SERVICE_KEY);
+  const aiOn = await anthropicUsable(SUPABASE_URL, SUPABASE_SERVICE_KEY);
   if (!aiOn) {
     return res.json({ ok: true, no_data: true, score: null, message: `No applicant reports yet for "${name}". Be the first to report your experience.` });
   }
