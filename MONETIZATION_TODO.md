@@ -7,16 +7,17 @@ owner controls). Implement once the prerequisite decision is made.
 
 ---
 
-## 1. 7-day free trial — ✅ BUILT (card-required, via Stripe)
-**Shipped:** `api/stripe.js` checkout now sets `subscription_data[trial_period_days]=7`, so the
-card is collected up front and Stripe auto-converts to a paid charge on day 7. The webhook
-handles the full trial lifecycle: `checkout.session.completed` grants Pro immediately, and
-`customer.subscription.updated` keeps entitlement in lockstep (trialing/active → Pro;
-canceled/unpaid/incomplete_expired → revoke; past_due/incomplete left alone for dunning grace).
-CTA copy ("Start 7-day free trial") + FTC/ARL trial disclosure added to `app/pricing/page.tsx`
-and `components/UpgradeModal.tsx`. No new infra/keys were needed — card-required trial reuses
-the existing Stripe subscription flow. Decision taken: **card-required** (higher paid
-conversion, cleaner implementation than a no-card grant-and-revoke).
+## 1. 7-day free trial — ❌ REMOVED (built #86, deleted #93) — rebuild only on a fresh owner decision
+**Status correction (2026-07-02, verified against code):** the trial described below was built
+in PR #86, patched (#89), rebuilt (#90), and **deleted in PR #93** in the same day because the
+business decision wasn't settled first (see CLAUDE.md mandatory rule 6 — this feature is the
+canonical example). As of today `trial_period_days` appears NOWHERE in `api/stripe.js`, and no
+trial CTA/disclosure copy exists in `app/pricing/page.tsx` or `components/UpgradeModal.tsx`
+(verified by grep). The stale "✅ BUILT" note that previously lived here is exactly the
+ground-truth rot rule 8 warns about — do not trust feature-status claims in docs without a grep.
+
+If the owner decides to reintroduce a trial, the original design (card-required, via Stripe)
+is preserved below as the implementation sketch:
 
 **Expected lift:** Large. Free trials on a $9.99–$83.88 SaaS commonly lift paid conversion
 2–4× by moving the payment decision *after* the user has felt Pro value (unlimited credits,
