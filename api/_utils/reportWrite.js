@@ -9,6 +9,12 @@ import { classifyPlatform, fuseCompanyIntel } from './companyIntel.js';
 
 const _SCORE_TTL_MS = 365 * 24 * 60 * 60 * 1000;
 
+// Range guards for the DB writers. Rates are fractions [0,1]; scores are [0,100]. A rate
+// that persists as e.g. 34.0 renders as "3400%" on the company page — these make that
+// impossible. Exported so the sanity is unit-tested directly.
+export const clampRate  = v => (v == null ? null : Math.min(1, Math.max(0, v)));
+export const clampScore = v => (v == null ? null : Math.min(100, Math.max(0, v)));
+
 // Normalize a company name the same way reports.js does (strip common legal suffixes).
 export function normalizeCompany(n) {
   return n
@@ -129,15 +135,17 @@ export async function recomputeCompanyScoreFromReports(SUPABASE_URL, hdrs, compa
     const sources = Object.entries(byType).map(([type, outcomes]) => ({ type, outcomes }));
     const fz = fuseCompanyIntel({ web: {}, sources });
     if (!fz || !fz.report_count) return false;
+    // Belt-and-suspenders: fusion already clamps, but the WRITER enforces the range too so a
+    // rate can never persist as e.g. 34.0 (→ "3400% ghost rate"). rates [0,1], scores [0,100].
     const row = {
       company_name: String(companyName).toLowerCase().trim(),
-      overall_score: fz.overall_score,
-      ghost_rate: fz.ghost_rate,
-      response_rate: fz.response_rate,
+      overall_score: clampScore(fz.overall_score),
+      ghost_rate: clampRate(fz.ghost_rate),
+      response_rate: clampRate(fz.response_rate),
       avg_wait_days: fz.avg_wait_days != null ? Math.round(fz.avg_wait_days) : null,
       avg_rounds: fz.avg_rounds,
-      waste_score: fz.waste_score,
-      unpaid_rate: fz.unpaid_rate,
+      waste_score: clampScore(fz.waste_score),
+      unpaid_rate: clampRate(fz.unpaid_rate),
       report_count: fz.report_count,
       data_quality: fz.confidence_label || 'low',
       data_source: 'reports',

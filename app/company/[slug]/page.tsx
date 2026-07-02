@@ -60,9 +60,18 @@ function letterGrade(score: number): string {
   return 'F'
 }
 
+// Convert a stored rate (fraction in [0,1]) to a clamped whole-number percent. Raw values
+// out of range (e.g. a hand-math merge writing 34.0 instead of 0.34) clamp to 0–100 and warn
+// — the company page must NEVER render "3400%".
+function ratePct(v: number | null | undefined): number | null {
+  if (v == null) return null
+  if (v > 1 || v < 0) console.warn('rate out of range', v)
+  return Math.round(Math.min(1, Math.max(0, v)) * 100)
+}
+
 function pct(n: number | null | undefined): string {
-  if (n == null) return '—'
-  return Math.round(n * 100) + '%'
+  const p = ratePct(n)
+  return p == null ? '—' : p + '%'
 }
 
 function riskColor(risk: string): string {
@@ -132,7 +141,9 @@ function computeVibes(sc: CompanyScore): { label: string; cls: string }[] {
   else if (rounds >= 3.5) vibes.push({ label: `📋 ${rounds.toFixed(1)} rounds avg`,        cls: 'v-b' })
   if (waste > 70)         vibes.push({ label: '⚠ Very high waste risk',            cls: 'v-y' })
   else if (waste > 50)    vibes.push({ label: '⚠ High waste risk',                 cls: 'v-y' })
-  if (rr > 0.75)          vibes.push({ label: '✅ Highly responsive',               cls: 'v-g' })
+  // Mutually exclusive with the ghost-surge banner (surge wins at ghost>=0.5): a company
+  // can't be both "highly responsive" and in a ghost surge.
+  if (rr > 0.75 && ghost < 0.5) vibes.push({ label: '✅ Highly responsive',           cls: 'v-g' })
   if (score >= 80)        vibes.push({ label: '🌟 Strong hiring process',           cls: 'v-g' })
   if (score < 35)         vibes.push({ label: '❌ Low transparency',                cls: 'v-r' })
   return vibes.slice(0, 5)
@@ -151,8 +162,9 @@ function VibeTagList({ sc }: { sc: CompanyScore }) {
 }
 
 function GhostSurgeAlert({ ghostRate }: { ghostRate: number }) {
-  if (ghostRate <= 0.6) return null
-  const ghostPct = Math.round(ghostRate * 100)
+  // Surge wins at ghost>=0.5; mutually exclusive with the "Highly responsive" badge.
+  if (ghostRate < 0.5) return null
+  const ghostPct = ratePct(ghostRate) ?? 0
   return (
     <div style={{
       position: 'relative', overflow: 'hidden',
@@ -190,7 +202,7 @@ function GhostSurgeAlert({ ghostRate }: { ghostRate: number }) {
 
 function ExpectedTimeline({ sc, risk }: { sc: CompanyScore; risk: string }) {
   const avgWait = sc.avg_wait_days || 30
-  const rr = Math.round((sc.response_rate || 0) * 100)
+  const rr = ratePct(sc.response_rate) ?? 0
   const w = sc.waste || 40
   const wColor = w > 60 ? 'var(--red)' : w > 30 ? 'var(--amber)' : 'var(--green)'
   const rrColor = riskColor(risk)
@@ -221,9 +233,9 @@ function ExpectedTimeline({ sc, risk }: { sc: CompanyScore; risk: string }) {
 }
 
 function HiringFunnel({ sc }: { sc: CompanyScore }) {
-  const rsp = Math.round((sc.response_rate || 0) * 100)
-  const rgp = Math.round((sc.ghost_rate || 0) * 100)
-  const viewedPct = Math.round((sc.response_rate || 0) * 1.8 * 100)
+  const rsp = ratePct(sc.response_rate) ?? 0
+  const rgp = ratePct(sc.ghost_rate) ?? 0
+  const viewedPct = Math.min(100, Math.round((Math.min(1, Math.max(0, sc.response_rate || 0)) * 1.8) * 100))
   const stages = [
     { label: 'Applied',   pct: 100,      color: 'var(--sub, #888)'     },
     { label: 'Viewed',    pct: Math.min(100, viewedPct), color: 'var(--blue)'  },
@@ -586,8 +598,8 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
   const g = score ? letterGrade(score.overall_score) : '—'
   const logoLetter = (companyName[0] || '?').toUpperCase()
   const ghostHigh = (score?.ghost_rate || 0) > 0.5
-  const ghostPct = score ? Math.round((score.ghost_rate || 0) * 100) : 0
-  const respPct = score ? Math.round((score.response_rate || 0) * 100) : 0
+  const ghostPct = score ? (ratePct(score.ghost_rate) ?? 0) : 0
+  const respPct = score ? (ratePct(score.response_rate) ?? 0) : 0
   const ghostColor = ghostHigh ? 'var(--red)' : (score?.ghost_rate || 0) > 0.3 ? 'var(--amber)' : 'var(--green)'
   const waitColor = (score?.avg_wait_days || 0) > 21 ? 'var(--amber)' : 'var(--text)'
   const wasteColor = (score?.waste || 0) > 60 ? 'var(--red)' : (score?.waste || 0) > 30 ? 'var(--amber)' : 'var(--green)'
