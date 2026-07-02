@@ -117,6 +117,13 @@ export default function ApplyOptimizeModal({
   const [result, setResult] = useState<OptimizeResult | null>(null)
   const [error, setError] = useState('')
   const [showUpgrade, setShowUpgrade] = useState(false)
+  // 'credits' when the optimize call is blocked at zero balance; 'generic' for the post-win
+  // upsell strip (the user succeeded — sell the cap removal, not a hard wall).
+  const [upgradeReason, setUpgradeReason] = useState<'credits' | 'generic'>('credits')
+  // null = unknown (don't show upsell yet), true = Pro, false = free. Same get_credits
+  // signal Nav.tsx reads. Gates the post-win upsell strip below the optimized bullets.
+  const [pro, setPro] = useState<boolean | null>(null)
+  const [upsellDismissed, setUpsellDismissed] = useState(false)
 
   useEffect(() => {
     if (!isLoggedIn) { setStep('not-logged-in'); return }
@@ -130,6 +137,18 @@ export default function ApplyOptimizeModal({
       }
     })
   }, [isLoggedIn, user?.id]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Pro status for the post-win upsell — same get_credits signal Nav.tsx uses.
+  useEffect(() => {
+    if (!isLoggedIn) { setPro(null); return }
+    let cancelled = false
+    aiHeaders()
+      .then(h => fetch('/api/user-sync', { method: 'POST', headers: h, body: JSON.stringify({ action: 'get_credits' }) }))
+      .then(r => r.ok ? r.json() : null)
+      .then(d => { if (!cancelled && d) setPro(!!d.pro) })
+      .catch(() => { /* leave pro null — upsell stays hidden when status is unknown */ })
+    return () => { cancelled = true }
+  }, [isLoggedIn, user?.id])
 
   async function runOptimize(resumeOverride?: string) {
     const text = resumeOverride ?? resumeText
@@ -153,6 +172,7 @@ export default function ApplyOptimizeModal({
         // Out of credits / Pro-only → surface the upgrade modal directly via a typed flag
         // (don't rely on string-matching the error message).
         if (r.status === 402 || e.credits_required || e.pro_required) {
+          setUpgradeReason('credits')
           setShowUpgrade(true)
           setStep('choose')
           return
@@ -215,7 +235,7 @@ export default function ApplyOptimizeModal({
 
   return (
     <>
-    {showUpgrade && <UpgradeModal reason="credits" onClose={() => setShowUpgrade(false)} />}
+    {showUpgrade && <UpgradeModal reason={upgradeReason} onClose={() => setShowUpgrade(false)} />}
     <div style={overlay} onClick={onClose}>
       <div style={sheet} onClick={e => e.stopPropagation()}>
         {/* Header */}
@@ -378,6 +398,24 @@ export default function ApplyOptimizeModal({
               {result?.stealth && (
                 <div style={{ background: 'rgba(124,58,237,.1)', border: '1px solid rgba(124,58,237,.3)', borderRadius: 8, padding: '.5rem .85rem', marginBottom: '.75rem', fontFamily: 'var(--mono)', fontSize: '.62rem', color: '#a78bfa', display: 'flex', alignItems: 'center', gap: '.4rem' }}>
                   🗣 Human Voice applied · sounds like you, every keyword kept
+                </div>
+              )}
+
+              {/* Post-win upsell — the user just saw a real result; sell the cap removal here,
+                  not only at zero credits. Hidden for Pro and while pro status is unknown. */}
+              {pro === false && !upsellDismissed && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '.6rem', background: 'rgba(99,102,241,.08)', border: '1px solid rgba(99,102,241,.25)', borderRadius: 8, padding: '.5rem .6rem .5rem .85rem', marginBottom: '.75rem' }}>
+                  <button
+                    onClick={() => { setUpgradeReason('generic'); setShowUpgrade(true) }}
+                    style={{ flex: 1, textAlign: 'left', background: 'none', border: 'none', padding: 0, cursor: 'pointer', fontFamily: 'var(--body)', fontSize: '.66rem', color: 'var(--sub)', lineHeight: 1.5 }}
+                  >
+                    That used 1 of your 3 daily credits · <span style={{ color: '#a5b4fc', fontWeight: 700 }}>Pro removes the cap →</span>
+                  </button>
+                  <button
+                    onClick={() => setUpsellDismissed(true)}
+                    aria-label="Dismiss"
+                    style={{ background: 'none', border: 'none', color: 'var(--dim)', cursor: 'pointer', fontSize: '.8rem', lineHeight: 1, padding: '.1rem .2rem', flexShrink: 0 }}
+                  >✕</button>
                 </div>
               )}
 

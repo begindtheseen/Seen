@@ -408,7 +408,23 @@ function ResumePageInner() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [showUpgrade, setShowUpgrade] = useState(false)
+  // 'credits' at a zero-balance wall; 'generic' for the post-win upsell strip below a result.
+  const [upgradeReason, setUpgradeReason] = useState<'credits' | 'generic'>('credits')
   const [showSurvey, setShowSurvey] = useState(false)
+  // Pro status (same get_credits signal Nav.tsx reads): null = unknown → upsell stays hidden.
+  const [pro, setPro] = useState<boolean | null>(null)
+  const [upsellDismissed, setUpsellDismissed] = useState(false)
+
+  useEffect(() => {
+    if (!isLoggedIn) { setPro(null); return }
+    let cancelled = false
+    aiHeaders()
+      .then(h => fetch('/api/user-sync', { method: 'POST', headers: h, body: JSON.stringify({ action: 'get_credits' }) }))
+      .then(r => r.ok ? r.json() : null)
+      .then(d => { if (!cancelled && d) setPro(!!d.pro) })
+      .catch(() => { /* leave pro null — upsell stays hidden when status is unknown */ })
+    return () => { cancelled = true }
+  }, [isLoggedIn, user?.id])
 
   useEffect(() => {
     ResumeStore.load(user?.id, isLoggedIn).then(data => {
@@ -468,7 +484,7 @@ function ResumePageInner() {
         })
         const data = await res.json() as { text?: string; credits_required?: boolean; error?: string }
         if (data.credits_required) {
-          if (isLoggedIn) setShowUpgrade(true)
+          if (isLoggedIn) { setUpgradeReason('credits'); setShowUpgrade(true) }
           else setError('Sign in to use AI resume features.')
           return
         }
@@ -573,7 +589,7 @@ function ResumePageInner() {
   // sign-in prompt inline.
   function handleCreditWall(e: unknown, fallback: string) {
     if (e instanceof CreditsError) {
-      if (e.outOfCredits) { setShowUpgrade(true); return }
+      if (e.outOfCredits) { setUpgradeReason('credits'); setShowUpgrade(true); return }
       setError(e.message); return
     }
     setError(fallback)
@@ -634,7 +650,7 @@ function ResumePageInner() {
 
   return (
     <div className="page-full">
-      {showUpgrade && <UpgradeModal reason="credits" onClose={() => setShowUpgrade(false)} />}
+      {showUpgrade && <UpgradeModal reason={upgradeReason} onClose={() => setShowUpgrade(false)} />}
       {showSurvey && <ResumeSurveyModal onClose={() => setShowSurvey(false)} />}
       <div className="resume-page">
         <div className="resume-hdr">
@@ -794,6 +810,24 @@ function ResumePageInner() {
               ) : (
                 <ResultEmpty icon="🧠" text={'Hiring-manager script, timing, referral tactics\n+ a 30/60/90-day plan appear here.'} />
               )
+            )}
+
+            {/* Post-win upsell — sell the cap removal after a real result, not only at zero
+                credits. Hidden for Pro and while pro status is unknown. */}
+            {(scanResult || advResult) && pro === false && !upsellDismissed && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '.6rem', background: 'rgba(99,102,241,.08)', border: '1px solid rgba(99,102,241,.25)', borderRadius: 8, padding: '.5rem .6rem .5rem .85rem', marginTop: '1rem' }}>
+                <button
+                  onClick={() => { setUpgradeReason('generic'); setShowUpgrade(true) }}
+                  style={{ flex: 1, textAlign: 'left', background: 'none', border: 'none', padding: 0, cursor: 'pointer', fontFamily: 'var(--body)', fontSize: '.68rem', color: 'var(--sub)', lineHeight: 1.5 }}
+                >
+                  That used 1 of your 3 daily credits · <span style={{ color: '#a5b4fc', fontWeight: 700 }}>Pro removes the cap →</span>
+                </button>
+                <button
+                  onClick={() => setUpsellDismissed(true)}
+                  aria-label="Dismiss"
+                  style={{ background: 'none', border: 'none', color: 'var(--dim)', cursor: 'pointer', fontSize: '.85rem', lineHeight: 1, padding: '.1rem .2rem', flexShrink: 0 }}
+                >✕</button>
+              </div>
             )}
           </div>
         </div>
