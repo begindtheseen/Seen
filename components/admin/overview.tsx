@@ -78,6 +78,37 @@ export function CardSubLink({ onClick, children }: { onClick: () => void; childr
   )
 }
 
+export type TabKey = 'overview' | 'users' | 'jobs' | 'community' | 'revenue' | 'system' | 'advanced'
+const TAB_DEFS: { key: TabKey; label: string }[] = [
+  { key: 'overview', label: 'Overview' },
+  { key: 'users', label: 'Users' },
+  { key: 'jobs', label: 'Jobs' },
+  { key: 'community', label: 'Community Data' },
+  { key: 'revenue', label: 'Revenue' },
+  { key: 'system', label: 'System Health' },
+  { key: 'advanced', label: 'Advanced Tools' },
+]
+
+// Segmented tab bar. Scrolls horizontally on narrow screens (no page overflow).
+export function AdminTabs({ value, onChange }: { value: TabKey; onChange: (t: TabKey) => void }) {
+  return (
+    <div className="a2-tabs" role="tablist" aria-label="Admin sections">
+      {TAB_DEFS.map(t => (
+        <button
+          key={t.key}
+          type="button"
+          role="tab"
+          aria-selected={value === t.key}
+          className={`a2-tab${value === t.key ? ' active' : ''}`}
+          onClick={() => onChange(t.key)}
+        >
+          {t.label}
+        </button>
+      ))}
+    </div>
+  )
+}
+
 const SEV_META: Record<AttnItem['sev'], { label: string; color: string }> = {
   red: { label: 'Critical', color: 'var(--red)' },
   amber: { label: 'Warning', color: 'var(--amber)' },

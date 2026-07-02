@@ -1350,3 +1350,12 @@ nav.nav-scrolled{background:rgba(6,6,8,0.82);backdrop-filter:blur(60px) saturate
   .a2-hero-actions .adm-btn,.a2-hero-actions .adm-btn-danger{flex:1;text-align:center}
   .a2-attn-sev{min-width:3.2rem}
 }
+
+/* Admin V2 tabs */
+.a2-tabs{display:flex;gap:.35rem;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none;margin-bottom:1.25rem;padding-bottom:.3rem;border-bottom:1px solid rgba(255,255,255,.07)}
+.a2-tabs::-webkit-scrollbar{display:none}
+.a2-tab{flex:0 0 auto;background:none;border:1px solid transparent;border-radius:8px;padding:.45rem .85rem;font-family:var(--mono);font-size:.62rem;letter-spacing:.02em;color:var(--dim);cursor:pointer;white-space:nowrap;transition:color .15s,background .15s,border-color .15s}
+.a2-tab:hover{color:var(--sub);background:rgba(255,255,255,.03)}
+.a2-tab.active{color:var(--white);background:rgba(59,130,246,.14);border-color:rgba(59,130,246,.4)}
+.a2-tabpanel{animation:fadeIn .18s ease both}
+.a2-overview-hint{font-family:var(--mono);font-size:.62rem;color:var(--dim);text-align:center;padding:1.5rem 1rem;line-height:1.6}
