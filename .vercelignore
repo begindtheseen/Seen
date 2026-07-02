@@ -1,0 +1,7 @@
+# Test files must never deploy as serverless functions. A test file placed under api/
+# is otherwise built as a function; the import-graph guard (which dynamically imports every
+# module) made Vercel's tracer try to bundle the whole repo and fail the build.
+**/*.test.mjs
+**/*.test.js
+# Local-only artifacts.
+.claude/
