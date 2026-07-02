@@ -6,6 +6,7 @@ import { applyRateLimit } from '../lib/server/ratelimit.js';
 import { logError } from '../lib/server/errlog.js';
 import { calcOverallScore, calcWaste, tenureAdjustment, scoreConfidence, confidenceLabel, aggregateTenure, MIN_TENURE_SAMPLE } from './_utils/companyScore.js';
 import { fuseCompanyIntel, classifyPlatform } from './_utils/companyIntel.js';
+import { recomputeCompanyScoreFromReports } from './_utils/reportWrite.js';
 import { anthropicEnabled } from '../lib/server/aiflag.js';
 
 // Verify a Supabase JWT locally (HS256). Returns the payload or null.
@@ -561,6 +562,10 @@ export default async function handler(req, res) {
     }
     if (!repRes.ok) { const e = await repRes.text(); return res.status(500).json({ error: 'Failed to save report', detail: e.slice(0,100) }); }
     console.log(`REPORT SAVED: "${safeCo}" @ "${safeLoc}" company_id:${cid}`);
+    // Refresh this company's cached score from its real reports right away so the new report
+    // reflects on the company page immediately (cache-first read would otherwise serve a stale
+    // grade). Only for trusted, non-review submits — flagged rows don't count toward the grade.
+    if (!trust.review) { await recomputeCompanyScoreFromReports(SUPABASE_URL, hdrsBase, safeCo); }
     return res.status(200).json({ ok: true, company_id: cid });
   }
 

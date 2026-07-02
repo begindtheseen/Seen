@@ -7,7 +7,7 @@ import { rateLimit } from '../lib/server/ratelimit.js';
 import { buildOpportunities } from './_utils/opportunityEngine.js';
 import { extractEmployment } from '../lib/server/resumeAnalysis.js';
 import { buildResumeSurvey, RESUME_SURVEY_KEYS, mapAnswersToReport } from './_utils/resumeSurvey.js';
-import { normalizeCompany, isValidCompanyName, resolveOrCreateCompany, assessSubmitTrust, writeReport } from './_utils/reportWrite.js';
+import { normalizeCompany, isValidCompanyName, resolveOrCreateCompany, assessSubmitTrust, writeReport, recomputeCompanyScoreFromReports } from './_utils/reportWrite.js';
 
 // Verify a Supabase JWT locally (HS256) — no network round-trip.
 // Returns the payload (with .sub = user UUID) on success, null on failure.
@@ -913,6 +913,13 @@ export default async function handler(req, res) {
           user_id: uid,
         };
         reportWritten = await writeReport(SUPABASE_URL, hdrs, reportBase, String(company).trim().slice(0, 200));
+        // Refresh THIS company's cached score from its real reports right away, so the survey's
+        // intel shows on the company page immediately (the score read is cache-first and would
+        // otherwise keep serving a stale web-research grade until a cron/force_refresh). Skipped
+        // when the report is held for review (it wouldn't count toward the grade anyway).
+        if (reportWritten && !trust.review) {
+          await recomputeCompanyScoreFromReports(SUPABASE_URL, hdrs, String(company).trim().slice(0, 200));
+        }
       }
     } catch (err) {
       console.error('[user-sync] resume_survey report write failed:', err?.message);
