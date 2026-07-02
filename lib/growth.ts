@@ -32,8 +32,12 @@ export type LeaderboardRow = {
 
 const REPORTS_URL = 'https://seenjobs.io/api/reports'
 
+// Company slug — MUST round-trip through /company/[slug]'s decoder
+// (decodeURIComponent(slug).replace(/-/g,' ')). The old version stripped punctuation
+// ("H&M" → "hm", "McDonald's" → "mcdonalds"), so every share/sitemap/compare link for a
+// punctuated company landed on a page whose name lookup could never match.
 export const slugify = (name: string) =>
-  name.toLowerCase().trim().replace(/[^a-z0-9\s-]/g, '').replace(/\s+/g, '-').replace(/-+/g, '-')
+  encodeURIComponent(name.toLowerCase().trim().replace(/\s+/g, '-'))
 
 export const titleCase = (slug: string) =>
   decodeURIComponent(slug).replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())

@@ -28,6 +28,12 @@ async function route(req, res) {
   const { allowed: rlOk } = await rateLimit(req, 'demand');
   if (!rlOk) return res.status(429).json({ error: 'Too many requests — slow down.' });
 
+  // Vercel crons fire as GET — route a cron-authenticated GET into the refresh handler
+  // (handlePost re-checks auth itself). Without this the monthly BLS refresh was
+  // unreachable: the cron GET just read the public cache and the data never updated.
+  if (req.method === 'GET' && (req.headers['x-vercel-cron'] === '1' || req.query?.action === 'refresh')) {
+    return handlePost(req, res);
+  }
   if (req.method === 'GET') return handleGet(req, res);
   if (req.method === 'POST') return handlePost(req, res);
   return res.status(405).end();

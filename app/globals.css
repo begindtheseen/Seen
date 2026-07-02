@@ -281,6 +281,8 @@ nav.nav-scrolled{background:rgba(6,6,8,0.82);backdrop-filter:blur(60px) saturate
 .side-menu-item{display:flex;align-items:center;gap:.75rem;padding:.75rem 1.25rem;font-family:var(--body);font-size:.85rem;color:var(--sub);cursor:pointer;transition:all .15s;border:none;background:none;width:100%;text-align:left}
 .side-menu-item:hover,.side-menu-item.active{color:var(--white);background:var(--surface)}
 .side-menu-item .side-menu-icon{font-size:1rem;width:20px;text-align:center;flex-shrink:0}
+.side-menu-label{font-family:var(--mono);font-size:.5rem;text-transform:uppercase;letter-spacing:.14em;color:var(--dim);padding:1rem 1.25rem .35rem}
+.side-menu-label:first-of-type{padding-top:.5rem}
 .side-menu-toggle{background:none;border:none;color:var(--sub);cursor:pointer;padding:.35rem;font-size:1.1rem;display:flex;align-items:center;justify-content:center;border-radius:6px;transition:all .15s}
 .side-menu-toggle:hover{color:var(--white);background:var(--raised)}
 .feat-sec{padding:4rem 1.5rem;max-width:1200px;margin:0 auto}

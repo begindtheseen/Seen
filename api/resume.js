@@ -6,7 +6,7 @@ import { applyRateLimit } from '../lib/server/ratelimit.js';
 import { logError } from '../lib/server/errlog.js';
 import { gateAI } from '../lib/server/credits.js';
 import { runScanner, runOptimize, runAdvantage, extractEmployment, extractCareerSignal, buildResumeDocument, resumeFileName } from '../lib/server/resumeAnalysis.js';
-import { extractPdfText } from '../lib/server/pdfText.js';
+import { extractPdfText, looksLikeGarbledText } from '../lib/server/pdfText.js';
 const inflateRaw = promisify(zlib.inflateRaw);
 
 // One-line "Seen data" block from read-only company intel (ghost/response from our
@@ -196,6 +196,15 @@ async function handleParseResume(req, res, body) {
         error: isPDF
           ? 'Could not read selectable text from this PDF (it may be a scanned image, or use an unusual font encoding). Please copy your résumé text and paste it directly into the box instead.'
           : 'Could not extract readable text. Make sure the file has selectable text (not a scanned image), or paste your résumé text directly.'
+      });
+    }
+
+    // A subset font with no usable ToUnicode extracts as scrambled glyph codes — long
+    // enough to pass the length gate but useless downstream (the résumé survey then finds
+    // "no work history"). Reject it honestly rather than storing gibberish.
+    if (isPDF && looksLikeGarbledText(extractedText)) {
+      return res.status(422).json({
+        error: 'This PDF uses a font we can’t read as text (the extracted characters come out scrambled). Please copy your résumé text and paste it directly into the box, or re-export the PDF from Word/Google Docs/Pages.'
       });
     }
 

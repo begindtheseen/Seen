@@ -79,6 +79,8 @@ export interface Job {
   salary: string | null
   apply_url: string | null
   availability_status?: string
+  /** ISO timestamp of when the listing entered our corpus — powers the Posted filter. */
+  posted_at?: string | null
 }
 
 export interface CheckScheduleItem {

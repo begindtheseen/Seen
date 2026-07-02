@@ -5,6 +5,10 @@
 // All calls use the SERVICE key headers (`hdrs`) supplied by the caller — these helpers
 // never touch RLS-protected reads on the client's behalf.
 
+import { classifyPlatform, fuseCompanyIntel } from './companyIntel.js';
+
+const _SCORE_TTL_MS = 365 * 24 * 60 * 60 * 1000;
+
 // Normalize a company name the same way reports.js does (strip common legal suffixes).
 export function normalizeCompany(n) {
   return n
@@ -92,6 +96,60 @@ export async function assessSubmitTrust(SUPABASE_URL, hdrs, uid, dupFilter) {
     else if (dayCount >= DAILY_CAP) { out.weight = 0.3; out.reason = 'velocity_capped';        out.review = true; }
   } catch { /* on failure, fall through at default trust */ }
   return out;
+}
+
+// Eagerly recompute a single company's cached score from its REAL reports and upsert it into
+// company_scores, so a freshly-written report (résumé survey or direct submit) reflects on the
+// company page IMMEDIATELY instead of waiting for a cache-miss / force_refresh / nightly cron.
+//
+// This is the exact same deterministic, LLM-free fusion handleCompanyScore runs on a cache-miss
+// (reports-first path): pool the company's non-review reports by source and blend them with the
+// per-source trust weights in SOURCE_TRUST (direct/survey 1.0, ingest 0.55, reddit 0.3). It is
+// idempotent — with an empty web prior the fused result is a pure function of the current report
+// set, so re-running over the same reports yields the same score (no drift on repeat writes).
+//
+// Preserves any existing web-research context (industry / summary / reviews) by OMITTING those
+// columns from the upsert — PostgREST merge-duplicates only overwrites columns present in the
+// payload. Best-effort: never throws, and returns false on any no-op so the write path is unaffected.
+export async function recomputeCompanyScoreFromReports(SUPABASE_URL, hdrs, companyName) {
+  try {
+    if (!SUPABASE_URL || !hdrs?.apikey || !companyName) return false;
+    const enc = encodeURIComponent(String(companyName).toLowerCase().trim());
+    // Same corpus the score path uses: exclude needs_review rows so anonymous/dup/flagged
+    // reports can't move the grade (they're held out until an admin clears them).
+    const r = await fetch(
+      `${SUPABASE_URL}/rest/v1/reports?company_name=ilike.${enc}&needs_review=not.is.true&select=outcome,platform&limit=500`,
+      { headers: hdrs },
+    );
+    if (!r.ok) return false;
+    const reps = await r.json();
+    if (!Array.isArray(reps) || !reps.length) return false;
+    const byType = {};
+    for (const row of reps) { const t = classifyPlatform(row.platform); (byType[t] ||= []).push({ outcome: row.outcome }); }
+    const sources = Object.entries(byType).map(([type, outcomes]) => ({ type, outcomes }));
+    const fz = fuseCompanyIntel({ web: {}, sources });
+    if (!fz || !fz.report_count) return false;
+    const row = {
+      company_name: String(companyName).toLowerCase().trim(),
+      overall_score: fz.overall_score,
+      ghost_rate: fz.ghost_rate,
+      response_rate: fz.response_rate,
+      avg_wait_days: fz.avg_wait_days != null ? Math.round(fz.avg_wait_days) : null,
+      avg_rounds: fz.avg_rounds,
+      waste_score: fz.waste_score,
+      unpaid_rate: fz.unpaid_rate,
+      report_count: fz.report_count,
+      data_quality: fz.confidence_label || 'low',
+      data_source: 'reports',
+      expires_at: new Date(Date.now() + _SCORE_TTL_MS).toISOString(),
+    };
+    const sv = await fetch(`${SUPABASE_URL}/rest/v1/company_scores?on_conflict=company_name`, {
+      method: 'POST',
+      headers: { ...hdrs, Prefer: 'resolution=merge-duplicates,return=minimal' },
+      body: JSON.stringify(row),
+    });
+    return sv.ok;
+  } catch { return false; }
 }
 
 // Write a report row, with the same company_name fallback retry reports.js uses when the

@@ -107,6 +107,22 @@ async function resolveCustomerId(uid, email, env) {
   } catch { return null; }
 }
 
+// Stripe signs the RAW request bytes — Vercel's auto-parsed req.body can never re-serialize
+// to the exact signed payload, so webhook signature verification was structurally impossible.
+// Disable the body parser and read the stream ourselves; every action parses JSON from the
+// captured raw string, and the webhook verifies the HMAC against the untouched bytes.
+export const config = { api: { bodyParser: false } };
+
+async function readRawBody(req) {
+  // If a runtime still pre-parsed the body (config ignored), fall back to it.
+  if (req.body !== undefined && req.body !== null) {
+    return typeof req.body === 'string' ? req.body : JSON.stringify(req.body);
+  }
+  const chunks = [];
+  for await (const chunk of req) chunks.push(typeof chunk === 'string' ? Buffer.from(chunk) : chunk);
+  return Buffer.concat(chunks).toString('utf8');
+}
+
 export default async function handler(req, res) {
   if (CORS(req, res)) return;
 
@@ -116,8 +132,10 @@ export default async function handler(req, res) {
   const JWT_SECRET   = process.env.SUPABASE_JWT_SECRET;
   const env = { STRIPE_KEY, SUPABASE_URL, SERVICE_KEY, JWT_SECRET };
 
-  let body = req.body;
-  if (typeof body === 'string') { try { body = JSON.parse(body); } catch { body = {}; } }
+  let rawBody = '';
+  try { if (req.method !== 'GET') rawBody = await readRawBody(req); } catch { rawBody = ''; }
+  let body = {};
+  if (rawBody) { try { body = JSON.parse(rawBody); } catch { body = {}; } }
   if (!body || typeof body !== 'object') body = {};
 
   const action = (req.query?.action) || body.action;
@@ -184,7 +202,7 @@ export default async function handler(req, res) {
     // No Stripe customer → comped/never-subscribed; leave the pro flag untouched.
     if (!customerId) return res.status(200).json({ ok: true, pro: null, subscription: null });
     try {
-      const listRes = await fetch(`https://api.stripe.com/v1/subscriptions?customer=${encodeURIComponent(customerId)}&status=all&limit=10&expand[]=data.items`, { headers: { Authorization: `Bearer ${STRIPE_KEY}` } });
+      const listRes = await fetch(`https://api.stripe.com/v1/subscriptions?customer=${encodeURIComponent(customerId)}&status=all&limit=10`, { headers: { Authorization: `Bearer ${STRIPE_KEY}` } });
       if (!listRes.ok) return res.status(502).json({ error: 'Could not read subscription' });
       const subs = (await listRes.json())?.data || [];
       // Only active / trialing / past_due grant access. A canceled/ended sub grants nothing.
@@ -200,7 +218,7 @@ export default async function handler(req, res) {
 
       // Refresh the active sub after any change so we return + reconcile on current state.
       if (active) {
-        const freshRes = await fetch(`https://api.stripe.com/v1/subscriptions/${active.id}?expand[]=items`, { headers: { Authorization: `Bearer ${STRIPE_KEY}` } });
+        const freshRes = await fetch(`https://api.stripe.com/v1/subscriptions/${active.id}`, { headers: { Authorization: `Bearer ${STRIPE_KEY}` } });
         active = freshRes.ok ? await freshRes.json() : active;
       }
 
@@ -367,7 +385,7 @@ export default async function handler(req, res) {
 
     const WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_SECRET;
     const sigHeader = req.headers['stripe-signature'];
-    const rawBody = typeof req.body === 'string' ? req.body : JSON.stringify(req.body);
+    // rawBody captured at handler entry — the exact bytes Stripe signed.
 
     // SECURITY: Require signature verification — no unsigned fallback.
     // If STRIPE_WEBHOOK_SECRET is not configured, return 503 rather than

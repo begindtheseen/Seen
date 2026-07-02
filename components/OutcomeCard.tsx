@@ -73,7 +73,9 @@ export default function OutcomeCard({ app, onClose, onShared }: Props) {
 
   // No public per-outcome page exists, so unfurl the company page (which has a dynamic
   // OG image) when we know the company, else the root site OG image.
-  const companySlug = (app.company || '').toLowerCase().trim().replace(/[^a-z0-9\s-]/g, '').replace(/\s+/g, '-').replace(/-+/g, '-')
+  // Must round-trip through /company/[slug]'s decoder — stripping punctuation ("H&M"→"hm")
+  // made every shared card link land on a dataless page.
+  const companySlug = encodeURIComponent((app.company || '').toLowerCase().trim().replace(/\s+/g, '-'))
   const unfurlUrl = companySlug ? `https://seenjobs.io/company/${companySlug}` : 'https://seenjobs.io'
 
   useEffect(() => { setMounted(true) }, [])

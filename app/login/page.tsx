@@ -5,7 +5,15 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/lib/auth'
 
-type Step = 'who' | 'email' | 'password' | 'verify' | 'signin' | 'reset'
+type Step = 'who' | 'email' | 'password' | 'verify' | 'signin'
+
+// Only ever redirect to an internal path — anything else (full URLs, protocol-relative
+// '//evil.com') falls back to the dashboard so login can't be used as an open redirect.
+function safeInternalPath(p: string | null): string | null {
+  if (!p) return null
+  if (!p.startsWith('/') || p.startsWith('//')) return null
+  return p
+}
 
 function fieldStyle(focused: boolean) {
   return {
@@ -27,8 +35,15 @@ function LoginContent() {
   const router = useRouter()
   const params = useSearchParams()
   const { isLoggedIn } = useAuth()
-  const [step, setStep] = useState<Step>(params.get('signup') === '1' ? 'who' : 'signin')
-  const [signupType, setSignupType] = useState<'seeker' | 'employer'>('seeker')
+  // Where to land after auth. /apply, /pricing and the UpgradeModal pass ?return= / ?next=
+  // so the user resumes what they were doing — dumping everyone on /dashboard lost the
+  // "did you apply?" context and the upgrade intent.
+  const returnTo = safeInternalPath(params.get('return')) || safeInternalPath(params.get('next')) || '/dashboard'
+  // "For employers →" links here with ?type=employer — open the chooser (not seeker sign-in).
+  const [step, setStep] = useState<Step>(
+    params.get('signup') === '1' || params.get('type') === 'employer' ? 'who' : 'signin'
+  )
+  const [signupType, setSignupType] = useState<'seeker' | 'employer'>(params.get('type') === 'employer' ? 'employer' : 'seeker')
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -38,8 +53,8 @@ function LoginContent() {
   const [focused, setFocused] = useState<string | null>(null)
 
   useEffect(() => {
-    if (isLoggedIn) router.replace('/dashboard')
-  }, [isLoggedIn, router])
+    if (isLoggedIn) router.replace(returnTo)
+  }, [isLoggedIn, router, returnTo])
 
   function clearError() { setError('') }
 
@@ -71,7 +86,7 @@ function LoginContent() {
     setLoading(false)
     if (err || !data.user) { setError('Not verified yet. Check your email.'); return }
     if (!data.user.email_confirmed_at) { setError('Still waiting on verification. Check your inbox.'); return }
-    router.replace('/dashboard')
+    router.replace(returnTo)
   }
 
   async function resendVerification() {
@@ -87,16 +102,7 @@ function LoginContent() {
     const { error: err } = await supabase.auth.signInWithPassword({ email, password })
     setLoading(false)
     if (err) { setError('Incorrect email or password.'); return }
-    router.replace('/dashboard')
-  }
-
-  async function doResetPassword() {
-    if (!email.trim()) { setError('Enter your email address.'); return }
-    setLoading(true); clearError()
-    await supabase.auth.resetPasswordForEmail(email, { redirectTo: `${window.location.origin}/login?reset=1` })
-    setLoading(false)
-    setError('')
-    alert('Check your email for a reset link.')
+    router.replace(returnTo)
   }
 
   const btnStyle: React.CSSProperties = {
@@ -259,7 +265,9 @@ function LoginContent() {
               <input type="password" placeholder="••••••••" value={password} onChange={e => setPassword(e.target.value)} style={fieldStyle(focused === 'siPw')} onFocus={() => setFocused('siPw')} onBlur={() => setFocused(null)} onKeyDown={e => e.key === 'Enter' && doSignIn()} />
             </div>
             <div style={{ textAlign: 'right', marginBottom: '1.25rem' }}>
-              <button onClick={() => { clearError(); setStep('reset') }} style={{ background: 'none', border: 'none', color: 'var(--muted)', fontFamily: 'var(--mono)', fontSize: '.62rem', cursor: 'pointer', textDecoration: 'underline' }}>
+              {/* /reset is the working code-based flow (send code → verify → set password).
+                  The old in-page step emailed a link that dead-ended on /dashboard. */}
+              <button onClick={() => router.push('/reset')} style={{ background: 'none', border: 'none', color: 'var(--muted)', fontFamily: 'var(--mono)', fontSize: '.62rem', cursor: 'pointer', textDecoration: 'underline' }}>
                 Forgot password?
               </button>
             </div>
@@ -275,21 +283,6 @@ function LoginContent() {
           </div>
         )}
 
-        {/* ── STEP: RESET ── */}
-        {step === 'reset' && (
-          <div>
-            {backBtn('signin')}
-            <div style={{ fontFamily: 'var(--display)', fontSize: '1.4rem', fontWeight: 800, color: 'var(--white)', letterSpacing: '-.025em', marginBottom: '.2rem' }}>Reset password</div>
-            <div style={{ fontSize: '.82rem', color: 'var(--sub)', fontWeight: 300, marginBottom: '1.5rem' }}>Enter your email and we&apos;ll send a reset link</div>
-            <div style={{ marginBottom: '1.25rem' }}>
-              {label('Email')}
-              <input type="email" placeholder="you@email.com" value={email} onChange={e => setEmail(e.target.value)} style={fieldStyle(focused === 'rEmail')} onFocus={() => setFocused('rEmail')} onBlur={() => setFocused(null)} onKeyDown={e => e.key === 'Enter' && doResetPassword()} />
-            </div>
-            <button style={btnStyle} onClick={doResetPassword} disabled={loading}>
-              {loading ? 'Sending...' : 'Send reset link →'}
-            </button>
-          </div>
-        )}
       </div>
     </div>
   )

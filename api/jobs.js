@@ -138,8 +138,12 @@ export default async function handler(req, res) {
     // Real distance search: clamp the requested radius, geocode the searched place once
     // (cached), and pass the distance to Adzuna so the live pull is already scoped. `center`
     // is filled in during the DB-first Promise.all below (overlapped with the DB reads).
-    const radiusMiles = Math.min(500, Math.max(5, parseInt(radius, 10) || 25));
-    const distanceKm = milesToKm(radiusMiles);
+    // radius === '0'/'remote' means REMOTE: skip geo filtering entirely and search remote
+    // listings — the old clamp silently turned "Remote" into an ordinary 25-mile search.
+    const isRemote = String(radius) === '0' || String(radius).toLowerCase() === 'remote';
+    if (isRemote) { loc = 'remote'; }
+    const radiusMiles = isRemote ? Infinity : Math.min(500, Math.max(5, parseInt(radius, 10) || 25));
+    const distanceKm = isRemote ? null : milesToKm(radiusMiles);
     let center = null; // { lat, lng } | null (null → geocode unavailable, fall back to city/state)
 
     // Keep a listing if it's within the radius; rank the whole list nearest-first. Jobs with
@@ -147,6 +151,12 @@ export default async function handler(req, res) {
     // coarse city → state match so they're never wrongly dropped.
     const applyRadius = (list) => {
       if (!loc) return Array.isArray(list) ? list : [];
+      // Remote search: distance is meaningless — prefer listings that say remote, keep the rest.
+      if (isRemote) {
+        const arr = Array.isArray(list) ? list : [];
+        const isRem = (j) => /\bremote\b|\bwork from home\b|\banywhere\b/i.test(`${j.location || ''} ${j.description || ''}`);
+        return [...arr.filter(isRem), ...arr.filter(j => !isRem(j))];
+      }
       if (!center) return filterByLocation(list, loc); // geocode failed → coarse city/state
       const withCoords = [], withoutCoords = [];
       for (const j of (list || [])) {
@@ -198,7 +208,9 @@ export default async function handler(req, res) {
           fetch(`${SUPABASE_URL}/rest/v1/feature_flags?flag_name=eq.job_search_target&select=percentage&limit=1`, { headers: dbHeaders })
             .then(r => r.ok ? r.json() : []).catch(() => []),
           // Geocode the searched place once (cached) — overlapped with the DB reads.
-          loc ? geocodeLocation(loc, SUPABASE_URL, SUPABASE_SERVICE_KEY) : Promise.resolve(null),
+          // 'remote' is not a place: skip geocoding (a null center + remote loc also skips
+          // the radius filter below).
+          loc && !isRemote ? geocodeLocation(loc, SUPABASE_URL, SUPABASE_SERVICE_KEY) : Promise.resolve(null),
         ]);
         center = centerResolved;
 
@@ -236,11 +248,12 @@ export default async function handler(req, res) {
           }
         }
         dbMatches = filterAndRank(pool, relevanceQuery).map(j => ({
+          id: j.id || null, // keep the DB id — without it /jobs/<id> permalinks can never resolve
           title: j.title, company: j.company, location: j.location || loc,
           salary: j.salary, url: j.apply_url || j.url || null, description: j.description,
           type: j.type || 'Full-time', level: inferLevel(j.title || ''),
           source: j.source || 'Seen', score: j.score || 65, waste_score: j.waste_score || 25,
-          lat: j.lat ?? null, lng: j.lng ?? null,
+          lat: j.lat ?? null, lng: j.lng ?? null, posted_at: j.created_at || null,
         }));
         // Keep only listings within the searched radius (true distance when we have
         // coordinates, else coarse city → state), nearest first.
@@ -287,11 +300,12 @@ export default async function handler(req, res) {
       });
       // Map the freshly-saved listings into the UI shape, then relevance + radius filter.
       jobs = (agg.jobs || []).map(j => ({
+        id: j.id || null, // keep the DB id when the upsert returned one
         title: j.title, company: j.company, location: j.location || loc,
         salary: j.salary, url: j.apply_url || j.url || null, description: j.description,
         type: j.type || 'Full-time', level: inferLevel(j.title || ''),
         source: j.source || 'Seen', score: j.score || 65, waste_score: j.waste_score || 25,
-        lat: j.lat ?? null, lng: j.lng ?? null,
+        lat: j.lat ?? null, lng: j.lng ?? null, posted_at: j.created_at || null,
       }));
       jobs = applyRadius(filterAndRank(jobs, relevanceQuery));
       console.log(`AGGREGATED: "${query}" → "${canonical}" @ "${loc}" — ${agg.jobs?.length || 0} fetched, ${agg.upserted || 0} saved, ${jobs.length} relevant`);
@@ -320,11 +334,12 @@ export default async function handler(req, res) {
     // place, so "nearby" stays nearby. Only if that's still empty do we fall back to a
     // national pull. rankByDistanceKeepAll always shows the closest listings first.
     const toUi = j => ({
+      id: j.id || null, // keep the DB id — /jobs/<id> permalinks depend on it
       title: j.title, company: j.company, location: j.location || loc,
       salary: j.salary, url: j.apply_url || j.url || null, description: j.description,
       type: j.type || 'Full-time', level: inferLevel(j.title || ''),
       source: j.source || 'Seen', score: j.score || 65, waste_score: j.waste_score || 25,
-      lat: j.lat ?? null, lng: j.lng ?? null,
+      lat: j.lat ?? null, lng: j.lng ?? null, posted_at: j.created_at || null,
     });
     const dedupJobs = arr => {
       const s = new Set(), out = [];
@@ -403,6 +418,7 @@ async function nearestListings(loc, supabaseUrl, dbHeaders) {
   const now = encodeURIComponent(new Date().toISOString());
   const cols = 'title,company,location,salary,apply_url,description,type,level,source,score,waste_score';
   const mapUi = rows => (Array.isArray(rows) ? rows : []).map(j => ({
+    id: j.id || null,
     title: j.title, company: j.company, location: j.location,
     salary: j.salary, url: j.apply_url, description: j.description,
     type: j.type || 'Full-time', level: inferLevel(j.title || ''),

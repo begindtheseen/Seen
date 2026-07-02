@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/lib/auth'
 import { AppStore } from '@/lib/stores/AppStore'
@@ -9,6 +9,10 @@ import { aiHeaders } from '@/lib/aiHeaders'
 interface ApplyCheckpointProps {
   job: { id: string; title: string; company: string; location?: string; apply_url?: string | null }
   optimized?: boolean
+  // When the user has ALREADY indicated they applied (e.g. finished the Apply & Optimize
+  // funnel and clicked "I Applied"), open straight into the tracked receipt and record the
+  // application on mount — don't re-ask "Did you apply?", which people close without tracking.
+  autoConfirm?: boolean
   onClose: () => void
 }
 
@@ -51,13 +55,25 @@ function saveSkipReason(
   }
 }
 
-export default function ApplyCheckpoint({ job, optimized: _optimized, onClose }: ApplyCheckpointProps) {
+export default function ApplyCheckpoint({ job, optimized: _optimized, autoConfirm = false, onClose }: ApplyCheckpointProps) {
   const router = useRouter()
   const { isLoggedIn } = useAuth()
-  const [step, setStep] = useState<Step>('main')
+  const [step, setStep] = useState<Step>(autoConfirm ? 'confirmed' : 'main')
   const [loading, setLoading] = useState(false)
 
   const [creditEarned, setCreditEarned] = useState(false)
+
+  // If the user already confirmed they applied (finished the Apply & Optimize funnel),
+  // record the application once on mount so it always lands in the tracker — no second
+  // "Did you apply?" prompt to accidentally dismiss.
+  const didAutoConfirm = useRef(false)
+  useEffect(() => {
+    if (autoConfirm && !didAutoConfirm.current) {
+      didAutoConfirm.current = true
+      handleApplied()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoConfirm])
 
   async function handleApplied() {
     setLoading(true)

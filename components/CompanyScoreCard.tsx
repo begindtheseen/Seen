@@ -41,7 +41,7 @@ export default function CompanyScoreCard({ data, shareUrl, onClose, onShared }: 
   // The unfurl URL: the company page (which has a dynamic OG image) when known,
   // else the root site. Pasting this into Reddit/X/etc renders an image preview card.
   const unfurlUrl = shareUrl
-    || `https://seenjobs.io/company/${(data.company || '').toLowerCase().trim().replace(/[^a-z0-9\s-]/g, '').replace(/\s+/g, '-').replace(/-+/g, '-')}`
+    || `https://seenjobs.io/company/${encodeURIComponent((data.company || '').toLowerCase().trim().replace(/\s+/g, '-'))}`
 
   const score = Math.round(data.overall_score || 0)
   const risk = data.risk ?? (score >= 70 ? 'safe' : score >= 40 ? 'warn' : 'danger')
