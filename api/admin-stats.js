@@ -377,8 +377,11 @@ async function _handler(req, res) {
     };
 
     // ── Monetization / conversion analytics ──────────────────────────────────
-    const freeCount = Math.max(0, creditRows.length - proCount);
-    const convPct = creditRows.length ? Math.round((proCount / creditRows.length) * 1000) / 10 : 0;
+    // Denominator is REAL signups (usersTotal = profiles count), not ai_credits rows: a
+    // user who never ran an AI tool has no ai_credits row, so counting creditRows
+    // undercounted accounts and inflated conversion. free = total − paid.
+    const freeCount = Math.max(0, usersTotal - proCount);
+    const convPct = usersTotal ? Math.round((proCount / usersTotal) * 1000) / 10 : 0;
     const subs = await stripeSubsBreakdown();
     const shareRows = outcomeSharesRes && outcomeSharesRes.ok ? await outcomeSharesRes.json() : [];
     const sharesByChannel = {};
@@ -391,7 +394,7 @@ async function _handler(req, res) {
 
     const monetization = {
       stripe_connected: !!process.env.STRIPE_SECRET_KEY,
-      total_accounts: creditRows.length,
+      total_accounts: usersTotal,
       pro_users: proCount,
       free_users: freeCount,
       conversion_pct: convPct,
@@ -1156,9 +1159,12 @@ async function _handler(req, res) {
   // days goes 'stale' and never resurfaces on a re-search — yet it still SERVES to users
   // (the job search filters on expires_at>now, not availability_status) until its expires_at
   // passes (up to 14 days later). Result: after a refresh the admin "Stale/expired" count
-  // never drops → the button looks dead. This explicit, admin-gated, audited action retires
-  // those unconfirmed-stale rows so the count observably matches the button beside it, and
-  // stops serving week-old, likely-filled listings to seekers (a data-quality win). Full
+  // never drops → the button looks dead. This explicit, admin-gated, audited action
+  // SOFT-RETIRES those unconfirmed-stale rows (does NOT delete them): it sets
+  // expires_at=now() so they immediately fall out of the user search (which gates on
+  // expires_at>now) AND out of the "Stale/expired" count, while the row itself SURVIVES so
+  // saved_jobs/applications foreign keys and /jobs/[id] permalinks (get_by_id resolves by
+  // id, no expires_at filter) still resolve for anyone holding a shared/saved link. Full
   // admins only; the fresh backfill from refresh-jobs replaces the cleared inventory.
   if (action === 'purge_stale_jobs') {
     if (adminRole === 'moderator') return res.status(403).json({ error: 'Insufficient role' });
@@ -1166,8 +1172,8 @@ async function _handler(req, res) {
     const beforeRes = await db(`jobs?availability_status=in.(stale,expired)&select=id`, { headers: { Prefer: 'count=exact', 'Range-Unit': 'items', Range: '0-0' } });
     const removed = cnt(beforeRes);
     if (removed > 0) {
-      const del = await db(`jobs?availability_status=in.(stale,expired)`, { method: 'DELETE', headers: { Prefer: 'return=minimal' } });
-      if (!del.ok) return res.status(500).json({ error: 'Failed to purge stale listings' });
+      const patch = await db(`jobs?availability_status=in.(stale,expired)`, { method: 'PATCH', body: JSON.stringify({ availability_status: 'expired', expires_at: new Date().toISOString() }), headers: { Prefer: 'return=minimal' } });
+      if (!patch.ok) return res.status(500).json({ error: 'Failed to retire stale listings' });
     }
     await db('admin_audit_log', { method: 'POST', body: JSON.stringify({ admin_id: sess.admin_id, username: sess.username || 'admin', action: 'purge_stale_jobs', target_type: 'jobs', metadata: { removed } }), headers: { Prefer: 'return=minimal' } }).catch(() => {});
     return res.status(200).json({ ok: true, removed });
