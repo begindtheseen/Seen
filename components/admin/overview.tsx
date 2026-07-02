@@ -1,17 +1,47 @@
 'use client'
 
+import { useState } from 'react'
 import type { Tone, AttnItem } from './types'
+import { saveFile } from './saveFile'
 
 export type HealthStatus = 'Healthy' | 'Attention needed' | 'Critical'
 
+// Two-step CSV export that survives iOS. Step 1 (Prepare) does the awaited fetch;
+// step 2 (Download) calls saveFile SYNCHRONOUSLY inside the click, preserving the
+// user gesture the share sheet / download requires.
+export function CsvDownloadButton({ fetchCsv }: { fetchCsv: () => Promise<{ filename: string; content: string } | null> }) {
+  const [state, setState] = useState<'idle' | 'preparing' | 'ready'>('idle')
+  const [payload, setPayload] = useState<{ filename: string; content: string } | null>(null)
+
+  async function prepare() {
+    setState('preparing')
+    try {
+      const d = await fetchCsv()
+      if (d && d.content) { setPayload(d); setState('ready') }
+      else setState('idle')
+    } catch { setState('idle') }
+  }
+
+  function download() {
+    if (!payload) return
+    // No await before this call — must stay in the user gesture for iOS.
+    saveFile(payload.filename, 'text/csv;charset=utf-8', payload.content)
+    setTimeout(() => { setState('idle'); setPayload(null) }, 600)
+  }
+
+  if (state === 'ready') {
+    return <button onClick={download} className="adm-btn" style={{ borderColor: 'rgba(16,185,129,.6)', color: 'var(--green)', background: 'rgba(16,185,129,.1)' }}>⬇ Download CSV</button>
+  }
+  return <button onClick={prepare} disabled={state === 'preparing'} className="adm-btn" style={{ borderColor: 'rgba(16,185,129,.4)', color: 'var(--green)' }}>{state === 'preparing' ? 'Preparing…' : '⬇ CSV'}</button>
+}
+
 // Hero band: product title, a computed health pill, one plain-English summary
 // sentence, and the primary session actions (refresh / CSV / sign out) + build stamp.
-export function AdminHero({ status, summary, onRefresh, onDownloadCsv, downloading, onLogout }: {
+export function AdminHero({ status, summary, onRefresh, fetchCsv, onLogout }: {
   status: HealthStatus
   summary: string
   onRefresh: () => void
-  onDownloadCsv: () => void
-  downloading: boolean
+  fetchCsv: () => Promise<{ filename: string; content: string } | null>
   onLogout: () => void
 }) {
   const pillClass = status === 'Critical' ? 'crit' : status === 'Attention needed' ? 'warn' : 'ok'
@@ -30,7 +60,7 @@ export function AdminHero({ status, summary, onRefresh, onDownloadCsv, downloadi
       </div>
       <div className="a2-hero-actions">
         <button onClick={onRefresh} className="adm-btn">↻ Refresh</button>
-        <button onClick={onDownloadCsv} disabled={downloading} className="adm-btn" style={{ borderColor: 'rgba(16,185,129,.4)', color: 'var(--green)' }}>{downloading ? 'Exporting…' : '⬇ CSV'}</button>
+        <CsvDownloadButton fetchCsv={fetchCsv} />
         <button onClick={onLogout} className="adm-btn-danger">Sign out</button>
       </div>
     </header>

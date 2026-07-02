@@ -1313,7 +1313,8 @@ nav.nav-scrolled{background:rgba(6,6,8,0.82);backdrop-filter:blur(60px) saturate
 .a2-pill.crit{color:var(--red);background:rgba(239,68,68,.12);border-color:rgba(239,68,68,.45)}
 
 /* 5 operating cards */
-.a2-cards{display:grid;grid-template-columns:1fr 1fr;gap:.7rem;margin-bottom:1.5rem}
+.a2-cards{display:grid;grid-template-columns:1fr;gap:.7rem;margin-bottom:1.5rem}
+@media(min-width:440px){.a2-cards{grid-template-columns:1fr 1fr}}
 @media(min-width:720px){.a2-cards{grid-template-columns:repeat(3,1fr)}}
 @media(min-width:1040px){.a2-cards{grid-template-columns:repeat(5,1fr)}}
 .a2-card{background:linear-gradient(165deg,rgba(255,255,255,.045),rgba(255,255,255,.015));border:1px solid rgba(255,255,255,.08);border-radius:14px;padding:1rem 1.05rem 1.1rem;min-width:0;box-sizing:border-box;box-shadow:inset 0 1px 0 rgba(255,255,255,.05);display:flex;flex-direction:column}
@@ -1359,3 +1360,24 @@ nav.nav-scrolled{background:rgba(6,6,8,0.82);backdrop-filter:blur(60px) saturate
 .a2-tab.active{color:var(--white);background:rgba(59,130,246,.14);border-color:rgba(59,130,246,.4)}
 .a2-tabpanel{animation:fadeIn .18s ease both}
 .a2-overview-hint{font-family:var(--mono);font-size:.62rem;color:var(--dim);text-align:center;padding:1.5rem 1rem;line-height:1.6}
+
+/* Admin V2 — visual polish + 375px hard requirement (no horizontal overflow) */
+.adm-wrap{overflow-x:hidden}
+.a2-card-n{max-width:100%}
+@media(max-width:430px){
+  .a2-title{font-size:1.75rem}
+  .a2-summary{font-size:.82rem}
+  .a2-card{padding:.85rem .9rem .95rem}
+  .a2-card-n{font-size:1.6rem}
+  .a2-hero-actions{width:100%}
+  .a2-hero-actions .adm-btn,.a2-hero-actions .adm-btn-danger{flex:1 1 auto;text-align:center;padding:.5rem .6rem}
+  .a2-attn{gap:.5rem}
+  .a2-attn-sev{min-width:2.9rem;font-size:.44rem;padding:.18rem .35rem}
+  .a2-attn-act{padding:.3rem .55rem}
+  .a2-tab{padding:.42rem .7rem;font-size:.58rem}
+  .a2-queue{padding:.95rem .9rem}
+}
+/* Detail panels sit calmer under the command center: a touch more breathing room,
+   softer separators (fewer hard glowing borders) inside tab panels. */
+.a2-tabpanel .ac-panel,.a2-tabpanel .adm-panel{border-color:rgba(255,255,255,.06)}
+.a2-tabpanel .ac-grid2{gap:.85rem}

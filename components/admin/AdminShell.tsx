@@ -17,7 +17,6 @@ export function AdminShell({ stats, token, reload, onLogout, onUnauthorized }: {
   onLogout: () => void
   onUnauthorized: () => void
 }) {
-  const [downloading, setDownloading] = useState(false)
   const [mergePrefill, setMergePrefill] = useState<MergePrefill | null>(null)
   const [kpiModal, setKpiModal] = useState<{ metric: string; title: string } | null>(null)
   const [manageOpen, setManageOpen] = useState(false)
@@ -29,8 +28,9 @@ export function AdminShell({ stats, token, reload, onLogout, onUnauthorized }: {
   function openKpi(metric: string, title: string) { setKpiModal({ metric, title }) }
   function openManage(f: 'all' | 'pro' | 'free') { setManageFilter(f); setManageOpen(true) }
 
-  async function downloadCsv() {
-    setDownloading(true)
+  // Fetches the CSV payload; the actual save happens in CsvDownloadButton's
+  // click handler (user-gesture-safe for iOS). Returns null on any failure.
+  async function fetchCsv(): Promise<{ filename: string; content: string } | null> {
     try {
       const res = await fetch('/api/admin-stats', {
         method: 'POST',
@@ -38,15 +38,9 @@ export function AdminShell({ stats, token, reload, onLogout, onUnauthorized }: {
         body: JSON.stringify({ action: 'export_csv' }),
       })
       const d = await res.json()
-      if (d?.csv) {
-        const blob = new Blob([d.csv], { type: 'text/csv;charset=utf-8' })
-        const url = URL.createObjectURL(blob)
-        const a = document.createElement('a')
-        a.href = url; a.download = d.filename || 'seen-metrics.csv'; a.click()
-        URL.revokeObjectURL(url)
-      }
-    } catch { /* ignore */ }
-    setDownloading(false)
+      if (d?.csv) return { filename: d.filename || 'seen-metrics.csv', content: d.csv }
+      return null
+    } catch { return null }
   }
 
   // Shared job-board remediation used by the Needs Attention rows. Backfills fresh listings
@@ -140,7 +134,7 @@ export function AdminShell({ stats, token, reload, onLogout, onUnauthorized }: {
       <div className="adm-wrap">
 
         {/* 1. Hero — title, health pill, plain-English summary, session actions */}
-        <AdminHero status={status} summary={summary} onRefresh={reload} onDownloadCsv={downloadCsv} downloading={downloading} onLogout={onLogout} />
+        <AdminHero status={status} summary={summary} onRefresh={reload} fetchCsv={fetchCsv} onLogout={onLogout} />
 
         {/* Crisis banner stays prominent (one-click remediation) */}
         {jh?.crisis && <JobCrisisBanner health={jh} token={token} onRefresh={reload} />}

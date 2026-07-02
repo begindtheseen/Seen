@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import type { AdminStats, RecentReport, Issue, InactiveReport, DupCluster, RecentJob, JobGroup, DupGroup, MergePrefill, MergeLog, FeatureFlag } from './types'
 import { Card, CardHeader, Badge, relTime, outcomeColor, availColor, runRefreshAndClear, refreshResultMsg } from './primitives'
+import { saveFile } from './saveFile'
 
 const ISSUE_TYPE_LABEL: Record<string, string> = {
   wrong_data: 'Wrong data', duplicate: 'Duplicate', broken_listing: 'Broken listing', spam: 'Spam', other: 'Other',
@@ -588,13 +589,15 @@ export function CompanyExportPanel({ token }: { token: string }) {
   const [company, setCompany] = useState('')
   const [busy, setBusy] = useState(false)
   const [status, setStatus] = useState<{ text: string; color: string } | null>(null)
+  // Two-step (prepare → download) so the save fires inside the user gesture on iOS.
+  const [ready, setReady] = useState<{ filename: string; content: string } | null>(null)
 
   const inputStyle: React.CSSProperties = { width: '100%', background: 'var(--raised)', border: '1px solid var(--line2)', borderRadius: 7, padding: '.42rem .65rem', fontFamily: 'var(--mono)', fontSize: '.65rem', color: 'var(--white)', outline: 'none', boxSizing: 'border-box' }
 
-  async function exportCompany() {
+  async function prepareExport() {
     const name = company.trim()
     if (name.length < 2) { setStatus({ text: 'Enter a company name', color: 'var(--red)' }); return }
-    setBusy(true)
+    setBusy(true); setReady(null)
     setStatus({ text: 'Assembling audit bundle…', color: 'var(--dim)' })
     try {
       const res = await fetch('/api/admin-stats', {
@@ -607,23 +610,20 @@ export function CompanyExportPanel({ token }: { token: string }) {
       const b = d.bundle
       const t = b?.totals || {}
       const cs = b?.computed_score || {}
-      // Trigger a client-side JSON download.
       const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'company'
       const date = new Date().toISOString().slice(0, 10)
-      const blob = new Blob([JSON.stringify(b, null, 2)], { type: 'application/json' })
-      const url = URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url
-      a.download = `seen-company-audit-${slug}-${date}.json`
-      document.body.appendChild(a)
-      a.click()
-      a.remove()
-      URL.revokeObjectURL(url)
-      setStatus({ text: `✓ Exported — ${t.total_reports ?? 0} reports (${t.included_in_score ?? 0} in score · ${t.excluded_needs_review ?? 0} held) · ${t.distinct_submitters ?? 0} submitters · grade ${cs.overall_score ?? 'n/a'}`, color: 'var(--green)' })
+      setReady({ filename: `seen-company-audit-${slug}-${date}.json`, content: JSON.stringify(b, null, 2) })
+      setStatus({ text: `✓ Ready — ${t.total_reports ?? 0} reports (${t.included_in_score ?? 0} in score · ${t.excluded_needs_review ?? 0} held) · ${t.distinct_submitters ?? 0} submitters · grade ${cs.overall_score ?? 'n/a'}. Tap Download.`, color: 'var(--green)' })
     } catch (e) {
       setStatus({ text: 'Export failed: ' + (e as Error).message, color: 'var(--red)' })
     }
     setBusy(false)
+  }
+
+  function download() {
+    if (!ready) return
+    // No await before this call — keeps the iOS share sheet inside the user gesture.
+    saveFile(ready.filename, 'application/json', ready.content)
   }
 
   return (
@@ -635,11 +635,17 @@ export function CompanyExportPanel({ token }: { token: string }) {
       <div style={{ display: 'flex', gap: '.5rem', alignItems: 'flex-end', flexWrap: 'wrap' }}>
         <div style={{ flex: 1, minWidth: 140 }}>
           <div style={{ fontFamily: 'var(--mono)', fontSize: '.48rem', color: 'var(--muted)', marginBottom: '.22rem' }}>Company name</div>
-          <input value={company} onChange={e => setCompany(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') exportCompany() }} placeholder="e.g. FedEx" style={inputStyle} />
+          <input value={company} onChange={e => { setCompany(e.target.value); setReady(null) }} onKeyDown={e => { if (e.key === 'Enter') prepareExport() }} placeholder="e.g. FedEx" style={inputStyle} />
         </div>
-        <button onClick={exportCompany} disabled={busy} style={{ fontFamily: 'var(--mono)', fontSize: '.6rem', padding: '.42rem .9rem', borderRadius: 7, border: '1px solid rgba(59,130,246,.3)', background: 'rgba(59,130,246,.08)', color: 'var(--blue)', cursor: 'pointer', flexShrink: 0 }}>
-          {busy ? 'Exporting…' : 'Export JSON ↓'}
-        </button>
+        {ready ? (
+          <button onClick={download} style={{ fontFamily: 'var(--mono)', fontSize: '.6rem', padding: '.42rem .9rem', borderRadius: 7, border: '1px solid rgba(16,185,129,.5)', background: 'rgba(16,185,129,.12)', color: 'var(--green)', cursor: 'pointer', flexShrink: 0 }}>
+            ⬇ Download JSON
+          </button>
+        ) : (
+          <button onClick={prepareExport} disabled={busy} style={{ fontFamily: 'var(--mono)', fontSize: '.6rem', padding: '.42rem .9rem', borderRadius: 7, border: '1px solid rgba(59,130,246,.3)', background: 'rgba(59,130,246,.08)', color: 'var(--blue)', cursor: 'pointer', flexShrink: 0 }}>
+            {busy ? 'Assembling…' : 'Prepare export'}
+          </button>
+        )}
       </div>
       {status && <div style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', marginTop: '.5rem', color: status.color, lineHeight: 1.5 }}>{status.text}</div>}
     </Card>
