@@ -172,21 +172,6 @@ export function AdminShell({ stats, token, reload, onLogout, onUnauthorized }: {
           <div className="a2-tabpanel a2-overview-hint">The command center above is your Overview. Pick a tab for detailed tools and data.</div>
         )}
 
-        {tab === 'revenue' && (
-          <div className="a2-tabpanel">
-          <Panel title="Revenue" right={<span className="ac-panel-status" style={{ color: mrr ? 'var(--green)' : 'var(--dim)' }}>{mrr ? 'Revenue is moving' : 'Not active yet'}</span>}>
-            <MetricRow label="MRR" value={mrr != null ? `$${mrr.toLocaleString()}` : '$0'} status={m?.mrr_annualized != null ? `$${m.mrr_annualized.toLocaleString()}/yr` : (stripeOn ? 'no active subs' : 'Stripe not connected')} tone={mrr ? 'green' : 'dim'} />
-            <MetricRow label="Paid users" value={paidUsers.toLocaleString()} status={m ? `${m.conversion_pct}% of ${m.total_accounts.toLocaleString()}` : ''} tone={paidUsers ? 'green' : 'dim'} />
-            <MetricRow label="On trial" value={stripeOn ? (m?.trialing ?? 0) : '—'} status="trialing now" tone={(m?.trialing ?? 0) > 0 ? 'blue' : 'dim'} />
-            <MetricRow label="Canceling" value={stripeOn ? (m?.canceling ?? 0) : '—'} status="cancels at period end" tone={(m?.canceling ?? 0) > 0 ? 'amber' : 'dim'} />
-            <MetricRow label="Past due" value={stripeOn ? (m?.past_due ?? 0) : '—'} status="payment failing" tone={(m?.past_due ?? 0) > 0 ? 'amber' : 'dim'} />
-            <MetricRow label="Canceled" value={stripeOn ? (m?.canceled ?? 0) : '—'} status="churned" tone={(m?.canceled ?? 0) > 0 ? 'red' : 'dim'} />
-            <MetricRow label="Conversion" value={m ? `${m.conversion_pct}%` : '—'} status="free → paid" tone="sub" />
-            {!stripeOn && <div className="ac-panel-foot">Stripe not connected — trial / paid / MRR breakdown unavailable.</div>}
-          </Panel>
-          </div>
-        )}
-
         {tab === 'users' && (
           <div className="a2-tabpanel">
           <Panel title="Users" right={<span className="ac-panel-status">{stats.users.dau} active today</span>}>
@@ -201,19 +186,6 @@ export function AdminShell({ stats, token, reload, onLogout, onUnauthorized }: {
           </div>
         )}
 
-        {tab === 'community' && (
-          <div className="a2-tabpanel">
-          <Panel title="Data Flywheel" right={<span className="ac-panel-status" style={{ color: fwStatus === 'Not moving yet' ? 'var(--dim)' : 'var(--green)' }}>{fwStatus}</span>}>
-            <MetricRow label="Outcome cards shared" value={shares.toLocaleString()} status="virality signal" tone={shares > 0 ? 'blue' : 'dim'} />
-            <MetricRow label="Community reports" value={stats.reports.total.toLocaleString()} status={`${stats.reports.today} today`} tone="green" onClick={() => openKpi('total_reports', 'All reports')} />
-            <MetricRow label="Job searches (30d)" value={fw ? fw.job_searches_30d.toLocaleString() : '—'} status="tracker demand" tone="sub" />
-            <MetricRow label="Résumé scans (30d)" value={fw ? fw.resume_scans_30d.toLocaleString() : '—'} status="intel surveys" tone="sub" />
-            <MetricRow label="Companies scored" value={stats.companies.with_scores.toLocaleString()} status="with AI scores" onClick={() => openKpi('companies_scored', 'Companies with scores')} />
-            <MetricRow label="Credits earned / spent" value={`${(stats.credits.earned ?? 0).toLocaleString()} / ${(stats.credits.spent ?? 0).toLocaleString()}`} status="engagement" tone="sub" />
-          </Panel>
-          </div>
-        )}
-
         {tab === 'jobs' && (
           <div className="a2-tabpanel">
           <Panel title="Jobs & Companies" right={staleJobs > 0 ? <JobRefreshButton token={token} onDone={reload} /> : <span className="ac-panel-status">{jh ? `${jh.active_pct}% live` : ''}</span>}>
@@ -224,32 +196,37 @@ export function AdminShell({ stats, token, reload, onLogout, onUnauthorized }: {
             <MetricRow label="Company scores" value={stats.companies.with_scores.toLocaleString()} status="graded companies" onClick={() => openKpi('companies_scored', 'Companies with scores')} />
             <MetricRow label="Reported inactive" value={inactiveCount} status="user-flagged listings" tone={inactiveCount > 0 ? 'amber' : 'dim'} />
           </Panel>
-          </div>
-        )}
+            {/* New job listings browser */}
+            <AllJobsBrowser token={token} onUnauthorized={onUnauthorized} />
 
-        {tab === 'system' && (
-          <div className="a2-tabpanel">
-          <Panel title="System Health" right={<span className="ac-panel-status" style={{ color: (errToday > 0 || jh?.crisis) ? 'var(--amber)' : 'var(--green)' }}>{(errToday > 0 || jh?.crisis) ? 'Attention needed' : 'All systems normal'}</span>}>
-          <MetricRow label="API errors today" value={errToday} status="last 24h" tone={errToday > 10 ? 'red' : errToday > 0 ? 'amber' : 'green'} />
-          <MetricRow label="API errors this week" value={stats.errors?.this_week ?? 0} status="last 7 days" tone={(stats.errors?.this_week ?? 0) > 0 ? 'amber' : 'dim'} />
-          <MetricRow label="Active users today" value={stats.users.dau} status="DAU" tone="sub" />
-          <MetricRow label="Job refresh" value={jh?.crisis ? 'Behind' : 'Healthy'} status={jh ? `${jh.active_pct}% corpus live` : ''} tone={jh?.crisis ? 'red' : 'green'} />
-          {stats.errors?.recent && stats.errors.recent.length > 0 ? (
-            <div className="ac-panel-foot">
-              <div style={{ marginBottom: '.35rem', color: 'var(--sub)' }}>Recent errors by route</div>
-              {stats.errors.recent.slice(0, 4).map((e, i) => (
-                <div key={i} style={{ padding: '.15rem 0', color: 'var(--muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                  <span style={{ color: 'var(--dim)' }}>{relTime(e.created_at)}</span> · <span style={{ color: 'var(--sub)' }}>{e.endpoint}</span> · {e.error_msg?.slice(0, 50)}
-                </div>
-              ))}
-            </div>
-          ) : <div className="ac-panel-foot" style={{ color: 'var(--green)' }}>✓ No system issues detected.</div>}
-        </Panel>
+            {/* Job deduplication */}
+            <JobDedupePanel token={token} />
+
+            {/* Reported inactive listings */}
+            <Card style={{ marginTop: '.65rem' }}>
+              <CardHeader
+                title="Reported inactive listings"
+                badge={(stats.jobs?.inactive_reports || []).length > 0 ? <Badge n={stats.jobs.inactive_reports.length} color="var(--amber)" /> : undefined}
+                action={<span style={{ fontFamily: 'var(--mono)', fontSize: '.48rem', color: 'var(--dim)' }}>User reports that a listing is no longer active</span>}
+              />
+              {(stats.jobs?.inactive_reports || []).length === 0
+                ? <div style={{ fontFamily: 'var(--mono)', fontSize: '.62rem', color: 'var(--dim)' }}>No inactive reports this week</div>
+                : (stats.jobs.inactive_reports || []).map(r => (<InactiveRow key={r.job_id} report={r} token={token} />))
+              }
+            </Card>
           </div>
         )}
 
         {tab === 'community' && (
           <div className="a2-tabpanel">
+          <Panel title="Data Flywheel" right={<span className="ac-panel-status" style={{ color: fwStatus === 'Not moving yet' ? 'var(--dim)' : 'var(--green)' }}>{fwStatus}</span>}>
+            <MetricRow label="Outcome cards shared" value={shares.toLocaleString()} status="virality signal" tone={shares > 0 ? 'blue' : 'dim'} />
+            <MetricRow label="Community reports" value={stats.reports.total.toLocaleString()} status={`${stats.reports.today} today`} tone="green" onClick={() => openKpi('total_reports', 'All reports')} />
+            <MetricRow label="Job searches (30d)" value={fw ? fw.job_searches_30d.toLocaleString() : '—'} status="tracker demand" tone="sub" />
+            <MetricRow label="Résumé scans (30d)" value={fw ? fw.resume_scans_30d.toLocaleString() : '—'} status="intel surveys" tone="sub" />
+            <MetricRow label="Companies scored" value={stats.companies.with_scores.toLocaleString()} status="with AI scores" onClick={() => openKpi('companies_scored', 'Companies with scores')} />
+            <MetricRow label="Credits earned / spent" value={`${(stats.credits.earned ?? 0).toLocaleString()} / ${(stats.credits.spent ?? 0).toLocaleString()}`} status="engagement" tone="sub" />
+          </Panel>
 
             {/* Company lookups setup note */}
             {stats.company_lookups && !stats.company_lookups.ready && (
@@ -339,34 +316,6 @@ export function AdminShell({ stats, token, reload, onLogout, onUnauthorized }: {
               }
             </Card>
 
-          </div>
-        )}
-
-        {tab === 'jobs' && (
-          <div className="a2-tabpanel">
-            {/* New job listings browser */}
-            <AllJobsBrowser token={token} onUnauthorized={onUnauthorized} />
-
-            {/* Job deduplication */}
-            <JobDedupePanel token={token} />
-
-            {/* Reported inactive listings */}
-            <Card style={{ marginTop: '.65rem' }}>
-              <CardHeader
-                title="Reported inactive listings"
-                badge={(stats.jobs?.inactive_reports || []).length > 0 ? <Badge n={stats.jobs.inactive_reports.length} color="var(--amber)" /> : undefined}
-                action={<span style={{ fontFamily: 'var(--mono)', fontSize: '.48rem', color: 'var(--dim)' }}>User reports that a listing is no longer active</span>}
-              />
-              {(stats.jobs?.inactive_reports || []).length === 0
-                ? <div style={{ fontFamily: 'var(--mono)', fontSize: '.62rem', color: 'var(--dim)' }}>No inactive reports this week</div>
-                : (stats.jobs.inactive_reports || []).map(r => (<InactiveRow key={r.job_id} report={r} token={token} />))
-              }
-            </Card>
-          </div>
-        )}
-
-        {tab === 'community' && (
-          <div className="a2-tabpanel">
             {/* Data quality issues queue */}
             <Card style={{ marginTop: '.65rem' }}>
               <CardHeader
@@ -388,6 +337,44 @@ export function AdminShell({ stats, token, reload, onLogout, onUnauthorized }: {
           </div>
         )}
 
+        {tab === 'revenue' && (
+          <div className="a2-tabpanel">
+          <Panel title="Revenue" right={<span className="ac-panel-status" style={{ color: mrr ? 'var(--green)' : 'var(--dim)' }}>{mrr ? 'Revenue is moving' : 'Not active yet'}</span>}>
+            <MetricRow label="MRR" value={mrr != null ? `$${mrr.toLocaleString()}` : '$0'} status={m?.mrr_annualized != null ? `$${m.mrr_annualized.toLocaleString()}/yr` : (stripeOn ? 'no active subs' : 'Stripe not connected')} tone={mrr ? 'green' : 'dim'} />
+            <MetricRow label="Paid users" value={paidUsers.toLocaleString()} status={m ? `${m.conversion_pct}% of ${m.total_accounts.toLocaleString()}` : ''} tone={paidUsers ? 'green' : 'dim'} />
+            <MetricRow label="On trial" value={stripeOn ? (m?.trialing ?? 0) : '—'} status="trialing now" tone={(m?.trialing ?? 0) > 0 ? 'blue' : 'dim'} />
+            <MetricRow label="Canceling" value={stripeOn ? (m?.canceling ?? 0) : '—'} status="cancels at period end" tone={(m?.canceling ?? 0) > 0 ? 'amber' : 'dim'} />
+            <MetricRow label="Past due" value={stripeOn ? (m?.past_due ?? 0) : '—'} status="payment failing" tone={(m?.past_due ?? 0) > 0 ? 'amber' : 'dim'} />
+            <MetricRow label="Canceled" value={stripeOn ? (m?.canceled ?? 0) : '—'} status="churned" tone={(m?.canceled ?? 0) > 0 ? 'red' : 'dim'} />
+            <MetricRow label="Conversion" value={m ? `${m.conversion_pct}%` : '—'} status="free → paid" tone="sub" />
+            {!stripeOn && <div className="ac-panel-foot">Stripe not connected — trial / paid / MRR breakdown unavailable.</div>}
+          </Panel>
+          </div>
+        )}
+
+        {tab === 'system' && (
+          <div className="a2-tabpanel">
+          <Panel title="System Health" right={<span className="ac-panel-status" style={{ color: (errToday > 0 || jh?.crisis) ? 'var(--amber)' : 'var(--green)' }}>{(errToday > 0 || jh?.crisis) ? 'Attention needed' : 'All systems normal'}</span>}>
+          <MetricRow label="API errors today" value={errToday} status="last 24h" tone={errToday > 10 ? 'red' : errToday > 0 ? 'amber' : 'green'} />
+          <MetricRow label="API errors this week" value={stats.errors?.this_week ?? 0} status="last 7 days" tone={(stats.errors?.this_week ?? 0) > 0 ? 'amber' : 'dim'} />
+          <MetricRow label="Active users today" value={stats.users.dau} status="DAU" tone="sub" />
+          <MetricRow label="Job refresh" value={jh?.crisis ? 'Behind' : 'Healthy'} status={jh ? `${jh.active_pct}% corpus live` : ''} tone={jh?.crisis ? 'red' : 'green'} />
+          {stats.errors?.recent && stats.errors.recent.length > 0 ? (
+            <div className="ac-panel-foot">
+              <div style={{ marginBottom: '.35rem', color: 'var(--sub)' }}>Recent errors by route</div>
+              {stats.errors.recent.slice(0, 4).map((e, i) => (
+                <div key={i} style={{ padding: '.15rem 0', color: 'var(--muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  <span style={{ color: 'var(--dim)' }}>{relTime(e.created_at)}</span> · <span style={{ color: 'var(--sub)' }}>{e.endpoint}</span> · {e.error_msg?.slice(0, 50)}
+                </div>
+              ))}
+            </div>
+          ) : <div className="ac-panel-foot" style={{ color: 'var(--green)' }}>✓ No system issues detected.</div>}
+        </Panel>
+            {/* Background job runner */}
+            <JobRunner token={token} />
+          </div>
+        )}
+
         {tab === 'advanced' && (
           <div className="a2-tabpanel">
             {/* Per-company evidentiary export */}
@@ -402,18 +389,6 @@ export function AdminShell({ stats, token, reload, onLogout, onUnauthorized }: {
             {/* Duplicate account clusters */}
             <ClustersPanel clusters={stats.duplicate_clusters?.items || []} suspected={stats.duplicate_clusters?.suspected || 0} token={token} onRefresh={reload} />
 
-          </div>
-        )}
-
-        {tab === 'system' && (
-          <div className="a2-tabpanel">
-            {/* Background job runner */}
-            <JobRunner token={token} />
-          </div>
-        )}
-
-        {tab === 'advanced' && (
-          <div className="a2-tabpanel">
             {/* Deploy trigger */}
             <DeployPanel />
 
