@@ -96,14 +96,16 @@ export default function Nav() {
           Seen
         </Link>
 
+        {/* Ordered by the seeker's own flow first (Dashboard → Jobs → Track → Résumé),
+            then shared explore links, so it doesn't read as a random wall of tabs. */}
         <div className="nav-pills">
+          {isSeeker && <Link href="/dashboard" className={`ntab${isActive('/dashboard') ? ' active' : ''}`}>Dashboard</Link>}
           <Link href="/jobs" className={`ntab${isActive('/jobs') ? ' active' : ''}`}>Jobs</Link>
+          {isSeeker && <Link href="/tracker" className={`ntab${isActive('/tracker') ? ' active' : ''}`}>Track</Link>}
+          {isSeeker && <Link href="/resume" className={`ntab${isActive('/resume') ? ' active' : ''}`}>Résumé AI</Link>}
           <Link href="/companies" className={`ntab${isActive('/companies') ? ' active' : ''}`}>Companies</Link>
           <Link href="/demand" className={`ntab${isActive('/demand') ? ' active' : ''}`}>Demand</Link>
           <Link href="/feed" className={`ntab${isActive('/feed') ? ' active' : ''}`}>Feed</Link>
-          {isSeeker && <Link href="/dashboard" className={`ntab${isActive('/dashboard') ? ' active' : ''}`}>Dashboard</Link>}
-          {isSeeker && <Link href="/resume" className={`ntab${isActive('/resume') ? ' active' : ''}`}>Resume AI</Link>}
-          {isSeeker && <Link href="/tracker" className={`ntab${isActive('/tracker') ? ' active' : ''}`}>Track</Link>}
           {isSeeker && <Link href="/saved" className={`ntab${isActive('/saved') ? ' active' : ''}`}>Saved</Link>}
           <Link href="/pricing" className={`ntab${isActive('/pricing') ? ' active' : ''}`}>Pricing</Link>
         </div>
@@ -206,14 +208,21 @@ export default function Nav() {
             </span>
           </button>
         )}
-        <Link href="/jobs" className={`side-menu-item${isActive('/jobs') ? ' active' : ''}`}><span className="side-menu-icon">💼</span>Jobs</Link>
-        <Link href="/companies" className={`side-menu-item${isActive('/companies') ? ' active' : ''}`}><span className="side-menu-icon">🏢</span>Companies</Link>
-        <Link href="/demand" className={`side-menu-item${isActive('/demand') ? ' active' : ''}`}><span className="side-menu-icon">📊</span>Demand</Link>
-        <Link href="/feed" className={`side-menu-item${isActive('/feed') ? ' active' : ''}`}><span className="side-menu-icon">📡</span>Feed</Link>
-        {isSeeker && <Link href="/resume" className={`side-menu-item${isActive('/resume') ? ' active' : ''}`}><span className="side-menu-icon">📄</span>Resume AI</Link>}
-        {isSeeker && <Link href="/tracker" className={`side-menu-item${isActive('/tracker') ? ' active' : ''}`}><span className="side-menu-icon">✓</span>Track</Link>}
-        {isSeeker && <Link href="/saved" className={`side-menu-item${isActive('/saved') ? ' active' : ''}`}><span className="side-menu-icon">♥</span>Saved</Link>}
+        {/* Grouped so the drawer reads as sections, not a flat wall of links. */}
+        {isSeeker && <div className="side-menu-label">Your job search</div>}
         {isSeeker && <Link href="/dashboard" className={`side-menu-item${isActive('/dashboard') ? ' active' : ''}`}><span className="side-menu-icon">▦</span>Dashboard</Link>}
+        {isSeeker && <Link href="/jobs" className={`side-menu-item${isActive('/jobs') ? ' active' : ''}`}><span className="side-menu-icon">💼</span>Find jobs</Link>}
+        {isSeeker && <Link href="/tracker" className={`side-menu-item${isActive('/tracker') ? ' active' : ''}`}><span className="side-menu-icon">✓</span>Track applications</Link>}
+        {isSeeker && <Link href="/resume" className={`side-menu-item${isActive('/resume') ? ' active' : ''}`}><span className="side-menu-icon">📄</span>Résumé AI</Link>}
+        {isSeeker && <Link href="/saved" className={`side-menu-item${isActive('/saved') ? ' active' : ''}`}><span className="side-menu-icon">♥</span>Saved jobs</Link>}
+
+        <div className="side-menu-label">Explore</div>
+        {!isSeeker && <Link href="/jobs" className={`side-menu-item${isActive('/jobs') ? ' active' : ''}`}><span className="side-menu-icon">💼</span>Jobs</Link>}
+        <Link href="/companies" className={`side-menu-item${isActive('/companies') ? ' active' : ''}`}><span className="side-menu-icon">🏢</span>Company intel</Link>
+        <Link href="/demand" className={`side-menu-item${isActive('/demand') ? ' active' : ''}`}><span className="side-menu-icon">📊</span>Hiring demand</Link>
+        <Link href="/feed" className={`side-menu-item${isActive('/feed') ? ' active' : ''}`}><span className="side-menu-icon">📡</span>Live feed</Link>
+
+        <div className="side-menu-label">Plans</div>
         <Link href="/pricing" className={`side-menu-item${isActive('/pricing') ? ' active' : ''}`}><span className="side-menu-icon">◈</span>Pricing</Link>
         <div style={{ marginTop: 'auto', padding: '1rem 1.25rem 1.25rem', borderTop: '1px solid var(--line)', display: 'flex', flexDirection: 'column', gap: '.5rem' }}>
           {isSeeker ? (

@@ -8,6 +8,7 @@ import { supabase } from '@/lib/supabase'
 import { AppStore } from '@/lib/stores/AppStore'
 import { EventStore } from '@/lib/stores/EventStore'
 import { BadgeStore } from '@/lib/stores/BadgeStore'
+import WelcomeOnboarding from '@/components/WelcomeOnboarding'
 import type { Application } from '@/lib/types'
 
 function companySlug(name: string) {
@@ -53,6 +54,14 @@ export default function DashboardPage() {
   const [surges, setSurges] = useState<string[]>([])
   const [recentCos, setRecentCos] = useState<Array<{name: string; slug: string}>>([])
   const [coScores, setCoScores] = useState<Record<string, {ghost_rate: number; overall_score: number; avg_wait_days: number}>>({})
+  // Start hidden to avoid a flash for returning users; the effect flips it on for anyone
+  // who hasn't dismissed the first-run guide.
+  const [onboardHidden, setOnboardHidden] = useState(true)
+
+  useEffect(() => {
+    if (!user?.id) return
+    try { setOnboardHidden(localStorage.getItem(`seen_onboarding_hidden_${user.id}`) === '1') } catch { setOnboardHidden(false) }
+  }, [user?.id])
 
   useEffect(() => {
     if (!isSeeker) return
@@ -207,9 +216,26 @@ export default function DashboardPage() {
   }
   const topMoves = moves.slice(0, 3)
 
+  const hasResume = !!(profile?.resume_file_name || (profile?.resume_word_count ?? 0) > 0)
+  const onboardComplete = hasResume && apps.length > 0 && recentCos.length > 0
+  const showOnboarding = !onboardHidden && !onboardComplete
+  const dismissOnboarding = () => {
+    setOnboardHidden(true)
+    try { if (user?.id) localStorage.setItem(`seen_onboarding_hidden_${user.id}`, '1') } catch {}
+  }
+
   return (
     <div className="page-full">
       <div className="dash">
+
+        {/* ── A. First-run getting-started guide ─────────────────── */}
+        {showOnboarding && (
+          <WelcomeOnboarding
+            name={name}
+            state={{ hasResume, appsCount: apps.length, companiesChecked: recentCos.length }}
+            onDismiss={dismissOnboarding}
+          />
+        )}
 
         {/* ── B. Hero Command Center ─────────────────────────────── */}
         <section className="dhero">
@@ -262,6 +288,38 @@ export default function DashboardPage() {
           <div className="dhero-cta">
             <Link href="/jobs" className="dbtn dbtn-primary">Find jobs →</Link>
             <Link href="/report" className="dbtn dbtn-ghost">Report outcome</Link>
+          </div>
+        </section>
+
+        {/* ── B2. Résumé — always-visible upload / status entry ──── */}
+        <section>
+          <div className="dcard dcard-pad" style={{ display: 'flex', alignItems: 'center', gap: '.8rem', flexWrap: 'wrap' }}>
+            <span style={{ fontSize: '1.5rem', flexShrink: 0 }}>📄</span>
+            <div style={{ minWidth: 0, flex: '1 1 160px' }}>
+              {hasResume ? (
+                <>
+                  <div style={{ fontFamily: 'var(--display)', fontSize: '.85rem', fontWeight: 700, color: 'var(--white)' }}>Résumé on file</div>
+                  <div style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', color: 'var(--muted)', marginTop: '.15rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {profile?.resume_file_name || 'Résumé'}{profile?.resume_word_count ? ` · ${profile.resume_word_count} words` : ''}
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div style={{ fontFamily: 'var(--display)', fontSize: '.85rem', fontWeight: 700, color: 'var(--white)' }}>Add your résumé</div>
+                  <div style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', color: 'var(--muted)', marginTop: '.15rem', lineHeight: 1.45 }}>Upload a PDF or Word doc to unlock résumé-fit scoring and earn AI credits</div>
+                </>
+              )}
+            </div>
+            <div style={{ display: 'flex', gap: '.45rem', flexShrink: 0 }}>
+              {hasResume ? (
+                <>
+                  <Link href="/resume" className="dbtn dbtn-primary" style={{ flex: 'none', padding: '.5rem .9rem' }}>Scan résumé fit →</Link>
+                  <Link href="/resume" className="dbtn dbtn-ghost" style={{ flex: 'none', padding: '.5rem .8rem' }}>Replace</Link>
+                </>
+              ) : (
+                <Link href="/resume" className="dbtn dbtn-primary" style={{ flex: 'none', padding: '.5rem 1rem' }}>Upload résumé →</Link>
+              )}
+            </div>
           </div>
         </section>
 
