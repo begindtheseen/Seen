@@ -48,7 +48,7 @@ const COMPARISON: [string, string | boolean, string | boolean][] = [
 ]
 
 const FAQ = [
-  { q: 'What is Stealth Mode?', a: 'Companies increasingly use AI-detection tools (GPTZero, Originality.ai) to auto-reject resumes that look AI-generated. Stealth Mode runs your optimized bullets through a second pass that varies sentence structure, avoids AI writing patterns, and keeps every keyword — so you pass ATS filters AND human review.' },
+  { q: 'What is Human Voice?', a: 'AI-optimized résumés often sound generic — and some companies auto-filter applications that read as machine-written. Human Voice rewrites your optimized bullets so they sound like you: varied sentence structure, natural rhythm, every keyword kept. Your words, your voice, still ATS-ready.' },
   { q: 'How do free AI credits work?', a: 'Every day you get 3 AI credits that reset at midnight. Each credit covers one AI action: parse a resume, optimize bullets for a job, or run the ATS scanner. You can earn more credits by tracking your applications and answering quick surveys about companies you\'ve worked with.' },
   { q: 'Can I cancel Pro?', a: 'Yes, anytime — no contracts. You keep Pro until the end of your billing period. We don\'t trap you.' },
   { q: 'Is my data sold to employers?', a: 'Never. We work for job seekers. Your resume content is processed in-memory to generate your optimization and immediately discarded. We never sell, share, or expose your info to recruiters or employers.' },
@@ -171,7 +171,7 @@ function PricingPageInner() {
           <div style={{ fontSize: '3.5rem', marginBottom: '1rem' }}>🎉</div>
           <h1 style={{ fontFamily: 'var(--display)', fontSize: '1.8rem', fontWeight: 800, color: 'var(--white)', marginBottom: '.5rem' }}>You're Pro.</h1>
           <p style={{ color: 'var(--sub)', fontFamily: 'var(--mono)', fontSize: '.78rem', lineHeight: 1.7, marginBottom: '1.75rem' }}>
-            Unlimited AI credits and Stealth Mode are live on your account right now.
+            Unlimited AI credits and Human Voice are live on your account right now.
             No setup needed.
           </p>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '.65rem' }}>
@@ -388,15 +388,14 @@ function PricingPageInner() {
           </div>
         </div>
 
-        {/* Stealth Mode callout */}
+        {/* Human Voice callout */}
         <div style={{ background: 'linear-gradient(135deg,rgba(124,58,237,.12),rgba(79,70,229,.08))', border: '1px solid rgba(124,58,237,.3)', borderRadius: 14, padding: '1.5rem 1.75rem', marginBottom: '3rem', display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '1.25rem', alignItems: 'center' }}>
-          <div style={{ fontSize: '2.5rem' }}>🥷</div>
+          <div style={{ fontSize: '2.5rem' }}>🗣</div>
           <div>
-            <div style={{ fontFamily: 'var(--display)', fontSize: '1rem', fontWeight: 800, color: 'var(--white)', marginBottom: '.25rem' }}>Stealth Mode — Pro exclusive</div>
-            <div style={{ fontFamily: 'var(--mono)', fontSize: '.68rem', color: 'var(--sub)', lineHeight: 1.65 }}>
-              After optimizing your resume, Stealth Mode rewrites every bullet to evade AI-detection software. Same keywords,
-              same meaning — but varied sentence structure, natural rhythm, no AI tells. The companies screening for AI
-              won't see it coming.
+            <div style={{ fontFamily: 'var(--display)', fontSize: '1rem', fontWeight: 800, color: 'var(--white)', marginBottom: '.25rem' }}>Human Voice — Pro exclusive</div>
+            <div style={{ fontFamily: 'var(--body)', fontSize: '.72rem', color: 'var(--sub)', lineHeight: 1.65 }}>
+              Human Voice rewrites your optimized bullets so they sound like you — varied sentence structure, natural
+              rhythm, every keyword kept. Your words, your voice, still ATS-ready.
             </div>
           </div>
         </div>

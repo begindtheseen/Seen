@@ -8,7 +8,7 @@ import { aiHeaders } from '@/lib/aiHeaders'
 interface UpgradeModalProps {
   reason: 'credits' | 'pro' | 'generic'
   onClose: () => void
-  featureName?: string // e.g. "Stealth Mode", "HumanProof"
+  featureName?: string // e.g. "Human Voice", "HumanProof"
 }
 
 const MONTHLY_PRICE = '$9.99'

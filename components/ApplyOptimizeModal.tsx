@@ -208,7 +208,7 @@ export default function ApplyOptimizeModal({
   const title = step === 'done'
     ? '🎉 You\'re ready to apply'
     : step === 'review'
-    ? result?.stealth ? '🥷 Optimized · Stealth Mode' : 'Review your optimized resume'
+    ? result?.stealth ? '🗣 Optimized · Human Voice' : 'Review your optimized resume'
     : step === 'optimizing' ? 'Optimizing your resume…'
     : step === 'sending' ? 'Sending to your email…'
     : 'Apply & Optimize'
@@ -377,7 +377,7 @@ export default function ApplyOptimizeModal({
 
               {result?.stealth && (
                 <div style={{ background: 'rgba(124,58,237,.1)', border: '1px solid rgba(124,58,237,.3)', borderRadius: 8, padding: '.5rem .85rem', marginBottom: '.75rem', fontFamily: 'var(--mono)', fontSize: '.62rem', color: '#a78bfa', display: 'flex', alignItems: 'center', gap: '.4rem' }}>
-                  🥷 Stealth Mode applied · AI-detection safe
+                  🗣 Human Voice applied · sounds like you, every keyword kept
                 </div>
               )}
 
