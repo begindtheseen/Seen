@@ -45,6 +45,7 @@ interface AdminStats {
   duplicate_clusters: { suspected: number; items: DupCluster[] }
   feature_flags: FeatureFlag[]
   credits: { total_users: number; pro_users: number; total_balance?: number; earned?: number; spent?: number }
+  flywheel?: { job_searches_30d: number; resume_scans_30d: number }
 }
 interface Issue {
   id: string; type: string; target_name: string; notes: string; created_at: string; status: string
@@ -301,19 +302,23 @@ function UserRow({ r, token, onDeleted, ts }: { r: Record<string, unknown>; toke
     setGranting(false)
   }
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: '1fr auto auto auto', gap: '.5rem', padding: '.5rem .6rem', background: 'var(--card)', borderRadius: 7, alignItems: 'center' }}>
-      <span style={{ fontFamily: 'var(--mono)', fontSize: '.62rem', color: 'var(--white)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{email}</span>
-      <span style={{ fontFamily: 'var(--mono)', fontSize: '.62rem', color: 'var(--sub)' }}>{ts(r.created_at)}</span>
-      {grantMsg && grantMsg.startsWith('✓') ? (
-        <span style={{ fontFamily: 'var(--mono)', fontSize: '.55rem', color: 'var(--green)', whiteSpace: 'nowrap' }}>{grantMsg}</span>
-      ) : (
-        <span style={{ display: 'flex', gap: '.25rem', alignItems: 'center' }}>
-          <input type="number" min={1} max={500} value={grantAmt} onChange={e => setGrantAmt(Number(e.target.value))} disabled={granting} style={{ width: 42, background: 'var(--bg)', border: '1px solid var(--line2)', borderRadius: 5, color: 'var(--white)', fontFamily: 'var(--mono)', fontSize: '.55rem', padding: '.2rem .3rem', textAlign: 'center' }} />
-          <button onClick={grant} disabled={granting} title="Grant AI credits to this account" style={{ background: 'none', border: '1px solid rgba(52,211,153,.4)', borderRadius: 5, color: 'var(--green)', fontFamily: 'var(--mono)', fontSize: '.55rem', padding: '.22rem .45rem', cursor: granting ? 'wait' : 'pointer', whiteSpace: 'nowrap' }}>{granting ? '…' : '＋ Credits'}</button>
-          {grantMsg && <span style={{ fontFamily: 'var(--mono)', fontSize: '.5rem', color: 'var(--red)', whiteSpace: 'nowrap' }}>{grantMsg}</span>}
-        </span>
-      )}
-      <button onClick={() => setShowModal(true)} title="Permanently delete this user and all their data" style={{ background: 'none', border: '1px solid rgba(239,68,68,.35)', borderRadius: 5, color: 'var(--red)', fontFamily: 'var(--mono)', fontSize: '.6rem', padding: '.22rem .5rem', cursor: 'pointer' }}>🗑</button>
+    <div className="ac-acct">
+      <div className="ac-acct-top">
+        <span className="ac-acct-email">{email}</span>
+        <span className="ac-acct-age">{ts(r.created_at)}</span>
+      </div>
+      <div className="ac-acct-actions">
+        {grantMsg && grantMsg.startsWith('✓') ? (
+          <span style={{ fontFamily: 'var(--mono)', fontSize: '.55rem', color: 'var(--green)', whiteSpace: 'nowrap' }}>{grantMsg}</span>
+        ) : (
+          <>
+            <input type="number" min={1} max={500} value={grantAmt} onChange={e => setGrantAmt(Number(e.target.value))} disabled={granting} style={{ width: 46, background: 'var(--void)', border: '1px solid var(--line2)', borderRadius: 5, color: 'var(--white)', fontFamily: 'var(--mono)', fontSize: '.55rem', padding: '.25rem .3rem', textAlign: 'center' }} />
+            <button onClick={grant} disabled={granting} title="Grant AI credits to this account" style={{ background: 'none', border: '1px solid rgba(52,211,153,.4)', borderRadius: 5, color: 'var(--green)', fontFamily: 'var(--mono)', fontSize: '.55rem', padding: '.28rem .5rem', cursor: granting ? 'wait' : 'pointer', whiteSpace: 'nowrap' }}>{granting ? '…' : '＋ Credits'}</button>
+            {grantMsg && <span style={{ fontFamily: 'var(--mono)', fontSize: '.5rem', color: 'var(--red)', whiteSpace: 'nowrap' }}>{grantMsg}</span>}
+          </>
+        )}
+        <button onClick={() => setShowModal(true)} title="Permanently delete this user and all their data" style={{ marginLeft: 'auto', background: 'none', border: '1px solid rgba(239,68,68,.35)', borderRadius: 5, color: 'var(--red)', fontFamily: 'var(--mono)', fontSize: '.55rem', padding: '.28rem .55rem', cursor: 'pointer', whiteSpace: 'nowrap' }}>🗑 Delete</button>
+      </div>
       {showModal && (
         <div onClick={closeModal} onKeyDown={e => { if (e.key === 'Escape') closeModal() }} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '1rem' }}>
           <div onClick={e => e.stopPropagation()} style={{ background: 'var(--card)', border: '1px solid var(--line2)', borderRadius: 10, padding: '1.1rem 1.2rem', maxWidth: 380, width: '100%' }}>
@@ -486,6 +491,149 @@ function KpiModal({ metric, title, token, onClose }: { metric: string; title: st
 
 const TOKEN_KEY = 'admin_token'
 
+// ── Command-center presentational primitives (.ac-*) ──────────────────────────
+type Tone = 'blue' | 'green' | 'amber' | 'red' | 'white' | 'dim' | 'sub'
+
+function Panel({ title, right, hero, children, style }: { title: string; right?: React.ReactNode; hero?: boolean; children: React.ReactNode; style?: React.CSSProperties }) {
+  return (
+    <section className={`ac-panel${hero ? ' hero' : ''}`} style={style}>
+      <div className="ac-panel-hdr">
+        <span className="ac-panel-title">{title}</span>
+        {right}
+      </div>
+      {children}
+    </section>
+  )
+}
+
+// A compact command-center tile: big number + a status PHRASE (never a bare number).
+function PulseTile({ label, value, phrase, tone = 'white' }: { label: string; value: React.ReactNode; phrase: string; tone?: Tone }) {
+  return (
+    <div className="ac-tile">
+      <div className="ac-tile-l">{label}</div>
+      <div className={`ac-tile-n ac-tone-${tone}`}>{value}</div>
+      <div className="ac-tile-p" title={phrase}>{phrase}</div>
+    </div>
+  )
+}
+
+// label · optional status text · value, optionally clickable (opens a KPI drill-down).
+function MetricRow({ label, value, status, tone = 'white', onClick }: { label: string; value: React.ReactNode; status?: string; tone?: Tone; onClick?: () => void }) {
+  return (
+    <div className={`ac-mrow${onClick ? ' ac-mrow-click' : ''}`} onClick={onClick} role={onClick ? 'button' : undefined}>
+      <span className="ac-mrow-l">{label}</span>
+      <span className="ac-mrow-mid">{status}</span>
+      <span className={`ac-mrow-n ac-tone-${tone}`}>{value}</span>
+      {onClick && <span className="ac-mrow-arrow">▸</span>}
+    </div>
+  )
+}
+
+const SEV_COLOR: Record<string, string> = { red: 'var(--red)', amber: 'var(--amber)', blue: 'var(--blue)', green: 'var(--green)' }
+
+// One actionable warning row for the Needs Attention panel.
+function AttnRow({ item }: { item: AttnItem }) {
+  return (
+    <div className="ac-attn">
+      <span className="ac-attn-dot" style={{ background: SEV_COLOR[item.sev] }} />
+      <div className="ac-attn-body">
+        <div className="ac-attn-t">{item.title}</div>
+        <div className="ac-attn-d">{item.detail}</div>
+      </div>
+      {item.action && <button className="ac-attn-act" onClick={item.action.onClick} disabled={item.action.busy}>{item.action.busy ? '…' : item.action.label}</button>}
+    </div>
+  )
+}
+
+interface AttnItem {
+  key: string
+  title: string
+  detail: string
+  sev: 'red' | 'amber' | 'blue' | 'green'
+  action?: { label: string; onClick: () => void; busy?: boolean }
+}
+
+// Manage accounts — reuses the get_kpi_detail(total_accounts) fetch (same data that powers
+// the users drill-down) + the existing UserRow (grant-credits input + type-to-confirm delete).
+// Adds an email search filter. Own scroll area, iPhone safe-area aware, mobile mini-cards.
+function ManageAccountsModal({ token, onClose }: { token: string; onClose: () => void }) {
+  const [rows, setRows] = useState<Record<string, unknown>[] | null>(null)
+  const [q, setQ] = useState('')
+
+  useEffect(() => {
+    fetch('/api/admin-stats', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Admin-Token': token },
+      body: JSON.stringify({ action: 'get_kpi_detail', metric: 'total_accounts' }),
+    }).then(r => r.json()).then(d => setRows(d.rows || [])).catch(() => setRows([]))
+  }, [token])
+
+  const ts = (iso: unknown) => {
+    if (!iso) return '—'
+    const d = new Date(String(iso)), m = Math.floor((Date.now() - d.getTime()) / 60000)
+    if (m < 60) return `${m}m ago`
+    const h = Math.floor(m / 60)
+    if (h < 24) return `${h}h ago`
+    return `${Math.floor(h / 24)}d ago`
+  }
+
+  const needle = q.trim().toLowerCase()
+  const filtered = (rows || []).filter(r => !needle || String(r.email ?? '').toLowerCase().includes(needle))
+
+  return (
+    <div className="ac-modal" onClick={onClose}>
+      <div className="ac-modal-card" onClick={e => e.stopPropagation()}>
+        <div className="ac-modal-hdr">
+          <div>
+            <div className="ac-modal-ttl">Manage accounts</div>
+            <div className="ac-modal-sub">{rows === null ? 'Loading…' : `${rows.length} account${rows.length === 1 ? '' : 's'}${needle ? ` · ${filtered.length} match` : ''} · newest 100`}</div>
+          </div>
+          <button className="ac-modal-x" onClick={onClose}>✕</button>
+        </div>
+        <div className="ac-modal-search">
+          <input value={q} onChange={e => setQ(e.target.value)} placeholder="Filter by email…" autoComplete="off" />
+        </div>
+        <div className="ac-modal-body">
+          {rows === null ? (
+            <div style={{ textAlign: 'center', padding: '2rem', fontFamily: 'var(--mono)', fontSize: '.65rem', color: 'var(--dim)' }}>Loading accounts…</div>
+          ) : !filtered.length ? (
+            <div style={{ textAlign: 'center', padding: '2rem', fontFamily: 'var(--mono)', fontSize: '.65rem', color: 'var(--dim)' }}>{needle ? 'No accounts match that email.' : 'No accounts yet.'}</div>
+          ) : (
+            filtered.map((r, i) => (
+              <UserRow key={String(r.id ?? i)} r={r} token={token} ts={ts} onDeleted={id => setRows(rs => (rs || []).filter(x => String(x.id) !== id))} />
+            ))
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// Real, wired stale-job remediation for the Jobs & Companies panel — same call the crisis
+// banner uses (refresh-jobs validates the admin session token itself).
+function JobRefreshButton({ token, onDone }: { token: string; onDone: () => void }) {
+  const [busy, setBusy] = useState(false)
+  const [msg, setMsg] = useState('')
+  async function run() {
+    setBusy(true); setMsg('')
+    try {
+      const res = await fetch('/api/refresh-jobs?all=1', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Admin-Token': token }, body: '{}' })
+      const d = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(d.error || `HTTP ${res.status}`)
+      const added = d.upserted ?? d.inserted ?? d.found ?? null
+      setMsg(added != null ? `✓ ${added} backfilled` : '✓ triggered')
+      setTimeout(onDone, 1500)
+    } catch (e) { setMsg('✗ ' + (e as Error).message.slice(0, 40)) }
+    setBusy(false)
+  }
+  return (
+    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '.4rem' }}>
+      {msg && <span style={{ fontFamily: 'var(--mono)', fontSize: '.52rem', color: msg.startsWith('✓') ? 'var(--green)' : 'var(--red)' }}>{msg}</span>}
+      <button className="ac-attn-act" onClick={run} disabled={busy}>{busy ? '…' : 'Refresh now'}</button>
+    </span>
+  )
+}
+
 export default function AdminPage() {
   const [stats, setStats] = useState<AdminStats | null>(null)
   const [loading, setLoading] = useState(true)
@@ -498,6 +646,8 @@ export default function AdminPage() {
   const [downloading, setDownloading] = useState(false)
   const [mergePrefill, setMergePrefill] = useState<MergePrefill | null>(null)
   const [kpiModal, setKpiModal] = useState<{ metric: string; title: string } | null>(null)
+  const [manageOpen, setManageOpen] = useState(false)
+  const [emgBusy, setEmgBusy] = useState(false)
   function openKpi(metric: string, title: string) { setKpiModal({ metric, title }) }
 
   useEffect(() => {
@@ -594,6 +744,19 @@ export default function AdminPage() {
     setDownloading(false)
   }
 
+  // Shared job-board remediation used by the crisis banner AND Needs Attention rows.
+  // Calls refresh-jobs directly (it validates this admin session token), then reloads.
+  async function runEmergencyRefresh() {
+    if (!token) return
+    setEmgBusy(true)
+    try {
+      const res = await fetch('/api/refresh-jobs?all=1', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Admin-Token': token }, body: '{}' })
+      await res.json().catch(() => ({}))
+      setTimeout(() => load(token), 1500)
+    } catch { /* surfaced by next refresh */ }
+    setEmgBusy(false)
+  }
+
   if (!token) return (
     <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
       <form onSubmit={login} style={{ background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 12, padding: '2rem', width: 320 }}
@@ -640,322 +803,302 @@ export default function AdminPage() {
   const chartMax = Math.max(...(stats.reports.chart || []).map(d => d.count), 1)
   const needsReviewCount = (stats.reports.recent || []).filter(r => r.needs_review).length
 
+  // ── Derive the command center from REAL response fields ONLY ────────────────
+  const m = stats.monetization
+  const jh = stats.job_health
+  const jb = stats.jobs
+  const fw = stats.flywheel
+  const inactiveCount = (jb?.inactive_reports || []).length
+  const staleJobs = jb?.stale_or_expired ?? 0
+  const activeJobs = jh?.active ?? jb?.active ?? 0
+  const paidUsers = m?.active_paid ?? m?.pro_users ?? 0
+  const mrr = m?.mrr ?? null
+  const shares = m?.outcome_card_shares ?? 0
+  const errToday = stats.errors?.today ?? 0
+  const dupSuspected = stats.duplicate_clusters?.suspected ?? 0
+  const openIssues = stats.issues?.open ?? 0
+  const stripeOn = !!m?.stripe_connected
+  const onUnauthorized = () => { sessionStorage.removeItem(TOKEN_KEY); setToken(null); setStats(null); setLoginError('Session expired') }
+
+  // Data-flywheel status phrase from real activity (product-critical panel).
+  const fwActivity = shares + (fw?.job_searches_30d ?? 0) + (fw?.resume_scans_30d ?? 0) + stats.reports.today
+  const fwStatus = shares === 0 && (fw?.job_searches_30d ?? 0) === 0 ? 'Not moving yet' : fwActivity < 25 ? 'Early activity' : 'Community data growing'
+
+  // Needs Attention — actionable warnings from real data. A benign zero (0 canceled,
+  // 0 errors) never appears; only zeros that ARE the problem do (per product spec).
+  const attn: AttnItem[] = []
+  if (jh?.crisis) attn.push({ key: 'crisis', sev: 'red', title: `Job board crisis — ${activeJobs.toLocaleString()} active listings`, detail: `${(jh.stale ?? 0).toLocaleString()} stale · only ${jh.active_pct}% of the corpus is live. Seekers see a dead board.`, action: { label: 'Refresh', onClick: runEmergencyRefresh, busy: emgBusy } })
+  else if (staleJobs > 500) attn.push({ key: 'stale', sev: 'amber', title: `${staleJobs.toLocaleString()} stale / expired listings`, detail: 'A large slice of the job corpus is unavailable. Refresh to keep the board fresh.', action: { label: 'Refresh', onClick: runEmergencyRefresh, busy: emgBusy } })
+  if (errToday > 10) attn.push({ key: 'errs', sev: 'red', title: `${errToday} API errors today`, detail: 'Error volume is elevated — see System Health for the failing routes.' })
+  if (stripeOn && paidUsers === 0) attn.push({ key: 'norev', sev: 'amber', title: '0 paid users — revenue not activated yet', detail: 'Stripe is connected but there are no active paid subscriptions. Conversion has not started.' })
+  if ((m?.past_due ?? 0) > 0) attn.push({ key: 'pastdue', sev: 'amber', title: `${m!.past_due} subscription${m!.past_due === 1 ? '' : 's'} past due`, detail: 'Payment is failing — these accounts may churn without follow-up.' })
+  if ((m?.trialing ?? 0) > 0) attn.push({ key: 'trials', sev: 'blue', title: `${m!.trialing} user${m!.trialing === 1 ? '' : 's'} trialing — watch conversion`, detail: 'Active trials in flight. Nudge them before the trial ends.' })
+  if (shares === 0) attn.push({ key: 'noshare', sev: 'blue', title: 'No outcome cards shared — flywheel not moving', detail: 'Outcome cards are the virality engine. Nothing has been shared yet.' })
+  if (needsReviewCount > 0) attn.push({ key: 'review', sev: 'amber', title: `${needsReviewCount} report${needsReviewCount === 1 ? '' : 's'} need review`, detail: 'Flagged community reports are held out of scoring until cleared (Advanced tools → moderation).' })
+  if (dupSuspected > 0) attn.push({ key: 'dup', sev: 'amber', title: `${dupSuspected} suspected duplicate account cluster${dupSuspected === 1 ? '' : 's'}`, detail: 'Shared-signal groups flagged for anti-Sybil review (Advanced tools → clusters).' })
+  if (inactiveCount > 0) attn.push({ key: 'inactive', sev: 'amber', title: `${inactiveCount} reported inactive listing${inactiveCount === 1 ? '' : 's'}`, detail: 'Users flagged these jobs as no longer active — verify and remove (Advanced tools).' })
+  if (openIssues > 0) attn.push({ key: 'issues', sev: 'amber', title: `${openIssues} open data-quality issue${openIssues === 1 ? '' : 's'}`, detail: 'Community-reported data problems awaiting resolution (Advanced tools → issues).' })
+
   return (
     <div className="page-full" style={{ background: 'radial-gradient(ellipse at 10% 0%,rgba(29,78,216,0.1) 0%,transparent 50%),radial-gradient(ellipse at 90% 10%,rgba(124,58,237,0.07) 0%,transparent 45%)' }}>
       <div className="adm-wrap">
 
-        {/* Header */}
-        <div style={{ fontFamily: 'var(--mono)', fontSize: '.52rem', textTransform: 'uppercase', letterSpacing: '.22em', color: 'var(--green)', marginBottom: '.65rem', display: 'flex', alignItems: 'center', gap: 12 }}>
-          <span style={{ width: 22, height: 1, background: 'var(--green)', display: 'inline-block', flexShrink: 0 }} />
-          Seen Admin
-        </div>
-        <div className="adm-hdr-row">
-          <div>
-            <h1 style={{ fontFamily: 'var(--display)', fontSize: 'clamp(1.35rem, 6vw, 2rem)', fontWeight: 800, color: 'var(--white)', letterSpacing: '-.04em', lineHeight: 1.05, marginBottom: '.25rem' }}>Data flywheel</h1>
-            <p style={{ fontSize: '.8rem', color: 'var(--sub)', fontWeight: 300 }}>Last updated just now</p>
-            <p style={{ fontFamily: 'var(--mono)', fontSize: '.48rem', color: 'var(--dim)', marginTop: '.2rem', letterSpacing: '.04em' }}>
-              build {process.env.NEXT_PUBLIC_VERCEL_GIT_COMMIT_SHA?.slice(0,7) ?? 'local'} · {process.env.NEXT_PUBLIC_VERCEL_GIT_COMMIT_MESSAGE?.slice(0,40) ?? 'dev'}
-            </p>
+        {/* 1. Header */}
+        <header className="ac-hdr">
+          <div className="ac-hdr-l">
+            <div className="ac-eyebrow">Founder command center</div>
+            <h1 className="ac-title">Seen Control</h1>
+            <div className="ac-meta">updated just now · build {process.env.NEXT_PUBLIC_VERCEL_GIT_COMMIT_SHA?.slice(0, 7) ?? 'local'} · {process.env.NEXT_PUBLIC_VERCEL_GIT_COMMIT_MESSAGE?.slice(0, 32) ?? 'dev'}</div>
           </div>
-          <div style={{ display: 'flex', gap: '.5rem', flexWrap: 'wrap' }}>
-            <button onClick={downloadCsv} disabled={downloading} className="adm-btn" style={{ borderColor: 'rgba(16,185,129,.4)', color: 'var(--green)' }}>{downloading ? 'Exporting…' : '⬇ Download data (CSV)'}</button>
+          <div className="ac-hdr-actions">
             <button onClick={() => token && load(token)} className="adm-btn">↻ Refresh</button>
+            <button onClick={downloadCsv} disabled={downloading} className="adm-btn" style={{ borderColor: 'rgba(16,185,129,.4)', color: 'var(--green)' }}>{downloading ? 'Exporting…' : '⬇ CSV'}</button>
             <button onClick={logout} className="adm-btn-danger">Sign out</button>
           </div>
+        </header>
+
+        {/* Crisis banner stays prominent (one-click remediation) */}
+        {jh?.crisis && <JobCrisisBanner health={jh} token={token!} onRefresh={() => load(token!)} />}
+
+        {/* 2. Seen Pulse — command center */}
+        <Panel title="Seen Pulse" hero right={<span className="ac-panel-status">what matters today</span>}>
+          <div className="ac-pulse">
+            <PulseTile label="Accounts" value={stats.users.total.toLocaleString()} phrase={stats.users.new_today > 0 ? `${stats.users.new_today} new today` : 'no new today'} tone="white" />
+            <PulseTile label="Paid users" value={paidUsers.toLocaleString()} phrase={paidUsers > 0 ? 'converting' : 'none yet'} tone={paidUsers > 0 ? 'green' : 'dim'} />
+            <PulseTile label="MRR" value={mrr != null ? `$${mrr.toLocaleString()}` : '$0'} phrase={mrr ? 'revenue moving' : stripeOn ? 'not activated yet' : 'Stripe off'} tone={mrr ? 'green' : 'dim'} />
+            <PulseTile label="Trials" value={stripeOn ? (m?.trialing ?? 0) : '—'} phrase={stripeOn ? `${m?.trialing ?? 0} trialing now` : 'Stripe not connected'} tone={(m?.trialing ?? 0) > 0 ? 'blue' : 'dim'} />
+            <PulseTile label="Cards shared" value={shares.toLocaleString()} phrase={shares > 0 ? 'flywheel moving' : 'none shared yet'} tone={shares > 0 ? 'blue' : 'dim'} />
+            <PulseTile label="API" value={errToday} phrase={errToday === 0 ? 'No API incidents' : `${errToday} errors today`} tone={errToday > 10 ? 'red' : errToday > 0 ? 'amber' : 'green'} />
+          </div>
+        </Panel>
+
+        {/* 3. Needs Attention */}
+        <Panel title="Needs Attention" right={attn.length ? <span className="ac-badge" style={{ background: 'rgba(245,158,11,.15)', color: 'var(--amber)' }}>{attn.length}</span> : undefined}>
+          {attn.length === 0
+            ? <div className="ac-allclear">✓ All clear — nothing needs action right now.</div>
+            : attn.map(a => <AttnRow key={a.key} item={a} />)}
+        </Panel>
+
+        {/* 4 & 5. Revenue + Users */}
+        <div className="ac-grid2">
+          <Panel title="Revenue" right={<span className="ac-panel-status" style={{ color: mrr ? 'var(--green)' : 'var(--dim)' }}>{mrr ? 'Revenue is moving' : 'Not active yet'}</span>}>
+            <MetricRow label="MRR" value={mrr != null ? `$${mrr.toLocaleString()}` : '$0'} status={m?.mrr_annualized != null ? `$${m.mrr_annualized.toLocaleString()}/yr` : (stripeOn ? 'no active subs' : 'Stripe not connected')} tone={mrr ? 'green' : 'dim'} />
+            <MetricRow label="Paid users" value={paidUsers.toLocaleString()} status={m ? `${m.conversion_pct}% of ${m.total_accounts.toLocaleString()}` : ''} tone={paidUsers ? 'green' : 'dim'} />
+            <MetricRow label="On trial" value={stripeOn ? (m?.trialing ?? 0) : '—'} status="trialing now" tone={(m?.trialing ?? 0) > 0 ? 'blue' : 'dim'} />
+            <MetricRow label="Past due" value={stripeOn ? (m?.past_due ?? 0) : '—'} status="payment failing" tone={(m?.past_due ?? 0) > 0 ? 'amber' : 'dim'} />
+            <MetricRow label="Canceled" value={stripeOn ? (m?.canceled ?? 0) : '—'} status="churned" tone={(m?.canceled ?? 0) > 0 ? 'red' : 'dim'} />
+            <MetricRow label="Conversion" value={m ? `${m.conversion_pct}%` : '—'} status="free → paid" tone="sub" />
+            {!stripeOn && <div className="ac-panel-foot">Stripe not connected — trial / paid / MRR breakdown unavailable.</div>}
+          </Panel>
+
+          <Panel title="Users" right={<span className="ac-panel-status">{stats.users.dau} active today</span>}>
+            <MetricRow label="Total accounts" value={stats.users.total.toLocaleString()} status="all time" onClick={() => openKpi('total_accounts', 'All accounts')} />
+            <MetricRow label="New today" value={stats.users.new_today} status="last 24h" tone={stats.users.new_today > 0 ? 'blue' : 'dim'} onClick={() => openKpi('new_today', 'New accounts today')} />
+            <MetricRow label="New this week" value={stats.users.new_this_week} status="last 7 days" onClick={() => openKpi('new_this_week', 'New accounts this week')} />
+            <MetricRow label="Free users" value={m ? m.free_users.toLocaleString() : '—'} status="not upgraded" tone="sub" />
+            <MetricRow label="Paid users" value={paidUsers.toLocaleString()} status="Pro" tone={paidUsers ? 'green' : 'dim'} />
+            <MetricRow label="Suspected duplicates" value={dupSuspected} status="shared-signal clusters" tone={dupSuspected > 0 ? 'amber' : 'dim'} />
+            <button className="ac-btn" onClick={() => setManageOpen(true)}>Manage accounts →</button>
+          </Panel>
         </div>
 
-        {/* Job crisis alert — prominent, above everything, with one-click remediation */}
-        {stats.job_health?.crisis && (
-          <JobCrisisBanner health={stats.job_health} token={token!} onRefresh={() => load(token!)} />
-        )}
+        {/* 6 & 7. Data Flywheel + Jobs & Companies */}
+        <div className="ac-grid2">
+          <Panel title="Data Flywheel" right={<span className="ac-panel-status" style={{ color: fwStatus === 'Not moving yet' ? 'var(--dim)' : 'var(--green)' }}>{fwStatus}</span>}>
+            <MetricRow label="Outcome cards shared" value={shares.toLocaleString()} status="virality signal" tone={shares > 0 ? 'blue' : 'dim'} />
+            <MetricRow label="Community reports" value={stats.reports.total.toLocaleString()} status={`${stats.reports.today} today`} tone="green" onClick={() => openKpi('total_reports', 'All reports')} />
+            <MetricRow label="Job searches (30d)" value={fw ? fw.job_searches_30d.toLocaleString() : '—'} status="tracker demand" tone="sub" />
+            <MetricRow label="Résumé scans (30d)" value={fw ? fw.resume_scans_30d.toLocaleString() : '—'} status="intel surveys" tone="sub" />
+            <MetricRow label="Companies scored" value={stats.companies.with_scores.toLocaleString()} status="with AI scores" onClick={() => openKpi('companies_scored', 'Companies with scores')} />
+            <MetricRow label="Credits earned / spent" value={`${(stats.credits.earned ?? 0).toLocaleString()} / ${(stats.credits.spent ?? 0).toLocaleString()}`} status="engagement" tone="sub" />
+          </Panel>
 
-        {/* Growth & Monetization — conversion analytics */}
-        {stats.monetization && (() => {
-          const m = stats.monetization!
-          return (
-            <>
-              <div className="adm-section-lbl">Growth &amp; monetization</div>
-              <div className="adm-kpi-row">
-                <KpiCard l="MRR" n={m.mrr != null ? `$${m.mrr.toLocaleString()}` : '—'} sub={m.mrr_annualized != null ? `$${m.mrr_annualized.toLocaleString()}/yr` : (m.stripe_connected ? 'no active subs yet' : 'Stripe not connected')} borderColor="var(--green)" numColor="var(--green)" />
-                <KpiCard l="Pro users" n={m.pro_users.toLocaleString()} sub={`${m.conversion_pct}% of ${m.total_accounts.toLocaleString()} accounts`} borderColor="var(--green)" numColor="var(--green)" />
-                <KpiCard l="On free trial" n={m.trialing != null ? m.trialing : '—'} sub={m.stripe_connected ? 'trialing now' : 'Stripe not connected'} borderColor="var(--blue)" numColor="var(--blue)" />
-                <KpiCard l="Active (paid)" n={m.active_paid != null ? m.active_paid : '—'} sub="past their trial" numColor="var(--green)" />
-              </div>
-              <div className="adm-kpi-row">
-                <KpiCard l="Free users" n={m.free_users.toLocaleString()} sub="not yet upgraded" />
-                <KpiCard l="Canceled" n={m.canceled != null ? m.canceled : '—'} sub="churned subs" borderColor="var(--red)" numColor={m.canceled ? 'var(--red)' : undefined} />
-                <KpiCard l="Past due" n={m.past_due != null ? m.past_due : '—'} sub="payment failing" borderColor="var(--amber)" numColor={m.past_due ? 'var(--amber)' : undefined} />
-                <KpiCard l="Outcome cards shared" n={m.outcome_card_shares.toLocaleString()} sub="virality signal" borderColor="var(--blue)" numColor="var(--blue)" />
-              </div>
-            </>
-          )
-        })()}
-
-        {/* Users KPIs */}
-        <div className="adm-section-lbl">Users</div>
-        <div className="adm-kpi-row">
-          <KpiCard l="Total accounts" n={stats.users.total.toLocaleString()} sub="all time" onClick={() => openKpi('total_accounts', 'All accounts')} />
-          <KpiCard l="New today" n={stats.users.new_today} sub="last 24h" onClick={() => openKpi('new_today', 'New accounts today')} />
-          <KpiCard l="New this week" n={stats.users.new_this_week} sub="last 7 days" onClick={() => openKpi('new_this_week', 'New accounts this week')} />
-          <KpiCard l="Companies scored" n={stats.companies.with_scores} sub="with AI scores" onClick={() => openKpi('companies_scored', 'Companies with scores')} />
+          <Panel title="Jobs & Companies" right={staleJobs > 0 ? <JobRefreshButton token={token!} onDone={() => load(token!)} /> : <span className="ac-panel-status">{jh ? `${jh.active_pct}% live` : ''}</span>}>
+            <MetricRow label="Total stored jobs" value={(jb?.total ?? 0).toLocaleString()} status="all statuses" onClick={() => openKpi('jobs_total', 'All stored jobs')} />
+            <MetricRow label="Active listings" value={activeJobs.toLocaleString()} status="live jobs users see" tone={jh?.crisis ? 'red' : 'blue'} onClick={() => openKpi('jobs_active', 'Active job listings')} />
+            <MetricRow label="Added today" value={jb?.added_today ?? jb?.new_today ?? 0} status="new listings" tone={(jb?.added_today ?? 0) > 0 ? 'green' : 'dim'} onClick={() => openKpi('jobs_today', 'Jobs added today')} />
+            <MetricRow label="Stale / expired" value={staleJobs.toLocaleString()} status="flagged unavailable" tone={staleJobs > 500 ? 'amber' : 'dim'} onClick={() => openKpi('jobs_stale', 'Stale & expired jobs')} />
+            <MetricRow label="Company scores" value={stats.companies.with_scores.toLocaleString()} status="graded companies" onClick={() => openKpi('companies_scored', 'Companies with scores')} />
+            <MetricRow label="Reported inactive" value={inactiveCount} status="user-flagged listings" tone={inactiveCount > 0 ? 'amber' : 'dim'} />
+          </Panel>
         </div>
 
-        {/* Community KPIs */}
-        <div className="adm-section-lbl">Community data</div>
-        <div className="adm-kpi-row">
-          <KpiCard l="Total reports" n={stats.reports.total.toLocaleString()} sub="all time" borderColor="var(--green)" numColor="var(--green)" onClick={() => openKpi('total_reports', 'All reports')} />
-          <KpiCard l="Reports today" n={stats.reports.today} sub="last 24h" onClick={() => openKpi('reports_today', 'Reports today')} />
-          <KpiCard l="Reports this week" n={stats.reports.this_week} sub="last 7 days" onClick={() => openKpi('reports_week', 'Reports this week')} />
-          <KpiCard l="Ghost rate (30d)" n={stats.applications.ghost_rate_pct != null ? `${stats.applications.ghost_rate_pct}%` : '—'} sub="of tracked apps" borderColor="var(--red)" numColor="var(--red)" onClick={() => openKpi('ghost_rate', 'Ghosted applications (30d)')} />
-        </div>
+        {/* 8. System Health */}
+        <Panel title="System Health" right={<span className="ac-panel-status" style={{ color: (errToday > 0 || jh?.crisis) ? 'var(--amber)' : 'var(--green)' }}>{(errToday > 0 || jh?.crisis) ? 'Attention needed' : 'All systems normal'}</span>}>
+          <MetricRow label="API errors today" value={errToday} status="last 24h" tone={errToday > 10 ? 'red' : errToday > 0 ? 'amber' : 'green'} />
+          <MetricRow label="API errors this week" value={stats.errors?.this_week ?? 0} status="last 7 days" tone={(stats.errors?.this_week ?? 0) > 0 ? 'amber' : 'dim'} />
+          <MetricRow label="Active users today" value={stats.users.dau} status="DAU" tone="sub" />
+          <MetricRow label="Job refresh" value={jh?.crisis ? 'Behind' : 'Healthy'} status={jh ? `${jh.active_pct}% corpus live` : ''} tone={jh?.crisis ? 'red' : 'green'} />
+          {stats.errors?.recent && stats.errors.recent.length > 0 ? (
+            <div className="ac-panel-foot">
+              <div style={{ marginBottom: '.35rem', color: 'var(--sub)' }}>Recent errors by route</div>
+              {stats.errors.recent.slice(0, 4).map((e, i) => (
+                <div key={i} style={{ padding: '.15rem 0', color: 'var(--muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  <span style={{ color: 'var(--dim)' }}>{relTime(e.created_at)}</span> · <span style={{ color: 'var(--sub)' }}>{e.endpoint}</span> · {e.error_msg?.slice(0, 50)}
+                </div>
+              ))}
+            </div>
+          ) : <div className="ac-panel-foot" style={{ color: 'var(--green)' }}>✓ No system issues detected.</div>}
+        </Panel>
 
-        {/* Application tracking KPIs */}
-        <div className="adm-section-lbl">Application tracking</div>
-        <div className="adm-kpi-row">
-          <KpiCard l="Apps tracked total" n={stats.applications.total.toLocaleString()} sub="across all users" onClick={() => openKpi('apps_total', 'All tracked applications')} />
-          <KpiCard l="Ghosted (30d)" n={stats.applications.ghosted_30d} sub="tracked as ghosted" numColor="var(--amber)" onClick={() => openKpi('ghosted_30d', 'Ghosted (30d)')} />
-          <KpiCard l="Hired (30d)" n={stats.applications.hired_30d} sub="tracked as hired" numColor="var(--green)" onClick={() => openKpi('hired_30d', 'Hired (30d)')} />
-          <KpiCard l="Co. lookups today" n={stats.company_lookups?.ready ? stats.company_lookups.today : '—'} sub="company pages viewed" onClick={() => openKpi('co_lookups', 'Company lookups today')} />
-        </div>
+        {/* Advanced tools & full data — every original panel preserved, collapsed by default */}
+        <details className="ac-adv">
+          <summary>Advanced tools &amp; full data</summary>
+          <div className="ac-adv-body">
 
-        {/* Company lookups setup note */}
-        {stats.company_lookups && !stats.company_lookups.ready && (
-          <div id="admSetupNote" style={{ background: 'rgba(245,158,11,.06)', border: '1px solid rgba(245,158,11,.2)', borderRadius: 10, padding: '1rem 1.1rem', marginBottom: '1rem' }}>
-            <div style={{ fontFamily: 'var(--mono)', fontSize: '.6rem', color: 'var(--amber)', textTransform: 'uppercase', letterSpacing: '.1em', marginBottom: '.5rem' }}>Enable company lookup tracking</div>
-            <p style={{ fontSize: '.78rem', color: 'var(--sub)', marginBottom: '.75rem', lineHeight: 1.6 }}>Run this SQL in your Supabase SQL editor once to track which companies users are researching:</p>
-            <pre style={{ background: 'rgba(0,0,0,.35)', border: '1px solid rgba(255,255,255,.08)', borderRadius: 6, padding: '.75rem 1rem', fontFamily: 'var(--mono)', fontSize: '.65rem', color: 'var(--white)', overflowX: 'auto', lineHeight: 1.7, margin: 0 }}>
-              {`CREATE TABLE IF NOT EXISTS search_logs (
+            {/* Company lookups setup note */}
+            {stats.company_lookups && !stats.company_lookups.ready && (
+              <div id="admSetupNote" style={{ background: 'rgba(245,158,11,.06)', border: '1px solid rgba(245,158,11,.2)', borderRadius: 10, padding: '1rem 1.1rem', marginBottom: '1rem' }}>
+                <div style={{ fontFamily: 'var(--mono)', fontSize: '.6rem', color: 'var(--amber)', textTransform: 'uppercase', letterSpacing: '.1em', marginBottom: '.5rem' }}>Enable company lookup tracking</div>
+                <p style={{ fontSize: '.78rem', color: 'var(--sub)', marginBottom: '.75rem', lineHeight: 1.6 }}>Run this SQL in your Supabase SQL editor once to track which companies users are researching:</p>
+                <pre style={{ background: 'rgba(0,0,0,.35)', border: '1px solid rgba(255,255,255,.08)', borderRadius: 6, padding: '.75rem 1rem', fontFamily: 'var(--mono)', fontSize: '.65rem', color: 'var(--white)', overflowX: 'auto', lineHeight: 1.7, margin: 0 }}>
+                  {`CREATE TABLE IF NOT EXISTS search_logs (
   id bigserial PRIMARY KEY,
   query text NOT NULL,
   created_at timestamptz DEFAULT now()
 );`}
-            </pre>
-          </div>
-        )}
-
-        {/* Jobs KPIs */}
-        <div className="adm-section-lbl">Jobs</div>
-        <div className="adm-kpi-row" style={{ marginBottom: '1.5rem' }}>
-          <KpiCard l="Total stored" n={(stats.jobs?.total ?? 0).toLocaleString()} sub="all statuses" onClick={() => openKpi('jobs_total', 'All stored jobs')} />
-          <KpiCard l="Active listings" n={(stats.jobs?.active ?? 0).toLocaleString()} sub="live jobs users see" borderColor="var(--blue)" numColor="var(--blue)" onClick={() => openKpi('jobs_active', 'Active job listings')} />
-          <KpiCard l="Added today" n={stats.jobs?.new_today ?? 0} sub="new listings posted" borderColor="var(--green)" numColor="var(--green)" onClick={() => openKpi('jobs_today', 'Jobs added today')} />
-          <KpiCard l="Stale / expired" n={(stats.jobs?.stale_or_expired ?? 0).toLocaleString()} sub="flagged unavailable" borderColor={stats.jobs?.stale_or_expired > 500 ? 'var(--amber)' : undefined} numColor={stats.jobs?.stale_or_expired > 500 ? 'var(--amber)' : undefined} onClick={() => openKpi('jobs_stale', 'Stale & expired jobs')} />
-        </div>
-
-        {/* Job health — always visible, turns red in a crisis */}
-        {stats.job_health && (() => {
-          const h = stats.job_health!
-          const crisisColor = h.crisis ? 'var(--red)' : undefined
-          return (
-            <>
-              <div className="adm-section-lbl">Job health{h.crisis && <span style={{ color: 'var(--red)', marginLeft: '.4rem' }}>● crisis</span>}</div>
-              <div className="adm-kpi-row" style={{ marginBottom: '1.5rem' }}>
-                <KpiCard l="Active listings" n={h.active.toLocaleString()} sub="live jobs users see" borderColor={crisisColor || 'var(--blue)'} numColor={crisisColor || 'var(--blue)'} onClick={() => openKpi('jobs_active', 'Active job listings')} />
-                <KpiCard l="Stale listings" n={h.stale.toLocaleString()} sub="stale or expired" borderColor={crisisColor || 'var(--amber)'} numColor={crisisColor || 'var(--amber)'} onClick={() => openKpi('jobs_stale', 'Stale & expired jobs')} />
-                <KpiCard l="Active %" n={`${h.active_pct}%`} sub={`of ${h.total.toLocaleString()} stored`} borderColor={h.crisis ? 'var(--red)' : 'var(--green)'} numColor={h.crisis ? 'var(--red)' : 'var(--green)'} />
-              </div>
-            </>
-          )
-        })()}
-
-        {/* Reports chart */}
-        <div className="adm-panel" style={{ marginBottom: '.65rem' }}>
-          <div className="adm-panel-hdr">
-            Reports submitted — last 30 days
-            <span style={{ fontFamily: 'var(--mono)', fontSize: '.5rem', color: 'var(--dim)' }}>one bar = one day</span>
-          </div>
-          <div style={{ padding: '.85rem 1rem .6rem' }}>
-            <div className="adm-chart-row">
-              {(stats.reports.chart || []).map(d => (
-                <div
-                  key={d.date}
-                  className="adm-chart-bar"
-                  style={{ height: `${chartMax > 0 ? (d.count / chartMax) * 100 : 0}%` }}
-                  title={`${d.date}: ${d.count}`}
-                />
-              ))}
-            </div>
-            {stats.reports.chart && stats.reports.chart.length > 0 && (
-              <div style={{ display: 'flex', justifyContent: 'space-between', padding: '.3rem 0 0', fontFamily: 'var(--mono)', fontSize: '.44rem', color: 'var(--dim)' }}>
-                {[0, 7, 14, 21, 29].map(i => (
-                  <span key={i}>{stats.reports.chart[i]?.date?.slice(5) || ''}</span>
-                ))}
+                </pre>
               </div>
             )}
-          </div>
-        </div>
 
-        {/* Two-column: most reported + most researched */}
-        <div className="adm-2col">
-          <div className="adm-panel">
-            <div className="adm-panel-hdr">Most reported companies <span style={{ color: 'var(--dim)', fontWeight: 400 }}>(30d)</span></div>
-            <BarChart
-              items={(stats.reports.top_companies || []).slice(0, 8).map(c => ({ label: c.company, value: c.count }))}
-              max={topReportedMax}
-            />
-          </div>
-          <div className="adm-panel">
-            <div className="adm-panel-hdr">Most researched companies <span style={{ color: 'var(--dim)', fontWeight: 400 }}>(7d)</span></div>
-            {stats.company_lookups?.ready
-              ? <BarChart items={(stats.company_lookups.top || []).slice(0, 8).map(c => ({ label: c.company, value: c.count }))} max={topLookupMax} green />
-              : <div style={{ padding: '.85rem 1rem', fontFamily: 'var(--mono)', fontSize: '.62rem', color: 'var(--dim)' }}>search_logs not set up</div>
-            }
-          </div>
-        </div>
-
-        {/* Outcome breakdown */}
-        <div className="adm-panel" style={{ marginBottom: '.65rem' }}>
-          <div className="adm-panel-hdr">Report outcome breakdown <span style={{ color: 'var(--dim)', fontWeight: 400 }}>(30d)</span></div>
-          <div style={{ display: 'flex', gap: '.5rem', flexWrap: 'wrap', padding: '.75rem 1rem' }}>
-            {Object.entries(stats.reports.outcome_breakdown ?? {}).filter(([, v]) => (v as number) > 0).map(([outcome, count]) => (
-              <div key={outcome} style={{ fontFamily: 'var(--mono)', fontSize: '.62rem', padding: '.35rem .75rem', borderRadius: 6, background: outcomeColor(outcome) + '18', color: outcomeColor(outcome), border: `1px solid ${outcomeColor(outcome)}30` }}>
-                {outcome}: {count as number}
+            {/* Reports chart */}
+            <div className="adm-panel" style={{ marginBottom: '.65rem' }}>
+              <div className="adm-panel-hdr">
+                Reports submitted — last 30 days
+                <span style={{ fontFamily: 'var(--mono)', fontSize: '.5rem', color: 'var(--dim)' }}>one bar = one day</span>
               </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Recent hiring reports */}
-        <Card style={{ marginTop: '.65rem' }}>
-          <CardHeader
-            title="Recent hiring reports (last 25)"
-            badge={needsReviewCount > 0 ? <Badge n={needsReviewCount} /> : undefined}
-          />
-          {(stats.reports.recent || []).length === 0
-            ? <div style={{ fontFamily: 'var(--mono)', fontSize: '.62rem', color: 'var(--dim)' }}>No reports yet</div>
-            : (stats.reports.recent || []).map(r => (
-              <ReportRow key={r.id} report={r} token={token!} onRefresh={() => load(token!)} />
-            ))
-          }
-        </Card>
-
-        {/* Recent tracker applications */}
-        <Card style={{ marginTop: '.65rem' }}>
-          <CardHeader title="Recent tracker applications (last 25)" />
-          {(stats.applications.recent || []).length === 0
-            ? <div style={{ fontFamily: 'var(--mono)', fontSize: '.62rem', color: 'var(--muted)' }}>No applications tracked yet</div>
-            : (stats.applications.recent || []).map(a => (
-              <div key={a.id} className="adm-row" style={{ margin: '0 -1rem', borderLeft: `3px solid ${stageColor(a.stage)}`, gap: '.6rem' }}>
-                <span style={{ fontFamily: 'var(--mono)', fontSize: '.55rem', color: stageColor(a.stage), background: stageColor(a.stage) + '18', border: `1px solid ${stageColor(a.stage)}30`, borderRadius: 4, padding: '.1rem .4rem', flexShrink: 0 }}>{a.stage}</span>
-                <span style={{ fontFamily: 'var(--mono)', fontSize: '.62rem', color: 'var(--white)', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{a.company_name} · {a.role}</span>
-                <span style={{ fontFamily: 'var(--mono)', fontSize: '.55rem', color: 'var(--muted)', flexShrink: 0 }}>{relTime(a.created_at)}</span>
+              <div style={{ padding: '.85rem 1rem .6rem' }}>
+                <div className="adm-chart-row">
+                  {(stats.reports.chart || []).map(d => (
+                    <div key={d.date} className="adm-chart-bar" style={{ height: `${chartMax > 0 ? (d.count / chartMax) * 100 : 0}%` }} title={`${d.date}: ${d.count}`} />
+                  ))}
+                </div>
+                {stats.reports.chart && stats.reports.chart.length > 0 && (
+                  <div style={{ display: 'flex', justifyContent: 'space-between', padding: '.3rem 0 0', fontFamily: 'var(--mono)', fontSize: '.44rem', color: 'var(--dim)' }}>
+                    {[0, 7, 14, 21, 29].map(i => (
+                      <span key={i}>{stats.reports.chart[i]?.date?.slice(5) || ''}</span>
+                    ))}
+                  </div>
+                )}
               </div>
-            ))
-          }
-        </Card>
+            </div>
 
-        {/* New job listings browser */}
-        <AllJobsBrowser token={token!} onUnauthorized={() => { sessionStorage.removeItem(TOKEN_KEY); setToken(null); setStats(null); setLoginError('Session expired') }} />
+            {/* Two-column: most reported + most researched */}
+            <div className="adm-2col">
+              <div className="adm-panel">
+                <div className="adm-panel-hdr">Most reported companies <span style={{ color: 'var(--dim)', fontWeight: 400 }}>(30d)</span></div>
+                <BarChart items={(stats.reports.top_companies || []).slice(0, 8).map(c => ({ label: c.company, value: c.count }))} max={topReportedMax} />
+              </div>
+              <div className="adm-panel">
+                <div className="adm-panel-hdr">Most researched companies <span style={{ color: 'var(--dim)', fontWeight: 400 }}>(7d)</span></div>
+                {stats.company_lookups?.ready
+                  ? <BarChart items={(stats.company_lookups.top || []).slice(0, 8).map(c => ({ label: c.company, value: c.count }))} max={topLookupMax} green />
+                  : <div style={{ padding: '.85rem 1rem', fontFamily: 'var(--mono)', fontSize: '.62rem', color: 'var(--dim)' }}>search_logs not set up</div>
+                }
+              </div>
+            </div>
 
-        {/* Job deduplication */}
-        <JobDedupePanel token={token!} />
+            {/* Outcome breakdown */}
+            <div className="adm-panel" style={{ marginBottom: '.65rem' }}>
+              <div className="adm-panel-hdr">Report outcome breakdown <span style={{ color: 'var(--dim)', fontWeight: 400 }}>(30d)</span></div>
+              <div style={{ display: 'flex', gap: '.5rem', flexWrap: 'wrap', padding: '.75rem 1rem' }}>
+                {Object.entries(stats.reports.outcome_breakdown ?? {}).filter(([, v]) => (v as number) > 0).map(([outcome, count]) => (
+                  <div key={outcome} style={{ fontFamily: 'var(--mono)', fontSize: '.62rem', padding: '.35rem .75rem', borderRadius: 6, background: outcomeColor(outcome) + '18', color: outcomeColor(outcome), border: `1px solid ${outcomeColor(outcome)}30` }}>
+                    {outcome}: {count as number}
+                  </div>
+                ))}
+              </div>
+            </div>
 
-        {/* Reported inactive listings */}
-        <Card style={{ marginTop: '.65rem' }}>
-          <CardHeader
-            title="Reported inactive listings"
-            badge={(stats.jobs?.inactive_reports || []).length > 0 ? <Badge n={stats.jobs.inactive_reports.length} color="var(--amber)" /> : undefined}
-            action={<span style={{ fontFamily: 'var(--mono)', fontSize: '.48rem', color: 'var(--dim)' }}>User reports that a listing is no longer active</span>}
-          />
-          {(stats.jobs?.inactive_reports || []).length === 0
-            ? <div style={{ fontFamily: 'var(--mono)', fontSize: '.62rem', color: 'var(--dim)' }}>No inactive reports this week</div>
-            : (stats.jobs.inactive_reports || []).map(r => (
-              <InactiveRow key={r.job_id} report={r} token={token!} />
-            ))
-          }
-        </Card>
+            {/* Recent hiring reports (moderation) */}
+            <Card style={{ marginTop: '.65rem' }}>
+              <CardHeader title="Recent hiring reports (last 25)" badge={needsReviewCount > 0 ? <Badge n={needsReviewCount} /> : undefined} />
+              {(stats.reports.recent || []).length === 0
+                ? <div style={{ fontFamily: 'var(--mono)', fontSize: '.62rem', color: 'var(--dim)' }}>No reports yet</div>
+                : (stats.reports.recent || []).map(r => (<ReportRow key={r.id} report={r} token={token!} onRefresh={() => load(token!)} />))
+              }
+            </Card>
 
-        {/* Data quality issues queue */}
-        <Card style={{ marginTop: '.65rem' }}>
-          <CardHeader
-            title="Data quality issues"
-            badge={stats.issues?.open > 0 ? <Badge n={stats.issues.open} /> : undefined}
-            action={<button onClick={() => token && load(token)} style={{ fontFamily: 'var(--mono)', fontSize: '.55rem', padding: '.3rem .75rem', borderRadius: 6, border: '1px solid var(--line2)', background: 'transparent', color: 'var(--sub)', cursor: 'pointer' }}>↻ Refresh</button>}
-          />
-          {(stats.issues?.items || []).length === 0
-            ? <div style={{ fontFamily: 'var(--mono)', fontSize: '.62rem', color: 'var(--green)' }}>✓ No open issues</div>
-            : (stats.issues.items || []).map(issue => (
-              <IssueRow
-                key={issue.id}
-                issue={issue}
-                token={token!}
-                onRefresh={() => load(token!)}
-                onOpenMerge={name => setMergePrefill({ primary: name, secondary: '', nonce: Date.now() })}
+            {/* Recent tracker applications */}
+            <Card style={{ marginTop: '.65rem' }}>
+              <CardHeader title="Recent tracker applications (last 25)" />
+              {(stats.applications.recent || []).length === 0
+                ? <div style={{ fontFamily: 'var(--mono)', fontSize: '.62rem', color: 'var(--muted)' }}>No applications tracked yet</div>
+                : (stats.applications.recent || []).map(a => (
+                  <div key={a.id} className="adm-row" style={{ margin: '0 -1rem', borderLeft: `3px solid ${stageColor(a.stage)}`, gap: '.6rem' }}>
+                    <span style={{ fontFamily: 'var(--mono)', fontSize: '.55rem', color: stageColor(a.stage), background: stageColor(a.stage) + '18', border: `1px solid ${stageColor(a.stage)}30`, borderRadius: 4, padding: '.1rem .4rem', flexShrink: 0 }}>{a.stage}</span>
+                    <span style={{ fontFamily: 'var(--mono)', fontSize: '.62rem', color: 'var(--white)', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{a.company_name} · {a.role}</span>
+                    <span style={{ fontFamily: 'var(--mono)', fontSize: '.55rem', color: 'var(--muted)', flexShrink: 0 }}>{relTime(a.created_at)}</span>
+                  </div>
+                ))
+              }
+            </Card>
+
+            {/* New job listings browser */}
+            <AllJobsBrowser token={token!} onUnauthorized={onUnauthorized} />
+
+            {/* Job deduplication */}
+            <JobDedupePanel token={token!} />
+
+            {/* Reported inactive listings */}
+            <Card style={{ marginTop: '.65rem' }}>
+              <CardHeader
+                title="Reported inactive listings"
+                badge={(stats.jobs?.inactive_reports || []).length > 0 ? <Badge n={stats.jobs.inactive_reports.length} color="var(--amber)" /> : undefined}
+                action={<span style={{ fontFamily: 'var(--mono)', fontSize: '.48rem', color: 'var(--dim)' }}>User reports that a listing is no longer active</span>}
               />
-            ))
-          }
-        </Card>
+              {(stats.jobs?.inactive_reports || []).length === 0
+                ? <div style={{ fontFamily: 'var(--mono)', fontSize: '.62rem', color: 'var(--dim)' }}>No inactive reports this week</div>
+                : (stats.jobs.inactive_reports || []).map(r => (<InactiveRow key={r.job_id} report={r} token={token!} />))
+              }
+            </Card>
 
-        {/* Company deduplication */}
-        <MergePanel token={token!} prefill={mergePrefill} />
+            {/* Data quality issues queue */}
+            <Card style={{ marginTop: '.65rem' }}>
+              <CardHeader
+                title="Data quality issues"
+                badge={stats.issues?.open > 0 ? <Badge n={stats.issues.open} /> : undefined}
+                action={<button onClick={() => token && load(token)} style={{ fontFamily: 'var(--mono)', fontSize: '.55rem', padding: '.3rem .75rem', borderRadius: 6, border: '1px solid var(--line2)', background: 'transparent', color: 'var(--sub)', cursor: 'pointer' }}>↻ Refresh</button>}
+              />
+              {(stats.issues?.items || []).length === 0
+                ? <div style={{ fontFamily: 'var(--mono)', fontSize: '.62rem', color: 'var(--green)' }}>✓ No open issues</div>
+                : (stats.issues.items || []).map(issue => (
+                  <IssueRow key={issue.id} issue={issue} token={token!} onRefresh={() => load(token!)} onOpenMerge={name => setMergePrefill({ primary: name, secondary: '', nonce: Date.now() })} />
+                ))
+              }
+            </Card>
 
-        {/* Per-company evidentiary export */}
-        <CompanyExportPanel token={token!} />
+            {/* Company deduplication */}
+            <MergePanel token={token!} prefill={mergePrefill} />
 
-        {/* Credits overview + master toggle */}
-        <CreditsPanel credits={stats.credits} flags={stats.feature_flags || []} token={token!} onRefresh={() => load(token!)} />
+            {/* Per-company evidentiary export */}
+            <CompanyExportPanel token={token!} />
 
-        {/* Feature flags */}
-        <FlagsPanel flags={stats.feature_flags || []} token={token!} onRefresh={() => load(token!)} />
+            {/* Credits overview + master toggle */}
+            <CreditsPanel credits={stats.credits} flags={stats.feature_flags || []} token={token!} onRefresh={() => load(token!)} />
 
-        {/* Duplicate account clusters */}
-        <ClustersPanel
-          clusters={stats.duplicate_clusters?.items || []}
-          suspected={stats.duplicate_clusters?.suspected || 0}
-          token={token!}
-          onRefresh={() => load(token!)}
-        />
+            {/* Feature flags */}
+            <FlagsPanel flags={stats.feature_flags || []} token={token!} onRefresh={() => load(token!)} />
 
-        {/* API Health */}
-        <Card>
-          <CardHeader title="API Health" />
-          <div className="adm-kpi-row" style={{ marginBottom: '.75rem' }}>
-            <KpiCard l="Errors today" n={stats.errors?.today ?? 0} sub="last 24h" borderColor={stats.errors?.today > 10 ? 'var(--red)' : undefined} numColor={stats.errors?.today > 10 ? 'var(--red)' : undefined} />
-            <KpiCard l="Errors this week" n={stats.errors?.this_week ?? 0} sub="last 7 days" />
-            <KpiCard l="DAU" n={stats.users?.dau ?? 0} sub="active today" />
+            {/* Duplicate account clusters */}
+            <ClustersPanel clusters={stats.duplicate_clusters?.items || []} suspected={stats.duplicate_clusters?.suspected || 0} token={token!} onRefresh={() => load(token!)} />
+
+            {/* Background job runner */}
+            <JobRunner token={token!} />
+
+            {/* Deploy trigger */}
+            <DeployPanel />
+
           </div>
-          {stats.errors?.by_route && Object.keys(stats.errors.by_route).length > 0 && (
-            <div style={{ marginBottom: '.75rem' }}>
-              <div style={{ fontFamily: 'var(--mono)', fontSize: '.5rem', textTransform: 'uppercase', letterSpacing: '.1em', color: 'var(--dim)', marginBottom: '.4rem' }}>Errors by route</div>
-              {Object.entries(stats.errors.by_route).sort((a, b) => b[1] - a[1]).map(([route, count]) => (
-                <div key={route} style={{ display: 'flex', justifyContent: 'space-between', fontFamily: 'var(--mono)', fontSize: '.6rem', color: 'var(--sub)', padding: '.2rem 0' }}>
-                  <span style={{ color: 'var(--dim)' }}>{route}</span>
-                  <span style={{ color: 'var(--red)' }}>{count as number}</span>
-                </div>
-              ))}
-            </div>
-          )}
-          {(stats.errors?.recent || []).length > 0 && (
-            <div>
-              <div style={{ fontFamily: 'var(--mono)', fontSize: '.5rem', textTransform: 'uppercase', letterSpacing: '.1em', color: 'var(--dim)', marginBottom: '.4rem' }}>Recent</div>
-              {stats.errors.recent.map((e, i) => (
-                <div key={i} style={{ fontFamily: 'var(--mono)', fontSize: '.6rem', color: 'var(--muted)', padding: '.2rem 0', borderBottom: '1px solid var(--line2)' }}>
-                  <span style={{ color: 'var(--dim)' }}>{relTime(e.created_at)}</span>
-                  {' · '}
-                  <span style={{ color: 'var(--sub)' }}>{e.endpoint}</span>
-                  {' · '}
-                  <span>{e.error_msg?.slice(0, 60)}</span>
-                </div>
-              ))}
-            </div>
-          )}
-        </Card>
-
-        {/* Background job runner */}
-        <JobRunner token={token!} />
-
-        {/* Deploy trigger */}
-        <DeployPanel />
+        </details>
 
       </div>
 
       {kpiModal && (
-        <KpiModal
-          metric={kpiModal.metric}
-          title={kpiModal.title}
-          token={token!}
-          onClose={() => setKpiModal(null)}
-        />
+        <KpiModal metric={kpiModal.metric} title={kpiModal.title} token={token!} onClose={() => setKpiModal(null)} />
+      )}
+      {manageOpen && (
+        <ManageAccountsModal token={token!} onClose={() => setManageOpen(false)} />
       )}
     </div>
   )

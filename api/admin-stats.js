@@ -190,6 +190,7 @@ async function _handler(req, res) {
       jobsActiveRes, jobsNewTodayRes,
       reportsMonthRes, searchLogsWeekRes,
       jobsTotalRes, creditTxnRes, outcomeSharesRes, usersMonthRes,
+      searchEvents30Res, resumeScans30Res,
     ] = await Promise.all([
       db(`profiles?select=id`, { headers: { Prefer: 'count=exact', 'Range-Unit': 'items', Range: '0-0' } }),
       db(`profiles?created_at=gte.${todayISO}&select=id`, { headers: { Prefer: 'count=exact', 'Range-Unit': 'items', Range: '0-0' } }),
@@ -224,6 +225,10 @@ async function _handler(req, res) {
       db(`credit_transactions?select=delta&limit=20000`),
       db(`outcome_card_shares?select=shared_via,created_at&order=created_at.desc&limit=5000`),
       db(`profiles?created_at=gte.${monthISO}&select=created_at&order=created_at.asc&limit=5000`),
+      // ADDITIVE (admin command-center Data Flywheel panel): 30-day activity counts.
+      // Both tables are service-key accessed (RLS bypassed). Never a constant.
+      db(`search_events?created_at=gte.${monthISO}&select=id`, { headers: { Prefer: 'count=exact', 'Range-Unit': 'items', Range: '0-0' } }),
+      db(`resume_surveys?created_at=gte.${monthISO}&select=id`, { headers: { Prefer: 'count=exact', 'Range-Unit': 'items', Range: '0-0' } }),
     ]);
 
     const usersTotal = ct(usersTotalRes);
@@ -383,6 +388,8 @@ async function _handler(req, res) {
       applications: { total: totalApps, ghosted_30d: ghosted, hired_30d: ct(appsHiredRes), ghost_rate_pct: totalApps > 0 ? Math.round(ghosted / totalApps * 100) : null, recent: recentApps },
       companies: { with_scores: ct(coScoredRes) },
       credits: { total_users: creditRows.length, pro_users: proCount, total_balance: totalBalance, earned: creditsEarned, spent: creditsSpent },
+      // ADDITIVE: real 30-day activity counts for the Data Flywheel panel.
+      flywheel: { job_searches_30d: ct(searchEvents30Res), resume_scans_30d: ct(resumeScans30Res) },
       errors: { today: errToday.length, this_week: ct(errWeekRes), by_route: errByRoute, recent: errToday.slice(0, 5) },
       issues: { open: issues.length, items: issues },
       duplicate_clusters: { suspected: dupClusters.length, items: dupClusters },
