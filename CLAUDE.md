@@ -142,6 +142,66 @@ and import graph; 30 confirmed breaks fixed. Ground truth established this sessi
 - Security: service_role key NEVER in frontend. anon key is intentionally public.
 - `ADMIN_EMAIL` env var controls /api/admin-stats access.
 
+## MANDATORY THOUGHT PROCESS (added 2026-07-02 after auditing PRs #75–#123)
+
+A post-hoc audit found ~30 features that "looked built but had never once worked" —
+every one failed at a seam this checklist would have caught. These are not suggestions;
+run them on EVERY change. The root cause was always the same: reasoning about code in
+isolation instead of verifying the whole path it lives on.
+
+**1. Trace the full contract before writing OR trusting any code.**
+For any frontend→API→DB path you touch, open BOTH sides and verify with file:line
+evidence: exact field names in the request body vs what the handler destructures; auth
+header sent vs auth the handler requires; HTTP method vs methods the handler routes
+(Vercel crons fire GET); response fields vs what the client reads. Bugs shipped by
+skipping this: tracker quick_submit sent no Bearer token (401'd silently for weeks),
+company-page Track CTA sent a flat body the handler couldn't read (never worked once),
+demand cron was POST-only, Stripe used an invalid expand[] param (502 on every call).
+
+**2. Verify the actual DB schema, not the schema you assume.**
+Before selecting/inserting a column, confirm it exists with the right type — read the
+migrations AND, when in doubt, probe prod. The single worst bug (tracker dead for every
+signed-in user) was a select on a column (`events`) that didn't exist in prod; another
+was job_id being uuid in prod despite migration 016 saying text. Migrations with
+`IF NOT EXISTS` silently no-op over pre-existing drift.
+
+**3. Exercise the runtime path once, honestly, before calling it done.**
+"The code reads correctly" is not verification. curl the endpoint / click the flow /
+run the cron handler locally. A filter that was rendered but never applied (Posted
+filter), a "Remote" option that silently ran a 25-mile local search, and a credit
+response that reported a different balance than it persisted all pass code-reading and
+fail one real invocation. State explicitly what you did NOT verify live.
+
+**4. When you find a bug, hunt the CLASS, not the instance.**
+Grep for the same pattern everywhere before closing the issue. The cross-user cache
+bleed was fixed twice in two days (#118 résumé, #121 profile) because the first fix
+patched one key instead of auditing every localStorage/cache key for user-scoping. Slug
+generation existed in 3 divergent copies. One bug found = one pattern search owed.
+
+**5. Never ship a known approximation.**
+If you catch yourself writing a comment like "no created_at filter, assume recent" —
+STOP. That exact comment shipped the lifetime-vs-daily credit cap bug that permanently
+killed the earn incentive after 3 uses. Do it right or surface the blocker; an honest
+TODO-and-ask beats silently-wrong logic every time.
+
+**6. Decide once, then build once.**
+The free-trial feature was built (#86), patched (#89), rebuilt key-only (#90), and
+deleted (#93) in a single day because building started before the business decision was
+settled. If a change hinges on an owner decision (pricing, trial policy, email infra),
+ask first or put it behind MONETIZATION_TODO.md — don't iterate product strategy in code.
+
+**7. Fixes ride with proof.**
+Every fix PR names how it was verified (test added/re-run, live probe, build). If a fix
+chain on the same file reaches attempt #3 (#78→#81 résumé exports), stop patching:
+re-derive the requirement end-to-end, then make ONE correct change.
+
+**8. Leave ground truth better than you found it.**
+Update CLAUDE_HANDOFF.md + this file's session notes with FACTS you verified (paths you
+opened, commands you ran) — never from memory. A prior session recorded a credits path
+that didn't exist and later sessions built on the error. If prod state diverges from git
+(promoted previews, hand-applied SQL), record it immediately and reconcile (merge the PR,
+codify the migration) before anything else lands.
+
 ## Application Data Model
 Every application must have:
 - `id`, `company`, `role`, `city`, `platform`
