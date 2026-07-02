@@ -2,7 +2,8 @@
 
 import { useState } from 'react'
 import type { AdminStats, AttnItem, MergePrefill } from './types'
-import { Panel, PulseTile, MetricRow, AttnRow, Card, CardHeader, Badge, BarChart, relTime, outcomeColor, stageColor, runRefreshAndClear, refreshResultMsg } from './primitives'
+import { Panel, MetricRow, Card, CardHeader, Badge, BarChart, relTime, outcomeColor, stageColor, runRefreshAndClear, refreshResultMsg } from './primitives'
+import { AdminHero, AdminCommandCenter, AdminMetricCard, CardSubLink, AdminAttentionQueue, type HealthStatus } from './overview'
 import { KpiModal, ManageAccountsModal, RevenueDetailModal, TrialsDetailModal, SharesDetailModal, ErrorsDetailModal } from './modals'
 import { JobCrisisBanner, JobRefreshButton, JobRunner, ReportRow, IssueRow, InactiveRow, MergePanel, CompanyExportPanel, CreditsPanel, FlagsPanel, ClustersPanel, JobDedupePanel, AllJobsBrowser, DeployPanel } from './panels'
 
@@ -92,61 +93,82 @@ export function AdminShell({ stats, token, reload, onLogout, onUnauthorized }: {
   const attn: AttnItem[] = []
   if (jh?.crisis) attn.push({ key: 'crisis', sev: 'red', title: `Job board crisis — ${activeJobs.toLocaleString()} active listings`, detail: `${(jh.stale ?? 0).toLocaleString()} stale · only ${jh.active_pct}% of the corpus is live. Seekers see a dead board.`, action: { label: 'Refresh', onClick: runEmergencyRefresh, busy: emgBusy } })
   else if (staleJobs > 500) attn.push({ key: 'stale', sev: 'amber', title: `${staleJobs.toLocaleString()} stale / expired listings`, detail: 'A large slice of the job corpus is unavailable. Refresh to keep the board fresh.', action: { label: 'Refresh', onClick: runEmergencyRefresh, busy: emgBusy } })
-  if (errToday > 10) attn.push({ key: 'errs', sev: 'red', title: `${errToday} API errors today`, detail: 'Error volume is elevated — see System Health for the failing routes.' })
-  if (stripeOn && paidUsers === 0) attn.push({ key: 'norev', sev: 'amber', title: '0 paid users — revenue not activated yet', detail: 'Stripe is connected but there are no active paid subscriptions. Conversion has not started.' })
-  if ((m?.past_due ?? 0) > 0) attn.push({ key: 'pastdue', sev: 'amber', title: `${m!.past_due} subscription${m!.past_due === 1 ? '' : 's'} past due`, detail: 'Payment is failing — these accounts may churn without follow-up.' })
-  if ((m?.trialing ?? 0) > 0) attn.push({ key: 'trials', sev: 'blue', title: `${m!.trialing} user${m!.trialing === 1 ? '' : 's'} trialing — watch conversion`, detail: 'Active trials in flight (cancelled trials excluded). Nudge them before the trial ends.' })
-  if ((m?.canceling ?? 0) > 0) attn.push({ key: 'canceling', sev: 'amber', title: `${m!.canceling} subscription${m!.canceling === 1 ? '' : 's'} set to cancel`, detail: 'Cancelled but still live until period end — these will churn. Win them back before then.' })
-  if (shares === 0) attn.push({ key: 'noshare', sev: 'blue', title: 'No outcome cards shared — flywheel not moving', detail: 'Outcome cards are the virality engine. Nothing has been shared yet.' })
+  if (errToday > 10) attn.push({ key: 'errs', sev: 'red', title: `${errToday} API errors today`, detail: 'Error volume is elevated — see the failing routes.', action: { label: 'View', onClick: () => setDetail('errors') } })
+  if (stripeOn && paidUsers === 0) attn.push({ key: 'norev', sev: 'amber', title: '0 paid users — revenue not activated yet', detail: 'Stripe is connected but there are no active paid subscriptions. Conversion has not started.', action: { label: 'View', onClick: () => setDetail('revenue') } })
+  if ((m?.past_due ?? 0) > 0) attn.push({ key: 'pastdue', sev: 'amber', title: `${m!.past_due} subscription${m!.past_due === 1 ? '' : 's'} past due`, detail: 'Payment is failing — these accounts may churn without follow-up.', action: { label: 'View', onClick: () => setDetail('trials') } })
+  if ((m?.trialing ?? 0) > 0) attn.push({ key: 'trials', sev: 'blue', title: `${m!.trialing} user${m!.trialing === 1 ? '' : 's'} trialing — watch conversion`, detail: 'Active trials in flight (cancelled trials excluded). Nudge them before the trial ends.', action: { label: 'View', onClick: () => setDetail('trials') } })
+  if ((m?.canceling ?? 0) > 0) attn.push({ key: 'canceling', sev: 'amber', title: `${m!.canceling} subscription${m!.canceling === 1 ? '' : 's'} set to cancel`, detail: 'Cancelled but still live until period end — these will churn. Win them back before then.', action: { label: 'View', onClick: () => setDetail('trials') } })
+  if (shares === 0) attn.push({ key: 'noshare', sev: 'blue', title: 'No outcome cards shared — flywheel not moving', detail: 'Outcome cards are the virality engine. Nothing has been shared yet.', action: { label: 'View', onClick: () => setDetail('shares') } })
   if (needsReviewCount > 0) attn.push({ key: 'review', sev: 'amber', title: `${needsReviewCount} report${needsReviewCount === 1 ? '' : 's'} need review`, detail: 'Flagged community reports are held out of scoring until cleared (Advanced tools → moderation).' })
   if (dupSuspected > 0) attn.push({ key: 'dup', sev: 'amber', title: `${dupSuspected} suspected duplicate account cluster${dupSuspected === 1 ? '' : 's'}`, detail: 'Shared-signal groups flagged for anti-Sybil review (Advanced tools → clusters).' })
   if (inactiveCount > 0) attn.push({ key: 'inactive', sev: 'amber', title: `${inactiveCount} reported inactive listing${inactiveCount === 1 ? '' : 's'}`, detail: 'Users flagged these jobs as no longer active — verify and remove (Advanced tools).' })
   if (openIssues > 0) attn.push({ key: 'issues', sev: 'amber', title: `${openIssues} open data-quality issue${openIssues === 1 ? '' : 's'}`, detail: 'Community-reported data problems awaiting resolution (Advanced tools → issues).' })
 
+  // ── Overall health for the hero pill + one-sentence summary (real signals only) ──
+  const hasWarnings = attn.some(a => a.sev === 'red' || a.sev === 'amber')
+  const status: HealthStatus = jh?.crisis
+    ? 'Critical'
+    : (errToday > 10 || staleJobs > 500 || hasWarnings) ? 'Attention needed' : 'Healthy'
+
+  let summary: string
+  if (jh?.crisis) {
+    summary = `The job board has collapsed to ${activeJobs.toLocaleString()} active listings — run an emergency refresh before anything else.`
+  } else if (status === 'Attention needed') {
+    const probs: string[] = []
+    if (errToday > 10) probs.push(`${errToday} API errors today`)
+    if (staleJobs > 500) probs.push(`${staleJobs.toLocaleString()} stale listings`)
+    if (stripeOn && paidUsers === 0) probs.push('no paid conversions yet')
+    if ((m?.past_due ?? 0) > 0) probs.push(`${m!.past_due} past-due subscription${m!.past_due === 1 ? '' : 's'}`)
+    if ((m?.canceling ?? 0) > 0) probs.push(`${m!.canceling} set to cancel`)
+    if (needsReviewCount > 0) probs.push(`${needsReviewCount} report${needsReviewCount === 1 ? '' : 's'} to review`)
+    if (inactiveCount > 0) probs.push(`${inactiveCount} flagged listing${inactiveCount === 1 ? '' : 's'}`)
+    if (openIssues > 0) probs.push(`${openIssues} data issue${openIssues === 1 ? '' : 's'}`)
+    if (dupSuspected > 0) probs.push(`${dupSuspected} duplicate cluster${dupSuspected === 1 ? '' : 's'}`)
+    const head = probs.length ? probs.slice(0, 3).join(', ') : 'a few items need a look'
+    summary = head.charAt(0).toUpperCase() + head.slice(1) + ' — clear the queue below.'
+  } else {
+    summary = `Jobs are fresh, errors are low, and ${fwStatus === 'Not moving yet' ? 'the data flywheel is ready to start' : 'the data flywheel is moving'}.`
+  }
+
+  // Card status phrases (honest, per-metric)
+  const revPhrase = mrr ? 'Revenue is moving' : stripeOn ? 'Not activated yet' : 'Stripe not connected'
+  const jobsPhrase = jh?.crisis ? 'Board in crisis' : staleJobs > 500 ? 'Stale building up' : 'Board is fresh'
+
   return (
     <div className="page-full" style={{ background: 'radial-gradient(ellipse at 10% 0%,rgba(29,78,216,0.1) 0%,transparent 50%),radial-gradient(ellipse at 90% 10%,rgba(124,58,237,0.07) 0%,transparent 45%)' }}>
       <div className="adm-wrap">
 
-        {/* 1. Header */}
-        <header className="ac-hdr">
-          <div className="ac-hdr-l">
-            <div className="ac-eyebrow">Founder command center</div>
-            <h1 className="ac-title">Seen Control</h1>
-            <div className="ac-meta">updated just now · build {process.env.NEXT_PUBLIC_VERCEL_GIT_COMMIT_SHA?.slice(0, 7) ?? 'local'} · {process.env.NEXT_PUBLIC_VERCEL_GIT_COMMIT_MESSAGE?.slice(0, 32) ?? 'dev'}</div>
-          </div>
-          <div className="ac-hdr-actions">
-            <button onClick={reload} className="adm-btn">↻ Refresh</button>
-            <button onClick={downloadCsv} disabled={downloading} className="adm-btn" style={{ borderColor: 'rgba(16,185,129,.4)', color: 'var(--green)' }}>{downloading ? 'Exporting…' : '⬇ CSV'}</button>
-            <button onClick={onLogout} className="adm-btn-danger">Sign out</button>
-          </div>
-        </header>
+        {/* 1. Hero — title, health pill, plain-English summary, session actions */}
+        <AdminHero status={status} summary={summary} onRefresh={reload} onDownloadCsv={downloadCsv} downloading={downloading} onLogout={onLogout} />
 
         {/* Crisis banner stays prominent (one-click remediation) */}
         {jh?.crisis && <JobCrisisBanner health={jh} token={token} onRefresh={reload} />}
 
-        {/* 2. Seen Pulse — command center */}
-        <Panel title="Seen Pulse" hero right={<span className="ac-panel-status">what matters today</span>}>
-          <div className="ac-pulse">
-            <PulseTile label="Accounts" value={stats.users.total.toLocaleString()} phrase={stats.users.new_today > 0 ? `${stats.users.new_today} new today` : 'no new today'} tone="white" onClick={() => openManage('all')} />
-            <PulseTile label="Paid users" value={paidUsers.toLocaleString()} phrase={paidUsers > 0 ? 'converting' : 'none yet'} tone={paidUsers > 0 ? 'green' : 'dim'} onClick={() => openManage('pro')} />
-            <PulseTile label="MRR" value={mrr != null ? `$${mrr.toLocaleString()}` : '$0'} phrase={mrr ? 'revenue moving' : stripeOn ? 'not activated yet' : 'Stripe off'} tone={mrr ? 'green' : 'dim'} onClick={() => setDetail('revenue')} />
-            <PulseTile label="Trials" value={stripeOn ? (m?.trialing ?? 0) : '—'} phrase={stripeOn ? `${m?.trialing ?? 0} trialing now` : 'Stripe not connected'} tone={(m?.trialing ?? 0) > 0 ? 'blue' : 'dim'} onClick={() => setDetail('trials')} />
-            <PulseTile label="Cards shared" value={shares.toLocaleString()} phrase={shares > 0 ? 'flywheel moving' : 'none shared yet'} tone={shares > 0 ? 'blue' : 'dim'} onClick={() => setDetail('shares')} />
-            <PulseTile label="API" value={errToday} phrase={errToday === 0 ? 'No API incidents' : `${errToday} errors today`} tone={errToday > 10 ? 'red' : errToday > 0 ? 'amber' : 'green'} onClick={() => setDetail('errors')} />
-          </div>
-        </Panel>
+        {/* 2. Five core operating cards — every original pulse door preserved (sub-links open the second modal). */}
+        <AdminCommandCenter>
+          <AdminMetricCard label="Revenue" value={mrr != null ? `$${mrr.toLocaleString()}` : '$0'} phrase={revPhrase} tone={mrr ? 'green' : 'dim'}
+            onClick={() => setDetail('revenue')}
+            secondary={<>{paidUsers.toLocaleString()} paid · {m ? `${m.conversion_pct}%` : '0%'} conv{stripeOn && (m?.trialing ?? 0) > 0 ? <> · <CardSubLink onClick={() => setDetail('trials')}>{m!.trialing} trialing</CardSubLink></> : null}</>} />
 
-        {/* 3. Needs Attention */}
-        <Panel title="Needs Attention" right={attn.length ? <span className="ac-badge" style={{ background: 'rgba(245,158,11,.15)', color: 'var(--amber)' }}>{attn.length}</span> : undefined}>
-          {emgMsg && (
-            <div style={{ fontFamily: 'var(--mono)', fontSize: '.6rem', marginBottom: '.5rem', color: emgMsg.ok ? 'var(--green)' : 'var(--red)' }}>
-              {emgMsg.ok ? '✓ ' : '✗ '}{emgMsg.text}
-            </div>
-          )}
-          {attn.length === 0
-            ? <div className="ac-allclear">✓ All clear — nothing needs action right now.</div>
-            : attn.map(a => <AttnRow key={a.key} item={a} />)}
-        </Panel>
+          <AdminMetricCard label="Users" value={stats.users.total.toLocaleString()} phrase={`${stats.users.dau} active today`} tone="white"
+            onClick={() => openManage('all')}
+            secondary={<><CardSubLink onClick={() => openManage('pro')}>{paidUsers.toLocaleString()} Pro</CardSubLink> · {m ? m.free_users.toLocaleString() : '—'} free</>} />
+
+          <AdminMetricCard label="Jobs" value={activeJobs.toLocaleString()} phrase={jobsPhrase} tone={jh?.crisis ? 'red' : 'blue'}
+            onClick={() => openKpi('jobs_active', 'Active job listings')}
+            secondary={<>{(jb?.added_today ?? jb?.new_today ?? 0).toLocaleString()} added today · <CardSubLink onClick={() => openKpi('jobs_stale', 'Stale & expired jobs')}>{staleJobs.toLocaleString()} stale</CardSubLink></>} />
+
+          <AdminMetricCard label="Flywheel" value={stats.reports.total.toLocaleString()} phrase={fwStatus} tone={stats.reports.total > 0 ? 'green' : 'dim'}
+            onClick={() => openKpi('total_reports', 'All reports')}
+            secondary={<><CardSubLink onClick={() => setDetail('shares')}>{shares.toLocaleString()} shared</CardSubLink> · {fw ? fw.job_searches_30d.toLocaleString() : '—'} searches</>} />
+
+          <AdminMetricCard label="System" value={errToday} phrase={errToday === 0 ? 'No API incidents' : `${errToday} error${errToday === 1 ? '' : 's'} today`} tone={errToday > 10 ? 'red' : errToday > 0 ? 'amber' : 'green'}
+            onClick={() => setDetail('errors')}
+            secondary={<>{jh?.crisis ? 'refresh behind' : 'refresh healthy'} · {stripeOn ? 'Stripe on' : 'Stripe off'}</>} />
+        </AdminCommandCenter>
+
+        {/* 3. Attention Queue */}
+        <AdminAttentionQueue items={attn} emgMsg={emgMsg} />
 
         {/* 4 & 5. Revenue + Users */}
         <div className="ac-grid2">
