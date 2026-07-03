@@ -141,8 +141,8 @@ export default function JobDetailDrawer({ job, isLoggedIn, onClose, onApply, onC
                 <div style={{ fontFamily: 'var(--display)', fontSize: '1.05rem', fontWeight: 800, color: 'var(--white)', letterSpacing: '-.025em', lineHeight: 1.2, marginBottom: '.22rem' }}>{job.title}</div>
                 <div style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', color: 'var(--dim)' }}>{job.company}{job.location ? ` · 📍 ${job.location}` : ''}</div>
               </div>
-              <div className={`sring ${risk}`} style={{ width: 40, height: 40, flexShrink: 0 }}>
-                <div className="sring-n" style={{ fontSize: '.8rem' }}>{job.score}</div>
+              <div className={`sring ${risk}`} style={{ width: 40, height: 40, flexShrink: 0 }} title={job.score == null ? 'Not enough signal in this listing to score it' : undefined}>
+                <div className="sring-n" style={{ fontSize: '.8rem' }}>{job.score ?? '–'}</div>
               </div>
             </div>
             {chips.length > 0 && (
@@ -154,8 +154,8 @@ export default function JobDetailDrawer({ job, isLoggedIn, onClose, onApply, onC
 
           {/* Stat grid */}
           <div className="jd-grid" style={{ marginBottom: '1rem' }}>
-            <div className="jd-stat"><span className="jd-sn" style={{ color: Score.color(risk) }}>{job.score}</span><span className="jd-sl">Score</span></div>
-            <div className="jd-stat"><span className="jd-sn" style={{ color: job.waste > 55 ? 'var(--red)' : job.waste > 35 ? 'var(--amber)' : 'var(--green)' }}>{job.waste}%</span><span className="jd-sl">Waste risk</span></div>
+            <div className="jd-stat"><span className="jd-sn" style={{ color: Score.color(risk) }}>{job.score ?? '–'}</span><span className="jd-sl">Score</span></div>
+            <div className="jd-stat"><span className="jd-sn" style={{ color: job.waste == null ? 'var(--dim)' : job.waste > 55 ? 'var(--red)' : job.waste > 35 ? 'var(--amber)' : 'var(--green)' }}>{job.waste == null ? '–' : `${job.waste}%`}</span><span className="jd-sl">Waste risk</span></div>
             <div className="jd-stat"><span className="jd-sn" style={{ fontSize: '.72rem' }}>{job.type || 'Full-time'}</span><span className="jd-sl">Type</span></div>
             <div className="jd-stat"><span className="jd-sn" style={{ fontSize: '.72rem' }}>{job.level || 'Mid level'}</span><span className="jd-sl">Level</span></div>
             <div className="jd-stat"><span className="jd-sn" style={{ color: 'var(--green)', fontSize: '.75rem' }}>{job.salary || '—'}</span><span className="jd-sl">Salary</span></div>
@@ -163,7 +163,7 @@ export default function JobDetailDrawer({ job, isLoggedIn, onClose, onApply, onC
           </div>
 
           {/* Waste panel */}
-          {job.waste > 40 && (
+          {job.waste != null && job.waste > 40 && (
             <div className="waste-panel">
               <span className="wp-label">⚠ {job.waste}% Waste risk</span>
               <span style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', color: 'var(--muted)' }}>High chance of no response</span>

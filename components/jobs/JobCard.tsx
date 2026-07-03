@@ -11,7 +11,7 @@ function jobVibes(job: Job): { cls: string; txt: string }[] {
   const vibes: { cls: string; txt: string }[] = []
   const src = (job.source || '').toLowerCase()
   const loc = (job.location || '').toLowerCase()
-  const score = job.score || 65
+  const score = job.score
   if (src.includes('greenhouse') || src.includes('lever') || src.includes('workday')) {
     vibes.push({ cls: 'v-g', txt: '✅ Direct ATS' })
   } else if (src.includes('linkedin')) {
@@ -20,19 +20,20 @@ function jobVibes(job: Job): { cls: string; txt: string }[] {
     vibes.push({ cls: 'v-n', txt: '🔍 Indeed' })
   }
   if (job.salary) vibes.push({ cls: 'v-g', txt: '💰 Salary listed' })
-  if (score >= 75) vibes.push({ cls: 'v-g', txt: '✅ High transparency' })
-  else if (score < 40) vibes.push({ cls: 'v-r', txt: '⚠️ Low score' })
+  if (score != null && score >= 75) vibes.push({ cls: 'v-g', txt: '✅ High transparency' })
+  else if (score != null && score < 40) vibes.push({ cls: 'v-r', txt: '⚠️ Low score' })
   if (loc.includes('remote') || (job.type || '').toLowerCase().includes('remote')) {
     vibes.push({ cls: 'v-b', txt: '🏠 Remote' })
   }
   return vibes.slice(0, 3)
 }
 
-function ScoreRing({ score }: { score: number }) {
+function ScoreRing({ score }: { score: number | null }) {
   const risk = Score.risk(score)
+  const unrated = score == null
   return (
-    <div className={`sring ${risk}`} style={{ width: 46, height: 46, flexShrink: 0 }}>
-      <div className="sring-n" style={{ fontSize: '.9rem' }}>{score}</div>
+    <div className={`sring ${risk}`} style={{ width: 46, height: 46, flexShrink: 0 }} title={unrated ? 'Not enough signal in this listing to score it' : undefined}>
+      <div className="sring-n" style={{ fontSize: unrated ? '1.1rem' : '.9rem' }}>{unrated ? '–' : score}</div>
       <div className="sring-l">{Score.label(risk)}</div>
     </div>
   )
@@ -40,7 +41,7 @@ function ScoreRing({ score }: { score: number }) {
 
 export default function JobCard({ job, index, onSaveToggle, onOpen, onApply, onCheckCompany, alreadyApplied }: { job: Job; index: number; onSaveToggle: (id: string) => void; onOpen: (job: Job) => void; onApply: (job: Job) => void; onCheckCompany: (company: string) => void; alreadyApplied?: boolean }) {
   const risk = Score.risk(job.score)
-  const wl = Score.wasteLabel(job.waste)
+  const wl = job.waste != null ? Score.wasteLabel(job.waste) : null
   const vibes = jobVibes(job)
   const [saved, setSaved] = useState(() => SavedJobsStore.isSaved(job.id))
   const [reportedInactive, setReportedInactive] = useState(false)
@@ -96,8 +97,8 @@ export default function JobCard({ job, index, onSaveToggle, onOpen, onApply, onC
       </div>
 
       <div style={{ display: 'flex', alignItems: 'center', gap: '.35rem', flexWrap: 'wrap', margin: '.35rem 0' }}>
-        <span className={`${wl.cls} waste-badge`}>{wl.txt}</span>
-        {job.waste >= 55 && (
+        {wl && <span className={`${wl.cls} waste-badge`}>{wl.txt}</span>}
+        {job.waste != null && job.waste >= 55 && (
           <span className="vibe v-r" style={{ display: 'inline-flex', alignItems: 'center', gap: '.25rem' }}>
             <span style={{ width: 5, height: 5, borderRadius: '50%', background: 'var(--red)', animation: 'pulse 1.2s infinite', display: 'inline-block', flexShrink: 0 }} />
             👻 high ghost risk

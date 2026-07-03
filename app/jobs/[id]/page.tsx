@@ -23,7 +23,22 @@ interface Insights {
   description_summary: string
 }
 
+interface ScoreFactor { signal: string; points: number; reason: string }
+interface ScoreExplanation {
+  transparency_score: number
+  score_factors: ScoreFactor[]
+  waste_score: number
+  waste_factors: ScoreFactor[]
+}
+
 const L1_TTL = 24 * 60 * 60 * 1000 // localStorage TTL — matches old _INSIGHTS_L1_TTL (24h)
+
+// A score/waste value is a real number or null (unrated) — never a fabricated default.
+function numOrNull(v: unknown): number | null {
+  if (v === null || v === undefined || v === '') return null
+  const n = Number(v)
+  return Number.isFinite(n) && n > 0 ? Math.round(n) : null
+}
 
 // Format raw/AI description into clean paragraphs — port of old _formatDescText
 function formatDesc(text: string): string[] {
@@ -60,6 +75,7 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
   const [showShareCard, setShowShareCard] = useState(false)
   const [reportedInactive, setReportedInactive] = useState(false)
   const [reportingInactive, setReportingInactive] = useState(false)
+  const [scoreWhy, setScoreWhy] = useState<ScoreExplanation | null>(null)
 
   async function reportInactive() {
     if (!isLoggedIn) { alert('Sign in to report listings.'); return }
@@ -109,8 +125,8 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
           title: String(r.title ?? ''),
           company: String(r.company ?? ''),
           location: String(r.location ?? ''),
-          score: Number(r.score) || 65,
-          waste: Number(r.waste_score ?? r.waste) || 25,
+          score: numOrNull(r.score),
+          waste: numOrNull(r.waste_score ?? r.waste),
           level: String(r.level ?? 'Mid level'),
           type: String(r.type ?? 'Full-time'),
           source: String(r.source ?? 'Job board'),
@@ -121,6 +137,8 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
         }
         JobCache.set(mapped)
         setJob(mapped)
+        const why = (r as { score_explanation?: ScoreExplanation }).score_explanation
+        if (why && Array.isArray(why.score_factors)) setScoreWhy(why)
         setSaved(SavedJobsStore.isSaved(id))
       })
       .catch(() => {})
@@ -232,8 +250,8 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
               <div style={{ fontFamily: 'var(--mono)', fontSize: '.65rem', color: 'var(--dim)' }}>{job.company}{job.location ? ` · 📍 ${job.location}` : ''}</div>
             </div>
             <div style={{ textAlign: 'center', flexShrink: 0 }}>
-              <div className={`sring ${risk}`} style={{ width: 44, height: 44 }}><div className="sring-n" style={{ fontSize: '.85rem' }}>{job.score}</div></div>
-              <div style={{ fontFamily: 'var(--mono)', fontSize: '.45rem', color: 'var(--muted)', marginTop: '.15rem' }}>score</div>
+              <div className={`sring ${risk}`} style={{ width: 44, height: 44 }} title={job.score == null ? 'Not enough signal in this listing to score it' : undefined}><div className="sring-n" style={{ fontSize: '.85rem' }}>{job.score ?? '–'}</div></div>
+              <div style={{ fontFamily: 'var(--mono)', fontSize: '.45rem', color: 'var(--muted)', marginTop: '.15rem' }}>{job.score == null ? 'unrated' : 'score'}</div>
             </div>
           </div>
           {chips.length > 0 && (
@@ -247,8 +265,8 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
 
         {/* Stat grid — Score / Waste / Type / Level / Salary / Source */}
         <div className="jd-grid">
-          <div className="jd-stat"><span className="jd-sn" style={{ color: Score.color(risk) }}>{job.score}</span><span className="jd-sl">Score</span></div>
-          <div className="jd-stat"><span className="jd-sn" style={{ color: job.waste > 55 ? 'var(--red)' : job.waste > 35 ? 'var(--amber)' : 'var(--green)' }}>{job.waste}%</span><span className="jd-sl">Waste risk</span></div>
+          <div className="jd-stat"><span className="jd-sn" style={{ color: Score.color(risk) }}>{job.score ?? '–'}</span><span className="jd-sl">Score</span></div>
+          <div className="jd-stat"><span className="jd-sn" style={{ color: job.waste == null ? 'var(--dim)' : job.waste > 55 ? 'var(--red)' : job.waste > 35 ? 'var(--amber)' : 'var(--green)' }}>{job.waste == null ? '–' : `${job.waste}%`}</span><span className="jd-sl">Waste risk</span></div>
           <div className="jd-stat"><span className="jd-sn" style={{ fontSize: '.75rem' }}>{job.type || 'Full-time'}</span><span className="jd-sl">Type</span></div>
           <div className="jd-stat"><span className="jd-sn" style={{ fontSize: '.75rem' }}>{job.level || 'Mid level'}</span><span className="jd-sl">Level</span></div>
           <div className="jd-stat"><span className="jd-sn" style={{ color: 'var(--green)', fontSize: '.78rem' }}>{job.salary || '—'}</span><span className="jd-sl">Salary</span></div>
@@ -256,11 +274,34 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
         </div>
 
         {/* Waste score panel — shown when company has high waste risk */}
-        {job.waste > 40 && (
+        {job.waste != null && job.waste > 40 && (
           <div className="waste-panel" style={{ animation: 'fadeUp .4s .1s ease both' }}>
             <span className="wp-label">⚠ {job.waste}% Waste risk</span>
             <span style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', color: 'var(--muted)' }}>High chance of no response</span>
           </div>
+        )}
+
+        {/* Why this score — the exact factors behind the listing's transparency score. Every
+            number is explained; nothing is a black box. */}
+        {scoreWhy && Array.isArray(scoreWhy.score_factors) && scoreWhy.score_factors.length > 0 && (
+          <details style={{ marginBottom: '.85rem', background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 8, padding: '.15rem .2rem' }}>
+            <summary style={{ cursor: 'pointer', fontFamily: 'var(--mono)', fontSize: '.62rem', color: 'var(--sub)', padding: '.5rem .7rem', listStyle: 'none' }}>
+              ▸ Why this score is {job.score ?? 'unrated'}{job.score != null ? '/95' : ''} — see the exact factors
+            </summary>
+            <div style={{ padding: '.2rem .7rem .6rem' }}>
+              {scoreWhy.score_factors.map((f, i) => (
+                <div key={i} style={{ display: 'flex', gap: '.5rem', alignItems: 'baseline', padding: '.22rem 0', borderTop: i ? '1px solid var(--line2)' : 'none' }}>
+                  <span style={{ fontFamily: 'var(--mono)', fontSize: '.6rem', fontWeight: 700, minWidth: 34, textAlign: 'right', color: f.points > 0 ? 'var(--green)' : f.points < 0 ? 'var(--red)' : 'var(--muted)' }}>
+                    {f.points > 0 ? `+${f.points}` : f.points}
+                  </span>
+                  <span style={{ fontFamily: 'var(--body)', fontSize: '.66rem', color: 'var(--sub)', lineHeight: 1.5 }}>{f.reason}</span>
+                </div>
+              ))}
+              <div style={{ fontFamily: 'var(--mono)', fontSize: '.54rem', color: 'var(--muted)', marginTop: '.5rem', lineHeight: 1.55 }}>
+                This grades the listing&apos;s transparency (salary disclosure, source, description quality) — not the company. It is not a verified fact about the employer.
+              </div>
+            </div>
+          </details>
         )}
 
         {/* Status indicator — pulsing blue if listing was recently seen */}

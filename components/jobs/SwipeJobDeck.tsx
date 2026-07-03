@@ -188,19 +188,22 @@ export default function SwipeJobDeck({ jobs, onOpen, onDismiss, onSave, onApply,
   const secondScale = 0.96 + dragProgress * 0.04
   const secondY = 8 - dragProgress * 8
 
-  const scoreRisk = (score: number): 'safe' | 'warn' | 'danger' => score >= 75 ? 'safe' : score >= 50 ? 'warn' : 'danger'
-  const scoreColor = (score: number) => score >= 75 ? 'var(--green)' : score >= 50 ? 'var(--amber)' : 'var(--red)'
-  // Continuous HSL scale: 25→0° (red), 60→60° (yellow), 95→120° (green)
-  const scoreHsl = (score: number, alpha: number) => {
+  const scoreRisk = (score: number | null): 'safe' | 'warn' | 'danger' | 'unrated' =>
+    score == null ? 'unrated' : score >= 75 ? 'safe' : score >= 50 ? 'warn' : 'danger'
+  const scoreColor = (score: number | null) => score == null ? 'var(--dim)' : score >= 75 ? 'var(--green)' : score >= 50 ? 'var(--amber)' : 'var(--red)'
+  // Continuous HSL scale: 25→0° (red), 60→60° (yellow), 95→120° (green).
+  // A null (unrated) listing gets a neutral desaturated gray — never a colored verdict.
+  const scoreHsl = (score: number | null, alpha: number) => {
+    if (score == null) return `hsla(0, 0%, 45%, ${alpha})`
     const t = Math.max(0, Math.min(1, (score - 25) / 70))
     const hue = Math.round(t * 120)
     return `hsla(${hue}, 80%, 55%, ${alpha})`
   }
-  const scoreGradient = (score: number) =>
+  const scoreGradient = (score: number | null) =>
     `linear-gradient(145deg, ${scoreHsl(score, .15)} 0%, transparent 60%)`
-  const scoreBorder = (score: number) => scoreHsl(score, .45)
-  const scoreGlow = (score: number) => scoreHsl(score, .2)
-  const scoreStripe = (score: number) => scoreHsl(score, .75)
+  const scoreBorder = (score: number | null) => scoreHsl(score, .45)
+  const scoreGlow = (score: number | null) => scoreHsl(score, .2)
+  const scoreStripe = (score: number | null) => scoreHsl(score, .75)
 
   return (
   <div>
@@ -259,8 +262,8 @@ export default function SwipeJobDeck({ jobs, onOpen, onDismiss, onSave, onApply,
             <div style={{ fontFamily: 'var(--display)', fontSize: '.92rem', fontWeight: 700, color: 'var(--white)', letterSpacing: '-.02em', lineHeight: 1.25, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{topJob.title}</div>
             <div style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', color: 'var(--dim)', marginTop: '.12rem' }}>{topJob.company}{topJob.location ? ` · ${topJob.location}` : ''}</div>
           </div>
-          <div className={`sring ${scoreRisk(topJob.score)}`} style={{ width: 40, height: 40, flexShrink: 0 }}>
-            <div className="sring-n" style={{ fontSize: '.8rem' }}>{topJob.score}</div>
+          <div className={`sring ${scoreRisk(topJob.score)}`} style={{ width: 40, height: 40, flexShrink: 0 }} title={topJob.score == null ? 'Not enough signal in this listing to score it' : undefined}>
+            <div className="sring-n" style={{ fontSize: '.8rem' }}>{topJob.score ?? '–'}</div>
           </div>
         </div>
 
