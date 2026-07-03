@@ -6,7 +6,7 @@ export default function LegalPage() {
     },
     {
       title: 'Section 230 & User-Generated Content',
-      body: `Seen operates as an interactive computer service under 47 U.S.C. § 230 and is not liable for user-submitted content. By submitting a report, you represent that it reflects a genuine first-hand experience, is truthful to the best of your knowledge, contains no personal identifying information about individuals, and that you have the right to share it. You grant Seen a perpetual, irrevocable, royalty-free license to use submitted content. We moderate content at our discretion. Report abuse to hello@tryseen.io — we review within 14 business days.`,
+      body: `Seen operates as an interactive computer service under 47 U.S.C. § 230 and is not liable for user-submitted content. By submitting a report, you represent that it reflects a genuine first-hand experience, is truthful to the best of your knowledge, contains no personal identifying information about individuals, and that you have the right to share it. You grant Seen a perpetual, irrevocable, royalty-free license to use submitted content. We moderate content at our discretion. Report abuse to hello@seenjobs.io — we review within 14 business days.`,
     },
     {
       title: 'Scores, Ratings & Data Disclaimer',
@@ -14,15 +14,15 @@ export default function LegalPage() {
     },
     {
       title: 'Privacy Policy',
-      body: `Anonymous users: We store only report text, company name, location, timestamp, and a hashed session ID. Registered users: We store email, optional display name, application data, and auth tokens. Pro waitlist: Email only, for launch notification. We use aggregated/anonymized page views only. We never sell, rent, or lease personal data. No behavioral advertising, no profiling. Cookies/local storage: minimal functional only (no tracking pixels). Third-party processors: Supabase (database/auth), Anthropic (AI). Data retention: anonymous reports indefinite; registered accounts until deletion. Not directed at minors. Privacy requests: hello@tryseen.io`,
+      body: `Anonymous users: We store only report text, company name, location, timestamp, and a hashed session ID. Registered users: We store email, optional display name, application data, and auth tokens. Pro waitlist: Email only, for launch notification. We use aggregated/anonymized page views only. We never sell, rent, or lease personal data. No behavioral advertising, no profiling. Cookies/local storage: minimal functional only (no tracking pixels). Third-party processors: Supabase (database/auth), Anthropic (AI). Data retention: anonymous reports indefinite; registered accounts until deletion. Not directed at minors. Privacy requests: hello@seenjobs.io`,
     },
     {
       title: 'Subscription Terms & Auto-Renewal',
-      body: `Seen Pro is a recurring subscription billed through Stripe. Monthly plans are $9.99/month; annual plans are $6.99/month billed once per year ($83.88/year). By subscribing you authorize Seen to automatically charge your payment method the applicable amount at the start of each billing period — monthly for monthly plans, annually for annual plans — until you cancel. Your first charge occurs at checkout; renewals occur on the same calendar date each period. You can cancel anytime from Profile → Billing & Subscription (which opens the Stripe customer portal); cancellation stops future renewals and your Pro access continues through the end of the period you already paid for. Charges are generally non-refundable except where required by law; we do not provide partial-period refunds. If a payment fails, we may retry and may suspend Pro access until payment succeeds. We may change prices or plan features with at least 30 days' notice before the change takes effect on your next renewal; continued use after the effective date constitutes acceptance. Promotional pricing applies only for its stated term and then renews at the standard rate. Questions or cancellation help: hello@tryseen.io.`,
+      body: `Seen Pro is a recurring subscription billed through Stripe. Monthly plans are $9.99/month; annual plans are $6.99/month billed once per year ($83.88/year). By subscribing you authorize Seen to automatically charge your payment method the applicable amount at the start of each billing period — monthly for monthly plans, annually for annual plans — until you cancel. Your first charge occurs at checkout; renewals occur on the same calendar date each period. You can cancel anytime from Profile → Billing & Subscription (which opens the Stripe customer portal); cancellation stops future renewals and your Pro access continues through the end of the period you already paid for. Charges are generally non-refundable except where required by law; we do not provide partial-period refunds. If a payment fails, we may retry and may suspend Pro access until payment succeeds. We may change prices or plan features with at least 30 days' notice before the change takes effect on your next renewal; continued use after the effective date constitutes acceptance. Promotional pricing applies only for its stated term and then renews at the standard rate. Questions or cancellation help: hello@seenjobs.io.`,
     },
     {
       title: 'CCPA & GDPR Rights',
-      body: `California residents have the right to: (a) know what data we collect, (b) request deletion, (c) opt out of sale (moot — we don't sell), (d) non-discrimination for exercising rights. European residents have the right to: access, rectify, erasure, restrict processing, data portability, object to processing, and withdraw consent. Data may be transferred to the US. To exercise any right, contact hello@tryseen.io.`,
+      body: `California residents have the right to: (a) know what data we collect, (b) request deletion, (c) opt out of sale (moot — we don't sell), (d) non-discrimination for exercising rights. European residents have the right to: access, rectify, erasure, restrict processing, data portability, object to processing, and withdraw consent. Data may be transferred to the US. To exercise any right, contact hello@seenjobs.io.`,
     },
     {
       title: 'Arbitration & Limitation of Liability',
@@ -49,7 +49,7 @@ export default function LegalPage() {
           Legal & Privacy
         </h1>
         <p style={{ color: 'var(--sub)', fontSize: '.82rem', marginBottom: '2.5rem' }}>
-          Last updated: June 2026 · Questions? <a href="mailto:hello@tryseen.io" style={{ color: 'var(--blue)', textDecoration: 'none' }}>hello@tryseen.io</a>
+          Last updated: July 2026 · Questions? <a href="mailto:hello@seenjobs.io" style={{ color: 'var(--blue)', textDecoration: 'none' }}>hello@seenjobs.io</a>
         </p>
 
         <div style={{ fontFamily: 'var(--mono)', fontSize: '.62rem', color: 'var(--muted)', background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 8, padding: '.65rem 1rem', marginBottom: '2rem', display: 'flex', alignItems: 'center', gap: '.5rem' }}>

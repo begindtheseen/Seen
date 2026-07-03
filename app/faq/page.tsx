@@ -63,7 +63,7 @@ export default function FAQPage() {
         },
         {
           q: 'Can I edit or delete my report?',
-          a: 'Because reports are fully anonymous, we cannot verify ownership. If you believe a report you submitted contains an error or personal information that should be removed, email hello@tryseen.io and we will review it manually.',
+          a: 'Because reports are fully anonymous, we cannot verify ownership. If you believe a report you submitted contains an error or personal information that should be removed, email hello@seenjobs.io and we will review it manually.',
         },
       ],
     },
@@ -76,7 +76,7 @@ export default function FAQPage() {
         },
         {
           q: 'Can I dispute a report?',
-          a: 'Email hello@tryseen.io with the specific content, the reason it violates our guidelines (factual inaccuracy, personal information, or clear fabrication), and supporting evidence. We review within 14 business days. We do not remove reports simply because they are negative — negative experiences are protected speech and the core data this platform is built on.',
+          a: 'Email hello@seenjobs.io with the specific content, the reason it violates our guidelines (factual inaccuracy, personal information, or clear fabrication), and supporting evidence. We review within 14 business days. We do not remove reports simply because they are negative — negative experiences are protected speech and the core data this platform is built on.',
         },
         {
           q: 'Does Seen accept paid placements?',
@@ -97,7 +97,7 @@ export default function FAQPage() {
           Frequently asked questions
         </h1>
         <p style={{ color: 'var(--sub)', fontSize: '.85rem', marginBottom: '3rem' }}>
-          Can&apos;t find what you need? Email <a href="mailto:hello@tryseen.io" style={{ color: 'var(--blue)', textDecoration: 'none' }}>hello@tryseen.io</a>
+          Can&apos;t find what you need? Email <a href="mailto:hello@seenjobs.io" style={{ color: 'var(--blue)', textDecoration: 'none' }}>hello@seenjobs.io</a>
         </p>
 
         {sections.map(section => (

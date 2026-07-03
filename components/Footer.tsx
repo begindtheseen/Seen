@@ -32,7 +32,7 @@ export default function Footer() {
             </Link>
           ))}
           <a
-            href="mailto:hello@tryseen.io"
+            href="mailto:hello@seenjobs.io"
             style={{ color: 'var(--muted)', fontFamily: 'var(--mono)', fontSize: '.6rem', textDecoration: 'none', padding: '.25rem .55rem', transition: 'color .15s' }}
             onMouseOver={e => (e.currentTarget.style.color = 'var(--sub)')}
             onMouseOut={e => (e.currentTarget.style.color = 'var(--muted)')}
