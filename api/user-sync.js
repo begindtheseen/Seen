@@ -425,12 +425,17 @@ export default async function handler(req, res) {
       console.error('report_job_availability insert failed:', errText);
       return res.status(500).json({ error: 'Failed to save report' });
     }
-    // Increment report count on the job itself (fire-and-forget)
-    db(`jobs?id=eq.${encodeURIComponent(String(job_id))}`, {
-      method: 'PATCH',
-      body: JSON.stringify({ availability_report_count: 1, last_checked_at: new Date().toISOString() }),
-      headers: { Prefer: 'return=minimal' },
-    }).catch(() => {});
+    // Increment report count on the job itself (fire-and-forget). jobs.id is a uuid
+    // column; live search results carry client-generated ephemeral ids (e.g. "j_1no2squ")
+    // that PostgREST would 400 as invalid-uuid input. The report row (job_id is text)
+    // is already saved above — only touch the jobs row when the id can actually match one.
+    if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(job_id))) {
+      db(`jobs?id=eq.${encodeURIComponent(String(job_id))}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ availability_report_count: 1, last_checked_at: new Date().toISOString() }),
+        headers: { Prefer: 'return=minimal' },
+      }).catch(() => {});
+    }
     return res.status(200).json({ ok: true });
   }
 

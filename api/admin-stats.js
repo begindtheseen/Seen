@@ -332,26 +332,34 @@ async function _handler(req, res) {
       .sort((a, b) => b[1] - a[1]).slice(0, 10)
       .map(([company, count]) => ({ company, count }));
 
-    // Enrich inactive reports with job details
+    // Enrich inactive reports with job details.
+    // job_id here is TEXT — reports from live search results carry client-generated
+    // ephemeral ids (e.g. "j_1no2squ") that never land in the jobs table, whose id is
+    // a uuid column. Feeding a non-uuid into `jobs?id=in.(...)` makes PostgREST 400 the
+    // WHOLE lookup (one bad id poisons every id), so we must filter to syntactically
+    // valid uuids before querying — and we must NEVER drop a report that has no job row,
+    // since surfacing those reports is the entire point of this panel.
+    const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
     let inactiveReports = [];
     if (inactiveReportRows.length) {
       const jobIds = [...new Set(inactiveReportRows.map(r => r.job_id).filter(Boolean))];
-      if (jobIds.length) {
-        const jobsRes = await db(`jobs?id=in.(${jobIds.map(id => encodeURIComponent(id)).join(',')})&select=id,company,title,city,url,apply_url,availability_status&limit=50`);
+      const uuidJobIds = jobIds.filter(id => UUID_RE.test(id));
+      let jobMap = {};
+      if (uuidJobIds.length) {
+        const jobsRes = await db(`jobs?id=in.(${uuidJobIds.map(id => encodeURIComponent(id)).join(',')})&select=id,company,title,city,url,apply_url,availability_status&limit=50`);
         const jobRows = jobsRes.ok ? await jobsRes.json() : [];
-        const jobMap = Object.fromEntries((jobRows || []).map(j => [j.id, j]));
-        // Group reports by job_id, count them
-        const grouped = {};
-        inactiveReportRows.forEach(r => {
-          if (!grouped[r.job_id]) grouped[r.job_id] = { job_id: r.job_id, report_count: 0, latest_reported_at: r.reported_at };
-          grouped[r.job_id].report_count++;
-          if (r.reported_at > grouped[r.job_id].latest_reported_at) grouped[r.job_id].latest_reported_at = r.reported_at;
-        });
-        inactiveReports = Object.values(grouped)
-          .sort((a, b) => b.report_count - a.report_count)
-          .map(g => ({ ...g, job: jobMap[g.job_id] || null }))
-          .filter(g => g.job);
+        jobMap = Object.fromEntries((jobRows || []).map(j => [j.id, j]));
       }
+      // Group reports by job_id, count them — every reported job_id is kept.
+      const grouped = {};
+      inactiveReportRows.forEach(r => {
+        if (!grouped[r.job_id]) grouped[r.job_id] = { job_id: r.job_id, report_count: 0, latest_reported_at: r.reported_at };
+        grouped[r.job_id].report_count++;
+        if (r.reported_at > grouped[r.job_id].latest_reported_at) grouped[r.job_id].latest_reported_at = r.reported_at;
+      });
+      inactiveReports = Object.values(grouped)
+        .sort((a, b) => b.report_count - a.report_count)
+        .map(g => ({ ...g, job: jobMap[g.job_id] || null }));
     }
 
     // ── Job-board health / crisis detection ───────────────────────────────────
@@ -921,6 +929,22 @@ async function _handler(req, res) {
       headers: { Prefer: 'return=minimal' },
     });
     await db('admin_audit_log', { method: 'POST', body: JSON.stringify({ admin_id: sess.admin_id, username: 'admin', action: 'remove_listing', target_type: 'job', target_id: String(job_id) }), headers: { Prefer: 'return=minimal' } });
+    return res.status(200).json({ ok: true });
+  }
+
+  // Dismiss inactive reports for a job_id that has no removable jobs-table row
+  // (ephemeral search-result id, or a listing already gone). remove_listing PATCHes
+  // jobs by uuid, which no-ops / 400s for these ids, leaving the reports on the
+  // panel forever. This deletes the report rows directly so the admin can clear them.
+  if (action === 'dismiss_inactive_report') {
+    if (adminRole === 'moderator') return res.status(403).json({ error: 'Insufficient role' });
+    const { job_id } = body;
+    if (!job_id) return res.status(400).json({ error: 'job_id required' });
+    await db(`job_availability_reports?job_id=eq.${encodeURIComponent(String(job_id))}`, {
+      method: 'DELETE',
+      headers: { Prefer: 'return=minimal' },
+    });
+    await db('admin_audit_log', { method: 'POST', body: JSON.stringify({ admin_id: sess.admin_id, username: 'admin', action: 'dismiss_inactive_report', target_type: 'job', target_id: String(job_id) }), headers: { Prefer: 'return=minimal' } });
     return res.status(200).json({ ok: true });
   }
 
