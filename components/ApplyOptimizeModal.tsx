@@ -7,6 +7,7 @@ import { aiHeaders } from '@/lib/aiHeaders'
 import { ResumeStore } from '@/lib/stores/ResumeStore'
 import UpgradeModal from './UpgradeModal'
 import { FREE_DAILY_CREDITS } from '@/lib/creditRules'
+import ApplicationIntelligencePanel, { type ApplicationIntelligence } from './optimizer/ApplicationIntelligencePanel'
 import type { Job } from '@/lib/types'
 
 const CREDIT_WORD = FREE_DAILY_CREDITS === 1 ? 'credit' : 'credits'
@@ -174,6 +175,10 @@ export default function ApplyOptimizeModal({
   const [hpState, setHpState] = useState<HpState>('idle')
   const [hp, setHp] = useState<HumanProofResult | null>(null)
 
+  // Application Intelligence V2 — fetched in the background from the free (no-credit) optimize
+  // action and shown as a compact "deep match" read-out. Null = not available; render nothing.
+  const [aiPkg, setAiPkg] = useState<ApplicationIntelligence | null>(null)
+
   // Copy + two-step download state.
   const [copied, setCopied] = useState<string | null>(null)
   const [prepping, setPrepping] = useState(false)
@@ -217,7 +222,7 @@ export default function ApplyOptimizeModal({
     setStep('optimizing')
     setError('')
     // Reset any downstream state from a previous pass.
-    setHp(null); setHpState('idle'); setPdfBlob(null)
+    setHp(null); setHpState('idle'); setPdfBlob(null); setAiPkg(null)
     try {
       const headers = await aiHeaders()
       const r = await fetch('/api/resume', {
@@ -249,11 +254,35 @@ export default function ApplyOptimizeModal({
       window.dispatchEvent(new Event('seen:credits-updated'))
       setResult(data)
       setStep('review')
+      // Fire-and-forget the richer V2 deep-match read-out (free, no extra credit).
+      loadV2(text)
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : 'Optimization failed — try again'
       setError(msg)
       setStep('choose')
     }
+  }
+
+  // ── Application Intelligence V2 — background, best-effort, never blocks the flow ──
+  async function loadV2(text: string) {
+    try {
+      const r = await fetch('/api/optimizer', {
+        method: 'POST',
+        headers: await aiHeaders(),
+        body: JSON.stringify({
+          action: 'optimize',
+          resumeText: text,
+          jobId: job.id,
+          jobTitle: job.title,
+          company: job.company,
+          jobDescription: job.description || '',
+          remoteOk: /remote/i.test(job.description || ''),
+        }),
+      })
+      if (!r.ok) return
+      const data = await r.json().catch(() => ({})) as { application_intelligence?: ApplicationIntelligence | null }
+      if (data.application_intelligence) setAiPkg(data.application_intelligence)
+    } catch { /* V2 read-out is a bonus — never surface an error */ }
   }
 
   // ── HumanProof: chain the optimized bullets through the deterministic humanizer ──
@@ -686,6 +715,14 @@ export default function ApplyOptimizeModal({
                       </div>
                     ))}
                   </div>
+                </div>
+              )}
+
+              {/* Application Intelligence V2 — compact deep-match read-out (background-loaded) */}
+              {aiPkg && (
+                <div style={{ borderTop: '1px solid var(--line)', paddingTop: '.9rem' }}>
+                  <div style={{ ...kicker, color: 'var(--indigo)' }}>Deep match analysis</div>
+                  <ApplicationIntelligencePanel pkg={aiPkg} compact />
                 </div>
               )}
 
