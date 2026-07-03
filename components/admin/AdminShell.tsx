@@ -27,6 +27,11 @@ export function AdminShell({ stats, token, reload, onLogout, onUnauthorized }: {
   const [tab, setTab] = useState<TabKey>('overview')
   function openKpi(metric: string, title: string) { setKpiModal({ metric, title }) }
   function openManage(f: 'all' | 'pro' | 'free') { setManageFilter(f); setManageOpen(true) }
+  // Jump from the top attention alert to the reported-listings section (in the Jobs tab).
+  function goToReportedListings() {
+    setTab('jobs')
+    setTimeout(() => document.getElementById('reported-listings-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 60)
+  }
 
   // Fetches the CSV payload; the actual save happens in CsvDownloadButton's
   // click handler (user-gesture-safe for iOS). Returns null on any failure.
@@ -96,7 +101,7 @@ export function AdminShell({ stats, token, reload, onLogout, onUnauthorized }: {
   if (shares === 0) attn.push({ key: 'noshare', sev: 'blue', title: 'No outcome cards shared — flywheel not moving', detail: 'Outcome cards are the virality engine. Nothing has been shared yet.', action: { label: 'View', onClick: () => setDetail('shares') } })
   if (needsReviewCount > 0) attn.push({ key: 'review', sev: 'amber', title: `${needsReviewCount} report${needsReviewCount === 1 ? '' : 's'} need review`, detail: 'Flagged community reports are held out of scoring until cleared (Advanced tools → moderation).' })
   if (dupSuspected > 0) attn.push({ key: 'dup', sev: 'amber', title: `${dupSuspected} suspected duplicate account cluster${dupSuspected === 1 ? '' : 's'}`, detail: 'Shared-signal groups flagged for anti-Sybil review (Advanced tools → clusters).' })
-  if (inactiveCount > 0) attn.push({ key: 'inactive', sev: 'amber', title: `${inactiveCount} reported inactive listing${inactiveCount === 1 ? '' : 's'}`, detail: 'Users flagged these jobs as no longer active — verify and remove (Advanced tools).' })
+  if (inactiveCount > 0) attn.push({ key: 'inactive', sev: 'amber', title: `${inactiveCount} reported inactive listing${inactiveCount === 1 ? '' : 's'}`, detail: 'Users flagged these jobs as no longer active — open each report to view the listing, then delete it or dismiss the report.', action: { label: 'Review', onClick: goToReportedListings } })
   if (openIssues > 0) attn.push({ key: 'issues', sev: 'amber', title: `${openIssues} open data-quality issue${openIssues === 1 ? '' : 's'}`, detail: 'Community-reported data problems awaiting resolution (Advanced tools → issues).' })
 
   // ── Overall health for the hero pill + one-sentence summary (real signals only) ──
@@ -202,18 +207,20 @@ export function AdminShell({ stats, token, reload, onLogout, onUnauthorized }: {
             {/* Job deduplication */}
             <JobDedupePanel token={token} />
 
-            {/* Reported inactive listings */}
+            {/* Reported listings — investigate & act (delete listing / dismiss report) */}
+            <div id="reported-listings-section" style={{ scrollMarginTop: '0.75rem' }}>
             <Card style={{ marginTop: '.65rem' }}>
               <CardHeader
-                title="Reported inactive listings"
+                title="Reported listings"
                 badge={(stats.jobs?.inactive_reports || []).length > 0 ? <Badge n={stats.jobs.inactive_reports.length} color="var(--amber)" /> : undefined}
-                action={<span style={{ fontFamily: 'var(--mono)', fontSize: '.48rem', color: 'var(--dim)' }}>User reports that a listing is no longer active</span>}
+                action={<span style={{ fontFamily: 'var(--mono)', fontSize: '.48rem', color: 'var(--dim)' }}>Users flagged these as no longer active — open the listing, then delete it or dismiss the report</span>}
               />
               {(stats.jobs?.inactive_reports || []).length === 0
-                ? <div style={{ fontFamily: 'var(--mono)', fontSize: '.62rem', color: 'var(--dim)' }}>No inactive reports this week</div>
-                : (stats.jobs.inactive_reports || []).map(r => (<InactiveRow key={r.job_id} report={r} token={token} />))
+                ? <div style={{ fontFamily: 'var(--mono)', fontSize: '.62rem', color: 'var(--dim)' }}>No reported listings this week</div>
+                : (stats.jobs.inactive_reports || []).map(r => (<InactiveRow key={r.job_id} report={r} token={token} onRefresh={reload} />))
               }
             </Card>
+            </div>
           </div>
         )}
 
