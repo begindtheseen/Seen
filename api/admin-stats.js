@@ -954,9 +954,18 @@ async function _handler(req, res) {
     return res.status(200).json({ ok: true });
   }
 
-  // Delete a reported listing: soft-delete the jobs row (reversible — flip
-  // availability_status back) AND clear its availability reports so it leaves the queue.
-  // We DELETE the report rows rather than PATCHing their status: the status CHECK only
+  // Delete a reported listing: soft-delete the jobs row (reversible — the row SURVIVES) AND
+  // clear its availability reports so it leaves the queue.
+  //
+  // HOW the listing is actually removed: the whole user-facing job stack filters on
+  // `expires_at > now()`, NOT on `availability_status` (see the stale-sweep at the bottom of
+  // this file). So we EXPIRE the row — `availability_status='expired'` + `expires_at=now()` —
+  // which drops it out of every search/read path immediately while keeping the row alive so
+  // direct /jobs/<id> links still resolve. NOTE: `availability_status` has a CHECK constraint
+  // (active/stale/expired/unknown) — writing 'removed' 400s silently and removes NOTHING, so
+  // 'expired' is the only correct value here.
+  //
+  // We DELETE the report rows rather than PATCHing their status: the report status CHECK only
   // permits active/expired/unknown, so writing a "resolved"-style status silently 400s and
   // the report would resurface on the next load. DELETE always sticks. Full admins only
   // (moderators cannot destroy listings).
@@ -972,7 +981,7 @@ async function _handler(req, res) {
     if (UUID.test(jid)) {
       const up = await db(`jobs?id=eq.${encodeURIComponent(jid)}`, {
         method: 'PATCH',
-        body: JSON.stringify({ availability_status: 'removed', last_checked_at: new Date().toISOString() }),
+        body: JSON.stringify({ availability_status: 'expired', expires_at: new Date().toISOString(), last_checked_at: new Date().toISOString() }),
         headers: { Prefer: 'return=minimal' },
       });
       soft_deleted = up.ok;
