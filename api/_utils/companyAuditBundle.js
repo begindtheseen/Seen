@@ -21,6 +21,143 @@ import { explainListingScore, SCORE_RANGE, WASTE_RANGE } from '../../lib/server/
 // endpoint and the tests agree on one threshold.
 export const LOW_SAMPLE_THRESHOLD = 5;
 
+// The seven use-classifications every source class in the audit is sorted into. A source
+// being AVAILABLE does not mean it affected the company grade — this taxonomy is what makes
+// that explicit and legally reproducible. Exported so the PDF and tests share one vocabulary.
+export const SOURCE_USE_CATEGORIES = {
+  included_in_score: 'Included in company score',
+  available_not_included: 'Available but not included in company score',
+  matching_only: 'Used only for company matching / alias resolution',
+  listing_transparency_only: 'Used only for listing transparency',
+  display_context_only: 'Used only for display / context',
+  held_out_excluded: 'Held out / excluded pending review',
+  not_available: 'Not available for this export',
+};
+
+// The nature of a source: who/what produced it. Drives the "applicant-reported vs
+// third-party/contextual vs listing-derived vs admin-enriched" column.
+export const SOURCE_NATURE = {
+  applicant_reported: 'Applicant-reported',
+  third_party_contextual: 'Third-party / contextual',
+  listing_derived: 'Listing-derived',
+  admin_enriched: 'Admin-enriched',
+  matching: 'Company-matching data',
+};
+
+// Parse a possibly-stringified web_reviews field into an array (or []).
+function parseReviews(v) {
+  if (!v) return [];
+  if (Array.isArray(v)) return v;
+  try { const p = JSON.parse(v); return Array.isArray(p) ? p : []; } catch { return []; }
+}
+
+// Build the full Source Inventory: EVERY source class SeenJobs can hold for a company, each
+// sorted into exactly one use-classification, whether or not it affected the grade — and
+// including methodology-configured classes that had zero records for this export (so the
+// packet proves the methodology supports the source even when it wasn't present).
+function buildSourceInventory({ annotated, computed, companies, aliases, cachedScore, listingCount }) {
+  const sourcesUsed = new Set(computed?.sources_used || []);
+  const inv = [];
+
+  // ── Applicant-report + web classes, driven by the methodology's configured trust weights
+  //    (so a configured-but-absent source still appears, count 0). ──
+  const REPORT_CLASSES = {
+    direct:     { name: 'Direct applicant reports', nature: 'applicant_reported', limitation: 'Applicant-submitted; not independently verified per report.' },
+    seen_intel: { name: 'SeenJobs internal intelligence (seen_intel)', nature: 'applicant_reported', limitation: 'In-product survey / Opportunity-Engine applicant answers; applicant-reported, not independently verified.' },
+    ingest:     { name: 'Imported applicant reports — ingest (Glassdoor / Blind / Indeed / LinkedIn)', nature: 'applicant_reported', limitation: 'Applicant reports imported from third-party platforms; lower trust than direct; third-party platform terms and attribution rules apply.' },
+    reddit:     { name: 'Reddit hiring-process reports', nature: 'applicant_reported', limitation: 'Public discussion imported as reports; lowest trust weight; a discussion/imported signal — not a verified fact.' },
+    web:        { name: 'Web / external review research (Glassdoor / Reddit / Blind snippets)', nature: 'third_party_contextual', limitation: 'Third-party external-review signal used only as a contextual prior. In this export the web prior is empty, so it is summarized for context and does not pool into the computed grade; underlying platform terms and attribution rules must be respected.' },
+  };
+  for (const [cls, meta] of Object.entries(REPORT_CLASSES)) {
+    const trust = SOURCE_TRUST[cls] ?? null;
+    let record_count = 0, included_count = 0, excluded_count = 0;
+    if (cls === 'web') {
+      record_count = parseReviews(cachedScore?.web_reviews).length;
+    } else {
+      const rows = annotated.filter(r => r.source_type === cls);
+      record_count = rows.length;
+      included_count = rows.filter(r => r.included_in_score).length;
+      excluded_count = record_count - included_count;
+    }
+    const affected_score = sourcesUsed.has(cls);
+    let category, reason;
+    if (record_count === 0) {
+      category = 'not_available';
+      reason = `Methodology supports this source (configured trust weight ${trust ?? 'n/a'}) but no records were present for this company/export.`;
+    } else if (affected_score) {
+      category = 'included_in_score';
+      reason = `${included_count} report(s) counted toward the company grade at trust weight ${trust}.`;
+    } else if (cls === 'web') {
+      category = 'display_context_only';
+      reason = `${record_count} external-review snippet(s) held for context; the web prior is empty in this export, so they did not affect the computed grade.`;
+    } else if (included_count === 0 && excluded_count > 0) {
+      category = 'held_out_excluded';
+      reason = `${excluded_count} report(s) present but flagged needs_review; none counted toward the grade.`;
+    } else {
+      category = 'available_not_included';
+      reason = `${record_count} report(s) present but not pooled into the grade (no resolved terminal outcomes to contribute).`;
+    }
+    inv.push({
+      source: meta.name, source_class: cls, nature: meta.nature,
+      record_count, included_count, excluded_count, affected_score,
+      configured_trust_weight: trust, effective_trust_weight: affected_score ? trust : null,
+      category, reason, limitation: meta.limitation, available: record_count > 0,
+    });
+  }
+
+  // ── Non-report classes ──
+  const aliasCount = (aliases || []).length;
+  inv.push({
+    source: 'Company aliases / alias resolution', source_class: 'aliases', nature: 'matching',
+    record_count: aliasCount, included_count: 0, excluded_count: 0, affected_score: false,
+    configured_trust_weight: null, effective_trust_weight: null,
+    category: aliasCount ? 'matching_only' : 'not_available',
+    reason: aliasCount ? `${aliasCount} alias(es) used only to resolve name variants to one company.` : 'No aliases recorded for this company.',
+    limitation: 'Helps identify the entity; does not itself prove any hiring behavior.', available: aliasCount > 0,
+  });
+
+  const coCount = (companies || []).length;
+  inv.push({
+    source: 'Company records (matched)', source_class: 'company_record', nature: 'admin_enriched',
+    record_count: coCount, included_count: 0, excluded_count: 0, affected_score: false,
+    configured_trust_weight: null, effective_trust_weight: null,
+    category: coCount ? 'display_context_only' : 'not_available',
+    reason: coCount ? `${coCount} matched company record(s); identifying/context data.` : 'No company records matched the query.',
+    limitation: 'Admin/enrichment record; must be auditable and timestamped; not a hiring-outcome signal.', available: coCount > 0,
+  });
+
+  inv.push({
+    source: 'Job listings (Adzuna / job sources)', source_class: 'listings', nature: 'listing_derived',
+    record_count: listingCount, included_count: 0, excluded_count: 0, affected_score: false,
+    configured_trust_weight: null, effective_trust_weight: null,
+    category: listingCount ? 'listing_transparency_only' : 'not_available',
+    reason: listingCount ? `${listingCount} listing(s) scored independently for LISTING transparency; they do not feed the company grade.` : 'No job listings on record for this company.',
+    limitation: 'Grades the posting, not the company as a whole.', available: listingCount > 0,
+  });
+
+  // Cached score row + its enrichment fields (industry / summary / provenance). The cached
+  // grade may be web-derived (data_source) and is NOT the authoritative recomputed grade.
+  const enrich = [];
+  if (cachedScore) {
+    if (cachedScore.industry) enrich.push('industry');
+    if (cachedScore.raw_summary) enrich.push('summary');
+    if (cachedScore.data_source) enrich.push(`data_source=${cachedScore.data_source}`);
+  }
+  inv.push({
+    source: 'Admin / cached company enrichment', source_class: 'admin_enrichment', nature: 'admin_enriched',
+    record_count: cachedScore ? 1 : 0, included_count: 0, excluded_count: 0, affected_score: false,
+    configured_trust_weight: null, effective_trust_weight: null,
+    category: cachedScore ? 'display_context_only' : 'not_available',
+    reason: cachedScore
+      ? `Cached company_scores row (${enrich.join(', ') || 'no enrichment fields'}); shown for context. The authoritative grade in this export is recomputed live from the included reports, not this cached row.`
+      : 'No cached company_scores row for this company.',
+    limitation: 'Enrichment/context; must be auditable and timestamped. A cached grade may be web-derived (see data_source) and is not the recomputed report grade.',
+    available: !!cachedScore,
+  });
+
+  return inv;
+}
+
 // SHA-256 of the canonical (compact) JSON serialization of the bundle — the legal fingerprint
 // embedded in the PDF and returned to the caller. Returns both the exact bytes hashed and the
 // hex digest so a recipient can re-hash the companion JSON and confirm it matches the PDF.
@@ -137,6 +274,30 @@ export async function buildCompanyAuditBundle({ db, serviceKey, adminId, adminRo
     };
   });
 
+  // Full source inventory — every source class SeenJobs can hold for this company, each sorted
+  // into one use-classification (score-contributing / context-only / listing-only / matching-
+  // only / held-out / not-available). Availability ≠ influence: the classification is what
+  // states whether a source actually moved the grade.
+  const source_inventory = buildSourceInventory({
+    annotated, computed, companies, aliases, cachedScore, listingCount: listing_scores.length,
+  });
+
+  // Split availability/confidence — replaces the single vague "Data quality" reading beside a
+  // possibly-zero report count. Each dimension is reported independently.
+  const externalReviewCount = parseReviews(cachedScore?.web_reviews).length;
+  const qnorm = s => String(s || '').trim().toLowerCase().replace(/[\s,]+(inc|llc|corp|ltd|co|plc)\.?$/i, '').trim();
+  const matchedExact = (companies || []).some(c => qnorm(c.name) === qnorm(rawName));
+  const source_availability = {
+    applicant_report_confidence: computed?.confidence_label || 'low',
+    applicant_report_sample_size: included.length,
+    no_applicant_reports_counted: (computed?.sources_used || []).length === 0,
+    external_context_available: externalReviewCount > 0 || (aliases || []).length > 0 || (companies || []).length > 0,
+    external_review_snippet_count: externalReviewCount,
+    listing_data_available: listing_scores.length,
+    company_matching_confidence: (companies || []).length ? (matchedExact ? 'exact' : 'partial') : 'none',
+    cached_score_provenance: cachedScore?.data_source || null,
+  };
+
   return {
     export_type: 'company_audit_bundle',
     schema_version: 1,
@@ -150,6 +311,8 @@ export async function buildCompanyAuditBundle({ db, serviceKey, adminId, adminRo
     },
     cached_company_score: cachedScore,
     computed_score: computed,
+    source_availability,
+    source_inventory,
     source_breakdown,
     totals: {
       total_reports: annotated.length,
@@ -165,7 +328,7 @@ export async function buildCompanyAuditBundle({ db, serviceKey, adminId, adminRo
       transparency_baseline: SCORE_RANGE.baseline,
       waste_range: [WASTE_RANGE.min, WASTE_RANGE.max],
       waste_baseline: WASTE_RANGE.baseline,
-      distinct_from_company_grade: 'The listing transparency score is independent of the company grade above. The company grade requires applicant reports and reads "no data" without them; the listing score always has a basis because the evidence is the listing.',
+      distinct_from_company_grade: 'The listing transparency score is independent of the company grade above. The company grade requires applicant reports and, without any that count, sits at a neutral 50/100 baseline (no applicant reports counted) rather than a positive or negative reading; the listing score always has a basis because the evidence is the listing.',
     },
     listing_scores,
     methodology: {
