@@ -366,6 +366,8 @@ export function MergePanel({ token, prefill }: { token: string; prefill: MergePr
   const [merges, setMerges] = useState<MergeLog[] | null>(null)
   const [confirmUndo, setConfirmUndo] = useState<string | null>(null)
   const [undoing, setUndoing] = useState<string | null>(null)
+  const [resplitName, setResplitName] = useState('')
+  const [resplitting, setResplitting] = useState(false)
 
   // Prefill from issues queue "Open in merge tool"
   useEffect(() => {
@@ -476,6 +478,31 @@ export function MergePanel({ token, prefill }: { token: string; prefill: MergePr
     setAutoMerging(false)
   }
 
+  // Reclaim a company that got wrongly absorbed into another, by NAME — reverses the most recent
+  // not-yet-undone merge where this was the absorbed company (no merge_id hunting required).
+  async function resplitCompany() {
+    const name = resplitName.trim()
+    if (name.length < 2) { setStatus({ text: 'Enter the company that got absorbed', color: 'var(--red)' }); return }
+    setResplitting(true)
+    setStatus({ text: `Separating "${name}" back out…`, color: 'var(--dim)' })
+    try {
+      const res = await fetch('/api/admin-stats', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Admin-Token': token },
+        body: JSON.stringify({ action: 'resplit_company', name }),
+      })
+      const d = await res.json()
+      if (!d.ok) throw new Error(d.error || res.status)
+      setStatus({ text: `✓ "${d.restored?.secondary_name}" split back out of "${d.restored?.primary_name}" (${d.restored?.reports ?? 0} reports restored${d.restored?.aliases_removed ? `, ${d.restored.aliases_removed} alias removed` : ''})`, color: 'var(--green)' })
+      setResplitName('')
+      loadMerges()
+      scan()
+    } catch (e) {
+      setStatus({ text: 'Separate failed: ' + (e as Error).message, color: 'var(--red)' })
+    }
+    setResplitting(false)
+  }
+
   function setMerge(p: string, s: string) { setPrimary(p); setSecondary(s) }
 
   const ts = (iso: unknown) => {
@@ -520,6 +547,18 @@ export function MergePanel({ token, prefill }: { token: string; prefill: MergePr
           <button onClick={manualMerge} disabled={merging} style={{ fontFamily: 'var(--mono)', fontSize: '.6rem', padding: '.42rem .9rem', borderRadius: 7, border: '1px solid rgba(239,68,68,.3)', background: 'rgba(239,68,68,.08)', color: 'var(--red)', cursor: 'pointer', flexShrink: 0 }}>Merge →</button>
         </div>
         {status && <div style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', marginTop: '.45rem', color: status.color }}>{status.text}</div>}
+      </div>
+      {/* Separate a company back out (recovery) — reverses a bad merge by NAME */}
+      <div style={{ paddingBottom: '.75rem', borderBottom: '1px solid var(--line2)', marginBottom: '.75rem' }}>
+        <div style={{ fontFamily: 'var(--mono)', fontSize: '.48rem', textTransform: 'uppercase', letterSpacing: '.12em', color: 'var(--dim)', marginBottom: '.25rem' }}>Separate a company (undo a bad merge)</div>
+        <div style={{ fontFamily: 'var(--mono)', fontSize: '.5rem', color: 'var(--muted)', marginBottom: '.5rem', lineHeight: 1.5 }}>Got absorbed into another company (e.g. &quot;Towne Park&quot; saved as &quot;Towne&quot;)? Type it here to split it back out — reverses the most recent merge where it was absorbed, moves its reports back, and clears the stale score.</div>
+        <div style={{ display: 'flex', gap: '.5rem', alignItems: 'flex-end', flexWrap: 'wrap' }}>
+          <div style={{ flex: 1, minWidth: 140 }}>
+            <div style={{ fontFamily: 'var(--mono)', fontSize: '.48rem', color: 'var(--muted)', marginBottom: '.22rem' }}>Absorbed company name</div>
+            <input value={resplitName} onChange={e => setResplitName(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') resplitCompany() }} placeholder="e.g. Towne Park" style={inputStyle} />
+          </div>
+          <button onClick={resplitCompany} disabled={resplitting} style={{ fontFamily: 'var(--mono)', fontSize: '.6rem', padding: '.42rem .9rem', borderRadius: 7, border: '1px solid rgba(59,130,246,.35)', background: 'rgba(59,130,246,.1)', color: 'var(--blue)', cursor: 'pointer', flexShrink: 0 }}>{resplitting ? 'Separating…' : 'Separate ←'}</button>
+        </div>
       </div>
       {/* Detected duplicates list */}
       {dupes === null
