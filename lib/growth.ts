@@ -30,22 +30,21 @@ export type LeaderboardRow = {
   }
 }
 
-const REPORTS_URL = 'https://seenjobs.io/api/reports'
-
-// Every network call on these SEO/GEO surfaces is capped. Node's fetch has NO default timeout,
-// so an uncapped self-fetch during `next build` static generation hangs the whole build forever.
+// These SEO/GEO helpers NEVER self-fetch the app's own live API (https://seenjobs.io/api/reports).
+// A build-time self-fetch has no timeout by default and would pin a `next build` worker forever if
+// the live site is slow/unreachable — and gating on NEXT_PHASE proved unreliable across build
+// environments (static generation can run in worker processes where the env var isn't observed).
+// So these server helpers read the cached scores DIRECTLY from Supabase in BOTH build and runtime:
+// deterministic, fast, and impossible to hang on a self-response. On-demand scoring for long-tail
+// companies still happens on the CLIENT company page (app/company/[slug]/page.tsx is 'use client'
+// and calls /api/reports from the browser), which primes the cache these helpers read.
+//
+// Every read is capped with AbortSignal.timeout — Node's fetch has no default timeout.
 const FETCH_TIMEOUT_MS = 8000
 
-// True only inside `next build`'s static-generation phase (Next sets NEXT_PHASE itself). During
-// the build we must NEVER self-fetch the live site (https://seenjobs.io) — a slow/unreachable
-// response would pin a build worker indefinitely. Instead we read the cached scores DIRECTLY from
-// Supabase (fast, deterministic) and fall back to an honest empty state when data/creds are absent.
-// At RUNTIME (ISR revalidation on the deployed site) the live API path is kept — it adds on-demand
-// scoring for long-tail companies the build never seeds.
-const IS_BUILD = process.env.NEXT_PHASE === 'phase-production-build'
-
-// Service-key Supabase creds. These modules are ALL server components (no 'use client'), and the
-// service key is not NEXT_PUBLIC_, so it can never reach a client bundle.
+// Service-key Supabase creds. These functions are ONLY called from server components (no
+// 'use client' importer calls getScore/getLeaderboard), the service key is not NEXT_PUBLIC_, and
+// it is referenced only inside this function body — so it can never reach a client bundle.
 function sbCreds(): { url: string; key: string } | null {
   const url = process.env.SUPABASE_URL
   const key = process.env.SUPABASE_SERVICE_KEY
@@ -154,59 +153,16 @@ export const riskLabel = (risk?: string): string =>
 export const pct = (v: number | null | undefined) =>
   v == null ? null : Math.round(v * 100)
 
-// Fetch a single company's real score via the working serverless endpoint. Cached 1h, deduped
-// across generateMetadata + render within a request. Returns null when no data / on failure.
+// A single company's real score — read DIRECTLY from the cached company_scores table (never a
+// self-fetch of the live API). Server-only; returns null when no data / creds absent / on failure.
 export async function getScore(nameOrSlug: string): Promise<GrowthScore | null> {
   const name = nameOrSlug.includes('-') ? nameOrSlug.replace(/-/g, ' ') : nameOrSlug
-  // Build-time: read the cached score straight from Supabase — never self-fetch the live site.
-  if (IS_BUILD) return scoreFromDb(name)
-  try {
-    const r = await fetch(REPORTS_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name }),
-      next: { revalidate: 3600 },
-      signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
-    })
-    if (!r.ok) return null
-    const d = await r.json()
-    const s = d?.score
-    if (!s || s.overall_score == null) return null
-    return {
-      overall_score: s.overall_score,
-      ghost_rate: s.ghost_rate ?? null,
-      response_rate: s.response_rate ?? null,
-      avg_wait_days: s.avg_wait_days ?? null,
-      avg_rounds: s.avg_rounds ?? null,
-      report_count: s.report_count ?? 0,
-      risk_level: s.risk_level ?? 'warn',
-      industry: s.industry ?? null,
-      waste: s.waste ?? null,
-      summary: s.summary ?? null,
-    }
-  } catch {
-    return null
-  }
+  return scoreFromDb(name)
 }
 
-// Fetch the public leaderboard (real aggregated company data). Cached 1h.
+// The public leaderboard — read DIRECTLY from company_scores (never a self-fetch of the live API).
 export async function getLeaderboard(): Promise<LeaderboardRow[]> {
-  // Build-time: read the leaderboard straight from Supabase — never self-fetch the live site.
-  if (IS_BUILD) return leaderboardFromDb()
-  try {
-    const r = await fetch(REPORTS_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'leaderboard' }),
-      next: { revalidate: 3600 },
-      signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
-    })
-    if (!r.ok) return []
-    const d = await r.json()
-    return Array.isArray(d?.companies) ? d.companies : []
-  } catch {
-    return []
-  }
+  return leaderboardFromDb()
 }
 
 // Top long-tail companies seeded for static generation (FAQ pages). These are the names people

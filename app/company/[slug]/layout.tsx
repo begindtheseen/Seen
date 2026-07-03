@@ -1,50 +1,10 @@
 import type { Metadata } from 'next'
-
-type ScoreRow = {
-  overall_score?: number
-  ghost_rate?: number
-  response_rate?: number
-  avg_wait_days?: number
-  report_count?: number
-  risk_level?: 'safe' | 'warn' | 'danger'
-  industry?: string
-}
+// Build-safe score reader — reads the cached score DIRECTLY from Supabase and NEVER self-fetches
+// the live https://seenjobs.io/api/reports (which had no build detection here and could hang
+// `next build`). generateMetadata + the layout render below both go through this one helper.
+import { getScore, type GrowthScore } from '@/lib/growth'
 
 const titleCase = (slug: string) => slug.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
-
-// Fetch the score via the public /api/reports endpoint — the SAME path the client uses and the
-// one proven to work in production. (A direct Supabase REST call from this App Router server
-// component was returning null in the Vercel runtime, which silently degraded the SEO/GEO
-// description + summary; routing through the working serverless function fixes that.) Cached 1h
-// and deduped across generateMetadata + the layout render within a request.
-async function getScore(slug: string): Promise<ScoreRow | null> {
-  try {
-    const name = slug.replace(/-/g, ' ')
-    const r = await fetch('https://seenjobs.io/api/reports', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name }),
-      next: { revalidate: 3600 },
-      // Cap the self-fetch so runtime metadata generation can never hang on a slow API.
-      signal: AbortSignal.timeout(8000),
-    })
-    if (!r.ok) return null
-    const d = await r.json()
-    const s = d?.score
-    if (!s) return null
-    return {
-      overall_score: s.overall_score,
-      ghost_rate: s.ghost_rate,
-      response_rate: s.response_rate,
-      avg_wait_days: s.avg_wait_days,
-      report_count: s.report_count,
-      risk_level: s.risk_level,
-      industry: s.industry,
-    }
-  } catch {
-    return null
-  }
-}
 
 export async function generateMetadata(
   { params }: { params: Promise<{ slug: string }> }
@@ -91,7 +51,7 @@ const accentFor = (risk?: string): string =>
   risk === 'safe' ? 'var(--green)' : risk === 'danger' ? 'var(--red)' : 'var(--amber)'
 
 // One-sentence plain-English read on the data, for crawlers and humans alike.
-function interpret(s: ScoreRow): string {
+function interpret(s: GrowthScore): string {
   const ghost = s.ghost_rate != null ? s.ghost_rate : null
   const score = s.overall_score ?? 0
   if (ghost != null && ghost >= 0.6) return 'Most applicants never hear back, so set expectations accordingly and keep applying elsewhere.'
