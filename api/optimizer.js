@@ -18,6 +18,7 @@ import { applyRateLimit } from '../lib/server/ratelimit.js';
 import { logError } from '../lib/server/errlog.js';
 import { gateAI } from '../lib/server/credits.js';
 import { runOptimizer, ENGINE_VERSION } from '../lib/optimizer/index.js';
+import { buildApplicationPackage } from '../lib/application-intelligence/index.js';
 import { extractJobFacts } from '../lib/optimizer/extractJobFacts.js';
 import { runHumanProof, HUMANPROOF_ENGINE_VERSION } from '../lib/humanizer/index.js';
 import { buildHumanProofPackage, normalizeBulletList } from '../lib/server/humanizePackage.js';
@@ -544,7 +545,28 @@ export default async function handler(req, res) {
       } catch (e) { console.error('optimizer persist:', e.message); }
     }
 
-    return res.status(200).json({ ...output, run_id: runId, _facts_source: factsSource, _engine_version: ENGINE_VERSION });
+    // Application Intelligence V2 — additive, non-breaking. Runs the richer local engine and
+    // attaches its package under `application_intelligence`. Never throws into the legacy
+    // path: if V2 fails for any reason, the classic SeenFit response is returned unchanged.
+    let application_intelligence = null;
+    try {
+      application_intelligence = buildApplicationPackage({
+        resumeText: String(resumeText),
+        jobDescription: jobDescription || '',
+        jobTitle: jobTitle || '',
+        company: company || '',
+        confirmedAnswers: Array.isArray(body.confirmed_answers) ? body.confirmed_answers : [],
+        pro: !!companyProc /* placeholder — V2 does not gate; kept for future Pro-only sections */,
+      });
+    } catch (e) { console.error('application_intelligence_v2:', e.message); }
+
+    return res.status(200).json({
+      ...output,
+      application_intelligence,
+      engine_version_v2: application_intelligence?.engine_version || null,
+      legacy_seenfit_compatible: true,
+      run_id: runId, _facts_source: factsSource, _engine_version: ENGINE_VERSION,
+    });
   } catch (e) {
     // Pass the Error (not just .message) so the stack is captured; surface the ref to the
     // client so a user-reported failure maps to the exact logged row (stack + action).
