@@ -4,6 +4,7 @@ import { applyRateLimit, rateLimit } from '../lib/server/ratelimit.js';
 import { logError } from '../lib/server/errlog.js';
 import { filterAndRank, filterByLocation, sortByProximity, locationDbTerm } from './_utils/jobRelevance.js';
 import { aggregateForQuery, upsertJobs, inferLevel } from '../lib/server/jobSources.js';
+import { scoreJob, wasteScore, scoreRow, explainListingScore } from '../lib/server/jobScore.js';
 import { geocodeLocation, haversineMiles, milesToKm } from '../lib/server/geo.js';
 
 // Verify a Supabase JWT (HS256) and return the user id, or null. Decoding the payload
@@ -89,7 +90,9 @@ export default async function handler(req, res) {
       );
       const rows = r.ok ? await r.json() : [];
       if (!Array.isArray(rows) || !rows.length) return res.status(404).json({ error: 'Not found' });
-      return res.status(200).json({ job: rows[0] });
+      // Attach the score's factor breakdown so the detail page can show WHY, not just a number.
+      const job = { ...rows[0], ...scoreRow(rows[0]), score_explanation: explainListingScore(rows[0]) };
+      return res.status(200).json({ job });
     } catch (e) {
       logError('jobs/get_by_id', e.message);
       return res.status(500).json({ error: 'DB error' });
@@ -252,7 +255,7 @@ export default async function handler(req, res) {
           title: j.title, company: j.company, location: j.location || loc,
           salary: j.salary, url: j.apply_url || j.url || null, description: j.description,
           type: j.type || 'Full-time', level: inferLevel(j.title || ''),
-          source: j.source || 'Seen', score: j.score || 65, waste_score: j.waste_score || 25,
+          source: j.source || 'Seen', ...scoreRow(j),
           lat: j.lat ?? null, lng: j.lng ?? null, posted_at: j.created_at || null,
         }));
         // Keep only listings within the searched radius (true distance when we have
@@ -304,7 +307,7 @@ export default async function handler(req, res) {
         title: j.title, company: j.company, location: j.location || loc,
         salary: j.salary, url: j.apply_url || j.url || null, description: j.description,
         type: j.type || 'Full-time', level: inferLevel(j.title || ''),
-        source: j.source || 'Seen', score: j.score || 65, waste_score: j.waste_score || 25,
+        source: j.source || 'Seen', ...scoreRow(j),
         lat: j.lat ?? null, lng: j.lng ?? null, posted_at: j.created_at || null,
       }));
       jobs = applyRadius(filterAndRank(jobs, relevanceQuery));
@@ -338,7 +341,7 @@ export default async function handler(req, res) {
       title: j.title, company: j.company, location: j.location || loc,
       salary: j.salary, url: j.apply_url || j.url || null, description: j.description,
       type: j.type || 'Full-time', level: inferLevel(j.title || ''),
-      source: j.source || 'Seen', score: j.score || 65, waste_score: j.waste_score || 25,
+      source: j.source || 'Seen', ...scoreRow(j),
       lat: j.lat ?? null, lng: j.lng ?? null, posted_at: j.created_at || null,
     });
     const dedupJobs = arr => {
@@ -424,7 +427,7 @@ async function nearestListings(loc, supabaseUrl, dbHeaders) {
     title: j.title, company: j.company, location: j.location,
     salary: j.salary, url: j.apply_url, description: j.description,
     type: j.type || 'Full-time', level: inferLevel(j.title || ''),
-    source: j.source || 'Seen', score: j.score || 65, waste_score: j.waste_score || 25,
+    source: j.source || 'Seen', ...scoreRow(j),
     posted_at: j.created_at || null,
   }));
   try {
@@ -497,78 +500,6 @@ function buildFallbackFilter(q) {
   return `or=${encodeURIComponent(`(${conditions.join(',')})`)}`;
 }
 
-function scoreJob(job) {
-  let s = 50; // neutral baseline — must earn a good score
-
-  const src   = (job.source || '').toLowerCase();
-  const co    = (job.company || '').toLowerCase();
-  const title = (job.title || '').toLowerCase();
-  const desc  = (job.description || '');
-
-  // ── ATS source quality (biggest single signal) ────────────────────────────
-  if (/greenhouse|lever|workday|ashby|rippling|bamboo/.test(src)) s += 18;
-  else if (/linkedin/.test(src)) s += 8;
-  else if (/indeed|glassdoor|ziprecruiter/.test(src)) s += 4;
-  // Adzuna/unknown = 0 bonus — neutral
-
-  // ── Salary transparency ───────────────────────────────────────────────────
-  const salary = job.salary || '';
-  const salaryMin = typeof job.salary_min === 'number' ? job.salary_min : 0;
-  if (salary || salaryMin > 0) s += 12;          // disclosed = big trust signal
-  if (salaryMin > 120000) s += 6;                // high comp = serious company
-
-  // ── Description quality ───────────────────────────────────────────────────
-  if (desc.length > 1200) s += 8;
-  else if (desc.length > 500) s += 4;
-  else if (desc.length < 120) s -= 8;             // suspiciously thin posting
-
-  // Description green flags
-  if (/\$\d+|\bsalary\b|\bcompensation\b|\bota\b|\bbase pay\b/i.test(desc)) s += 5;
-  if (/interview process|hiring process|rounds?:|technical screen/i.test(desc)) s += 6;
-  if (/\bremote\b|\bhybrid\b|\bwork from home\b/i.test(desc)) s += 3;
-  if (/401k|equity|pto|parental leave/i.test(desc)) s += 4;
-
-  // Description red flags
-  if (/staffing agency|on behalf of our client|recruiting firm/i.test(desc)) s -= 10;
-  if (/must be a team player|fast[- ]paced|wear many hats|self[- ]starter/i.test(desc)) s -= 4;
-  if (/unpaid|volunteer|commission only|1099 only/i.test(desc)) s -= 20;
-  if (/\$10.{0,5}hour|\$12.{0,5}hour|\$15.{0,5}hour/i.test(desc)) s -= 8; // poverty wages
-
-  // ── Company reputation ────────────────────────────────────────────────────
-  const KNOWN_GOOD = ['stripe','linear','figma','notion','vercel','anthropic','openai',
-    'databricks','retool','ramp','brex','plaid','airtable','coda','loom','pitch',
-    'segment','miro','intercom','hubspot','twilio','datadog'];
-  const KNOWN_BAD  = ['amazon','accenture','cognizant','infosys','wipro','tata consultancy',
-    'hcl tech','capgemini','tech mahindra','unison','staffmark','manpower','randstad',
-    'robert half','kelly services'];
-
-  if (KNOWN_GOOD.some(g => co.includes(g))) s += 15;
-  if (KNOWN_BAD.some(g => co.includes(g)))  s -= 14;
-
-  // ── Title red flags ───────────────────────────────────────────────────────
-  if (/\b(rockstar|ninja|guru|wizard|superhero|unicorn)\b/i.test(title)) s -= 6;
-  if (/commission|insurance agent|real estate agent|door.to.door/i.test(title)) s -= 12;
-
-  // ── Job type penalty ──────────────────────────────────────────────────────
-  if (/contract|temp|freelance|gig/i.test(job.type || '')) s -= 6;
-
-  return Math.min(95, Math.max(18, Math.round(s)));
-}
-
-function wasteScore(job) {
-  let w = 20;
-  const co   = (job.company || '').toLowerCase();
-  const desc = (job.description || '');
-
-  if (/amazon|accenture|cognizant|infosys|wipro|tata|hcl/.test(co)) w += 35;
-  if (/staffing agency|on behalf of our client/.test(desc))           w += 20;
-  if (/unpaid|volunteer|commission only/.test(desc))                  w += 40;
-  if (/greenhouse|lever|workday|ashby/.test((job.source || '').toLowerCase())) w -= 10;
-  if (job.salary || (typeof job.salary_min === 'number' && job.salary_min > 0)) w -= 8;
-
-  return Math.min(90, Math.max(5, Math.round(w)));
-}
-
 // ── handleCompanyJobs: DB lookup + live search for a specific company ─────────
 async function handleCompanyJobs(req, res, body) {
   const { company } = body;
@@ -590,7 +521,7 @@ async function handleCompanyJobs(req, res, body) {
     );
     const cached = r.ok ? await r.json() : [];
     if (Array.isArray(cached) && cached.length >= 3) {
-      const jobs = cached.map(j => ({ title: j.title, company: j.company, location: j.location, salary: j.salary, url: j.apply_url, source: j.source, type: j.type, level: inferLevel(j.title || ''), score: j.score, waste_score: j.waste_score }));
+      const jobs = cached.map(j => ({ title: j.title, company: j.company, location: j.location, salary: j.salary, url: j.apply_url, source: j.source, type: j.type, level: inferLevel(j.title || ''), ...scoreRow(j) }));
       return res.status(200).json({ ok: true, jobs, _src: 'cache' });
     }
   } catch(e) { console.warn('company_jobs cache:', e.message); }
@@ -618,7 +549,7 @@ async function handleCompanyJobs(req, res, body) {
         title: j.title, company: j.company, location: j.location,
         salary: j.salary, url: j.apply_url || j.url || null, description: j.description,
         source: j.source, type: j.type, level: inferLevel(j.title || ''),
-        score: j.score || 65, waste_score: j.waste_score || 25,
+        ...scoreRow(j),
       }));
     console.log(`COMPANY AGGREGATED: "${safeName}" — ${agg.jobs?.length || 0} fetched, ${agg.upserted || 0} saved, ${jobs.length} matched`);
     return res.status(200).json({ ok: true, jobs, _src: 'aggregated' });
@@ -694,7 +625,7 @@ async function handleRecommended(req, res, _body) {
     const ranked = unique.map(j => {
       const titleL = (j.title || '').toLowerCase();
       const descL = (j.description || '').toLowerCase();
-      let matchScore = j.score || 65;
+      let matchScore = scoreRow(j).score;
       for (const s of skillsLower.slice(0, 5)) { if (titleL.includes(s)) matchScore += 10; }
       let descHits = 0;
       for (const s of skillsLower) { if (descL.includes(s)) descHits++; }
@@ -715,8 +646,7 @@ async function handleRecommended(req, res, _body) {
       type: j.type || 'Full-time',
       level: inferLevel(j.title || ''),
       source: j.source || 'Seen',
-      score: j.score || 65,
-      waste_score: j.waste_score || 25,
+      ...scoreRow(j),
     }));
 
     return res.status(200).json({ ok: true, jobs, skills: topSkills.slice(0, 3), seniority, function: fn });

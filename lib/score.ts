@@ -1,4 +1,4 @@
-type RiskLevel = 'safe' | 'warn' | 'danger'
+type RiskLevel = 'safe' | 'warn' | 'danger' | 'unrated'
 
 export const Score = {
   calc(responseRate: number, ghostRate: number, waitDays: number, reportCount: number): number {
@@ -6,14 +6,18 @@ export const Score = {
       50 + (responseRate * 40) + (ghostRate * -30) + (Math.min(waitDays / 60, 1) * -15) + (Math.log(reportCount + 1) * 5)
     )))
   },
-  risk(score: number): RiskLevel {
+  // A null/undefined/non-finite score is UNRATED — we never invent a number for it. Callers
+  // render an explicit "unrated" state rather than a fabricated default. (Owner directive:
+  // "if we score something it must be for a reason or no score.")
+  risk(score: number | null | undefined): RiskLevel {
+    if (score == null || !Number.isFinite(score)) return 'unrated'
     return score >= 70 ? 'safe' : score >= 40 ? 'warn' : 'danger'
   },
   label(risk: RiskLevel): string {
-    return { safe: 'SAFE', warn: 'CAUTION', danger: 'DANGER' }[risk] || '—'
+    return { safe: 'SAFE', warn: 'CAUTION', danger: 'DANGER', unrated: 'UNRATED' }[risk] || '—'
   },
   color(risk: RiskLevel): string {
-    return risk === 'safe' ? 'var(--green)' : risk === 'warn' ? 'var(--amber)' : 'var(--red)'
+    return risk === 'safe' ? 'var(--green)' : risk === 'warn' ? 'var(--amber)' : risk === 'danger' ? 'var(--red)' : 'var(--dim)'
   },
   waste(ghostRate: number, roundCount: number, unpaidRate: number): number {
     const base = ghostRate * 60 + unpaidRate * 25 + (roundCount > 4 ? 15 : 0)

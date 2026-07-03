@@ -12,8 +12,8 @@ export interface ListingCardData {
   location: string
   level?: string
   type?: string
-  score: number        // company hiring grade for this listing
-  waste?: number
+  score: number | null // listing transparency grade — null = UNRATED (never faked to a number)
+  waste?: number | null
   whatTheyWant?: string[]
   insiderTip?: string
 }
@@ -40,16 +40,17 @@ async function drawCard(d: ListingCardData): Promise<HTMLCanvasElement> {
   canvas.width = W; canvas.height = H
   const c = canvas.getContext('2d')!
 
-  const score = Math.round(d.score || 0)
-  const risk = score >= 70 ? 'safe' : score >= 40 ? 'warn' : 'danger'
-  const OC = risk === 'safe' ? '#10b981' : risk === 'danger' ? '#ef4444' : '#f59e0b'
-  const gradeEmoji = risk === 'safe' ? '🟢' : risk === 'danger' ? '🔴' : '🟡'
-  const grade = letterGrade(score)
+  const rated = typeof d.score === 'number' && Number.isFinite(d.score)
+  const score = rated ? Math.round(d.score as number) : 0
+  const risk = !rated ? 'warn' : score >= 70 ? 'safe' : score >= 40 ? 'warn' : 'danger'
+  const OC = !rated ? '#8b93a7' : risk === 'safe' ? '#10b981' : risk === 'danger' ? '#ef4444' : '#f59e0b'
+  const gradeEmoji = !rated ? '⚪' : risk === 'safe' ? '🟢' : risk === 'danger' ? '🔴' : '🟡'
+  const grade = rated ? letterGrade(score) : 'Unrated'
 
   const facts: { e: string; t: string }[] = []
   for (const w of (d.whatTheyWant || []).slice(0, 3)) facts.push({ e: '🎯', t: w })
   if (d.insiderTip) facts.push({ e: '💡', t: d.insiderTip })
-  facts.push({ e: gradeEmoji, t: `Seen Hiring Grade: ${grade} (${score}/100)` })
+  facts.push({ e: gradeEmoji, t: rated ? `Seen Hiring Grade: ${grade} (${score}/100)` : 'Seen Hiring Grade: Unrated — not enough listing signal' })
   if (!facts.length) facts.push({ e: '🔎', t: 'Check ghost risk + response rate before applying.' })
   const factList = facts.slice(0, 6)
 
@@ -95,7 +96,7 @@ async function drawCard(d: ListingCardData): Promise<HTMLCanvasElement> {
   c.beginPath(); c.moveTo(PAD, d1Y); c.lineTo(W - PAD, d1Y); c.stroke()
 
   // Big grade headline (like the outcome word)
-  const HEAD = `${grade}  ·  ${score}/100`
+  const HEAD = rated ? `${grade}  ·  ${score}/100` : 'UNRATED'
   let oFs = 138; c.font = `800 ${oFs}px "Syne",sans-serif`
   while (c.measureText(HEAD).width > W - PAD * 2 && oFs > 72) {
     oFs -= 4; c.font = `800 ${oFs}px "Syne",sans-serif`
@@ -146,11 +147,14 @@ export default function ListingCard({ data, onClose }: { data: ListingCardData; 
   const [blob, setBlob] = useState<Blob | null>(null)
   const doneRef = useRef(false)
 
-  const score = Math.round(data.score || 0)
-  const risk = score >= 70 ? 'safe' : score >= 40 ? 'warn' : 'danger'
-  const OC = risk === 'safe' ? '#10b981' : risk === 'danger' ? '#ef4444' : '#f59e0b'
-  const grade = letterGrade(score)
-  const shareText = `${data.title} at ${data.company}${data.location ? ' (' + data.location + ')' : ''} — Seen hiring grade ${grade} (${score}/100). Know before you apply.`
+  const rated = typeof data.score === 'number' && Number.isFinite(data.score)
+  const score = rated ? Math.round(data.score as number) : 0
+  const risk = !rated ? 'warn' : score >= 70 ? 'safe' : score >= 40 ? 'warn' : 'danger'
+  const OC = !rated ? '#8b93a7' : risk === 'safe' ? '#10b981' : risk === 'danger' ? '#ef4444' : '#f59e0b'
+  const grade = rated ? letterGrade(score) : 'Unrated'
+  const shareText = rated
+    ? `${data.title} at ${data.company}${data.location ? ' (' + data.location + ')' : ''} — Seen hiring grade ${grade} (${score}/100). Know before you apply.`
+    : `${data.title} at ${data.company}${data.location ? ' (' + data.location + ')' : ''} — Seen. Know before you apply.`
 
   useEffect(() => {
     if (doneRef.current) return

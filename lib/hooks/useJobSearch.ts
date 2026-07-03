@@ -12,6 +12,15 @@ import type { Job } from '@/lib/types'
 // In-memory search cache: `${query}|${location}` → { jobs, ts }
 const searchCache = new Map<string, { jobs: Job[]; ts: number }>()
 
+// Parse a score/waste value from the API into a real number, or null when absent — we never
+// fabricate a default (e.g. the old `|| 65`). The API now always sends an earned number for
+// live listings; null is the honest "unrated" fallback for anything malformed or legacy.
+function numOrNull(v: unknown): number | null {
+  if (v === null || v === undefined || v === '') return null
+  const n = Number(v)
+  return Number.isFinite(n) && n > 0 ? Math.round(n) : null
+}
+
 export type SortMode = 'transparency' | 'waste' | 'recent'
 export type NicheFilter = '' | 'tech' | 'healthcare' | 'retail' | 'logistics' | 'finance' | 'other'
 export type LevelFilter = '' | 'entry' | 'mid' | 'senior'
@@ -49,9 +58,10 @@ export function useJobSearch() {
 
   function applySort(list: Job[], mode: SortMode): Job[] {
     const copy = [...list]
-    if (mode === 'waste') return copy.sort((a, b) => a.waste - b.waste)
+    // Unrated (null) listings sort to the end of a score/waste sort — never treated as 0.
+    if (mode === 'waste') return copy.sort((a, b) => (a.waste ?? Infinity) - (b.waste ?? Infinity))
     if (mode === 'recent') return copy // preserve server order (most recent first)
-    return copy.sort((a, b) => b.score - a.score) // transparency
+    return copy.sort((a, b) => (b.score ?? -Infinity) - (a.score ?? -Infinity)) // transparency
   }
 
   function applyFilters(list: Job[]): Job[] {
@@ -170,8 +180,8 @@ export function useJobSearch() {
           title: String(j.title || ''),
           company: String(j.company || ''),
           location: String(j.location || 'US'),
-          score: Number(j.score) || 65,
-          waste: Number(j.waste_score ?? j.waste) || 25,
+          score: numOrNull(j.score),
+          waste: numOrNull(j.waste_score ?? j.waste),
           level: String(j.level || 'Mid level'),
           type: String(j.type || 'Full-time'),
           source: String(j.source || 'Seen'),
@@ -309,8 +319,8 @@ export function useJobSearch() {
             title,
             company,
             location,
-            score: Number(j.score) || 65,
-            waste: Number(j.waste_score ?? j.waste) || 25,
+            score: numOrNull(j.score),
+            waste: numOrNull(j.waste_score ?? j.waste),
             level: String(j.level || j.lvl || 'Mid level'),
             type: String(j.type || 'Full-time'),
             source: String(j.source || 'Job board'),

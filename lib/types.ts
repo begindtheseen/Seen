@@ -52,7 +52,7 @@ export interface SavedJob {
   company: string
   role: string
   location?: string
-  score?: number
+  score?: number | null
   saved_at: string
   // Deep-link back to the original posting (parity: lets a saved listing reopen
   // to the real job board page even if it has aged out of our cache).
@@ -70,8 +70,11 @@ export interface Job {
   title: string
   company: string
   location: string
-  score: number
-  waste: number
+  // null = UNRATED. We store a score only when it's earned from the listing's own signals;
+  // a listing we can't score honestly carries null and renders an explicit "unrated" state
+  // rather than a fabricated number. (Owner directive: "score for a reason or no score.")
+  score: number | null
+  waste: number | null
   level: string
   type: string
   source: string

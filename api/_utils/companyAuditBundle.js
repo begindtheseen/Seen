@@ -14,6 +14,7 @@ import {
   SOURCE_TRUST, PRIOR_STRENGTH, classifyPlatform, fuseCompanyIntel, aggregateOutcomes,
   GHOST_OUTCOMES, RESPONSE_OUTCOMES, NONTERMINAL_OUTCOMES,
 } from './companyIntel.js';
+import { explainListingScore, SCORE_RANGE, WASTE_RANGE } from '../../lib/server/jobScore.js';
 
 // Below this many reports actually counted toward the grade, the sample is treated as too
 // small for a firm reading — the PDF prints a strong low-sample warning. Exported so the
@@ -39,16 +40,18 @@ export async function buildCompanyAuditBundle({ db, serviceKey, adminId, adminRo
   // the server secret. Anonymous rows (no user_id) collapse to a shared 'anon' bucket (null).
   const pseudonymize = (uid) => uid ? `sub_${createHash('sha256').update(`${serviceKey}:${uid}`).digest('hex').slice(0, 16)}` : null;
 
-  const [coRes, scoreRes, reportsRes, aliasRes] = await Promise.all([
+  const [coRes, scoreRes, reportsRes, aliasRes, jobsRes] = await Promise.all([
     db(`companies?name=ilike.${nameLike}&select=id,name,logo_letter,created_at&limit=25`),
     db(`company_scores?company_name=ilike.${nameEnc}&order=created_at.desc&limit=1`),
     db(`reports?company_name=ilike.${nameEnc}&select=id,company_name,company_id,location_id,role,platform,source,outcome,ghost_stage,rounds,wait_days,unpaid_work,experience_level,needs_review,outcome_weight,trust_reason,user_id,created_at&order=created_at.desc&limit=2000`),
     db(`company_aliases?canonical=ilike.${nameEnc}&select=alias,canonical&limit=50`).catch(() => null),
+    db(`jobs?company=ilike.${nameEnc}&select=id,title,company,location,salary,source,type,description,score,waste_score,created_at,apply_url&order=created_at.desc&limit=500`).catch(() => null),
   ]);
   const companies = coRes.ok ? await coRes.json() : [];
   const cachedScore = scoreRes.ok ? ((await scoreRes.json())[0] || null) : null;
   const reports = reportsRes.ok ? await reportsRes.json() : [];
   const aliases = aliasRes && aliasRes.ok ? await aliasRes.json() : [];
+  const jobs = jobsRes && jobsRes.ok ? await jobsRes.json() : [];
 
   // Resolve location_id → city for readability.
   const locIds = [...new Set((reports || []).map(r => r.location_id).filter(Boolean))];
@@ -111,6 +114,29 @@ export async function buildCompanyAuditBundle({ db, serviceKey, adminId, adminRo
   const fusionSources = Object.entries(bySource).map(([type, rows]) => ({ type, outcomes: rows }));
   const computed = fuseCompanyIntel({ web: {}, sources: fusionSources });
 
+  // Per-LISTING transparency scores WITH their full factor breakdown. Every listing score the
+  // product ever displays is reproduced here next to the exact logic that produced it — the
+  // factor deltas sum to the score, so each number is legally explainable from this export
+  // alone. This is the listing-quality grade (from the posting's own signals), distinct from
+  // the company grade above (from applicant reports). `score_mismatch` flags any listing whose
+  // stored number no longer equals a live recomputation (e.g. scored before a logic change).
+  const listing_scores = (jobs || []).map(j => {
+    const ex = explainListingScore(j);
+    return {
+      id: j.id,
+      title: j.title || null,
+      location: j.location || null,
+      source: j.source || null,
+      salary: j.salary || null,
+      type: j.type || null,
+      posted_at: j.created_at || null,
+      apply_url: j.apply_url || null,
+      description_length: (j.description || '').length,
+      score_mismatch: ex.stored_score != null && ex.stored_score !== ex.transparency_score,
+      ...ex,
+    };
+  });
+
   return {
     export_type: 'company_audit_bundle',
     schema_version: 1,
@@ -130,7 +156,18 @@ export async function buildCompanyAuditBundle({ db, serviceKey, adminId, adminRo
       included_in_score: included.length,
       excluded_needs_review: excluded.length,
       distinct_submitters: new Set(annotated.map(r => r.submitter).filter(Boolean)).size,
+      total_listings: listing_scores.length,
+      listings_with_score_mismatch: listing_scores.filter(l => l.score_mismatch).length,
     },
+    listing_methodology: {
+      description: 'Each listing carries a transparency score (18–95) and a wasted-time/ghost-risk score (5–90) computed ONLY from signals present in the posting itself — its source/ATS, whether compensation is disclosed, the length and language of the description, and red-flag titles. It grades the POSTING, not the company. Every listing below lists the exact factors that fired, each with its point delta and reason; the deltas (including the neutral baseline) sum to the raw score, which is then clamped to the stated range. No listing receives a number without a stated reason.',
+      transparency_range: [SCORE_RANGE.min, SCORE_RANGE.max],
+      transparency_baseline: SCORE_RANGE.baseline,
+      waste_range: [WASTE_RANGE.min, WASTE_RANGE.max],
+      waste_baseline: WASTE_RANGE.baseline,
+      distinct_from_company_grade: 'The listing transparency score is independent of the company grade above. The company grade requires applicant reports and reads "no data" without them; the listing score always has a basis because the evidence is the listing.',
+    },
+    listing_scores,
     methodology: {
       description: 'Company grade = trust-weighted fusion of applicant-reported outcomes, shrunk toward a web-research prior by sample size. Reports flagged needs_review are excluded until an admin clears them.',
       source_trust_weights: SOURCE_TRUST,

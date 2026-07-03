@@ -145,6 +145,8 @@ nav.nav-scrolled{background:rgba(6,6,8,0.82);backdrop-filter:blur(60px) saturate
 .sring.safe .sring-n{color:var(--green)}.sring.warn .sring-n{color:var(--amber)}.sring.danger .sring-n{color:var(--red)}
 .sring-l{font-family:var(--mono);font-size:.46rem;letter-spacing:.07em;margin-top:.08rem}
 .sring.safe .sring-l{color:var(--green)}.sring.warn .sring-l{color:var(--amber)}.sring.danger .sring-l{color:var(--red)}
+.sring.unrated{border-color:var(--line2);background:var(--card);box-shadow:none}.sring.unrated::after{border-color:var(--line2);opacity:.25}
+.sring.unrated .sring-n{color:var(--muted);font-size:1rem}.sring.unrated .sring-l{color:var(--dim)}
 
 /* NEW: WASTE SCORE */
 .waste-badge{display:inline-flex;align-items:center;gap:.35rem;padding:.28rem .75rem;border-radius:6px;font-family:var(--mono);font-size:.62rem;font-weight:500;border:1px solid}
