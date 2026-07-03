@@ -29,7 +29,7 @@ export default function EmployersPage() {
         'Waste score improvement tools',
       ],
       cta: 'Get verified →',
-      ctaHref: 'mailto:hello@tryseen.io?subject=Verified Employer',
+      ctaHref: 'mailto:hello@seenjobs.io?subject=Verified Employer',
     },
     {
       name: 'Multi-location',
@@ -45,7 +45,7 @@ export default function EmployersPage() {
         'ATS integration',
       ],
       cta: 'Contact sales',
-      ctaHref: 'mailto:hello@tryseen.io?subject=Enterprise',
+      ctaHref: 'mailto:hello@seenjobs.io?subject=Enterprise',
     },
   ]
 
@@ -124,7 +124,7 @@ export default function EmployersPage() {
             Get in early. Be the employer job seekers already trust when they arrive.
           </p>
           <a
-            href="mailto:hello@tryseen.io?subject=Early Access Employer"
+            href="mailto:hello@seenjobs.io?subject=Early Access Employer"
             style={{ display: 'inline-block', background: 'linear-gradient(135deg,#3b82f6 0%,#8b5cf6 100%)', border: 'none', borderRadius: 8, padding: '.75rem 2rem', fontFamily: 'var(--display)', fontWeight: 800, fontSize: '.85rem', color: '#fff', textDecoration: 'none', boxShadow: '0 0 20px rgba(59,130,246,0.3)' }}
           >
             Get early access →

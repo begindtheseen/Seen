@@ -280,7 +280,7 @@ export default function ProfilePage() {
       router.replace('/')
     } catch {
       setDeleting(false)
-      alert('Delete failed. Contact hello@tryseen.io')
+      alert('Delete failed. Contact hello@seenjobs.io')
     }
   }
 
