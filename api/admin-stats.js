@@ -245,7 +245,7 @@ async function _handler(req, res) {
       db(`reports?select=id,company_name,outcome,role,city,platform,created_at,report_text,outcome_weight,trust_reason,needs_review&order=created_at.desc&limit=25`),
       db(`applications?select=id,company_name,role,city,status,stage,platform,created_at&order=created_at.desc&limit=25`),
       db(`jobs?created_at=gte.${todayISO}&select=id`, { headers: { Prefer: 'count=exact', 'Range-Unit': 'items', Range: '0-0' } }),
-      db(`job_availability_reports?status=eq.expired&select=id,job_id,reported_at&order=reported_at.desc&limit=50`),
+      db(`job_availability_reports?status=in.(expired,unknown)&select=id,job_id,status,reported_at&order=reported_at.desc&limit=50`),
       db(`jobs?select=count&availability_status=eq.active`),
       db(`jobs?select=count&created_at=gte.${encodeURIComponent(todayISO)}`),
       db(`reports?created_at=gte.${monthISO}&select=created_at,company_name,outcome&order=created_at.asc&limit=2000`),
@@ -346,15 +346,21 @@ async function _handler(req, res) {
       const uuidJobIds = jobIds.filter(id => UUID_RE.test(id));
       let jobMap = {};
       if (uuidJobIds.length) {
-        const jobsRes = await db(`jobs?id=in.(${uuidJobIds.map(id => encodeURIComponent(id)).join(',')})&select=id,company,title,city,url,apply_url,availability_status&limit=50`);
+        // NOTE: the jobs table has no `url` column (only `apply_url`) — selecting a
+        // non-existent column 400s the whole lookup, so we select apply_url only.
+        const jobsRes = await db(`jobs?id=in.(${uuidJobIds.map(id => encodeURIComponent(id)).join(',')})&select=id,company,title,city,apply_url,availability_status&limit=50`);
         const jobRows = jobsRes.ok ? await jobsRes.json() : [];
         jobMap = Object.fromEntries((jobRows || []).map(j => [j.id, j]));
       }
       // Group reports by job_id, count them — every reported job_id is kept.
+      // `reasons` breaks the count down by report status (expired / unknown) so the admin
+      // can see WHY it was flagged.
       const grouped = {};
       inactiveReportRows.forEach(r => {
-        if (!grouped[r.job_id]) grouped[r.job_id] = { job_id: r.job_id, report_count: 0, latest_reported_at: r.reported_at };
+        if (!grouped[r.job_id]) grouped[r.job_id] = { job_id: r.job_id, report_count: 0, latest_reported_at: r.reported_at, reasons: {} };
         grouped[r.job_id].report_count++;
+        const reason = r.status || 'expired';
+        grouped[r.job_id].reasons[reason] = (grouped[r.job_id].reasons[reason] || 0) + 1;
         if (r.reported_at > grouped[r.job_id].latest_reported_at) grouped[r.job_id].latest_reported_at = r.reported_at;
       });
       inactiveReports = Object.values(grouped)
@@ -946,6 +952,37 @@ async function _handler(req, res) {
     });
     await db('admin_audit_log', { method: 'POST', body: JSON.stringify({ admin_id: sess.admin_id, username: 'admin', action: 'dismiss_inactive_report', target_type: 'job', target_id: String(job_id) }), headers: { Prefer: 'return=minimal' } });
     return res.status(200).json({ ok: true });
+  }
+
+  // Delete a reported listing: soft-delete the jobs row (reversible — flip
+  // availability_status back) AND clear its availability reports so it leaves the queue.
+  // We DELETE the report rows rather than PATCHing their status: the status CHECK only
+  // permits active/expired/unknown, so writing a "resolved"-style status silently 400s and
+  // the report would resurface on the next load. DELETE always sticks. Full admins only
+  // (moderators cannot destroy listings).
+  if (action === 'delete_listing') {
+    if (adminRole === 'moderator') return res.status(403).json({ error: 'Insufficient role' });
+    const { job_id } = body;
+    if (!job_id) return res.status(400).json({ error: 'job_id required' });
+    const jid = String(job_id);
+    // Only a syntactically valid uuid can be a real jobs-table row — feeding an ephemeral
+    // search-result id (e.g. "j_1no2squ") into jobs?id=eq. 400s (uuid parse). Guard it.
+    const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    let soft_deleted = false;
+    if (UUID.test(jid)) {
+      const up = await db(`jobs?id=eq.${encodeURIComponent(jid)}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ availability_status: 'removed', last_checked_at: new Date().toISOString() }),
+        headers: { Prefer: 'return=minimal' },
+      });
+      soft_deleted = up.ok;
+    }
+    await db(`job_availability_reports?job_id=eq.${encodeURIComponent(jid)}`, {
+      method: 'DELETE',
+      headers: { Prefer: 'return=minimal' },
+    });
+    await db('admin_audit_log', { method: 'POST', body: JSON.stringify({ admin_id: sess.admin_id, username: sess.username || 'admin', action: 'delete_listing', target_type: 'job', target_id: jid, metadata: { soft_deleted } }), headers: { Prefer: 'return=minimal' } });
+    return res.status(200).json({ ok: true, soft_deleted });
   }
 
   // ── JOB DEDUPLICATION ────────────────────────────────────────────────────────
