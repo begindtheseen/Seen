@@ -19,6 +19,39 @@ export function UserRow({ r, token, onDeleted, ts }: { r: Record<string, unknown
   const [proBusy, setProBusy] = useState(false)
   const [proMsg, setProMsg] = useState('')
   function closeModal() { if (!busy) { setShowModal(false); setTyped('') } }
+  // Emergency password reset state (full admins only).
+  const [showPw, setShowPw] = useState(false)
+  const [newPw, setNewPw] = useState('')
+  const [pwReason, setPwReason] = useState('')
+  const [pwBusy, setPwBusy] = useState(false)
+  const [pwErr, setPwErr] = useState('')
+  const [pwDone, setPwDone] = useState(false)
+  const [pwConfirm, setPwConfirm] = useState('') // type the email to confirm the right account
+  const [copied, setCopied] = useState(false)
+  const pwCanSubmit = email !== '—' && pwConfirm.trim().toLowerCase() === email.trim().toLowerCase() && newPw.length >= 8
+  function closePw() { if (!pwBusy) { setShowPw(false); setNewPw(''); setPwReason(''); setPwErr(''); setPwDone(false); setPwConfirm(''); setCopied(false) } }
+  function genPassword() {
+    // Strong, unambiguous (no 0/O/1/l/I) random password using the browser CSPRNG.
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789!@#$%&*?'
+    const a = new Uint32Array(18); crypto.getRandomValues(a)
+    setNewPw(Array.from(a, n => chars[n % chars.length]).join(''))
+    setCopied(false)
+  }
+  async function setPassword() {
+    if (!id || !pwCanSubmit || pwBusy) return
+    setPwBusy(true); setPwErr('')
+    try {
+      const res = await fetch('/api/admin-stats', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Admin-Token': token },
+        body: JSON.stringify({ action: 'set_user_password', user_id: id, new_password: newPw, reason: pwReason.trim() || undefined }),
+      })
+      const d = await res.json().catch(() => ({}))
+      if (res.ok && d.ok) setPwDone(true)
+      else setPwErr(d.error || 'Failed')
+    } catch { setPwErr('Network error') }
+    setPwBusy(false)
+  }
   async function togglePro() {
     if (!id || proBusy) return
     const next = !pro
@@ -84,8 +117,49 @@ export function UserRow({ r, token, onDeleted, ts }: { r: Record<string, unknown
             {grantMsg && <span style={{ fontFamily: 'var(--mono)', fontSize: '.5rem', color: 'var(--red)', whiteSpace: 'nowrap' }}>{grantMsg}</span>}
           </>
         )}
-        <button onClick={() => setShowModal(true)} title="Permanently delete this user and all their data" style={{ marginLeft: 'auto', background: 'none', border: '1px solid rgba(239,68,68,.35)', borderRadius: 5, color: 'var(--red)', fontFamily: 'var(--mono)', fontSize: '.55rem', padding: '.28rem .55rem', cursor: 'pointer', whiteSpace: 'nowrap' }}>🗑 Delete</button>
+        <button onClick={() => setShowPw(true)} title="Emergency: set a new password for this account" style={{ marginLeft: 'auto', background: 'none', border: '1px solid rgba(59,130,246,.4)', borderRadius: 5, color: 'var(--blue)', fontFamily: 'var(--mono)', fontSize: '.55rem', padding: '.28rem .55rem', cursor: 'pointer', whiteSpace: 'nowrap' }}>🔑 Reset PW</button>
+        <button onClick={() => setShowModal(true)} title="Permanently delete this user and all their data" style={{ background: 'none', border: '1px solid rgba(239,68,68,.35)', borderRadius: 5, color: 'var(--red)', fontFamily: 'var(--mono)', fontSize: '.55rem', padding: '.28rem .55rem', cursor: 'pointer', whiteSpace: 'nowrap' }}>🗑 Delete</button>
       </div>
+      {showPw && (
+        <div onClick={closePw} onKeyDown={e => { if (e.key === 'Escape') closePw() }} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '1rem' }}>
+          <div onClick={e => e.stopPropagation()} style={{ background: 'var(--card)', border: '1px solid var(--line2)', borderRadius: 10, padding: '1.1rem 1.2rem', maxWidth: 420, width: '100%', boxSizing: 'border-box' }}>
+            {!pwDone ? (
+              <>
+                <div style={{ fontFamily: 'var(--mono)', fontSize: '.72rem', color: 'var(--blue)', fontWeight: 700, marginBottom: '.5rem' }}>Emergency password reset</div>
+                <p style={{ fontSize: '.68rem', color: 'var(--sub)', lineHeight: 1.5, margin: '0 0 .7rem' }}>
+                  Sets a new password for <span style={{ color: 'var(--white)' }}>{email}</span>. The account holder can then sign in with it. It is <strong>not stored</strong> — you must relay it to them securely. This action is audit-logged.
+                </p>
+                <div style={{ fontFamily: 'var(--mono)', fontSize: '.55rem', color: 'var(--muted)', marginBottom: '.2rem' }}>New password (min 8 chars)</div>
+                <div style={{ display: 'flex', gap: '.4rem', marginBottom: '.6rem' }}>
+                  <input autoFocus value={newPw} onChange={e => { setNewPw(e.target.value); setCopied(false) }} disabled={pwBusy} placeholder="type or generate" style={{ flex: 1, minWidth: 0, background: 'var(--bg)', border: '1px solid var(--line2)', borderRadius: 6, color: 'var(--white)', fontFamily: 'var(--mono)', fontSize: '.65rem', padding: '.4rem .5rem', boxSizing: 'border-box' }} />
+                  <button onClick={genPassword} disabled={pwBusy} style={{ background: 'none', border: '1px solid var(--line2)', borderRadius: 6, color: 'var(--sub)', fontFamily: 'var(--mono)', fontSize: '.58rem', padding: '.35rem .6rem', cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0 }}>Generate</button>
+                </div>
+                <div style={{ fontFamily: 'var(--mono)', fontSize: '.55rem', color: 'var(--muted)', marginBottom: '.2rem' }}>Reason (optional, for the audit log)</div>
+                <input value={pwReason} onChange={e => setPwReason(e.target.value)} disabled={pwBusy} placeholder="e.g. user locked out, no email access" style={{ width: '100%', background: 'var(--bg)', border: '1px solid var(--line2)', borderRadius: 6, color: 'var(--white)', fontFamily: 'var(--mono)', fontSize: '.62rem', padding: '.4rem .5rem', marginBottom: '.7rem', boxSizing: 'border-box' }} />
+                <p style={{ fontFamily: 'var(--mono)', fontSize: '.6rem', color: 'var(--dim)', margin: '0 0 .3rem' }}>Type <span style={{ color: 'var(--white)' }}>{email}</span> to confirm:</p>
+                <input value={pwConfirm} onChange={e => setPwConfirm(e.target.value)} onKeyDown={e => { if (e.key === 'Escape') closePw() }} disabled={pwBusy} placeholder={email} style={{ width: '100%', background: 'var(--bg)', border: '1px solid var(--line2)', borderRadius: 6, color: 'var(--white)', fontFamily: 'var(--mono)', fontSize: '.65rem', padding: '.4rem .5rem', marginBottom: '.4rem', boxSizing: 'border-box' }} />
+                {pwErr && <div style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', color: 'var(--red)', marginBottom: '.5rem' }}>{pwErr}</div>}
+                <div style={{ display: 'flex', gap: '.5rem', justifyContent: 'flex-end', marginTop: '.5rem' }}>
+                  <button onClick={closePw} disabled={pwBusy} style={{ background: 'none', border: '1px solid var(--line2)', borderRadius: 6, color: 'var(--dim)', fontFamily: 'var(--mono)', fontSize: '.62rem', padding: '.35rem .7rem', cursor: 'pointer' }}>Cancel</button>
+                  <button onClick={setPassword} disabled={pwBusy || !pwCanSubmit} style={{ background: pwCanSubmit ? 'var(--blue)' : 'var(--line2)', border: 'none', borderRadius: 6, color: '#fff', fontFamily: 'var(--mono)', fontSize: '.62rem', padding: '.35rem .8rem', cursor: pwBusy ? 'wait' : pwCanSubmit ? 'pointer' : 'not-allowed', opacity: pwCanSubmit ? 1 : .6 }}>{pwBusy ? '…' : 'Set password'}</button>
+                </div>
+              </>
+            ) : (
+              <>
+                <div style={{ fontFamily: 'var(--mono)', fontSize: '.72rem', color: 'var(--green)', fontWeight: 700, marginBottom: '.5rem' }}>✓ Password set for {email}</div>
+                <p style={{ fontSize: '.68rem', color: 'var(--sub)', lineHeight: 1.5, margin: '0 0 .6rem' }}>Relay this to the account holder securely. It won&apos;t be shown again.</p>
+                <div style={{ display: 'flex', gap: '.4rem', alignItems: 'center', marginBottom: '.8rem' }}>
+                  <code style={{ flex: 1, minWidth: 0, background: 'var(--void)', border: '1px solid var(--line2)', borderRadius: 6, color: 'var(--white)', fontFamily: 'var(--mono)', fontSize: '.7rem', padding: '.45rem .55rem', overflowWrap: 'anywhere' }}>{newPw}</code>
+                  <button onClick={() => { navigator.clipboard?.writeText(newPw).then(() => setCopied(true)).catch(() => {}) }} style={{ background: 'none', border: '1px solid var(--line2)', borderRadius: 6, color: copied ? 'var(--green)' : 'var(--sub)', fontFamily: 'var(--mono)', fontSize: '.58rem', padding: '.4rem .6rem', cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0 }}>{copied ? '✓ Copied' : 'Copy'}</button>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                  <button onClick={closePw} style={{ background: 'var(--blue)', border: 'none', borderRadius: 6, color: '#fff', fontFamily: 'var(--mono)', fontSize: '.62rem', padding: '.35rem .9rem', cursor: 'pointer' }}>Done</button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
       {showModal && (
         <div onClick={closeModal} onKeyDown={e => { if (e.key === 'Escape') closeModal() }} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '1rem' }}>
           <div onClick={e => e.stopPropagation()} style={{ background: 'var(--card)', border: '1px solid var(--line2)', borderRadius: 10, padding: '1.1rem 1.2rem', maxWidth: 380, width: '100%' }}>
