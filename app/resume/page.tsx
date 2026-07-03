@@ -10,12 +10,13 @@ import type { SavedJob } from '@/lib/types'
 import UpgradeModal from '@/components/UpgradeModal'
 import { FREE_DAILY_CREDITS } from '@/lib/creditRules'
 import dynamic from 'next/dynamic'
+import ApplicationIntelligencePanel, { type ApplicationIntelligence, type ConfirmedAnswer } from '@/components/optimizer/ApplicationIntelligencePanel'
 
 const ResumeSurveyModal = dynamic(() => import('@/components/ResumeSurveyModal'), { ssr: false })
 
 const CREDIT_WORD = FREE_DAILY_CREDITS === 1 ? 'credit' : 'credits'
 
-type Tab = 'fit' | 'rewrite' | 'humanproof' | 'strategy' | 'export'
+type Tab = 'fit' | 'intel' | 'rewrite' | 'humanproof' | 'strategy' | 'export'
 
 // ── SeenFit optimizer output (canonical, from /api/optimizer action:'optimize') ──
 interface Contribution { factor: string; weight: number; raw: number; points: number; reason: string }
@@ -43,6 +44,8 @@ interface OptimizerOutput {
   application_message: string
   explanation: { summary: string; contributions: Contribution[]; notes: string[] }
   engine_version?: string
+  // Application Intelligence V2 — additive, may be null (falls back to the legacy UI).
+  application_intelligence?: ApplicationIntelligence | null
 }
 
 // ── HumanProof package-mode output ──
@@ -393,6 +396,7 @@ function ResumePageInner() {
   const [fitOut, setFitOut] = useState<OptimizerOutput | null>(null)
   const [fitState, setFitState] = useState<'idle' | 'loading' | 'done' | 'error' | 'disabled'>('idle')
   const [fitErrRef, setFitErrRef] = useState('') // server error ref for a failed optimize (traceable in api_errors)
+  const [v2Rerunning, setV2Rerunning] = useState(false) // "Improve this result" re-score in flight
 
   // HumanProof
   const [hp, setHp] = useState<HumanProofResult | null>(null)
@@ -524,18 +528,37 @@ function ResumePageInner() {
     loadInsights()
   }
 
-  async function runFit() {
+  async function runFit(confirmedAnswers?: ConfirmedAnswer[]) {
     setFitState('loading'); setFitErrRef('')
     try {
       const res = await fetch('/api/optimizer', {
         method: 'POST', headers: await aiHeaders(),
-        body: JSON.stringify({ action: 'optimize', resumeText, jobId: jobIdFor(), jobTitle, company: jobCompany, jobDescription: jobJD, remoteOk: /remote/i.test(jobJD) }),
+        body: JSON.stringify({
+          action: 'optimize', resumeText, jobId: jobIdFor(), jobTitle, company: jobCompany, jobDescription: jobJD, remoteOk: /remote/i.test(jobJD),
+          ...(confirmedAnswers?.length ? { confirmed_answers: confirmedAnswers } : {}),
+        }),
       })
       if (res.status === 403) { setFitState('disabled'); return }
       const data = await res.json().catch(() => ({}))
       if (!res.ok || data.error) { setFitErrRef(data?.ref || ''); setFitState('error'); return }
       setFitOut(data as OptimizerOutput); setFitState('done')
     } catch { setFitState('error') }
+  }
+
+  // "Improve this result": fold the user's confirmed answers back into the V2 engine and
+  // re-score. The optimize action is free (deterministic, no credit) — safe to re-run.
+  async function rerunV2WithAnswers(answers: ConfirmedAnswer[]) {
+    if (!answers.length) return
+    setV2Rerunning(true)
+    try {
+      const res = await fetch('/api/optimizer', {
+        method: 'POST', headers: await aiHeaders(),
+        body: JSON.stringify({ action: 'optimize', resumeText, jobId: jobIdFor(), jobTitle, company: jobCompany, jobDescription: jobJD, remoteOk: /remote/i.test(jobJD), confirmed_answers: answers }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (res.ok && !data.error) setFitOut(data as OptimizerOutput)
+    } catch { /* keep the prior result on failure */ }
+    setV2Rerunning(false)
   }
 
   // Read-only insights: DB cache is free; a fresh generation costs 1 credit (surfaced honestly).
@@ -683,8 +706,10 @@ function ResumePageInner() {
   const trackHref = `/apply?co=${encodeURIComponent(jobCompany)}&role=${encodeURIComponent(jobTitle)}${jobUrl ? `&jobUrl=${encodeURIComponent(jobUrl)}` : ''}`
   const reportHref = `/report?company=${encodeURIComponent(jobCompany)}&role=${encodeURIComponent(jobTitle)}`
 
+  const hasV2 = !!fitOut?.application_intelligence
   const tabs: Array<{ id: Tab; label: string }> = [
     { id: 'fit', label: '🎯 Fit' },
+    ...(hasV2 ? [{ id: 'intel' as Tab, label: '🧬 Deep Dive' }] : []),
     { id: 'rewrite', label: '✍️ Rewrite' },
     { id: 'humanproof', label: '🗣 HumanProof' },
     { id: 'strategy', label: '🧠 Strategy' },
@@ -792,8 +817,16 @@ function ResumePageInner() {
                 {tab === 'fit' && (
                   fitState === 'loading' ? <ResultEmpty icon="⏳" text={'Scoring your fit…'} />
                   : fitState === 'disabled' ? <ResultEmpty icon="🚧" text={'SeenFit is temporarily unavailable.'} />
-                  : fitState === 'error' ? <div><ResultEmpty icon="⚠️" text={'Could not score your fit. Try again.'} />{fitErrRef && <div style={{ fontFamily: 'var(--mono)', fontSize: '.55rem', color: 'var(--dim)', marginTop: '.35rem' }}>Error ref: {fitErrRef} — share this if it keeps happening.</div>}<button onClick={runFit} style={{ ...btnPrimary, marginTop: '.5rem' }}>Retry</button></div>
+                  : fitState === 'error' ? <div><ResultEmpty icon="⚠️" text={'Could not score your fit. Try again.'} />{fitErrRef && <div style={{ fontFamily: 'var(--mono)', fontSize: '.55rem', color: 'var(--dim)', marginTop: '.35rem' }}>Error ref: {fitErrRef} — share this if it keeps happening.</div>}<button onClick={() => runFit()} style={{ ...btnPrimary, marginTop: '.5rem' }}>Retry</button></div>
                   : fitOut ? <FitView out={fitOut} intel={companyIntel} jobCompany={jobCompany} insights={insights} /> : null
+                )}
+
+                {/* DEEP DIVE — Application Intelligence V2 (only present when the engine returns it) */}
+                {tab === 'intel' && (
+                  fitState === 'loading' ? <ResultEmpty icon="⏳" text={'Building your deep match analysis…'} />
+                  : fitOut?.application_intelligence
+                    ? <ApplicationIntelligencePanel pkg={fitOut.application_intelligence} onAnswers={rerunV2WithAnswers} rerunning={v2Rerunning} />
+                    : <ResultEmpty icon="🧬" text={'Run the analysis to see the deep match breakdown.'} />
                 )}
 
                 {/* REWRITE */}
