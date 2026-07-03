@@ -306,12 +306,17 @@ export function IssueRow({ issue, token, onRefresh, onOpenMerge }: { issue: Issu
 
 export function InactiveRow({ report: r, token }: { report: InactiveReport; token: string }) {
   const [acting, setActing] = useState(false)
-  const [done, setDone] = useState<'removed' | 'kept' | null>(null)
+  const [done, setDone] = useState<'removed' | 'kept' | 'dismissed' | null>(null)
   const j = r.job || ({} as NonNullable<InactiveReport['job']>)
   const jobUrl = j.url || j.apply_url || ''
+  // Reports whose job_id isn't a real jobs-table row (ephemeral search-result id, or
+  // an already-gone listing) can't be removed via the listing PATCH — the admin can
+  // only dismiss the report itself.
+  const orphan = !r.job
 
-  async function act(action: 'remove_listing' | 'deny_report') {
+  async function act(action: 'remove_listing' | 'deny_report' | 'dismiss_inactive_report') {
     if (action === 'remove_listing' && !confirm('Remove this job listing? It will be hidden from job seekers.')) return
+    if (action === 'dismiss_inactive_report' && !confirm('Dismiss this report? It will be deleted from the inactive-reports queue.')) return
     setActing(true)
     try {
       const res = await fetch('/api/admin-stats', {
@@ -321,7 +326,7 @@ export function InactiveRow({ report: r, token }: { report: InactiveReport; toke
       })
       const d = await res.json()
       if (!d.ok) throw new Error(d.error || res.status)
-      setDone(action === 'remove_listing' ? 'removed' : 'kept')
+      setDone(action === 'remove_listing' ? 'removed' : action === 'dismiss_inactive_report' ? 'dismissed' : 'kept')
     } catch (e) {
       setActing(false)
       alert('Error: ' + (e as Error).message)
@@ -330,7 +335,7 @@ export function InactiveRow({ report: r, token }: { report: InactiveReport; toke
 
   if (done) return (
     <div style={{ padding: '.5rem 0', borderBottom: '1px solid var(--line2)', fontFamily: 'var(--mono)', fontSize: '.58rem', color: done === 'removed' ? 'var(--green)' : 'var(--dim)' }}>
-      {done === 'removed' ? '✓ Listing removed' : '✓ Marked as still active'}
+      {done === 'removed' ? '✓ Listing removed' : done === 'dismissed' ? '✓ Report dismissed' : '✓ Marked as still active'}
     </div>
   )
 
@@ -338,17 +343,36 @@ export function InactiveRow({ report: r, token }: { report: InactiveReport; toke
     <div style={{ padding: '.7rem 0', borderBottom: '1px solid var(--line2)' }}>
       <div style={{ display: 'flex', alignItems: 'flex-start', gap: '.75rem', flexWrap: 'wrap' }}>
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontFamily: 'var(--mono)', fontSize: '.65rem', color: 'var(--white)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-            {j.title || 'Unknown title'} · <span style={{ color: 'var(--sub)' }}>{j.company || 'Unknown company'}</span>
-          </div>
-          <div style={{ fontFamily: 'var(--mono)', fontSize: '.55rem', color: 'var(--dim)', marginTop: '.15rem' }}>
-            {j.city || ''} · {r.report_count} report{r.report_count === 1 ? '' : 's'} · latest {relTime(r.latest_reported_at)}
-          </div>
-          {jobUrl && <a href={jobUrl} target="_blank" rel="noopener noreferrer" style={{ fontFamily: 'var(--mono)', fontSize: '.55rem', color: 'var(--blue)', textDecoration: 'none', marginTop: '.2rem', display: 'inline-block' }}>↗ Verify listing →</a>}
+          {orphan ? (
+            <>
+              <div style={{ fontFamily: 'var(--mono)', fontSize: '.65rem', color: 'var(--white)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                <span style={{ color: 'var(--sub)' }}>{r.job_id}</span>
+              </div>
+              <div style={{ fontFamily: 'var(--mono)', fontSize: '.55rem', color: 'var(--dim)', marginTop: '.15rem' }}>
+                listing not in the job board (expired or ephemeral search result) · {r.report_count} report{r.report_count === 1 ? '' : 's'} · latest {relTime(r.latest_reported_at)}
+              </div>
+            </>
+          ) : (
+            <>
+              <div style={{ fontFamily: 'var(--mono)', fontSize: '.65rem', color: 'var(--white)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {j.title || 'Unknown title'} · <span style={{ color: 'var(--sub)' }}>{j.company || 'Unknown company'}</span>
+              </div>
+              <div style={{ fontFamily: 'var(--mono)', fontSize: '.55rem', color: 'var(--dim)', marginTop: '.15rem' }}>
+                {j.city || ''} · {r.report_count} report{r.report_count === 1 ? '' : 's'} · latest {relTime(r.latest_reported_at)}
+              </div>
+              {jobUrl && <a href={jobUrl} target="_blank" rel="noopener noreferrer" style={{ fontFamily: 'var(--mono)', fontSize: '.55rem', color: 'var(--blue)', textDecoration: 'none', marginTop: '.2rem', display: 'inline-block' }}>↗ Verify listing →</a>}
+            </>
+          )}
         </div>
         <div style={{ display: 'flex', gap: '.45rem', flexShrink: 0 }}>
-          <button onClick={() => act('remove_listing')} disabled={acting} style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', padding: '.3rem .65rem', borderRadius: 6, border: '1px solid rgba(239,68,68,.4)', background: 'rgba(239,68,68,.08)', color: 'var(--red)', cursor: 'pointer' }}>Remove</button>
-          <button onClick={() => act('deny_report')} disabled={acting} style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', padding: '.3rem .65rem', borderRadius: 6, border: '1px solid var(--line2)', background: 'transparent', color: 'var(--sub)', cursor: 'pointer' }}>Keep active</button>
+          {orphan ? (
+            <button onClick={() => act('dismiss_inactive_report')} disabled={acting} style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', padding: '.3rem .65rem', borderRadius: 6, border: '1px solid var(--line2)', background: 'transparent', color: 'var(--sub)', cursor: 'pointer' }}>Dismiss</button>
+          ) : (
+            <>
+              <button onClick={() => act('remove_listing')} disabled={acting} style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', padding: '.3rem .65rem', borderRadius: 6, border: '1px solid rgba(239,68,68,.4)', background: 'rgba(239,68,68,.08)', color: 'var(--red)', cursor: 'pointer' }}>Remove</button>
+              <button onClick={() => act('deny_report')} disabled={acting} style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', padding: '.3rem .65rem', borderRadius: 6, border: '1px solid var(--line2)', background: 'transparent', color: 'var(--sub)', cursor: 'pointer' }}>Keep active</button>
+            </>
+          )}
         </div>
       </div>
     </div>
