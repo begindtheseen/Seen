@@ -626,7 +626,7 @@ export function MergePanel({ token, prefill }: { token: string; prefill: MergePr
 // downloads it as JSON. Built for legal defensibility + showing exactly how a grade was derived.
 export function CompanyExportPanel({ token }: { token: string }) {
   const [company, setCompany] = useState('')
-  const [busy, setBusy] = useState<'' | 'json' | 'pdf'>('')
+  const [busy, setBusy] = useState<'' | 'json' | 'pdf' | 'package'>('')
   const [status, setStatus] = useState<{ text: string; color: string } | null>(null)
   // Two-step (prepare → download) so the save fires inside the user gesture on iOS. `ready`
   // holds whichever artifact was last prepared (JSON bundle or the legal PDF blob).
@@ -686,6 +686,32 @@ export function CompanyExportPanel({ token }: { token: string }) {
     setBusy('')
   }
 
+  // Legal Audit PACKAGE — a ZIP of the PDF + the exact source JSON + a manifest, all from ONE
+  // bundle so the PDF's printed hash, the JSON's hash, and the manifest all agree. Strongest
+  // legal-defense export (the standalone JSON and PDF stay available above).
+  async function preparePackage() {
+    const name = company.trim()
+    if (name.length < 2) { setStatus({ text: 'Enter a company name', color: 'var(--red)' }); return }
+    setBusy('package'); setReady(null)
+    setStatus({ text: 'Assembling legal audit package…', color: 'var(--dim)' })
+    try {
+      const res = await fetch('/api/admin-company-audit-package', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Admin-Token': token },
+        body: JSON.stringify({ company: name }),
+      })
+      if (!res.ok) { const d = await res.json().catch(() => ({})); throw new Error(d.error || res.status) }
+      const blob = await res.blob()
+      const hash = res.headers.get('X-Source-Json-Sha256') || ''
+      const { slug, date } = slugDate(name)
+      setReady({ filename: `seen-legal-audit-package-${slug}-${date}.zip`, mime: 'application/zip', content: blob, label: 'Package' })
+      setStatus({ text: `✓ Package ready (PDF + source JSON + manifest)${hash ? ` — source SHA-256 ${hash.slice(0, 12)}…` : ''}. Tap Download.`, color: 'var(--green)' })
+    } catch (e) {
+      setStatus({ text: 'Package failed: ' + (e as Error).message, color: 'var(--red)' })
+    }
+    setBusy('')
+  }
+
   function download() {
     if (!ready) return
     // No await before this call — keeps the iOS share sheet inside the user gesture.
@@ -696,7 +722,7 @@ export function CompanyExportPanel({ token }: { token: string }) {
     <Card style={{ marginBottom: '1.25rem' }}>
       <CardHeader title="Company score audit" />
       <div style={{ fontFamily: 'var(--mono)', fontSize: '.55rem', color: 'var(--dim)', marginBottom: '.6rem', lineHeight: 1.5 }}>
-        Full evidentiary record for one company — every contributing &amp; held-out report with its source and trust weight, the per-source aggregation, the live-recomputed grade with all inputs, and the scoring methodology. Submitters are pseudonymized. Export the raw <strong>JSON</strong> bundle, or generate a professional <strong>Legal Audit PDF</strong> (methodology + evidence packet with the source JSON SHA-256 embedded) for a company, attorney, or regulator.
+        Full evidentiary record for one company — every contributing &amp; held-out report with its source and trust weight, the per-source aggregation, the live-recomputed grade with all inputs, and the scoring methodology. Submitters are pseudonymized. Export the raw <strong>JSON</strong> bundle, the professional <strong>Legal Audit PDF</strong> (methodology + evidence packet, source JSON SHA-256 embedded), or the <strong>Legal Audit Package</strong> — a ZIP of the PDF + the exact source JSON + a manifest whose hashes all match (the strongest option for a company, its counsel, an authorized legal representative, or a regulator).
       </div>
       <div style={{ display: 'flex', gap: '.5rem', alignItems: 'flex-end', flexWrap: 'wrap' }}>
         <div style={{ flex: 1, minWidth: 140 }}>
@@ -714,6 +740,9 @@ export function CompanyExportPanel({ token }: { token: string }) {
             </button>
             <button onClick={preparePdf} disabled={!!busy} style={{ fontFamily: 'var(--mono)', fontSize: '.6rem', padding: '.42rem .9rem', borderRadius: 7, border: '1px solid rgba(124,58,237,.4)', background: 'rgba(124,58,237,.12)', color: 'var(--indigo, #a78bfa)', cursor: 'pointer', flexShrink: 0 }}>
               {busy === 'pdf' ? 'Generating…' : 'Generate Legal Audit PDF'}
+            </button>
+            <button onClick={preparePackage} disabled={!!busy} style={{ fontFamily: 'var(--mono)', fontSize: '.6rem', padding: '.42rem .9rem', borderRadius: 7, border: '1px solid rgba(16,185,129,.45)', background: 'rgba(16,185,129,.1)', color: 'var(--green)', cursor: 'pointer', flexShrink: 0 }}>
+              {busy === 'package' ? 'Packaging…' : 'Generate Legal Audit Package'}
             </button>
           </>
         )}

@@ -25,6 +25,8 @@ async function getScore(slug: string): Promise<ScoreRow | null> {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ name }),
       next: { revalidate: 3600 },
+      // Cap the self-fetch so runtime metadata generation can never hang on a slow API.
+      signal: AbortSignal.timeout(8000),
     })
     if (!r.ok) return null
     const d = await r.json()
