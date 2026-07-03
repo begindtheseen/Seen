@@ -1121,6 +1121,33 @@ async function _handler(req, res) {
     return res.status(200).json({ ok: true, deleted: userId });
   }
 
+  // ── set_user_password: EMERGENCY password reset for ANY account (full admins only).
+  //    Uses the Supabase Auth Admin API (service key, server-only). The new password is NEVER
+  //    persisted or logged here — only the audit trail (which admin reset which account, and an
+  //    optional reason) is recorded. The admin relays the new password to the account holder
+  //    out-of-band. This exists so a locked-out user can be recovered without email access. ──
+  if (body.action === 'set_user_password') {
+    if (adminRole === 'moderator') return res.status(403).json({ error: 'Insufficient role' });
+    const userId = String(body.user_id || '').trim();
+    if (!/^[0-9a-f-]{36}$/i.test(userId)) return res.status(400).json({ error: 'Valid user_id required' });
+    const pw = String(body.new_password || '');
+    if (pw.length < 8) return res.status(400).json({ error: 'Password must be at least 8 characters' });
+    if (pw.length > 72) return res.status(400).json({ error: 'Password must be 72 characters or fewer' });
+    // Update the auth password via the GoTrue admin API (same service-key path as delete_user).
+    const upd = await fetch(`${SB}/auth/v1/admin/users/${encodeURIComponent(userId)}`, {
+      method: 'PUT',
+      headers: { apikey: SK, Authorization: `Bearer ${SK}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ password: pw }),
+    });
+    if (!upd.ok) {
+      const t = await upd.text().catch(() => '');
+      return res.status(502).json({ error: `Password reset failed (${upd.status})`, detail: t.slice(0, 160) });
+    }
+    // Audit records WHO reset WHOSE password (+ optional reason) — never the password itself.
+    await db('admin_audit_log', { method: 'POST', body: JSON.stringify({ admin_id: sess.admin_id, username: sess.username || 'admin', action: 'set_user_password', target_type: 'user', target_id: userId, metadata: { reason: String(body.reason || '').slice(0, 200) || null } }), headers: { Prefer: 'return=minimal' } }).catch(() => {});
+    return res.status(200).json({ ok: true, user_id: userId });
+  }
+
   // ── grant_credits: top up a specific account's AI-credit balance (full admins only) ──
   if (body.action === 'grant_credits') {
     if (adminRole === 'moderator') return res.status(403).json({ error: 'Insufficient role' });
