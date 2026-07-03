@@ -53,6 +53,7 @@ type Step =
   | 'loading-resume'
   | 'not-logged-in'
   | 'no-resume'
+  | 'resume-corrupted'
   | 'choose'
   | 'optimizing'
   | 'review'
@@ -238,6 +239,9 @@ export default function ApplyOptimizeModal({
           setStep('choose')
           return
         }
+        // Saved résumé couldn't be read (often a phone PDF that didn't convert to clean text).
+        // Route to a clear recovery step instead of dead-ending on a raw error code.
+        if (e.error === 'RESUME_CORRUPTED') { setStep('resume-corrupted'); return }
         throw new Error(e.error || `Error ${r.status}`)
       }
       const data = await r.json() as OptimizeResult
@@ -523,6 +527,32 @@ export default function ApplyOptimizeModal({
                   }}
                 >
                   Upload resume + optimize →
+                </button>
+                <button style={btnGhost} onClick={applyWithoutOptimize}>Apply without optimizing</button>
+              </div>
+            </>
+          )}
+
+          {/* ── resume-corrupted (saved résumé couldn't be read — recover by re-uploading/pasting) ── */}
+          {step === 'resume-corrupted' && (
+            <>
+              <div style={{ textAlign: 'center', padding: '.5rem 0 1rem' }}>
+                <div style={{ fontSize: '2rem', marginBottom: '.75rem' }}>📄</div>
+                <div style={{ fontFamily: 'var(--display)', fontSize: '.95rem', fontWeight: 700, color: 'var(--white)', marginBottom: '.35rem' }}>We couldn&apos;t read your saved resume</div>
+                <div style={{ fontSize: '.8rem', color: 'var(--sub)', lineHeight: 1.7, marginBottom: '1.25rem' }}>
+                  It didn&apos;t convert to clean text — this is common with resumes exported or scanned on a phone.
+                  Re-upload it (or paste the text) and you&apos;re good to go. Takes 30 seconds.
+                </div>
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '.5rem' }}>
+                <button
+                  style={btnPrimary}
+                  onClick={() => {
+                    onClose()
+                    router.push(`/resume?company=${encodeURIComponent(job.company)}&role=${encodeURIComponent(job.title)}&reupload=1`)
+                  }}
+                >
+                  Re-upload or paste resume →
                 </button>
                 <button style={btnGhost} onClick={applyWithoutOptimize}>Apply without optimizing</button>
               </div>

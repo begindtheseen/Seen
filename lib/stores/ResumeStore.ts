@@ -2,6 +2,7 @@
 
 import { _sync } from '../sync'
 import type { ResumeData } from '../types'
+import { isReadableResume } from '../resumeReadability'
 
 function getKey(userId?: string): string {
   return `seen_resume_${userId || 'guest'}`
@@ -11,10 +12,12 @@ function getMetaKey(userId?: string): string {
   return `seen_resume_meta_${userId || 'guest'}`
 }
 
+// Canonical readability (lib/server/resumeReadability.js via the isomorphic re-export) — the
+// SAME predicate the server's upload / optimize / save_resume gates enforce, so the client can
+// never accept text the server would reject (or vice versa). Length floor kept from before.
 function isReadable(text: string): boolean {
   if (!text || text.length < 50) return false
-  const readable = (text.match(/[A-Za-z][A-Za-z\s]{2,}/g) || []).join('').length
-  return readable / text.length >= 0.4
+  return isReadableResume(text)
 }
 
 export const ResumeStore = {
@@ -41,6 +44,15 @@ export const ResumeStore = {
       try {
         const result = await _sync('load_profile') as { profile?: Record<string, unknown> } | null
         const data = result?.profile
+        // SELF-HEALING: a legacy row saved before the readability gates can hold glyph-code
+        // junk (the cross-device corruption incident). Treat it as no résumé, purge the DB
+        // copy so every device converges to a clean re-upload prompt, and drop the local cache.
+        if (data?.resume_text && !isReadable(data.resume_text as string)) {
+          _sync('clear_resume').catch(() => { /* best-effort purge; load still heals locally */ })
+          localStorage.removeItem(getKey(userId))
+          localStorage.removeItem(getMetaKey(userId))
+          return null
+        }
         if (data?.resume_text) {
           const key = getKey(userId)
           const metaKey = getMetaKey(userId)

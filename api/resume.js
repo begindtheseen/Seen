@@ -6,6 +6,7 @@ import { gateAI } from '../lib/server/credits.js';
 import { runAdvantage, extractEmployment, extractCareerSignal, buildResumeDocument, resumeFileName } from '../lib/server/resumeAnalysis.js';
 import { scannerFromSeenFit, optimizeFromSeenFit } from '../lib/server/seenfitCompat.js';
 import { extractUploadText } from '../lib/server/resumeUpload.js';
+import { isReadableResume } from '../lib/server/resumeReadability.js';
 
 // One-line "Seen data" block from read-only company intel (ghost/response from our
 // scores), or '' when we have no data on the company. This is the differentiator —
@@ -101,16 +102,11 @@ export default async function handler(req, res) {
   try {
     if (!tool) return res.status(400).json({ error: 'Missing tool parameter' });
 
-    // Validate resume text is actually readable before analysing it.
-    if (body.resume !== undefined) {
-      const r = body.resume || '';
-      // Count pure alphabetic words (3+ letters) — catches binary/base64 garbage
-      // which has essentially no real English words, while allowing resumes heavy
-      // with dates, numbers, abbreviations, and medical/technical codes.
-      const wordMatches = r.match(/[A-Za-z]{3,}/g) || [];
-      if (r.length > 100 && wordMatches.length < 20) {
-        return res.status(400).json({ error: 'RESUME_CORRUPTED' });
-      }
+    // Validate resume text is actually readable before analysing it — the CANONICAL check
+    // (lib/server/resumeReadability.js), identical to the upload gate and the DB save gate,
+    // so text that reaches any tool is always text every other layer would also accept.
+    if (body.resume !== undefined && !isReadableResume(body.resume || '')) {
+      return res.status(400).json({ error: 'RESUME_CORRUPTED' });
     }
 
     // ── Deterministic, keyless analysis — no LLM, no API keys, free at scale ──
