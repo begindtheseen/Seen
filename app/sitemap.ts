@@ -15,7 +15,8 @@ async function getCompanyNames(): Promise<string[]> {
   try {
     const r = await fetch(
       `${url}/rest/v1/company_scores?select=company_name&order=report_count.desc&limit=10000`,
-      { headers: { apikey: key, Authorization: `Bearer ${key}` }, next: { revalidate: 3600 } }
+      // AbortSignal.timeout so build-time sitemap generation can never hang on a slow Supabase.
+      { headers: { apikey: key, Authorization: `Bearer ${key}` }, next: { revalidate: 3600 }, signal: AbortSignal.timeout(8000) }
     )
     if (!r.ok) return []
     const rows = await r.json()
