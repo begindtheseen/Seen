@@ -9,6 +9,7 @@ import { extractEmployment } from '../lib/server/resumeAnalysis.js';
 import { buildResumeSurvey, RESUME_SURVEY_KEYS, mapAnswersToReport } from './_utils/resumeSurvey.js';
 import { normalizeCompany, isValidCompanyName, resolveOrCreateCompany, assessSubmitTrust, writeReport, recomputeCompanyScoreFromReports } from './_utils/reportWrite.js';
 import { WELCOME_CREDITS, FREE_DAILY_CREDITS, PRO_DAILY_CREDITS, RESUME_OPTIMIZE_COST, RESUME_SURVEY_AWARD, TRACK_APPLICATION_AWARD, MAX_DAILY_EARN, MAX_FREE_BALANCE } from '../lib/server/creditRules.js';
+import { isReadableResume } from '../lib/server/resumeReadability.js';
 
 // Verify a Supabase JWT locally (HS256) — no network round-trip.
 // Returns the payload (with .sub = user UUID) on success, null on failure.
@@ -279,6 +280,13 @@ export default async function handler(req, res) {
   // ── SAVE RESUME — upsert so it works even if profile row doesn't exist yet ──
   if (action === 'save_resume') {
     const { text, fileName, wordCount } = body;
+    // AUTHORITATIVE readability gate: unreadable text (glyph codes, binary spill) must NEVER
+    // reach profiles.resume_text — the DB is the source of truth for signed-in users, so one
+    // poisoned save corrupts the résumé on EVERY device (the 2026-07-03 cross-device incident).
+    // Same canonical predicate as the upload + optimize gates (lib/server/resumeReadability.js).
+    if (text && !isReadableResume(text)) {
+      return res.status(400).json({ ok: false, error: 'RESUME_UNREADABLE' });
+    }
     const r = await db('profiles?on_conflict=id', {
       method: 'POST',
       body: JSON.stringify({
