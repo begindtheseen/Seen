@@ -1,11 +1,15 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
-import { getScore, getLeaderboard, titleCase, slugify } from '@/lib/growth'
-import ComparePicker from './ComparePicker'
-import CompareView from './CompareView'
+import { Suspense } from 'react'
+import { getLeaderboard, titleCase, slugify } from '@/lib/growth'
+import ComparePicker, { CompareQuery } from './ComparePicker'
 
-// Compare tool landing. Pick two companies (or pass ?a=&b=) → side-by-side real hiring data.
-// Suggests real high-volume matchups from the leaderboard for instant internal linking.
+// Compare tool landing — fully STATIC (revalidated hourly). This server component must never
+// read searchParams: `await searchParams` on a revalidated page is a dynamic-usage error that
+// fails/wedges `next build` static generation. Query handling for the old ?a=&b= deep links
+// lives in the CLIENT ComparePicker (useSearchParams inside the Suspense boundary below):
+// one param prefills the picker; both params redirect to the canonical SEO route
+// /compare/[a]-vs-[b], which remains the real comparison page.
 
 export const revalidate = 3600
 
@@ -20,17 +24,8 @@ export const metadata: Metadata = {
 
 const wrap = { maxWidth: 760, margin: '0 auto', padding: '3.5rem 1.25rem 5rem', width: '100%', boxSizing: 'border-box' as const }
 
-export default async function ComparePage({ searchParams }: { searchParams: Promise<{ a?: string; b?: string }> }) {
-  const sp = await searchParams
-  const aRaw = (sp.a || '').trim()
-  const bRaw = (sp.b || '').trim()
-  const hasBoth = aRaw && bRaw
-
-  const [a, b, board] = await Promise.all([
-    hasBoth ? getScore(aRaw) : Promise.resolve(null),
-    hasBoth ? getScore(bRaw) : Promise.resolve(null),
-    getLeaderboard(),
-  ])
+export default async function ComparePage() {
+  const board = await getLeaderboard()
 
   // Real, interesting matchups: pair adjacent leaderboard companies in the same industry-ish band.
   const top = board.slice(0, 12)
@@ -53,13 +48,12 @@ export default async function ComparePage({ searchParams }: { searchParams: Prom
           Two companies, head to head — ghost rate, response rate, average wait, and Seen Grade, all from real applicant reports. Pick where your application actually has a chance.
         </p>
 
-        <ComparePicker initialA={hasBoth ? titleCase(aRaw) : ''} initialB={hasBoth ? titleCase(bRaw) : ''} />
+        {/* useSearchParams lives in CompareQuery — the Suspense boundary keeps this page static. */}
+        <Suspense fallback={<ComparePicker />}>
+          <CompareQuery />
+        </Suspense>
 
-        {hasBoth && (
-          <CompareView aName={titleCase(aRaw)} a={a} bName={titleCase(bRaw)} b={b} />
-        )}
-
-        <div style={{ marginTop: hasBoth ? '3rem' : '0' }}>
+        <div>
           <div style={{ fontFamily: 'var(--mono)', fontSize: '.55rem', textTransform: 'uppercase', letterSpacing: '.12em', color: 'var(--blue)', marginBottom: '1rem', paddingBottom: '.5rem', borderBottom: '1px solid var(--line)' }}>
             Popular matchups
           </div>

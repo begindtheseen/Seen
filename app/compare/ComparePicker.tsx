@@ -1,9 +1,27 @@
 'use client'
 
-import { useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useEffect, useState } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 
 const slugify = (s: string) => s.toLowerCase().trim().replace(/[^a-z0-9\s-]/g, '').replace(/\s+/g, '-').replace(/-+/g, '-')
+
+// Query-param handler for the old /compare?a=&b= deep links — kept CLIENT-side so the /compare
+// server page stays fully static (reading searchParams server-side was a dynamic-usage build
+// failure). One param prefills the picker; both params redirect to the canonical
+// /compare/[a]-vs-[b] SEO page. Must render inside a <Suspense> boundary (useSearchParams).
+export function CompareQuery() {
+  const router = useRouter()
+  const sp = useSearchParams()
+  const a = (sp.get('a') || '').trim()
+  const b = (sp.get('b') || '').trim()
+  useEffect(() => {
+    if (a && b) {
+      const sa = slugify(a), sb = slugify(b)
+      if (sa && sb) router.replace(`/compare/${sa}-vs-${sb}`)
+    }
+  }, [a, b, router])
+  return <ComparePicker initialA={a} initialB={b} />
+}
 
 // Two-company picker. On submit, routes to the canonical /compare/[a]-vs-[b] SEO page.
 export default function ComparePicker({ initialA = '', initialB = '' }: { initialA?: string; initialB?: string }) {
