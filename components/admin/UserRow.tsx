@@ -121,8 +121,8 @@ export function UserRow({ r, token, onDeleted, ts }: { r: Record<string, unknown
         <button onClick={() => setShowModal(true)} title="Permanently delete this user and all their data" style={{ background: 'none', border: '1px solid rgba(239,68,68,.35)', borderRadius: 5, color: 'var(--red)', fontFamily: 'var(--mono)', fontSize: '.55rem', padding: '.28rem .55rem', cursor: 'pointer', whiteSpace: 'nowrap' }}>🗑 Delete</button>
       </div>
       {showPw && (
-        <div onClick={closePw} onKeyDown={e => { if (e.key === 'Escape') closePw() }} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '1rem' }}>
-          <div onClick={e => e.stopPropagation()} style={{ background: 'var(--card)', border: '1px solid var(--line2)', borderRadius: 10, padding: '1.1rem 1.2rem', maxWidth: 420, width: '100%', boxSizing: 'border-box' }}>
+        <div onClick={closePw} onKeyDown={e => { if (e.key === 'Escape') closePw() }} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.72)', backdropFilter: 'blur(3px)', WebkitBackdropFilter: 'blur(3px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '1rem' }}>
+          <div onClick={e => e.stopPropagation()} style={{ background: 'var(--surface)', border: '1px solid var(--line2)', borderRadius: 10, boxShadow: '0 24px 64px rgba(0,0,0,.7)', padding: '1.1rem 1.2rem', maxWidth: 420, width: '100%', boxSizing: 'border-box' }}>
             {!pwDone ? (
               <>
                 <div style={{ fontFamily: 'var(--mono)', fontSize: '.72rem', color: 'var(--blue)', fontWeight: 700, marginBottom: '.5rem' }}>Emergency password reset</div>
@@ -161,8 +161,8 @@ export function UserRow({ r, token, onDeleted, ts }: { r: Record<string, unknown
         </div>
       )}
       {showModal && (
-        <div onClick={closeModal} onKeyDown={e => { if (e.key === 'Escape') closeModal() }} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '1rem' }}>
-          <div onClick={e => e.stopPropagation()} style={{ background: 'var(--card)', border: '1px solid var(--line2)', borderRadius: 10, padding: '1.1rem 1.2rem', maxWidth: 380, width: '100%' }}>
+        <div onClick={closeModal} onKeyDown={e => { if (e.key === 'Escape') closeModal() }} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.72)', backdropFilter: 'blur(3px)', WebkitBackdropFilter: 'blur(3px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '1rem' }}>
+          <div onClick={e => e.stopPropagation()} style={{ background: 'var(--surface)', border: '1px solid var(--line2)', borderRadius: 10, boxShadow: '0 24px 64px rgba(0,0,0,.7)', padding: '1.1rem 1.2rem', maxWidth: 380, width: '100%' }}>
             <div style={{ fontFamily: 'var(--mono)', fontSize: '.72rem', color: 'var(--red)', fontWeight: 700, marginBottom: '.5rem' }}>Delete account</div>
             <p style={{ fontSize: '.68rem', color: 'var(--sub)', lineHeight: 1.5, margin: '0 0 .8rem' }}>
               This permanently deletes the account, applications, saved jobs, and credits. Reports and survey intel they contributed are kept and anonymized.

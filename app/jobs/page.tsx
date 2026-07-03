@@ -61,7 +61,7 @@ export default function JobsPage() {
   }
 
   const inputStyle: React.CSSProperties = {
-    flex: 1, minWidth: 160,
+    flex: 1, minWidth: 130,
     background: 'var(--surface)',
     border: '1.5px solid var(--line2)',
     borderRadius: 8,
@@ -114,7 +114,7 @@ export default function JobsPage() {
               onKeyDown={e => { if (e.key === 'Enter') { if (debounceRef.current) clearTimeout(debounceRef.current); searchJobs() } }}
               style={inputStyle}
             />
-            <div style={{ position: 'relative', flex: 1, minWidth: 160 }}>
+            <div style={{ position: 'relative', flex: 1, minWidth: 130 }}>
               <input
                 type="text"
                 placeholder="City or state..."

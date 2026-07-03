@@ -334,7 +334,7 @@ nav.nav-scrolled{background:rgba(6,6,8,0.82);backdrop-filter:blur(60px) saturate
 .diff-winner{display:inline-flex;align-items:center;font-family:var(--mono);font-size:.6rem;background:var(--bdim);color:var(--blue);border:1px solid var(--bmid);padding:.2rem .6rem;border-radius:4px;margin-top:.85rem}
 
 /* ═══ JOBS PAGE ═══ */
-.jpage{max-width:1300px;margin:0 auto;padding:2.5rem 2rem}
+.jpage{max-width:1300px;margin:0 auto;padding:2.5rem 2rem;overflow-x:clip}
 .jpage-hdr{margin-bottom:1.75rem}
 .jpage-hdr h1{font-family:var(--display);font-size:2rem;font-weight:800;color:var(--white);letter-spacing:-.03em;margin-bottom:.28rem}
 .jpage-hdr p{color:var(--sub);font-size:.82rem;font-weight:300}
@@ -353,9 +353,15 @@ nav.nav-scrolled{background:rgba(6,6,8,0.82);backdrop-filter:blur(60px) saturate
 .rng label{font-size:.75rem;color:var(--sub);display:flex;justify-content:space-between;margin-bottom:.2rem}
 .rng label span{font-family:var(--mono);color:var(--blue)}
 .rng input{width:100%;accent-color:var(--blue)}
-.jtb{display:flex;align-items:center;justify-content:space-between;margin-bottom:.85rem}
+.jtb{display:flex;align-items:center;justify-content:space-between;gap:.5rem;flex-wrap:wrap;margin-bottom:.85rem}
 .jct{font-family:var(--mono);font-size:.68rem;color:var(--muted)}
-.jss{background:var(--card);border:1px solid var(--line2);border-radius:6px;padding:.33rem .68rem;font-family:var(--mono);font-size:.68rem;color:var(--sub);outline:none;cursor:pointer}
+.jss{background:var(--card);border:1px solid var(--line2);border-radius:6px;padding:.33rem .68rem;font-family:var(--mono);font-size:.68rem;color:var(--sub);outline:none;cursor:pointer;max-width:100%}
+/* Jobs page — tighter gutters on phones so cards, the score ring, and the toolbar never clip. */
+@media(max-width:640px){
+  .jpage{padding:1.5rem 1rem}
+  .jlc{padding:1rem 1.05rem}
+  .jlc-title{word-break:break-word}
+}
 .jlist{border:1px solid var(--line);border-radius:12px;overflow:hidden}
 .jlc{display:flex;flex-direction:column;padding:1.05rem 1.3rem;border-bottom:1px solid var(--line);cursor:pointer;transition:all 0.18s ease;position:relative}
 .jlc:last-child{border-bottom:none}
