@@ -5,7 +5,10 @@
   "type": "module",
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build": "next build --experimental-build-mode=compile && next build --experimental-build-mode=generate",
+    "build:default": "next build",
+    "build:compile": "next build --experimental-build-mode=compile",
+    "build:generate": "next build --experimental-build-mode=generate",
     "start": "next start",
     "test": "node --test --test-reporter=spec \"**/*.test.mjs\""
   },
