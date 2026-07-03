@@ -64,7 +64,14 @@ test('delete_listing soft-deletes the job and clears its reports', async () => {
 
   const jobPatch = calls.find(c => c.url.includes('/jobs?id=eq') && c.method === 'PATCH');
   assert.ok(jobPatch, 'issues a jobs PATCH');
-  assert.match(jobPatch.body, /"availability_status":"removed"/);
+  // Must EXPIRE the listing: 'expired' is the only CHECK-valid status ('removed' would 400),
+  // and setting expires_at=now() is what actually drops it from the user search (which gates
+  // on expires_at>now, not availability_status).
+  assert.match(jobPatch.body, /"availability_status":"expired"/, 'uses a CHECK-valid status, not the invalid "removed"');
+  assert.doesNotMatch(jobPatch.body, /"removed"/, 'never writes the constraint-violating "removed"');
+  const patched = JSON.parse(jobPatch.body);
+  assert.ok(patched.expires_at, 'sets expires_at so the listing actually leaves the search');
+  assert.ok(new Date(patched.expires_at).getTime() <= Date.now() + 1000, 'expires_at is now/past → excluded by expires_at>now filter');
 
   const reportDelete = calls.find(c => c.url.includes('/job_availability_reports?job_id=eq') && c.method === 'DELETE');
   assert.ok(reportDelete, 'deletes the availability reports');
