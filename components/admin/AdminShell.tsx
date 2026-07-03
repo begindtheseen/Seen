@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import type { AdminStats, AttnItem, MergePrefill } from './types'
 import { Panel, MetricRow, Card, CardHeader, Badge, BarChart, relTime, outcomeColor, stageColor, runRefreshAndClear, refreshResultMsg } from './primitives'
 import { AdminHero, AdminCommandCenter, AdminMetricCard, CardSubLink, AdminAttentionQueue, AdminTabs, type HealthStatus, type TabKey } from './overview'
@@ -28,10 +28,26 @@ export function AdminShell({ stats, token, reload, onLogout, onUnauthorized }: {
   function openKpi(metric: string, title: string) { setKpiModal({ metric, title }) }
   function openManage(f: 'all' | 'pro' | 'free') { setManageFilter(f); setManageOpen(true) }
   // Jump from the top attention alert to the reported-listings section (in the Jobs tab).
-  function goToReportedListings() {
-    setTab('jobs')
-    setTimeout(() => document.getElementById('reported-listings-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 60)
+  // The section only exists in the DOM after the Jobs tab renders, so we can't scroll on a
+  // fixed timer (it fires before layout and lands short — "scroll down a little to find it").
+  // Instead we flag a pending scroll and perform it in an effect, once the Jobs tab has
+  // committed and painted.
+  const [pendingReportScroll, setPendingReportScroll] = useState(false)
+  function scrollToReportedListings() {
+    document.getElementById('reported-listings-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
   }
+  function goToReportedListings() {
+    if (tab === 'jobs') { scrollToReportedListings(); return } // already there — scroll now
+    setTab('jobs')
+    setPendingReportScroll(true)
+  }
+  useEffect(() => {
+    if (!pendingReportScroll || tab !== 'jobs') return
+    // Wait for the just-committed Jobs tab to lay out before measuring the scroll target.
+    const raf = requestAnimationFrame(() => requestAnimationFrame(scrollToReportedListings))
+    setPendingReportScroll(false)
+    return () => cancelAnimationFrame(raf)
+  }, [pendingReportScroll, tab])
 
   // Fetches the CSV payload; the actual save happens in CsvDownloadButton's
   // click handler (user-gesture-safe for iOS). Returns null on any failure.
@@ -208,7 +224,7 @@ export function AdminShell({ stats, token, reload, onLogout, onUnauthorized }: {
             <JobDedupePanel token={token} />
 
             {/* Reported listings — investigate & act (delete listing / dismiss report) */}
-            <div id="reported-listings-section" style={{ scrollMarginTop: '0.75rem' }}>
+            <div id="reported-listings-section" style={{ scrollMarginTop: '1.25rem' }}>
             <Card style={{ marginTop: '.65rem' }}>
               <CardHeader
                 title="Reported listings"
