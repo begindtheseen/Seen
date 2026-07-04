@@ -21,6 +21,23 @@ and dashboard (PRs #122/#123) were intentionally REDESIGNED beyond the old site;
 longer the design source of truth for redesigned pages. `SITE_PARITY_CHECKLIST.md` /
 `ADMIN_PARITY_CHECKLIST.md` are frozen pre-06-30 records, not an active work queue.
 
+## Session 2026-07-04 (OPERATION 50%): growth plan approved — business decisions LOCKED
+
+The owner approved the "Operation 50%" growth plan (target: ≥50% probability of $1–5k MRR
+in 24–36 months via FOUR parallel revenue engines + weekly cadence + kill-gates). The full
+plan and evidence live in the probability-assessment report + `playbook/` (weekly routine,
+outreach scripts, content engine, 90-day calendar). **Locked owner decisions (rule 6 —
+do NOT relitigate or unwind):** 7-day NO-CARD trial (rebuild approved) · one-time SKUs
+(Interview Sprint $14.99 = +30 credits + 7-day Pro via `ai_credits.pro_until`; Credit Pack
+$4.99 = +20 credits) · PostHog analytics (`NEXT_PUBLIC_POSTHOG_KEY`, no-op without key) ·
+Resend outcome emails (`RESEND_API_KEY`) · beachhead niche = staffing-agency-ghosted /
+r/recruitinghell audience with the Staffing Agency Ghost Index (/agencies) as hero asset ·
+employer-side revenue (featured listings, sponsorships, Transparency Verified badge —
+money NEVER changes a score). Prior context: 2026-07-03 shipped listing-score integrity
+(#144), legal-audit source inventory (#145), Application Intelligence V2 (#146, industry-
+agnostic), admin rescore endpoint (#147), V2 UI (#148), reported-listings admin (#149,
+delete fixed in #150), admin jump fix (#151), instant autocomplete (#152).
+
 ## Session 2026-07-02 C (PR #127): conversion pass + jobs-page extraction (all facts verified)
 
 Owner decisions taken this session (rule 6 — decided BEFORE building):
