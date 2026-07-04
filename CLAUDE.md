@@ -41,11 +41,11 @@ delete fixed in #150), admin jump fix (#151), instant autocomplete (#152).
 ## Session 2026-07-02 C (PR #127): conversion pass + jobs-page extraction (all facts verified)
 
 Owner decisions taken this session (rule 6 — decided BEFORE building):
-- **Free tier = 3 AI credits/day.** Code had reset to 1 (migration 031) while every copy
-  surface promised 3. All daily-reset baselines now 3: api/user-sync.js (load, get_credits,
-  earn_credit, submit_answer, credit_history, resume_survey, and consume_credit's inline
-  reset-then-deduct → 2) + lib/server/credits.js. DB DEFAULT intentionally untouched —
-  resets converge in code within a day.
+- **Free tier = 3 AI credits/day.** ⚠ SUPERSEDED — the CURRENT owner decision is **1/day**
+  (see `lib/server/creditRules.js` FREE_DAILY_CREDITS = 1 and `app/pricing/page.tsx`'s
+  "owner decision 2026-07-02" comment; all copy renders from the constant, and migration
+  031/044's RPC resets to 1). Do NOT "restore" 3/day from this stale note.
+  <s>Original note: code had reset to 1 while copy promised 3; baselines were set to 3.</s>
 - **"Stealth Mode" is renamed "Human Voice" in ALL UI strings** (authenticity framing —
   never use evade/bypass/detection language). The `stealth` API field, code identifiers,
   and the separate HumanProof feature keep their names. Do not reintroduce "Stealth" copy.
