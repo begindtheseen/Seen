@@ -11,8 +11,7 @@ import SwipeJobDeck from '@/components/jobs/SwipeJobDeck'
 import JobFilters from '@/components/jobs/JobFilters'
 import ApplyCheckpoint from '@/components/ApplyCheckpoint'
 import ApplyOptimizeModal from '@/components/ApplyOptimizeModal'
-
-const US_CITIES = ['New York, NY','Los Angeles, CA','Chicago, IL','Houston, TX','Phoenix, AZ','San Antonio, TX','San Diego, CA','Dallas, TX','San Jose, CA','Austin, TX','Seattle, WA','Denver, CO','Boston, MA','Atlanta, GA','Miami, FL','Portland, OR','Las Vegas, NV','San Francisco, CA','Washington, DC','Charlotte, NC','Nashville, TN','Minneapolis, MN','Raleigh, NC','Detroit, MI','Sacramento, CA']
+import { matchCities } from '@/lib/data/usCities'
 
 export default function JobsPage() {
   const router = useRouter()
@@ -123,7 +122,7 @@ export default function JobsPage() {
                   const val = e.target.value
                   setLocation(val)
                   if (val.length >= 2) {
-                    setLocSuggs(US_CITIES.filter(c => c.toLowerCase().includes(val.toLowerCase())).slice(0, 6))
+                    setLocSuggs(matchCities(val, 6))
                     setShowLocSuggs(true)
                   } else {
                     setShowLocSuggs(false)

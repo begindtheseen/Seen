@@ -1,11 +1,12 @@
 'use client'
 
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/lib/auth'
 import { _sync } from '@/lib/sync'
 import { aiHeaders } from '@/lib/aiHeaders'
+import { matchCities } from '@/lib/data/usCities'
 
 const inp: React.CSSProperties = {
   width: '100%',
@@ -102,7 +103,6 @@ export default function ProfilePage() {
   // City autocomplete
   const [citySuggs, setCitySuggs] = useState<LocResult[]>([])
   const [showCitySuggs, setShowCitySuggs] = useState(false)
-  const cityTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const cityContainerRef = useRef<HTMLDivElement>(null)
 
   // Password change (send-link flow)
@@ -184,30 +184,14 @@ export default function ProfilePage() {
     return () => document.removeEventListener('mousedown', handle)
   }, [])
 
-  const fetchCitySuggs = useCallback(async (q: string) => {
-    if (q.length < 3) { setCitySuggs([]); setShowCitySuggs(false); return }
-    try {
-      const r = await fetch(
-        `https://nominatim.openstreetmap.org/search?format=json&countrycodes=us&limit=6&q=${encodeURIComponent(q)}&addressdetails=1`,
-        { headers: { 'Accept-Language': 'en-US', 'User-Agent': 'seenjobs.io' } }
-      )
-      if (!r.ok) return
-      const data = await r.json() as Array<{ address: Record<string, string>; display_name: string }>
-      const results: LocResult[] = data.map(d => {
-        const c = d.address?.city || d.address?.town || d.address?.village || ''
-        const s = d.address?.state || ''
-        const display = c && s ? `${c}, ${s}` : d.display_name.split(',').slice(0, 2).join(',').trim()
-        return { display }
-      })
-      setCitySuggs(results)
-      setShowCitySuggs(results.length > 0)
-    } catch { /* ignore */ }
-  }, [])
-
+  // Instant, offline city suggestions — filters the bundled US_CITIES list locally instead of
+  // hitting a slow public geocoder (Nominatim) on every keystroke.
   function onCityInput(val: string) {
     setCity(val)
-    if (cityTimerRef.current) clearTimeout(cityTimerRef.current)
-    cityTimerRef.current = setTimeout(() => fetchCitySuggs(val), 350)
+    if (val.trim().length < 2) { setCitySuggs([]); setShowCitySuggs(false); return }
+    const results: LocResult[] = matchCities(val, 6).map(display => ({ display }))
+    setCitySuggs(results)
+    setShowCitySuggs(results.length > 0)
   }
 
   async function saveProfile() {
