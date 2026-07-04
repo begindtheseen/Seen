@@ -7,7 +7,32 @@ owner controls). Implement once the prerequisite decision is made.
 
 ---
 
-## 1. 7-day free trial — ❌ REMOVED (built #86, deleted #93) — rebuild only on a fresh owner decision
+## ⚡ OPERATION 50% DECISIONS — LOCKED BY OWNER 2026-07-04 (approved plan)
+
+The owner approved the "Operation 50%" plan on 2026-07-04. The following are now
+**settled business decisions** (rule 6 satisfied — decide once, build once):
+
+1. **7-day NO-CARD free trial — APPROVED, rebuild.** Variant: `payment_method_collection:
+   'if_required'` + `trial_settings.end_behavior.missing_payment_method: 'cancel'`.
+   Revisit card-required only at meaningful traffic volume.
+2. **One-time SKUs — APPROVED.** "Interview Sprint" $14.99 (+30 credits + 7-day Pro via
+   new `ai_credits.pro_until`), "Credit Pack" $4.99 (+20 credits). Inline `price_data`,
+   fulfilled in the `checkout.session.completed` webhook.
+3. **Analytics — DECIDED: PostHog** (free tier). Key-activated via `NEXT_PUBLIC_POSTHOG_KEY`;
+   code no-ops without it. Closes item 2 below.
+4. **Email — DECIDED: Resend** for the Day-7/14/30 outcome loop. Key-activated via
+   `RESEND_API_KEY`; owner does the one-time domain DNS verification.
+5. **Beachhead niche — DECIDED:** staffing-agency-ghosted + entry-level/service seekers
+   (r/recruitinghell audience). Hero asset: the Staffing Agency Ghost Index (/agencies).
+6. **Employer-side revenue — APPROVED to build:** featured listings, niche sponsorships,
+   "Transparency Verified" badge (verified against outcome data; money NEVER changes a score).
+
+Operating manual: `playbook/` (weekly routine, outreach scripts, content engine, 90-day
+calendar with kill/scale gates).
+
+---
+
+## 1. 7-day free trial — ✅ DECISION MADE 2026-07-04, no-card variant (see Operation 50% block) — was: ❌ REMOVED (built #86, deleted #93)
 **Status correction (2026-07-02, verified against code):** the trial described below was built
 in PR #86, patched (#89), rebuilt (#90), and **deleted in PR #93** in the same day because the
 business decision wasn't settled first (see CLAUDE.md mandatory rule 6 — this feature is the
