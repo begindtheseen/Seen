@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from 'next'
 import { AuthProvider } from '@/lib/auth'
+import AnalyticsProvider from '@/components/AnalyticsProvider'
 import Nav from '@/components/Nav'
 import Footer from '@/components/Footer'
 import IntroSplash from '@/components/IntroSplash'
@@ -59,6 +60,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             IntroSplash removes it as soon as it mounts. */}
         <div id="intro-guard" aria-hidden="true" style={{ position: 'fixed', inset: 0, zIndex: 2147483646, background: '#02040a' }} />
         <AuthProvider>
+          <AnalyticsProvider />
           <IntroSplash />
           {/* Global aurora background orbs — renders on all pages */}
           <div className="aurora" aria-hidden="true">

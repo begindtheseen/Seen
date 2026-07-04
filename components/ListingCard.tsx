@@ -5,6 +5,7 @@
 // No shared kit — parity with the proven outcome card.
 
 import { useEffect, useState, useRef } from 'react'
+import { track } from '@/lib/analytics'
 
 export interface ListingCardData {
   title: string
@@ -165,6 +166,7 @@ export default function ListingCard({ data, onClose }: { data: ListingCardData; 
         const canvas = await drawCard(data)
         setDataUrl(canvas.toDataURL('image/png'))
         canvas.toBlob(b => { if (b) setBlob(b) }, 'image/png')
+        track('card_generated', { card_type: 'listing', rated })
       } catch { /* leave preview in loading state */ }
     }
     run()
@@ -195,16 +197,23 @@ export default function ListingCard({ data, onClose }: { data: ListingCardData; 
       window.open(`https://www.linkedin.com/feed/?shareActive=true&text=${encodeURIComponent(shareText + '\n\nseenjobs.io')}`, '_blank', 'noopener')
     }
 
+    // Method reflects how the image actually travelled: native share sheet, plain
+    // download, or the destination whose composer we opened above. A dismissed
+    // native sheet with no destination window opened is not a share — don't count it.
+    let method: string | null = dest === 'download' ? 'download' : dest
     const fileName = `seen_listing_${(data.company || 'c').replace(/[^a-z0-9]/gi, '_')}_${Date.now()}.png`
     if (blob && navigator.share && navigator.canShare?.({ files: [new File([blob], fileName, { type: 'image/png' })] })) {
       try {
         await navigator.share({ files: [new File([blob], fileName, { type: 'image/png' })] })
+        method = 'native_share'
       } catch (e) {
         if ((e as Error).name !== 'AbortError') download()
+        else if (dest === 'download') method = null
       }
     } else if (dest === 'download') {
       download()
     }
+    if (method) track('card_shared', { card_type: 'listing', method, destination: dest, rated })
 
     if (dest !== 'download') setTimeout(onClose, 400)
   }

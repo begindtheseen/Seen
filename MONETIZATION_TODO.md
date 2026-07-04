@@ -71,11 +71,17 @@ Stealth Mode, HumanProof).
 Lets you see paywall-view → checkout-start → paid drop-off per trigger context
 (credits vs pro vs generic) and per plan (monthly vs yearly).
 
-**Why it's an owner decision:** Needs a tool + keys (e.g. PostHog, Plausible, or GA4) and a
-privacy/consent decision. No analytics dependency or key currently exists in the repo.
+**Status (2026-07-04): FOUNDATION BUILT — Operation 50% wave 1.** Owner approved PostHog.
+- `lib/analytics.ts` exists (posthog-js wrapper: `initAnalytics`/`track`/`identify`/`reset`;
+  silent no-op when `NEXT_PUBLIC_POSTHOG_KEY` is unset, so CI/previews need zero config).
+- `components/AnalyticsProvider.tsx` is wired into `app/layout.tsx`: SPA `$pageview` on
+  route change + `identify(user.id)` on sign-in / `reset()` on sign-out via `useAuth()`.
+- Viral-loop events instrumented: `card_generated` + `card_shared` in
+  `components/OutcomeCard.tsx`, `components/ListingCard.tsx`, `components/CompanyScoreCard.tsx`.
+- OWNER ACTION: add `NEXT_PUBLIC_POSTHOG_KEY` (and optionally `NEXT_PUBLIC_POSTHOG_HOST`,
+  default `https://us.i.posthog.com`) in Vercel env settings. Events no-op until then.
 
-**Files involved:**
-- A new `lib/analytics.ts` client wrapper + env keys (e.g. `NEXT_PUBLIC_POSTHOG_KEY`).
+**Remaining (wave 2 — funnel instrumentation via `track()` from `lib/analytics.ts`):**
 - Instrument `components/UpgradeModal.tsx` (`paywall_viewed`, `plan_selected`,
   `checkout_started`), `app/pricing/page.tsx`, and the 402 paths in
   `components/ApplyOptimizeModal.tsx` / `components/HumanProofPanel.tsx` / `app/resume/page.tsx`.
