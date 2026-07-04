@@ -6,6 +6,7 @@ import { useAuth } from '@/lib/auth'
 import { AppStore } from '@/lib/stores/AppStore'
 import HiringProbability from '@/components/HiringProbability'
 import CompanyScoreCard from '@/components/CompanyScoreCard'
+import { isRedditSourced, PUBLIC_DISCUSSION_LABEL } from '@/lib/reportSource'
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -969,6 +970,9 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
                         <div className="rc-footer">
                           <span style={{ fontFamily: 'var(--mono)', fontSize: '.56rem', color: 'var(--muted)' }}>via</span>
                           <span className="vibe v-n" style={{ fontSize: '.55rem' }}>{r.platform || 'Seen'}</span>
+                          {isRedditSourced(r.platform) && (
+                            <span className="vibe v-n" style={{ fontSize: '.55rem', borderStyle: 'dashed', color: 'var(--dim)' }} title="Imported from a public Reddit thread, not submitted directly to Seen">{PUBLIC_DISCUSSION_LABEL}</span>
+                          )}
                         </div>
                       </div>
                     ))}

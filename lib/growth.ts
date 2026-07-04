@@ -165,6 +165,51 @@ export async function getLeaderboard(): Promise<LeaderboardRow[]> {
   return leaderboardFromDb()
 }
 
+// Batch score lookup by EXACT stored names (company_scores stores names trim().toLowerCase()).
+// One PostgREST in.() read — same direct-from-Supabase, timeout-guarded pattern as the helpers
+// above (never a self-fetch of the live API). Returns a map keyed by the stored company_name;
+// when a company has multiple score rows, the most recent one wins. Names that don't match
+// return nothing — callers treat that as "no data", never as a reason to guess.
+export async function getScoresByNames(namesLower: string[]): Promise<Map<string, LeaderboardRow>> {
+  const out = new Map<string, LeaderboardRow>()
+  const creds = sbCreds()
+  if (!creds || !namesLower.length) return out
+  const headers = { apikey: creds.key, Authorization: `Bearer ${creds.key}` }
+  // in.() values are double-quoted (names contain spaces / "/"), then the whole list is
+  // URI-encoded. None of our curated names contain a double quote.
+  const list = encodeURIComponent(`(${namesLower.map(n => `"${n.trim().toLowerCase()}"`).join(',')})`)
+  const sel = 'select=company_name,overall_score,ghost_rate,response_rate,avg_wait_days,waste_score,report_count,verification_status,industry,created_at'
+  try {
+    const r = await fetch(
+      `${creds.url}/rest/v1/company_scores?company_name=in.${list}&${sel}&order=created_at.desc&limit=200`,
+      { headers, signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) },
+    )
+    if (!r.ok) return out
+    const rows = await r.json()
+    for (const c of Array.isArray(rows) ? rows : []) {
+      if (!c?.company_name || out.has(c.company_name)) continue // created_at.desc → first row per name is newest
+      const s = c.overall_score || 0
+      out.set(c.company_name, {
+        name: c.company_name,
+        industry: c.industry || '',
+        verified: c.verification_status === 'verified',
+        score: {
+          overall_score: s,
+          ghost_rate: c.ghost_rate || 0,
+          response_rate: c.response_rate || 0,
+          avg_wait_days: c.avg_wait_days || 0,
+          report_count: c.report_count || 0,
+          risk_level: s >= 70 ? 'safe' : s >= 40 ? 'warn' : 'danger',
+          waste: c.waste_score || 0,
+        },
+      })
+    }
+    return out
+  } catch {
+    return out
+  }
+}
+
 // Top long-tail companies seeded for static generation (FAQ pages). These are the names people
 // actually type into Google / Reddit ("does <x> ghost applicants"). Real data is fetched per page;
 // this is only the static-params seed list — other companies render on-demand.
