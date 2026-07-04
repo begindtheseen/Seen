@@ -4,7 +4,7 @@ import { useState, useEffect, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useAuth } from '@/lib/auth'
 import { aiHeaders } from '@/lib/aiHeaders'
-import { FREE_DAILY_CREDITS, WELCOME_CREDITS, MAX_DAILY_EARN } from '@/lib/creditRules'
+import { FREE_DAILY_CREDITS, WELCOME_CREDITS, MAX_DAILY_EARN, PRO_TRIAL_DAYS, ONE_TIME_SKUS } from '@/lib/creditRules'
 
 // UI copy is generated from the SAME constants the server enforces — never a hand-typed
 // number that drifts. Free tier is 1 AI credit/day (owner decision 2026-07-02).
@@ -17,6 +17,11 @@ const MONTHLY_NUM = 9.99
 const YEARLY_NUM  = 6.99
 const YEARLY_TOTAL = +(YEARLY_NUM * 12).toFixed(2)              // 83.88
 const ANNUAL_SAVINGS = +(MONTHLY_NUM * 12 - YEARLY_TOTAL).toFixed(2) // ~35.99
+
+// One-time SKUs — prices/grants come from the SAME constants the server fulfills with.
+const SPRINT = ONE_TIME_SKUS.sprint       // $14.99 · 30 credits + 7 days Pro
+const CREDITS20 = ONE_TIME_SKUS.credits20 // $4.99 · 20 credits
+const skuPrice = (cents: number) => `$${(cents / 100).toFixed(2)}`
 
 const FREE_FEATURES = [
   `${FREE_DAILY_LABEL} — parse, optimize, score`,
@@ -56,6 +61,8 @@ const COMPARISON: [string, string | boolean, string | boolean][] = [
 const FAQ = [
   { q: 'What is Human Voice?', a: 'AI-optimized résumés often sound generic — and some companies auto-filter applications that read as machine-written. Human Voice rewrites your optimized bullets so they sound like you: varied sentence structure, natural rhythm, every keyword kept. Your words, your voice, still ATS-ready.' },
   { q: 'How do free AI credits work?', a: `You start with a ${WELCOME_CREDITS}-credit welcome bonus, then get ${FREE_DAILY_CREDITS} AI ${CREDIT_WORD} that reset each day at midnight. Each credit covers one AI action: parse a resume, optimize bullets for a job, or run the ATS scanner. You can earn up to ${MAX_DAILY_EARN} more credits a day by tracking your applications and answering quick surveys about companies you've worked with.` },
+  { q: 'How does the free trial work?', a: `Pro starts with ${PRO_TRIAL_DAYS} days free — no card required. If you add a payment method before the trial ends, your plan renews at the price you chose; cancel anytime. If you don't add one, nothing is charged and access simply ends.` },
+  { q: 'What if I don\'t want a subscription?', a: `Pay once, own it: the Interview Sprint (${skuPrice(SPRINT.amount_cents)}) gives you ${SPRINT.credits} AI credits plus ${SPRINT.pro_days} days of full Pro access, and the Credit Pack (${skuPrice(CREDITS20.amount_cents)}) adds ${CREDITS20.credits} AI credits. Purchased credits never expire and roll over every day — no auto-renewal, ever.` },
   { q: 'Can I cancel Pro?', a: 'Yes, anytime — no contracts. You keep Pro until the end of your billing period. We don\'t trap you.' },
   { q: 'Is my data sold to employers?', a: 'Never. We work for job seekers. Your resume content is processed in-memory to generate your optimization and immediately discarded. We never sell, share, or expose your info to recruiters or employers.' },
   { q: 'When does Pro activate?', a: 'Instantly after payment. Credits update in real-time — no waiting, no manual activation.' },
@@ -70,6 +77,9 @@ function PricingPageInner() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [upgraded, setUpgraded] = useState(false)
+  // Which one-time SKU (if any) the user just bought — drives the success-screen copy.
+  const [purchasedSku, setPurchasedSku] = useState<string | null>(null)
+  const [skuLoading, setSkuLoading] = useState<string | null>(null)
   // null = unknown (optimistic), false = Stripe not wired up yet → show "launching soon"
   // instead of a broken checkout. Flips to true automatically once Stripe keys are set.
   const [paymentsEnabled, setPaymentsEnabled] = useState<boolean | null>(null)
@@ -80,8 +90,11 @@ function PricingPageInner() {
   useEffect(() => {
     if (params.get('upgraded') === '1') {
       setUpgraded(true)
-      // Grant Pro on return from Stripe Checkout without relying on a webhook: confirm the
-      // session server-side, which verifies ownership and flips the account to Pro.
+      const bought = params.get('purchase')
+      if (bought && ONE_TIME_SKUS[bought as keyof typeof ONE_TIME_SKUS]) setPurchasedSku(bought)
+      // Fulfill/grant on return from Stripe Checkout without relying on a webhook: confirm
+      // the session server-side, which verifies ownership, then grants Pro (subscription)
+      // or fulfills the one-time SKU (idempotent — shares a claim with the webhook).
       const sid = params.get('session_id')
       if (sid) {
         aiHeaders()
@@ -164,6 +177,34 @@ function PricingPageInner() {
     }
   }
 
+  // One-time purchase (mode:'payment' on the server) — same checkout endpoint, sku body.
+  async function handleOneTime(sku: 'sprint' | 'credits20') {
+    if (!isLoggedIn) {
+      router.push('/login?next=/pricing')
+      return
+    }
+    setSkuLoading(sku)
+    setError('')
+    try {
+      const hdrs = await aiHeaders()
+      const r = await fetch('/api/stripe?action=checkout', {
+        method: 'POST',
+        headers: hdrs,
+        body: JSON.stringify({ sku }),
+      })
+      const d = await r.json()
+      if (d.url) {
+        window.location.href = d.url
+      } else {
+        setError(d.error || 'Checkout failed — please try again or email hello@seenjobs.io')
+        setSkuLoading(null)
+      }
+    } catch {
+      setError('Network error — please try again')
+      setSkuLoading(null)
+    }
+  }
+
   const checkStyle = (val: string | boolean): React.ReactNode => {
     if (val === true) return <span style={{ color: 'var(--green)', fontSize: '1rem' }}>✓</span>
     if (val === false) return <span style={{ color: 'var(--line2)' }}>—</span>
@@ -171,14 +212,21 @@ function PricingPageInner() {
   }
 
   if (upgraded) {
+    const successTitle = purchasedSku === 'sprint' ? 'Sprint unlocked.'
+      : purchasedSku === 'credits20' ? 'Credits added.'
+      : "You're Pro."
+    const successBody = purchasedSku === 'sprint'
+      ? `${SPRINT.credits} AI credits are on your account, plus full Pro access for the next ${SPRINT.pro_days} days. Purchased credits never expire. No subscription — nothing renews.`
+      : purchasedSku === 'credits20'
+      ? `${CREDITS20.credits} AI credits are on your account. Purchased credits never expire and roll over every day. No subscription — nothing renews.`
+      : `Your ${PRO_TRIAL_DAYS}-day free trial is live — unlimited AI credits and Human Voice, right now. No card on file means nothing is ever charged; access simply ends after the trial unless you add one.`
     return (
       <div className="page-full" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '80vh' }}>
         <div style={{ textAlign: 'center', maxWidth: 420, padding: '2rem' }}>
           <div style={{ fontSize: '3.5rem', marginBottom: '1rem' }}>🎉</div>
-          <h1 style={{ fontFamily: 'var(--display)', fontSize: '1.8rem', fontWeight: 800, color: 'var(--white)', marginBottom: '.5rem' }}>You're Pro.</h1>
+          <h1 style={{ fontFamily: 'var(--display)', fontSize: '1.8rem', fontWeight: 800, color: 'var(--white)', marginBottom: '.5rem' }}>{successTitle}</h1>
           <p style={{ color: 'var(--sub)', fontFamily: 'var(--body)', fontSize: '.78rem', lineHeight: 1.7, marginBottom: '1.75rem' }}>
-            Unlimited AI credits and Human Voice are live on your account right now.
-            No setup needed.
+            {successBody}
           </p>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '.65rem' }}>
             <button
@@ -375,22 +423,81 @@ function PricingPageInner() {
                     boxShadow: loading ? 'none' : '0 0 32px rgba(99,102,241,.4)',
                   }}
                 >
-                  {loading ? 'Redirecting…' : isLoggedIn ? 'Upgrade to Pro →' : 'Get Pro →'}
+                  {loading ? 'Redirecting…' : `Start ${PRO_TRIAL_DAYS}-day free trial →`}
                 </button>
                 <div style={{ display: 'flex', justifyContent: 'center', gap: '1.25rem', marginTop: '.75rem' }}>
-                  <span style={{ fontFamily: 'var(--mono)', fontSize: '.52rem', color: 'var(--dim)' }}>↩ Cancel anytime</span>
+                  <span style={{ fontFamily: 'var(--mono)', fontSize: '.52rem', color: 'var(--dim)' }}>🚫 No card required</span>
                   <span style={{ fontFamily: 'var(--mono)', fontSize: '.52rem', color: 'var(--dim)' }}>💳 Stripe secure</span>
                   <span style={{ fontFamily: 'var(--mono)', fontSize: '.52rem', color: 'var(--dim)' }}>⚡ Instant access</span>
                 </div>
-                {/* Auto-renewal disclosure (FTC / state ARL compliance). */}
+                {/* Trial + auto-renewal disclosure (FTC / state ARL compliance). */}
                 <div style={{ fontFamily: 'var(--body)', fontSize: '.62rem', color: 'var(--sub)', textAlign: 'center', lineHeight: 1.6, marginTop: '.65rem' }}>
-                  {yearly
-                    ? `Billed $${YEARLY_TOTAL.toFixed(2)} today, then automatically each year until canceled.`
-                    : `Billed ${MONTHLY} today, then automatically each month until canceled.`}
-                  {' '}Cancel anytime — you keep Pro through the period you&apos;ve paid for.
+                  Free for {PRO_TRIAL_DAYS} days. No card required. If you add a payment method, renews at
+                  {yearly ? ` $${YEARLY_TOTAL.toFixed(2)}/yr` : ` ${MONTHLY}/mo`} after the trial — cancel anytime;
+                  without one, access simply ends and you&apos;re never charged.
                 </div>
               </>
             )}
+          </div>
+        </div>
+
+        {/* One-time purchases — no subscription */}
+        <div style={{ marginBottom: '3.5rem' }}>
+          <div style={{ textAlign: 'center', marginBottom: '1.25rem' }}>
+            <div style={{ fontFamily: 'var(--mono)', fontSize: '.52rem', textTransform: 'uppercase', letterSpacing: '.22em', color: 'var(--green)', marginBottom: '.4rem' }}>
+              No subscription. Pay once.
+            </div>
+            <h2 style={{ fontFamily: 'var(--display)', fontSize: '1.2rem', fontWeight: 800, color: 'var(--white)', margin: 0 }}>
+              Not ready for a membership?
+            </h2>
+            <p style={{ color: 'var(--sub)', fontFamily: 'var(--body)', fontSize: '.72rem', lineHeight: 1.6, maxWidth: 440, margin: '.4rem auto 0' }}>
+              One payment, no renewals. Purchased credits never expire and roll over every day.
+            </p>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(280px,1fr))', gap: '1.25rem' }}>
+            {/* Interview Sprint */}
+            <div style={{ background: 'var(--card)', border: '1px solid rgba(16,185,129,.35)', borderRadius: 16, padding: '1.5rem', position: 'relative' }}>
+              <div style={{ position: 'absolute', top: -11, left: '50%', transform: 'translateX(-50%)', background: 'var(--green)', color: '#052e22', fontFamily: 'var(--mono)', fontSize: '.52rem', fontWeight: 700, letterSpacing: '.08em', padding: '.2rem .7rem', borderRadius: 100, whiteSpace: 'nowrap' }}>
+                BEST FOR AN ACTIVE SEARCH
+              </div>
+              <div style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', textTransform: 'uppercase', letterSpacing: '.14em', color: 'var(--green)', marginBottom: '.5rem' }}>{SPRINT.name}</div>
+              <div style={{ display: 'flex', alignItems: 'baseline', gap: '.35rem', marginBottom: '1rem' }}>
+                <div style={{ fontFamily: 'var(--display)', fontSize: '1.9rem', fontWeight: 900, color: 'var(--white)' }}>{skuPrice(SPRINT.amount_cents)}</div>
+                <div style={{ fontFamily: 'var(--mono)', fontSize: '.62rem', color: 'var(--muted)' }}>one-time</div>
+              </div>
+              {[`${SPRINT.credits} AI credits — never expire`, `${SPRINT.pro_days} days of full Pro access`, 'Human Voice + ghost alerts during your sprint', 'No renewal — it just ends'].map(f => (
+                <div key={f} style={{ display: 'flex', gap: '.5rem', marginBottom: '.45rem', fontFamily: 'var(--body)', fontSize: '.72rem', color: 'var(--sub)', lineHeight: 1.45 }}>
+                  <span style={{ color: 'var(--green)', flexShrink: 0 }}>✓</span>{f}
+                </div>
+              ))}
+              <button
+                onClick={() => handleOneTime('sprint')}
+                disabled={skuLoading !== null}
+                style={{ width: '100%', marginTop: '1rem', background: skuLoading === 'sprint' ? 'var(--line)' : 'rgba(16,185,129,.14)', border: '1px solid rgba(16,185,129,.4)', borderRadius: 9, padding: '.8rem', fontFamily: 'var(--display)', fontWeight: 800, fontSize: '.84rem', color: 'var(--green)', cursor: skuLoading ? 'default' : 'pointer' }}
+              >
+                {skuLoading === 'sprint' ? 'Redirecting…' : `Get the Sprint · ${skuPrice(SPRINT.amount_cents)}`}
+              </button>
+            </div>
+            {/* Credit Pack */}
+            <div style={{ background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 16, padding: '1.5rem' }}>
+              <div style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', textTransform: 'uppercase', letterSpacing: '.14em', color: 'var(--dim)', marginBottom: '.5rem' }}>{CREDITS20.name}</div>
+              <div style={{ display: 'flex', alignItems: 'baseline', gap: '.35rem', marginBottom: '1rem' }}>
+                <div style={{ fontFamily: 'var(--display)', fontSize: '1.9rem', fontWeight: 900, color: 'var(--white)' }}>{skuPrice(CREDITS20.amount_cents)}</div>
+                <div style={{ fontFamily: 'var(--mono)', fontSize: '.62rem', color: 'var(--muted)' }}>one-time</div>
+              </div>
+              {[`${CREDITS20.credits} AI credits — never expire`, 'Use them any day, at your pace', 'No renewal, no membership'].map(f => (
+                <div key={f} style={{ display: 'flex', gap: '.5rem', marginBottom: '.45rem', fontFamily: 'var(--body)', fontSize: '.72rem', color: 'var(--sub)', lineHeight: 1.45 }}>
+                  <span style={{ color: 'var(--dim)', flexShrink: 0 }}>✓</span>{f}
+                </div>
+              ))}
+              <button
+                onClick={() => handleOneTime('credits20')}
+                disabled={skuLoading !== null}
+                style={{ width: '100%', marginTop: '1rem', background: 'none', border: '1px solid var(--line2)', borderRadius: 9, padding: '.8rem', fontFamily: 'var(--display)', fontWeight: 700, fontSize: '.84rem', color: 'var(--sub)', cursor: skuLoading ? 'default' : 'pointer' }}
+              >
+                {skuLoading === 'credits20' ? 'Redirecting…' : `Get ${CREDITS20.credits} credits · ${skuPrice(CREDITS20.amount_cents)}`}
+              </button>
+            </div>
           </div>
         </div>
 
@@ -443,10 +550,10 @@ function PricingPageInner() {
             disabled={loading}
             style={{ padding: '.95rem 3rem', background: 'linear-gradient(135deg,#4f46e5,#7c3aed)', border: 'none', borderRadius: 12, fontFamily: 'var(--display)', fontWeight: 800, fontSize: '1rem', color: '#fff', cursor: 'pointer', boxShadow: '0 0 40px rgba(99,102,241,.4)' }}
           >
-            {loading ? 'Redirecting…' : `Get Pro · ${yearly ? YEARLY : MONTHLY}/mo →`}
+            {loading ? 'Redirecting…' : `Start ${PRO_TRIAL_DAYS}-day free trial →`}
           </button>
           <div style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', color: 'var(--dim)', marginTop: '.75rem' }}>
-            Cancel anytime · Stripe secure · Instant activation
+            No card required · then {yearly ? YEARLY : MONTHLY}/mo if you continue · Cancel anytime
           </div>
         </div>
 

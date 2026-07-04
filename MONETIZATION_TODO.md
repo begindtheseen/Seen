@@ -32,17 +32,20 @@ calendar with kill/scale gates).
 
 ---
 
-## 1. 7-day free trial — ✅ DECISION MADE 2026-07-04, no-card variant (see Operation 50% block) — was: ❌ REMOVED (built #86, deleted #93)
-**Status correction (2026-07-02, verified against code):** the trial described below was built
-in PR #86, patched (#89), rebuilt (#90), and **deleted in PR #93** in the same day because the
-business decision wasn't settled first (see CLAUDE.md mandatory rule 6 — this feature is the
-canonical example). As of today `trial_period_days` appears NOWHERE in `api/stripe.js`, and no
-trial CTA/disclosure copy exists in `app/pricing/page.tsx` or `components/UpgradeModal.tsx`
-(verified by grep). The stale "✅ BUILT" note that previously lived here is exactly the
-ground-truth rot rule 8 warns about — do not trust feature-status claims in docs without a grep.
+## 1. 7-day free trial — ✅ REBUILT 2026-07-04 on a fresh owner decision (Operation 50%)
+**Status (2026-07-04):** the owner approved the trial + one-time SKUs on 2026-07-04, so this
+was rebuilt (rule 6 satisfied — decision BEFORE code this time). Differences from the deleted
+#86 design: it is a **NO-CARD** trial (`payment_method_collection: 'if_required'` +
+`trial_settings.end_behavior.missing_payment_method: 'cancel'`), so nobody is ever charged
+without adding a payment method. Shipped alongside two one-time SKUs (`sprint` $14.99 =
+30 credits + 7 days Pro via `ai_credits.pro_until`; `credits20` $4.99 = 20 credits via
+`ai_credits.purchased_credits`) — see migration `044_pro_until.sql` and
+`lib/server/stripeFulfillment.js`. Verify with grep before trusting this note, per rule 8:
+`trial_period_days` lives in `api/stripe.js`, SKU constants in `lib/server/creditRules.js`.
 
-If the owner decides to reintroduce a trial, the original design (card-required, via Stripe)
-is preserved below as the implementation sketch:
+Historical context: the trial was first built in PR #86, patched (#89), rebuilt (#90), and
+deleted in PR #93 in one day because the business decision wasn't settled first (the CLAUDE.md
+rule-6 canonical example). The original card-required sketch is preserved below for history:
 
 **Expected lift:** Large. Free trials on a $9.99–$83.88 SaaS commonly lift paid conversion
 2–4× by moving the payment decision *after* the user has felt Pro value (unlimited credits,

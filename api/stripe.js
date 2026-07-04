@@ -3,6 +3,8 @@
 //                   STRIPE_WEBHOOK_SECRET, SUPABASE_URL, SUPABASE_SERVICE_KEY, SUPABASE_JWT_SECRET
 
 import { createHmac, timingSafeEqual } from 'crypto';
+import { ONE_TIME_SKUS, PRO_TRIAL_DAYS } from '../lib/server/creditRules.js';
+import { fulfillOneTimeCheckout } from '../lib/server/stripeFulfillment.js';
 
 const CORS = (req, res) => {
   const o = req.headers.origin || '';
@@ -173,7 +175,13 @@ export default async function handler(req, res) {
       // SECURITY: the session must belong to THIS user (set at checkout creation).
       const owner = session.metadata?.uid || session.client_reference_id;
       if (owner !== uid) return res.status(403).json({ error: 'Session does not match account' });
-      // A subscription (incl. a $0 trial) means the upgrade succeeded.
+      // One-time SKU purchase (mode: 'payment') — fulfill idempotently (shares the
+      // session-id claim with the webhook, so double delivery can never double-grant).
+      if (session.mode === 'payment' || session.metadata?.sku) {
+        const result = await fulfillOneTimeCheckout(session, env);
+        return res.status(200).json({ ok: !!result.ok, sku: session.metadata?.sku || null, duplicate: !!result.duplicate });
+      }
+      // A subscription (incl. the $0 no-card trial) means the upgrade succeeded.
       const ok = !!session.subscription && (session.status === 'complete' || session.payment_status === 'paid' || session.payment_status === 'no_payment_required');
       if (ok) {
         await setPro(uid, true, env);
@@ -229,7 +237,20 @@ export default async function handler(req, res) {
       const entitled = !!active && ['active', 'trialing', 'past_due'].includes(active.status);
       await setPro(uid, entitled, env);
 
-      if (!entitled) return res.status(200).json({ ok: true, pro: false, subscription: null });
+      if (!entitled) {
+        // No live subscription — but a purchased Pro window (sprint SKU, ai_credits.pro_until)
+        // is independent of the subscription lifecycle and must still read as Pro.
+        // (setPro above only writes the `pro` flag; it never touches pro_until.)
+        try {
+          const rowRes = await db(SUPABASE_URL, SERVICE_KEY)(`ai_credits?user_id=eq.${uid}&limit=1`);
+          const row = rowRes.ok ? (await rowRes.json())?.[0] : null;
+          const t = row?.pro_until ? Date.parse(row.pro_until) : NaN;
+          if (Number.isFinite(t) && t > Date.now()) {
+            return res.status(200).json({ ok: true, pro: true, subscription: null, pro_until: row.pro_until });
+          }
+        } catch { /* fall through to plain non-pro */ }
+        return res.status(200).json({ ok: true, pro: false, subscription: null });
+      }
 
       const item = active.items?.data?.[0];
       return res.status(200).json({
@@ -295,6 +316,11 @@ export default async function handler(req, res) {
     const { uid, email } = await resolveUid(req, env);
     if (!uid) return res.status(401).json({ error: 'Sign in before upgrading' });
 
+    // One-time SKUs (owner-approved 2026-07-04): 'sprint' and 'credits20'. Any other
+    // non-empty sku is a client bug — reject rather than silently selling a subscription.
+    if (body.sku && !ONE_TIME_SKUS[body.sku]) return res.status(400).json({ error: 'Unknown product' });
+    const sku = body.sku && ONE_TIME_SKUS[body.sku] ? body.sku : null;
+
     const plan = body.plan === 'yearly' ? 'yearly' : 'monthly';
     // Use a pre-made Stripe price ID if one is configured; otherwise create the price
     // INLINE so no Products/prices setup is needed in the Stripe dashboard — the secret
@@ -311,29 +337,52 @@ export default async function handler(req, res) {
     } catch { /* ignore — new customer */ }
 
     const form = new URLSearchParams({
-      mode: 'subscription',
       'payment_method_types[]': 'card',
       'line_items[0][quantity]': '1',
       client_reference_id: uid,
-      // Include the session id so the return page can confirm + grant Pro without a webhook.
-      success_url: `${origin}/pricing?upgraded=1&session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${origin}/pricing`,
       'metadata[uid]': uid,
-      'subscription_data[metadata][uid]': uid,
       allow_promotion_codes: 'true',
     });
-    if (priceId) {
-      form.set('line_items[0][price]', priceId);
-    } else {
-      // Inline price — Seen Pro $9.99/mo or $83.88/yr. No dashboard product needed.
-      const amount = plan === 'yearly' ? '8388' : '999';
-      const interval = plan === 'yearly' ? 'year' : 'month';
+
+    if (sku) {
+      // ── ONE-TIME PURCHASE (mode: 'payment', inline price_data) ────────────────
+      // Fulfilled by the webhook AND the return-page confirm (shared idempotency claim
+      // on the session id) — see lib/server/stripeFulfillment.js.
+      const def = ONE_TIME_SKUS[sku];
+      form.set('mode', 'payment');
+      // Include the session id + sku so the return page can confirm-fulfill and show
+      // purchase-specific copy without a webhook.
+      form.set('success_url', `${origin}/pricing?upgraded=1&purchase=${sku}&session_id={CHECKOUT_SESSION_ID}`);
+      form.set('metadata[user_id]', uid);
+      form.set('metadata[sku]', sku);
       form.set('line_items[0][price_data][currency]', 'usd');
-      form.set('line_items[0][price_data][unit_amount]', amount);
-      form.set('line_items[0][price_data][recurring][interval]', interval);
-      form.set('line_items[0][price_data][product_data][name]', 'Seen Pro');
+      form.set('line_items[0][price_data][unit_amount]', String(def.amount_cents));
+      form.set('line_items[0][price_data][product_data][name]', `Seen ${def.name}`);
+    } else {
+      // ── SUBSCRIPTION with a 7-day NO-CARD trial (owner-approved 2026-07-04) ───
+      form.set('mode', 'subscription');
+      // Include the session id so the return page can confirm + grant Pro without a webhook.
+      form.set('success_url', `${origin}/pricing?upgraded=1&session_id={CHECKOUT_SESSION_ID}`);
+      form.set('subscription_data[metadata][uid]', uid);
+      if (priceId) {
+        form.set('line_items[0][price]', priceId);
+      } else {
+        // Inline price — Seen Pro $9.99/mo or $83.88/yr. No dashboard product needed.
+        const amount = plan === 'yearly' ? '8388' : '999';
+        const interval = plan === 'yearly' ? 'year' : 'month';
+        form.set('line_items[0][price_data][currency]', 'usd');
+        form.set('line_items[0][price_data][unit_amount]', amount);
+        form.set('line_items[0][price_data][recurring][interval]', interval);
+        form.set('line_items[0][price_data][product_data][name]', 'Seen Pro');
+      }
+      // 7-day free trial, no card required: if no payment method is on file when the
+      // trial ends, the subscription simply CANCELS (nobody is charged without a card);
+      // if one was added, it renews at the plan price. Webhook keeps `pro` in lockstep.
+      form.set('subscription_data[trial_period_days]', String(PRO_TRIAL_DAYS));
+      form.set('subscription_data[trial_settings][end_behavior][missing_payment_method]', 'cancel');
+      form.set('payment_method_collection', 'if_required');
     }
-    // No free trial — the subscription is charged immediately (first month up front).
     if (existingCustomer) form.set('customer', existingCustomer);
     else if (email) form.set('customer_email', email);
 
@@ -433,7 +482,21 @@ export default async function handler(req, res) {
         const session = event.data?.object || {};
         const uid = getUid(session);
         const customerId = session.customer;
-        if (uid && SUPABASE_URL && SERVICE_KEY) {
+        if (session.metadata?.sku) {
+          // One-time SKU (mode: 'payment') — grant credits / pro_until, NOT the permanent
+          // pro flag. Idempotent via the shared session-id claim (also used by confirm).
+          const result = await fulfillOneTimeCheckout(session, env);
+          if (!result.ok && !result.duplicate) {
+            // Release the event-level idempotency row and 500 so Stripe redelivers —
+            // otherwise a transient DB failure would eat a paid purchase forever.
+            if (event.id && SUPABASE_URL && SERVICE_KEY) {
+              await db(SUPABASE_URL, SERVICE_KEY)(`stripe_events_processed?event_id=eq.${encodeURIComponent(event.id)}`, { method: 'DELETE', headers: { Prefer: 'return=minimal' } }).catch(() => {});
+            }
+            console.error('[stripe/webhook] one-time fulfillment failed:', result.reason);
+            return res.status(500).json({ error: 'Fulfillment failed' });
+          }
+        } else if (uid && SUPABASE_URL && SERVICE_KEY) {
+          // Subscription checkout (incl. a $0 no-card trial start) → Pro on.
           await setPro(uid, true, env);
           if (customerId) {
             const q = db(SUPABASE_URL, SERVICE_KEY);
@@ -443,6 +506,14 @@ export default async function handler(req, res) {
             });
           }
         }
+      }
+
+      // Trial ending in ~3 days. v1: log only — no email infra is configured (see
+      // MONETIZATION_TODO.md item 3). The no-card trial cancels itself via
+      // trial_settings.end_behavior, and subscription.updated keeps `pro` in lockstep.
+      if (event.type === 'customer.subscription.trial_will_end') {
+        const sub = event.data?.object || {};
+        console.log(`[stripe/webhook] trial_will_end for uid=${getUid(sub) || 'unknown'} sub=${sub.id || '?'} trial_end=${sub.trial_end || '?'}`);
       }
 
       if (event.type === 'customer.subscription.deleted' || event.type === 'customer.subscription.paused') {

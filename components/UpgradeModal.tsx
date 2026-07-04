@@ -4,9 +4,14 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/lib/auth'
 import { aiHeaders } from '@/lib/aiHeaders'
-import { FREE_DAILY_CREDITS } from '@/lib/creditRules'
+import { FREE_DAILY_CREDITS, PRO_TRIAL_DAYS, ONE_TIME_SKUS } from '@/lib/creditRules'
 
 const OPT_WORD = FREE_DAILY_CREDITS === 1 ? 'optimization' : 'optimizations'
+
+// One-time SKUs — copy generated from the same constants the server fulfills with.
+const SPRINT = ONE_TIME_SKUS.sprint       // $14.99 · 30 credits + 7 days Pro
+const CREDITS20 = ONE_TIME_SKUS.credits20 // $4.99 · 20 credits
+const skuPrice = (cents: number) => `$${(cents / 100).toFixed(2)}`
 
 interface UpgradeModalProps {
   reason: 'credits' | 'pro' | 'generic'
@@ -61,6 +66,7 @@ export default function UpgradeModal({ reason, onClose, featureName }: UpgradeMo
   // Annual is the recommended default.
   const [plan, setPlan] = useState<'monthly' | 'yearly'>('yearly')
   const [loading, setLoading] = useState(false)
+  const [skuLoading, setSkuLoading] = useState<string | null>(null)
   const [error, setError] = useState('')
 
   // Close on Escape
@@ -106,6 +112,38 @@ export default function UpgradeModal({ reason, onClose, featureName }: UpgradeMo
     } catch {
       setError('Network error — check connection and try again')
       setLoading(false)
+    }
+  }
+
+  // One-time purchase (mode:'payment' on the server) — same checkout endpoint, sku body.
+  async function handleOneTime(sku: 'sprint' | 'credits20') {
+    if (!isLoggedIn) {
+      onClose()
+      router.push('/login?next=/pricing')
+      return
+    }
+    setSkuLoading(sku)
+    setError('')
+    try {
+      const hdrs = await aiHeaders()
+      const r = await fetch('/api/stripe?action=checkout', {
+        method: 'POST',
+        headers: hdrs,
+        body: JSON.stringify({ sku }),
+      })
+      const d = await r.json()
+      if (d.url) {
+        window.location.href = d.url
+      } else if (r.status === 503) {
+        setError('✦ Seen Pro is launching soon — and during early launch every feature is unlocked free. Nothing to do.')
+        setSkuLoading(null)
+      } else {
+        setError(d.error || 'Checkout unavailable — try again')
+        setSkuLoading(null)
+      }
+    } catch {
+      setError('Network error — check connection and try again')
+      setSkuLoading(null)
     }
   }
 
@@ -211,21 +249,53 @@ export default function UpgradeModal({ reason, onClose, featureName }: UpgradeMo
               transition: 'opacity .15s',
             }}
           >
-            {loading ? 'Redirecting to checkout…' : `Upgrade to Pro · ${plan === 'yearly' ? YEARLY_PRICE + '/mo' : MONTHLY_PRICE + '/mo'}`}
+            {loading ? 'Redirecting to checkout…' : `Start ${PRO_TRIAL_DAYS}-day free trial`}
           </button>
 
-          {/* Auto-renewal disclosure — shown at the point of purchase (FTC / state ARL compliance). */}
+          {/* Trial + auto-renewal disclosure — shown at the point of purchase (FTC / state ARL compliance). */}
           <div style={{ fontFamily: 'var(--body)', fontSize: '.66rem', color: 'var(--sub)', textAlign: 'center', lineHeight: 1.6, marginTop: '.85rem' }}>
-            {plan === 'yearly'
-              ? `Billed $${YEARLY_TOTAL.toFixed(2)} today, then automatically each year until you cancel.`
-              : `Billed ${MONTHLY_PRICE} today, then automatically each month until you cancel.`}
-            {' '}Cancel anytime — you keep Pro through the period you’ve paid for. See <a href="/legal" style={{ color: 'var(--blue)' }}>Subscription Terms</a>.
+            Free for {PRO_TRIAL_DAYS} days. No card required. If you add a payment method, renews at
+            {plan === 'yearly' ? ` $${YEARLY_TOTAL.toFixed(2)}/yr` : ` ${MONTHLY_PRICE}/mo`} after the trial — cancel
+            anytime; without one, access simply ends. See <a href="/legal" style={{ color: 'var(--blue)' }}>Subscription Terms</a>.
           </div>
 
           <div style={{ display: 'flex', justifyContent: 'center', gap: '1.5rem', marginTop: '.75rem' }}>
-            <span style={{ fontFamily: 'var(--mono)', fontSize: '.55rem', color: 'var(--dim)' }}>↩ Cancel anytime</span>
+            <span style={{ fontFamily: 'var(--mono)', fontSize: '.55rem', color: 'var(--dim)' }}>🚫 No card required</span>
             <span style={{ fontFamily: 'var(--mono)', fontSize: '.55rem', color: 'var(--dim)' }}>💳 Stripe secure</span>
             <span style={{ fontFamily: 'var(--mono)', fontSize: '.55rem', color: 'var(--dim)' }}>⚡ Instant access</span>
+          </div>
+
+          {/* One-time options — no subscription. Pay once. */}
+          <div style={{ marginTop: '1rem', paddingTop: '.9rem', borderTop: '1px solid var(--line)' }}>
+            <div style={{ fontFamily: 'var(--mono)', fontSize: '.55rem', textTransform: 'uppercase', letterSpacing: '.16em', color: 'var(--green)', textAlign: 'center', marginBottom: '.6rem' }}>
+              No subscription. Pay once.
+            </div>
+            <div style={{ display: 'flex', gap: '.5rem' }}>
+              <button
+                onClick={() => handleOneTime('sprint')}
+                disabled={skuLoading !== null || loading}
+                style={{ flex: 1.25, padding: '.6rem .5rem', background: 'rgba(16,185,129,.1)', border: '1px solid rgba(16,185,129,.35)', borderRadius: 10, cursor: skuLoading ? 'default' : 'pointer', textAlign: 'center' }}
+              >
+                <div style={{ fontFamily: 'var(--mono)', fontSize: '.66rem', fontWeight: 700, color: 'var(--green)' }}>
+                  {skuLoading === 'sprint' ? 'Redirecting…' : `${SPRINT.name} · ${skuPrice(SPRINT.amount_cents)}`}
+                </div>
+                <div style={{ fontFamily: 'var(--mono)', fontSize: '.52rem', color: 'var(--muted)', marginTop: '.15rem' }}>
+                  {SPRINT.credits} credits + {SPRINT.pro_days} days of Pro
+                </div>
+              </button>
+              <button
+                onClick={() => handleOneTime('credits20')}
+                disabled={skuLoading !== null || loading}
+                style={{ flex: 1, padding: '.6rem .5rem', background: 'none', border: '1px solid var(--line2)', borderRadius: 10, cursor: skuLoading ? 'default' : 'pointer', textAlign: 'center' }}
+              >
+                <div style={{ fontFamily: 'var(--mono)', fontSize: '.66rem', fontWeight: 700, color: 'var(--sub)' }}>
+                  {skuLoading === 'credits20' ? 'Redirecting…' : `${CREDITS20.credits} credits · ${skuPrice(CREDITS20.amount_cents)}`}
+                </div>
+                <div style={{ fontFamily: 'var(--mono)', fontSize: '.52rem', color: 'var(--muted)', marginTop: '.15rem' }}>
+                  never expire
+                </div>
+              </button>
+            </div>
           </div>
 
           {reason === 'credits' && (
