@@ -10,6 +10,7 @@ import { createPortal } from 'react-dom'
 import type { Application } from '@/lib/types'
 import { drawOutcomeCard, type OutcomeCardData } from '@/lib/cardKit'
 import { shareCardImage, shareHint, type ShareDest } from '@/lib/shareCard'
+import { track } from '@/lib/analytics'
 
 interface Props {
   app: Application
@@ -90,6 +91,7 @@ export default function OutcomeCard({ app, onClose, onShared }: Props) {
         drawOutcomeCard(canvas, buildOutcome(app))
         setDataUrl(canvas.toDataURL('image/png'))
         canvas.toBlob(b => { if (b) setBlob(b) }, 'image/png')
+        track('card_generated', { card_type: 'outcome', outcome: status })
       } catch { /* leave preview in loading state */ }
     }
     run()
@@ -105,6 +107,16 @@ export default function OutcomeCard({ app, onClose, onShared }: Props) {
     try { onShared?.(dest) } catch { /* never block the share UX */ }
     const fileName = `seen_${status}_${(app.company || 'c').replace(/[^a-z0-9]/gi, '_')}_${Date.now()}.png`
     const result = await shareCardImage({ blob, dataUrl, fileName, text: shareText, url: unfurlUrl, dest })
+    // Method reflects how the image actually travelled: native share sheet, clipboard
+    // copy, plain download, or the destination whose composer/unfurl we opened.
+    // 'cancelled'/'noop' means nothing was shared — don't count those.
+    if (result !== 'cancelled' && result !== 'noop') {
+      const method = dest === 'download' ? 'download'
+        : result === 'native' ? 'native_share'
+        : result === 'clipboard+open' ? 'copy'
+        : dest
+      track('card_shared', { card_type: 'outcome', method, destination: dest, outcome: status })
+    }
     const msg = shareHint(result, dest)
     if (msg) {
       setHint(msg)
