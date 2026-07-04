@@ -1,11 +1,12 @@
 'use client'
 
-import { useState, useEffect, Suspense } from 'react'
+import { useState, useEffect, useRef, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { AppStore } from '@/lib/stores/AppStore'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/lib/auth'
 import OutcomeCard from '@/components/OutcomeCard'
+import { isRedditSourced, PUBLIC_DISCUSSION_LABEL } from '@/lib/reportSource'
 import type { Application } from '@/lib/types'
 
 type Outcome = 'ghosted' | 'autoreject' | 'human' | 'waiting' | ''
@@ -111,13 +112,19 @@ function ReportPage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [done, setDone] = useState(false)
-  const [recentReports, setRecentReports] = useState<Array<{id:string;outcome:string;company_name?:string;role?:string;created_at:string}>>([])
+  const [recentReports, setRecentReports] = useState<Array<{id:string;outcome:string;company_name?:string;role?:string;platform?:string;created_at:string}>>([])
   const [matchedAppId, setMatchedAppId] = useState<string | null>(null)
   const [trackerUpdated, setTrackerUpdated] = useState(false)
   // The tracked app for one-click card mode (?app_id=&auto=1). When set, we render the
   // OutcomeCard live over the prefilled form and record a first-party create_from_tracker report.
   const [autoApp, setAutoApp] = useState<Application | null>(null)
   const [trackerSubmitted, setTrackerSubmitted] = useState(false)
+  // Low-friction deep links (/report?company=X&outcome=ghosted from /agencies, /ghosted, company
+  // pages): when the URL prefills the form we show a confirm strip and drop the cursor on the
+  // first field still missing, so the happy path is type-one-thing-and-submit.
+  const [urlPrefilled, setUrlPrefilled] = useState(false)
+  const roleRef = useRef<HTMLInputElement>(null)
+  const locationRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     try {
@@ -127,18 +134,27 @@ function ReportPage() {
       const urlCompany = searchParams?.get('company') || ''
       const urlRole = searchParams?.get('role') || ''
       const urlOutcomeRaw = (searchParams?.get('outcome') || '').toLowerCase()
+      // Map caller vocab onto the form's outcome union ('human' = a person responded).
+      const OUTCOME_MAP: Record<string, Outcome> = {
+        ghosted: 'ghosted', autoreject: 'autoreject', rejected: 'autoreject',
+        interview: 'human', interviewing: 'human', hired: 'human', offer: 'human',
+        waiting: 'waiting',
+      }
+      const urlOutcome = OUTCOME_MAP[urlOutcomeRaw]
       if (urlCompany) {
         setCompany(urlCompany)
         if (urlRole) setRole(urlRole)
-        // Map caller vocab onto the form's outcome union ('human' = a person responded).
-        const OUTCOME_MAP: Record<string, Outcome> = {
-          ghosted: 'ghosted', autoreject: 'autoreject', rejected: 'autoreject',
-          interview: 'human', interviewing: 'human', hired: 'human', offer: 'human',
-          waiting: 'waiting',
-        }
-        if (OUTCOME_MAP[urlOutcomeRaw]) setOutcome(OUTCOME_MAP[urlOutcomeRaw])
+        if (urlOutcome) setOutcome(urlOutcome)
+        setUrlPrefilled(true)
+        // Land the cursor on the first field still missing so the prefilled link is
+        // fill-one-gap-and-submit. (Required fields stay required — this is friction
+        // reduction, not validation reduction.)
+        setTimeout(() => { (urlRole ? locationRef : roleRef).current?.focus() }, 0)
         return // do NOT overwrite explicit intent with tracker data
       }
+      // Outcome-only links (/report?outcome=ghosted from /ghosted and /agencies): honor the
+      // explicit outcome, then let the tracker fill the who/what below WITHOUT overriding it.
+      if (urlOutcome) setOutcome(urlOutcome)
 
       const apps = AppStore.loadSync()
       if (!apps.length) return
@@ -152,7 +168,8 @@ function ReportPage() {
       if (source.role) setRole(source.role)
       if (source.location) setLocation(source.location)
       if (source.platform) setPlatform(source.platform)
-      setOutcome(statusToOutcome(source.status))
+      // An explicit ?outcome= param wins over the tracker's guess (URL params are intent).
+      if (!urlOutcome) setOutcome(statusToOutcome(source.status))
       // Auto card: a terminal tracked app + auto=1 → show the live OutcomeCard immediately.
       const isTerminal = source.status === 'ghosted' || source.status === 'rejected' || source.status === 'hired'
       if (auto && explicit && isTerminal) setAutoApp(source)
@@ -206,7 +223,7 @@ function ReportPage() {
       body: JSON.stringify({ action: 'feed', limit: 5, offset: 0 }),
     })
       .then(r => r.json())
-      .then((d: { reports?: Array<{id:string;outcome:string;company_name?:string;role?:string;created_at:string}> }) => {
+      .then((d: { reports?: Array<{id:string;outcome:string;company_name?:string;role?:string;platform?:string;created_at:string}> }) => {
         if (d.reports?.length) setRecentReports(d.reports)
       })
       .catch(() => {})
@@ -345,6 +362,11 @@ function ReportPage() {
             </button>
           </div>
         )}
+        {urlPrefilled && (
+          <div style={{ background: 'rgba(59,130,246,.08)', border: '1px solid rgba(59,130,246,.22)', borderRadius: 10, padding: '.7rem 1rem', marginBottom: '1.25rem', fontFamily: 'var(--mono)', fontSize: '.62rem', color: 'var(--sub)', lineHeight: 1.6 }}>
+            ✦ Prefilled for you{company ? <> — reporting <span style={{ color: 'var(--white)', fontWeight: 700 }}>{company}</span></> : ''}. Fill any missing field and hit submit.
+          </div>
+        )}
         <div style={{ fontFamily: 'var(--mono)', fontSize: '.52rem', textTransform: 'uppercase', letterSpacing: '.22em', color: 'var(--blue)', marginBottom: '.6rem', display: 'flex', alignItems: 'center', gap: 12 }}>
           <span style={{ width: 22, height: 1, background: 'var(--blue)', display: 'inline-block' }} />
           Anonymous report
@@ -389,13 +411,13 @@ function ReportPage() {
               </div>
               <div>
                 {lbl('Job title *')}
-                <input type="text" placeholder="e.g. Software Engineer" value={role} onChange={e => setRole(e.target.value)} style={inputStyle} />
+                <input ref={roleRef} type="text" placeholder="e.g. Software Engineer" value={role} onChange={e => setRole(e.target.value)} style={inputStyle} />
               </div>
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '.75rem' }}>
               <div>
                 {lbl('City, State *')}
-                <input type="text" placeholder="e.g. Austin, TX" value={location} onChange={e => setLocation(e.target.value)} style={inputStyle} />
+                <input ref={locationRef} type="text" placeholder="e.g. Austin, TX" value={location} onChange={e => setLocation(e.target.value)} style={inputStyle} />
               </div>
               <div>
                 {lbl('Platform (optional)')}
@@ -505,6 +527,9 @@ function ReportPage() {
                   <div style={{ fontFamily: 'var(--mono)', fontSize: '.68rem', color: 'var(--white)', fontWeight: 600 }}>{r.outcome}</div>
                   {r.company_name && <div style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', color: 'var(--blue)', marginTop: '.15rem' }}>@ {r.company_name}</div>}
                   {r.role && <div style={{ fontFamily: 'var(--mono)', fontSize: '.56rem', color: 'var(--dim)', marginTop: '.1rem' }}>{r.role}</div>}
+                  {isRedditSourced(r.platform) && (
+                    <div style={{ fontFamily: 'var(--mono)', fontSize: '.52rem', color: 'var(--muted)', marginTop: '.2rem' }} title="Imported from a public Reddit thread, not submitted directly to Seen">{PUBLIC_DISCUSSION_LABEL}</div>
+                  )}
                 </div>
                 <span style={{ fontFamily: 'var(--mono)', fontSize: '.52rem', color: 'var(--muted)', flexShrink: 0 }}>
                   {new Date(r.created_at).toLocaleDateString()}

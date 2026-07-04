@@ -14,6 +14,8 @@ export default function Footer() {
         <div style={{ display: 'flex', gap: '.1rem', flexWrap: 'wrap', alignItems: 'center', flex: 1, justifyContent: 'center' }}>
           {[
             { href: '/jobs', label: 'Jobs' },
+            { href: '/agencies', label: 'Agencies' },
+            { href: '/ghosted', label: 'Ghosted?' },
             { href: '/demand', label: 'Demand' },
             { href: '/resume', label: 'Resume AI' },
             { href: '/employers', label: 'Employers' },

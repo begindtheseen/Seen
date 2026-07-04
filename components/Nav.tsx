@@ -224,6 +224,7 @@ export default function Nav() {
         <div className="side-menu-label">Explore</div>
         {!isSeeker && <Link href="/jobs" className={`side-menu-item${isActive('/jobs') ? ' active' : ''}`}><span className="side-menu-icon">💼</span>Jobs</Link>}
         <Link href="/companies" className={`side-menu-item${isActive('/companies') ? ' active' : ''}`}><span className="side-menu-icon">🏢</span>Company intel</Link>
+        <Link href="/agencies" className={`side-menu-item${isActive('/agencies') ? ' active' : ''}`}><span className="side-menu-icon">👻</span>Agency ghost index</Link>
         <Link href="/demand" className={`side-menu-item${isActive('/demand') ? ' active' : ''}`}><span className="side-menu-icon">📊</span>Hiring demand</Link>
         <Link href="/feed" className={`side-menu-item${isActive('/feed') ? ' active' : ''}`}><span className="side-menu-icon">📡</span>Live feed</Link>
 
