@@ -4,6 +4,7 @@ import AnalyticsProvider from '@/components/AnalyticsProvider'
 import Nav from '@/components/Nav'
 import Footer from '@/components/Footer'
 import IntroSplash from '@/components/IntroSplash'
+import { ToastHost } from '@/components/ToastHost'
 import './globals.css'
 
 export const metadata: Metadata = {
@@ -70,6 +71,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <div className="site-main">{children}</div>
           <Footer />
           <div id="toast" />
+          <ToastHost />
         </AuthProvider>
       </body>
     </html>

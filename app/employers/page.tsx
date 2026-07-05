@@ -1,3 +1,5 @@
+import { EmployerCheckout, EmployerPurchaseConfirm } from '@/components/EmployerCheckout'
+
 export default function EmployersPage() {
   const tiers = [
     {
@@ -69,6 +71,20 @@ export default function EmployersPage() {
             ))}
           </div>
         </div>
+
+        {/* Post-checkout confirmation (renders only on the Stripe return) */}
+        <EmployerPurchaseConfirm />
+
+        {/* One-time products — real checkout, no account needed */}
+        <div style={{ marginBottom: '1rem', textAlign: 'center' }}>
+          <div style={{ fontFamily: 'var(--mono)', fontSize: '.55rem', textTransform: 'uppercase', letterSpacing: '.14em', color: 'var(--dim)', marginBottom: '.4rem' }}>Start now · one-time · no account needed</div>
+        </div>
+        <EmployerCheckout />
+        <div style={{ textAlign: 'center', fontFamily: 'var(--mono)', fontSize: '.55rem', color: 'var(--muted)', marginBottom: '3rem', lineHeight: 1.6 }}>
+          Payments never change a company&apos;s transparency score. Featured buys reach; Transparency Verified is a commitment we review against real applicant outcomes.
+        </div>
+
+        <div style={{ textAlign: 'center', fontFamily: 'var(--mono)', fontSize: '.6rem', textTransform: 'uppercase', letterSpacing: '.14em', color: 'var(--dim)', marginBottom: '1.5rem' }}>Or go bigger — recurring plans</div>
 
         {/* Pricing tiers */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: '1.25rem', marginBottom: '3rem' }}>

@@ -5,6 +5,7 @@ import { Score } from '@/lib/score'
 import { SavedJobsStore } from '@/lib/stores/SavedJobs'
 import { useAuth } from '@/lib/auth'
 import { aiHeaders } from '@/lib/aiHeaders'
+import { notify } from '@/lib/notify'
 import type { Job } from '@/lib/types'
 
 function jobVibes(job: Job): { cls: string; txt: string }[] {
@@ -57,9 +58,22 @@ export default function JobCard({ job, index, onSaveToggle, onOpen, onApply, onC
       await fetch('/api/user-sync', {
         method: 'POST',
         headers: await aiHeaders(),
-        body: JSON.stringify({ action: 'report_job_availability', job_id: String(job.id), status: 'expired' }),
+        // Send a listing snapshot so admin can see/investigate the report even when this is a
+        // live search result (j_<hash> id) never saved to the board. Mirrors app/jobs/[id].
+        body: JSON.stringify({
+          action: 'report_job_availability',
+          job_id: String(job.id),
+          status: 'expired',
+          snapshot: {
+            company: job.company || null,
+            title: job.title || null,
+            city: job.location || null,
+            apply_url: job.apply_url || null,
+          },
+        }),
       })
       setReportedInactive(true)
+      notify({ title: 'Thanks — reported', sub: 'We’ll review this listing', severity: 'success', duration: 2600 })
     } catch { /* silent */ } finally {
       setReportingInactive(false)
     }
@@ -70,9 +84,11 @@ export default function JobCard({ job, index, onSaveToggle, onOpen, onApply, onC
     if (saved) {
       SavedJobsStore.remove(job.id, false)
       setSaved(false)
+      notify({ title: 'Removed from saved', sub: `${job.title} · ${job.company}`, severity: 'info', duration: 2600 })
     } else {
       SavedJobsStore.save(job, false)
       setSaved(true)
+      notify({ title: 'Saved to your list', sub: `${job.title} · ${job.company}`, severity: 'success', duration: 2600 })
     }
     onSaveToggle(job.id)
   }

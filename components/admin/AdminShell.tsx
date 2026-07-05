@@ -7,6 +7,8 @@ import { AdminHero, AdminCommandCenter, AdminMetricCard, CardSubLink, AdminAtten
 import { KpiModal, ManageAccountsModal, RevenueDetailModal, TrialsDetailModal, SharesDetailModal, ErrorsDetailModal } from './modals'
 import { JobCrisisBanner, JobRefreshButton, JobRunner, ReportRow, IssueRow, InactiveRow, MergePanel, CompanyExportPanel, CreditsPanel, FlagsPanel, ClustersPanel, JobDedupePanel, AllJobsBrowser, DeployPanel } from './panels'
 import { GhostReportPanel } from './GhostReportPanel'
+import { LiveBell } from './LiveBell'
+import { useAdminLive } from '@/lib/hooks/useAdminLive'
 
 // The authenticated dashboard body. Owns local UI state (open modals, merge prefill,
 // emergency-refresh status). `reload` re-fetches stats; `onLogout`/`onUnauthorized`
@@ -151,8 +153,12 @@ export function AdminShell({ stats, token, reload, onLogout, onUnauthorized }: {
   const revPhrase = mrr ? 'Revenue is moving' : stripeOn ? 'Not activated yet' : 'Stripe not connected'
   const jobsPhrase = jh?.crisis ? 'Board in crisis' : staleJobs > 500 ? 'Stale building up' : 'Board is fresh'
 
+  // Seen Live — stream new events, pop toasts, refresh KPIs without a manual reload.
+  const liveFeed = useAdminLive(token, reload)
+
   return (
     <div className="page-full" style={{ background: 'radial-gradient(ellipse at 10% 0%,rgba(29,78,216,0.1) 0%,transparent 50%),radial-gradient(ellipse at 90% 10%,rgba(124,58,237,0.07) 0%,transparent 45%)' }}>
+      <LiveBell events={liveFeed.events} unread={liveFeed.unread} markRead={liveFeed.markRead} live={liveFeed.live} />
       <div className="adm-wrap">
 
         {/* 1. Hero — title, health pill, plain-English summary, session actions */}
