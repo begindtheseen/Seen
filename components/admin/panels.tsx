@@ -323,8 +323,13 @@ export function InactiveRow({ report: r, token, onRefresh }: { report: InactiveR
     .join(', ') || `${r.report_count} report${r.report_count === 1 ? '' : 's'}`
 
   async function act(action: 'delete_listing' | 'dismiss_inactive_report') {
-    if (action === 'delete_listing' && !confirm('Delete this listing? It will be removed from the job board (job seekers will no longer see it) and its reports cleared. This can be reversed by an engineer.')) return
-    if (action === 'dismiss_inactive_report' && !confirm('Dismiss this report? The report is cleared from the queue and the listing stays live.')) return
+    if (action === 'delete_listing') {
+      const msg = orphan
+        ? 'Delete this listing? It is a live search result (not saved to the board), so it will be suppressed from future searches so it can’t resurface, and the report cleared.'
+        : 'Delete this listing? It will be removed from the job board (job seekers will no longer see it) and its reports cleared. This can be reversed by an engineer.'
+      if (!confirm(msg)) return
+    }
+    if (action === 'dismiss_inactive_report' && !confirm('Keep this listing? The report is cleared from the queue and the listing stays live/searchable.')) return
     setActing(true)
     try {
       const res = await fetch('/api/admin-stats', {
@@ -344,7 +349,7 @@ export function InactiveRow({ report: r, token, onRefresh }: { report: InactiveR
 
   if (done) return (
     <div style={{ padding: '.5rem 0', borderBottom: '1px solid var(--line2)', fontFamily: 'var(--mono)', fontSize: '.58rem', color: done === 'deleted' ? 'var(--green)' : 'var(--dim)' }}>
-      {done === 'deleted' ? '✓ Listing deleted' : '✓ Report dismissed'}
+      {done === 'deleted' ? '✓ Listing deleted' : '✓ Listing kept — report cleared'}
     </div>
   )
 
@@ -360,12 +365,14 @@ export function InactiveRow({ report: r, token, onRefresh }: { report: InactiveR
                   : <span style={{ color: 'var(--sub)' }}>{r.job_id}</span>}
               </div>
               <div style={{ fontFamily: 'var(--mono)', fontSize: '.55rem', color: 'var(--dim)', marginTop: '.15rem' }}>
-                {snap?.city ? `${snap.city} · ` : ''}live search result — not stored on the board · {reasonStr} · latest {relTime(r.latest_reported_at)}
+                {snap?.city ? `${snap.city} · ` : ''}live listing (not saved to the board) · {reasonStr} · latest {relTime(r.latest_reported_at)}
               </div>
-              {snap?.apply_url && (
-                <div style={{ marginTop: '.25rem' }}>
-                  <a href={snap.apply_url} target="_blank" rel="noopener noreferrer" style={{ fontFamily: 'var(--mono)', fontSize: '.55rem', color: 'var(--blue)', textDecoration: 'none' }}>↗ Open reported apply URL</a>
+              {snap?.apply_url ? (
+                <div style={{ marginTop: '.3rem' }}>
+                  <a href={snap.apply_url} target="_blank" rel="noopener noreferrer" style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', color: 'var(--blue)', textDecoration: 'none', fontWeight: 700 }}>↗ Open the live posting to investigate</a>
                 </div>
+              ) : (
+                <div style={{ fontFamily: 'var(--mono)', fontSize: '.52rem', color: 'var(--muted)', marginTop: '.3rem' }}>No apply URL captured (reported before snapshotting shipped) — dismiss to clear.</div>
               )}
             </>
           ) : (
@@ -384,10 +391,10 @@ export function InactiveRow({ report: r, token, onRefresh }: { report: InactiveR
           )}
         </div>
         <div style={{ display: 'flex', gap: '.45rem', flexShrink: 0 }}>
-          {!orphan && (
-            <button onClick={() => act('delete_listing')} disabled={acting} style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', padding: '.3rem .65rem', borderRadius: 6, border: '1px solid rgba(239,68,68,.4)', background: 'rgba(239,68,68,.08)', color: 'var(--red)', cursor: 'pointer' }}>Delete listing</button>
-          )}
-          <button onClick={() => act('dismiss_inactive_report')} disabled={acting} style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', padding: '.3rem .65rem', borderRadius: 6, border: '1px solid var(--line2)', background: 'transparent', color: 'var(--sub)', cursor: 'pointer' }}>Dismiss report</button>
+          {/* Orphan (ephemeral) delete suppresses the listing from future searches; a real board
+              row is soft-deleted. Both are offered so the admin can always keep or delete. */}
+          <button onClick={() => act('delete_listing')} disabled={acting} style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', padding: '.3rem .65rem', borderRadius: 6, border: '1px solid rgba(239,68,68,.4)', background: 'rgba(239,68,68,.08)', color: 'var(--red)', cursor: 'pointer' }}>Delete listing</button>
+          <button onClick={() => act('dismiss_inactive_report')} disabled={acting} style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', padding: '.3rem .65rem', borderRadius: 6, border: '1px solid var(--line2)', background: 'transparent', color: 'var(--sub)', cursor: 'pointer' }}>Keep listing</button>
         </div>
       </div>
     </div>

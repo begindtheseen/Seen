@@ -33,6 +33,11 @@ function installFetch(role) {
     if (u.includes('/admin_sessions?token=eq')) {
       return mockResponse([{ expires_at: new Date(Date.now() + 3600e3).toISOString(), role, admin_id: 'admin-1' }]);
     }
+    // The ephemeral-delete path reads the report's client snapshot to recover the apply_url it
+    // suppresses. Return a snapshot row for that specific GET.
+    if (u.includes('/job_availability_reports?job_id=eq') && u.includes('select=apply_url') && method === 'GET') {
+      return mockResponse([{ apply_url: 'https://example.com/job/123', title: 'Warehouse Associate', company: 'Aerotek' }]);
+    }
     return mockResponse(null, { ok: true, status: 204 });
   };
   return calls;
@@ -81,11 +86,19 @@ test('delete_listing soft-deletes the job and clears its reports', async () => {
   assert.match(audit.body, /"action":"delete_listing"/);
 });
 
-test('delete_listing on an ephemeral (non-uuid) id only clears reports, no job PATCH', async () => {
+test('delete_listing on an ephemeral (non-uuid) id suppresses by apply_url and clears reports, no job PATCH', async () => {
   const { res, calls } = await callDelete({ job_id: 'j_1no2squ' });
   assert.equal(res.statusCode, 200);
   assert.equal(res.jsonBody.soft_deleted, false);
+  // No jobs-table PATCH (ephemeral id would 400 on uuid parse).
   assert.equal(calls.some(c => c.url.includes('/jobs?id=eq') && c.method === 'PATCH'), false);
+  // It suppresses the listing by the apply_url recovered from the report snapshot, so a
+  // re-search can't resurface it.
+  const suppress = calls.find(c => c.url.includes('/suppressed_listings') && c.method === 'POST');
+  assert.ok(suppress, 'inserts a suppressed_listings row');
+  assert.match(suppress.body, /https:\/\/example\.com\/job\/123/);
+  assert.equal(res.jsonBody.suppressed, true);
+  // And clears the availability reports so the queue empties.
   assert.ok(calls.find(c => c.url.includes('/job_availability_reports?job_id=eq') && c.method === 'DELETE'));
 });
 

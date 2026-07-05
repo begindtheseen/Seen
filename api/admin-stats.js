@@ -984,6 +984,7 @@ async function _handler(req, res) {
     // search-result id (e.g. "j_1no2squ") into jobs?id=eq. 400s (uuid parse). Guard it.
     const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
     let soft_deleted = false;
+    let suppressed = false;
     if (UUID.test(jid)) {
       const up = await db(`jobs?id=eq.${encodeURIComponent(jid)}`, {
         method: 'PATCH',
@@ -991,13 +992,29 @@ async function _handler(req, res) {
         headers: { Prefer: 'return=minimal' },
       });
       soft_deleted = up.ok;
+    } else {
+      // Ephemeral (live-search) listing — no jobs row to expire. Suppress it by apply_url so a
+      // re-search can't resurface the same dead posting (migration 047). We read the listing
+      // snapshot the client saved on the report (migration 046) to get the apply_url; without one
+      // there's nothing stable to suppress, so we just clear the report below.
+      const snapRes = await db(`job_availability_reports?job_id=eq.${encodeURIComponent(jid)}&select=apply_url,title,company&limit=1`);
+      const snapRows = snapRes.ok ? await snapRes.json() : null;
+      const snap = Array.isArray(snapRows) ? snapRows[0] : null;
+      if (snap?.apply_url) {
+        const ins = await db('suppressed_listings?on_conflict=apply_url', {
+          method: 'POST',
+          headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
+          body: JSON.stringify({ apply_url: snap.apply_url, stable_job_id: jid, title: snap.title || null, company: snap.company || null, reason: 'admin_removed' }),
+        });
+        suppressed = ins.ok;
+      }
     }
     await db(`job_availability_reports?job_id=eq.${encodeURIComponent(jid)}`, {
       method: 'DELETE',
       headers: { Prefer: 'return=minimal' },
     });
-    await db('admin_audit_log', { method: 'POST', body: JSON.stringify({ admin_id: sess.admin_id, username: sess.username || 'admin', action: 'delete_listing', target_type: 'job', target_id: jid, metadata: { soft_deleted } }), headers: { Prefer: 'return=minimal' } });
-    return res.status(200).json({ ok: true, soft_deleted });
+    await db('admin_audit_log', { method: 'POST', body: JSON.stringify({ admin_id: sess.admin_id, username: sess.username || 'admin', action: 'delete_listing', target_type: 'job', target_id: jid, metadata: { soft_deleted, suppressed } }), headers: { Prefer: 'return=minimal' } });
+    return res.status(200).json({ ok: true, soft_deleted, suppressed });
   }
 
   // ── JOB DEDUPLICATION ────────────────────────────────────────────────────────
