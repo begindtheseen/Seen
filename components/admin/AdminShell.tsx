@@ -6,6 +6,7 @@ import { Panel, MetricRow, Card, CardHeader, Badge, BarChart, relTime, outcomeCo
 import { AdminHero, AdminCommandCenter, AdminMetricCard, CardSubLink, AdminAttentionQueue, AdminTabs, type HealthStatus, type TabKey } from './overview'
 import { KpiModal, ManageAccountsModal, RevenueDetailModal, TrialsDetailModal, SharesDetailModal, ErrorsDetailModal } from './modals'
 import { JobCrisisBanner, JobRefreshButton, JobRunner, ReportRow, IssueRow, InactiveRow, MergePanel, CompanyExportPanel, CreditsPanel, FlagsPanel, ClustersPanel, JobDedupePanel, AllJobsBrowser, DeployPanel } from './panels'
+import { GhostReportPanel } from './GhostReportPanel'
 
 // The authenticated dashboard body. Owns local UI state (open modals, merge prefill,
 // emergency-refresh status). `reload` re-fetches stats; `onLogout`/`onUnauthorized`
@@ -250,6 +251,8 @@ export function AdminShell({ stats, token, reload, onLogout, onUnauthorized }: {
             <MetricRow label="Companies scored" value={stats.companies.with_scores.toLocaleString()} status="with AI scores" onClick={() => openKpi('companies_scored', 'Companies with scores')} />
             <MetricRow label="Credits earned / spent" value={`${(stats.credits.earned ?? 0).toLocaleString()} / ${(stats.credits.spent ?? 0).toLocaleString()}`} status="engagement" tone="sub" />
           </Panel>
+
+            <GhostReportPanel />
 
             {/* Company lookups setup note */}
             {stats.company_lookups && !stats.company_lookups.ready && (
