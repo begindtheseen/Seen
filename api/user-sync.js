@@ -411,14 +411,25 @@ export default async function handler(req, res) {
   }
 
   if (action === 'report_job_availability') {
-    const { job_id, status: avStatus } = body;
+    const { job_id, status: avStatus, snapshot } = body;
     if (!job_id || !['active','expired','unknown'].includes(avStatus)) {
       return res.status(400).json({ error: 'job_id and valid status required' });
     }
+    // Snapshot of the listing at report time (client sends it). Lets the admin see what was
+    // reported even for ephemeral search results with no jobs-table row. Trimmed + length-capped
+    // so a bad client payload can't bloat the row; missing fields stay null (migration 046).
+    const clip = (v) => {
+      const s = (v == null ? '' : String(v)).trim();
+      return s ? s.slice(0, 300) : null;
+    };
+    const snap = snapshot && typeof snapshot === 'object' ? snapshot : {};
     // Upsert report (one per user per job)
     const rr = await db('job_availability_reports?on_conflict=user_id,job_id', {
       method: 'POST',
-      body: JSON.stringify({ job_id: String(job_id), user_id: uid, status: avStatus, reported_at: new Date().toISOString() }),
+      body: JSON.stringify({
+        job_id: String(job_id), user_id: uid, status: avStatus, reported_at: new Date().toISOString(),
+        company: clip(snap.company), title: clip(snap.title), city: clip(snap.city), apply_url: clip(snap.apply_url),
+      }),
       headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
     });
     if (!rr.ok) {
