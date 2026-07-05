@@ -313,6 +313,9 @@ export function InactiveRow({ report: r, token, onRefresh }: { report: InactiveR
   // already-gone listing) have no board listing to delete or link to — the admin can only
   // dismiss the report itself.
   const orphan = !r.job
+  // For ephemeral (non-DB) listings there's no job row, but the client-sent snapshot lets us
+  // still show what was reported instead of a bare id.
+  const snap = r.snapshot || null
   // WHY it was flagged — count broken down by report status (expired / unknown).
   const reasonStr = Object.entries(r.reasons || {})
     .sort((a, b) => b[1] - a[1])
@@ -352,11 +355,18 @@ export function InactiveRow({ report: r, token, onRefresh }: { report: InactiveR
           {orphan ? (
             <>
               <div style={{ fontFamily: 'var(--mono)', fontSize: '.65rem', color: 'var(--white)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                <span style={{ color: 'var(--sub)' }}>{r.job_id}</span>
+                {snap && (snap.title || snap.company)
+                  ? <>{snap.title || 'Untitled role'} · <span style={{ color: 'var(--sub)' }}>{snap.company || 'Unknown company'}</span></>
+                  : <span style={{ color: 'var(--sub)' }}>{r.job_id}</span>}
               </div>
               <div style={{ fontFamily: 'var(--mono)', fontSize: '.55rem', color: 'var(--dim)', marginTop: '.15rem' }}>
-                listing not in the job board (expired or ephemeral search result) · {reasonStr} · latest {relTime(r.latest_reported_at)}
+                {snap?.city ? `${snap.city} · ` : ''}live search result — not stored on the board · {reasonStr} · latest {relTime(r.latest_reported_at)}
               </div>
+              {snap?.apply_url && (
+                <div style={{ marginTop: '.25rem' }}>
+                  <a href={snap.apply_url} target="_blank" rel="noopener noreferrer" style={{ fontFamily: 'var(--mono)', fontSize: '.55rem', color: 'var(--blue)', textDecoration: 'none' }}>↗ Open reported apply URL</a>
+                </div>
+              )}
             </>
           ) : (
             <>

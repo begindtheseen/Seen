@@ -52,6 +52,9 @@ export interface InactiveReport {
   job_id: string; report_count: number; latest_reported_at: string
   reasons?: Record<string, number>
   job: { id: string; company: string; title: string; city: string; apply_url: string; availability_status: string } | null
+  // Client-sent snapshot of the listing at report time — present for ephemeral (non-DB) listings
+  // so the admin still sees what was flagged even when there is no jobs-table row.
+  snapshot?: { company: string | null; title: string | null; city: string | null; apply_url: string | null } | null
 }
 export interface DupCluster {
   id: string; risk_score: number; status: string; signals: string[]; user_ids: string[]

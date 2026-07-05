@@ -245,7 +245,7 @@ async function _handler(req, res) {
       db(`reports?select=id,company_name,outcome,role,city,platform,created_at,report_text,outcome_weight,trust_reason,needs_review&order=created_at.desc&limit=25`),
       db(`applications?select=id,company_name,role,city,status,stage,platform,created_at&order=created_at.desc&limit=25`),
       db(`jobs?created_at=gte.${todayISO}&select=id`, { headers: { Prefer: 'count=exact', 'Range-Unit': 'items', Range: '0-0' } }),
-      db(`job_availability_reports?status=in.(expired,unknown)&select=id,job_id,status,reported_at&order=reported_at.desc&limit=50`),
+      db(`job_availability_reports?status=in.(expired,unknown)&select=id,job_id,status,reported_at,company,title,city,apply_url&order=reported_at.desc&limit=50`),
       db(`jobs?select=count&availability_status=eq.active`),
       db(`jobs?select=count&created_at=gte.${encodeURIComponent(todayISO)}`),
       db(`reports?created_at=gte.${monthISO}&select=created_at,company_name,outcome&order=created_at.asc&limit=2000`),
@@ -357,11 +357,17 @@ async function _handler(req, res) {
       // can see WHY it was flagged.
       const grouped = {};
       inactiveReportRows.forEach(r => {
-        if (!grouped[r.job_id]) grouped[r.job_id] = { job_id: r.job_id, report_count: 0, latest_reported_at: r.reported_at, reasons: {} };
-        grouped[r.job_id].report_count++;
+        if (!grouped[r.job_id]) grouped[r.job_id] = { job_id: r.job_id, report_count: 0, latest_reported_at: r.reported_at, reasons: {}, snapshot: null };
+        const g = grouped[r.job_id];
+        g.report_count++;
         const reason = r.status || 'expired';
-        grouped[r.job_id].reasons[reason] = (grouped[r.job_id].reasons[reason] || 0) + 1;
-        if (r.reported_at > grouped[r.job_id].latest_reported_at) grouped[r.job_id].latest_reported_at = r.reported_at;
+        g.reasons[reason] = (g.reasons[reason] || 0) + 1;
+        if (r.reported_at > g.latest_reported_at) g.latest_reported_at = r.reported_at;
+        // Client-sent listing snapshot (migration 046). Rows arrive newest-first, so the first one
+        // carrying any snapshot field wins — gives the admin context even for ephemeral listings.
+        if (!g.snapshot && (r.company || r.title || r.city || r.apply_url)) {
+          g.snapshot = { company: r.company || null, title: r.title || null, city: r.city || null, apply_url: r.apply_url || null };
+        }
       });
       inactiveReports = Object.values(grouped)
         .sort((a, b) => b.report_count - a.report_count)
