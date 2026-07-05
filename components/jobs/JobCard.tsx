@@ -5,6 +5,7 @@ import { Score } from '@/lib/score'
 import { SavedJobsStore } from '@/lib/stores/SavedJobs'
 import { useAuth } from '@/lib/auth'
 import { aiHeaders } from '@/lib/aiHeaders'
+import { notify } from '@/lib/notify'
 import type { Job } from '@/lib/types'
 
 function jobVibes(job: Job): { cls: string; txt: string }[] {
@@ -72,6 +73,7 @@ export default function JobCard({ job, index, onSaveToggle, onOpen, onApply, onC
         }),
       })
       setReportedInactive(true)
+      notify({ title: 'Thanks — reported', sub: 'We’ll review this listing', severity: 'success', duration: 2600 })
     } catch { /* silent */ } finally {
       setReportingInactive(false)
     }
@@ -82,9 +84,11 @@ export default function JobCard({ job, index, onSaveToggle, onOpen, onApply, onC
     if (saved) {
       SavedJobsStore.remove(job.id, false)
       setSaved(false)
+      notify({ title: 'Removed from saved', sub: `${job.title} · ${job.company}`, severity: 'info', duration: 2600 })
     } else {
       SavedJobsStore.save(job, false)
       setSaved(true)
+      notify({ title: 'Saved to your list', sub: `${job.title} · ${job.company}`, severity: 'success', duration: 2600 })
     }
     onSaveToggle(job.id)
   }

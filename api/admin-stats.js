@@ -476,6 +476,32 @@ async function _handler(req, res) {
     return res.status(200).json({ ok: true });
   }
 
+  // ── LIVE FEED — cheap cursor poll for the real-time admin (Seen Live) ─────────
+  // Returns only events NEWER than `since` across the tables that represent "something
+  // happened", so the client can pop notifications + update without a full stats refetch.
+  // The client passes back the previous poll's `server_time` as `since` (strictly-greater),
+  // guaranteeing no gaps; it dedups by the composite event id. Read-only, all roles.
+  if (action === 'recent_events') {
+    const sinceRaw = body.since && !isNaN(Date.parse(body.since)) ? new Date(body.since).toISOString() : new Date(Date.now() - 2 * 60000).toISOString();
+    const s = encodeURIComponent(sinceRaw);
+    const j = (path) => db(path).then(r => (r.ok ? r.json() : [])).then(x => (Array.isArray(x) ? x : [])).catch(() => []);
+    const [reports, apps, purchases, flags, signups] = await Promise.all([
+      j(`reports?created_at=gt.${s}&select=id,company_name,outcome,role,created_at&order=created_at.desc&limit=15`),
+      j(`applications?created_at=gt.${s}&select=id,company_name,role,created_at&order=created_at.desc&limit=15`),
+      j(`employer_purchases?created_at=gt.${s}&select=id,company,employer_sku,amount_cents,created_at&order=created_at.desc&limit=15`),
+      j(`job_availability_reports?reported_at=gt.${s}&select=id,job_id,company,title,reported_at&order=reported_at.desc&limit=15`),
+      j(`profiles?created_at=gt.${s}&select=created_at&order=created_at.desc&limit=15`),
+    ]);
+    const events = [];
+    for (const r of reports) events.push({ id: `report:${r.id}`, type: 'report', sev: 'blue', at: r.created_at, title: `New report — ${r.company_name || 'a company'}`, sub: `${r.outcome || 'reported'}${r.role ? ` · ${r.role}` : ''}` });
+    for (const a of apps) events.push({ id: `app:${a.id}`, type: 'application', sev: 'green', at: a.created_at, title: `Application tracked — ${a.company_name || 'a company'}`, sub: a.role || '' });
+    for (const p of purchases) events.push({ id: `purchase:${p.id}`, type: 'purchase', sev: 'money', at: p.created_at, title: `Employer sale — $${((p.amount_cents || 0) / 100).toFixed(0)}`, sub: `${p.company || 'an employer'}${p.employer_sku ? ` · ${p.employer_sku}` : ''}` });
+    for (const f of flags) events.push({ id: `flag:${f.id}`, type: 'flag', sev: 'amber', at: f.reported_at, title: `Listing flagged — ${f.title || f.company || f.job_id}`, sub: 'reported no longer active' });
+    for (const g of signups) events.push({ id: `signup:${g.created_at}`, type: 'signup', sev: 'violet', at: g.created_at, title: 'New signup', sub: '' });
+    events.sort((a, b) => new Date(b.at).getTime() - new Date(a.at).getTime());
+    return res.status(200).json({ ok: true, events: events.slice(0, 40), server_time: new Date().toISOString() });
+  }
+
   // ── EXPORT CSV — downloadable snapshot for conversion analysis ────────────────
   // Returns { csv, filename }; the admin UI turns it into a file download. Includes a
   // summary block + a 30-day daily time series (signups, reports, outcome-card shares).
