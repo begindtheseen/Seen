@@ -193,6 +193,22 @@ export default async function handler(req, res) {
     'Content-Type': 'application/json',
   };
 
+  // ── Employer perks (Engine E4) — active Featured / Transparency Verified for a company.
+  // Isolated read so the company page can show the badge without touching the scoring path.
+  // Perks never affect a score; this is display-only. Must run BEFORE the `body.name` catch below.
+  if (body.action === 'employer_perk') {
+    const name = String(body.name || '').trim().toLowerCase();
+    if (!name) return res.status(200).json({ featured: false, verified: false });
+    res.setHeader('Cache-Control', 'public, s-maxage=300, stale-while-revalidate=600');
+    try {
+      const r = await fetch(`${SUPABASE_URL}/rest/v1/employer_perks?company=eq.${encodeURIComponent(name)}&select=featured_until,verified_until&limit=1`, { headers: hdrsBase });
+      const row = r.ok ? (await r.json())[0] : null;
+      const now = Date.now();
+      const active = (v) => !!v && Date.parse(v) > now;
+      return res.status(200).json({ featured: active(row?.featured_until), verified: active(row?.verified_until) });
+    } catch { return res.status(200).json({ featured: false, verified: false }); }
+  }
+
   // ── Company-score: merged from api/company-score.js ─────────────────────────
   if (body.action === 'company_score' || body.action === 'research' || body.action === 'resolve' || body.action === 'populate' || body.name) {
     if (await applyRateLimit(req, res, 'company-score')) return;

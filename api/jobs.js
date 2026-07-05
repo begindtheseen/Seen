@@ -30,7 +30,29 @@ async function getSuppressedSet(url, headers) {
 }
 // Drop any listing whose apply_url (mapped to `url` in the UI shape) is suppressed.
 const dropSuppressed = (list, set) =>
-  (!set || set.size === 0) ? list : list.filter((j) => !set.has(_normUrl(j.url || j.apply_url)));
+  (!set || set.size === 0) ? list : list.filter((j) => !set.has(_normUrl(j.url || j.apply_url)))
+
+// Featured employers (Engine E4) — companies with an active paid featured perk. Cached 60s,
+// fail-safe. Their listings get a `featured` flag (badge on the card) and sort to the top.
+let _featCache = { at: 0, set: new Set() }
+async function getFeaturedSet(url, headers) {
+  const now = Date.now()
+  if (now - _featCache.at < 60_000) return _featCache.set
+  try {
+    const r = await fetch(`${url}/rest/v1/employer_perks?featured_until=gt.${encodeURIComponent(new Date().toISOString())}&select=company&limit=500`, { headers })
+    if (r.ok) {
+      const rows = await r.json()
+      _featCache = { at: now, set: new Set((Array.isArray(rows) ? rows : []).map((x) => String(x.company || '').toLowerCase()).filter(Boolean)) }
+    } else { _featCache = { at: now, set: _featCache.set } }
+  } catch { _featCache = { at: now, set: _featCache.set } }
+  return _featCache.set
+}
+// Flag featured listings and stable-sort them first (paid placement; never a score change).
+const applyFeatured = (list, set) => {
+  if (!set || set.size === 0) return list
+  const marked = list.map((j) => ({ ...j, featured: set.has(String(j.company || '').toLowerCase()) }))
+  return marked.map((j, i) => [j, i]).sort((a, b) => (b[0].featured - a[0].featured) || (a[1] - b[1])).map(([j]) => j)
+};
 
 // Verify a Supabase JWT (HS256) and return the user id, or null. Decoding the payload
 // WITHOUT this check would let anyone forge a token and read another user's data.
@@ -156,8 +178,9 @@ export default async function handler(req, res) {
       'Content-Type': 'application/json',
     };
 
-    // Admin-suppressed dead listings to filter out of results (fail-safe: empty set on error).
-    const suppressedSet = await getSuppressedSet(SUPABASE_URL, dbHeaders);
+    // Admin-suppressed dead listings to filter out + featured employers to boost (fail-safe).
+    const suppressedSet = await getSuppressedSet(SUPABASE_URL, dbHeaders)
+    const featuredSet = await getFeaturedSet(SUPABASE_URL, dbHeaders);
 
     const qNorm = safeQuery.toLowerCase();
 
@@ -292,7 +315,7 @@ export default async function handler(req, res) {
 
         if (dbMatches.length >= TARGET) {
           console.log(`DB HIT: "${query}" → "${canonical}" @ "${loc}" (${radiusMiles}mi) — ${dbMatches.length} in-radius results (no API call)`);
-          return res.status(200).json({ ok: true, jobs: dropSuppressed(dbMatches.slice(0, 60), suppressedSet), query, location: loc, _src: 'db' });
+          return res.status(200).json({ ok: true, jobs: applyFeatured(dropSuppressed(dbMatches.slice(0, 60), suppressedSet), featuredSet), query, location: loc, _src: 'db' });
         }
       } catch(e) { console.warn('DB-first search error:', e.message); }
       console.log(`DB TOP-UP: "${query}" → "${canonical}" @ "${loc}" — ${dbMatches.length} in DB, pulling more from API`);
@@ -428,7 +451,7 @@ export default async function handler(req, res) {
       console.log(`NEAREST FALLBACK: "${query}" @ "${loc}" — ${finalJobs.length} nearby listings`);
     }
 
-    const result = { jobs: dropSuppressed(finalJobs, suppressedSet), query, location: loc, radius: radiusMiles, _src: widened ? 'widened' : (jobs.length ? 'aggregated' : 'db'), widened };
+    const result = { jobs: applyFeatured(dropSuppressed(finalJobs, suppressedSet), featuredSet), query, location: loc, radius: radiusMiles, _src: widened ? 'widened' : (jobs.length ? 'aggregated' : 'db'), widened };
     _inflightResolve?.(result);
     _inflight.delete(inflightKey);
     return res.status(200).json({ ok: true, ...result });

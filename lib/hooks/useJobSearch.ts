@@ -328,6 +328,7 @@ export function useJobSearch() {
             salary: j.salary ? String(j.salary) : null,
             apply_url,
             posted_at: j.posted_at ? String(j.posted_at) : null,
+            featured: !!j.featured,
           }
         })
         searchCache.set(cacheKey, { jobs: raw, ts: Date.now() })

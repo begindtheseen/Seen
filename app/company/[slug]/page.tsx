@@ -470,6 +470,13 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
   const [location, setLocation] = useState('')
   const [webReviews, setWebReviews] = useState<WebReview[]>([])
   const [viewers, setViewers] = useState(0)
+  const [perk, setPerk] = useState<{ featured: boolean; verified: boolean }>({ featured: false, verified: false })
+  useEffect(() => {
+    let alive = true
+    fetch('/api/reports', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'employer_perk', name: companyName }) })
+      .then(r => r.json()).then(d => { if (alive && d) setPerk({ featured: !!d.featured, verified: !!d.verified }) }).catch(() => {})
+    return () => { alive = false }
+  }, [companyName])
   const [companyJobs, setCompanyJobs] = useState<Array<{title:string;company:string;location:string;salary:string|null;url:string|null;source:string;type:string;level:string;score:number}>>([])
   const [jobsLoading, setJobsLoading] = useState(false)
   const [jobsFetched, setJobsFetched] = useState(false)
@@ -675,7 +682,15 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
           <div className="co-top">
             <div className="co-logo-lg">{logoLetter}</div>
             <div style={{ flex: 1 }}>
-              <div className="co-name">{companyName}</div>
+              <div className="co-name" style={{ display: 'inline-flex', alignItems: 'center', gap: '.55rem', flexWrap: 'wrap' }}>
+                {companyName}
+                {perk.verified && (
+                  <span title="This employer committed to responding to applicants. Reviewed against real outcome data — it never affects the transparency score." style={{ display: 'inline-flex', alignItems: 'center', gap: '.3rem', fontFamily: 'var(--mono)', fontSize: '.5rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.08em', color: 'var(--blue)', background: 'rgba(59,130,246,.12)', border: '1px solid rgba(59,130,246,.4)', borderRadius: 999, padding: '.2rem .55rem', whiteSpace: 'nowrap' }}>✓ Transparency Verified</span>
+                )}
+                {perk.featured && (
+                  <span title="Featured employer — paid placement. Never affects the transparency score." style={{ display: 'inline-flex', alignItems: 'center', gap: '.3rem', fontFamily: 'var(--mono)', fontSize: '.5rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.08em', color: '#f7c948', background: 'rgba(247,201,72,.12)', border: '1px solid rgba(247,201,72,.4)', borderRadius: 999, padding: '.2rem .55rem', whiteSpace: 'nowrap' }}>★ Featured</span>
+                )}
+              </div>
               {industry && <div className="co-ind">{industry}</div>}
               {/* T3-9: Live viewer count */}
               {viewers > 0 && (

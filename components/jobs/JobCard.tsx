@@ -113,6 +113,9 @@ export default function JobCard({ job, index, onSaveToggle, onOpen, onApply, onC
       </div>
 
       <div style={{ display: 'flex', alignItems: 'center', gap: '.35rem', flexWrap: 'wrap', margin: '.35rem 0' }}>
+        {job.featured && (
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '.25rem', fontFamily: 'var(--mono)', fontSize: '.55rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.06em', color: '#f7c948', background: 'rgba(247,201,72,.12)', border: '1px solid rgba(247,201,72,.4)', borderRadius: 999, padding: '.15rem .5rem' }}>★ Featured</span>
+        )}
         {wl && <span className={`${wl.cls} waste-badge`}>{wl.txt}</span>}
         {job.waste != null && job.waste >= 55 && (
           <span className="vibe v-r" style={{ display: 'inline-flex', alignItems: 'center', gap: '.25rem' }}>
