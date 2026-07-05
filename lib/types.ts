@@ -84,6 +84,8 @@ export interface Job {
   availability_status?: string
   /** ISO timestamp of when the listing entered our corpus — powers the Posted filter. */
   posted_at?: string | null
+  /** Paid Featured-employer placement (Engine E4) — badge + sorts first. Never a score change. */
+  featured?: boolean
 }
 
 export interface CheckScheduleItem {

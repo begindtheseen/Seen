@@ -210,6 +210,51 @@ export async function getScoresByNames(namesLower: string[]): Promise<Map<string
   }
 }
 
+// ── Employer perks (Engine E4 — paid Featured placement + Transparency Verified badge) ──────
+// Read time-boxed perks from employer_perks (keyed by lowercased company name). Server-only,
+// timeout-guarded, direct from Supabase — never a self-fetch of the live API. Perks NEVER touch a
+// score: featured is placement, verified is a displayed commitment the admin granted after review.
+
+export type EmployerPerk = { featured: boolean; verified: boolean }
+
+// One company's active perks — for the company page badge. Returns all-false when absent/expired.
+export async function getEmployerPerk(nameOrSlug: string): Promise<EmployerPerk> {
+  const creds = sbCreds()
+  const none = { featured: false, verified: false }
+  if (!creds) return none
+  const name = (nameOrSlug.includes('-') ? nameOrSlug.replace(/-/g, ' ') : nameOrSlug).toLowerCase().trim()
+  const headers = { apikey: creds.key, Authorization: `Bearer ${creds.key}` }
+  try {
+    const r = await fetch(`${creds.url}/rest/v1/employer_perks?company=eq.${encodeURIComponent(name)}&select=featured_until,verified_until&limit=1`, { headers, signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) })
+    if (!r.ok) return none
+    const row = (await r.json())?.[0]
+    if (!row) return none
+    const now = Date.now()
+    const active = (v: string | null) => !!v && Date.parse(v) > now
+    return { featured: active(row.featured_until), verified: active(row.verified_until) }
+  } catch {
+    return none
+  }
+}
+
+// Set of lowercased company names with an ACTIVE featured perk — for the search placement boost +
+// "Featured" badge. Small table; one read, timeout-guarded.
+export async function getFeaturedCompanies(): Promise<Set<string>> {
+  const out = new Set<string>()
+  const creds = sbCreds()
+  if (!creds) return out
+  const headers = { apikey: creds.key, Authorization: `Bearer ${creds.key}` }
+  const nowIso = new Date().toISOString()
+  try {
+    const r = await fetch(`${creds.url}/rest/v1/employer_perks?featured_until=gt.${encodeURIComponent(nowIso)}&select=company&limit=500`, { headers, signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) })
+    if (!r.ok) return out
+    for (const row of (await r.json()) || []) if (row?.company) out.add(String(row.company).toLowerCase())
+    return out
+  } catch {
+    return out
+  }
+}
+
 // Top long-tail companies seeded for static generation (FAQ pages). These are the names people
 // actually type into Google / Reddit ("does <x> ghost applicants"). Real data is fetched per page;
 // this is only the static-params seed list — other companies render on-demand.

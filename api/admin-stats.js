@@ -502,6 +502,47 @@ async function _handler(req, res) {
     return res.status(200).json({ ok: true, events: events.slice(0, 40), server_time: new Date().toISOString() });
   }
 
+  // ── EMPLOYER PURCHASES — list for fulfillment (Engine E4) ─────────────────────
+  if (action === 'list_employer_purchases') {
+    const pr = await db(`employer_purchases?select=id,company,email,employer_sku,amount_cents,status,created_at,fulfilled_at&order=created_at.desc&limit=50`);
+    const purchases = pr.ok ? await pr.json() : [];
+    const pk = await db(`employer_perks?select=company,featured_until,verified_until&order=updated_at.desc&limit=200`);
+    const perks = pk.ok ? await pk.json() : [];
+    const revRes = await db(`employer_purchases?select=amount_cents`);
+    const rev = revRes.ok ? (await revRes.json()).reduce((n, r) => n + (r.amount_cents || 0), 0) : 0;
+    return res.status(200).json({ ok: true, purchases: Array.isArray(purchases) ? purchases : [], perks: Array.isArray(perks) ? perks : [], total_cents: rev });
+  }
+
+  // ── FULFILL an employer purchase → grant the time-boxed perk (Engine E4) ──────
+  // featured30 → featured_until = now+30d; verified90 → verified_until = now+90d. Company-keyed,
+  // merge-upsert so granting one perk never clears the other. Money grants reach/badge, never a
+  // score. Full admins only.
+  if (action === 'fulfill_employer_purchase') {
+    if (adminRole === 'moderator') return res.status(403).json({ error: 'Insufficient role' });
+    const { purchase_id } = body;
+    if (!purchase_id) return res.status(400).json({ error: 'purchase_id required' });
+    const pr = await db(`employer_purchases?id=eq.${encodeURIComponent(purchase_id)}&select=id,company,employer_sku&limit=1`);
+    const purchase = pr.ok ? (await pr.json())[0] : null;
+    if (!purchase) return res.status(404).json({ error: 'Purchase not found' });
+    const company = String(purchase.company || '').trim().toLowerCase();
+    if (!company) return res.status(400).json({ error: 'Purchase has no company to attach the perk to' });
+    const isVerified = purchase.employer_sku === 'verified90';
+    const days = isVerified ? 90 : 30;
+    const col = isVerified ? 'verified_until' : 'featured_until';
+    const until = new Date(Date.now() + days * 86400e3).toISOString();
+    const up = await db('employer_perks?on_conflict=company', {
+      method: 'POST', headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
+      body: JSON.stringify({ company, [col]: until, purchase_id: purchase.id, updated_at: new Date().toISOString() }),
+    });
+    if (!up.ok) return res.status(500).json({ error: 'Could not grant perk' });
+    await db(`employer_purchases?id=eq.${encodeURIComponent(purchase.id)}`, {
+      method: 'PATCH', headers: { Prefer: 'return=minimal' },
+      body: JSON.stringify({ status: 'fulfilled', fulfilled_at: new Date().toISOString() }),
+    });
+    await db('admin_audit_log', { method: 'POST', body: JSON.stringify({ admin_id: sess.admin_id, username: sess.username || 'admin', action: 'fulfill_employer_purchase', target_type: 'employer', target_id: company, metadata: { sku: purchase.employer_sku, until } }), headers: { Prefer: 'return=minimal' } });
+    return res.status(200).json({ ok: true, company, perk: col, until });
+  }
+
   // ── EXPORT CSV — downloadable snapshot for conversion analysis ────────────────
   // Returns { csv, filename }; the admin UI turns it into a file download. Includes a
   // summary block + a 30-day daily time series (signups, reports, outcome-card shares).

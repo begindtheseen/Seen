@@ -1,15 +1,18 @@
 'use client'
 
 import { useEffect, useRef, useState, useCallback } from 'react'
+import { supabase } from '@/lib/supabase'
 import { notify, type NotifySeverity } from '@/lib/notify'
 
-// The real-time engine for the admin dashboard (Seen Live). Polls the cheap `recent_events`
-// cursor action every POLL_MS, pops a toast + prepends to the activity feed for each NEW event,
-// and refreshes the heavy stats (via `reload`) only when something actually changed — so KPIs
-// update on their own without a manual refresh, and notifications fire the moment things happen.
+// The real-time engine for the admin dashboard (Seen Live). It is INSTANT: the server broadcasts
+// a tiny "activity" ping to the Supabase Realtime channel `seen-live` the moment anything happens
+// (report, employer sale, flag, …), and this hook reacts in <1s — fetching the authenticated
+// details from the cheap `recent_events` cursor endpoint, popping a toast, prepending to the feed,
+// and refreshing KPIs. A slow fallback poll (every FALLBACK_MS) is only a safety net for the rare
+// case Realtime is unreachable, so an event is never lost.
 //
-// The FIRST poll only primes the cursor (server_time) and does NOT toast, so opening the
-// dashboard never replays a backlog of old events as fake "new" notifications.
+// The FIRST fetch only primes the cursor and does NOT toast, so opening the dashboard never
+// replays a backlog of old events as fake "new" notifications.
 
 export type LiveEvent = {
   id: string
@@ -20,7 +23,8 @@ export type LiveEvent = {
   sub?: string
 }
 
-const POLL_MS = 8000
+const LIVE_TOPIC = 'seen-live'
+const FALLBACK_MS = 12000
 const FEED_CAP = 60
 
 const toNotifySev = (sev: LiveEvent['sev']): NotifySeverity =>
@@ -33,6 +37,7 @@ export function useAdminLive(token: string | null, reload: () => void) {
   const cursor = useRef<string | null>(null)
   const primed = useRef(false)
   const seen = useRef<Set<string>>(new Set())
+  const inflight = useRef(false)
   const reloadRef = useRef(reload)
   reloadRef.current = reload
 
@@ -41,39 +46,56 @@ export function useAdminLive(token: string | null, reload: () => void) {
   useEffect(() => {
     if (!token) return
     let alive = true
-    let timer: ReturnType<typeof setTimeout> | null = null
+    let interval: ReturnType<typeof setInterval> | null = null
+    let debounce: ReturnType<typeof setTimeout> | null = null
 
     async function poll() {
+      if (!alive || inflight.current) return
+      inflight.current = true
       try {
         const res = await fetch('/api/admin-stats', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'X-Admin-Token': token as string },
           body: JSON.stringify({ action: 'recent_events', since: cursor.current }),
         })
-        if (!res.ok) { if (alive) setLive(false); return }
+        if (!res.ok) return
         const data = await res.json()
         if (!alive) return
-        setLive(true)
         cursor.current = data.server_time || cursor.current
         const incoming: LiveEvent[] = Array.isArray(data.events) ? data.events : []
         const fresh = incoming.filter(e => e && e.id && !seen.current.has(e.id))
         fresh.forEach(e => seen.current.add(e.id))
-
-        if (!primed.current) { primed.current = true; return } // first poll: cursor only
+        if (!primed.current) { primed.current = true; return }
         if (fresh.length) {
-          // Newest-first into the feed; oldest-first for toasts so they read chronologically.
           setEvents(prev => [...fresh, ...prev].slice(0, FEED_CAP))
           setUnread(u => u + fresh.length)
           ;[...fresh].reverse().forEach(e =>
             notify({ title: e.title, sub: e.sub, severity: toNotifySev(e.sev), key: e.id, duration: e.sev === 'money' ? 8000 : 5000 }),
           )
-          reloadRef.current() // refresh KPIs now that state changed
+          reloadRef.current()
         }
-      } catch { if (alive) setLive(false) }
-      finally { if (alive) timer = setTimeout(poll, POLL_MS) }
+      } catch { /* fallback poll will retry */ }
+      finally { inflight.current = false }
     }
-    poll()
-    return () => { alive = false; if (timer) clearTimeout(timer) }
+
+    // Instant path: broadcast ping → immediate (debounced) fetch.
+    const channel = supabase
+      .channel(LIVE_TOPIC)
+      .on('broadcast', { event: 'activity' }, () => {
+        if (debounce) clearTimeout(debounce)
+        debounce = setTimeout(() => poll(), 250)
+      })
+      .subscribe((status) => { if (alive) setLive(status === 'SUBSCRIBED') })
+
+    poll() // prime cursor now
+    interval = setInterval(poll, FALLBACK_MS) // safety net only
+
+    return () => {
+      alive = false
+      if (interval) clearInterval(interval)
+      if (debounce) clearTimeout(debounce)
+      supabase.removeChannel(channel)
+    }
   }, [token])
 
   return { events, unread, markRead, live }

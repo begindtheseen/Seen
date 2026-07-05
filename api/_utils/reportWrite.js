@@ -6,6 +6,7 @@
 // never touch RLS-protected reads on the client's behalf.
 
 import { classifyPlatform, fuseCompanyIntel } from './companyIntel.js';
+import { broadcastActivity } from '../../lib/server/realtime.js';
 
 const _SCORE_TTL_MS = 365 * 24 * 60 * 60 * 1000;
 
@@ -176,5 +177,6 @@ export async function writeReport(SUPABASE_URL, hdrs, reportBase, companyName) {
       });
     }
   }
+  if (repRes.ok) broadcastActivity('report'); // instant Seen Live ping
   return repRes.ok;
 }

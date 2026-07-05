@@ -8,6 +8,7 @@ import { KpiModal, ManageAccountsModal, RevenueDetailModal, TrialsDetailModal, S
 import { JobCrisisBanner, JobRefreshButton, JobRunner, ReportRow, IssueRow, InactiveRow, MergePanel, CompanyExportPanel, CreditsPanel, FlagsPanel, ClustersPanel, JobDedupePanel, AllJobsBrowser, DeployPanel } from './panels'
 import { GhostReportPanel } from './GhostReportPanel'
 import { LiveBell } from './LiveBell'
+import { EmployerPanel } from './EmployerPanel'
 import { useAdminLive } from '@/lib/hooks/useAdminLive'
 
 // The authenticated dashboard body. Owns local UI state (open modals, merge prefill,
@@ -381,6 +382,8 @@ export function AdminShell({ stats, token, reload, onLogout, onUnauthorized }: {
             <MetricRow label="Conversion" value={m ? `${m.conversion_pct}%` : '—'} status="free → paid" tone="sub" />
             {!stripeOn && <div className="ac-panel-foot">Stripe not connected — trial / paid / MRR breakdown unavailable.</div>}
           </Panel>
+
+          <EmployerPanel token={token} />
           </div>
         )}
 

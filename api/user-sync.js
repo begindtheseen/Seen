@@ -4,6 +4,7 @@
 
 import { createHmac, timingSafeEqual } from 'crypto';
 import { rateLimit } from '../lib/server/ratelimit.js';
+import { broadcastActivity } from '../lib/server/realtime.js';
 import { buildOpportunities } from './_utils/opportunityEngine.js';
 import { extractEmployment } from '../lib/server/resumeAnalysis.js';
 import { buildResumeSurvey, RESUME_SURVEY_KEYS, mapAnswersToReport } from './_utils/resumeSurvey.js';
@@ -448,6 +449,7 @@ export default async function handler(req, res) {
         headers: { Prefer: 'return=minimal' },
       }).catch(() => {});
     }
+    broadcastActivity('flag'); // instant Seen Live ping
     return res.status(200).json({ ok: true });
   }
 
