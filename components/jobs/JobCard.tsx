@@ -57,7 +57,19 @@ export default function JobCard({ job, index, onSaveToggle, onOpen, onApply, onC
       await fetch('/api/user-sync', {
         method: 'POST',
         headers: await aiHeaders(),
-        body: JSON.stringify({ action: 'report_job_availability', job_id: String(job.id), status: 'expired' }),
+        // Send a listing snapshot so admin can see/investigate the report even when this is a
+        // live search result (j_<hash> id) never saved to the board. Mirrors app/jobs/[id].
+        body: JSON.stringify({
+          action: 'report_job_availability',
+          job_id: String(job.id),
+          status: 'expired',
+          snapshot: {
+            company: job.company || null,
+            title: job.title || null,
+            city: job.location || null,
+            apply_url: job.apply_url || null,
+          },
+        }),
       })
       setReportedInactive(true)
     } catch { /* silent */ } finally {
