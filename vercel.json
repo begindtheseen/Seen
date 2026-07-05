@@ -26,9 +26,11 @@
     "api/user-sync.js": { "maxDuration": 15 },
     "api/demand.js": { "maxDuration": 60 },
     "api/reports.js": { "maxDuration": 300 },
-    "api/stripe.js": { "maxDuration": 30 }
+    "api/stripe.js": { "maxDuration": 30 },
+    "api/outcome-followups.js": { "maxDuration": 60 }
   },
   "crons": [
+    { "path": "/api/outcome-followups", "schedule": "0 15 * * *" },
     { "path": "/api/refresh-jobs", "schedule": "0 2 * * *" },
     { "path": "/api/refresh-jobs", "schedule": "0 6 * * *" },
     { "path": "/api/refresh-jobs", "schedule": "0 10 * * *" },
