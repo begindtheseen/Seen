@@ -7,6 +7,31 @@ import { aggregateForQuery, upsertJobs, inferLevel } from '../lib/server/jobSour
 import { scoreJob, wasteScore, scoreRow, explainListingScore } from '../lib/server/jobScore.js';
 import { geocodeLocation, haversineMiles, milesToKm } from '../lib/server/geo.js';
 
+// ── Suppressed listings (migration 047) ─────────────────────────────────────────────────────
+// Admins can "delete" an ephemeral (live-search) listing they've confirmed dead; its apply_url
+// lands in suppressed_listings and we filter it out of search so a re-search can't resurface it.
+// The set is cached module-side for 60s (admin-driven, changes rarely) and the loader is
+// fail-safe: any error yields an empty set, so search never breaks on this.
+const _normUrl = (u) => (u == null ? '' : String(u).trim());
+let _suppressCache = { at: 0, set: new Set() };
+async function getSuppressedSet(url, headers) {
+  const now = Date.now();
+  if (_suppressCache.set.size >= 0 && now - _suppressCache.at < 60_000) return _suppressCache.set;
+  try {
+    const r = await fetch(`${url}/rest/v1/suppressed_listings?select=apply_url&limit=5000`, { headers });
+    if (r.ok) {
+      const rows = await r.json();
+      _suppressCache = { at: now, set: new Set((Array.isArray(rows) ? rows : []).map((x) => _normUrl(x.apply_url)).filter(Boolean)) };
+    } else {
+      _suppressCache = { at: now, set: _suppressCache.set }; // keep last good set on a transient error
+    }
+  } catch { _suppressCache = { at: now, set: _suppressCache.set }; }
+  return _suppressCache.set;
+}
+// Drop any listing whose apply_url (mapped to `url` in the UI shape) is suppressed.
+const dropSuppressed = (list, set) =>
+  (!set || set.size === 0) ? list : list.filter((j) => !set.has(_normUrl(j.url || j.apply_url)));
+
 // Verify a Supabase JWT (HS256) and return the user id, or null. Decoding the payload
 // WITHOUT this check would let anyone forge a token and read another user's data.
 function _verifyJWT(token, secret) {
@@ -130,6 +155,9 @@ export default async function handler(req, res) {
       Authorization: `Bearer ${SUPABASE_SERVICE_KEY}`,
       'Content-Type': 'application/json',
     };
+
+    // Admin-suppressed dead listings to filter out of results (fail-safe: empty set on error).
+    const suppressedSet = await getSuppressedSet(SUPABASE_URL, dbHeaders);
 
     const qNorm = safeQuery.toLowerCase();
 
@@ -264,7 +292,7 @@ export default async function handler(req, res) {
 
         if (dbMatches.length >= TARGET) {
           console.log(`DB HIT: "${query}" → "${canonical}" @ "${loc}" (${radiusMiles}mi) — ${dbMatches.length} in-radius results (no API call)`);
-          return res.status(200).json({ ok: true, jobs: dbMatches.slice(0, 60), query, location: loc, _src: 'db' });
+          return res.status(200).json({ ok: true, jobs: dropSuppressed(dbMatches.slice(0, 60), suppressedSet), query, location: loc, _src: 'db' });
         }
       } catch(e) { console.warn('DB-first search error:', e.message); }
       console.log(`DB TOP-UP: "${query}" → "${canonical}" @ "${loc}" — ${dbMatches.length} in DB, pulling more from API`);
@@ -400,7 +428,7 @@ export default async function handler(req, res) {
       console.log(`NEAREST FALLBACK: "${query}" @ "${loc}" — ${finalJobs.length} nearby listings`);
     }
 
-    const result = { jobs: finalJobs, query, location: loc, radius: radiusMiles, _src: widened ? 'widened' : (jobs.length ? 'aggregated' : 'db'), widened };
+    const result = { jobs: dropSuppressed(finalJobs, suppressedSet), query, location: loc, radius: radiusMiles, _src: widened ? 'widened' : (jobs.length ? 'aggregated' : 'db'), widened };
     _inflightResolve?.(result);
     _inflight.delete(inflightKey);
     return res.status(200).json({ ok: true, ...result });
