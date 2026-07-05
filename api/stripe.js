@@ -5,6 +5,8 @@
 import { createHmac, timingSafeEqual } from 'crypto';
 import { ONE_TIME_SKUS, PRO_TRIAL_DAYS } from '../lib/server/creditRules.js';
 import { fulfillOneTimeCheckout } from '../lib/server/stripeFulfillment.js';
+import { EMPLOYER_SKUS } from '../lib/server/employerSkus.js';
+import { fulfillEmployerCheckout, isEmployerSession } from '../lib/server/employerFulfillment.js';
 
 const CORS = (req, res) => {
   const o = req.headers.origin || '';
@@ -308,6 +310,74 @@ export default async function handler(req, res) {
   }
 
   // ── CREATE CHECKOUT SESSION ───────────────────────────────────────────────
+  // ── EMPLOYER CHECKOUT (no login — email-based, Operation 50% Engine E4) ────────
+  // Employers have no Seen account; they buy a one-time Featured Listing or Transparency
+  // Verified enrollment by email. mode:'payment', inline price_data (no dashboard product).
+  // Fulfillment records the purchase + emails the owner (see employerFulfillment.js). Routed
+  // in confirm + webhook by metadata.kind === 'employer'.
+  if (action === 'employer_checkout') {
+    if (req.method !== 'POST') return res.status(405).end();
+    if (!STRIPE_KEY) return res.status(503).json({ error: 'Payments not yet configured — contact hello@seenjobs.io.' });
+    const skuKey = body.employer_sku;
+    if (!skuKey || !EMPLOYER_SKUS[skuKey]) return res.status(400).json({ error: 'Unknown product' });
+    const def = EMPLOYER_SKUS[skuKey];
+    const email = String(body.email || '').trim().slice(0, 200);
+    const company = String(body.company || '').trim().slice(0, 200);
+    const target = String(body.target_url || '').trim().slice(0, 500);
+    if (!email || !email.includes('@') || !company) return res.status(400).json({ error: 'Company and a valid email are required' });
+    const origin = req.headers.origin || 'https://seenjobs.io';
+    const form = new URLSearchParams({
+      'payment_method_types[]': 'card',
+      'line_items[0][quantity]': '1',
+      mode: 'payment',
+      success_url: `${origin}/employers?purchased=${skuKey}&session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${origin}/employers`,
+      customer_email: email,
+      allow_promotion_codes: 'true',
+      'metadata[kind]': 'employer',
+      'metadata[employer_sku]': skuKey,
+      'metadata[company]': company,
+      'metadata[email]': email,
+      'metadata[target]': target,
+      'line_items[0][price_data][currency]': 'usd',
+      'line_items[0][price_data][unit_amount]': String(def.amount_cents),
+      'line_items[0][price_data][product_data][name]': `Seen — ${def.name}`,
+    });
+    const stripeRes = await fetch('https://api.stripe.com/v1/checkout/sessions', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${STRIPE_KEY}`, 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: form.toString(),
+    });
+    if (!stripeRes.ok) {
+      const err = await stripeRes.json().catch(() => ({}));
+      return res.status(502).json({ error: err.error?.message || 'Checkout creation failed — try again' });
+    }
+    const session = await stripeRes.json();
+    return res.status(200).json({ url: session.url });
+  }
+
+  // Return-page confirm for employer purchases — no login (employers have no account). Verifies
+  // the session with Stripe and fulfills; shares the session-id idempotency with the webhook.
+  if (action === 'employer_confirm') {
+    if (req.method !== 'POST') return res.status(405).end();
+    if (!STRIPE_KEY || !SUPABASE_URL || !SERVICE_KEY) return res.status(503).json({ error: 'Payments not configured' });
+    const sessionId = String(body.session_id || '');
+    if (!sessionId.startsWith('cs_')) return res.status(400).json({ error: 'Invalid session' });
+    try {
+      const r = await fetch(`https://api.stripe.com/v1/checkout/sessions/${encodeURIComponent(sessionId)}`, {
+        headers: { Authorization: `Bearer ${STRIPE_KEY}` },
+      });
+      if (!r.ok) return res.status(502).json({ error: 'Could not verify session' });
+      const session = await r.json();
+      if (!isEmployerSession(session)) return res.status(400).json({ error: 'Not an employer session' });
+      const result = await fulfillEmployerCheckout(session, env);
+      return res.status(200).json({ ok: !!result.ok, duplicate: !!result.duplicate });
+    } catch (e) {
+      console.error('[stripe/employer_confirm]', e.message);
+      return res.status(500).json({ error: 'Confirm failed' });
+    }
+  }
+
   if (action === 'checkout') {
     if (req.method !== 'POST') return res.status(405).end();
     if (!STRIPE_KEY) return res.status(503).json({ error: 'Payments not yet configured — contact hello@seenjobs.io to upgrade.' });
@@ -482,7 +552,18 @@ export default async function handler(req, res) {
         const session = event.data?.object || {};
         const uid = getUid(session);
         const customerId = session.customer;
-        if (session.metadata?.sku) {
+        if (isEmployerSession(session)) {
+          // Employer one-time purchase (no Seen account) — record it + notify the owner.
+          // Idempotent via the unique stripe_session_id (shared with employer_confirm).
+          const result = await fulfillEmployerCheckout(session, env);
+          if (!result.ok && !result.duplicate) {
+            if (event.id && SUPABASE_URL && SERVICE_KEY) {
+              await db(SUPABASE_URL, SERVICE_KEY)(`stripe_events_processed?event_id=eq.${encodeURIComponent(event.id)}`, { method: 'DELETE', headers: { Prefer: 'return=minimal' } }).catch(() => {});
+            }
+            console.error('[stripe/webhook] employer fulfillment failed:', result.reason);
+            return res.status(500).json({ error: 'Fulfillment failed' });
+          }
+        } else if (session.metadata?.sku) {
           // One-time SKU (mode: 'payment') — grant credits / pro_until, NOT the permanent
           // pro flag. Idempotent via the shared session-id claim (also used by confirm).
           const result = await fulfillOneTimeCheckout(session, env);
