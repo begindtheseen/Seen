@@ -5,11 +5,89 @@
 > **Read this first. Every session. No exceptions.**
 > Then read SEEN_STRATEGY.md. Then `git status`. Then pick up exactly where this doc ends.
 
-Last updated: **2026-07-02 (Session B — PR #124 review/merge + live audit)**
+Last updated: **2026-07-06 (Operation 50% build — Ghost Report, outcome emails, employer engine, Seen Live realtime, employer portal)**
 
 ---
 
-## ⚠️ CURRENT STATE (2026-07-02) — supersedes all sections below
+## ⚠️ CURRENT STATE (2026-07-05→06) — supersedes everything below
+
+**Era: Operation 50% growth build.** The owner approved the "Operation 50%" plan (four
+parallel revenue engines → ≥50% odds of $1–5k MRR; plan + evidence in `playbook/` and the
+plan file). This session shipped a large slice of it. Deploys are still automatic (merge →
+next-migration → prod), and the owner merges by **promoting the PR preview to production**
+in Vercel — when a preview shows `previewUrl: seenjobs.io` while the PR is unmerged, that's
+the promoted-preview/prod divergence: **merge that PR immediately** (institutional rule).
+
+### PRs this session (all squash-merged to next-migration unless noted)
+- **#157 Weekly Ghost Report** — `/ghost-report` page + `opengraph-image` share card + admin
+  `GhostReportPanel` (copy-caption tool) + pure `lib/server/ghostReport.js` (8 tests). No
+  owner setup; reads existing data.
+- **#158 Outcome email loop** — Day-7/14/30 follow-ups. `api/outcome-followups.js` (daily
+  cron 15:00 UTC, routes the Vercel cron GET), `lib/server/outcomeEmails.js` (pure, 7 tests,
+  HMAC unsubscribe), `api/unsubscribe.js`. **Runs on the already-live `RESEND_KEY` + verified
+  `noreply@seenjobs.io`** — works on deploy, no setup. `email_prefs` opt-out.
+- **#159 report snapshot** + **#160 report view/keep/delete** — reported ephemeral (live-search
+  `j_<hash>`) listings are now viewable/actionable in admin. Snapshot columns capture
+  title/company/city/apply_url at report time; admin can open the posting, Keep (dismiss), or
+  Delete (real suppression via `suppressed_listings`, filtered in `api/jobs.js` search).
+- **#161** — search-card report snapshot fix (was only on the detail page) **+ Employer
+  revenue engine E4** (checkout) **+ Seen Live** (poll-based realtime v1, global toast system).
+- **#162** — **Seen Live INSTANT** (Supabase Realtime broadcast → <1s push) **+ complete
+  Employer engine** (fulfillment, perks, badges).
+- **#163 Employer portal** — **OPEN, preview green, NOT yet merged as of handoff.** Makes
+  `/employers` an employer-first experience (seeker Nav/Footer hidden on `/employers*`),
+  reputation dashboard, promote section; `account_type` separation label.
+
+### Migrations APPLIED TO PROD this session (verified present by SQL): 045–050
+`045_outcome_email_log` (outcome_email_log + email_prefs) · `046_job_report_snapshot`
+(job_availability_reports += company/title/city/apply_url) · `047_suppressed_listings` ·
+`048_employer_purchases` · `049_employer_perks` (company-keyed featured_until/verified_until) ·
+`050_account_type` (profiles.account_type 'seeker'|'employer' DEFAULT 'seeker' + CHECK + index).
+(044_pro_until was applied in the prior session.)
+
+### Key architecture facts established this session
+- **Seen Live (realtime admin).** Admin auth is a custom token + service-key reads (no Supabase
+  session / no RLS) → **Supabase Realtime postgres_changes is NOT viable**; instead
+  `lib/server/realtime.js` `broadcastActivity(kind)` POSTs a tiny NON-SENSITIVE ping to the
+  public Realtime **broadcast** channel `seen-live` (fired from report writes, listing flags,
+  employer sales). `lib/hooks/useAdminLive.ts` subscribes and, on ping, immediately fetches the
+  authenticated `recent_events` cursor action in `api/admin-stats.js` (12s poll is a fallback).
+  Global toast system: `lib/notify.ts` (`seen:notify` event, extends the seen:* bus) +
+  `components/ToastHost.tsx` (mounted in `app/layout.tsx`); `components/admin/LiveBell.tsx`.
+- **Employer engine E4 (complete, no employer accounts yet).** SKUs in
+  `lib/server/employerSkus.js`: `featured30` $79/30d, `verified90` $249/90d. Email-based,
+  no-login checkout: `api/stripe.js` `employer_checkout` + `employer_confirm`, routed by
+  `metadata.kind==='employer'`; `lib/server/employerFulfillment.js` → idempotent insert into
+  `employer_purchases` (unique `stripe_session_id`) + owner email (`OWNER_EMAIL` ||
+  `ADMIN_EMAIL` || `NOTIFY_EMAIL`; no-op until set). Admin `list_employer_purchases` +
+  `fulfill_employer_purchase` grant time-boxed perks into `employer_perks`
+  (`components/admin/EmployerPanel.tsx`, Revenue tab). Display: company-page Transparency
+  Verified/Featured badges (isolated `employer_perk` action in `api/reports.js`), JobCard
+  **★ Featured** badge + search sort-first (`getFeaturedSet` in `api/jobs.js`, cached 60s).
+- **INTEGRITY (load-bearing):** money NEVER changes a transparency score. Featured = paid
+  placement; Transparency Verified = a displayed commitment the admin grants after review.
+- **Employer/seeker separation:** `/employers` hides the seeker Nav/Footer; the portal creates
+  NO seeker records (reputation is read-only; checkout writes only employer tables);
+  `profiles.account_type` is the DB label so employer accounts can never mix into seeker views.
+- **Candidate sourcing = deliberate PHASE-2** (owner chose "portal on real data first"). It
+  needs a candidate-profile opt-in model (seekers publishing a hireable profile) before
+  employers can browse talent. NOT built/faked.
+
+### Owner activations still pending (env only — code is no-op-safe without them)
+- `NEXT_PUBLIC_POSTHOG_KEY` — analytics (PostHog). `OWNER_EMAIL` — employer-sale alert emails.
+  (`RESEND_KEY` is already live; outcome emails + employer notifications use it.)
+
+### State: 259/259 tests pass, tsc clean, build 91/91 pages. Test cmd:
+`node --test --test-reporter=spec "**/*.test.mjs"` (or `npm test`).
+
+### Next-session candidates
+- Merge/confirm #163 landed. Phase-2 candidate profiles + employer sourcing (owner-gated).
+  Company-page GEO restructure (real-data-first for AI citations) still pending from the plan.
+  Distribution/cadence (owner posts Ghost Report, DMs, outreach) is the human half of the plan.
+
+---
+
+## ⚠️ CURRENT STATE (2026-07-02) — historical; superseded by the 2026-07-05→06 section above
 
 **The parity era is over.** Between 2026-06-30 and 07-02, 50 PRs (#75–#124) landed on
 `next-migration`: SeenFit/HumanProof résumé engines, landing + dashboard redesigns
