@@ -1,73 +1,57 @@
+import type { Metadata } from 'next'
+import Link from 'next/link'
 import { EmployerCheckout, EmployerPurchaseConfirm } from '@/components/EmployerCheckout'
+import { EmployerReputation } from '@/components/employer/EmployerReputation'
+
+// The employer portal — a distinct, employer-first experience. The seeker Nav + Footer hide
+// themselves on /employers (see components/Nav.tsx / Footer.tsx), so nothing job-seeker ever shows
+// here. Everything is oriented around what an employer needs to hire: see your reputation
+// (what candidates see before applying), get in front of ready-to-apply candidates, and prove you
+// respond. NOTE: the portal creates NO seeker/user accounts — reputation is a read-only lookup and
+// checkout writes only to the employer-namespaced tables (employer_purchases / employer_perks), so
+// employer activity can never mix into seeker data.
+
+export const metadata: Metadata = {
+  title: 'Seen for Employers — Hire people who actually show up',
+  description:
+    'See your hiring reputation the way candidates do — your ghost rate, response rate, and Seen grade — then get in front of ready-to-apply candidates with Featured placement and the Transparency Verified badge.',
+  alternates: { canonical: 'https://seenjobs.io/employers' },
+  openGraph: { title: 'Seen for Employers', description: 'Hire people who actually show up. See your reputation, reach candidates, prove you respond.', url: 'https://seenjobs.io/employers', type: 'website', siteName: 'Seen' },
+}
+
+const wrap = { maxWidth: 900, margin: '0 auto', padding: '0 1.5rem', width: '100%', boxSizing: 'border-box' as const }
 
 export default function EmployersPage() {
-  const tiers = [
-    {
-      name: 'Basic listing',
-      price: 'Free',
-      period: 'forever',
-      highlight: false,
-      features: [
-        'Post up to 2 listings',
-        'Public transparency score',
-        'Location-level reports',
-        'Standard placement',
-      ],
-      cta: 'Post for free',
-      ctaHref: '/login?signup=1',
-    },
-    {
-      name: 'Verified employer',
-      price: '$149',
-      period: '/month per location',
-      highlight: true,
-      badge: 'Most popular',
-      features: [
-        'Verified badge at your location',
-        'Priority placement in your city',
-        'Location transparency dashboard',
-        'Process funnel analytics',
-        'Applicant insight reports',
-        'Waste score improvement tools',
-      ],
-      cta: 'Get verified →',
-      ctaHref: 'mailto:hello@seenjobs.io?subject=Verified Employer',
-    },
-    {
-      name: 'Multi-location',
-      price: '$799',
-      period: '/month all locations',
-      highlight: false,
-      badge: 'Enterprise',
-      features: [
-        'All locations verified',
-        'Franchise-wide analytics',
-        'Location comparison dashboard',
-        'Dedicated account manager',
-        'ATS integration',
-      ],
-      cta: 'Contact sales',
-      ctaHref: 'mailto:hello@seenjobs.io?subject=Enterprise',
-    },
-  ]
-
   return (
-    <div style={{ minHeight: '100vh' }}>
-      <div style={{ maxWidth: 960, margin: '0 auto', padding: '4rem 2rem', width: '100%', boxSizing: 'border-box' }}>
-        {/* Hero */}
-        <div style={{ textAlign: 'center', marginBottom: '3.5rem' }}>
-          <div style={{ fontFamily: 'var(--mono)', fontSize: '.52rem', textTransform: 'uppercase', letterSpacing: '.22em', color: 'var(--blue)', marginBottom: '.6rem' }}>
-            For employers
+    <div style={{ minHeight: '100vh', background: 'radial-gradient(ellipse at 15% -5%,rgba(29,78,216,0.12) 0%,transparent 55%),radial-gradient(ellipse at 100% 5%,rgba(124,58,237,0.09) 0%,transparent 45%)' }}>
+      {/* Employer-first header — no seeker nav */}
+      <header style={{ borderBottom: '1px solid var(--line)', background: 'rgba(5,7,15,.7)', backdropFilter: 'blur(12px)', position: 'sticky', top: 0, zIndex: 50 }}>
+        <div style={{ ...wrap, display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '.9rem 1.5rem' }}>
+          <Link href="/employers" style={{ display: 'flex', alignItems: 'center', gap: '.55rem', textDecoration: 'none' }}>
+            <span style={{ width: 8, height: 8, borderRadius: 999, background: 'var(--blue)', boxShadow: '0 0 8px var(--blue)' }} />
+            <span style={{ fontFamily: 'var(--display)', fontWeight: 800, fontSize: '1.05rem', color: 'var(--white)', letterSpacing: '-.02em' }}>Seen</span>
+            <span style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', color: 'var(--dim)', textTransform: 'uppercase', letterSpacing: '.12em' }}>for employers</span>
+          </Link>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+            <a href="#promote" style={{ fontFamily: 'var(--mono)', fontSize: '.62rem', color: 'var(--sub)', textDecoration: 'none' }}>Pricing</a>
+            <Link href="/jobs" style={{ fontFamily: 'var(--mono)', fontSize: '.6rem', color: 'var(--dim)', textDecoration: 'none' }}>Looking for a job? →</Link>
           </div>
-          <h1 style={{ fontFamily: 'var(--display)', fontSize: '2.2rem', fontWeight: 800, color: 'var(--white)', letterSpacing: '-.03em', marginBottom: '1rem', maxWidth: 680, margin: '0 auto .75rem' }}>
-            The companies that respond win everything.
+        </div>
+      </header>
+
+      <div style={{ ...wrap, padding: '3.5rem 1.5rem 5rem' }}>
+        {/* Hero */}
+        <div style={{ textAlign: 'center', marginBottom: '3rem' }}>
+          <div style={{ fontFamily: 'var(--mono)', fontSize: '.52rem', textTransform: 'uppercase', letterSpacing: '.22em', color: 'var(--blue)', marginBottom: '.7rem' }}>For employers</div>
+          <h1 style={{ fontFamily: 'var(--display)', fontSize: 'clamp(1.9rem,6vw,2.8rem)', fontWeight: 800, color: 'var(--white)', letterSpacing: '-.03em', lineHeight: 1.05, margin: '0 auto .9rem', maxWidth: 640 }}>
+            Hire the people who actually show up.
           </h1>
-          <p style={{ color: 'var(--sub)', fontSize: '.9rem', lineHeight: 1.75, maxWidth: 580, margin: '0 auto 2rem' }}>
-            Job seekers check Seen before they apply — and they check by location. A verified badge at your specific branch tells them your process is real, transparent, and worth their time before they ever hit apply.
+          <p style={{ color: 'var(--sub)', fontSize: '.95rem', lineHeight: 1.75, maxWidth: 580, margin: '0 auto 2rem' }}>
+            Candidates check Seen before they apply. See exactly what they see about you, get in front of the ones ready to apply, and prove you respond — so the strongest people don&apos;t self-select out.
           </p>
           <div style={{ display: 'flex', gap: '.75rem', justifyContent: 'center', flexWrap: 'wrap' }}>
-            {['👻 Ghost rate visible per location', '📍 City-level trust scores', '⚡ Surge alerts affect applications'].map(b => (
-              <span key={b} className="vibe v-b" style={{ padding: '.35rem .85rem' }}>{b}</span>
+            {['📊 Your reputation, candidate-side', '★ Featured placement', '✓ Transparency Verified'].map(b => (
+              <span key={b} className="vibe v-b" style={{ padding: '.4rem .9rem' }}>{b}</span>
             ))}
           </div>
         </div>
@@ -75,78 +59,54 @@ export default function EmployersPage() {
         {/* Post-checkout confirmation (renders only on the Stripe return) */}
         <EmployerPurchaseConfirm />
 
-        {/* One-time products — real checkout, no account needed */}
-        <div style={{ marginBottom: '1rem', textAlign: 'center' }}>
-          <div style={{ fontFamily: 'var(--mono)', fontSize: '.55rem', textTransform: 'uppercase', letterSpacing: '.14em', color: 'var(--dim)', marginBottom: '.4rem' }}>Start now · one-time · no account needed</div>
-        </div>
-        <EmployerCheckout />
-        <div style={{ textAlign: 'center', fontFamily: 'var(--mono)', fontSize: '.55rem', color: 'var(--muted)', marginBottom: '3rem', lineHeight: 1.6 }}>
-          Payments never change a company&apos;s transparency score. Featured buys reach; Transparency Verified is a commitment we review against real applicant outcomes.
-        </div>
+        {/* Anchor feature: your reputation the way candidates see it */}
+        <EmployerReputation />
 
-        <div style={{ textAlign: 'center', fontFamily: 'var(--mono)', fontSize: '.6rem', textTransform: 'uppercase', letterSpacing: '.14em', color: 'var(--dim)', marginBottom: '1.5rem' }}>Or go bigger — recurring plans</div>
-
-        {/* Pricing tiers */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: '1.25rem', marginBottom: '3rem' }}>
-          {tiers.map(tier => (
-            <div
-              key={tier.name}
-              style={{
-                background: tier.highlight ? 'linear-gradient(135deg,rgba(59,130,246,0.08) 0%,rgba(124,58,237,0.08) 100%)' : 'var(--card)',
-                border: `1.5px solid ${tier.highlight ? 'var(--blue)' : 'var(--line)'}`,
-                borderRadius: 16, padding: '2rem', position: 'relative',
-              }}
-            >
-              {tier.badge && (
-                <div style={{ position: 'absolute', top: -12, left: '50%', transform: 'translateX(-50%)', background: tier.highlight ? 'var(--blue)' : 'var(--raised)', color: tier.highlight ? '#fff' : 'var(--sub)', fontFamily: 'var(--mono)', fontSize: '.58rem', fontWeight: 700, padding: '.2rem .75rem', borderRadius: 100, whiteSpace: 'nowrap', border: `1px solid ${tier.highlight ? 'var(--blue)' : 'var(--line)'}` }}>
-                  {tier.badge}
-                </div>
-              )}
-              <div style={{ fontFamily: 'var(--mono)', fontSize: '.6rem', textTransform: 'uppercase', letterSpacing: '.1em', color: tier.highlight ? 'var(--blue)' : 'var(--dim)', marginBottom: '.5rem' }}>{tier.name}</div>
-              <div style={{ fontFamily: 'var(--display)', fontSize: '2rem', fontWeight: 800, color: 'var(--white)', marginBottom: '.15rem' }}>{tier.price}</div>
-              <div style={{ fontFamily: 'var(--mono)', fontSize: '.6rem', color: 'var(--muted)', marginBottom: '1.5rem' }}>{tier.period}</div>
-              <div style={{ marginBottom: '1.5rem' }}>
-                {tier.features.map(f => (
-                  <div key={f} style={{ display: 'flex', gap: '.5rem', marginBottom: '.5rem', fontFamily: 'var(--mono)', fontSize: '.65rem', color: 'var(--sub)' }}>
-                    <span style={{ color: tier.highlight ? 'var(--blue)' : 'var(--green)', flexShrink: 0 }}>✓</span> {f}
-                  </div>
-                ))}
-              </div>
-              <a
-                href={tier.ctaHref}
-                style={{
-                  display: 'block', textAlign: 'center',
-                  background: tier.highlight ? 'linear-gradient(135deg,#1d4ed8 0%,#7c3aed 100%)' : 'none',
-                  border: tier.highlight ? 'none' : '1px solid var(--line2)',
-                  borderRadius: 8, padding: '.75rem',
-                  fontFamily: 'var(--display)', fontWeight: tier.highlight ? 800 : 600, fontSize: '.85rem',
-                  color: tier.highlight ? '#fff' : 'var(--sub)',
-                  textDecoration: 'none',
-                  boxShadow: tier.highlight ? '0 0 24px rgba(29,78,216,0.3)' : 'none',
-                }}
-              >
-                {tier.cta}
-              </a>
+        {/* Why it matters — real mechanism, honest */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(240px,1fr))', gap: '1rem', marginBottom: '3rem' }}>
+          {[
+            { t: 'Candidates screen you first', d: 'Before applying, people check your ghost rate and response rate on Seen. A bad record silently kills your applicant flow — the best candidates have options.' },
+            { t: 'Featured = more of the right applicants', d: 'Featured placement puts your listings above standard results for matching searches, in front of candidates already looking for what you offer.' },
+            { t: 'Verified = trust that converts', d: 'The Transparency Verified badge is a public commitment to respond — reviewed against real outcome data. It tells strong candidates you’re worth their time.' },
+          ].map(c => (
+            <div key={c.t} style={{ background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 14, padding: '1.4rem' }}>
+              <div style={{ fontFamily: 'var(--display)', fontSize: '.95rem', fontWeight: 700, color: 'var(--white)', marginBottom: '.4rem' }}>{c.t}</div>
+              <p style={{ color: 'var(--sub)', fontSize: '.78rem', lineHeight: 1.65, margin: 0 }}>{c.d}</p>
             </div>
           ))}
         </div>
 
-        {/* Bottom CTA */}
-        <div style={{ textAlign: 'center', padding: '2rem', background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 16 }}>
-          <div style={{ fontFamily: 'var(--display)', fontSize: '1.1rem', fontWeight: 800, color: 'var(--white)', marginBottom: '.5rem' }}>
-            First 50 locations get 3 months free.
+        {/* Promote — real, no-login checkout */}
+        <div id="promote" style={{ scrollMarginTop: 80 }}>
+          <div style={{ textAlign: 'center', marginBottom: '1.4rem' }}>
+            <h2 style={{ fontFamily: 'var(--display)', fontSize: '1.5rem', fontWeight: 800, color: 'var(--white)', letterSpacing: '-.02em', margin: '0 0 .4rem' }}>Get in front of candidates</h2>
+            <p style={{ fontFamily: 'var(--mono)', fontSize: '.6rem', color: 'var(--dim)', textTransform: 'uppercase', letterSpacing: '.14em' }}>One-time · no account needed</p>
           </div>
-          <p style={{ fontFamily: 'var(--mono)', fontSize: '.7rem', color: 'var(--sub)', marginBottom: '1rem' }}>
-            Get in early. Be the employer job seekers already trust when they arrive.
+          <EmployerCheckout />
+          <p style={{ textAlign: 'center', fontFamily: 'var(--mono)', fontSize: '.55rem', color: 'var(--muted)', lineHeight: 1.6, marginBottom: '3rem' }}>
+            Payments never change a company&apos;s transparency score. Featured buys reach; Transparency Verified is a commitment we review against real applicant outcomes.
           </p>
-          <a
-            href="mailto:hello@seenjobs.io?subject=Early Access Employer"
-            style={{ display: 'inline-block', background: 'linear-gradient(135deg,#3b82f6 0%,#8b5cf6 100%)', border: 'none', borderRadius: 8, padding: '.75rem 2rem', fontFamily: 'var(--display)', fontWeight: 800, fontSize: '.85rem', color: '#fff', textDecoration: 'none', boxShadow: '0 0 20px rgba(59,130,246,0.3)' }}
-          >
-            Get early access →
-          </a>
+        </div>
+
+        {/* Enterprise / contact */}
+        <div style={{ textAlign: 'center', padding: '2rem', background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 16 }}>
+          <div style={{ fontFamily: 'var(--display)', fontSize: '1.05rem', fontWeight: 800, color: 'var(--white)', marginBottom: '.5rem' }}>Hiring across many roles or locations?</div>
+          <p style={{ fontFamily: 'var(--mono)', fontSize: '.68rem', color: 'var(--sub)', marginBottom: '1rem' }}>We&apos;ll set up multi-location placement, verified badges, and applicant reporting for your team.</p>
+          <a href="mailto:hello@seenjobs.io?subject=Seen for Employers — Enterprise" style={{ display: 'inline-block', background: 'linear-gradient(135deg,#3b82f6,#8b5cf6)', border: 'none', borderRadius: 8, padding: '.7rem 1.8rem', fontFamily: 'var(--display)', fontWeight: 800, fontSize: '.82rem', color: '#fff', textDecoration: 'none' }}>Talk to us →</a>
         </div>
       </div>
+
+      {/* Employer-first footer (no seeker links) */}
+      <footer style={{ borderTop: '1px solid var(--line)', padding: '1.4rem 1.5rem' }}>
+        <div style={{ ...wrap, display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '.6rem' }}>
+          <span style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', color: 'var(--dim)' }}>© 2026 Seen · for employers</span>
+          <div style={{ display: 'flex', gap: '1.1rem' }}>
+            <a href="#promote" style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', color: 'var(--dim)', textDecoration: 'none' }}>Pricing</a>
+            <Link href="/legal" style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', color: 'var(--dim)', textDecoration: 'none' }}>Legal</Link>
+            <a href="mailto:hello@seenjobs.io" style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', color: 'var(--dim)', textDecoration: 'none' }}>Contact</a>
+          </div>
+        </div>
+      </footer>
     </div>
   )
 }

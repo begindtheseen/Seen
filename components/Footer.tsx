@@ -1,8 +1,12 @@
 'use client'
 
 import Link from 'next/link'
+import { usePathname } from 'next/navigation'
 
 export default function Footer() {
+  const pathname = usePathname()
+  // The employer portal supplies its own footer/chrome — hide the seeker footer there.
+  if (pathname?.startsWith('/employers')) return null
   return (
     <footer style={{ background: 'var(--void)', borderTop: '1px solid var(--line)', padding: '1rem 1.5rem' }}>
       <div style={{ maxWidth: 1300, margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem', flexWrap: 'wrap' }}>

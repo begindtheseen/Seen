@@ -92,6 +92,9 @@ export default function Nav() {
 
   const isDashboard = pathname === '/dashboard'
 
+  // The employer portal has its own employer-first chrome — never show the job-seeker nav there.
+  if (pathname?.startsWith('/employers')) return null
+
   return (
     <>
       <nav id="mainNav" className={scrolled ? 'nav-scrolled' : ''}>
