@@ -280,6 +280,20 @@ rejected, ghosted, withdrawn
 
 ## Session Continuity
 Before starting any session:
-1. Run `git status` to see current state
-2. Read SEEN_STRATEGY.md
-3. Pick up exactly where previous session left off
+1. Read the memory vault: `memory/protocol.md` → `memory/HOME.md` → the newest
+   note in `memory/timeline/` (the fast-recall layer; see below)
+2. Run `git status` to see current state
+3. Read SEEN_STRATEGY.md
+4. Pick up exactly where previous session left off
+
+At session END: append what happened to `memory/timeline/YYYY-MM-DD.md` and edit
+any knowledge note whose facts changed (`memory/protocol.md` has the full loop).
+
+## Memory Vault (`memory/`)
+An Obsidian-compatible vault is the persistent, structured memory for this
+project — an upgrade over relying on model context + this file alone. It splits
+**temporal memory** (`memory/timeline/`, append-only dated session notes) from
+**knowledge** (`memory/knowledge/`, `memory/decisions/`, `memory/people/` —
+wiki-linked entity notes). Start at `memory/protocol.md`. The root docs
+(this file, CLAUDE_HANDOFF.md, SEEN_STRATEGY.md, SEENJOBS_BEHAVIORAL_FLYWHEEL.md,
+…) remain the deep reference the vault links back to.

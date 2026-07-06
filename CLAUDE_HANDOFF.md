@@ -2,6 +2,14 @@
 
 
 
+> **📓 Memory vault (2026-07-06): start at `memory/` — read `memory/protocol.md`,
+> then `memory/HOME.md`, then the newest note in `memory/timeline/`.** The vault
+> is the fast-recall layer (temporal timeline + wiki-linked knowledge notes)
+> distilled from this file and the other root docs. This handoff and the other
+> `*.md` files remain the deep reference; append your session to
+> `memory/timeline/YYYY-MM-DD.md` and update the relevant knowledge note at
+> session end (see `memory/protocol.md`).
+
 > **Read this first. Every session. No exceptions.**
 > Then read SEEN_STRATEGY.md. Then `git status`. Then pick up exactly where this doc ends.
 
