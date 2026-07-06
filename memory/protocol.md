@@ -42,8 +42,14 @@ when you need detail the vault doesn't carry.
    timeline says *what happened*; the knowledge note holds *what is now true*.
    Do not duplicate the whole story into the knowledge note — record the new
    fact and link back to the day: `Changed 2026-07-06 → [[timeline/2026-07-06]]`.
-3. **Log owner decisions** in [[decisions/log]] (locked decisions that must not
-   be relitigated — pricing, policy, infra choices).
+3. **Log decisions** in [[decisions/log]] (locked decisions that must not be
+   relitigated — pricing, policy, infra, architecture choices).
+   - For any **process / architecture / tooling** decision (one that changes
+     *how effectively we build*), also attach a **`Projected impact:` line**
+     (productivity Δ · effectiveness Δ · confidence · one-line basis) and add a
+     row to the [[impact-ledger|Impact Ledger]], then recompute its compounded
+     cumulative. Product/pricing decisions are exempt — their upside is revenue
+     probability ([[operation-50]]), not build productivity.
 4. Bump the `updated:` date in the frontmatter of any note you edited.
 
 ## Conventions

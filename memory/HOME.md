@@ -57,6 +57,8 @@ folder's `README.md`.
 
 **Decisions**
 - [[decisions/log]] — locked owner decisions (do not relitigate)
+- [[impact-ledger]] — projected productivity/effectiveness Δ per process
+  decision (cumulative: **≈ +20% productivity · +31% effectiveness**)
 
 ## Timeline
 

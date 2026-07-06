@@ -13,6 +13,11 @@ that day's [[timeline/README|timeline]].
 
 Format: `YYYY-MM-DD — decision — where it lives in code/docs`.
 
+**Process / architecture decisions also carry a `Projected impact:` line**
+(productivity Δ · effectiveness Δ) and get a row in the [[impact-ledger|Impact
+Ledger]]. Product/pricing decisions do not — their upside is revenue probability
+([[operation-50]]), not build productivity. See [[protocol]].
+
 ## Product / pricing (Operation 50%, see [[operation-50]])
 - **2026-07-02 — Free tier = 1 AI credit/day.** SUPERSEDES an earlier "3/day".
   `lib/server/creditRules.js` `FREE_DAILY_CREDITS = 1`; pricing copy renders from
@@ -38,6 +43,14 @@ Format: `YYYY-MM-DD — decision — where it lives in code/docs`.
   (`memory/`), split into temporal [[timeline/README|timeline]] + [[HOME|knowledge]].
   Chosen over an external store: git-backed, portable, populatable same-day. See
   [[protocol]] and [[timeline/2026-07-06]].
+  - *Projected impact:* **+18% productivity · +25% effectiveness** (Med) —
+    [[impact-ledger|Impact Ledger]] #1.
+- **2026-07-06 — Every process/architecture decision carries a projected
+  productivity + effectiveness stat**, logged in the [[impact-ledger|Impact
+  Ledger]]. Makes the payoff of process changes legible so we scale winners and
+  kill low-value churn (Operation 50% kill-gate discipline). See [[protocol]].
+  - *Projected impact:* **+2% productivity · +5% effectiveness** (Low) —
+    [[impact-ledger|Impact Ledger]] #2.
 - **Never touch `main`** (old HTML app, unrelated history). Prod branch is
   `next-migration`; merge = deploy. See [[deployment]].
 - **Candidate sourcing is Phase 2** (owner: "portal on real data first") — needs
