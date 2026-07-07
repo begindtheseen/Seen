@@ -18,7 +18,11 @@ import { fileURLToPath } from 'node:url';
 import {
   buildIndex, searchFacts, whatsChanged, findContradictions, getTimeline, getEntity, openThreads,
 } from '../../lib/server/memoryGraph.js';
+import { recordFact, appendTimeline } from '../../lib/server/writeFact.js';
 import { renderBriefing } from '../../scripts/memory-status.mjs';
+
+// Where Claude's own writes land (bi-temporal facts). Kept separate from human-curated knowledge notes.
+const CLAUDE_NOTE = 'claude-observations.md';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const VAULT = resolve(process.env.CHRONOS_VAULT || join(HERE, '..')); // memory/
@@ -147,6 +151,52 @@ const TOOLS = {
       out.push(`\nLinks → ${e.links.join(', ') || '(none)'}`);
       out.push(`Backlinks ← ${e.backlinks.join(', ') || '(none)'}`);
       return text(out.join('\n'));
+    },
+  },
+
+  // ---- WRITE tools — the brain is now read AND write --------------------------
+  memory_record_fact: {
+    def: {
+      name: 'memory_record_fact',
+      description: 'Record a durable fact into the brain (bi-temporal, supersede-not-overwrite). If a fact with the same subject+predicate is already active with a DIFFERENT value, its window is closed and the new value appended (history preserved); an identical value is a no-op. Use at session end for anything worth remembering next time. Recall with memory_search_facts.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          subject: { type: 'string', description: 'the entity, e.g. "Seen" or "GITHUB_TOKEN"' },
+          predicate: { type: 'string', description: 'the relation, e.g. "status" or "mrr"' },
+          object: { type: 'string', description: 'the value' },
+          confidence: { type: 'string', description: 'high | medium | low (default medium)' },
+          source: { type: 'string', description: 'optional provenance, e.g. "[[note]]" or a URL' },
+          note: { type: 'string', description: `which vault note to write into (default ${CLAUDE_NOTE})` },
+        },
+        required: ['subject', 'predicate', 'object'],
+      },
+    },
+    run: (a) => {
+      const r = recordFact(VAULT, a.note || CLAUDE_NOTE, { subject: a.subject, predicate: a.predicate, object: a.object, confidence: a.confidence, source: a.source });
+      INDEX = loadIndex();
+      return text(r.written ? `Recorded: ${a.subject} — ${a.predicate} → ${a.object}` : `No change (already current): ${a.subject} — ${a.predicate} → ${a.object}`);
+    },
+  },
+  memory_append_timeline: {
+    def: {
+      name: 'memory_append_timeline',
+      description: 'Append a dated episode to the timeline (session log / narrative memory). Use for "what happened" this session — decisions made, work shipped — as opposed to typed facts.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          date: { type: 'string', description: 'ISO date YYYY-MM-DD (defaults to today)' },
+          heading: { type: 'string', description: 'short episode heading' },
+          text: { type: 'string', description: 'the episode body (markdown)' },
+        },
+        required: ['heading', 'text'],
+      },
+    },
+    run: (a) => {
+      const date = a.date || new Date().toISOString().slice(0, 10);
+      appendTimeline(VAULT, date, a.heading, a.text);
+      INDEX = loadIndex();
+      return text(`Appended to timeline/${date}.md: ${a.heading}`);
     },
   },
 };
