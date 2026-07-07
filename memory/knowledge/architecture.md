@@ -1,7 +1,53 @@
 ---
 title: Architecture
 tags: [architecture]
-updated: 2026-07-06
+updated: 2026-07-07
+facts:
+  - id: stack-framework
+    subject: Seen
+    predicate: framework
+    object: Next.js 15.5 (App Router, React 19)
+    valid_from: 2026-06-01
+    valid_to: null
+    confidence: high
+    source: "[[architecture]] · package.json"
+    recorded: 2026-07-07
+  - id: api-pattern
+    subject: Seen API
+    predicate: runs_as
+    object: Vercel serverless api/*.js (plain JS, not app/api)
+    valid_from: 2026-06-01
+    valid_to: null
+    confidence: high
+    source: "[[architecture]]"
+    recorded: 2026-07-07
+  - id: styling
+    subject: Seen
+    predicate: styling
+    object: CSS variables in app/globals.css (no Tailwind)
+    valid_from: 2026-06-01
+    valid_to: null
+    confidence: high
+    source: "[[architecture]]"
+    recorded: 2026-07-07
+  - id: db-auth
+    subject: Seen
+    predicate: auth_and_db
+    object: Supabase (service_role server-only)
+    valid_from: 2026-06-01
+    valid_to: null
+    confidence: high
+    source: "[[architecture]]"
+    recorded: 2026-07-07
+  - id: main-branch-status
+    subject: main branch
+    predicate: status
+    object: old HTML app — never touch, unrelated history
+    valid_from: 2026-06-01
+    valid_to: null
+    confidence: high
+    source: "[[architecture]] · [[deployment]]"
+    recorded: 2026-07-07
 ---
 
 # Architecture

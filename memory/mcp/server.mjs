@@ -16,8 +16,9 @@ import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, relative, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
-  buildIndex, searchFacts, whatsChanged, findContradictions, getTimeline, getEntity,
+  buildIndex, searchFacts, whatsChanged, findContradictions, getTimeline, getEntity, openThreads,
 } from '../../lib/server/memoryGraph.js';
+import { renderBriefing } from '../../scripts/memory-status.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const VAULT = resolve(process.env.CHRONOS_VAULT || join(HERE, '..')); // memory/
@@ -49,6 +50,30 @@ const text = (s) => ({ content: [{ type: 'text', text: s }] });
 
 // ---- tools ----------------------------------------------------------------
 const TOOLS = {
+  memory_status: {
+    def: {
+      name: 'memory_status',
+      description: 'One-call session orientation: what changed since last session, what still needs work (open threads), and what is shaky (contradictions / low-confidence facts). Call this FIRST each session instead of re-reading the vault — recall, not re-read.',
+      inputSchema: { type: 'object', properties: {} },
+    },
+    run: () => {
+      const today = new Date().toISOString().slice(0, 10);
+      return text(renderBriefing(INDEX, today));
+    },
+  },
+  memory_open_threads: {
+    def: {
+      name: 'memory_open_threads',
+      description: 'List open work items ("what still needs work"), highest priority first. Optionally filter by area or include done.',
+      inputSchema: { type: 'object', properties: { area: { type: 'string' }, includeDone: { type: 'boolean' } } },
+    },
+    run: (a) => {
+      let ts = a.includeDone ? (INDEX.threads || []) : openThreads(INDEX.threads || []);
+      if (a.area) ts = ts.filter((t) => String(t.area || '').toLowerCase() === String(a.area).toLowerCase());
+      if (!ts.length) return text('No matching threads.');
+      return text(ts.map((t) => `[${t.priority}] ${t.status === 'done' ? '✓ ' : ''}${t.title}${t.area ? ` (${t.area})` : ''}${t.ref ? ` · ${t.ref}` : ''}`).join('\n'));
+    },
+  },
   memory_search_facts: {
     def: {
       name: 'memory_search_facts',

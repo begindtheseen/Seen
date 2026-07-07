@@ -2,7 +2,26 @@
 title: Strategy
 tags: [product, decision]
 aliases: [North Star, Thesis]
-updated: 2026-07-06
+updated: 2026-07-07
+facts:
+  - id: moat
+    subject: Seen
+    predicate: moat
+    object: the Hiring Outcome Graph
+    valid_from: 2026-05-01
+    valid_to: null
+    confidence: high
+    source: "[[strategy]]"
+    recorded: 2026-07-07
+  - id: success-metric
+    subject: Seen
+    predicate: success_metric
+    object: outcome_rate (apps with >=1 post-submit event)
+    valid_from: 2026-05-01
+    valid_to: null
+    confidence: high
+    source: "[[strategy]]"
+    recorded: 2026-07-07
 ---
 
 # Strategy — the north star

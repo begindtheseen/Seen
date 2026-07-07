@@ -62,19 +62,23 @@ folder's `README.md`.
 
 **Memory system (meta)**
 - [[protocol]] — the session read/write loop
+- [[decision-protocol]] — the D1 decision thought-process (run every decision)
+- [[open-threads]] — the living backlog: what still needs work
 - [[temporal]] — Chronos: the bi-temporal fact layer + typed-fact schema
-- [[mcp/README|Chronos MCP]] — query tools for Claude
+- [[mcp/README|Chronos MCP]] — query tools (`memory_status`, `memory_open_threads`, …)
+- [[session-hook]] — opt-in auto-boot hook (guarantees the briefing every session)
 - [[graph/README]] — optional self-hosted Graphiti engine (your cloud steps)
 
 **Decisions**
 - [[decisions/log]] — locked owner decisions (do not relitigate)
 - [[impact-ledger]] — projected productivity/effectiveness Δ per process
-  decision (cumulative: **≈ +35% productivity · +48% effectiveness**)
+  decision (cumulative: **≈ +45% productivity · +55% effectiveness**)
 
 ## Timeline
 
 Newest first. Full index and template in [[timeline/README]].
 
+- [[timeline/2026-07-07]] — memory made load-bearing: briefing, decision-protocol, open-threads
 - [[timeline/2026-07-06]] — memory vault created; Operation 50% build recap
 - [[timeline/2026-07-05]] — Operation 50% build: Ghost Report, outcome emails,
   employer engine, Seen Live, employer portal (#157–#163)

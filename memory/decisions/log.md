@@ -51,6 +51,13 @@ Ledger]]. Product/pricing decisions do not — their upside is revenue probabili
   kill low-value churn (Operation 50% kill-gate discipline). See [[protocol]].
   - *Projected impact:* **+2% productivity · +5% effectiveness** (Low) —
     [[impact-ledger|Impact Ledger]] #2.
+- **2026-07-07 — Memory is load-bearing every session.** A compact session
+  briefing ([[open-threads|status]] + what-changed + what's-shaky) boots at session
+  start via `CLAUDE.md` + the opt-in [[session-hook]], and every decision runs
+  [[decision-protocol]]. Recall replaces re-reading — the token save. Open work is
+  tracked as typed threads in [[open-threads]].
+  - *Projected impact:* **+15% productivity · +20% effectiveness** (Med) —
+    [[impact-ledger|Impact Ledger]] #4.
 - **2026-07-06 — Temporal memory = one authority, derived graph (Chronos).** The
   markdown vault stays the single source of truth; a bi-temporal fact layer is
   *derived* from it (never edited directly), queried locally now and by
