@@ -2,6 +2,16 @@
 title: Testing & Build
 tags: [architecture]
 updated: 2026-07-06
+facts:
+  - id: test-status
+    subject: Seen test suite
+    predicate: passing
+    object: 259/259
+    valid_from: 2026-07-06
+    valid_to: null
+    confidence: medium
+    source: "[[testing]] · CLAUDE_HANDOFF.md"
+    recorded: 2026-07-06
 ---
 
 # Testing & Build

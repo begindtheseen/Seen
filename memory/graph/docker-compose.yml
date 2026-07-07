@@ -1,0 +1,52 @@
+# Chronos → Graphiti self-host stack (the OPTIONAL cloud engine — see memory/graph/README.md).
+#
+# This adds LLM-extracted entity/relationship reasoning + hybrid semantic retrieval ON TOP of
+# the deterministic vault facts. The vault stays the source of truth; Graphiti ingests the
+# derived episodes/facts. FalkorDB is chosen over Neo4j — it idles far cheaper for a single user.
+#
+# ⚠ Verify before committing: the official zepai/graphiti image has historically wired up Neo4j
+#   only (getzep/graphiti#749). If FalkorDB isn't supported by the tag you pull, either use the
+#   Neo4j service below or build the MCP image from the graphiti repo's mcp_server/ Dockerfile.
+#
+# Run locally:  docker compose -f memory/graph/docker-compose.yml up -d
+# Env:          create memory/graph/.env from the README's list (never commit it).
+
+services:
+  falkordb:
+    image: falkordb/falkordb:latest
+    restart: unless-stopped
+    ports:
+      - "6379:6379"      # graph DB (redis protocol)
+      - "3000:3000"      # FalkorDB Browser UI (optional)
+    volumes:
+      - falkordb_data:/data
+    command: ["--save", "60", "1"]   # periodic snapshot to the persistent volume
+
+  graphiti-mcp:
+    image: zepai/graphiti:latest
+    restart: unless-stopped
+    depends_on:
+      - falkordb
+    ports:
+      - "8000:8000"      # MCP endpoint (streamable HTTP / SSE)
+    env_file:
+      - .env
+    environment:
+      FALKORDB_URI: "redis://falkordb:6379"
+      GRAPHITI_TELEMETRY_ENABLED: "false"
+      SEMAPHORE_LIMIT: "5"           # cap concurrent LLM ingest calls (avoid 429s / cost spikes)
+      MCP_TRANSPORT: "http"
+
+  # --- Alternative backend if FalkorDB support is missing on your image tag ---
+  # neo4j:
+  #   image: neo4j:5.26
+  #   restart: unless-stopped
+  #   ports: ["7474:7474", "7687:7687"]
+  #   environment:
+  #     NEO4J_AUTH: "neo4j/${NEO4J_PASSWORD}"
+  #   volumes: ["neo4j_data:/data"]
+  #   # then set NEO4J_URI/NEO4J_USER/NEO4J_PASSWORD on graphiti-mcp instead of FALKORDB_URI
+
+volumes:
+  falkordb_data:
+  # neo4j_data:

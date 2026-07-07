@@ -10,7 +10,10 @@
     "build:compile": "next build --experimental-build-mode=compile",
     "build:generate": "next build --experimental-build-mode=generate",
     "start": "next start",
-    "test": "node --test --test-reporter=spec \"**/*.test.mjs\""
+    "test": "node --test --test-reporter=spec \"**/*.test.mjs\"",
+    "memory:sync": "node scripts/memory-sync.mjs",
+    "memory:check": "node scripts/memory-sync.mjs --check",
+    "memory:mcp": "node memory/mcp/server.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.49.2",

@@ -3,6 +3,25 @@ title: Seen
 tags: [product]
 aliases: [SeenJobs, seenjobs.io]
 updated: 2026-07-06
+facts:
+  - id: seen-category
+    subject: Seen
+    predicate: is_a
+    object: hiring-intelligence platform
+    valid_from: 2026-05-01
+    valid_to: null
+    confidence: high
+    source: "[[seen]] · [[strategy]]"
+    recorded: 2026-07-06
+  - id: seen-live-url
+    subject: Seen
+    predicate: live_at
+    object: seenjobs.io
+    valid_from: 2026-06-30
+    valid_to: null
+    confidence: high
+    source: "[[deployment]]"
+    recorded: 2026-07-06
 ---
 
 # Seen / SeenJobs

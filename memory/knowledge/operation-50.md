@@ -2,6 +2,44 @@
 title: Operation 50%
 tags: [growth, revenue, decision]
 updated: 2026-07-06
+facts:
+  - id: free-credits-3
+    subject: Seen free tier
+    predicate: daily_ai_credits
+    object: 3
+    valid_from: 2026-06-01
+    valid_to: 2026-07-02
+    confidence: high
+    source: "[[decisions/log]]"
+    recorded: 2026-06-01
+    invalidated: 2026-07-02
+  - id: free-credits-1
+    subject: Seen free tier
+    predicate: daily_ai_credits
+    object: 1
+    valid_from: 2026-07-02
+    valid_to: null
+    confidence: high
+    source: "[[decisions/log]] · lib/server/creditRules.js"
+    recorded: 2026-07-02
+  - id: sku-interview-sprint
+    subject: Interview Sprint SKU
+    predicate: price_usd
+    object: 14.99
+    valid_from: 2026-07-04
+    valid_to: null
+    confidence: high
+    source: "[[decisions/log]]"
+    recorded: 2026-07-06
+  - id: sku-credit-pack
+    subject: Credit Pack SKU
+    predicate: price_usd
+    object: 4.99
+    valid_from: 2026-07-04
+    valid_to: null
+    confidence: high
+    source: "[[decisions/log]]"
+    recorded: 2026-07-06
 ---
 
 # Operation 50%

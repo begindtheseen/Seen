@@ -3,6 +3,25 @@ title: Brandon
 tags: [person]
 aliases: [owner, begindtheseen]
 updated: 2026-07-06
+facts:
+  - id: brandon-role
+    subject: Brandon
+    predicate: role
+    object: owner/operator
+    valid_from: 2026-05-01
+    valid_to: null
+    confidence: high
+    source: "[[people/brandon]]"
+    recorded: 2026-07-06
+  - id: brandon-github
+    subject: Brandon
+    predicate: github_handle
+    object: begindtheseen
+    valid_from: 2026-05-01
+    valid_to: null
+    confidence: high
+    source: "[[people/brandon]]"
+    recorded: 2026-07-06
 ---
 
 # Brandon — owner

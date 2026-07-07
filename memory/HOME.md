@@ -10,6 +10,11 @@ The map of content for this vault. Start here every session, then read the
 newest [[#Timeline|timeline]] note. New here? Read [[protocol]] and this
 folder's `README.md`.
 
+> **Temporal memory is live.** Typed facts carry bi-temporal validity, so memory
+> answers "what was true on date X" and "what changed since last session" — not
+> just current state. See [[temporal|Chronos]]; query via the
+> [[mcp/README|Chronos MCP]] (`memory_search_facts`, `memory_whats_changed`, …).
+
 > **What is Seen?** A hiring-intelligence platform whose moat is the **Hiring
 > Outcome Graph** — the tracker is the data-acquisition engine, outcome cards
 > drive virality, trust/confidence systems keep data clean. Full thesis:
@@ -55,10 +60,16 @@ folder's `README.md`.
 **People**
 - [[people/brandon|Brandon]] — the owner
 
+**Memory system (meta)**
+- [[protocol]] — the session read/write loop
+- [[temporal]] — Chronos: the bi-temporal fact layer + typed-fact schema
+- [[mcp/README|Chronos MCP]] — query tools for Claude
+- [[graph/README]] — optional self-hosted Graphiti engine (your cloud steps)
+
 **Decisions**
 - [[decisions/log]] — locked owner decisions (do not relitigate)
 - [[impact-ledger]] — projected productivity/effectiveness Δ per process
-  decision (cumulative: **≈ +20% productivity · +31% effectiveness**)
+  decision (cumulative: **≈ +35% productivity · +48% effectiveness**)
 
 ## Timeline
 

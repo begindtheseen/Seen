@@ -2,6 +2,16 @@
 title: Database
 tags: [db]
 updated: 2026-07-06
+facts:
+  - id: latest-migration
+    subject: Seen database
+    predicate: latest_migration
+    object: 050_account_type
+    valid_from: 2026-07-06
+    valid_to: null
+    confidence: high
+    source: "[[database]]"
+    recorded: 2026-07-06
 ---
 
 # Database (Supabase)

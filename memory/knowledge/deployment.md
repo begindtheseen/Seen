@@ -2,6 +2,25 @@
 title: Deployment
 tags: [deploy]
 updated: 2026-07-06
+facts:
+  - id: prod-branch
+    subject: Seen
+    predicate: deploys_from
+    object: next-migration
+    valid_from: 2026-06-30
+    valid_to: null
+    confidence: high
+    source: "[[deployment]]"
+    recorded: 2026-07-06
+  - id: deploy-trigger
+    subject: Seen production
+    predicate: deploys_on
+    object: merge to next-migration
+    valid_from: 2026-06-30
+    valid_to: null
+    confidence: high
+    source: "[[deployment]]"
+    recorded: 2026-07-06
 ---
 
 # Deployment

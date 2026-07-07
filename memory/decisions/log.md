@@ -51,6 +51,14 @@ Ledger]]. Product/pricing decisions do not — their upside is revenue probabili
   kill low-value churn (Operation 50% kill-gate discipline). See [[protocol]].
   - *Projected impact:* **+2% productivity · +5% effectiveness** (Low) —
     [[impact-ledger|Impact Ledger]] #2.
+- **2026-07-06 — Temporal memory = one authority, derived graph (Chronos).** The
+  markdown vault stays the single source of truth; a bi-temporal fact layer is
+  *derived* from it (never edited directly), queried locally now and by
+  self-hosted Graphiti later. Rejected the common bidirectional Obsidian↔graph
+  "circle" (dual sources of truth). Facts are typed with valid-time +
+  transaction-time and superseded, never overwritten. See [[temporal]].
+  - *Projected impact:* **+22% productivity · +30% effectiveness** (Med) —
+    [[impact-ledger|Impact Ledger]] #3.
 - **Never touch `main`** (old HTML app, unrelated history). Prod branch is
   `next-migration`; merge = deploy. See [[deployment]].
 - **Candidate sourcing is Phase 2** (owner: "portal on real data first") — needs

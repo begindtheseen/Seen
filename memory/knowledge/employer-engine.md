@@ -2,6 +2,25 @@
 title: Employer Engine
 tags: [revenue, product]
 updated: 2026-07-06
+facts:
+  - id: sku-featured30
+    subject: featured30 SKU
+    predicate: price_usd
+    object: 79
+    valid_from: 2026-07-05
+    valid_to: null
+    confidence: high
+    source: "[[employer-engine]]"
+    recorded: 2026-07-06
+  - id: sku-verified90
+    subject: verified90 SKU
+    predicate: price_usd
+    object: 249
+    valid_from: 2026-07-05
+    valid_to: null
+    confidence: high
+    source: "[[employer-engine]]"
+    recorded: 2026-07-06
 ---
 
 # Employer Engine (E4)
