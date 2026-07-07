@@ -82,6 +82,15 @@ machine layer). Fields:
 them with **no LLM call** — sidestepping the dominant cost of graph memory (an LLM extraction
 per episode). Prose is left for humans / an optional, off-by-default LLM extraction pass.
 
+## See it (the temporal graph view)
+
+`npm run memory:graph` builds a self-contained `memory/.graph/graph.html` — open it in
+any browser. It's the Obsidian-style brain graph **plus a time scrubber**: drag it (or hit
+play) and typed facts fade in at their `valid_from` and expire at their `valid_to`, so you
+watch the memory network grow and rewire across dates. Note↔note wiki-links are the stable
+cortex; fact edges are the synapses that light up over time. No dependencies, no CDN — the
+graph is derived from the vault and rebuildable, so it's gitignored.
+
 ## What Claude can ask (via the [[mcp/README|Chronos MCP server]])
 
 - `memory_search_facts({query, as_of, subject, predicate})` — point-in-time recall.
