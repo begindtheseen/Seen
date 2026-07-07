@@ -1,4 +1,9 @@
-.claude/
+# Ignore local Claude state, but TRACK the committed session hook + settings so every
+# web session boots the memory system (see .claude/hooks/session-start.sh).
+.claude/*
+!.claude/settings.json
+!.claude/hooks/
+.claude/settings.local.json
 *.local
 .env
 .env.*

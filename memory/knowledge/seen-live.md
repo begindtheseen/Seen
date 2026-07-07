@@ -2,7 +2,17 @@
 title: Seen Live
 tags: [architecture, product]
 aliases: [realtime, admin live]
-updated: 2026-07-06
+updated: 2026-07-07
+facts:
+  - id: seen-live-transport
+    subject: Seen Live
+    predicate: realtime_via
+    object: Supabase broadcast ping + authenticated fetch (12s poll fallback)
+    valid_from: 2026-07-05
+    valid_to: null
+    confidence: high
+    source: "[[seen-live]]"
+    recorded: 2026-07-07
 ---
 
 # Seen Live (realtime admin activity)

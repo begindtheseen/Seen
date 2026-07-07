@@ -1,7 +1,26 @@
 ---
 title: Behavioral Flywheel
 tags: [product, growth]
-updated: 2026-07-06
+updated: 2026-07-07
+facts:
+  - id: flywheel-status
+    subject: Behavioral flywheel
+    predicate: status
+    object: BUILT (apply checkpoint, outcome cards, day-7/14/30 check-ins)
+    valid_from: 2026-07-02
+    valid_to: null
+    confidence: high
+    source: "[[behavioral-flywheel]]"
+    recorded: 2026-07-07
+  - id: outcome-emails
+    subject: Outcome email loop
+    predicate: status
+    object: live (day-7/14/30, daily cron 15:00 UTC, on RESEND_KEY)
+    valid_from: 2026-07-05
+    valid_to: null
+    confidence: high
+    source: "[[behavioral-flywheel]]"
+    recorded: 2026-07-07
 ---
 
 # Behavioral Flywheel

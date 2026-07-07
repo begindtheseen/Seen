@@ -1,7 +1,17 @@
 ---
 title: Trust & Anti-Gaming
 tags: [product, security]
-updated: 2026-07-06
+updated: 2026-07-07
+facts:
+  - id: claims-not-facts
+    subject: Seen data model
+    predicate: principle
+    object: treat user submissions as claims, not facts
+    valid_from: 2026-05-01
+    valid_to: null
+    confidence: high
+    source: "[[trust-and-anti-gaming]]"
+    recorded: 2026-07-07
 ---
 
 # Trust & Anti-Gaming

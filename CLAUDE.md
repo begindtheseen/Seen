@@ -1,5 +1,24 @@
 # Seen — Claude Code Instructions
 
+## ⚡ START HERE EVERY SESSION — memory boot (do this first)
+This project has a persistent memory system (`memory/`). **Use it every session so you
+recall where things stand instead of re-reading everything — that is the token save.**
+
+1. **Orient from memory, don't re-read the whole vault.** Run `npm run memory:status` (or the
+   `memory_status` MCP tool) for a compact briefing: what changed since last session, what
+   still needs work ([[open-threads]]), and what's shaky. Then skim `memory/HOME.md`.
+2. **Decide via `memory/decision-protocol.md`.** Every non-trivial decision: orient from
+   memory (current facts · locked decisions · contradictions · open threads · unknowns) →
+   decide → write it back. Be a D1 athlete at decisions: know the context and know what's missing.
+3. **At session end, write it back** (`memory/protocol.md`): supersede changed typed facts
+   (never overwrite), open/close threads in `memory/open-threads.md`, append to
+   `memory/timeline/YYYY-MM-DD.md`, log decisions in `memory/decisions/log.md` (+ impact
+   ledger), then `npm run memory:sync`. If you skip this, the next session pays the token
+   cost you just saved.
+
+Full model: `memory/temporal.md`. Visual map: `npm run memory:graph`. The optional
+auto-boot hook is in `memory/session-hook.md`.
+
 ## North Star
 Read SEEN_STRATEGY.md at the start of every session. That document is the product strategy.
 Every code change must serve the strategy. When in doubt, re-read it.

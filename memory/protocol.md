@@ -10,13 +10,13 @@ How to use this vault every session. Keep it mechanical so it actually happens.
 
 ## At the START of a session
 
-1. Read [[HOME]] — the map of content and current-state snapshot.
-2. Read the **newest note in `timeline/`** — that is where the last session
-   ended and what it handed off.
-3. **Temporal delta:** if the [[mcp/README|Chronos MCP]] is connected, call
-   `memory_whats_changed({ since: <last session date> })` to see which typed
-   facts were recorded or invalidated since. This is the fast "what moved"
-   check — see [[temporal|Chronos]].
+1. **Boot memory (recall, don't re-read).** Run `npm run memory:status` (or the
+   `memory_status` MCP tool) for the compact briefing — what changed since last
+   session, [[open-threads|what still needs work]], and what's shaky. That one
+   read replaces re-reading the vault. Then skim [[HOME]].
+2. Read the **newest note in `timeline/`** — where the last session ended.
+3. **Temporal delta / gaps:** `memory_whats_changed({ since })` for fact changes;
+   `memory_open_threads` for the backlog. See [[temporal|Chronos]].
 4. Read the knowledge notes relevant to your task (follow the wiki-links from
    HOME or the timeline entry). If your task touches deploys, read
    [[deployment]]; if it touches money, read [[employer-engine]] and
@@ -29,6 +29,9 @@ when you need detail the vault doesn't carry.
 
 ## During the session
 
+- **Every non-trivial decision goes through [[decision-protocol]]** — orient
+  from memory (current facts · locked decisions · contradictions · open threads ·
+  unknowns), decide, then write it back. That's the D1-decisions loop.
 - When you verify a **fact** (a path, a schema column, an endpoint contract),
   fix the relevant knowledge note immediately — do not wait for end of session,
   and never write facts from memory. This mirrors the project's own rule 8

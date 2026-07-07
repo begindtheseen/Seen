@@ -2,7 +2,35 @@
 title: Environment
 tags: [deploy, security]
 aliases: [Env Vars]
-updated: 2026-07-06
+updated: 2026-07-07
+facts:
+  - id: env-resend
+    subject: RESEND_KEY
+    predicate: status
+    object: live (noreply@seenjobs.io verified)
+    valid_from: 2026-07-05
+    valid_to: null
+    confidence: high
+    source: "[[environment]]"
+    recorded: 2026-07-07
+  - id: env-posthog-status
+    subject: NEXT_PUBLIC_POSTHOG_KEY
+    predicate: status
+    object: pending (analytics no-op without it)
+    valid_from: 2026-07-05
+    valid_to: null
+    confidence: high
+    source: "[[environment]] · [[open-threads]]"
+    recorded: 2026-07-07
+  - id: env-owner-email-status
+    subject: OWNER_EMAIL
+    predicate: status
+    object: pending (employer alert emails no-op without it)
+    valid_from: 2026-07-05
+    valid_to: null
+    confidence: high
+    source: "[[environment]] · [[open-threads]]"
+    recorded: 2026-07-07
 ---
 
 # Environment variables (Vercel)
