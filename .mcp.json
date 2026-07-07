@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "chronos": {
+      "command": "node",
+      "args": ["memory/mcp/server.mjs"],
+      "env": { "CHRONOS_VAULT": "memory" }
+    }
+  }
+}

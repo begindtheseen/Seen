@@ -10,11 +10,13 @@ recall where things stand instead of re-reading everything — that is the token
 2. **Decide via `memory/decision-protocol.md`.** Every non-trivial decision: orient from
    memory (current facts · locked decisions · contradictions · open threads · unknowns) →
    decide → write it back. Be a D1 athlete at decisions: know the context and know what's missing.
-3. **At session end, write it back** (`memory/protocol.md`): supersede changed typed facts
-   (never overwrite), open/close threads in `memory/open-threads.md`, append to
-   `memory/timeline/YYYY-MM-DD.md`, log decisions in `memory/decisions/log.md` (+ impact
-   ledger), then `npm run memory:sync`. If you skip this, the next session pays the token
-   cost you just saved.
+3. **At session end, write it back** (`memory/protocol.md`): record durable typed facts with the
+   **`memory_record_fact`** MCP tool (bi-temporal, supersede-not-overwrite — no hand-editing;
+   lands in `memory/claude-observations.md`), append what happened with **`memory_append_timeline`**,
+   open/close threads in `memory/open-threads.md`, log decisions in `memory/decisions/log.md`
+   (+ impact ledger), then `npm run memory:sync`. If you skip this, the next session pays the token
+   cost you just saved. (The brain is read **and** write now — `.mcp.json` auto-loads the `chronos`
+   server with `memory_record_fact` / `memory_append_timeline` alongside the read tools.)
 
 Full model: `memory/temporal.md`. Visual map: `npm run memory:graph`. The optional
 auto-boot hook is in `memory/session-hook.md`.
