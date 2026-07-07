@@ -5,3 +5,8 @@
 node_modules/
 .next/
 tsconfig.tsbuildinfo
+
+# Chronos memory: derived graph index is rebuildable (npm run memory:sync); secrets never committed
+memory/.graph/
+memory/graph/.env
+!memory/graph/.env.example

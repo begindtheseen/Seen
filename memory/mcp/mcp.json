@@ -1,0 +1,10 @@
+{
+  "_comment": "Chronos memory MCP server (project-scoped). Copy this to .mcp.json at the repo root, or run: claude mcp add chronos -- node memory/mcp/server.mjs. See memory/mcp/README.md.",
+  "mcpServers": {
+    "chronos": {
+      "command": "node",
+      "args": ["memory/mcp/server.mjs"],
+      "env": { "CHRONOS_VAULT": "memory" }
+    }
+  }
+}
