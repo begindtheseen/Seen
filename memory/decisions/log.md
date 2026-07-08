@@ -75,3 +75,7 @@ Ledger]]. Product/pricing decisions do not — their upside is revenue probabili
 ## Source docs
 `CLAUDE.md` (Operation 50% / session decision blocks), `MONETIZATION_TODO.md`,
 `CLAUDE_HANDOFF.md`.
+
+## 2026-07-08 — Online brain architecture: Chronos delegates storage to Supabase; Chronos is never replaced
+
+Brandon's call (2026-07-08): Chronos remains THE brain layer — every app communicates only with Chronos (the shared writer + brain MCP + visualizer app), and Chronos delegates data organization/storage. Storage backend = Supabase (project tmngmmofrplsldvlobfx): brain_notes (full vault mirror, verbatim), brain_facts (queryable bi-temporal facts), brain_timeline (episodes). RLS enabled with zero policies — service-key only, never publicly readable. The local vault (../seen/memory) stays the fast working copy Chronos.app visualizes; every board meeting auto-pushes to the cloud; `npm run brain:restore` rebuilds the vault on any machine. Refinement accepted by Brandon: Chronos is an embedded layer, not an always-on middleman process, so the brain never goes dark if the GUI isn't running.
