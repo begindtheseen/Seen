@@ -17,7 +17,9 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          # Node 22: `node --test` only expands the "**/*.test.mjs" glob natively
+          # on v21+. On v20 the test step failed with "Could not find '**/*.test.mjs'".
+          node-version: 22
           cache: npm
 
       - name: Install
