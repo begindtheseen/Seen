@@ -210,9 +210,13 @@ export default async function handler(req, res) {
     if (!uid) return res.status(401).json({ error: 'Sign in first' });
     const customerId = await resolveCustomerId(uid, email, env);
     // No Stripe customer → comped/never-subscribed; leave the pro flag untouched.
-    if (!customerId) return res.status(200).json({ ok: true, pro: null, subscription: null });
+    if (!customerId) {
+  // Check if the user has an admin-granted Pro status
+  const adminGrantedPro = await checkAdminGrantedPro(uid, env);
+  return res.status(200).json({ ok: true, pro: adminGrantedPro, subscription: null });
+}
     try {
-      const listRes = await fetch(`https://api.stripe.com/v1/subscriptions?customer=${encodeURIComponent(customerId)}&status=all&limit=10`, { headers: { Authorization: `Bearer ${STRIPE_KEY}` } });
+      const listRes = await fetch(`https://api.stripe.com/v1/subscriptions?customer=${encodeURIComponent(customerId)}&status=all&limit=10`, { headers: { Authorization: `Bearer ${STRIPE_KEY}`, 'Content-Type': 'application/json' } });
       if (!listRes.ok) return res.status(502).json({ error: 'Could not read subscription' });
       const subs = (await listRes.json())?.data || [];
       // Only active / trialing / past_due grant access. A canceled/ended sub grants nothing.
