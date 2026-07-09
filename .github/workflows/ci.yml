@@ -1,0 +1,40 @@
+name: CI
+
+# Runs the checks we already have on every PR/push to next-migration. No secrets
+# needed: unit tests are pure logic, `next build` doesn't require env at build time,
+# and serverless functions in api/ are syntax-checked (next build doesn't compile them).
+on:
+  pull_request:
+    branches: [next-migration]
+  push:
+    branches: [next-migration]
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      - name: Unit tests
+        run: npm test
+
+      - name: Syntax-check serverless functions
+        run: |
+          for f in $(find api lib -name '*.js'); do node --check "$f"; done
+
+      - name: Build
+        run: npm run build
+
+      # Dependency scan — reported, not blocking (a future transitive vuln shouldn't
+      # freeze every merge; high-severity findings still surface loudly in the log).
+      - name: Dependency audit (high+)
+        run: npm audit --audit-level=high
+        continue-on-error: true
