@@ -461,6 +461,12 @@ export default async function handler(req, res) {
     logError('jobs', err.message, { query: safeQuery, loc });
     _inflightReject?.(err);
     _inflight.delete(inflightKey);
+    // Graceful degradation: the live API call failed (billing/rate-limit/outage), but if
+    // we already pulled related listings from our own corpus, serve those rather than an
+    // empty error — search should never go blank just because the top-up couldn't run.
+    if (dbMatches.length) {
+      return res.status(200).json({ ok: true, jobs: dbMatches.slice(0, 60), query: safeQuery, location: loc, _src: 'db-fallback' });
+    }
     return res.status(500).json({ error: err.message, jobs: [] });
   }
 }
