@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react'
 import type { AdminStats } from '@/components/admin/types'
 import { AdminLogin } from '@/components/admin/AdminLogin'
 import { AdminShell } from '@/components/admin/AdminShell'
+import { safeSessionGet, safeSessionSet, safeSessionRemove } from '@/lib/safeStorage'
 
 const TOKEN_KEY = 'admin_token'
 
@@ -17,7 +18,7 @@ export default function AdminPage() {
   const [loginError, setLoginError] = useState('')
 
   useEffect(() => {
-    const stored = sessionStorage.getItem(TOKEN_KEY)
+    const stored = safeSessionGet(TOKEN_KEY)
     if (stored) {
       setToken(stored)
     } else {
@@ -34,7 +35,7 @@ export default function AdminPage() {
       })
       if (res.status === 401 || res.status === 403) {
         const msg = res.status === 403 ? 'Access denied' : 'Session expired'
-        sessionStorage.removeItem(TOKEN_KEY)
+        safeSessionRemove(TOKEN_KEY)
         setToken(null)
         setLoading(false)
         setLoginError(msg)
@@ -54,13 +55,13 @@ export default function AdminPage() {
   }, [token, load])
 
   function onAuthed(newToken: string) {
-    sessionStorage.setItem(TOKEN_KEY, newToken)
+    safeSessionSet(TOKEN_KEY, newToken)
     setToken(newToken)
   }
 
   async function logout() {
     const t = token
-    sessionStorage.removeItem(TOKEN_KEY)
+    safeSessionRemove(TOKEN_KEY)
     setToken(null)
     setStats(null)
     if (t) {
@@ -75,7 +76,7 @@ export default function AdminPage() {
   }
 
   function onUnauthorized() {
-    sessionStorage.removeItem(TOKEN_KEY)
+    safeSessionRemove(TOKEN_KEY)
     setToken(null)
     setStats(null)
     setLoginError('Session expired')

@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react'
 import type { AdminStats, RecentReport, Issue, InactiveReport, DupCluster, RecentJob, JobGroup, DupGroup, MergePrefill, MergeLog, FeatureFlag } from './types'
 import { Card, CardHeader, Badge, relTime, outcomeColor, availColor, runRefreshAndClear, refreshResultMsg } from './primitives'
 import { saveFile } from './saveFile'
+import { safeLocalGet, safeLocalSet } from '@/lib/safeStorage'
 
 const ISSUE_TYPE_LABEL: Record<string, string> = {
   wrong_data: 'Wrong data', duplicate: 'Duplicate', broken_listing: 'Broken listing', spam: 'Spam', other: 'Other',
@@ -1336,7 +1337,7 @@ export function DeployPanel() {
   const [showInput, setShowInput] = useState(false)
 
   useEffect(() => {
-    const stored = localStorage.getItem(DEPLOY_HOOK_KEY) || ''
+    const stored = safeLocalGet(DEPLOY_HOOK_KEY) || ''
     setSaved(stored)
     setHookUrl(stored)
   }, [])
@@ -1344,7 +1345,7 @@ export function DeployPanel() {
   function saveHook() {
     const url = input.trim()
     if (!url.startsWith('https://')) { setStatus({ text: 'Paste the full Vercel deploy hook URL', color: 'var(--red)' }); return }
-    localStorage.setItem(DEPLOY_HOOK_KEY, url)
+    safeLocalSet(DEPLOY_HOOK_KEY, url)
     setSaved(url)
     setHookUrl(url)
     setInput('')
