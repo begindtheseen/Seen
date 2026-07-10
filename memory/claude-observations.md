@@ -29,6 +29,16 @@ facts:
     predicate: status
     object: "Paste-a-link import built (branch claude/job-listing-link-import-chix8k): api/import-listing.js + lib/server/listingImport.js (JSON-LD→meta→URL-slug ladder, SSRF-guarded) + ImportListingModal on /jobs feeding ApplyOptimizeModal; imported listings live 60d, source '<Platform> (imported)', unrated when description thin"
     valid_from: 2026-07-10
+    valid_to: 2026-07-10
+    confidence: high
+    source: "[[claude-observations]]"
+    recorded: 2026-07-10
+    invalidated: 2026-07-10
+  - id: seen-listing-import-status-20260710-3
+    subject: Seen listing import
+    predicate: status
+    object: "SHIPPED to production: PR #172 (paste-a-link import → Apply & Optimize, storage guaranteed, api/helpers.ts build fix) and PR #173 ($0 scoring: keyless ATS JSON enrichment — Greenhouse/Lever/Ashby/SmartRecruiters/Workday — + always-score buildImportedJobRow) both merged to next-migration 2026-07-10; merge auto-deploys seenjobs.io. Remaining spot-check: paste one real ATS link on prod (sandbox couldn't reach external job hosts)"
+    valid_from: 2026-07-10
     valid_to: null
     confidence: high
     source: "[[claude-observations]]"
