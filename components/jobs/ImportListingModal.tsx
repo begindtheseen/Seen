@@ -92,15 +92,24 @@ export default function ImportListingModal({
   const [title, setTitle] = useState('')
   const [company, setCompany] = useState('')
   const [location, setLocation] = useState('')
+  const [description, setDescription] = useState('')
+  // Whether the details step must collect the job description (site walled us out of it).
+  const [needDesc, setNeedDesc] = useState(false)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
 
   async function submit() {
     if (busy) return
     if (!url.trim()) { setError('Paste the link to the job listing.'); return }
-    if (phase === 'details' && (!title.trim() || !company.trim())) {
-      setError('Job title and company are needed to import this listing.')
-      return
+    if (phase === 'details') {
+      if (!title.trim() || !company.trim()) {
+        setError('Job title and company are needed to import this listing.')
+        return
+      }
+      if (needDesc && description.trim().length < 80) {
+        setError('Paste the job description (a sentence or two isn’t enough) so we can optimize your resume against it.')
+        return
+      }
     }
     setBusy(true); setError('')
     try {
@@ -109,7 +118,7 @@ export default function ImportListingModal({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(
           phase === 'details'
-            ? { url: url.trim(), title: title.trim(), company: company.trim(), location: location.trim() }
+            ? { url: url.trim(), title: title.trim(), company: company.trim(), location: location.trim(), description: description.trim() }
             : { url: url.trim() }
         ),
       })
@@ -117,7 +126,8 @@ export default function ImportListingModal({
         error?: string
         job?: Record<string, unknown>
         needs_details?: boolean
-        draft?: { title?: string; company?: string; location?: string }
+        need_description?: boolean
+        draft?: { title?: string; company?: string; location?: string; description?: string }
       }
       if (!r.ok) {
         setError(data.error || (r.status === 429 ? 'Too many imports — try again in a bit.' : 'Import failed — try again.'))
@@ -127,6 +137,8 @@ export default function ImportListingModal({
         setTitle(t => t || data.draft?.title || '')
         setCompany(c => c || data.draft?.company || '')
         setLocation(l => l || data.draft?.location || '')
+        setDescription(d => d || data.draft?.description || '')
+        setNeedDesc(!!data.need_description)
         setPhase('details')
         return
       }
@@ -162,8 +174,9 @@ export default function ImportListingModal({
           )}
           {phase === 'details' && (
             <p style={{ fontFamily: 'var(--mono)', fontSize: '.62rem', color: 'var(--sub)', lineHeight: 1.7, marginBottom: '.9rem' }}>
-              That site didn&apos;t let us read the whole listing. Confirm the job title and
-              company and we&apos;ll take it from here.
+              {needDesc
+                ? 'This site (Indeed and a few others) blocks automated reads, so we can’t pull the description ourselves. Confirm the basics and paste the job description from the listing — then the optimizer works off the real text.'
+                : 'That site didn’t let us read the whole listing. Confirm the job title and company and we’ll take it from here.'}
             </p>
           )}
 
@@ -202,6 +215,26 @@ export default function ImportListingModal({
                     onChange={e => setLocation(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') submit() }}
                     style={inputStyle} />
                 </div>
+                {needDesc && (
+                  <div>
+                    <label style={labelStyle}>
+                      Job description
+                      <span style={{ textTransform: 'none', letterSpacing: 'normal', color: description.trim().length >= 80 ? 'var(--green)' : 'var(--dim)' }}>
+                        {' '}— paste from the listing{description.trim().length >= 80 ? ' ✓' : ''}
+                      </span>
+                    </label>
+                    <textarea
+                      placeholder="Select the job description on the listing, copy it, and paste it here. This is what the optimizer tailors your resume against."
+                      value={description}
+                      onChange={e => setDescription(e.target.value)}
+                      rows={7}
+                      style={{ ...inputStyle, resize: 'vertical', minHeight: 120, lineHeight: 1.5, fontFamily: 'var(--body)' }}
+                    />
+                    <div style={{ fontFamily: 'var(--mono)', fontSize: '.55rem', color: 'var(--dim)', marginTop: '.3rem' }}>
+                      {description.trim().length} characters · we score and optimize off this exact text
+                    </div>
+                  </div>
+                )}
               </>
             )}
 
@@ -212,7 +245,7 @@ export default function ImportListingModal({
             )}
 
             <button style={{ ...btnPrimary, opacity: busy ? 0.6 : 1, cursor: busy ? 'not-allowed' : 'pointer' }} onClick={submit} disabled={busy}>
-              {busy ? 'Importing…' : phase === 'details' ? 'Add listing →' : '🔗 Import listing →'}
+              {busy ? 'Importing…' : phase === 'details' ? (needDesc ? 'Add listing & optimize →' : 'Add listing →') : '🔗 Import listing →'}
             </button>
           </div>
         </div>

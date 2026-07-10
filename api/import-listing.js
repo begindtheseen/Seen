@@ -368,28 +368,38 @@ export default async function handler(req, res) {
     if (Array.isArray(existing) && existing[0]) {
       const ex = existing[0];
       if ((ex.description || '').length < 80) {
+        // Heal a hollow row: prefer a fresh auto-extraction, else the user's pasted JD.
+        const pastedNow = String(body.description || '').trim().slice(0, 12000);
+        let healDesc = '', healSalary = ex.salary, healSalaryMin = 0, healVia = '';
         try {
           const { fields } = await resolveListing(v);
           if (fields.description && fields.description.length >= 80) {
-            const enriched = buildImportedJobRow({
-              title: ex.title,
-              company: ex.company,
-              location: fields.location || ex.location,
-              salary: fields.salary || ex.salary,
-              salaryMin: fields.salaryMin,
-              description: fields.description,
-              type: ex.type,
-            }, v.url);
-            if (enriched) {
-              const patch = { description: enriched.description, salary: enriched.salary ?? ex.salary, score: enriched.score, waste_score: enriched.waste_score, last_checked_at: new Date().toISOString() };
-              await fetch(`${SUPABASE_URL}/rest/v1/jobs?id=eq.${encodeURIComponent(ex.id)}`, {
-                method: 'PATCH', headers: { ...dbHeaders, Prefer: 'return=minimal' }, body: JSON.stringify(patch),
-              }).catch(() => {});
-              console.log(`IMPORT ENRICHED: "${ex.title}" @ "${ex.company}" — backfilled ${enriched.description.length}-char description (via ${fields.via})`);
-              return res.status(200).json({ ok: true, job: toUi({ ...ex, ...patch }), existing: true, stored: true, enriched: true });
-            }
+            healDesc = fields.description; healSalary = fields.salary || ex.salary; healSalaryMin = fields.salaryMin; healVia = fields.via;
           }
-        } catch { /* keep the existing row as-is */ }
+        } catch { /* fall through to pasted */ }
+        if (!healDesc && pastedNow.length >= 80) { healDesc = pastedNow; healVia = 'user-paste'; }
+
+        if (healDesc) {
+          const enriched = buildImportedJobRow({
+            title: ex.title, company: ex.company, location: ex.location,
+            salary: healSalary, salaryMin: healSalaryMin, description: healDesc, type: ex.type,
+          }, v.url);
+          if (enriched) {
+            const patch = { description: enriched.description, salary: enriched.salary ?? ex.salary, score: enriched.score, waste_score: enriched.waste_score, last_checked_at: new Date().toISOString() };
+            await fetch(`${SUPABASE_URL}/rest/v1/jobs?id=eq.${encodeURIComponent(ex.id)}`, {
+              method: 'PATCH', headers: { ...dbHeaders, Prefer: 'return=minimal' }, body: JSON.stringify(patch),
+            }).catch(() => {});
+            console.log(`IMPORT ENRICHED: "${ex.title}" @ "${ex.company}" — backfilled ${enriched.description.length}-char description (via ${healVia})`);
+            return res.status(200).json({ ok: true, job: toUi({ ...ex, ...patch }), existing: true, stored: true, enriched: true });
+          }
+        }
+        // Still no description and none pasted — ask for it instead of returning a hollow
+        // row the optimizer can't use. Title/company are known, so only the JD is needed.
+        return res.status(200).json({
+          ok: true, needs_details: true, need_description: true,
+          draft: { title: ex.title || '', company: ex.company || '', location: ex.location || '', description: '' },
+          page_fetched: false,
+        });
       }
       return res.status(200).json({ ok: true, job: toUi(ex), existing: true, stored: true });
     }
@@ -406,7 +416,11 @@ export default async function handler(req, res) {
       rungs = [{ rung: 'direct', error: e.message }];
     }
 
-    // User-supplied fields (second call after needs_details) always win.
+    // User-supplied fields (second call after needs_details) always win. A user-pasted
+    // description is the guaranteed-reliable source for hard-walled sites (Indeed's
+    // Cloudflare blocks every server-side rung from serverless IPs) — and it's the EXACT
+    // JD the user is looking at, so the optimizer gets grounded, real text.
+    const manualDesc = String(body.description || '').trim().slice(0, 12000);
     const manual = {
       title: sanitizeField(body.title, 200),
       company: sanitizeField(body.company, 120),
@@ -417,19 +431,30 @@ export default async function handler(req, res) {
       title: manual.title || fields.title,
       company: manual.company || fields.company,
       location: manual.location || fields.location,
+      // A pasted description overrides only when the automatic one is thin/empty.
+      description: (fields.description && fields.description.length >= 80) ? fields.description : (manualDesc || fields.description),
+      via: manualDesc && (!fields.description || fields.description.length < 80) ? 'user-paste' : fields.via,
     };
 
-    if (!fieldsMerged.title || !fieldsMerged.company) {
+    // Ask the user for whatever is still missing — INCLUDING the description. This is the
+    // key change: we never save a hollow, description-less listing (which left the
+    // optimizer with nothing). If title/company resolved automatically but the site walled
+    // the description, we still surface the form so the user can paste the JD they see.
+    const needTitleCo = !fieldsMerged.title || !fieldsMerged.company;
+    const needDesc = !fieldsMerged.description || fieldsMerged.description.length < 80;
+    if (needTitleCo || needDesc) {
       // Visible in Vercel logs: which rungs ran and what each produced — the trail for
       // any future "site can't read X listings" report.
-      console.warn(`IMPORT UNRESOLVED: ${v.host} — ${JSON.stringify(rungs)}`);
+      console.warn(`IMPORT NEEDS INPUT (${needTitleCo ? 'title/co' : ''}${needDesc ? ' desc' : ''}): ${v.host} — ${JSON.stringify(rungs)}`);
       return res.status(200).json({
         ok: true,
         needs_details: true,
+        need_description: needDesc,
         draft: {
           title: fieldsMerged.title || '',
           company: fieldsMerged.company || '',
           location: fieldsMerged.location || '',
+          description: fieldsMerged.description && fieldsMerged.description.length >= 80 ? fieldsMerged.description : '',
         },
         page_fetched: rungs.some(r => r.blocked === false),
       });
@@ -459,7 +484,7 @@ export default async function handler(req, res) {
       saved = stitch((await upsertJobs([row], SUPABASE_URL, SUPABASE_SERVICE_KEY)).rows);
       if (!saved) {
         logError('import-listing', 'listing not persisted after retry', { url: v.url, title: row.title, company: row.company });
-        return res.status(200).json({ ok: true, job: toUi(row), stored: false, via: fields.via });
+        return res.status(200).json({ ok: true, job: toUi(row), stored: false, via: fieldsMerged.via });
       }
     }
 
@@ -471,7 +496,7 @@ export default async function handler(req, res) {
     try { await recomputeCompanyScoreFromReports(SUPABASE_URL, dbHeaders, saved.company); } catch { /* best-effort */ }
 
     console.log(`IMPORTED: "${row.title}" @ "${row.company}" from ${v.host} (via ${fields.via}${manual.title || manual.company ? ' + manual' : ''}) rungs=${JSON.stringify(rungs)}`);
-    return res.status(200).json({ ok: true, job: toUi(saved), stored: true, via: fields.via });
+    return res.status(200).json({ ok: true, job: toUi(saved), stored: true, via: fieldsMerged.via });
   } catch (err) {
     logError('import-listing', err.message, { url: v.url });
     return res.status(500).json({ error: 'Import failed — try again.' });
