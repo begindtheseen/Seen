@@ -73,8 +73,8 @@ function OffenderRow({ r, rank }: { r: Ranked; rank: number }) {
   const accent = riskColor(r.riskLevel)
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: '.85rem', background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 10, padding: '.8rem 1rem', marginBottom: '.5rem' }}>
-      <div style={{ ...mono('.62rem', 'var(--muted)'), width: 18, textAlign: 'right', flexShrink: 0 }}>{rank}</div>
-      <div style={{ fontFamily: 'var(--display)', fontSize: '1.4rem', fontWeight: 800, color: accent, width: 28, textAlign: 'center', flexShrink: 0 }}>{grade(r.overallScore)}</div>
+      <div style={{ ...mono('.62rem', 'var(--muted)'), minWidth: 40, textAlign: 'right', flexShrink: 0 }}>{rank}</div>
+      <div style={{ fontFamily: 'var(--display)', fontSize: '1.4rem', fontWeight: 800, color: accent, minWidth: 36, textAlign: 'center', flexShrink: 0 }}>{grade(r.overallScore)}</div>
       <div style={{ minWidth: 0, flex: 1 }}>
         <Link href={`/company/${slugify(r.name)}`} style={{ fontFamily: 'var(--display)', fontSize: '.92rem', fontWeight: 700, color: 'var(--white)', textDecoration: 'none', textTransform: 'capitalize' }}>{r.name}</Link>
         <div style={{ ...mono('.58rem', 'var(--dim)'), marginTop: '.15rem' }}>
