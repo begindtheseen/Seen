@@ -110,3 +110,18 @@ test('thin evidence stays close to the prior (2 reports barely move it)', () => 
   // effN = 2 → weight = 2/10 = 0.2 toward empirical(1.0): 0.2*1 + 0.8*0.2 = 0.36
   assert.ok(Math.abs(r.ghost_rate - 0.36) < 0.001, `got ${r.ghost_rate}`);
 });
+
+test('confirmedStaleListings lowers the fused score by the bounded penalty', () => {
+  const web = { ghost_rate: 0.2, response_rate: 0.7, avg_wait_days: 10, report_count: 20 };
+  const clean = fuseCompanyIntel({ web });
+  const zombie2 = fuseCompanyIntel({ web, confirmedStaleListings: 2 });
+  const zombie99 = fuseCompanyIntel({ web, confirmedStaleListings: 99 });
+  assert.equal(clean.stale_listing_penalty, 0);
+  assert.equal(zombie2.stale_listing_penalty, -8);
+  assert.equal(zombie2.confirmed_stale_listings, 2);
+  assert.equal(zombie2.overall_score, Math.max(0, clean.overall_score - 8));
+  assert.equal(zombie99.stale_listing_penalty, -20, 'penalty is capped');
+  // Rates/waste are outcome evidence — dead listings must not distort them.
+  assert.equal(zombie2.ghost_rate, clean.ghost_rate);
+  assert.equal(zombie2.waste_score, clean.waste_score);
+});

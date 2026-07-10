@@ -118,6 +118,23 @@ export async function assessSubmitTrust(SUPABASE_URL, hdrs, uid, dupFilter) {
 // Preserves any existing web-research context (industry / summary / reviews) by OMITTING those
 // columns from the upsert — PostgREST merge-duplicates only overwrites columns present in the
 // payload. Best-effort: never throws, and returns false on any no-op so the write path is unaffected.
+// Admin-confirmed dead listings for a company (suppressed_listings is written ONLY by
+// the admin delete flow, so this count is verified evidence — not raw user reports).
+// Fail-safe: any error reads as 0 so a hiccup here can never distort a score.
+export async function fetchConfirmedStaleCount(SUPABASE_URL, hdrs, companyName) {
+  try {
+    if (!SUPABASE_URL || !hdrs?.apikey || !companyName) return 0;
+    const enc = encodeURIComponent(String(companyName).toLowerCase().trim());
+    const r = await fetch(
+      `${SUPABASE_URL}/rest/v1/suppressed_listings?company=ilike.${enc}&select=apply_url&limit=100`,
+      { headers: hdrs },
+    );
+    if (!r.ok) return 0;
+    const rows = await r.json();
+    return Array.isArray(rows) ? rows.length : 0;
+  } catch { return 0; }
+}
+
 export async function recomputeCompanyScoreFromReports(SUPABASE_URL, hdrs, companyName) {
   try {
     if (!SUPABASE_URL || !hdrs?.apikey || !companyName) return false;
@@ -134,7 +151,10 @@ export async function recomputeCompanyScoreFromReports(SUPABASE_URL, hdrs, compa
     const byType = {};
     for (const row of reps) { const t = classifyPlatform(row.platform); (byType[t] ||= []).push({ outcome: row.outcome }); }
     const sources = Object.entries(byType).map(([type, outcomes]) => ({ type, outcomes }));
-    const fz = fuseCompanyIntel({ web: {}, sources });
+    // Fold in admin-confirmed dead listings so companies that leave zombie postings up
+    // carry the (bounded) penalty in their stored grade.
+    const confirmedStaleListings = await fetchConfirmedStaleCount(SUPABASE_URL, hdrs, companyName);
+    const fz = fuseCompanyIntel({ web: {}, sources, confirmedStaleListings });
     if (!fz || !fz.report_count) return false;
     // Belt-and-suspenders: fusion already clamps, but the WRITER enforces the range too so a
     // rate can never persist as e.g. 34.0 (→ "3400% ghost rate"). rates [0,1], scores [0,100].

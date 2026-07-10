@@ -18,6 +18,7 @@ import dns from 'node:dns/promises';
 import { applyRateLimit } from '../lib/server/ratelimit.js';
 import { logError } from '../lib/server/errlog.js';
 import { upsertJobs, inferLevel } from '../lib/server/jobSources.js';
+import { recomputeCompanyScoreFromReports } from './_utils/reportWrite.js';
 import {
   validateListingUrl,
   isPrivateIp,
@@ -146,6 +147,17 @@ export default async function handler(req, res) {
   };
 
   try {
+    // Admin-confirmed dead posting? An import must not resurrect a listing a user
+    // reported and an admin verified as gone (suppressed_listings) — tell the user
+    // the truth instead of re-adding a zombie.
+    const suppressed = await fetch(
+      `${SUPABASE_URL}/rest/v1/suppressed_listings?apply_url=eq.${encodeURIComponent(v.url)}&select=apply_url&limit=1`,
+      { headers: dbHeaders }
+    ).then(r => (r.ok ? r.json() : [])).catch(() => []);
+    if (Array.isArray(suppressed) && suppressed[0]) {
+      return res.status(410).json({ error: 'This listing was reported by applicants and confirmed no longer active.' });
+    }
+
     // Already imported (same canonical URL) → return the existing listing. Also refreshes
     // nothing: the user's saved copy stays exactly what they imported.
     const existing = await fetch(
@@ -265,6 +277,13 @@ export default async function handler(req, res) {
         return res.status(200).json({ ok: true, job: toUi(row), stored: false, via: extracted.via });
       }
     }
+
+    // Every import feeds the company graph too (owner decision 2026-07-10): the company
+    // row was created by upsertJobs; now refresh its stored score from all evidence we
+    // hold (reports corpus + confirmed-stale registry — deterministic, $0, no LLM).
+    // Companies with zero evidence stay honestly unscored ("no data yet"), never invented.
+    // Awaited (not fire-and-forget): Vercel freezes the function right after the response.
+    try { await recomputeCompanyScoreFromReports(SUPABASE_URL, dbHeaders, saved.company); } catch { /* best-effort */ }
 
     console.log(`IMPORTED: "${row.title}" @ "${row.company}" from ${v.host} (via ${extracted.via}${manual.title || manual.company ? ' + manual' : ''})`);
     return res.status(200).json({ ok: true, job: toUi(saved), stored: true, via: extracted.via });

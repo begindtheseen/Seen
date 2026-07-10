@@ -16,7 +16,7 @@ interface ApplyCheckpointProps {
   onClose: () => void
 }
 
-type Step = 'main' | 'not_yet' | 'declined' | 'confirmed' | 'not_yet_confirmed'
+type Step = 'main' | 'not_yet' | 'declined' | 'confirmed' | 'not_yet_confirmed' | 'listing_gone'
 
 const NOT_YET_REASONS = [
   'I want to edit the resume first',
@@ -74,6 +74,41 @@ export default function ApplyCheckpoint({ job, optimized: _optimized, autoConfir
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [autoConfirm])
+
+  // The listing page was up but the position was gone/closed — the applicant couldn't
+  // apply at all. File an availability report (the same signal the job-card flag uses):
+  // it lands in the admin reported-listings queue to keep or remove, and once an admin
+  // confirms it dead, the company's score carries the stale-listing penalty.
+  const [reportedGone, setReportedGone] = useState<'sent' | 'signin' | null>(null)
+  async function handleListingGone() {
+    setLoading(true)
+    if (!isLoggedIn) {
+      setReportedGone('signin')
+    } else {
+      try {
+        await fetch('/api/user-sync', {
+          method: 'POST',
+          headers: await aiHeaders(),
+          body: JSON.stringify({
+            action: 'report_job_availability',
+            job_id: String(job.id),
+            status: 'expired',
+            snapshot: {
+              company: job.company || null,
+              title: job.title || null,
+              city: job.location || null,
+              apply_url: job.apply_url || null,
+            },
+          }),
+        })
+        setReportedGone('sent')
+      } catch {
+        setReportedGone('sent') // report is best-effort; never dead-end the user on a network blip
+      }
+    }
+    setLoading(false)
+    setStep('listing_gone')
+  }
 
   async function handleApplied() {
     setLoading(true)
@@ -377,10 +412,46 @@ export default function ApplyCheckpoint({ job, optimized: _optimized, autoConfir
             </button>
 
             <button
+              style={secondaryBtnStyle}
+              onClick={handleListingGone}
+              disabled={loading}
+            >
+              🚫 Couldn&apos;t — the listing was gone or closed
+            </button>
+
+            <button
               style={ghostBtnStyle}
               onClick={() => setStep('declined')}
             >
               I changed my mind
+            </button>
+          </div>
+        )}
+
+        {/* ── LISTING GONE (couldn't apply — flag for admin review) ── */}
+        {step === 'listing_gone' && (
+          <div style={innerStyle}>
+            <div style={{ ...confirmedCheckStyle, fontSize: 36 }}>
+              {reportedGone === 'signin' ? 'Thanks for flagging.' : 'Flagged for review.'}
+            </div>
+            <div style={{
+              fontFamily: 'var(--mono)',
+              fontSize: 14,
+              color: 'var(--sub)',
+              lineHeight: 1.6,
+              marginBottom: 24,
+            }}>
+              {reportedGone === 'signin' ? (
+                <>Sign in and report it from the listing card so it counts — verified dead
+                listings get pulled, and companies that leave them up lose transparency score.</>
+              ) : (
+                <>We&apos;ll verify {job.company} — {job.title} and pull it if it&apos;s dead.
+                Companies that leave inactive listings up lose transparency score, so this
+                report protects the next applicant&apos;s time.</>
+              )}
+            </div>
+            <button style={closeFullBtnStyle} onClick={onClose}>
+              Close
             </button>
           </div>
         )}
@@ -446,6 +517,21 @@ export default function ApplyCheckpoint({ job, optimized: _optimized, autoConfir
                   style={reasonBtnStyle}
                   onClick={() => {
                     saveSkipReason(job.company, job.title, reason, 'declined')
+                    // "Fake or outdated" is an availability claim, not just a skip reason —
+                    // file it (weaker 'unknown' status) so it reaches the admin review queue
+                    // instead of dying in localStorage.
+                    if (reason === 'Listing seems fake or outdated' && isLoggedIn) {
+                      aiHeaders().then(h => fetch('/api/user-sync', {
+                        method: 'POST',
+                        headers: h,
+                        body: JSON.stringify({
+                          action: 'report_job_availability',
+                          job_id: String(job.id),
+                          status: 'unknown',
+                          snapshot: { company: job.company || null, title: job.title || null, city: job.location || null, apply_url: job.apply_url || null },
+                        }),
+                      })).catch(() => { /* best-effort signal */ })
+                    }
                     onClose()
                   }}
                 >
