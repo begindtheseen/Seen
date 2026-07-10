@@ -2,7 +2,7 @@ import PDFDocument from 'pdfkit';
 import { createClient } from '@supabase/supabase-js';
 import { applyRateLimit } from '../lib/server/ratelimit.js';
 import { logError } from '../lib/server/errlog.js';
-import { gateAI } from '../lib/server/credits.js';
+import { gateAI, resolveAuthedUser } from '../lib/server/credits.js';
 import { runAdvantage, extractEmployment, extractCareerSignal, buildResumeDocument, resumeFileName } from '../lib/server/resumeAnalysis.js';
 import { scannerFromSeenFit, optimizeFromSeenFit } from '../lib/server/seenfitCompat.js';
 import { extractUploadText } from '../lib/server/resumeUpload.js';
@@ -63,10 +63,18 @@ export default async function handler(req, res) {
   if (!body || typeof body !== 'object') body = {};
 
   // ── Route: email_analysis — send resume analysis + apply link via Resend ──────
+  // SECURITY: require auth and send ONLY to the signed-in user's own email. This
+  // route was previously unauthenticated with a body-supplied recipient, letting
+  // any anonymous caller send Seen-branded mail from noreply@seenjobs.io to any
+  // address (spam / deliverability-reputation abuse). Both real callers already
+  // default the recipient to the user's own email, so binding it to the token is
+  // behavior-preserving for legitimate use.
   if (body.action === 'email_analysis') {
     if (req.method !== 'POST') return res.status(405).end();
     if (await applyRateLimit(req, res, 'email-analysis')) return;
-    return handleEmailAnalysis(req, res, body);
+    const authed = await resolveAuthedUser(req);
+    if (!authed?.email) return res.status(401).json({ error: 'Sign in to email your package' });
+    return handleEmailAnalysis(req, res, { ...body, email: authed.email });
   }
 
   // ── Route: download_resume — return a complete, submittable résumé PDF ────────
@@ -738,8 +746,13 @@ async function handleDownloadResume(req, res, body) {
 // Extracts anonymized career signals from a parsed resume and stores them in
 // two layers: resume_skills (per-user, private) and career_signals (anonymized).
 async function storeCareerSignals(resumeText, employment, req) {
-  const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL;
-  const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  // Use the same env-var names as the rest of the codebase (SUPABASE_URL /
+  // SUPABASE_SERVICE_KEY). The prior NEXT_PUBLIC_SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY
+  // names are almost certainly unset in prod, which silently no-op'd this whole
+  // function — so resume_skills never persisted and `recommended` was degraded.
+  // Keep the old names as a fallback in case an env sets only those.
+  const SUPABASE_URL = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!SUPABASE_URL || !SUPABASE_SERVICE_KEY) return;
 
   // Get user_id from JWT if available

@@ -685,7 +685,7 @@ function ResumePageInner() {
     setEmailState('sending')
     try {
       await fetch('/api/resume', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        method: 'POST', headers: await aiHeaders(),
         body: JSON.stringify({
           action: 'email_analysis', email: emailAddr.trim(), co: jobCompany, role: jobTitle,
           ...(jobUrl ? { jobUrl } : {}),

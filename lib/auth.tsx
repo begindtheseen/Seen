@@ -39,6 +39,9 @@ const SESSION_LOCAL_KEYS = [
   'seen_applications_v1', 'seen_saved_v1', 'seen_hevents_v1', 'seen_check_snooze',
   'seen_apply_reminders', 'seen_avoided_apps', 'seen_skip_reasons', 'seen_recent_cos',
   '_seen_survey_done',
+  // Device-local search state — must clear on sign-out so the next account on a
+  // shared device doesn't inherit the previous user's recent searches / job cache.
+  'seen_recent_v1', 'seen_job_cache_v1',
 ]
 
 function clearSessionLocalData() {
