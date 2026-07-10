@@ -1052,13 +1052,30 @@ async function _handler(req, res) {
     const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
     let soft_deleted = false;
     let suppressed = false;
+    let deadCompany = null; // company of the confirmed-dead listing → score recompute below
     if (UUID.test(jid)) {
+      // Read the row BEFORE expiring it: its apply_url goes into suppressed_listings so the
+      // same dead posting can neither resurface via re-aggregation nor be paste-a-link
+      // re-imported, and its company feeds the stale-listing registry/penalty. Previously
+      // only ephemeral listings got suppressed — DB-backed ones could come straight back.
+      const rowRes = await db(`jobs?id=eq.${encodeURIComponent(jid)}&select=apply_url,title,company&limit=1`);
+      const rowRows = rowRes.ok ? await rowRes.json() : null;
+      const jobRow = Array.isArray(rowRows) ? rowRows[0] : null;
       const up = await db(`jobs?id=eq.${encodeURIComponent(jid)}`, {
         method: 'PATCH',
         body: JSON.stringify({ availability_status: 'expired', expires_at: new Date().toISOString(), last_checked_at: new Date().toISOString() }),
         headers: { Prefer: 'return=minimal' },
       });
       soft_deleted = up.ok;
+      if (jobRow?.apply_url) {
+        const ins = await db('suppressed_listings?on_conflict=apply_url', {
+          method: 'POST',
+          headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
+          body: JSON.stringify({ apply_url: jobRow.apply_url, stable_job_id: jid, title: jobRow.title || null, company: jobRow.company || null, reason: 'admin_removed' }),
+        });
+        suppressed = ins.ok;
+        deadCompany = jobRow.company || null;
+      }
     } else {
       // Ephemeral (live-search) listing — no jobs row to expire. Suppress it by apply_url so a
       // re-search can't resurface the same dead posting (migration 047). We read the listing
@@ -1074,12 +1091,19 @@ async function _handler(req, res) {
           body: JSON.stringify({ apply_url: snap.apply_url, stable_job_id: jid, title: snap.title || null, company: snap.company || null, reason: 'admin_removed' }),
         });
         suppressed = ins.ok;
+        deadCompany = snap.company || null;
       }
     }
     await db(`job_availability_reports?job_id=eq.${encodeURIComponent(jid)}`, {
       method: 'DELETE',
       headers: { Prefer: 'return=minimal' },
     });
+    // Admin just CONFIRMED a dead listing — recompute the company's stored score so the
+    // stale-listing penalty (companyScore.js) lands now, not on the next report write.
+    // Awaited (not fire-and-forget): Vercel freezes the function after the response.
+    if (suppressed && deadCompany) {
+      try { await recomputeCompanyScoreFromReports(SB, { apikey: SK, Authorization: `Bearer ${SK}`, 'Content-Type': 'application/json' }, normalizeCompany(deadCompany)); } catch { /* score refresh is best-effort */ }
+    }
     await db('admin_audit_log', { method: 'POST', body: JSON.stringify({ admin_id: sess.admin_id, username: sess.username || 'admin', action: 'delete_listing', target_type: 'job', target_id: jid, metadata: { soft_deleted, suppressed } }), headers: { Prefer: 'return=minimal' } });
     return res.status(200).json({ ok: true, soft_deleted, suppressed });
   }

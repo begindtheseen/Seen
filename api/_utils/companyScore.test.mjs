@@ -3,7 +3,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   calcOverallScore, calcWaste, tenureAdjustment, scoreConfidence, fuseScore, MIN_TENURE_SAMPLE,
-  parseMonthIndex, aggregateTenure, volumeBonus, VOLUME_BONUS_MAX,
+  parseMonthIndex, aggregateTenure, volumeBonus, VOLUME_BONUS_MAX, staleListingPenalty,
 } from './companyScore.js';
 
 test('base formula = response/ghost/wait terms + capped volume bonus', () => {
@@ -108,4 +108,16 @@ test('aggregateTenure averages months per company with sample counts', () => {
   assert.equal(out.meta.sample, 1);
   assert.ok(out.meta.avg_tenure_months >= 20); // ~24 months to Jan 2023
   assert.ok(!('x' in out)); // unparseable rows dropped
+});
+
+test('staleListingPenalty: −4 per admin-confirmed dead listing, capped, zero-safe', () => {
+  assert.equal(staleListingPenalty(0), 0);
+  assert.equal(staleListingPenalty(1), -4);
+  assert.equal(staleListingPenalty(3), -12);
+  assert.equal(staleListingPenalty(5), -20);   // exactly at the cap
+  assert.equal(staleListingPenalty(50), -20);  // capped — can never swamp outcome terms
+  assert.equal(staleListingPenalty(-2), 0);
+  assert.equal(staleListingPenalty(NaN), 0);
+  assert.equal(staleListingPenalty(undefined), 0);
+  assert.equal(staleListingPenalty(2.9), -8);  // partial counts floor, never round up
 });

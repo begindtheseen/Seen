@@ -6,7 +6,7 @@ import { applyRateLimit } from '../lib/server/ratelimit.js';
 import { logError } from '../lib/server/errlog.js';
 import { calcOverallScore, calcWaste, tenureAdjustment, scoreConfidence, confidenceLabel, aggregateTenure, MIN_TENURE_SAMPLE } from './_utils/companyScore.js';
 import { fuseCompanyIntel, classifyPlatform } from './_utils/companyIntel.js';
-import { recomputeCompanyScoreFromReports } from './_utils/reportWrite.js';
+import { recomputeCompanyScoreFromReports, fetchConfirmedStaleCount } from './_utils/reportWrite.js';
 import { anthropicEnabled } from '../lib/server/aiflag.js';
 
 // Authorize admin/cron-only actions (the Anthropic web-research endpoints). Accepts a Vercel
@@ -1314,7 +1314,10 @@ async function _fuseWithReports(name, web, SUPABASE_URL, dbH) {
       (byType[type] ||= []).push({ outcome: row.outcome });
     }
     const sources = Object.entries(byType).map(([type, outcomes]) => ({ type, outcomes }));
-    return fuseCompanyIntel({ web, sources });
+    // Admin-confirmed dead listings (zombie postings) carry a bounded penalty here too,
+    // so the company-page score matches the stored recompute path.
+    const confirmedStaleListings = await fetchConfirmedStaleCount(SUPABASE_URL, dbH, name);
+    return fuseCompanyIntel({ web, sources, confirmedStaleListings });
   } catch (_e) { return null; }
 }
 

@@ -12,6 +12,8 @@ import JobFilters from '@/components/jobs/JobFilters'
 import ApplyCheckpoint from '@/components/ApplyCheckpoint'
 import ApplyOptimizeModal from '@/components/ApplyOptimizeModal'
 import ImportListingModal from '@/components/jobs/ImportListingModal'
+import { SavedJobsStore } from '@/lib/stores/SavedJobs'
+import { notify } from '@/lib/notify'
 import { matchCities } from '@/lib/data/usCities'
 
 export default function JobsPage() {
@@ -350,7 +352,15 @@ export default function JobsPage() {
     {showImport && (
       <ImportListingModal
         onClose={() => setShowImport(false)}
-        onImported={job => { setShowImport(false); setApplyJob(job) }}
+        onImported={job => {
+          setShowImport(false)
+          // An import is the user handing us a listing they care about — keep it visibly:
+          // saved list (with full snapshot) + DB row, so it survives the modal closing.
+          SavedJobsStore.save(job, isLoggedIn)
+          setSaveVersion(v => v + 1)
+          notify({ title: 'Listing added & saved', sub: `${job.title} · ${job.company} — in your Saved list`, severity: 'success', duration: 3200 })
+          setApplyJob(job)
+        }}
       />
     )}
 

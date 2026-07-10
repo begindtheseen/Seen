@@ -43,6 +43,21 @@ export function riskLevel(score) {
   return score >= 70 ? 'safe' : score >= 40 ? 'warn' : 'danger';
 }
 
+// ── Stale-listing penalty (owner decision 2026-07-10) ─────────────────────────
+// Companies that leave dead listings up waste applicant time — the core harm this
+// platform exists to expose. The signal is EARNED and anti-gameable: it counts only
+// listings a user reported AND an admin confirmed dead (suppressed_listings, written
+// exclusively by the admin delete flow) — never raw unreviewed reports, so brigading
+// a company can't move its score. Bounded like every other adjustment (−4 per
+// confirmed dead listing, capped at −20) so it signals without swamping outcomes.
+export const STALE_LISTING_POINTS = 4;
+export const STALE_LISTING_PENALTY_MAX = 20;
+export function staleListingPenalty(confirmedStaleCount) {
+  const n = Math.floor(Number(confirmedStaleCount));
+  if (!Number.isFinite(n) || n <= 0) return 0;
+  return -Math.min(STALE_LISTING_PENALTY_MAX, n * STALE_LISTING_POINTS);
+}
+
 // Minimum résumé samples before tenure is allowed to move the score at all.
 export const MIN_TENURE_SAMPLE = 4;
 // Sample size at which the tenure signal reaches full strength.
