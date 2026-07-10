@@ -3,23 +3,29 @@ import type { NextRequest } from 'next/server'
 
 // Domains actually used by SeenJobs:
 // - fonts.googleapis.com / fonts.gstatic.com — Google Fonts
-// - tmngmmofrplsldvlobfx.supabase.co — Supabase (auth, DB)
+// - tmngmmofrplsldvlobfx.supabase.co — Supabase (auth, DB; wss: for Realtime —
+//   Seen Live on the admin dashboard. The wss: entry is load-bearing on iOS:
+//   WebKit throws a SYNCHRONOUS SecurityError from `new WebSocket()` when CSP
+//   blocks it (Chrome fails async), which crashed /admin to the Next.js
+//   "Application error" screen on every iPhone browser.)
+// - us.i.posthog.com / us-assets.i.posthog.com — PostHog analytics (events go
+//   to us.i; lazy feature bundles like session replay load from us-assets)
 // - js.stripe.com / hooks.stripe.com — Stripe checkout widget
 // - nominatim.openstreetmap.org — City autocomplete
 // - api.anthropic.com is server-side only; never called from the browser
 // - cdn.jsdelivr.net is NOT used
 const CSP = [
   "default-src 'self'",
-  // Scripts: self + Stripe (checkout widget injects scripts)
-  "script-src 'self' https://js.stripe.com 'unsafe-inline'",
+  // Scripts: self + Stripe (checkout widget injects scripts) + PostHog lazy bundles
+  "script-src 'self' https://js.stripe.com https://us-assets.i.posthog.com 'unsafe-inline'",
   // Styles: self + Google Fonts
   "style-src 'self' https://fonts.googleapis.com 'unsafe-inline'",
   // Fonts: self + Google Fonts CDN
   "font-src 'self' https://fonts.gstatic.com",
   // Images: self + data URIs (canvas toDataURL)
   "img-src 'self' data: blob:",
-  // XHR/fetch: self + Supabase + Stripe + OpenStreetMap geocoder
-  "connect-src 'self' https://tmngmmofrplsldvlobfx.supabase.co https://api.stripe.com https://hooks.stripe.com https://nominatim.openstreetmap.org",
+  // XHR/fetch/WebSocket: self + Supabase (https + wss) + PostHog + Stripe + OpenStreetMap geocoder
+  "connect-src 'self' https://tmngmmofrplsldvlobfx.supabase.co wss://tmngmmofrplsldvlobfx.supabase.co https://us.i.posthog.com https://us-assets.i.posthog.com https://api.stripe.com https://hooks.stripe.com https://nominatim.openstreetmap.org",
   // iframes: Stripe checkout opens in an iframe
   "frame-src https://js.stripe.com https://hooks.stripe.com",
   // No plugins
