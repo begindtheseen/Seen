@@ -257,7 +257,7 @@ async function _handler(req, res) {
       // ADDITIVE (admin command-center Data Flywheel panel): 30-day activity counts.
       // Both tables are service-key accessed (RLS bypassed). Never a constant.
       db(`search_events?created_at=gte.${monthISO}&select=id`, { headers: { Prefer: 'count=exact', 'Range-Unit': 'items', Range: '0-0' } }),
-      db(`resume_surveys?created_at=gte.${monthISO}&select=id`, { headers: { Prefer: 'count=exact', 'Range-Unit': 'items', Range: '0-0' } }),
+      db(`resume_surveys?created_at=gte.${monthISO}&select=id`, { headers: { Prefer: 'count=exact', 'Range-Unit': 'items', Range: '0-0' } })
     ]);
 
     const usersTotal = ct(usersTotalRes);
