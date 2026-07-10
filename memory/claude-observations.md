@@ -2,7 +2,7 @@
 title: Claude — Observations
 tags: [observations, claude]
 aliases: [Claude Observations]
-updated: 2026-07-08
+updated: 2026-07-10
 facts:
   - id: claude-brain-connection
     subject: Claude
@@ -23,6 +23,16 @@ facts:
     confidence: high
     source: brain/lib/cloud.mjs
     recorded: 2026-07-08
+    invalidated: null
+  - id: seen-listing-import-status-20260710-2
+    subject: Seen listing import
+    predicate: status
+    object: "Paste-a-link import built (branch claude/job-listing-link-import-chix8k): api/import-listing.js + lib/server/listingImport.js (JSON-LD→meta→URL-slug ladder, SSRF-guarded) + ImportListingModal on /jobs feeding ApplyOptimizeModal; imported listings live 60d, source '<Platform> (imported)', unrated when description thin"
+    valid_from: 2026-07-10
+    valid_to: null
+    confidence: high
+    source: "[[claude-observations]]"
+    recorded: 2026-07-10
     invalidated: null
 ---
 
