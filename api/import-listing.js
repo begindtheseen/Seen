@@ -39,6 +39,7 @@ import {
   indeedEmbeddedFields,
   alternateFetchPlans,
   parseJinaReader,
+  browserHeaders,
 } from '../lib/server/listingImport.js';
 
 const MAX_REDIRECTS = 5;
@@ -46,13 +47,28 @@ const FETCH_TIMEOUT_MS = 9000;
 const JINA_TIMEOUT_MS = 25000; // the reader renders with a real browser — give it room
 const BODY_CAP_BYTES = 3_000_000;
 
-// Browser-like headers — many boards serve structured pages to browsers but a bare
-// bot-wall to default fetch UAs. If the site still blocks us, the recovery ladder runs.
-const PAGE_HEADERS = {
-  'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36',
-  Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-  'Accept-Language': 'en-US,en;q=0.9',
-};
+// A default UA string for the sub-fetches that don't build a full browser profile
+// (ATS JSON APIs, which want a plain client, not a navigation).
+const DEFAULT_UA = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36';
+
+// ── Per-host politeness cooldown ─────────────────────────────────────────────────
+// The surest way to get flagged as a bot is a burst of requests to one host. We keep a
+// module-scoped last-hit timestamp per host (warm across invocations on a reused
+// instance) and, if we hit the same host within the window, wait out the remainder
+// before firing. Low-volume by nature (one paste = a few fetches), so this just spaces
+// the rare same-host bursts — it never meaningfully delays a normal import.
+const HOST_COOLDOWN_MS = 1500;
+const _lastHostHit = new Map();
+const _sleep = (ms) => new Promise(r => setTimeout(r, ms));
+async function hostCooldown(host) {
+  const now = Date.now();
+  const last = _lastHostHit.get(host) || 0;
+  const wait = HOST_COOLDOWN_MS - (now - last);
+  if (wait > 0 && wait <= HOST_COOLDOWN_MS) await _sleep(wait);
+  _lastHostHit.set(host, Date.now());
+  // Bound the map so a long-lived instance can't grow it without limit.
+  if (_lastHostHit.size > 500) _lastHostHit.delete(_lastHostHit.keys().next().value);
+}
 
 // Every host we connect to (including each redirect hop) must resolve to public
 // addresses only — the hostname-level checks in validateListingUrl can't see DNS.
@@ -83,15 +99,16 @@ async function readBodyCapped(res) {
   return Buffer.concat(chunks).toString('utf8');
 }
 
-// Fetch the listing page with manual redirect handling so every hop is re-validated
-// (a public host 302-ing to an internal address is the classic SSRF bypass).
-// Returns { html, finalUrl, blocked, status }.
-async function fetchListingPage(startUrl, { timeoutMs = FETCH_TIMEOUT_MS, headers = PAGE_HEADERS } = {}) {
+// One redirect-following fetch with a given header set. Returns {html, finalUrl,
+// blocked, status}. Every hop is re-validated (a public host 302-ing to an internal
+// address is the classic SSRF bypass) and paced by the per-host cooldown.
+async function fetchOnce(startUrl, headers, timeoutMs) {
   let url = startUrl;
   for (let hop = 0; hop <= MAX_REDIRECTS; hop++) {
     const v = validateListingUrl(url);
     if (!v.ok) return { html: '', finalUrl: startUrl, blocked: true, status: 0 };
     await assertResolvesPublic(v.host);
+    await hostCooldown(v.host);
 
     const ctrl = new AbortController();
     const tmo = setTimeout(() => ctrl.abort(), timeoutMs);
@@ -115,6 +132,29 @@ async function fetchListingPage(startUrl, { timeoutMs = FETCH_TIMEOUT_MS, header
     return { html: await readBodyCapped(res), finalUrl: v.url, blocked: false, status: res.status };
   }
   return { html: '', finalUrl: startUrl, blocked: true, status: 0 };
+}
+
+// Fetch a listing page as a real browser would: a complete, self-consistent header set
+// (see browserHeaders), rotated per attempt, plus a polite per-host cooldown. If a host
+// answers with a block/challenge status (403/429/503), we don't hammer — we back off
+// briefly and retry ONCE with a different browser profile, which clears the common
+// "one identical fingerprint repeated" heuristic without pretending to be something
+// we're not. `seed` varies the profile; `mobile`/`accept` are passed through.
+// A blocked result still flows to the next recovery rung, so this only ever helps.
+let _reqSeed = 0;
+async function fetchListingPage(startUrl, { timeoutMs = FETCH_TIMEOUT_MS, headers = null, mobile = false, accept } = {}) {
+  const seed = _reqSeed++;
+  const hdrs = headers || browserHeaders(startUrl, { seed, mobile, accept });
+  let out = await fetchOnce(startUrl, hdrs, timeoutMs);
+  // Retry once on an explicit block/challenge with a fresh profile + short backoff.
+  if (out.blocked && [403, 429, 503].includes(out.status) && !headers) {
+    await _sleep(700 + (seed % 3) * 400);
+    const retryHdrs = browserHeaders(startUrl, { seed: seed + 1, mobile, accept });
+    const retry = await fetchOnce(startUrl, retryHdrs, timeoutMs);
+    if (!retry.blocked) return retry;
+    out = retry.status ? retry : out;
+  }
+  return out;
 }
 
 const sanitizeField = (val, max) => String(val || '').replace(/[<>`\\]/g, '').replace(/\s+/g, ' ').trim().slice(0, max);
@@ -180,7 +220,7 @@ async function resolveListing(v) {
           const tmo = setTimeout(() => ctrl.abort(), FETCH_TIMEOUT_MS);
           let json = null;
           try {
-            const r = await fetch(pv.url, { headers: { Accept: 'application/json', 'User-Agent': PAGE_HEADERS['User-Agent'] }, signal: ctrl.signal });
+            const r = await fetch(pv.url, { headers: { Accept: 'application/json', 'User-Agent': DEFAULT_UA, 'Accept-Language': 'en-US,en;q=0.9' }, signal: ctrl.signal });
             if (r.ok) json = JSON.parse(await readBodyCapped(r));
           } finally { clearTimeout(tmo); }
           const mapped = mapAtsJson(plan, json);
@@ -204,7 +244,9 @@ async function resolveListing(v) {
       if (fieldsComplete(fields)) break;
       try {
         if (plan.kind === 'html') {
-          const alt = await fetchListingPage(plan.url);
+          // Indeed's m/ page is a mobile surface — use the iPhone profile so the UA
+          // matches what we're hitting (a desktop UA on a mobile URL is a tell).
+          const alt = await fetchListingPage(plan.url, { mobile: /\/m\//.test(plan.url) });
           const got = harvest(alt.html, plan.url);
           fields = mergeMissing(fields, got, got.via);
           rungs.push({ rung: plan.label, status: alt.status, blocked: alt.blocked, got: { title: !!fields.title, company: !!fields.company, desc: fields.description.length } });
@@ -213,7 +255,7 @@ async function resolveListing(v) {
           // fall back to parsing its markdown format if that's what comes back.
           const alt = await fetchListingPage(plan.url, {
             timeoutMs: JINA_TIMEOUT_MS,
-            headers: { Accept: 'text/html,text/plain;q=0.9', 'X-Return-Format': 'html', 'X-Respond-With': 'html', 'User-Agent': PAGE_HEADERS['User-Agent'] },
+            headers: { Accept: 'text/html,text/plain;q=0.9', 'X-Return-Format': 'html', 'X-Respond-With': 'html', 'User-Agent': DEFAULT_UA },
           });
           if (alt.html) {
             const looksHtml = /<html|<head|<body|<script|<meta/i.test(alt.html.slice(0, 2000));
