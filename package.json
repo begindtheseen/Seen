@@ -11,6 +11,7 @@
     "build:generate": "next build --experimental-build-mode=generate",
     "start": "next start",
     "test": "node --test --test-reporter=spec \"**/*.test.mjs\"",
+    "loadtest": "k6 run load-test/hot-paths.js",
     "memory:sync": "node scripts/memory-sync.mjs",
     "memory:check": "node scripts/memory-sync.mjs --check",
     "memory:status": "node scripts/memory-status.mjs",

@@ -220,6 +220,14 @@ export default async function handler(req, res) {
       optimizedBullets = [], keywords = [], wasOptimized = false,
     } = req.body || {};
 
+    // Validate the applicant email before it becomes a recipient / reply_to. It's
+    // body-supplied and reflected into To: and Reply-To: of mail sent from
+    // noreply@seenjobs.io — an unvalidated value is an arbitrary-recipient / header-
+    // injection vector (isValidEmail rejects whitespace and separator chars).
+    if (!isValidEmail(applicantEmail)) {
+      return res.status(400).json({ error: 'A valid email address is required to apply.' });
+    }
+
     // Reject binary/XML artifacts — only use if human-readable
     const isReadable = t => t && t.length > 20 && !/(word\/|\.xml|docProps|rels\/|PK\x03)/.test(t.slice(0, 500));
     const resumeText = isReadable(rawResumeText) ? rawResumeText : null;
