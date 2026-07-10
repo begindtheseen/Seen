@@ -197,8 +197,8 @@ export default async function handler(req, res) {
     // upsertJobs creates the company (companies table) and inserts the job. A zero-row
     // result means the exact (title, company, location) already exists from aggregation
     // (jobs_uniq) — surface THAT row so the import still lands on a real listing.
-    const { rows } = await upsertJobs([row], SUPABASE_URL, SUPABASE_SERVICE_KEY);
-    let saved = Array.isArray(rows) && rows[0] ? { ...row, id: rows[0].id, created_at: rows[0].created_at } : null;
+    const stitch = (rows) => (Array.isArray(rows) && rows[0] ? { ...row, id: rows[0].id, created_at: rows[0].created_at } : null);
+    let saved = stitch((await upsertJobs([row], SUPABASE_URL, SUPABASE_SERVICE_KEY)).rows);
 
     if (!saved) {
       const dupe = await fetch(
@@ -206,15 +206,21 @@ export default async function handler(req, res) {
         { headers: dbHeaders }
       ).then(r => (r.ok ? r.json() : [])).catch(() => []);
       if (Array.isArray(dupe) && dupe[0]) {
-        return res.status(200).json({ ok: true, job: toUi(dupe[0]), existing: true });
+        return res.status(200).json({ ok: true, job: toUi(dupe[0]), existing: true, stored: true });
       }
-      // Insert failed and no duplicate found (transient DB issue) — the extraction is
-      // still perfectly usable for optimize; return it unsaved rather than failing.
-      saved = row;
+      // Not a duplicate — the insert itself failed (transient DB hiccup). Every import
+      // is a user-contributed listing feeding the corpus, so persisting it is part of
+      // the feature, not a nice-to-have: retry once, and if it still won't land, log it
+      // and say so in the response rather than reporting silent success.
+      saved = stitch((await upsertJobs([row], SUPABASE_URL, SUPABASE_SERVICE_KEY)).rows);
+      if (!saved) {
+        logError('import-listing', 'listing not persisted after retry', { url: v.url, title: row.title, company: row.company });
+        return res.status(200).json({ ok: true, job: toUi(row), stored: false, via: extracted.via });
+      }
     }
 
     console.log(`IMPORTED: "${row.title}" @ "${row.company}" from ${v.host} (via ${extracted.via}${manual.title || manual.company ? ' + manual' : ''})`);
-    return res.status(200).json({ ok: true, job: toUi(saved), via: extracted.via });
+    return res.status(200).json({ ok: true, job: toUi(saved), stored: true, via: extracted.via });
   } catch (err) {
     logError('import-listing', err.message, { url: v.url });
     return res.status(500).json({ error: 'Import failed — try again.' });
