@@ -258,6 +258,8 @@ async function _handler(req, res) {
       // Both tables are service-key accessed (RLS bypassed). Never a constant.
       db(`search_events?created_at=gte.${monthISO}&select=id`, { headers: { Prefer: 'count=exact', 'Range-Unit': 'items', Range: '0-0' } }),
       db(`resume_surveys?created_at=gte.${monthISO}&select=id`, { headers: { Prefer: 'count=exact', 'Range-Unit': 'items', Range: '0-0' } }),
+      // NEW (Chronos and Seen Command audit)
+      db(`audit_logs?created_at=gte.${weekISO}&select=log_entry&order=created_at.asc&limit=1000`),
     ]);
 
     const usersTotal = ct(usersTotalRes);

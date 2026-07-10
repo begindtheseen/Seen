@@ -201,6 +201,15 @@ export function AdminShell({ stats, token, reload, onLogout, onUnauthorized }: {
           <div className="a2-tabpanel a2-overview-hint">The command center above is your Overview. Pick a tab for detailed tools and data.</div>
         )}
 
+        {tab === 'audit' && (
+          <div className="a2-tabpanel">
+            <Panel title="Chronos and Seen Command Audit" right={<span className="ac-panel-status">{stats.audit.total} logs</span>}>
+              <MetricRow label="Total audit logs" value={stats.audit.total.toLocaleString()} status="last 7 days" onClick={() => openKpi('total_audit_logs', 'All audit logs')} />
+              <MetricRow label="Recent issues" value={stats.audit.issues} status="last 24h" tone={stats.audit.issues > 0 ? 'red' : 'green'} onClick={() => setDetail('audit_issues')} />
+            </Panel>
+          </div>
+        )}
+
         {tab === 'users' && (
           <div className="a2-tabpanel">
           <Panel title="Users" right={<span className="ac-panel-status">{stats.users.dau} active today</span>}>
