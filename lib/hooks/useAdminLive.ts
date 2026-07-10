@@ -79,13 +79,23 @@ export function useAdminLive(token: string | null, reload: () => void) {
     }
 
     // Instant path: broadcast ping → immediate (debounced) fetch.
-    const channel = supabase
-      .channel(LIVE_TOPIC)
-      .on('broadcast', { event: 'activity' }, () => {
-        if (debounce) clearTimeout(debounce)
-        debounce = setTimeout(() => poll(), 250)
-      })
-      .subscribe((status) => { if (alive) setLive(status === 'SUBSCRIBED') })
+    // Wrapped in try/catch because iOS WebKit throws a SYNCHRONOUS SecurityError
+    // from `new WebSocket()` when the socket is blocked (CSP, Lockdown Mode, …) —
+    // an unhandled throw here unmounts the whole dashboard to the Next.js
+    // "Application error" screen. Realtime is an enhancement: on failure we stay
+    // on the fallback poll below and the feed still works, just slower.
+    let channel: ReturnType<typeof supabase.channel> | null = null
+    try {
+      channel = supabase
+        .channel(LIVE_TOPIC)
+        .on('broadcast', { event: 'activity' }, () => {
+          if (debounce) clearTimeout(debounce)
+          debounce = setTimeout(() => poll(), 250)
+        })
+        .subscribe((status) => { if (alive) setLive(status === 'SUBSCRIBED') })
+    } catch {
+      channel = null // fallback poll keeps the feed alive
+    }
 
     poll() // prime cursor now
     interval = setInterval(poll, FALLBACK_MS) // safety net only
@@ -94,7 +104,7 @@ export function useAdminLive(token: string | null, reload: () => void) {
       alive = false
       if (interval) clearInterval(interval)
       if (debounce) clearTimeout(debounce)
-      supabase.removeChannel(channel)
+      if (channel) { try { supabase.removeChannel(channel) } catch { /* socket never opened */ } }
     }
   }, [token])
 
