@@ -179,10 +179,14 @@ export default function ApplyOptimizeModal({
   // action and shown as a compact "deep match" read-out. Null = not available; render nothing.
   const [aiPkg, setAiPkg] = useState<ApplicationIntelligence | null>(null)
 
-  // Copy + two-step download state.
+  // Copy + download state. The PDF is pre-built in the BACKGROUND while the user reads
+  // their results, so the Apply tap can download + redirect fully in-gesture (iOS blocks
+  // both after any await). pdfFailed stops the auto-build from retry-looping on a
+  // persistent server error; it resets whenever the bullets change.
   const [copied, setCopied] = useState<string | null>(null)
   const [prepping, setPrepping] = useState(false)
   const [pdfBlob, setPdfBlob] = useState<Blob | null>(null)
+  const [pdfFailed, setPdfFailed] = useState(false)
   const [pdfName, setPdfName] = useState('Seen Resume.pdf')
 
   useEffect(() => {
@@ -210,6 +214,14 @@ export default function ApplyOptimizeModal({
     return () => { cancelled = true }
   }, [isLoggedIn, user?.id])
 
+  // Pre-build the résumé PDF as soon as results are on screen — and again after
+  // HumanProof rewrites the bullets (runHumanProof clears pdfBlob) — so the blob is
+  // ready before the user taps Apply.
+  useEffect(() => {
+    if (step === 'review' && result && !pdfBlob && !prepping && !pdfFailed) preparePdf()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [step, result, hp, pdfBlob, pdfFailed])
+
   // Derived views over the SeenFit result — grounded, no fabrication.
   const realBullets = (result?.optimized_bullets || []).filter(b => !isGuidance(b.original) && !isGuidance(b.optimized))
   const guidanceItems = (result?.optimized_bullets || []).filter(b => isGuidance(b.original) || isGuidance(b.optimized))
@@ -222,7 +234,7 @@ export default function ApplyOptimizeModal({
     setStep('optimizing')
     setError('')
     // Reset any downstream state from a previous pass.
-    setHp(null); setHpState('idle'); setPdfBlob(null); setAiPkg(null)
+    setHp(null); setHpState('idle'); setPdfBlob(null); setPdfFailed(false); setAiPkg(null)
     try {
       const headers = await aiHeaders()
       const r = await fetch('/api/resume', {
@@ -316,6 +328,9 @@ export default function ApplyOptimizeModal({
       window.dispatchEvent(new Event('seen:credits-updated'))
       setHp(data as HumanProofResult)
       setHpState('done')
+      // Bullets changed — invalidate the pre-built PDF so the auto-build effect
+      // rebuilds it with the humanized versions.
+      setPdfBlob(null); setPdfFailed(false)
     } catch {
       setHpState('error')
     }
@@ -404,6 +419,7 @@ export default function ApplyOptimizeModal({
       if (!res.ok) {
         const d = await res.json().catch(() => ({})) as { error?: string }
         setError(d.error || 'Could not build your résumé PDF. Try again.')
+        setPdfFailed(true)
         setPrepping(false)
         return
       }
@@ -412,6 +428,7 @@ export default function ApplyOptimizeModal({
       setPdfName(derivePdfName())
     } catch {
       setError('Could not build your résumé PDF. Please try again.')
+      setPdfFailed(true)
     }
     setPrepping(false)
   }
@@ -430,6 +447,24 @@ export default function ApplyOptimizeModal({
     document.body.appendChild(a); a.click(); a.remove()
     // Deferred revoke — some browsers cancel the download if the URL dies immediately.
     setTimeout(() => URL.revokeObjectURL(url), 10000)
+  }
+
+  // One tap: the optimized résumé downloads to the device, the original listing opens,
+  // and tracking starts. EVERYTHING here is synchronous — an await before the download
+  // or window.open would leave the tap gesture and iOS would block both. The anchor
+  // method (not the share sheet) keeps the download silent so the redirect wins focus.
+  function handleApplyNow() {
+    if (pdfBlob) {
+      const url = URL.createObjectURL(pdfBlob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = pdfName
+      document.body.appendChild(a); a.click(); a.remove()
+      setTimeout(() => URL.revokeObjectURL(url), 10000)
+    }
+    if (job.apply_url) window.open(job.apply_url, '_blank', 'noopener,noreferrer')
+    onApplied()
+    onClose()
   }
 
   async function approveAndSend() {
@@ -821,8 +856,26 @@ export default function ApplyOptimizeModal({
                 </div>
               )}
 
-              {/* Export + apply actions */}
+              {/* Apply actions — the optimized résumé downloads to the device in the same
+                  tap, then the original listing opens (owner decision 2026-07-10: download
+                  is the primary path; email is an option). */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: '.5rem' }}>
+                <button
+                  style={{ ...btnPrimary, opacity: prepping ? 0.7 : 1, cursor: prepping ? 'wait' : 'pointer' }}
+                  onClick={handleApplyNow}
+                  disabled={prepping}
+                >
+                  {prepping
+                    ? 'Preparing your resume…'
+                    : pdfBlob
+                      ? (job.apply_url ? '⬇ Apply — your resume downloads first →' : '⬇ Download resume & start tracking')
+                      : (job.apply_url ? 'Apply online →' : 'I applied — start tracking')}
+                </button>
+                {pdfFailed && (
+                  <div style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', color: 'var(--muted)', textAlign: 'center' }}>
+                    Couldn&apos;t build the PDF — Apply still works, or retry / email below.
+                  </div>
+                )}
                 <div className="ai-btn-row" style={{ display: 'flex', gap: '.5rem' }}>
                   <button
                     onClick={() => copyText(buildPackageText(), 'pkg')}
@@ -833,23 +886,26 @@ export default function ApplyOptimizeModal({
                   {pdfBlob ? (
                     <button
                       onClick={saveBlob}
-                      style={{ flex: 1, padding: '.65rem .5rem', background: 'var(--surface)', border: '1.5px solid var(--blue)', color: 'var(--blue)', borderRadius: 9, fontFamily: 'var(--mono)', fontSize: '.66rem', fontWeight: 700, cursor: 'pointer' }}
+                      style={{ flex: 1, padding: '.65rem .5rem', background: 'var(--raised)', border: '1px solid var(--line2)', color: 'var(--sub)', borderRadius: 9, fontFamily: 'var(--mono)', fontSize: '.66rem', cursor: 'pointer' }}
                     >
-                      ⬇ Save résumé PDF
+                      ⬇ Save PDF
                     </button>
                   ) : (
                     <button
-                      onClick={preparePdf}
+                      onClick={() => { setPdfFailed(false); preparePdf() }}
                       disabled={prepping}
                       style={{ flex: 1, padding: '.65rem .5rem', background: 'var(--raised)', border: '1px solid var(--line2)', color: 'var(--sub)', borderRadius: 9, fontFamily: 'var(--mono)', fontSize: '.66rem', cursor: prepping ? 'not-allowed' : 'pointer', opacity: prepping ? 0.6 : 1 }}
                     >
-                      {prepping ? 'Building…' : '⬇ Prepare résumé PDF'}
+                      {prepping ? 'Building…' : '⬇ Save PDF'}
                     </button>
                   )}
+                  <button
+                    onClick={approveAndSend}
+                    style={{ flex: 1, padding: '.65rem .5rem', background: 'var(--raised)', border: '1px solid var(--line2)', color: 'var(--sub)', borderRadius: 9, fontFamily: 'var(--mono)', fontSize: '.66rem', cursor: 'pointer' }}
+                  >
+                    ✉ Email it
+                  </button>
                 </div>
-                <button style={btnGreen} onClick={approveAndSend}>
-                  ✓ Email me this &amp; continue to apply
-                </button>
                 <button style={btnGhost} onClick={() => runOptimize()}>← Re-optimize</button>
               </div>
             </div>
