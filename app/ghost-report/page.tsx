@@ -134,17 +134,25 @@ export default async function GhostReportPage() {
               <section style={{ marginBottom: '2.4rem' }}>
                 <h2 style={{ fontFamily: 'var(--display)', fontSize: '1.1rem', fontWeight: 700, color: 'var(--white)', margin: '0 0 .3rem' }}>Most-reported ghosters</h2>
                 <p style={{ color: 'var(--sub)', fontSize: '.8rem', lineHeight: 1.6, margin: '0 0 1rem', fontWeight: 300 }}>Ranked by reported ghost rate among companies with real applicant reports. No reports, no number.</p>
-                {report.worstOffenders.map((r, i) => <OffenderRow key={r.name} r={r} rank={i + 1} />)}
-              </section>
-            )}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
+                {report.worstOffenders.map((r, i) => (
+                <OffenderRow key={r.name} r={r} rank={i + 1} />
+                ))}
+                </div>
+                </section>
+                )}
 
-            {report.responseLeaders.length > 0 && (
-              <section style={{ marginBottom: '2.4rem' }}>
+                {report.responseLeaders.length > 0 && (
+                <section style={{ marginBottom: '2.4rem' }}>
                 <h2 style={{ fontFamily: 'var(--display)', fontSize: '1.1rem', fontWeight: 700, color: 'var(--white)', margin: '0 0 .3rem' }}>Actually replies</h2>
                 <p style={{ color: 'var(--sub)', fontSize: '.8rem', lineHeight: 1.6, margin: '0 0 1rem', fontWeight: 300 }}>The companies applicants reported hearing back from most — proof that responding is a choice.</p>
-                {report.responseLeaders.map((r, i) => <OffenderRow key={r.name} r={r} rank={i + 1} />)}
-              </section>
-            )}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
+                {report.responseLeaders.map((r, i) => (
+                <OffenderRow key={r.name} r={r} rank={i + 1} />
+                ))}
+                </div>
+                </section>
+                )}
           </>
         ) : (
           <div style={{ background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 12, padding: '1.6rem', margin: '1.4rem 0 2.4rem' }}>
