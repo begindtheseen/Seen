@@ -916,7 +916,10 @@ async function _handler(req, res) {
     if (adminRole === 'moderator') return res.status(403).json({ error: 'Insufficient role' });
     const { user_id, pro } = body;
     if (!user_id) return res.status(400).json({ error: 'user_id required' });
-    await db(`ai_credits?on_conflict=user_id`, { method: 'POST', body: JSON.stringify({ user_id, pro: !!pro, balance: pro ? 999 : 3, daily_earned: 0, last_reset: new Date().toISOString().split('T')[0] }), headers: { Prefer: 'resolution=merge-duplicates,return=minimal' } });
+    // `comped` (migration 051) is what makes the grant DURABLE: the Stripe reconcile
+    // paths refuse to revoke comped accounts, so an admin grant no longer evaporates on
+    // the next pricing-page load / nightly sweep for anyone with a stripe_customer_id.
+    await db(`ai_credits?on_conflict=user_id`, { method: 'POST', body: JSON.stringify({ user_id, pro: !!pro, comped: !!pro, balance: pro ? 999 : 3, daily_earned: 0, last_reset: new Date().toISOString().split('T')[0] }), headers: { Prefer: 'resolution=merge-duplicates,return=minimal' } });
     await db('admin_audit_log', { method: 'POST', body: JSON.stringify({ admin_id: sess.admin_id, username: sess.username || 'admin', action: 'set_pro', target_type: 'user', target_id: user_id, metadata: { pro } }), headers: { Prefer: 'return=minimal' } });
     return res.status(200).json({ ok: true });
   }

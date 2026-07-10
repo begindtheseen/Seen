@@ -1,0 +1,14 @@
+-- 051 — comped accounts: admin-granted Pro that the Stripe lifecycle can never revoke.
+--
+-- BUG (owner-reported 2026-07-10): the admin "set_pro" grant wrote ai_credits.pro=true —
+-- the SAME flag the Stripe reconcile paths actively manage. Any account with a
+-- stripe_customer_id (the owner has one from test purchases; resolveCustomerId also
+-- self-heals one on by email) and no active subscription had the grant revoked by the
+-- next manage-membership page load (on-read reconcile) or the nightly reconcile_all cron
+-- — "the site keeps forgetting who has admin".
+--
+-- Fix: a separate `comped` flag, set only by the admin grant. hasProAccess() treats it
+-- as Pro; every Stripe revoke path (setPro(false), reconcile_all) filters comped=false
+-- so it can never touch a comped account. Commit 671ae5a was an earlier attempt at this
+-- same bug (users.admin_granted_pro) that referenced a nonexistent table and never ran.
+ALTER TABLE ai_credits ADD COLUMN IF NOT EXISTS comped boolean NOT NULL DEFAULT false;

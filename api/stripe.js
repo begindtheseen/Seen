@@ -75,7 +75,13 @@ async function setPro(uid, isPro, env) {
   if (!uid) return;
   const q = db(env.SUPABASE_URL, env.SERVICE_KEY);
   const today = new Date().toISOString().slice(0, 10);
-  const patch = await q(`ai_credits?user_id=eq.${uid}`, {
+  // Revokes must NEVER touch an admin-comped account (migration 051) — comped Pro is
+  // granted outside the Stripe lifecycle, so Stripe's "no active subscription" is not
+  // evidence against it. The filter makes a comped row simply not match (0-row PATCH),
+  // and every revoke site (on-read reconcile, reconcile_all, webhooks) routes through
+  // here, so the guard holds everywhere at once.
+  const filter = isPro ? '' : '&comped=eq.false';
+  const patch = await q(`ai_credits?user_id=eq.${uid}${filter}`, {
     method: 'PATCH', headers: { Prefer: 'return=minimal' },
     body: JSON.stringify({ pro: isPro }),
   });
@@ -215,11 +221,11 @@ export default async function handler(req, res) {
     // (ai_credits.pro_until, e.g. Interview Sprint) must read as Pro, not false.
     if (!customerId) {
       try {
-        const rowRes = await db(SUPABASE_URL, SERVICE_KEY)(`ai_credits?user_id=eq.${uid}&select=pro,pro_until&limit=1`);
+        const rowRes = await db(SUPABASE_URL, SERVICE_KEY)(`ai_credits?user_id=eq.${uid}&select=pro,pro_until,comped&limit=1`);
         const row = rowRes.ok ? (await rowRes.json())?.[0] : null;
         const t = row?.pro_until ? Date.parse(row.pro_until) : NaN;
         const windowActive = Number.isFinite(t) && t > Date.now();
-        const pro = row?.pro === true || windowActive;
+        const pro = row?.comped === true || row?.pro === true || windowActive;
         return res.status(200).json({ ok: true, pro, subscription: null, ...(windowActive ? { pro_until: row.pro_until } : {}) });
       } catch {
         return res.status(200).json({ ok: true, pro: false, subscription: null });
@@ -254,12 +260,15 @@ export default async function handler(req, res) {
       await setPro(uid, entitled, env);
 
       if (!entitled) {
-        // No live subscription — but a purchased Pro window (sprint SKU, ai_credits.pro_until)
+        // No live subscription — but an admin-comped account (setPro above can't touch
+        // it, migration 051) or a purchased Pro window (sprint SKU, ai_credits.pro_until)
         // is independent of the subscription lifecycle and must still read as Pro.
-        // (setPro above only writes the `pro` flag; it never touches pro_until.)
         try {
           const rowRes = await db(SUPABASE_URL, SERVICE_KEY)(`ai_credits?user_id=eq.${uid}&limit=1`);
           const row = rowRes.ok ? (await rowRes.json())?.[0] : null;
+          if (row?.comped === true) {
+            return res.status(200).json({ ok: true, pro: true, subscription: null });
+          }
           const t = row?.pro_until ? Date.parse(row.pro_until) : NaN;
           if (Number.isFinite(t) && t > Date.now()) {
             return res.status(200).json({ ok: true, pro: true, subscription: null, pro_until: row.pro_until });
@@ -303,7 +312,9 @@ export default async function handler(req, res) {
     }
     if (!STRIPE_KEY || !SUPABASE_URL || !SERVICE_KEY) return res.status(503).json({ error: 'Payments not configured' });
     const q = db(SUPABASE_URL, SERVICE_KEY);
-    const listRes = await q(`ai_credits?pro=eq.true&stripe_customer_id=not.is.null&select=user_id,stripe_customer_id&limit=500`);
+    // comped accounts are excluded outright — the sweep exists to catch lapsed
+    // SUBSCRIBERS, and an admin grant is not a subscription.
+    const listRes = await q(`ai_credits?pro=eq.true&comped=eq.false&stripe_customer_id=not.is.null&select=user_id,stripe_customer_id&limit=500`);
     const rows = listRes.ok ? await listRes.json() : [];
     let checked = 0, revoked = 0;
     // Bounded concurrency (8) so one Stripe call per user stays well within the function budget.
