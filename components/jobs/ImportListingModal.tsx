@@ -12,6 +12,7 @@
 
 import { useState } from 'react'
 import type { Job } from '@/lib/types'
+import { parsePastedListing } from '@/lib/pastedListing'
 
 const numOrNull = (v: unknown): number | null => {
   const n = Number(v)
@@ -175,7 +176,7 @@ export default function ImportListingModal({
           {phase === 'details' && (
             <p style={{ fontFamily: 'var(--mono)', fontSize: '.62rem', color: 'var(--sub)', lineHeight: 1.7, marginBottom: '.9rem' }}>
               {needDesc
-                ? 'This site (Indeed and a few others) blocks automated reads, so we can’t pull the description ourselves. Confirm the basics and paste the job description from the listing — then the optimizer works off the real text.'
+                ? 'Indeed (and a few sites) block us from reading the page. Easiest fix: on the listing, select the whole thing → Copy → paste it in the box below and we’ll fill everything in. Or fill the fields yourself.'
                 : 'That site didn’t let us read the whole listing. Confirm the job title and company and we’ll take it from here.'}
             </p>
           )}
@@ -194,6 +195,28 @@ export default function ImportListingModal({
                 style={{ ...inputStyle, opacity: phase === 'details' ? 0.55 : 1 }}
               />
             </div>
+
+            {phase === 'details' && needDesc && (
+              <div style={{ background: 'rgba(99,102,241,.06)', border: '1px solid rgba(99,102,241,.22)', borderRadius: 10, padding: '.7rem .8rem' }}>
+                <label style={{ ...labelStyle, color: '#a5b4fc' }}>⚡ Smart paste — drop the whole listing here</label>
+                <textarea
+                  placeholder="Paste everything you copied from the Indeed listing (title, company, and description). We’ll split it into the fields below automatically."
+                  onChange={e => {
+                    const parsed = parsePastedListing(e.target.value)
+                    if (parsed.title) setTitle(parsed.title)
+                    if (parsed.company) setCompany(parsed.company)
+                    if (parsed.location) setLocation(parsed.location)
+                    if (parsed.description) setDescription(parsed.description)
+                    if (parsed.title || parsed.description) setError('')
+                  }}
+                  rows={4}
+                  style={{ ...inputStyle, resize: 'vertical', minHeight: 84, lineHeight: 1.5, fontFamily: 'var(--body)' }}
+                />
+                <div style={{ fontFamily: 'var(--mono)', fontSize: '.55rem', color: 'var(--dim)', marginTop: '.3rem' }}>
+                  We auto-fill Title / Company / Location / Description below — check them, then Add.
+                </div>
+              </div>
+            )}
 
             {phase === 'details' && (
               <>
