@@ -23,6 +23,10 @@ import {
   isPrivateIp,
   extractListingFromHtml,
   buildImportedJobRow,
+  atsApiPlan,
+  mapAtsJson,
+  companyFromUrl,
+  titleFromUrl,
 } from '../lib/server/listingImport.js';
 
 const MAX_REDIRECTS = 5;
@@ -163,7 +167,50 @@ export default async function handler(req, res) {
       // timeout / network error — proceed with URL-only extraction
     }
 
-    const extracted = extractListingFromHtml(page.html, v.url);
+    let extracted = extractListingFromHtml(page.html, v.url);
+
+    // $0 enrichment: keyless public ATS JSON APIs. ATS pages are often JS-rendered or
+    // bot-walled, so the HTML yields nothing — but Greenhouse/Lever/Ashby/SmartRecruiters/
+    // Workday all serve the same posting as public JSON. This is what keeps imported
+    // listings fully described AND scored without any paid API (owner decision 2026-07-10).
+    if (!extracted.description || !extracted.title || !extracted.company) {
+      const plan = atsApiPlan(v.url);
+      if (plan) {
+        try {
+          const pv = validateListingUrl(plan.apiUrl);
+          if (pv.ok) {
+            await assertResolvesPublic(pv.host);
+            const ctrl = new AbortController();
+            const tmo = setTimeout(() => ctrl.abort(), FETCH_TIMEOUT_MS);
+            let json = null;
+            try {
+              const r = await fetch(pv.url, { headers: { Accept: 'application/json', 'User-Agent': PAGE_HEADERS['User-Agent'] }, signal: ctrl.signal });
+              if (r.ok) json = JSON.parse(await readBodyCapped(r));
+            } finally { clearTimeout(tmo); }
+            const mapped = mapAtsJson(plan, json);
+            if (mapped) {
+              const descFromApi = !extracted.description && !!mapped.description;
+              // The API's own values beat rung-3 URL-slug guesses ("Acme Corp" from
+              // company_name vs "Acmecorp" from the board slug) — keep the extracted
+              // value only when it came from the page itself, not slug inference.
+              const pageTitle = extracted.title && extracted.title !== titleFromUrl(v.url) ? extracted.title : '';
+              const pageCompany = extracted.company && extracted.company !== companyFromUrl(v.url) ? extracted.company : '';
+              extracted = {
+                ...extracted,
+                title: pageTitle || mapped.title || extracted.title || '',
+                company: pageCompany || mapped.company || extracted.company || '',
+                location: extracted.location || mapped.location || '',
+                salary: extracted.salary || mapped.salary || null,
+                salaryMin: extracted.salaryMin || mapped.salaryMin || 0,
+                description: extracted.description || mapped.description || '',
+                type: mapped.type === 'Part-time' ? 'Part-time' : extracted.type,
+                via: descFromApi ? 'ats-api' : extracted.via,
+              };
+            }
+          }
+        } catch { /* best-effort — the import continues on whatever we already have */ }
+      }
+    }
 
     // User-supplied fields (second call after needs_details) always win.
     const manual = {
