@@ -11,6 +11,7 @@ import SwipeJobDeck from '@/components/jobs/SwipeJobDeck'
 import JobFilters from '@/components/jobs/JobFilters'
 import ApplyCheckpoint from '@/components/ApplyCheckpoint'
 import ApplyOptimizeModal from '@/components/ApplyOptimizeModal'
+import ImportListingModal from '@/components/jobs/ImportListingModal'
 import { matchCities } from '@/lib/data/usCities'
 
 export default function JobsPage() {
@@ -50,6 +51,7 @@ export default function JobsPage() {
   const [deckDone, setDeckDone] = useState(false)
   const [swipeMode, setSwipeMode] = useState(false)
   const [checkpointJob, setCheckpointJob] = useState<Job | null>(null)
+  const [showImport, setShowImport] = useState(false)
   // When the checkpoint is opened AFTER the user already confirmed applying (the Apply &
   // Optimize funnel), it should record the application immediately rather than re-ask.
   const [checkpointAuto, setCheckpointAuto] = useState(false)
@@ -175,6 +177,17 @@ export default function JobsPage() {
               {status === 'loading' ? 'Searching...' : 'Search →'}
             </button>
           </div>
+
+          {/* Paste-a-link import — bring any listing (Indeed, LinkedIn, a careers page…)
+              into the optimize flow */}
+          <button
+            onClick={() => setShowImport(true)}
+            style={{ background: 'none', border: 'none', padding: 0, marginTop: '.55rem', cursor: 'pointer', fontFamily: 'var(--mono)', fontSize: '.62rem', color: 'var(--sub)', display: 'inline-flex', alignItems: 'center', gap: 6 }}
+          >
+            <span aria-hidden>🔗</span>
+            Found a job somewhere else?
+            <span style={{ color: '#a5b4fc', fontWeight: 700 }}>Paste the link to optimize your resume for it →</span>
+          </button>
 
           {/* Filter bar */}
           <JobFilters
@@ -331,6 +344,13 @@ export default function JobsPage() {
         job={applyJob}
         onClose={() => setApplyJob(null)}
         onApplied={() => { setCheckpointAuto(true); setCheckpointJob(applyJob) }}
+      />
+    )}
+
+    {showImport && (
+      <ImportListingModal
+        onClose={() => setShowImport(false)}
+        onImported={job => { setShowImport(false); setApplyJob(job) }}
       />
     )}
 

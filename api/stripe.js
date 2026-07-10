@@ -209,12 +209,22 @@ export default async function handler(req, res) {
     const { uid, email } = await resolveUid(req, env);
     if (!uid) return res.status(401).json({ error: 'Sign in first' });
     const customerId = await resolveCustomerId(uid, email, env);
-    // No Stripe customer → comped/never-subscribed; leave the pro flag untouched.
+    // No Stripe customer → comped/never-subscribed. Pro can still be true here: an
+    // admin-comped account (ai_credits.pro=true with no stripe_customer_id — the
+    // reconcile paths deliberately never touch those) or a purchased Pro window
+    // (ai_credits.pro_until, e.g. Interview Sprint) must read as Pro, not false.
     if (!customerId) {
-  // Check if the user has an admin-granted Pro status
-  const adminGrantedPro = await checkAdminGrantedPro(uid, env);
-  return res.status(200).json({ ok: true, pro: adminGrantedPro, subscription: null });
-}
+      try {
+        const rowRes = await db(SUPABASE_URL, SERVICE_KEY)(`ai_credits?user_id=eq.${uid}&select=pro,pro_until&limit=1`);
+        const row = rowRes.ok ? (await rowRes.json())?.[0] : null;
+        const t = row?.pro_until ? Date.parse(row.pro_until) : NaN;
+        const windowActive = Number.isFinite(t) && t > Date.now();
+        const pro = row?.pro === true || windowActive;
+        return res.status(200).json({ ok: true, pro, subscription: null, ...(windowActive ? { pro_until: row.pro_until } : {}) });
+      } catch {
+        return res.status(200).json({ ok: true, pro: false, subscription: null });
+      }
+    }
     try {
       const listRes = await fetch(`https://api.stripe.com/v1/subscriptions?customer=${encodeURIComponent(customerId)}&status=all&limit=10`, { headers: { Authorization: `Bearer ${STRIPE_KEY}`, 'Content-Type': 'application/json' } });
       if (!listRes.ok) return res.status(502).json({ error: 'Could not read subscription' });
