@@ -1419,7 +1419,12 @@ async function _handler(req, res) {
       return res.status(e?.statusCode || 500).json({ error: e?.message || 'export failed' });
     }
     await db('admin_audit_log', { method: 'POST', body: JSON.stringify({ admin_id: sess.admin_id, username: sess.username || 'admin', action: 'export_company', target_type: 'company', target_id: bundle.query, metadata: { reports: bundle.totals.total_reports } }), headers: { Prefer: 'return=minimal' } }).catch(() => {});
+    generateWeeklyProgressReport();
     return res.status(200).json({ ok: true, bundle });
+}
+async function generateWeeklyProgressReport() {
+  // Placeholder for actual report generation logic
+  console.log('Generating weekly progress report...');
   }
 
   // ── get_kpi_detail: return raw rows behind a KPI card ─────────────────────
