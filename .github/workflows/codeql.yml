@@ -1,0 +1,43 @@
+name: CodeQL
+
+# Static application security testing (SAST) via GitHub's built-in code scanning.
+# Runs CodeQL's security-and-quality query suite over the JS/TS in this repo on
+# every push/PR to the default branch and weekly, so injection, auth, and
+# data-flow issues surface as code-scanning alerts before they reach prod.
+#
+# CodeQL requires GitHub code scanning to be enabled for the repo. On public
+# repos this is free; on private repos it needs GitHub Advanced Security. If
+# code scanning is not enabled the "upload" step no-ops with a clear message.
+on:
+  push:
+    branches: [next-migration]
+  pull_request:
+    branches: [next-migration]
+  schedule:
+    # Weekly — catches newly-published CodeQL queries against unchanged code.
+    - cron: '27 4 * * 1'
+
+jobs:
+  analyze:
+    name: Analyze (javascript-typescript)
+    runs-on: ubuntu-latest
+    permissions:
+      # Needed to write code-scanning results back to the Security tab.
+      security-events: write
+      actions: read
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: javascript-typescript
+          # security-and-quality is a superset of the default security queries.
+          queries: security-and-quality
+
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v3
+        with:
+          category: '/language:javascript-typescript'
