@@ -22,33 +22,12 @@ export function useRealtimeConnection(onMessage: (payload: Payload) => void) {
       supabase.removeChannel(channel);
     };
   }, [supabase, onMessage]);
-
-  // Helper to broadcast an activity from the client side if needed
-  const broadcast = async (kind: string) => {
-    const serviceKey = process.env.NEXT_PUBLIC_SUPABASE_SERVICE_KEY ?? '';
-    if (!serviceKey) return;
-    try {
-      await fetch(`${supabaseUrl}/realtime/v1/api/broadcast`, {
-        method: 'POST',
-        headers: {
-          apikey: serviceKey,
-          Authorization: `Bearer ${serviceKey}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          messages: [
-            {
-              topic: LIVE_TOPIC,
-              event: 'activity',
-              payload: { kind: String(kind || 'event'), t: Date.now() },
-            },
-          ],
-        }),
-      });
-    } catch {
-      // swallow errors – fallback polling will still work
-    }
-  };
-
-  return { broadcast };
 }
+
+// NOTE: broadcasting is a SERVER-ONLY operation. It requires the Supabase
+// service_role key, which must never reach the browser. Client code must never
+// read a service key — a `NEXT_PUBLIC_*` service key would be inlined into the
+// JS bundle and handed to every visitor, giving them full RLS-bypass access to
+// the database. Emit live events from a server handler via
+// `broadcastActivity()` in `lib/server/realtime.js` (or POST to a token-authed
+// API route) instead.

@@ -1,0 +1,41 @@
+name: ZAP DAST
+
+# Dynamic application security testing with OWASP ZAP — the "run ZAP against your
+# app" step, as a repeatable workflow instead of a one-off local Docker command.
+# ZAP crawls the target and probes for the OWASP Top 10 (injection, XSS, broken
+# auth, security-header gaps, etc.), then files findings as a report + GitHub issue.
+#
+# Manual by design: DAST sends real (benign) attack traffic, so you choose the
+# target each run. Point it at STAGING/a preview URL — never production, and only
+# a site you own. Defaults to the live site so a zero-arg run still works, but
+# override `target` in the run dialog to scan a preview deploy.
+on:
+  workflow_dispatch:
+    inputs:
+      target:
+        description: 'URL to scan (staging/preview — a site you own)'
+        required: true
+        default: 'https://seenjobs.io'
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  zap-baseline:
+    name: ZAP Baseline Scan
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: OWASP ZAP Baseline Scan
+        uses: zaproxy/action-baseline@v0.14.0
+        with:
+          target: ${{ github.event.inputs.target }}
+          # Passive + a few active baseline rules; won't hammer the target.
+          # Warnings don't fail the job so the report always publishes; tune
+          # rule severities in .zap/rules.tsv once the first report is triaged.
+          cmd_options: '-a'
+          allow_issue_writing: true
+          fail_action: false
