@@ -307,8 +307,13 @@ export default async function handler(req, res) {
     const isCron = req.headers['x-vercel-cron'] === '1';
     const authHeader = req.headers['authorization'] || '';
     const qsecret = new URL(req.url, 'https://x').searchParams.get('secret') || '';
-    if (!isCron && cronSecret && authHeader !== `Bearer ${cronSecret}` && qsecret !== cronSecret) {
-      return res.status(401).json({ error: 'Unauthorized' });
+    // Fail CLOSED: a non-cron caller must present a valid cron secret. Do NOT make
+    // the check contingent on CRON_SECRET being set — an unset secret must never
+    // open this sweep (up to 500 Stripe calls; revokes Pro from lapsed subscribers)
+    // to anonymous callers.
+    if (!isCron) {
+      const cronOk = !!cronSecret && (authHeader === `Bearer ${cronSecret}` || qsecret === cronSecret);
+      if (!cronOk) return res.status(401).json({ error: 'Unauthorized' });
     }
     if (!STRIPE_KEY || !SUPABASE_URL || !SERVICE_KEY) return res.status(503).json({ error: 'Payments not configured' });
     const q = db(SUPABASE_URL, SERVICE_KEY);
