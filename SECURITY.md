@@ -66,7 +66,15 @@ The correct pattern (already used across `api/*.js`): read `Authorization: Beare
 
 ## Last self-audit — 2026-07-11
 
-**Fixed this pass**
+A full static audit of all 17 `api/*.js` handlers + shared `lib/server/` auth
+helpers was run for the primary target class — **IDOR / broken object-level
+authorization via service-key calls that trust a body/query identifier**. No
+Critical or High holes of that class were found: every per-user read/write derives
+identity from a **verified JWT**, never the request body; DELETE/PATCH are
+double-scoped (`id=eq.${id}&user_id=eq.${uid}`); SSRF, filter injection, and the
+Stripe webhook are all properly defended.
+
+**Fixed (PR #191)**
 - **[Critical] Service-role key exposable to the browser.** `lib/hooks/
   useRealtimeConnection.ts` had a client-side `broadcast()` helper that read
   `NEXT_PUBLIC_SUPABASE_SERVICE_KEY` and sent it as `apikey`/`Authorization`.
@@ -76,11 +84,35 @@ The correct pattern (already used across `api/*.js`): read `Authorization: Beare
   helper; the hook is now subscription-only (anon key), with a comment recording
   the invariant.
 
-**Reviewed and confirmed sound**
+**Fixed (follow-up)**
+- **[Low–Medium] `api/refresh-jobs.js` failed open when `CRON_SECRET` was unset.**
+  The auth block was gated on `if (!isCron && cronSecret)`, so a blank/unset
+  `CRON_SECRET` skipped authorization entirely — an anonymous `POST /api/refresh-jobs`
+  would run the expensive (paid Adzuna calls) and destructive
+  (`deleteExpired`/`deleteJunk`/`markStaleJobs`) refresh. Reworked to **fail
+  closed**: every non-cron caller must present a valid cron secret or admin session
+  token regardless of whether `CRON_SECRET` is configured.
+
+**Reviewed and confirmed sound (no change needed)**
 - **Admin auth** (`api/admin-stats.js`): salted password hashes, IP rate-limit
   (5/15 min), per-account lockout after 5 failures, random 32-byte session tokens
   with 8h expiry, audit logging. PostgREST token filters use `encodeURIComponent`
   (no filter injection).
 - **Stripe webhook** (`api/stripe.js`): HMAC-SHA256 signature verified with
   `timingSafeEqual`; refuses unsigned webhooks (503).
+- **SSRF** (`api/import-listing.js`): DNS-resolves and rejects private IPs on every
+  redirect hop, with content-type allow-listing and a body-size cap.
 - **No committed secrets**; `.env*` gitignored; anon key public by design.
+
+**Documented as hardening backlog (Low / not independently exploitable)**
+- Loose `origin.includes('localhost')` CORS reflection in ~13 handlers. Not a data-
+  theft vector (no `Access-Control-Allow-Credentials`; auth is via the
+  `Authorization` header, which a cross-origin page can't attach). Tighten to an
+  exact-match allowlist when convenient — deferred here to avoid breaking Vercel
+  preview origins in a security patch.
+- `api/import-listing.js` POST is unauthenticated and writes the shared `jobs`
+  table (rate-limited; spam/pollution vector, not IDOR).
+- Info: DNS-rebinding TOCTOU in the SSRF check; non-timing-safe cron-secret
+  compares (high-entropy secrets, network-bound — impractical); `verifyJWT` omits
+  `aud`/`iss` checks (not exploitable — HMAC-SHA256 is forced, so `alg:none`/
+  alg-confusion don't apply).
