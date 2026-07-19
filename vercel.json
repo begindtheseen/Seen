@@ -50,6 +50,12 @@
     { "path": "/api/reports?reddit_cron=antiwork",          "schedule": "0 13 * * *" },
     { "path": "/api/reports?reddit_cron=AskHR",             "schedule": "0 16 * * *" },
     { "path": "/api/reports?reddit_cron=interviews",        "schedule": "0 19 * * *" },
-    { "path": "/api/reports?reddit_cron=ExperiencedDevs",   "schedule": "0 22 * * *" }
+    { "path": "/api/reports?reddit_cron=ExperiencedDevs",   "schedule": "0 22 * * *" },
+    { "path": "/api/reports?reddit_cron=GetEmployed",        "schedule": "30 2 * * *" },
+    { "path": "/api/reports?reddit_cron=jobsearchhacks",     "schedule": "30 5 * * *" },
+    { "path": "/api/reports?reddit_cron=ITCareerQuestions",  "schedule": "30 8 * * *" },
+    { "path": "/api/reports?reddit_cron=EngineeringResumes", "schedule": "30 11 * * *" },
+    { "path": "/api/reports?reddit_cron=womenEngineers",     "schedule": "30 17 * * *" },
+    { "path": "/api/reports?reddit_cron=Devilcorp",          "schedule": "30 20 * * *" }
   ]
 }
