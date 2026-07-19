@@ -1,8 +1,10 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import { EmployerCheckout, EmployerPurchaseConfirm } from '@/components/EmployerCheckout'
+import { EmployerCompanyProvider } from '@/components/employer/EmployerCompanyContext'
 import { EmployerReputation } from '@/components/employer/EmployerReputation'
 import { EmployerListings } from '@/components/employer/EmployerListings'
+import { EmployerSurfaces } from '@/components/employer/EmployerSurfaces'
 
 // The employer portal — a distinct, employer-first experience. The seeker Nav + Footer hide
 // themselves on /employers (see components/Nav.tsx / Footer.tsx), so nothing job-seeker ever shows
@@ -60,11 +62,18 @@ export default function EmployersPage() {
         {/* Post-checkout confirmation (renders only on the Stripe return) */}
         <EmployerPurchaseConfirm />
 
-        {/* Anchor feature: your reputation the way candidates see it */}
-        <EmployerReputation />
+        {/* The company an employer looks up in any card below is shared, so the deep-dive surface
+            links (dashboard / analytics / notifications) carry it through as ?company= (#113). */}
+        <EmployerCompanyProvider>
+          {/* Anchor feature: your reputation the way candidates see it */}
+          <EmployerReputation />
 
-        {/* Manage your listings — close a filled role in one verified click (seen-command#94) */}
-        <EmployerListings />
+          {/* Manage your listings — close a filled role in one verified click (seen-command#94) */}
+          <EmployerListings />
+
+          {/* Jump to your dashboard, analytics & notifications — company carried through (#113) */}
+          <EmployerSurfaces />
+        </EmployerCompanyProvider>
 
         {/* Why it matters — real mechanism, honest */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(240px,1fr))', gap: '1rem', marginBottom: '3rem' }}>

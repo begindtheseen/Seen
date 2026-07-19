@@ -115,6 +115,8 @@ export default function Nav() {
           <Link href="/demand" className={`ntab${isActive('/demand') ? ' active' : ''}`}>Demand</Link>
           <Link href="/feed" className={`ntab${isActive('/feed') ? ' active' : ''}`}>Feed</Link>
           {isSeeker && <Link href="/saved" className={`ntab${isActive('/saved') ? ' active' : ''}`}>Saved</Link>}
+          {/* Public employer portal — reachable for everyone (logged-out and logged-in). */}
+          <Link href="/employers" className={`ntab${isActive('/employers') ? ' active' : ''}`}>Employers</Link>
           <Link href="/pricing" className={`ntab${isActive('/pricing') ? ' active' : ''}`}>Pricing</Link>
         </div>
 
@@ -230,6 +232,8 @@ export default function Nav() {
         <Link href="/agencies" className={`side-menu-item${isActive('/agencies') ? ' active' : ''}`}><span className="side-menu-icon">👻</span>Agency ghost index</Link>
         <Link href="/demand" className={`side-menu-item${isActive('/demand') ? ' active' : ''}`}><span className="side-menu-icon">📊</span>Hiring demand</Link>
         <Link href="/feed" className={`side-menu-item${isActive('/feed') ? ' active' : ''}`}><span className="side-menu-icon">📡</span>Live feed</Link>
+        {/* Public employer portal — reachable for everyone (logged-out and logged-in). */}
+        <Link href="/employers" className={`side-menu-item${isActive('/employers') ? ' active' : ''}`}><span className="side-menu-icon">🤝</span>For employers</Link>
 
         <div className="side-menu-label">Plans</div>
         <Link href="/pricing" className={`side-menu-item${isActive('/pricing') ? ' active' : ''}`}><span className="side-menu-icon">◈</span>Pricing</Link>
