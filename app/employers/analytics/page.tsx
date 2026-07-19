@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import { fetchEmployerAnalytics } from '@/lib/server/employerAnalytics'
+import { EmployerScopeGuard } from '@/components/employer/EmployerScopeGuard'
 
 // Employer posting analytics — issue #96 ("Employers can view analytics on their job posting
 // performance, including applicant sources and application rates").
@@ -128,9 +129,12 @@ function Shell({ children }: { children: React.ReactNode }) {
   )
 }
 
-function Intro({ company }: { company?: string }) {
+function Intro({ company, godview }: { company?: string; godview?: boolean }) {
   return (
     <div style={{ marginBottom: '2rem' }}>
+      {/* Login-scoping (migration 053): redirects a logged-in approved employer to their company;
+          shows the god-view banner for admins. No-op for logged-out visitors. */}
+      <EmployerScopeGuard param={company || ''} godview={godview} />
       <div style={kicker}>Posting analytics</div>
       <h1 style={{ fontFamily: 'var(--display)', fontSize: 'clamp(1.6rem,5vw,2.2rem)', fontWeight: 800, color: 'var(--white)', letterSpacing: '-.03em', lineHeight: 1.08, margin: '0 0 .7rem', maxWidth: 640 }}>
         How your postings actually perform.
@@ -148,17 +152,18 @@ function Intro({ company }: { company?: string }) {
 export default async function EmployerAnalyticsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ company?: string | string[] }>
+  searchParams: Promise<{ company?: string | string[]; godview?: string | string[] }>
 }) {
   const sp = await searchParams
   const raw = Array.isArray(sp.company) ? sp.company[0] : sp.company
   const company = (raw || '').trim()
+  const godview = (Array.isArray(sp.godview) ? sp.godview[0] : sp.godview) === '1'
 
   // No company yet → the honest lookup prompt.
   if (!company) {
     return (
       <Shell>
-        <Intro />
+        <Intro godview={godview} />
         <div style={{ ...card, textAlign: 'center', padding: '2.4rem 1.7rem' }}>
           <div style={{ fontFamily: 'var(--display)', fontSize: '1rem', fontWeight: 700, color: 'var(--white)', marginBottom: '.4rem' }}>Enter your company name to begin.</div>
           <p style={{ ...mono('.66rem', 'var(--muted)'), lineHeight: 1.7, maxWidth: 460, margin: '0 auto' }}>
@@ -176,7 +181,7 @@ export default async function EmployerAnalyticsPage({
   if (!result.ok || !result.analytics) {
     return (
       <Shell>
-        <Intro company={company} />
+        <Intro company={company} godview={godview} />
         <div style={card}>
           <div style={{ fontFamily: 'var(--display)', fontSize: '1rem', fontWeight: 700, color: 'var(--white)', marginBottom: '.35rem' }}>Couldn’t load analytics right now.</div>
           <p style={{ ...mono('.66rem', 'var(--sub)'), lineHeight: 1.7 }}>
@@ -196,7 +201,7 @@ export default async function EmployerAnalyticsPage({
   if (!analytics.hasData) {
     return (
       <Shell>
-        <Intro company={company} />
+        <Intro company={company} godview={godview} />
         <div style={card}>
           <div style={{ fontFamily: 'var(--display)', fontSize: '1.05rem', fontWeight: 700, color: 'var(--white)', marginBottom: '.4rem' }}>No applicant reports for “{resolvedCompany}” yet.</div>
           <p style={{ color: 'var(--sub)', fontSize: '.8rem', lineHeight: 1.7, maxWidth: 540, margin: '0 0 1rem' }}>
@@ -217,7 +222,7 @@ export default async function EmployerAnalyticsPage({
 
   return (
     <Shell>
-      <Intro company={company} />
+      <Intro company={company} godview={godview} />
 
       {/* Identity + headline reputation (what candidates see) */}
       <div style={card}>

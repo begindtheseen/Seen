@@ -87,7 +87,14 @@ const BUCKET_ORDER: Array<{ key: string; short: string; tone: string }> = [
 function EmployerDashboardInner() {
   const router = useRouter()
   const params = useSearchParams()
-  const { profile, isEmployer, ready } = useAuth()
+  const { profile, isEmployer, ready, employerCompany, claimsReady } = useAuth()
+
+  // God-view: an admin opens ?company=<name>&godview=1 to view ANY company's employer dashboard
+  // without being that company (the surfaces show the same public data a visitor sees).
+  const godview = params.get('godview') === '1'
+  // Login-scoping: a logged-in employer with an APPROVED claim (migration 053) is pinned to their
+  // company — the ?company= param is ignored for them (unless god-view). Everyone else uses the param.
+  const scoped = ready && claimsReady && isEmployer && !!employerCompany && !godview
 
   const initial = (params.get('company') || '').trim()
   const [companyInput, setCompanyInput] = useState(initial)
@@ -133,6 +140,15 @@ function EmployerDashboardInner() {
 
   useEffect(() => { if (company) load(company) }, [company, load])
 
+  // When a logged-in approved employer lands here, pin the view to their claimed company — overrides
+  // whatever ?company= param was present. God-view and visitors are untouched (param drives them).
+  useEffect(() => {
+    if (scoped && employerCompany && employerCompany !== company) {
+      setCompany(employerCompany)
+      setCompanyInput(employerCompany)
+    }
+  }, [scoped, employerCompany, company])
+
   function lookup() {
     const q = companyInput.trim()
     if (!q) return
@@ -173,9 +189,14 @@ function EmployerDashboardInner() {
         <div style={{ marginBottom: '1.6rem' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '.6rem', flexWrap: 'wrap', marginBottom: '.55rem' }}>
             <span style={{ fontFamily: 'var(--mono)', fontSize: '.52rem', textTransform: 'uppercase', letterSpacing: '.22em', color: 'var(--blue)' }}>Employer dashboard</span>
-            {ready && isEmployer && (
+            {godview && (
+              <span style={{ fontFamily: 'var(--mono)', fontSize: '.55rem', color: '#a78bfa', background: 'rgba(124,58,237,.12)', border: '1px solid rgba(124,58,237,.35)', borderRadius: 7, padding: '.16rem .5rem' }}>
+                Admin god-view
+              </span>
+            )}
+            {ready && isEmployer && !godview && (
               <span style={{ fontFamily: 'var(--mono)', fontSize: '.55rem', color: 'var(--green)', background: 'rgba(16,185,129,.12)', border: '1px solid rgba(16,185,129,.35)', borderRadius: 7, padding: '.16rem .5rem' }}>
-                Signed in as {profile?.name || 'employer'}
+                {scoped ? 'Your company' : `Signed in as ${profile?.name || 'employer'}`}
               </span>
             )}
           </div>
@@ -188,20 +209,38 @@ function EmployerDashboardInner() {
           </p>
         </div>
 
-        {/* Company lookup (mirrors the reputation lookup idiom — no employer login exists yet) */}
-        <div style={{ display: 'flex', gap: '.6rem', flexWrap: 'wrap', marginBottom: '1.8rem' }}>
-          <input
-            value={companyInput}
-            onChange={e => setCompanyInput(e.target.value)}
-            onKeyDown={e => { if (e.key === 'Enter') lookup() }}
-            placeholder="Your company name"
-            aria-label="Your company name"
-            style={{ flex: 1, minWidth: 220, background: 'var(--raised)', border: '1px solid var(--line2)', borderRadius: 9, padding: '.7rem .9rem', fontFamily: 'var(--mono)', fontSize: '.75rem', color: 'var(--white)', outline: 'none' }}
-          />
-          <button onClick={lookup} disabled={loading || !companyInput.trim()} style={{ background: 'linear-gradient(135deg,#1d4ed8,#7c3aed)', border: 'none', borderRadius: 9, padding: '.7rem 1.4rem', fontFamily: 'var(--display)', fontWeight: 800, fontSize: '.8rem', color: '#fff', cursor: loading ? 'default' : 'pointer', opacity: loading || !companyInput.trim() ? .6 : 1 }}>
-            {loading ? 'Loading…' : company ? 'Refresh →' : 'View dashboard →'}
-          </button>
-        </div>
+        {/* When a logged-in approved employer is scoped to their company, the lookup is locked to
+            them (migration 053). Visitors, and admins in god-view, keep the public lookup. */}
+        {scoped ? (
+          <div style={{ display: 'flex', alignItems: 'center', gap: '.6rem', flexWrap: 'wrap', marginBottom: '1.8rem', padding: '.7rem .9rem', background: 'rgba(16,185,129,.05)', border: '1px solid rgba(16,185,129,.25)', borderRadius: 10 }}>
+            <span style={{ fontFamily: 'var(--mono)', fontSize: '.6rem', color: 'var(--green)', textTransform: 'uppercase', letterSpacing: '.1em' }}>Viewing your company</span>
+            <span style={{ fontFamily: 'var(--display)', fontSize: '.9rem', fontWeight: 700, color: 'var(--white)', textTransform: 'capitalize' }}>{employerCompany}</span>
+            <button onClick={() => company && load(company)} disabled={loading} style={{ marginLeft: 'auto', background: 'transparent', border: '1px solid var(--line2)', borderRadius: 8, padding: '.4rem .8rem', fontFamily: 'var(--mono)', fontSize: '.6rem', color: 'var(--sub)', cursor: loading ? 'default' : 'pointer' }}>
+              {loading ? 'Loading…' : '↻ Refresh'}
+            </button>
+          </div>
+        ) : (
+          <>
+            {godview && (
+              <div style={{ marginBottom: '1rem', padding: '.6rem .9rem', background: 'rgba(124,58,237,.06)', border: '1px solid rgba(124,58,237,.28)', borderRadius: 10, fontFamily: 'var(--mono)', fontSize: '.6rem', color: 'var(--sub)', lineHeight: 1.6 }}>
+                Admin god-view — this is the same public data any visitor sees, scoped to the company in the URL. Change the company below to view another.
+              </div>
+            )}
+            <div style={{ display: 'flex', gap: '.6rem', flexWrap: 'wrap', marginBottom: '1.8rem' }}>
+              <input
+                value={companyInput}
+                onChange={e => setCompanyInput(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter') lookup() }}
+                placeholder="Your company name"
+                aria-label="Your company name"
+                style={{ flex: 1, minWidth: 220, background: 'var(--raised)', border: '1px solid var(--line2)', borderRadius: 9, padding: '.7rem .9rem', fontFamily: 'var(--mono)', fontSize: '.75rem', color: 'var(--white)', outline: 'none' }}
+              />
+              <button onClick={lookup} disabled={loading || !companyInput.trim()} style={{ background: 'linear-gradient(135deg,#1d4ed8,#7c3aed)', border: 'none', borderRadius: 9, padding: '.7rem 1.4rem', fontFamily: 'var(--display)', fontWeight: 800, fontSize: '.8rem', color: '#fff', cursor: loading ? 'default' : 'pointer', opacity: loading || !companyInput.trim() ? .6 : 1 }}>
+                {loading ? 'Loading…' : company ? 'Refresh →' : 'View dashboard →'}
+              </button>
+            </div>
+          </>
+        )}
         {err && <div style={{ fontFamily: 'var(--mono)', fontSize: '.62rem', color: 'var(--red)', marginBottom: '1.2rem' }}>{err}</div>}
 
         {/* Entry state — no company chosen yet (honest, no placeholder data) */}

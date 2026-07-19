@@ -5,6 +5,19 @@ import type { User, Session } from '@supabase/supabase-js'
 import { supabase } from './supabase'
 import { _sync } from './sync'
 import type { UserProfile } from './types'
+import { resolveEmployerCompany, selectActiveClaim } from './server/employerClaims'
+
+/** An employer's request to manage a company (ADMIN-APPROVED CLAIMS model, migration 053).
+ *  Only a 'approved' claim grants login-scoped access to that company's employer surfaces. */
+export interface EmployerClaim {
+  id: string
+  company_name: string
+  company_display_name?: string | null
+  status: 'pending' | 'approved' | 'rejected'
+  created_at?: string
+  reviewed_at?: string | null
+  note?: string | null
+}
 
 interface AuthState {
   user: User | null
@@ -16,6 +29,17 @@ interface AuthState {
    *  redirecting on !isLoggedIn — otherwise a signed-in user deep-linking /tracker gets
    *  bounced to /login (which forwards to /dashboard) while the session is still loading. */
   ready: boolean
+  /** The company this employer has an APPROVED claim for (display name), or null. This is the
+   *  employer→company link the surfaces scope to when logged in (migration 053). */
+  employerCompany: string | null
+  /** The employer's single most-relevant claim (approved > pending > rejected) so the portal can
+   *  render one honest state. null for seekers / logged-out / employers who haven't claimed. */
+  employerClaim: EmployerClaim | null
+  /** True once claims have been resolved for the current user (false while an employer's claims
+   *  are still loading) — the portal waits on this before showing claim state. */
+  claimsReady: boolean
+  /** Re-fetch this employer's claims (call after submitting a claim request). */
+  reloadClaims: () => Promise<void>
   token: () => Promise<string | null>
   loadProfile: () => Promise<void>
 }
@@ -27,6 +51,10 @@ const AuthContext = createContext<AuthState>({
   isSeeker: false,
   isEmployer: false,
   ready: false,
+  employerCompany: null,
+  employerClaim: null,
+  claimsReady: false,
+  reloadClaims: async () => {},
   token: async () => null,
   loadProfile: async () => {},
 })
@@ -52,6 +80,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [profile, setProfile] = useState<UserProfile | null>(null)
   const [ready, setReady] = useState(false)
+  // The employer→company claim link (migration 053). Empty for seekers / logged-out.
+  const [claims, setClaims] = useState<EmployerClaim[]>([])
+  const [claimsReady, setClaimsReady] = useState(false)
 
   const getToken = useCallback(async (): Promise<string | null> => {
     try {
@@ -59,6 +90,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return data?.session?.access_token || null
     } catch { return null }
   }, [])
+
+  // Fetch this user's company claims via the service-key endpoint (RLS-scoped defense-in-depth on
+  // the table; the endpoint returns only the caller's own rows). Resilient: any failure leaves the
+  // user un-scoped (falls back to the public ?company= lookup), never blocks the app.
+  const reloadClaims = useCallback(async () => {
+    try {
+      const authToken = await getToken()
+      if (!authToken) { setClaims([]); return }
+      const r = await fetch('/api/employer-claims', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${authToken}` },
+        body: JSON.stringify({ action: 'mine' }),
+      })
+      if (!r.ok) { setClaims([]); return }
+      const d = await r.json() as { claims?: EmployerClaim[] }
+      setClaims(Array.isArray(d?.claims) ? d.claims : [])
+    } catch {
+      setClaims([])
+    } finally {
+      setClaimsReady(true)
+    }
+  }, [getToken])
 
   const loadProfile = useCallback(async () => {
     const currentUser = user
@@ -131,8 +184,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const isEmployer = isLoggedIn && accountType === 'employer'
   const isSeeker = isLoggedIn && accountType !== 'employer'
 
+  // Load claims only for employers (seekers never have any). Re-runs when employer status resolves
+  // (profile loads after login). A seeker / logged-out user is claims-ready immediately with none.
+  useEffect(() => {
+    if (!isLoggedIn) { setClaims([]); setClaimsReady(true); return }
+    if (isEmployer) { setClaimsReady(false); reloadClaims() }
+    else { setClaims([]); setClaimsReady(true) }
+  }, [isLoggedIn, isEmployer, reloadClaims])
+
+  // Only an APPROVED claim grants scope; the active claim drives the portal's honest state.
+  const employerCompany = isEmployer ? resolveEmployerCompany(claims) : null
+  const employerClaim = (isEmployer ? selectActiveClaim(claims) : null) as EmployerClaim | null
+
   return (
-    <AuthContext.Provider value={{ user, profile, isLoggedIn, isSeeker, isEmployer, ready, token: getToken, loadProfile }}>
+    <AuthContext.Provider value={{ user, profile, isLoggedIn, isSeeker, isEmployer, ready, employerCompany, employerClaim, claimsReady, reloadClaims, token: getToken, loadProfile }}>
       {children}
     </AuthContext.Provider>
   )
