@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import Link from 'next/link'
 import { EmployerCheckout, EmployerPurchaseConfirm } from '@/components/EmployerCheckout'
 import { EmployerReputation } from '@/components/employer/EmployerReputation'
+import { EmployerListings } from '@/components/employer/EmployerListings'
 
 // The employer portal — a distinct, employer-first experience. The seeker Nav + Footer hide
 // themselves on /employers (see components/Nav.tsx / Footer.tsx), so nothing job-seeker ever shows
@@ -61,6 +62,9 @@ export default function EmployersPage() {
 
         {/* Anchor feature: your reputation the way candidates see it */}
         <EmployerReputation />
+
+        {/* Manage your listings — close a filled role in one verified click (seen-command#94) */}
+        <EmployerListings />
 
         {/* Why it matters — real mechanism, honest */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(240px,1fr))', gap: '1rem', marginBottom: '3rem' }}>
