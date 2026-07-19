@@ -1,0 +1,265 @@
+/* Redesigned top nav — full-width hairline bar (the global `nav{}` tag styles
+   already give the fixed bar + single bottom hairline; this module only styles the
+   contents). Replaces the old floating translucent `.nav-pills` container: primary
+   links are now plain text with a gradient underline for the active route.
+   Uses the real brand tokens (--display Syne, --mono DM Mono, --body Instrument Sans,
+   and the dark identity palette) declared in app/globals.css. */
+
+/* Primary link row — sits just after the logo; the right cluster uses margin-left:auto
+   to push itself to the far edge, which collapses the global nav's space-between so the
+   logo + links pack together on the left. */
+.primary {
+  display: flex;
+  align-items: center;
+  gap: 0.12rem;
+  margin-left: 1.1rem;
+  min-width: 0;
+}
+
+.link {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.42rem 0.62rem;
+  border-radius: 8px;
+  font-family: var(--body);
+  font-size: 0.8rem;
+  font-weight: 500;
+  line-height: 1;
+  color: rgba(255, 255, 255, 0.55);
+  text-decoration: none;
+  white-space: nowrap;
+  background: none;
+  border: none;
+  cursor: pointer;
+  transition: color 0.15s ease, background 0.15s ease;
+}
+.link:hover {
+  color: var(--white);
+  background: rgba(255, 255, 255, 0.06);
+}
+.linkActive {
+  color: #fff;
+  font-weight: 600;
+}
+/* Gradient underline for the active destination — mirrors the mockup's hairline accent. */
+.linkActive::after {
+  content: "";
+  position: absolute;
+  left: 0.62rem;
+  right: 0.62rem;
+  bottom: -0.42rem;
+  height: 2px;
+  border-radius: 2px;
+  background: linear-gradient(90deg, var(--indigo), var(--blue));
+}
+
+.chevron {
+  width: 12px;
+  height: 12px;
+  opacity: 0.7;
+  transition: transform 0.18s ease;
+}
+.chevronOpen {
+  transform: rotate(180deg);
+}
+
+/* Right-hand cluster: credits chip · saved · account. */
+.right {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+/* A dropdown anchor (More / account). */
+.menuWrap {
+  position: relative;
+  display: inline-flex;
+}
+
+.menu {
+  position: absolute;
+  top: calc(100% + 10px);
+  right: 0;
+  z-index: 600;
+  min-width: 216px;
+  padding: 0.4rem;
+  background: var(--surface);
+  border: 1px solid var(--line2);
+  border-radius: 12px;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.55), 0 0 0 0.5px rgba(255, 255, 255, 0.04);
+  animation: snMenuIn 0.14s ease;
+}
+.menuLeft {
+  right: auto;
+  left: 0;
+}
+@keyframes snMenuIn {
+  from { opacity: 0; transform: translateY(-4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.menuLabel {
+  font-family: var(--mono);
+  font-size: 0.5rem;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  color: var(--dim);
+  padding: 0.5rem 0.6rem 0.3rem;
+}
+
+.menuItem {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  width: 100%;
+  padding: 0.5rem 0.6rem;
+  border-radius: 8px;
+  font-family: var(--body);
+  font-size: 0.78rem;
+  font-weight: 500;
+  color: var(--sub);
+  text-decoration: none;
+  text-align: left;
+  background: none;
+  border: none;
+  cursor: pointer;
+  transition: color 0.14s ease, background 0.14s ease;
+}
+.menuItem:hover {
+  color: var(--white);
+  background: var(--raised);
+}
+.menuItemIcon {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+  opacity: 0.8;
+}
+.menuDanger { color: var(--red); }
+.menuDanger:hover { color: var(--red); background: rgba(239, 68, 68, 0.1); }
+
+.menuDivider {
+  height: 1px;
+  margin: 0.35rem 0.3rem;
+  background: var(--line);
+}
+
+.menuNote {
+  display: flex;
+  gap: 0.4rem;
+  margin: 0.25rem 0.3rem 0.1rem;
+  padding: 0.5rem 0.55rem;
+  border-radius: 8px;
+  background: var(--bdim);
+  border: 1px solid var(--bmid);
+  font-family: var(--mono);
+  font-size: 0.58rem;
+  line-height: 1.5;
+  color: var(--blue);
+}
+
+/* Credits chip — subtle monospace pill (replaces the loud gradient "🪙 10 credits"). */
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.34rem 0.62rem;
+  border-radius: 999px;
+  border: 1px solid var(--line2);
+  background: rgba(255, 255, 255, 0.02);
+  font-family: var(--mono);
+  font-size: 0.66rem;
+  font-weight: 500;
+  line-height: 1;
+  color: var(--sub);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: border-color 0.15s ease, color 0.15s ease;
+}
+.chip:hover { border-color: rgba(255, 255, 255, 0.24); color: var(--text); }
+.chip b { color: var(--white); font-weight: 600; }
+.chipSpark {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--green);
+  box-shadow: 0 0 8px rgba(16, 185, 129, 0.7);
+  flex-shrink: 0;
+}
+/* Out-of-credits: still subtle, just semantic red. */
+.chipZero {
+  border-color: rgba(239, 68, 68, 0.4);
+  background: rgba(239, 68, 68, 0.08);
+  color: var(--red);
+}
+.chipZero b { color: var(--red); }
+.chipZero .chipSpark { background: var(--red); box-shadow: 0 0 8px rgba(239, 68, 68, 0.6); }
+
+/* Pro badge — subtle mono pill matching the chip language. */
+.pro {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.34rem;
+  padding: 0.34rem 0.62rem;
+  border-radius: 999px;
+  border: 1px solid rgba(16, 185, 129, 0.4);
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.14), rgba(99, 102, 241, 0.14));
+  font-family: var(--mono);
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  line-height: 1;
+  color: var(--green);
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+/* Icon button (Saved bookmark). */
+.iconBtn {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 9px;
+  border: 1px solid var(--line);
+  background: transparent;
+  color: var(--sub);
+  cursor: pointer;
+  text-decoration: none;
+  transition: color 0.15s ease, border-color 0.15s ease, background 0.15s ease;
+}
+.iconBtn:hover { color: var(--white); border-color: var(--line2); background: rgba(255, 255, 255, 0.04); }
+.iconBtnActive { color: var(--white); border-color: var(--line2); background: rgba(255, 255, 255, 0.06); }
+.iconBtn svg { width: 17px; height: 17px; }
+
+/* Account avatar trigger. */
+.avatar {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: none;
+  background: linear-gradient(135deg, var(--g-start) 0%, var(--g-mid) 55%, var(--g-end) 100%);
+  color: #fff;
+  font-family: var(--body);
+  font-size: 0.78rem;
+  font-weight: 700;
+  cursor: pointer;
+  line-height: 1;
+}
+.avatar:hover { filter: brightness(1.08); }
+
+/* Below the tablet breakpoint the primary row + More collapse into the existing
+   hamburger drawer (global .side-menu / .side-menu-toggle). */
+@media (max-width: 768px) {
+  .primary { display: none; }
+}
+@media (max-width: 480px) {
+  /* Keep the bar breathable on small phones — the drawer carries the full nav. */
+  .chipLabel { display: none; }
+}

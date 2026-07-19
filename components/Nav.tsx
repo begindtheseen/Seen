@@ -2,23 +2,70 @@
 
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef, type ReactNode } from 'react'
 import dynamic from 'next/dynamic'
 import { useAuth } from '@/lib/auth'
 import { supabase } from '@/lib/supabase'
 import UpgradeModal from './UpgradeModal'
+import styles from './Nav.module.css'
 
 // The earn-credits flow: the résumé survey (asks about the user's past employers).
 const ResumeSurveyModal = dynamic(() => import('./ResumeSurveyModal'), { ssr: false })
 
+function ChevronIcon({ open }: { open: boolean }) {
+  return (
+    <svg className={`${styles.chevron}${open ? ' ' + styles.chevronOpen : ''}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <path d="M6 9l6 6 6-6" />
+    </svg>
+  )
+}
+
+function BookmarkIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" />
+    </svg>
+  )
+}
+
+/** Accessible click-outside / Escape dropdown used by the More and Account menus. */
+function Dropdown({ trigger, open, setOpen, align = 'right', children }: {
+  trigger: ReactNode
+  open: boolean
+  setOpen: (v: boolean) => void
+  align?: 'left' | 'right'
+  children: ReactNode
+}) {
+  const ref = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    if (!open) return
+    const onDown = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false) }
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpen(false) }
+    document.addEventListener('mousedown', onDown)
+    document.addEventListener('keydown', onKey)
+    return () => { document.removeEventListener('mousedown', onDown); document.removeEventListener('keydown', onKey) }
+  }, [open, setOpen])
+  return (
+    <div className={styles.menuWrap} ref={ref}>
+      {trigger}
+      {open && (
+        <div className={`${styles.menu}${align === 'left' ? ' ' + styles.menuLeft : ''}`} role="menu">
+          {children}
+        </div>
+      )}
+    </div>
+  )
+}
+
 export default function Nav() {
   const pathname = usePathname()
   const router = useRouter()
-  const { isLoggedIn, isSeeker, token } = useAuth()
-  const [showAccountModal, setShowAccountModal] = useState(false)
+  const { isLoggedIn, isSeeker, token, user, profile } = useAuth()
   const [resetSent, setResetSent] = useState(false)
   const [scrolled, setScrolled] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
+  const [moreOpen, setMoreOpen] = useState(false)
+  const [acctOpen, setAcctOpen] = useState(false)
   const [creditBalance, setCreditBalance] = useState<number | null>(null)
   const [isPro, setIsPro] = useState(false)
   const [showUpgrade, setShowUpgrade] = useState(false)
@@ -67,8 +114,8 @@ export default function Nav() {
     }
   }, [fetchBalance])
 
-  // Close the mobile drawer whenever the route changes
-  useEffect(() => { setMenuOpen(false) }, [pathname])
+  // Close the mobile drawer and any open dropdown whenever the route changes
+  useEffect(() => { setMenuOpen(false); setMoreOpen(false); setAcctOpen(false) }, [pathname])
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 10)
@@ -90,10 +137,15 @@ export default function Nav() {
     setResetSent(true)
   }
 
-  const isDashboard = pathname === '/dashboard'
-
   // The employer portal has its own employer-first chrome — never show the job-seeker nav there.
   if (pathname?.startsWith('/employers')) return null
+
+  // ── Nav information architecture (9→5 primary; every destination still reachable) ──
+  // Primary desktop links change with auth state; secondary destinations relocate to the
+  // "More" affordance, the Saved bookmark icon, and the account menu (see PR for the full map).
+  const linkCls = (path: string) => `${styles.link}${isActive(path) ? ' ' + styles.linkActive : ''}`
+  const moreActive = isActive('/demand') || isActive('/feed') || (isSeeker && isActive('/employers'))
+  const avatarInitial = (profile?.name?.trim()?.[0] || user?.email?.[0] || 'S').toUpperCase()
 
   return (
     <>
@@ -104,68 +156,116 @@ export default function Nav() {
           Seen
         </Link>
 
-        {/* Ordered by the seeker's own flow first (Dashboard → Jobs → Track → Résumé),
-            then shared explore links, so it doesn't read as a random wall of tabs. */}
-        <div className="nav-pills">
-          {isSeeker && <Link href="/dashboard" className={`ntab${isActive('/dashboard') ? ' active' : ''}`}>Dashboard</Link>}
-          <Link href="/jobs" className={`ntab${isActive('/jobs') ? ' active' : ''}`}>Jobs</Link>
-          {isSeeker && <Link href="/tracker" className={`ntab${isActive('/tracker') ? ' active' : ''}`}>Track</Link>}
-          {isSeeker && <Link href="/resume" className={`ntab${isActive('/resume') ? ' active' : ''}`}>Résumé AI</Link>}
-          <Link href="/companies" className={`ntab${isActive('/companies') ? ' active' : ''}`}>Companies</Link>
-          <Link href="/demand" className={`ntab${isActive('/demand') ? ' active' : ''}`}>Demand</Link>
-          <Link href="/feed" className={`ntab${isActive('/feed') ? ' active' : ''}`}>Feed</Link>
-          {isSeeker && <Link href="/saved" className={`ntab${isActive('/saved') ? ' active' : ''}`}>Saved</Link>}
-          {/* Public employer portal — reachable for everyone (logged-out and logged-in). */}
-          <Link href="/employers" className={`ntab${isActive('/employers') ? ' active' : ''}`}>Employers</Link>
-          <Link href="/pricing" className={`ntab${isActive('/pricing') ? ' active' : ''}`}>Pricing</Link>
+        {/* Primary destinations — the five that matter for the current auth state. */}
+        <div className={styles.primary}>
+          {isSeeker ? (
+            <>
+              <Link href="/dashboard" className={linkCls('/dashboard')}>Dashboard</Link>
+              <Link href="/jobs" className={linkCls('/jobs')}>Jobs</Link>
+              <Link href="/companies" className={linkCls('/companies')}>Companies</Link>
+              <Link href="/tracker" className={linkCls('/tracker')}>Track</Link>
+              <Link href="/resume" className={linkCls('/resume')}>Résumé AI</Link>
+            </>
+          ) : (
+            <>
+              <Link href="/companies" className={linkCls('/companies')}>Companies</Link>
+              <Link href="/jobs" className={linkCls('/jobs')}>Jobs</Link>
+              {/* Public employer portal (#200) — kept prominent for logged-out visitors. */}
+              <Link href="/employers" className={linkCls('/employers')}>Employers</Link>
+              <Link href="/pricing" className={linkCls('/pricing')}>Pricing</Link>
+            </>
+          )}
+
+          {/* More — relocates Demand/Feed (and Employers for signed-in seekers) without deleting them. */}
+          <Dropdown
+            open={moreOpen}
+            setOpen={setMoreOpen}
+            align="left"
+            trigger={
+              <button
+                className={`${styles.link}${moreActive ? ' ' + styles.linkActive : ''}`}
+                onClick={() => { setMoreOpen(v => !v); setAcctOpen(false) }}
+                aria-haspopup="menu"
+                aria-expanded={moreOpen}
+              >
+                More<ChevronIcon open={moreOpen} />
+              </button>
+            }
+          >
+            <div className={styles.menuLabel}>Explore</div>
+            {isSeeker && <Link href="/employers" className={styles.menuItem} role="menuitem">For employers</Link>}
+            <Link href="/demand" className={styles.menuItem} role="menuitem">Hiring demand</Link>
+            <Link href="/feed" className={styles.menuItem} role="menuitem">Live feed</Link>
+            <Link href="/agencies" className={styles.menuItem} role="menuitem">Agency ghost index</Link>
+          </Dropdown>
         </div>
 
-        <div className="nav-right">
+        <div className={styles.right}>
+          {/* Credits — subtle monospace chip (Pro shows an unlimited badge). */}
           {isSeeker && isPro && (
-            <Link
-              href="/pricing"
-              title="Seen Pro — unlimited AI credits. Manage your membership."
-              style={{
-                display: 'inline-flex', alignItems: 'center', gap: '.32rem',
-                background: 'linear-gradient(135deg,rgba(16,185,129,.18),rgba(99,102,241,.18))',
-                color: 'var(--green)', border: '1px solid rgba(16,185,129,.4)',
-                borderRadius: 20, padding: '.32rem .7rem',
-                fontFamily: 'var(--mono)', fontSize: '.62rem', fontWeight: 700, letterSpacing: '.04em',
-                textDecoration: 'none', lineHeight: 1, boxShadow: '0 0 14px rgba(16,185,129,.18)',
-              }}
-            >
+            <Link href="/pricing" className={styles.pro} title="Seen Pro — unlimited AI credits. Manage your membership.">
               ★ Unlimited · PRO
             </Link>
           )}
           {isSeeker && !isPro && creditBalance !== null && (
             <button
-              title={creditBalance === 0 ? 'Out of AI credits — upgrade or earn more by tracking applications and answering surveys' : `${creditBalance} AI credit${creditBalance === 1 ? '' : 's'} left today`}
-              style={{
-                display: 'inline-flex', alignItems: 'center', gap: '.34rem',
-                background: creditBalance === 0 ? 'rgba(239,68,68,.16)' : 'linear-gradient(135deg,rgba(59,130,246,.22),rgba(99,102,241,.22))',
-                color: creditBalance === 0 ? 'var(--red)' : 'var(--white)',
-                border: creditBalance === 0 ? '1px solid rgba(239,68,68,.4)' : '1px solid rgba(99,102,241,.45)',
-                borderRadius: 20, padding: '.32rem .72rem',
-                fontFamily: 'var(--mono)', fontSize: '.62rem', fontWeight: 700, cursor: 'pointer', lineHeight: 1,
-                whiteSpace: 'nowrap',
-                boxShadow: creditBalance === 0 ? '0 0 14px rgba(239,68,68,.18)' : '0 0 12px rgba(99,102,241,.16)',
-                animation: creditBalance === 0 ? 'pulse 2s ease-in-out infinite' : undefined,
-              }}
+              className={`${styles.chip}${creditBalance === 0 ? ' ' + styles.chipZero : ''}`}
+              title={creditBalance === 0
+                ? 'Out of AI credits — upgrade or earn more by tracking applications and answering surveys'
+                : `${creditBalance} AI credit${creditBalance === 1 ? '' : 's'} left today`}
               onClick={() => creditBalance === 0 ? setShowUpgrade(true) : setShowSurvey(true)}
             >
-              {creditBalance === 0
-                ? <>⚠️ Out of credits · Upgrade</>
-                : <>🪙 {creditBalance} credit{creditBalance === 1 ? '' : 's'} left</>}
+              <span className={styles.chipSpark} />
+              <b>{creditBalance}</b>
+              <span className={styles.chipLabel}>{creditBalance === 0 ? 'credits · top up' : `credit${creditBalance === 1 ? '' : 's'}`}</span>
             </button>
           )}
+
+          {/* Saved — an icon, not a full nav slot. */}
           {isSeeker && (
-            <button
-              onClick={() => setShowAccountModal(true)}
-              className="btn btn-ghost"
-              style={{ fontSize: '.75rem', padding: '.45rem .65rem', lineHeight: 1 }}
-              title="Account settings"
-            >⚙</button>
+            <Link
+              href="/saved"
+              className={`${styles.iconBtn}${isActive('/saved') ? ' ' + styles.iconBtnActive : ''}`}
+              title="Saved jobs"
+              aria-label="Saved jobs"
+            >
+              <BookmarkIcon />
+            </Link>
           )}
+
+          {/* Account menu — Pricing lives here (per the IA), plus profile + sign out. */}
+          {isLoggedIn && (
+            <Dropdown
+              open={acctOpen}
+              setOpen={setAcctOpen}
+              align="right"
+              trigger={
+                <button
+                  className={styles.avatar}
+                  onClick={() => { setAcctOpen(v => !v); setMoreOpen(false) }}
+                  aria-haspopup="menu"
+                  aria-expanded={acctOpen}
+                  aria-label="Account menu"
+                  title="Account"
+                >
+                  {avatarInitial}
+                </button>
+              }
+            >
+              <div className={styles.menuLabel}>{user?.email ? user.email : 'Account'}</div>
+              <Link href="/pricing" className={styles.menuItem} role="menuitem">Pricing &amp; plans</Link>
+              {isSeeker && <Link href="/profile" className={styles.menuItem} role="menuitem">Profile &amp; settings</Link>}
+              {isSeeker && (
+                <button className={styles.menuItem} role="menuitem" onClick={handlePasswordReset}>Change password</button>
+              )}
+              {resetSent && (
+                <div className={styles.menuNote}>✓ Reset link sent — check your email to set a new password.</div>
+              )}
+              <div className={styles.menuDivider} />
+              <button className={`${styles.menuItem} ${styles.menuDanger}`} role="menuitem" onClick={handleSignOut}>Sign out</button>
+            </Dropdown>
+          )}
+
           {!isLoggedIn && (
             <>
               <Link href="/login" className="btn btn-ghost">Sign in</Link>
@@ -243,6 +343,8 @@ export default function Nav() {
               <Link href="/profile" onClick={() => setMenuOpen(false)} style={{ display: 'block', background: 'none', border: '1px solid var(--line2)', color: 'var(--sub)', borderRadius: 8, padding: '.5rem 1rem', fontFamily: 'var(--mono)', fontSize: '.65rem', cursor: 'pointer', textAlign: 'center', textDecoration: 'none' }}>⚙ Profile &amp; settings</Link>
               <button onClick={() => { handleSignOut(); setMenuOpen(false) }} style={{ background: 'rgba(239,68,68,0.07)', border: '1px solid rgba(239,68,68,0.25)', color: 'var(--red)', borderRadius: 8, padding: '.5rem 1rem', fontFamily: 'var(--mono)', fontSize: '.65rem', fontWeight: 600, cursor: 'pointer', width: '100%' }}>Sign out</button>
             </>
+          ) : isLoggedIn ? (
+            <button onClick={() => { handleSignOut(); setMenuOpen(false) }} style={{ background: 'rgba(239,68,68,0.07)', border: '1px solid rgba(239,68,68,0.25)', color: 'var(--red)', borderRadius: 8, padding: '.5rem 1rem', fontFamily: 'var(--mono)', fontSize: '.65rem', fontWeight: 600, cursor: 'pointer', width: '100%' }}>Sign out</button>
           ) : (
             <Link href="/login" className="btn btn-ghost" style={{ width: '100%', justifyContent: 'center' }}>Sign in</Link>
           )}
@@ -255,42 +357,6 @@ export default function Nav() {
           onClose={() => setShowSurvey(false)}
           onCreditsEarned={() => fetchBalance()}
         />
-      )}
-
-      {/* Account Settings Modal */}
-      {showAccountModal && (
-        <div
-          style={{ display: 'block', position: 'fixed', inset: 0, background: 'rgba(0,0,0,.75)', zIndex: 9000, backdropFilter: 'blur(4px)' }}
-          onClick={e => { if (e.target === e.currentTarget) setShowAccountModal(false) }}
-        >
-          <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', width: 'calc(100% - 2rem)', maxWidth: 380, background: 'var(--surface)', border: '1px solid rgba(99,102,241,.2)', borderRadius: 14, overflow: 'hidden', boxShadow: '0 32px 96px rgba(0,0,0,.7),0 0 72px rgba(99,102,241,.16),0 0 140px rgba(124,58,237,.08)' }}>
-            <div style={{ padding: '.9rem 1.1rem', borderBottom: '1px solid var(--line)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <div style={{ fontFamily: 'var(--display)', fontSize: '.88rem', fontWeight: 700, color: 'var(--white)', letterSpacing: '-.02em' }}>Account Settings</div>
-              <button onClick={() => setShowAccountModal(false)} style={{ background: 'none', border: 'none', color: 'var(--dim)', cursor: 'pointer', fontSize: '1rem', lineHeight: 1, padding: '.2rem .3rem' }}>✕</button>
-            </div>
-            <div style={{ padding: '1rem 1.1rem' }}>
-              <div style={{ marginBottom: '1rem' }}>
-                <Link href="/profile" onClick={() => setShowAccountModal(false)} style={{ display: 'block', background: 'none', border: '1px solid var(--line2)', borderRadius: 8, padding: '.6rem 1rem', fontFamily: 'var(--mono)', fontSize: '.68rem', color: 'var(--sub)', textDecoration: 'none', textAlign: 'center', marginBottom: '.65rem' }}>
-                  Profile settings →
-                </Link>
-                <div style={{ fontSize: '.78rem', fontWeight: 600, color: 'var(--white)', marginBottom: '.12rem' }}>Change password</div>
-                <div style={{ fontFamily: 'var(--mono)', fontSize: '.6rem', color: 'var(--muted)', marginBottom: '.65rem' }}>We&apos;ll send a reset link to your email</div>
-                <button className="btn btn-ghost" style={{ width: '100%', justifyContent: 'center', fontSize: '.78rem' }} onClick={handlePasswordReset}>Send reset link →</button>
-              </div>
-              {resetSent && (
-                <div style={{ borderTop: '1px solid var(--line)', paddingTop: '.85rem', marginBottom: '1rem' }}>
-                  <div style={{ background: 'var(--bdim)', border: '1px solid var(--bmid)', borderRadius: 8, padding: '.75rem 1rem', fontFamily: 'var(--mono)', fontSize: '.62rem', color: 'var(--blue)', lineHeight: 1.65 }}>
-                    ✓ Reset link sent — check your email.<br />
-                    <span style={{ color: 'var(--sub)' }}>Click the link in the email to set your new password.</span>
-                  </div>
-                </div>
-              )}
-              <div style={{ borderTop: '1px solid var(--line)', paddingTop: '.85rem' }}>
-                <button className="btn btn-ghost" style={{ width: '100%', justifyContent: 'center', fontSize: '.78rem', color: 'var(--red)', borderColor: 'rgba(239,68,68,.3)' }} onClick={handleSignOut}>Sign out of Seen</button>
-              </div>
-            </div>
-          </div>
-        </div>
       )}
     </>
   )

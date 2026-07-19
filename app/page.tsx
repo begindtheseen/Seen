@@ -1,4 +1,4 @@
-import LandingHero from '@/components/LandingHero'
+import HomeHero from '@/components/HomeHero'
 import LandingMarketingSections from '@/components/LandingMarketingSections'
 
 export default function LandingPage() {
@@ -11,8 +11,8 @@ export default function LandingPage() {
         <div className="lp2-bg-fade" />
       </div>
 
-      {/* Hero + search (interactive client component) */}
-      <LandingHero />
+      {/* Redesigned hero: one consolidated company search + a live real-data proof card */}
+      <HomeHero />
 
       {/* Value · How it works · Final CTA */}
       <LandingMarketingSections />
