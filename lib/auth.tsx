@@ -81,9 +81,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setProfile(merged)
 
       // Backfill the DB with the user's OWN signup name if the row is missing it — never
-      // from a shared local cache.
+      // from a shared local cache. Preserve the row's REAL type — hardcoding 'seeker' here
+      // would silently demote an employer whose row happened to be missing a name.
       if (data && !data.name && metaName) {
-        _sync('save_profile', { profile: { email: currentUser.email || '', type: 'seeker', name: metaName } }).catch(() => {})
+        _sync('save_profile', { profile: { email: currentUser.email || '', type: data.account_type || data.type || 'seeker', name: metaName } }).catch(() => {})
       }
     } catch {
       setProfile(prev => prev || { name: metaName, city: '', experience: '' })
@@ -123,8 +124,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [user, loadProfile])
 
   const isLoggedIn = !!user
-  const isSeeker = isLoggedIn && profile?.type !== 'employer'
-  const isEmployer = isLoggedIn && profile?.type === 'employer'
+  // account_type (migration 050, NOT NULL) is the source of truth for employer vs seeker; fall
+  // back to the legacy `type` for any older row. Reading the REAL profile row — not a hardcoded
+  // 'seeker' — is what lets an employer be routed to the portal instead of the seeker dashboard.
+  const accountType = profile?.account_type || profile?.type
+  const isEmployer = isLoggedIn && accountType === 'employer'
+  const isSeeker = isLoggedIn && accountType !== 'employer'
 
   return (
     <AuthContext.Provider value={{ user, profile, isLoggedIn, isSeeker, isEmployer, ready, token: getToken, loadProfile }}>

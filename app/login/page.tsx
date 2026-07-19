@@ -31,10 +31,17 @@ function fieldStyle(focused: boolean) {
   } as React.CSSProperties
 }
 
+// Kill switch for NEW employer signups. Unset (or anything other than 'false') → enabled, the
+// default. Set NEXT_PUBLIC_EMPLOYER_SIGNUP_ENABLED='false' to close the route: the Employer tile
+// is hidden and /login?type=employer falls back to seeker signup with a note. This gates SIGNUP
+// only — existing employers can still sign in and reach the portal.
+const EMPLOYER_SIGNUP_ENABLED = process.env.NEXT_PUBLIC_EMPLOYER_SIGNUP_ENABLED !== 'false'
+
 function LoginContent() {
   const router = useRouter()
   const params = useSearchParams()
-  const { isLoggedIn } = useAuth()
+  const { isLoggedIn, isEmployer } = useAuth()
+  const cameAsEmployer = params.get('type') === 'employer'
   // Where to land after auth. /apply, /pricing and the UpgradeModal pass ?return= / ?next=
   // so the user resumes what they were doing — dumping everyone on /dashboard lost the
   // "did you apply?" context and the upgrade intent.
@@ -43,7 +50,7 @@ function LoginContent() {
   const [step, setStep] = useState<Step>(
     params.get('signup') === '1' || params.get('type') === 'employer' ? 'who' : 'signin'
   )
-  const [signupType, setSignupType] = useState<'seeker' | 'employer'>(params.get('type') === 'employer' ? 'employer' : 'seeker')
+  const [signupType, setSignupType] = useState<'seeker' | 'employer'>(EMPLOYER_SIGNUP_ENABLED && cameAsEmployer ? 'employer' : 'seeker')
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -53,8 +60,10 @@ function LoginContent() {
   const [focused, setFocused] = useState<string | null>(null)
 
   useEffect(() => {
-    if (isLoggedIn) router.replace(returnTo)
-  }, [isLoggedIn, router, returnTo])
+    // Already signed in and hitting /login → bounce out. Employers go to the portal (the
+    // /dashboard guard is the fallback if the profile hasn't resolved yet); seekers to returnTo.
+    if (isLoggedIn) router.replace(isEmployer ? '/employers' : returnTo)
+  }, [isLoggedIn, isEmployer, router, returnTo])
 
   function clearError() { setError('') }
 
@@ -68,7 +77,12 @@ function LoginContent() {
   async function createAccount() {
     if (password.length < 8) { setError('Password must be at least 8 characters.'); return }
     setLoading(true); clearError()
-    const meta: Record<string, string> = { name, role_type: signupType }
+    // Kill switch: force seeker when employer signup is closed, even if state somehow says otherwise.
+    const effectiveType = EMPLOYER_SIGNUP_ENABLED ? signupType : 'seeker'
+    // Persist the intent under BOTH keys: account_type is the stable key the DB trigger (migration
+    // 052) reads; role_type is kept for back-compat with the pre-052 trigger, so signup labels the
+    // account correctly regardless of whether the migration has been applied yet.
+    const meta: Record<string, string> = { name, role_type: effectiveType, account_type: effectiveType }
     const { error: err } = await supabase.auth.signUp({
       email,
       password,
@@ -86,7 +100,9 @@ function LoginContent() {
     setLoading(false)
     if (err || !data.user) { setError('Not verified yet. Check your email.'); return }
     if (!data.user.email_confirmed_at) { setError('Still waiting on verification. Check your inbox.'); return }
-    router.replace(returnTo)
+    // Fresh employer signups land on the portal; seekers resume returnTo. (The kill switch forces
+    // seeker in createAccount, so signupType is only 'employer' here when employer signup is open.)
+    router.replace(EMPLOYER_SIGNUP_ENABLED && signupType === 'employer' ? '/employers' : returnTo)
   }
 
   async function resendVerification() {
@@ -99,10 +115,15 @@ function LoginContent() {
   async function doSignIn() {
     if (!email.trim() || !password.trim()) { setError('Email and password required.'); return }
     setLoading(true); clearError()
-    const { error: err } = await supabase.auth.signInWithPassword({ email, password })
+    const { data, error: err } = await supabase.auth.signInWithPassword({ email, password })
     setLoading(false)
     if (err) { setError('Incorrect email or password.'); return }
-    router.replace(returnTo)
+    // Route employers to their portal. Employer-ness comes from the account's own signup metadata;
+    // the /dashboard guard is the safety net for any older account whose metadata predates this.
+    // Sign-in is NOT gated by the kill switch — existing employers must still get in when closed.
+    const m = (data.user?.user_metadata || {}) as Record<string, unknown>
+    const isEmp = m.account_type === 'employer' || m.role_type === 'employer' || m.type === 'employer'
+    router.replace(isEmp ? '/employers' : returnTo)
   }
 
   const btnStyle: React.CSSProperties = {
@@ -129,6 +150,13 @@ function LoginContent() {
     </label>
   )
 
+  // Signup role tiles. The Employer tile drops out when the kill switch closes employer signup,
+  // leaving only the seeker path (and the grid collapses to a single column).
+  const roleTiles = ([
+    { type: 'seeker' as const, emoji: '🎯', label: 'Job Seeker', desc: 'Find real jobs, track applications, avoid getting ghosted' },
+    { type: 'employer' as const, emoji: '🏢', label: 'Employer', desc: 'Manage your score, respond to reports, post listings' },
+  ]).filter(t => EMPLOYER_SIGNUP_ENABLED || t.type !== 'employer')
+
   return (
     <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1.5rem', paddingTop: 80 }}>
       <div style={{ width: '100%', maxWidth: 420, animation: 'fadeUp .4s ease both' }}>
@@ -152,11 +180,13 @@ function LoginContent() {
               <div style={{ fontFamily: 'var(--display)', fontSize: '1.5rem', fontWeight: 800, color: 'var(--white)', letterSpacing: '-.025em', marginBottom: '.35rem' }}>Who are you?</div>
               <div style={{ fontSize: '.85rem', color: 'var(--sub)', fontWeight: 300 }}>Pick one to get started</div>
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '.75rem', marginBottom: '1.25rem' }}>
-              {([
-                { type: 'seeker' as const, emoji: '🎯', label: 'Job Seeker', desc: 'Find real jobs, track applications, avoid getting ghosted' },
-                { type: 'employer' as const, emoji: '🏢', label: 'Employer', desc: 'Manage your score, respond to reports, post listings' },
-              ]).map(t => (
+            {!EMPLOYER_SIGNUP_ENABLED && cameAsEmployer && (
+              <div style={{ background: 'var(--bdim)', border: '1px solid var(--bmid)', borderRadius: 8, padding: '.6rem .85rem', fontFamily: 'var(--mono)', fontSize: '.62rem', color: 'var(--sub)', marginBottom: '1.1rem', textAlign: 'center', lineHeight: 1.55 }}>
+                Employer signups are currently closed. You can still create a job seeker account below.
+              </div>
+            )}
+            <div style={{ display: 'grid', gridTemplateColumns: roleTiles.length > 1 ? '1fr 1fr' : '1fr', gap: '.75rem', marginBottom: '1.25rem' }}>
+              {roleTiles.map(t => (
                 <button
                   key={t.type}
                   onClick={() => { setSignupType(t.type); setStep('email') }}

@@ -82,7 +82,9 @@ export default function DashboardPage() {
   useEffect(() => {
     if (!ready) return // wait for the session to resolve — redirecting early bounced signed-in users
     if (!isLoggedIn) { router.replace('/login'); return }
-    if (isLoggedIn && !isSeeker) { router.replace('/'); return }
+    // Employers have no seeker dashboard — route them to their portal. Safety net for a stale
+    // link or a post-login redirect race; the login page already sends employers to /employers.
+    if (isLoggedIn && !isSeeker) { router.replace('/employers'); return }
   }, [ready, isLoggedIn, isSeeker, router])
 
   useEffect(() => {

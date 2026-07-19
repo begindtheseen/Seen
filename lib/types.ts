@@ -33,7 +33,11 @@ export interface Application {
 
 export interface UserProfile {
   id?: string
+  // `type` is the legacy label; `account_type` is the NOT-NULL hard-separation column
+  // (migration 050) that the signup trigger now also writes. isEmployer reads account_type
+  // first (see lib/auth.tsx) so the two are consistent.
   type?: 'seeker' | 'employer'
+  account_type?: 'seeker' | 'employer'
   name?: string
   email?: string
   city?: string
