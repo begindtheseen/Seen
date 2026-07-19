@@ -7,6 +7,7 @@ import { AppStore } from '@/lib/stores/AppStore'
 import HiringProbability from '@/components/HiringProbability'
 import CompanyScoreCard from '@/components/CompanyScoreCard'
 import { isRedditSourced, PUBLIC_DISCUSSION_LABEL } from '@/lib/reportSource'
+import CompanyRedditDiscussion from '@/components/CompanyRedditDiscussion'
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -1121,24 +1122,20 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
             {/* ── REDDIT TAB ── */}
             {tab === 'reddit' && (
               <div>
-                {loading && (
-                  <div style={{ textAlign: 'center', padding: '2.5rem', color: 'var(--muted)', fontFamily: 'var(--mono)', fontSize: '.7rem' }}>
-                    Loading community insights…
-                  </div>
-                )}
+                {/* LIVE, cached per-company Reddit search — populates on demand so this
+                    section is (almost) never empty, and never blocks page render. Every
+                    item is an attributed link to a public thread; includes the dispute path. */}
+                <CompanyRedditDiscussion companyName={companyName} hasReportData={reports.length > 0 || !!score} />
+
+                {/* Secondary: the AI-summarized cross-source insights from the scoring
+                    pipeline (Reddit/Glassdoor/Blind), when the batch enrichment has them. */}
                 {!loading && webReviews.length > 0 && (
-                  <>
+                  <div style={{ marginTop: '1.75rem', borderTop: '1px solid var(--line2)', paddingTop: '1.25rem' }}>
                     <div style={{ fontFamily: 'var(--mono)', fontSize: '.52rem', color: 'var(--dim)', letterSpacing: '.06em', textTransform: 'uppercase', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '.5rem' }}>
-                      <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--red)', display: 'inline-block', flexShrink: 0 }} />
-                      Community insights from Reddit, Glassdoor &amp; Blind · updated every 30 days
+                      <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--amber)', display: 'inline-block', flexShrink: 0 }} />
+                      AI-summarized insights · Reddit, Glassdoor &amp; Blind · updated every 30 days
                     </div>
                     <WebReviewsSection reviews={webReviews} />
-                  </>
-                )}
-                {!loading && webReviews.length === 0 && (
-                  <div style={{ textAlign: 'center', padding: '2.5rem', color: 'var(--muted)', fontFamily: 'var(--mono)', fontSize: '.7rem' }}>
-                    No community data yet for {companyName}.<br />
-                    <span style={{ fontSize: '.6rem', opacity: .6 }}>Data populates automatically on first company lookup.</span>
                   </div>
                 )}
               </div>
