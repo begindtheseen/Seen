@@ -37,6 +37,75 @@ export async function anthropicUsable(SUPABASE_URL, SERVICE_KEY) {
   return anthropicEnabled(SUPABASE_URL, SERVICE_KEY);
 }
 
+// ── Deterministic outcome classifier (pure, unit-tested) ─────────────────────────
+// Maps free-text hiring-experience prose to Seen's outcome vocabulary. It sits BESIDE the
+// LLM extraction in the Reddit pipeline as a conservative safety net: negative detection
+// (ghosted / rejected / autoreject) was always the strong suit, but SUCCESS was under-
+// detected, so positive detection (offer / hired / interview / human) is the whole point
+// of this function. Pure — no I/O — so it can be unit-tested exhaustively.
+//
+// Precedence is deliberate and false-positive-safe (recruitinghell is sarcastic):
+//   1. Explicit sarcasm tags (/s, /j, "just kidding", "sike") neutralise a positive claim.
+//   2. Non-outcome mentions of rejection/ghosting ("worried about rejection") are stripped
+//      before negative matching, so they don't masquerade as the outcome.
+//   3. Terminal NEGATIVES win over any co-occurring positive words — a "got the offer …
+//      then rejected" story is a rejection, and sarcastic posts almost always contain the
+//      real outcome word ("rejected"/"ghosted").
+//   4. Only then are POSITIVES considered, and only first-person / committal phrasing counts
+//      ("got the offer", "accepted", "start date", "signed") — a bare mention of the word
+//      "offer" or "hired" is ignored.
+// Returns one of Seen's outcomes, or 'unknown' when no confident signal is present.
+export function classifyOutcomeFromText(text) {
+  const t = ` ${String(text ?? '').toLowerCase().replace(/\s+/g, ' ')} `;
+  if (!t.trim()) return 'unknown';
+
+  // Reddit sarcasm markers — when present, a positive claim is not meant literally.
+  const sarcastic = /(^|\s)\/s\b/.test(t) || /(^|\s)\/j\b/.test(t) || /\bjust kidding\b/.test(t) || /\bsike\b/.test(t);
+
+  // Drop non-outcome mentions of rejection/ghosting ("worried about rejection but got the
+  // offer") so they can't be read as the actual result. Positives are matched on the raw text.
+  const tn = t.replace(/\b(worried|worry|anxious|anxiety|scared|afraid|fear|nervous|terrified|dread|avoid|risk)\w* (about|of|over) (a |the |any )?(reject\w*|ghost\w*|no[ -]?response)/g, ' ');
+
+  // ── Negatives (terminal, highest precedence) ──
+  // Automated / instant rejection is its own bucket.
+  if (/\bauto[- ]?reject|automated (rejection|reject|response)|instant(ly)? reject|rejected within (\d+ )?(second|minute|an hour|hour)|rejected \d+ (second|minute|hour)s? (later|after)|generic rejection (email|template)|rejection email \d+ (minute|hour)s? (later|after)\b/.test(tn)) return 'autoreject';
+
+  if (/\breject(ed|ion)\b|turned me down|turned down for|didn'?t get (the|an|a|it)|did not get (the|an|a|it)|not moving forward|not move forward|moving forward with (other|another)|move forward with other|went with (another|other|a different) candidate|position (has been|was|is) filled|role (has been|was) filled|we regret to inform|decided not to (proceed|move|continue)|no longer (being )?considered|offer (was )?rescinded|rescinded (the|my|his|her) offer\b/.test(tn)) return 'rejected';
+
+  if (/\bghosted|never heard back|no response|no reply|didn'?t hear back|haven'?t heard (back|anything)|radio silence|heard nothing (back)?|no word back|still waiting.{0,20}(week|month)|crickets|left on read|zero response|complete silence\b/.test(tn)) return 'ghosted';
+
+  // ── Positives (only if no negative matched) ──
+  // Offer / hired — strongest success signals, committal phrasing only.
+  const offer = /\b(got|received|have|got extended|extended me|accepted|signed|took) (a |an |the |my |their )?offer|offer letter|offer came (through|in)|verbal offer|written offer|accepted (the|an|a|my) (job|offer|position|role)|they made me an offer\b/.test(t);
+  const hired = /\bi (got|was|am|'m) hired|\bgot (the|a) job\b(?!\s+(description|desc|posting|listing|req|title|ad|alert|market|search|fair|hunt|done|yet))|start(ing)? date|i start (on |next |monday|tuesday|wednesday|thursday|friday|the )|first day (is|next|on)|onboarding (start|next|begin)|new job start|i accepted the (job|position|role)|signed the (contract|paperwork)\b/.test(t);
+  if (offer || hired) return sarcastic ? 'unknown' : (offer ? 'offer' : 'hired');
+
+  // Interview / progressing — advanced to the next stage.
+  if (/\b(got|have|scheduled|booked|landed|received) (a|an|another|my|the) (interview|phone screen|onsite|final round)|interview (scheduled|is scheduled|next|coming up|set up|lined up|invite)|moving (to|on to|forward to|onto) the (next|final|second|third) round|next round|advanced to|made it to (the )?(next|final)|onsite (scheduled|next)|recruiter (call|screen) (scheduled|next|set up)\b/.test(t)) return sarcastic ? 'unknown' : 'interview';
+
+  // Reached a human / got a real response (weakest positive).
+  if (/\bheard back|got a (response|reply|callback|call back)|they (responded|replied|reached out)|recruiter (emailed|called|reached out|got back)|moving forward\b/.test(t)) return sarcastic ? 'unknown' : 'human';
+
+  return 'unknown';
+}
+
+// Reconcile the LLM's extracted outcome with the deterministic classifier. Conservative by
+// design:
+//   • LLM committed to an outcome → keep it (it read the whole thread incl. sarcasm/negation),
+//     EXCEPT let a stronger positive signal upgrade a weaker positive (human/interview → offer).
+//   • LLM non-committal ('unknown'/'applied'/'waiting'/blank) → adopt the deterministic outcome.
+//     This is where under-detected successes (and other misses) actually get rescued.
+// A negative is NEVER flipped to a positive here — that's the recruitinghell-sarcasm guardrail.
+const _NONCOMMITTAL = new Set(['unknown', 'applied', 'waiting', '']);
+const _POS_RANK = { human: 1, interview: 2, hired: 3, offer: 3 };
+export function reconcileOutcome(llmOutcome, detected) {
+  const llm = String(llmOutcome ?? '').toLowerCase();
+  if (!detected || detected === 'unknown') return llmOutcome;         // detector adds nothing
+  if (_NONCOMMITTAL.has(llm)) return detected;                        // rescue: adopt the signal
+  if (_POS_RANK[llm] && _POS_RANK[detected] > _POS_RANK[llm]) return detected; // strengthen positive
+  return llmOutcome;                                                  // otherwise respect the LLM
+}
+
 // Verify a Supabase JWT locally (HS256). Returns the payload or null.
 function verifyJWT(token, secret) {
   try {
@@ -666,6 +735,20 @@ export default async function handler(req, res) {
     const ALL_SUBREDDITS = [
       'recruitinghell','jobs','cscareerquestions','careerguidance',
       'antiwork','AskHR','interviews','ExperiencedDevs','humanresources','WorkReform',
+      // Positive / success-skewing communities — counterbalance the negative lean of
+      // recruitinghell + antiwork so offers/hires enter the corpus, not just ghostings.
+      // Ingested identically to every other sub: attributed third-party reports, reddit
+      // weight (0.3), "Sourced from public discussion" badge. Owner-tunable — verify each
+      // slug's exact casing/activity before enabling its cron in vercel.json.
+      'GetEmployed',        // "got employed" success stories
+      'jobsearchhacks',     // tactics + wins (owner-tunable: confirm slug is active)
+      'ITCareerQuestions',  // large IT-careers sub, many offer/onboarding posts
+      'EngineeringResumes', // resume feedback + "got the job with this" success posts
+      'womenEngineers',     // owner-tunable: confirm exact slug (vs WomenEngineers/WomenInTech)
+      // Direct-sales "devil corp" watch community (Credico/Cydcor/Appco/Smart Circle etc.).
+      // Ingested ONLY as attributed third-party discussion tied to whatever company a post
+      // names — NO scam/fraud label is ever applied by Seen. Owner-tunable.
+      'Devilcorp',
     ];
     const SUBREDDITS    = body.subreddit ? [body.subreddit] : ALL_SUBREDDITS.slice(0, 1);
     const REDDIT_WEIGHT = 0.3;
@@ -951,6 +1034,17 @@ Return ONLY a valid JSON array. Return [] if there are genuinely no hiring exper
 
       // Extract all experiences from this company's threads in one Claude call
       const experiences = await extractReports(fresh, company);
+
+      // Deterministic positive-outcome pass. The LLM under-detects success, so reconcile each
+      // extracted outcome against classifyOutcomeFromText over the per-experience summary (the
+      // model's own normalized "review" line — avoids OP↔commenter cross-talk). This rescues
+      // offers/hires/interviews the model left as 'unknown'/'applied' and strengthens weak
+      // positives, while never flipping a negative to a positive (sarcasm-safe). See classifier.
+      for (const exp of experiences) {
+        const src   = fresh[exp.post_idx] || fresh[0] || {};
+        const prose = (exp.summary && exp.summary.trim()) ? exp.summary : `${src.title || ''}. ${src.body || ''}`;
+        exp.outcome = reconcileOutcome(exp.outcome, classifyOutcomeFromText(prose));
+      }
 
       if (!experiences.length) {
         if (!dryRun) {
