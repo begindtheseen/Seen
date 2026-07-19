@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import Link from 'next/link'
 import { EmployerCheckout, EmployerPurchaseConfirm } from '@/components/EmployerCheckout'
 import { EmployerCompanyProvider } from '@/components/employer/EmployerCompanyContext'
+import { EmployerClaimPanel } from '@/components/employer/EmployerClaimPanel'
 import { EmployerReputation } from '@/components/employer/EmployerReputation'
 import { EmployerListings } from '@/components/employer/EmployerListings'
 import { EmployerSurfaces } from '@/components/employer/EmployerSurfaces'
@@ -65,6 +66,11 @@ export default function EmployersPage() {
         {/* The company an employer looks up in any card below is shared, so the deep-dive surface
             links (dashboard / analytics / notifications) carry it through as ?company= (#113). */}
         <EmployerCompanyProvider>
+          {/* Claim your company (ADMIN-APPROVED CLAIMS, migration 053): a signed-in employer
+              requests a company; an admin approves; only then do the surfaces below auto-scope.
+              Renders a quiet sign-in prompt for logged-out/seeker visitors. */}
+          <EmployerClaimPanel />
+
           {/* Anchor feature: your reputation the way candidates see it */}
           <EmployerReputation />
 
