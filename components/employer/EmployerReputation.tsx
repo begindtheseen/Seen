@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { useEmployerCompany } from './EmployerCompanyContext'
 
 // The employer portal's anchor: an employer looks up their own company and sees EXACTLY what
 // candidates see before they apply — their Seen grade, ghost rate, response rate, and how many
@@ -20,6 +21,7 @@ const gradeColor = (s: number) => (s >= 65 ? 'var(--green)' : s >= 50 ? 'var(--a
 const pct = (v: number | null | undefined) => (v == null ? null : Math.round(v * 100))
 
 export function EmployerReputation() {
+  const { setCompany } = useEmployerCompany()
   const [name, setName] = useState('')
   const [loading, setLoading] = useState(false)
   const [score, setScore] = useState<Score | null>(null)
@@ -29,6 +31,7 @@ export function EmployerReputation() {
   async function look() {
     const q = name.trim()
     if (!q) return
+    setCompany(q) // carry the looked-up company to the portal's surface links (EmployerSurfaces)
     setLoading(true); setErr(''); setScore(null)
     try {
       const res = await fetch('/api/reports', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'company_score', name: q }) })

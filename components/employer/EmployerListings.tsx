@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { useEmployerCompany } from './EmployerCompanyContext'
 
 // Manage your listings — the employer portal's first real management surface
 // (seen-command#94). Seen's corpus is ingest-driven and the portal is account-free, so
@@ -25,6 +26,7 @@ type RowState = { busy?: boolean; closed?: boolean; verified?: boolean; already?
 const mono = (size: string, color: string): React.CSSProperties => ({ fontFamily: 'var(--mono)', fontSize: size, color })
 
 export function EmployerListings() {
+  const { setCompany } = useEmployerCompany()
   const [name, setName] = useState('')
   const [loading, setLoading] = useState(false)
   const [checked, setChecked] = useState('')
@@ -35,6 +37,7 @@ export function EmployerListings() {
   async function look() {
     const q = name.trim()
     if (!q) return
+    setCompany(q) // carry the looked-up company to the portal's surface links (EmployerSurfaces)
     setLoading(true); setErr(''); setListings(null); setRows({})
     try {
       const res = await fetch('/api/reports', {
