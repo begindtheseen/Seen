@@ -8,6 +8,7 @@ import { calcOverallScore, calcWaste, tenureAdjustment, scoreConfidence, confide
 import { fuseCompanyIntel, classifyPlatform } from './_utils/companyIntel.js';
 import { recomputeCompanyScoreFromReports, fetchConfirmedStaleCount } from './_utils/reportWrite.js';
 import { anthropicEnabled } from '../lib/server/aiflag.js';
+import { listEmployerListings, closeEmployerListing } from '../lib/server/employerListings.js';
 
 // Authorize admin/cron-only actions (the Anthropic web-research endpoints). Accepts a Vercel
 // cron header, a shared CRON_SECRET, or a valid admin_sessions token. Everything Anthropic in
@@ -207,6 +208,22 @@ export default async function handler(req, res) {
       const active = (v) => !!v && Date.parse(v) > now;
       return res.status(200).json({ featured: active(row?.featured_until), verified: active(row?.verified_until) });
     } catch { return res.status(200).json({ featured: false, verified: false }); }
+  }
+
+  // ── Employer self-serve listing management (seen-command#94) ────────────────
+  // No employer accounts exist, so trust comes from the listing's own source: a close
+  // request only auto-expires when a live fetch of the apply_url confirms the posting is
+  // gone (lib/server/employerListings.js); otherwise it queues in the admin open-issues
+  // list. Both send `name`/no name — MUST run before the `body.name` catch below.
+  if (body.action === 'employer_listings') {
+    if (await applyRateLimit(req, res, 'employer-listings')) return;
+    const r = await listEmployerListings({ url: SUPABASE_URL, key: SUPABASE_SERVICE_KEY, company: body.name });
+    return res.status(r.http).json(r.body);
+  }
+  if (body.action === 'employer_close_listing') {
+    if (await applyRateLimit(req, res, 'employer-close')) return;
+    const r = await closeEmployerListing({ url: SUPABASE_URL, key: SUPABASE_SERVICE_KEY, jobId: body.job_id, reason: body.reason });
+    return res.status(r.http).json(r.body);
   }
 
   // ── Company-score: merged from api/company-score.js ─────────────────────────
