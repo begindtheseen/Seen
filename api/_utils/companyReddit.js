@@ -113,9 +113,13 @@ export function isSearchableCompany(name) {
 
 // ── Reddit search Atom parsing ─────────────────────────────────────────────────
 
+// &amp; MUST be unescaped LAST: doing it first can synthesize a new entity from already-escaped
+// text (e.g. "&amp;lt;" → "&lt;" → "<"), double-unescaping the content. Named/numeric refs first,
+// ampersand last, so each source entity is decoded exactly once.
 const unescapeXml = (s) => String(s)
-  .replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>')
-  .replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&#x27;/g, "'");
+  .replace(/&lt;/g, '<').replace(/&gt;/g, '>')
+  .replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&#x27;/g, "'")
+  .replace(/&amp;/g, '&');
 
 // Parse a Reddit search RSS/Atom feed into display items. Unlike the reports.js parser
 // (which keeps only id/title/body for AI classification), this keeps the permalink,

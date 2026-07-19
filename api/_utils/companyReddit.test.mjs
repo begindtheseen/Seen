@@ -227,7 +227,9 @@ test('sanitizeDispute accepts a good-faith correction + derives the key', () => 
   assert.equal(r.row.reason, 'not_us');
   assert.equal(r.row.status, 'open');
   assert.equal(r.row.contact, 'me@example.com');
-  assert.match(r.row.permalink, /reddit\.com/);
+  // Anchored to the host, not a bare substring — CodeQL's missing-regexp-anchor rule (and a
+  // stricter assertion): reddit.com must be the actual host, not "evil.com/reddit.com".
+  assert.match(r.row.permalink, /^https:\/\/(www\.|old\.)?reddit\.com\//);
 });
 
 test('sanitizeDispute rejects bad reason, junk company + too-short detail', () => {
