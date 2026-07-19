@@ -13,7 +13,6 @@ export default function Footer() {
         <div style={{ display: 'flex', alignItems: 'center', gap: '.5rem', flexShrink: 0 }}>
           <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--blue)', display: 'inline-block', flexShrink: 0 }} />
           <span style={{ fontFamily: 'var(--display)', fontSize: '.88rem', fontWeight: 800, color: 'var(--white)', letterSpacing: '-.02em' }}>Seen</span>
-          <span style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', color: 'var(--muted)', paddingLeft: '.35rem' }}>© 2025</span>
         </div>
         <div style={{ display: 'flex', gap: '.1rem', flexWrap: 'wrap', alignItems: 'center', flex: 1, justifyContent: 'center' }}>
           {[
@@ -25,6 +24,9 @@ export default function Footer() {
             { href: '/employers', label: 'Employers' },
             { href: '/pricing', label: 'Pricing' },
             { href: '/faq', label: 'FAQ' },
+            { href: '/terms', label: 'Terms' },
+            { href: '/privacy', label: 'Privacy' },
+            { href: '/content-policy', label: 'Content Policy' },
             { href: '/legal', label: 'Legal' },
           ].map(({ href, label }) => (
             <Link
