@@ -184,6 +184,14 @@ export default function JobDetailDrawer({ job, isLoggedIn, onClose, onApply, onC
             <div style={{ marginBottom: '.75rem', padding: '.5rem .75rem', background: 'rgba(239,68,68,.07)', border: '1px solid rgba(239,68,68,.2)', borderRadius: 8, fontFamily: 'var(--mono)', fontSize: '.6rem', color: 'var(--red)', lineHeight: 1.5 }}>✕ Likely closed — check the company&apos;s careers page.</div>
           )}
 
+          {/* Factual freshness — literally-true observations of OUR data (never an employer verdict);
+              shows the evidence behind the availability note above. */}
+          {job.freshness?.label && (
+            <div style={{ marginBottom: '.75rem', fontFamily: 'var(--mono)', fontSize: '.54rem', color: 'var(--dim)', lineHeight: 1.5 }}>
+              {job.freshness.label}
+            </div>
+          )}
+
           {/* AI Insights */}
           <div style={{ background: 'var(--gdim)', border: '1px solid var(--line)', borderRadius: 12, padding: '1rem', marginBottom: '1.1rem' }}>
             <div style={{ fontFamily: 'var(--mono)', fontSize: '.56rem', textTransform: 'uppercase' as const, letterSpacing: '.08em', color: 'var(--dim)', marginBottom: '.7rem' }}>

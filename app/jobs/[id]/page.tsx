@@ -146,6 +146,7 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
           salary: r.salary ? String(r.salary) : null,
           apply_url: r.apply_url ? String(r.apply_url) : (r.url ? String(r.url) : null),
           availability_status: r.availability_status ? String(r.availability_status) : undefined,
+          freshness: (r as { freshness?: Job['freshness'] }).freshness,
         }
         JobCache.set(mapped)
         setJob(mapped)
@@ -330,6 +331,14 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
         )}
         {avail === 'expired' && (
           <div style={{ marginTop: '.85rem', padding: '.55rem .8rem', background: 'rgba(239,68,68,.07)', border: '1px solid rgba(239,68,68,.2)', borderRadius: 8, fontFamily: 'var(--mono)', fontSize: '.62rem', color: 'var(--red)', lineHeight: 1.55 }}>✕ This listing is likely closed — it hasn&apos;t been seen in 14+ days. Check the company&apos;s careers page directly.</div>
+        )}
+
+        {/* Factual freshness — literally-true observations of OUR data (never an employer verdict);
+            the evidence behind the availability note above. */}
+        {job.freshness?.label && (
+          <div style={{ marginTop: '.6rem', fontFamily: 'var(--mono)', fontSize: '.56rem', color: 'var(--dim)', lineHeight: 1.55 }}>
+            {job.freshness.label}
+          </div>
         )}
 
         {/* Report inactive */}
