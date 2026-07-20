@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useAuth } from '@/lib/auth'
 
@@ -37,7 +37,7 @@ type Listing = {
 
 type Summary = { total: number; active: number; employerPosted: number; applications: number; openDisputes: number }
 
-type DisputeKind = 'inactive' | 'delete' | 'edit' | 'not_ours' | 'other'
+type DisputeKind = 'inactive' | 'delete' | 'edit' | 'not_ours' | 'other' | 'still_active'
 type ProposedChanges = { title?: string; description?: string; location?: string; salary?: string; apply_url?: string }
 
 type Dispute = {
@@ -77,6 +77,7 @@ function availColor(a: string) {
 const disputeStatusColor = (s: string) => (s === 'approved' ? 'var(--green)' : s === 'denied' ? 'var(--red)' : 'var(--amber)')
 
 const KIND_OPTIONS: { value: DisputeKind; label: string }[] = [
+  { value: 'still_active', label: 'Report is wrong — still active' },
   { value: 'inactive', label: 'Report inactive' },
   { value: 'delete', label: 'Request removal' },
   { value: 'edit', label: 'Request an edit' },
@@ -107,6 +108,36 @@ export function EmployerListingsManager() {
   const [disputeFor, setDisputeFor] = useState<Listing | null>(null)
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const [showAll, setShowAll] = useState(false)
+  const [modalDefaultKind, setModalDefaultKind] = useState<DisputeKind | null>(null)
+
+  // Deep link from an employer notification: /employers/dashboard?dispute=<jobId>&kind=still_active
+  // auto-opens the dispute modal for that listing once the list loads — "your listing was
+  // reported" is disputable in one click, not a hunt through the table. Params are consumed
+  // (replaceState) so refresh/back doesn't re-open the modal.
+  const deepLinkRef = useRef<{ jobId: string; kind: DisputeKind } | null>(null)
+  useEffect(() => {
+    try {
+      const p = new URLSearchParams(window.location.search)
+      const jid = p.get('dispute')
+      if (!jid) return
+      const k = p.get('kind') as DisputeKind | null
+      deepLinkRef.current = { jobId: jid, kind: k && KIND_OPTIONS.some(o => o.value === k) ? k : 'still_active' }
+      p.delete('dispute'); p.delete('kind')
+      const qs = p.toString()
+      window.history.replaceState(null, '', window.location.pathname + (qs ? `?${qs}` : '') + window.location.hash)
+    } catch { /* deep link is best-effort */ }
+  }, [])
+  useEffect(() => {
+    const dl = deepLinkRef.current
+    if (!dl || loading) return
+    const target = listings.find(l => String(l.id) === dl.jobId)
+    if (target) {
+      deepLinkRef.current = null
+      setShowAll(true)
+      setModalDefaultKind(dl.kind)
+      setDisputeFor(target)
+    }
+  }, [loading, listings])
 
   // Your OWN posted listings lead, then the aggregated ones (newest first from the API). For a big
   // company that keeps the listings you manage from being lost in a wall of indexed roles.
@@ -324,7 +355,8 @@ export function EmployerListingsManager() {
               <div key={d.id} style={{ display: 'flex', alignItems: 'flex-start', gap: '.7rem', flexWrap: 'wrap', background: 'var(--raised)', border: '1px solid var(--line2)', borderRadius: 10, padding: '.7rem .9rem' }}>
                 <span style={{ ...mono('.5rem', disputeStatusColor(d.status)), textTransform: 'uppercase', letterSpacing: '.08em', fontWeight: 700, border: `1px solid ${disputeStatusColor(d.status)}`, borderRadius: 5, padding: '.12rem .4rem', flexShrink: 0 }}>{d.status}</span>
                 <div style={{ minWidth: 0, flex: 1 }}>
-                  <div style={mono('.62rem', 'var(--white)')}>{KIND_LABEL[d.kind] || d.kind}</div>
+                  {/* The dispute number — the same reference the admin verdict + your notification carry. */}
+                  <div style={mono('.62rem', 'var(--white)')}><span style={{ color: 'var(--blue)', fontWeight: 700 }}>#{d.id}</span> · {KIND_LABEL[d.kind] || d.kind}</div>
                   <div style={{ ...mono('.58rem', 'var(--sub)'), lineHeight: 1.5, marginTop: '.15rem', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{d.detail}</div>
                   {d.admin_note && <div style={{ ...mono('.56rem', 'var(--muted)'), marginTop: '.2rem' }}>Admin note: {d.admin_note}</div>}
                 </div>
@@ -339,8 +371,9 @@ export function EmployerListingsManager() {
         <DisputeModal
           listing={disputeFor}
           token={token}
-          onClose={() => setDisputeFor(null)}
-          onSubmitted={() => { setDisputeFor(null); load() }}
+          defaultKind={modalDefaultKind}
+          onClose={() => { setDisputeFor(null); setModalDefaultKind(null) }}
+          onSubmitted={() => { setDisputeFor(null); setModalDefaultKind(null); load() }}
         />
       )}
     </div>
@@ -440,8 +473,8 @@ function AddListingForm({ token, onCreated }: { token: () => Promise<string | nu
 }
 
 // ── Dispute modal ─────────────────────────────────────────────────────────────
-function DisputeModal({ listing, token, onClose, onSubmitted }: { listing: Listing; token: () => Promise<string | null>; onClose: () => void; onSubmitted: () => void }) {
-  const [kind, setKind] = useState<DisputeKind>('inactive')
+function DisputeModal({ listing, token, onClose, onSubmitted, defaultKind }: { listing: Listing; token: () => Promise<string | null>; onClose: () => void; onSubmitted: () => void; defaultKind?: DisputeKind | null }) {
+  const [kind, setKind] = useState<DisputeKind>(defaultKind || 'inactive')
   const [detail, setDetail] = useState('')
   const [pc, setPc] = useState<ProposedChanges>({})
   const [busy, setBusy] = useState(false)

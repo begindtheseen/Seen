@@ -465,11 +465,13 @@ export function RedditDisputesPanel({ token }: { token: string }) {
 // an effect (takedown / edit) the server reports back so we can show what happened.
 const LISTING_KIND_LABEL: Record<string, string> = {
   inactive: 'Report inactive', delete: 'Request removal', edit: 'Request an edit', not_ours: 'Not our company', other: 'Other',
+  still_active: 'Report is wrong — still active',
 }
 function listingKindColor(kind: string) {
   if (kind === 'delete' || kind === 'not_ours') return 'var(--red)'
   if (kind === 'edit') return 'var(--blue)'
   if (kind === 'inactive') return 'var(--amber)'
+  if (kind === 'still_active') return 'var(--green)'
   return 'var(--dim)'
 }
 function listingDisputeStatusColor(status: string) {
@@ -581,6 +583,9 @@ export function ListingDisputesPanel({ token }: { token: string }) {
             <div key={d.id} style={{ display: 'flex', alignItems: 'flex-start', gap: '.65rem', padding: '.7rem 0', borderBottom: '1px solid rgba(255,255,255,.04)' }}>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '.4rem', flexWrap: 'wrap', marginBottom: '.25rem' }}>
+                  {/* The dispute number — the shared reference across the employer's portal, their
+                      notifications, and the seeker-report queue's "disputed" badge. */}
+                  <span style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', color: 'var(--blue)', fontWeight: 700, flexShrink: 0 }}>#{d.id}</span>
                   <span style={{ fontFamily: 'var(--mono)', fontSize: '.48rem', textTransform: 'uppercase', letterSpacing: '.1em', padding: '.18rem .5rem', borderRadius: 4, flexShrink: 0, color: kindColor, background: kindColor + '1f' }}>
                     {LISTING_KIND_LABEL[d.kind] || d.kind}
                   </span>
@@ -591,6 +596,16 @@ export function ListingDisputesPanel({ token }: { token: string }) {
                   <span style={{ fontFamily: 'var(--mono)', fontSize: '.5rem', color: 'var(--dim)', marginLeft: 'auto', flexShrink: 0 }}>{relTime(d.created_at)}</span>
                 </div>
                 <div style={{ fontFamily: 'var(--mono)', fontSize: '.6rem', color: 'var(--sub)', lineHeight: 1.5, marginTop: '.1rem', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{d.detail}</div>
+                {/* BOTH SIDES: the seeker's reports on this same listing, so the ruling weighs the
+                    employer's dispute against the candidate signal — never one side blind. */}
+                {d.seeker_reports && d.seeker_reports.count > 0 && (
+                  <div style={{ marginTop: '.35rem', padding: '.35rem .6rem', border: '1px solid rgba(245,158,11,.3)', borderRadius: 6, background: 'rgba(245,158,11,.06)', fontFamily: 'var(--mono)', fontSize: '.55rem', color: 'var(--amber)' }}>
+                    👤 Seeker side: {d.seeker_reports.count} report{d.seeker_reports.count === 1 ? '' : 's'} on this listing
+                    {d.seeker_reports.expired > 0 ? ` · ${d.seeker_reports.expired} say inactive` : ''}
+                    {d.seeker_reports.unknown > 0 ? ` · ${d.seeker_reports.unknown} unsure` : ''}
+                    {d.kind === 'still_active' ? ' — approving clears these reports; denying lets them stand.' : ''}
+                  </div>
+                )}
                 {pcEntries.length > 0 && (
                   <div style={{ marginTop: '.35rem', padding: '.4rem .6rem', border: '1px solid var(--line2)', borderRadius: 6, background: 'rgba(59,130,246,.05)' }}>
                     <div style={{ fontFamily: 'var(--mono)', fontSize: '.48rem', textTransform: 'uppercase', letterSpacing: '.08em', color: 'var(--blue)', marginBottom: '.25rem' }}>Proposed changes</div>
@@ -677,6 +692,14 @@ export function InactiveRow({ report: r, token, onRefresh }: { report: InactiveR
 
   return (
     <div style={{ padding: '.7rem 0', borderBottom: '1px solid var(--line2)' }}>
+      {/* BOTH SIDES: the employer filed a dispute on this reported listing — same dispute
+          number as the Community tab's queue. Rule there (with both sides in view) before
+          deleting here, or the rebuttal is silently orphaned. */}
+      {r.dispute && (
+        <div style={{ marginBottom: '.45rem', padding: '.35rem .6rem', border: '1px solid rgba(59,130,246,.35)', borderRadius: 6, background: 'rgba(59,130,246,.07)', fontFamily: 'var(--mono)', fontSize: '.55rem', color: 'var(--blue)' }}>
+          ⚖ Employer dispute <span style={{ fontWeight: 700 }}>#{r.dispute.id}</span> open on this listing ({LISTING_KIND_LABEL[r.dispute.kind] || r.dispute.kind}) — resolve it in Community Data → Listing disputes before acting here.
+        </div>
+      )}
       <div style={{ display: 'flex', alignItems: 'flex-start', gap: '.75rem', flexWrap: 'wrap' }}>
         <div style={{ flex: 1, minWidth: 0 }}>
           {orphan ? (
