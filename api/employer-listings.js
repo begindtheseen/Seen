@@ -84,6 +84,7 @@ async function route(req, res) {
 
   if (action === 'list') return listListings(res, ctx);
   if (action === 'create') return createListing(res, ctx);
+  if (action === 'delete') return deleteOwnListing(res, ctx);
   if (action === 'dispute') return fileDispute(res, ctx);
   if (action === 'disputes') return listDisputes(res, ctx);
   return res.status(400).json({ error: 'Unknown action' });
@@ -156,6 +157,38 @@ async function createListing(res, { db, body, uid, claim }) {
   }
   const listing = (await insRes.json())[0] || null;
   return res.status(200).json({ ok: true, listing });
+}
+
+// ── delete: remove an employer's OWN posted listing (direct — no admin needed) ─
+// Only a listing THIS employer posted (is_employer_posted + employer_user_id === uid) can be
+// deleted directly. Aggregated / imported listings are third-party data and go through the
+// admin-reviewed dispute path instead — this endpoint refuses them.
+async function deleteOwnListing(res, { db, body, uid, claim }) {
+  const jid = String(body.job_id == null ? '' : body.job_id).trim();
+  if (!UUID.test(jid)) return res.status(400).json({ error: 'A valid listing id is required' });
+
+  const jr = await db(`jobs?id=eq.${encodeURIComponent(jid)}&select=company,is_employer_posted,employer_user_id&limit=1`);
+  const job = jr.ok ? (await jr.json())[0] : null;
+  if (!job) return res.status(404).json({ error: 'That listing no longer exists' });
+  if (!job.is_employer_posted || job.employer_user_id !== uid) {
+    return res.status(403).json({ error: 'You can only delete listings you posted — dispute other listings instead' });
+  }
+  if (normalizeClaimCompany(job.company) !== claim.companyKey) {
+    return res.status(403).json({ error: 'That listing is not attached to your company' });
+  }
+
+  // Hard-delete, but SCOPE the delete itself to this owner (defense in depth): even a TOCTOU race
+  // can only ever remove a row that is is_employer_posted AND owned by this uid.
+  const del = await db(
+    `jobs?id=eq.${encodeURIComponent(jid)}&is_employer_posted=eq.true&employer_user_id=eq.${encodeURIComponent(uid)}`,
+    { method: 'DELETE', headers: { Prefer: 'return=minimal' } },
+  );
+  if (!del.ok) {
+    const txt = await del.text().catch(() => '');
+    console.error('[employer-listings] delete failed:', del.status, txt.slice(0, 200));
+    return res.status(500).json({ error: 'Could not delete the listing — please try again' });
+  }
+  return res.status(200).json({ ok: true, deleted: jid });
 }
 
 // ── dispute: contest a listing (admin approves/denies) ────────────────────────
