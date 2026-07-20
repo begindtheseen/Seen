@@ -15,6 +15,7 @@ import {
   isValidClaimCompany,
   canRequestClaim,
 } from '../lib/server/employerClaims.js';
+import { broadcastActivity } from '../lib/server/realtime.js';
 
 const ALLOWED = ['https://seenjobs.io', 'https://www.seenjobs.io'];
 
@@ -169,6 +170,7 @@ async function employerRoute(req, res, { db, body, uid }) {
       return res.status(500).json({ error: 'Could not submit your claim — please try again' });
     }
     const claim = (await insRes.json())[0] || null;
+    broadcastActivity('claim'); // instant admin bell ping (fail-safe; fallback poll backs it up)
     return res.status(200).json({ ok: true, claim, claims: await listClaimsForUser(db, uid) });
   }
 

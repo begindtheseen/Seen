@@ -17,6 +17,7 @@
 
 import { applyRateLimit } from '../lib/server/ratelimit.js';
 import { logError } from '../lib/server/errlog.js';
+import { broadcastActivity } from '../lib/server/realtime.js';
 import {
   normalizeCompanyKey, isSearchableCompany, parseRedditSearchAtom, rankAndFilter,
   buildSearchUrl, needsBroadFallback, emptyStateDecision, ttlForStatus, cacheFresh,
@@ -193,6 +194,7 @@ async function handleDispute(req, res, body) {
       logError('company-reddit/dispute', `DB ${r.status}`, { detail: detail.slice(0, 200) });
       return res.status(500).json({ ok: false, error: 'Could not record your correction. Please try again.' });
     }
+    broadcastActivity('reddit_dispute'); // instant admin bell ping (fail-safe; fallback poll backs it up)
     return res.status(200).json({ ok: true, recorded: true });
   } catch (e) {
     logError('company-reddit/dispute', e);

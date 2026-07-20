@@ -22,6 +22,7 @@ import {
   validateNewListing, buildEmployerListingRow, applyCounts, annotateListings,
 } from '../lib/server/employerPostings.js';
 import { validateDisputeInput } from '../lib/server/listingDisputes.js';
+import { broadcastActivity } from '../lib/server/realtime.js';
 
 const ALLOWED = ['https://seenjobs.io', 'https://www.seenjobs.io'];
 const LISTING_TTL_DAYS = 60; // employer-posted listings live 60 days, matching paste-a-link imports.
@@ -201,6 +202,7 @@ async function fileDispute(res, { db, body, uid, claim }) {
     return res.status(500).json({ error: 'Could not file your dispute — please try again' });
   }
   const dispute = (await insRes.json())[0] || null;
+  broadcastActivity('listing_dispute'); // instant admin bell ping (fail-safe; fallback poll backs it up)
   return res.status(200).json({ ok: true, dispute });
 }
 
