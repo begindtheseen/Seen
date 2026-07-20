@@ -16,7 +16,7 @@ import { notify, type NotifySeverity } from '@/lib/notify'
 
 export type LiveEvent = {
   id: string
-  type: 'report' | 'application' | 'purchase' | 'flag' | 'signup'
+  type: 'report' | 'application' | 'purchase' | 'flag' | 'signup' | 'claim' | 'listing_dispute' | 'reddit_dispute'
   sev: 'blue' | 'green' | 'money' | 'amber' | 'violet'
   at: string
   title: string

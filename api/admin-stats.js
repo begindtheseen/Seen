@@ -504,12 +504,18 @@ async function _handler(req, res) {
     const sinceRaw = body.since && !isNaN(Date.parse(body.since)) ? new Date(body.since).toISOString() : new Date(Date.now() - 2 * 60000).toISOString();
     const s = encodeURIComponent(sinceRaw);
     const j = (path) => db(path).then(r => (r.ok ? r.json() : [])).then(x => (Array.isArray(x) ? x : [])).catch(() => []);
-    const [reports, apps, purchases, flags, signups] = await Promise.all([
+    const [reports, apps, purchases, flags, signups, claims, listingDisputes, redditDisputes] = await Promise.all([
       j(`reports?created_at=gt.${s}&select=id,company_name,outcome,role,created_at&order=created_at.desc&limit=15`),
       j(`applications?created_at=gt.${s}&select=id,company_name,role,created_at&order=created_at.desc&limit=15`),
       j(`employer_purchases?created_at=gt.${s}&select=id,company,employer_sku,amount_cents,created_at&order=created_at.desc&limit=15`),
       j(`job_availability_reports?reported_at=gt.${s}&select=id,job_id,company,title,reported_at&order=reported_at.desc&limit=15`),
       j(`profiles?created_at=gt.${s}&select=created_at&order=created_at.desc&limit=15`),
+      // Employer-side admin-review events — the ones that need a human. These are the same signals
+      // the Needs Attention queue counts (migrations 053/056/054); surfacing them here makes them
+      // pop in the live bell + toast the moment they happen.
+      j(`employer_company_claims?created_at=gt.${s}&status=eq.pending&select=id,company_display_name,company_name,created_at&order=created_at.desc&limit=15`),
+      j(`listing_disputes?created_at=gt.${s}&status=eq.open&select=id,company_name,kind,created_at&order=created_at.desc&limit=15`),
+      j(`company_reddit_disputes?created_at=gt.${s}&status=eq.open&select=id,company_name,reason,created_at&order=created_at.desc&limit=15`),
     ]);
     const events = [];
     for (const r of reports) events.push({ id: `report:${r.id}`, type: 'report', sev: 'blue', at: r.created_at, title: `New report — ${r.company_name || 'a company'}`, sub: `${r.outcome || 'reported'}${r.role ? ` · ${r.role}` : ''}` });
@@ -517,6 +523,9 @@ async function _handler(req, res) {
     for (const p of purchases) events.push({ id: `purchase:${p.id}`, type: 'purchase', sev: 'money', at: p.created_at, title: `Employer sale — $${((p.amount_cents || 0) / 100).toFixed(0)}`, sub: `${p.company || 'an employer'}${p.employer_sku ? ` · ${p.employer_sku}` : ''}` });
     for (const f of flags) events.push({ id: `flag:${f.id}`, type: 'flag', sev: 'amber', at: f.reported_at, title: `Listing flagged — ${f.title || f.company || f.job_id}`, sub: 'reported no longer active' });
     for (const g of signups) events.push({ id: `signup:${g.created_at}`, type: 'signup', sev: 'violet', at: g.created_at, title: 'New signup', sub: '' });
+    for (const c of claims) events.push({ id: `claim:${c.id}`, type: 'claim', sev: 'amber', at: c.created_at, title: `Employer claim — ${c.company_display_name || c.company_name || 'a company'}`, sub: 'awaiting your approval' });
+    for (const d of listingDisputes) events.push({ id: `ldispute:${d.id}`, type: 'listing_dispute', sev: 'amber', at: d.created_at, title: `Listing dispute — ${d.company_name || 'a company'}`, sub: `${d.kind || 'dispute'} · needs review` });
+    for (const rd of redditDisputes) events.push({ id: `rdispute:${rd.id}`, type: 'reddit_dispute', sev: 'amber', at: rd.created_at, title: `Reddit dispute — ${rd.company_name || 'a company'}`, sub: `${rd.reason || 'flagged'} · needs review` });
     events.sort((a, b) => new Date(b.at).getTime() - new Date(a.at).getTime());
     return res.status(200).json({ ok: true, events: events.slice(0, 40), server_time: new Date().toISOString() });
   }
