@@ -3,6 +3,7 @@ import Link from 'next/link'
 import { deriveEmployerNotifications } from '@/lib/server/employerNotifications'
 import { NotificationsFeed } from './NotificationsFeed'
 import { EmployerScopeGuard } from '@/components/employer/EmployerScopeGuard'
+import { EmployerLiveNotifications } from '@/components/employer/EmployerLiveNotifications'
 
 // Employer notifications — the signed-in-less employer's LIVE feed of updates to their postings.
 //
@@ -115,6 +116,12 @@ export default async function EmployerNotificationsPage({
         {/* Login-scoping (migration 053): redirects a logged-in approved employer to their company;
             shows the god-view banner for admins. No-op for logged-out visitors. */}
         <EmployerScopeGuard param={company} godview={godview} />
+
+        {/* Login-scoped, PERSISTED feed (POST /api/employer-notifications) — self-scopes to the
+            signed-in employer's claimed company via their session, so it needs no ?company= param.
+            Renders nothing for logged-out visitors; the derived per-company feed below is untouched. */}
+        <EmployerLiveNotifications />
+
         {/* Hero */}
         <div style={{ marginBottom: '2rem' }}>
           <div style={{ fontFamily: 'var(--mono)', fontSize: '.52rem', textTransform: 'uppercase', letterSpacing: '.22em', color: 'var(--blue)', marginBottom: '.7rem' }}>For employers · updates</div>

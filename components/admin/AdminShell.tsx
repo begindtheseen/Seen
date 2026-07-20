@@ -5,7 +5,7 @@ import type { AdminStats, AttnItem, MergePrefill } from './types'
 import { Panel, MetricRow, Card, CardHeader, Badge, BarChart, relTime, outcomeColor, stageColor, runRefreshAndClear, refreshResultMsg } from './primitives'
 import { AdminHero, AdminCommandCenter, AdminMetricCard, CardSubLink, AdminAttentionQueue, AdminTabs, type HealthStatus, type TabKey } from './overview'
 import { KpiModal, ManageAccountsModal, RevenueDetailModal, TrialsDetailModal, SharesDetailModal, ErrorsDetailModal } from './modals'
-import { JobCrisisBanner, JobRefreshButton, JobRunner, ReportRow, IssueRow, RedditDisputesPanel, InactiveRow, MergePanel, CompanyExportPanel, CreditsPanel, FlagsPanel, ClustersPanel, JobDedupePanel, AllJobsBrowser, DeployPanel } from './panels'
+import { JobCrisisBanner, JobRefreshButton, JobRunner, ReportRow, IssueRow, RedditDisputesPanel, ListingDisputesPanel, InactiveRow, MergePanel, CompanyExportPanel, CreditsPanel, FlagsPanel, ClustersPanel, JobDedupePanel, AllJobsBrowser, DeployPanel } from './panels'
 import { GhostReportPanel } from './GhostReportPanel'
 import { LiveBell } from './LiveBell'
 import { EmployerPanel } from './EmployerPanel'
@@ -267,6 +267,10 @@ export function AdminShell({ stats, token, reload, onLogout, onUnauthorized }: {
 
             {/* Reddit disputes — the ADMIN side of the company-page correction loop (migration 054) */}
             <RedditDisputesPanel token={token} />
+
+            {/* Listing disputes — the ADMIN side of the employer→admin listing correction loop
+                (migration 056): approve applies a takedown/edit, deny leaves the listing unchanged. */}
+            <ListingDisputesPanel token={token} />
 
             {/* Company lookups setup note */}
             {stats.company_lookups && !stats.company_lookups.ready && (

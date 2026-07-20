@@ -60,6 +60,21 @@ export interface RedditDispute {
 export interface RedditDisputeCounts {
   open: number; reviewed: number; actioned: number; dismissed: number; total: number
 }
+// An employer-filed dispute against a listing (api/employer-listings.js dispute action →
+// listing_disputes, migration 056). Admins approve/deny; approval APPLIES the effect (takedown /
+// edit). `id` is a bigserial PK; `status` is the review lifecycle: open | approved | denied.
+export interface ListingDispute {
+  id: number; job_id: string; company_name: string; company_key: string | null
+  employer_user_id: string | null
+  kind: 'inactive' | 'delete' | 'edit' | 'not_ours' | 'other'
+  reason: string | null; detail: string
+  proposed_changes: { title?: string; description?: string; location?: string; salary?: string; apply_url?: string } | null
+  status: 'open' | 'approved' | 'denied'
+  created_at: string; reviewed_at: string | null; reviewed_by: string | null; admin_note: string | null
+}
+export interface ListingDisputeCounts { open: number; approved: number; denied: number }
+// The listing-level effect an approved dispute applied (from resolve_listing_dispute).
+export interface ListingDisputeApplied { takedown: boolean; edited: boolean; suppressed: boolean }
 export interface InactiveReport {
   job_id: string; report_count: number; latest_reported_at: string
   reasons?: Record<string, number>

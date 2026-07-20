@@ -30,6 +30,7 @@ import {
   summarizeInteractions,
   recentInteractions,
 } from '@/lib/server/employerDashboard'
+import { EmployerListingsManager } from '@/components/employer/EmployerListingsManager'
 
 // ── Types (the JS helper is inferred as loose; these annotate the render layer) ──
 type Score = {
@@ -185,6 +186,11 @@ function EmployerDashboardInner() {
       </header>
 
       <div style={{ ...wrap, padding: '2.6rem 1.5rem 4rem' }}>
+        {/* Login-scoped listings manager (POST /api/employer-listings) — prominent, above the
+            public company-name reputation lookup. Renders gracefully (a sign-in / pending note)
+            for anyone without an approved claim, so it's safe to sit at the top. */}
+        <EmployerListingsManager />
+
         {/* Intro */}
         <div style={{ marginBottom: '1.6rem' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '.6rem', flexWrap: 'wrap', marginBottom: '.55rem' }}>

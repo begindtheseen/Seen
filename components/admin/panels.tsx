@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import type { AdminStats, RecentReport, Issue, RedditDispute, RedditDisputeCounts, InactiveReport, DupCluster, RecentJob, JobGroup, DupGroup, MergePrefill, MergeLog, FeatureFlag } from './types'
+import type { AdminStats, RecentReport, Issue, RedditDispute, RedditDisputeCounts, ListingDispute, ListingDisputeCounts, ListingDisputeApplied, InactiveReport, DupCluster, RecentJob, JobGroup, DupGroup, MergePrefill, MergeLog, FeatureFlag } from './types'
 import { Card, CardHeader, Badge, relTime, outcomeColor, availColor, runRefreshAndClear, refreshResultMsg } from './primitives'
 import { saveFile } from './saveFile'
 import { safeLocalGet, safeLocalSet } from '@/lib/safeStorage'
@@ -451,6 +451,173 @@ export function RedditDisputesPanel({ token }: { token: string }) {
                   )
                 })}
               </div>
+            </div>
+          )
+        })
+      )}
+    </Card>
+  )
+}
+
+// ── Listing disputes (migration 056) — the ADMIN side of the employer→admin listing correction
+// loop. Mirrors RedditDisputesPanel: same X-Admin-Token, same filter/counts UI, same optimistic
+// update + background reconcile. Difference: the verdict is APPROVE / DENY, and an approval APPLIES
+// an effect (takedown / edit) the server reports back so we can show what happened.
+const LISTING_KIND_LABEL: Record<string, string> = {
+  inactive: 'Report inactive', delete: 'Request removal', edit: 'Request an edit', not_ours: 'Not our company', other: 'Other',
+}
+function listingKindColor(kind: string) {
+  if (kind === 'delete' || kind === 'not_ours') return 'var(--red)'
+  if (kind === 'edit') return 'var(--blue)'
+  if (kind === 'inactive') return 'var(--amber)'
+  return 'var(--dim)'
+}
+function listingDisputeStatusColor(status: string) {
+  if (status === 'open') return 'var(--amber)'
+  if (status === 'approved') return 'var(--green)'
+  return 'var(--red)' // denied
+}
+type ListingDisputeFilter = 'open' | 'approved' | 'denied' | 'all'
+const LISTING_DISPUTE_FILTERS: { key: ListingDisputeFilter; label: string }[] = [
+  { key: 'open', label: 'Open' }, { key: 'approved', label: 'Approved' }, { key: 'denied', label: 'Denied' }, { key: 'all', label: 'All' },
+]
+
+export function ListingDisputesPanel({ token }: { token: string }) {
+  const [disputes, setDisputes] = useState<ListingDispute[]>([])
+  const [counts, setCounts] = useState<ListingDisputeCounts>({ open: 0, approved: 0, denied: 0 })
+  const [filter, setFilter] = useState<ListingDisputeFilter>('open')
+  const [loading, setLoading] = useState(true)
+  const [busy, setBusy] = useState<number | null>(null)
+  const [notes, setNotes] = useState<Record<number, string>>({})
+  const [msg, setMsg] = useState('')
+  const [err, setErr] = useState('')
+
+  // Silent reload (no loading flash after first paint) — matches RedditDisputesPanel.
+  const load = useCallback(async () => {
+    try {
+      const res = await fetch('/api/admin-stats', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Admin-Token': token },
+        body: JSON.stringify({ action: 'list_listing_disputes', ...(filter === 'all' ? {} : { status: filter }) }),
+      })
+      const d = await res.json()
+      if (!d.ok) throw new Error(d.error || res.status)
+      setDisputes(Array.isArray(d.disputes) ? d.disputes : [])
+      if (d.counts) setCounts(d.counts)
+      setErr('')
+    } catch (e) { setErr((e as Error).message || 'Could not load listing disputes') } finally { setLoading(false) }
+  }, [token, filter])
+
+  useEffect(() => { load() }, [load])
+
+  async function resolve(id: number, decision: 'approved' | 'denied') {
+    setBusy(id); setErr('')
+    const note = (notes[id] || '').trim() || undefined
+    // Optimistic: in a filtered view the row leaves the Open queue immediately; in "All" it flips
+    // state in place. A background reload then reconciles the list + counts (and reverts on failure).
+    setDisputes(list => (filter === 'all' ? list.map(x => (x.id === id ? { ...x, status: decision } : x)) : list.filter(x => x.id !== id)))
+    try {
+      const res = await fetch('/api/admin-stats', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Admin-Token': token },
+        body: JSON.stringify({ action: 'resolve_listing_dispute', id, decision, ...(note ? { note } : {}) }),
+      })
+      const d = await res.json()
+      if (!d.ok) throw new Error(d.error || res.status)
+      const applied = (d.applied || {}) as ListingDisputeApplied
+      if (decision === 'approved') {
+        const effects = [applied.takedown && 'listing taken down', applied.edited && 'edit applied', applied.suppressed && 'apply link suppressed'].filter(Boolean)
+        setMsg(`✓ Approved — ${effects.length ? effects.join(', ') : 'no listing change (ephemeral or already gone)'}.`)
+      } else {
+        setMsg('✓ Denied — the listing is unchanged and the employer was notified.')
+      }
+    } catch (e) {
+      setErr((e as Error).message || 'Resolve failed')
+    } finally {
+      setBusy(null)
+      load() // reconcile with the server (restores the row if the resolve failed)
+    }
+  }
+
+  const activeLabel = (LISTING_DISPUTE_FILTERS.find(f => f.key === filter)?.label || '').toLowerCase()
+  const emptyMsg = filter === 'open' ? 'No open disputes.' : `No ${activeLabel} disputes.`
+  const total = counts.open + counts.approved + counts.denied
+
+  return (
+    <Card style={{ marginTop: '.65rem', border: '1px solid rgba(59,130,246,.22)' }}>
+      <CardHeader
+        title="Listing disputes"
+        badge={counts.open > 0 ? <Badge n={counts.open} color="var(--amber)" /> : undefined}
+        action={<span style={{ fontFamily: 'var(--mono)', fontSize: '.55rem', color: 'var(--dim)' }}>Employers contesting a listing on their company — approve applies a takedown/edit</span>}
+      />
+
+      {/* Status filter — the actionable Open queue first; the rest is decision history */}
+      <div style={{ display: 'flex', gap: '.35rem', flexWrap: 'wrap', padding: '.2rem 0 .7rem', borderBottom: '1px solid var(--line2)', marginBottom: '.7rem' }}>
+        {LISTING_DISPUTE_FILTERS.map(f => {
+          const n = f.key === 'all' ? total : counts[f.key]
+          const active = filter === f.key
+          return (
+            <button key={f.key} onClick={() => setFilter(f.key)} style={{ fontFamily: 'var(--mono)', fontSize: '.55rem', padding: '.24rem .55rem', borderRadius: 6, border: `1px solid ${active ? 'var(--white)' : 'var(--line2)'}`, background: active ? 'rgba(255,255,255,.06)' : 'transparent', color: active ? 'var(--white)' : 'var(--sub)', cursor: 'pointer' }}>
+              {f.label}{n > 0 ? ` ${n}` : ''}
+            </button>
+          )
+        })}
+      </div>
+
+      {msg && <div style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', color: 'var(--green)', marginBottom: '.6rem' }}>{msg}</div>}
+      {err && <div style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', color: 'var(--red)', marginBottom: '.6rem' }}>{err}</div>}
+
+      {loading ? (
+        <div style={{ fontFamily: 'var(--mono)', fontSize: '.6rem', color: 'var(--dim)' }}>Loading…</div>
+      ) : disputes.length === 0 ? (
+        <div style={{ fontFamily: 'var(--mono)', fontSize: '.62rem', color: filter === 'open' ? 'var(--green)' : 'var(--dim)' }}>{filter === 'open' ? '✓ ' : ''}{emptyMsg}</div>
+      ) : (
+        disputes.map(d => {
+          const kindColor = listingKindColor(d.kind)
+          const pc = d.proposed_changes || null
+          const pcEntries = pc ? Object.entries(pc).filter(([, v]) => v != null && String(v).trim() !== '') : []
+          const open = d.status === 'open'
+          return (
+            <div key={d.id} style={{ display: 'flex', alignItems: 'flex-start', gap: '.65rem', padding: '.7rem 0', borderBottom: '1px solid rgba(255,255,255,.04)' }}>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '.4rem', flexWrap: 'wrap', marginBottom: '.25rem' }}>
+                  <span style={{ fontFamily: 'var(--mono)', fontSize: '.48rem', textTransform: 'uppercase', letterSpacing: '.1em', padding: '.18rem .5rem', borderRadius: 4, flexShrink: 0, color: kindColor, background: kindColor + '1f' }}>
+                    {LISTING_KIND_LABEL[d.kind] || d.kind}
+                  </span>
+                  <span style={{ fontFamily: 'var(--mono)', fontSize: '.62rem', color: 'var(--white)', fontWeight: 600 }}>{d.company_name}</span>
+                  {d.status !== 'open' && (
+                    <span style={{ fontFamily: 'var(--mono)', fontSize: '.46rem', textTransform: 'uppercase', letterSpacing: '.08em', color: listingDisputeStatusColor(d.status), border: `1px solid ${listingDisputeStatusColor(d.status)}`, borderRadius: 4, padding: '.1rem .35rem', flexShrink: 0 }}>{d.status}</span>
+                  )}
+                  <span style={{ fontFamily: 'var(--mono)', fontSize: '.5rem', color: 'var(--dim)', marginLeft: 'auto', flexShrink: 0 }}>{relTime(d.created_at)}</span>
+                </div>
+                <div style={{ fontFamily: 'var(--mono)', fontSize: '.6rem', color: 'var(--sub)', lineHeight: 1.5, marginTop: '.1rem', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{d.detail}</div>
+                {pcEntries.length > 0 && (
+                  <div style={{ marginTop: '.35rem', padding: '.4rem .6rem', border: '1px solid var(--line2)', borderRadius: 6, background: 'rgba(59,130,246,.05)' }}>
+                    <div style={{ fontFamily: 'var(--mono)', fontSize: '.48rem', textTransform: 'uppercase', letterSpacing: '.08em', color: 'var(--blue)', marginBottom: '.25rem' }}>Proposed changes</div>
+                    {pcEntries.map(([k, v]) => (
+                      <div key={k} style={{ fontFamily: 'var(--mono)', fontSize: '.55rem', color: 'var(--sub)', lineHeight: 1.5, wordBreak: 'break-word' }}>
+                        <span style={{ color: 'var(--dim)' }}>{k}:</span> {String(v)}
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {d.admin_note && <div style={{ fontFamily: 'var(--mono)', fontSize: '.54rem', color: 'var(--muted)', marginTop: '.25rem' }}>Admin note: {d.admin_note}</div>}
+                {open && (
+                  <input
+                    value={notes[d.id] || ''}
+                    onChange={e => setNotes(n => ({ ...n, [d.id]: e.target.value }))}
+                    placeholder="Optional note to the employer"
+                    aria-label="Optional note to the employer"
+                    style={{ marginTop: '.4rem', width: '100%', maxWidth: 320, background: 'var(--raised)', border: '1px solid var(--line2)', borderRadius: 6, padding: '.3rem .5rem', fontFamily: 'var(--mono)', fontSize: '.55rem', color: 'var(--white)', outline: 'none', boxSizing: 'border-box' }}
+                  />
+                )}
+              </div>
+              {open && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '.3rem', flexShrink: 0 }}>
+                  <button onClick={() => resolve(d.id, 'approved')} disabled={busy === d.id} style={{ fontFamily: 'var(--mono)', fontSize: '.52rem', padding: '.22rem .6rem', borderRadius: 5, border: '1px solid rgba(16,185,129,.4)', background: 'rgba(16,185,129,.12)', color: 'var(--green)', cursor: busy === d.id ? 'default' : 'pointer', opacity: busy === d.id ? 0.5 : 1, whiteSpace: 'nowrap' }}>{busy === d.id ? '…' : 'Approve'}</button>
+                  <button onClick={() => resolve(d.id, 'denied')} disabled={busy === d.id} style={{ fontFamily: 'var(--mono)', fontSize: '.52rem', padding: '.22rem .6rem', borderRadius: 5, border: '1px solid rgba(239,68,68,.4)', background: 'rgba(239,68,68,.1)', color: 'var(--red)', cursor: busy === d.id ? 'default' : 'pointer', opacity: busy === d.id ? 0.5 : 1, whiteSpace: 'nowrap' }}>Deny</button>
+                </div>
+              )}
             </div>
           )
         })

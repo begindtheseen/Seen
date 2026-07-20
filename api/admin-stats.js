@@ -11,6 +11,9 @@ import { recomputeCompanyScoreFromReports, normalizeCompany } from './_utils/rep
 import { logError } from '../lib/server/errlog.js';
 import { buildCompanyAuditBundle } from './_utils/companyAuditBundle.js';
 import { isDisputeStatus, isDisputeReviewStatus, disputeStatusCounts, orderDisputesOpenFirst } from './_utils/companyReddit.js';
+import { isDisputeDecision, resolveDisputeEffect, disputeStatusCounts as listingDisputeCounts, orderDisputesOpenFirst as orderListingDisputes } from '../lib/server/listingDisputes.js';
+import { buildNotificationRow } from '../lib/server/employerNotificationsStore.js';
+import { normalizeClaimCompany } from '../lib/server/employerClaims.js';
 
 const ALLOWED = ['https://seenjobs.io', 'https://www.seenjobs.io'];
 
@@ -949,6 +952,103 @@ async function _handler(req, res) {
     await db(`company_reddit_disputes?id=eq.${idNum}`, { method: 'PATCH', body: JSON.stringify({ status: body.status }), headers: { Prefer: 'return=minimal' } });
     await db('admin_audit_log', { method: 'POST', body: JSON.stringify({ admin_id: sess.admin_id, username: sess.username || 'admin', action: 'update_reddit_dispute', target_type: 'reddit_dispute', target_id: String(idNum), metadata: { status: body.status } }), headers: { Prefer: 'return=minimal' } });
     return res.status(200).json({ ok: true });
+  }
+
+  // ── LISTING DISPUTES — the ADMIN side of the employer→admin listing correction loop ─────
+  // Employers file disputes via api/employer-listings.js (dispute action → listing_disputes,
+  // migration 056) to contest ANY listing on their company. ONLY an admin approves/denies, and
+  // approval APPLIES the effect (resolveDisputeEffect): a takedown reuses the exact delete_listing
+  // machinery (expire the row + suppress the apply_url + recompute the company score); an edit
+  // patches the row with the employer's sanitized proposed_changes. Either verdict notifies the
+  // filer (employer_notifications, migration 057).
+  if (action === 'list_listing_disputes') {
+    const filterStatus = ['open', 'approved', 'denied'].includes(body.status) ? body.status : null;
+    const countRes = await db(`listing_disputes?select=status&limit=5000`);
+    const counts = listingDisputeCounts(countRes.ok ? await countRes.json() : []);
+    const where = filterStatus ? `status=eq.${filterStatus}&` : '';
+    const listRes = await db(`listing_disputes?${where}select=id,job_id,company_name,company_key,employer_user_id,kind,reason,detail,proposed_changes,status,created_at,reviewed_at,reviewed_by,admin_note&order=created_at.desc&limit=200`);
+    const rows = listRes.ok ? await listRes.json() : [];
+    const disputes = filterStatus ? rows : orderListingDisputes(rows);
+    return res.status(200).json({ ok: true, disputes, counts, filter: filterStatus });
+  }
+
+  if (action === 'resolve_listing_dispute') {
+    // Full admins only — approval can EXPIRE a listing (destructive), same bar as delete_listing.
+    if (adminRole === 'moderator') return res.status(403).json({ error: 'Insufficient role' });
+    const idNum = Number(body.id);
+    if (!Number.isInteger(idNum) || idNum <= 0) return res.status(400).json({ error: 'A valid dispute id is required' });
+    if (!isDisputeDecision(body.decision)) return res.status(400).json({ error: 'decision must be approved or denied' });
+    const note = body.note != null ? String(body.note).slice(0, 500) : null;
+    const decision = body.decision; // 'approved' | 'denied'
+
+    const dRes = await db(`listing_disputes?id=eq.${idNum}&select=id,job_id,company_name,company_key,employer_user_id,kind,proposed_changes,status&limit=1`);
+    const dispute = dRes.ok ? (await dRes.json())[0] : null;
+    if (!dispute) return res.status(404).json({ error: 'Dispute not found' });
+    if (dispute.status !== 'open') return res.status(409).json({ error: 'This dispute was already resolved' });
+
+    const applied = { takedown: false, edited: false, suppressed: false };
+    const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+    if (decision === 'approved') {
+      const effect = resolveDisputeEffect(dispute);
+      const jid = String(dispute.job_id || '');
+      if (effect.takedown && UUID.test(jid)) {
+        // Reuse the delete_listing recipe: read the row, EXPIRE it (the whole stack filters on
+        // expires_at, not availability_status), suppress its apply_url so it can't re-aggregate or
+        // be paste-a-link re-imported, clear its availability reports, recompute the company score.
+        const rowRes = await db(`jobs?id=eq.${encodeURIComponent(jid)}&select=apply_url,title,company&limit=1`);
+        const jobRow = rowRes.ok ? (await rowRes.json())[0] : null;
+        const up = await db(`jobs?id=eq.${encodeURIComponent(jid)}`, {
+          method: 'PATCH',
+          body: JSON.stringify({ availability_status: 'expired', expires_at: new Date().toISOString(), last_checked_at: new Date().toISOString() }),
+          headers: { Prefer: 'return=minimal' },
+        });
+        applied.takedown = up.ok;
+        if (jobRow?.apply_url) {
+          const ins = await db('suppressed_listings?on_conflict=apply_url', {
+            method: 'POST',
+            headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
+            body: JSON.stringify({ apply_url: jobRow.apply_url, stable_job_id: jid, title: jobRow.title || null, company: jobRow.company || null, reason: 'employer_dispute' }),
+          });
+          applied.suppressed = ins.ok;
+        }
+        await db(`job_availability_reports?job_id=eq.${encodeURIComponent(jid)}`, { method: 'DELETE', headers: { Prefer: 'return=minimal' } });
+        if (jobRow?.company) {
+          try { await recomputeCompanyScoreFromReports(SB, { apikey: SK, Authorization: `Bearer ${SK}`, 'Content-Type': 'application/json' }, normalizeCompany(jobRow.company)); } catch { /* best-effort */ }
+        }
+      } else if (effect.edit && effect.patch && UUID.test(jid)) {
+        // Apply the employer's sanitized proposed changes. Keep the legacy `url` alias in lockstep
+        // with apply_url when that field is edited.
+        const patch = { ...effect.patch, ...(effect.patch.apply_url ? { url: effect.patch.apply_url } : {}), last_checked_at: new Date().toISOString() };
+        const up = await db(`jobs?id=eq.${encodeURIComponent(jid)}`, { method: 'PATCH', body: JSON.stringify(patch), headers: { Prefer: 'return=minimal' } });
+        applied.edited = up.ok;
+      }
+    }
+
+    await db(`listing_disputes?id=eq.${idNum}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ status: decision, reviewed_at: new Date().toISOString(), reviewed_by: sess.username || 'admin', admin_note: note }),
+      headers: { Prefer: 'return=minimal' },
+    });
+
+    // Notify the filer of the verdict (best-effort — a notify failure must not fail the resolve).
+    try {
+      const kindN = decision === 'approved' ? 'dispute_approved' : 'dispute_denied';
+      const notif = buildNotificationRow(kindN, {
+        companyName: dispute.company_name,
+        companyKey: dispute.company_key || normalizeClaimCompany(dispute.company_name),
+        employerUserId: dispute.employer_user_id, jobId: dispute.job_id,
+        title: decision === 'approved' ? 'Your listing dispute was approved' : 'Your listing dispute was reviewed',
+        body: decision === 'approved'
+          ? `An admin approved your ${dispute.kind} dispute.${note ? ` Note: ${note}` : ''}`
+          : `An admin reviewed your ${dispute.kind} dispute and did not approve it.${note ? ` Note: ${note}` : ''}`,
+        meta: { dispute_id: idNum, decision },
+      });
+      if (notif) await db('employer_notifications', { method: 'POST', body: JSON.stringify(notif), headers: { Prefer: 'return=minimal' } });
+    } catch (e) { console.error('[resolve_listing_dispute] notify failed (non-fatal):', e?.message || e); }
+
+    await db('admin_audit_log', { method: 'POST', body: JSON.stringify({ admin_id: sess.admin_id, username: sess.username || 'admin', action: 'resolve_listing_dispute', target_type: 'listing_dispute', target_id: String(idNum), metadata: { decision, kind: dispute.kind, ...applied } }), headers: { Prefer: 'return=minimal' } });
+    return res.status(200).json({ ok: true, decision, applied });
   }
 
   if (action === 'set_pro') {

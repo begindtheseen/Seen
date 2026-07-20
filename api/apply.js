@@ -1,5 +1,48 @@
 import { createHmac, timingSafeEqual } from 'crypto';
 import { rateLimit } from '../lib/server/ratelimit.js';
+import { normalizeClaimCompany } from '../lib/server/employerClaims.js';
+import { buildNotificationRow } from '../lib/server/employerNotificationsStore.js';
+
+// Best-effort: record the observed apply CLICK (the only thing observable on a redirect apply) and
+// enqueue an "apply_activity" notification for the company's employer (migrations 057/058). NEVER
+// throws and NEVER blocks the apply — a failure here must not turn a successful application into an
+// error. Awaited (not fire-and-forget) because Vercel freezes the function after the response.
+async function recordApplyActivity({ company, role, location, uid, jobId, applyUrl }) {
+  const SUPABASE_URL = process.env.SUPABASE_URL;
+  const SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY;
+  const companyKey = normalizeClaimCompany(company);
+  if (!SUPABASE_URL || !SERVICE_KEY || !companyKey) return;
+  const db = (path, opts = {}) => fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
+    ...opts,
+    headers: {
+      apikey: SERVICE_KEY, Authorization: `Bearer ${SERVICE_KEY}`,
+      'Content-Type': 'application/json', Prefer: 'return=minimal', ...(opts.headers || {}),
+    },
+  });
+  try {
+    await db('apply_events', {
+      method: 'POST',
+      body: JSON.stringify({
+        job_id: jobId ? String(jobId) : null,
+        company_name: company || null,
+        company_key: companyKey,
+        role: role || null,
+        city: location || null,
+        apply_url: applyUrl || null,
+        user_id: uid || null,
+      }),
+    });
+    const notif = buildNotificationRow('apply_activity', {
+      companyName: company, companyKey, jobId,
+      title: role ? `New applicant — ${role}` : 'New applicant',
+      body: `A candidate applied to ${role ? `“${role}”` : 'a listing'}${location ? ` (${location})` : ''} via your Seen listing.`,
+      meta: { role: role || null, city: location || null },
+    });
+    if (notif) await db('employer_notifications', { method: 'POST', body: JSON.stringify(notif) });
+  } catch (e) {
+    console.error('[apply] recordApplyActivity failed (non-fatal):', e?.message || e);
+  }
+}
 
 // Verify Supabase JWT locally. Returns payload or null.
 function verifyJWT(token, secret) {
@@ -218,6 +261,7 @@ export default async function handler(req, res) {
       applicantName, applicantEmail, role, company, location,
       resumeLink, resumeText: rawResumeText, coverNote, applyEmail,
       optimizedBullets = [], keywords = [], wasOptimized = false,
+      jobId, applyUrl,
     } = req.body || {};
 
     // Validate the applicant email before it becomes a recipient / reply_to. It's
@@ -367,6 +411,9 @@ ${coverNote ? `<p style="font-size:14px;color:#555;margin:0 0 6px"><strong style
     const results = await Promise.allSettled(sends);
     const failed = results.filter(r => r.status === 'rejected');
     if (failed.length) console.error('Some emails failed:', failed);
+
+    // Record the observed apply CLICK + notify the company's employer (best-effort, never fatal).
+    await recordApplyActivity({ company, role, location, uid, jobId, applyUrl });
 
     return res.status(200).json({ ok: true });
 
