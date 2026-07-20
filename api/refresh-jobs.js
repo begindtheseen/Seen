@@ -358,13 +358,17 @@ async function markStaleJobs(supabaseUrl, serviceKey) {
   const h = { apikey: serviceKey, Authorization: `Bearer ${serviceKey}`, 'Content-Type': 'application/json', Prefer: 'return=minimal' };
   const staleISO = new Date(Date.now() - 7 * 86400000).toISOString();
   const expiredISO = new Date(Date.now() - 14 * 86400000).toISOString();
+  // EMPLOYER-POSTED listings are excluded: staleness here is AGE-since-last-seen, and an employer
+  // listing is never re-seen by the aggregator (it isn't scraped), so it would wrongly go stale at
+  // 7d / expired at 14d. Employer listings live until their own expires_at (60d) or the employer
+  // deletes them (api/employer-listings.js). `is_employer_posted=eq.false` keeps only aggregated rows.
   await Promise.all([
     // active jobs not seen in 7+ days → stale
-    fetch(`${supabaseUrl}/rest/v1/jobs?availability_status=eq.active&last_seen_at=lt.${staleISO}`, {
+    fetch(`${supabaseUrl}/rest/v1/jobs?is_employer_posted=eq.false&availability_status=eq.active&last_seen_at=lt.${staleISO}`, {
       method: 'PATCH', headers: h, body: JSON.stringify({ availability_status: 'stale' }),
     }),
     // stale/active jobs not seen in 14+ days → expired
-    fetch(`${supabaseUrl}/rest/v1/jobs?availability_status=in.(active,stale)&last_seen_at=lt.${expiredISO}`, {
+    fetch(`${supabaseUrl}/rest/v1/jobs?is_employer_posted=eq.false&availability_status=in.(active,stale)&last_seen_at=lt.${expiredISO}`, {
       method: 'PATCH', headers: h, body: JSON.stringify({ availability_status: 'expired' }),
     }),
   ]).catch(e => console.error('markStaleJobs error (non-fatal):', e.message));
@@ -374,8 +378,12 @@ async function markStaleJobs(supabaseUrl, serviceKey) {
 // Runs every cron hit — cheap (only fetches id + description + apply_url).
 async function deleteJunk(supabaseUrl, serviceKey) {
   try {
+    // EMPLOYER-POSTED listings are EXCLUDED from the junk sweep. This quality gate (needs a
+    // description ≥ 80 chars + an apply_url) is for SCRAPED aggregator rows; a first-party listing
+    // an employer posted is curated by them and must never be auto-deleted for a short description.
+    // (This is exactly why a freshly-posted employer listing with a brief description vanished.)
     const res = await fetch(
-      `${supabaseUrl}/rest/v1/jobs?select=id,description,apply_url&expires_at=gt.${new Date().toISOString()}&limit=2000`,
+      `${supabaseUrl}/rest/v1/jobs?select=id,description,apply_url&is_employer_posted=eq.false&expires_at=gt.${new Date().toISOString()}&limit=2000`,
       { headers: { apikey: serviceKey, Authorization: `Bearer ${serviceKey}` } }
     );
     if (!res.ok) return { removed: 0 };
