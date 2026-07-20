@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import type { AdminStats, RecentReport, Issue, RedditDispute, RedditDisputeCounts, ListingDispute, ListingDisputeCounts, ListingDisputeApplied, InactiveReport, DupCluster, RecentJob, JobGroup, DupGroup, MergePrefill, MergeLog, FeatureFlag } from './types'
+import type { AdminStats, RecentReport, Issue, RedditDispute, RedditDisputeCounts, ListingDispute, ListingDisputeCounts, ListingDisputeApplied, ListingTicket, InactiveReport, DupCluster, RecentJob, JobGroup, DupGroup, MergePrefill, MergeLog, FeatureFlag } from './types'
 import { Card, CardHeader, Badge, relTime, outcomeColor, availColor, runRefreshAndClear, refreshResultMsg } from './primitives'
 import { saveFile } from './saveFile'
 import { safeLocalGet, safeLocalSet } from '@/lib/safeStorage'
@@ -637,6 +637,136 @@ export function ListingDisputesPanel({ token }: { token: string }) {
           )
         })
       )}
+    </Card>
+  )
+}
+
+// ── UNIFIED LISTING TICKETS ──────────────────────────────────────────────────────
+// One ticket per listing (seeker report ⋃ employer dispute), reviewed in ONE place. Actions
+// reuse the existing endpoints: an open dispute → resolve_listing_dispute (approve/deny); a bare
+// report → delete_listing / dismiss_inactive_report. Replaces the separate Reported-listings and
+// Listing-disputes panels so both sides of a listing are always seen together.
+type TicketFilter = 'open' | 'resolved' | 'all'
+const TICKET_REASON_LABEL: Record<string, string> = { admin_removed: 'Removed by admin', employer_dispute: 'Removed via dispute', employer_closed: 'Closed by employer' }
+
+export function ListingTicketsPanel({ token }: { token: string }) {
+  const [tickets, setTickets] = useState<ListingTicket[]>([])
+  const [counts, setCounts] = useState<{ open: number; resolved: number }>({ open: 0, resolved: 0 })
+  const [filter, setFilter] = useState<TicketFilter>('open')
+  const [loading, setLoading] = useState(true)
+  const [busy, setBusy] = useState<string | null>(null)
+  const [notes, setNotes] = useState<Record<string, string>>({})
+  const [msg, setMsg] = useState('')
+  const [err, setErr] = useState('')
+
+  const load = useCallback(async () => {
+    try {
+      const res = await fetch('/api/admin-stats', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Admin-Token': token }, body: JSON.stringify({ action: 'list_listing_tickets' }) })
+      const d = await res.json()
+      if (!d.ok) throw new Error(d.error || res.status)
+      setTickets(Array.isArray(d.tickets) ? d.tickets : [])
+      setCounts(d.counts || { open: 0, resolved: 0 })
+      setErr('')
+    } catch (e) { setErr('Could not load tickets: ' + (e as Error).message) } finally { setLoading(false) }
+  }, [token])
+  useEffect(() => { load() }, [load])
+
+  async function act(t: ListingTicket, body: Record<string, unknown>, okMsg: string) {
+    setBusy(t.job_id); setMsg(''); setErr('')
+    try {
+      const res = await fetch('/api/admin-stats', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Admin-Token': token }, body: JSON.stringify(body) })
+      const d = await res.json()
+      if (!d.ok) throw new Error(d.error || res.status)
+      setMsg(okMsg)
+      await load()
+    } catch (e) { setErr((e as Error).message) } finally { setBusy(null) }
+  }
+
+  const shown = tickets.filter(t => filter === 'all' ? true : t.status === filter)
+  const total = counts.open + counts.resolved
+
+  return (
+    <Card style={{ marginTop: '.65rem', border: '1px solid rgba(245,158,11,.22)' }}>
+      <CardHeader
+        title="Listing tickets"
+        badge={counts.open > 0 ? <Badge n={counts.open} color="var(--amber)" /> : undefined}
+        action={<span style={{ fontFamily: 'var(--mono)', fontSize: '.5rem', color: 'var(--dim)' }}>One ticket per listing — the seeker&apos;s report and the employer&apos;s dispute, reviewed together</span>}
+      />
+      <div style={{ display: 'flex', gap: '.35rem', flexWrap: 'wrap', padding: '.2rem 0 .7rem', borderBottom: '1px solid var(--line2)', marginBottom: '.7rem' }}>
+        {([['open', 'Open', counts.open], ['resolved', 'Resolved', counts.resolved], ['all', 'All', total]] as [TicketFilter, string, number][]).map(([k, label, n]) => (
+          <button key={k} onClick={() => setFilter(k)} style={{ fontFamily: 'var(--mono)', fontSize: '.55rem', padding: '.24rem .55rem', borderRadius: 6, border: `1px solid ${filter === k ? 'var(--white)' : 'var(--line2)'}`, background: filter === k ? 'rgba(255,255,255,.06)' : 'transparent', color: filter === k ? 'var(--white)' : 'var(--sub)', cursor: 'pointer' }}>{label}{n > 0 ? ` ${n}` : ''}</button>
+        ))}
+      </div>
+      {msg && <div style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', color: 'var(--green)', marginBottom: '.6rem' }}>{msg}</div>}
+      {err && <div style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', color: 'var(--red)', marginBottom: '.6rem' }}>{err}</div>}
+
+      {loading ? (
+        <div style={{ fontFamily: 'var(--mono)', fontSize: '.6rem', color: 'var(--dim)' }}>Loading…</div>
+      ) : shown.length === 0 ? (
+        <div style={{ fontFamily: 'var(--mono)', fontSize: '.62rem', color: filter === 'open' ? 'var(--green)' : 'var(--dim)' }}>{filter === 'open' ? '✓ No open tickets.' : 'No tickets.'}</div>
+      ) : shown.map(t => {
+        const d = t.dispute
+        const openDispute = d && d.status === 'open'
+        const rep = t.reports
+        const pcEntries = d && d.proposed_changes ? Object.entries(d.proposed_changes).filter(([, v]) => v != null && String(v).trim() !== '') : []
+        const isBusy = busy === t.job_id
+        const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(t.job_id)
+        return (
+          <div key={t.job_id} style={{ padding: '.75rem 0', borderBottom: '1px solid rgba(255,255,255,.05)' }}>
+            {/* Ticket header: the listing + its state */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '.4rem', flexWrap: 'wrap', marginBottom: '.3rem' }}>
+              {d && <span style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', color: 'var(--blue)', fontWeight: 700 }}>#{d.id}</span>}
+              <span style={{ fontFamily: 'var(--mono)', fontSize: '.66rem', color: 'var(--white)', fontWeight: 600 }}>{t.title || t.job_id}</span>
+              {t.company && <span style={{ fontFamily: 'var(--mono)', fontSize: '.56rem', color: 'var(--sub)' }}>· {t.company}</span>}
+              {t.removed
+                ? <span style={{ fontFamily: 'var(--mono)', fontSize: '.46rem', textTransform: 'uppercase', letterSpacing: '.08em', color: 'var(--red)', border: '1px solid rgba(239,68,68,.4)', borderRadius: 4, padding: '.1rem .35rem' }}>{TICKET_REASON_LABEL[t.removed.reason] || 'Removed'}</span>
+                : t.availability_status && <span style={{ fontFamily: 'var(--mono)', fontSize: '.46rem', textTransform: 'uppercase', letterSpacing: '.08em', color: availColor(t.availability_status || ''), border: `1px solid ${availColor(t.availability_status || '')}`, borderRadius: 4, padding: '.1rem .35rem' }}>{t.availability_status}</span>}
+              <span style={{ fontFamily: 'var(--mono)', fontSize: '.5rem', color: 'var(--dim)', marginLeft: 'auto' }}>{t.latest_activity ? relTime(t.latest_activity) : ''}</span>
+            </div>
+
+            {/* Seeker side */}
+            {rep && rep.count > 0 && (
+              <div style={{ fontFamily: 'var(--mono)', fontSize: '.56rem', color: 'var(--amber)', marginBottom: '.25rem' }}>
+                👤 Seeker: {rep.count} report{rep.count === 1 ? '' : 's'}{rep.expired > 0 ? ` · ${rep.expired} say inactive` : ''}{rep.unknown > 0 ? ` · ${rep.unknown} unsure` : ''}
+              </div>
+            )}
+            {/* Employer side */}
+            {d ? (
+              <div style={{ fontFamily: 'var(--mono)', fontSize: '.56rem', color: 'var(--sub)', marginBottom: '.25rem' }}>
+                🏢 Employer: <span style={{ color: listingKindColor(d.kind) }}>{LISTING_KIND_LABEL[d.kind] || d.kind}</span>{d.status !== 'open' ? ` · ${d.status}` : ''} — {d.detail}
+                {pcEntries.length > 0 && <span style={{ color: 'var(--blue)' }}> · proposes: {pcEntries.map(([k, v]) => `${k}=${String(v)}`).join(', ')}</span>}
+                {d.admin_note && <span style={{ color: 'var(--muted)' }}> · note: {d.admin_note}</span>}
+              </div>
+            ) : (
+              <div style={{ fontFamily: 'var(--mono)', fontSize: '.54rem', color: 'var(--muted)', marginBottom: '.25rem' }}>🏢 No employer dispute filed.</div>
+            )}
+
+            {isUuid && <a href={`/jobs/${encodeURIComponent(t.job_id)}`} target="_blank" rel="noopener noreferrer" style={{ fontFamily: 'var(--mono)', fontSize: '.54rem', color: 'var(--blue)', textDecoration: 'none' }}>↗ View listing</a>}
+
+            {/* One action bar for the whole ticket */}
+            {t.status === 'open' && (
+              <div style={{ marginTop: '.45rem' }}>
+                {(openDispute || (rep && rep.count > 0)) && (
+                  <input value={notes[t.job_id] || ''} onChange={e => setNotes(n => ({ ...n, [t.job_id]: e.target.value }))} placeholder="Note to the employer (optional)" style={{ width: '100%', boxSizing: 'border-box', background: 'var(--raised)', border: '1px solid var(--line2)', borderRadius: 6, padding: '.35rem .5rem', fontFamily: 'var(--mono)', fontSize: '.55rem', color: 'var(--white)', outline: 'none', marginBottom: '.35rem' }} />
+                )}
+                <div style={{ display: 'flex', gap: '.4rem', flexWrap: 'wrap' }}>
+                  {openDispute ? (
+                    <>
+                      <button disabled={isBusy} onClick={() => act(t, { action: 'resolve_listing_dispute', id: d!.id, decision: 'approved', note: notes[t.job_id] || undefined }, `Dispute #${d!.id} approved`)} style={{ fontFamily: 'var(--display)', fontWeight: 800, fontSize: '.6rem', padding: '.35rem .8rem', borderRadius: 6, border: '1px solid var(--green)', background: 'rgba(16,185,129,.12)', color: 'var(--green)', cursor: 'pointer', opacity: isBusy ? .6 : 1 }}>{isBusy ? '…' : 'Approve dispute'}</button>
+                      <button disabled={isBusy} onClick={() => act(t, { action: 'resolve_listing_dispute', id: d!.id, decision: 'denied', note: notes[t.job_id] || undefined }, `Dispute #${d!.id} denied`)} style={{ fontFamily: 'var(--display)', fontWeight: 800, fontSize: '.6rem', padding: '.35rem .8rem', borderRadius: 6, border: '1px solid var(--red)', background: 'rgba(239,68,68,.1)', color: 'var(--red)', cursor: 'pointer', opacity: isBusy ? .6 : 1 }}>{isBusy ? '…' : 'Deny dispute'}</button>
+                    </>
+                  ) : rep && rep.count > 0 ? (
+                    <>
+                      <button disabled={isBusy} onClick={() => { if (confirm('Delete this listing? It leaves search + is suppressed from re-aggregation, and the reports clear.')) act(t, { action: 'delete_listing', job_id: t.job_id }, 'Listing deleted') }} style={{ fontFamily: 'var(--display)', fontWeight: 800, fontSize: '.6rem', padding: '.35rem .8rem', borderRadius: 6, border: '1px solid var(--red)', background: 'rgba(239,68,68,.1)', color: 'var(--red)', cursor: 'pointer', opacity: isBusy ? .6 : 1 }}>{isBusy ? '…' : 'Delete listing'}</button>
+                      <button disabled={isBusy} onClick={() => act(t, { action: 'dismiss_inactive_report', job_id: t.job_id }, 'Reports dismissed — listing kept')} style={{ fontFamily: 'var(--mono)', fontSize: '.6rem', padding: '.35rem .8rem', borderRadius: 6, border: '1px solid var(--line2)', background: 'transparent', color: 'var(--sub)', cursor: 'pointer', opacity: isBusy ? .6 : 1 }}>{isBusy ? '…' : 'Keep — dismiss reports'}</button>
+                    </>
+                  ) : null}
+                </div>
+              </div>
+            )}
+          </div>
+        )
+      })}
     </Card>
   )
 }

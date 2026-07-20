@@ -11,7 +11,7 @@ import { recomputeCompanyScoreFromReports, normalizeCompany } from './_utils/rep
 import { logError } from '../lib/server/errlog.js';
 import { buildCompanyAuditBundle } from './_utils/companyAuditBundle.js';
 import { isDisputeStatus, isDisputeReviewStatus, disputeStatusCounts, orderDisputesOpenFirst } from './_utils/companyReddit.js';
-import { isDisputeDecision, resolveDisputeEffect, disputeStatusCounts as listingDisputeCounts, orderDisputesOpenFirst as orderListingDisputes } from '../lib/server/listingDisputes.js';
+import { isDisputeDecision, resolveDisputeEffect, disputeStatusCounts as listingDisputeCounts, orderDisputesOpenFirst as orderListingDisputes, buildListingTickets } from '../lib/server/listingDisputes.js';
 import { buildNotificationRow } from '../lib/server/employerNotificationsStore.js';
 import { normalizeClaimCompany } from '../lib/server/employerClaims.js';
 
@@ -1110,6 +1110,48 @@ async function _handler(req, res) {
 
     await db('admin_audit_log', { method: 'POST', body: JSON.stringify({ admin_id: sess.admin_id, username: sess.username || 'admin', action: 'resolve_listing_dispute', target_type: 'listing_dispute', target_id: String(idNum), metadata: { decision, kind: dispute.kind, ...applied } }), headers: { Prefer: 'return=minimal' } });
     return res.status(200).json({ ok: true, decision, applied });
+  }
+
+  // ── UNIFIED LISTING TICKETS — one ticket per listing (seeker report ⋃ employer dispute) ──
+  // The single place a report and its dispute are reviewed together. Actions stay the existing
+  // ones (resolve_listing_dispute for a dispute; delete_listing / dismiss_inactive_report for a
+  // bare report) — this only UNIFIES the read so the whole ticket is one object keyed by job_id.
+  if (action === 'list_listing_tickets') {
+    const monthAgo = new Date(Date.now() - 30 * 86400000).toISOString();
+    const [repRes, dispRes] = await Promise.all([
+      db(`job_availability_reports?reported_at=gte.${encodeURIComponent(monthAgo)}&select=job_id,status,reported_at,company,title,city,apply_url&order=reported_at.desc&limit=2000`),
+      db(`listing_disputes?select=id,job_id,company_name,employer_user_id,kind,reason,detail,proposed_changes,status,created_at,reviewed_at,reviewed_by,admin_note&order=created_at.desc&limit=300`),
+    ]);
+    const reports = repRes.ok ? await repRes.json() : [];
+    const disputes = dispRes.ok ? await dispRes.json() : [];
+
+    // Enrich the real (uuid) listings + find which apply_urls are admin-suppressed (removed).
+    const UUID_RE2 = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    const jobIds = [...new Set([...reports, ...disputes].map(x => x.job_id).filter(Boolean))];
+    const uuidIds = jobIds.filter(id => UUID_RE2.test(id));
+    let jobsById = {};
+    if (uuidIds.length) {
+      const jr = await db(`jobs?id=in.(${uuidIds.map(encodeURIComponent).join(',')})&select=id,title,company,city,apply_url,availability_status&limit=500`);
+      const jrows = jr.ok ? await jr.json() : [];
+      jobsById = Object.fromEntries(jrows.map(j => [j.id, j]));
+    }
+    // Suppressed listings carry the removal reason (admin_removed / employer_dispute / employer_closed).
+    const applyUrls = [...new Set([
+      ...Object.values(jobsById).map(j => j.apply_url),
+      ...reports.map(r => r.apply_url),
+    ].filter(Boolean))];
+    let suppressedByUrl = {};
+    if (applyUrls.length) {
+      // PostgREST in-list of urls: comma-join encoded values, capped to a sane size.
+      const inList = applyUrls.slice(0, 400).map(u => encodeURIComponent(u)).join(',');
+      const sr = await db(`suppressed_listings?apply_url=in.(${inList})&select=apply_url,reason,created_at&limit=500`);
+      const srows = sr.ok ? await sr.json() : [];
+      suppressedByUrl = Object.fromEntries(srows.map(s => [s.apply_url, { reason: s.reason, created_at: s.created_at }]));
+    }
+
+    const tickets = buildListingTickets({ reports, disputes, jobsById, suppressedByUrl });
+    const counts = { open: tickets.filter(t => t.status === 'open').length, resolved: tickets.filter(t => t.status === 'resolved').length };
+    return res.status(200).json({ ok: true, tickets, counts });
   }
 
   if (action === 'set_pro') {
