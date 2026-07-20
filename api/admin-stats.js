@@ -10,6 +10,7 @@ import {
 import { recomputeCompanyScoreFromReports, normalizeCompany } from './_utils/reportWrite.js';
 import { logError } from '../lib/server/errlog.js';
 import { buildCompanyAuditBundle } from './_utils/companyAuditBundle.js';
+import { isDisputeStatus, isDisputeReviewStatus, disputeStatusCounts, orderDisputesOpenFirst } from './_utils/companyReddit.js';
 
 const ALLOWED = ['https://seenjobs.io', 'https://www.seenjobs.io'];
 
@@ -219,7 +220,7 @@ async function _handler(req, res) {
       jobsActiveRes, jobsNewTodayRes,
       reportsMonthRes, searchLogsWeekRes,
       jobsTotalRes, creditTxnRes, outcomeSharesRes, usersMonthRes,
-      searchEvents30Res, resumeScans30Res,
+      searchEvents30Res, resumeScans30Res, disputesOpenRes,
     ] = await Promise.all([
       db(`profiles?select=id`, { headers: { Prefer: 'count=exact', 'Range-Unit': 'items', Range: '0-0' } }),
       db(`profiles?created_at=gte.${todayISO}&select=id`, { headers: { Prefer: 'count=exact', 'Range-Unit': 'items', Range: '0-0' } }),
@@ -257,7 +258,9 @@ async function _handler(req, res) {
       // ADDITIVE (admin command-center Data Flywheel panel): 30-day activity counts.
       // Both tables are service-key accessed (RLS bypassed). Never a constant.
       db(`search_events?created_at=gte.${monthISO}&select=id`, { headers: { Prefer: 'count=exact', 'Range-Unit': 'items', Range: '0-0' } }),
-      db(`resume_surveys?created_at=gte.${monthISO}&select=id`, { headers: { Prefer: 'count=exact', 'Range-Unit': 'items', Range: '0-0' } })
+      db(`resume_surveys?created_at=gte.${monthISO}&select=id`, { headers: { Prefer: 'count=exact', 'Range-Unit': 'items', Range: '0-0' } }),
+      // ADDITIVE (overview attention signal): open Reddit-dispute count (migration 054). Count-only.
+      db(`company_reddit_disputes?status=eq.open&select=id`, { headers: { Prefer: 'count=exact', 'Range-Unit': 'items', Range: '0-0' } })
     ]);
 
     const usersTotal = ct(usersTotalRes);
@@ -447,6 +450,7 @@ async function _handler(req, res) {
       flywheel: { job_searches_30d: ct(searchEvents30Res), resume_scans_30d: ct(resumeScans30Res) },
       errors: { today: errToday.length, this_week: ct(errWeekRes), by_route: errByRoute, recent: errToday.slice(0, 5) },
       issues: { open: issues.length, items: issues },
+      reddit_disputes: { open: ct(disputesOpenRes) },
       duplicate_clusters: { suspected: dupClusters.length, items: dupClusters },
       feature_flags: flags,
       job_health: jobHealth,
@@ -909,6 +913,41 @@ async function _handler(req, res) {
     if (!id) return res.status(400).json({ error: 'id required' });
     await db(`user_issues?id=eq.${id}`, { method: 'PATCH', body: JSON.stringify({ status: action === 'resolve_issue' ? 'resolved' : 'dismissed', resolved_at: new Date().toISOString() }), headers: { Prefer: 'return=minimal' } });
     await db('admin_audit_log', { method: 'POST', body: JSON.stringify({ admin_id: sess.admin_id, username: 'admin', action, target_type: 'issue', target_id: String(id) }), headers: { Prefer: 'return=minimal' } });
+    return res.status(200).json({ ok: true });
+  }
+
+  // ── REDDIT DISPUTES — the ADMIN side of the company-page correction loop ───────
+  // Visitors flag the surfaced public-Reddit discussion via api/company-reddit.js (dispute
+  // action → company_reddit_disputes, migration 054). These two actions are how an admin
+  // finally SEES and ACTS ON that queue — the loop was write-only until now.
+  //
+  // list_reddit_disputes → the review queue: open-first + newest-first by default, with a
+  // count by status so the admin sees the whole picture; an optional `status` filter narrows it.
+  if (action === 'list_reddit_disputes') {
+    const filter = isDisputeStatus(body.status) ? body.status : null;
+    // Whole-table status tally (status column only — cheap) so the header counts are always
+    // accurate regardless of the active filter or the 200-row list window.
+    const countRes = await db(`company_reddit_disputes?select=status&limit=5000`);
+    const countRows = countRes.ok ? await countRes.json() : [];
+    const counts = disputeStatusCounts(countRows);
+    // The list itself. A filter scopes it to one status; otherwise pull the recent window and
+    // float still-open disputes to the top (both already newest-first).
+    const where = filter ? `status=eq.${filter}&` : '';
+    const listRes = await db(`company_reddit_disputes?${where}select=id,company_name,company_key,reason,detail,permalink,contact,status,created_at&order=created_at.desc&limit=200`);
+    const rows = listRes.ok ? await listRes.json() : [];
+    const disputes = filter ? rows : orderDisputesOpenFirst(rows);
+    return res.status(200).json({ ok: true, disputes, counts, filter });
+  }
+
+  // update_reddit_dispute → move one dispute to a review state (reviewed | actioned | dismissed).
+  // Migration 054 has no reviewed_at/updated_at column, so status IS the transition. `id` is the
+  // table's bigserial PK — validated as a positive integer before it reaches the query path.
+  if (action === 'update_reddit_dispute') {
+    const idNum = Number(body.id);
+    if (!Number.isInteger(idNum) || idNum <= 0) return res.status(400).json({ error: 'A valid dispute id is required' });
+    if (!isDisputeReviewStatus(body.status)) return res.status(400).json({ error: 'status must be reviewed, actioned, or dismissed' });
+    await db(`company_reddit_disputes?id=eq.${idNum}`, { method: 'PATCH', body: JSON.stringify({ status: body.status }), headers: { Prefer: 'return=minimal' } });
+    await db('admin_audit_log', { method: 'POST', body: JSON.stringify({ admin_id: sess.admin_id, username: sess.username || 'admin', action: 'update_reddit_dispute', target_type: 'reddit_dispute', target_id: String(idNum), metadata: { status: body.status } }), headers: { Prefer: 'return=minimal' } });
     return res.status(200).json({ ok: true });
   }
 

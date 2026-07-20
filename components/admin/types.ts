@@ -40,6 +40,7 @@ export interface AdminStats {
   job_health?: { active: number; total: number; stale: number; active_pct: number; crisis: boolean }
   errors: { today: number; this_week: number; by_route: Record<string, number>; recent: { endpoint: string; error_msg: string; created_at: string }[] }
   issues: { open: number; items: Issue[] }
+  reddit_disputes?: { open: number }
   duplicate_clusters: { suspected: number; items: DupCluster[] }
   feature_flags: FeatureFlag[]
   credits: { total_users: number; pro_users: number; total_balance?: number; earned?: number; spent?: number }
@@ -47,6 +48,17 @@ export interface AdminStats {
 }
 export interface Issue {
   id: string; type: string; target_name: string; notes: string; created_at: string; status: string
+}
+// A visitor-submitted correction about a company page's surfaced public-Reddit discussion
+// (api/company-reddit.js dispute action → company_reddit_disputes, migration 054). `id` is a
+// bigserial PK; `status` is the review lifecycle: open | reviewed | actioned | dismissed.
+export interface RedditDispute {
+  id: number; company_name: string; company_key: string | null
+  reason: string; detail: string; permalink: string | null
+  contact: string | null; status: string; created_at: string
+}
+export interface RedditDisputeCounts {
+  open: number; reviewed: number; actioned: number; dismissed: number; total: number
 }
 export interface InactiveReport {
   job_id: string; report_count: number; latest_reported_at: string

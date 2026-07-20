@@ -325,3 +325,46 @@ export function sanitizeDispute(body = {}) {
     },
   };
 }
+
+// ── Admin review of disputes (the ADMIN side of the correction loop) ─────────────────
+// The dispute lifecycle mirrors migration 054's `status` column exactly: 'open' is the intake
+// state a submission lands in; an admin moves it to one of the review states below. Migration
+// 054 has NO reviewed_at/updated_at column, so a status change IS the whole state transition.
+export const DISPUTE_STATUSES = ['open', 'reviewed', 'actioned', 'dismissed'];
+// The states an admin may SET from the review queue. Never back to 'open' — a dispute only
+// leaves intake, it never re-enters it (open is where the submit endpoint puts new rows).
+export const DISPUTE_REVIEW_STATUSES = ['reviewed', 'actioned', 'dismissed'];
+
+// A valid status to FILTER the list by (any lifecycle state).
+export function isDisputeStatus(s) {
+  return typeof s === 'string' && DISPUTE_STATUSES.includes(s);
+}
+// A valid status for an admin to SET on a dispute (a review transition only).
+export function isDisputeReviewStatus(s) {
+  return typeof s === 'string' && DISPUTE_REVIEW_STATUSES.includes(s);
+}
+
+// Tally disputes by status for the review-queue header (open / reviewed / actioned / dismissed
+// + total). Accepts any row list exposing a `status`; an unrecognized status still counts toward
+// `total` but never invents a bucket, so a future lifecycle state can't corrupt the known counts.
+export function disputeStatusCounts(rows = []) {
+  const counts = { open: 0, reviewed: 0, actioned: 0, dismissed: 0, total: 0 };
+  for (const r of Array.isArray(rows) ? rows : []) {
+    const s = r && r.status;
+    if (s !== 'total' && Object.prototype.hasOwnProperty.call(counts, s)) counts[s] += 1;
+    counts.total += 1;
+  }
+  return counts;
+}
+
+// Order the default (unfiltered) review list "open first, newest first". The caller fetches rows
+// already sorted newest-first (created_at desc); this is a STABLE partition that floats the still-
+// open disputes to the top of the actionable queue while preserving recency order within each
+// group. Pure — returns a new array, never mutates the input.
+export function orderDisputesOpenFirst(rows = []) {
+  const list = Array.isArray(rows) ? rows : [];
+  return [
+    ...list.filter(r => r && r.status === 'open'),
+    ...list.filter(r => !(r && r.status === 'open')),
+  ];
+}

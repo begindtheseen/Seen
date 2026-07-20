@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import type { AdminStats, RecentReport, Issue, InactiveReport, DupCluster, RecentJob, JobGroup, DupGroup, MergePrefill, MergeLog, FeatureFlag } from './types'
+import type { AdminStats, RecentReport, Issue, RedditDispute, RedditDisputeCounts, InactiveReport, DupCluster, RecentJob, JobGroup, DupGroup, MergePrefill, MergeLog, FeatureFlag } from './types'
 import { Card, CardHeader, Badge, relTime, outcomeColor, availColor, runRefreshAndClear, refreshResultMsg } from './primitives'
 import { saveFile } from './saveFile'
 import { safeLocalGet, safeLocalSet } from '@/lib/safeStorage'
@@ -302,6 +302,160 @@ export function IssueRow({ issue, token, onRefresh, onOpenMerge }: { issue: Issu
         <button onClick={() => act('dismiss_issue')} disabled={acting} style={{ fontFamily: 'var(--mono)', fontSize: '.52rem', padding: '.22rem .6rem', borderRadius: 5, border: '1px solid var(--line2)', background: 'transparent', color: 'var(--dim)', cursor: 'pointer' }}>Dismiss</button>
       </div>
     </div>
+  )
+}
+
+// ── Reddit disputes (the ADMIN side of the company-page correction loop) ──────────────
+// Visitors flag a company page's surfaced public-Reddit discussion as a name collision,
+// outdated, misleading, or resolved (api/company-reddit.js dispute action → company_reddit_disputes,
+// migration 054). That was write-only; this panel is where an admin finally SEES and ACTS on the
+// queue. Self-fetches the review queue (list_reddit_disputes) and PATCHes a row's status
+// (update_reddit_dispute) — mirrors EmployerClaimsPanel's self-fetch/self-refresh shape and the
+// IssueRow moderation semantics.
+const DISPUTE_REASON_LABEL: Record<string, string> = {
+  not_us: 'Not us', outdated: 'Outdated', misleading: 'Misleading', resolved: 'Resolved', other: 'Other',
+}
+function disputeReasonColor(reason: string) {
+  if (reason === 'not_us') return 'var(--red)'
+  if (reason === 'misleading') return 'var(--amber)'
+  if (reason === 'resolved') return 'var(--green)'
+  if (reason === 'outdated') return 'var(--sub)'
+  return 'var(--dim)'
+}
+function disputeStatusColor(status: string) {
+  if (status === 'open') return 'var(--amber)'
+  if (status === 'actioned') return 'var(--green)'
+  if (status === 'reviewed') return 'var(--blue)'
+  return 'var(--dim)' // dismissed
+}
+type DisputeFilter = 'open' | 'reviewed' | 'actioned' | 'dismissed' | 'all'
+const DISPUTE_FILTERS: { key: DisputeFilter; label: string }[] = [
+  { key: 'open', label: 'Open' }, { key: 'reviewed', label: 'Reviewed' },
+  { key: 'actioned', label: 'Actioned' }, { key: 'dismissed', label: 'Dismissed' }, { key: 'all', label: 'All' },
+]
+// The review states an admin can set. Rendered as a button per state, minus the row's current one.
+const DISPUTE_ACTIONS: { status: 'reviewed' | 'actioned' | 'dismissed'; label: string }[] = [
+  { status: 'reviewed', label: 'Mark reviewed' }, { status: 'actioned', label: 'Actioned' }, { status: 'dismissed', label: 'Dismiss' },
+]
+
+export function RedditDisputesPanel({ token }: { token: string }) {
+  const [disputes, setDisputes] = useState<RedditDispute[]>([])
+  const [counts, setCounts] = useState<RedditDisputeCounts>({ open: 0, reviewed: 0, actioned: 0, dismissed: 0, total: 0 })
+  const [filter, setFilter] = useState<DisputeFilter>('open')
+  const [loading, setLoading] = useState(true)
+  const [busy, setBusy] = useState<number | null>(null)
+  const [err, setErr] = useState('')
+
+  // Silent reload (no loading flash after first paint) — matches EmployerClaimsPanel.
+  const load = useCallback(async () => {
+    try {
+      const res = await fetch('/api/admin-stats', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Admin-Token': token },
+        body: JSON.stringify({ action: 'list_reddit_disputes', ...(filter === 'all' ? {} : { status: filter }) }),
+      })
+      const d = await res.json()
+      if (!d.ok) throw new Error(d.error || res.status)
+      setDisputes(Array.isArray(d.disputes) ? d.disputes : [])
+      if (d.counts) setCounts(d.counts)
+      setErr('')
+    } catch (e) { setErr((e as Error).message || 'Could not load disputes') } finally { setLoading(false) }
+  }, [token, filter])
+
+  useEffect(() => { load() }, [load])
+
+  async function act(id: number, status: 'reviewed' | 'actioned' | 'dismissed') {
+    setBusy(id); setErr('')
+    // Optimistic: in a filtered view the row leaves the queue immediately; in "All" it flips state
+    // in place. A background reload then reconciles the list + counts (and reverts on failure).
+    setDisputes(list => (filter === 'all' ? list.map(x => (x.id === id ? { ...x, status } : x)) : list.filter(x => x.id !== id)))
+    try {
+      const res = await fetch('/api/admin-stats', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Admin-Token': token },
+        body: JSON.stringify({ action: 'update_reddit_dispute', id, status }),
+      })
+      const d = await res.json()
+      if (!d.ok) throw new Error(d.error || res.status)
+    } catch (e) {
+      setErr((e as Error).message || 'Update failed')
+    } finally {
+      setBusy(null)
+      load() // reconcile with the server (restores the row if the PATCH failed)
+    }
+  }
+
+  const activeLabel = (DISPUTE_FILTERS.find(f => f.key === filter)?.label || '').toLowerCase()
+  const emptyMsg = filter === 'open' ? 'No open disputes.' : `No ${activeLabel} disputes.`
+
+  return (
+    <Card style={{ marginTop: '.65rem', border: '1px solid rgba(245,158,11,.22)' }}>
+      <CardHeader
+        title="Reddit disputes"
+        badge={counts.open > 0 ? <Badge n={counts.open} color="var(--amber)" /> : undefined}
+        action={<span style={{ fontFamily: 'var(--mono)', fontSize: '.55rem', color: 'var(--dim)' }}>Corrections submitted on company pages about the surfaced public-Reddit discussion</span>}
+      />
+
+      {/* Status filter — the actionable Open queue first; the rest is review history */}
+      <div style={{ display: 'flex', gap: '.35rem', flexWrap: 'wrap', padding: '.2rem 0 .7rem', borderBottom: '1px solid var(--line2)', marginBottom: '.7rem' }}>
+        {DISPUTE_FILTERS.map(f => {
+          const n = f.key === 'all' ? counts.total : counts[f.key]
+          const active = filter === f.key
+          return (
+            <button key={f.key} onClick={() => setFilter(f.key)} style={{ fontFamily: 'var(--mono)', fontSize: '.55rem', padding: '.24rem .55rem', borderRadius: 6, border: `1px solid ${active ? 'var(--white)' : 'var(--line2)'}`, background: active ? 'rgba(255,255,255,.06)' : 'transparent', color: active ? 'var(--white)' : 'var(--sub)', cursor: 'pointer' }}>
+              {f.label}{n > 0 ? ` ${n}` : ''}
+            </button>
+          )
+        })}
+      </div>
+
+      {err && <div style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', color: 'var(--red)', marginBottom: '.6rem' }}>{err}</div>}
+
+      {loading ? (
+        <div style={{ fontFamily: 'var(--mono)', fontSize: '.6rem', color: 'var(--dim)' }}>Loading…</div>
+      ) : disputes.length === 0 ? (
+        <div style={{ fontFamily: 'var(--mono)', fontSize: '.62rem', color: filter === 'open' ? 'var(--green)' : 'var(--dim)' }}>{filter === 'open' ? '✓ ' : ''}{emptyMsg}</div>
+      ) : (
+        disputes.map(d => {
+          const reasonColor = disputeReasonColor(d.reason)
+          return (
+            <div key={d.id} style={{ display: 'flex', alignItems: 'flex-start', gap: '.65rem', padding: '.7rem 0', borderBottom: '1px solid rgba(255,255,255,.04)' }}>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '.4rem', flexWrap: 'wrap', marginBottom: '.25rem' }}>
+                  <span style={{ fontFamily: 'var(--mono)', fontSize: '.48rem', textTransform: 'uppercase', letterSpacing: '.1em', padding: '.18rem .5rem', borderRadius: 4, flexShrink: 0, color: reasonColor, background: reasonColor + '1f' }}>
+                    {DISPUTE_REASON_LABEL[d.reason] || d.reason}
+                  </span>
+                  <span style={{ fontFamily: 'var(--mono)', fontSize: '.62rem', color: 'var(--white)', fontWeight: 600 }}>{d.company_name}</span>
+                  {d.status !== 'open' && (
+                    <span style={{ fontFamily: 'var(--mono)', fontSize: '.46rem', textTransform: 'uppercase', letterSpacing: '.08em', color: disputeStatusColor(d.status), border: `1px solid ${disputeStatusColor(d.status)}`, borderRadius: 4, padding: '.1rem .35rem', flexShrink: 0 }}>{d.status}</span>
+                  )}
+                  <span style={{ fontFamily: 'var(--mono)', fontSize: '.5rem', color: 'var(--dim)', marginLeft: 'auto', flexShrink: 0 }}>{relTime(d.created_at)}</span>
+                </div>
+                <div style={{ fontFamily: 'var(--mono)', fontSize: '.6rem', color: 'var(--sub)', lineHeight: 1.5, marginTop: '.1rem', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{d.detail}</div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '.6rem', flexWrap: 'wrap', marginTop: '.3rem' }}>
+                  {d.permalink && (
+                    <a href={d.permalink} target="_blank" rel="noopener noreferrer" style={{ fontFamily: 'var(--mono)', fontSize: '.55rem', color: 'var(--blue)', textDecoration: 'none', fontWeight: 700 }}>↗ Disputed thread</a>
+                  )}
+                  {d.contact && (
+                    <a href={`mailto:${d.contact}`} style={{ fontFamily: 'var(--mono)', fontSize: '.55rem', color: 'var(--sub)', textDecoration: 'none' }}>✉ {d.contact}</a>
+                  )}
+                </div>
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '.3rem', flexShrink: 0 }}>
+                {DISPUTE_ACTIONS.filter(a => a.status !== d.status).map(a => {
+                  const c = disputeStatusColor(a.status)
+                  return (
+                    <button key={a.status} onClick={() => act(d.id, a.status)} disabled={busy === d.id} style={{ fontFamily: 'var(--mono)', fontSize: '.52rem', padding: '.22rem .6rem', borderRadius: 5, border: `1px solid ${c}4d`, background: c + '14', color: c, cursor: busy === d.id ? 'default' : 'pointer', opacity: busy === d.id ? 0.5 : 1, whiteSpace: 'nowrap' }}>
+                      {busy === d.id ? '…' : a.label}
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+          )
+        })
+      )}
+    </Card>
   )
 }
 
