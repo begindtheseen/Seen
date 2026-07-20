@@ -19,10 +19,11 @@
 import { resolveEmployerUid, resolveApprovedClaim } from '../lib/server/employerAuth.js';
 import { normalizeClaimCompany } from '../lib/server/employerClaims.js';
 import {
-  validateNewListing, buildEmployerListingRow, applyCounts, annotateListings,
+  validateNewListing, buildEmployerListingRow, applyCounts, annotateListings, isRemoteLocation,
 } from '../lib/server/employerPostings.js';
 import { validateDisputeInput } from '../lib/server/listingDisputes.js';
 import { broadcastActivity } from '../lib/server/realtime.js';
+import { geocodeLocation } from '../lib/server/geo.js';
 
 const ALLOWED = ['https://seenjobs.io', 'https://www.seenjobs.io'];
 const LISTING_TTL_DAYS = 60; // employer-posted listings live 60 days, matching paste-a-link imports.
@@ -144,6 +145,17 @@ async function createListing(res, { db, body, uid, claim }) {
     uid, company: companyName, companyKey,
     nowISO: now.toISOString(), expiresISO: expires.toISOString(),
   });
+
+  // GEO: geocode a real place to lat/lng so the listing shows in seeker radius/distance searches
+  // (api/jobs.js filters by great-circle distance when coords exist). Remote listings aren't a
+  // place — they surface via their "remote" location text on a Remote search, no coords needed.
+  // Best-effort: geocodeLocation is cached + never throws; a miss just falls back to text matching.
+  if (!isRemoteLocation(v.listing.location)) {
+    try {
+      const center = await geocodeLocation(v.listing.location, process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY);
+      if (center && center.lat != null && center.lng != null) { row.lat = center.lat; row.lng = center.lng; }
+    } catch { /* text-match fallback */ }
+  }
 
   const insRes = await db('jobs', {
     method: 'POST',
