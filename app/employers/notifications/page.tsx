@@ -51,7 +51,7 @@ async function loadEmployerData(company: string): Promise<{ jobs: Job[]; applica
   try {
     const [jr, ar] = await Promise.all([
       fetch(
-        `${url}/rest/v1/jobs?company=ilike.${enc}&select=id,title,company,city,availability_status,last_seen_at,created_at&order=last_seen_at.asc&limit=200`,
+        `${url}/rest/v1/jobs?company=ilike.${enc}&select=id,title,company,city,availability_status,last_seen_at,created_at,is_employer_posted,source,expires_at&order=last_seen_at.asc&limit=200`,
         { headers, cache: 'no-store', signal: AbortSignal.timeout(8000) },
       ),
       fetch(
@@ -204,8 +204,8 @@ export default async function EmployerNotificationsPage({
 function IntroState() {
   const rows: { emoji: string; t: string; d: string }[] = [
     { emoji: '👥', t: 'New applicants', d: 'How many candidates reported applying to each of your roles recently, and when the most recent one came in.' },
-    { emoji: '⏳', t: 'Postings going stale', d: 'Listings that haven’t been seen on their source in a while — they go stale at 7 days and expire at 14, dropping out of search.' },
-    { emoji: '⚠️', t: 'Expired postings', d: 'Listings that have expired and are being removed — so you can re-post before you lose applicant flow.' },
+    { emoji: '⏳', t: 'Aggregated listings aging off', d: 'Indexed listings drop off Seen when their source stops showing them (stale at 7 days, gone at 14). Still hiring? Post the role yourself and it stays live under your control.' },
+    { emoji: '⚠️', t: 'Dropped-off listings', d: 'Listings that left search results — with a one-click way to post the role yourself so you don’t lose applicant flow.' },
   ]
   return (
     <div style={{ background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 16, padding: '1.6rem' }}>

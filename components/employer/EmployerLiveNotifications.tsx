@@ -27,6 +27,8 @@ type Item = {
   read: boolean
   stored: boolean
   meta?: Record<string, unknown>
+  // Derived posting items carry what the employer can DO: 'repost' | 'post_yourself'.
+  action?: string | null
 }
 
 const mono = (size: string, color: string): React.CSSProperties => ({ fontFamily: 'var(--mono)', fontSize: size, color })
@@ -181,6 +183,16 @@ export function EmployerLiveNotifications() {
                       style={{ ...mono('.58rem', 'var(--white)'), border: '1px solid var(--line2)', borderRadius: 6, padding: '.25rem .6rem', textDecoration: 'none', fontWeight: 700 }}
                     >
                       ⚖ Dispute this report →
+                    </a>
+                  )}
+                  {/* Listing-decay items: the one real remedy is a first-party (re)post —
+                      deep-link to the dashboard add form prefilled from this listing. */}
+                  {(it.action === 'repost' || it.action === 'post_yourself') && it.jobId && (
+                    <a
+                      href={`/employers/dashboard?prefill=${encodeURIComponent(it.jobId)}`}
+                      style={{ ...mono('.58rem', 'var(--white)'), border: '1px solid var(--line2)', borderRadius: 6, padding: '.25rem .6rem', textDecoration: 'none', fontWeight: 700 }}
+                    >
+                      {it.action === 'repost' ? '↻ Repost this listing →' : '＋ Post this role yourself →'}
                     </a>
                   )}
                 </div>

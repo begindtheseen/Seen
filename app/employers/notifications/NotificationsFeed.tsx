@@ -12,7 +12,7 @@ import { useEffect, useState } from 'react'
 
 export type FeedItem = {
   id: string
-  kind: 'new_applicants' | 'posting_expired' | 'posting_stale' | 'posting_nearing_stale'
+  kind: 'new_applicants' | 'posting_expired' | 'posting_stale' | 'posting_nearing_stale' | 'posting_expiring'
   severity: 'critical' | 'warning' | 'info'
   title: string
   detail: string
@@ -22,6 +22,10 @@ export type FeedItem = {
   count?: number
   daysUntilExpiry?: number
   ageDays?: number | null
+  // What the employer can DO about it: 'repost' (their own listing is expiring) or
+  // 'post_yourself' (an aggregated listing is decaying — post a first-party copy).
+  action?: 'repost' | 'post_yourself' | null
+  jobId?: string | null
 }
 
 type Summary = {
@@ -64,9 +68,10 @@ function relTime(iso: string | null, nowMs: number): string {
 }
 
 const KIND_META: Record<FeedItem['kind'], { icon: string; color: string; ring: string; label: string }> = {
-  posting_expired: { icon: '🛑', color: 'var(--red)', ring: 'rgba(239,68,68,.28)', label: 'Expired' },
-  posting_stale: { icon: '⏳', color: 'var(--amber)', ring: 'rgba(245,158,11,.28)', label: 'Going stale' },
-  posting_nearing_stale: { icon: '⏳', color: 'var(--amber)', ring: 'rgba(245,158,11,.22)', label: 'Needs refresh' },
+  posting_expired: { icon: '🛑', color: 'var(--red)', ring: 'rgba(239,68,68,.28)', label: 'Dropped off' },
+  posting_stale: { icon: '⏳', color: 'var(--amber)', ring: 'rgba(245,158,11,.28)', label: 'Dropping off soon' },
+  posting_nearing_stale: { icon: '⏳', color: 'var(--amber)', ring: 'rgba(245,158,11,.22)', label: 'Aging off' },
+  posting_expiring: { icon: '📅', color: 'var(--amber)', ring: 'rgba(245,158,11,.25)', label: 'Expiring — repost' },
   new_applicants: { icon: '👥', color: 'var(--blue)', ring: 'rgba(59,130,246,.26)', label: 'New applicants' },
 }
 
@@ -108,9 +113,9 @@ export function NotificationsFeed({
     <div>
       {/* Summary strip */}
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: '.5rem', marginBottom: '1.4rem', alignItems: 'center' }}>
-        <SummaryPill n={summary.postingsExpired} label="expired" color="var(--red)" />
-        <SummaryPill n={summary.postingsStale} label="going stale" color="var(--amber)" />
-        <SummaryPill n={summary.postingsNearingStale} label="need a refresh" color="var(--amber)" />
+        <SummaryPill n={summary.postingsExpired} label="dropped off" color="var(--red)" />
+        <SummaryPill n={summary.postingsStale} label="dropping off soon" color="var(--amber)" />
+        <SummaryPill n={summary.postingsNearingStale} label="aging off" color="var(--amber)" />
         <SummaryPill n={summary.newApplicants} label={`new applicant${summary.newApplicants === 1 ? '' : 's'}`} color="var(--blue)" />
         {mounted && lastVisit != null && newCount > 0 && (
           <span style={{ marginLeft: 'auto', fontFamily: 'var(--mono)', fontSize: '.58rem', color: 'var(--green)', border: '1px solid rgba(16,185,129,.3)', borderRadius: 999, padding: '.28rem .7rem' }}>
@@ -148,6 +153,17 @@ export function NotificationsFeed({
                   )}
                 </div>
                 <p style={{ color: 'var(--sub)', fontSize: '.78rem', lineHeight: 1.6, margin: '.3rem 0 0' }}>{it.detail}</p>
+                {/* Actionable, not just informational: reposting/first-party posting is the one
+                    thing an employer can actually DO about listing decay. Deep-links to the
+                    dashboard's add-a-listing form prefilled from this listing. */}
+                {it.action && it.jobId && (
+                  <a
+                    href={`/employers/dashboard?prefill=${encodeURIComponent(it.jobId)}`}
+                    style={{ display: 'inline-block', marginTop: '.55rem', fontFamily: 'var(--mono)', fontSize: '.6rem', fontWeight: 700, color: 'var(--white)', border: '1px solid var(--line2)', borderRadius: 6, padding: '.3rem .7rem', textDecoration: 'none' }}
+                  >
+                    {it.action === 'repost' ? '↻ Repost this listing →' : '＋ Post this role yourself →'}
+                  </a>
+                )}
                 <div style={{ display: 'flex', gap: '.7rem', marginTop: '.5rem', flexWrap: 'wrap' }}>
                   <span
                     style={{ fontFamily: 'var(--mono)', fontSize: '.55rem', textTransform: 'uppercase', letterSpacing: '.08em', color: meta.color }}
