@@ -115,27 +115,46 @@ export function EmployerListingsManager() {
   // reported" is disputable in one click, not a hunt through the table. Params are consumed
   // (replaceState) so refresh/back doesn't re-open the modal.
   const deepLinkRef = useRef<{ jobId: string; kind: DisputeKind } | null>(null)
+  // ?prefill=<jobId> (from a listing-decay notification): open Add-a-listing prefilled from
+  // that listing — "post this role yourself" / "repost" in one click.
+  const prefillLinkRef = useRef<string | null>(null)
+  const [prefill, setPrefill] = useState<ListingPrefill | null>(null)
   useEffect(() => {
     try {
       const p = new URLSearchParams(window.location.search)
       const jid = p.get('dispute')
-      if (!jid) return
-      const k = p.get('kind') as DisputeKind | null
-      deepLinkRef.current = { jobId: jid, kind: k && KIND_OPTIONS.some(o => o.value === k) ? k : 'still_active' }
-      p.delete('dispute'); p.delete('kind')
+      const pre = p.get('prefill')
+      if (!jid && !pre) return
+      if (jid) {
+        const k = p.get('kind') as DisputeKind | null
+        deepLinkRef.current = { jobId: jid, kind: k && KIND_OPTIONS.some(o => o.value === k) ? k : 'still_active' }
+      }
+      if (pre) prefillLinkRef.current = pre
+      p.delete('dispute'); p.delete('kind'); p.delete('prefill')
       const qs = p.toString()
       window.history.replaceState(null, '', window.location.pathname + (qs ? `?${qs}` : '') + window.location.hash)
     } catch { /* deep link is best-effort */ }
   }, [])
   useEffect(() => {
+    if (loading) return
     const dl = deepLinkRef.current
-    if (!dl || loading) return
-    const target = listings.find(l => String(l.id) === dl.jobId)
-    if (target) {
-      deepLinkRef.current = null
-      setShowAll(true)
-      setModalDefaultKind(dl.kind)
-      setDisputeFor(target)
+    if (dl) {
+      const target = listings.find(l => String(l.id) === dl.jobId)
+      if (target) {
+        deepLinkRef.current = null
+        setShowAll(true)
+        setModalDefaultKind(dl.kind)
+        setDisputeFor(target)
+      }
+    }
+    const pre = prefillLinkRef.current
+    if (pre) {
+      const target = listings.find(l => String(l.id) === pre)
+      prefillLinkRef.current = null
+      // Prefill from the listing when we have it (title/location/apply link — the list shape
+      // carries no description); an unknown id still opens the empty form rather than nothing.
+      setPrefill(target ? { title: target.title, location: target.location, apply_url: target.apply_url } : {})
+      setShowAdd(true)
     }
   }, [loading, listings])
 
@@ -286,7 +305,7 @@ export function EmployerListingsManager() {
       )}
 
       {/* Add-a-listing form */}
-      {showAdd && <AddListingForm token={token} onCreated={() => { setShowAdd(false); load() }} />}
+      {showAdd && <AddListingForm key={prefill ? `pre-${prefill.title || 'blank'}` : 'blank'} token={token} initial={prefill} onCreated={() => { setShowAdd(false); setPrefill(null); load() }} />}
 
       {/* Listings */}
       {listings.length === 0 ? (
@@ -390,12 +409,14 @@ function Stat({ value, label, color }: { value: number; label: string; color: st
 }
 
 // ── Add-a-listing form ────────────────────────────────────────────────────────
-function AddListingForm({ token, onCreated }: { token: () => Promise<string | null>; onCreated: () => void }) {
-  const [title, setTitle] = useState('')
-  const [applyUrl, setApplyUrl] = useState('')
-  const [location, setLocation] = useState('')
-  const [salary, setSalary] = useState('')
-  const [description, setDescription] = useState('')
+export type ListingPrefill = { title?: string; apply_url?: string | null; location?: string | null; salary?: string | null; description?: string | null }
+
+function AddListingForm({ token, onCreated, initial }: { token: () => Promise<string | null>; onCreated: () => void; initial?: ListingPrefill | null }) {
+  const [title, setTitle] = useState(initial?.title || '')
+  const [applyUrl, setApplyUrl] = useState(initial?.apply_url || '')
+  const [location, setLocation] = useState(initial?.location || '')
+  const [salary, setSalary] = useState(initial?.salary || '')
+  const [description, setDescription] = useState(initial?.description || '')
   const [type, setType] = useState('Full-time')
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState('')

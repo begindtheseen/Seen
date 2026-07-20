@@ -81,7 +81,7 @@ async function listFeed(res, { db, claim }) {
     db(`employer_notifications?company_key=eq.${encodeURIComponent(companyKey)}` +
        `&select=id,kind,severity,title,body,job_id,meta,read_at,created_at&order=created_at.desc&limit=200`),
     db(`jobs?company=ilike.${encodeURIComponent(nameFilter)}` +
-       `&select=id,title,company,city,availability_status,last_seen_at,created_at&order=last_seen_at.asc&limit=200`),
+       `&select=id,title,company,city,availability_status,last_seen_at,created_at,is_employer_posted,source,expires_at&order=last_seen_at.asc&limit=200`),
     db(`applications?company_name=ilike.${encodeURIComponent(nameFilter)}` +
        `&select=role,city,status,created_at&order=created_at.desc&limit=200`),
   ]);
