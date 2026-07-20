@@ -180,9 +180,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // account_type (migration 050, NOT NULL) is the source of truth for employer vs seeker; fall
   // back to the legacy `type` for any older row. Reading the REAL profile row — not a hardcoded
   // 'seeker' — is what lets an employer be routed to the portal instead of the seeker dashboard.
-  const accountType = profile?.account_type || profile?.type
-  const isEmployer = isLoggedIn && accountType === 'employer'
-  const isSeeker = isLoggedIn && accountType !== 'employer'
+  const profileType = profile?.account_type || profile?.type || ''
+  // DEFENSE IN DEPTH: also honor the employer choice recorded on the user's OWN signup JWT
+  // (user_metadata, set by app/login/page.tsx). If the profiles row lags or was mislabeled — e.g.
+  // a signup created before migration 052 fixed the trigger, which silently wrote account_type
+  // 'seeker' — the metadata still carries the real intent, so a genuine employer is never trapped
+  // in the seeker login loop (verify → /employers → "sign in" → seeker dashboard → repeat). The
+  // metadata can only UPGRADE to employer (never demote) and reflects this user's own choice.
+  const metaType = (user?.user_metadata?.account_type || user?.user_metadata?.role_type || user?.user_metadata?.type || '') as string
+  const isEmployer = isLoggedIn && (profileType === 'employer' || metaType === 'employer')
+  const isSeeker = isLoggedIn && !isEmployer
 
   // Load claims only for employers (seekers never have any). Re-runs when employer status resolves
   // (profile loads after login). A seeker / logged-out user is claims-ready immediately with none.
