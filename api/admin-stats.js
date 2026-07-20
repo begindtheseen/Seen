@@ -1040,7 +1040,7 @@ async function _handler(req, res) {
       } else if (effect.edit && effect.patch && UUID.test(jid)) {
         // Apply the employer's sanitized proposed changes. Keep the legacy `url` alias in lockstep
         // with apply_url when that field is edited.
-        const patch = { ...effect.patch, ...(effect.patch.apply_url ? { url: effect.patch.apply_url } : {}), last_checked_at: new Date().toISOString() };
+        const patch = { ...effect.patch, last_checked_at: new Date().toISOString() };
         const up = await db(`jobs?id=eq.${encodeURIComponent(jid)}`, { method: 'PATCH', body: JSON.stringify(patch), headers: { Prefer: 'return=minimal' } });
         applied.edited = up.ok;
       }
