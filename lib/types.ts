@@ -90,6 +90,21 @@ export interface Job {
   posted_at?: string | null
   /** Paid Featured-employer placement (Engine E4) — badge + sorts first. Never a score change. */
   featured?: boolean
+  /** Factual, our-own-observation freshness descriptor (see lib/server/listingFreshness.js). */
+  freshness?: ListingFreshness
+}
+
+/**
+ * Literally-true observations of OUR data about a listing — never a claim about the employer.
+ * `label` is a single factual sentence safe to render verbatim; '' when nothing is known.
+ */
+export interface ListingFreshness {
+  daysListed: number | null
+  daysSinceSeen: number | null
+  reportCount: number
+  isEmployerPosted: boolean
+  freshness: 'fresh' | 'aging' | 'stale' | 'unknown' | 'employer'
+  label: string
 }
 
 export interface CheckScheduleItem {

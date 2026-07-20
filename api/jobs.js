@@ -5,6 +5,7 @@ import { logError } from '../lib/server/errlog.js';
 import { filterAndRank, filterByLocation, sortByProximity, locationDbTerm } from './_utils/jobRelevance.js';
 import { aggregateForQuery, upsertJobs, inferLevel } from '../lib/server/jobSources.js';
 import { scoreJob, wasteScore, scoreRow, explainListingScore } from '../lib/server/jobScore.js';
+import { computeListingFreshness } from '../lib/server/listingFreshness.js';
 import { geocodeLocation, haversineMiles, milesToKm } from '../lib/server/geo.js';
 
 // ── Suppressed listings (migration 047) ─────────────────────────────────────────────────────
@@ -140,13 +141,18 @@ export default async function handler(req, res) {
       // reject the whole select, so every direct /jobs/<id> link 404'd. Same class as the
       // employer-listings phantom-url bug; `url` is aliased from apply_url in the response.
       const r = await fetch(
-        `${U}/rest/v1/jobs?id=eq.${encodeURIComponent(id)}&select=id,title,company,location,salary,apply_url,description,type,level,source,score,waste_score,availability_status&limit=1`,
+        `${U}/rest/v1/jobs?id=eq.${encodeURIComponent(id)}&select=id,title,company,location,salary,apply_url,description,type,level,source,score,waste_score,availability_status,created_at,last_seen_at,last_checked_at,availability_report_count,is_employer_posted&limit=1`,
         { headers: { apikey: K, Authorization: `Bearer ${K}` } }
       );
       const rows = r.ok ? await r.json() : [];
       if (!Array.isArray(rows) || !rows.length) return res.status(404).json({ error: 'Not found' });
-      // Attach the score's factor breakdown so the detail page can show WHY, not just a number.
-      const job = { ...rows[0], url: rows[0].apply_url || null, ...scoreRow(rows[0]), score_explanation: explainListingScore(rows[0]) };
+      // Attach the score's factor breakdown so the detail page can show WHY, not just a number,
+      // plus the factual freshness descriptor (our-own-observation facts — never an employer verdict).
+      const job = {
+        ...rows[0], url: rows[0].apply_url || null,
+        ...scoreRow(rows[0]), score_explanation: explainListingScore(rows[0]),
+        freshness: computeListingFreshness(rows[0]),
+      };
       return res.status(200).json({ job });
     } catch (e) {
       logError('jobs/get_by_id', e.message);
