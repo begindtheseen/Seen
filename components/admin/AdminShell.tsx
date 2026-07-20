@@ -5,7 +5,7 @@ import type { AdminStats, AttnItem, MergePrefill } from './types'
 import { Panel, MetricRow, Card, CardHeader, Badge, BarChart, relTime, outcomeColor, stageColor, runRefreshAndClear, refreshResultMsg } from './primitives'
 import { AdminHero, AdminCommandCenter, AdminMetricCard, CardSubLink, AdminAttentionQueue, AdminTabs, type HealthStatus, type TabKey } from './overview'
 import { KpiModal, ManageAccountsModal, RevenueDetailModal, TrialsDetailModal, SharesDetailModal, ErrorsDetailModal } from './modals'
-import { JobCrisisBanner, JobRefreshButton, JobRunner, ReportRow, IssueRow, InactiveRow, MergePanel, CompanyExportPanel, CreditsPanel, FlagsPanel, ClustersPanel, JobDedupePanel, AllJobsBrowser, DeployPanel } from './panels'
+import { JobCrisisBanner, JobRefreshButton, JobRunner, ReportRow, IssueRow, RedditDisputesPanel, InactiveRow, MergePanel, CompanyExportPanel, CreditsPanel, FlagsPanel, ClustersPanel, JobDedupePanel, AllJobsBrowser, DeployPanel } from './panels'
 import { GhostReportPanel } from './GhostReportPanel'
 import { LiveBell } from './LiveBell'
 import { EmployerPanel } from './EmployerPanel'
@@ -103,6 +103,7 @@ export function AdminShell({ stats, token, reload, onLogout, onUnauthorized }: {
   const errToday = stats.errors?.today ?? 0
   const dupSuspected = stats.duplicate_clusters?.suspected ?? 0
   const openIssues = stats.issues?.open ?? 0
+  const openDisputes = stats.reddit_disputes?.open ?? 0
   const stripeOn = !!m?.stripe_connected
 
   // Data-flywheel status phrase from real activity (product-critical panel).
@@ -124,6 +125,7 @@ export function AdminShell({ stats, token, reload, onLogout, onUnauthorized }: {
   if (dupSuspected > 0) attn.push({ key: 'dup', sev: 'amber', title: `${dupSuspected} suspected duplicate account cluster${dupSuspected === 1 ? '' : 's'}`, detail: 'Shared-signal groups flagged for anti-Sybil review (Advanced tools → clusters).' })
   if (inactiveCount > 0) attn.push({ key: 'inactive', sev: 'amber', title: `${inactiveCount} reported inactive listing${inactiveCount === 1 ? '' : 's'}`, detail: 'Users flagged these jobs as no longer active — open each report to view the listing, then delete it or dismiss the report.', action: { label: 'Review', onClick: goToReportedListings } })
   if (openIssues > 0) attn.push({ key: 'issues', sev: 'amber', title: `${openIssues} open data-quality issue${openIssues === 1 ? '' : 's'}`, detail: 'Community-reported data problems awaiting resolution (Advanced tools → issues).' })
+  if (openDisputes > 0) attn.push({ key: 'disputes', sev: 'amber', title: `${openDisputes} open Reddit dispute${openDisputes === 1 ? '' : 's'}`, detail: 'Visitors flagged the surfaced public-Reddit discussion on a company page — review and act (Community Data → Reddit disputes).' })
 
   // ── Overall health for the hero pill + one-sentence summary (real signals only) ──
   const hasWarnings = attn.some(a => a.sev === 'red' || a.sev === 'amber')
@@ -144,6 +146,7 @@ export function AdminShell({ stats, token, reload, onLogout, onUnauthorized }: {
     if (needsReviewCount > 0) probs.push(`${needsReviewCount} report${needsReviewCount === 1 ? '' : 's'} to review`)
     if (inactiveCount > 0) probs.push(`${inactiveCount} flagged listing${inactiveCount === 1 ? '' : 's'}`)
     if (openIssues > 0) probs.push(`${openIssues} data issue${openIssues === 1 ? '' : 's'}`)
+    if (openDisputes > 0) probs.push(`${openDisputes} Reddit dispute${openDisputes === 1 ? '' : 's'}`)
     if (dupSuspected > 0) probs.push(`${dupSuspected} duplicate cluster${dupSuspected === 1 ? '' : 's'}`)
     const head = probs.length ? probs.slice(0, 3).join(', ') : 'a few items need a look'
     summary = head.charAt(0).toUpperCase() + head.slice(1) + ' — clear the queue below.'
@@ -261,6 +264,9 @@ export function AdminShell({ stats, token, reload, onLogout, onUnauthorized }: {
           </Panel>
 
             <GhostReportPanel />
+
+            {/* Reddit disputes — the ADMIN side of the company-page correction loop (migration 054) */}
+            <RedditDisputesPanel token={token} />
 
             {/* Company lookups setup note */}
             {stats.company_lookups && !stats.company_lookups.ready && (
