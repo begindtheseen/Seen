@@ -9,6 +9,7 @@ import { fuseCompanyIntel, classifyPlatform } from './_utils/companyIntel.js';
 import { recomputeCompanyScoreFromReports, fetchConfirmedStaleCount } from './_utils/reportWrite.js';
 import { anthropicEnabled } from '../lib/server/aiflag.js';
 import { listEmployerListings, closeEmployerListing } from '../lib/server/employerListings.js';
+import { buildSearchUrl, parseRedditSearchAtom } from './_utils/companyReddit.js';
 
 // Authorize admin/cron-only actions (the Anthropic web-research endpoints). Accepts a Vercel
 // cron header, a shared CRON_SECRET, or a valid admin_sessions token. Everything Anthropic in
@@ -1012,6 +1013,43 @@ Return ONLY a valid JSON array. Return [] if there are genuinely no hiring exper
 
       await sleep(1000);
     }
+
+    // ── Source 4: GLOBAL Reddit search RSS (the transport that actually answers) ──────────
+    // The per-subreddit search RSS above (Source 2) is throttled/blocked from serverless IPs —
+    // it returns 0 even for heavily-discussed companies. The company page's live Reddit search
+    // (api/company-reddit.js) proved the GLOBAL /search/.rss endpoint, with a www→old.reddit
+    // host fallback, gets through reliably. Reuse that exact transport here so the scored ingest
+    // actually pulls posts. Job-context-biased query (buildSearchUrl), past year, www→old fallback.
+    // Items carry title + a body snippet — enough for the classifier without the (also-blocked)
+    // .json comments fetch. Every post stays attributed third-party discussion at reddit weight.
+    async function redditGlobalSearch(company) {
+      const hosts = ['https://www.reddit.com', 'https://old.reddit.com'];
+      for (const host of hosts) {
+        try {
+          const r = await fetch(buildSearchUrl(company, { host, limit: 25 }), {
+            headers: { 'User-Agent': 'SeenJobs/1.0 RSS reader (+https://seenjobs.io)', Accept: 'application/rss+xml, application/atom+xml, text/xml' },
+            signal: AbortSignal.timeout(7000),
+          });
+          if (r.status === 429 || !r.ok) continue;   // throttled/error on this host → try the next
+          const items = parseRedditSearchAtom(await r.text());
+          if (items.length) {
+            return items.map(it => ({ id: it.id, title: it.title, body: it._body || '', subreddit: it.subreddit, permalink: it.permalink, created: it.created }));
+          }
+        } catch { /* timeout/network → try the next host */ }
+      }
+      return [];
+    }
+    await pMap(companies, async (company) => {
+      const globalPosts = await redditGlobalSearch(company);
+      // Keep only posts with real job context (the search is company-biased; this filters out
+      // product/shopping threads for common-word brands — same gate as the /new source above).
+      const cl = company.toLowerCase();
+      const relevant = globalPosts.filter(p => {
+        const txt = `${p.title} ${p.body}`.toLowerCase();
+        return txt.includes(cl) && keywords.some(k => txt.includes(k));
+      });
+      postsByCompany[company].push(...relevant);
+    }, 4);
 
     const results = {};
 
