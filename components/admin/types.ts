@@ -41,6 +41,10 @@ export interface AdminStats {
   errors: { today: number; this_week: number; by_route: Record<string, number>; recent: { endpoint: string; error_msg: string; created_at: string }[] }
   issues: { open: number; items: Issue[] }
   reddit_disputes?: { open: number }
+  // Employer-side attention signals surfaced in the overview queue (see AdminShell).
+  employer_claims?: { pending: number }
+  listing_disputes?: { open: number }
+  employer_purchases?: { unfulfilled: number }
   duplicate_clusters: { suspected: number; items: DupCluster[] }
   feature_flags: FeatureFlag[]
   credits: { total_users: number; pro_users: number; total_balance?: number; earned?: number; spent?: number }
