@@ -98,7 +98,7 @@ async function listListings(res, { db, uid, claim }) {
   // newest first. NOT gated on expires_at — the employer manages the whole set.
   const [jobsRes, dispRes, evRes, appRes] = await Promise.all([
     db(`jobs?company=ilike.${encodeURIComponent(nameFilter)}` +
-       `&select=id,title,company,location,city,apply_url,url,source,availability_status,expires_at,created_at,is_employer_posted,employer_user_id` +
+       `&select=id,title,company,location,city,apply_url,source,availability_status,expires_at,created_at,is_employer_posted,employer_user_id` +
        `&order=created_at.desc&limit=300`),
     db(`listing_disputes?employer_user_id=eq.${encodeURIComponent(uid)}&status=eq.open` +
        `&select=id,job_id,kind,status,created_at&order=created_at.desc&limit=300`),
