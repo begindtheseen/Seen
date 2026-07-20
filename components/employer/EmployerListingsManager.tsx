@@ -558,8 +558,10 @@ function DisputeModal({ listing, token, onClose, onSubmitted, defaultKind }: { l
   }
 
   return (
-    <div onClick={onClose} style={{ position: 'fixed', inset: 0, zIndex: 200, background: 'rgba(3,5,12,.72)', display: 'flex', alignItems: 'flex-start', justifyContent: 'center', padding: '4vh 1rem', overflowY: 'auto' }}>
-      <div onClick={e => e.stopPropagation()} style={{ width: '100%', maxWidth: 560, background: 'var(--card)', border: '1px solid var(--line2)', borderRadius: 16, padding: '1.6rem' }}>
+    <div onClick={onClose} style={{ position: 'fixed', inset: 0, zIndex: 200, background: 'rgba(2,4,10,.86)', backdropFilter: 'blur(6px)', WebkitBackdropFilter: 'blur(6px)', display: 'flex', alignItems: 'flex-start', justifyContent: 'center', padding: '4vh 1rem', overflowY: 'auto' }}>
+      {/* SOLID surface — var(--card) is a translucent 3%-white raised tint (fine layered over a
+          solid bg, but see-through as a floating panel), so the modal uses an opaque background. */}
+      <div onClick={e => e.stopPropagation()} style={{ width: '100%', maxWidth: 560, background: 'var(--surface)', border: '1px solid var(--line2)', borderRadius: 16, padding: '1.6rem', boxShadow: '0 24px 70px rgba(0,0,0,.7)' }}>
         <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '1rem', marginBottom: '.3rem' }}>
           <div style={{ fontFamily: 'var(--display)', fontSize: '1.15rem', fontWeight: 800, color: 'var(--white)', letterSpacing: '-.02em' }}>Dispute a listing</div>
           <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'var(--dim)', fontSize: '1rem', cursor: 'pointer', lineHeight: 1 }}>✕</button>
