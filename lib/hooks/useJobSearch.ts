@@ -54,7 +54,7 @@ export type PostedFilter = '' | '1' | '7' | '30'
 export type CoScoreMap = Record<string, { ghost_rate: number; overall_score: number; response_rate?: number }>
 
 export function useJobSearch() {
-  const { isLoggedIn, profile } = useAuth()
+  const { isLoggedIn, profile, token } = useAuth()
   const [query, setQuery] = useState('')
   const [location, setLocation] = useState('')
   const autoSearchedRef = useRef(false)
@@ -307,6 +307,12 @@ export function useJobSearch() {
       if (!cached) { setJobs([]); setFiltered([]) }
     }
 
+    // Send the signed-in user's token so the server rate-buckets PER USER, not per shared
+    // IP — this is what lets several people on one WiFi (or a whole CGNAT carrier) search
+    // at the same time without starving each other. Anonymous users fall back to IP.
+    let authToken: string | null = null
+    if (isLoggedIn) { try { authToken = await token() } catch { /* anonymous bucket */ } }
+
     // One automatic retry on a transient failure (cold start, flaky network) before
     // ever showing an error — a single blip should never surface as "Search failed".
     for (let attempt = 0; ; attempt++) {
@@ -315,10 +321,17 @@ export function useJobSearch() {
         abortRef.current = ctrl
         const res = await fetch('/api/jobs', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}) },
           body: JSON.stringify({ query: q, location: loc, radius }),
           signal: ctrl.signal,
         })
+        if (res.status === 429) {
+          // The abuse ceiling (not a normal condition since search became tiered). Say what
+          // it is instead of a generic failure — and don't burn the retry on it.
+          setStatus('error')
+          setStatusMsg('You’re searching very fast — give it a few seconds and try again.')
+          return
+        }
         if (!res.ok) throw new Error(`HTTP ${res.status}`)
         const data = await res.json() as { jobs?: unknown[]; results?: unknown[]; widened?: boolean; radius?: number }
         const raw: Job[] = (data.jobs || data.results || []).map((item: unknown) => {

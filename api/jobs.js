@@ -1,6 +1,6 @@
 import { createHmac, timingSafeEqual } from 'crypto';
 import { getQueryExpansion } from '../lib/server/expand.js';
-import { applyRateLimit, rateLimit } from '../lib/server/ratelimit.js';
+import { applyRateLimit, rateLimit, rateLimitGlobal, resolveRateBucket } from '../lib/server/ratelimit.js';
 import { logError } from '../lib/server/errlog.js';
 import { filterAndRank, filterByLocation, sortByProximity, locationDbTerm } from './_utils/jobRelevance.js';
 import { aggregateForQuery, upsertJobs, inferLevel } from '../lib/server/jobSources.js';
@@ -111,34 +111,42 @@ export default async function handler(req, res) {
     return handleLocationJobs(req, res, _body);
   }
 
+  // Rate bucket: the signed-in USER when the request carries a verifiable JWT, else the IP.
+  // Per-user buckets are the scale fix for shared IPs (household/office/CGNAT) — users no
+  // longer starve each other out of one shared allowance.
+  const rlBucket = resolveRateBucket(req);
+
   // ── Company jobs: fetch/search jobs for a specific company ─────────────────
   if (_body.action === 'company_jobs') {
-    if (await applyRateLimit(req, res, 'job-search')) return;
+    if (await applyRateLimit(req, res, 'job-read', { bucketKey: rlBucket.key })) return;
     return handleCompanyJobs(req, res, _body);
   }
 
   // ── Recommended jobs: personalized from resume_skills ────────────────────
   if (_body.action === 'recommended') {
-    if (await applyRateLimit(req, res, 'job-search')) return;
+    if (await applyRateLimit(req, res, 'job-read', { bucketKey: rlBucket.key })) return;
     return handleRecommended(req, res, _body);
   }
 
   // ── Get single job by ID — direct link / refresh fallback ──────────────────
   if (_body.action === 'get_by_id') {
-    if (await applyRateLimit(req, res, 'job-search')) return;
+    if (await applyRateLimit(req, res, 'job-read', { bucketKey: rlBucket.key })) return;
     const { id } = _body;
     if (!id || typeof id !== 'string') return res.status(400).json({ error: 'id required' });
     const U = process.env.SUPABASE_URL, K = process.env.SUPABASE_SERVICE_KEY;
     if (!U || !K) return res.status(503).json({ error: 'DB unavailable' });
     try {
+      // NOTE: jobs has apply_url ONLY — selecting a phantom `url` column made PostgREST
+      // reject the whole select, so every direct /jobs/<id> link 404'd. Same class as the
+      // employer-listings phantom-url bug; `url` is aliased from apply_url in the response.
       const r = await fetch(
-        `${U}/rest/v1/jobs?id=eq.${encodeURIComponent(id)}&select=id,title,company,location,salary,apply_url,url,description,type,level,source,score,waste_score,availability_status&limit=1`,
+        `${U}/rest/v1/jobs?id=eq.${encodeURIComponent(id)}&select=id,title,company,location,salary,apply_url,description,type,level,source,score,waste_score,availability_status&limit=1`,
         { headers: { apikey: K, Authorization: `Bearer ${K}` } }
       );
       const rows = r.ok ? await r.json() : [];
       if (!Array.isArray(rows) || !rows.length) return res.status(404).json({ error: 'Not found' });
       // Attach the score's factor breakdown so the detail page can show WHY, not just a number.
-      const job = { ...rows[0], ...scoreRow(rows[0]), score_explanation: explainListingScore(rows[0]) };
+      const job = { ...rows[0], url: rows[0].apply_url || null, ...scoreRow(rows[0]), score_explanation: explainListingScore(rows[0]) };
       return res.status(200).json({ job });
     } catch (e) {
       logError('jobs/get_by_id', e.message);
@@ -146,7 +154,10 @@ export default async function handler(req, res) {
     }
   }
 
-  const limited = await applyRateLimit(req, res, 'job-search');
+  // Main search: the per-bucket 'job-search' cap is an ABUSE ceiling (~10/min sustained),
+  // not a usage meter — the cheap DB-first path below must survive real traffic. The
+  // expensive live top-up is separately budgeted at the aggregation branch.
+  const limited = await applyRateLimit(req, res, 'job-search', { bucketKey: rlBucket.key });
   if (limited) return;
 
   // Declare catch-block variables in outer scope so the catch handler can access them
@@ -319,6 +330,23 @@ export default async function handler(req, res) {
         }
       } catch(e) { console.warn('DB-first search error:', e.message); }
       console.log(`DB TOP-UP: "${query}" → "${canonical}" @ "${loc}" — ${dbMatches.length} in DB, pulling more from API`);
+    }
+
+    // ── Expensive live top-up: BUDGETED, never user-blocking ─────────────────────
+    // Live aggregation (Adzuna pulls + first-time LLM expansion) is the only costly part
+    // of a search. It's capped per bucket AND by a global platform budget so 10k users
+    // searching at once can't stampede external spend — and when the budget is out we
+    // serve what the corpus already has (degraded), never a 429: search must never go
+    // blank over budget.
+    const [topupBucket, topupGlobal] = await Promise.all([
+      rateLimit(req, 'job-search-topup', { bucketKey: rlBucket.key }),
+      rateLimitGlobal('agg-global'),
+    ]);
+    if (!topupBucket.allowed || !topupGlobal.allowed) {
+      let degradedJobs = dbMatches.slice(0, 60);
+      if (!degradedJobs.length) degradedJobs = await nearestListings(loc, SUPABASE_URL, dbHeaders);
+      console.log(`DEGRADED (top-up budget out — bucket:${topupBucket.allowed} global:${topupGlobal.allowed}): "${query}" @ "${loc}" — ${degradedJobs.length} DB results`);
+      return res.status(200).json({ ok: true, jobs: applyFeatured(dropSuppressed(degradedJobs, suppressedSet), featuredSet), query, location: loc, _src: 'db-degraded', degraded: true });
     }
 
     // ── Not enough in our corpus → aggregate LIVE from keyless sources ───────────
@@ -585,7 +613,14 @@ async function handleCompanyJobs(req, res, body) {
 
   // No cached jobs — aggregate LIVE from keyless sources (Adzuna), saving the jobs AND
   // creating the company. Keyed by the company name so future visits hit the DB cache.
+  // Draws from the same GLOBAL aggregation budget as the main search — when it's out,
+  // return the (thin) DB result instead of spending; the cron refresh will fill in.
   try {
+    const budget = await rateLimitGlobal('agg-global');
+    if (!budget.allowed) {
+      console.log(`COMPANY DEGRADED (global agg budget out): "${safeName}"`);
+      return res.status(200).json({ ok: true, jobs: [], _src: 'db-degraded', degraded: true });
+    }
     const agg = await aggregateForQuery({
       query: safeName,
       location: '',
