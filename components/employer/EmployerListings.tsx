@@ -1,7 +1,8 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useEmployerCompany } from './EmployerCompanyContext'
+import { useAuth } from '@/lib/auth'
 
 // Manage your listings — the employer portal's first real management surface
 // (seen-command#94). Seen's corpus is ingest-driven and the portal is account-free, so
@@ -27,6 +28,12 @@ const mono = (size: string, color: string): React.CSSProperties => ({ fontFamily
 
 export function EmployerListings() {
   const { setCompany } = useEmployerCompany()
+  const { ready, isEmployer, employerCompany, claimsReady } = useAuth()
+  // A logged-in employer with an APPROVED claim is SCOPED to their own company: auto-load THEIR
+  // listings and lock the input, so the portal can never surface (or offer to close) another
+  // company's postings. Logged-out / unclaimed visitors keep the open company lookup.
+  const scoped = !!(ready && claimsReady && isEmployer && employerCompany)
+
   const [name, setName] = useState('')
   const [loading, setLoading] = useState(false)
   const [checked, setChecked] = useState('')
@@ -34,10 +41,10 @@ export function EmployerListings() {
   const [rows, setRows] = useState<Record<string, RowState>>({})
   const [err, setErr] = useState('')
 
-  async function look() {
-    const q = name.trim()
+  async function runLookup(raw: string) {
+    const q = raw.trim()
     if (!q) return
-    setCompany(q) // carry the looked-up company to the portal's surface links (EmployerSurfaces)
+    setCompany(q) // carry the company to the portal's surface links (EmployerSurfaces)
     setLoading(true); setErr(''); setListings(null); setRows({})
     try {
       const res = await fetch('/api/reports', {
@@ -50,6 +57,16 @@ export function EmployerListings() {
       setListings(Array.isArray(d?.listings) ? d.listings : [])
     } catch { setErr('Could not load your listings — try again.') } finally { setLoading(false) }
   }
+  const look = () => runLookup(name)
+
+  const autoRan = useRef(false)
+  useEffect(() => {
+    if (scoped && employerCompany && !autoRan.current) {
+      autoRan.current = true
+      setName(employerCompany)
+      runLookup(employerCompany)
+    }
+  }, [scoped, employerCompany]) // eslint-disable-line react-hooks/exhaustive-deps
 
   async function close(id: string) {
     setRows(r => ({ ...r, [id]: { busy: true } }))
@@ -74,18 +91,28 @@ export function EmployerListings() {
         A filled role that stays listed collects applications you&apos;ll never answer — and every one of those becomes a ghost report against your score. Find your live listings and close the ones that are done. We confirm against your own posting before anything is removed.
       </p>
 
-      <div style={{ display: 'flex', gap: '.6rem', flexWrap: 'wrap', marginBottom: listings || loading ? '1.6rem' : 0 }}>
-        <input
-          value={name}
-          onChange={e => setName(e.target.value)}
-          onKeyDown={e => { if (e.key === 'Enter') look() }}
-          placeholder="Your company name (as it appears on the listing)"
-          style={{ flex: 1, minWidth: 220, background: 'var(--raised)', border: '1px solid var(--line2)', borderRadius: 9, padding: '.7rem .9rem', ...mono('.75rem', 'var(--white)'), outline: 'none' }}
-        />
-        <button onClick={look} disabled={loading || !name.trim()} style={{ background: 'linear-gradient(135deg,#1d4ed8,#7c3aed)', border: 'none', borderRadius: 9, padding: '.7rem 1.4rem', fontFamily: 'var(--display)', fontWeight: 800, fontSize: '.8rem', color: '#fff', cursor: 'pointer', opacity: loading ? .6 : 1 }}>
-          {loading ? 'Looking…' : 'Show my listings →'}
-        </button>
-      </div>
+      {scoped ? (
+        <div style={{ display: 'flex', alignItems: 'center', gap: '.6rem', flexWrap: 'wrap', marginBottom: listings || loading ? '1.6rem' : 0 }}>
+          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '.5rem', background: 'var(--raised)', border: '1px solid var(--line2)', borderRadius: 9, padding: '.55rem .9rem' }}>
+            <span style={{ ...mono('.52rem', 'var(--dim)'), textTransform: 'uppercase', letterSpacing: '.14em' }}>Your company</span>
+            <span style={{ fontFamily: 'var(--display)', fontWeight: 800, fontSize: '.85rem', color: 'var(--white)' }}>{employerCompany}</span>
+          </div>
+          {loading && <span style={mono('.6rem', 'var(--dim)')}>Loading…</span>}
+        </div>
+      ) : (
+        <div style={{ display: 'flex', gap: '.6rem', flexWrap: 'wrap', marginBottom: listings || loading ? '1.6rem' : 0 }}>
+          <input
+            value={name}
+            onChange={e => setName(e.target.value)}
+            onKeyDown={e => { if (e.key === 'Enter') look() }}
+            placeholder="Your company name (as it appears on the listing)"
+            style={{ flex: 1, minWidth: 220, background: 'var(--raised)', border: '1px solid var(--line2)', borderRadius: 9, padding: '.7rem .9rem', ...mono('.75rem', 'var(--white)'), outline: 'none' }}
+          />
+          <button onClick={look} disabled={loading || !name.trim()} style={{ background: 'linear-gradient(135deg,#1d4ed8,#7c3aed)', border: 'none', borderRadius: 9, padding: '.7rem 1.4rem', fontFamily: 'var(--display)', fontWeight: 800, fontSize: '.8rem', color: '#fff', cursor: 'pointer', opacity: loading ? .6 : 1 }}>
+            {loading ? 'Looking…' : 'Show my listings →'}
+          </button>
+        </div>
+      )}
       {err && <div style={mono('.6rem', 'var(--red)')}>{err}</div>}
 
       {listings !== null && !loading && (

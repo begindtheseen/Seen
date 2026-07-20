@@ -1,7 +1,8 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useEmployerCompany } from './EmployerCompanyContext'
+import { useAuth } from '@/lib/auth'
 
 // The employer portal's anchor: an employer looks up their own company and sees EXACTLY what
 // candidates see before they apply — their Seen grade, ghost rate, response rate, and how many
@@ -22,16 +23,23 @@ const pct = (v: number | null | undefined) => (v == null ? null : Math.round(v *
 
 export function EmployerReputation() {
   const { setCompany } = useEmployerCompany()
+  const { ready, isEmployer, employerCompany, claimsReady } = useAuth()
+  // A logged-in employer with an APPROVED claim is SCOPED to their own company: the portal must
+  // show THEIR reputation, auto-loaded and locked — never a free-text lookup of someone else's.
+  // (The bug this fixes: a scoped employer could type any company and the whole portal — reputation
+  // AND listings — would show that other company's data, e.g. Amazon's grade on the Seen Jobs portal.)
+  const scoped = !!(ready && claimsReady && isEmployer && employerCompany)
+
   const [name, setName] = useState('')
   const [loading, setLoading] = useState(false)
   const [score, setScore] = useState<Score | null>(null)
   const [checked, setChecked] = useState('')
   const [err, setErr] = useState('')
 
-  async function look() {
-    const q = name.trim()
+  async function runLookup(raw: string) {
+    const q = raw.trim()
     if (!q) return
-    setCompany(q) // carry the looked-up company to the portal's surface links (EmployerSurfaces)
+    setCompany(q) // carry the company to the portal's surface links (EmployerSurfaces)
     setLoading(true); setErr(''); setScore(null)
     try {
       const res = await fetch('/api/reports', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'company_score', name: q }) })
@@ -40,6 +48,17 @@ export function EmployerReputation() {
       setScore(d?.score || null)
     } catch { setErr('Could not load your reputation — try again.') } finally { setLoading(false) }
   }
+  const look = () => runLookup(name)
+
+  // Scoped employers: auto-load their OWN company once, and never accept another name.
+  const autoRan = useRef(false)
+  useEffect(() => {
+    if (scoped && employerCompany && !autoRan.current) {
+      autoRan.current = true
+      setName(employerCompany)
+      runLookup(employerCompany)
+    }
+  }, [scoped, employerCompany]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const s = score
   const overall = s?.overall_score ?? null
@@ -56,18 +75,28 @@ export function EmployerReputation() {
         Job seekers check Seen before they hit apply. Look up your company and see the exact grade, ghost rate, and response rate they see — the numbers that decide whether your best candidates bother applying.
       </p>
 
-      <div style={{ display: 'flex', gap: '.6rem', flexWrap: 'wrap', marginBottom: score || loading ? '1.6rem' : 0 }}>
-        <input
-          value={name}
-          onChange={e => setName(e.target.value)}
-          onKeyDown={e => { if (e.key === 'Enter') look() }}
-          placeholder="Your company name"
-          style={{ flex: 1, minWidth: 220, background: 'var(--raised)', border: '1px solid var(--line2)', borderRadius: 9, padding: '.7rem .9rem', fontFamily: 'var(--mono)', fontSize: '.75rem', color: 'var(--white)', outline: 'none' }}
-        />
-        <button onClick={look} disabled={loading || !name.trim()} style={{ background: 'linear-gradient(135deg,#1d4ed8,#7c3aed)', border: 'none', borderRadius: 9, padding: '.7rem 1.4rem', fontFamily: 'var(--display)', fontWeight: 800, fontSize: '.8rem', color: '#fff', cursor: 'pointer', opacity: loading ? .6 : 1 }}>
-          {loading ? 'Checking…' : 'Check my reputation →'}
-        </button>
-      </div>
+      {scoped ? (
+        <div style={{ display: 'flex', alignItems: 'center', gap: '.6rem', flexWrap: 'wrap', marginBottom: score || loading ? '1.6rem' : 0 }}>
+          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '.5rem', background: 'var(--raised)', border: '1px solid var(--line2)', borderRadius: 9, padding: '.55rem .9rem' }}>
+            <span style={{ fontFamily: 'var(--mono)', fontSize: '.52rem', textTransform: 'uppercase', letterSpacing: '.14em', color: 'var(--dim)' }}>Your company</span>
+            <span style={{ fontFamily: 'var(--display)', fontWeight: 800, fontSize: '.85rem', color: 'var(--white)' }}>{employerCompany}</span>
+          </div>
+          {loading && <span style={{ fontFamily: 'var(--mono)', fontSize: '.6rem', color: 'var(--dim)' }}>Loading…</span>}
+        </div>
+      ) : (
+        <div style={{ display: 'flex', gap: '.6rem', flexWrap: 'wrap', marginBottom: score || loading ? '1.6rem' : 0 }}>
+          <input
+            value={name}
+            onChange={e => setName(e.target.value)}
+            onKeyDown={e => { if (e.key === 'Enter') look() }}
+            placeholder="Your company name"
+            style={{ flex: 1, minWidth: 220, background: 'var(--raised)', border: '1px solid var(--line2)', borderRadius: 9, padding: '.7rem .9rem', fontFamily: 'var(--mono)', fontSize: '.75rem', color: 'var(--white)', outline: 'none' }}
+          />
+          <button onClick={look} disabled={loading || !name.trim()} style={{ background: 'linear-gradient(135deg,#1d4ed8,#7c3aed)', border: 'none', borderRadius: 9, padding: '.7rem 1.4rem', fontFamily: 'var(--display)', fontWeight: 800, fontSize: '.8rem', color: '#fff', cursor: 'pointer', opacity: loading ? .6 : 1 }}>
+            {loading ? 'Checking…' : 'Check my reputation →'}
+          </button>
+        </div>
+      )}
       {err && <div style={{ fontFamily: 'var(--mono)', fontSize: '.6rem', color: 'var(--red)' }}>{err}</div>}
 
       {score !== null && !loading && (
