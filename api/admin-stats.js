@@ -224,6 +224,7 @@ async function _handler(req, res) {
       reportsMonthRes, searchLogsWeekRes,
       jobsTotalRes, creditTxnRes, outcomeSharesRes, usersMonthRes,
       searchEvents30Res, resumeScans30Res, disputesOpenRes,
+      pendingClaimsRes, listingDisputesOpenRes, unfulfilledPurchasesRes,
     ] = await Promise.all([
       db(`profiles?select=id`, { headers: { Prefer: 'count=exact', 'Range-Unit': 'items', Range: '0-0' } }),
       db(`profiles?created_at=gte.${todayISO}&select=id`, { headers: { Prefer: 'count=exact', 'Range-Unit': 'items', Range: '0-0' } }),
@@ -263,7 +264,15 @@ async function _handler(req, res) {
       db(`search_events?created_at=gte.${monthISO}&select=id`, { headers: { Prefer: 'count=exact', 'Range-Unit': 'items', Range: '0-0' } }),
       db(`resume_surveys?created_at=gte.${monthISO}&select=id`, { headers: { Prefer: 'count=exact', 'Range-Unit': 'items', Range: '0-0' } }),
       // ADDITIVE (overview attention signal): open Reddit-dispute count (migration 054). Count-only.
-      db(`company_reddit_disputes?status=eq.open&select=id`, { headers: { Prefer: 'count=exact', 'Range-Unit': 'items', Range: '0-0' } })
+      db(`company_reddit_disputes?status=eq.open&select=id`, { headers: { Prefer: 'count=exact', 'Range-Unit': 'items', Range: '0-0' } }),
+      // ADDITIVE (overview attention signals — employer side). Count-only, service-key (RLS bypassed).
+      //  • pending employer→company claims (migration 053) awaiting approve/reject.
+      //  • open listing disputes (migration 056) — only an admin can approve/deny.
+      //  • employer purchases still 'paid' (not 'fulfilled') — someone paid for Featured/Verified
+      //    and is waiting on the admin to grant the perk (migration 048).
+      db(`employer_company_claims?status=eq.pending&select=id`, { headers: { Prefer: 'count=exact', 'Range-Unit': 'items', Range: '0-0' } }),
+      db(`listing_disputes?status=eq.open&select=id`, { headers: { Prefer: 'count=exact', 'Range-Unit': 'items', Range: '0-0' } }),
+      db(`employer_purchases?status=eq.paid&select=id`, { headers: { Prefer: 'count=exact', 'Range-Unit': 'items', Range: '0-0' } })
     ]);
 
     const usersTotal = ct(usersTotalRes);
@@ -454,6 +463,9 @@ async function _handler(req, res) {
       errors: { today: errToday.length, this_week: ct(errWeekRes), by_route: errByRoute, recent: errToday.slice(0, 5) },
       issues: { open: issues.length, items: issues },
       reddit_disputes: { open: ct(disputesOpenRes) },
+      employer_claims: { pending: ct(pendingClaimsRes) },
+      listing_disputes: { open: ct(listingDisputesOpenRes) },
+      employer_purchases: { unfulfilled: ct(unfulfilledPurchasesRes) },
       duplicate_clusters: { suspected: dupClusters.length, items: dupClusters },
       feature_flags: flags,
       job_health: jobHealth,
