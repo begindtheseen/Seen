@@ -117,7 +117,45 @@ async function listListings(res, { db, uid, claim }) {
   const openByJob = {};
   for (const d of openDisputes) openByJob[String(d.job_id)] = d;
 
-  const listings = annotateListings(jobs, { openDisputesByJob: openByJob, applyCountsByJob: counts.perJob });
+  // DELETED-BY-ADMIN surface: a listing an admin took down is EXPIRED + its apply_url is in
+  // suppressed_listings (the reason lives there). Look those up, plus any resolved dispute that
+  // explains WHY, so the employer sees "Deleted by admin" + a reason instead of a silent expiry.
+  const removedByJob = {};
+  try {
+    const applyUrls = [...new Set(jobs.map(j => j.apply_url).filter(Boolean))].slice(0, 300);
+    const jobIdList = [...new Set(jobs.map(j => j.id).filter(Boolean))].slice(0, 300);
+    const [supRes, resolvedRes] = await Promise.all([
+      applyUrls.length
+        ? db(`suppressed_listings?apply_url=in.(${applyUrls.map(encodeURIComponent).join(',')})&select=apply_url,reason,created_at&limit=400`)
+        : Promise.resolve({ ok: true, json: async () => [] }),
+      jobIdList.length
+        ? db(`listing_disputes?job_id=in.(${jobIdList.map(encodeURIComponent).join(',')})&status=in.(approved,denied)&select=id,job_id,kind,status,admin_note,reviewed_at&order=reviewed_at.desc&limit=300`)
+        : Promise.resolve({ ok: true, json: async () => [] }),
+    ]);
+    const suppressed = supRes.ok ? await supRes.json() : [];
+    const supByUrl = Object.fromEntries(suppressed.map(s => [s.apply_url, s]));
+    const resolved = resolvedRes.ok ? await resolvedRes.json() : [];
+    const resolvedByJob = {};
+    for (const d of resolved) if (!resolvedByJob[d.job_id]) resolvedByJob[d.job_id] = d; // newest wins (ordered desc)
+    const REASON_LABEL = { admin_removed: 'Removed by an admin', employer_dispute: 'Removed via an approved dispute', employer_closed: 'Closed at the employer’s request' };
+    for (const j of jobs) {
+      const sup = j.apply_url ? supByUrl[j.apply_url] : null;
+      if (!sup) continue;
+      const rd = resolvedByJob[j.id] || null;
+      removedByJob[String(j.id)] = {
+        by: 'admin',
+        reason: sup.reason || 'admin_removed',
+        reasonLabel: REASON_LABEL[sup.reason] || 'Removed by an admin',
+        at: sup.created_at || null,
+        disputeId: rd ? rd.id : null,
+        note: rd ? rd.admin_note : null,
+        disputeKind: rd ? rd.kind : null,
+      };
+    }
+  } catch { /* best-effort — the list must load even if the removal lookup fails */ }
+
+  const listings = annotateListings(jobs, { openDisputesByJob: openByJob, applyCountsByJob: counts.perJob })
+    .map(l => ({ ...l, removed: removedByJob[String(l.id)] || null }));
 
   return res.status(200).json({
     ok: true,

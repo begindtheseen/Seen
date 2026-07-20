@@ -5,7 +5,7 @@ import type { AdminStats, AttnItem, MergePrefill } from './types'
 import { Panel, MetricRow, Card, CardHeader, Badge, BarChart, relTime, outcomeColor, stageColor, runRefreshAndClear, refreshResultMsg } from './primitives'
 import { AdminHero, AdminCommandCenter, AdminMetricCard, CardSubLink, AdminAttentionQueue, AdminTabs, type HealthStatus, type TabKey } from './overview'
 import { KpiModal, ManageAccountsModal, RevenueDetailModal, TrialsDetailModal, SharesDetailModal, ErrorsDetailModal } from './modals'
-import { JobCrisisBanner, JobRefreshButton, JobRunner, ReportRow, IssueRow, RedditDisputesPanel, ListingDisputesPanel, InactiveRow, MergePanel, CompanyExportPanel, CreditsPanel, FlagsPanel, ClustersPanel, JobDedupePanel, AllJobsBrowser, DeployPanel } from './panels'
+import { JobCrisisBanner, JobRefreshButton, JobRunner, ReportRow, IssueRow, RedditDisputesPanel, ListingTicketsPanel, MergePanel, CompanyExportPanel, CreditsPanel, FlagsPanel, ClustersPanel, JobDedupePanel, AllJobsBrowser, DeployPanel } from './panels'
 import { GhostReportPanel } from './GhostReportPanel'
 import { LiveBell } from './LiveBell'
 import { EmployerPanel } from './EmployerPanel'
@@ -245,18 +245,18 @@ export function AdminShell({ stats, token, reload, onLogout, onUnauthorized }: {
             {/* Job deduplication */}
             <JobDedupePanel token={token} />
 
-            {/* Reported listings — investigate & act (delete listing / dismiss report) */}
+            {/* Reported listings now live in the unified LISTING TICKETS queue (Community tab),
+                where each listing's seeker report and employer dispute are reviewed together. */}
             <div id="reported-listings-section" style={{ scrollMarginTop: '1.25rem' }}>
             <Card style={{ marginTop: '.65rem' }}>
               <CardHeader
                 title="Reported listings"
-                badge={(stats.jobs?.inactive_reports || []).length > 0 ? <Badge n={stats.jobs.inactive_reports.length} color="var(--amber)" /> : undefined}
-                action={<span style={{ fontFamily: 'var(--mono)', fontSize: '.48rem', color: 'var(--dim)' }}>Users flagged these as no longer active — open the listing, then delete it or dismiss the report</span>}
+                badge={inactiveCount > 0 ? <Badge n={inactiveCount} color="var(--amber)" /> : undefined}
               />
-              {(stats.jobs?.inactive_reports || []).length === 0
-                ? <div style={{ fontFamily: 'var(--mono)', fontSize: '.62rem', color: 'var(--dim)' }}>No reported listings this week</div>
-                : (stats.jobs.inactive_reports || []).map(r => (<InactiveRow key={r.job_id} report={r} token={token} onRefresh={reload} />))
-              }
+              <div style={{ fontFamily: 'var(--mono)', fontSize: '.62rem', color: 'var(--sub)', lineHeight: 1.6 }}>
+                {inactiveCount > 0 ? `${inactiveCount} listing${inactiveCount === 1 ? '' : 's'} reported this week. ` : 'No reported listings this week. '}
+                Reports and employer disputes are now handled together as <button onClick={() => setTab('community')} style={{ background: 'none', border: 'none', padding: 0, color: 'var(--blue)', cursor: 'pointer', fontFamily: 'var(--mono)', fontSize: '.62rem', textDecoration: 'underline' }}>Listing tickets → Community</button>.
+              </div>
             </Card>
             </div>
           </div>
@@ -278,9 +278,11 @@ export function AdminShell({ stats, token, reload, onLogout, onUnauthorized }: {
             {/* Reddit disputes — the ADMIN side of the company-page correction loop (migration 054) */}
             <RedditDisputesPanel token={token} />
 
-            {/* Listing disputes — the ADMIN side of the employer→admin listing correction loop
-                (migration 056): approve applies a takedown/edit, deny leaves the listing unchanged. */}
-            <ListingDisputesPanel token={token} />
+            {/* Listing tickets — the ONE place a listing's seeker report(s) and employer dispute
+                are reviewed together (migrations 056/060). Approve/deny a dispute, or delete/keep
+                a reported listing, from a single ticket. Replaces the old split Reported-listings
+                + Listing-disputes panels. */}
+            <ListingTicketsPanel token={token} />
 
             {/* Company lookups setup note */}
             {stats.company_lookups && !stats.company_lookups.ready && (

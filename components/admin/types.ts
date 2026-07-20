@@ -80,6 +80,22 @@ export interface ListingDispute {
   seeker_reports?: { count: number; expired: number; unknown: number } | null
 }
 export interface ListingDisputeCounts { open: number; approved: number; denied: number }
+
+// One unified ticket per listing (seeker report ⋃ employer dispute), keyed by job_id.
+export interface ListingTicket {
+  job_id: string
+  title: string | null
+  company: string | null
+  city: string | null
+  apply_url: string | null
+  availability_status: string | null
+  is_db_listing: boolean
+  removed: { reason: string; at: string | null } | null
+  reports: { count: number; expired: number; unknown: number; latest: string | null; snapshot: { company: string | null; title: string | null; city: string | null; apply_url: string | null } | null } | null
+  dispute: ListingDispute | null
+  status: 'open' | 'resolved'
+  latest_activity: string | null
+}
 // The listing-level effect an approved dispute applied (from resolve_listing_dispute).
 export interface ListingDisputeApplied { takedown: boolean; edited: boolean; suppressed: boolean; reportsCleared?: boolean }
 export interface InactiveReport {

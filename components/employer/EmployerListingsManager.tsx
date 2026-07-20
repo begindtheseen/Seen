@@ -33,6 +33,9 @@ type Listing = {
   is_employer_posted: boolean
   applications: number
   openDispute: OpenDispute
+  // Set when an admin took the listing down (via delete or an approved dispute) — carries the
+  // reason so the employer sees "Deleted by admin · view why" instead of a silent expiry.
+  removed: { reason: string; reasonLabel: string; at: string | null; disputeId: number | null; note: string | null; disputeKind: string | null } | null
 }
 
 type Summary = { total: number; active: number; employerPosted: number; applications: number; openDisputes: number }
@@ -108,6 +111,7 @@ export function EmployerListingsManager() {
   const [disputeFor, setDisputeFor] = useState<Listing | null>(null)
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const [showAll, setShowAll] = useState(false)
+  const [whyOpen, setWhyOpen] = useState<Record<string, boolean>>({})
   const [modalDefaultKind, setModalDefaultKind] = useState<DisputeKind | null>(null)
 
   // Deep link from an employer notification: /employers/dashboard?dispute=<jobId>&kind=still_active
@@ -323,24 +327,44 @@ export function EmployerListingsManager() {
               <div key={l.id} style={{ display: 'flex', alignItems: 'flex-start', gap: '1rem', flexWrap: 'wrap', padding: '.95rem 0', borderBottom: '1px solid var(--line)' }}>
                 <div style={{ flex: 1, minWidth: 220 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '.5rem', flexWrap: 'wrap' }}>
-                    <span style={{ fontFamily: 'var(--display)', fontSize: '.9rem', fontWeight: 700, color: 'var(--white)' }}>{l.title}</span>
+                    <span style={{ fontFamily: 'var(--display)', fontSize: '.9rem', fontWeight: 700, color: l.removed ? 'var(--muted)' : 'var(--white)', textDecoration: l.removed ? 'line-through' : 'none' }}>{l.title}</span>
                     <span style={{ ...mono('.5rem', om.color), textTransform: 'uppercase', letterSpacing: '.08em', border: `1px solid ${om.color}`, borderRadius: 5, padding: '.1rem .4rem' }}>{om.label}</span>
-                    <span style={{ ...mono('.5rem', availColor(l.availability_status)), textTransform: 'uppercase', letterSpacing: '.06em', background: 'var(--raised)', border: `1px solid ${availColor(l.availability_status)}`, borderRadius: 999, padding: '.1rem .45rem' }}>{l.availability_status}</span>
+                    {l.removed ? (
+                      <span style={{ ...mono('.5rem', 'var(--red)'), textTransform: 'uppercase', letterSpacing: '.06em', background: 'rgba(239,68,68,.08)', border: '1px solid rgba(239,68,68,.4)', borderRadius: 999, padding: '.1rem .45rem' }}>Deleted by admin</span>
+                    ) : (
+                      <span style={{ ...mono('.5rem', availColor(l.availability_status)), textTransform: 'uppercase', letterSpacing: '.06em', background: 'var(--raised)', border: `1px solid ${availColor(l.availability_status)}`, borderRadius: 999, padding: '.1rem .45rem' }}>{l.availability_status}</span>
+                    )}
+                    {l.removed && (
+                      <button onClick={() => setWhyOpen(w => ({ ...w, [String(l.id)]: !w[String(l.id)] }))} style={{ background: 'none', border: 'none', cursor: 'pointer', ...mono('.55rem', 'var(--blue)'), textDecoration: 'underline', padding: 0 }}>
+                        {whyOpen[String(l.id)] ? 'hide' : 'view why'}
+                      </button>
+                    )}
                   </div>
                   <div style={{ ...mono('.56rem', 'var(--dim)'), marginTop: '.3rem', display: 'flex', gap: '.5rem', flexWrap: 'wrap' }}>
                     {l.location && <span>{l.location}</span>}
                     {l.source && <span>· {l.source}</span>}
                     {l.created_at && <span>· posted {fmtDate(l.created_at)}</span>}
-                    {l.expires_at && <span>· expires {fmtDate(l.expires_at)}</span>}
+                    {!l.removed && l.expires_at && <span>· expires {fmtDate(l.expires_at)}</span>}
                     {l.apply_url && <>· <a href={l.apply_url} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--blue)', textDecoration: 'none' }}>Apply link ↗</a></>}
                   </div>
+                  {l.removed && whyOpen[String(l.id)] && (
+                    <div style={{ marginTop: '.5rem', padding: '.6rem .8rem', background: 'rgba(239,68,68,.05)', border: '1px solid rgba(239,68,68,.25)', borderRadius: 8 }}>
+                      <div style={{ ...mono('.58rem', 'var(--white)'), fontWeight: 700 }}>{l.removed.reasonLabel}{l.removed.at ? ` · ${fmtDate(l.removed.at)}` : ''}</div>
+                      {l.removed.disputeId && <div style={{ ...mono('.55rem', 'var(--sub)'), marginTop: '.25rem' }}>Via dispute <span style={{ color: 'var(--blue)' }}>#{l.removed.disputeId}</span>{l.removed.disputeKind ? ` (${KIND_LABEL[l.removed.disputeKind] || l.removed.disputeKind})` : ''}</div>}
+                      {l.removed.note && <div style={{ ...mono('.55rem', 'var(--sub)'), marginTop: '.25rem', lineHeight: 1.5 }}>Admin note: {l.removed.note}</div>}
+                      <div style={{ ...mono('.52rem', 'var(--muted)'), marginTop: '.35rem', lineHeight: 1.5 }}>Think this was a mistake? Repost the role or contact support to appeal.</div>
+                    </div>
+                  )}
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '.35rem', flexShrink: 0 }}>
                   <div style={{ textAlign: 'right' }}>
                     <span style={{ fontFamily: 'var(--display)', fontSize: '1.1rem', fontWeight: 800, color: l.applications ? 'var(--white)' : 'var(--muted)', lineHeight: 1 }}>{l.applications}</span>
                     <span style={{ ...mono('.5rem', 'var(--dim)'), marginLeft: '.35rem' }}>application{l.applications === 1 ? '' : 's'}</span>
                   </div>
-                  {l.is_employer_posted ? (
+                  {l.removed ? (
+                    // Already taken down by an admin — nothing to act on; "view why" is on the left.
+                    <span style={{ ...mono('.55rem', 'var(--muted)') }}>Removed</span>
+                  ) : l.is_employer_posted ? (
                     // Your OWN posted listing — delete it directly (no admin dispute needed).
                     <button onClick={() => removeListing(l.id)} disabled={deletingId === l.id} style={{ ...ghostBtn, padding: '.35rem .8rem', ...mono('.6rem', 'var(--red)'), borderColor: 'rgba(239,68,68,.45)', opacity: deletingId === l.id ? .6 : 1 }}>{deletingId === l.id ? 'Deleting…' : 'Delete'}</button>
                   ) : l.openDispute ? (
