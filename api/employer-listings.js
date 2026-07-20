@@ -20,7 +20,7 @@ import { resolveEmployerUid, resolveApprovedClaim } from '../lib/server/employer
 import { normalizeClaimCompany } from '../lib/server/employerClaims.js';
 import {
   validateNewListing, buildEmployerListingRow, applyCounts, annotateListings,
-} from '../lib/server/employerListings.js';
+} from '../lib/server/employerPostings.js';
 import { validateDisputeInput } from '../lib/server/listingDisputes.js';
 
 const ALLOWED = ['https://seenjobs.io', 'https://www.seenjobs.io'];
