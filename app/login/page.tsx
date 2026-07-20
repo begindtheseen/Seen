@@ -83,10 +83,16 @@ function LoginContent() {
     // 052) reads; role_type is kept for back-compat with the pre-052 trigger, so signup labels the
     // account correctly regardless of whether the migration has been applied yet.
     const meta: Record<string, string> = { name, role_type: effectiveType, account_type: effectiveType }
+    // Route the EMAIL-CONFIRMATION link to the right place. Without emailRedirectTo, Supabase sends
+    // the verify link to the project Site URL (the seeker homepage) — so a new employer who confirms
+    // via the email link landed on the job-seeker front page instead of their portal. Employers →
+    // /employers (where they claim their company); seekers keep the homepage. Path redirects on this
+    // origin are already allow-listed (the password-reset flow uses ${origin}/reset).
+    const verifyDest = effectiveType === 'employer' ? '/employers' : '/'
     const { error: err } = await supabase.auth.signUp({
       email,
       password,
-      options: { data: meta },
+      options: { data: meta, emailRedirectTo: `${window.location.origin}${verifyDest}` },
     })
     setLoading(false)
     if (err) { setError(err.message); return }
