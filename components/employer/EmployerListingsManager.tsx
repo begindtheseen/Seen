@@ -54,9 +54,9 @@ type Dispute = {
 }
 
 const mono = (size: string, color: string): React.CSSProperties => ({ fontFamily: 'var(--mono)', fontSize: size, color })
-const card: React.CSSProperties = { background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 18, padding: '2rem', marginBottom: '2.5rem' }
+const card: React.CSSProperties = { background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 16, padding: '1.5rem', marginBottom: 0 }
 const kicker: React.CSSProperties = { ...mono('.55rem', 'var(--blue)'), textTransform: 'uppercase', letterSpacing: '.16em', marginBottom: '.5rem' }
-const h2: React.CSSProperties = { fontFamily: 'var(--display)', fontSize: '1.5rem', fontWeight: 800, color: 'var(--white)', margin: '0 0 .5rem', letterSpacing: '-.02em' }
+const h2: React.CSSProperties = { fontFamily: 'var(--display)', fontSize: '1.15rem', fontWeight: 800, color: 'var(--white)', margin: '0 0 .4rem', letterSpacing: '-.02em' }
 const bodyText: React.CSSProperties = { color: 'var(--sub)', fontSize: '.85rem', lineHeight: 1.7, margin: '0 0 1.4rem', maxWidth: 560 }
 const primaryBtn: React.CSSProperties = { background: 'linear-gradient(135deg,#1d4ed8,#7c3aed)', border: 'none', borderRadius: 9, padding: '.7rem 1.4rem', fontFamily: 'var(--display)', fontWeight: 800, fontSize: '.8rem', color: '#fff', cursor: 'pointer' }
 const ghostBtn: React.CSSProperties = { background: 'none', border: '1px solid var(--line2)', borderRadius: 8, padding: '.5rem 1rem', ...mono('.62rem', 'var(--white)'), cursor: 'pointer' }
@@ -106,6 +106,14 @@ export function EmployerListingsManager() {
   const [showAdd, setShowAdd] = useState(false)
   const [disputeFor, setDisputeFor] = useState<Listing | null>(null)
   const [deletingId, setDeletingId] = useState<string | null>(null)
+  const [showAll, setShowAll] = useState(false)
+
+  // Your OWN posted listings lead, then the aggregated ones (newest first from the API). For a big
+  // company that keeps the listings you manage from being lost in a wall of indexed roles.
+  const VISIBLE_CAP = 6
+  const sortedListings = [...listings].sort((a, b) => Number(b.is_employer_posted) - Number(a.is_employer_posted))
+  const visibleListings = showAll ? sortedListings : sortedListings.slice(0, VISIBLE_CAP)
+  const hiddenCount = sortedListings.length - visibleListings.length
 
   const load = useCallback(async () => {
     setErr('')
@@ -259,7 +267,7 @@ export function EmployerListingsManager() {
         </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column' }}>
-          {listings.map(l => {
+          {visibleListings.map(l => {
             const om = ORIGIN_META[l.origin] || ORIGIN_META.aggregated
             return (
               <div key={l.id} style={{ display: 'flex', alignItems: 'flex-start', gap: '1rem', flexWrap: 'wrap', padding: '.95rem 0', borderBottom: '1px solid var(--line)' }}>
@@ -296,6 +304,14 @@ export function EmployerListingsManager() {
               </div>
             )
           })}
+          {(hiddenCount > 0 || showAll) && sortedListings.length > VISIBLE_CAP && (
+            <button
+              onClick={() => setShowAll(v => !v)}
+              style={{ ...ghostBtn, alignSelf: 'flex-start', marginTop: '.9rem', padding: '.45rem 1rem', ...mono('.62rem', 'var(--sub)') }}
+            >
+              {showAll ? '↑ Show fewer' : `↓ Show all ${sortedListings.length} listings`}
+            </button>
+          )}
         </div>
       )}
 

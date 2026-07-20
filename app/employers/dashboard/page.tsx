@@ -77,13 +77,6 @@ function fmtDate(iso: string | null) {
 }
 
 // Order + labels for the compact per-posting outcome chips.
-const BUCKET_ORDER: Array<{ key: string; short: string; tone: string }> = [
-  { key: 'ghosted', short: 'ghosted', tone: 'bad' },
-  { key: 'interviewing', short: 'interviewing', tone: 'good' },
-  { key: 'hired', short: 'hired', tone: 'good' },
-  { key: 'rejected', short: 'rejected', tone: 'warn' },
-  { key: 'waiting', short: 'awaiting', tone: 'neutral' },
-]
 
 function EmployerDashboardInner() {
   const router = useRouter()
@@ -186,11 +179,6 @@ function EmployerDashboardInner() {
       </header>
 
       <div style={{ ...wrap, padding: '2.6rem 1.5rem 4rem' }}>
-        {/* Login-scoped listings manager (POST /api/employer-listings) — prominent, above the
-            public company-name reputation lookup. Renders gracefully (a sign-in / pending note)
-            for anyone without an approved claim, so it's safe to sit at the top. */}
-        <EmployerListingsManager />
-
         {/* Intro */}
         <div style={{ marginBottom: '1.6rem' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '.6rem', flexWrap: 'wrap', marginBottom: '.55rem' }}>
@@ -295,59 +283,6 @@ function EmployerDashboardInner() {
               </p>
             </section>
 
-            {/* ── Job postings ──────────────────────────────────────────────── */}
-            <section style={{ marginBottom: '1.4rem' }}>
-              <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: '.5rem', marginBottom: '.7rem' }}>
-                <h2 style={{ fontFamily: 'var(--display)', fontSize: '1.05rem', fontWeight: 800, color: 'var(--white)', letterSpacing: '-.02em', margin: 0 }}>Your job postings on Seen</h2>
-                <span style={{ fontFamily: 'var(--mono)', fontSize: '.55rem', color: 'var(--dim)' }}>{postingRows.length} live</span>
-              </div>
-
-              {postingRows.length === 0 ? (
-                <div style={{ background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 14, padding: '1.6rem', textAlign: 'center' }}>
-                  <div style={{ fontFamily: 'var(--display)', fontSize: '.9rem', fontWeight: 700, color: 'var(--white)', marginBottom: '.3rem' }}>No live postings indexed for {company} yet</div>
-                  <p style={{ fontFamily: 'var(--mono)', fontSize: '.6rem', color: 'var(--muted)', lineHeight: 1.6, margin: 0 }}>
-                    Seen indexes public job listings. When a listing for your company is live, it appears here with the outcomes candidates report.
-                  </p>
-                </div>
-              ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '.55rem' }}>
-                  {postingRows.map((p, i) => (
-                    <div key={`${p.title}-${i}`} style={{ background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 12, padding: '1rem 1.1rem', display: 'flex', gap: '.9rem', alignItems: 'flex-start', flexWrap: 'wrap' }}>
-                      <div style={{ minWidth: 0, flex: '1 1 260px' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '.5rem', flexWrap: 'wrap' }}>
-                          <span style={{ width: 7, height: 7, borderRadius: 999, background: 'var(--green)', flexShrink: 0 }} title="Live on Seen" />
-                          {p.url
-                            ? <a href={p.url} target="_blank" rel="noopener noreferrer" style={{ fontFamily: 'var(--display)', fontSize: '.9rem', fontWeight: 700, color: 'var(--white)', textDecoration: 'none' }}>{p.title}</a>
-                            : <span style={{ fontFamily: 'var(--display)', fontSize: '.9rem', fontWeight: 700, color: 'var(--white)' }}>{p.title}</span>}
-                        </div>
-                        <div style={{ fontFamily: 'var(--mono)', fontSize: '.56rem', color: 'var(--muted)', marginTop: '.25rem', display: 'flex', gap: '.5rem', flexWrap: 'wrap' }}>
-                          {p.location && <span>{p.location}</span>}
-                          {p.type && <span>· {p.type}</span>}
-                          {p.salary && <span>· {p.salary}</span>}
-                          {p.postedAt && <span>· posted {fmtDate(p.postedAt)}</span>}
-                          <span>· {p.source}</span>
-                          <span>· {p.score != null ? `Seen score ${p.score}` : 'unrated'}</span>
-                        </div>
-                      </div>
-                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '.3rem', flexShrink: 0 }}>
-                        <span style={{ fontFamily: 'var(--display)', fontSize: '1.1rem', fontWeight: 800, color: p.applicantCount ? 'var(--white)' : 'var(--muted)', lineHeight: 1 }}>{p.applicantCount}</span>
-                        <span style={{ fontFamily: 'var(--mono)', fontSize: '.5rem', color: 'var(--dim)' }}>reported outcome{p.applicantCount === 1 ? '' : 's'}</span>
-                        {p.applicantCount > 0 && (
-                          <div style={{ display: 'flex', gap: '.3rem', flexWrap: 'wrap', justifyContent: 'flex-end', marginTop: '.1rem' }}>
-                            {BUCKET_ORDER.filter(b => (p.counts?.[b.key] || 0) > 0).map(b => (
-                              <span key={b.key} style={{ fontFamily: 'var(--mono)', fontSize: '.5rem', color: toneColor(b.tone), border: `1px solid ${toneColor(b.tone)}`, opacity: .85, borderRadius: 5, padding: '.05rem .3rem' }}>
-                                {p.counts[b.key]} {b.short}
-                              </span>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </section>
-
             {/* ── Recent applicant interactions ─────────────────────────────── */}
             <section style={{ marginBottom: '1.8rem' }}>
               <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: '.5rem', marginBottom: '.7rem' }}>
@@ -377,6 +312,14 @@ function EmployerDashboardInner() {
                 </div>
               )}
             </section>
+
+            {/* ── Manage your listings (login-scoped) ───────────────────────── */}
+            {/* The full listings manager lives BELOW the reputation + applicant activity so the
+                score an employer came to check leads — not an 80-row wall of listings. It renders
+                its own graceful sign-in / pending states for anyone without an approved claim. */}
+            <div style={{ marginBottom: '1.8rem' }}>
+              <EmployerListingsManager />
+            </div>
 
             {/* Honest disclosure — what these numbers are and aren't */}
             <div style={{ background: 'var(--surface)', border: '1px solid var(--line2)', borderRadius: 12, padding: '1rem 1.2rem' }}>
