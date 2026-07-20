@@ -105,6 +105,7 @@ export function EmployerListingsManager() {
 
   const [showAdd, setShowAdd] = useState(false)
   const [disputeFor, setDisputeFor] = useState<Listing | null>(null)
+  const [deletingId, setDeletingId] = useState<string | null>(null)
 
   const load = useCallback(async () => {
     setErr('')
@@ -140,6 +141,28 @@ export function EmployerListingsManager() {
       setLoading(false)
     }
   }, [token])
+
+  // Delete one of the employer's OWN posted listings (direct — the API enforces ownership).
+  const removeListing = useCallback(async (id: string) => {
+    if (!window.confirm('Delete this listing? It will be removed from Seen. This cannot be undone.')) return
+    setDeletingId(id); setErr('')
+    try {
+      const authToken = await token()
+      if (!authToken) return
+      const res = await fetch('/api/employer-listings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${authToken}` },
+        body: JSON.stringify({ action: 'delete', job_id: id }),
+      })
+      const d = await res.json().catch(() => ({}))
+      if (!res.ok) { setErr(d?.error || 'Could not delete the listing — please try again.'); return }
+      await load()
+    } catch {
+      setErr('Could not delete the listing — please try again.')
+    } finally {
+      setDeletingId(null)
+    }
+  }, [token, load])
 
   useEffect(() => {
     // Only load once the session + claims have resolved and this is an approved employer.
@@ -199,9 +222,9 @@ export function EmployerListingsManager() {
             Manage your listings{company ? <span style={{ color: 'var(--sub)', textTransform: 'capitalize' }}> — {company}</span> : null}
           </h2>
           <p style={{ ...bodyText, marginBottom: '1rem' }}>
-            Every listing Seen has matched to your company. Post a new role, or dispute a listing
-            that&apos;s inactive, wrong, or not yours. An admin reviews every dispute — nothing changes
-            until it&apos;s approved.
+            Every listing Seen has matched to your company. Post a new role and delete it anytime;
+            for aggregated listings, dispute one that&apos;s inactive, wrong, or not yours — an admin
+            reviews every dispute, so nothing third-party changes until it&apos;s approved.
           </p>
         </div>
         <div style={{ display: 'flex', gap: '.5rem', flexShrink: 0 }}>
@@ -259,7 +282,10 @@ export function EmployerListingsManager() {
                     <span style={{ fontFamily: 'var(--display)', fontSize: '1.1rem', fontWeight: 800, color: l.applications ? 'var(--white)' : 'var(--muted)', lineHeight: 1 }}>{l.applications}</span>
                     <span style={{ ...mono('.5rem', 'var(--dim)'), marginLeft: '.35rem' }}>application{l.applications === 1 ? '' : 's'}</span>
                   </div>
-                  {l.openDispute ? (
+                  {l.is_employer_posted ? (
+                    // Your OWN posted listing — delete it directly (no admin dispute needed).
+                    <button onClick={() => removeListing(l.id)} disabled={deletingId === l.id} style={{ ...ghostBtn, padding: '.35rem .8rem', ...mono('.6rem', 'var(--red)'), borderColor: 'rgba(239,68,68,.45)', opacity: deletingId === l.id ? .6 : 1 }}>{deletingId === l.id ? 'Deleting…' : 'Delete'}</button>
+                  ) : l.openDispute ? (
                     <span style={{ ...mono('.55rem', 'var(--amber)'), border: '1px solid rgba(245,158,11,.4)', background: 'rgba(245,158,11,.08)', borderRadius: 6, padding: '.25rem .55rem' }}>
                       Dispute pending{l.openDispute.kind ? ` · ${KIND_LABEL[l.openDispute.kind] || l.openDispute.kind}` : ''}
                     </span>
