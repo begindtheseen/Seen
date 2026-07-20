@@ -8,6 +8,7 @@ import HiringProbability from '@/components/HiringProbability'
 import CompanyScoreCard from '@/components/CompanyScoreCard'
 import { isRedditSourced, PUBLIC_DISCUSSION_LABEL } from '@/lib/reportSource'
 import CompanyRedditDiscussion from '@/components/CompanyRedditDiscussion'
+import CompanyPublicRecord from '@/components/CompanyPublicRecord'
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -915,6 +916,10 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
                   </div>
                 </div>
                 {webReviews.length > 0 && <WebReviewsSection reviews={webReviews} />}
+                {/* Attributed public-record signals (SEC 8-K, etc.) — self-hides when there are none. */}
+                <div style={{ marginBottom: '1rem' }}>
+                  <CompanyPublicRecord companyName={companyName} />
+                </div>
                 <div style={{ background: 'var(--raised, #111)', borderRadius: 7, padding: '.7rem .95rem', fontFamily: 'var(--mono)', fontSize: '.58rem', color: 'var(--muted)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '.5rem' }}>
                   <span>📊 Based on {score.report_count || 0} {score.data_source === 'web_research' ? 'web research reports' : 'verified reports'}</span>
                   <a href="/report" style={{ color: 'var(--green)', textDecoration: 'none', whiteSpace: 'nowrap' }}>+ Add your report →</a>
