@@ -10,6 +10,8 @@ import { extractEmployment } from '../lib/server/resumeAnalysis.js';
 import { buildResumeSurvey, RESUME_SURVEY_KEYS, mapAnswersToReport } from './_utils/resumeSurvey.js';
 import { normalizeCompany, isValidCompanyName, resolveOrCreateCompany, assessSubmitTrust, writeReport, recomputeCompanyScoreFromReports } from './_utils/reportWrite.js';
 import { WELCOME_CREDITS, FREE_DAILY_CREDITS, PRO_DAILY_CREDITS, RESUME_OPTIMIZE_COST, RESUME_SURVEY_AWARD, TRACK_APPLICATION_AWARD, MAX_DAILY_EARN, MAX_FREE_BALANCE, hasProAccess, creditBalance } from '../lib/server/creditRules.js';
+import { normalizeClaimCompany } from '../lib/server/employerClaims.js';
+import { buildNotificationRow } from '../lib/server/employerNotificationsStore.js';
 import { isReadableResume } from '../lib/server/resumeReadability.js';
 
 // Verify a Supabase JWT locally (HS256) — no network round-trip.
@@ -448,6 +450,28 @@ export default async function handler(req, res) {
         body: JSON.stringify({ availability_report_count: 1, last_checked_at: new Date().toISOString() }),
         headers: { Prefer: 'return=minimal' },
       }).catch(() => {});
+    }
+    // Notify the company's employer that one of their listings was REPORTED inactive (migration
+    // 057). Only on an 'expired' report (the "reported inactive" signal — 'active' is a
+    // confirmation, 'unknown' is ambiguous). Scoped by company_key; best-effort, never fatal.
+    if (avStatus === 'expired') {
+      const reportedCompany = clip(snap.company);
+      const companyKey = normalizeClaimCompany(reportedCompany);
+      if (companyKey) {
+        try {
+          const notif = buildNotificationRow('listing_reported', {
+            companyName: reportedCompany, companyKey, jobId: String(job_id),
+            title: 'A listing was reported inactive',
+            body: `A candidate reported “${clip(snap.title) || 'a listing'}” as no longer active. You can dispute this from your dashboard — an admin reviews every dispute.`,
+            meta: { role: clip(snap.title) || null, city: clip(snap.city) || null },
+          });
+          if (notif) {
+            await db('employer_notifications', { method: 'POST', body: JSON.stringify(notif), headers: { Prefer: 'return=minimal' } });
+          }
+        } catch (e) {
+          console.error('[user-sync] listing_reported notify failed (non-fatal):', e?.message || e);
+        }
+      }
     }
     broadcastActivity('flag'); // instant Seen Live ping
     return res.status(200).json({ ok: true });
