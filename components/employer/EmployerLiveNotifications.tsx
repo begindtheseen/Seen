@@ -164,9 +164,25 @@ export function EmployerLiveNotifications() {
                   )}
                 </div>
                 <p style={{ color: 'var(--sub)', fontSize: '.77rem', lineHeight: 1.6, margin: '.3rem 0 0' }}>{it.detail}</p>
-                <div style={{ display: 'flex', gap: '.7rem', marginTop: '.45rem', flexWrap: 'wrap' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '.7rem', marginTop: '.45rem', flexWrap: 'wrap' }}>
                   <span style={{ ...mono('.55rem', color), textTransform: 'uppercase', letterSpacing: '.08em' }}>{it.severity}</span>
                   {it.at && <span style={mono('.55rem', 'var(--dim)')}>{fmtDate(it.at)}</span>}
+                  {/* Dispute number — the shared reference the employer, seeker report, and admin
+                      verdict all meet on. Verdict notifications carry it in meta.dispute_id. */}
+                  {it.meta && it.meta.dispute_id != null && (
+                    <span style={{ ...mono('.55rem', 'var(--blue)'), border: '1px solid rgba(59,130,246,.35)', borderRadius: 4, padding: '.1rem .4rem' }}>Dispute #{String(it.meta.dispute_id)}</span>
+                  )}
+                  {/* A reported listing is disputable RIGHT HERE: deep-link to the dashboard's
+                      listings manager, which auto-opens the dispute modal for this listing with
+                      the "report is wrong — still active" kind preselected. */}
+                  {it.kind === 'listing_reported' && it.jobId && (
+                    <a
+                      href={`/employers/dashboard?dispute=${encodeURIComponent(it.jobId)}&kind=still_active`}
+                      style={{ ...mono('.58rem', 'var(--white)'), border: '1px solid var(--line2)', borderRadius: 6, padding: '.25rem .6rem', textDecoration: 'none', fontWeight: 700 }}
+                    >
+                      ⚖ Dispute this report →
+                    </a>
+                  )}
                 </div>
               </div>
             </div>

@@ -387,6 +387,16 @@ async function _handler(req, res) {
       inactiveReports = Object.values(grouped)
         .sort((a, b) => b.report_count - a.report_count)
         .map(g => ({ ...g, job: jobMap[g.job_id] || null }));
+
+      // BOTH SIDES: flag reported listings the EMPLOYER has an OPEN dispute on (by dispute
+      // number), so the admin never deletes a listing while its rebuttal sits unresolved in
+      // the Community tab. Best-effort — the queue must load even if this lookup fails.
+      try {
+        const dRes = await db(`listing_disputes?job_id=in.(${jobIds.map(encodeURIComponent).join(',')})&status=eq.open&select=id,job_id,kind&limit=200`);
+        const dRows = dRes.ok ? await dRes.json() : [];
+        const dByJob = Object.fromEntries(dRows.map(d => [d.job_id, { id: d.id, kind: d.kind }]));
+        inactiveReports = inactiveReports.map(g => ({ ...g, dispute: dByJob[g.job_id] || null }));
+      } catch { /* annotation only */ }
     }
 
     // ── Job-board health / crisis detection ───────────────────────────────────
@@ -989,7 +999,25 @@ async function _handler(req, res) {
     const where = filterStatus ? `status=eq.${filterStatus}&` : '';
     const listRes = await db(`listing_disputes?${where}select=id,job_id,company_name,company_key,employer_user_id,kind,reason,detail,proposed_changes,status,created_at,reviewed_at,reviewed_by,admin_note&order=created_at.desc&limit=200`);
     const rows = listRes.ok ? await listRes.json() : [];
-    const disputes = filterStatus ? rows : orderListingDisputes(rows);
+    let disputes = filterStatus ? rows : orderListingDisputes(rows);
+    // BOTH SIDES IN ONE PLACE: attach the SEEKER's availability reports for each disputed
+    // listing (count + expired/unknown breakdown), so the admin rules on the employer's
+    // dispute with the candidate reports in view — never one side blind.
+    try {
+      const jobIds = [...new Set(disputes.map(d => d.job_id).filter(Boolean))];
+      if (jobIds.length) {
+        const rRes = await db(`job_availability_reports?job_id=in.(${jobIds.map(encodeURIComponent).join(',')})&select=job_id,status&limit=1000`);
+        const rRows = rRes.ok ? await rRes.json() : [];
+        const byJob = {};
+        for (const r of rRows) {
+          const b = byJob[r.job_id] || (byJob[r.job_id] = { count: 0, expired: 0, unknown: 0 });
+          b.count++;
+          if (r.status === 'expired') b.expired++;
+          else if (r.status === 'unknown') b.unknown++;
+        }
+        disputes = disputes.map(d => ({ ...d, seeker_reports: byJob[d.job_id] || null }));
+      }
+    } catch { /* enrichment is best-effort — the queue itself must always load */ }
     return res.status(200).json({ ok: true, disputes, counts, filter: filterStatus });
   }
 
@@ -1007,7 +1035,7 @@ async function _handler(req, res) {
     if (!dispute) return res.status(404).json({ error: 'Dispute not found' });
     if (dispute.status !== 'open') return res.status(409).json({ error: 'This dispute was already resolved' });
 
-    const applied = { takedown: false, edited: false, suppressed: false };
+    const applied = { takedown: false, edited: false, suppressed: false, reportsCleared: false };
     const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
     if (decision === 'approved') {
@@ -1038,11 +1066,23 @@ async function _handler(req, res) {
           try { await recomputeCompanyScoreFromReports(SB, { apikey: SK, Authorization: `Bearer ${SK}`, 'Content-Type': 'application/json' }, normalizeCompany(jobRow.company)); } catch { /* best-effort */ }
         }
       } else if (effect.edit && effect.patch && UUID.test(jid)) {
-        // Apply the employer's sanitized proposed changes. Keep the legacy `url` alias in lockstep
-        // with apply_url when that field is edited.
+        // Apply the employer's sanitized proposed changes.
         const patch = { ...effect.patch, last_checked_at: new Date().toISOString() };
         const up = await db(`jobs?id=eq.${encodeURIComponent(jid)}`, { method: 'PATCH', body: JSON.stringify(patch), headers: { Prefer: 'return=minimal' } });
         applied.edited = up.ok;
+      } else if (effect.clearReports) {
+        // still_active APPROVED: the admin sided with the EMPLOYER's rebuttal — the seeker's
+        // inactive reports for this listing are cleared and (when a real jobs row exists) the
+        // listing is re-marked active so it stops surfacing in the reported-inactive queue.
+        const delRes = await db(`job_availability_reports?job_id=eq.${encodeURIComponent(jid)}`, { method: 'DELETE', headers: { Prefer: 'return=minimal' } });
+        applied.reportsCleared = delRes.ok;
+        if (UUID.test(jid)) {
+          await db(`jobs?id=eq.${encodeURIComponent(jid)}`, {
+            method: 'PATCH',
+            body: JSON.stringify({ availability_status: 'active', last_checked_at: new Date().toISOString(), availability_report_count: 0 }),
+            headers: { Prefer: 'return=minimal' },
+          });
+        }
       }
     }
 
@@ -1059,10 +1099,10 @@ async function _handler(req, res) {
         companyName: dispute.company_name,
         companyKey: dispute.company_key || normalizeClaimCompany(dispute.company_name),
         employerUserId: dispute.employer_user_id, jobId: dispute.job_id,
-        title: decision === 'approved' ? 'Your listing dispute was approved' : 'Your listing dispute was reviewed',
+        title: decision === 'approved' ? `Dispute #${idNum} approved` : `Dispute #${idNum} reviewed`,
         body: decision === 'approved'
-          ? `An admin approved your ${dispute.kind} dispute.${note ? ` Note: ${note}` : ''}`
-          : `An admin reviewed your ${dispute.kind} dispute and did not approve it.${note ? ` Note: ${note}` : ''}`,
+          ? `An admin approved your ${dispute.kind} dispute (#${idNum}).${applied.reportsCleared ? ' The inactive reports were cleared and your listing is active again.' : ''}${note ? ` Note: ${note}` : ''}`
+          : `An admin reviewed your ${dispute.kind} dispute (#${idNum}) and did not approve it.${note ? ` Note: ${note}` : ''}`,
         meta: { dispute_id: idNum, decision },
       });
       if (notif) await db('employer_notifications', { method: 'POST', body: JSON.stringify(notif), headers: { Prefer: 'return=minimal' } });

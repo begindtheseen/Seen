@@ -70,15 +70,18 @@ export interface RedditDisputeCounts {
 export interface ListingDispute {
   id: number; job_id: string; company_name: string; company_key: string | null
   employer_user_id: string | null
-  kind: 'inactive' | 'delete' | 'edit' | 'not_ours' | 'other'
+  kind: 'inactive' | 'delete' | 'edit' | 'not_ours' | 'other' | 'still_active'
   reason: string | null; detail: string
   proposed_changes: { title?: string; description?: string; location?: string; salary?: string; apply_url?: string } | null
   status: 'open' | 'approved' | 'denied'
   created_at: string; reviewed_at: string | null; reviewed_by: string | null; admin_note: string | null
+  // BOTH SIDES: the seeker's availability reports for this listing (count + reason breakdown),
+  // attached by list_listing_disputes so the admin rules with the candidate side in view.
+  seeker_reports?: { count: number; expired: number; unknown: number } | null
 }
 export interface ListingDisputeCounts { open: number; approved: number; denied: number }
 // The listing-level effect an approved dispute applied (from resolve_listing_dispute).
-export interface ListingDisputeApplied { takedown: boolean; edited: boolean; suppressed: boolean }
+export interface ListingDisputeApplied { takedown: boolean; edited: boolean; suppressed: boolean; reportsCleared?: boolean }
 export interface InactiveReport {
   job_id: string; report_count: number; latest_reported_at: string
   reasons?: Record<string, number>
@@ -86,6 +89,9 @@ export interface InactiveReport {
   // Client-sent snapshot of the listing at report time — present for ephemeral (non-DB) listings
   // so the admin still sees what was flagged even when there is no jobs-table row.
   snapshot?: { company: string | null; title: string | null; city: string | null; apply_url: string | null } | null
+  // BOTH SIDES: the employer's OPEN dispute on this reported listing (by dispute number), so
+  // the admin never deletes a listing while its rebuttal sits unresolved in the Community tab.
+  dispute?: { id: number; kind: string } | null
 }
 export interface DupCluster {
   id: string; risk_score: number; status: string; signals: string[]; user_ids: string[]
