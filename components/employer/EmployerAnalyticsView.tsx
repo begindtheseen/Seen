@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useAuth } from '@/lib/auth'
+import { useCountUp } from '@/lib/hooks/useCountUp'
 
 // Employer posting analytics — the login-scoped CLIENT view for the hub's Analytics tab.
 //
@@ -74,10 +75,15 @@ const monthLabel = (m: string) => {
   return d.toLocaleDateString('en-US', { month: 'short', year: '2-digit', timeZone: 'UTC' })
 }
 
-function Bar({ pct, color = 'var(--blue)' }: { pct: number; color?: string }) {
+// `grow` animates the fill from 0 → its width (scaleX from the left, matching the
+// horizontal bar orientation) via `.emp-bar-grow`; `delay` staggers a row of bars.
+function Bar({ pct, color = 'var(--blue)', grow = false, delay = 0 }: { pct: number; color?: string; grow?: boolean; delay?: number }) {
   return (
     <div style={{ height: 8, background: 'var(--raised)', borderRadius: 999, overflow: 'hidden', minWidth: 60 }}>
-      <div style={{ width: `${Math.max(2, Math.min(100, pct))}%`, height: '100%', background: color, borderRadius: 999 }} />
+      <div
+        className={grow ? 'emp-bar-grow' : undefined}
+        style={{ width: `${Math.max(2, Math.min(100, pct))}%`, height: '100%', background: color, borderRadius: 999, animationDelay: grow ? `${delay}ms` : undefined }}
+      />
     </div>
   )
 }
@@ -97,10 +103,30 @@ function BreakdownTable({ rows, color = 'var(--blue)' }: { rows: { key: string; 
   )
 }
 
-function StatTile({ value, label, color = 'var(--white)', note }: { value: string; label: string; color?: string; note?: string }) {
+function StatTile({ value, label, color = 'var(--white)', note, revealDelay }: { value: string; label: string; color?: string; note?: string; revealDelay?: number }) {
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '.25rem', minWidth: 90 }}>
+    <div
+      className={revealDelay != null ? 'emp-reveal' : undefined}
+      style={{ display: 'flex', flexDirection: 'column', gap: '.25rem', minWidth: 90, animationDelay: revealDelay != null ? `${revealDelay}ms` : undefined }}
+    >
       <div style={{ fontFamily: 'var(--display)', fontSize: '1.7rem', fontWeight: 800, color, lineHeight: 1 }}>{value}</div>
+      <div style={{ fontFamily: 'var(--mono)', fontSize: '.55rem', color: 'var(--dim)', textTransform: 'uppercase', letterSpacing: '.08em' }}>{label}</div>
+      {note ? <div style={{ fontFamily: 'var(--mono)', fontSize: '.52rem', color: 'var(--muted)' }}>{note}</div> : null}
+    </div>
+  )
+}
+
+// A StatTile whose numeric value counts up on mount. `render(n, done)` formats the
+// current value; `done` is true on the final frame (n === target) so the exact final
+// string (decimals, %, "d", …) is shown while intermediate frames stay integer-clean.
+function CountTile({ target, render, label, color = 'var(--white)', note, revealDelay }: { target: number; render: (n: number, done: boolean) => string; label: string; color?: string; note?: string; revealDelay?: number }) {
+  const n = useCountUp(target)
+  return (
+    <div
+      className={revealDelay != null ? 'emp-reveal' : undefined}
+      style={{ display: 'flex', flexDirection: 'column', gap: '.25rem', minWidth: 90, animationDelay: revealDelay != null ? `${revealDelay}ms` : undefined }}
+    >
+      <div style={{ fontFamily: 'var(--display)', fontSize: '1.7rem', fontWeight: 800, color, lineHeight: 1 }}>{render(n, n >= target)}</div>
       <div style={{ fontFamily: 'var(--mono)', fontSize: '.55rem', color: 'var(--dim)', textTransform: 'uppercase', letterSpacing: '.08em' }}>{label}</div>
       {note ? <div style={{ fontFamily: 'var(--mono)', fontSize: '.52rem', color: 'var(--muted)' }}>{note}</div> : null}
     </div>
@@ -158,9 +184,40 @@ export function EmployerAnalyticsView() {
   }, [ready, claimsReady, isLoggedIn, isEmployer, load])
 
   if (loading) {
+    // Shimmer skeleton that mirrors the real layout — a headline card (identity + a
+    // row of stat tiles + grade ring) and a chart card — so the transition to data
+    // has no jarring reflow.
     return (
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '20vh' }}>
-        <div className="spinner" />
+      <div>
+        <div style={card}>
+          <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '1rem', marginBottom: '1.2rem' }}>
+            <div style={{ display: 'grid', gap: '.5rem' }}>
+              <div className="emp-skel" style={{ width: 110, height: 11 }} />
+              <div className="emp-skel" style={{ width: 190, height: 24 }} />
+            </div>
+            <div className="emp-skel" style={{ width: 78, height: 78, borderRadius: 999 }} />
+          </div>
+          <div style={{ display: 'flex', gap: '1.8rem', flexWrap: 'wrap', paddingTop: '1.2rem', borderTop: '1px solid var(--line)' }}>
+            {[0, 1, 2, 3, 4].map(i => (
+              <div key={i} style={{ display: 'grid', gap: '.4rem' }}>
+                <div className="emp-skel" style={{ width: 60, height: 26 }} />
+                <div className="emp-skel" style={{ width: 84, height: 9 }} />
+              </div>
+            ))}
+          </div>
+        </div>
+        <div style={card}>
+          <div className="emp-skel" style={{ width: 230, height: 13, marginBottom: '1.1rem' }} />
+          <div style={{ display: 'grid', gap: '.55rem' }}>
+            {[0, 1, 2, 3, 4, 5].map(i => (
+              <div key={i} style={{ display: 'grid', gridTemplateColumns: '52px 1fr auto', gap: '.8rem', alignItems: 'center' }}>
+                <div className="emp-skel" style={{ width: 40, height: 10 }} />
+                <div className="emp-skel" style={{ height: 8, borderRadius: 999 }} />
+                <div className="emp-skel" style={{ width: 26, height: 10 }} />
+              </div>
+            ))}
+          </div>
+        </div>
       </div>
     )
   }
@@ -217,7 +274,7 @@ export function EmployerAnalyticsView() {
   return (
     <div>
       {/* Identity + headline reputation (what candidates see) */}
-      <div style={card}>
+      <div className="emp-reveal" style={{ ...card, animationDelay: '0ms' }}>
         <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', flexWrap: 'wrap', gap: '.5rem', marginBottom: '1.2rem' }}>
           <div>
             <div style={kicker}>Reporting on</div>
@@ -240,11 +297,17 @@ export function EmployerAnalyticsView() {
         </div>
 
         <div style={{ display: 'flex', gap: '1.8rem', flexWrap: 'wrap', paddingTop: '1.2rem', borderTop: '1px solid var(--line)' }}>
-          <StatTile value={h.reportCount.toLocaleString()} label="applicant reports" />
-          <StatTile value={fmtPct(h.ghostPct)} label="ghost rate" color="var(--red)" note={h.ratesComputedLive ? 'from reports' : undefined} />
-          <StatTile value={fmtPct(h.responsePct)} label="response rate" color="var(--green)" note={h.ratesComputedLive ? 'from reports' : undefined} />
-          <StatTile value={h.avgWaitDays == null ? '—' : `${h.avgWaitDays}d`} label="avg reported wait" color="var(--amber)" />
-          <StatTile value={String(analytics.roleCount)} label="roles reported" />
+          <CountTile target={h.reportCount} render={n => Math.round(n).toLocaleString()} label="applicant reports" revealDelay={40} />
+          {h.ghostPct == null
+            ? <StatTile value="—" label="ghost rate" color="var(--red)" revealDelay={100} />
+            : <CountTile target={h.ghostPct} render={(n, done) => (done ? fmtPct(h.ghostPct) : `${Math.round(n)}%`)} label="ghost rate" color="var(--red)" note={h.ratesComputedLive ? 'from reports' : undefined} revealDelay={100} />}
+          {h.responsePct == null
+            ? <StatTile value="—" label="response rate" color="var(--green)" revealDelay={160} />
+            : <CountTile target={h.responsePct} render={(n, done) => (done ? fmtPct(h.responsePct) : `${Math.round(n)}%`)} label="response rate" color="var(--green)" note={h.ratesComputedLive ? 'from reports' : undefined} revealDelay={160} />}
+          {h.avgWaitDays == null
+            ? <StatTile value="—" label="avg reported wait" color="var(--amber)" revealDelay={220} />
+            : <CountTile target={h.avgWaitDays} render={(n, done) => (done ? `${h.avgWaitDays}d` : `${Math.round(n)}d`)} label="avg reported wait" color="var(--amber)" revealDelay={220} />}
+          <CountTile target={analytics.roleCount} render={n => Math.round(n).toLocaleString()} label="roles reported" revealDelay={280} />
         </div>
         {h.ratesWithheld ? (
           <p style={{ ...mono('.58rem', 'var(--muted)'), marginTop: '1rem', lineHeight: 1.6 }}>
@@ -255,7 +318,7 @@ export function EmployerAnalyticsView() {
       </div>
 
       {/* Application volume over time */}
-      <div style={card}>
+      <div className="emp-reveal" style={{ ...card, animationDelay: '70ms' }}>
         <div style={kicker}>Application volume over time</div>
         <h2 style={h2}>When applicants reported applying</h2>
         <p style={sub}>
@@ -263,10 +326,10 @@ export function EmployerAnalyticsView() {
           postings or track impressions, so there’s no applications-per-view rate to show, and we don’t invent one.
         </p>
         <div style={{ display: 'grid', gap: '.5rem' }}>
-          {analytics.monthly.map(m => (
+          {analytics.monthly.map((m, i) => (
             <div key={m.month} style={{ display: 'grid', gridTemplateColumns: '52px 1fr auto', gap: '.8rem', alignItems: 'center' }}>
               <span style={mono('.62rem', 'var(--dim)')}>{monthLabel(m.month)}</span>
-              <Bar pct={(m.count / maxMonth) * 100} color="var(--blue)" />
+              <Bar pct={(m.count / maxMonth) * 100} color="var(--blue)" grow delay={i * 60} />
               <span style={mono('.64rem', 'var(--sub)')}>{m.count.toLocaleString()}</span>
             </div>
           ))}
@@ -274,7 +337,7 @@ export function EmployerAnalyticsView() {
       </div>
 
       {/* Applicant sources */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(300px,1fr))', gap: '1.4rem' }}>
+      <div className="emp-reveal" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(300px,1fr))', gap: '1.4rem', animationDelay: '140ms' }}>
         <div style={card}>
           <div style={kicker}>Applicant sources</div>
           <h2 style={h2}>Where applicants applied</h2>
@@ -290,7 +353,7 @@ export function EmployerAnalyticsView() {
       </div>
 
       {/* Response outcomes */}
-      <div style={card}>
+      <div className="emp-reveal" style={{ ...card, animationDelay: '210ms' }}>
         <div style={kicker}>Application outcomes</div>
         <h2 style={h2}>What happened after applicants applied</h2>
         <p style={sub}>
@@ -309,7 +372,7 @@ export function EmployerAnalyticsView() {
       </div>
 
       {/* Per-role breakdown */}
-      <div style={card}>
+      <div className="emp-reveal" style={{ ...card, animationDelay: '280ms' }}>
         <div style={kicker}>Per-role breakdown</div>
         <h2 style={h2}>Performance by role</h2>
         <p style={sub}>

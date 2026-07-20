@@ -16,10 +16,11 @@
 // login-scoped: they self-fetch via the Bearer token and resolve the company from the caller's
 // approved claim, so they render their own graceful sign-in / pending states for anyone unscoped.
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useAuth } from '@/lib/auth'
+import { useCountUp } from '@/lib/hooks/useCountUp'
 import { recentInteractions, summarizeInteractions } from '@/lib/server/employerDashboard'
 import { EmployerListingsManager } from '@/components/employer/EmployerListingsManager'
 import { EmployerAnalyticsView } from '@/components/employer/EmployerAnalyticsView'
@@ -103,6 +104,49 @@ export function EmployerHub() {
     } catch { /* history unavailable — the in-memory tab still switches */ }
   }, [])
 
+  // ── Sliding tab indicator — measure the active button and slide a gradient pill
+  //    behind it. Recomputes on tab change, on data load, and on resize. ──────────
+  const tablistRef = useRef<HTMLDivElement | null>(null)
+  const tabRefs = useRef<Record<TabKey, HTMLButtonElement | null>>({ overview: null, listings: null, analytics: null, updates: null })
+  const [ind, setInd] = useState<{ left: number; top: number; width: number; height: number } | null>(null)
+
+  const measureInd = useCallback(() => {
+    const btn = tabRefs.current[tab]
+    if (!btn) return
+    setInd({ left: btn.offsetLeft, top: btn.offsetTop, width: btn.offsetWidth, height: btn.offsetHeight })
+  }, [tab])
+
+  // Measure after the tablist mounts (data loaded) and whenever the active tab changes.
+  useEffect(() => { measureInd() }, [measureInd, loaded])
+
+  // Re-measure on layout changes (button reflow / viewport resize).
+  useEffect(() => {
+    const el = tablistRef.current
+    if (!el) return
+    if (typeof ResizeObserver === 'undefined') {
+      const onResize = () => measureInd()
+      window.addEventListener('resize', onResize)
+      return () => window.removeEventListener('resize', onResize)
+    }
+    const ro = new ResizeObserver(() => measureInd())
+    ro.observe(el)
+    window.addEventListener('resize', measureInd)
+    return () => { ro.disconnect(); window.removeEventListener('resize', measureInd) }
+  }, [measureInd, loaded])
+
+  // ── Panel crossfade — replay `.emp-panel-in` on the visible panel each time the
+  //    tab changes, without remounting the self-fetching tab components (no refetch).
+  const panelHostRef = useRef<HTMLDivElement | null>(null)
+  useEffect(() => {
+    const host = panelHostRef.current
+    if (!host) return
+    const active = host.querySelector<HTMLElement>('[data-active-panel="1"]')
+    if (!active) return
+    active.classList.remove('emp-panel-in')
+    void active.offsetWidth // force reflow so the animation restarts
+    active.classList.add('emp-panel-in')
+  }, [tab, loaded])
+
   const load = useCallback(async (name: string) => {
     const q = name.trim()
     if (!q) return
@@ -178,7 +222,7 @@ export function EmployerHub() {
 
       <div style={{ ...wrap, padding: '2.4rem 1.5rem 4rem' }}>
         {/* Persistent header — kicker + scope badges + title */}
-        <div style={{ marginBottom: '1.4rem' }}>
+        <div className="emp-reveal" style={{ marginBottom: '1.4rem', animationDelay: '0ms' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '.6rem', flexWrap: 'wrap', marginBottom: '.55rem' }}>
             <span style={{ fontFamily: 'var(--mono)', fontSize: '.52rem', textTransform: 'uppercase', letterSpacing: '.22em', color: 'var(--blue)' }}>Employer dashboard</span>
             {godview && (
@@ -206,7 +250,7 @@ export function EmployerHub() {
           <div style={{ display: 'flex', alignItems: 'center', gap: '.6rem', flexWrap: 'wrap', marginBottom: '1.6rem', padding: '.7rem .9rem', background: 'rgba(16,185,129,.05)', border: '1px solid rgba(16,185,129,.25)', borderRadius: 10 }}>
             <span style={{ fontFamily: 'var(--mono)', fontSize: '.6rem', color: 'var(--green)', textTransform: 'uppercase', letterSpacing: '.1em' }}>Viewing your company</span>
             <span style={{ fontFamily: 'var(--display)', fontSize: '.9rem', fontWeight: 700, color: 'var(--white)', textTransform: 'capitalize' }}>{employerCompany}</span>
-            <button onClick={() => company && load(company)} disabled={loading} style={{ marginLeft: 'auto', background: 'transparent', border: '1px solid var(--line2)', borderRadius: 8, padding: '.4rem .8rem', fontFamily: 'var(--mono)', fontSize: '.6rem', color: 'var(--sub)', cursor: loading ? 'default' : 'pointer' }}>
+            <button className="emp-btn" onClick={() => company && load(company)} disabled={loading} style={{ marginLeft: 'auto', background: 'transparent', border: '1px solid var(--line2)', borderRadius: 8, padding: '.4rem .8rem', fontFamily: 'var(--mono)', fontSize: '.6rem', color: 'var(--sub)', cursor: loading ? 'default' : 'pointer' }}>
               {loading ? 'Loading…' : '↻ Refresh'}
             </button>
           </div>
@@ -254,23 +298,14 @@ export function EmployerHub() {
         {company && loaded && !loading && (
           <>
             {/* ── Reputation hero (always visible above the tabs) ──────────────── */}
-            <section style={{ background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 16, padding: '1.6rem', marginBottom: '1.4rem' }}>
+            <section className="emp-reveal" style={{ background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 16, padding: '1.6rem', marginBottom: '1.4rem', animationDelay: '70ms' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '1.4rem', flexWrap: 'wrap' }}>
-                {hasRep ? (
-                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', width: 84, height: 84, borderRadius: 999, border: `4px solid ${gradeColor(overall!)}`, flexShrink: 0 }}>
-                    <div style={{ fontFamily: 'var(--display)', fontSize: '2rem', fontWeight: 800, color: gradeColor(overall!), lineHeight: 1 }}>{gradeOf(overall!)}</div>
-                    <div style={{ fontFamily: 'var(--mono)', fontSize: '.5rem', color: 'var(--dim)', marginTop: 2 }}>{overall}/100</div>
-                  </div>
-                ) : (
-                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', width: 84, height: 84, borderRadius: 999, border: '4px solid var(--line2)', flexShrink: 0 }}>
-                    <div style={{ fontFamily: 'var(--display)', fontSize: '1.4rem', fontWeight: 800, color: 'var(--muted)', lineHeight: 1 }}>—</div>
-                  </div>
-                )}
+                <GradeRing score={hasRep ? overall! : null} />
                 <div style={{ display: 'flex', gap: '1.6rem', flexWrap: 'wrap' }}>
-                  <Stat value={String(postings.length)} label="live postings" color="var(--blue)" />
-                  <Stat value={totalReports.toLocaleString()} label="applicant reports" color="var(--white)" />
-                  <Stat value={ghost != null ? `${ghost}%` : '—'} label="ghost rate" color="var(--red)" />
-                  <Stat value={reply != null ? `${reply}%` : '—'} label="response rate" color="var(--green)" />
+                  <CountStat value={postings.length} label="live postings" color="var(--blue)" />
+                  <CountStat value={totalReports} label="applicant reports" color="var(--white)" />
+                  <CountStat value={ghost} suffix="%" label="ghost rate" color="var(--red)" />
+                  <CountStat value={reply} suffix="%" label="response rate" color="var(--green)" />
                 </div>
               </div>
               <p style={{ fontFamily: 'var(--mono)', fontSize: '.55rem', color: 'var(--muted)', lineHeight: 1.6, margin: '1.1rem 0 0' }}>
@@ -280,23 +315,37 @@ export function EmployerHub() {
               </p>
             </section>
 
-            {/* ── Tab bar (segmented control) ──────────────────────────────────── */}
-            <div role="tablist" aria-label="Employer hub sections" style={{ display: 'flex', flexWrap: 'wrap', gap: 4, background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 12, padding: 4, marginBottom: '1.6rem' }}>
+            {/* ── Tab bar (segmented control with sliding gradient pill) ────────── */}
+            <div ref={tablistRef} role="tablist" aria-label="Employer hub sections" className="emp-reveal" style={{ position: 'relative', display: 'flex', flexWrap: 'wrap', gap: 4, background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 12, padding: 4, marginBottom: '1.6rem', animationDelay: '140ms' }}>
+              {ind && (
+                <span
+                  aria-hidden
+                  className="emp-tab-ind"
+                  style={{
+                    position: 'absolute', left: 0, top: 0, width: ind.width, height: ind.height,
+                    transform: `translate(${ind.left}px, ${ind.top}px)`,
+                    background: 'linear-gradient(135deg,#1d4ed8,#7c3aed)', borderRadius: 9,
+                    boxShadow: '0 0 20px rgba(124,58,237,.32)', pointerEvents: 'none', zIndex: 0,
+                  }}
+                />
+              )}
               {TABS.map(t => {
                 const active = tab === t.key
                 return (
                   <button
                     key={t.key}
+                    ref={el => { tabRefs.current[t.key] = el }}
                     role="tab"
                     aria-selected={active}
                     onClick={() => selectTab(t.key)}
                     style={{
+                      position: 'relative', zIndex: 1,
                       flex: '1 1 auto', minWidth: 96, textAlign: 'center',
-                      background: active ? 'linear-gradient(135deg,#1d4ed8,#7c3aed)' : 'transparent',
+                      background: 'transparent',
                       border: 'none', borderRadius: 9, padding: '.55rem 1rem',
                       fontFamily: 'var(--display)', fontWeight: 800, fontSize: '.78rem',
                       color: active ? '#fff' : 'var(--sub)', cursor: active ? 'default' : 'pointer',
-                      transition: 'color .15s ease, background .15s ease',
+                      transition: 'color .2s ease',
                     }}
                   >
                     {t.label}
@@ -306,26 +355,30 @@ export function EmployerHub() {
             </div>
 
             {/* ── Tab panels (lazy-mounted, kept alive once opened) ────────────── */}
-            {opened.has('overview') && (
-              <div role="tabpanel" style={{ display: tab === 'overview' ? 'block' : 'none' }}>
-                <OverviewTab company={company} recent={recent} onManage={() => selectTab('listings')} />
-              </div>
-            )}
-            {opened.has('listings') && (
-              <div role="tabpanel" style={{ display: tab === 'listings' ? 'block' : 'none' }}>
-                <EmployerListingsManager />
-              </div>
-            )}
-            {opened.has('analytics') && (
-              <div role="tabpanel" style={{ display: tab === 'analytics' ? 'block' : 'none' }}>
-                <EmployerAnalyticsView />
-              </div>
-            )}
-            {opened.has('updates') && (
-              <div role="tabpanel" style={{ display: tab === 'updates' ? 'block' : 'none' }}>
-                <UpdatesTab />
-              </div>
-            )}
+            {/* panelHostRef scopes the crossfade effect; each wrapper is flagged
+                data-active-panel so only the visible one replays `.emp-panel-in`. */}
+            <div ref={panelHostRef}>
+              {opened.has('overview') && (
+                <div role="tabpanel" data-active-panel={tab === 'overview' ? '1' : '0'} style={{ display: tab === 'overview' ? 'block' : 'none' }}>
+                  <OverviewTab company={company} recent={recent} onManage={() => selectTab('listings')} />
+                </div>
+              )}
+              {opened.has('listings') && (
+                <div role="tabpanel" data-active-panel={tab === 'listings' ? '1' : '0'} style={{ display: tab === 'listings' ? 'block' : 'none' }}>
+                  <EmployerListingsManager />
+                </div>
+              )}
+              {opened.has('analytics') && (
+                <div role="tabpanel" data-active-panel={tab === 'analytics' ? '1' : '0'} style={{ display: tab === 'analytics' ? 'block' : 'none' }}>
+                  <EmployerAnalyticsView />
+                </div>
+              )}
+              {opened.has('updates') && (
+                <div role="tabpanel" data-active-panel={tab === 'updates' ? '1' : '0'} style={{ display: tab === 'updates' ? 'block' : 'none' }}>
+                  <UpdatesTab />
+                </div>
+              )}
+            </div>
           </>
         )}
       </div>
@@ -355,14 +408,14 @@ function OverviewTab({ company, recent, onManage }: { company: string; recent: I
           <span style={{ fontFamily: 'var(--mono)', fontSize: '.55rem', color: 'var(--dim)' }}>candidate-reported</span>
         </div>
         {recent.length === 0 ? (
-          <div style={{ background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 14, padding: '1.6rem', textAlign: 'center' }}>
+          <div className="emp-card" style={{ background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 14, padding: '1.6rem', textAlign: 'center' }}>
             <div style={{ fontFamily: 'var(--display)', fontSize: '.9rem', fontWeight: 700, color: 'var(--white)', marginBottom: '.3rem' }}>No applicant outcomes reported yet</div>
             <p style={{ fontFamily: 'var(--mono)', fontSize: '.6rem', color: 'var(--muted)', lineHeight: 1.6, margin: 0 }}>
               When candidates report what happened after applying to {company}, it shows up here.
             </p>
           </div>
         ) : (
-          <div style={{ background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 14, overflow: 'hidden' }}>
+          <div className="emp-card" style={{ background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 14, overflow: 'hidden' }}>
             {recent.map((r, i) => (
               <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '.7rem', padding: '.7rem .95rem', borderBottom: i < recent.length - 1 ? '1px solid var(--line)' : 'none' }}>
                 <span style={{ fontFamily: 'var(--mono)', fontSize: '.5rem', fontWeight: 700, color: toneColor(r.tone), background: 'var(--raised)', border: `1px solid ${toneColor(r.tone)}`, borderRadius: 6, padding: '.16rem .45rem', flexShrink: 0, whiteSpace: 'nowrap' }}>{r.label}</span>
@@ -380,7 +433,7 @@ function OverviewTab({ company, recent, onManage }: { company: string; recent: I
       <ListingsSummaryCard onManage={onManage} />
 
       {/* Honest disclosure — what these numbers are and aren't */}
-      <div style={{ background: 'var(--surface)', border: '1px solid var(--line2)', borderRadius: 12, padding: '1rem 1.2rem' }}>
+      <div className="emp-card" style={{ background: 'var(--surface)', border: '1px solid var(--line2)', borderRadius: 12, padding: '1rem 1.2rem' }}>
         <p style={{ fontFamily: 'var(--mono)', fontSize: '.55rem', color: 'var(--muted)', lineHeight: 1.7, margin: 0 }}>
           Postings are live public listings Seen has indexed for your company. Applicant interactions are outcomes candidates reported on Seen — public, aggregate signal, never private applicant contact data. Seen has no employer login yet for public lookups, so the reputation hero is scoped by company name, exactly like your public reputation; the Listings, Analytics and Updates tabs are scoped to your approved claim.
         </p>
@@ -426,7 +479,7 @@ function ListingsSummaryCard({ onManage }: { onManage: () => void }) {
   }, [ready, claimsReady, isLoggedIn, isEmployer, load])
 
   const manageBtn = (
-    <button onClick={onManage} style={{ background: 'transparent', border: '1px solid var(--line2)', borderRadius: 8, padding: '.45rem .9rem', fontFamily: 'var(--display)', fontWeight: 800, fontSize: '.72rem', color: 'var(--white)', cursor: 'pointer' }}>
+    <button className="emp-btn" onClick={onManage} style={{ background: 'transparent', border: '1px solid var(--line2)', borderRadius: 8, padding: '.45rem .9rem', fontFamily: 'var(--display)', fontWeight: 800, fontSize: '.72rem', color: 'var(--white)', cursor: 'pointer' }}>
       Manage listings →
     </button>
   )
@@ -439,7 +492,7 @@ function ListingsSummaryCard({ onManage }: { onManage: () => void }) {
   )
 
   return (
-    <section style={{ background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 16, padding: '1.5rem', marginBottom: '1.6rem' }}>
+    <section className="emp-card" style={{ background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 16, padding: '1.5rem', marginBottom: '1.6rem' }}>
       {header}
       {loading ? (
         <div style={{ display: 'flex', alignItems: 'center', gap: '.6rem' }}>
@@ -516,6 +569,59 @@ function Stat({ value, label, color }: { value: string; label: string; color: st
     <div style={{ display: 'flex', flexDirection: 'column', gap: '.2rem' }}>
       <div style={{ fontFamily: 'var(--display)', fontSize: '1.5rem', fontWeight: 800, color, lineHeight: 1 }}>{value}</div>
       <div style={{ fontFamily: 'var(--mono)', fontSize: '.52rem', color: 'var(--dim)' }}>{label}</div>
+    </div>
+  )
+}
+
+// A hero stat whose numeric value counts up on mount (rAF, ease-out, reduced-motion
+// aware). A null value renders as "—" and never animates.
+function CountStat({ value, label, color, suffix = '' }: { value: number | null; label: string; color: string; suffix?: string }) {
+  const n = useCountUp(value ?? 0)
+  const display = value == null ? '—' : `${Math.round(n).toLocaleString()}${suffix}`
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '.2rem' }}>
+      <div style={{ fontFamily: 'var(--display)', fontSize: '1.5rem', fontWeight: 800, color, lineHeight: 1 }}>{display}</div>
+      <div style={{ fontFamily: 'var(--mono)', fontSize: '.52rem', color: 'var(--dim)' }}>{label}</div>
+    </div>
+  )
+}
+
+// Animated grade ring — an SVG track + a foreground arc that "draws in" from empty to
+// the score's fraction via `.emp-ring` (CSS `empRingDraw`, target offset in --emp-dash).
+// The SVG is rotated -90° so the arc fills from the top; the grade letter + score sit
+// centered on top as HTML. score == null → a plain track ring (empty / unrated state).
+function GradeRing({ score }: { score: number | null }) {
+  const animated = useCountUp(score ?? 0)
+  const R = 38
+  const CIRC = 2 * Math.PI * R
+  if (score == null) {
+    return (
+      <div style={{ position: 'relative', width: 84, height: 84, flexShrink: 0 }}>
+        <svg width={84} height={84} viewBox="0 0 84 84">
+          <circle cx={42} cy={42} r={R} fill="none" stroke="var(--line2)" strokeWidth={6} />
+        </svg>
+        <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'var(--display)', fontSize: '1.4rem', fontWeight: 800, color: 'var(--muted)' }}>—</div>
+      </div>
+    )
+  }
+  const color = gradeColor(score)
+  const dashStyle = { ['--emp-dash']: String(CIRC * (1 - score / 100)) } as React.CSSProperties
+  return (
+    <div style={{ position: 'relative', width: 84, height: 84, flexShrink: 0 }}>
+      <svg width={84} height={84} viewBox="0 0 84 84" style={{ transform: 'rotate(-90deg)' }}>
+        <circle cx={42} cy={42} r={R} fill="none" stroke="var(--line2)" strokeWidth={6} />
+        <circle
+          className="emp-ring"
+          cx={42} cy={42} r={R}
+          fill="none" stroke={color} strokeWidth={6} strokeLinecap="round"
+          strokeDasharray={CIRC} strokeDashoffset={CIRC}
+          style={dashStyle}
+        />
+      </svg>
+      <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+        <div style={{ fontFamily: 'var(--display)', fontSize: '1.85rem', fontWeight: 800, color, lineHeight: 1 }}>{gradeOf(score)}</div>
+        <div style={{ fontFamily: 'var(--mono)', fontSize: '.5rem', color: 'var(--dim)', marginTop: 2 }}>{Math.round(animated)}/100</div>
+      </div>
     </div>
   )
 }

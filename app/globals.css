@@ -60,6 +60,33 @@ body{background:var(--ink);background-image:radial-gradient(ellipse at 30% 0%,rg
 @keyframes auroraFloat2{0%,100%{transform:translate(0,0) scale(1)}33%{transform:translate(-4%,3%) scale(1.08)}66%{transform:translate(5%,-2%) scale(0.94)}}
 @keyframes auroraFloat3{0%,100%{transform:translate(0,0) scale(1)}50%{transform:translate(2%,-4%) scale(1.06)}}
 
+/* ═══ EMPLOYER HUB — motion + polish kit (namespaced `emp-`) ═══
+   Restrained, expensive, 60fps: only transform/opacity animate (plus width on the
+   tab indicator). Every rule below is neutralized in the prefers-reduced-motion block. */
+@keyframes empRingDraw{to{stroke-dashoffset:var(--emp-dash,0)}}
+@keyframes empPanelIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+/* Analytics monthly bars are horizontal — grow along X, anchored left. */
+@keyframes empBarGrow{from{transform:scaleX(0)}to{transform:scaleX(1)}}
+.emp-reveal{animation:fadeUp .5s cubic-bezier(.16,1,.3,1) both}
+.emp-panel-in{animation:empPanelIn .28s cubic-bezier(.16,1,.3,1) both}
+.emp-card{transition:transform .18s cubic-bezier(.16,1,.3,1),box-shadow .18s ease,border-color .18s ease}
+.emp-card:hover{transform:translateY(-2px)}
+.emp-card:active{transform:translateY(0) scale(.995)}
+.emp-btn{transition:transform .14s cubic-bezier(.16,1,.3,1),filter .14s ease,background .15s ease}
+.emp-btn:hover{filter:brightness(1.08)}
+.emp-btn:active{transform:scale(.96)}
+.emp-ring{animation:empRingDraw .9s cubic-bezier(.22,1,.36,1) both}
+.emp-skel{background:linear-gradient(90deg,rgba(255,255,255,.04) 25%,rgba(255,255,255,.09) 50%,rgba(255,255,255,.04) 75%);background-size:200% 100%;animation:shimmer 1.4s linear infinite;border-radius:10px}
+.emp-tab-ind{transition:transform .34s cubic-bezier(.22,1,.36,1),width .34s cubic-bezier(.22,1,.36,1)}
+.emp-bar-grow{transform-origin:left;animation:empBarGrow .6s cubic-bezier(.16,1,.3,1) both}
+@media(prefers-reduced-motion:reduce){
+  .emp-reveal,.emp-panel-in,.emp-bar-grow{animation:none!important}
+  .emp-card,.emp-btn,.emp-tab-ind{transition:none!important}
+  .emp-card:hover,.emp-btn:hover{transform:none!important}
+  .emp-ring{animation:none!important;stroke-dashoffset:var(--emp-dash,0)!important}
+  .emp-skel{animation:none!important}
+}
+
 /* AURORA — Deep Cosmos: royal blue, indigo, violet, teal */
 .aurora{position:fixed;inset:0;pointer-events:none;z-index:0;overflow:hidden}
 /* Orb 1 — royal blue → indigo, top-left */
