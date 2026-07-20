@@ -12,6 +12,30 @@ import type { Job } from '@/lib/types'
 // In-memory search cache: `${query}|${location}` → { jobs, ts }
 const searchCache = new Map<string, { jobs: Job[]; ts: number }>()
 
+// Industry ("niche") matching for the jobs filter. The old version keyword-matched the TITLE
+// ONLY against a tiny list (retail = "retail|store|cashier|food|restaurant|barista"), so the bulk
+// of real listings — "Server", "Crew Member", "Line Cook", "Sales Associate", "Team Member" —
+// matched nothing and the board fell back to "No exact filter matches — showing all N roles",
+// which reads as a broken filter. Now we match title + company + description across a real-world
+// keyword set per industry, and "other" is a true negation (jobs in none of the known industries).
+// Short/ambiguous tokens (a bare "it", "tech") are deliberately excluded so description text
+// doesn't false-match everything.
+const NICHE_PATTERNS: Record<string, RegExp> = {
+  tech: /engineer|developer|software|programmer|\bdev\b|devops|\bdata\b|front[- ]?end|back[- ]?end|full[- ]?stack|web dev|cloud|cyber|\bqa\b|machine learning|\bml\b|\bai\b|\bsre\b|architect|sysadmin|database|analytics|technolog/i,
+  healthcare: /nurs|\brn\b|\blpn\b|\bcna\b|doctor|physician|health|medical|\bmedic\b|pharmac|clinic|caregiv|care\s?giver|therap|dental|patient|hospital|\baide\b|phlebot|radiolog|surgical|behavioral|assisted living|home care/i,
+  retail: /retail|\bstore\b|\bshop\b|cashier|sales assoc|merchandis|stock(er|ing| assoc)?|\bfood\b|restaurant|barista|\bserver\b|waiter|waitress|\bcook\b|kitchen|\bchef\b|\bcrew\b|team member|host(ess)?|bartend|\bdeli\b|grocery|fast[- ]?food|caf[eé]\b|coffee|dishwash|busser|shift (lead|superv|manager)|key\s?holder|hospitality|catering|concession|drive[- ]?thru|cafeteria|dietary|fry cook|line cook/i,
+  logistics: /driver|warehouse|logistic|supply chain|\bdelivery\b|courier|forklift|\bloader\b|\bpicker\b|\bpacker\b|shipping|receiving|\bfreight\b|dispatch|fulfillment|distribution|material handler|\bcdl\b|\btruck\b|\broute\b|\bmover\b/i,
+  finance: /financ|accounting|accountant|bookkeep|\banalyst\b|banker|\bbank\b|insurance|teller|underwrit|actuar|\baudit|\btax\b|payroll|\bcredit\b|investment|\bloan\b|mortgage|controller|billing/i,
+}
+
+// True if a job belongs to the selected industry. 'other' = matches none of the known industries.
+function matchesNiche(job: Job, niche: string): boolean {
+  const hay = `${job.title || ''} ${job.company || ''} ${job.description || ''} ${job.source || ''}`.toLowerCase()
+  if (niche === 'other') return !Object.values(NICHE_PATTERNS).some(re => re.test(hay))
+  const re = NICHE_PATTERNS[niche]
+  return re ? re.test(hay) : true
+}
+
 // Parse a score/waste value from the API into a real number, or null when absent — we never
 // fabricate a default (e.g. the old `|| 65`). The API now always sends an earned number for
 // live listings; null is the honest "unrated" fallback for anything malformed or legacy.
@@ -66,16 +90,7 @@ export function useJobSearch() {
 
   function applyFilters(list: Job[]): Job[] {
     let out = list
-    if (niche) out = out.filter(j => {
-      const src = (j.source || '').toLowerCase()
-      const title = (j.title || '').toLowerCase()
-      if (niche === 'tech') return src.includes('tech') || title.match(/engineer|developer|software|data|devops|product/i) !== null
-      if (niche === 'healthcare') return title.match(/nurse|doctor|health|medical|pharmacy|clinical/i) !== null
-      if (niche === 'retail') return title.match(/retail|store|cashier|food|restaurant|barista/i) !== null
-      if (niche === 'logistics') return title.match(/driver|warehouse|logistics|supply|delivery/i) !== null
-      if (niche === 'finance') return title.match(/finance|accounting|analyst|banker|insurance/i) !== null
-      return true
-    })
+    if (niche) out = out.filter(j => matchesNiche(j, niche))
     if (level) out = out.filter(j => (j.level || '').toLowerCase().includes(level))
     if (jobType) out = out.filter(j => j.type === jobType)
     // Posted-within filter (1/7/30 days). Listings without a posted date are kept —
