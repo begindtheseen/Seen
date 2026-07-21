@@ -62,7 +62,12 @@ async function route(req, res) {
   const company = String(body.company || req.query?.company || '').trim();
   if (!company) return res.status(400).json({ error: 'company required' });
   const q = new URLSearchParams({
-    company: `eq.${company}`,
+    // Case-insensitive exact match: the company page derives its name from the URL slug
+    // (lowercased), but signals are stored under our companies.name (often upper/mixed case).
+    // ilike with no % wildcards = exact match, case-insensitive. Escape ILIKE specials so a
+    // company name can't act as a pattern — backslash FIRST (it's ILIKE's escape char), then
+    // % and _ ; the single char-class handles all three in one pass.
+    company: `ilike.${company.replace(/[\\%_]/g, '\\$&')}`,
     status: 'eq.active',
     match_confidence: 'eq.high',
     select: 'source,event_type,title,detail,event_date,location,source_url,source_label',
