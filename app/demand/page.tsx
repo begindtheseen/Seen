@@ -15,89 +15,23 @@ interface DemandCity {
   city: string
   urg: 'hot' | 'warm' | 'cool'
   src: string
+  /** 'live' = computed from Seen's live listings corpus; 'bls' = modeled from the BLS blend. */
+  kind?: 'live' | 'bls'
+  updated_at?: string | null
   jobs: DemandJob[]
 }
 
-const FALLBACK: DemandCity[] = [
-  {city:'New York, NY',urg:'hot',src:'BLS OES 2024 · JOLTS Q3 2024',jobs:[
-    {t:'Home Health Aide',n:'Healthcare',l:'Entry level',count:12400,di:88,note:'NYC #1 metro for HHA openings; BLS/HRSA project 22% national growth 2023-2033'},
-    {t:'Software Engineer',n:'Tech / Software',l:'Mid level',count:15800,di:74,note:'NYC tech #2 only to SF; LinkedIn Workforce Report Q3 2024'},
-    {t:'Registered Nurse',n:'Healthcare',l:'Mid level',count:9200,di:78,note:'HRSA: national shortage of 78,610 RNs; NYC hospitals posted 9,200+ vacancies in 2024'},
-    {t:'Data Analyst',n:'Tech / Software',l:'Mid level',count:7100,di:68,note:'BLS: Data Analyst roles growing 36% nationally 2023-2033'},
-  ]},
-  {city:'Los Angeles, CA',urg:'warm',src:'BLS OES 2024 · California EDD 2024',jobs:[
-    {t:'Home Health Aide',n:'Healthcare',l:'Entry level',count:9800,di:85,note:'CA leads the US in HHA demand; CA Employment Development Dept Q3 2024'},
-    {t:'Software Engineer',n:'Tech / Software',l:'Senior',count:11200,di:72,note:'LA tech cluster growing post-entertainment-strike; CompTIA 2024'},
-    {t:'Registered Nurse',n:'Healthcare',l:'Mid level',count:6400,di:76,note:'CA Board of Registered Nursing: 6,400+ hospital vacancies in LA County 2024'},
-    {t:'Physical Therapist',n:'Healthcare',l:'Mid level',count:2800,di:65,note:'BLS: PT occupations growing 17% 2023-2033; above average wage growth'},
-  ]},
-  {city:'San Francisco Bay Area',urg:'hot',src:'BLS OES 2024 · CompTIA State of Tech 2024',jobs:[
-    {t:'Software Engineer',n:'Tech / Software',l:'Senior',count:28400,di:74,note:'Highest concentration of SWE jobs in US; CompTIA State of Tech 2024'},
-    {t:'Cybersecurity Analyst',n:'Tech / Software',l:'Mid level',count:3100,di:76,note:'CISA Cyber Workforce Study 2024: 700K unfilled cybersecurity roles nationally'},
-    {t:'Data Scientist',n:'Tech / Software',l:'Senior',count:4200,di:70,note:'BLS: Data Scientist roles 36% growth 2023-2033; SF highest concentration'},
-    {t:'Product Manager',n:'Tech / Software',l:'Senior',count:3800,di:60,note:'LinkedIn: PM roles highly competitive but consistent demand in Bay Area'},
-  ]},
-  {city:'Seattle, WA',urg:'hot',src:'BLS OES 2024 · WA Employment Security Dept 2024',jobs:[
-    {t:'Software Engineer',n:'Tech / Software',l:'Mid level',count:14600,di:74,note:'Amazon + Microsoft anchor Seattle as 3rd largest US tech hub; BLS 2024'},
-    {t:'Cloud / DevOps Engineer',n:'Tech / Software',l:'Senior',count:3200,di:78,note:'AWS HQ: highest concentration of cloud engineering roles nationally'},
-    {t:'Data Analyst',n:'Tech / Software',l:'Mid level',count:2800,di:68,note:'WA Employment Security Dept: tech support roles +18% YoY 2024'},
-    {t:'Cybersecurity Analyst',n:'Tech / Software',l:'Mid level',count:2400,di:76,note:'CISA: WA public + private sector cyber roles growing 33% 2023-2033'},
-  ]},
-  {city:'Chicago, IL',urg:'warm',src:'BLS OES 2024 · JOLTS Q3 2024 · IL Dept of Employment Security',jobs:[
-    {t:'Registered Nurse',n:'Healthcare',l:'Mid level',count:7200,di:76,note:'IL DES: Chicago metro 7,200+ RN vacancies; IDPH reports critical shortage'},
-    {t:'CDL Truck Driver',n:'Logistics / Warehouse',l:'Entry level',count:5800,di:82,note:'ATA Truck Driver Shortage Report 2023: 80K national shortage; Chicago is top logistics hub'},
-    {t:'Accountant / CPA',n:'Finance',l:'Mid level',count:3400,di:52,note:'BLS: Accounting 4% growth 2023-2033; stable demand, moderate competition'},
-    {t:'Electrician',n:'Trades / Construction',l:'Entry level',count:2800,di:71,note:'BLS: Electricians 11% growth 2023-2033; IBEW Chicago 2,800 openings tracked'},
-  ]},
-  {city:'Houston, TX',urg:'hot',src:'BLS OES 2024 · TX Workforce Commission 2024 · ATA 2023',jobs:[
-    {t:'CDL Truck Driver',n:'Logistics / Warehouse',l:'Entry level',count:9200,di:82,note:'Houston is the top US metro for CDL driver demand; ATA shortage report 2023'},
-    {t:'Electrician',n:'Trades / Construction',l:'Entry level',count:6400,di:71,note:'TX Workforce Commission: energy sector electricians critically short; 11% BLS growth'},
-    {t:'Registered Nurse',n:'Healthcare',l:'Mid level',count:5200,di:76,note:'TX Dept of State Health: Houston hospitals 5,200+ RN vacancies in Q3 2024'},
-    {t:'Industrial Engineer',n:'Tech / Software',l:'Mid level',count:3800,di:62,note:'BLS: Industrial Engineering 12% growth 2023-2033; energy/manufacturing demand'},
-  ]},
-  {city:'Dallas-Fort Worth, TX',urg:'warm',src:'BLS OES 2024 · TX Workforce Commission 2024',jobs:[
-    {t:'Software Engineer',n:'Tech / Software',l:'Mid level',count:9800,di:74,note:'DFW emerged as major tech hub; TX Workforce Commission 2024: 9,800 SWE openings'},
-    {t:'Registered Nurse',n:'Healthcare',l:'Mid level',count:5600,di:76,note:'TX leads the US in RN shortage; DFW hospital systems 5,600 vacancies Q3 2024'},
-    {t:'Cybersecurity Analyst',n:'Tech / Software',l:'Mid level',count:2600,di:76,note:'CISA: TX public sector cyber workforce gap 26% larger than national average'},
-    {t:'Financial Analyst',n:'Finance',l:'Mid level',count:3200,di:58,note:'BLS: Financial Analyst 8% growth; DFW finance sector expanding with corporate relocations'},
-  ]},
-  {city:'Austin, TX',urg:'hot',src:'BLS OES 2024 · TX Workforce Commission 2024 · CompTIA 2024',jobs:[
-    {t:'Software Engineer',n:'Tech / Software',l:'Mid level',count:12400,di:74,note:'Austin tech boom: Tesla, Apple, Google, Oracle all hiring; CompTIA State of Tech 2024'},
-    {t:'Cybersecurity Analyst',n:'Tech / Software',l:'Mid level',count:2800,di:76,note:'TX Workforce Commission: Austin #1 fastest-growing cyber hub in the US'},
-    {t:'Construction Manager',n:'Trades / Construction',l:'Mid level',count:2400,di:67,note:'BLS: Construction Manager 9% growth; Austin building boom drives demand'},
-    {t:'DevOps Engineer',n:'Tech / Software',l:'Senior',count:2100,di:76,note:'CompTIA: Austin DevOps salaries +14% YoY; demand outpacing supply'},
-  ]},
-  {city:'Phoenix, AZ',urg:'hot',src:'BLS OES 2024 · AZ Dept of Economic Security 2024',jobs:[
-    {t:'Home Health Aide',n:'Healthcare',l:'Entry level',count:7400,di:85,note:'AZ DES: Phoenix fastest-growing US metro for HHA demand due to aging population'},
-    {t:'CDL Truck Driver',n:'Logistics / Warehouse',l:'Entry level',count:5200,di:82,note:'Phoenix distribution hub: Amazon, UPS, FedEx all citing critical driver shortage'},
-    {t:'Registered Nurse',n:'Healthcare',l:'Mid level',count:4600,di:76,note:'AZ Dept of Health: Phoenix metro 4,600+ RN vacancies; top per-capita shortage metro'},
-    {t:'Software Engineer',n:'Tech / Software',l:'Mid level',count:4800,di:72,note:'Intel, TSMC, PayPal expansions driving AZ tech hiring; AZ DES 2024'},
-  ]},
-  {city:'Miami, FL',urg:'warm',src:'BLS OES 2024 · FL Agency for Workforce Innovation 2024',jobs:[
-    {t:'Home Health Aide',n:'Healthcare',l:'Entry level',count:6200,di:85,note:'FL is the US retirement capital; Miami-Dade ranks top 5 nationwide for HHA openings'},
-    {t:'Registered Nurse',n:'Healthcare',l:'Mid level',count:5800,di:76,note:'FL Dept of Health: Miami-Dade 5,800+ RN vacancies; nurse shortage is statewide'},
-    {t:'Financial Analyst',n:'Finance',l:'Mid level',count:2400,di:58,note:'Miami financial services sector growing; FL no income tax draws Wall Street firms south'},
-    {t:'Software Engineer',n:'Tech / Software',l:'Mid level',count:3600,di:70,note:'FL Agency for Workforce Innovation: Miami tech sector +22% job growth 2022-2024'},
-  ]},
-  {city:'Washington, DC metro',urg:'hot',src:'BLS OES 2024 · CISA Cyber Workforce Study 2024',jobs:[
-    {t:'Cybersecurity Analyst',n:'Tech / Software',l:'Mid level',count:18400,di:76,note:'CISA 2024: DC metro is the #1 US market for cybersecurity; 700K national unfilled roles'},
-    {t:'Software Engineer',n:'Tech / Software',l:'Senior',count:12600,di:74,note:'BLS OES: DC metro federal + contractor SWE demand exceeds any other sector'},
-    {t:'Data Analyst',n:'Tech / Software',l:'Mid level',count:5800,di:68,note:'Federal agencies are the largest employer of data analysts in the US'},
-    {t:'Network Engineer',n:'Tech / Software',l:'Mid level',count:3400,di:72,note:'DoD, NSA, DHS all cite critical network engineering shortage; CISA 2024'},
-  ]},
-  {city:'Atlanta, GA',urg:'warm',src:'BLS OES 2024 · GA Dept of Labor 2024',jobs:[
-    {t:'Software Engineer',n:'Tech / Software',l:'Mid level',count:8800,di:72,note:'GA Dept of Labor: Atlanta tech sector grew 28% 2020-2024; Delta, NCR, Mailchimp hiring'},
-    {t:'Registered Nurse',n:'Healthcare',l:'Mid level',count:4800,di:76,note:'GA Dept of Public Health: Atlanta hospital system 4,800 RN vacancies Q3 2024'},
-    {t:'Logistics Coordinator',n:'Logistics / Warehouse',l:'Entry level',count:5200,di:64,note:'Atlanta is the Southeast logistics hub; Hartsfield-Jackson drives massive freight workforce'},
-    {t:'Electrician',n:'Trades / Construction',l:'Entry level',count:2600,di:71,note:'BLS: GA construction boom driving 11% electrician growth; 2,600 openings in metro'},
-  ]},
-  {city:'Remote — All US',urg:'warm',src:'LinkedIn Workforce Report Q3 2024 · BLS OES 2024',jobs:[
-    {t:'Software Engineer',n:'Tech / Software',l:'Mid level',count:42800,di:74,note:'LinkedIn Q3 2024: SWE is the #1 remote role by volume; 42K+ active postings'},
-    {t:'Customer Success Manager',n:'Tech / Software',l:'Entry level',count:8400,di:58,note:'LinkedIn: CSM roles highest remote availability after SWE; entry pay $45-65K'},
-    {t:'Data Analyst',n:'Tech / Software',l:'Mid level',count:6200,di:68,note:'BLS: Data Analyst 36% 10-yr growth; 60%+ of roles now offer remote options'},
-    {t:'Product Manager',n:'Tech / Software',l:'Senior',count:4800,di:60,note:'LinkedIn: Remote PM roles highly competitive but 4,800 active US postings Q3 2024'},
-  ]},
-]
+function relAgo(iso?: string | null): string {
+  if (!iso) return ''
+  const t = Date.parse(iso)
+  if (!Number.isFinite(t)) return ''
+  const d = Math.floor((Date.now() - t) / 86400000)
+  if (d <= 0) return 'today'
+  if (d === 1) return 'yesterday'
+  if (d < 30) return `${d}d ago`
+  return `${Math.floor(d / 30)}mo ago`
+}
+
 
 const URG_CFG = {
   hot:  { label: '🔥 High demand', cls: 'hot' },
@@ -123,12 +57,21 @@ function diLabel(di: number): { label: string; color: string } {
 
 function CityCard({ city }: { city: DemandCity }) {
   const cfg = URG_CFG[city.urg]
+  const live = city.kind === 'live'
   return (
     <div className="dcity">
       <div className="dc-hdr">
         <div>
           <div className="dc-city">{city.city}</div>
-          <div style={{ fontFamily: 'var(--mono)', fontSize: '.55rem', color: 'var(--muted)', marginTop: '.15rem' }}>{city.src}</div>
+          {/* Honest vintage chip: live-from-corpus vs modeled-from-BLS — never both as "Live" */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '.45rem', marginTop: '.18rem', flexWrap: 'wrap' }}>
+            <span style={{ fontFamily: 'var(--mono)', fontSize: '.5rem', fontWeight: 700, letterSpacing: '.06em', color: live ? 'var(--green)' : 'var(--blue)', border: `1px solid ${live ? 'rgba(16,185,129,.35)' : 'rgba(99,102,241,.35)'}`, borderRadius: 4, padding: '.08rem .35rem' }}>
+              {live ? '● LIVE · Seen listings' : '≈ MODELED · BLS blend'}
+            </span>
+            <span style={{ fontFamily: 'var(--mono)', fontSize: '.55rem', color: 'var(--muted)' }}>
+              {city.src}{city.updated_at ? ` · updated ${relAgo(city.updated_at)}` : ''}
+            </span>
+          </div>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '.6rem', flexShrink: 0 }}>
           <a
@@ -147,7 +90,7 @@ function CityCard({ city }: { city: DemandCity }) {
               <div style={{ display: 'flex', alignItems: 'center', gap: '.5rem' }}>
                 <div className="dc-job">{job.t}</div>
                 <a
-                  href={`/jobs?q=${encodeURIComponent(job.t)}&loc=${encodeURIComponent(city.city)}`}
+                  href={`/jobs?q=${encodeURIComponent(job.t.split('/')[0].trim())}&loc=${encodeURIComponent(city.city)}`}
                   style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', color: 'var(--blue)', textDecoration: 'none', whiteSpace: 'nowrap', flexShrink: 0 }}
                 >
                   Find these jobs →
@@ -159,7 +102,10 @@ function CityCard({ city }: { city: DemandCity }) {
                 {(() => { const dl = diLabel(job.di); return <span style={{ fontFamily: 'var(--mono)', fontSize: '.52rem', color: dl.color, marginLeft: '.4rem', fontWeight: 700 }}>{dl.label}</span>; })()}
               </div>
             </div>
-            <div className="dc-count" style={{ marginLeft: '.75rem', flexShrink: 0 }}>{job.count.toLocaleString()}</div>
+            {/* Live counts are exact Seen listings; BLS counts are model estimates — say so. */}
+            <div className="dc-count" style={{ marginLeft: '.75rem', flexShrink: 0 }} title={live ? `${job.count} live listings on Seen` : 'Estimate modeled from BLS sector data'}>
+              {live ? job.count.toLocaleString() : `~${job.count.toLocaleString()}`}
+            </div>
           </div>
         ))}
       </div>
@@ -168,26 +114,61 @@ function CityCard({ city }: { city: DemandCity }) {
 }
 
 export default function DemandPage() {
-  const [data, setData] = useState<DemandCity[]>(FALLBACK)
+  // null = loading. NO hardcoded fallback dataset: the old one contradicted the DB on every
+  // load (its numbers were ~5× the real rows, so the page visibly "shrank" after hydration).
+  const [data, setData] = useState<DemandCity[] | null>(null)
+  const [loadFailed, setLoadFailed] = useState(false)
   const [blsPeriod, setBlsPeriod] = useState<string | null>(null)
   const [locFilter, setLocFilter] = useState('')
   const [nicheFilter, setNicheFilter] = useState('')
   const [expFilter, setExpFilter] = useState('')
+  // Generate-on-miss state: searching a city we don't have triggers live generation from the
+  // Seen jobs corpus (geocode → radius → bucket) — cached server-side for everyone after.
+  const [genState, setGenState] = useState<'idle' | 'loading' | 'failed'>('idle')
+  const [genMsg, setGenMsg] = useState('')
 
   useEffect(() => {
     fetch('/api/demand')
       .then(r => r.json())
       .then((d: { demand?: DemandCity[]; bls_period?: string }) => {
-        if (d.demand?.length) { setData(d.demand); setBlsPeriod(d.bls_period || null) }
+        setData(d.demand ?? [])
+        setBlsPeriod(d.bls_period || null)
       })
-      .catch(() => {/* use fallback */})
+      .catch(() => { setData([]); setLoadFailed(true) })
   }, [])
 
+  const generateCity = async () => {
+    const q = locFilter.trim()
+    if (!q || genState === 'loading') return
+    setGenState('loading'); setGenMsg('')
+    try {
+      const r = await fetch(`/api/demand?city=${encodeURIComponent(q)}`)
+      const d = (await r.json()) as { demand?: DemandCity[]; message?: string; city?: string }
+      if (d.demand?.length) {
+        setData(prev => {
+          const others = (prev ?? []).filter(c => !d.demand!.some(n => n.city === c.city))
+          return [...d.demand!, ...others]
+        })
+        if (d.city) setLocFilter(d.city)
+        setGenState('idle')
+      } else {
+        setGenState('failed')
+        setGenMsg(d.message || `No live listings found near "${q}" yet.`)
+      }
+    } catch {
+      setGenState('failed'); setGenMsg('Could not reach the demand service — try again.')
+    }
+  }
+
   const filtered = useMemo(() => {
-    let cities = data
-    if (locFilter.trim()) {
-      const q = locFilter.toLowerCase()
-      cities = cities.filter(c => c.city.toLowerCase().includes(q))
+    let cities = data ?? []
+    const q = locFilter.trim().toLowerCase()
+    if (q) {
+      // A bare 2-letter query is a STATE code: match the ", ST" suffix — substring matching
+      // returned absurdities ("CO" → San Francisco, "AL" → dozens of cities).
+      cities = /^[a-z]{2}$/.test(q)
+        ? cities.filter(c => c.city.toLowerCase().endsWith(`, ${q}`))
+        : cities.filter(c => c.city.toLowerCase().includes(q))
     }
     return cities.map(c => ({
       ...c,
@@ -228,13 +209,13 @@ export default function DemandPage() {
         <div className="demand-hdr">
           <div style={{ fontFamily: 'var(--mono)', fontSize: '.52rem', textTransform: 'uppercase', letterSpacing: '.22em', color: 'var(--amber)', marginBottom: '.6rem', display: 'flex', alignItems: 'center', gap: 12 }}>
             <span style={{ width: 22, height: 1, background: 'var(--amber)', display: 'inline-block' }} />
-            Live job demand · {blsPeriod || 'BLS OES 2024'}
+            Job demand{blsPeriod ? ` · BLS ${blsPeriod}` : ''} + live Seen listings
           </div>
           <h1 style={{ fontFamily: 'var(--display)', fontSize: '2rem', fontWeight: 800, color: 'var(--white)', letterSpacing: '-.03em', marginBottom: '.28rem' }}>
             Where jobs desperately need people
           </h1>
           <p style={{ color: 'var(--sub)', fontSize: '.82rem', fontWeight: 300, marginBottom: '1.5rem' }}>
-            Real demand data from BLS, JOLTS, and industry reports. Sorted by demand index — roles where supply can&apos;t keep up.
+            Two honest sources, labeled per card: <span style={{ color: 'var(--green)' }}>● LIVE</span> markets computed from real listings on Seen, and <span style={{ color: 'var(--blue)' }}>≈ MODELED</span> markets from the BLS blend. Search any city — if we don&apos;t have it, we generate it from live listings on the spot.
           </p>
 
           {/* Filters */}
@@ -287,15 +268,44 @@ export default function DemandPage() {
         </div>
 
         {/* City grid */}
-        {filtered.length > 0 ? (
+        {data === null ? (
+          /* Honest loading skeleton — never a fabricated dataset while we wait */
+          <div className="demand-grid">
+            {[0, 1, 2, 3].map(i => (
+              <div key={i} className="dcity" style={{ minHeight: 180, opacity: 0.55 }}>
+                <div style={{ height: 12, width: `${58 - i * 6}%`, background: 'var(--line2)', borderRadius: 4, margin: '1rem' }} />
+                {[0, 1, 2].map(j => <div key={j} style={{ height: 9, width: `${80 - j * 14}%`, background: 'var(--line)', borderRadius: 4, margin: '.8rem 1rem' }} />)}
+              </div>
+            ))}
+          </div>
+        ) : filtered.length > 0 ? (
           <div className="demand-grid">
             {filtered.map(city => (
               <CityCard key={city.city} city={city} />
             ))}
           </div>
         ) : (
-          <div style={{ textAlign: 'center', padding: '4rem 2rem', color: 'var(--muted)', fontFamily: 'var(--mono)', fontSize: '.75rem' }}>
-            No markets match your filters. Try clearing them.
+          <div style={{ textAlign: 'center', padding: '4rem 2rem', color: 'var(--muted)', fontFamily: 'var(--mono)', fontSize: '.75rem', lineHeight: 1.7 }}>
+            {loadFailed ? (
+              <>Couldn&apos;t load demand data just now — refresh to retry.</>
+            ) : locFilter.trim().length >= 3 ? (
+              /* Generate-on-miss: the searched city isn't tracked yet — build it from live listings */
+              <>
+                <div style={{ marginBottom: '1rem' }}>&ldquo;{locFilter.trim()}&rdquo; isn&apos;t tracked yet.</div>
+                <button
+                  onClick={generateCity}
+                  disabled={genState === 'loading'}
+                  style={{ background: 'rgba(16,185,129,.08)', border: '1px solid rgba(16,185,129,.35)', color: 'var(--green)', borderRadius: 8, padding: '.65rem 1.2rem', fontFamily: 'var(--mono)', fontSize: '.7rem', cursor: genState === 'loading' ? 'wait' : 'pointer' }}
+                >
+                  {genState === 'loading' ? `Scanning live listings near ${locFilter.trim()}…` : `⚡ Generate demand for “${locFilter.trim()}” from live Seen listings`}
+                </button>
+                {genState === 'failed' && genMsg && (
+                  <div style={{ marginTop: '.9rem', color: 'var(--amber)', fontSize: '.66rem' }}>{genMsg}</div>
+                )}
+              </>
+            ) : (
+              <>No markets match your filters. Try clearing them — or type a city to generate its live demand.</>
+            )}
           </div>
         )}
       </div>
