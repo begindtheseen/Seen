@@ -20,6 +20,8 @@ interface CompanyScore {
   avg_rounds: number
   waste: number
   report_count: number
+  first_party_report_count?: number
+  web_report_count?: number
   risk_level: 'safe' | 'warn' | 'danger'
   process_score?: number
   data_quality?: string
@@ -107,14 +109,27 @@ function BarRow({ label, value, color }: { label: string; value: number; color: 
   )
 }
 
-function DataQualityBadge({ dq, reportCount }: { dq: string; reportCount: number }) {
+function DataQualityBadge({ dq, reportCount, webCount = 0 }: { dq: string; reportCount: number; webCount?: number }) {
+  // reportCount here is FIRST-PARTY applicant reports only. With zero first-party rows the
+  // score is a web-research estimate — say exactly that; never mint "High confidence · N
+  // reports" from the LLM's claimed mention count (that number looked fake because it was).
+  if (reportCount === 0) {
+    return (
+      <span style={{
+        fontFamily: 'var(--mono)', fontSize: '.54rem', fontWeight: 600,
+        color: 'var(--amber)', display: 'inline-flex', alignItems: 'center', gap: '.3rem',
+      }}>
+        🌐 {webCount > 0 ? 'Web-research estimate — no first-party reports yet' : 'Estimated'}
+      </span>
+    )
+  }
   const map: Record<string, { emoji: string; label: string; color: string }> = {
-    strong:   { emoji: '🟢', label: `High · ${reportCount} reports`,      color: 'var(--green)' },
-    moderate: { emoji: '🟡', label: `Moderate · ${reportCount} reports`,  color: 'var(--amber)' },
-    limited:  { emoji: '🟡', label: `Low · ${reportCount} reports`,       color: 'var(--amber)' },
+    strong:   { emoji: '🟢', label: `High · ${reportCount} applicant reports`,      color: 'var(--green)' },
+    moderate: { emoji: '🟡', label: `Moderate · ${reportCount} applicant reports`,  color: 'var(--amber)' },
+    limited:  { emoji: '🟡', label: `Low · ${reportCount} applicant reports`,       color: 'var(--amber)' },
     medium:   { emoji: '🟡', label: 'Moderate confidence',                color: 'var(--amber)' },
     low:      { emoji: '🔴', label: 'Low confidence',                     color: 'var(--red)'   },
-    high:     { emoji: '🟢', label: `High confidence · ${reportCount} reports`, color: 'var(--green)' },
+    high:     { emoji: '🟢', label: `High confidence · ${reportCount} applicant reports`, color: 'var(--green)' },
   }
   const info = map[dq] || { emoji: '🔴', label: 'Estimated', color: 'var(--red)' }
   return (
@@ -606,6 +621,11 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
 
   const risk = score ? Score.risk(score.overall_score) : 'warn'
   const g = score ? letterGrade(score.overall_score) : '—'
+  // Honest count split (migration 063). Legacy payloads without the split fields infer from
+  // data_source: only 'reports'-derived scores were counted from real rows — anything else is
+  // the web-research pipeline's *claimed* number, which must never render as "reports".
+  const fpReports = score ? (score.first_party_report_count ?? (score.data_source === 'reports' ? (score.report_count || 0) : 0)) : 0
+  const webEst = score ? (score.web_report_count ?? (score.data_source === 'reports' ? 0 : (score.report_count || 0))) : 0
   const logoLetter = (companyName[0] || '?').toUpperCase()
   const ghostHigh = (score?.ghost_rate || 0) > 0.5
   const ghostPct = score ? (ratePct(score.ghost_rate) ?? 0) : 0
@@ -752,7 +772,10 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
                   response_rate: score.response_rate,
                   avg_wait_days: score.avg_wait_days,
                   waste: score.waste,
-                  report_count: score.report_count,
+                  // First-party only: the PNG renders "Based on N applicant reports" — feeding it
+                  // the fused web claim published the phantom number to social. Its own zero-state
+                  // ("Baseline estimate · share your experience") is the honest fallback.
+                  report_count: fpReports,
                   risk: score.risk_level,
                   tags: [
                     score.ghost_rate >= 0.5 ? '👻 High ghost rate' : null,
@@ -799,13 +822,13 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
                   <span className="co-grade-score">{displayScore} / 100</span>
                   {score.data_quality && (
                     <div style={{ marginTop: '.35rem' }}>
-                      <DataQualityBadge dq={score.data_quality} reportCount={score.report_count} />
+                      <DataQualityBadge dq={score.data_quality} reportCount={fpReports} webCount={webEst} />
                     </div>
                   )}
                 </div>
-                {score.report_count > 0 && (
+                {(fpReports > 0 || webEst > 0) && (
                   <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                    <span className="co-live">{score.report_count} reports</span>
+                    <span className="co-live">{fpReports > 0 ? `${fpReports} applicant report${fpReports === 1 ? '' : 's'}` : 'web-research estimate'}</span>
                   </div>
                 )}
               </div>
@@ -817,7 +840,7 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
               <GhostSurgeAlert ghostRate={score.ghost_rate || 0} />
 
               {/* Emotional ghost rate visual */}
-              <GhostVisual ghostRate={score.ghost_rate || 0} count={score.report_count} />
+              <GhostVisual ghostRate={score.ghost_rate || 0} count={fpReports} />
 
               {/* Metrics grid */}
               <div className="co-mets">
@@ -921,7 +944,11 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
                   <CompanyPublicRecord companyName={companyName} />
                 </div>
                 <div style={{ background: 'var(--raised, #111)', borderRadius: 7, padding: '.7rem .95rem', fontFamily: 'var(--mono)', fontSize: '.58rem', color: 'var(--muted)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '.5rem' }}>
-                  <span>📊 Based on {score.report_count || 0} {score.data_source === 'web_research' ? 'web research reports' : 'verified reports'}</span>
+                  <span>📊 {fpReports > 0
+                    ? `Based on ${fpReports} applicant report${fpReports === 1 ? '' : 's'}${webEst > 0 ? ' + public web research' : ''}`
+                    : webEst > 0
+                      ? 'Score estimated from public web research — no first-party applicant reports yet'
+                      : 'No reports yet'}</span>
                   <a href="/report" style={{ color: 'var(--green)', textDecoration: 'none', whiteSpace: 'nowrap' }}>+ Add your report →</a>
                 </div>
               </div>
@@ -1000,7 +1027,9 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
                   </>
                 ) : (
                   <div style={{ textAlign: 'center', padding: '2.5rem', color: 'var(--muted)', fontFamily: 'var(--mono)', fontSize: '.7rem' }}>
-                    No community reports yet.<br /><br />
+                    {webEst > 0 && fpReports === 0
+                      ? <>No first-party reports yet — the score on this page is estimated from public web research.<br /><br /></>
+                      : <>No community reports yet.<br /><br /></>}
                     <a href="/report" style={{ color: 'var(--green)', textDecoration: 'none' }}>Be the first to report →</a>
                   </div>
                 )}

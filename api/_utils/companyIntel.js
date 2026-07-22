@@ -97,6 +97,12 @@ export function blendRate(prior, empiricalRate, effN) {
 //   avgTenureMonths, tenureSample, dataAgeDays,
 //   confirmedStaleListings, // admin-confirmed dead listings (suppressed_listings) — bounded penalty
 // }
+// Upper bound on the LLM web-research *claimed* mention count. The model returns an unbounded
+// self-reported number (observed: 12,775 for one company vs 147 rows in our entire reports
+// table) — the cap keeps a claim from dominating volume-driven score math. Display surfaces
+// must label it as a web-research estimate, never as "reports".
+export const WEB_CLAIM_CAP = 500;
+
 export function fuseCompanyIntel(input = {}) {
   const { web = {}, sources = [], avgTenureMonths = null, tenureSample = 0, dataAgeDays = 0, confirmedStaleListings = 0 } = input;
 
@@ -129,15 +135,23 @@ export function fuseCompanyIntel(input = {}) {
   const avg_rounds = round1(blendRate(num(web.avg_rounds), empRounds, effN));
   const unpaid_rate = clamp01(num(web.unpaid_rate) ?? 0) ?? 0;
 
-  // Volume/confidence sample = real resolved reports we hold + the web's claimed count.
-  const report_count = Math.round((rawResolved || 0) + (num(web.report_count) || 0));
+  // Split the sample honestly: first-party = resolved report rows we actually hold;
+  // web = the LLM research's *claimed* mention count — clamped (it arrives unbounded, e.g.
+  // "12,775") and NEVER counted as first-party. The fused report_count remains their sum for
+  // scoring math/back-compat, but confidence can no longer be minted from the claim alone.
+  const first_party_report_count = Math.max(0, Math.round(rawResolved || 0));
+  const web_report_count = Math.max(0, Math.min(WEB_CLAIM_CAP, Math.round(num(web.report_count) || 0)));
+  const report_count = first_party_report_count + web_report_count;
 
   const base = calcOverallScore(response_rate ?? 0, ghost_rate ?? 0, avg_wait_days ?? 0, report_count);
   const tAdj = tenureAdjustment(avgTenureMonths, tenureSample);
   const stalePen = staleListingPenalty(confirmedStaleListings);
   const overall_score = clamp100(base + tAdj + stalePen);
   const waste_score = calcWaste(ghost_rate ?? 0, avg_rounds ?? 0, unpaid_rate);
-  const confidence = scoreConfidence({ reportCount: report_count, tenureSample, dataAgeDays });
+  const confidence = scoreConfidence({
+    reportCount: first_party_report_count, tenureSample, dataAgeDays,
+    webClaimedCount: web_report_count,
+  });
 
   return {
     overall_score,
@@ -152,6 +166,8 @@ export function fuseCompanyIntel(input = {}) {
     unpaid_rate,
     waste_score,
     report_count,
+    first_party_report_count,
+    web_report_count,
     confidence,
     confidence_label: confidenceLabel(confidence),
     sufficient: confidence >= 0.33,

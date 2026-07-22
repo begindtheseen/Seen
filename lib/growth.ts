@@ -9,10 +9,23 @@ export type GrowthScore = {
   avg_wait_days: number | null
   avg_rounds?: number | null
   report_count: number
+  /** Real applicant-report rows behind the score (migration 063). */
+  first_party_report_count?: number | null
+  /** LLM web-research *claimed* mention count — never applicant reports. */
+  web_report_count?: number | null
+  data_source?: string | null
   risk_level: 'safe' | 'warn' | 'danger'
   industry?: string | null
   waste?: number | null
   summary?: string | null
+}
+
+// Honest count for public claims ("N applicant reports", schema.org ratingCount): first-party
+// rows only. Legacy rows (pre-063) infer from data_source — only 'reports'-derived scores were
+// counted from real rows; anything else is a web-research claim and yields 0 here.
+export function firstPartyReportCount(s: GrowthScore | null | undefined): number {
+  if (!s) return 0
+  return s.first_party_report_count ?? (s.data_source === 'reports' ? (s.report_count ?? 0) : 0)
 }
 
 export type LeaderboardRow = {
@@ -64,7 +77,7 @@ async function scoreFromDb(name: string): Promise<GrowthScore | null> {
   const creds = sbCreds()
   if (!creds) return null
   const headers = { apikey: creds.key, Authorization: `Bearer ${creds.key}` }
-  const sel = 'select=company_name,overall_score,ghost_rate,response_rate,avg_wait_days,avg_rounds,report_count,waste_score,industry,raw_summary'
+  const sel = 'select=company_name,overall_score,ghost_rate,response_rate,avg_wait_days,avg_rounds,report_count,first_party_report_count,web_report_count,data_source,waste_score,industry,raw_summary'
   try {
     const enc = encodeURIComponent(name.toLowerCase().trim())
     let r = await fetch(`${creds.url}/rest/v1/company_scores?company_name=ilike.${enc}&${sel}&order=created_at.desc&limit=1`, { headers, signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) })
@@ -83,6 +96,9 @@ async function scoreFromDb(name: string): Promise<GrowthScore | null> {
       avg_wait_days: row.avg_wait_days ?? null,
       avg_rounds: row.avg_rounds ?? null,
       report_count: row.report_count ?? 0,
+      first_party_report_count: row.first_party_report_count ?? null,
+      web_report_count: row.web_report_count ?? null,
+      data_source: row.data_source ?? null,
       risk_level: s >= 70 ? 'safe' : s >= 40 ? 'warn' : 'danger',
       industry: row.industry || null,
       waste: row.waste_score ?? null,
