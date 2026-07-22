@@ -1,5 +1,5 @@
 import { ImageResponse } from 'next/og'
-import { getScore, titleCase, grade, riskColor, riskLabel, pct, firstPartyReportCount } from '@/lib/growth'
+import { getScore, titleCase, displayCompanyName, grade, riskColor, riskLabel, pct, firstPartyReportCount } from '@/lib/growth'
 
 // Dynamic OG share image for company pages — the biggest virality lever. Renders the company's
 // REAL Seen Grade + ghost%/response% in an on-brand card. 1200×630. When no data exists we still
@@ -15,8 +15,10 @@ export const contentType = 'image/png'
 
 export default async function Image({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params
-  const name = titleCase(slug)
   const s = await getScore(slug)
+  // Prefer the STORED canonical name — a slug can't carry punctuation, so titleCase(slug)
+  // rendered "Lowe S" on the public unfurl where the company is actually "Lowe's".
+  const name = s?.company_name ? displayCompanyName(s.company_name) : titleCase(slug)
 
   const score = s?.overall_score ?? null
   const accent = riskColor(s?.risk_level)
