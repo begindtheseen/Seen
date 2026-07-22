@@ -93,8 +93,11 @@ export default function CompanyPublicRecord({ companyName }: { companyName: stri
         ))}
       </div>
 
+      {/* Honest footer: no promises of flows that don't exist. Every entry links to its
+          official source; corrections go through the real employer-claims channel. */}
       <div style={{ fontFamily: 'var(--mono)', fontSize: '.52rem', color: 'var(--muted)', marginTop: '.85rem', lineHeight: 1.5 }}>
-        These are public records surfaced for transparency. An employer can dispute or correct any entry from their dashboard.
+        Public records surfaced for transparency — every entry links to its official source.
+        Employers: <a href="/employers" style={{ color: 'var(--blue)', textDecoration: 'none' }}>claim your company</a> to flag a mis-attributed record for review.
       </div>
     </div>
   )

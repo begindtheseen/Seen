@@ -257,6 +257,19 @@ export default async function handler(req, res) {
   if (!rlOk) return res.status(429).json({ error: 'Too many requests — slow down.' });
 
   try {
+    // ── Lightweight redirect-apply tracking ────────────────────────────────────
+    // The COMMON apply path is a pure redirect (window.open to the employer's page) — no
+    // email, no résumé. Until now NOTHING recorded it, so apply_events stayed empty and the
+    // employer "applies" feature was dead end-to-end. This action records the observed click
+    // + the employer notification and nothing else (no PII beyond the optional signed-in uid,
+    // which is stored server-side only — same posture as migration 058).
+    if ((req.body || {}).action === 'track_click') {
+      const uid = await resolveUid(req);
+      const { company: tcCompany, role: tcRole, location: tcLocation, jobId: tcJobId, applyUrl: tcApplyUrl } = req.body || {};
+      await recordApplyActivity({ company: tcCompany, role: tcRole, location: tcLocation, uid, jobId: tcJobId, applyUrl: tcApplyUrl });
+      return res.status(200).json({ ok: true });
+    }
+
     const {
       applicantName, applicantEmail, role, company, location,
       resumeLink, resumeText: rawResumeText, coverNote, applyEmail,

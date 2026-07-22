@@ -3,6 +3,7 @@
 import { useState, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import type { Job } from '@/lib/types'
+import { trackApplyClick } from '@/lib/trackApply'
 import { useJobSearch, type SortMode } from '@/lib/hooks/useJobSearch'
 import JobCard from '@/components/jobs/JobCard'
 import JobDetailDrawer from '@/components/jobs/JobDetailDrawer'
@@ -231,7 +232,7 @@ export default function JobsPage() {
                 onOpen={j => setDetailJob(j)}
                 onDismiss={() => setDeckDone(true)}
                 onSave={() => setSwipeCount(c => c + 1)}
-                onApply={j => { if (j.apply_url) window.open(j.apply_url, '_blank', 'noopener,noreferrer'); setCheckpointJob(j) }}
+                onApply={j => { if (j.apply_url) { trackApplyClick(j); window.open(j.apply_url, '_blank', 'noopener,noreferrer') } setCheckpointJob(j) }}
                 coScores={coScores}
               />
             )}
@@ -275,7 +276,7 @@ export default function JobsPage() {
             onOpen={j => setDetailJob(j)}
             onDismiss={() => setSwipeMode(false)}
             onSave={() => setSaveVersion(v => v + 1)}
-            onApply={j => { if (j.apply_url) window.open(j.apply_url, '_blank', 'noopener,noreferrer'); setCheckpointJob(j) }}
+            onApply={j => { if (j.apply_url) { trackApplyClick(j); window.open(j.apply_url, '_blank', 'noopener,noreferrer') } setCheckpointJob(j) }}
             coScores={coScores}
           />
         ) : filtered.length > 0 ? (

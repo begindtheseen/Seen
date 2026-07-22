@@ -954,6 +954,15 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
               </div>
             )}
 
+            {/* Public records must not depend on having a score: a company with real SEC
+                filings but no rating still shows them (the section self-hides when empty).
+                The score-gated overview above already renders it for scored companies. */}
+            {tab === 'overview' && !score && (
+              <div style={{ marginBottom: '1rem' }}>
+                <CompanyPublicRecord companyName={companyName} />
+              </div>
+            )}
+
             {/* ── PROCESS SCORE TAB ── */}
             {tab === 'process' && score && (
               <div>

@@ -55,6 +55,13 @@ async function route(req, res) {
   if (typeof body === 'string') { try { body = JSON.parse(body); } catch { body = {}; } }
   body = body || {};
 
+  // Weekly Vercel cron (GET, x-vercel-cron header — same trust pattern as api/demand.js):
+  // ingest the last 14 days of SEC filings so the public-record section stays populated
+  // without anyone remembering to run it. Before this, NOTHING fed company_signals in prod.
+  if (req.method === 'GET' && req.headers['x-vercel-cron'] === '1') {
+    return ingestSec(req, res, { db, body: { days: 14 } });
+  }
+
   const adminToken = (req.headers['x-admin-token'] || body.admin_token || '').trim();
   if (adminToken) return adminRoute(req, res, { db, body, adminToken });
 

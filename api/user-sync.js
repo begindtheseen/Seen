@@ -445,11 +445,18 @@ export default async function handler(req, res) {
     // that PostgREST would 400 as invalid-uuid input. The report row (job_id is text)
     // is already saved above — only touch the jobs row when the id can actually match one.
     if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(job_id))) {
-      db(`jobs?id=eq.${encodeURIComponent(String(job_id))}`, {
-        method: 'PATCH',
-        body: JSON.stringify({ availability_report_count: 1, last_checked_at: new Date().toISOString() }),
-        headers: { Prefer: 'return=minimal' },
-      }).catch(() => {});
+      // Real increment (read-then-patch): this used to hardcode `1`, making the "counter" a
+      // boolean — every listing showed "1 job-seeker reported it closed" no matter how many
+      // actually had. Awaited (not fire-and-forget) because Vercel freezes after the response.
+      try {
+        const jr = await db(`jobs?id=eq.${encodeURIComponent(String(job_id))}&select=availability_report_count&limit=1`);
+        const cur = jr.ok ? (((await jr.json())?.[0]?.availability_report_count) || 0) : 0;
+        await db(`jobs?id=eq.${encodeURIComponent(String(job_id))}`, {
+          method: 'PATCH',
+          body: JSON.stringify({ availability_report_count: cur + 1, last_checked_at: new Date().toISOString() }),
+          headers: { Prefer: 'return=minimal' },
+        });
+      } catch { /* best-effort — the report row above is already saved */ }
     }
     // Notify the company's employer that one of their listings was REPORTED inactive (migration
     // 057). Only on an 'expired' report (the "reported inactive" signal — 'active' is a
