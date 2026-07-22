@@ -730,8 +730,12 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
               )}
               {/* T3-8: Share buttons */}
               <div style={{ display: 'flex', gap: '.4rem', flexWrap: 'wrap', marginTop: '.6rem' }}>
+                {/* ?sv=<score> versions the shared URL: Reddit caches unfurls PER URL roughly
+                    forever, so links shared before the OG card existed are stuck blank. A new
+                    score → a new URL → a fresh unfurl fetch. rel=canonical keeps SEO on the
+                    clean URL; visitors landing with ?sv= see the normal page. */}
                 <a
-                  href={`https://reddit.com/submit?url=${encodeURIComponent(`https://seenjobs.io/company/${slug}`)}&title=${encodeURIComponent(`Is ${companyName} worth applying to? Seen score: ${score?.overall_score ?? '?'}/100`)}`}
+                  href={`https://reddit.com/submit?url=${encodeURIComponent(`https://seenjobs.io/company/${slug}${score?.overall_score != null ? `?sv=${score.overall_score}` : ''}`)}&title=${encodeURIComponent(`Is ${companyName} worth applying to? Seen score: ${score?.overall_score ?? '?'}/100`)}`}
                   target="_blank"
                   rel="noopener noreferrer"
                   style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', background: 'rgba(255,69,0,0.1)', border: '1px solid rgba(255,69,0,0.25)', color: '#ff6314', borderRadius: 6, padding: '.25rem .6rem', textDecoration: 'none' }}

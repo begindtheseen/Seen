@@ -57,7 +57,11 @@ export type LeaderboardRow = {
 // and calls /api/reports from the browser), which primes the cache these helpers read.
 //
 // Every read is capped with AbortSignal.timeout — Node's fetch has no default timeout.
-const FETCH_TIMEOUT_MS = 8000
+// Tight on purpose: this fetch runs INSIDE the OG-image render. Link crawlers (Reddit ≈4s
+// total) cache "no preview" forever for a URL whose image blows their budget — an 8s timeout
+// (×2 with the fuzzy retry) did exactly that. Worst case now: fast branded no-data card,
+// which beats a permanently blank unfurl.
+const FETCH_TIMEOUT_MS = 2500
 
 // Service-key Supabase creds. These functions are ONLY called from server components (no
 // 'use client' importer calls getScore/getLeaderboard), the service key is not NEXT_PUBLIC_, and
