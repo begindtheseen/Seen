@@ -3,59 +3,127 @@
   "headers": [
     {
       "source": "/",
-      "headers": [{ "key": "Cache-Control", "value": "no-store, no-cache, must-revalidate, max-age=0" }]
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "no-store, no-cache, must-revalidate, max-age=0"
+        }
+      ]
     },
     {
       "source": "/admin",
-      "headers": [{ "key": "Cache-Control", "value": "no-store, no-cache, must-revalidate, max-age=0" }]
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "no-store, no-cache, must-revalidate, max-age=0"
+        }
+      ]
     },
     {
       "source": "/admin/(.*)",
-      "headers": [{ "key": "Cache-Control", "value": "no-store, no-cache, must-revalidate, max-age=0" }]
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "no-store, no-cache, must-revalidate, max-age=0"
+        }
+      ]
     }
   ],
   "functions": {
-    "api/job-insights.js": { "maxDuration": 20 },
-    "api/optimizer.js": { "maxDuration": 30 },
-    "api/refresh-jobs.js": { "maxDuration": 60 },
-    "api/refresh-stale-jobs.js": { "maxDuration": 300 },
-    "api/resume.js": { "maxDuration": 30 },
-    "api/apply.js": { "maxDuration": 30 },
-    "api/jobs.js": { "maxDuration": 60 },
-    "api/import-listing.js": { "maxDuration": 60 },
-    "api/admin-stats.js": { "maxDuration": 15 },
-    "api/admin-rescore-jobs.js": { "maxDuration": 300 },
-    "api/user-sync.js": { "maxDuration": 15 },
-    "api/demand.js": { "maxDuration": 60 },
-    "api/reports.js": { "maxDuration": 300 },
-    "api/stripe.js": { "maxDuration": 30 },
-    "api/outcome-followups.js": { "maxDuration": 60 }
+    "api/job-insights.js": {
+      "maxDuration": 20
+    },
+    "api/optimizer.js": {
+      "maxDuration": 30
+    },
+    "api/refresh-jobs.js": {
+      "maxDuration": 60
+    },
+    "api/refresh-stale-jobs.js": {
+      "maxDuration": 300
+    },
+    "api/resume.js": {
+      "maxDuration": 30
+    },
+    "api/apply.js": {
+      "maxDuration": 30
+    },
+    "api/jobs.js": {
+      "maxDuration": 60
+    },
+    "api/import-listing.js": {
+      "maxDuration": 60
+    },
+    "api/admin-stats.js": {
+      "maxDuration": 15
+    },
+    "api/admin-rescore-jobs.js": {
+      "maxDuration": 300
+    },
+    "api/user-sync.js": {
+      "maxDuration": 15
+    },
+    "api/demand.js": {
+      "maxDuration": 60
+    },
+    "api/reports.js": {
+      "maxDuration": 300
+    },
+    "api/stripe.js": {
+      "maxDuration": 30
+    },
+    "api/outcome-followups.js": {
+      "maxDuration": 60
+    }
   },
   "crons": [
-    { "path": "/api/outcome-followups", "schedule": "0 15 * * *" },
-    { "path": "/api/refresh-jobs", "schedule": "0 2 * * *" },
-    { "path": "/api/refresh-jobs", "schedule": "0 6 * * *" },
-    { "path": "/api/refresh-jobs", "schedule": "0 10 * * *" },
-    { "path": "/api/refresh-jobs", "schedule": "0 14 * * *" },
-    { "path": "/api/refresh-jobs", "schedule": "0 18 * * *" },
-    { "path": "/api/refresh-jobs", "schedule": "0 22 * * *" },
-    { "path": "/api/refresh-stale-jobs", "schedule": "30 3 * * *" },
-    { "path": "/api/demand", "schedule": "0 4 1 * *" },
-    { "path": "/api/stripe?action=reconcile_all", "schedule": "0 5 * * *" },
-    { "path": "/api/reports?action=update_tenure", "schedule": "0 3 * * *" },
-    { "path": "/api/reports?reddit_cron=recruitinghell",    "schedule": "0 1 * * *" },
-    { "path": "/api/reports?reddit_cron=jobs",              "schedule": "0 4 * * *" },
-    { "path": "/api/reports?reddit_cron=cscareerquestions", "schedule": "0 7 * * *" },
-    { "path": "/api/reports?reddit_cron=careerguidance",    "schedule": "0 10 * * *" },
-    { "path": "/api/reports?reddit_cron=antiwork",          "schedule": "0 13 * * *" },
-    { "path": "/api/reports?reddit_cron=AskHR",             "schedule": "0 16 * * *" },
-    { "path": "/api/reports?reddit_cron=interviews",        "schedule": "0 19 * * *" },
-    { "path": "/api/reports?reddit_cron=ExperiencedDevs",   "schedule": "0 22 * * *" },
-    { "path": "/api/reports?reddit_cron=GetEmployed",        "schedule": "30 2 * * *" },
-    { "path": "/api/reports?reddit_cron=jobsearchhacks",     "schedule": "30 5 * * *" },
-    { "path": "/api/reports?reddit_cron=ITCareerQuestions",  "schedule": "30 8 * * *" },
-    { "path": "/api/reports?reddit_cron=EngineeringResumes", "schedule": "30 11 * * *" },
-    { "path": "/api/reports?reddit_cron=womenEngineers",     "schedule": "30 17 * * *" },
-    { "path": "/api/reports?reddit_cron=Devilcorp",          "schedule": "30 20 * * *" }
+    {
+      "path": "/api/outcome-followups",
+      "schedule": "0 15 * * *"
+    },
+    {
+      "path": "/api/refresh-jobs",
+      "schedule": "0 2 * * *"
+    },
+    {
+      "path": "/api/refresh-jobs",
+      "schedule": "0 6 * * *"
+    },
+    {
+      "path": "/api/refresh-jobs",
+      "schedule": "0 10 * * *"
+    },
+    {
+      "path": "/api/refresh-jobs",
+      "schedule": "0 14 * * *"
+    },
+    {
+      "path": "/api/refresh-jobs",
+      "schedule": "0 18 * * *"
+    },
+    {
+      "path": "/api/refresh-jobs",
+      "schedule": "0 22 * * *"
+    },
+    {
+      "path": "/api/refresh-stale-jobs",
+      "schedule": "30 3 * * *"
+    },
+    {
+      "path": "/api/demand",
+      "schedule": "0 4 1 * *"
+    },
+    {
+      "path": "/api/stripe?action=reconcile_all",
+      "schedule": "0 5 * * *"
+    },
+    {
+      "path": "/api/reports?action=update_tenure",
+      "schedule": "0 3 * * *"
+    },
+    {
+      "path": "/api/company-signals",
+      "schedule": "0 8 * * 1"
+    }
   ]
 }

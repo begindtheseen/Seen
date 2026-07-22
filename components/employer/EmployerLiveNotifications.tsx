@@ -57,6 +57,8 @@ export function EmployerLiveNotifications() {
   const [loading, setLoading] = useState(true)
   const [items, setItems] = useState<Item[]>([])
   const [unread, setUnread] = useState(0)
+  // The API computes this per request; until now no mounted UI ever read it (orphaned data).
+  const [summary, setSummary] = useState<{ newApplicants?: number; postingsExpired?: number; postingsStale?: number; postingsNearingStale?: number } | null>(null)
   const [company, setCompany] = useState('')
   const [pending, setPending] = useState(false)
   const [err, setErr] = useState('')
@@ -82,6 +84,7 @@ export function EmployerLiveNotifications() {
       setItems(Array.isArray(d?.items) ? d.items : [])
       setUnread(typeof d?.unread === 'number' ? d.unread : 0)
       setCompany(d?.company || '')
+      setSummary(d?.summary && typeof d.summary === 'object' ? d.summary : null)
     } catch {
       setErr('Could not load your updates.')
     } finally {
@@ -133,6 +136,16 @@ export function EmployerLiveNotifications() {
         {unread > 0 && (
           <span style={{ ...mono('.55rem', 'var(--green)'), border: '1px solid rgba(16,185,129,.35)', borderRadius: 999, padding: '.22rem .6rem' }}>{unread} unread</span>
         )}
+        {/* At-a-glance summary chips (computed server-side; previously returned but never rendered) */}
+        {summary && ([
+          { n: summary.newApplicants, label: 'new applicants', color: 'var(--green)', border: 'rgba(16,185,129,.35)' },
+          { n: summary.postingsExpired, label: 'expired', color: 'var(--red)', border: 'rgba(239,68,68,.35)' },
+          { n: summary.postingsNearingStale, label: 'expiring soon', color: 'var(--amber)', border: 'rgba(245,158,11,.35)' },
+        ] as const).filter(c => (c.n ?? 0) > 0).map(c => (
+          <span key={c.label} style={{ ...mono('.55rem', c.color), border: `1px solid ${c.border}`, borderRadius: 999, padding: '.22rem .6rem' }}>
+            {c.n} {c.label}
+          </span>
+        ))}
         {hasUnreadStored && (
           <button onClick={markAllRead} disabled={marking} style={{ marginLeft: 'auto', background: 'none', border: '1px solid var(--line2)', borderRadius: 8, padding: '.4rem .8rem', ...mono('.6rem', 'var(--sub)'), cursor: marking ? 'default' : 'pointer', opacity: marking ? .6 : 1 }}>
             {marking ? 'Marking…' : 'Mark all read'}

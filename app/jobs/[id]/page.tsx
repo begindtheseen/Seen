@@ -14,6 +14,7 @@ import SeenFitPanel from '@/components/SeenFitPanel'
 import HumanProofPanel from '@/components/HumanProofPanel'
 import { aiHeaders } from '@/lib/aiHeaders'
 import { useAuth } from '@/lib/auth'
+import { trackApplyClick } from '@/lib/trackApply'
 import type { Job } from '@/lib/types'
 
 interface Insights {
@@ -506,7 +507,7 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
                   target="_blank"
                   rel="noopener noreferrer"
                   style={{ display: 'block', textAlign: 'center', background: 'var(--card)', border: '1px solid var(--line2)', color: 'var(--sub)', borderRadius: 9, padding: '.75rem', fontFamily: 'var(--mono)', fontSize: '.72rem', textDecoration: 'none' }}
-                  onClick={() => setShowApplyModal(false)}
+                  onClick={() => { trackApplyClick(job); setShowApplyModal(false) }}
                 >
                   Skip optimization — apply directly
                 </a>
