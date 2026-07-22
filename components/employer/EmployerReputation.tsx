@@ -15,6 +15,9 @@ type Score = {
   response_rate: number | null
   avg_wait_days: number | null
   report_count: number
+  first_party_report_count?: number
+  web_report_count?: number
+  data_source?: string
 }
 
 const gradeOf = (s: number) => (s >= 80 ? 'A' : s >= 65 ? 'B' : s >= 50 ? 'C' : s >= 35 ? 'D' : 'F')
@@ -66,6 +69,9 @@ export function EmployerReputation() {
   const reply = pct(s?.response_rate)
   const wait = s?.avg_wait_days != null ? Math.round(s.avg_wait_days) : null
   const hasData = overall != null && (s?.report_count ?? 0) > 0
+  // Honest split (migration 063): only first-party rows may render as "applicant reports" —
+  // the web-research claimed count is an estimate, not applicants who reported this employer.
+  const fpReports = s ? (s.first_party_report_count ?? (s.data_source === 'reports' ? (s.report_count ?? 0) : 0)) : 0
 
   return (
     <div style={{ background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 18, padding: '2rem', marginBottom: '2.5rem' }}>
@@ -111,7 +117,9 @@ export function EmployerReputation() {
                 {ghost != null && <Stat value={`${ghost}%`} label="ghost rate" color="var(--red)" />}
                 {reply != null && <Stat value={`${reply}%`} label="response rate" color="var(--green)" />}
                 {wait != null && <Stat value={`${wait}d`} label="avg wait" color="var(--amber)" />}
-                <Stat value={s!.report_count.toLocaleString()} label="applicant reports" color="var(--white)" />
+                {fpReports > 0
+                  ? <Stat value={fpReports.toLocaleString()} label="applicant reports" color="var(--white)" />
+                  : <Stat value="Web est." label="no first-party reports yet" color="var(--dim)" />}
               </div>
             </div>
             <div style={{ marginTop: '1.4rem', padding: '1rem 1.2rem', background: overall! >= 65 ? 'rgba(16,185,129,.06)' : 'rgba(239,68,68,.06)', border: `1px solid ${overall! >= 65 ? 'rgba(16,185,129,.25)' : 'rgba(239,68,68,.25)'}`, borderRadius: 12 }}>

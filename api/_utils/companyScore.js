@@ -82,11 +82,15 @@ export function tenureAdjustment(avgTenureMonths, tenureSample) {
 }
 
 // Confidence 0–1 from how much data backs the score and how fresh it is.
-// Reports carry most of the weight (0.7), tenure adds up to 0.3; stale data decays.
-export function scoreConfidence({ reportCount = 0, tenureSample = 0, dataAgeDays = 0 } = {}) {
+// FIRST-PARTY reports carry most of the weight (0.7), tenure adds up to 0.3; stale data decays.
+// `webClaimedCount` is an LLM web-research *claim*, NOT applicant reports: it contributes only
+// when we hold zero first-party rows, and is capped at 0.35 so "high" confidence (≥0.66) can
+// never be minted from a claimed number alone (0.35 + full tenure 0.3 = 0.65 → still "medium").
+export function scoreConfidence({ reportCount = 0, tenureSample = 0, dataAgeDays = 0, webClaimedCount = 0 } = {}) {
   const rep = Math.min(1, reportCount / 10) * 0.7;
+  const webRep = reportCount > 0 ? 0 : Math.min(1, webClaimedCount / 10) * 0.35;
   const ten = Math.min(1, tenureSample / FULL_TENURE_SAMPLE) * 0.3;
-  let c = rep + ten;
+  let c = Math.min(1, rep + webRep + ten);
   if (dataAgeDays > 180) c -= Math.min(0.2, ((dataAgeDays - 180) / 360) * 0.2);
   return Math.max(0, Math.min(1, Number(c.toFixed(2))));
 }

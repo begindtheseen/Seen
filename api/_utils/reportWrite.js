@@ -168,6 +168,9 @@ export async function recomputeCompanyScoreFromReports(SUPABASE_URL, hdrs, compa
       waste_score: clampScore(fz.waste_score),
       unpaid_rate: clampRate(fz.unpaid_rate),
       report_count: fz.report_count,
+      // Recompute runs with web:{} — this count is 100% first-party report rows.
+      first_party_report_count: fz.first_party_report_count ?? fz.report_count,
+      web_report_count: 0,
       data_quality: fz.confidence_label || 'low',
       data_source: 'reports',
       expires_at: new Date(Date.now() + _SCORE_TTL_MS).toISOString(),

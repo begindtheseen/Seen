@@ -2,7 +2,7 @@ import type { Metadata } from 'next'
 // Build-safe score reader — reads the cached score DIRECTLY from Supabase and NEVER self-fetches
 // the live https://seenjobs.io/api/reports (which had no build detection here and could hang
 // `next build`). generateMetadata + the layout render below both go through this one helper.
-import { getScore, type GrowthScore } from '@/lib/growth'
+import { getScore, firstPartyReportCount, type GrowthScore } from '@/lib/growth'
 
 const titleCase = (slug: string) => slug.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
 
@@ -73,14 +73,17 @@ export default async function CompanySlugLayout(
     url: `https://seenjobs.io/company/${slug}`,
   }
   if (s?.industry) org.industry = s.industry
-  // Only assert an aggregateRating when we have REAL reports behind it.
-  if (s && (s.report_count ?? 0) > 0 && s.overall_score != null) {
+  // Only assert an aggregateRating when we have REAL reports behind it. "Real" means
+  // FIRST-PARTY rows (migration 063) — the fused report_count once fed the LLM's claimed
+  // web-mention number into schema.org ratingCount, publishing a fabricated figure to Google.
+  const fpSeo = firstPartyReportCount(s)
+  if (s && fpSeo > 0 && s.overall_score != null) {
     org.aggregateRating = {
       '@type': 'AggregateRating',
       ratingValue: (s.overall_score / 20).toFixed(1),
       bestRating: '5',
       worstRating: '0',
-      ratingCount: s.report_count,
+      ratingCount: fpSeo,
       reviewAspect: 'Hiring process and applicant response',
     }
   }
