@@ -2,16 +2,20 @@ import type { Metadata } from 'next'
 // Build-safe score reader — reads the cached score DIRECTLY from Supabase and NEVER self-fetches
 // the live https://seenjobs.io/api/reports (which had no build detection here and could hang
 // `next build`). generateMetadata + the layout render below both go through this one helper.
-import { getScore, firstPartyReportCount, type GrowthScore } from '@/lib/growth'
+import { getScore, firstPartyReportCount, displayCompanyName, type GrowthScore } from '@/lib/growth'
 
 const titleCase = (slug: string) => slug.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
+// Slug-mangled fallback only when no score row exists — the stored name keeps real punctuation
+// ("lowe's" → "Lowe's", not "Lowe S"), and this name feeds the OG title + schema.org for shares.
+const bestName = (slug: string, s: GrowthScore | null) =>
+  s?.company_name ? displayCompanyName(s.company_name) : titleCase(slug)
 
 export async function generateMetadata(
   { params }: { params: Promise<{ slug: string }> }
 ): Promise<Metadata> {
   const { slug } = await params
-  const name = titleCase(slug)
   const s = await getScore(slug)
+  const name = bestName(slug, s)
   const ghostPct = s?.ghost_rate != null ? Math.round(s.ghost_rate * 100) : null
 
   // Reddit-targeted: LLM/Google searches like "<company> hiring reddit" and "does <company>
@@ -64,8 +68,8 @@ export default async function CompanySlugLayout(
   { children, params }: { children: React.ReactNode; params: Promise<{ slug: string }> }
 ) {
   const { slug } = await params
-  const name = titleCase(slug)
   const s = await getScore(slug)
+  const name = bestName(slug, s)
 
   const org: Record<string, unknown> = {
     '@type': 'Organization',

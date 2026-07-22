@@ -2,7 +2,11 @@
 // images). All data comes from the app's OWN proven public endpoint — POST /api/reports — the
 // exact pattern app/company/[slug]/layout.tsx getScore() already uses. NO external services.
 
+import { tenureAdjustment } from '@/api/_utils/companyScore.js'
+
 export type GrowthScore = {
+  /** The STORED canonical company name (lowercase, real punctuation — e.g. "lowe's"). */
+  company_name?: string | null
   overall_score: number
   ghost_rate: number | null
   response_rate: number | null
@@ -70,14 +74,14 @@ const fuzzyPattern = (name: string) =>
   encodeURIComponent(String(name).toLowerCase().trim().replace(/[\s-]+/g, '*'))
 
 // Build-time: read one company's cached score straight from Supabase. Mirrors the cache-hit shape
-// of api/reports.js `_rowToScore` for the fields GrowthScore needs (the small tenure nudge the
-// live path adds on read is intentionally skipped — invisible on an SEO page, and ISR re-renders
-// hourly through the live path anyway).
+// of api/reports.js `_rowToScore` INCLUDING the tenure adjustment — the OG unfurl and the live
+// page must show the SAME grade (a Reddit post whose preview says 78 while the page says 84 reads
+// as a lie; audit finding "two different Seen Grades in a single post").
 async function scoreFromDb(name: string): Promise<GrowthScore | null> {
   const creds = sbCreds()
   if (!creds) return null
   const headers = { apikey: creds.key, Authorization: `Bearer ${creds.key}` }
-  const sel = 'select=company_name,overall_score,ghost_rate,response_rate,avg_wait_days,avg_rounds,report_count,first_party_report_count,web_report_count,data_source,waste_score,industry,raw_summary'
+  const sel = 'select=company_name,overall_score,ghost_rate,response_rate,avg_wait_days,avg_rounds,report_count,first_party_report_count,web_report_count,data_source,waste_score,industry,raw_summary,avg_tenure_months,tenure_sample_count'
   try {
     const enc = encodeURIComponent(name.toLowerCase().trim())
     let r = await fetch(`${creds.url}/rest/v1/company_scores?company_name=ilike.${enc}&${sel}&order=created_at.desc&limit=1`, { headers, signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) })
@@ -88,8 +92,12 @@ async function scoreFromDb(name: string): Promise<GrowthScore | null> {
     }
     const row = rows?.[0]
     if (!row || row.overall_score == null) return null
-    const s = Math.max(0, Math.min(100, Math.round(row.overall_score)))
+    // Same tenure fold-in as the live read path (api/reports.js _rowToScore) — canonical
+    // implementation imported, not mirrored, so the two can't drift.
+    const tAdj = tenureAdjustment(row.avg_tenure_months, row.tenure_sample_count)
+    const s = Math.max(0, Math.min(100, Math.round(row.overall_score + tAdj)))
     return {
+      company_name: row.company_name ?? null,
       overall_score: s,
       ghost_rate: row.ghost_rate ?? null,
       response_rate: row.response_rate ?? null,
@@ -150,6 +158,14 @@ export const slugify = (name: string) =>
 
 export const titleCase = (slug: string) =>
   decodeURIComponent(slug).replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
+
+// Canonical display name from a STORED company_name ("lowe's" → "Lowe's"). titleCase is
+// slug-oriented (hyphens → spaces, \b-based) and mangles punctuation two ways: the slug path
+// renders "Lowe S" and \b\w would render "Lowe'S". This only capitalizes the first letter of
+// each space-separated word, so punctuation inside a word survives. Prefer it whenever a
+// score row is in hand — the stored name carries the company's real punctuation.
+export const displayCompanyName = (name: string) =>
+  String(name).split(' ').map((w) => (w ? w.charAt(0).toUpperCase() + w.slice(1) : w)).join(' ')
 
 // 0–100 score → letter grade. Matches the scale used on the companies leaderboard.
 export function grade(score: number): string {
