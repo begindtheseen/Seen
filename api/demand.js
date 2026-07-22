@@ -1,10 +1,17 @@
 import { rateLimit } from '../lib/server/ratelimit.js';
 import { logError } from '../lib/server/errlog.js';
+import { geocodeLocation, haversineMiles } from '../lib/server/geo.js';
+import { computeCityDemand, normalizeCityLabel } from '../lib/server/demandFromCorpus.js';
 
 // /api/demand — Demand data hub.
 //
-// GET  /api/demand  — Public read. Returns demand_data grouped by city.
-//                     Cache-Control: public, max-age=21600, stale-while-revalidate=86400
+// GET  /api/demand           — Public read. Returns demand_data grouped by city + freshness meta.
+//                              Cache-Control: public, max-age=21600, stale-while-revalidate=86400
+// GET  /api/demand?city=X    — GENERATE-ON-MISS: serve the city's cached rows; when missing (or
+//                              corpus rows are >7 days stale) geocode the city, radius-match the
+//                              live jobs corpus, compute demand rows (lib/server/demandFromCorpus),
+//                              cache them in demand_data, and return them. Any city becomes a
+//                              living market — labeled "Seen live listings", never dressed as BLS.
 //
 // POST /api/demand  — Auth required (CRON_SECRET or admin JWT).
 //                     Fetches BLS JOLTS + CES, computes DI, upserts demand_data.
@@ -34,6 +41,7 @@ async function route(req, res) {
   if (req.method === 'GET' && (req.headers['x-vercel-cron'] === '1' || req.query?.action === 'refresh')) {
     return handlePost(req, res);
   }
+  if (req.method === 'GET' && req.query?.city) return handleCityGet(req, res);
   if (req.method === 'GET') return handleGet(req, res);
   if (req.method === 'POST') return handlePost(req, res);
   return res.status(405).end();
@@ -55,6 +63,104 @@ export default async function handler(req, res) {
       } catch (_) {}
       return res.status(200).json({ ok: true, demand: [], generated_at: new Date().toISOString() });
     }
+  }
+}
+
+// ── Shared: group demand_data rows into the city shape the page renders ───────
+// Adds honest per-city vintage metadata: kind 'live' (computed from Seen's corpus) vs 'bls'
+// (modeled from the BLS blend) + updated_at — so the UI can label each card's data source
+// instead of presenting three vintages as one "Live".
+function groupRows(rawRows) {
+  const cityMap = new Map();
+  for (const row of rawRows) {
+    if (!cityMap.has(row.city)) {
+      cityMap.set(row.city, {
+        city: row.city, urg: row.urg, src: row.src,
+        kind: row.data_version === 'corpus-v1' ? 'live' : 'bls',
+        updated_at: row.updated_at || null,
+        jobs: [],
+      });
+    }
+    const c = cityMap.get(row.city);
+    c.jobs.push({ t: row.role_title, n: row.niche, l: row.level, count: row.count, di: row.di, note: row.note || '' });
+    if (row.updated_at && (!c.updated_at || row.updated_at > c.updated_at)) c.updated_at = row.updated_at;
+  }
+  return Array.from(cityMap.values());
+}
+
+// ── GET ?city= : serve-or-generate one city ───────────────────────────────────
+const CORPUS_STALE_MS = 7 * 86400000;
+const RADIUS_MILES = 40;
+
+async function handleCityGet(req, res) {
+  // Shorter CDN cache than the hub read — generated cities should feel current.
+  res.setHeader('Cache-Control', 'public, max-age=3600, stale-while-revalidate=86400');
+  const SUPABASE_URL = process.env.SUPABASE_URL;
+  const SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY;
+  const READ_KEY = process.env.SUPABASE_ANON_KEY || SERVICE_KEY;
+  const label = normalizeCityLabel(String(req.query.city || '').slice(0, 80));
+  if (!label) return res.status(400).json({ ok: false, error: 'city required' });
+  if (!SUPABASE_URL || !READ_KEY) return res.status(200).json({ ok: true, city: label, demand: [], generated: false });
+  const hdrs = { apikey: READ_KEY, Authorization: `Bearer ${READ_KEY}` };
+
+  // 1. Cached rows. BLS-blend rows are cron-managed and always served; corpus rows
+  //    self-refresh once they're older than 7 days (fall through to regeneration).
+  try {
+    const cityWord = label.split(',')[0].trim();
+    const r = await fetch(
+      `${SUPABASE_URL}/rest/v1/demand_data?city=ilike.${encodeURIComponent(cityWord)}*&select=*&order=di.desc&limit=24`,
+      { headers: hdrs },
+    );
+    const rows = r.ok ? await r.json() : [];
+    if (Array.isArray(rows) && rows.length) {
+      const corpus = rows.filter(x => x.data_version === 'corpus-v1');
+      const corpusStale = corpus.length > 0 &&
+        corpus.every(x => Date.now() - Date.parse(x.updated_at || 0) > CORPUS_STALE_MS);
+      if (!corpusStale) {
+        return res.status(200).json({ ok: true, city: rows[0].city, demand: groupRows(rows), generated: false });
+      }
+    }
+  } catch (_e) { /* fall through to generation */ }
+
+  // 2. Generate from the live corpus: geocode → bounding box → precise radius → bucket.
+  const pt = await geocodeLocation(label, SUPABASE_URL, SERVICE_KEY || READ_KEY);
+  if (!pt) {
+    return res.status(200).json({ ok: true, city: label, demand: [], generated: false, message: `Couldn't locate "${label}" — check the spelling (try "City, ST").` });
+  }
+  try {
+    const dLat = RADIUS_MILES / 69.0;
+    const dLng = RADIUS_MILES / Math.max(10, 69.17 * Math.cos((pt.lat * Math.PI) / 180));
+    const nowIso = new Date().toISOString();
+    const jr = await fetch(
+      `${SUPABASE_URL}/rest/v1/jobs?select=title,level,salary,created_at,last_seen_at,lat,lng` +
+      `&expires_at=gt.${encodeURIComponent(nowIso)}` +
+      `&lat=gte.${(pt.lat - dLat).toFixed(4)}&lat=lte.${(pt.lat + dLat).toFixed(4)}` +
+      `&lng=gte.${(pt.lng - dLng).toFixed(4)}&lng=lte.${(pt.lng + dLng).toFixed(4)}&limit=2000`,
+      { headers: { apikey: SERVICE_KEY || READ_KEY, Authorization: `Bearer ${SERVICE_KEY || READ_KEY}` } },
+    );
+    const box = jr.ok ? await jr.json() : [];
+    const near = (Array.isArray(box) ? box : []).filter(j =>
+      j.lat != null && j.lng != null && haversineMiles(pt, { lat: j.lat, lng: j.lng }) <= RADIUS_MILES);
+
+    const { rows: gen, totalListings } = computeCityDemand({ city: label, jobs: near });
+    if (!gen.length) {
+      return res.status(200).json({
+        ok: true, city: label, demand: [], generated: true, total_listings: near.length,
+        message: `Not enough live listings near ${label} yet to compute demand honestly (${near.length} found). It appears here automatically as coverage grows.`,
+      });
+    }
+    // Cache the generated rows (service key only — RLS blocks anon writes; serving still works).
+    if (SERVICE_KEY) {
+      fetch(`${SUPABASE_URL}/rest/v1/demand_data?on_conflict=city,role_title`, {
+        method: 'POST',
+        headers: { apikey: SERVICE_KEY, Authorization: `Bearer ${SERVICE_KEY}`, 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal' },
+        body: JSON.stringify(gen),
+      }).catch(() => {});
+    }
+    return res.status(200).json({ ok: true, city: label, demand: groupRows(gen), generated: true, total_listings: totalListings });
+  } catch (e) {
+    logError('demand', e.message, { method: 'GET', city: label });
+    return res.status(200).json({ ok: true, city: label, demand: [], generated: false });
   }
 }
 
@@ -86,27 +192,32 @@ async function handleGet(req, res) {
       return res.status(200).json({ ok: true, demand: [], generated_at: new Date().toISOString() });
     }
 
-    const cityMap = new Map();
     let latestUpdatedAt = null;
     let blsPeriod = null;
-
     for (const row of rawRows) {
-      if (!cityMap.has(row.city)) {
-        cityMap.set(row.city, { city: row.city, urg: row.urg, src: row.src, jobs: [] });
-      }
-      cityMap.get(row.city).jobs.push({
-        t: row.role_title, n: row.niche, l: row.level,
-        count: row.count, di: row.di, note: row.note || '',
-      });
       if (!latestUpdatedAt || row.updated_at > latestUpdatedAt) latestUpdatedAt = row.updated_at;
       if (row.bls_period && !blsPeriod) blsPeriod = row.bls_period;
     }
 
+    // Freshness meta, surfaced instead of hidden: the last refresh-log entry (the July 2026
+    // cron miss was invisible because this log was write-only) + an explicit stale flag when
+    // the BLS blend is older than ~2 monthly cycles.
+    let lastRefresh = null;
+    try {
+      const lr = await fetch(`${SUPABASE_URL}/rest/v1/demand_refresh_log?select=status,bls_period,created_at&order=created_at.desc&limit=1`, {
+        headers: { apikey: SUPABASE_ANON, Authorization: `Bearer ${SUPABASE_ANON}` },
+      });
+      if (lr.ok) lastRefresh = (await lr.json())?.[0] || null;
+    } catch (_e) {}
+    const blsStale = latestUpdatedAt ? (Date.now() - Date.parse(latestUpdatedAt)) > 65 * 86400000 : false;
+
     return res.status(200).json({
       ok: true,
-      demand: Array.from(cityMap.values()),
+      demand: groupRows(rawRows),
       generated_at: latestUpdatedAt || new Date().toISOString(),
       bls_period: blsPeriod,
+      bls_stale: blsStale,
+      last_refresh: lastRefresh,
       row_count: rawRows.length,
     });
   } catch (e) {
