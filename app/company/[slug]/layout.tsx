@@ -37,13 +37,18 @@ export async function generateMetadata(
       type: 'website',
       siteName: 'Seen',
       url: `https://seenjobs.io/company/${slug}`,
+      // EXPLICIT stable image URL (no ?<buildhash> query). The file-convention auto-attach
+      // rotates the og:image URL every deploy, so crawlers nearly always hit a COLD render —
+      // and Reddit permanently caches "no preview" for a URL whose image misses its ~4s
+      // budget. A stable URL keeps prior fetches warm across deploys.
+      images: [{ url: `/company/${slug}/opengraph-image`, width: 1200, height: 630, alt: 'Hiring transparency score on Seen' }],
     },
     twitter: {
-      // summary_large_image so the dynamic 1200×630 opengraph-image.tsx renders full-bleed in
-      // shares. The image itself is auto-attached by Next.js's file-based metadata convention.
+      // summary_large_image so the dynamic 1200×630 card renders full-bleed in shares.
       card: 'summary_large_image',
       title: `${name} Ghost Rate & Hiring Reviews`,
       description,
+      images: [`/company/${slug}/opengraph-image`],
     },
     alternates: {
       canonical: `https://seenjobs.io/company/${slug}`,
