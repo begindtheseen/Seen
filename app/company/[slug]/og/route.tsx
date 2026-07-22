@@ -7,13 +7,16 @@ import { getScore, titleCase, displayCompanyName, grade, riskColor, riskLabel, p
 //
 // Satori (next/og) rule: every <div> with more than one child node MUST set display:flex. We set
 // display:flex on all multi-child / interpolated divs below to satisfy that.
+// ROUTE HANDLER, not the opengraph-image file convention — deliberately. The convention
+// auto-attaches og:image with a per-deploy build-hash query AND takes priority over explicit
+// metadata images, so the crawler-facing URL rotated every deploy (cold render every time —
+// Reddit's ~4s budget → permanently cached blank unfurls). This URL (/company/<slug>/og) is
+// STABLE across deploys; app/company/[slug]/layout.tsx points og:image + twitter:image here.
 export const runtime = 'nodejs'
-export const revalidate = 3600
-export const alt = 'Hiring transparency score on Seen'
-export const size = { width: 1200, height: 630 }
-export const contentType = 'image/png'
 
-export default async function Image({ params }: { params: Promise<{ slug: string }> }) {
+const size = { width: 1200, height: 630 }
+
+export async function GET(_req: Request, { params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params
   const s = await getScore(slug)
   // Prefer the STORED canonical name — a slug can't carry punctuation, so titleCase(slug)
@@ -112,6 +115,11 @@ export default async function Image({ params }: { params: Promise<{ slug: string
         </div>
       </div>
     ),
-    size
+    {
+      ...size,
+      // Long CDN cache on the stable URL: one good crawl serves everyone; scores drift
+      // slowly and a stale-while-revalidate refresh keeps the card current within a day.
+      headers: { 'Cache-Control': 'public, s-maxage=86400, stale-while-revalidate=604800' },
+    }
   )
 }
