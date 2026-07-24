@@ -20,12 +20,30 @@ import {
 } from '../../lib/server/memoryGraph.js';
 import { recordFact, appendTimeline } from '../../lib/server/writeFact.js';
 import { renderBriefing } from '../../scripts/memory-status.mjs';
+import {
+  cloudConfigured, fetchNotes, recordFactCloud, appendTimelineCloud,
+} from '../../lib/server/brainCloud.js';
 
 // Where Claude's own writes land (bi-temporal facts). Kept separate from human-curated knowledge notes.
 const CLAUDE_NOTE = 'claude-observations.md';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const VAULT = resolve(process.env.CHRONOS_VAULT || join(HERE, '..')); // memory/
+
+// Source resolution — where the brain is read/written this run:
+//   • "local" (default on the Mac): the vault files under CHRONOS_VAULT — fast, offline, re-read per call.
+//   • "cloud" (default in a repo-connected session with Supabase creds): the ALWAYS-ON online mirror, so
+//     Chronos answers even with no machine running. Offline data reaches the cloud session ONLY through
+//     this private, service-key-gated channel — never through GitHub.
+// Override with CHRONOS_SOURCE=cloud|local; "auto" (default) picks cloud when Supabase creds are present.
+function resolveCloud() {
+  const s = (process.env.CHRONOS_SOURCE || 'auto').toLowerCase();
+  if (s === 'cloud') return true;
+  if (s === 'local') return false;
+  return cloudConfigured();
+}
+const CLOUD = resolveCloud();
+const REFRESH_MS = Number(process.env.CHRONOS_REFRESH_MS || 20000);
 
 function walk(dir, acc = []) {
   for (const name of readdirSync(dir)) {
@@ -37,11 +55,26 @@ function walk(dir, acc = []) {
   return acc;
 }
 
-function loadIndex() {
+const EMPTY_INDEX = { facts: [], episodes: [], edges: [], entities: [], threads: [], errors: [] };
+
+// LOCAL: re-read the vault files (single source of truth) — always current, no sync step.
+function loadIndexLocal() {
   const notes = walk(VAULT).map((f) => ({ path: relative(VAULT, f).replace(/\\/g, '/'), text: readFileSync(f, 'utf8') }));
   return buildIndex(notes);
 }
-let INDEX = loadIndex();
+// CLOUD: build the same index from the online mirror's notes (identical shape → every tool works unchanged).
+async function loadIndexCloud() {
+  return buildIndex(await fetchNotes());
+}
+
+let INDEX = CLOUD ? EMPTY_INDEX : loadIndexLocal();
+
+// Cloud mode reads from a cached index (reads don't await the network); refresh it periodically and
+// after every write so answers stay fresh. Never throws — a transient network blip just keeps the last index.
+async function refreshCloud() {
+  try { INDEX = await loadIndexCloud(); return true; }
+  catch (e) { process.stderr.write(`[chronos] cloud refresh skipped: ${e.message}\n`); return false; }
+}
 
 // ---- formatting helpers ---------------------------------------------------
 const fmtFact = (f) => {
@@ -172,9 +205,14 @@ const TOOLS = {
         required: ['subject', 'predicate', 'object'],
       },
     },
-    run: (a) => {
+    run: async (a) => {
+      if (CLOUD) {
+        const r = await recordFactCloud({ subject: a.subject, predicate: a.predicate, object: a.object, confidence: a.confidence, source: a.source }, { note: a.note });
+        await refreshCloud();
+        return text(r.written ? `Recorded (online brain): ${a.subject} — ${a.predicate} → ${a.object}` : `No change (already current): ${a.subject} — ${a.predicate} → ${a.object}`);
+      }
       const r = recordFact(VAULT, a.note || CLAUDE_NOTE, { subject: a.subject, predicate: a.predicate, object: a.object, confidence: a.confidence, source: a.source });
-      INDEX = loadIndex();
+      INDEX = loadIndexLocal();
       return text(r.written ? `Recorded: ${a.subject} — ${a.predicate} → ${a.object}` : `No change (already current): ${a.subject} — ${a.predicate} → ${a.object}`);
     },
   },
@@ -192,10 +230,15 @@ const TOOLS = {
         required: ['heading', 'text'],
       },
     },
-    run: (a) => {
+    run: async (a) => {
       const date = a.date || new Date().toISOString().slice(0, 10);
+      if (CLOUD) {
+        await appendTimelineCloud(date, a.heading, a.text);
+        await refreshCloud();
+        return text(`Appended to online brain timeline/${date}.md: ${a.heading}`);
+      }
       appendTimeline(VAULT, date, a.heading, a.text);
-      INDEX = loadIndex();
+      INDEX = loadIndexLocal();
       return text(`Appended to timeline/${date}.md: ${a.heading}`);
     },
   },
@@ -206,13 +249,13 @@ function send(msg) { process.stdout.write(JSON.stringify(msg) + '\n'); }
 function reply(id, result) { send({ jsonrpc: '2.0', id, result }); }
 function replyErr(id, code, message) { send({ jsonrpc: '2.0', id, error: { code, message } }); }
 
-function handle(msg) {
+async function handle(msg) {
   const { id, method, params } = msg;
   if (method === 'initialize') {
     return reply(id, {
       protocolVersion: (params && params.protocolVersion) || '2024-11-05',
       capabilities: { tools: {} },
-      serverInfo: { name: 'chronos-memory', version: '0.1.0' },
+      serverInfo: { name: 'chronos-memory', version: '0.2.0' },
     });
   }
   if (method === 'notifications/initialized' || method === 'notifications/cancelled') return; // no response
@@ -222,8 +265,8 @@ function handle(msg) {
     const t = TOOLS[params && params.name];
     if (!t) return replyErr(id, -32601, `Unknown tool: ${params && params.name}`);
     try {
-      INDEX = loadIndex(); // always answer from the live vault
-      return reply(id, t.run((params && params.arguments) || {}));
+      if (!CLOUD) INDEX = loadIndexLocal(); // local: answer from the live vault (cloud: cached + auto-refreshed)
+      return reply(id, await t.run((params && params.arguments) || {}));
     } catch (e) {
       return reply(id, { content: [{ type: 'text', text: `Error: ${e.message}` }], isError: true });
     }
@@ -232,16 +275,30 @@ function handle(msg) {
 }
 
 let buf = '';
-process.stdin.setEncoding('utf8');
-process.stdin.on('data', (chunk) => {
-  buf += chunk;
-  let nl;
-  while ((nl = buf.indexOf('\n')) !== -1) {
-    const line = buf.slice(0, nl).trim();
-    buf = buf.slice(nl + 1);
-    if (!line) continue;
-    try { handle(JSON.parse(line)); }
-    catch (e) { process.stderr.write(`[chronos] parse error: ${e.message}\n`); }
-  }
-});
-process.stderr.write(`[chronos] memory MCP server ready — vault ${VAULT}, ${INDEX.facts.length} facts, ${INDEX.episodes.length} episodes\n`);
+let chain = Promise.resolve(); // process messages sequentially so async (cloud) handlers keep JSON-RPC order
+function enqueue(line) {
+  let msg;
+  try { msg = JSON.parse(line); }
+  catch (e) { process.stderr.write(`[chronos] parse error: ${e.message}\n`); return; }
+  chain = chain.then(() => handle(msg)).catch((e) => process.stderr.write(`[chronos] handler error: ${e.message}\n`));
+}
+function attachStdin() {
+  process.stdin.setEncoding('utf8');
+  process.stdin.on('data', (chunk) => {
+    buf += chunk;
+    let nl;
+    while ((nl = buf.indexOf('\n')) !== -1) {
+      const line = buf.slice(0, nl).trim();
+      buf = buf.slice(nl + 1);
+      if (line) enqueue(line);
+    }
+  });
+}
+
+// Startup. In cloud mode, load the online brain once BEFORE accepting calls, then keep it fresh.
+if (CLOUD) {
+  await refreshCloud();
+  setInterval(() => { refreshCloud(); }, REFRESH_MS).unref();
+}
+attachStdin();
+process.stderr.write(`[chronos] memory MCP server ready — source=${CLOUD ? 'cloud (always-on online brain)' : `local vault ${VAULT}`}, ${INDEX.facts.length} facts, ${INDEX.episodes.length} episodes\n`);

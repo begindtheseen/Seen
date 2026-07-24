@@ -4,6 +4,16 @@
 This project has a persistent memory system (`memory/`). **Use it every session so you
 recall where things stand instead of re-reading everything — that is the token save.**
 
+**Local vs cloud — how you reach the brain (Chronos):**
+- **Local (Mac) session:** the `chronos` MCP server reads/writes the vault FILES under `memory/`
+  directly (`.mcp.json` sets `CHRONOS_VAULT=memory`) — fast, offline, the on-disk source of truth.
+- **Cloud / repo-connected session (no Mac filesystem):** the SAME `chronos` tools answer from the
+  **always-on online brain** (Supabase mirror) via a token-gated gateway. It auto-switches to cloud mode
+  when `BRAIN_API_URL` + `BRAIN_API_TOKEN` are set in the environment. Offline files never enter git.
+  **If you are a cloud session, read `memory/CHRONOS_BRIDGE.md` FIRST** — it's the full contract + self-test.
+
+The `memory_*` tool names and usage below are identical in both modes.
+
 1. **Orient from memory, don't re-read the whole vault.** Run `npm run memory:status` (or the
    `memory_status` MCP tool) for a compact briefing: what changed since last session, what
    still needs work ([[open-threads]]), and what's shaky. Then skim `memory/HOME.md`.
