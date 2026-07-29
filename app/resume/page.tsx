@@ -655,7 +655,9 @@ function ResumePageInner() {
     setDownloading(true); setError('')
     try {
       const res = await fetch('/api/resume', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        // Auth header lets the server identify Pro users → clean, unwatermarked résumé.
+        // Signed-out callers send no token and get the free-tier "seenjobs.io" footer.
+        method: 'POST', headers: await aiHeaders(),
         body: JSON.stringify({
           action: 'download_resume', resume: resumeText, job: jobTitle, company: jobCompany, jobDescription: jobJD,
           optimizedBullets: (fitOut?.safe_bullets || []).map(b => b.text),

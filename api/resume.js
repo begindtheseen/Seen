@@ -2,7 +2,7 @@ import PDFDocument from 'pdfkit';
 import { createClient } from '@supabase/supabase-js';
 import { applyRateLimit } from '../lib/server/ratelimit.js';
 import { logError } from '../lib/server/errlog.js';
-import { gateAI, resolveAuthedUser } from '../lib/server/credits.js';
+import { gateAI, resolveProAccess } from '../lib/server/credits.js';
 import { runAdvantage, extractEmployment, extractCareerSignal, buildResumeDocument, resumeFileName } from '../lib/server/resumeAnalysis.js';
 import { scannerFromSeenFit, optimizeFromSeenFit } from '../lib/server/seenfitCompat.js';
 import { extractUploadText } from '../lib/server/resumeUpload.js';
@@ -72,9 +72,9 @@ export default async function handler(req, res) {
   if (body.action === 'email_analysis') {
     if (req.method !== 'POST') return res.status(405).end();
     if (await applyRateLimit(req, res, 'email-analysis')) return;
-    const authed = await resolveAuthedUser(req);
+    const authed = await resolveProAccess(req);
     if (!authed?.email) return res.status(401).json({ error: 'Sign in to email your package' });
-    return handleEmailAnalysis(req, res, { ...body, email: authed.email });
+    return handleEmailAnalysis(req, res, { ...body, email: authed.email }, authed.pro);
   }
 
   // ── Route: download_resume — return a complete, submittable résumé PDF ────────
@@ -417,10 +417,16 @@ export function buildResumePDF(document, meta = {}) {
     }
 
     // ── Footer on every page (drawn after content, via buffered pages) ──
-    const range = doc.bufferedPageRange();
-    for (let i = range.start; i < range.start + range.count; i++) {
-      doc.switchToPage(i);
-      drawFooter(doc, LEFT, W, RULE, FOOT, FOOTER_BAND);
+    // Free/anonymous exports carry the "seenjobs.io" wordmark footer; Pro users get a
+    // clean, unbranded résumé. meta.pro === true suppresses the footer entirely. The
+    // reserved FOOTER_BAND is kept either way, so pagination is byte-for-byte identical
+    // between the two — the only difference is the presence of the footer line.
+    if (!meta.pro) {
+      const range = doc.bufferedPageRange();
+      for (let i = range.start; i < range.start + range.count; i++) {
+        doc.switchToPage(i);
+        drawFooter(doc, LEFT, W, RULE, FOOT, FOOTER_BAND);
+      }
     }
     doc.flushPages();
 
@@ -498,7 +504,7 @@ function drawFooter(doc, LEFT, W, RULE, FOOT, footerBand) {
 }
 
 // ── Email analysis handler ─────────────────────────────────────────────────────
-async function handleEmailAnalysis(req, res, body) {
+async function handleEmailAnalysis(req, res, body, pro = false) {
   try {
     const RESEND_KEY = process.env.RESEND_KEY;
     if (!RESEND_KEY) return res.status(500).json({ error: 'Email not configured' });
@@ -536,7 +542,7 @@ async function handleEmailAnalysis(req, res, body) {
       if (hasContent) {
         // Optional optimized-package appendix (additive) — never edits the base résumé body.
         const optimized = _normalizeOptimizedPackage(body);
-        const pdfBuf = await buildResumePDF(resumeDoc, { role, company: co, optimized });
+        const pdfBuf = await buildResumePDF(resumeDoc, { role, company: co, optimized, pro });
         pdfBase64 = pdfBuf.toString('base64');
         attachName = resumeFileName({ name: resumeDoc.name, role });
       } else {
@@ -713,6 +719,10 @@ async function handleDownloadResume(req, res, body) {
       return res.status(400).json({ error: 'Add your résumé first.' });
     }
 
+    // Effective Pro status (no credit consumed) decides watermarking: anonymous/free
+    // callers get the "seenjobs.io" footer; Pro users get a clean, unbranded résumé.
+    const { pro } = await resolveProAccess(req);
+
     const resumeDoc = buildResumeDocument({ resume, jobDescription, job, company });
     const hasContent = resumeDoc.name || resumeDoc.summary ||
       (resumeDoc.experience && resumeDoc.experience.length) ||
@@ -724,7 +734,7 @@ async function handleDownloadResume(req, res, body) {
 
     // Optional optimized-package appendix (additive) — never edits the base résumé body.
     const optimized = _normalizeOptimizedPackage(body);
-    const pdfBuf = await buildResumePDF(resumeDoc, { role: job, company, optimized });
+    const pdfBuf = await buildResumePDF(resumeDoc, { role: job, company, optimized, pro });
     const filename = resumeFileName({ name: resumeDoc.name, role: job });
 
     // RFC 5987 — a plain ASCII fallback plus a UTF-8 encoded name so the em-dash
