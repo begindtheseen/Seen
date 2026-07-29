@@ -141,8 +141,10 @@ export default function HomeHero() {
   return (
     <section className={`${styles.hero}${ready ? ' ' + styles.heroIn : ''}`}>
       <div className={styles.grid}>
-        {/* ── Left: headline + one search ── */}
-        <div>
+        {/* ── Left: headline + one search ──
+            On mobile the wrapper dissolves (display:contents) so the proof card can
+            slot in directly after the search — real data on the FIRST screen. */}
+        <div className={styles.left}>
           <span className={`${styles.eyebrow} ${styles.stage} ${styles.d1}`}>
             <span className={styles.pulse} />
             Real hiring outcomes from real applicants

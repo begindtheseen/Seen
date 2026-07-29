@@ -1520,3 +1520,12 @@ nav.nav-scrolled{background:rgba(6,6,8,0.82);backdrop-filter:blur(60px) saturate
   .lp2-card-ico{transition:none}
   .lp2-card:hover .lp2-card-ico{transform:none}
 }
+
+/* ── Mobile inputs: ≥16px, always ───────────────────────────────────────────
+   With pinch-zoom restored (maximumScale removed — WCAG 1.4.4), iOS Safari
+   auto-zooms into any focused control whose font-size is under 16px. Forcing
+   16px on phones kills the zoom-jump at the source (and is better mobile type
+   anyway). !important intentionally beats inline-styled small inputs. */
+@media (max-width: 560px){
+  input, select, textarea { font-size: 16px !important; }
+}

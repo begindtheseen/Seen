@@ -20,8 +20,21 @@
   gap: clamp(2rem, 4.5vw, 3.5rem);
   align-items: center;
 }
+/* ── Mobile is DESIGNED, not wrapped ──────────────────────────────────────────
+   The left column dissolves (display:contents) so hero pieces become grid items
+   we can ORDER: headline → search → PROOF CARD → chips → trust. The proof card
+   (the product's thesis) lands on the first scroll instead of two screens down.
+   Spacing moves to per-item margins because grid gap would double up. */
 @media (max-width: 920px) {
-  .grid { grid-template-columns: 1fr; gap: 2.25rem; }
+  .grid { grid-template-columns: 1fr; gap: 0; }
+  .left { display: contents; }
+  .eyebrow { order: 1; justify-self: start; }
+  .title { order: 2; }
+  .lede { order: 3; }
+  .search { order: 4; }
+  .proof { order: 5; margin-top: 1.4rem; }
+  .examples { order: 6; margin-top: 1.3rem; }
+  .trust { order: 7; margin-top: 1.1rem; }
 }
 
 /* ── Left column ── */
@@ -139,6 +152,7 @@
   .field { flex: 1 1 100%; padding: 0.35rem 0.6rem; }
   .field + .field { border-left: none; border-top: 1px solid var(--line); }
   .go { flex: 1 1 100%; padding: 0.75rem; }
+  .lede { font-size: 0.98rem; }
 }
 
 .trust {
@@ -379,6 +393,38 @@
   box-shadow: 0 6px 20px rgba(99, 102, 241, 0.18);
 }
 .chip:active { transform: translateY(0) scale(0.97); }
+
+/* Mobile: a deliberate 2×2 chip grid (no orphaned wrap), label on its own line,
+   and the trust row becomes a ✓ checklist — one font, no mid-phrase line breaks. */
+@media (max-width: 560px) {
+  .examples {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.5rem;
+  }
+  .examplesLabel { grid-column: 1 / -1; margin: 0 0 0.05rem; }
+  .chip {
+    padding: 0.6rem 0.5rem;
+    text-align: center;
+    font-size: 0.84rem;
+  }
+  .trust {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.5rem;
+    font-size: 0.82rem;
+  }
+  .trust span { display: flex; align-items: baseline; gap: 0.45rem; }
+  .trust span::before {
+    content: "✓";
+    color: var(--green);
+    font-family: var(--mono);
+    font-size: 0.72rem;
+    flex-shrink: 0;
+  }
+  /* Single-font emphasis on mobile — the desktop mono-bold mix breaks ugly when wrapping. */
+  .trust b { font-family: var(--body); color: var(--white); }
+}
 
 @media (prefers-reduced-motion: reduce) {
   .pulse { animation: none; }
