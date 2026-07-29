@@ -41,10 +41,12 @@ export const metadata: Metadata = {
   },
 }
 
+// No maximumScale: capping zoom at 1 disables pinch-zoom — an accessibility
+// failure (WCAG 1.4.4) and a Lighthouse flag. iOS input auto-zoom is avoided by
+// font-size, not by locking the viewport.
 export const viewport: Viewport = {
   width: 'device-width',
   initialScale: 1,
-  maximumScale: 1,
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

@@ -4,6 +4,17 @@ import { useState, useEffect, useRef, memo } from 'react';
 
 type Phase = 'hidden' | 'in' | 'out';
 
+// Splash→page handoff: pages gate their entrance choreography on this (see
+// lib/hooks/useIntroGate.ts) so hero animations begin exactly as the splash
+// dissolves — never invisibly behind it, never abruptly after it.
+function markIntroDone() {
+  try {
+    if (window.__seenIntroDone) return
+    window.__seenIntroDone = true
+    window.dispatchEvent(new Event('seen:intro-done'))
+  } catch { /* never let the handoff break the splash */ }
+}
+
 function IntroSplashInner() {
   const [phase, setPhase] = useState<Phase>('hidden');
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -20,6 +31,7 @@ function IntroSplashInner() {
           // Hide (don't .remove()) — see note in the phase==='in' effect below.
           setTimeout(() => { guard.style.display = 'none' }, 200)
         }
+        markIntroDone() // repeat visit: page entrance runs immediately
         return
       }
     } catch {}
@@ -209,6 +221,7 @@ function IntroSplashInner() {
     const hideTimer = setTimeout(() => {
       try { sessionStorage.setItem('seen_intro_shown', '1'); } catch {}
       setPhase('out');
+      markIntroDone(); // page entrance rises WHILE the splash dissolves (580ms overlap)
       setTimeout(() => setPhase('hidden'), 580);
     }, 2400);
 

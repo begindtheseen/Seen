@@ -14,10 +14,17 @@ import type { NextRequest } from 'next/server'
 // - nominatim.openstreetmap.org — City autocomplete
 // - api.anthropic.com is server-side only; never called from the browser
 // - cdn.jsdelivr.net is NOT used
+// Next.js DEV MODE only: the dev runtime (react-refresh / webpack eval sourcemaps)
+// requires 'unsafe-eval'. Without it the client bundle throws EvalError before
+// hydration, React effects never run, and the #intro-guard cover never lifts —
+// every page renders as a black screen in local dev. Production builds need no
+// eval, so the production CSP is byte-for-byte unchanged.
+const DEV_SCRIPT = process.env.NODE_ENV === 'development' ? " 'unsafe-eval'" : ''
+
 const CSP = [
   "default-src 'self'",
   // Scripts: self + Stripe (checkout widget injects scripts) + PostHog lazy bundles
-  "script-src 'self' https://js.stripe.com https://us-assets.i.posthog.com 'unsafe-inline'",
+  "script-src 'self' https://js.stripe.com https://us-assets.i.posthog.com 'unsafe-inline'" + DEV_SCRIPT,
   // Styles: self + Google Fonts
   "style-src 'self' https://fonts.googleapis.com 'unsafe-inline'",
   // Fonts: self + Google Fonts CDN

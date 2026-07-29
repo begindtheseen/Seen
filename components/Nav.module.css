@@ -43,7 +43,8 @@
   color: #fff;
   font-weight: 600;
 }
-/* Gradient underline for the active destination — mirrors the mockup's hairline accent. */
+/* Gradient underline for the active destination — mirrors the mockup's hairline accent.
+   Draws itself in from the left on route change (a small "alive" cue). */
 .linkActive::after {
   content: "";
   position: absolute;
@@ -53,6 +54,15 @@
   height: 2px;
   border-radius: 2px;
   background: linear-gradient(90deg, var(--indigo), var(--blue));
+  transform-origin: left center;
+  animation: navUnderlineIn 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+}
+@keyframes navUnderlineIn {
+  from { transform: scaleX(0); opacity: 0.4; }
+  to   { transform: scaleX(1); opacity: 1; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .linkActive::after { animation: none; }
 }
 
 .chevron {
@@ -87,10 +97,12 @@
   z-index: 600;
   min-width: 216px;
   padding: 0.4rem;
-  background: var(--surface);
-  border: 1px solid var(--line2);
-  border-radius: 12px;
-  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.55), 0 0 0 0.5px rgba(255, 255, 255, 0.04);
+  background: var(--glass-strong, var(--surface));
+  backdrop-filter: blur(24px) saturate(150%);
+  -webkit-backdrop-filter: blur(24px) saturate(150%);
+  border: 1px solid var(--glass-line, var(--line2));
+  border-radius: 14px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08), 0 24px 60px rgba(0, 0, 0, 0.55);
   animation: snMenuIn 0.14s ease;
 }
 .menuLeft {

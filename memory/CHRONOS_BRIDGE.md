@@ -161,3 +161,72 @@ recent dates, you're on the live brain.
   session; the MCP server already refreshes ~every 20s. No tight polling loops.
 - **Coordinate writes** with the Mac per §6 (syncDown-before-push is the Mac's job, but avoid racing the
   same note in the same minute).
+
+---
+
+## 11. Serializer corruption (FIXED 2026-07-29) + the one-time repair runbook
+
+### The bug
+The fact serializer's write and parse halves were **not inverses**, so `parse(write(x)) !== x` for any
+value containing a `"` or `\`:
+
+- **WRITE** — `lib/server/writeFact.js` `emitVal()` quoted such values with `JSON.stringify`, which
+  escapes `"` → `\"` and `\` → `\\`.
+- **PARSE** — `lib/server/memoryGraph.js` `parseScalar()` stripped the surrounding quotes
+  (`v.slice(1, -1)`) and **never unescaped**, so the backslashes became part of the value.
+
+Because `applyFact` re-emits a note's **entire** `facts:` block on every write, one write of *any* fact
+re-escaped every **neighbouring** fact in the same note. Backslashes before a quote compounded
+**n → 2n+1 per write cycle** (1, 3, 7, 15 … 1023, 4095). That is why
+`Seen resume PDF export / watermark_policy` grew to thousands of backslashes: a 497-character fact had
+become a 4,591-character string after 11 cycles.
+
+Two related asymmetries were fixed at the same time:
+- `stripComment()` was not escape-aware, so an escaped quote flipped its in-string state and a value
+  containing `… " … # …` was **truncated at the `#`** (silent data loss, not just escape growth).
+- `emitVal()` emitted values containing a raw newline/tab **bare**, splitting one value across
+  frontmatter lines and losing everything after the first line.
+
+### The fix
+- `parseScalar()` now unescapes double-quoted scalars with an exact, non-throwing inverse of
+  `JSON.stringify` (`\" \\ \/ \b \f \n \r \t \uXXXX`). An escape `JSON.stringify` would never emit is
+  kept **verbatim** rather than guessed at. Single-quoted scalars are unchanged.
+- `emitVal()` emits bare **only** when that is provably lossless — no structurally unsafe character
+  **and** `parseScalar(bare)` returns the identical string (which also stops `"42"`/`"true"`/`"null"`
+  from coming back as a number/bool/null). Everything else is JSON-quoted.
+- Guaranteed properties, pinned by tests: `parse(write(x)) === x` and `write(parse(write(x))) === write(x)`
+  for quotes, apostrophes, backslashes, colons, brackets, newlines, control chars and unicode
+  (`· é ✓ —`). Verified identical output on all 38 committed vault notes (the parser change is a
+  provable no-op on healthy notes — none contain a backslash in frontmatter).
+
+Reading a corrupted value with the fixed parser removes exactly **one** escape layer per read; the
+historical damage already stored needs the repair below.
+
+### One-time repair runbook — `scripts/brain-repair.mjs`
+Every collapse step is **proved**, not guessed: it inverts one lossy cycle and then re-applies the cycle
+to check it reproduces the input byte-for-byte. Anything non-canonical is reported and **skipped**.
+Findings are classed `repaired` (certain: a run of ≥2 backslashes or ≥2 verified cycles), `review`
+(a single `\"` — indistinguishable from an author who literally typed a backslash-quote; **not** applied
+unless you pass `--include-single-cycle`), or `ambiguous` (never applied).
+
+**Step 1 — dry run (safe anywhere, including a cloud session):**
+```bash
+node scripts/brain-repair.mjs            # auto transport; --json for machine output
+```
+In a cloud session this reads the brain through the gateway's read-only `notes` op. `--apply` is
+**refused** there (exit 2) before any network call — the gateway token cannot write notes back.
+
+**Step 2 — apply, on the Mac / any env holding `SUPABASE_URL` + `SUPABASE_SERVICE_KEY`:**
+```bash
+node scripts/brain-repair.mjs                 # re-read the report first
+node scripts/brain-repair.mjs --apply         # rewrites brain_notes AND re-derives brain_facts
+node scripts/brain-repair.mjs                 # confirm: "nothing to repair"
+```
+Repairing a note re-emits its `facts:` block in canonical form — byte-identical to what the next
+`memory_record_fact` write would produce anyway (omitted optional fields become explicit `null`).
+Other frontmatter keys, `updated:`, and the body are untouched. Local vault files can be repaired the
+same way with `--vault memory [--apply]`; `--note <path>` limits the scope.
+
+**Status (dry run, 2026-07-29, 48 notes / 123 facts): 1 corrupted fact —
+`claude-observations.md · seen-resume-pdf-export-watermark-policy-20260729-2 · object`,
+4094 backslashes, 11 cycles, 0 review, 0 ambiguous. Not yet applied — needs the Mac.**

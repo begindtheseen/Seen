@@ -14,24 +14,11 @@ export default function LandingPage() {
       {/* Redesigned hero: one consolidated company search + a live real-data proof card */}
       <HomeHero />
 
-      {/* Value · How it works · Final CTA */}
+      {/* Value · How it works · Final CTA.
+          NOTE: no page-local footer here — the global <Footer /> from app/layout.tsx
+          renders on every page. The old lp2-footer duplicated it (two stacked footers
+          with two different © years on the landing page). */}
       <LandingMarketingSections />
-
-      {/* Minimal footer */}
-      <footer className="lp2-footer">
-        <div className="lp2-wrap lp2-footer-row">
-          <span>Free for job seekers</span>
-          <span className="lp2-footer-sep">·</span>
-          <span>No account required to search</span>
-          <span className="lp2-footer-sep">·</span>
-          <a href="/compare">Compare</a>
-          <span className="lp2-footer-sep">·</span>
-          <a href="/reddit">Reddit outcomes</a>
-          <span className="lp2-footer-sep">·</span>
-          <a href="/legal">Legal</a>
-          <span className="lp2-footer-copy">© 2025 Seen. All rights reserved.</span>
-        </div>
-      </footer>
     </div>
   )
 }

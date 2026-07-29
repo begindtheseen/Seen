@@ -33,7 +33,7 @@ const link = { color: 'var(--blue)', textDecoration: 'none' } as const
 
 export default function ContentPolicyPage() {
   return (
-    <div style={{ minHeight: '100vh' }}>
+    <div className="rise-in" style={{ minHeight: '100vh' }}>
       <div style={wrap}>
         {/* Draft status banner */}
         <div style={{ background: 'var(--adim)', border: '1px solid rgba(245,158,11,0.25)', borderRadius: 10, padding: '1rem 1.25rem', marginBottom: '2rem', fontFamily: 'var(--mono)', fontSize: '.7rem', color: 'var(--amber)', lineHeight: 1.7 }}>
