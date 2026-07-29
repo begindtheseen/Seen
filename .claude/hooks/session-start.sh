@@ -1,31 +1,38 @@
 #!/bin/bash
-# SessionStart hook — Seen memory-boot enforcement.
+# SessionStart hook — Seen Chronos memory boot.
 #
-# Deterministic backstop for CLAUDE.md rule 1 ("memory boot"): inject a short,
-# unmissable directive at the top of EVERY session so the Chronos brain gets booted
-# AND written back — even when the long CLAUDE.md is skimmed. (This exists because a
-# session shipped real work on 2026-07-29 without ever booting the brain.)
+# Injects the LIVE brain briefing (the always-on online brain in a cloud session, the
+# local vault on a Mac) as SessionStart additionalContext, so the session starts already
+# oriented — ZERO tool calls. That is the whole point: connect the session to the info it
+# needs and save the round-trip. Falls back to a directive if the briefing can't be fetched.
+# Exists because a 2026-07-29 session shipped real work without ever booting the brain.
 #
-# Works in both cloud (online brain) and local Mac (file vault) sessions: it only
-# tells the agent which chronos MCP tools to call; the chronos server auto-picks the
-# backend. Dependency install is handled separately by scripts/cloud-setup.sh (the
-# environment Setup script), so this hook stays a pure, fast context injector.
-set -euo pipefail
+# scripts/memory-status.mjs is cloud-aware (fetches via the token-gated gateway when
+# BRAIN_API_URL+BRAIN_API_TOKEN are set) and dependency-free, so this needs no node_modules.
+# Deps + brain reachability are handled separately by scripts/cloud-setup.sh.
+set -uo pipefail  # NOT -e: a briefing failure must fall back to the directive, never abort the session.
 
-MSG=$(cat <<'EOF'
-🧠 CHRONOS MEMORY — do this before substantive work (CLAUDE.md rule 1), unless already done this session:
-1. Call the chronos `memory_status` MCP tool to orient (it auto-uses the always-on online brain in cloud sessions, the local vault on a Mac). Check `memory_open_threads` too. Skim memory/HOME.md only if you still need more.
-2. For any non-trivial decision, follow memory/decision-protocol.md.
-3. BEFORE you end the session, WRITE BACK: `memory_record_fact` for durable typed facts, `memory_append_timeline` for what happened, and open/close threads. Skipping the write-back costs the next session the tokens this boot just saved.
-No task is "too small" to skip this — the boot + write-back loop is unconditional.
-EOF
-)
+PROJ="${CLAUDE_PROJECT_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)}"
+STATUS="$PROJ/scripts/memory-status.mjs"
 
-# Emit as SessionStart additionalContext. node is always available in this repo env and
-# guarantees valid JSON escaping of the multi-line message.
-printf '%s' "$MSG" | node -e '
+# Bound the (possibly networked) briefing so session start never hangs. `timeout` exists on
+# Linux (every cloud session); a Mac without it runs unbounded — local vault, no network, fast.
+if command -v timeout >/dev/null 2>&1; then RUN=(timeout 15 node "$STATUS"); else RUN=(node "$STATUS"); fi
+
+BRIEF=""
+[ -f "$STATUS" ] && BRIEF="$("${RUN[@]}" 2>/dev/null || true)"
+
+if [ -n "$BRIEF" ]; then
+  CONTEXT="🧠 Chronos brain — LIVE briefing, injected at session start so you begin oriented (recall, don't re-read). Follow memory/decision-protocol.md for non-trivial decisions, and WRITE BACK before the session ends: memory_record_fact (durable facts) + memory_append_timeline (what happened) + open/close threads.
+
+$BRIEF"
+else
+  CONTEXT="🧠 CHRONOS MEMORY (CLAUDE.md rule 1) — the auto-briefing couldn't be fetched this session, so boot it yourself before substantive work: call the chronos memory_status MCP tool to orient (+ memory_open_threads), follow memory/decision-protocol.md, and WRITE BACK before ending (memory_record_fact / memory_append_timeline / threads). No task is too small to skip this."
+fi
+
+# JSON-encode via node (always present) so any briefing bytes — quotes, backslashes, emoji —
+# are escaped correctly into the SessionStart additionalContext payload.
+printf '%s' "$CONTEXT" | node -e '
   const c = require("fs").readFileSync(0, "utf8");
-  process.stdout.write(JSON.stringify({
-    hookSpecificOutput: { hookEventName: "SessionStart", additionalContext: c }
-  }));
+  process.stdout.write(JSON.stringify({ hookSpecificOutput: { hookEventName: "SessionStart", additionalContext: c } }));
 '

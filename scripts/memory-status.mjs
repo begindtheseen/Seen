@@ -12,6 +12,7 @@ import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, relative, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { buildIndex, buildBriefing } from '../lib/server/memoryGraph.js';
+import { fetchNotes, cloudConfigured } from '../lib/server/brainCloud.js';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const VAULT = resolve(process.env.CHRONOS_VAULT || join(HERE, '..', 'memory'));
@@ -58,6 +59,14 @@ export function renderBriefing(index, today) {
 // CLI
 if (import.meta.url === `file://${process.argv[1]}`) {
   const today = new Date().toISOString().slice(0, 10);
-  const notes = walk(VAULT).map((f) => ({ path: relative(VAULT, f).replace(/\\/g, '/'), text: readFileSync(f, 'utf8') }));
+  // Source of truth: a cloud/repo-connected session reads the ALWAYS-ON online brain
+  // through the gateway (the local vault under memory/ is stale or absent there); a
+  // local Mac session reads the vault files. Mirrors the chronos MCP server's
+  // resolveCloud(): CHRONOS_SOURCE forces local/cloud, else auto → cloud when brain
+  // creds (BRAIN_API_URL+BRAIN_API_TOKEN, or direct Supabase) are present.
+  const useCloud = process.env.CHRONOS_SOURCE !== 'local' && cloudConfigured();
+  const notes = useCloud
+    ? await fetchNotes()
+    : walk(VAULT).map((f) => ({ path: relative(VAULT, f).replace(/\\/g, '/'), text: readFileSync(f, 'utf8') }));
   process.stdout.write(renderBriefing(buildIndex(notes), today) + '\n');
 }
