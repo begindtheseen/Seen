@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
+import Reveal from '@/components/Reveal'
 import { EmployerCheckout, EmployerPurchaseConfirm } from '@/components/EmployerCheckout'
 import { EmployerCompanyProvider } from '@/components/employer/EmployerCompanyContext'
 import { EmployerClaimPanel } from '@/components/employer/EmployerClaimPanel'
@@ -27,7 +28,7 @@ const wrap = { maxWidth: 900, margin: '0 auto', padding: '0 1.5rem', width: '100
 
 export default function EmployersPage() {
   return (
-    <div style={{ minHeight: '100vh', background: 'radial-gradient(ellipse at 15% -5%,rgba(29,78,216,0.12) 0%,transparent 55%),radial-gradient(ellipse at 100% 5%,rgba(124,58,237,0.09) 0%,transparent 45%)' }}>
+    <div className="rise-in" style={{ minHeight: '100vh', background: 'radial-gradient(ellipse at 15% -5%,rgba(29,78,216,0.12) 0%,transparent 55%),radial-gradient(ellipse at 100% 5%,rgba(124,58,237,0.09) 0%,transparent 45%)' }}>
       {/* Employer-first header — no seeker nav */}
       <header style={{ borderBottom: '1px solid var(--line)', background: 'rgba(5,7,15,.7)', backdropFilter: 'blur(12px)', position: 'sticky', top: 0, zIndex: 50 }}>
         <div style={{ ...wrap, display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '.9rem 1.5rem' }}>
@@ -82,6 +83,7 @@ export default function EmployersPage() {
         </EmployerCompanyProvider>
 
         {/* Why it matters — real mechanism, honest */}
+        <Reveal>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(240px,1fr))', gap: '1rem', marginBottom: '3rem' }}>
           {[
             { t: 'Candidates screen you first', d: 'Before applying, people check your ghost rate and response rate on Seen. A bad record silently kills your applicant flow — the best candidates have options.' },
@@ -94,6 +96,7 @@ export default function EmployersPage() {
             </div>
           ))}
         </div>
+        </Reveal>
 
         {/* Promote — real, no-login checkout */}
         <div id="promote" style={{ scrollMarginTop: 80 }}>
@@ -108,11 +111,13 @@ export default function EmployersPage() {
         </div>
 
         {/* Enterprise / contact */}
+        <Reveal>
         <div style={{ textAlign: 'center', padding: '2rem', background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 16 }}>
           <div style={{ fontFamily: 'var(--display)', fontSize: '1.05rem', fontWeight: 800, color: 'var(--white)', marginBottom: '.5rem' }}>Hiring across many roles or locations?</div>
           <p style={{ fontFamily: 'var(--mono)', fontSize: '.68rem', color: 'var(--sub)', marginBottom: '1rem' }}>We&apos;ll set up multi-location placement, verified badges, and applicant reporting for your team.</p>
           <a href="mailto:hello@seenjobs.io?subject=Seen for Employers — Enterprise" style={{ display: 'inline-block', background: 'linear-gradient(135deg,#3b82f6,#8b5cf6)', border: 'none', borderRadius: 8, padding: '.7rem 1.8rem', fontFamily: 'var(--display)', fontWeight: 800, fontSize: '.82rem', color: '#fff', textDecoration: 'none' }}>Talk to us →</a>
         </div>
+        </Reveal>
       </div>
 
       {/* Employer-first footer (no seeker links) */}

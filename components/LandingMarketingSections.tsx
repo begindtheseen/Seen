@@ -1,7 +1,7 @@
 'use client'
 
-import { useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
+import Reveal from '@/components/Reveal'
 
 const VALUE_CARDS = [
   {
@@ -45,58 +45,36 @@ const VALUE_CARDS = [
 ]
 
 const STEPS = [
-  { n: 1, t: 'Search a company' },
-  { n: 2, t: 'See real applicant outcomes' },
-  { n: 3, t: 'Decide if it is worth applying' },
+  { n: 1, t: 'Search a company', d: 'Type a name — or tap an example above.' },
+  { n: 2, t: 'See real applicant outcomes', d: 'Ghost rate, response time, and a grade.' },
+  { n: 3, t: 'Decide if it’s worth applying', d: 'Spend your hours where people hear back.' },
 ]
 
 export default function LandingMarketingSections() {
-  const wrapRef = useRef<HTMLDivElement>(null)
   const router = useRouter()
 
-  useEffect(() => {
-    const els = wrapRef.current?.querySelectorAll<HTMLElement>('[data-reveal]')
-    if (!els || !('IntersectionObserver' in window)) {
-      els?.forEach(el => { el.style.opacity = '1'; el.style.transform = 'none' })
-      return
-    }
-    const obs = new IntersectionObserver((entries) => {
-      entries.forEach(entry => {
-        if (entry.isIntersecting) {
-          const el = entry.target as HTMLElement
-          el.style.transitionDelay = `${el.dataset.delay || '0'}ms`
-          el.style.opacity = '1'
-          el.style.transform = 'translateY(0)'
-          obs.unobserve(el)
-        }
-      })
-    }, { threshold: 0.12, rootMargin: '0px 0px -50px 0px' })
-
-    els.forEach(el => {
-      el.style.opacity = '0'
-      el.style.transform = 'translateY(24px)'
-      el.style.transition = 'opacity .6s cubic-bezier(.16,1,.3,1), transform .6s cubic-bezier(.16,1,.3,1)'
-      obs.observe(el)
-    })
-    return () => obs.disconnect()
-  }, [])
-
   return (
-    <div ref={wrapRef}>
+    <div>
       {/* VALUE SECTION */}
       <section className="lp2-section">
         <div className="lp2-wrap">
-          <div className="lp2-section-head" data-reveal>
+          <Reveal className="lp2-section-head">
             <div className="lp2-kicker">Why Seen</div>
             <h2 className="lp2-h2">Stop applying blind.</h2>
-          </div>
+            <p className="lp2-section-sub">
+              Every number on Seen comes from what actually happened to real applicants —
+              never from employer marketing.
+            </p>
+          </Reveal>
           <div className="lp2-grid-4">
             {VALUE_CARDS.map((c, i) => (
-              <div key={c.title} className="lp2-card" data-reveal data-delay={`${i * 70}`}>
-                <div className="lp2-card-ico">{c.icon}</div>
-                <h3 className="lp2-card-t">{c.title}</h3>
-                <p className="lp2-card-d">{c.desc}</p>
-              </div>
+              <Reveal key={c.title} delay={i * 70}>
+                <div className="lp2-card">
+                  <div className="lp2-card-ico">{c.icon}</div>
+                  <h3 className="lp2-card-t">{c.title}</h3>
+                  <p className="lp2-card-d">{c.desc}</p>
+                </div>
+              </Reveal>
             ))}
           </div>
         </div>
@@ -105,16 +83,19 @@ export default function LandingMarketingSections() {
       {/* HOW IT WORKS */}
       <section className="lp2-section" style={{ paddingTop: 0 }}>
         <div className="lp2-wrap">
-          <div className="lp2-section-head" data-reveal>
+          <Reveal className="lp2-section-head">
             <div className="lp2-kicker">Simple by design</div>
-            <h2 className="lp2-h2">How SeenJobs works</h2>
-          </div>
+            <h2 className="lp2-h2">How Seen works</h2>
+          </Reveal>
           <div className="lp2-steps">
             {STEPS.map((s, i) => (
-              <div key={s.n} className="lp2-step" data-reveal data-delay={`${i * 90}`}>
-                <div className="lp2-step-n">{s.n}</div>
-                <h3 className="lp2-step-t">{s.t}</h3>
-              </div>
+              <Reveal key={s.n} delay={i * 110}>
+                <div className="lp2-step">
+                  <div className="lp2-step-n">{s.n}</div>
+                  <h3 className="lp2-step-t">{s.t}</h3>
+                  <p className="lp2-step-d">{s.d}</p>
+                </div>
+              </Reveal>
             ))}
           </div>
         </div>
@@ -123,18 +104,23 @@ export default function LandingMarketingSections() {
       {/* FINAL CTA */}
       <section className="lp2-final">
         <div className="lp2-wrap">
-          <div className="lp2-final-card" data-reveal>
-            <div style={{ position: 'relative', zIndex: 1 }}>
-              <h2 className="lp2-h2" style={{ maxWidth: '18ch', margin: '0 auto' }}>
-                Check your next company before you apply.
-              </h2>
-              <div className="lp2-cta-row" style={{ marginTop: '2rem' }}>
-                <button className="lp2-btn lp2-btn-primary" onClick={() => router.push('/companies')}>
-                  Check a company
-                </button>
+          <Reveal className="lp2-final-reveal">
+            <div className="lp2-final-card">
+              <div style={{ position: 'relative', zIndex: 1 }}>
+                <h2 className="lp2-h2" style={{ maxWidth: '18ch', margin: '0 auto' }}>
+                  Check your next company before you apply.
+                </h2>
+                <p className="lp2-section-sub" style={{ marginTop: '.9rem' }}>
+                  It takes five seconds. Free, no account needed.
+                </p>
+                <div className="lp2-cta-row" style={{ marginTop: '1.8rem' }}>
+                  <button className="lp2-btn lp2-btn-primary" onClick={() => router.push('/companies')}>
+                    Check a company
+                  </button>
+                </div>
               </div>
             </div>
-          </div>
+          </Reveal>
         </div>
       </section>
     </div>

@@ -164,11 +164,6 @@
   border-radius: 20px;
   padding: 1.4rem;
   box-shadow: 0 24px 70px -28px rgba(0, 0, 0, 0.75);
-  animation: snCardIn 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
-}
-@keyframes snCardIn {
-  from { opacity: 0; transform: translateY(14px); }
-  to   { opacity: 1; transform: translateY(0); }
 }
 .proof::before {
   content: "";
@@ -303,7 +298,101 @@
 }
 .reportLink:hover { color: #93c5fd; }
 
+/* ── Entrance choreography ─────────────────────────────────────────────────────
+   Every .stage element starts hidden and rises when the section gets .heroIn
+   (which useIntroGate flips the moment the intro splash dissolves). Delays d1→d6
+   cascade left column top-to-bottom; the proof card rides with the search bar
+   and settles with a slight scale so it reads as "landing", not "appearing". */
+.stage {
+  opacity: 0;
+  transform: translateY(18px);
+  transition:
+    opacity 0.7s cubic-bezier(0.16, 1, 0.3, 1),
+    transform 0.7s cubic-bezier(0.16, 1, 0.3, 1);
+  will-change: opacity, transform;
+}
+.proof.stage { transform: translateY(22px) scale(0.975); }
+.heroIn .stage { opacity: 1; transform: none; }
+.heroIn .d1 { transition-delay: 0.05s; }
+.heroIn .d2 { transition-delay: 0.13s; }
+.heroIn .d3 { transition-delay: 0.21s; }
+.heroIn .d4 { transition-delay: 0.30s; }
+.heroIn .d5 { transition-delay: 0.40s; }
+.heroIn .d6 { transition-delay: 0.50s; }
+
+/* Grade chip pops after the ring has mostly swept (springy, tiny overshoot). */
+.grade {
+  opacity: 0;
+  transform: scale(0.55);
+  transition:
+    transform 0.55s cubic-bezier(0.34, 1.56, 0.64, 1) 1.35s,
+    opacity 0.3s ease 1.35s;
+}
+.heroIn .grade { opacity: 1; transform: scale(1); }
+
+/* ── Search focus: the whole bar lights up, not just a caret ── */
+.search {
+  transition: border-color 0.25s ease, box-shadow 0.25s ease;
+}
+.search:focus-within {
+  border-color: rgba(129, 140, 248, 0.55);
+  box-shadow:
+    0 20px 60px -24px rgba(0, 0, 0, 0.7),
+    0 0 0 3px rgba(99, 102, 241, 0.16),
+    0 0 44px rgba(99, 102, 241, 0.2);
+}
+
+/* ── "Try one" example chips — one tap to first value ── */
+.examples {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  flex-wrap: wrap;
+  margin-top: 1.05rem;
+}
+.examplesLabel {
+  font-family: var(--mono);
+  font-size: 0.62rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--dim);
+  margin-right: 0.15rem;
+}
+.chip {
+  font-family: var(--body);
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--sub);
+  background: rgba(255, 255, 255, 0.035);
+  border: 1px solid var(--line2);
+  border-radius: 999px;
+  padding: 0.34rem 0.85rem;
+  cursor: pointer;
+  transition: color 0.18s ease, border-color 0.18s ease, background 0.18s ease,
+    transform 0.18s ease, box-shadow 0.22s ease;
+}
+.chip:hover {
+  color: var(--white);
+  border-color: rgba(129, 140, 248, 0.5);
+  background: rgba(99, 102, 241, 0.1);
+  transform: translateY(-1px);
+  box-shadow: 0 6px 20px rgba(99, 102, 241, 0.18);
+}
+.chip:active { transform: translateY(0) scale(0.97); }
+
 @media (prefers-reduced-motion: reduce) {
   .pulse { animation: none; }
-  .proof { animation: none; }
+  .stage,
+  .proof.stage {
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
+  .grade {
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
+  .chip,
+  .search { transition: none; }
 }

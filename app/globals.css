@@ -148,7 +148,11 @@ nav.nav-scrolled{background:rgba(6,6,8,0.82);backdrop-filter:blur(60px) saturate
 .page{display:none;min-height:100vh;padding-top:58px;box-sizing:border-box;overflow-x:hidden;width:100%}
 .page.active{display:block;animation:pageIn 0.25s cubic-bezier(0.22,1,0.36,1) both}
 @keyframes pageIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
-.page-full{display:flex;flex-direction:column;flex:1 0 auto;overflow-x:hidden;padding-top:58px;box-sizing:border-box;width:100%;animation:fadeIn .2s ease both}
+/* Every route rises in gently — the ONE page-entrance shared by all pages (jobs,
+   company, employer portal, legal, …). Subtle + fast so repeat navigation never drags. */
+.page-full{display:flex;flex-direction:column;flex:1 0 auto;overflow-x:hidden;padding-top:58px;box-sizing:border-box;width:100%;animation:pageIn .5s cubic-bezier(.16,1,.3,1) both}
+@keyframes pageIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+@media(prefers-reduced-motion:reduce){.page-full{animation:fadeIn .2s ease both}}
 .wrap{max-width:1300px;margin:0 auto;padding:0 1.25rem}
 
 /* SHARED COMPONENTS */
@@ -500,7 +504,8 @@ nav.nav-scrolled{background:rgba(6,6,8,0.82);backdrop-filter:blur(60px) saturate
 .co-hdr>*{position:relative;z-index:1}
 .co-top{display:flex;align-items:flex-start;gap:1.25rem;margin-bottom:1.75rem}
 .co-logo-lg{width:54px;height:54px;border-radius:11px;background:var(--raised);border:1px solid var(--line2);display:flex;align-items:center;justify-content:center;font-family:var(--display);font-size:1.3rem;font-weight:800;color:var(--sub);flex-shrink:0}
-.co-name{font-family:var(--display);font-size:2rem;font-weight:800;color:var(--white);letter-spacing:-.04em;margin-bottom:.12rem}
+/* capitalize: slugs arrive lowercase ("amazon") — display them as names, not slugs. */
+.co-name{font-family:var(--display);font-size:2rem;font-weight:800;color:var(--white);letter-spacing:-.04em;margin-bottom:.12rem;text-transform:capitalize}
 .co-ind{font-family:var(--mono);font-size:.65rem;color:var(--dim);margin-bottom:.35rem}
 .co-loc-tag{display:inline-flex;align-items:center;gap:.28rem;background:var(--bdim);border:1px solid #4b9eff20;border-radius:4px;padding:.18rem .55rem;font-family:var(--mono);font-size:.6rem;color:var(--blue);margin-bottom:.5rem}
 .co-mets{display:grid;grid-template-columns:repeat(6,1fr);gap:1px;background:var(--line);border:1px solid var(--line);border-radius:8px;overflow:hidden}
@@ -1203,8 +1208,8 @@ nav.nav-scrolled{background:rgba(6,6,8,0.82);backdrop-filter:blur(60px) saturate
 @media(max-width:520px){.lp2-trust{gap:1.1rem 1.6rem}.lp2-trust-div{display:none}.lp2-trust-n{font-size:1.25rem}.lp2-trust-l{font-size:.72rem}}
 
 /* ── SECTION SHELL ── */
-.lp2-section{position:relative;z-index:2;padding:clamp(3.5rem,9vw,6rem) 0}
-.lp2-section-head{text-align:center;max-width:42ch;margin:0 auto clamp(2.5rem,5vw,3.5rem)}
+.lp2-section{position:relative;z-index:2;padding:clamp(3rem,6.5vw,4.5rem) 0}
+.lp2-section-head{text-align:center;max-width:46ch;margin:0 auto clamp(2rem,4vw,2.75rem)}
 .lp2-kicker{font-family:var(--body);font-size:.8rem;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:#818cf8;margin-bottom:.9rem}
 .lp2-h2{font-family:var(--display);font-weight:800;color:#fff;letter-spacing:-.03em;line-height:1.1;font-size:clamp(1.8rem,4.5vw,2.9rem);margin:0}
 .lp2-section-sub{margin:1rem auto 0;color:#aeb6c6;font-size:clamp(.95rem,2vw,1.05rem);line-height:1.6;max-width:48ch}
@@ -1237,13 +1242,8 @@ nav.nav-scrolled{background:rgba(6,6,8,0.82);backdrop-filter:blur(60px) saturate
 .lp2-final-card::before{content:'';position:absolute;top:-40%;left:50%;transform:translateX(-50%);width:120%;height:120%;background:radial-gradient(ellipse at center,rgba(124,58,237,0.18),transparent 60%);pointer-events:none}
 
 /* ── FOOTER ── */
-.lp2-footer{position:relative;z-index:2;border-top:1px solid rgba(255,255,255,0.07);padding:1.6rem 0;background:rgba(5,6,15,.6)}
-.lp2-footer-row{display:flex;flex-wrap:wrap;align-items:center;gap:.6rem 1.2rem;font-family:var(--body);font-size:.8rem;color:#7c84a0}
-.lp2-footer-row a{color:#9aa2b4;text-decoration:none}
-.lp2-footer-row a:hover{color:#c4b5fd}
-.lp2-footer-sep{color:rgba(255,255,255,.14)}
-.lp2-footer-copy{margin-left:auto;color:#5d6577}
-@media(max-width:560px){.lp2-footer-copy{margin-left:0;width:100%}}
+/* (lp2-footer removed — the landing page now uses the ONE global <Footer />; the
+   old page-local footer stacked a second, contradictory footer under it.) */
 
 /* ══ ADMIN COMMAND CENTER — .ac-* (founder dashboard redesign) ══════════════ */
 .ac-tone-blue{color:var(--blue)}.ac-tone-green{color:var(--green)}.ac-tone-amber{color:var(--amber)}
@@ -1457,4 +1457,66 @@ nav.nav-scrolled{background:rgba(6,6,8,0.82);backdrop-filter:blur(60px) saturate
   .ai-stack{gap:.85rem}
   .ai-tab{padding:.45rem .7rem;font-size:.64rem}
   .ai-btn-row>*{flex:1 1 100%}
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   FINISH LAYER (2026-07-29) — one shared motion + interaction vocabulary for
+   EVERY page. Pages opt in with tiny primitives instead of inventing their own:
+   · .rv / .rv-in       — scroll-reveal (components/Reveal.tsx adds .rv-in)
+   · .sk                — skeleton shimmer while loading
+   · global ::selection, scrollbar, :focus-visible, press states
+   Everything here is neutralized under prefers-reduced-motion.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ── Route entrance for pages that don't use .page-full (legal, employer chrome, …) ── */
+.rise-in{animation:pageIn .5s cubic-bezier(.16,1,.3,1) both}
+@media(prefers-reduced-motion:reduce){.rise-in{animation:fadeIn .2s ease both}}
+
+/* ── Scroll reveal ── */
+.rv{opacity:0;transform:translateY(22px);transition:opacity .65s cubic-bezier(.16,1,.3,1),transform .65s cubic-bezier(.16,1,.3,1)}
+.rv.rv-in{opacity:1;transform:none}
+/* Reveal wrappers inside grids must stretch so cards keep equal heights. */
+.lp2-grid-4>.rv,.lp2-steps>.rv{display:flex;position:relative}
+.lp2-grid-4>.rv>*,.lp2-steps>.rv>*{flex:1}
+
+/* ── Skeleton shimmer (loading placeholders) ── */
+.sk{position:relative;overflow:hidden;background:rgba(255,255,255,.045);border-radius:10px;min-height:12px}
+.sk::after{content:'';position:absolute;inset:0;transform:translateX(-100%);background:linear-gradient(90deg,transparent,rgba(255,255,255,.075),transparent);animation:skSweep 1.5s ease infinite}
+@keyframes skSweep{to{transform:translateX(100%)}}
+
+/* ── Text selection in brand indigo ── */
+::selection{background:rgba(99,102,241,.4);color:#fff}
+
+/* ── Dark, quiet scrollbar (finished-product chrome) ── */
+*{scrollbar-width:thin;scrollbar-color:rgba(255,255,255,.14) transparent}
+::-webkit-scrollbar{width:10px;height:10px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:rgba(255,255,255,.13);border-radius:8px;border:2.5px solid transparent;background-clip:content-box}
+::-webkit-scrollbar-thumb:hover{background:rgba(129,140,248,.42);border:2.5px solid transparent;background-clip:content-box}
+
+/* ── Keyboard focus: one visible, on-brand ring everywhere ── */
+:focus-visible{outline:2px solid rgba(129,140,248,.75);outline-offset:2px;border-radius:6px}
+
+/* ── Press feedback on every button-like control ── */
+.btn:active,.lp2-btn:active{transform:translateY(0) scale(.975)}
+
+/* ── Value cards: icon responds with the card ── */
+.lp2-card-ico{transition:transform .3s cubic-bezier(.16,1,.3,1),background .3s ease,color .3s ease,border-color .3s ease}
+.lp2-card:hover .lp2-card-ico{transform:scale(1.08) rotate(-3deg);color:#c7d2fe;background:rgba(99,102,241,.18);border-color:rgba(129,140,248,.38)}
+
+/* ── How-it-works: step descriptions + flow connectors between cards ── */
+.lp2-step-d{font-family:var(--body);font-size:.85rem;color:#98a1b3;line-height:1.55;margin:.45rem 0 0}
+@media(min-width:760px){
+  .lp2-steps>.rv:not(:last-child)::after{
+    content:'→';position:absolute;top:50%;right:-1.18rem;transform:translateY(-50%);
+    font-family:var(--mono);font-size:.95rem;color:rgba(129,140,248,.55);pointer-events:none}
+}
+
+/* ── Reduced motion: the finish layer gets out of the way entirely ── */
+@media(prefers-reduced-motion:reduce){
+  .rv{opacity:1;transform:none;transition:none}
+  .sk::after{animation:none}
+  .btn:active,.lp2-btn:active{transform:none}
+  .lp2-card-ico{transition:none}
+  .lp2-card:hover .lp2-card-ico{transform:none}
 }

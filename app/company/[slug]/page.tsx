@@ -809,8 +809,22 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
           </div>
 
           {loading ? (
-            <div style={{ textAlign: 'center', padding: '2rem', color: 'var(--muted)', fontFamily: 'var(--mono)', fontSize: '.72rem' }}>
-              Loading company data...
+            /* Skeleton mirrors the grade bar + stat row it's about to become —
+               perceived speed instead of a bare "Loading…" line. */
+            <div aria-label="Loading company data" role="status" style={{ display: 'flex', flexDirection: 'column', gap: '.8rem', padding: '.4rem 0 .2rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                <div className="sk" style={{ width: 64, height: 64, borderRadius: 14, flexShrink: 0 }} />
+                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '.55rem' }}>
+                  <div className="sk" style={{ width: '34%', height: 14 }} />
+                  <div className="sk" style={{ width: '52%', height: 10 }} />
+                </div>
+                <div className="sk" style={{ width: 120, height: 12 }} />
+              </div>
+              <div style={{ display: 'flex', gap: '.8rem' }}>
+                <div className="sk" style={{ flex: 1, height: 58, borderRadius: 12 }} />
+                <div className="sk" style={{ flex: 1, height: 58, borderRadius: 12 }} />
+                <div className="sk" style={{ flex: 1, height: 58, borderRadius: 12 }} />
+              </div>
             </div>
           ) : error ? (
             <div style={{ background: 'var(--rdim, rgba(239,68,68,.08))', border: '1px solid rgba(239,68,68,.25)', borderRadius: 8, padding: '1rem', fontFamily: 'var(--mono)', fontSize: '.72rem', color: 'var(--red)', textAlign: 'center' }}>

@@ -4,6 +4,8 @@ import { useState, useCallback, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { RecentSearchesStore } from '@/lib/stores/RecentSearches'
+import { useIntroGate } from '@/lib/hooks/useIntroGate'
+import { useCountUp } from '@/lib/hooks/useCountUp'
 import styles from './HomeHero.module.css'
 
 const JOB_KEYWORDS = ['engineer', 'developer', 'manager', 'analyst', 'designer', 'nurse', 'coordinator', 'specialist', 'director', 'associate', 'assistant', 'recruiter', 'sales', 'marketing', 'accountant', 'therapist', 'technician']
@@ -36,6 +38,18 @@ const FEATURED_SEED: ProofScore = {
   report_count: 46,
 }
 
+// One-tap example companies for brand-new users — zero typing to first value.
+// Every entry verified against the LIVE production leaderboard (2026-07-29): all have
+// real applicant reports (Starbucks 11.5k · Nike 2.2k · McDonald's 12.7k · Amazon 46),
+// and the grade spread (A → D) shows instantly that Seen differentiates companies.
+// Slugs are the exact stored names, so routing never depends on punctuation cleanup.
+const EXAMPLES: Array<{ label: string; slug: string }> = [
+  { label: 'Amazon', slug: 'amazon' },
+  { label: 'Starbucks', slug: 'starbucks' },
+  { label: 'Nike', slug: 'nike' },
+  { label: 'McDonald’s', slug: 'mcdonalds' },
+]
+
 function letterGrade(s: number): string {
   if (s >= 80) return 'A'
   if (s >= 65) return 'B'
@@ -50,6 +64,10 @@ export default function HomeHero() {
   const [query, setQuery] = useState('')
   const [location, setLocation] = useState('')
   const [proof, setProof] = useState<ProofScore>(FEATURED_SEED)
+
+  // Entrance choreography starts the moment the intro splash dissolves (or instantly
+  // on repeat visits) — never invisibly behind it. See useIntroGate/IntroSplash.
+  const ready = useIntroGate()
 
   // Preserve the original routing logic: company queries → /company/<slug>,
   // job-style queries → /jobs?q=&loc=
@@ -102,6 +120,14 @@ export default function HomeHero() {
   const respPct = Math.round(proof.response_rate * 100)
   const grade = letterGrade(proof.overall_score)
 
+  // Animated figures — the ring and its number share ONE eased value so they can
+  // never disagree mid-flight. Colors key off the FINAL values (never the animated
+  // ones) so semantics don't flicker green→red while counting.
+  const ghostAnim = Math.round(useCountUp(ghostPct, { start: ready, duration: 1500, delay: 420 }))
+  const respAnim = Math.round(useCountUp(respPct, { start: ready, duration: 1200, delay: 540 }))
+  const waitAnim = Math.round(useCountUp(proof.avg_wait_days, { start: ready, duration: 1200, delay: 640 }))
+  const wasteAnim = Math.round(useCountUp(proof.waste, { start: ready, duration: 1200, delay: 740 }))
+
   // Semantic colour — green responds, red ghosts, amber in between (matches the app).
   const ghostColor = proof.ghost_rate > 0.5 ? 'var(--red)' : proof.ghost_rate > 0.3 ? 'var(--amber)' : 'var(--green)'
   const respColor = proof.response_rate >= 0.5 ? 'var(--green)' : proof.response_rate >= 0.3 ? 'var(--amber)' : 'var(--red)'
@@ -113,26 +139,26 @@ export default function HomeHero() {
   const gradeBorder = risk === 'safe' ? 'rgba(16,185,129,.4)' : risk === 'warn' ? 'rgba(245,158,11,.4)' : 'rgba(239,68,68,.4)'
 
   return (
-    <section className={styles.hero}>
+    <section className={`${styles.hero}${ready ? ' ' + styles.heroIn : ''}`}>
       <div className={styles.grid}>
         {/* ── Left: headline + one search ── */}
         <div>
-          <span className={styles.eyebrow}>
+          <span className={`${styles.eyebrow} ${styles.stage} ${styles.d1}`}>
             <span className={styles.pulse} />
             Real hiring outcomes from real applicants
           </span>
 
-          <h1 className={styles.title}>
+          <h1 className={`${styles.title} ${styles.stage} ${styles.d2}`}>
             See who actually <span className={styles.grad}>responds</span> before you apply.
           </h1>
 
-          <p className={styles.lede}>
+          <p className={`${styles.lede} ${styles.stage} ${styles.d3}`}>
             Check a company&apos;s ghost rate, response time, and real applicant outcomes — before you
             spend another hour on an application that goes nowhere.
           </p>
 
           <form
-            className={styles.search}
+            className={`${styles.search} ${styles.stage} ${styles.d4}`}
             onSubmit={(e) => { e.preventDefault(); doSearch() }}
             aria-label="Check a company"
           >
@@ -163,7 +189,22 @@ export default function HomeHero() {
             <button className={styles.go} type="submit">Check company</button>
           </form>
 
-          <div className={styles.trust}>
+          {/* One tap to first value — real companies with real report volume. */}
+          <div className={`${styles.examples} ${styles.stage} ${styles.d5}`} aria-label="Example companies">
+            <span className={styles.examplesLabel}>Try one</span>
+            {EXAMPLES.map(ex => (
+              <button
+                key={ex.slug}
+                type="button"
+                className={styles.chip}
+                onClick={() => router.push(`/company/${ex.slug}`)}
+              >
+                {ex.label}
+              </button>
+            ))}
+          </div>
+
+          <div className={`${styles.trust} ${styles.stage} ${styles.d6}`}>
             <span><b>Free</b> company checks</span>
             <span><b>No account</b> needed to look</span>
             <span><b>Real</b> applicant reports</span>
@@ -171,7 +212,7 @@ export default function HomeHero() {
         </div>
 
         {/* ── Right: the thesis, made visible (real company, real numbers) ── */}
-        <aside className={styles.proof} aria-label={`${proof.name} hiring report`}>
+        <aside className={`${styles.proof} ${styles.stage} ${styles.d4}`} aria-label={`${proof.name} hiring report`}>
           <div className={styles.proofHead}>
             <div className={styles.co}>
               <div className={styles.logo}>{proof.name[0]?.toUpperCase()}</div>
@@ -186,24 +227,25 @@ export default function HomeHero() {
           </div>
 
           <div className={styles.gaugeRow}>
-            <div className={styles.gauge} style={{ background: `conic-gradient(${ghostColor} ${ghostPct}%, var(--line2) 0)` }} aria-hidden>
+            {/* Ring and number share ghostAnim — they land together, always in sync. */}
+            <div className={styles.gauge} style={{ background: `conic-gradient(${ghostColor} ${ghostAnim}%, var(--line2) 0)` }} aria-hidden>
               <div className={styles.gaugeNum}>
-                <b>{ghostPct}%</b>
+                <b>{ghostAnim}%</b>
                 <small>ghosted</small>
               </div>
             </div>
             <div className={styles.stats}>
               <div className={styles.stat}>
                 <span className={styles.statK}>Responds to applicants</span>
-                <span className={styles.statV} style={{ color: respColor }}>{respPct}%</span>
+                <span className={styles.statV} style={{ color: respColor }}>{respAnim}%</span>
               </div>
               <div className={styles.stat}>
                 <span className={styles.statK}>Median wait to hear back</span>
-                <span className={styles.statV} style={{ color: waitColor }}>{proof.avg_wait_days} days</span>
+                <span className={styles.statV} style={{ color: waitColor }}>{waitAnim} days</span>
               </div>
               <div className={styles.stat}>
                 <span className={styles.statK}>Wasted-effort risk</span>
-                <span className={styles.statV} style={{ color: wasteColor }}>{proof.waste}%</span>
+                <span className={styles.statV} style={{ color: wasteColor }}>{wasteAnim}%</span>
               </div>
             </div>
           </div>

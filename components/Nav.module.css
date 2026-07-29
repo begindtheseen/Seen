@@ -43,7 +43,8 @@
   color: #fff;
   font-weight: 600;
 }
-/* Gradient underline for the active destination — mirrors the mockup's hairline accent. */
+/* Gradient underline for the active destination — mirrors the mockup's hairline accent.
+   Draws itself in from the left on route change (a small "alive" cue). */
 .linkActive::after {
   content: "";
   position: absolute;
@@ -53,6 +54,15 @@
   height: 2px;
   border-radius: 2px;
   background: linear-gradient(90deg, var(--indigo), var(--blue));
+  transform-origin: left center;
+  animation: navUnderlineIn 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+}
+@keyframes navUnderlineIn {
+  from { transform: scaleX(0); opacity: 0.4; }
+  to   { transform: scaleX(1); opacity: 1; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .linkActive::after { animation: none; }
 }
 
 .chevron {
