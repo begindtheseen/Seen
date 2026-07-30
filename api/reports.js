@@ -1655,6 +1655,11 @@ async function handleCompanyScore(req, res, body) {
   }
 
   if (!apiRes.ok) {
+    // ALWAYS log the upstream status — a silent `!ok` here cost a 27-day outage window
+    // (dead ANTHROPIC_KEY since ~2026-07-03) that had to be diagnosed from black-box 502s.
+    let errBody = '';
+    try { errBody = (await apiRes.text()).slice(0, 300); } catch(_) {}
+    console.error(`Anthropic research failed: HTTP ${apiRes.status} for "${name}" — ${errBody}`);
     if ((apiRes.status === 429 || apiRes.status === 529 || apiRes.status >= 500) && SUPABASE_URL && SUPABASE_SERVICE_KEY) {
       try {
         const nameEnc = encodeURIComponent(name.toLowerCase().trim());
@@ -1662,7 +1667,15 @@ async function handleCompanyScore(req, res, body) {
         if (staleRes.ok) { const staleRows = await staleRes.json(); if (staleRows?.[0]) return res.json({ ok: true, score: _rowToScore(staleRows[0]), _src: 'stale-cache' }); }
       } catch(_) {}
     }
-    return res.status(502).json({ error: 'Score service temporarily unavailable', retry_after: '60' });
+    // Transient upstream trouble (rate limit / overload / 5xx) with no stale cache: an
+    // honest retry hint. The CLIENT-CAUSED failures (401 bad key, 400, 403 billing) are
+    // NOT transient — the product is designed to work fully Anthropic-less, so degrade to
+    // the same honest "no reports yet" state the flag-off path serves instead of 502ing
+    // every new-company page until someone fixes the key.
+    if (apiRes.status === 429 || apiRes.status === 529 || apiRes.status >= 500) {
+      return res.status(502).json({ error: 'Score service temporarily unavailable', retry_after: '60' });
+    }
+    return res.json({ ok: true, no_data: true, score: null, degraded: 'research_unavailable', message: `No applicant reports yet for "${name}". Be the first to report your experience.` });
   }
 
   const data = await apiRes.json();
