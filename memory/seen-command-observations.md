@@ -1,7 +1,7 @@
 ---
 title: Seen Command Observations
 tags: [knowledge]
-updated: 2026-07-23
+updated: 2026-07-31
 facts:
   - id: seen-users-total
     subject: Seen
@@ -778,10 +778,20 @@ facts:
     predicate: active_jobs
     object: 11559
     valid_from: 2026-07-23
-    valid_to: null
+    valid_to: 2026-07-31
     confidence: high
     source: engine/run.mjs (board meeting)
     recorded: 2026-07-23
+    invalidated: 2026-07-31
+  - id: seen-active-jobs-20260731-78
+    subject: Seen
+    predicate: active_jobs
+    object: 10919
+    valid_from: 2026-07-31
+    valid_to: null
+    confidence: high
+    source: engine/run.mjs (board meeting)
+    recorded: 2026-07-31
     invalidated: null
 ---
 
