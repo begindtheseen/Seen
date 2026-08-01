@@ -9,8 +9,15 @@ async function generateReport() {
   const now = moment();
   const weekLabel = `week of ${now.format('MMM D, YYYY')}`;
   
-  // Placeholder for actual report generation logic
+  // Fetch and process data for the report
+  const ghostedApps = await db(`applications?status=eq.ghosted&updated_at=gte.${monthISO}&select=id,company_name,role,city,stage,updated_at&order=updated_at.desc&limit=100`);
+  const hiredApps = await db(`applications?status=eq.hired&updated_at=gte.${monthISO}&select=id,company_name,role,city,updated_at&order=updated_at.desc&limit=100`);
+
   console.log(`Generating weekly progress report for ${weekLabel}`);
+  console.log('Ghosted Applications:', ghostedApps);
+  console.log('Hired Applications:', hiredApps);
+
+  // Send email or save to file (future enhancement)
 }
 
 generateReport().catch(err => {

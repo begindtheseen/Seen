@@ -317,11 +317,30 @@ async function _handler(req, res) {
     const outcomeMap = { ghosted: 0, rejected: 0, interview: 0, offer: 0, waiting: 0 };
     reportsMonth.forEach(r => {
       const o = r.outcome;
-      if (o === 'ghosted') outcomeMap.ghosted++;
-      else if (o === 'rejected' || o === 'autoreject') outcomeMap.rejected++;
-      else if (o === 'interview' || o === 'human') outcomeMap.interview++;
-      else if (o === 'offer' || o === 'hired') outcomeMap.offer++;
-      else outcomeMap.waiting++;
+      switch (o) {
+        case 'ghosted':
+          outcomeMap.ghosted++;
+          console.log(`Ghosted application: ${r.id} - Company: ${r.company_name}, Role: ${r.role}`);
+          break;
+        case 'rejected':
+        case 'autoreject':
+          outcomeMap.rejected++;
+          console.log(`Rejected application: ${r.id} - Company: ${r.company_name}, Role: ${r.role}`);
+          break;
+        case 'interview':
+        case 'human':
+          outcomeMap.interview++;
+          console.log(`Interview stage application: ${r.id} - Company: ${r.company_name}, Role: ${r.role}`);
+          break;
+        case 'offer':
+        case 'hired':
+          outcomeMap.offer++;
+          console.log(`Offer/Hired application: ${r.id} - Company: ${r.company_name}, Role: ${r.role}`);
+          break;
+        default:
+          outcomeMap.waiting++;
+          console.log(`Waiting stage application: ${r.id} - Company: ${r.company_name}, Role: ${r.role}`);
+      }
     });
 
     // Most researched companies (7d) from search_logs
@@ -720,11 +739,13 @@ async function _handler(req, res) {
     const enc = encodeURIComponent(String(name).toLowerCase().trim());
     const real = await db(`reports?company_name=ilike.${enc}&needs_review=not.is.true&select=id&limit=1`).then(jsonOrEmpty);
     if (Array.isArray(real) && real.length > 0) {
-      await recomputeCompanyScoreFromReports(SB, svcHdrs, name);
+    console.log(`Recomputing company score for ${name}`);
+    await recomputeCompanyScoreFromReports(SB, svcHdrs, name);
     } else {
-      await db(`company_scores?company_name=eq.${enc}`, { method: 'DELETE', headers: { Prefer: 'return=minimal' } }).catch(() => {});
+    console.log(`Deleting company score for ${name}`);
+    await db(`company_scores?company_name=eq.${enc}`, { method: 'DELETE', headers: { Prefer: 'return=minimal' } }).catch(() => {});
     }
-  }
+    }
 
   // Reverse ONE logged merge from its snapshot. Reusable by both undo_merge (by id) and
   // resplit_company (by name). Tolerant of partial/seeded logs that lack a secondary_row snapshot
@@ -1470,18 +1491,23 @@ async function generateWeeklyProgressReport() {
     } else if (metric === 'ghosted_30d') {
       const r = await db(`applications?status=eq.ghosted&updated_at=gte.${monthISO}&select=id,company_name,role,city,stage,updated_at&order=updated_at.desc&limit=100`);
       rows = await r.json();
+      console.log(`Fetched 30-day ghosted applications for ${name}`);
     } else if (metric === 'hired_30d') {
       const r = await db(`applications?status=eq.hired&updated_at=gte.${monthISO}&select=id,company_name,role,city,updated_at&order=updated_at.desc&limit=100`);
       rows = await r.json();
+      console.log(`Fetched 30-day hired applications for ${name}`);
     } else if (metric === 'co_lookups') {
       const r = await db(`search_logs?created_at=gte.${todayISO}&select=query,created_at&order=created_at.desc&limit=100`);
       rows = await r.json();
+      console.log(`Fetched today's company lookups for ${name}`);
     } else if (metric === 'jobs_total') {
       const r = await db('jobs?select=company,title,city,availability_status,source,created_at&order=created_at.desc&limit=100');
       rows = await r.json();
+      console.log(`Fetched total jobs for ${name}`);
     } else if (metric === 'jobs_active') {
       const r = await db('jobs?availability_status=eq.active&select=company,title,city,source,last_seen_at&order=last_seen_at.desc&limit=100');
       rows = await r.json();
+      console.log(`Fetched active jobs for ${name}`);
     } else if (metric === 'jobs_today') {
       const r = await db(`jobs?created_at=gte.${todayISO}&select=company,title,city,source,created_at&order=created_at.desc&limit=100`);
       rows = await r.json();
