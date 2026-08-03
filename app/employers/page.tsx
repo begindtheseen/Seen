@@ -38,6 +38,7 @@ export default function EmployersPage() {
             <span style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', color: 'var(--dim)', textTransform: 'uppercase', letterSpacing: '.12em' }}>for employers</span>
           </Link>
           <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+            <Link href="/employers/dashboard" style={{ fontFamily: 'var(--mono)', fontSize: '.62rem', color: 'var(--sub)', textDecoration: 'none' }}>Dashboard</Link>
             <a href="#promote" style={{ fontFamily: 'var(--mono)', fontSize: '.62rem', color: 'var(--sub)', textDecoration: 'none' }}>Pricing</a>
             <Link href="/jobs" style={{ fontFamily: 'var(--mono)', fontSize: '.6rem', color: 'var(--dim)', textDecoration: 'none' }}>Looking for a job? →</Link>
           </div>
@@ -68,9 +69,13 @@ export default function EmployersPage() {
             links (dashboard / analytics / notifications) carry it through as ?company= (#113). */}
         <EmployerCompanyProvider>
           {/* Claim your company (ADMIN-APPROVED CLAIMS, migration 053): a signed-in employer
-              requests a company; an admin approves; only then do the surfaces below auto-scope.
-              Renders a quiet sign-in prompt for logged-out/seeker visitors. */}
-          <EmployerClaimPanel />
+              requests a company; a matching work-email domain auto-approves instantly, otherwise an
+              admin approves; only then do the surfaces below auto-scope. Renders a quiet sign-in
+              prompt for logged-out/seeker visitors. The #claim anchor is the dashboard checklist's
+              "Claim your company" target. */}
+          <div id="claim" style={{ scrollMarginTop: 80 }}>
+            <EmployerClaimPanel />
+          </div>
 
           {/* Anchor feature: your reputation the way candidates see it */}
           <EmployerReputation />

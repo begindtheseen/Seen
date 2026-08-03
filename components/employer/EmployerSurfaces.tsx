@@ -16,16 +16,24 @@ import { useEmployerCompany } from './EmployerCompanyContext'
 
 const mono = (size: string, color: string): React.CSSProperties => ({ fontFamily: 'var(--mono)', fontSize: size, color })
 
-const SURFACES: { href: string; emoji: string; title: string; desc: string }[] = [
-  { href: '/employers/dashboard', emoji: '▦', title: 'Your dashboard', desc: 'Every live posting Seen has indexed for you, next to the real outcomes candidates reported after applying.' },
-  { href: '/employers/analytics', emoji: '📈', title: 'Posting analytics', desc: 'Where your applicants come from, application volume over time, and your response and ghost rates by role.' },
-  { href: '/employers/notifications', emoji: '🔔', title: 'Posting updates', desc: 'New applicants and postings about to go stale or expire — computed live the moment you open it.' },
+// All three point at the ONE unified hub (/employers/dashboard), each deep-linking to its tab —
+// no more redirect hop through the retired standalone pages.
+const SURFACES: { tab?: string; emoji: string; title: string; desc: string }[] = [
+  { emoji: '▦', title: 'Your dashboard', desc: 'Every live posting Seen has indexed for you, next to the real outcomes candidates reported after applying.' },
+  { tab: 'analytics', emoji: '📈', title: 'Posting analytics', desc: 'Where your applicants come from, application volume over time, and your response and ghost rates by role.' },
+  { tab: 'updates', emoji: '🔔', title: 'Posting updates', desc: 'New applicants and postings about to go stale or expire — computed live the moment you open it.' },
 ]
 
 export function EmployerSurfaces() {
   const { company, setCompany } = useEmployerCompany()
   const q = company.trim()
-  const hrefFor = (base: string) => (q ? `${base}?company=${encodeURIComponent(q)}` : base)
+  const hrefFor = (tab?: string) => {
+    const usp = new URLSearchParams()
+    if (tab) usp.set('tab', tab)
+    if (q) usp.set('company', q)
+    const qs = usp.toString()
+    return qs ? `/employers/dashboard?${qs}` : '/employers/dashboard'
+  }
 
   return (
     <div style={{ background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 18, padding: '2rem', marginBottom: '2.5rem' }}>
@@ -48,7 +56,7 @@ export function EmployerSurfaces() {
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(220px,1fr))', gap: '1rem' }}>
         {SURFACES.map(s => (
-          <Link key={s.href} href={hrefFor(s.href)} style={{ display: 'block', background: 'var(--raised)', border: '1px solid var(--line2)', borderRadius: 14, padding: '1.3rem', textDecoration: 'none' }}>
+          <Link key={s.title} href={hrefFor(s.tab)} style={{ display: 'block', background: 'var(--raised)', border: '1px solid var(--line2)', borderRadius: 14, padding: '1.3rem', textDecoration: 'none' }}>
             <div style={{ fontSize: '1.2rem', marginBottom: '.5rem' }} aria-hidden>{s.emoji}</div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '.4rem', marginBottom: '.3rem' }}>
               <span style={{ fontFamily: 'var(--display)', fontSize: '.95rem', fontWeight: 700, color: 'var(--white)' }}>{s.title}</span>
@@ -61,8 +69,8 @@ export function EmployerSurfaces() {
 
       <p style={{ ...mono('.55rem', 'var(--muted)'), lineHeight: 1.6, margin: '1.1rem 0 0' }}>
         {q
-          ? <>Carrying <span style={{ color: 'var(--sub)' }}>{q}</span> through — each tool opens scoped to your company. No employer login needed.</>
-          : <>Enter your company above to carry it through, or open any tool and set it there. Scoped by company name — no login needed.</>}
+          ? <>Carrying <span style={{ color: 'var(--sub)' }}>{q}</span> through to your dashboard. The reputation view is public; posting, disputes, and applicant updates unlock once your company claim is approved.</>
+          : <>Enter your company above, or open the dashboard and set it there. The reputation view is public; managing listings and updates needs an approved company claim.</>}
       </p>
     </div>
   )
