@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import Link from 'next/link'
 import { getScoresByNames, slugify, grade, riskColor, riskLabel, pct, type LeaderboardRow } from '@/lib/growth'
 import { STAFFING_AGENCIES, type StaffingAgency } from '@/lib/agencies'
+import { pickActiveSponsor } from '@/lib/server/sponsorSlot'
 
 // The Staffing Agency Ghost Index: a ranked, living page of major staffing agencies by
 // ghosting/transparency signals. Server component + ISR, reading cached scores DIRECTLY from
@@ -120,11 +121,31 @@ function EmptyRow({ r }: { r: Ranked }) {
   )
 }
 
+// The single, owner-granted sponsor slot for this page (employer_perks.sponsor_until). Read directly
+// with the service key (perks are server-only), same pattern as the other server reads. Best-effort:
+// any failure just hides the slot — it never breaks the index.
+async function fetchActiveSponsor(): Promise<{ company: string; until: string } | null> {
+  const SUPABASE_URL = process.env.SUPABASE_URL
+  const SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY
+  if (!SUPABASE_URL || !SERVICE_KEY) return null
+  try {
+    const nowISO = new Date().toISOString()
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/employer_perks?sponsor_until=gt.${encodeURIComponent(nowISO)}&select=company,sponsor_until&limit=50`, {
+      headers: { apikey: SERVICE_KEY, Authorization: `Bearer ${SERVICE_KEY}` }, next: { revalidate: 3600 },
+    })
+    if (!r.ok) return null
+    return pickActiveSponsor(await r.json(), Date.now())
+  } catch {
+    return null
+  }
+}
+
 export default async function AgenciesPage() {
   // One exact-name batch read against cached scores (see honesty note in lib/agencies.ts on
   // why matching is exact, never fuzzy).
   const allAliases = STAFFING_AGENCIES.flatMap(a => a.aliases)
   const scoreMap = await getScoresByNames(allAliases)
+  const sponsor = await fetchActiveSponsor()
 
   const ranked: Ranked[] = STAFFING_AGENCIES.map(agency => {
     // Best match across aliases: prefer the row with the most applicant reports, then alias order.
@@ -187,6 +208,19 @@ export default async function AgenciesPage() {
           <Link href="/report?outcome=ghosted" className="btn" style={{ background: 'linear-gradient(135deg,var(--g-start),var(--g-mid),var(--g-end))', color: '#fff', padding: '.7rem 1.3rem', fontWeight: 800 }}>Ghosted by an agency? Report it →</Link>
           <Link href="/ghosted" className="btn btn-ghost" style={{ padding: '.7rem 1.3rem' }}>Why this index exists</Link>
         </div>
+
+        {/* Sponsor slot — LABELED advertising above the index. Never part of the ranking, never a
+            score. Renders only when the owner has granted an active sponsor (employer_perks.sponsor_until). */}
+        {sponsor && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: '.9rem', flexWrap: 'wrap', margin: '0 0 2.6rem', padding: '.9rem 1.1rem', background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 12 }}>
+            <span style={{ fontFamily: 'var(--mono)', fontSize: '.5rem', textTransform: 'uppercase', letterSpacing: '.16em', color: 'var(--muted)', border: '1px solid var(--line2)', borderRadius: 5, padding: '.15rem .4rem', flexShrink: 0 }}>Sponsored</span>
+            <div style={{ minWidth: 0, flex: 1 }}>
+              <div style={{ fontFamily: 'var(--display)', fontSize: '.92rem', fontWeight: 700, color: 'var(--white)', textTransform: 'capitalize' }}>{sponsor.company}</div>
+              <div style={{ fontFamily: 'var(--mono)', fontSize: '.56rem', color: 'var(--sub)', marginTop: '.1rem' }}>Sponsors the Staffing Agency Ghost Index · placement only, never part of the ranking</div>
+            </div>
+            <Link href={`/company/${slugify(sponsor.company)}`} className="btn btn-ghost" style={{ padding: '.5rem 1rem', flexShrink: 0 }}>View their record →</Link>
+          </div>
+        )}
 
         {reported.length > 0 && (
           <section style={{ marginBottom: '2.4rem' }}>

@@ -82,6 +82,10 @@
       "schedule": "0 15 * * *"
     },
     {
+      "path": "/api/employer-renewals",
+      "schedule": "0 16 * * *"
+    },
+    {
       "path": "/api/refresh-jobs",
       "schedule": "0 2 * * *"
     },

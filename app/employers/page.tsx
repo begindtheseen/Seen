@@ -39,6 +39,7 @@ export default function EmployersPage() {
           </Link>
           <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
             <Link href="/employers/dashboard" style={{ fontFamily: 'var(--mono)', fontSize: '.62rem', color: 'var(--sub)', textDecoration: 'none' }}>Dashboard</Link>
+            <Link href="/employers/verified" style={{ fontFamily: 'var(--mono)', fontSize: '.62rem', color: 'var(--sub)', textDecoration: 'none' }}>Verified</Link>
             <a href="#promote" style={{ fontFamily: 'var(--mono)', fontSize: '.62rem', color: 'var(--sub)', textDecoration: 'none' }}>Pricing</a>
             <Link href="/jobs" style={{ fontFamily: 'var(--mono)', fontSize: '.6rem', color: 'var(--dim)', textDecoration: 'none' }}>Looking for a job? →</Link>
           </div>

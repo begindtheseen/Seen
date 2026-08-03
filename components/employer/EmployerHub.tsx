@@ -27,6 +27,7 @@ import { EmployerAnalyticsView } from '@/components/employer/EmployerAnalyticsVi
 import { EmployerLiveNotifications } from '@/components/employer/EmployerLiveNotifications'
 import EmployerActivationChecklist from '@/components/employer/EmployerActivationChecklist'
 import { EmployerReplyManager } from '@/components/employer/EmployerReplyManager'
+import { EmployerPerkBanner } from '@/components/employer/EmployerPerkBanner'
 
 type Score = {
   overall_score: number | null
@@ -253,6 +254,9 @@ export function EmployerHub() {
         {ready && claimsReady && isEmployer && !employerCompany && !godview && (
           <EmployerActivationChecklist />
         )}
+
+        {/* Renewal nudge — a scoped employer whose Featured/Verified is lapsing gets a re-buy CTA. */}
+        {scoped && <EmployerPerkBanner />}
 
         {/* Scope chip (logged-in) OR public lookup (visitor / god-view) */}
         {scoped ? (
