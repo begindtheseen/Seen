@@ -486,6 +486,9 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
   const [tab, setTab] = useState<TabKey>('overview')
   const [location, setLocation] = useState('')
   const [webReviews, setWebReviews] = useState<WebReview[]>([])
+  // Approved employer replies to reports, keyed by report id (Wave 2). Display-only employer voice,
+  // never a score input — clearly labeled as the employer's claim.
+  const [employerReplies, setEmployerReplies] = useState<Record<string, { body: string; created_at: string }>>({})
   const [viewers, setViewers] = useState(0)
   const [perk, setPerk] = useState<{ featured: boolean; verified: boolean }>({ featured: false, verified: false })
   useEffect(() => {
@@ -562,6 +565,15 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
           const rJson = await rRes.json() as { reports?: Report[]; ok?: boolean }
           if (rJson.reports) setReports(rJson.reports)
         }
+
+        // Approved employer replies for this company, keyed by report id (best-effort, public).
+        try {
+          const repRes = await fetch(`/api/employer-replies?company=${encodeURIComponent(companyName)}`)
+          if (repRes.ok) {
+            const repJson = await repRes.json() as { replies?: Record<string, { body: string; created_at: string }> }
+            if (repJson.replies) setEmployerReplies(repJson.replies)
+          }
+        } catch { /* replies are additive — a failure just hides them */ }
 
         // Fetch score from company-score endpoint
         const sRes = await fetch('/api/reports', {
@@ -1041,6 +1053,15 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
                         </div>
                         {r.report_text && (
                           <div className="rc-body">{r.report_text}</div>
+                        )}
+                        {r.id && employerReplies[r.id] && (
+                          <div style={{ marginTop: '.7rem', padding: '.7rem .85rem', background: 'rgba(59,130,246,.06)', border: '1px solid rgba(59,130,246,.25)', borderRadius: 10 }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '.4rem', marginBottom: '.3rem' }}>
+                              <span style={{ fontFamily: 'var(--mono)', fontSize: '.5rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.08em', color: 'var(--blue)' }}>Employer response</span>
+                              <span style={{ fontFamily: 'var(--mono)', fontSize: '.5rem', color: 'var(--muted)' }}>· unverified claim, doesn&apos;t affect the score</span>
+                            </div>
+                            <div style={{ fontSize: '.78rem', color: 'var(--sub)', lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>{employerReplies[r.id]!.body}</div>
+                          </div>
                         )}
                         <div className="rc-footer">
                           <span style={{ fontFamily: 'var(--mono)', fontSize: '.56rem', color: 'var(--muted)' }}>via</span>

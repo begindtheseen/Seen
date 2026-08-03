@@ -9,6 +9,7 @@
 
 import { resolveEmployerUid, resolveApprovedClaim } from '../lib/server/employerAuth.js';
 import { fetchEmployerAnalytics } from '../lib/server/employerAnalytics.js';
+import { shapeApplyActivity } from '../lib/server/employerActivity.js';
 
 const ALLOWED = ['https://seenjobs.io', 'https://www.seenjobs.io'];
 
@@ -42,7 +43,20 @@ export default async function handler(req, res) {
     if (!claim) return res.status(403).json({ error: 'Your company claim must be approved first', reason: 'no_approved_claim' });
 
     const result = await fetchEmployerAnalytics(claim.companyName);
-    return res.status(200).json({ ok: true, company: claim.companyName, ...result });
+
+    // Applicant activity — the observable apply-click signal (migration 058), aggregate + no PII.
+    // company_key-scoped, cap the window generously; the pure shaper does the 7/30-day + per-role cut.
+    let activity = null;
+    try {
+      const evRes = await db(
+        `apply_events?company_key=eq.${encodeURIComponent(claim.companyKey)}` +
+        `&select=role,city,created_at,job_id&order=created_at.desc&limit=1000`,
+      );
+      const events = evRes.ok ? await evRes.json() : [];
+      activity = shapeApplyActivity(events, Date.now());
+    } catch { /* fail soft — analytics still returns the reports-derived view */ }
+
+    return res.status(200).json({ ok: true, company: claim.companyName, activity, ...result });
   } catch (e) {
     console.error('[employer-analytics] Unhandled error:', e?.message || e);
     return res.status(500).json({ error: 'Internal server error' });

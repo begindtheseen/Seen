@@ -18,7 +18,9 @@ import { NextResponse } from 'next/server'
 
 export const dynamic = 'force-dynamic'
 
-const PUBLIC_COLS = 'role,outcome,created_at,experience_level'
+// id + report_text are public (both render on the company page) — id lets the employer reply to a
+// specific report, report_text gives them the context they're responding to.
+const PUBLIC_COLS = 'id,role,outcome,created_at,experience_level,report_text'
 
 export async function GET(req: Request) {
   const raw = (new URL(req.url).searchParams.get('company') || '').trim()
@@ -45,10 +47,12 @@ export async function GET(req: Request) {
     if (!r.ok) return NextResponse.json({ reports: [] })
     const rows = await r.json()
     const reports = (Array.isArray(rows) ? rows : []).map((row: Record<string, unknown>) => ({
+      id: row.id == null ? null : String(row.id),
       role: typeof row.role === 'string' ? row.role : null,
       outcome: typeof row.outcome === 'string' ? row.outcome : null,
       created_at: typeof row.created_at === 'string' ? row.created_at : null,
       experience_level: typeof row.experience_level === 'string' ? row.experience_level : null,
+      report_text: typeof row.report_text === 'string' ? row.report_text : null,
     }))
     // Public aggregate data — cache at the edge like the company_score path does.
     return NextResponse.json(

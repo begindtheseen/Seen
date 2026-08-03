@@ -10,6 +10,7 @@ import { GhostReportPanel } from './GhostReportPanel'
 import { LiveBell } from './LiveBell'
 import { EmployerPanel } from './EmployerPanel'
 import { EmployerClaimsPanel } from './EmployerClaimsPanel'
+import { EmployerRepliesPanel } from './EmployerRepliesPanel'
 import { useAdminLive } from '@/lib/hooks/useAdminLive'
 
 // The authenticated dashboard body. Owns local UI state (open modals, merge prefill,
@@ -408,6 +409,9 @@ export function AdminShell({ stats, token, reload, onLogout, onUnauthorized }: {
 
           {/* Employer → company claims: approve/reject + admin god-view (migration 053) */}
           <EmployerClaimsPanel token={token} />
+
+          {/* Employer replies to reports: moderate before they go public (migration 060) */}
+          <EmployerRepliesPanel token={token} />
 
           <EmployerPanel token={token} />
           </div>
