@@ -14,6 +14,7 @@ import { isDisputeStatus, isDisputeReviewStatus, disputeStatusCounts, orderDispu
 import { isDisputeDecision, resolveDisputeEffect, disputeStatusCounts as listingDisputeCounts, orderDisputesOpenFirst as orderListingDisputes, buildListingTickets } from '../lib/server/listingDisputes.js';
 import { buildNotificationRow } from '../lib/server/employerNotificationsStore.js';
 import { normalizeClaimCompany } from '../lib/server/employerClaims.js';
+import { EMPLOYER_SKUS } from '../lib/server/employerSkus.js';
 
 const ALLOWED = ['https://seenjobs.io', 'https://www.seenjobs.io'];
 
@@ -564,9 +565,12 @@ async function _handler(req, res) {
     if (!purchase) return res.status(404).json({ error: 'Purchase not found' });
     const company = String(purchase.company || '').trim().toLowerCase();
     if (!company) return res.status(400).json({ error: 'Purchase has no company to attach the perk to' });
-    const isVerified = purchase.employer_sku === 'verified90';
-    const days = isVerified ? 90 : 30;
-    const col = isVerified ? 'verified_until' : 'featured_until';
+    // Map the SKU's kind → the perk column it grants (featured/verified/sponsor), from the single
+    // source of truth. Unknown SKUs fall back to featured (reach-only) so a grant never errors.
+    const def = EMPLOYER_SKUS[purchase.employer_sku] || null;
+    const kind = def?.kind || 'featured';
+    const days = def?.days || 30;
+    const col = kind === 'verified' ? 'verified_until' : kind === 'sponsor' ? 'sponsor_until' : 'featured_until';
     const until = new Date(Date.now() + days * 86400e3).toISOString();
     const up = await db('employer_perks?on_conflict=company', {
       method: 'POST', headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },

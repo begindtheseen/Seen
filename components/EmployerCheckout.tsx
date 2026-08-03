@@ -8,7 +8,7 @@ import { EMPLOYER_SKUS } from '@/lib/server/employerSkus'
 export function EmployerPurchaseConfirm() {
   const [state, setState] = useState<'idle' | 'ok' | 'pending'>('idle')
   const [name, setName] = useState('')
-  const [kind, setKind] = useState<'featured' | 'verified' | ''>('')
+  const [kind, setKind] = useState<'featured' | 'verified' | 'sponsor' | ''>('')
   useEffect(() => {
     const p = new URLSearchParams(window.location.search)
     const sku = p.get('purchased')
@@ -16,7 +16,7 @@ export function EmployerPurchaseConfirm() {
     if (!sku || !sid) return
     const def = EMPLOYER_SKUS[sku as keyof typeof EMPLOYER_SKUS]
     setName(def?.name || 'your purchase')
-    setKind((def?.kind as 'featured' | 'verified') || '')
+    setKind((def?.kind as 'featured' | 'verified' | 'sponsor') || '')
     setState('pending')
     fetch('/api/stripe?action=employer_confirm', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -27,7 +27,9 @@ export function EmployerPurchaseConfirm() {
   // Featured is applied automatically on payment (reach-only); Verified is reviewed by hand.
   const okCopy = kind === 'featured'
     ? 'Payment received and your featured placement is live now — your roles rise to the top of matching searches for the next 30 days. Receipt emailed.'
-    : "We've got your payment and emailed a receipt. Transparency Verified is reviewed by our team against your real outcome data — we'll set it up and follow up at the email you used, usually within one business day."
+    : kind === 'sponsor'
+      ? "We've got your payment and emailed a receipt. The Ghost Index sponsor slot is a single, exclusive placement — our team sets it up (so it's never oversold) and follows up at the email you used, usually within one business day."
+      : "We've got your payment and emailed a receipt. Transparency Verified is reviewed by our team against your real outcome data — we'll set it up and follow up at the email you used, usually within one business day."
   return (
     <div style={{ background: 'linear-gradient(135deg,rgba(16,185,129,.12),rgba(16,185,129,.03))', border: '1px solid rgba(16,185,129,.35)', borderRadius: 14, padding: '1.25rem 1.5rem', marginBottom: '2rem', textAlign: 'center' }}>
       <div style={{ fontFamily: 'var(--display)', fontSize: '1.05rem', fontWeight: 800, color: 'var(--white)', marginBottom: '.3rem' }}>
@@ -49,6 +51,7 @@ type SkuKey = keyof typeof EMPLOYER_SKUS
 const PRODUCTS: { sku: SkuKey; tagline: string; points: string[] }[] = [
   { sku: 'featured30', tagline: 'Get seen first', points: ['30 days of priority placement for all your live roles', 'Shown above standard results in matching searches', 'Live within minutes of payment — reach only, never a score'] },
   { sku: 'verified90', tagline: 'Prove you respond', points: ['90-day Transparency Verified enrollment', 'Publicly commit to responding to every applicant', 'Reviewed against real outcome data — money never buys a score'] },
+  { sku: 'sponsor30', tagline: 'Own the niche', points: ['30-day exclusive sponsor slot atop the Staffing Agency Ghost Index', 'High-intent audience actively vetting who to trust', 'Labeled advertising — never part of the ranking or any score'] },
 ]
 
 export function EmployerCheckout() {
