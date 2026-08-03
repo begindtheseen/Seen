@@ -60,9 +60,10 @@ function LoginContent() {
   const [focused, setFocused] = useState<string | null>(null)
 
   useEffect(() => {
-    // Already signed in and hitting /login → bounce out. Employers go to the portal (the
-    // /dashboard guard is the fallback if the profile hasn't resolved yet); seekers to returnTo.
-    if (isLoggedIn) router.replace(isEmployer ? '/employers' : returnTo)
+    // Already signed in and hitting /login → bounce out. Employers land directly on their
+    // dashboard (it shows the claim/activation checklist when they haven't claimed yet); seekers
+    // resume returnTo.
+    if (isLoggedIn) router.replace(isEmployer ? '/employers/dashboard' : returnTo)
   }, [isLoggedIn, isEmployer, router, returnTo])
 
   function clearError() { setError('') }
@@ -86,9 +87,10 @@ function LoginContent() {
     // Route the EMAIL-CONFIRMATION link to the right place. Without emailRedirectTo, Supabase sends
     // the verify link to the project Site URL (the seeker homepage) — so a new employer who confirms
     // via the email link landed on the job-seeker front page instead of their portal. Employers →
-    // /employers (where they claim their company); seekers keep the homepage. Path redirects on this
-    // origin are already allow-listed (the password-reset flow uses ${origin}/reset).
-    const verifyDest = effectiveType === 'employer' ? '/employers' : '/'
+    // their dashboard (which walks them through claiming + posting via the activation checklist);
+    // seekers keep the homepage. Path redirects on this origin are already allow-listed (the
+    // password-reset flow uses ${origin}/reset).
+    const verifyDest = effectiveType === 'employer' ? '/employers/dashboard' : '/'
     const { error: err } = await supabase.auth.signUp({
       email,
       password,
@@ -106,9 +108,10 @@ function LoginContent() {
     setLoading(false)
     if (err || !data.user) { setError('Not verified yet. Check your email.'); return }
     if (!data.user.email_confirmed_at) { setError('Still waiting on verification. Check your inbox.'); return }
-    // Fresh employer signups land on the portal; seekers resume returnTo. (The kill switch forces
-    // seeker in createAccount, so signupType is only 'employer' here when employer signup is open.)
-    router.replace(EMPLOYER_SIGNUP_ENABLED && signupType === 'employer' ? '/employers' : returnTo)
+    // Fresh employer signups land on their dashboard (activation checklist guides them to claim +
+    // post); seekers resume returnTo. (The kill switch forces seeker in createAccount, so signupType
+    // is only 'employer' here when employer signup is open.)
+    router.replace(EMPLOYER_SIGNUP_ENABLED && signupType === 'employer' ? '/employers/dashboard' : returnTo)
   }
 
   async function resendVerification() {
@@ -124,12 +127,12 @@ function LoginContent() {
     const { data, error: err } = await supabase.auth.signInWithPassword({ email, password })
     setLoading(false)
     if (err) { setError('Incorrect email or password.'); return }
-    // Route employers to their portal. Employer-ness comes from the account's own signup metadata;
-    // the /dashboard guard is the safety net for any older account whose metadata predates this.
-    // Sign-in is NOT gated by the kill switch — existing employers must still get in when closed.
+    // Route employers straight to their dashboard. Employer-ness comes from the account's own signup
+    // metadata; the /dashboard guard is the safety net for any older account whose metadata predates
+    // this. Sign-in is NOT gated by the kill switch — existing employers must still get in when closed.
     const m = (data.user?.user_metadata || {}) as Record<string, unknown>
     const isEmp = m.account_type === 'employer' || m.role_type === 'employer' || m.type === 'employer'
-    router.replace(isEmp ? '/employers' : returnTo)
+    router.replace(isEmp ? '/employers/dashboard' : returnTo)
   }
 
   const btnStyle: React.CSSProperties = {
@@ -160,7 +163,7 @@ function LoginContent() {
   // leaving only the seeker path (and the grid collapses to a single column).
   const roleTiles = ([
     { type: 'seeker' as const, emoji: '🎯', label: 'Job Seeker', desc: 'Find real jobs, track applications, avoid getting ghosted' },
-    { type: 'employer' as const, emoji: '🏢', label: 'Employer', desc: 'Manage your score, respond to reports, post listings' },
+    { type: 'employer' as const, emoji: '🏢', label: 'Employer', desc: 'See your reputation, respond to applicants, post listings' },
   ]).filter(t => EMPLOYER_SIGNUP_ENABLED || t.type !== 'employer')
 
   return (

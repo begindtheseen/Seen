@@ -25,6 +25,7 @@ import { recentInteractions, summarizeInteractions } from '@/lib/server/employer
 import { EmployerListingsManager } from '@/components/employer/EmployerListingsManager'
 import { EmployerAnalyticsView } from '@/components/employer/EmployerAnalyticsView'
 import { EmployerLiveNotifications } from '@/components/employer/EmployerLiveNotifications'
+import EmployerActivationChecklist from '@/components/employer/EmployerActivationChecklist'
 
 type Score = {
   overall_score: number | null
@@ -244,6 +245,13 @@ export function EmployerHub() {
             Every live listing, applicant outcome, analytic, and update for your company — one place, four tabs, the same signals candidates see about you before they apply.
           </p>
         </div>
+
+        {/* Signed-in employer who hasn't finished claiming → the activation checklist is the primary
+            surface (not a bare "type any company" box). It self-scopes off the auth claim state and
+            disappears the moment an approved claim pins the company. */}
+        {ready && claimsReady && isEmployer && !employerCompany && !godview && (
+          <EmployerActivationChecklist />
+        )}
 
         {/* Scope chip (logged-in) OR public lookup (visitor / god-view) */}
         {scoped ? (

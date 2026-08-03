@@ -112,8 +112,8 @@ export function EmployerClaimPanel() {
         </p>
         <div style={{ display: 'flex', gap: '.6rem', flexWrap: 'wrap' }}>
           <Link href="/employers/dashboard" style={{ ...primaryBtn, display: 'inline-block', textDecoration: 'none' }}>Open your dashboard →</Link>
-          <Link href="/employers/analytics" style={{ display: 'inline-block', border: '1px solid var(--line2)', borderRadius: 9, padding: '.7rem 1.2rem', ...mono('.7rem', 'var(--white)'), textDecoration: 'none' }}>Analytics</Link>
-          <Link href="/employers/notifications" style={{ display: 'inline-block', border: '1px solid var(--line2)', borderRadius: 9, padding: '.7rem 1.2rem', ...mono('.7rem', 'var(--white)'), textDecoration: 'none' }}>Updates</Link>
+          <Link href="/employers/dashboard?tab=analytics" style={{ display: 'inline-block', border: '1px solid var(--line2)', borderRadius: 9, padding: '.7rem 1.2rem', ...mono('.7rem', 'var(--white)'), textDecoration: 'none' }}>Analytics</Link>
+          <Link href="/employers/dashboard?tab=updates" style={{ display: 'inline-block', border: '1px solid var(--line2)', borderRadius: 9, padding: '.7rem 1.2rem', ...mono('.7rem', 'var(--white)'), textDecoration: 'none' }}>Updates</Link>
         </div>
       </div>
     )
@@ -175,7 +175,8 @@ export function EmployerClaimPanel() {
       </div>
       {err && <div style={{ ...mono('.62rem', 'var(--red)'), marginTop: '.7rem' }}>{err}</div>}
       <p style={{ ...mono('.55rem', 'var(--muted)'), lineHeight: 1.6, margin: '1rem 0 0' }}>
-        Requesting sends your claim to an admin for review. You&apos;ll see the status here.
+        Signed up with your work email? If its domain matches the company, your claim is approved
+        instantly. Otherwise it goes to an admin for a quick review — you&apos;ll see the status here.
       </p>
     </div>
   )
