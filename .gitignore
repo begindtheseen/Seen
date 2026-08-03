@@ -6,3 +6,9 @@ node_modules/
 .next/
 tsconfig.tsbuildinfo
 next-env.d.ts
+
+# Chronos brain vault — a LOCAL working copy of the ONLINE brain (Supabase is the source of truth;
+# `npm run brain:restore` rebuilds it). Never track it: it churns every board meeting. Tracking it on
+# the feat/chronos-cloud-bridge branch is what dragged the whole vault into an unrelated 2-file PR
+# (#243; fixed in seen-command #139). main has never tracked it — this keeps it that way.
+memory/
