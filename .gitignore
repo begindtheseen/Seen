@@ -15,3 +15,9 @@ tsconfig.tsbuildinfo
 memory/.graph/
 memory/graph/.env
 !memory/graph/.env.example
+
+# Chronos brain vault — a LOCAL working copy of the ONLINE brain (Supabase is the source of
+# truth; `npm run brain:restore` rebuilds it). Untracked: it churns every board meeting, and
+# tracking it is what let the builder drag the whole vault into an unrelated PR (#243). No app
+# code reads memory/ at build/runtime.
+memory/
