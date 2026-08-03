@@ -581,6 +581,46 @@ async function _handler(req, res) {
     return res.status(200).json({ ok: true, company, perk: col, until });
   }
 
+  // ── EMPLOYER REPLIES — moderation queue (Wave 2) ──────────────────────────────
+  // Employer replies to outcome reports land 'pending' (migration 060) and are invisible to seekers
+  // until approved here. Display-only content — never a score input. Any admin session may moderate.
+  if (action === 'list_employer_replies') {
+    const status = String(body.status || '').trim();
+    const filt = ['pending', 'approved', 'rejected'].includes(status) ? `&status=eq.${status}` : '';
+    const rr = await db(`employer_report_replies?select=id,report_id,company_key,body,status,created_at,reviewed_at,reviewed_by${filt}&order=created_at.desc&limit=200`);
+    const replies = rr.ok ? await rr.json() : [];
+    // Attach the report each reply answers, so the admin can judge it in context.
+    const ids = [...new Set(replies.map(x => x.report_id).filter(Boolean))].slice(0, 200);
+    const ctx = {};
+    if (ids.length) {
+      const cr = await db(`reports?id=in.(${ids.map(encodeURIComponent).join(',')})&select=id,role,outcome,report_text,company_name`);
+      const rows = cr.ok ? await cr.json() : [];
+      for (const row of rows) ctx[row.id] = { role: row.role, outcome: row.outcome, report_text: row.report_text, company_name: row.company_name };
+    }
+    const rank = { pending: 0, approved: 1, rejected: 2 };
+    const withCtx = replies
+      .map(x => ({ ...x, report: ctx[x.report_id] || null }))
+      .sort((a, b) => (rank[a.status] - rank[b.status]) || (Date.parse(b.created_at) || 0) - (Date.parse(a.created_at) || 0));
+    const counts = { pending: 0, approved: 0, rejected: 0 };
+    for (const x of replies) if (counts[x.status] != null) counts[x.status]++;
+    return res.status(200).json({ ok: true, replies: withCtx, counts });
+  }
+
+  if (action === 'moderate_employer_reply') {
+    const { reply_id, decision } = body;
+    if (!reply_id || !['approve', 'reject'].includes(decision)) return res.status(400).json({ error: 'reply_id and decision (approve|reject) required' });
+    const status = decision === 'approve' ? 'approved' : 'rejected';
+    const nowIso = new Date().toISOString();
+    const up = await db(`employer_report_replies?id=eq.${encodeURIComponent(reply_id)}`, {
+      method: 'PATCH', headers: { Prefer: 'return=representation' },
+      body: JSON.stringify({ status, reviewed_by: sess.username || 'admin', reviewed_at: nowIso, updated_at: nowIso }),
+    });
+    if (!up.ok) return res.status(500).json({ error: 'Could not update the reply' });
+    const updated = (await up.json())[0] || null;
+    await db('admin_audit_log', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ admin_id: sess.admin_id, username: sess.username || 'admin', action: 'moderate_employer_reply', target_type: 'employer_reply', target_id: String(reply_id), metadata: { decision, company_key: updated?.company_key || null } }) });
+    return res.status(200).json({ ok: true, reply: updated });
+  }
+
   // ── EXPORT CSV — downloadable snapshot for conversion analysis ────────────────
   // Returns { csv, filename }; the admin UI turns it into a file download. Includes a
   // summary block + a 30-day daily time series (signups, reports, outcome-card shares).

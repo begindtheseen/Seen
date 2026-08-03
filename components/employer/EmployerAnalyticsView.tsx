@@ -53,12 +53,18 @@ type Analytics = {
   roleCount: number
 }
 
+// Applicant apply-click activity (Wave 2) — the observable apply signal, aggregate + no PII.
+type ActivityRole = { role: string; count: number; count7: number; last: string | null }
+type ActivityRecent = { role: string | null; city: string | null; created_at: string | null }
+type ActivityShape = { total: number; last7: number; last30: number; byRole: ActivityRole[]; recent: ActivityRecent[]; activeRoles: number }
+
 type Loaded = {
   ok: true
   company: string
   industry: string | null
   verified: boolean
   analytics: Analytics
+  activity?: ActivityShape | null
 }
 
 const mono = (size: string, color: string): React.CSSProperties => ({ fontFamily: 'var(--mono)', fontSize: size, color })
@@ -129,6 +135,41 @@ function CountTile({ target, render, label, color = 'var(--white)', note, reveal
       <div style={{ fontFamily: 'var(--display)', fontSize: '1.7rem', fontWeight: 800, color, lineHeight: 1 }}>{render(n, n >= target)}</div>
       <div style={{ fontFamily: 'var(--mono)', fontSize: '.55rem', color: 'var(--dim)', textTransform: 'uppercase', letterSpacing: '.08em' }}>{label}</div>
       {note ? <div style={{ fontFamily: 'var(--mono)', fontSize: '.52rem', color: 'var(--muted)' }}>{note}</div> : null}
+    </div>
+  )
+}
+
+// Applicant apply-click activity — the "did my roles get traction this week?" hook. Renders from
+// apply_events (migration 058) aggregated server-side; aggregate counts + role only, never identity.
+// Shown even when there are no outcome reports yet (apply activity exists independently).
+function ActivityCard({ activity }: { activity: ActivityShape | null | undefined }) {
+  if (!activity) return null
+  const { total, last7, last30, byRole } = activity
+  const maxRole = Math.max(...byRole.map(r => r.count), 1)
+  return (
+    <div className="emp-reveal" style={{ ...card, animationDelay: '0ms' }}>
+      <div style={kicker}>Applicant activity</div>
+      <h2 style={h2}>Apply-clicks on your listings</h2>
+      <p style={sub}>
+        How many candidates clicked apply on your roles via Seen — aggregate only, never an applicant&apos;s identity.
+        {total === 0 ? ' No apply activity yet; this fills in as candidates apply.' : ''}
+      </p>
+      <div style={{ display: 'flex', gap: '1.8rem', flexWrap: 'wrap', marginBottom: byRole.length ? '1.2rem' : 0 }}>
+        <CountTile target={last7} render={n => Math.round(n).toLocaleString()} label="last 7 days" color="var(--blue)" revealDelay={40} />
+        <CountTile target={last30} render={n => Math.round(n).toLocaleString()} label="last 30 days" revealDelay={100} />
+        <CountTile target={total} render={n => Math.round(n).toLocaleString()} label="all time" revealDelay={160} />
+      </div>
+      {byRole.length > 0 && (
+        <div style={{ display: 'grid', gap: '.6rem' }}>
+          {byRole.map((r, i) => (
+            <div key={r.role} style={{ display: 'grid', gridTemplateColumns: 'minmax(120px,1.4fr) 2fr auto', gap: '.8rem', alignItems: 'center' }}>
+              <span style={{ fontFamily: 'var(--mono)', fontSize: '.68rem', color: 'var(--white)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.role}</span>
+              <Bar pct={(r.count / maxRole) * 100} color="var(--blue)" grow delay={i * 60} />
+              <span style={{ fontFamily: 'var(--mono)', fontSize: '.66rem', color: 'var(--dim)', whiteSpace: 'nowrap' }}>{r.count.toLocaleString()}{r.count7 > 0 ? ` · ${r.count7} new` : ''}</span>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   )
 }
@@ -257,15 +298,19 @@ export function EmployerAnalyticsView() {
   const h = analytics.headline
   const rs = analytics.responseSummary
 
-  // Matched by name, but no applicant reports on record — an honest clean slate.
+  // Matched by name, but no applicant reports on record — an honest clean slate. Apply activity can
+  // still exist without outcome reports, so it renders above the empty-reports notice.
   if (!analytics.hasData) {
     return (
-      <StateCard
-        title={`No applicant reports for “${resolvedCompany}” yet.`}
-        cta={<Link href="/employers" style={ctaStyle}>See your reputation →</Link>}
-      >
-        Nothing to chart yet — which is a clean slate, not a bad sign. As candidates report how your postings went, their sources, volume, and response outcomes will appear here. This is the same record that builds your public reputation, so there are no numbers to show until the first real report lands.
-      </StateCard>
+      <div>
+        <ActivityCard activity={data.activity} />
+        <StateCard
+          title={`No applicant reports for “${resolvedCompany}” yet.`}
+          cta={<Link href="/employers" style={ctaStyle}>See your reputation →</Link>}
+        >
+          Nothing to chart yet — which is a clean slate, not a bad sign. As candidates report how your postings went, their sources, volume, and response outcomes will appear here. This is the same record that builds your public reputation, so there are no numbers to show until the first real report lands.
+        </StateCard>
+      </div>
     )
   }
 
@@ -273,6 +318,8 @@ export function EmployerAnalyticsView() {
 
   return (
     <div>
+      {/* Applicant activity (apply-clicks) — the freshest signal, top of the tab. */}
+      <ActivityCard activity={data.activity} />
       {/* Identity + headline reputation (what candidates see) */}
       <div className="emp-reveal" style={{ ...card, animationDelay: '0ms' }}>
         <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', flexWrap: 'wrap', gap: '.5rem', marginBottom: '1.2rem' }}>

@@ -26,6 +26,7 @@ import { EmployerListingsManager } from '@/components/employer/EmployerListingsM
 import { EmployerAnalyticsView } from '@/components/employer/EmployerAnalyticsView'
 import { EmployerLiveNotifications } from '@/components/employer/EmployerLiveNotifications'
 import EmployerActivationChecklist from '@/components/employer/EmployerActivationChecklist'
+import { EmployerReplyManager } from '@/components/employer/EmployerReplyManager'
 
 type Score = {
   overall_score: number | null
@@ -368,7 +369,7 @@ export function EmployerHub() {
             <div ref={panelHostRef}>
               {opened.has('overview') && (
                 <div role="tabpanel" data-active-panel={tab === 'overview' ? '1' : '0'} style={{ display: tab === 'overview' ? 'block' : 'none' }}>
-                  <OverviewTab company={company} recent={recent} onManage={() => selectTab('listings')} />
+                  <OverviewTab company={company} recent={recent} canRespond={scoped} onManage={() => selectTab('listings')} />
                 </div>
               )}
               {opened.has('listings') && (
@@ -407,9 +408,13 @@ export function EmployerHub() {
 }
 
 // ── Overview tab: short by design — recent interactions (top 5) + a compact listings summary ──
-function OverviewTab({ company, recent, onManage }: { company: string; recent: InteractionView[]; onManage: () => void }) {
+function OverviewTab({ company, recent, canRespond, onManage }: { company: string; recent: InteractionView[]; canRespond: boolean; onManage: () => void }) {
   return (
     <>
+      {/* Respond surface — an approved employer can reply to the reports below (reviewed before public,
+          never a score input). Non-scoped viewers (visitor / god-view) just see the read-only feed. */}
+      {canRespond && <EmployerReplyManager company={company} />}
+
       <section style={{ marginBottom: '1.6rem' }}>
         <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: '.5rem', marginBottom: '.7rem' }}>
           <h2 style={{ fontFamily: 'var(--display)', fontSize: '1.05rem', fontWeight: 800, color: 'var(--white)', letterSpacing: '-.02em', margin: 0 }}>Recent applicant interactions</h2>
