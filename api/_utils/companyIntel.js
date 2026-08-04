@@ -19,6 +19,7 @@ import {
   calcOverallScore, calcWaste, tenureAdjustment, scoreConfidence, confidenceLabel,
   staleListingPenalty,
 } from './companyScore.js';
+import { wilsonInterval } from '../../lib/server/wilson.js';
 
 const clamp01 = (n) => (n == null ? null : Math.max(0, Math.min(1, n)));
 const clamp100 = (n) => Math.max(0, Math.min(100, Math.round(n)));
@@ -107,7 +108,7 @@ export function fuseCompanyIntel(input = {}) {
   const { web = {}, sources = [], avgTenureMonths = null, tenureSample = 0, dataAgeDays = 0, confirmedStaleListings = 0 } = input;
 
   // Pool empirical evidence across sources, each weighted by its trust.
-  let wGhost = 0, wResp = 0, wResolved = 0, effN = 0, rawResolved = 0;
+  let wGhost = 0, wResp = 0, wResolved = 0, effN = 0, rawResolved = 0, rawGhost = 0;
   let waitNum = 0, waitDen = 0, roundsNum = 0, roundsDen = 0;
   const usedTypes = [];
   for (const s of sources || []) {
@@ -120,6 +121,7 @@ export function fuseCompanyIntel(input = {}) {
     wResolved += trust * agg.resolved;
     effN += trust * agg.resolved;
     rawResolved += agg.resolved;
+    rawGhost += agg.ghost;
     if (num(s.avgWaitDays) != null) { waitNum += trust * num(s.avgWaitDays) * agg.resolved; waitDen += trust * agg.resolved; }
     if (num(s.avgRounds) != null) { roundsNum += trust * num(s.avgRounds) * agg.resolved; roundsDen += trust * agg.resolved; }
   }
@@ -178,6 +180,14 @@ export function fuseCompanyIntel(input = {}) {
       ghost_rate: empGhost == null ? null : round1(empGhost),
       response_rate: empResp == null ? null : round1(empResp),
     },
+    // Grounded, sample-size-aware bound on the FIRST-PARTY ghost rate (Wilson 95% interval over RAW
+    // counts, never the blended rate). The lower bound is a confidence-discounted rate — gaming-
+    // resistant on small n (2/2 ghosts can't manufacture a confident 100%) — and the width is an
+    // honest "how sure are we" signal. Additive: scores, rates, and `confidence` are unchanged.
+    // Null when we hold no first-party resolved reports (nothing real to bound).
+    ghost_rate_ci: rawResolved > 0
+      ? (() => { const iv = wilsonInterval(rawGhost, rawResolved); return { lower: round1(iv.lower), upper: round1(iv.upper), n: iv.n }; })()
+      : null,
     sources_used: usedTypes,
   };
 }

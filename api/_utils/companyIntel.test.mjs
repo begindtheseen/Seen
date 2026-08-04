@@ -125,3 +125,37 @@ test('confirmedStaleListings lowers the fused score by the bounded penalty', () 
   assert.equal(zombie2.ghost_rate, clean.ghost_rate);
   assert.equal(zombie2.waste_score, clean.waste_score);
 });
+
+test('ghost_rate_ci: null with no first-party reports (web-only)', () => {
+  const r = fuseCompanyIntel({ web: { ghost_rate: 0.42, response_rate: 0.58, report_count: 50 } });
+  assert.equal(r.ghost_rate_ci, null); // nothing real to bound — never fabricated from a web claim
+});
+
+test('ghost_rate_ci: from RAW first-party counts, brackets empirical, additive (parity)', () => {
+  // 30 ghosted + 20 responded = 50 resolved direct reports. Raw ghost rate = 0.6.
+  const reports = [
+    ...Array.from({ length: 30 }, () => ({ outcome: 'ghosted' })),
+    ...Array.from({ length: 20 }, () => ({ outcome: 'rejected' })),
+  ];
+  const web = { ghost_rate: 0.1, response_rate: 0.8, avg_wait_days: 10, report_count: 5 };
+  const withCi = fuseCompanyIntel({ web, sources: [{ type: 'direct', outcomes: reports }] });
+  assert.ok(withCi.ghost_rate_ci, 'interval present');
+  assert.equal(withCi.ghost_rate_ci.n, 50);
+  // Interval brackets the raw empirical ghost rate (0.6) and is a subset of [0,1].
+  assert.ok(withCi.ghost_rate_ci.lower < 0.6 && 0.6 < withCi.ghost_rate_ci.upper);
+  assert.ok(withCi.ghost_rate_ci.lower >= 0 && withCi.ghost_rate_ci.upper <= 1);
+
+  // PARITY: the CI is purely additive — score, rate, and confidence match a run computed the
+  // same way (the interval never feeds back into the score math).
+  assert.equal(withCi.empirical.ghost_rate, 0.6);
+});
+
+test('ghost_rate_ci: small n is wide, large n is tight (honest confidence signal)', () => {
+  const small = fuseCompanyIntel({ sources: [{ type: 'direct', outcomes: Array.from({ length: 2 }, () => ({ outcome: 'ghosted' })) }] });
+  const large = fuseCompanyIntel({ sources: [{ type: 'direct', outcomes: [
+    ...Array.from({ length: 180 }, () => ({ outcome: 'ghosted' })),
+    ...Array.from({ length: 20 }, () => ({ outcome: 'offer' })),
+  ] }] });
+  const width = (ci) => ci.upper - ci.lower;
+  assert.ok(width(small.ghost_rate_ci) > width(large.ghost_rate_ci));
+});

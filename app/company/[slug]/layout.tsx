@@ -3,6 +3,7 @@ import type { Metadata } from 'next'
 // the live https://seenjobs.io/api/reports (which had no build detection here and could hang
 // `next build`). generateMetadata + the layout render below both go through this one helper.
 import { getScore, firstPartyReportCount, displayCompanyName, type GrowthScore } from '@/lib/growth'
+import { buildCompanyFaq } from '@/lib/server/companyFaq'
 
 const titleCase = (slug: string) => slug.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
 // Slug-mangled fallback only when no score row exists — the stored name keeps real punctuation
@@ -97,6 +98,20 @@ export default async function CompanySlugLayout(
     }
   }
 
+  // FAQ built ONLY from real data (percentages gated on first-party reports; grade Q always names
+  // its basis). Backs both a FAQPage node AND the visible block below — the format AI answer engines
+  // (ChatGPT, Perplexity, Gemini) cite for "does <company> ghost applicants?" queries. Empty → omitted.
+  const faq = s
+    ? buildCompanyFaq({
+        name,
+        overallScore: s.overall_score,
+        ghostRate: s.ghost_rate,
+        responseRate: s.response_rate,
+        avgWaitDays: s.avg_wait_days,
+        reportCount: s.report_count,
+      })
+    : []
+
   const jsonLd = {
     '@context': 'https://schema.org',
     '@graph': [
@@ -108,6 +123,16 @@ export default async function CompanySlugLayout(
         ],
       },
       org,
+      ...(faq.length
+        ? [{
+            '@type': 'FAQPage',
+            mainEntity: faq.map(f => ({
+              '@type': 'Question',
+              name: f.question,
+              acceptedAnswer: { '@type': 'Answer', text: f.answer },
+            })),
+          }]
+        : []),
     ],
   }
 
@@ -194,6 +219,25 @@ export default async function CompanySlugLayout(
               <a href={`/compare?a=${encodeURIComponent(name)}`} style={{ fontFamily: 'var(--mono)', fontSize: '.62rem', color: 'var(--blue)', textDecoration: 'none' }}>Compare {name} vs another</a>
             </div>
           </div>
+
+          {/* Visible FAQ backing the FAQPage schema above (Google requires the schema's Q&A text to
+              be present on the page). Server-rendered so AI answer engines cite the real numbers from
+              the initial HTML. Real-data-gated — no fabricated rates. */}
+          {faq.length > 0 && (
+            <div style={{ marginTop: '1rem' }}>
+              <h2 style={{ fontFamily: 'var(--display)', fontSize: '.9rem', fontWeight: 700, color: 'var(--white)', margin: '0 0 .7rem' }}>
+                {name} hiring — frequently asked
+              </h2>
+              {faq.map(f => (
+                <details key={f.question} style={{ borderTop: '1px solid var(--line)', padding: '.65rem 0' }}>
+                  <summary style={{ cursor: 'pointer', fontFamily: 'var(--display)', fontSize: '.82rem', fontWeight: 600, color: 'var(--white)', listStyle: 'none' }}>
+                    {f.question}
+                  </summary>
+                  <p style={{ fontSize: '.82rem', lineHeight: 1.65, color: 'var(--sub)', margin: '.5rem 0 0', fontWeight: 300 }}>{f.answer}</p>
+                </details>
+              ))}
+            </div>
+          )}
         </section>
       )}
       {children}
