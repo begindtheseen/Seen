@@ -42,6 +42,9 @@
     "api/refresh-stale-jobs.js": {
       "maxDuration": 300
     },
+    "api/prune-jobs.js": {
+      "maxDuration": 60
+    },
     "api/resume.js": {
       "maxDuration": 30
     },
@@ -112,6 +115,10 @@
     {
       "path": "/api/refresh-stale-jobs",
       "schedule": "30 3 * * *"
+    },
+    {
+      "path": "/api/prune-jobs",
+      "schedule": "45 3 * * *"
     },
     {
       "path": "/api/demand",
