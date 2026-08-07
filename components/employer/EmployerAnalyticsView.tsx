@@ -439,18 +439,18 @@ export function EmployerAnalyticsView() {
           Seen doesn’t host individual postings, so role is the finest posting-level cut the data supports —
           the honest stand-in for per-posting performance.
         </p>
-        <div style={{ display: 'grid', gap: '.7rem' }}>
-          <div style={{ display: 'grid', gridTemplateColumns: 'minmax(120px,2fr) 1fr 1fr 1fr', gap: '.6rem', paddingBottom: '.4rem', borderBottom: '1px solid var(--line)' }}>
+        <div style={{ display: 'grid', gap: '.7rem', overflowX: 'auto' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'minmax(120px,2fr) 1fr 1fr 1fr', minWidth: 360, gap: '.6rem', paddingBottom: '.4rem', borderBottom: '1px solid var(--line)' }}>
             {['Role', 'Reports', 'Responded', 'Ghosted'].map((t, i) => (
               <span key={t} style={{ ...mono('.55rem', 'var(--dim)'), textTransform: 'uppercase', letterSpacing: '.08em', textAlign: i === 0 ? 'left' : 'right' }}>{t}</span>
             ))}
           </div>
           {analytics.roles.map(r => (
-            <div key={r.role} style={{ display: 'grid', gridTemplateColumns: 'minmax(120px,2fr) 1fr 1fr 1fr', gap: '.6rem', alignItems: 'center' }}>
+            <div key={r.role} style={{ display: 'grid', gridTemplateColumns: 'minmax(120px,2fr) 1fr 1fr 1fr', minWidth: 360, gap: '.6rem', alignItems: 'center' }}>
               <span style={{ fontFamily: 'var(--mono)', fontSize: '.68rem', color: 'var(--white)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.role}</span>
-              <span style={{ ...mono('.66rem', 'var(--sub)'), textAlign: 'right' }}>{r.count.toLocaleString()}</span>
-              <span style={{ ...mono('.66rem', 'var(--green)'), textAlign: 'right' }}>{r.responded} · {fmtPct(r.respondedPct)}</span>
-              <span style={{ ...mono('.66rem', 'var(--red)'), textAlign: 'right' }}>{r.ghosted} · {fmtPct(r.ghostedPct)}</span>
+              <span style={{ ...mono('.66rem', 'var(--sub)'), textAlign: 'right', whiteSpace: 'nowrap' }}>{r.count.toLocaleString()}</span>
+              <span style={{ ...mono('.66rem', 'var(--green)'), textAlign: 'right', whiteSpace: 'nowrap' }}>{r.responded} · {fmtPct(r.respondedPct)}</span>
+              <span style={{ ...mono('.66rem', 'var(--red)'), textAlign: 'right', whiteSpace: 'nowrap' }}>{r.ghosted} · {fmtPct(r.ghostedPct)}</span>
             </div>
           ))}
         </div>

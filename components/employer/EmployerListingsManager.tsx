@@ -100,6 +100,7 @@ export function EmployerListingsManager() {
   const { ready, isLoggedIn, isEmployer, employerCompany, claimsReady, token } = useAuth()
 
   const [loading, setLoading] = useState(true)
+  const [refreshing, setRefreshing] = useState(false)
   const [listings, setListings] = useState<Listing[]>([])
   const [summary, setSummary] = useState<Summary | null>(null)
   const [disputes, setDisputes] = useState<Dispute[]>([])
@@ -291,7 +292,7 @@ export function EmployerListingsManager() {
         </div>
         <div style={{ display: 'flex', gap: '.5rem', flexShrink: 0 }}>
           <button onClick={() => setShowAdd(v => !v)} style={primaryBtn}>{showAdd ? 'Close' : '+ Add a listing'}</button>
-          <button onClick={() => { setLoading(true); load().finally(() => setLoading(false)) }} style={ghostBtn}>↻ Refresh</button>
+          <button onClick={() => { setRefreshing(true); load().finally(() => setRefreshing(false)) }} disabled={refreshing} style={ghostBtn}>{refreshing ? '↻ Refreshing…' : '↻ Refresh'}</button>
         </div>
       </div>
 

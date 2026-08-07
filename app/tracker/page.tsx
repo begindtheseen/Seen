@@ -60,10 +60,10 @@ function AppCard({ app, onUpdate, onRemove, onShare, intel }: {
         onClick={() => { if (isActive) setExpanded(e => !e) }}
         style={{ cursor: isActive ? 'pointer' : 'default' }}
       >
-        <div className="app-logo">{app.company.charAt(0)}</div>
+        <div className="app-card-logo">{app.company.charAt(0)}</div>
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div className="app-co">{app.company}</div>
-          <div className="app-role">{app.role}</div>
+          <div className="app-card-co">{app.company}</div>
+          <div className="app-card-title">{app.role}</div>
           {app.location && <div style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', color: 'var(--muted)' }}>{app.location}</div>}
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '.25rem', flexShrink: 0 }}>
@@ -84,19 +84,15 @@ function AppCard({ app, onUpdate, onRemove, onShare, intel }: {
 
       {/* Stage pipeline (active only, collapsed when expanded to save space) */}
       {isActive && !expanded && (
-        <div className="app-stages" style={{ marginTop: '.65rem' }}>
-          <div style={{ display: 'flex', gap: '.25rem', alignItems: 'center', overflowX: 'auto' }}>
-            {STAGES.map((s, i) => {
-              const stageIdx = STAGES.indexOf(app.stage as typeof STAGES[number])
-              const isDone = i < stageIdx
-              const isCurrent = i === stageIdx
-              return (
-                <div key={s} className={`stage-pip ${isDone ? 'done' : ''} ${isCurrent ? 'current' : ''}`} title={s}>
-                  <span style={{ fontFamily: 'var(--mono)', fontSize: '.5rem', whiteSpace: 'nowrap' }}>{s}</span>
-                </div>
-              )
-            })}
-          </div>
+        <div className="stage-pipe" style={{ marginTop: '.65rem' }}>
+          {STAGES.map((s, i) => {
+            const stageIdx = STAGES.indexOf(app.stage as typeof STAGES[number])
+            const isDone = i < stageIdx
+            const isCurrent = i === stageIdx
+            return (
+              <div key={s} className={`stage-step ${isDone ? 'done' : ''} ${isCurrent ? 'current' : ''}`} title={s}>{s}</div>
+            )
+          })}
         </div>
       )}
 
@@ -545,7 +541,7 @@ function TrackerPage() {
         </div>
 
         {/* Stats */}
-        <div style={{ display: 'flex', gap: '.75rem', flexWrap: 'wrap', marginBottom: '1.5rem' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(84px, 1fr))', gap: '.6rem', marginBottom: '1.5rem' }}>
           {[
             { label: 'Total', n: apps.length },
             { label: 'Active', n: active.length },

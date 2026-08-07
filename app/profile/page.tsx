@@ -370,6 +370,21 @@ export default function ProfilePage() {
           </div>
         </div>
 
+        {/* Save changes — sits directly under the fields it persists (name / city / experience),
+            not stranded below the account & billing cards. */}
+        {isDirty && (
+          <button
+            onClick={saveProfile}
+            disabled={saving}
+            style={{ width: '100%', padding: '.9rem', background: 'var(--green)', color: 'var(--ink)', border: 'none', borderRadius: 10, fontFamily: 'var(--display)', fontWeight: 800, fontSize: '.9rem', cursor: saving ? 'not-allowed' : 'pointer', marginBottom: '1rem', opacity: saving ? 0.7 : 1 }}
+          >
+            {saving ? 'Saving...' : 'Save changes →'}
+          </button>
+        )}
+        {saveMsg && (
+          <div style={{ fontFamily: 'var(--mono)', fontSize: '.65rem', color: saveMsgOk ? 'var(--green)' : 'var(--red)', textAlign: 'center', marginBottom: '1.5rem' }}>{saveMsg}</div>
+        )}
+
         {/* Account & Security */}
         <div style={card}>
           <div style={sectionHead}>Account &amp; Security</div>
@@ -462,19 +477,6 @@ export default function ProfilePage() {
             </div>
           </div>
         </div>
-
-        {isDirty && (
-          <button
-            onClick={saveProfile}
-            disabled={saving}
-            style={{ width: '100%', padding: '.9rem', background: 'var(--green)', color: 'var(--ink)', border: 'none', borderRadius: 10, fontFamily: 'var(--display)', fontWeight: 800, fontSize: '.9rem', cursor: saving ? 'not-allowed' : 'pointer', marginBottom: '1rem', opacity: saving ? 0.7 : 1 }}
-          >
-            {saving ? 'Saving...' : 'Save changes →'}
-          </button>
-        )}
-        {saveMsg && (
-          <div style={{ fontFamily: 'var(--mono)', fontSize: '.65rem', color: saveMsgOk ? 'var(--green)' : 'var(--red)', textAlign: 'center', marginBottom: '1.5rem' }}>{saveMsg}</div>
-        )}
 
         {/* Billing & Subscription */}
         <div style={card}>

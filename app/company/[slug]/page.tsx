@@ -412,11 +412,11 @@ function OutcomeDistribution({ reports }: { reports: Report[] }) {
   reports.forEach(r => { const oc = r.outcome || 'unknown'; dist[oc] = (dist[oc] || 0) + 1 })
   const total = reports.length
   const merged = [
-    { label: 'Ghosted',   count: dist.ghosted || 0,                                                   color: '#ef4444' },
-    { label: 'Rejected',  count: (dist.rejected || 0) + (dist.autoreject || 0),                       color: '#f59e0b' },
-    { label: 'Interview', count: (dist.interview || 0) + (dist.human || 0) + (dist.interviewing || 0), color: '#3b82f6' },
-    { label: 'Hired',     count: (dist.hired || 0) + (dist.offer || 0),                               color: '#10b981' },
-    { label: 'Waiting',   count: dist.waiting || 0,                                                    color: '#6b7280' },
+    { label: 'Ghosted',   count: dist.ghosted || 0,                                                   color: 'var(--red)' },
+    { label: 'Rejected',  count: (dist.rejected || 0) + (dist.autoreject || 0),                       color: 'var(--amber)' },
+    { label: 'Interview', count: (dist.interview || 0) + (dist.human || 0) + (dist.interviewing || 0), color: 'var(--blue)' },
+    { label: 'Hired',     count: (dist.hired || 0) + (dist.offer || 0),                               color: 'var(--green)' },
+    { label: 'Waiting',   count: dist.waiting || 0,                                                    color: 'var(--dim)' },
   ].filter(s => s.count > 0)
 
   return (
@@ -885,8 +885,10 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
               {/* Ghost surge alert */}
               <GhostSurgeAlert ghostRate={score.ghost_rate || 0} />
 
-              {/* Emotional ghost rate visual */}
-              <GhostVisual ghostRate={score.ghost_rate || 0} count={fpReports} />
+              {/* Emotional ghost-rate visual — suppressed when the surge alert above already owns the
+                  high-ghost story (ghost ≥ 50%), so a high-ghost company never stacks two red ghost
+                  panels back-to-back. The Ghost% metric box below still carries the number either way. */}
+              {(score.ghost_rate || 0) < 0.5 && <GhostVisual ghostRate={score.ghost_rate || 0} count={fpReports} />}
 
               {/* Metrics grid */}
               <div className="co-mets">

@@ -515,14 +515,14 @@ function PricingPageInner() {
 
         {/* Comparison table */}
         <h2 style={{ fontFamily: 'var(--display)', fontSize: '1.2rem', fontWeight: 800, color: 'var(--white)', marginBottom: '1rem' }}>Full comparison</h2>
-        <div style={{ border: '1px solid var(--line)', borderRadius: 12, overflow: 'hidden', marginBottom: '3rem' }}>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 100px 100px', background: 'var(--raised)', padding: '.65rem 1.25rem', gap: '1rem' }}>
+        <div style={{ border: '1px solid var(--line)', borderRadius: 12, overflow: 'hidden', overflowX: 'auto', marginBottom: '3rem' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 100px 100px', minWidth: 380, background: 'var(--raised)', padding: '.65rem 1.25rem', gap: '1rem' }}>
             <span style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', color: 'var(--dim)', textTransform: 'uppercase', letterSpacing: '.1em' }}>Feature</span>
             <span style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', color: 'var(--dim)', textAlign: 'center' }}>Free</span>
             <span style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', color: '#818cf8', textAlign: 'center' }}>Pro</span>
           </div>
           {COMPARISON.map(([feature, freeVal, proVal]) => (
-            <div key={feature} style={{ display: 'grid', gridTemplateColumns: '1fr 100px 100px', padding: '.65rem 1.25rem', borderTop: '1px solid var(--line)', gap: '1rem', alignItems: 'center' }}>
+            <div key={feature} style={{ display: 'grid', gridTemplateColumns: '1fr 100px 100px', minWidth: 380, padding: '.65rem 1.25rem', borderTop: '1px solid var(--line)', gap: '1rem', alignItems: 'center' }}>
               <span style={{ fontFamily: 'var(--mono)', fontSize: '.68rem', color: 'var(--sub)' }}>{feature}</span>
               <span style={{ textAlign: 'center' }}>{checkStyle(freeVal)}</span>
               <span style={{ textAlign: 'center' }}>{checkStyle(proVal)}</span>
@@ -534,8 +534,9 @@ function PricingPageInner() {
         <h2 style={{ fontFamily: 'var(--display)', fontSize: '1.2rem', fontWeight: 800, color: 'var(--white)', marginBottom: '1rem' }}>Questions</h2>
         {FAQ.map(item => (
           <details key={item.q} style={{ marginBottom: '.6rem', background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 10 }}>
-            <summary style={{ padding: '.85rem 1.25rem', fontFamily: 'var(--display)', fontSize: '.82rem', fontWeight: 700, color: 'var(--white)', cursor: 'pointer', listStyle: 'none' }}>
-              {item.q}
+            <summary style={{ padding: '.85rem 1.25rem', fontFamily: 'var(--display)', fontSize: '.82rem', fontWeight: 700, color: 'var(--white)', cursor: 'pointer', listStyle: 'none', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '.5rem' }}>
+              <span>{item.q}</span>
+              <span className="dt-chev" style={{ color: 'var(--dim)', fontWeight: 400, fontSize: '.7rem', flexShrink: 0 }}>▾</span>
             </summary>
             <div style={{ padding: '0 1.25rem .85rem', fontFamily: 'var(--body)', fontSize: '.72rem', color: 'var(--sub)', lineHeight: 1.75 }}>
               {item.a}

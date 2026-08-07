@@ -12,6 +12,13 @@ import type { Application } from '@/lib/types'
 type Outcome = 'ghosted' | 'autoreject' | 'human' | 'waiting' | ''
 type Stage = 'application' | 'phone' | 'interview' | 'final' | ''
 
+// Human-readable labels for stored outcome enums — never show raw "autoreject"/"human" to users.
+const OUTCOME_LABELS: Record<string, string> = {
+  ghosted: 'Ghosted', autoreject: 'Auto-rejected', rejected: 'Rejected', human: 'Human reply',
+  interview: 'Interview', interviewing: 'Interviewing', offer: 'Offer', hired: 'Hired', waiting: 'Still waiting',
+}
+const outcomeLabel = (o: string) => OUTCOME_LABELS[o] || (o ? o.charAt(0).toUpperCase() + o.slice(1) : '—')
+
 const inputStyle: React.CSSProperties = {
   width: '100%',
   background: 'var(--surface)',
@@ -295,7 +302,7 @@ function ReportPage() {
 
   if (done) {
     return (
-      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '2rem' }}>
+      <div style={{ minHeight: '70vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '80px 2rem 3rem' }}>
         <div style={{ textAlign: 'center', maxWidth: 440 }}>
           <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>✅</div>
           <h2 style={{ fontFamily: 'var(--display)', fontSize: '1.5rem', fontWeight: 800, color: 'var(--white)', marginBottom: '.5rem' }}>
@@ -467,7 +474,7 @@ function ReportPage() {
             <div style={{ fontFamily: 'var(--mono)', fontSize: '.6rem', textTransform: 'uppercase', letterSpacing: '.1em', color: 'var(--dim)', marginBottom: '1rem', paddingBottom: '.5rem', borderBottom: '1px solid var(--line)' }}>
               Details
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '.75rem' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '.75rem' }}>
               <div>
                 {lbl('Interview rounds')}
                 <select value={rounds} onChange={e => setRounds(e.target.value)} style={selectStyle}>
@@ -524,7 +531,7 @@ function ReportPage() {
             {recentReports.map(r => (
               <div key={r.id} style={{ background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 8, padding: '.75rem 1rem', marginBottom: '.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '1rem' }}>
                 <div>
-                  <div style={{ fontFamily: 'var(--mono)', fontSize: '.68rem', color: 'var(--white)', fontWeight: 600 }}>{r.outcome}</div>
+                  <div style={{ fontFamily: 'var(--mono)', fontSize: '.68rem', color: 'var(--white)', fontWeight: 600 }}>{outcomeLabel(r.outcome)}</div>
                   {r.company_name && <div style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', color: 'var(--blue)', marginTop: '.15rem' }}>@ {r.company_name}</div>}
                   {r.role && <div style={{ fontFamily: 'var(--mono)', fontSize: '.56rem', color: 'var(--dim)', marginTop: '.1rem' }}>{r.role}</div>}
                   {isRedditSourced(r.platform) && (

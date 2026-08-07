@@ -32,7 +32,9 @@ type Item = {
 }
 
 const mono = (size: string, color: string): React.CSSProperties => ({ fontFamily: 'var(--mono)', fontSize: size, color })
-const wrap = { maxWidth: 820, margin: '0 auto', padding: '0 1.5rem', width: '100%', boxSizing: 'border-box' as const }
+// Fills its parent — this feed is embedded in the hub's Updates tab (960 container), whose other
+// children are full-width; a self-imposed max-width here would read as a width step in the stack.
+const wrap = { maxWidth: '100%', margin: 0, padding: 0, width: '100%', boxSizing: 'border-box' as const }
 
 const SEV_COLOR: Record<Severity, string> = { critical: 'var(--red)', warning: 'var(--amber)', info: 'var(--blue)' }
 
