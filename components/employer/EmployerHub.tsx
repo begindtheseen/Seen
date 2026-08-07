@@ -25,6 +25,7 @@ import { recentInteractions, summarizeInteractions } from '@/lib/server/employer
 import { EmployerListingsManager } from '@/components/employer/EmployerListingsManager'
 import { EmployerAnalyticsView } from '@/components/employer/EmployerAnalyticsView'
 import { EmployerLiveNotifications } from '@/components/employer/EmployerLiveNotifications'
+import IndustryBenchmark, { type Benchmark } from '@/components/IndustryBenchmark'
 import EmployerActivationChecklist from '@/components/employer/EmployerActivationChecklist'
 import { EmployerReplyManager } from '@/components/employer/EmployerReplyManager'
 import { EmployerPerkBanner } from '@/components/employer/EmployerPerkBanner'
@@ -90,6 +91,7 @@ export function EmployerHub() {
   const [postings, setPostings] = useState<RawPosting[]>([])
   const [reports, setReports] = useState<RawReport[]>([])
   const [score, setScore] = useState<Score>(null)
+  const [benchmark, setBenchmark] = useState<Benchmark | null>(null)
 
   // ── Tab state (from ?tab=, default 'overview'; shallow URL update, lazy mount) ──
   const initialTab: TabKey = isTab(params.get('tab')) ? (params.get('tab') as TabKey) : 'overview'
@@ -155,7 +157,7 @@ export function EmployerHub() {
     if (!q) return
     setLoading(true); setErr(''); setLoaded(false)
     try {
-      const [jobsRes, scoreRes, feedRes] = await Promise.all([
+      const [jobsRes, scoreRes, feedRes, benchRes] = await Promise.all([
         fetch('/api/jobs', {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ action: 'company_jobs', company: q }),
@@ -166,10 +168,15 @@ export function EmployerHub() {
         }).then(r => (r.ok ? r.json() : { score: null })).catch(() => ({ score: null })),
         fetch(`/employers/dashboard/reports-feed?company=${encodeURIComponent(q)}`)
           .then(r => (r.ok ? r.json() : { reports: [] })).catch(() => ({ reports: [] })),
+        fetch('/api/reports', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'industry_benchmark', name: q }),
+        }).then(r => (r.ok ? r.json() : { benchmark: null })).catch(() => ({ benchmark: null })),
       ])
       setPostings(Array.isArray(jobsRes?.jobs) ? jobsRes.jobs : [])
       setScore((scoreRes?.score as Score) || null)
       setReports(Array.isArray(feedRes?.reports) ? feedRes.reports : [])
+      setBenchmark((benchRes?.benchmark as Benchmark) || null)
       setLoaded(true)
     } catch {
       setErr('Could not load this company’s dashboard — please try again.')
@@ -327,6 +334,15 @@ export function EmployerHub() {
                   : `No applicant outcomes reported for ${company} yet — a clean slate. Your live postings still show below.`}
               </p>
             </section>
+
+            {/* Industry benchmark — the never-empty layer. Shows how this company compares to its
+                sector on Seen even when it has zero first-party reports, so the hub is never a blank
+                "clean slate" for a real employer looking themselves up. */}
+            {benchmark && (
+              <div className="emp-reveal" style={{ marginBottom: '1.4rem', animationDelay: '105ms' }}>
+                <IndustryBenchmark benchmark={benchmark} variant="employer" />
+              </div>
+            )}
 
             {/* ── Tab bar (segmented control with sliding gradient pill) ────────── */}
             <div ref={tablistRef} role="tablist" aria-label="Employer hub sections" className="emp-reveal" style={{ position: 'relative', display: 'flex', flexWrap: 'wrap', gap: 4, background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 12, padding: 4, marginBottom: '1.6rem', animationDelay: '140ms' }}>

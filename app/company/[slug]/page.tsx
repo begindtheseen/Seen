@@ -9,6 +9,7 @@ import CompanyScoreCard from '@/components/CompanyScoreCard'
 import { isRedditSourced, PUBLIC_DISCUSSION_LABEL } from '@/lib/reportSource'
 import CompanyRedditDiscussion from '@/components/CompanyRedditDiscussion'
 import CompanyPublicRecord from '@/components/CompanyPublicRecord'
+import IndustryBenchmark, { type Benchmark } from '@/components/IndustryBenchmark'
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -486,6 +487,7 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
   const [tab, setTab] = useState<TabKey>('overview')
   const [location, setLocation] = useState('')
   const [webReviews, setWebReviews] = useState<WebReview[]>([])
+  const [benchmark, setBenchmark] = useState<Benchmark | null>(null)
   // Approved employer replies to reports, keyed by report id (Wave 2). Display-only employer voice,
   // never a score input — clearly labeled as the employer's claim.
   const [employerReplies, setEmployerReplies] = useState<Record<string, { body: string; created_at: string }>>({})
@@ -598,6 +600,20 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
     }
     load()
   }, [companyName, location]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Industry benchmark — how this company ranks vs its sector on Seen (public aggregate). Turns a
+  // bare score into authoritative context. Fail-soft: the page renders fine without it.
+  useEffect(() => {
+    let alive = true
+    fetch('/api/reports', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'industry_benchmark', name: companyName }),
+    })
+      .then(r => (r.ok ? r.json() : { benchmark: null }))
+      .then(d => { if (alive) setBenchmark((d?.benchmark as Benchmark) || null) })
+      .catch(() => {})
+    return () => { alive = false }
+  }, [companyName])
 
   // Fetch open roles when roles tab is first opened
   useEffect(() => {
@@ -942,6 +958,11 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
                   ghostRate={score.ghost_rate}
                   overallScore={score.overall_score}
                 />
+                {benchmark && (
+                  <div style={{ margin: '0 0 1rem' }}>
+                    <IndustryBenchmark benchmark={benchmark} variant="public" companyName={companyName} />
+                  </div>
+                )}
                 <OutcomeDistribution reports={reports} />
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(240px,1fr))', gap: '1rem', marginBottom: '1rem' }}>
                   <div style={{ background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 10, padding: '1.2rem' }}>

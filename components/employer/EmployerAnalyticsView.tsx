@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useAuth } from '@/lib/auth'
 import { useCountUp } from '@/lib/hooks/useCountUp'
+import IndustryBenchmark, { type Benchmark } from '@/components/IndustryBenchmark'
 
 // Employer posting analytics — the login-scoped CLIENT view for the hub's Analytics tab.
 //
@@ -65,6 +66,7 @@ type Loaded = {
   verified: boolean
   analytics: Analytics
   activity?: ActivityShape | null
+  benchmark?: Benchmark | null
 }
 
 const mono = (size: string, color: string): React.CSSProperties => ({ fontFamily: 'var(--mono)', fontSize: size, color })
@@ -303,6 +305,11 @@ export function EmployerAnalyticsView() {
   if (!analytics.hasData) {
     return (
       <div>
+        {data.benchmark && (
+          <div className="emp-reveal" style={{ marginBottom: '1.4rem' }}>
+            <IndustryBenchmark benchmark={data.benchmark} variant="employer" />
+          </div>
+        )}
         <ActivityCard activity={data.activity} />
         <StateCard
           title={`No applicant reports for “${resolvedCompany}” yet.`}
@@ -320,6 +327,12 @@ export function EmployerAnalyticsView() {
     <div>
       {/* Applicant activity (apply-clicks) — the freshest signal, top of the tab. */}
       <ActivityCard activity={data.activity} />
+      {/* Industry benchmark — how this grade compares to the sector on Seen (always available). */}
+      {data.benchmark && (
+        <div className="emp-reveal" style={{ marginBottom: '1.4rem' }}>
+          <IndustryBenchmark benchmark={data.benchmark} variant="employer" />
+        </div>
+      )}
       {/* Identity + headline reputation (what candidates see) */}
       <div className="emp-reveal" style={{ ...card, animationDelay: '0ms' }}>
         <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', flexWrap: 'wrap', gap: '.5rem', marginBottom: '1.2rem' }}>
