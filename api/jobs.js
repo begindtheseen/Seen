@@ -4,6 +4,7 @@ import { applyRateLimit, rateLimit, rateLimitGlobal, resolveRateBucket } from '.
 import { logError } from '../lib/server/errlog.js';
 import { filterAndRank, filterByLocation, sortByProximity, locationDbTerm } from './_utils/jobRelevance.js';
 import { aggregateForQuery, upsertJobs, inferLevel, wasRecentlyPulled, recordPull } from '../lib/server/jobSources.js';
+import { deriveResumeJobQuery, pullResumeJobFloor } from '../lib/server/resumeJobMatch.js';
 import { scoreJob, wasteScore, scoreRow, explainListingScore } from '../lib/server/jobScore.js';
 import { computeListingFreshness } from '../lib/server/listingFreshness.js';
 import { geocodeLocation, haversineMiles, milesToKm, hasUsableCoords, geoBoxClause, sanitizeCoords } from '../lib/server/geo.js';
@@ -733,9 +734,15 @@ async function handleRecommended(req, res, _body) {
       return res.status(200).json({ ok: true, jobs: [], reason: 'no_resume' });
     }
 
-    const { skills = [], seniority, function: fn } = skillsRows[0];
+    const { skills = [], seniority, function: fn, top_titles } = skillsRows[0];
     const topSkills = skills.slice(0, 5);
     const now = encodeURIComponent(new Date().toISOString());
+
+    // The résumé's real ROLE (title first, else function, else strongest skill) — a
+    // high-recall query that catches listings pure skill-matching misses: a "Budtender"
+    // whose skills are "customer service, POS" would otherwise never surface a budtender
+    // listing. Same derivation the parse-time warm uses.
+    const roleQuery = deriveResumeJobQuery({ top_titles, function: fn, skills });
 
     // Map resume seniority to job level filter terms
     const levelTerms = { junior: 'entry', mid: 'mid', senior: 'senior', staff: 'senior', principal: 'senior', executive: 'director' };
@@ -756,7 +763,13 @@ async function handleRecommended(req, res, _body) {
       return fetch(url, { headers: dbHeaders }).then(r => r.ok ? r.json() : []).catch(() => []);
     });
 
-    const allResults = await Promise.all([...titleQueries, ...descQueries]);
+    // Role-title match — listings whose TITLE is the résumé's actual role (e.g. "budtender"),
+    // the signal skill-matching alone misses. Cheap DB read, folded into the same round-trip.
+    const roleTitleQuery = roleQuery
+      ? [fetch(`${SUPABASE_URL}/rest/v1/jobs?title=ilike.*${encodeURIComponent(roleQuery.slice(0, 40))}*&expires_at=gt.${now}&select=id,title,company,location,salary,apply_url,description,type,level,source,score,waste_score&order=score.desc&limit=10`, { headers: dbHeaders }).then(r => r.ok ? r.json() : []).catch(() => [])]
+      : [];
+
+    const allResults = await Promise.all([...titleQueries, ...descQueries, ...roleTitleQuery]);
 
     // Deduplicate
     const seenIds = new Set();
@@ -765,6 +778,37 @@ async function handleRecommended(req, res, _body) {
       seenIds.add(j.id);
       return true;
     });
+
+    // ── Floor: a résumé rail is NEVER allowed to be thin ──────────────────────────
+    // If our corpus doesn't have enough for this résumé yet (niche role / cold start), pull
+    // LIVE for the résumé's role through the SAME aggregation the search uses — inheriting its
+    // 3h cooldown + global-budget guards (no second uncapped pull). A niche résumé still fills.
+    // Best-effort: on cooldown/budget skip we simply serve the DB rows we have.
+    const RECS_MIN = 6;
+    if (unique.length < RECS_MIN && roleQuery) {
+      const floor = await pullResumeJobFloor({
+        query: roleQuery,
+        location: '', // the rail's DB queries aren't geo-scoped — a national role pull fills it
+        supabaseUrl: SUPABASE_URL,
+        serviceKey: SUPABASE_SERVICE_KEY,
+        adzunaAppId: process.env.ADZUNA_APP_ID,
+        adzunaAppKey: process.env.ADZUNA_APP_KEY,
+      });
+      // Relevance-filter the live pull against the role using the SAME ranker the search uses,
+      // so the rail only gains genuinely on-role listings — then merge what's new.
+      const floorRelevant = filterAndRank(floor.jobs || [], roleQuery);
+      for (const j of floorRelevant) {
+        const key = j.id || j.apply_url || `${(j.title || '').toLowerCase()}|${(j.company || '').toLowerCase()}`;
+        if (!key || seenIds.has(key)) continue;
+        seenIds.add(key);
+        unique.push({
+          id: j.id || null, title: j.title, company: j.company, location: j.location,
+          salary: j.salary, apply_url: j.apply_url || j.url || null, description: j.description,
+          type: j.type || 'Full-time', level: j.level, source: j.source || 'Seen',
+          score: j.score, waste_score: j.waste_score,
+        });
+      }
+    }
 
     // Rank by skill overlap relevance
     const skillsLower = skills.map(s => s.toLowerCase());
