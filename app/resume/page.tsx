@@ -12,6 +12,8 @@ import UpgradeModal from '@/components/UpgradeModal'
 import { FREE_DAILY_CREDITS } from '@/lib/creditRules'
 import dynamic from 'next/dynamic'
 import ApplicationIntelligencePanel, { type ApplicationIntelligence, type ConfirmedAnswer } from '@/components/optimizer/ApplicationIntelligencePanel'
+import MatchAnalysisPanel from '@/components/optimizer/MatchAnalysisPanel'
+import type { MatchAnalysis } from '@/lib/resume-intelligence/engine'
 import ErrorBoundary from '@/components/ErrorBoundary'
 
 const ResumeSurveyModal = dynamic(() => import('@/components/ResumeSurveyModal'), { ssr: false })
@@ -48,6 +50,8 @@ interface OptimizerOutput {
   engine_version?: string
   // Application Intelligence V2 — additive, may be null (falls back to the legacy UI).
   application_intelligence?: ApplicationIntelligence | null
+  // Canonical Resume Intelligence Engine — the unified analysis (preferred when present).
+  resume_intelligence?: MatchAnalysis | null
 }
 
 // ── HumanProof package-mode output ──
@@ -821,12 +825,15 @@ function ResumePageInner() {
                   : fitOut ? <FitView out={fitOut} intel={companyIntel} jobCompany={jobCompany} insights={insights} /> : null
                 )}
 
-                {/* DEEP DIVE — Application Intelligence V2 (only present when the engine returns it) */}
+                {/* DEEP DIVE — the canonical Resume Intelligence Engine (one MatchAnalysis). Falls
+                    back to the legacy V2 panel only if the canonical analysis is unavailable. */}
                 {tab === 'intel' && (
                   fitState === 'loading' ? <ResultEmpty icon="⏳" text={'Building your deep match analysis…'} />
-                  : fitOut?.application_intelligence
-                    ? <ErrorBoundary label="deep-dive"><ApplicationIntelligencePanel pkg={fitOut.application_intelligence} onAnswers={rerunV2WithAnswers} rerunning={v2Rerunning} /></ErrorBoundary>
-                    : <ResultEmpty icon="🧬" text={'Run the analysis to see the deep match breakdown.'} />
+                  : fitOut?.resume_intelligence
+                    ? <ErrorBoundary label="match-analysis"><MatchAnalysisPanel analysis={fitOut.resume_intelligence} /></ErrorBoundary>
+                    : fitOut?.application_intelligence
+                      ? <ErrorBoundary label="deep-dive"><ApplicationIntelligencePanel pkg={fitOut.application_intelligence} onAnswers={rerunV2WithAnswers} rerunning={v2Rerunning} /></ErrorBoundary>
+                      : <ResultEmpty icon="🧬" text={'Run the analysis to see the deep match breakdown.'} />
                 )}
 
                 {/* REWRITE */}
