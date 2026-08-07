@@ -4,6 +4,7 @@ import { applyRateLimit, rateLimit, rateLimitGlobal, resolveRateBucket } from '.
 import { logError } from '../lib/server/errlog.js';
 import { filterAndRank, filterByLocation, sortByProximity, locationDbTerm } from './_utils/jobRelevance.js';
 import { aggregateForQuery, upsertJobs, inferLevel, wasRecentlyPulled, recordPull } from '../lib/server/jobSources.js';
+import { aggregateWithSources } from '../lib/jobs/expand.js';
 import { deriveResumeJobQuery, pullResumeJobFloor } from '../lib/server/resumeJobMatch.js';
 import { scoreJob, wasteScore, scoreRow, explainListingScore } from '../lib/server/jobScore.js';
 import { computeListingFreshness } from '../lib/server/listingFreshness.js';
@@ -416,7 +417,11 @@ export default async function handler(req, res) {
 
     let jobs = [];
     try {
-      const agg = await aggregateForQuery({
+      // Multi-source expansion: employer-direct ATS (registered Greenhouse/Lever/Ashby/… boards
+      // matching the query's company) FIRST, then Adzuna as the demoted gap-filler — and snowball
+      // any ATS tenant the results reveal into the source registry. Every valid discovery persists
+      // to the shared corpus, so the next user benefits without a live fetch.
+      const agg = await aggregateWithSources({
         query: canonical,
         location: loc,
         relatedTerms,
@@ -676,7 +681,9 @@ async function handleCompanyJobs(req, res, body) {
       console.log(`COMPANY DEGRADED (global agg budget out): "${safeName}"`);
       return res.status(200).json({ ok: true, jobs: [], _src: 'db-degraded', degraded: true });
     }
-    const agg = await aggregateForQuery({
+    // Employer-direct first: if this company has a registered ATS board, pull it straight from the
+    // source (real openings, real apply URLs), then Adzuna as fallback. Snowballs new tenants too.
+    const agg = await aggregateWithSources({
       query: safeName,
       location: '',
       supabaseUrl: SUPABASE_URL,

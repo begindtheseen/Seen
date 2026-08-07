@@ -10,6 +10,48 @@ import {
   upsertJobs,
   mapLimit,
 } from '../lib/server/jobSources.js';
+// Employer-direct ATS ingestion + self-growing source registry (multi-source engine).
+import { fetchSourceJobs } from '../lib/jobs/atsProviders.js';
+import { seedSources, dueSources, recordSourceSync } from '../lib/jobs/sourceRegistry.js';
+import { SEED_SOURCES } from '../lib/jobs/seedSources.js';
+import { discoverFromCommonCrawl } from '../lib/jobs/discovery.js';
+
+// Refresh a batch of registered employer-direct ATS boards straight from the source, and grow the
+// source registry (seed on first run; a daily Common Crawl discovery sweep). Fail-open + bounded so
+// it never breaks the cron or exceeds the function time budget. Returns a small summary.
+async function refreshEmployerSources(supabaseUrl, serviceKey, { full = false, runDiscovery = false } = {}) {
+  const summary = { sources: 0, upserted: 0, discovered: 0 };
+  try {
+    // Seed the registry (idempotent merge-duplicates — a cheap no-op after the first run).
+    await seedSources(SEED_SOURCES, supabaseUrl, serviceKey);
+    // Ingest the freshest-need ingestable sources DIRECTLY (employer-direct, real apply URLs).
+    const due = await dueSources(supabaseUrl, serviceKey, full ? 40 : 24);
+    if (due.length) {
+      const results = await mapLimit(due, 8, async (s) => {
+        const r = await fetchSourceJobs({ provider: s.provider, tenant: s.tenant, companyName: s.company_name });
+        return { s, ok: r.ok && r.rows.length > 0, rows: r.rows };
+      });
+      const rows = [];
+      await Promise.all(results.map(({ s, ok, rows: r }) => {
+        if (ok) rows.push(...r);
+        // ok:false (error) OR 200-but-empty both count toward the circuit breaker, so a wrong/dead
+        // tenant self-disables; a real success resets it.
+        return recordSourceSync({ id: s.id, ok, jobCount: r.length, prevFailures: s.consecutive_failures || 0 }, supabaseUrl, serviceKey);
+      }));
+      for (let i = 0; i < rows.length; i += 100) {
+        const u = await upsertJobs(rows.slice(i, i + 100), supabaseUrl, serviceKey).catch(() => ({ upserted: 0 }));
+        summary.upserted += u.upserted || 0;
+      }
+      summary.sources = due.length;
+    }
+    // Common Crawl discovery — grow the source index (once/day, bounded). Fail-open.
+    if (runDiscovery) {
+      const disc = await discoverFromCommonCrawl({ supabaseUrl, serviceKey, perPatternLimit: 300, maxRegister: 200 }).catch(() => ({ registered: 0 }));
+      summary.discovered = disc.registered || 0;
+    }
+  } catch (e) { console.warn('refreshEmployerSources (non-fatal):', e.message); }
+  return summary;
+}
 
 // 240 searches across 12 batches of 20. 6 cron runs/day → all 12 batches covered in 2 days.
 // Adzuna free tier: 250 calls/day — 120/day (20×6) stays well within limit.
@@ -557,6 +599,15 @@ export default async function handler(req, res) {
     const inserted = (countBefore != null && countAfter != null) ? Math.max(0, countAfter - countBefore) : null;
     const updated = inserted != null ? Math.max(0, upsertedTotal - inserted) : null;
 
+    // ── Employer-direct ATS refresh + source-registry growth ────────────────────
+    // Pull registered Greenhouse/Lever/Ashby/… boards straight from the source (freshest,
+    // employer-direct), and grow the source index (seed on first run; a daily Common Crawl sweep on
+    // the 02:00 UTC run). Non-fatal + bounded — it never breaks the aggregator refresh above.
+    const atsSummary = await refreshEmployerSources(SUPABASE_URL, SUPABASE_SERVICE_KEY, {
+      full: fullMode,
+      runDiscovery: isCron && new Date().getUTCHours() === 2,
+    });
+
     // Job insights are now generated deterministically on demand (lib/server/jobInsights.js
     // via api/job-insights.js) — no Anthropic pre-generation needed in the cron.
 
@@ -604,6 +655,7 @@ export default async function handler(req, res) {
       updated,
       purged: junkResult.removed,
       merged,
+      ats: atsSummary, // employer-direct sources synced + registry growth
     });
 
   } catch (err) {
