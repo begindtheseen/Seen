@@ -1,12 +1,44 @@
 // Pure relevance + company-match logic for job search. No I/O → unit-testable.
 //
 // Two jobs:
-//  - relevanceScore/isRelated: keep only listings RELATED to the query (a query
-//    token must appear in title/company/description), ranked title > company > desc.
+//  - relevanceScore/isRelevant: keep only listings GENUINELY related to the query.
+//    The bar is a TITLE/role signal — a query token, the query phrase, or a TRUE
+//    synonym must appear in the TITLE (or the company, for a company search). A term
+//    that appears only in the description, or only via an over-broad expansion token
+//    (e.g. the generic word "sales"), is NOT enough. This is the fix for the reported
+//    leak: searching "budtender" was returning a "Sales Manager" because expansion
+//    terms were tokenized into one loose bag and a description/generic hit cleared the
+//    threshold. Now the original query drives relevance and expansion terms only count
+//    as SYNONYM PHRASES matched against the title (generic single words are ignored).
 //  - looksLikeCompany: detect a company-name search so it returns that company's
 //    listings rather than keyword-matched roles.
 
 const STOP = new Set(['the', 'a', 'an', 'and', 'or', 'of', 'for', 'in', 'at', 'to', 'jobs', 'job', 'near', 'me', 'remote', 'hiring', 'careers', 'role', 'roles', 'position', 'positions', 'opening', 'openings']);
+
+// Single words that are too generic to establish relevance on their own. A synonym that
+// is JUST one of these (e.g. expansion returns the bare word "sales" for "budtender") is
+// dropped, so it can never rescue an unrelated title like "Sales Manager". Discriminating
+// single-word synonyms (cannabis, dispensary, nurse, welder, barista, …) are NOT in here.
+const GENERIC_SYNONYM = new Set([
+  'sales', 'manager', 'management', 'associate', 'assistant', 'representative', 'rep',
+  'coordinator', 'specialist', 'agent', 'clerk', 'staff', 'professional', 'consultant',
+  'officer', 'supervisor', 'administrator', 'executive', 'operator', 'general', 'team',
+  'member', 'worker', 'personnel', 'employee', 'senior', 'junior', 'entry', 'level',
+  'full', 'part', 'time', 'hybrid', 'onsite', 'trainee', 'apprentice',
+]);
+
+// Curated true-synonym sets for high-value / niche roles whose synonyms share NO token
+// with the query (so a token match can never find them). Keyed by the normalized query.
+// This hardens relevance even when the LLM expansion is unavailable or returns junk.
+// Callers may pass additional synonyms (the DB/LLM expansion terms) via options.
+const ROLE_SYNONYMS = {
+  budtender: ['budtender', 'cannabis', 'dispensary', 'marijuana', 'weed', 'cannabis associate', 'dispensary associate', 'dispensary agent', 'cannabis consultant', 'weed dispensary'],
+  barista: ['barista', 'coffee', 'espresso', 'cafe', 'coffee shop'],
+  bartender: ['bartender', 'barback', 'mixologist', 'bar tender'],
+  phlebotomist: ['phlebotomist', 'phlebotomy', 'blood draw'],
+  dishwasher: ['dishwasher', 'kitchen steward', 'dish washer'],
+  caregiver: ['caregiver', 'caregiving', 'home care aide', 'personal care aide', 'direct support'],
+};
 
 export function tokenize(q) {
   return String(q || '')
@@ -24,9 +56,47 @@ export function normalizeCompany(s) {
     .trim();
 }
 
-// Relevance score of a listing for a query. Title hits weigh most, then company,
-// then description. Returns 0 when no query token appears anywhere (→ unrelated).
-export function relevanceScore(job, query) {
+// Resolve the effective true-synonym phrases for a query: the built-in curated set for
+// the query PLUS any caller-provided expansion terms, cleaned. A single-word synonym is
+// kept only if it is discriminating (not in GENERIC_SYNONYM and ≥3 chars); multi-word
+// phrases are specific enough to keep as-is. Deduped, lowercased.
+export function effectiveSynonyms(query, extra = []) {
+  const tokens = tokenize(query);
+  const qNorm = normalizeCompany(query);
+  const built = ROLE_SYNONYMS[tokens.join(' ')] || ROLE_SYNONYMS[qNorm] || ROLE_SYNONYMS[String(query || '').toLowerCase().trim()] || [];
+  const out = new Set();
+  for (const raw of [...built, ...(Array.isArray(extra) ? extra : [])]) {
+    const s = String(raw || '').toLowerCase().replace(/\s+/g, ' ').trim();
+    if (!s) continue;
+    const words = s.split(' ');
+    if (words.length === 1) {
+      if (s.length >= 3 && !GENERIC_SYNONYM.has(s)) out.add(s);
+    } else {
+      out.add(s);
+    }
+  }
+  return [...out];
+}
+
+// True iff a synonym appears in the title as a real token/phrase (word-boundary for a
+// single word so "cannabis" doesn't match inside another word; substring for a phrase).
+function titleHasSynonym(title, syn) {
+  if (!syn) return false;
+  if (syn.includes(' ')) return title.includes(syn);
+  return new RegExp(`(^|[^a-z0-9])${syn.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}([^a-z0-9]|$)`).test(title);
+}
+
+// Whole-query company match (a company-name search like "stripe").
+function isCompanyMatch(company, qNorm) {
+  return !!qNorm && (company === qNorm || company.includes(qNorm) || (qNorm.length >= 4 && qNorm.includes(company) && company.length >= 4));
+}
+
+// Relevance score of a listing for a query — used for RANKING. Title hits weigh most,
+// then company, then description; a true-synonym phrase in the title adds a boost; the
+// full query phrase in the title adds a big bonus. Returns 0 when nothing matches.
+// Description hits still contribute to the RANK (as a weak tiebreaker) but — unlike the
+// old behavior — a description-only hit does NOT make a listing relevant (see isRelevant).
+export function relevanceScore(job, query, { synonyms = [] } = {}) {
   const tokens = tokenize(query);
   if (!tokens.length) return 1; // empty query: everything is "related"
   const title = String(job.title || '').toLowerCase();
@@ -35,10 +105,7 @@ export function relevanceScore(job, query) {
   const qNorm = normalizeCompany(query);
 
   let score = 0;
-  // Whole-query company match (company search).
-  if (qNorm && (company === qNorm || company.includes(qNorm) || (qNorm.length >= 4 && qNorm.includes(company) && company.length >= 4))) {
-    score += 60;
-  }
+  if (isCompanyMatch(company, qNorm)) score += 60;
   for (const t of tokens) {
     if (title.includes(t)) score += 12;
     else if (company.includes(t)) score += 8;
@@ -46,13 +113,38 @@ export function relevanceScore(job, query) {
   }
   // Phrase bonus: the full query appears verbatim in the title.
   if (qNorm && title.includes(qNorm)) score += 20;
+  // True-synonym title match (e.g. "budtender" → a "Cannabis Dispensary Associate").
+  for (const syn of effectiveSynonyms(query, synonyms)) {
+    if (titleHasSynonym(title, syn)) score += 12;
+  }
   return score;
 }
 
-// Is this listing related enough to show? (Any token hit, by default.)
-export function isRelated(job, query, minScore = 1) {
-  if (!tokenize(query).length) return true;
-  return relevanceScore(job, query) >= minScore;
+// Is this listing GENUINELY related enough to show? The bar is a TITLE or COMPANY signal:
+//  • a company-name match (company search), OR
+//  • a query token in the title, OR
+//  • the full query phrase in the title, OR
+//  • a TRUE synonym (curated or caller-supplied expansion) in the title.
+// A match found ONLY in the description, or ONLY via a generic expansion word, is NOT
+// enough — that was the "budtender → Sales Manager" leak.
+export function isRelevant(job, query, { synonyms = [] } = {}) {
+  const tokens = tokenize(query);
+  if (!tokens.length) return true; // empty query: everything is "related"
+  const title = String(job.title || '').toLowerCase();
+  const company = normalizeCompany(job.company);
+  const qNorm = normalizeCompany(query);
+
+  if (isCompanyMatch(company, qNorm)) return true;
+  for (const t of tokens) { if (title.includes(t)) return true; }
+  if (qNorm && title.includes(qNorm)) return true;
+  for (const syn of effectiveSynonyms(query, synonyms)) { if (titleHasSynonym(title, syn)) return true; }
+  return false;
+}
+
+// Back-compat alias. Older callers used isRelated(job, query[, minScore]); the strict
+// title/synonym bar replaces the numeric threshold, so a legacy numeric arg is ignored.
+export function isRelated(job, query, opts = {}) {
+  return isRelevant(job, query, (opts && typeof opts === 'object') ? opts : {});
 }
 
 // Detect a company-name search: the whole query closely matches a known company.
@@ -66,12 +158,14 @@ export function looksLikeCompany(query, knownCompanies) {
   return set.some((c) => c && c.length >= 4 && (c === qn || c.includes(qn) || qn.includes(c)));
 }
 
-// Filter to related listings and rank by relevance, then quality score.
-export function filterAndRank(jobs, query, { minScore = 1 } = {}) {
+// Filter to GENUINELY related listings (strict title/synonym bar) and rank by relevance,
+// then quality score. `synonyms` are the query's expansion terms (canonical + related)
+// used as true-synonym signals — matched as title phrases, never scattered as loose tokens.
+export function filterAndRank(jobs, query, { synonyms = [] } = {}) {
   const hasQuery = tokenize(query).length > 0;
   const scored = (jobs || [])
-    .map((j) => ({ j, r: relevanceScore(j, query) }))
-    .filter((x) => !hasQuery || x.r >= minScore);
+    .map((j) => ({ j, r: relevanceScore(j, query, { synonyms }) }))
+    .filter((x) => !hasQuery || isRelevant(x.j, query, { synonyms }));
   scored.sort((a, b) => (b.r - a.r) || ((b.j.score || 0) - (a.j.score || 0)));
   return scored.map((x) => x.j);
 }

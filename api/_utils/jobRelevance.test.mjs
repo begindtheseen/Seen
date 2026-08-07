@@ -1,7 +1,7 @@
 // Tests for job relevance + company matching. Run: node --test api/_utils/jobRelevance.test.mjs
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { relevanceScore, isRelated, looksLikeCompany, filterAndRank, tokenize, parseLocation, locationScore, filterByLocation, locationDbTerm } from './jobRelevance.js';
+import { relevanceScore, isRelated, isRelevant, effectiveSynonyms, looksLikeCompany, filterAndRank, tokenize, parseLocation, locationScore, filterByLocation, locationDbTerm } from './jobRelevance.js';
 
 const J = (title, company, description = '') => ({ title, company, description, score: 65 });
 const L = (location) => ({ title: 'Nurse', company: 'X', location, score: 65 });
@@ -30,15 +30,57 @@ test('company-name query scores the company strongly', () => {
   assert.equal(notCompany, 0);
 });
 
-test('filterAndRank drops junk and orders by relevance', () => {
+test('filterAndRank keeps title/synonym matches, drops description-only + junk', () => {
   const jobs = [
-    J('Truck Driver', 'Acme'),                       // unrelated
-    J('Backend Developer', 'Y', 'react a plus'),     // weak
-    J('Senior React Engineer', 'Z'),                 // strong
+    J('Truck Driver', 'Acme'),                       // unrelated → drop
+    J('Backend Developer', 'Y', 'react a plus'),     // "react" only in DESC → drop (strict bar)
+    J('Senior React Engineer', 'Z'),                 // title → keep, ranks first
+    J('React Native Developer', 'W'),                // title token → keep
   ];
   const out = filterAndRank(jobs, 'react engineer');
   assert.equal(out.length, 2);
   assert.equal(out[0].title, 'Senior React Engineer');
+  assert.ok(out.map((j) => j.title).includes('React Native Developer'));
+  assert.ok(!out.map((j) => j.title).includes('Backend Developer')); // description-only is not enough
+});
+
+// ── THE REPORTED LEAK: "budtender" must not return "Sales Manager" ──────────────
+test('budtender: cannabis/dispensary roles are relevant; sales/account roles are NOT', () => {
+  const q = 'budtender';
+  // Real cannabis roles — relevant. "Cannabis Dispensary Associate" shares NO token with
+  // "budtender"; it is recognized via curated true synonyms (cannabis / dispensary).
+  assert.equal(isRelevant(J('Budtender', 'Green Cross'), q), true);
+  assert.equal(isRelevant(J('Cannabis Dispensary Associate', 'GreenLeaf'), q), true);
+  assert.equal(isRelated(J('Dispensary Associate', 'GreenLeaf'), q), true);
+
+  // The exact reported bug — these must be dropped.
+  assert.equal(isRelevant(J('Sales Manager', 'BigBox Retail'), q), false);
+  assert.equal(isRelevant(J('Account Executive', 'SaaSCo'), q), false);
+
+  // A Sales Manager whose DESCRIPTION merely mentions budtenders is still not a budtender.
+  assert.equal(isRelevant(J('Sales Manager', 'BigBox', 'manage a team of budtenders'), q), false);
+
+  // Even if LLM-style expansion injects a generic "sales" term, the leak stays closed
+  // (generic single-word synonyms are dropped; phrases are matched against the title).
+  assert.equal(isRelevant(J('Sales Manager', 'X'), q, { synonyms: ['sales', 'retail sales associate'] }), false);
+
+  // End-to-end: only the cannabis roles survive filterAndRank.
+  const jobs = [
+    J('Sales Manager', 'BigBox'),
+    J('Budtender', 'Green Cross'),
+    J('Cannabis Dispensary Associate', 'GreenLeaf'),
+    J('Account Executive', 'SaaSCo'),
+  ];
+  const kept = new Set(filterAndRank(jobs, q).map((j) => j.title));
+  assert.deepEqual(kept, new Set(['Budtender', 'Cannabis Dispensary Associate']));
+});
+
+test('effectiveSynonyms: drops generic single words, keeps discriminating words + phrases', () => {
+  const syns = effectiveSynonyms('budtender', ['sales', 'manager', 'cannabis', 'retail sales associate']);
+  assert.ok(syns.includes('cannabis'));                 // discriminating single word kept
+  assert.ok(syns.includes('retail sales associate'));   // multi-word phrase kept
+  assert.ok(!syns.includes('sales'));                   // generic single word dropped
+  assert.ok(!syns.includes('manager'));                 // generic single word dropped
 });
 
 test('looksLikeCompany detects a company-name search', () => {
