@@ -12,6 +12,27 @@ import type { Job } from '@/lib/types'
 // In-memory search cache: `${query}|${location}` → { jobs, ts }
 const searchCache = new Map<string, { jobs: Job[]; ts: number }>()
 
+// ── Sticky search location (Indeed-style) ────────────────────────────────────────────────
+// A location the user chose or searched persists across reloads/navigation so GPS/auto-fill
+// can never stomp it. Device-local; CLEARED on sign-out (added to SESSION_LOCAL_KEYS in
+// lib/auth.tsx) so one account's location can't bleed into the next person on a shared device.
+const LOC_KEY = 'seen_job_location_v1'
+
+function readStoredLocation(): string {
+  try { return (localStorage.getItem(LOC_KEY) || '').trim() } catch { return '' }
+}
+
+// Persist ONLY explicit location choices (typing, picking a suggestion, GPS resolve). Auto-
+// seeding from the profile HOME or a recent search deliberately does NOT persist here, so the
+// home stays dynamic (re-read from the profile each visit) until the user actually changes it.
+function writeStoredLocation(v: string): void {
+  try {
+    const t = (v || '').trim()
+    if (t) localStorage.setItem(LOC_KEY, t)
+    else localStorage.removeItem(LOC_KEY)
+  } catch { /* ignore quota/private-mode */ }
+}
+
 // Industry ("niche") matching for the jobs filter. The old version keyword-matched the TITLE
 // ONLY against a tiny list (retail = "retail|store|cashier|food|restaurant|barista"), so the bulk
 // of real listings — "Server", "Crew Member", "Line Cook", "Sales Associate", "Team Member" —
@@ -54,9 +75,13 @@ export type PostedFilter = '' | '1' | '7' | '30'
 export type CoScoreMap = Record<string, { ghost_rate: number; overall_score: number; response_rate?: number }>
 
 export function useJobSearch() {
-  const { isLoggedIn, profile, token } = useAuth()
+  const { isLoggedIn, profile, token, ready } = useAuth()
   const [query, setQuery] = useState('')
-  const [location, setLocation] = useState('')
+  const [location, setLocationRaw] = useState('')
+  // Persisting setter — used for the user's EXPLICIT choices (the page's location input and
+  // suggestion picks, plus a resolved GPS location). Auto-seeds (home / recent / stored) use
+  // setLocationRaw directly so they don't get re-persisted as a fresh explicit choice.
+  const setLocation = useCallback((v: string) => { setLocationRaw(v); writeStoredLocation(v) }, [])
   const autoSearchedRef = useRef(false)
   const [locSuggs, setLocSuggs] = useState<string[]>([])
   const [showLocSuggs, setShowLocSuggs] = useState(false)
@@ -143,40 +168,60 @@ export function useJobSearch() {
     } catch {}
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Auto-request GPS on mount; fall back to profile city if GPS denied
+  // Initial location seed + auto-search. Runs AFTER the URL-params effect above (which has
+  // already claimed autoSearchedRef for an explicit ?q link — do NOT reorder). Gated on
+  // `ready` so we act with correct knowledge of logged-in state + a loaded profile. Priority
+  // (Indeed-style location behavior):
+  //   1) a location the user previously CHOSE/searched (LOC_KEY) — survives reloads; GPS
+  //      never stomps it.
+  //   2) signed-in: the profile HOME location as a pre-fill (re-runs when profile loads late).
+  //   3) signed-out: the last recent search (restores query + loc) — also a "set" location.
+  //   4) GPS auto-locate — ONLY when nothing above is stored (signed-out first visit).
   useEffect(() => {
+    if (!ready) return                     // wait until logged-in state + profile are known
+    if (autoSearchedRef.current) return    // an explicit ?q search already ran
+    if (location.trim()) return            // user already typed a location — respect it
+
+    // 1) A previously chosen/searched location wins over everything auto — and over GPS.
+    const stored = readStoredLocation()
+    if (stored) {
+      autoSearchedRef.current = true
+      setLocationRaw(stored)
+      searchJobs(undefined, stored)
+      return
+    }
+
+    // 2) Signed-in → pre-fill HOME location. If profile.city hasn't loaded yet, this effect
+    //    re-runs when it arrives (profile?.city is a dep); we do NOT fall through to GPS while
+    //    a home location may still be incoming, and signed-in users never auto-GPS.
+    if (isLoggedIn) {
+      if (profile?.city) {
+        autoSearchedRef.current = true
+        setLocationRaw(profile.city)
+        searchJobs(undefined, profile.city)
+      }
+      return
+    }
+
+    // 3) Signed-out with a recent search (no stored choice) → restore it; this counts as a
+    //    previously-set location, so GPS won't fire over it.
+    try {
+      const recent = RecentSearchesStore.get()
+      if (recent.length > 0) {
+        const last = recent[0]
+        autoSearchedRef.current = true
+        setQuery(last.name)
+        if (last.loc) setLocationRaw(last.loc)
+        searchJobs(last.name, last.loc)
+        return
+      }
+    } catch {}
+
+    // 4) Nothing stored anywhere → GPS auto-locate (signed-out first visit only).
     if (typeof navigator !== 'undefined' && navigator.geolocation) {
       requestGpsLocation()
-    } else if (profile?.city) {
-      setLocation(profile.city)
-      if (!autoSearchedRef.current) { autoSearchedRef.current = true; searchJobs(undefined, profile.city) }
     }
-    // Pre-load last search from recent history (delayed to not conflict with GPS)
-    const t = setTimeout(() => {
-      if (!autoSearchedRef.current) {
-        try {
-          const recent = RecentSearchesStore.get()
-          if (recent.length > 0) {
-            const last = recent[0]
-            setQuery(last.name)
-            if (last.loc) setLocation(last.loc)
-            autoSearchedRef.current = true
-            searchJobs(last.name, last.loc)
-          }
-        } catch {}
-      }
-    }, 1200)
-    return () => clearTimeout(t)
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
-
-  // Once profile loads, if location still empty, pre-fill and auto-search
-  useEffect(() => {
-    if (!autoSearchedRef.current && !location.trim() && profile?.city && !gpsLoading) {
-      autoSearchedRef.current = true
-      setLocation(profile.city)
-      searchJobs(undefined, profile.city)
-    }
-  }, [profile?.city]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [ready, isLoggedIn, profile?.city]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Fetch resume-powered recommendations when logged in
   useEffect(() => {
@@ -268,14 +313,16 @@ export function useJobSearch() {
       const state = geo.address.state || ''
       const loc = city && state ? `${city}, ${state}` : city || state
       if (loc) {
+        // A resolved GPS location IS an explicit "set" — persist it (via the wrapper) so it
+        // survives reloads and GPS won't re-fire over it next visit.
         setLocation(loc)
         if (!autoSearchedRef.current) { autoSearchedRef.current = true; searchJobs(undefined, loc) }
       }
     } catch {
-      // GPS failed — fall back to profile city
+      // GPS failed — fall back to profile HOME (not persisted; home stays dynamic).
       if (profile?.city && !autoSearchedRef.current) {
         autoSearchedRef.current = true
-        setLocation(profile.city)
+        setLocationRaw(profile.city)
         searchJobs(undefined, profile.city)
       }
     }

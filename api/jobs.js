@@ -6,7 +6,7 @@ import { filterAndRank, filterByLocation, sortByProximity, locationDbTerm } from
 import { aggregateForQuery, upsertJobs, inferLevel } from '../lib/server/jobSources.js';
 import { scoreJob, wasteScore, scoreRow, explainListingScore } from '../lib/server/jobScore.js';
 import { computeListingFreshness } from '../lib/server/listingFreshness.js';
-import { geocodeLocation, haversineMiles, milesToKm } from '../lib/server/geo.js';
+import { geocodeLocation, haversineMiles, milesToKm, hasUsableCoords, geoBoxClause, sanitizeCoords } from '../lib/server/geo.js';
 
 // ── Suppressed listings (migration 047) ─────────────────────────────────────────────────────
 // Admins can "delete" an ephemeral (live-search) listing they've confirmed dead; its apply_url
@@ -217,9 +217,13 @@ export default async function handler(req, res) {
     const distanceKm = isRemote ? null : milesToKm(radiusMiles);
     let center = null; // { lat, lng } | null (null → geocode unavailable, fall back to city/state)
 
-    // Keep a listing if it's within the radius; rank the whole list nearest-first. Jobs with
-    // coordinates use true great-circle distance; legacy rows without coords fall back to the
-    // coarse city → state match so they're never wrongly dropped.
+    // Exact-circle refine of an ALREADY-bbox-scoped page (the DB did the heavy geo pre-filter
+    // on jobs_latlng_idx — see geoClause below; this runs only on the ≤60-row page, cheap).
+    // Keep a listing only if its coords are usable AND within the radius, nearest-first.
+    // NULL and (0,0) coords are UNKNOWN, not a real point — they are EXCLUDED from a
+    // location-scoped search and never leak in via coarse text matching (the old bug). They
+    // still appear in Remote/national searches. Only when geocoding the SEARCH place itself
+    // failed (no center) do we degrade to coarse city → state text matching.
     const applyRadius = (list) => {
       if (!loc) return Array.isArray(list) ? list : [];
       // Remote search: distance is meaningless — prefer listings that say remote, keep the rest.
@@ -228,24 +232,21 @@ export default async function handler(req, res) {
         const isRem = (j) => /\bremote\b|\bwork from home\b|\banywhere\b/i.test(`${j.location || ''} ${j.description || ''}`);
         return [...arr.filter(isRem), ...arr.filter(j => !isRem(j))];
       }
-      if (!center) return filterByLocation(list, loc); // geocode failed → coarse city/state
-      const withCoords = [], withoutCoords = [];
-      for (const j of (list || [])) {
-        if (j.lat != null && j.lng != null) withCoords.push(j); else withoutCoords.push(j);
-      }
-      const near = withCoords
+      if (!center) return filterByLocation(list, loc); // search geocode failed → coarse city/state
+      return (list || [])
+        .filter(hasUsableCoords) // drop NULL / (0,0) — unknown location, can't be distance-checked
         .map(j => ({ j, d: haversineMiles(center, j) }))
         .filter(x => x.d <= radiusMiles + 1) // 1mi buffer for border rounding
         .sort((a, b) => a.d - b.d)
         .map(x => x.j);
-      return [...near, ...filterByLocation(withoutCoords, loc)];
     };
-    // Widen ranking (never-empty path): keep everything, nearest-first, no radius cap.
+    // Widen ranking (never-empty path): keep everything, nearest-first, no radius cap. Unknown
+    // coords (NULL / 0,0) sort last (Infinity) rather than being placed at a bogus (0,0) point.
     const rankByDistanceKeepAll = (list) => {
       if (!loc) return Array.isArray(list) ? list : [];
       if (!center) return sortByProximity(list, loc);
       return (list || [])
-        .map((j, i) => ({ j, d: (j.lat != null && j.lng != null) ? haversineMiles(center, j) : Infinity, i }))
+        .map((j, i) => ({ j, d: hasUsableCoords(j) ? haversineMiles(center, j) : Infinity, i }))
         .sort((a, b) => (a.d - b.d) || (a.i - b.i))
         .map(x => x.j);
     };
@@ -260,30 +261,33 @@ export default async function handler(req, res) {
         const now = encodeURIComponent(new Date().toISOString());
         const t3filter = buildFallbackFilter(qNorm);
         const qEnc = encodeURIComponent(qNorm);
-        // Pre-filter the pool to the searched place (city, else state) so we fetch
-        // location-relevant listings — not jobs from anywhere. '' for national searches.
-        const locTerm = locationDbTerm(loc);
-        const locClause = locTerm ? `&location=ilike.*${encodeURIComponent(locTerm)}*` : '';
 
-        const [expansion, kwRows, coRows, tgtRows, centerResolved] = await Promise.all([
+        // Geocode the searched place FIRST (cached in geocode_cache — usually one fast DB read)
+        // so the DB query itself is geo-scoped. THE SCALE FIX: we never fetch the whole ~22k
+        // corpus and haversine it in Node. Overlap the geocode with the cheap expansion +
+        // aggregation-target reads that don't depend on it.
+        const [expansion, tgtRows, centerResolved] = await Promise.all([
           getQueryExpansion(qNorm, SUPABASE_URL, dbHeaders),
-          t3filter
-            ? fetch(`${SUPABASE_URL}/rest/v1/jobs?${t3filter}${locClause}&expires_at=gt.${now}&limit=60`, { headers: dbHeaders })
-                .then(r => r.ok ? r.json() : []).catch(() => [])
-            : Promise.resolve([]),
-          // Company-column match so ANY company name surfaces its listings — not
-          // just the hardcoded set in buildFallbackFilter.
-          fetch(`${SUPABASE_URL}/rest/v1/jobs?company=ilike.*${qEnc}*${locClause}&expires_at=gt.${now}&limit=60`, { headers: dbHeaders })
-            .then(r => r.ok ? r.json() : []).catch(() => []),
           // Admin-tunable aggregation target (feature_flags.job_search_target.percentage).
           fetch(`${SUPABASE_URL}/rest/v1/feature_flags?flag_name=eq.job_search_target&select=percentage&limit=1`, { headers: dbHeaders })
             .then(r => r.ok ? r.json() : []).catch(() => []),
-          // Geocode the searched place once (cached) — overlapped with the DB reads.
-          // 'remote' is not a place: skip geocoding (a null center + remote loc also skips
-          // the radius filter below).
+          // 'remote' is not a place: skip geocoding (a null center + remote loc also skips the
+          // distance filter below).
           loc && !isRemote ? geocodeLocation(loc, SUPABASE_URL, SUPABASE_SERVICE_KEY) : Promise.resolve(null),
         ]);
         center = centerResolved;
+
+        // DB-side geo scope applied to EVERY pool query:
+        //  • center resolved → indexed bounding-box range scan (jobs_latlng_idx, migration 033),
+        //    NULL/(0,0) excluded. The DB returns only rows near the point — Node never loads the
+        //    corpus; the exact-circle haversine refine (applyRadius) runs on the ≤60-row page.
+        //  • geocode failed  → coarse `location ilike city/state` text (honest degrade).
+        //  • remote/national → no geo scope.
+        // The box (not the old exact-city text) is what lets a radius search surface NEARBY
+        // cities — Irvine/Santa Ana for a "Tustin" search — instead of only name matches.
+        const locTerm = locationDbTerm(loc);
+        const textClause = locTerm ? `&location=ilike.*${encodeURIComponent(locTerm)}*` : '';
+        const geoClause = isRemote ? '' : (center ? geoBoxClause(center, radiusMiles) : textClause);
 
         // Below TARGET related listings → top up from the live API. Admin lowers this
         // to calm aggregation, raises it to aggregate harder. Clamped to a sane range.
@@ -297,12 +301,24 @@ export default async function handler(req, res) {
         // matches (e.g. "SWE" → "Software Engineer") are kept, not dropped.
         relevanceQuery = [safeQuery, ...searchTerms].filter(Boolean).join(' ');
 
+        // Keyword-fallback + company-column pool reads, geo-scoped by the DB (bbox ANDs with
+        // the query filters). Company-column match surfaces ANY company name, not just the
+        // hardcoded buildFallbackFilter set.
+        const [kwRows, coRows] = await Promise.all([
+          t3filter
+            ? fetch(`${SUPABASE_URL}/rest/v1/jobs?${t3filter}${geoClause}&expires_at=gt.${now}&limit=60`, { headers: dbHeaders })
+                .then(r => r.ok ? r.json() : []).catch(() => [])
+            : Promise.resolve([]),
+          fetch(`${SUPABASE_URL}/rest/v1/jobs?company=ilike.*${qEnc}*${geoClause}&expires_at=gt.${now}&limit=60`, { headers: dbHeaders })
+            .then(r => r.ok ? r.json() : []).catch(() => []),
+        ]);
+
         // Search both search_query and title columns so jobs cached under different
         // query keys still surface for synonymous searches.
         const termRows = await Promise.all(
           searchTerms.map(term => {
             const orFilter = `or=${encodeURIComponent(`(search_query.ilike.*${term}*,title.ilike.*${term}*)`)}`;
-            return fetch(`${SUPABASE_URL}/rest/v1/jobs?${orFilter}${locClause}&expires_at=gt.${now}&limit=60`, { headers: dbHeaders })
+            return fetch(`${SUPABASE_URL}/rest/v1/jobs?${orFilter}${geoClause}&expires_at=gt.${now}&limit=60`, { headers: dbHeaders })
               .then(r => r.ok ? r.json() : []).catch(() => []);
           })
         );
@@ -787,6 +803,9 @@ async function _fetchAdzuna(what, where, appId, appKey, distKm) {
     const expires = new Date(Date.now() + 7*24*60*60*1000).toISOString();
     return (data.results||[]).map(j => {
       const salary = j.salary_min||j.salary_max ? (j.salary_min>=10000?`$${Math.round(j.salary_min/1000)}k`:j.salary_min>0?`$${j.salary_min}/hr`:null) : null;
+      // Keep Adzuna's coordinates so location-browsed listings are distance-filterable too;
+      // (0,0)/non-finite → NULL (honest "unknown"), never a bogus equator point.
+      const { lat: adzLat, lng: adzLng } = sanitizeCoords(j.latitude, j.longitude);
       const mapped = {
         title: j.title||what,
         company: j.company?.display_name||'Unknown',
@@ -800,6 +819,8 @@ async function _fetchAdzuna(what, where, appId, appKey, distKm) {
         level: inferLevel(j.title || ''),
         search_query: what,
         expires_at: expires,
+        lat: adzLat,
+        lng: adzLng,
       };
       return { ...mapped, score: scoreJob(mapped), waste_score: wasteScore(mapped) };
     }).filter(j=>j.company!=='Unknown'&&j.apply_url);
