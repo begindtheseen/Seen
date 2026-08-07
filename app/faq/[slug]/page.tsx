@@ -4,6 +4,7 @@ import {
   getScore, titleCase, slugify, grade, riskColor, riskLabel, pct,
   SEED_COMPANIES, type GrowthScore,
 } from '@/lib/growth'
+import { jsonLdHtml } from '@/lib/jsonLd'
 
 // Evergreen long-tail FAQ pages: /faq/does-amazon-ghost-applicants, /faq/google-hiring-process, etc.
 // Server-rendered, factual, embedding the company's LIVE grade + ghost data. Targets the exact
@@ -196,7 +197,7 @@ export default async function FaqSlugPage({ params }: { params: Promise<{ slug: 
 
   return (
     <div className="page-full">
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLdHtml(jsonLd) }} />
       <div style={S.wrap}>
         <div style={S.eyebrow}>
           <span style={{ width: 20, height: 1, background: 'var(--blue)', display: 'inline-block' }} />

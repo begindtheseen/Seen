@@ -3,6 +3,7 @@ import Link from 'next/link'
 import { getScoresByNames, slugify, grade, riskColor, riskLabel, pct, type LeaderboardRow } from '@/lib/growth'
 import { STAFFING_AGENCIES, type StaffingAgency } from '@/lib/agencies'
 import { pickActiveSponsor } from '@/lib/server/sponsorSlot'
+import { jsonLdHtml } from '@/lib/jsonLd'
 
 // The Staffing Agency Ghost Index: a ranked, living page of major staffing agencies by
 // ghosting/transparency signals. Server component + ISR, reading cached scores DIRECTLY from
@@ -191,7 +192,7 @@ export default async function AgenciesPage() {
 
   return (
     <div className="page-full">
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLdHtml(jsonLd) }} />
       <div style={wrap}>
         <div style={{ ...mono('.55rem', 'var(--blue)'), textTransform: 'uppercase', letterSpacing: '.2em', marginBottom: '.7rem', display: 'flex', alignItems: 'center', gap: 10 }}>
           <span style={{ width: 20, height: 1, background: 'var(--blue)', display: 'inline-block' }} />
