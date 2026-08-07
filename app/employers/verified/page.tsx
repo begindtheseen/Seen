@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
+import { EmployerNav, EmployerFooter } from '@/components/employer/EmployerNav'
 import { shapeVerifiedDirectory } from '@/lib/server/verifiedDirectory'
 
 // Public "companies that respond" directory (Wave 3). Lists currently Transparency-Verified employers
@@ -55,19 +56,7 @@ export default async function VerifiedDirectoryPage() {
 
   return (
     <div className="rise-in" style={{ minHeight: '100vh', background: 'radial-gradient(ellipse at 15% -5%,rgba(29,78,216,0.12) 0%,transparent 55%),radial-gradient(ellipse at 100% 5%,rgba(124,58,237,0.09) 0%,transparent 45%)' }}>
-      <header style={{ borderBottom: '1px solid var(--line)', background: 'rgba(5,7,15,.7)', backdropFilter: 'blur(12px)', position: 'sticky', top: 0, zIndex: 50 }}>
-        <div style={{ ...wrap, display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '.9rem 1.5rem' }}>
-          <Link href="/employers" style={{ display: 'flex', alignItems: 'center', gap: '.55rem', textDecoration: 'none' }}>
-            <span style={{ width: 8, height: 8, borderRadius: 999, background: 'var(--blue)', boxShadow: '0 0 8px var(--blue)' }} />
-            <span style={{ fontFamily: 'var(--display)', fontWeight: 800, fontSize: '1.05rem', color: 'var(--white)', letterSpacing: '-.02em' }}>Seen</span>
-            <span style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', color: 'var(--dim)', textTransform: 'uppercase', letterSpacing: '.12em' }}>verified</span>
-          </Link>
-          <div style={{ display: 'flex', gap: '1rem' }}>
-            <Link href="/employers" style={{ fontFamily: 'var(--mono)', fontSize: '.62rem', color: 'var(--sub)', textDecoration: 'none' }}>For employers</Link>
-            <Link href="/jobs" style={{ fontFamily: 'var(--mono)', fontSize: '.6rem', color: 'var(--dim)', textDecoration: 'none' }}>Find a job →</Link>
-          </div>
-        </div>
-      </header>
+      <EmployerNav />
 
       <div style={{ ...wrap, padding: '3.5rem 1.5rem 5rem' }}>
         <div style={{ textAlign: 'center', marginBottom: '2.5rem' }}>
@@ -119,6 +108,7 @@ export default async function VerifiedDirectoryPage() {
           </>
         )}
       </div>
+      <EmployerFooter />
     </div>
   )
 }
