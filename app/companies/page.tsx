@@ -4,6 +4,7 @@ import { useState, useEffect, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { Score } from '@/lib/score'
 import { AppStore } from '@/lib/stores/AppStore'
+import CompanyScoreModal from '@/components/CompanyScoreModal'
 
 interface Company {
   id: string
@@ -40,6 +41,7 @@ export default function CompaniesPage() {
   const [lookup, setLookup] = useState('')
   const [showLookupSuggs, setShowLookupSuggs] = useState(false)
   const [appliedCos, setAppliedCos] = useState<Set<string>>(new Set())
+  const [modalCo, setModalCo] = useState<string | null>(null)
 
   // Instant company autocomplete for the lookup field — filters the already-loaded leaderboard
   // (companies with scores) locally. Prefix matches rank first; free text still works for any
@@ -362,6 +364,13 @@ export default function CompaniesPage() {
                   href={`/company/${encodeURIComponent(
                     co.name.toLowerCase().replace(/\s+/g, '-')
                   )}`}
+                  onClick={(e) => {
+                    // Plain click pops the score modal in place. Cmd/Ctrl/Shift/middle-click
+                    // keep the native <a> behavior so "open in new tab" still works.
+                    if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0) return
+                    e.preventDefault()
+                    setModalCo(co.name)
+                  }}
                   style={{
                     textDecoration: 'none',
                     animation: `fadeUp .4s ${Math.min(i, 14) * 0.04}s ease both`,
@@ -479,6 +488,10 @@ export default function CompaniesPage() {
           </div>
         )}
       </div>
+
+      {modalCo && (
+        <CompanyScoreModal companyName={modalCo} onClose={() => setModalCo(null)} />
+      )}
     </div>
   )
 }
