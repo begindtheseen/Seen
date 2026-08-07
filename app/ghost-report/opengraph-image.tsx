@@ -1,7 +1,7 @@
 import { ImageResponse } from 'next/og'
 import { getLeaderboard, getScoresByNames, riskColor } from '@/lib/growth'
 import { STAFFING_AGENCIES } from '@/lib/agencies'
-import { assembleGhostReport } from '@/lib/server/ghostReport'
+import { assembleGhostReport, weekProvenance } from '@/lib/server/ghostReport'
 
 // Share card for the Weekly Ghost Report — the virality lever. Renders the REAL snapshot (top
 // reported ghosters + headline stats) in an on-brand 1200×630 card so pasting the /ghost-report
@@ -23,7 +23,8 @@ export default async function Image() {
   const byName = new Map<string, (typeof leaderboard)[number]>()
   for (const r of leaderboard) if (r?.name) byName.set(r.name.toLowerCase(), r)
   for (const [name, r] of agencyMap) if (!byName.has(name.toLowerCase())) byName.set(name.toLowerCase(), r)
-  const report = assembleGhostReport([...byName.values()], { agencyNames: agencyAliases.map((a) => a.toLowerCase()), topN: 3 })
+  const { weekLabel, weekNumber } = weekProvenance(new Date())
+  const report = assembleGhostReport([...byName.values()], { agencyNames: agencyAliases.map((a) => a.toLowerCase()), topN: 3, weekLabel, weekNumber })
 
   const h = report.headline
   const top = report.worstOffenders.slice(0, 3)

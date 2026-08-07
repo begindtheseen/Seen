@@ -69,3 +69,5 @@ export function assembleGhostReport(
 export function pickHeadline(report: GhostReport): string
 
 export function buildCaption(report: GhostReport, site?: string): string
+
+export function weekProvenance(date: Date | number | string): { weekLabel: string; weekNumber: number }
