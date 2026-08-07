@@ -8,6 +8,7 @@ import { ResumeStore } from '@/lib/stores/ResumeStore'
 import UpgradeModal from './UpgradeModal'
 import { FREE_DAILY_CREDITS } from '@/lib/creditRules'
 import ApplicationIntelligencePanel, { type ApplicationIntelligence } from './optimizer/ApplicationIntelligencePanel'
+import ErrorBoundary from './ErrorBoundary'
 import type { Job } from '@/lib/types'
 
 const CREDIT_WORD = FREE_DAILY_CREDITS === 1 ? 'credit' : 'credits'
@@ -759,7 +760,7 @@ export default function ApplyOptimizeModal({
               {aiPkg && (
                 <div style={{ borderTop: '1px solid var(--line)', paddingTop: '.9rem' }}>
                   <div style={{ ...kicker, color: 'var(--indigo)' }}>Deep match analysis</div>
-                  <ApplicationIntelligencePanel pkg={aiPkg} compact />
+                  <ErrorBoundary label="deep-dive-compact"><ApplicationIntelligencePanel pkg={aiPkg} compact /></ErrorBoundary>
                 </div>
               )}
 

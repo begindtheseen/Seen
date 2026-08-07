@@ -11,6 +11,7 @@ import UpgradeModal from '@/components/UpgradeModal'
 import { FREE_DAILY_CREDITS } from '@/lib/creditRules'
 import dynamic from 'next/dynamic'
 import ApplicationIntelligencePanel, { type ApplicationIntelligence, type ConfirmedAnswer } from '@/components/optimizer/ApplicationIntelligencePanel'
+import ErrorBoundary from '@/components/ErrorBoundary'
 
 const ResumeSurveyModal = dynamic(() => import('@/components/ResumeSurveyModal'), { ssr: false })
 
@@ -827,7 +828,7 @@ function ResumePageInner() {
                 {tab === 'intel' && (
                   fitState === 'loading' ? <ResultEmpty icon="⏳" text={'Building your deep match analysis…'} />
                   : fitOut?.application_intelligence
-                    ? <ApplicationIntelligencePanel pkg={fitOut.application_intelligence} onAnswers={rerunV2WithAnswers} rerunning={v2Rerunning} />
+                    ? <ErrorBoundary label="deep-dive"><ApplicationIntelligencePanel pkg={fitOut.application_intelligence} onAnswers={rerunV2WithAnswers} rerunning={v2Rerunning} /></ErrorBoundary>
                     : <ResultEmpty icon="🧬" text={'Run the analysis to see the deep match breakdown.'} />
                 )}
 

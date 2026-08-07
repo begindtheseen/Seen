@@ -122,7 +122,7 @@ function MatchRow({ m }: { m: AiMatch }) {
         {tag(m.matchType)}
       </div>
       {m.explanation && <div style={{ fontFamily: mono, fontSize: '.62rem', color: 'var(--sub)', lineHeight: 1.55, overflowWrap: 'anywhere' }}>{m.explanation}</div>}
-      {m.evidence && m.evidence.length > 0 && (
+      {Array.isArray(m.evidence) && typeof m.evidence[0] === 'string' && m.evidence[0].length > 0 && (
         <div style={{ fontFamily: mono, fontSize: '.58rem', color: c, lineHeight: 1.5, overflowWrap: 'anywhere' }}>▸ {m.evidence[0].slice(0, 140)}</div>
       )}
       {m.importance && <div style={{ fontFamily: mono, fontSize: '.52rem', color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '.05em' }}>{m.importance}{m.missSeverity ? ` · ${m.missSeverity}` : ''}</div>}
