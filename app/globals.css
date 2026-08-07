@@ -451,6 +451,7 @@ nav.nav-scrolled{background:rgba(6,6,8,0.82);backdrop-filter:blur(60px) saturate
 .dc-track{flex:1;height:3px;background:var(--line2);border-radius:2px;overflow:hidden}
 .dc-fill{height:100%;border-radius:2px}
 .dc-count{font-family:var(--mono);font-size:.7rem;color:var(--green)}
+@media(max-width:560px){.dc-hdr{flex-direction:column;align-items:flex-start;gap:.45rem}}
 
 /* ═══ RESUME AI ═══ */
 .resume-page{max-width:1100px;width:100%;margin:0 auto;padding:2.5rem 2rem;box-sizing:border-box}
@@ -468,6 +469,9 @@ nav.nav-scrolled{background:rgba(6,6,8,0.82);backdrop-filter:blur(60px) saturate
 .fi,.fs{width:100%;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.1);border-radius:10px;padding:.68rem .95rem;color:var(--white);font-family:var(--body);font-size:.85rem;outline:none;transition:border-color .2s,box-shadow .2s;appearance:none;caret-color:var(--blue)}
 .fi:focus,.fs:focus{border-color:var(--blue);box-shadow:0 0 0 1px rgba(59,130,246,0.4),0 0 20px rgba(59,130,246,0.15)}
 .fi::placeholder{color:var(--muted)}
+/* Native <select> dropdown affordance — appearance:none strips the OS chevron, so paint one back
+   on every select that uses the form classes (inputs/textarea keep the plain box). */
+select.fi,select.fs,select.fi-r,select.fs-r{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%239ca3af' stroke-width='2.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right .85rem center;background-size:12px;padding-right:2.2rem;cursor:pointer}
 .rta{width:100%;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.1);border-radius:10px;padding:.75rem .95rem;color:var(--white);font-family:var(--mono);font-size:.7rem;outline:none;resize:vertical;line-height:1.65;min-height:130px;transition:border-color .2s,box-shadow .2s;caret-color:var(--blue)}
 .rta:focus{border-color:var(--blue);box-shadow:0 0 0 1px rgba(59,130,246,0.4),0 0 20px rgba(59,130,246,0.15)}
 .rta::placeholder{color:var(--muted)}
@@ -663,6 +667,15 @@ nav.nav-scrolled{background:rgba(6,6,8,0.82);backdrop-filter:blur(60px) saturate
 .stage-step.current{background:var(--blue);color:#fff;font-weight:700}
 .stage-step.ghosted-stage{background:var(--rdim);color:var(--red)}
 .stage-step.hired-stage{background:var(--gdim);color:var(--green);font-weight:700}
+/* Terminal status badge on tracker cards (Ghosted / Hired / Rejected / Active). */
+.status-pill{display:inline-flex;align-items:center;gap:.3rem;font-family:var(--mono);font-size:.6rem;font-weight:600;text-transform:uppercase;letter-spacing:.06em;padding:.22rem .6rem;border-radius:999px;border:1px solid var(--line2);color:var(--sub);background:var(--raised)}
+.status-pill.ghosted{color:var(--red);background:var(--rdim);border-color:rgba(239,68,68,.3)}
+.status-pill.hired{color:var(--green);background:var(--gdim);border-color:rgba(16,185,129,.3)}
+.status-pill.rejected{color:var(--dim);background:var(--raised);border-color:var(--line2)}
+.status-pill.active{color:var(--blue);background:var(--bdim);border-color:rgba(59,130,246,.3)}
+/* Disclosure chevron that flips 180° when its parent <details> opens (FAQ + pricing FAQ). */
+.dt-chev{display:inline-block;transition:transform .22s ease}
+details[open] .dt-chev{transform:rotate(180deg)}
 
 /* Days tracker */
 .days-chip{font-family:var(--mono);font-size:.65rem;padding:.2rem .55rem;border-radius:5px;border:1px solid}
@@ -689,7 +702,7 @@ nav.nav-scrolled{background:rgba(6,6,8,0.82);backdrop-filter:blur(60px) saturate
 .pipeline-mini-card .days{font-family:var(--mono);font-size:.58rem}
 
 /* Stat chips in header */
-.tracker-stat{text-align:center}
+.tracker-stat{text-align:center;background:var(--raised);border:1px solid var(--line);border-radius:10px;padding:.7rem .5rem}
 .tracker-stat-n{font-family:var(--mono);font-size:1.35rem;font-weight:500;color:var(--white);display:block;line-height:1}
 .tracker-stat-l{font-family:var(--mono);font-size:.55rem;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-top:.2rem}
 

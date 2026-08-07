@@ -109,7 +109,7 @@ export default function FAQPage() {
               <details key={item.q} style={{ marginBottom: '.65rem', background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 10 }}>
                 <summary style={{ padding: '1rem 1.25rem', fontFamily: 'var(--display)', fontSize: '.9rem', fontWeight: 700, color: 'var(--white)', cursor: 'pointer', listStyle: 'none', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   {item.q}
-                  <span style={{ color: 'var(--dim)', fontWeight: 400, fontSize: '.7rem', flexShrink: 0, marginLeft: '.5rem' }}>+</span>
+                  <span className="dt-chev" style={{ color: 'var(--dim)', fontWeight: 400, fontSize: '.7rem', flexShrink: 0, marginLeft: '.5rem' }}>▾</span>
                 </summary>
                 <div style={{ padding: '0 1.25rem 1rem', fontFamily: 'var(--body)', fontSize: '.82rem', color: 'var(--sub)', lineHeight: 1.75 }}>
                   {item.a}

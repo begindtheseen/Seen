@@ -11,6 +11,7 @@ import { anthropicEnabled } from '../lib/server/aiflag.js';
 import { listEmployerListings, closeEmployerListing } from '../lib/server/employerListings.js';
 import { buildSearchUrl, parseRedditSearchAtom } from './_utils/companyReddit.js';
 import { SECURITY_PREAMBLE, fenceUntrusted, scanInjection } from '../lib/server/promptGuard.js';
+import { fetchIndustryBenchmark } from '../lib/server/benchmark.js';
 
 // Authorize admin/cron-only actions (the Anthropic web-research endpoints). Accepts a Vercel
 // cron header, a shared CRON_SECRET, or a valid admin_sessions token. Everything Anthropic in
@@ -295,6 +296,24 @@ export default async function handler(req, res) {
     if (await applyRateLimit(req, res, 'employer-close')) return;
     const r = await closeEmployerListing({ url: SUPABASE_URL, key: SUPABASE_SERVICE_KEY, jobId: body.job_id, reason: body.reason });
     return res.status(r.http).json(r.body);
+  }
+
+  // ── Industry benchmark (public, aggregate) — "you vs your industry on Seen". Powers the
+  //    never-empty employer reputation hero and the consumer company page's credibility context.
+  //    MUST be checked before the company_score block below, which greedily matches any body.name. ──
+  if (body.action === 'industry_benchmark') {
+    if (await applyRateLimit(req, res, 'company-score')) return;
+    const name = (body.name || body.company || '').trim();
+    if (!name) return res.status(400).json({ ok: false, error: 'name required' });
+    let benchmark = null;
+    try {
+      benchmark = await fetchIndustryBenchmark(name, {
+        SUPABASE_URL: process.env.SUPABASE_URL,
+        SERVICE_KEY: process.env.SUPABASE_SERVICE_KEY,
+      });
+    } catch { /* fail-soft: the page still renders its own score without the benchmark */ }
+    res.setHeader('Cache-Control', 'public, s-maxage=600, stale-while-revalidate=1200');
+    return res.status(200).json({ ok: true, benchmark });
   }
 
   // ── Company-score: merged from api/company-score.js ─────────────────────────

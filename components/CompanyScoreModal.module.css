@@ -1,0 +1,118 @@
+/* CompanyScoreModal — the score presented modal-first: a focused overlay that pops from the
+   scoreboard (and anywhere a company is named) so the grade is a glance, not a full-page trek.
+   All color/spacing from the Aura-Glass tokens in app/globals.css. */
+
+.overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding: 0;
+  background: rgba(3, 5, 12, 0.62);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  animation: overlayIn 0.18s ease both;
+}
+@media (min-width: 640px) {
+  .overlay { align-items: center; padding: 1.5rem; }
+}
+
+.dialog {
+  position: relative;
+  width: 100%;
+  max-width: 460px;
+  max-height: 92vh;
+  overflow-y: auto;
+  background: var(--glass-strong, var(--surface));
+  border: 1px solid var(--glass-line, var(--line2));
+  border-radius: 20px 20px 0 0;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08), 0 -20px 60px rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(28px) saturate(150%);
+  -webkit-backdrop-filter: blur(28px) saturate(150%);
+  padding: 1.5rem 1.4rem 1.3rem;
+  animation: sheetIn 0.28s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+@media (min-width: 640px) {
+  .dialog { border-radius: 20px; box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08), 0 30px 80px rgba(0, 0, 0, 0.6); animation: dialogIn 0.24s cubic-bezier(0.16, 1, 0.3, 1) both; }
+}
+
+.close {
+  position: absolute;
+  top: 0.9rem;
+  right: 0.9rem;
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: var(--raised);
+  color: var(--sub);
+  cursor: pointer;
+  font-size: 0.9rem;
+  line-height: 1;
+  transition: color 0.15s ease, border-color 0.15s ease;
+}
+.close:hover { color: var(--white); border-color: var(--line2); }
+
+/* Grab handle on the mobile sheet. */
+.handle { width: 36px; height: 4px; border-radius: 999px; background: var(--line2); margin: -0.4rem auto 0.9rem; }
+@media (min-width: 640px) { .handle { display: none; } }
+
+.head { display: flex; align-items: center; gap: 0.85rem; margin-bottom: 1.1rem; padding-right: 2rem; }
+.logo {
+  display: grid;
+  place-items: center;
+  width: 46px; height: 46px;
+  border-radius: 12px;
+  flex-shrink: 0;
+  background: linear-gradient(135deg, var(--g-start, #3b82f6) 0%, var(--g-mid, #6366f1) 55%, var(--g-end, #8b5cf6) 100%);
+  color: #fff;
+  font-family: var(--display);
+  font-weight: 800;
+  font-size: 1.2rem;
+}
+.name { font-family: var(--display); font-weight: 800; font-size: 1.1rem; color: var(--white); letter-spacing: -0.02em; line-height: 1.15; text-transform: capitalize; }
+.ind { font-family: var(--mono); font-size: 0.56rem; color: var(--dim); margin-top: 0.15rem; }
+.verified { font-family: var(--mono); font-size: 0.5rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: var(--blue); background: rgba(59, 130, 246, 0.12); border: 1px solid rgba(59, 130, 246, 0.4); border-radius: 999px; padding: 0.12rem 0.45rem; margin-left: 0.4rem; white-space: nowrap; }
+
+/* Grade block — ring + label. */
+.gradeRow { display: flex; align-items: center; gap: 1.1rem; margin-bottom: 1.1rem; }
+.ring { position: relative; width: 92px; height: 92px; flex-shrink: 0; }
+.ringNum { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+.ringGrade { font-family: var(--display); font-weight: 800; font-size: 2.1rem; line-height: 1; }
+.ringScore { font-family: var(--mono); font-size: 0.52rem; color: var(--dim); margin-top: 2px; }
+.gradeMeta { min-width: 0; }
+.gradeVerdict { font-family: var(--display); font-weight: 700; font-size: 0.92rem; color: var(--white); letter-spacing: -0.01em; margin-bottom: 0.28rem; }
+.dq { font-family: var(--mono); font-size: 0.54rem; font-weight: 600; display: inline-flex; align-items: center; gap: 0.3rem; }
+
+/* Metric chips row. */
+.metrics { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.5rem; margin-bottom: 1.1rem; }
+.metric { background: var(--raised); border: 1px solid var(--line); border-radius: 10px; padding: 0.6rem 0.5rem; text-align: center; }
+.metricN { font-family: var(--display); font-weight: 800; font-size: 1.05rem; line-height: 1; }
+.metricL { font-family: var(--mono); font-size: 0.48rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); margin-top: 0.3rem; }
+
+.benchWrap { margin-bottom: 1.1rem; }
+
+/* Footer actions. */
+.actions { display: flex; flex-direction: column; gap: 0.5rem; }
+.full {
+  display: flex; align-items: center; justify-content: center;
+  padding: 0.6rem 1rem; border-radius: 10px;
+  border: 1px solid var(--line2); background: transparent;
+  font-family: var(--mono); font-size: 0.72rem; color: var(--sub); text-decoration: none;
+  transition: color 0.15s ease, border-color 0.15s ease, background 0.15s ease;
+}
+.full:hover { color: var(--white); border-color: var(--line2); background: var(--raised); }
+
+.skeleton { display: flex; flex-direction: column; gap: 1rem; padding: 0.5rem 0; }
+.skRow { display: flex; gap: 1rem; align-items: center; }
+
+@keyframes overlayIn { from { opacity: 0; } to { opacity: 1; } }
+@keyframes sheetIn { from { transform: translateY(100%); } to { transform: translateY(0); } }
+@keyframes dialogIn { from { opacity: 0; transform: translateY(10px) scale(0.98); } to { opacity: 1; transform: translateY(0) scale(1); } }
+@media (prefers-reduced-motion: reduce) {
+  .overlay, .dialog { animation: none; }
+}

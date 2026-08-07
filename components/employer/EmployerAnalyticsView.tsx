@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useAuth } from '@/lib/auth'
 import { useCountUp } from '@/lib/hooks/useCountUp'
+import IndustryBenchmark, { type Benchmark } from '@/components/IndustryBenchmark'
 
 // Employer posting analytics — the login-scoped CLIENT view for the hub's Analytics tab.
 //
@@ -65,6 +66,7 @@ type Loaded = {
   verified: boolean
   analytics: Analytics
   activity?: ActivityShape | null
+  benchmark?: Benchmark | null
 }
 
 const mono = (size: string, color: string): React.CSSProperties => ({ fontFamily: 'var(--mono)', fontSize: size, color })
@@ -303,6 +305,11 @@ export function EmployerAnalyticsView() {
   if (!analytics.hasData) {
     return (
       <div>
+        {data.benchmark && (
+          <div className="emp-reveal" style={{ marginBottom: '1.4rem' }}>
+            <IndustryBenchmark benchmark={data.benchmark} variant="employer" />
+          </div>
+        )}
         <ActivityCard activity={data.activity} />
         <StateCard
           title={`No applicant reports for “${resolvedCompany}” yet.`}
@@ -320,6 +327,12 @@ export function EmployerAnalyticsView() {
     <div>
       {/* Applicant activity (apply-clicks) — the freshest signal, top of the tab. */}
       <ActivityCard activity={data.activity} />
+      {/* Industry benchmark — how this grade compares to the sector on Seen (always available). */}
+      {data.benchmark && (
+        <div className="emp-reveal" style={{ marginBottom: '1.4rem' }}>
+          <IndustryBenchmark benchmark={data.benchmark} variant="employer" />
+        </div>
+      )}
       {/* Identity + headline reputation (what candidates see) */}
       <div className="emp-reveal" style={{ ...card, animationDelay: '0ms' }}>
         <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', flexWrap: 'wrap', gap: '.5rem', marginBottom: '1.2rem' }}>
@@ -426,18 +439,18 @@ export function EmployerAnalyticsView() {
           Seen doesn’t host individual postings, so role is the finest posting-level cut the data supports —
           the honest stand-in for per-posting performance.
         </p>
-        <div style={{ display: 'grid', gap: '.7rem' }}>
-          <div style={{ display: 'grid', gridTemplateColumns: 'minmax(120px,2fr) 1fr 1fr 1fr', gap: '.6rem', paddingBottom: '.4rem', borderBottom: '1px solid var(--line)' }}>
+        <div style={{ display: 'grid', gap: '.7rem', overflowX: 'auto' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'minmax(120px,2fr) 1fr 1fr 1fr', minWidth: 360, gap: '.6rem', paddingBottom: '.4rem', borderBottom: '1px solid var(--line)' }}>
             {['Role', 'Reports', 'Responded', 'Ghosted'].map((t, i) => (
               <span key={t} style={{ ...mono('.55rem', 'var(--dim)'), textTransform: 'uppercase', letterSpacing: '.08em', textAlign: i === 0 ? 'left' : 'right' }}>{t}</span>
             ))}
           </div>
           {analytics.roles.map(r => (
-            <div key={r.role} style={{ display: 'grid', gridTemplateColumns: 'minmax(120px,2fr) 1fr 1fr 1fr', gap: '.6rem', alignItems: 'center' }}>
+            <div key={r.role} style={{ display: 'grid', gridTemplateColumns: 'minmax(120px,2fr) 1fr 1fr 1fr', minWidth: 360, gap: '.6rem', alignItems: 'center' }}>
               <span style={{ fontFamily: 'var(--mono)', fontSize: '.68rem', color: 'var(--white)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.role}</span>
-              <span style={{ ...mono('.66rem', 'var(--sub)'), textAlign: 'right' }}>{r.count.toLocaleString()}</span>
-              <span style={{ ...mono('.66rem', 'var(--green)'), textAlign: 'right' }}>{r.responded} · {fmtPct(r.respondedPct)}</span>
-              <span style={{ ...mono('.66rem', 'var(--red)'), textAlign: 'right' }}>{r.ghosted} · {fmtPct(r.ghostedPct)}</span>
+              <span style={{ ...mono('.66rem', 'var(--sub)'), textAlign: 'right', whiteSpace: 'nowrap' }}>{r.count.toLocaleString()}</span>
+              <span style={{ ...mono('.66rem', 'var(--green)'), textAlign: 'right', whiteSpace: 'nowrap' }}>{r.responded} · {fmtPct(r.respondedPct)}</span>
+              <span style={{ ...mono('.66rem', 'var(--red)'), textAlign: 'right', whiteSpace: 'nowrap' }}>{r.ghosted} · {fmtPct(r.ghostedPct)}</span>
             </div>
           ))}
         </div>

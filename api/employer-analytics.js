@@ -10,6 +10,7 @@
 import { resolveEmployerUid, resolveApprovedClaim } from '../lib/server/employerAuth.js';
 import { fetchEmployerAnalytics } from '../lib/server/employerAnalytics.js';
 import { shapeApplyActivity } from '../lib/server/employerActivity.js';
+import { fetchIndustryBenchmark } from '../lib/server/benchmark.js';
 
 const ALLOWED = ['https://seenjobs.io', 'https://www.seenjobs.io'];
 
@@ -44,6 +45,13 @@ export default async function handler(req, res) {
 
     const result = await fetchEmployerAnalytics(claim.companyName);
 
+    // Industry benchmark — the "never-empty" layer. Even when there are zero first-party reports
+    // (result.hasData === false), the company's web-researched score + its industry peers still let
+    // us show "here's your reputation vs your industry on Seen." Fail-soft: analytics still returns
+    // its reports-derived view if this can't be computed.
+    let benchmark = null;
+    try { benchmark = await fetchIndustryBenchmark(claim.companyName, { SUPABASE_URL, SERVICE_KEY }); } catch { /* fail soft */ }
+
     // Applicant activity — the observable apply-click signal (migration 058), aggregate + no PII.
     // company_key-scoped, cap the window generously; the pure shaper does the 7/30-day + per-role cut.
     let activity = null;
@@ -56,7 +64,7 @@ export default async function handler(req, res) {
       activity = shapeApplyActivity(events, Date.now());
     } catch { /* fail soft — analytics still returns the reports-derived view */ }
 
-    return res.status(200).json({ ok: true, company: claim.companyName, activity, ...result });
+    return res.status(200).json({ ok: true, company: claim.companyName, activity, benchmark, ...result });
   } catch (e) {
     console.error('[employer-analytics] Unhandled error:', e?.message || e);
     return res.status(500).json({ error: 'Internal server error' });

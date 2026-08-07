@@ -319,8 +319,10 @@ export default function JobsPage() {
             ))}
           </div>
         ) : (
-          <div style={{ textAlign: 'center', padding: '4rem 2rem', color: 'var(--muted)', fontFamily: 'var(--mono)', fontSize: '.75rem' }}>
-            No results found. Try a different title or wider radius.
+          <div style={{ textAlign: 'center', padding: '4rem 2rem' }}>
+            <div style={{ fontSize: '2rem', marginBottom: '.75rem' }}>🔍</div>
+            <div style={{ fontFamily: 'var(--display)', fontSize: '1.05rem', fontWeight: 800, color: 'var(--white)', marginBottom: '.4rem' }}>No matches for this search</div>
+            <div style={{ color: 'var(--sub)', fontFamily: 'var(--body)', fontSize: '.82rem', fontWeight: 300, maxWidth: 360, margin: '0 auto', lineHeight: 1.6 }}>Try a broader job title, widen the radius, or clear a filter — new roles are indexed continuously.</div>
           </div>
         )}
       </div>

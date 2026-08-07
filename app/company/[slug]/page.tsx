@@ -9,6 +9,7 @@ import CompanyScoreCard from '@/components/CompanyScoreCard'
 import { isRedditSourced, PUBLIC_DISCUSSION_LABEL } from '@/lib/reportSource'
 import CompanyRedditDiscussion from '@/components/CompanyRedditDiscussion'
 import CompanyPublicRecord from '@/components/CompanyPublicRecord'
+import IndustryBenchmark, { type Benchmark } from '@/components/IndustryBenchmark'
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -411,11 +412,11 @@ function OutcomeDistribution({ reports }: { reports: Report[] }) {
   reports.forEach(r => { const oc = r.outcome || 'unknown'; dist[oc] = (dist[oc] || 0) + 1 })
   const total = reports.length
   const merged = [
-    { label: 'Ghosted',   count: dist.ghosted || 0,                                                   color: '#ef4444' },
-    { label: 'Rejected',  count: (dist.rejected || 0) + (dist.autoreject || 0),                       color: '#f59e0b' },
-    { label: 'Interview', count: (dist.interview || 0) + (dist.human || 0) + (dist.interviewing || 0), color: '#3b82f6' },
-    { label: 'Hired',     count: (dist.hired || 0) + (dist.offer || 0),                               color: '#10b981' },
-    { label: 'Waiting',   count: dist.waiting || 0,                                                    color: '#6b7280' },
+    { label: 'Ghosted',   count: dist.ghosted || 0,                                                   color: 'var(--red)' },
+    { label: 'Rejected',  count: (dist.rejected || 0) + (dist.autoreject || 0),                       color: 'var(--amber)' },
+    { label: 'Interview', count: (dist.interview || 0) + (dist.human || 0) + (dist.interviewing || 0), color: 'var(--blue)' },
+    { label: 'Hired',     count: (dist.hired || 0) + (dist.offer || 0),                               color: 'var(--green)' },
+    { label: 'Waiting',   count: dist.waiting || 0,                                                    color: 'var(--dim)' },
   ].filter(s => s.count > 0)
 
   return (
@@ -486,6 +487,7 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
   const [tab, setTab] = useState<TabKey>('overview')
   const [location, setLocation] = useState('')
   const [webReviews, setWebReviews] = useState<WebReview[]>([])
+  const [benchmark, setBenchmark] = useState<Benchmark | null>(null)
   // Approved employer replies to reports, keyed by report id (Wave 2). Display-only employer voice,
   // never a score input — clearly labeled as the employer's claim.
   const [employerReplies, setEmployerReplies] = useState<Record<string, { body: string; created_at: string }>>({})
@@ -598,6 +600,20 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
     }
     load()
   }, [companyName, location]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Industry benchmark — how this company ranks vs its sector on Seen (public aggregate). Turns a
+  // bare score into authoritative context. Fail-soft: the page renders fine without it.
+  useEffect(() => {
+    let alive = true
+    fetch('/api/reports', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'industry_benchmark', name: companyName }),
+    })
+      .then(r => (r.ok ? r.json() : { benchmark: null }))
+      .then(d => { if (alive) setBenchmark((d?.benchmark as Benchmark) || null) })
+      .catch(() => {})
+    return () => { alive = false }
+  }, [companyName])
 
   // Fetch open roles when roles tab is first opened
   useEffect(() => {
@@ -869,8 +885,10 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
               {/* Ghost surge alert */}
               <GhostSurgeAlert ghostRate={score.ghost_rate || 0} />
 
-              {/* Emotional ghost rate visual */}
-              <GhostVisual ghostRate={score.ghost_rate || 0} count={fpReports} />
+              {/* Emotional ghost-rate visual — suppressed when the surge alert above already owns the
+                  high-ghost story (ghost ≥ 50%), so a high-ghost company never stacks two red ghost
+                  panels back-to-back. The Ghost% metric box below still carries the number either way. */}
+              {(score.ghost_rate || 0) < 0.5 && <GhostVisual ghostRate={score.ghost_rate || 0} count={fpReports} />}
 
               {/* Metrics grid */}
               <div className="co-mets">
@@ -942,6 +960,11 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
                   ghostRate={score.ghost_rate}
                   overallScore={score.overall_score}
                 />
+                {benchmark && (
+                  <div style={{ margin: '0 0 1rem' }}>
+                    <IndustryBenchmark benchmark={benchmark} variant="public" companyName={companyName} />
+                  </div>
+                )}
                 <OutcomeDistribution reports={reports} />
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(240px,1fr))', gap: '1rem', marginBottom: '1rem' }}>
                   <div style={{ background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 10, padding: '1.2rem' }}>
