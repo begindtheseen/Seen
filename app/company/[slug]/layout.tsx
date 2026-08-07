@@ -4,6 +4,7 @@ import type { Metadata } from 'next'
 // `next build`). generateMetadata + the layout render below both go through this one helper.
 import { getScore, firstPartyReportCount, displayCompanyName, type GrowthScore } from '@/lib/growth'
 import { buildCompanyFaq } from '@/lib/server/companyFaq'
+import { jsonLdHtml } from '@/lib/jsonLd'
 
 const titleCase = (slug: string) => slug.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
 // Slug-mangled fallback only when no score row exists — the stored name keeps real punctuation
@@ -149,7 +150,7 @@ export default async function CompanySlugLayout(
 
   return (
     <>
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLdHtml(jsonLd) }} />
       {hasFacts && s && (
         <section
           aria-label={`${name} hiring data summary`}

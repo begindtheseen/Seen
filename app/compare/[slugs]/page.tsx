@@ -3,6 +3,7 @@ import Link from 'next/link'
 import { getScore, titleCase, pct } from '@/lib/growth'
 import ComparePicker from '../ComparePicker'
 import CompareView from '../CompareView'
+import { jsonLdHtml } from '@/lib/jsonLd'
 
 // SEO comparison page: /compare/amazon-vs-google → "Amazon vs Google hiring" intent.
 export const revalidate = 3600
@@ -69,7 +70,7 @@ export default async function CompareSlugsPage({ params }: { params: Promise<{ s
 
   return (
     <div className="page-full">
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLdHtml(jsonLd) }} />
       <div style={wrap}>
         <div style={{ fontFamily: 'var(--mono)', fontSize: '.55rem', textTransform: 'uppercase', letterSpacing: '.2em', color: 'var(--blue)', marginBottom: '.7rem', display: 'flex', alignItems: 'center', gap: 10 }}>
           <span style={{ width: 20, height: 1, background: 'var(--blue)', display: 'inline-block' }} />

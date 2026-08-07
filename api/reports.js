@@ -462,8 +462,8 @@ export default async function handler(req, res) {
       if (!VALID.has(outcome)) return res.status(400).json({ error: 'invalid outcome' });
 
       const hdrs = { ...hdrsBase, Prefer: 'return=representation' };
-      const safeCo  = String(co).trim().slice(0, 200);
-      const safeLoc = location ? String(location).trim().slice(0, 200) : '';
+      const safeCo  = String(co).trim().slice(0, 200).replace(/[<>`\\]/g, '');
+      const safeLoc = location ? String(location).trim().slice(0, 200).replace(/[<>`\\]/g, '') : '';
       const normalize = n => n ? n.trim().toLowerCase().replace(/[\s,]+(inc\.?|llc\.?|corp\.?|ltd\.?|co\.|plc\.?|group|holdings|enterprises|solutions|technologies)\.?$/i, '').trim() : '';
       const coNorm = normalize(safeCo);
 
@@ -666,8 +666,8 @@ export default async function handler(req, res) {
     const submitUid = await resolveUid(req);
     const trusted = !!submitUid;
     const hdrs = { ...hdrsBase, Prefer: 'return=representation' };
-    const safeCo = co.trim().slice(0, 200);
-    const safeLoc = (location || '').trim().slice(0, 200);
+    const safeCo = co.trim().slice(0, 200).replace(/[<>`\\]/g, '');
+    const safeLoc = (location || '').trim().slice(0, 200).replace(/[<>`\\]/g, '');
     const normalize = n => n ? n.trim().toLowerCase().replace(/[\s,]+(inc\.?|llc\.?|corp\.?|ltd\.?|co\.|plc\.?|group|holdings|enterprises|solutions|technologies)\.?$/i, '').trim() : '';
     const coNorm = normalize(safeCo);
 
