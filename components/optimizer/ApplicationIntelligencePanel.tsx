@@ -86,6 +86,16 @@ const mono = 'var(--mono)'
 function scoreColor(s: number): string { return s >= 70 ? 'var(--green)' : s >= 45 ? 'var(--amber)' : 'var(--red)' }
 function pct(n: number): string { return `${Math.round((n || 0) * 100)}%` }
 
+// Render-safe text coercion. The panel renders many fields straight from a complex local engine;
+// if one is ever an object (e.g. a warning {code,severity,message}) React throws "Objects are not
+// valid as a React child" and the whole section fails. Route every engine string through this.
+function asText(v: unknown): string {
+  if (typeof v === 'string') return v
+  if (typeof v === 'number') return String(v)
+  if (v && typeof v === 'object' && 'message' in v) return String((v as { message?: unknown }).message ?? '')
+  return v == null ? '' : String(v)
+}
+
 function matchColor(t: MatchType): string {
   return t === 'exact' ? 'var(--green)'
     : t === 'adjacent' ? 'var(--green)'
@@ -118,10 +128,10 @@ function MatchRow({ m }: { m: AiMatch }) {
   return (
     <li style={{ display: 'flex', flexDirection: 'column', gap: '.25rem', background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 8, padding: '.6rem .75rem' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: '.5rem' }}>
-        <span style={{ fontSize: '.76rem', color: 'var(--white)', fontWeight: 600, minWidth: 0, overflowWrap: 'anywhere', flex: 1 }}>{m.requirement}</span>
+        <span style={{ fontSize: '.76rem', color: 'var(--white)', fontWeight: 600, minWidth: 0, overflowWrap: 'anywhere', flex: 1 }}>{asText(m.requirement)}</span>
         {tag(m.matchType)}
       </div>
-      {m.explanation && <div style={{ fontFamily: mono, fontSize: '.62rem', color: 'var(--sub)', lineHeight: 1.55, overflowWrap: 'anywhere' }}>{m.explanation}</div>}
+      {m.explanation && <div style={{ fontFamily: mono, fontSize: '.62rem', color: 'var(--sub)', lineHeight: 1.55, overflowWrap: 'anywhere' }}>{asText(m.explanation)}</div>}
       {Array.isArray(m.evidence) && typeof m.evidence[0] === 'string' && m.evidence[0].length > 0 && (
         <div style={{ fontFamily: mono, fontSize: '.58rem', color: c, lineHeight: 1.5, overflowWrap: 'anywhere' }}>▸ {m.evidence[0].slice(0, 140)}</div>
       )}
@@ -305,10 +315,10 @@ export default function ApplicationIntelligencePanel({
                   <div key={b.id || i} style={{ background: 'rgba(245,158,11,.06)', border: '1px solid rgba(245,158,11,.2)', borderRadius: 8, padding: '.7rem .85rem' }}>
                     <div style={{ fontSize: '.74rem', color: 'var(--sub)', lineHeight: 1.6, overflowWrap: 'anywhere' }}>{b.text}</div>
                     {(b.confirmBeforeUsing || []).map((c, j) => (
-                      <div key={j} style={{ fontFamily: mono, fontSize: '.56rem', color: 'var(--amber)', marginTop: '.35rem', lineHeight: 1.5, overflowWrap: 'anywhere' }}>→ {c}</div>
+                      <div key={j} style={{ fontFamily: mono, fontSize: '.56rem', color: 'var(--amber)', marginTop: '.35rem', lineHeight: 1.5, overflowWrap: 'anywhere' }}>→ {asText(c)}</div>
                     ))}
                     {(b.warnings || []).map((w, j) => (
-                      <div key={`w${j}`} style={{ fontFamily: mono, fontSize: '.54rem', color: 'var(--muted)', marginTop: '.3rem', lineHeight: 1.45, overflowWrap: 'anywhere' }}>{w}</div>
+                      <div key={`w${j}`} style={{ fontFamily: mono, fontSize: '.54rem', color: 'var(--muted)', marginTop: '.3rem', lineHeight: 1.45, overflowWrap: 'anywhere' }}>{asText(w)}</div>
                     ))}
                   </div>
                 ))}
@@ -324,7 +334,7 @@ export default function ApplicationIntelligencePanel({
               <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: '.4rem' }}>
                 {pkg.interview_defense.map((n, i) => (
                   <li key={i} style={{ display: 'flex', gap: '.5rem', fontSize: '.72rem', color: n.severity === 'high' ? 'var(--red)' : n.severity === 'medium' ? 'var(--amber)' : 'var(--muted)', lineHeight: 1.5 }}>
-                    <span style={{ flexShrink: 0 }}>{n.severity === 'high' ? '✕' : '⚠'}</span><span style={{ minWidth: 0, overflowWrap: 'anywhere' }}>{n.message}</span>
+                    <span style={{ flexShrink: 0 }}>{n.severity === 'high' ? '✕' : '⚠'}</span><span style={{ minWidth: 0, overflowWrap: 'anywhere' }}>{asText(n.message)}</span>
                   </li>
                 ))}
               </ul>
