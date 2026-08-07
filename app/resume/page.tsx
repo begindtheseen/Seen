@@ -6,6 +6,7 @@ import { ResumeStore } from '@/lib/stores/ResumeStore'
 import { SavedJobsStore } from '@/lib/stores/SavedJobs'
 import { useAuth } from '@/lib/auth'
 import { aiHeaders } from '@/lib/aiHeaders'
+import { parseResumeFile } from '@/lib/resumeUploadClient'
 import type { SavedJob } from '@/lib/types'
 import UpgradeModal from '@/components/UpgradeModal'
 import { FREE_DAILY_CREDITS } from '@/lib/creditRules'
@@ -372,7 +373,7 @@ function ResumeInput({ resumeText, setResumeText, resumeMeta, onUpload, onClear,
 }
 
 function ResumePageInner() {
-  const { isLoggedIn, user } = useAuth()
+  const { isLoggedIn, user, profile } = useAuth()
   const params = useSearchParams()
 
   const [resumeText, setResumeText] = useState('')
@@ -483,28 +484,24 @@ function ResumePageInner() {
   }
 
   async function uploadFile(file: File) {
-    const reader = new FileReader()
-    reader.onload = async (ev) => {
-      const b64 = (ev.target?.result as string).split(',')[1]
-      try {
-        const res = await fetch('/api/resume', { method: 'POST', headers: await aiHeaders(), body: JSON.stringify({ action: 'parse', base64: b64, fileName: file.name, mimeType: file.type }) })
-        const data = await res.json() as { text?: string; credits_required?: boolean; error?: string }
-        if (data.credits_required) {
-          if (isLoggedIn) { setUpgradeReason('credits'); setUpgradeFeature(undefined); setShowUpgrade(true) }
-          else setError('Sign in to use AI resume features.')
-          return
-        }
-        if (data.text) {
-          window.dispatchEvent(new Event('seen:credits-updated'))
-          const wc = data.text.trim().split(/\s+/).length
-          await ResumeStore.save(data.text, file.name, wc, user?.id, isLoggedIn)
-          setResumeText(data.text); setResumeMeta({ fileName: file.name, wordCount: wc }); setError('')
-        } else {
-          setError(data.error || 'Could not read this file. Paste your résumé text into the box instead.')
-        }
-      } catch { setError('Failed to parse file. Try pasting text instead.') }
-    }
-    reader.readAsDataURL(file)
+    try {
+      // Canonical upload path (shared with Settings). Passing the profile city lets the server
+      // fire the background résumé→jobs match at the user's location — non-blocking.
+      const r = await parseResumeFile(file, { location: profile?.city || '' })
+      if (r.credits_required) {
+        if (isLoggedIn) { setUpgradeReason('credits'); setUpgradeFeature(undefined); setShowUpgrade(true) }
+        else setError('Sign in to use AI resume features.')
+        return
+      }
+      if (r.ok && r.text) {
+        window.dispatchEvent(new Event('seen:credits-updated'))
+        const wc = r.wordCount || r.text.trim().split(/\s+/).length
+        await ResumeStore.save(r.text, r.fileName, wc, user?.id, isLoggedIn)
+        setResumeText(r.text); setResumeMeta({ fileName: r.fileName, wordCount: wc }); setError('')
+      } else {
+        setError(r.error || 'Could not read this file. Paste your résumé text into the box instead.')
+      }
+    } catch { setError('Failed to parse file. Try pasting text instead.') }
   }
   async function handleUpload(e: React.ChangeEvent<HTMLInputElement>) { const f = e.target.files?.[0]; if (f) await uploadFile(f) }
   function clearResume() { ResumeStore.clear(user?.id, isLoggedIn); setResumeText(''); setResumeMeta(null) }

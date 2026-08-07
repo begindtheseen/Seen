@@ -5,6 +5,7 @@ import Nav from '@/components/Nav'
 import Footer from '@/components/Footer'
 import IntroSplash from '@/components/IntroSplash'
 import { ToastHost } from '@/components/ToastHost'
+import MicroSurveyHost from '@/components/MicroSurveyHost'
 import './globals.css'
 
 export const metadata: Metadata = {
@@ -74,6 +75,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <Footer />
           <div id="toast" />
           <ToastHost />
+          <MicroSurveyHost />
         </AuthProvider>
       </body>
     </html>

@@ -7,6 +7,7 @@ import { runAdvantage, extractEmployment, extractCareerSignal, buildResumeDocume
 import { scannerFromSeenFit, optimizeFromSeenFit } from '../lib/server/seenfitCompat.js';
 import { extractUploadText } from '../lib/server/resumeUpload.js';
 import { isReadableResume } from '../lib/server/resumeReadability.js';
+import { deriveResumeJobQuery, pullResumeJobFloor } from '../lib/server/resumeJobMatch.js';
 
 // One-line "Seen data" block from read-only company intel (ghost/response from our
 // scores), or '' when we have no data on the company. This is the differentiator —
@@ -183,7 +184,7 @@ export default async function handler(req, res) {
 // ── Parse handler (formerly api/parse-resume.js) ─────────────────────────────
 async function handleParseResume(req, res, body) {
   try {
-    const { base64, fileName, mimeType } = body;
+    const { base64, fileName, mimeType, location } = body;
     // Keyless file→text extraction + quality gates (PDF / Word / plain-text). See resumeUpload.js.
     const extracted = await extractUploadText({ base64, fileName, mimeType });
     if (!extracted.ok) return res.status(extracted.status).json({ error: extracted.error });
@@ -194,10 +195,15 @@ async function handleParseResume(req, res, body) {
     try { employment = extractEmployment(extractedText); }
     catch(_) { employment = []; }
 
-    // Fire-and-forget signal extraction — runs in background, never blocks parse response
+    // Fire-and-forget: persist the résumé signal, THEN warm the corpus for the résumé's role
+    // so the /jobs "Matched to your résumé" rail is already full when the user gets there. A
+    // parsed résumé is the strongest job-seeking signal we get — act on it. BOTH steps are
+    // best-effort and NEVER block the parse response (the analysis returns instantly below);
+    // the pull is cooldown + global-budget guarded, so a flood of uploads can't stampede spend.
     Promise.race([
-      storeCareerSignals(extractedText, employment, req),
-      new Promise(r => setTimeout(r, 3000)),
+      storeCareerSignals(extractedText, employment, req)
+        .then(signal => warmResumeJobs(signal, employment, location)),
+      new Promise(r => setTimeout(r, 8000)),
     ]).catch(() => {});
 
     return res.status(200).json({ ok: true, text: extractedText, fileName, fileType, wordCount, employment });
@@ -763,7 +769,7 @@ async function storeCareerSignals(resumeText, employment, req) {
   // Keep the old names as a fallback in case an env sets only those.
   const SUPABASE_URL = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
   const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!SUPABASE_URL || !SUPABASE_SERVICE_KEY) return;
+  if (!SUPABASE_URL || !SUPABASE_SERVICE_KEY) return null;
 
   // Get user_id from JWT if available
   let userId = null;
@@ -780,49 +786,81 @@ async function storeCareerSignals(resumeText, employment, req) {
   let signal = null;
   try { signal = extractCareerSignal(resumeText, employment); }
   catch (_) { signal = null; }
-  if (!signal?.skills?.length) return;
+  if (!signal?.skills?.length) return null;
 
-  const sb = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
+  // The anonymized inserts below are best-effort — never let one failing reject this function,
+  // so the caller still gets `signal` back and the résumé→jobs warm can fire off it.
+  try {
+    const sb = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
 
-  // Layer 1: per-user resume_skills (private, with user_id)
-  if (userId) {
-    const topTitles = employment.slice(0, 3).map(e => e.title).filter(Boolean);
-    await sb.from('resume_skills').upsert({
-      user_id: userId,
+    // Layer 1: per-user resume_skills (private, with user_id)
+    if (userId) {
+      const topTitles = employment.slice(0, 3).map(e => e.title).filter(Boolean);
+      await sb.from('resume_skills').upsert({
+        user_id: userId,
+        skills: signal.skills,
+        seniority: signal.seniority,
+        function: signal.function,
+        years_exp: signal.years_exp,
+        top_titles: topTitles,
+        updated_at: new Date().toISOString(),
+      }, { onConflict: 'user_id' }).catch(() => {});
+    }
+
+    // Layer 2: anonymized career_signals (no user_id — pure market signal)
+    const { data: signalRow } = await sb.from('career_signals').insert({
       skills: signal.skills,
       seniority: signal.seniority,
       function: signal.function,
       years_exp: signal.years_exp,
-      top_titles: topTitles,
-      updated_at: new Date().toISOString(),
-    }, { onConflict: 'user_id' }).catch(() => {});
-  }
+    }).select('id').single();
 
-  // Layer 2: anonymized career_signals (no user_id — pure market signal)
-  const { data: signalRow } = await sb.from('career_signals').insert({
-    skills: signal.skills,
-    seniority: signal.seniority,
-    function: signal.function,
-    years_exp: signal.years_exp,
-  }).select('id').single();
-
-  // Layer 2b: career transitions (anonymized, from employment history)
-  if (signalRow?.id && employment.length >= 2) {
-    const transitions = [];
-    for (let i = 0; i < employment.length - 1; i++) {
-      const from = employment[i + 1]; // older role
-      const to   = employment[i];     // newer role
-      if (from.title && to.title) {
-        // Estimate years in prior role (best-effort, not surfaced to user)
-        let yearsInPrior = null;
-        if (from.start_date && from.end_date && from.end_date !== 'Present') {
-          const yr = s => parseInt(s.replace(/\D/g, '').slice(0, 4));
-          const diff = yr(from.end_date) - yr(from.start_date);
-          if (!isNaN(diff) && diff >= 0 && diff <= 40) yearsInPrior = diff;
+    // Layer 2b: career transitions (anonymized, from employment history)
+    if (signalRow?.id && employment.length >= 2) {
+      const transitions = [];
+      for (let i = 0; i < employment.length - 1; i++) {
+        const from = employment[i + 1]; // older role
+        const to   = employment[i];     // newer role
+        if (from.title && to.title) {
+          // Estimate years in prior role (best-effort, not surfaced to user)
+          let yearsInPrior = null;
+          if (from.start_date && from.end_date && from.end_date !== 'Present') {
+            const yr = s => parseInt(s.replace(/\D/g, '').slice(0, 4));
+            const diff = yr(from.end_date) - yr(from.start_date);
+            if (!isNaN(diff) && diff >= 0 && diff <= 40) yearsInPrior = diff;
+          }
+          transitions.push({ from_title: from.title, to_title: to.title, function: signal.function, years_in_prior_role: yearsInPrior });
         }
-        transitions.push({ from_title: from.title, to_title: to.title, function: signal.function, years_in_prior_role: yearsInPrior });
       }
+      if (transitions.length) await sb.from('career_transitions').insert(transitions).catch(() => {});
     }
-    if (transitions.length) await sb.from('career_transitions').insert(transitions).catch(() => {});
-  }
+  } catch (_) { /* anonymized-layer write failed — still return the signal for the warm */ }
+
+  return signal;
+}
+
+// ── Résumé → jobs warm ─────────────────────────────────────────────────────────
+// A parsed résumé is the strongest job-seeking signal we get. Warm the corpus for the
+// résumé's ROLE (derived from the person's real titles / function / skills) at their
+// location, so the /jobs "Matched to your résumé" rail is already full when they arrive.
+// Routes through the SAME live aggregation the job search uses (pullResumeJobFloor →
+// cooldown + global budget + upsert) — no parallel matcher, no second uncapped pull.
+// Best-effort and fully guarded; safe to fire-and-forget after the parse response is sent.
+async function warmResumeJobs(signal, employment, location) {
+  try {
+    const SUPABASE_URL = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY;
+    if (!SUPABASE_URL || !SUPABASE_SERVICE_KEY) return;
+    const top_titles = (Array.isArray(employment) ? employment : []).map(e => e && e.title).filter(Boolean);
+    const query = deriveResumeJobQuery({ top_titles, function: signal?.function, skills: signal?.skills });
+    if (!query) return;
+    await pullResumeJobFloor({
+      query,
+      location: typeof location === 'string' ? location.trim().slice(0, 120) : '',
+      supabaseUrl: SUPABASE_URL,
+      serviceKey: SUPABASE_SERVICE_KEY,
+      adzunaAppId: process.env.ADZUNA_APP_ID,
+      adzunaAppKey: process.env.ADZUNA_APP_KEY,
+    });
+  } catch { /* best-effort warm — never affects the parse response */ }
 }

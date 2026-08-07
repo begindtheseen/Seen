@@ -7,6 +7,8 @@ import { useAuth } from '@/lib/auth'
 import { _sync } from '@/lib/sync'
 import { aiHeaders } from '@/lib/aiHeaders'
 import { matchCities } from '@/lib/data/usCities'
+import { ResumeStore } from '@/lib/stores/ResumeStore'
+import { parseResumeFile } from '@/lib/resumeUploadClient'
 
 const inp: React.CSSProperties = {
   width: '100%',
@@ -117,6 +119,13 @@ export default function ProfilePage() {
 
   const [deleting, setDeleting] = useState(false)
 
+  // Résumé (add / replace lives here too — owner found "it's only in Résumé AI" confusing)
+  const [resumeMeta, setResumeMeta] = useState<{ fileName: string; wordCount: number } | null>(null)
+  const [resumeBusy, setResumeBusy] = useState(false)
+  const [resumeMsg, setResumeMsg] = useState('')
+  const [resumeMsgOk, setResumeMsgOk] = useState(false)
+  const resumeFileRef = useRef<HTMLInputElement>(null)
+
   useEffect(() => {
     if (!ready) return // wait for the session to resolve — redirecting early bounced signed-in users
     if (!isLoggedIn) { router.replace('/login'); return }
@@ -140,6 +149,40 @@ export default function ProfilePage() {
       if (pro) loadSub()
     }).catch(() => {})
   }, [ready, isLoggedIn, router])
+
+  // Load the current résumé's meta so the card reflects what's already on file.
+  useEffect(() => {
+    if (!ready || !isLoggedIn) return
+    ResumeStore.load(user?.id, isLoggedIn)
+      .then(data => { if (data) setResumeMeta({ fileName: data.fileName, wordCount: data.wordCount }) })
+      .catch(() => {})
+  }, [ready, isLoggedIn, user?.id])
+
+  // Add / replace the résumé — the SAME canonical upload path as the Résumé-AI page
+  // (parseResumeFile → /api/resume parse → ResumeStore.save), never a fork. Passing the city
+  // fires the server's background résumé→jobs match at the user's location (non-blocking,
+  // cooldown + budget guarded), so the Jobs page "Matched to your résumé" rail fills itself.
+  async function onResumeFile(file: File) {
+    setResumeBusy(true); setResumeMsg('')
+    try {
+      const r = await parseResumeFile(file, { location: (city || initCity || '').trim() })
+      if (r.credits_required) {
+        setResumeMsg('You’re out of AI credits today — parsing a résumé uses one. Upgrade for unlimited.')
+        setResumeMsgOk(false); setResumeBusy(false); return
+      }
+      if (r.ok && r.text) {
+        await ResumeStore.save(r.text, r.fileName, r.wordCount || 0, user?.id, isLoggedIn)
+        setResumeMeta({ fileName: r.fileName, wordCount: r.wordCount || 0 })
+        setResumeMsg('Résumé saved — we’re matching jobs to it now. See them on the Jobs page.')
+        setResumeMsgOk(true)
+        window.dispatchEvent(new Event('seen:credits-updated'))
+      } else {
+        setResumeMsg(r.error || 'Could not read this file. Try a PDF, Word, or .txt export.')
+        setResumeMsgOk(false)
+      }
+    } catch { setResumeMsg('Upload failed — please try again.'); setResumeMsgOk(false) }
+    setResumeBusy(false)
+  }
 
   // Pull the live subscription (plan, renewal date, cancel state) for the manage view.
   async function loadSub() {
@@ -384,6 +427,50 @@ export default function ProfilePage() {
         {saveMsg && (
           <div style={{ fontFamily: 'var(--mono)', fontSize: '.65rem', color: saveMsgOk ? 'var(--green)' : 'var(--red)', textAlign: 'center', marginBottom: '1.5rem' }}>{saveMsg}</div>
         )}
+
+        {/* Résumé — add / replace here, not only inside Résumé AI */}
+        <div style={card}>
+          <div style={sectionHead}>Résumé</div>
+          <div style={{ padding: '1.25rem' }}>
+            {resumeMeta ? (
+              <div style={{ background: 'rgba(16,185,129,0.08)', border: '1px solid rgba(16,185,129,0.22)', borderRadius: 8, padding: '.72rem 1rem', fontFamily: 'var(--mono)', fontSize: '.68rem', color: 'var(--green)', marginBottom: '.85rem', overflowWrap: 'anywhere' }}>
+                ✓ résumé on file — {resumeMeta.fileName} · {resumeMeta.wordCount} words
+              </div>
+            ) : (
+              <div style={{ fontFamily: 'var(--body)', fontSize: '.8rem', color: 'var(--sub)', lineHeight: 1.6, marginBottom: '.85rem' }}>
+                Add your résumé once and we&apos;ll match jobs to it on the Jobs page — and power your fit score &amp; rewrites in Résumé AI.
+              </div>
+            )}
+            <div style={{ display: 'flex', gap: '.5rem', flexWrap: 'wrap' }}>
+              <button
+                onClick={() => resumeFileRef.current?.click()}
+                disabled={resumeBusy}
+                style={{ flex: 1, minWidth: 150, padding: '.72rem 1rem', background: resumeMeta ? 'none' : 'var(--green)', color: resumeMeta ? 'var(--green)' : 'var(--ink)', border: resumeMeta ? '1px solid rgba(16,185,129,0.4)' : 'none', borderRadius: 10, fontFamily: 'var(--display)', fontWeight: 800, fontSize: '.82rem', cursor: resumeBusy ? 'not-allowed' : 'pointer', opacity: resumeBusy ? 0.65 : 1 }}
+              >
+                {resumeBusy ? 'Uploading…' : resumeMeta ? 'Replace résumé' : 'Upload résumé →'}
+              </button>
+              <button
+                onClick={() => router.push('/resume')}
+                style={{ flex: 1, minWidth: 130, padding: '.72rem 1rem', background: 'var(--raised, var(--surface))', border: '1px solid var(--line2)', color: 'var(--sub)', borderRadius: 10, fontFamily: 'var(--mono)', fontSize: '.7rem', cursor: 'pointer', boxSizing: 'border-box' }}
+              >
+                Open Résumé AI →
+              </button>
+            </div>
+            <input
+              ref={resumeFileRef}
+              type="file"
+              accept=".pdf,.doc,.docx,.txt,.md,text/plain"
+              onChange={e => { const f = e.target.files?.[0]; if (f) onResumeFile(f); e.target.value = '' }}
+              style={{ display: 'none' }}
+            />
+            <div style={{ fontFamily: 'var(--mono)', fontSize: '.6rem', color: 'var(--muted)', marginTop: '.6rem', lineHeight: 1.6 }}>
+              PDF, Word, or .txt. Uploading matches jobs to your experience automatically.
+            </div>
+            {resumeMsg && (
+              <div style={{ fontFamily: 'var(--mono)', fontSize: '.62rem', color: resumeMsgOk ? 'var(--green)' : 'var(--red)', marginTop: '.6rem', lineHeight: 1.6 }}>{resumeMsg}</div>
+            )}
+          </div>
+        </div>
 
         {/* Account & Security */}
         <div style={card}>
