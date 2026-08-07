@@ -1,6 +1,6 @@
 import type { Metadata } from 'next'
-import Link from 'next/link'
 import Reveal from '@/components/Reveal'
+import { EmployerNav, EmployerFooter } from '@/components/employer/EmployerNav'
 import { EmployerCheckout, EmployerPurchaseConfirm } from '@/components/EmployerCheckout'
 import { EmployerCompanyProvider } from '@/components/employer/EmployerCompanyContext'
 import { EmployerClaimPanel } from '@/components/employer/EmployerClaimPanel'
@@ -29,22 +29,8 @@ const wrap = { maxWidth: 900, margin: '0 auto', padding: '0 1.5rem', width: '100
 export default function EmployersPage() {
   return (
     <div className="rise-in" style={{ minHeight: '100vh', background: 'radial-gradient(ellipse at 15% -5%,rgba(29,78,216,0.12) 0%,transparent 55%),radial-gradient(ellipse at 100% 5%,rgba(124,58,237,0.09) 0%,transparent 45%)' }}>
-      {/* Employer-first header — no seeker nav */}
-      <header style={{ borderBottom: '1px solid var(--line)', background: 'rgba(5,7,15,.7)', backdropFilter: 'blur(12px)', position: 'sticky', top: 0, zIndex: 50 }}>
-        <div style={{ ...wrap, display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '.9rem 1.5rem' }}>
-          <Link href="/employers" style={{ display: 'flex', alignItems: 'center', gap: '.55rem', textDecoration: 'none' }}>
-            <span style={{ width: 8, height: 8, borderRadius: 999, background: 'var(--blue)', boxShadow: '0 0 8px var(--blue)' }} />
-            <span style={{ fontFamily: 'var(--display)', fontWeight: 800, fontSize: '1.05rem', color: 'var(--white)', letterSpacing: '-.02em' }}>Seen</span>
-            <span style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', color: 'var(--dim)', textTransform: 'uppercase', letterSpacing: '.12em' }}>for employers</span>
-          </Link>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap', justifyContent: 'flex-end', rowGap: '.4rem' }}>
-            <Link href="/employers/dashboard" style={{ fontFamily: 'var(--mono)', fontSize: '.62rem', color: 'var(--sub)', textDecoration: 'none' }}>Dashboard</Link>
-            <Link href="/employers/verified" style={{ fontFamily: 'var(--mono)', fontSize: '.62rem', color: 'var(--sub)', textDecoration: 'none' }}>Verified</Link>
-            <a href="#promote" style={{ fontFamily: 'var(--mono)', fontSize: '.62rem', color: 'var(--sub)', textDecoration: 'none' }}>Pricing</a>
-            <Link href="/jobs" style={{ fontFamily: 'var(--mono)', fontSize: '.6rem', color: 'var(--dim)', textDecoration: 'none' }}>Looking for a job? →</Link>
-          </div>
-        </div>
-      </header>
+      {/* Shared employer chrome — logo→home, organized menu, sign out, mobile drawer (EmployerNav.tsx) */}
+      <EmployerNav />
 
       <div style={{ ...wrap, padding: '3.5rem 1.5rem 5rem' }}>
         {/* Hero */}
@@ -126,17 +112,7 @@ export default function EmployersPage() {
         </Reveal>
       </div>
 
-      {/* Employer-first footer (no seeker links) */}
-      <footer style={{ borderTop: '1px solid var(--line)', padding: '1.4rem 1.5rem' }}>
-        <div style={{ ...wrap, display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '.6rem' }}>
-          <span style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', color: 'var(--dim)' }}>© 2026 Seen · for employers</span>
-          <div style={{ display: 'flex', gap: '1.1rem' }}>
-            <a href="#promote" style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', color: 'var(--dim)', textDecoration: 'none' }}>Pricing</a>
-            <Link href="/legal" style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', color: 'var(--dim)', textDecoration: 'none' }}>Legal</Link>
-            <a href="mailto:hello@seenjobs.io" style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', color: 'var(--dim)', textDecoration: 'none' }}>Contact</a>
-          </div>
-        </div>
-      </footer>
+      <EmployerFooter />
     </div>
   )
 }

@@ -17,8 +17,8 @@
 // approved claim, so they render their own graceful sign-in / pending states for anyone unscoped.
 
 import { useCallback, useEffect, useRef, useState } from 'react'
-import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
+import { EmployerNav, EmployerFooter } from '@/components/employer/EmployerNav'
 import { useAuth } from '@/lib/auth'
 import { useCountUp } from '@/lib/hooks/useCountUp'
 import { recentInteractions, summarizeInteractions } from '@/lib/server/employerDashboard'
@@ -215,20 +215,8 @@ export function EmployerHub() {
 
   return (
     <div style={{ minHeight: '100vh', background: 'radial-gradient(ellipse at 15% -5%,rgba(29,78,216,0.12) 0%,transparent 55%),radial-gradient(ellipse at 100% 5%,rgba(124,58,237,0.09) 0%,transparent 45%)' }}>
-      {/* Employer-first header (seeker Nav/Footer hide on /employers) */}
-      <header style={{ borderBottom: '1px solid var(--line)', background: 'rgba(5,7,15,.7)', backdropFilter: 'blur(12px)', position: 'sticky', top: 0, zIndex: 50 }}>
-        <div style={{ ...wrap, display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '.9rem 1.5rem' }}>
-          <Link href="/employers" style={{ display: 'flex', alignItems: 'center', gap: '.55rem', textDecoration: 'none' }}>
-            <span style={{ width: 8, height: 8, borderRadius: 999, background: 'var(--blue)', boxShadow: '0 0 8px var(--blue)' }} />
-            <span style={{ fontFamily: 'var(--display)', fontWeight: 800, fontSize: '1.05rem', color: 'var(--white)', letterSpacing: '-.02em' }}>Seen</span>
-            <span style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', color: 'var(--dim)', textTransform: 'uppercase', letterSpacing: '.12em' }}>for employers</span>
-          </Link>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-            <Link href="/employers" style={{ fontFamily: 'var(--mono)', fontSize: '.62rem', color: 'var(--sub)', textDecoration: 'none' }}>Reputation &amp; promote</Link>
-            <Link href="/jobs" style={{ fontFamily: 'var(--mono)', fontSize: '.6rem', color: 'var(--dim)', textDecoration: 'none' }}>Looking for a job? →</Link>
-          </div>
-        </div>
-      </header>
+      {/* Shared employer chrome (EmployerNav.tsx) — logo→home, organized menu, sign out, mobile drawer */}
+      <EmployerNav />
 
       <div style={{ ...wrap, padding: '2.4rem 1.5rem 4rem' }}>
         {/* Persistent header — kicker + scope badges + title */}
@@ -412,17 +400,7 @@ export function EmployerHub() {
         )}
       </div>
 
-      {/* Employer-first footer */}
-      <footer style={{ borderTop: '1px solid var(--line)', padding: '1.4rem 1.5rem' }}>
-        <div style={{ ...wrap, display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '.6rem' }}>
-          <span style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', color: 'var(--dim)' }}>© 2026 Seen · for employers</span>
-          <div style={{ display: 'flex', gap: '1.1rem' }}>
-            <Link href="/employers" style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', color: 'var(--dim)', textDecoration: 'none' }}>Reputation</Link>
-            <Link href="/legal" style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', color: 'var(--dim)', textDecoration: 'none' }}>Legal</Link>
-            <a href="mailto:hello@seenjobs.io" style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', color: 'var(--dim)', textDecoration: 'none' }}>Contact</a>
-          </div>
-        </div>
-      </footer>
+      <EmployerFooter />
     </div>
   )
 }

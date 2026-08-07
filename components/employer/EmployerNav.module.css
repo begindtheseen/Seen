@@ -1,0 +1,16 @@
+/* Employer-nav layout on top of the shared Nav.module.css classes.
+   The shared .primary already hides below 768px; the inline right-hand actions do not, so on
+   mobile they would crowd the bar next to the wider "Seen · for employers" wordmark. This collapses
+   the whole inline cluster on mobile — the hamburger drawer carries every action (sign in, claim,
+   switch to job search, sign out), leaving the mobile bar as just [menu] [logo]. */
+.desktopActions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+@media (max-width: 768px) {
+  .desktopActions {
+    display: none;
+  }
+}
