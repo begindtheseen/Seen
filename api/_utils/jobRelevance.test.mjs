@@ -120,6 +120,14 @@ test('provenance: a job fetched FOR this query (search_query) is relevant even w
   // Canonical is accepted too (aggregation stamps the canonical key).
   const ap2 = { title: 'Loss Prevention Officer', company: 'Macy\'s', search_query: 'loss prevention' };
   assert.equal(isRelevant(ap2, 'theft prevention', { canonical: 'loss prevention' }), true);
+
+  // A BARE company / common word does NOT trust provenance — sources full-text-match "target"
+  // inside unrelated descriptions, so a "target" search stamped a Nurse Manager. Only company/
+  // title match keeps real results (this is the fix for the "Nurse Manager for target" noise).
+  const noise = { title: 'Nurse Manager', company: 'Kaiser', search_query: 'target' };
+  assert.equal(isRelevant(noise, 'target'), false);
+  const realTarget = { title: 'Cashier', company: 'Target', search_query: 'target' };
+  assert.equal(isRelevant(realTarget, 'target'), true); // kept by company match, not provenance
 });
 
 test('theft prevention: end-to-end, real titles survive filterAndRank (was 1 → many)', () => {

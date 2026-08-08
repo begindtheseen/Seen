@@ -116,9 +116,21 @@ export function expandQueryTerms(query, max = 8) {
 // relevance signal that recovers the real roles a title-only bar drops ("Asset Protection
 // Specialist" cached under search_query="theft prevention"). Keyed to the ORIGINAL query (and
 // its canonical) ONLY — never to loose expansion tokens — so it can't reopen the budtender leak.
+// Provenance is trustworthy only for a SPECIFIC query. A multi-word query ("theft prevention",
+// "customer service") or a known role family ("budtender", "warehouse") stamps a topical
+// search_query. A bare single common word ("target", "apple", "overnight") does NOT: sources
+// full-text-match it inside unrelated descriptions, so a "target" search stamped a Nurse Manager.
+// Those fall back to company/title match only — which keeps the real Target jobs, drops the noise.
+function _isSpecificQuery(query) {
+  const qn = _norm(query);
+  if (!qn) return false;
+  if (qn.split(' ').length >= 2) return true;
+  return _familyFor(qn) != null;
+}
 function _provenanceMatch(job, query, canonical) {
   const sq = _norm(job && job.search_query);
   if (!sq) return false;
+  if (!_isSpecificQuery(query)) return false; // don't trust a bare company/common-word stamp
   const qn = normalizeCompany(query);
   const cn = normalizeCompany(canonical || '');
   if (qn && (sq === qn || (qn.length >= 4 && _phraseIn(sq, qn)))) return true;
