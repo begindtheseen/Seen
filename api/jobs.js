@@ -2,7 +2,7 @@ import { createHmac, timingSafeEqual } from 'crypto';
 import { getQueryExpansion } from '../lib/server/expand.js';
 import { applyRateLimit, rateLimit, rateLimitGlobal, resolveRateBucket } from '../lib/server/ratelimit.js';
 import { logError } from '../lib/server/errlog.js';
-import { filterAndRank, filterByLocation, sortByProximity, locationDbTerm } from './_utils/jobRelevance.js';
+import { filterAndRank, filterByLocation, sortByProximity, locationDbTerm, expandQueryTerms } from './_utils/jobRelevance.js';
 import { aggregateForQuery, upsertJobs, inferLevel, wasRecentlyPulled, recordPull } from '../lib/server/jobSources.js';
 import { aggregateWithSources } from '../lib/jobs/expand.js';
 import { deriveResumeJobQuery, pullResumeJobFloor } from '../lib/server/resumeJobMatch.js';
@@ -176,6 +176,8 @@ export default async function handler(req, res) {
   let dbMatches = []; // related listings already in our DB (merged with any API top-up)
   let relevanceQuery = ''; // the ORIGINAL user query — what relevance is judged against
   let synonyms = []; // canonical + expansion terms — true-synonym signals (matched vs the TITLE)
+  let searchTerms = []; // original + canonical + deterministic expansion — the DB pool + corpus reads
+  const PAGE_MIN = 10; // below this many results we widen (geo, then corpus, then national)
 
   try {
     let body = _body;
@@ -300,9 +302,17 @@ export default async function handler(req, res) {
         const tp = parseInt(tgtRows?.[0]?.percentage, 10);
         const TARGET = Number.isFinite(tp) && tp > 0 ? Math.min(60, Math.max(5, tp)) : 25;
 
-        canonical = expansion.canonical;
-        relatedTerms = expansion.related || [];
-        const searchTerms = [canonical, ...expansion.related].filter(Boolean);
+        canonical = expansion.canonical || qNorm;
+        // DETERMINISTIC (no-AI) expansion — the curated role families bridge "theft prevention"
+        // → "asset protection", "warehouse" → "material handler" even though the LLM expansion
+        // has been dormant since 2026-07-03 (owner directive: no paid AI). Merge with any LLM
+        // related terms so the bridge exists on EVERY search, not just cached ones.
+        const curatedRelated = expandQueryTerms(qNorm);
+        relatedTerms = [...new Set([...(expansion.related || []), ...curatedRelated])].filter(Boolean);
+        // Pool reads: the ORIGINAL query FIRST (so rows stamped search_query=<query> — the
+        // "Asset Protection Specialist" fetched for "theft prevention" — surface even when the
+        // canonical differs), then canonical + related, deduped, capped to bound the parallel reads.
+        searchTerms = [...new Set([qNorm, canonical, ...relatedTerms].filter(Boolean))].slice(0, 6);
         // Relevance is judged against the ORIGINAL query; the canonical + expansion terms
         // are passed as SYNONYMS (matched as phrases against the TITLE, generic single
         // words dropped). This keeps real synonyms ("SWE" → "Software Engineer") while
@@ -344,12 +354,13 @@ export default async function handler(req, res) {
             pool.push(row);
           }
         }
-        dbMatches = filterAndRank(pool, relevanceQuery, { synonyms }).map(j => ({
+        dbMatches = filterAndRank(pool, relevanceQuery, { synonyms, canonical }).map(j => ({
           id: j.id || null, // keep the DB id — without it /jobs/<id> permalinks can never resolve
           title: j.title, company: j.company, location: j.location || loc,
           salary: j.salary, url: j.apply_url || j.url || null, description: j.description,
           type: j.type || 'Full-time', level: inferLevel(j.title || ''),
           source: j.source || 'Seen', ...scoreRow(j),
+          search_query: j.search_query || null, // provenance for the merged re-filter downstream
           lat: j.lat ?? null, lng: j.lng ?? null, posted_at: j.created_at || null,
         }));
         // Keep only listings within the searched radius (true distance when we have
@@ -374,6 +385,13 @@ export default async function handler(req, res) {
     if (SUPABASE_URL && SUPABASE_SERVICE_KEY &&
         await wasRecentlyPulled(canonical, loc, SUPABASE_URL, SUPABASE_SERVICE_KEY)) {
       let cached = dbMatches.slice(0, 60);
+      // A recent pull already stored everything Adzuna had for this (query, location), so we skip
+      // the paid re-pull — but a THIN boxed page must not surface as "1 result" when we hold plenty
+      // just outside the box. Fill from our own corpus (query-relevant, nearest-first) — pure DB.
+      if (cached.length < PAGE_MIN) {
+        const corpus = await corpusRelevant({ supabaseUrl: SUPABASE_URL, dbHeaders, terms: searchTerms, query: relevanceQuery, canonical, synonyms, center, loc, limit: 60 });
+        cached = dedupByIdentity([...cached, ...corpus]).slice(0, 60);
+      }
       if (!cached.length) cached = await nearestListings(loc, SUPABASE_URL, dbHeaders);
       console.log(`COOLDOWN: "${canonical}" @ "${loc}" pulled recently — serving ${cached.length} cached (no API call)`);
       return res.status(200).json({ ok: true, jobs: applyFeatured(dropSuppressed(cached, suppressedSet), featuredSet), query, location: loc, _src: 'db-cooldown' });
@@ -391,6 +409,12 @@ export default async function handler(req, res) {
     ]);
     if (!topupBucket.allowed || !topupGlobal.allowed) {
       let degradedJobs = dbMatches.slice(0, 60);
+      // Budget's out for the paid pull, but the corpus is free — fill a thin page from what we
+      // already hold (query-relevant, nearest-first) before falling back to query-agnostic nearest.
+      if (degradedJobs.length < PAGE_MIN) {
+        const corpus = await corpusRelevant({ supabaseUrl: SUPABASE_URL, dbHeaders, terms: searchTerms, query: relevanceQuery, canonical, synonyms, center, loc, limit: 60 });
+        degradedJobs = dedupByIdentity([...degradedJobs, ...corpus]).slice(0, 60);
+      }
       if (!degradedJobs.length) degradedJobs = await nearestListings(loc, SUPABASE_URL, dbHeaders);
       console.log(`DEGRADED (top-up budget out — bucket:${topupBucket.allowed} global:${topupGlobal.allowed}): "${query}" @ "${loc}" — ${degradedJobs.length} DB results`);
       return res.status(200).json({ ok: true, jobs: applyFeatured(dropSuppressed(degradedJobs, suppressedSet), featuredSet), query, location: loc, _src: 'db-degraded', degraded: true });
@@ -442,9 +466,10 @@ export default async function handler(req, res) {
         salary: j.salary, url: j.apply_url || j.url || null, description: j.description,
         type: j.type || 'Full-time', level: inferLevel(j.title || ''),
         source: j.source || 'Seen', ...scoreRow(j),
+        search_query: j.search_query || null, // provenance survives into the relevance filter
         lat: j.lat ?? null, lng: j.lng ?? null, posted_at: j.created_at || null,
       }));
-      jobs = applyRadius(filterAndRank(jobs, relevanceQuery, { synonyms }));
+      jobs = applyRadius(filterAndRank(jobs, relevanceQuery, { synonyms, canonical }));
       console.log(`AGGREGATED: "${query}" → "${canonical}" @ "${loc}" — ${agg.jobs?.length || 0} fetched, ${agg.upserted || 0} saved, ${jobs.length} relevant`);
       if (SUPABASE_URL && SUPABASE_SERVICE_KEY) _logSearch(canonical, loc, jobs.length, SUPABASE_URL, dbHeaders);
     } catch (e) {
@@ -461,13 +486,12 @@ export default async function handler(req, res) {
       mergedSeen.add(key);
       merged.push(j);
     }
-    let finalJobs = applyRadius(filterAndRank(merged, relevanceQuery, { synonyms })).slice(0, 60);
+    let finalJobs = applyRadius(filterAndRank(merged, relevanceQuery, { synonyms, canonical })).slice(0, 60);
     let widened = false;
-    // A niche/sparse query should still return a FULL page (owner directive). Below this
-    // many in-radius results we geographically widen to fill it — closest listings always
-    // lead (rankByDistanceKeepAll), so the radius is honored in RANK even as farther-out
-    // matches fill the rest of the page. A query that already has a full page never widens.
-    const PAGE_MIN = 10;
+    // A niche/sparse query should still return a FULL page (owner directive). Below PAGE_MIN
+    // in-radius results we widen to fill it — closest listings always lead (rankByDistanceKeepAll),
+    // so the radius is honored in RANK even as farther-out matches fill the rest of the page. A
+    // query that already has a full page never widens. (PAGE_MIN is declared in the outer scope.)
 
     // ── Fill a thin page by widening GEOGRAPHICALLY, not nationwide ───────────────
     // A radius search can come up thin (a role that's sparse within, say, 10mi) even
@@ -481,6 +505,7 @@ export default async function handler(req, res) {
       salary: j.salary, url: j.apply_url || j.url || null, description: j.description,
       type: j.type || 'Full-time', level: inferLevel(j.title || ''),
       source: j.source || 'Seen', ...scoreRow(j),
+      search_query: j.search_query || null,
       lat: j.lat ?? null, lng: j.lng ?? null, posted_at: j.created_at || null,
     });
     const dedupJobs = arr => {
@@ -510,7 +535,11 @@ export default async function handler(req, res) {
         wideJobs = (wide.jobs || []).map(toUi);
         console.log(`WIDENED (geo): "${query}" expanded ${radiusMiles}→${expandedMiles}mi, ${finalJobs.length} in-radius, added ${wideJobs.length}`);
       } catch (e) { console.warn('geo-widen error:', e.message); }
-      finalJobs = rankByDistanceKeepAll(filterAndRank(dedupJobs([...merged, ...wideJobs]), relevanceQuery, { synonyms })).slice(0, 60);
+      // ALSO re-read our OWN corpus at the wider radius — the geo-boxed pool never saw the jobs
+      // we already hold just outside the box (the 9 Target listings within 100mi of a small city
+      // the 25mi box hid). Pure DB; complements the paid Adzuna widen instead of relying on it.
+      const corpusWide = await corpusRelevant({ supabaseUrl: SUPABASE_URL, dbHeaders, terms: searchTerms, query: relevanceQuery, canonical, synonyms, center, loc, limit: 60 });
+      finalJobs = rankByDistanceKeepAll(filterAndRank(dedupJobs([...merged, ...wideJobs, ...corpusWide]), relevanceQuery, { synonyms, canonical })).slice(0, 60);
     }
 
     // Stage 2 — national query (no location) that's empty, or nothing within the expanded
@@ -527,7 +556,7 @@ export default async function handler(req, res) {
         wideJobs = (wide.jobs || []).map(toUi);
         console.log(`WIDENED (national): "${query}" added ${wideJobs.length}`);
       } catch (e) { console.warn('national-widen error:', e.message); }
-      finalJobs = rankByDistanceKeepAll(filterAndRank(dedupJobs([...merged, ...wideJobs]), relevanceQuery, { synonyms })).slice(0, 60);
+      finalJobs = rankByDistanceKeepAll(filterAndRank(dedupJobs([...merged, ...wideJobs]), relevanceQuery, { synonyms, canonical })).slice(0, 60);
     }
 
     // ── Absolute last resort ─────────────────────────────────────────────────────
@@ -556,6 +585,67 @@ export default async function handler(req, res) {
       return res.status(200).json({ ok: true, jobs: dbMatches.slice(0, 60), query: safeQuery, location: loc, _src: 'db-fallback' });
     }
     return res.status(500).json({ error: err.message, jobs: [] });
+  }
+}
+
+// Dedup UI rows by their title|company|location identity (first occurrence wins).
+function dedupByIdentity(arr) {
+  const seen = new Set(), out = [];
+  for (const j of (arr || [])) {
+    if (!j) continue;
+    const key = `${(j.title || '').toLowerCase()}|${(j.company || '').toLowerCase()}|${(j.location || '').toLowerCase()}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(j);
+  }
+  return out;
+}
+
+// ── Query-relevant listings from our OWN corpus, WITHOUT the tight geo box ────────────────────
+// The geo-boxed pool reads only see jobs within the searched radius — so the 9 Target listings we
+// already hold within 100mi of a small city (but outside a 25mi box) stay invisible, and a thin
+// page shows "1 result" when we have plenty nearby. This reads the corpus for the query's terms
+// with NO box, applies the SAME relevance bar, and ranks nearest-first. Pure DB — no paid pull —
+// so it's safe to call on the cooldown / degraded / geo-widen paths. Never throws.
+async function corpusRelevant({ supabaseUrl, dbHeaders, terms, query, canonical, synonyms, center, loc, limit = 60 }) {
+  if (!supabaseUrl) return [];
+  const now = encodeURIComponent(new Date().toISOString());
+  const cols = 'id,created_at,title,company,location,salary,apply_url,description,type,level,source,score,waste_score,search_query,lat,lng';
+  const uniq = [...new Set((terms || []).map(t => String(t || '').toLowerCase().trim()).filter(t => t.length > 1))].slice(0, 6);
+  if (!uniq.length) return [];
+  try {
+    const arrays = await Promise.all(uniq.map(t => {
+      const orf = `or=${encodeURIComponent(`(company.ilike.*${t}*,title.ilike.*${t}*,search_query.ilike.*${t}*)`)}`;
+      return fetch(`${supabaseUrl}/rest/v1/jobs?${orf}&expires_at=gt.${now}&select=${cols}&limit=120`, { headers: dbHeaders })
+        .then(r => r.ok ? r.json() : []).catch(() => []);
+    }));
+    const pool = [], seen = new Set();
+    for (const arr of arrays) for (const row of (Array.isArray(arr) ? arr : [])) {
+      const key = row.id ?? `${(row.title || '').toLowerCase()}|${(row.company || '').toLowerCase()}|${(row.location || '').toLowerCase()}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      pool.push(row);
+    }
+    let rel = filterAndRank(pool, query, { synonyms, canonical });
+    // Nearest-first (unknown coords last), relevance order as the tiebreak.
+    if (center && hasUsableCoords(center)) {
+      rel = rel.map((j, i) => ({ j, d: hasUsableCoords(j) ? haversineMiles(center, j) : Infinity, i }))
+        .sort((a, b) => (a.d - b.d) || (a.i - b.i)).map(x => x.j);
+    } else if (loc) {
+      rel = sortByProximity(rel, loc);
+    }
+    return rel.slice(0, limit).map(j => ({
+      id: j.id || null,
+      title: j.title, company: j.company, location: j.location || loc,
+      salary: j.salary, url: j.apply_url || j.url || null, description: j.description,
+      type: j.type || 'Full-time', level: inferLevel(j.title || ''),
+      source: j.source || 'Seen', ...scoreRow(j),
+      search_query: j.search_query || null,
+      lat: j.lat ?? null, lng: j.lng ?? null, posted_at: j.created_at || null,
+    }));
+  } catch (e) {
+    console.warn('corpusRelevant error:', e.message);
+    return [];
   }
 }
 
@@ -802,8 +892,9 @@ async function handleRecommended(req, res, _body) {
         adzunaAppKey: process.env.ADZUNA_APP_KEY,
       });
       // Relevance-filter the live pull against the role using the SAME ranker the search uses,
-      // so the rail only gains genuinely on-role listings — then merge what's new.
-      const floorRelevant = filterAndRank(floor.jobs || [], roleQuery);
+      // so the rail only gains genuinely on-role listings — then merge what's new. Curated
+      // role-family synonyms bridge the résumé's role title to differently-titled listings.
+      const floorRelevant = filterAndRank(floor.jobs || [], roleQuery, { synonyms: expandQueryTerms(roleQuery), canonical: roleQuery });
       for (const j of floorRelevant) {
         const key = j.id || j.apply_url || `${(j.title || '').toLowerCase()}|${(j.company || '').toLowerCase()}`;
         if (!key || seenIds.has(key)) continue;
