@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { Card, CardHeader } from './primitives'
 import { STAFFING_AGENCIES } from '@/lib/agencies'
-import { assembleGhostReport, pickHeadline, buildCaption } from '@/lib/server/ghostReport'
+import { assembleGhostReport, pickHeadline, buildCaption, weekProvenance } from '@/lib/server/ghostReport'
 
 // The weekly "grab and post" tool (playbook/CONTENT_ENGINE.md § Weekly Ghost Report). Reads the
 // public leaderboard, assembles the SAME honest report the /ghost-report page renders, and hands
@@ -35,7 +35,8 @@ export function GhostReportPanel() {
     return () => { alive = false }
   }, [])
 
-  const report = rows ? assembleGhostReport(rows, { agencyNames: AGENCY_NAMES, topN: 5 }) : null
+  // Pass the current week so the headline rotates weekly and MATCHES what /ghost-report renders.
+  const report = rows ? assembleGhostReport(rows, { agencyNames: AGENCY_NAMES, topN: 5, weekNumber: weekProvenance(new Date()).weekNumber }) : null
   const caption = report ? buildCaption(report, SITE) : ''
 
   async function copy() {

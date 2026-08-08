@@ -19,6 +19,7 @@ import { logError } from '../lib/server/errlog.js';
 import { gateAI } from '../lib/server/credits.js';
 import { runOptimizer, ENGINE_VERSION } from '../lib/optimizer/index.js';
 import { buildApplicationPackage } from '../lib/application-intelligence/index.js';
+import { analyzeApplication } from '../lib/resume-intelligence/engine.js';
 import { extractJobFacts } from '../lib/optimizer/extractJobFacts.js';
 import { runHumanProof, HUMANPROOF_ENGINE_VERSION } from '../lib/humanizer/index.js';
 import { buildHumanProofPackage, normalizeBulletList } from '../lib/server/humanizePackage.js';
@@ -560,10 +561,27 @@ export default async function handler(req, res) {
       });
     } catch (e) { console.error('application_intelligence_v2:', e.message); }
 
+    // Canonical Resume Intelligence Engine — the unified job+résumé understanding that replaces the
+    // three keyword engines above. Rides alongside during migration (the UI can consume this single
+    // MatchAnalysis instead of three independent keyword arrays). `?debug=1` returns the
+    // explainability dump. Never throws into the response.
+    let resume_intelligence = null;
+    try {
+      resume_intelligence = analyzeApplication({
+        resumeText: String(resumeText),
+        jobDescription: jobDescription || '',
+        jobTitle: jobTitle || '',
+        company: company || '',
+        debug: /^(1|true)$/i.test(String(req.query?.debug || body.debug || '')),
+      });
+    } catch (e) { console.error('resume_intelligence:', e.message); }
+
     return res.status(200).json({
       ...output,
       application_intelligence,
+      resume_intelligence,
       engine_version_v2: application_intelligence?.engine_version || null,
+      engine_version_ri: resume_intelligence?.engine_version || null,
       legacy_seenfit_compatible: true,
       run_id: runId, _facts_source: factsSource, _engine_version: ENGINE_VERSION,
     });

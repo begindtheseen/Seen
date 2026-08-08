@@ -2,7 +2,7 @@ import type { Metadata } from 'next'
 import Link from 'next/link'
 import { getLeaderboard, getScoresByNames, slugify, grade, riskColor, riskLabel, type LeaderboardRow } from '@/lib/growth'
 import { STAFFING_AGENCIES } from '@/lib/agencies'
-import { assembleGhostReport, pickHeadline } from '@/lib/server/ghostReport'
+import { assembleGhostReport, pickHeadline, weekProvenance } from '@/lib/server/ghostReport'
 
 // The Weekly Ghost Report — the amplifier engine's flagship, auto-generated public data story
 // (playbook/CONTENT_ENGINE.md). Server component + hourly ISR, reading cached scores DIRECTLY
@@ -34,17 +34,8 @@ export const metadata: Metadata = {
 const wrap = { maxWidth: 760, margin: '0 auto', padding: '3.5rem 1.25rem 5rem', width: '100%', boxSizing: 'border-box' as const }
 const mono = (size: string, color: string): React.CSSProperties => ({ fontFamily: 'var(--mono)', fontSize: size, color })
 
-// Human "week of Mon D, YYYY" label + a stable week ordinal, for provenance (NOT a fabricated
-// trend). ISR re-renders hourly so this tracks the real calendar.
-function weekProvenance(now: Date): { weekLabel: string; weekNumber: number } {
-  const monday = new Date(now)
-  const day = (monday.getUTCDay() + 6) % 7 // 0 = Monday
-  monday.setUTCDate(monday.getUTCDate() - day)
-  const weekLabel = `week of ${monday.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' })}`
-  const start = Date.UTC(monday.getUTCFullYear(), 0, 1)
-  const weekNumber = Math.floor((monday.getTime() - start) / (7 * 24 * 60 * 60 * 1000)) + 1
-  return { weekLabel, weekNumber }
-}
+// weekProvenance (the "week of …" label + rotation seed) is shared from lib/server/ghostReport so
+// the public page, the admin panel, and the OG card all resolve the SAME week and headline.
 
 // Build the pool of scored rows the report ranks over: the public leaderboard (top companies by
 // report volume) plus every staffing-agency row (agencies may not all sit in the top-150), deduped
