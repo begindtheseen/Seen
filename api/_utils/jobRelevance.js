@@ -27,18 +27,104 @@ const GENERIC_SYNONYM = new Set([
   'full', 'part', 'time', 'hybrid', 'onsite', 'trainee', 'apprentice',
 ]);
 
-// Curated true-synonym sets for high-value / niche roles whose synonyms share NO token
-// with the query (so a token match can never find them). Keyed by the normalized query.
-// This hardens relevance even when the LLM expansion is unavailable or returns junk.
-// Callers may pass additional synonyms (the DB/LLM expansion terms) via options.
-const ROLE_SYNONYMS = {
-  budtender: ['budtender', 'cannabis', 'dispensary', 'marijuana', 'weed', 'cannabis associate', 'dispensary associate', 'dispensary agent', 'cannabis consultant', 'weed dispensary'],
-  barista: ['barista', 'coffee', 'espresso', 'cafe', 'coffee shop'],
-  bartender: ['bartender', 'barback', 'mixologist', 'bar tender'],
-  phlebotomist: ['phlebotomist', 'phlebotomy', 'blood draw'],
-  dishwasher: ['dishwasher', 'kitchen steward', 'dish washer'],
-  caregiver: ['caregiver', 'caregiving', 'home care aide', 'personal care aide', 'direct support'],
-};
+// ── Curated role families — DETERMINISTIC query expansion (NO AI) ─────────────────
+// The single hardest problem in job search is the gap between what a seeker TYPES and what
+// employers TITLE the same job: "theft prevention" → "Asset Protection Specialist",
+// "warehouse" → "Material Handler", "budtender" → "Cannabis Dispensary Associate". The LLM
+// expansion (lib/server/expand.js) is optional and, on this deployment, dormant — so these
+// curated families are the ONLY cross-lexical bridge, by design (owner directive: no paid AI).
+//
+// Each family is a set of INTERCHANGEABLE role phrases for the SAME work. Any query matching a
+// member expands (BIDIRECTIONALLY) to the rest of the family, which we use to (a) recognize a
+// title as relevant and (b) widen the DB pool + live pull toward more supply. Members are
+// SPECIFIC role words/phrases only — never a bare generic ("sales", "manager", "associate")
+// that would pull unrelated jobs; effectiveSynonyms + GENERIC_SYNONYM are the backstop.
+const ROLE_FAMILIES = [
+  // Retail loss prevention / asset protection / security — the owner's Target-AP beachhead. The
+  // real titles almost never contain "theft"/"prevention", which is why a title-only bar returns 0.
+  ['loss prevention', 'asset protection', 'theft prevention', 'loss prevention officer', 'loss prevention associate', 'loss prevention detective', 'asset protection specialist', 'asset protection team leader', 'security officer', 'security guard', 'retail security', 'store detective', 'shrink'],
+  // Warehouse / fulfillment — titles are "Material Handler", "Order Picker", "Package Handler"…
+  // Front-loaded with the most lexically-DISTINCT titles: both the expansion cap and the live-pull
+  // cap take from the front, so the terms that surface NEW supply lead.
+  ['warehouse', 'material handler', 'package handler', 'fulfillment associate', 'order picker', 'forklift operator', 'warehouse associate', 'warehouse worker', 'order selector', 'picker packer', 'stower', 'sortation associate', 'distribution associate'],
+  // Delivery / driving.
+  ['delivery driver', 'courier', 'package delivery driver', 'dsp driver', 'cdl driver', 'truck driver', 'route driver', 'delivery associate', 'driver'],
+  // Cannabis retail (keeps the discriminating single words cannabis/dispensary/marijuana).
+  ['budtender', 'cannabis', 'dispensary', 'marijuana', 'cannabis associate', 'dispensary associate', 'dispensary agent', 'cannabis consultant', 'dispensary technician', 'cannabis retail associate'],
+  // Food & beverage.
+  ['barista', 'coffee', 'espresso', 'coffee barista', 'cafe associate'],
+  ['bartender', 'barback', 'mixologist', 'bar tender'],
+  ['server', 'waiter', 'waitress', 'food server', 'banquet server', 'restaurant server'],
+  ['line cook', 'cook', 'prep cook', 'grill cook', 'kitchen staff', 'food prep'],
+  ['dishwasher', 'kitchen steward', 'dish washer'],
+  // Front-line retail.
+  ['cashier', 'checkout associate', 'front end associate', 'retail cashier'],
+  ['retail associate', 'sales associate', 'store associate', 'retail sales associate', 'merchandiser', 'stock associate'],
+  ['customer service representative', 'customer service associate', 'customer support representative', 'call center representative', 'csr'],
+  // Care / clinical support.
+  ['caregiver', 'caregiving', 'home care aide', 'personal care aide', 'direct support professional', 'home health aide'],
+  ['certified nursing assistant', 'cna', 'nursing assistant', 'patient care technician', 'patient care assistant'],
+  ['medical assistant', 'clinical assistant', 'medical office assistant'],
+  ['phlebotomist', 'phlebotomy', 'phlebotomy technician', 'blood draw technician'],
+  // Facilities.
+  ['janitor', 'custodian', 'housekeeper', 'cleaner', 'custodial', 'housekeeping', 'janitorial'],
+  // Admin.
+  ['administrative assistant', 'office assistant', 'administrative coordinator', 'front desk receptionist', 'office administrator', 'receptionist'],
+];
+
+// Normalize a surface for family matching: lowercase, keep alnum/+#., collapse spaces.
+function _norm(s) {
+  return String(s || '').toLowerCase().replace(/[^a-z0-9+#.\s]/g, ' ').replace(/\s+/g, ' ').trim();
+}
+// Whole-word phrase containment: does `needle` appear as a full token-run inside `hay`?
+function _phraseIn(hay, needle) {
+  if (!hay || !needle) return false;
+  return new RegExp(`(^|\\s)${needle.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(\\s|$)`).test(hay);
+}
+// The curated family a query belongs to (or null). Exact member match first, then whole-word
+// containment either direction for queries ≥4 chars (so "warehouse" hits "warehouse associate"
+// and "asset protection specialist" hits "asset protection").
+function _familyFor(query) {
+  const qn = _norm(query);
+  if (!qn) return null;
+  for (const fam of ROLE_FAMILIES) if (fam.includes(qn)) return fam;
+  if (qn.length >= 4) {
+    for (const fam of ROLE_FAMILIES) for (const m of fam) {
+      if (_phraseIn(m, qn) || _phraseIn(qn, m)) return fam;
+    }
+  }
+  return null;
+}
+
+// Deterministic (no-AI) query expansion: the curated family phrases that name the SAME job,
+// excluding the query itself. Empty when the query isn't in a known family. Used to widen the
+// DB pool + live aggregation AND as relevance synonyms. Capped for latency/cost.
+export function expandQueryTerms(query, max = 8) {
+  const fam = _familyFor(query);
+  if (!fam) return [];
+  const qn = _norm(query);
+  const out = [];
+  for (const m of fam) {
+    if (m !== qn && !out.includes(m)) out.push(m);
+    if (out.length >= max) break;
+  }
+  return out;
+}
+
+// A listing carries PROVENANCE for a query when our own aggregation stamped its search_query
+// with that query — i.e. Adzuna already fetched it FOR this exact search. This is a high-trust
+// relevance signal that recovers the real roles a title-only bar drops ("Asset Protection
+// Specialist" cached under search_query="theft prevention"). Keyed to the ORIGINAL query (and
+// its canonical) ONLY — never to loose expansion tokens — so it can't reopen the budtender leak.
+function _provenanceMatch(job, query, canonical) {
+  const sq = _norm(job && job.search_query);
+  if (!sq) return false;
+  const qn = normalizeCompany(query);
+  const cn = normalizeCompany(canonical || '');
+  if (qn && (sq === qn || (qn.length >= 4 && _phraseIn(sq, qn)))) return true;
+  if (cn && (sq === cn || (cn.length >= 4 && _phraseIn(sq, cn)))) return true;
+  return false;
+}
 
 export function tokenize(q) {
   return String(q || '')
@@ -61,9 +147,7 @@ export function normalizeCompany(s) {
 // kept only if it is discriminating (not in GENERIC_SYNONYM and ≥3 chars); multi-word
 // phrases are specific enough to keep as-is. Deduped, lowercased.
 export function effectiveSynonyms(query, extra = []) {
-  const tokens = tokenize(query);
-  const qNorm = normalizeCompany(query);
-  const built = ROLE_SYNONYMS[tokens.join(' ')] || ROLE_SYNONYMS[qNorm] || ROLE_SYNONYMS[String(query || '').toLowerCase().trim()] || [];
+  const built = _familyFor(query) || []; // the curated family (bidirectional), one source of truth
   const out = new Set();
   for (const raw of [...built, ...(Array.isArray(extra) ? extra : [])]) {
     const s = String(raw || '').toLowerCase().replace(/\s+/g, ' ').trim();
@@ -96,7 +180,7 @@ function isCompanyMatch(company, qNorm) {
 // full query phrase in the title adds a big bonus. Returns 0 when nothing matches.
 // Description hits still contribute to the RANK (as a weak tiebreaker) but — unlike the
 // old behavior — a description-only hit does NOT make a listing relevant (see isRelevant).
-export function relevanceScore(job, query, { synonyms = [] } = {}) {
+export function relevanceScore(job, query, { synonyms = [], canonical = '' } = {}) {
   const tokens = tokenize(query);
   if (!tokens.length) return 1; // empty query: everything is "related"
   const title = String(job.title || '').toLowerCase();
@@ -117,6 +201,9 @@ export function relevanceScore(job, query, { synonyms = [] } = {}) {
   for (const syn of effectiveSynonyms(query, synonyms)) {
     if (titleHasSynonym(title, syn)) score += 12;
   }
+  // Provenance: fetched by our own aggregation FOR this query. A moderate boost — below a title
+  // hit, so title matches still rank first, but enough to lift a genuine role a title-only bar missed.
+  if (_provenanceMatch(job, query, canonical)) score += 6;
   return score;
 }
 
@@ -127,7 +214,7 @@ export function relevanceScore(job, query, { synonyms = [] } = {}) {
 //  • a TRUE synonym (curated or caller-supplied expansion) in the title.
 // A match found ONLY in the description, or ONLY via a generic expansion word, is NOT
 // enough — that was the "budtender → Sales Manager" leak.
-export function isRelevant(job, query, { synonyms = [] } = {}) {
+export function isRelevant(job, query, { synonyms = [], canonical = '' } = {}) {
   const tokens = tokenize(query);
   if (!tokens.length) return true; // empty query: everything is "related"
   const title = String(job.title || '').toLowerCase();
@@ -138,6 +225,10 @@ export function isRelevant(job, query, { synonyms = [] } = {}) {
   for (const t of tokens) { if (title.includes(t)) return true; }
   if (qNorm && title.includes(qNorm)) return true;
   for (const syn of effectiveSynonyms(query, synonyms)) { if (titleHasSynonym(title, syn)) return true; }
+  // Fetched by our aggregation FOR this exact query (search_query provenance) — the signal that
+  // recovers "Asset Protection Specialist" for a "theft prevention" search. Not description, not a
+  // generic expansion word, so the budtender→Sales Manager leak stays closed.
+  if (_provenanceMatch(job, query, canonical)) return true;
   return false;
 }
 
@@ -161,11 +252,11 @@ export function looksLikeCompany(query, knownCompanies) {
 // Filter to GENUINELY related listings (strict title/synonym bar) and rank by relevance,
 // then quality score. `synonyms` are the query's expansion terms (canonical + related)
 // used as true-synonym signals — matched as title phrases, never scattered as loose tokens.
-export function filterAndRank(jobs, query, { synonyms = [] } = {}) {
+export function filterAndRank(jobs, query, { synonyms = [], canonical = '' } = {}) {
   const hasQuery = tokenize(query).length > 0;
   const scored = (jobs || [])
-    .map((j) => ({ j, r: relevanceScore(j, query, { synonyms }) }))
-    .filter((x) => !hasQuery || isRelevant(x.j, query, { synonyms }));
+    .map((j) => ({ j, r: relevanceScore(j, query, { synonyms, canonical }) }))
+    .filter((x) => !hasQuery || isRelevant(x.j, query, { synonyms, canonical }));
   scored.sort((a, b) => (b.r - a.r) || ((b.j.score || 0) - (a.j.score || 0)));
   return scored.map((x) => x.j);
 }

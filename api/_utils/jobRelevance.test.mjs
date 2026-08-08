@@ -1,7 +1,7 @@
 // Tests for job relevance + company matching. Run: node --test api/_utils/jobRelevance.test.mjs
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { relevanceScore, isRelated, isRelevant, effectiveSynonyms, looksLikeCompany, filterAndRank, tokenize, parseLocation, locationScore, filterByLocation, locationDbTerm } from './jobRelevance.js';
+import { relevanceScore, isRelated, isRelevant, effectiveSynonyms, looksLikeCompany, filterAndRank, tokenize, parseLocation, locationScore, filterByLocation, locationDbTerm, expandQueryTerms } from './jobRelevance.js';
 
 const J = (title, company, description = '') => ({ title, company, description, score: 65 });
 const L = (location) => ({ title: 'Nurse', company: 'X', location, score: 65 });
@@ -73,6 +73,66 @@ test('budtender: cannabis/dispensary roles are relevant; sales/account roles are
   ];
   const kept = new Set(filterAndRank(jobs, q).map((j) => j.title));
   assert.deepEqual(kept, new Set(['Budtender', 'Cannabis Dispensary Associate']));
+});
+
+// ── Deterministic role-family expansion (no-AI bridge) ──────────────────────────
+test('expandQueryTerms bridges what a seeker types → what employers title the job', () => {
+  // "theft prevention" → the loss-prevention / asset-protection / security family.
+  const theft = expandQueryTerms('theft prevention');
+  assert.ok(theft.includes('asset protection'), 'theft prevention → asset protection');
+  assert.ok(theft.includes('loss prevention'));
+  assert.ok(theft.includes('security officer'));
+  assert.ok(!theft.includes('theft prevention'), 'excludes the query itself');
+
+  // "warehouse" → material-handler family (titles rarely say "warehouse").
+  const wh = expandQueryTerms('warehouse');
+  assert.ok(wh.includes('material handler'));
+  assert.ok(wh.includes('package handler'));
+
+  // Bidirectional: a member query resolves the whole family too.
+  assert.ok(expandQueryTerms('asset protection').includes('loss prevention'));
+
+  // Unknown / non-family query → no expansion (never invents synonyms).
+  assert.deepEqual(expandQueryTerms('quantum blockchain wizard'), []);
+
+  // No expansion term is a bare generic word that would pull unrelated jobs.
+  const GENERIC = new Set(['sales', 'manager', 'associate', 'assistant', 'representative', 'specialist']);
+  for (const q of ['theft prevention', 'warehouse', 'budtender', 'cashier', 'delivery driver']) {
+    for (const t of expandQueryTerms(q)) assert.ok(!GENERIC.has(t), `${q} expanded to bare generic "${t}"`);
+  }
+});
+
+test('provenance: a job fetched FOR this query (search_query) is relevant even without a title hit', () => {
+  // The exact production bug: "Asset Protection Specialist" cached under search_query="theft
+  // prevention" was dropped by the title-only bar. Provenance recovers it.
+  const ap = { title: 'Asset Protection Specialist', company: 'Target', description: 'prevent shrink', search_query: 'theft prevention' };
+  assert.equal(isRelevant(ap, 'theft prevention'), true);
+  assert.ok(relevanceScore(ap, 'theft prevention') > 0);
+
+  // Curated synonyms ALSO recover it by title, independent of provenance.
+  const apNoProv = { title: 'Asset Protection Specialist', company: 'Target' };
+  assert.equal(isRelevant(apNoProv, 'theft prevention'), true);
+
+  // Provenance is keyed to the ORIGINAL query only — a job stamped with an UNRELATED
+  // search_query is NOT rescued (this is what keeps the budtender→Sales Manager leak closed).
+  const salesMgr = { title: 'Sales Manager', company: 'BigBox', search_query: 'sales' };
+  assert.equal(isRelevant(salesMgr, 'budtender'), false);
+  // Canonical is accepted too (aggregation stamps the canonical key).
+  const ap2 = { title: 'Loss Prevention Officer', company: 'Macy\'s', search_query: 'loss prevention' };
+  assert.equal(isRelevant(ap2, 'theft prevention', { canonical: 'loss prevention' }), true);
+});
+
+test('theft prevention: end-to-end, real titles survive filterAndRank (was 1 → many)', () => {
+  const jobs = [
+    { title: 'Asset Protection Specialist', company: 'Target', search_query: 'theft prevention' },
+    { title: 'Loss Prevention Officer', company: "Macy's", search_query: 'theft prevention' },
+    { title: 'Target Security Specialist', company: 'Target', search_query: 'theft prevention' },
+    { title: 'Security Officer - San Clemente', company: 'CGS', search_query: 'theft prevention' },
+    { title: 'Software Engineer', company: 'Unrelated', search_query: 'software engineer' }, // must NOT leak in
+  ];
+  const kept = filterAndRank(jobs, 'theft prevention', { synonyms: expandQueryTerms('theft prevention'), canonical: 'theft prevention' });
+  assert.equal(kept.length, 4, 'the four loss-prevention roles survive');
+  assert.ok(!kept.map((j) => j.title).includes('Software Engineer'), 'unrelated cached job excluded');
 });
 
 test('effectiveSynonyms: drops generic single words, keeps discriminating words + phrases', () => {
