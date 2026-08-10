@@ -25,12 +25,14 @@
   max-width: 460px;
   max-height: 92vh;
   overflow-y: auto;
-  background: var(--glass-strong, var(--surface));
+  /* SOLID opaque surface — NOT a translucent glass that leans on backdrop-filter. A
+     backdrop-filter nested inside the overlay's own backdrop-filter fails to composite on
+     mobile WebKit and paints the whole card (background AND its content) invisible — so a tap
+     read as "just blurs the screen, nothing else". Solid card = the working .ac-modal-card pattern. */
+  background: var(--surface);
   border: 1px solid var(--glass-line, var(--line2));
   border-radius: 20px 20px 0 0;
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08), 0 -20px 60px rgba(0, 0, 0, 0.6);
-  backdrop-filter: blur(28px) saturate(150%);
-  -webkit-backdrop-filter: blur(28px) saturate(150%);
   padding: 1.5rem 1.4rem 1.3rem;
   animation: sheetIn 0.28s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
