@@ -83,6 +83,7 @@ export function useJobSearch() {
   // setLocationRaw directly so they don't get re-persisted as a fresh explicit choice.
   const setLocation = useCallback((v: string) => { setLocationRaw(v); writeStoredLocation(v) }, [])
   const autoSearchedRef = useRef(false)
+  const searchedOnceRef = useRef(false) // a real search has run → a radius change should re-search
   const [locSuggs, setLocSuggs] = useState<string[]>([])
   const [showLocSuggs, setShowLocSuggs] = useState(false)
   const [gpsLoading, setGpsLoading] = useState(false)
@@ -149,6 +150,15 @@ export function useJobSearch() {
   useEffect(() => {
     if (jobs.length > 0) updateDisplay(jobs, sort)
   }, [niche, level, jobType, posted, sort]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Radius is a SERVER-side geo filter (the DB does the bbox scan) — it can't be applied to the
+  // already-loaded listings client-side like niche/level/type. So changing the radius dropdown
+  // must RE-RUN the search with the current query+location; otherwise it silently does nothing to
+  // the visible results ("radius doesn't work"). Only fires after the first real search, and the
+  // 5-min client cache is keyed on radius so distinct radii don't serve each other's stale page.
+  useEffect(() => {
+    if (searchedOnceRef.current) searchJobs()
+  }, [radius]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Honor inbound search params — the Demand page links here with ?q=<title>&loc=<city>
   // ("Find these jobs →"). These were silently ignored; the user got the default page.
@@ -336,6 +346,7 @@ export function useJobSearch() {
       setStatusMsg('Enter a job title or location to search.')
       return
     }
+    searchedOnceRef.current = true
 
     const cacheKey = `${q}|${loc}|${radius}`
     const cached = searchCache.get(cacheKey)
