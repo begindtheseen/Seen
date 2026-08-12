@@ -114,15 +114,37 @@ async function _handler(req, res) {
   const SK = process.env.SUPABASE_SERVICE_KEY;
   if (!SB || !SK) return res.status(500).json({ error: 'Not configured' });
 
-  const db = (path, opts = {}) => fetch(`${SB}/rest/v1/${path}`, {
-    ...opts,
-    headers: {
-      apikey: SK, Authorization: `Bearer ${SK}`,
-      'Content-Type': 'application/json',
-      Prefer: 'return=representation',
-      ...(opts.headers || {}),
-    },
-  });
+  // Every failed query, recorded centrally. `db` does not throw and callers reduce a response to a
+  // number with `ct()` / `parseInt(...) || 0`, so a 4xx, a 5xx or a timeout silently becomes a clean
+  // ZERO that is indistinguishable from a real count of nothing. That is not theoretical: on
+  // 2026-08-12 this endpoint reported active_jobs = 0 while the table held tens of thousands of rows,
+  // and the exec brain recorded the 0 as a durable fact over the previous value.
+  //
+  // Recorded here rather than at the ~18 `ct()` call sites so it covers EVERY query, reads and writes
+  // alike. Only the table name and status are kept — never the query string, which can carry user
+  // identifiers in its filters.
+  const failedQueries = [];
+  const db = async (path, opts = {}) => {
+    let res;
+    try {
+      res = await fetch(`${SB}/rest/v1/${path}`, {
+        ...opts,
+        headers: {
+          apikey: SK, Authorization: `Bearer ${SK}`,
+          'Content-Type': 'application/json',
+          Prefer: 'return=representation',
+          ...(opts.headers || {}),
+        },
+      });
+    } catch (e) {
+      // A transport failure never even produced a response. Record it and hand back a synthetic
+      // not-ok so existing `res.ok` checks keep working instead of throwing into Promise.all.
+      failedQueries.push({ table: String(path).split('?')[0], status: 0, error: String(e.message).slice(0, 120) });
+      return { ok: false, status: 0, headers: { get: () => null }, json: async () => null, text: async () => '' };
+    }
+    if (!res.ok) failedQueries.push({ table: String(path).split('?')[0], status: res.status });
+    return res;
+  };
 
   let body = req.body;
   if (typeof body === 'string') { try { body = JSON.parse(body); } catch { body = {}; } }
@@ -494,6 +516,15 @@ async function _handler(req, res) {
         availability_reports_7d: jobReportRows.length,
         reports_by_status: jobReportsByStatus,
         inactive_reports: inactiveReports,
+      },
+      // Whether the numbers above can be trusted. `degraded: true` means at least one underlying query
+      // failed, so some count in this payload is a fabricated 0 rather than a measurement. Consumers
+      // (the exec dashboard, the brain sync) must refuse to record or display numbers when this is set
+      // — a wrong figure presented as fact is worse than an admitted gap.
+      data_quality: {
+        degraded: failedQueries.length > 0,
+        failed_query_count: failedQueries.length,
+        failed_queries: failedQueries.slice(0, 20),
       },
     });
   }
