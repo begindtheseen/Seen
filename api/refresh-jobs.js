@@ -25,6 +25,9 @@ import { discoverFromCommonCrawl } from '../lib/jobs/discovery.js';
 const DISCOVERY_RESERVE_MS = 45_000;
 // Must stay under the maxDuration in vercel.json (300s) with room to serialize the response.
 const HANDLER_BUDGET_MS = Number(process.env.REFRESH_JOBS_BUDGET_MS || 270_000);
+// Slice of the run the stale sweep may use. It is chunked and resumable, so a backlog it cannot
+// finish carries to the next run rather than costing this run its ingestion.
+const SWEEP_BUDGET_MS = Number(process.env.REFRESH_JOBS_SWEEP_BUDGET_MS || 60_000);
 
 export async function refreshEmployerSources(supabaseUrl, serviceKey, { full = false, runDiscovery = false, deadline = null } = {}) {
   const summary = { sources: 0, upserted: 0, discovered: 0, skipped: [] };
@@ -418,8 +421,80 @@ async function deleteExpired(supabaseUrl, serviceKey) {
   });
 }
 
-export async function markStaleJobs(supabaseUrl, serviceKey) {
-  const h = { apikey: serviceKey, Authorization: `Bearer ${serviceKey}`, 'Content-Type': 'application/json', Prefer: 'return=minimal' };
+// Rows per PATCH. The sweep runs as `service_role`, which has no rolconfig of its own and so
+// inherits `authenticator`'s statement_timeout of 8s. A single PATCH over the whole matching set
+// is therefore not slow — it is IMPOSSIBLE past a few thousand rows: Postgres cancels it with
+// 57014 and nothing is written. That is exactly what the backfill step did on every run
+// (12,983 rows in one statement), which is why the rows it was written to hide stayed in search.
+// Chunking makes the sweep's cost per statement constant and independent of the backlog.
+const SWEEP_CHUNK = 200;
+// Backstop against a chunk that reports progress but never drains (concurrent writer, filter that
+// does not self-exclude). 250 × 200 = 50k rows/step — far above any real backlog.
+const SWEEP_MAX_CHUNKS = 250;
+
+// Rows actually written by a PATCH, read from the count=exact Content-Range ("*/57"). Returns null
+// when the header is absent so the caller can fall back to the chunk size rather than assume zero.
+function patchedCount(res) {
+  const cr = res?.headers?.get?.('content-range');
+  if (!cr || !cr.includes('/')) return null;
+  const n = parseInt(cr.split('/')[1], 10);
+  return Number.isFinite(n) ? n : null;
+}
+
+// Drain one sweep step in bounded chunks: select a page of ids that still match, PATCH exactly
+// those ids, repeat until nothing matches. Every step's patch removes its own rows from its own
+// filter, so re-selecting always advances. Returns what it actually did — a step that ran out of
+// time reports done:false instead of pretending the backlog is clear.
+async function sweepStep(supabaseUrl, serviceKey, { label, filter, patch, deadline }) {
+  const h = { apikey: serviceKey, Authorization: `Bearer ${serviceKey}` };
+  const writeHeaders = { ...h, 'Content-Type': 'application/json', Prefer: 'return=minimal,count=exact' };
+  let updated = 0;
+  for (let chunk = 0; chunk < SWEEP_MAX_CHUNKS; chunk++) {
+    if (deadline != null && Date.now() >= deadline) {
+      console.warn(`markStaleJobs ${label}: out of time after ${updated} rows — resumes next run`);
+      return { label, updated, done: false };
+    }
+    let ids;
+    try {
+      const sel = await fetch(`${supabaseUrl}/rest/v1/jobs?${filter}&select=id&limit=${SWEEP_CHUNK}`, { headers: h });
+      if (!sel.ok) {
+        console.error(`markStaleJobs ${label} select failed: ${sel.status} ${(await sel.text().catch(() => '')).slice(0, 200)}`);
+        return { label, updated, done: false };
+      }
+      ids = (await sel.json() || []).map((r) => r.id).filter(Boolean);
+    } catch (e) {
+      console.error(`markStaleJobs ${label} select error:`, e.message);
+      return { label, updated, done: false };
+    }
+    if (!ids.length) return { label, updated, done: true };
+    try {
+      const res = await fetch(`${supabaseUrl}/rest/v1/jobs?${filter}&id=in.(${ids.join(',')})`, {
+        method: 'PATCH', headers: writeHeaders, body: JSON.stringify(patch),
+      });
+      // A bare fetch does not throw on 4xx, so an unchecked response hides a rejected write
+      // completely — the same failure that left `remove_listing` silently doing nothing.
+      if (!res.ok) {
+        console.error(`markStaleJobs ${label} failed: ${res.status} ${(await res.text().catch(() => '')).slice(0, 200)}`);
+        return { label, updated, done: false };
+      }
+      const n = patchedCount(res);
+      // Zero rows written while rows still match means this step cannot make progress; spinning
+      // through all 250 chunks would just burn the handler's budget.
+      if (n === 0) {
+        console.warn(`markStaleJobs ${label}: matched ${ids.length} rows but wrote 0 — stopping`);
+        return { label, updated, done: false };
+      }
+      updated += n == null ? ids.length : n;
+    } catch (e) {
+      console.error(`markStaleJobs ${label} error (non-fatal):`, e.message);
+      return { label, updated, done: false };
+    }
+  }
+  console.warn(`markStaleJobs ${label}: hit the ${SWEEP_MAX_CHUNKS}-chunk cap at ${updated} rows — resumes next run`);
+  return { label, updated, done: false };
+}
+
+export async function markStaleJobs(supabaseUrl, serviceKey, { deadline = null } = {}) {
   const staleISO = new Date(Date.now() - 7 * 86400000).toISOString();
   const expiredISO = new Date(Date.now() - 14 * 86400000).toISOString();
   // EMPLOYER-POSTED listings are excluded: staleness here is AGE-since-last-seen, and an employer
@@ -447,16 +522,15 @@ export async function markStaleJobs(supabaseUrl, serviceKey) {
   ];
   // Sequential, not Promise.all: the 14-day query matches `in.(active,stale)` while the 7-day query
   // is concurrently flipping active→stale, so running them together races on the same rows.
+  const results = [];
   for (const [label, filter, patch] of steps) {
-    try {
-      const res = await fetch(`${supabaseUrl}/rest/v1/jobs?${filter}`, { method: 'PATCH', headers: h, body: JSON.stringify(patch) });
-      // A bare fetch does not throw on 4xx, so an unchecked response hides a rejected write
-      // completely — the same failure that left `remove_listing` silently doing nothing.
-      if (!res.ok) console.error(`markStaleJobs ${label} failed: ${res.status} ${(await res.text().catch(() => '')).slice(0, 200)}`);
-    } catch (e) {
-      console.error(`markStaleJobs ${label} error (non-fatal):`, e.message);
-    }
+    results.push(await sweepStep(supabaseUrl, serviceKey, { label, filter, patch, deadline }));
   }
+  return {
+    swept: results.reduce((sum, r) => sum + r.updated, 0),
+    complete: results.every((r) => r.done),
+    steps: Object.fromEntries(results.map((r) => [r.label, r.updated])),
+  };
 }
 
 // Scan every active listing and immediately remove any that fail quality standards.
@@ -549,10 +623,14 @@ export default async function handler(req, res) {
   }
 
   try {
-    const [, junkResult] = await Promise.all([
+    const [, junkResult, sweep] = await Promise.all([
       deleteExpired(SUPABASE_URL, SUPABASE_SERVICE_KEY),
       deleteJunk(SUPABASE_URL, SUPABASE_SERVICE_KEY),
-      markStaleJobs(SUPABASE_URL, SUPABASE_SERVICE_KEY),
+      // Capped so a large one-off backlog (the 12,983-row repair) cannot starve ingestion. Each
+      // step resumes where it stopped on the next run, and there are six runs a day.
+      markStaleJobs(SUPABASE_URL, SUPABASE_SERVICE_KEY, {
+        deadline: Math.min(handlerDeadline, Date.now() + SWEEP_BUDGET_MS),
+      }),
     ]);
 
     // ?all=1 (or ?mode=full): "backfill everything now" emergency mode — runs ALL
@@ -643,6 +721,9 @@ export default async function handler(req, res) {
     }
     const countAfter = await jobCount(SUPABASE_URL, SUPABASE_SERVICE_KEY);
     const upsertedTotal = upsertResults.reduce((sum, r) => sum + (r.upserted || 0), 0);
+    // A rejected batch used to read as "found nothing" — upsertJobs swallowed !res.ok and returned
+    // upserted:0 with no log. Surface it, or a total write failure looks like a quiet day.
+    const failedBatches = upsertResults.filter((r) => r.error).map((r) => r.error);
     const inserted = (countBefore != null && countAfter != null) ? Math.max(0, countAfter - countBefore) : null;
     const updated = inserted != null ? Math.max(0, upsertedTotal - inserted) : null;
 
@@ -703,7 +784,10 @@ export default async function handler(req, res) {
       upserted: upsertedTotal,
       inserted,
       updated,
+      failed_batches: failedBatches.length,
+      upsert_errors: failedBatches.slice(0, 3),
       purged: junkResult.removed,
+      stale_sweep: sweep,
       merged,
       ats: atsSummary, // employer-direct sources synced + registry growth
     });
