@@ -396,7 +396,7 @@ async function deleteExpired(supabaseUrl, serviceKey) {
   });
 }
 
-async function markStaleJobs(supabaseUrl, serviceKey) {
+export async function markStaleJobs(supabaseUrl, serviceKey) {
   const h = { apikey: serviceKey, Authorization: `Bearer ${serviceKey}`, 'Content-Type': 'application/json', Prefer: 'return=minimal' };
   const staleISO = new Date(Date.now() - 7 * 86400000).toISOString();
   const expiredISO = new Date(Date.now() - 14 * 86400000).toISOString();
@@ -404,16 +404,37 @@ async function markStaleJobs(supabaseUrl, serviceKey) {
   // listing is never re-seen by the aggregator (it isn't scraped), so it would wrongly go stale at
   // 7d / expired at 14d. Employer listings live until their own expires_at (60d) or the employer
   // deletes them (api/employer-listings.js). `is_employer_posted=eq.false` keeps only aggregated rows.
-  await Promise.all([
-    // active jobs not seen in 7+ days → stale
-    fetch(`${supabaseUrl}/rest/v1/jobs?is_employer_posted=eq.false&availability_status=eq.active&last_seen_at=lt.${staleISO}`, {
-      method: 'PATCH', headers: h, body: JSON.stringify({ availability_status: 'stale' }),
-    }),
-    // stale/active jobs not seen in 14+ days → expired
-    fetch(`${supabaseUrl}/rest/v1/jobs?is_employer_posted=eq.false&availability_status=in.(active,stale)&last_seen_at=lt.${expiredISO}`, {
-      method: 'PATCH', headers: h, body: JSON.stringify({ availability_status: 'expired' }),
-    }),
-  ]).catch(e => console.error('markStaleJobs error (non-fatal):', e.message));
+  // Marking a row 'stale' does not hide it. User search gates on `expires_at > now()`, NOT on
+  // availability_status, so this sweep used to relabel rows and leave every one of them in the
+  // results — 12,899 rows sat 'stale' with a future expires_at, which is why the admin stale counts
+  // read correctly while clearing them changed nothing anyone could see. A stale listing is hidden
+  // by expiring it, so every transition below sets expires_at alongside the status.
+  const now = new Date().toISOString();
+  const steps = [
+    // active, not seen in 7+ days → stale AND hidden
+    ['stale', `is_employer_posted=eq.false&availability_status=eq.active&last_seen_at=lt.${staleISO}`,
+      { availability_status: 'stale', expires_at: now, last_checked_at: now }],
+    // Repair pass for rows already marked stale by the previous behaviour: they carry a future
+    // expires_at and are still being served. Without this they would never be picked up again —
+    // the 7-day step only matches `active`.
+    ['stale-backfill', `is_employer_posted=eq.false&availability_status=eq.stale&expires_at=gt.${now}`,
+      { expires_at: now, last_checked_at: now }],
+    // not seen in 14+ days → terminal expired
+    ['expired', `is_employer_posted=eq.false&availability_status=in.(active,stale)&last_seen_at=lt.${expiredISO}`,
+      { availability_status: 'expired', expires_at: now, last_checked_at: now }],
+  ];
+  // Sequential, not Promise.all: the 14-day query matches `in.(active,stale)` while the 7-day query
+  // is concurrently flipping active→stale, so running them together races on the same rows.
+  for (const [label, filter, patch] of steps) {
+    try {
+      const res = await fetch(`${supabaseUrl}/rest/v1/jobs?${filter}`, { method: 'PATCH', headers: h, body: JSON.stringify(patch) });
+      // A bare fetch does not throw on 4xx, so an unchecked response hides a rejected write
+      // completely — the same failure that left `remove_listing` silently doing nothing.
+      if (!res.ok) console.error(`markStaleJobs ${label} failed: ${res.status} ${(await res.text().catch(() => '')).slice(0, 200)}`);
+    } catch (e) {
+      console.error(`markStaleJobs ${label} error (non-fatal):`, e.message);
+    }
+  }
 }
 
 // Scan every active listing and immediately remove any that fail quality standards.
