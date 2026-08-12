@@ -1285,11 +1285,25 @@ async function _handler(req, res) {
     if (adminRole === 'moderator') return res.status(403).json({ error: 'Insufficient role' });
     const { job_id } = body;
     if (!job_id) return res.status(400).json({ error: 'job_id required' });
-    await db(`jobs?id=eq.${encodeURIComponent(job_id)}`, {
+    // 'removed' is not a legal value: jobs_availability_status_check allows only
+    // active/stale/expired/unknown, so this PATCH was rejected with a 400 EVERY time. `db` is a bare
+    // fetch that does not throw on 4xx and the result was discarded, so the handler went on to write
+    // an audit-log entry and return ok:true for a removal that never happened.
+    //
+    // Setting expires_at is what actually pulls the listing: search filters on expires_at > now(),
+    // NOT on availability_status. Marking a row 'expired' alone would leave it visible. Mirrors the
+    // confirm-expired handler above.
+    const removedAt = new Date().toISOString();
+    const patch = await db(`jobs?id=eq.${encodeURIComponent(job_id)}`, {
       method: 'PATCH',
-      body: JSON.stringify({ availability_status: 'removed' }),
+      body: JSON.stringify({ availability_status: 'expired', expires_at: removedAt, last_checked_at: removedAt }),
       headers: { Prefer: 'return=minimal' },
     });
+    if (!patch.ok) {
+      const detail = await patch.text().catch(() => '');
+      console.error(`remove_listing failed for ${job_id}: ${patch.status} ${detail.slice(0, 200)}`);
+      return res.status(502).json({ error: 'Could not remove listing', status: patch.status });
+    }
     // Mark all expired reports for this job as resolved
     await db(`job_availability_reports?job_id=eq.${encodeURIComponent(job_id)}&status=eq.expired`, {
       method: 'PATCH',
