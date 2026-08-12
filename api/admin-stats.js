@@ -270,7 +270,13 @@ async function _handler(req, res) {
       db(`search_events?result_count=eq.0&created_at=gte.${weekISO}&select=query&order=created_at.desc&limit=20`),
       db(`job_availability_reports?reported_at=gte.${weekISO}&select=job_id,status&limit=200`),
       db(`search_logs?created_at=gte.${todayISO}&select=id`, { headers: { Prefer: 'count=exact', 'Range-Unit': 'items', Range: '0-0' } }),
-      db(`reports?select=id,company_name,outcome,role,city,platform,created_at,report_text,outcome_weight,trust_reason,needs_review&order=created_at.desc&limit=25`),
+      // NOTE: `reports` has no `city` column — it carries `location_id` (uuid FK). Selecting `city`
+      // made PostgREST reject the whole request with 400, so `recent` has been silently EMPTY: the
+      // admin dashboard's recent-reports feed showed nothing at all, not merely a missing city. Nothing
+      // reads a report's city (the `.city` reads elsewhere in this file and in components/admin are on
+      // JOB rows), so the column is simply dropped. Add `location_id` and resolve the name if the feed
+      // ever needs a place again.
+      db(`reports?select=id,company_name,outcome,role,platform,created_at,report_text,outcome_weight,trust_reason,needs_review&order=created_at.desc&limit=25`),
       db(`applications?select=id,company_name,role,city,status,stage,platform,created_at&order=created_at.desc&limit=25`),
       db(`jobs?created_at=gte.${todayISO}&select=id`, { headers: { Prefer: 'count=exact', 'Range-Unit': 'items', Range: '0-0' } }),
       db(`job_availability_reports?status=in.(expired,unknown)&select=id,job_id,status,reported_at,company,title,city,apply_url&order=reported_at.desc&limit=50`),
