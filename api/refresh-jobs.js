@@ -706,7 +706,12 @@ export default async function handler(req, res) {
     const uniqueCompanies = [...new Set(allJobs.map(j => j.company).filter(Boolean))];
     await mapLimit(uniqueCompanies, 12, name => getOrCreateCompanyId(name, SUPABASE_URL, SUPABASE_SERVICE_KEY));
 
-    // Upsert in batches of 100, 3 batches at a time — 4× fewer round trips than 25-per-batch serial
+    // Upsert in batches of 100, SEQUENTIALLY. These used to run 3 at a time for throughput, but the
+    // dedupe trigger UPDATEs (and sometimes DELETEs) the existing row a duplicate matches, so two
+    // concurrent batches holding overlapping listings acquire the same row locks in opposite order
+    // and deadlock — production logged 40P01 on the first run after the trigger was rekeyed, and a
+    // deadlock costs the whole batch. Sequential batches cannot deadlock against each other, and
+    // the 300s budget (#267) leaves ample room for the extra round trips.
     const UPSERT_BATCH = 100;
     const upsertBatches = Array.from({ length: Math.ceil(allJobs.length / UPSERT_BATCH) }, (_, i) =>
       allJobs.slice(i * UPSERT_BATCH, (i + 1) * UPSERT_BATCH)
@@ -715,15 +720,19 @@ export default async function handler(req, res) {
     // existing ones (a merge-duplicates upsert can't tell them apart on its own).
     const countBefore = await jobCount(SUPABASE_URL, SUPABASE_SERVICE_KEY);
     const upsertResults = [];
-    for (let i = 0; i < upsertBatches.length; i += 3) {
-      const chunk = await Promise.all(upsertBatches.slice(i, i + 3).map(b => upsertJobs(b, SUPABASE_URL, SUPABASE_SERVICE_KEY)));
-      upsertResults.push(...chunk);
+    for (const batch of upsertBatches) {
+      if (Date.now() >= handlerDeadline) {
+        console.warn(`refresh-jobs: out of time after ${upsertResults.length}/${upsertBatches.length} upsert batches`);
+        break;
+      }
+      upsertResults.push(await upsertJobs(batch, SUPABASE_URL, SUPABASE_SERVICE_KEY));
     }
     const countAfter = await jobCount(SUPABASE_URL, SUPABASE_SERVICE_KEY);
     const upsertedTotal = upsertResults.reduce((sum, r) => sum + (r.upserted || 0), 0);
     // A rejected batch used to read as "found nothing" — upsertJobs swallowed !res.ok and returned
     // upserted:0 with no log. Surface it, or a total write failure looks like a quiet day.
     const failedBatches = upsertResults.filter((r) => r.error).map((r) => r.error);
+    const rowsDropped = upsertResults.reduce((sum, r) => sum + (r.dropped || 0), 0);
     const inserted = (countBefore != null && countAfter != null) ? Math.max(0, countAfter - countBefore) : null;
     const updated = inserted != null ? Math.max(0, upsertedTotal - inserted) : null;
 
@@ -785,6 +794,7 @@ export default async function handler(req, res) {
       inserted,
       updated,
       failed_batches: failedBatches.length,
+      rows_dropped: rowsDropped,
       upsert_errors: failedBatches.slice(0, 3),
       purged: junkResult.removed,
       stale_sweep: sweep,
