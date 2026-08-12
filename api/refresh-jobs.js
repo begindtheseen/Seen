@@ -19,8 +19,16 @@ import { discoverFromCommonCrawl } from '../lib/jobs/discovery.js';
 // Refresh a batch of registered employer-direct ATS boards straight from the source, and grow the
 // source registry (seed on first run; a daily Common Crawl discovery sweep). Fail-open + bounded so
 // it never breaks the cron or exceeds the function time budget. Returns a small summary.
-async function refreshEmployerSources(supabaseUrl, serviceKey, { full = false, runDiscovery = false } = {}) {
-  const summary = { sources: 0, upserted: 0, discovered: 0 };
+// How long Common Crawl discovery needs to be worth starting. It is the LAST thing this handler
+// does, so without a reserved slice it is always the first work to be starved — which is exactly
+// why company_sources holds nothing but hand-typed seeds despite discovery being scheduled daily.
+const DISCOVERY_RESERVE_MS = 45_000;
+// Must stay under the maxDuration in vercel.json (300s) with room to serialize the response.
+const HANDLER_BUDGET_MS = Number(process.env.REFRESH_JOBS_BUDGET_MS || 270_000);
+
+export async function refreshEmployerSources(supabaseUrl, serviceKey, { full = false, runDiscovery = false, deadline = null } = {}) {
+  const summary = { sources: 0, upserted: 0, discovered: 0, skipped: [] };
+  const msLeft = () => (deadline == null ? Infinity : deadline - Date.now());
   try {
     // Seed the registry (idempotent merge-duplicates — a cheap no-op after the first run).
     await seedSources(SEED_SOURCES, supabaseUrl, serviceKey);
@@ -46,8 +54,22 @@ async function refreshEmployerSources(supabaseUrl, serviceKey, { full = false, r
     }
     // Common Crawl discovery — grow the source index (once/day, bounded). Fail-open.
     if (runDiscovery) {
-      const disc = await discoverFromCommonCrawl({ supabaseUrl, serviceKey, perPatternLimit: 300, maxRegister: 200 }).catch(() => ({ registered: 0 }));
-      summary.discovered = disc.registered || 0;
+      if (msLeft() < DISCOVERY_RESERVE_MS) {
+        // Say so. The old code swallowed every outcome into `registered: 0`, so a discovery run
+        // that never happened was indistinguishable from one that found nothing — which is how
+        // this went unnoticed while the function was 504-ing before it ever got here.
+        summary.skipped.push(`discovery: only ${Math.max(0, msLeft())}ms left, needs ${DISCOVERY_RESERVE_MS}ms`);
+        console.warn(`discovery skipped: ${Math.max(0, msLeft())}ms remaining`);
+      } else {
+        try {
+          const disc = await discoverFromCommonCrawl({ supabaseUrl, serviceKey, perPatternLimit: 300, maxRegister: 200, deadline });
+          summary.discovered = disc.registered || 0;
+        } catch (e) {
+          // Still fail-open, but never silent again.
+          console.error('discoverFromCommonCrawl failed:', e.message);
+          summary.skipped.push(`discovery: ${e.message}`);
+        }
+      }
     }
   } catch (e) { console.warn('refreshEmployerSources (non-fatal):', e.message); }
   return summary;
@@ -466,6 +488,10 @@ export default async function handler(req, res) {
   const cronSecret = process.env.CRON_SECRET;
   const adminToken = req.headers['x-admin-token'] || '';
   const isCron     = req.headers['x-vercel-cron'] === '1';
+  // Vercel kills the function at maxDuration and the caller gets a 504 with NO record of what ran.
+  // Stop short of that and return what completed. Kept below the configured ceiling so the response
+  // is actually written before the platform pulls the plug.
+  const handlerDeadline = Date.now() + HANDLER_BUDGET_MS;
   // Fail CLOSED: every non-cron caller must present a valid cron secret OR a valid
   // admin session token. Authorization must NOT be contingent on CRON_SECRET being
   // set — if that env var is blank/unset, the cron-secret path is simply
@@ -606,6 +632,9 @@ export default async function handler(req, res) {
     const atsSummary = await refreshEmployerSources(SUPABASE_URL, SUPABASE_SERVICE_KEY, {
       full: fullMode,
       runDiscovery: isCron && new Date().getUTCHours() === 2,
+      // Stop cleanly before the platform kills us. A 504 loses the whole run with no record;
+      // a deadline returns what actually completed.
+      deadline: handlerDeadline,
     });
 
     // Job insights are now generated deterministically on demand (lib/server/jobInsights.js

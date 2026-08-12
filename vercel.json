@@ -37,7 +37,7 @@
       "maxDuration": 30
     },
     "api/refresh-jobs.js": {
-      "maxDuration": 60
+      "maxDuration": 300
     },
     "api/refresh-stale-jobs.js": {
       "maxDuration": 300
