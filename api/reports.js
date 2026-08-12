@@ -12,6 +12,7 @@ import { listEmployerListings, closeEmployerListing } from '../lib/server/employ
 import { buildSearchUrl, parseRedditSearchAtom } from './_utils/companyReddit.js';
 import { SECURITY_PREAMBLE, fenceUntrusted, scanInjection } from '../lib/server/promptGuard.js';
 import { fetchIndustryBenchmark } from '../lib/server/benchmark.js';
+import { isEvidencedScore, suppressionReason, servedDataSource } from '../lib/server/scoreProvenance.js';
 
 // Authorize admin/cron-only actions (the Anthropic web-research endpoints). Accepts a Vercel
 // cron header, a shared CRON_SECRET, or a valid admin_sessions token. Everything Anthropic in
@@ -1384,11 +1385,16 @@ async function fetchCompanyStats(name, supabaseUrl, dbHeaders) {
   try {
     const enc = encodeURIComponent(name);
     const [scoresRes, reportsRes] = await Promise.all([
-      fetch(`${supabaseUrl}/rest/v1/company_scores?company_name=ilike.${enc}&select=company_name,overall_score,ghost_rate,response_rate,avg_wait_days,avg_rounds,waste_score,report_count,data_quality&order=created_at.desc&limit=1`, { headers: dbHeaders }),
+      fetch(`${supabaseUrl}/rest/v1/company_scores?company_name=ilike.${enc}&select=company_name,overall_score,ghost_rate,response_rate,avg_wait_days,avg_rounds,waste_score,report_count,data_quality,data_source,first_party_report_count,web_report_count,web_reviews&order=created_at.desc&limit=1`, { headers: dbHeaders }),
       fetch(`${supabaseUrl}/rest/v1/reports?company_name=ilike.${enc}&select=outcome&order=created_at.desc&limit=150`, { headers: dbHeaders }),
     ]);
     const [scores, reps] = await Promise.all([scoresRes.ok ? scoresRes.json() : [], reportsRes.ok ? reportsRes.json() : []]);
-    const cs = Array.isArray(scores) ? scores[0] : null;
+    // The cached row is used below as a FALLBACK for ghost_rate/response_rate when we have too few
+    // reports to compute them. An unevidenced cached row would therefore supply an invented ghost
+    // rate to a company that has no real data — exactly the number we must never publish. Drop it
+    // and let the computed-or-null path decide. `data_source` is selected above solely for this.
+    const raw = Array.isArray(scores) ? scores[0] : null;
+    const cs = isEvidencedScore(raw) ? raw : null;
     const total = Array.isArray(reps) ? reps.length : 0;
     const dist = {};
     (Array.isArray(reps) ? reps : []).forEach(r => { const oc = r.outcome||'unknown'; dist[oc] = (dist[oc]||0)+1; });
@@ -1462,9 +1468,9 @@ function _rowToScore(row) {
     first_party_report_count: firstParty, web_report_count: webClaim,
     avg_tenure_months: row.avg_tenure_months || null, tenure_sample_count: row.tenure_sample_count || 0,
     confidence, confidence_label: confidenceLabel(confidence), sufficient: confidence >= 0.33,
-    // Was hardcoded 'web_research' for every cache hit — now reflects the stored row, so a
-    // reports-derived score is no longer mislabeled (and vice versa).
-    data_quality: row.data_quality || 'medium', data_source: row.data_source === 'reports' ? 'reports' : 'web_research',
+    // Provenance is reported, never renamed. This previously collapsed every non-'reports' row to
+    // 'web_research', which presented model-generated estimates to users as research.
+    data_quality: row.data_quality || 'medium', data_source: servedDataSource(row),
     risk_level: s >= 70 ? 'safe' : s >= 40 ? 'warn' : 'danger',
     industry: row.industry || '', summary: row.raw_summary || '',
     process_score: s, web_reviews: reviews,
@@ -1643,7 +1649,13 @@ async function handleCompanyScore(req, res, body) {
         cacheRes = await fetch(`${SUPABASE_URL}/rest/v1/company_scores?company_name=ilike.${_fuzzyNamePattern(name)}&order=created_at.desc&limit=1`, { headers: dbH });
         rows = cacheRes.ok ? await cacheRes.json() : null;
       }
-      if (rows?.[0]) return res.json({ ok: true, score: _rowToScore(rows[0]), _src: 'cache' });
+      // A cached row only counts as a hit if there is evidence behind it. An unevidenced row is
+      // treated as a MISS rather than an error, so the request falls through to real report
+      // aggregation and, failing that, to the honest "no data yet — be the first to report" state.
+      if (rows?.[0]) {
+        if (isEvidencedScore(rows[0])) return res.json({ ok: true, score: _rowToScore(rows[0]), _src: 'cache' });
+        console.warn(`score suppressed for "${name}": ${suppressionReason(rows[0])}`);
+      }
     } catch(e) { console.warn('Cache check:', e.message); }
   }
 
