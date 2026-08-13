@@ -27,8 +27,10 @@ import { logError } from '../lib/server/errlog.js';
 // serialize the response. Discovery gets the WHOLE budget here — that is the entire point.
 const BUDGET_MS = Number(process.env.DISCOVER_SOURCES_BUDGET_MS || 240_000);
 
-// The CDX index is walked a page at a time. Cron advances the page once per firing so successive runs
-// cover new ground instead of rescanning page 0 forever; ?page=N overrides it for a targeted sweep.
+// Rotation HINT only. discoverFromCommonCrawl clamps it to each pattern's real page count, because
+// these host patterns have exactly one page ({"pages":1}) and a cursor past the end is a hard CDX 400,
+// not an empty result. #273 rotated blind, reached page 36, and 400ed every request for hours. ?page=N
+// overrides the hint for a targeted sweep; it is still clamped.
 const PAGES = 40;
 const DEFAULT_INTERVAL_MS = 12 * 60 * 60 * 1000; // this endpoint's cron cadence
 export const pageFor = (now = Date.now(), intervalMs = DEFAULT_INTERVAL_MS) =>
@@ -98,7 +100,8 @@ export default async function handler(req, res) {
     // One line that states the outcome outright. The absence of exactly this is why a sweep returning
     // nothing looked identical to a sweep that never ran, for three weeks.
     console.log(
-      `discover-sources: crawl=${summary.crawl} page=${summary.page} ` +
+      `discover-sources: crawl=${summary.crawl} page_hint=${summary.page} ` +
+      `pages_used=${JSON.stringify(summary.pages_used || [])} ` +
       `patterns=${summary.patterns_swept}/${summary.patterns_total} tenants=${summary.discovered} ` +
       `registered=${summary.registered} new=${summary.new_boards} reason=${summary.reason}` +
       `${summary.detail ? ` detail=${summary.detail}` : ''} ms=${Date.now() - startedAt}`
