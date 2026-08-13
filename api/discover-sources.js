@@ -210,6 +210,14 @@ async function probeAdzuna(supabaseUrl, serviceKey, n) {
     }
   });
 
+  return summarizeAdzunaProbe(results);
+}
+
+// PURE, and exported for tests, because THIS is where both independent implementations of this probe
+// went wrong — not in the fetching. Mocking the network would only test the mock; this classification
+// is the part that turned 50 HTTP 403s into "0% yield, all destinations adzuna.com". Naming the
+// failure mode did not stop either of us from writing it, so it is pinned by assertions instead.
+export function summarizeAdzunaProbe(results) {
   const sortDesc = (o) => Object.fromEntries(Object.entries(o).sort((a, b) => b[1] - a[1]));
   const bump = (o, k) => { if (k != null) o[k] = (o[k] || 0) + 1; };
 
