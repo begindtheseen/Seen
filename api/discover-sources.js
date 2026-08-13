@@ -8,12 +8,14 @@
 // summary that could not say why a zero was a zero) — and the 08-13 02:00Z run still returned zero
 // while NOT being starved, which proved the defects were not the whole story.
 //
-// The measurement that settled it (owner probe against CC-MAIN-2026-30, 2026-08-13): every pattern
-// returns HTTP 200 with real tenant rows — Common Crawl is up, not blocking, and the CDX patterns are
-// correct — but the seven of them cost 19.3s SEQUENTIALLY at limit=3, with careers.smartrecruiters.com
-// at 9.0s and *.recruitee.com at 7.0s on their own. That is per-pattern index seek time, not row
-// transfer, so it does not shrink at the real limit=300. A sweep that costs tens of seconds cannot be
-// the last thing a handler does with its leftovers. It needs its own invocation. That is this file.
+// The first measurement (owner probe from a RESIDENTIAL IP against CC-MAIN-2026-30, 2026-08-13) said
+// every pattern returns HTTP 200 with real tenant rows, and that the seven cost 19.3s sequentially at
+// limit=3 — so the sweep needed its own invocation rather than a handler's leftovers. That reasoning
+// still holds and is why this file exists. But the residential result did NOT generalise: from Vercel,
+// the CDX query API returns HTTP 503 on all seven patterns, with the same User-Agent that gets 200
+// from a laptop. Discovery therefore no longer uses the query API at all — lib/jobs/discovery.js reads
+// the cc-index OBJECTS on data.commoncrawl.org over Range requests, which Vercel can read (HTTP 206).
+// Measured with production defaults: 5,570 ingestable tenants in 2.6s for ~6.8MB of ranged reads.
 //
 // Nothing here is destructive: it performs no deletes, no stale marking, and no job upserts. It reads
 // the Common Crawl index and upserts rows into company_sources. The scheduled refresh then ingests
@@ -29,10 +31,11 @@ import { logError } from '../lib/server/errlog.js';
 // serialize the response. Discovery gets the WHOLE budget here — that is the entire point.
 const BUDGET_MS = Number(process.env.DISCOVER_SOURCES_BUDGET_MS || 240_000);
 
-// Rotation HINT only. discoverFromCommonCrawl clamps it to each pattern's real page count, because
-// these host patterns have exactly one page ({"pages":1}) and a cursor past the end is a hard CDX 400,
-// not an empty result. #273 rotated blind, reached page 36, and 400ed every request for hours. ?page=N
-// overrides the hint for a targeted sweep; it is still clamped.
+// Rotation HINT only. discoverFromCommonCrawl clamps it to the number of index blocks that actually
+// cover each pattern's key prefix, so successive runs read a different slice of the same prefix instead
+// of re-reading its first blocks forever. It is no longer a CDX page cursor — there is no query API in
+// this path — but the clamp is kept, because #273 rotated an offset blind past the end of what existed
+// and every request failed for hours. ?page=N overrides the hint; it is still clamped.
 const PAGES = 40;
 const DEFAULT_INTERVAL_MS = 12 * 60 * 60 * 1000; // this endpoint's cron cadence
 export const pageFor = (now = Date.now(), intervalMs = DEFAULT_INTERVAL_MS) =>
@@ -342,20 +345,22 @@ export default async function handler(req, res) {
   }
 
   const pageParam = params.get('page');
-  const limitParam = params.get('limit');
+  const blocksParam = params.get('blocks');
   const page = pageParam !== null && Number.isFinite(Number(pageParam))
     ? Math.abs(Math.trunc(Number(pageParam))) % PAGES
     : pageFor();
-  const perPatternLimit = limitParam !== null && Number.isFinite(Number(limitParam))
-    ? Math.min(1000, Math.max(1, Math.trunc(Number(limitParam))))
-    : 300;
+  // How many cc-index blocks to read per pattern. Each is one ~220-260KB gzip member holding ~3,000
+  // CDX rows, so this is the real cost knob — the CDX-era `limit` (rows per query) has no analogue.
+  const maxBlocksPerPattern = blocksParam !== null && Number.isFinite(Number(blocksParam))
+    ? Math.min(24, Math.max(1, Math.trunc(Number(blocksParam))))
+    : 4;
 
   const startedAt = Date.now();
   try {
     const summary = await discoverFromCommonCrawl({
       supabaseUrl: SUPABASE_URL,
       serviceKey: SUPABASE_SERVICE_KEY,
-      perPatternLimit,
+      maxBlocksPerPattern,
       page,
       maxRegister: 200,
       deadline: startedAt + BUDGET_MS,
@@ -363,10 +368,15 @@ export default async function handler(req, res) {
 
     // One line that states the outcome outright. The absence of exactly this is why a sweep returning
     // nothing looked identical to a sweep that never ran, for three weeks.
+    // shards_read/bytes_read are in here on purpose: without them a run stopped short by a byte cap
+    // reports the same tenant count as a genuinely exhausted index, and `truncated` is the flag that
+    // tells those apart.
     console.log(
       `discover-sources: crawl=${summary.crawl} page_hint=${summary.page} ` +
-      `pages_used=${JSON.stringify(summary.pages_used || [])} ` +
+      `blocks=${JSON.stringify(summary.pattern_blocks || {})} ` +
       `patterns=${summary.patterns_swept}/${summary.patterns_total} tenants=${summary.discovered} ` +
+      `shards_read=${summary.shards_read} bytes_read=${summary.bytes_read} ` +
+      `range_requests=${summary.range_requests} truncated=${summary.truncated} ` +
       `registered=${summary.registered} new=${summary.new_boards} reason=${summary.reason}` +
       `${summary.detail ? ` detail=${summary.detail}` : ''} ms=${Date.now() - startedAt}`
     );
@@ -375,11 +385,11 @@ export default async function handler(req, res) {
       ok: true,
       date: new Date().toISOString(),
       ms: Date.now() - startedAt,
-      per_pattern_limit: perPatternLimit,
+      max_blocks_per_pattern: maxBlocksPerPattern,
       ...summary,
     });
   } catch (e) {
-    try { logError('api/discover-sources', e, { page, perPatternLimit }); } catch { /* best-effort */ }
+    try { logError('api/discover-sources', e, { page, maxBlocksPerPattern }); } catch { /* best-effort */ }
     return res.status(500).json({ ok: false, error: e.message, ms: Date.now() - startedAt });
   }
 }
