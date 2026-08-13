@@ -23,14 +23,27 @@ import { discoverFromCommonCrawl } from '../lib/jobs/discovery.js';
 // does, so without a reserved slice it is always the first work to be starved — which is exactly
 // why company_sources holds nothing but hand-typed seeds despite discovery being scheduled daily.
 const DISCOVERY_RESERVE_MS = 45_000;
+// Hard cap on a single sweep, so discovery can never eat a run even when the index is slow.
+const DISCOVERY_BUDGET_MS = 45_000;
+// Discovery used to be gated to `getUTCHours() === 2` — ONE attempt per day, last in the handler.
+// On 2026-08-12 that single run 504'd at the old 60s maxDuration before reaching discovery, and the
+// whole day was lost; company_sources has never held a single crawl-discovered board. Every cron run
+// may now sweep, so one bad run costs one run instead of a day.
+//
+// The page must advance between runs: at a fixed page every sweep rescans the identical first rows
+// per pattern forever. Cron fires every 4h, so flooring on that interval advances exactly once per
+// run, wrapping after DISCOVERY_PAGES runs.
+const DISCOVERY_PAGES = 40;
+const CRON_INTERVAL_MS = 4 * 60 * 60 * 1000;
+export const discoveryPageFor = (now = Date.now()) => Math.floor(now / CRON_INTERVAL_MS) % DISCOVERY_PAGES;
 // Must stay under the maxDuration in vercel.json (300s) with room to serialize the response.
 const HANDLER_BUDGET_MS = Number(process.env.REFRESH_JOBS_BUDGET_MS || 270_000);
 // Slice of the run the stale sweep may use. It is chunked and resumable, so a backlog it cannot
 // finish carries to the next run rather than costing this run its ingestion.
 const SWEEP_BUDGET_MS = Number(process.env.REFRESH_JOBS_SWEEP_BUDGET_MS || 60_000);
 
-export async function refreshEmployerSources(supabaseUrl, serviceKey, { full = false, runDiscovery = false, deadline = null } = {}) {
-  const summary = { sources: 0, upserted: 0, discovered: 0, skipped: [] };
+export async function refreshEmployerSources(supabaseUrl, serviceKey, { full = false, runDiscovery = false, deadline = null, discoveryPage = null } = {}) {
+  const summary = { sources: 0, upserted: 0, discovered: 0, skipped: [], discovery: null };
   const msLeft = () => (deadline == null ? Infinity : deadline - Date.now());
   try {
     // Seed the registry (idempotent merge-duplicates — a cheap no-op after the first run).
@@ -65,8 +78,19 @@ export async function refreshEmployerSources(supabaseUrl, serviceKey, { full = f
         console.warn(`discovery skipped: ${Math.max(0, msLeft())}ms remaining`);
       } else {
         try {
-          const disc = await discoverFromCommonCrawl({ supabaseUrl, serviceKey, perPatternLimit: 300, maxRegister: 200, deadline });
-          summary.discovered = disc.registered || 0;
+          const disc = await discoverFromCommonCrawl({
+            supabaseUrl, serviceKey, perPatternLimit: 300, maxRegister: 200,
+            page: discoveryPage == null ? discoveryPageFor() : discoveryPage,
+            // Its own hard slice, never more than what is left of the handler.
+            deadline: deadline == null
+              ? Date.now() + DISCOVERY_BUDGET_MS
+              : Math.min(deadline, Date.now() + DISCOVERY_BUDGET_MS),
+          });
+          // Keep the whole summary. Collapsing it to a single number is why "Common Crawl was
+          // unreachable" and "swept fine, every board already known" were indistinguishable.
+          summary.discovery = disc;
+          summary.discovered = disc.new_boards || 0;
+          console.log(`discovery: crawl=${disc.crawl} page=${disc.page} patterns=${disc.patterns_swept}/${disc.patterns_total} tenants=${disc.discovered} registered=${disc.registered} new=${disc.new_boards} reason=${disc.reason}${disc.detail ? ` detail=${disc.detail}` : ''}`);
         } catch (e) {
           // Still fail-open, but never silent again.
           console.error('discoverFromCommonCrawl failed:', e.message);
@@ -742,7 +766,10 @@ export default async function handler(req, res) {
     // the 02:00 UTC run). Non-fatal + bounded — it never breaks the aggregator refresh above.
     const atsSummary = await refreshEmployerSources(SUPABASE_URL, SUPABASE_SERVICE_KEY, {
       full: fullMode,
-      runDiscovery: isCron && new Date().getUTCHours() === 2,
+      // EVERY cron run may sweep now, not just 02:00 UTC — that single daily attempt 504'd on
+      // 2026-08-12 and took the whole day's discovery with it. ?discover=1 forces a sweep on an
+      // authenticated manual call so the path is testable without waiting for a cron slot.
+      runDiscovery: isCron || reqUrl.searchParams.get('discover') === '1',
       // Stop cleanly before the platform kills us. A 504 loses the whole run with no record;
       // a deadline returns what actually completed.
       deadline: handlerDeadline,
