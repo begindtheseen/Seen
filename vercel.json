@@ -39,6 +39,9 @@
     "api/refresh-jobs.js": {
       "maxDuration": 300
     },
+    "api/discover-sources.js": {
+      "maxDuration": 300
+    },
     "api/refresh-stale-jobs.js": {
       "maxDuration": 300
     },
@@ -111,6 +114,14 @@
     {
       "path": "/api/refresh-jobs",
       "schedule": "0 22 * * *"
+    },
+    {
+      "path": "/api/discover-sources",
+      "schedule": "20 3 * * *"
+    },
+    {
+      "path": "/api/discover-sources",
+      "schedule": "20 15 * * *"
     },
     {
       "path": "/api/refresh-stale-jobs",
