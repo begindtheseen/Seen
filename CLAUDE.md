@@ -193,12 +193,30 @@ and import graph; 30 confirmed breaks fixed. Ground truth established this sessi
 - **Vercel Pro — 500 serverless function limit. No constraint on adding new api/*.js files.**
 - Currently 9 declared api/*.js functions. Add new ones freely as needed.
 
-### Vercel deploy: RESOLVED — auto-deploys are working (updated 2026-06-30):
-- The old "Vercel won't build claude-authored commits" problem (2026-06-12, Session B) is
-  **no longer true.** Vercel is now fully connected to the GitHub repo: every PR gets a
-  preview deployment, and **merging to `next-migration` auto-deploys to production
-  (seenjobs.io)** with no manual step. Do NOT tell the owner to manually trigger deploys —
-  merging the PR is the deploy.
+### Vercel deploy: auto-deploy USUALLY works but is NOT guaranteed (updated 2026-08-13):
+- Vercel is connected to the GitHub repo and normally every PR gets a preview and merging to
+  `next-migration` deploys production (seenjobs.io) within ~2 minutes. **But it silently
+  fails.** On 2026-08-13 the merge of #274 produced NO production deployment at all: commit
+  `58c02f6` carried **zero GitHub statuses** — the integration never fired — and production
+  served five-hour-old code while the database had already been migrated ahead of it. The
+  previous wording here ("do NOT tell the owner to manually trigger deploys — merging the PR
+  is the deploy") is what made that invisible, so it is now retracted.
+- **VERIFY, then conclude. A merge that never deployed is indistinguishable from a fix that
+  did not work** — you will misread it as "my change didn't help". After merging anything you
+  intend to observe in production, confirm a **production** deployment exists for the merged
+  sha before drawing any conclusion:
+  `gh api repos/begindtheseen/Seen/commits/<sha>/status` (0 statuses = never fired), or check
+  Vercel for `target: production` on that sha. **A green Vercel check on a PR is a PREVIEW,
+  not production** — that exact confusion cost hours.
+- If it did not fire, create the deployment for the merged sha (Vercel API `POST /v13/deployments`
+  with `target: production` and a `gitSource` ref, or `vercel --prod`). The command-os repo now
+  checks this automatically every hour (`scripts/deploy-drift.mjs`) and records the verdict as a
+  brain fact, so drift is visible in Chronos → Brain rather than depending on memory.
+- **Ordering rule, learned the hard way the same day: deploy code BEFORE schema**, or make the
+  schema change backward-compatible so both the old and new build work against it. Migration 069
+  was applied ahead of its code and every `append_timeline` failed — worse than the bug it fixed.
+  Schema-first also has no cheap rollback: the old unique index could no longer be recreated once
+  a row exceeded its size limit.
 - Evidence: in the 2026-06-30 session, PRs #82–#87 each produced a green Vercel preview
   ("Ready/DEPLOYED" status checks) and the owner confirmed merged changes were live on the site.
 - `"type": "module"` is set in package.json (fixes Vercel's ESM→CJS compile warning)
