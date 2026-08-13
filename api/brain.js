@@ -11,7 +11,10 @@
 //   op "notes"           → { ok:true, notes:[{path,text}] }              (all vault notes; read backbone)
 //   op "counts"          → { ok:true, counts:{notes,facts,episodes} }    (freshness / self-test)
 //   op "record_fact"     { fact:{subject,predicate,object,confidence?,source?}, note? } → { ok:true, written, note }
-//   op "append_timeline" { date?, heading, text } → { ok:true, note, heading }
+//   op "append_timeline" { date?, heading, text } → { ok:true, note, heading, appended }
+//        `appended:false` means the identical episode was already in the note (a converged retry), not a failure.
+//        Body size is unbounded: the brain_timeline mirror is keyed on md5(body) (migration 069), and the
+//        mirror insert runs BEFORE the note write so a failure leaves zero durable state. See brainStore.js.
 // Errors: 401 missing/bad token · 405 non-POST · 400 bad op/params · 503 not configured · 500 (error).
 // Server-to-server only (no CORS headers exposed): the caller is the MCP server / a script, not a browser.
 //
