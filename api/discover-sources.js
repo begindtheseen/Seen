@@ -136,60 +136,157 @@ async function probeCommonCrawl({ crawl = 'CC-MAIN-2026-30', ccpath = null } = {
   return { probe: 'cc', verdict, crawl, data_key_url: dataKeyUrl, results };
 }
 
-// What do Adzuna's redirect stubs actually resolve to? Every Adzuna row's apply_url is an
-// adzuna.com/details/{id} stub whose destination Seen never follows, and those destinations are the
-// candidate second source of ATS boards. Reports the FULL destination-host histogram, not only the
-// ingestable hits: if the misses cluster on one or two providers Seen does not parse yet, that
-// number changes what to build rather than merely gating whether to build it.
-async function probeAdzuna(supabaseUrl, serviceKey, n) {
-  const r = await fetch(
-    `${supabaseUrl}/rest/v1/jobs?source=eq.Adzuna&apply_url=ilike.*adzuna.com/details*&select=apply_url&limit=${n}`,
-    { headers: { apikey: serviceKey, Authorization: `Bearer ${serviceKey}` } }
-  );
-  if (!r.ok) return { probe: 'adzuna', error: `stub query failed: ${r.status}`, sampled: 0 };
-  const rows = await r.json();
-  const stubs = (Array.isArray(rows) ? rows : []).map((x) => x.apply_url).filter(Boolean);
+// Can the employer destination behind an Adzuna stub be recovered at all?
+//
+// THE INSTRUMENT MATTERS MORE THAN THE NUMBER HERE, because the obvious implementation produces a
+// confident wrong answer. Following redirects and treating "no throw" as success counts an Adzuna
+// bot-block (HTTP 403) as a successful resolution to adzuna.com — yielding a decisive-looking
+// 0% ATS rate that is really "we were blocked and never saw a destination". The owner hit exactly
+// that from a residential IP on 2026-08-13. "Yield is zero" and "we were refused" are opposite
+// decision inputs and must never collapse into the same output.
+//
+// So: a non-2xx is UNRESOLVED, never "resolved, not ATS"; every status is reported in a histogram;
+// and the ATS rate is computed over genuinely-resolved responses only, staying null when there are
+// none rather than rounding to a persuasive zero.
+//
+// Redirect-following alone is also the wrong mechanism. An inspected interstitial had no HTTP
+// redirect, no meta refresh, no JS location target, and no non-Adzuna host anywhere in 13.7KB of
+// HTML. So this ALSO scans the returned body for any ATS host — testing that finding across a
+// sample instead of one page. If bodies resolve 200 and still contain no ATS host, the destination
+// is not in the HTML at all and no amount of fetching will produce it.
+//
+// Both stub shapes are sampled. The corpus is 8,598 /land/ad/ and 11,734 /details/; querying only
+// one shape would measure a little over half the population and call it the population.
+const ADZUNA_SHAPES = [['details', '*adzuna.com/details*'], ['land_ad', '*adzuna.com/land/ad*']];
+const MAX_BODY_BYTES = 250_000;
 
-  const resolved = await mapLimit(stubs, 5, async (stub) => {
+async function probeAdzuna(supabaseUrl, serviceKey, n) {
+  const perShape = Math.max(1, Math.floor(n / ADZUNA_SHAPES.length));
+  const stubs = [];
+  for (const [shape, pattern] of ADZUNA_SHAPES) {
+    const r = await fetch(
+      `${supabaseUrl}/rest/v1/jobs?source=eq.Adzuna&apply_url=ilike.${encodeURIComponent(pattern)}&select=apply_url&limit=${perShape}`,
+      { headers: { apikey: serviceKey, Authorization: `Bearer ${serviceKey}` } }
+    );
+    if (!r.ok) return { probe: 'adzuna', error: `stub query failed for ${shape}: ${r.status}`, sampled: 0 };
+    for (const row of (await r.json()) || []) if (row.apply_url) stubs.push({ shape, stub: row.apply_url });
+  }
+
+  const results = await mapLimit(stubs, 5, async ({ shape, stub }) => {
     const t0 = Date.now();
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 15000);
     try {
       const res = await fetch(stub, { headers: { 'User-Agent': UA }, signal: controller.signal, redirect: 'follow' });
       clearTimeout(timer);
-      try { await res.body?.cancel(); } catch { /* destination only */ }
+      const status = res.status;
+      // NON-2xx IS UNRESOLVED. This single line is the difference between "yield is zero" and
+      // "we were blocked" — the whole reason this probe exists.
+      if (!res.ok) {
+        try { await res.body?.cancel(); } catch { /* nothing to read */ }
+        return { shape, resolved: false, blocked: true, status, ms: Date.now() - t0 };
+      }
+      const body = (await res.text()).slice(0, MAX_BODY_BYTES);
       const final = res.url || stub;
       let host = null;
       try { host = new URL(final).hostname.replace(/^www\./, ''); } catch { /* unparseable */ }
-      const hit = detectAts(final);
-      return { ok: true, status: res.status, host, provider: hit?.provider || null, ingestable: !!(hit && hit.ingestable), ms: Date.now() - t0 };
+
+      // The destination may not be the final URL — look for an ATS host anywhere in the page too.
+      const inBody = new Map();
+      for (const m of body.matchAll(/https?:\/\/[^\s"'<>\\)]+/g)) {
+        const hit = detectAts(m[0]);
+        if (hit && hit.ingestable) inBody.set(`${hit.provider}|${hit.tenant}`, hit.provider);
+      }
+      const finalHit = detectAts(final);
+      return {
+        shape, resolved: true, blocked: false, status, host, bytes: body.length,
+        final_provider: finalHit?.ingestable ? finalHit.provider : null,
+        body_providers: [...new Set(inBody.values())],
+        ms: Date.now() - t0,
+      };
     } catch (e) {
       clearTimeout(timer);
-      return { ok: false, error: `${(e && e.name) || 'error'}`, ms: Date.now() - t0 };
+      return { shape, resolved: false, blocked: false, status: null, error: `${(e && e.name) || 'error'}`, ms: Date.now() - t0 };
     }
   });
 
-  const good = resolved.filter((x) => x && x.ok);
-  const hosts = {};
-  const providers = {};
-  for (const x of good) {
-    if (x.host) hosts[x.host] = (hosts[x.host] || 0) + 1;
-    if (x.provider) providers[x.provider] = (providers[x.provider] || 0) + 1;
-  }
   const sortDesc = (o) => Object.fromEntries(Object.entries(o).sort((a, b) => b[1] - a[1]));
-  const ingestableHits = good.filter((x) => x.ingestable).length;
+  const bump = (o, k) => { if (k != null) o[k] = (o[k] || 0) + 1; };
+
+  const statuses = {}, hosts = {}, providers = {}, byShape = {};
+  let resolvedCount = 0, blockedCount = 0, threwCount = 0, atsHits = 0;
+  for (const x of results) {
+    if (!x) continue;
+    byShape[x.shape] ||= { sampled: 0, resolved: 0, blocked: 0, ats_hits: 0 };
+    byShape[x.shape].sampled++;
+    bump(statuses, x.status == null ? 'threw' : String(x.status));
+    if (!x.resolved) { x.blocked ? blockedCount++ : threwCount++; if (x.blocked) byShape[x.shape].blocked++; continue; }
+    resolvedCount++; byShape[x.shape].resolved++;
+    bump(hosts, x.host);
+    const hit = x.final_provider || x.body_providers?.[0] || null;
+    if (hit) { atsHits++; byShape[x.shape].ats_hits++; bump(providers, hit); }
+  }
+
+  // Say which question the data actually answers.
+  const verdict = resolvedCount === 0
+    ? (blockedCount ? 'blocked_yield_unknown' : 'unreachable_yield_unknown')
+    : atsHits === 0
+      ? 'resolved_but_no_ats_in_destination_or_body'
+      : 'ats_recoverable';
+
   return {
-    probe: 'adzuna',
-    sampled: stubs.length,
-    resolved: good.length,
-    failed: resolved.length - good.length,
-    ats_ingestable_hits: ingestableHits,
-    ats_ingestable_rate: good.length ? Number((ingestableHits / good.length).toFixed(3)) : null,
-    ats_detected_any: good.filter((x) => x.provider).length,
+    probe: 'adzuna', verdict,
+    sampled: results.length, resolved: resolvedCount, blocked: blockedCount, threw: threwCount,
+    http_status_histogram: sortDesc(statuses),
+    // Rate over RESOLVED only, and null when nothing resolved — never a persuasive zero.
+    ats_ingestable_hits: atsHits,
+    ats_ingestable_rate: resolvedCount ? Number((atsHits / resolvedCount).toFixed(3)) : null,
     providers: sortDesc(providers),
-    // Every destination host, hits and misses alike — the misses are the interesting half.
     destination_hosts: sortDesc(hosts),
+    by_shape: byShape,
   };
+}
+
+// Does the Adzuna API already hand us a destination URL we simply never read?
+//
+// If it does, the entire stub-resolution question is moot — no HTML fetching, no bot-block, no
+// rendering. lib/server/jobSources.js consumes only `redirect_url`, but consuming one field is not
+// evidence about what the response CONTAINS. This asks the API for a single result and reports its
+// field names plus the HOST of every URL-shaped value, so an unused destination field would be
+// immediately visible. Field names and hosts only — never values, and never the credentialed URL.
+async function probeAdzunaApi() {
+  const appId = process.env.ADZUNA_APP_ID, appKey = process.env.ADZUNA_APP_KEY;
+  if (!appId || !appKey) return { probe: 'adzuna-api', error: 'ADZUNA_APP_ID / ADZUNA_APP_KEY not set' };
+  const url = `https://api.adzuna.com/v1/api/jobs/us/search/1?app_id=${encodeURIComponent(appId)}&app_key=${encodeURIComponent(appKey)}&results_per_page=1&what=engineer`;
+  const t0 = Date.now();
+  try {
+    const res = await fetch(url, { headers: { Accept: 'application/json', 'User-Agent': UA }, signal: AbortSignal.timeout(12000) });
+    if (!res.ok) return { probe: 'adzuna-api', reachable: true, status: res.status, error: `http_${res.status}`, ms: Date.now() - t0 };
+    const data = await res.json();
+    const job = (data.results || [])[0];
+    if (!job) return { probe: 'adzuna-api', reachable: true, status: res.status, error: 'no results', ms: Date.now() - t0 };
+
+    const urlHosts = {};
+    const walk = (obj, path = '') => {
+      for (const [k, v] of Object.entries(obj || {})) {
+        const p = path ? `${path}.${k}` : k;
+        if (v && typeof v === 'object' && !Array.isArray(v)) { walk(v, p); continue; }
+        if (typeof v === 'string' && /^https?:\/\//.test(v)) {
+          try { urlHosts[p] = new URL(v).hostname; } catch { urlHosts[p] = '(unparseable)'; }
+        }
+      }
+    };
+    walk(job);
+    return {
+      probe: 'adzuna-api', reachable: true, status: res.status, ms: Date.now() - t0,
+      top_level_fields: Object.keys(job).sort(),
+      // path -> host for every URL-valued field. A non-adzuna host here would moot the HTML path.
+      url_fields: urlHosts,
+      carries_non_adzuna_url: Object.values(urlHosts).some((h) => !/(^|\.)adzuna\./i.test(h)),
+    };
+  } catch (e) {
+    return { probe: 'adzuna-api', reachable: false, error: `${(e && e.name) || 'error'}: ${((e && e.message) || '').slice(0, 120)}`, ms: Date.now() - t0 };
+  }
 }
 
 // Vercel crons fire as GET, so GET must reach the work — a POST-only handler would make the schedule
@@ -223,8 +320,10 @@ export default async function handler(req, res) {
         const nRaw = Number(params.get('n'));
         const n = Number.isFinite(nRaw) ? Math.min(200, Math.max(1, Math.trunc(nRaw))) : 50;
         out = await probeAdzuna(SUPABASE_URL, SUPABASE_SERVICE_KEY, n);
+      } else if (probe === 'adzuna-api') {
+        out = await probeAdzunaApi();
       } else {
-        return res.status(400).json({ ok: false, error: `unknown probe: ${probe} (expected cc | adzuna)` });
+        return res.status(400).json({ ok: false, error: `unknown probe: ${probe} (expected cc | adzuna | adzuna-api)` });
       }
       console.log(`discover-probe ${probe}: ${JSON.stringify(out).slice(0, 900)}`);
       return res.status(200).json({ ok: true, ms: Date.now() - t0, ...out });
