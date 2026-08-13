@@ -74,41 +74,66 @@ const UA = 'SeenJobs/1.0 (+https://seenjobs.io)';
 // REACHABILITY IS "DID WE GET AN HTTP STATUS AT ALL". A 404 proves the host answered us; only a
 // throw/timeout proves it did not. Conflating those is how "CC is down" and "CC won't serve us"
 // became the same observation.
-async function probeUrl(label, url, timeoutMs = 12000) {
+async function probeUrl(label, url, { timeoutMs = 12000, headers = {}, diagnostic = true, note = null } = {}) {
   const t0 = Date.now();
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
-    const res = await fetch(url, { headers: { 'User-Agent': UA }, signal: controller.signal, redirect: 'follow' });
+    const res = await fetch(url, { headers: { 'User-Agent': UA, ...headers }, signal: controller.signal, redirect: 'follow' });
     clearTimeout(timer);
     try { await res.body?.cancel(); } catch { /* body not needed */ }
-    return { label, url, reachable: true, status: res.status, ms: Date.now() - t0, error: null };
+    return { label, url, reachable: true, status: res.status, ms: Date.now() - t0, error: null, diagnostic, note };
   } catch (e) {
     clearTimeout(timer);
-    return { label, url, reachable: false, status: null, ms: Date.now() - t0, error: `${(e && e.name) || 'error'}: ${((e && e.message) || '').slice(0, 120)}` };
+    return { label, url, reachable: false, status: null, ms: Date.now() - t0, error: `${(e && e.name) || 'error'}: ${((e && e.message) || '').slice(0, 120)}`, diagnostic, note };
   }
 }
 
-// Four probes, chosen to separate three different failure stories that all look identical from one
-// endpoint: (1) is the CDX API path refusing us, (2) is the whole index host refusing us, (3) is a
-// DIFFERENT commoncrawl.org host fine — i.e. host-level policy, or (4) is even raw S3 refusing us,
-// which would mean something network-level rather than anything Common Crawl chose.
-async function probeCommonCrawl() {
+// Probes chosen to separate failure stories that look identical from a single endpoint: is the CDX
+// API path refusing us, is the whole index HOST refusing us, is a DIFFERENT commoncrawl.org host fine
+// (host-level policy → the S3-hosted cc-index is viable), or is nothing reachable at all
+// (network-level → no host swap helps).
+//
+// `data_key` is the target that actually decides option 2: reading a REAL cc-index object is what
+// that option depends on, and a bucket ROOT cannot tell you whether you could. Override the path with
+// ?ccpath=<url> (or just the collection with ?crawl=CC-MAIN-YYYY-NN) — this environment cannot reach
+// Common Crawl to confirm any specific key exists, so the default is a starting point, not a claim.
+//
+// `raw_s3_root` is deliberately marked NON-DIAGNOSTIC. A private-ACL bucket root returns 403 to
+// EVERYONE — confirmed against a residential control on 2026-08-13, which also got 403 — so a 403
+// there carries no information about whether Vercel specifically is being refused. It stays in the
+// output as context and is excluded from the verdict. (Reachability throughout is "returned an HTTP
+// status at all"; only a throw counts as unreachable, so a 403 was never going to read as a refusal
+// in the verdict logic either — but a target whose most likely answer is uninformative is a bad
+// target regardless of how carefully the verdict handles it.)
+async function probeCommonCrawl({ crawl = 'CC-MAIN-2026-30', ccpath = null } = {}) {
+  const dataKeyUrl = ccpath || `https://data.commoncrawl.org/cc-index/collections/${encodeURIComponent(crawl)}/indexes/cluster.idx`;
   const targets = [
-    ['cdx_api', 'https://index.commoncrawl.org/collinfo.json'],
-    ['cdx_host', 'https://index.commoncrawl.org/robots.txt'],
-    ['data_host', 'https://data.commoncrawl.org/robots.txt'],
-    ['raw_s3', 'https://commoncrawl.s3.amazonaws.com/robots.txt'],
+    ['cdx_api', 'https://index.commoncrawl.org/collinfo.json', {}],
+    ['cdx_host', 'https://index.commoncrawl.org/robots.txt', {}],
+    ['data_host', 'https://data.commoncrawl.org/robots.txt', {}],
+    ['data_key', dataKeyUrl, { headers: { Range: 'bytes=0-1023' }, note: 'the target option 2 depends on — a real cc-index object, not a bucket root' }],
+    ['raw_s3_root', 'https://commoncrawl.s3.amazonaws.com/robots.txt', { diagnostic: false, note: '403 here is expected for everyone (private-ACL bucket root) — excluded from the verdict' }],
   ];
-  const results = await mapLimit(targets, 4, ([label, url]) => probeUrl(label, url));
+  const results = await mapLimit(targets, 4, ([label, url, opts]) => probeUrl(label, url, opts));
   const byLabel = Object.fromEntries(results.map((r) => [r.label, r]));
-  const verdict =
-    !byLabel.raw_s3?.reachable && !byLabel.data_host?.reachable && !byLabel.cdx_host?.reachable
-      ? 'network_level_all_cc_unreachable'
-      : byLabel.data_host?.reachable || byLabel.raw_s3?.reachable
-        ? 'alternate_host_reachable_cdx_specific'
-        : 'inconclusive';
-  return { probe: 'cc', verdict, results };
+
+  const diagnostic = results.filter((r) => r.diagnostic);
+  const anyAnswered = diagnostic.some((r) => r.reachable);
+  const indexHostRefusing = [byLabel.cdx_api, byLabel.cdx_host].every((r) => r && (!r.reachable || r.status >= 400));
+  const dataUsable = !!(byLabel.data_host?.reachable && byLabel.data_key?.reachable && byLabel.data_key.status < 400);
+
+  const verdict = !anyAnswered
+    ? 'network_level_nothing_answers'
+    : dataUsable && indexHostRefusing
+      ? 'host_level_cdx_refused_but_data_usable'   // option 2 viable
+      : dataUsable
+        ? 'all_reachable'
+        : byLabel.data_host?.reachable
+          ? 'data_host_answers_but_key_unreadable'  // check ccpath before concluding
+          : 'data_host_unreachable_option_2_dead';
+
+  return { probe: 'cc', verdict, crawl, data_key_url: dataKeyUrl, results };
 }
 
 // What do Adzuna's redirect stubs actually resolve to? Every Adzuna row's apply_url is an
@@ -190,7 +215,10 @@ export default async function handler(req, res) {
     try {
       let out;
       if (probe === 'cc') {
-        out = await probeCommonCrawl();
+        out = await probeCommonCrawl({
+          crawl: params.get('crawl') || undefined,
+          ccpath: params.get('ccpath') || null,
+        });
       } else if (probe === 'adzuna') {
         const nRaw = Number(params.get('n'));
         const n = Number.isFinite(nRaw) ? Math.min(200, Math.max(1, Math.trunc(nRaw))) : 50;
