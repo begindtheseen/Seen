@@ -14,37 +14,23 @@ import {
 import { fetchSourceJobs } from '../lib/jobs/atsProviders.js';
 import { seedSources, dueSources, recordSourceSync } from '../lib/jobs/sourceRegistry.js';
 import { SEED_SOURCES } from '../lib/jobs/seedSources.js';
-import { discoverFromCommonCrawl } from '../lib/jobs/discovery.js';
 
-// Refresh a batch of registered employer-direct ATS boards straight from the source, and grow the
-// source registry (seed on first run; a daily Common Crawl discovery sweep). Fail-open + bounded so
-// it never breaks the cron or exceeds the function time budget. Returns a small summary.
-// How long Common Crawl discovery needs to be worth starting. It is the LAST thing this handler
-// does, so without a reserved slice it is always the first work to be starved — which is exactly
-// why company_sources holds nothing but hand-typed seeds despite discovery being scheduled daily.
-const DISCOVERY_RESERVE_MS = 45_000;
-// Hard cap on a single sweep, so discovery can never eat a run even when the index is slow.
-const DISCOVERY_BUDGET_MS = 45_000;
-// Discovery used to be gated to `getUTCHours() === 2` — ONE attempt per day, last in the handler.
-// On 2026-08-12 that single run 504'd at the old 60s maxDuration before reaching discovery, and the
-// whole day was lost; company_sources has never held a single crawl-discovered board. Every cron run
-// may now sweep, so one bad run costs one run instead of a day.
+// Refresh a batch of registered employer-direct ATS boards straight from the source. Fail-open +
+// bounded so it never breaks the cron or exceeds the function time budget. Returns a small summary.
 //
-// The page must advance between runs: at a fixed page every sweep rescans the identical first rows
-// per pattern forever. Cron fires every 4h, so flooring on that interval advances exactly once per
-// run, wrapping after DISCOVERY_PAGES runs.
-const DISCOVERY_PAGES = 40;
-const CRON_INTERVAL_MS = 4 * 60 * 60 * 1000;
-export const discoveryPageFor = (now = Date.now()) => Math.floor(now / CRON_INTERVAL_MS) % DISCOVERY_PAGES;
+// DISCOVERY NO LONGER LIVES HERE. Common Crawl source discovery ran at the tail of this handler on
+// leftover budget and registered exactly zero boards for its entire life. It now has its own
+// invocation, budget and crons in api/discover-sources.js (#276). The tail-end copy was kept for one
+// more cycle only to preserve a diagnostic reading, and is deleted here rather than left dormant:
+// the page-rotation bug in #273 survived precisely because nobody was watching code that still ran.
 // Must stay under the maxDuration in vercel.json (300s) with room to serialize the response.
 const HANDLER_BUDGET_MS = Number(process.env.REFRESH_JOBS_BUDGET_MS || 270_000);
 // Slice of the run the stale sweep may use. It is chunked and resumable, so a backlog it cannot
 // finish carries to the next run rather than costing this run its ingestion.
 const SWEEP_BUDGET_MS = Number(process.env.REFRESH_JOBS_SWEEP_BUDGET_MS || 60_000);
 
-export async function refreshEmployerSources(supabaseUrl, serviceKey, { full = false, runDiscovery = false, deadline = null, discoveryPage = null } = {}) {
-  const summary = { sources: 0, upserted: 0, discovered: 0, skipped: [], discovery: null };
-  const msLeft = () => (deadline == null ? Infinity : deadline - Date.now());
+export async function refreshEmployerSources(supabaseUrl, serviceKey, { full = false } = {}) {
+  const summary = { sources: 0, upserted: 0, skipped: [] };
   try {
     // Seed the registry (idempotent merge-duplicates — a cheap no-op after the first run).
     await seedSources(SEED_SOURCES, supabaseUrl, serviceKey);
@@ -67,36 +53,6 @@ export async function refreshEmployerSources(supabaseUrl, serviceKey, { full = f
         summary.upserted += u.upserted || 0;
       }
       summary.sources = due.length;
-    }
-    // Common Crawl discovery — grow the source index (once/day, bounded). Fail-open.
-    if (runDiscovery) {
-      if (msLeft() < DISCOVERY_RESERVE_MS) {
-        // Say so. The old code swallowed every outcome into `registered: 0`, so a discovery run
-        // that never happened was indistinguishable from one that found nothing — which is how
-        // this went unnoticed while the function was 504-ing before it ever got here.
-        summary.skipped.push(`discovery: only ${Math.max(0, msLeft())}ms left, needs ${DISCOVERY_RESERVE_MS}ms`);
-        console.warn(`discovery skipped: ${Math.max(0, msLeft())}ms remaining`);
-      } else {
-        try {
-          const disc = await discoverFromCommonCrawl({
-            supabaseUrl, serviceKey, perPatternLimit: 300, maxRegister: 200,
-            page: discoveryPage == null ? discoveryPageFor() : discoveryPage,
-            // Its own hard slice, never more than what is left of the handler.
-            deadline: deadline == null
-              ? Date.now() + DISCOVERY_BUDGET_MS
-              : Math.min(deadline, Date.now() + DISCOVERY_BUDGET_MS),
-          });
-          // Keep the whole summary. Collapsing it to a single number is why "Common Crawl was
-          // unreachable" and "swept fine, every board already known" were indistinguishable.
-          summary.discovery = disc;
-          summary.discovered = disc.new_boards || 0;
-          console.log(`discovery: crawl=${disc.crawl} page=${disc.page} patterns=${disc.patterns_swept}/${disc.patterns_total} tenants=${disc.discovered} registered=${disc.registered} new=${disc.new_boards} reason=${disc.reason}${disc.detail ? ` detail=${disc.detail}` : ''}`);
-        } catch (e) {
-          // Still fail-open, but never silent again.
-          console.error('discoverFromCommonCrawl failed:', e.message);
-          summary.skipped.push(`discovery: ${e.message}`);
-        }
-      }
     }
   } catch (e) { console.warn('refreshEmployerSources (non-fatal):', e.message); }
   return summary;
@@ -760,19 +716,12 @@ export default async function handler(req, res) {
     const inserted = (countBefore != null && countAfter != null) ? Math.max(0, countAfter - countBefore) : null;
     const updated = inserted != null ? Math.max(0, upsertedTotal - inserted) : null;
 
-    // ── Employer-direct ATS refresh + source-registry growth ────────────────────
+    // ── Employer-direct ATS refresh ─────────────────────────────────────────────
     // Pull registered Greenhouse/Lever/Ashby/… boards straight from the source (freshest,
-    // employer-direct), and grow the source index (seed on first run; a daily Common Crawl sweep on
-    // the 02:00 UTC run). Non-fatal + bounded — it never breaks the aggregator refresh above.
+    // employer-direct). Non-fatal + bounded — it never breaks the aggregator refresh above.
+    // Growing the registry is api/discover-sources.js's job, on its own invocation and crons.
     const atsSummary = await refreshEmployerSources(SUPABASE_URL, SUPABASE_SERVICE_KEY, {
       full: fullMode,
-      // EVERY cron run may sweep now, not just 02:00 UTC — that single daily attempt 504'd on
-      // 2026-08-12 and took the whole day's discovery with it. ?discover=1 forces a sweep on an
-      // authenticated manual call so the path is testable without waiting for a cron slot.
-      runDiscovery: isCron || reqUrl.searchParams.get('discover') === '1',
-      // Stop cleanly before the platform kills us. A 504 loses the whole run with no record;
-      // a deadline returns what actually completed.
-      deadline: handlerDeadline,
     });
 
     // Job insights are now generated deterministically on demand (lib/server/jobInsights.js
