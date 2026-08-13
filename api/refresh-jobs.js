@@ -90,7 +90,7 @@ export async function refreshEmployerSources(supabaseUrl, serviceKey, { full = f
           // unreachable" and "swept fine, every board already known" were indistinguishable.
           summary.discovery = disc;
           summary.discovered = disc.new_boards || 0;
-          console.log(`discovery: crawl=${disc.crawl} page=${disc.page} patterns=${disc.patterns_swept}/${disc.patterns_total} tenants=${disc.discovered} registered=${disc.registered} new=${disc.new_boards} reason=${disc.reason}`);
+          console.log(`discovery: crawl=${disc.crawl} page=${disc.page} patterns=${disc.patterns_swept}/${disc.patterns_total} tenants=${disc.discovered} registered=${disc.registered} new=${disc.new_boards} reason=${disc.reason}${disc.detail ? ` detail=${disc.detail}` : ''}`);
         } catch (e) {
           // Still fail-open, but never silent again.
           console.error('discoverFromCommonCrawl failed:', e.message);
