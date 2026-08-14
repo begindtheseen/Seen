@@ -24,11 +24,11 @@ BRIEF=""
 [ -f "$STATUS" ] && BRIEF="$("${RUN[@]}" 2>/dev/null || true)"
 
 if [ -n "$BRIEF" ]; then
-  CONTEXT="🧠 Chronos brain — LIVE briefing for authenticated source claude-seenjobs, injected at session start so you begin oriented (recall, don't re-read). Every Brain request must identify as exactly claude-seenjobs; never use claude-session or another fallback. Follow memory/decision-protocol.md for non-trivial decisions, and WRITE BACK before the session ends: memory_record_fact (durable facts) + memory_append_timeline (what happened) + open/close threads.
+  CONTEXT="🧠 Chronos brain — LIVE briefing for authenticated source claude-seenjobs, injected at session start so you begin oriented (recall, don't re-read). Every Brain request must identify as exactly claude-seenjobs; never use claude-session or another fallback. Follow CLAUDE.md's Brain protocol and WRITE BACK before the session ends with recordFactCloud + appendTimelineCloud, then run contradictionsCloud.
 
 $BRIEF"
 else
-  CONTEXT="🧠 CHRONOS MEMORY (CLAUDE.md rule 1) — authenticated source must be exactly claude-seenjobs. The auto-briefing couldn't be fetched, so verify BRAIN_CLIENT=claude-seenjobs and the protected BRAIN_CLIENT_TOKEN environment variable, then call chronos memory_status before substantive work. Never use claude-session or another fallback. Follow memory/decision-protocol.md and WRITE BACK before ending."
+  CONTEXT="🧠 CHRONOS MEMORY (CLAUDE.md rule 1) — authenticated source must be exactly claude-seenjobs. The auto-briefing couldn't be fetched, so verify BRAIN_CLIENT=claude-seenjobs and the protected BRAIN_CLIENT_TOKEN environment variable, then run npm run memory:status before substantive work. Never use claude-session or another fallback. Follow CLAUDE.md's Brain protocol and WRITE BACK before ending."
 fi
 
 # JSON-encode via node (always present) so any briefing bytes — quotes, backslashes, emoji —

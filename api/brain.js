@@ -11,6 +11,9 @@
 // `by` is REQUIRED but never trusted: it must match the identity resolved from the credential registry.
 //   op "notes"           → { ok:true, notes:[{path,text}] }              (all vault notes; read backbone)
 //   op "counts"          → { ok:true, counts:{notes,facts,episodes} }    (freshness / self-test)
+//   op "briefing"        { today?, since? } → { ok:true, briefing }      (compact session orientation)
+//   op "search_facts"    { query?|subject?|predicate?, as_of?, limit? }  (bounded bi-temporal search)
+//   op "contradictions"  → { ok:true, contradictions:{count,conflicts} } (full hygiene sweep)
 //   op "record_fact"     { fact:{subject,predicate,object,confidence?,source?}, note? } → { ok:true, written, note }
 //   op "append_timeline" { date?, heading, text } → { ok:true, note, heading, appended }
 //        `appended:false` means the identical episode was already in the note (a converged retry), not a failure.
@@ -48,12 +51,37 @@ const WRITE_OPS = new Set(['record_fact', 'append_timeline']);
 // Deliberately never the fact object, the note body, the timeline text, or any credential: for a read
 // the op name is the whole story, and for a write the identifiers are enough to recognise the change.
 function auditArgs(op, body) {
+  const short = (value, max = 120) => String(value).slice(0, max);
   if (op === 'record_fact') {
     const f = body.fact || {};
-    return [f.subject, f.predicate].filter(Boolean).map(String).join(' · ') || null;
+    return [f.subject, f.predicate].filter(Boolean).map((v) => short(v)).join(' · ') || null;
   }
-  if (op === 'append_timeline') return body.heading ? String(body.heading) : null;
+  if (op === 'append_timeline') return body.heading ? short(body.heading) : null;
+  if (op === 'briefing') return [body.today && `today:${body.today}`, body.since && `since:${body.since}`].filter(Boolean).join(' · ') || null;
+  if (op === 'search_facts') {
+    return [body.subject && `subject:${short(body.subject)}`, body.predicate && `predicate:${short(body.predicate)}`,
+      body.as_of && `as_of:${body.as_of}`, body.query && `query:${String(body.query).length} chars`]
+      .filter(Boolean).map(String).join(' · ') || null;
+  }
   return null;
+}
+
+const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
+function optionalDate(value, name) {
+  if (value == null || value === '') return null;
+  const v = String(value);
+  const parsed = new Date(`${v}T00:00:00.000Z`);
+  if (!ISO_DATE.test(v) || Number.isNaN(parsed.getTime()) || parsed.toISOString().slice(0, 10) !== v) {
+    throw new Error(`${name} must be an ISO date (YYYY-MM-DD)`);
+  }
+  return v;
+}
+function optionalBoundedString(value, name, max) {
+  if (value == null || value === '') return null;
+  const v = String(value).trim();
+  if (!v) return null;
+  if (v.length > max) throw new Error(`${name} exceeds ${max} characters`);
+  return v;
 }
 
 // Run one op → { status, json }. Split out of the handler so the result (and therefore a TRUTHFUL
@@ -61,6 +89,34 @@ function auditArgs(op, body) {
 async function runOp(op, body, actor) {
   if (op === 'notes') return { status: 200, json: { ok: true, notes: await store.fetchNotes() } };
   if (op === 'counts') return { status: 200, json: { ok: true, counts: await store.counts() } };
+  if (op === 'briefing') {
+    let today; let since;
+    try {
+      today = optionalDate(body.today, 'today') || new Date().toISOString().slice(0, 10);
+      since = optionalDate(body.since, 'since');
+    } catch (e) { return { status: 400, json: { ok: false, error: e.message } }; }
+    return { status: 200, json: { ok: true, briefing: await store.briefing({ today, since }) } };
+  }
+  if (op === 'search_facts') {
+    let filters; let n;
+    try {
+      filters = {
+        query: optionalBoundedString(body.query, 'query', 200),
+        subject: optionalBoundedString(body.subject, 'subject', 160),
+        predicate: optionalBoundedString(body.predicate, 'predicate', 160),
+        as_of: optionalDate(body.as_of, 'as_of'),
+      };
+      if (!filters.query && !filters.subject && !filters.predicate) {
+        throw new Error('search_facts needs query, subject, or predicate');
+      }
+      n = body.limit == null ? 50 : Number(body.limit);
+      if (!Number.isInteger(n) || n < 1 || n > 100) throw new Error('limit must be an integer from 1 to 100');
+    } catch (e) { return { status: 400, json: { ok: false, error: e.message } }; }
+    return { status: 200, json: { ok: true, ...(await store.findFacts({ ...filters, limit: n })) } };
+  }
+  if (op === 'contradictions') {
+    return { status: 200, json: { ok: true, contradictions: await store.contradictions() } };
+  }
   if (op === 'record_fact') {
     const f = body.fact || {};
     if (!f.subject || !f.predicate || f.object === undefined || f.object === null) {

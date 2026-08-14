@@ -45,7 +45,8 @@ function mockResponse(body, { ok = true, status = 200 } = {}) {
 
 // Records every REST call and answers the brain_* routes the gateway actually uses.
 // `access` controls how the brain_access insert behaves: ok | http-500 | reject | hang.
-function installFetch({ access = 'ok', notesRead = 'ok', delayMs = 0, clientScopes = ['read', 'write'], clientRows = null } = {}) {
+function installFetch({ access = 'ok', notesRead = 'ok', delayMs = 0, clientScopes = ['read', 'write'], clientRows = null,
+  factRows = [] } = {}) {
   const calls = [];
   global.fetch = async (url, init = {}) => {
     const u = String(url);
@@ -78,6 +79,12 @@ function installFetch({ access = 'ok', notesRead = 'ok', delayMs = 0, clientScop
     }
     if (u.includes('brain_notes?select=content')) return mockResponse([]);       // fresh note → scaffold
     if (u.includes('brain_notes?select=path')) return mockResponse([{ path: 'a.md' }, { path: 'b.md' }]);
+    if (u.includes('brain_facts?select=note,id,subject,predicate,object')) {
+      const parsed = new URL(u);
+      const offset = Number(parsed.searchParams.get('offset') || 0);
+      const limit = Number(parsed.searchParams.get('limit') || factRows.length);
+      return mockResponse(factRows.slice(offset, offset + limit));
+    }
     if (u.includes('brain_facts?select=note')) return mockResponse([{ note: 'a.md' }]);
     if (u.includes('brain_timeline?select=id')) return mockResponse([{ id: 1 }, { id: 2 }, { id: 3 }]);
     return mockResponse([]);
@@ -130,6 +137,91 @@ for (const op of ['notes', 'counts']) {
     assert.equal(row.at, undefined, 'timestamp comes from the DB default, not the caller');
   });
 }
+
+test('briefing returns bounded orientation instead of the full vault payload', async () => {
+  const calls = installFetch();
+  const res = await call({ op: 'briefing', today: '2026-08-14', since: '2026-08-13' });
+  assert.equal(res.statusCode, 200);
+  assert.equal(res.jsonBody.ok, true);
+  assert.equal(typeof res.jsonBody.briefing.counts.notes, 'number');
+  assert.equal('notes' in res.jsonBody, false, 'raw vault notes never cross this compact op');
+  assert.equal(calls.filter((c) => c.url.includes('brain_notes?select=path,content')).length, 1);
+  const row = auditRows(calls)[0];
+  assert.equal(row.mode, 'read');
+  assert.equal(row.args, 'today:2026-08-14 · since:2026-08-13');
+});
+
+test('search_facts is filtered, bi-temporal, bounded, and never downloads brain_notes', async () => {
+  const facts = [
+    { note: 'k.md', id: 'old', subject: 'Seen', predicate: 'users_total', object: '7', valid_from: '2026-08-01', valid_to: '2026-08-10', recorded_at: '2026-08-01T00:00:00Z' },
+    { note: 'k.md', id: 'now', subject: 'Seen', predicate: 'users_total', object: '9', valid_from: '2026-08-10', valid_to: null, recorded_at: '2026-08-10T00:00:00Z' },
+    { note: 'k.md', id: 'other', subject: 'Seen', predicate: 'active_jobs', object: '30', valid_from: '2026-08-10', valid_to: null, recorded_at: '2026-08-10T00:00:00Z' },
+  ];
+  const calls = installFetch({ factRows: facts });
+  const res = await call({ op: 'search_facts', subject: 'seen', predicate: 'users_total', limit: 1 });
+  assert.equal(res.statusCode, 200);
+  assert.deepEqual(res.jsonBody.facts.map((f) => f.id), ['now']);
+  assert.equal(res.jsonBody.count, 1);
+  assert.equal(res.jsonBody.truncated, false);
+  assert.equal(calls.some((c) => c.url.includes('brain_notes')), false);
+  assert.match(auditRows(calls)[0].args, /subject:seen · predicate:users_total/);
+});
+
+test('search_facts rejects unfiltered, malformed-date, oversized, and over-limit requests before storage', async () => {
+  for (const body of [
+    { op: 'search_facts' },
+    { op: 'search_facts', subject: 'Seen', as_of: '2026-99-99' },
+    { op: 'search_facts', query: 'q'.repeat(201) },
+    { op: 'search_facts', subject: 'Seen', limit: 101 },
+  ]) {
+    const calls = installFetch();
+    const res = await call(body);
+    assert.equal(res.statusCode, 400);
+    assert.equal(calls.some((c) => c.url.includes('/brain_facts')), false);
+    assert.equal(auditRows(calls)[0].ok, false);
+  }
+});
+
+test('contradictions uses the queryable fact mirror and returns the local engine verdict', async () => {
+  const calls = installFetch({ factRows: [
+    { note: 'k.md', id: 'a', subject: 'Seen', predicate: 'deploys_from', object: 'main', valid_from: '2026-01-01', valid_to: null },
+    { note: 'k.md', id: 'b', subject: 'Seen', predicate: 'deploys_from', object: 'next-migration', valid_from: '2026-01-01', valid_to: null },
+  ] });
+  const res = await call({ op: 'contradictions' });
+  assert.equal(res.statusCode, 200);
+  assert.equal(res.jsonBody.contradictions.count, 1);
+  assert.equal(res.jsonBody.contradictions.conflicts[0].a.id, 'a');
+  assert.equal(calls.some((c) => c.url.includes('brain_notes')), false);
+  assert.equal(auditRows(calls)[0].mode, 'read');
+});
+
+test('fact reads page past the first PostgREST response without silently truncating', async () => {
+  const factRows = Array.from({ length: 501 }, (_, i) => ({
+    note: 'k.md', id: `f${i}`, subject: 'Seen', predicate: 'paged_fact', object: String(i),
+    valid_from: '2026-08-14', valid_to: null, recorded_at: '2026-08-14T00:00:00Z',
+  }));
+  const calls = installFetch({ factRows });
+  const res = await call({ op: 'search_facts', subject: 'Seen', predicate: 'paged_fact', limit: 1 });
+  assert.equal(res.statusCode, 200);
+  assert.equal(res.jsonBody.count, 501);
+  assert.equal(res.jsonBody.truncated, true);
+  const scans = calls.filter((c) => c.url.includes('brain_facts?select=note,id,subject,predicate,object'));
+  assert.equal(scans.length, 2);
+  assert.match(scans[1].url, /offset=500/);
+});
+
+test('fact reads fail loudly above the full-scan safety bound', async () => {
+  const factRows = Array.from({ length: 5001 }, (_, i) => ({
+    note: 'k.md', id: `f${i}`, subject: 'Seen', predicate: 'large_scan', object: String(i),
+    valid_from: '2026-08-14', valid_to: null, recorded_at: '2026-08-14T00:00:00Z',
+  }));
+  const calls = installFetch({ factRows });
+  const res = await call({ op: 'contradictions' });
+  assert.equal(res.statusCode, 500);
+  assert.equal(res.jsonBody.ok, false);
+  assert.match(res.jsonBody.error, /exceeds the 5000-row safety bound/);
+  assert.equal(auditRows(calls)[0].ok, false);
+});
 
 test('a valid token without identity is denied before reading and the attempt is audited', async () => {
   const calls = installFetch();

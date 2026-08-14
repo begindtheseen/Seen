@@ -1,38 +1,30 @@
 # Seen — Claude Code Instructions
 
 ## ⚡ START HERE EVERY SESSION — memory boot (do this first)
-This project has a persistent memory system (`memory/`). **Use it every session so you
-recall where things stand instead of re-reading everything — that is the token save.**
+This project uses the shared Chronos brain. **Use it every session so you recall where things
+stand instead of re-reading everything — that is the token save.**
 
 **Local vs cloud — how you reach the brain (Chronos):**
-- **Local (Mac) session:** the `chronos` MCP server reads/writes the vault FILES under `memory/`
-  directly (`.mcp.json` sets `CHRONOS_VAULT=memory`) — fast, offline, the on-disk source of truth.
-- **Cloud / repo-connected session (no Mac filesystem):** the SAME `chronos` tools answer from the
-  **always-on online brain** (Supabase mirror) via an identity-gated gateway. It auto-switches to cloud
-  mode when the protected environment contains `BRAIN_API_URL`, `BRAIN_API_TOKEN`,
-  `BRAIN_CLIENT=claude-seenjobs`, and the unique `BRAIN_CLIENT_TOKEN`. Every request must identify as
-  exactly **`claude-seenjobs`**; `claude-session` and fallback identities are forbidden and denied.
-  Never paste either token into a prompt, log, source file, or Brain entry. Offline files never enter git.
-  **If you are a cloud session, read `memory/CHRONOS_BRIDGE.md` FIRST** — it's the full contract + self-test.
+- **Local (Mac) session:** use the private, user-owned MCP registration for exact source
+  `claude-seenjobs`. The shared project `.mcp.json` is intentionally empty so a checkout can never
+  inherit another principal's credential or an ungated legacy server.
+- **Cloud / repo-connected session:** there is no checked-in `memory/` directory and no guaranteed
+  `memory_*` MCP catalog. The protected environment reaches the always-on online brain through
+  `lib/server/brainCloud.js` with `BRAIN_API_URL`, `BRAIN_API_TOKEN`, `BRAIN_CLIENT=claude-seenjobs`,
+  and its unique `BRAIN_CLIENT_TOKEN`. Every call is credential-bound and audited as exactly
+  **`claude-seenjobs`**; `claude-session` and fallback identities are forbidden and denied. Never
+  paste either token into a prompt, log, source file, command argument, or Brain entry.
 
-The `memory_*` tool names and usage below are identical in both modes.
-
-1. **Orient from memory, don't re-read the whole vault.** Run `npm run memory:status` (or the
-   `memory_status` MCP tool) for a compact briefing: what changed since last session, what
-   still needs work ([[open-threads]]), and what's shaky. Then skim `memory/HOME.md`.
-2. **Decide via `memory/decision-protocol.md`.** Every non-trivial decision: orient from
-   memory (current facts · locked decisions · contradictions · open threads · unknowns) →
-   decide → write it back. Be a D1 athlete at decisions: know the context and know what's missing.
-3. **At session end, write it back** (`memory/protocol.md`): record durable typed facts with the
-   **`memory_record_fact`** MCP tool (bi-temporal, supersede-not-overwrite — no hand-editing;
-   lands in `memory/claude-observations.md`), append what happened with **`memory_append_timeline`**,
-   open/close threads in `memory/open-threads.md`, log decisions in `memory/decisions/log.md`
-   (+ impact ledger), then `npm run memory:sync`. If you skip this, the next session pays the token
-   cost you just saved. (The brain is read **and** write now — `.mcp.json` auto-loads the `chronos`
-   server with `memory_record_fact` / `memory_append_timeline` alongside the read tools.)
-
-Full model: `memory/temporal.md`. Visual map: `npm run memory:graph`. The optional
-auto-boot hook is in `memory/session-hook.md`.
+1. **Orient, don't download the vault.** Run `npm run memory:status`. In cloud mode it calls the
+   compact server-side `briefing` op; it does not transfer every note into the container.
+2. **Drill down when needed.** Use the authenticated helpers `searchFactsCloud(filters)` and
+   `contradictionsCloud()` exported by `lib/server/brainCloud.js`. Search requires at least one of
+   `query`, `subject`, or `predicate`; optional `as_of` is an ISO date and `limit` is 1–100.
+3. **At session end, write it back.** Use `recordFactCloud(fact,{note})` for durable facts and
+   `appendTimelineCloud(date,heading,text)` for the session episode, then run
+   `contradictionsCloud()` and report any conflict. These calls preserve supersede-not-overwrite
+   history and authoritative credential attribution. If you skip this, the next session pays the
+   context cost you just saved.
 
 ## North Star
 Read SEEN_STRATEGY.md at the start of every session. That document is the product strategy.

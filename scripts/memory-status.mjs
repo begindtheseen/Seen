@@ -5,14 +5,15 @@
 // This prints a ~1 KB high-signal orientation — what changed since last session, what still needs
 // work, what's shaky — straight into context. That's the token save: recall, not re-read.
 //
-// Used by the SessionStart hook (.claude/hooks/session-start.sh) and mirrored by the
-// memory_status MCP tool. Usage: node scripts/memory-status.mjs   (or npm run memory:status)
+// Used by the SessionStart hook (.claude/hooks/session-start.sh). Cloud sessions call the compact,
+// credential-gated briefing op; local sessions read the vault. Usage: node scripts/memory-status.mjs
+// (or npm run memory:status)
 
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, relative, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { buildIndex, buildBriefing } from '../lib/server/memoryGraph.js';
-import { fetchNotes, cloudConfigured } from '../lib/server/brainCloud.js';
+import { fetchBriefing, cloudConfigured } from '../lib/server/brainCloud.js';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const VAULT = resolve(process.env.CHRONOS_VAULT || join(HERE, '..', 'memory'));
@@ -27,11 +28,10 @@ function walk(dir, acc = []) {
   return acc;
 }
 
-export function renderBriefing(index, today) {
-  const b = buildBriefing(index, { today });
+export function renderBriefingData(b, today) {
   const L = [];
   L.push(`🧠 Chronos memory — session briefing (${today})`);
-  L.push(`Recall, don't re-read. Full map: memory/HOME.md · loop: memory/protocol.md · decide: memory/decision-protocol.md`);
+  L.push(`Recall, don't re-read. Use a filtered fact search when this compact view is not enough.`);
   L.push(`${b.counts.notes} notes · ${b.counts.currentFacts} current facts · ${b.counts.openThreads} open threads`);
 
   const add = b.changed.added, inv = b.changed.invalidated;
@@ -52,8 +52,12 @@ export function renderBriefing(index, today) {
     b.lowConfidence.slice(0, 5).forEach((f) => L.push(`  ? low-confidence: ${f.subject} ${f.predicate} → ${f.object}`));
   }
 
-  L.push(`\nBefore deciding, follow memory/decision-protocol.md. At session end: supersede changed facts, close/open threads, npm run memory:sync.`);
+  L.push(`\nBefore deciding, verify unknowns. At session end: supersede changed facts, append the timeline, and run a contradiction check.`);
   return L.join('\n');
+}
+
+export function renderBriefing(index, today) {
+  return renderBriefingData(buildBriefing(index, { today }), today);
 }
 
 // CLI
@@ -65,8 +69,10 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   // resolveCloud(): CHRONOS_SOURCE forces local/cloud, else auto → cloud when brain
   // creds (all four identity-gateway values, or direct Supabase) are present.
   const useCloud = process.env.CHRONOS_SOURCE !== 'local' && cloudConfigured();
-  const notes = useCloud
-    ? await fetchNotes()
-    : walk(VAULT).map((f) => ({ path: relative(VAULT, f).replace(/\\/g, '/'), text: readFileSync(f, 'utf8') }));
-  process.stdout.write(renderBriefing(buildIndex(notes), today) + '\n');
+  if (useCloud) {
+    process.stdout.write(renderBriefingData(await fetchBriefing({ today }), today) + '\n');
+  } else {
+    const notes = walk(VAULT).map((f) => ({ path: relative(VAULT, f).replace(/\\/g, '/'), text: readFileSync(f, 'utf8') }));
+    process.stdout.write(renderBriefing(buildIndex(notes), today) + '\n');
+  }
 }

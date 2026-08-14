@@ -265,6 +265,24 @@ test('a retry of an op that already succeeded does not stack a second copy', asy
   assert.equal(occurrences(content, '## Already in'), 1, 'still exactly one copy of the episode');
 });
 
+test('an idempotent retry repairs legacy type-less timeline frontmatter', async () => {
+  const date = '2026-08-13';
+  const notes = new Map([[
+    `timeline/${date}.md`,
+    `---\ntitle: ${date}\ndate: ${date}\ntags: [timeline]\n---\n\n## Legacy\n\nsame body\n`,
+  ]]);
+  const { calls } = installFetch({ notes });
+  const res = await call({ op: 'append_timeline', date, heading: 'Legacy', text: 'same body' });
+
+  assert.equal(res.statusCode, 200);
+  assert.equal(res.jsonBody.appended, false);
+  assert.equal(res.jsonBody.repaired, true);
+  assert.equal(notePosts(calls).length, 1, 'the canonical header repair is persisted');
+  const content = notes.get(`timeline/${date}.md`);
+  assert.match(content, /^type: daily$/m);
+  assert.equal(occurrences(content, '## Legacy'), 1, 'the episode remains idempotent');
+});
+
 test('a note-write failure after the mirror landed converges on retry (the acceptable direction)', async () => {
   const notes = new Map();
 
@@ -321,6 +339,6 @@ test('a fresh date scaffolds the note frontmatter, then appends the episode', as
   await call({ op: 'append_timeline', date: '2026-09-01', heading: 'Day one', text: 'body' });
 
   const content = notes.get('timeline/2026-09-01.md');
-  assert.ok(content.startsWith('---\ntitle: 2026-09-01\ndate: 2026-09-01\ntags: [timeline]\n---\n'), content.slice(0, 80));
+  assert.ok(content.startsWith('---\ntitle: 2026-09-01\ntype: daily\ndate: 2026-09-01\ntags: [timeline]\n---\n'), content.slice(0, 100));
   assert.ok(content.includes('\n## Day one\n\nbody\n'));
 });
