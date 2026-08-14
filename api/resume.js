@@ -299,19 +299,18 @@ export function buildResumePDF(document, meta = {}) {
          .text(d.name, LEFT, doc.y, { width: W, align: 'center', characterSpacing: 0.5 });
       doc.moveDown(0.22);
     }
-    // Subtle target-role context line (only when we know it) — not fabricated.
-    const targetLine = [meta.role, meta.company].filter(Boolean).join('   ·   ');
-    if (targetLine) {
-      doc.fillColor(META).font('Times-Italic').fontSize(10.5)
-         .text(targetLine, LEFT, doc.y, { width: W, align: 'center' });
-      doc.moveDown(0.22);
-    }
+    // NOTE: the role and company being APPLIED TO are deliberately not printed here.
+    // A line reading "Order Builder · Compass Group" directly beneath the candidate's
+    // name occupies the exact position a résumé uses for a current title and employer,
+    // so both a human screener and an ATS read the target employer as the candidate's
+    // present job. The target role reaches the employer through the filename and the
+    // application itself; it does not belong on the document.
     if (contactBits.length) {
       doc.fillColor(INK).font('Times-Roman').fontSize(10)
          .text(contactBits.join('   ·   '), LEFT, doc.y, { width: W, align: 'center' });
       doc.moveDown(0.4);
     }
-    if (d.name || contactBits.length || targetLine) {
+    if (d.name || contactBits.length) {
       const ruleY = doc.y;
       doc.save().lineWidth(1.1).strokeColor(INK)
          .moveTo(LEFT, ruleY).lineTo(RIGHT, ruleY).stroke().restore();
