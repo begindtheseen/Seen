@@ -3,11 +3,12 @@
 // WHY: a repo-connected (web) Claude session has git but no Supabase key — and must NEVER be given the
 // service_role key, which bypasses RLS on the WHOLE product project (users, admin, billing, 23k companies)
 // that the brain_* tables share. This endpoint runs on seenjobs.io where the service key already lives and
-// exposes ONLY brain read/write ops, gated by BRAIN_API_TOKEN. The cloud session holds just
-// BRAIN_API_URL + BRAIN_API_TOKEN; a token leak is brain-scoped and revoked by rotating one env var —
+// exposes ONLY brain read/write ops, gated by BRAIN_API_TOKEN plus a distinct per-client credential.
+// The cloud session holds the gateway URL, outer token, exact BRAIN_CLIENT, and its own client token;
 // the service key and the product DB are never exposed.
 //
-// CONTRACT — POST JSON `{ op, ... }` with header `Authorization: Bearer <BRAIN_API_TOKEN>`:
+// CONTRACT — POST JSON `{ op, by, ... }` with BOTH the deployment bearer and a per-client credential.
+// `by` is REQUIRED but never trusted: it must match the identity resolved from the credential registry.
 //   op "notes"           → { ok:true, notes:[{path,text}] }              (all vault notes; read backbone)
 //   op "counts"          → { ok:true, counts:{notes,facts,episodes} }    (freshness / self-test)
 //   op "record_fact"     { fact:{subject,predicate,object,confidence?,source?}, note? } → { ok:true, written, note }
@@ -15,13 +16,14 @@
 //        `appended:false` means the identical episode was already in the note (a converged retry), not a failure.
 //        Body size is unbounded: the brain_timeline mirror is keyed on md5(body) (migration 069), and the
 //        mirror insert runs BEFORE the note write so a failure leaves zero durable state. See brainStore.js.
-// Errors: 401 missing/bad token · 405 non-POST · 400 bad op/params · 503 not configured · 500 (error).
+// Errors: 401 missing/bad token or client credential · 403 revoked/expired/scope/identity mismatch
+// · 428 missing identity · 405 non-POST · 400 bad op/params · 503 not configured · 500 (error).
 // Server-to-server only (no CORS headers exposed): the caller is the MCP server / a script, not a browser.
 //
-// AUDIT: every authenticated op — READS INCLUDED — appends one row to brain_access, so cloud-session
+// AUDIT: every authenticated op — READS INCLUDED — appends one row to brain_access, so cloud client
 // activity is visible live from the Chronos Mac app. Reads used to leave no trace anywhere, which meant
-// a cloud session could pull the entire vault invisibly. The insert is strictly fire-and-forget (never
-// awaited, all failures swallowed): the audit trail must never slow, fail, or change a brain op.
+// a cloud session could pull the entire vault invisibly. The bounded insert is awaited before the
+// response so serverless teardown cannot discard it; storage failure never changes the Brain op result.
 
 import { timingSafeEqual } from 'node:crypto';
 import * as store from '../lib/server/brainStore.js';
@@ -56,7 +58,7 @@ function auditArgs(op, body) {
 
 // Run one op → { status, json }. Split out of the handler so the result (and therefore a TRUTHFUL
 // `ok`/`ms`) is known before the audit row is written.
-async function runOp(op, body) {
+async function runOp(op, body, actor) {
   if (op === 'notes') return { status: 200, json: { ok: true, notes: await store.fetchNotes() } };
   if (op === 'counts') return { status: 200, json: { ok: true, counts: await store.counts() } };
   if (op === 'record_fact') {
@@ -64,7 +66,13 @@ async function runOp(op, body) {
     if (!f.subject || !f.predicate || f.object === undefined || f.object === null) {
       return { status: 400, json: { ok: false, error: 'record_fact needs fact.subject, fact.predicate, fact.object' } };
     }
-    return { status: 200, json: { ok: true, ...(await store.recordFact(f, { note: body.note })) } };
+    try { store.assertNotePath(body.note || 'claude-observations.md'); }
+    catch (e) { return { status: 400, json: { ok: false, error: e.message } }; }
+    const authenticatedFact = {
+      ...f,
+      by: actor,
+    };
+    return { status: 200, json: { ok: true, ...(await store.recordFact(authenticatedFact, { note: body.note })) } };
   }
   if (op === 'append_timeline') {
     if (!body.heading || !body.text) return { status: 400, json: { ok: false, error: 'append_timeline needs heading + text' } };
@@ -74,20 +82,19 @@ async function runOp(op, body) {
   return { status: 400, json: { ok: false, error: `unknown op: ${op || '(none)'}` } };
 }
 
-// Fire-and-forget audit — ONE row per authenticated op, no dedupe, no sampling, no rate limit.
-// Never awaited and never allowed to throw, so the op's latency and status code are untouched.
-function audit(op, body, out, ms) {
+// Durable audit — ONE row per authenticated op, no dedupe or sampling. Awaited before the response so
+// serverless invocation teardown cannot discard traffic; recordAccess is bounded and never throws.
+async function audit(op, body, out, ms, actor) {
   try {
-    const p = store.recordAccess({
+    await store.recordAccess({
       op,
       mode: WRITE_OPS.has(op) ? 'write' : 'read',
-      by: (typeof body.by === 'string' && body.by.trim()) ? body.by.trim() : 'claude:cloud-session',
+      by: actor || 'unidentified',
       args: auditArgs(op, body),
       ok: out.json.ok === true,
       ms,
+      error: out.json.ok === true ? null : String(out.json.error || 'request failed').slice(0, 300),
     });
-    // recordAccess already swallows its own failures; this guards a future/unexpected rejection.
-    if (p && typeof p.catch === 'function') p.catch(() => {});
   } catch (e) {
     try { console.error(`[brain-audit] ${e && e.message}`); } catch { /* ignore */ }
   }
@@ -100,24 +107,54 @@ export default async function handler(req, res) {
   const auth = tokenOk(req);
   if (auth === null) return res.status(503).json({ ok: false, error: 'gateway not configured (BRAIN_API_TOKEN unset)' });
   if (!auth) return res.status(401).json({ ok: false, error: 'unauthorized' });
-  if (!store.serviceConfigured()) return res.status(503).json({ ok: false, error: 'brain store not configured (SUPABASE_URL / SUPABASE_SERVICE_KEY)' });
 
   const body = (req.body && typeof req.body === 'object')
     ? req.body
     : (() => { try { return JSON.parse(req.body || '{}'); } catch { return {}; } })();
   const op = body.op;
+  const identity = typeof body.by === 'string' ? body.by.trim() : '';
+  if (!identity) {
+    const out = { status: 428, json: { ok: false, error: 'Identify yourself: include a nonblank `by` client identity. Brain access is denied.' } };
+    await audit(op, body, out, 0, 'unidentified'); // authenticated denial is traffic too
+    return res.status(out.status).json(out.json);
+  }
+  if (!store.serviceConfigured()) return res.status(503).json({ ok: false, error: 'brain store not configured (SUPABASE_URL / SUPABASE_SERVICE_KEY)' });
+
+  const clientToken = String(req.headers['x-chronos-client-token'] || '').trim();
+  // Writes read the existing note before superseding it, so a write-only principal would gain an
+  // observable read channel through conflict behavior. Require both capabilities (admin implies both).
+  const requiredScope = WRITE_OPS.has(op) ? ['read', 'write'] : 'read';
+  let client;
+  try { client = await store.authorizeClient(clientToken, { scope: requiredScope }); }
+  catch (e) {
+    const out = { status: 500, json: { ok: false, error: `client authorization unavailable: ${e.message}` } };
+    await audit(op, body, out, 0, 'unidentified');
+    return res.status(out.status).json(out.json);
+  }
+  if (!client.ok) {
+    const known = client.identity?.name || 'unidentified';
+    const invalid = client.error === 'invalid client credential';
+    const out = { status: invalid ? 401 : 403, json: { ok: false, error: `Access denied: ${client.error}` } };
+    await audit(op, body, out, 0, known);
+    return res.status(out.status).json(out.json);
+  }
+  if (identity.toLowerCase() !== String(client.identity.name).toLowerCase()) {
+    const out = { status: 403, json: { ok: false, error: `Access denied: identity claim does not match credential owner ${client.identity.name}` } };
+    await audit(op, body, out, 0, client.identity.name);
+    return res.status(out.status).json(out.json);
+  }
 
   const t0 = Date.now();
   let out;
   try {
-    out = await runOp(op, body);
+    out = await runOp(op, body, client.identity.name);
   } catch (e) {
     try { logError('api/brain', e, { op }); } catch { /* best-effort */ }
     out = { status: 500, json: { ok: false, error: e.message } };
   }
 
-  // Audit AFTER the outcome is known (so ok/ms are truthful) and BEFORE responding, but never awaited.
-  audit(op, body, out, Date.now() - t0);
+  // Audit AFTER the outcome is known (so ok/ms are truthful) and await durability before responding.
+  await audit(op, body, out, Date.now() - t0, client.identity.name);
 
   return res.status(out.status).json(out.json);
 }

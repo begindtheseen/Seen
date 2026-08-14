@@ -8,8 +8,11 @@ recall where things stand instead of re-reading everything — that is the token
 - **Local (Mac) session:** the `chronos` MCP server reads/writes the vault FILES under `memory/`
   directly (`.mcp.json` sets `CHRONOS_VAULT=memory`) — fast, offline, the on-disk source of truth.
 - **Cloud / repo-connected session (no Mac filesystem):** the SAME `chronos` tools answer from the
-  **always-on online brain** (Supabase mirror) via a token-gated gateway. It auto-switches to cloud mode
-  when `BRAIN_API_URL` + `BRAIN_API_TOKEN` are set in the environment. Offline files never enter git.
+  **always-on online brain** (Supabase mirror) via an identity-gated gateway. It auto-switches to cloud
+  mode when the protected environment contains `BRAIN_API_URL`, `BRAIN_API_TOKEN`,
+  `BRAIN_CLIENT=claude-seenjobs`, and the unique `BRAIN_CLIENT_TOKEN`. Every request must identify as
+  exactly **`claude-seenjobs`**; `claude-session` and fallback identities are forbidden and denied.
+  Never paste either token into a prompt, log, source file, or Brain entry. Offline files never enter git.
   **If you are a cloud session, read `memory/CHRONOS_BRIDGE.md` FIRST** — it's the full contract + self-test.
 
 The `memory_*` tool names and usage below are identical in both modes.
