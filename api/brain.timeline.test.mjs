@@ -24,8 +24,17 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { createHash, scryptSync } from 'node:crypto';
 
 const TOKEN = 'test-brain-token';
+const CLIENT_TOKEN = 'chr_test_client_credential_not_a_real_secret';
+const CLIENT_SALT = '0123456789abcdef0123456789abcdef';
+const CLIENT_ROW = {
+  id: 'client_test', name: 'test-client', scopes: ['read', 'write'], salt: CLIENT_SALT,
+  lookup: createHash('sha256').update(CLIENT_TOKEN).digest('hex'),
+  verifier: scryptSync(CLIENT_TOKEN, CLIENT_SALT, 32).toString('hex'),
+  created_at: '2026-08-14T00:00:00.000Z', expires_at: null, revoked_at: null, last_used_at: null,
+};
 process.env.BRAIN_API_TOKEN = TOKEN;
 process.env.SUPABASE_URL = process.env.SUPABASE_URL || 'https://example.supabase.co';
 process.env.SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY || 'test-service-key';
@@ -61,6 +70,10 @@ function installFetch({ mirror = 'ok', note = 'ok', notes = new Map() } = {}) {
     calls.push({ url: u, method, body, headers: init.headers || {} });
 
     if (u.includes('/brain_access')) return mockResponse('', { status: 201 }); // audit: not under test here
+    if (u.includes('/brain_clients')) {
+      if (method === 'GET') return mockResponse([CLIENT_ROW]);
+      return mockResponse('', { status: 204 });
+    }
 
     // --- the brain_timeline mirror insert ---
     if (u.includes('/brain_timeline') && method === 'POST') {
@@ -101,12 +114,14 @@ function makeRes() {
   return r;
 }
 
-const post = (body, { token = TOKEN, method = 'POST' } = {}) => ({ method, headers: { authorization: `Bearer ${token}` }, body });
+const post = (body, { token = TOKEN, clientToken = CLIENT_TOKEN, method = 'POST' } = {}) => ({
+  method, headers: { authorization: `Bearer ${token}`, 'x-chronos-client-token': clientToken }, body,
+});
 const flush = () => new Promise((r) => setImmediate(r));
 
 async function call(body, opts = {}) {
   const res = makeRes();
-  await handler(post(body, opts), res);
+  await handler(post({ by: 'test-client', ...body }, opts), res);
   await flush(); // let the un-awaited audit insert be issued
   return res;
 }

@@ -8,7 +8,8 @@
 # Exists because a 2026-07-29 session shipped real work without ever booting the brain.
 #
 # scripts/memory-status.mjs is cloud-aware (fetches via the token-gated gateway when
-# BRAIN_API_URL+BRAIN_API_TOKEN are set) and dependency-free, so this needs no node_modules.
+# all four gateway values are set (URL, outer token, exact client name, unique client token) and is
+# dependency-free, so this needs no node_modules. The cloud role is always `claude-seenjobs`.
 # Deps + brain reachability are handled separately by scripts/cloud-setup.sh.
 set -uo pipefail  # NOT -e: a briefing failure must fall back to the directive, never abort the session.
 
@@ -23,11 +24,11 @@ BRIEF=""
 [ -f "$STATUS" ] && BRIEF="$("${RUN[@]}" 2>/dev/null || true)"
 
 if [ -n "$BRIEF" ]; then
-  CONTEXT="🧠 Chronos brain — LIVE briefing, injected at session start so you begin oriented (recall, don't re-read). Follow memory/decision-protocol.md for non-trivial decisions, and WRITE BACK before the session ends: memory_record_fact (durable facts) + memory_append_timeline (what happened) + open/close threads.
+  CONTEXT="🧠 Chronos brain — LIVE briefing for authenticated source claude-seenjobs, injected at session start so you begin oriented (recall, don't re-read). Every Brain request must identify as exactly claude-seenjobs; never use claude-session or another fallback. Follow memory/decision-protocol.md for non-trivial decisions, and WRITE BACK before the session ends: memory_record_fact (durable facts) + memory_append_timeline (what happened) + open/close threads.
 
 $BRIEF"
 else
-  CONTEXT="🧠 CHRONOS MEMORY (CLAUDE.md rule 1) — the auto-briefing couldn't be fetched this session, so boot it yourself before substantive work: call the chronos memory_status MCP tool to orient (+ memory_open_threads), follow memory/decision-protocol.md, and WRITE BACK before ending (memory_record_fact / memory_append_timeline / threads). No task is too small to skip this."
+  CONTEXT="🧠 CHRONOS MEMORY (CLAUDE.md rule 1) — authenticated source must be exactly claude-seenjobs. The auto-briefing couldn't be fetched, so verify BRAIN_CLIENT=claude-seenjobs and the protected BRAIN_CLIENT_TOKEN environment variable, then call chronos memory_status before substantive work. Never use claude-session or another fallback. Follow memory/decision-protocol.md and WRITE BACK before ending."
 fi
 
 # JSON-encode via node (always present) so any briefing bytes — quotes, backslashes, emoji —

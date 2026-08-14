@@ -63,7 +63,7 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   // through the gateway (the local vault under memory/ is stale or absent there); a
   // local Mac session reads the vault files. Mirrors the chronos MCP server's
   // resolveCloud(): CHRONOS_SOURCE forces local/cloud, else auto → cloud when brain
-  // creds (BRAIN_API_URL+BRAIN_API_TOKEN, or direct Supabase) are present.
+  // creds (all four identity-gateway values, or direct Supabase) are present.
   const useCloud = process.env.CHRONOS_SOURCE !== 'local' && cloudConfigured();
   const notes = useCloud
     ? await fetchNotes()

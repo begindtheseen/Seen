@@ -7,8 +7,8 @@
 //
 // The load-bearing properties, all asserted below:
 //   1. ONE row per op — reads included, no dedupe/sampling (a read op used to be pure and silent).
-//   2. FIRE-AND-FORGET — a failing, or even a permanently hanging, audit insert must not change the
-//      op's status code, body, or latency. The hang test fails (rather than hangs) if someone `await`s it.
+//   2. DURABLE + FAILURE-TOLERANT — the handler waits for audit completion before responding, while a
+//      failed insert still cannot change the Brain operation's status or body.
 //   3. TRUTHFUL ok/ms — the row is written after the outcome is known, so a 400/500 logs ok:false.
 //   4. args CARRIES IDENTIFIERS ONLY — never note bodies, fact objects, or the bearer token.
 //
@@ -17,8 +17,17 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { createHash, scryptSync } from 'node:crypto';
 
 const TOKEN = 'test-brain-token';
+const CLIENT_TOKEN = 'chr_test_client_credential_not_a_real_secret';
+const CLIENT_SALT = '0123456789abcdef0123456789abcdef';
+const clientRow = (scopes = ['read', 'write'], name = 'test-client') => ({
+  id: 'client_test', name, scopes, salt: CLIENT_SALT,
+  lookup: createHash('sha256').update(CLIENT_TOKEN).digest('hex'),
+  verifier: scryptSync(CLIENT_TOKEN, CLIENT_SALT, 32).toString('hex'),
+  created_at: '2026-08-14T00:00:00.000Z', expires_at: null, revoked_at: null, last_used_at: null,
+});
 process.env.BRAIN_API_TOKEN = TOKEN;
 process.env.SUPABASE_URL = process.env.SUPABASE_URL || 'https://example.supabase.co';
 process.env.SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY || 'test-service-key';
@@ -36,7 +45,7 @@ function mockResponse(body, { ok = true, status = 200 } = {}) {
 
 // Records every REST call and answers the brain_* routes the gateway actually uses.
 // `access` controls how the brain_access insert behaves: ok | http-500 | reject | hang.
-function installFetch({ access = 'ok', notesRead = 'ok', delayMs = 0 } = {}) {
+function installFetch({ access = 'ok', notesRead = 'ok', delayMs = 0, clientScopes = ['read', 'write'], clientRows = null } = {}) {
   const calls = [];
   global.fetch = async (url, init = {}) => {
     const u = String(url);
@@ -49,8 +58,15 @@ function installFetch({ access = 'ok', notesRead = 'ok', delayMs = 0 } = {}) {
     if (u.includes('/brain_access')) {
       if (access === 'reject') throw new Error('audit: network unreachable');
       if (access === 'http-500') return mockResponse('permission denied for table brain_access', { ok: false, status: 500 });
-      if (access === 'hang') return new Promise(() => {}); // never settles
+      if (access === 'delay') {
+        await new Promise((r) => setTimeout(r, 25));
+        return mockResponse('', { status: 201 });
+      }
       return mockResponse('', { status: 201 });
+    }
+    if (u.includes('/brain_clients')) {
+      if (method === 'GET') return mockResponse(clientRows || [clientRow(clientScopes)]);
+      return mockResponse('', { status: 204 });
     }
 
     if (delayMs) await new Promise((r) => setTimeout(r, delayMs));
@@ -75,13 +91,16 @@ function makeRes() {
   return r;
 }
 
-const post = (body, { token = TOKEN, method = 'POST' } = {}) => ({ method, headers: { authorization: `Bearer ${token}` }, body });
+const post = (body, { token = TOKEN, clientToken = CLIENT_TOKEN, method = 'POST' } = {}) => ({
+  method, headers: { authorization: `Bearer ${token}`, 'x-chronos-client-token': clientToken }, body,
+});
 const flush = () => new Promise((r) => setImmediate(r));
 const auditRows = (calls) => calls.filter((c) => c.url.includes('/brain_access') && c.method === 'POST').flatMap((c) => c.body);
 
 async function call(body, opts = {}) {
   const res = makeRes();
-  await handler(post(body, opts), res);
+  const identified = opts.identify === false ? body : { ...body, by: opts.identity || 'test-client' };
+  await handler(post(identified, opts), res);
   await flush(); // let the un-awaited audit insert be issued
   return res;
 }
@@ -91,7 +110,7 @@ async function call(body, opts = {}) {
 // ---------------------------------------------------------------------------
 
 for (const op of ['notes', 'counts']) {
-  test(`read op "${op}" inserts ONE audit row with mode 'read' and the default actor`, async () => {
+  test(`read op "${op}" inserts ONE audit row with mode 'read' and the declared actor`, async () => {
     const calls = installFetch();
     const res = await call({ op });
 
@@ -103,7 +122,7 @@ for (const op of ['notes', 'counts']) {
     const row = rows[0];
     assert.equal(row.op, op);
     assert.equal(row.mode, 'read');
-    assert.equal(row.by, 'claude:cloud-session', 'no `by` in the body → the cloud-session default');
+    assert.equal(row.by, 'test-client');
     assert.equal(row.ok, true);
     assert.equal(typeof row.ms, 'number');
     assert.ok(row.ms >= 0);
@@ -111,6 +130,76 @@ for (const op of ['notes', 'counts']) {
     assert.equal(row.at, undefined, 'timestamp comes from the DB default, not the caller');
   });
 }
+
+test('a valid token without identity is denied before reading and the attempt is audited', async () => {
+  const calls = installFetch();
+  const res = await call({ op: 'notes' }, { identify: false });
+  assert.equal(res.statusCode, 428);
+  assert.match(res.jsonBody.error, /^Identify yourself:/);
+  assert.equal(calls.some((c) => c.url.includes('brain_notes')), false, 'no brain read may occur');
+  const rows = auditRows(calls);
+  assert.equal(rows.length, 1, 'the denied attempt is still monitored');
+  assert.equal(rows[0].by, 'unidentified');
+  assert.equal(rows[0].ok, false);
+  assert.match(rows[0].error, /^Identify yourself:/);
+});
+
+test('a claimed name cannot impersonate the credential owner', async () => {
+  const calls = installFetch();
+  const res = await call({ op: 'notes' }, { identity: 'claude' });
+  assert.equal(res.statusCode, 403);
+  assert.match(res.jsonBody.error, /identity claim does not match credential owner test-client/);
+  assert.equal(calls.some((c) => c.url.includes('brain_notes')), false);
+  assert.equal(auditRows(calls)[0].by, 'test-client', 'audit identity comes from the credential');
+});
+
+for (const legacyName of ['claude', 'claude-session', 'claude-session-old', 'claude:cloud-session-old']) {
+  test(`credential records with forbidden legacy source ${legacyName} are denied`, async () => {
+    const calls = installFetch({ clientRows: [clientRow(['read', 'write'], legacyName)] });
+    const res = await call({ op: 'notes' }, { identity: legacyName });
+    assert.equal(res.statusCode, 403);
+    assert.match(res.jsonBody.error, /legacy Claude session identity forbidden/);
+    assert.equal(calls.some((c) => c.url.includes('brain_notes')), false);
+    assert.equal(auditRows(calls)[0].by, legacyName);
+    assert.equal(auditRows(calls)[0].ok, false);
+  });
+}
+
+test('an invalid client credential is denied and audited without a brain read', async () => {
+  const calls = installFetch();
+  const res = await call({ op: 'notes' }, { clientToken: 'chr_wrong' });
+  assert.equal(res.statusCode, 401);
+  assert.match(res.jsonBody.error, /invalid client credential/);
+  assert.equal(calls.some((c) => c.url.includes('brain_notes')), false);
+  assert.equal(calls.filter((c) => c.url.includes('/brain_clients')).length, 1);
+  assert.match(calls.find((c) => c.url.includes('/brain_clients')).url, /lookup=eq\.[0-9a-f]{64}/);
+  assert.equal(auditRows(calls)[0].ok, false);
+});
+
+test('authorization consumes at most one indexed row even if the REST boundary misbehaves', async () => {
+  const malformedFirst = { ...clientRow(), verifier: '0'.repeat(64) };
+  const calls = installFetch({ clientRows: [malformedFirst, clientRow()] });
+  const res = await call({ op: 'notes' });
+  assert.equal(res.statusCode, 401, 'the valid second row must never be examined');
+  assert.equal(calls.some((c) => c.url.includes('brain_notes')), false);
+});
+
+test('a read-only client is denied a write and the scoped denial is audited', async () => {
+  const calls = installFetch({ clientScopes: ['read'] });
+  const res = await call({ op: 'record_fact', fact: { subject: 'a', predicate: 'b', object: 'c' } });
+  assert.equal(res.statusCode, 403);
+  assert.match(res.jsonBody.error, /lacks read\+write scope/);
+  assert.equal(calls.some((c) => c.url.includes('brain_notes')), false);
+  assert.equal(auditRows(calls)[0].by, 'test-client');
+});
+
+test('a write-only client is denied a read-before-write operation', async () => {
+  const calls = installFetch({ clientScopes: ['write'] });
+  const res = await call({ op: 'record_fact', fact: { subject: 'a', predicate: 'b', object: 'c' } });
+  assert.equal(res.statusCode, 403);
+  assert.match(res.jsonBody.error, /lacks read\+write scope/);
+  assert.equal(calls.some((c) => c.url.includes('brain_notes')), false);
+});
 
 test('one op = one row: three identical reads are NOT deduped or sampled', async () => {
   const calls = installFetch();
@@ -130,12 +219,14 @@ test('ms reflects the real elapsed time of the op', async () => {
 // (b) writes are audited as writes, with `by` passed through
 // ---------------------------------------------------------------------------
 
-test("record_fact inserts mode 'write' and passes `by` through", async () => {
+test("record_fact inserts mode 'write' under the credential's authoritative identity", async () => {
   const calls = installFetch();
   const res = await call({
     op: 'record_fact',
-    by: 'claude:cloud-session-4f21',
-    fact: { subject: 'Seen brain gateway', predicate: 'audits', object: 'every op incl. reads' },
+    fact: {
+      subject: 'Seen brain gateway', predicate: 'audits', object: 'every op incl. reads',
+      by: 'forged-client', change: 'operator-supplied reason', source: 'operator-supplied citation',
+    },
   });
 
   assert.equal(res.statusCode, 200);
@@ -146,10 +237,33 @@ test("record_fact inserts mode 'write' and passes `by` through", async () => {
   assert.equal(rows.length, 1);
   assert.equal(rows[0].op, 'record_fact');
   assert.equal(rows[0].mode, 'write');
-  assert.equal(rows[0].by, 'claude:cloud-session-4f21');
+  assert.equal(rows[0].by, 'test-client');
   assert.equal(rows[0].args, 'Seen brain gateway · audits', 'subject · predicate');
   assert.equal(rows[0].ok, true);
+  const noteWrite = calls.find((c) => c.method === 'POST' && c.url.includes('/brain_notes'));
+  const content = noteWrite.body[0].content;
+  assert.match(content, /by: test-client/);
+  assert.match(content, /change: operator-supplied reason/);
+  assert.match(content, /source: operator-supplied citation/);
+  assert.doesNotMatch(content, /forged-client/);
 });
+
+for (const note of ['This is prose, not a note path', '../outside.md', 'knowledge/../../outside.md']) {
+  test(`record_fact rejects unsafe note target ${JSON.stringify(note)} before storage`, async () => {
+    const calls = installFetch();
+    const res = await call({
+      op: 'record_fact', note,
+      fact: { subject: 'safe', predicate: 'note', object: 'required' },
+    });
+    assert.equal(res.statusCode, 400);
+    assert.match(res.jsonBody.error, /brain write rejected/);
+    assert.equal(calls.some((c) => c.url.includes('brain_notes')), false);
+    const row = auditRows(calls)[0];
+    assert.equal(row.by, 'test-client');
+    assert.equal(row.ok, false);
+    assert.equal(JSON.stringify(row).includes(note), false, 'unsafe note value is never audited');
+  });
+}
 
 test("append_timeline inserts mode 'write' with the heading as args", async () => {
   const calls = installFetch();
@@ -161,12 +275,12 @@ test("append_timeline inserts mode 'write' with the heading as args", async () =
   assert.equal(rows.length, 1);
   assert.equal(rows[0].mode, 'write');
   assert.equal(rows[0].op, 'append_timeline');
-  assert.equal(rows[0].by, 'claude:mac');
+  assert.equal(rows[0].by, 'test-client');
   assert.equal(rows[0].args, 'Gateway audit shipped');
 });
 
 // ---------------------------------------------------------------------------
-// (c) fire-and-forget: an audit failure changes NOTHING about the op
+// (c) durable but failure-tolerant: an audit failure changes NOTHING about the op
 // ---------------------------------------------------------------------------
 
 for (const access of ['http-500', 'reject']) {
@@ -199,14 +313,14 @@ for (const access of ['http-500', 'reject']) {
   });
 }
 
-test('the audit insert is never awaited — a permanently hanging insert cannot hang the op', async () => {
-  installFetch({ access: 'hang' });
+test('the handler awaits audit durability before responding', async () => {
+  installFetch({ access: 'delay' });
   const res = makeRes();
-  const outcome = await Promise.race([
-    handler(post({ op: 'notes' }), res).then(() => 'returned'),
-    new Promise((r) => { const t = setTimeout(() => r('timed-out'), 1000); if (t.unref) t.unref(); }),
-  ]);
-  assert.equal(outcome, 'returned', 'handler must not block on the audit insert');
+  let settled = false;
+  const request = handler(post({ op: 'notes', by: 'test-client' }), res).then(() => { settled = true; });
+  await new Promise((r) => setTimeout(r, 5));
+  assert.equal(settled, false, 'response must remain coupled to the pending audit write');
+  await request;
   assert.equal(res.statusCode, 200);
   assert.equal(res.jsonBody.ok, true);
 });
@@ -223,7 +337,7 @@ test('args carries identifiers only — never note bodies, fact objects, or the 
     op: 'append_timeline',
     heading: 'Session 14:02',
     text: `Long private entry: ${SECRET} — several paragraphs of vault content.`,
-    by: 'claude:cloud-session',
+    by: 'claude-seenjobs',
   });
   let row = auditRows(calls)[0];
   assert.equal(row.args, 'Session 14:02', 'the heading, not the entry body');
@@ -268,6 +382,7 @@ test('a rejected op (400 bad params) is audited with ok:false', async () => {
   assert.equal(rows[0].op, 'record_fact');
   assert.equal(rows[0].mode, 'write');
   assert.equal(rows[0].ok, false);
+  assert.match(rows[0].error, /record_fact needs/);
 });
 
 test('a thrown op (500) is audited with ok:false', async () => {
