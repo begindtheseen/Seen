@@ -1,128 +1,104 @@
-# Handoff → `claude-brain`: cloud Brain path BLOCKED (2026-08-14)
+# Cloud Brain path: BLOCKED → RESOLVED, verified as `claude-seenjobs` (2026-08-14)
 
-Written by the SeenJobs product session on branch `claude/chronos-brain-session-kxt7ep`.
-It is a **git** handoff rather than a Brain fact/timeline entry **because writing it to the
-Brain would require the very path this document reports as forbidden.** Someone with a
-role-qualified surface should transcribe the facts at the bottom into Chronos.
+Status: **resolved 16:00Z.** Written by the SeenJobs product session on branch
+`claude/chronos-brain-session-kxt7ep`. The original blocked report is kept below as history —
+it is why the earlier session made zero Brain calls — followed by the verification that
+unblocked it. **Two owner-gated risks remain open; see the last section.**
 
-## Verdict
+These findings are now durable in Chronos as three facts under `Seen brain gateway` and
+`Seen brain cloud client`, plus a `timeline/2026-08-14.md` entry. This file is the in-repo
+copy, which still matters while cloud sessions boot unoriented.
 
-The cloud Brain path is **blocked pending role-qualified gateway provisioning**. Zero Brain
-requests were made by this session's own tool calls. See the disclosure below for one that
-the SessionStart hook made before the session had any control.
+---
 
-Both preconditions from the role briefing fail, and the second fails structurally, not just
-on timing.
+## Part 1 — the blocked report (11:56Z, history)
 
-## Surface determination
+The earlier session found the cloud path not cleared for use and made **zero Brain requests**.
+It wrote its handoff to git rather than the Brain because writing to the Brain would have
+required the path it was reporting as forbidden.
 
-This is a cloud/container workspace: `/home/user/Seen` exists, `/Users/brandonburnett` does not.
+Surface: cloud/container. `/home/user/Seen` exists, `/Users/brandonburnett` does not. There is
+**no local Brain MCP** — `.mcp.json` registers a `chronos` server at `memory/mcp/server.mjs`,
+but `.gitignore:23` excludes `memory/`, so the server cannot start and no `brain_*` tools are
+registered. `AGENTS.md` is absent. The command-os `BRAIN_AI_CLIENT_PROTOCOL.txt` is Mac-only
+and was **not** read — reported rather than pretended.
 
-There is **no local Brain MCP here**. `.mcp.json` registers a `chronos` server at
-`memory/mcp/server.mjs`, but `memory/` is not in the checkout — `.gitignore:23` excludes it
-(`memory/`, with only `memory/graph/.env.example` re-included). The server cannot start, and
-no `brain_*` / `memory_*` tools are registered in this session. The cloud gateway is the only
-surface, at `BRAIN_API_URL=https://seenjobs.io/api/brain` with `BRAIN_API_TOKEN` set.
+Both preconditions failed at the time:
 
-## (a) Hardened gateway is NOT in production — verified
+- **(a) Hardened gateway not in production.** `2279783` had exactly one Vercel deployment and it
+  was a `target: preview`. Latest `target: production` was `458d1a3` — PR #284's own base,
+  unmoved. The "silently promoted preview" scenario was checked and, at that moment, ruled out.
+- **(b) The prescribed provisioning check was not trustworthy against `458d1a3`.** That gateway
+  took the audit `by` from a caller-supplied body field (defaulting to `claude:cloud-session`)
+  and never verified it, and authorized on one shared `BRAIN_API_TOKEN` with no per-client
+  identity or scopes. So "confirm Chronos recorded exactly `claude-seenjobs`" would have passed
+  on assertion alone, writing a fake-authentic row indistinguishable from real provisioning.
 
-| Evidence | Value |
-|---|---|
-| PR #284 | `state: open`, `draft: true`, `merged: false` |
-| PR #284 head | `227978354b0bff2dbec74e94fe8332f630a1512c` |
-| PR #284 base | `next-migration` @ `458d1a3` |
-| `origin/next-migration` tip | `458d1a3` — the PR's base, unmoved |
-| `2279783` in this checkout | absent (`git cat-file -t` → not a valid object) |
-| Only Vercel deployment of `2279783` | `target: preview`, READY, 2026-08-14T11:25:20Z, branch `codex/brain-client-identity-gate` |
-| Latest `target: production` | `458d1a3` / `next-migration`, READY, 2026-08-13T09:50:01Z |
+It also disclosed that `.claude/hooks/session-start.sh` fetches the briefing through the gateway
+at every cloud boot with zero tool calls, so one `claude:cloud-session`-attributed read had
+already occurred before that session had any control.
 
-The "silently promoted preview" scenario (CLAUDE.md's PR #124 incident) was checked and ruled
-out: `2279783` has exactly one deployment and it is a preview. `seenjobs.io/api/brain` is
-running `458d1a3`, which is the code in this checkout.
+**Both points were since confirmed from the other side.** The `brain_access` audit log contains
+`claude:cloud-session` rows at `11:56:24` and `11:56:43` — exactly the disclosed hook reads.
 
-Migrations `070`/`071` are **applied to production but absent from `supabase/migrations/`**
-(only `069` is present; they live on the PR branch). The verifier registry therefore exists in
-the prod database while no deployed code reads it — schema ahead of code, the same ordering
-hazard CLAUDE.md records for migration 069. It is inert rather than harmful, but it means prod
-DB state currently overstates what prod actually enforces.
+## Part 2 — verification that unblocked it (16:00Z)
 
-## (b) The prescribed verification cannot be trusted against the deployed gateway
+Both preconditions verified complete, **independently of the PR body's claim**:
 
-This is the finding worth acting on. In `api/brain.js` as deployed to production:
+- **(a) Promoted, verified via the Vercel API.** `dpl_8fpCkEGdRAVjgdCxcBH4UxcRxv3r` ·
+  `state: READY` · `target: production` · sha `2279783` · `meta.action: "promote"` ·
+  `originalDeploymentId: dpl_CpXq5MJ8X4T82eQE8tywppaBxERo` (the preview identified in Part 1) ·
+  created `2026-08-14T12:04:13.503Z`, superseding `458d1a3`.
+- **(b) Credential installed.** This fresh session's environment carries `BRAIN_CLIENT=claude-seenjobs`
+  and `BRAIN_CLIENT_TOKEN` alongside `BRAIN_API_TOKEN`.
 
-- **`tokenOk()` (`api/brain.js:31-40`)** compares the bearer against a single shared
-  `BRAIN_API_TOKEN`. There is no per-client credential, no verifier lookup, and no scopes. Any
-  holder of that one token is fully authorized for every op. That is shared-credential auth by
-  construction.
-- **`audit()` (`api/brain.js:84`)** sets
-  `by: (typeof body.by === 'string' && body.by.trim()) ? body.by.trim() : 'claude:cloud-session'`.
-  **The attribution is caller-asserted and never verified.**
+The deployed contract at sha `2279783` was read before any call, so the first request would not
+fumble into denial rows. Auth is **four-part**: `Authorization: Bearer <BRAIN_API_TOKEN>` +
+`x-chronos-client-token` header + a nonblank body `by` (else 428) + `by` must match the
+credential owner case-insensitively (else 403).
 
-Consequence: the role briefing's check — "after the first successful call, require confirmation
-that Chronos recorded exactly `claude-seenjobs`" — is **not a valid test against this gateway
-version**. Any client can send `by: "claude-seenjobs"` and manufacture a passing audit row.
-Running the prescribed verification now would produce a **false positive that is
-indistinguishable after the fact from real provisioning**, which is worse than the
-`claude-session-*` row it is meant to catch: the bad outcome would be a Brain audit log
-containing a fake-authentic `claude-seenjobs` row, permanently.
+**First Brain operation: one harmless read.** `op: "counts"` → `200 {notes:63, facts:401, episodes:291}`.
 
-So the check must run **only** against the hardened gateway, where identity is bound to a
-credential. Until `2279783` is in production, "install the unique credential in Claude Cloud"
-cannot mean anything the deployed code can honor — changing `BRAIN_API_TOKEN` in Vercel to the
-new value would only rename the shared secret, not make it role-qualified.
+**Provisioning check PASSED:**
 
-## Disclosure: one legacy-attributed read already happened, before session control
+```
+2026-08-14 16:00:25.589Z | by: claude-seenjobs | op: counts | read | ok: true | 270ms | error: null
+```
 
-`.claude/hooks/session-start.sh` runs `scripts/memory-status.mjs`, which is cloud-aware and
-fetches the briefing over `BRAIN_API_URL` + `BRAIN_API_TOKEN` at SessionStart with **zero tool
-calls** — by design ("connect the session to the info it needs and save the round-trip").
+Exactly `claude-seenjobs`. No `claude-session*` row.
 
-Per `api/brain.js:21-24`, every authenticated op **including reads** appends a `brain_access`
-row. The hook sends no `by`, so that row is attributed `claude:cloud-session` — a
-`claude-session*` row, which the role briefing defines as a failed provisioning check.
+Part 1's concern (b) is **fixed in the deployed code**: `audit()` now records
+`client.identity.name` resolved from the credential registry rather than the caller's claim;
+denials are audited too (428/401/403); the audit insert is awaited rather than fire-and-forget
+so serverless teardown cannot drop it; write ops require read **and** write scope; and
+`record_fact` runs `assertNotePath`, closing the stranded-facts-at-root class for the cloud
+writer. The provisioning check is therefore a meaningful test now, where against `458d1a3` it
+was a false-positive risk.
 
-Therefore: **one legacy-path read occurred at this session's start, not by the session's
-choice**, and the orientation context this session holds is that **boot-time snapshot**, not a
-live query. Nothing was re-queried.
+## Part 3 — open, owner-gated
 
-Standing consequence: **the hook is an unconditional legacy-path caller.** Every future cloud
-session boot makes another `claude:cloud-session`-attributed Brain read until either the
-hardened gateway ships or the hook is gated. If the forbiddance is meant to hold in the
-interim, the hook needs a guard — that is Brain-infrastructure work and was deliberately left
-untouched by this session.
+Both stem from one condition: **`2279783` is promoted but unmerged.** `origin/next-migration` is
+still `458d1a3`, so production runs code that exists on no merged branch.
 
-## Unblock sequence
+1. **Silent rollback risk.** The next merge to `next-migration` deploys `next-migration` and
+   rolls the hardened gateway back to the pre-hardening version — un-hardening Brain auth
+   without anyone touching security code. This is CLAUDE.md's PR #124 lesson in a new form.
+2. **Every cloud session boots unoriented.** PR #284 changes the client side too
+   (`.claude/hooks/session-start.sh`, `scripts/memory-status.mjs`, `lib/server/brainCloud.js`,
+   `scripts/cloud-setup.sh`), but a container clones from `next-migration@458d1a3` and therefore
+   runs the **pre-hardening client against the hardened gateway**: it sends no `by` and gets
+   `428 Identify yourself`. Measured as two `by=unidentified` rows at `15:58:27` and `15:58:28`
+   — this session's own boot attempts. It fails *closed*, which is the right failure, but the
+   briefing is gone until the client matches the server.
 
-1. Promote `2279783` to production (owner-approved merge of PR #284 → `next-migration`, then
-   confirm a `target: production` deployment exists for the merged sha — CLAUDE.md's
-   deploy-drift rule; a green PR check is a preview, not production).
-2. Commit migrations `070`/`071` into `supabase/migrations/` so the repo stops describing a
-   database that differs from it (CLAUDE.md's uncommitted-061 lesson).
-3. Install the unique `claude-seenjobs` credential in Claude Cloud as protected env vars, then
-   **start a fresh cloud session** so it receives them. Never pasted into chat.
-4. In that fresh session: one harmless read, then confirm the `brain_access` source is exactly
-   `claude-seenjobs`. Any `claude-session*` row is a failed provisioning check.
-5. Gate or remove the SessionStart hook's unconditional Brain fetch, or accept that each boot
-   writes a legacy-attributed read row.
+**One action closes both: merge PR #284 into `next-migration`.** That is a protected-branch
+merge, so it needs Brandon's explicit scoped approval and was not taken by this session.
 
-## Facts to transcribe into Chronos
+Also still true from Part 1: migrations `070`/`071` are applied to production but absent from
+`supabase/migrations/` — they live on the PR branch, so merging #284 resolves that too.
 
-Supersede, do not overwrite.
+## Not available on this surface
 
-- `Seen brain gateway prod_state` → As of 2026-08-14, production `seenjobs.io/api/brain` runs
-  `458d1a3` (deployed 2026-08-13T09:50:01Z). The hardened identity gateway `2279783` exists
-  only as a Vercel **preview** on PR #284, which is open/draft/unmerged; `origin/next-migration`
-  is still at the PR's base `458d1a3`. Migrations 070/071 are applied to prod but absent from
-  `supabase/migrations/`, so the verifier registry is inert — no deployed code reads it.
-- `Seen brain gateway attribution_is_unverified` → In the deployed gateway, `api/brain.js:84`
-  takes the audit `by` from the request body and falls back to `claude:cloud-session`. It is
-  never verified against the credential, and `tokenOk()` (`api/brain.js:31-40`) accepts one
-  shared `BRAIN_API_TOKEN` with no per-client identity or scopes. Therefore the
-  "confirm Chronos recorded exactly `claude-seenjobs`" provisioning check is a FALSE-POSITIVE
-  RISK against this version: any caller can assert that label and manufacture a passing row.
-  Run that check only against the hardened gateway.
-- `Seen session-start hook legacy_brain_read` → `.claude/hooks/session-start.sh` fetches the
-  briefing through the cloud gateway at every cloud session start with zero tool calls, and
-  reads are audited, so each boot writes a `brain_access` row attributed `claude:cloud-session`.
-  This happens before the session can consent. Any interim ban on the legacy path must gate the
-  hook or it will keep being violated at boot.
+`brain_contradictions` has no cloud-gateway op — the gateway exposes only
+`notes` / `counts` / `record_fact` / `append_timeline`. The session-end contradiction sweep was
+**not performed** rather than faked.
