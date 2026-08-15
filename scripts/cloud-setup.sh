@@ -2,14 +2,14 @@
 # Seen cloud-environment setup — verifies the SeenJobs Claude cloud session can reach the always-on
 # Chronos brain (the Supabase mirror) through the identity-gated gateway. Wire it as the setup script:
 #   bash scripts/cloud-setup.sh
-# Full contract: memory/CHRONOS_BRIDGE.md. NOT `set -e`: the brain check is informational and must
+# Full contract: CLAUDE.md, "START HERE EVERY SESSION". NOT `set -e`: the brain check is informational and must
 # never fail environment setup.
 set -uo pipefail
 
 echo "▶ Seen cloud setup"
 
 # 0) Sanity: is the bridge actually in this checkout? (Guards the seen vs seen-command mixup.)
-if [ ! -f memory/CHRONOS_BRIDGE.md ] || [ ! -f lib/server/brainCloud.js ]; then
+if [ ! -f lib/server/brainCloud.js ] || [ ! -f scripts/memory-status.mjs ]; then
   echo "⚠ Bridge files not found — are you on begindtheseen/seen @ next-migration?"
   echo "  (seen-command does NOT contain the bridge.)"
 fi
@@ -33,7 +33,7 @@ else
 fi
 
 # 2) Orientation hint for the session.
-echo "▶ Next: read memory/CHRONOS_BRIDGE.md, then call memory_status() to orient from the brain."
+echo "▶ Next: run npm run memory:status, then follow the Brain protocol at the top of CLAUDE.md."
 
 # 3) OPTIONAL — product deps (only if you build/run the Next.js app or run tests here).
 #    The chronos MCP itself is dependency-free, so delete this block for a brain-only environment.
