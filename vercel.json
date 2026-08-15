@@ -92,6 +92,10 @@
       "schedule": "0 16 * * *"
     },
     {
+      "path": "/api/gmail?action=sync_all&cron=1",
+      "schedule": "0 13 * * *"
+    },
+    {
       "path": "/api/refresh-jobs",
       "schedule": "0 2 * * *"
     },

@@ -10,6 +10,7 @@ import type { Application } from '@/lib/types'
 import dynamic from 'next/dynamic'
 import OutcomeCard from '@/components/OutcomeCard'
 import RoundsPrompt from '@/components/RoundsPrompt'
+import { GmailConnect } from '@/components/GmailConnect'
 const SurveyModal = dynamic(() => import('@/components/SurveyModal'), { ssr: false })
 const ResumeSurveyModal = dynamic(() => import('@/components/ResumeSurveyModal'), { ssr: false })
 
@@ -266,6 +267,13 @@ function TrackerPage() {
     if (!isLoggedIn) return
     loadApps()
   }, [isLoggedIn, loadApps])
+
+  // Refresh when a Gmail capture is confirmed into the tracker (GmailConnect adds via AppStore).
+  useEffect(() => {
+    const h = () => loadApps()
+    window.addEventListener('seen:applications-updated', h)
+    return () => window.removeEventListener('seen:applications-updated', h)
+  }, [loadApps])
 
   useEffect(() => {
     if (!apps.length) return
@@ -539,6 +547,9 @@ function TrackerPage() {
             {apps.length > 0 && <button className="btn btn-ghost" style={{ fontSize: '.72rem', color: 'var(--muted)' }} onClick={() => { if (confirm('Remove all applications? This cannot be undone.')) { AppStore.clear(isLoggedIn); setApps([]) } }}>Clear all</button>}
           </div>
         </div>
+
+        {/* Gmail auto-capture (renders only once the owner has configured Google OAuth creds) */}
+        <GmailConnect />
 
         {/* Stats */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(84px, 1fr))', gap: '.6rem', marginBottom: '1.5rem' }}>
