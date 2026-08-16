@@ -115,18 +115,45 @@ export default async function handler(req, res) {
   const dryRun = url.searchParams.get('dry') === '1';
   const targets = subs.length ? subs : DEFAULT_SUBS;
 
+  // Leave headroom under vercel.json's 300s maxDuration for the catalogue load, matching and
+  // writes that follow the loop. Being killed mid-sweep is the worst outcome available: the
+  // summary never returns, so the run that most needs explaining is the one that explains
+  // nothing. Stopping early and SAYING so is strictly better than dying comprehensive.
+  // Parsed explicitly rather than with `|| 240000`, because `Number(null)` and `Number('0')` are
+  // both 0 and `||` would turn an intentional 0 into the default.
+  const budgetRaw = url.searchParams.get('budget_ms');
+  const budgetMs = budgetRaw !== null && Number.isFinite(Number(budgetRaw))
+    ? Math.min(Math.max(Number(budgetRaw), 0), 280000)
+    : 240000;
+
+  // `?retries=0` answers "does Reddit talk to this IP at all, right now" without sitting through
+  // 17s of backoff per host first. The reachability probe to run straight after a deploy.
+  const retriesParam = url.searchParams.get('retries');
+  const retries = retriesParam === null ? null : Math.max(0, Math.min(Number(retriesParam) || 0, 3));
+
   const started = Date.now();
   const perSub = [];
   const allPosts = [];
+  const skipped = [];
+
+  // Reddit blocks and throttles per IP, not per subreddit. Once one sub answers 403/429 the
+  // rest of this invocation is talking to the same wall, so retrying each of them through the
+  // full 1s/4s/12s backoff on both hosts buys nothing and costs ~34s each — 340s over ten subs,
+  // which overruns the function limit and destroys the telemetry. After the first IP-level
+  // refusal, take the remaining subs' answers at face value.
+  let ipWall = false;
 
   // Sequential across subs on purpose: concurrent requests from one IP are what trips Reddit's
   // per-IP throttle, and a 429 costs far more than the extra wall-clock.
   for (const sub of targets) {
+    if (Date.now() - started >= budgetMs) { skipped.push(sub); continue; }
+
     const t0 = Date.now();
-    const r = mode === 'top'
-      ? await listTop(sub, { t: window, limit })
-      : await listNew(sub, { limit });
+    const opts = { limit, ...(ipWall ? { retries: 0 } : retries !== null ? { retries } : {}) };
+    const r = mode === 'top' ? await listTop(sub, { t: window, ...opts }) : await listNew(sub, opts);
     const ms = Date.now() - t0;
+
+    if (r.status === 403 || r.status === 451 || r.status === 429) ipWall = true;
 
     const usable = (r.items || []).filter(p => !p.removed && (p.title || p.body));
     perSub.push({
@@ -203,14 +230,23 @@ export default async function handler(req, res) {
   const blocked   = perSub.filter(s => s.status === 403 || s.status === 451);
   const throttled = perSub.filter(s => s.status === 429);
   const reason = allPosts.length === 0
-    ? (blocked.length ? 'all_hosts_blocked' : throttled.length ? 'rate_limited' : 'no_posts_returned')
+    ? (blocked.length ? 'all_hosts_blocked'
+      : throttled.length ? 'rate_limited'
+      // A run that never got to fetch must not borrow the vocabulary of a run that fetched and
+      // found nothing. "no_posts_returned" when no request was made is the same lie as the old
+      // 'no_experiences_extracted'.
+      : skipped.length && !perSub.length ? 'budget_exhausted_before_any_fetch'
+      : 'no_posts_returned')
     : matchRows.length === 0 ? 'posts_harvested_but_no_tracked_company_named' : null;
 
   return res.status(200).json({
     ok: true,
     mode, window: mode === 'top' ? window : null, dry_run: dryRun,
-    subs_attempted: targets.length,
+    subs_attempted: perSub.length,
     subs_ok: perSub.filter(s => s.ok).length,
+    // A sweep that ran out of clock must never read as a sweep that covered everything.
+    subs_skipped: skipped,
+    budget_exhausted: skipped.length > 0,
     posts_usable: allPosts.length,
     raw_stored: stored,
     catalogue_size: catalogue.length,

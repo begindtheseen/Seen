@@ -34,6 +34,13 @@ const CATALOGUE = [
   { id: 'c3', name: 'Target' },
 ];
 
+// Route on the parsed hostname, never a substring of the URL: `u.includes('reddit.com')` also
+// matches https://reddit.com.evil.test/ and https://x/?r=reddit.com, so a stub written that way
+// can answer for a host the code never meant to call — and would hide exactly that bug.
+const REDDIT_HOSTS = new Set(['www.reddit.com', 'old.reddit.com']);
+const hostOf = u => { try { return new URL(u).hostname; } catch { return ''; } };
+const pathOf = u => { try { return new URL(u).pathname; } catch { return ''; } };
+
 /** Install a fetch stub that routes by URL. redditStatus drives the Reddit half. */
 function stubFetch({ redditBody = null, redditStatus = 200, catalogue = CATALOGUE } = {}) {
   const calls = [];
@@ -41,13 +48,13 @@ function stubFetch({ redditBody = null, redditStatus = 200, catalogue = CATALOGU
     const u = String(url);
     calls.push({ url: u, method: init.method || 'GET' });
 
-    if (u.includes('reddit.com')) {
+    if (REDDIT_HOSTS.has(hostOf(u))) {
       if (redditStatus !== 200) {
         return { ok: false, status: redditStatus, text: async () => 'blocked', json: async () => ({}) };
       }
       return { ok: true, status: 200, text: async () => JSON.stringify(redditBody) };
     }
-    if (u.includes('/rest/v1/companies')) {
+    if (pathOf(u) === '/rest/v1/companies') {
       // Single short page ends pagination.
       return { ok: true, status: 200, json: async () => catalogue };
     }
@@ -124,10 +131,36 @@ test('a 403 zero says all_hosts_blocked and names the subs', async () => {
 
 test('a 429 zero says rate_limited, not blocked and not empty', async () => {
   stubFetch({ redditStatus: 429 });
-  const { body } = await run('subs=recruitinghell&dry=1');
+  const { body } = await run('subs=recruitinghell&dry=1&retries=0');
   assert.equal(body.reason, 'rate_limited');
   assert.deepEqual(body.throttled_subs, ['recruitinghell']);
   assert.deepEqual(body.blocked_subs, []);
+});
+
+test('after one throttled sub the rest stop retrying — the wall is the IP, not the sub', async () => {
+  stubFetch({ redditStatus: 429 });
+  // retries=1 → first sub: 2 hosts × (initial + 1 retry) = 4 attempts.
+  const { body } = await run('subs=recruitinghell,jobs,AskHR&dry=1&retries=1');
+
+  assert.equal(body.per_sub[0].attempts, 4, 'the first sub is given the benefit of the doubt');
+  assert.equal(body.per_sub[1].attempts, 2, 'once throttled, later subs try each host once');
+  assert.equal(body.per_sub[2].attempts, 2);
+  assert.equal(body.reason, 'rate_limited');
+  // The point of the optimisation: all three still got measured and reported.
+  assert.equal(body.throttled_subs.length, 3);
+  assert.deepEqual(body.subs_skipped, []);
+});
+
+test('running out of clock is reported, never disguised as an empty Reddit', async () => {
+  stubFetch({ redditBody: listing([post('h1', 'Deloitte ghosted me', 'no response')]) });
+  const { body } = await run('subs=recruitinghell,jobs&dry=1&budget_ms=0');
+
+  assert.equal(body.subs_attempted, 0);
+  assert.equal(body.budget_exhausted, true);
+  assert.deepEqual(body.subs_skipped, ['recruitinghell', 'jobs']);
+  assert.equal(body.reason, 'budget_exhausted_before_any_fetch',
+    'a sweep that never fetched must not claim Reddit returned nothing');
+  assert.notEqual(body.reason, 'no_posts_returned');
 });
 
 test('an genuinely empty subreddit says no_posts_returned', async () => {
@@ -166,7 +199,7 @@ test('dry run performs no writes at all', async () => {
   assert.equal(body.dry_run, true);
   assert.equal(body.raw_stored, 0);
   assert.equal(body.matches_written, 0);
-  const writes = calls.filter(c => c.method === 'POST' && c.url.includes('/rest/v1/'));
+  const writes = calls.filter(c => c.method === 'POST' && pathOf(c.url).startsWith('/rest/v1/'));
   assert.equal(writes.length, 0, 'dry=1 must not touch reddit_raw, reddit_company_match or the fetch log');
 });
 
@@ -175,9 +208,10 @@ test('a non-dry run persists raw posts and matches', async () => {
   const { body } = await run('subs=recruitinghell');
   assert.equal(body.raw_stored, 1);
   assert.equal(body.matches_written, 1);
-  assert.ok(calls.some(c => c.url.includes('reddit_raw')), 'raw corpus is written before interpretation');
-  assert.ok(calls.some(c => c.url.includes('reddit_company_match')));
-  assert.ok(calls.some(c => c.url.includes('reddit_fetch_log')), 'every fetch is logged with its status');
+  const hit = table => calls.some(c => pathOf(c.url) === `/rest/v1/${table}`);
+  assert.ok(hit('reddit_raw'), 'raw corpus is written before interpretation');
+  assert.ok(hit('reddit_company_match'));
+  assert.ok(hit('reddit_fetch_log'), 'every fetch is logged with its status');
 });
 
 test('unauthorized callers are refused', async () => {
