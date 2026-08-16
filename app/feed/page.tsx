@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { AppStore } from '@/lib/stores/AppStore'
-import { isRedditSourced, PUBLIC_DISCUSSION_LABEL } from '@/lib/reportSource'
 
 type Filter = 'all' | 'ghosted' | 'rejected' | 'interviewing' | 'hired'
 
@@ -215,9 +214,6 @@ export default function FeedPage() {
                     )}
                     {r.platform && (
                       <span className="vibe v-n">{r.platform}</span>
-                    )}
-                    {isRedditSourced(r.platform) && (
-                      <span className="vibe v-n" style={{ borderStyle: 'dashed', color: 'var(--dim)' }} title="Imported from a public Reddit thread, not submitted directly to Seen">{PUBLIC_DISCUSSION_LABEL}</span>
                     )}
                   </div>
 
