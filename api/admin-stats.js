@@ -243,7 +243,7 @@ async function _handler(req, res) {
       dauRes, dupClustersRes, flagsRes,
       staleJobsRes, zeroSearchesRes, jobReportsRes, searchLogsTodayRes,
       recentReportsRes, recentAppsRes, jobsTodayRes, inactiveReportsRes,
-      jobsActiveRes, jobsNewTodayRes,
+      jobsActiveRes,
       reportsMonthRes, searchLogsWeekRes,
       jobsTotalRes, creditTxnRes, outcomeSharesRes, usersMonthRes,
       searchEvents30Res, resumeScans30Res, disputesOpenRes,
@@ -280,11 +280,18 @@ async function _handler(req, res) {
       db(`applications?select=id,company_name,role,city,status,stage,platform,created_at&order=created_at.desc&limit=25`),
       db(`jobs?created_at=gte.${todayISO}&select=id`, { headers: { Prefer: 'count=exact', 'Range-Unit': 'items', Range: '0-0' } }),
       db(`job_availability_reports?status=in.(expired,unknown)&select=id,job_id,status,reported_at,company,title,city,apply_url&order=reported_at.desc&limit=50`),
-      db(`jobs?select=count&availability_status=eq.active`),
-      db(`jobs?select=count&created_at=gte.${encodeURIComponent(todayISO)}`),
+      // `select=count` is not a count primitive: on the 60k+ jobs table PostgREST spent the full
+      // statement timeout trying to serve it, then the dashboard quietly displayed zero. Ask for
+      // an exact count in Content-Range instead and discard the rows with HEAD. This is the same
+      // count contract used by the smaller tables above, without transferring any job records.
+      db(`jobs?availability_status=eq.active&select=id`, {
+        method: 'HEAD', headers: { Prefer: 'count=exact', 'Range-Unit': 'items', Range: '0-0' },
+      }),
       db(`reports?created_at=gte.${monthISO}&select=created_at,company_name,outcome&order=created_at.asc&limit=2000`),
       db(`search_logs?created_at=gte.${weekISO}&select=query&limit=500`),
-      db(`jobs?select=count`),
+      db(`jobs?select=id`, {
+        method: 'HEAD', headers: { Prefer: 'count=exact', 'Range-Unit': 'items', Range: '0-0' },
+      }),
       db(`credit_transactions?select=delta&limit=20000`),
       db(`outcome_card_shares?select=shared_via,created_at&order=created_at.desc&limit=5000`),
       db(`profiles?created_at=gte.${monthISO}&select=created_at&order=created_at.asc&limit=5000`),
@@ -306,12 +313,11 @@ async function _handler(req, res) {
 
     const usersTotal = ct(usersTotalRes);
     const issues = issuesRes.ok ? await issuesRes.json() : [];
-    const jobsActiveData  = jobsActiveRes.ok   ? await jobsActiveRes.json()   : [];
-    const jobsNewTodayData = jobsNewTodayRes.ok ? await jobsNewTodayRes.json() : [];
-    const jobsTotalData   = jobsTotalRes.ok    ? await jobsTotalRes.json()    : [];
-    const jobsActive  = parseInt(jobsActiveData[0]?.count)   || 0;
-    const jobsNewToday = parseInt(jobsNewTodayData[0]?.count) || 0;
-    const jobsTotal   = parseInt(jobsTotalData[0]?.count)    || 0;
+    const jobsActive = ct(jobsActiveRes);
+    // jobsTodayRes already performs this exact count. The old duplicate `select=count` query both
+    // wasted a second table scan and could disagree with `added_today` when one request timed out.
+    const jobsNewToday = ct(jobsTodayRes);
+    const jobsTotal = ct(jobsTotalRes);
     const creditRows = creditListRes.ok ? await creditListRes.json() : [];
     const proCount = creditRows.filter(r => r.pro).length;
     const totalBalance = creditRows.reduce((s, r) => s + (Number(r.balance) || 0), 0);
