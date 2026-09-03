@@ -332,8 +332,8 @@ test("record_fact inserts mode 'write' under the credential's authoritative iden
   assert.equal(rows[0].by, 'test-client');
   assert.equal(rows[0].args, 'Seen brain gateway · audits', 'subject · predicate');
   assert.equal(rows[0].ok, true);
-  const noteWrite = calls.find((c) => c.method === 'POST' && c.url.includes('/brain_notes'));
-  const content = noteWrite.body[0].content;
+  const noteWrite = calls.find((c) => c.method === 'POST' && c.url.includes('/rpc/brain_replace_note'));
+  const content = noteWrite.body.p_content;
   assert.match(content, /by: test-client/);
   assert.match(content, /change: operator-supplied reason/);
   assert.match(content, /source: operator-supplied citation/);
@@ -396,7 +396,7 @@ for (const access of ['http-500', 'reject']) {
       assert.equal(write.jsonBody.written, 1, 'the fact was still persisted');
 
       // The op's own REST work happened regardless of the audit outcome.
-      assert.ok(calls.some((c) => c.method === 'POST' && c.url.includes('/brain_notes')), 'the note upsert still ran');
+      assert.ok(calls.some((c) => c.method === 'POST' && c.url.includes('/rpc/brain_replace_note')), 'the atomic note replacement still ran');
       assert.equal(auditRows(calls).length, 2, 'both inserts were attempted');
     } finally {
       console.error = realError;
