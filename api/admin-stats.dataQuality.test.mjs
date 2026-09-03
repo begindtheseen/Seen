@@ -59,6 +59,37 @@ test('a healthy payload reports data_quality.degraded = false', async () => {
   assert.equal(out.payload.data_quality.failed_query_count, 0);
 });
 
+test('active and total job counts use exact HEAD metadata, never the timed-out select=count path', async () => {
+  const calls = [];
+  global.fetch = async (url, opts = {}) => {
+    const u = String(url);
+    calls.push({ url: u, opts });
+    if (u.includes('/admin_sessions?token=eq')) return okRes(session);
+    if (u.includes('/jobs?availability_status=eq.active&select=id')) {
+      return okRes([], { 'content-range': '0-0/71372' });
+    }
+    if (u.endsWith('/jobs?select=id')) return okRes([], { 'content-range': '0-0/72086' });
+    return okRes([], { 'content-range': '0-0/7' });
+  };
+
+  const { req, res, out } = reqRes();
+  await handler(req, res);
+
+  assert.equal(out.code, 200);
+  assert.equal(out.payload.jobs.active, 71372);
+  assert.equal(out.payload.jobs.total, 72086);
+  assert.equal(out.payload.job_health.crisis, false);
+  assert.equal(out.payload.data_quality.degraded, false);
+
+  const jobCountCalls = calls.filter((c) => c.url.includes('/jobs?') && c.opts?.method === 'HEAD');
+  assert.equal(jobCountCalls.length, 2, 'active and total are the only dedicated jobs count calls');
+  for (const call of jobCountCalls) {
+    assert.equal(call.opts.headers.Prefer, 'count=exact');
+    assert.ok(!call.url.includes('select=count'), `legacy timeout path must be gone: ${call.url}`);
+  }
+  assert.ok(!calls.some((c) => c.url.includes('select=count')), 'no dashboard query uses select=count');
+});
+
 test('a failed query is reported instead of passing off its 0 as a measurement', async () => {
   global.fetch = async (url) => {
     const u = String(url);
