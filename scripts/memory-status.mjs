@@ -34,22 +34,35 @@ export function renderBriefingData(b, today) {
   L.push(`Recall, don't re-read. Use a filtered fact search when this compact view is not enough.`);
   L.push(`${b.counts.notes} notes · ${b.counts.currentFacts} current facts · ${b.counts.openThreads} open threads`);
 
+  // The true size of each list: the gateway sends `totals` (its lists are already capped); a local
+  // briefing carries the full lists. Anything not shown is SAID, never silently dropped.
+  const total = (k, list) => (b.totals && Number.isFinite(b.totals[k]) ? b.totals[k] : list.length);
+  const more = (k, list, cap) => {
+    const hidden = total(k, list) - Math.min(list.length, cap);
+    if (hidden > 0) L.push(`  … ${hidden} more not shown — use a filtered fact search for the full list`);
+  };
+
   const add = b.changed.added, inv = b.changed.invalidated;
   if (add.length || inv.length) {
-    L.push(`\n▸ Changed since ${b.since}:`);
+    L.push(`\n▸ Changed since ${b.since} (${total('added', add)} added · ${total('invalidated', inv)} retired, newest first):`);
     add.slice(0, 8).forEach((f) => L.push(`  + ${f.subject} ${f.predicate} → ${f.object}`));
+    more('added', add, 8);
     inv.slice(0, 8).forEach((f) => L.push(`  ~ ${f.subject} ${f.predicate} → ${f.object} (retired)`));
+    more('invalidated', inv, 8);
   }
 
   if (b.openThreads.length) {
-    L.push(`\n▸ Still needs work (${b.openThreads.length}):`);
+    L.push(`\n▸ Still needs work (${total('openThreads', b.openThreads)}):`);
     b.openThreads.slice(0, 10).forEach((t) => L.push(`  [${t.priority}] ${t.title}${t.area ? ` (${t.area})` : ''}${t.status === 'blocked' ? ' — BLOCKED' : ''}`));
+    more('openThreads', b.openThreads, 10);
   }
 
   if (b.contradictions.length || b.lowConfidence.length) {
     L.push(`\n▸ Verify before trusting:`);
     b.contradictions.slice(0, 5).forEach((c) => L.push(`  ! conflict: ${c.a.subject} ${c.a.predicate} = "${c.a.object}" vs "${c.b.object}"`));
+    more('contradictions', b.contradictions, 5);
     b.lowConfidence.slice(0, 5).forEach((f) => L.push(`  ? low-confidence: ${f.subject} ${f.predicate} → ${f.object}`));
+    more('lowConfidence', b.lowConfidence, 5);
   }
 
   L.push(`\nBefore deciding, verify unknowns. At session end: supersede changed facts, append the timeline, and run a contradiction check.`);
