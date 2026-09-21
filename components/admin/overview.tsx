@@ -45,7 +45,7 @@ export function AdminHero({ status, summary, onRefresh, fetchCsv, onLogout }: {
   onLogout: () => void
 }) {
   const pillClass = status === 'Critical' ? 'crit' : status === 'Attention needed' ? 'warn' : 'ok'
-  const build = process.env.NEXT_PUBLIC_VERCEL_GIT_COMMIT_SHA?.slice(0, 7) ?? 'local'
+  const build = process.env.NEXT_PUBLIC_VERCEL_GIT_COMMIT_SHA ?? 'local'
   const msg = process.env.NEXT_PUBLIC_VERCEL_GIT_COMMIT_MESSAGE?.slice(0, 32) ?? 'dev'
   return (
     <header className="a2-hero">
