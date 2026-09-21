@@ -41,6 +41,39 @@ const DEFAULT_INTERVAL_MS = 12 * 60 * 60 * 1000; // this endpoint's cron cadence
 export const pageFor = (now = Date.now(), intervalMs = DEFAULT_INTERVAL_MS) =>
   Math.floor(now / intervalMs) % PAGES;
 
+// How many patterns discoverFromCommonCrawl sweeps at once. A caller can dial this DOWN to 1 (fully
+// serial) but never past the hard cap, no matter what ?concurrency asks for: data.commoncrawl.org is a
+// free public service that degrades under load and every request carries an identifying User-Agent, so
+// the sweep stays deliberately modest. The default matches the library default.
+const DEFAULT_CONCURRENCY = 4;
+const MAX_CONCURRENCY = 8;
+
+// Parse the sweep-shaping query params (page, blocks, concurrency) into clamped options. PURE and
+// exported so the clamps that protect a free public index are pinned by tests without standing up the
+// whole handler — the handler is the only caller. `page` defaults to the rotating cron slot; blocks and
+// concurrency default to the library's own defaults; every value is bounded even for hostile input
+// (NaN, negatives, absurd counts) so a manual ?concurrency=999 can never hammer the index.
+export function sweepOptionsFromParams(params, now = Date.now()) {
+  const pageParam = params.get('page');
+  const page = pageParam !== null && Number.isFinite(Number(pageParam))
+    ? Math.abs(Math.trunc(Number(pageParam))) % PAGES
+    : pageFor(now);
+
+  // How many cc-index blocks to read per pattern. Each is one ~220-260KB gzip member holding ~3,000
+  // CDX rows, so this is the real cost knob — the CDX-era `limit` (rows per query) has no analogue.
+  const blocksParam = params.get('blocks');
+  const maxBlocksPerPattern = blocksParam !== null && Number.isFinite(Number(blocksParam))
+    ? Math.min(24, Math.max(1, Math.trunc(Number(blocksParam))))
+    : 4;
+
+  const concParam = params.get('concurrency');
+  const concurrency = concParam !== null && Number.isFinite(Number(concParam))
+    ? Math.min(MAX_CONCURRENCY, Math.max(1, Math.trunc(Number(concParam))))
+    : DEFAULT_CONCURRENCY;
+
+  return { page, maxBlocksPerPattern, concurrency };
+}
+
 // Fail CLOSED, matching api/refresh-jobs.js. Authorization must never be contingent on CRON_SECRET
 // being set: if that env var is blank the cron-secret path is simply unavailable and callers fall
 // through to 401, rather than the endpoint becoming an open trigger for outbound crawling.
@@ -344,16 +377,9 @@ export default async function handler(req, res) {
     }
   }
 
-  const pageParam = params.get('page');
-  const blocksParam = params.get('blocks');
-  const page = pageParam !== null && Number.isFinite(Number(pageParam))
-    ? Math.abs(Math.trunc(Number(pageParam))) % PAGES
-    : pageFor();
-  // How many cc-index blocks to read per pattern. Each is one ~220-260KB gzip member holding ~3,000
-  // CDX rows, so this is the real cost knob — the CDX-era `limit` (rows per query) has no analogue.
-  const maxBlocksPerPattern = blocksParam !== null && Number.isFinite(Number(blocksParam))
-    ? Math.min(24, Math.max(1, Math.trunc(Number(blocksParam))))
-    : 4;
+  // ?page=N, ?blocks=N, ?concurrency=N give a targeted manual sweep; each is clamped (see
+  // sweepOptionsFromParams) so a hand-crafted request cannot push the free public index past its caps.
+  const { page, maxBlocksPerPattern, concurrency } = sweepOptionsFromParams(params);
 
   const startedAt = Date.now();
   try {
@@ -362,6 +388,7 @@ export default async function handler(req, res) {
       serviceKey: SUPABASE_SERVICE_KEY,
       maxBlocksPerPattern,
       page,
+      concurrency,
       maxRegister: 200,
       deadline: startedAt + BUDGET_MS,
     });
@@ -372,7 +399,7 @@ export default async function handler(req, res) {
     // reports the same tenant count as a genuinely exhausted index, and `truncated` is the flag that
     // tells those apart.
     console.log(
-      `discover-sources: crawl=${summary.crawl} page_hint=${summary.page} ` +
+      `discover-sources: crawl=${summary.crawl} page_hint=${summary.page} concurrency=${concurrency} ` +
       `blocks=${JSON.stringify(summary.pattern_blocks || {})} ` +
       `patterns=${summary.patterns_swept}/${summary.patterns_total} tenants=${summary.discovered} ` +
       `shards_read=${summary.shards_read} bytes_read=${summary.bytes_read} ` +
@@ -386,6 +413,7 @@ export default async function handler(req, res) {
       date: new Date().toISOString(),
       ms: Date.now() - startedAt,
       max_blocks_per_pattern: maxBlocksPerPattern,
+      concurrency,
       ...summary,
     });
   } catch (e) {
