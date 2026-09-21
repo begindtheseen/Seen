@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import type { Tone, AttnItem } from './types'
+import { formatBuildStamp } from './types'
 import { saveFile } from './saveFile'
 
 export type HealthStatus = 'Healthy' | 'Attention needed' | 'Critical'
@@ -45,8 +46,12 @@ export function AdminHero({ status, summary, onRefresh, fetchCsv, onLogout }: {
   onLogout: () => void
 }) {
   const pillClass = status === 'Critical' ? 'crit' : status === 'Attention needed' ? 'warn' : 'ok'
-  const build = process.env.NEXT_PUBLIC_VERCEL_GIT_COMMIT_SHA ?? 'local'
-  const msg = process.env.NEXT_PUBLIC_VERCEL_GIT_COMMIT_MESSAGE?.slice(0, 32) ?? 'dev'
+  // Read the deployed commit as the verbatim literals so Next inlines them at build time
+  // (a dynamic/aliased lookup would not be inlined and would strand the stamp on "local").
+  const { build, msg } = formatBuildStamp(
+    process.env.NEXT_PUBLIC_VERCEL_GIT_COMMIT_SHA,
+    process.env.NEXT_PUBLIC_VERCEL_GIT_COMMIT_MESSAGE,
+  )
   return (
     <header className="a2-hero">
       <div className="a2-hero-main">

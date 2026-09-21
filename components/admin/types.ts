@@ -133,6 +133,22 @@ export interface Sub {
 // Command-center presentational tone tokens (map to .ac-tone-* CSS classes).
 export type Tone = 'blue' | 'green' | 'amber' | 'red' | 'white' | 'dim' | 'sub'
 
+// The deployed build stamp shown in the admin hero — this is how "current deployment /
+// build number" is verified from the running app. Vercel injects the deployed commit at
+// build time into NEXT_PUBLIC_VERCEL_GIT_COMMIT_SHA (short SHA = the build number) and its
+// subject into NEXT_PUBLIC_VERCEL_GIT_COMMIT_MESSAGE. Those literals MUST be read verbatim
+// inside the client component (AdminHero) so Next inlines them into the bundle; this helper
+// only trims them and supplies the local-dev fallbacks, keeping that logic testable.
+// NOTE: the var is *_VERCEL_GIT_COMMIT_SHA — NOT *_VERCEL_GITHUB_COMMIT_SHA, which is not a
+// real Vercel system env var and would leave the stamp permanently stuck on "local".
+export interface BuildStamp { build: string; msg: string }
+export function formatBuildStamp(sha: string | undefined, message: string | undefined): BuildStamp {
+  return {
+    build: sha == null ? 'local' : sha.slice(0, 7),
+    msg: message == null ? 'dev' : message.slice(0, 32),
+  }
+}
+
 export interface AttnItem {
   key: string
   title: string
