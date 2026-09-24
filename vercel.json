@@ -80,6 +80,9 @@
     },
     "api/outcome-followups.js": {
       "maxDuration": 60
+    },
+    "api/reddit-harvest.js": {
+      "maxDuration": 300
     }
   },
   "crons": [
@@ -146,6 +149,22 @@
     {
       "path": "/api/company-signals",
       "schedule": "0 8 * * 1"
+    },
+    {
+      "path": "/api/reddit-harvest?mode=new",
+      "schedule": "10 1 * * *"
+    },
+    {
+      "path": "/api/reddit-harvest?mode=new",
+      "schedule": "10 9 * * *"
+    },
+    {
+      "path": "/api/reddit-harvest?mode=new",
+      "schedule": "10 17 * * *"
+    },
+    {
+      "path": "/api/reddit-harvest?mode=top&t=week",
+      "schedule": "40 5 * * 1"
     }
   ]
 }

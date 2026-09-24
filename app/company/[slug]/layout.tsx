@@ -23,11 +23,11 @@ export async function generateMetadata(
   // Reddit-targeted: LLM/Google searches like "<company> hiring reddit" and "does <company>
   // ghost applicants" should land here. Real ghost % folded in when we have it.
   const description = ghostPct != null
-    ? `Does ${name} ghost applicants? ${ghostPct}% ghost rate from real applicant outcomes. See ${name}'s response time, interview rounds, and hiring reviews — aggregated from Reddit, Glassdoor, and verified job-seeker reports.`
-    : `Does ${name} ghost applicants? See ${name}'s ghost rate, response time, and hiring reviews — aggregated from Reddit, Glassdoor, and verified job-seeker reports on Seen.`
+    ? `Does ${name} ghost applicants? ${ghostPct}% ghost rate from real applicant outcomes. See ${name}'s response time, interview rounds, and hiring reviews — aggregated from verified job-seeker reports and public sources.`
+    : `Does ${name} ghost applicants? See ${name}'s ghost rate, response time, and hiring reviews — aggregated from verified job-seeker reports and public sources on Seen.`
 
   return {
-    title: `${name} Ghost Rate & Hiring Reviews (Reddit + Real Reports)`,
+    title: `${name} Ghost Rate & Hiring Reviews`,
     description,
     keywords: [
       `${name} hiring`, `${name} ghosting`, `${name} reddit`, `does ${name} ghost applicants`,

@@ -6,7 +6,6 @@ import { AppStore } from '@/lib/stores/AppStore'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/lib/auth'
 import OutcomeCard from '@/components/OutcomeCard'
-import { isRedditSourced, PUBLIC_DISCUSSION_LABEL } from '@/lib/reportSource'
 import type { Application } from '@/lib/types'
 
 type Outcome = 'ghosted' | 'autoreject' | 'human' | 'waiting' | ''
@@ -534,9 +533,6 @@ function ReportPage() {
                   <div style={{ fontFamily: 'var(--mono)', fontSize: '.68rem', color: 'var(--white)', fontWeight: 600 }}>{outcomeLabel(r.outcome)}</div>
                   {r.company_name && <div style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', color: 'var(--blue)', marginTop: '.15rem' }}>@ {r.company_name}</div>}
                   {r.role && <div style={{ fontFamily: 'var(--mono)', fontSize: '.56rem', color: 'var(--dim)', marginTop: '.1rem' }}>{r.role}</div>}
-                  {isRedditSourced(r.platform) && (
-                    <div style={{ fontFamily: 'var(--mono)', fontSize: '.52rem', color: 'var(--muted)', marginTop: '.2rem' }} title="Imported from a public Reddit thread, not submitted directly to Seen">{PUBLIC_DISCUSSION_LABEL}</div>
-                  )}
                 </div>
                 <span style={{ fontFamily: 'var(--mono)', fontSize: '.52rem', color: 'var(--muted)', flexShrink: 0 }}>
                   {new Date(r.created_at).toLocaleDateString()}

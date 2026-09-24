@@ -6,8 +6,6 @@ import { useAuth } from '@/lib/auth'
 import { AppStore } from '@/lib/stores/AppStore'
 import HiringProbability from '@/components/HiringProbability'
 import CompanyScoreCard from '@/components/CompanyScoreCard'
-import { isRedditSourced, PUBLIC_DISCUSSION_LABEL } from '@/lib/reportSource'
-import CompanyRedditDiscussion from '@/components/CompanyRedditDiscussion'
 import CompanyPublicRecord from '@/components/CompanyPublicRecord'
 import IndustryBenchmark, { type Benchmark } from '@/components/IndustryBenchmark'
 
@@ -54,7 +52,7 @@ interface WebReview {
   year?: string
 }
 
-type TabKey = 'overview' | 'process' | 'reports' | 'locations' | 'roles' | 'reddit' | 'compare'
+type TabKey = 'overview' | 'process' | 'reports' | 'locations' | 'roles' | 'insights' | 'compare'
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
@@ -668,7 +666,7 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
     { key: 'reports',   label: `Reports${reports.length > 0 ? ` (${reports.length})` : ''}` },
     { key: 'locations', label: 'Locations' },
     { key: 'roles',     label: 'Open Roles' },
-    { key: 'reddit',    label: 'Reddit' },
+    { key: 'insights',  label: 'Insights' },
     { key: 'compare',   label: '⚡ Compare' },
   ]
 
@@ -1089,9 +1087,6 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
                         <div className="rc-footer">
                           <span style={{ fontFamily: 'var(--mono)', fontSize: '.56rem', color: 'var(--muted)' }}>via</span>
                           <span className="vibe v-n" style={{ fontSize: '.55rem' }}>{r.platform || 'Seen'}</span>
-                          {isRedditSourced(r.platform) && (
-                            <span className="vibe v-n" style={{ fontSize: '.55rem', borderStyle: 'dashed', color: 'var(--dim)' }} title="Imported from a public Reddit thread, not submitted directly to Seen">{PUBLIC_DISCUSSION_LABEL}</span>
-                          )}
                         </div>
                       </div>
                     ))}
@@ -1224,23 +1219,22 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
               </div>
             )}
 
-            {/* ── REDDIT TAB ── */}
-            {tab === 'reddit' && (
+            {/* ── INSIGHTS TAB ── */}
+            {tab === 'insights' && (
               <div>
-                {/* LIVE, cached per-company Reddit search — populates on demand so this
-                    section is (almost) never empty, and never blocks page render. Every
-                    item is an attributed link to a public thread; includes the dispute path. */}
-                <CompanyRedditDiscussion companyName={companyName} hasReportData={reports.length > 0 || !!score} />
-
-                {/* Secondary: the AI-summarized cross-source insights from the scoring
-                    pipeline (Reddit/Glassdoor/Blind), when the batch enrichment has them. */}
-                {!loading && webReviews.length > 0 && (
-                  <div style={{ marginTop: '1.75rem', borderTop: '1px solid var(--line2)', paddingTop: '1.25rem' }}>
+                {/* AI-summarized cross-source insights from the scoring pipeline, when the
+                    batch enrichment has them. Sources are not enumerated in the UI. */}
+                {!loading && webReviews.length > 0 ? (
+                  <div>
                     <div style={{ fontFamily: 'var(--mono)', fontSize: '.52rem', color: 'var(--dim)', letterSpacing: '.06em', textTransform: 'uppercase', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '.5rem' }}>
                       <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--amber)', display: 'inline-block', flexShrink: 0 }} />
-                      AI-summarized insights · Reddit, Glassdoor &amp; Blind · updated every 30 days
+                      AI-summarized insights · updated every 30 days
                     </div>
                     <WebReviewsSection reviews={webReviews} />
+                  </div>
+                ) : (
+                  <div style={{ fontSize: '.8rem', color: 'var(--muted)' }}>
+                    No summarized insights for {companyName} yet.
                   </div>
                 )}
               </div>
