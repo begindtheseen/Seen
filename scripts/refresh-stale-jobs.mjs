@@ -3,7 +3,7 @@
 // each row's status, shrinking the "stale jobs" KPI
 // (api/admin-stats.js › stale_or_expired = count of availability_status IN (stale,expired)).
 //
-// Jobs go `stale` purely by AGE (api/refresh-jobs.js › markStaleJobs: last_seen_at > 7d → stale,
+// Jobs go `stale` purely by AGE (public.sweep_stale_jobs: last_seen_at > 7d → stale,
 // > 14d → expired). The only path back to `active` is a keyword re-ingest happening to re-surface
 // the exact listing — which never reaches the long tail of still-open postings. This script closes
 // that gap: it fetches each stale listing's own apply_url and re-derives status from the response
@@ -11,7 +11,7 @@
 //   • live    (2xx, no "posting gone" marker) → back to `active` (+ last_seen_at/last_checked_at/
 //               expires_at bumped, EXACTLY like the ingest's re-confirmation) — leaves the KPI.
 //   • dead    (404/410, or a 2xx page that says it's gone) → `expired` (expires_at=now) so the
-//               next refresh-jobs cron's deleteExpired() purges it.
+//               next stale sweep (public.sweep_stale_jobs) deletes it.
 //   • unknown (403/429/5xx/timeout) → left untouched. We never guess on a blocked fetch.
 //
 // SAFE BY DEFAULT: dry-run unless you pass --apply. Dry-run does ZERO writes — it fetches +

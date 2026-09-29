@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import type { AdminStats, RecentReport, Issue, RedditDispute, RedditDisputeCounts, ListingDispute, ListingDisputeCounts, ListingDisputeApplied, ListingTicket, InactiveReport, DupCluster, RecentJob, JobGroup, DupGroup, MergePrefill, MergeLog, FeatureFlag } from './types'
-import { Card, CardHeader, Badge, relTime, outcomeColor, availColor, runRefreshAndClear, refreshResultMsg } from './primitives'
+import { Card, CardHeader, Badge, relTime, outcomeColor, availColor, runRefreshAndClear, runClearStale, refreshResultMsg } from './primitives'
 import { saveFile } from './saveFile'
 import { safeLocalGet, safeLocalSet } from '@/lib/safeStorage'
 
@@ -104,17 +104,17 @@ export function JobCrisisBanner({
   )
 }
 
-// Real, wired stale-job remediation for the Jobs & Companies panel — same flow the crisis
-// banner uses (refresh-jobs validates the admin session token itself).
+// Stale-job remediation for the Jobs & Companies panel: the instant server-side sweep only.
+// (Fresh listings arrive on the 6×/day refresh cron; the crisis banner runs a full backfill.)
 export function JobRefreshButton({ token, onDone }: { token: string; onDone: () => void }) {
   const [busy, setBusy] = useState(false)
   const [msg, setMsg] = useState('')
   async function run() {
     setBusy(true); setMsg('')
-    const r = await runRefreshAndClear(token)
+    const r = await runClearStale(token)
     if (r.ok) {
-      setMsg('✓ ' + refreshResultMsg(r))
-      setTimeout(onDone, 1500)
+      setMsg(`✓ cleared ${(r.cleared ?? 0).toLocaleString()} stale${r.complete ? '' : ' · more queued'}`)
+      onDone()
     } else {
       setMsg('✗ ' + (r.error || 'failed').slice(0, 40))
     }
@@ -123,7 +123,7 @@ export function JobRefreshButton({ token, onDone }: { token: string; onDone: () 
   return (
     <span style={{ display: 'inline-flex', alignItems: 'center', gap: '.4rem' }}>
       {msg && <span style={{ fontFamily: 'var(--mono)', fontSize: '.52rem', color: msg.startsWith('✓') ? 'var(--green)' : 'var(--red)' }}>{msg}</span>}
-      <button className="ac-attn-act" onClick={run} disabled={busy}>{busy ? '…' : 'Refresh now'}</button>
+      <button className="ac-attn-act" onClick={run} disabled={busy}>{busy ? '…' : 'Clear stale'}</button>
     </span>
   )
 }

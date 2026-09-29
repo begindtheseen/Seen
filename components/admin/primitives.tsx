@@ -172,26 +172,34 @@ export function DetailStat({ label, value, status, tone = 'white' }: { label: st
   )
 }
 
-// Shared job-board remediation: (1) backfill fresh ACTIVE listings via refresh-jobs?all=1
-// (it validates this admin session token itself), then (2) clear the unconfirmed-stale rows
-// the sources couldn't re-confirm so the admin "Stale/expired" count actually drops. Both
-// halves are needed for the button's outcome to observably match the number beside it.
-export async function runRefreshAndClear(token: string): Promise<{ ok: boolean; added: number | null; cleared: number | null; error?: string }> {
+// Stale-job protocol, admin half: one call to the batched server-side sweep (api/admin-stats.js ›
+// purge_stale_jobs → public.sweep_stale_jobs). Deletes every unreferenced stale/expired listing and
+// returns in well under a second on a clean corpus — it no longer waits on a re-ingest.
+export async function runClearStale(token: string): Promise<{ ok: boolean; cleared: number | null; complete: boolean; error?: string }> {
   try {
+    const res = await fetch('/api/admin-stats', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Admin-Token': token }, body: JSON.stringify({ action: 'purge_stale_jobs' }) })
+    const d = await res.json().catch(() => ({}))
+    if (!res.ok || !d.ok) return { ok: false, cleared: null, complete: false, error: d.detail || d.error || `HTTP ${res.status}` }
+    return { ok: true, cleared: d.removed ?? 0, complete: d.complete !== false }
+  } catch (e) {
+    return { ok: false, cleared: null, complete: false, error: (e as Error).message }
+  }
+}
+
+// Crisis remediation (too few ACTIVE listings): backfill fresh listings via refresh-jobs?all=1 (it
+// validates this admin session token itself) while clearing stale rows IN PARALLEL — the clear no
+// longer waits behind the multi-minute re-ingest.
+export async function runRefreshAndClear(token: string): Promise<{ ok: boolean; added: number | null; cleared: number | null; error?: string }> {
+  const refresh = (async () => {
     const res = await fetch('/api/refresh-jobs?all=1', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Admin-Token': token }, body: '{}' })
     const d = await res.json().catch(() => ({}))
-    if (!res.ok) return { ok: false, added: null, cleared: null, error: d.error || `HTTP ${res.status}` }
-    const added = d.upserted ?? d.inserted ?? d.found ?? null
-    let cleared: number | null = null
-    try {
-      const pres = await fetch('/api/admin-stats', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Admin-Token': token }, body: JSON.stringify({ action: 'purge_stale_jobs' }) })
-      const pd = await pres.json().catch(() => ({}))
-      if (pres.ok && pd.ok) cleared = pd.removed ?? 0
-    } catch { /* purge is best-effort; the backfill already succeeded */ }
-    return { ok: true, added, cleared }
-  } catch (e) {
-    return { ok: false, added: null, cleared: null, error: (e as Error).message }
-  }
+    if (!res.ok) throw new Error(d.error || `HTTP ${res.status}`)
+    return (d.upserted ?? d.inserted ?? d.found ?? null) as number | null
+  })()
+  const [r, c] = await Promise.allSettled([refresh, runClearStale(token)])
+  const cleared = c.status === 'fulfilled' && c.value.ok ? c.value.cleared : null
+  if (r.status === 'rejected') return { ok: false, added: null, cleared, error: (r.reason as Error)?.message || 'refresh failed' }
+  return { ok: true, added: r.value, cleared }
 }
 
 export function refreshResultMsg(r: { added: number | null; cleared: number | null }): string {
