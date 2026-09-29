@@ -47,6 +47,26 @@ and dashboard (PRs #122/#123) were intentionally REDESIGNED beyond the old site;
 longer the design source of truth for redesigned pages. `SITE_PARITY_CHECKLIST.md` /
 `ADMIN_PARITY_CHECKLIST.md` are frozen pre-06-30 records, not an active work queue.
 
+## Session 2026-09-29: stale-job protocol (one batched DB sweep) — facts verified on prod
+
+- **Stale backlog was 95,505 rows (67% of `jobs`)** because all three stale paths silently died on
+  the 8s `statement_timeout` service_role inherits: `deleteExpired()` (one unbounded, unchecked
+  DELETE), admin `purge_stale_jobs` (one unbounded PATCH — button said "cleared N", wrote nothing),
+  and `markStaleJobs()` (correct but 2 REST round trips / 200 rows). All replaced.
+- **The protocol now lives in ONE place: `public.sweep_stale_jobs(p_mode, p_batch)`** (migration
+  `20260929120000_stale_job_protocol.sql`, applied to prod), driven by `lib/server/staleSweep.js`
+  from both the refresh-jobs cron (`'scheduled'`: active unseen 7d → stale+hidden; stale unseen 14d
+  or `expired` → DELETE) and the admin "Clear stale" button (`'all'`: delete every unreferenced
+  stale row now). Rows referenced by saved_jobs/applications are kept as hidden `expired`;
+  employer-posted rows are never touched. Every candidate query is a partial-index range scan —
+  OR-predicates made the planner seq-scan (8.4s/page), so keep the UNION ALL branches.
+- Prod after the clear-out: 0 stale, 1 expired (referenced), ~49k active. A no-op sweep is 79–151ms.
+- Admin: "Clear stale" no longer waits on a full `refresh-jobs?all=1` re-ingest (up to 300s); only
+  the crisis banner re-ingests, with the clear in parallel. `jobs(created_at)` index took the admin
+  "added today" count from 6,852ms → 8ms.
+- Behaviour change: expired EMPLOYER-posted rows are no longer hard-deleted by the cron (the old
+  unbounded delete did not exclude them); they stay hidden and visible in the employer's manager.
+
 ## Session 2026-07-04 (OPERATION 50%): growth plan approved — business decisions LOCKED
 
 The owner approved the "Operation 50%" growth plan (target: ≥50% probability of $1–5k MRR

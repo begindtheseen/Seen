@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import type { AdminStats, AttnItem, MergePrefill } from './types'
-import { Panel, MetricRow, Card, CardHeader, Badge, BarChart, relTime, outcomeColor, stageColor, runRefreshAndClear, refreshResultMsg } from './primitives'
+import { Panel, MetricRow, Card, CardHeader, Badge, BarChart, relTime, outcomeColor, stageColor, runRefreshAndClear, runClearStale, refreshResultMsg } from './primitives'
 import { AdminHero, AdminCommandCenter, AdminMetricCard, CardSubLink, AdminAttentionQueue, AdminTabs, type HealthStatus, type TabKey } from './overview'
 import { KpiModal, ManageAccountsModal, RevenueDetailModal, TrialsDetailModal, SharesDetailModal, ErrorsDetailModal } from './modals'
 import { JobCrisisBanner, JobRefreshButton, JobRunner, ReportRow, IssueRow, RedditDisputesPanel, ListingTicketsPanel, MergePanel, CompanyExportPanel, CreditsPanel, FlagsPanel, ClustersPanel, JobDedupePanel, AllJobsBrowser, DeployPanel } from './panels'
@@ -70,9 +70,9 @@ export function AdminShell({ stats, token, reload, onLogout, onUnauthorized }: {
     } catch { return null }
   }
 
-  // Shared job-board remediation used by the Needs Attention rows. Backfills fresh listings
-  // AND clears unconfirmed-stale rows, then surfaces a clear result (never a silent no-op)
-  // and reloads so the stale count visibly drops.
+  // Needs Attention remediation. The crisis row (too few ACTIVE listings) needs a full backfill;
+  // the stale row only needs the instant server-side sweep — it must not wait on a re-ingest.
+  // Both surface a clear result (never a silent no-op) and reload so the count visibly drops.
   async function runEmergencyRefresh() {
     setEmgBusy(true); setEmgMsg(null)
     const r = await runRefreshAndClear(token)
@@ -81,6 +81,17 @@ export function AdminShell({ stats, token, reload, onLogout, onUnauthorized }: {
       setTimeout(reload, 1500)
     } else {
       setEmgMsg({ ok: false, text: (r.error || 'refresh failed').slice(0, 120) })
+    }
+    setEmgBusy(false)
+  }
+  async function runStaleClear() {
+    setEmgBusy(true); setEmgMsg(null)
+    const r = await runClearStale(token)
+    if (r.ok) {
+      setEmgMsg({ ok: true, text: `cleared ${(r.cleared ?? 0).toLocaleString()} stale${r.complete ? '' : ' · more queued for the next run'}` })
+      reload()
+    } else {
+      setEmgMsg({ ok: false, text: (r.error || 'clear failed').slice(0, 120) })
     }
     setEmgBusy(false)
   }
@@ -118,7 +129,7 @@ export function AdminShell({ stats, token, reload, onLogout, onUnauthorized }: {
   // 0 errors) never appears; only zeros that ARE the problem do (per product spec).
   const attn: AttnItem[] = []
   if (jh?.crisis) attn.push({ key: 'crisis', sev: 'red', title: `Job board crisis — ${activeJobs.toLocaleString()} active listings`, detail: `${(jh.stale ?? 0).toLocaleString()} stale · only ${jh.active_pct}% of the corpus is live. Seekers see a dead board.`, action: { label: 'Refresh', onClick: runEmergencyRefresh, busy: emgBusy } })
-  else if (staleJobs > 500) attn.push({ key: 'stale', sev: 'amber', title: `${staleJobs.toLocaleString()} stale / expired listings`, detail: 'A large slice of the job corpus is unavailable. Refresh to keep the board fresh.', action: { label: 'Refresh', onClick: runEmergencyRefresh, busy: emgBusy } })
+  else if (staleJobs > 500) attn.push({ key: 'stale', sev: 'amber', title: `${staleJobs.toLocaleString()} stale / expired listings`, detail: 'Listings the sources stopped returning. Clearing removes them now instead of on the next scheduled sweep.', action: { label: 'Clear stale', onClick: runStaleClear, busy: emgBusy } })
   if (errToday > 10) attn.push({ key: 'errs', sev: 'red', title: `${errToday} API errors today`, detail: 'Error volume is elevated — see the failing routes.', action: { label: 'View', onClick: () => setDetail('errors') } })
   if (stripeOn && paidUsers === 0) attn.push({ key: 'norev', sev: 'amber', title: '0 paid users — revenue not activated yet', detail: 'Stripe is connected but there are no active paid subscriptions. Conversion has not started.', action: { label: 'View', onClick: () => setDetail('revenue') } })
   if ((m?.past_due ?? 0) > 0) attn.push({ key: 'pastdue', sev: 'amber', title: `${m!.past_due} subscription${m!.past_due === 1 ? '' : 's'} past due`, detail: 'Payment is failing — these accounts may churn without follow-up.', action: { label: 'View', onClick: () => setDetail('trials') } })

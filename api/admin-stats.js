@@ -9,6 +9,7 @@ import {
 } from './_utils/companyIntel.js';
 import { recomputeCompanyScoreFromReports, normalizeCompany } from './_utils/reportWrite.js';
 import { logError } from '../lib/server/errlog.js';
+import { runStaleSweep } from '../lib/server/staleSweep.js';
 import { buildCompanyAuditBundle } from './_utils/companyAuditBundle.js';
 import { isDisputeStatus, isDisputeReviewStatus, disputeStatusCounts, orderDisputesOpenFirst } from './_utils/companyReddit.js';
 import { isDisputeDecision, resolveDisputeEffect, disputeStatusCounts as listingDisputeCounts, orderDisputesOpenFirst as orderListingDisputes, buildListingTickets } from '../lib/server/listingDisputes.js';
@@ -1848,30 +1849,29 @@ async function _handler(req, res) {
     return res.status(200).json({ ok: true, metric, rows });
   }
 
-  // ── PURGE STALE/EXPIRED LISTINGS — the "clear stale" half of a manual refresh ─────
-  // Why this exists: the refresh cron backfills fresh ACTIVE listings but can NOT un-stale
-  // jobs the sources no longer return. Adzuna is date-sorted, so a listing not re-seen in 7+
-  // days goes 'stale' and never resurfaces on a re-search — yet it still SERVES to users
-  // (the job search filters on expires_at>now, not availability_status) until its expires_at
-  // passes (up to 14 days later). Result: after a refresh the admin "Stale/expired" count
-  // never drops → the button looks dead. This explicit, admin-gated, audited action
-  // SOFT-RETIRES those unconfirmed-stale rows (does NOT delete them): it sets
-  // expires_at=now() so they immediately fall out of the user search (which gates on
-  // expires_at>now) AND out of the "Stale/expired" count, while the row itself SURVIVES so
-  // saved_jobs/applications foreign keys and /jobs/[id] permalinks (get_by_id resolves by
-  // id, no expires_at filter) still resolve for anyone holding a shared/saved link. Full
-  // admins only; the fresh backfill from refresh-jobs replaces the cleared inventory.
+  // ── CLEAR STALE LISTINGS NOW — the admin half of the stale-job protocol ─────────────
+  // Runs the same batched Postgres sweep as the scheduled cron (lib/server/staleSweep.js ›
+  // public.sweep_stale_jobs) in mode 'all': ages out active rows unseen 7d+, then deletes every
+  // stale/expired aggregated row nobody references. Rows a user saved or applied to stay as
+  // hidden 'expired' so their /jobs/[id] link still resolves; employer-posted rows are never
+  // touched. The previous version issued ONE unbounded PATCH over the whole stale set, which the
+  // 8s statement_timeout cancelled every time — the button reported success and cleared nothing
+  // while the backlog grew to 95,505 rows. Budgeted to finish inside this function's 15s limit;
+  // `complete:false` means the rest drains on the next click or the next cron run.
   if (action === 'purge_stale_jobs') {
     if (adminRole === 'moderator') return res.status(403).json({ error: 'Insufficient role' });
-    const cnt = r => parseInt((r?.headers?.get('content-range') || '').split('/')[1]) || 0;
-    const beforeRes = await db(`jobs?availability_status=in.(stale,expired)&select=id`, { headers: { Prefer: 'count=exact', 'Range-Unit': 'items', Range: '0-0' } });
-    const removed = cnt(beforeRes);
-    if (removed > 0) {
-      const patch = await db(`jobs?availability_status=in.(stale,expired)`, { method: 'PATCH', body: JSON.stringify({ availability_status: 'expired', expires_at: new Date().toISOString() }), headers: { Prefer: 'return=minimal' } });
-      if (!patch.ok) return res.status(500).json({ error: 'Failed to retire stale listings' });
+    const sweep = await runStaleSweep({
+      url: SB, key: SK,
+      // Starts no new batch after 6s: one batch is at most the 8s statement_timeout, so 6+8 < 15s.
+      mode: 'all', deadline: Date.now() + 6_000,
+    });
+    if (!sweep.ok) {
+      logError('admin-stats', `purge_stale_jobs failed: ${sweep.error}`, {});
+      return res.status(500).json({ error: 'Failed to clear stale listings', detail: sweep.error, ...sweep });
     }
-    await db('admin_audit_log', { method: 'POST', body: JSON.stringify({ admin_id: sess.admin_id, username: sess.username || 'admin', action: 'purge_stale_jobs', target_type: 'jobs', metadata: { removed } }), headers: { Prefer: 'return=minimal' } }).catch(() => {});
-    return res.status(200).json({ ok: true, removed });
+    const removed = sweep.deleted + sweep.retained;
+    await db('admin_audit_log', { method: 'POST', body: JSON.stringify({ admin_id: sess.admin_id, username: sess.username || 'admin', action: 'purge_stale_jobs', target_type: 'jobs', metadata: { removed, deleted: sweep.deleted, retained: sweep.retained, staled: sweep.staled, complete: sweep.complete, ms: sweep.ms } }), headers: { Prefer: 'return=minimal' } }).catch(() => {});
+    return res.status(200).json({ ok: true, removed, deleted: sweep.deleted, retained: sweep.retained, complete: sweep.complete, ms: sweep.ms });
   }
 
   // ── EMERGENCY JOB REFRESH — server-side auto-remediation for a job crisis ─────

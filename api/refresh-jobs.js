@@ -14,6 +14,9 @@ import {
 import { fetchSourceJobs } from '../lib/jobs/atsProviders.js';
 import { seedSources, dueSources, recordSourceSync } from '../lib/jobs/sourceRegistry.js';
 import { SEED_SOURCES } from '../lib/jobs/seedSources.js';
+// Stale-job protocol (age → stale → delete): one batched Postgres function, shared with the admin
+// "clear stale now" action. Replaced deleteExpired() + markStaleJobs(), which could not finish.
+import { runStaleSweep } from '../lib/server/staleSweep.js';
 
 // Refresh a batch of registered employer-direct ATS boards straight from the source. Fail-open +
 // bounded so it never breaks the cron or exceeds the function time budget. Returns a small summary.
@@ -25,9 +28,9 @@ import { SEED_SOURCES } from '../lib/jobs/seedSources.js';
 // the page-rotation bug in #273 survived precisely because nobody was watching code that still ran.
 // Must stay under the maxDuration in vercel.json (300s) with room to serialize the response.
 const HANDLER_BUDGET_MS = Number(process.env.REFRESH_JOBS_BUDGET_MS || 270_000);
-// Slice of the run the stale sweep may use. It is chunked and resumable, so a backlog it cannot
+// Slice of the run the stale sweep may use. It is batched and resumable, so a backlog it cannot
 // finish carries to the next run rather than costing this run its ingestion.
-const SWEEP_BUDGET_MS = Number(process.env.REFRESH_JOBS_SWEEP_BUDGET_MS || 60_000);
+const SWEEP_BUDGET_MS = Number(process.env.REFRESH_JOBS_SWEEP_BUDGET_MS || 45_000);
 
 export async function refreshEmployerSources(supabaseUrl, serviceKey, { full = false } = {}) {
   const summary = { sources: 0, upserted: 0, skipped: [] };
@@ -390,129 +393,6 @@ async function activeJobCount(supabaseUrl, serviceKey) {
 // Crisis floor — keep in sync with admin-stats.js JOB_HEALTH_MIN_ACTIVE.
 const AUTO_HEAL_MIN_ACTIVE = 500;
 
-async function deleteExpired(supabaseUrl, serviceKey) {
-  await fetch(`${supabaseUrl}/rest/v1/jobs?expires_at=lt.${new Date().toISOString()}`, {
-    method: 'DELETE',
-    headers: {
-      apikey: serviceKey,
-      Authorization: `Bearer ${serviceKey}`,
-      Prefer: 'return=minimal',
-    },
-  });
-}
-
-// Rows per PATCH. The sweep runs as `service_role`, which has no rolconfig of its own and so
-// inherits `authenticator`'s statement_timeout of 8s. A single PATCH over the whole matching set
-// is therefore not slow — it is IMPOSSIBLE past a few thousand rows: Postgres cancels it with
-// 57014 and nothing is written. That is exactly what the backfill step did on every run
-// (12,983 rows in one statement), which is why the rows it was written to hide stayed in search.
-// Chunking makes the sweep's cost per statement constant and independent of the backlog.
-const SWEEP_CHUNK = 200;
-// Backstop against a chunk that reports progress but never drains (concurrent writer, filter that
-// does not self-exclude). 250 × 200 = 50k rows/step — far above any real backlog.
-const SWEEP_MAX_CHUNKS = 250;
-
-// Rows actually written by a PATCH, read from the count=exact Content-Range ("*/57"). Returns null
-// when the header is absent so the caller can fall back to the chunk size rather than assume zero.
-function patchedCount(res) {
-  const cr = res?.headers?.get?.('content-range');
-  if (!cr || !cr.includes('/')) return null;
-  const n = parseInt(cr.split('/')[1], 10);
-  return Number.isFinite(n) ? n : null;
-}
-
-// Drain one sweep step in bounded chunks: select a page of ids that still match, PATCH exactly
-// those ids, repeat until nothing matches. Every step's patch removes its own rows from its own
-// filter, so re-selecting always advances. Returns what it actually did — a step that ran out of
-// time reports done:false instead of pretending the backlog is clear.
-async function sweepStep(supabaseUrl, serviceKey, { label, filter, patch, deadline }) {
-  const h = { apikey: serviceKey, Authorization: `Bearer ${serviceKey}` };
-  const writeHeaders = { ...h, 'Content-Type': 'application/json', Prefer: 'return=minimal,count=exact' };
-  let updated = 0;
-  for (let chunk = 0; chunk < SWEEP_MAX_CHUNKS; chunk++) {
-    if (deadline != null && Date.now() >= deadline) {
-      console.warn(`markStaleJobs ${label}: out of time after ${updated} rows — resumes next run`);
-      return { label, updated, done: false };
-    }
-    let ids;
-    try {
-      const sel = await fetch(`${supabaseUrl}/rest/v1/jobs?${filter}&select=id&limit=${SWEEP_CHUNK}`, { headers: h });
-      if (!sel.ok) {
-        console.error(`markStaleJobs ${label} select failed: ${sel.status} ${(await sel.text().catch(() => '')).slice(0, 200)}`);
-        return { label, updated, done: false };
-      }
-      ids = (await sel.json() || []).map((r) => r.id).filter(Boolean);
-    } catch (e) {
-      console.error(`markStaleJobs ${label} select error:`, e.message);
-      return { label, updated, done: false };
-    }
-    if (!ids.length) return { label, updated, done: true };
-    try {
-      const res = await fetch(`${supabaseUrl}/rest/v1/jobs?${filter}&id=in.(${ids.join(',')})`, {
-        method: 'PATCH', headers: writeHeaders, body: JSON.stringify(patch),
-      });
-      // A bare fetch does not throw on 4xx, so an unchecked response hides a rejected write
-      // completely — the same failure that left `remove_listing` silently doing nothing.
-      if (!res.ok) {
-        console.error(`markStaleJobs ${label} failed: ${res.status} ${(await res.text().catch(() => '')).slice(0, 200)}`);
-        return { label, updated, done: false };
-      }
-      const n = patchedCount(res);
-      // Zero rows written while rows still match means this step cannot make progress; spinning
-      // through all 250 chunks would just burn the handler's budget.
-      if (n === 0) {
-        console.warn(`markStaleJobs ${label}: matched ${ids.length} rows but wrote 0 — stopping`);
-        return { label, updated, done: false };
-      }
-      updated += n == null ? ids.length : n;
-    } catch (e) {
-      console.error(`markStaleJobs ${label} error (non-fatal):`, e.message);
-      return { label, updated, done: false };
-    }
-  }
-  console.warn(`markStaleJobs ${label}: hit the ${SWEEP_MAX_CHUNKS}-chunk cap at ${updated} rows — resumes next run`);
-  return { label, updated, done: false };
-}
-
-export async function markStaleJobs(supabaseUrl, serviceKey, { deadline = null } = {}) {
-  const staleISO = new Date(Date.now() - 7 * 86400000).toISOString();
-  const expiredISO = new Date(Date.now() - 14 * 86400000).toISOString();
-  // EMPLOYER-POSTED listings are excluded: staleness here is AGE-since-last-seen, and an employer
-  // listing is never re-seen by the aggregator (it isn't scraped), so it would wrongly go stale at
-  // 7d / expired at 14d. Employer listings live until their own expires_at (60d) or the employer
-  // deletes them (api/employer-listings.js). `is_employer_posted=eq.false` keeps only aggregated rows.
-  // Marking a row 'stale' does not hide it. User search gates on `expires_at > now()`, NOT on
-  // availability_status, so this sweep used to relabel rows and leave every one of them in the
-  // results — 12,899 rows sat 'stale' with a future expires_at, which is why the admin stale counts
-  // read correctly while clearing them changed nothing anyone could see. A stale listing is hidden
-  // by expiring it, so every transition below sets expires_at alongside the status.
-  const now = new Date().toISOString();
-  const steps = [
-    // active, not seen in 7+ days → stale AND hidden
-    ['stale', `is_employer_posted=eq.false&availability_status=eq.active&last_seen_at=lt.${staleISO}`,
-      { availability_status: 'stale', expires_at: now, last_checked_at: now }],
-    // Repair pass for rows already marked stale by the previous behaviour: they carry a future
-    // expires_at and are still being served. Without this they would never be picked up again —
-    // the 7-day step only matches `active`.
-    ['stale-backfill', `is_employer_posted=eq.false&availability_status=eq.stale&expires_at=gt.${now}`,
-      { expires_at: now, last_checked_at: now }],
-    // not seen in 14+ days → terminal expired
-    ['expired', `is_employer_posted=eq.false&availability_status=in.(active,stale)&last_seen_at=lt.${expiredISO}`,
-      { availability_status: 'expired', expires_at: now, last_checked_at: now }],
-  ];
-  // Sequential, not Promise.all: the 14-day query matches `in.(active,stale)` while the 7-day query
-  // is concurrently flipping active→stale, so running them together races on the same rows.
-  const results = [];
-  for (const [label, filter, patch] of steps) {
-    results.push(await sweepStep(supabaseUrl, serviceKey, { label, filter, patch, deadline }));
-  }
-  return {
-    swept: results.reduce((sum, r) => sum + r.updated, 0),
-    complete: results.every((r) => r.done),
-    steps: Object.fromEntries(results.map((r) => [r.label, r.updated])),
-  };
-}
-
 // Scan every active listing and immediately remove any that fail quality standards.
 // Runs every cron hit — cheap (only fetches id + description + apply_url).
 async function deleteJunk(supabaseUrl, serviceKey) {
@@ -571,7 +451,7 @@ export default async function handler(req, res) {
   // admin session token. Authorization must NOT be contingent on CRON_SECRET being
   // set — if that env var is blank/unset, the cron-secret path is simply
   // unavailable and callers fall through to 401. Never let a missing secret turn
-  // this expensive + destructive (deleteExpired/deleteJunk/markStaleJobs) endpoint
+  // this expensive + destructive (deleteJunk / stale sweep) endpoint
   // into an open, unauthenticated trigger.
   if (!isCron) {
     const authHeader  = req.headers['authorization'] || '';
@@ -603,15 +483,18 @@ export default async function handler(req, res) {
   }
 
   try {
-    const [, junkResult, sweep] = await Promise.all([
-      deleteExpired(SUPABASE_URL, SUPABASE_SERVICE_KEY),
+    const [junkResult, sweep] = await Promise.all([
       deleteJunk(SUPABASE_URL, SUPABASE_SERVICE_KEY),
-      // Capped so a large one-off backlog (the 12,983-row repair) cannot starve ingestion. Each
-      // step resumes where it stopped on the next run, and there are six runs a day.
-      markStaleJobs(SUPABASE_URL, SUPABASE_SERVICE_KEY, {
+      // Capped so a large backlog cannot starve ingestion; it resumes on the next run (six a day).
+      runStaleSweep({
+        url: SUPABASE_URL, key: SUPABASE_SERVICE_KEY, mode: 'scheduled',
         deadline: Math.min(handlerDeadline, Date.now() + SWEEP_BUDGET_MS),
       }),
     ]);
+    if (!sweep.ok) {
+      console.error('stale sweep failed:', sweep.error);
+      logError('refresh-jobs', `stale sweep failed: ${sweep.error}`, { isCron });
+    }
 
     // ?all=1 (or ?mode=full): "backfill everything now" emergency mode — runs ALL
     // Adzuna searches AND every keyless source in one invocation. Capped so it stays
