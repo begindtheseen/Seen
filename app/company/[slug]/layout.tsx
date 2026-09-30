@@ -19,11 +19,20 @@ export async function generateMetadata(
   const s = await getScore(slug)
   const name = bestName(slug, s)
   const ghostPct = s?.ghost_rate != null ? Math.round(s.ghost_rate * 100) : null
+  // Same weak-data gate as the page body: a percentage from a tiny sample must carry its sample
+  // size anywhere it is quoted — and the meta description is the single most-quoted string.
+  const metaReports = s?.report_count ?? 0
+  const metaThin = (s?.data_quality === 'low') || (metaReports > 0 && metaReports < 5)
+  const rateClause = ghostPct != null
+    ? (metaThin
+        ? `${ghostPct}% ghost rate from early data (${metaReports} applicant report${metaReports === 1 ? '' : 's'} so far).`
+        : `${ghostPct}% ghost rate from real applicant outcomes.`)
+    : null
 
   // Reddit-targeted: LLM/Google searches like "<company> hiring reddit" and "does <company>
   // ghost applicants" should land here. Real ghost % folded in when we have it.
-  const description = ghostPct != null
-    ? `Does ${name} ghost applicants? ${ghostPct}% ghost rate from real applicant outcomes. See ${name}'s response time, interview rounds, and hiring reviews — aggregated from Reddit, Glassdoor, and verified job-seeker reports.`
+  const description = rateClause != null
+    ? `Does ${name} ghost applicants? ${rateClause} See ${name}'s response time, interview rounds, and hiring reviews — aggregated from Reddit, Glassdoor, and verified job-seeker reports.`
     : `Does ${name} ghost applicants? See ${name}'s ghost rate, response time, and hiring reviews — aggregated from Reddit, Glassdoor, and verified job-seeker reports on Seen.`
 
   return {
@@ -97,6 +106,15 @@ export default async function CompanySlugLayout(
       ratingCount: fpSeo,
       reviewAspect: 'Hiring process and applicant response',
     }
+    // The confidence caveat must travel WITH the number into anything that quotes this markup.
+    // ratingCount already carries the sample size, but answer engines quote descriptions, not
+    // counts — a "50% ghost rate" cited without "from 2 reports" is weak data presented as fact.
+    if ((s.data_quality === 'low') || (fpSeo > 0 && fpSeo < 5)) {
+      org.aggregateRating = {
+        ...org.aggregateRating as Record<string, unknown>,
+        description: `Early data: based on ${fpSeo} applicant report${fpSeo === 1 ? '' : 's'}. Rates may change substantially as more reports arrive.`,
+      }
+    }
   }
 
   // FAQ built ONLY from real data (percentages gated on first-party reports; grade Q always names
@@ -138,8 +156,8 @@ export default async function CompanySlugLayout(
   }
 
   // Server-rendered factual summary so AI answer engines (ChatGPT, Perplexity, Gemini) and
-  // Google can read and cite real hiring data from the initial HTML — the client UI below
-  // only hydrates after load. Rendered ONLY when we have a real score. Null-safe.
+  // Google can read and cite real hiring data from the initial HTML — the client UI in
+  // {children} only hydrates after load. Rendered ONLY when we have a real score. Null-safe.
   const hasFacts = s != null && s.overall_score != null
   const accent = accentFor(s?.risk_level)
   const ghostPct = s?.ghost_rate != null ? Math.round(s.ghost_rate * 100) : null
@@ -147,20 +165,34 @@ export default async function CompanySlugLayout(
   const waitDays = s?.avg_wait_days != null ? Math.round(s.avg_wait_days) : null
   const reportCount = s?.report_count ?? 0
   const dataPoints = reportCount > 0 ? `${reportCount} applicant report${reportCount === 1 ? '' : 's'}` : 'estimated data'
+  // ANTI-GAMING RULE (CLAUDE.md): never present weak data as fact. The scoring pipeline already
+  // computes its own confidence verdicts — data_quality / data_confidence — and 55% of scored
+  // companies have ≤2 reports, so a bold "50% ghost rate" is often one person out of two. The
+  // qualifier renders whenever the pipeline itself called the data weak or the sample is tiny, in
+  // BOTH the visible prose and (below) the JSON-LD description AI engines quote from.
+  const lowConfidence = (s?.data_quality === 'low') || (reportCount > 0 && reportCount < 5)
+  const confidenceNote = lowConfidence
+    ? `Early data — based on only ${dataPoints}, so these rates can swing sharply as more reports arrive.`
+    : null
 
   return (
     <>
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLdHtml(jsonLd) }} />
+      {children}
       {hasFacts && s && (
         <section
           aria-label={`${name} hiring data summary`}
           style={{
             maxWidth: 880,
             margin: '0 auto',
-            // Clear the fixed 58px site header (nav is position:fixed) so the heading
-            // isn't cut off — this section renders above the .page-full children that
-            // normally provide that offset.
-            padding: 'calc(58px + 1.4rem) 1.25rem 0',
+            // This section renders BELOW {children} — the company page the visitor came for owns
+            // the viewport, and the fixed-nav offset is provided once, by .page-full inside it.
+            // It was originally rendered ABOVE, which put an AI-citation block and a wall of FAQ
+            // rows before the page's own identity and double-paid the 58px nav offset (an entire
+            // dead viewport between the FAQ and the company card). Crawlers and answer engines
+            // read the full HTML document — DOM position does not gate citability; the JSON-LD
+            // above and this block's presence in the initial HTML are what matter.
+            padding: '2.5rem 1.25rem 0',
           }}
         >
           <div
@@ -205,6 +237,14 @@ export default async function CompanySlugLayout(
                 </>
               )}
               {interpret(s)}
+              {confidenceNote && (
+                <>
+                  {' '}
+                  <em style={{ color: 'var(--muted)', fontStyle: 'normal', fontSize: '.8rem' }}>
+                    {confidenceNote}
+                  </em>
+                </>
+              )}
             </p>
             {/* Crawlable internal links to the new growth surfaces — present in initial HTML.
                 Uses a div (not <nav>) on purpose: the global CSS `nav{position:fixed}` rule is
@@ -231,17 +271,22 @@ export default async function CompanySlugLayout(
               </h2>
               {faq.map(f => (
                 <details key={f.question} style={{ borderTop: '1px solid var(--line)', padding: '.65rem 0' }}>
-                  <summary style={{ cursor: 'pointer', fontFamily: 'var(--display)', fontSize: '.82rem', fontWeight: 600, color: 'var(--white)', listStyle: 'none' }}>
+                  {/* listStyle:'none' removed the browser's disclosure triangle and left rows that
+                      LOOKED like a flat list of unanswered questions — the answers were there, but
+                      nothing signalled the rows open. A static inline ▸ restores the affordance with
+                      zero CSS dependencies (deliberately not rotated on open; server component,
+                      no stylesheet coupling). */}
+                  <summary style={{ cursor: 'pointer', fontFamily: 'var(--display)', fontSize: '.82rem', fontWeight: 600, color: 'var(--white)', listStyle: 'none', display: 'flex', alignItems: 'baseline', gap: '.5rem' }}>
+                    <span aria-hidden="true" style={{ color: 'var(--blue)', fontSize: '.7rem', flexShrink: 0 }}>▸</span>
                     {f.question}
                   </summary>
-                  <p style={{ fontSize: '.82rem', lineHeight: 1.65, color: 'var(--sub)', margin: '.5rem 0 0', fontWeight: 300 }}>{f.answer}</p>
+                  <p style={{ fontSize: '.82rem', lineHeight: 1.65, color: 'var(--sub)', margin: '.5rem 0 0 1.1rem', fontWeight: 300 }}>{f.answer}</p>
                 </details>
               ))}
             </div>
           )}
         </section>
       )}
-      {children}
     </>
   )
 }

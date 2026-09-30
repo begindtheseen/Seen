@@ -18,6 +18,11 @@ export type GrowthScore = {
   /** LLM web-research *claimed* mention count — never applicant reports. */
   web_report_count?: number | null
   data_source?: string | null
+  /** Scoring pipeline's own confidence verdicts — surfaced on the public page (anti-gaming rule:
+   *  never present weak data as fact). */
+  data_quality?: string | null
+  data_confidence?: number | null
+  verification_status?: string | null
   risk_level: 'safe' | 'warn' | 'danger'
   industry?: string | null
   waste?: number | null
@@ -85,7 +90,7 @@ async function scoreFromDb(name: string): Promise<GrowthScore | null> {
   const creds = sbCreds()
   if (!creds) return null
   const headers = { apikey: creds.key, Authorization: `Bearer ${creds.key}` }
-  const sel = 'select=company_name,overall_score,ghost_rate,response_rate,avg_wait_days,avg_rounds,report_count,first_party_report_count,web_report_count,data_source,waste_score,industry,raw_summary,avg_tenure_months,tenure_sample_count'
+  const sel = 'select=company_name,overall_score,ghost_rate,response_rate,avg_wait_days,avg_rounds,report_count,first_party_report_count,web_report_count,data_source,waste_score,industry,raw_summary,avg_tenure_months,tenure_sample_count,data_quality,data_confidence,verification_status'
   try {
     const enc = encodeURIComponent(name.toLowerCase().trim())
     let r = await fetch(`${creds.url}/rest/v1/company_scores?company_name=ilike.${enc}&${sel}&order=created_at.desc&limit=1`, { headers, signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) })
@@ -111,6 +116,9 @@ async function scoreFromDb(name: string): Promise<GrowthScore | null> {
       first_party_report_count: row.first_party_report_count ?? null,
       web_report_count: row.web_report_count ?? null,
       data_source: row.data_source ?? null,
+      data_quality: row.data_quality ?? null,
+      data_confidence: row.data_confidence ?? null,
+      verification_status: row.verification_status ?? null,
       risk_level: s >= 70 ? 'safe' : s >= 40 ? 'warn' : 'danger',
       industry: row.industry || null,
       waste: row.waste_score ?? null,
