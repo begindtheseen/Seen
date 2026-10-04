@@ -14,7 +14,7 @@ export const metadata: Metadata = {
     default: 'Seen — Company Ghost Rates & Hiring Transparency',
     template: '%s | Seen',
   },
-  description: 'Check any company’s ghost rate, response time, and real applicant outcomes before you apply. Hiring transparency aggregated from Reddit, Glassdoor, and verified job-seeker reports.',
+  description: 'Check any company’s ghost rate, response time, and real applicant outcomes before you apply. Hiring transparency aggregated from verified job-seeker reports and public sources.',
   keywords: ['company ghost rate', 'does company ghost applicants', 'hiring reviews reddit', 'interview process reviews', 'job application tracker', 'company response rate', 'glassdoor alternative'],
   applicationName: 'Seen',
   icons: {
@@ -25,7 +25,7 @@ export const metadata: Metadata = {
   },
   openGraph: {
     title: 'Seen — Company Ghost Rates & Hiring Transparency',
-    description: 'Know before you apply. Real ghost rates and applicant outcomes from Reddit and verified reports.',
+    description: 'Know before you apply. Real ghost rates and applicant outcomes from verified reports.',
     type: 'website',
     siteName: 'Seen',
     url: 'https://seenjobs.io',
