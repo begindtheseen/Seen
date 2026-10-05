@@ -1,13 +1,13 @@
 // Company intel fusion — turns ALL the signals we collect about a company into one
 // confidence-gated score, instead of trusting a single web-research estimate. See
-// SCORING.md (§2 sources) and OPPORTUNITY_ENGINE.md (data acquisition).
+// docs/SCORING.md (§2 sources) and docs/OPPORTUNITY_ENGINE.md (data acquisition).
 //
 // The problem this solves: handleCompanyScore/populate computed the score purely from
 // Claude's web-research guess and ignored the real outcome data we already have
 // (direct user reports, Reddit imports, survey answers). This engine fuses them:
 //
 //   - The web-research estimate is a PRIOR (a reasonable starting guess).
-//   - Real reported outcomes are EVIDENCE, weighted by source trust (SCORING.md §2).
+//   - Real reported outcomes are EVIDENCE, weighted by source trust (docs/SCORING.md §2).
 //   - We shrink the prior toward the evidence as the (trust-weighted) sample grows
 //     — so 2 reports barely move a well-researched prior, but 200 real reports
 //     dominate it. This is standard Bayesian shrinkage toward a prior.
@@ -26,7 +26,7 @@ const clamp100 = (n) => Math.max(0, Math.min(100, Math.round(n)));
 const round1 = (n) => (n == null ? null : Math.round(n * 10) / 10);
 const num = (n) => (n == null || n === '' || Number.isNaN(Number(n)) ? null : Number(n));
 
-// Trust weight per source — mirrors SCORING.md §2 (outcome_weight). Higher = more
+// Trust weight per source — mirrors docs/SCORING.md §2 (outcome_weight). Higher = more
 // influence on the fused rates per resolved report.
 export const SOURCE_TRUST = {
   direct: 1.0,      // /api/reports submit / quick_submit

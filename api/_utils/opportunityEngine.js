@@ -5,7 +5,7 @@
 // of "opportunities" — survey-shaped questions, each tagged with the data point it
 // captures. These feed the earn-credit survey: answer = insight (data) + 1 credit.
 //
-// Pure and side-effect free, so it is fully unit-testable. See OPPORTUNITY_ENGINE.md.
+// Pure and side-effect free, so it is fully unit-testable. See docs/OPPORTUNITY_ENGINE.md.
 
 function companyKey(name) {
   return String(name || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');

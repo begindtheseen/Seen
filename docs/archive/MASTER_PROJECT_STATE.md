@@ -6,7 +6,7 @@
 
 ## ⚠️ BUSINESS ENGINE PRIORITY (as of Session G)
 
-**`SEENJOBS_BEHAVIORAL_FLYWHEEL.md` is now core product architecture.**
+**`../SEENJOBS_BEHAVIORAL_FLYWHEEL.md` is now core product architecture.**
 
 The apply checkpoint, update loop, outcome cards, and credit reward system are NOT optional growth features. They are the data engine that makes SeenJobs valuable. Without them, there is no moat, no virality, no outcome data.
 
@@ -18,7 +18,7 @@ Files to create:
 - `supabase/migrations/016_applications.sql` — applications + application_events tables
 - Dashboard reminder cards in `app/dashboard/page.tsx`
 
-Do not start this without reading `SEENJOBS_BEHAVIORAL_FLYWHEEL.md` in full.
+Do not start this without reading `../SEENJOBS_BEHAVIORAL_FLYWHEEL.md` in full.
 
 ---
 

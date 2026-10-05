@@ -1,5 +1,5 @@
 // Company scoring engine — the single source of truth for how a company score is
-// computed from fused signals, with confidence gating. See SCORING.md.
+// computed from fused signals, with confidence gating. See docs/SCORING.md.
 //
 // Design goals:
 //  - PARITY: the base formula matches the historical _calcScore/_calcWaste exactly,

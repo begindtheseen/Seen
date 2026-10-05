@@ -5,8 +5,8 @@
 > numeric kill/scale gates. This folder is the owner's field manual.
 >
 > Approved 2026-07-04. Full plan + evidence: the probability assessment report and the
-> approved Operation 50% plan (session artifacts). Strategy foundation: SEEN_STRATEGY.md,
-> SEENJOBS_BEHAVIORAL_FLYWHEEL.md, OPPORTUNITY_ENGINE.md.
+> approved Operation 50% plan (session artifacts). Strategy foundation: ../docs/SEEN_STRATEGY.md,
+> ../docs/SEENJOBS_BEHAVIORAL_FLYWHEEL.md, ../docs/OPPORTUNITY_ENGINE.md.
 
 ## The contract (what makes the 50% real)
 

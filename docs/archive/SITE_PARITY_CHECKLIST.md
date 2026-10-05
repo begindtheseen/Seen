@@ -5,7 +5,7 @@
 > (#75–#124) have landed since. The landing page (PR #77) and dashboard (PRs #122/#123)
 > were intentionally redesigned BEYOND the old site — treat 🟡 rows for those pages as
 > obsolete, not as gaps to re-port from `main`. Kept for historical reference only.
-> See CLAUDE_HANDOFF.md "CURRENT STATE" for what matters now.
+> See ../CLAUDE_HANDOFF.md "CURRENT STATE" for what matters now.
 
 Full parity audit: old production SPA (`main:index.html` + `main:employer.html`) vs Next.js port (`next-migration`).
 

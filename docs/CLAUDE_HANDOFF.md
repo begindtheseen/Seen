@@ -232,12 +232,12 @@ Session D ran 5 parallel agents + direct edits to knock out the entire Tier 1–
 
 A contradiction existed between two checklist documents:
 
-- `VISUAL_PARITY_CHECKLIST.md` claimed admin was 12/16 sections missing
-- `ADMIN_PARITY_CHECKLIST.md` claimed admin was 16/16 complete
+- `archive/VISUAL_PARITY_CHECKLIST.md` claimed admin was 12/16 sections missing
+- `archive/ADMIN_PARITY_CHECKLIST.md` claimed admin was 16/16 complete
 
 **Resolution:** The VISUAL_PARITY_CHECKLIST.md was stale. It was written at commit `572b886` before the admin recovery commits were merged into `next-migration`. All 9 admin recovery commits (`6f79d84` through `9fff826`) are confirmed present on `next-migration`. `app/admin/page.tsx` is 1,176 lines and contains all 16 admin sections. No cherry-pick or merge was needed.
 
-**`ADMIN_PARITY_CHECKLIST.md` is authoritative for admin functionality.**
+**`archive/ADMIN_PARITY_CHECKLIST.md` is authoritative for admin functionality.**
 
 Remaining admin work is **visual polish only** (command-center aesthetics, colored KPI borders, section separators) — not missing functionality.
 
@@ -272,7 +272,7 @@ git push -u origin next-migration
 
 # Brandon promotes the preview in Vercel dashboard → production
 # OR trigger via deploy hook:
-curl -X POST "https://api.vercel.com/v1/integrations/deploy/prj_P2SoPxsy9RpdoJfVUqqg6RslWXV5/6kpPtZBS1w"
+curl -X POST "<YOUR_VERCEL_DEPLOY_HOOK_URL>"
 ```
 
 **Never deploy to production without Brandon verifying the preview first.**

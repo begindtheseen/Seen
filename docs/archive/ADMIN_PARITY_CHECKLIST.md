@@ -4,7 +4,7 @@
 > a work queue.** The admin page has since gained post-parity features (conversion
 > analytics PR #92, job-crisis tools PRs #100–#103, user deletion PR #119, per-company
 > evidentiary export PR #124) that have no counterpart in the old site.
-> See CLAUDE_HANDOFF.md "CURRENT STATE" for what matters now.
+> See ../CLAUDE_HANDOFF.md "CURRENT STATE" for what matters now.
 
 ## ✅ MILESTONE 2026-06-13 — Admin parity 16/16 functionally complete
 

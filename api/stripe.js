@@ -620,7 +620,7 @@ export default async function handler(req, res) {
       }
 
       // Trial ending in ~3 days. v1: log only — no email infra is configured (see
-      // MONETIZATION_TODO.md item 3). The no-card trial cancels itself via
+      // docs/MONETIZATION_TODO.md item 3). The no-card trial cancels itself via
       // trial_settings.end_behavior, and subscription.updated keeps `pro` in lockstep.
       if (event.type === 'customer.subscription.trial_will_end') {
         const sub = event.data?.object || {};

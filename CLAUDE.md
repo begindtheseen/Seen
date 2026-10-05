@@ -27,7 +27,7 @@ stand instead of re-reading everything — that is the token save.**
    context cost you just saved.
 
 ## North Star
-Read SEEN_STRATEGY.md at the start of every session. That document is the product strategy.
+Read docs/SEEN_STRATEGY.md at the start of every session. That document is the product strategy.
 Every code change must serve the strategy. When in doubt, re-read it.
 
 ## Core Mission
@@ -44,8 +44,8 @@ the work has been feature, growth, monetization, and reliability development on
 `next-migration` — 50 PRs (#75–#124) landed 2026-06-30 → 07-02. The landing page (PR #77)
 and dashboard (PRs #122/#123) were intentionally REDESIGNED beyond the old site; do NOT
 "restore" them back to `origin/main` parity. `origin/main` remains useful history but is no
-longer the design source of truth for redesigned pages. `SITE_PARITY_CHECKLIST.md` /
-`ADMIN_PARITY_CHECKLIST.md` are frozen pre-06-30 records, not an active work queue.
+longer the design source of truth for redesigned pages. `docs/archive/SITE_PARITY_CHECKLIST.md` /
+`docs/archive/ADMIN_PARITY_CHECKLIST.md` are frozen pre-06-30 records, not an active work queue.
 
 ## Session 2026-09-29: stale-job protocol (one batched DB sweep) — facts verified on prod
 
@@ -113,7 +113,7 @@ fixes — green build + 44/44 tests did NOT catch it. When delegating: pin the E
 sha, and give the agent marker strings that must exist in the source before it starts and
 in its output when done. Verify the markers yourself in the merged result.
 
-Doc corrections: MONETIZATION_TODO.md item 1 falsely said the 7-day trial was "✅ BUILT" —
+Doc corrections: docs/MONETIZATION_TODO.md item 1 falsely said the 7-day trial was "✅ BUILT" —
 it was deleted in #93 (verified: no trial_period_days in api/stripe.js, no trial copy).
 Corrected. Grep before trusting any feature-status claim in docs.
 
@@ -302,7 +302,7 @@ TODO-and-ask beats silently-wrong logic every time.
 The free-trial feature was built (#86), patched (#89), rebuilt key-only (#90), and
 deleted (#93) in a single day because building started before the business decision was
 settled. If a change hinges on an owner decision (pricing, trial policy, email infra),
-ask first or put it behind MONETIZATION_TODO.md — don't iterate product strategy in code.
+ask first or put it behind docs/MONETIZATION_TODO.md — don't iterate product strategy in code.
 
 **7. Fixes ride with proof.**
 Every fix PR names how it was verified (test added/re-run, live probe, build). If a fix
@@ -310,7 +310,7 @@ chain on the same file reaches attempt #3 (#78→#81 résumé exports), stop pat
 re-derive the requirement end-to-end, then make ONE correct change.
 
 **8. Leave ground truth better than you found it.**
-Update CLAUDE_HANDOFF.md + this file's session notes with FACTS you verified (paths you
+Update docs/CLAUDE_HANDOFF.md + this file's session notes with FACTS you verified (paths you
 opened, commands you ran) — never from memory. A prior session recorded a credits path
 that didn't exist and later sessions built on the error. If prod state diverges from git
 (promoted previews, hand-applied SQL), record it immediately and reconcile (merge the PR,
@@ -322,7 +322,7 @@ Every application must have:
 - `status` (active/ghosted/hired/rejected)
 - `stage` (Applied/Screening/Interview/Offer/Rejected/Ghosted)
 - `addedAt`, `updatedAt`
-- `events[]` — array of hiring events (see Event System in SEEN_STRATEGY.md)
+- `events[]` — array of hiring events (see Event System in docs/SEEN_STRATEGY.md)
 
 ## Event System (Critical)
 Store event history, NOT just status changes:
@@ -347,7 +347,7 @@ Before starting any session:
 1. Read the memory vault: `memory/protocol.md` → `memory/HOME.md` → the newest
    note in `memory/timeline/` (the fast-recall layer; see below)
 2. Run `git status` to see current state
-3. Read SEEN_STRATEGY.md
+3. Read docs/SEEN_STRATEGY.md
 4. Pick up exactly where previous session left off
 
 At session END: append what happened to `memory/timeline/YYYY-MM-DD.md` and edit
@@ -358,6 +358,6 @@ An Obsidian-compatible vault is the persistent, structured memory for this
 project — an upgrade over relying on model context + this file alone. It splits
 **temporal memory** (`memory/timeline/`, append-only dated session notes) from
 **knowledge** (`memory/knowledge/`, `memory/decisions/`, `memory/people/` —
-wiki-linked entity notes). Start at `memory/protocol.md`. The root docs
-(this file, CLAUDE_HANDOFF.md, SEEN_STRATEGY.md, SEENJOBS_BEHAVIORAL_FLYWHEEL.md,
+wiki-linked entity notes). Start at `memory/protocol.md`. The repo docs
+(this file, docs/CLAUDE_HANDOFF.md, docs/SEEN_STRATEGY.md, docs/SEENJOBS_BEHAVIORAL_FLYWHEEL.md,
 …) remain the deep reference the vault links back to.

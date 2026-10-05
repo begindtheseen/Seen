@@ -39,7 +39,7 @@ Vercel does NOT auto-build commits authored by the `claude` bot. To trigger:
 
 **Option B — Deploy Hook:**
 ```bash
-curl -X POST "https://api.vercel.com/v1/integrations/deploy/prj_P2SoPxsy9RpdoJfVUqqg6RslWXV5/6kpPtZBS1w"
+curl -X POST "<YOUR_VERCEL_DEPLOY_HOOK_URL>"
 ```
 
 **Option C — Vercel CLI from owner's Mac:**
