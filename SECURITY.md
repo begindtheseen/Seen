@@ -104,19 +104,15 @@ Stripe webhook are all properly defended.
   redirect hop, with content-type allow-listing and a body-size cap.
 - **No committed secrets**; `.env*` gitignored; anon key public by design.
 
-**Hardening backlog: closed 2026-10-05**
-- CORS: every handler uses one policy (`lib/server/cors.js`): an exact-match allowlist for the
-  production origins, and loopback origins only when the code is not running as a production build.
-  Origins are matched on the parsed hostname, never by substring.
-- `api/import-listing.js` (POST import and GET dry run) now requires a signed-in user, verified the
-  same way as the other user write paths; the jobs page sends the session token and shows a
-  sign-in step to signed-out visitors.
-- Cron secrets are compared in constant time and only read from headers (`lib/server/cronAuth.js`).
-- Still informational: the DNS-rebinding window in the SSRF check, and `verifyJWT` not checking
-  `aud`/`iss` (HMAC-SHA256 is forced, so algorithm confusion does not apply).
-
-**Owner settings that complete the picture**
-- Set `CRON_SECRET` in Vercel (Production). Vercel then sends it on every cron call and the cron
-  header alone stops being accepted. Without it, scheduled jobs still run exactly as before.
-- Supabase Auth leaked-password protection is a dashboard setting (Pro plan); see
-  `SECURITY_FOLLOWUPS.md`.
+**Documented as hardening backlog (Low / not independently exploitable)**
+- Loose `origin.includes('localhost')` CORS reflection in ~13 handlers. Not a data-
+  theft vector (no `Access-Control-Allow-Credentials`; auth is via the
+  `Authorization` header, which a cross-origin page can't attach). Tighten to an
+  exact-match allowlist when convenient — deferred here to avoid breaking Vercel
+  preview origins in a security patch.
+- `api/import-listing.js` POST is unauthenticated and writes the shared `jobs`
+  table (rate-limited; spam/pollution vector, not IDOR).
+- Info: DNS-rebinding TOCTOU in the SSRF check; non-timing-safe cron-secret
+  compares (high-entropy secrets, network-bound — impractical); `verifyJWT` omits
+  `aud`/`iss` checks (not exploitable — HMAC-SHA256 is forced, so `alg:none`/
+  alg-confusion don't apply).

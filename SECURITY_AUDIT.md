@@ -197,7 +197,7 @@ Tables created before RLS was standard had no row-level security. An attacker wh
 
 #### H6 — Rate Limits Fail Open on DB Unavailability
 **File**: `lib/server/ratelimit.js`  
-**Status**: ✅ FIXED (2026-10-05) — paid, email-sending, import and login endpoints refuse with 503 while the counter is unreachable; all other endpoints fall back to an in-memory per-instance limiter (`lib/server/ratelimit.js`).
+**Status**: ⚠️ NEEDS MANUAL REVIEW
 
 All rate limit checks have graceful degradation (allow-all when DB is unreachable). During a DB outage, all rate limits are bypassed, allowing unlimited Claude API calls, resume processing, and DB writes.
 
@@ -221,7 +221,7 @@ Resume text is sliced to 4000 chars before sending to Claude, which limits promp
 
 #### M1 — Admin Session Tokens Stored in Plaintext
 **File**: `api/admin-stats.js`, `supabase/migrations/008_credits_admin.sql`  
-**Status**: ✅ FIXED (2026-10-05) — only the SHA-256 digest is stored; every lookup hashes the presented token (`lib/server/adminSession.js`). Sessions created before the change stop matching, so admins sign in once more.
+**Status**: ⚠️ NEEDS MANUAL REVIEW
 
 Admin session tokens are 32-byte random hex strings stored as-is in the `admin_sessions` table. If the table were ever read (e.g., via a future SQL injection or insider breach), all active admin sessions would be compromised.
 
@@ -251,7 +251,7 @@ The job search strips `<>` backtick and backslash from user queries but allows m
 
 #### M4 — `user-sync.js` Error Messages May Expose Internals
 **File**: `api/user-sync.js`  
-**Status**: ✅ FIXED (2026-10-05) — no response echoes database text; a top-level handler now turns any unexpected error into a generic 500. Same class fixed on the public jobs, reports, resume and import endpoints.
+**Status**: ⚠️ NEEDS MANUAL REVIEW
 
 Several error paths return raw error messages. The file is large (693 lines) and was not fully patched in this session.
 
@@ -261,7 +261,7 @@ Several error paths return raw error messages. The file is large (693 lines) and
 
 #### M5 — No Per-User Rate Limiting (IP-Only)
 **File**: `lib/server/ratelimit.js`  
-**Status**: ✅ FIXED (2026-10-05) — requests with a verified Supabase JWT are limited per user by default; anonymous requests per client IP (`resolveRateBucket`).
+**Status**: ⚠️ NEEDS MANUAL REVIEW
 
 Rate limits are IP-based. A logged-in Pro user at a corporate office shares limits with all other employees on the same IP. Conversely, attackers using residential proxy pools have distinct IPs per request and bypass per-IP limits entirely.
 
@@ -271,7 +271,7 @@ Rate limits are IP-based. A logged-in Pro user at a corporate office shares limi
 
 #### M6 — Reddit Cron Authentication Relies on Non-Secret Header
 **File**: `api/reports.js`, `vercel.json`  
-**Status**: ✅ FIXED (2026-10-05) — every cron and admin-triggered job goes through `lib/server/cronAuth.js`: with `CRON_SECRET` configured the secret is required and the cron header alone is refused. Without it, behaviour is unchanged (header accepted) until the owner sets `CRON_SECRET`.
+**Status**: 🟡 PARTIALLY MITIGATED
 
 The `x-vercel-cron: 1` header gates the reddit import cron. This header is set by Vercel internally and is stripped from external requests in production. Admin token also accepted as alternative. However, in development or with certain Vercel configurations, this header could be faked.
 
@@ -303,7 +303,7 @@ Logging is via `console.error` and `logError`. There's no correlation ID, no req
 
 #### L3 — Auth Token Exposed in Cron HTTP Calls
 **File**: `api/refresh-jobs.js`  
-**Status**: ✅ FIXED (2026-10-05) — the internal call that remained (admin emergency refresh) forwards the admin's own session token instead of `CRON_SECRET`, and secrets are no longer accepted in query strings, so they cannot land in request logs.
+**Status**: ⚠️ NEEDS MANUAL REVIEW
 
 The job refresh cron makes internal HTTP calls to `/api/jobs` with a Bearer token. If these requests appear in Vercel request logs, the token may be exposed.
 
@@ -348,13 +348,13 @@ The job refresh cron makes internal HTTP calls to `/api/jobs` with a Bearer toke
 
 | Risk | Priority |
 |---|---|
-| Rate limits fail open during DB outage | ✅ Fixed 2026-10-05 |
-| Admin session tokens stored in plaintext | ✅ Fixed 2026-10-05 |
-| No per-user rate limiting | ✅ Fixed 2026-10-05 |
+| Rate limits fail open during DB outage | HIGH — add Vercel Firewall backup limits |
+| Admin session tokens stored in plaintext | MEDIUM — hash before storing |
+| No per-user rate limiting | MEDIUM — add user-ID dimension to rate limits |
 | NEXT_PUBLIC env vars for Supabase anon key | LOW — move to env var for rotation |
 | No structured request logging / tracing | LOW — add correlation IDs |
-| Admin cron auth inconsistency | ✅ Fixed 2026-10-05 (one shared check; set `CRON_SECRET` in Vercel) |
-| `user-sync.js` error messages | ✅ Fixed 2026-10-05 |
+| Admin cron auth inconsistency | LOW — standardize on CRON_SECRET everywhere |
+| `user-sync.js` error messages | LOW — audit all catch blocks |
 
 ---
 
