@@ -5,7 +5,7 @@ import { STAFFING_AGENCIES } from '@/lib/agencies'
 import { assembleGhostReport, pickHeadline, weekProvenance } from '@/lib/server/ghostReport'
 
 // The Weekly Ghost Report — the amplifier engine's flagship, auto-generated public data story
-// (playbook/CONTENT_ENGINE.md). Server component + hourly ISR, reading cached scores DIRECTLY
+// (format kept in the private ops notes). Server component + hourly ISR, reading cached scores DIRECTLY
 // from Supabase via lib/growth (never a self-fetch of the live API — see lib/growth.ts). Every
 // number is computed by lib/server/ghostReport.js, which ranks ONLY rows with real applicant
 // reports and never fabricates a figure. The link's share card is app/ghost-report/opengraph-image.

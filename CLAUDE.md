@@ -44,8 +44,9 @@ the work has been feature, growth, monetization, and reliability development on
 `next-migration` — 50 PRs (#75–#124) landed 2026-06-30 → 07-02. The landing page (PR #77)
 and dashboard (PRs #122/#123) were intentionally REDESIGNED beyond the old site; do NOT
 "restore" them back to `origin/main` parity. `origin/main` remains useful history but is no
-longer the design source of truth for redesigned pages. `docs/archive/SITE_PARITY_CHECKLIST.md` /
-`docs/archive/ADMIN_PARITY_CHECKLIST.md` are frozen pre-06-30 records, not an active work queue.
+longer the design source of truth for redesigned pages. `SITE_PARITY_CHECKLIST.md` /
+`ADMIN_PARITY_CHECKLIST.md` (now in the private seen-command repo at `docs/seen-internal/archive/`)
+are frozen pre-06-30 records, not an active work queue.
 
 ## Session 2026-09-29: stale-job protocol (one batched DB sweep) — facts verified on prod
 
@@ -71,8 +72,9 @@ longer the design source of truth for redesigned pages. `docs/archive/SITE_PARIT
 
 The owner approved the "Operation 50%" growth plan (target: ≥50% probability of $1–5k MRR
 in 24–36 months via FOUR parallel revenue engines + weekly cadence + kill-gates). The full
-plan and evidence live in the probability-assessment report + `playbook/` (weekly routine,
-outreach scripts, content engine, 90-day calendar). **Locked owner decisions (rule 6 —
+plan and evidence live in the probability-assessment report + the playbook, which lives in the
+private seen-command repo at `docs/seen-internal/playbook/` (weekly routine, outreach scripts,
+content engine, 90-day calendar). **Locked owner decisions (rule 6 —
 do NOT relitigate or unwind):** 7-day NO-CARD trial (rebuild approved) · one-time SKUs
 (Interview Sprint $14.99 = +30 credits + 7-day Pro via `ai_credits.pro_until`; Credit Pack
 $4.99 = +20 credits) · PostHog analytics (`NEXT_PUBLIC_POSTHOG_KEY`, no-op without key) ·
@@ -113,7 +115,8 @@ fixes — green build + 44/44 tests did NOT catch it. When delegating: pin the E
 sha, and give the agent marker strings that must exist in the source before it starts and
 in its output when done. Verify the markers yourself in the merged result.
 
-Doc corrections: docs/MONETIZATION_TODO.md item 1 falsely said the 7-day trial was "✅ BUILT" —
+Doc corrections: MONETIZATION_TODO.md (now in the private seen-command repo at
+`docs/seen-internal/MONETIZATION_TODO.md`) item 1 falsely said the 7-day trial was "✅ BUILT" —
 it was deleted in #93 (verified: no trial_period_days in api/stripe.js, no trial copy).
 Corrected. Grep before trusting any feature-status claim in docs.
 
@@ -173,7 +176,6 @@ and import graph; 30 confirmed breaks fixed. Ground truth established this sessi
 - **Résumé employment parser** (lib/server/resumeAnalysis.js): COMMON_TITLE_WORDS must
   stay \b-anchored; company = single segment, cleaned by cleanCompany(). Tests:
   `node --test lib/server/*.test.mjs api/_utils/*.test.mjs` (44 tests — keep green).
-- Remaining manual dashboard item: enable Auth leaked-password protection (HaveIBeenPwned).
 - Deferred (known, acceptable): EventStore check-in ledger is device-local only (re-prompts
   on a new device); RLS-no-policy INFO lints are intentional (server-only tables).
 
@@ -302,7 +304,8 @@ TODO-and-ask beats silently-wrong logic every time.
 The free-trial feature was built (#86), patched (#89), rebuilt key-only (#90), and
 deleted (#93) in a single day because building started before the business decision was
 settled. If a change hinges on an owner decision (pricing, trial policy, email infra),
-ask first or put it behind docs/MONETIZATION_TODO.md — don't iterate product strategy in code.
+ask first or put it behind MONETIZATION_TODO.md (private seen-command repo,
+`docs/seen-internal/MONETIZATION_TODO.md`) — don't iterate product strategy in code.
 
 **7. Fixes ride with proof.**
 Every fix PR names how it was verified (test added/re-run, live probe, build). If a fix

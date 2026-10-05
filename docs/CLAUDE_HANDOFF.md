@@ -20,8 +20,9 @@ Last updated: **2026-07-06 (Operation 50% build — Ghost Report, outcome emails
 ## ⚠️ CURRENT STATE (2026-07-05→06) — supersedes everything below
 
 **Era: Operation 50% growth build.** The owner approved the "Operation 50%" plan (four
-parallel revenue engines → ≥50% odds of $1–5k MRR; plan + evidence in `playbook/` and the
-plan file). This session shipped a large slice of it. Deploys are still automatic (merge →
+parallel revenue engines → ≥50% odds of $1–5k MRR; plan + evidence in the playbook
+(private seen-command repo, `docs/seen-internal/playbook/`) and the plan file). This session
+shipped a large slice of it. Deploys are still automatic (merge →
 next-migration → prod), and the owner merges by **promoting the PR preview to production**
 in Vercel — when a preview shows `previewUrl: seenjobs.io` while the PR is unmerged, that's
 the promoted-preview/prod divergence: **merge that PR immediately** (institutional rule).
@@ -129,7 +130,8 @@ immediately — otherwise the next unrelated merge to next-migration rolls produ
   ids/created_at back onto results; nearestListings selects id/created_at and maps
   posted_at. Also restored the NUL-strip in pdfText.js cleanupText (Postgres rejects \x00).
 - Doc refresh: this file, CLAUDE.md (mission history corrected), staleness banners on
-  SITE_PARITY_CHECKLIST.md and ADMIN_PARITY_CHECKLIST.md.
+  SITE_PARITY_CHECKLIST.md and ADMIN_PARITY_CHECKLIST.md (both now in the private seen-command
+  repo at `docs/seen-internal/archive/`).
 
 **Read order now:** this file → CLAUDE.md session notes (2026-07-02 A + B) →
 `SEEN_STRATEGY.md` → `git status`.
@@ -230,7 +232,8 @@ Session D ran 5 parallel agents + direct edits to knock out the entire Tier 1–
 
 ## Admin parity reconciliation (2026-06-14)
 
-A contradiction existed between two checklist documents:
+A contradiction existed between two checklist documents (both now kept in the private
+seen-command repo at `docs/seen-internal/archive/`):
 
 - `archive/VISUAL_PARITY_CHECKLIST.md` claimed admin was 12/16 sections missing
 - `archive/ADMIN_PARITY_CHECKLIST.md` claimed admin was 16/16 complete

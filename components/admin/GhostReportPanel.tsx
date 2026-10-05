@@ -5,7 +5,7 @@ import { Card, CardHeader } from './primitives'
 import { STAFFING_AGENCIES } from '@/lib/agencies'
 import { assembleGhostReport, pickHeadline, buildCaption, weekProvenance } from '@/lib/server/ghostReport'
 
-// The weekly "grab and post" tool (playbook/CONTENT_ENGINE.md § Weekly Ghost Report). Reads the
+// The weekly "grab and post" tool (see the private ops notes, Weekly Ghost Report). Reads the
 // public leaderboard, assembles the SAME honest report the /ghost-report page renders, and hands
 // the owner a ready-to-paste caption + the share links. The panel never invents a number — it only
 // reflects what assembleGhostReport computes from real applicant reports.
