@@ -13,6 +13,7 @@ import { WELCOME_CREDITS, FREE_DAILY_CREDITS, PRO_DAILY_CREDITS, RESUME_OPTIMIZE
 import { normalizeClaimCompany } from '../lib/server/employerClaims.js';
 import { buildNotificationRow } from '../lib/server/employerNotificationsStore.js';
 import { isReadableResume } from '../lib/server/resumeReadability.js';
+import { allowOrigin } from '../lib/server/cors.js';
 
 // Verify a Supabase JWT locally (HS256) — no network round-trip.
 // Returns the payload (with .sub = user UUID) on success, null on failure.
@@ -31,10 +32,19 @@ function verifyJWTLocal(token, secret) {
   } catch { return null; }
 }
 
+// Every unexpected failure is logged here and answered with a generic message, so a thrown
+// database or runtime error never reaches the client with its internals.
 export default async function handler(req, res) {
-  const _o=req.headers.origin||'';
-  const _devO=!_o||_o.includes('localhost')||_o.includes('127.0.0.1');
-  res.setHeader('Access-Control-Allow-Origin',(_devO||['https://seenjobs.io','https://www.seenjobs.io'].includes(_o))?(_o||'*'):'https://seenjobs.io');
+  try {
+    return await route(req, res);
+  } catch (e) {
+    console.error('[user-sync] Unhandled error:', e?.message || e);
+    if (!res.headersSent) return res.status(500).json({ error: 'Internal server error' });
+  }
+}
+
+async function route(req, res) {
+  res.setHeader('Access-Control-Allow-Origin', allowOrigin(req.headers.origin));
   res.setHeader('Vary','Origin');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
@@ -49,7 +59,7 @@ export default async function handler(req, res) {
   const token = (req.headers.authorization || '').replace(/^Bearer\s+/i, '').trim();
   if (!token) return res.status(401).json({ error: 'No auth token' });
 
-  // IP-level gate — blocks flood attempts before any DB or auth work
+  // Flood gate before any DB or auth work: per user when the token verifies locally, else per IP.
   const { allowed: ipOk } = await rateLimit(req, 'user-sync');
   if (!ipOk) return res.status(429).json({ error: 'Too many requests — slow down.' });
 
@@ -94,19 +104,9 @@ export default async function handler(req, res) {
   // Rate-limit mutating actions per user (not reads — those are cheap DB fetches)
   const WRITE_ACTIONS = new Set(['add_application','update_application','remove_application','save_job','unsave_job','save_profile','save_resume','delete_account','submit_resume_survey']);
   if (WRITE_ACTIONS.has(action)) {
-    const windowHour = Math.floor(Date.now() / 3_600_000);
-    const rlKey = `${uid}:user-sync:${windowHour}`;
-    try {
-      const rlRes = await fetch(`${SUPABASE_URL}/rest/v1/rpc/increment_rate_limit`, {
-        method: 'POST',
-        headers: { apikey: SERVICE_KEY, Authorization: `Bearer ${SERVICE_KEY}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ p_key: rlKey, p_ttl_seconds: 3600 }),
-      });
-      if (rlRes.ok) {
-        const count = await rlRes.json();
-        if (count > 300) return res.status(429).json({ error: 'Too many requests — slow down.' });
-      }
-    } catch(_) { /* fail open */ }
+    // Per-USER write budget on the shared limiter (in-memory fallback if the counter is down).
+    const { allowed: writeOk } = await rateLimit(req, 'user-sync-write', { bucketKey: `user:${uid}` });
+    if (!writeOk) return res.status(429).json({ error: 'Too many requests — slow down.' });
   }
 
   // ── LOAD — applications + saved jobs + recent cos + credits + feature flags ──

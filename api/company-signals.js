@@ -14,13 +14,12 @@ import {
   buildCompanyIndex, matchViaIndex,
 } from '../lib/server/companyEntityMatch.js';
 import { SEC_PHRASES, fetchEdgarGroup } from '../lib/server/secEdgar.js';
-
-const ALLOWED = ['https://seenjobs.io', 'https://www.seenjobs.io'];
+import { allowOrigin } from '../lib/server/cors.js';
+import { hashAdminToken } from '../lib/server/adminSession.js';
+import { claimsVercelCron, isCronAuthorized } from '../lib/server/cronAuth.js';
 
 function cors(req, res) {
-  const o = req.headers.origin || '';
-  const ok = !o || o.includes('localhost') || o.includes('127.0.0.1') || ALLOWED.includes(o);
-  res.setHeader('Access-Control-Allow-Origin', ok ? (o || '*') : ALLOWED[0]);
+  res.setHeader('Access-Control-Allow-Origin', allowOrigin(req.headers.origin));
   res.setHeader('Vary', 'Origin');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Admin-Token');
@@ -55,10 +54,11 @@ async function route(req, res) {
   if (typeof body === 'string') { try { body = JSON.parse(body); } catch { body = {}; } }
   body = body || {};
 
-  // Weekly Vercel cron (GET, x-vercel-cron header — same trust pattern as api/demand.js):
-  // ingest the last 14 days of SEC filings so the public-record section stays populated
-  // without anyone remembering to run it. Before this, NOTHING fed company_signals in prod.
-  if (req.method === 'GET' && req.headers['x-vercel-cron'] === '1') {
+  // Weekly Vercel cron (GET): ingest the last 14 days of SEC filings so the public-record section
+  // stays populated without anyone remembering to run it. The cron header only routes the request;
+  // whether it may run is decided by lib/server/cronAuth.js (CRON_SECRET when configured).
+  if (req.method === 'GET' && claimsVercelCron(req)) {
+    if (!isCronAuthorized(req)) return res.status(401).json({ error: 'Unauthorized' });
     return ingestSec(req, res, { db, body: { days: 14 } });
   }
 
@@ -88,7 +88,7 @@ async function route(req, res) {
 
 // ── ADMIN ────────────────────────────────────────────────────────────────────
 async function adminRoute(req, res, { db, body, adminToken }) {
-  const sessRes = await db(`admin_sessions?token=eq.${encodeURIComponent(adminToken)}&limit=1`);
+  const sessRes = await db(`admin_sessions?token=eq.${hashAdminToken(adminToken)}&limit=1`);
   const sess = sessRes.ok ? (await sessRes.json())[0] : null;
   if (!sess || new Date(sess.expires_at) < new Date()) {
     return res.status(401).json({ error: 'Session expired — log in again' });

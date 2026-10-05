@@ -7,11 +7,11 @@ import { ONE_TIME_SKUS, PRO_TRIAL_DAYS } from '../lib/server/creditRules.js';
 import { fulfillOneTimeCheckout } from '../lib/server/stripeFulfillment.js';
 import { EMPLOYER_SKUS } from '../lib/server/employerSkus.js';
 import { fulfillEmployerCheckout, isEmployerSession } from '../lib/server/employerFulfillment.js';
+import { isCronAuthorized } from '../lib/server/cronAuth.js';
+import { allowOrigin } from '../lib/server/cors.js';
 
 const CORS = (req, res) => {
-  const o = req.headers.origin || '';
-  const dev = !o || o.includes('localhost') || o.includes('127.0.0.1');
-  res.setHeader('Access-Control-Allow-Origin', (dev || ['https://seenjobs.io','https://www.seenjobs.io'].includes(o)) ? (o || '*') : 'https://seenjobs.io');
+  res.setHeader('Access-Control-Allow-Origin', allowOrigin(req.headers.origin));
   res.setHeader('Vary', 'Origin');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   if (req.method === 'OPTIONS') { res.status(200).end(); return true; }
@@ -303,18 +303,9 @@ export default async function handler(req, res) {
   // customer against Stripe; if none of their subs are active/trialing/past_due, Pro is
   // revoked. Comped accounts (no stripe_customer_id) are never touched.
   if (action === 'reconcile_all') {
-    const cronSecret = process.env.CRON_SECRET;
-    const isCron = req.headers['x-vercel-cron'] === '1';
-    const authHeader = req.headers['authorization'] || '';
-    const qsecret = new URL(req.url, 'https://x').searchParams.get('secret') || '';
-    // Fail CLOSED: a non-cron caller must present a valid cron secret. Do NOT make
-    // the check contingent on CRON_SECRET being set — an unset secret must never
-    // open this sweep (up to 500 Stripe calls; revokes Pro from lapsed subscribers)
-    // to anonymous callers.
-    if (!isCron) {
-      const cronOk = !!cronSecret && (authHeader === `Bearer ${cronSecret}` || qsecret === cronSecret);
-      if (!cronOk) return res.status(401).json({ error: 'Unauthorized' });
-    }
+    // Fail CLOSED: only the scheduler (CRON_SECRET when configured; lib/server/cronAuth.js) may run
+    // this sweep (up to 500 Stripe calls; revokes Pro from lapsed subscribers).
+    if (!isCronAuthorized(req)) return res.status(401).json({ error: 'Unauthorized' });
     if (!STRIPE_KEY || !SUPABASE_URL || !SERVICE_KEY) return res.status(503).json({ error: 'Payments not configured' });
     const q = db(SUPABASE_URL, SERVICE_KEY);
     // comped accounts are excluded outright — the sweep exists to catch lapsed

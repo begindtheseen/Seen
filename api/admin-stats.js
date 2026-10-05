@@ -16,13 +16,12 @@ import { isDisputeDecision, resolveDisputeEffect, disputeStatusCounts as listing
 import { buildNotificationRow } from '../lib/server/employerNotificationsStore.js';
 import { normalizeClaimCompany } from '../lib/server/employerClaims.js';
 import { EMPLOYER_SKUS } from '../lib/server/employerSkus.js';
-
-const ALLOWED = ['https://seenjobs.io', 'https://www.seenjobs.io'];
+import { hashAdminToken } from '../lib/server/adminSession.js';
+import { rateLimit, getIP } from '../lib/server/ratelimit.js';
+import { allowOrigin } from '../lib/server/cors.js';
 
 function cors(req, res) {
-  const o = req.headers.origin || '';
-  const ok = !o || o.includes('localhost') || o.includes('127.0.0.1') || ALLOWED.includes(o);
-  res.setHeader('Access-Control-Allow-Origin', ok ? (o || '*') : ALLOWED[0]);
+  res.setHeader('Access-Control-Allow-Origin', allowOrigin(req.headers.origin));
   res.setHeader('Vary', 'Origin');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, X-Admin-Token');
@@ -155,22 +154,14 @@ async function _handler(req, res) {
   if (req.method === 'POST' && body.action === 'admin_login') {
     const { username, password } = body;
     if (!username || !password) return res.status(400).json({ error: 'Username and password required' });
-    const ip = (req.headers['x-forwarded-for'] || '').split(',')[0].trim() || '';
-
-    // IP rate limit: 5 attempts per 15 minutes per IP
-    const rlWindow = Math.floor(Date.now() / (15 * 60000));
-    const rlKey = `${ip}:admin_login:${rlWindow}`;
-    try {
-      const rlRes = await fetch(`${SB}/rest/v1/rpc/increment_rate_limit`, {
-        method: 'POST',
-        headers: { apikey: SK, Authorization: `Bearer ${SK}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ p_key: rlKey, p_ttl_seconds: 900 }),
-      });
-      if (rlRes.ok) {
-        const count = await rlRes.json();
-        if (count > 5) return res.status(429).json({ error: 'Too many login attempts — try again in 15 minutes' });
-      }
-    } catch(_) { /* fail open */ }
+    // Per-IP login budget: 5 attempts per 15 minutes. The IP comes from the same resolver as every
+    // other limiter (x-real-ip on Vercel, which a client cannot set), and the bucket is pinned to the
+    // IP so a Supabase token can't buy a fresh bucket. If the counter is unreachable, login is
+    // refused rather than left unlimited (the per-account lockout below is the second layer).
+    const ip = getIP(req);
+    const rl = await rateLimit(req, 'admin-login', { bucketKey: `ip:${ip}`, windowSec: 900, limit: 5 });
+    if (rl.unavailable) return res.status(503).json({ error: 'Login is briefly unavailable — try again in a moment' });
+    if (!rl.allowed) return res.status(429).json({ error: 'Too many login attempts — try again in 15 minutes' });
 
     // Bootstrap: if no admin accounts exist, create one from env vars
     const listRes = await db('admin_accounts?select=id&limit=1');
@@ -201,10 +192,11 @@ async function _handler(req, res) {
       return res.status(401).json({ error: 'Invalid credentials' });
     }
 
+    // The browser keeps the raw token; the table only ever holds its SHA-256 digest.
     const token = randomBytes(32).toString('hex');
     await db('admin_sessions', {
       method: 'POST',
-      body: JSON.stringify({ token, admin_id: acct.id, role: acct.role, expires_at: new Date(Date.now() + 8 * 3600000).toISOString(), ip_address: ip }),
+      body: JSON.stringify({ token: hashAdminToken(token), admin_id: acct.id, role: acct.role, expires_at: new Date(Date.now() + 8 * 3600000).toISOString(), ip_address: ip }),
       headers: { Prefer: 'return=minimal' },
     });
     await db(`admin_accounts?id=eq.${acct.id}`, {
@@ -221,7 +213,7 @@ async function _handler(req, res) {
   const adminToken = (req.headers['x-admin-token'] || body.admin_token || '').trim();
   if (!adminToken) return res.status(401).json({ error: 'Admin token required' });
 
-  const sessRes = await db(`admin_sessions?token=eq.${encodeURIComponent(adminToken)}&limit=1`);
+  const sessRes = await db(`admin_sessions?token=eq.${hashAdminToken(adminToken)}&limit=1`);
   const sess = sessRes.ok ? (await sessRes.json())[0] : null;
   if (!sess || new Date(sess.expires_at) < new Date()) return res.status(401).json({ error: 'Session expired — log in again' });
   const adminRole = sess.role;
@@ -546,7 +538,7 @@ async function _handler(req, res) {
   const { action } = body;
 
   if (action === 'admin_logout') {
-    await db(`admin_sessions?token=eq.${encodeURIComponent(adminToken)}`, { method: 'DELETE', headers: { Prefer: 'return=minimal' } });
+    await db(`admin_sessions?token=eq.${hashAdminToken(adminToken)}`, { method: 'DELETE', headers: { Prefer: 'return=minimal' } });
     return res.status(200).json({ ok: true });
   }
 
@@ -1260,7 +1252,7 @@ async function _handler(req, res) {
     const { flag_name, status, percentage } = body;
     const VALID_STATUSES = ['off','admin_only','beta_users','percentage_rollout','fully_on'];
     if (!flag_name || !VALID_STATUSES.includes(status)) return res.status(400).json({ error: 'flag_name and valid status required' });
-    const acctRes = await db(`admin_sessions?token=eq.${encodeURIComponent(adminToken)}&select=admin_id&limit=1`);
+    const acctRes = await db(`admin_sessions?token=eq.${hashAdminToken(adminToken)}&select=admin_id&limit=1`);
     const acctRows = acctRes.ok ? await acctRes.json() : [];
     const adminIdForFlag = acctRows[0]?.admin_id || 'unknown';
     // UPSERT — creates the row if it doesn't exist yet, updates otherwise
@@ -1878,18 +1870,15 @@ async function _handler(req, res) {
   // Triggered from the admin crisis banner. Calls the refresh-jobs endpoint
   // (owned by another module — we only CALL it, never edit it) with ?all=1 so it
   // runs every batch + source in one shot to backfill the board immediately.
-  // We forward the cron secret server-side so this works even if the caller's
-  // admin token isn't accepted by refresh-jobs; if CRON_SECRET is unset we fall
-  // back to forwarding the admin session token (refresh-jobs validates either).
+  // The request carries the admin's OWN session token (refresh-jobs validates admin sessions), never
+  // CRON_SECRET: the platform-wide secret should not travel in an outbound HTTP call whose target is
+  // derived from request headers.
   if (action === 'emergency_job_refresh') {
     if (adminRole === 'moderator') return res.status(403).json({ error: 'Insufficient role' });
     const proto = (req.headers['x-forwarded-proto'] || 'https').split(',')[0].trim();
     const host  = (req.headers['x-forwarded-host'] || req.headers.host || '').split(',')[0].trim();
     if (!host) return res.status(500).json({ error: 'Cannot resolve host for refresh' });
-    const cronSecret = process.env.CRON_SECRET;
-    const refreshHeaders = { 'Content-Type': 'application/json' };
-    if (cronSecret) refreshHeaders.Authorization = `Bearer ${cronSecret}`;
-    else refreshHeaders['X-Admin-Token'] = adminToken; // refresh-jobs validates admin sessions too
+    const refreshHeaders = { 'Content-Type': 'application/json', 'X-Admin-Token': adminToken };
     try {
       const refreshRes = await fetch(`${proto}://${host}/api/refresh-jobs?all=1`, {
         method: 'POST',

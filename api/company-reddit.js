@@ -23,6 +23,7 @@ import {
   buildSearchUrl, needsBroadFallback, emptyStateDecision, ttlForStatus, cacheFresh,
   sanitizeDispute, MAX_ITEMS,
 } from './_utils/companyReddit.js';
+import { allowOrigin } from '../lib/server/cors.js';
 
 const REDDIT_UA = 'SeenJobs/1.0 RSS reader (+https://seenjobs.io)';
 const REDDIT_HOSTS = ['https://www.reddit.com', 'https://old.reddit.com'];
@@ -204,9 +205,7 @@ async function handleDispute(req, res, body) {
 
 export default async function handler(req, res) {
   // CORS (same posture as api/reports.js): allow the site + local dev, echo otherwise-deny.
-  const o = req.headers.origin || '';
-  const devO = !o || o.includes('localhost') || o.includes('127.0.0.1');
-  res.setHeader('Access-Control-Allow-Origin', (devO || ['https://seenjobs.io', 'https://www.seenjobs.io'].includes(o)) ? (o || '*') : 'https://seenjobs.io');
+  res.setHeader('Access-Control-Allow-Origin', allowOrigin(req.headers.origin));
   res.setHeader('Vary', 'Origin');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');

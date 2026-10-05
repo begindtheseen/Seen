@@ -1,4 +1,6 @@
 import { rateLimit } from '../lib/server/ratelimit.js';
+import { isCronOrAdmin } from '../lib/server/cronAuth.js';
+import { allowOrigin } from '../lib/server/cors.js';
 import { logError } from '../lib/server/errlog.js';
 import { geocodeLocation, haversineMiles } from '../lib/server/geo.js';
 import { computeCityDemand, normalizeCityLabel } from '../lib/server/demandFromCorpus.js';
@@ -13,7 +15,7 @@ import { computeCityDemand, normalizeCityLabel } from '../lib/server/demandFromC
 //                              cache them in demand_data, and return them. Any city becomes a
 //                              living market — labeled "Seen live listings", never dressed as BLS.
 //
-// POST /api/demand  — Auth required (CRON_SECRET or admin JWT).
+// POST /api/demand  — Auth required (scheduler, admin session, or the ADMIN_EMAIL user's JWT).
 //                     Fetches BLS JOLTS + CES, computes DI, upserts demand_data.
 //                     Triggered by monthly Vercel cron (0 4 1 * *).
 //
@@ -23,10 +25,7 @@ import { computeCityDemand, normalizeCityLabel } from '../lib/server/demandFromC
 //   dtf_norm          = min(1, avg_days_to_fill / 90) × 100
 
 async function route(req, res) {
-  const origin = req.headers.origin || '';
-  const allowed = !origin || origin.includes('localhost') || origin.includes('127.0.0.1') ||
-    ['https://seenjobs.io', 'https://www.seenjobs.io'].includes(origin);
-  res.setHeader('Access-Control-Allow-Origin', allowed ? (origin || '*') : 'https://seenjobs.io');
+  res.setHeader('Access-Control-Allow-Origin', allowOrigin(req.headers.origin));
   res.setHeader('Vary', 'Origin');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
@@ -232,7 +231,6 @@ async function handleGet(req, res) {
 async function handlePost(req, res) {
   const SUPABASE_URL         = process.env.SUPABASE_URL;
   const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY;
-  const CRON_SECRET          = process.env.CRON_SECRET;
   const BLS_API_KEY          = process.env.BLS_API_KEY || '';
 
   if (!SUPABASE_URL || !SUPABASE_SERVICE_KEY) {
@@ -242,15 +240,9 @@ async function handlePost(req, res) {
   const authHeader = req.headers.authorization || '';
   const token = authHeader.replace(/^Bearer /i, '').trim();
   let authed = false;
-  const adminToken = req.headers['x-admin-token'] || '';
-  const isCron     = req.headers['x-vercel-cron'] === '1';
 
-  if (isCron || (CRON_SECRET && token === CRON_SECRET)) {
-    authed = true;
-  } else if (adminToken) {
-    const sr = await fetch(`${SUPABASE_URL}/rest/v1/admin_sessions?token=eq.${encodeURIComponent(adminToken)}&select=expires_at&limit=1`, { headers: { apikey: SUPABASE_SERVICE_KEY, Authorization: `Bearer ${SUPABASE_SERVICE_KEY}` } });
-    const sess = sr.ok ? (await sr.json())?.[0] : null;
-    if (sess && new Date(sess.expires_at) > new Date()) authed = true;
+  if (await isCronOrAdmin(req)) {
+    authed = true; // scheduler (CRON_SECRET when configured) or a live admin session
   } else if (token) {
     try {
       const userRes = await fetch(`${SUPABASE_URL}/auth/v1/user`, {

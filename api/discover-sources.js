@@ -26,6 +26,7 @@ import { discoverFromCommonCrawl } from '../lib/jobs/discovery.js';
 import { detectAts } from '../lib/jobs/atsDetect.js';
 import { mapLimit } from '../lib/server/jobSources.js';
 import { logError } from '../lib/server/errlog.js';
+import { isCronOrAdmin } from '../lib/server/cronAuth.js';
 
 // Must stay under the maxDuration declared for this function in vercel.json (300s), with room to
 // serialize the response. Discovery gets the WHOLE budget here — that is the entire point.
@@ -74,30 +75,10 @@ export function sweepOptionsFromParams(params, now = Date.now()) {
   return { page, maxBlocksPerPattern, concurrency };
 }
 
-// Fail CLOSED, matching api/refresh-jobs.js. Authorization must never be contingent on CRON_SECRET
-// being set: if that env var is blank the cron-secret path is simply unavailable and callers fall
-// through to 401, rather than the endpoint becoming an open trigger for outbound crawling.
+// Fail CLOSED, matching api/refresh-jobs.js: the scheduler (CRON_SECRET when configured) or a valid
+// admin session, via the shared check in lib/server/cronAuth.js. Never an open trigger for crawling.
 async function authorize(req) {
-  if (req.headers['x-vercel-cron'] === '1') return true;
-
-  const cronSecret = process.env.CRON_SECRET;
-  const authHeader = req.headers['authorization'] || '';
-  const querySecret = new URL(req.url, 'https://x').searchParams.get('secret') || '';
-  if (cronSecret && (authHeader === `Bearer ${cronSecret}` || querySecret === cronSecret)) return true;
-
-  const adminToken = req.headers['x-admin-token'] || '';
-  const SB = process.env.SUPABASE_URL, SK = process.env.SUPABASE_SERVICE_KEY;
-  if (adminToken && SB && SK) {
-    try {
-      const r = await fetch(
-        `${SB}/rest/v1/admin_sessions?token=eq.${encodeURIComponent(adminToken)}&select=expires_at&limit=1`,
-        { headers: { apikey: SK, Authorization: `Bearer ${SK}` } }
-      );
-      const sess = r.ok ? (await r.json())?.[0] : null;
-      if (sess && new Date(sess.expires_at) >= new Date()) return true;
-    } catch { /* fall through to 401 */ }
-  }
-  return false;
+  return isCronOrAdmin(req);
 }
 
 const UA = 'SeenJobs/1.0 (+https://seenjobs.io)';
