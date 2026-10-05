@@ -1,118 +1,15 @@
-# Security — Testing Seen Against Itself
+# Security Policy
 
-RLS on, auth configured, HTTPS everywhere is the *baseline*, not the finish line.
-This doc is the repeatable "try to hack your own app" process for Seen, plus what
-the last self-audit found. Run the three steps below before a breach forces you to.
+If you find a security problem in Seen, I'd like to hear about it so I can fix it.
 
-## The three steps
+## Reporting a vulnerability
 
-### 1. Dynamic scan (OWASP ZAP) — automated, on demand
-`.github/workflows/zap-dast.yml` runs an OWASP ZAP baseline scan against a target
-URL you choose (Actions → "ZAP DAST" → Run workflow → enter a **staging/preview**
-URL you own — never production, never a site you don't control). ZAP crawls the
-app and probes for the OWASP Top 10 (injection, XSS, broken auth, missing security
-headers) and files a report + issue. Triage findings, then tune rule severities in
-`.zap/rules.tsv`.
+Please report it privately. Open the Security tab of this repository and use the "Report a vulnerability" button. That sends the details only to me.
 
-Local equivalent (the "one Docker command"):
-```bash
-docker run --rm -t ghcr.io/zaproxy/zaproxy:stable zap-baseline.py -t https://staging.example.com
-```
+Please don't open a public issue or pull request for a security problem, since that would make it visible before it is fixed.
 
-### 2. Authorization / IDOR testing (Burp Suite, by hand)
-The scanner won't find broken *object-level* authorization — you have to try it.
-Intercept your own requests and mutate identity:
-- Change a `user_id` / `application_id` / `customer_id` in the body or query — can
-  you read or write another user's record?
-- Swap the JWT for a different user's — does the server re-derive identity from the
-  token, or trust the body?
-- Change a `role` claim or hit an admin endpoint with a non-admin token.
+I'll reply within a few days, and I'll keep you updated while I work on a fix.
 
-**Why this matters here specifically:** Seen's API talks to Supabase with the
-`service_role` key, which **bypasses RLS entirely**. On any endpoint that uses the
-service key, RLS is *not* protecting you — the handler code is the only thing
-standing between an attacker and another tenant's data. The rule is absolute:
+## How payments and accounts are handled
 
-> On a service-key path, every object identifier must come from the **verified
-> JWT**, never from the request body/query. If the handler reads `user_id` from
-> the body and doesn't cross-check it against the token, it's a live IDOR.
-
-The correct pattern (already used across `api/*.js`): read `Authorization: Bearer
-<token>`, call Supabase **with that token** (so RLS applies) or verify it against
-`/auth/v1/user`, and derive identity from the result.
-
-### 3. Automated scanning in CI — every push, every PR
-- **SAST:** `.github/workflows/codeql.yml` — CodeQL `security-and-quality` suite
-  over JS/TS on every push/PR to `next-migration` + weekly. Alerts land in the
-  Security tab (requires code scanning enabled; free on public repos, GHAS on
-  private).
-- **Secrets:** `.github/workflows/secret-scan.yml` — TruffleHog OSS on every push/PR.
-  Verified hits (live, exploitable credentials) fail the job. GitGuardian is a
-  drop-in SaaS alternative.
-- **Dependencies:** `npm audit --audit-level=high` runs in `ci.yml` (reported, not
-  blocking).
-
-## Secret handling — the load-bearing invariant
-- **Supabase `anon` key is intentionally public.** It's hardcoded in
-  `lib/supabase.ts` on purpose; RLS is what protects it. Expected in the client bundle.
-- **Supabase `service_role` key is server-only, forever.** It must never appear in
-  client code, and **never** behind a `NEXT_PUBLIC_*` variable — Next.js inlines
-  every `NEXT_PUBLIC_*` value into the browser bundle, so a `NEXT_PUBLIC` service
-  key is handed to every visitor = full RLS bypass = total DB compromise. Broadcast
-  live events from a server handler (`lib/server/realtime.js` `broadcastActivity()`),
-  never from the browser.
-- Stripe/Resend/LLM keys are server-only. `.env*` is gitignored; only `.env.example`
-  is committed.
-
-## Last self-audit — 2026-07-11
-
-A full static audit of all 17 `api/*.js` handlers + shared `lib/server/` auth
-helpers was run for the primary target class — **IDOR / broken object-level
-authorization via service-key calls that trust a body/query identifier**. No
-Critical or High holes of that class were found: every per-user read/write derives
-identity from a **verified JWT**, never the request body; DELETE/PATCH are
-double-scoped (`id=eq.${id}&user_id=eq.${uid}`); SSRF, filter injection, and the
-Stripe webhook are all properly defended.
-
-**Fixed (PR #191)**
-- **[Critical] Service-role key exposable to the browser.** `lib/hooks/
-  useRealtimeConnection.ts` had a client-side `broadcast()` helper that read
-  `NEXT_PUBLIC_SUPABASE_SERVICE_KEY` and sent it as `apikey`/`Authorization`.
-  Any deploy that set that (plausibly-named) env var would have shipped the
-  RLS-bypass service key to every visitor. The helper was dead code — the correct
-  server-side broadcast (`lib/server/realtime.js`) already exists. Removed the
-  helper; the hook is now subscription-only (anon key), with a comment recording
-  the invariant.
-
-**Fixed (follow-up)**
-- **[Low–Medium] `api/refresh-jobs.js` failed open when `CRON_SECRET` was unset.**
-  The auth block was gated on `if (!isCron && cronSecret)`, so a blank/unset
-  `CRON_SECRET` skipped authorization entirely — an anonymous `POST /api/refresh-jobs`
-  would run the expensive (paid Adzuna calls) and destructive
-  (`deleteExpired`/`deleteJunk`/`markStaleJobs`) refresh. Reworked to **fail
-  closed**: every non-cron caller must present a valid cron secret or admin session
-  token regardless of whether `CRON_SECRET` is configured.
-
-**Reviewed and confirmed sound (no change needed)**
-- **Admin auth** (`api/admin-stats.js`): salted password hashes, IP rate-limit
-  (5/15 min), per-account lockout after 5 failures, random 32-byte session tokens
-  with 8h expiry, audit logging. PostgREST token filters use `encodeURIComponent`
-  (no filter injection).
-- **Stripe webhook** (`api/stripe.js`): HMAC-SHA256 signature verified with
-  `timingSafeEqual`; refuses unsigned webhooks (503).
-- **SSRF** (`api/import-listing.js`): DNS-resolves and rejects private IPs on every
-  redirect hop, with content-type allow-listing and a body-size cap.
-- **No committed secrets**; `.env*` gitignored; anon key public by design.
-
-**Documented as hardening backlog (Low / not independently exploitable)**
-- Loose `origin.includes('localhost')` CORS reflection in ~13 handlers. Not a data-
-  theft vector (no `Access-Control-Allow-Credentials`; auth is via the
-  `Authorization` header, which a cross-origin page can't attach). Tighten to an
-  exact-match allowlist when convenient — deferred here to avoid breaking Vercel
-  preview origins in a security patch.
-- `api/import-listing.js` POST is unauthenticated and writes the shared `jobs`
-  table (rate-limited; spam/pollution vector, not IDOR).
-- Info: DNS-rebinding TOCTOU in the SSRF check; non-timing-safe cron-secret
-  compares (high-entropy secrets, network-bound — impractical); `verifyJWT` omits
-  `aud`/`iss` checks (not exploitable — HMAC-SHA256 is forced, so `alg:none`/
-  alg-confusion don't apply).
+Payments go through Stripe Checkout, and sign in is handled by Supabase Auth. Card numbers are entered on Stripe's own pages, so card data never touches this app's servers.

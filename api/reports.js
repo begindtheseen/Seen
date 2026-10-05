@@ -1480,7 +1480,7 @@ function _rowToScore(row) {
 // Fuse a web-research estimate with the company's REAL reported outcomes (direct user
 // reports + Reddit + ingest), so the stored score reflects all the intel we hold rather
 // than a single web guess. Returns the web estimate unchanged when we have no reports
-// (no regression). See api/_utils/companyIntel.js + SCORING.md §2.
+// (no regression). See api/_utils/companyIntel.js + docs/SCORING.md §2.
 // Company slugs decode hyphens to spaces, so "Coca-Cola" arrives as "coca cola" and an
 // exact ilike misses it. Fallback pattern: wildcard between tokens ("coca*cola"), still
 // anchored at both ends so it can't over-match unrelated companies.

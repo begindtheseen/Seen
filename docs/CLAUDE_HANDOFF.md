@@ -20,8 +20,9 @@ Last updated: **2026-07-06 (Operation 50% build — Ghost Report, outcome emails
 ## ⚠️ CURRENT STATE (2026-07-05→06) — supersedes everything below
 
 **Era: Operation 50% growth build.** The owner approved the "Operation 50%" plan (four
-parallel revenue engines → ≥50% odds of $1–5k MRR; plan + evidence in `playbook/` and the
-plan file). This session shipped a large slice of it. Deploys are still automatic (merge →
+parallel revenue engines → ≥50% odds of $1–5k MRR; plan + evidence in the playbook
+(private seen-command repo, `docs/seen-internal/playbook/`) and the plan file). This session
+shipped a large slice of it. Deploys are still automatic (merge →
 next-migration → prod), and the owner merges by **promoting the PR preview to production**
 in Vercel — when a preview shows `previewUrl: seenjobs.io` while the PR is unmerged, that's
 the promoted-preview/prod divergence: **merge that PR immediately** (institutional rule).
@@ -129,7 +130,8 @@ immediately — otherwise the next unrelated merge to next-migration rolls produ
   ids/created_at back onto results; nearestListings selects id/created_at and maps
   posted_at. Also restored the NUL-strip in pdfText.js cleanupText (Postgres rejects \x00).
 - Doc refresh: this file, CLAUDE.md (mission history corrected), staleness banners on
-  SITE_PARITY_CHECKLIST.md and ADMIN_PARITY_CHECKLIST.md.
+  SITE_PARITY_CHECKLIST.md and ADMIN_PARITY_CHECKLIST.md (both now in the private seen-command
+  repo at `docs/seen-internal/archive/`).
 
 **Read order now:** this file → CLAUDE.md session notes (2026-07-02 A + B) →
 `SEEN_STRATEGY.md` → `git status`.
@@ -230,14 +232,15 @@ Session D ran 5 parallel agents + direct edits to knock out the entire Tier 1–
 
 ## Admin parity reconciliation (2026-06-14)
 
-A contradiction existed between two checklist documents:
+A contradiction existed between two checklist documents (both now kept in the private
+seen-command repo at `docs/seen-internal/archive/`):
 
-- `VISUAL_PARITY_CHECKLIST.md` claimed admin was 12/16 sections missing
-- `ADMIN_PARITY_CHECKLIST.md` claimed admin was 16/16 complete
+- `archive/VISUAL_PARITY_CHECKLIST.md` claimed admin was 12/16 sections missing
+- `archive/ADMIN_PARITY_CHECKLIST.md` claimed admin was 16/16 complete
 
 **Resolution:** The VISUAL_PARITY_CHECKLIST.md was stale. It was written at commit `572b886` before the admin recovery commits were merged into `next-migration`. All 9 admin recovery commits (`6f79d84` through `9fff826`) are confirmed present on `next-migration`. `app/admin/page.tsx` is 1,176 lines and contains all 16 admin sections. No cherry-pick or merge was needed.
 
-**`ADMIN_PARITY_CHECKLIST.md` is authoritative for admin functionality.**
+**`archive/ADMIN_PARITY_CHECKLIST.md` is authoritative for admin functionality.**
 
 Remaining admin work is **visual polish only** (command-center aesthetics, colored KPI borders, section separators) — not missing functionality.
 
@@ -272,7 +275,7 @@ git push -u origin next-migration
 
 # Brandon promotes the preview in Vercel dashboard → production
 # OR trigger via deploy hook:
-curl -X POST "https://api.vercel.com/v1/integrations/deploy/prj_P2SoPxsy9RpdoJfVUqqg6RslWXV5/6kpPtZBS1w"
+curl -X POST "<YOUR_VERCEL_DEPLOY_HOOK_URL>"
 ```
 
 **Never deploy to production without Brandon verifying the preview first.**

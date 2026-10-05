@@ -27,7 +27,7 @@ stand instead of re-reading everything — that is the token save.**
    context cost you just saved.
 
 ## North Star
-Read SEEN_STRATEGY.md at the start of every session. That document is the product strategy.
+Read docs/SEEN_STRATEGY.md at the start of every session. That document is the product strategy.
 Every code change must serve the strategy. When in doubt, re-read it.
 
 ## Core Mission
@@ -45,7 +45,8 @@ the work has been feature, growth, monetization, and reliability development on
 and dashboard (PRs #122/#123) were intentionally REDESIGNED beyond the old site; do NOT
 "restore" them back to `origin/main` parity. `origin/main` remains useful history but is no
 longer the design source of truth for redesigned pages. `SITE_PARITY_CHECKLIST.md` /
-`ADMIN_PARITY_CHECKLIST.md` are frozen pre-06-30 records, not an active work queue.
+`ADMIN_PARITY_CHECKLIST.md` (now in the private seen-command repo at `docs/seen-internal/archive/`)
+are frozen pre-06-30 records, not an active work queue.
 
 ## Session 2026-09-29: stale-job protocol (one batched DB sweep) — facts verified on prod
 
@@ -71,8 +72,9 @@ longer the design source of truth for redesigned pages. `SITE_PARITY_CHECKLIST.m
 
 The owner approved the "Operation 50%" growth plan (target: ≥50% probability of $1–5k MRR
 in 24–36 months via FOUR parallel revenue engines + weekly cadence + kill-gates). The full
-plan and evidence live in the probability-assessment report + `playbook/` (weekly routine,
-outreach scripts, content engine, 90-day calendar). **Locked owner decisions (rule 6 —
+plan and evidence live in the probability-assessment report + the playbook, which lives in the
+private seen-command repo at `docs/seen-internal/playbook/` (weekly routine, outreach scripts,
+content engine, 90-day calendar). **Locked owner decisions (rule 6 —
 do NOT relitigate or unwind):** 7-day NO-CARD trial (rebuild approved) · one-time SKUs
 (Interview Sprint $14.99 = +30 credits + 7-day Pro via `ai_credits.pro_until`; Credit Pack
 $4.99 = +20 credits) · PostHog analytics (`NEXT_PUBLIC_POSTHOG_KEY`, no-op without key) ·
@@ -113,7 +115,8 @@ fixes — green build + 44/44 tests did NOT catch it. When delegating: pin the E
 sha, and give the agent marker strings that must exist in the source before it starts and
 in its output when done. Verify the markers yourself in the merged result.
 
-Doc corrections: MONETIZATION_TODO.md item 1 falsely said the 7-day trial was "✅ BUILT" —
+Doc corrections: MONETIZATION_TODO.md (now in the private seen-command repo at
+`docs/seen-internal/MONETIZATION_TODO.md`) item 1 falsely said the 7-day trial was "✅ BUILT" —
 it was deleted in #93 (verified: no trial_period_days in api/stripe.js, no trial copy).
 Corrected. Grep before trusting any feature-status claim in docs.
 
@@ -173,7 +176,6 @@ and import graph; 30 confirmed breaks fixed. Ground truth established this sessi
 - **Résumé employment parser** (lib/server/resumeAnalysis.js): COMMON_TITLE_WORDS must
   stay \b-anchored; company = single segment, cleaned by cleanCompany(). Tests:
   `node --test lib/server/*.test.mjs api/_utils/*.test.mjs` (44 tests — keep green).
-- Remaining manual dashboard item: enable Auth leaked-password protection (HaveIBeenPwned).
 - Deferred (known, acceptable): EventStore check-in ledger is device-local only (re-prompts
   on a new device); RLS-no-policy INFO lints are intentional (server-only tables).
 
@@ -302,7 +304,8 @@ TODO-and-ask beats silently-wrong logic every time.
 The free-trial feature was built (#86), patched (#89), rebuilt key-only (#90), and
 deleted (#93) in a single day because building started before the business decision was
 settled. If a change hinges on an owner decision (pricing, trial policy, email infra),
-ask first or put it behind MONETIZATION_TODO.md — don't iterate product strategy in code.
+ask first or put it behind MONETIZATION_TODO.md (private seen-command repo,
+`docs/seen-internal/MONETIZATION_TODO.md`) — don't iterate product strategy in code.
 
 **7. Fixes ride with proof.**
 Every fix PR names how it was verified (test added/re-run, live probe, build). If a fix
@@ -310,7 +313,7 @@ chain on the same file reaches attempt #3 (#78→#81 résumé exports), stop pat
 re-derive the requirement end-to-end, then make ONE correct change.
 
 **8. Leave ground truth better than you found it.**
-Update CLAUDE_HANDOFF.md + this file's session notes with FACTS you verified (paths you
+Update docs/CLAUDE_HANDOFF.md + this file's session notes with FACTS you verified (paths you
 opened, commands you ran) — never from memory. A prior session recorded a credits path
 that didn't exist and later sessions built on the error. If prod state diverges from git
 (promoted previews, hand-applied SQL), record it immediately and reconcile (merge the PR,
@@ -322,7 +325,7 @@ Every application must have:
 - `status` (active/ghosted/hired/rejected)
 - `stage` (Applied/Screening/Interview/Offer/Rejected/Ghosted)
 - `addedAt`, `updatedAt`
-- `events[]` — array of hiring events (see Event System in SEEN_STRATEGY.md)
+- `events[]` — array of hiring events (see Event System in docs/SEEN_STRATEGY.md)
 
 ## Event System (Critical)
 Store event history, NOT just status changes:
@@ -347,7 +350,7 @@ Before starting any session:
 1. Read the memory vault: `memory/protocol.md` → `memory/HOME.md` → the newest
    note in `memory/timeline/` (the fast-recall layer; see below)
 2. Run `git status` to see current state
-3. Read SEEN_STRATEGY.md
+3. Read docs/SEEN_STRATEGY.md
 4. Pick up exactly where previous session left off
 
 At session END: append what happened to `memory/timeline/YYYY-MM-DD.md` and edit
@@ -358,6 +361,6 @@ An Obsidian-compatible vault is the persistent, structured memory for this
 project — an upgrade over relying on model context + this file alone. It splits
 **temporal memory** (`memory/timeline/`, append-only dated session notes) from
 **knowledge** (`memory/knowledge/`, `memory/decisions/`, `memory/people/` —
-wiki-linked entity notes). Start at `memory/protocol.md`. The root docs
-(this file, CLAUDE_HANDOFF.md, SEEN_STRATEGY.md, SEENJOBS_BEHAVIORAL_FLYWHEEL.md,
+wiki-linked entity notes). Start at `memory/protocol.md`. The repo docs
+(this file, docs/CLAUDE_HANDOFF.md, docs/SEEN_STRATEGY.md, docs/SEENJOBS_BEHAVIORAL_FLYWHEEL.md,
 …) remain the deep reference the vault links back to.
