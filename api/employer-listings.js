@@ -24,15 +24,13 @@ import {
 import { validateDisputeInput } from '../lib/server/listingDisputes.js';
 import { broadcastActivity } from '../lib/server/realtime.js';
 import { geocodeLocation } from '../lib/server/geo.js';
+import { allowOrigin } from '../lib/server/cors.js';
 
-const ALLOWED = ['https://seenjobs.io', 'https://www.seenjobs.io'];
 const LISTING_TTL_DAYS = 60; // employer-posted listings live 60 days, matching paste-a-link imports.
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 function cors(req, res) {
-  const o = req.headers.origin || '';
-  const ok = !o || o.includes('localhost') || o.includes('127.0.0.1') || ALLOWED.includes(o);
-  res.setHeader('Access-Control-Allow-Origin', ok ? (o || '*') : ALLOWED[0]);
+  res.setHeader('Access-Control-Allow-Origin', allowOrigin(req.headers.origin));
   res.setHeader('Vary', 'Origin');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');

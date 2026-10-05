@@ -3,6 +3,9 @@
 
 import { createHmac, timingSafeEqual } from 'crypto';
 import { applyRateLimit } from '../lib/server/ratelimit.js';
+import { isCronOrAdmin } from '../lib/server/cronAuth.js';
+import { findAdminSession } from '../lib/server/adminSession.js';
+import { allowOrigin } from '../lib/server/cors.js';
 import { logError } from '../lib/server/errlog.js';
 import { calcOverallScore, calcWaste, tenureAdjustment, scoreConfidence, confidenceLabel, aggregateTenure, MIN_TENURE_SAMPLE } from './_utils/companyScore.js';
 import { fuseCompanyIntel, classifyPlatform, WEB_CLAIM_CAP } from './_utils/companyIntel.js';
@@ -14,23 +17,15 @@ import { SECURITY_PREAMBLE, fenceUntrusted, scanInjection } from '../lib/server/
 import { fetchIndustryBenchmark } from '../lib/server/benchmark.js';
 import { isEvidencedScore, suppressionReason, servedDataSource } from '../lib/server/scoreProvenance.js';
 
-// Authorize admin/cron-only actions (the Anthropic web-research endpoints). Accepts a Vercel
-// cron header, a shared CRON_SECRET, or a valid admin_sessions token. Everything Anthropic in
-// this file is gated behind this — no anonymous caller can spend a web-search credit.
+// Authorize admin/cron-only actions (the Anthropic web-research endpoints): the scheduler
+// (CRON_SECRET when configured) or a valid admin session, via lib/server/cronAuth.js. Everything
+// Anthropic in this file is gated behind this — no anonymous caller can spend a web-search credit.
 export async function isAdminOrCron(req, SUPABASE_URL, SERVICE_KEY) {
-  if (req.headers['x-vercel-cron'] === '1') return true;
-  const CRON_SECRET = process.env.CRON_SECRET;
-  if (CRON_SECRET && req.headers['x-cron-secret'] === CRON_SECRET) return true;
-  const adminToken = (req.headers['x-admin-token'] || '').trim();
-  if (!adminToken || !SUPABASE_URL || !SERVICE_KEY) return false;
-  try {
-    const sessRes = await fetch(
-      `${SUPABASE_URL}/rest/v1/admin_sessions?token=eq.${encodeURIComponent(adminToken)}&select=expires_at&limit=1`,
-      { headers: { apikey: SERVICE_KEY, Authorization: `Bearer ${SERVICE_KEY}` } },
-    );
-    const sess = sessRes.ok ? (await sessRes.json())?.[0] : null;
-    return !!(sess && new Date(sess.expires_at) >= new Date());
-  } catch { return false; }
+  return isCronOrAdmin(req, {
+    adminToken: (req.headers['x-admin-token'] || '').trim(),
+    SUPABASE_URL: SUPABASE_URL || '',
+    SERVICE_KEY: SERVICE_KEY || '',
+  });
 }
 
 // True only when Anthropic is BOTH configured (key present) AND enabled by the admin flag.
@@ -204,9 +199,7 @@ const INDUSTRY_BENCHMARKS = {
 };
 
 export default async function handler(req, res) {
-  const _o=req.headers.origin||'';
-  const _devO=!_o||_o.includes('localhost')||_o.includes('127.0.0.1');
-  res.setHeader('Access-Control-Allow-Origin',(_devO||['https://seenjobs.io','https://www.seenjobs.io'].includes(_o))?(_o||'*'):'https://seenjobs.io');
+  res.setHeader('Access-Control-Allow-Origin', allowOrigin(req.headers.origin));
   res.setHeader('Vary','Origin');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
@@ -361,16 +354,7 @@ export default async function handler(req, res) {
   // PATCHes EXISTING company_scores rows (never creates). Additive + idempotent; if
   // the tenure columns or table are absent the PATCH simply no-ops.
   if (body.action === 'update_tenure') {
-    const CRON_SECRET = process.env.CRON_SECRET;
-    const isCron = req.headers['x-vercel-cron'] === '1';
-    const hasCronSecret = CRON_SECRET && req.headers['x-cron-secret'] === CRON_SECRET;
-    if (!isCron && !hasCronSecret) {
-      const adminToken = (req.headers['x-admin-token'] || '').trim();
-      if (!adminToken) return res.status(401).json({ error: 'unauthorized' });
-      const sessRes = await fetch(`${SUPABASE_URL}/rest/v1/admin_sessions?token=eq.${encodeURIComponent(adminToken)}&select=expires_at&limit=1`, { headers: hdrsBase });
-      const sess = sessRes.ok ? (await sessRes.json())?.[0] : null;
-      if (!sess || new Date(sess.expires_at) < new Date()) return res.status(401).json({ error: 'unauthorized' });
-    }
+    if (!(await isAdminOrCron(req, SUPABASE_URL, SUPABASE_SERVICE_KEY))) return res.status(401).json({ error: 'unauthorized' });
     try {
       // Light normalizer matching company_scores.company_name storage (lowercased + trimmed).
       const norm = (n) => (n || '').toString().trim().toLowerCase();
@@ -647,7 +631,7 @@ export default async function handler(req, res) {
       return res.status(200).json({ ok: true, reports: page, total });
     } catch(e) {
       console.error('FEED: unhandled error:', e.message);
-      return res.status(500).json({ error: 'feed error', detail: e.message });
+      return res.status(500).json({ error: 'feed error' });
     }
   }
 
@@ -719,7 +703,7 @@ export default async function handler(req, res) {
       const errText = await repRes.text();
       if (errText.includes('company_name') || errText.includes('column')) repRes = await fetch(`${SUPABASE_URL}/rest/v1/reports`, { method: 'POST', headers: { ...hdrs, Prefer: 'return=minimal' }, body: JSON.stringify(reportBase) });
     }
-    if (!repRes.ok) { const e = await repRes.text(); return res.status(500).json({ error: 'Failed to save report', detail: e.slice(0,100) }); }
+    if (!repRes.ok) { const e = await repRes.text().catch(() => ''); console.error('REPORT SAVE failed:', repRes.status, e.slice(0, 200)); return res.status(500).json({ error: 'Failed to save report' }); }
     console.log(`REPORT SAVED: "${safeCo}" @ "${safeLoc}" company_id:${cid}`);
     // Refresh this company's cached score from its real reports right away so the new report
     // reflects on the company page immediately (cache-first read would otherwise serve a stale
@@ -732,20 +716,7 @@ export default async function handler(req, res) {
   // Crons are GET requests passing the subreddit as ?reddit_cron=… — routed to this
   // action at the top of the handler (before the benchmark GET block).
   if (body.action === 'reddit_import') {
-    const CRON_SECRET = process.env.CRON_SECRET;
-    const isCron = req.headers['x-vercel-cron'] === '1';
-    const hasCronSecret = CRON_SECRET && req.headers['x-cron-secret'] === CRON_SECRET;
-    if (!isCron && !hasCronSecret) {
-      // Validate X-Admin-Token against admin_sessions table
-      const adminToken = (req.headers['x-admin-token'] || '').trim();
-      if (!adminToken) return res.status(401).json({ error: 'unauthorized' });
-      const sessRes = await fetch(
-        `${SUPABASE_URL}/rest/v1/admin_sessions?token=eq.${encodeURIComponent(adminToken)}&select=expires_at&limit=1`,
-        { headers: { apikey: SUPABASE_SERVICE_KEY, Authorization: `Bearer ${SUPABASE_SERVICE_KEY}` } },
-      );
-      const sess = sessRes.ok ? (await sessRes.json())?.[0] : null;
-      if (!sess || new Date(sess.expires_at) < new Date()) return res.status(401).json({ error: 'unauthorized' });
-    }
+    if (!(await isAdminOrCron(req, SUPABASE_URL, SUPABASE_SERVICE_KEY))) return res.status(401).json({ error: 'unauthorized' });
     const ANTHROPIC_KEY = process.env.ANTHROPIC_KEY || process.env.ANTHROPIC_API_KEY;
     // Reddit ingestion is an OPTIONAL enrichment layer. When Anthropic is unconfigured or the
     // admin flag is off, no-op gracefully (200) so the cron doesn't error-spam — the product
@@ -1175,9 +1146,8 @@ Return ONLY a valid JSON array. Return [] if there are genuinely no hiring exper
   if (body.action === 'ingest') {
     const tok = (req.headers['x-admin-token'] || '').trim();
     if (!tok) return res.status(401).json({ error: 'unauthorized' });
-    const s = await fetch(`${SUPABASE_URL}/rest/v1/admin_sessions?token=eq.${encodeURIComponent(tok)}&select=expires_at&limit=1`, { headers: { apikey: SUPABASE_SERVICE_KEY, Authorization: `Bearer ${SUPABASE_SERVICE_KEY}` } });
-    const sess = s.ok ? (await s.json())?.[0] : null;
-    if (!sess || new Date(sess.expires_at) < new Date()) return res.status(401).json({ error: 'unauthorized' });
+    const sess = await findAdminSession(tok, { SUPABASE_URL, SERVICE_KEY: SUPABASE_SERVICE_KEY });
+    if (!sess) return res.status(401).json({ error: 'unauthorized' });
 
     const reports = Array.isArray(body.reports) ? body.reports : [];
     if (!reports.length) return res.status(400).json({ error: 'reports array required' });
@@ -1326,7 +1296,7 @@ Return ONLY a valid JSON array. Return [] if there are genuinely no hiring exper
 
   } catch(e) {
     console.error('REPORTS error:', e.message);
-    return res.status(500).json({ error: e.message });
+    return res.status(500).json({ error: 'Internal server error' });
   }
 }
 
@@ -1551,7 +1521,7 @@ async function handleCompanyScore(req, res, body) {
       const clean = txt.replace(/```json|```/g, '').trim();
       let parsed; try { parsed = JSON.parse(clean); } catch(e) { const m = clean.match(/\{[\s\S]*\}/); parsed = m ? JSON.parse(m[0]) : { error: 'Parse failed', summary: 'Could not parse results.', data_confidence: 'low', known_issues: [], known_positives: [], sources_note: 'Search completed.' }; }
       return res.json(parsed);
-    } catch(err) { return res.status(500).json({ error: err.message }); }
+    } catch(err) { console.error('company research failed:', err?.message || err); return res.status(500).json({ error: 'Research failed — try again.' }); }
   }
 
   if (body.action === 'resolve') {

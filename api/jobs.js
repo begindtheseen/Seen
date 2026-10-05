@@ -9,6 +9,7 @@ import { deriveResumeJobQuery, pullResumeJobFloor } from '../lib/server/resumeJo
 import { scoreJob, wasteScore, scoreRow, explainListingScore } from '../lib/server/jobScore.js';
 import { computeListingFreshness } from '../lib/server/listingFreshness.js';
 import { geocodeLocation, haversineMiles, milesToKm, hasUsableCoords, geoBoxClause, sanitizeCoords } from '../lib/server/geo.js';
+import { allowOrigin } from '../lib/server/cors.js';
 
 // ── Suppressed listings (migration 047) ─────────────────────────────────────────────────────
 // Admins can "delete" an ephemeral (live-search) listing they've confirmed dead; its apply_url
@@ -92,9 +93,7 @@ async function _resolveUid(req) {
 const _inflight = new Map();
 
 export default async function handler(req, res) {
-  const _o=req.headers.origin||'';
-  const _devO=!_o||_o.includes('localhost')||_o.includes('127.0.0.1');
-  res.setHeader('Access-Control-Allow-Origin',(_devO||['https://seenjobs.io','https://www.seenjobs.io'].includes(_o))?(_o||'*'):'https://seenjobs.io');
+  res.setHeader('Access-Control-Allow-Origin', allowOrigin(req.headers.origin));
   res.setHeader('Vary','Origin');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
@@ -109,7 +108,8 @@ export default async function handler(req, res) {
 
   // ── Location-jobs: merged from api/fetch-location-jobs.js ──────────────────
   if (_body.action === 'location' || (_body.location && !_body.query)) {
-    const { allowed: rlOk } = await rateLimit(req, 'fetch-location-jobs');
+    const { allowed: rlOk, unavailable: rlDown } = await rateLimit(req, 'fetch-location-jobs');
+    if (rlDown) return res.status(503).json({ error: 'Nearby jobs are briefly unavailable — try again in a moment.', jobs: [] });
     if (!rlOk) return res.status(429).json({ error: 'Too many requests — slow down.', jobs: [] });
     return handleLocationJobs(req, res, _body);
   }
@@ -584,7 +584,7 @@ export default async function handler(req, res) {
     if (dbMatches.length) {
       return res.status(200).json({ ok: true, jobs: dbMatches.slice(0, 60), query: safeQuery, location: loc, _src: 'db-fallback' });
     }
-    return res.status(500).json({ error: err.message, jobs: [] });
+    return res.status(500).json({ error: 'Search failed — try again.', jobs: [] });
   }
 }
 
@@ -940,7 +940,7 @@ async function handleRecommended(req, res, _body) {
     return res.status(200).json({ ok: true, jobs, skills: topSkills.slice(0, 3), seniority, function: fn });
   } catch (e) {
     logError('jobs/recommended', e.message, { user_id });
-    return res.status(500).json({ error: e.message, jobs: [] });
+    return res.status(500).json({ error: 'Could not load recommendations.', jobs: [] });
   }
 }
 
@@ -1025,6 +1025,6 @@ async function handleLocationJobs(req, res, body) {
     return res.status(200).json({ ok:true, jobs:allJobs, location });
   } catch(err) {
     logError('fetch-location-jobs', err.message);
-    return res.status(500).json({ error: err.message, jobs: [] });
+    return res.status(500).json({ error: 'Could not load jobs near you.', jobs: [] });
   }
 }

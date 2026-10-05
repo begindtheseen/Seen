@@ -1,10 +1,10 @@
 import { applyRateLimit } from '../lib/server/ratelimit.js';
 import { gateAI } from '../lib/server/credits.js';
 import { buildJobInsights } from '../lib/server/jobInsights.js';
+import { allowOrigin } from '../lib/server/cors.js';
 
 export default async function handler(req, res) {
-  const _o = req.headers.origin || '';
-  res.setHeader('Access-Control-Allow-Origin', !_o || _o.includes('localhost') || ['https://seenjobs.io','https://www.seenjobs.io'].includes(_o) ? (_o || '*') : 'https://seenjobs.io');
+  res.setHeader('Access-Control-Allow-Origin', allowOrigin(req.headers.origin));
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   if (req.method === 'OPTIONS') return res.status(200).end();
   if (await applyRateLimit(req, res, 'job-insights')) return;

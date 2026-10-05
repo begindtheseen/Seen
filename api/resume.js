@@ -8,6 +8,7 @@ import { scannerFromSeenFit, optimizeFromSeenFit } from '../lib/server/seenfitCo
 import { extractUploadText } from '../lib/server/resumeUpload.js';
 import { isReadableResume } from '../lib/server/resumeReadability.js';
 import { deriveResumeJobQuery, pullResumeJobFloor } from '../lib/server/resumeJobMatch.js';
+import { allowOrigin } from '../lib/server/cors.js';
 
 // One-line "Seen data" block from read-only company intel (ghost/response from our
 // scores), or '' when we have no data on the company. This is the differentiator —
@@ -52,9 +53,7 @@ function _normalizeOptimizedPackage(body) {
 }
 
 export default async function handler(req, res) {
-  const _o = req.headers.origin || '';
-  const _devO = !_o || _o.includes('localhost') || _o.includes('127.0.0.1');
-  res.setHeader('Access-Control-Allow-Origin', (_devO || ['https://seenjobs.io','https://www.seenjobs.io'].includes(_o)) ? (_o || '*') : 'https://seenjobs.io');
+  res.setHeader('Access-Control-Allow-Origin', allowOrigin(req.headers.origin));
   res.setHeader('Vary', 'Origin');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   if (req.method === 'OPTIONS') return res.status(200).end();
@@ -177,7 +176,7 @@ export default async function handler(req, res) {
 
   } catch(err) {
     const ref = logError('resume', err, { method: req.method, tool: body?.tool, action: body?.action });
-    return res.status(500).json({ error: err.message, ref });
+    return res.status(500).json({ error: 'Something went wrong — try again.', ref });
   }
 }
 
@@ -210,7 +209,7 @@ async function handleParseResume(req, res, body) {
 
   } catch(err) {
     const ref = logError('parse-resume', err, { method: req.method });
-    return res.status(500).json({ error: err.message, ref });
+    return res.status(500).json({ error: 'Could not read this file. Paste your résumé text into the box instead.', ref });
   }
 }
 

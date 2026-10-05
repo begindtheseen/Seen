@@ -2,6 +2,7 @@ import { createHmac, timingSafeEqual } from 'crypto';
 import { rateLimit } from '../lib/server/ratelimit.js';
 import { normalizeClaimCompany } from '../lib/server/employerClaims.js';
 import { buildNotificationRow } from '../lib/server/employerNotificationsStore.js';
+import { allowOrigin } from '../lib/server/cors.js';
 
 // Best-effort: record the observed apply CLICK (the only thing observable on a redirect apply) and
 // enqueue an "apply_activity" notification for the company's employer (migrations 057/058). NEVER
@@ -237,9 +238,7 @@ ${sections.map(s => `<div class="sec"><div class="st">${esc(s.title)}</div>${for
 }
 
 export default async function handler(req, res) {
-  const _o=req.headers.origin||'';
-  const _devO=!_o||_o.includes('localhost')||_o.includes('127.0.0.1');
-  res.setHeader('Access-Control-Allow-Origin',(_devO||['https://seenjobs.io','https://www.seenjobs.io'].includes(_o))?(_o||'*'):'https://seenjobs.io');
+  res.setHeader('Access-Control-Allow-Origin', allowOrigin(req.headers.origin));
   res.setHeader('Vary','Origin');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
@@ -253,7 +252,8 @@ export default async function handler(req, res) {
   const uid = await resolveUid(req);
   if (!uid) return res.status(401).json({ error: 'Sign in to apply' });
 
-  const { allowed: rlOk } = await rateLimit(req, 'apply');
+  const { allowed: rlOk, unavailable: rlDown } = await rateLimit(req, 'apply');
+  if (rlDown) return res.status(503).json({ error: 'Applying is briefly unavailable — try again in a moment.' });
   if (!rlOk) return res.status(429).json({ error: 'Too many requests — slow down.' });
 
   try {

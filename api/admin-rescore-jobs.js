@@ -19,14 +19,13 @@
 // requires admin or super_admin). Returns { ok, dry_run, scanned, changed, unchanged, sample }.
 
 import { scoreJob, wasteScore } from '../lib/server/jobScore.js';
+import { allowOrigin } from '../lib/server/cors.js';
+import { hashAdminToken } from '../lib/server/adminSession.js';
 
-const ALLOWED = ['https://seenjobs.io', 'https://www.seenjobs.io'];
 const PAGE = 500;
 
 function cors(req, res) {
-  const o = req.headers.origin || '';
-  const ok = !o || o.includes('localhost') || o.includes('127.0.0.1') || ALLOWED.includes(o);
-  res.setHeader('Access-Control-Allow-Origin', ok ? (o || '*') : ALLOWED[0]);
+  res.setHeader('Access-Control-Allow-Origin', allowOrigin(req.headers.origin));
   res.setHeader('Vary', 'Origin');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, X-Admin-Token');
@@ -67,7 +66,7 @@ export default async function handler(req, res) {
     // ── Admin session auth (mirrors admin-stats / admin-company-audit-pdf) ──
     const adminToken = (req.headers['x-admin-token'] || '').trim();
     if (!adminToken) return res.status(401).json({ error: 'unauthorized' });
-    const sessRes = await db(`admin_sessions?token=eq.${encodeURIComponent(adminToken)}&limit=1`);
+    const sessRes = await db(`admin_sessions?token=eq.${hashAdminToken(adminToken)}&limit=1`);
     const sess = sessRes.ok ? (await sessRes.json())[0] : null;
     if (!sess || new Date(sess.expires_at) < new Date()) return res.status(401).json({ error: 'Session expired — log in again' });
     // Destructive bulk op — require admin or super_admin; moderators are refused.

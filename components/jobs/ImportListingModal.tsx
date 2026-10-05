@@ -9,8 +9,12 @@
 // Two-step contract with /api/import-listing: a first call with just { url } either
 // returns the saved job, or needs_details:true with whatever was extractable (bot-walled
 // pages) — then we ask the user for title/company and resubmit with those fields.
+// The endpoint requires a signed-in user (it fetches third-party pages and writes the shared jobs
+// corpus), so every call carries the Supabase access token; signed-out visitors get a sign-in step.
 
 import { useState } from 'react'
+import { useRouter } from 'next/navigation'
+import { useAuth } from '@/lib/auth'
 import type { Job } from '@/lib/types'
 import { parsePastedListing } from '@/lib/pastedListing'
 
@@ -98,6 +102,11 @@ export default function ImportListingModal({
   const [needDesc, setNeedDesc] = useState(false)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
+  const { token, isLoggedIn, ready } = useAuth()
+  const router = useRouter()
+  // Set when the server says the session is missing/expired, even if the client thought it was signed in.
+  const [authRejected, setAuthRejected] = useState(false)
+  const needsSignIn = authRejected || (ready && !isLoggedIn)
 
   async function submit() {
     if (busy) return
@@ -114,9 +123,11 @@ export default function ImportListingModal({
     }
     setBusy(true); setError('')
     try {
+      const authToken = await token()
+      if (!authToken) { setAuthRejected(true); return }
       const r = await fetch('/api/import-listing', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${authToken}` },
         body: JSON.stringify(
           phase === 'details'
             ? { url: url.trim(), title: title.trim(), company: company.trim(), location: location.trim(), description: description.trim() }
@@ -130,6 +141,7 @@ export default function ImportListingModal({
         need_description?: boolean
         draft?: { title?: string; company?: string; location?: string; description?: string }
       }
+      if (r.status === 401) { setAuthRejected(true); return }
       if (!r.ok) {
         setError(data.error || (r.status === 429 ? 'Too many imports — try again in a bit.' : 'Import failed — try again.'))
         return
@@ -166,6 +178,17 @@ export default function ImportListingModal({
         </div>
 
         <div style={{ padding: '1.1rem' }}>
+          {needsSignIn ? (
+            <>
+              <p style={{ fontFamily: 'var(--mono)', fontSize: '.62rem', color: 'var(--sub)', lineHeight: 1.7, marginBottom: '.9rem' }}>
+                Sign in to pull a listing into Seen and optimize your resume for it. It only takes a moment, and
+                the listing is saved to your account.
+              </p>
+              <button style={btnPrimary} onClick={() => { onClose(); router.push('/login?next=/jobs') }}>
+                Sign in to import →
+              </button>
+            </>
+          ) : (<>
           {phase === 'input' && (
             <p style={{ fontFamily: 'var(--mono)', fontSize: '.62rem', color: 'var(--sub)', lineHeight: 1.7, marginBottom: '.9rem' }}>
               Paste a listing from Indeed, LinkedIn, or any careers page. We&apos;ll pull it into
@@ -271,6 +294,7 @@ export default function ImportListingModal({
               {busy ? 'Importing…' : phase === 'details' ? (needDesc ? 'Add listing & optimize →' : 'Add listing →') : '🔗 Import listing →'}
             </button>
           </div>
+          </>)}
         </div>
       </div>
     </div>

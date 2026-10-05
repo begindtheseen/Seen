@@ -23,6 +23,7 @@ import { analyzeApplication } from '../lib/resume-intelligence/engine.js';
 import { extractJobFacts } from '../lib/optimizer/extractJobFacts.js';
 import { runHumanProof, HUMANPROOF_ENGINE_VERSION } from '../lib/humanizer/index.js';
 import { buildHumanProofPackage, normalizeBulletList } from '../lib/server/humanizePackage.js';
+import { allowOrigin } from '../lib/server/cors.js';
 
 // ── auth: derive the user id from the Supabase JWT (same pattern as api/apply.js) ──
 function verifyJWT(token, secret) {
@@ -221,9 +222,7 @@ async function cacheJobFacts(db, jobId, facts) {
 }
 
 export default async function handler(req, res) {
-  const _o = req.headers.origin || '';
-  const _devO = !_o || _o.includes('localhost') || _o.includes('127.0.0.1');
-  res.setHeader('Access-Control-Allow-Origin', (_devO || ['https://seenjobs.io', 'https://www.seenjobs.io'].includes(_o)) ? (_o || '*') : 'https://seenjobs.io');
+  res.setHeader('Access-Control-Allow-Origin', allowOrigin(req.headers.origin));
   res.setHeader('Vary', 'Origin');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   if (req.method === 'OPTIONS') return res.status(200).end();

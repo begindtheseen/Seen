@@ -17,6 +17,7 @@ import { SEED_SOURCES } from '../lib/jobs/seedSources.js';
 // Stale-job protocol (age → stale → delete): one batched Postgres function, shared with the admin
 // "clear stale now" action. Replaced deleteExpired() + markStaleJobs(), which could not finish.
 import { runStaleSweep } from '../lib/server/staleSweep.js';
+import { isCronOrAdmin, claimsVercelCron } from '../lib/server/cronAuth.js';
 
 // Refresh a batch of registered employer-direct ATS boards straight from the source. Fail-open +
 // bounded so it never breaks the cron or exceeds the function time budget. Returns a small summary.
@@ -440,35 +441,15 @@ async function deleteJunk(supabaseUrl, serviceKey) {
 export default async function handler(req, res) {
   const headers = { 'Content-Type': 'application/json' };
 
-  const cronSecret = process.env.CRON_SECRET;
-  const adminToken = req.headers['x-admin-token'] || '';
-  const isCron     = req.headers['x-vercel-cron'] === '1';
   // Vercel kills the function at maxDuration and the caller gets a 504 with NO record of what ran.
   // Stop short of that and return what completed. Kept below the configured ceiling so the response
   // is actually written before the platform pulls the plug.
   const handlerDeadline = Date.now() + HANDLER_BUDGET_MS;
-  // Fail CLOSED: every non-cron caller must present a valid cron secret OR a valid
-  // admin session token. Authorization must NOT be contingent on CRON_SECRET being
-  // set — if that env var is blank/unset, the cron-secret path is simply
-  // unavailable and callers fall through to 401. Never let a missing secret turn
-  // this expensive + destructive (deleteJunk / stale sweep) endpoint
-  // into an open, unauthenticated trigger.
-  if (!isCron) {
-    const authHeader  = req.headers['authorization'] || '';
-    const querySecret = new URL(req.url, 'https://x').searchParams.get('secret') || '';
-    const cronOk = !!cronSecret && (authHeader === `Bearer ${cronSecret}` || querySecret === cronSecret);
-    let adminOk = false;
-    if (!cronOk && adminToken) {
-      // Validate admin session token
-      const SB = process.env.SUPABASE_URL, SK = process.env.SUPABASE_SERVICE_KEY;
-      if (SB && SK) {
-        const sr = await fetch(`${SB}/rest/v1/admin_sessions?token=eq.${encodeURIComponent(adminToken)}&select=expires_at&limit=1`, { headers: { apikey: SK, Authorization: `Bearer ${SK}` } });
-        const sess = sr.ok ? (await sr.json())?.[0] : null;
-        adminOk = !!sess && new Date(sess.expires_at) >= new Date();
-      }
-    }
-    if (!cronOk && !adminOk) return res.status(401).json({ error: 'Unauthorized' });
-  }
+  // Fail CLOSED: the caller must be the scheduler (CRON_SECRET when configured; see
+  // lib/server/cronAuth.js) or hold a valid admin session. Never let a missing secret turn this
+  // expensive + destructive (deleteJunk / stale sweep) endpoint into an open trigger.
+  if (!(await isCronOrAdmin(req))) return res.status(401).json({ error: 'Unauthorized' });
+  const isCron = claimsVercelCron(req); // logging context only — authorization is decided above
 
   const ADZUNA_APP_ID = process.env.ADZUNA_APP_ID;
   const ADZUNA_APP_KEY = process.env.ADZUNA_APP_KEY;

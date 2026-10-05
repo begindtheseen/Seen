@@ -13,34 +13,18 @@
 // selected. Preview WITHOUT deleting via ?dry=1 (or PRUNE_DRY_RUN=1). Tuning knobs: ?grace=<days>
 // (or PRUNE_GRACE_DAYS), ?limit=<rows> (or PRUNE_MAX).
 //
-// AUTH: fails CLOSED like api/refresh-jobs.js (this is a destructive DELETE endpoint) using the three
-// mechanisms from api/refresh-stale-jobs.js — the Vercel cron header, CRON_SECRET, or an admin token.
+// AUTH: fails CLOSED like api/refresh-jobs.js (this is a destructive DELETE endpoint) through the
+// shared scheduler-or-admin check in lib/server/cronAuth.js.
 
 import { logError } from '../lib/server/errlog.js';
 import { pruneStaleJobs, PRUNE_DEFAULTS } from '../lib/server/jobPrune.js';
+import { isCronOrAdmin, claimsVercelCron } from '../lib/server/cronAuth.js';
 
 export default async function handler(req, res) {
-  const cronSecret = process.env.CRON_SECRET;
-  const adminToken = req.headers['x-admin-token'] || '';
-  const isCron = req.headers['x-vercel-cron'] === '1';
-  // Fail CLOSED: a destructive endpoint must never be an open trigger. Every non-cron caller must
-  // present a valid CRON_SECRET or a valid admin session; a missing/blank secret simply makes the
-  // cron-secret path unavailable (callers fall through to 401) — same stance as api/refresh-jobs.js.
-  if (!isCron) {
-    const authHeader = req.headers['authorization'] || '';
-    const querySecret = new URL(req.url, 'https://x').searchParams.get('secret') || '';
-    const cronOk = !!cronSecret && (authHeader === `Bearer ${cronSecret}` || querySecret === cronSecret);
-    let adminOk = false;
-    if (!cronOk && adminToken) {
-      const SB = process.env.SUPABASE_URL, SK = process.env.SUPABASE_SERVICE_KEY;
-      if (SB && SK) {
-        const sr = await fetch(`${SB}/rest/v1/admin_sessions?token=eq.${encodeURIComponent(adminToken)}&select=expires_at&limit=1`, { headers: { apikey: SK, Authorization: `Bearer ${SK}` } });
-        const sess = sr.ok ? (await sr.json())?.[0] : null;
-        adminOk = !!sess && new Date(sess.expires_at) >= new Date();
-      }
-    }
-    if (!cronOk && !adminOk) return res.status(401).json({ error: 'Unauthorized' });
-  }
+  // Fail CLOSED: a destructive endpoint must never be an open trigger. Scheduler (CRON_SECRET when
+  // configured) or a valid admin session only — see lib/server/cronAuth.js.
+  if (!(await isCronOrAdmin(req))) return res.status(401).json({ error: 'Unauthorized' });
+  const isCron = claimsVercelCron(req); // logging context only
 
   const SUPABASE_URL = process.env.SUPABASE_URL;
   const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY;

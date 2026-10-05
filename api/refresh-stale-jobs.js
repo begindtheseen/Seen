@@ -7,28 +7,17 @@
 // scheduled run is a dry-run (reads + classifies + logs what it WOULD change, zero writes), so
 // merging + deploying this changes nothing about the data until the owner explicitly enables it —
 // the same env-gate stance as OVERNIGHT_AUTOMERGE / PROPOSAL_GATE elsewhere in the system.
-// Auth mirrors api/refresh-jobs.js exactly (Vercel cron header, CRON_SECRET, or an admin token).
+// Auth: the shared scheduler-or-admin check in lib/server/cronAuth.js, same as api/refresh-jobs.js.
 
 import { logError } from '../lib/server/errlog.js';
 import { refreshStaleJobs } from '../lib/server/staleRefresh.js';
+import { isCronOrAdmin, claimsVercelCron } from '../lib/server/cronAuth.js';
 
 export default async function handler(req, res) {
-  const cronSecret = process.env.CRON_SECRET;
-  const adminToken = req.headers['x-admin-token'] || '';
-  const isCron = req.headers['x-vercel-cron'] === '1';
-  if (!isCron && cronSecret) {
-    const authHeader = req.headers['authorization'] || '';
-    const querySecret = new URL(req.url, 'https://x').searchParams.get('secret') || '';
-    const cronOk = authHeader === `Bearer ${cronSecret}` || querySecret === cronSecret;
-    if (!cronOk && !adminToken) return res.status(401).json({ error: 'Unauthorized' });
-    if (!cronOk && adminToken) {
-      const SB = process.env.SUPABASE_URL, SK = process.env.SUPABASE_SERVICE_KEY;
-      if (!SB || !SK) return res.status(401).json({ error: 'Unauthorized' });
-      const sr = await fetch(`${SB}/rest/v1/admin_sessions?token=eq.${encodeURIComponent(adminToken)}&select=expires_at&limit=1`, { headers: { apikey: SK, Authorization: `Bearer ${SK}` } });
-      const sess = sr.ok ? (await sr.json())?.[0] : null;
-      if (!sess || new Date(sess.expires_at) < new Date()) return res.status(401).json({ error: 'Unauthorized' });
-    }
-  }
+  // Fail CLOSED (scheduler or admin session; lib/server/cronAuth.js). This used to skip the check
+  // entirely whenever CRON_SECRET was unset.
+  if (!(await isCronOrAdmin(req))) return res.status(401).json({ error: 'Unauthorized' });
+  const isCron = claimsVercelCron(req); // logging context only
 
   const SUPABASE_URL = process.env.SUPABASE_URL;
   const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY;

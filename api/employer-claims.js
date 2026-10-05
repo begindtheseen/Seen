@@ -18,13 +18,11 @@ import {
 } from '../lib/server/employerClaims.js';
 import { sendClaimApprovedEmail } from '../lib/server/employerEmail.js';
 import { broadcastActivity } from '../lib/server/realtime.js';
-
-const ALLOWED = ['https://seenjobs.io', 'https://www.seenjobs.io'];
+import { allowOrigin } from '../lib/server/cors.js';
+import { hashAdminToken } from '../lib/server/adminSession.js';
 
 function cors(req, res) {
-  const o = req.headers.origin || '';
-  const ok = !o || o.includes('localhost') || o.includes('127.0.0.1') || ALLOWED.includes(o);
-  res.setHeader('Access-Control-Allow-Origin', ok ? (o || '*') : ALLOWED[0]);
+  res.setHeader('Access-Control-Allow-Origin', allowOrigin(req.headers.origin));
   res.setHeader('Vary', 'Origin');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Admin-Token');
@@ -203,7 +201,7 @@ async function listClaimsForUser(db, uid) {
 // ── Admin actions: verify session, list all claims, approve, reject ────────────
 async function adminRoute(req, res, { db, body, adminToken }) {
   // Same verification as api/admin-stats.js: look the token up in admin_sessions, check expiry.
-  const sessRes = await db(`admin_sessions?token=eq.${encodeURIComponent(adminToken)}&limit=1`);
+  const sessRes = await db(`admin_sessions?token=eq.${hashAdminToken(adminToken)}&limit=1`);
   const sess = sessRes.ok ? (await sessRes.json())[0] : null;
   if (!sess || new Date(sess.expires_at) < new Date()) {
     return res.status(401).json({ error: 'Session expired — log in again' });

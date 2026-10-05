@@ -19,10 +19,12 @@
 // each rung produced (no DB writes, same rate limit) — how walled-host extraction is
 // verified against the real deployment and debugged from the Vercel logs.
 //
-// No LLM, no credits — deterministic scraping only. Rate limited per IP.
+// No LLM, no credits — deterministic scraping only. Requires a signed-in user (both the POST import
+// and the GET dry run); rate limited per user.
 
 import dns from 'node:dns/promises';
 import { applyRateLimit } from '../lib/server/ratelimit.js';
+import { resolveAuthedUser } from '../lib/server/credits.js';
 import { logError } from '../lib/server/errlog.js';
 import { upsertJobs, inferLevel } from '../lib/server/jobSources.js';
 import { recomputeCompanyScoreFromReports } from './_utils/reportWrite.js';
@@ -305,6 +307,13 @@ const toUi = (row) => ({
 export default async function handler(req, res) {
   if (await applyRateLimit(req, res, 'import-listing')) return;
 
+  // Signed-in users only. Every import fetches third-party pages from our servers and (on POST)
+  // writes into the shared jobs corpus, so an anonymous caller must not be able to drive either.
+  // Same identity check as the other user write paths (verified Supabase JWT; lib/server/credits.js).
+  let user = null;
+  try { user = await resolveAuthedUser(req); } catch { user = null; }
+  if (!user?.uid) return res.status(401).json({ error: 'Sign in to import a listing.', auth_required: true });
+
   // Write-free diagnostic: GET ?url=…&dry=1 → run the ladder, report the rungs, write
   // NOTHING. (POST remains the only path that persists anything.)
   const isDry = req.method === 'GET';
@@ -322,7 +331,8 @@ export default async function handler(req, res) {
       });
     } catch (err) {
       if (err.message === 'unreachable' || err.message === 'unresolvable') return res.status(400).json({ error: 'That link isn’t reachable from here.' });
-      return res.status(500).json({ error: err.message });
+      logError('import-listing', err.message, { url: v.url, dry: true });
+      return res.status(500).json({ error: 'Import failed — try again.' });
     }
   }
 
