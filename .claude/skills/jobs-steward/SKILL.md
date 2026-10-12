@@ -18,6 +18,8 @@ Use the `brain` skill: `node scripts/brain.mjs search --subject "Jobs steward"` 
 verdict, so you compare against a baseline instead of judging numbers in isolation.
 
 ## 1. Did the crons run? (Vercel MCP `get_runtime_logs`, environment `production`, since `7d`)
+If the Vercel MCP tools aren't available (load via ToolSearch `+Vercel runtime logs` first), skip this
+step, say so in the report and the brain verdict, and rely on step 2 — never mark crons "verified".
 - `group_by: requestPath`, `level: [error, fatal, warning]` → any row for `/api/refresh-jobs`,
   `/api/discover-sources`, `/api/refresh-stale-jobs`, `/api/prune-jobs` is a finding; pull those lines.
 - `query: "discover-sources:"`, limit 20 → each line has `reason=` and `registered=/new=`.
