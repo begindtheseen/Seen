@@ -15,6 +15,9 @@ stand instead of re-reading everything — that is the token save.**
   **`claude-seenjobs`**; `claude-session` and fallback identities are forbidden and denied. Never
   paste either token into a prompt, log, source file, command argument, or Brain entry.
 
+**Use the `brain` skill (`.claude/skills/brain/SKILL.md`) — every call below is one command via
+`node scripts/brain.mjs <status|ping|search|fact|timeline|contradictions>`; no hand-written snippets.**
+
 1. **Orient, don't download the vault.** Run `npm run memory:status`. In cloud mode it calls the
    compact server-side `briefing` op; it does not transfer every note into the container.
 2. **Drill down when needed.** Use the authenticated helpers `searchFactsCloud(filters)` and

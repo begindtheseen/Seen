@@ -16,7 +16,8 @@
     "memory:check": "node scripts/memory-sync.mjs --check",
     "memory:status": "node scripts/memory-status.mjs",
     "memory:mcp": "node memory/mcp/server.mjs",
-    "memory:graph": "node scripts/memory-graph.mjs"
+    "memory:graph": "node scripts/memory-graph.mjs",
+    "brain": "node scripts/brain.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.49.2",
