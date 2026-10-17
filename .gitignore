@@ -22,3 +22,6 @@ memory/graph/.env
 # tracking it is what let the builder drag the whole vault into an unrelated PR (#243). No app
 # code reads memory/ at build/runtime.
 memory/
+
+# One-time API-credit batch runs (scripts/credit): state, results, spend ledger
+.credit-runs/
