@@ -19,7 +19,7 @@ export const contentType = 'image/png'
 
 export default async function Image() {
   const agencyAliases = STAFFING_AGENCIES.flatMap((a) => a.aliases)
-  const [leaderboard, agencyMap] = await Promise.all([getLeaderboard(), getScoresByNames(agencyAliases)])
+  const [leaderboard, agencyMap] = await Promise.all([getLeaderboard({ by: 'first_party' }), getScoresByNames(agencyAliases)])
   const byName = new Map<string, (typeof leaderboard)[number]>()
   for (const r of leaderboard) if (r?.name) byName.set(r.name.toLowerCase(), r)
   for (const [name, r] of agencyMap) if (!byName.has(name.toLowerCase())) byName.set(name.toLowerCase(), r)

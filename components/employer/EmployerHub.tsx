@@ -29,13 +29,17 @@ import IndustryBenchmark, { type Benchmark } from '@/components/IndustryBenchmar
 import EmployerActivationChecklist from '@/components/employer/EmployerActivationChecklist'
 import { EmployerReplyManager } from '@/components/employer/EmployerReplyManager'
 import { EmployerPerkBanner } from '@/components/employer/EmployerPerkBanner'
+import { firstPartyReportCount } from '@/lib/server/reportCounts'
 
 type Score = {
   overall_score: number | null
   ghost_rate: number | null
   response_rate: number | null
   avg_wait_days: number | null
-  report_count: number
+  report_count: number // FUSED (first-party + web claim) — never rendered as "applicant reports"
+  first_party_report_count?: number
+  web_report_count?: number
+  data_source?: string
 } | null
 
 type RawPosting = { title?: string }
@@ -207,7 +211,10 @@ export function EmployerHub() {
   // ── Derived hero + overview numbers (same helpers as the old dashboard) ──────
   const recent = recentInteractions(reports, 5) as InteractionView[]
   const summary = summarizeInteractions(reports) as Summary
-  const totalReports = score?.report_count ?? summary.total
+  // "applicant reports": first-party rows only (migration 063) — the web-research claimed count is
+  // an estimate input, not applicants who reported this employer.
+  const fpReports = firstPartyReportCount(score)
+  const totalReports = score ? fpReports : summary.total
   const overall = score?.overall_score ?? null
   const ghost = pct(score?.ghost_rate)
   const reply = pct(score?.response_rate)
@@ -317,9 +324,11 @@ export function EmployerHub() {
                 </div>
               </div>
               <p style={{ fontFamily: 'var(--mono)', fontSize: '.55rem', color: 'var(--muted)', lineHeight: 1.6, margin: '1.1rem 0 0' }}>
-                {hasRep
+                {hasRep && fpReports > 0
                   ? 'Grade, ghost rate and response rate are your public Seen reputation — what candidates see before applying.'
-                  : `No applicant outcomes reported for ${company} yet — a clean slate. Your live postings still show below.`}
+                  : hasRep
+                    ? `Your public Seen grade is currently estimated from aggregated public web data — no applicant outcomes have been reported for ${company} yet. Candidates see it labeled as an estimate.`
+                    : `No applicant outcomes reported for ${company} yet — a clean slate. Your live postings still show below.`}
               </p>
             </section>
 

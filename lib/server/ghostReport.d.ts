@@ -12,7 +12,12 @@ export interface GhostReportInputRow {
     ghost_rate: number | null
     response_rate: number | null
     avg_wait_days: number | null
+    /** FUSED total — ignored by the assembler (never presented as reports). */
     report_count: number
+    /** Real applicant-report rows — the only count the report uses. */
+    first_party_report_count?: number | null
+    web_report_count?: number | null
+    data_source?: string | null
     risk_level: GhostRisk | string
     waste?: number
   }
@@ -21,6 +26,7 @@ export interface GhostReportInputRow {
 export interface GhostReportRow {
   name: string
   industry: string | null
+  /** First-party applicant reports (never the fused report_count). */
   reportCount: number
   ghostPct: number | null
   replyPct: number | null

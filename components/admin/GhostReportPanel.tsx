@@ -13,7 +13,7 @@ import { assembleGhostReport, pickHeadline, buildCaption, weekProvenance } from 
 const SITE = 'https://seenjobs.io'
 const AGENCY_NAMES = STAFFING_AGENCIES.flatMap((a) => a.aliases).map((a) => a.toLowerCase())
 
-type LbRow = { name: string; industry?: string; verified?: boolean; score: { overall_score: number; ghost_rate: number; response_rate: number; avg_wait_days: number; report_count: number; risk_level: 'safe' | 'warn' | 'danger'; waste: number } }
+type LbRow = { name: string; industry?: string; verified?: boolean; score: { overall_score: number; ghost_rate: number; response_rate: number; avg_wait_days: number; report_count: number; first_party_report_count?: number; web_report_count?: number; data_source?: string | null; risk_level: 'safe' | 'warn' | 'danger'; waste: number } }
 
 export function GhostReportPanel() {
   const [rows, setRows] = useState<LbRow[] | null>(null)
@@ -24,7 +24,7 @@ export function GhostReportPanel() {
     let alive = true
     ;(async () => {
       try {
-        const r = await fetch('/api/reports', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'leaderboard' }) })
+        const r = await fetch('/api/reports', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'leaderboard', order: 'first_party' }) })
         const j = await r.json()
         if (!alive) return
         setRows(Array.isArray(j.companies) ? j.companies : [])

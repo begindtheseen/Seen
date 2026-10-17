@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { firstPartyReportCount } from '@/lib/server/reportCounts'
 
 // ── Company Preview Modal ─────────────────────────────────────────────────────
 
@@ -11,7 +12,9 @@ interface CoPreviewScore {
   avg_wait_days: number
   avg_rounds: number
   waste: number
-  report_count: number
+  report_count: number // FUSED (first-party + web claim) — never rendered as "reports"
+  first_party_report_count?: number
+  data_source?: string
   data_quality?: string
 }
 
@@ -93,7 +96,10 @@ export default function CoPreviewModal({ company, onClose }: { company: string; 
                 <div>
                   <div style={{ fontFamily: 'var(--mono)', fontSize: '.52rem', textTransform: 'uppercase', letterSpacing: '.08em', color: 'var(--muted)' }}>Seen Score</div>
                   <div style={{ fontFamily: 'var(--display)', fontSize: '1.6rem', fontWeight: 800, color: 'var(--white)', lineHeight: 1, letterSpacing: '-.03em' }}>{sc.overall_score}<span style={{ fontSize: '.9rem', color: 'var(--muted)' }}>/100</span></div>
-                  {sc.report_count > 0 && <div style={{ fontFamily: 'var(--mono)', fontSize: '.5rem', color: 'var(--dim)', marginTop: '.15rem' }}>{sc.report_count} reports</div>}
+                  {(() => {
+                    const fp = firstPartyReportCount(sc)
+                    return <div style={{ fontFamily: 'var(--mono)', fontSize: '.5rem', color: 'var(--dim)', marginTop: '.15rem' }}>{fp > 0 ? `${fp} applicant report${fp === 1 ? '' : 's'}` : 'Estimated from public web data'}</div>
+                  })()}
                 </div>
               </div>
 

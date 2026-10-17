@@ -4,6 +4,11 @@ import { getLeaderboard, titleCase, slugify, grade, riskColor, riskLabel } from 
 
 // Reddit landing: "Real hiring outcomes from Reddit." Surfaces the worst ghosters and fastest
 // responders from real leaderboard data, in Reddit-native voice, with tight internal links.
+//
+// HONESTY: every list and every "N reports" here uses FIRST-PARTY applicant reports
+// (score.first_party_report_count) — never the fused report_count, which adds the web-research
+// pipeline's *claimed* mention count (live: McDonald's "12,775 reports" with zero report rows).
+// Companies scored only from web research never appear in these "reported" lists.
 
 export const revalidate = 3600
 
@@ -36,18 +41,21 @@ function CompanyRow({ name, score, ghostRate, responseRate, sub }: { name: strin
 }
 
 export default async function RedditPage() {
-  const board = await getLeaderboard()
-  const withReports = board.filter(c => c.score.report_count > 0)
+  // Ordered by first-party rows so genuinely-reported companies aren't crowded out of the window
+  // by web-research claims.
+  const board = await getLeaderboard({ by: 'first_party' })
+  const reportsOf = (c: (typeof board)[number]) => c.score.first_party_report_count
+  const withReports = board.filter(c => reportsOf(c) > 0)
 
   // Real "worst ghosters" — highest ghost rate among companies with meaningful report volume.
   const ghosters = [...withReports]
-    .filter(c => c.score.report_count >= 50)
+    .filter(c => reportsOf(c) >= 50)
     .sort((a, b) => b.score.ghost_rate - a.score.ghost_rate)
     .slice(0, 8)
 
   // Real "fastest responders" — lowest avg wait + high response among safe-ish companies.
   const responders = [...withReports]
-    .filter(c => c.score.response_rate >= 0.6 && c.score.report_count >= 50)
+    .filter(c => c.score.response_rate >= 0.6 && reportsOf(c) >= 50)
     .sort((a, b) => a.score.avg_wait_days - b.score.avg_wait_days)
     .slice(0, 8)
 
@@ -74,8 +82,16 @@ export default async function RedditPage() {
             <h2 style={{ fontFamily: 'var(--display)', fontSize: '1.1rem', fontWeight: 700, color: 'var(--white)', margin: '0 0 .3rem' }}>The ghosters (apply with your eyes open)</h2>
             <p style={{ color: 'var(--sub)', fontSize: '.8rem', lineHeight: 1.6, margin: '0 0 1rem', fontWeight: 300 }}>Highest reported ghost rates among companies with real report volume. Not a verdict — a heads-up.</p>
             {ghosters.map(c => (
-              <CompanyRow key={c.name} name={c.name} score={c.score.overall_score} ghostRate={c.score.ghost_rate} responseRate={c.score.response_rate} sub={`${c.score.report_count.toLocaleString()} reports · ${riskLabel(c.score.risk_level)}`} />
+              <CompanyRow key={c.name} name={c.name} score={c.score.overall_score} ghostRate={c.score.ghost_rate} responseRate={c.score.response_rate} sub={`${reportsOf(c).toLocaleString()} reports · ${riskLabel(c.score.risk_level)}`} />
             ))}
+          </section>
+        )}
+
+        {ghosters.length === 0 && responders.length === 0 && (
+          <section style={{ background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 12, padding: '1.2rem 1.4rem', marginBottom: '2.6rem' }}>
+            <p style={{ color: 'var(--sub)', fontSize: '.85rem', lineHeight: 1.7, margin: 0, fontWeight: 300 }}>
+              No company has enough applicant-reported outcomes yet to rank here — we only list ghosters and responders backed by real report volume, never web estimates. <Link href="/report" style={{ color: 'var(--blue)' }}>Your report</Link> is how these lists fill in.
+            </p>
           </section>
         )}
 
@@ -84,7 +100,7 @@ export default async function RedditPage() {
             <h2 style={{ fontFamily: 'var(--display)', fontSize: '1.1rem', fontWeight: 700, color: 'var(--white)', margin: '0 0 .3rem' }}>The fast responders (where applying pays off)</h2>
             <p style={{ color: 'var(--sub)', fontSize: '.8rem', lineHeight: 1.6, margin: '0 0 1rem', fontWeight: 300 }}>Shortest reported wait times among companies that actually reply. These are worth your time.</p>
             {responders.map(c => (
-              <CompanyRow key={c.name} name={c.name} score={c.score.overall_score} ghostRate={c.score.ghost_rate} responseRate={c.score.response_rate} sub={`avg ${Math.round(c.score.avg_wait_days)}d wait · ${c.score.report_count.toLocaleString()} reports`} />
+              <CompanyRow key={c.name} name={c.name} score={c.score.overall_score} ghostRate={c.score.ghost_rate} responseRate={c.score.response_rate} sub={`avg ${Math.round(c.score.avg_wait_days)}d wait · ${reportsOf(c).toLocaleString()} reports`} />
             ))}
           </section>
         )}

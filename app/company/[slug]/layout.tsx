@@ -140,7 +140,7 @@ export default async function CompanySlugLayout(
         ghostRate: s.ghost_rate,
         responseRate: s.response_rate,
         avgWaitDays: s.avg_wait_days,
-        reportCount: s.report_count,
+        reportCount: fpSeo,
       })
     : []
 
@@ -190,7 +190,7 @@ export default async function CompanySlugLayout(
   const ghostPct = s?.ghost_rate != null ? Math.round(s.ghost_rate * 100) : null
   const respPct = s?.response_rate != null ? Math.round(s.response_rate * 100) : null
   const waitDays = s?.avg_wait_days != null ? Math.round(s.avg_wait_days) : null
-  const reportCount = s?.report_count ?? 0
+  const reportCount = firstPartyReportCount(s)
   const dataPoints = reportCount > 0 ? `${reportCount} applicant report${reportCount === 1 ? '' : 's'}` : 'estimated data'
   const summaryDate = summary ? summaryMonth(summary.generated_at) : null
   const summaryBlock = summary ? (

@@ -6,6 +6,7 @@ import Link from 'next/link'
 import { RecentSearchesStore } from '@/lib/stores/RecentSearches'
 import { useIntroGate } from '@/lib/hooks/useIntroGate'
 import { useCountUp } from '@/lib/hooks/useCountUp'
+import { firstPartyReportCount } from '@/lib/server/reportCounts'
 import styles from './HomeHero.module.css'
 
 const JOB_KEYWORDS = ['engineer', 'developer', 'manager', 'analyst', 'designer', 'nurse', 'coordinator', 'specialist', 'director', 'associate', 'assistant', 'recruiter', 'sales', 'marketing', 'accountant', 'therapist', 'technician']
@@ -18,30 +19,38 @@ interface ProofScore {
   response_rate: number
   avg_wait_days: number
   waste: number
+  /** FUSED total (first-party + web-research claim) — never rendered as "reports". */
   report_count: number
+  /** Real applicant-report rows — the only count the card may call "applicant reports". */
+  first_party_report_count: number
 }
 
 // Real proof, not a promise: a genuine company's real hiring behaviour rendered in the
 // first screen. Seeded from Seen's own production company-score leaderboard
-// (/api/reports · action:leaderboard) captured 2026-07-19, then live-refreshed from that
-// same endpoint on mount so the numbers stay current wherever the API is reachable. These
-// are real applicant-reported figures — never invented. Amazon is featured because it is
-// widely recognised and its profile makes the product's thesis legible at a glance.
+// (/api/reports · action:leaderboard) captured 2026-10-17, then live-refreshed from that
+// same endpoint on mount so the numbers stay current wherever the API is reachable. Amazon is
+// featured because it is widely recognised AND its score is backed by first-party applicant
+// reports (23 at capture — verified via the company page's schema.org ratingCount, which is
+// first-party only). The card labels its count from first_party_report_count — never the fused
+// report_count, which adds the web-research pipeline's claimed mention count.
 const FEATURED_SEED: ProofScore = {
   name: 'Amazon',
   industry: 'E-Commerce, Cloud Computing, Technology',
-  overall_score: 43,
-  ghost_rate: 0.519231,
-  response_rate: 0.346154,
-  avg_wait_days: 60,
-  waste: 56,
-  report_count: 46,
+  overall_score: 66,
+  ghost_rate: 0.276316,
+  response_rate: 0.447368,
+  avg_wait_days: 0,
+  waste: 17,
+  report_count: 23,
+  first_party_report_count: 23,
 }
 
 // One-tap example companies for brand-new users — zero typing to first value.
-// Every entry verified against the LIVE production leaderboard (2026-07-29): all have
-// real applicant reports (Starbucks 11.5k · Nike 2.2k · McDonald's 12.7k · Amazon 46),
-// and the grade spread (A → D) shows instantly that Seen differentiates companies.
+// Checked against the LIVE production leaderboard (2026-10-17): every entry has a score and the
+// grade spread shows instantly that Seen differentiates companies. NOTE: only Amazon's score is
+// backed by first-party applicant reports (23); Starbucks / Nike / McDonald's scores are
+// web-research ESTIMATES (their large fused counts — 11.5k / 2.2k / 12.7k — are web claims with
+// zero report rows), and their company pages label them as estimates.
 // Slugs are the exact stored names, so routing never depends on punctuation cleanup.
 const EXAMPLES: Array<{ label: string; slug: string }> = [
   { label: 'Amazon', slug: 'amazon' },
@@ -97,7 +106,7 @@ export default function HomeHero() {
           signal: ac.signal,
         })
         if (!res.ok) return
-        const data = await res.json() as { companies?: Array<{ name: string; industry?: string; score: Omit<ProofScore, 'name' | 'industry'> }> }
+        const data = await res.json() as { companies?: Array<{ name: string; industry?: string; score: Omit<ProofScore, 'name' | 'industry' | 'first_party_report_count'> & { first_party_report_count?: number; data_source?: string | null } }> }
         const match = (data.companies || []).find(c => c.name?.toLowerCase() === FEATURED_SEED.name.toLowerCase())
         if (match && Number.isFinite(match.score?.overall_score)) {
           setProof({
@@ -109,6 +118,7 @@ export default function HomeHero() {
             avg_wait_days: match.score.avg_wait_days,
             waste: match.score.waste,
             report_count: match.score.report_count,
+            first_party_report_count: firstPartyReportCount(match.score),
           })
         }
       } catch { /* keep the real seed */ }
@@ -220,7 +230,9 @@ export default function HomeHero() {
               <div className={styles.logo}>{proof.name[0]?.toUpperCase()}</div>
               <div style={{ minWidth: 0 }}>
                 <h3 className={styles.coName}>{proof.name}</h3>
-                <span className={styles.coMeta}>{proof.report_count.toLocaleString()} applicant reports</span>
+                <span className={styles.coMeta}>{proof.first_party_report_count > 0
+                  ? `${proof.first_party_report_count.toLocaleString()} applicant report${proof.first_party_report_count === 1 ? '' : 's'}`
+                  : 'Estimated from public web data'}</span>
               </div>
             </div>
             <div className={styles.grade} style={{ color: gradeColor, background: gradeTint, border: `1px solid ${gradeBorder}` }}>

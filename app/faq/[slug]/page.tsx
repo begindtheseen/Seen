@@ -1,7 +1,7 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import {
-  getScore, titleCase, slugify, grade, riskColor, riskLabel, pct,
+  getScore, titleCase, slugify, grade, riskColor, riskLabel, pct, firstPartyReportCount,
   SEED_COMPANIES, type GrowthScore,
 } from '@/lib/growth'
 import { jsonLdHtml } from '@/lib/jsonLd'
@@ -9,6 +9,10 @@ import { jsonLdHtml } from '@/lib/jsonLd'
 // Evergreen long-tail FAQ pages: /faq/does-amazon-ghost-applicants, /faq/google-hiring-process, etc.
 // Server-rendered, factual, embedding the company's LIVE grade + ghost data. Targets the exact
 // phrasing people type into Google/Reddit. Never fabricates — if no data, honest "be the first".
+// "Reported"/"real data" wording is used ONLY when first-party applicant reports back the score
+// (firstPartyReportCount). A score built from web research alone is worded as Seen's estimate from
+// aggregated public data — the fused report_count includes the web pipeline's claimed mentions
+// and is never presented as applicant reports.
 
 export const revalidate = 3600
 export const dynamicParams = true
@@ -49,12 +53,15 @@ export async function generateMetadata(
   const name = titleCase(parsed.company)
   const s = await getScore(parsed.company)
   const ghostPct = pct(s?.ghost_rate)
+  const reported = firstPartyReportCount(s) > 0
   const url = `https://seenjobs.io/faq/${slug}`
 
   if (parsed.kind === 'ghost') {
-    const title = `Does ${name} Ghost Applicants? (Real Data, ${new Date().getFullYear()})`
+    const title = `Does ${name} Ghost Applicants? (${reported ? 'Real Data' : 'Hiring Data'}, ${new Date().getFullYear()})`
     const description = ghostPct != null
-      ? `${name} ghosts roughly ${ghostPct}% of applicants based on real reported outcomes. See ${name}'s response rate, average wait time, and what Reddit says before you apply.`
+      ? (reported
+          ? `${name} ghosts roughly ${ghostPct}% of applicants based on real reported outcomes. See ${name}'s response rate, average wait time, and what Reddit says before you apply.`
+          : `Seen estimates ${name} ghosts roughly ${ghostPct}% of applicants, from aggregated public hiring data — no applicant reports yet. See the estimate and add your own experience.`)
       : `Does ${name} ghost applicants? See real reported hiring outcomes, response rates, and wait times — and add your own experience.`
     return {
       title, description,
@@ -65,7 +72,7 @@ export async function generateMetadata(
     }
   }
   const title = `${name} Hiring Process: Stages, Wait Time & Ghost Rate`
-  const description = `How ${name}'s hiring process works — stages, average wait time${ghostPct != null ? `, and a ${ghostPct}% ghost rate` : ''} — from real applicant reports. What to expect before you apply.`
+  const description = `How ${name}'s hiring process works — stages, average wait time${ghostPct != null ? `, and a ${ghostPct}% ${reported ? '' : 'estimated '}ghost rate` : ''} — ${reported ? 'from real applicant reports' : 'estimated from aggregated public hiring data'}. What to expect before you apply.`
   return {
     title, description,
     keywords: [`${name} hiring process`, `${name} interview process`, `${name} application timeline`, `how long does ${name} take to respond`, `${name} hiring stages`],
@@ -98,6 +105,7 @@ function DataPanel({ name, s }: { name: string; s: GrowthScore }) {
   const ghostPct = pct(s.ghost_rate)
   const respPct = pct(s.response_rate)
   const wait = s.avg_wait_days != null ? Math.round(s.avg_wait_days) : null
+  const fp = firstPartyReportCount(s)
   return (
     <div style={{ background: 'var(--card)', border: '1px solid var(--line)', borderLeft: `3px solid ${accent}`, borderRadius: 12, padding: '1.2rem 1.25rem', margin: '0 0 1.8rem' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap', marginBottom: '1rem' }}>
@@ -113,7 +121,7 @@ function DataPanel({ name, s }: { name: string; s: GrowthScore }) {
         {wait != null && <MetricCard label="Avg wait" value={`${wait}d`} color="var(--amber)" />}
       </div>
       <div style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', color: 'var(--dim)', marginTop: '.9rem' }}>
-        {s.report_count > 0 ? `Based on ${s.report_count.toLocaleString()} applicant report${s.report_count === 1 ? '' : 's'}` : 'Estimated from aggregated public data'} · A community signal, not a verified fact
+        {fp > 0 ? `Based on ${fp.toLocaleString()} applicant report${fp === 1 ? '' : 's'}` : 'Estimated from aggregated public data'} · A community signal, not a verified fact
       </div>
     </div>
   )
@@ -154,16 +162,22 @@ export default async function FaqSlugPage({ params }: { params: Promise<{ slug: 
   const respPct = pct(s?.response_rate)
   const wait = s?.avg_wait_days != null ? Math.round(s.avg_wait_days) : null
   const year = new Date().getFullYear()
+  // true → first-party applicant reports back the numbers; false → web-research estimate.
+  const reported = firstPartyReportCount(s) > 0
 
   const isGhost = parsed.kind === 'ghost'
   const h1 = isGhost ? `Does ${name} ghost applicants?` : `${name} hiring process: what to expect`
 
   // Short answer line — straight, factual, no fabrication.
   let shortAnswer: string
-  if (s && ghostPct != null) {
+  if (s && ghostPct != null && reported) {
     shortAnswer = isGhost
       ? `Based on real reported outcomes, ${name} ghosts roughly ${ghostPct}% of applicants${respPct != null ? `, and responds to about ${respPct}%` : ''}. That puts ${name} at a Seen Grade of ${s.overall_score}/100 (${riskLabel(s.risk_level).toLowerCase()}).`
       : `${name} carries a Seen Grade of ${s.overall_score}/100${wait != null ? `, with an average wait of about ${wait} days to hear back` : ''}${ghostPct != null ? ` and a ${ghostPct}% ghost rate` : ''}. Here's what applicants report.`
+  } else if (s && ghostPct != null) {
+    shortAnswer = isGhost
+      ? `No applicant has reported an outcome with ${name} on Seen yet. Seen's estimate from aggregated public hiring data puts its ghost rate at roughly ${ghostPct}%${respPct != null ? ` and its response rate at about ${respPct}%` : ''}, for an estimated Seen Grade of ${s.overall_score}/100 (${riskLabel(s.risk_level).toLowerCase()}).`
+      : `${name} has an estimated Seen Grade of ${s.overall_score}/100${wait != null ? `, with an estimated wait of about ${wait} days to hear back` : ''} and an estimated ${ghostPct}% ghost rate — from aggregated public hiring data, not yet from applicant reports.`
   } else if (s) {
     shortAnswer = `${name} has a Seen Grade of ${s.overall_score}/100. We don't yet have a precise ghost rate — add your experience to sharpen the picture for the next applicant.`
   } else {
@@ -175,9 +189,13 @@ export default async function FaqSlugPage({ params }: { params: Promise<{ slug: 
     {
       q: isGhost ? `Does ${name} ghost applicants?` : `How long does ${name}'s hiring process take?`,
       a: s && ghostPct != null
-        ? (isGhost
-            ? `${name} ghosts about ${ghostPct}% of applicants based on reported outcomes${respPct != null ? `, and responds to roughly ${respPct}%` : ''}.`
-            : `${name}'s reported average wait is ${wait != null ? `about ${wait} days` : 'variable'}, with a ${ghostPct}% ghost rate.`)
+        ? (reported
+            ? (isGhost
+                ? `${name} ghosts about ${ghostPct}% of applicants based on reported outcomes${respPct != null ? `, and responds to roughly ${respPct}%` : ''}.`
+                : `${name}'s reported average wait is ${wait != null ? `about ${wait} days` : 'variable'}, with a ${ghostPct}% ghost rate.`)
+            : (isGhost
+                ? `Seen has no applicant reports for ${name} yet. Its estimate from aggregated public hiring data is a ghost rate of about ${ghostPct}%${respPct != null ? ` and a response rate of roughly ${respPct}%` : ''}.`
+                : `Seen has no applicant reports for ${name} yet. Its estimate from aggregated public hiring data is an average wait of ${wait != null ? `about ${wait} days` : 'unknown length'}, with a ${ghostPct}% ghost rate.`))
         : `We don't have enough verified reports for ${name} yet. Reported outcomes update this answer in real time.`,
     },
     {
@@ -216,8 +234,8 @@ export default async function FaqSlugPage({ params }: { params: Promise<{ slug: 
         <h2 style={S.h2}>{isGhost ? `Why applicants think ${name} ghosts them` : `What ${name}'s hiring process looks like`}</h2>
         <p style={S.p}>
           {isGhost
-            ? `"Ghosting" means applying and never hearing back — no rejection, no update, nothing. It's the single most common complaint on Reddit threads about ${name}. ${s && respPct != null ? `${name}'s reported response rate is ${respPct}%, so a meaningful share of applicants never get a reply.` : `Reported response data for ${name} is still thin — every new report makes the signal sharper.`} Common reasons: roles filled internally, listings left open after closing, or high applicant volume that outpaces recruiting capacity.`
-            : `${s?.summary ? s.summary : `Most applicants describe an online application, an initial screen, one or more interview rounds, and then a decision.`} ${wait != null ? `Reported average time to first response is about ${wait} days.` : ''} ${s?.avg_rounds ? `Applicants report roughly ${Math.round(s.avg_rounds)} interview round(s).` : ''}`}
+            ? `"Ghosting" means applying and never hearing back — no rejection, no update, nothing. It's the single most common complaint on Reddit threads about ${name}. ${s && respPct != null ? `${name}'s ${reported ? 'reported' : 'estimated'} response rate is ${respPct}%, so a meaningful share of applicants never get a reply.` : `Reported response data for ${name} is still thin — every new report makes the signal sharper.`} Common reasons: roles filled internally, listings left open after closing, or high applicant volume that outpaces recruiting capacity.`
+            : `${s?.summary ? s.summary : `Most applicants describe an online application, an initial screen, one or more interview rounds, and then a decision.`} ${wait != null ? `${reported ? 'Reported' : 'Estimated'} average time to first response is about ${wait} days.` : ''} ${s?.avg_rounds ? (reported ? `Applicants report roughly ${Math.round(s.avg_rounds)} interview round(s).` : `Public hiring data suggests roughly ${Math.round(s.avg_rounds)} interview round(s).`) : ''}`}
         </p>
 
         <h2 style={S.h2}>What you can do before you apply</h2>

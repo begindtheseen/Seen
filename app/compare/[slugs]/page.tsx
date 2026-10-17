@@ -27,7 +27,7 @@ export async function generateMetadata({ params }: { params: Promise<{ slugs: st
   const aName = titleCase(parsed[0]), bName = titleCase(parsed[1])
   const url = `https://seenjobs.io/compare/${slugs}`
   const title = `${aName} vs ${bName} Hiring: Ghost Rate & Response Time Compared`
-  const description = `${aName} vs ${bName} — which treats applicants better? Compare ghost rate, response rate, average wait, and Seen Grade side by side from real applicant reports.`
+  const description = `${aName} vs ${bName} — which treats applicants better? Compare ghost rate, response rate, average wait, and Seen Grade side by side — from applicant reports, with labeled estimates where reports are missing.`
   return {
     title, description,
     keywords: [`${aName} vs ${bName} hiring`, `${aName} or ${bName}`, `${aName} vs ${bName} ghost rate`, `which is better ${aName} ${bName}`, `${aName} ${bName} interview process`],

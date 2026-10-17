@@ -3,6 +3,7 @@
 // exact pattern app/company/[slug]/layout.tsx getScore() already uses. NO external services.
 
 import { tenureAdjustment } from '@/api/_utils/companyScore.js'
+import { firstPartyReportCount as firstPartyCountOf, webClaimCount } from '@/lib/server/reportCounts.js'
 
 export type GrowthScore = {
   /** The STORED canonical company name (lowercase, real punctuation — e.g. "lowe's"). */
@@ -27,9 +28,9 @@ export type GrowthScore = {
 // Honest count for public claims ("N applicant reports", schema.org ratingCount): first-party
 // rows only. Legacy rows (pre-063) infer from data_source — only 'reports'-derived scores were
 // counted from real rows; anything else is a web-research claim and yields 0 here.
+// Canonical implementation lives in lib/server/reportCounts.js (shared with api/*.js + ghostReport).
 export function firstPartyReportCount(s: GrowthScore | null | undefined): number {
-  if (!s) return 0
-  return s.first_party_report_count ?? (s.data_source === 'reports' ? (s.report_count ?? 0) : 0)
+  return firstPartyCountOf(s)
 }
 
 export type LeaderboardRow = {
@@ -41,11 +42,57 @@ export type LeaderboardRow = {
     ghost_rate: number
     response_rate: number
     avg_wait_days: number
+    /** FUSED total (first-party + web claim) — ordering/scoring only, NEVER label it "reports". */
     report_count: number
+    /** Real applicant-report rows behind the score — the only count that may render as "reports". */
+    first_party_report_count: number
+    /** Web-research claimed mention count — an estimate input, never applicant reports. */
+    web_report_count: number
+    data_source: string | null
     risk_level: 'safe' | 'warn' | 'danger'
     waste: number
   }
 }
+
+// One company_scores row → LeaderboardRow. Shared by every leaderboard-shaped reader so the honest
+// split is always present (a reader that forgot it is how /agencies came to call a web-research
+// claim "3,085 applicant reports").
+type ScoreDbRow = {
+  company_name: string
+  industry?: string | null
+  verification_status?: string | null
+  overall_score?: number | null
+  ghost_rate?: number | null
+  response_rate?: number | null
+  avg_wait_days?: number | null
+  waste_score?: number | null
+  report_count?: number | null
+  first_party_report_count?: number | null
+  web_report_count?: number | null
+  data_source?: string | null
+}
+function toLeaderboardRow(c: ScoreDbRow): LeaderboardRow {
+  const s = c.overall_score || 0
+  return {
+    name: c.company_name,
+    industry: c.industry || '',
+    verified: c.verification_status === 'verified',
+    score: {
+      overall_score: s,
+      ghost_rate: c.ghost_rate || 0,
+      response_rate: c.response_rate || 0,
+      avg_wait_days: c.avg_wait_days || 0,
+      report_count: c.report_count || 0,
+      first_party_report_count: firstPartyCountOf(c),
+      web_report_count: webClaimCount(c),
+      data_source: c.data_source ?? null,
+      risk_level: s >= 70 ? 'safe' : s >= 40 ? 'warn' : 'danger',
+      waste: c.waste_score || 0,
+    },
+  }
+}
+
+const LEADERBOARD_SELECT = 'company_name,overall_score,ghost_rate,response_rate,avg_wait_days,waste_score,report_count,first_party_report_count,web_report_count,data_source,data_quality,verification_status,industry'
 
 // These SEO/GEO helpers NEVER self-fetch the app's own live API (https://seenjobs.io/api/reports).
 // A build-time self-fetch has no timeout by default and would pin a `next build` worker forever if
@@ -122,32 +169,22 @@ async function scoreFromDb(name: string): Promise<GrowthScore | null> {
 }
 
 // Build-time leaderboard read — mirrors the api/reports.js `action:'leaderboard'` mapping exactly.
-async function leaderboardFromDb(): Promise<LeaderboardRow[]> {
+// `by: 'first_party'` orders by REAL report rows (then fused total) — for surfaces that rank or
+// count reported outcomes (/ghost-report, /reddit). The default fused order is dominated by
+// web-research claims and can push a company with genuine reports out of the 150-row window.
+async function leaderboardFromDb(by: 'fused' | 'first_party' = 'fused'): Promise<LeaderboardRow[]> {
   const creds = sbCreds()
   if (!creds) return []
   const headers = { apikey: creds.key, Authorization: `Bearer ${creds.key}` }
+  const order = by === 'first_party' ? 'first_party_report_count.desc.nullslast,report_count.desc' : 'report_count.desc'
   try {
     const r = await fetch(
-      `${creds.url}/rest/v1/company_scores?select=company_name,overall_score,ghost_rate,response_rate,avg_wait_days,waste_score,report_count,data_quality,verification_status,industry&order=report_count.desc&limit=150`,
+      `${creds.url}/rest/v1/company_scores?select=${LEADERBOARD_SELECT}&order=${order}&limit=150`,
       { headers, signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) },
     )
     if (!r.ok) return []
     const rows = await r.json()
-    const ov = (s: number) => s || 0
-    return (Array.isArray(rows) ? rows : []).map((c) => ({
-      name: c.company_name,
-      industry: c.industry || '',
-      verified: c.verification_status === 'verified',
-      score: {
-        overall_score: ov(c.overall_score),
-        ghost_rate: c.ghost_rate || 0,
-        response_rate: c.response_rate || 0,
-        avg_wait_days: c.avg_wait_days || 0,
-        report_count: c.report_count || 0,
-        risk_level: ov(c.overall_score) >= 70 ? 'safe' : ov(c.overall_score) >= 40 ? 'warn' : 'danger',
-        waste: c.waste_score || 0,
-      },
-    }))
+    return (Array.isArray(rows) ? rows : []).map(toLeaderboardRow)
   } catch {
     return []
   }
@@ -197,8 +234,8 @@ export async function getScore(nameOrSlug: string): Promise<GrowthScore | null> 
 }
 
 // The public leaderboard — read DIRECTLY from company_scores (never a self-fetch of the live API).
-export async function getLeaderboard(): Promise<LeaderboardRow[]> {
-  return leaderboardFromDb()
+export async function getLeaderboard(opts: { by?: 'fused' | 'first_party' } = {}): Promise<LeaderboardRow[]> {
+  return leaderboardFromDb(opts.by ?? 'fused')
 }
 
 // Batch score lookup by EXACT stored names (company_scores stores names trim().toLowerCase()).
@@ -214,7 +251,7 @@ export async function getScoresByNames(namesLower: string[]): Promise<Map<string
   // in.() values are double-quoted (names contain spaces / "/"), then the whole list is
   // URI-encoded. None of our curated names contain a double quote.
   const list = encodeURIComponent(`(${namesLower.map(n => `"${n.trim().toLowerCase()}"`).join(',')})`)
-  const sel = 'select=company_name,overall_score,ghost_rate,response_rate,avg_wait_days,waste_score,report_count,verification_status,industry,created_at'
+  const sel = `select=${LEADERBOARD_SELECT},created_at`
   try {
     const r = await fetch(
       `${creds.url}/rest/v1/company_scores?company_name=in.${list}&${sel}&order=created_at.desc&limit=200`,
@@ -224,21 +261,7 @@ export async function getScoresByNames(namesLower: string[]): Promise<Map<string
     const rows = await r.json()
     for (const c of Array.isArray(rows) ? rows : []) {
       if (!c?.company_name || out.has(c.company_name)) continue // created_at.desc → first row per name is newest
-      const s = c.overall_score || 0
-      out.set(c.company_name, {
-        name: c.company_name,
-        industry: c.industry || '',
-        verified: c.verification_status === 'verified',
-        score: {
-          overall_score: s,
-          ghost_rate: c.ghost_rate || 0,
-          response_rate: c.response_rate || 0,
-          avg_wait_days: c.avg_wait_days || 0,
-          report_count: c.report_count || 0,
-          risk_level: s >= 70 ? 'safe' : s >= 40 ? 'warn' : 'danger',
-          waste: c.waste_score || 0,
-        },
-      })
+      out.set(c.company_name, toLeaderboardRow(c))
     }
     return out
   } catch {
