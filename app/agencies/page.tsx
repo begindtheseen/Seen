@@ -1,6 +1,6 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
-import { getScoresByNames, slugify, grade, riskColor, riskLabel, pct, type LeaderboardRow } from '@/lib/growth'
+import { getScoresByNames, slugify, grade, riskColor, riskLabel, pct, MIN_REPORTS_FOR_GRADE, type LeaderboardRow } from '@/lib/growth'
 import { publicDiscussionCountPath, parseExactCount, publicDiscussionShare } from '@/lib/server/reportCounts'
 import { STAFFING_AGENCIES, type StaffingAgency } from '@/lib/agencies'
 import { pickActiveSponsor } from '@/lib/server/sponsorSlot'
@@ -14,8 +14,11 @@ import { jsonLdHtml } from '@/lib/jsonLd'
 // - Ghost/response percentages are shown ONLY for agencies with actual applicant reports
 //   (first_party_report_count > 0 — NEVER the fused report_count, which adds the web-research
 //   pipeline's *claimed* mention count: live, Robert Half showed "3,085 reports" with zero report
-//   rows behind it). Score rows that exist with zero first-party reports carry web-prior
-//   estimates; those show a grade explicitly labeled as estimated, never a percentage.
+//   rows behind it).
+// - GRADE GATE (owner decision 2026-10-17, lib/server/reportCounts.js MIN_REPORTS_FOR_GRADE): a grade
+//   and percentages appear only with ≥5 first-party reports. 1–4 reports → "building a record" row with
+//   the count and no verdict; 0 reports → "no data yet", even if a web-prior estimate exists (estimates
+//   are never shown as a grade).
 // - First-party reports include attributed public third-party rows — Reddit threads imported with
 //   platform "Reddit r/<sub>" and first-hand accounts from public review sites found by web search
 //   (platform "Public review · <host>"), both trust-weighted 0.3 in the fusion. Each reported row
@@ -77,6 +80,7 @@ function ReportCta({ agencyName }: { agencyName: string }) {
 // much of that count is attributed public discussion / review-site content.
 function ReportedRow({ r, rank }: { r: Ranked; rank: number }) {
   const s = r.row!.score
+  if (s.overall_score == null) return null // only gradeable rows reach here
   const accent = riskColor(s.risk_level)
   const ghost = pct(s.ghost_rate)
   const reply = pct(s.response_rate)
@@ -104,17 +108,18 @@ function ReportedRow({ r, rank }: { r: Ranked; rank: number }) {
   )
 }
 
-// Row for an agency whose score row exists but has ZERO applicant reports: the grade is an
-// estimate from public hiring signals, so we label it as such and show no percentages.
-function EstimatedRow({ r }: { r: Ranked }) {
-  const s = r.row!.score
+// Row for an agency with SOME applicant reports but fewer than the grade bar: the reports are
+// readable on its page, but no grade or percentage is shown until it has enough of them.
+function BuildingRow({ r }: { r: Ranked }) {
+  const n = r.reports
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: '.85rem', background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 10, padding: '.85rem 1rem', marginBottom: '.55rem', opacity: 0.92 }}>
-      <div style={{ fontFamily: 'var(--display)', fontSize: '1.5rem', fontWeight: 800, color: 'var(--dim)', width: 30, textAlign: 'center', flexShrink: 0 }}>{grade(s.overall_score)}</div>
+      <div style={{ fontFamily: 'var(--display)', fontSize: '1.5rem', fontWeight: 800, color: 'var(--muted)', width: 30, textAlign: 'center', flexShrink: 0 }}>—</div>
       <div style={{ minWidth: 0, flex: 1 }}>
         <Link href={`/company/${r.slug}`} style={{ fontFamily: 'var(--display)', fontSize: '.92rem', fontWeight: 700, color: 'var(--white)', textDecoration: 'none' }}>{r.agency.name}</Link>
         <div style={{ ...mono('.6rem', 'var(--dim)'), marginTop: '.15rem' }}>
-          Grade estimated from public hiring signals · no applicant reports yet — be the first
+          {`Not enough reviews to grade yet (${Math.min(n, MIN_REPORTS_FOR_GRADE)} of ${MIN_REPORTS_FOR_GRADE})`}
+          {r.publicDiscussion ? ` · ${r.publicDiscussion.toLocaleString()} from public threads & review sites` : ''}
         </div>
       </div>
       <ReportCta agencyName={r.agency.name} />
@@ -206,21 +211,24 @@ export default async function AgenciesPage() {
       : null,
   })))
 
+  // Grade gate: only gradeable agencies (≥ MIN_REPORTS_FOR_GRADE real reports) are ranked.
   const reported = ranked
-    .filter(r => r.row && r.reports > 0)
-    .sort((a, b) => b.row!.score.ghost_rate - a.row!.score.ghost_rate || a.agency.name.localeCompare(b.agency.name))
-  const estimated = ranked
-    .filter(r => r.row && r.reports === 0)
-    .sort((a, b) => a.row!.score.overall_score - b.row!.score.overall_score || a.agency.name.localeCompare(b.agency.name))
+    .filter(r => r.row?.score.gradeable)
+    .sort((a, b) => (b.row!.score.ghost_rate ?? 0) - (a.row!.score.ghost_rate ?? 0) || a.agency.name.localeCompare(b.agency.name))
+  const building = ranked
+    .filter(r => r.row && !r.row.score.gradeable && r.reports > 0)
+    .sort((a, b) => b.reports - a.reports || a.agency.name.localeCompare(b.agency.name))
+  // No real reports → no data, even when a web-prior estimate exists (never shown as a grade).
   const unlisted = ranked
-    .filter(r => !r.row)
+    .filter(r => !r.row || r.reports === 0)
     .sort((a, b) => a.agency.name.localeCompare(b.agency.name))
 
-  const totalReports = reported.reduce((n, r) => n + r.reports, 0)
-  // Only state a public-discussion total when EVERY reported row's split is known — a partial sum
+  const withReports = [...reported, ...building]
+  const totalReports = withReports.reduce((n, r) => n + r.reports, 0)
+  // Only state a public-discussion total when EVERY row-with-reports' split is known — a partial sum
   // would understate it.
-  const totalPublic = reported.every(r => r.publicDiscussion != null)
-    ? reported.reduce((n, r) => n + (r.publicDiscussion ?? 0), 0)
+  const totalPublic = withReports.every(r => r.publicDiscussion != null)
+    ? withReports.reduce((n, r) => n + (r.publicDiscussion ?? 0), 0)
     : null
 
   const faqQa = [
@@ -281,16 +289,16 @@ export default async function AgenciesPage() {
         {reported.length > 0 && (
           <section style={{ marginBottom: '2.4rem' }}>
             <h2 style={{ fontFamily: 'var(--display)', fontSize: '1.1rem', fontWeight: 700, color: 'var(--white)', margin: '0 0 .3rem' }}>Ranked by reported ghost rate</h2>
-            <p style={{ color: 'var(--sub)', fontSize: '.8rem', lineHeight: 1.6, margin: '0 0 1rem', fontWeight: 300 }}>Agencies with applicant-reported outcomes — submitted to Seen, or shared publicly in discussion threads and on review sites (labeled and down-weighted) — worst ghost rate first. Where an agency has only a few reports, its rates can be blended with a public-data baseline, and the row is marked low confidence.</p>
+            <p style={{ color: 'var(--sub)', fontSize: '.8rem', lineHeight: 1.6, margin: '0 0 1rem', fontWeight: 300 }}>{`Agencies with at least ${MIN_REPORTS_FOR_GRADE} applicant-reported outcomes — submitted to Seen, or shared publicly in discussion threads and on review sites (labeled and down-weighted) — worst ghost rate first. Rows with fewer than 10 reports are marked low confidence.`}</p>
             {reported.map((r, i) => <ReportedRow key={r.agency.name} r={r} rank={i + 1} />)}
           </section>
         )}
 
-        {estimated.length > 0 && (
+        {building.length > 0 && (
           <section style={{ marginBottom: '2.4rem' }}>
-            <h2 style={{ fontFamily: 'var(--display)', fontSize: '1.1rem', fontWeight: 700, color: 'var(--white)', margin: '0 0 .3rem' }}>Graded on public signals — awaiting first reports</h2>
-            <p style={{ color: 'var(--sub)', fontSize: '.8rem', lineHeight: 1.6, margin: '0 0 1rem', fontWeight: 300 }}>These agencies have a provisional Seen Grade from public hiring signals, but no applicant reports yet — so no ghost percentage is shown. One report starts their real record.</p>
-            {estimated.map(r => <EstimatedRow key={r.agency.name} r={r} />)}
+            <h2 style={{ fontFamily: 'var(--display)', fontSize: '1.1rem', fontWeight: 700, color: 'var(--white)', margin: '0 0 .3rem' }}>Building a record — not graded yet</h2>
+            <p style={{ color: 'var(--sub)', fontSize: '.8rem', lineHeight: 1.6, margin: '0 0 1rem', fontWeight: 300 }}>{`These agencies have applicant reports you can read on their page, but fewer than ${MIN_REPORTS_FOR_GRADE} — too few for a fair grade or ghost rate. Every new report gets them closer.`}</p>
+            {building.map(r => <BuildingRow key={r.agency.name} r={r} />)}
           </section>
         )}
 
@@ -302,7 +310,7 @@ export default async function AgenciesPage() {
           </section>
         )}
 
-        {reported.length === 0 && estimated.length === 0 && unlisted.length === 0 && (
+        {reported.length === 0 && building.length === 0 && unlisted.length === 0 && (
           <div style={{ textAlign: 'center', padding: '2.5rem', color: 'var(--muted)', fontFamily: 'var(--mono)', fontSize: '.7rem' }}>
             The index is loading its first data. Check back shortly — or <Link href="/report?outcome=ghosted" style={{ color: 'var(--blue)' }}>add the first report</Link>.
           </div>
@@ -319,7 +327,7 @@ export default async function AgenciesPage() {
         </section>
 
         <p style={{ ...mono('.6rem', 'var(--dim)'), lineHeight: 1.7 }}>
-          Seen Grades aggregate applicant reports and public hiring signals into a 0–100 score. They are community signals, not verified facts, and update hourly as new reports arrive. Percentages appear only where applicants have actually reported outcomes. Report counts include outcomes shared publicly in discussion threads and on review sites (labeled and counted at reduced weight); web-research estimates are never counted as reports.
+          Seen Grades aggregate applicant reports and public hiring signals into a 0–100 score. They are community signals, not verified facts, and update hourly as new reports arrive. Grades and percentages appear only once at least {MIN_REPORTS_FOR_GRADE} applicants have reported outcomes. Report counts include outcomes shared publicly in discussion threads and on review sites (labeled and counted at reduced weight); web-research estimates are never counted as reports.
         </p>
       </div>
     </div>

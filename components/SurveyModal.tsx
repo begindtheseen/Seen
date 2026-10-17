@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { supabase } from '@/lib/supabase'
 import type { Application } from '@/lib/types'
+import ModalPortal from '@/components/ModalPortal'
 
 interface Question {
   key: string
@@ -432,6 +433,7 @@ export default function SurveyModal({ apps, onClose, onCreditsEarned }: SurveyMo
         }
       `}</style>
 
+      <ModalPortal>
       <div style={backdropStyle} onClick={e => { if (e.target === e.currentTarget) onClose() }}>
         <div style={modalStyle}>
 
@@ -737,6 +739,7 @@ export default function SurveyModal({ apps, onClose, onCreditsEarned }: SurveyMo
 
         </div>
       </div>
+      </ModalPortal>
     </>
   )
 }

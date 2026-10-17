@@ -12,6 +12,7 @@ import { ResumeStore } from '@/lib/stores/ResumeStore'
 import { aiHeaders } from '@/lib/aiHeaders'
 import { useAuth } from '@/lib/auth'
 import type { Job } from '@/lib/types'
+import { MIN_REPORTS_FOR_GRADE } from '@/lib/gradeGate'
 
 interface Contribution { factor: string; weight: number; raw: number; points: number; reason: string }
 interface RiskFlag { code: string; severity: 'low' | 'medium' | 'high'; message: string }
@@ -30,6 +31,7 @@ interface OptimizerOutput {
   evidence_strength: number
   seniority_alignment: number
   company_process_score: number
+  company_process_known?: boolean
   risk_flags: RiskFlag[]
   missing_keywords: string[]
   matched_requirements: RequirementMatch[]
@@ -269,8 +271,12 @@ export default function SeenFitPanel({ job }: { job: Job }) {
       {/* Company hiring / process risk */}
       <Section title="COMPANY HIRING RISK">
         <div style={{ display: 'flex', alignItems: 'center', gap: '.6rem', marginBottom: out.risk_flags.length ? '.7rem' : 0 }}>
-          <span style={{ fontFamily: 'var(--display)', fontWeight: 800, fontSize: '1.1rem', color: scoreColor(out.company_process_score) }}>{Math.round(out.company_process_score)}<span style={{ fontSize: '.6rem', color: 'var(--muted)' }}>/100</span></span>
-          <span style={{ fontFamily: mono, fontSize: '.6rem', color: 'var(--muted)' }}>hiring-process score (real applicant outcomes)</span>
+          {out.company_process_known === false ? (
+            <span style={{ fontFamily: 'var(--display)', fontWeight: 800, fontSize: '.85rem', color: 'var(--muted)' }}>Not graded yet</span>
+          ) : (
+            <span style={{ fontFamily: 'var(--display)', fontWeight: 800, fontSize: '1.1rem', color: scoreColor(out.company_process_score) }}>{Math.round(out.company_process_score)}<span style={{ fontSize: '.6rem', color: 'var(--muted)' }}>/100</span></span>
+          )}
+          <span style={{ fontFamily: mono, fontSize: '.6rem', color: 'var(--muted)' }}>{out.company_process_known === false ? `Fewer than ${MIN_REPORTS_FOR_GRADE} applicant reports — no grade yet` : 'hiring-process score (real applicant outcomes)'}</span>
         </div>
         {out.risk_flags.length > 0 ? (
           <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: '.4rem' }}>

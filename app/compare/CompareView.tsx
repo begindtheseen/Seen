@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { grade, riskColor, riskLabel, pct, slugify, firstPartyReportCount, type GrowthScore } from '@/lib/growth'
+import { grade, riskColor, riskLabel, pct, slugify, firstPartyReportCount, MIN_REPORTS_FOR_GRADE, type GrowthScore } from '@/lib/growth'
 
 // Server-rendered side-by-side comparison card used by both /compare?a=&b= and /compare/[slugs].
 // Mobile-first: two columns that stay readable at 390px (no overflow), real data only.
@@ -16,9 +16,22 @@ function Col({ name, s }: { name: string; s: GrowthScore | null }) {
       </div>
     )
   }
-  const accent = riskColor(s.risk_level)
   // First-party applicant reports only — the fused report_count includes the web-research claim.
   const fp = firstPartyReportCount(s)
+  // Grade gate: below MIN_REPORTS_FOR_GRADE real reports there is no grade or rate to compare.
+  if (s.overall_score == null) {
+    return (
+      <div style={{ flex: '1 1 0', minWidth: 0, background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 12, padding: '1.1rem', textAlign: 'center' }}>
+        <Link href={`/company/${cslug}`} style={{ textDecoration: 'none' }}>
+          <div style={{ fontFamily: 'var(--display)', fontSize: '1.05rem', fontWeight: 800, color: 'var(--white)', wordBreak: 'break-word', lineHeight: 1.15 }}>{name}</div>
+        </Link>
+        <div style={{ fontFamily: 'var(--display)', fontSize: '2.6rem', fontWeight: 800, color: 'var(--dim)', margin: '.6rem 0' }}>—</div>
+        <div style={{ fontSize: '.74rem', color: 'var(--sub)', lineHeight: 1.5 }}>{`Not enough reviews to grade yet (${Math.min(fp, MIN_REPORTS_FOR_GRADE)} of ${MIN_REPORTS_FOR_GRADE}).`}</div>
+        <Link href={fp > 0 ? `/company/${cslug}` : `/report`} className="btn btn-ghost" style={{ marginTop: '.8rem', fontSize: '.7rem', padding: '.5rem .9rem' }}>{fp > 0 ? 'Read the reports' : 'Be the first to report'}</Link>
+      </div>
+    )
+  }
+  const accent = riskColor(s.risk_level)
   const rows: { label: string; value: string; color?: string }[] = [
     { label: 'Ghost rate', value: pct(s.ghost_rate) != null ? `${pct(s.ghost_rate)}%` : '—', color: 'var(--red)' },
     { label: 'Response rate', value: pct(s.response_rate) != null ? `${pct(s.response_rate)}%` : '—', color: 'var(--green)' },
@@ -41,20 +54,21 @@ function Col({ name, s }: { name: string; s: GrowthScore | null }) {
         ))}
       </div>
       <div style={{ fontFamily: 'var(--mono)', fontSize: '.52rem', color: 'var(--dim)', marginTop: '.7rem', lineHeight: 1.5 }}>
-        {fp > 0 ? `Based on ${fp.toLocaleString()} applicant report${fp === 1 ? '' : 's'}` : 'Estimated from aggregated public data — no applicant reports yet'}
+        {`Based on ${fp.toLocaleString()} applicant report${fp === 1 ? '' : 's'}`}
       </div>
     </div>
   )
 }
 
 function Verdict({ aName, a, bName, b }: { aName: string; a: GrowthScore | null; bName: string; b: GrowthScore | null }) {
-  if (!a || !b) return null
+  // Grade gate: a verdict needs two GRADED companies (both ≥ MIN_REPORTS_FOR_GRADE real reports).
+  if (!a || !b || a.overall_score == null || b.overall_score == null) return null
   const better = a.overall_score >= b.overall_score ? aName : bName
   const worse = better === aName ? bName : aName
   const hi = Math.max(a.overall_score, b.overall_score)
   const lo = Math.min(a.overall_score, b.overall_score)
   const tie = hi === lo
-  // A grade with no first-party reports behind it is a public-data estimate — never call it "reported".
+  // Both graded → both have real reports behind them (the estimate-only case can't reach here).
   const anyEst = firstPartyReportCount(a) === 0 || firstPartyReportCount(b) === 0
   return (
     <div style={{ background: 'var(--raised)', border: '1px solid var(--line)', borderRadius: 12, padding: '1rem 1.2rem', margin: '1.4rem 0 0' }}>

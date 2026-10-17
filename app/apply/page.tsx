@@ -4,6 +4,7 @@ import { Suspense, useEffect, useState } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { useAuth } from '@/lib/auth'
 import { AppStore } from '@/lib/stores/AppStore'
+import { isGradeableScore } from '@/lib/gradeGate'
 
 interface CoScore {
   overall_score: number
@@ -70,7 +71,9 @@ function ApplyContent() {
       body: JSON.stringify({ name: co }),
     })
       .then(r => r.json())
-      .then(d => { if (d.score) setScore(d.score) })
+      // Grade gate (lib/gradeGate.ts): below 5 real reports there is no grade to show, so the
+      // apply flow behaves exactly as for an unknown company (no card, generic insight).
+      .then(d => { if (d.score && isGradeableScore(d.score)) setScore(d.score) })
       .catch(() => {})
   }, [co])
 

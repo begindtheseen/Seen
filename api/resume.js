@@ -8,19 +8,27 @@ import { scannerFromSeenFit, optimizeFromSeenFit } from '../lib/server/seenfitCo
 import { extractUploadText } from '../lib/server/resumeUpload.js';
 import { isReadableResume } from '../lib/server/resumeReadability.js';
 import { deriveResumeJobQuery, pullResumeJobFloor } from '../lib/server/resumeJobMatch.js';
+import { firstPartyReportCount, isGradeable } from '../lib/server/reportCounts.js';
 
 // One-line "Seen data" block from read-only company intel (ghost/response from our
 // scores), or '' when we have no data on the company. This is the differentiator —
 // only Seen knows how a company actually treats applicants.
+// Grade gate (lib/server/reportCounts.js): rates/grade are only quoted when MIN_REPORTS_FOR_GRADE
+// real reports back them — the client sends the gated score payload, and a below-bar company's
+// null rates must never become "0% ghosted". The count quoted is first-party only (never the fused
+// report_count, which includes the web-research claim).
+function _intelUsable(ci) {
+  return !!ci && isGradeable(ci) && ci.overall_score != null && ci.ghost_rate != null && ci.response_rate != null;
+}
 function _seenIntel(company, ci) {
-  if (!ci || !ci.report_count) return '';
+  if (!_intelUsable(ci)) return '';
   const pct = (v) => Math.round((Number(v) || 0) * 100);
-  return `SEEN DATA on ${company} (from ${ci.report_count} real applicant reports): ${pct(ci.ghost_rate)}% were ghosted, ${pct(ci.response_rate)}% got a response, average wait ${Math.round(Number(ci.avg_wait_days) || 0)} days, Seen hiring grade ${Math.round(Number(ci.overall_score) || 0)}/100.`;
+  return `SEEN DATA on ${company} (from ${firstPartyReportCount(ci)} real applicant reports): ${pct(ci.ghost_rate)}% were ghosted, ${pct(ci.response_rate)}% got a response, average wait ${Math.round(Number(ci.avg_wait_days) || 0)} days, Seen hiring grade ${Math.round(Number(ci.overall_score) || 0)}/100.`;
 }
 
 // Numeric company-intel rates for deterministic advice templates (or null).
 function _intelStats(ci) {
-  if (!ci || !ci.report_count) return null;
+  if (!_intelUsable(ci)) return null;
   return {
     ghost_rate: Number(ci.ghost_rate) || 0,
     response_rate: Number(ci.response_rate) || 0,

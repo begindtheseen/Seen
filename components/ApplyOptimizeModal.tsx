@@ -10,6 +10,7 @@ import { FREE_DAILY_CREDITS } from '@/lib/creditRules'
 import ApplicationIntelligencePanel, { type ApplicationIntelligence } from './optimizer/ApplicationIntelligencePanel'
 import ErrorBoundary from './ErrorBoundary'
 import type { Job } from '@/lib/types'
+import ModalPortal from '@/components/ModalPortal'
 
 const CREDIT_WORD = FREE_DAILY_CREDITS === 1 ? 'credit' : 'credits'
 
@@ -527,6 +528,7 @@ export default function ApplyOptimizeModal({
   return (
     <>
     {showUpgrade && <UpgradeModal reason={upgradeReason} featureName={upgradeFeature} onClose={() => setShowUpgrade(false)} />}
+    <ModalPortal>
     <div style={overlay} onClick={onClose}>
       <div style={sheet} onClick={e => e.stopPropagation()}>
         {/* Header */}
@@ -976,6 +978,7 @@ export default function ApplyOptimizeModal({
         </div>
       </div>
     </div>
+    </ModalPortal>
     </>
   )
 }

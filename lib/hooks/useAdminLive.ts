@@ -48,9 +48,21 @@ export function useAdminLive(token: string | null, reload: () => void) {
     let alive = true
     let interval: ReturnType<typeof setInterval> | null = null
     let debounce: ReturnType<typeof setTimeout> | null = null
+    // A full dashboard reload is dozens of DB counts. Live events can arrive in bursts (an import,
+    // a credit run), so event-driven reloads are throttled to one per RELOAD_MIN_MS; events in
+    // between are folded into one trailing reload instead of firing a reload each.
+    let lastReload = 0
+    let trailing: ReturnType<typeof setTimeout> | null = null
+    const RELOAD_MIN_MS = 30_000
+    const throttledReload = () => {
+      const wait = lastReload + RELOAD_MIN_MS - Date.now()
+      if (wait <= 0) { lastReload = Date.now(); reloadRef.current(); return }
+      if (!trailing) trailing = setTimeout(() => { trailing = null; lastReload = Date.now(); if (alive) reloadRef.current() }, wait)
+    }
 
     async function poll() {
-      if (!alive || inflight.current) return
+      // A hidden tab doesn't poll; the visibilitychange handler below catches up when it returns.
+      if (!alive || inflight.current || document.visibilityState === 'hidden') return
       inflight.current = true
       try {
         const res = await fetch('/api/admin-stats', {
@@ -72,7 +84,7 @@ export function useAdminLive(token: string | null, reload: () => void) {
           ;[...fresh].reverse().forEach(e =>
             notify({ title: e.title, sub: e.sub, severity: toNotifySev(e.sev), key: e.id, duration: e.sev === 'money' ? 8000 : 5000 }),
           )
-          reloadRef.current()
+          throttledReload()
         }
       } catch { /* fallback poll will retry */ }
       finally { inflight.current = false }
@@ -99,11 +111,15 @@ export function useAdminLive(token: string | null, reload: () => void) {
 
     poll() // prime cursor now
     interval = setInterval(poll, FALLBACK_MS) // safety net only
+    const onVisible = () => { if (document.visibilityState === 'visible') poll() }
+    document.addEventListener('visibilitychange', onVisible)
 
     return () => {
       alive = false
       if (interval) clearInterval(interval)
       if (debounce) clearTimeout(debounce)
+      if (trailing) clearTimeout(trailing)
+      document.removeEventListener('visibilitychange', onVisible)
       if (channel) { try { supabase.removeChannel(channel) } catch { /* socket never opened */ } }
     }
   }, [token])

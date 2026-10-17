@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import type { AdminStats } from '@/components/admin/types'
 import { AdminLogin } from '@/components/admin/AdminLogin'
 import { AdminShell } from '@/components/admin/AdminShell'
@@ -26,12 +26,21 @@ export default function AdminPage() {
     }
   }, [])
 
-  const load = useCallback(async (t: string) => {
-    setLoading(true)
-    setError('')
+  // background=true (a reload after an admin action): keep the dashboard mounted while the fresh
+  // numbers load. Swapping it for the full-page spinner unmounted AdminShell, which erased the
+  // action's result message ("cleared N stale") and made the click look like it did nothing.
+  // Every admin action refreshes in the background, so refreshes can overlap (an action, the live
+  // feed, the Refresh button). Only the NEWEST request may update the dashboard — an older, slower
+  // response landing last would otherwise flip the numbers back.
+  const loadSeq = useRef(0)
+  // Resolves true when fresh stats landed, false on failure (the refresh button shows which).
+  const load = useCallback(async (t: string, background = false): Promise<boolean> => {
+    const seq = ++loadSeq.current
+    if (!background) { setLoading(true); setError('') }
     try {
       const res = await fetch('/api/admin-stats', {
         headers: { 'X-Admin-Token': t },
+        cache: 'no-store',
       })
       if (res.status === 401 || res.status === 403) {
         const msg = res.status === 403 ? 'Access denied' : 'Session expired'
@@ -39,15 +48,20 @@ export default function AdminPage() {
         setToken(null)
         setLoading(false)
         setLoginError(msg)
-        return
+        return false
       }
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
       const data = await res.json() as AdminStats
+      if (seq !== loadSeq.current) return true // a newer refresh superseded this one
       setStats(data)
+      setLoading(false)
+      return true
     } catch (e) {
-      setError((e as Error).message)
+      // A failed background reload keeps the current dashboard rather than replacing it with an error.
+      if (!background) setError((e as Error).message)
+      setLoading(false)
+      return false
     }
-    setLoading(false)
   }, [])
 
   useEffect(() => {
@@ -105,7 +119,7 @@ export default function AdminPage() {
     <AdminShell
       stats={stats}
       token={token}
-      reload={() => load(token)}
+      reload={() => load(token, true)}
       onLogout={logout}
       onUnauthorized={onUnauthorized}
     />

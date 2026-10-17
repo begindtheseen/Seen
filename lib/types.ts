@@ -90,6 +90,10 @@ export interface Job {
   posted_at?: string | null
   /** Paid Featured-employer placement (Engine E4) — badge + sorts first. Never a score change. */
   featured?: boolean
+  /** Posted (or imported) directly on Seen by the employer — sorts ahead of aggregated listings. */
+  employer_posted?: boolean
+  /** Where candidates apply (employer-posted listings only): own site, on Seen, or both. */
+  apply_mode?: 'external' | 'seen' | 'both'
   /** Factual, our-own-observation freshness descriptor (see lib/server/listingFreshness.js). */
   freshness?: ListingFreshness
 }

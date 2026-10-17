@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { useAuth } from '@/lib/auth'
 import { AppStore } from '@/lib/stores/AppStore'
 import { aiHeaders } from '@/lib/aiHeaders'
+import ModalPortal from '@/components/ModalPortal'
 
 interface ApplyCheckpointProps {
   job: { id: string; title: string; company: string; location?: string; apply_url?: string | null }
@@ -382,6 +383,7 @@ export default function ApplyCheckpoint({ job, optimized: _optimized, autoConfir
   // ── Render ──────────────────────────────────────────────────────────────────
 
   return (
+    <ModalPortal>
     <div
       style={backdropStyle}
       onClick={e => { if (e.target === e.currentTarget) onClose() }}
@@ -594,5 +596,6 @@ export default function ApplyCheckpoint({ job, optimized: _optimized, autoConfir
         )}
       </div>
     </div>
+    </ModalPortal>
   )
 }

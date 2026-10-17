@@ -2,6 +2,8 @@
 
 import { useState, useEffect } from 'react'
 import { firstPartyReportCount } from '@/lib/server/reportCounts'
+import { isGradeableScore, notEnoughReviewsLabel } from '@/lib/gradeGate'
+import ModalPortal from '@/components/ModalPortal'
 
 // ── Company Preview Modal ─────────────────────────────────────────────────────
 
@@ -17,6 +19,11 @@ interface CoPreviewScore {
   data_source?: string
   data_quality?: string
 }
+
+// What /api/reports actually returns: below the grade gate (≥5 real reports, lib/gradeGate.ts)
+// `gradeable` is false and every verdict field is null. Only a gradeable payload becomes a
+// CoPreviewScore (the graded shape the card renders).
+type CoPreviewPayload = { [K in keyof CoPreviewScore]?: CoPreviewScore[K] | null } & { gradeable?: boolean | null }
 
 function coVibes(sc: CoPreviewScore): { label: string; cls: string }[] {
   const vibes: { label: string; cls: string }[] = []
@@ -37,7 +44,7 @@ function coGrade(s: number) {
 }
 
 export default function CoPreviewModal({ company, onClose }: { company: string; onClose: () => void }) {
-  const [sc, setSc] = useState<CoPreviewScore | null>(null)
+  const [sc, setSc] = useState<CoPreviewPayload | null>(null)
   const [loading, setLoading] = useState(true)
   const slug = encodeURIComponent(company.toLowerCase().replace(/\s+/g, '-'))
 
@@ -50,17 +57,19 @@ export default function CoPreviewModal({ company, onClose }: { company: string; 
       body: JSON.stringify({ name: company }),
     })
       .then(r => r.ok ? r.json() : {})
-      .then((d: { score?: CoPreviewScore }) => { if (d.score) setSc(d.score) })
+      .then((d: { score?: CoPreviewPayload }) => { if (d.score) setSc(d.score) })
       .catch(() => {})
       .finally(() => setLoading(false))
   }, [company])
 
-  const risk = sc ? (sc.overall_score >= 65 ? 'safe' : sc.overall_score >= 40 ? 'warn' : 'danger') : 'warn'
+  const graded: CoPreviewScore | null = sc && isGradeableScore(sc) ? (sc as CoPreviewScore) : null
+  const risk = graded ? (graded.overall_score >= 65 ? 'safe' : graded.overall_score >= 40 ? 'warn' : 'danger') : 'warn'
   const glowColor = risk === 'safe' ? 'rgba(16,185,129,0.3)' : risk === 'danger' ? 'rgba(239,68,68,0.3)' : 'rgba(245,158,11,0.3)'
   const borderColor = risk === 'safe' ? 'rgba(16,185,129,0.35)' : risk === 'danger' ? 'rgba(239,68,68,0.35)' : 'rgba(245,158,11,0.35)'
   const gradeColor = risk === 'safe' ? 'var(--green)' : risk === 'danger' ? 'var(--red)' : 'var(--amber)'
 
   return (
+    <ModalPortal>
     <div
       style={{ position: 'fixed', inset: 0, zIndex: 9500, background: 'rgba(0,0,0,.8)', backdropFilter: 'blur(6px)' }}
       onClick={onClose}
@@ -88,34 +97,34 @@ export default function CoPreviewModal({ company, onClose }: { company: string; 
               <div style={{ fontSize: '1.25rem', marginBottom: '.5rem', animation: 'spin 1s linear infinite' }}>🔍</div>
               Checking hiring data...
             </div>
-          ) : sc ? (
+          ) : graded ? (
             <>
               {/* Grade + score */}
               <div style={{ display: 'flex', alignItems: 'center', gap: '.85rem', marginBottom: '.75rem' }}>
-                <div style={{ fontFamily: 'var(--display)', fontSize: '3rem', fontWeight: 800, color: gradeColor, lineHeight: 1, letterSpacing: '-.04em' }}>{coGrade(sc.overall_score)}</div>
+                <div style={{ fontFamily: 'var(--display)', fontSize: '3rem', fontWeight: 800, color: gradeColor, lineHeight: 1, letterSpacing: '-.04em' }}>{coGrade(graded.overall_score)}</div>
                 <div>
                   <div style={{ fontFamily: 'var(--mono)', fontSize: '.52rem', textTransform: 'uppercase', letterSpacing: '.08em', color: 'var(--muted)' }}>Seen Score</div>
-                  <div style={{ fontFamily: 'var(--display)', fontSize: '1.6rem', fontWeight: 800, color: 'var(--white)', lineHeight: 1, letterSpacing: '-.03em' }}>{sc.overall_score}<span style={{ fontSize: '.9rem', color: 'var(--muted)' }}>/100</span></div>
+                  <div style={{ fontFamily: 'var(--display)', fontSize: '1.6rem', fontWeight: 800, color: 'var(--white)', lineHeight: 1, letterSpacing: '-.03em' }}>{graded.overall_score}<span style={{ fontSize: '.9rem', color: 'var(--muted)' }}>/100</span></div>
                   {(() => {
-                    const fp = firstPartyReportCount(sc)
+                    const fp = firstPartyReportCount(graded)
                     return <div style={{ fontFamily: 'var(--mono)', fontSize: '.5rem', color: 'var(--dim)', marginTop: '.15rem' }}>{fp > 0 ? `${fp} applicant report${fp === 1 ? '' : 's'}` : 'Estimated from public web data'}</div>
                   })()}
                 </div>
               </div>
 
               {/* Vibe tags */}
-              {coVibes(sc).length > 0 && (
+              {coVibes(graded).length > 0 && (
                 <div style={{ display: 'flex', gap: '.28rem', flexWrap: 'wrap', marginBottom: '.85rem' }}>
-                  {coVibes(sc).map(v => <span key={v.label} className={`vibe ${v.cls}`}>{v.label}</span>)}
+                  {coVibes(graded).map(v => <span key={v.label} className={`vibe ${v.cls}`}>{v.label}</span>)}
                 </div>
               )}
 
               {/* Key stats */}
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '.5rem', marginBottom: '1rem' }}>
                 {[
-                  { label: 'Response', value: `${Math.round((sc.response_rate || 0) * 100)}%` },
-                  { label: 'Ghosts',   value: `${Math.round((sc.ghost_rate || 0) * 100)}%`    },
-                  { label: 'Avg wait', value: `${sc.avg_wait_days || '—'}d`                   },
+                  { label: 'Response', value: `${Math.round((graded.response_rate || 0) * 100)}%` },
+                  { label: 'Ghosts',   value: `${Math.round((graded.ghost_rate || 0) * 100)}%`    },
+                  { label: 'Avg wait', value: `${graded.avg_wait_days || '—'}d`                   },
                 ].map(({ label, value }) => (
                   <div key={label} style={{ background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 8, padding: '.55rem .6rem', textAlign: 'center' }}>
                     <div style={{ fontFamily: 'var(--mono)', fontSize: '.95rem', fontWeight: 500, color: 'var(--white)', lineHeight: 1, marginBottom: '.18rem' }}>{value}</div>
@@ -124,6 +133,19 @@ export default function CoPreviewModal({ company, onClose }: { company: string; 
                 ))}
               </div>
 
+              <a
+                href={`/company/${slug}`}
+                style={{ display: 'block', width: '100%', textAlign: 'center', background: 'linear-gradient(135deg,#3b82f6,#8b5cf6)', color: '#fff', border: 'none', borderRadius: 9, padding: '.7rem 1rem', fontFamily: 'var(--display)', fontWeight: 800, fontSize: '.88rem', cursor: 'pointer', textDecoration: 'none', boxShadow: '0 0 20px rgba(59,130,246,0.3)' }}
+              >
+                View full company →
+              </a>
+            </>
+          ) : sc ? (
+            <>
+              {/* Grade gate: real reports exist but fewer than the bar — no verdict, just the facts. */}
+              <div style={{ fontFamily: 'var(--mono)', fontSize: '.52rem', textTransform: 'uppercase', letterSpacing: '.08em', color: 'var(--muted)', marginBottom: '.35rem' }}>Seen Score</div>
+              <div style={{ fontFamily: 'var(--display)', fontSize: '1rem', fontWeight: 700, color: 'var(--white)', lineHeight: 1.3, marginBottom: '.35rem' }}>{notEnoughReviewsLabel(sc)}</div>
+              <div style={{ fontFamily: 'var(--mono)', fontSize: '.55rem', color: 'var(--dim)', marginBottom: '1rem' }}>We only grade a company once enough real applicants have reported. Read the reviews we have on the company page.</div>
               <a
                 href={`/company/${slug}`}
                 style={{ display: 'block', width: '100%', textAlign: 'center', background: 'linear-gradient(135deg,#3b82f6,#8b5cf6)', color: '#fff', border: 'none', borderRadius: 9, padding: '.7rem 1rem', fontFamily: 'var(--display)', fontWeight: 800, fontSize: '.88rem', cursor: 'pointer', textDecoration: 'none', boxShadow: '0 0 20px rgba(59,130,246,0.3)' }}
@@ -140,5 +162,6 @@ export default function CoPreviewModal({ company, onClose }: { company: string; 
         </div>
       </div>
     </div>
+    </ModalPortal>
   )
 }

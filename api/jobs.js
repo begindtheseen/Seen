@@ -3,6 +3,7 @@ import { getQueryExpansion } from '../lib/server/expand.js';
 import { applyRateLimit, rateLimit, rateLimitGlobal, resolveRateBucket } from '../lib/server/ratelimit.js';
 import { logError } from '../lib/server/errlog.js';
 import { filterAndRank, filterByLocation, sortByProximity, locationDbTerm, expandQueryTerms } from './_utils/jobRelevance.js';
+import { sortByPriority, companyMatchesQuery, isRemoteListing } from '../lib/server/jobPriority.js';
 import { aggregateForQuery, upsertJobs, inferLevel, wasRecentlyPulled, recordPull } from '../lib/server/jobSources.js';
 import { aggregateWithSources } from '../lib/jobs/expand.js';
 import { deriveResumeJobQuery, pullResumeJobFloor } from '../lib/server/resumeJobMatch.js';
@@ -50,12 +51,31 @@ async function getFeaturedSet(url, headers) {
   } catch { _featCache = { at: now, set: _featCache.set } }
   return _featCache.set
 }
-// Flag featured listings and stable-sort them first (paid placement; never a score change).
+// Flag featured listings, then stable-sort by priority tier (lib/server/jobPriority.js):
+// Featured (paid) → posted on Seen by the employer → everything else. Order only, never a score.
 const applyFeatured = (list, set) => {
-  if (!set || set.size === 0) return list
-  const marked = list.map((j) => ({ ...j, featured: set.has(String(j.company || '').toLowerCase()) }))
-  return marked.map((j, i) => [j, i]).sort((a, b) => (b[0].featured - a[0].featured) || (a[1] - b[1])).map(([j]) => j)
+  const has = !!set && set.size > 0
+  const marked = list.map((j) => ({ ...j, featured: has && set.has(String(j.company || '').toLowerCase()) }))
+  return sortByPriority(marked)
 };
+
+// Listings employers posted (or imported) directly on Seen. A small set, cached 60s, fail-safe.
+// Every search checks it so a relevant direct post is never hidden by the geo-boxed pool reads
+// (a "Remote" post has no coordinates, so the radius box would otherwise drop it).
+let _empCache = { at: 0, rows: [] }
+async function getEmployerPostedPool(url, headers) {
+  const now = Date.now()
+  if (now - _empCache.at < 60_000) return _empCache.rows
+  try {
+    const iso = encodeURIComponent(new Date().toISOString())
+    const r = await fetch(`${url}/rest/v1/jobs?is_employer_posted=eq.true&expires_at=gt.${iso}&order=created_at.desc&limit=500`, { headers })
+    if (r.ok) {
+      const rows = await r.json()
+      _empCache = { at: now, rows: Array.isArray(rows) ? rows : [] }
+    } else { _empCache = { at: now, rows: _empCache.rows } }
+  } catch { _empCache = { at: now, rows: _empCache.rows } }
+  return _empCache.rows
+}
 
 // Verify a Supabase JWT (HS256) and return the user id, or null. Decoding the payload
 // WITHOUT this check would let anyone forge a token and read another user's data.
@@ -142,10 +162,12 @@ export default async function handler(req, res) {
       // NOTE: jobs has apply_url ONLY — selecting a phantom `url` column made PostgREST
       // reject the whole select, so every direct /jobs/<id> link 404'd. Same class as the
       // employer-listings phantom-url bug; `url` is aliased from apply_url in the response.
-      const r = await fetch(
-        `${U}/rest/v1/jobs?id=eq.${encodeURIComponent(id)}&select=id,title,company,location,salary,apply_url,description,type,level,source,score,waste_score,availability_status,created_at,last_seen_at,last_checked_at,availability_report_count,is_employer_posted&limit=1`,
-        { headers: { apikey: K, Authorization: `Bearer ${K}` } }
-      );
+      const cols = 'id,title,company,location,salary,apply_url,description,type,level,source,score,waste_score,availability_status,created_at,last_seen_at,last_checked_at,availability_report_count,is_employer_posted';
+      const get = (select) => fetch(`${U}/rest/v1/jobs?id=eq.${encodeURIComponent(id)}&select=${select}&limit=1`, { headers: { apikey: K, Authorization: `Bearer ${K}` } });
+      // apply_mode exists once the Apply-on-Seen migration is applied; before that the column is
+      // missing and PostgREST 400s the select, so retry without it (lib/server/seenApply.js).
+      let r = await get(`${cols},apply_mode`);
+      if (r.status === 400) r = await get(cols);
       const rows = r.ok ? await r.json() : [];
       if (!Array.isArray(rows) || !rows.length) return res.status(404).json({ error: 'Not found' });
       // Attach the score's factor breakdown so the detail page can show WHY, not just a number,
@@ -178,6 +200,7 @@ export default async function handler(req, res) {
   let synonyms = []; // canonical + expansion terms — true-synonym signals (matched vs the TITLE)
   let searchTerms = []; // original + canonical + deterministic expansion — the DB pool + corpus reads
   const PAGE_MIN = 10; // below this many results we widen (geo, then corpus, then national)
+  let serve = (list) => list; // final shaping of every response (set once the search context exists)
 
   try {
     let body = _body;
@@ -201,8 +224,11 @@ export default async function handler(req, res) {
     };
 
     // Admin-suppressed dead listings to filter out + featured employers to boost (fail-safe).
-    const suppressedSet = await getSuppressedSet(SUPABASE_URL, dbHeaders)
-    const featuredSet = await getFeaturedSet(SUPABASE_URL, dbHeaders);
+    const [suppressedSet, featuredSet, employerPool] = await Promise.all([
+      getSuppressedSet(SUPABASE_URL, dbHeaders),
+      getFeaturedSet(SUPABASE_URL, dbHeaders),
+      SUPABASE_URL && SUPABASE_SERVICE_KEY ? getEmployerPostedPool(SUPABASE_URL, dbHeaders) : Promise.resolve([]),
+    ]);
 
     const qNorm = safeQuery.toLowerCase();
 
@@ -254,6 +280,28 @@ export default async function handler(req, res) {
         .map((j, i) => ({ j, d: hasUsableCoords(j) ? haversineMiles(center, j) : Infinity, i }))
         .sort((a, b) => (a.d - b.d) || (a.i - b.i))
         .map(x => x.j);
+    };
+
+    // Every response goes through serve(): add the relevant listings employers posted on Seen,
+    // drop admin-suppressed ones, flag Featured, then order by priority tier. A direct post is
+    // included when the search names its company or the listing matches the query, and it is
+    // remote or inside the searched area. Reads relevanceQuery/synonyms at call time (they are
+    // filled in by the DB-first block below).
+    serve = (list) => {
+      const base = Array.isArray(list) ? list : [];
+      const relevant = (employerPool || []).filter((row) =>
+        companyMatchesQuery(row.company, relevanceQuery) ||
+        filterAndRank([row], relevanceQuery, { synonyms, canonical }).length > 0);
+      const inArea = relevant.filter((row) => !loc || isRemote || isRemoteListing(row) || applyRadius([row]).length > 0);
+      const postIds = new Set(inArea.map((r) => r.id).filter(Boolean));
+      const out = [], seenKeys = new Set();
+      for (const j of [...inArea.map(toUiRow), ...base]) {
+        const key = j.id || `${(j.title || '').toLowerCase()}|${(j.company || '').toLowerCase()}|${(j.location || '').toLowerCase()}`;
+        if (seenKeys.has(key)) continue;
+        seenKeys.add(key);
+        out.push(postIds.has(j.id) || j.employer_posted ? { ...j, employer_posted: true } : j);
+      }
+      return applyFeatured(dropSuppressed(out, suppressedSet), featuredSet);
     };
 
     // ── DB-FIRST search ──────────────────────────────────────────────────────
@@ -354,22 +402,14 @@ export default async function handler(req, res) {
             pool.push(row);
           }
         }
-        dbMatches = filterAndRank(pool, relevanceQuery, { synonyms, canonical }).map(j => ({
-          id: j.id || null, // keep the DB id — without it /jobs/<id> permalinks can never resolve
-          title: j.title, company: j.company, location: j.location || loc,
-          salary: j.salary, url: j.apply_url || j.url || null, description: j.description,
-          type: j.type || 'Full-time', level: inferLevel(j.title || ''),
-          source: j.source || 'Seen', ...scoreRow(j),
-          search_query: j.search_query || null, // provenance for the merged re-filter downstream
-          lat: j.lat ?? null, lng: j.lng ?? null, posted_at: j.created_at || null,
-        }));
+        dbMatches = filterAndRank(pool, relevanceQuery, { synonyms, canonical }).map(j => toUiRow(j, loc));
         // Keep only listings within the searched radius (true distance when we have
         // coordinates, else coarse city → state), nearest first.
         dbMatches = applyRadius(dbMatches);
 
         if (dbMatches.length >= TARGET) {
           console.log(`DB HIT: "${query}" → "${canonical}" @ "${loc}" (${radiusMiles}mi) — ${dbMatches.length} in-radius results (no API call)`);
-          return res.status(200).json({ ok: true, jobs: applyFeatured(dropSuppressed(dbMatches.slice(0, 60), suppressedSet), featuredSet), query, location: loc, _src: 'db' });
+          return res.status(200).json({ ok: true, jobs: serve(dbMatches.slice(0, 60)), query, location: loc, _src: 'db' });
         }
       } catch(e) { console.warn('DB-first search error:', e.message); }
       console.log(`DB TOP-UP: "${query}" → "${canonical}" @ "${loc}" — ${dbMatches.length} in DB, pulling more from API`);
@@ -394,7 +434,7 @@ export default async function handler(req, res) {
       }
       if (!cached.length) cached = await nearestListings(loc, SUPABASE_URL, dbHeaders);
       console.log(`COOLDOWN: "${canonical}" @ "${loc}" pulled recently — serving ${cached.length} cached (no API call)`);
-      return res.status(200).json({ ok: true, jobs: applyFeatured(dropSuppressed(cached, suppressedSet), featuredSet), query, location: loc, _src: 'db-cooldown' });
+      return res.status(200).json({ ok: true, jobs: serve(cached), query, location: loc, _src: 'db-cooldown' });
     }
 
     // ── Expensive live top-up: BUDGETED, never user-blocking ─────────────────────
@@ -417,7 +457,7 @@ export default async function handler(req, res) {
       }
       if (!degradedJobs.length) degradedJobs = await nearestListings(loc, SUPABASE_URL, dbHeaders);
       console.log(`DEGRADED (top-up budget out — bucket:${topupBucket.allowed} global:${topupGlobal.allowed}): "${query}" @ "${loc}" — ${degradedJobs.length} DB results`);
-      return res.status(200).json({ ok: true, jobs: applyFeatured(dropSuppressed(degradedJobs, suppressedSet), featuredSet), query, location: loc, _src: 'db-degraded', degraded: true });
+      return res.status(200).json({ ok: true, jobs: serve(degradedJobs), query, location: loc, _src: 'db-degraded', degraded: true });
     }
 
     // ── Not enough in our corpus → aggregate LIVE from keyless sources ───────────
@@ -568,7 +608,7 @@ export default async function handler(req, res) {
       console.log(`NEAREST FALLBACK: "${query}" @ "${loc}" — ${finalJobs.length} nearby listings`);
     }
 
-    const result = { jobs: applyFeatured(dropSuppressed(finalJobs, suppressedSet), featuredSet), query, location: loc, radius: radiusMiles, _src: widened ? 'widened' : (jobs.length ? 'aggregated' : 'db'), widened };
+    const result = { jobs: serve(finalJobs), query, location: loc, radius: radiusMiles, _src: widened ? 'widened' : (jobs.length ? 'aggregated' : 'db'), widened };
     _inflightResolve?.(result);
     _inflight.delete(inflightKey);
     return res.status(200).json({ ok: true, ...result });
@@ -582,10 +622,25 @@ export default async function handler(req, res) {
     // we already pulled related listings from our own corpus, serve those rather than an
     // empty error — search should never go blank just because the top-up couldn't run.
     if (dbMatches.length) {
-      return res.status(200).json({ ok: true, jobs: dbMatches.slice(0, 60), query: safeQuery, location: loc, _src: 'db-fallback' });
+      return res.status(200).json({ ok: true, jobs: serve(dbMatches.slice(0, 60)), query: safeQuery, location: loc, _src: 'db-fallback' });
     }
     return res.status(500).json({ error: err.message, jobs: [] });
   }
+}
+
+// DB jobs row → the UI listing shape every search response uses.
+function toUiRow(j, loc = '') {
+  return {
+    id: j.id || null, // keep the DB id — without it /jobs/<id> permalinks can never resolve
+    title: j.title, company: j.company, location: j.location || loc,
+    salary: j.salary, url: j.apply_url || j.url || null, description: j.description,
+    type: j.type || 'Full-time', level: inferLevel(j.title || ''),
+    source: j.source || 'Seen', ...scoreRow(j),
+    search_query: j.search_query || null, // provenance for the merged re-filter downstream
+    lat: j.lat ?? null, lng: j.lng ?? null, posted_at: j.created_at || null,
+    employer_posted: j.is_employer_posted === true, // posted on Seen by the employer → search priority
+    apply_mode: j.is_employer_posted === true ? (j.apply_mode || 'external') : 'external', // Apply on Seen
+  };
 }
 
 // Dedup UI rows by their title|company|location identity (first occurrence wins).

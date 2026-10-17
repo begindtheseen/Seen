@@ -8,6 +8,8 @@ import { RecentSearchesStore } from '@/lib/stores/RecentSearches'
 import { useAuth } from '@/lib/auth'
 import { aiHeaders } from '@/lib/aiHeaders'
 import type { Job } from '@/lib/types'
+import { isGradeableScore } from '@/lib/gradeGate'
+import { sortByPriority } from '@/lib/server/jobPriority.js'
 
 // In-memory search cache: `${query}|${location}` → { jobs, ts }
 const searchCache = new Map<string, { jobs: Job[]; ts: number }>()
@@ -72,6 +74,8 @@ export type LevelFilter = '' | 'entry' | 'mid' | 'senior'
 export type TypeFilter = '' | 'Full-time' | 'Part-time' | 'Contract'
 export type PostedFilter = '' | '1' | '7' | '30'
 
+// Company intel for job cards. ONLY gradeable companies (≥5 real reports — lib/gradeGate.ts) are
+// ever put in this map, so every consumer can trust these numbers are earned verdicts.
 export type CoScoreMap = Record<string, { ghost_rate: number; overall_score: number; response_rate?: number }>
 
 export function useJobSearch() {
@@ -109,9 +113,11 @@ export function useJobSearch() {
   function applySort(list: Job[], mode: SortMode): Job[] {
     const copy = [...list]
     // Unrated (null) listings sort to the end of a score/waste sort — never treated as 0.
-    if (mode === 'waste') return copy.sort((a, b) => (a.waste ?? Infinity) - (b.waste ?? Infinity))
-    if (mode === 'recent') return copy // preserve server order (most recent first)
-    return copy.sort((a, b) => (b.score ?? -Infinity) - (a.score ?? -Infinity)) // transparency
+    if (mode === 'waste') copy.sort((a, b) => (a.waste ?? Infinity) - (b.waste ?? Infinity))
+    else if (mode !== 'recent') copy.sort((a, b) => (b.score ?? -Infinity) - (a.score ?? -Infinity)) // transparency
+    // 'recent' keeps server order. Every mode then keeps Featured and posted-on-Seen listings
+    // first (stable, so the chosen sort still orders within each tier) — lib/server/jobPriority.js.
+    return sortByPriority(copy)
   }
 
   function applyFilters(list: Job[]): Job[] {
@@ -280,8 +286,17 @@ export function useJobSearch() {
       body: JSON.stringify({ action: 'batch_scores', names: cos }),
     })
       .then(r => r.ok ? r.json() : { scores: {} })
-      .then((d: { scores?: CoScoreMap }) => {
-        if (d.scores) setCoScores(prev => ({ ...prev, ...d.scores }))
+      .then((d: { scores?: Record<string, { ghost_rate?: number | null; overall_score?: number | null; response_rate?: number | null; gradeable?: boolean | null; first_party_report_count?: number | null }> }) => {
+        if (!d.scores) return
+        // Grade gate: drop ungraded companies (verdict fields null below the bar) so no card shows a
+        // ghost-rate badge or hiring probability built from too few reports.
+        const graded: CoScoreMap = {}
+        for (const [k, v] of Object.entries(d.scores)) {
+          if (isGradeableScore(v) && typeof v.ghost_rate === 'number') {
+            graded[k] = { ghost_rate: v.ghost_rate, overall_score: v.overall_score, ...(typeof v.response_rate === 'number' ? { response_rate: v.response_rate } : {}) }
+          }
+        }
+        setCoScores(prev => ({ ...prev, ...graded }))
       })
       .catch(() => {})
   }, [recommended, jobs])
@@ -415,6 +430,10 @@ export function useJobSearch() {
             apply_url,
             posted_at: j.posted_at ? String(j.posted_at) : null,
             featured: !!j.featured,
+            // Without these the "Posted on Seen" badge, its search-priority tier (applySort →
+            // sortByPriority) and the Apply-on-Seen buttons never reach the page.
+            employer_posted: !!j.employer_posted,
+            apply_mode: j.apply_mode === 'seen' || j.apply_mode === 'both' ? j.apply_mode : 'external',
           }
         })
         searchCache.set(cacheKey, { jobs: raw, ts: Date.now() })

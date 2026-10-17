@@ -6,6 +6,7 @@
 
 import { useEffect, useState, useRef } from 'react'
 import { track } from '@/lib/analytics'
+import ModalPortal from '@/components/ModalPortal'
 
 export interface ListingCardData {
   title: string
@@ -219,6 +220,7 @@ export default function ListingCard({ data, onClose }: { data: ListingCardData; 
   }
 
   return (
+    <ModalPortal>
     <div style={{ position: 'fixed', inset: 0, zIndex: 9999, background: 'rgba(2,4,10,0.97)', display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '1.5rem 1.25rem 2.5rem', overflowY: 'auto' }}>
       <div style={{ width: '100%', maxWidth: 480 }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem' }}>
@@ -250,5 +252,6 @@ export default function ListingCard({ data, onClose }: { data: ListingCardData; 
         <button onClick={onClose} style={{ background: 'none', border: 'none', width: '100%', fontFamily: 'var(--mono)', fontSize: '.6rem', color: 'rgba(255,255,255,0.25)', cursor: 'pointer', padding: '.5rem', textAlign: 'center' }}>Skip</button>
       </div>
     </div>
+    </ModalPortal>
   )
 }

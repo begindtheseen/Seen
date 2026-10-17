@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useAuth } from '@/lib/auth'
 import { useEmployerCompany } from './EmployerCompanyContext'
+import RefreshButton from '@/components/RefreshButton'
 
 // The claim flow on the /employers portal (ADMIN-APPROVED CLAIMS model, migration 053).
 //
@@ -132,7 +133,7 @@ export function EmployerClaimPanel() {
           data from ever showing to another. We&apos;ll open your scoped dashboard here the moment it&apos;s
           approved. You can still look up any company&apos;s public reputation below in the meantime.
         </p>
-        <button onClick={reloadClaims} style={{ ...mono('.62rem', 'var(--sub)'), background: 'transparent', border: '1px solid var(--line2)', borderRadius: 8, padding: '.5rem 1rem', cursor: 'pointer' }}>↻ Check status</button>
+        <RefreshButton onRefresh={reloadClaims} label="Check status" busyLabel="Checking…" doneLabel="Checked — still pending" style={{ ...mono('.62rem', 'var(--sub)'), background: 'transparent', border: '1px solid var(--line2)', borderRadius: 8, padding: '.5rem 1rem' }} />
       </div>
     )
   }

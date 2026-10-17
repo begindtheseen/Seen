@@ -78,6 +78,7 @@ export default function EmployersPage() {
         <Reveal>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(240px,1fr))', gap: '1rem', marginBottom: '3rem' }}>
           {[
+            { t: 'Post on Seen, show up first', d: 'Jobs you post or import on Seen appear ahead of aggregated listings in every search they match — free. Searching your company name puts your own listings at the top.' },
             { t: 'Candidates screen you first', d: 'Before applying, people check your ghost rate and response rate on Seen. A bad record silently kills your applicant flow — the best candidates have options.' },
             { t: 'Featured = more of the right applicants', d: 'Featured placement puts your listings above standard results for matching searches, in front of candidates already looking for what you offer.' },
             { t: 'Verified = trust that converts', d: 'The Transparency Verified badge is a public commitment to respond — reviewed against real outcome data. It tells strong candidates you’re worth their time.' },

@@ -6,6 +6,7 @@ import { Score } from '@/lib/score'
 import { AppStore } from '@/lib/stores/AppStore'
 import CompanyScoreModal from '@/components/CompanyScoreModal'
 import { firstPartyReportCount } from '@/lib/server/reportCounts'
+import { isGradeableScore, MIN_REPORTS_FOR_GRADE } from '@/lib/gradeGate'
 
 interface Company {
   id: string
@@ -88,7 +89,10 @@ export default function CompaniesPage() {
     })
       .then((r) => r.json())
       .then((d: { companies?: Company[] }) => {
-        if (d.companies?.length) setCompanies(d.companies)
+        // Grade gate: the API already ranks only gradeable companies (≥5 real reports); filter
+        // again so a CDN-cached pre-gate payload can never put an ungraded company on the board.
+        const graded = (d.companies || []).filter((c) => isGradeableScore(c.score))
+        if (graded.length) setCompanies(graded)
       })
       .catch(() => {})
       .finally(() => setLoading(false))
@@ -162,7 +166,8 @@ export default function CompaniesPage() {
             }}
           >
             Ranked by hiring transparency score. Ghost rate, response rate, and
-            process quality — all in one place.
+            process quality — all in one place. Only companies with at least{' '}
+            {MIN_REPORTS_FOR_GRADE} real reviews are graded.
           </p>
 
           {/* Hero company lookup */}

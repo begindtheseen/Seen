@@ -55,7 +55,8 @@ export default async function CompareSlugsPage({ params }: { params: Promise<{ s
   const [a, b] = await Promise.all([getScore(aSlug), getScore(bSlug)])
 
   // JSON-LD: factual comparison answer for AI engines.
-  const answer = (a && b)
+  // Grade gate: only two GRADED companies (≥5 real reports each) get a comparison answer.
+  const answer = (a && b && a.overall_score != null && b.overall_score != null)
     ? `${a.overall_score >= b.overall_score ? aName : bName} has the higher hiring transparency grade (${Math.max(a.overall_score, b.overall_score)}/100 vs ${Math.min(a.overall_score, b.overall_score)}/100).`
     : `Not enough applicant reports yet to compare ${aName} and ${bName} fully.`
   const jsonLd = {

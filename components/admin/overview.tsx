@@ -4,6 +4,7 @@ import { useState } from 'react'
 import type { Tone, AttnItem } from './types'
 import { formatBuildStamp } from './types'
 import { saveFile } from './saveFile'
+import RefreshButton from '@/components/RefreshButton'
 
 export type HealthStatus = 'Healthy' | 'Attention needed' | 'Critical'
 
@@ -41,7 +42,7 @@ export function CsvDownloadButton({ fetchCsv }: { fetchCsv: () => Promise<{ file
 export function AdminHero({ status, summary, onRefresh, fetchCsv, onLogout }: {
   status: HealthStatus
   summary: string
-  onRefresh: () => void
+  onRefresh: () => unknown
   fetchCsv: () => Promise<{ filename: string; content: string } | null>
   onLogout: () => void
 }) {
@@ -64,7 +65,7 @@ export function AdminHero({ status, summary, onRefresh, fetchCsv, onLogout }: {
         <div className="a2-build">build {build} · {msg}</div>
       </div>
       <div className="a2-hero-actions">
-        <button onClick={onRefresh} className="adm-btn">↻ Refresh</button>
+        <RefreshButton onRefresh={onRefresh} className="adm-btn" />
         <CsvDownloadButton fetchCsv={fetchCsv} />
         <button onClick={onLogout} className="adm-btn-danger">Sign out</button>
       </div>

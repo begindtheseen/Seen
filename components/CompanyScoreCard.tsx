@@ -7,10 +7,13 @@
 
 import { useEffect, useState, useRef } from 'react'
 import { createPortal } from 'react-dom'
+import { useScrollLock } from '@/components/ModalPortal'
 import { drawCompanyCard, type CompanyCardData } from '@/lib/cardKit'
 import { shareCardImage, shareHint, type ShareDest } from '@/lib/shareCard'
 import { track } from '@/lib/analytics'
 
+// Only ever rendered for a GRADEABLE score (lib/gradeGate.ts) — the company page hides the
+// "Grade card" action below MIN_REPORTS_FOR_GRADE real reports, so no PNG is minted from 2 reviews.
 export interface CompanyScoreCardData {
   company: string
   industry?: string
@@ -113,6 +116,7 @@ export default function CompanyScoreCard({ data, shareUrl, onClose, onShared }: 
     if (dest !== 'download') setTimeout(onClose, 400)
   }
 
+  useScrollLock(mounted)
   if (!mounted) return null
 
   return createPortal(

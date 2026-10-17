@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import type { Application } from '@/lib/types'
+import ModalPortal from '@/components/ModalPortal'
 
 interface Props {
   app: Application
@@ -14,6 +15,7 @@ export default function RoundsPrompt({ app, onSubmit, onSkip }: Props) {
   const [notes, setNotes] = useState('')
 
   return (
+    <ModalPortal>
     <div
       style={{ position: 'fixed', inset: 0, zIndex: 9998, background: 'rgba(0,0,0,.7)', backdropFilter: 'blur(4px)', display: 'flex', flexDirection: 'column', justifyContent: 'flex-end' }}
       onClick={e => { if (e.target === e.currentTarget) onSkip() }}
@@ -85,5 +87,6 @@ export default function RoundsPrompt({ app, onSubmit, onSkip }: Props) {
         </div>
       </div>
     </div>
+    </ModalPortal>
   )
 }

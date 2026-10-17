@@ -9,7 +9,7 @@ import {
 } from './_utils/companyIntel.js';
 import { recomputeCompanyScoreFromReports, normalizeCompany } from './_utils/reportWrite.js';
 import { logError } from '../lib/server/errlog.js';
-import { runStaleSweep } from '../lib/server/staleSweep.js';
+import { runStaleSweep, STALE_CLEARABLE_FILTER, STALE_KEPT_FILTER } from '../lib/server/staleSweep.js';
 import { buildCompanyAuditBundle } from './_utils/companyAuditBundle.js';
 import { isDisputeStatus, isDisputeReviewStatus, disputeStatusCounts, orderDisputesOpenFirst } from './_utils/companyReddit.js';
 import { isDisputeDecision, resolveDisputeEffect, disputeStatusCounts as listingDisputeCounts, orderDisputesOpenFirst as orderListingDisputes, buildListingTickets } from '../lib/server/listingDisputes.js';
@@ -240,6 +240,19 @@ async function _handler(req, res) {
     // db() wrapper — before the migration is applied it 404s, and that must read as { ready:false },
     // not mark every other number on this dashboard `degraded`.
     const enrichmentP = enrichmentQueueStats(SB, SK);
+    // The "stale" number the admin alert + Clear stale button use: the SAME definition the sweep
+    // clears (lib/server/staleSweep.js). The older stale_or_expired count also includes 'expired'
+    // rows kept for users' saved/applied links, which no clear can (or should) remove.
+    const countHdr = { headers: { Prefer: 'count=exact', 'Range-Unit': 'items', Range: '0-0' } };
+    // stale_overdue: stale rows the daily cron sweep should ALREADY have deleted (unseen 15d+ — its
+    // cut-off is 14d, plus a day of grace). Normal churn keeps thousands of rows stale for 7–14 days
+    // by design; only an overdue backlog means the sweep is falling behind and needs a manual clear.
+    const overdueCutoff = encodeURIComponent(new Date(Date.now() - 15 * 86_400_000).toISOString());
+    const staleCountsP = Promise.all([
+      db(`jobs?${STALE_CLEARABLE_FILTER}&select=id`, countHdr),
+      db(`jobs?${STALE_KEPT_FILTER}&select=id`, countHdr),
+      db(`jobs?${STALE_CLEARABLE_FILTER}&last_seen_at=lt.${overdueCutoff}&select=id`, countHdr),
+    ]).catch(() => [null, null, null]);
 
     const [
       usersTotalRes, usersTodayRes, usersWeekRes,
@@ -454,6 +467,7 @@ async function _handler(req, res) {
     const JOB_HEALTH_MIN_ACTIVE = 500;   // floor of live listings before we alert
     const JOB_HEALTH_MIN_RATIO  = 0.40;  // min share of corpus that must be active
     const staleJobs = ct(staleJobsRes);
+    const [staleClearableRes, staleKeptRes, staleOverdueRes] = await staleCountsP;
     const activePct = jobsTotal > 0 ? Math.round((jobsActive / jobsTotal) * 100) : 0;
     const jobCrisis =
       jobsActive < JOB_HEALTH_MIN_ACTIVE ||
@@ -531,6 +545,10 @@ async function _handler(req, res) {
         new_today: jobsNewToday,
         added_today: ct(jobsTodayRes),
         stale_or_expired: ct(staleJobsRes),
+        // Clearable stale rows (what "Clear stale" removes) vs expired rows kept for saved/applied links.
+        stale_clearable: staleClearableRes?.ok ? ct(staleClearableRes) : null,
+        expired_kept: staleKeptRes?.ok ? ct(staleKeptRes) : null,
+        stale_overdue: staleOverdueRes?.ok ? ct(staleOverdueRes) : null,
         zero_result_searches_7d: zeroSearchRows.length,
         top_zero_queries: [...new Set(zeroSearchRows.map(r => r.query))].slice(0, 10),
         availability_reports_7d: jobReportRows.length,
@@ -1863,8 +1881,10 @@ async function _handler(req, res) {
   // hidden 'expired' so their /jobs/[id] link still resolves; employer-posted rows are never
   // touched. The previous version issued ONE unbounded PATCH over the whole stale set, which the
   // 8s statement_timeout cancelled every time — the button reported success and cleared nothing
-  // while the backlog grew to 95,505 rows. Budgeted to finish inside this function's 15s limit;
-  // `complete:false` means the rest drains on the next click or the next cron run.
+  // while the backlog grew to 95,505 rows. Budgeted to finish inside this function's 15s limit
+  // (~3–5k rows per request on prod). `complete:false` means call again: the admin client loops
+  // this action until complete (components/admin/clearStale.ts) — the scheduled cron would NOT
+  // drain it, since it only deletes stale rows unseen 14d+.
   if (action === 'purge_stale_jobs') {
     if (adminRole === 'moderator') return res.status(403).json({ error: 'Insufficient role' });
     const sweep = await runStaleSweep({
@@ -1877,8 +1897,18 @@ async function _handler(req, res) {
       return res.status(500).json({ error: 'Failed to clear stale listings', detail: sweep.error, ...sweep });
     }
     const removed = sweep.deleted + sweep.retained;
+    // Re-count with the dashboard's definition so the client knows whether to keep going and can
+    // show the true remainder (never "cleared" while rows are still there).
+    const countHdr = { headers: { Prefer: 'count=exact', 'Range-Unit': 'items', Range: '0-0' } };
+    const [remRes, keptRes] = await Promise.all([
+      db(`jobs?${STALE_CLEARABLE_FILTER}&select=id`, countHdr).catch(() => null),
+      db(`jobs?${STALE_KEPT_FILTER}&select=id`, countHdr).catch(() => null),
+    ]);
+    const cnt = (r) => (r?.ok ? (parseInt((r.headers.get('content-range') || '').split('/')[1]) || 0) : null);
+    const remaining = cnt(remRes);
+    const kept = cnt(keptRes);
     await db('admin_audit_log', { method: 'POST', body: JSON.stringify({ admin_id: sess.admin_id, username: sess.username || 'admin', action: 'purge_stale_jobs', target_type: 'jobs', metadata: { removed, deleted: sweep.deleted, retained: sweep.retained, staled: sweep.staled, complete: sweep.complete, ms: sweep.ms } }), headers: { Prefer: 'return=minimal' } }).catch(() => {});
-    return res.status(200).json({ ok: true, removed, deleted: sweep.deleted, retained: sweep.retained, complete: sweep.complete, ms: sweep.ms });
+    return res.status(200).json({ ok: true, removed, deleted: sweep.deleted, retained: sweep.retained, staled: sweep.staled, complete: sweep.complete, remaining, kept, ms: sweep.ms });
   }
 
   // ── EMERGENCY JOB REFRESH — server-side auto-remediation for a job crisis ─────

@@ -7,6 +7,7 @@ import { useAuth } from '@/lib/auth'
 import { aiHeaders } from '@/lib/aiHeaders'
 import { notify } from '@/lib/notify'
 import type { Job } from '@/lib/types'
+import { takesSeenApply } from '@/lib/seenApplyMode'
 
 function jobVibes(job: Job): { cls: string; txt: string }[] {
   const vibes: { cls: string; txt: string }[] = []
@@ -116,6 +117,9 @@ export default function JobCard({ job, index, onSaveToggle, onOpen, onApply, onC
         {job.featured && (
           <span style={{ display: 'inline-flex', alignItems: 'center', gap: '.25rem', fontFamily: 'var(--mono)', fontSize: '.55rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.06em', color: '#f7c948', background: 'rgba(247,201,72,.12)', border: '1px solid rgba(247,201,72,.4)', borderRadius: 999, padding: '.15rem .5rem' }}>★ Featured</span>
         )}
+        {job.employer_posted && (
+          <span title="Posted directly on Seen by the employer" style={{ display: 'inline-flex', alignItems: 'center', gap: '.25rem', fontFamily: 'var(--mono)', fontSize: '.55rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.06em', color: 'var(--green)', background: 'var(--gdim)', border: '1px solid var(--green)', borderRadius: 999, padding: '.15rem .5rem' }}>✓ Posted on Seen</span>
+        )}
         {wl && <span className={`${wl.cls} waste-badge`}>{wl.txt}</span>}
         {job.waste != null && job.waste >= 55 && (
           <span className="vibe v-r" style={{ display: 'inline-flex', alignItems: 'center', gap: '.25rem' }}>
@@ -171,9 +175,9 @@ export default function JobCard({ job, index, onSaveToggle, onOpen, onApply, onC
         <button
           className="jlc-apply"
           onClick={e => { e.stopPropagation(); onApply(job) }}
-          disabled={!job.apply_url}
+          disabled={!job.apply_url && !takesSeenApply(job)}
         >
-          Apply &amp; Optimize →
+          {takesSeenApply(job) ? 'Apply on Seen →' : <>Apply &amp; Optimize →</>}
         </button>
       </div>
 

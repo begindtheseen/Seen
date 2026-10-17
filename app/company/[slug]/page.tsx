@@ -13,21 +13,25 @@ import { aggregateJobLocations } from '@/lib/jobLocations'
 import CompanyRedditDiscussion from '@/components/CompanyRedditDiscussion'
 import CompanyPublicRecord from '@/components/CompanyPublicRecord'
 import IndustryBenchmark, { type Benchmark } from '@/components/IndustryBenchmark'
+import { isGradeableScore, notEnoughReviewsLabel, MIN_REPORTS_FOR_GRADE } from '@/lib/gradeGate'
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
+// Grade gate (lib/gradeGate.ts): below MIN_REPORTS_FOR_GRADE real reports the API sends
+// gradeable:false and every verdict field below as null — the page shows reports, not a grade.
 interface CompanyScore {
-  overall_score: number
-  response_rate: number
-  ghost_rate: number
-  avg_wait_days: number
-  avg_rounds: number
-  waste: number
+  gradeable?: boolean
+  overall_score: number | null
+  response_rate: number | null
+  ghost_rate: number | null
+  avg_wait_days: number | null
+  avg_rounds: number | null
+  waste: number | null
   report_count: number
   first_party_report_count?: number
   web_report_count?: number
-  risk_level: 'safe' | 'warn' | 'danger'
-  process_score?: number
+  risk_level: 'safe' | 'warn' | 'danger' | null
+  process_score?: number | null
   data_quality?: string
   data_source?: string
   industry?: string
@@ -449,8 +453,8 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
   // company + grade in view with a way back — the page can be long, the context never leaves.
   const heroRef = useRef<HTMLDivElement | null>(null)
   const [stuck, setStuck] = useState(false)
-  // Portal target: .page-full keeps an (identity) transform from its entrance animation, which makes
-  // it the containing block for position:fixed — so the strip must live on <body> to pin to the viewport.
+  // Portal target: render the strip on <body> so no transformed/filtered ancestor can ever become its
+  // containing block (.page-full's entrance animation used to hold a transform — see globals.css pageIn).
   const [mounted, setMounted] = useState(false)
   useEffect(() => { setMounted(true) }, [])
   useEffect(() => {
@@ -535,7 +539,8 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
         })
         if (rRes.ok) {
           const rJson = await rRes.json() as { reports?: Report[]; ok?: boolean }
-          if (rJson.reports) setReports(rJson.reports)
+          // Newest experience first by its REAL date (imported rows: the source's posted date).
+          if (rJson.reports) setReports(sortReportsByDate(rJson.reports))
         }
 
         // Approved employer replies for this company, keyed by report id (best-effort, public).
@@ -604,7 +609,7 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
 
   // Score reveal animation
   useEffect(() => {
-    if (!score || scoreRevealed) return
+    if (!score || scoreRevealed || !isGradeableScore(score)) return
     setScoreRevealed(true)
     const target = score.overall_score
     const duration = 1200
@@ -641,13 +646,22 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
 
   function share() {
     const url = window.location.href.split('#')[0]
-    const data = { title: `${companyName} on Seen`, text: `${companyName} has a Seen score of ${score?.overall_score ?? '?'}/100`, url }
+    const data = {
+      title: `${companyName} on Seen`,
+      text: isGradeableScore(score)
+        ? `${companyName} has a Seen score of ${score.overall_score}/100`
+        : `${companyName} on Seen — real applicant reports on how they hire`,
+      url,
+    }
     if (navigator.share) { navigator.share(data).catch(() => {}); return }
     navigator.clipboard?.writeText(url).then(() => { setCopied(true); setTimeout(() => setCopied(false), 1800) }).catch(() => {})
   }
 
-  const risk = score ? Score.risk(score.overall_score) : 'warn'
-  const g = score ? letterGrade(score.overall_score) : '—'
+  // Only a gradeable score is a verdict — below the report bar there is no letter, number or risk.
+  const graded = isGradeableScore(score)
+  const risk = graded ? Score.risk(score.overall_score) : 'warn'
+  const g = graded ? letterGrade(score.overall_score) : '—'
+  const ungradedLabel = score && !graded ? notEnoughReviewsLabel(score) : ''
   // Honest count split (migration 063). Legacy payloads without the split fields infer from
   // data_source: only 'reports'-derived scores were counted from real rows — anything else is
   // the web-research pipeline's *claimed* number, which must never render as "reports".
@@ -657,16 +671,16 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
   // page has no first-party reports to show. It promises nothing about what will be found.
   const gatheringPublic = !loading && fpReports === 0 && reports.length === 0 && (enrichmentStatus === 'queued' || enrichmentStatus === 'running')
   const logoLetter = (companyName[0] || '?').toUpperCase()
-  const ghostRate = score?.ghost_rate || 0
+  const ghostRate = graded ? score.ghost_rate || 0 : 0
   const ghostHigh = ghostRate > 0.5
-  const ghostPct = score ? (ratePct(score.ghost_rate) ?? 0) : 0
-  const respPct = score ? (ratePct(score.response_rate) ?? 0) : 0
+  const ghostPct = graded ? (ratePct(score.ghost_rate) ?? 0) : 0
+  const respPct = graded ? (ratePct(score.response_rate) ?? 0) : 0
   const ghostColor = ghostHigh ? 'var(--red)' : ghostRate > 0.3 ? 'var(--amber)' : 'var(--green)'
   const waitColor = (score?.avg_wait_days || 0) > 21 ? 'var(--amber)' : 'var(--text)'
   const wasteColor = (score?.waste || 0) > 60 ? 'var(--red)' : (score?.waste || 0) > 30 ? 'var(--amber)' : 'var(--green)'
 
   // One plain-English line a first-time visitor can act on, built only from the numbers shown.
-  const verdict = score ? (() => {
+  const verdict = graded ? (() => {
     const wait = score.avg_wait_days != null ? ` Typical wait to hear back: ${score.avg_wait_days} days.` : ''
     if (ghostRate >= 0.5) return `Most applicants never hear back — ${Math.round(ghostRate * 10)} in 10 are ghosted.${wait}`
     if ((score.response_rate || 0) >= 0.75) return `Most applicants hear back — ${respPct}% get a response.${wait}`
@@ -731,34 +745,42 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
   const capped = hiring.listings >= 20
   const sectionNote: CSSProperties = { fontFamily: 'var(--mono)', fontSize: '.58rem', color: 'var(--dim)', marginBottom: '1rem', lineHeight: 1.6 }
 
+  // Compare cells: an ungraded company shows "Not graded" / "—", never a number standing in for one.
+  const cmpScore = (sc: CompanyScore | null) => !sc ? '—' : isGradeableScore(sc) ? String(sc.overall_score) : 'Not graded'
+  const cmpScoreColor = (sc: CompanyScore | null) => isGradeableScore(sc) ? riskColor(Score.risk(sc.overall_score)) : 'var(--muted)'
+  const cmpGhostColor = (sc: CompanyScore | null) => {
+    if (!isGradeableScore(sc) || sc.ghost_rate == null) return 'var(--muted)'
+    return sc.ghost_rate > 0.5 ? 'var(--red)' : sc.ghost_rate > 0.3 ? 'var(--amber)' : 'var(--green)'
+  }
+  const cmpWait = (sc: CompanyScore | null) => isGradeableScore(sc) && sc.avg_wait_days != null ? `${sc.avg_wait_days}d` : '—'
   const compareRows = [
     {
       label: 'Score',
-      current: score ? String(score.overall_score) : '—',
-      get: (sc: CompanyScore | null) => sc ? String(sc.overall_score) : '—',
-      currentColor: score ? riskColor(Score.risk(score.overall_score)) : 'var(--muted)',
-      getColor: (sc: CompanyScore | null) => sc ? riskColor(Score.risk(sc.overall_score)) : 'var(--muted)',
+      current: cmpScore(score),
+      get: cmpScore,
+      currentColor: cmpScoreColor(score),
+      getColor: cmpScoreColor,
     },
     {
       label: 'Ghost %',
-      current: score ? pct(score.ghost_rate) : '—',
-      get: (sc: CompanyScore | null) => sc ? pct(sc.ghost_rate) : '—',
-      currentColor: ghostColor,
-      getColor: (sc: CompanyScore | null) => sc ? ((sc.ghost_rate > 0.5) ? 'var(--red)' : (sc.ghost_rate > 0.3) ? 'var(--amber)' : 'var(--green)') : 'var(--muted)',
+      current: graded ? pct(score.ghost_rate) : '—',
+      get: (sc: CompanyScore | null) => isGradeableScore(sc) ? pct(sc.ghost_rate) : '—',
+      currentColor: cmpGhostColor(score),
+      getColor: cmpGhostColor,
     },
     {
       label: 'Response %',
-      current: score ? pct(score.response_rate) : '—',
-      get: (sc: CompanyScore | null) => sc ? pct(sc.response_rate) : '—',
-      currentColor: 'var(--blue)',
-      getColor: () => 'var(--blue)',
+      current: graded ? pct(score.response_rate) : '—',
+      get: (sc: CompanyScore | null) => isGradeableScore(sc) ? pct(sc.response_rate) : '—',
+      currentColor: graded ? 'var(--blue)' : 'var(--muted)',
+      getColor: (sc: CompanyScore | null) => isGradeableScore(sc) ? 'var(--blue)' : 'var(--muted)',
     },
     {
       label: 'Avg wait',
-      current: score?.avg_wait_days != null ? `${score.avg_wait_days}d` : '—',
-      get: (sc: CompanyScore | null) => sc?.avg_wait_days != null ? `${sc.avg_wait_days}d` : '—',
-      currentColor: waitColor,
-      getColor: (sc: CompanyScore | null) => sc ? ((sc.avg_wait_days || 0) > 21 ? 'var(--amber)' : 'var(--text)') : 'var(--muted)',
+      current: cmpWait(score),
+      get: cmpWait,
+      currentColor: graded ? waitColor : 'var(--muted)',
+      getColor: (sc: CompanyScore | null) => isGradeableScore(sc) ? ((sc.avg_wait_days || 0) > 21 ? 'var(--amber)' : 'var(--text)') : 'var(--muted)',
     },
   ]
 
@@ -794,7 +816,7 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
               <button type="button" className="co-sticky-back" onClick={goBack} aria-label="Back" tabIndex={stuck ? 0 : -1}>←</button>
               <span className="co-sticky-logo" aria-hidden>{logoLetter}</span>
               <span className="co-sticky-name">{companyName}</span>
-              {score && (
+              {graded && (
                 <span className="co-sticky-grade">
                   <span className={`co-sticky-letter ${risk}`}>{g}</span>
                   <span className="co-sticky-score">{score.overall_score}<span>/100</span></span>
@@ -846,7 +868,24 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
             <div style={{ background: 'var(--rdim, rgba(239,68,68,.08))', border: '1px solid rgba(239,68,68,.25)', borderRadius: 8, padding: '1rem', fontFamily: 'var(--mono)', fontSize: '.72rem', color: 'var(--red)', textAlign: 'center' }}>
               {error}
             </div>
-          ) : score ? (
+          ) : score && !graded ? (
+            /* Below the report bar: no letter, score, rates or vibe tags — just what we actually hold. */
+            <div className="co-grade-bar warn" role="status">
+              <div className="co-grade-letter warn" aria-hidden style={{ fontSize: '1.4rem' }}>—</div>
+              <div className="co-grade-main">
+                <span className="co-grade-lbl">Seen Grade</span>
+                <span className="co-grade-score" style={{ fontSize: '.95rem' }}>{ungradedLabel}</span>
+                <p className="co-verdict">
+                  {fpReports > 0
+                    ? `We have ${fpReports} applicant report${fpReports === 1 ? '' : 's'} for ${companyName} so far. A grade appears once ${MIN_REPORTS_FOR_GRADE} real reports are in — read them below.`
+                    : `No applicant reports for ${companyName} yet. A grade appears once ${MIN_REPORTS_FOR_GRADE} real reports are in.`}
+                </p>
+                <div className="co-grade-meta">
+                  <a href={`/report?company=${encodeURIComponent(companyName)}`} className="co-live" style={{ textDecoration: 'none' }}>+ Add yours to help grade it</a>
+                </div>
+              </div>
+            </div>
+          ) : graded ? (
             <>
               <div className={`co-grade-bar ${risk}`}>
                 <div className={`co-grade-letter ${risk}`}>{g}</div>
@@ -867,7 +906,7 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
                 <MetBox label="Response" value={pct(score.response_rate)} color="var(--blue)" />
                 <MetBox label="Ghosted" value={pct(score.ghost_rate)} alarm={ghostHigh} color={ghostColor} />
                 <MetBox label="Avg wait" value={score.avg_wait_days != null ? `${score.avg_wait_days}d` : '—'} color={waitColor} />
-                <MetBox label="Rounds" value={score.avg_rounds != null ? String(score.avg_rounds.toFixed(1)) : '—'} />
+                <MetBox label="Rounds" value={score.avg_rounds != null ? score.avg_rounds.toFixed(1) : '—'} />
                 <MetBox label="Waste risk" value={score.waste != null ? `${score.waste}%` : '—'} color={wasteColor} />
               </div>
             </>
@@ -895,32 +934,32 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
                     clean URL; visitors landing with ?sv= see the normal page. */}
                 <a
                   className="co-chip co-chip-reddit"
-                  href={`https://reddit.com/submit?url=${encodeURIComponent(`https://seenjobs.io/company/${slug}${score?.overall_score != null ? `?sv=${score.overall_score}` : ''}`)}&title=${encodeURIComponent(`Is ${companyName} worth applying to? Seen score: ${score?.overall_score ?? '?'}/100`)}`}
+                  href={`https://reddit.com/submit?url=${encodeURIComponent(`https://seenjobs.io/company/${slug}${graded ? `?sv=${score.overall_score}` : ''}`)}&title=${encodeURIComponent(graded ? `Is ${companyName} worth applying to? Seen score: ${score.overall_score}/100` : `Is ${companyName} worth applying to? Applicant reports on Seen`)}`}
                   target="_blank" rel="noopener noreferrer"
                 >🔴 Post to Reddit</a>
-                {score && <button type="button" className="co-chip" onClick={() => setShowGradeCard(true)}>🖼 Grade card</button>}
+                {graded && <button type="button" className="co-chip" onClick={() => setShowGradeCard(true)}>🖼 Grade card</button>}
               </div>
             </div>
           )}
 
-          {showGradeCard && score && (
+          {showGradeCard && graded && (
             <CompanyScoreCard
               data={{
                 company: companyName,
                 industry: industry || score.industry,
                 overall_score: score.overall_score,
-                ghost_rate: score.ghost_rate,
-                response_rate: score.response_rate,
-                avg_wait_days: score.avg_wait_days,
-                waste: score.waste,
+                ghost_rate: score.ghost_rate ?? 0,
+                response_rate: score.response_rate ?? 0,
+                avg_wait_days: score.avg_wait_days ?? 0,
+                waste: score.waste ?? 0,
                 // First-party only: the PNG renders "Based on N applicant reports" — feeding it
                 // the fused web claim published the phantom number to social. Its own zero-state
                 // ("Baseline estimate · share your experience") is the honest fallback.
                 report_count: fpReports,
-                risk: score.risk_level,
+                risk: score.risk_level ?? undefined,
                 tags: [
-                  score.ghost_rate >= 0.5 ? '👻 High ghost rate' : null,
-                  score.response_rate >= 0.5 ? '✅ Responsive' : null,
+                  (score.ghost_rate ?? 0) >= 0.5 ? '👻 High ghost rate' : null,
+                  (score.response_rate ?? 0) >= 0.5 ? '✅ Responsive' : null,
                   (score.waste || 0) >= 50 ? '⚠ High waste risk' : null,
                   (score.avg_wait_days || 0) >= 30 ? '⏳ Long wait times' : null,
                 ].filter(Boolean) as string[],
@@ -935,7 +974,7 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
             row with a truthful summary. Open what you need; nothing is gone. ── */}
         {!loading && (
           <div className="co-secs">
-            {score && (
+            {graded && (
               <Section id="odds" icon="📅" title="Your odds here" open={open.odds} onToggle={toggle}
                 summary={`${score.avg_wait_days != null ? `${score.avg_wait_days}d typical wait · ` : ''}${respPct}% hear back · your response probability & industry rank`}>
                 <HiringProbability responseRate={score.response_rate} ghostRate={score.ghost_rate} overallScore={score.overall_score} />
@@ -947,7 +986,7 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
               </Section>
             )}
 
-            {score && (
+            {graded && (
               <Section id="breakdown" icon="📊" title="How the grade is built" open={open.breakdown} onToggle={toggle}
                 summary={`Response ${respPct}% · ghost ${ghostPct}% · waste ${score.waste ?? 0}% · where in the process they ghost`}>
                 <div className="co-two">
@@ -981,7 +1020,7 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
             <Section id="reports" icon="🗣" title="Applicant reports" count={reports.length} open={open.reports} onToggle={toggle}
               summary={reports.length > 0
                 ? `${ghostedN} ghosted · ${interviewN} interviewed · ${hiredN} hired${thirdPartyN > 0 ? ` · ${thirdPartyN} from public discussions` : ''}`
-                : (webEst > 0 && fpReports === 0 ? 'None yet — the grade is a web-research estimate' : 'None yet — be the first to report')}>
+                : 'None yet — be the first to report'}>
               <div className="co-reports-tools">
                 <div style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', color: 'var(--muted)', lineHeight: 1.6, flex: 1, minWidth: 180 }}>
                   {reports.length > 0
@@ -1005,6 +1044,7 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
                     const badge = reportSourceBadge(r.platform)
                     const src = reportSourceLink(r.platform, r.report_text)
                     const body = src ? src.body : r.report_text
+                    const when = reportDate(r.platform, r.report_text, r.created_at).label
                     return (
                       <div key={r.id} className={`rcard${r.outcome ? ` outcome-${r.outcome}` : ''}`}>
                         <div className="rc-hd">
@@ -1014,9 +1054,7 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
                               {r.ghost_stage && <span style={{ color: 'var(--muted)' }}> · ghosted at {r.ghost_stage.replace(/_/g, ' ')}</span>}
                             </div>
                             <div className="rc-meta">
-                              {r.city ? `📍 ${r.city} · ` : ''}
-                              {r.rounds ? `${r.rounds} round${r.rounds !== 1 ? 's' : ''} · ` : ''}
-                              {r.created_at ? `${Math.floor((Date.now() - new Date(r.created_at).getTime()) / 86400000)}d ago` : ''}
+                              {[r.city ? `📍 ${r.city}` : '', r.rounds ? `${r.rounds} round${r.rounds !== 1 ? 's' : ''}` : '', when].filter(Boolean).join(' · ')}
                             </div>
                           </div>
                           <span className={`vibe rc-outcome ${ocClass[r.outcome] || 'v-n'}`}>{ocLabel[r.outcome] || r.outcome}</span>
@@ -1053,9 +1091,7 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
                 <div style={{ textAlign: 'center', padding: '1.5rem 1rem', color: 'var(--muted)', fontFamily: 'var(--mono)', fontSize: '.7rem', lineHeight: 1.7 }}>
                   {location
                     ? <>No reports mention &ldquo;{location}&rdquo;. <button type="button" onClick={() => setLocation('')} style={{ background: 'none', border: 'none', color: 'var(--blue)', cursor: 'pointer', fontFamily: 'inherit', fontSize: 'inherit', padding: 0 }}>Clear the city filter</button></>
-                    : webEst > 0 && fpReports === 0
-                      ? <>No first-party reports yet — the grade on this page is estimated from public web research.</>
-                      : <>No community reports yet.</>}
+                    : <>No community reports yet — {companyName} gets a grade once {MIN_REPORTS_FOR_GRADE} real reports are in.</>}
                   {gatheringPublic && <EnrichmentNotice companyName={companyName} />}
                   <div style={{ marginTop: '.6rem' }}><a href={`/report?company=${encodeURIComponent(companyName)}`} style={{ color: 'var(--green)', textDecoration: 'none' }}>Be the first to report →</a></div>
                 </div>
@@ -1086,6 +1122,13 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
                     {cityRows.map(row => {
                       const ghostPctVal = Math.round(row.ghostRate * 100)
                       const barColor = row.ghostRate > 0.55 ? 'var(--red)' : row.ghostRate > 0.35 ? 'var(--amber)' : 'var(--green)'
+                      // Ungraded companies: per-city percentages from a handful of reports are a verdict too.
+                      if (!graded) return (
+                        <div key={row.city} className="co-row">
+                          <div style={{ fontFamily: 'var(--mono)', fontSize: '.68rem', color: 'var(--white)', minWidth: 110, flex: '1 1 120px', overflowWrap: 'anywhere' }}>{row.city}</div>
+                          <span className="co-pill">{row.total} report{row.total !== 1 ? 's' : ''}</span>
+                        </div>
+                      )
                       return (
                         <div key={row.city} className="co-row">
                           <div style={{ fontFamily: 'var(--mono)', fontSize: '.68rem', color: 'var(--white)', minWidth: 110, flex: '1 1 120px', overflowWrap: 'anywhere' }}>{row.city}</div>
@@ -1150,7 +1193,7 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
             </Section>
 
             <Section id="roles" icon="💼" title="Open roles" count={jobsFetched ? companyJobs.length : null} open={open.roles} onToggle={toggle}
-              summary={jobsFetched ? (companyJobs.length > 0 ? `${companyJobs.length} current listing${companyJobs.length !== 1 ? 's' : ''} · apply with the grade in mind` : 'No open roles found right now') : `Current job listings at ${companyName}`}>
+              summary={jobsFetched ? (companyJobs.length > 0 ? `${companyJobs.length} current listing${companyJobs.length !== 1 ? 's' : ''} · apply with the ${graded ? 'grade' : 'reports'} in mind` : 'No open roles found right now') : `Current job listings at ${companyName}`}>
               {jobsLoading && (
                 <div style={{ textAlign: 'center', padding: '1.5rem', color: 'var(--muted)', fontFamily: 'var(--mono)', fontSize: '.7rem' }}>
                   Searching for open roles at {companyName}…
@@ -1266,20 +1309,18 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
 
             <Section id="about" icon="ℹ" title="About this grade" open={open.about} onToggle={toggle}
               summary={score
-                ? (fpReports > 0
-                    ? `Based on ${fpReports} applicant report${fpReports === 1 ? '' : 's'}${webEst > 0 ? ' + public web research' : ''} · summary & public records`
-                    : webEst > 0 ? 'Estimated from public web research — no first-party reports yet' : 'No reports yet · public records')
+                ? (!graded
+                    ? `${ungradedLabel} · summary & public records`
+                    : `Based on ${fpReports} applicant report${fpReports === 1 ? '' : 's'}${webEst > 0 ? ' + public web research' : ''} · summary & public records`)
                 : 'Public records & data status'}>
               {score?.summary ? (
                 <p style={{ fontFamily: 'var(--mono)', fontSize: '.68rem', color: 'var(--sub)', lineHeight: 1.7, margin: '0 0 .9rem' }}>{score.summary}</p>
               ) : null}
               {score && (
                 <div className="co-about-line">
-                  <span>📊 {fpReports > 0
-                    ? `Based on ${fpReports} applicant report${fpReports === 1 ? '' : 's'}${webEst > 0 ? ' + public web research' : ''}`
-                    : webEst > 0
-                      ? 'Score estimated from public web research — no first-party applicant reports yet'
-                      : 'No reports yet'}</span>
+                  <span>📊 {!graded
+                    ? `${ungradedLabel} — we never grade a company on fewer than ${MIN_REPORTS_FOR_GRADE} real reports, and web estimates never count toward it`
+                    : `Based on ${fpReports} applicant report${fpReports === 1 ? '' : 's'}${webEst > 0 ? ' + public web research' : ''}`}</span>
                   <a href={`/report?company=${encodeURIComponent(companyName)}`} style={{ color: 'var(--green)', textDecoration: 'none' }}>+ Add your report →</a>
                 </div>
               )}

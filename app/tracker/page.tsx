@@ -11,6 +11,8 @@ import dynamic from 'next/dynamic'
 import OutcomeCard from '@/components/OutcomeCard'
 import RoundsPrompt from '@/components/RoundsPrompt'
 import { firstPartyReportCount } from '@/lib/server/reportCounts'
+import { isGradeableScore } from '@/lib/gradeGate'
+import ModalPortal from '@/components/ModalPortal'
 const SurveyModal = dynamic(() => import('@/components/SurveyModal'), { ssr: false })
 const ResumeSurveyModal = dynamic(() => import('@/components/ResumeSurveyModal'), { ssr: false })
 
@@ -284,8 +286,17 @@ function TrackerPage() {
       body: JSON.stringify({ action: 'batch_scores', names: cos }),
     })
       .then(r => r.ok ? r.json() : { scores: {} })
-      .then((d: { scores?: Record<string, ScoreIntel> }) => {
-        if (d.scores) setCompanyScores(d.scores)
+      .then((d: { scores?: Record<string, Partial<{ [K in keyof ScoreIntel]: ScoreIntel[K] | null }> & { gradeable?: boolean | null }> }) => {
+        if (!d.scores) return
+        // Grade gate (lib/gradeGate.ts): only companies with ≥5 real reports supply ghost rates /
+        // wait times to the tracker's watches, badges and check-ins.
+        const graded: Record<string, ScoreIntel> = {}
+        for (const [k, v] of Object.entries(d.scores)) {
+          if (isGradeableScore(v) && typeof v.ghost_rate === 'number') {
+            graded[k] = { ghost_rate: v.ghost_rate, overall_score: v.overall_score, report_count: v.report_count ?? 0, ...(typeof v.avg_wait_days === 'number' ? { avg_wait_days: v.avg_wait_days } : {}), ...(v.first_party_report_count != null ? { first_party_report_count: v.first_party_report_count } : {}), ...(v.data_source != null ? { data_source: v.data_source } : {}) }
+          }
+        }
+        setCompanyScores(graded)
       })
       .catch(() => {})
   }, [apps])
@@ -339,7 +350,7 @@ function TrackerPage() {
         body: JSON.stringify({ name: app.company }),
       })
       const d = await r.json()
-      if (d.score) score = d.score
+      if (d.score && isGradeableScore(d.score)) score = d.score
     } catch {}
 
     const days = Math.floor((Date.now() - app.appliedAt) / 86400000)
@@ -483,6 +494,7 @@ function TrackerPage() {
     <>
     {/* Manual add modal */}
     {showManual && (
+      <ModalPortal>
       <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.8)', zIndex: 9000, backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
         onClick={e => { if (e.target === e.currentTarget) setShowManual(false) }}>
         <div style={{ width: 'calc(100% - 2rem)', maxWidth: 440, background: 'var(--surface)', border: '1px solid rgba(99,102,241,.25)', borderRadius: 14, overflow: 'hidden', boxShadow: '0 32px 96px rgba(0,0,0,.7),0 0 72px rgba(99,102,241,.18),0 0 140px rgba(124,58,237,.08)' }}>
@@ -519,6 +531,7 @@ function TrackerPage() {
           </div>
         </div>
       </div>
+      </ModalPortal>
     )}
     {outcomeApp && <OutcomeCard app={outcomeApp} onClose={() => setOutcomeApp(null)} />}
     {roundsApp && !outcomeApp && (

@@ -1,9 +1,12 @@
 'use client'
 
+// Grade gate: a probability is derived from the company's response/ghost rates, which are null when
+// the company is below MIN_REPORTS_FOR_GRADE real reports (lib/gradeGate.ts). With no real rates there
+// is no honest probability — the component renders nothing instead of inventing default rates.
 interface HiringProbabilityProps {
-  responseRate?: number   // e.g. 0.22 (22%)
-  ghostRate?: number      // e.g. 0.55 (55%)
-  overallScore?: number   // 0-100
+  responseRate?: number | null   // e.g. 0.22 (22%)
+  ghostRate?: number | null      // e.g. 0.55 (55%)
+  overallScore?: number | null   // 0-100
   jobLevel?: string       // e.g. "Senior", "Entry Level", "Mid level"
   profileExp?: string     // from profile.experience e.g. "2-5 years", "Senior"
   compact?: boolean       // compact mode for swipe cards (less height)
@@ -30,7 +33,8 @@ function calcProb(responseRate: number, ghostRate: number, jobLevel?: string, pr
 }
 
 export default function HiringProbability({ responseRate, ghostRate, overallScore: _overallScore, jobLevel, profileExp, compact = false }: HiringProbabilityProps) {
-  const prob = calcProb(responseRate ?? 0.20, ghostRate ?? 0.55, jobLevel, profileExp)
+  if (responseRate == null || ghostRate == null) return null
+  const prob = calcProb(responseRate, ghostRate, jobLevel, profileExp)
   const pct = Math.round(prob * 100)
   const color = pct >= 40 ? 'var(--green)' : pct >= 20 ? 'var(--amber)' : 'var(--red)'
 

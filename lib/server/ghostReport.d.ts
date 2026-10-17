@@ -8,7 +8,7 @@ export interface GhostReportInputRow {
   industry?: string | null
   verified?: boolean
   score: {
-    overall_score: number
+    overall_score: number | null
     ghost_rate: number | null
     response_rate: number | null
     avg_wait_days: number | null
@@ -18,8 +18,8 @@ export interface GhostReportInputRow {
     first_party_report_count?: number | null
     web_report_count?: number | null
     data_source?: string | null
-    risk_level: GhostRisk | string
-    waste?: number
+    risk_level: GhostRisk | string | null
+    waste?: number | null
   }
 }
 

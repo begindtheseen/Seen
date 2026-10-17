@@ -30,6 +30,7 @@ import EmployerActivationChecklist from '@/components/employer/EmployerActivatio
 import { EmployerReplyManager } from '@/components/employer/EmployerReplyManager'
 import { EmployerPerkBanner } from '@/components/employer/EmployerPerkBanner'
 import { firstPartyReportCount } from '@/lib/server/reportCounts'
+import { isGradeableScore, notEnoughReviewsLabel } from '@/lib/gradeGate'
 
 type Score = {
   overall_score: number | null
@@ -218,7 +219,9 @@ export function EmployerHub() {
   const overall = score?.overall_score ?? null
   const ghost = pct(score?.ghost_rate)
   const reply = pct(score?.response_rate)
-  const hasRep = overall != null && (score?.report_count ?? 0) > 0
+  // Grade gate (lib/gradeGate.ts): the employer sees what candidates see — no grade or rates until
+  // MIN_REPORTS_FOR_GRADE real reports (the API already nulls them; this keeps the copy honest).
+  const hasRep = isGradeableScore(score) && (score?.report_count ?? 0) > 0
 
   return (
     <div style={{ minHeight: '100vh', background: 'radial-gradient(ellipse at 15% -5%,rgba(29,78,216,0.12) 0%,transparent 55%),radial-gradient(ellipse at 100% 5%,rgba(124,58,237,0.09) 0%,transparent 45%)' }}>
@@ -326,8 +329,8 @@ export function EmployerHub() {
               <p style={{ fontFamily: 'var(--mono)', fontSize: '.55rem', color: 'var(--muted)', lineHeight: 1.6, margin: '1.1rem 0 0' }}>
                 {hasRep && fpReports > 0
                   ? 'Grade, ghost rate and response rate are your public Seen reputation — what candidates see before applying.'
-                  : hasRep
-                    ? `Your public Seen grade is currently estimated from aggregated public web data — no applicant outcomes have been reported for ${company} yet. Candidates see it labeled as an estimate.`
+                  : fpReports > 0
+                    ? `${notEnoughReviewsLabel(score)}. Candidates can read your ${fpReports} applicant report${fpReports === 1 ? '' : 's'}, but no grade or ghost / response rate is shown until there are enough.`
                     : `No applicant outcomes reported for ${company} yet — a clean slate. Your live postings still show below.`}
               </p>
             </section>

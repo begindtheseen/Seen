@@ -10,12 +10,16 @@ import { AppStore } from '@/lib/stores/AppStore'
 import { useAuth } from '@/lib/auth'
 import IndustryBenchmark, { type Benchmark } from './IndustryBenchmark'
 import styles from './CompanyScoreModal.module.css'
+import { isGradeableScore, notEnoughReviewsLabel, MIN_REPORTS_FOR_GRADE } from '@/lib/gradeGate'
 
+// Grade gate (lib/gradeGate.ts): below MIN_REPORTS_FOR_GRADE real reports the API sends
+// gradeable:false and null verdict fields — the modal then shows the report count, not a grade.
 type Score = {
-  overall_score: number
-  ghost_rate: number
-  response_rate: number
-  avg_wait_days: number
+  gradeable?: boolean
+  overall_score: number | null
+  ghost_rate: number | null
+  response_rate: number | null
+  avg_wait_days: number | null
   waste?: number
   report_count?: number
   first_party_report_count?: number
@@ -77,7 +81,8 @@ export default function CompanyScoreModal({ companyName, onClose }: { companyNam
   }, [companyName, isLoggedIn])
 
   const s = score
-  const score100 = s ? Math.round(s.overall_score) : 0
+  const graded = isGradeableScore(s)
+  const score100 = graded ? Math.round(s.overall_score) : 0
   const color = riskColor(score100)
   const R = 40, CIRC = 2 * Math.PI * R
   const dashOff = revealed ? CIRC * (1 - score100 / 100) : CIRC
@@ -118,6 +123,29 @@ export default function CompanyScoreModal({ companyName, onClose }: { companyNam
             </p>
             <a href={`/company/${slugify(companyName)}`} className={styles.full}>Open full report →</a>
           </div>
+        ) : !graded ? (
+          <>
+            <div className={styles.gradeRow}>
+              <div className={styles.gradeMeta}>
+                <div className={styles.gradeVerdict}>{notEnoughReviewsLabel(s)}</div>
+                <span className={styles.dq} style={{ color: 'var(--muted)' }}>
+                  We grade a company only once {MIN_REPORTS_FOR_GRADE} real applicant reports are in — open the full report to read what we have.
+                </span>
+              </div>
+            </div>
+            <div className={styles.actions}>
+              {!tracked ? (
+                <button className={styles.full} onClick={track} style={{ borderColor: 'rgba(16,185,129,.3)', color: 'var(--green)' }}>
+                  ＋ I applied here — track it
+                </button>
+              ) : (
+                <div className={styles.full} style={{ borderColor: 'rgba(16,185,129,.3)', color: 'var(--green)' }}>
+                  ✓ Tracked — follow up in your tracker
+                </div>
+              )}
+              <a href={`/company/${slugify(companyName)}`} className={styles.full}>Open full report →</a>
+            </div>
+          </>
         ) : (
           <>
             <div className={styles.gradeRow}>

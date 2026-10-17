@@ -10,20 +10,39 @@
 //                 never directly edit/delete an existing listing — every change is a dispute an ADMIN
 //                 approves/denies (api/admin-stats.js). Filing one notifies nobody until an admin acts.
 //   • disputes  → your filed disputes + their verdicts.
+//   • import_preview → { url } of a listing on ANY site (your ATS, Indeed, LinkedIn, …). Runs the
+//                 same resolution ladder + SSRF guards as the seeker import (lib/server/listingResolve.js)
+//                 and returns the parsed fields to PREFILL the create form. Writes nothing — the
+//                 employer reviews, edits and posts through `create`, so it is employer-posted and
+//                 gets the same search priority as a typed-in listing.
+//   • applications       → Apply-on-Seen inbox: applications candidates sent to THIS company's
+//                 listings through Seen (name, email, phone, note, status). Optional { job_id }.
+//   • application_status → { id, status } — move an application through new/reviewed/
+//                 interviewing/rejected/hired.
+//   • application_resume → { id } — a 10-minute signed URL for the résumé file (private bucket),
+//                 or the résumé text when the applicant sent their saved Seen résumé.
+//   Apply-on-Seen actions answer { available:false } until migration 20261017150000 is applied.
 //
 // NO DATA BLEED: every action is scoped to the caller's companyKey. `list`/`disputes` only ever read
 // this company's rows; `dispute` verifies the target listing's company matches before accepting it;
-// applicant activity is returned ONLY as aggregate counts (never an identity). All DB work uses the
+// applicant activity is returned ONLY as aggregate counts (never an identity) — EXCEPT Apply-on-Seen
+// applications, where the candidate explicitly consented to share their name, email, résumé and
+// note with this company; those are scoped by company_key on every read and write. All DB work uses the
 // service key (RLS bypassed); the approved-claim check is the authz that matters operationally.
 
 import { resolveEmployerUid, resolveApprovedClaim } from '../lib/server/employerAuth.js';
 import { normalizeClaimCompany } from '../lib/server/employerClaims.js';
 import {
-  validateNewListing, buildEmployerListingRow, applyCounts, annotateListings, isRemoteLocation,
+  validateNewListing, buildEmployerListingRow, applyCounts, annotateListings, isRemoteLocation, buildImportPreview,
 } from '../lib/server/employerPostings.js';
 import { validateDisputeInput } from '../lib/server/listingDisputes.js';
 import { broadcastActivity } from '../lib/server/realtime.js';
 import { geocodeLocation } from '../lib/server/geo.js';
+import { rateLimit } from '../lib/server/ratelimit.js';
+import { validateListingUrl } from '../lib/server/listingImport.js';
+import { resolveListing } from '../lib/server/listingResolve.js';
+import { APPLICATION_STATUSES, inboxItem } from '../lib/server/seenApply.js';
+import { seenApplyAvailable, signResumeUrl } from '../lib/server/seenApplyStore.js';
 
 const ALLOWED = ['https://seenjobs.io', 'https://www.seenjobs.io'];
 const LISTING_TTL_DAYS = 60; // employer-posted listings live 60 days, matching paste-a-link imports.
@@ -88,6 +107,10 @@ async function route(req, res) {
   if (action === 'delete') return deleteOwnListing(res, ctx);
   if (action === 'dispute') return fileDispute(res, ctx);
   if (action === 'disputes') return listDisputes(res, ctx);
+  if (action === 'import_preview') return importPreview(req, res, ctx);
+  if (action === 'applications') return listApplications(res, ctx);
+  if (action === 'application_status') return setApplicationStatus(res, ctx);
+  if (action === 'application_resume') return applicationResume(res, ctx);
   return res.status(400).json({ error: 'Unknown action' });
 }
 
@@ -95,12 +118,15 @@ async function route(req, res) {
 async function listListings(res, { db, uid, claim }) {
   const { companyKey, companyName } = claim;
   const nameFilter = ilikeContains(companyName);
+  // jobs.apply_mode only exists once the Apply-on-Seen migration is applied — selecting it before
+  // that would 400 the whole list, so it is added only when the probe says the feature is live.
+  const seenApply = await seenApplyAvailable(db);
 
   // All of this company's listings (active + stale + expired so inactive ones can be disputed),
   // newest first. NOT gated on expires_at — the employer manages the whole set.
   const [jobsRes, dispRes, evRes, appRes] = await Promise.all([
     db(`jobs?company=ilike.${encodeURIComponent(nameFilter)}` +
-       `&select=id,title,company,location,city,apply_url,source,availability_status,expires_at,created_at,is_employer_posted,employer_user_id` +
+       `&select=id,title,company,location,city,apply_url,source,availability_status,expires_at,created_at,is_employer_posted,employer_user_id${seenApply ? ',apply_mode' : ''}` +
        `&order=created_at.desc&limit=300`),
     db(`listing_disputes?employer_user_id=eq.${encodeURIComponent(uid)}&status=eq.open` +
        `&select=id,job_id,kind,status,created_at&order=created_at.desc&limit=300`),
@@ -154,13 +180,28 @@ async function listListings(res, { db, uid, claim }) {
     }
   } catch { /* best-effort — the list must load even if the removal lookup fails */ }
 
+  // Apply-on-Seen applications per listing (count of new ones too) — company-scoped.
+  const seenByJob = {};
+  if (seenApply) {
+    try {
+      const sr = await db(`seen_applications?company_key=eq.${encodeURIComponent(companyKey)}&select=job_id,status&limit=5000`);
+      for (const r of (sr.ok ? await sr.json() : [])) {
+        const k = String(r.job_id);
+        seenByJob[k] = seenByJob[k] || { total: 0, new: 0 };
+        seenByJob[k].total += 1;
+        if (r.status === 'new') seenByJob[k].new += 1;
+      }
+    } catch { /* counts are best-effort */ }
+  }
+
   const listings = annotateListings(jobs, { openDisputesByJob: openByJob, applyCountsByJob: counts.perJob })
-    .map(l => ({ ...l, removed: removedByJob[String(l.id)] || null }));
+    .map(l => ({ ...l, removed: removedByJob[String(l.id)] || null, seen_applications: seenByJob[String(l.id)] || { total: 0, new: 0 } }));
 
   return res.status(200).json({
     ok: true,
     company: companyName,
     listings,
+    seen_apply_available: seenApply,
     summary: {
       total: listings.length,
       active: listings.filter((l) => l.availability_status === 'active').length,
@@ -176,6 +217,9 @@ async function createListing(res, { db, body, uid, claim }) {
   const v = validateNewListing(body);
   if (!v.ok) return res.status(400).json({ error: v.error });
   const { companyKey, companyName } = claim;
+  if (v.listing.apply_mode !== 'external' && !(await seenApplyAvailable(db))) {
+    return res.status(400).json({ error: 'Applying on Seen isn’t switched on yet — choose “On your website” for now', reason: 'seen_apply_unavailable' });
+  }
 
   const now = new Date();
   const expires = new Date(now.getTime() + LISTING_TTL_DAYS * 86400000);
@@ -207,6 +251,93 @@ async function createListing(res, { db, body, uid, claim }) {
   }
   const listing = (await insRes.json())[0] || null;
   return res.status(200).json({ ok: true, listing });
+}
+
+// ── import_preview: parse a listing link into the create form (writes nothing) ─
+async function importPreview(req, res, { body, uid, claim }) {
+  const v = validateListingUrl(body.url);
+  if (!v.ok) return res.status(400).json({ error: v.error });
+
+  // Each preview fetches an external page — per-employer hourly cap (fails open on a limiter blip).
+  const rl = await rateLimit(req, 'employer-import', { bucketKey: `user:${uid}` });
+  if (!rl.allowed) return res.status(429).json({ error: 'Too many imports this hour — try again later.' });
+
+  let resolved;
+  try {
+    resolved = await resolveListing(v);
+  } catch (e) {
+    if (e.message === 'unreachable' || e.message === 'unresolvable') {
+      return res.status(400).json({ error: 'That link isn’t reachable from here.' });
+    }
+    console.error('[employer-listings] import_preview failed:', e?.message || e);
+    resolved = { fields: {}, rungs: [{ rung: 'direct', error: e?.message || 'failed' }], blocked: true };
+  }
+  const preview = buildImportPreview(resolved.fields, { url: v.url, claimCompanyName: claim.companyName });
+  if (preview.needs_details) {
+    console.warn(`[employer-listings] import_preview needs input (${preview.missing.join(',')}): ${v.host} — ${JSON.stringify(resolved.rungs)}`);
+  }
+  return res.status(200).json({
+    ok: true,
+    ...preview,
+    your_company: claim.companyName,
+    page_fetched: (resolved.rungs || []).some((r) => r.blocked === false),
+  });
+}
+
+// ── applications: the Apply-on-Seen inbox for this company ────────────────────
+// NO BLEED: every read filters on the caller's companyKey (stamped from the listing at apply time).
+async function listApplications(res, { db, body, claim }) {
+  if (!(await seenApplyAvailable(db))) return res.status(200).json({ ok: true, available: false, applications: [] });
+  const jid = String(body.job_id == null ? '' : body.job_id).trim();
+  if (jid && !UUID.test(jid)) return res.status(400).json({ error: 'A valid listing id is required' });
+  const r = await db(
+    `seen_applications?company_key=eq.${encodeURIComponent(claim.companyKey)}` +
+    (jid ? `&job_id=eq.${encodeURIComponent(jid)}` : '') +
+    `&select=id,job_id,job_title,applicant_name,applicant_email,applicant_phone,note,status,created_at,resume_path,resume_file_name,resume_text` +
+    `&order=created_at.desc&limit=500`,
+  );
+  if (!r.ok) {
+    console.error('[employer-listings] applications read failed:', r.status, (await r.text().catch(() => '')).slice(0, 200));
+    return res.status(500).json({ error: 'Could not load applications — please try again' });
+  }
+  const rows = await r.json();
+  return res.status(200).json({ ok: true, available: true, applications: rows.map((row) => inboxItem(row)) });
+}
+
+async function setApplicationStatus(res, { db, body, claim }) {
+  if (!(await seenApplyAvailable(db))) return res.status(400).json({ error: 'Applying on Seen isn’t switched on yet' });
+  const id = String(body.id == null ? '' : body.id).trim();
+  const status = String(body.status == null ? '' : body.status).trim();
+  if (!UUID.test(id)) return res.status(400).json({ error: 'A valid application id is required' });
+  if (!APPLICATION_STATUSES.includes(status)) return res.status(400).json({ error: 'Unknown status' });
+  // The company_key filter IS the ownership check: another company's application matches 0 rows.
+  const r = await db(`seen_applications?id=eq.${encodeURIComponent(id)}&company_key=eq.${encodeURIComponent(claim.companyKey)}`, {
+    method: 'PATCH',
+    headers: { Prefer: 'return=representation' },
+    body: JSON.stringify({ status, updated_at: new Date().toISOString() }),
+  });
+  if (!r.ok) return res.status(500).json({ error: 'Could not update the application — please try again' });
+  const rows = await r.json();
+  if (!rows.length) return res.status(404).json({ error: 'That application isn’t on your company’s listings' });
+  return res.status(200).json({ ok: true, application: inboxItem(rows[0]) });
+}
+
+async function applicationResume(res, { db, body, claim }) {
+  if (!(await seenApplyAvailable(db))) return res.status(400).json({ error: 'Applying on Seen isn’t switched on yet' });
+  const id = String(body.id == null ? '' : body.id).trim();
+  if (!UUID.test(id)) return res.status(400).json({ error: 'A valid application id is required' });
+  const r = await db(`seen_applications?id=eq.${encodeURIComponent(id)}&company_key=eq.${encodeURIComponent(claim.companyKey)}&select=resume_path,resume_file_name,resume_text&limit=1`);
+  const row = r.ok ? (await r.json())[0] : null;
+  if (!row) return res.status(404).json({ error: 'That application isn’t on your company’s listings' });
+  if (row.resume_path) {
+    const url = await signResumeUrl({
+      SUPABASE_URL: process.env.SUPABASE_URL, SERVICE_KEY: process.env.SUPABASE_SERVICE_KEY,
+      path: row.resume_path, expiresIn: 600,
+    });
+    if (url) return res.status(200).json({ ok: true, url, file_name: row.resume_file_name || null, expires_in: 600 });
+  }
+  if (row.resume_text) return res.status(200).json({ ok: true, text: row.resume_text });
+  return res.status(404).json({ error: 'No résumé is attached to this application' });
 }
 
 // ── delete: remove an employer's OWN posted listing (direct — no admin needed) ─

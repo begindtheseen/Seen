@@ -16,6 +16,9 @@ import { aiHeaders } from '@/lib/aiHeaders'
 import { useAuth } from '@/lib/auth'
 import { trackApplyClick } from '@/lib/trackApply'
 import type { Job } from '@/lib/types'
+import ModalPortal from '@/components/ModalPortal'
+import SeenApplyModal from '@/components/jobs/SeenApplyModal'
+import { takesSeenApply } from '@/lib/seenApplyMode'
 
 interface Insights {
   what_they_want: string[]
@@ -73,6 +76,7 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
   const [insights, setInsights] = useState<Insights | null>(null)
   const [insightsState, setInsightsState] = useState<'loading' | 'done' | 'unavailable' | 'no_desc' | 'credits'>('loading')
   const [showApplyModal, setShowApplyModal] = useState(false)
+  const [showSeenApply, setShowSeenApply] = useState(false)
   const [showShareCard, setShowShareCard] = useState(false)
   const [reportedInactive, setReportedInactive] = useState(false)
   const [reportingInactive, setReportingInactive] = useState(false)
@@ -148,6 +152,8 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
           apply_url: r.apply_url ? String(r.apply_url) : (r.url ? String(r.url) : null),
           availability_status: r.availability_status ? String(r.availability_status) : undefined,
           freshness: (r as { freshness?: Job['freshness'] }).freshness,
+          employer_posted: r.is_employer_posted === true,
+          apply_mode: r.apply_mode === 'seen' || r.apply_mode === 'both' ? r.apply_mode : 'external',
         }
         JobCache.set(mapped)
         setJob(mapped)
@@ -467,17 +473,30 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
           <div style={{ display: 'flex', gap: '.75rem' }}>
             <button onClick={toggleSave} aria-label={saved ? 'Unsave' : 'Save'} style={{ background: 'none', border: '1px solid var(--line2)', borderRadius: 8, padding: '.65rem 1rem', fontSize: '1.1rem', cursor: 'pointer', color: saved ? 'var(--green)' : 'var(--muted)', flexShrink: 0 }}>{saved ? '♥' : '♡'}</button>
             <button onClick={() => setShowShareCard(true)} aria-label="Share listing" title="Share this listing" style={{ background: 'none', border: '1px solid var(--line2)', borderRadius: 8, padding: '.65rem 1rem', fontSize: '1.05rem', cursor: 'pointer', color: 'var(--muted)', flexShrink: 0 }}>🖼</button>
-            {job.apply_url
+            {takesSeenApply(job) && (
+              <button
+                onClick={() => setShowSeenApply(true)}
+                style={{ flex: 1, textAlign: 'center', background: 'var(--green)', color: 'var(--ink)', borderRadius: 8, padding: '.65rem 1rem', fontFamily: 'var(--display)', fontWeight: 800, fontSize: '.85rem', border: 'none', cursor: 'pointer' }}
+              >
+                Apply on Seen →
+              </button>
+            )}
+            {job.apply_url && job.apply_mode !== 'seen'
               ? <button
                   onClick={() => setShowApplyModal(true)}
-                  style={{ flex: 1, textAlign: 'center', background: 'var(--green)', color: 'var(--ink)', borderRadius: 8, padding: '.65rem 1rem', fontFamily: 'var(--display)', fontWeight: 800, fontSize: '.85rem', border: 'none', cursor: 'pointer' }}
+                  style={takesSeenApply(job)
+                    ? { flex: 1, textAlign: 'center', background: 'none', color: 'var(--sub)', borderRadius: 8, padding: '.65rem .8rem', fontFamily: 'var(--display)', fontWeight: 700, fontSize: '.78rem', border: '1px solid var(--line2)', cursor: 'pointer' }
+                    : { flex: 1, textAlign: 'center', background: 'var(--green)', color: 'var(--ink)', borderRadius: 8, padding: '.65rem 1rem', fontFamily: 'var(--display)', fontWeight: 800, fontSize: '.85rem', border: 'none', cursor: 'pointer' }}
                 >
-                  Apply &amp; Optimize →
+                  {takesSeenApply(job) ? 'Apply on their site →' : <>Apply &amp; Optimize →</>}
                 </button>
-              : <button disabled style={{ flex: 1, background: 'var(--muted)', color: 'var(--ink)', border: 'none', borderRadius: 8, padding: '.65rem 1rem', fontFamily: 'var(--display)', fontWeight: 800, fontSize: '.85rem', opacity: .65 }}>No apply link</button>
+              : !takesSeenApply(job) && <button disabled style={{ flex: 1, background: 'var(--muted)', color: 'var(--ink)', border: 'none', borderRadius: 8, padding: '.65rem 1rem', fontFamily: 'var(--display)', fontWeight: 800, fontSize: '.85rem', opacity: .65 }}>No apply link</button>
             }
           </div>
         </div>
+        {showSeenApply && job && (
+          <SeenApplyModal job={job} onClose={() => setShowSeenApply(false)} />
+        )}
         {showShareCard && job && (
           <ListingCard
             data={{
@@ -489,7 +508,8 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
           />
         )}
         {showApplyModal && job && (
-          <div style={{ position: 'fixed', inset: 0, zIndex: 1000, background: 'rgba(0,0,0,.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }} onClick={() => setShowApplyModal(false)}>
+          <ModalPortal>
+          <div style={{ position: 'fixed', inset: 0, zIndex: 1000, background: 'rgba(0,0,0,.7)', backdropFilter: 'blur(6px)', WebkitBackdropFilter: 'blur(6px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }} onClick={() => setShowApplyModal(false)}>
             <div style={{ position: 'relative', background: 'var(--surface)', borderRadius: 16, padding: '1.5rem', width: '100%', maxWidth: 520, maxHeight: '85dvh', overflowY: 'auto', animation: 'fadeUp .25s ease both' }} onClick={e => e.stopPropagation()}>
               <div style={{ fontFamily: 'var(--display)', fontSize: '1.1rem', fontWeight: 800, color: 'var(--white)', marginBottom: '.4rem' }}>Ready to apply?</div>
               <p style={{ fontFamily: 'var(--mono)', fontSize: '.68rem', color: 'var(--sub)', marginBottom: '1.25rem', lineHeight: 1.65 }}>
@@ -515,6 +535,7 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
               <button onClick={() => setShowApplyModal(false)} style={{ position: 'absolute', top: '1rem', right: '1rem', background: 'none', border: 'none', color: 'var(--muted)', fontSize: '1.2rem', cursor: 'pointer' }}>×</button>
             </div>
           </div>
+          </ModalPortal>
         )}
       </div>
     </div>
