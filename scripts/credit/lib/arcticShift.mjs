@@ -28,11 +28,21 @@ export const ARCTIC_UA = 'SeenJobs/1.0 hiring-transparency research backfill (+h
 // there, so these get narrowed 1-year windows; the rest of JOB_SUBREDDITS are searched all-time.
 export const ACTIVE_SUBREDDITS = ['recruitinghell', 'jobs', 'antiwork', 'cscareerquestions', 'WorkReform', 'ExperiencedDevs'];
 export const QUIET_SUBREDDITS = JOB_SUBREDDITS.filter((s) => !ACTIVE_SUBREDDITS.includes(s));
+// --quick (breadth runs): only the four subreddits that carry most first-hand hiring stories, one
+// 1-year window each, no quieter subreddits — 4 searches per target instead of 10 + 6 × windows.
+export const QUICK_SUBREDDITS = ['recruitinghell', 'jobs', 'cscareerquestions', 'antiwork'];
+
+/** Discovery scope for a run: { quietSubs, activeSubs, windows }. quick forces 1 window. */
+export function discoveryScope({ quick = false, windows = ARCTIC_DEFAULTS.activeWindows } = {}) {
+  return quick
+    ? { quietSubs: [], activeSubs: [...QUICK_SUBREDDITS], windows: 1 }
+    : { quietSubs: [...QUIET_SUBREDDITS], activeSubs: [...ACTIVE_SUBREDDITS], windows };
+}
 
 export const ARCTIC_DEFAULTS = {
   searchLimit: 100,     // posts per search (API max)
   treeLimit: 200,       // comment nodes per thread tree request (we keep ≤ DEFAULTS.commentsPerThread)
-  activeWindows: 3,     // 1-year windows, newest first, per very active subreddit
+  activeWindows: 1,     // 1-year windows, newest first, per very active subreddit (was 3; 1 for breadth — --windows 3 for depth)
   intervalMs: 1000,     // minimum gap between ANY two Arctic Shift requests (shared by all workers)
   concurrency: 2,
   retryDelayMs: 5000,   // pause before the single retry of a timed-out / failed query
@@ -339,13 +349,14 @@ export async function fetchArcticTarget(target, {
   fetcher, state = createDiscoveryState(), importedIds = new Set(), threadsCap = DEFAULTS.threadsPerTarget,
   limits = {}, nowSec = Math.floor(Date.now() / 1000), windows = ARCTIC_DEFAULTS.activeWindows,
   limit = ARCTIC_DEFAULTS.searchLimit, treeLimit = ARCTIC_DEFAULTS.treeLimit, fullDiscovery = false, includeGlobal = false, log = () => {},
+  quietSubs = QUIET_SUBREDDITS, activeSubs = ACTIVE_SUBREDDITS,
 }) {
   const { maxComments = DEFAULTS.commentsPerThread, maxChars = DEFAULTS.charsPerComment, opMaxChars = DEFAULTS.charsOp } = limits;
   const byId = new Map();
   const authors = new Map(); // thread id → post author, in memory only (OP flag)
   const searches = {};
   let skippedQueries = 0, rawItems = 0, shortcut = false;
-  for (const q of discoveryQueries(target, { nowSec, limit, windows, includeGlobal })) {
+  for (const q of discoveryQueries(target, { nowSec, limit, windows, includeGlobal, quietSubs, activeSubs })) {
     const r = await searchWithFallback(q, { fetcher, state });
     searches[q.name] = { ok: r.ok, param: r.param, items: r.items.length, ...(r.errors.length ? { errors: r.errors } : {}) };
     if (!r.ok) skippedQueries++;

@@ -6,7 +6,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  ACTIVE_SUBREDDITS, ARCTIC_UA, QUIET_SUBREDDITS, cleanRedditMarkdown, createArcticFetcher, createDiscoveryState,
+  ACTIVE_SUBREDDITS, ARCTIC_DEFAULTS, ARCTIC_UA, QUICK_SUBREDDITS, QUIET_SUBREDDITS, cleanRedditMarkdown, discoveryScope, createArcticFetcher, createDiscoveryState,
   discoveryQueries, fetchArcticTarget, flattenCommentTree, isRetryable, parseArcticResponse, postToItem,
   resetDelayMs, searchWithFallback,
 } from './lib/arcticShift.mjs';
@@ -335,4 +335,24 @@ test('fetchArcticTarget: relevance gate — "Robert" alone is not Robert Half; a
   assert.equal(c.complete, false);
   assert.equal(c.threads.length, 0);
   assert.equal(c.skippedQueries, 1 + QUIET_SUBREDDITS.length + ACTIVE_SUBREDDITS.length);
+});
+
+test('breadth defaults: 1 window; --quick = 4 busiest subs × 1 window, no quiet subs, passed through fetchArcticTarget', async () => {
+  assert.equal(ARCTIC_DEFAULTS.activeWindows, 1);
+  assert.deepEqual(QUICK_SUBREDDITS, ['recruitinghell', 'jobs', 'cscareerquestions', 'antiwork']);
+  assert.ok(QUICK_SUBREDDITS.every((s) => ACTIVE_SUBREDDITS.includes(s)));
+  const nowSec = 1_760_000_000;
+  const full = discoveryScope();
+  assert.equal(discoveryQueries(IG, { nowSec, ...full }).length, QUIET_SUBREDDITS.length + ACTIVE_SUBREDDITS.length);
+  assert.equal(discoveryQueries(IG, { nowSec, ...discoveryScope({ windows: 3 }) }).length, QUIET_SUBREDDITS.length + ACTIVE_SUBREDDITS.length * 3);
+  const quick = discoveryScope({ quick: true, windows: 3 });
+  assert.equal(quick.windows, 1, 'quick forces one window');
+  const qs = discoveryQueries(IG, { nowSec, ...quick });
+  assert.deepEqual(qs.map((q) => q.scope), QUICK_SUBREDDITS);
+  assert.ok(qs.every((q) => q.params.after && q.params.before));
+  const seen = [];
+  const fetcher = { stats: {}, get: async (path, params) => { seen.push(params.subreddit || path); return { ok: true, status: 200, items: [], error: null }; } };
+  const cache = await fetchArcticTarget(IG, { fetcher, nowSec, ...quick });
+  assert.deepEqual(Object.keys(cache.searches), QUICK_SUBREDDITS.map((s) => `r/${s}@0-1y`));
+  assert.deepEqual(seen, QUICK_SUBREDDITS);
 });

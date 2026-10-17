@@ -6,7 +6,7 @@ import { join } from 'node:path';
 import { parseRedditSearchAtom } from '../../api/_utils/companyReddit.js';
 import {
   EXTRACT_SCHEMA, EXTRACT_SYSTEM, JOB_SUBREDDITS, REDDIT_UA, REPO_ROOT, WRITE_OUTCOMES,
-  buildExtractRequests, buildImportRow, buildReportRow, buildTargets, chooseAgencyAlias, chunkThreads,
+  buildExtractRequests, buildImportRow, buildReportRow, buildTargets, buildTargetsFromCompanies, chooseAgencyAlias, chunkThreads, searchPhrase,
   cleanRedditHtml, createRedditFetcher, dedupeExperiences, extractionsFromResults, fetchTarget,
   importedIdsForTarget, loadAgencies, normKey, parseThreadFeed, piiReason, planWrite, redactPII,
   sampleN, searchUrlBuilders, selectThreads, sourceFor, targetSlug, validateExperience,
@@ -298,7 +298,10 @@ test('dedupe keeps one report per (company, thread, comment), most confident win
 
 test('report + import rows match the api/reports.js reddit_import shape', () => {
   const row = buildReportRow({ ...goodExp(), company: 'insight global', subreddit: 'recruitinghell' }, { companyId: 'uuid-1' });
-  assert.deepEqual(Object.keys(row).sort(), ['company_id', 'company_name', 'experience_level', 'needs_review', 'outcome', 'outcome_weight', 'platform', 'report_text', 'role', 'rounds', 'source', 'trust_reason', 'unpaid_work'].sort());
+  assert.deepEqual(Object.keys(row).sort(), ['company_id', 'company_name', 'experience_level', 'location_id', 'needs_review', 'outcome', 'outcome_weight', 'platform', 'report_text', 'role', 'rounds', 'source', 'trust_reason', 'unpaid_work'].sort());
+  assert.equal(row.location_id, null, 'uniform keys for bulk insert: null when no city');
+  assert.equal('city' in row, false, 'reports has no city column on prod');
+  assert.equal(buildReportRow({ ...goodExp(), company: 'x', subreddit: 'jobs' }, { companyId: 'c', locationId: 'loc-1' }).location_id, 'loc-1');
   assert.equal(row.platform, 'Reddit r/recruitinghell');
   assert.equal(row.source, 'reddit');
   assert.equal(row.outcome_weight, 0.3);
@@ -335,4 +338,44 @@ test('results → extractions → write plan → QA sample, end to end', () => {
   assert.match(sourceFor(plan.kept[1], c.threads[0]), /OP FOLLOW-UPS/);
   assert.deepEqual(sampleN([1, 2, 3, 4, 5], 3, 9), sampleN([1, 2, 3, 4, 5], 3, 9)); // reproducible
   assert.equal(sampleN([1, 2], 40).length, 2);
+});
+
+// ── city capture + demand targets ──
+
+test('extraction schema + prompt ask for an optional, never-inferred city; planWrite normalizes it', () => {
+  const item = EXTRACT_SCHEMA.properties.experiences.items;
+  assert.ok(item.required.includes('city'));
+  assert.equal(item.properties.city.type, 'string');
+  assert.match(EXTRACT_SYSTEM, /city:[^\n]*ONLY if the writer states it[^\n]*Never infer it from the company's headquarters/);
+  const c = cacheFor(IG, 2);
+  const slug = targetSlug(IG);
+  const plan = planWrite([{ custom_id: 'x', target_slug: slug, thread_ids: ['t0x', 't1x'], experiences: [
+    goodExp({ city: 'austin, texas' }), goodExp({ thread_id: 't1x', city: '' }), goodExp({ comment_index: 2, city: 'Remote' }), goodExp({ comment_index: 3 }),
+  ] }], new Map([[slug, c]]));
+  assert.deepEqual(plan.kept.map((e) => e.city), ['Austin, TX', null, null, null]);
+});
+
+test('buildTargetsFromCompanies: agencies first, demand order kept, legal-suffix search phrase, agency/dup skipped', () => {
+  const targets = buildTargetsFromCompanies({ agencies: AGENCIES, companies: [
+    { name: 'AutoZone, Inc.', writeName: 'autozone, inc.', aliases: ['autozone, inc.', 'autozone'] },
+    { name: 'Insight Global', writeName: 'insight global', aliases: ['insight global'] },
+    { name: 'AutoZone', writeName: 'autozone', aliases: ['autozone'] },
+    { name: 'Compass Group', writeName: 'compass group', aliases: ['compass group'] },
+    { name: 'Confidential', writeName: 'confidential', aliases: [] },
+  ] });
+  assert.equal(targets.filter((t) => t.kind === 'agency').length, 26);
+  const cos = targets.filter((t) => t.kind === 'company');
+  assert.deepEqual(cos.map((t) => t.writeName), ['autozone, inc.', 'compass group']);
+  assert.equal(cos[0].searchTerm, 'autozone');
+  assert.ok(cos[0].terms.includes('autozone'));
+  assert.equal(cos[1].searchTerm, 'compass group', 'group is not a legal suffix — "compass" alone would be too loose');
+  assert.equal(searchPhrase('The Home Depot, Inc.'), 'the home depot');
+  assert.equal(searchPhrase('Co'), 'co');
+  assert.equal(searchPhrase('Gap Inc'), 'gap inc', 'never strip down to an everyday ≤3-char word');
+  const [gap, cvs] = buildTargetsFromCompanies({ agencies: [], companies: [
+    { name: 'Gap Inc', writeName: 'gap inc', aliases: ['gap inc', 'gap', 'old navy'] },
+    { name: 'CVS Health', writeName: 'cvs health', aliases: ['cvs health', 'cvs'] },
+  ] });
+  assert.deepEqual(gap.terms, ['gap inc', 'old navy'], 'everyday word "gap" is not a mention term');
+  assert.deepEqual(cvs.terms, ['cvs health', 'cvs'], 'typed acronyms stay');
 });

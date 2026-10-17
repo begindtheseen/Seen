@@ -7,18 +7,26 @@
 // publicly, and to return each one with the URL it came from.
 //
 //   node scripts/credit/web-reports.mjs run   [--dry-run] [--agencies "Robert Half,Aerotek"] [--limit N]
-//                                             [--companies N] [--no-agencies] [--max-uses 6] [--label L]
-//   node scripts/credit/web-reports.mjs write [--dry-run] [--label L] [--needs-review] [--include-non-reddit]
+//                                             [--companies N] [--targets-file F.json] [--skip-if-reports 15]
+//                                             [--refresh-demand] [--no-agencies] [--max-uses 5] [--label L]
+//   node scripts/credit/web-reports.mjs write [--dry-run] [--label L] [--needs-review]
+//
+// Company targets (--companies N / --targets-file): lib/targets.mjs — file entries first, then the
+// companies with the most current job listings, then company_scores by report_count; deduped, agencies
+// and companies already holding ≥ --skip-if-reports first-party reports skipped. N caps the merged list
+// (a --targets-file without --companies runs the whole file).
 //
 // What this job will NOT do (the reason it exists separately from api/reports.js `research`):
 //   • it never asks for or stores a rate, percentage, or "mention count" — only individual accounts;
 //   • every account must cite a URL that actually came back in a web_search_tool_result block of
 //     the same message. The model cannot see our validator, and an account whose URL was not
 //     retrieved is dropped as a possible hallucination (counted, never written);
-//   • rows are written exactly like the existing Reddit pipeline (platform "Reddit r/<sub>", reddit
-//     trust 0.3, "Sourced from public discussion" badge) — never as a direct / first-party report.
-//     Non-Reddit sources have no honest label + low-trust tier in the app today, so they are HELD in
-//     a local file instead of written (see nonRedditWritable() below).
+//   • Reddit-sourced accounts are written exactly like the existing Reddit pipeline (platform
+//     "Reddit r/<sub>", reddit trust 0.3, "Sourced from public discussion" badge); every other site is
+//     written under the app's public-review contract (platform "Public review · <host>", source
+//     'web_public', trust 0.3 — see PUBLIC_REVIEW_ROW). Never as a direct / first-party report.
+//   • a stated city (never inferred from the company HQ) becomes reports.location_id via the app's
+//     resolveOrCreateLocation — reports has no city column (lib/location.mjs).
 //
 // Anti-gaming (CLAUDE.md): these are third-party CLAIMS. They are attributed (URL in report_text),
 // down-weighted, PII-filtered, and deduped against what we already hold.
@@ -28,17 +36,19 @@ import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { SECURITY_PREAMBLE } from '../../lib/server/promptGuard.js';
 import { STAFFING_AGENCIES } from '../../lib/agencies.ts';
-import * as reportSource from '../../lib/reportSource.ts';
 import { SOURCE_TRUST, classifyPlatform } from '../../api/_utils/companyIntel.js';
-import { isValidCompanyName, recomputeCompanyScoreFromReports, resolveOrCreateCompany } from '../../api/_utils/reportWrite.js';
+import { recomputeCompanyScoreFromReports, resolveOrCreateCompany } from '../../api/_utils/reportWrite.js';
 import {
   MODELS, PRICES, RUNS_DIR, WEB_SEARCH_USD, argValue, budgetUsd, customId, isDryRun, readJsonOrNull, readLedger, runBatch, sb, sbAll, sbEnv,
 } from './lib/batch.mjs';
+import { createLocationResolver, normalizeCity } from './lib/location.mjs';
+import { normKey } from './lib/reddit.mjs';
+import { DEFAULT_SKIP_IF_REPORTS, loadTargetsFile, selectCompanyTargets } from './lib/targets.mjs';
 
 // ---------- constants ----------
 
 export const MODEL = MODELS.quality; // claude-sonnet-5-5
-export const DEFAULT_MAX_USES = 6;
+export const DEFAULT_MAX_USES = 5; // pilot (6): $0.31 for 3 agencies ≈ $0.10/target; 5 for breadth
 export const MAX_TOKENS = 16_000;           // dynamic filtering writes code (output tokens) before the answer
 export const EXPECTED_IN_TOKENS = 40_000;   // search results + server-loop iterations inflate input heavily
 export const EXPECTED_OUT_TOKENS = 5_000;
@@ -52,7 +62,8 @@ export const OUTCOMES = ['ghosted', 'rejected', 'interview', 'offer', 'hired', '
 // 'unknown' carries no signal — never written.
 const WRITABLE_OUTCOMES = new Set(OUTCOMES.filter((o) => o !== 'unknown'));
 
-// Row values, chosen to land in the SAME tier as api/reports.js reddit_import (justification):
+// Row values for REDDIT-sourced accounts, chosen to land in the SAME tier as api/reports.js
+// reddit_import (justification):
 //   platform "Reddit r/<sub>" → classifyPlatform() = 'reddit' → SOURCE_TRUST.reddit = 0.3 in every
 //     score fusion, and lib/reportSource.ts isRedditSourced() = true → the UI renders
 //     PUBLIC_DISCUSSION_LABEL ("Sourced from public discussion") in feed / report / company pages.
@@ -64,6 +75,19 @@ export const ROW_DEFAULTS = {
   source: 'reddit',
   outcome_weight: 0.3,
   trust_reason: 'web_search_public_discussion',
+  rounds: 0,
+  unpaid_work: 'na',
+  experience_level: 'Unknown',
+};
+
+// Row values for every NON-Reddit source — the app's public-review contract (api/_utils/companyIntel.js
+// classifyPlatform: /^public review ·/i → 'public_web', SOURCE_TRUST.public_web 0.3). trust_reason is
+// distinct from the Reddit-shaped rows so the whole batch can be found & removed.
+export const PUBLIC_REVIEW_PREFIX = 'Public review · ';
+export const PUBLIC_REVIEW_ROW = {
+  source: 'web_public',
+  outcome_weight: 0.3,
+  trust_reason: 'web_search_public_review',
   rounds: 0,
   unpaid_work: 'na',
   experience_level: 'Unknown',
@@ -96,28 +120,11 @@ export function agencyTargets(filter = null, limit = null) {
   return list.map((a) => ({ kind: 'agency', name: a.name, aliases: [...a.aliases] }));
 }
 
-// Top companies by real (first-party) report rows. Columns verified: company_scores.company_name
-// (unique, migration 023), first_party_report_count (migration 063), report_count (read by lib/growth.ts).
-// first_party_report_count is used instead of report_count because report_count also includes the
-// LLM web-research CLAIMED mention count (migration 063: observed 12,775 for one company).
-export async function companyTargets(n, excludeNames = new Set()) {
-  const sel = 'select=company_name,first_party_report_count,report_count';
-  let rows;
-  try {
-    rows = await sb(`company_scores?${sel}&order=first_party_report_count.desc.nullslast&limit=${n + 80}`);
-  } catch {
-    rows = await sb(`company_scores?${sel}&order=report_count.desc&limit=${n + 80}`);
-  }
-  const out = [];
-  const seen = new Set();
-  for (const r of rows || []) {
-    const name = lc(r.company_name);
-    if (!name || seen.has(name) || excludeNames.has(name) || !isValidCompanyName(name)) continue;
-    seen.add(name);
-    out.push({ kind: 'company', name: r.company_name, aliases: [name] });
-    if (out.length >= n) break;
-  }
-  return out;
+// Company targets come from lib/targets.mjs (demand-ranked, deduped, skip-if-reports). This adapts
+// them to the { kind, name, aliases } shape: aliases[0] is the write name (an existing exact
+// company_scores spelling when there is one), the rest are other spellings seen in jobs / the file.
+export function toWebTarget(t) {
+  return { kind: 'company', name: t.name, aliases: [...t.aliases], jobs: t.jobs || 0, origin: t.origin };
 }
 
 // ---------- request ----------
@@ -180,12 +187,15 @@ Return at most ${MAX_ACCOUNTS_PER_TARGET} accounts, best-evidenced first, as:
   "posted_date": "YYYY-MM-DD, YYYY-MM or YYYY if visible, else null",
   "outcome": ${OUTCOMES.map((o) => `"${o}"`).join(' | ')},
   "role": "job title if stated, else null",
+  "city": "city + state/region where THIS applicant applied or interviewed, if the account states it (e.g. \"Austin, TX\"), else null",
   "summary": "1-2 neutral third-person sentences",
   "first_hand": true,
   "subject": "target" | "other_employer" | "unclear",
   "confidence": "high" | "medium" | "low"
 }]}
 \`\`\`
+city: only a location the account itself states for this applicant's job / interview. Never infer it from
+the company's headquarters, the poster's profile, or the site's region; "Remote" or several places → null.
 confidence "high" = clearly first-hand, clearly about the target, outcome stated explicitly.
 If you found nothing that meets every rule, return {"accounts":[]}.`;
 }
@@ -433,6 +443,7 @@ export function validateAccounts(accounts, searchResults, target, { maxAgeYears 
       posted_date: posted?.text || null,
       outcome: a.outcome,
       role: a.role ? String(a.role).replace(/\s+/g, ' ').trim().slice(0, 200) : null,
+      city: normalizeCity(a.city),
       summary,
       confidence: a.confidence,
     });
@@ -442,7 +453,7 @@ export function validateAccounts(accounts, searchResults, target, { maxAgeYears 
 
 export function processResults(targets, requests, results, opts = {}) {
   const perTarget = [];
-  const stats = { targets: targets.length, ok: 0, incomplete: 0, failed: 0, bad_json: 0, searches: 0, accounts_raw: 0, kept: 0, dropped: {}, statuses: {} };
+  const stats = { targets: targets.length, ok: 0, incomplete: 0, failed: 0, bad_json: 0, searches: 0, accounts_raw: 0, kept: 0, with_city: 0, dropped: {}, statuses: {} };
   for (let i = 0; i < targets.length; i++) {
     const t = targets[i];
     const r = readResult(results.get(requests[i].custom_id));
@@ -458,6 +469,7 @@ export function processResults(targets, requests, results, opts = {}) {
       ({ kept, dropped } = validateAccounts(r.accounts, r.searchResults, t, opts));
     }
     stats.kept += kept.length;
+    stats.with_city += kept.filter((k) => k.city).length;
     for (const d of dropped) stats.dropped[d.reason] = (stats.dropped[d.reason] || 0) + 1;
     perTarget.push({ target: t, status: r.status, searches: r.searches || 0, search_results: (r.searchResults || []).length, search_errors: r.searchErrors || [], kept, dropped });
   }
@@ -466,21 +478,20 @@ export function processResults(targets, requests, results, opts = {}) {
 
 // ---------- write planning ----------
 
-// Today only Reddit has BOTH an honest UI label (isRedditSourced → PUBLIC_DISCUSSION_LABEL) and a
-// low trust tier (classifyPlatform → reddit 0.3). A "Public web · glassdoor.com" platform would be
-// scored as ingest (0.55) and an arbitrary forum as 'direct' (1.0!) with no badge — a first-party
-// mislabel. This guard reads the LIVE app code, so non-Reddit writes unlock automatically once
-// lib/reportSource.ts (e.g. an isPublicDiscussion export) and classifyPlatform learn the marker.
-export const NON_REDDIT_PLATFORM = (host) => `Public web · ${host}`;
-export function nonRedditWritable(host = 'example-forum.com') {
-  const platform = NON_REDDIT_PLATFORM(host);
-  const label = reportSource.isPublicDiscussion || reportSource.isRedditSourced;
-  return label(platform) === true && (SOURCE_TRUST[classifyPlatform(platform)] ?? 1) <= SOURCE_TRUST.reddit;
+export const isRedditItem = (item) => item.host === 'reddit.com';
+
+// host is canonicalUrl's: lowercase, www./old./m./amp. stripped.
+export function platformFor(item) {
+  if (isRedditItem(item)) return item.reddit?.subreddit ? `Reddit r/${item.reddit.subreddit}` : 'Reddit';
+  return `${PUBLIC_REVIEW_PREFIX}${String(item.host).toLowerCase().replace(/^www\./, '')}`;
 }
 
-export function platformFor(item) {
-  if (item.host === 'reddit.com') return item.reddit?.subreddit ? `Reddit r/${item.reddit.subreddit}` : 'Reddit';
-  return NON_REDDIT_PLATFORM(item.host);
+// Does THIS checkout's app code score a platform at ≤ the reddit tier? Informational only (printed by
+// `write`): the label + tier must be DEPLOYED before these rows are written, and that can't be seen
+// from here.
+export function platformTier(platform) {
+  const tier = classifyPlatform(platform);
+  return { tier, trust: SOURCE_TRUST[tier] ?? null, lowTrust: (SOURCE_TRUST[tier] ?? 1) <= SOURCE_TRUST.reddit };
 }
 
 export function reportTextFor(item) {
@@ -518,7 +529,7 @@ export function dedupeAgainstExisting(items, target, existingRows = [], redditIm
   return { fresh, dupes };
 }
 
-export function buildRow(item, writeName, { needsReview = false } = {}) {
+export function buildRow(item, writeName, { needsReview = false, locationId = null } = {}) {
   return {
     company_name: writeName,
     platform: platformFor(item),
@@ -526,7 +537,8 @@ export function buildRow(item, writeName, { needsReview = false } = {}) {
     role: item.role,
     report_text: reportTextFor(item),
     needs_review: !!needsReview,
-    ...ROW_DEFAULTS,
+    ...(isRedditItem(item) ? ROW_DEFAULTS : PUBLIC_REVIEW_ROW),
+    ...(locationId ? { location_id: locationId } : {}),
   };
 }
 
@@ -555,28 +567,46 @@ function defaultLabel(targets, maxUses) {
   return `web-reports-${targets.length}t-${h.toString(36)}`;
 }
 
+// --companies N / --targets-file F → demand-ranked company targets (lib/targets.mjs).
+export async function resolveCompanyTargets(argv, { select = selectCompanyTargets, loadFile = loadTargetsFile, log = console.log } = {}) {
+  const nRaw = argValue('companies', null, argv);
+  const n = nRaw == null ? null : Math.max(0, Number(nRaw) || 0);
+  const file = argValue('targets-file', null, argv);
+  if (!file && !n) return [];
+  const fileTargets = file ? loadFile(file) : [];
+  if (file) log(`[targets] ${fileTargets.length} entries in ${file}`);
+  const skipRaw = argValue('skip-if-reports', null, argv);
+  const skipIfReports = skipRaw == null ? DEFAULT_SKIP_IF_REPORTS : Math.max(0, Number(skipRaw) || 0);
+  sbEnv(); // fail fast with a clear message
+  const excludeKeys = new Set(STAFFING_AGENCIES.flatMap((a) => [a.name, ...a.aliases]).map(normKey));
+  const picked = await select({
+    sbAll, fileTargets, skipIfReports, excludeKeys,
+    n: n ?? fileTargets.length, // a file alone runs the whole file; --companies caps the merged list
+    useDemand: !!n, refreshDemand: argv.includes('--refresh-demand'), log,
+  });
+  return picked.map(toWebTarget);
+}
+
 async function cmdRun(argv) {
   const maxUses = Number(argValue('max-uses', DEFAULT_MAX_USES, argv)) || DEFAULT_MAX_USES;
   const filter = argValue('agencies', null, argv)?.split(',').map((s) => s.trim()).filter(Boolean) || null;
   const limit = argValue('limit', null, argv) ? Number(argValue('limit', null, argv)) : null;
-  const nCompanies = Number(argValue('companies', 0, argv)) || 0;
   let targets = argv.includes('--no-agencies') ? [] : agencyTargets(filter, limit);
-  if (nCompanies > 0) {
-    sbEnv(); // fail fast with a clear message
-    const exclude = new Set(STAFFING_AGENCIES.flatMap((a) => a.aliases));
-    targets = targets.concat(await companyTargets(nCompanies, exclude));
-  }
+  targets = targets.concat(await resolveCompanyTargets(argv));
   if (!targets.length) throw new Error('no targets');
   const label = argValue('label', null, argv) || defaultLabel(targets, maxUses);
   const requests = targets.map((t) => buildRequest(t, { maxUses }));
   const est = estimateWebCost(requests.length, { searches: maxUses });
   console.log(`[${label}] ${targets.length} targets (${targets.filter((t) => t.kind === 'agency').length} agencies, ${targets.filter((t) => t.kind === 'company').length} companies)`);
+  for (const t of targets.slice(0, 25)) console.log(`  ${t.kind.padEnd(7)} ${t.name.padEnd(40)} → "${t.aliases[0]}"${t.kind === 'company' ? ` · ${t.origin} · ${t.jobs} current listings` : ''}`);
+  if (targets.length > 25) console.log(`  … and ${targets.length - 25} more (full list: ${join(RUNS_DIR, label, 'targets.json')})`);
   console.log(`[${label}] web-search estimate: ~$${est.perRequest.toFixed(3)}/target (≈${EXPECTED_IN_TOKENS / 1000}k in, ${EXPECTED_OUT_TOKENS / 1000}k out, ${maxUses} searches) → ~$${est.total.toFixed(2)} total. runBatch's own line below counts prompt tokens only and undercounts search-result input.`);
   const dir = runDir(label);
   writeFileSync(join(dir, 'targets.json'), JSON.stringify({ targets, maxUses }, null, 2));
   if (!isDryRun(argv) && readJsonOrNull(join(dir, 'batches.json')) === null) {
     const spent = readLedger().spentUsd;
     if (spent + est.total > budgetUsd()) throw new Error(`refusing to submit: ledger $${spent.toFixed(2)} + web estimate $${est.total.toFixed(2)} > budget $${budgetUsd()}`);
+    console.log(`[${label}] ledger $${spent.toFixed(2)} + estimate $${est.total.toFixed(2)} ≤ budget $${budgetUsd()} — submitting`);
   }
   const { results, dryRun } = await runBatch({ label, requests, estimate: { expectedOutTokens: EXPECTED_OUT_TOKENS, searchesPerRequest: maxUses } });
   if (dryRun) {
@@ -588,9 +618,17 @@ async function cmdRun(argv) {
   writeFileSync(lastPointer(), JSON.stringify({ label }));
   const s = extracted.stats;
   console.log(`[${label}] ok ${s.ok} · incomplete ${s.incomplete} (pause_turn/max_tokens, not parsed) · bad_json ${s.bad_json} · failed ${s.failed} · searches ${s.searches}`);
-  console.log(`[${label}] accounts: ${s.accounts_raw} returned → ${s.kept} kept. Dropped: ${JSON.stringify(s.dropped)}`);
+  console.log(`[${label}] accounts: ${s.accounts_raw} returned → ${s.kept} kept (${s.with_city} with a city). Dropped: ${JSON.stringify(s.dropped)}`);
   for (const p of extracted.perTarget) console.log(`  ${p.target.name.padEnd(34)} ${p.status.padEnd(22)} searches=${p.searches} results=${p.search_results} kept=${p.kept.length} dropped=${p.dropped.length}`);
   console.log(`\nNext: node scripts/credit/web-reports.mjs write --label ${label} --dry-run`);
+}
+
+// Plan one target's rows: dedupe against the DB, pick the write name, shape rows (location ids are
+// resolved by the caller once the company id is known). Pure — exported for tests.
+export function planTargetRows(target, kept, existing = [], imports = [], { needsReview = false } = {}) {
+  const { fresh, dupes } = dedupeAgainstExisting(kept, target, existing, imports);
+  const writeName = chooseWriteName(target, existing);
+  return { writeName, dupes, items: fresh, rows: fresh.map((it) => buildRow(it, writeName, { needsReview })) };
 }
 
 async function cmdWrite(argv) {
@@ -603,66 +641,62 @@ async function cmdWrite(argv) {
   const { perTarget } = saved;
   const dry = isDryRun(argv);
   const needsReview = argv.includes('--needs-review');
-  const wantNonReddit = argv.includes('--include-non-reddit');
-  const nonRedditOk = nonRedditWritable();
-  if (wantNonReddit && !nonRedditOk) console.log('⚠ --include-non-reddit ignored: the app has no public-discussion label + ≤0.3 trust tier for non-Reddit platforms yet (see nonRedditWritable() in web-reports.mjs).');
+  const tier = platformTier(`${PUBLIC_REVIEW_PREFIX}example.com`);
+  console.log(`Non-Reddit rows: platform "${PUBLIC_REVIEW_PREFIX}<host>", source 'web_public', weight 0.3. This checkout scores them as '${tier.tier}' (trust ${tier.trust}).${tier.lowTrust ? '' : ' ⚠ NOT the low-trust tier — the public-review label change is missing here.'} Make sure that change is DEPLOYED to production before a real write (deploy code before data).`);
   let dbOk = true;
   try { sbEnv(); } catch (e) { if (!dry) throw e; dbOk = false; console.log('⚠ no Supabase env — dry run skips DB dedupe (counts below are pre-dedupe)'); }
   const hdrs = dbOk ? (() => { const { key } = sbEnv(); return { apikey: key, Authorization: `Bearer ${key}`, 'Content-Type': 'application/json', Prefer: 'return=representation' }; })() : null;
+  const locations = dbOk ? createLocationResolver({ url: sbEnv().url, hdrs, log: console.log }) : null;
 
-  const totals = { candidates: 0, held_non_reddit: 0, duplicates: 0, to_write: 0, written: 0, failed: 0 };
-  const held = [], samples = [];
+  const totals = { candidates: 0, reddit: 0, public_review: 0, with_city: 0, duplicates: 0, to_write: 0, written: 0, with_location: 0, failed: 0 };
+  const samples = [];
   const touched = new Set();
   for (const p of perTarget) {
     const t = p.target;
     totals.candidates += p.kept.length;
-    const reddit = [], other = [];
-    for (const it of p.kept) (it.host === 'reddit.com' ? reddit : other).push(it);
-    const writable = wantNonReddit && nonRedditOk ? [...reddit, ...other] : reddit;
-    if (!(wantNonReddit && nonRedditOk)) { totals.held_non_reddit += other.length; held.push(...other); }
-    if (!writable.length) continue;
+    if (!p.kept.length) continue;
     const existing = dbOk ? await loadExisting(t) : [];
-    const imports = dbOk ? await loadRedditImports(writable) : [];
-    const { fresh, dupes } = dedupeAgainstExisting(writable, t, existing, imports);
-    totals.duplicates += dupes.length;
-    const writeName = chooseWriteName(t, existing);
-    const rows = fresh.map((it) => ({ it, row: buildRow(it, writeName, { needsReview }) }));
-    totals.to_write += rows.length;
-    if (samples.length < 6) samples.push(...rows.slice(0, 2).map((r) => r.row));
-    console.log(`  ${t.name.padEnd(34)} → "${writeName}": ${rows.length} new, ${dupes.length} dup, ${other.length} non-reddit`);
-    if (dry || !rows.length) continue;
-    const cid = await resolveOrCreateCompany(sbEnv().url, hdrs, writeName).catch(() => null);
-    for (const { it, row } of rows) {
+    const imports = dbOk ? await loadRedditImports(p.kept) : [];
+    const plan = planTargetRows(t, p.kept, existing, imports, { needsReview });
+    totals.duplicates += plan.dupes.length;
+    totals.to_write += plan.rows.length;
+    for (const it of plan.items) { if (isRedditItem(it)) totals.reddit++; else totals.public_review++; if (it.city) totals.with_city++; }
+    if (samples.length < 6) samples.push(...plan.rows.slice(0, 2));
+    console.log(`  ${t.name.padEnd(34)} → "${plan.writeName}": ${plan.rows.length} new (${plan.items.filter((i) => !isRedditItem(i)).length} public review, ${plan.items.filter((i) => i.city).length} with city), ${plan.dupes.length} dup`);
+    if (dry || !plan.rows.length) continue;
+    const cid = await resolveOrCreateCompany(sbEnv().url, hdrs, plan.writeName).catch(() => null);
+    for (let i = 0; i < plan.rows.length; i++) {
+      const it = plan.items[i];
+      const lid = cid && it.city ? await locations.locationId(cid, it.city) : null;
+      const row = { ...plan.rows[i], ...(cid ? { company_id: cid } : {}), ...(lid ? { location_id: lid } : {}) };
       try {
-        const ins = await sb('reports', { method: 'POST', body: cid ? { ...row, company_id: cid } : row, prefer: 'return=representation' });
+        const ins = await sb('reports', { method: 'POST', body: row, prefer: 'return=representation' });
         const reportId = Array.isArray(ins) ? ins[0]?.id : ins?.id;
-        totals.written++; touched.add(writeName);
+        totals.written++; touched.add(plan.writeName);
+        if (lid) totals.with_location++;
         if (it.reddit?.postId) {
           // Mark the thread imported so the Reddit cron / RSS backfill never double-counts it.
           await sb('reddit_imports?on_conflict=reddit_post_id', {
             method: 'POST', prefer: 'resolution=ignore-duplicates,return=minimal',
-            body: { reddit_post_id: `t3_${it.reddit.postId}`, company_name: writeName, subreddit: it.reddit.subreddit || 'unknown', report_id: reportId || null, skipped: false, skip_reason: null },
+            body: { reddit_post_id: `t3_${it.reddit.postId}`, company_name: plan.writeName, subreddit: it.reddit.subreddit || 'unknown', report_id: reportId || null, skipped: false, skip_reason: null },
           }).catch((e) => console.log(`    reddit_imports note failed (report kept): ${e.message.slice(0, 120)}`));
         }
       } catch (e) { totals.failed++; console.log(`    insert failed: ${e.message.slice(0, 200)}`); }
     }
   }
-  const dir = runDir(label);
-  if (held.length) writeFileSync(join(dir, 'held-non-reddit.json'), JSON.stringify(held, null, 2));
-  console.log(`\n${dry ? '[dry run] ' : ''}candidates ${totals.candidates} · held non-reddit ${totals.held_non_reddit} · duplicates ${totals.duplicates} · to write ${totals.to_write}${dry ? '' : ` · written ${totals.written} · failed ${totals.failed}`}`);
+  console.log(`\n${dry ? '[dry run] ' : ''}candidates ${totals.candidates} · duplicates ${totals.duplicates} · to write ${totals.to_write} (reddit ${totals.reddit}, public review ${totals.public_review}, with city ${totals.with_city})${dry ? '' : ` · written ${totals.written} (with location ${totals.with_location}) · failed ${totals.failed}`}`);
   console.log('Sample rows:'); for (const s of samples) console.log(JSON.stringify(s));
-  if (held.length) console.log(`Held non-reddit items: ${join(dir, 'held-non-reddit.json')}`);
   if (dry) return;
   let recomputed = 0;
   for (const name of touched) if (await recomputeCompanyScoreFromReports(sbEnv().url, hdrs, name)) recomputed++;
-  console.log(`recomputed ${recomputed}/${touched.size} company scores`);
+  console.log(`recomputed ${recomputed}/${touched.size} company scores · locations ${JSON.stringify(locations.stats)}`);
 }
 
 async function main(argv = process.argv) {
   const cmd = argv[2];
   if (cmd === 'run') return cmdRun(argv);
   if (cmd === 'write') return cmdWrite(argv);
-  console.log('usage: web-reports.mjs run|write [--dry-run] [--agencies a,b] [--limit N] [--companies N] [--no-agencies] [--max-uses N] [--label L] [--needs-review] [--include-non-reddit]');
+  console.log('usage: web-reports.mjs run|write [--dry-run] [--agencies a,b] [--limit N] [--companies N] [--targets-file F.json] [--skip-if-reports K] [--refresh-demand] [--no-agencies] [--max-uses N] [--label L] [--needs-review]');
   process.exitCode = 2;
 }
 

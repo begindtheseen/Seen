@@ -6,8 +6,10 @@ import assert from 'node:assert/strict';
 import {
   MODEL, buildRequest, agencyTargets, resolveAgency, chooseWriteName, canonicalUrl, extractSearchResults,
   parseFinalJson, readResult, validateAccounts, piiReason, groundUrl, groundingIndex, isOwnDomain,
-  dedupeAgainstExisting, buildRow, platformFor, nonRedditWritable, processResults, estimateWebCost,
+  dedupeAgainstExisting, buildRow, platformFor, platformTier, processResults, estimateWebCost, planTargetRows,
+  resolveCompanyTargets, toWebTarget, PUBLIC_REVIEW_ROW,
 } from './web-reports.mjs';
+import { createLocationResolver } from './lib/location.mjs';
 import { STAFFING_AGENCIES } from '../../lib/agencies.ts';
 import { isRedditSourced } from '../../lib/reportSource.ts';
 import { SOURCE_TRUST, classifyPlatform } from '../../api/_utils/companyIntel.js';
@@ -58,7 +60,7 @@ test('request shape: sonnet 5.5, web_search_20260209 only, no thinking, no forma
   const r = buildRequest(RH);
   assert.match(r.custom_id, /^[a-zA-Z0-9_-]{1,64}$/);
   assert.equal(r.params.model, 'claude-sonnet-5-5');
-  assert.deepEqual(r.params.tools, [{ type: 'web_search_20260209', name: 'web_search', max_uses: 6 }]);
+  assert.deepEqual(r.params.tools, [{ type: 'web_search_20260209', name: 'web_search', max_uses: 5 }]);
   assert.equal(r.params.tools.some((t) => /code_execution/.test(t.type)), false);
   assert.equal('thinking' in r.params, false);
   assert.deepEqual(r.params.output_config, { effort: 'medium' });
@@ -314,11 +316,103 @@ test('buildRow: reddit tier (0.3 trust, public-discussion label), attribution UR
   assert.equal('user_id' in row, false);
 });
 
-test('non-reddit sources stay held: no honest label + low-trust tier exists for them today', () => {
-  assert.equal(platformFor({ host: 'teamblind.com' }), 'Public web · teamblind.com');
-  // classifyPlatform would score these as ingest (0.55) or direct (1.0) with no badge — the guard refuses.
-  assert.equal(nonRedditWritable('glassdoor.com'), false);
-  assert.equal(nonRedditWritable('someforum.com'), false);
+const GD_URL = 'https://www.glassdoor.com/Interview/Robert-Half-Interview-Questions-E1124.htm';
+
+test('non-reddit accounts are written under the EXACT public-review contract', () => {
+  const results = [{ url: `${GD_URL}?utm_source=x` }];
+  const { kept } = validateAccounts([ACC({ source_url: GD_URL, city: 'Austin, TX' })], results, RH);
+  assert.equal(kept.length, 1);
+  const row = buildRow(kept[0], 'robert half');
+  assert.equal(row.platform, 'Public review · glassdoor.com');
+  assert.equal(row.source, 'web_public');
+  assert.equal(row.outcome_weight, 0.3);
+  assert.equal(row.trust_reason, 'web_search_public_review');
+  assert.equal(row.needs_review, false);
+  assert.equal(row.company_name, 'robert half');
+  assert.equal(row.outcome, 'ghosted');
+  assert.match(row.report_text, /\[Public glassdoor\.com post, posted 2025-03: https:\/\/www\.glassdoor\.com\/Interview\/Robert-Half-Interview-Questions-E1124\.htm\]$/);
+  assert.equal('city' in row, false, 'reports has no city column — city goes to location_id');
+  assert.equal('user_id' in row, false);
+  assert.deepEqual(PUBLIC_REVIEW_ROW, { source: 'web_public', outcome_weight: 0.3, trust_reason: 'web_search_public_review', rounds: 0, unpaid_work: 'na', experience_level: 'Unknown' });
+  // Hostname: lowercase, no www. (canonicalUrl), for every kind of host.
+  assert.equal(platformFor({ host: 'teamblind.com' }), 'Public review · teamblind.com');
+  assert.equal(platformFor({ host: canonicalUrl('https://WWW.ConsumerAffairs.com/x').host }), 'Public review · consumeraffairs.com');
+  assert.equal(platformFor({ host: canonicalUrl('https://www.pissedconsumer.com/a.html').host }), 'Public review · pissedconsumer.com');
+  // Reddit-sourced accounts keep the reddit shape.
+  assert.equal(buildRow({ ...kept[0], host: 'reddit.com', reddit: { postId: 'x', subreddit: 'jobs' } }, 'robert half').source, 'reddit');
+  // The app classifier in this checkout must put the label in the ≤ reddit (0.3) tier.
+  const tier = platformTier(row.platform);
+  assert.equal(tier.lowTrust, true, `classifyPlatform → ${tier.tier} (${tier.trust})`);
+});
+
+test('city: captured when stated, normalized, null when absent / vague', () => {
+  const results = [1, 2, 3, 4].map((i) => ({ url: `https://www.reddit.com/r/jobs/comments/c${i}x/x/` }));
+  const s = (i) => `The applicant number ${i} interviewed twice with the agency and then was rejected by email.`;
+  const { kept } = validateAccounts([
+    ACC({ source_url: results[0].url, summary: s(0), city: 'austin, texas' }),
+    ACC({ source_url: results[1].url, summary: s(1), city: null }),
+    ACC({ source_url: results[2].url, summary: s(2), city: 'Remote' }),
+    ACC({ source_url: results[3].url, summary: s(3) }),
+  ], results, RH);
+  assert.deepEqual(kept.map((k) => k.city), ['Austin, TX', null, null, null]);
+  const prompt = buildRequest(RH).params.messages[0].content;
+  assert.match(prompt, /"city": "city \+ state\/region/);
+  assert.match(prompt, /Never infer it from\s+the company's headquarters/);
+});
+
+test('location resolution: resolveOrCreateLocation once per (company, city), skipped without company or city', async () => {
+  const calls = [];
+  const loc = createLocationResolver({ url: 'https://x.supabase.co', hdrs: { apikey: 'k' }, resolve: async (url, hdrs, cid, city) => { calls.push([url, cid, city, hdrs.apikey]); return `loc-${calls.length}`; } });
+  assert.equal(await loc.locationId('cid-1', 'Austin, TX'), 'loc-1');
+  assert.equal(await loc.locationId('cid-1', 'austin, tx'), 'loc-1', 'cached case-insensitively');
+  assert.equal(await loc.locationId('cid-2', 'Austin, TX'), 'loc-2');
+  assert.equal(await loc.locationId(null, 'Austin, TX'), null);
+  assert.equal(await loc.locationId('cid-1', null), null);
+  assert.deepEqual(calls, [['https://x.supabase.co', 'cid-1', 'Austin, TX', 'k'], ['https://x.supabase.co', 'cid-2', 'Austin, TX', 'k']]);
+  const failing = createLocationResolver({ url: 'u', hdrs: {}, resolve: async () => { throw new Error('boom'); } });
+  assert.equal(await failing.locationId('c', 'Austin, TX'), null, 'a location failure never blocks the report');
+  assert.equal(failing.stats.failed, 1);
+});
+
+test('planTargetRows: mixed reddit + public-review rows, dedupe still applies', () => {
+  const results = [{ url: 'https://www.reddit.com/r/jobs/comments/aaa111/x/' }, { url: GD_URL }];
+  const { kept } = validateAccounts([
+    ACC({ source_url: results[0].url }),
+    ACC({ source_url: GD_URL, summary: 'The applicant interviewed twice at the branch and was rejected by email a week later.', outcome: 'rejected' }),
+  ], results, RH);
+  const plan = planTargetRows(RH, kept, [{ company_name: 'robert half international', report_text: 'x' }]);
+  assert.equal(plan.writeName, 'robert half international');
+  assert.deepEqual(plan.rows.map((r) => [r.platform, r.source, r.trust_reason]), [
+    ['Reddit r/jobs', 'reddit', 'web_search_public_discussion'],
+    ['Public review · glassdoor.com', 'web_public', 'web_search_public_review'],
+  ]);
+  const again = planTargetRows(RH, kept, [{ company_name: 'robert half', report_text: `old [Public glassdoor.com post: ${GD_URL}]` }]);
+  assert.equal(again.rows.length, 1);
+  assert.equal(again.dupes[0].reason, 'existing_url');
+});
+
+test('resolveCompanyTargets: --companies / --targets-file / --skip-if-reports flow into the shared selector', async () => {
+  const seen = [];
+  const select = async (opts) => { seen.push(opts); return [{ name: 'AutoZone', writeName: 'autozone', aliases: ['autozone', 'autozone, inc.'], jobs: 40, origin: 'jobs' }]; };
+  const prevUrl = process.env.SUPABASE_URL, prevKey = process.env.SUPABASE_SERVICE_KEY;
+  process.env.SUPABASE_URL ||= 'https://x.supabase.co'; process.env.SUPABASE_SERVICE_KEY ||= 'k';
+  try {
+    assert.deepEqual(await resolveCompanyTargets(['node', 'x', 'run'], { select }), []);
+    const t = await resolveCompanyTargets(['node', 'x', 'run', '--companies', '300', '--skip-if-reports', '5'], { select, log: () => {} });
+    assert.deepEqual(t, [{ kind: 'company', name: 'AutoZone', aliases: ['autozone', 'autozone, inc.'], jobs: 40, origin: 'jobs' }]);
+    assert.equal(seen[0].n, 300);
+    assert.equal(seen[0].skipIfReports, 5);
+    assert.equal(seen[0].useDemand, true);
+    assert.ok(seen[0].excludeKeys.has('robert half'), 'agencies excluded from company targets');
+    await resolveCompanyTargets(['node', 'x', 'run', '--targets-file', 'f.json'], { select, loadFile: () => [{ name: 'Walmart', aliases: ['walmart'] }, { name: 'Target', aliases: ['target'] }], log: () => {} });
+    assert.equal(seen[1].n, 2, 'a file alone runs the whole file');
+    assert.equal(seen[1].useDemand, false);
+    assert.equal(seen[1].skipIfReports, 15, 'default --skip-if-reports');
+  } finally {
+    if (prevUrl === undefined) delete process.env.SUPABASE_URL; else process.env.SUPABASE_URL = prevUrl;
+    if (prevKey === undefined) delete process.env.SUPABASE_SERVICE_KEY; else process.env.SUPABASE_SERVICE_KEY = prevKey;
+  }
+  assert.deepEqual(toWebTarget({ name: 'X Co', writeName: 'x co', aliases: ['x co'], jobs: 0, origin: 'file' }).aliases, ['x co']);
 });
 
 test('processResults end-to-end over a fixture batch', () => {

@@ -13,6 +13,7 @@ import { buildSearchUrl, isRelevant, isSearchableCompany, scoreRelevance } from 
 import { isValidCompanyName, normalizeCompany } from '../../../api/_utils/reportWrite.js';
 import { SECURITY_PREAMBLE, fenceUntrusted, scanInjection } from '../../../lib/server/promptGuard.js';
 import { MODELS, customId, jsonFormat, resultJson } from './batch.mjs';
+import { normalizeCity } from './location.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 export const REPO_ROOT = resolve(here, '..', '..', '..');
@@ -31,7 +32,7 @@ export const JOB_SUBREDDITS = [
 ];
 
 export const DEFAULTS = {
-  companies: 400,       // top-N company_scores rows by report_count
+  companies: 400,       // top-N company targets (demand-ranked by default; --rank reports = company_scores order)
   threadsPerTarget: 25, // kept threads per target
   searchLimit: 50,      // items requested per search feed
   commentsPerThread: 40,
@@ -121,6 +122,49 @@ export function buildTargets({ agencies, agencyScoreRows = [], companyRows = [],
     taken.add(key);
     targets.push({ kind: 'company', displayName: name, writeName: name, searchTerm: name, terms: [name], keys: [key] });
     added++;
+  }
+  return targets;
+}
+
+// Legal suffixes only (NOT normalizeCompany's group/holdings/solutions/technologies, which would turn
+// "Compass Group" into the far too loose search phrase "compass").
+const LEGAL_SUFFIX = /[\s,]+(inc|llc|l\.l\.c|corp|corporation|co|company|ltd|plc|lp|llp)\.?$/i;
+// Aliases that are ordinary English words in job-subreddit text — never used as a mention term alone.
+export const EVERYDAY_WORDS = new Set(['gap', 'ey', 'fox', 'chase', 'ppl', 'aes', 'cat', 'ge', 'ti', 'ea', 'wm', 'box', 'ice', 'meta',
+  'square', 'block', 'snap', 'target', 'delta', 'united', 'spirit', 'frontier', 'progressive', 'travelers', 'nationwide', 'principal',
+  'discover', 'ally', 'citizens', 'regions', 'equitable', 'prime', 'express', 'sonic', 'subway', 'chime', 'marsh', 'mercer', 'coach',
+  'vans', 'ross', 'michaels', 'journeys', 'carrier', 'dow', 'dominion', 'providence', 'ascension', 'mercy', 'compass', 'genesis', 'select',
+  'insight', 'apex', 'crown', 'shell', 'echo', 'coyote', 'parker', 'ball', 'dover', 'flex', 'hartford', 'cox', 'dish', 'optimum', 'spectrum']);
+
+// A strip that would leave ≤3 characters keeps the suffix: "gap inc" / "fox corporation" / "ppl
+// corporation" are searchable phrases, "gap" / "fox" / "ppl" are everyday words.
+export function searchPhrase(name) {
+  const full = String(name || '').toLowerCase().trim();
+  let s = full;
+  for (let i = 0; i < 2 && LEGAL_SUFFIX.test(s); i++) s = s.replace(LEGAL_SUFFIX, '').trim();
+  return s.length > 3 ? s : full;
+}
+
+/**
+ * Agencies first (exactly as buildTargets), then company targets already chosen + ordered by
+ * lib/targets.mjs selectCompanyTargets ({ name, writeName, aliases, keys }). The search phrase is the
+ * write name minus a legal suffix; every spelling is a mention term.
+ */
+export function buildTargetsFromCompanies({ agencies, agencyScoreRows = [], companies = [] }) {
+  const targets = buildTargets({ agencies, agencyScoreRows, companyRows: [], limit: 0 });
+  const taken = new Set(targets.flatMap((t) => t.keys));
+  for (const c of companies) {
+    const writeName = String(c.writeName).toLowerCase().trim();
+    if (!isValidCompanyName(writeName) || !isSearchableCompany(writeName)) continue;
+    const searchTerm = searchPhrase(writeName);
+    // Mention terms: every spelling except everyday-word aliases ("gap", "fox", "chase") that would admit
+    // any thread using the word; acronyms people actually type ("cvs", "ups", "kfc") stay.
+    const aliases = (c.aliases || []).map((a) => String(a).toLowerCase().trim()).filter((a) => a && !EVERYDAY_WORDS.has(a));
+    const terms = [...new Set([writeName, ...aliases, searchTerm].filter(Boolean))];
+    const keys = [...new Set(terms.map(normKey).filter(Boolean))];
+    if (!keys.length || keys.some((k) => taken.has(k))) continue;
+    keys.forEach((k) => taken.add(k));
+    targets.push({ kind: 'company', displayName: c.name || writeName, writeName, searchTerm, terms, keys });
   }
   return targets;
 }
@@ -413,7 +457,7 @@ export const EXTRACT_SCHEMA = {
       items: {
         type: 'object',
         additionalProperties: false,
-        required: ['thread_id', 'comment_index', 'first_hand', 'about_target', 'outcome', 'role', 'confidence', 'summary'],
+        required: ['thread_id', 'comment_index', 'first_hand', 'about_target', 'outcome', 'role', 'city', 'confidence', 'summary'],
         properties: {
           thread_id: { type: 'string', description: 'The id from the [THREAD id=…] header.' },
           comment_index: { type: 'integer', description: '0 = the original post, N = comment [N].' },
@@ -421,6 +465,7 @@ export const EXTRACT_SCHEMA = {
           about_target: { type: 'boolean', description: 'True only if the experience is with the target company itself.' },
           outcome: { type: 'string', enum: EXTRACT_OUTCOMES },
           role: { type: 'string', description: 'Job title if stated, else empty string.' },
+          city: { type: 'string', description: 'City + state/region of this job/interview if the writer states it (e.g. "Austin, TX"), else empty string. Never inferred.' },
           confidence: { type: 'string', enum: ['low', 'medium', 'high'] },
           summary: { type: 'string', description: '1–2 neutral sentences, no names/usernames/contact details.' },
         },
@@ -453,6 +498,7 @@ One entry per writer per thread (comment_index 0 = the original post). If the OP
 
 summary: 1–2 neutral sentences in the third person, written like a review ("Applicant reports…"). Include only facts in the text. NEVER include personal names (recruiters, managers, the writer), usernames, emails, phone numbers, URLs, or other identifying details; refer to people by role ("a recruiter").
 role: the job title if stated, else "".
+city: the city (+ state/region when given, e.g. "Austin, TX") where this writer's job or interview was, ONLY if the writer states it; else "". Never infer it from the company's headquarters, the subreddit, or other writers; "remote" or several places → "".
 confidence: high = explicit first-hand outcome about the target; medium = clear but somewhat implied; low = ambiguous subject, outcome or first-handedness.
 Return {"experiences": []} when nothing qualifies.`;
 
@@ -573,7 +619,7 @@ export const REDDIT_WEIGHT = 0.3;
 // Exactly the api/reports.js reddit_import row shape (company_id always present so a PostgREST bulk
 // insert has uniform keys). reports has no permalink/source column in the migrations, so the
 // thread link is recorded via reddit_imports.report_id + the local written ledger instead.
-export function buildReportRow(exp, { companyId = null } = {}) {
+export function buildReportRow(exp, { companyId = null, locationId = null } = {}) {
   return {
     company_name: exp.company,
     platform: `Reddit r/${exp.subreddit}`,
@@ -588,6 +634,9 @@ export function buildReportRow(exp, { companyId = null } = {}) {
     unpaid_work: 'na',
     experience_level: 'Unknown',
     company_id: companyId,
+    // reports has no city column (prod, 2026-10-17); the city lives on company_locations. Always
+    // present (null when unknown) so a PostgREST bulk insert keeps uniform keys.
+    location_id: locationId,
   };
 }
 
@@ -623,7 +672,7 @@ export function planWrite(extractions, cachesBySlug) {
       const v = validateExperience(e, { threadsById, chunkThreadIds: x.thread_ids });
       if (!v.ok) { bump(v.reason); continue; }
       const t = threadsById.get(e.thread_id);
-      raw.push({ ...e, summary: String(e.summary).trim(), company: cache.target.writeName, target_slug: x.target_slug, subreddit: t.subreddit, permalink: t.permalink });
+      raw.push({ ...e, summary: String(e.summary).trim(), city: normalizeCity(e.city), company: cache.target.writeName, target_slug: x.target_slug, subreddit: t.subreddit, permalink: t.permalink });
     }
   }
   const kept = dedupeExperiences(raw);
