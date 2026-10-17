@@ -31,7 +31,7 @@ export default function RefreshButton({
     if (phase === 'busy') return
     if (timer.current) clearTimeout(timer.current)
     setPhase('busy')
-    let ok = true
+    let ok: boolean
     // A refresh that resolves to `false` failed (it handled its own error); anything else is success.
     try { ok = (await onRefresh()) !== false } catch { ok = false }
     if (!alive.current) return
