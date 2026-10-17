@@ -8,7 +8,9 @@ Every job uses `lib/batch.mjs`: the Message Batches API (50% price), a shared sp
 and resumable state (a crashed run re-attaches to its batch; it never resubmits).
 
 ## Needs
-- Env: `ANTHROPIC_API_KEY`, `SUPABASE_URL`, `SUPABASE_SERVICE_KEY` (never in files or chat)
+- Env: `CREDIT_ANTHROPIC_API_KEY` (cloud sessions reserve `ANTHROPIC_API_KEY` for Claude Code; it still
+  works for local runs), `SUPABASE_URL`, `SUPABASE_SERVICE_KEY` — never in files or chat. The client pins
+  `https://api.anthropic.com` so a session's `ANTHROPIC_BASE_URL` can't redirect the credit jobs.
 - Network: Anthropic, `*.supabase.co`, and for the Reddit job `www.reddit.com` / `old.reddit.com`
 - Node ≥ 22.18 (scripts import `lib/*.ts` directly)
 - Migrations applied (Supabase MCP or dashboard SQL editor — additive and idempotent):

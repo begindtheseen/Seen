@@ -5,7 +5,7 @@
 // accepted (cost ≈ $0.0001), Supabase reachable with the service key, Reddit + Arctic Shift
 // reachable, and the current spend ledger.
 
-import { MODELS, budgetUsd, client, readLedger, sb } from './lib/batch.mjs';
+import { CREDIT_KEY_ENV, MODELS, budgetUsd, client, creditApiKey, readLedger, sb } from './lib/batch.mjs';
 
 const UA = 'SeenJobs/1.0 RSS reader (+https://seenjobs.io)';
 const rows = [];
@@ -16,7 +16,8 @@ async function check(name, fn) {
   catch (e) { mark(name, false, String(e.message || e).slice(0, 160)); }
 }
 
-for (const k of ['ANTHROPIC_API_KEY', 'SUPABASE_URL', 'SUPABASE_SERVICE_KEY']) mark(`env ${k}`, !!process.env[k], process.env[k] ? 'set' : 'MISSING');
+mark(`env ${CREDIT_KEY_ENV} (or ANTHROPIC_API_KEY locally)`, !!creditApiKey(), creditApiKey() ? 'set' : 'MISSING');
+for (const k of ['SUPABASE_URL', 'SUPABASE_SERVICE_KEY']) mark(`env ${k}`, !!process.env[k], process.env[k] ? 'set' : 'MISSING');
 
 await check('anthropic: key valid + Haiku 5.5 answers', async () => {
   const m = await client().messages.create({ model: MODELS.cheap, max_tokens: 16, messages: [{ role: 'user', content: 'Reply with: ok' }] });
@@ -50,7 +51,7 @@ const l = readLedger();
 mark('spend ledger', true, `$${l.spentUsd.toFixed(2)} spent of $${budgetUsd()} budget`);
 
 for (const r of rows) console.log(`${r.ok ? '✓' : '✗'} ${r.name}${r.detail ? ` — ${r.detail}` : ''}`);
-const required = rows.filter((r) => /^env (ANTHROPIC|SUPABASE_URL|SUPABASE_SERVICE)|^anthropic|^supabase/.test(r.name));
+const required = rows.filter((r) => /^env (CREDIT_ANTHROPIC|SUPABASE_URL|SUPABASE_SERVICE)|^anthropic|^supabase/.test(r.name));
 const redditOk = rows.some((r) => /reddit/.test(r.name) && r.ok);
 console.log(`\nCore (keys + DB): ${required.every((r) => r.ok) ? 'READY' : 'BLOCKED'} · Reddit fetch: ${redditOk ? 'available' : 'BLOCKED — use web-reports.mjs instead'}`);
 if (!required.every((r) => r.ok)) process.exitCode = 1;

@@ -46,11 +46,22 @@ export function argValue(name, fallback = null, argv = process.argv) {
   return eq ? eq.slice(name.length + 3) : fallback;
 }
 
+// Cloud sessions reserve ANTHROPIC_API_KEY for Claude Code itself, so a user-set value under that
+// name never reaches the shell. The credit key therefore lives under its own name; ANTHROPIC_API_KEY
+// is still honored for local runs.
+export const CREDIT_KEY_ENV = 'CREDIT_ANTHROPIC_API_KEY';
+export function creditApiKey() {
+  return process.env[CREDIT_KEY_ENV] || process.env.ANTHROPIC_API_KEY || '';
+}
+
 let _client = null;
 export function client() {
   if (!_client) {
-    if (!process.env.ANTHROPIC_API_KEY) throw new Error('ANTHROPIC_API_KEY is not set (add it to the environment, never to a file)');
-    _client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+    const apiKey = creditApiKey();
+    if (!apiKey) throw new Error(`${CREDIT_KEY_ENV} is not set (add it to the environment, never to a file)`);
+    // Pin the public API endpoint: cloud sessions export ANTHROPIC_BASE_URL for Claude Code's own
+    // traffic, and the SDK would otherwise follow it — the credit jobs must bill the credit account.
+    _client = new Anthropic({ apiKey, baseURL: 'https://api.anthropic.com' });
   }
   return _client;
 }
