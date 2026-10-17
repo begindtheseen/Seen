@@ -60,7 +60,9 @@ export const DEFAULT_MAX_AGE_YEARS = 5;
 // migration (the base table predates supabase/migrations), so the code paths ARE the contract.
 export const OUTCOMES = ['ghosted', 'rejected', 'interview', 'offer', 'hired', 'applied', 'unknown'];
 // 'unknown' carries no signal — never written.
-const WRITABLE_OUTCOMES = new Set(OUTCOMES.filter((o) => o !== 'unknown'));
+// reports_outcome_check (prod, 2026-10-17) rejects 'unknown' AND 'applied' — an applied-no-news account
+// is not a terminal outcome, so it is skipped like the Reddit writer skips non-terminal outcomes.
+const WRITABLE_OUTCOMES = new Set(OUTCOMES.filter((o) => o !== 'unknown' && o !== 'applied'));
 
 // Row values for REDDIT-sourced accounts, chosen to land in the SAME tier as api/reports.js
 // reddit_import (justification):
@@ -534,7 +536,7 @@ export function buildRow(item, writeName, { needsReview = false, locationId = nu
     company_name: writeName,
     platform: platformFor(item),
     outcome: item.outcome,
-    role: item.role,
+    role: item.role || '', // reports.role is NOT NULL (prod, 2026-10-17); a null role fails the insert
     report_text: reportTextFor(item),
     needs_review: !!needsReview,
     ...(isRedditItem(item) ? ROW_DEFAULTS : PUBLIC_REVIEW_ROW),
@@ -626,7 +628,8 @@ async function cmdRun(argv) {
 // Plan one target's rows: dedupe against the DB, pick the write name, shape rows (location ids are
 // resolved by the caller once the company id is known). Pure — exported for tests.
 export function planTargetRows(target, kept, existing = [], imports = [], { needsReview = false } = {}) {
-  const { fresh, dupes } = dedupeAgainstExisting(kept, target, existing, imports);
+  // Files extracted before 'applied' was excluded still carry it — filter at write time too.
+  const { fresh, dupes } = dedupeAgainstExisting(kept.filter((it) => WRITABLE_OUTCOMES.has(it.outcome)), target, existing, imports);
   const writeName = chooseWriteName(target, existing);
   return { writeName, dupes, items: fresh, rows: fresh.map((it) => buildRow(it, writeName, { needsReview })) };
 }
