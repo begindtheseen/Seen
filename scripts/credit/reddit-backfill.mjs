@@ -2,14 +2,19 @@
 // One-time Reddit backfill for the Staffing Agency Ghost Index + top companies.
 // Resumable, phase by phase (each phase reads the previous phase's files under .credit-runs/reddit):
 //
-//   node scripts/credit/reddit-backfill.mjs fetch   [--companies 400] [--threads 25] [--only <substr>] [--refetch] [--dry-run]
+//   node scripts/credit/reddit-backfill.mjs fetch   [--source arctic|reddit] [--companies 400] [--threads 25] [--only <substr>]
+//                                                   [--windows 3] [--full-discovery] [--refetch] [--dry-run]
 //   node scripts/credit/reddit-backfill.mjs extract [--label reddit-extract] [--kind agency|company] [--dry-run]
 //   node scripts/credit/reddit-backfill.mjs sample  [--label reddit-extract] [--n 40] [--seed 1]
 //   node scripts/credit/qa-judge.mjs --input .credit-runs/reddit/qa-sample.json --label qa-reddit
 //   node scripts/credit/reddit-backfill.mjs write   [--label reddit-extract] [--qa-label qa-reddit] [--dry-run]
 //
-// fetch   — Reddit Atom search (all time) per target → thread comment feeds → threads/<target>.json.
-//           Needs SUPABASE_URL/SUPABASE_SERVICE_KEY (target list + reddit_imports dedupe). No API spend.
+// fetch   — per target: discover threads → comments → threads/<target>.json. No API spend.
+//           --source arctic (default): Arctic Shift archive (arctic-shift.photon-reddit.com) posts/search
+//             (global, quieter job subs all-time, very active subs in --windows 1-year windows; `query`
+//             falling back to `title`) → comments/tree per kept thread. Reddit itself 403s our cloud runner.
+//           --source reddit: the original Reddit Atom search + per-thread comment RSS feeds.
+//           Needs SUPABASE_URL/SUPABASE_SERVICE_KEY (target list + reddit_imports dedupe).
 // extract — one Sonnet 5.5 batch request per (target, ≤8 threads); results → <label>/extractions.json.
 // sample  — 40 random validated (source, extraction) pairs → qa-sample.json for the Opus judge.
 // write   — validate + PII-filter + dedupe → reports + reddit_imports rows → recompute each company.
@@ -23,6 +28,7 @@ import { join } from 'node:path';
 import { parseRedditSearchAtom } from '../../api/_utils/companyReddit.js';
 import { recomputeCompanyScoreFromReports, resolveOrCreateCompany } from '../../api/_utils/reportWrite.js';
 import { RUNS_DIR, argValue, isDryRun, runBatch, sb, sbAll, sbEnv } from './lib/batch.mjs';
+import { ARCTIC_DEFAULTS, createArcticFetcher, createDiscoveryState, discoveryQueries, fetchArcticTarget } from './lib/arcticShift.mjs';
 import {
   DEFAULTS, buildExtractRequests, buildImportRow, buildReportRow, buildTargets, coverage, createRedditFetcher,
   expKey, extractionsFromResults, fetchTarget, importedIdsForTarget, loadAgencies, normKey, planWrite, sampleN,
@@ -55,8 +61,13 @@ async function pool(items, n, fn) {
 // ── fetch ────────────────────────────────────────────────────────────────────────
 
 async function fetchPhase() {
-  const limit = num('companies', DEFAULTS.companies);
+  // --companies 0 is meaningful (agencies only), so it can't go through num() (which wants > 0).
+  const limit = Math.max(0, Number(argValue('companies', DEFAULTS.companies)) || 0);
   const threadsCap = num('threads', DEFAULTS.threadsPerTarget);
+  const source = argValue('source', 'arctic');
+  if (!['arctic', 'reddit'].includes(source)) throw new Error(`--source must be arctic or reddit (got "${source}")`);
+  const windows = num('windows', ARCTIC_DEFAULTS.activeWindows);
+  const nowSec = Math.floor(Date.now() / 1000); // one clock for the whole run → identical windows per target
   const agencies = loadAgencies();
   let agencyScoreRows = [], companyRows = [], importRows = [];
   if (hasSupabase()) {
@@ -80,9 +91,12 @@ async function fetchPhase() {
     const p = join(THREADS_DIR, `${targetSlug(t)}.json`);
     return has('refetch') || !readJsonMaybe(p)?.complete;
   });
-  const perTarget = searchUrlBuilders(targets[0] || { searchTerm: 'x' }).length + threadsCap;
+  const sample = targets[0] || { searchTerm: 'x' };
+  const arctic = source === 'arctic';
+  const perTarget = (arctic ? discoveryQueries(sample, { nowSec, windows }).length : searchUrlBuilders(sample).length) + threadsCap;
   const reqs = pending.length * perTarget;
-  console.log(`[fetch] ${targets.length} targets (${targets.filter((t) => t.kind === 'agency').length} agencies) · ${pending.length} to fetch · ≤${reqs.toLocaleString()} Reddit requests · ≥${(reqs * DEFAULTS.intervalMs / 3.6e6).toFixed(1)}h at ${DEFAULTS.intervalMs}ms spacing (more with 429 back-offs)`);
+  const intervalMs = arctic ? ARCTIC_DEFAULTS.intervalMs : DEFAULTS.intervalMs;
+  console.log(`[fetch] source ${arctic ? 'Arctic Shift' : 'Reddit RSS'} · ${targets.length} targets (${targets.filter((t) => t.kind === 'agency').length} agencies) · ${pending.length} to fetch · ≤${reqs.toLocaleString()} requests${arctic ? ' (+ title fallbacks/retries; fewer when a global search is complete)' : ''} · ≥${(reqs * intervalMs / 3.6e6).toFixed(1)}h at ${intervalMs}ms spacing (more with 429 back-offs)`);
   console.log(`[fetch] reddit_imports rows loaded for dedupe: ${importRows.length}`);
   if (isDryRun()) {
     for (const t of targets.slice(0, 40)) console.log(`  ${t.kind.padEnd(7)} ${t.displayName} → writes as "${t.writeName}" · search "${t.searchTerm}"`);
@@ -91,11 +105,16 @@ async function fetchPhase() {
   }
 
   mkdirSync(THREADS_DIR, { recursive: true });
-  const fetcher = createRedditFetcher({ log: console.log });
+  const fetcher = arctic ? createArcticFetcher({ log: console.log }) : createRedditFetcher({ log: console.log });
+  const state = createDiscoveryState({ log: console.log }); // shared across targets (query→title breaker)
+  const fullDiscovery = has('full-discovery');
   let done = 0;
-  await pool(pending, DEFAULTS.concurrency, async (t) => {
+  await pool(pending, arctic ? ARCTIC_DEFAULTS.concurrency : DEFAULTS.concurrency, async (t) => {
     try {
-      const cache = await fetchTarget(t, { fetcher, parseSearch: parseRedditSearchAtom, importedIds: importedIdsForTarget(importRows, t), threadsCap, log: console.log });
+      const importedIds = importedIdsForTarget(importRows, t);
+      const cache = arctic
+        ? await fetchArcticTarget(t, { fetcher, state, importedIds, threadsCap, nowSec, windows, fullDiscovery, log: console.log })
+        : await fetchTarget(t, { fetcher, parseSearch: parseRedditSearchAtom, importedIds, threadsCap, log: console.log });
       writeJson(join(THREADS_DIR, `${targetSlug(t)}.json`), cache); // persisted per target → resumable
       if (!cache.complete) console.log(`  ${t.displayName}: every search failed — will retry on the next run`);
     } catch (e) {
@@ -103,10 +122,11 @@ async function fetchPhase() {
     }
     if (++done % 10 === 0) console.log(`[fetch] ${done}/${pending.length} · ${fetcher.stats.requests} requests · ${fetcher.stats.r429} × 429`);
   });
+  console.log(`[fetch] requests ${JSON.stringify(fetcher.stats)}`);
   const wanted = new Set(targets.map(targetSlug));
   const cov = coverage(loadCaches().filter((c) => wanted.has(targetSlug(c.target))));
   writeJson(join(DIR, 'coverage.json'), cov);
-  console.log(`[fetch] coverage: ${cov.targetsWithThreads}/${cov.targets} targets with ≥1 thread (agencies ${cov.agenciesWithThreads}/${cov.agencies}) · ${cov.threads} threads · ${cov.comments} comments · ${cov.chars.toLocaleString()} chars · ${cov.threadsWithoutComments} threads without a comment feed`);
+  console.log(`[fetch] coverage: ${cov.targetsWithThreads}/${cov.targets} targets with ≥1 thread (agencies ${cov.agenciesWithThreads}/${cov.agencies}) · ${cov.threads} threads · ${cov.comments} comments · ${cov.chars.toLocaleString()} chars · ${cov.threadsWithoutComments} threads without a comment feed${arctic ? ` · ${cov.skippedQueries} searches failed after retry + title fallback` : ''}`);
 }
 
 // ── extract ──────────────────────────────────────────────────────────────────────

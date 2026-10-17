@@ -392,6 +392,7 @@ export function coverage(caches) {
     comments: caches.reduce((n, c) => n + c.threads.reduce((m, t) => m + t.comments.length, 0), 0),
     chars: caches.reduce((n, c) => n + c.chars, 0),
     threadsWithoutComments: caches.reduce((n, c) => n + c.threads.filter((t) => !t.comments_fetched).length, 0),
+    skippedQueries: caches.reduce((n, c) => n + (c.skippedQueries || 0), 0), // Arctic Shift searches that failed after retry + fallback
   };
 }
 

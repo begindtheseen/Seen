@@ -11,7 +11,8 @@ and resumable state (a crashed run re-attaches to its batch; it never resubmits)
 - Env: `CREDIT_ANTHROPIC_API_KEY` (cloud sessions reserve `ANTHROPIC_API_KEY` for Claude Code; it still
   works for local runs), `SUPABASE_URL`, `SUPABASE_SERVICE_KEY` — never in files or chat. The client pins
   `https://api.anthropic.com` so a session's `ANTHROPIC_BASE_URL` can't redirect the credit jobs.
-- Network: Anthropic, `*.supabase.co`, and for the Reddit job `www.reddit.com` / `old.reddit.com`
+- Network: Anthropic, `*.supabase.co`, and for the Reddit job `arctic-shift.photon-reddit.com` (default
+  `--source arctic`; `www.reddit.com` / `old.reddit.com` only for `--source reddit` — Reddit 403s cloud runners)
 - Node ≥ 22.18 (scripts import `lib/*.ts` directly)
 - Migrations applied (Supabase MCP or dashboard SQL editor — additive and idempotent):
   `supabase/migrations/20261017120000_job_enrichment.sql`, `20261017120100_company_summaries.sql`
@@ -27,7 +28,7 @@ pilot's quality is poor; unspent credit is better than bad public data.
 |---|---|---|---|
 | 0 | Preflight | `node scripts/credit/preflight.mjs` | ~$0 |
 | 1 | Agencies via web search, pilot | `node scripts/credit/web-reports.mjs run --agencies "Robert Half,Insight Global,Aerotek"` → `write --label <label> --dry-run` → open every kept URL → `write --label <label>` | ~$0.40 |
-| 2 | Agencies via Reddit | `reddit-backfill.mjs fetch --companies 0` → `extract --kind agency --label reddit-extract-agencies` → `sample --label …` → `qa-judge.mjs --input .credit-runs/reddit/qa-sample.json --label qa-reddit` → `write --label …` (refuses unless QA PASS) | ~$3–8 |
+| 2 | Agencies via Reddit (fetched from the Arctic Shift archive) | pilot `reddit-backfill.mjs fetch --companies 0 --only "insight global"` → check its log + `.credit-runs/reddit/threads/*.json` → `fetch --companies 0` → `extract --kind agency --label reddit-extract-agencies` → `sample --label …` → `qa-judge.mjs --input .credit-runs/reddit/qa-sample.json --label qa-reddit` → `write --label …` (refuses unless QA PASS) | ~$3–8 |
 | 3 | All 26 agencies via web search | `web-reports.mjs run` → `write` | ~$3 |
 | 4 | Job tagging | `tag-jobs.mjs run --limit 200 --no-write` → review `validation.json` / `review-sample.json` → `write --label …` → `tag-jobs.mjs run` | ~$8–12 |
 | 5 | Top companies via Reddit | `reddit-backfill.mjs fetch --companies 400` (hours: rate-limited) → `extract --kind company --label reddit-extract-companies` → sample → QA → write | ~$20–100 |
@@ -37,6 +38,18 @@ pilot's quality is poor; unspent credit is better than bad public data.
 
 `node scripts/credit/web-reports.mjs`, etc. Use `node --test 'scripts/credit/*.test.mjs'` for tests
 (Node 22 won't take the bare directory).
+
+## Reddit data source (Arctic Shift)
+`fetch` reads Reddit through the public Arctic Shift archive (`/api/posts/search` + `/api/comments/tree`),
+because Reddit returns 403 to our cloud runner. Per target: one global all-time search, one all-time
+search per quieter job subreddit, and `--windows` (default 3) one-year windows per very active one
+(r/recruitinghell, jobs, antiwork, cscareerquestions, WorkReform, ExperiencedDevs — full-text search
+times out there unbounded). Each search tries `query` (title + body), then `title`; a timeout is retried
+once, then the search is skipped and counted. If the global search returns fewer than 100 posts it is
+the complete all-time result and the per-subreddit searches are skipped (`--full-discovery` forces
+them). Kept threads (same relevance gate as the live company page) get one comment-tree request each.
+Requests are spaced ≥1s and honor `X-RateLimit-Reset` on 429. The cache format is the same as the
+`--source reddit` (RSS) path, so extract/sample/write don't care which source fetched it.
 
 ## Rules the jobs enforce
 - Public-discussion data is written as attributed, down-weighted (0.3) rows the UI labels
