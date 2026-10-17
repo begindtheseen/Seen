@@ -10,6 +10,7 @@ import type { Application } from '@/lib/types'
 import dynamic from 'next/dynamic'
 import OutcomeCard from '@/components/OutcomeCard'
 import RoundsPrompt from '@/components/RoundsPrompt'
+import { firstPartyReportCount } from '@/lib/server/reportCounts'
 const SurveyModal = dynamic(() => import('@/components/SurveyModal'), { ssr: false })
 const ResumeSurveyModal = dynamic(() => import('@/components/ResumeSurveyModal'), { ssr: false })
 
@@ -25,17 +26,24 @@ function getDaysSince(ts: number): number {
 }
 
 type Watch = { tone: 'ok' | 'warn' | 'danger'; text: string }
+type Intel = { ghost_rate?: number; avg_wait_days?: number; report_count?: number; first_party_report_count?: number; data_source?: string | null; overall_score?: number }
+// batch_scores payload (api/reports.js): report_count is FUSED; first_party_report_count is the honest count.
+type ScoreIntel = { ghost_rate: number; overall_score: number; report_count: number; avg_wait_days?: number; first_party_report_count?: number; data_source?: string | null }
 // Time-aware "is this normal?" verdict — the insight only Seen can give: compare how
 // long an application has been silent against how this company ACTUALLY responds.
-function ghostWatch(days: number, intel?: { ghost_rate?: number; avg_wait_days?: number; report_count?: number }): Watch | null {
+// Stated as fact ("they ghost 42%") ONLY when first-party applicant reports back it; a score
+// built from web research alone (fused report_count > 0, first-party 0) is worded as an estimate.
+function ghostWatch(days: number, intel?: Intel): Watch | null {
   if (!intel || !intel.report_count || !intel.avg_wait_days) return null
   const w = Math.round(intel.avg_wait_days)
   if (w <= 0) return null
   const gp = Math.round((intel.ghost_rate || 0) * 100)
-  if (days <= w) return { tone: 'ok', text: `Day ${days} · typical first response here is ~${w}d — still in the normal window.` }
-  if (days <= w * 2) return { tone: 'warn', text: `Day ${days} · past their ~${w}d average — a good time to follow up${gp >= 30 ? `; they ghost ${gp}%` : ''}.` }
+  const est = firstPartyReportCount(intel) === 0
+  const avg = est ? `~${w}d estimated average` : `~${w}d average`
+  if (days <= w) return { tone: 'ok', text: `Day ${days} · typical first response here is ${est ? `estimated at ~${w}d` : `~${w}d`} — still in the normal window.` }
+  if (days <= w * 2) return { tone: 'warn', text: `Day ${days} · past their ${avg} — a good time to follow up${gp >= 30 ? (est ? `; estimated ghost rate ${gp}%` : `; they ghost ${gp}%`) : ''}.` }
   const x = (days / w).toFixed(1)
-  return { tone: 'danger', text: `Day ${days} · ${x}× their ~${w}d average${gp >= 30 ? ` — they ghost ${gp}% of applicants here. Likely ghosted.` : ' — likely ghosted.'}` }
+  return { tone: 'danger', text: `Day ${days} · ${x}× their ${avg}${gp >= 30 ? (est ? ` — estimated ghost rate ${gp}%. Likely ghosted.` : ` — they ghost ${gp}% of applicants here. Likely ghosted.`) : ' — likely ghosted.'}` }
 }
 
 function AppCard({ app, onUpdate, onRemove, onShare, intel }: {
@@ -43,7 +51,7 @@ function AppCard({ app, onUpdate, onRemove, onShare, intel }: {
   onUpdate: (id: string, changes: Partial<Application>) => void
   onRemove: (id: string) => void
   onShare: (app: Application) => void
-  intel?: { ghost_rate?: number; avg_wait_days?: number; report_count?: number; overall_score?: number }
+  intel?: Intel
 }) {
   const days = getDaysSince(app.appliedAt)
   const statusClass = STATUS_MAP[app.status] || ''
@@ -239,7 +247,7 @@ function TrackerPage() {
   const [highlightNew, setHighlightNew] = useState(false)
   const highlightedRef = useRef(false)
   const [updateInsight, setUpdateInsight] = useState<{ title: string; body: string; color: string } | null>(null)
-  const [companyScores, setCompanyScores] = useState<Record<string, {ghost_rate: number; overall_score: number; report_count: number; avg_wait_days?: number}>>({})
+  const [companyScores, setCompanyScores] = useState<Record<string, ScoreIntel>>({})
 
   useEffect(() => {
     if (!ready) return // wait for the session to resolve — redirecting early bounced signed-in users
@@ -276,7 +284,7 @@ function TrackerPage() {
       body: JSON.stringify({ action: 'batch_scores', names: cos }),
     })
       .then(r => r.ok ? r.json() : { scores: {} })
-      .then((d: { scores?: Record<string, {ghost_rate: number; overall_score: number; report_count: number}> }) => {
+      .then((d: { scores?: Record<string, ScoreIntel> }) => {
         if (d.scores) setCompanyScores(d.scores)
       })
       .catch(() => {})

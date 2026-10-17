@@ -23,6 +23,8 @@ import { analyzeApplication } from '../lib/resume-intelligence/engine.js';
 import { extractJobFacts } from '../lib/optimizer/extractJobFacts.js';
 import { runHumanProof, HUMANPROOF_ENGINE_VERSION } from '../lib/humanizer/index.js';
 import { buildHumanProofPackage, normalizeBulletList } from '../lib/server/humanizePackage.js';
+import { scoreConfidence } from './_utils/companyScore.js';
+import { firstPartyReportCount, webClaimCount } from '../lib/server/reportCounts.js';
 
 // ── auth: derive the user id from the Supabase JWT (same pattern as api/apply.js) ──
 function verifyJWT(token, secret) {
@@ -168,13 +170,15 @@ async function loadTaxonomy(db) {
 async function getCompanyProcess(db, company) {
   if (!company) return { score: null, confidence: null };
   try {
-    const r = await db(`company_scores?company_name=ilike.${encodeURIComponent(company)}&select=overall_score,report_count&order=report_count.desc&limit=1`);
+    const r = await db(`company_scores?company_name=ilike.${encodeURIComponent(company)}&select=overall_score,report_count,first_party_report_count,web_report_count,data_source&order=report_count.desc&limit=1`);
     if (!r.ok) return { score: null, confidence: null };
     const rows = await r.json();
     if (!rows?.length) return { score: null, confidence: null };
     const score = rows[0].overall_score == null ? null : Number(rows[0].overall_score);
-    const cnt = Number(rows[0].report_count) || 0;
-    const confidence = Math.max(0, Math.min(1, cnt / 10)); // mirrors companyScore confidence shape
+    // Canonical confidence from the HONEST split: first-party rows drive it; a web-research claim
+    // alone caps at medium (scoreConfidence). The old cnt/10 on the fused report_count turned a
+    // claimed "3,085 mentions" into full confidence with zero real reports behind it.
+    const confidence = scoreConfidence({ reportCount: firstPartyReportCount(rows[0]), webClaimedCount: webClaimCount(rows[0]) });
     return { score, confidence };
   } catch { return { score: null, confidence: null }; }
 }

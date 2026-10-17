@@ -39,7 +39,7 @@ async function fetchDirectory(): Promise<Row[]> {
     let scores: unknown[] = []
     if (names.length) {
       const inList = names.map(n => `"${n.replace(/"/g, '')}"`).join(',')
-      const sRes = await fetch(`${SUPABASE_URL}/rest/v1/company_scores?company_name=in.(${encodeURIComponent(inList)})&select=company_name,overall_score,ghost_rate,response_rate,report_count&limit=500`, { headers: h, cache: 'no-store' })
+      const sRes = await fetch(`${SUPABASE_URL}/rest/v1/company_scores?company_name=in.(${encodeURIComponent(inList)})&select=company_name,overall_score,ghost_rate,response_rate,report_count,first_party_report_count,web_report_count,data_source&limit=500`, { headers: h, cache: 'no-store' })
       scores = sRes.ok ? await sRes.json() : []
     }
     return shapeVerifiedDirectory(perks, scores as Parameters<typeof shapeVerifiedDirectory>[1], Date.now())

@@ -37,12 +37,13 @@ const mono = (size: string, color: string): React.CSSProperties => ({ fontFamily
 // weekProvenance (the "week of …" label + rotation seed) is shared from lib/server/ghostReport so
 // the public page, the admin panel, and the OG card all resolve the SAME week and headline.
 
-// Build the pool of scored rows the report ranks over: the public leaderboard (top companies by
-// report volume) plus every staffing-agency row (agencies may not all sit in the top-150), deduped
-// by stored name. The agency name set flags which rows count as agencies for the spotlight.
+// Build the pool of scored rows the report ranks over: the leaderboard ordered by FIRST-PARTY report
+// rows (the default fused order is dominated by web-research claims, which the assembler ignores —
+// it would crowd genuinely-reported companies out of the 150-row window) plus every staffing-agency
+// row (agencies may not all sit in the top-150), deduped by stored name. The agency name set flags which rows count as agencies for the spotlight.
 async function loadRows(): Promise<{ rows: LeaderboardRow[]; agencyNames: string[] }> {
   const agencyAliases = STAFFING_AGENCIES.flatMap((a) => a.aliases)
-  const [leaderboard, agencyMap] = await Promise.all([getLeaderboard(), getScoresByNames(agencyAliases)])
+  const [leaderboard, agencyMap] = await Promise.all([getLeaderboard({ by: 'first_party' }), getScoresByNames(agencyAliases)])
   const byName = new Map<string, LeaderboardRow>()
   for (const r of leaderboard) if (r?.name) byName.set(r.name.toLowerCase(), r)
   for (const [name, r] of agencyMap) if (!byName.has(name.toLowerCase())) byName.set(name.toLowerCase(), r)
@@ -159,7 +160,7 @@ export default async function GhostReportPage() {
         </div>
 
         <p style={{ ...mono('.6rem', 'var(--dim)'), lineHeight: 1.7 }}>
-          Methodology: applicant-reported outcomes, trust-weighted, aggregated with public hiring signals into a 0–100 Seen Grade. These are community signals, not verified facts, and update hourly as reports arrive. Percentages appear only where applicants have actually reported outcomes; companies with no reports show no number — Seen never fabricates a rate.
+          Methodology: applicant-reported outcomes, trust-weighted, aggregated with public hiring signals into a 0–100 Seen Grade. These are community signals, not verified facts, and update hourly as reports arrive. Percentages appear only where applicants have actually reported outcomes; companies with no reports show no number — Seen never fabricates a rate. Report counts include outcomes submitted to Seen and outcomes shared in public discussion threads (labeled and down-weighted); web-research estimates are never counted as reports. Where reports are few, rates can be blended with a public-data baseline and are marked low confidence.
         </p>
       </div>
     </div>

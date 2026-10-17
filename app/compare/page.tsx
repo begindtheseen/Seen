@@ -15,10 +15,10 @@ export const revalidate = 3600
 
 export const metadata: Metadata = {
   title: 'Compare Company Hiring: Ghost Rates Side by Side — Seen',
-  description: 'Compare any two companies side by side on hiring transparency — ghost rate, response rate, average wait, and Seen Grade — from real applicant reports. Decide where to apply.',
+  description: 'Compare any two companies side by side on hiring transparency — ghost rate, response rate, average wait, and Seen Grade — from applicant reports, with labeled estimates where reports are missing. Decide where to apply.',
   keywords: ['compare company hiring', 'ghost rate comparison', 'which company responds faster', 'company hiring comparison', 'compare ghost rates'],
   alternates: { canonical: 'https://seenjobs.io/compare' },
-  openGraph: { title: 'Compare Company Hiring Side by Side', description: 'Ghost rate, response rate, and Seen Grade for any two companies — from real applicant reports.', url: 'https://seenjobs.io/compare', type: 'website', siteName: 'Seen' },
+  openGraph: { title: 'Compare Company Hiring Side by Side', description: 'Ghost rate, response rate, and Seen Grade for any two companies — from applicant reports, with labeled estimates where reports are missing.', url: 'https://seenjobs.io/compare', type: 'website', siteName: 'Seen' },
   twitter: { card: 'summary_large_image', title: 'Compare Company Hiring Side by Side', description: 'Ghost rate, response rate, and Seen Grade for any two companies.' },
 }
 
@@ -45,7 +45,7 @@ export default async function ComparePage() {
           Compare hiring, side by side
         </h1>
         <p style={{ color: 'var(--sub)', fontSize: '.95rem', lineHeight: 1.7, fontWeight: 300, margin: '0 0 2rem' }}>
-          Two companies, head to head — ghost rate, response rate, average wait, and Seen Grade, all from real applicant reports. Pick where your application actually has a chance.
+          Two companies, head to head — ghost rate, response rate, average wait, and Seen Grade, from applicant reports where we have them and clearly labeled public-data estimates where we don&apos;t. Pick where your application actually has a chance.
         </p>
 
         {/* useSearchParams lives in CompareQuery — the Suspense boundary keeps this page static. */}

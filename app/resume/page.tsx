@@ -193,7 +193,7 @@ function FitView({ out, intel, jobCompany, insights }: { out: OptimizerOutput; i
         {kicker('Company hiring risk')}
         <div style={{ display: 'flex', alignItems: 'center', gap: '.6rem', marginBottom: out.risk_flags.length ? '.7rem' : 0 }}>
           <span style={{ fontFamily: 'var(--display)', fontWeight: 800, fontSize: '1.1rem', color: scoreColor(out.company_process_score) }}>{Math.round(out.company_process_score)}<span style={{ fontSize: '.6rem', color: 'var(--muted)' }}>/100</span></span>
-          <span style={{ fontFamily: 'var(--mono)', fontSize: '.6rem', color: 'var(--muted)' }}>hiring-process score (real applicant outcomes)</span>
+          <span style={{ fontFamily: 'var(--mono)', fontSize: '.6rem', color: 'var(--muted)' }}>Seen hiring-process grade (applicant reports + public hiring data)</span>
         </div>
         {out.risk_flags.length > 0 ? (
           <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: '.4rem' }}>

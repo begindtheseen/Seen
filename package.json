@@ -28,6 +28,7 @@
     "react-dom": "19.0.0"
   },
   "devDependencies": {
+    "@anthropic-ai/sdk": "^0.134.0",
     "@types/node": "^22",
     "@types/react": "^19",
     "@types/react-dom": "^19",

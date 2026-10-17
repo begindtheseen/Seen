@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { Score } from '@/lib/score'
 import { AppStore } from '@/lib/stores/AppStore'
 import CompanyScoreModal from '@/components/CompanyScoreModal'
+import { firstPartyReportCount } from '@/lib/server/reportCounts'
 
 interface Company {
   id: string
@@ -16,10 +17,21 @@ interface Company {
     ghost_rate: number
     response_rate: number
     avg_wait_days: number
+    /** FUSED total (first-party + web-research claim) — sorting only, never a "reports" label. */
     report_count: number
+    /** Real applicant-report rows (api/reports.js leaderboard). */
+    first_party_report_count?: number
+    data_source?: string | null
     risk_level: 'safe' | 'warn' | 'danger'
     waste: number
   }
+}
+
+// "12r" = 12 first-party applicant reports. A score with none behind it is a web-research
+// estimate and says so — the fused report_count once rendered here as "12775r".
+function reportsLabel(s: Company['score']): string {
+  const fp = firstPartyReportCount(s)
+  return fp > 0 ? `${fp}r` : 'est.'
 }
 
 type SortKey = 'score' | 'ghost' | 'wait'
@@ -199,7 +211,7 @@ export default function CompaniesPage() {
                     style={{ display: 'flex', width: '100%', textAlign: 'left', alignItems: 'center', justifyContent: 'space-between', gap: '.6rem', background: 'none', border: 'none', borderBottom: '1px solid var(--line2)', padding: '.55rem .85rem', cursor: 'pointer', color: 'var(--white)', fontFamily: 'var(--mono)', fontSize: '.72rem' }}
                   >
                     <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.name}</span>
-                    <span style={{ flexShrink: 0, color: 'var(--dim)', fontSize: '.6rem' }}>{Math.round(c.score.overall_score)}/100 · {c.score.report_count}r</span>
+                    <span style={{ flexShrink: 0, color: 'var(--dim)', fontSize: '.6rem' }}>{Math.round(c.score.overall_score)}/100 · {reportsLabel(c.score)}</span>
                   </button>
                 ))}
               </div>
@@ -473,7 +485,7 @@ export default function CompaniesPage() {
                       <div className="ldr-waste">⚠ {co.score.waste}% waste risk</div>
                     )}
                     <div className="ldr-label">
-                      {co.score.overall_score}/100 · {co.score.report_count}r
+                      {co.score.overall_score}/100 · {reportsLabel(co.score)}
                     </div>
                     <div className="ldr-bar">
                       <div

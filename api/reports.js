@@ -13,6 +13,7 @@ import { buildSearchUrl, parseRedditSearchAtom } from './_utils/companyReddit.js
 import { SECURITY_PREAMBLE, fenceUntrusted, scanInjection } from '../lib/server/promptGuard.js';
 import { fetchIndustryBenchmark } from '../lib/server/benchmark.js';
 import { isEvidencedScore, suppressionReason, servedDataSource } from '../lib/server/scoreProvenance.js';
+import { firstPartyReportCount, webClaimCount } from '../lib/server/reportCounts.js';
 
 // Authorize admin/cron-only actions (the Anthropic web-research endpoints). Accepts a Vercel
 // cron header, a shared CRON_SECRET, or a valid admin_sessions token. Everything Anthropic in
@@ -328,8 +329,13 @@ export default async function handler(req, res) {
   if (body.action === 'leaderboard') {
     if (!SUPABASE_URL || !SUPABASE_SERVICE_KEY) return res.status(200).json({ companies: [] });
     try {
+      // report_count is the FUSED total (first-party rows + the web-research claim) — fine for
+      // ordering, never for a "reports" label. Every row also carries the honest split so clients
+      // can label correctly. order:'first_party' ranks by real report rows (the admin Ghost Report
+      // panel needs this — mirrors lib/growth.ts getLeaderboard({ by: 'first_party' })).
+      const order = body.order === 'first_party' ? 'first_party_report_count.desc.nullslast,report_count.desc' : 'report_count.desc';
       const r = await fetch(
-        `${SUPABASE_URL}/rest/v1/company_scores?select=company_name,overall_score,ghost_rate,response_rate,avg_wait_days,waste_score,report_count,data_quality,verification_status,industry&order=report_count.desc&limit=150`,
+        `${SUPABASE_URL}/rest/v1/company_scores?select=company_name,overall_score,ghost_rate,response_rate,avg_wait_days,waste_score,report_count,first_party_report_count,web_report_count,data_source,data_quality,verification_status,industry&order=${order}&limit=150`,
         { headers: hdrsBase }
       );
       if (!r.ok) return res.status(200).json({ companies: [] });
@@ -345,6 +351,9 @@ export default async function handler(req, res) {
           response_rate: c.response_rate || 0,
           avg_wait_days: c.avg_wait_days || 0,
           report_count: c.report_count || 0,
+          first_party_report_count: firstPartyReportCount(c),
+          web_report_count: webClaimCount(c),
+          data_source: servedDataSource(c),
           risk_level: overall(c.overall_score) >= 70 ? 'safe' : overall(c.overall_score) >= 40 ? 'warn' : 'danger',
           waste: c.waste_score || 0,
         },
@@ -561,7 +570,7 @@ export default async function handler(req, res) {
       // of the quoted PostgREST CSV value and alter which rows match (filter injection).
       const inFilter = nameList.map(n => `"${n.replace(/["\\]/g, '')}"`).join(',');
       const r = await fetch(
-        `${SUPABASE_URL}/rest/v1/company_scores?company_name=in.(${inFilter})&select=company_name,overall_score,ghost_rate,response_rate,avg_wait_days,waste_score,report_count&limit=50`,
+        `${SUPABASE_URL}/rest/v1/company_scores?company_name=in.(${inFilter})&select=company_name,overall_score,ghost_rate,response_rate,avg_wait_days,waste_score,report_count,first_party_report_count,web_report_count,data_source&limit=50`,
         { headers: hdrsBase }
       );
       const rows = r.ok ? await r.json() : [];
@@ -573,7 +582,10 @@ export default async function handler(req, res) {
           response_rate: row.response_rate,
           avg_wait_days: row.avg_wait_days,
           waste: row.waste_score,
-          report_count: row.report_count,
+          report_count: row.report_count, // fused — use first_party_report_count for any "reports" claim
+          first_party_report_count: firstPartyReportCount(row),
+          web_report_count: webClaimCount(row),
+          data_source: servedDataSource(row),
         };
       });
       return res.json({ ok: true, scores });
@@ -1400,7 +1412,7 @@ async function fetchCompanyStats(name, supabaseUrl, dbHeaders) {
     (Array.isArray(reps) ? reps : []).forEach(r => { const oc = r.outcome||'unknown'; dist[oc] = (dist[oc]||0)+1; });
     const ghost_rate = cs?.ghost_rate ?? (total >= 5 ? (dist.ghosted||0)/total : null);
     const response_rate = cs?.response_rate ?? (total >= 5 ? ((dist.hired||0)+(dist.offer||0)+(dist.interview||0)+(dist.human||0))/total : null);
-    return { company_name: cs?.company_name||name, overall_score: cs?.overall_score||null, ghost_rate, response_rate, avg_wait_days: cs?.avg_wait_days||null, avg_rounds: cs?.avg_rounds||null, waste_score: cs?.waste_score||null, report_count: total||cs?.report_count||0, data_quality: cs?.data_quality||(total>=10?'strong':total>=3?'moderate':'limited'), outcome_dist: dist };
+    return { company_name: cs?.company_name||name, overall_score: cs?.overall_score||null, ghost_rate, response_rate, avg_wait_days: cs?.avg_wait_days||null, avg_rounds: cs?.avg_rounds||null, waste_score: cs?.waste_score||null, report_count: total||firstPartyReportCount(cs), data_quality: cs?.data_quality||(total>=10?'strong':total>=3?'moderate':'limited'), outcome_dist: dist };
   } catch(e) { return null; }
 }
 
@@ -1457,8 +1469,8 @@ function _rowToScore(row) {
   // Honest split: first-party rows vs the LLM web-research claim. Legacy rows (pre-migration
   // 063, split columns null) are inferred from data_source — 'reports' rows were computed from
   // real report rows; anything else ('web_search'/null) is a web claim, NOT applicant reports.
-  const firstParty = row.first_party_report_count ?? (row.data_source === 'reports' ? (row.report_count || 0) : 0);
-  const webClaim = row.web_report_count ?? (row.data_source === 'reports' ? 0 : (row.report_count || 0));
+  const firstParty = firstPartyReportCount(row);
+  const webClaim = webClaimCount(row);
   const confidence = scoreConfidence({ reportCount: firstParty, tenureSample: row.tenure_sample_count || 0, dataAgeDays: ageDays, webClaimedCount: webClaim });
   return {
     overall_score: s, base_score: base, tenure_adjustment: tAdj,

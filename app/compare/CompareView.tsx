@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { grade, riskColor, riskLabel, pct, slugify, type GrowthScore } from '@/lib/growth'
+import { grade, riskColor, riskLabel, pct, slugify, firstPartyReportCount, type GrowthScore } from '@/lib/growth'
 
 // Server-rendered side-by-side comparison card used by both /compare?a=&b= and /compare/[slugs].
 // Mobile-first: two columns that stay readable at 390px (no overflow), real data only.
@@ -17,11 +17,13 @@ function Col({ name, s }: { name: string; s: GrowthScore | null }) {
     )
   }
   const accent = riskColor(s.risk_level)
+  // First-party applicant reports only — the fused report_count includes the web-research claim.
+  const fp = firstPartyReportCount(s)
   const rows: { label: string; value: string; color?: string }[] = [
     { label: 'Ghost rate', value: pct(s.ghost_rate) != null ? `${pct(s.ghost_rate)}%` : '—', color: 'var(--red)' },
     { label: 'Response rate', value: pct(s.response_rate) != null ? `${pct(s.response_rate)}%` : '—', color: 'var(--green)' },
     { label: 'Avg wait', value: s.avg_wait_days != null ? `${Math.round(s.avg_wait_days)}d` : '—', color: 'var(--amber)' },
-    { label: 'Reports', value: s.report_count > 0 ? s.report_count.toLocaleString() : '—' },
+    { label: 'Reports', value: fp > 0 ? fp.toLocaleString() : '—' },
   ]
   return (
     <div style={{ flex: '1 1 0', minWidth: 0, background: 'var(--card)', border: '1px solid var(--line)', borderTop: `3px solid ${accent}`, borderRadius: 12, padding: '1.1rem', textAlign: 'center' }}>
@@ -38,6 +40,9 @@ function Col({ name, s }: { name: string; s: GrowthScore | null }) {
           </div>
         ))}
       </div>
+      <div style={{ fontFamily: 'var(--mono)', fontSize: '.52rem', color: 'var(--dim)', marginTop: '.7rem', lineHeight: 1.5 }}>
+        {fp > 0 ? `Based on ${fp.toLocaleString()} applicant report${fp === 1 ? '' : 's'}` : 'Estimated from aggregated public data — no applicant reports yet'}
+      </div>
     </div>
   )
 }
@@ -49,13 +54,15 @@ function Verdict({ aName, a, bName, b }: { aName: string; a: GrowthScore | null;
   const hi = Math.max(a.overall_score, b.overall_score)
   const lo = Math.min(a.overall_score, b.overall_score)
   const tie = hi === lo
+  // A grade with no first-party reports behind it is a public-data estimate — never call it "reported".
+  const anyEst = firstPartyReportCount(a) === 0 || firstPartyReportCount(b) === 0
   return (
     <div style={{ background: 'var(--raised)', border: '1px solid var(--line)', borderRadius: 12, padding: '1rem 1.2rem', margin: '1.4rem 0 0' }}>
       <div style={{ fontFamily: 'var(--mono)', fontSize: '.55rem', textTransform: 'uppercase', letterSpacing: '.14em', color: 'var(--blue)', marginBottom: '.5rem' }}>The verdict</div>
       <p style={{ color: 'var(--sub)', fontSize: '.84rem', lineHeight: 1.65, margin: 0, fontWeight: 300 }}>
         {tie
           ? `${aName} and ${bName} score evenly at ${hi}/100 on hiring transparency. Compare the ghost and response rates above to break the tie for your situation.`
-          : <>On reported hiring transparency, <strong style={{ color: 'var(--white)' }}>{better}</strong> scores higher ({hi}/100) than <strong style={{ color: 'var(--white)' }}>{worse}</strong> ({lo}/100). That means applicants to {better} were more likely to hear back. Scores are community signals, not verified facts.</>}
+          : <>On {anyEst ? 'Seen’s hiring-transparency grade' : 'reported hiring transparency'}, <strong style={{ color: 'var(--white)' }}>{better}</strong> scores higher ({hi}/100) than <strong style={{ color: 'var(--white)' }}>{worse}</strong> ({lo}/100). {anyEst ? 'At least one of these grades is estimated from aggregated public data rather than applicant reports, so treat the gap as directional.' : `That means applicants to ${better} were more likely to hear back.`} Scores are community signals, not verified facts.</>}
       </p>
     </div>
   )

@@ -5,12 +5,36 @@ import type { Metadata } from 'next'
 import { getScore, firstPartyReportCount, displayCompanyName, type GrowthScore } from '@/lib/growth'
 import { buildCompanyFaq } from '@/lib/server/companyFaq'
 import { jsonLdHtml } from '@/lib/jsonLd'
+// Offline, numerically-grounded "What applicants report" paragraph (company_summaries). No-op when the
+// table is missing/empty or the read fails — the page renders exactly as before.
+import { getCompanySummary, summaryMonth, type CompanySummary } from '@/lib/companySummary'
 
 const titleCase = (slug: string) => slug.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
 // Slug-mangled fallback only when no score row exists — the stored name keeps real punctuation
 // ("lowe's" → "Lowe's", not "Lowe S"), and this name feeds the OG title + schema.org for shares.
 const bestName = (slug: string, s: GrowthScore | null) =>
   s?.company_name ? displayCompanyName(s.company_name) : titleCase(slug)
+
+// company_summaries is keyed by the STORED company_scores name; fall back to the slug decoded the one
+// way the slug scheme allows (decodeURIComponent + hyphens → spaces).
+function summaryKey(slug: string, s: GrowthScore | null): string {
+  if (s?.company_name) return s.company_name
+  let d = slug
+  try { d = decodeURIComponent(slug) } catch { /* malformed escape — use the raw slug */ }
+  return d.replace(/-/g, ' ')
+}
+
+// Meta descriptions are cut by search engines; keep whole sentences up to ~300 chars.
+function clipSentences(text: string, max = 300): string {
+  if (text.length <= max) return text
+  const parts = text.split(/(?<=[.!?])\s+/)
+  let out = ''
+  for (const p of parts) {
+    if ((out ? out.length + 1 : 0) + p.length > max) break
+    out = out ? `${out} ${p}` : p
+  }
+  return out || `${text.slice(0, max - 1).trimEnd()}…`
+}
 
 export async function generateMetadata(
   { params }: { params: Promise<{ slug: string }> }
@@ -19,10 +43,14 @@ export async function generateMetadata(
   const s = await getScore(slug)
   const name = bestName(slug, s)
   const ghostPct = s?.ghost_rate != null ? Math.round(s.ghost_rate * 100) : null
+  const summary = await getCompanySummary(summaryKey(slug, s))
 
   // Reddit-targeted: LLM/Google searches like "<company> hiring reddit" and "does <company>
-  // ghost applicants" should land here. Real ghost % folded in when we have it.
-  const description = ghostPct != null
+  // ghost applicants" should land here. Real ghost % folded in when we have it. A grounded
+  // company summary (same text as the visible paragraph) takes precedence when one exists.
+  const description = summary
+    ? clipSentences(summary.summary)
+    : ghostPct != null
     ? `Does ${name} ghost applicants? ${ghostPct}% ghost rate from real applicant outcomes. See ${name}'s response time, interview rounds, and hiring reviews — aggregated from Reddit, Glassdoor, and verified job-seeker reports.`
     : `Does ${name} ghost applicants? See ${name}'s ghost rate, response time, and hiring reviews — aggregated from Reddit, Glassdoor, and verified job-seeker reports on Seen.`
 
@@ -77,11 +105,14 @@ export default async function CompanySlugLayout(
   const { slug } = await params
   const s = await getScore(slug)
   const name = bestName(slug, s)
+  const summary: CompanySummary | null = await getCompanySummary(summaryKey(slug, s))
+  const pageUrl = `https://seenjobs.io/company/${slug}`
 
   const org: Record<string, unknown> = {
     '@type': 'Organization',
+    '@id': `${pageUrl}#organization`,
     name,
-    url: `https://seenjobs.io/company/${slug}`,
+    url: pageUrl,
   }
   if (s?.industry) org.industry = s.industry
   // Only assert an aggregateRating when we have REAL reports behind it. "Real" means
@@ -109,7 +140,7 @@ export default async function CompanySlugLayout(
         ghostRate: s.ghost_rate,
         responseRate: s.response_rate,
         avgWaitDays: s.avg_wait_days,
-        reportCount: s.report_count,
+        reportCount: fpSeo,
       })
     : []
 
@@ -124,6 +155,19 @@ export default async function CompanySlugLayout(
         ],
       },
       org,
+      // The visible "What applicants report" paragraph, as the page description — the quotable,
+      // sample-size-labelled summary. Present only when a grounded summary exists.
+      ...(summary
+        ? [{
+            '@type': 'WebPage',
+            '@id': pageUrl,
+            url: pageUrl,
+            name: `${name} hiring — what applicants report`,
+            description: summary.summary,
+            ...(summary.generated_at ? { dateModified: summary.generated_at } : {}),
+            about: { '@id': `${pageUrl}#organization` },
+          }]
+        : []),
       ...(faq.length
         ? [{
             '@type': 'FAQPage',
@@ -139,19 +183,33 @@ export default async function CompanySlugLayout(
 
   // Server-rendered factual summary so AI answer engines (ChatGPT, Perplexity, Gemini) and
   // Google can read and cite real hiring data from the initial HTML — the client UI below
-  // only hydrates after load. Rendered ONLY when we have a real score. Null-safe.
+  // only hydrates after load. Rendered ONLY when we have a real score or a grounded company
+  // summary (company_summaries, status 'ok'). Null-safe.
   const hasFacts = s != null && s.overall_score != null
   const accent = accentFor(s?.risk_level)
   const ghostPct = s?.ghost_rate != null ? Math.round(s.ghost_rate * 100) : null
   const respPct = s?.response_rate != null ? Math.round(s.response_rate * 100) : null
   const waitDays = s?.avg_wait_days != null ? Math.round(s.avg_wait_days) : null
-  const reportCount = s?.report_count ?? 0
+  const reportCount = firstPartyReportCount(s)
   const dataPoints = reportCount > 0 ? `${reportCount} applicant report${reportCount === 1 ? '' : 's'}` : 'estimated data'
+  const summaryDate = summary ? summaryMonth(summary.generated_at) : null
+  const summaryBlock = summary ? (
+    <div style={{ marginTop: hasFacts ? '.85rem' : 0, paddingTop: hasFacts ? '.85rem' : 0, borderTop: hasFacts ? '1px solid var(--line)' : 'none' }}>
+      <h2 style={{ fontFamily: 'var(--display)', fontSize: '.86rem', fontWeight: 700, color: 'var(--white)', margin: '0 0 .4rem' }}>
+        What applicants report about {name}
+      </h2>
+      <p style={{ fontSize: '.86rem', lineHeight: 1.65, color: 'var(--sub)', margin: 0, fontWeight: 300 }}>{summary.summary}</p>
+      <p style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', color: 'var(--sub)', margin: '.45rem 0 0', opacity: 0.85 }}>
+        Based on {summary.data_basis || `${summary.report_count_at_generation} self-reported applicant reports`}
+        {summaryDate ? ` · summary generated ${summaryDate}` : ''} · self-reported claims, not verified facts
+      </p>
+    </div>
+  ) : null
 
   return (
     <>
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLdHtml(jsonLd) }} />
-      {hasFacts && s && (
+      {(hasFacts || summary) && (
         <section
           aria-label={`${name} hiring data summary`}
           style={{
@@ -172,6 +230,7 @@ export default async function CompanySlugLayout(
               padding: '1.1rem 1.25rem',
             }}
           >
+            {hasFacts && s && (<>
             <h1
               style={{
                 fontFamily: 'var(--display)',
@@ -206,6 +265,8 @@ export default async function CompanySlugLayout(
               )}
               {interpret(s)}
             </p>
+            </>)}
+            {summaryBlock}
             {/* Crawlable internal links to the new growth surfaces — present in initial HTML.
                 Uses a div (not <nav>) on purpose: the global CSS `nav{position:fixed}` rule is
                 for the site header only, and a <nav> here would get pinned to the top of the
