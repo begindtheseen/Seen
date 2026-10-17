@@ -50,6 +50,15 @@ and dashboard (PRs #122/#123) were intentionally REDESIGNED beyond the old site;
 longer the design source of truth for redesigned pages. `SITE_PARITY_CHECKLIST.md` /
 `ADMIN_PARITY_CHECKLIST.md` are frozen pre-06-30 records, not an active work queue.
 
+## Session 2026-10-17: self-filling company pages read the Arctic Shift archive when Reddit refuses
+- Verified on prod: the first enrichment cron run (Sheetz) got `reddit_429` from www.reddit.com on
+  Vercel; cloud runners get 403. `ENRICH_SOURCE` (default `auto`) now switches the rest of a run to the
+  Arctic Shift archive (`api/_utils/arcticShift.js`) after Reddit's first refusal. Reports keep the
+  Reddit shape and permalink (the content is Reddit's). `reddit` / `arctic` pin one source.
+- Archive facts (live 2026-10-17): posts/search needs `subreddit`; full-text search in big subs needs
+  a time window; overload = HTTP 422 `{"error":"Timeout. Maybe slow down a bit"}` (fall back
+  `query`→`title`); rate limit = "Too many requests" + `x-ratelimit-reset` seconds.
+
 ## Session 2026-09-29: stale-job protocol (one batched DB sweep) — facts verified on prod
 
 - **Stale backlog was 95,505 rows (67% of `jobs`)** because all three stale paths silently died on

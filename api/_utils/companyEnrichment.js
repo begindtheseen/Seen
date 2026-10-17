@@ -47,7 +47,15 @@ export const ENRICH_DEFAULTS = {
   llmReserveMs: 80_000,     // never START an LLM call with less than this left (llm.js retries ×3)
   cooldownDays: 30,         // re-enrichment cooldown (next_eligible_at) after done/empty
   maxAttempts: 3,
+  // Where threads come from. 'auto' = Reddit first; once Reddit refuses us (429 / 403 / no answer)
+  // the rest of the run reads the Arctic Shift archive (api/_utils/arcticShift.js). 'reddit' and
+  // 'arctic' pin one source (ENRICH_SOURCE env).
+  source: 'auto',
 };
+export const ENRICH_SOURCES = ['auto', 'reddit', 'arctic'];
+
+/** Run-stop reasons → how long the stopped companies wait before they are claimable again. */
+export const RUN_STOP_DELAYS_MS = { reddit_429: 30 * 60_000, arctic_429: 30 * 60_000, sources_unavailable: 30 * 60_000 };
 
 export const REDDIT_UA = 'SeenJobs/1.0 RSS reader (+https://seenjobs.io)'; // same UA as api/company-reddit.js
 export const REDDIT_HOSTS = ['https://www.reddit.com', 'https://old.reddit.com'];
@@ -604,6 +612,7 @@ export function readEnrichConfig(env = process.env) {
     dailyMax: n('ENRICH_DAILY_MAX', ENRICH_DEFAULTS.dailyMax),
     promptChars: Math.min(n('ENRICH_PROMPT_CHARS', ENRICH_DEFAULTS.promptChars), 60_000),
     tpm: n('ENRICH_TPM', ENRICH_DEFAULTS.tpm),
+    source: ENRICH_SOURCES.includes(String(env.ENRICH_SOURCE || '').toLowerCase()) ? String(env.ENRICH_SOURCE).toLowerCase() : ENRICH_DEFAULTS.source,
   };
 }
 
