@@ -12,7 +12,7 @@
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { SECURITY_PREAMBLE, fenceUntrusted } from '../../lib/server/promptGuard.js';
-import { MODELS, RUNS_DIR, argValue, customId, isDryRun, jsonFormat, resultJson, runBatch } from './lib/batch.mjs';
+import { MODELS, RUNS_DIR, argValue, customId, jsonFormat, resultJson, runBatch } from './lib/batch.mjs';
 
 const VERDICT_SCHEMA = {
   type: 'object',

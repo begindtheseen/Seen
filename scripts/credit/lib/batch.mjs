@@ -11,7 +11,7 @@
 //   • runs are resumable: batch ids are saved before polling, so a crash re-attaches, never resubmits.
 
 import Anthropic from '@anthropic-ai/sdk';
-import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { appendFileSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -81,8 +81,12 @@ export function costOfUsage(model, usage = {}) {
 }
 
 const ledgerPath = () => join(RUNS_DIR, 'ledger.json');
+function readJsonOrNull(path) {
+  try { return JSON.parse(readFileSync(path, 'utf8')); }
+  catch (e) { if (e.code === 'ENOENT') return null; throw e; }
+}
 export function readLedger() {
-  try { return JSON.parse(readFileSync(ledgerPath(), 'utf8')); } catch { return { spentUsd: 0, jobs: {} }; }
+  return readJsonOrNull(ledgerPath()) || { spentUsd: 0, jobs: {} };
 }
 function writeLedger(l) { mkdirSync(RUNS_DIR, { recursive: true }); writeFileSync(ledgerPath(), JSON.stringify(l, null, 2)); }
 export function budgetUsd() { return Number(process.env.CREDIT_BUDGET_USD || 190); }
@@ -109,7 +113,8 @@ export async function runBatch({ label, requests, estimate = {}, pollMs = 30_000
     return { results: new Map(), costUsd: 0, dryRun: true, estimate: est };
   }
 
-  let state = existsSync(statePath) ? JSON.parse(readFileSync(statePath, 'utf8')) : null;
+  // Read-or-null in one step (no exists-then-read check, which races).
+  let state = readJsonOrNull(statePath);
   if (!state) {
     const ledger = readLedger();
     if (ledger.spentUsd + est.usd > budgetUsd()) {

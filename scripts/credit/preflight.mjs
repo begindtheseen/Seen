@@ -17,7 +17,6 @@ async function check(name, fn) {
 }
 
 for (const k of ['ANTHROPIC_API_KEY', 'SUPABASE_URL', 'SUPABASE_SERVICE_KEY']) mark(`env ${k}`, !!process.env[k], process.env[k] ? 'set' : 'MISSING');
-mark('env SUPABASE_ACCESS_TOKEN (optional, for migrations)', true, process.env.SUPABASE_ACCESS_TOKEN ? 'set' : 'not set — migrations must be applied another way');
 
 await check('anthropic: key valid + Haiku 5.5 answers', async () => {
   const m = await client().messages.create({ model: MODELS.cheap, max_tokens: 16, messages: [{ role: 'user', content: 'Reply with: ok' }] });
