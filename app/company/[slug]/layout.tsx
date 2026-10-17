@@ -214,6 +214,17 @@ export default async function CompanySlugLayout(
           on the score, not a wall of text — the HTML order crawlers read is unchanged. */}
       {(hasFacts || summary) && (
         <section className="co-seo" aria-label={`${name} hiring data summary`}>
+          {/* Collapsed by default (native <details>, no JS): the numbers are already on the page above;
+              this is the citable prose + FAQ for people and crawlers who want the long form. */}
+          <details className="co-seo-details">
+            <summary className="co-seo-summary">
+              <span className="co-seo-ico" aria-hidden>📄</span>
+              <span className="co-seo-txt">
+                <span className="co-seo-ttl">About {name}&apos;s hiring data</span>
+                <span className="co-seo-sub">{hasFacts && s ? `Seen Grade ${s.overall_score}/100 in plain English` : 'What applicants report'}{faq.length > 0 ? ` · ${faq.length} frequently asked questions` : ''}</span>
+              </span>
+              <span className="co-seo-chev" aria-hidden />
+            </summary>
           <div
             style={{
               background: 'var(--card)',
@@ -221,6 +232,7 @@ export default async function CompanySlugLayout(
               borderLeft: `3px solid ${accent}`,
               borderRadius: 12,
               padding: '1.1rem 1.25rem',
+              marginTop: '.6rem',
             }}
           >
             {hasFacts && s && (<>
@@ -293,6 +305,7 @@ export default async function CompanySlugLayout(
               ))}
             </div>
           )}
+          </details>
         </section>
       )}
       {children}

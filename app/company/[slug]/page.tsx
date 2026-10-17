@@ -1,6 +1,7 @@
 'use client'
 
-import { useState, useEffect, use, type CSSProperties } from 'react'
+import { useState, useEffect, useRef, use, type CSSProperties, type ReactNode } from 'react'
+import { createPortal } from 'react-dom'
 import { Score } from '@/lib/score'
 import { useAuth } from '@/lib/auth'
 import { AppStore } from '@/lib/stores/AppStore'
@@ -56,7 +57,7 @@ interface WebReview {
   year?: string
 }
 
-type TabKey = 'overview' | 'process' | 'reports' | 'locations' | 'roles' | 'reddit' | 'compare'
+type SectionKey = 'odds' | 'breakdown' | 'reports' | 'online' | 'reddit' | 'locations' | 'roles' | 'compare' | 'about'
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
@@ -128,8 +129,8 @@ function DataQualityBadge({ dq, reportCount, webCount = 0 }: { dq: string; repor
     strong:   { emoji: '🟢', label: `High confidence · ${n}`,     color: 'var(--green)' },
     moderate: { emoji: '🟡', label: `Moderate confidence · ${n}`, color: 'var(--amber)' },
     limited:  { emoji: '🟡', label: `Low confidence · ${n}`,      color: 'var(--amber)' },
-    medium:   { emoji: '🟡', label: 'Moderate confidence',        color: 'var(--amber)' },
-    low:      { emoji: '🔴', label: 'Low confidence',             color: 'var(--red)'   },
+    medium:   { emoji: '🟡', label: `Moderate confidence · ${n}`, color: 'var(--amber)' },
+    low:      { emoji: '🔴', label: `Low confidence · ${n}`,      color: 'var(--red)'   },
     high:     { emoji: '🟢', label: `High confidence · ${n}`,     color: 'var(--green)' },
   }
   const info = map[dq] || { emoji: '🔴', label: 'Estimated', color: 'var(--red)' }
@@ -173,71 +174,6 @@ function VibeTagList({ sc }: { sc: CompanyScore }) {
       {vibes.map(v => (
         <span key={v.label} className={`vibe ${v.cls}`}>{v.label}</span>
       ))}
-    </div>
-  )
-}
-
-function GhostSurgeAlert({ ghostRate }: { ghostRate: number }) {
-  // Surge wins at ghost>=0.5; mutually exclusive with the "Highly responsive" badge.
-  if (ghostRate < 0.5) return null
-  const ghostPct = ratePct(ghostRate) ?? 0
-  return (
-    <div className="co-surge">
-      <div style={{ minWidth: 0 }}>
-        <div style={{
-          fontFamily: 'var(--mono)', fontSize: '.56rem', fontWeight: 500, color: 'var(--red)',
-          textTransform: 'uppercase', letterSpacing: '.16em', marginBottom: '.22rem',
-          display: 'flex', alignItems: 'center', gap: '.4rem',
-        }}>
-          <span style={{
-            width: 6, height: 6, borderRadius: '50%', background: 'var(--red)',
-            display: 'inline-block', flexShrink: 0,
-          }} />
-          ⚡ Ghost surge — high risk
-        </div>
-        <div style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', color: 'rgba(255,59,92,.65)' }}>
-          Most applicants never hear back from this company
-        </div>
-      </div>
-      <div className="co-surge-num">
-        <div style={{
-          fontFamily: 'var(--display)', fontSize: '1.7rem', fontWeight: 800,
-          color: 'var(--red)', lineHeight: '.95', letterSpacing: '-.03em',
-        }}>{ghostPct}%</div>
-        <div style={{ fontFamily: 'var(--mono)', fontSize: '.46rem', color: 'rgba(255,59,92,.55)', textTransform: 'uppercase', letterSpacing: '.14em', marginTop: '.12rem' }}>Ghost rate</div>
-      </div>
-    </div>
-  )
-}
-
-function ExpectedTimeline({ sc, risk }: { sc: CompanyScore; risk: string }) {
-  const avgWait = sc.avg_wait_days || 30
-  const rr = ratePct(sc.response_rate) ?? 0
-  const w = sc.waste || 40
-  const wColor = w > 60 ? 'var(--red)' : w > 30 ? 'var(--amber)' : 'var(--green)'
-  const rrColor = riskColor(risk)
-  return (
-    <div style={{
-      background: 'rgba(99,102,241,0.07)', border: '1px solid rgba(99,102,241,0.18)',
-      borderRadius: 12, padding: '1rem 1.1rem', marginBottom: '1rem',
-    }}>
-      <div className="co-sec-lbl" style={{ color: 'var(--indigo, #818cf8)', marginBottom: '.75rem' }}>
-        📅 If you applied today
-      </div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: '.75rem', marginBottom: '.85rem' }}>
-        <div>
-          <div className="co-tl-n" style={{ color: 'var(--white)' }}>{avgWait}d</div>
-          <div className="co-tl-l">avg response</div>
-        </div>
-        <div>
-          <div className="co-tl-n" style={{ color: rrColor }}>{rr}%</div>
-          <div className="co-tl-l">hear back</div>
-        </div>
-        <div>
-          <div className="co-tl-n" style={{ color: wColor }}>{w}%</div>
-          <div className="co-tl-l">waste risk</div>
-        </div>
-      </div>
     </div>
   )
 }
@@ -428,43 +364,36 @@ function OutcomeDistribution({ reports }: { reports: Report[] }) {
   )
 }
 
-function GhostVisual({ ghostRate, count }: { ghostRate: number; count: number }) {
-  const pct = Math.round(ghostRate * 100)
-  const outOf10 = Math.round(ghostRate * 10)
-  if (pct < 15) return null
-  return (
-    <div style={{
-      background: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.15)',
-      borderRadius: 10, padding: '.85rem 1rem', marginBottom: '.85rem',
-      display: 'flex', alignItems: 'center', gap: '1rem',
-    }}>
-      <div style={{ flex: 1 }}>
-        <div style={{ fontFamily: 'var(--mono)', fontSize: '.6rem', color: 'var(--red)', fontWeight: 600, marginBottom: '.3rem' }}>
-          {outOf10} in 10 applicants never hear back
-        </div>
-        <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap', marginBottom: '.3rem' }}>
-          {Array.from({ length: 10 }).map((_, i) => (
-            <span key={i} style={{ fontSize: '.9rem', opacity: i < outOf10 ? 0.25 : 0.9, filter: i < outOf10 ? 'grayscale(1)' : 'none', transition: `opacity .3s ${i * 0.04}s` }}>
-              👤
-            </span>
-          ))}
-        </div>
-        {count > 0 && <div style={{ fontFamily: 'var(--mono)', fontSize: '.52rem', color: 'var(--dim)' }}>Based on {count} reported applications</div>}
-      </div>
-      <div style={{ textAlign: 'right', flexShrink: 0 }}>
-        <div style={{ fontFamily: 'var(--display)', fontSize: '2.2rem', fontWeight: 800, color: 'var(--red)', lineHeight: .9, letterSpacing: '-.03em' }}>{pct}%</div>
-        <div style={{ fontFamily: 'var(--mono)', fontSize: '.42rem', color: 'rgba(239,68,68,.5)', textTransform: 'uppercase', letterSpacing: '.14em' }}>ghost rate</div>
-      </div>
-    </div>
-  )
-}
-
 // Truthful "self-filling" status: the company is queued for the public-discussion enrichment cron.
 function EnrichmentNotice({ companyName }: { companyName: string }) {
   return (
     <div role="status" style={{ marginTop: '.75rem', fontFamily: 'var(--mono)', fontSize: '.66rem', color: 'var(--sub)', lineHeight: 1.6 }}>
       We&apos;re gathering public hiring discussions about <span style={{ textTransform: 'capitalize' }}>{companyName}</span> — check back shortly.
     </div>
+  )
+}
+
+// ── Collapsible section ────────────────────────────────────────────────────────
+// Every block below the hero is one of these: a header row that always shows a truthful,
+// data-derived one-line summary, and a body that renders only while open (so sections that
+// fetch — roles, locations, Reddit — fetch on demand). Nothing is removed from the page;
+// it is just not expanded until asked for.
+function Section({ id, icon, title, summary, count, open, onToggle, children }: {
+  id: SectionKey; icon: string; title: string; summary?: ReactNode; count?: number | null
+  open: boolean; onToggle: (id: SectionKey) => void; children: ReactNode
+}) {
+  return (
+    <section className={`co-sec${open ? ' open' : ''}`} id={`sec-${id}`}>
+      <button type="button" className="co-sec-hd" aria-expanded={open} aria-controls={`sec-${id}-body`} onClick={() => onToggle(id)}>
+        <span className="co-sec-ico" aria-hidden>{icon}</span>
+        <span className="co-sec-txt">
+          <span className="co-sec-ttl">{title}{count != null && count > 0 ? <span className="co-sec-cnt">{count}</span> : null}</span>
+          {summary ? <span className="co-sec-sum">{summary}</span> : null}
+        </span>
+        <span className="co-sec-chev" aria-hidden>{open ? '−' : '+'}</span>
+      </button>
+      {open && <div className="co-sec-body" id={`sec-${id}-body`}>{children}</div>}
+    </section>
   )
 }
 
@@ -483,7 +412,17 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
   // Self-filling pages: the score API reports when this company is queued for public-discussion
   // enrichment (api/enrich-companies cron). Only 'queued' / 'running' ever render a line.
   const [enrichmentStatus, setEnrichmentStatus] = useState<string | null>(null)
-  const [tab, setTab] = useState<TabKey>('overview')
+  // Which sections are expanded. The first ("odds") opens by default so the page is never a bare
+  // list of closed rows; a #hash in the URL (e.g. /company/x#reports) opens that section instead.
+  const [open, setOpen] = useState<Record<SectionKey, boolean>>({
+    odds: true, breakdown: false, reports: false, online: false, reddit: false,
+    locations: false, roles: false, compare: false, about: false,
+  })
+  const toggle = (id: SectionKey) => setOpen(prev => ({ ...prev, [id]: !prev[id] }))
+  const openSection = (id: SectionKey) => {
+    setOpen(prev => ({ ...prev, [id]: true }))
+    requestAnimationFrame(() => document.getElementById(`sec-${id}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' }))
+  }
   const [location, setLocation] = useState('')
   const [webReviews, setWebReviews] = useState<WebReview[]>([])
   const [benchmark, setBenchmark] = useState<Benchmark | null>(null)
@@ -503,11 +442,43 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
   const [jobsFetched, setJobsFetched] = useState(false)
   const [compareInput, setCompareInput] = useState('')
   const [compareList, setCompareList] = useState<Array<{name: string; score: CompanyScore | null; loading: boolean}>>([])
+  // Reports render in pages of 5 — "Show more" reveals the rest; nothing is hidden for good.
+  const [reportsShown, setReportsShown] = useState(5)
+  const [copied, setCopied] = useState(false)
+  // Sticky context strip: once the hero's grade card scrolls under the nav, a slim bar keeps the
+  // company + grade in view with a way back — the page can be long, the context never leaves.
+  const heroRef = useRef<HTMLDivElement | null>(null)
+  const [stuck, setStuck] = useState(false)
+  // Portal target: .page-full keeps an (identity) transform from its entrance animation, which makes
+  // it the containing block for position:fixed — so the strip must live on <body> to pin to the viewport.
+  const [mounted, setMounted] = useState(false)
+  useEffect(() => { setMounted(true) }, [])
+  useEffect(() => {
+    const el = heroRef.current
+    if (!el || typeof IntersectionObserver === 'undefined') return
+    const io = new IntersectionObserver(([entry]) => {
+      setStuck(!entry.isIntersecting && entry.boundingClientRect.top < 0)
+    }, { rootMargin: '-58px 0px 0px 0px', threshold: 0 })
+    io.observe(el)
+    return () => io.disconnect()
+  }, [loading])
+  function goBack() {
+    let sameSite = false
+    try { sameSite = !!document.referrer && new URL(document.referrer).origin === window.location.origin } catch {}
+    if (sameSite && window.history.length > 1) window.history.back()
+    else window.location.href = '/companies'
+  }
 
   const [displayScore, setDisplayScore] = useState(0)
   const [showGradeCard, setShowGradeCard] = useState(false)
   const [scoreRevealed, setScoreRevealed] = useState(false)
   const [myApp, setMyApp] = useState<{company: string; role: string; status: string; stage: string; appliedAt: number; daysSince: number} | null>(null)
+
+  // Deep link: /company/<slug>#reports opens that section on load.
+  useEffect(() => {
+    const h = (window.location.hash || '').replace('#', '') as SectionKey
+    if (h && h in open) setOpen(prev => ({ ...prev, [h]: true }))
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Load matching tracker entry for this company
   useEffect(() => {
@@ -564,8 +535,7 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
         })
         if (rRes.ok) {
           const rJson = await rRes.json() as { reports?: Report[]; ok?: boolean }
-          // Newest experience first by its REAL date (imported rows: the source's posted date).
-          if (rJson.reports) setReports(sortReportsByDate(rJson.reports))
+          if (rJson.reports) setReports(rJson.reports)
         }
 
         // Approved employer replies for this company, keyed by report id (best-effort, public).
@@ -616,10 +586,10 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
     return () => { alive = false }
   }, [companyName])
 
-  // Fetch open roles when the roles OR locations tab is first opened — one shared request (the
-  // Locations tab's "Where <company> is hiring" section aggregates these same listings).
+  // Fetch open roles when the roles OR locations section is first opened — one shared request (the
+  // Locations section's "Where <company> is hiring" aggregates these same listings).
   useEffect(() => {
-    if ((tab !== 'roles' && tab !== 'locations') || jobsFetched) return
+    if ((!open.roles && !open.locations) || jobsFetched) return
     setJobsLoading(true)
     fetch('/api/jobs', {
       method: 'POST',
@@ -630,7 +600,7 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
       .then(d => { setCompanyJobs(d.jobs || []); setJobsFetched(true) })
       .catch(() => setJobsFetched(true))
       .finally(() => setJobsLoading(false))
-  }, [tab, companyName, jobsFetched])
+  }, [open.roles, open.locations, companyName, jobsFetched])
 
   // Score reveal animation
   useEffect(() => {
@@ -649,7 +619,7 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
     requestAnimationFrame(tick)
   }, [score]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Compare tab: Enter key and the button share one path (two divergent copies before).
+  // Compare: Enter key and the button share one path.
   function addCompare() {
     const name = compareInput.trim()
     if (!name || compareList.length >= 2) return
@@ -669,6 +639,13 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
       .catch(() => setCompareList(prev => prev.map(c => c.name === name ? { ...c, loading: false } : c)))
   }
 
+  function share() {
+    const url = window.location.href.split('#')[0]
+    const data = { title: `${companyName} on Seen`, text: `${companyName} has a Seen score of ${score?.overall_score ?? '?'}/100`, url }
+    if (navigator.share) { navigator.share(data).catch(() => {}); return }
+    navigator.clipboard?.writeText(url).then(() => { setCopied(true); setTimeout(() => setCopied(false), 1800) }).catch(() => {})
+  }
+
   const risk = score ? Score.risk(score.overall_score) : 'warn'
   const g = score ? letterGrade(score.overall_score) : '—'
   // Honest count split (migration 063). Legacy payloads without the split fields infer from
@@ -680,22 +657,28 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
   // page has no first-party reports to show. It promises nothing about what will be found.
   const gatheringPublic = !loading && fpReports === 0 && reports.length === 0 && (enrichmentStatus === 'queued' || enrichmentStatus === 'running')
   const logoLetter = (companyName[0] || '?').toUpperCase()
-  const ghostHigh = (score?.ghost_rate || 0) > 0.5
+  const ghostRate = score?.ghost_rate || 0
+  const ghostHigh = ghostRate > 0.5
   const ghostPct = score ? (ratePct(score.ghost_rate) ?? 0) : 0
   const respPct = score ? (ratePct(score.response_rate) ?? 0) : 0
-  const ghostColor = ghostHigh ? 'var(--red)' : (score?.ghost_rate || 0) > 0.3 ? 'var(--amber)' : 'var(--green)'
+  const ghostColor = ghostHigh ? 'var(--red)' : ghostRate > 0.3 ? 'var(--amber)' : 'var(--green)'
   const waitColor = (score?.avg_wait_days || 0) > 21 ? 'var(--amber)' : 'var(--text)'
   const wasteColor = (score?.waste || 0) > 60 ? 'var(--red)' : (score?.waste || 0) > 30 ? 'var(--amber)' : 'var(--green)'
 
-  const TABS: { key: TabKey; label: string }[] = [
-    { key: 'overview',  label: 'Overview' },
-    { key: 'process',   label: 'Process Score' },
-    { key: 'reports',   label: `Reports${reports.length > 0 ? ` (${reports.length})` : ''}` },
-    { key: 'locations', label: 'Locations' },
-    { key: 'roles',     label: 'Open Roles' },
-    { key: 'reddit',    label: 'Reddit' },
-    { key: 'compare',   label: '⚡ Compare' },
-  ]
+  // One plain-English line a first-time visitor can act on, built only from the numbers shown.
+  const verdict = score ? (() => {
+    const wait = score.avg_wait_days != null ? ` Typical wait to hear back: ${score.avg_wait_days} days.` : ''
+    if (ghostRate >= 0.5) return `Most applicants never hear back — ${Math.round(ghostRate * 10)} in 10 are ghosted.${wait}`
+    if ((score.response_rate || 0) >= 0.75) return `Most applicants hear back — ${respPct}% get a response.${wait}`
+    return `Mixed: about ${respPct}% of applicants hear back, ${ghostPct}% are ghosted.${wait}`
+  })() : ''
+
+  // Report outcome counts for the section summary + distribution (reused by two blocks).
+  const oc = reports.reduce((m, r) => { const k = r.outcome || 'unknown'; m[k] = (m[k] || 0) + 1; return m }, {} as Record<string, number>)
+  const ghostedN = oc.ghosted || 0
+  const hiredN = (oc.hired || 0) + (oc.offer || 0)
+  const interviewN = (oc.interview || 0) + (oc.human || 0) + (oc.interviewing || 0)
+  const thirdPartyN = reports.filter(r => isPublicDiscussion(r.platform)).length
 
   const ocLabel: Record<string, string> = {
     ghosted: '👻 Ghosted', autoreject: '🤖 Auto-rejected',
@@ -727,14 +710,66 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
     )
   }
 
+  // ── Locations data (derived; cheap) ──
+  const cityMap: Record<string, { total: number; ghosted: number }> = {}
+  let reportsWithCity = 0
+  reports.forEach(r => {
+    const city = (r.city || r.location || '').trim()
+    if (!city) return
+    reportsWithCity += 1
+    if (!cityMap[city]) cityMap[city] = { total: 0, ghosted: 0 }
+    cityMap[city].total += 1
+    if (r.outcome === 'ghosted') cityMap[city].ghosted += 1
+  })
+  const cityRows = Object.entries(cityMap)
+    .map(([city, data]) => ({ city, total: data.total, ghostRate: data.ghosted / data.total, responseRate: (data.total - data.ghosted) / data.total }))
+    .sort((a, b) => b.total - a.total)
+    .slice(0, 6)
+  const hiring = aggregateJobLocations(companyJobs, { top: 8 })
+  const hiringRows = [...(hiring.remote > 0 ? [{ label: 'Remote', count: hiring.remote }] : []), ...hiring.places].sort((a, b) => b.count - a.count)
+  const maxCount = hiringRows.reduce((m, r) => Math.max(m, r.count), 0)
+  const capped = hiring.listings >= 20
+  const sectionNote: CSSProperties = { fontFamily: 'var(--mono)', fontSize: '.58rem', color: 'var(--dim)', marginBottom: '1rem', lineHeight: 1.6 }
+
+  const compareRows = [
+    {
+      label: 'Score',
+      current: score ? String(score.overall_score) : '—',
+      get: (sc: CompanyScore | null) => sc ? String(sc.overall_score) : '—',
+      currentColor: score ? riskColor(Score.risk(score.overall_score)) : 'var(--muted)',
+      getColor: (sc: CompanyScore | null) => sc ? riskColor(Score.risk(sc.overall_score)) : 'var(--muted)',
+    },
+    {
+      label: 'Ghost %',
+      current: score ? pct(score.ghost_rate) : '—',
+      get: (sc: CompanyScore | null) => sc ? pct(sc.ghost_rate) : '—',
+      currentColor: ghostColor,
+      getColor: (sc: CompanyScore | null) => sc ? ((sc.ghost_rate > 0.5) ? 'var(--red)' : (sc.ghost_rate > 0.3) ? 'var(--amber)' : 'var(--green)') : 'var(--muted)',
+    },
+    {
+      label: 'Response %',
+      current: score ? pct(score.response_rate) : '—',
+      get: (sc: CompanyScore | null) => sc ? pct(sc.response_rate) : '—',
+      currentColor: 'var(--blue)',
+      getColor: () => 'var(--blue)',
+    },
+    {
+      label: 'Avg wait',
+      current: score?.avg_wait_days != null ? `${score.avg_wait_days}d` : '—',
+      get: (sc: CompanyScore | null) => sc?.avg_wait_days != null ? `${sc.avg_wait_days}d` : '—',
+      currentColor: waitColor,
+      getColor: (sc: CompanyScore | null) => sc ? ((sc.avg_wait_days || 0) > 21 ? 'var(--amber)' : 'var(--text)') : 'var(--muted)',
+    },
+  ]
+
   return (
     <div className="page-full">
       <div className="co-page">
 
         {/* ── "You applied here" context strip ── */}
         {myApp && (
-          <div style={{ background: 'rgba(99,102,241,.08)', border: '1px solid rgba(99,102,241,.22)', borderRadius: 10, padding: '.65rem 1rem', marginBottom: '.85rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '.75rem', flexWrap: 'wrap' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '.5rem' }}>
+          <div className="co-myapp">
+            <div style={{ display: 'flex', alignItems: 'center', gap: '.5rem', flexWrap: 'wrap' }}>
               <span style={{ fontFamily: 'var(--mono)', fontSize: '.55rem', color: 'var(--indigo)', textTransform: 'uppercase', letterSpacing: '.1em' }}>Your application</span>
               <span style={{ fontFamily: 'var(--mono)', fontSize: '.6rem', color: 'var(--sub)' }}>
                 {myApp.role} · Day {myApp.daysSince}
@@ -752,118 +787,47 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
           </div>
         )}
 
-        {/* ── Company header ── */}
-        <div className="co-hdr">
+        {/* ── Sticky context strip (appears once the hero scrolls away) ── */}
+        {mounted && createPortal(
+          <div className={`co-sticky${stuck ? ' show' : ''}`} aria-hidden={!stuck}>
+            <div className="co-sticky-in">
+              <button type="button" className="co-sticky-back" onClick={goBack} aria-label="Back" tabIndex={stuck ? 0 : -1}>←</button>
+              <span className="co-sticky-logo" aria-hidden>{logoLetter}</span>
+              <span className="co-sticky-name">{companyName}</span>
+              {score && (
+                <span className="co-sticky-grade">
+                  <span className={`co-sticky-letter ${risk}`}>{g}</span>
+                  <span className="co-sticky-score">{score.overall_score}<span>/100</span></span>
+                </span>
+              )}
+            </div>
+          </div>,
+          document.body
+        )}
+
+        {/* ── Hero: who, the grade, one verdict, the numbers — each shown exactly once ── */}
+        <div className="co-hdr" ref={heroRef}>
           <div className="co-top">
             <div className="co-logo-lg">{logoLetter}</div>
-            <div style={{ flex: 1 }}>
-              <div className="co-name" style={{ display: 'inline-flex', alignItems: 'center', gap: '.55rem', flexWrap: 'wrap' }}>
+            <div className="co-id">
+              <div className="co-name">
                 {companyName}
                 {perk.verified && (
-                  <span title="This employer committed to responding to applicants. Reviewed against real outcome data — it never affects the transparency score." style={{ display: 'inline-flex', alignItems: 'center', gap: '.3rem', fontFamily: 'var(--mono)', fontSize: '.5rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.08em', color: 'var(--blue)', background: 'rgba(59,130,246,.12)', border: '1px solid rgba(59,130,246,.4)', borderRadius: 999, padding: '.2rem .55rem', whiteSpace: 'nowrap' }}>✓ Transparency Verified</span>
+                  <span className="co-badge co-badge-verified" title="This employer committed to responding to applicants. Reviewed against real outcome data — it never affects the transparency score.">✓ Transparency Verified</span>
                 )}
                 {perk.featured && (
-                  <span title="Featured employer — paid placement. Never affects the transparency score." style={{ display: 'inline-flex', alignItems: 'center', gap: '.3rem', fontFamily: 'var(--mono)', fontSize: '.5rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.08em', color: '#f7c948', background: 'rgba(247,201,72,.12)', border: '1px solid rgba(247,201,72,.4)', borderRadius: 999, padding: '.2rem .55rem', whiteSpace: 'nowrap' }}>★ Featured</span>
+                  <span className="co-badge co-badge-featured" title="Featured employer — paid placement. Never affects the transparency score.">★ Featured</span>
                 )}
               </div>
-              {industry && <div className="co-ind">{industry}</div>}
-              {/* T3-9: Live viewer count */}
-              {viewers > 0 && (
-                <div style={{ display: 'flex', alignItems: 'center', gap: '.65rem', flexWrap: 'wrap', marginTop: '.3rem' }}>
-                  <div style={{ fontFamily: 'var(--mono)', fontSize: '.56rem', color: 'var(--dim)', display: 'flex', alignItems: 'center', gap: '.3rem' }}>
-                    <span style={{ width: 5, height: 5, borderRadius: '50%', background: 'var(--green)', display: 'inline-block', animation: 'pulse 1.5s ease infinite' }} />
-                    {viewers} Seen users checked this week
-                  </div>
-                  {score && score.ghost_rate > 0.4 && (
-                    <div style={{ fontFamily: 'var(--mono)', fontSize: '.52rem', color: 'var(--amber)', background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.2)', borderRadius: 100, padding: '.1rem .45rem' }}>
-                      ↑ High ghost activity
-                    </div>
-                  )}
-                </div>
-              )}
-              {/* T3-8: Share buttons */}
-              <div className="co-share-row">
-                {/* ?sv=<score> versions the shared URL: Reddit caches unfurls PER URL roughly
-                    forever, so links shared before the OG card existed are stuck blank. A new
-                    score → a new URL → a fresh unfurl fetch. rel=canonical keeps SEO on the
-                    clean URL; visitors landing with ?sv= see the normal page. */}
-                <a
-                  href={`https://reddit.com/submit?url=${encodeURIComponent(`https://seenjobs.io/company/${slug}${score?.overall_score != null ? `?sv=${score.overall_score}` : ''}`)}&title=${encodeURIComponent(`Is ${companyName} worth applying to? Seen score: ${score?.overall_score ?? '?'}/100`)}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', background: 'rgba(255,69,0,0.1)', border: '1px solid rgba(255,69,0,0.25)', color: '#ff6314', borderRadius: 6, padding: '.25rem .6rem', textDecoration: 'none' }}
-                >
-                  🔴 Reddit
-                </a>
-                <button
-                  onClick={() => {
-                    navigator.share?.({
-                      title: `${companyName} on Seen`,
-                      text: `${companyName} has a Seen score of ${score?.overall_score ?? '?'}/100`,
-                      url: window.location.href,
-                    }).catch(() => {
-                      navigator.clipboard?.writeText(window.location.href)
-                    })
-                  }}
-                  style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', background: 'var(--card)', border: '1px solid var(--line2)', color: 'var(--sub)', borderRadius: 6, padding: '.25rem .6rem', cursor: 'pointer' }}
-                >
-                  ↗ Share
-                </button>
-                {score && (
-                  <button
-                    onClick={() => setShowGradeCard(true)}
-                    style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', background: 'rgba(99,102,241,0.1)', border: '1px solid rgba(99,102,241,0.3)', color: '#a5b4fc', borderRadius: 6, padding: '.25rem .6rem', cursor: 'pointer' }}
-                  >
-                    🖼 Share grade card
-                  </button>
-                )}
+              <div className="co-ind">
+                {industry ? <span>{industry}</span> : null}
+                {viewers > 0 && <span className="co-viewers"><span className="co-dot" />{viewers} Seen users checked this week</span>}
               </div>
-            </div>
-            {showGradeCard && score && (
-              <CompanyScoreCard
-                data={{
-                  company: companyName,
-                  industry: industry || score.industry,
-                  overall_score: score.overall_score,
-                  ghost_rate: score.ghost_rate,
-                  response_rate: score.response_rate,
-                  avg_wait_days: score.avg_wait_days,
-                  waste: score.waste,
-                  // First-party only: the PNG renders "Based on N applicant reports" — feeding it
-                  // the fused web claim published the phantom number to social. Its own zero-state
-                  // ("Baseline estimate · share your experience") is the honest fallback.
-                  report_count: fpReports,
-                  risk: score.risk_level,
-                  tags: [
-                    score.ghost_rate >= 0.5 ? '👻 High ghost rate' : null,
-                    score.response_rate >= 0.5 ? '✅ Responsive' : null,
-                    (score.waste || 0) >= 50 ? '⚠ High waste risk' : null,
-                    (score.avg_wait_days || 0) >= 30 ? '⏳ Long wait times' : null,
-                  ].filter(Boolean) as string[],
-                }}
-                shareUrl={`https://seenjobs.io/company/${slug}`}
-                onClose={() => setShowGradeCard(false)}
-              />
-            )}
-            <div className="co-city-filter">
-              <input
-                type="text"
-                placeholder="Filter by city..."
-                value={location}
-                onChange={e => setLocation(e.target.value)}
-                style={{
-                  background: 'var(--surface, #111)', border: '1px solid var(--line2)',
-                  borderRadius: 6, padding: '.35rem .65rem', color: 'var(--white)',
-                  fontFamily: 'var(--mono)', fontSize: '.65rem', outline: 'none',
-                  width: 140, caretColor: 'var(--blue)',
-                }}
-              />
             </div>
           </div>
 
           {loading ? (
-            /* Skeleton mirrors the grade bar + stat row it's about to become —
-               perceived speed instead of a bare "Loading…" line. */
+            /* Skeleton mirrors the grade card + stat row it's about to become. */
             <div aria-label="Loading company data" role="status" style={{ display: 'flex', flexDirection: 'column', gap: '.8rem', padding: '.4rem 0 .2rem' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
                 <div className="sk" style={{ width: 64, height: 64, borderRadius: 14, flexShrink: 0 }} />
@@ -871,7 +835,6 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
                   <div className="sk" style={{ width: '34%', height: 14 }} />
                   <div className="sk" style={{ width: '52%', height: 10 }} />
                 </div>
-                <div className="sk" style={{ width: 120, height: 12 }} />
               </div>
               <div style={{ display: 'flex', gap: '.8rem' }}>
                 <div className="sk" style={{ flex: 1, height: 58, borderRadius: 12 }} />
@@ -885,238 +848,190 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
             </div>
           ) : score ? (
             <>
-              {/* Grade bar */}
-              <div className={`co-grade-bar ${risk}`} style={{ marginBottom: '1rem' }}>
+              <div className={`co-grade-bar ${risk}`}>
                 <div className={`co-grade-letter ${risk}`}>{g}</div>
                 <div className="co-grade-main">
                   <span className="co-grade-lbl">Seen Grade</span>
                   <span className="co-grade-score">{displayScore} / 100</span>
-                  {score.data_quality && (
-                    <div style={{ marginTop: '.35rem' }}>
-                      <DataQualityBadge dq={score.data_quality} reportCount={fpReports} webCount={webEst} />
-                    </div>
-                  )}
-                </div>
-                {(fpReports > 0 || webEst > 0) && (
-                  <div className="co-grade-side">
-                    <span className="co-live">{fpReports > 0 ? `${fpReports} applicant report${fpReports === 1 ? '' : 's'}` : 'web-research estimate'}</span>
+                  {verdict && <p className="co-verdict">{verdict}</p>}
+                  <div className="co-grade-meta">
+                    {score.data_quality && <DataQualityBadge dq={score.data_quality} reportCount={fpReports} webCount={webEst} />}
+                    {fpReports === 0 && webEst > 0 && <span className="co-live">web-research estimate</span>}
                   </div>
-                )}
+                </div>
               </div>
 
-              {/* Vibe / explanation tags */}
               <VibeTagList sc={score} />
 
-              {/* Ghost surge alert */}
-              <GhostSurgeAlert ghostRate={score.ghost_rate || 0} />
-
-              {/* Emotional ghost-rate visual — suppressed when the surge alert above already owns the
-                  high-ghost story (ghost ≥ 50%), so a high-ghost company never stacks two red ghost
-                  panels back-to-back. The Ghost% metric box below still carries the number either way. */}
-              {(score.ghost_rate || 0) < 0.5 && <GhostVisual ghostRate={score.ghost_rate || 0} count={fpReports} />}
-
-              {/* Metrics grid */}
-              <div className="co-mets">
-                <MetBox label="Score" value={String(displayScore)} color={riskColor(risk)} />
-                <MetBox label="Response %" value={pct(score.response_rate)} color="var(--blue)" />
-                <MetBox label="Ghost %" value={pct(score.ghost_rate)} alarm={ghostHigh} color={ghostColor} />
+              <div className="co-mets co-mets-5">
+                <MetBox label="Response" value={pct(score.response_rate)} color="var(--blue)" />
+                <MetBox label="Ghosted" value={pct(score.ghost_rate)} alarm={ghostHigh} color={ghostColor} />
                 <MetBox label="Avg wait" value={score.avg_wait_days != null ? `${score.avg_wait_days}d` : '—'} color={waitColor} />
-                <MetBox label="Avg rounds" value={score.avg_rounds != null ? String(score.avg_rounds.toFixed(1)) : '—'} />
+                <MetBox label="Rounds" value={score.avg_rounds != null ? String(score.avg_rounds.toFixed(1)) : '—'} />
                 <MetBox label="Waste risk" value={score.waste != null ? `${score.waste}%` : '—'} color={wasteColor} />
               </div>
             </>
           ) : (
-            <div style={{ textAlign: 'center', padding: '2rem', color: 'var(--muted)', fontFamily: 'var(--mono)', fontSize: '.72rem' }}>
+            <div style={{ textAlign: 'center', padding: '1.5rem 1rem', color: 'var(--muted)', fontFamily: 'var(--mono)', fontSize: '.72rem' }}>
               No score data found for this company.
               {gatheringPublic && <EnrichmentNotice companyName={companyName} />}
             </div>
           )}
+
+          {/* Actions: one primary, the rest compact. */}
+          {!loading && (
+            <div className="co-actions">
+              <TrackCTA companyName={companyName} />
+              <div className="co-action-row">
+                <a href={`/resume?company=${encodeURIComponent(companyName || '')}`} className="co-act co-act-primary"><span>✨ Analyze résumé for <span style={{ textTransform: 'capitalize' }}>{companyName}</span></span></a>
+                <a href={`/report?company=${encodeURIComponent(companyName || '')}`} className="co-act">📝 Report experience</a>
+              </div>
+              <div className="co-chip-row">
+                <button type="button" className="co-chip" onClick={() => openSection('compare')}>⚡ Compare</button>
+                <button type="button" className="co-chip" onClick={share}>{copied ? '✓ Link copied' : '↗ Share'}</button>
+                {/* ?sv=<score> versions the shared URL: Reddit caches unfurls PER URL roughly
+                    forever, so links shared before the OG card existed are stuck blank. A new
+                    score → a new URL → a fresh unfurl fetch. rel=canonical keeps SEO on the
+                    clean URL; visitors landing with ?sv= see the normal page. */}
+                <a
+                  className="co-chip co-chip-reddit"
+                  href={`https://reddit.com/submit?url=${encodeURIComponent(`https://seenjobs.io/company/${slug}${score?.overall_score != null ? `?sv=${score.overall_score}` : ''}`)}&title=${encodeURIComponent(`Is ${companyName} worth applying to? Seen score: ${score?.overall_score ?? '?'}/100`)}`}
+                  target="_blank" rel="noopener noreferrer"
+                >🔴 Post to Reddit</a>
+                {score && <button type="button" className="co-chip" onClick={() => setShowGradeCard(true)}>🖼 Grade card</button>}
+              </div>
+            </div>
+          )}
+
+          {showGradeCard && score && (
+            <CompanyScoreCard
+              data={{
+                company: companyName,
+                industry: industry || score.industry,
+                overall_score: score.overall_score,
+                ghost_rate: score.ghost_rate,
+                response_rate: score.response_rate,
+                avg_wait_days: score.avg_wait_days,
+                waste: score.waste,
+                // First-party only: the PNG renders "Based on N applicant reports" — feeding it
+                // the fused web claim published the phantom number to social. Its own zero-state
+                // ("Baseline estimate · share your experience") is the honest fallback.
+                report_count: fpReports,
+                risk: score.risk_level,
+                tags: [
+                  score.ghost_rate >= 0.5 ? '👻 High ghost rate' : null,
+                  score.response_rate >= 0.5 ? '✅ Responsive' : null,
+                  (score.waste || 0) >= 50 ? '⚠ High waste risk' : null,
+                  (score.avg_wait_days || 0) >= 30 ? '⏳ Long wait times' : null,
+                ].filter(Boolean) as string[],
+              }}
+              shareUrl={`https://seenjobs.io/company/${slug}`}
+              onClose={() => setShowGradeCard(false)}
+            />
+          )}
         </div>
 
-        {/* ── Track CTA ── */}
-        {!loading && <TrackCTA companyName={companyName} />}
-
-        {/* ── Pre-filled CTAs — T3-13 ── */}
+        {/* ── Sections: every detail the page used to spread across seven tabs, each behind one
+            row with a truthful summary. Open what you need; nothing is gone. ── */}
         {!loading && (
-          <div className="co-cta-row">
-            <a
-              href={`/resume?company=${encodeURIComponent(companyName || '')}`}
-              className="co-cta co-cta-primary"
-            >
-              <span>✨ Analyze resume for <span style={{ textTransform: 'capitalize' }}>{companyName}</span></span>
-            </a>
-            <a
-              href={`/report?company=${encodeURIComponent(companyName || '')}`}
-              className="co-cta"
-            >
-              📝 Report experience
-            </a>
-          </div>
-        )}
-
-        {/* ── Tabs ── */}
-        {!loading && (
-          <>
-            <div className="co-tabs" role="tablist" aria-label="Company sections">
-              {TABS.map(t => (
-                <button
-                  key={t.key}
-                  type="button"
-                  role="tab"
-                  aria-selected={tab === t.key}
-                  onClick={() => setTab(t.key)}
-                  className={`ctab${tab === t.key ? ' active' : ''}`}
-                >
-                  {t.label}
-                </button>
-              ))}
-            </div>
-
-            {/* ── OVERVIEW TAB ── */}
-            {tab === 'overview' && score && (
-              <div>
-                <ExpectedTimeline sc={score} risk={risk} />
-                <HiringProbability
-                  responseRate={score.response_rate}
-                  ghostRate={score.ghost_rate}
-                  overallScore={score.overall_score}
-                />
+          <div className="co-secs">
+            {score && (
+              <Section id="odds" icon="📅" title="Your odds here" open={open.odds} onToggle={toggle}
+                summary={`${score.avg_wait_days != null ? `${score.avg_wait_days}d typical wait · ` : ''}${respPct}% hear back · your response probability & industry rank`}>
+                <HiringProbability responseRate={score.response_rate} ghostRate={score.ghost_rate} overallScore={score.overall_score} />
                 {benchmark && (
-                  <div style={{ margin: '0 0 1rem' }}>
+                  <div style={{ margin: '1rem 0 0' }}>
                     <IndustryBenchmark benchmark={benchmark} variant="public" companyName={companyName} />
                   </div>
                 )}
-                <OutcomeDistribution reports={reports} />
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(240px,1fr))', gap: '1rem', marginBottom: '1rem' }}>
-                  <div style={{ background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 10, padding: '1.2rem' }}>
-                    <div className="co-sec-lbl" style={{ marginBottom: '.85rem' }}>
-                      Score breakdown
-                    </div>
+              </Section>
+            )}
+
+            {score && (
+              <Section id="breakdown" icon="📊" title="How the grade is built" open={open.breakdown} onToggle={toggle}
+                summary={`Response ${respPct}% · ghost ${ghostPct}% · waste ${score.waste ?? 0}% · where in the process they ghost`}>
+                <div className="co-two">
+                  <div className="co-card">
+                    <div className="co-sec-lbl" style={{ marginBottom: '.85rem' }}>Score breakdown</div>
                     <BarRow label="Response rate" value={respPct} color={riskColor(risk)} />
                     <BarRow label="Ghost rate" value={ghostPct} color="var(--red)" />
                     <BarRow label="Waste risk" value={score.waste || 0} color={wasteColor} />
-                  </div>
-                  <div style={{ background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 10, padding: '1.2rem' }}>
-                    <div className="co-sec-lbl" style={{ marginBottom: '.85rem' }}>
-                      At a glance
+                    <div className="co-kv">
+                      <span>Process score</span><b style={{ color: riskColor(risk) }}>{score.process_score ?? score.overall_score} / 100</b>
                     </div>
-                    {score.summary ? (
-                      <p style={{ fontFamily: 'var(--mono)', fontSize: '.65rem', color: 'var(--sub)', lineHeight: 1.65, margin: '0 0 .75rem' }}>
-                        {score.summary}
-                      </p>
-                    ) : null}
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '.4rem', marginTop: '.5rem' }}>
-                      <a href="/report" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'none', border: '1px solid var(--line2)', borderRadius: 6, color: 'var(--sub)', fontFamily: 'var(--mono)', fontSize: '.72rem', padding: '.5rem .75rem', cursor: 'pointer', textDecoration: 'none', textAlign: 'center' }}>
-                        + Report your experience
-                      </a>
+                    <div className="co-kv">
+                      <span>Avg rounds</span><b>{score.avg_rounds != null ? score.avg_rounds : '—'}</b>
+                    </div>
+                    <div className="co-kv">
+                      <span>Avg timeline</span><b>{score.avg_wait_days != null ? `${score.avg_wait_days} days` : '—'}</b>
                     </div>
                   </div>
-                </div>
-                {webReviews.length > 0 && <WebReviewsSection reviews={webReviews} />}
-                {/* Attributed public-record signals (SEC 8-K, etc.) — self-hides when there are none. */}
-                <div style={{ marginBottom: '1rem' }}>
-                  <CompanyPublicRecord companyName={companyName} />
-                </div>
-                <div style={{ background: 'var(--raised, #111)', borderRadius: 7, padding: '.7rem .95rem', fontFamily: 'var(--mono)', fontSize: '.58rem', color: 'var(--muted)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '.5rem' }}>
-                  <span>📊 {fpReports > 0
-                    ? `Based on ${fpReports} applicant report${fpReports === 1 ? '' : 's'}${webEst > 0 ? ' + public web research' : ''}`
-                    : webEst > 0
-                      ? 'Score estimated from public web research — no first-party applicant reports yet'
-                      : 'No reports yet'}</span>
-                  <a href="/report" style={{ color: 'var(--green)', textDecoration: 'none', whiteSpace: 'nowrap' }}>+ Add your report →</a>
-                </div>
-              </div>
-            )}
-
-            {/* Public records must not depend on having a score: a company with real SEC
-                filings but no rating still shows them (the section self-hides when empty).
-                The score-gated overview above already renders it for scored companies. */}
-            {tab === 'overview' && !score && (
-              <div style={{ marginBottom: '1rem' }}>
-                <CompanyPublicRecord companyName={companyName} />
-              </div>
-            )}
-
-            {/* ── PROCESS SCORE TAB ── */}
-            {tab === 'process' && score && (
-              <div>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(240px,1fr))', gap: '1rem', marginBottom: '1rem' }}>
-                  <div style={{ background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 10, padding: '1.2rem' }}>
-                    <div className="co-sec-lbl" style={{ marginBottom: '.85rem' }}>Process score</div>
-                    <div style={{ fontFamily: 'var(--mono)', fontSize: '2.5rem', fontWeight: 500, color: riskColor(risk), lineHeight: 1, marginBottom: '.25rem' }}>
-                      {score.process_score ?? score.overall_score}
-                    </div>
-                    <div style={{ fontFamily: 'var(--mono)', fontSize: '.55rem', color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '.07em', marginBottom: '1rem' }}>out of 100</div>
-                    <div style={{ fontFamily: 'var(--mono)', fontSize: '.62rem', color: 'var(--dim)' }}>
-                      Avg rounds: <span style={{ color: 'var(--text)' }}>{score.avg_rounds != null ? score.avg_rounds : '—'}</span>
-                    </div>
-                    <div style={{ fontFamily: 'var(--mono)', fontSize: '.62rem', color: 'var(--dim)', marginTop: '.3rem' }}>
-                      Avg timeline: <span style={{ color: 'var(--text)' }}>{score.avg_wait_days != null ? `${score.avg_wait_days} days` : '—'}</span>
-                    </div>
-                    {score.data_quality && (
-                      <div style={{ marginTop: '.75rem' }}>
-                        <DataQualityBadge dq={score.data_quality} reportCount={score.report_count} />
-                      </div>
-                    )}
-                  </div>
-                  <div style={{ background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 10, padding: '1.2rem' }}>
+                  <div className="co-card">
                     <div className="co-sec-lbl" style={{ marginBottom: '.85rem' }}>Where they ghost</div>
                     <HiringFunnel sc={score} />
+                    <div style={{ marginTop: '.85rem', fontFamily: 'var(--mono)', fontSize: '.58rem', color: 'var(--green)', lineHeight: 1.5 }}>
+                      Exclusive to Seen — no other job board tracks which stage companies ghost at.
+                    </div>
                   </div>
                 </div>
-                <div style={{ background: 'rgba(16,185,129,.06)', border: '1px solid rgba(16,185,129,.18)', borderRadius: 8, padding: '.75rem 1rem', fontFamily: 'var(--mono)', fontSize: '.62rem', color: 'var(--green)' }}>
-                  This feature is exclusive to Seen. No other job board tracks which stage companies ghost at.
-                </div>
-              </div>
+                <OutcomeDistribution reports={reports} />
+              </Section>
             )}
 
-            {/* ── REPORTS TAB ── */}
-            {tab === 'reports' && (
-              <div>
-                {reports.length > 0 ? (
-                  <>
-                    <div style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', color: 'var(--muted)', marginBottom: '.85rem' }}>
-                      {(() => {
-                        const thirdParty = reports.filter(r => isPublicDiscussion(r.platform)).length
-                        return thirdParty > 0
-                          ? `${reports.length} report${reports.length !== 1 ? 's' : ''} · ${reports.length - thirdParty} submitted to Seen · ${thirdParty} found in public discussions (labeled, reduced weight)`
-                          : `${reports.length} report${reports.length !== 1 ? 's' : ''} from real applicants · anonymous · verified`
-                      })()}
-                    </div>
-                    {reports.map(r => {
-                      const badge = reportSourceBadge(r.platform)
-                      const src = reportSourceLink(r.platform, r.report_text)
-                      const body = src ? src.body : r.report_text
-                      const when = reportDate(r.platform, r.report_text, r.created_at).label
-                      return (
+            <Section id="reports" icon="🗣" title="Applicant reports" count={reports.length} open={open.reports} onToggle={toggle}
+              summary={reports.length > 0
+                ? `${ghostedN} ghosted · ${interviewN} interviewed · ${hiredN} hired${thirdPartyN > 0 ? ` · ${thirdPartyN} from public discussions` : ''}`
+                : (webEst > 0 && fpReports === 0 ? 'None yet — the grade is a web-research estimate' : 'None yet — be the first to report')}>
+              <div className="co-reports-tools">
+                <div style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', color: 'var(--muted)', lineHeight: 1.6, flex: 1, minWidth: 180 }}>
+                  {reports.length > 0
+                    ? (thirdPartyN > 0
+                        ? `${reports.length} report${reports.length !== 1 ? 's' : ''} · ${reports.length - thirdPartyN} submitted to Seen · ${thirdPartyN} found in public discussions (labeled, reduced weight)`
+                        : `${reports.length} report${reports.length !== 1 ? 's' : ''} from real applicants · anonymous · verified`)
+                    : 'Reports are anonymous claims, labeled by source and weighted by trust.'}
+                </div>
+                <input
+                  type="text"
+                  placeholder="Filter by city…"
+                  aria-label="Filter reports by city"
+                  value={location}
+                  onChange={e => setLocation(e.target.value)}
+                  className="co-city-input"
+                />
+              </div>
+              {reports.length > 0 ? (
+                <>
+                  {reports.slice(0, reportsShown).map(r => {
+                    const badge = reportSourceBadge(r.platform)
+                    const src = reportSourceLink(r.platform, r.report_text)
+                    const body = src ? src.body : r.report_text
+                    return (
                       <div key={r.id} className={`rcard${r.outcome ? ` outcome-${r.outcome}` : ''}`}>
                         <div className="rc-hd">
-                          <div className="rc-av">{(r.role || '?')[0].toUpperCase()}</div>
                           <div style={{ flex: 1, minWidth: 0 }}>
                             <div className="rc-role">
                               {r.role || 'Unknown role'}
                               {r.ghost_stage && <span style={{ color: 'var(--muted)' }}> · ghosted at {r.ghost_stage.replace(/_/g, ' ')}</span>}
                             </div>
                             <div className="rc-meta">
-                              {[r.city ? `📍 ${r.city}` : '', r.rounds ? `${r.rounds} round${r.rounds !== 1 ? 's' : ''}` : '', when].filter(Boolean).join(' · ')}
+                              {r.city ? `📍 ${r.city} · ` : ''}
+                              {r.rounds ? `${r.rounds} round${r.rounds !== 1 ? 's' : ''} · ` : ''}
+                              {r.created_at ? `${Math.floor((Date.now() - new Date(r.created_at).getTime()) / 86400000)}d ago` : ''}
                             </div>
                           </div>
                           <span className={`vibe rc-outcome ${ocClass[r.outcome] || 'v-n'}`}>{ocLabel[r.outcome] || r.outcome}</span>
                         </div>
-                        {body && (
-                          <div className="rc-body">{body}</div>
-                        )}
+                        {body && <div className="rc-body">{body}</div>}
                         {r.id && employerReplies[r.id] && (
-                          <div style={{ marginTop: '.7rem', padding: '.7rem .85rem', background: 'rgba(59,130,246,.06)', border: '1px solid rgba(59,130,246,.25)', borderRadius: 10 }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '.4rem', marginBottom: '.3rem' }}>
+                          <div className="rc-reply">
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '.4rem', marginBottom: '.3rem', flexWrap: 'wrap' }}>
                               <span style={{ fontFamily: 'var(--mono)', fontSize: '.5rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.08em', color: 'var(--blue)' }}>Employer response</span>
                               <span style={{ fontFamily: 'var(--mono)', fontSize: '.5rem', color: 'var(--muted)' }}>· unverified claim, doesn&apos;t affect the score</span>
                             </div>
                             <div style={{ fontSize: '.78rem', color: 'var(--sub)', lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>{employerReplies[r.id]!.body}</div>
                           </div>
                         )}
-                        {/* One attribution line, not three: third-party rows show their source badge + link
-                            (the host is in the link); first-party rows show the platform they applied on. */}
+                        {/* One attribution line: third-party rows show their source badge + link; first-party rows the platform applied on. */}
                         <div className="rc-footer">
                           {badge ? (
                             <span className="vibe v-n rc-src" style={{ borderStyle: 'dashed', color: 'var(--dim)' }} title={badge.title}>{badge.label}</span>
@@ -1126,358 +1041,255 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
                           {src && <ReportSourceLink url={src.url} host={src.host} posted={src.posted} className="rc-srclink" />}
                         </div>
                       </div>
+                    )
+                  })}
+                  {reports.length > reportsShown && (
+                    <button type="button" className="co-more" onClick={() => setReportsShown(n => n + 10)}>
+                      Show {Math.min(10, reports.length - reportsShown)} more of {reports.length - reportsShown} remaining
+                    </button>
+                  )}
+                </>
+              ) : (
+                <div style={{ textAlign: 'center', padding: '1.5rem 1rem', color: 'var(--muted)', fontFamily: 'var(--mono)', fontSize: '.7rem', lineHeight: 1.7 }}>
+                  {location
+                    ? <>No reports mention &ldquo;{location}&rdquo;. <button type="button" onClick={() => setLocation('')} style={{ background: 'none', border: 'none', color: 'var(--blue)', cursor: 'pointer', fontFamily: 'inherit', fontSize: 'inherit', padding: 0 }}>Clear the city filter</button></>
+                    : webEst > 0 && fpReports === 0
+                      ? <>No first-party reports yet — the grade on this page is estimated from public web research.</>
+                      : <>No community reports yet.</>}
+                  {gatheringPublic && <EnrichmentNotice companyName={companyName} />}
+                  <div style={{ marginTop: '.6rem' }}><a href={`/report?company=${encodeURIComponent(companyName)}`} style={{ color: 'var(--green)', textDecoration: 'none' }}>Be the first to report →</a></div>
+                </div>
+              )}
+            </Section>
+
+            {webReviews.length > 0 && (
+              <Section id="online" icon="💬" title="What applicants say online" count={webReviews.length} open={open.online} onToggle={toggle}
+                summary="AI-summarized insights from Reddit, Glassdoor & Blind · refreshed every 30 days">
+                <WebReviewsSection reviews={webReviews} />
+              </Section>
+            )}
+
+            <Section id="reddit" icon="🔴" title="Reddit discussion" open={open.reddit} onToggle={toggle}
+              summary={`Live public threads mentioning ${companyName} — every item links to its source`}>
+              <CompanyRedditDiscussion companyName={companyName} hasReportData={reports.length > 0 || !!score} />
+            </Section>
+
+            <Section id="locations" icon="📍" title="Locations" open={open.locations} onToggle={toggle}
+              summary={cityRows.length > 0
+                ? `${cityRows.length} cit${cityRows.length === 1 ? 'y' : 'ies'} with reported outcomes · where ${companyName} is hiring now`
+                : `Where ${companyName} is hiring now · no reports name a city yet`}>
+              {cityRows.length > 0 && (
+                <div style={{ marginBottom: '1.5rem' }}>
+                  <div className="co-sec-lbl" style={{ marginBottom: '.35rem' }}>Reported outcomes by city</div>
+                  <div style={sectionNote}>From {reportsWithCity} applicant report{reportsWithCity !== 1 ? 's' : ''} that named a city</div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '.55rem' }}>
+                    {cityRows.map(row => {
+                      const ghostPctVal = Math.round(row.ghostRate * 100)
+                      const barColor = row.ghostRate > 0.55 ? 'var(--red)' : row.ghostRate > 0.35 ? 'var(--amber)' : 'var(--green)'
+                      return (
+                        <div key={row.city} className="co-row">
+                          <div style={{ fontFamily: 'var(--mono)', fontSize: '.68rem', color: 'var(--white)', minWidth: 110, flex: '1 1 120px', overflowWrap: 'anywhere' }}>{row.city}</div>
+                          <div style={{ flex: '2 1 120px', minWidth: 80 }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '.5rem', marginBottom: '.2rem' }}>
+                              <div style={{ flex: 1, height: 6, background: 'var(--line2)', borderRadius: 3, overflow: 'hidden' }}>
+                                <div style={{ width: `${ghostPctVal}%`, height: '100%', background: barColor, borderRadius: 3, transition: 'width .4s ease' }} />
+                              </div>
+                              <span style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', color: barColor, width: 36, textAlign: 'right', flexShrink: 0 }}>{ghostPctVal}%</span>
+                            </div>
+                            <div style={{ fontFamily: 'var(--mono)', fontSize: '.52rem', color: 'var(--muted)' }}>ghost rate · {Math.round(row.responseRate * 100)}% responded</div>
+                          </div>
+                          <span className="co-pill">{row.total} report{row.total !== 1 ? 's' : ''}</span>
+                        </div>
                       )
                     })}
+                  </div>
+                </div>
+              )}
+              <div>
+                <div className="co-sec-lbl" style={{ marginBottom: '.35rem' }}>Where {companyName} is hiring</div>
+                {jobsLoading || !jobsFetched ? (
+                  <div style={{ ...sectionNote, marginBottom: 0 }}>Checking current job listings…</div>
+                ) : hiringRows.length > 0 ? (
+                  <>
+                    <div style={sectionNote}>
+                      From {hiring.listings} current job listing{hiring.listings !== 1 ? 's' : ''}{capped ? ' (the top-scored open listings — there may be more)' : ''} · listing locations, not applicant reports
+                      {hiring.withLocation < hiring.listings ? ` · ${hiring.listings - hiring.withLocation} without a stated location` : ''}
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '.45rem' }}>
+                      {hiringRows.map(row => (
+                        <div key={row.label} className="co-row">
+                          <div style={{ fontFamily: 'var(--mono)', fontSize: '.66rem', color: 'var(--white)', minWidth: 110, flex: '1 1 140px', overflowWrap: 'anywhere' }}>
+                            {row.label === 'Remote' ? '🌐 Remote' : `📍 ${row.label}`}
+                          </div>
+                          <div style={{ flex: '2 1 80px', height: 6, background: 'var(--line2)', borderRadius: 3, overflow: 'hidden' }}>
+                            <div style={{ width: `${maxCount ? Math.round((row.count / maxCount) * 100) : 0}%`, height: '100%', background: 'var(--blue)', borderRadius: 3 }} />
+                          </div>
+                          <span className="co-pill">{row.count} listing{row.count !== 1 ? 's' : ''}</span>
+                        </div>
+                      ))}
+                    </div>
+                    {hiring.otherPlaces > 0 && (
+                      <div style={{ ...sectionNote, marginTop: '.6rem', marginBottom: 0 }}>+ {hiring.otherPlaces} more location{hiring.otherPlaces !== 1 ? 's' : ''}</div>
+                    )}
+                    <button type="button" onClick={() => openSection('roles')} className="co-link-btn">See open roles →</button>
                   </>
                 ) : (
-                  <div style={{ textAlign: 'center', padding: '2.5rem', color: 'var(--muted)', fontFamily: 'var(--mono)', fontSize: '.7rem' }}>
-                    {webEst > 0 && fpReports === 0
-                      ? <>No first-party reports yet — the score on this page is estimated from public web research.<br /><br /></>
-                      : <>No community reports yet.<br /><br /></>}
-                    {gatheringPublic && <><EnrichmentNotice companyName={companyName} /><br /></>}
-                    <a href="/report" style={{ color: 'var(--green)', textDecoration: 'none' }}>Be the first to report →</a>
+                  <div style={{ ...sectionNote, marginBottom: 0 }}>
+                    {companyJobs.length > 0
+                      ? `${companyJobs.length} current job listing${companyJobs.length !== 1 ? 's' : ''}, but none states a location.`
+                      : 'No current job listings found for this company.'}
                   </div>
                 )}
               </div>
-            )}
+              {cityRows.length === 0 && (
+                <div style={{ marginTop: '1.2rem', fontFamily: 'var(--mono)', fontSize: '.58rem', color: 'var(--muted)' }}>
+                  No applicant reports with a city yet.{' '}
+                  <a href={`/report?company=${encodeURIComponent(companyName)}`} style={{ color: 'var(--green)', textDecoration: 'none' }}>Report your experience →</a>
+                </div>
+              )}
+            </Section>
 
-            {/* ── LOCATIONS TAB ── */}
-            {tab === 'locations' && (() => {
-              // Section 1 — reported outcomes by city: ONLY reports that actually carry a city.
-              const cityMap: Record<string, { total: number; ghosted: number }> = {}
-              let reportsWithCity = 0
-              reports.forEach(r => {
-                const city = (r.city || r.location || '').trim()
-                if (!city) return
-                reportsWithCity += 1
-                if (!cityMap[city]) cityMap[city] = { total: 0, ghosted: 0 }
-                cityMap[city].total += 1
-                if (r.outcome === 'ghosted') cityMap[city].ghosted += 1
-              })
-              const cityRows = Object.entries(cityMap)
-                .map(([city, data]) => ({
-                  city,
-                  total: data.total,
-                  ghostRate: data.ghosted / data.total,
-                  responseRate: (data.total - data.ghosted) / data.total,
-                }))
-                .sort((a, b) => b.total - a.total)
-                .slice(0, 6)
-
-              // Section 2 — where the company is hiring, from its CURRENT job listings (listing data,
-              // not applicant reports). Same companyJobs the Open roles tab shows; no extra request.
-              const hiring = aggregateJobLocations(companyJobs, { top: 8 })
-              const hiringRows = [
-                ...(hiring.remote > 0 ? [{ label: 'Remote', count: hiring.remote }] : []),
-                ...hiring.places,
-              ].sort((a, b) => b.count - a.count)
-              const maxCount = hiringRows.reduce((m, r) => Math.max(m, r.count), 0)
-              // company_jobs returns at most the 20 top-scored open listings — say so when capped.
-              const capped = hiring.listings >= 20
-              const sectionLabel: CSSProperties = { marginBottom: '.35rem' }
-              const sectionNote: CSSProperties = { fontFamily: 'var(--mono)', fontSize: '.55rem', color: 'var(--dim)', marginBottom: '1rem', lineHeight: 1.6 }
-
-              return (
-              <div>
-                {cityRows.length > 0 && (
-                    <div style={{ marginBottom: '2rem' }}>
-                      <div className="co-sec-lbl" style={sectionLabel}>
-                        Reported outcomes by city
+            <Section id="roles" icon="💼" title="Open roles" count={jobsFetched ? companyJobs.length : null} open={open.roles} onToggle={toggle}
+              summary={jobsFetched ? (companyJobs.length > 0 ? `${companyJobs.length} current listing${companyJobs.length !== 1 ? 's' : ''} · apply with the grade in mind` : 'No open roles found right now') : `Current job listings at ${companyName}`}>
+              {jobsLoading && (
+                <div style={{ textAlign: 'center', padding: '1.5rem', color: 'var(--muted)', fontFamily: 'var(--mono)', fontSize: '.7rem' }}>
+                  Searching for open roles at {companyName}…
+                </div>
+              )}
+              {!jobsLoading && jobsFetched && companyJobs.length === 0 && (
+                <div style={{ textAlign: 'center', padding: '1.5rem', color: 'var(--muted)', fontFamily: 'var(--mono)', fontSize: '.7rem' }}>
+                  No open roles found right now.<br />
+                  <a href={`/jobs?q=${encodeURIComponent(companyName)}`} style={{ color: 'var(--blue)', marginTop: '.6rem', display: 'inline-block' }}>Search jobs →</a>
+                </div>
+              )}
+              {!jobsLoading && companyJobs.length > 0 && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '.65rem' }}>
+                  {companyJobs.map((j, i) => (
+                    <div key={i} className="jlc" style={{ display: 'flex', flexDirection: 'column', gap: '.35rem', padding: '.85rem 1rem', background: 'var(--card)', border: '1px solid var(--line)', borderRadius: '10px' }}>
+                      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '.5rem', flexWrap: 'wrap' }}>
+                        <span className="jlc-title" style={{ fontSize: '.95rem', fontWeight: 700, color: 'var(--white)', letterSpacing: '-.02em', flex: 1 }}>{j.title}</span>
+                        {j.salary && <span style={{ fontFamily: 'var(--mono)', fontSize: '.6rem', color: 'var(--green)', whiteSpace: 'nowrap' }}>{j.salary}</span>}
                       </div>
-                      <div style={sectionNote}>
-                        From {reportsWithCity} applicant report{reportsWithCity !== 1 ? 's' : ''} that named a city
+                      <div style={{ display: 'flex', gap: '.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
+                        <span style={{ fontFamily: 'var(--mono)', fontSize: '.55rem', color: 'var(--muted)' }}>{j.location || 'US'}</span>
+                        <span style={{ fontFamily: 'var(--mono)', fontSize: '.55rem', color: 'var(--dim)' }}>·</span>
+                        <span style={{ fontFamily: 'var(--mono)', fontSize: '.55rem', color: 'var(--dim)' }}>{j.type}</span>
+                        <span style={{ fontFamily: 'var(--mono)', fontSize: '.55rem', color: 'var(--dim)' }}>·</span>
+                        <span style={{ fontFamily: 'var(--mono)', fontSize: '.55rem', color: 'var(--dim)' }}>{j.level}</span>
+                        {j.source && <><span style={{ fontFamily: 'var(--mono)', fontSize: '.55rem', color: 'var(--dim)' }}>·</span><span style={{ fontFamily: 'var(--mono)', fontSize: '.55rem', color: 'var(--muted)' }}>{j.source}</span></>}
                       </div>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '.55rem' }}>
-                        {cityRows.map(row => {
-                          const ghostPctVal = Math.round(row.ghostRate * 100)
-                          const barColor = row.ghostRate > 0.55 ? 'var(--red)' : row.ghostRate > 0.35 ? 'var(--amber)' : 'var(--green)'
-                          return (
-                            <div key={row.city} style={{
-                              background: 'var(--surface, #111)', border: '1px solid var(--line2)',
-                              borderRadius: 8, padding: '.75rem 1rem',
-                              display: 'flex', alignItems: 'center', gap: '.85rem', flexWrap: 'wrap',
-                            }}>
-                              <div style={{ fontFamily: 'var(--mono)', fontSize: '.68rem', color: 'var(--white)', minWidth: 120, flexShrink: 0 }}>
-                                {row.city}
-                              </div>
-                              <div style={{ flex: 1, minWidth: 80 }}>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '.5rem', marginBottom: '.2rem' }}>
-                                  <div style={{ flex: 1, height: 6, background: 'var(--line2)', borderRadius: 3, overflow: 'hidden' }}>
-                                    <div style={{ width: `${ghostPctVal}%`, height: '100%', background: barColor, borderRadius: 3, transition: 'width .4s ease' }} />
-                                  </div>
-                                  <span style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', color: barColor, width: 36, textAlign: 'right', flexShrink: 0 }}>
-                                    {ghostPctVal}%
-                                  </span>
-                                </div>
-                                <div style={{ fontFamily: 'var(--mono)', fontSize: '.52rem', color: 'var(--muted)' }}>
-                                  ghost rate · {Math.round(row.responseRate * 100)}% responded
-                                </div>
-                              </div>
-                              <span style={{
-                                fontFamily: 'var(--mono)', fontSize: '.54rem', fontWeight: 600,
-                                background: 'var(--card)', border: '1px solid var(--line2)',
-                                borderRadius: 100, padding: '.1rem .5rem', color: 'var(--sub)',
-                                flexShrink: 0,
-                              }}>
-                                {row.total} report{row.total !== 1 ? 's' : ''}
-                              </span>
-                            </div>
-                          )
-                        })}
-                      </div>
+                      {j.url && (
+                        <a href={j.url} target="_blank" rel="noopener noreferrer" className="analyze-btn" style={{ display: 'inline-block', textAlign: 'center', padding: '.45rem 1rem', fontSize: '.7rem', marginTop: '.2rem', width: 'auto', alignSelf: 'flex-start' }}>
+                          Apply → 1 credit
+                        </a>
+                      )}
                     </div>
-                )}
+                  ))}
+                </div>
+              )}
+            </Section>
 
-                <div>
-                  <div className="co-sec-lbl" style={sectionLabel}>
-                    Where {companyName} is hiring
-                  </div>
-                  {jobsLoading || !jobsFetched ? (
-                    <div style={{ ...sectionNote, marginBottom: 0 }}>Checking current job listings…</div>
-                  ) : hiringRows.length > 0 ? (
-                    <>
-                      <div style={sectionNote}>
-                        From {hiring.listings} current job listing{hiring.listings !== 1 ? 's' : ''}{capped ? ' (the top-scored open listings — there may be more)' : ''} · listing locations, not applicant reports
-                        {hiring.withLocation < hiring.listings ? ` · ${hiring.listings - hiring.withLocation} without a stated location` : ''}
-                      </div>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '.45rem' }}>
-                        {hiringRows.map(row => (
-                          <div key={row.label} style={{
-                            background: 'var(--surface, #111)', border: '1px solid var(--line2)',
-                            borderRadius: 8, padding: '.6rem 1rem',
-                            display: 'flex', alignItems: 'center', gap: '.85rem', flexWrap: 'wrap',
-                          }}>
-                            <div style={{ fontFamily: 'var(--mono)', fontSize: '.66rem', color: 'var(--white)', minWidth: 120, flex: '1 1 140px', overflowWrap: 'anywhere' }}>
-                              {row.label === 'Remote' ? '🌐 Remote' : `📍 ${row.label}`}
-                            </div>
-                            <div style={{ flex: '2 1 80px', height: 6, background: 'var(--line2)', borderRadius: 3, overflow: 'hidden' }}>
-                              <div style={{ width: `${maxCount ? Math.round((row.count / maxCount) * 100) : 0}%`, height: '100%', background: 'var(--blue)', borderRadius: 3 }} />
-                            </div>
-                            <span style={{ fontFamily: 'var(--mono)', fontSize: '.54rem', fontWeight: 600, color: 'var(--sub)', flexShrink: 0 }}>
-                              {row.count} listing{row.count !== 1 ? 's' : ''}
-                            </span>
-                          </div>
+            <Section id="compare" icon="⚡" title="Compare" open={open.compare} onToggle={toggle}
+              summary={compareList.length > 0 ? `${companyName} vs ${compareList.map(c => c.name).join(' & ')}` : 'Side by side with up to 2 other companies'}>
+              <div className="co-cmp-form">
+                <input
+                  type="text"
+                  placeholder="Company name"
+                  aria-label="Company to compare"
+                  value={compareInput}
+                  onChange={e => setCompareInput(e.target.value)}
+                  onKeyDown={e => { if (e.key === 'Enter') addCompare() }}
+                  disabled={compareList.length >= 2}
+                  className="co-cmp-input"
+                  style={{ opacity: compareList.length >= 2 ? 0.5 : 1 }}
+                />
+                <div className="co-cmp-btns">
+                  <button
+                    type="button"
+                    disabled={!compareInput.trim() || compareList.length >= 2}
+                    onClick={addCompare}
+                    className="co-cmp-go"
+                    style={{ cursor: compareList.length >= 2 ? 'not-allowed' : 'pointer', opacity: !compareInput.trim() || compareList.length >= 2 ? 0.5 : 1 }}
+                  >
+                    Compare →
+                  </button>
+                  {compareList.length > 0 && (
+                    <button type="button" onClick={() => setCompareList([])} className="co-cmp-clear">Clear</button>
+                  )}
+                </div>
+              </div>
+              {compareList.length >= 2 && (
+                <div style={{ fontFamily: 'var(--mono)', fontSize: '.6rem', color: 'var(--muted)', marginTop: '.45rem' }}>
+                  You can compare up to 2 other companies at once — clear to start over.
+                </div>
+              )}
+              {compareList.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: '1.25rem', marginTop: '.85rem', color: 'var(--muted)', fontFamily: 'var(--mono)', fontSize: '.66rem', background: 'var(--surface, #111)', border: '1px dashed var(--line2)', borderRadius: 10 }}>
+                  Add a company to see score, ghost rate, response rate and wait time side by side.
+                </div>
+              ) : (
+                <div className="co-cmp-wrap" style={{ marginTop: '.85rem' }}>
+                  <table className="co-cmp-table">
+                    <thead>
+                      <tr>
+                        <th className="co-cmp-metric-h">Metric</th>
+                        <th className="co-cmp-co">
+                          <div className="co-cmp-name">{companyName}</div>
+                          <div style={{ fontFamily: 'var(--mono)', fontSize: '.5rem', color: 'var(--blue)', textTransform: 'uppercase', letterSpacing: '.08em' }}>current</div>
+                        </th>
+                        {compareList.map(c => (
+                          <th key={c.name} className="co-cmp-co">
+                            <div className="co-cmp-name">{c.name}</div>
+                            {c.loading && <div style={{ fontFamily: 'var(--mono)', fontSize: '.5rem', color: 'var(--muted)' }}>loading…</div>}
+                            {!c.loading && !c.score && <div style={{ fontFamily: 'var(--mono)', fontSize: '.5rem', color: 'var(--red)' }}>no data</div>}
+                          </th>
                         ))}
-                      </div>
-                      {hiring.otherPlaces > 0 && (
-                        <div style={{ ...sectionNote, marginTop: '.6rem', marginBottom: 0 }}>
-                          + {hiring.otherPlaces} more location{hiring.otherPlaces !== 1 ? 's' : ''}
-                        </div>
-                      )}
-                      <button onClick={() => setTab('roles')} style={{ marginTop: '.85rem', background: 'none', border: 'none', padding: 0, cursor: 'pointer', fontFamily: 'var(--mono)', fontSize: '.6rem', color: 'var(--blue)' }}>
-                        See open roles →
-                      </button>
-                    </>
-                  ) : (
-                    <div style={{ ...sectionNote, marginBottom: 0 }}>
-                      {companyJobs.length > 0
-                        ? `${companyJobs.length} current job listing${companyJobs.length !== 1 ? 's' : ''}, but none states a location.`
-                        : 'No current job listings found for this company.'}
-                    </div>
-                  )}
-                </div>
-
-                {cityRows.length === 0 && (
-                  <div style={{ marginTop: '1.6rem', fontFamily: 'var(--mono)', fontSize: '.58rem', color: 'var(--muted)' }}>
-                    No applicant reports with a city yet.{' '}
-                    <a href={`/report?company=${encodeURIComponent(companyName)}`} style={{ color: 'var(--green)', textDecoration: 'none' }}>Report your experience →</a>
-                  </div>
-                )}
-              </div>
-              )
-            })()}
-
-            {/* ── OPEN ROLES TAB ── */}
-            {tab === 'roles' && (
-              <div>
-                {jobsLoading && (
-                  <div style={{ textAlign: 'center', padding: '2.5rem', color: 'var(--muted)', fontFamily: 'var(--mono)', fontSize: '.7rem' }}>
-                    Searching for open roles at {companyName}…
-                  </div>
-                )}
-                {!jobsLoading && companyJobs.length === 0 && (
-                  <div style={{ textAlign: 'center', padding: '2.5rem', color: 'var(--muted)', fontFamily: 'var(--mono)', fontSize: '.7rem' }}>
-                    No open roles found right now.<br />
-                    <a href={`/jobs?q=${encodeURIComponent(companyName)}`} style={{ color: 'var(--blue)', marginTop: '.6rem', display: 'inline-block' }}>Search jobs →</a>
-                  </div>
-                )}
-                {!jobsLoading && companyJobs.length > 0 && (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '.65rem' }}>
-                    {companyJobs.map((j, i) => (
-                      <div key={i} className="jlc" style={{ display: 'flex', flexDirection: 'column', gap: '.35rem', padding: '.85rem 1rem', background: 'var(--card)', border: '1px solid var(--line)', borderRadius: '10px' }}>
-                        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '.5rem', flexWrap: 'wrap' }}>
-                          <span className="jlc-title" style={{ fontSize: '.95rem', fontWeight: 700, color: 'var(--white)', letterSpacing: '-.02em', flex: 1 }}>{j.title}</span>
-                          {j.salary && <span style={{ fontFamily: 'var(--mono)', fontSize: '.6rem', color: 'var(--green)', whiteSpace: 'nowrap' }}>{j.salary}</span>}
-                        </div>
-                        <div style={{ display: 'flex', gap: '.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
-                          <span style={{ fontFamily: 'var(--mono)', fontSize: '.55rem', color: 'var(--muted)' }}>{j.location || 'US'}</span>
-                          <span style={{ fontFamily: 'var(--mono)', fontSize: '.55rem', color: 'var(--dim)' }}>·</span>
-                          <span style={{ fontFamily: 'var(--mono)', fontSize: '.55rem', color: 'var(--dim)' }}>{j.type}</span>
-                          <span style={{ fontFamily: 'var(--mono)', fontSize: '.55rem', color: 'var(--dim)' }}>·</span>
-                          <span style={{ fontFamily: 'var(--mono)', fontSize: '.55rem', color: 'var(--dim)' }}>{j.level}</span>
-                          {j.source && <><span style={{ fontFamily: 'var(--mono)', fontSize: '.55rem', color: 'var(--dim)' }}>·</span><span style={{ fontFamily: 'var(--mono)', fontSize: '.55rem', color: 'var(--muted)' }}>{j.source}</span></>}
-                        </div>
-                        {j.url && (
-                          <a href={j.url} target="_blank" rel="noopener noreferrer" className="analyze-btn" style={{ display: 'inline-block', textAlign: 'center', padding: '.45rem 1rem', fontSize: '.7rem', marginTop: '.2rem', width: 'auto', alignSelf: 'flex-start' }}>
-                            Apply → 1 credit
-                          </a>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* ── REDDIT TAB ── */}
-            {tab === 'reddit' && (
-              <div>
-                {/* LIVE, cached per-company Reddit search — populates on demand so this
-                    section is (almost) never empty, and never blocks page render. Every
-                    item is an attributed link to a public thread; includes the dispute path. */}
-                <CompanyRedditDiscussion companyName={companyName} hasReportData={reports.length > 0 || !!score} />
-
-                {/* Secondary: the AI-summarized cross-source insights from the scoring
-                    pipeline (Reddit/Glassdoor/Blind), when the batch enrichment has them. */}
-                {!loading && webReviews.length > 0 && (
-                  <div style={{ marginTop: '1.75rem', borderTop: '1px solid var(--line2)', paddingTop: '1.25rem' }}>
-                    <div style={{ fontFamily: 'var(--mono)', fontSize: '.52rem', color: 'var(--dim)', letterSpacing: '.06em', textTransform: 'uppercase', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '.5rem' }}>
-                      <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--amber)', display: 'inline-block', flexShrink: 0 }} />
-                      AI-summarized insights · Reddit, Glassdoor &amp; Blind · updated every 30 days
-                    </div>
-                    <WebReviewsSection reviews={webReviews} />
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* ── COMPARE TAB ── */}
-            {tab === 'compare' && (
-              <div>
-                {/* Add company input */}
-                <div style={{ marginBottom: '1.25rem' }}>
-                  <div className="co-sec-lbl" style={{ marginBottom: '.6rem' }}>
-                    Compare {companyName} with another company
-                  </div>
-                  <div className="co-cmp-form">
-                    <input
-                      type="text"
-                      placeholder="Company name"
-                      aria-label="Company to compare"
-                      value={compareInput}
-                      onChange={e => setCompareInput(e.target.value)}
-                      onKeyDown={e => { if (e.key === 'Enter') addCompare() }}
-                      disabled={compareList.length >= 2}
-                      className="co-cmp-input"
-                      style={{ opacity: compareList.length >= 2 ? 0.5 : 1 }}
-                    />
-                    <div className="co-cmp-btns">
-                      <button
-                        type="button"
-                        disabled={!compareInput.trim() || compareList.length >= 2}
-                        onClick={addCompare}
-                        className="co-cmp-go"
-                        style={{
-                          cursor: compareList.length >= 2 ? 'not-allowed' : 'pointer',
-                          opacity: !compareInput.trim() || compareList.length >= 2 ? 0.5 : 1,
-                        }}
-                      >
-                        Compare →
-                      </button>
-                      {compareList.length > 0 && (
-                        <button type="button" onClick={() => setCompareList([])} className="co-cmp-clear">
-                          Clear
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                  {compareList.length >= 2 && (
-                    <div style={{ fontFamily: 'var(--mono)', fontSize: '.6rem', color: 'var(--muted)', marginTop: '.45rem' }}>
-                      You can compare up to 2 other companies at once — clear to start over.
-                    </div>
-                  )}
-                </div>
-
-                {/* Comparison table */}
-                {compareList.length === 0 ? (
-                  <div style={{ textAlign: 'center', padding: '2rem', color: 'var(--muted)', fontFamily: 'var(--mono)', fontSize: '.68rem', background: 'var(--surface, #111)', border: '1px solid var(--line2)', borderRadius: 10 }}>
-                    Add a company to compare
-                  </div>
-                ) : (
-                  <div className="co-cmp-wrap">
-                    <table className="co-cmp-table">
-                      <thead>
-                        <tr>
-                          <th className="co-cmp-metric-h">
-                            Metric
-                          </th>
-                          {/* Current company column */}
-                          <th className="co-cmp-co">
-                            <div className="co-cmp-name">{companyName}</div>
-                            <div style={{ fontFamily: 'var(--mono)', fontSize: '.5rem', color: 'var(--blue)', textTransform: 'uppercase', letterSpacing: '.08em' }}>current</div>
-                          </th>
-                          {/* Added companies columns */}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {compareRows.map((row, i) => (
+                        <tr key={row.label} style={{ background: i % 2 === 0 ? 'transparent' : 'rgba(255,255,255,0.02)' }}>
+                          <td className="co-cmp-metric">{row.label}</td>
+                          <td className="co-cmp-val" style={{ color: row.currentColor }}>{row.current}</td>
                           {compareList.map(c => (
-                            <th key={c.name} className="co-cmp-co">
-                              <div className="co-cmp-name">{c.name}</div>
-                              {c.loading && <div style={{ fontFamily: 'var(--mono)', fontSize: '.5rem', color: 'var(--muted)' }}>loading…</div>}
-                              {!c.loading && !c.score && <div style={{ fontFamily: 'var(--mono)', fontSize: '.5rem', color: 'var(--red)' }}>no data</div>}
-                            </th>
+                            <td key={c.name} className="co-cmp-val" style={{ color: c.loading ? 'var(--muted)' : row.getColor(c.score) }}>
+                              {c.loading ? '…' : row.get(c.score)}
+                            </td>
                           ))}
                         </tr>
-                      </thead>
-                      <tbody>
-                        {[
-                          {
-                            label: 'Score',
-                            current: score ? String(score.overall_score) : '—',
-                            get: (sc: CompanyScore | null) => sc ? String(sc.overall_score) : '—',
-                            currentColor: score ? riskColor(Score.risk(score.overall_score)) : 'var(--muted)',
-                            getColor: (sc: CompanyScore | null) => sc ? riskColor(Score.risk(sc.overall_score)) : 'var(--muted)',
-                          },
-                          {
-                            label: 'Ghost %',
-                            current: score ? pct(score.ghost_rate) : '—',
-                            get: (sc: CompanyScore | null) => sc ? pct(sc.ghost_rate) : '—',
-                            currentColor: ghostColor,
-                            getColor: (sc: CompanyScore | null) => sc ? ((sc.ghost_rate > 0.5) ? 'var(--red)' : (sc.ghost_rate > 0.3) ? 'var(--amber)' : 'var(--green)') : 'var(--muted)',
-                          },
-                          {
-                            label: 'Response %',
-                            current: score ? pct(score.response_rate) : '—',
-                            get: (sc: CompanyScore | null) => sc ? pct(sc.response_rate) : '—',
-                            currentColor: 'var(--blue)',
-                            getColor: () => 'var(--blue)',
-                          },
-                          {
-                            label: 'Avg wait days',
-                            current: score?.avg_wait_days != null ? `${score.avg_wait_days}d` : '—',
-                            get: (sc: CompanyScore | null) => sc?.avg_wait_days != null ? `${sc.avg_wait_days}d` : '—',
-                            currentColor: waitColor,
-                            getColor: (sc: CompanyScore | null) => sc ? ((sc.avg_wait_days || 0) > 21 ? 'var(--amber)' : 'var(--text)') : 'var(--muted)',
-                          },
-                        ].map((row, i) => (
-                          <tr key={row.label} style={{ background: i % 2 === 0 ? 'transparent' : 'rgba(255,255,255,0.02)' }}>
-                            <td className="co-cmp-metric">
-                              {row.label}
-                            </td>
-                            <td className="co-cmp-val" style={{ color: row.currentColor }}>
-                              {row.current}
-                            </td>
-                            {compareList.map(c => (
-                              <td key={c.name} className="co-cmp-val" style={{ color: c.loading ? 'var(--muted)' : row.getColor(c.score) }}>
-                                {c.loading ? '…' : row.get(c.score)}
-                              </td>
-                            ))}
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </Section>
+
+            <Section id="about" icon="ℹ" title="About this grade" open={open.about} onToggle={toggle}
+              summary={score
+                ? (fpReports > 0
+                    ? `Based on ${fpReports} applicant report${fpReports === 1 ? '' : 's'}${webEst > 0 ? ' + public web research' : ''} · summary & public records`
+                    : webEst > 0 ? 'Estimated from public web research — no first-party reports yet' : 'No reports yet · public records')
+                : 'Public records & data status'}>
+              {score?.summary ? (
+                <p style={{ fontFamily: 'var(--mono)', fontSize: '.68rem', color: 'var(--sub)', lineHeight: 1.7, margin: '0 0 .9rem' }}>{score.summary}</p>
+              ) : null}
+              {score && (
+                <div className="co-about-line">
+                  <span>📊 {fpReports > 0
+                    ? `Based on ${fpReports} applicant report${fpReports === 1 ? '' : 's'}${webEst > 0 ? ' + public web research' : ''}`
+                    : webEst > 0
+                      ? 'Score estimated from public web research — no first-party applicant reports yet'
+                      : 'No reports yet'}</span>
+                  <a href={`/report?company=${encodeURIComponent(companyName)}`} style={{ color: 'var(--green)', textDecoration: 'none' }}>+ Add your report →</a>
+                </div>
+              )}
+              {gatheringPublic && <EnrichmentNotice companyName={companyName} />}
+              {/* Attributed public-record signals (SEC 8-K, etc.) — self-hides when there are none; never score-gated. */}
+              <div style={{ marginTop: '1rem' }}>
+                <CompanyPublicRecord companyName={companyName} />
               </div>
-            )}
-          </>
+            </Section>
+          </div>
         )}
       </div>
     </div>
