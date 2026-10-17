@@ -308,7 +308,7 @@ test('report + import rows match the api/reports.js reddit_import shape', () => 
   assert.equal(row.trust_reason, 'community_signal');
   assert.equal(row.needs_review, false);
   assert.equal(row.experience_level, 'Unknown');
-  assert.equal(buildReportRow({ ...goodExp({ role: '' }), company: 'x', subreddit: 'jobs' }).role, null);
+  assert.equal(buildReportRow({ ...goodExp({ role: '' }), company: 'x', subreddit: 'jobs' }).role, ''); // reports.role is NOT NULL
   assert.deepEqual(buildImportRow({ threadId: 'abc', company: 'insight global', subreddit: 'jobs', kept: 0 }),
     { reddit_post_id: 't3_abc', company_name: 'insight global', subreddit: 'jobs', report_id: null, skipped: true, skip_reason: 'no_experiences_extracted' });
   assert.equal(buildImportRow({ threadId: 'abc', company: 'x', subreddit: 'jobs', reportId: 'r1', kept: 2 }).skipped, false);

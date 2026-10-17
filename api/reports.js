@@ -103,6 +103,16 @@ export function classifyOutcomeFromText(text) {
 //     This is where under-detected successes (and other misses) actually get rescued.
 // A negative is NEVER flipped to a positive here — that's the recruitinghell-sarcasm guardrail.
 const _NONCOMMITTAL = new Set(['unknown', 'applied', 'waiting', '']);
+
+// Exactly the outcomes the prod reports_outcome_check constraint accepts (verified 2026-10-17).
+export const REPORT_OUTCOMES = new Set(['ghosted', 'rejected', 'autoreject', 'hired', 'offer', 'interview', 'interviewing', 'human', 'waiting']);
+/** An extracted/imported outcome as a writable one: 'applied' (no response yet) → 'waiting'; anything
+ *  the constraint rejects ('unknown', junk) → null, meaning "do not write this row". */
+export function writableOutcome(o) {
+  const v = String(o || '').trim().toLowerCase();
+  const mapped = v === 'applied' ? 'waiting' : v;
+  return REPORT_OUTCOMES.has(mapped) ? mapped : null;
+}
 const _POS_RANK = { human: 1, interview: 2, hired: 3, offer: 3 };
 export function reconcileOutcome(llmOutcome, detected) {
   const llm = String(llmOutcome ?? '').toLowerCase();
@@ -1155,14 +1165,20 @@ Return ONLY a valid JSON array. Return [] if there are genuinely no hiring exper
 
       const cid = await upsertCo(company);
 
-      // Insert all reports in parallel instead of serial loop
-      const insertResults = await Promise.all(experiences.map(exp => {
+      // Insert all reports in parallel instead of serial loop. Only outcomes the reports_outcome_check
+      // constraint accepts are written: the extractor's 'applied' (no response yet) is 'waiting';
+      // 'unknown' is not publishable data and is dropped (it used to fail the insert silently).
+      const writable = experiences
+        .map(exp => ({ ...exp, outcome: writableOutcome(exp.outcome) }))
+        .filter(exp => exp.outcome);
+      skipped += experiences.length - writable.length;
+      const insertResults = await Promise.all(writable.map(exp => {
         const sourcePost = fresh[exp.post_idx] || fresh[0];
         const rpt = {
           company_name: company,
           platform: `Reddit r/${sourcePost.subreddit}`,
-          outcome: exp.outcome || 'unknown',
-          role: exp.role || null,
+          outcome: exp.outcome,
+          role: exp.role ? String(exp.role).trim().slice(0, 200) : '', // reports.role is NOT NULL (prod)
           report_text: exp.summary || sourcePost.title.slice(0, 500),
           source: 'reddit',
           outcome_weight: REDDIT_WEIGHT,
@@ -1208,14 +1224,14 @@ Return ONLY a valid JSON array. Return [] if there are genuinely no hiring exper
     if (!reports.length) return res.status(400).json({ error: 'reports array required' });
 
     const SOURCE_WEIGHTS = { glassdoor: 0.7, indeed: 0.6, linkedin: 0.5, blind: 0.6, trustpilot: 0.4, news: 0.3, other: 0.3 };
-    const VALID_OUTCOMES = new Set(['ghosted','rejected','hired','offer','interview','applied','unknown','waiting','autoreject','human']);
 
     let imported = 0, skipped = 0, errors = [];
     const wroteCompanies = new Set();
     for (const rpt of reports.slice(0, 500)) {
       try {
         if (!rpt.company || !rpt.outcome || !isValidCompanyName(rpt.company)) { skipped++; continue; }
-        const outcome = VALID_OUTCOMES.has(rpt.outcome) ? rpt.outcome : 'unknown';
+        const outcome = writableOutcome(rpt.outcome); // 'unknown' / junk used to fail the insert silently
+        if (!outcome) { skipped++; continue; }
         const src = (rpt.source || body.source || 'other').toLowerCase().split('/')[0];
         const weight = SOURCE_WEIGHTS[src] || 0.3;
 
@@ -1232,7 +1248,7 @@ Return ONLY a valid JSON array. Return [] if there are genuinely no hiring exper
           company_name:     String(rpt.company).slice(0, 120),
           platform:         String(rpt.platform || body.source || 'External').slice(0, 100),
           outcome,
-          role:             rpt.role ? String(rpt.role).slice(0, 200) : null,
+          role:             rpt.role ? String(rpt.role).slice(0, 200) : '', // reports.role is NOT NULL (prod)
           report_text:      rpt.report_text ? String(rpt.report_text).slice(0, 2000) : null,
           source:           src,
           outcome_weight:   weight,

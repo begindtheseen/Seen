@@ -440,7 +440,7 @@ export function buildReportRow(exp, { companyName, subreddit, threadId, companyI
     company_name: String(companyName).toLowerCase().trim(),
     platform: `Reddit r/${subreddit}`,
     outcome: exp.outcome,
-    role: exp.role ? String(exp.role).trim().slice(0, 200) || null : null,
+    role: exp.role ? String(exp.role).trim().slice(0, 200) : '', // reports.role is NOT NULL (prod)
     report_text: link ? `${summary} ${link}` : summary,
     source: 'reddit',
     outcome_weight: REDDIT_WEIGHT,

@@ -534,7 +534,7 @@ export function buildRow(item, writeName, { needsReview = false, locationId = nu
     company_name: writeName,
     platform: platformFor(item),
     outcome: item.outcome,
-    role: item.role,
+    role: item.role || '', // reports.role is NOT NULL (prod, 2026-10-17); a null role fails the insert
     report_text: reportTextFor(item),
     needs_review: !!needsReview,
     ...(isRedditItem(item) ? ROW_DEFAULTS : PUBLIC_REVIEW_ROW),
