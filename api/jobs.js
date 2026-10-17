@@ -3,7 +3,8 @@ import { getQueryExpansion } from '../lib/server/expand.js';
 import { applyRateLimit, rateLimit, rateLimitGlobal, resolveRateBucket } from '../lib/server/ratelimit.js';
 import { logError } from '../lib/server/errlog.js';
 import { filterAndRank, filterByLocation, sortByProximity, locationDbTerm, expandQueryTerms } from './_utils/jobRelevance.js';
-import { sortByPriority, companyMatchesQuery, isRemoteListing } from '../lib/server/jobPriority.js';
+import { sortByPriority, companyMatchesQuery, queryNamesCompany, isRemoteListing } from '../lib/server/jobPriority.js';
+import { waitUntil } from '@vercel/functions';
 import { aggregateForQuery, upsertJobs, inferLevel, wasRecentlyPulled, recordPull } from '../lib/server/jobSources.js';
 import { aggregateWithSources } from '../lib/jobs/expand.js';
 import { deriveResumeJobQuery, pullResumeJobFloor } from '../lib/server/resumeJobMatch.js';
@@ -194,7 +195,7 @@ export default async function handler(req, res) {
   let safeQuery = '';
   let loc = '';
   let inflightKey = '';
-  let _inflightResolve, _inflightReject;
+
   let dbMatches = []; // related listings already in our DB (merged with any API top-up)
   let relevanceQuery = ''; // the ORIGINAL user query — what relevance is judged against
   let synonyms = []; // canonical + expansion terms — true-synonym signals (matched vs the TITLE)
@@ -299,7 +300,10 @@ export default async function handler(req, res) {
         const key = j.id || `${(j.title || '').toLowerCase()}|${(j.company || '').toLowerCase()}|${(j.location || '').toLowerCase()}`;
         if (seenKeys.has(key)) continue;
         seenKeys.add(key);
-        out.push(postIds.has(j.id) || j.employer_posted ? { ...j, employer_posted: true } : j);
+        const flagged = postIds.has(j.id) || j.employer_posted ? { ...j, employer_posted: true } : j;
+        // A search that names the company (company name typed into the job search) ranks that
+        // company's listings first — jobPriority.priorityTier, kept by the client's sort too.
+        out.push(queryNamesCompany(j.company, relevanceQuery) ? { ...flagged, company_match: true } : flagged);
       }
       return applyFeatured(dropSuppressed(out, suppressedSet), featuredSet);
     };
@@ -372,24 +376,23 @@ export default async function handler(req, res) {
         // Keyword-fallback + company-column pool reads, geo-scoped by the DB (bbox ANDs with
         // the query filters). Company-column match surfaces ANY company name, not just the
         // hardcoded buildFallbackFilter set.
-        const [kwRows, coRows] = await Promise.all([
+        // All pool reads in ONE parallel round (keyword + company + every term) — they're independent.
+        const [[kwRows, coRows], termRows] = await Promise.all([Promise.all([
           t3filter
             ? fetch(`${SUPABASE_URL}/rest/v1/jobs?${t3filter}${geoClause}&expires_at=gt.${now}&limit=60`, { headers: dbHeaders })
                 .then(r => r.ok ? r.json() : []).catch(() => [])
             : Promise.resolve([]),
           fetch(`${SUPABASE_URL}/rest/v1/jobs?company=ilike.*${qEnc}*${geoClause}&expires_at=gt.${now}&limit=60`, { headers: dbHeaders })
             .then(r => r.ok ? r.json() : []).catch(() => []),
-        ]);
-
-        // Search both search_query and title columns so jobs cached under different
-        // query keys still surface for synonymous searches.
-        const termRows = await Promise.all(
-          searchTerms.map(term => {
+        ]),
+          // Search both search_query and title columns so jobs cached under different
+          // query keys still surface for synonymous searches.
+          Promise.all(searchTerms.map(term => {
             const orFilter = `or=${encodeURIComponent(`(search_query.ilike.*${term}*,title.ilike.*${term}*)`)}`;
             return fetch(`${SUPABASE_URL}/rest/v1/jobs?${orFilter}${geoClause}&expires_at=gt.${now}&limit=60`, { headers: dbHeaders })
               .then(r => r.ok ? r.json() : []).catch(() => []);
-          })
-        );
+          })),
+        ]);
 
         // Pool everything, dedup, then keep only listings RELATED to the query,
         // ranked by relevance (title > company > description) then quality score.
@@ -415,76 +418,53 @@ export default async function handler(req, res) {
       console.log(`DB TOP-UP: "${query}" → "${canonical}" @ "${loc}" — ${dbMatches.length} in DB, pulling more from API`);
     }
 
-    // ── Scale guard #1: dedupe/cooldown ──────────────────────────────────────────
-    // The corpus is thin by design, so a niche/first-time query legitimately drops here.
-    // But we must NOT re-pull the SAME (query, location) from Adzuna on every repeat within
-    // a short window — the last pull already stored everything it found (fresh for 14 days).
-    // If we pulled this (query, location) recently, serve the cached DB rows and SKIP the
-    // external call. Fail-open (a missing table / DB blip → allow the pull); the global
-    // aggregation budget below is the always-on backstop.
-    if (SUPABASE_URL && SUPABASE_SERVICE_KEY &&
-        await wasRecentlyPulled(canonical, loc, SUPABASE_URL, SUPABASE_SERVICE_KEY)) {
-      let cached = dbMatches.slice(0, 60);
-      // A recent pull already stored everything Adzuna had for this (query, location), so we skip
-      // the paid re-pull — but a THIN boxed page must not surface as "1 result" when we hold plenty
-      // just outside the box. Fill from our own corpus (query-relevant, nearest-first) — pure DB.
-      if (cached.length < PAGE_MIN) {
-        const corpus = await corpusRelevant({ supabaseUrl: SUPABASE_URL, dbHeaders, terms: searchTerms, query: relevanceQuery, canonical, synonyms, center, loc, limit: 60 });
-        cached = dedupByIdentity([...cached, ...corpus]).slice(0, 60);
-      }
-      if (!cached.length) cached = await nearestListings(loc, SUPABASE_URL, dbHeaders);
-      console.log(`COOLDOWN: "${canonical}" @ "${loc}" pulled recently — serving ${cached.length} cached (no API call)`);
-      return res.status(200).json({ ok: true, jobs: serve(cached), query, location: loc, _src: 'db-cooldown' });
-    }
-
-    // ── Expensive live top-up: BUDGETED, never user-blocking ─────────────────────
-    // Live aggregation (Adzuna pulls + first-time LLM expansion) is the only costly part
-    // of a search. It's capped per bucket AND by a global platform budget so 10k users
-    // searching at once can't stampede external spend — and when the budget is out we
-    // serve what the corpus already has (degraded), never a 429: search must never go
-    // blank over budget.
-    const [topupBucket, topupGlobal] = await Promise.all([
-      rateLimit(req, 'job-search-topup', { bucketKey: rlBucket.key }),
-      rateLimitGlobal('agg-global'),
-    ]);
-    if (!topupBucket.allowed || !topupGlobal.allowed) {
-      let degradedJobs = dbMatches.slice(0, 60);
-      // Budget's out for the paid pull, but the corpus is free — fill a thin page from what we
-      // already hold (query-relevant, nearest-first) before falling back to query-agnostic nearest.
-      if (degradedJobs.length < PAGE_MIN) {
-        const corpus = await corpusRelevant({ supabaseUrl: SUPABASE_URL, dbHeaders, terms: searchTerms, query: relevanceQuery, canonical, synonyms, center, loc, limit: 60 });
-        degradedJobs = dedupByIdentity([...degradedJobs, ...corpus]).slice(0, 60);
-      }
-      if (!degradedJobs.length) degradedJobs = await nearestListings(loc, SUPABASE_URL, dbHeaders);
-      console.log(`DEGRADED (top-up budget out — bucket:${topupBucket.allowed} global:${topupGlobal.allowed}): "${query}" @ "${loc}" — ${degradedJobs.length} DB results`);
-      return res.status(200).json({ ok: true, jobs: serve(degradedJobs), query, location: loc, _src: 'db-degraded', degraded: true });
-    }
-
-    // ── Not enough in our corpus → aggregate LIVE from keyless sources ───────────
-    // Pull fresh listings from Adzuna for the canonical query (+ expansion terms) at
-    // this location, SAVE them — jobs AND their companies — to the DB, then merge with
-    // what we already had. Every under-served search grows the corpus, so popular
-    // searches get progressively faster (more DB hits) and our data compounds over time.
-    // Coalesce concurrent identical searches into one live aggregation.
+    // ── INSTANT RESPONSE (owner directive 2026-10-17: a search never waits on a live pull) ──────
+    // Below TARGET this handler used to AWAIT a live Adzuna/ATS aggregation (plus geo and national
+    // widening pulls) before answering — 4–30s. Now the user gets the best page our own corpus holds
+    // right away, and the live top-up runs AFTER the response (waitUntil) and saves what it finds to
+    // the corpus. The response says topup:'pending'; the jobs page re-fetches once, silently, with
+    // db_only:true, and every later search reads the new listings straight from the DB.
+    // The cooldown and the per-bucket + global top-up budgets still gate every live pull.
+    const dbOnly = body.db_only === true;
+    const canPull = !!(SUPABASE_URL && SUPABASE_SERVICE_KEY) && !dbOnly;
     inflightKey = `${canonical}::${loc}`;
-    if (_inflight.has(inflightKey)) {
-      console.log(`COALESCED: "${canonical}" @ "${loc}" — waiting on in-flight aggregation`);
-      try {
-        const coalesced = await _inflight.get(inflightKey);
-        return res.status(200).json({ ok: true, ...coalesced, _src: 'coalesced' });
-      } catch(e) { /* fall through to run our own */ }
+
+    // Fill a thin in-radius page from our own corpus (query-relevant, nearest-first), then the
+    // nearest listings so the board is never empty. Pure DB.
+    const pageP = (async () => {
+      let page = dbMatches.slice(0, 60);
+      if (page.length < PAGE_MIN && SUPABASE_URL && SUPABASE_SERVICE_KEY) {
+        const corpus = await corpusRelevant({ supabaseUrl: SUPABASE_URL, dbHeaders, terms: searchTerms, query: relevanceQuery, canonical, synonyms, center, loc, limit: 60 });
+        page = dedupByIdentity([...page, ...corpus]).slice(0, 60);
+      }
+      if (!page.length && SUPABASE_URL && SUPABASE_SERVICE_KEY) page = await nearestListings(loc, SUPABASE_URL, dbHeaders);
+      return page;
+    })();
+    // Decide whether a live top-up may run — in parallel with building the page. The budget is only
+    // consumed when no recent pull already covered this (query, location).
+    const decisionP = (async () => {
+      if (!canPull) return 'skip';
+      if (_inflight.has(inflightKey)) return 'inflight';
+      if (await wasRecentlyPulled(canonical, loc, SUPABASE_URL, SUPABASE_SERVICE_KEY)) return 'cooldown';
+      const [topupBucket, topupGlobal] = await Promise.all([
+        rateLimit(req, 'job-search-topup', { bucketKey: rlBucket.key }),
+        rateLimitGlobal('agg-global'),
+      ]);
+      return topupBucket.allowed && topupGlobal.allowed ? 'pull' : 'budget';
+    })();
+    const [page, decision] = await Promise.all([pageP, decisionP]);
+
+    if (decision === 'pull' && !_inflight.has(inflightKey)) {
+      const key = inflightKey;
+      const work = liveTopUp().catch((e) => console.warn('live top-up error:', e.message)).finally(() => _inflight.delete(key));
+      _inflight.set(key, work);
+      setTimeout(() => _inflight.delete(key), 90_000);
+      waitUntil(work);
     }
 
-    const inflightPromise = new Promise((resolve, reject) => { _inflightResolve = resolve; _inflightReject = reject; });
-    _inflight.set(inflightKey, inflightPromise);
-    setTimeout(() => _inflight.delete(inflightKey), 90_000);
-
-    let jobs = [];
-    try {
-      // Multi-source expansion: employer-direct ATS (registered Greenhouse/Lever/Ashby/… boards
-      // matching the query's company) FIRST, then Adzuna as the demoted gap-filler — and snowball
-      // any ATS tenant the results reveal into the source registry. Every valid discovery persists
-      // to the shared corpus, so the next user benefits without a live fetch.
+    // The live pull (runs after the response). Everything it finds is upserted into the corpus by
+    // aggregateWithSources / aggregateForQuery; nothing here touches the response.
+    async function liveTopUp() {
       const agg = await aggregateWithSources({
         query: canonical,
         location: loc,
@@ -495,129 +475,47 @@ export default async function handler(req, res) {
         adzunaAppKey: process.env.ADZUNA_APP_KEY,
         distanceKm, // Adzuna scopes the live pull to the searched radius
       });
-      // Record the pull so an identical repeat search within the cooldown window serves the
-      // now-cached rows instead of hitting Adzuna again (fire-and-forget; only after a real
-      // pull ran, so a failure never locks out retries).
-      if (SUPABASE_URL && SUPABASE_SERVICE_KEY) recordPull(canonical, loc, agg.jobs?.length || 0, SUPABASE_URL, SUPABASE_SERVICE_KEY);
-      // Map the freshly-saved listings into the UI shape, then relevance + radius filter.
-      jobs = (agg.jobs || []).map(j => ({
-        id: j.id || null, // keep the DB id when the upsert returned one
-        title: j.title, company: j.company, location: j.location || loc,
-        salary: j.salary, url: j.apply_url || j.url || null, description: j.description,
-        type: j.type || 'Full-time', level: inferLevel(j.title || ''),
-        source: j.source || 'Seen', ...scoreRow(j),
-        search_query: j.search_query || null, // provenance survives into the relevance filter
-        lat: j.lat ?? null, lng: j.lng ?? null, posted_at: j.created_at || null,
-      }));
-      jobs = applyRadius(filterAndRank(jobs, relevanceQuery, { synonyms, canonical }));
-      console.log(`AGGREGATED: "${query}" → "${canonical}" @ "${loc}" — ${agg.jobs?.length || 0} fetched, ${agg.upserted || 0} saved, ${jobs.length} relevant`);
-      if (SUPABASE_URL && SUPABASE_SERVICE_KEY) _logSearch(canonical, loc, jobs.length, SUPABASE_URL, dbHeaders);
-    } catch (e) {
-      console.warn('aggregateForQuery error:', e.message);
-    }
-
-    // Merge the listings already in our DB with the fresh aggregated results
-    // (deduped, relevance-ranked) so the user always gets the fullest related set.
-    const mergedSeen = new Set();
-    const merged = [];
-    for (const j of [...dbMatches, ...jobs]) {
-      const key = `${(j.title||'').toLowerCase()}|${(j.company||'').toLowerCase()}|${(j.location||'').toLowerCase()}`;
-      if (mergedSeen.has(key)) continue;
-      mergedSeen.add(key);
-      merged.push(j);
-    }
-    let finalJobs = applyRadius(filterAndRank(merged, relevanceQuery, { synonyms, canonical })).slice(0, 60);
-    let widened = false;
-    // A niche/sparse query should still return a FULL page (owner directive). Below PAGE_MIN
-    // in-radius results we widen to fill it — closest listings always lead (rankByDistanceKeepAll),
-    // so the radius is honored in RANK even as farther-out matches fill the rest of the page. A
-    // query that already has a full page never widens. (PAGE_MIN is declared in the outer scope.)
-
-    // ── Fill a thin page by widening GEOGRAPHICALLY, not nationwide ───────────────
-    // A radius search can come up thin (a role that's sparse within, say, 10mi) even
-    // though it's plentiful a bit farther out. Rather than teleport to national results
-    // (jumping to jobs 100s–1000s of miles away), first EXPAND the radius around the same
-    // place, so "nearby" stays nearby. Only if that's still empty do we fall back to a
-    // national pull. rankByDistanceKeepAll always shows the closest listings first.
-    const toUi = j => ({
-      id: j.id || null, // keep the DB id — /jobs/<id> permalinks depend on it
-      title: j.title, company: j.company, location: j.location || loc,
-      salary: j.salary, url: j.apply_url || j.url || null, description: j.description,
-      type: j.type || 'Full-time', level: inferLevel(j.title || ''),
-      source: j.source || 'Seen', ...scoreRow(j),
-      search_query: j.search_query || null,
-      lat: j.lat ?? null, lng: j.lng ?? null, posted_at: j.created_at || null,
-    });
-    const dedupJobs = arr => {
-      const s = new Set(), out = [];
-      for (const j of arr) {
-        const key = `${(j.title||'').toLowerCase()}|${(j.company||'').toLowerCase()}|${(j.location||'').toLowerCase()}`;
-        if (s.has(key)) continue; s.add(key); out.push(j);
-      }
-      return out;
-    };
-
-    // Stage 1 — expand the radius around the SAME location (≈4× the radius, 60–250mi) when
-    // the in-radius page is thin (< PAGE_MIN). Closest listings still lead, so a real
-    // in-radius result is never buried — we only ADD farther matches to fill an otherwise
-    // sparse page (the niche-query case the owner wants full). A full page never widens.
-    if (finalJobs.length < PAGE_MIN && loc) {
-      widened = finalJobs.length === 0; // only a truly-empty in-radius page counts as "widened" in the response flag
-      const expandedMiles = Math.min(250, Math.max(radiusMiles * 4, 60));
-      let wideJobs = [];
-      try {
+      // Record the pull so a repeat search inside the cooldown window doesn't pull again.
+      recordPull(canonical, loc, agg.jobs?.length || 0, SUPABASE_URL, SUPABASE_SERVICE_KEY);
+      const fresh = (agg.jobs || []).map((j) => toUiRow(j, loc));
+      const inRadius = applyRadius(filterAndRank(dedupByIdentity([...dbMatches, ...fresh]), relevanceQuery, { synonyms, canonical }));
+      console.log(`TOP-UP: "${query}" → "${canonical}" @ "${loc}" — ${agg.jobs?.length || 0} fetched, ${agg.upserted || 0} saved, ${inRadius.length} relevant in radius`);
+      _logSearch(canonical, loc, inRadius.length, SUPABASE_URL, dbHeaders);
+      // Still thin → widen geographically (≈4× the radius, 60–250mi), and nationally if nothing at
+      // all matched. Same behaviour as before, just after the response; results land in the corpus.
+      if (inRadius.length < PAGE_MIN && loc) {
+        const expandedMiles = Math.min(250, Math.max(radiusMiles * 4, 60));
         const wide = await aggregateForQuery({
           query: canonical, location: loc, relatedTerms,
           supabaseUrl: SUPABASE_URL, serviceKey: SUPABASE_SERVICE_KEY,
           adzunaAppId: process.env.ADZUNA_APP_ID, adzunaAppKey: process.env.ADZUNA_APP_KEY,
           distanceKm: milesToKm(expandedMiles),
-        });
-        wideJobs = (wide.jobs || []).map(toUi);
-        console.log(`WIDENED (geo): "${query}" expanded ${radiusMiles}→${expandedMiles}mi, ${finalJobs.length} in-radius, added ${wideJobs.length}`);
-      } catch (e) { console.warn('geo-widen error:', e.message); }
-      // ALSO re-read our OWN corpus at the wider radius — the geo-boxed pool never saw the jobs
-      // we already hold just outside the box (the 9 Target listings within 100mi of a small city
-      // the 25mi box hid). Pure DB; complements the paid Adzuna widen instead of relying on it.
-      const corpusWide = await corpusRelevant({ supabaseUrl: SUPABASE_URL, dbHeaders, terms: searchTerms, query: relevanceQuery, canonical, synonyms, center, loc, limit: 60 });
-      finalJobs = rankByDistanceKeepAll(filterAndRank(dedupJobs([...merged, ...wideJobs, ...corpusWide]), relevanceQuery, { synonyms, canonical })).slice(0, 60);
-    }
-
-    // Stage 2 — national query (no location) that's empty, or nothing within the expanded
-    // radius: pull nationally as the last broadening step, still ranked nearest-first.
-    if (finalJobs.length === 0) {
-      widened = true;
-      let wideJobs = [];
-      try {
+        }).catch((e) => { console.warn('geo-widen error:', e.message); return { jobs: [] }; });
+        console.log(`TOP-UP WIDENED (geo): "${query}" ${radiusMiles}→${expandedMiles}mi, added ${(wide.jobs || []).length}`);
+      }
+      if (inRadius.length === 0) {
         const wide = await aggregateForQuery({
           query: canonical, location: '', relatedTerms,
           supabaseUrl: SUPABASE_URL, serviceKey: SUPABASE_SERVICE_KEY,
           adzunaAppId: process.env.ADZUNA_APP_ID, adzunaAppKey: process.env.ADZUNA_APP_KEY,
-        });
-        wideJobs = (wide.jobs || []).map(toUi);
-        console.log(`WIDENED (national): "${query}" added ${wideJobs.length}`);
-      } catch (e) { console.warn('national-widen error:', e.message); }
-      finalJobs = rankByDistanceKeepAll(filterAndRank(dedupJobs([...merged, ...wideJobs]), relevanceQuery, { synonyms, canonical })).slice(0, 60);
+        }).catch((e) => { console.warn('national-widen error:', e.message); return { jobs: [] }; });
+        console.log(`TOP-UP WIDENED (national): "${query}" added ${(wide.jobs || []).length}`);
+      }
     }
 
-    // ── Absolute last resort ─────────────────────────────────────────────────────
-    // The query matched nothing anywhere (typo/nonsense/brand-new niche). Show the
-    // nearest available listings regardless of query so the board is never empty.
-    if (!finalJobs.length) {
-      widened = true;
-      finalJobs = await nearestListings(loc, SUPABASE_URL, dbHeaders);
-      console.log(`NEAREST FALLBACK: "${query}" @ "${loc}" — ${finalJobs.length} nearby listings`);
-    }
-
-    const result = { jobs: serve(finalJobs), query, location: loc, radius: radiusMiles, _src: widened ? 'widened' : (jobs.length ? 'aggregated' : 'db'), widened };
-    _inflightResolve?.(result);
-    _inflight.delete(inflightKey);
-    return res.status(200).json({ ok: true, ...result });
+    const pending = decision === 'pull' || decision === 'inflight';
+    const widened = dbMatches.length === 0 && page.length > 0;
+    console.log(`INSTANT: "${query}" @ "${loc}" — ${page.length} served (${dbMatches.length} in radius), top-up ${decision}`);
+    return res.status(200).json({
+      ok: true, jobs: serve(page), query, location: loc, radius: radiusMiles,
+      _src: dbOnly ? 'db-refresh' : `db-${decision}`, widened,
+      topup: pending ? 'pending' : null,
+      ...(decision === 'budget' ? { degraded: true } : {}),
+    });
 
   } catch(err) {
     console.error('Jobs error:', err.message);
     logError('jobs', err.message, { query: safeQuery, loc });
-    _inflightReject?.(err);
-    _inflight.delete(inflightKey);
     // Graceful degradation: the live API call failed (billing/rate-limit/outage), but if
     // we already pulled related listings from our own corpus, serve those rather than an
     // empty error — search should never go blank just because the top-up couldn't run.
