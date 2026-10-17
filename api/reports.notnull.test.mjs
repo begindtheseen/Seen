@@ -9,7 +9,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { REPORT_OUTCOMES, writableOutcome } from './reports.js';
 import { buildReportRow as enrichRow } from './_utils/companyEnrichment.js';
-import { buildRow as webRow } from '../scripts/credit/web-reports.mjs';
+import { buildRow as webRow, planTargetRows } from '../scripts/credit/web-reports.mjs';
 import { buildReportRow as backfillRow } from '../scripts/credit/lib/reddit.mjs';
 
 const PROD_OUTCOMES = ['ghosted', 'rejected', 'autoreject', 'hired', 'offer', 'interview', 'interviewing', 'human', 'waiting'];
@@ -44,4 +44,12 @@ test('credit web-reports row: null role → ""', () => {
 test('credit Reddit backfill row: null role → ""', () => {
   const row = backfillRow({ company: 'acme', subreddit: 'jobs', outcome: 'ghosted', role: null, summary: 'x' });
   assert.equal(row.role, '');
+});
+
+test('credit web-reports plan: applied/unknown accounts never become rows; every row outcome is writable', () => {
+  const base = { summary: 'Applicant reports an experience.', host: 'www.glassdoor.com', source_site: 'www.glassdoor.com', role: null };
+  const kept = ['ghosted', 'applied', 'unknown', 'offer'].map((outcome, i) => ({ ...base, outcome, url: `https://www.glassdoor.com/r${i}`, summary: `Account ${i} for the test.` }));
+  const plan = planTargetRows({ name: 'acme', aliases: ['acme'] }, kept, [], []);
+  assert.deepEqual(plan.rows.map((r) => r.outcome).sort(), ['ghosted', 'offer']);
+  for (const r of plan.rows) { assert.ok(REPORT_OUTCOMES.has(r.outcome)); assert.equal(r.role, ''); }
 });
