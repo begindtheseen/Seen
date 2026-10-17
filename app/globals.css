@@ -562,7 +562,7 @@ select.fi,select.fs,select.fi-r,select.fs-r{background-image:url("data:image/svg
 .rc-role{font-size:.82rem;font-weight:600;color:var(--white)}
 .rc-meta{font-family:var(--mono);font-size:.62rem;color:var(--muted)}
 .rc-body{font-size:.82rem;color:var(--sub);line-height:1.68;font-weight:300}
-.rc-footer{display:flex;align-items:center;gap:.45rem;margin-top:.5rem}
+.rc-footer{display:flex;flex-wrap:wrap;align-items:center;gap:.45rem;margin-top:.5rem}
 
 /* ═══ REPORT ═══ */
 .rep-wrap{max-width:620px;margin:0 auto;padding:2.5rem 2rem}

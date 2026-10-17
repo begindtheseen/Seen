@@ -3,6 +3,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   aggregateOutcomes, blendRate, fuseCompanyIntel, classifyPlatform, PRIOR_STRENGTH, SOURCE_TRUST,
+  PUBLIC_REVIEW_PLATFORM_PREFIX, publicReviewPlatform,
 } from './companyIntel.js';
 
 test('classifyPlatform maps real reports.platform values to trust tiers', () => {
@@ -11,6 +12,35 @@ test('classifyPlatform maps real reports.platform values to trust tiers', () => 
   assert.equal(classifyPlatform('seen_intel'), 'seen_intel');
   assert.equal(classifyPlatform('Company website'), 'direct');
   assert.equal(classifyPlatform(''), 'direct');
+});
+
+test('classifyPlatform: "Public review · <host>" rows are third-party low-trust (public_web), never ingest/direct', () => {
+  // The web-search review-site contract: platform 'Public review · <hostname>', source 'web_public',
+  // outcome_weight 0.3, trust_reason 'web_search_public_review'.
+  assert.equal(PUBLIC_REVIEW_PLATFORM_PREFIX, 'Public review · ');
+  assert.equal(publicReviewPlatform('Glassdoor.com '), 'Public review · glassdoor.com');
+  assert.equal(classifyPlatform('Public review · glassdoor.com'), 'public_web');   // NOT ingest (0.55)
+  assert.equal(classifyPlatform('Public review · indeed.com'), 'public_web');
+  assert.equal(classifyPlatform('Public review · some-forum.example'), 'public_web'); // NOT direct (1.0)
+  assert.equal(classifyPlatform('public review · reddit.com'), 'public_web');
+  assert.equal(SOURCE_TRUST.public_web, 0.3);
+  assert.equal(SOURCE_TRUST.public_web, SOURCE_TRUST.reddit);
+  assert.ok(SOURCE_TRUST.public_web < SOURCE_TRUST.ingest && SOURCE_TRUST.public_web < SOURCE_TRUST.direct);
+  // Only the exact prefix opts in — a direct report mentioning a review site stays where it was.
+  assert.equal(classifyPlatform('Glassdoor'), 'ingest');
+  assert.equal(classifyPlatform('Saw it on a public review site'), 'direct');
+});
+
+test('fusion: public_web evidence is pooled at the reddit weight, not first-party weight', () => {
+  const web = { ghost_rate: 0.2, response_rate: 0.6, avg_wait_days: 10, report_count: 0 };
+  const ghosts = Array.from({ length: 10 }, () => ({ outcome: 'ghosted' }));
+  const viaReview = fuseCompanyIntel({ web, sources: [{ type: 'public_web', outcomes: ghosts }] });
+  const viaReddit = fuseCompanyIntel({ web, sources: [{ type: 'reddit', outcomes: ghosts }] });
+  const viaDirect = fuseCompanyIntel({ web, sources: [{ type: 'direct', outcomes: ghosts }] });
+  assert.equal(viaReview.ghost_rate, viaReddit.ghost_rate);
+  assert.equal(viaReview.empirical.eff_n, 3);
+  assert.ok(viaReview.ghost_rate < viaDirect.ghost_rate);
+  assert.deepEqual(viaReview.sources_used, ['public_web']);
 });
 
 test('waiting/autoreject taxonomy: waiting is non-terminal, autoreject is neutral-resolved', () => {

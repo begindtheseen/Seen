@@ -111,7 +111,7 @@ export async function assessSubmitTrust(SUPABASE_URL, hdrs, uid, dupFilter) {
 //
 // This is the exact same deterministic, LLM-free fusion handleCompanyScore runs on a cache-miss
 // (reports-first path): pool the company's non-review reports by source and blend them with the
-// per-source trust weights in SOURCE_TRUST (direct/survey 1.0, ingest 0.55, reddit 0.3). It is
+// per-source trust weights in SOURCE_TRUST (direct/survey 1.0, ingest 0.55, reddit / public review sites 0.3). It is
 // idempotent — with an empty web prior the fused result is a pure function of the current report
 // set, so re-running over the same reports yields the same score (no drift on repeat writes).
 //

@@ -16,10 +16,11 @@ import { jsonLdHtml } from '@/lib/jsonLd'
 //   pipeline's *claimed* mention count: live, Robert Half showed "3,085 reports" with zero report
 //   rows behind it). Score rows that exist with zero first-party reports carry web-prior
 //   estimates; those show a grade explicitly labeled as estimated, never a percentage.
-// - First-party reports include attributed public-discussion rows (Reddit threads imported with
-//   platform "Reddit r/<sub>", trust-weighted 0.3 in the fusion). Each reported row says how many
-//   of its reports came from public discussion; if that count can't be read, NO split is shown
-//   (never a guessed one).
+// - First-party reports include attributed public third-party rows — Reddit threads imported with
+//   platform "Reddit r/<sub>" and first-hand accounts from public review sites found by web search
+//   (platform "Public review · <host>"), both trust-weighted 0.3 in the fusion. Each reported row
+//   says how many of its reports came from those public sources; if that count can't be read, NO
+//   split is shown (never a guessed one).
 // - Agencies with no score row at all show "No reports yet — be the first". No number is
 //   ever fabricated for them.
 
@@ -28,7 +29,7 @@ export const revalidate = 3600
 export const metadata: Metadata = {
   title: 'Staffing Agency Ghost Index — Which Agencies Ghost Candidates | Seen',
   description:
-    'A live index of major staffing agencies — Robert Half, Aerotek, Insight Global, TEKsystems, Randstad and more — ranked by applicant-reported ghost and response rates, from outcomes submitted to Seen or shared in public discussion threads. Agencies without reports are labeled, never given a made-up rate.',
+    'A live index of major staffing agencies — Robert Half, Aerotek, Insight Global, TEKsystems, Randstad and more — ranked by applicant-reported ghost and response rates, from outcomes submitted to Seen or shared publicly in discussion threads and on review sites. Agencies without reports are labeled, never given a made-up rate.',
   keywords: [
     'staffing agency ghosting', 'staffing agency ghost rate', 'do staffing agencies ghost',
     'recruiter ghosted me', 'staffing agency reviews', 'best staffing agencies', 'worst staffing agencies',
@@ -57,7 +58,7 @@ type Ranked = {
   row: LeaderboardRow | null // matched company_scores row (may have 0 applicant reports)
   slug: string // slug of the matched stored name when scored, else of the display name
   reports: number // FIRST-PARTY applicant reports behind the row (0 when none / no row)
-  publicDiscussion: number | null // of `reports`, how many came from public discussion; null = unknown
+  publicDiscussion: number | null // of `reports`, how many came from public discussion threads / review sites; null = unknown
 }
 
 function reportHref(agencyName: string) {
@@ -73,7 +74,7 @@ function ReportCta({ agencyName }: { agencyName: string }) {
 }
 
 // Row for an agency WITH first-party applicant reports: grade + honest percentages + count, and how
-// much of that count is attributed public discussion.
+// much of that count is attributed public discussion / review-site content.
 function ReportedRow({ r, rank }: { r: Ranked; rank: number }) {
   const s = r.row!.score
   const accent = riskColor(s.risk_level)
@@ -89,7 +90,7 @@ function ReportedRow({ r, rank }: { r: Ranked; rank: number }) {
         <Link href={`/company/${r.slug}`} style={{ fontFamily: 'var(--display)', fontSize: '.92rem', fontWeight: 700, color: 'var(--white)', textDecoration: 'none' }}>{r.agency.name}</Link>
         <div style={{ ...mono('.6rem', 'var(--dim)'), marginTop: '.15rem' }}>
           {n.toLocaleString()} report{n !== 1 ? 's' : ''}
-          {r.publicDiscussion ? ` · ${r.publicDiscussion.toLocaleString()} from public discussion` : ''}
+          {r.publicDiscussion ? ` · ${r.publicDiscussion.toLocaleString()} from public threads & review sites` : ''}
           {` · ${riskLabel(s.risk_level)}`}
           {thin ? ' · early signal — low confidence' : ''}
         </div>
@@ -135,8 +136,8 @@ function EmptyRow({ r }: { r: Ranked }) {
   )
 }
 
-// How many of an agency's first-party reports came from attributed public discussion (Reddit
-// threads). Same service-key server read as fetchActiveSponsor below, counting the exact corpus the score
+// How many of an agency's first-party reports came from attributed public sources (Reddit threads
+// and public review sites). Same service-key server read as fetchActiveSponsor below, counting the exact corpus the score
 // fusion counts (lib/server/reportCounts.js publicDiscussionCountPath). Best-effort: ANY failure
 // returns null and the row shows no split — never a wrong one.
 async function fetchPublicDiscussionCount(storedName: string): Promise<number | null> {
@@ -225,7 +226,7 @@ export default async function AgenciesPage() {
   const faqQa = [
     {
       q: 'What is a staffing agency ghost rate?',
-      a: 'The share of applicants who reported never hearing back from an agency after applying or interviewing — no rejection, no update, just silence. Seen computes it from applicant-reported outcomes — submitted to Seen or shared in public discussion threads (labeled and down-weighted) — not agency marketing, and never from web-research estimates.',
+      a: 'The share of applicants who reported never hearing back from an agency after applying or interviewing — no rejection, no update, just silence. Seen computes it from applicant-reported outcomes — submitted to Seen, or shared publicly in discussion threads and on review sites (labeled, linked to their source where available, and down-weighted) — not agency marketing, and never from web-research estimates.',
     },
     {
       q: 'Do staffing agencies ghost candidates more than direct employers?',
@@ -256,7 +257,7 @@ export default async function AgenciesPage() {
         <p style={{ color: 'var(--sub)', fontSize: '.95rem', lineHeight: 1.75, fontWeight: 300, margin: '0 0 1.4rem' }}>
           Staffing agencies are the highest-volume gatekeepers in hiring — and the most common source of &ldquo;the recruiter just disappeared&rdquo; stories. This index tracks {STAFFING_AGENCIES.length} major agencies by what applicants actually report: who replies, who ghosts, and how long it takes.
           {totalReports > 0
-            ? ` It currently reflects ${totalReports.toLocaleString()} applicant-reported outcome${totalReports !== 1 ? 's' : ''}${totalPublic ? ` (${totalPublic.toLocaleString()} shared in public discussion threads)` : ''} and grows with every new one.`
+            ? ` It currently reflects ${totalReports.toLocaleString()} applicant-reported outcome${totalReports !== 1 ? 's' : ''}${totalPublic ? ` (${totalPublic.toLocaleString()} shared publicly in discussion threads or on review sites)` : ''} and grows with every new one.`
             : ' No agency has applicant-reported outcomes on Seen yet — it grows with every report submitted.'}
         </p>
         <div style={{ display: 'flex', gap: '.6rem', flexWrap: 'wrap', margin: '0 0 2.6rem' }}>
@@ -280,7 +281,7 @@ export default async function AgenciesPage() {
         {reported.length > 0 && (
           <section style={{ marginBottom: '2.4rem' }}>
             <h2 style={{ fontFamily: 'var(--display)', fontSize: '1.1rem', fontWeight: 700, color: 'var(--white)', margin: '0 0 .3rem' }}>Ranked by reported ghost rate</h2>
-            <p style={{ color: 'var(--sub)', fontSize: '.8rem', lineHeight: 1.6, margin: '0 0 1rem', fontWeight: 300 }}>Agencies with applicant-reported outcomes — submitted to Seen or shared in public discussion threads (labeled and down-weighted) — worst ghost rate first. Where an agency has only a few reports, its rates can be blended with a public-data baseline, and the row is marked low confidence.</p>
+            <p style={{ color: 'var(--sub)', fontSize: '.8rem', lineHeight: 1.6, margin: '0 0 1rem', fontWeight: 300 }}>Agencies with applicant-reported outcomes — submitted to Seen, or shared publicly in discussion threads and on review sites (labeled and down-weighted) — worst ghost rate first. Where an agency has only a few reports, its rates can be blended with a public-data baseline, and the row is marked low confidence.</p>
             {reported.map((r, i) => <ReportedRow key={r.agency.name} r={r} rank={i + 1} />)}
           </section>
         )}
@@ -318,7 +319,7 @@ export default async function AgenciesPage() {
         </section>
 
         <p style={{ ...mono('.6rem', 'var(--dim)'), lineHeight: 1.7 }}>
-          Seen Grades aggregate applicant reports and public hiring signals into a 0–100 score. They are community signals, not verified facts, and update hourly as new reports arrive. Percentages appear only where applicants have actually reported outcomes. Report counts include outcomes shared in public discussion threads (counted at reduced weight); web-research estimates are never counted as reports.
+          Seen Grades aggregate applicant reports and public hiring signals into a 0–100 score. They are community signals, not verified facts, and update hourly as new reports arrive. Percentages appear only where applicants have actually reported outcomes. Report counts include outcomes shared publicly in discussion threads and on review sites (labeled and counted at reduced weight); web-research estimates are never counted as reports.
         </p>
       </div>
     </div>

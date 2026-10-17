@@ -2,7 +2,8 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { AppStore } from '@/lib/stores/AppStore'
-import { isRedditSourced, PUBLIC_DISCUSSION_LABEL } from '@/lib/reportSource'
+import { reportSourceBadge, reportSourceLink } from '@/lib/reportSource'
+import ReportSourceLink from '@/components/ReportSourceLink'
 
 type Filter = 'all' | 'ghosted' | 'rejected' | 'interviewing' | 'hired'
 
@@ -179,6 +180,9 @@ export default function FeedPage() {
           <>
             {reports.map(r => {
               const oc = OUTCOME_LABELS[r.outcome] || { label: r.outcome, cls: '' }
+              const badge = reportSourceBadge(r.platform)
+              const src = reportSourceLink(r.platform, r.report_text)
+              const body = src ? src.body : r.report_text
               return (
                 <div key={r.id} className={`rcard ${oc.cls}`} style={{ marginBottom: '.65rem' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '.5rem' }}>
@@ -216,15 +220,20 @@ export default function FeedPage() {
                     {r.platform && (
                       <span className="vibe v-n">{r.platform}</span>
                     )}
-                    {isRedditSourced(r.platform) && (
-                      <span className="vibe v-n" style={{ borderStyle: 'dashed', color: 'var(--dim)' }} title="Imported from a public Reddit thread, not submitted directly to Seen">{PUBLIC_DISCUSSION_LABEL}</span>
+                    {badge && (
+                      <span className="vibe v-n" style={{ borderStyle: 'dashed', color: 'var(--dim)' }} title={badge.title}>{badge.label}</span>
                     )}
                   </div>
 
-                  {r.report_text && (
+                  {body && (
                     <p style={{ fontFamily: 'var(--mono)', fontSize: '.68rem', color: 'var(--sub)', lineHeight: 1.7, margin: 0 }}>
-                      {r.report_text}
+                      {body}
                     </p>
+                  )}
+                  {src && (
+                    <div style={{ marginTop: '.45rem' }}>
+                      <ReportSourceLink url={src.url} host={src.host} posted={src.posted} />
+                    </div>
                   )}
                 </div>
               )
