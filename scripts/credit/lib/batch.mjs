@@ -81,7 +81,7 @@ export function costOfUsage(model, usage = {}) {
 }
 
 const ledgerPath = () => join(RUNS_DIR, 'ledger.json');
-function readJsonOrNull(path) {
+export function readJsonOrNull(path) {
   try { return JSON.parse(readFileSync(path, 'utf8')); }
   catch (e) { if (e.code === 'ENOENT') return null; throw e; }
 }
