@@ -7,6 +7,7 @@ import { RecentSearchesStore } from '@/lib/stores/RecentSearches'
 import { useIntroGate } from '@/lib/hooks/useIntroGate'
 import { useCountUp } from '@/lib/hooks/useCountUp'
 import { firstPartyReportCount } from '@/lib/server/reportCounts'
+import { isGradeableScore } from '@/lib/gradeGate'
 import styles from './HomeHero.module.css'
 
 const JOB_KEYWORDS = ['engineer', 'developer', 'manager', 'analyst', 'designer', 'nurse', 'coordinator', 'specialist', 'director', 'associate', 'assistant', 'recruiter', 'sales', 'marketing', 'accountant', 'therapist', 'technician']
@@ -108,7 +109,8 @@ export default function HomeHero() {
         if (!res.ok) return
         const data = await res.json() as { companies?: Array<{ name: string; industry?: string; score: Omit<ProofScore, 'name' | 'industry' | 'first_party_report_count'> & { first_party_report_count?: number; data_source?: string | null } }> }
         const match = (data.companies || []).find(c => c.name?.toLowerCase() === FEATURED_SEED.name.toLowerCase())
-        if (match && Number.isFinite(match.score?.overall_score)) {
+        // Grade gate: only refresh the proof card from a GRADEABLE score (≥5 real reports).
+        if (match && isGradeableScore(match.score)) {
           setProof({
             name: FEATURED_SEED.name,
             industry: match.industry || FEATURED_SEED.industry,

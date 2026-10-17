@@ -1,5 +1,5 @@
 import { ImageResponse } from 'next/og'
-import { getScore, titleCase, displayCompanyName, grade, riskColor, riskLabel, pct, firstPartyReportCount } from '@/lib/growth'
+import { getScore, titleCase, displayCompanyName, grade, riskColor, riskLabel, pct, firstPartyReportCount, MIN_REPORTS_FOR_GRADE } from '@/lib/growth'
 
 // Dynamic OG share image for company pages — the biggest virality lever. Renders the company's
 // REAL Seen Grade + ghost%/response% in an on-brand card. 1200×630. When no data exists we still
@@ -102,7 +102,10 @@ export async function GET(_req: Request, { params }: { params: Promise<{ slug: s
               </div>
             ) : (
               <div style={{ display: 'flex', fontSize: 30, color: '#9ca3af', marginTop: 20, maxWidth: 620, lineHeight: 1.4 }}>
-                {`No applicant reports yet. Be the first to report how ${name} treats applicants.`}
+                {fpOg > 0
+                  // Grade gate: some reports, but fewer than the bar — say so, never "no reports".
+                  ? `Not enough reviews to grade yet (${Math.min(fpOg, MIN_REPORTS_FOR_GRADE)} of ${MIN_REPORTS_FOR_GRADE}). Read what applicants report about ${name}.`
+                  : `No applicant reports yet. Be the first to report how ${name} treats applicants.`}
               </div>
             )}
           </div>

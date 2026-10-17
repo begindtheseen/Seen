@@ -15,11 +15,13 @@ import {
   GHOST_OUTCOMES, RESPONSE_OUTCOMES, NONTERMINAL_OUTCOMES,
 } from './companyIntel.js';
 import { explainListingScore, SCORE_RANGE, WASTE_RANGE } from '../../lib/server/jobScore.js';
+import { MIN_REPORTS_FOR_GRADE } from '../../lib/server/reportCounts.js';
 
 // Below this many reports actually counted toward the grade, the sample is treated as too
-// small for a firm reading — the PDF prints a strong low-sample warning. Exported so the
-// endpoint and the tests agree on one threshold.
-export const LOW_SAMPLE_THRESHOLD = 5;
+// small for a firm reading — the PDF prints a strong low-sample warning. It IS the public grade
+// gate (lib/server/reportCounts.js MIN_REPORTS_FOR_GRADE): below it Seen publishes no grade at all.
+// Exported so the endpoint and the tests agree on one threshold.
+export const LOW_SAMPLE_THRESHOLD = MIN_REPORTS_FOR_GRADE;
 
 // The seven use-classifications every source class in the audit is sorted into. A source
 // being AVAILABLE does not mean it affected the company grade — this taxonomy is what makes

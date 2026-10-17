@@ -13,7 +13,7 @@ import { buildSearchUrl, parseRedditSearchAtom } from './_utils/companyReddit.js
 import { SECURITY_PREAMBLE, fenceUntrusted, scanInjection } from '../lib/server/promptGuard.js';
 import { fetchIndustryBenchmark } from '../lib/server/benchmark.js';
 import { isEvidencedScore, suppressionReason, servedDataSource } from '../lib/server/scoreProvenance.js';
-import { firstPartyReportCount, webClaimCount } from '../lib/server/reportCounts.js';
+import { firstPartyReportCount, webClaimCount, gateScore, isGradeable } from '../lib/server/reportCounts.js';
 import { enqueueCompanyEnrichment } from '../lib/server/enrichmentQueue.js';
 
 // Authorize admin/cron-only actions (the Anthropic web-research endpoints). Accepts a Vercel
@@ -352,7 +352,9 @@ export default async function handler(req, res) {
       if (!r.ok) return res.status(200).json({ companies: [] });
       const rows = await r.json();
       const overall = s => s || 0;
-      const companies = (Array.isArray(rows) ? rows : []).map(c => ({
+      // Grade gate (lib/server/reportCounts.js): a ranked list is a list of verdicts, so only companies
+      // with enough real reports to be graded are on it.
+      const companies = (Array.isArray(rows) ? rows : []).filter(c => isGradeable(c)).map(c => ({
         name: c.company_name,
         industry: c.industry || '',
         verified: c.verification_status === 'verified',
@@ -599,7 +601,7 @@ export default async function handler(req, res) {
       const rows = r.ok ? await r.json() : [];
       const scores = {};
       (Array.isArray(rows) ? rows : []).forEach(row => {
-        scores[row.company_name.toLowerCase()] = {
+        scores[row.company_name.toLowerCase()] = gateScore({
           overall_score: row.overall_score,
           ghost_rate: row.ghost_rate,
           response_rate: row.response_rate,
@@ -609,7 +611,7 @@ export default async function handler(req, res) {
           first_party_report_count: firstPartyReportCount(row),
           web_report_count: webClaimCount(row),
           data_source: servedDataSource(row),
-        };
+        });
       });
       return res.json({ ok: true, scores });
     } catch { return res.json({ ok: true, scores: {} }); }
@@ -1441,7 +1443,9 @@ async function fetchCompanyStats(name, supabaseUrl, dbHeaders) {
     (Array.isArray(reps) ? reps : []).forEach(r => { const oc = r.outcome||'unknown'; dist[oc] = (dist[oc]||0)+1; });
     const ghost_rate = cs?.ghost_rate ?? (total >= 5 ? (dist.ghosted||0)/total : null);
     const response_rate = cs?.response_rate ?? (total >= 5 ? ((dist.hired||0)+(dist.offer||0)+(dist.interview||0)+(dist.human||0))/total : null);
-    return { company_name: cs?.company_name||name, overall_score: cs?.overall_score||null, ghost_rate, response_rate, avg_wait_days: cs?.avg_wait_days||null, avg_rounds: cs?.avg_rounds||null, waste_score: cs?.waste_score||null, report_count: total||firstPartyReportCount(cs), data_quality: cs?.data_quality||(total>=10?'strong':total>=3?'moderate':'limited'), outcome_dist: dist };
+    const realCount = total || firstPartyReportCount(cs);
+    // Grade gate (lib/server/reportCounts.js): no score / ghost / response rate below the report bar.
+    return gateScore({ company_name: cs?.company_name||name, overall_score: cs?.overall_score||null, ghost_rate, response_rate, avg_wait_days: cs?.avg_wait_days||null, avg_rounds: cs?.avg_rounds||null, waste_score: cs?.waste_score||null, report_count: realCount, first_party_report_count: realCount, data_quality: cs?.data_quality||(total>=10?'strong':total>=3?'moderate':'limited'), outcome_dist: dist });
   } catch(e) { return null; }
 }
 
@@ -1484,7 +1488,10 @@ const _SCORE_TTL_MS = 365 * 24 * 60 * 60 * 1000;
 function _calcScore(rr, gr, wait, cnt) { return calcOverallScore(rr, gr, wait, cnt); }
 function _calcWaste(ghostRate, avgRounds, unpaidRate) { return calcWaste(ghostRate, avgRounds, unpaidRate); }
 
-function _rowToScore(row) {
+// Every company-score response passes through gateScore (lib/server/reportCounts.js): below
+// MIN_REPORTS_FOR_GRADE real reports the payload keeps its counts/reviews but no verdict fields.
+function _rowToScore(row) { return gateScore(_rowToScoreRaw(row)); }
+function _rowToScoreRaw(row) {
   const base = row.overall_score;
   let reviews = [];
   if (row.web_reviews) {
@@ -1604,7 +1611,7 @@ async function handleCompanyScore(req, res, body) {
     try {
       const [aliasRes, scoresRes] = await Promise.all([
         fetch(`${SUPABASE_URL}/rest/v1/company_aliases?alias=ilike.${encodeURIComponent(q)}&select=canonical,alias&limit=3`, { headers: dbH }),
-        fetch(`${SUPABASE_URL}/rest/v1/company_scores?company_name=ilike.*${encodeURIComponent(qWord)}*&select=company_name,overall_score,ghost_rate,report_count,data_quality,verification_status&order=report_count.desc&limit=8`, { headers: dbH }),
+        fetch(`${SUPABASE_URL}/rest/v1/company_scores?company_name=ilike.*${encodeURIComponent(qWord)}*&select=company_name,overall_score,ghost_rate,report_count,first_party_report_count,data_source,data_quality,verification_status&order=report_count.desc&limit=8`, { headers: dbH }),
       ]);
       const aliases = aliasRes.ok ? await aliasRes.json() : [];
       const scores = scoresRes.ok ? await scoresRes.json() : [];
@@ -1613,7 +1620,7 @@ async function handleCompanyScore(req, res, body) {
       (Array.isArray(scores) ? scores : []).forEach(s => {
         const cn = (s.company_name || '').toLowerCase();
         let conf = cn === q ? 99 : cn.includes(q) || q.includes(cn) ? Math.round(Math.min(q.length, cn.length) / Math.max(q.length, cn.length) * 90) : Math.round([...q.split(' ')].filter(w => w.length > 1 && cn.includes(w)).length / Math.max(q.split(' ').length, 1) * 80);
-        if (!candidates.find(c => c.name.toLowerCase() === cn)) candidates.push({ name: s.company_name, match_confidence: conf, overall_score: s.overall_score, report_count: s.report_count, data_quality: s.data_quality, verification_status: s.verification_status });
+        if (!candidates.find(c => c.name.toLowerCase() === cn)) candidates.push({ name: s.company_name, match_confidence: conf, overall_score: isGradeable(s) ? s.overall_score : null, gradeable: isGradeable(s), report_count: s.report_count, data_quality: s.data_quality, verification_status: s.verification_status });
       });
       candidates.sort((a, b) => b.match_confidence - a.match_confidence);
       return res.status(200).json({ ok: true, query, candidates: candidates.slice(0, 5) });
@@ -1727,7 +1734,7 @@ async function handleCompanyScore(req, res, body) {
       const rowBase = { company_name:name.toLowerCase().trim(), overall_score:score.overall_score, ghost_rate:score.ghost_rate, response_rate:score.response_rate, avg_wait_days:score.avg_wait_days, avg_rounds:score.avg_rounds, waste_score:score.waste, unpaid_rate:score.unpaid_rate, report_count:score.report_count, first_party_report_count: score.first_party_report_count, web_report_count: score.web_report_count, data_quality:score.data_quality, data_source:'reports', industry:'', raw_summary:'', expires_at:expires };
       try { await fetch(`${SUPABASE_URL}/rest/v1/company_scores?on_conflict=company_name`, { method:'POST', headers:{...dbH,Prefer:'resolution=merge-duplicates,return=minimal'}, body:JSON.stringify({...rowBase, web_reviews:[]}) }); } catch(_e) {}
     }
-    return res.json({ ok: true, score, _src: 'reports' });
+    return res.json({ ok: true, score: gateScore(score), _src: 'reports' });
   }
 
   // 3. No reports yet. Queue this company for self-filling (public Reddit discussion → attributed,
@@ -1807,5 +1814,5 @@ async function handleCompanyScore(req, res, body) {
     } catch(e) { console.error('Save error:', e.message); }
   }
 
-  return res.json(await withEnrichment({ ok: true, score, _src: 'fresh' }));
+  return res.json(await withEnrichment({ ok: true, score: gateScore(score), _src: 'fresh' }));
 }

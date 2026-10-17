@@ -10,6 +10,7 @@ import { EventStore } from '@/lib/stores/EventStore'
 import { BadgeStore } from '@/lib/stores/BadgeStore'
 import WelcomeOnboarding from '@/components/WelcomeOnboarding'
 import type { Application } from '@/lib/types'
+import { isGradeableScore } from '@/lib/gradeGate'
 
 function companySlug(name: string) {
   return encodeURIComponent(name.toLowerCase().replace(/\s+/g, '-'))
@@ -127,8 +128,15 @@ export default function DashboardPage() {
       body: JSON.stringify({ action: 'batch_scores', names: cos }),
     })
       .then(r => r.ok ? r.json() : { scores: {} })
-      .then((d: { scores?: Record<string, {ghost_rate: number; overall_score: number; avg_wait_days: number}> }) => {
-        if (d.scores) setCoScores(d.scores)
+      .then((d: { scores?: Record<string, { ghost_rate?: number | null; overall_score?: number | null; avg_wait_days?: number | null; gradeable?: boolean | null; first_party_report_count?: number | null }> }) => {
+        if (!d.scores) return
+        // Grade gate (lib/gradeGate.ts): only companies with enough real reports feed ghost badges,
+        // stale-application thresholds and the average company score.
+        const graded: Record<string, {ghost_rate: number; overall_score: number; avg_wait_days: number}> = {}
+        for (const [k, v] of Object.entries(d.scores)) {
+          if (isGradeableScore(v) && typeof v.ghost_rate === 'number') graded[k] = { ghost_rate: v.ghost_rate, overall_score: v.overall_score, avg_wait_days: v.avg_wait_days ?? 0 }
+        }
+        setCoScores(graded)
       })
       .catch(() => {})
   }, [apps])

@@ -43,7 +43,8 @@ export async function generateMetadata(
   const s = await getScore(slug)
   const name = bestName(slug, s)
   const ghostPct = s?.ghost_rate != null ? Math.round(s.ghost_rate * 100) : null
-  const summary = await getCompanySummary(summaryKey(slug, s))
+  // AI summaries can quote rates — only for gradeable companies (5-report grade gate).
+  const summary = s?.gradeable ? await getCompanySummary(summaryKey(slug, s)) : null
 
   // Reddit-targeted: LLM/Google searches like "<company> hiring reddit" and "does <company>
   // ghost applicants" should land here. Real ghost % folded in when we have it. A grounded
@@ -86,7 +87,7 @@ export async function generateMetadata(
   }
 }
 
-const accentFor = (risk?: string): string =>
+const accentFor = (risk?: string | null): string =>
   risk === 'safe' ? 'var(--green)' : risk === 'danger' ? 'var(--red)' : 'var(--amber)'
 
 // One-sentence plain-English read on the data, for crawlers and humans alike.
@@ -105,7 +106,7 @@ export default async function CompanySlugLayout(
   const { slug } = await params
   const s = await getScore(slug)
   const name = bestName(slug, s)
-  const summary: CompanySummary | null = await getCompanySummary(summaryKey(slug, s))
+  const summary: CompanySummary | null = s?.gradeable ? await getCompanySummary(summaryKey(slug, s)) : null
   const pageUrl = `https://seenjobs.io/company/${slug}`
 
   const org: Record<string, unknown> = {

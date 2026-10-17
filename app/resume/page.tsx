@@ -15,6 +15,7 @@ import ApplicationIntelligencePanel, { type ApplicationIntelligence, type Confir
 import MatchAnalysisPanel from '@/components/optimizer/MatchAnalysisPanel'
 import type { MatchAnalysis } from '@/lib/resume-intelligence/engine'
 import ErrorBoundary from '@/components/ErrorBoundary'
+import { MIN_REPORTS_FOR_GRADE } from '@/lib/gradeGate'
 
 const ResumeSurveyModal = dynamic(() => import('@/components/ResumeSurveyModal'), { ssr: false })
 
@@ -39,6 +40,7 @@ interface OptimizerOutput {
   evidence_strength: number
   seniority_alignment: number
   company_process_score: number
+  company_process_known?: boolean
   risk_flags: RiskFlag[]
   missing_keywords: string[]
   matched_requirements: RequirementMatch[]
@@ -192,8 +194,12 @@ function FitView({ out, intel, jobCompany, insights }: { out: OptimizerOutput; i
       <Card>
         {kicker('Company hiring risk')}
         <div style={{ display: 'flex', alignItems: 'center', gap: '.6rem', marginBottom: out.risk_flags.length ? '.7rem' : 0 }}>
-          <span style={{ fontFamily: 'var(--display)', fontWeight: 800, fontSize: '1.1rem', color: scoreColor(out.company_process_score) }}>{Math.round(out.company_process_score)}<span style={{ fontSize: '.6rem', color: 'var(--muted)' }}>/100</span></span>
-          <span style={{ fontFamily: 'var(--mono)', fontSize: '.6rem', color: 'var(--muted)' }}>Seen hiring-process grade (applicant reports + public hiring data)</span>
+          {out.company_process_known === false ? (
+            <span style={{ fontFamily: 'var(--display)', fontWeight: 800, fontSize: '.85rem', color: 'var(--muted)' }}>Not graded yet</span>
+          ) : (
+            <span style={{ fontFamily: 'var(--display)', fontWeight: 800, fontSize: '1.1rem', color: scoreColor(out.company_process_score) }}>{Math.round(out.company_process_score)}<span style={{ fontSize: '.6rem', color: 'var(--muted)' }}>/100</span></span>
+          )}
+          <span style={{ fontFamily: 'var(--mono)', fontSize: '.6rem', color: 'var(--muted)' }}>{out.company_process_known === false ? `Fewer than ${MIN_REPORTS_FOR_GRADE} applicant reports — no grade yet` : 'Seen hiring-process grade (applicant reports + public hiring data)'}</span>
         </div>
         {out.risk_flags.length > 0 ? (
           <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: '.4rem' }}>
@@ -460,7 +466,9 @@ function ResumePageInner() {
     try {
       const r = await fetch(`/api/reports?type=company&name=${encodeURIComponent(company.trim())}`)
       const d = await r.json().catch(() => ({})) as { stats?: CompanyIntel }
-      if (d.stats && (d.stats.report_count || 0) > 0) setCompanyIntel(d.stats)
+      // Grade gate (lib/gradeGate.ts): this stats payload's report_count is real report rows; below
+      // MIN_REPORTS_FOR_GRADE the ghost/response/grade line would be a verdict from too little data.
+      if (d.stats && (d.stats.report_count || 0) >= MIN_REPORTS_FOR_GRADE) setCompanyIntel(d.stats)
     } catch { /* no intel */ }
   }
 

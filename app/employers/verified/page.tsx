@@ -1,4 +1,5 @@
 import type { Metadata } from 'next'
+import { MIN_REPORTS_FOR_GRADE } from '@/lib/gradeGate'
 import Link from 'next/link'
 import { EmployerNav, EmployerFooter } from '@/components/employer/EmployerNav'
 import { shapeVerifiedDirectory } from '@/lib/server/verifiedDirectory'
@@ -94,7 +95,7 @@ export default async function VerifiedDirectoryPage() {
                   <div style={{ display: 'flex', gap: '1.2rem' }}>
                     <div><div style={{ fontFamily: 'var(--display)', fontSize: '1rem', fontWeight: 800, color: 'var(--green)' }}>{c.responseRate == null ? '—' : `${c.responseRate}%`}</div><div style={{ fontFamily: 'var(--mono)', fontSize: '.5rem', color: 'var(--dim)', textTransform: 'uppercase', letterSpacing: '.06em' }}>response</div></div>
                     <div><div style={{ fontFamily: 'var(--display)', fontSize: '1rem', fontWeight: 800, color: 'var(--red)' }}>{c.ghostRate == null ? '—' : `${c.ghostRate}%`}</div><div style={{ fontFamily: 'var(--mono)', fontSize: '.5rem', color: 'var(--dim)', textTransform: 'uppercase', letterSpacing: '.06em' }}>ghost</div></div>
-                    <div style={{ marginLeft: 'auto', alignSelf: 'flex-end' }}><div style={{ fontFamily: 'var(--mono)', fontSize: '.5rem', color: 'var(--muted)' }}>{c.reportCount || 0} report{c.reportCount === 1 ? '' : 's'}</div></div>
+                    <div style={{ marginLeft: 'auto', alignSelf: 'flex-end' }}><div style={{ fontFamily: 'var(--mono)', fontSize: '.5rem', color: 'var(--muted)' }}>{c.reportCount || 0} report{c.reportCount === 1 ? '' : 's'}{c.grade == null ? ` · not graded yet (needs ${MIN_REPORTS_FOR_GRADE})` : ''}</div></div>
                   </div>
                 </Link>
               ))}

@@ -8,6 +8,7 @@ import { RecentSearchesStore } from '@/lib/stores/RecentSearches'
 import { useAuth } from '@/lib/auth'
 import { aiHeaders } from '@/lib/aiHeaders'
 import type { Job } from '@/lib/types'
+import { isGradeableScore } from '@/lib/gradeGate'
 
 // In-memory search cache: `${query}|${location}` → { jobs, ts }
 const searchCache = new Map<string, { jobs: Job[]; ts: number }>()
@@ -72,6 +73,8 @@ export type LevelFilter = '' | 'entry' | 'mid' | 'senior'
 export type TypeFilter = '' | 'Full-time' | 'Part-time' | 'Contract'
 export type PostedFilter = '' | '1' | '7' | '30'
 
+// Company intel for job cards. ONLY gradeable companies (≥5 real reports — lib/gradeGate.ts) are
+// ever put in this map, so every consumer can trust these numbers are earned verdicts.
 export type CoScoreMap = Record<string, { ghost_rate: number; overall_score: number; response_rate?: number }>
 
 export function useJobSearch() {
@@ -280,8 +283,17 @@ export function useJobSearch() {
       body: JSON.stringify({ action: 'batch_scores', names: cos }),
     })
       .then(r => r.ok ? r.json() : { scores: {} })
-      .then((d: { scores?: CoScoreMap }) => {
-        if (d.scores) setCoScores(prev => ({ ...prev, ...d.scores }))
+      .then((d: { scores?: Record<string, { ghost_rate?: number | null; overall_score?: number | null; response_rate?: number | null; gradeable?: boolean | null; first_party_report_count?: number | null }> }) => {
+        if (!d.scores) return
+        // Grade gate: drop ungraded companies (verdict fields null below the bar) so no card shows a
+        // ghost-rate badge or hiring probability built from too few reports.
+        const graded: CoScoreMap = {}
+        for (const [k, v] of Object.entries(d.scores)) {
+          if (isGradeableScore(v) && typeof v.ghost_rate === 'number') {
+            graded[k] = { ghost_rate: v.ghost_rate, overall_score: v.overall_score, ...(typeof v.response_rate === 'number' ? { response_rate: v.response_rate } : {}) }
+          }
+        }
+        setCoScores(prev => ({ ...prev, ...graded }))
       })
       .catch(() => {})
   }, [recommended, jobs])

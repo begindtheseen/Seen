@@ -43,6 +43,8 @@ function CompanyRow({ name, score, ghostRate, responseRate, sub }: { name: strin
 export default async function RedditPage() {
   // Ordered by first-party rows so genuinely-reported companies aren't crowded out of the window
   // by web-research claims.
+  // getLeaderboard returns only GRADEABLE companies (≥ MIN_REPORTS_FOR_GRADE real reports), so the
+  // verdict fields below are always present; the `?? 0` / `!` only satisfy the nullable types.
   const board = await getLeaderboard({ by: 'first_party' })
   const reportsOf = (c: (typeof board)[number]) => c.score.first_party_report_count
   const withReports = board.filter(c => reportsOf(c) > 0)
@@ -50,13 +52,13 @@ export default async function RedditPage() {
   // Real "worst ghosters" — highest ghost rate among companies with meaningful report volume.
   const ghosters = [...withReports]
     .filter(c => reportsOf(c) >= 50)
-    .sort((a, b) => b.score.ghost_rate - a.score.ghost_rate)
+    .sort((a, b) => (b.score.ghost_rate ?? 0) - (a.score.ghost_rate ?? 0))
     .slice(0, 8)
 
   // Real "fastest responders" — lowest avg wait + high response among safe-ish companies.
   const responders = [...withReports]
-    .filter(c => c.score.response_rate >= 0.6 && reportsOf(c) >= 50)
-    .sort((a, b) => a.score.avg_wait_days - b.score.avg_wait_days)
+    .filter(c => (c.score.response_rate ?? 0) >= 0.6 && reportsOf(c) >= 50)
+    .sort((a, b) => (a.score.avg_wait_days ?? 0) - (b.score.avg_wait_days ?? 0))
     .slice(0, 8)
 
   return (
@@ -82,7 +84,7 @@ export default async function RedditPage() {
             <h2 style={{ fontFamily: 'var(--display)', fontSize: '1.1rem', fontWeight: 700, color: 'var(--white)', margin: '0 0 .3rem' }}>The ghosters (apply with your eyes open)</h2>
             <p style={{ color: 'var(--sub)', fontSize: '.8rem', lineHeight: 1.6, margin: '0 0 1rem', fontWeight: 300 }}>Highest reported ghost rates among companies with real report volume. Not a verdict — a heads-up.</p>
             {ghosters.map(c => (
-              <CompanyRow key={c.name} name={c.name} score={c.score.overall_score} ghostRate={c.score.ghost_rate} responseRate={c.score.response_rate} sub={`${reportsOf(c).toLocaleString()} reports · ${riskLabel(c.score.risk_level)}`} />
+              <CompanyRow key={c.name} name={c.name} score={c.score.overall_score!} ghostRate={c.score.ghost_rate!} responseRate={c.score.response_rate!} sub={`${reportsOf(c).toLocaleString()} reports · ${riskLabel(c.score.risk_level)}`} />
             ))}
           </section>
         )}
@@ -100,7 +102,7 @@ export default async function RedditPage() {
             <h2 style={{ fontFamily: 'var(--display)', fontSize: '1.1rem', fontWeight: 700, color: 'var(--white)', margin: '0 0 .3rem' }}>The fast responders (where applying pays off)</h2>
             <p style={{ color: 'var(--sub)', fontSize: '.8rem', lineHeight: 1.6, margin: '0 0 1rem', fontWeight: 300 }}>Shortest reported wait times among companies that actually reply. These are worth your time.</p>
             {responders.map(c => (
-              <CompanyRow key={c.name} name={c.name} score={c.score.overall_score} ghostRate={c.score.ghost_rate} responseRate={c.score.response_rate} sub={`avg ${Math.round(c.score.avg_wait_days)}d wait · ${reportsOf(c).toLocaleString()} reports`} />
+              <CompanyRow key={c.name} name={c.name} score={c.score.overall_score!} ghostRate={c.score.ghost_rate!} responseRate={c.score.response_rate!} sub={`avg ${Math.round(c.score.avg_wait_days ?? 0)}d wait · ${reportsOf(c).toLocaleString()} reports`} />
             ))}
           </section>
         )}

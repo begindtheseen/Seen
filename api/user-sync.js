@@ -645,13 +645,15 @@ export default async function handler(req, res) {
 
     // Priority 3: Data verification (low-confidence companies). The column is
     // company_name — the bare `name` select 400'd and this tier never served a question.
+    // These are, by construction, companies below the grade gate (MIN_REPORTS_FOR_GRADE real
+    // reports) — so the prompt must not quote their ghost rate as a fact; it asks for the report
+    // that helps grade them instead.
     const coRes = await db(`company_scores?report_count=lt.5&ghost_rate=not.is.null&select=name:company_name,ghost_rate&order=report_count.asc&limit=10`);
     const lowCos = coRes.ok ? await coRes.json() : [];
     for (const co of lowCos) {
       const key = `verify_ghost|${co.name.toLowerCase()}`;
       if (!answered.has(key)) {
-        const pct = Math.round((co.ghost_rate || 0) * 100);
-        return res.status(200).json({ question: { key, company: co.name, prompt: `Our data shows ${co.name} has a ${pct}% ghost rate.`, text: `Did ${co.name} respond to your application?`, options: ['Yes, they responded','No, was ghosted','I haven\'t applied there'], credit_value: 1, source: 'verification' } });
+        return res.status(200).json({ question: { key, company: co.name, prompt: `${co.name} isn't graded yet — we need more applicant reports.`, text: `Did ${co.name} respond to your application?`, options: ['Yes, they responded','No, was ghosted','I haven\'t applied there'], credit_value: 1, source: 'verification' } });
       }
     }
 

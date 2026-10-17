@@ -3,12 +3,16 @@
 // exact pattern app/company/[slug]/layout.tsx getScore() already uses. NO external services.
 
 import { tenureAdjustment } from '@/api/_utils/companyScore.js'
-import { firstPartyReportCount as firstPartyCountOf, webClaimCount } from '@/lib/server/reportCounts.js'
+import { firstPartyReportCount as firstPartyCountOf, webClaimCount, isGradeable, MIN_REPORTS_FOR_GRADE } from '@/lib/server/reportCounts.js'
+
+export { MIN_REPORTS_FOR_GRADE }
 
 export type GrowthScore = {
   /** The STORED canonical company name (lowercase, real punctuation — e.g. "lowe's"). */
   company_name?: string | null
-  overall_score: number
+  /** False below MIN_REPORTS_FOR_GRADE real reports — then every verdict field below is null. */
+  gradeable: boolean
+  overall_score: number | null
   ghost_rate: number | null
   response_rate: number | null
   avg_wait_days: number | null
@@ -19,7 +23,7 @@ export type GrowthScore = {
   /** LLM web-research *claimed* mention count — never applicant reports. */
   web_report_count?: number | null
   data_source?: string | null
-  risk_level: 'safe' | 'warn' | 'danger'
+  risk_level: 'safe' | 'warn' | 'danger' | null
   industry?: string | null
   waste?: number | null
   summary?: string | null
@@ -38,10 +42,12 @@ export type LeaderboardRow = {
   industry?: string
   verified?: boolean
   score: {
-    overall_score: number
-    ghost_rate: number
-    response_rate: number
-    avg_wait_days: number
+    /** False below MIN_REPORTS_FOR_GRADE real reports — then the verdict fields are null. */
+    gradeable: boolean
+    overall_score: number | null
+    ghost_rate: number | null
+    response_rate: number | null
+    avg_wait_days: number | null
     /** FUSED total (first-party + web claim) — ordering/scoring only, NEVER label it "reports". */
     report_count: number
     /** Real applicant-report rows behind the score — the only count that may render as "reports". */
@@ -49,8 +55,8 @@ export type LeaderboardRow = {
     /** Web-research claimed mention count — an estimate input, never applicant reports. */
     web_report_count: number
     data_source: string | null
-    risk_level: 'safe' | 'warn' | 'danger'
-    waste: number
+    risk_level: 'safe' | 'warn' | 'danger' | null
+    waste: number | null
   }
 }
 
@@ -72,22 +78,26 @@ type ScoreDbRow = {
   data_source?: string | null
 }
 function toLeaderboardRow(c: ScoreDbRow): LeaderboardRow {
+  // Grade gate (lib/server/reportCounts.js): below the report bar the row keeps its counts but carries
+  // no verdict — every score field is null, never a 0 that would render as an "F".
+  const gradeable = isGradeable(c)
   const s = c.overall_score || 0
   return {
     name: c.company_name,
     industry: c.industry || '',
     verified: c.verification_status === 'verified',
     score: {
-      overall_score: s,
-      ghost_rate: c.ghost_rate || 0,
-      response_rate: c.response_rate || 0,
-      avg_wait_days: c.avg_wait_days || 0,
+      gradeable,
+      overall_score: gradeable ? s : null,
+      ghost_rate: gradeable ? c.ghost_rate || 0 : null,
+      response_rate: gradeable ? c.response_rate || 0 : null,
+      avg_wait_days: gradeable ? c.avg_wait_days || 0 : null,
       report_count: c.report_count || 0,
       first_party_report_count: firstPartyCountOf(c),
       web_report_count: webClaimCount(c),
       data_source: c.data_source ?? null,
-      risk_level: s >= 70 ? 'safe' : s >= 40 ? 'warn' : 'danger',
-      waste: c.waste_score || 0,
+      risk_level: gradeable ? (s >= 70 ? 'safe' : s >= 40 ? 'warn' : 'danger') : null,
+      waste: gradeable ? c.waste_score || 0 : null,
     },
   }
 }
@@ -147,20 +157,23 @@ async function scoreFromDb(name: string): Promise<GrowthScore | null> {
     // implementation imported, not mirrored, so the two can't drift.
     const tAdj = tenureAdjustment(row.avg_tenure_months, row.tenure_sample_count)
     const s = Math.max(0, Math.min(100, Math.round(row.overall_score + tAdj)))
+    // Same grade gate as api/reports.js gateScore: the OG card, SEO title and page must agree.
+    const gradeable = isGradeable(row)
     return {
       company_name: row.company_name ?? null,
-      overall_score: s,
-      ghost_rate: row.ghost_rate ?? null,
-      response_rate: row.response_rate ?? null,
-      avg_wait_days: row.avg_wait_days ?? null,
-      avg_rounds: row.avg_rounds ?? null,
+      gradeable,
+      overall_score: gradeable ? s : null,
+      ghost_rate: gradeable ? row.ghost_rate ?? null : null,
+      response_rate: gradeable ? row.response_rate ?? null : null,
+      avg_wait_days: gradeable ? row.avg_wait_days ?? null : null,
+      avg_rounds: gradeable ? row.avg_rounds ?? null : null,
       report_count: row.report_count ?? 0,
       first_party_report_count: row.first_party_report_count ?? null,
       web_report_count: row.web_report_count ?? null,
       data_source: row.data_source ?? null,
-      risk_level: s >= 70 ? 'safe' : s >= 40 ? 'warn' : 'danger',
+      risk_level: gradeable ? (s >= 70 ? 'safe' : s >= 40 ? 'warn' : 'danger') : null,
       industry: row.industry || null,
-      waste: row.waste_score ?? null,
+      waste: gradeable ? row.waste_score ?? null : null,
       summary: row.raw_summary || null,
     }
   } catch {
@@ -184,7 +197,8 @@ async function leaderboardFromDb(by: 'fused' | 'first_party' = 'fused'): Promise
     )
     if (!r.ok) return []
     const rows = await r.json()
-    return (Array.isArray(rows) ? rows : []).map(toLeaderboardRow)
+    // A leaderboard ranks verdicts — only gradeable companies are on it.
+    return (Array.isArray(rows) ? rows : []).map(toLeaderboardRow).filter((row) => row.score.gradeable)
   } catch {
     return []
   }
@@ -209,6 +223,7 @@ export const displayCompanyName = (name: string) =>
   String(name).split(' ').map((w) => (w ? w.charAt(0).toUpperCase() + w.slice(1) : w)).join(' ')
 
 // 0–100 score → letter grade. Matches the scale used on the companies leaderboard.
+// Callers must only pass a GRADEABLE score (see GrowthScore.gradeable) — never a 0 stand-in.
 export function grade(score: number): string {
   if (score >= 80) return 'A'
   if (score >= 65) return 'B'
@@ -217,10 +232,10 @@ export function grade(score: number): string {
   return 'F'
 }
 
-export const riskColor = (risk?: string): string =>
+export const riskColor = (risk?: string | null): string =>
   risk === 'safe' ? '#10b981' : risk === 'danger' ? '#ef4444' : '#f59e0b'
 
-export const riskLabel = (risk?: string): string =>
+export const riskLabel = (risk?: string | null): string =>
   risk === 'safe' ? 'SAFE' : risk === 'danger' ? 'DANGER' : 'CAUTION'
 
 export const pct = (v: number | null | undefined) =>

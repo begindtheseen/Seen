@@ -2,7 +2,7 @@ import type { Metadata } from 'next'
 import Link from 'next/link'
 import {
   getScore, titleCase, slugify, grade, riskColor, riskLabel, pct, firstPartyReportCount,
-  SEED_COMPANIES, type GrowthScore,
+  SEED_COMPANIES, MIN_REPORTS_FOR_GRADE, type GrowthScore,
 } from '@/lib/growth'
 import { jsonLdHtml } from '@/lib/jsonLd'
 
@@ -101,6 +101,7 @@ function MetricCard({ label, value, color }: { label: string; value: string; col
 }
 
 function DataPanel({ name, s }: { name: string; s: GrowthScore }) {
+  if (s.overall_score == null) return null // grade gate: only graded scores reach here
   const accent = riskColor(s.risk_level)
   const ghostPct = pct(s.ghost_rate)
   const respPct = pct(s.response_rate)
@@ -121,7 +122,7 @@ function DataPanel({ name, s }: { name: string; s: GrowthScore }) {
         {wait != null && <MetricCard label="Avg wait" value={`${wait}d`} color="var(--amber)" />}
       </div>
       <div style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', color: 'var(--dim)', marginTop: '.9rem' }}>
-        {fp > 0 ? `Based on ${fp.toLocaleString()} applicant report${fp === 1 ? '' : 's'}` : 'Estimated from aggregated public data'} · A community signal, not a verified fact
+        {`Based on ${fp.toLocaleString()} applicant report${fp === 1 ? '' : 's'}`} · A community signal, not a verified fact
       </div>
     </div>
   )
@@ -164,22 +165,25 @@ export default async function FaqSlugPage({ params }: { params: Promise<{ slug: 
   const year = new Date().getFullYear()
   // true → first-party applicant reports back the numbers; false → web-research estimate.
   const reported = firstPartyReportCount(s) > 0
+  // Grade gate: a grade/ghost% is shown only with ≥ MIN_REPORTS_FOR_GRADE real reports (getScore nulls
+  // the verdict fields below that). `fp` reports may still exist and are mentioned, never graded.
+  const fp = firstPartyReportCount(s)
+  const graded = s != null && s.overall_score != null ? s : null
+  const notEnough = `${name} isn't graded yet — it has ${Math.min(fp, MIN_REPORTS_FOR_GRADE)} of the ${MIN_REPORTS_FOR_GRADE} applicant reports Seen needs before it shows a grade or ghost rate.`
 
   const isGhost = parsed.kind === 'ghost'
   const h1 = isGhost ? `Does ${name} ghost applicants?` : `${name} hiring process: what to expect`
 
   // Short answer line — straight, factual, no fabrication.
   let shortAnswer: string
-  if (s && ghostPct != null && reported) {
+  if (graded && ghostPct != null && reported) {
     shortAnswer = isGhost
-      ? `Based on real reported outcomes, ${name} ghosts roughly ${ghostPct}% of applicants${respPct != null ? `, and responds to about ${respPct}%` : ''}. That puts ${name} at a Seen Grade of ${s.overall_score}/100 (${riskLabel(s.risk_level).toLowerCase()}).`
-      : `${name} carries a Seen Grade of ${s.overall_score}/100${wait != null ? `, with an average wait of about ${wait} days to hear back` : ''}${ghostPct != null ? ` and a ${ghostPct}% ghost rate` : ''}. Here's what applicants report.`
-  } else if (s && ghostPct != null) {
-    shortAnswer = isGhost
-      ? `No applicant has reported an outcome with ${name} on Seen yet. Seen's estimate from aggregated public hiring data puts its ghost rate at roughly ${ghostPct}%${respPct != null ? ` and its response rate at about ${respPct}%` : ''}, for an estimated Seen Grade of ${s.overall_score}/100 (${riskLabel(s.risk_level).toLowerCase()}).`
-      : `${name} has an estimated Seen Grade of ${s.overall_score}/100${wait != null ? `, with an estimated wait of about ${wait} days to hear back` : ''} and an estimated ${ghostPct}% ghost rate — from aggregated public hiring data, not yet from applicant reports.`
-  } else if (s) {
-    shortAnswer = `${name} has a Seen Grade of ${s.overall_score}/100. We don't yet have a precise ghost rate — add your experience to sharpen the picture for the next applicant.`
+      ? `Based on real reported outcomes, ${name} ghosts roughly ${ghostPct}% of applicants${respPct != null ? `, and responds to about ${respPct}%` : ''}. That puts ${name} at a Seen Grade of ${graded.overall_score}/100 (${riskLabel(graded.risk_level).toLowerCase()}).`
+      : `${name} carries a Seen Grade of ${graded.overall_score}/100${wait != null ? `, with an average wait of about ${wait} days to hear back` : ''}${ghostPct != null ? ` and a ${ghostPct}% ghost rate` : ''}. Here's what applicants report.`
+  } else if (graded) {
+    shortAnswer = `${name} has a Seen Grade of ${graded.overall_score}/100. We don't yet have a precise ghost rate — add your experience to sharpen the picture for the next applicant.`
+  } else if (fp > 0) {
+    shortAnswer = `${notEnough} Read what applicants have reported so far, and add yours if you've applied.`
   } else {
     shortAnswer = `We don't have enough applicant reports for ${name} yet. If you've applied, you can be the first to report what happened — and help the next person decide.`
   }
@@ -188,7 +192,7 @@ export default async function FaqSlugPage({ params }: { params: Promise<{ slug: 
   const faqQa: { q: string; a: string }[] = [
     {
       q: isGhost ? `Does ${name} ghost applicants?` : `How long does ${name}'s hiring process take?`,
-      a: s && ghostPct != null
+      a: graded && ghostPct != null
         ? (reported
             ? (isGhost
                 ? `${name} ghosts about ${ghostPct}% of applicants based on reported outcomes${respPct != null ? `, and responds to roughly ${respPct}%` : ''}.`
@@ -196,11 +200,11 @@ export default async function FaqSlugPage({ params }: { params: Promise<{ slug: 
             : (isGhost
                 ? `Seen has no applicant reports for ${name} yet. Its estimate from aggregated public hiring data is a ghost rate of about ${ghostPct}%${respPct != null ? ` and a response rate of roughly ${respPct}%` : ''}.`
                 : `Seen has no applicant reports for ${name} yet. Its estimate from aggregated public hiring data is an average wait of ${wait != null ? `about ${wait} days` : 'unknown length'}, with a ${ghostPct}% ghost rate.`))
-        : `We don't have enough verified reports for ${name} yet. Reported outcomes update this answer in real time.`,
+        : fp > 0 ? notEnough : `We don't have enough verified reports for ${name} yet. Reported outcomes update this answer in real time.`,
     },
     {
       q: `What is ${name}'s Seen Grade?`,
-      a: s ? `${name} has a Seen Grade of ${s.overall_score}/100 (${riskLabel(s.risk_level).toLowerCase()}). Higher is more transparent.` : `${name} doesn't have a Seen Grade yet — be the first to report.`,
+      a: graded ? `${name} has a Seen Grade of ${graded.overall_score}/100 (${riskLabel(graded.risk_level).toLowerCase()}). Higher is more transparent.` : fp > 0 ? notEnough : `${name} doesn't have a Seen Grade yet — be the first to report.`,
     },
     {
       q: `Is ${name}'s ghost rate a verified fact?`,
@@ -224,10 +228,10 @@ export default async function FaqSlugPage({ params }: { params: Promise<{ slug: 
         <h1 style={S.h1}>{h1}</h1>
         <p style={S.lead}>{shortAnswer}</p>
 
-        {s ? <DataPanel name={name} s={s} /> : (
+        {graded ? <DataPanel name={name} s={graded} /> : (
           <div style={{ background: 'var(--card)', border: '1px solid var(--line)', borderLeft: '3px solid var(--blue)', borderRadius: 12, padding: '1.2rem 1.25rem', margin: '0 0 1.8rem' }}>
-            <div style={{ fontFamily: 'var(--display)', fontWeight: 700, color: 'var(--white)', marginBottom: '.4rem' }}>No reports yet for {name}</div>
-            <p style={{ ...S.p, margin: 0 }}>Be the first to report how {name} treated your application. Your report becomes the data the next applicant searches for tonight.</p>
+            <div style={{ fontFamily: 'var(--display)', fontWeight: 700, color: 'var(--white)', marginBottom: '.4rem' }}>{fp > 0 ? `Not enough reviews to grade ${name} yet (${Math.min(fp, MIN_REPORTS_FOR_GRADE)} of ${MIN_REPORTS_FOR_GRADE})` : `No reports yet for ${name}`}</div>
+            <p style={{ ...S.p, margin: 0 }}>{fp > 0 ? `Read the ${fp} applicant report${fp === 1 ? '' : 's'} on ${name}'s page — and add yours so it can be graded fairly.` : `Be the first to report how ${name} treated your application. Your report becomes the data the next applicant searches for tonight.`}</p>
           </div>
         )}
 

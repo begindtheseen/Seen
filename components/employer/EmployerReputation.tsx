@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
+import { isGradeableScore, notEnoughReviewsLabel, MIN_REPORTS_FOR_GRADE } from '@/lib/gradeGate'
 import { useEmployerCompany } from './EmployerCompanyContext'
 import { useAuth } from '@/lib/auth'
 
@@ -68,7 +69,9 @@ export function EmployerReputation() {
   const ghost = pct(s?.ghost_rate)
   const reply = pct(s?.response_rate)
   const wait = s?.avg_wait_days != null ? Math.round(s.avg_wait_days) : null
-  const hasData = overall != null && (s?.report_count ?? 0) > 0
+  // Grade gate (lib/gradeGate.ts): employers see exactly what candidates see — no grade/rates
+  // until MIN_REPORTS_FOR_GRADE real reports back them.
+  const hasData = isGradeableScore(s) && (s?.report_count ?? 0) > 0
   // Honest split (migration 063): only first-party rows may render as "applicant reports" —
   // the web-research claimed count is an estimate, not applicants who reported this employer.
   const fpReports = s ? (s.first_party_report_count ?? (s.data_source === 'reports' ? (s.report_count ?? 0) : 0)) : 0
@@ -133,6 +136,14 @@ export function EmployerReputation() {
               </p>
               <a href="#promote" style={{ display: 'inline-block', background: 'none', border: '1px solid var(--line2)', borderRadius: 8, padding: '.5rem 1rem', fontFamily: 'var(--mono)', fontSize: '.62rem', color: 'var(--white)', textDecoration: 'none' }}>Get Transparency Verified →</a>
             </div>
+          </div>
+        ) : fpReports > 0 ? (
+          <div style={{ paddingTop: '1.4rem', borderTop: '1px solid var(--line)' }}>
+            <div style={{ fontFamily: 'var(--display)', fontSize: '.95rem', fontWeight: 700, color: 'var(--white)', marginBottom: '.35rem' }}>{notEnoughReviewsLabel(s)}</div>
+            <p style={{ color: 'var(--sub)', fontSize: '.8rem', lineHeight: 1.65, margin: '0 0 .9rem', maxWidth: 520 }}>
+              Candidates can read the {fpReports.toLocaleString()} applicant report{fpReports === 1 ? '' : 's'} about &ldquo;{checked}&rdquo;, but Seen doesn&apos;t grade a company or show ghost / response rates until at least {MIN_REPORTS_FOR_GRADE} real reports back it. Get Transparency Verified now so the first thing candidates see is your commitment to respond.
+            </p>
+            <a href="#promote" style={{ display: 'inline-block', background: 'linear-gradient(135deg,#1d4ed8,#7c3aed)', border: 'none', borderRadius: 8, padding: '.55rem 1.1rem', fontFamily: 'var(--display)', fontWeight: 800, fontSize: '.78rem', color: '#fff', textDecoration: 'none' }}>Get Transparency Verified →</a>
           </div>
         ) : (
           <div style={{ paddingTop: '1.4rem', borderTop: '1px solid var(--line)' }}>
