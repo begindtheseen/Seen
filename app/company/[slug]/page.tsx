@@ -1,6 +1,7 @@
 'use client'
 
-import { useState, useEffect, use, type CSSProperties, type ReactNode } from 'react'
+import { useState, useEffect, useRef, use, type CSSProperties, type ReactNode } from 'react'
+import { createPortal } from 'react-dom'
 import { Score } from '@/lib/score'
 import { useAuth } from '@/lib/auth'
 import { AppStore } from '@/lib/stores/AppStore'
@@ -444,6 +445,29 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
   // Reports render in pages of 5 — "Show more" reveals the rest; nothing is hidden for good.
   const [reportsShown, setReportsShown] = useState(5)
   const [copied, setCopied] = useState(false)
+  // Sticky context strip: once the hero's grade card scrolls under the nav, a slim bar keeps the
+  // company + grade in view with a way back — the page can be long, the context never leaves.
+  const heroRef = useRef<HTMLDivElement | null>(null)
+  const [stuck, setStuck] = useState(false)
+  // Portal target: .page-full keeps an (identity) transform from its entrance animation, which makes
+  // it the containing block for position:fixed — so the strip must live on <body> to pin to the viewport.
+  const [mounted, setMounted] = useState(false)
+  useEffect(() => { setMounted(true) }, [])
+  useEffect(() => {
+    const el = heroRef.current
+    if (!el || typeof IntersectionObserver === 'undefined') return
+    const io = new IntersectionObserver(([entry]) => {
+      setStuck(!entry.isIntersecting && entry.boundingClientRect.top < 0)
+    }, { rootMargin: '-58px 0px 0px 0px', threshold: 0 })
+    io.observe(el)
+    return () => io.disconnect()
+  }, [loading])
+  function goBack() {
+    let sameSite = false
+    try { sameSite = !!document.referrer && new URL(document.referrer).origin === window.location.origin } catch {}
+    if (sameSite && window.history.length > 1) window.history.back()
+    else window.location.href = '/companies'
+  }
 
   const [displayScore, setDisplayScore] = useState(0)
   const [showGradeCard, setShowGradeCard] = useState(false)
@@ -763,8 +787,26 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
           </div>
         )}
 
+        {/* ── Sticky context strip (appears once the hero scrolls away) ── */}
+        {mounted && createPortal(
+          <div className={`co-sticky${stuck ? ' show' : ''}`} aria-hidden={!stuck}>
+            <div className="co-sticky-in">
+              <button type="button" className="co-sticky-back" onClick={goBack} aria-label="Back" tabIndex={stuck ? 0 : -1}>←</button>
+              <span className="co-sticky-logo" aria-hidden>{logoLetter}</span>
+              <span className="co-sticky-name">{companyName}</span>
+              {score && (
+                <span className="co-sticky-grade">
+                  <span className={`co-sticky-letter ${risk}`}>{g}</span>
+                  <span className="co-sticky-score">{score.overall_score}<span>/100</span></span>
+                </span>
+              )}
+            </div>
+          </div>,
+          document.body
+        )}
+
         {/* ── Hero: who, the grade, one verdict, the numbers — each shown exactly once ── */}
-        <div className="co-hdr">
+        <div className="co-hdr" ref={heroRef}>
           <div className="co-top">
             <div className="co-logo-lg">{logoLetter}</div>
             <div className="co-id">
