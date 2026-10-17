@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { AppStore } from '@/lib/stores/AppStore'
-import { reportSourceBadge, reportSourceLink } from '@/lib/reportSource'
+import { isPublicDiscussion, reportDate, reportSourceBadge, reportSourceLink } from '@/lib/reportSource'
 import ReportSourceLink from '@/components/ReportSourceLink'
 
 type Filter = 'all' | 'ghosted' | 'rejected' | 'interviewing' | 'hired'
@@ -200,7 +200,7 @@ export default function FeedPage() {
                       )}
                     </div>
                     <span style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', color: 'var(--muted)', flexShrink: 0 }}>
-                      {timeAgo(r.created_at)}
+                      {isPublicDiscussion(r.platform) ? reportDate(r.platform, r.report_text, r.created_at).label : timeAgo(r.created_at)}
                     </span>
                   </div>
 

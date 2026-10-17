@@ -238,6 +238,13 @@ export function selectThreads(items, name, { cap = ENRICH_DEFAULTS.threads, impo
   return out;
 }
 
+/** An ISO timestamp / date → "YYYY-MM-DD" (UTC), or null when missing, invalid or in the future. */
+export function postedDay(iso, now = Date.now()) {
+  const t = Date.parse(String(iso || ''));
+  if (!Number.isFinite(t) || t > now + 86_400_000 || t < Date.UTC(2005, 0, 1)) return null;
+  return new Date(t).toISOString().slice(0, 10);
+}
+
 /** Canonical, safe thread link appended to report_text (lib/reportSource.ts renders it as attribution). */
 export function canonicalPermalink(subreddit, threadId) {
   const sub = String(subreddit || '').replace(/^r\//, '');
@@ -433,15 +440,18 @@ export function normalizeCity(raw) {
  * reportSourceLink renders it as the attribution link; it accepts only reddit hosts for Reddit rows).
  * Every key always present so a PostgREST bulk insert has uniform keys.
  */
-export function buildReportRow(exp, { companyName, subreddit, threadId, companyId = null, locationId = null }) {
+export function buildReportRow(exp, { companyName, subreddit, threadId, companyId = null, locationId = null, posted = null }) {
   const link = canonicalPermalink(subreddit, threadId);
   const summary = String(exp.summary).trim().slice(0, 1800);
+  // The thread's own date travels in the attribution (lib/reportSource.ts reportDate shows it) —
+  // created_at is only the import time, so without this every auto-filled report reads "today".
+  const day = postedDay(posted);
   return {
     company_name: String(companyName).toLowerCase().trim(),
     platform: `Reddit r/${subreddit}`,
     outcome: exp.outcome,
     role: exp.role ? String(exp.role).trim().slice(0, 200) : '', // reports.role is NOT NULL (prod)
-    report_text: link ? `${summary} ${link}` : summary,
+    report_text: link ? `${summary} [Public reddit.com post${day ? `, posted ${day}` : ''}: ${link}]` : summary,
     source: 'reddit',
     outcome_weight: REDDIT_WEIGHT,
     trust_reason: TRUST_REASON,
