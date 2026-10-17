@@ -6,7 +6,7 @@ import { applyRateLimit } from '../lib/server/ratelimit.js';
 import { logError } from '../lib/server/errlog.js';
 import { calcOverallScore, calcWaste, tenureAdjustment, scoreConfidence, confidenceLabel, aggregateTenure, MIN_TENURE_SAMPLE } from './_utils/companyScore.js';
 import { fuseCompanyIntel, classifyPlatform, WEB_CLAIM_CAP } from './_utils/companyIntel.js';
-import { recomputeCompanyScoreFromReports, fetchConfirmedStaleCount } from './_utils/reportWrite.js';
+import { recomputeCompanyScoreFromReports, fetchConfirmedStaleCount, resolveOrCreateCompany, resolveOrCreateLocation } from './_utils/reportWrite.js';
 import { anthropicEnabled } from '../lib/server/aiflag.js';
 import { listEmployerListings, closeEmployerListing } from '../lib/server/employerListings.js';
 import { buildSearchUrl, parseRedditSearchAtom } from './_utils/companyReddit.js';
@@ -435,10 +435,22 @@ export default async function handler(req, res) {
       if (!safeCompany) return res.status(400).json({ error: 'company required' });
       // Same anti-Sybil down-weighting as the full submit path (dedup + per-account daily cap).
       const trust = await assessSubmitTrust(SUPABASE_URL, hdrsBase, uid, `company_name=ilike.${encodeURIComponent(safeCompany)}`);
+      // reports has no `city` column (city lives on company_locations via location_id, like the
+      // full `submit` path) — sending one made PostgREST reject every quick submit that named a city.
+      // Location is best-effort: a lookup failure must never block the outcome itself.
+      const loc = {};
+      if (safeCity) {
+        try {
+          const cid = await resolveOrCreateCompany(SUPABASE_URL, { ...hdrsBase, Prefer: 'return=representation' }, safeCompany);
+          const lid = cid ? await resolveOrCreateLocation(SUPABASE_URL, { ...hdrsBase, Prefer: 'return=representation' }, cid, safeCity) : null;
+          if (cid) loc.company_id = cid;
+          if (lid) loc.location_id = lid;
+        } catch { /* outcome still submits without a location */ }
+      }
       const r = await fetch(`${SUPABASE_URL}/rest/v1/reports`, {
         method: 'POST',
         headers: { ...hdrsBase, Prefer: 'return=minimal' },
-        body: JSON.stringify({ company_name: safeCompany, outcome, role: safeRole, city: safeCity, platform: 'Seen', experience_level: 'Unknown', outcome_weight: trust.weight, needs_review: trust.review, trust_reason: trust.reason, user_id: uid }),
+        body: JSON.stringify({ company_name: safeCompany, outcome, role: safeRole, ...loc, platform: 'Seen', experience_level: 'Unknown', outcome_weight: trust.weight, needs_review: trust.review, trust_reason: trust.reason, user_id: uid }),
       });
       if (!r.ok) {
         const e = await r.text().catch(() => '');
