@@ -12,6 +12,7 @@ import OutcomeCard from '@/components/OutcomeCard'
 import RoundsPrompt from '@/components/RoundsPrompt'
 import { firstPartyReportCount } from '@/lib/server/reportCounts'
 import { isGradeableScore } from '@/lib/gradeGate'
+import ModalPortal from '@/components/ModalPortal'
 const SurveyModal = dynamic(() => import('@/components/SurveyModal'), { ssr: false })
 const ResumeSurveyModal = dynamic(() => import('@/components/ResumeSurveyModal'), { ssr: false })
 
@@ -493,6 +494,7 @@ function TrackerPage() {
     <>
     {/* Manual add modal */}
     {showManual && (
+      <ModalPortal>
       <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.8)', zIndex: 9000, backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
         onClick={e => { if (e.target === e.currentTarget) setShowManual(false) }}>
         <div style={{ width: 'calc(100% - 2rem)', maxWidth: 440, background: 'var(--surface)', border: '1px solid rgba(99,102,241,.25)', borderRadius: 14, overflow: 'hidden', boxShadow: '0 32px 96px rgba(0,0,0,.7),0 0 72px rgba(99,102,241,.18),0 0 140px rgba(124,58,237,.08)' }}>
@@ -529,6 +531,7 @@ function TrackerPage() {
           </div>
         </div>
       </div>
+      </ModalPortal>
     )}
     {outcomeApp && <OutcomeCard app={outcomeApp} onClose={() => setOutcomeApp(null)} />}
     {roundsApp && !outcomeApp && (

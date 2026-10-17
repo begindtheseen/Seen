@@ -10,6 +10,11 @@
 //                 never directly edit/delete an existing listing — every change is a dispute an ADMIN
 //                 approves/denies (api/admin-stats.js). Filing one notifies nobody until an admin acts.
 //   • disputes  → your filed disputes + their verdicts.
+//   • import_preview → { url } of a listing on ANY site (your ATS, Indeed, LinkedIn, …). Runs the
+//                 same resolution ladder + SSRF guards as the seeker import (lib/server/listingResolve.js)
+//                 and returns the parsed fields to PREFILL the create form. Writes nothing — the
+//                 employer reviews, edits and posts through `create`, so it is employer-posted and
+//                 gets the same search priority as a typed-in listing.
 //
 // NO DATA BLEED: every action is scoped to the caller's companyKey. `list`/`disputes` only ever read
 // this company's rows; `dispute` verifies the target listing's company matches before accepting it;
@@ -19,11 +24,14 @@
 import { resolveEmployerUid, resolveApprovedClaim } from '../lib/server/employerAuth.js';
 import { normalizeClaimCompany } from '../lib/server/employerClaims.js';
 import {
-  validateNewListing, buildEmployerListingRow, applyCounts, annotateListings, isRemoteLocation,
+  validateNewListing, buildEmployerListingRow, applyCounts, annotateListings, isRemoteLocation, buildImportPreview,
 } from '../lib/server/employerPostings.js';
 import { validateDisputeInput } from '../lib/server/listingDisputes.js';
 import { broadcastActivity } from '../lib/server/realtime.js';
 import { geocodeLocation } from '../lib/server/geo.js';
+import { rateLimit } from '../lib/server/ratelimit.js';
+import { validateListingUrl } from '../lib/server/listingImport.js';
+import { resolveListing } from '../lib/server/listingResolve.js';
 
 const ALLOWED = ['https://seenjobs.io', 'https://www.seenjobs.io'];
 const LISTING_TTL_DAYS = 60; // employer-posted listings live 60 days, matching paste-a-link imports.
@@ -88,6 +96,7 @@ async function route(req, res) {
   if (action === 'delete') return deleteOwnListing(res, ctx);
   if (action === 'dispute') return fileDispute(res, ctx);
   if (action === 'disputes') return listDisputes(res, ctx);
+  if (action === 'import_preview') return importPreview(req, res, ctx);
   return res.status(400).json({ error: 'Unknown action' });
 }
 
@@ -207,6 +216,37 @@ async function createListing(res, { db, body, uid, claim }) {
   }
   const listing = (await insRes.json())[0] || null;
   return res.status(200).json({ ok: true, listing });
+}
+
+// ── import_preview: parse a listing link into the create form (writes nothing) ─
+async function importPreview(req, res, { body, uid, claim }) {
+  const v = validateListingUrl(body.url);
+  if (!v.ok) return res.status(400).json({ error: v.error });
+
+  // Each preview fetches an external page — per-employer hourly cap (fails open on a limiter blip).
+  const rl = await rateLimit(req, 'employer-import', { bucketKey: `user:${uid}` });
+  if (!rl.allowed) return res.status(429).json({ error: 'Too many imports this hour — try again later.' });
+
+  let resolved;
+  try {
+    resolved = await resolveListing(v);
+  } catch (e) {
+    if (e.message === 'unreachable' || e.message === 'unresolvable') {
+      return res.status(400).json({ error: 'That link isn’t reachable from here.' });
+    }
+    console.error('[employer-listings] import_preview failed:', e?.message || e);
+    resolved = { fields: {}, rungs: [{ rung: 'direct', error: e?.message || 'failed' }], blocked: true };
+  }
+  const preview = buildImportPreview(resolved.fields, { url: v.url, claimCompanyName: claim.companyName });
+  if (preview.needs_details) {
+    console.warn(`[employer-listings] import_preview needs input (${preview.missing.join(',')}): ${v.host} — ${JSON.stringify(resolved.rungs)}`);
+  }
+  return res.status(200).json({
+    ok: true,
+    ...preview,
+    your_company: claim.companyName,
+    page_fetched: (resolved.rungs || []).some((r) => r.blocked === false),
+  });
 }
 
 // ── delete: remove an employer's OWN posted listing (direct — no admin needed) ─

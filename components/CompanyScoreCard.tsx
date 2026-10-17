@@ -7,6 +7,7 @@
 
 import { useEffect, useState, useRef } from 'react'
 import { createPortal } from 'react-dom'
+import { useScrollLock } from '@/components/ModalPortal'
 import { drawCompanyCard, type CompanyCardData } from '@/lib/cardKit'
 import { shareCardImage, shareHint, type ShareDest } from '@/lib/shareCard'
 import { track } from '@/lib/analytics'
@@ -115,6 +116,7 @@ export default function CompanyScoreCard({ data, shareUrl, onClose, onShared }: 
     if (dest !== 'download') setTimeout(onClose, 400)
   }
 
+  useScrollLock(mounted)
   if (!mounted) return null
 
   return createPortal(

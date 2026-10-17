@@ -9,6 +9,7 @@ import { useAuth } from '@/lib/auth'
 import { aiHeaders } from '@/lib/aiHeaders'
 import type { Job } from '@/lib/types'
 import { isGradeableScore } from '@/lib/gradeGate'
+import { sortByPriority } from '@/lib/server/jobPriority.js'
 
 // In-memory search cache: `${query}|${location}` → { jobs, ts }
 const searchCache = new Map<string, { jobs: Job[]; ts: number }>()
@@ -112,9 +113,11 @@ export function useJobSearch() {
   function applySort(list: Job[], mode: SortMode): Job[] {
     const copy = [...list]
     // Unrated (null) listings sort to the end of a score/waste sort — never treated as 0.
-    if (mode === 'waste') return copy.sort((a, b) => (a.waste ?? Infinity) - (b.waste ?? Infinity))
-    if (mode === 'recent') return copy // preserve server order (most recent first)
-    return copy.sort((a, b) => (b.score ?? -Infinity) - (a.score ?? -Infinity)) // transparency
+    if (mode === 'waste') copy.sort((a, b) => (a.waste ?? Infinity) - (b.waste ?? Infinity))
+    else if (mode !== 'recent') copy.sort((a, b) => (b.score ?? -Infinity) - (a.score ?? -Infinity)) // transparency
+    // 'recent' keeps server order. Every mode then keeps Featured and posted-on-Seen listings
+    // first (stable, so the chosen sort still orders within each tier) — lib/server/jobPriority.js.
+    return sortByPriority(copy)
   }
 
   function applyFilters(list: Job[]): Job[] {

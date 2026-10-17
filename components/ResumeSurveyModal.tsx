@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
+import ModalPortal from '@/components/ModalPortal'
 
 interface SurveyQuestion {
   key: string
@@ -174,6 +175,7 @@ export default function ResumeSurveyModal({ onClose, onCreditsEarned, onExhauste
         .rs-anim { animation: rsFade .25s ease forwards; }
       `}</style>
 
+      <ModalPortal>
       <div style={backdrop} onClick={e => { if (e.target === e.currentTarget) onClose() }}>
         <div style={modal}>
           <button style={close} onClick={onClose} aria-label="Close">×</button>
@@ -308,6 +310,7 @@ export default function ResumeSurveyModal({ onClose, onCreditsEarned, onExhauste
           )}
         </div>
       </div>
+      </ModalPortal>
     </>
   )
 }

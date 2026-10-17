@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useAuth } from '@/lib/auth'
+import ModalPortal from '@/components/ModalPortal'
 
 // Manage your listings — the LOGIN-SCOPED listings manager (POST /api/employer-listings).
 //
@@ -285,8 +286,9 @@ export function EmployerListingsManager() {
             Manage your listings{company ? <span style={{ color: 'var(--sub)', textTransform: 'capitalize' }}> — {company}</span> : null}
           </h2>
           <p style={{ ...bodyText, marginBottom: '1rem' }}>
-            Every listing Seen has matched to your company. Post a new role and delete it anytime;
-            for aggregated listings, dispute one that&apos;s inactive, wrong, or not yours — an admin
+            Every listing Seen has matched to your company. Post a new role (or import one from a link)
+            and delete it anytime — listings you post or import on Seen appear ahead of aggregated
+            listings in matching searches. For aggregated listings, dispute one that&apos;s inactive, wrong, or not yours — an admin
             reviews every dispute, so nothing third-party changes until it&apos;s approved.
           </p>
         </div>
@@ -445,6 +447,55 @@ function AddListingForm({ token, onCreated, initial }: { token: () => Promise<st
   const [type, setType] = useState('Full-time')
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState('')
+  // Import from a link → api/employer-listings import_preview (writes nothing; just prefills).
+  const [importUrl, setImportUrl] = useState('')
+  const [importing, setImporting] = useState(false)
+  const [importNote, setImportNote] = useState<{ tone: 'ok' | 'warn' | 'err'; text: string } | null>(null)
+
+  async function importFromLink() {
+    const url = importUrl.trim()
+    if (!/^https?:\/\//i.test(url)) { setImportNote({ tone: 'err', text: 'Paste the full listing link (https://…).' }); return }
+    setImporting(true); setImportNote(null)
+    try {
+      const authToken = await token()
+      if (!authToken) { setImportNote({ tone: 'err', text: 'Your session expired — please sign in again.' }); return }
+      const r = await fetch('/api/employer-listings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${authToken}` },
+        body: JSON.stringify({ action: 'import_preview', url }),
+      })
+      const d = await r.json().catch(() => ({}))
+      if (!r.ok || !d?.listing) { setImportNote({ tone: 'err', text: d?.error || 'Could not read that link — fill the form in by hand.' }); return }
+      const l = d.listing as { title: string; company: string; location: string; salary: string; type: string; description: string; apply_url: string }
+      // Only overwrite with what the link actually gave us — never blank out typed fields.
+      if (l.title) setTitle(l.title)
+      if (l.apply_url) setApplyUrl(l.apply_url)
+      if (l.location) setLocation(l.location)
+      if (l.salary) setSalary(l.salary)
+      if (l.description) setDescription(l.description)
+      if (l.type === 'Part-time' || l.type === 'Full-time') setType(l.type)
+      const notes: string[] = []
+      let tone: 'ok' | 'warn' = 'ok'
+      if (d.company_matches === false) {
+        tone = 'warn'
+        notes.push(`This listing names “${l.company}”, not ${d.your_company || 'your company'}. It will post under ${d.your_company || 'your company'} — only post roles you're hiring for.`)
+      } else if (d.company_matches == null) {
+        tone = 'warn'
+        notes.push(`We couldn't tell which company this listing is for — check it's one of yours.`)
+      }
+      const missing: string[] = Array.isArray(d.missing) ? d.missing : []
+      if (missing.length) {
+        tone = 'warn'
+        const names: Record<string, string> = { title: 'the title', description: 'the description', apply_url: 'the apply link' }
+        notes.push(`We couldn't read ${missing.map(m => names[m] || m).join(' or ')} from that page — fill ${missing.length > 1 ? 'them' : 'it'} in below.`)
+      }
+      setImportNote({ tone, text: notes.length ? notes.join(' ') : 'Imported — review the details below, then post.' })
+    } catch {
+      setImportNote({ tone: 'err', text: 'Could not read that link — fill the form in by hand.' })
+    } finally {
+      setImporting(false)
+    }
+  }
 
   const label: React.CSSProperties = { ...mono('.55rem', 'var(--sub)'), textTransform: 'uppercase', letterSpacing: '.08em', marginBottom: '.3rem', display: 'block' }
   const field: React.CSSProperties = { ...inputStyle, width: '100%', minWidth: 0 }
@@ -481,6 +532,19 @@ function AddListingForm({ token, onCreated, initial }: { token: () => Promise<st
   return (
     <div style={{ background: 'var(--raised)', border: '1px solid var(--line2)', borderRadius: 12, padding: '1.2rem', margin: '1.3rem 0' }}>
       <div style={{ ...mono('.55rem', 'var(--blue)'), textTransform: 'uppercase', letterSpacing: '.12em', marginBottom: '.9rem' }}>Add a listing</div>
+      <div style={{ marginBottom: '1rem', paddingBottom: '1rem', borderBottom: '1px solid var(--line)' }}>
+        <label style={label}>Import from a link — your careers page, ATS, Indeed, LinkedIn…</label>
+        <div style={{ display: 'flex', gap: '.5rem', flexWrap: 'wrap' }}>
+          <input value={importUrl} onChange={e => setImportUrl(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') importFromLink() }} placeholder="https://boards.greenhouse.io/yourco/jobs/123" style={{ ...field, flex: '1 1 240px', width: 'auto' }} />
+          <button onClick={importFromLink} disabled={importing} style={{ ...ghostBtn, opacity: importing ? .6 : 1 }}>{importing ? 'Reading…' : 'Import'}</button>
+        </div>
+        <div style={{ ...mono('.55rem', 'var(--dim)'), marginTop: '.4rem', lineHeight: 1.6 }}>
+          We fill in the form below from the listing — you review it before anything is posted. Applicants are sent to the original link. Listings you post or import on Seen show ahead of aggregated listings in matching searches.
+        </div>
+        {importNote && (
+          <div style={{ ...mono('.6rem', importNote.tone === 'err' ? 'var(--red)' : importNote.tone === 'warn' ? 'var(--amber)' : 'var(--green)'), marginTop: '.55rem', lineHeight: 1.6 }}>{importNote.text}</div>
+        )}
+      </div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(200px,1fr))', gap: '.9rem' }}>
         <div>
           <label style={label}>Title *</label>
@@ -559,6 +623,7 @@ function DisputeModal({ listing, token, onClose, onSubmitted, defaultKind }: { l
   }
 
   return (
+    <ModalPortal>
     <div onClick={onClose} style={{ position: 'fixed', inset: 0, zIndex: 200, background: 'rgba(2,4,10,.86)', backdropFilter: 'blur(6px)', WebkitBackdropFilter: 'blur(6px)', display: 'flex', alignItems: 'flex-start', justifyContent: 'center', padding: '4vh 1rem', overflowY: 'auto' }}>
       {/* SOLID surface — var(--card) is a translucent 3%-white raised tint (fine layered over a
           solid bg, but see-through as a floating panel), so the modal uses an opaque background. */}
@@ -606,5 +671,6 @@ function DisputeModal({ listing, token, onClose, onSubmitted, defaultKind }: { l
         </div>
       </div>
     </div>
+    </ModalPortal>
   )
 }

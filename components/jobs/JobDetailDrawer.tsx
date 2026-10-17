@@ -5,6 +5,7 @@ import { Score } from '@/lib/score'
 import { SavedJobsStore } from '@/lib/stores/SavedJobs'
 import { aiHeaders } from '@/lib/aiHeaders'
 import type { Job } from '@/lib/types'
+import ModalPortal from '@/components/ModalPortal'
 
 // ── Job detail drawer helpers ─────────────────────────────────────────────────
 
@@ -95,7 +96,7 @@ export default function JobDetailDrawer({ job, isLoggedIn, onClose, onApply, onC
   const chips = [job.type, job.level, job.salary && job.salary !== '—' ? job.salary : ''].filter(Boolean) as string[]
 
   return (
-    <>
+    <ModalPortal>
       {/* Backdrop */}
       <div
         style={{
@@ -291,6 +292,6 @@ export default function JobDetailDrawer({ job, isLoggedIn, onClose, onApply, onC
           </div>
         </div>
       </div>
-    </>
+    </ModalPortal>
   )
 }

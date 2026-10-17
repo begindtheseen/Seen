@@ -453,8 +453,8 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
   // company + grade in view with a way back — the page can be long, the context never leaves.
   const heroRef = useRef<HTMLDivElement | null>(null)
   const [stuck, setStuck] = useState(false)
-  // Portal target: .page-full keeps an (identity) transform from its entrance animation, which makes
-  // it the containing block for position:fixed — so the strip must live on <body> to pin to the viewport.
+  // Portal target: render the strip on <body> so no transformed/filtered ancestor can ever become its
+  // containing block (.page-full's entrance animation used to hold a transform — see globals.css pageIn).
   const [mounted, setMounted] = useState(false)
   useEffect(() => { setMounted(true) }, [])
   useEffect(() => {

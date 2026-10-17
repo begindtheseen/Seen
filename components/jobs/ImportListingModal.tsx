@@ -13,6 +13,7 @@
 import { useState } from 'react'
 import type { Job } from '@/lib/types'
 import { parsePastedListing } from '@/lib/pastedListing'
+import ModalPortal from '@/components/ModalPortal'
 
 const numOrNull = (v: unknown): number | null => {
   const n = Number(v)
@@ -156,6 +157,7 @@ export default function ImportListingModal({
   }
 
   return (
+    <ModalPortal>
     <div style={overlay} onClick={onClose}>
       <div style={sheet} onClick={e => e.stopPropagation()}>
         <div style={{ padding: '.85rem 1.1rem', borderBottom: '1px solid var(--line)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -274,5 +276,6 @@ export default function ImportListingModal({
         </div>
       </div>
     </div>
+    </ModalPortal>
   )
 }

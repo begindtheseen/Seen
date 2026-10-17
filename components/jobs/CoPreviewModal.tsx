@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { firstPartyReportCount } from '@/lib/server/reportCounts'
 import { isGradeableScore, notEnoughReviewsLabel } from '@/lib/gradeGate'
+import ModalPortal from '@/components/ModalPortal'
 
 // ── Company Preview Modal ─────────────────────────────────────────────────────
 
@@ -68,6 +69,7 @@ export default function CoPreviewModal({ company, onClose }: { company: string; 
   const gradeColor = risk === 'safe' ? 'var(--green)' : risk === 'danger' ? 'var(--red)' : 'var(--amber)'
 
   return (
+    <ModalPortal>
     <div
       style={{ position: 'fixed', inset: 0, zIndex: 9500, background: 'rgba(0,0,0,.8)', backdropFilter: 'blur(6px)' }}
       onClick={onClose}
@@ -160,5 +162,6 @@ export default function CoPreviewModal({ company, onClose }: { company: string; 
         </div>
       </div>
     </div>
+    </ModalPortal>
   )
 }

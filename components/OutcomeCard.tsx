@@ -7,6 +7,7 @@
 
 import { useEffect, useState, useRef } from 'react'
 import { createPortal } from 'react-dom'
+import { useScrollLock } from '@/components/ModalPortal'
 import type { Application } from '@/lib/types'
 import { drawOutcomeCard, type OutcomeCardData } from '@/lib/cardKit'
 import { shareCardImage, shareHint, type ShareDest } from '@/lib/shareCard'
@@ -127,6 +128,7 @@ export default function OutcomeCard({ app, onClose, onShared }: Props) {
     if (dest !== 'download') setTimeout(onClose, 400)
   }
 
+  useScrollLock(mounted)
   if (!mounted) return null
 
   return createPortal(

@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import type { AdminStats, RecentReport, Issue, RedditDispute, RedditDisputeCounts, ListingDispute, ListingDisputeCounts, ListingDisputeApplied, ListingTicket, InactiveReport, DupCluster, RecentJob, JobGroup, DupGroup, MergePrefill, MergeLog, FeatureFlag } from './types'
 import { Card, CardHeader, Badge, relTime, outcomeColor, availColor, runRefreshAndClear, runClearStale, refreshResultMsg } from './primitives'
+import { clearStaleMessage } from './clearStale'
 import { saveFile } from './saveFile'
 import { safeLocalGet, safeLocalSet } from '@/lib/safeStorage'
 
@@ -111,18 +112,14 @@ export function JobRefreshButton({ token, onDone }: { token: string; onDone: () 
   const [msg, setMsg] = useState('')
   async function run() {
     setBusy(true); setMsg('')
-    const r = await runClearStale(token)
-    if (r.ok) {
-      setMsg(`✓ cleared ${(r.cleared ?? 0).toLocaleString()} stale${r.complete ? '' : ' · more queued'}`)
-      onDone()
-    } else {
-      setMsg('✗ ' + (r.error || 'failed').slice(0, 40))
-    }
+    const r = await runClearStale(token, (p) => setMsg(`… ${p.cleared.toLocaleString()} cleared${p.remaining != null ? ` · ${p.remaining.toLocaleString()} left` : ''}`))
+    setMsg((r.ok && r.complete ? '✓ ' : r.ok ? '… ' : '✗ ') + clearStaleMessage(r))
+    if (r.rounds > 0) onDone()
     setBusy(false)
   }
   return (
     <span style={{ display: 'inline-flex', alignItems: 'center', gap: '.4rem' }}>
-      {msg && <span style={{ fontFamily: 'var(--mono)', fontSize: '.52rem', color: msg.startsWith('✓') ? 'var(--green)' : 'var(--red)' }}>{msg}</span>}
+      {msg && <span style={{ fontFamily: 'var(--mono)', fontSize: '.52rem', color: msg.startsWith('✓') ? 'var(--green)' : msg.startsWith('✗') ? 'var(--red)' : 'var(--amber)' }}>{msg}</span>}
       <button className="ac-attn-act" onClick={run} disabled={busy}>{busy ? '…' : 'Clear stale'}</button>
     </span>
   )

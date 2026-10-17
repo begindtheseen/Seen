@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { useAuth } from '@/lib/auth'
 import { aiHeaders } from '@/lib/aiHeaders'
 import { FREE_DAILY_CREDITS, PRO_TRIAL_DAYS, ONE_TIME_SKUS } from '@/lib/creditRules'
+import ModalPortal from '@/components/ModalPortal'
 
 const OPT_WORD = FREE_DAILY_CREDITS === 1 ? 'optimization' : 'optimizations'
 
@@ -150,6 +151,7 @@ export default function UpgradeModal({ reason, onClose, featureName }: UpgradeMo
   const { headline, sub } = copyFor(reason, featureName)
 
   return (
+    <ModalPortal>
     <div
       style={{ position: 'fixed', inset: 0, zIndex: 9999, background: 'rgba(0,0,0,.82)', backdropFilter: 'blur(6px)', display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}
       onClick={e => { if (e.target === e.currentTarget) onClose() }}
@@ -311,5 +313,6 @@ export default function UpgradeModal({ reason, onClose, featureName }: UpgradeMo
         </div>
       </div>
     </div>
+    </ModalPortal>
   )
 }

@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import type { AdminStats, Sub, Tone } from './types'
 import { UserRow } from './UserRow'
 import { DetailModal, DetailStat, relTime } from './primitives'
+import ModalPortal from '@/components/ModalPortal'
 
 export function KpiDetailRows({ metric, rows, token, onDeleteRow }: { metric: string; rows: Record<string, unknown>[]; token: string; onDeleteRow: (id: string) => void }) {
   const cell = (txt: unknown, color?: string) => (
@@ -127,8 +128,9 @@ export function KpiModal({ metric, title, token, onClose }: { metric: string; ti
   }, [metric, token])
 
   return (
+    <ModalPortal>
     <div
-      style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.72)', zIndex: 300, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}
+      style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.72)', backdropFilter: 'blur(6px)', WebkitBackdropFilter: 'blur(6px)', zIndex: 300, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}
       onClick={onClose}
     >
       <div
@@ -152,6 +154,7 @@ export function KpiModal({ metric, title, token, onClose }: { metric: string; ti
         </div>
       </div>
     </div>
+    </ModalPortal>
   )
 }
 
@@ -192,6 +195,7 @@ export function ManageAccountsModal({ token, initialFilter = 'all', onClose }: {
   })
 
   return (
+    <ModalPortal>
     <div className="ac-modal" onClick={onClose}>
       <div className="ac-modal-card" onClick={e => e.stopPropagation()}>
         <div className="ac-modal-hdr">
@@ -222,6 +226,7 @@ export function ManageAccountsModal({ token, initialFilter = 'all', onClose }: {
         </div>
       </div>
     </div>
+    </ModalPortal>
   )
 }
 

@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import type { AdminStats, AttnItem, MergePrefill } from './types'
 import { Panel, MetricRow, Card, CardHeader, Badge, BarChart, relTime, outcomeColor, stageColor, runRefreshAndClear, runClearStale, refreshResultMsg } from './primitives'
+import { clearStaleMessage } from './clearStale'
 import { AdminHero, AdminCommandCenter, AdminMetricCard, CardSubLink, AdminAttentionQueue, AdminTabs, type HealthStatus, type TabKey } from './overview'
 import { KpiModal, ManageAccountsModal, RevenueDetailModal, TrialsDetailModal, SharesDetailModal, ErrorsDetailModal } from './modals'
 import { JobCrisisBanner, JobRefreshButton, JobRunner, ReportRow, IssueRow, RedditDisputesPanel, ListingTicketsPanel, MergePanel, CompanyExportPanel, CreditsPanel, FlagsPanel, ClustersPanel, JobDedupePanel, AllJobsBrowser, DeployPanel } from './panels'
@@ -86,13 +87,11 @@ export function AdminShell({ stats, token, reload, onLogout, onUnauthorized }: {
   }
   async function runStaleClear() {
     setEmgBusy(true); setEmgMsg(null)
-    const r = await runClearStale(token)
-    if (r.ok) {
-      setEmgMsg({ ok: true, text: `cleared ${(r.cleared ?? 0).toLocaleString()} stale${r.complete ? '' : ' · more queued for the next run'}` })
-      reload()
-    } else {
-      setEmgMsg({ ok: false, text: (r.error || 'clear failed').slice(0, 120) })
-    }
+    // Loops until the backlog is gone (clearStale.ts), showing live progress; then reloads the stats
+    // in the background so the alert recomputes from the new counts without unmounting this message.
+    const r = await runClearStale(token, (p) => setEmgMsg({ ok: true, text: `clearing… ${p.cleared.toLocaleString()} cleared${p.remaining != null ? ` · ${p.remaining.toLocaleString()} left` : ''}` }))
+    setEmgMsg({ ok: r.ok, text: clearStaleMessage(r) })
+    if (r.rounds > 0) reload()
     setEmgBusy(false)
   }
 
@@ -107,7 +106,10 @@ export function AdminShell({ stats, token, reload, onLogout, onUnauthorized }: {
   const jb = stats.jobs
   const fw = stats.flywheel
   const inactiveCount = (jb?.inactive_reports || []).length
-  const staleJobs = jb?.stale_or_expired ?? 0
+  // "Stale" = what Clear stale removes (stale_clearable, same definition as the sweep). Falls back to
+  // the older stale_or_expired count, which also includes rows kept for users' saved/applied links.
+  const staleJobs = jb?.stale_clearable ?? jb?.stale_or_expired ?? 0
+  const keptExpired = jb?.expired_kept ?? 0
   const activeJobs = jh?.active ?? jb?.active ?? 0
   const paidUsers = m?.active_paid ?? m?.pro_users ?? 0
   const mrr = m?.mrr ?? null
@@ -247,7 +249,7 @@ export function AdminShell({ stats, token, reload, onLogout, onUnauthorized }: {
             <MetricRow label="Total stored jobs" value={(jb?.total ?? 0).toLocaleString()} status="all statuses" onClick={() => openKpi('jobs_total', 'All stored jobs')} />
             <MetricRow label="Active listings" value={activeJobs.toLocaleString()} status="live jobs users see" tone={jh?.crisis ? 'red' : 'blue'} onClick={() => openKpi('jobs_active', 'Active job listings')} />
             <MetricRow label="Added today" value={jb?.added_today ?? jb?.new_today ?? 0} status="new listings" tone={(jb?.added_today ?? 0) > 0 ? 'green' : 'dim'} onClick={() => openKpi('jobs_today', 'Jobs added today')} />
-            <MetricRow label="Stale / expired" value={staleJobs.toLocaleString()} status="flagged unavailable" tone={staleJobs > 500 ? 'amber' : 'dim'} onClick={() => openKpi('jobs_stale', 'Stale & expired jobs')} />
+            <MetricRow label="Stale / expired" value={staleJobs.toLocaleString()} status={keptExpired ? `hidden · ${keptExpired.toLocaleString()} kept for saved/applied` : 'hidden from search'} tone={staleJobs > 500 ? 'amber' : 'dim'} onClick={() => openKpi('jobs_stale', 'Stale & expired jobs')} />
             <MetricRow label="Company scores" value={stats.companies.with_scores.toLocaleString()} status="graded companies" onClick={() => openKpi('companies_scored', 'Companies with scores')} />
             <MetricRow label="Reported inactive" value={inactiveCount} status="user-flagged listings" tone={inactiveCount > 0 ? 'amber' : 'dim'} />
           </Panel>

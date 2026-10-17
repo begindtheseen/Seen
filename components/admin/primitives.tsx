@@ -1,6 +1,8 @@
 // Presentational primitives + shared helpers for the admin command center
 // (extracted verbatim from app/admin/page.tsx — behavior-identical).
 import type { Tone, AttnItem } from './types'
+import { clearStaleUntilDone, type ClearStaleResult } from './clearStale'
+import ModalPortal from '@/components/ModalPortal'
 
 export function Card({ children, style }: { children: React.ReactNode; style?: React.CSSProperties }) {
   return (
@@ -146,6 +148,7 @@ export function AttnRow({ item }: { item: AttnItem }) {
 // Accounts but without the search/filter bar.
 export function DetailModal({ title, sub, onClose, children }: { title: string; sub?: string; onClose: () => void; children: React.ReactNode }) {
   return (
+    <ModalPortal>
     <div className="ac-modal" onClick={onClose}>
       <div className="ac-modal-card" onClick={e => e.stopPropagation()}>
         <div className="ac-modal-hdr">
@@ -158,6 +161,7 @@ export function DetailModal({ title, sub, onClose, children }: { title: string; 
         <div className="ac-modal-body">{children}</div>
       </div>
     </div>
+    </ModalPortal>
   )
 }
 
@@ -172,18 +176,11 @@ export function DetailStat({ label, value, status, tone = 'white' }: { label: st
   )
 }
 
-// Stale-job protocol, admin half: one call to the batched server-side sweep (api/admin-stats.js ›
-// purge_stale_jobs → public.sweep_stale_jobs). Deletes every unreferenced stale/expired listing and
-// returns in well under a second on a clean corpus — it no longer waits on a re-ingest.
-export async function runClearStale(token: string): Promise<{ ok: boolean; cleared: number | null; complete: boolean; error?: string }> {
-  try {
-    const res = await fetch('/api/admin-stats', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Admin-Token': token }, body: JSON.stringify({ action: 'purge_stale_jobs' }) })
-    const d = await res.json().catch(() => ({}))
-    if (!res.ok || !d.ok) return { ok: false, cleared: null, complete: false, error: d.detail || d.error || `HTTP ${res.status}` }
-    return { ok: true, cleared: d.removed ?? 0, complete: d.complete !== false }
-  } catch (e) {
-    return { ok: false, cleared: null, complete: false, error: (e as Error).message }
-  }
+// Stale-job protocol, admin half: loops the batched server-side sweep (api/admin-stats.js ›
+// purge_stale_jobs → public.sweep_stale_jobs) until the whole backlog is gone — see clearStale.ts.
+// Deletes every unreferenced stale/expired listing; rows a user saved/applied to are kept hidden.
+export async function runClearStale(token: string, onProgress?: (p: { rounds: number; cleared: number; remaining: number | null }) => void): Promise<ClearStaleResult> {
+  return clearStaleUntilDone(token, { onProgress })
 }
 
 // Crisis remediation (too few ACTIVE listings): backfill fresh listings via refresh-jobs?all=1 (it
