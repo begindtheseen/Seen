@@ -244,10 +244,15 @@ async function _handler(req, res) {
     // clears (lib/server/staleSweep.js). The older stale_or_expired count also includes 'expired'
     // rows kept for users' saved/applied links, which no clear can (or should) remove.
     const countHdr = { headers: { Prefer: 'count=exact', 'Range-Unit': 'items', Range: '0-0' } };
+    // stale_overdue: stale rows the daily cron sweep should ALREADY have deleted (unseen 15d+ — its
+    // cut-off is 14d, plus a day of grace). Normal churn keeps thousands of rows stale for 7–14 days
+    // by design; only an overdue backlog means the sweep is falling behind and needs a manual clear.
+    const overdueCutoff = encodeURIComponent(new Date(Date.now() - 15 * 86_400_000).toISOString());
     const staleCountsP = Promise.all([
       db(`jobs?${STALE_CLEARABLE_FILTER}&select=id`, countHdr),
       db(`jobs?${STALE_KEPT_FILTER}&select=id`, countHdr),
-    ]).catch(() => [null, null]);
+      db(`jobs?${STALE_CLEARABLE_FILTER}&last_seen_at=lt.${overdueCutoff}&select=id`, countHdr),
+    ]).catch(() => [null, null, null]);
 
     const [
       usersTotalRes, usersTodayRes, usersWeekRes,
@@ -462,7 +467,7 @@ async function _handler(req, res) {
     const JOB_HEALTH_MIN_ACTIVE = 500;   // floor of live listings before we alert
     const JOB_HEALTH_MIN_RATIO  = 0.40;  // min share of corpus that must be active
     const staleJobs = ct(staleJobsRes);
-    const [staleClearableRes, staleKeptRes] = await staleCountsP;
+    const [staleClearableRes, staleKeptRes, staleOverdueRes] = await staleCountsP;
     const activePct = jobsTotal > 0 ? Math.round((jobsActive / jobsTotal) * 100) : 0;
     const jobCrisis =
       jobsActive < JOB_HEALTH_MIN_ACTIVE ||
@@ -543,6 +548,7 @@ async function _handler(req, res) {
         // Clearable stale rows (what "Clear stale" removes) vs expired rows kept for saved/applied links.
         stale_clearable: staleClearableRes?.ok ? ct(staleClearableRes) : null,
         expired_kept: staleKeptRes?.ok ? ct(staleKeptRes) : null,
+        stale_overdue: staleOverdueRes?.ok ? ct(staleOverdueRes) : null,
         zero_result_searches_7d: zeroSearchRows.length,
         top_zero_queries: [...new Set(zeroSearchRows.map(r => r.query))].slice(0, 10),
         availability_reports_7d: jobReportRows.length,

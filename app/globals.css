@@ -1721,3 +1721,27 @@ details[open] .dt-chev{transform:rotate(180deg)}
 .aurora::after{background:radial-gradient(ellipse at center,rgba(124,58,237,0.32) 0%,rgba(139,92,246,0.17) 35%,rgba(8,145,178,0.1) 65%,transparent 80%)}
 /* Final CTA card joins the material system. */
 .lp2-final-card{backdrop-filter:blur(22px) saturate(140%);-webkit-backdrop-filter:blur(22px) saturate(140%);border:1px solid var(--glass-line);box-shadow:var(--glass-hi),0 30px 80px -30px rgba(0,0,0,.7)}
+/* Shared refresh button (components/RefreshButton.tsx): visible press + spinning icon while working. */
+.refresh-btn{display:inline-flex;align-items:center;gap:.35rem;cursor:pointer;transition:transform .12s ease,opacity .15s ease}
+.refresh-btn:active{transform:scale(.95)}
+.refresh-btn[aria-busy="true"]{opacity:.75;cursor:progress}
+.refresh-btn-ico{display:inline-block;line-height:1}
+.refresh-btn-ico.spinning{animation:spin .8s linear infinite}
+@media(prefers-reduced-motion:reduce){.refresh-btn-ico.spinning{animation:none}}
+/* ── PERFORMANCE (2026-10-17) ──────────────────────────────────────────────────────────────────────
+   1. The background orbs are huge blurred layers. Animating them forever meant every blurred bar and
+      card above had to re-blur its backdrop on every frame, even on an idle page, which is the main
+      cause of the phone lag. Still, they are rasterized once and cached; the look is unchanged.
+   2. backdrop-filter is expensive per element. It stays on the few single surfaces that float over
+      content (nav, menus, overlays, the landing search card) and comes off repeated items: job
+      cards and their badges, KPI tiles, swipe cards, grade bars, and the inner box of modals (the
+      overlay behind them is already blurred). Over the static background they look the same. */
+.aurora{contain:strict}
+.aurora::before,.aurora::after,.aurora-3{animation:none!important}
+.vibe,.jcard,.dstat,.adm-kpi,.swipe-card,.co-grade-bar,.ntab.active,.nav-pills,.glass,.glow-card,.lp2-card,.lp2-step,.modal{backdrop-filter:none;-webkit-backdrop-filter:none}
+/* Repeat visits in a session skip the intro splash, so the cover must not hide the server-rendered
+   page while JavaScript loads (app/layout.tsx sets .intro-seen before first paint). */
+html.intro-seen #intro-guard{display:none}
+/* Every button shows it was pressed, and taps fire immediately on phones (no double-tap-zoom wait). */
+button,a,[role="button"]{touch-action:manipulation}
+button:not(:disabled):active{opacity:.82}

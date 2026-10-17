@@ -33,7 +33,8 @@ export default function AdminPage() {
   // feed, the Refresh button). Only the NEWEST request may update the dashboard — an older, slower
   // response landing last would otherwise flip the numbers back.
   const loadSeq = useRef(0)
-  const load = useCallback(async (t: string, background = false) => {
+  // Resolves true when fresh stats landed, false on failure (the refresh button shows which).
+  const load = useCallback(async (t: string, background = false): Promise<boolean> => {
     const seq = ++loadSeq.current
     if (!background) { setLoading(true); setError('') }
     try {
@@ -47,17 +48,20 @@ export default function AdminPage() {
         setToken(null)
         setLoading(false)
         setLoginError(msg)
-        return
+        return false
       }
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
       const data = await res.json() as AdminStats
-      if (seq !== loadSeq.current) return // a newer refresh superseded this one
+      if (seq !== loadSeq.current) return true // a newer refresh superseded this one
       setStats(data)
+      setLoading(false)
+      return true
     } catch (e) {
       // A failed background reload keeps the current dashboard rather than replacing it with an error.
       if (!background) setError((e as Error).message)
+      setLoading(false)
+      return false
     }
-    setLoading(false)
   }, [])
 
   useEffect(() => {
