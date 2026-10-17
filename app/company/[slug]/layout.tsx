@@ -209,18 +209,11 @@ export default async function CompanySlugLayout(
   return (
     <>
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLdHtml(jsonLd) }} />
+      {/* Layout lives in .co-seo (globals.css): it clears the fixed 58px nav on desktop, and on
+          phones it is visually ordered AFTER the interactive page (flex order) so a visitor lands
+          on the score, not a wall of text — the HTML order crawlers read is unchanged. */}
       {(hasFacts || summary) && (
-        <section
-          aria-label={`${name} hiring data summary`}
-          style={{
-            maxWidth: 880,
-            margin: '0 auto',
-            // Clear the fixed 58px site header (nav is position:fixed) so the heading
-            // isn't cut off — this section renders above the .page-full children that
-            // normally provide that offset.
-            padding: 'calc(58px + 1.4rem) 1.25rem 0',
-          }}
-        >
+        <section className="co-seo" aria-label={`${name} hiring data summary`}>
           <div
             style={{
               background: 'var(--card)',
