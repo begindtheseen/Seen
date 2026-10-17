@@ -7,6 +7,7 @@ import { useAuth } from '@/lib/auth'
 import { aiHeaders } from '@/lib/aiHeaders'
 import { notify } from '@/lib/notify'
 import type { Job } from '@/lib/types'
+import { takesSeenApply } from '@/lib/seenApplyMode'
 
 function jobVibes(job: Job): { cls: string; txt: string }[] {
   const vibes: { cls: string; txt: string }[] = []
@@ -174,9 +175,9 @@ export default function JobCard({ job, index, onSaveToggle, onOpen, onApply, onC
         <button
           className="jlc-apply"
           onClick={e => { e.stopPropagation(); onApply(job) }}
-          disabled={!job.apply_url}
+          disabled={!job.apply_url && !takesSeenApply(job)}
         >
-          Apply &amp; Optimize →
+          {takesSeenApply(job) ? 'Apply on Seen →' : <>Apply &amp; Optimize →</>}
         </button>
       </div>
 

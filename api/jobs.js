@@ -162,10 +162,12 @@ export default async function handler(req, res) {
       // NOTE: jobs has apply_url ONLY — selecting a phantom `url` column made PostgREST
       // reject the whole select, so every direct /jobs/<id> link 404'd. Same class as the
       // employer-listings phantom-url bug; `url` is aliased from apply_url in the response.
-      const r = await fetch(
-        `${U}/rest/v1/jobs?id=eq.${encodeURIComponent(id)}&select=id,title,company,location,salary,apply_url,description,type,level,source,score,waste_score,availability_status,created_at,last_seen_at,last_checked_at,availability_report_count,is_employer_posted&limit=1`,
-        { headers: { apikey: K, Authorization: `Bearer ${K}` } }
-      );
+      const cols = 'id,title,company,location,salary,apply_url,description,type,level,source,score,waste_score,availability_status,created_at,last_seen_at,last_checked_at,availability_report_count,is_employer_posted';
+      const get = (select) => fetch(`${U}/rest/v1/jobs?id=eq.${encodeURIComponent(id)}&select=${select}&limit=1`, { headers: { apikey: K, Authorization: `Bearer ${K}` } });
+      // apply_mode exists once the Apply-on-Seen migration is applied; before that the column is
+      // missing and PostgREST 400s the select, so retry without it (lib/server/seenApply.js).
+      let r = await get(`${cols},apply_mode`);
+      if (r.status === 400) r = await get(cols);
       const rows = r.ok ? await r.json() : [];
       if (!Array.isArray(rows) || !rows.length) return res.status(404).json({ error: 'Not found' });
       // Attach the score's factor breakdown so the detail page can show WHY, not just a number,
@@ -637,6 +639,7 @@ function toUiRow(j, loc = '') {
     search_query: j.search_query || null, // provenance for the merged re-filter downstream
     lat: j.lat ?? null, lng: j.lng ?? null, posted_at: j.created_at || null,
     employer_posted: j.is_employer_posted === true, // posted on Seen by the employer → search priority
+    apply_mode: j.is_employer_posted === true ? (j.apply_mode || 'external') : 'external', // Apply on Seen
   };
 }
 

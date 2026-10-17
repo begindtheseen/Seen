@@ -6,6 +6,7 @@ import { SavedJobsStore } from '@/lib/stores/SavedJobs'
 import { aiHeaders } from '@/lib/aiHeaders'
 import type { Job } from '@/lib/types'
 import ModalPortal from '@/components/ModalPortal'
+import SeenApplyModal from '@/components/jobs/SeenApplyModal'
 
 // ── Job detail drawer helpers ─────────────────────────────────────────────────
 
@@ -47,6 +48,12 @@ export default function JobDetailDrawer({ job, isLoggedIn, onClose, onApply, onC
   const [saved, setSaved] = useState(() => SavedJobsStore.isSaved(job.id))
   const [insights, setInsights] = useState<Insights | null>(null)
   const [insightsState, setInsightsState] = useState<'loading' | 'done' | 'unavailable' | 'no_desc' | 'credits'>('loading')
+  // Apply on Seen: an employer-posted listing whose employer takes applications here
+  // (apply_mode 'seen' | 'both'); 'both' also keeps the employer's own site as a second button.
+  const mode = job.employer_posted ? (job.apply_mode || 'external') : 'external'
+  const seenApply = mode === 'seen' || mode === 'both'
+  const externalApply = mode !== 'seen' && !!job.apply_url
+  const [seenApplyOpen, setSeenApplyOpen] = useState(false)
 
   useEffect(() => {
     const id = requestAnimationFrame(() => setVisible(true))
@@ -282,16 +289,27 @@ export default function JobDetailDrawer({ job, isLoggedIn, onClose, onApply, onC
           </button>
           <div style={{ display: 'flex', gap: '.6rem' }}>
             <button onClick={toggleSave} style={{ background: 'none', border: '1px solid var(--line2)', borderRadius: 8, padding: '.58rem .85rem', fontSize: '.95rem', cursor: 'pointer', color: saved ? 'var(--green)' : 'var(--muted)', flexShrink: 0 }}>{saved ? '♥' : '♡'}</button>
-            {job.apply_url
+            {seenApply && (
+              <button
+                onClick={() => setSeenApplyOpen(true)}
+                style={{ flex: 1, textAlign: 'center', background: 'var(--green)', color: 'var(--ink)', borderRadius: 8, padding: '.58rem 1rem', fontFamily: 'var(--display)', fontWeight: 800, fontSize: '.82rem', border: 'none', cursor: 'pointer' }}
+              >Apply on Seen →</button>
+            )}
+            {externalApply
               ? <button
                   onClick={() => { onClose(); onApply(job) }}
-                  style={{ flex: 1, textAlign: 'center', background: 'var(--green)', color: 'var(--ink)', borderRadius: 8, padding: '.58rem 1rem', fontFamily: 'var(--display)', fontWeight: 800, fontSize: '.82rem', border: 'none', cursor: 'pointer' }}
-                >Apply &amp; Optimize →</button>
-              : <button disabled style={{ flex: 1, background: 'var(--raised)', color: 'var(--muted)', border: 'none', borderRadius: 8, padding: '.58rem 1rem', fontFamily: 'var(--display)', fontWeight: 800, fontSize: '.82rem', opacity: .45 }}>No apply link</button>
+                  style={seenApply
+                    ? { flex: 1, textAlign: 'center', background: 'none', color: 'var(--sub)', borderRadius: 8, padding: '.58rem .8rem', fontFamily: 'var(--display)', fontWeight: 700, fontSize: '.76rem', border: '1px solid var(--line2)', cursor: 'pointer' }
+                    : { flex: 1, textAlign: 'center', background: 'var(--green)', color: 'var(--ink)', borderRadius: 8, padding: '.58rem 1rem', fontFamily: 'var(--display)', fontWeight: 800, fontSize: '.82rem', border: 'none', cursor: 'pointer' }}
+                >{seenApply ? 'Apply on their site →' : <>Apply &amp; Optimize →</>}</button>
+              : !seenApply && <button disabled style={{ flex: 1, background: 'var(--raised)', color: 'var(--muted)', border: 'none', borderRadius: 8, padding: '.58rem 1rem', fontFamily: 'var(--display)', fontWeight: 800, fontSize: '.82rem', opacity: .45 }}>No apply link</button>
             }
           </div>
         </div>
       </div>
+      {seenApplyOpen && (
+        <SeenApplyModal job={job} onClose={() => setSeenApplyOpen(false)} />
+      )}
     </ModalPortal>
   )
 }

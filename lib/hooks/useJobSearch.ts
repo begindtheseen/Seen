@@ -430,6 +430,10 @@ export function useJobSearch() {
             apply_url,
             posted_at: j.posted_at ? String(j.posted_at) : null,
             featured: !!j.featured,
+            // Without these the "Posted on Seen" badge, its search-priority tier (applySort →
+            // sortByPriority) and the Apply-on-Seen buttons never reach the page.
+            employer_posted: !!j.employer_posted,
+            apply_mode: j.apply_mode === 'seen' || j.apply_mode === 'both' ? j.apply_mode : 'external',
           }
         })
         searchCache.set(cacheKey, { jobs: raw, ts: Date.now() })

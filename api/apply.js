@@ -2,6 +2,12 @@ import { createHmac, timingSafeEqual } from 'crypto';
 import { rateLimit } from '../lib/server/ratelimit.js';
 import { normalizeClaimCompany } from '../lib/server/employerClaims.js';
 import { buildNotificationRow } from '../lib/server/employerNotificationsStore.js';
+import {
+  allowsSeenApply, validateSeenApplication, base64Bytes, resumeObject, buildSeenApplicationRow,
+  buildTrackerRow, isDuplicate, isNotMigrated, MAX_RESUME_BYTES,
+} from '../lib/server/seenApply.js';
+import { seenApplyAvailable, uploadResumeFile, authUserEmail, sendNewApplicationEmail } from '../lib/server/seenApplyStore.js';
+import { extractUploadText } from '../lib/server/resumeUpload.js';
 
 // Best-effort: record the observed apply CLICK (the only thing observable on a redirect apply) and
 // enqueue an "apply_activity" notification for the company's employer (migrations 057/058). NEVER
@@ -236,6 +242,153 @@ ${sections.map(s => `<div class="sec"><div class="st">${esc(s.title)}</div>${for
 </html>`;
 }
 
+// ── Apply on Seen ─────────────────────────────────────────────────────────────
+function seenDb() {
+  const SUPABASE_URL = process.env.SUPABASE_URL;
+  const SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY;
+  const db = (path, opts = {}) => fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
+    ...opts,
+    headers: {
+      apikey: SERVICE_KEY, Authorization: `Bearer ${SERVICE_KEY}`,
+      'Content-Type': 'application/json', Prefer: 'return=representation', ...(opts.headers || {}),
+    },
+  });
+  return { db, SUPABASE_URL, SERVICE_KEY };
+}
+
+const SEEN_JOB_SELECT = 'id,title,company,location,apply_url,is_employer_posted,employer_user_id,apply_mode,expires_at,availability_status';
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+async function loadSeenJob(db, jobId) {
+  if (!UUID_RE.test(String(jobId || ''))) return { job: null };
+  const r = await db(`jobs?id=eq.${encodeURIComponent(jobId)}&select=${SEEN_JOB_SELECT}&limit=1`);
+  if (!r.ok) {
+    const txt = await r.text().catch(() => '');
+    return { job: null, notMigrated: isNotMigrated(r.status, txt) };
+  }
+  return { job: (await r.json())[0] || null };
+}
+
+// POST { action:'seen_apply_status', job_id } → can this listing take a Seen application, has this
+// user already applied, and what to prefill (name, email, saved résumé).
+async function seenApplyStatus(req, res, uid) {
+  const { db, SUPABASE_URL, SERVICE_KEY } = seenDb();
+  if (!SUPABASE_URL || !SERVICE_KEY) return res.status(200).json({ ok: true, available: false });
+  if (!(await seenApplyAvailable(db))) return res.status(200).json({ ok: true, available: false });
+  const jobId = String((req.body || {}).job_id || '');
+  const { job } = await loadSeenJob(db, jobId);
+  if (!job) return res.status(200).json({ ok: true, available: true, accepts_seen: false });
+  const [prof, dup, email] = await Promise.all([
+    db(`profiles?id=eq.${uid}&select=name,email,resume_text,resume_file_name&limit=1`).then(r => r.ok ? r.json() : []).catch(() => []),
+    db(`seen_applications?job_id=eq.${encodeURIComponent(job.id)}&applicant_user_id=eq.${uid}&select=id,created_at,status&limit=1`).then(r => r.ok ? r.json() : []).catch(() => []),
+    authUserEmail({ SUPABASE_URL, SERVICE_KEY, uid }),
+  ]);
+  const p = prof[0] || {};
+  return res.status(200).json({
+    ok: true,
+    available: true,
+    accepts_seen: allowsSeenApply(job),
+    company: job.company || null,
+    title: job.title || null,
+    already_applied: dup[0] ? { at: dup[0].created_at } : null,
+    prefill: {
+      name: p.name || '',
+      email: email || p.email || '',
+      has_saved_resume: !!(p.resume_text && p.resume_text.length >= 50),
+      saved_resume_file_name: p.resume_file_name || null,
+    },
+  });
+}
+
+// POST { action:'seen_apply', job_id, name, email, phone?, note?, resume_source:'saved'|'upload',
+//        file_base64?, file_name?, mime_type?, consent:true }
+async function seenApply(req, res, uid) {
+  const { db, SUPABASE_URL, SERVICE_KEY } = seenDb();
+  if (!SUPABASE_URL || !SERVICE_KEY) return res.status(500).json({ error: 'DB not configured' });
+  if (!(await seenApplyAvailable(db))) return res.status(400).json({ error: 'Applying on Seen isn’t available yet', reason: 'unavailable' });
+
+  const body = req.body || {};
+  const v = validateSeenApplication(body);
+  if (!v.ok) return res.status(400).json({ error: v.error });
+  const app = v.application;
+
+  const { job, notMigrated } = await loadSeenJob(db, app.job_id);
+  if (notMigrated) return res.status(400).json({ error: 'Applying on Seen isn’t available yet', reason: 'unavailable' });
+  if (!job) return res.status(404).json({ error: 'That listing no longer exists' });
+  if (!allowsSeenApply(job)) return res.status(400).json({ error: 'This employer takes applications on their own site', reason: 'external_only' });
+  if (job.expires_at && new Date(job.expires_at).getTime() < Date.now()) {
+    return res.status(400).json({ error: 'This listing has closed', reason: 'closed' });
+  }
+  const companyKey = normalizeClaimCompany(job.company);
+  if (!companyKey) return res.status(400).json({ error: 'That listing can’t take applications' });
+
+  // Already applied? Friendly answer before any upload happens.
+  const dupRes = await db(`seen_applications?job_id=eq.${encodeURIComponent(job.id)}&applicant_user_id=eq.${uid}&select=id&limit=1`);
+  if (dupRes.ok && (await dupRes.json()).length) {
+    return res.status(409).json({ error: 'You already applied to this listing on Seen', reason: 'already_applied' });
+  }
+
+  // Résumé: the saved Seen résumé (profiles.resume_text) or an uploaded file (kept as the original
+  // file in the PRIVATE application-resumes bucket + its extracted text).
+  let resumeText = null, resumePath = null, resumeFileName = null, resumeMime = null;
+  if (app.resumeSource === 'saved') {
+    const pr = await db(`profiles?id=eq.${uid}&select=resume_text,resume_file_name&limit=1`);
+    const p = pr.ok ? (await pr.json())[0] : null;
+    if (!p || !p.resume_text || p.resume_text.length < 50) return res.status(400).json({ error: 'You don’t have a résumé saved on Seen — attach one instead' });
+    resumeText = p.resume_text;
+    resumeFileName = p.resume_file_name || null;
+  } else {
+    const b64 = String(body.file_base64 || '').replace(/^data:[^,]*,/, '');
+    if (base64Bytes(b64) > MAX_RESUME_BYTES) return res.status(400).json({ error: 'That file is over 3 MB — try a smaller PDF' });
+    const fileName = String(body.file_name || 'resume.pdf').slice(0, 200);
+    const extracted = await extractUploadText({ base64: b64, fileName, mimeType: body.mime_type });
+    if (!extracted.ok) return res.status(extracted.status || 400).json({ error: extracted.error });
+    resumeText = extracted.text;
+    resumeFileName = fileName;
+    const obj = resumeObject({ applicantId: uid, jobId: job.id, fileName, nowMs: Date.now() });
+    const up = await uploadResumeFile({ SUPABASE_URL, SERVICE_KEY, path: obj.path, mime: obj.mime, buffer: Buffer.from(b64, 'base64') });
+    if (up.ok) { resumePath = obj.path; resumeMime = obj.mime; }
+    // An upload failure still sends the application with the extracted text — the employer can
+    // read the résumé; only the original file is missing (logged in uploadResumeFile).
+  }
+
+  const row = buildSeenApplicationRow(app, { job, applicantId: uid, companyKey, resumeText, resumePath, resumeFileName, resumeMime });
+  const ins = await db('seen_applications', { method: 'POST', body: JSON.stringify(row) });
+  if (!ins.ok) {
+    const txt = await ins.text().catch(() => '');
+    if (isDuplicate(ins.status, txt)) return res.status(409).json({ error: 'You already applied to this listing on Seen', reason: 'already_applied' });
+    console.error('[apply] seen_apply insert failed:', ins.status, txt.slice(0, 200));
+    return res.status(500).json({ error: 'Could not send your application — please try again' });
+  }
+  const saved = (await ins.json())[0] || null;
+
+  // The applicant's own tracker — best-effort (the application itself already landed). Skip when
+  // they already track this listing so a manual entry isn't duplicated.
+  try {
+    const have = await db(`applications?user_id=eq.${uid}&job_id=eq.${encodeURIComponent(String(job.id))}&select=id&limit=1`);
+    if (!(have.ok && (await have.json()).length)) {
+      await db('applications', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify(buildTrackerRow({ job, applicantId: uid, nowMs: Date.now() })) });
+    }
+  } catch (e) { console.warn('[apply] seen_apply tracker insert failed (non-fatal):', e?.message || e); }
+
+  // Employer: in-app notification + email. Both best-effort; neither blocks the apply.
+  try {
+    const notif = buildNotificationRow('apply_activity', {
+      companyName: job.company, companyKey, jobId: job.id, employerUserId: job.employer_user_id || null,
+      title: job.title ? `New application on Seen — ${job.title}` : 'New application on Seen',
+      body: `${app.name} applied${job.title ? ` to “${job.title}”` : ''} on Seen. Their résumé and note are in your applications inbox.`,
+      meta: { role: job.title || null, city: job.location || null, seen_application_id: saved?.id || null },
+    });
+    if (notif) await db('employer_notifications', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify(notif) });
+  } catch (e) { console.warn('[apply] seen_apply notification failed (non-fatal):', e?.message || e); }
+  try {
+    const to = await authUserEmail({ SUPABASE_URL, SERVICE_KEY, uid: job.employer_user_id });
+    await sendNewApplicationEmail({ to, company: job.company, role: job.title, applicantName: app.name });
+  } catch { /* best-effort */ }
+
+  return res.status(200).json({ ok: true, application_id: saved?.id || null, resume_file_kept: !!resumePath || app.resumeSource === 'saved' });
+}
+
 export default async function handler(req, res) {
   const _o=req.headers.origin||'';
   const _devO=!_o||_o.includes('localhost')||_o.includes('127.0.0.1');
@@ -247,29 +400,44 @@ export default async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(200).end();
   if (req.method !== 'POST') return res.status(405).end('Method not allowed');
 
+  // ── Lightweight redirect-apply tracking ──────────────────────────────────────
+  // The COMMON apply path is a pure redirect (window.open to the employer's page). This records the
+  // observed click + the employer notification and nothing else — no email, no résumé, no PII beyond
+  // the optional signed-in uid (stored server-side only, same posture as migration 058). It runs
+  // BEFORE the sign-in gate: the beacon (lib/trackApply.ts) sends no token and most seekers aren't
+  // signed in, so behind the gate every click 401'd and apply_events never recorded anything.
+  if ((req.body || {}).action === 'track_click') {
+    const { allowed: tcOk } = await rateLimit(req, 'apply');
+    if (!tcOk) return res.status(429).json({ error: 'Too many requests — slow down.' });
+    try {
+      const tcUid = await resolveUid(req);
+      const { company: tcCompany, role: tcRole, location: tcLocation, jobId: tcJobId, applyUrl: tcApplyUrl } = req.body || {};
+      await recordApplyActivity({ company: tcCompany, role: tcRole, location: tcLocation, uid: tcUid, jobId: tcJobId, applyUrl: tcApplyUrl });
+    } catch { /* tracking never fails the apply */ }
+    return res.status(200).json({ ok: true });
+  }
+
   // SECURITY: Require authentication to prevent anonymous email spam/impersonation.
   // An unauthenticated caller could send arbitrary resumes to any employer email
   // address with a forged applicant identity.
   const uid = await resolveUid(req);
   if (!uid) return res.status(401).json({ error: 'Sign in to apply' });
 
+  // ── Apply on Seen (employer-posted listings whose employer takes applications here) ──
+  // Read-only status check skips the limiter; the submission has its own per-user bucket so it
+  // never competes with click tracking for the shared 'apply' cap.
+  const _action = (req.body || {}).action;
+  if (_action === 'seen_apply_status') return seenApplyStatus(req, res, uid);
+  if (_action === 'seen_apply') {
+    const rl = await rateLimit(req, 'seen-apply', { bucketKey: `user:${uid}` });
+    if (!rl.allowed) return res.status(429).json({ error: 'Too many applications this hour — try again later.' });
+    return seenApply(req, res, uid);
+  }
+
   const { allowed: rlOk } = await rateLimit(req, 'apply');
   if (!rlOk) return res.status(429).json({ error: 'Too many requests — slow down.' });
 
   try {
-    // ── Lightweight redirect-apply tracking ────────────────────────────────────
-    // The COMMON apply path is a pure redirect (window.open to the employer's page) — no
-    // email, no résumé. Until now NOTHING recorded it, so apply_events stayed empty and the
-    // employer "applies" feature was dead end-to-end. This action records the observed click
-    // + the employer notification and nothing else (no PII beyond the optional signed-in uid,
-    // which is stored server-side only — same posture as migration 058).
-    if ((req.body || {}).action === 'track_click') {
-      const uid = await resolveUid(req);
-      const { company: tcCompany, role: tcRole, location: tcLocation, jobId: tcJobId, applyUrl: tcApplyUrl } = req.body || {};
-      await recordApplyActivity({ company: tcCompany, role: tcRole, location: tcLocation, uid, jobId: tcJobId, applyUrl: tcApplyUrl });
-      return res.status(200).json({ ok: true });
-    }
-
     const {
       applicantName, applicantEmail, role, company, location,
       resumeLink, resumeText: rawResumeText, coverNote, applyEmail,

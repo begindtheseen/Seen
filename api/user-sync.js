@@ -13,6 +13,7 @@ import { WELCOME_CREDITS, FREE_DAILY_CREDITS, PRO_DAILY_CREDITS, RESUME_OPTIMIZE
 import { normalizeClaimCompany } from '../lib/server/employerClaims.js';
 import { buildNotificationRow } from '../lib/server/employerNotificationsStore.js';
 import { isReadableResume } from '../lib/server/resumeReadability.js';
+import { deleteApplicantResumes } from '../lib/server/seenApplyStore.js';
 
 // Verify a Supabase JWT locally (HS256) — no network round-trip.
 // Returns the payload (with .sub = user UUID) on success, null on failure.
@@ -354,6 +355,9 @@ export default async function handler(req, res) {
         }
       }
     } catch { /* storage cleanup is best-effort */ }
+    // Apply-on-Seen résumé files (private application-resumes bucket). The seen_applications rows
+    // themselves cascade with the auth user (migration 20261017150000).
+    await deleteApplicantResumes({ SUPABASE_URL, SERVICE_KEY, uid });
 
     // Contributed company intel outlives the account: de-link the user from their public
     // reports AND résumé-survey answers (user_id → null) rather than deleting the signal.

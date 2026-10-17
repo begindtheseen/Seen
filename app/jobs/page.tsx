@@ -16,6 +16,7 @@ import ImportListingModal from '@/components/jobs/ImportListingModal'
 import { SavedJobsStore } from '@/lib/stores/SavedJobs'
 import { notify } from '@/lib/notify'
 import { matchCities } from '@/lib/data/usCities'
+import { takesSeenApply } from '@/lib/seenApplyMode'
 
 export default function JobsPage() {
   const router = useRouter()
@@ -232,7 +233,7 @@ export default function JobsPage() {
                 onOpen={j => setDetailJob(j)}
                 onDismiss={() => setDeckDone(true)}
                 onSave={() => setSwipeCount(c => c + 1)}
-                onApply={j => { if (j.apply_url) { trackApplyClick(j); window.open(j.apply_url, '_blank', 'noopener,noreferrer') } setCheckpointJob(j) }}
+                onApply={j => { if (takesSeenApply(j)) { setDetailJob(j); return } if (j.apply_url) { trackApplyClick(j); window.open(j.apply_url, '_blank', 'noopener,noreferrer') } setCheckpointJob(j) }}
                 coScores={coScores}
               />
             )}
@@ -276,13 +277,13 @@ export default function JobsPage() {
             onOpen={j => setDetailJob(j)}
             onDismiss={() => setSwipeMode(false)}
             onSave={() => setSaveVersion(v => v + 1)}
-            onApply={j => { if (j.apply_url) { trackApplyClick(j); window.open(j.apply_url, '_blank', 'noopener,noreferrer') } setCheckpointJob(j) }}
+            onApply={j => { if (takesSeenApply(j)) { setDetailJob(j); return } if (j.apply_url) { trackApplyClick(j); window.open(j.apply_url, '_blank', 'noopener,noreferrer') } setCheckpointJob(j) }}
             coScores={coScores}
           />
         ) : filtered.length > 0 ? (
           <div className="jlist" key={saveVersion}>
             {filtered.map((job, i) => (
-              <JobCard key={job.id} job={job} index={i} onSaveToggle={handleSaveToggle} onOpen={j => setDetailJob(j)} onApply={j => setApplyJob(j)} onCheckCompany={co => setCheckCompany(co)} alreadyApplied={appliedCos.has(job.company.toLowerCase().trim())} />
+              <JobCard key={job.id} job={job} index={i} onSaveToggle={handleSaveToggle} onOpen={j => setDetailJob(j)} onApply={j => takesSeenApply(j) ? setDetailJob(j) : setApplyJob(j)} onCheckCompany={co => setCheckCompany(co)} alreadyApplied={appliedCos.has(job.company.toLowerCase().trim())} />
             ))}
           </div>
         ) : status === 'idle' ? (
