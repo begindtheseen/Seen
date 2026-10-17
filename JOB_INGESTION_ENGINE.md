@@ -30,6 +30,8 @@ Employer-direct, public JSON, no keys, no scraping: **Greenhouse, Lever, Ashby, 
 ## 6. Provider interface
 `fetchCompanyJobs(tenant, {companyName, fetchImpl, timeoutMs}) → CanonicalJobRow[]` — `fetchImpl` injectable (tests), rows produced by the shared `buildJob()` + provenance stamp, `[]` on any error (isolation). `fetchSourceJobs()` is the central health-tracked entry.
 
+**Title-as-company guard (2026-10-17).** `buildJob()` (and the Adzuna mapper) reject a row whose company is a job title, via `isTitleLikeCompany()` in `lib/server/jobSources.js`. Arbeitnow sends these upstream: `company_name` is its only employer field and its URL slug is built from it, so nothing better can be recovered. On 2026-10-17 prod had 23 such rows under 3 fake names. The rule needs a role noun plus a title shape (a leading seniority word, parentheses, ` - `, `/`), or a gender marker such as `(m/w/d)`. A legal suffix (GmbH, Ltd, …) or a leading "The" marks a real company. Checked against all 10,871 distinct `jobs.company` values: it matched only those 3.
+
 ## 7. Direct ATS coverage
 Six ingestable providers cover the majority of tech/startup employers and a large share of mid-market. 27 well-known boards seeded live; the registry grows automatically via snowball + Common Crawl.
 
