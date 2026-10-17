@@ -91,6 +91,15 @@ export function costOfUsage(model, usage = {}) {
   return BATCH_DISCOUNT * (input * p.in + (usage.output_tokens || 0) * p.out) / 1e6 + searches * WEB_SEARCH_USD;
 }
 
+// A slice() can cut an emoji in half, leaving a lone surrogate that makes the whole batch body
+// invalid JSON to the API ("no low surrogate"). Replace any lone surrogate with U+FFFD before submit.
+export function wellFormed(v) {
+  if (typeof v === 'string') return v.toWellFormed();
+  if (Array.isArray(v)) return v.map(wellFormed);
+  if (v && typeof v === 'object') return Object.fromEntries(Object.entries(v).map(([k, x]) => [k, wellFormed(x)]));
+  return v;
+}
+
 const ledgerPath = () => join(RUNS_DIR, 'ledger.json');
 export function readJsonOrNull(path) {
   try { return JSON.parse(readFileSync(path, 'utf8')); }
@@ -139,7 +148,7 @@ export async function runBatch({ label, requests, estimate = {}, pollMs = 30_000
     }
     state = { label, createdAt: new Date().toISOString(), estimateUsd: est.usd, batches: [] };
     for (let i = 0; i < requests.length; i += MAX_PER_BATCH) {
-      const chunk = requests.slice(i, i + MAX_PER_BATCH);
+      const chunk = wellFormed(requests.slice(i, i + MAX_PER_BATCH));
       const b = await client().messages.batches.create({ requests: chunk });
       state.batches.push({ id: b.id, n: chunk.length, done: false });
       writeFileSync(statePath, JSON.stringify(state, null, 2)); // persist BEFORE the next submit
