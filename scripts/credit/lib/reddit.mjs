@@ -616,6 +616,19 @@ export const expKey = (e) => `${e.company}|${e.thread_id}|${e.comment_index}`;
 
 export const REDDIT_WEIGHT = 0.3;
 
+// "[Public reddit.com post, posted YYYY-MM-DD: <thread url>]" — the same attribution the app's
+// self-filling worker writes. lib/reportSource.ts turns it into the source link AND the date the
+// card shows (created_at is only the import time: without it every backfilled row reads "today").
+// Only canonical reddit.com thread URLs are linked; a missing/odd date is simply left out.
+export function withAttribution(summary, permalink, created, now = Date.now()) {
+  const url = /^https:\/\/(?:www\.|old\.)?reddit\.com\/r\/[A-Za-z0-9_]+\/comments\/[a-z0-9]+\//i.test(String(permalink || ''))
+    ? String(permalink).replace(/^https:\/\/old\./i, 'https://www.') : null;
+  if (!url) return summary;
+  const t = Date.parse(String(created || ''));
+  const day = Number.isFinite(t) && t <= now + 86_400_000 && t >= Date.UTC(2005, 0, 1) ? new Date(t).toISOString().slice(0, 10) : null;
+  return `${summary} [Public reddit.com post${day ? `, posted ${day}` : ''}: ${url}]`;
+}
+
 // Exactly the api/reports.js reddit_import row shape (company_id always present so a PostgREST bulk
 // insert has uniform keys). reports has no permalink/source column in the migrations, so the
 // thread link is recorded via reddit_imports.report_id + the local written ledger instead.
@@ -625,7 +638,7 @@ export function buildReportRow(exp, { companyId = null, locationId = null } = {}
     platform: `Reddit r/${exp.subreddit}`,
     outcome: exp.outcome,
     role: exp.role ? String(exp.role).trim().slice(0, 200) : '', // reports.role is NOT NULL (prod)
-    report_text: String(exp.summary).trim().slice(0, 2000),
+    report_text: withAttribution(String(exp.summary).trim().slice(0, 1800), exp.permalink, exp.created),
     source: 'reddit',
     outcome_weight: REDDIT_WEIGHT,
     trust_reason: 'community_signal',
@@ -672,7 +685,7 @@ export function planWrite(extractions, cachesBySlug) {
       const v = validateExperience(e, { threadsById, chunkThreadIds: x.thread_ids });
       if (!v.ok) { bump(v.reason); continue; }
       const t = threadsById.get(e.thread_id);
-      raw.push({ ...e, summary: String(e.summary).trim(), city: normalizeCity(e.city), company: cache.target.writeName, target_slug: x.target_slug, subreddit: t.subreddit, permalink: t.permalink });
+      raw.push({ ...e, summary: String(e.summary).trim(), city: normalizeCity(e.city), company: cache.target.writeName, target_slug: x.target_slug, subreddit: t.subreddit, permalink: t.permalink, created: t.created || null });
     }
   }
   const kept = dedupeExperiences(raw);

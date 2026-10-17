@@ -6,7 +6,7 @@ import { useAuth } from '@/lib/auth'
 import { AppStore } from '@/lib/stores/AppStore'
 import HiringProbability from '@/components/HiringProbability'
 import CompanyScoreCard from '@/components/CompanyScoreCard'
-import { isPublicDiscussion, reportSourceBadge, reportSourceLink } from '@/lib/reportSource'
+import { isPublicDiscussion, reportDate, reportSourceBadge, reportSourceLink, sortReportsByDate } from '@/lib/reportSource'
 import ReportSourceLink from '@/components/ReportSourceLink'
 import { aggregateJobLocations } from '@/lib/jobLocations'
 import CompanyRedditDiscussion from '@/components/CompanyRedditDiscussion'
@@ -564,7 +564,8 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
         })
         if (rRes.ok) {
           const rJson = await rRes.json() as { reports?: Report[]; ok?: boolean }
-          if (rJson.reports) setReports(rJson.reports)
+          // Newest experience first by its REAL date (imported rows: the source's posted date).
+          if (rJson.reports) setReports(sortReportsByDate(rJson.reports))
         }
 
         // Approved employer replies for this company, keyed by report id (best-effort, public).
@@ -1086,6 +1087,7 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
                       const badge = reportSourceBadge(r.platform)
                       const src = reportSourceLink(r.platform, r.report_text)
                       const body = src ? src.body : r.report_text
+                      const when = reportDate(r.platform, r.report_text, r.created_at).label
                       return (
                       <div key={r.id} className={`rcard${r.outcome ? ` outcome-${r.outcome}` : ''}`}>
                         <div className="rc-hd">
@@ -1096,9 +1098,7 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
                               {r.ghost_stage && <span style={{ color: 'var(--muted)' }}> · ghosted at {r.ghost_stage.replace(/_/g, ' ')}</span>}
                             </div>
                             <div className="rc-meta">
-                              {r.city ? `📍 ${r.city} · ` : ''}
-                              {r.rounds ? `${r.rounds} round${r.rounds !== 1 ? 's' : ''} · ` : ''}
-                              {r.created_at ? `${Math.floor((Date.now() - new Date(r.created_at).getTime()) / 86400000)}d ago` : ''}
+                              {[r.city ? `📍 ${r.city}` : '', r.rounds ? `${r.rounds} round${r.rounds !== 1 ? 's' : ''}` : '', when].filter(Boolean).join(' · ')}
                             </div>
                           </div>
                           <span className={`vibe rc-outcome ${ocClass[r.outcome] || 'v-n'}`}>{ocLabel[r.outcome] || r.outcome}</span>
