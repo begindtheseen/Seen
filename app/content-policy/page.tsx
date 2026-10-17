@@ -78,11 +78,18 @@ export default function ContentPolicyPage() {
             individual item appears, so readers can see it was imported from a public third-party thread rather
             than submitted directly to Seen.
           </p>
+          <p style={p}>
+            Some content is a <strong>first-hand account that its author posted publicly on a third-party
+            review site or forum</strong>, found through web search. Seen summarizes such an account, labels it
+            {' '}<em>&ldquo;Sourced from a public review site&rdquo;</em> together with the site&apos;s name, and
+            links to the original public post where its address is available, so readers can see it was not
+            submitted directly to Seen and can check the source themselves.
+          </p>
           <p style={quote}>
             This content reflects statements made publicly by third parties in their own venues. Seen is
             surfacing and organizing pre-existing public speech, with attribution to its public-discussion
-            origin. Imported public-discussion items are also weighted lower than first-hand reports in any
-            aggregate statistics.
+            origin. Imported public-discussion and review-site items are also weighted lower than first-hand
+            reports submitted to Seen in any aggregate statistics.
           </p>
         </div>
 

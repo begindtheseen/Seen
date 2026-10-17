@@ -1,12 +1,14 @@
 'use client'
 
-import { useState, useEffect, use } from 'react'
+import { useState, useEffect, use, type CSSProperties } from 'react'
 import { Score } from '@/lib/score'
 import { useAuth } from '@/lib/auth'
 import { AppStore } from '@/lib/stores/AppStore'
 import HiringProbability from '@/components/HiringProbability'
 import CompanyScoreCard from '@/components/CompanyScoreCard'
-import { isRedditSourced, PUBLIC_DISCUSSION_LABEL } from '@/lib/reportSource'
+import { isPublicDiscussion, reportSourceBadge, reportSourceLink } from '@/lib/reportSource'
+import ReportSourceLink from '@/components/ReportSourceLink'
+import { aggregateJobLocations } from '@/lib/jobLocations'
 import CompanyRedditDiscussion from '@/components/CompanyRedditDiscussion'
 import CompanyPublicRecord from '@/components/CompanyPublicRecord'
 import IndustryBenchmark, { type Benchmark } from '@/components/IndustryBenchmark'
@@ -615,9 +617,10 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
     return () => { alive = false }
   }, [companyName])
 
-  // Fetch open roles when roles tab is first opened
+  // Fetch open roles when the roles OR locations tab is first opened — one shared request (the
+  // Locations tab's "Where <company> is hiring" section aggregates these same listings).
   useEffect(() => {
-    if (tab !== 'roles' || jobsFetched) return
+    if ((tab !== 'roles' && tab !== 'locations') || jobsFetched) return
     setJobsLoading(true)
     fetch('/api/jobs', {
       method: 'POST',
@@ -1055,9 +1058,18 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
                 {reports.length > 0 ? (
                   <>
                     <div style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', color: 'var(--muted)', marginBottom: '.85rem' }}>
-                      {reports.length} report{reports.length !== 1 ? 's' : ''} from real applicants · anonymous · verified
+                      {(() => {
+                        const thirdParty = reports.filter(r => isPublicDiscussion(r.platform)).length
+                        return thirdParty > 0
+                          ? `${reports.length} report${reports.length !== 1 ? 's' : ''} · ${reports.length - thirdParty} submitted to Seen · ${thirdParty} from public discussion threads & review sites (labeled, down-weighted)`
+                          : `${reports.length} report${reports.length !== 1 ? 's' : ''} from real applicants · anonymous · verified`
+                      })()}
                     </div>
-                    {reports.map(r => (
+                    {reports.map(r => {
+                      const badge = reportSourceBadge(r.platform)
+                      const src = reportSourceLink(r.platform, r.report_text)
+                      const body = src ? src.body : r.report_text
+                      return (
                       <div key={r.id} className="rcard">
                         <div className="rc-hd">
                           <div className="rc-av">{(r.role || '?')[0].toUpperCase()}</div>
@@ -1074,8 +1086,8 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
                           </div>
                           <span className={`vibe ${ocClass[r.outcome] || 'v-n'}`}>{ocLabel[r.outcome] || r.outcome}</span>
                         </div>
-                        {r.report_text && (
-                          <div className="rc-body">{r.report_text}</div>
+                        {body && (
+                          <div className="rc-body">{body}</div>
                         )}
                         {r.id && employerReplies[r.id] && (
                           <div style={{ marginTop: '.7rem', padding: '.7rem .85rem', background: 'rgba(59,130,246,.06)', border: '1px solid rgba(59,130,246,.25)', borderRadius: 10 }}>
@@ -1089,12 +1101,14 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
                         <div className="rc-footer">
                           <span style={{ fontFamily: 'var(--mono)', fontSize: '.56rem', color: 'var(--muted)' }}>via</span>
                           <span className="vibe v-n" style={{ fontSize: '.55rem' }}>{r.platform || 'Seen'}</span>
-                          {isRedditSourced(r.platform) && (
-                            <span className="vibe v-n" style={{ fontSize: '.55rem', borderStyle: 'dashed', color: 'var(--dim)' }} title="Imported from a public Reddit thread, not submitted directly to Seen">{PUBLIC_DISCUSSION_LABEL}</span>
+                          {badge && (
+                            <span className="vibe v-n" style={{ fontSize: '.55rem', borderStyle: 'dashed', color: 'var(--dim)' }} title={badge.title}>{badge.label}</span>
                           )}
+                          {src && <ReportSourceLink url={src.url} host={src.host} posted={src.posted} />}
                         </div>
                       </div>
-                    ))}
+                      )
+                    })}
                   </>
                 ) : (
                   <div style={{ textAlign: 'center', padding: '2.5rem', color: 'var(--muted)', fontFamily: 'var(--mono)', fontSize: '.7rem' }}>
@@ -1108,35 +1122,50 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
             )}
 
             {/* ── LOCATIONS TAB ── */}
-            {tab === 'locations' && (
-              <div>
-                {reports.length === 0 ? (
-                  <div style={{ textAlign: 'center', padding: '2.5rem', color: 'var(--muted)', fontFamily: 'var(--mono)', fontSize: '.7rem' }}>
-                    No location data yet — reports populate as applications come in
-                  </div>
-                ) : (() => {
-                  // Group reports by city
-                  const cityMap: Record<string, { total: number; ghosted: number }> = {}
-                  reports.forEach(r => {
-                    const city = r.city || r.location || 'Unknown'
-                    if (!cityMap[city]) cityMap[city] = { total: 0, ghosted: 0 }
-                    cityMap[city].total += 1
-                    if (r.outcome === 'ghosted') cityMap[city].ghosted += 1
-                  })
-                  const cityRows = Object.entries(cityMap)
-                    .map(([city, data]) => ({
-                      city,
-                      total: data.total,
-                      ghostRate: data.ghosted / data.total,
-                      responseRate: (data.total - data.ghosted) / data.total,
-                    }))
-                    .sort((a, b) => b.total - a.total)
-                    .slice(0, 6)
+            {tab === 'locations' && (() => {
+              // Section 1 — reported outcomes by city: ONLY reports that actually carry a city.
+              const cityMap: Record<string, { total: number; ghosted: number }> = {}
+              let reportsWithCity = 0
+              reports.forEach(r => {
+                const city = (r.city || r.location || '').trim()
+                if (!city) return
+                reportsWithCity += 1
+                if (!cityMap[city]) cityMap[city] = { total: 0, ghosted: 0 }
+                cityMap[city].total += 1
+                if (r.outcome === 'ghosted') cityMap[city].ghosted += 1
+              })
+              const cityRows = Object.entries(cityMap)
+                .map(([city, data]) => ({
+                  city,
+                  total: data.total,
+                  ghostRate: data.ghosted / data.total,
+                  responseRate: (data.total - data.ghosted) / data.total,
+                }))
+                .sort((a, b) => b.total - a.total)
+                .slice(0, 6)
 
-                  return (
-                    <div>
-                      <div style={{ fontFamily: 'var(--mono)', fontSize: '.56rem', textTransform: 'uppercase', letterSpacing: '.08em', color: 'var(--muted)', marginBottom: '1rem' }}>
-                        Location breakdown · {reports.length} reports
+              // Section 2 — where the company is hiring, from its CURRENT job listings (listing data,
+              // not applicant reports). Same companyJobs the Open roles tab shows; no extra request.
+              const hiring = aggregateJobLocations(companyJobs, { top: 8 })
+              const hiringRows = [
+                ...(hiring.remote > 0 ? [{ label: 'Remote', count: hiring.remote }] : []),
+                ...hiring.places,
+              ].sort((a, b) => b.count - a.count)
+              const maxCount = hiringRows.reduce((m, r) => Math.max(m, r.count), 0)
+              // company_jobs returns at most the 20 top-scored open listings — say so when capped.
+              const capped = hiring.listings >= 20
+              const sectionLabel: CSSProperties = { fontFamily: 'var(--mono)', fontSize: '.56rem', textTransform: 'uppercase', letterSpacing: '.08em', color: 'var(--muted)', marginBottom: '.35rem' }
+              const sectionNote: CSSProperties = { fontFamily: 'var(--mono)', fontSize: '.55rem', color: 'var(--dim)', marginBottom: '1rem', lineHeight: 1.6 }
+
+              return (
+              <div>
+                {cityRows.length > 0 && (
+                    <div style={{ marginBottom: '2rem' }}>
+                      <div style={sectionLabel}>
+                        Reported outcomes by city
+                      </div>
+                      <div style={sectionNote}>
+                        From {reportsWithCity} applicant report{reportsWithCity !== 1 ? 's' : ''} that named a city
                       </div>
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '.55rem' }}>
                         {cityRows.map(row => {
@@ -1177,10 +1206,66 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
                         })}
                       </div>
                     </div>
-                  )
-                })()}
+                )}
+
+                <div>
+                  <div style={sectionLabel}>
+                    Where {companyName} is hiring
+                  </div>
+                  {jobsLoading || !jobsFetched ? (
+                    <div style={{ ...sectionNote, marginBottom: 0 }}>Checking current job listings…</div>
+                  ) : hiringRows.length > 0 ? (
+                    <>
+                      <div style={sectionNote}>
+                        From {hiring.listings} current job listing{hiring.listings !== 1 ? 's' : ''}{capped ? ' (the top-scored open listings — there may be more)' : ''} · listing locations, not applicant reports
+                        {hiring.withLocation < hiring.listings ? ` · ${hiring.listings - hiring.withLocation} without a stated location` : ''}
+                      </div>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '.45rem' }}>
+                        {hiringRows.map(row => (
+                          <div key={row.label} style={{
+                            background: 'var(--surface, #111)', border: '1px solid var(--line2)',
+                            borderRadius: 8, padding: '.6rem 1rem',
+                            display: 'flex', alignItems: 'center', gap: '.85rem', flexWrap: 'wrap',
+                          }}>
+                            <div style={{ fontFamily: 'var(--mono)', fontSize: '.66rem', color: 'var(--white)', minWidth: 120, flex: '1 1 140px', overflowWrap: 'anywhere' }}>
+                              {row.label === 'Remote' ? '🌐 Remote' : `📍 ${row.label}`}
+                            </div>
+                            <div style={{ flex: '2 1 80px', height: 6, background: 'var(--line2)', borderRadius: 3, overflow: 'hidden' }}>
+                              <div style={{ width: `${maxCount ? Math.round((row.count / maxCount) * 100) : 0}%`, height: '100%', background: 'var(--blue)', borderRadius: 3 }} />
+                            </div>
+                            <span style={{ fontFamily: 'var(--mono)', fontSize: '.54rem', fontWeight: 600, color: 'var(--sub)', flexShrink: 0 }}>
+                              {row.count} listing{row.count !== 1 ? 's' : ''}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                      {hiring.otherPlaces > 0 && (
+                        <div style={{ ...sectionNote, marginTop: '.6rem', marginBottom: 0 }}>
+                          + {hiring.otherPlaces} more location{hiring.otherPlaces !== 1 ? 's' : ''}
+                        </div>
+                      )}
+                      <button onClick={() => setTab('roles')} style={{ marginTop: '.85rem', background: 'none', border: 'none', padding: 0, cursor: 'pointer', fontFamily: 'var(--mono)', fontSize: '.6rem', color: 'var(--blue)' }}>
+                        See open roles →
+                      </button>
+                    </>
+                  ) : (
+                    <div style={{ ...sectionNote, marginBottom: 0 }}>
+                      {companyJobs.length > 0
+                        ? `${companyJobs.length} current job listing${companyJobs.length !== 1 ? 's' : ''}, but none states a location.`
+                        : 'No current job listings found for this company.'}
+                    </div>
+                  )}
+                </div>
+
+                {cityRows.length === 0 && (
+                  <div style={{ marginTop: '1.6rem', fontFamily: 'var(--mono)', fontSize: '.58rem', color: 'var(--muted)' }}>
+                    No applicant reports with a city yet.{' '}
+                    <a href={`/report?company=${encodeURIComponent(companyName)}`} style={{ color: 'var(--green)', textDecoration: 'none' }}>Report your experience →</a>
+                  </div>
+                )}
               </div>
-            )}
+              )
+            })()}
 
             {/* ── OPEN ROLES TAB ── */}
             {tab === 'roles' && (

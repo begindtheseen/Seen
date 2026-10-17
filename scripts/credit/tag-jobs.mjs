@@ -32,7 +32,7 @@ const here = dirname(fileURLToPath(import.meta.url));
 export const POSTED_BY = ['direct', 'staffing_agency', 'recruiter_unclear', 'unknown'];
 export const IS_REMOTE = ['remote', 'hybrid', 'onsite', 'unknown'];
 export const SENIORITY = ['entry', 'mid', 'senior', 'lead', 'unknown'];
-export const SALARY_PERIOD = ['hour', 'year', 'unknown'];
+export const SALARY_PERIOD = ['hour', 'day', 'week', 'month', 'year', 'unknown'];
 export const CONFIDENCE = ['high', 'medium', 'low'];
 
 // Signals that the listing may not be a real, currently-open seat (ghost-job risk).
@@ -154,8 +154,11 @@ seniority — "entry" (entry level, junior, graduate, intern, associate), "mid",
 Pay — only pay explicitly stated in the listing (the salary field or the description):
 - salary_min / salary_max as plain numbers in the stated unit ("$25/hr" → 25 and 25, period "hour";
   "$80k–$100k" → 80000 and 100000, period "year"). One number → the same value in both.
-- Pay stated per day, week, or month, or commission/bonus-only figures: salary_min and salary_max
-  null, salary_period "unknown".
+- Pay stated per day, week, or month keeps that unit: "$2,764 per week" → 2764 and 2764, period
+  "week" (likewise "day" and "month"). Never convert between units.
+- When the description states a pay rate that conflicts with the salary field, use the description
+  (the salary field can be a source's estimate): "$16.75–$17.00 per hour" → 16.75 / 17, "hour".
+- Commission- or bonus-only figures: salary_min and salary_max null, salary_period "unknown".
 - salary_currency: ISO 4217 code ("USD", "GBP", "CAD"…). "$" with a US location means "USD". null
   when no pay is stated or the currency is not clear.
 
@@ -166,14 +169,17 @@ ghost_signals — include each only when the listing text clearly supports it:
 - reposted_language: says it was reposted, re-opened, or is "still" looking.
 - unrealistic_requirements: requirements that contradict the level (e.g. 8+ years for entry level).
 - generic_boilerplate: template text that could describe any job at any company.
-- hidden_employer: an intermediary posting that never names who the hire would work for.
+- hidden_employer: an intermediary posting that never names who the hire would work for — including a
+  staffing agency that describes the client only generically ("a fast-growing creative agency").
 
 red_flags — include each only when the listing text clearly supports it:
-- mlm_or_commission_only: multi-level marketing, or pay is commission-only / "unlimited earnings".
+- mlm_or_commission_only: multi-level marketing, or the listing states there is no base or hourly pay.
+  Base pay plus commission is NOT this flag.
 - pay_to_apply: the applicant must pay for training, a starter kit, certification, or a background check.
 - requests_sensitive_info: asks for SSN, bank details, or ID documents before an offer.
 - off_platform_contact: asks applicants to apply or talk via Telegram, WhatsApp, text, or a personal email.
-- too_good_to_be_true_pay: pay wildly out of line with the stated duties or requirements.
+- too_good_to_be_true_pay: pay that is implausible for the duties (e.g. $5,000/week for entry-level data
+  entry). A high but realistic range for the role is NOT this flag; when unsure, leave it out.
 - unpaid_trial_work: unpaid trial shifts or unpaid test projects that are real work.
 - misleading_title: the title describes a different job than the duties do.
 
@@ -293,7 +299,10 @@ function cleanText(v, max) {
 }
 const bump = (counts, k, n = 1) => { counts[k] = (counts[k] || 0) + n; };
 
-const SALARY_BOUNDS = { hour: [5, 1000], year: [5000, 5_000_000], unknown: [1, 10_000_000] };
+const SALARY_BOUNDS = {
+  hour: [5, 1000], day: [20, 10_000], week: [100, 50_000], month: [400, 500_000], year: [5000, 5_000_000],
+  unknown: [1, 10_000_000],
+};
 
 export function newCounts() { return {}; }
 

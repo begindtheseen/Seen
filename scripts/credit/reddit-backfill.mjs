@@ -2,14 +2,25 @@
 // One-time Reddit backfill for the Staffing Agency Ghost Index + top companies.
 // Resumable, phase by phase (each phase reads the previous phase's files under .credit-runs/reddit):
 //
-//   node scripts/credit/reddit-backfill.mjs fetch   [--companies 400] [--threads 25] [--only <substr>] [--refetch] [--dry-run]
+//   node scripts/credit/reddit-backfill.mjs fetch   [--source arctic|reddit] [--companies 400] [--targets-file F.json]
+//                                                   [--rank demand|reports] [--skip-if-reports 15] [--refresh-demand]
+//                                                   [--quick] [--windows 1] [--threads 25] [--only <substr>]
+//                                                   [--full-discovery] [--refetch] [--dry-run]
 //   node scripts/credit/reddit-backfill.mjs extract [--label reddit-extract] [--kind agency|company] [--dry-run]
 //   node scripts/credit/reddit-backfill.mjs sample  [--label reddit-extract] [--n 40] [--seed 1]
 //   node scripts/credit/qa-judge.mjs --input .credit-runs/reddit/qa-sample.json --label qa-reddit
 //   node scripts/credit/reddit-backfill.mjs write   [--label reddit-extract] [--qa-label qa-reddit] [--dry-run]
 //
-// fetch   — Reddit Atom search (all time) per target → thread comment feeds → threads/<target>.json.
-//           Needs SUPABASE_URL/SUPABASE_SERVICE_KEY (target list + reddit_imports dedupe). No API spend.
+// fetch   — per target: discover threads → comments → threads/<target>.json. No API spend.
+//           --source arctic (default): Arctic Shift archive (arctic-shift.photon-reddit.com) posts/search
+//             (global, quieter job subs all-time, very active subs in --windows 1-year windows; `query`
+//             falling back to `title`) → comments/tree per kept thread. Reddit itself 403s our cloud runner.
+//             --quick: only r/recruitinghell, jobs, cscareerquestions, antiwork, 1 window each (4 searches/target).
+//           Company targets (--rank demand, the default): lib/targets.mjs — --targets-file entries first,
+//             then most current job listings, then company_scores; deduped; companies with ≥ --skip-if-reports
+//             first-party reports skipped. --rank reports = the original company_scores report_count order.
+//           --source reddit: the original Reddit Atom search + per-thread comment RSS feeds.
+//           Needs SUPABASE_URL/SUPABASE_SERVICE_KEY (target list + reddit_imports dedupe).
 // extract — one Sonnet 5.5 batch request per (target, ≤8 threads); results → <label>/extractions.json.
 // sample  — 40 random validated (source, extraction) pairs → qa-sample.json for the Opus judge.
 // write   — validate + PII-filter + dedupe → reports + reddit_imports rows → recompute each company.
@@ -23,8 +34,12 @@ import { join } from 'node:path';
 import { parseRedditSearchAtom } from '../../api/_utils/companyReddit.js';
 import { recomputeCompanyScoreFromReports, resolveOrCreateCompany } from '../../api/_utils/reportWrite.js';
 import { RUNS_DIR, argValue, isDryRun, runBatch, sb, sbAll, sbEnv } from './lib/batch.mjs';
+import { ARCTIC_DEFAULTS, createArcticFetcher, createDiscoveryState, discoveryQueries, discoveryScope, fetchArcticTarget } from './lib/arcticShift.mjs';
+import { createLocationResolver } from './lib/location.mjs';
+import { DEFAULT_SKIP_IF_REPORTS, loadTargetsFile, selectCompanyTargets } from './lib/targets.mjs';
+import { isSearchableCompany } from '../../api/_utils/companyReddit.js';
 import {
-  DEFAULTS, buildExtractRequests, buildImportRow, buildReportRow, buildTargets, coverage, createRedditFetcher,
+  DEFAULTS, buildExtractRequests, buildImportRow, buildReportRow, buildTargets, buildTargetsFromCompanies, coverage, createRedditFetcher,
   expKey, extractionsFromResults, fetchTarget, importedIdsForTarget, loadAgencies, normKey, planWrite, sampleN,
   searchUrlBuilders, sourceFor, targetSlug,
 } from './lib/reddit.mjs';
@@ -55,23 +70,48 @@ async function pool(items, n, fn) {
 // ── fetch ────────────────────────────────────────────────────────────────────────
 
 async function fetchPhase() {
-  const limit = num('companies', DEFAULTS.companies);
+  // --companies 0 is meaningful (agencies only), so it can't go through num() (which wants > 0).
+  const limit = Math.max(0, Number(argValue('companies', DEFAULTS.companies)) || 0);
   const threadsCap = num('threads', DEFAULTS.threadsPerTarget);
+  const source = argValue('source', 'arctic');
+  if (!['arctic', 'reddit'].includes(source)) throw new Error(`--source must be arctic or reddit (got "${source}")`);
+  const quick = has('quick');
+  const scope = discoveryScope({ quick, windows: num('windows', ARCTIC_DEFAULTS.activeWindows) });
+  const windows = scope.windows;
+  const rank = argValue('rank', 'demand');
+  if (!['demand', 'reports'].includes(rank)) throw new Error(`--rank must be demand or reports (got "${rank}")`);
+  const targetsFile = argValue('targets-file');
+  const fileTargets = targetsFile ? loadTargetsFile(targetsFile) : [];
+  const skipRaw = argValue('skip-if-reports');
+  const skipIfReports = skipRaw == null ? DEFAULT_SKIP_IF_REPORTS : Math.max(0, Number(skipRaw) || 0);
+  const nowSec = Math.floor(Date.now() / 1000); // one clock for the whole run → identical windows per target
   const agencies = loadAgencies();
-  let agencyScoreRows = [], companyRows = [], importRows = [];
+  let agencyScoreRows = [], companyRows = [], importRows = [], picked = [];
   if (hasSupabase()) {
     const aliases = agencies.flatMap((a) => a.aliases);
     const inList = encodeURIComponent(`(${aliases.map((a) => `"${a.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`).join(',')})`);
     agencyScoreRows = await sb(`company_scores?company_name=in.${inList}&select=company_name,report_count,first_party_report_count`);
-    // Over-fetch: invalid names, agency duplicates and spelling variants are dropped by buildTargets.
-    companyRows = await sbAll('company_scores?select=company_name,report_count,first_party_report_count&report_count=gt.0&order=report_count.desc.nullslast,company_name.asc', { max: limit * 2 + 200 });
+    if (rank === 'reports') {
+      // Over-fetch: invalid names, agency duplicates and spelling variants are dropped by buildTargets.
+      companyRows = await sbAll('company_scores?select=company_name,report_count,first_party_report_count&report_count=gt.0&order=report_count.desc.nullslast,company_name.asc', { max: limit * 2 + 200 });
+    } else if (limit > 0 || fileTargets.length) {
+      const excludeKeys = new Set(agencies.flatMap((a) => [a.name, ...a.aliases]).map(normKey));
+      // --companies caps the merged list; a --targets-file with --companies 0 runs the whole file.
+      picked = await selectCompanyTargets({
+        sbAll, fileTargets, skipIfReports, excludeKeys, valid: isSearchableCompany,
+        n: limit > 0 ? limit : fileTargets.length, useDemand: limit > 0, refreshDemand: has('refresh-demand'), log: console.log,
+      });
+    }
     importRows = await sbAll('reddit_imports?select=reddit_post_id,company_name&order=id.asc');
   } else if (isDryRun()) {
     console.warn('SUPABASE_URL / SUPABASE_SERVICE_KEY not set — dry run lists agencies only.');
   } else {
     throw new Error('fetch needs SUPABASE_URL / SUPABASE_SERVICE_KEY (target list + reddit_imports dedupe)');
   }
-  let targets = buildTargets({ agencies, agencyScoreRows, companyRows, limit });
+  if (rank === 'reports' && fileTargets.length) throw new Error('--targets-file needs --rank demand (the default)');
+  let targets = rank === 'reports'
+    ? buildTargets({ agencies, agencyScoreRows, companyRows, limit })
+    : buildTargetsFromCompanies({ agencies, agencyScoreRows, companies: picked });
   const only = argValue('only');
   if (only) targets = targets.filter((t) => t.writeName.includes(only.toLowerCase()));
   writeJson(join(DIR, 'targets.json'), targets);
@@ -80,9 +120,13 @@ async function fetchPhase() {
     const p = join(THREADS_DIR, `${targetSlug(t)}.json`);
     return has('refetch') || !readJsonMaybe(p)?.complete;
   });
-  const perTarget = searchUrlBuilders(targets[0] || { searchTerm: 'x' }).length + threadsCap;
+  const sample = targets[0] || { searchTerm: 'x' };
+  const arctic = source === 'arctic';
+  const perTarget = (arctic ? discoveryQueries(sample, { nowSec, ...scope }).length : searchUrlBuilders(sample).length) + threadsCap;
   const reqs = pending.length * perTarget;
-  console.log(`[fetch] ${targets.length} targets (${targets.filter((t) => t.kind === 'agency').length} agencies) · ${pending.length} to fetch · ≤${reqs.toLocaleString()} Reddit requests · ≥${(reqs * DEFAULTS.intervalMs / 3.6e6).toFixed(1)}h at ${DEFAULTS.intervalMs}ms spacing (more with 429 back-offs)`);
+  const intervalMs = arctic ? ARCTIC_DEFAULTS.intervalMs : DEFAULTS.intervalMs;
+  if (arctic) console.log(`[fetch] discovery: ${quick ? 'QUICK — ' : ''}${scope.quietSubs.length} quiet subs all-time + ${scope.activeSubs.length} active subs × ${windows} window(s) = ${discoveryQueries(sample, { nowSec, ...scope }).length} searches/target`);
+  console.log(`[fetch] source ${arctic ? 'Arctic Shift' : 'Reddit RSS'} · ${targets.length} targets (${targets.filter((t) => t.kind === 'agency').length} agencies) · ${pending.length} to fetch · ≤${reqs.toLocaleString()} requests${arctic ? ' (+ title fallbacks/retries; fewer when a global search is complete)' : ''} · ≥${(reqs * intervalMs / 3.6e6).toFixed(1)}h at ${intervalMs}ms spacing (more with 429 back-offs)`);
   console.log(`[fetch] reddit_imports rows loaded for dedupe: ${importRows.length}`);
   if (isDryRun()) {
     for (const t of targets.slice(0, 40)) console.log(`  ${t.kind.padEnd(7)} ${t.displayName} → writes as "${t.writeName}" · search "${t.searchTerm}"`);
@@ -91,11 +135,16 @@ async function fetchPhase() {
   }
 
   mkdirSync(THREADS_DIR, { recursive: true });
-  const fetcher = createRedditFetcher({ log: console.log });
+  const fetcher = arctic ? createArcticFetcher({ log: console.log }) : createRedditFetcher({ log: console.log });
+  const state = createDiscoveryState({ log: console.log }); // shared across targets (query→title breaker)
+  const fullDiscovery = has('full-discovery');
   let done = 0;
-  await pool(pending, DEFAULTS.concurrency, async (t) => {
+  await pool(pending, arctic ? ARCTIC_DEFAULTS.concurrency : DEFAULTS.concurrency, async (t) => {
     try {
-      const cache = await fetchTarget(t, { fetcher, parseSearch: parseRedditSearchAtom, importedIds: importedIdsForTarget(importRows, t), threadsCap, log: console.log });
+      const importedIds = importedIdsForTarget(importRows, t);
+      const cache = arctic
+        ? await fetchArcticTarget(t, { fetcher, state, importedIds, threadsCap, nowSec, ...scope, fullDiscovery, log: console.log })
+        : await fetchTarget(t, { fetcher, parseSearch: parseRedditSearchAtom, importedIds, threadsCap, log: console.log });
       writeJson(join(THREADS_DIR, `${targetSlug(t)}.json`), cache); // persisted per target → resumable
       if (!cache.complete) console.log(`  ${t.displayName}: every search failed — will retry on the next run`);
     } catch (e) {
@@ -103,10 +152,11 @@ async function fetchPhase() {
     }
     if (++done % 10 === 0) console.log(`[fetch] ${done}/${pending.length} · ${fetcher.stats.requests} requests · ${fetcher.stats.r429} × 429`);
   });
+  console.log(`[fetch] requests ${JSON.stringify(fetcher.stats)}`);
   const wanted = new Set(targets.map(targetSlug));
   const cov = coverage(loadCaches().filter((c) => wanted.has(targetSlug(c.target))));
   writeJson(join(DIR, 'coverage.json'), cov);
-  console.log(`[fetch] coverage: ${cov.targetsWithThreads}/${cov.targets} targets with ≥1 thread (agencies ${cov.agenciesWithThreads}/${cov.agencies}) · ${cov.threads} threads · ${cov.comments} comments · ${cov.chars.toLocaleString()} chars · ${cov.threadsWithoutComments} threads without a comment feed`);
+  console.log(`[fetch] coverage: ${cov.targetsWithThreads}/${cov.targets} targets with ≥1 thread (agencies ${cov.agenciesWithThreads}/${cov.agencies}) · ${cov.threads} threads · ${cov.comments} comments · ${cov.chars.toLocaleString()} chars · ${cov.threadsWithoutComments} threads without a comment feed${arctic ? ` · ${cov.skippedQueries} searches failed after retry + title fallback` : ''}`);
 }
 
 // ── extract ──────────────────────────────────────────────────────────────────────
@@ -155,7 +205,7 @@ function samplePhase() {
       id: expKey(e),
       company: caches.get(e.target_slug).target.displayName,
       source: sourceFor(e, t),
-      extraction: { outcome: e.outcome, role: e.role, summary: e.summary, confidence: e.confidence, comment_index: e.comment_index },
+      extraction: { outcome: e.outcome, role: e.role, city: e.city || null, summary: e.summary, confidence: e.confidence, comment_index: e.comment_index },
     };
   });
   writeJson(join(DIR, 'qa-sample.json'), items);
@@ -209,7 +259,7 @@ async function writePhase() {
     if (!g.exps.length) continue;
     const outcomes = {};
     for (const e of g.exps) outcomes[e.outcome] = (outcomes[e.outcome] || 0) + 1;
-    summary.companies[g.cache.target.writeName] = { kind: g.cache.target.kind, reports: g.exps.length, threads: g.threads.length, outcomes };
+    summary.companies[g.cache.target.writeName] = { kind: g.cache.target.kind, reports: g.exps.length, with_city: g.exps.filter((e) => e.city).length, threads: g.threads.length, outcomes };
   }
 
   if (dry) {
@@ -217,7 +267,7 @@ async function writePhase() {
     console.log(`[write] DRY RUN — would insert ${kept.length} reports across ${rows.length} companies (dropped: ${JSON.stringify(plan.dropped)})`);
     for (const [name, v] of rows) console.log(`  ${String(v.reports).padStart(4)}  ${name}  ${JSON.stringify(v.outcomes)}`);
     console.log('[write] samples:');
-    for (const e of sampleN(kept, 10, 7)) console.log(`  · ${e.company} [${e.outcome}/${e.confidence}] r/${e.subreddit}: ${e.summary}`);
+    for (const e of sampleN(kept, 10, 7)) console.log(`  · ${e.company} [${e.outcome}/${e.confidence}]${e.city ? ` (${e.city})` : ''} r/${e.subreddit}: ${e.summary}`);
     writeJson(join(DIR, 'write-summary.json'), summary);
     return;
   }
@@ -226,6 +276,7 @@ async function writePhase() {
   const key = process.env.SUPABASE_SERVICE_KEY;
   const hdrs = { apikey: key, Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' };
   const recomputed = [];
+  const locations = createLocationResolver({ url, hdrs: { ...hdrs, Prefer: 'return=representation' }, log: console.log });
   let inserted = 0;
   for (const [slug, g] of groups) {
     const t = g.cache.target;
@@ -236,7 +287,8 @@ async function writePhase() {
         const cid = await resolveOrCreateCompany(url, { ...hdrs, Prefer: 'return=representation' }, t.kind === 'agency' ? t.displayName : t.writeName);
         for (let i = 0; i < g.exps.length; i += 200) {
           const chunk = g.exps.slice(i, i + 200);
-          const ins = await sb('reports?select=id', { method: 'POST', body: chunk.map((e) => buildReportRow(e, { companyId: cid })), prefer: 'return=representation' });
+          const lids = await Promise.all(chunk.map((e) => locations.locationId(cid, e.city)));
+          const ins = await sb('reports?select=id', { method: 'POST', body: chunk.map((e, j) => buildReportRow(e, { companyId: cid, locationId: lids[j] })), prefer: 'return=representation' });
           if (!Array.isArray(ins) || ins.length !== chunk.length) throw new Error(`reports insert returned ${ins?.length} rows for ${chunk.length}`);
           inserted += chunk.length;
           chunk.forEach((e, j) => {
@@ -264,9 +316,10 @@ async function writePhase() {
     }
   }
   summary.inserted = inserted;
+  summary.locations = locations.stats;
   summary.recomputed = recomputed;
   writeJson(join(DIR, 'write-summary.json'), summary);
-  console.log(`[write] inserted ${inserted}/${kept.length} reports across ${Object.keys(summary.companies).length} companies · recomputed ${recomputed.length} · errors ${summary.errors.length} · ledger ${ledgerPath}`);
+  console.log(`[write] inserted ${inserted}/${kept.length} reports across ${Object.keys(summary.companies).length} companies · recomputed ${recomputed.length} · locations ${JSON.stringify(locations.stats)} · errors ${summary.errors.length} · ledger ${ledgerPath}`);
 }
 
 async function main() {

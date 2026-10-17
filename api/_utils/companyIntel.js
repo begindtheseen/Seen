@@ -33,6 +33,8 @@ export const SOURCE_TRUST = {
   seen_intel: 1.0,  // survey / Opportunity-Engine answers
   ingest: 0.55,     // Glassdoor / Blind / Indeed / LinkedIn (n8n)
   reddit: 0.3,      // Reddit pipeline
+  public_web: 0.3,  // first-hand accounts found on public review sites / forums via web search
+                    // (platform "Public review · <host>") — third-party, attributed, same tier as reddit
   web: 0.5,         // generic web research (used as the prior, not pooled here)
 };
 
@@ -51,9 +53,22 @@ export const RESPONSE_OUTCOMES = new Set([
 // the denominator but neither rate bucket.)
 export const NONTERMINAL_OUTCOMES = new Set(['unknown', 'pending', 'active', 'applied', 'withdrawn', 'submitted', 'waiting', '']);
 
+// Platform marker for first-hand accounts collected from public review sites / forums by web
+// search (scripts/credit/web-reports.mjs). THE contract for those rows:
+//   platform 'Public review · <hostname>', source 'web_public', outcome_weight 0.3,
+//   trust_reason 'web_search_public_review'.
+// Checked BEFORE the ingest/reddit tests: "Public review · glassdoor.com" must never be scored as
+// ingest (0.55) and an unknown forum host must never fall through to 'direct' (1.0, first-party).
+// Mirrored by lib/reportSource.ts (display label) and lib/server/reportCounts.js (count path).
+export const PUBLIC_REVIEW_PLATFORM_PREFIX = 'Public review · ';
+export const PUBLIC_REVIEW_PLATFORM_RE = /^public review ·/i;
+export const publicReviewPlatform = (host) => `${PUBLIC_REVIEW_PLATFORM_PREFIX}${String(host || '').trim().toLowerCase()}`;
+
 // Map a free-form `reports.platform` string to a fusion source type / trust tier.
 export function classifyPlatform(platform) {
-  const p = String(platform || '').toLowerCase();
+  const raw = String(platform || '');
+  if (PUBLIC_REVIEW_PLATFORM_RE.test(raw)) return 'public_web';
+  const p = raw.toLowerCase();
   if (/reddit/.test(p)) return 'reddit';
   if (/glassdoor|blind|indeed|linkedin/.test(p)) return 'ingest';
   if (/seen[_ -]?intel|survey/.test(p)) return 'seen_intel';
@@ -94,7 +109,7 @@ export function blendRate(prior, empiricalRate, effN) {
 //
 // input = {
 //   web:    { ghost_rate, response_rate, avg_wait_days, avg_rounds, unpaid_rate, report_count },
-//   sources:[ { type:'direct'|'reddit'|'ingest'|'seen_intel', outcomes:[{outcome}], avgWaitDays?, avgRounds? } ],
+//   sources:[ { type:'direct'|'reddit'|'public_web'|'ingest'|'seen_intel', outcomes:[{outcome}], avgWaitDays?, avgRounds? } ],
 //   avgTenureMonths, tenureSample, dataAgeDays,
 //   confirmedStaleListings, // admin-confirmed dead listings (suppressed_listings) — bounded penalty
 // }
