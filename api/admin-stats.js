@@ -16,6 +16,7 @@ import { isDisputeDecision, resolveDisputeEffect, disputeStatusCounts as listing
 import { buildNotificationRow } from '../lib/server/employerNotificationsStore.js';
 import { normalizeClaimCompany } from '../lib/server/employerClaims.js';
 import { EMPLOYER_SKUS } from '../lib/server/employerSkus.js';
+import { enrichmentQueueStats } from '../lib/server/enrichmentQueue.js';
 
 const ALLOWED = ['https://seenjobs.io', 'https://www.seenjobs.io'];
 
@@ -234,6 +235,11 @@ async function _handler(req, res) {
     const monthISO = new Date(Date.now() - 30 * 86400000).toISOString();
 
     const ct = r => parseInt((r?.headers?.get('content-range') || '').split('/')[1]) || 0;
+
+    // Self-filling company pages (migration 20261017140000): one small RPC, deliberately OUTSIDE the
+    // db() wrapper — before the migration is applied it 404s, and that must read as { ready:false },
+    // not mark every other number on this dashboard `degraded`.
+    const enrichmentP = enrichmentQueueStats(SB, SK);
 
     const [
       usersTotalRes, usersTodayRes, usersWeekRes,
@@ -509,6 +515,7 @@ async function _handler(req, res) {
       errors: { today: errToday.length, this_week: ct(errWeekRes), by_route: errByRoute, recent: errToday.slice(0, 5) },
       issues: { open: issues.length, items: issues },
       reddit_disputes: { open: ct(disputesOpenRes) },
+      enrichment: await enrichmentP,
       employer_claims: { pending: ct(pendingClaimsRes) },
       listing_disputes: { open: ct(listingDisputesOpenRes) },
       employer_purchases: { unfulfilled: ct(unfulfilledPurchasesRes) },

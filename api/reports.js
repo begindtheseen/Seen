@@ -14,6 +14,7 @@ import { SECURITY_PREAMBLE, fenceUntrusted, scanInjection } from '../lib/server/
 import { fetchIndustryBenchmark } from '../lib/server/benchmark.js';
 import { isEvidencedScore, suppressionReason, servedDataSource } from '../lib/server/scoreProvenance.js';
 import { firstPartyReportCount, webClaimCount } from '../lib/server/reportCounts.js';
+import { enqueueCompanyEnrichment } from '../lib/server/enrichmentQueue.js';
 
 // Authorize admin/cron-only actions (the Anthropic web-research endpoints). Accepts a Vercel
 // cron header, a shared CRON_SECRET, or a valid admin_sessions token. Everything Anthropic in
@@ -1677,7 +1678,17 @@ async function handleCompanyScore(req, res, body) {
       // treated as a MISS rather than an error, so the request falls through to real report
       // aggregation and, failing that, to the honest "no data yet — be the first to report" state.
       if (rows?.[0]) {
-        if (isEvidencedScore(rows[0])) return res.json({ ok: true, score: _rowToScore(rows[0]), _src: 'cache' });
+        if (isEvidencedScore(rows[0])) {
+          // Self-filling pages: an evidenced score with ZERO first-party reports (a web-research
+          // estimate) still has no applicant reports behind it — queue public-discussion enrichment
+          // under the STORED name so new reports land on this score row. Bounded (≤1.5s timeout),
+          // never throws; null when the queue is unavailable. See lib/server/enrichmentQueue.js.
+          const fp = firstPartyReportCount(rows[0]);
+          const enrichment = fp === 0
+            ? await enqueueCompanyEnrichment(SUPABASE_URL, SUPABASE_SERVICE_KEY, rows[0].company_name || name, { firstPartyCount: fp })
+            : null;
+          return res.json({ ok: true, score: _rowToScore(rows[0]), _src: 'cache', ...(enrichment ? { enrichment } : {}) });
+        }
         console.warn(`score suppressed for "${name}": ${suppressionReason(rows[0])}`);
       }
     } catch(e) { console.warn('Cache check:', e.message); }
@@ -1703,11 +1714,18 @@ async function handleCompanyScore(req, res, body) {
     return res.json({ ok: true, score, _src: 'reports' });
   }
 
-  // 3. No reports yet. Anthropic web-research is the ONLY LLM path here, and it's gated: it runs
-  //    only when the admin flag is on AND a key exists. Otherwise return an honest empty state.
+  // 3. No reports yet. Queue this company for self-filling (public Reddit discussion → attributed,
+  //    down-weighted reports, filled by the api/enrich-companies cron). Started in parallel with the
+  //    flag read so it adds ~no latency; bounded (≤1.5s), never throws, resolves null when the queue
+  //    is unavailable — the response is then exactly what it was before this feature.
+  const enrichP = enqueueCompanyEnrichment(SUPABASE_URL, SUPABASE_SERVICE_KEY, name, { firstPartyCount: 0 });
+  const withEnrichment = async (payload) => { const enrichment = await enrichP; return enrichment ? { ...payload, enrichment } : payload; };
+
+  //    Anthropic web-research is the ONLY LLM path here, and it's gated: it runs only when the admin
+  //    flag is on AND a key exists. Otherwise return an honest empty state.
   const aiOn = await anthropicUsable(SUPABASE_URL, SUPABASE_SERVICE_KEY);
   if (!aiOn) {
-    return res.json({ ok: true, no_data: true, score: null, message: `No applicant reports yet for "${name}". Be the first to report your experience.` });
+    return res.json(await withEnrichment({ ok: true, no_data: true, score: null, message: `No applicant reports yet for "${name}". Be the first to report your experience.` }));
   }
 
   let apiRes;
@@ -1742,7 +1760,7 @@ async function handleCompanyScore(req, res, body) {
     if (apiRes.status === 429 || apiRes.status === 529 || apiRes.status >= 500) {
       return res.status(502).json({ error: 'Score service temporarily unavailable', retry_after: '60' });
     }
-    return res.json({ ok: true, no_data: true, score: null, degraded: 'research_unavailable', message: `No applicant reports yet for "${name}". Be the first to report your experience.` });
+    return res.json(await withEnrichment({ ok: true, no_data: true, score: null, degraded: 'research_unavailable', message: `No applicant reports yet for "${name}". Be the first to report your experience.` }));
   }
 
   const data = await apiRes.json();
@@ -1773,5 +1791,5 @@ async function handleCompanyScore(req, res, body) {
     } catch(e) { console.error('Save error:', e.message); }
   }
 
-  return res.json({ ok: true, score, _src: 'fresh' });
+  return res.json(await withEnrichment({ ok: true, score, _src: 'fresh' }));
 }

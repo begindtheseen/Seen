@@ -474,6 +474,15 @@ function GhostVisual({ ghostRate, count }: { ghostRate: number; count: number })
   )
 }
 
+// Truthful "self-filling" status: the company is queued for the public-discussion enrichment cron.
+function EnrichmentNotice({ companyName }: { companyName: string }) {
+  return (
+    <div role="status" style={{ marginTop: '.75rem', fontFamily: 'var(--mono)', fontSize: '.66rem', color: 'var(--sub)', lineHeight: 1.6 }}>
+      We&apos;re gathering public hiring discussions about <span style={{ textTransform: 'capitalize' }}>{companyName}</span> — check back shortly.
+    </div>
+  )
+}
+
 // ── Main Page ──────────────────────────────────────────────────────────────────
 
 export default function CompanyPage({ params }: { params: Promise<{ slug: string }> }) {
@@ -486,6 +495,9 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [notFound, setNotFound] = useState(false)
+  // Self-filling pages: the score API reports when this company is queued for public-discussion
+  // enrichment (api/enrich-companies cron). Only 'queued' / 'running' ever render a line.
+  const [enrichmentStatus, setEnrichmentStatus] = useState<string | null>(null)
   const [tab, setTab] = useState<TabKey>('overview')
   const [location, setLocation] = useState('')
   const [webReviews, setWebReviews] = useState<WebReview[]>([])
@@ -586,7 +598,8 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
           body: JSON.stringify({ name: companyName }),
         })
         if (sRes.ok) {
-          const sJson = await sRes.json() as { score?: CompanyScore; ok?: boolean; not_found?: boolean }
+          const sJson = await sRes.json() as { score?: CompanyScore; ok?: boolean; not_found?: boolean; enrichment?: { status?: string } }
+          setEnrichmentStatus(typeof sJson.enrichment?.status === 'string' ? sJson.enrichment.status : null)
           if (sJson.not_found) {
             setNotFound(true)
           } else if (sJson.score) {
@@ -657,6 +670,9 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
   // the web-research pipeline's *claimed* number, which must never render as "reports".
   const fpReports = score ? (score.first_party_report_count ?? (score.data_source === 'reports' ? (score.report_count || 0) : 0)) : 0
   const webEst = score ? (score.web_report_count ?? (score.data_source === 'reports' ? 0 : (score.report_count || 0))) : 0
+  // Honest status line: only while the enrichment worker has this company queued/running AND the
+  // page has no first-party reports to show. It promises nothing about what will be found.
+  const gatheringPublic = !loading && fpReports === 0 && reports.length === 0 && (enrichmentStatus === 'queued' || enrichmentStatus === 'running')
   const logoLetter = (companyName[0] || '?').toUpperCase()
   const ghostHigh = (score?.ghost_rate || 0) > 0.5
   const ghostPct = score ? (ratePct(score.ghost_rate) ?? 0) : 0
@@ -906,6 +922,7 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
           ) : (
             <div style={{ textAlign: 'center', padding: '2rem', color: 'var(--muted)', fontFamily: 'var(--mono)', fontSize: '.72rem' }}>
               No score data found for this company.
+              {gatheringPublic && <EnrichmentNotice companyName={companyName} />}
             </div>
           )}
         </div>
@@ -1115,6 +1132,7 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
                     {webEst > 0 && fpReports === 0
                       ? <>No first-party reports yet — the score on this page is estimated from public web research.<br /><br /></>
                       : <>No community reports yet.<br /><br /></>}
+                    {gatheringPublic && <><EnrichmentNotice companyName={companyName} /><br /></>}
                     <a href="/report" style={{ color: 'var(--green)', textDecoration: 'none' }}>Be the first to report →</a>
                   </div>
                 )}
