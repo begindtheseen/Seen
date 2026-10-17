@@ -41,6 +41,8 @@ export interface AdminStats {
   errors: { today: number; this_week: number; by_route: Record<string, number>; recent: { endpoint: string; error_msg: string; created_at: string }[] }
   issues: { open: number; items: Issue[] }
   reddit_disputes?: { open: number }
+  // Self-filling company pages queue (migration 20261017140000). ready:false before the migration.
+  enrichment?: { ready: boolean; queued?: number; running?: number; done?: number; empty?: number; error?: number; reports_added_24h?: number; llm_calls_24h?: number }
   // Employer-side attention signals surfaced in the overview queue (see AdminShell).
   employer_claims?: { pending: number }
   listing_disputes?: { open: number }

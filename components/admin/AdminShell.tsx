@@ -348,6 +348,28 @@ export function AdminShell({ stats, token, reload, onLogout, onUnauthorized }: {
               </div>
             </div>
 
+            {/* Self-filling company pages — the enrichment queue (api/enrich-companies cron, every 15 min).
+                Companies land here when a visitor looks them up with zero first-party reports. */}
+            {stats.enrichment?.ready && (
+              <div className="adm-panel" style={{ marginBottom: '.65rem' }}>
+                <div className="adm-panel-hdr">
+                  Self-filling company pages
+                  <span style={{ fontFamily: 'var(--mono)', fontSize: '.5rem', color: 'var(--dim)' }}>public Reddit discussion · every 15 min</span>
+                </div>
+                <div style={{ display: 'flex', gap: '.5rem', flexWrap: 'wrap', padding: '.75rem 1rem' }}>
+                  {([
+                    ['queued', stats.enrichment.queued], ['running', stats.enrichment.running], ['done', stats.enrichment.done],
+                    ['empty', stats.enrichment.empty], ['error', stats.enrichment.error],
+                    ['reports added 24h', stats.enrichment.reports_added_24h], ['LLM calls 24h', stats.enrichment.llm_calls_24h],
+                  ] as [string, number | undefined][]).map(([label, n]) => (
+                    <div key={label} style={{ fontFamily: 'var(--mono)', fontSize: '.62rem', padding: '.35rem .75rem', borderRadius: 6, background: 'var(--raised, #111)', color: label === 'error' && (n ?? 0) > 0 ? 'var(--red)' : 'var(--sub)', border: '1px solid var(--line)' }}>
+                      {label}: {n ?? 0}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {/* Outcome breakdown */}
             <div className="adm-panel" style={{ marginBottom: '.65rem' }}>
               <div className="adm-panel-hdr">Report outcome breakdown <span style={{ color: 'var(--dim)', fontWeight: 400 }}>(30d)</span></div>
