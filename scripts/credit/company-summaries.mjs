@@ -39,6 +39,7 @@ const SOURCE_LABELS = {
   seen_intel: 'seen_surveys',
   ingest: 'imported_from_job_review_sites',
   reddit: 'public_reddit_discussion',
+  public_web: 'public_review_sites', // "Public review · <host>" rows (web-reports.mjs), low trust like reddit
 };
 
 const pctInt = (v) => (v == null || !Number.isFinite(Number(v)) ? null : Math.round(Math.min(1, Math.max(0, Number(v))) * 100));
@@ -47,6 +48,18 @@ const round1 = (v) => (v == null || !Number.isFinite(Number(v)) ? null : Math.ro
 /** Display name the page uses for a stored lowercase name (mirror of lib/growth.ts displayCompanyName). */
 export function displayName(stored) {
   return String(stored || '').split(' ').map((w) => (w ? w.charAt(0).toUpperCase() + w.slice(1) : w)).join(' ');
+}
+
+// Year an account describes. Imported public rows (reddit / "Public review · host") were written long
+// after the post, so created_at is the import date; they carry the real one in report_text as
+// "[Public <host> post, posted YYYY…". Without that tag an imported row has no known year.
+export function reportYear(r) {
+  const kind = classifyPlatform(r?.platform);
+  if (kind === 'reddit' || kind === 'public_web') {
+    const m = /\[Public [^\]]*?\bposted (\d{4})\b/.exec(String(r?.report_text || ''));
+    return m ? Number(m[1]) : null;
+  }
+  return r?.created_at ? new Date(r.created_at).getUTCFullYear() : null;
 }
 
 /**
@@ -58,7 +71,10 @@ export function buildStats(score, reports) {
   const bySource = { direct: [], seen_intel: [], ingest: [], reddit: [] };
   for (const r of rows) (bySource[classifyPlatform(r.platform)] ||= []).push(r);
   const agg = aggregateOutcomes(rows);
-  const years = rows.map((r) => (r.created_at ? new Date(r.created_at).getUTCFullYear() : null)).filter((y) => Number.isFinite(y));
+  // A year range is stated only when EVERY row's year is known — otherwise "2024" would read as
+  // "all from 2024" when it is just the few rows that carry a posted date.
+  const allYears = rows.map(reportYear);
+  const years = allYears.every((y) => Number.isFinite(y)) ? allYears : [];
 
   // Same tenure fold-in the company page applies (lib/growth.ts scoreFromDb) so the grade matches.
   let grade = null;
@@ -186,6 +202,7 @@ export function dataBasis(stats) {
   if (src.seen_surveys) parts.push(`${src.seen_surveys} from Seen surveys`);
   if (src.imported_from_job_review_sites) parts.push(`${src.imported_from_job_review_sites} imported from job-review sites`);
   if (src.public_reddit_discussion) parts.push(`${src.public_reddit_discussion} from public Reddit discussion`);
+  if (src.public_review_sites) parts.push(`${src.public_review_sites} from public review sites`);
   const span = stats.earliest_report_year
     ? (stats.earliest_report_year === stats.latest_report_year ? `, ${stats.earliest_report_year}` : `, ${stats.earliest_report_year}–${stats.latest_report_year}`)
     : '';
@@ -248,7 +265,8 @@ export function snippetBlock(reports) {
   for (const r of reports) {
     const t = String(r.report_text || '').replace(/\s+/g, ' ').trim();
     if (t.length < 15) continue;
-    const src = classifyPlatform(r.platform) === 'reddit' ? 'public discussion' : SOURCE_LABELS[classifyPlatform(r.platform)].replace(/_/g, ' ');
+    const kind = classifyPlatform(r.platform);
+    const src = kind === 'reddit' ? 'public discussion' : kind === 'public_web' ? 'public review site' : (SOURCE_LABELS[kind] || 'unknown source').replace(/_/g, ' ');
     lines.push(`- [${src}; outcome: ${String(r.outcome || 'unknown').slice(0, 30)}] ${t.slice(0, SNIPPET_CHARS)}`);
     if (lines.length >= MAX_SNIPPETS) break;
   }
