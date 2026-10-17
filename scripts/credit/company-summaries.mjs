@@ -321,7 +321,7 @@ async function pool(items, n, fn) {
   const out = new Array(items.length);
   let next = 0;
   await Promise.all(Array.from({ length: Math.min(n, items.length) }, async () => {
-    for (;;) { const i = next++; if (i >= items.length) return; out[i] = await fn(items[i], i); }
+    for (;;) { const i = next++; if (i >= items.length) return; out[i] = await fn(items[i]); }
   }));
   return out;
 }

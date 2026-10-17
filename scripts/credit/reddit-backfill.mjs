@@ -61,7 +61,7 @@ async function fetchPhase() {
   let agencyScoreRows = [], companyRows = [], importRows = [];
   if (hasSupabase()) {
     const aliases = agencies.flatMap((a) => a.aliases);
-    const inList = encodeURIComponent(`(${aliases.map((a) => `"${a.replace(/"/g, '\\"')}"`).join(',')})`);
+    const inList = encodeURIComponent(`(${aliases.map((a) => `"${a.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`).join(',')})`);
     agencyScoreRows = await sb(`company_scores?company_name=in.${inList}&select=company_name,report_count,first_party_report_count`);
     // Over-fetch: invalid names, agency duplicates and spelling variants are dropped by buildTargets.
     companyRows = await sbAll('company_scores?select=company_name,report_count,first_party_report_count&report_count=gt.0&order=report_count.desc.nullslast,company_name.asc', { max: limit * 2 + 200 });
