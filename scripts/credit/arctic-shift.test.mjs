@@ -99,7 +99,12 @@ test('discoveryQueries: global first, quiet subs all-time, active subs in contig
   assert.deepEqual(new Set([...QUIET_SUBREDDITS, ...ACTIVE_SUBREDDITS]), new Set(JOB_SUBREDDITS));
   assert.ok(ACTIVE_SUBREDDITS.every((s) => JOB_SUBREDDITS.includes(s)));
   const nowSec = 1_760_000_000;
-  const qs = discoveryQueries(IG, { nowSec, windows: 3 });
+  // Default: no global query (the live API requires a subreddit on posts/search).
+  const def = discoveryQueries(IG, { nowSec, windows: 3 });
+  assert.equal(def.length, QUIET_SUBREDDITS.length + ACTIVE_SUBREDDITS.length * 3);
+  assert.ok(def.every((q) => q.params.subreddit));
+  assert.ok(def.every((q) => !q.params.fields.split(',').includes('permalink')));
+  const qs = discoveryQueries(IG, { nowSec, windows: 3, includeGlobal: true });
   assert.equal(qs.length, 1 + QUIET_SUBREDDITS.length + ACTIVE_SUBREDDITS.length * 3);
   assert.equal(qs[0].name, 'global');
   assert.equal(qs[0].params.subreddit, undefined);
@@ -252,7 +257,7 @@ test('fetchArcticTarget: merged + deduped discovery, timeout → title fallback,
     AskHR: { status: 400, body: { error: 'Invalid request' } },               // query + title both fail
   }, { t3_aa1111: TREE_AA });
   const fetcher = fetcherFor(fetchImpl);
-  const cache = await fetchArcticTarget(IG, { fetcher, importedIds: new Set(['bb2222']), nowSec: 1_760_000_000, windows: 1, limit: 3 });
+  const cache = await fetchArcticTarget(IG, { fetcher, importedIds: new Set(['bb2222']), nowSec: 1_760_000_000, windows: 1, limit: 3, includeGlobal: true });
   assert.equal(cache.complete, true);
   assert.equal(cache.source, 'arctic');
   assert.deepEqual(cache.skippedImported, ['bb2222']);
@@ -291,7 +296,7 @@ test('fetchArcticTarget: merged + deduped discovery, timeout → title fallback,
 
 test('fetchArcticTarget cache feeds extract → plan → QA source unchanged', async () => {
   const { fetchImpl } = arcticServer({ global: { data: [P.aa] } }, { t3_aa1111: TREE_AA });
-  const cache = await fetchArcticTarget(IG, { fetcher: fetcherFor(fetchImpl), nowSec: 1_760_000_000 });
+  const cache = await fetchArcticTarget(IG, { fetcher: fetcherFor(fetchImpl), nowSec: 1_760_000_000, includeGlobal: true });
   const { requests, manifest } = buildExtractRequests([cache]);
   assert.equal(requests.length, 1);
   const content = requests[0].params.messages[0].content;
@@ -310,23 +315,23 @@ test('fetchArcticTarget cache feeds extract → plan → QA source unchanged', a
 
 test('fetchArcticTarget: complete global result skips per-subreddit searches; --full-discovery runs them', async () => {
   const a = arcticServer({ global: { data: [P.aa, P.bb] } });
-  const c1 = await fetchArcticTarget(IG, { fetcher: fetcherFor(a.fetchImpl), nowSec: 1_760_000_000 });
+  const c1 = await fetchArcticTarget(IG, { fetcher: fetcherFor(a.fetchImpl), nowSec: 1_760_000_000, includeGlobal: true });
   assert.deepEqual(Object.keys(c1.searches), ['global']);
   assert.equal(a.log.filter((l) => l.startsWith('search ')).length, 1);
   const b = arcticServer({ global: { data: [P.aa, P.bb] } });
-  const c2 = await fetchArcticTarget(IG, { fetcher: fetcherFor(b.fetchImpl), nowSec: 1_760_000_000, windows: 1, fullDiscovery: true });
+  const c2 = await fetchArcticTarget(IG, { fetcher: fetcherFor(b.fetchImpl), nowSec: 1_760_000_000, includeGlobal: true, windows: 1, fullDiscovery: true });
   assert.equal(Object.keys(c2.searches).length, 1 + QUIET_SUBREDDITS.length + ACTIVE_SUBREDDITS.length);
   // a global result that only came from the `title` fallback is NOT exhaustive (misses body mentions)
   const t = arcticServer({ 'global|query': { status: 400, body: { error: 'nope' } }, 'global|title': { data: [P.aa] } });
-  const c3 = await fetchArcticTarget(IG, { fetcher: fetcherFor(t.fetchImpl), nowSec: 1_760_000_000, windows: 1 });
+  const c3 = await fetchArcticTarget(IG, { fetcher: fetcherFor(t.fetchImpl), nowSec: 1_760_000_000, includeGlobal: true, windows: 1 });
   assert.ok(Object.keys(c3.searches).length > 1);
 });
 
 test('fetchArcticTarget: relevance gate — "Robert" alone is not Robert Half; all-failed target is incomplete', async () => {
   const { fetchImpl } = arcticServer({ global: { data: [P.dd, P.aa] } });
-  assert.equal((await fetchArcticTarget(RH, { fetcher: fetcherFor(fetchImpl), nowSec: 1_760_000_000 })).threads.length, 0);
+  assert.equal((await fetchArcticTarget(RH, { fetcher: fetcherFor(fetchImpl), nowSec: 1_760_000_000, includeGlobal: true })).threads.length, 0);
   const down = fetcherFor(async () => resp(503, {}));
-  const c = await fetchArcticTarget(IG, { fetcher: down, nowSec: 1_760_000_000, windows: 1 });
+  const c = await fetchArcticTarget(IG, { fetcher: down, nowSec: 1_760_000_000, includeGlobal: true, windows: 1 });
   assert.equal(c.complete, false);
   assert.equal(c.threads.length, 0);
   assert.equal(c.skippedQueries, 1 + QUIET_SUBREDDITS.length + ACTIVE_SUBREDDITS.length);

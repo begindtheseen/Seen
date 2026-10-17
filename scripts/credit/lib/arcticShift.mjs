@@ -41,7 +41,8 @@ export const ARCTIC_DEFAULTS = {
 };
 
 // Only what selection + caching need (keeps responses small for a volunteer-run service).
-export const POST_FIELDS = 'id,subreddit,title,selftext,author,created_utc,permalink,num_comments';
+// `permalink` is NOT an accepted field (live API: "invalid field"); postToItem rebuilds it from id + subreddit.
+export const POST_FIELDS = 'id,subreddit,title,selftext,author,created_utc,num_comments';
 
 const YEAR_S = 365 * 86_400;
 const BOT_AUTHORS = new Set(['automoderator', 'reddit']);
@@ -206,11 +207,13 @@ export function createArcticFetcher({
  */
 export function discoveryQueries(target, {
   nowSec = Math.floor(Date.now() / 1000), limit = ARCTIC_DEFAULTS.searchLimit, windows = ARCTIC_DEFAULTS.activeWindows,
-  quietSubs = QUIET_SUBREDDITS, activeSubs = ACTIVE_SUBREDDITS,
+  quietSubs = QUIET_SUBREDDITS, activeSubs = ACTIVE_SUBREDDITS, includeGlobal = false,
 } = {}) {
   const term = String(target.searchTerm).replace(/["\\]/g, '').trim();
   const base = { limit: String(limit), sort: 'desc', fields: POST_FIELDS };
-  const qs = [{ name: 'global', scope: 'global', term, params: { ...base } }];
+  // The live API rejects posts/search without a subreddit ("global search needs a subreddit"), so the
+  // global query is opt-in only (kept for an API that allows it later).
+  const qs = includeGlobal ? [{ name: 'global', scope: 'global', term, params: { ...base } }] : [];
   for (const sub of quietSubs) qs.push({ name: `r/${sub}`, scope: sub, term, params: { ...base, subreddit: sub } });
   for (const sub of activeSubs) {
     for (let w = 0; w < windows; w++) {
@@ -335,14 +338,14 @@ export function flattenCommentTree(nodes, { postAuthor = '', maxComments = DEFAU
 export async function fetchArcticTarget(target, {
   fetcher, state = createDiscoveryState(), importedIds = new Set(), threadsCap = DEFAULTS.threadsPerTarget,
   limits = {}, nowSec = Math.floor(Date.now() / 1000), windows = ARCTIC_DEFAULTS.activeWindows,
-  limit = ARCTIC_DEFAULTS.searchLimit, treeLimit = ARCTIC_DEFAULTS.treeLimit, fullDiscovery = false, log = () => {},
+  limit = ARCTIC_DEFAULTS.searchLimit, treeLimit = ARCTIC_DEFAULTS.treeLimit, fullDiscovery = false, includeGlobal = false, log = () => {},
 }) {
   const { maxComments = DEFAULTS.commentsPerThread, maxChars = DEFAULTS.charsPerComment, opMaxChars = DEFAULTS.charsOp } = limits;
   const byId = new Map();
   const authors = new Map(); // thread id → post author, in memory only (OP flag)
   const searches = {};
   let skippedQueries = 0, rawItems = 0, shortcut = false;
-  for (const q of discoveryQueries(target, { nowSec, limit, windows })) {
+  for (const q of discoveryQueries(target, { nowSec, limit, windows, includeGlobal })) {
     const r = await searchWithFallback(q, { fetcher, state });
     searches[q.name] = { ok: r.ok, param: r.param, items: r.items.length, ...(r.errors.length ? { errors: r.errors } : {}) };
     if (!r.ok) skippedQueries++;

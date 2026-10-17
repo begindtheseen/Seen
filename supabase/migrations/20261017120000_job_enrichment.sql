@@ -37,7 +37,7 @@ create table if not exists public.job_enrichment (
   seniority       text,                 -- entry | mid | senior | lead | unknown
   salary_min      numeric,
   salary_max      numeric,
-  salary_period   text,                 -- hour | year | unknown
+  salary_period   text,                 -- hour | day | week | month | year | unknown (widened by 20261017130000)
   salary_currency text,                 -- ISO 4217, e.g. USD
   ghost_signals   text[]      not null default '{}',
   red_flags       text[]      not null default '{}',
