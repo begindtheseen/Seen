@@ -143,6 +143,10 @@ export function EmployerListingsManager() {
   const [listingEditsAvailable, setListingEditsAvailable] = useState(false)
   const [editing, setEditing] = useState<{ id: string; initial: ListingPrefill } | null>(null)
   const [editLoadingId, setEditLoadingId] = useState<string | null>(null)
+  // Taking Seen applications on a listing Seen pulled in (api/employer-listings claim_listing).
+  const [claimFor, setClaimFor] = useState<string | null>(null)
+  const [claimMode, setClaimMode] = useState<ApplyMode>('seen')
+  const [claiming, setClaiming] = useState(false)
   useEffect(() => {
     try {
       const p = new URLSearchParams(window.location.search)
@@ -251,6 +255,24 @@ export function EmployerListingsManager() {
       setDeletingId(null)
     }
   }, [token, load])
+
+  const claimListing = useCallback(async (l: Listing) => {
+    setClaiming(true); setErr('')
+    try {
+      const authToken = await token()
+      if (!authToken) { setErr('Your session expired — please sign in again.'); return }
+      const r = await fetch('/api/employer-listings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${authToken}` },
+        body: JSON.stringify({ action: 'claim_listing', job_id: l.id, apply_mode: claimMode }),
+      })
+      const d = await r.json().catch(() => ({}))
+      if (!r.ok) { setErr(d?.error || 'Could not switch the listing — please try again.'); return }
+      setClaimFor(null)
+      await load()
+    } catch { setErr('Could not switch the listing — please try again.') }
+    finally { setClaiming(false) }
+  }, [token, claimMode, load])
 
   // Load the full listing (description etc. aren't in the list payload) and open the edit form.
   const startEdit = useCallback(async (l: Listing) => {
@@ -409,6 +431,27 @@ export function EmployerListingsManager() {
                       <div style={{ ...mono('.52rem', 'var(--muted)'), marginTop: '.35rem', lineHeight: 1.5 }}>Think this was a mistake? Repost the role or contact support to appeal.</div>
                     </div>
                   )}
+                  {claimFor === l.id && (
+                    <div style={{ marginTop: '.6rem', padding: '.75rem .85rem', background: 'rgba(16,185,129,.05)', border: '1px solid rgba(16,185,129,.3)', borderRadius: 10 }}>
+                      <div style={{ fontFamily: 'var(--display)', fontWeight: 700, fontSize: '.85rem', color: 'var(--white)' }}>Take applications for this listing on Seen</div>
+                      <div style={{ ...mono('.56rem', 'var(--sub)'), lineHeight: 1.6, margin: '.3rem 0 .6rem' }}>
+                        It becomes yours to manage: applications come to your Seen inbox, you can edit or close it, and it shows ahead of aggregated listings in search. Anyone who saved or tracked it keeps the same link.
+                      </div>
+                      <div style={{ display: 'flex', gap: '.4rem', flexWrap: 'wrap', marginBottom: '.6rem' }}>
+                        {([['seen', 'On Seen only', 'Résumés come to your inbox'], ...(l.apply_url ? [['both', 'Seen + original link', 'Candidates choose']] : [])] as [ApplyMode, string, string][]).map(([m, t, sub]) => (
+                          <button key={m} type="button" aria-pressed={claimMode === m} onClick={() => setClaimMode(m)}
+                            style={{ flex: '1 1 140px', textAlign: 'left', background: claimMode === m ? 'rgba(16,185,129,.1)' : 'var(--card)', border: `1px solid ${claimMode === m ? 'var(--green)' : 'var(--line2)'}`, borderRadius: 9, padding: '.5rem .65rem', cursor: 'pointer' }}>
+                            <div style={{ fontFamily: 'var(--display)', fontWeight: 700, fontSize: '.78rem', color: claimMode === m ? 'var(--green)' : 'var(--white)' }}>{t}</div>
+                            <div style={{ ...mono('.52rem', 'var(--muted)'), marginTop: '.1rem' }}>{sub}</div>
+                          </button>
+                        ))}
+                      </div>
+                      <div style={{ display: 'flex', gap: '.4rem' }}>
+                        <button onClick={() => claimListing(l)} disabled={claiming} style={{ ...ghostBtn, ...mono('.62rem', 'var(--ink)'), background: 'var(--green)', border: 'none', fontWeight: 700, opacity: claiming ? .6 : 1 }}>{claiming ? 'Switching…' : 'Switch to Seen applications'}</button>
+                        <button onClick={() => setClaimFor(null)} disabled={claiming} style={{ ...ghostBtn, ...mono('.62rem', 'var(--muted)') }}>Cancel</button>
+                      </div>
+                    </div>
+                  )}
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '.35rem', flexShrink: 0 }}>
                   <div style={{ textAlign: 'right' }}>
@@ -436,7 +479,12 @@ export function EmployerListingsManager() {
                       Dispute pending{l.openDispute.kind ? ` · ${KIND_LABEL[l.openDispute.kind] || l.openDispute.kind}` : ''}
                     </span>
                   ) : (
-                    <button onClick={() => setDisputeFor(l)} style={{ ...ghostBtn, padding: '.35rem .8rem', ...mono('.6rem', 'var(--sub)') }}>Dispute</button>
+                    <div style={{ display: 'flex', gap: '.35rem', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                      {seenApplyAvailable && l.availability_status !== 'expired' && (
+                        <button onClick={() => { setClaimFor(claimFor === l.id ? null : l.id); setClaimMode('seen') }} style={{ ...ghostBtn, padding: '.35rem .8rem', ...mono('.6rem', 'var(--green)'), borderColor: 'rgba(16,185,129,.45)' }}>Take applications on Seen</button>
+                      )}
+                      <button onClick={() => setDisputeFor(l)} style={{ ...ghostBtn, padding: '.35rem .8rem', ...mono('.6rem', 'var(--sub)') }}>Dispute</button>
+                    </div>
                   )}
                 </div>
               </div>

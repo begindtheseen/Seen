@@ -26,6 +26,8 @@
 //   • update      → edit your OWN posted listing in place; dated via jobs.edited_at.
 //   • fill_listing → { job_id, hired_ids, message?, confirm_hired } — mark the hires, send everyone
 //                 still waiting one decline message, close the listing (not delete).
+//   • claim_listing → { job_id, apply_mode:'seen'|'both' } — take Seen applications on a listing Seen
+//                 pulled in for your company (Adzuna etc.). Converted in place; you manage it from then on.
 //   • delete      → remove your OWN posted listing (and with it every application on it).
 //   Apply-on-Seen actions answer { available:false } until migration 20261017150000 is applied.
 //
@@ -41,7 +43,7 @@ import { normalizeClaimCompany } from '../lib/server/employerClaims.js';
 import {
   validateNewListing, buildEmployerListingRow, applyCounts, annotateListings, isRemoteLocation, buildImportPreview,
 } from '../lib/server/employerPostings.js';
-import { validateDisputeInput } from '../lib/server/listingDisputes.js';
+import { validateDisputeInput, isHttpUrl } from '../lib/server/listingDisputes.js';
 import { broadcastActivity } from '../lib/server/realtime.js';
 import { geocodeLocation } from '../lib/server/geo.js';
 import { rateLimit } from '../lib/server/ratelimit.js';
@@ -49,7 +51,7 @@ import { validateListingUrl } from '../lib/server/listingImport.js';
 import { resolveListing } from '../lib/server/listingResolve.js';
 import {
   APPLICATION_STATUSES, inboxItem, EMPLOYER_STATUS_TRACKER, trackerUpdateForEmployerStatus,
-  planFill, defaultDeclineMessage, buildListingEditPatch, DECLINE_MESSAGE_MAX, OPEN_APPLICATION_STATUSES,
+  planFill, defaultDeclineMessage, buildListingEditPatch, DECLINE_MESSAGE_MAX, OPEN_APPLICATION_STATUSES, claimListingPatch,
 } from '../lib/server/seenApply.js';
 import { seenApplyAvailable, signResumeUrl, sendApplicationUpdateEmail, threadAvailable, sendEmployerMessageEmail, lifecycleAvailable } from '../lib/server/seenApplyStore.js';
 import { appendThreadEntry, cleanMessage } from '../lib/server/applicationThread.js';
@@ -118,6 +120,7 @@ async function route(req, res) {
   if (action === 'delete') return deleteOwnListing(res, ctx);
   if (action === 'update') return updateListing(res, ctx);
   if (action === 'fill_listing') return fillListing(res, ctx);
+  if (action === 'claim_listing') return claimListing(res, ctx);
   if (action === 'dispute') return fileDispute(res, ctx);
   if (action === 'disputes') return listDisputes(res, ctx);
   if (action === 'import_preview') return importPreview(req, res, ctx);
@@ -504,6 +507,29 @@ async function updateListing(res, { db, body, uid, claim }) {
   }
   const rows = await up.json();
   if (!rows.length) return res.status(404).json({ error: 'That listing no longer exists' });
+  return res.status(200).json({ ok: true, listing: rows[0] });
+}
+
+// ── claim_listing: take Seen applications on an aggregated listing (owner request 2026-10-18) ─
+// The listing becomes yours to manage (lib/server/seenApply.js claimListingPatch explains why it is
+// converted in place). The PATCH is guarded so two accounts can't claim the same listing at once.
+async function claimListing(res, { db, body, uid, claim }) {
+  if (!(await seenApplyAvailable(db))) return res.status(400).json({ error: 'Applying on Seen isn’t switched on yet', reason: 'unavailable' });
+  const jid = String(body.job_id == null ? '' : body.job_id).trim();
+  if (!UUID.test(jid)) return res.status(400).json({ error: 'A valid listing id is required' });
+  const jr = await db(`jobs?id=eq.${encodeURIComponent(jid)}&select=id,title,company,apply_url,is_employer_posted,employer_user_id,expires_at,availability_status&limit=1`);
+  const job = jr.ok ? (await jr.json())[0] : null;
+  const v = claimListingPatch(job, { mode: body.apply_mode, uid, companyKey: claim.companyKey, companyOf: normalizeClaimCompany, nowMs: Date.now(), isHttpUrl });
+  if (!v.ok) return res.status(v.status).json({ error: v.error, reason: v.reason });
+  const up = await db(`jobs?id=eq.${encodeURIComponent(jid)}&or=(employer_user_id.is.null,employer_user_id.eq.${encodeURIComponent(uid)})`, {
+    method: 'PATCH', headers: { Prefer: 'return=representation' }, body: JSON.stringify(v.patch),
+  });
+  if (!up.ok) {
+    console.error('[employer-listings] claim failed:', up.status, (await up.text().catch(() => '')).slice(0, 200));
+    return res.status(500).json({ error: 'Could not switch the listing — please try again' });
+  }
+  const rows = await up.json();
+  if (!rows.length) return res.status(409).json({ error: 'Another account on your company just took this listing', reason: 'owned' });
   return res.status(200).json({ ok: true, listing: rows[0] });
 }
 
