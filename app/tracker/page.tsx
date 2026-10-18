@@ -75,6 +75,12 @@ function AppCard({ app, onUpdate, onRemove, onShare, intel }: {
           <div className="app-card-co">{app.company}</div>
           <div className="app-card-title">{app.role}</div>
           {app.location && <div style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', color: 'var(--muted)' }}>{app.location}</div>}
+          {/* Set by the employer from their Seen applications inbox (api/employer-listings syncApplicantTracker). */}
+          {app.employerStage && (
+            <div title="Updated by the employer on Seen" style={{ display: 'inline-flex', alignItems: 'center', gap: '.25rem', marginTop: '.25rem', fontFamily: 'var(--mono)', fontSize: '.55rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.06em', color: app.employerStage === 'Not selected' ? 'var(--red)' : 'var(--green)', border: '1px solid currentColor', borderRadius: 999, padding: '.12rem .5rem' }}>
+              🏢 Employer: {app.employerStage}
+            </div>
+          )}
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '.25rem', flexShrink: 0 }}>
           {app.score != null && (

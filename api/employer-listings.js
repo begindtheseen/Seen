@@ -41,8 +41,8 @@ import { geocodeLocation } from '../lib/server/geo.js';
 import { rateLimit } from '../lib/server/ratelimit.js';
 import { validateListingUrl } from '../lib/server/listingImport.js';
 import { resolveListing } from '../lib/server/listingResolve.js';
-import { APPLICATION_STATUSES, inboxItem } from '../lib/server/seenApply.js';
-import { seenApplyAvailable, signResumeUrl } from '../lib/server/seenApplyStore.js';
+import { APPLICATION_STATUSES, inboxItem, EMPLOYER_STATUS_TRACKER, trackerUpdateForEmployerStatus } from '../lib/server/seenApply.js';
+import { seenApplyAvailable, signResumeUrl, sendApplicationUpdateEmail } from '../lib/server/seenApplyStore.js';
 
 const ALLOWED = ['https://seenjobs.io', 'https://www.seenjobs.io'];
 const LISTING_TTL_DAYS = 60; // employer-posted listings live 60 days, matching paste-a-link imports.
@@ -311,6 +311,9 @@ async function setApplicationStatus(res, { db, body, claim }) {
   if (!UUID.test(id)) return res.status(400).json({ error: 'A valid application id is required' });
   if (!APPLICATION_STATUSES.includes(status)) return res.status(400).json({ error: 'Unknown status' });
   // The company_key filter IS the ownership check: another company's application matches 0 rows.
+  const prevRes = await db(`seen_applications?id=eq.${encodeURIComponent(id)}&company_key=eq.${encodeURIComponent(claim.companyKey)}&select=status&limit=1`);
+  const prevRows = prevRes.ok ? await prevRes.json() : [];
+  const prevStatus = Array.isArray(prevRows) && prevRows[0] ? prevRows[0].status : null;
   const r = await db(`seen_applications?id=eq.${encodeURIComponent(id)}&company_key=eq.${encodeURIComponent(claim.companyKey)}`, {
     method: 'PATCH',
     headers: { Prefer: 'return=representation' },
@@ -319,7 +322,38 @@ async function setApplicationStatus(res, { db, body, claim }) {
   if (!r.ok) return res.status(500).json({ error: 'Could not update the application — please try again' });
   const rows = await r.json();
   if (!rows.length) return res.status(404).json({ error: 'That application isn’t on your company’s listings' });
-  return res.status(200).json({ ok: true, application: inboxItem(rows[0]) });
+  // The applicant's tracker follows the employer's decision (best-effort — never fails this update).
+  const tracker = status !== prevStatus ? await syncApplicantTracker(db, rows[0], status) : { synced: false, reason: 'unchanged' };
+  return res.status(200).json({ ok: true, application: inboxItem(rows[0]), tracker });
+}
+
+// Mirror an employer status change onto the applicant's own tracker row (created at apply time by
+// api/apply.js) and, for decisions worth an email (interviewing / not selected / hired), tell them.
+// Matches the row by the applicant's user id + job id, so only that applicant's own row for that
+// listing is touched. If they deleted it from their tracker, it is not recreated.
+async function syncApplicantTracker(db, application, status) {
+  try {
+    const m = EMPLOYER_STATUS_TRACKER[status];
+    if (!m || !application?.applicant_user_id || !application?.job_id) return { synced: false, reason: 'no_mapping' };
+    const q = `applications?user_id=eq.${encodeURIComponent(application.applicant_user_id)}&job_id=eq.${encodeURIComponent(String(application.job_id))}`;
+    const cur = await db(`${q}&select=id,status,stage,events&limit=1`);
+    const apps = cur.ok ? await cur.json() : [];
+    const app = Array.isArray(apps) ? apps[0] : null;
+    let synced = false;
+    if (app) {
+      const patch = trackerUpdateForEmployerStatus(app, status, Date.now());
+      if (patch) {
+        const up = await db(`applications?id=eq.${encodeURIComponent(app.id)}&user_id=eq.${encodeURIComponent(application.applicant_user_id)}`, {
+          method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify(patch),
+        });
+        synced = up.ok;
+      }
+    }
+    if (m.email) {
+      await sendApplicationUpdateEmail({ to: application.applicant_email, company: application.company_name, role: application.job_title, label: m.label });
+    }
+    return { synced, reason: app ? (synced ? 'updated' : 'write_failed') : 'not_in_tracker' };
+  } catch { return { synced: false, reason: 'error' }; }
 }
 
 async function applicationResume(res, { db, body, claim }) {
