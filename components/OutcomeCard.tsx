@@ -132,7 +132,7 @@ export default function OutcomeCard({ app, onClose, onShared }: Props) {
   if (!mounted) return null
 
   return createPortal(
-    <div style={{ position: 'fixed', inset: 0, zIndex: 99999, background: 'rgba(4,5,12,0.985)', backdropFilter: 'blur(6px)', WebkitBackdropFilter: 'blur(6px)', display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '1.5rem 1.25rem 2.5rem', overflowY: 'auto' }}>
+    <div style={{ position: 'fixed', inset: 0, zIndex: 99999, background: 'rgba(4,5,12,0.985)', display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '1.5rem 1.25rem 2.5rem', overflowY: 'auto' }}>
       <div style={{ width: '100%', maxWidth: 480 }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem' }}>
           <div style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', color: OC, textTransform: 'uppercase', letterSpacing: '.1em', fontWeight: 600 }}>

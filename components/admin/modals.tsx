@@ -130,7 +130,7 @@ export function KpiModal({ metric, title, token, onClose }: { metric: string; ti
   return (
     <ModalPortal>
     <div
-      style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.72)', backdropFilter: 'blur(6px)', WebkitBackdropFilter: 'blur(6px)', zIndex: 300, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}
+      style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.80)', zIndex: 300, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}
       onClick={onClose}
     >
       <div

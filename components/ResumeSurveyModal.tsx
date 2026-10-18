@@ -149,7 +149,7 @@ export default function ResumeSurveyModal({ onClose, onCreditsEarned, onExhauste
   const companyLetter = survey?.company?.charAt(0).toUpperCase() || '?'
 
   // ── Styles (mirrors components/SurveyModal.tsx) ──────────────────────────────
-  const backdrop: React.CSSProperties = { position: 'fixed', inset: 0, background: 'rgba(0,0,0,.85)', backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)', zIndex: 9900, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }
+  const backdrop: React.CSSProperties = { position: 'fixed', inset: 0, background: 'rgba(0,0,0,.92)', zIndex: 9900, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }
   const modal: React.CSSProperties = { maxWidth: 420, width: '100%', background: 'var(--surface)', borderRadius: 18, border: '1px solid rgba(99,102,241,.3)', boxShadow: '0 0 80px rgba(99,102,241,.25)', overflow: 'hidden', position: 'relative' }
   const pad: React.CSSProperties = { padding: '28px 24px' }
   const close: React.CSSProperties = { position: 'absolute', top: 14, right: 16, background: 'none', border: 'none', color: 'var(--muted)', fontSize: 20, cursor: 'pointer', lineHeight: 1, padding: 4, zIndex: 1 }

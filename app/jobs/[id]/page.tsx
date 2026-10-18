@@ -523,7 +523,7 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
         )}
         {showApplyModal && job && (
           <ModalPortal>
-          <div style={{ position: 'fixed', inset: 0, zIndex: 1000, background: 'rgba(0,0,0,.7)', backdropFilter: 'blur(6px)', WebkitBackdropFilter: 'blur(6px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }} onClick={() => setShowApplyModal(false)}>
+          <div style={{ position: 'fixed', inset: 0, zIndex: 1000, background: 'rgba(0,0,0,.78)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }} onClick={() => setShowApplyModal(false)}>
             <div style={{ position: 'relative', background: 'var(--surface)', borderRadius: 16, padding: '1.5rem', width: '100%', maxWidth: 520, maxHeight: '85dvh', overflowY: 'auto', animation: 'fadeUp .25s ease both' }} onClick={e => e.stopPropagation()}>
               <div style={{ fontFamily: 'var(--display)', fontSize: '1.1rem', fontWeight: 800, color: 'var(--white)', marginBottom: '.4rem' }}>Ready to apply?</div>
               <p style={{ fontFamily: 'var(--mono)', fontSize: '.68rem', color: 'var(--sub)', marginBottom: '1.25rem', lineHeight: 1.65 }}>
