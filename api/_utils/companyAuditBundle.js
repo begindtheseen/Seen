@@ -11,7 +11,7 @@
 
 import { createHash } from 'crypto';
 import {
-  SOURCE_TRUST, PRIOR_STRENGTH, classifyPlatform, fuseCompanyIntel, aggregateOutcomes,
+  SOURCE_TRUST, PRIOR_STRENGTH, classifyPlatform, fuseCompanyIntel, aggregateOutcomes, mentionOutcomes, mentionTotal,
   GHOST_OUTCOMES, RESPONSE_OUTCOMES, NONTERMINAL_OUTCOMES,
 } from './companyIntel.js';
 import { explainListingScore, SCORE_RANGE, WASTE_RANGE } from '../../lib/server/jobScore.js';
@@ -69,6 +69,7 @@ function buildSourceInventory({ annotated, computed, companies, aliases, cachedS
     ingest:     { name: 'Imported applicant reports — ingest (Glassdoor / Blind / Indeed / LinkedIn)', nature: 'applicant_reported', limitation: 'Applicant reports imported from third-party platforms; lower trust than direct; third-party platform terms and attribution rules apply.' },
     reddit:     { name: 'Reddit hiring-process reports', nature: 'applicant_reported', limitation: 'Public discussion imported as reports; lowest trust weight; a discussion/imported signal — not a verified fact.' },
     public_web: { name: 'Public review-site accounts (web search)', nature: 'applicant_reported', limitation: 'First-hand accounts found on public review sites / forums via web search (platform "Public review · <host>"), attributed to their source URL; lowest trust weight; a third-party public claim — not a verified fact. Underlying site terms and attribution rules apply.' },
+    mentions:   { name: 'What people are saying online (quoted accounts)', nature: 'third_party_contextual', limitation: 'Short quoted accounts gathered by web research; each counts half of an applicant report toward the grade bar, and only those stating an outcome (ghosted / heard back / automated rejection) move the rates. Third-party claims, not verified facts.' },
     web:        { name: 'Web / external review research (Glassdoor / Reddit / Blind snippets)', nature: 'third_party_contextual', limitation: 'Third-party external-review signal used only as a contextual prior. In this export the web prior is empty, so it is summarized for context and does not pool into the computed grade; underlying platform terms and attribution rules must be respected.' },
   };
   for (const [cls, meta] of Object.entries(REPORT_CLASSES)) {
@@ -76,6 +77,10 @@ function buildSourceInventory({ annotated, computed, companies, aliases, cachedS
     let record_count = 0, included_count = 0, excluded_count = 0;
     if (cls === 'web') {
       record_count = parseReviews(cachedScore?.web_reviews).length;
+    } else if (cls === 'mentions') {
+      record_count = mentionTotal(cachedScore?.web_reviews);
+      included_count = mentionOutcomes(cachedScore?.web_reviews).length;
+      excluded_count = record_count - included_count;
     } else {
       const rows = annotated.filter(r => r.source_type === cls);
       record_count = rows.length;
@@ -235,6 +240,9 @@ export async function buildCompanyAuditBundle({ db, serviceKey, adminId, adminRo
   // Per-source aggregation breakdown — exactly the pooling the fusion engine performs.
   const bySource = {};
   for (const r of included) (bySource[r.source_type] ||= []).push({ outcome: r.outcome });
+  // "What people are saying" (stored web_reviews) — each counts half a report, same as the live score.
+  const mentionRows = mentionOutcomes(cachedScore?.web_reviews);
+  if (mentionRows.length) bySource.mentions = mentionRows;
   const source_breakdown = Object.entries(bySource).map(([type, rows]) => {
     const agg = aggregateOutcomes(rows);
     const trust = SOURCE_TRUST[type] ?? 0.5;

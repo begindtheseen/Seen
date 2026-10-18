@@ -36,7 +36,52 @@ export const SOURCE_TRUST = {
   public_web: 0.3,  // first-hand accounts found on public review sites / forums via web search
                     // (platform "Public review · <host>") — third-party, attributed, same tier as reddit
   web: 0.5,         // generic web research (used as the prior, not pooled here)
+  mentions: 0.5,    // "what people are saying": quoted online accounts (company_scores.web_reviews) that
+                    // state an outcome. Owner decision 2026-10-18: a mention counts EXACTLY HALF of a
+                    // report (direct 1.0). NOT report rows — counted separately as mention_count.
 };
+
+// ── "What people are saying" → outcomes (owner request 2026-10-18) ─────────────────────────────
+// Deterministic (no LLM). A snippet counts only when it states a hiring outcome; ghosting is checked
+// FIRST because one account often says both ("no response after my interview" is a ghost).
+// Everything else — process descriptions with no outcome, workplace chatter — is ignored.
+const MENTION_GHOST_RE = /\bghost|never (?:heard|got) back|no (?:response|reply|word|callback|follow.?up)|did(?:n'?t| not) (?:even )?(?:respond|reply|hear|get back)|radio silen|heard nothing|nothing back|never (?:responded|contacted|called)|left (?:me |us |candidates )?hanging/i;
+const MENTION_RESPONSE_RE = /\boffer|\bhired\b|got the job|accepted|interview|recruiter (?:called|reached|contacted|emailed)|phone screen|reject|turned (?:me )?down|\bdeclined\b|heard back|called (?:me|back)|got back to|responded|quick (?:response|reply)/i;
+// An automated "thank you for your interest" rejection is an outcome, but neither a ghost nor a
+// human response — scored like a report's 'autoreject'.
+const MENTION_AUTOREJECT_RE = /thank(?:s| you) for (?:your )?interest|automated (?:rejection|email|reply)|form (?:email|letter)|auto.?reject/i;
+/** 'ghosted' | 'responded' | 'autoreject' | null for one quoted online account. */
+export function classifyMention(text) {
+  const t = String(text || '');
+  if (!t.trim()) return null;
+  if (MENTION_GHOST_RE.test(t)) return 'ghosted';
+  if (MENTION_AUTOREJECT_RE.test(t)) return 'autoreject';
+  if (MENTION_RESPONSE_RE.test(t)) return 'responded';
+  return null;
+}
+/**
+ * How many "what people are saying" accounts a company has — EVERY quoted account counts toward the
+ * grade bar at half a report (owner rule 2026-10-18: "2 reports + 6 what people are saying meets the
+ * 5 threshold"). Only the ones that state an outcome (mentionOutcomes) move the rates.
+ */
+export function mentionTotal(webReviews) {
+  let list = webReviews;
+  if (typeof list === 'string') { try { list = JSON.parse(list); } catch { list = []; } }
+  if (!Array.isArray(list)) return 0;
+  return list.filter((r) => r && String(r.text || r.quote || r.summary || '').trim()).length;
+}
+/** company_scores.web_reviews (array or JSON string) → fusion outcomes for the 'mentions' source. */
+export function mentionOutcomes(webReviews) {
+  let list = webReviews;
+  if (typeof list === 'string') { try { list = JSON.parse(list); } catch { list = []; } }
+  if (!Array.isArray(list)) return [];
+  const out = [];
+  for (const r of list) {
+    const c = classifyMention(r && (r.text || r.quote || r.summary));
+    if (c) out.push({ outcome: c });
+  }
+  return out;
+}
 
 // Outcome taxonomy. A "ghost" = no human ever responded; a "response" = the company
 // engaged in any way (including a rejection — that's still a response). Non-terminal
@@ -123,7 +168,7 @@ export function fuseCompanyIntel(input = {}) {
   const { web = {}, sources = [], avgTenureMonths = null, tenureSample = 0, dataAgeDays = 0, confirmedStaleListings = 0 } = input;
 
   // Pool empirical evidence across sources, each weighted by its trust.
-  let wGhost = 0, wResp = 0, wResolved = 0, effN = 0, rawResolved = 0, rawGhost = 0;
+  let wGhost = 0, wResp = 0, wResolved = 0, effN = 0, rawResolved = 0, rawGhost = 0, mentionResolved = 0;
   let waitNum = 0, waitDen = 0, roundsNum = 0, roundsDen = 0;
   const usedTypes = [];
   for (const s of sources || []) {
@@ -135,6 +180,8 @@ export function fuseCompanyIntel(input = {}) {
     wResp += trust * agg.response;
     wResolved += trust * agg.resolved;
     effN += trust * agg.resolved;
+    // Mentions shape the rates (at their low trust) but are not report rows.
+    if (s.type === 'mentions') { mentionResolved += agg.resolved; continue; }
     rawResolved += agg.resolved;
     rawGhost += agg.ghost;
     if (num(s.avgWaitDays) != null) { waitNum += trust * num(s.avgWaitDays) * agg.resolved; waitDen += trust * agg.resolved; }
@@ -159,6 +206,7 @@ export function fuseCompanyIntel(input = {}) {
   const first_party_report_count = Math.max(0, Math.round(rawResolved || 0));
   const web_report_count = Math.max(0, Math.min(WEB_CLAIM_CAP, Math.round(num(web.report_count) || 0)));
   const report_count = first_party_report_count + web_report_count;
+  const mention_count = Math.max(0, Math.round(mentionResolved || 0));
 
   const base = calcOverallScore(response_rate ?? 0, ghost_rate ?? 0, avg_wait_days ?? 0, report_count);
   const tAdj = tenureAdjustment(avgTenureMonths, tenureSample);
@@ -185,6 +233,7 @@ export function fuseCompanyIntel(input = {}) {
     report_count,
     first_party_report_count,
     web_report_count,
+    mention_count,
     confidence,
     confidence_label: confidenceLabel(confidence),
     sufficient: confidence >= 0.33,

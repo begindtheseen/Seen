@@ -4,6 +4,7 @@
 
 import { tenureAdjustment } from '@/api/_utils/companyScore.js'
 import { firstPartyReportCount as firstPartyCountOf, webClaimCount, isGradeable, MIN_REPORTS_FOR_GRADE } from '@/lib/server/reportCounts.js'
+import { mentionSel } from '@/lib/server/scoreColumns.js'
 
 export { MIN_REPORTS_FOR_GRADE }
 
@@ -20,6 +21,8 @@ export type GrowthScore = {
   report_count: number
   /** Real applicant-report rows behind the score (migration 063). */
   first_party_report_count?: number | null
+  /** "What people are saying" accounts — each counts half a report toward the grade bar. */
+  mention_count?: number | null
   /** LLM web-research *claimed* mention count — never applicant reports. */
   web_report_count?: number | null
   data_source?: string | null
@@ -52,6 +55,8 @@ export type LeaderboardRow = {
     report_count: number
     /** Real applicant-report rows behind the score — the only count that may render as "reports". */
     first_party_report_count: number
+    /** "What people are saying" accounts — each counts half a report toward the grade bar. */
+    mention_count?: number
     /** Web-research claimed mention count — an estimate input, never applicant reports. */
     web_report_count: number
     data_source: string | null
@@ -74,6 +79,7 @@ type ScoreDbRow = {
   waste_score?: number | null
   report_count?: number | null
   first_party_report_count?: number | null
+  mention_count?: number | null
   web_report_count?: number | null
   data_source?: string | null
 }
@@ -94,6 +100,7 @@ function toLeaderboardRow(c: ScoreDbRow): LeaderboardRow {
       avg_wait_days: gradeable ? c.avg_wait_days || 0 : null,
       report_count: c.report_count || 0,
       first_party_report_count: firstPartyCountOf(c),
+      mention_count: c.mention_count ?? 0,
       web_report_count: webClaimCount(c),
       data_source: c.data_source ?? null,
       risk_level: gradeable ? (s >= 70 ? 'safe' : s >= 40 ? 'warn' : 'danger') : null,
@@ -142,7 +149,7 @@ async function scoreFromDb(name: string): Promise<GrowthScore | null> {
   const creds = sbCreds()
   if (!creds) return null
   const headers = { apikey: creds.key, Authorization: `Bearer ${creds.key}` }
-  const sel = 'select=company_name,overall_score,ghost_rate,response_rate,avg_wait_days,avg_rounds,report_count,first_party_report_count,web_report_count,data_source,waste_score,industry,raw_summary,avg_tenure_months,tenure_sample_count'
+  const sel = `select=company_name,overall_score,ghost_rate,response_rate,avg_wait_days,avg_rounds,report_count,first_party_report_count${await mentionSel(creds.url, headers)},web_report_count,data_source,waste_score,industry,raw_summary,avg_tenure_months,tenure_sample_count`
   try {
     const enc = encodeURIComponent(name.toLowerCase().trim())
     let r = await fetch(`${creds.url}/rest/v1/company_scores?company_name=ilike.${enc}&${sel}&order=created_at.desc&limit=1`, { headers, signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) })
@@ -169,6 +176,7 @@ async function scoreFromDb(name: string): Promise<GrowthScore | null> {
       avg_rounds: gradeable ? row.avg_rounds ?? null : null,
       report_count: row.report_count ?? 0,
       first_party_report_count: row.first_party_report_count ?? null,
+      mention_count: row.mention_count ?? 0,
       web_report_count: row.web_report_count ?? null,
       data_source: row.data_source ?? null,
       risk_level: gradeable ? (s >= 70 ? 'safe' : s >= 40 ? 'warn' : 'danger') : null,
@@ -192,7 +200,7 @@ async function leaderboardFromDb(by: 'fused' | 'first_party' = 'fused'): Promise
   const order = by === 'first_party' ? 'first_party_report_count.desc.nullslast,report_count.desc' : 'report_count.desc'
   try {
     const r = await fetch(
-      `${creds.url}/rest/v1/company_scores?select=${LEADERBOARD_SELECT}&order=${order}&limit=150`,
+      `${creds.url}/rest/v1/company_scores?select=${LEADERBOARD_SELECT}${await mentionSel(creds.url, { apikey: creds.key, Authorization: `Bearer ${creds.key}` })}&order=${order}&limit=150`,
       { headers, signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) },
     )
     if (!r.ok) return []
@@ -266,7 +274,7 @@ export async function getScoresByNames(namesLower: string[]): Promise<Map<string
   // in.() values are double-quoted (names contain spaces / "/"), then the whole list is
   // URI-encoded. None of our curated names contain a double quote.
   const list = encodeURIComponent(`(${namesLower.map(n => `"${n.trim().toLowerCase()}"`).join(',')})`)
-  const sel = `select=${LEADERBOARD_SELECT},created_at`
+  const sel = `select=${LEADERBOARD_SELECT}${await mentionSel(creds.url, { apikey: creds.key, Authorization: `Bearer ${creds.key}` })},created_at`
   try {
     const r = await fetch(
       `${creds.url}/rest/v1/company_scores?company_name=in.${list}&${sel}&order=created_at.desc&limit=200`,

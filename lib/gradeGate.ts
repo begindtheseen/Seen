@@ -4,7 +4,7 @@
 // lib/growth.ts carries `gradeable`; below the bar its verdict fields are null (see gateScore in
 // lib/server/reportCounts.js). Surfaces use these helpers so the wording is the same everywhere.
 
-import { MIN_REPORTS_FOR_GRADE, firstPartyReportCount } from '@/lib/server/reportCounts.js'
+import { MIN_REPORTS_FOR_GRADE, firstPartyReportCount, gradeEvidenceCount, mentionCount } from '@/lib/server/reportCounts.js'
 
 export { MIN_REPORTS_FOR_GRADE }
 
@@ -14,6 +14,7 @@ type MaybeScore = {
   first_party_report_count?: number | null
   data_source?: string | null
   report_count?: number | null
+  mention_count?: number | null
 } | null | undefined
 
 /**
@@ -30,12 +31,25 @@ export function realReportCount(s: MaybeScore): number {
   return firstPartyReportCount(s ?? null)
 }
 
+/** Reports + half of each online mention (owner rule), capped at the bar, e.g. "3.5". */
+function progress(s: MaybeScore): string {
+  const n = Math.min(gradeEvidenceCount(s ?? null), MIN_REPORTS_FOR_GRADE)
+  return Number.isInteger(n) ? String(n) : n.toFixed(1)
+}
+
 /** "Not enough reviews to grade yet (2 of 5)" — the one wording every surface uses. */
 export function notEnoughReviewsLabel(s: MaybeScore): string {
-  return `Not enough reviews to grade yet (${Math.min(realReportCount(s), MIN_REPORTS_FOR_GRADE)} of ${MIN_REPORTS_FOR_GRADE})`
+  return `Not enough reviews to grade yet (${progress(s)} of ${MIN_REPORTS_FOR_GRADE})`
 }
 
 /** Short form for tight spaces (cards, chips): "2 of 5 reviews". */
 export function notEnoughReviewsShort(s: MaybeScore): string {
-  return `${Math.min(realReportCount(s), MIN_REPORTS_FOR_GRADE)} of ${MIN_REPORTS_FOR_GRADE} reviews`
+  return `${progress(s)} of ${MIN_REPORTS_FOR_GRADE} reviews`
+}
+
+/** "12 reports + 6 online mentions" — what a score stands on (mentions count half each). */
+export function gradeBasisLabel(s: MaybeScore): string {
+  const r = realReportCount(s), m = mentionCount(s ?? null)
+  const reports = `${r} report${r === 1 ? '' : 's'}`
+  return m > 0 ? `${reports} + ${m} online mention${m === 1 ? '' : 's'} (count half)` : reports
 }

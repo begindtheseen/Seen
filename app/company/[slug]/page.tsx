@@ -13,7 +13,7 @@ import { aggregateJobLocations } from '@/lib/jobLocations'
 import CompanyRedditDiscussion from '@/components/CompanyRedditDiscussion'
 import CompanyPublicRecord from '@/components/CompanyPublicRecord'
 import IndustryBenchmark, { type Benchmark } from '@/components/IndustryBenchmark'
-import { isGradeableScore, notEnoughReviewsLabel, MIN_REPORTS_FOR_GRADE } from '@/lib/gradeGate'
+import { isGradeableScore, notEnoughReviewsLabel, gradeBasisLabel, MIN_REPORTS_FOR_GRADE } from '@/lib/gradeGate'
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -883,7 +883,7 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
                 <span className="co-grade-score" style={{ fontSize: '.95rem' }}>{ungradedLabel}</span>
                 <p className="co-verdict">
                   {fpReports > 0
-                    ? `We have ${fpReports} applicant report${fpReports === 1 ? '' : 's'} for ${companyName} so far. A grade appears once ${MIN_REPORTS_FOR_GRADE} real reports are in — read them below.`
+                    ? `We have ${gradeBasisLabel(score)} for ${companyName} so far. A grade appears at ${MIN_REPORTS_FOR_GRADE} — each report counts 1, each thing people say online counts ½.`
                     : `No applicant reports for ${companyName} yet. A grade appears once ${MIN_REPORTS_FOR_GRADE} real reports are in.`}
                 </p>
                 <div className="co-grade-meta">
@@ -1323,7 +1323,7 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
               summary={score
                 ? (!graded
                     ? `${ungradedLabel} · summary & public records`
-                    : `Based on ${fpReports} applicant report${fpReports === 1 ? '' : 's'}${webEst > 0 ? ' + public web research' : ''} · summary & public records`)
+                    : `Based on ${gradeBasisLabel(score)}${webEst > 0 ? ' + public web research' : ''} · summary & public records`)
                 : 'Public records & data status'}>
               {score?.summary ? (
                 <p style={{ fontFamily: 'var(--mono)', fontSize: '.68rem', color: 'var(--sub)', lineHeight: 1.7, margin: '0 0 .9rem' }}>{score.summary}</p>
@@ -1331,8 +1331,8 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
               {score && (
                 <div className="co-about-line">
                   <span>📊 {!graded
-                    ? `${ungradedLabel} — we never grade a company on fewer than ${MIN_REPORTS_FOR_GRADE} real reports, and web estimates never count toward it`
-                    : `Based on ${fpReports} applicant report${fpReports === 1 ? '' : 's'}${webEst > 0 ? ' + public web research' : ''}`}</span>
+                    ? `${ungradedLabel} — a grade needs ${MIN_REPORTS_FOR_GRADE}: each applicant report counts 1, each thing people say online counts ½; web estimates never count`
+                    : `Based on ${gradeBasisLabel(score)}${webEst > 0 ? ' + public web research' : ''}`}</span>
                   <a href={`/report?company=${encodeURIComponent(companyName)}`} style={{ color: 'var(--green)', textDecoration: 'none' }}>+ Add your report →</a>
                 </div>
               )}
