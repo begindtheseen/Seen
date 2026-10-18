@@ -5,7 +5,8 @@ import { createHmac, timingSafeEqual } from 'crypto';
 import { applyRateLimit } from '../lib/server/ratelimit.js';
 import { logError } from '../lib/server/errlog.js';
 import { calcOverallScore, calcWaste, tenureAdjustment, scoreConfidence, confidenceLabel, aggregateTenure, MIN_TENURE_SAMPLE } from './_utils/companyScore.js';
-import { fuseCompanyIntel, classifyPlatform, WEB_CLAIM_CAP } from './_utils/companyIntel.js';
+import { fuseCompanyIntel, classifyPlatform, WEB_CLAIM_CAP, mentionOutcomes, mentionTotal } from './_utils/companyIntel.js';
+import { hasMentionCount, mentionSel } from '../lib/server/scoreColumns.js';
 import { recomputeCompanyScoreFromReports, fetchConfirmedStaleCount, resolveOrCreateCompany, resolveOrCreateLocation } from './_utils/reportWrite.js';
 import { anthropicEnabled } from '../lib/server/aiflag.js';
 import { listEmployerListings, closeEmployerListing } from '../lib/server/employerListings.js';
@@ -13,7 +14,7 @@ import { buildSearchUrl, parseRedditSearchAtom } from './_utils/companyReddit.js
 import { SECURITY_PREAMBLE, fenceUntrusted, scanInjection } from '../lib/server/promptGuard.js';
 import { fetchIndustryBenchmark } from '../lib/server/benchmark.js';
 import { isEvidencedScore, suppressionReason, servedDataSource } from '../lib/server/scoreProvenance.js';
-import { firstPartyReportCount, webClaimCount, gateScore, isGradeable, SCORABLE_REPORTS_FILTER, scorableResolvedCountPath, parseExactCount } from '../lib/server/reportCounts.js';
+import { firstPartyReportCount, mentionCount, webClaimCount, gateScore, isGradeable, SCORABLE_REPORTS_FILTER, scorableResolvedCountPath, parseExactCount } from '../lib/server/reportCounts.js';
 import { enqueueCompanyEnrichment } from '../lib/server/enrichmentQueue.js';
 
 // Authorize admin/cron-only actions (the Anthropic web-research endpoints). Accepts a Vercel
@@ -346,7 +347,7 @@ export default async function handler(req, res) {
       // panel needs this — mirrors lib/growth.ts getLeaderboard({ by: 'first_party' })).
       const order = body.order === 'first_party' ? 'first_party_report_count.desc.nullslast,report_count.desc' : 'report_count.desc';
       const r = await fetch(
-        `${SUPABASE_URL}/rest/v1/company_scores?select=company_name,overall_score,ghost_rate,response_rate,avg_wait_days,waste_score,report_count,first_party_report_count,web_report_count,data_source,data_quality,verification_status,industry&order=${order}&limit=150`,
+        `${SUPABASE_URL}/rest/v1/company_scores?select=company_name,overall_score,ghost_rate,response_rate,avg_wait_days,waste_score,report_count,first_party_report_count${await mentionSel(SUPABASE_URL, hdrsBase)},web_report_count,data_source,data_quality,verification_status,industry&order=${order}&limit=150`,
         { headers: hdrsBase }
       );
       if (!r.ok) return res.status(200).json({ companies: [] });
@@ -365,6 +366,7 @@ export default async function handler(req, res) {
           avg_wait_days: c.avg_wait_days || 0,
           report_count: c.report_count || 0,
           first_party_report_count: firstPartyReportCount(c),
+          mention_count: mentionCount(c),
           web_report_count: webClaimCount(c),
           data_source: servedDataSource(c),
           risk_level: overall(c.overall_score) >= 70 ? 'safe' : overall(c.overall_score) >= 40 ? 'warn' : 'danger',
@@ -595,7 +597,7 @@ export default async function handler(req, res) {
       // of the quoted PostgREST CSV value and alter which rows match (filter injection).
       const inFilter = nameList.map(n => `"${n.replace(/["\\]/g, '')}"`).join(',');
       const r = await fetch(
-        `${SUPABASE_URL}/rest/v1/company_scores?company_name=in.(${inFilter})&select=company_name,overall_score,ghost_rate,response_rate,avg_wait_days,waste_score,report_count,first_party_report_count,web_report_count,data_source&limit=50`,
+        `${SUPABASE_URL}/rest/v1/company_scores?company_name=in.(${inFilter})&select=company_name,overall_score,ghost_rate,response_rate,avg_wait_days,waste_score,report_count,first_party_report_count${await mentionSel(SUPABASE_URL, hdrsBase)},web_report_count,data_source&limit=50`,
         { headers: hdrsBase }
       );
       const rows = r.ok ? await r.json() : [];
@@ -609,6 +611,7 @@ export default async function handler(req, res) {
           waste: row.waste_score,
           report_count: row.report_count, // fused — use first_party_report_count for any "reports" claim
           first_party_report_count: firstPartyReportCount(row),
+          mention_count: mentionCount(row),
           web_report_count: webClaimCount(row),
           data_source: servedDataSource(row),
         });
@@ -1429,7 +1432,7 @@ async function fetchCompanyStats(name, supabaseUrl, dbHeaders) {
   try {
     const enc = encodeURIComponent(name);
     const [scoresRes, reportsRes] = await Promise.all([
-      fetch(`${supabaseUrl}/rest/v1/company_scores?company_name=ilike.${enc}&select=company_name,overall_score,ghost_rate,response_rate,avg_wait_days,avg_rounds,waste_score,report_count,data_quality,data_source,first_party_report_count,web_report_count,web_reviews&order=created_at.desc&limit=1`, { headers: dbHeaders }),
+      fetch(`${supabaseUrl}/rest/v1/company_scores?company_name=ilike.${enc}&select=company_name,overall_score,ghost_rate,response_rate,avg_wait_days,avg_rounds,waste_score,report_count,data_quality,data_source,first_party_report_count${await mentionSel(supabaseUrl, dbHeaders)},web_report_count,web_reviews&order=created_at.desc&limit=1`, { headers: dbHeaders }),
       // Same corpus as the score (employee reviews and anti-gaming holds excluded), so this count can't
       // pass the 5-review grade gate on rows that aren't hiring outcomes.
       fetch(`${supabaseUrl}/rest/v1/reports?company_name=ilike.${enc}&${SCORABLE_REPORTS_FILTER}&select=outcome&order=created_at.desc&limit=150`, { headers: dbHeaders }),
@@ -1448,7 +1451,7 @@ async function fetchCompanyStats(name, supabaseUrl, dbHeaders) {
     const response_rate = cs?.response_rate ?? (total >= 5 ? ((dist.hired||0)+(dist.offer||0)+(dist.interview||0)+(dist.human||0))/total : null);
     const realCount = total || firstPartyReportCount(cs);
     // Grade gate (lib/server/reportCounts.js): no score / ghost / response rate below the report bar.
-    return gateScore({ company_name: cs?.company_name||name, overall_score: cs?.overall_score||null, ghost_rate, response_rate, avg_wait_days: cs?.avg_wait_days||null, avg_rounds: cs?.avg_rounds||null, waste_score: cs?.waste_score||null, report_count: realCount, first_party_report_count: realCount, data_quality: cs?.data_quality||(total>=10?'strong':total>=3?'moderate':'limited'), outcome_dist: dist });
+    return gateScore({ company_name: cs?.company_name||name, overall_score: cs?.overall_score||null, ghost_rate, response_rate, avg_wait_days: cs?.avg_wait_days||null, avg_rounds: cs?.avg_rounds||null, waste_score: cs?.waste_score||null, report_count: realCount, first_party_report_count: realCount, mention_count: mentionCount(cs), data_quality: cs?.data_quality||(total>=10?'strong':total>=3?'moderate':'limited'), outcome_dist: dist });
   } catch(e) { return null; }
 }
 
@@ -1516,7 +1519,7 @@ function _rowToScoreRaw(row) {
     ghost_rate: row.ghost_rate, response_rate: row.response_rate,
     avg_wait_days: row.avg_wait_days, avg_rounds: row.avg_rounds, waste: row.waste_score,
     unpaid_rate: row.unpaid_rate, report_count: row.report_count || 0,
-    first_party_report_count: firstParty, web_report_count: webClaim,
+    first_party_report_count: firstParty, mention_count: mentionCount(row), web_report_count: webClaim,
     avg_tenure_months: row.avg_tenure_months || null, tenure_sample_count: row.tenure_sample_count || 0,
     confidence, confidence_label: confidenceLabel(confidence), sufficient: confidence >= 0.33,
     // Provenance is reported, never renamed. This previously collapsed every non-'reports' row to
@@ -1551,17 +1554,31 @@ async function _fuseWithReports(name, web, SUPABASE_URL, dbH) {
       r = await fetch(`${SUPABASE_URL}/rest/v1/reports?company_name=ilike.${_fuzzyNamePattern(name)}&${SCORABLE_REPORTS_FILTER}&select=outcome,platform&limit=2000`, { headers: dbH });
       reps = r.ok ? await r.json() : null;
     }
-    if (!Array.isArray(reps) || !reps.length) return null;
+    if (!Array.isArray(reps)) return null;
     const byType = {};
     for (const row of reps) {
       const type = classifyPlatform(row.platform);
       (byType[type] ||= []).push({ outcome: row.outcome });
     }
+    // "What people are saying" (stored web_reviews) counts exactly half a report — only once
+    // mention_count can be stored, so this path and the stored recompute always agree.
+    let totalMentions = null;
+    if (await hasMentionCount(SUPABASE_URL, dbH)) {
+      const wr = await fetch(`${SUPABASE_URL}/rest/v1/company_scores?company_name=eq.${enc}&select=web_reviews&limit=1`, { headers: dbH })
+        .then((x) => (x.ok ? x.json() : [])).catch(() => []);
+      const webReviews = Array.isArray(wr) && wr[0] ? wr[0].web_reviews : null;
+      const mentions = mentionOutcomes(webReviews);
+      totalMentions = mentionTotal(webReviews);
+      if (mentions.length) byType.mentions = mentions;
+    }
+    if (!Object.keys(byType).length && !totalMentions) return null;
     const sources = Object.entries(byType).map(([type, outcomes]) => ({ type, outcomes }));
     // Admin-confirmed dead listings (zombie postings) carry a bounded penalty here too,
     // so the company-page score matches the stored recompute path.
     const confirmedStaleListings = await fetchConfirmedStaleCount(SUPABASE_URL, dbH, name);
-    return fuseCompanyIntel({ web, sources, confirmedStaleListings });
+    const fz = fuseCompanyIntel({ web, sources, confirmedStaleListings });
+    // mention_count = EVERY quoted account (each counts half a report toward the bar); null = column absent.
+    return fz ? { ...fz, mention_count: totalMentions } : fz;
   } catch (_e) { return null; }
 }
 
@@ -1613,7 +1630,7 @@ async function handleCompanyScore(req, res, body) {
     try {
       const [aliasRes, scoresRes] = await Promise.all([
         fetch(`${SUPABASE_URL}/rest/v1/company_aliases?alias=ilike.${encodeURIComponent(q)}&select=canonical,alias&limit=3`, { headers: dbH }),
-        fetch(`${SUPABASE_URL}/rest/v1/company_scores?company_name=ilike.*${encodeURIComponent(qWord)}*&select=company_name,overall_score,ghost_rate,report_count,first_party_report_count,data_source,data_quality,verification_status&order=report_count.desc&limit=8`, { headers: dbH }),
+        fetch(`${SUPABASE_URL}/rest/v1/company_scores?company_name=ilike.*${encodeURIComponent(qWord)}*&select=company_name,overall_score,ghost_rate,report_count,first_party_report_count${await mentionSel(SUPABASE_URL, dbH)},data_source,data_quality,verification_status&order=report_count.desc&limit=8`, { headers: dbH }),
       ]);
       const aliases = aliasRes.ok ? await aliasRes.json() : [];
       const scores = scoresRes.ok ? await scoresRes.json() : [];
@@ -1715,7 +1732,10 @@ async function handleCompanyScore(req, res, body) {
       if (rows?.[0]) {
         const live = await liveCountP;
         // The recompute reads at most 2,000 rows, so compare at that cap (no endless re-recompute).
-        if (live != null && live > 0 && Math.min(live, 2000) !== firstPartyReportCount(rows[0])) {
+        // Mentions: only compared once the column exists (row carries mention_count).
+        const mentionsStale = 'mention_count' in rows[0]
+          && mentionTotal(rows[0].web_reviews) !== mentionCount(rows[0]);
+        if ((live != null && live > 0 && Math.min(live, 2000) !== firstPartyReportCount(rows[0])) || mentionsStale) {
           const fresh = await recomputeCompanyScoreFromReports(SUPABASE_URL, dbH, rows[0].company_name || name);
           if (fresh) { console.log(`score repaired for "${name}": ${firstPartyReportCount(rows[0])} → ${fresh.first_party_report_count} reports`); rows[0] = { ...rows[0], ...fresh }; }
         }
@@ -1739,20 +1759,23 @@ async function handleCompanyScore(req, res, body) {
 
   // 2. Reports aggregation — compute the grade from our own report corpus (deterministic, no LLM).
   const repFused = await _fuseWithReports(name, {}, SUPABASE_URL, dbH);
-  if (repFused && repFused.report_count > 0) {
+  if (repFused && (repFused.report_count > 0 || repFused.mention_count > 0)) {
     const score = {
       overall_score: repFused.overall_score, ghost_rate: repFused.ghost_rate, response_rate: repFused.response_rate,
       avg_wait_days: repFused.avg_wait_days ? Math.round(repFused.avg_wait_days) : null, avg_rounds: repFused.avg_rounds || null,
       waste: repFused.waste_score, unpaid_rate: repFused.unpaid_rate, report_count: repFused.report_count,
       first_party_report_count: repFused.first_party_report_count ?? repFused.report_count,
       web_report_count: repFused.web_report_count ?? 0,
+      ...(repFused.mention_count != null ? { mention_count: repFused.mention_count } : {}),
       data_quality: repFused.confidence_label || 'low', data_source: 'reports', risk_level: repFused.risk_level,
       process_score: repFused.overall_score, industry: '', summary: '', web_reviews: [], fused_sources: repFused.sources_used || [],
     };
     if (SUPABASE_URL && SUPABASE_SERVICE_KEY) {
       const expires = new Date(Date.now() + _SCORE_TTL_MS).toISOString();
-      const rowBase = { company_name:name.toLowerCase().trim(), overall_score:score.overall_score, ghost_rate:score.ghost_rate, response_rate:score.response_rate, avg_wait_days:score.avg_wait_days, avg_rounds:score.avg_rounds, waste_score:score.waste, unpaid_rate:score.unpaid_rate, report_count:score.report_count, first_party_report_count: score.first_party_report_count, web_report_count: score.web_report_count, data_quality:score.data_quality, data_source:'reports', industry:'', raw_summary:'', expires_at:expires };
-      try { await fetch(`${SUPABASE_URL}/rest/v1/company_scores?on_conflict=company_name`, { method:'POST', headers:{...dbH,Prefer:'resolution=merge-duplicates,return=minimal'}, body:JSON.stringify({...rowBase, web_reviews:[]}) }); } catch(_e) {}
+      const rowBase = { company_name:name.toLowerCase().trim(), overall_score:score.overall_score, ghost_rate:score.ghost_rate, response_rate:score.response_rate, avg_wait_days:score.avg_wait_days, avg_rounds:score.avg_rounds, waste_score:score.waste, unpaid_rate:score.unpaid_rate, report_count:score.report_count, first_party_report_count: score.first_party_report_count, web_report_count: score.web_report_count, ...(score.mention_count != null ? { mention_count: score.mention_count } : {}), data_quality:score.data_quality, data_source:'reports', industry:'', raw_summary:'', expires_at:expires };
+      // web_reviews is NOT sent: merge-duplicates keeps the stored "what people are saying" quotes
+      // (sending [] used to erase them — and they now count toward the score).
+      try { await fetch(`${SUPABASE_URL}/rest/v1/company_scores?on_conflict=company_name`, { method:'POST', headers:{...dbH,Prefer:'resolution=merge-duplicates,return=minimal'}, body:JSON.stringify(rowBase) }); } catch(_e) {}
     }
     return res.json({ ok: true, score: gateScore(score), _src: 'reports' });
   }

@@ -25,6 +25,7 @@ import { runHumanProof, HUMANPROOF_ENGINE_VERSION } from '../lib/humanizer/index
 import { buildHumanProofPackage, normalizeBulletList } from '../lib/server/humanizePackage.js';
 import { scoreConfidence } from './_utils/companyScore.js';
 import { firstPartyReportCount, webClaimCount, isGradeable } from '../lib/server/reportCounts.js';
+import { mentionSel } from '../lib/server/scoreColumns.js';
 
 // ── auth: derive the user id from the Supabase JWT (same pattern as api/apply.js) ──
 function verifyJWT(token, secret) {
@@ -170,7 +171,7 @@ async function loadTaxonomy(db) {
 async function getCompanyProcess(db, company) {
   if (!company) return { score: null, confidence: null };
   try {
-    const r = await db(`company_scores?company_name=ilike.${encodeURIComponent(company)}&select=overall_score,report_count,first_party_report_count,web_report_count,data_source&order=report_count.desc&limit=1`);
+    const r = await db(`company_scores?company_name=ilike.${encodeURIComponent(company)}&select=overall_score,report_count,first_party_report_count${await mentionSel()},web_report_count,data_source&order=report_count.desc&limit=1`);
     if (!r.ok) return { score: null, confidence: null };
     const rows = await r.json();
     if (!rows?.length) return { score: null, confidence: null };

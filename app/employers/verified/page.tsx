@@ -3,6 +3,7 @@ import { MIN_REPORTS_FOR_GRADE } from '@/lib/gradeGate'
 import Link from 'next/link'
 import { EmployerNav, EmployerFooter } from '@/components/employer/EmployerNav'
 import { shapeVerifiedDirectory } from '@/lib/server/verifiedDirectory'
+import { mentionSel } from '@/lib/server/scoreColumns.js'
 
 // Public "companies that respond" directory (Wave 3). Lists currently Transparency-Verified employers
 // next to their real public grade/response-rate. Doubles as SEO acquisition and the reason the badge
@@ -40,7 +41,7 @@ async function fetchDirectory(): Promise<Row[]> {
     let scores: unknown[] = []
     if (names.length) {
       const inList = names.map(n => `"${n.replace(/"/g, '')}"`).join(',')
-      const sRes = await fetch(`${SUPABASE_URL}/rest/v1/company_scores?company_name=in.(${encodeURIComponent(inList)})&select=company_name,overall_score,ghost_rate,response_rate,report_count,first_party_report_count,web_report_count,data_source&limit=500`, { headers: h, cache: 'no-store' })
+      const sRes = await fetch(`${SUPABASE_URL}/rest/v1/company_scores?company_name=in.(${encodeURIComponent(inList)})&select=company_name,overall_score,ghost_rate,response_rate,report_count,first_party_report_count${await mentionSel(SUPABASE_URL, h)},web_report_count,data_source&limit=500`, { headers: h, cache: 'no-store' })
       scores = sRes.ok ? await sRes.json() : []
     }
     return shapeVerifiedDirectory(perks, scores as Parameters<typeof shapeVerifiedDirectory>[1], Date.now())

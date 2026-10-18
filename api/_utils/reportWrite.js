@@ -5,7 +5,8 @@
 // All calls use the SERVICE key headers (`hdrs`) supplied by the caller — these helpers
 // never touch RLS-protected reads on the client's behalf.
 
-import { classifyPlatform, fuseCompanyIntel } from './companyIntel.js';
+import { classifyPlatform, fuseCompanyIntel, mentionOutcomes, mentionTotal } from './companyIntel.js';
+import { hasMentionCount } from '../../lib/server/scoreColumns.js';
 import { SCORABLE_REPORTS_FILTER } from '../../lib/server/reportCounts.js';
 import { broadcastActivity } from '../../lib/server/realtime.js';
 
@@ -142,21 +143,31 @@ export async function recomputeCompanyScoreFromReports(SUPABASE_URL, hdrs, compa
     const enc = encodeURIComponent(String(companyName).toLowerCase().trim());
     // Same corpus the score path uses (lib/server/reportCounts.js SCORABLE_REPORTS_FILTER): every
     // report at its trust weight; only the anti-gaming holds (anonymous/duplicate/velocity) wait.
-    const r = await fetch(
-      `${SUPABASE_URL}/rest/v1/reports?company_name=ilike.${enc}&${SCORABLE_REPORTS_FILTER}&select=outcome,platform&limit=2000`,
-      { headers: hdrs },
-    );
+    // Reports + "what people are saying" (the stored web_reviews), fetched together.
+    const [r, wr, withMentions] = await Promise.all([
+      fetch(`${SUPABASE_URL}/rest/v1/reports?company_name=ilike.${enc}&${SCORABLE_REPORTS_FILTER}&select=outcome,platform&limit=2000`, { headers: hdrs }),
+      fetch(`${SUPABASE_URL}/rest/v1/company_scores?company_name=eq.${enc}&select=web_reviews&limit=1`, { headers: hdrs })
+        .then((x) => (x.ok ? x.json() : [])).catch(() => []),
+      hasMentionCount(SUPABASE_URL, hdrs),
+    ]);
     if (!r.ok) return false;
     const reps = await r.json();
-    if (!Array.isArray(reps) || !reps.length) return false;
+    if (!Array.isArray(reps)) return false;
     const byType = {};
     for (const row of reps) { const t = classifyPlatform(row.platform); (byType[t] ||= []).push({ outcome: row.outcome }); }
+    // Mentions count exactly half a report (SOURCE_TRUST.mentions) — only once mention_count can be stored,
+    // so the stored score and its evidence count always agree.
+    const webReviews = Array.isArray(wr) && wr[0] ? wr[0].web_reviews : null;
+    const mentions = withMentions ? mentionOutcomes(webReviews) : [];
+    const totalMentions = withMentions ? mentionTotal(webReviews) : 0;
+    if (mentions.length) byType.mentions = mentions;
+    if (!reps.length && !totalMentions) return false;
     const sources = Object.entries(byType).map(([type, outcomes]) => ({ type, outcomes }));
     // Fold in admin-confirmed dead listings so companies that leave zombie postings up
     // carry the (bounded) penalty in their stored grade.
     const confirmedStaleListings = await fetchConfirmedStaleCount(SUPABASE_URL, hdrs, companyName);
     const fz = fuseCompanyIntel({ web: {}, sources, confirmedStaleListings });
-    if (!fz || !fz.report_count) return false;
+    if (!fz || !(fz.report_count || totalMentions)) return false;
     // Belt-and-suspenders: fusion already clamps, but the WRITER enforces the range too so a
     // rate can never persist as e.g. 34.0 (→ "3400% ghost rate"). rates [0,1], scores [0,100].
     const row = {
@@ -172,6 +183,7 @@ export async function recomputeCompanyScoreFromReports(SUPABASE_URL, hdrs, compa
       // Recompute runs with web:{} — this count is 100% first-party report rows.
       first_party_report_count: fz.first_party_report_count ?? fz.report_count,
       web_report_count: 0,
+      ...(withMentions ? { mention_count: totalMentions } : {}),
       data_quality: fz.confidence_label || 'low',
       data_source: 'reports',
       expires_at: new Date(Date.now() + _SCORE_TTL_MS).toISOString(),
