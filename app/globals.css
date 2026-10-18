@@ -777,6 +777,7 @@ select.fi,select.fs,select.fi-r,select.fs-r{background-image:url("data:image/svg
 .status-pill.ghosted{color:var(--red);background:var(--rdim);border-color:rgba(239,68,68,.3)}
 .status-pill.hired{color:var(--green);background:var(--gdim);border-color:rgba(16,185,129,.3)}
 .status-pill.rejected{color:var(--dim);background:var(--raised);border-color:var(--line2)}
+.status-pill.withdrawn{color:var(--muted);background:var(--raised);border-color:var(--line2)}
 .status-pill.active{color:var(--blue);background:var(--bdim);border-color:rgba(59,130,246,.3)}
 /* Disclosure chevron that flips 180° when its parent <details> opens (FAQ + pricing FAQ). */
 .dt-chev{display:inline-block;transition:transform .22s ease}

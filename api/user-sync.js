@@ -14,6 +14,7 @@ import { normalizeClaimCompany } from '../lib/server/employerClaims.js';
 import { buildNotificationRow } from '../lib/server/employerNotificationsStore.js';
 import { isReadableResume } from '../lib/server/resumeReadability.js';
 import { deleteApplicantResumes } from '../lib/server/seenApplyStore.js';
+import { decodeThread } from '../lib/server/applicationThread.js';
 
 // Verify a Supabase JWT locally (HS256) — no network round-trip.
 // Returns the payload (with .sub = user UUID) on success, null on failure.
@@ -115,14 +116,27 @@ export default async function handler(req, res) {
     const appsLimit = Math.min(500, Math.max(1, parseInt(body.apps_limit) || 200));
     const appsOffset = Math.max(0, parseInt(body.apps_offset) || 0);
     const today = new Date().toISOString().split('T')[0];
-    const [appsRes, savedRes, recentRes, credRes, flagsRes] = await Promise.all([
+    const [appsRes, savedRes, recentRes, credRes, flagsRes, threadsRes] = await Promise.all([
       db(`applications?user_id=eq.${uid}&select=id,job_id,company_name,role,city,platform,job_url,status,stage,score,waste_score,events,applied_at,employer_stage,created_at,updated_at&order=created_at.desc&limit=${appsLimit}&offset=${appsOffset}`, { headers: { Prefer: 'count=estimated' } }),
       db(`saved_jobs?user_id=eq.${uid}&order=saved_at.desc&limit=500`),
       db(`user_recent_cos?user_id=eq.${uid}&order=viewed_at.desc&limit=6`),
       db(`ai_credits?user_id=eq.${uid}&limit=1`),
       db(`feature_flags?select=flag_name,status,percentage`),
+      // Apply-on-Seen applications + their conversations (employer messages, the withdrawal note) — read
+      // from the one copy on seen_applications. 400s harmlessly before migration 20261018150000.
+      db(`seen_applications?applicant_user_id=eq.${uid}&select=job_id,thread&order=updated_at.desc&limit=200`).catch(() => null),
     ]);
     const apps   = appsRes.ok   ? await appsRes.json()   : [];
+    const threads = threadsRes && threadsRes.ok ? await threadsRes.json().catch(() => []) : [];
+    if (Array.isArray(threads) && threads.length) {
+      const byJob = new Map(threads.map(t => [String(t.job_id), t.thread]));
+      for (const a of apps) {
+        if (a.job_id == null || !byJob.has(String(a.job_id))) continue;
+        a.seen_apply = true; // the employer gets this application (and a withdrawal) on Seen
+        const t = byJob.get(String(a.job_id));
+        if (t) a.messages = decodeThread(t);
+      }
+    }
     const saved  = savedRes.ok  ? await savedRes.json()  : [];
     const recent = recentRes.ok ? await recentRes.json() : [];
     let cred = credRes.ok ? (await credRes.json())[0] : null;

@@ -42,7 +42,8 @@ import { rateLimit } from '../lib/server/ratelimit.js';
 import { validateListingUrl } from '../lib/server/listingImport.js';
 import { resolveListing } from '../lib/server/listingResolve.js';
 import { APPLICATION_STATUSES, inboxItem, EMPLOYER_STATUS_TRACKER, trackerUpdateForEmployerStatus } from '../lib/server/seenApply.js';
-import { seenApplyAvailable, signResumeUrl, sendApplicationUpdateEmail } from '../lib/server/seenApplyStore.js';
+import { seenApplyAvailable, signResumeUrl, sendApplicationUpdateEmail, threadAvailable, sendEmployerMessageEmail } from '../lib/server/seenApplyStore.js';
+import { appendThreadEntry } from '../lib/server/applicationThread.js';
 
 const ALLOWED = ['https://seenjobs.io', 'https://www.seenjobs.io'];
 const LISTING_TTL_DAYS = 60; // employer-posted listings live 60 days, matching paste-a-link imports.
@@ -111,6 +112,7 @@ async function route(req, res) {
   if (action === 'applications') return listApplications(res, ctx);
   if (action === 'application_status') return setApplicationStatus(res, ctx);
   if (action === 'application_resume') return applicationResume(res, ctx);
+  if (action === 'application_message') return applicationMessage(res, ctx);
   return res.status(400).json({ error: 'Unknown action' });
 }
 
@@ -293,7 +295,7 @@ async function listApplications(res, { db, body, claim }) {
   const r = await db(
     `seen_applications?company_key=eq.${encodeURIComponent(claim.companyKey)}` +
     (jid ? `&job_id=eq.${encodeURIComponent(jid)}` : '') +
-    `&select=id,job_id,job_title,applicant_name,applicant_email,applicant_phone,note,status,created_at,resume_path,resume_file_name,resume_text` +
+    `&select=id,job_id,job_title,applicant_name,applicant_email,applicant_phone,note,status,created_at,resume_path,resume_file_name,resume_text${(await threadAvailable(db)) ? ',thread' : ''}` +
     `&order=created_at.desc&limit=500`,
   );
   if (!r.ok) {
@@ -314,6 +316,7 @@ async function setApplicationStatus(res, { db, body, claim }) {
   const prevRes = await db(`seen_applications?id=eq.${encodeURIComponent(id)}&company_key=eq.${encodeURIComponent(claim.companyKey)}&select=status&limit=1`);
   const prevRows = prevRes.ok ? await prevRes.json() : [];
   const prevStatus = Array.isArray(prevRows) && prevRows[0] ? prevRows[0].status : null;
+  if (prevStatus === 'withdrawn') return res.status(409).json({ error: 'The applicant withdrew this application', reason: 'withdrawn' });
   const r = await db(`seen_applications?id=eq.${encodeURIComponent(id)}&company_key=eq.${encodeURIComponent(claim.companyKey)}`, {
     method: 'PATCH',
     headers: { Prefer: 'return=representation' },
@@ -354,6 +357,38 @@ async function syncApplicantTracker(db, application, status) {
     }
     return { synced, reason: app ? (synced ? 'updated' : 'write_failed') : 'not_in_tracker' };
   } catch { return { synced: false, reason: 'error' }; }
+}
+
+// ── application_message: write to one applicant on their application ───────────
+// Interview time, a number to call, anything they should know. Stored on the application row
+// (lib/server/applicationThread.js), shown on the applicant's tracker, and emailed to them.
+async function applicationMessage(res, { db, body, claim }) {
+  if (!(await seenApplyAvailable(db)) || !(await threadAvailable(db))) return res.status(400).json({ error: 'Messaging applicants isn’t switched on yet', reason: 'unavailable' });
+  const id = String(body.id == null ? '' : body.id).trim();
+  if (!UUID.test(id)) return res.status(400).json({ error: 'A valid application id is required' });
+  // The company_key filter IS the ownership check: another company's application matches 0 rows.
+  const own = `seen_applications?id=eq.${encodeURIComponent(id)}&company_key=eq.${encodeURIComponent(claim.companyKey)}`;
+  // Two writes racing on one row would drop a message, so the PATCH only lands if the row is
+  // unchanged since it was read (updated_at), with one re-read on a lost race.
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const cur = await db(`${own}&select=id,thread,updated_at,applicant_email,company_name,job_title&limit=1`);
+    const row = cur.ok ? (await cur.json())[0] : null;
+    if (!row) return res.status(404).json({ error: 'That application isn’t on your company’s listings' });
+    const next = appendThreadEntry(row.thread, { from: 'e', text: body.text, nowMs: Date.now() });
+    if (!next.ok) return res.status(400).json({ error: next.error });
+    const up = await db(`${own}&updated_at=eq.${encodeURIComponent(row.updated_at)}`, {
+      method: 'PATCH',
+      headers: { Prefer: 'return=representation' },
+      body: JSON.stringify({ thread: next.thread, updated_at: new Date().toISOString() }),
+    });
+    if (!up.ok) return res.status(500).json({ error: 'Could not send the message — please try again' });
+    const rows = await up.json();
+    if (!rows.length) continue; // someone else wrote first — re-read and append again
+    const text = next.thread[next.thread.length - 1][2];
+    const mail = await sendEmployerMessageEmail({ to: row.applicant_email, company: row.company_name, role: row.job_title, text });
+    return res.status(200).json({ ok: true, application: inboxItem(rows[0]), emailed: !!mail.ok });
+  }
+  return res.status(409).json({ error: 'The application changed while you were writing — please send again' });
 }
 
 async function applicationResume(res, { db, body, claim }) {
