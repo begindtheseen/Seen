@@ -92,6 +92,8 @@ export interface Job {
   featured?: boolean
   /** Posted (or imported) directly on Seen by the employer — sorts ahead of aggregated listings. */
   employer_posted?: boolean
+  /** The search named this listing's company — ranks first (lib/server/jobPriority.js). */
+  company_match?: boolean
   /** Where candidates apply (employer-posted listings only): own site, on Seen, or both. */
   apply_mode?: 'external' | 'seen' | 'both'
   /** Factual, our-own-observation freshness descriptor (see lib/server/listingFreshness.js). */

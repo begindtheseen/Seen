@@ -78,6 +78,41 @@ export type PostedFilter = '' | '1' | '7' | '30'
 // ever put in this map, so every consumer can trust these numbers are earned verdicts.
 export type CoScoreMap = Record<string, { ghost_rate: number; overall_score: number; response_rate?: number }>
 
+// API listing → the page's Job shape. Module-level so the search and its silent top-up refresh
+// map identically.
+function toJobs(items: unknown[], loc: string): Job[] {
+  return items.map((item: unknown) => {
+    const j = item as Record<string, unknown>
+    const company = String(j.company || j.co || '')
+    const title = String(j.title || '')
+    const location = String(j.location || j.loc || j.city || loc || 'US')
+    const apply_url = j.apply_url ? String(j.apply_url) : (j.url ? String(j.url) : null)
+    return {
+      // Stable, content-derived id when the API has none — so the same listing
+      // keeps the same id across loads and saved listings reliably reopen.
+      id: String(j.id || stableJobId({ company, title, location, apply_url })),
+      title,
+      company,
+      location,
+      score: numOrNull(j.score),
+      waste: numOrNull(j.waste_score ?? j.waste),
+      level: String(j.level || j.lvl || 'Mid level'),
+      type: String(j.type || 'Full-time'),
+      source: String(j.source || 'Job board'),
+      description: String(j.description || ''),
+      salary: j.salary ? String(j.salary) : null,
+      apply_url,
+      posted_at: j.posted_at ? String(j.posted_at) : null,
+      featured: !!j.featured,
+      // Without these the "Posted on Seen" badge, its search-priority tier (applySort →
+      // sortByPriority) and the Apply-on-Seen buttons never reach the page.
+      employer_posted: !!j.employer_posted,
+      company_match: !!j.company_match,
+      apply_mode: j.apply_mode === 'seen' || j.apply_mode === 'both' ? j.apply_mode : 'external',
+    }
+  })
+}
+
 export function useJobSearch() {
   const { isLoggedIn, profile, token, ready } = useAuth()
   const [query, setQuery] = useState('')
@@ -107,6 +142,9 @@ export function useJobSearch() {
   const [coScores, setCoScores] = useState<CoScoreMap>({})
   const [appliedCos, setAppliedCos] = useState<Set<string>>(new Set())
   const abortRef = useRef<AbortController | null>(null)
+  // Bumped by every new search, so a pending silent top-up refresh for an older search is dropped.
+  const searchSeqRef = useRef(0)
+  const topupTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const hasFilters = !!(niche || level || jobType || posted)
 
@@ -152,6 +190,11 @@ export function useJobSearch() {
     setFiltered(s)
     setStatusMsg(s.length === 0 ? 'No results. Try a different title or wider radius.' : `${s.length} result${s.length !== 1 ? 's' : ''}`)
   }, [niche, level, jobType, posted]) // eslint-disable-line react-hooks/exhaustive-deps
+  // Latest sort + filters for the delayed top-up refresh (its timer outlives the render it was set in).
+  const sortRef = useRef(sort); sortRef.current = sort
+  const updateDisplayRef = useRef(updateDisplay); updateDisplayRef.current = updateDisplay
+  // A pending top-up refresh never fires after the page unmounts.
+  useEffect(() => () => { if (topupTimerRef.current) clearTimeout(topupTimerRef.current) }, [])
 
   useEffect(() => {
     if (jobs.length > 0) updateDisplay(jobs, sort)
@@ -362,12 +405,15 @@ export function useJobSearch() {
       return
     }
     searchedOnceRef.current = true
+    const seq = ++searchSeqRef.current
+    if (topupTimerRef.current) { clearTimeout(topupTimerRef.current); topupTimerRef.current = null }
 
     const cacheKey = `${q}|${loc}|${radius}`
     const cached = searchCache.get(cacheKey)
     const CACHE_TTL = 5 * 60 * 1000 // 5 min
     if (cached && Date.now() - cached.ts < CACHE_TTL) {
       // Serve cached results immediately, then silently refresh in background
+      if (abortRef.current) abortRef.current.abort() // drop any older in-flight search
       setJobs(cached.jobs)
       updateDisplay(cached.jobs, sort)
       setStatus('done')
@@ -406,36 +452,8 @@ export function useJobSearch() {
           return
         }
         if (!res.ok) throw new Error(`HTTP ${res.status}`)
-        const data = await res.json() as { jobs?: unknown[]; results?: unknown[]; widened?: boolean; radius?: number }
-        const raw: Job[] = (data.jobs || data.results || []).map((item: unknown) => {
-          const j = item as Record<string, unknown>
-          const company = String(j.company || j.co || '')
-          const title = String(j.title || '')
-          const location = String(j.location || j.loc || j.city || loc || 'US')
-          const apply_url = j.apply_url ? String(j.apply_url) : (j.url ? String(j.url) : null)
-          return {
-            // Stable, content-derived id when the API has none — so the same listing
-            // keeps the same id across loads and saved listings reliably reopen.
-            id: String(j.id || stableJobId({ company, title, location, apply_url })),
-            title,
-            company,
-            location,
-            score: numOrNull(j.score),
-            waste: numOrNull(j.waste_score ?? j.waste),
-            level: String(j.level || j.lvl || 'Mid level'),
-            type: String(j.type || 'Full-time'),
-            source: String(j.source || 'Job board'),
-            description: String(j.description || ''),
-            salary: j.salary ? String(j.salary) : null,
-            apply_url,
-            posted_at: j.posted_at ? String(j.posted_at) : null,
-            featured: !!j.featured,
-            // Without these the "Posted on Seen" badge, its search-priority tier (applySort →
-            // sortByPriority) and the Apply-on-Seen buttons never reach the page.
-            employer_posted: !!j.employer_posted,
-            apply_mode: j.apply_mode === 'seen' || j.apply_mode === 'both' ? j.apply_mode : 'external',
-          }
-        })
+        const data = await res.json() as { jobs?: unknown[]; results?: unknown[]; widened?: boolean; radius?: number; topup?: string | null }
+        const raw: Job[] = toJobs(data.jobs || data.results || [], loc)
         searchCache.set(cacheKey, { jobs: raw, ts: Date.now() })
         JobCache.setMany(raw)
         setJobs(raw)
@@ -447,6 +465,29 @@ export function useJobSearch() {
           setStatusMsg(`No jobs within ${data.radius || radius} mi of ${loc} — showing the ${raw.length} nearest matches`)
         }
         if (q) try { RecentSearchesStore.push(q, loc || undefined) } catch {}
+        // The server answered instantly from our corpus and is pulling more listings in the
+        // background (topup:'pending'). Re-read once, silently — no spinner, sort kept — and merge
+        // in anything new. Dropped if a newer search starts first.
+        if (data.topup === 'pending') {
+          topupTimerRef.current = setTimeout(async () => {
+            if (seq !== searchSeqRef.current) return
+            try {
+              const r2 = await fetch('/api/jobs', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}) },
+                body: JSON.stringify({ query: q, location: loc, radius, db_only: true }),
+              })
+              if (!r2.ok || seq !== searchSeqRef.current) return
+              const d2 = await r2.json() as { jobs?: unknown[] }
+              const fresh = toJobs(d2.jobs || [], loc)
+              if (seq !== searchSeqRef.current || fresh.length <= raw.length) return
+              searchCache.set(cacheKey, { jobs: fresh, ts: Date.now() })
+              JobCache.setMany(fresh)
+              setJobs(fresh)
+              updateDisplayRef.current(fresh, sortRef.current)
+            } catch { /* keep the first page */ }
+          }, 4000)
+        }
         return
       } catch (err) {
         if ((err as Error).name === 'AbortError') return // superseded by a newer search

@@ -17,6 +17,7 @@ import { SavedJobsStore } from '@/lib/stores/SavedJobs'
 import { notify } from '@/lib/notify'
 import { matchCities } from '@/lib/data/usCities'
 import { takesSeenApply } from '@/lib/seenApplyMode'
+import { useCompanySuggestions, CompanySuggestList, CompanyResultCard } from '@/components/jobs/CompanySuggest'
 
 export default function JobsPage() {
   const router = useRouter()
@@ -60,6 +61,9 @@ export default function JobsPage() {
   // Optimize funnel), it should record the application immediately rather than re-ask.
   const [checkpointAuto, setCheckpointAuto] = useState(false)
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  // Company search in the same box: matching companies under the input, card above results.
+  const coSuggs = useCompanySuggestions(query)
+  const [showCoSuggs, setShowCoSuggs] = useState(false)
 
   function handleSaveToggle() {
     setSaveVersion(v => v + 1)
@@ -102,12 +106,15 @@ export default function JobsPage() {
           <h1>Open positions</h1>
           <p>Sorted by transparency. Every listing shows waste risk, process score, and vibe tags — not just salary and location.</p>
 
-          {/* Search bar */}
+          {/* Search bar — job titles AND company names in the same box (CompanySuggest.tsx) */}
           <div style={{ display: 'flex', gap: '.5rem', marginTop: '1rem', flexWrap: 'wrap' }}>
+            <div style={{ position: 'relative', flex: 2, minWidth: 180, display: 'flex' }}>
             <input
               type="text"
-              placeholder="Job title or role..."
+              placeholder="Job title, role or company..."
               value={query}
+              onFocus={() => setShowCoSuggs(true)}
+              onBlur={() => setTimeout(() => setShowCoSuggs(false), 150)}
               onChange={e => {
                 const val = e.target.value
                 setQuery(val)
@@ -116,9 +123,21 @@ export default function JobsPage() {
                   debounceRef.current = setTimeout(() => searchJobs(val, undefined), 450)
                 }
               }}
-              onKeyDown={e => { if (e.key === 'Enter') { if (debounceRef.current) clearTimeout(debounceRef.current); searchJobs() } }}
-              style={inputStyle}
+              onKeyDown={e => { if (e.key === 'Enter') { if (debounceRef.current) clearTimeout(debounceRef.current); setShowCoSuggs(false); searchJobs() } }}
+              style={{ ...inputStyle, width: '100%' }}
             />
+            {showCoSuggs && (
+              <CompanySuggestList
+                items={coSuggs}
+                onPick={name => {
+                  if (debounceRef.current) clearTimeout(debounceRef.current)
+                  setQuery(name)
+                  setShowCoSuggs(false)
+                  searchJobs(name)
+                }}
+              />
+            )}
+            </div>
             <div style={{ position: 'relative', flex: 1, minWidth: 130 }}>
               <input
                 type="text"
@@ -239,6 +258,9 @@ export default function JobsPage() {
             )}
           </div>
         )}
+
+        {/* The search names a company → its card (grade only when it has enough reviews) */}
+        {status === 'done' && <CompanyResultCard items={coSuggs} searched={query} />}
 
         {/* Results header */}
         <div className="jtb">
