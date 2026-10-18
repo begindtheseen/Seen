@@ -562,7 +562,7 @@ function TrackerPage() {
     {/* Manual add modal */}
     {showManual && (
       <ModalPortal>
-      <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.8)', zIndex: 9000, backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+      <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.88)', zIndex: 9000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
         onClick={e => { if (e.target === e.currentTarget) setShowManual(false) }}>
         <div style={{ width: 'calc(100% - 2rem)', maxWidth: 440, background: 'var(--surface)', border: '1px solid rgba(99,102,241,.25)', borderRadius: 14, overflow: 'hidden', boxShadow: '0 32px 96px rgba(0,0,0,.7),0 0 72px rgba(99,102,241,.18),0 0 140px rgba(124,58,237,.08)' }}>
           <div style={{ padding: '.9rem 1.1rem', borderBottom: '1px solid var(--line)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>

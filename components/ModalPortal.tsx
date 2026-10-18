@@ -7,7 +7,9 @@
 //    blurred containers (.page-full, .rise-in, glass cards). Inside one of those a "fixed" overlay
 //    is placed relative to that container instead, so it opened off-screen (admin "Manage
 //    accounts", employer listing editor). Rendering at <body> makes the viewport its only parent.
-// 2. Lock the page behind it, so the blurred background stays put and the modal stays in view.
+// 2. Lock the page behind it, so the background stays put and the modal stays in view.
+// 3. No backdrop-filter on overlays: a live blur over this app's glass cards + animations flickers in
+//    Safari. Dim with an opaque-enough color instead, and freeze the page's animations while open.
 //    Ref-counted: a modal opened from another modal keeps the lock until the last one closes.
 
 import { useEffect, useState, type ReactNode } from 'react'
@@ -26,6 +28,10 @@ function lockScroll() {
   saved = { htmlOverflow: html.style.overflow, bodyOverflow: body.style.overflow, bodyPaddingRight: body.style.paddingRight }
   html.style.overflow = 'hidden'
   body.style.overflow = 'hidden'
+  // Freeze the page's own animations behind the overlay (globals.css body.modal-open). Nothing
+  // behind a modal needs to move, and every animating frame under a full-screen overlay made Safari
+  // recomposite the stacked glass blurs — the background flickered constantly.
+  body.classList.add('modal-open')
   if (scrollbar > 0) body.style.paddingRight = `${scrollbar}px`
 }
 
@@ -34,6 +40,7 @@ function unlockScroll() {
   if (--lockCount > 0) return
   const html = document.documentElement
   const body = document.body
+  body.classList.remove('modal-open')
   if (saved) {
     html.style.overflow = saved.htmlOverflow
     body.style.overflow = saved.bodyOverflow

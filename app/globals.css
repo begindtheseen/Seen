@@ -1746,3 +1746,7 @@ html.intro-seen #intro-guard{display:none}
 /* Every button shows it was pressed, and taps fire immediately on phones (no double-tap-zoom wait). */
 button,a,[role="button"]{touch-action:manipulation}
 button:not(:disabled):active{opacity:.82}
+
+/* A modal is open (components/ModalPortal.tsx): freeze the page behind it. Modals portal to <body>,
+   outside .site-main, so their own animations keep running. */
+body.modal-open .site-main,body.modal-open .site-main *,body.modal-open nav,body.modal-open nav *{animation-play-state:paused!important}

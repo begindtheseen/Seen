@@ -71,7 +71,7 @@ export default function CoPreviewModal({ company, onClose }: { company: string; 
   return (
     <ModalPortal>
     <div
-      style={{ position: 'fixed', inset: 0, zIndex: 9500, background: 'rgba(0,0,0,.8)', backdropFilter: 'blur(6px)' }}
+      style={{ position: 'fixed', inset: 0, zIndex: 9500, background: 'rgba(0,0,0,.88)' }}
       onClick={onClose}
     >
       <div

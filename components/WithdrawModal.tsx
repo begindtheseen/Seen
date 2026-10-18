@@ -143,7 +143,7 @@ export default function WithdrawModal({ app, onClose, onWithdrawn }: {
 
   return (
     <ModalPortal>
-      <div onClick={() => { if (!busy) onClose() }} style={{ position: 'fixed', inset: 0, zIndex: 10000, background: 'rgba(2,4,10,.82)', backdropFilter: 'blur(6px)', WebkitBackdropFilter: 'blur(6px)', display: 'flex', alignItems: 'flex-start', justifyContent: 'center', padding: '6vh 1rem', overflowY: 'auto' }}>
+      <div onClick={() => { if (!busy) onClose() }} style={{ position: 'fixed', inset: 0, zIndex: 10000, background: 'rgba(2,4,10,.90)', display: 'flex', alignItems: 'flex-start', justifyContent: 'center', padding: '6vh 1rem', overflowY: 'auto' }}>
         <div role="dialog" aria-modal="true" aria-label={`Withdraw from ${app.role} at ${app.company}`} onClick={e => e.stopPropagation()} style={{ width: '100%', maxWidth: 460, background: 'var(--surface)', border: '1px solid var(--line2)', borderRadius: 16, padding: '1.25rem 1.25rem 1.4rem', boxShadow: '0 30px 90px rgba(0,0,0,.6)' }}>
           <div style={{ display: 'flex', alignItems: 'flex-start', gap: '.75rem' }}>
             <div style={{ flex: 1, minWidth: 0 }}>

@@ -17,7 +17,7 @@ export default function RoundsPrompt({ app, onSubmit, onSkip }: Props) {
   return (
     <ModalPortal>
     <div
-      style={{ position: 'fixed', inset: 0, zIndex: 9998, background: 'rgba(0,0,0,.7)', backdropFilter: 'blur(4px)', display: 'flex', flexDirection: 'column', justifyContent: 'flex-end' }}
+      style={{ position: 'fixed', inset: 0, zIndex: 9998, background: 'rgba(0,0,0,.78)', display: 'flex', flexDirection: 'column', justifyContent: 'flex-end' }}
       onClick={e => { if (e.target === e.currentTarget) onSkip() }}
     >
       <div style={{ background: 'var(--surface)', border: '1px solid var(--line)', borderTopLeftRadius: 18, borderTopRightRadius: 18, padding: '1.5rem 1.5rem 2rem', animation: 'fadeUp .25s ease both' }}>

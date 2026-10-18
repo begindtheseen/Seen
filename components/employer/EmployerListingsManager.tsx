@@ -722,7 +722,7 @@ function DisputeModal({ listing, token, onClose, onSubmitted, defaultKind }: { l
 
   return (
     <ModalPortal>
-    <div onClick={onClose} style={{ position: 'fixed', inset: 0, zIndex: 200, background: 'rgba(2,4,10,.86)', backdropFilter: 'blur(6px)', WebkitBackdropFilter: 'blur(6px)', display: 'flex', alignItems: 'flex-start', justifyContent: 'center', padding: '4vh 1rem', overflowY: 'auto' }}>
+    <div onClick={onClose} style={{ position: 'fixed', inset: 0, zIndex: 200, background: 'rgba(2,4,10,.92)', display: 'flex', alignItems: 'flex-start', justifyContent: 'center', padding: '4vh 1rem', overflowY: 'auto' }}>
       {/* SOLID surface — var(--card) is a translucent 3%-white raised tint (fine layered over a
           solid bg, but see-through as a floating panel), so the modal uses an opaque background. */}
       <div onClick={e => e.stopPropagation()} style={{ width: '100%', maxWidth: 560, background: 'var(--surface)', border: '1px solid var(--line2)', borderRadius: 16, padding: '1.6rem', boxShadow: '0 24px 70px rgba(0,0,0,.7)' }}>
@@ -896,7 +896,7 @@ function ApplicationsInbox({ listing, token, onClose, canClose }: { listing: Lis
 
   return (
     <ModalPortal>
-      <div onClick={onClose} style={{ position: 'fixed', inset: 0, zIndex: 300, background: 'rgba(2,4,10,.86)', backdropFilter: 'blur(6px)', WebkitBackdropFilter: 'blur(6px)', display: 'flex', alignItems: 'flex-start', justifyContent: 'center', padding: '4vh 1rem', overflowY: 'auto' }}>
+      <div onClick={onClose} style={{ position: 'fixed', inset: 0, zIndex: 300, background: 'rgba(2,4,10,.92)', display: 'flex', alignItems: 'flex-start', justifyContent: 'center', padding: '4vh 1rem', overflowY: 'auto' }}>
         <div role="dialog" aria-modal="true" aria-label={`Applications for ${listing.title}`} onClick={e => e.stopPropagation()} style={{ width: '100%', maxWidth: 640, background: 'var(--surface)', border: '1px solid var(--line2)', borderRadius: 16, padding: '1.2rem 1.2rem 1.4rem' }}>
           <div style={{ display: 'flex', alignItems: 'flex-start', gap: '.75rem', marginBottom: '.9rem' }}>
             <div style={{ flex: 1, minWidth: 0 }}>
