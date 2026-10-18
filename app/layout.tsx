@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from 'next'
+import { Analytics } from '@vercel/analytics/react'
 import { AuthProvider } from '@/lib/auth'
 import AnalyticsProvider from '@/components/AnalyticsProvider'
 import Nav from '@/components/Nav'
@@ -81,6 +82,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <ToastHost />
           <MicroSurveyHost />
         </AuthProvider>
+        <Analytics />
       </body>
     </html>
   )
