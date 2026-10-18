@@ -21,6 +21,12 @@
 //                 interviewing/rejected/hired.
 //   • application_resume → { id } — a 10-minute signed URL for the résumé file (private bucket),
 //                 or the résumé text when the applicant sent their saved Seen résumé.
+//   • application_message → { id, text } — write to one applicant (shown on their tracker, emailed).
+//                 Applicants never write back (no DMs — owner rule 2026-10-18).
+//   • update      → edit your OWN posted listing in place; dated via jobs.edited_at.
+//   • fill_listing → { job_id, hired_ids, message?, confirm_hired } — mark the hires, send everyone
+//                 still waiting one decline message, close the listing (not delete).
+//   • delete      → remove your OWN posted listing (and with it every application on it).
 //   Apply-on-Seen actions answer { available:false } until migration 20261017150000 is applied.
 //
 // NO DATA BLEED: every action is scoped to the caller's companyKey. `list`/`disputes` only ever read
@@ -41,9 +47,13 @@ import { geocodeLocation } from '../lib/server/geo.js';
 import { rateLimit } from '../lib/server/ratelimit.js';
 import { validateListingUrl } from '../lib/server/listingImport.js';
 import { resolveListing } from '../lib/server/listingResolve.js';
-import { APPLICATION_STATUSES, inboxItem, EMPLOYER_STATUS_TRACKER, trackerUpdateForEmployerStatus } from '../lib/server/seenApply.js';
-import { seenApplyAvailable, signResumeUrl, sendApplicationUpdateEmail, threadAvailable, sendEmployerMessageEmail } from '../lib/server/seenApplyStore.js';
-import { appendThreadEntry } from '../lib/server/applicationThread.js';
+import {
+  APPLICATION_STATUSES, inboxItem, EMPLOYER_STATUS_TRACKER, trackerUpdateForEmployerStatus,
+  planFill, defaultDeclineMessage, buildListingEditPatch, DECLINE_MESSAGE_MAX, OPEN_APPLICATION_STATUSES,
+} from '../lib/server/seenApply.js';
+import { seenApplyAvailable, signResumeUrl, sendApplicationUpdateEmail, threadAvailable, sendEmployerMessageEmail, lifecycleAvailable } from '../lib/server/seenApplyStore.js';
+import { appendThreadEntry, cleanMessage } from '../lib/server/applicationThread.js';
+import { daysUntilCleared, RETENTION_DAYS } from '../lib/server/applicationRetention.js';
 
 const ALLOWED = ['https://seenjobs.io', 'https://www.seenjobs.io'];
 const LISTING_TTL_DAYS = 60; // employer-posted listings live 60 days, matching paste-a-link imports.
@@ -106,6 +116,8 @@ async function route(req, res) {
   if (action === 'list') return listListings(res, ctx);
   if (action === 'create') return createListing(res, ctx);
   if (action === 'delete') return deleteOwnListing(res, ctx);
+  if (action === 'update') return updateListing(res, ctx);
+  if (action === 'fill_listing') return fillListing(res, ctx);
   if (action === 'dispute') return fileDispute(res, ctx);
   if (action === 'disputes') return listDisputes(res, ctx);
   if (action === 'import_preview') return importPreview(req, res, ctx);
@@ -123,12 +135,13 @@ async function listListings(res, { db, uid, claim }) {
   // jobs.apply_mode only exists once the Apply-on-Seen migration is applied — selecting it before
   // that would 400 the whole list, so it is added only when the probe says the feature is live.
   const seenApply = await seenApplyAvailable(db);
+  const life = await lifecycleAvailable(db);
 
   // All of this company's listings (active + stale + expired so inactive ones can be disputed),
   // newest first. NOT gated on expires_at — the employer manages the whole set.
   const [jobsRes, dispRes, evRes, appRes] = await Promise.all([
     db(`jobs?company=ilike.${encodeURIComponent(nameFilter)}` +
-       `&select=id,title,company,location,city,apply_url,source,availability_status,expires_at,created_at,is_employer_posted,employer_user_id${seenApply ? ',apply_mode' : ''}` +
+       `&select=id,title,company,location,city,apply_url,source,availability_status,expires_at,created_at,is_employer_posted,employer_user_id${seenApply ? ',apply_mode' : ''}${life ? ',edited_at,status' : ''}` +
        `&order=created_at.desc&limit=300`),
     db(`listing_disputes?employer_user_id=eq.${encodeURIComponent(uid)}&status=eq.open` +
        `&select=id,job_id,kind,status,created_at&order=created_at.desc&limit=300`),
@@ -186,7 +199,7 @@ async function listListings(res, { db, uid, claim }) {
   const seenByJob = {};
   if (seenApply) {
     try {
-      const sr = await db(`seen_applications?company_key=eq.${encodeURIComponent(companyKey)}&select=job_id,status&limit=5000`);
+      const sr = await db(`seen_applications?company_key=eq.${encodeURIComponent(companyKey)}${life ? '&purged_at=is.null' : ''}&select=job_id,status&limit=5000`);
       for (const r of (sr.ok ? await sr.json() : [])) {
         const k = String(r.job_id);
         seenByJob[k] = seenByJob[k] || { total: 0, new: 0 };
@@ -204,6 +217,7 @@ async function listListings(res, { db, uid, claim }) {
     company: companyName,
     listings,
     seen_apply_available: seenApply,
+    listing_edits_available: life,
     summary: {
       total: listings.length,
       active: listings.filter((l) => l.availability_status === 'active').length,
@@ -292,18 +306,31 @@ async function listApplications(res, { db, body, claim }) {
   if (!(await seenApplyAvailable(db))) return res.status(200).json({ ok: true, available: false, applications: [] });
   const jid = String(body.job_id == null ? '' : body.job_id).trim();
   if (jid && !UUID.test(jid)) return res.status(400).json({ error: 'A valid listing id is required' });
-  const r = await db(
-    `seen_applications?company_key=eq.${encodeURIComponent(claim.companyKey)}` +
-    (jid ? `&job_id=eq.${encodeURIComponent(jid)}` : '') +
-    `&select=id,job_id,job_title,applicant_name,applicant_email,applicant_phone,note,status,created_at,resume_path,resume_file_name,resume_text${(await threadAvailable(db)) ? ',thread' : ''}` +
-    `&order=created_at.desc&limit=500`,
-  );
+  const life = await lifecycleAvailable(db);
+  const [r, jr] = await Promise.all([
+    db(
+      `seen_applications?company_key=eq.${encodeURIComponent(claim.companyKey)}` +
+      (jid ? `&job_id=eq.${encodeURIComponent(jid)}` : '') +
+      (life ? '&purged_at=is.null' : '') + // cleared declined applications leave the inbox
+      `&select=id,job_id,job_title,applicant_name,applicant_email,applicant_phone,note,status,created_at,resume_path,resume_file_name,resume_text${(await threadAvailable(db)) ? ',thread' : ''}${life ? ',decided_at' : ''}` +
+      `&order=created_at.desc&limit=500`,
+    ),
+    // The listing's last edit, so the inbox can show which applications came in before it.
+    jid && life ? db(`jobs?id=eq.${encodeURIComponent(jid)}&select=edited_at,title&limit=1`) : Promise.resolve(null),
+  ]);
   if (!r.ok) {
     console.error('[employer-listings] applications read failed:', r.status, (await r.text().catch(() => '')).slice(0, 200));
     return res.status(500).json({ error: 'Could not load applications — please try again' });
   }
   const rows = await r.json();
-  return res.status(200).json({ ok: true, available: true, applications: rows.map((row) => inboxItem(row)) });
+  const job = jr && jr.ok ? (await jr.json())[0] : null;
+  const now = Date.now();
+  return res.status(200).json({
+    ok: true, available: true,
+    listing_edited_at: job?.edited_at || null,
+    retention_days: RETENTION_DAYS,
+    applications: rows.map((row) => ({ ...inboxItem(row), decided_at: row.decided_at || null, clears_in_days: daysUntilCleared(row, now) })),
+  });
 }
 
 async function setApplicationStatus(res, { db, body, claim }) {
@@ -320,7 +347,11 @@ async function setApplicationStatus(res, { db, body, claim }) {
   const r = await db(`seen_applications?id=eq.${encodeURIComponent(id)}&company_key=eq.${encodeURIComponent(claim.companyKey)}`, {
     method: 'PATCH',
     headers: { Prefer: 'return=representation' },
-    body: JSON.stringify({ status, updated_at: new Date().toISOString() }),
+    body: JSON.stringify({
+      status, updated_at: new Date().toISOString(),
+      // The retention clock (lib/server/applicationRetention.js) starts at a final decision.
+      ...((await lifecycleAvailable(db)) ? { decided_at: status === 'hired' || status === 'rejected' ? new Date().toISOString() : null } : {}),
+    }),
   });
   if (!r.ok) return res.status(500).json({ error: 'Could not update the application — please try again' });
   const rows = await r.json();
@@ -334,7 +365,7 @@ async function setApplicationStatus(res, { db, body, claim }) {
 // api/apply.js) and, for decisions worth an email (interviewing / not selected / hired), tell them.
 // Matches the row by the applicant's user id + job id, so only that applicant's own row for that
 // listing is touched. If they deleted it from their tracker, it is not recreated.
-async function syncApplicantTracker(db, application, status) {
+async function syncApplicantTracker(db, application, status, text = null) {
   try {
     const m = EMPLOYER_STATUS_TRACKER[status];
     if (!m || !application?.applicant_user_id || !application?.job_id) return { synced: false, reason: 'no_mapping' };
@@ -353,7 +384,7 @@ async function syncApplicantTracker(db, application, status) {
       }
     }
     if (m.email) {
-      await sendApplicationUpdateEmail({ to: application.applicant_email, company: application.company_name, role: application.job_title, label: m.label });
+      await sendApplicationUpdateEmail({ to: application.applicant_email, company: application.company_name, role: application.job_title, label: m.label, text });
     }
     return { synced, reason: app ? (synced ? 'updated' : 'write_failed') : 'not_in_tracker' };
   } catch { return { synced: false, reason: 'error' }; }
@@ -407,6 +438,111 @@ async function applicationResume(res, { db, body, claim }) {
   }
   if (row.resume_text) return res.status(200).json({ ok: true, text: row.resume_text });
   return res.status(404).json({ error: 'No résumé is attached to this application' });
+}
+
+// Your OWN posted listing, or a reason it isn't. Shared by update / fill_listing / delete.
+async function loadOwnListing(db, jid, uid, claim, extra = '') {
+  if (!UUID.test(jid)) return { error: [400, 'A valid listing id is required'] };
+  const jr = await db(`jobs?id=eq.${encodeURIComponent(jid)}&select=id,title,company,is_employer_posted,employer_user_id,expires_at,location${extra}&limit=1`);
+  const job = jr.ok ? (await jr.json())[0] : null;
+  if (!job) return { error: [404, 'That listing no longer exists'] };
+  if (!job.is_employer_posted || job.employer_user_id !== uid) return { error: [403, 'You can only change listings you posted — dispute other listings instead'] };
+  if (normalizeClaimCompany(job.company) !== claim.companyKey) return { error: [403, 'That listing is not attached to your company'] };
+  return { job };
+}
+const ownScope = (jid, uid) => `jobs?id=eq.${encodeURIComponent(jid)}&is_employer_posted=eq.true&employer_user_id=eq.${encodeURIComponent(uid)}`;
+
+// ── update: edit your own posted listing in place (owner request 2026-10-18) ──
+// Same fields and rules as `create`. Stamps jobs.edited_at so the edit is dated on the listing and on
+// every application sent before it; the original post date and expiry are kept.
+async function updateListing(res, { db, body, uid, claim }) {
+  if (!(await lifecycleAvailable(db))) return res.status(400).json({ error: 'Editing listings isn’t switched on yet', reason: 'unavailable' });
+  const jid = String(body.job_id == null ? '' : body.job_id).trim();
+  const own = await loadOwnListing(db, jid, uid, claim);
+  if (own.error) return res.status(own.error[0]).json({ error: own.error[1] });
+  if (own.job.expires_at && Date.parse(own.job.expires_at) <= Date.now()) {
+    return res.status(400).json({ error: 'This listing has closed — post a new one instead', reason: 'closed' });
+  }
+  const v = validateNewListing(body);
+  if (!v.ok) return res.status(400).json({ error: v.error });
+  const seen = await seenApplyAvailable(db);
+  if (v.listing.apply_mode !== 'external' && !seen) return res.status(400).json({ error: 'Applying on Seen isn’t switched on yet — choose “On your website” for now', reason: 'seen_apply_unavailable' });
+  const patch = buildListingEditPatch(v.listing, { nowISO: new Date().toISOString(), withApplyMode: seen });
+  // A new place is re-geocoded so radius searches keep finding it; remote has no coordinates.
+  if (patch.location !== own.job.location) {
+    patch.lat = null; patch.lng = null;
+    if (!patch.remote) {
+      try {
+        const c = await geocodeLocation(patch.location, process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY);
+        if (c && c.lat != null && c.lng != null) { patch.lat = c.lat; patch.lng = c.lng; }
+      } catch { /* text-match fallback */ }
+    }
+  }
+  const up = await db(ownScope(jid, uid), { method: 'PATCH', headers: { Prefer: 'return=representation' }, body: JSON.stringify(patch) });
+  if (!up.ok) {
+    console.error('[employer-listings] update failed:', up.status, (await up.text().catch(() => '')).slice(0, 200));
+    return res.status(500).json({ error: 'Could not save your changes — please try again' });
+  }
+  const rows = await up.json();
+  if (!rows.length) return res.status(404).json({ error: 'That listing no longer exists' });
+  return res.status(200).json({ ok: true, listing: rows[0] });
+}
+
+// ── fill_listing: "We hired — close this listing" (owner request 2026-10-18) ─
+// { job_id, hired_ids:[application ids], message?, confirm_hired:true }. One manual step: the employer
+// has confirmed everyone they hired (the inbox makes them tick a box saying so). Then:
+//   hired_ids            → marked hired (tracker updated, they are emailed the good news)
+//   everyone still open  → one decline message (default or the employer's edit) + marked not selected
+//   already hired / already declined / withdrawn → left alone, never messaged twice
+//   the listing          → closed (leaves search; jobs.status 'filled'). NOT deleted: deleting a
+//                          listing would erase its applications and break every applicant's tracker link.
+// Safe to re-run: a second run finds nobody still open and the listing already closed.
+async function fillListing(res, { db, body, uid, claim }) {
+  if (!(await seenApplyAvailable(db)) || !(await threadAvailable(db)) || !(await lifecycleAvailable(db))) {
+    return res.status(400).json({ error: 'Closing a filled listing isn’t switched on yet', reason: 'unavailable' });
+  }
+  const jid = String(body.job_id == null ? '' : body.job_id).trim();
+  const own = await loadOwnListing(db, jid, uid, claim);
+  if (own.error) return res.status(own.error[0]).json({ error: own.error[1] });
+  if (body.confirm_hired !== true) return res.status(400).json({ error: 'Confirm you’ve selected everyone you hired', reason: 'confirm_required' });
+  const job = own.job;
+  const message = cleanMessage(body.message, DECLINE_MESSAGE_MAX) || defaultDeclineMessage({ title: job.title, company: claim.companyName });
+
+  const scope = `seen_applications?job_id=eq.${encodeURIComponent(jid)}&company_key=eq.${encodeURIComponent(claim.companyKey)}&purged_at=is.null`;
+  const lr = await db(`${scope}&select=id,job_id,status,thread,applicant_user_id,applicant_email,company_name,job_title&limit=2000`);
+  if (!lr.ok) return res.status(500).json({ error: 'Could not load the applications — please try again' });
+  const plan = planFill(await lr.json(), body.hired_ids);
+  if (!plan.ok) return res.status(400).json({ error: plan.error });
+
+  const nowMs = Date.now();
+  const nowISO = new Date(nowMs).toISOString();
+  const result = { hired: 0, declined: 0, skipped: 0, kept: plan.keep };
+  const one = (id) => `seen_applications?id=eq.${encodeURIComponent(id)}&company_key=eq.${encodeURIComponent(claim.companyKey)}`;
+
+  for (const row of plan.hire) {
+    const up = await db(`${one(row.id)}&status=neq.withdrawn`, { method: 'PATCH', headers: { Prefer: 'return=representation' }, body: JSON.stringify({ status: 'hired', decided_at: nowISO, updated_at: nowISO }) });
+    if (up.ok && (await up.json()).length) { result.hired += 1; await syncApplicantTracker(db, row, 'hired'); } else result.skipped += 1;
+  }
+  // Declines, a few at a time. The status filter means anyone who withdrew a moment ago is skipped.
+  const queue = plan.decline.slice();
+  const worker = async () => {
+    while (queue.length) {
+      const row = queue.shift();
+      const next = appendThreadEntry(row.thread, { from: 'e', text: message, nowMs });
+      const up = await db(`${one(row.id)}&status=in.(${OPEN_APPLICATION_STATUSES.join(',')})`, {
+        method: 'PATCH', headers: { Prefer: 'return=representation' },
+        body: JSON.stringify({ status: 'rejected', decided_at: nowISO, updated_at: nowISO, ...(next.ok ? { thread: next.thread } : {}) }),
+      });
+      if (up.ok && (await up.json()).length) { result.declined += 1; await syncApplicantTracker(db, row, 'rejected', message); } else result.skipped += 1;
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(5, queue.length) }, worker));
+
+  const close = await db(ownScope(jid, uid), {
+    method: 'PATCH', headers: { Prefer: 'return=minimal' },
+    body: JSON.stringify({ availability_status: 'expired', expires_at: nowISO, last_checked_at: nowISO, status: 'filled' }),
+  });
+  return res.status(200).json({ ok: true, ...result, closed: close.ok });
 }
 
 // ── delete: remove an employer's OWN posted listing (direct — no admin needed) ─

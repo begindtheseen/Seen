@@ -175,7 +175,9 @@ export default async function handler(req, res) {
       const get = (select) => fetch(`${U}/rest/v1/jobs?id=eq.${encodeURIComponent(id)}&select=${select}&limit=1`, { headers: { apikey: K, Authorization: `Bearer ${K}` } });
       // apply_mode exists once the Apply-on-Seen migration is applied; before that the column is
       // missing and PostgREST 400s the select, so retry without it (lib/server/seenApply.js).
-      let r = await get(`${cols},apply_mode`);
+      // edited_at + status ('filled') exist once migration 20261018170000 is applied.
+      let r = await get(`${cols},apply_mode,edited_at,status`);
+      if (r.status === 400) r = await get(`${cols},apply_mode`);
       if (r.status === 400) r = await get(cols);
       const rows = r.ok ? await r.json() : [];
       if (!Array.isArray(rows) || !rows.length) return res.status(404).json({ error: 'Not found' });

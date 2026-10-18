@@ -149,6 +149,14 @@ function AppCard({ app, onUpdate, onRemove, onShare, onReload, intel }: {
           : <a href={listing.href} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()} style={linkStyle}>View listing →</a>)}
       </div>
 
+      {/* The employer edited the listing after this application went in — dated so the applicant
+          knows the posting they read may have changed. */}
+      {app.listingEditedAt && Date.parse(app.listingEditedAt) > app.appliedAt && (
+        <div style={{ marginTop: '.45rem', fontFamily: 'var(--mono)', fontSize: '.56rem', color: 'var(--amber)' }}>
+          ✎ Listing edited by the employer {new Date(app.listingEditedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} — after you applied
+        </div>
+      )}
+
       {/* Messages on an Apply-on-Seen application: from the employer (interview time, a number to
           call, …) and the applicant's own withdrawal note. Stored once, on the employer's copy. */}
       {!!app.messages?.length && (

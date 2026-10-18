@@ -6,9 +6,9 @@ import {
   allowsSeenApply, validateSeenApplication, base64Bytes, resumeObject, buildSeenApplicationRow,
   buildTrackerRow, isDuplicate, isNotMigrated, MAX_RESUME_BYTES,
 } from '../lib/server/seenApply.js';
-import { seenApplyAvailable, uploadResumeFile, authUserEmail, sendNewApplicationEmail, threadAvailable, sendWithdrawalEmail } from '../lib/server/seenApplyStore.js';
+import { seenApplyAvailable, uploadResumeFile, authUserEmail, sendNewApplicationEmail, threadAvailable, sendWithdrawalEmail, lifecycleAvailable } from '../lib/server/seenApplyStore.js';
 import {
-  appendThreadEntry, withdrawTrackerPatch, validateWithdrawReview, alreadyReviewed, markWithdrawReviewed,
+  appendThreadEntry, applicantMayNote, withdrawTrackerPatch, validateWithdrawReview, alreadyReviewed, markWithdrawReviewed,
   withdrawalOutcome, firstResponseDays, interviewRounds, buildWithdrawalReport,
 } from '../lib/server/applicationThread.js';
 import {
@@ -400,7 +400,8 @@ async function seenApply(req, res, uid) {
 // ── Withdraw (owner request 2026-10-18) ──────────────────────────────────────────────────────
 // POST { action:'withdraw', application_id, message? } — the applicant cancels an application from
 // their tracker. For an Apply-on-Seen application the employer's copy is marked withdrawn, the
-// optional note (a reason, a thank-you) is added to the application's thread, and the employer is
+// optional note (a reason, a thank-you — only if the employer hasn't written yet; applicants never
+// reply) is added to the application's thread, and the employer is
 // notified in-app and by email. Idempotent: a repeat call finishes whatever the first one didn't.
 async function withdraw(req, res, uid) {
   const { db, SUPABASE_URL, SERVICE_KEY } = seenDb();
@@ -424,13 +425,18 @@ async function withdraw(req, res, uid) {
       if (!row) break;
       seen = true;
       if (row.status === 'withdrawn' || row.status === 'rejected' || row.status === 'hired') break; // already over
-      const next = appendThreadEntry(row.thread, { from: 'a', text: body.message, nowMs: Date.now(), kind: 'w' });
+      // No replies: once the employer has written, the withdrawal goes without a note (owner rule).
+      const text = applicantMayNote(row.thread) ? body.message : '';
+      const next = appendThreadEntry(row.thread, { from: 'a', text, nowMs: Date.now(), kind: 'w' });
       const note = next.ok ? next.thread[next.thread.length - 1][2] : '';
       const up = await db(`${own}&updated_at=eq.${encodeURIComponent(row.updated_at)}`, {
         method: 'PATCH',
         headers: { Prefer: 'return=representation' },
         // A full thread still withdraws — only the note is dropped.
-        body: JSON.stringify({ status: 'withdrawn', ...(next.ok ? { thread: next.thread } : {}), updated_at: new Date().toISOString() }),
+        body: JSON.stringify({
+          status: 'withdrawn', ...(next.ok ? { thread: next.thread } : {}), updated_at: new Date().toISOString(),
+          ...((await lifecycleAvailable(db)) ? { decided_at: new Date().toISOString() } : {}),
+        }),
       });
       if (!up.ok) return res.status(500).json({ error: 'Could not withdraw — please try again' });
       if (!(await up.json()).length) continue; // the employer wrote at the same moment — re-read

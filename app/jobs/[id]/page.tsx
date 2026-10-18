@@ -154,6 +154,8 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
           freshness: (r as { freshness?: Job['freshness'] }).freshness,
           employer_posted: r.is_employer_posted === true,
           apply_mode: r.apply_mode === 'seen' || r.apply_mode === 'both' ? r.apply_mode : 'external',
+          edited_at: r.edited_at ? String(r.edited_at) : undefined,
+          filled: r.status === 'filled',
         }
         JobCache.set(mapped)
         setJob(mapped)
@@ -336,7 +338,10 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
         {avail === 'stale' && (
           <div style={{ marginTop: '.85rem', padding: '.55rem .8rem', background: 'rgba(245,158,11,.07)', border: '1px solid rgba(245,158,11,.2)', borderRadius: 8, fontFamily: 'var(--mono)', fontSize: '.62rem', color: 'var(--amber)', lineHeight: 1.55 }}>⚠ This listing hasn&apos;t been seen in 7+ days and may be closed. Verify before applying.</div>
         )}
-        {avail === 'expired' && (
+        {job.filled && (
+          <div style={{ marginTop: '.85rem', padding: '.55rem .8rem', background: 'rgba(16,185,129,.07)', border: '1px solid rgba(16,185,129,.25)', borderRadius: 8, fontFamily: 'var(--mono)', fontSize: '.62rem', color: 'var(--green)', lineHeight: 1.55 }}>✓ This position has been filled — the employer closed it on Seen.</div>
+        )}
+        {avail === 'expired' && !job.filled && (
           <div style={{ marginTop: '.85rem', padding: '.55rem .8rem', background: 'rgba(239,68,68,.07)', border: '1px solid rgba(239,68,68,.2)', borderRadius: 8, fontFamily: 'var(--mono)', fontSize: '.62rem', color: 'var(--red)', lineHeight: 1.55 }}>✕ This listing is likely closed — it hasn&apos;t been seen in 14+ days. Check the company&apos;s careers page directly.</div>
         )}
 
@@ -345,6 +350,11 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
         {job.freshness?.label && (
           <div style={{ marginTop: '.6rem', fontFamily: 'var(--mono)', fontSize: '.56rem', color: 'var(--dim)', lineHeight: 1.55 }}>
             {job.freshness.label}
+          </div>
+        )}
+        {job.edited_at && (
+          <div style={{ marginTop: '.3rem', fontFamily: 'var(--mono)', fontSize: '.56rem', color: 'var(--amber)', lineHeight: 1.55 }}>
+            ✎ Edited by the employer {new Date(job.edited_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
           </div>
         )}
 
@@ -473,6 +483,9 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
           <div style={{ display: 'flex', gap: '.75rem' }}>
             <button onClick={toggleSave} aria-label={saved ? 'Unsave' : 'Save'} style={{ background: 'none', border: '1px solid var(--line2)', borderRadius: 8, padding: '.65rem 1rem', fontSize: '1.1rem', cursor: 'pointer', color: saved ? 'var(--green)' : 'var(--muted)', flexShrink: 0 }}>{saved ? '♥' : '♡'}</button>
             <button onClick={() => setShowShareCard(true)} aria-label="Share listing" title="Share this listing" style={{ background: 'none', border: '1px solid var(--line2)', borderRadius: 8, padding: '.65rem 1rem', fontSize: '1.05rem', cursor: 'pointer', color: 'var(--muted)', flexShrink: 0 }}>🖼</button>
+            {job.filled ? (
+              <button disabled style={{ flex: 1, background: 'var(--raised)', color: 'var(--muted)', border: '1px solid var(--line2)', borderRadius: 8, padding: '.65rem 1rem', fontFamily: 'var(--display)', fontWeight: 800, fontSize: '.85rem' }}>Position filled</button>
+            ) : <>
             {takesSeenApply(job) && (
               <button
                 onClick={() => setShowSeenApply(true)}
@@ -492,6 +505,7 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
                 </button>
               : !takesSeenApply(job) && <button disabled style={{ flex: 1, background: 'var(--muted)', color: 'var(--ink)', border: 'none', borderRadius: 8, padding: '.65rem 1rem', fontFamily: 'var(--display)', fontWeight: 800, fontSize: '.85rem', opacity: .65 }}>No apply link</button>
             }
+            </>}
           </div>
         </div>
         {showSeenApply && job && (

@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useAuth } from '@/lib/auth'
+import FillListingPanel from './FillListingPanel'
 import ModalPortal from '@/components/ModalPortal'
 
 // Manage your listings — the LOGIN-SCOPED listings manager (POST /api/employer-listings).
@@ -33,6 +34,9 @@ type Listing = {
   created_at: string | null
   is_employer_posted: boolean
   apply_mode?: ApplyMode
+  // Set once the employer edits the listing (jobs.edited_at); 'filled' once they close it after hiring.
+  edited_at?: string | null
+  status?: string | null
   // Apply-on-Seen applications to this listing ({ total, new }) — 0s until the feature is live.
   seen_applications?: { total: number; new: number }
   applications: number
@@ -134,6 +138,10 @@ export function EmployerListingsManager() {
   // Apply on Seen: switched on once the migration is live (list → seen_apply_available).
   const [seenApplyAvailable, setSeenApplyAvailable] = useState(false)
   const [inboxFor, setInboxFor] = useState<Listing | null>(null)
+  // Editing one of your own listings in place (api/employer-listings update).
+  const [listingEditsAvailable, setListingEditsAvailable] = useState(false)
+  const [editing, setEditing] = useState<{ id: string; initial: ListingPrefill } | null>(null)
+  const [editLoadingId, setEditLoadingId] = useState<string | null>(null)
   useEffect(() => {
     try {
       const p = new URLSearchParams(window.location.search)
@@ -202,6 +210,7 @@ export function EmployerListingsManager() {
       setSummary((listData?.summary as Summary) || null)
       setCompanyName(listData?.company || '')
       setSeenApplyAvailable(!!listData?.seen_apply_available)
+      setListingEditsAvailable(!!listData?.listing_edits_available)
 
       // Disputes strip (best-effort — a failure here never blocks the listings).
       try {
@@ -217,8 +226,12 @@ export function EmployerListingsManager() {
   }, [token])
 
   // Delete one of the employer's OWN posted listings (direct — the API enforces ownership).
-  const removeListing = useCallback(async (id: string) => {
-    if (!window.confirm('Delete this listing? It will be removed from Seen. This cannot be undone.')) return
+  const removeListing = useCallback(async (id: string, seenApps = 0) => {
+    // Deleting a listing also erases its Apply-on-Seen applications — steer a filled role to "We hired".
+    const warn = seenApps > 0
+      ? `Delete this listing? Its ${seenApps} application${seenApps === 1 ? '' : 's'} on Seen will be erased too, and applicants lose the link from their tracker.\n\nFilled the role? Cancel, open its applications and use “We hired — close this listing” instead.`
+      : 'Delete this listing? It will be removed from Seen. This cannot be undone.'
+    if (!window.confirm(warn)) return
     setDeletingId(id); setErr('')
     try {
       const authToken = await token()
@@ -237,6 +250,29 @@ export function EmployerListingsManager() {
       setDeletingId(null)
     }
   }, [token, load])
+
+  // Load the full listing (description etc. aren't in the list payload) and open the edit form.
+  const startEdit = useCallback(async (l: Listing) => {
+    setEditLoadingId(l.id); setErr('')
+    try {
+      const r = await fetch('/api/jobs', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'get_by_id', id: l.id }) })
+      const d = await r.json().catch(() => ({})) as { job?: Record<string, unknown> }
+      const j = d.job
+      if (!r.ok || !j) { setErr('Could not load that listing — please try again.'); return }
+      const str = (v: unknown) => (v == null ? '' : String(v))
+      setShowAdd(false)
+      setEditing({
+        id: l.id,
+        initial: {
+          title: str(j.title), apply_url: str(j.apply_url) || null, location: str(j.location) || null,
+          salary: str(j.salary) || null, description: str(j.description) || null,
+          type: str(j.type) === 'Part-time' ? 'Part-time' : 'Full-time',
+          apply_mode: j.apply_mode === 'seen' || j.apply_mode === 'both' ? j.apply_mode : 'external',
+        },
+      })
+    } catch { setErr('Could not load that listing — please try again.') }
+    finally { setEditLoadingId(null) }
+  }, [])
 
   useEffect(() => {
     // Only load once the session + claims have resolved and this is an approved employer.
@@ -323,6 +359,7 @@ export function EmployerListingsManager() {
 
       {/* Add-a-listing form */}
       {showAdd && <AddListingForm key={prefill ? `pre-${prefill.title || 'blank'}` : 'blank'} token={token} initial={prefill} seenApplyAvailable={seenApplyAvailable} onCreated={() => { setShowAdd(false); setPrefill(null); load() }} />}
+      {editing && <AddListingForm key={`edit-${editing.id}`} token={token} initial={editing.initial} editId={editing.id} seenApplyAvailable={seenApplyAvailable} onCreated={() => { setEditing(null); load() }} onCancel={() => setEditing(null)} />}
 
       {/* Listings */}
       {listings.length === 0 ? (
@@ -357,6 +394,8 @@ export function EmployerListingsManager() {
                     {l.location && <span>{l.location}</span>}
                     {l.source && <span>· {l.source}</span>}
                     {l.created_at && <span>· posted {fmtDate(l.created_at)}</span>}
+                    {l.edited_at && <span style={{ color: 'var(--amber)' }}>· edited {fmtDate(l.edited_at)}</span>}
+                    {l.status === 'filled' && <span style={{ color: 'var(--green)' }}>· filled</span>}
                     {!l.removed && l.expires_at && <span>· expires {fmtDate(l.expires_at)}</span>}
                     {l.apply_url && l.apply_mode !== 'seen' && <>· <a href={l.apply_url} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--blue)', textDecoration: 'none' }}>Apply link ↗</a></>}
                     {seenApplyAvailable && l.is_employer_posted && <span>· {APPLY_MODE_LABEL[l.apply_mode || 'external']}</span>}
@@ -385,7 +424,12 @@ export function EmployerListingsManager() {
                     <span style={{ ...mono('.55rem', 'var(--muted)') }}>Removed</span>
                   ) : l.is_employer_posted ? (
                     // Your OWN posted listing — delete it directly (no admin dispute needed).
-                    <button onClick={() => removeListing(l.id)} disabled={deletingId === l.id} style={{ ...ghostBtn, padding: '.35rem .8rem', ...mono('.6rem', 'var(--red)'), borderColor: 'rgba(239,68,68,.45)', opacity: deletingId === l.id ? .6 : 1 }}>{deletingId === l.id ? 'Deleting…' : 'Delete'}</button>
+                    <div style={{ display: 'flex', gap: '.35rem' }}>
+                      {listingEditsAvailable && l.availability_status !== 'expired' && (
+                        <button onClick={() => startEdit(l)} disabled={editLoadingId === l.id} style={{ ...ghostBtn, padding: '.35rem .8rem', ...mono('.6rem', 'var(--blue)'), opacity: editLoadingId === l.id ? .6 : 1 }}>{editLoadingId === l.id ? 'Opening…' : 'Edit'}</button>
+                      )}
+                      <button onClick={() => removeListing(l.id, l.seen_applications?.total || 0)} disabled={deletingId === l.id} style={{ ...ghostBtn, padding: '.35rem .8rem', ...mono('.6rem', 'var(--red)'), borderColor: 'rgba(239,68,68,.45)', opacity: deletingId === l.id ? .6 : 1 }}>{deletingId === l.id ? 'Deleting…' : 'Delete'}</button>
+                    </div>
                   ) : l.openDispute ? (
                     <span style={{ ...mono('.55rem', 'var(--amber)'), border: '1px solid rgba(245,158,11,.4)', background: 'rgba(245,158,11,.08)', borderRadius: 6, padding: '.25rem .55rem' }}>
                       Dispute pending{l.openDispute.kind ? ` · ${KIND_LABEL[l.openDispute.kind] || l.openDispute.kind}` : ''}
@@ -430,7 +474,7 @@ export function EmployerListingsManager() {
       )}
 
       {inboxFor && (
-        <ApplicationsInbox listing={inboxFor} token={token} onClose={() => { setInboxFor(null); load() }} />
+        <ApplicationsInbox listing={inboxFor} token={token} canClose={listingEditsAvailable && inboxFor.availability_status !== 'expired'} onClose={() => { setInboxFor(null); load() }} />
       )}
 
       {disputeFor && (
@@ -456,18 +500,20 @@ function Stat({ value, label, color }: { value: number; label: string; color: st
 }
 
 // ── Add-a-listing form ────────────────────────────────────────────────────────
-export type ListingPrefill = { title?: string; apply_url?: string | null; location?: string | null; salary?: string | null; description?: string | null }
+export type ListingPrefill = { title?: string; apply_url?: string | null; location?: string | null; salary?: string | null; description?: string | null; type?: 'Full-time' | 'Part-time'; apply_mode?: ApplyMode }
 
-function AddListingForm({ token, onCreated, initial, seenApplyAvailable }: { token: () => Promise<string | null>; onCreated: () => void; initial?: ListingPrefill | null; seenApplyAvailable?: boolean }) {
+// Post a new listing, or (with editId) edit one of your own in place — same fields either way.
+function AddListingForm({ token, onCreated, onCancel, initial, editId, seenApplyAvailable }: { token: () => Promise<string | null>; onCreated: () => void; onCancel?: () => void; initial?: ListingPrefill | null; editId?: string; seenApplyAvailable?: boolean }) {
+  const isEdit = !!editId
   const [title, setTitle] = useState(initial?.title || '')
   // Where candidates apply. 'external' until Apply on Seen is live (the API refuses the others).
-  const [applyMode, setApplyMode] = useState<ApplyMode>('external')
+  const [applyMode, setApplyMode] = useState<ApplyMode>(initial?.apply_mode || 'external')
   const needsLink = applyMode !== 'seen'
   const [applyUrl, setApplyUrl] = useState(initial?.apply_url || '')
   const [location, setLocation] = useState(initial?.location || '')
   const [salary, setSalary] = useState(initial?.salary || '')
   const [description, setDescription] = useState(initial?.description || '')
-  const [type, setType] = useState('Full-time')
+  const [type, setType] = useState<string>(initial?.type || 'Full-time')
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState('')
   // Import from a link → api/employer-listings import_preview (writes nothing; just prefills).
@@ -534,7 +580,8 @@ function AddListingForm({ token, onCreated, initial, seenApplyAvailable }: { tok
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${authToken}` },
         body: JSON.stringify({
-          action: 'create',
+          action: isEdit ? 'update' : 'create',
+          ...(isEdit ? { job_id: editId } : {}),
           title: title.trim(),
           apply_url: applyUrl.trim() || undefined,
           apply_mode: seenApplyAvailable ? applyMode : 'external',
@@ -545,7 +592,7 @@ function AddListingForm({ token, onCreated, initial, seenApplyAvailable }: { tok
         }),
       })
       const d = await r.json().catch(() => ({}))
-      if (!r.ok) { setErr(d?.error || 'Could not create that listing — please try again.'); setBusy(false); return }
+      if (!r.ok) { setErr(d?.error || (isEdit ? 'Could not save your changes — please try again.' : 'Could not create that listing — please try again.')); setBusy(false); return }
       onCreated()
     } catch {
       setErr('Could not create that listing — please try again.')
@@ -555,8 +602,13 @@ function AddListingForm({ token, onCreated, initial, seenApplyAvailable }: { tok
 
   return (
     <div style={{ background: 'var(--raised)', border: '1px solid var(--line2)', borderRadius: 12, padding: '1.2rem', margin: '1.3rem 0' }}>
-      <div style={{ ...mono('.55rem', 'var(--blue)'), textTransform: 'uppercase', letterSpacing: '.12em', marginBottom: '.9rem' }}>Add a listing</div>
-      <div style={{ marginBottom: '1rem', paddingBottom: '1rem', borderBottom: '1px solid var(--line)' }}>
+      <div style={{ ...mono('.55rem', 'var(--blue)'), textTransform: 'uppercase', letterSpacing: '.12em', marginBottom: isEdit ? '.4rem' : '.9rem' }}>{isEdit ? 'Edit listing' : 'Add a listing'}</div>
+      {isEdit && (
+        <div style={{ ...mono('.58rem', 'var(--sub)'), lineHeight: 1.6, marginBottom: '.9rem' }}>
+          Changes go live right away. The listing shows the date you edited it, and anyone who applied before the edit sees it on their tracker.
+        </div>
+      )}
+      {!isEdit && <div style={{ marginBottom: '1rem', paddingBottom: '1rem', borderBottom: '1px solid var(--line)' }}>
         <label style={label}>Import from a link — your careers page, ATS, Indeed, LinkedIn…</label>
         <div style={{ display: 'flex', gap: '.5rem', flexWrap: 'wrap' }}>
           <input value={importUrl} onChange={e => setImportUrl(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') importFromLink() }} placeholder="https://boards.greenhouse.io/yourco/jobs/123" style={{ ...field, flex: '1 1 240px', width: 'auto' }} />
@@ -568,7 +620,7 @@ function AddListingForm({ token, onCreated, initial, seenApplyAvailable }: { tok
         {importNote && (
           <div style={{ ...mono('.6rem', importNote.tone === 'err' ? 'var(--red)' : importNote.tone === 'warn' ? 'var(--amber)' : 'var(--green)'), marginTop: '.55rem', lineHeight: 1.6 }}>{importNote.text}</div>
         )}
-      </div>
+      </div>}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(200px,1fr))', gap: '.9rem' }}>
         <div>
           <label style={label}>Title *</label>
@@ -620,7 +672,8 @@ function AddListingForm({ token, onCreated, initial, seenApplyAvailable }: { tok
       </div>
       {err && <div style={{ ...mono('.62rem', 'var(--red)'), marginTop: '.8rem' }}>{err}</div>}
       <div style={{ display: 'flex', gap: '.6rem', marginTop: '1rem' }}>
-        <button onClick={submit} disabled={busy} style={{ ...primaryBtn, opacity: busy ? .6 : 1 }}>{busy ? 'Posting…' : 'Post listing →'}</button>
+        <button onClick={submit} disabled={busy} style={{ ...primaryBtn, opacity: busy ? .6 : 1 }}>{busy ? (isEdit ? 'Saving…' : 'Posting…') : (isEdit ? 'Save changes' : 'Post listing →')}</button>
+        {onCancel && <button onClick={onCancel} disabled={busy} style={ghostBtn}>Cancel</button>}
       </div>
     </div>
   )
@@ -725,13 +778,18 @@ type SeenApplication = {
   note: string | null; status: AppStatus; created_at: string; resume_file_name: string | null
   has_resume_file: boolean; has_resume_text: boolean
   thread?: { from: 'employer' | 'applicant'; at: string; text: string; withdrawal?: boolean }[]
+  decided_at?: string | null
+  clears_in_days?: number | null
 }
 // 'withdrawn' is set by the applicant only — never offered in the employer's status picker.
 type AppStatus = 'new' | 'reviewed' | 'interviewing' | 'rejected' | 'hired' | 'withdrawn'
 const APP_STATUSES: [Exclude<AppStatus, 'withdrawn'>, string][] = [['new', 'New'], ['reviewed', 'Reviewed'], ['interviewing', 'Interviewing'], ['rejected', 'Not moving forward'], ['hired', 'Hired']]
 
-function ApplicationsInbox({ listing, token, onClose }: { listing: Listing; token: () => Promise<string | null>; onClose: () => void }) {
+function ApplicationsInbox({ listing, token, onClose, canClose }: { listing: Listing; token: () => Promise<string | null>; onClose: () => void; canClose?: boolean }) {
   const [apps, setApps] = useState<SeenApplication[] | null>(null)
+  const [editedAt, setEditedAt] = useState<string | null>(null)
+  const [filling, setFilling] = useState(false)
+  const [closedNote, setClosedNote] = useState('')
   const [err, setErr] = useState('')
   const [synced, setSynced] = useState('')
   const [resumeText, setResumeText] = useState<Record<string, string>>({})
@@ -755,7 +813,7 @@ function ApplicationsInbox({ listing, token, onClose }: { listing: Listing; toke
   useEffect(() => {
     let cancelled = false
     call({ action: 'applications', job_id: listing.id })
-      .then(d => { if (!cancelled) setApps(Array.isArray(d.applications) ? d.applications : []) })
+      .then(d => { if (!cancelled) { setApps(Array.isArray(d.applications) ? d.applications : []); setEditedAt(d.listing_edited_at || null) } })
       .catch(e => { if (!cancelled) setErr((e as Error).message) })
     return () => { cancelled = true }
   }, [call, listing.id])
@@ -824,11 +882,30 @@ function ApplicationsInbox({ listing, token, onClose }: { listing: Listing; toke
           </div>
           {err && <div role="alert" style={{ ...mono('.62rem', 'var(--red)'), marginBottom: '.7rem' }}>{err}</div>}
           {synced && <div role="status" style={{ ...mono('.62rem', 'var(--green)'), marginBottom: '.7rem' }}>✓ {synced}</div>}
+          {closedNote && <div role="status" style={{ ...mono('.62rem', 'var(--green)'), marginBottom: '.7rem', lineHeight: 1.6 }}>✓ {closedNote}</div>}
+          {canClose && !closedNote && apps && !filling && (
+            <button type="button" onClick={() => { setFilling(true); setErr('') }} style={{ ...ghostBtn, width: '100%', marginBottom: '.8rem', padding: '.6rem .9rem', ...mono('.64rem', 'var(--green)'), borderColor: 'rgba(16,185,129,.5)', background: 'rgba(16,185,129,.06)' }}>
+              ✓ We hired — close this listing and let everyone else know
+            </button>
+          )}
+          {filling && apps && (
+            <FillListingPanel
+              listing={{ id: listing.id, title: listing.title, company: listing.company }}
+              apps={apps.map(a => ({ id: a.id, name: a.name, status: a.status }))}
+              call={call}
+              onCancel={() => setFilling(false)}
+              onDone={r => {
+                setFilling(false)
+                setClosedNote(`${r.declined ? `${r.declined} applicant${r.declined === 1 ? '' : 's'} got your message. ` : ''}${r.hired ? `${r.hired} marked hired. ` : ''}${r.closed ? 'The listing is closed.' : 'Could not close the listing — try again.'}`)
+                call({ action: 'applications', job_id: listing.id }).then(d => setApps(Array.isArray(d.applications) ? d.applications : [])).catch(() => {})
+              }}
+            />
+          )}
           {apps === null && !err && <div style={mono('.62rem', 'var(--muted)')}>Loading…</div>}
           {apps && apps.length === 0 && (
             <div style={{ ...mono('.62rem', 'var(--muted)'), lineHeight: 1.6 }}>No applications yet. When a candidate applies on Seen, their résumé, contact details and note show up here — and we email you.</div>
           )}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '.65rem' }}>
+          <div style={{ display: filling ? 'none' : 'flex', flexDirection: 'column', gap: '.65rem' }}>
             {(apps || []).map(a => (
               <div key={a.id} style={{ background: 'var(--raised)', border: `1px solid ${a.status === 'new' ? 'rgba(16,185,129,.4)' : 'var(--line2)'}`, borderRadius: 11, padding: '.8rem .9rem' }}>
                 <div style={{ display: 'flex', alignItems: 'flex-start', gap: '.6rem', flexWrap: 'wrap' }}>
@@ -838,6 +915,7 @@ function ApplicationsInbox({ listing, token, onClose }: { listing: Listing; toke
                       <a href={`mailto:${a.email}?subject=${encodeURIComponent(`Your application — ${listing.title}`)}`} style={{ color: 'var(--blue)', textDecoration: 'none' }}>{a.email}</a>
                       {a.phone && <a href={`tel:${a.phone}`} style={{ color: 'var(--blue)', textDecoration: 'none' }}>{a.phone}</a>}
                       <span style={{ color: 'var(--dim)' }}>· {fmtDate(a.created_at)}</span>
+                      {editedAt && Date.parse(a.created_at) < Date.parse(editedAt) && <span style={{ color: 'var(--amber)' }}>· applied before your {fmtDate(editedAt)} edit</span>}
                     </div>
                   </div>
                   {a.status === 'withdrawn'
@@ -849,6 +927,11 @@ function ApplicationsInbox({ listing, token, onClose }: { listing: Listing; toke
                     )}
                 </div>
                 {a.note && <div style={{ ...mono('.6rem', 'var(--sub)'), lineHeight: 1.6, marginTop: '.55rem', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>“{a.note}”</div>}
+                {a.clears_in_days != null && (
+                  <div style={{ ...mono('.55rem', 'var(--muted)'), marginTop: '.45rem', lineHeight: 1.5 }}>
+                    Résumé and contact details are cleared {a.clears_in_days === 0 ? 'today' : `in ${a.clears_in_days} day${a.clears_in_days === 1 ? '' : 's'}`} — download the résumé if you need to keep it.
+                  </div>
+                )}
                 {(a.has_resume_file || a.has_resume_text) && (
                   <button type="button" onClick={() => openResume(a)} disabled={busyId === a.id} style={{ ...ghostBtn, marginTop: '.6rem', padding: '.35rem .8rem', ...mono('.6rem', 'var(--blue)'), opacity: busyId === a.id ? .6 : 1 }}>
                     {busyId === a.id ? 'Opening…' : a.has_resume_file ? `View résumé${a.resume_file_name ? ` (${a.resume_file_name})` : ''} ↗` : 'View résumé'}

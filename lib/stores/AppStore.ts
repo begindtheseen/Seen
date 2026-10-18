@@ -28,6 +28,7 @@ function mapRow(a: Record<string, unknown>): Application {
     employerStage: a.employer_stage as string | undefined,
     messages: Array.isArray(a.messages) ? (a.messages as Application['messages']) : undefined,
     seenApply: a.seen_apply === true || undefined,
+    listingEditedAt: typeof a.listing_edited_at === 'string' ? a.listing_edited_at : undefined,
     // applied_at is the user's real apply date; created_at is only the row-insert time.
     appliedAt: (a.applied_at || a.created_at) ? new Date((a.applied_at || a.created_at) as string).getTime() : Date.now(),
     updatedAt: a.updated_at ? new Date(a.updated_at as string).getTime() : Date.now(),

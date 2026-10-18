@@ -25,6 +25,10 @@ export default function WithdrawModal({ app, onClose, onWithdrawn }: {
 }) {
   const { token } = useAuth()
   const isSeen = app.seenApply === true
+  // Applicants never reply on Seen: once the employer has written, a withdrawal goes without a note
+  // (the server enforces the same rule — lib/server/applicationThread.js applicantMayNote).
+  const employerWrote = (app.messages || []).some(m => m.from === 'employer')
+  const canNote = isSeen && !employerWrote
   const [step, setStep] = useState<Step>('confirm')
   const [message, setMessage] = useState('')
   const [reason, setReason] = useState('')
@@ -54,7 +58,7 @@ export default function WithdrawModal({ app, onClose, onWithdrawn }: {
   async function withdraw() {
     setErr(''); setBusy(true)
     try {
-      const { ok, d } = await call({ action: 'withdraw', application_id: app.id, message: isSeen ? message : undefined })
+      const { ok, d } = await call({ action: 'withdraw', application_id: app.id, message: canNote ? message : undefined })
       if (!ok) { setErr(String(d.error || 'Could not withdraw — please try again')); return }
       setNotified(d.employer_notified === true)
       onWithdrawn()
@@ -85,7 +89,7 @@ export default function WithdrawModal({ app, onClose, onWithdrawn }: {
         <p style={{ fontSize: '.84rem', color: 'var(--sub)', lineHeight: 1.6, margin: '.6rem 0 0' }}>
           Your tracker will show this application as withdrawn.{isSeen ? ` ${app.company} will be told you withdrew.` : ''}
         </p>
-        {isSeen && (
+        {canNote && (
           <>
             <div style={label}>Message to {app.company} (optional)</div>
             <textarea value={message} onChange={e => setMessage(e.target.value)} maxLength={MESSAGE_MAX} placeholder="A reason, or a quick thank-you — they’ll see it with your application." style={area} />

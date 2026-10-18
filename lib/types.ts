@@ -37,6 +37,8 @@ export interface Application {
   messages?: ApplicationMessage[]
   /** Sent through Apply on Seen — the employer sees it (and a withdrawal) in their Seen inbox. */
   seenApply?: boolean
+  /** When the employer last edited the listing (Seen-posted listings only). */
+  listingEditedAt?: string
   appliedAt: number
   updatedAt: number
   events: HiringEvent[]
@@ -107,6 +109,10 @@ export interface Job {
   company_match?: boolean
   /** Where candidates apply (employer-posted listings only): own site, on Seen, or both. */
   apply_mode?: 'external' | 'seen' | 'both'
+  /** The employer last edited this listing (Seen-posted only). */
+  edited_at?: string
+  /** The employer closed this listing because they hired (jobs.status 'filled'). */
+  filled?: boolean
   /** Factual, our-own-observation freshness descriptor (see lib/server/listingFreshness.js). */
   freshness?: ListingFreshness
 }
