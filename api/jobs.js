@@ -69,7 +69,15 @@ async function getEmployerPostedPool(url, headers) {
   if (now - _empCache.at < 60_000) return _empCache.rows
   try {
     const iso = encodeURIComponent(new Date().toISOString())
-    const r = await fetch(`${url}/rest/v1/jobs?is_employer_posted=eq.true&expires_at=gt.${iso}&order=created_at.desc&limit=500`, { headers })
+    // employer_user_id IS NOT NULL rides the partial index idx_jobs_employer_user_id (migration 055) —
+    // every employer-posted row has an owner. The old is_employer_posted=eq.true + order=created_at +
+    // select=* had no index and seq-scanned the whole table: 4.5s on prod, paid by every cold instance.
+    const cols = 'id,title,company,location,salary,apply_url,description,type,level,source,score,waste_score,search_query,lat,lng,created_at,is_employer_posted,availability_status'
+    const q = (c) => fetch(`${url}/rest/v1/jobs?employer_user_id=not.is.null&is_employer_posted=eq.true&expires_at=gt.${iso}&select=${c}&limit=500`, { headers })
+    // apply_mode exists only once the Apply-on-Seen migration is applied; before that, selecting it
+    // 400s — retry without it so search priority never depends on that migration.
+    let r = await q(`${cols},apply_mode`)
+    if (r.status === 400) r = await q(cols)
     if (r.ok) {
       const rows = await r.json()
       _empCache = { at: now, rows: Array.isArray(rows) ? rows : [] }
@@ -201,7 +209,7 @@ export default async function handler(req, res) {
   let synonyms = []; // canonical + expansion terms — true-synonym signals (matched vs the TITLE)
   let searchTerms = []; // original + canonical + deterministic expansion — the DB pool + corpus reads
   const PAGE_MIN = 10; // below this many results we widen (geo, then corpus, then national)
-  let serve = (list) => list; // final shaping of every response (set once the search context exists)
+  let serve = async (list) => list; // final shaping of every response (set once the search context exists)
 
   try {
     let body = _body;
@@ -225,10 +233,12 @@ export default async function handler(req, res) {
     };
 
     // Admin-suppressed dead listings to filter out + featured employers to boost (fail-safe).
-    const [suppressedSet, featuredSet, employerPool] = await Promise.all([
+    // The employer-posted pool is only needed when the response is shaped, so it loads in parallel
+    // with the search's own DB reads instead of in front of them (serve() awaits it).
+    const employerPoolP = SUPABASE_URL && SUPABASE_SERVICE_KEY ? getEmployerPostedPool(SUPABASE_URL, dbHeaders) : Promise.resolve([]);
+    const [suppressedSet, featuredSet] = await Promise.all([
       getSuppressedSet(SUPABASE_URL, dbHeaders),
       getFeaturedSet(SUPABASE_URL, dbHeaders),
-      SUPABASE_URL && SUPABASE_SERVICE_KEY ? getEmployerPostedPool(SUPABASE_URL, dbHeaders) : Promise.resolve([]),
     ]);
 
     const qNorm = safeQuery.toLowerCase();
@@ -288,8 +298,9 @@ export default async function handler(req, res) {
     // included when the search names its company or the listing matches the query, and it is
     // remote or inside the searched area. Reads relevanceQuery/synonyms at call time (they are
     // filled in by the DB-first block below).
-    serve = (list) => {
+    serve = async (list) => {
       const base = Array.isArray(list) ? list : [];
+      const employerPool = await employerPoolP;
       const relevant = (employerPool || []).filter((row) =>
         companyMatchesQuery(row.company, relevanceQuery) ||
         filterAndRank([row], relevanceQuery, { synonyms, canonical }).length > 0);
@@ -412,7 +423,7 @@ export default async function handler(req, res) {
 
         if (dbMatches.length >= TARGET) {
           console.log(`DB HIT: "${query}" → "${canonical}" @ "${loc}" (${radiusMiles}mi) — ${dbMatches.length} in-radius results (no API call)`);
-          return res.status(200).json({ ok: true, jobs: serve(dbMatches.slice(0, 60)), query, location: loc, _src: 'db' });
+          return res.status(200).json({ ok: true, jobs: await serve(dbMatches.slice(0, 60)), query, location: loc, _src: 'db' });
         }
       } catch(e) { console.warn('DB-first search error:', e.message); }
       console.log(`DB TOP-UP: "${query}" → "${canonical}" @ "${loc}" — ${dbMatches.length} in DB, pulling more from API`);
@@ -507,7 +518,7 @@ export default async function handler(req, res) {
     const widened = dbMatches.length === 0 && page.length > 0;
     console.log(`INSTANT: "${query}" @ "${loc}" — ${page.length} served (${dbMatches.length} in radius), top-up ${decision}`);
     return res.status(200).json({
-      ok: true, jobs: serve(page), query, location: loc, radius: radiusMiles,
+      ok: true, jobs: await serve(page), query, location: loc, radius: radiusMiles,
       _src: dbOnly ? 'db-refresh' : `db-${decision}`, widened,
       topup: pending ? 'pending' : null,
       ...(decision === 'budget' ? { degraded: true } : {}),
@@ -520,7 +531,7 @@ export default async function handler(req, res) {
     // we already pulled related listings from our own corpus, serve those rather than an
     // empty error — search should never go blank just because the top-up couldn't run.
     if (dbMatches.length) {
-      return res.status(200).json({ ok: true, jobs: serve(dbMatches.slice(0, 60)), query: safeQuery, location: loc, _src: 'db-fallback' });
+      return res.status(200).json({ ok: true, jobs: await serve(dbMatches.slice(0, 60)).catch(() => dbMatches.slice(0, 60)), query: safeQuery, location: loc, _src: 'db-fallback' });
     }
     return res.status(500).json({ error: err.message, jobs: [] });
   }

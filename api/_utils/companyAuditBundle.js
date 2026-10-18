@@ -15,7 +15,7 @@ import {
   GHOST_OUTCOMES, RESPONSE_OUTCOMES, NONTERMINAL_OUTCOMES,
 } from './companyIntel.js';
 import { explainListingScore, SCORE_RANGE, WASTE_RANGE } from '../../lib/server/jobScore.js';
-import { MIN_REPORTS_FOR_GRADE } from '../../lib/server/reportCounts.js';
+import { MIN_REPORTS_FOR_GRADE, isScorableReport } from '../../lib/server/reportCounts.js';
 
 // Below this many reports actually counted toward the grade, the sample is treated as too
 // small for a firm reading — the PDF prints a strong low-sample warning. It IS the public grade
@@ -183,7 +183,7 @@ export async function buildCompanyAuditBundle({ db, serviceKey, adminId, adminRo
   const [coRes, scoreRes, reportsRes, aliasRes, jobsRes] = await Promise.all([
     db(`companies?name=ilike.${nameLike}&select=id,name,logo_letter,created_at&limit=25`),
     db(`company_scores?company_name=ilike.${nameEnc}&order=created_at.desc&limit=1`),
-    db(`reports?company_name=ilike.${nameEnc}&select=id,company_name,company_id,location_id,role,platform,source,outcome,ghost_stage,rounds,wait_days,unpaid_work,experience_level,needs_review,outcome_weight,trust_reason,user_id,created_at&order=created_at.desc&limit=2000`),
+    db(`reports?company_name=ilike.${nameEnc}&select=id,company_name,company_id,location_id,role,platform,source,outcome,ghost_stage,rounds,wait_days,unpaid_work,experience_level,needs_review,outcome_weight,trust_reason,user_id,created_at,report_text&order=created_at.desc&limit=2000`),
     db(`company_aliases?canonical=ilike.${nameEnc}&select=alias,canonical&limit=50`).catch(() => null),
     db(`jobs?company=ilike.${nameEnc}&select=id,title,company,location,salary,source,type,description,score,waste_score,created_at,apply_url&order=created_at.desc&limit=500`).catch(() => null),
   ]);
@@ -225,7 +225,7 @@ export async function buildCompanyAuditBundle({ db, serviceKey, adminId, adminRo
       experience_level: r.experience_level || null,
       outcome_weight: r.outcome_weight ?? null,
       needs_review: !!r.needs_review,
-      included_in_score: !r.needs_review,
+      included_in_score: isScorableReport(r),
       trust_reason: r.trust_reason || null,
     };
   });

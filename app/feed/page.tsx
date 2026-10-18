@@ -180,7 +180,7 @@ export default function FeedPage() {
           <>
             {reports.map(r => {
               const oc = OUTCOME_LABELS[r.outcome] || { label: r.outcome, cls: '' }
-              const badge = reportSourceBadge(r.platform)
+              const badge = reportSourceBadge(r.platform, r.report_text)
               const src = reportSourceLink(r.platform, r.report_text)
               const body = src ? src.body : r.report_text
               return (

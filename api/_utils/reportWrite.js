@@ -6,6 +6,7 @@
 // never touch RLS-protected reads on the client's behalf.
 
 import { classifyPlatform, fuseCompanyIntel } from './companyIntel.js';
+import { SCORABLE_REPORTS_FILTER } from '../../lib/server/reportCounts.js';
 import { broadcastActivity } from '../../lib/server/realtime.js';
 
 const _SCORE_TTL_MS = 365 * 24 * 60 * 60 * 1000;
@@ -139,10 +140,10 @@ export async function recomputeCompanyScoreFromReports(SUPABASE_URL, hdrs, compa
   try {
     if (!SUPABASE_URL || !hdrs?.apikey || !companyName) return false;
     const enc = encodeURIComponent(String(companyName).toLowerCase().trim());
-    // Same corpus the score path uses: exclude needs_review rows so anonymous/dup/flagged
-    // reports can't move the grade (they're held out until an admin clears them).
+    // Same corpus the score path uses (lib/server/reportCounts.js SCORABLE_REPORTS_FILTER): every
+    // report at its trust weight; only the anti-gaming holds (anonymous/duplicate/velocity) wait.
     const r = await fetch(
-      `${SUPABASE_URL}/rest/v1/reports?company_name=ilike.${enc}&needs_review=not.is.true&select=outcome,platform&limit=500`,
+      `${SUPABASE_URL}/rest/v1/reports?company_name=ilike.${enc}&${SCORABLE_REPORTS_FILTER}&select=outcome,platform&limit=2000`,
       { headers: hdrs },
     );
     if (!r.ok) return false;
@@ -180,7 +181,8 @@ export async function recomputeCompanyScoreFromReports(SUPABASE_URL, hdrs, compa
       headers: { ...hdrs, Prefer: 'resolution=merge-duplicates,return=minimal' },
       body: JSON.stringify(row),
     });
-    return sv.ok;
+    // The written row (truthy) on success, so a caller can serve the fresh numbers right away.
+    return sv.ok ? row : false;
   } catch { return false; }
 }
 

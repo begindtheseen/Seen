@@ -10,6 +10,7 @@ import {
 import { recomputeCompanyScoreFromReports, normalizeCompany } from './_utils/reportWrite.js';
 import { logError } from '../lib/server/errlog.js';
 import { runStaleSweep, STALE_CLEARABLE_FILTER, STALE_KEPT_FILTER } from '../lib/server/staleSweep.js';
+import { SCORABLE_REPORTS_FILTER } from '../lib/server/reportCounts.js';
 import { buildCompanyAuditBundle } from './_utils/companyAuditBundle.js';
 import { isDisputeStatus, isDisputeReviewStatus, disputeStatusCounts, orderDisputesOpenFirst } from './_utils/companyReddit.js';
 import { isDisputeDecision, resolveDisputeEffect, disputeStatusCounts as listingDisputeCounts, orderDisputesOpenFirst as orderListingDisputes, buildListingTickets } from '../lib/server/listingDisputes.js';
@@ -869,7 +870,7 @@ async function _handler(req, res) {
   async function refreshOrClearScore(name) {
     if (!name) return;
     const enc = encodeURIComponent(String(name).toLowerCase().trim());
-    const real = await db(`reports?company_name=ilike.${enc}&needs_review=not.is.true&select=id&limit=1`).then(jsonOrEmpty);
+    const real = await db(`reports?company_name=ilike.${enc}&${SCORABLE_REPORTS_FILTER}&select=id&limit=1`).then(jsonOrEmpty);
     if (Array.isArray(real) && real.length > 0) {
       await recomputeCompanyScoreFromReports(SB, svcHdrs, name);
     } else {

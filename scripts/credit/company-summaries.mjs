@@ -25,6 +25,7 @@ import { join } from 'node:path';
 import { SECURITY_PREAMBLE, fenceUntrusted } from '../../lib/server/promptGuard.js';
 import { aggregateOutcomes, classifyPlatform } from '../../api/_utils/companyIntel.js';
 import { tenureAdjustment } from '../../api/_utils/companyScore.js';
+import { SCORABLE_REPORTS_FILTER } from '../../lib/server/reportCounts.js';
 import { MODELS, RUNS_DIR, argValue, customId, isDryRun, jsonFormat, readJsonOrNull, resultJson, runBatch, sb, sbAll } from './lib/batch.mjs';
 
 export const MODEL = MODELS.quality; // claude-sonnet-5-5
@@ -352,7 +353,7 @@ async function gather({ companies, minReports, log }) {
   let done = 0;
   const items = await pool(scores, 8, async (s) => {
     const enc = encodeURIComponent(String(s.company_name).toLowerCase().trim());
-    const reports = await sb(`reports?company_name=ilike.${enc}&needs_review=not.is.true&select=outcome,platform,source,report_text,created_at&order=created_at.desc&limit=${REPORT_ROW_CAP}`);
+    const reports = await sb(`reports?company_name=ilike.${enc}&${SCORABLE_REPORTS_FILTER}&select=outcome,platform,source,report_text,created_at&order=created_at.desc&limit=${REPORT_ROW_CAP}`);
     if (++done % 250 === 0) log(`[gather] ${done}/${scores.length}`);
     // Re-check against the real corpus — the stored count can be stale.
     if (!Array.isArray(reports) || reports.length < minReports) return null;
