@@ -13,7 +13,7 @@ import { buildSearchUrl, parseRedditSearchAtom } from './_utils/companyReddit.js
 import { SECURITY_PREAMBLE, fenceUntrusted, scanInjection } from '../lib/server/promptGuard.js';
 import { fetchIndustryBenchmark } from '../lib/server/benchmark.js';
 import { isEvidencedScore, suppressionReason, servedDataSource } from '../lib/server/scoreProvenance.js';
-import { firstPartyReportCount, webClaimCount, gateScore, isGradeable } from '../lib/server/reportCounts.js';
+import { firstPartyReportCount, webClaimCount, gateScore, isGradeable, SCORABLE_REPORTS_FILTER, scorableResolvedCountPath, parseExactCount } from '../lib/server/reportCounts.js';
 import { enqueueCompanyEnrichment } from '../lib/server/enrichmentQueue.js';
 
 // Authorize admin/cron-only actions (the Anthropic web-research endpoints). Accepts a Vercel
@@ -1254,8 +1254,10 @@ Return ONLY a valid JSON array. Return [] if there are genuinely no hiring exper
           report_text:      rpt.report_text ? String(rpt.report_text).slice(0, 2000) : null,
           source:           src,
           outcome_weight:   weight,
-          trust_reason:     'external_import',
-          needs_review:     true, // flag for admin review since it's external
+          // An employee review ("what it's like to work here") is not a hiring outcome — stored for the
+          // page but never scored (lib/server/reportCounts.js SCORABLE_REPORTS_FILTER).
+          trust_reason:     (rpt.kind === 'employee_review' || /\bemployee review\b/i.test(String(rpt.report_text || '')) || /employee/i.test(String(rpt.platform || ''))) ? 'external_employee_review' : 'external_import',
+          needs_review:     true, // queued for an admin spot-check — but COUNTED in the score at ingest trust (SCORABLE_REPORTS_FILTER)
           rounds:           Number.isInteger(rpt.rounds) ? rpt.rounds : 0,
           unpaid_work:      'na',
           experience_level: rpt.experience_level ? String(rpt.experience_level).slice(0, 50) : 'Unknown',
@@ -1267,8 +1269,7 @@ Return ONLY a valid JSON array. Return [] if there are genuinely no hiring exper
     }
     // Recompute each company that got a report so ingested intel actually moves grades
     // (otherwise trapped behind the 365-day score cache). Bounded to 25 per run.
-    // NOTE: ingest reports are needs_review:true — held out of recompute until an admin
-    // clears them — so this only refreshes the confidence/label off the existing cleared corpus.
+    // Imported reports count toward the score at ingest trust (0.55), so this moves the grade.
     for (const c of [...wroteCompanies].slice(0, 25)) { await recomputeCompanyScoreFromReports(SUPABASE_URL, hdrsBase, c); }
     if (errors.length) logError('reports/reddit_import', `${errors.length} errors`, { subreddit: body.subreddit || null, imported, skipped, sample: errors.slice(0, 3) });
     return res.status(200).json({ ok: true, imported, skipped, errors: errors.slice(0, 5), recomputed: Math.min(wroteCompanies.size, 25) });
@@ -1429,7 +1430,9 @@ async function fetchCompanyStats(name, supabaseUrl, dbHeaders) {
     const enc = encodeURIComponent(name);
     const [scoresRes, reportsRes] = await Promise.all([
       fetch(`${supabaseUrl}/rest/v1/company_scores?company_name=ilike.${enc}&select=company_name,overall_score,ghost_rate,response_rate,avg_wait_days,avg_rounds,waste_score,report_count,data_quality,data_source,first_party_report_count,web_report_count,web_reviews&order=created_at.desc&limit=1`, { headers: dbHeaders }),
-      fetch(`${supabaseUrl}/rest/v1/reports?company_name=ilike.${enc}&select=outcome&order=created_at.desc&limit=150`, { headers: dbHeaders }),
+      // Same corpus as the score (employee reviews and anti-gaming holds excluded), so this count can't
+      // pass the 5-review grade gate on rows that aren't hiring outcomes.
+      fetch(`${supabaseUrl}/rest/v1/reports?company_name=ilike.${enc}&${SCORABLE_REPORTS_FILTER}&select=outcome&order=created_at.desc&limit=150`, { headers: dbHeaders }),
     ]);
     const [scores, reps] = await Promise.all([scoresRes.ok ? scoresRes.json() : [], reportsRes.ok ? reportsRes.json() : []]);
     // The cached row is used below as a FALLBACK for ghost_rate/response_rate when we have too few
@@ -1540,13 +1543,12 @@ async function _fuseWithReports(name, web, SUPABASE_URL, dbH) {
   if (!SUPABASE_URL || !dbH) return null;
   try {
     const enc = encodeURIComponent(String(name).toLowerCase().trim());
-    // Exclude reports flagged for review (needs_review=true) — anonymous/unverified and
-    // external-import submissions are held out of the score until an admin clears them, so
-    // they can't poison a company's grade. `not.is.true` keeps legacy false/null rows.
-    let r = await fetch(`${SUPABASE_URL}/rest/v1/reports?company_name=ilike.${enc}&needs_review=not.is.true&select=outcome,platform&limit=500`, { headers: dbH });
+    // Every report counts at its trust weight; only the anti-gaming holds wait for an admin
+    // (lib/server/reportCounts.js SCORABLE_REPORTS_FILTER — the same corpus the stored recompute uses).
+    let r = await fetch(`${SUPABASE_URL}/rest/v1/reports?company_name=ilike.${enc}&${SCORABLE_REPORTS_FILTER}&select=outcome,platform&limit=2000`, { headers: dbH });
     let reps = r.ok ? await r.json() : null;
     if ((!Array.isArray(reps) || !reps.length) && /[\s-]/.test(String(name))) {
-      r = await fetch(`${SUPABASE_URL}/rest/v1/reports?company_name=ilike.${_fuzzyNamePattern(name)}&needs_review=not.is.true&select=outcome,platform&limit=500`, { headers: dbH });
+      r = await fetch(`${SUPABASE_URL}/rest/v1/reports?company_name=ilike.${_fuzzyNamePattern(name)}&${SCORABLE_REPORTS_FILTER}&select=outcome,platform&limit=2000`, { headers: dbH });
       reps = r.ok ? await r.json() : null;
     }
     if (!Array.isArray(reps) || !reps.length) return null;
@@ -1689,6 +1691,12 @@ async function handleCompanyScore(req, res, body) {
   if (!force_refresh && SUPABASE_URL && SUPABASE_SERVICE_KEY) {
     try {
       const nameEnc = encodeURIComponent(name.toLowerCase().trim());
+      // In parallel with the cache read: how many reports the score SHOULD be built from right now.
+      const livePath = scorableResolvedCountPath(name);
+      const liveCountP = livePath
+        ? fetch(`${SUPABASE_URL}/rest/v1/${livePath}`, { headers: { ...dbH, Prefer: 'count=exact' } })
+            .then((r) => (r.ok ? parseExactCount(r.headers.get('content-range')) : null)).catch(() => null)
+        : Promise.resolve(null);
       let cacheRes = await fetch(`${SUPABASE_URL}/rest/v1/company_scores?company_name=ilike.${nameEnc}&order=created_at.desc&limit=1`, { headers: dbH });
       let rows = cacheRes.ok ? await cacheRes.json() : null;
       // Slug decoding turns hyphens into spaces ("coca cola") — retry with token wildcards
@@ -1700,6 +1708,18 @@ async function handleCompanyScore(req, res, body) {
       // A cached row only counts as a hit if there is evidence behind it. An unevidenced row is
       // treated as a MISS rather than an error, so the request falls through to real report
       // aggregation and, failing that, to the honest "no data yet — be the first to report" state.
+      // Self-repair: a stored score built from a different number of reports than we now hold is
+      // stale — new reports since, or rows an older rule never counted (SpaceX: 4 stored vs 104
+      // real). Recompute from the full corpus before answering, so the page, the grade gate and every
+      // list that reads company_scores get the real numbers. Only fires when the counts differ.
+      if (rows?.[0]) {
+        const live = await liveCountP;
+        // The recompute reads at most 2,000 rows, so compare at that cap (no endless re-recompute).
+        if (live != null && live > 0 && Math.min(live, 2000) !== firstPartyReportCount(rows[0])) {
+          const fresh = await recomputeCompanyScoreFromReports(SUPABASE_URL, dbH, rows[0].company_name || name);
+          if (fresh) { console.log(`score repaired for "${name}": ${firstPartyReportCount(rows[0])} → ${fresh.first_party_report_count} reports`); rows[0] = { ...rows[0], ...fresh }; }
+        }
+      }
       if (rows?.[0]) {
         if (isEvidencedScore(rows[0])) {
           // Self-filling pages: an evidenced score with ZERO first-party reports (a web-research

@@ -7,7 +7,7 @@ import { useAuth } from '@/lib/auth'
 import { AppStore } from '@/lib/stores/AppStore'
 import HiringProbability from '@/components/HiringProbability'
 import CompanyScoreCard from '@/components/CompanyScoreCard'
-import { isPublicDiscussion, reportDate, reportSourceBadge, reportSourceLink, sortReportsByDate } from '@/lib/reportSource'
+import { isPublicDiscussion, isEmployeeReview, isImportedReview, reportDate, reportSourceBadge, reportSourceLink, sortReportsByDate } from '@/lib/reportSource'
 import ReportSourceLink from '@/components/ReportSourceLink'
 import { aggregateJobLocations } from '@/lib/jobLocations'
 import CompanyRedditDiscussion from '@/components/CompanyRedditDiscussion'
@@ -687,12 +687,18 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
     return `Mixed: about ${respPct}% of applicants hear back, ${ghostPct}% are ghosted.${wait}`
   })() : ''
 
-  // Report outcome counts for the section summary + distribution (reused by two blocks).
-  const oc = reports.reduce((m, r) => { const k = r.outcome || 'unknown'; m[k] = (m[k] || 0) + 1; return m }, {} as Record<string, number>)
+  // Report outcome counts for the section summary + distribution (reused by two blocks). Employee
+  // reviews are shown but are NOT hiring outcomes, so they never enter these counts (same rule as
+  // the score — lib/server/reportCounts.js).
+  const hiringReports = reports.filter(r => !isEmployeeReview(r))
+  const employeeN = reports.length - hiringReports.length
+  const oc = hiringReports.reduce((m, r) => { const k = r.outcome || 'unknown'; m[k] = (m[k] || 0) + 1; return m }, {} as Record<string, number>)
   const ghostedN = oc.ghosted || 0
   const hiredN = (oc.hired || 0) + (oc.offer || 0)
   const interviewN = (oc.interview || 0) + (oc.human || 0) + (oc.interviewing || 0)
-  const thirdPartyN = reports.filter(r => isPublicDiscussion(r.platform)).length
+  const thirdPartyN = hiringReports.filter(r => isPublicDiscussion(r.platform)).length
+  const importedN = hiringReports.filter(r => isImportedReview(r.platform)).length
+  const seenN = hiringReports.length - thirdPartyN - importedN
 
   const ocLabel: Record<string, string> = {
     ghosted: '👻 Ghosted', autoreject: '🤖 Auto-rejected',
@@ -1013,19 +1019,24 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
                     </div>
                   </div>
                 </div>
-                <OutcomeDistribution reports={reports} />
+                <OutcomeDistribution reports={hiringReports} />
               </Section>
             )}
 
             <Section id="reports" icon="🗣" title="Applicant reports" count={reports.length} open={open.reports} onToggle={toggle}
               summary={reports.length > 0
-                ? `${ghostedN} ghosted · ${interviewN} interviewed · ${hiredN} hired${thirdPartyN > 0 ? ` · ${thirdPartyN} from public discussions` : ''}`
+                ? [`${ghostedN} ghosted`, `${interviewN} interviewed`, `${hiredN} hired`, thirdPartyN > 0 ? `${thirdPartyN} from public discussions` : '', employeeN > 0 ? `${employeeN} employee review${employeeN !== 1 ? 's' : ''}` : ''].filter(Boolean).join(' · ')
                 : 'None yet — be the first to report'}>
               <div className="co-reports-tools">
                 <div style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', color: 'var(--muted)', lineHeight: 1.6, flex: 1, minWidth: 180 }}>
                   {reports.length > 0
-                    ? (thirdPartyN > 0
-                        ? `${reports.length} report${reports.length !== 1 ? 's' : ''} · ${reports.length - thirdPartyN} submitted to Seen · ${thirdPartyN} found in public discussions (labeled, reduced weight)`
+                    ? (thirdPartyN > 0 || importedN > 0 || employeeN > 0
+                        ? [`${reports.length} report${reports.length !== 1 ? 's' : ''}`,
+                            seenN > 0 ? `${seenN} submitted to Seen` : '',
+                            importedN > 0 ? `${importedN} imported from review sites (reduced weight)` : '',
+                            thirdPartyN > 0 ? `${thirdPartyN} found in public discussions (reduced weight)` : '',
+                            employeeN > 0 ? `${employeeN} employee review${employeeN !== 1 ? 's' : ''} (shown, not counted in the hiring grade)` : '',
+                          ].filter(Boolean).join(' · ')
                         : `${reports.length} report${reports.length !== 1 ? 's' : ''} from real applicants · anonymous · verified`)
                     : 'Reports are anonymous claims, labeled by source and weighted by trust.'}
                 </div>
@@ -1041,7 +1052,8 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
               {reports.length > 0 ? (
                 <>
                   {reports.slice(0, reportsShown).map(r => {
-                    const badge = reportSourceBadge(r.platform)
+                    const badge = reportSourceBadge(r.platform, r.report_text)
+                    const employee = isEmployeeReview(r)
                     const src = reportSourceLink(r.platform, r.report_text)
                     const body = src ? src.body : r.report_text
                     const when = reportDate(r.platform, r.report_text, r.created_at).label
@@ -1057,7 +1069,7 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
                               {[r.city ? `📍 ${r.city}` : '', r.rounds ? `${r.rounds} round${r.rounds !== 1 ? 's' : ''}` : '', when].filter(Boolean).join(' · ')}
                             </div>
                           </div>
-                          <span className={`vibe rc-outcome ${ocClass[r.outcome] || 'v-n'}`}>{ocLabel[r.outcome] || r.outcome}</span>
+                          <span className={`vibe rc-outcome ${employee ? 'v-n' : (ocClass[r.outcome] || 'v-n')}`}>{employee ? '💼 Employee review' : (ocLabel[r.outcome] || r.outcome)}</span>
                         </div>
                         {body && <div className="rc-body">{body}</div>}
                         {r.id && employerReplies[r.id] && (

@@ -37,6 +37,22 @@ export const isPublicReviewSourced = (platform?: string | null): boolean =>
 export const isPublicDiscussion = (platform?: string | null): boolean =>
   isRedditSourced(platform) || isPublicReviewSourced(platform)
 
+/** An employee review ("what it's like to work here") — shown, but never a hiring outcome or score input. */
+export const isEmployeeReview = (r: { report_text?: string | null }): boolean =>
+  /\bemployee review\b/i.test(String(r?.report_text ?? ''))
+
+// Same test as classifyPlatform's 'ingest' tier (api/_utils/companyIntel.js), so the label always
+// matches how the row is weighted.
+const IMPORT_SITE_RE = /glassdoor|blind|indeed|linkedin/i
+const IMPORT_SITE_NAME: Record<string, string> = { glassdoor: 'Glassdoor', blind: 'Blind', indeed: 'Indeed', linkedin: 'LinkedIn' }
+/** A review imported from a review site (Glassdoor / Indeed / LinkedIn / Blind) — not submitted to Seen. */
+export const isImportedReview = (platform?: string | null): boolean =>
+  !isPublicDiscussion(platform) && IMPORT_SITE_RE.test(String(platform ?? ''))
+const importSiteName = (platform?: string | null): string => {
+  const m = IMPORT_SITE_RE.exec(String(platform ?? ''))
+  return m ? IMPORT_SITE_NAME[m[0].toLowerCase()] : ''
+}
+
 export const PUBLIC_DISCUSSION_LABEL = 'Sourced from public discussion'
 export const PUBLIC_REVIEW_LABEL = 'Sourced from a public review site'
 
@@ -48,7 +64,20 @@ export const publicReviewLabel = (host?: string | null): string =>
  * The honest provenance badge for a report row, or null for first-hand Seen reports.
  * `label` is the visible text; `title` is the hover explanation.
  */
-export function reportSourceBadge(platform?: string | null): { label: string; title: string } | null {
+export function reportSourceBadge(platform?: string | null, reportText?: string | null): { label: string; title: string } | null {
+  const site = importSiteName(platform) || String(platform ?? '').trim().split(/\s+/)[0]
+  if (isEmployeeReview({ report_text: reportText })) {
+    return {
+      label: `Employee review${site ? ` · ${site}` : ''}`,
+      title: 'A current or former employee describing what it is like to work here, imported from a review site. It is not a hiring outcome, so it does not count toward the hiring grade.',
+    }
+  }
+  if (isImportedReview(platform)) {
+    return {
+      label: `Imported from ${site}`,
+      title: `An applicant's hiring account imported from ${site} — not submitted directly to Seen, and counted at reduced weight`,
+    }
+  }
   if (isPublicReviewSourced(platform)) {
     const host = publicReviewHost(platform)
     return {
