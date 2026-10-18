@@ -270,7 +270,7 @@ export default function JobDetailDrawer({ job, isLoggedIn, onClose, onApply, onC
                 { label: '✅ Offer',     outcome: 'hired',        bg: 'rgba(16,185,129,0.08)', border: 'rgba(16,185,129,0.2)',  color: 'var(--green)' },
               ] as const).map(({ label, outcome, bg, border, color }) => (
                 <a key={outcome}
-                  href={`/report?company=${encodeURIComponent(job.company)}&role=${encodeURIComponent(job.title)}&outcome=${outcome}`}
+                  href={`/report?from=company&company=${encodeURIComponent(job.company)}&role=${encodeURIComponent(job.title)}&outcome=${outcome}`}
                   style={{ fontFamily: 'var(--mono)', fontSize: '.6rem', background: bg, border: `1px solid ${border}`, color, borderRadius: 7, padding: '.32rem .7rem', textDecoration: 'none' }}>
                   {label}
                 </a>

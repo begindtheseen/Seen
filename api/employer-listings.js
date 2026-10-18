@@ -333,32 +333,51 @@ async function listApplications(res, { db, body, claim }) {
   });
 }
 
+// { id, status, message? } — `message` only with 'rejected': an optional decline note (a recommended
+// one or the employer's own) added to the application's conversation and to the decline email.
 async function setApplicationStatus(res, { db, body, claim }) {
   if (!(await seenApplyAvailable(db))) return res.status(400).json({ error: 'Applying on Seen isn’t switched on yet' });
   const id = String(body.id == null ? '' : body.id).trim();
   const status = String(body.status == null ? '' : body.status).trim();
   if (!UUID.test(id)) return res.status(400).json({ error: 'A valid application id is required' });
   if (!APPLICATION_STATUSES.includes(status)) return res.status(400).json({ error: 'Unknown status' });
+  const withThread = await threadAvailable(db);
+  const message = status === 'rejected' && withThread ? cleanMessage(body.message, DECLINE_MESSAGE_MAX) : '';
+  const life = await lifecycleAvailable(db);
   // The company_key filter IS the ownership check: another company's application matches 0 rows.
-  const prevRes = await db(`seen_applications?id=eq.${encodeURIComponent(id)}&company_key=eq.${encodeURIComponent(claim.companyKey)}&select=status&limit=1`);
-  const prevRows = prevRes.ok ? await prevRes.json() : [];
-  const prevStatus = Array.isArray(prevRows) && prevRows[0] ? prevRows[0].status : null;
-  if (prevStatus === 'withdrawn') return res.status(409).json({ error: 'The applicant withdrew this application', reason: 'withdrawn' });
-  const r = await db(`seen_applications?id=eq.${encodeURIComponent(id)}&company_key=eq.${encodeURIComponent(claim.companyKey)}`, {
-    method: 'PATCH',
-    headers: { Prefer: 'return=representation' },
-    body: JSON.stringify({
-      status, updated_at: new Date().toISOString(),
-      // The retention clock (lib/server/applicationRetention.js) starts at a final decision.
-      ...((await lifecycleAvailable(db)) ? { decided_at: status === 'hired' || status === 'rejected' ? new Date().toISOString() : null } : {}),
-    }),
-  });
-  if (!r.ok) return res.status(500).json({ error: 'Could not update the application — please try again' });
-  const rows = await r.json();
-  if (!rows.length) return res.status(404).json({ error: 'That application isn’t on your company’s listings' });
-  // The applicant's tracker follows the employer's decision (best-effort — never fails this update).
-  const tracker = status !== prevStatus ? await syncApplicantTracker(db, rows[0], status) : { synced: false, reason: 'unchanged' };
-  return res.status(200).json({ ok: true, application: inboxItem(rows[0]), tracker });
+  const own = `seen_applications?id=eq.${encodeURIComponent(id)}&company_key=eq.${encodeURIComponent(claim.companyKey)}`;
+  // With a message, the PATCH only lands if the row is unchanged since it was read (updated_at), so
+  // a message written at the same moment is never dropped; one re-read on a lost race.
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const prevRes = await db(`${own}&select=status,updated_at${message ? ',thread' : ''}&limit=1`);
+    const prev = prevRes.ok ? (await prevRes.json())[0] : null;
+    if (!prev) return res.status(404).json({ error: 'That application isn’t on your company’s listings' });
+    if (prev.status === 'withdrawn') return res.status(409).json({ error: 'The applicant withdrew this application', reason: 'withdrawn' });
+    const nowISO = new Date().toISOString();
+    let thread = null;
+    if (message) {
+      const next = appendThreadEntry(prev.thread, { from: 'e', text: message, nowMs: Date.now() });
+      if (!next.ok) return res.status(400).json({ error: next.error });
+      thread = next.thread;
+    }
+    const r = await db(`${own}${message ? `&updated_at=eq.${encodeURIComponent(prev.updated_at)}` : ''}`, {
+      method: 'PATCH',
+      headers: { Prefer: 'return=representation' },
+      body: JSON.stringify({
+        status, updated_at: nowISO,
+        ...(thread ? { thread } : {}),
+        // The retention clock (lib/server/applicationRetention.js) starts at a final decision.
+        ...(life ? { decided_at: status === 'hired' || status === 'rejected' ? nowISO : null } : {}),
+      }),
+    });
+    if (!r.ok) return res.status(500).json({ error: 'Could not update the application — please try again' });
+    const rows = await r.json();
+    if (!rows.length) { if (message) continue; return res.status(404).json({ error: 'That application isn’t on your company’s listings' }); }
+    // The applicant's tracker follows the employer's decision (best-effort — never fails this update).
+    const tracker = status !== prev.status ? await syncApplicantTracker(db, rows[0], status, message || null) : { synced: false, reason: 'unchanged' };
+    return res.status(200).json({ ok: true, application: inboxItem(rows[0]), tracker });
+  }
+  return res.status(409).json({ error: 'The application changed while you were updating it — please try again' });
 }
 
 // Mirror an employer status change onto the applicant's own tracker row (created at apply time by

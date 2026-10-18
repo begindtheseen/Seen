@@ -3,7 +3,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useAuth } from '@/lib/auth'
-import FillListingPanel from './FillListingPanel'
+import FillListingPanel, { DeclineMessagePicker } from './FillListingPanel'
+import { declineTemplates } from '@/lib/server/seenApply.js'
 import ModalPortal from '@/components/ModalPortal'
 
 // Manage your listings — the LOGIN-SCOPED listings manager (POST /api/employer-listings).
@@ -789,6 +790,11 @@ function ApplicationsInbox({ listing, token, onClose, canClose }: { listing: Lis
   const [apps, setApps] = useState<SeenApplication[] | null>(null)
   const [editedAt, setEditedAt] = useState<string | null>(null)
   const [filling, setFilling] = useState(false)
+  // Applicant whose "Hired" status opened the close-out flow (pre-ticked in step 1).
+  const [fillFrom, setFillFrom] = useState<string | null>(null)
+  // A status pick that needs one more answer before it is saved (see pickStatus).
+  const [pending, setPending] = useState<{ app: SeenApplication; status: 'hired' | 'rejected' } | null>(null)
+  const [declineText, setDeclineText] = useState('')
   const [closedNote, setClosedNote] = useState('')
   const [err, setErr] = useState('')
   const [synced, setSynced] = useState('')
@@ -824,12 +830,31 @@ function ApplicationsInbox({ listing, token, onClose, canClose }: { listing: Lis
     return () => window.removeEventListener('keydown', onKey)
   }, [onClose])
 
-  async function setStatus(a: SeenApplication, status: AppStatus) {
+  // Picking "Hired" or "Not moving forward" asks one question first, right here in the inbox:
+  //   Hired → just mark them, or close the listing and decline everyone still waiting (with a message);
+  //   Not moving forward → send a recommended message, your own, or none.
+  // The prompt renders at the top of the inbox — bring it into view from wherever the employer is.
+  const revealPrompt = () => requestAnimationFrame(() => document.getElementById('inbox-status-prompt')?.scrollIntoView({ behavior: 'smooth', block: 'center' }))
+  function pickStatus(a: SeenApplication, status: AppStatus) {
+    setErr(''); setSynced('')
+    if (status === 'hired') {
+      const othersWaiting = (apps || []).some(x => x.id !== a.id && ['new', 'reviewed', 'interviewing'].includes(x.status))
+      if (canClose && othersWaiting) { setPending({ app: a, status: 'hired' }); revealPrompt(); return }
+    }
+    if (status === 'rejected') {
+      setDeclineText(declineTemplates({ title: listing.title, company: listing.company }, 'single')[0].text)
+      setPending({ app: a, status: 'rejected' }); revealPrompt(); return
+    }
+    setStatus(a, status)
+  }
+
+  async function setStatus(a: SeenApplication, status: AppStatus, message?: string) {
     const prev = a.status
     setApps(list => (list || []).map(x => x.id === a.id ? { ...x, status } : x)) // optimistic
     setSynced('')
     try {
-      const d = await call({ action: 'application_status', id: a.id, status }) as { tracker?: { synced?: boolean } }
+      const d = await call({ action: 'application_status', id: a.id, status, ...(message ? { message } : {}) }) as { tracker?: { synced?: boolean }; application?: SeenApplication }
+      if (d?.application) setApps(list => (list || []).map(x => x.id === a.id ? { ...x, ...d.application } : x))
       // The applicant's own Seen tracker follows the employer's status (api/employer-listings syncApplicantTracker).
       if (d?.tracker?.synced) setSynced(`${a.name}'s Seen tracker is updated${['interviewing', 'rejected', 'hired'].includes(status) ? ' and they were emailed' : ''}.`)
     }
@@ -883,7 +908,30 @@ function ApplicationsInbox({ listing, token, onClose, canClose }: { listing: Lis
           {err && <div role="alert" style={{ ...mono('.62rem', 'var(--red)'), marginBottom: '.7rem' }}>{err}</div>}
           {synced && <div role="status" style={{ ...mono('.62rem', 'var(--green)'), marginBottom: '.7rem' }}>✓ {synced}</div>}
           {closedNote && <div role="status" style={{ ...mono('.62rem', 'var(--green)'), marginBottom: '.7rem', lineHeight: 1.6 }}>✓ {closedNote}</div>}
-          {canClose && !closedNote && apps && !filling && (
+          {pending?.status === 'hired' && (
+            <div id="inbox-status-prompt" style={{ background: 'var(--raised)', border: '1px solid rgba(16,185,129,.45)', borderRadius: 11, padding: '.85rem .9rem', marginBottom: '.8rem' }}>
+              <div style={{ fontFamily: 'var(--display)', fontWeight: 800, fontSize: '.95rem', color: 'var(--white)' }}>Mark {pending.app.name} as hired 🎉</div>
+              <div style={{ ...mono('.6rem', 'var(--sub)'), lineHeight: 1.6, margin: '.3rem 0 .75rem' }}>
+                Is the role filled? You can close the listing now and send everyone still waiting a decline message — you’ll confirm everyone you hired and choose the message first.
+              </div>
+              <div style={{ display: 'flex', gap: '.45rem', flexWrap: 'wrap' }}>
+                <button type="button" onClick={() => { const a = pending.app; setPending(null); setFillFrom(a.id); setFilling(true) }} style={{ ...ghostBtn, ...mono('.62rem', 'var(--ink)'), background: 'var(--green)', border: 'none', fontWeight: 700 }}>Yes — close listing & decline the rest →</button>
+                <button type="button" onClick={() => { const a = pending.app; setPending(null); setStatus(a, 'hired') }} style={{ ...ghostBtn, ...mono('.62rem', 'var(--white)') }}>Just mark {pending.app.name} hired</button>
+                <button type="button" onClick={() => setPending(null)} style={{ ...ghostBtn, ...mono('.62rem', 'var(--muted)') }}>Cancel</button>
+              </div>
+            </div>
+          )}
+          {pending?.status === 'rejected' && (
+            <div id="inbox-status-prompt" style={{ background: 'var(--raised)', border: '1px solid rgba(239,68,68,.35)', borderRadius: 11, padding: '.85rem .9rem', marginBottom: '.8rem' }}>
+              <div style={{ fontFamily: 'var(--display)', fontWeight: 800, fontSize: '.95rem', color: 'var(--white)', marginBottom: '.55rem' }}>Not moving forward with {pending.app.name}</div>
+              <DeclineMessagePicker templates={declineTemplates({ title: listing.title, company: listing.company }, 'single')} value={declineText} onChange={setDeclineText} allowNone />
+              <div style={{ display: 'flex', gap: '.45rem', flexWrap: 'wrap', marginTop: '.75rem' }}>
+                <button type="button" onClick={() => { const a = pending.app; const m = declineText.trim(); setPending(null); setStatus(a, 'rejected', m || undefined) }} style={{ ...ghostBtn, ...mono('.62rem', '#fff'), background: 'var(--red)', border: 'none', fontWeight: 700 }}>{declineText.trim() ? 'Decline & send message' : 'Decline without a message'}</button>
+                <button type="button" onClick={() => setPending(null)} style={{ ...ghostBtn, ...mono('.62rem', 'var(--muted)') }}>Cancel</button>
+              </div>
+            </div>
+          )}
+          {canClose && !closedNote && apps && !filling && !pending && (
             <button type="button" onClick={() => { setFilling(true); setErr('') }} style={{ ...ghostBtn, width: '100%', marginBottom: '.8rem', padding: '.6rem .9rem', ...mono('.64rem', 'var(--green)'), borderColor: 'rgba(16,185,129,.5)', background: 'rgba(16,185,129,.06)' }}>
               ✓ We hired — close this listing and let everyone else know
             </button>
@@ -892,10 +940,11 @@ function ApplicationsInbox({ listing, token, onClose, canClose }: { listing: Lis
             <FillListingPanel
               listing={{ id: listing.id, title: listing.title, company: listing.company }}
               apps={apps.map(a => ({ id: a.id, name: a.name, status: a.status }))}
+              initialPicked={fillFrom ? [fillFrom] : undefined}
               call={call}
-              onCancel={() => setFilling(false)}
+              onCancel={() => { setFilling(false); setFillFrom(null) }}
               onDone={r => {
-                setFilling(false)
+                setFilling(false); setFillFrom(null)
                 setClosedNote(`${r.declined ? `${r.declined} applicant${r.declined === 1 ? '' : 's'} got your message. ` : ''}${r.hired ? `${r.hired} marked hired. ` : ''}${r.closed ? 'The listing is closed.' : 'Could not close the listing — try again.'}`)
                 call({ action: 'applications', job_id: listing.id }).then(d => setApps(Array.isArray(d.applications) ? d.applications : [])).catch(() => {})
               }}
@@ -921,7 +970,7 @@ function ApplicationsInbox({ listing, token, onClose, canClose }: { listing: Lis
                   {a.status === 'withdrawn'
                     ? <span style={{ ...mono('.58rem', 'var(--muted)'), textTransform: 'uppercase', letterSpacing: '.08em', border: '1px solid var(--line2)', borderRadius: 999, padding: '.25rem .6rem' }}>Withdrawn</span>
                     : (
-                      <select value={a.status} onChange={e => setStatus(a, e.target.value as AppStatus)} aria-label="Application status" style={{ ...inputStyle, flex: 'none', minWidth: 0, width: 'auto', padding: '.35rem .5rem', cursor: 'pointer' }}>
+                      <select value={a.status} onChange={e => pickStatus(a, e.target.value as AppStatus)} aria-label="Application status" style={{ ...inputStyle, flex: 'none', minWidth: 0, width: 'auto', padding: '.35rem .5rem', cursor: 'pointer' }}>
                         {APP_STATUSES.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
                       </select>
                     )}

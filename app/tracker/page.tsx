@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useCallback, useRef, Suspense } from 'react'
+import { useEffect, useState, useCallback, useRef, useMemo, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useAuth } from '@/lib/auth'
 import { AppStore } from '@/lib/stores/AppStore'
@@ -289,6 +289,8 @@ function TrackerPage() {
   const searchParams = useSearchParams()
   const { isLoggedIn, isSeeker, ready, token } = useAuth()
   const [apps, setApps] = useState<Application[]>([])
+  // Newest application first (owner request 2026-10-18): by the date applied, then last update.
+  const orderedApps = useMemo(() => [...apps].sort((a, b) => (b.appliedAt - a.appliedAt) || (b.updatedAt - a.updatedAt)), [apps])
   const [loading, setLoading] = useState(true)
   const [outcomeApp, setOutcomeApp] = useState<Application | null>(null)
   const [roundsApp, setRoundsApp] = useState<Application | null>(null)
@@ -299,8 +301,8 @@ function TrackerPage() {
   const [surveyMode, setSurveyMode] = useState<'resume' | 'tracker'>('resume')
   const [creditsEarned, setCreditsEarned] = useState(0)
   const [manualForm, setManualForm] = useState({ company: '', role: '', location: '', platform: 'Direct' })
-  const [highlightNew, setHighlightNew] = useState(false)
-  const highlightedRef = useRef(false)
+  const [highlightId, setHighlightId] = useState('')
+  const highlightedRef = useRef('')
   const [updateInsight, setUpdateInsight] = useState<{ title: string; body: string; color: string } | null>(null)
   const [companyScores, setCompanyScores] = useState<Record<string, ScoreIntel>>({})
 
@@ -314,16 +316,28 @@ function TrackerPage() {
     const data = await AppStore.load(isLoggedIn)
     setApps(data)
     setLoading(false)
-    if (searchParams?.get('new') === '1' && !highlightedRef.current && data.length > 0) {
-      highlightedRef.current = true
-      setHighlightNew(true)
+    // Highlight + scroll to one card: the one just added (?new=1 — the DB returns it first), or the
+    // one a notification points at (#app_<id>, from the bell in the Nav).
+    const hashId = typeof window !== 'undefined' && window.location.hash.startsWith('#app_') ? window.location.hash.slice(5) : ''
+    const target = hashId && data.some(a => a.id === hashId) ? hashId
+      : searchParams?.get('new') === '1' && data.length > 0 ? data[0].id : ''
+    if (target && highlightedRef.current !== target) {
+      highlightedRef.current = target
+      setHighlightId(target)
       setTimeout(() => {
-        const el = document.getElementById(`app_${data[0].id}`)
+        const el = document.getElementById(`app_${target}`)
         if (el) { el.scrollIntoView({ behavior: 'smooth', block: 'center' }) }
-        setTimeout(() => setHighlightNew(false), 2800)
+        setTimeout(() => setHighlightId(''), 2800)
       }, 300)
     }
   }, [isLoggedIn, searchParams])
+
+  // A notification tapped while already on the tracker changes only the hash — re-run the jump.
+  useEffect(() => {
+    const onHash = () => { if (window.location.hash.startsWith('#app_')) loadApps() }
+    window.addEventListener('hashchange', onHash)
+    return () => window.removeEventListener('hashchange', onHash)
+  }, [loadApps])
 
   useEffect(() => {
     if (!isLoggedIn) return
@@ -809,8 +823,8 @@ function TrackerPage() {
         {/* Application cards */}
         {apps.length > 0 && (
           <div id="trackerList" style={{ display: 'flex', flexDirection: 'column', gap: '.75rem' }}>
-            {apps.map((app, i) => (
-              <div key={app.id} style={highlightNew && i === 0 ? { borderRadius: 12, boxShadow: '0 0 0 2px var(--green), 0 0 30px rgba(16,185,129,0.3)', transition: 'box-shadow 2.5s ease' } : undefined}>
+            {orderedApps.map(app => (
+              <div key={app.id} style={highlightId === app.id ? { borderRadius: 12, boxShadow: '0 0 0 2px var(--green), 0 0 30px rgba(16,185,129,0.3)', transition: 'box-shadow 2.5s ease' } : undefined}>
                 <AppCard app={app} onUpdate={handleUpdate} onRemove={handleRemove} onShare={handleShare} onReload={loadApps} intel={companyScores[app.company.toLowerCase().trim()]} />
               </div>
             ))}

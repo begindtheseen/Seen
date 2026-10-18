@@ -406,6 +406,9 @@ function Section({ id, icon, title, summary, count, open, onToggle, children }: 
 export default function CompanyPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = use(params)
   const companyName = decodeURIComponent(slug).replace(/-/g, ' ')
+  // The report form is pre-filled with this company, named the way this page shows it (capitalized),
+  // so "Report experience" from a company page never asks which company again.
+  const reportHref = `/report?company=${encodeURIComponent(companyName.replace(/\b\w/g, c => c.toUpperCase()))}&from=company`
 
   const [reports, setReports] = useState<Report[]>([])
   const [score, setScore] = useState<CompanyScore | null>(null)
@@ -887,7 +890,7 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
                     : `No applicant reports for ${companyName} yet. A grade appears once ${MIN_REPORTS_FOR_GRADE} real reports are in.`}
                 </p>
                 <div className="co-grade-meta">
-                  <a href={`/report?company=${encodeURIComponent(companyName)}`} className="co-live" style={{ textDecoration: 'none' }}>+ Add yours to help grade it</a>
+                  <a href={reportHref} className="co-live" style={{ textDecoration: 'none' }}>+ Add yours to help grade it</a>
                 </div>
               </div>
             </div>
@@ -929,7 +932,7 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
               <TrackCTA companyName={companyName} />
               <div className="co-action-row">
                 <a href={`/resume?company=${encodeURIComponent(companyName || '')}`} className="co-act co-act-primary"><span>✨ Analyze résumé for <span style={{ textTransform: 'capitalize' }}>{companyName}</span></span></a>
-                <a href={`/report?company=${encodeURIComponent(companyName || '')}`} className="co-act">📝 Report experience</a>
+                <a href={reportHref} className="co-act">📝 Report experience</a>
               </div>
               <div className="co-chip-row">
                 <button type="button" className="co-chip" onClick={() => openSection('compare')}>⚡ Compare</button>
@@ -1105,7 +1108,7 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
                     ? <>No reports mention &ldquo;{location}&rdquo;. <button type="button" onClick={() => setLocation('')} style={{ background: 'none', border: 'none', color: 'var(--blue)', cursor: 'pointer', fontFamily: 'inherit', fontSize: 'inherit', padding: 0 }}>Clear the city filter</button></>
                     : <>No community reports yet — {companyName} gets a grade once {MIN_REPORTS_FOR_GRADE} real reports are in.</>}
                   {gatheringPublic && <EnrichmentNotice companyName={companyName} />}
-                  <div style={{ marginTop: '.6rem' }}><a href={`/report?company=${encodeURIComponent(companyName)}`} style={{ color: 'var(--green)', textDecoration: 'none' }}>Be the first to report →</a></div>
+                  <div style={{ marginTop: '.6rem' }}><a href={reportHref} style={{ color: 'var(--green)', textDecoration: 'none' }}>Be the first to report →</a></div>
                 </div>
               )}
             </Section>
@@ -1199,7 +1202,7 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
               {cityRows.length === 0 && (
                 <div style={{ marginTop: '1.2rem', fontFamily: 'var(--mono)', fontSize: '.58rem', color: 'var(--muted)' }}>
                   No applicant reports with a city yet.{' '}
-                  <a href={`/report?company=${encodeURIComponent(companyName)}`} style={{ color: 'var(--green)', textDecoration: 'none' }}>Report your experience →</a>
+                  <a href={reportHref} style={{ color: 'var(--green)', textDecoration: 'none' }}>Report your experience →</a>
                 </div>
               )}
             </Section>
@@ -1333,7 +1336,7 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
                   <span>📊 {!graded
                     ? `${ungradedLabel} — a grade needs ${MIN_REPORTS_FOR_GRADE}: each applicant report counts 1, each thing people say online counts ½; web estimates never count`
                     : `Based on ${gradeBasisLabel(score)}${webEst > 0 ? ' + public web research' : ''}`}</span>
-                  <a href={`/report?company=${encodeURIComponent(companyName)}`} style={{ color: 'var(--green)', textDecoration: 'none' }}>+ Add your report →</a>
+                  <a href={reportHref} style={{ color: 'var(--green)', textDecoration: 'none' }}>+ Add your report →</a>
                 </div>
               )}
               {gatheringPublic && <EnrichmentNotice companyName={companyName} />}
