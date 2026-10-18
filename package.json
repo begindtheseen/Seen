@@ -21,6 +21,7 @@
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.49.2",
+    "@vercel/analytics": "^2.0.1",
     "@vercel/functions": "3.9.7",
     "next": "^15.5.19",
     "pdfkit": "^0.19.1",
