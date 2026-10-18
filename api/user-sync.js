@@ -128,6 +128,18 @@ export default async function handler(req, res) {
     ]);
     const apps   = appsRes.ok   ? await appsRes.json()   : [];
     const threads = threadsRes && threadsRes.ok ? await threadsRes.json().catch(() => []) : [];
+    // Listings the employer edited (jobs.edited_at, migration 20261018170000): the tracker dates the
+    // edit on any application sent before it. One PK lookup per 150 listings; 400s before the migration.
+    const uuidJobIds = [...new Set(apps.map(a => String(a.job_id || '')).filter(id => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)))];
+    if (uuidJobIds.length) {
+      const edited = new Map();
+      for (let i = 0; i < uuidJobIds.length; i += 150) {
+        const er = await db(`jobs?id=in.(${uuidJobIds.slice(i, i + 150).join(',')})&edited_at=not.is.null&select=id,edited_at`).catch(() => null);
+        const rows = er && er.ok ? await er.json().catch(() => []) : [];
+        for (const r of (Array.isArray(rows) ? rows : [])) edited.set(String(r.id), r.edited_at);
+      }
+      if (edited.size) for (const a of apps) { const e = edited.get(String(a.job_id || '')); if (e) a.listing_edited_at = e; }
+    }
     if (Array.isArray(threads) && threads.length) {
       const byJob = new Map(threads.map(t => [String(t.job_id), t.thread]));
       for (const a of apps) {

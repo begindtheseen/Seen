@@ -30,6 +30,9 @@
     }
   ],
   "functions": {
+    "api/employer-listings.js": {
+      "maxDuration": 60
+    },
     "api/job-insights.js": {
       "maxDuration": 20
     },
@@ -93,6 +96,10 @@
     {
       "path": "/api/employer-renewals",
       "schedule": "0 16 * * *"
+    },
+    {
+      "path": "/api/application-retention",
+      "schedule": "40 4 * * *"
     },
     {
       "path": "/api/refresh-jobs",
