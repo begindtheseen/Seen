@@ -8,6 +8,8 @@ import { EventStore } from '@/lib/stores/EventStore'
 import { STAGES } from '@/lib/constants'
 import type { Application } from '@/lib/types'
 import dynamic from 'next/dynamic'
+import Link from 'next/link'
+import { listingHref } from '@/lib/listingHref.js'
 import OutcomeCard from '@/components/OutcomeCard'
 import RoundsPrompt from '@/components/RoundsPrompt'
 import { firstPartyReportCount } from '@/lib/server/reportCounts'
@@ -61,6 +63,8 @@ function AppCard({ app, onUpdate, onRemove, onShare, intel }: {
   const [expanded, setExpanded] = useState(false)
   const ghostRate = intel?.ghost_rate
   const watch = isActive ? ghostWatch(days, intel) : null
+  const listing = listingHref(app)
+  const linkStyle = { fontFamily: 'var(--mono)', fontSize: '.58rem', color: 'var(--blue)', textDecoration: 'none' } as const
 
   return (
     <div className={`app-card ${statusClass}`} id={`app_${app.id}`}>
@@ -135,7 +139,10 @@ function AppCard({ app, onUpdate, onRemove, onShare, intel }: {
       <div style={{ display: 'flex', gap: '.6rem', flexWrap: 'wrap', marginTop: '.5rem', alignItems: 'center' }}>
         <span style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', color: 'var(--muted)' }}>Applied {new Date(app.appliedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
         {app.platform && <span style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', color: 'var(--muted)' }}>via {app.platform}</span>}
-        {app.jobUrl && <a href={app.jobUrl} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()} style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', color: 'var(--blue)', textDecoration: 'none' }}>View listing →</a>}
+        {listing && (listing.internal
+          // A listing posted on Seen: its page is /jobs/<id> here, so open it in the app.
+          ? <Link href={listing.href} onClick={e => e.stopPropagation()} style={linkStyle}>View listing →</Link>
+          : <a href={listing.href} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()} style={linkStyle}>View listing →</a>)}
       </div>
 
       {/* Actions — shown when expanded */}
