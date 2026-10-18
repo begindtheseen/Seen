@@ -7,6 +7,7 @@ import dynamic from 'next/dynamic'
 import { useAuth } from '@/lib/auth'
 import { supabase } from '@/lib/supabase'
 import UpgradeModal from './UpgradeModal'
+import NotificationsBell from './NotificationsBell'
 import styles from './Nav.module.css'
 
 // The earn-credits flow: the résumé survey (asks about the user's past employers).
@@ -220,6 +221,9 @@ export default function Nav() {
               <span className={styles.chipLabel}>{creditBalance === 0 ? 'credits · top up' : `credit${creditBalance === 1 ? '' : 's'}`}</span>
             </button>
           )}
+
+          {/* Application updates — a bell that opens a modal (components/NotificationsBell.tsx). */}
+          {isSeeker && user?.id && <NotificationsBell uid={user.id} className={styles.iconBtn} />}
 
           {/* Saved — an icon, not a full nav slot. */}
           {isSeeker && (

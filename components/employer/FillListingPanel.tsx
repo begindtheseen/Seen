@@ -9,24 +9,68 @@
 // Server: api/employer-listings.js fill_listing.
 
 import { useMemo, useState } from 'react'
-import { defaultDeclineMessage, DECLINE_MESSAGE_MAX } from '@/lib/server/seenApply.js'
+import { declineTemplates, DECLINE_MESSAGE_MAX } from '@/lib/server/seenApply.js'
 
 export type FillApp = { id: string; name: string; status: string }
+type Template = { id: string; label: string; text: string }
+
+/**
+ * Pick a recommended decline message or write your own. Choosing a recommendation fills the box;
+ * editing it (or "Write your own") makes it the employer's own. Shared by the close-out flow and
+ * the single "Not moving forward" prompt.
+ */
+export function DeclineMessagePicker({ templates, value, onChange, allowNone }: {
+  templates: Template[]
+  value: string
+  onChange: (v: string) => void
+  /** Offer "No message" (single decline only — the close-out always sends one). */
+  allowNone?: boolean
+}) {
+  const match = templates.find(t => t.text === value)
+  const [mode, setMode] = useState<string>(match ? match.id : value ? 'custom' : allowNone ? 'none' : templates[0]?.id || 'custom')
+  const chip = (id: string, label: string, onPick: () => void) => (
+    <button key={id} type="button" aria-pressed={mode === id} onClick={() => { setMode(id); onPick() }}
+      style={{ padding: '.32rem .65rem', borderRadius: 999, fontSize: '.7rem', cursor: 'pointer', border: `1px solid ${mode === id ? 'var(--blue)' : 'var(--line2)'}`, background: mode === id ? 'rgba(59,130,246,.12)' : 'none', color: mode === id ? 'var(--white)' : 'var(--sub)' }}>
+      {label}
+    </button>
+  )
+  return (
+    <div>
+      <div style={{ ...mono('.52rem', 'var(--dim)'), textTransform: 'uppercase', letterSpacing: '.09em', marginBottom: '.35rem' }}>Recommended messages</div>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '.35rem', marginBottom: '.5rem' }}>
+        {templates.map(t => chip(t.id, t.label, () => onChange(t.text)))}
+        {chip('custom', '✎ Write your own', () => onChange(''))}
+        {allowNone && chip('none', 'No message', () => onChange(''))}
+      </div>
+      {mode !== 'none' && (
+        <textarea value={value} onChange={e => { onChange(e.target.value); if (mode !== 'custom') setMode('custom') }} maxLength={DECLINE_MESSAGE_MAX} rows={4}
+          aria-label="Decline message" placeholder={mode === 'custom' ? 'Write your message — it goes to the applicant as written.' : undefined}
+          style={{ width: '100%', boxSizing: 'border-box', resize: 'vertical', background: 'var(--card)', border: '1px solid var(--line2)', borderRadius: 8, padding: '.55rem .65rem', color: 'var(--white)', fontSize: '.78rem', lineHeight: 1.5, fontFamily: 'var(--body)' }} />
+      )}
+      <div style={{ ...mono('.52rem', 'var(--muted)'), marginTop: '.3rem' }}>
+        {mode === 'none' ? 'They’ll see “Not selected” on their tracker and get the standard update email.' : 'It shows on their Seen tracker and is emailed to them. They can’t reply.'}
+      </div>
+    </div>
+  )
+}
 type Result = { hired: number; declined: number; skipped: number; closed: boolean }
 
 const mono = (size: string, color: string): React.CSSProperties => ({ fontFamily: 'var(--mono)', fontSize: size, color })
 const btn: React.CSSProperties = { borderRadius: 9, padding: '.6rem 1rem', fontFamily: 'var(--display)', fontWeight: 800, fontSize: '.8rem', cursor: 'pointer' }
 
-export default function FillListingPanel({ listing, apps, call, onDone, onCancel }: {
+export default function FillListingPanel({ listing, apps, call, onDone, onCancel, initialPicked }: {
   listing: { id: string; title: string; company: string }
   apps: FillApp[]
+  /** Pre-ticked as hired — the applicant whose "Hired" status opened this flow. */
+  initialPicked?: string[]
   call: (body: object) => Promise<Record<string, unknown>>
   onDone: (r: Result) => void
   onCancel: () => void
 }) {
   const [step, setStep] = useState<1 | 2>(1)
-  const [picked, setPicked] = useState<Set<string>>(new Set())
-  const [message, setMessage] = useState(() => defaultDeclineMessage({ title: listing.title, company: listing.company }))
+  const [picked, setPicked] = useState<Set<string>>(() => new Set(initialPicked || []))
+  const templates = useMemo(() => declineTemplates({ title: listing.title, company: listing.company }, 'filled'), [listing.title, listing.company])
+  const [message, setMessage] = useState(() => templates[0].text)
   const [confirmed, setConfirmed] = useState(false)
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState('')
@@ -105,10 +149,8 @@ export default function FillListingPanel({ listing, apps, call, onDone, onCancel
           <div style={mono('.58rem', n ? 'var(--red)' : 'var(--muted)')}>✉ {n ? `${n} applicant${n === 1 ? '' : 's'} will get this message and be marked “not selected”` : 'Nobody is waiting — no message will be sent'}</div>
           {n > 0 && (
             <>
-              <div style={{ fontSize: '.8rem', color: 'var(--white)', margin: '.25rem 0 .5rem' }}>{names(groups.decline)}</div>
-              <textarea value={message} onChange={e => setMessage(e.target.value)} maxLength={DECLINE_MESSAGE_MAX} rows={4} aria-label="Decline message"
-                style={{ width: '100%', boxSizing: 'border-box', resize: 'vertical', background: 'var(--card)', border: '1px solid var(--line2)', borderRadius: 8, padding: '.55rem .65rem', color: 'var(--white)', fontSize: '.78rem', lineHeight: 1.5, fontFamily: 'var(--body)' }} />
-              <div style={{ ...mono('.52rem', 'var(--muted)'), marginTop: '.3rem' }}>It shows on their Seen tracker and is emailed to them. They can’t reply.</div>
+              <div style={{ fontSize: '.8rem', color: 'var(--white)', margin: '.25rem 0 .6rem' }}>{names(groups.decline)}</div>
+              <DeclineMessagePicker templates={templates} value={message} onChange={setMessage} />
             </>
           )}
         </div>

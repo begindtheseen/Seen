@@ -130,6 +130,9 @@ function ReportPage() {
   // pages): when the URL prefills the form we show a confirm strip and drop the cursor on the
   // first field still missing, so the happy path is type-one-thing-and-submit.
   const [urlPrefilled, setUrlPrefilled] = useState(false)
+  // Opened from a company page: the company is filled in and shown as set (with a "change" link),
+  // so the reporter doesn't retype it or drift onto a different company by mistake.
+  const [companyLocked, setCompanyLocked] = useState(false)
   const roleRef = useRef<HTMLInputElement>(null)
   const locationRef = useRef<HTMLInputElement>(null)
 
@@ -150,6 +153,7 @@ function ReportPage() {
       const urlOutcome = OUTCOME_MAP[urlOutcomeRaw]
       if (urlCompany) {
         setCompany(urlCompany)
+        if (searchParams?.get('from') === 'company') setCompanyLocked(true)
         if (urlRole) setRole(urlRole)
         if (urlOutcome) setOutcome(urlOutcome)
         setUrlPrefilled(true)
@@ -414,7 +418,14 @@ function ReportPage() {
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '.75rem' }}>
               <div>
                 {lbl('Company name *')}
-                <input type="text" placeholder="e.g. Stripe" value={company} onChange={e => setCompany(e.target.value)} style={inputStyle} />
+                {companyLocked && company ? (
+                  <div style={{ ...inputStyle, display: 'flex', alignItems: 'center', gap: '.5rem', borderColor: 'rgba(16,185,129,.45)' }}>
+                    <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontWeight: 600 }}>✓ {company}</span>
+                    <button type="button" onClick={() => setCompanyLocked(false)} style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', fontFamily: 'var(--mono)', fontSize: '.6rem', color: 'var(--blue)', flexShrink: 0 }}>change</button>
+                  </div>
+                ) : (
+                  <input type="text" placeholder="e.g. Stripe" value={company} onChange={e => setCompany(e.target.value)} style={inputStyle} />
+                )}
               </div>
               <div>
                 {lbl('Job title *')}
