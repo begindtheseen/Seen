@@ -11,6 +11,7 @@ export type CheckType = 'response_check' | 'interview_check' | 'outcome_check'
 
 export const EVENT_TYPES = [
   'application_submitted',
+  'application_viewed',   // the employer marked a Seen application "reviewed" (employer-sourced)
   'response_received',
   'assessment_received',
   'interview_received',

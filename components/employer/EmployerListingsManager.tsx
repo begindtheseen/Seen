@@ -731,6 +731,7 @@ const APP_STATUSES: [AppStatus, string][] = [['new', 'New'], ['reviewed', 'Revie
 function ApplicationsInbox({ listing, token, onClose }: { listing: Listing; token: () => Promise<string | null>; onClose: () => void }) {
   const [apps, setApps] = useState<SeenApplication[] | null>(null)
   const [err, setErr] = useState('')
+  const [synced, setSynced] = useState('')
   const [resumeText, setResumeText] = useState<Record<string, string>>({})
   const [busyId, setBusyId] = useState<string | null>(null)
 
@@ -764,7 +765,12 @@ function ApplicationsInbox({ listing, token, onClose }: { listing: Listing; toke
   async function setStatus(a: SeenApplication, status: AppStatus) {
     const prev = a.status
     setApps(list => (list || []).map(x => x.id === a.id ? { ...x, status } : x)) // optimistic
-    try { await call({ action: 'application_status', id: a.id, status }) }
+    setSynced('')
+    try {
+      const d = await call({ action: 'application_status', id: a.id, status }) as { tracker?: { synced?: boolean } }
+      // The applicant's own Seen tracker follows the employer's status (api/employer-listings syncApplicantTracker).
+      if (d?.tracker?.synced) setSynced(`${a.name}'s Seen tracker is updated${['interviewing', 'rejected', 'hired'].includes(status) ? ' and they were emailed' : ''}.`)
+    }
     catch (e) { setApps(list => (list || []).map(x => x.id === a.id ? { ...x, status: prev } : x)); setErr((e as Error).message) }
   }
 
@@ -799,6 +805,7 @@ function ApplicationsInbox({ listing, token, onClose }: { listing: Listing; toke
             <button type="button" onClick={onClose} aria-label="Close" style={{ ...ghostBtn, width: 32, height: 32, padding: 0 }}>✕</button>
           </div>
           {err && <div role="alert" style={{ ...mono('.62rem', 'var(--red)'), marginBottom: '.7rem' }}>{err}</div>}
+          {synced && <div role="status" style={{ ...mono('.62rem', 'var(--green)'), marginBottom: '.7rem' }}>✓ {synced}</div>}
           {apps === null && !err && <div style={mono('.62rem', 'var(--muted)')}>Loading…</div>}
           {apps && apps.length === 0 && (
             <div style={{ ...mono('.62rem', 'var(--muted)'), lineHeight: 1.6 }}>No applications yet. When a candidate applies on Seen, their résumé, contact details and note show up here — and we email you.</div>
