@@ -8,11 +8,14 @@ import { EventStore } from '@/lib/stores/EventStore'
 import { STAGES } from '@/lib/constants'
 import type { Application } from '@/lib/types'
 import dynamic from 'next/dynamic'
+import Link from 'next/link'
+import { listingHref } from '@/lib/listingHref.js'
 import OutcomeCard from '@/components/OutcomeCard'
 import RoundsPrompt from '@/components/RoundsPrompt'
 import { firstPartyReportCount } from '@/lib/server/reportCounts'
 import { isGradeableScore } from '@/lib/gradeGate'
 import ModalPortal from '@/components/ModalPortal'
+import WithdrawModal from '@/components/WithdrawModal'
 const SurveyModal = dynamic(() => import('@/components/SurveyModal'), { ssr: false })
 const ResumeSurveyModal = dynamic(() => import('@/components/ResumeSurveyModal'), { ssr: false })
 
@@ -21,6 +24,7 @@ const STATUS_MAP: Record<string, string> = {
   ghosted: 'ghosted',
   hired: 'hired',
   rejected: 'rejected',
+  withdrawn: 'rejected',
 }
 
 function getDaysSince(ts: number): number {
@@ -48,19 +52,23 @@ function ghostWatch(days: number, intel?: Intel): Watch | null {
   return { tone: 'danger', text: `Day ${days} · ${x}× their ${avg}${gp >= 30 ? (est ? ` — estimated ghost rate ${gp}%. Likely ghosted.` : ` — they ghost ${gp}% of applicants here. Likely ghosted.`) : ' — likely ghosted.'}` }
 }
 
-function AppCard({ app, onUpdate, onRemove, onShare, intel }: {
+function AppCard({ app, onUpdate, onRemove, onShare, onReload, intel }: {
   app: Application
   onUpdate: (id: string, changes: Partial<Application>) => void
   onRemove: (id: string) => void
   onShare: (app: Application) => void
+  onReload: () => void
   intel?: Intel
 }) {
+  const [withdrawing, setWithdrawing] = useState(false)
   const days = getDaysSince(app.appliedAt)
   const statusClass = STATUS_MAP[app.status] || ''
   const isActive = app.status === 'active'
   const [expanded, setExpanded] = useState(false)
   const ghostRate = intel?.ghost_rate
   const watch = isActive ? ghostWatch(days, intel) : null
+  const listing = listingHref(app)
+  const linkStyle = { fontFamily: 'var(--mono)', fontSize: '.58rem', color: 'var(--blue)', textDecoration: 'none' } as const
 
   return (
     <div className={`app-card ${statusClass}`} id={`app_${app.id}`}>
@@ -135,8 +143,28 @@ function AppCard({ app, onUpdate, onRemove, onShare, intel }: {
       <div style={{ display: 'flex', gap: '.6rem', flexWrap: 'wrap', marginTop: '.5rem', alignItems: 'center' }}>
         <span style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', color: 'var(--muted)' }}>Applied {new Date(app.appliedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
         {app.platform && <span style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', color: 'var(--muted)' }}>via {app.platform}</span>}
-        {app.jobUrl && <a href={app.jobUrl} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()} style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', color: 'var(--blue)', textDecoration: 'none' }}>View listing →</a>}
+        {listing && (listing.internal
+          // A listing posted on Seen: its page is /jobs/<id> here, so open it in the app.
+          ? <Link href={listing.href} onClick={e => e.stopPropagation()} style={linkStyle}>View listing →</Link>
+          : <a href={listing.href} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()} style={linkStyle}>View listing →</a>)}
       </div>
+
+      {/* Messages on an Apply-on-Seen application: from the employer (interview time, a number to
+          call, …) and the applicant's own withdrawal note. Stored once, on the employer's copy. */}
+      {!!app.messages?.length && (
+        <div style={{ marginTop: '.7rem', display: 'flex', flexDirection: 'column', gap: '.4rem' }}>
+          {app.messages.map((m, i) => (
+            <div key={i} style={{ borderRadius: 9, padding: '.5rem .7rem', background: m.from === 'employer' ? 'rgba(59,130,246,.08)' : 'var(--raised)', border: `1px solid ${m.from === 'employer' ? 'rgba(59,130,246,.25)' : 'var(--line)'}` }}>
+              <div style={{ fontFamily: 'var(--mono)', fontSize: '.54rem', color: m.from === 'employer' ? 'var(--blue)' : 'var(--muted)', marginBottom: '.2rem' }}>
+                {m.from === 'employer' ? `🏢 ${app.company}` : m.withdrawal ? 'You · withdrew' : 'You'} · {new Date(m.at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+              </div>
+              {m.text
+                ? <div style={{ fontSize: '.8rem', color: 'var(--white)', lineHeight: 1.5, whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>{m.text}</div>
+                : <div style={{ fontSize: '.74rem', color: 'var(--muted)' }}>Withdrew without a note.</div>}
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* Actions — shown when expanded */}
       {isActive && expanded && (
@@ -153,26 +181,37 @@ function AppCard({ app, onUpdate, onRemove, onShare, intel }: {
               <button key={s} className="btn btn-ghost" style={{ fontSize: '.62rem', padding: '.28rem .65rem' }} onClick={e => { e.stopPropagation(); onUpdate(app.id, { stage: s }); setExpanded(false) }}>→ {s}</button>
             ))}
           </div>
-          <button
-            onClick={e => { e.stopPropagation(); setExpanded(false) }}
-            style={{ marginTop: '.65rem', background: 'none', border: 'none', fontFamily: 'var(--mono)', fontSize: '.6rem', color: 'var(--muted)', cursor: 'pointer', padding: '0' }}
-          >
-            ✕ collapse
-          </button>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '.5rem', marginTop: '.65rem' }}>
+            <button
+              onClick={e => { e.stopPropagation(); setExpanded(false) }}
+              style={{ background: 'none', border: 'none', fontFamily: 'var(--mono)', fontSize: '.6rem', color: 'var(--muted)', cursor: 'pointer', padding: '0' }}
+            >
+              ✕ collapse
+            </button>
+            <button
+              onClick={e => { e.stopPropagation(); setWithdrawing(true) }}
+              style={{ background: 'none', border: 'none', fontFamily: 'var(--mono)', fontSize: '.6rem', color: 'var(--red)', cursor: 'pointer', padding: '0' }}
+            >
+              ↩ Withdraw application
+            </button>
+          </div>
         </div>
       )}
       {!isActive && (
         <div style={{ marginTop: '.75rem', display: 'flex', gap: '.4rem', flexWrap: 'wrap', alignItems: 'center' }}>
-          <button
-            className="btn"
-            style={{ fontSize: '.66rem', padding: '.34rem .8rem', fontWeight: 700, color: '#fff', border: 'none', background: 'linear-gradient(135deg,#3b82f6 0%,#8b5cf6 100%)', boxShadow: '0 0 16px rgba(99,102,241,.3)' }}
-            onClick={() => onShare(app)}
-          >
-            ✦ Share outcome card
-          </button>
+          {app.status !== 'withdrawn' && (
+            <button
+              className="btn"
+              style={{ fontSize: '.66rem', padding: '.34rem .8rem', fontWeight: 700, color: '#fff', border: 'none', background: 'linear-gradient(135deg,#3b82f6 0%,#8b5cf6 100%)', boxShadow: '0 0 16px rgba(99,102,241,.3)' }}
+              onClick={() => onShare(app)}
+            >
+              ✦ Share outcome card
+            </button>
+          )}
           <button className="btn btn-ghost" style={{ fontSize: '.62rem', padding: '.28rem .65rem', color: 'var(--muted)' }} onClick={() => onRemove(app.id)}>Remove</button>
         </div>
       )}
+      {withdrawing && <WithdrawModal app={app} onClose={() => setWithdrawing(false)} onWithdrawn={onReload} />}
     </div>
   )
 }
@@ -764,7 +803,7 @@ function TrackerPage() {
           <div id="trackerList" style={{ display: 'flex', flexDirection: 'column', gap: '.75rem' }}>
             {apps.map((app, i) => (
               <div key={app.id} style={highlightNew && i === 0 ? { borderRadius: 12, boxShadow: '0 0 0 2px var(--green), 0 0 30px rgba(16,185,129,0.3)', transition: 'box-shadow 2.5s ease' } : undefined}>
-                <AppCard app={app} onUpdate={handleUpdate} onRemove={handleRemove} onShare={handleShare} intel={companyScores[app.company.toLowerCase().trim()]} />
+                <AppCard app={app} onUpdate={handleUpdate} onRemove={handleRemove} onShare={handleShare} onReload={loadApps} intel={companyScores[app.company.toLowerCase().trim()]} />
               </div>
             ))}
           </div>

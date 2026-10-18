@@ -1,6 +1,6 @@
 import type { EventType, CheckType } from './constants'
 
-export type AppStatus = 'active' | 'ghosted' | 'hired' | 'rejected'
+export type AppStatus = 'active' | 'ghosted' | 'hired' | 'rejected' | 'withdrawn'
 
 export interface HiringEvent {
   id: string
@@ -11,6 +11,13 @@ export interface HiringEvent {
   trust_weight?: number
   anomaly_flags?: string[]
   data?: Record<string, unknown>
+}
+
+export interface ApplicationMessage {
+  from: 'employer' | 'applicant'
+  at: string
+  text: string
+  withdrawal?: boolean
 }
 
 export interface Application {
@@ -26,6 +33,10 @@ export interface Application {
   score?: number
   waste?: number
   employerStage?: string
+  /** Apply-on-Seen conversation (employer messages, the applicant's withdrawal note), oldest first. */
+  messages?: ApplicationMessage[]
+  /** Sent through Apply on Seen — the employer sees it (and a withdrawal) in their Seen inbox. */
+  seenApply?: boolean
   appliedAt: number
   updatedAt: number
   events: HiringEvent[]

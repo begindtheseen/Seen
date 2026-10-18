@@ -6,7 +6,15 @@ import {
   allowsSeenApply, validateSeenApplication, base64Bytes, resumeObject, buildSeenApplicationRow,
   buildTrackerRow, isDuplicate, isNotMigrated, MAX_RESUME_BYTES,
 } from '../lib/server/seenApply.js';
-import { seenApplyAvailable, uploadResumeFile, authUserEmail, sendNewApplicationEmail } from '../lib/server/seenApplyStore.js';
+import { seenApplyAvailable, uploadResumeFile, authUserEmail, sendNewApplicationEmail, threadAvailable, sendWithdrawalEmail } from '../lib/server/seenApplyStore.js';
+import {
+  appendThreadEntry, withdrawTrackerPatch, validateWithdrawReview, alreadyReviewed, markWithdrawReviewed,
+  withdrawalOutcome, firstResponseDays, interviewRounds, buildWithdrawalReport,
+} from '../lib/server/applicationThread.js';
+import {
+  isValidCompanyName, resolveOrCreateCompany, resolveOrCreateLocation, assessSubmitTrust, writeReport,
+  recomputeCompanyScoreFromReports,
+} from './_utils/reportWrite.js';
 import { extractUploadText } from '../lib/server/resumeUpload.js';
 
 // Best-effort: record the observed apply CLICK (the only thing observable on a redirect apply) and
@@ -389,6 +397,132 @@ async function seenApply(req, res, uid) {
   return res.status(200).json({ ok: true, application_id: saved?.id || null, resume_file_kept: !!resumePath || app.resumeSource === 'saved' });
 }
 
+// ── Withdraw (owner request 2026-10-18) ──────────────────────────────────────────────────────
+// POST { action:'withdraw', application_id, message? } — the applicant cancels an application from
+// their tracker. For an Apply-on-Seen application the employer's copy is marked withdrawn, the
+// optional note (a reason, a thank-you) is added to the application's thread, and the employer is
+// notified in-app and by email. Idempotent: a repeat call finishes whatever the first one didn't.
+async function withdraw(req, res, uid) {
+  const { db, SUPABASE_URL, SERVICE_KEY } = seenDb();
+  if (!SUPABASE_URL || !SERVICE_KEY) return res.status(500).json({ error: 'DB not configured' });
+  if (!(await threadAvailable(db))) return res.status(400).json({ error: 'Withdrawing isn’t available yet', reason: 'unavailable' });
+  const body = req.body || {};
+  const appId = String(body.application_id || '');
+  if (!UUID_RE.test(appId)) return res.status(400).json({ error: 'That application hasn’t synced yet — try again in a moment' });
+  const ar = await db(`applications?id=eq.${appId}&user_id=eq.${uid}&select=id,job_id,company_name,role,status,events&limit=1`);
+  const app = ar.ok ? (await ar.json())[0] : null;
+  if (!app) return res.status(404).json({ error: 'That application isn’t in your tracker' });
+  if (app.status !== 'active' && app.status !== 'withdrawn') return res.status(400).json({ error: 'This application has already ended', reason: 'ended' });
+
+  // The employer's copy (Apply on Seen only), matched by this applicant's own id.
+  let seen = false, employerNotified = false;
+  if (UUID_RE.test(String(app.job_id || ''))) {
+    const own = `seen_applications?job_id=eq.${encodeURIComponent(app.job_id)}&applicant_user_id=eq.${uid}`;
+    for (let attempt = 0; attempt < 2; attempt++) {
+      const sr = await db(`${own}&select=id,status,thread,updated_at,company_key,company_name,job_title,employer_user_id,applicant_name&limit=1`);
+      const row = sr.ok ? (await sr.json())[0] : null;
+      if (!row) break;
+      seen = true;
+      if (row.status === 'withdrawn' || row.status === 'rejected' || row.status === 'hired') break; // already over
+      const next = appendThreadEntry(row.thread, { from: 'a', text: body.message, nowMs: Date.now(), kind: 'w' });
+      const note = next.ok ? next.thread[next.thread.length - 1][2] : '';
+      const up = await db(`${own}&updated_at=eq.${encodeURIComponent(row.updated_at)}`, {
+        method: 'PATCH',
+        headers: { Prefer: 'return=representation' },
+        // A full thread still withdraws — only the note is dropped.
+        body: JSON.stringify({ status: 'withdrawn', ...(next.ok ? { thread: next.thread } : {}), updated_at: new Date().toISOString() }),
+      });
+      if (!up.ok) return res.status(500).json({ error: 'Could not withdraw — please try again' });
+      if (!(await up.json()).length) continue; // the employer wrote at the same moment — re-read
+      employerNotified = await notifyEmployerOfWithdrawal(db, { SUPABASE_URL, SERVICE_KEY, row, note });
+      break;
+    }
+  }
+
+  const patch = withdrawTrackerPatch(app, Date.now());
+  if (patch) {
+    const tp = await db(`applications?id=eq.${appId}&user_id=eq.${uid}`, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify(patch) });
+    if (!tp.ok) return res.status(500).json({ error: 'Could not update your tracker — please try again' });
+  }
+  return res.status(200).json({ ok: true, seen_application: seen, employer_notified: employerNotified });
+}
+
+// In-app (employer_notifications, kind apply_activity) + email. Best-effort; never throws.
+async function notifyEmployerOfWithdrawal(db, { SUPABASE_URL, SERVICE_KEY, row, note }) {
+  let ok = false;
+  const who = row.applicant_name || 'An applicant';
+  try {
+    const notif = buildNotificationRow('apply_activity', {
+      companyName: row.company_name, companyKey: row.company_key, jobId: row.job_id, employerUserId: row.employer_user_id || null,
+      title: `${who} withdrew their application${row.job_title ? ` — ${row.job_title}` : ''}`,
+      body: note ? `Their note: “${note}”` : `${who} withdrew from ${row.job_title ? `“${row.job_title}”` : 'your listing'}.`,
+      meta: { event: 'withdrawn', role: row.job_title || null, seen_application_id: row.id },
+    });
+    if (notif) ok = (await db('employer_notifications', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify(notif) })).ok;
+  } catch (e) { console.warn('[apply] withdraw notification failed (non-fatal):', e?.message || e); }
+  try {
+    const to = await authUserEmail({ SUPABASE_URL, SERVICE_KEY, uid: row.employer_user_id });
+    const m = await sendWithdrawalEmail({ to, applicantName: row.applicant_name, role: row.job_title, text: note });
+    ok = ok || !!m.ok;
+  } catch { /* best-effort */ }
+  return ok;
+}
+
+const EMPLOYER_LABEL_STATUS = { Reviewed: 'reviewed', Interviewing: 'interviewing', 'Not selected': 'rejected', Hired: 'hired' };
+
+// POST { action:'withdraw_review', application_id, reason?, review? } — the optional exit survey
+// right after withdrawing. Written as a first-party `reports` row (the scoring pool), with the
+// hiring OUTCOME taken from what is on record (employer status + messages, tracker stage + events),
+// then the company's stored score is recomputed so it counts immediately.
+async function withdrawReview(req, res, uid) {
+  const { db, SUPABASE_URL, SERVICE_KEY } = seenDb();
+  if (!SUPABASE_URL || !SERVICE_KEY) return res.status(500).json({ error: 'DB not configured' });
+  const body = req.body || {};
+  const v = validateWithdrawReview(body);
+  if (!v.ok) return res.status(400).json({ error: v.error });
+  const appId = String(body.application_id || '');
+  if (!UUID_RE.test(appId)) return res.status(400).json({ error: 'That application isn’t in your tracker' });
+  const ar = await db(`applications?id=eq.${appId}&user_id=eq.${uid}&select=id,job_id,company_name,role,city,status,stage,events,employer_stage,applied_at,created_at&limit=1`);
+  const app = ar.ok ? (await ar.json())[0] : null;
+  if (!app) return res.status(404).json({ error: 'That application isn’t in your tracker' });
+  if (app.status !== 'withdrawn') return res.status(400).json({ error: 'Withdraw the application first' });
+  if (alreadyReviewed(app.events)) return res.status(409).json({ error: 'You already shared why you withdrew', reason: 'already_reviewed' });
+  const company = String(app.company_name || '').trim().slice(0, 200).replace(/[<>`\\]/g, '');
+  if (!isValidCompanyName(company)) return res.status(400).json({ error: 'This application has no company to review' });
+
+  let thread = null, seenApplication = false;
+  if (UUID_RE.test(String(app.job_id || ''))) {
+    const sr = await db(`seen_applications?job_id=eq.${encodeURIComponent(app.job_id)}&applicant_user_id=eq.${uid}&select=thread&limit=1`);
+    const row = sr.ok ? (await sr.json())[0] : null;
+    if (row) { seenApplication = true; thread = row.thread; }
+  }
+  const appliedAtMs = Date.parse(app.applied_at || app.created_at);
+  const outcome = withdrawalOutcome({
+    stage: app.stage, events: app.events, appliedAtMs, nowMs: Date.now(),
+    employerStatus: EMPLOYER_LABEL_STATUS[app.employer_stage] || null, thread,
+  });
+
+  const hdrs = { apikey: SERVICE_KEY, Authorization: `Bearer ${SERVICE_KEY}`, 'Content-Type': 'application/json', Prefer: 'return=representation' };
+  const cid = await resolveOrCreateCompany(SUPABASE_URL, hdrs, company);
+  if (!cid) return res.status(500).json({ error: 'Could not save your review — please try again' });
+  const lid = await resolveOrCreateLocation(SUPABASE_URL, hdrs, cid, app.city).catch(() => null);
+  // Same anti-gaming check as every first-party report: a repeat for this company in 30 days or a
+  // flood is held at low weight for review instead of counting in full.
+  const trust = await assessSubmitTrust(SUPABASE_URL, hdrs, uid, `company_id=eq.${cid}`);
+  const report = buildWithdrawalReport({
+    role: app.role, outcome, waitDays: firstResponseDays({ events: app.events, appliedAtMs, thread }),
+    rounds: interviewRounds(app.events), review: v.review, trust, uid, companyId: cid, locationId: lid, seenApply: seenApplication,
+  });
+  if (!(await writeReport(SUPABASE_URL, hdrs, report, company))) return res.status(500).json({ error: 'Could not save your review — please try again' });
+  // Mark the withdrawal reviewed (and keep the reason code) so it can't be submitted twice.
+  await db(`applications?id=eq.${appId}&user_id=eq.${uid}`, {
+    method: 'PATCH', headers: { Prefer: 'return=minimal' },
+    body: JSON.stringify({ events: markWithdrawReviewed(app.events, v.reason), updated_at: new Date().toISOString() }),
+  }).catch(() => {});
+  const fresh = trust.review ? false : await recomputeCompanyScoreFromReports(SUPABASE_URL, hdrs, company);
+  return res.status(200).json({ ok: true, outcome, counted: !trust.review, score_updated: !!fresh });
+}
+
 export default async function handler(req, res) {
   const _o=req.headers.origin||'';
   const _devO=!_o||_o.includes('localhost')||_o.includes('127.0.0.1');
@@ -432,6 +566,12 @@ export default async function handler(req, res) {
     const rl = await rateLimit(req, 'seen-apply', { bucketKey: `user:${uid}` });
     if (!rl.allowed) return res.status(429).json({ error: 'Too many applications this hour — try again later.' });
     return seenApply(req, res, uid);
+  }
+
+  if (_action === 'withdraw' || _action === 'withdraw_review') {
+    const rl = await rateLimit(req, 'application-withdraw', { bucketKey: `user:${uid}` });
+    if (!rl.allowed) return res.status(429).json({ error: 'Too many requests — try again later.' });
+    return _action === 'withdraw' ? withdraw(req, res, uid) : withdrawReview(req, res, uid);
   }
 
   const { allowed: rlOk } = await rateLimit(req, 'apply');

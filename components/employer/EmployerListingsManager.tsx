@@ -724,9 +724,11 @@ type SeenApplication = {
   id: string; job_id: string; job_title: string | null; name: string; email: string; phone: string | null
   note: string | null; status: AppStatus; created_at: string; resume_file_name: string | null
   has_resume_file: boolean; has_resume_text: boolean
+  thread?: { from: 'employer' | 'applicant'; at: string; text: string; withdrawal?: boolean }[]
 }
-type AppStatus = 'new' | 'reviewed' | 'interviewing' | 'rejected' | 'hired'
-const APP_STATUSES: [AppStatus, string][] = [['new', 'New'], ['reviewed', 'Reviewed'], ['interviewing', 'Interviewing'], ['rejected', 'Not moving forward'], ['hired', 'Hired']]
+// 'withdrawn' is set by the applicant only — never offered in the employer's status picker.
+type AppStatus = 'new' | 'reviewed' | 'interviewing' | 'rejected' | 'hired' | 'withdrawn'
+const APP_STATUSES: [Exclude<AppStatus, 'withdrawn'>, string][] = [['new', 'New'], ['reviewed', 'Reviewed'], ['interviewing', 'Interviewing'], ['rejected', 'Not moving forward'], ['hired', 'Hired']]
 
 function ApplicationsInbox({ listing, token, onClose }: { listing: Listing; token: () => Promise<string | null>; onClose: () => void }) {
   const [apps, setApps] = useState<SeenApplication[] | null>(null)
@@ -734,6 +736,8 @@ function ApplicationsInbox({ listing, token, onClose }: { listing: Listing; toke
   const [synced, setSynced] = useState('')
   const [resumeText, setResumeText] = useState<Record<string, string>>({})
   const [busyId, setBusyId] = useState<string | null>(null)
+  const [drafts, setDrafts] = useState<Record<string, string>>({})
+  const [sendingId, setSendingId] = useState<string | null>(null)
 
   const call = useCallback(async (body: object) => {
     const authToken = await token()
@@ -772,6 +776,20 @@ function ApplicationsInbox({ listing, token, onClose }: { listing: Listing; toke
       if (d?.tracker?.synced) setSynced(`${a.name}'s Seen tracker is updated${['interviewing', 'rejected', 'hired'].includes(status) ? ' and they were emailed' : ''}.`)
     }
     catch (e) { setApps(list => (list || []).map(x => x.id === a.id ? { ...x, status: prev } : x)); setErr((e as Error).message) }
+  }
+
+  // A message to this applicant — shown on their Seen tracker and emailed to them.
+  async function sendMessage(a: SeenApplication) {
+    const text = (drafts[a.id] || '').trim()
+    if (!text) return
+    setSendingId(a.id); setErr(''); setSynced('')
+    try {
+      const d = await call({ action: 'application_message', id: a.id, text }) as { application?: SeenApplication; emailed?: boolean }
+      if (d.application) setApps(list => (list || []).map(x => x.id === a.id ? { ...x, ...d.application } : x))
+      setDrafts(m => ({ ...m, [a.id]: '' }))
+      setSynced(`Sent — ${a.name} sees it on their Seen tracker${d.emailed ? ' and by email' : ''}.`)
+    } catch (e) { setErr((e as Error).message) }
+    finally { setSendingId(null) }
   }
 
   async function openResume(a: SeenApplication) {
@@ -822,9 +840,13 @@ function ApplicationsInbox({ listing, token, onClose }: { listing: Listing; toke
                       <span style={{ color: 'var(--dim)' }}>· {fmtDate(a.created_at)}</span>
                     </div>
                   </div>
-                  <select value={a.status} onChange={e => setStatus(a, e.target.value as AppStatus)} aria-label="Application status" style={{ ...inputStyle, flex: 'none', minWidth: 0, width: 'auto', padding: '.35rem .5rem', cursor: 'pointer' }}>
-                    {APP_STATUSES.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
-                  </select>
+                  {a.status === 'withdrawn'
+                    ? <span style={{ ...mono('.58rem', 'var(--muted)'), textTransform: 'uppercase', letterSpacing: '.08em', border: '1px solid var(--line2)', borderRadius: 999, padding: '.25rem .6rem' }}>Withdrawn</span>
+                    : (
+                      <select value={a.status} onChange={e => setStatus(a, e.target.value as AppStatus)} aria-label="Application status" style={{ ...inputStyle, flex: 'none', minWidth: 0, width: 'auto', padding: '.35rem .5rem', cursor: 'pointer' }}>
+                        {APP_STATUSES.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+                      </select>
+                    )}
                 </div>
                 {a.note && <div style={{ ...mono('.6rem', 'var(--sub)'), lineHeight: 1.6, marginTop: '.55rem', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>“{a.note}”</div>}
                 {(a.has_resume_file || a.has_resume_text) && (
@@ -832,6 +854,34 @@ function ApplicationsInbox({ listing, token, onClose }: { listing: Listing; toke
                     {busyId === a.id ? 'Opening…' : a.has_resume_file ? `View résumé${a.resume_file_name ? ` (${a.resume_file_name})` : ''} ↗` : 'View résumé'}
                   </button>
                 )}
+                {!!a.thread?.length && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '.35rem', marginTop: '.6rem' }}>
+                    {a.thread.map((m, i) => (
+                      <div key={i} style={{ borderRadius: 8, padding: '.45rem .65rem', background: m.from === 'employer' ? 'rgba(59,130,246,.08)' : 'var(--card)', border: `1px solid ${m.from === 'employer' ? 'rgba(59,130,246,.25)' : 'var(--line)'}` }}>
+                        <div style={{ ...mono('.52rem', m.from === 'employer' ? 'var(--blue)' : 'var(--muted)'), marginBottom: '.15rem' }}>
+                          {m.from === 'employer' ? 'You' : m.withdrawal ? `${a.name} · withdrew` : a.name} · {fmtDate(m.at)}
+                        </div>
+                        {m.text
+                          ? <div style={{ fontSize: '.78rem', color: 'var(--white)', lineHeight: 1.5, whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>{m.text}</div>
+                          : <div style={mono('.58rem', 'var(--muted)')}>Withdrew without a note.</div>}
+                      </div>
+                    ))}
+                  </div>
+                )}
+                <div style={{ display: 'flex', gap: '.4rem', alignItems: 'flex-end', marginTop: '.6rem' }}>
+                  <textarea
+                    value={drafts[a.id] || ''}
+                    onChange={e => setDrafts(m => ({ ...m, [a.id]: e.target.value }))}
+                    maxLength={600}
+                    rows={2}
+                    aria-label={`Message to ${a.name}`}
+                    placeholder={`Message ${a.name} — interview time, a number to call, anything they should know`}
+                    style={{ ...inputStyle, flex: 1, minHeight: 44, resize: 'vertical', fontSize: '.74rem', lineHeight: 1.45 }}
+                  />
+                  <button type="button" onClick={() => sendMessage(a)} disabled={sendingId === a.id || !(drafts[a.id] || '').trim()} style={{ ...ghostBtn, padding: '.45rem .8rem', ...mono('.6rem', 'var(--blue)'), opacity: sendingId === a.id || !(drafts[a.id] || '').trim() ? .55 : 1 }}>
+                    {sendingId === a.id ? 'Sending…' : 'Send'}
+                  </button>
+                </div>
                 {resumeText[a.id] && (
                   <pre style={{ ...mono('.6rem', 'var(--text)'), whiteSpace: 'pre-wrap', wordBreak: 'break-word', background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 8, padding: '.7rem', marginTop: '.55rem', maxHeight: 360, overflowY: 'auto' }}>{resumeText[a.id]}</pre>
                 )}
