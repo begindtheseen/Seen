@@ -578,8 +578,6 @@ select.fi,select.fs,select.fi-r,select.fs-r{background-image:url("data:image/svg
 .co-badge-verified{color:var(--blue);background:rgba(59,130,246,.12);border:1px solid rgba(59,130,246,.4)}
 .co-badge-featured{color:#f7c948;background:rgba(247,201,72,.12);border:1px solid rgba(247,201,72,.4)}
 .co-ind{display:flex;align-items:center;gap:.4rem .9rem;flex-wrap:wrap}
-.co-viewers{display:inline-flex;align-items:center;gap:.3rem;color:var(--dim)}
-.co-dot{width:5px;height:5px;border-radius:50%;background:var(--green);display:inline-block;animation:pulse 1.5s ease infinite}
 .co-verdict{font-family:var(--body);font-size:.92rem;line-height:1.45;color:var(--text);margin:.45rem 0 .5rem;font-weight:400}
 .co-grade-meta{display:flex;align-items:center;gap:.4rem .9rem;flex-wrap:wrap}
 .co-dq{font-family:var(--mono);font-size:.58rem;font-weight:600;display:inline-flex;align-items:center;gap:.3rem}

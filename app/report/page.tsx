@@ -383,7 +383,7 @@ function ReportPage() {
           eyebrow="Anonymous report"
           title="Report your experience"
           crumbLabel="Report"
-          sub="Takes 60 seconds. Helps thousands of job seekers tonight. 100% anonymous."
+          sub="Takes 60 seconds. Warns the next applicant who checks this company. Never shown with your name."
         />
 
         {/* Step progress indicator */}

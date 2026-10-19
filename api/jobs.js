@@ -256,6 +256,7 @@ export default async function handler(req, res) {
     // radius === '0'/'remote' means REMOTE: skip geo filtering entirely and search remote
     // listings — the old clamp silently turned "Remote" into an ordinary 25-mile search.
     const isRemote = String(radius) === '0' || String(radius).toLowerCase() === 'remote';
+    const isRemoteListing = (j) => /\bremote\b|\bwork from home\b|\banywhere\b/i.test(`${j.location || ''} ${j.type || ''} ${j.description || ''}`);
     if (isRemote) { loc = 'remote'; }
     const radiusMiles = isRemote ? Infinity : Math.min(500, Math.max(5, parseInt(radius, 10) || 25));
     const distanceKm = isRemote ? null : milesToKm(radiusMiles);
@@ -270,11 +271,12 @@ export default async function handler(req, res) {
     // failed (no center) do we degrade to coarse city → state text matching.
     const applyRadius = (list) => {
       if (!loc) return Array.isArray(list) ? list : [];
-      // Remote search: distance is meaningless — prefer listings that say remote, keep the rest.
+      // Remote search: only listings that say remote. (Partitioning "remote first, keep the rest" served
+      // 58 non-remote Dallas/Phoenix rows as a "Remote" result — the page fills from the corpus and
+      // says `remote_thin` when few exist.)
       if (isRemote) {
         const arr = Array.isArray(list) ? list : [];
-        const isRem = (j) => /\bremote\b|\bwork from home\b|\banywhere\b/i.test(`${j.location || ''} ${j.description || ''}`);
-        return [...arr.filter(isRem), ...arr.filter(j => !isRem(j))];
+        return arr.filter(isRemoteListing);
       }
       if (!center) return filterByLocation(list, loc); // search geocode failed → coarse city/state
       return (list || [])
@@ -446,12 +448,15 @@ export default async function handler(req, res) {
     // nearest listings so the board is never empty. Pure DB.
     const pageP = (async () => {
       let page = dbMatches.slice(0, 60);
+      let fallback = null; // 'outside_radius' | 'remote_thin' | 'unrelated' — the client labels the page by this
       if (page.length < PAGE_MIN && SUPABASE_URL && SUPABASE_SERVICE_KEY) {
         const corpus = await corpusRelevant({ supabaseUrl: SUPABASE_URL, dbHeaders, terms: searchTerms, query: relevanceQuery, canonical, synonyms, center, loc, limit: 60 });
+        const before = page.length;
         page = dedupByIdentity([...page, ...corpus]).slice(0, 60);
+        if (page.length > before) fallback = isRemote ? 'remote_thin' : 'outside_radius';
       }
-      if (!page.length && SUPABASE_URL && SUPABASE_SERVICE_KEY) page = await nearestListings(loc, SUPABASE_URL, dbHeaders);
-      return page;
+      if (!page.length && SUPABASE_URL && SUPABASE_SERVICE_KEY) { page = await nearestListings(loc, SUPABASE_URL, dbHeaders); if (page.length) fallback = 'unrelated'; }
+      return { page, fallback };
     })();
     // Decide whether a live top-up may run — in parallel with building the page. The budget is only
     // consumed when no recent pull already covered this (query, location).
@@ -465,7 +470,7 @@ export default async function handler(req, res) {
       ]);
       return topupBucket.allowed && topupGlobal.allowed ? 'pull' : 'budget';
     })();
-    const [page, decision] = await Promise.all([pageP, decisionP]);
+    const [{ page, fallback }, decision] = await Promise.all([pageP, decisionP]);
 
     if (decision === 'pull' && !_inflight.has(inflightKey)) {
       const key = inflightKey;
@@ -518,10 +523,10 @@ export default async function handler(req, res) {
 
     const pending = decision === 'pull' || decision === 'inflight';
     const widened = dbMatches.length === 0 && page.length > 0;
-    console.log(`INSTANT: "${query}" @ "${loc}" — ${page.length} served (${dbMatches.length} in radius), top-up ${decision}`);
+    console.log(`INSTANT: "${query}" @ "${loc}" — ${page.length} served (${dbMatches.length} in radius, fallback ${fallback || 'none'}), top-up ${decision}`);
     return res.status(200).json({
-      ok: true, jobs: await serve(page), query, location: loc, radius: radiusMiles,
-      _src: dbOnly ? 'db-refresh' : `db-${decision}`, widened,
+      ok: true, jobs: await serve(page), query, location: loc, radius: Number.isFinite(radiusMiles) ? radiusMiles : null,
+      _src: dbOnly ? 'db-refresh' : `db-${decision}`, widened, fallback,
       topup: pending ? 'pending' : null,
       ...(decision === 'budget' ? { degraded: true } : {}),
     });
@@ -714,13 +719,17 @@ async function handleCompanyJobs(req, res, body) {
   const safeName = company.trim().slice(0, 100).replace(/[<>`\\]/g, '');
   const now = encodeURIComponent(new Date().toISOString());
 
-  // Check DB first (non-expired listings for this company)
+  // Check DB first (non-expired listings for THIS company). Wildcards only between tokens
+  // ("coca-cola" ↔ "Coca Cola"), then an exact normalized-name check — the old `*name*`
+  // contains-match listed Amazon Flex under Amazon and every United* employer under United.
+  const nameKey = n => String(n || '').toLowerCase().trim().replace(/[\s,]+(inc\.?|llc\.?|corp\.?|ltd\.?|co\.|plc\.?)\.?$/i, '').replace(/[\s-]+/g, ' ').trim();
   try {
+    const pattern = encodeURIComponent(`*${safeName.toLowerCase().trim().replace(/[\s-]+/g, '*')}*`);
     const r = await fetch(
-      `${SUPABASE_URL}/rest/v1/jobs?company=ilike.*${encodeURIComponent(safeName)}*&expires_at=gt.${now}&select=id,title,company,location,salary,apply_url,source,type,level,score,waste_score&order=score.desc&limit=20`,
+      `${SUPABASE_URL}/rest/v1/jobs?company=ilike.${pattern}&expires_at=gt.${now}&select=id,title,company,location,salary,apply_url,source,type,level,score,waste_score&order=score.desc&limit=40`,
       { headers: dbHeaders }
     );
-    const cached = r.ok ? await r.json() : [];
+    const cached = (r.ok ? await r.json() : []).filter(j => nameKey(j.company) === nameKey(safeName)).slice(0, 20);
     if (Array.isArray(cached) && cached.length >= 3) {
       const jobs = cached.map(j => ({ title: j.title, company: j.company, location: j.location, salary: j.salary, url: j.apply_url, source: j.source, type: j.type, level: inferLevel(j.title || ''), ...scoreRow(j) }));
       return res.status(200).json({ ok: true, jobs, _src: 'cache' });

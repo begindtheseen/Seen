@@ -44,9 +44,8 @@ export const EventStore = {
       all.unshift(e)
       localStorage.setItem(KEY, JSON.stringify(all))
     }
-    if (e.type === 'outcome_check' && (e.data?.outcome as string) && e.data?.outcome !== 'active') {
-      this._submitAsReport(e)
-    }
+    // The tracker's handleUpdate files ONE community report per terminal outcome (quick_submit);
+    // the day-30 check used to file a second copy here (down-weighted + held for review every time).
     return e
   },
 
@@ -71,7 +70,9 @@ export const EventStore = {
     // (response → interview → outcome). An old application used to queue all of its overdue
     // checks at once, so "Did they schedule interviews?" was asked before "Did they respond?".
     // If that earliest check is snoozed, the application waits — a later check never jumps it.
-    for (const app of apps.filter(a => a.status === 'active' || a.status === 'ghosted')) {
+    // Only OPEN applications are asked — a card already marked ghosted/rejected/hired/withdrawn has
+    // its answer, so it must not keep raising "Did they respond?" at day 7/14/30.
+    for (const app of apps.filter(a => a.status === 'active')) {
       const days = Math.floor((Date.now() - app.appliedAt) / 86400000)
       const chk = CHECK_SCHEDULE.find(c => days >= c.day && !this.hasCheck(app.id, c.type))
       if (!chk) continue
@@ -105,7 +106,8 @@ export const EventStore = {
     const outcomes = all.filter(e => e.type === 'outcome_check' && e.data)
     const roundsMap: Record<string, Record<string, unknown>> = {}
     all.filter(e => e.type === 'rounds_detail').forEach(e => { if (e.appId) roundsMap[e.appId] = (e.data || {}) as Record<string, unknown> })
-    const outcomeMap: Record<string, string> = { offer: 'hired', rejected: 'human', ghosted: 'ghosted', withdrew: 'human' }
+    // A withdrawal is not a company response — it never becomes a report (filtered as 'waiting').
+    const outcomeMap: Record<string, string> = { offer: 'hired', rejected: 'human', ghosted: 'ghosted', withdrew: 'waiting' }
     return outcomes.map(e => {
       const d = e.data || {}
       const rd = roundsMap[e.appId || ''] || {}
@@ -126,7 +128,7 @@ export const EventStore = {
       if (!session) return
 
       const d = evt.data || {}
-      const outcomeMap: Record<string, string> = { offer: 'hired', rejected: 'human', ghosted: 'ghosted', withdrew: 'human', active: '' }
+      const outcomeMap: Record<string, string> = { offer: 'hired', rejected: 'human', ghosted: 'ghosted', withdrew: '', active: '' }
       const outcome = outcomeMap[d.outcome as string]
       if (!outcome) return
 

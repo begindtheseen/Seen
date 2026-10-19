@@ -59,7 +59,6 @@ export default function FeedPage() {
   const [total, setTotal] = useState(0)
   const [loading, setLoading] = useState(true)
   const [loadingMore, setLoadingMore] = useState(false)
-  const [ghostCos, setGhostCos] = useState<string[]>([])
   const [appliedCos, setAppliedCos] = useState<Set<string>>(new Set())
 
   const loadFeed = useCallback(async (newFilter: Filter, newOffset: number, append = false) => {
@@ -80,14 +79,6 @@ export default function FeedPage() {
       const rows = data.reports || []
       setTotal(data.total || 0)
       setReports(prev => append ? [...prev, ...rows] : rows)
-      // Derive ghost surge companies from first load
-      if (!append && newFilter === 'all') {
-        const ghosted = rows
-          .filter(r => r.outcome === 'ghosted' && r.company_name)
-          .map(r => r.company_name as string)
-        const unique = [...new Set(ghosted)].slice(0, 5)
-        if (unique.length >= 2) setGhostCos(unique)
-      }
     } catch {
       if (!append) setReports([])
     }
@@ -122,7 +113,7 @@ export default function FeedPage() {
           eyebrow="Live feed"
           title="Fresh from the community"
           crumbLabel="Live feed"
-          sub="Real experiences — every report shapes the score for that company."
+          sub="Applicant accounts, newest first — submitted to Seen or compiled from public review sites and discussions (labeled). Each one counts toward that company's score at its trust weight."
         />
 
         {/* CTA strip — old HTML order: report CTA comes first */}
@@ -134,22 +125,8 @@ export default function FeedPage() {
           <div style={{ fontFamily: 'var(--mono)', fontSize: '.65rem', color: 'var(--green)', flexShrink: 0, whiteSpace: 'nowrap' }}>Add yours →</div>
         </div>
 
-        {/* Ghost surge banner — shown only when ghost companies detected from feed data */}
-        {ghostCos.length >= 2 && (
-          <div style={{ background: 'linear-gradient(90deg, rgba(239,68,68,0.1), rgba(239,68,68,0.03))', border: '1px solid rgba(239,68,68,0.25)', borderRadius: 10, padding: '.75rem 1rem', marginBottom: '1.25rem' }}>
-            <div style={{ fontFamily: 'var(--mono)', fontSize: '.55rem', textTransform: 'uppercase', letterSpacing: '.14em', color: 'var(--red)', marginBottom: '.5rem', display: 'flex', alignItems: 'center', gap: '.4rem' }}>
-              <span style={{ width: 5, height: 5, borderRadius: '50%', background: 'var(--red)', display: 'inline-block', animation: 'pulse 1s infinite' }} />
-              Companies with ghost surges this week
-            </div>
-            <div className="surge-strip" style={{ margin: 0 }}>
-              {ghostCos.map(co => (
-                <a key={co} href={`/company/${encodeURIComponent(co.toLowerCase().replace(/\s+/g, '-'))}`} className="surge-chip">
-                  {co}
-                </a>
-              ))}
-            </div>
-          </div>
-        )}
+        {/* The old "ghost surges this week" banner here was any two companies with a ghosted row in the
+            first page — no window, no threshold. Real surges (≥3 in 7 days) show on the dashboard. */}
 
         {/* Filters */}
         <div style={{ display: 'flex', gap: '.5rem', flexWrap: 'wrap', marginBottom: '1.5rem' }}>
@@ -214,7 +191,7 @@ export default function FeedPage() {
                     {r.ghost_stage && (
                       <span className="vibe v-r">ghosted after {r.ghost_stage}</span>
                     )}
-                    {r.platform && (
+                    {r.platform && !badge && (
                       <span className="vibe v-n">{r.platform}</span>
                     )}
                     {badge && (
@@ -256,7 +233,7 @@ export default function FeedPage() {
             Had a notable experience?
           </div>
           <p style={{ fontFamily: 'var(--mono)', fontSize: '.65rem', color: 'var(--sub)', marginBottom: '1rem' }}>
-            Takes 60 seconds. Helps thousands of job seekers tonight.
+            Takes 60 seconds. Helps the next applicant who checks this company.
           </p>
           <a href="/report" style={{ display: 'inline-block', background: 'linear-gradient(135deg,#3b82f6 0%,#8b5cf6 100%)', border: 'none', borderRadius: 8, padding: '.65rem 1.5rem', fontFamily: 'var(--display)', fontWeight: 800, fontSize: '.82rem', color: '#fff', textDecoration: 'none', boxShadow: '0 0 20px rgba(59,130,246,0.3)' }}>
             Submit your report →

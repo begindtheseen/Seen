@@ -257,7 +257,7 @@ export default function Nav() {
               className={`${styles.chip}${creditBalance === 0 ? ' ' + styles.chipZero : ''}`}
               title={creditBalance === 0
                 ? 'Out of AI credits — upgrade or earn more by tracking applications and answering surveys'
-                : `${creditBalance} AI credit${creditBalance === 1 ? '' : 's'} left today`}
+                : `${creditBalance} AI credit${creditBalance === 1 ? '' : 's'} available`}
               onClick={() => creditBalance === 0 ? setShowUpgrade(true) : setShowSurvey(true)}
             >
               <span className={styles.chipSpark} />

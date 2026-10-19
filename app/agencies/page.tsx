@@ -5,6 +5,7 @@ import { publicDiscussionCountPath, parseExactCount, publicDiscussionShare } fro
 import { STAFFING_AGENCIES, type StaffingAgency } from '@/lib/agencies'
 import { pickActiveSponsor } from '@/lib/server/sponsorSlot'
 import { jsonLdHtml } from '@/lib/jsonLd'
+import { notEnoughReviewsLabel } from '@/lib/gradeGate'
 import PageHeader from '@/components/shell/PageHeader'
 
 // The Staffing Agency Ghost Index: a ranked, living page of major staffing agencies by
@@ -119,7 +120,8 @@ function BuildingRow({ r }: { r: Ranked }) {
       <div style={{ minWidth: 0, flex: 1 }}>
         <Link href={`/company/${r.slug}`} style={{ fontFamily: 'var(--display)', fontSize: '.92rem', fontWeight: 700, color: 'var(--white)', textDecoration: 'none' }}>{r.agency.name}</Link>
         <div style={{ ...mono('.6rem', 'var(--dim)'), marginTop: '.15rem' }}>
-          {`Not enough reviews to grade yet (${Math.min(n, MIN_REPORTS_FOR_GRADE)} of ${MIN_REPORTS_FOR_GRADE})`}
+          {/* The one wording every surface uses — reports plus half of each online mention, like the company page. */}
+          {notEnoughReviewsLabel(r.row?.score ?? null)}
           {r.publicDiscussion ? ` · ${r.publicDiscussion.toLocaleString()} from public threads & review sites` : ''}
         </div>
       </div>
@@ -289,7 +291,7 @@ export default async function AgenciesPage() {
         {reported.length > 0 && (
           <section style={{ marginBottom: '2.4rem' }}>
             <h2 style={{ fontFamily: 'var(--display)', fontSize: '1.1rem', fontWeight: 700, color: 'var(--white)', margin: '0 0 .3rem' }}>Ranked by reported ghost rate</h2>
-            <p style={{ color: 'var(--sub)', fontSize: '.8rem', lineHeight: 1.6, margin: '0 0 1rem', fontWeight: 300 }}>{`Agencies with at least ${MIN_REPORTS_FOR_GRADE} applicant-reported outcomes — submitted to Seen, or shared publicly in discussion threads and on review sites (labeled and down-weighted) — worst ghost rate first. Rows with fewer than 10 reports are marked low confidence.`}</p>
+            <p style={{ color: 'var(--sub)', fontSize: '.8rem', lineHeight: 1.6, margin: '0 0 1rem', fontWeight: 300 }}>{`Agencies with enough evidence for a grade — at least one report submitted to Seen and ${MIN_REPORTS_FOR_GRADE} pieces in total, counting applicant accounts shared publicly in discussion threads and on review sites (labeled and down-weighted) and online mentions at half weight — worst ghost rate first. Rows with fewer than 10 reports are marked low confidence.`}</p>
             {reported.map((r, i) => <ReportedRow key={r.agency.name} r={r} rank={i + 1} />)}
           </section>
         )}
@@ -297,7 +299,7 @@ export default async function AgenciesPage() {
         {building.length > 0 && (
           <section style={{ marginBottom: '2.4rem' }}>
             <h2 style={{ fontFamily: 'var(--display)', fontSize: '1.1rem', fontWeight: 700, color: 'var(--white)', margin: '0 0 .3rem' }}>Building a record — not graded yet</h2>
-            <p style={{ color: 'var(--sub)', fontSize: '.8rem', lineHeight: 1.6, margin: '0 0 1rem', fontWeight: 300 }}>{`These agencies have applicant reports you can read on their page, but fewer than ${MIN_REPORTS_FOR_GRADE} — too few for a fair grade or ghost rate. Every new report gets them closer.`}</p>
+            <p style={{ color: 'var(--sub)', fontSize: '.8rem', lineHeight: 1.6, margin: '0 0 1rem', fontWeight: 300 }}>{`These agencies have applicant reports you can read on their page, but not yet ${MIN_REPORTS_FOR_GRADE} pieces of evidence — too few for a fair grade or ghost rate. Every new report gets them closer.`}</p>
             {building.map(r => <BuildingRow key={r.agency.name} r={r} />)}
           </section>
         )}

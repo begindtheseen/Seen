@@ -208,13 +208,16 @@ export function fuseCompanyIntel(input = {}) {
   const report_count = first_party_report_count + web_report_count;
   const mention_count = Math.max(0, Math.round(mentionResolved || 0));
 
-  const base = calcOverallScore(response_rate ?? 0, ghost_rate ?? 0, avg_wait_days ?? 0, report_count);
+  // Volume bonus and confidence come from the trust-WEIGHTED sample (effN), not the raw row count:
+  // 8 Reddit/review-site rows at 0.3 are 2.4 reports' worth of evidence, not a "moderate confidence" 8.
+  const effCount = Math.round(effN);
+  const base = calcOverallScore(response_rate ?? 0, ghost_rate ?? 0, avg_wait_days ?? 0, effCount);
   const tAdj = tenureAdjustment(avgTenureMonths, tenureSample);
   const stalePen = staleListingPenalty(confirmedStaleListings);
   const overall_score = clamp100(base + tAdj + stalePen);
   const waste_score = calcWaste(ghost_rate ?? 0, avg_rounds ?? 0, unpaid_rate);
   const confidence = scoreConfidence({
-    reportCount: first_party_report_count, tenureSample, dataAgeDays,
+    reportCount: effCount, tenureSample, dataAgeDays,
     webClaimedCount: web_report_count,
   });
 

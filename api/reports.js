@@ -337,6 +337,28 @@ export default async function handler(req, res) {
     return handleCompanyScore(req, res, body);
   }
 
+  // ── Ghost surges for a user's tracked companies (dashboard "Signals") ─────────
+  // Same rule the FAQ states: ≥3 scorable "ghosted" reports in the last 7 days. Names are matched
+  // exactly (case-insensitive) so "general" never counts Dollar General's reports.
+  if (body.action === 'ghost_surges') {
+    if (!SUPABASE_URL || !SUPABASE_SERVICE_KEY) return res.status(200).json({ ok: true, surges: [] });
+    const names = Array.isArray(body.names) ? [...new Set(body.names.map(n => String(n || '').toLowerCase().trim()).filter(Boolean))].slice(0, 20) : [];
+    if (!names.length) return res.status(200).json({ ok: true, surges: [] });
+    try {
+      const since = encodeURIComponent(new Date(Date.now() - 7 * 86400000).toISOString());
+      const inList = names.map(n => `"${n.replace(/"/g, '')}"`).join(',');
+      const r = await fetch(
+        `${SUPABASE_URL}/rest/v1/reports?select=company_name&outcome=eq.ghosted&created_at=gte.${since}&company_name=in.(${encodeURIComponent(inList)})&${SCORABLE_REPORTS_FILTER}&limit=1000`,
+        { headers: hdrsBase }
+      );
+      const rows = r.ok ? await r.json() : [];
+      const counts = {};
+      for (const row of (Array.isArray(rows) ? rows : [])) { const k = String(row.company_name || '').toLowerCase().trim(); counts[k] = (counts[k] || 0) + 1; }
+      const surges = names.filter(n => (counts[n] || 0) >= 3).map(n => ({ name: n, ghosted_7d: counts[n] }));
+      return res.status(200).json({ ok: true, surges });
+    } catch(e) { return res.status(200).json({ ok: true, surges: [] }); }
+  }
+
   // ── Company leaderboard ───────────────────────────────────────────────────────
   if (body.action === 'leaderboard') {
     if (!SUPABASE_URL || !SUPABASE_SERVICE_KEY) return res.status(200).json({ companies: [] });
@@ -345,9 +367,13 @@ export default async function handler(req, res) {
       // ordering, never for a "reports" label. Every row also carries the honest split so clients
       // can label correctly. order:'first_party' ranks by real report rows (the admin Ghost Report
       // panel needs this — mirrors lib/growth.ts getLeaderboard({ by: 'first_party' })).
-      const order = body.order === 'first_party' ? 'first_party_report_count.desc.nullslast,report_count.desc' : 'report_count.desc';
+      // Only companies with ≥1 real report can ever be gradeable (lib/server/reportCounts.js), so the
+      // 150 slots are filled from those, most-reported first. Ordering by the FUSED count let web-claim
+      // rows (McDonald's 12.7k claimed) take the slots and the gate then threw them away — the board
+      // showed 66 companies while ≥150 were gradeable (nike 8/8, apple 7/7, marriott 8/8 missing).
+      const order = 'first_party_report_count.desc.nullslast,report_count.desc';
       const r = await fetch(
-        `${SUPABASE_URL}/rest/v1/company_scores?select=company_name,overall_score,ghost_rate,response_rate,avg_wait_days,waste_score,report_count,first_party_report_count${await mentionSel(SUPABASE_URL, hdrsBase)},web_report_count,data_source,data_quality,verification_status,industry&order=${order}&limit=150`,
+        `${SUPABASE_URL}/rest/v1/company_scores?select=company_name,overall_score,ghost_rate,response_rate,avg_wait_days,waste_score,report_count,first_party_report_count${await mentionSel(SUPABASE_URL, hdrsBase)},web_report_count,data_source,data_quality,verification_status,industry&first_party_report_count=gte.1&order=${order}&limit=150`,
         { headers: hdrsBase }
       );
       if (!r.ok) return res.status(200).json({ companies: [] });
@@ -667,17 +693,19 @@ export default async function handler(req, res) {
       };
       const outcomes = outcomeMap[outcome] || null;
 
+      // Only reports that shape a score are public — held rows (anti-gaming review) never were.
       let url = `${SUPABASE_URL}/rest/v1/reports`
         + `?select=id,role,outcome,ghost_stage,rounds,report_text,platform,created_at,experience_level,company_name`
+        + `&${SCORABLE_REPORTS_FILTER}`
         + `&order=created_at.desc`
         + `&limit=${safeLimit}&offset=${safeOffset}`;
       if (outcomes) url += `&outcome=in.(${outcomes.join(',')})`;
 
-      // Prefer= count to get total without a second query
-      const r = await fetch(url, { headers: { ...hdrsBase, 'Prefer': 'count=estimated' } });
+      // Exact count: "Load more (N remaining)" printed a planner estimate before.
+      const r = await fetch(url, { headers: { ...hdrsBase, 'Prefer': 'count=exact' } });
       if (!r.ok) { console.error('FEED: supabase error', r.status); return res.status(500).json({ error: 'feed error' }); }
       const rows = await r.json();
-      const page = (rows || []).map(row => ({ ...row, source: 'seen' }));
+      const page = (rows || []).map(row => ({ ...row, source: classifyPlatform(row.platform) }));
 
       // Content-Range: 0-19/1234
       const contentRange = r.headers.get('content-range') || '';
@@ -1290,16 +1318,22 @@ Return ONLY a valid JSON array. Return [] if there are genuinely no hiring exper
     .trim() : '';
 
   const canonical = normalize(company.trim());
-  const firstWord = canonical.split(/\s+/)[0];
+  // Same-company test used on every row that comes back: legal suffixes stripped, hyphens and
+  // spaces equivalent (slugs decode "coca-cola" → "coca cola"). "General Motors" never matches
+  // "Dollar General" or "Mass General Brigham" — the old first-word wildcard returned all of them.
+  const nameKey = n => normalize(n).replace(/[\s-]+/g, ' ');
+  const sameCompany = r => nameKey(r.company_name) === nameKey(canonical);
 
   console.log(`REPORTS: company="${company}" canonical="${canonical}"`);
 
   try {
     // ── Query reports directly by company_name (no FK join) ───────────────────
-    // Use first significant word so "Towne Park LLC" matches "Towne Park"
-    const nameEnc = encodeURIComponent(`*${firstWord}*`);
+    // Wildcards only BETWEEN tokens (so "Towne Park LLC" / "coca-cola" still match); every row is
+    // then checked with sameCompany. Held rows (anti-gaming needs_review) are not public.
+    const nameEnc = encodeURIComponent(`*${canonical.replace(/[\s-]+/g, '*')}*`);
     const url = `${SUPABASE_URL}/rest/v1/reports`
       + `?company_name=ilike.${nameEnc}`
+      + `&needs_review=not.is.true`
       + `&select=id,role,outcome,ghost_stage,rounds,report_text,platform,outcome_weight,trust_reason,created_at,experience_level,location_id,company_name,company_id`
       + `&order=created_at.desc`
       + `&limit=100`;
@@ -1331,6 +1365,7 @@ Return ONLY a valid JSON array. Return [] if there are genuinely no hiring exper
 
       const fbUrl = `${SUPABASE_URL}/rest/v1/reports`
         + `?company_id=in.(${ids.join(',')})`
+        + `&needs_review=not.is.true`
         + `&select=id,role,outcome,ghost_stage,rounds,report_text,platform,outcome_weight,trust_reason,created_at,experience_level,location_id,company_id`
         + `&order=created_at.desc&limit=100`;
       const fbRes = await fetch(fbUrl, { headers: hdrs });
@@ -1339,7 +1374,7 @@ Return ONLY a valid JSON array. Return [] if there are genuinely no hiring exper
       return buildResponse(res, fbRows, hdrs, SUPABASE_URL, city);
     }
 
-    const rows = await rRes.json();
+    const rows = (await rRes.json() || []).filter(sameCompany);
     console.log(`REPORTS: company_name query got ${rows?.length || 0} rows`);
 
     // Also get any older reports that have company_id but no company_name
@@ -1358,6 +1393,7 @@ Return ONLY a valid JSON array. Return [] if there are genuinely no hiring exper
         const knownIds = new Set((rows || []).map(r => r.id));
         const fbUrl2 = `${SUPABASE_URL}/rest/v1/reports`
           + `?company_id=in.(${ids2.join(',')})`
+          + `&needs_review=not.is.true`
           + `&select=id,role,outcome,ghost_stage,rounds,report_text,platform,outcome_weight,trust_reason,created_at,experience_level,location_id,company_id`
           + `&order=created_at.desc&limit=100`;
         const fb2 = await fetch(fbUrl2, { headers: hdrs });
@@ -1526,7 +1562,7 @@ function _rowToScoreRaw(row) {
     // 'web_research', which presented model-generated estimates to users as research.
     data_quality: row.data_quality || 'medium', data_source: servedDataSource(row),
     risk_level: s >= 70 ? 'safe' : s >= 40 ? 'warn' : 'danger',
-    industry: row.industry || '', summary: row.raw_summary || '',
+    industry: row.industry || '', summary: /^estimated baseline/i.test(String(row.raw_summary || '')) ? '' : (row.raw_summary || ''),
     process_score: s, web_reviews: reviews,
   };
 }
@@ -1542,24 +1578,43 @@ function _fuzzyNamePattern(name) {
   return encodeURIComponent(String(name).toLowerCase().trim().replace(/[\s-]+/g, '*'));
 }
 
+// Group report rows by trust class and carry each class's mean wait_days / rounds, so fusion
+// (companyIntel sources[].avgWaitDays/avgRounds) produces a real avg wait instead of null.
+// Shared with api/_utils/reportWrite.js recompute via the same helper there.
+export function groupReportsByType(reps) {
+  const byType = {};
+  for (const row of reps) {
+    const type = classifyPlatform(row.platform);
+    (byType[type] ||= []).push({ outcome: row.outcome, wait_days: row.wait_days, rounds: row.rounds });
+  }
+  return byType;
+}
+export function sourcesFromGroups(byType) {
+  const mean = (rows, key, max) => {
+    const vals = rows.map(r => Number(r[key])).filter(v => Number.isFinite(v) && v > 0 && v <= max);
+    return vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : null;
+  };
+  return Object.entries(byType).map(([type, rows]) => ({
+    type,
+    outcomes: rows.map(r => ({ outcome: r.outcome })),
+    ...(type === 'mentions' ? {} : { avgWaitDays: mean(rows, 'wait_days', 365), avgRounds: mean(rows, 'rounds', 20) }),
+  }));
+}
+
 async function _fuseWithReports(name, web, SUPABASE_URL, dbH) {
   if (!SUPABASE_URL || !dbH) return null;
   try {
     const enc = encodeURIComponent(String(name).toLowerCase().trim());
     // Every report counts at its trust weight; only the anti-gaming holds wait for an admin
     // (lib/server/reportCounts.js SCORABLE_REPORTS_FILTER — the same corpus the stored recompute uses).
-    let r = await fetch(`${SUPABASE_URL}/rest/v1/reports?company_name=ilike.${enc}&${SCORABLE_REPORTS_FILTER}&select=outcome,platform&limit=2000`, { headers: dbH });
+    let r = await fetch(`${SUPABASE_URL}/rest/v1/reports?company_name=ilike.${enc}&${SCORABLE_REPORTS_FILTER}&select=outcome,platform,wait_days,rounds&limit=2000`, { headers: dbH });
     let reps = r.ok ? await r.json() : null;
     if ((!Array.isArray(reps) || !reps.length) && /[\s-]/.test(String(name))) {
-      r = await fetch(`${SUPABASE_URL}/rest/v1/reports?company_name=ilike.${_fuzzyNamePattern(name)}&${SCORABLE_REPORTS_FILTER}&select=outcome,platform&limit=2000`, { headers: dbH });
+      r = await fetch(`${SUPABASE_URL}/rest/v1/reports?company_name=ilike.${_fuzzyNamePattern(name)}&${SCORABLE_REPORTS_FILTER}&select=outcome,platform,wait_days,rounds&limit=2000`, { headers: dbH });
       reps = r.ok ? await r.json() : null;
     }
     if (!Array.isArray(reps)) return null;
-    const byType = {};
-    for (const row of reps) {
-      const type = classifyPlatform(row.platform);
-      (byType[type] ||= []).push({ outcome: row.outcome });
-    }
+    const byType = groupReportsByType(reps);
     // "What people are saying" (stored web_reviews) counts exactly half a report — only once
     // mention_count can be stored, so this path and the stored recompute always agree.
     let totalMentions = null;
@@ -1572,7 +1627,7 @@ async function _fuseWithReports(name, web, SUPABASE_URL, dbH) {
       if (mentions.length) byType.mentions = mentions;
     }
     if (!Object.keys(byType).length && !totalMentions) return null;
-    const sources = Object.entries(byType).map(([type, outcomes]) => ({ type, outcomes }));
+    const sources = sourcesFromGroups(byType);
     // Admin-confirmed dead listings (zombie postings) carry a bounded penalty here too,
     // so the company-page score matches the stored recompute path.
     const confirmedStaleListings = await fetchConfirmedStaleCount(SUPABASE_URL, dbH, name);
@@ -1685,7 +1740,7 @@ async function handleCompanyScore(req, res, body) {
         const eGr = fz?fz.ghost_rate:gr, eRr = fz?fz.response_rate:rr, eWait = Math.round(fz?fz.avg_wait_days:wait), eRounds = fz?fz.avg_rounds:Math.round(rounds*10)/10, eUnpaid = fz?fz.unpaid_rate:unpaid, eCnt = fz?fz.report_count:cnt;
         const overall = fz?fz.overall_score:_calcScore(rr,gr,wait,cnt), waste = fz?fz.waste_score:_calcWaste(gr,rounds,unpaid);
         const revs = Array.isArray(p.reviews) ? p.reviews.slice(0,6).map(r=>({text:(r.text||'').slice(0,400),sentiment:['positive','negative','mixed'].includes(r.sentiment)?r.sentiment:'mixed',source:(r.source||'').slice(0,80),year:(r.year||'').slice(0,4)})) : [];
-        const row = { company_name:co, overall_score:overall, ghost_rate:eGr, response_rate:eRr, avg_wait_days:eWait, avg_rounds:eRounds, waste_score:waste, unpaid_rate:eUnpaid, report_count:eCnt, first_party_report_count: fz ? (fz.first_party_report_count ?? 0) : 0, web_report_count: fz ? (fz.web_report_count ?? cnt) : cnt, data_quality:p.data_quality||'medium', data_source:'web_search', industry:(p.industry||'').slice(0,80), raw_summary:(p.summary||'').slice(0,500), expires_at:new Date(Date.now()+_SCORE_TTL_MS).toISOString(), web_reviews:revs };
+        const row = { company_name:co, overall_score:overall, ghost_rate:eGr, response_rate:eRr, avg_wait_days:eWait, avg_rounds:eRounds, waste_score:waste, unpaid_rate:eUnpaid, report_count:eCnt, first_party_report_count: fz ? (fz.first_party_report_count ?? 0) : 0, web_report_count: fz ? (fz.web_report_count ?? cnt) : cnt, ...((await hasMentionCount(SUPABASE_URL, dbH)) ? { mention_count: mentionTotal(revs) } : {}), data_quality:p.data_quality||'medium', data_source:'web_search', industry:(p.industry||'').slice(0,80), raw_summary:(p.summary||'').slice(0,500), expires_at:new Date(Date.now()+_SCORE_TTL_MS).toISOString(), web_reviews:revs };
         const sv = await fetch(`${SUPABASE_URL}/rest/v1/company_scores?on_conflict=company_name`, { method:'POST', headers:{...dbH,Prefer:'resolution=merge-duplicates,return=minimal'}, body:JSON.stringify(row) });
         results.push({ company:co, score:overall, reviews:revs.length, saved:sv.ok });
       } catch(e) {
@@ -1849,7 +1904,7 @@ async function handleCompanyScore(req, res, body) {
 
   if (SUPABASE_URL && SUPABASE_SERVICE_KEY) {
     const expires = new Date(Date.now() + _SCORE_TTL_MS).toISOString();
-    const rowBase = { company_name:name.toLowerCase().trim(), overall_score:overall, ghost_rate:eGr, response_rate:eRr, avg_wait_days:eWait, avg_rounds:eRounds, waste_score:waste, unpaid_rate:eUnpaid, report_count:eCnt, first_party_report_count: score.first_party_report_count, web_report_count: score.web_report_count, data_quality:score.data_quality, data_source:'web_search', industry:score.industry, raw_summary:score.summary, expires_at:expires };
+    const rowBase = { company_name:name.toLowerCase().trim(), overall_score:overall, ghost_rate:eGr, response_rate:eRr, avg_wait_days:eWait, avg_rounds:eRounds, waste_score:waste, unpaid_rate:eUnpaid, report_count:eCnt, first_party_report_count: score.first_party_report_count, web_report_count: score.web_report_count, ...((await hasMentionCount(SUPABASE_URL, dbH)) ? { mention_count: mentionTotal(reviews) } : {}), data_quality:score.data_quality, data_source:'web_search', industry:score.industry, raw_summary:score.summary, expires_at:expires };
     try {
       const prefer = force_refresh ? 'resolution=merge-duplicates,return=minimal' : 'resolution=ignore-duplicates,return=minimal';
       let saveRes = await fetch(`${SUPABASE_URL}/rest/v1/company_scores?on_conflict=company_name`, { method:'POST', headers:{...dbH,Prefer:prefer}, body:JSON.stringify({...rowBase,web_reviews:reviews}) });

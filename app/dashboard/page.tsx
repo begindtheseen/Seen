@@ -4,7 +4,6 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { useAuth } from '@/lib/auth'
-import { supabase } from '@/lib/supabase'
 import { AppStore } from '@/lib/stores/AppStore'
 import { EventStore } from '@/lib/stores/EventStore'
 import { BadgeStore } from '@/lib/stores/BadgeStore'
@@ -38,14 +37,23 @@ function surveyFrustration(onboarding: string | Record<string, unknown> | undefi
   }
 }
 
+const RESPONSE_EVENTS = new Set(['response_received', 'interview_received', 'interview_completed', 'offer_received'])
+/** The company engaged: a decision (hired/rejected) or a logged response/interview. Ghosted and withdrawn are not responses. */
+function responded(a: Application): boolean {
+  return a.status === 'hired' || a.status === 'rejected' || (a.events || []).some(e => RESPONSE_EVENTS.has(e.type))
+}
+function hadInterview(a: Application): boolean {
+  return a.status === 'hired' || (a.events || []).some(e => e.type === 'interview_received' || e.type === 'interview_completed')
+}
+
 function calcJobSearchHealth(apps: Application[]) {
   if (apps.length < 3) return null
   const terminal = apps.filter(a => a.status !== 'active')
-  const responseRate = terminal.length > 0 ? Math.round((apps.filter(a => a.status !== 'active' && a.status !== 'ghosted').length / apps.length) * 100) : 0
+  const responseRate = Math.round((apps.filter(responded).length / apps.length) * 100)
   const ghostRate = Math.round((apps.filter(a => a.status === 'ghosted').length / apps.length) * 100)
-  const interviewRate = Math.round((apps.filter(a => (a.events || []).some(e => e.type === 'interview_received' || e.type === 'interview_completed')).length / apps.length) * 100)
+  const interviewRate = Math.round((apps.filter(hadInterview).length / apps.length) * 100)
   const score = Math.max(0, Math.min(100, Math.round(50 + responseRate * 0.3 - ghostRate * 0.4 + interviewRate * 0.5)))
-  return { score, responseRate, ghostRate, interviewRate, avgCompanyScore: 65 }
+  return { score, responseRate, ghostRate, interviewRate, terminal: terminal.length }
 }
 
 export default function DashboardPage() {
@@ -56,6 +64,12 @@ export default function DashboardPage() {
   const [isPro, setIsPro] = useState(false)
   const [surges, setSurges] = useState<string[]>([])
   const [recentCos, setRecentCos] = useState<Array<{name: string; slug: string}>>([])
+  // Greeting by the visitor's local hour — set after mount so the server HTML (UTC) never mismatches.
+  const [greeting, setGreeting] = useState('Hey')
+  useEffect(() => {
+    const h = new Date().getHours()
+    setGreeting(h < 5 ? 'Still up' : h < 12 ? 'Good morning' : h < 17 ? 'Good afternoon' : h < 22 ? 'Good evening' : 'Late one')
+  }, [])
   const [coScores, setCoScores] = useState<Record<string, {ghost_rate: number; overall_score: number; avg_wait_days: number}>>({})
   // Start hidden to avoid a flash for returning users; the effect flips it on for anyone
   // who hasn't dismissed the first-run guide.
@@ -95,29 +109,40 @@ export default function DashboardPage() {
     AppStore.load(true).then(data => { setApps(data); setLoading(false) })
   }, [isLoggedIn])
 
-  // Ghost-surge alerts — read public reports via the anon client (parity: index.html:9447).
+  // Ghost-surge alerts for the companies you're waiting on — served by api/reports.js
+  // (action:'ghost_surges', ≥3 scorable ghosted reports in the last 7 days, exact-name match).
   useEffect(() => {
     if (!isLoggedIn || apps.length === 0) return
-    const tracked = [...new Set(apps.filter(a => a.status !== 'ghosted').map(a => a.company).filter(Boolean))].slice(0, 4)
+    const tracked = [...new Set(apps.filter(a => a.status === 'active').map(a => a.company.trim()).filter(Boolean))].slice(0, 20)
     if (!tracked.length) return
-    const cutoff = new Date(Date.now() - 7 * 86400000).toISOString()
-    ;(async () => {
-      try {
-        const { data, error } = await supabase
-          .from('reports').select('company_name').eq('outcome', 'ghosted').gte('created_at', cutoff).limit(300)
-        if (error || !data?.length) return
-        const counts: Record<string, number> = {}
-        for (const r of data as { company_name: string | null }[]) {
-          if (r.company_name) { const k = r.company_name.toLowerCase(); counts[k] = (counts[k] || 0) + 1 }
-        }
-        const found = tracked.filter(co => {
-          const ck = co.toLowerCase()
-          return Object.entries(counts).some(([k, c]) => (k.includes(ck) || ck.includes(k)) && c >= 3)
-        })
-        if (found.length) setSurges(found)
-      } catch { /* RLS / network — stale-only fallback */ }
-    })()
+    let cancelled = false
+    fetch('/api/reports', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'ghost_surges', names: tracked }),
+    })
+      .then(r => (r.ok ? r.json() : null))
+      .then((d: { surges?: Array<{ name: string }> } | null) => {
+        if (cancelled || !d?.surges?.length) return
+        const hit = new Set(d.surges.map(s => s.name))
+        setSurges(tracked.filter(co => hit.has(co.toLowerCase())))
+      })
+      .catch(() => { /* stale-only fallback */ })
+    return () => { cancelled = true }
   }, [isLoggedIn, apps])
+
+  // Reference rates for the benchmark column — the server's ONE set (GET /api/reports?type=industry),
+  // labeled as reference estimates. Without them the column is simply not shown.
+  const [refRates, setRefRates] = useState<{ response_rate: number; interview_rate: number; offer_rate: number; ghost_rate: number } | null>(null)
+  useEffect(() => {
+    let cancelled = false
+    fetch('/api/reports?type=industry').then(r => (r.ok ? r.json() : null))
+      .then((d: { benchmarks?: { response_rate?: number; interview_rate?: number; offer_rate?: number; ghost_rate?: number } } | null) => {
+        const b = d?.benchmarks
+        if (cancelled || !b || [b.response_rate, b.interview_rate, b.offer_rate, b.ghost_rate].some(v => typeof v !== 'number')) return
+        setRefRates({ response_rate: b.response_rate!, interview_rate: b.interview_rate!, offer_rate: b.offer_rate!, ghost_rate: b.ghost_rate! })
+      }).catch(() => {})
+    return () => { cancelled = true }
+  }, [])
 
   // Batch-fetch company scores for active applications
   useEffect(() => {
@@ -167,43 +192,36 @@ export default function DashboardPage() {
     const n = apps.length
     const terminal = apps.filter(a => ['hired', 'rejected', 'ghosted'].includes(a.status))
     if (n < 3 || terminal.length < 2) return null
-    const withInt = apps.filter(a => (a.events || []).some(e => e.type === 'interview_received' || e.type === 'interview_completed'))
-    const rr = Math.round((terminal.length / n) * 100)
-    const ir = Math.round((withInt.length / n) * 100)
+    const rr = Math.round((apps.filter(responded).length / n) * 100)
+    const ir = Math.round((apps.filter(hadInterview).length / n) * 100)
     const or = Math.round((hired.length / n) * 100)
     const gr = Math.round((ghosted.length / n) * 100)
-    const AVG = { rr: 22, ir: 10, or: 4, gr: 55 }
+    const AVG = refRates ? { rr: Math.round(refRates.response_rate * 100), ir: Math.round(refRates.interview_rate * 100), or: Math.round(refRates.offer_rate * 100), gr: Math.round(refRates.ghost_rate * 100) } : null
     const pct = (v: number, avg: number, hi: boolean) => {
       if (v === 0 && hi) return 5
       const ratio = hi ? v / Math.max(avg, 1) : avg / Math.max(v, 1)
       return Math.min(99, Math.max(1, Math.round(50 * ratio)))
     }
-    const col = (v: number, avg: number, hi: boolean) => v === 0 ? 'var(--muted)' : (hi ? (v >= avg ? 'var(--green)' : 'var(--amber)') : (v <= avg ? 'var(--green)' : v < avg * 1.4 ? 'var(--amber)' : 'var(--red)'))
+    const col = (v: number, avg: number | null, hi: boolean) => v === 0 || avg == null ? 'var(--muted)' : (hi ? (v >= avg ? 'var(--green)' : 'var(--amber)') : (v <= avg ? 'var(--green)' : v < avg * 1.4 ? 'var(--amber)' : 'var(--red)'))
+    const row = (lbl: string, v: number, avg: number | null, hi: boolean) => ({ lbl, val: `${v}%`, pct: avg == null ? 50 : pct(v, avg, hi), avg: avg == null ? 'reference pending' : `${avg}% reference`, col: col(v, avg, hi) })
     return {
       n,
+      hasRef: !!AVG,
       metrics: [
-        { lbl: 'Response Rate', val: `${rr}%`, pct: pct(rr, AVG.rr, true), avg: `${AVG.rr}% avg`, col: col(rr, AVG.rr, true) },
-        { lbl: 'Interview Rate', val: `${ir}%`, pct: pct(ir, AVG.ir, true), avg: `${AVG.ir}% avg`, col: col(ir, AVG.ir, true) },
-        { lbl: 'Offer Rate', val: `${or}%`, pct: pct(or, AVG.or, true), avg: `${AVG.or}% avg`, col: col(or, AVG.or, true) },
-        { lbl: 'Ghost Rate', val: `${gr}%`, pct: pct(gr, AVG.gr, false), avg: `${AVG.gr}% avg`, col: col(gr, AVG.gr, false) },
+        row('Response Rate', rr, AVG?.rr ?? null, true),
+        row('Interview Rate', ir, AVG?.ir ?? null, true),
+        row('Offer Rate', or, AVG?.or ?? null, true),
+        row('Ghost Rate', gr, AVG?.gr ?? null, false),
       ],
     }
   })()
 
   const badges = BadgeStore.compute(apps, allEvents)
   const health = calcJobSearchHealth(apps)
-  if (health && Object.keys(coScores).length > 0) {
-    const appliedScores = active
-      .map(a => coScores[a.company.toLowerCase()]?.overall_score)
-      .filter((s): s is number => typeof s === 'number')
-    if (appliedScores.length) {
-      health.avgCompanyScore = Math.round(appliedScores.reduce((a, b) => a + b, 0) / appliedScores.length)
-    }
-  }
 
   const rawName = profile?.name || user?.user_metadata?.name || ''
   const name = rawName ? rawName.charAt(0).toUpperCase() + rawName.slice(1).split(/[^a-zA-Z]/)[0] : 'there'
-  const responseNum = apps.length ? Math.round((apps.filter(a => a.status !== 'active' && a.status !== 'ghosted').length / apps.length) * 100) : null
+  const responseNum = apps.length ? Math.round((apps.filter(responded).length / apps.length) * 100) : null
 
   // Health ring visuals
   const healthColor = health ? (health.score >= 75 ? 'var(--green)' : health.score >= 55 ? 'var(--amber)' : 'var(--red)') : 'var(--muted)'
@@ -236,11 +254,13 @@ export default function DashboardPage() {
   // Health headline: one plain sentence instead of a caption line.
   const healthHead = !health
     ? { t: 'Your score unlocks soon.', s: `Track ${Math.max(1, 3 - apps.length)} more application${Math.max(1, 3 - apps.length) !== 1 ? 's' : ''} and Seen scores how your search is going.`, badge: 'Getting started', tone: 'muted' }
-    : health.score >= 75
-      ? { t: "You're getting noticed.", s: 'Your response rate is beating the average. Keep doing what works.', badge: 'Above average', tone: 'green' }
-      : health.score >= 55
-        ? { t: "You're on track.", s: 'Steady replies. A follow-up on your quiet applications could tip it.', badge: 'On track', tone: 'amber' }
-        : { t: 'Room to improve.', s: 'Fewer replies than average. Check companies before applying and tailor your résumé.', badge: 'Needs attention', tone: 'red' }
+    : health.terminal < 2
+      ? { t: 'Too early to call.', s: 'Report what happened with a couple of applications and this becomes a real read on your search.', badge: 'Early days', tone: 'muted' }
+      : health.score >= 75
+        ? { t: "You're getting noticed.", s: `${health.interviewRate}% of your applications reached an interview and ${health.responseRate}% got a reply. Keep doing what works.`, badge: 'Strong', tone: 'green' }
+        : health.score >= 55
+          ? { t: "You're on track.", s: `${health.responseRate}% of your applications got a reply. A follow-up on the quiet ones could tip it.`, badge: 'On track', tone: 'amber' }
+          : { t: 'Room to improve.', s: `${health.ghostRate}% of your applications went silent. Check a company's ghost rate before applying and tailor your résumé.`, badge: 'Needs attention', tone: 'red' }
   const signalCount = alertCount + (surveyInsight ? 1 : 0)
   const today = new Date().toLocaleDateString('en-US', { month: 'short', year: 'numeric' })
 
@@ -262,7 +282,7 @@ export default function DashboardPage() {
         <header className={styles.intro}>
           <div style={{ minWidth: 0 }}>
             <div className={styles.eyebrow}>✦ Command Center · {today}</div>
-            <h1 className={styles.hello}>Hey, {name}<span className={styles.dot}>.</span></h1>
+            <h1 className={styles.hello}>{greeting}, {name}<span className={styles.dot}>.</span></h1>
             <p className={styles.status}>{statusLine}{apps.length ? <span className={styles.statusDim}> · {apps.length} tracked total</span> : null}</p>
           </div>
           <Link href="/tracker?add=1" className={`${styles.primary} btn-shine`}>+ Track application</Link>
@@ -381,7 +401,7 @@ export default function DashboardPage() {
             })}
             {!isPro && (
               <Link href="/pricing" className={styles.lock}>
-                <span>🔒 Ghost-surge email alerts before you apply</span><span className={styles.link}>Pro →</span>
+                <span>🔒 Unlimited AI credits and deeper company analysis</span><span className={styles.link}>Pro →</span>
               </Link>
             )}
           </section>
@@ -392,7 +412,7 @@ export default function DashboardPage() {
           <>
             <div className={styles.secHead}>
               <h2 className={styles.secT}>Career benchmarks</h2>
-              <span className={styles.eyebrow}>You vs reference averages</span>
+              <span className={styles.eyebrow}>{benchmarks.hasRef ? 'You vs reference estimates' : 'Your rates'}</span>
             </div>
             <div className={styles.metrics}>
               {benchmarks.metrics.map(m => (
@@ -403,7 +423,7 @@ export default function DashboardPage() {
                 </div>
               ))}
             </div>
-            <p className={styles.caption}>Based on {benchmarks.n} tracked applications. Treat small samples as directional.</p>
+            <p className={styles.caption}>Based on {benchmarks.n} tracked applications. Treat small samples as directional.{benchmarks.hasRef ? ' Reference figures are industry-wide estimates, not Seen user data.' : ''}</p>
           </>
         )}
 

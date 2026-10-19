@@ -122,7 +122,7 @@ export default function JobsPage() {
                 const val = e.target.value
                 setQuery(val)
                 if (debounceRef.current) clearTimeout(debounceRef.current)
-                if (val.trim().length >= 2 || location.trim().length >= 2) {
+                if (val.trim().length >= 2) {
                   debounceRef.current = setTimeout(() => searchJobs(val, undefined), 450)
                 }
               }}
@@ -306,9 +306,9 @@ export default function JobsPage() {
             coScores={coScores}
           />
         ) : filtered.length > 0 ? (
-          <div className="jlist" key={saveVersion}>
+          <div className="jlist">
             {filtered.map((job, i) => (
-              <JobCard key={job.id} job={job} index={i} onSaveToggle={handleSaveToggle} onOpen={j => setDetailJob(j)} onApply={j => takesSeenApply(j) ? setDetailJob(j) : setApplyJob(j)} onCheckCompany={co => setCheckCompany(co)} alreadyApplied={appliedCos.has(job.company.toLowerCase().trim())} />
+              <JobCard key={job.id} job={job} index={i} onSaveToggle={handleSaveToggle} onOpen={j => setDetailJob(j)} onApply={j => takesSeenApply(j) ? setDetailJob(j) : setApplyJob(j)} onCheckCompany={co => setCheckCompany(co)} alreadyApplied={appliedCos.has(job.id) || (!!job.apply_url && appliedCos.has(job.apply_url))} />
             ))}
           </div>
         ) : status === 'idle' ? (

@@ -443,7 +443,7 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
         <div style={{ marginTop: '1.5rem', background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 12, padding: '1.25rem' }}>
           <div style={{ fontFamily: 'var(--display)', fontSize: '.9rem', fontWeight: 700, color: 'var(--white)', marginBottom: '.3rem' }}>Report your experience</div>
           <p style={{ fontFamily: 'var(--mono)', fontSize: '.65rem', color: 'var(--sub)', marginBottom: '1rem', lineHeight: 1.6 }}>
-            Applied here? Share how it went — takes 60 seconds and helps thousands of job seekers.
+            Applied here? Share how it went — takes 60 seconds and warns the next applicant.
           </p>
           <div style={{ display: 'flex', gap: '.5rem', flexWrap: 'wrap' }}>
             <a

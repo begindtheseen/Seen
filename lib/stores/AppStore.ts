@@ -199,12 +199,14 @@ export const AppStore = {
     const syncChanges = { ...changes }
     const updatedApp = apps.find(a => a.id === id)
     if (updatedApp?.events) syncChanges.events = updatedApp.events
-    if (loggedIn) _sync('update_application', { id, changes: syncChanges })
+    // Awaited: the tracker reloads right after, and an un-awaited PATCH let the reload's SELECT win
+    // the race and visibly revert a "Ghosted"/"Rejected" click.
+    if (loggedIn) await _sync('update_application', { id, changes: syncChanges })
   },
 
   async remove(id: string, loggedIn: boolean): Promise<void> {
     localStorage.setItem(KEY, JSON.stringify(this.loadSync().filter(a => a.id !== id)))
-    if (loggedIn) _sync('remove_application', { id })
+    if (loggedIn) await _sync('remove_application', { id })
   },
 
   async clear(loggedIn = false): Promise<void> {

@@ -1,5 +1,6 @@
 import HomeHero from '@/components/HomeHero'
 import LandingMarketingSections from '@/components/LandingMarketingSections'
+import LivePulse from '@/components/home/LivePulse'
 
 export default function LandingPage() {
   return (
@@ -13,6 +14,9 @@ export default function LandingPage() {
 
       {/* Redesigned hero: one consolidated company search + a live real-data proof card */}
       <HomeHero />
+
+      {/* Live pulse: the newest real applicant reports gliding by (components/home/LivePulse) */}
+      <LivePulse />
 
       {/* Value · How it works · Final CTA.
           NOTE: no page-local footer here — the global <Footer /> from app/layout.tsx

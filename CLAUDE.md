@@ -131,6 +131,64 @@ longer the design source of truth for redesigned pages. `SITE_PARITY_CHECKLIST.m
   (`scratchpad/shell.mjs`: crumb click, g-t, Ctrl+K search/route, tab bar tap/duck, guest tabs, footer
   clearance) + the per-element overflow check on 15 pages at 360/390/430.
 
+## Session 2026-10-19 B: logic fact-check of every non-résumé surface (owner: "fact check logics… bring the site to life")
+Four read-only audits (dashboard+tracker, company page+scoring, explore/homepage/pricing, jobs) traced every
+frontend→API→DB contract and probed prod. ~50 verified defects fixed in ONE pass (PR #328). Ground truth now:
+- **Leaderboard** (`api/reports.js` + `lib/growth.ts`): the 150-row cap ran BEFORE the grade gate, ordered by the
+  FUSED count, so web-claim rows filled the slots — /companies showed 66 while ≥150 were gradeable. Now
+  `first_party_report_count=gte.1`, ordered by first-party. `order:'first_party'` is the only ordering.
+- **Company reports list** was a first-word wildcard (`*general*` → Dollar General, Mass General under General
+  Motors) with no post-filter; now wildcard-between-tokens + exact `sameCompany` key, and `needs_review` rows
+  (anti-gaming holds) are never public. `company_jobs` (api/jobs.js) same class (Amazon Flex under Amazon).
+- **Fusion** reads `wait_days,rounds` so `avg_wait_days`/`avg_rounds` are real (were null for every reports-
+  derived score; the share PNG printed "0d"). Volume bonus + confidence use `effN` (trust-weighted), not raw row
+  count — 8 Reddit rows ≠ "Moderate confidence · 8 reports". Stored rows only pick this up on the next recompute
+  (new report, or the admin rescore). Fresh/populate saves now write `mention_count`, so the view-time
+  self-repair no longer rewrites a web-researched row into `data_source:'reports', web_report_count:0`.
+- **No invented numbers:** the company page "N Seen users checked this week" (a hash) is gone; the "Viewed"
+  funnel bar (response×1.8) is gone — "Where they ghost" is built from reports' `ghost_stage` or hidden;
+  tracker never says "their 21-day average" without `avg_wait_days`; HiringProbability no longer defaults a
+  real 0% to 55% (`||`→ real values; it is the response rate, labeled "company-wide estimate");
+  dashboard benchmark references come from GET `/api/reports?type=industry` (one server constant set, labeled
+  "reference estimates"), never a second local table; the health verdict waits for ≥2 real outcomes and never
+  says "beating the average". Dashboard ghost surges are served by `action:'ghost_surges'` (the browser's
+  reports SELECT is DENIED in prod — the anon grant was revoked by hand; record in a migration if touched).
+- **Tracker semantics:** "I withdrew" → `status:'withdrawn'` (was recorded as REJECTED and filed against the
+  company). ONE community report per terminal outcome via `quick_submit` (hired now included; the day-30
+  EventStore duplicate is gone). `dueChecks` asks only `active` apps. `AppStore.update/remove` await the sync
+  (the un-awaited PATCH raced the reload and reverted clicks). Funnel "Screened" excludes ghosted/withdrawn;
+  stats row has Withdrawn; "Clear dupes" is active-only, newest kept, confirmed.
+- **Outcome follow-up cron** (`api/outcome-followups.js`) selected `applications.company` — the column is
+  `company_name` — so it 400'd on every run since it shipped. Fixed; needs ONE fire with `?secret=` to confirm
+  `sent>0` (not done from this session — no CRON_SECRET here). Env var is `RESEND_KEY` (not RESEND_API_KEY).
+- **Feed:** SCORABLE filter + `count=exact`; the "ghost surges this week" banner (any 2 companies with a ghosted
+  row on page 1) is gone; raw platform chip hidden when a provenance badge exists.
+- **Demand:** `/api/demand` had been stale since 2026-08-14 (monthly cron silent for Sep + Oct — NOT verified
+  why; Vercel log retention too short). The page now shows a stale banner, "~" on modeled totals, and the
+  eyebrow drops "+ live Seen listings" unless a live city exists. The refresh log is read with the service key
+  (it is service_role-only; the anon read returned null forever).
+- **Jobs:** Remote = only listings that say remote (page fills from corpus and says `remote_thin`); the API
+  returns `fallback: 'outside_radius'|'remote_thin'|'unrelated'` and the hook words each honestly ("No matches
+  for X — showing N other openings"); a search requires a title (location-only ran an unfiltered Adzuna path);
+  "Most recent" sorts by `posted_at`; zero-filter matches show an empty state, not every row; "Contract" option
+  removed (no source emits it); the Posted filter is labeled "Added to Seen" (it is `created_at`); the listing
+  scorer no longer carries hand-written KNOWN_GOOD/KNOWN_BAD company lists; the deck uses `Score.risk` thresholds;
+  JobCard passes `isLoggedIn` to save/unsave (was hard-coded false → unsave resurrected); "Applied" badge keys
+  on jobId/apply_url, not company; 60-row pages read "60+ results".
+- **Copy:** FAQ rewritten to what the code does (no 47k companies, no surge emails, no per-location scoring, no
+  hashed session id); grade bar wording = "enough evidence (≥1 report to Seen, 5 pieces; mentions ½)" via
+  `notEnoughReviewsLabel`; "helps thousands" → "warns the next applicant"; landing names ranked agencies
+  (Insight Global, Randstad, Addison Group); credits chip says "available" (balance includes purchased).
+- **Homepage LivePulse** (`components/home/LivePulse.tsx`): real feed rows gliding by, worded "compiled
+  applicant accounts" (brain seen:growth); dashboard greets by local hour (set after mount — SSR is UTC).
+- **Prod data to clean (owner):** this session's demo wrote 4 `rejected` reports (Hilton ×2, Advatix, Goodwill
+  SoCal, 2026-10-19 06:21–06:30 UTC, platform Seen) via the anonymous submit path, plus owner test rows
+  ("Seen Jobs"/"test2"/"Test run"). Delete them and rescore those companies. The demo harness
+  (`scratchpad/mockuser.mjs`) must stub `action:'submit'` and `quick_submit` — never proxy writes to prod.
+- Deferred (larger product changes, listed in PR #328): capture source post dates as `posted_at`; level as a
+  badge instead of a hard filter; a scored-company ghost badge on listings; pagination past 60; per-report
+  `needs_review` badge for the submitter's own held reports; `profiles.onboarding_survey` has no writer.
+
 ## Session 2026-10-17: self-filling company pages read the Arctic Shift archive when Reddit refuses
 - Verified on prod: the first enrichment cron run (Sheetz) got `reddit_429` from www.reddit.com on
   Vercel; cloud runners get 403. `ENRICH_SOURCE` (default `auto`) now switches the rest of a run to the

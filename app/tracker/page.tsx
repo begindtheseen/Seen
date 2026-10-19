@@ -376,11 +376,12 @@ function TrackerPage() {
 
   const handleUpdate = async (id: string, changes: Partial<Application>) => {
     await AppStore.update(id, changes, isLoggedIn)
-    // Auto-submit community report when user confirms terminal outcome
-    if (changes.status === 'ghosted' || changes.status === 'rejected') {
+    // The ONE community report per terminal outcome (hired included — "Got the job" never reached
+    // the company's score before). A withdrawal is the applicant's move, not the company's: no report.
+    if (changes.status === 'ghosted' || changes.status === 'rejected' || changes.status === 'hired') {
       const origApp = apps.find(a => a.id === id)
       if (origApp) {
-        const outcome = changes.status === 'ghosted' ? 'ghosted' : 'rejected'
+        const outcome = changes.status
         // quick_submit requires a signed-in user — without the Bearer token every one of
         // these community reports 401'd silently and the tracker→intel flywheel fed nothing.
         token().then(tok => {
@@ -399,12 +400,12 @@ function TrackerPage() {
         }).catch(() => {})
       }
     }
-    const terminalStatuses = ['hired', 'ghosted', 'rejected']
+    const terminalStatuses = ['hired', 'ghosted', 'rejected', 'withdrawn']
     if (changes.status && terminalStatuses.includes(changes.status)) {
       const updated = await AppStore.load(isLoggedIn)
       setApps(updated)
       const app = updated.find(a => a.id === id)
-      if (app) {
+      if (app && changes.status !== 'withdrawn') {
         const merged = { ...app, ...changes }
         setOutcomeApp(merged)
         if (changes.status === 'hired') setRoundsApp(merged)
@@ -440,19 +441,23 @@ function TrackerPage() {
           color: 'rgba(156,163,175,0.15)',
         })
       } else if (rt === 'interview') {
-        const avgWait = score?.avg_wait_days ?? 21
+        const avgWait = score?.avg_wait_days || null // null = no wait data for this company; never invent one
         setUpdateInsight({
           title: '📞 Interview unlocked — you\'re ahead',
-          body: `You reached the interview stage at ${app.company} in ${days} days. The average applicant waits ${avgWait} days just for a first response.`,
+          body: avgWait
+            ? `You reached the interview stage at ${app.company} in ${days} days. Applicants there wait about ${avgWait} days just for a first response.`
+            : `You reached the interview stage at ${app.company} in ${days} days. Logged — this sharpens ${app.company}'s response data.`,
           color: 'rgba(99,102,241,0.12)',
         })
       } else if (rt !== 'withdrew') {
-        const avgWait = score?.avg_wait_days ?? 21
+        const avgWait = score?.avg_wait_days || null
         setUpdateInsight({
           title: '✅ Response received',
-          body: days <= avgWait
-            ? `${app.company} responded in ${days} days — faster than their ${avgWait}-day average.`
-            : `Response took ${days} days vs their ${avgWait}-day average. Logged.`,
+          body: avgWait
+            ? (days <= avgWait
+                ? `${app.company} responded in ${days} days — faster than their ${avgWait}-day average.`
+                : `Response took ${days} days vs their ${avgWait}-day average. Logged.`)
+            : `${app.company} responded in ${days} days. Logged — this becomes part of their response-time record.`,
           color: 'rgba(16,185,129,0.1)',
         })
       }
@@ -460,7 +465,7 @@ function TrackerPage() {
       if (data.interview_type) {
         setUpdateInsight({
           title: '🗓 Interview stage confirmed',
-          body: `You\'re in the interview stage at ${app.company} after ${days} days. Top 20-30% of applicants reach this point.`,
+          body: `You\'re in the interview stage at ${app.company} after ${days} days. Most applications never get this far.`,
           color: 'rgba(99,102,241,0.12)',
         })
       }
@@ -498,7 +503,8 @@ function TrackerPage() {
     })
     if (app) handleCheckInsight(app, checkType, data)
     if (data.withdrew) {
-      handleUpdate(appId, { status: 'rejected', stage: 'Rejected' })
+      // "I withdrew" used to be recorded as REJECTED and filed against the company as a rejection.
+      handleUpdate(appId, { status: 'withdrawn' })
       return
     }
     if (checkType === 'outcome_check') {
@@ -530,15 +536,20 @@ function TrackerPage() {
   }
 
   const clearDupes = () => {
+    // Only OPEN duplicates of the same company+role are dupes; a finished application at the same
+    // company last year is history, not a duplicate. Newest copy wins. Always confirmed.
     const seen = new Set<string>()
     const local = AppStore.loadSync()
     const removed: Application[] = []
-    const deduped = local.filter(a => {
-      const key = `${a.company.toLowerCase()}|${a.role.toLowerCase()}`
+    const deduped = [...local].sort((a, b) => (b.appliedAt || 0) - (a.appliedAt || 0)).filter(a => {
+      if (a.status !== 'active') return true
+      const key = `${a.company.toLowerCase().trim()}|${a.role.toLowerCase().trim()}`
       if (seen.has(key)) { removed.push(a); return false }
       seen.add(key)
       return true
     })
+    if (!removed.length) { setUpdateInsight({ title: 'No duplicates', body: 'Every open application is unique.', color: 'rgba(99,102,241,0.12)' }); return }
+    if (!confirm(`Remove ${removed.length} duplicate open application${removed.length > 1 ? 's' : ''}? The newest copy of each is kept.`)) return
     localStorage.setItem('seen_applications_v1', JSON.stringify(deduped))
     // Also delete the dropped duplicates from the DB — dedupe-in-localStorage-only just
     // let them resurrect on the next load.
@@ -553,6 +564,7 @@ function TrackerPage() {
   const ghosted = apps.filter(a => a.status === 'ghosted')
   const hired = apps.filter(a => a.status === 'hired')
   const rejected = apps.filter(a => a.status === 'rejected')
+  const withdrawn = apps.filter(a => a.status === 'withdrawn')
   const dueChecks = EventStore.dueChecks(apps)
   const checkByApp = new Map(dueChecks.map(d => [d.app.id, d]))
   const firstChecked = orderedApps.find(a => checkByApp.has(a.id))
@@ -626,7 +638,7 @@ function TrackerPage() {
         <PageHeader
           eyebrow="Application tracker"
           title="My applications"
-          sub="Synced to your account across all devices."
+          sub="Applications sync to your account. Check-in answers stay on this device."
           actions={<>
             <button className="btn btn-green" style={{ fontSize: '.72rem' }} onClick={() => setShowManual(true)}>+ Track manually</button>
             <button className="btn btn-ghost" style={{ fontSize: '.72rem' }} onClick={clearDupes}>Clear dupes</button>
@@ -642,6 +654,7 @@ function TrackerPage() {
             { label: 'Hired', n: hired.length },
             { label: 'Ghosted', n: ghosted.length },
             { label: 'Rejected', n: rejected.length },
+            ...(withdrawn.length ? [{ label: 'Withdrawn', n: withdrawn.length }] : []),
           ].map(s => (
             <div key={s.label} className="tracker-stat">
               <span className="tracker-stat-n">{s.n}</span>
@@ -657,7 +670,9 @@ function TrackerPage() {
             <div className="funnel">
               {(() => {
                 const stageLevel = (s: string) => ['Applied', 'Viewed', 'Phone Screen', 'Interview', 'Final Round', 'Offer'].indexOf(s)
-                const screened = apps.filter(a => stageLevel(a.stage) >= 1 || a.status !== 'active').length
+                // Screened = the company engaged: moved past Applied, or ended with a decision (hired/rejected).
+                // Ghosted and withdrawn applications never got a screen.
+                const screened = apps.filter(a => stageLevel(a.stage) >= 1 || a.status === 'hired' || a.status === 'rejected').length
                 const interviewed = apps.filter(a => stageLevel(a.stage) >= 3 || a.status === 'hired').length
                 return [
                   { label: 'Applied', n: apps.length, color: 'var(--blue)' },
@@ -710,9 +725,10 @@ function TrackerPage() {
         {(() => {
           const atRisk = active.filter(a => {
             const score = companyScores[a.company.toLowerCase().trim()]
-            if (!score || score.ghost_rate < 0.5) return false
+            // Needs a real ghost rate AND a real wait time — no 21-day stand-in (that number was invented).
+            if (!score || score.ghost_rate < 0.5 || !score.avg_wait_days) return false
             const days = getDaysSince(a.appliedAt)
-            const avgWait = score.avg_wait_days || 21
+            const avgWait = score.avg_wait_days
             // In the danger window: past 7 days but not yet 2x avg wait
             return days >= 7 && days < avgWait * 2
           })
@@ -727,7 +743,7 @@ function TrackerPage() {
                 {atRisk.slice(0, 3).map(a => {
                   const score = companyScores[a.company.toLowerCase().trim()]!
                   const days = getDaysSince(a.appliedAt)
-                  const avgWait = score.avg_wait_days || 21
+                  const avgWait = score.avg_wait_days || 0 // atRisk already requires a real value
                   const daysLeft = Math.max(0, avgWait - days)
                   return (
                     <div key={a.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '.75rem' }}>
