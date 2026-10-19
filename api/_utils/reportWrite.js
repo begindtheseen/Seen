@@ -144,9 +144,9 @@ export async function recomputeCompanyScoreFromReports(SUPABASE_URL, hdrs, compa
     // Same corpus the score path uses (lib/server/reportCounts.js SCORABLE_REPORTS_FILTER): every
     // report at its trust weight; only the anti-gaming holds (anonymous/duplicate/velocity) wait.
     // Reports + "what people are saying" (the stored web_reviews), fetched together.
-    const [r, wr, withMentions] = await Promise.all([
+    const [r, scoreRows, withMentions] = await Promise.all([
       fetch(`${SUPABASE_URL}/rest/v1/reports?company_name=ilike.${enc}&${SCORABLE_REPORTS_FILTER}&select=outcome,platform,wait_days,rounds&limit=2000`, { headers: hdrs }),
-      fetch(`${SUPABASE_URL}/rest/v1/company_scores?company_name=eq.${enc}&select=web_reviews&limit=1`, { headers: hdrs })
+      fetch(`${SUPABASE_URL}/rest/v1/company_scores?company_name=eq.${enc}&select=web_reviews,web_report_count,data_source,ghost_rate,response_rate,avg_wait_days,avg_rounds,unpaid_rate&limit=1`, { headers: hdrs })
         .then((x) => (x.ok ? x.json() : [])).catch(() => []),
       hasMentionCount(SUPABASE_URL, hdrs),
     ]);
@@ -158,7 +158,8 @@ export async function recomputeCompanyScoreFromReports(SUPABASE_URL, hdrs, compa
     for (const row of reps) { const t = classifyPlatform(row.platform); (byType[t] ||= []).push({ outcome: row.outcome, wait_days: row.wait_days, rounds: row.rounds }); }
     // Mentions count exactly half a report (SOURCE_TRUST.mentions) — only once mention_count can be stored,
     // so the stored score and its evidence count always agree.
-    const webReviews = Array.isArray(wr) && wr[0] ? wr[0].web_reviews : null;
+    const priorScore = Array.isArray(scoreRows) && scoreRows[0] ? scoreRows[0] : null;
+    const webReviews = priorScore?.web_reviews || null;
     const mentions = withMentions ? mentionOutcomes(webReviews) : [];
     const totalMentions = withMentions ? mentionTotal(webReviews) : 0;
     if (mentions.length) byType.mentions = mentions;
@@ -171,7 +172,18 @@ export async function recomputeCompanyScoreFromReports(SUPABASE_URL, hdrs, compa
     // Fold in admin-confirmed dead listings so companies that leave zombie postings up
     // carry the (bounded) penalty in their stored grade.
     const confirmedStaleListings = await fetchConfirmedStaleCount(SUPABASE_URL, hdrs, companyName);
-    const fz = fuseCompanyIntel({ web: {}, sources, confirmedStaleListings });
+    // Keep a separately stored web-research estimate when real reports arrive. It is an
+    // estimate, never an applicant-report count, but erasing it here made cached totals jump.
+    const priorWebCount = Math.max(0, Number(priorScore?.web_report_count) || 0);
+    const web = priorWebCount > 0 ? {
+      report_count: priorWebCount,
+      ghost_rate: priorScore.ghost_rate,
+      response_rate: priorScore.response_rate,
+      avg_wait_days: priorScore.avg_wait_days,
+      avg_rounds: priorScore.avg_rounds,
+      unpaid_rate: priorScore.unpaid_rate,
+    } : {};
+    const fz = fuseCompanyIntel({ web, sources, confirmedStaleListings });
     if (!fz || !(fz.report_count || totalMentions)) return false;
     // Belt-and-suspenders: fusion already clamps, but the WRITER enforces the range too so a
     // rate can never persist as e.g. 34.0 (→ "3400% ghost rate"). rates [0,1], scores [0,100].
@@ -185,11 +197,9 @@ export async function recomputeCompanyScoreFromReports(SUPABASE_URL, hdrs, compa
       waste_score: clampScore(fz.waste_score),
       unpaid_rate: clampRate(fz.unpaid_rate),
       report_count: fz.report_count,
-      // Recompute runs with web:{} — this count is 100% first-party report rows.
       first_party_report_count: fz.first_party_report_count ?? fz.report_count,
-      // A mentions-only recompute (no report rows) must not erase the row's web-research provenance:
-      // keep web_report_count/data_source as stored so the page can still say "web-research estimate".
-      ...(reps.length ? { web_report_count: 0, data_source: 'reports' } : {}),
+      web_report_count: fz.web_report_count,
+      data_source: fz.web_report_count > 0 && reps.length ? 'fused' : (fz.web_report_count > 0 ? (priorScore?.data_source || 'web_search') : 'reports'),
       ...(withMentions ? { mention_count: totalMentions } : {}),
       data_quality: fz.confidence_label || 'low',
       expires_at: new Date(Date.now() + _SCORE_TTL_MS).toISOString(),

@@ -14,7 +14,7 @@ export default async function handler(req, res) {
   const url = process.env.SUPABASE_URL, key = process.env.SUPABASE_SERVICE_KEY;
   if (!url || !key) return res.status(503).json({ error: 'Company-intelligence storage is unavailable.' });
   const hdrs = headersFor(key), strictExisting = body.require_existing === true;
-  const metrics = { ok: true, received: input.length, accepted: 0, imported_reports: 0, commentary: 0, duplicates: 0, rejected: 0, errors: [] }, touched = new Set();
+  const metrics = { ok: true, received: input.length, accepted: 0, imported_reports: 0, commentary: 0, duplicates: 0, rejected: 0, errors: [] }, reportCompanies = new Set();
   for (const raw of input) {
     const item = normalizeIntelItem(raw);
     if (!item) { metrics.rejected++; continue; }
@@ -34,11 +34,11 @@ export default async function handler(req, res) {
     const claimed = claim.ok ? await claim.json().catch(() => []) : [];
     if (!claim.ok) { metrics.errors.push(`registry ${claim.status}`); metrics.rejected++; continue; }
     if (!Array.isArray(claimed) || !claimed.length) { metrics.duplicates++; continue; }
-    metrics.accepted++; touched.add(item.company);
+    metrics.accepted++;
     if (item.kind === 'applicant_outcome') {
       const cid = await resolveOrCreateCompany(url, hdrs, item.company);
       const ok = await writeReport(url, hdrs, { company_id: cid || undefined, role: item.role, platform: `Public review · ${new URL(item.source_url).hostname.replace(/^www\./, '')}`, source: 'web_public', outcome: item.outcome, outcome_weight: 0.3, trust_reason: 'external_import', needs_review: true, rounds: 0, unpaid_work: 'na', experience_level: 'Unknown', report_text: `${item.excerpt} [Source: ${item.source_url}]` }, item.company.toLowerCase());
-      if (ok) metrics.imported_reports++; else { metrics.errors.push('report write failed'); metrics.rejected++; }
+      if (ok) { metrics.imported_reports++; reportCompanies.add(item.company); } else { metrics.errors.push('report write failed'); metrics.rejected++; }
     } else {
       // Commentary stays on the company page but carries a kind flag so employee reviews do not
       // count as hiring-outcome mentions.
@@ -52,6 +52,8 @@ export default async function handler(req, res) {
       if (save.ok) metrics.commentary++; else { metrics.errors.push('commentary write failed'); metrics.rejected++; }
     }
   }
-  for (const company of touched) await recomputeCompanyScoreFromReports(url, hdrs, company);
+  // Commentary is display-only and must never rewrite a company's score/count cache.
+  // Only actual applicant-outcome rows need a score refresh.
+  for (const company of reportCompanies) await recomputeCompanyScoreFromReports(url, hdrs, company);
   return res.status(200).json(metrics);
 }
