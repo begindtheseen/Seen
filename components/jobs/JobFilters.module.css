@@ -1,0 +1,165 @@
+/* Job search filters — one "Filters" button that opens a small panel, with the active
+   filters shown as chips next to it so nothing is hidden while the panel is closed.
+   Replaces the row of four bare <select>s under the search bar. */
+
+.wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-top: 0.7rem;
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.42rem 0.8rem 0.42rem 0.7rem;
+  border-radius: 999px;
+  border: 1px solid var(--line2);
+  background: rgba(255, 255, 255, 0.035);
+  color: var(--sub);
+  font-family: var(--body);
+  font-size: 0.78rem;
+  font-weight: 600;
+  line-height: 1;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: color 0.15s ease, border-color 0.15s ease, background 0.15s ease, transform 0.25s var(--ease-spring);
+}
+.btn:hover { color: var(--white); border-color: rgba(129, 140, 248, 0.5); background: rgba(99, 102, 241, 0.1); }
+.btn:active { transform: scale(0.96); }
+.btn svg { width: 14px; height: 14px; flex: none; }
+.btnOpen { color: var(--white); border-color: rgba(129, 140, 248, 0.6); background: rgba(99, 102, 241, 0.14); }
+.btnActive { color: #c7d2fe; border-color: rgba(129, 140, 248, 0.45); }
+
+/* Count of active filters, inside the button. */
+.count {
+  display: inline-grid;
+  place-items: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 0.3rem;
+  border-radius: 999px;
+  background: linear-gradient(135deg, var(--indigo), var(--blue));
+  color: #fff;
+  font-family: var(--mono);
+  font-size: 0.6rem;
+  font-weight: 700;
+  animation: countIn 0.35s var(--ease-spring) both;
+}
+@keyframes countIn { from { transform: scale(0.4); opacity: 0; } to { transform: none; opacity: 1; } }
+
+/* Active-filter chips — each one clears itself. */
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.34rem 0.55rem 0.34rem 0.7rem;
+  border-radius: 999px;
+  border: 1px solid rgba(129, 140, 248, 0.3);
+  background: rgba(99, 102, 241, 0.1);
+  color: #c7d2fe;
+  font-family: var(--mono);
+  font-size: 0.62rem;
+  line-height: 1;
+  cursor: pointer;
+  white-space: nowrap;
+  animation: riseIn 0.35s var(--ease-out) both;
+  transition: border-color 0.15s ease, background 0.15s ease, color 0.15s ease;
+}
+.chip:hover { border-color: rgba(239, 68, 68, 0.45); background: rgba(239, 68, 68, 0.1); color: #fca5a5; }
+.chip b { font-weight: 400; opacity: 0.7; }
+
+.clear {
+  background: none;
+  border: none;
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 0.62rem;
+  cursor: pointer;
+  padding: 0.3rem 0.4rem;
+  transition: color 0.15s ease;
+}
+.clear:hover { color: var(--sub); }
+
+/* The panel. */
+.pop {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  z-index: 40;
+  width: min(340px, calc(100vw - 2.5rem));
+  padding: 0.7rem;
+  border-radius: 16px;
+  border: 1px solid var(--glass-line, var(--line2));
+  background: #0e111c; /* SOLID: floating panels over content never use backdrop-filter (see Nav.module.css .menu) */
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08), 0 24px 60px rgba(0, 0, 0, 0.55);
+  transform-origin: top left;
+  animation: popIn 0.28s var(--ease-spring) both;
+}
+@keyframes popIn {
+  from { opacity: 0; transform: translateY(-6px) scale(0.96); }
+  to   { opacity: 1; transform: none; }
+}
+
+.row {
+  display: grid;
+  grid-template-columns: 82px 1fr;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.35rem 0.3rem;
+  animation: riseIn 0.4s var(--ease-out) backwards;
+}
+.row:nth-child(2) { animation-delay: 0.04s; }
+.row:nth-child(3) { animation-delay: 0.08s; }
+.row:nth-child(4) { animation-delay: 0.12s; }
+.label {
+  font-family: var(--mono);
+  font-size: 0.58rem;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--dim);
+}
+.select {
+  width: 100%;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--line2);
+  border-radius: 9px;
+  padding: 0.5rem 0.65rem;
+  color: var(--white);
+  font-family: var(--body);
+  font-size: 0.8rem;
+  outline: none;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+.select:hover, .select:focus { border-color: rgba(129, 140, 248, 0.55); background: rgba(99, 102, 241, 0.08); }
+.select option { background: #0c0f1a; color: var(--text); }
+
+.foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+  padding-top: 0.6rem;
+  border-top: 1px solid var(--line);
+}
+.done {
+  padding: 0.5rem 1rem;
+  border: none;
+  border-radius: 9px;
+  background: linear-gradient(135deg, #1d4ed8 0%, #7c3aed 55%, #a855f7 100%);
+  color: #fff;
+  font-family: var(--body);
+  font-size: 0.78rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pop, .row, .chip, .count { animation: none; }
+  .btn { transition: none; }
+}

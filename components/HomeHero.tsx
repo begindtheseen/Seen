@@ -76,8 +76,8 @@ export default function HomeHero() {
   const [location, setLocation] = useState('')
   const [proof, setProof] = useState<ProofScore>(FEATURED_SEED)
 
-  // Entrance choreography starts the moment the intro splash dissolves (or instantly
-  // on repeat visits) — never invisibly behind it. See useIntroGate/IntroSplash.
+  // Entrance choreography starts as soon as the display font is available (useIntroGate)
+  // — there is no blocking intro; the hero rising IS the opening.
   const ready = useIntroGate()
   // Once the entrance has settled, the proof card drops its stage delay so the cursor
   // tilt (MotionLayer → .tilt) responds instantly instead of 300ms late.
@@ -171,8 +171,8 @@ export default function HomeHero() {
             Real hiring outcomes from real applicants
           </span>
 
-          {/* Kinetic headline: each word rises from behind its own clip, 42ms apart, the
-              moment the intro opens (KineticText gates on `ready` like the other stages). */}
+          {/* Kinetic headline: each word rises from behind its own clip, 42ms apart
+              (KineticText gates on `ready` like the other stages). */}
           <KineticText as="h1" className={styles.title} in={ready} delay={120}>
             See who actually <span className={styles.grad}>responds</span> before you apply.
           </KineticText>

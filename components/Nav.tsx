@@ -179,9 +179,15 @@ export default function Nav() {
     <>
       <nav id="mainNav" className={scrolled ? 'nav-scrolled' : ''}>
         <button className="side-menu-toggle" onClick={() => setMenuOpen(true)} aria-label="Menu" title="Menu">☰</button>
-        <Link href="/" className="logo">
+        <Link href="/" className="logo" aria-label="Seen — home">
           <span className="logo-pulse" />
-          Seen
+          {/* Four clipped letters: on the first load of a session they rise in one after another
+              (app/motion.css `html.seen-first .logo-l`); otherwise they are just the wordmark. */}
+          <span className="logo-word" aria-hidden="true">
+            {['S', 'e', 'e', 'n'].map((ch, i) => (
+              <span key={i} className="logo-c"><span className="logo-l">{ch}</span></span>
+            ))}
+          </span>
         </Link>
 
         {/* Primary destinations — the five that matter for the current auth state. */}

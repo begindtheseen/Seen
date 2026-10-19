@@ -3,7 +3,6 @@ import { AuthProvider } from '@/lib/auth'
 import AnalyticsProvider from '@/components/AnalyticsProvider'
 import Nav from '@/components/Nav'
 import Footer from '@/components/Footer'
-import IntroSplash from '@/components/IntroSplash'
 import { ToastHost } from '@/components/ToastHost'
 import MicroSurveyHost from '@/components/MicroSurveyHost'
 import MotionLayer from '@/components/motion/MotionLayer'
@@ -56,22 +55,18 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
-        {/* Before first paint: on a repeat visit this session the intro splash is skipped, so hide the
-            #intro-guard cover now instead of after hydration — otherwise every page load shows a black
-            screen until JavaScript runs. (The class is added before React, hence suppressHydrationWarning.) */}
-        <script dangerouslySetInnerHTML={{ __html: "try{if(sessionStorage.getItem('seen_intro_shown'))document.documentElement.classList.add('intro-seen')}catch(e){}" }} />
+        {/* The opening: on the FIRST load of a session the nav wordmark rises letter by letter and the
+            nav hairline draws (app/motion.css `html.seen-first`). Marked before first paint so the pure-CSS
+            animation starts on the server-rendered frame, with no hydration flash. There is no blocking
+            splash any more — the page is the intro. (Class added before React, hence suppressHydrationWarning.) */}
+        <script dangerouslySetInnerHTML={{ __html: "try{if(!sessionStorage.getItem('seen_opened')){document.documentElement.classList.add('seen-first');sessionStorage.setItem('seen_opened','1')}}catch(e){}" }} />
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=DM+Mono:ital,wght@0,300;0,400;0,500;1,400&family=Instrument+Sans:ital,wght@0,300;0,400;0,500;0,600;1,300&display=swap" rel="stylesheet" />
       </head>
       <body>
-        {/* Static full-screen cover — present in the initial HTML before JS runs.
-            Prevents the flash of page content during React hydration.
-            IntroSplash removes it as soon as it mounts. */}
-        <div id="intro-guard" aria-hidden="true" style={{ position: 'fixed', inset: 0, zIndex: 2147483646, background: '#02040a' }} />
         <AuthProvider>
           <AnalyticsProvider />
-          <IntroSplash />
           {/* Global aurora background orbs — renders on all pages */}
           <div className="aurora" aria-hidden="true">
             <div className="aurora-3" />
