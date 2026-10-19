@@ -68,6 +68,9 @@
     "api/ingest-local-company-intel.js": {
       "maxDuration": 60
     },
+    "api/local-company-intel-targets.js": {
+      "maxDuration": 60
+    },
     "api/admin-stats.js": {
       "maxDuration": 15
     },

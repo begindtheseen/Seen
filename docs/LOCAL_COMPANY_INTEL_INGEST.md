@@ -20,3 +20,21 @@ report. `employee_review` and `public_commentary` appear under “What people ar
 never affect applicant-report counts, ghost rates, response rates, or grades. A source URL plus
 normalized excerpt hash is registered in `company_intel_imports`, so re-runs and overlapping searches
 skip duplicates safely.
+
+## Automatic Reddit collection for companies already on Seen
+
+After the Vercel deployment is live, this Mac-only command asks Seen for its most active existing
+companies, searches Reddit through your connected OpenCLI browser, and imports raw source-attributed
+excerpts. It never creates a company from a Reddit search. Direct first-person hiring outcomes become
+low-trust reports; employee comments and everything else stay under “What people are saying online.”
+No text is AI-summarized.
+
+```sh
+export SEEN_COMPANY_INTEL_INGEST_TOKEN='same-secret-from-vercel'
+export COMPANY_INTEL_COMPANY_LIMIT=10
+export COMPANY_INTEL_POSTS_PER_COMPANY=3
+npm run ingest:reddit-intel
+```
+
+Start cautiously with `COMPANY_INTEL_COMPANY_LIMIT=5`. To inspect what it would collect without
+writing anything, run `npm run ingest:reddit-intel -- --dry-run`.

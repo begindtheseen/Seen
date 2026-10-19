@@ -13,10 +13,22 @@ export default async function handler(req, res) {
   if (!input.length) return res.status(400).json({ error: 'Provide 1–100 source-attributed items.' });
   const url = process.env.SUPABASE_URL, key = process.env.SUPABASE_SERVICE_KEY;
   if (!url || !key) return res.status(503).json({ error: 'Company-intelligence storage is unavailable.' });
-  const hdrs = headersFor(key), metrics = { ok: true, received: input.length, accepted: 0, imported_reports: 0, commentary: 0, duplicates: 0, rejected: 0, errors: [] }, touched = new Set();
+  const hdrs = headersFor(key), strictExisting = body.require_existing === true;
+  const metrics = { ok: true, received: input.length, accepted: 0, imported_reports: 0, commentary: 0, duplicates: 0, rejected: 0, errors: [] }, touched = new Set();
   for (const raw of input) {
     const item = normalizeIntelItem(raw);
     if (!item) { metrics.rejected++; continue; }
+    // The automatic collector is intentionally limited to companies Seen already knows.
+    // Manual admin imports remain available for a deliberately entered new company.
+    if (strictExisting) {
+      const name = encodeURIComponent(item.company.toLowerCase());
+      const [score, job] = await Promise.all([
+        fetch(`${url}/rest/v1/company_scores?company_name=eq.${name}&select=company_name&limit=1`, { headers: hdrs }),
+        fetch(`${url}/rest/v1/jobs?company=ilike.${encodeURIComponent(item.company)}&select=id&limit=1`, { headers: hdrs }),
+      ]);
+      const known = (score.ok && (await score.json()).length) || (job.ok && (await job.json()).length);
+      if (!known) { metrics.rejected++; metrics.errors.push(`unknown company: ${item.company}`); continue; }
+    }
     // Register first: the unique source_hash is the cross-run and cross-query duplicate guard.
     const claim = await fetch(`${url}/rest/v1/company_intel_imports`, { method: 'POST', headers: { ...hdrs, Prefer: 'resolution=ignore-duplicates,return=representation' }, body: JSON.stringify({ company_name: item.company, source: item.source, source_url: item.source_url, source_hash: item.source_hash, kind: item.kind }) });
     const claimed = claim.ok ? await claim.json().catch(() => []) : [];

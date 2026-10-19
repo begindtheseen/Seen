@@ -19,7 +19,8 @@
     "memory:graph": "node scripts/memory-graph.mjs",
     "brain": "node scripts/brain.mjs",
     "ingest:indeed": "node scripts/ingest-indeed-opencli.mjs",
-    "ingest:company-intel": "node scripts/ingest-company-intel.mjs"
+    "ingest:company-intel": "node scripts/ingest-company-intel.mjs",
+    "ingest:reddit-intel": "node scripts/collect-reddit-company-intel.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.49.2",
