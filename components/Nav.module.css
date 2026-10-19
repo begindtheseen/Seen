@@ -104,15 +104,31 @@
   border: 1px solid var(--line2);
   border-radius: 14px;
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08), 0 24px 60px rgba(0, 0, 0, 0.55);
-  animation: snMenuIn 0.14s ease;
+  /* Springs open from the corner it hangs off; the rows inside rise in one after another. */
+  transform-origin: top right;
+  animation: snMenuIn 0.34s var(--ease-spring) both;
 }
 .menuLeft {
   right: auto;
   left: 0;
+  transform-origin: top left;
 }
 @keyframes snMenuIn {
-  from { opacity: 0; transform: translateY(-4px); }
-  to   { opacity: 1; transform: translateY(0); }
+  from { opacity: 0; transform: translateY(-8px) scale(0.92); }
+  to   { opacity: 1; transform: none; }
+}
+.menu > * { animation: snRowIn 0.38s var(--ease-out) backwards; }
+.menu > *:nth-child(1) { animation-delay: 0.05s; }
+.menu > *:nth-child(2) { animation-delay: 0.09s; }
+.menu > *:nth-child(3) { animation-delay: 0.13s; }
+.menu > *:nth-child(4) { animation-delay: 0.17s; }
+.menu > *:nth-child(5) { animation-delay: 0.21s; }
+.menu > *:nth-child(6) { animation-delay: 0.25s; }
+.menu > *:nth-child(7) { animation-delay: 0.29s; }
+.menu > *:nth-child(8) { animation-delay: 0.33s; }
+@keyframes snRowIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: none; }
 }
 
 .menuLabel {
@@ -140,12 +156,29 @@
   background: none;
   border: none;
   cursor: pointer;
-  transition: color 0.14s ease, background 0.14s ease;
+  position: relative;
+  transition: color 0.14s ease, background 0.14s ease, padding-left 0.22s var(--ease-out);
+}
+/* Hover: the row lights up and a small indigo tick slides in from the left edge. */
+.menuItem::before {
+  content: "";
+  position: absolute;
+  left: 0.35rem;
+  top: 50%;
+  width: 3px;
+  height: 0;
+  border-radius: 2px;
+  background: linear-gradient(180deg, var(--indigo), var(--blue));
+  transform: translateY(-50%);
+  opacity: 0;
+  transition: height 0.22s var(--ease-out), opacity 0.15s ease;
 }
 .menuItem:hover {
   color: var(--white);
   background: var(--raised);
+  padding-left: 0.95rem;
 }
+.menuItem:hover::before { height: 55%; opacity: 1; }
 .menuItemIcon {
   width: 16px;
   height: 16px;
@@ -265,12 +298,20 @@
   cursor: pointer;
   line-height: 1;
 }
-.avatar:hover { filter: brightness(1.08); }
+.avatar { transition: transform 0.3s var(--ease-spring), box-shadow 0.25s ease; }
+.avatar:hover { filter: brightness(1.08); transform: scale(1.08); box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.25), 0 6px 18px rgba(99, 102, 241, 0.35); }
+.avatar:active { transform: scale(0.94); }
 
 /* Below the tablet breakpoint the primary row + More collapse into the existing
    hamburger drawer (global .side-menu / .side-menu-toggle). */
 @media (max-width: 768px) {
   .primary { display: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .menu, .menu > * { animation: none; }
+  .menuItem, .menuItem::before, .avatar { transition: none; }
+  .menuItem:hover { padding-left: 0.6rem; }
+  .avatar:hover, .avatar:active { transform: none; }
 }
 @media (max-width: 480px) {
   /* Keep the bar breathable on small phones — the drawer carries the full nav. */
