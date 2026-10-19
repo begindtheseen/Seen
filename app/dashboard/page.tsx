@@ -11,6 +11,7 @@ import { BadgeStore } from '@/lib/stores/BadgeStore'
 import WelcomeOnboarding from '@/components/WelcomeOnboarding'
 import type { Application } from '@/lib/types'
 import { isGradeableScore } from '@/lib/gradeGate'
+import Odometer from '@/components/motion/Odometer'
 
 function companySlug(name: string) {
   return encodeURIComponent(name.toLowerCase().replace(/\s+/g, '-'))
@@ -201,7 +202,7 @@ export default function DashboardPage() {
 
   const rawName = profile?.name || user?.user_metadata?.name || ''
   const name = rawName ? rawName.charAt(0).toUpperCase() + rawName.slice(1).split(/[^a-zA-Z]/)[0] : 'there'
-  const responseRate = apps.length ? Math.round((apps.filter(a => a.status !== 'active' && a.status !== 'ghosted').length / apps.length) * 100) + '%' : '—'
+  const responseNum = apps.length ? Math.round((apps.filter(a => a.status !== 'active' && a.status !== 'ghosted').length / apps.length) * 100) : null
 
   // Health ring visuals
   const healthColor = health ? (health.score >= 75 ? 'var(--green)' : health.score >= 55 ? 'var(--amber)' : 'var(--red)') : 'var(--muted)'
@@ -237,7 +238,8 @@ export default function DashboardPage() {
 
   return (
     <div className="page-full">
-      <div className="dash">
+      {/* .stagger: sections rise one after another (app/motion.css) */}
+      <div className="dash stagger">
 
         {/* ── A. First-run getting-started guide ─────────────────── */}
         {showOnboarding && (
@@ -284,10 +286,11 @@ export default function DashboardPage() {
 
           {/* Stat pills — "Open" is current; Response/Hired/Ghosted are all-time (see caption) */}
           <div className="dpills">
-            <div className="dpill"><div className="dpill-l">Open</div><div className="dpill-n" style={{ color: 'var(--blue)' }}>{active.length}</div></div>
-            <div className="dpill"><div className="dpill-l">Response</div><div className="dpill-n" style={{ color: 'var(--indigo)' }}>{responseRate}</div></div>
-            <div className="dpill"><div className="dpill-l">Hired</div><div className="dpill-n" style={{ color: 'var(--green)' }}>{hired.length}</div></div>
-            <div className="dpill"><div className="dpill-l">Ghosted</div><div className="dpill-n" style={{ color: 'var(--red)' }}>{ghosted.length}</div></div>
+            {/* Figures roll in (and re-roll when the store loads) instead of flashing. */}
+            <div className="dpill"><div className="dpill-l">Open</div><div className="dpill-n" style={{ color: 'var(--blue)' }}><Odometer value={active.length} /></div></div>
+            <div className="dpill"><div className="dpill-l">Response</div><div className="dpill-n" style={{ color: 'var(--indigo)' }}>{responseNum == null ? '—' : <Odometer value={responseNum} suffix="%" />}</div></div>
+            <div className="dpill"><div className="dpill-l">Hired</div><div className="dpill-n" style={{ color: 'var(--green)' }}><Odometer value={hired.length} /></div></div>
+            <div className="dpill"><div className="dpill-l">Ghosted</div><div className="dpill-n" style={{ color: 'var(--red)' }}><Odometer value={ghosted.length} /></div></div>
           </div>
           {apps.length > 0 && (
             <div style={{ fontFamily: 'var(--mono)', fontSize: '.5rem', color: 'var(--muted)', textAlign: 'center', marginTop: '.45rem', letterSpacing: '.04em' }}>
@@ -304,7 +307,7 @@ export default function DashboardPage() {
 
         {/* ── B2. Résumé — always-visible upload / status entry ──── */}
         <section>
-          <div className="dcard dcard-pad" style={{ display: 'flex', alignItems: 'center', gap: '.8rem', flexWrap: 'wrap' }}>
+          <div className="dcard dcard-pad spot" style={{ display: 'flex', alignItems: 'center', gap: '.8rem', flexWrap: 'wrap' }}>
             <span style={{ fontSize: '1.5rem', flexShrink: 0 }}>📄</span>
             <div style={{ minWidth: 0, flex: '1 1 160px' }}>
               {hasResume ? (
@@ -338,7 +341,7 @@ export default function DashboardPage() {
         <section>
           <div className="dsec-head"><div className="dsec-title">Next best move</div></div>
           {active.length === 0 ? (
-            <div className="dcard dcard-pad">
+            <div className="dcard dcard-pad spot">
               <div style={{ fontFamily: 'var(--display)', fontSize: '.92rem', fontWeight: 800, color: 'var(--white)', marginBottom: '.35rem', letterSpacing: '-.02em' }}>
                 {apps.length ? 'Start your next tracked application' : 'Start tracking applications'}
               </div>
@@ -356,7 +359,7 @@ export default function DashboardPage() {
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '.5rem' }}>
               {topMoves.map((m, i) => (
-                <button key={i} className="dmove" onClick={m.go}>
+                <button key={i} className="dmove spot" onClick={m.go}>
                   <span className="dmove-ic">{m.icon}</span>
                   <span style={{ minWidth: 0 }}>
                     <span className="dmove-t" style={{ display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{m.title}</span>
@@ -390,7 +393,7 @@ export default function DashboardPage() {
                 const ghostPct = sc ? Math.round(sc.ghost_rate * 100) : null
                 const risk = sc ? (sc.ghost_rate > 0.55 ? { c: 'var(--red)', t: 'high ghost risk' } : sc.ghost_rate > 0.35 ? { c: 'var(--amber)', t: `${ghostPct}% ghost` } : { c: 'var(--green)', t: `${ghostPct}% ghost` }) : null
                 return (
-                  <div key={app.id} className="dpipe">
+                  <div key={app.id} className="dpipe spot">
                     <div className="dpipe-logo">{(app.company || '?').charAt(0).toUpperCase()}</div>
                     <div style={{ minWidth: 0, flex: 1 }}>
                       <div style={{ fontFamily: 'var(--display)', fontSize: '.83rem', fontWeight: 700, color: 'var(--white)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{app.company}</div>
@@ -414,10 +417,10 @@ export default function DashboardPage() {
         {/* ── E. Quick Actions ───────────────────────────────────── */}
         <section>
           <div className="dqa">
-            <Link href="/resume" className="dqa-tile"><span className="dqa-ic">🧠</span><div className="dqa-t">Resume AI</div><div className="dqa-s">Optimize before applying</div></Link>
-            <Link href="/tracker" className="dqa-tile"><span className="dqa-ic">📋</span><div className="dqa-t">All applications</div><div className="dqa-s">View your pipeline</div></Link>
-            <Link href="/demand" className="dqa-tile"><span className="dqa-ic">🗺️</span><div className="dqa-t">Demand map</div><div className="dqa-s">See where hiring is hot</div></Link>
-            <Link href="/report" className="dqa-tile"><span className="dqa-ic">📢</span><div className="dqa-t">Report outcome</div><div className="dqa-s">Help the community</div></Link>
+            <Link href="/resume" className="dqa-tile spot"><span className="dqa-ic">🧠</span><div className="dqa-t">Resume AI</div><div className="dqa-s">Optimize before applying</div></Link>
+            <Link href="/tracker" className="dqa-tile spot"><span className="dqa-ic">📋</span><div className="dqa-t">All applications</div><div className="dqa-s">View your pipeline</div></Link>
+            <Link href="/demand" className="dqa-tile spot"><span className="dqa-ic">🗺️</span><div className="dqa-t">Demand map</div><div className="dqa-s">See where hiring is hot</div></Link>
+            <Link href="/report" className="dqa-tile spot"><span className="dqa-ic">📢</span><div className="dqa-t">Report outcome</div><div className="dqa-s">Help the community</div></Link>
           </div>
         </section>
 

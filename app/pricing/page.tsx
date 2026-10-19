@@ -292,7 +292,7 @@ function PricingPageInner() {
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(280px,1fr))', gap: '1.25rem', marginBottom: '3.5rem' }}>
 
           {/* Free */}
-          <div style={{ background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 16, padding: '1.75rem' }}>
+          <div className="spot" style={{ background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 16, padding: '1.75rem' }}>
             <div style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', textTransform: 'uppercase', letterSpacing: '.14em', color: 'var(--dim)', marginBottom: '.6rem' }}>Free</div>
             <div style={{ fontFamily: 'var(--display)', fontSize: '2.2rem', fontWeight: 900, color: 'var(--white)', marginBottom: '.1rem' }}>$0</div>
             <div style={{ fontFamily: 'var(--mono)', fontSize: '.62rem', color: 'var(--muted)', marginBottom: '1.5rem' }}>forever — no card required</div>
@@ -312,7 +312,7 @@ function PricingPageInner() {
           </div>
 
           {/* Pro */}
-          <div style={{ background: 'linear-gradient(150deg,rgba(79,70,229,.12) 0%,rgba(124,58,237,.08) 100%)', border: '1.5px solid rgba(99,102,241,.45)', borderRadius: 16, padding: '1.75rem', position: 'relative' }}>
+          <div className="spot" style={{ background: 'linear-gradient(150deg,rgba(79,70,229,.12) 0%,rgba(124,58,237,.08) 100%)', border: '1.5px solid rgba(99,102,241,.45)', borderRadius: 16, padding: '1.75rem', position: 'relative' }}>
             <div style={{ position: 'absolute', top: -13, left: '50%', transform: 'translateX(-50%)', background: 'linear-gradient(90deg,#4f46e5,#7c3aed)', color: '#fff', fontFamily: 'var(--mono)', fontSize: '.56rem', fontWeight: 700, letterSpacing: '.08em', padding: '.25rem .9rem', borderRadius: 100, whiteSpace: 'nowrap' }}>
               MOST POPULAR
             </div>
@@ -412,6 +412,7 @@ function PricingPageInner() {
             ) : (
               <>
                 <button
+                  className="btn-shine"
                   onClick={handleUpgrade}
                   disabled={loading}
                   style={{
@@ -547,6 +548,7 @@ function PricingPageInner() {
         {/* Bottom CTA */}
         <div style={{ textAlign: 'center', marginTop: '3rem' }}>
           <button
+            className="btn-shine"
             onClick={handleUpgrade}
             disabled={loading}
             style={{ padding: '.95rem 3rem', background: 'linear-gradient(135deg,#4f46e5,#7c3aed)', border: 'none', borderRadius: 12, fontFamily: 'var(--display)', fontWeight: 800, fontSize: '1rem', color: '#fff', cursor: 'pointer', boxShadow: '0 0 40px rgba(99,102,241,.4)' }}

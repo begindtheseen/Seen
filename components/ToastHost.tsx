@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef, useState, useCallback } from 'react'
+import { useEffect, useRef, useState, useCallback, type CSSProperties } from 'react'
 import { NOTIFY_EVENT, type NotifyPayload, type NotifySeverity } from '@/lib/notify'
 
 // Global, stacked, animated toast host. Mounted once in app/layout.tsx. Listens for the
@@ -8,7 +8,7 @@ import { NOTIFY_EVENT, type NotifyPayload, type NotifySeverity } from '@/lib/not
 // "something happened" surface that pops on real events, never on a refresh. Enter/leave use
 // the .seen-toast / .seen-toast.leaving keyframes in globals.css (reduced-motion aware).
 
-type Toast = NotifyPayload & { tid: number; leaving?: boolean }
+type Toast = NotifyPayload & { tid: number; dur: number; leaving?: boolean }
 
 const SEV: Record<NotifySeverity, { accent: string; glow: string; icon: string }> = {
   info:    { accent: 'var(--blue)',  glow: 'rgba(59,130,246,.32)', icon: '›' },
@@ -43,7 +43,7 @@ export function ToastHost() {
       }
       const tid = ++_seq
       const dur = p.duration ?? 5000
-      setToasts(prev => [...prev.slice(-4), { ...p, tid }]) // keep at most 5 on screen
+      setToasts(prev => [...prev.slice(-4), { ...p, tid, dur }]) // keep at most 5 on screen
       if (dur > 0) timers.current[tid] = setTimeout(() => dismiss(tid), dur)
     }
     window.addEventListener(NOTIFY_EVENT, onNotify as EventListener)
@@ -66,13 +66,16 @@ export function ToastHost() {
     >
       {toasts.map(t => {
         const sev = SEV[t.severity || 'info']
+        // --dur drives the timer hairline that drains along the bottom edge (app/motion.css).
+        const vars = { '--dur': `${t.dur}ms`, '--acc': sev.accent } as CSSProperties
         return (
           <div
             key={t.tid}
             role="status"
-            className={`seen-toast${t.leaving ? ' leaving' : ''}`}
+            className={`seen-toast${t.dur > 0 ? ' timed' : ''}${t.leaving ? ' leaving' : ''}`}
             onClick={() => dismiss(t.tid)}
             style={{
+              ...vars,
               pointerEvents: 'auto', cursor: 'pointer', display: 'flex', alignItems: 'flex-start', gap: 12,
               background: 'linear-gradient(180deg, rgba(20,24,36,.98), rgba(12,15,26,.98))',
               border: '1px solid var(--line2)', borderLeft: `3px solid ${sev.accent}`,

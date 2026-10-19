@@ -6,7 +6,9 @@ import Footer from '@/components/Footer'
 import IntroSplash from '@/components/IntroSplash'
 import { ToastHost } from '@/components/ToastHost'
 import MicroSurveyHost from '@/components/MicroSurveyHost'
+import MotionLayer from '@/components/motion/MotionLayer'
 import './globals.css'
+import './motion.css'
 
 export const metadata: Metadata = {
   metadataBase: new URL('https://seenjobs.io'),
@@ -80,6 +82,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <div id="toast" />
           <ToastHost />
           <MicroSurveyHost />
+          {/* Cursor spotlight / tilt listener + film grain (app/motion.css) */}
+          <MotionLayer />
         </AuthProvider>
       </body>
     </html>

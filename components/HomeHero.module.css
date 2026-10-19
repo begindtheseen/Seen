@@ -347,6 +347,20 @@
 .heroIn .d5 { transition-delay: 0.40s; }
 .heroIn .d6 { transition-delay: 0.50s; }
 
+/* The proof card leans toward the cursor (MotionLayer writes --rx/--ry on `.tilt`).
+   Its entrance ends ON the tilt transform (the vars start at 0deg, i.e. flat), so the
+   two can never fight; once it has landed (HomeHero adds .landed ~1.3s after `ready`)
+   the stage delay is dropped so the lean answers the pointer instantly. */
+.heroIn .proof {
+  transform: perspective(1000px) rotateX(var(--rx, 0deg)) rotateY(var(--ry, 0deg));
+}
+.landed .proof { transition-delay: 0s; transition-duration: 0.6s; }
+.landed .proof.tilting { transition: transform 0.14s linear; }
+
+/* Figures never jitter while counting. */
+.gaugeNum b,
+.statV { font-variant-numeric: tabular-nums; }
+
 /* Grade chip pops after the ring has mostly swept (springy, tiny overshoot). */
 .grade {
   opacity: 0;
@@ -454,6 +468,8 @@
     transform: none;
     transition: none;
   }
+  .heroIn .proof,
+  .landed .proof { transform: none; transition: none; }
   .chip,
   .search { transition: none; }
 }

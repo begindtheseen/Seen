@@ -69,7 +69,7 @@ export default function LandingMarketingSections() {
           <div className="lp2-grid-4">
             {VALUE_CARDS.map((c, i) => (
               <Reveal key={c.title} delay={i * 70}>
-                <div className="lp2-card">
+                <div className="lp2-card spot">
                   <div className="lp2-card-ico">{c.icon}</div>
                   <h3 className="lp2-card-t">{c.title}</h3>
                   <p className="lp2-card-d">{c.desc}</p>
@@ -90,7 +90,7 @@ export default function LandingMarketingSections() {
           <div className="lp2-steps">
             {STEPS.map((s, i) => (
               <Reveal key={s.n} delay={i * 110}>
-                <div className="lp2-step">
+                <div className="lp2-step spot">
                   <div className="lp2-step-n">{s.n}</div>
                   <h3 className="lp2-step-t">{s.t}</h3>
                   <p className="lp2-step-d">{s.d}</p>

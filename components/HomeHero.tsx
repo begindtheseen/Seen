@@ -8,6 +8,7 @@ import { useIntroGate } from '@/lib/hooks/useIntroGate'
 import { useCountUp } from '@/lib/hooks/useCountUp'
 import { firstPartyReportCount } from '@/lib/server/reportCounts'
 import { isGradeableScore } from '@/lib/gradeGate'
+import KineticText from '@/components/motion/KineticText'
 import styles from './HomeHero.module.css'
 
 const JOB_KEYWORDS = ['engineer', 'developer', 'manager', 'analyst', 'designer', 'nurse', 'coordinator', 'specialist', 'director', 'associate', 'assistant', 'recruiter', 'sales', 'marketing', 'accountant', 'therapist', 'technician']
@@ -78,6 +79,14 @@ export default function HomeHero() {
   // Entrance choreography starts the moment the intro splash dissolves (or instantly
   // on repeat visits) — never invisibly behind it. See useIntroGate/IntroSplash.
   const ready = useIntroGate()
+  // Once the entrance has settled, the proof card drops its stage delay so the cursor
+  // tilt (MotionLayer → .tilt) responds instantly instead of 300ms late.
+  const [landed, setLanded] = useState(false)
+  useEffect(() => {
+    if (!ready) return
+    const t = setTimeout(() => setLanded(true), 1300)
+    return () => clearTimeout(t)
+  }, [ready])
 
   // Preserve the original routing logic: company queries → /company/<slug>,
   // job-style queries → /jobs?q=&loc=
@@ -151,7 +160,7 @@ export default function HomeHero() {
   const gradeBorder = risk === 'safe' ? 'rgba(16,185,129,.4)' : risk === 'warn' ? 'rgba(245,158,11,.4)' : 'rgba(239,68,68,.4)'
 
   return (
-    <section className={`${styles.hero}${ready ? ' ' + styles.heroIn : ''}`}>
+    <section className={`${styles.hero}${ready ? ' ' + styles.heroIn : ''}${landed ? ' ' + styles.landed : ''}`}>
       <div className={styles.grid}>
         {/* ── Left: headline + one search ──
             On mobile the wrapper dissolves (display:contents) so the proof card can
@@ -162,9 +171,11 @@ export default function HomeHero() {
             Real hiring outcomes from real applicants
           </span>
 
-          <h1 className={`${styles.title} ${styles.stage} ${styles.d2}`}>
+          {/* Kinetic headline: each word rises from behind its own clip, 42ms apart, the
+              moment the intro opens (KineticText gates on `ready` like the other stages). */}
+          <KineticText as="h1" className={styles.title} in={ready} delay={120}>
             See who actually <span className={styles.grad}>responds</span> before you apply.
-          </h1>
+          </KineticText>
 
           <p className={`${styles.lede} ${styles.stage} ${styles.d3}`}>
             Check a company&apos;s ghost rate, response time, and real applicant outcomes — before you
@@ -200,7 +211,7 @@ export default function HomeHero() {
                 aria-label="City or remote"
               />
             </label>
-            <button className={styles.go} type="submit">Check company</button>
+            <button className={`${styles.go} btn-shine`} type="submit">Check company</button>
           </form>
 
           {/* One tap to first value — real companies with real report volume. */}
@@ -226,7 +237,9 @@ export default function HomeHero() {
         </div>
 
         {/* ── Right: the thesis, made visible (real company, real numbers) ── */}
-        <aside className={`${styles.proof} ${styles.stage} ${styles.d4}`} aria-label={`${proof.name} hiring report`}>
+        <aside className={`${styles.proof} ${styles.stage} ${styles.d4} tilt`} aria-label={`${proof.name} hiring report`}>
+          {/* A highlight travels the card border forever; the card leans toward the cursor. */}
+          <span className="beam" aria-hidden="true"><span className="beam-spin" /></span>
           <div className={styles.proofHead}>
             <div className={styles.co}>
               <div className={styles.logo}>{proof.name[0]?.toUpperCase()}</div>
