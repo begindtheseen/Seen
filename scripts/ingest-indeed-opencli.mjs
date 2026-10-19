@@ -22,8 +22,16 @@ if (!Array.isArray(searches) || !searches.length) throw new Error('INDEED_SEARCH
 
 async function opencliJson(args) {
   const { stdout } = await exec('opencli', args, { maxBuffer: 10 * 1024 * 1024, timeout: 120_000 });
-  try { return JSON.parse(stdout); }
+  let parsed;
+  try { parsed = JSON.parse(stdout); }
   catch { throw new Error(`OpenCLI returned non-JSON output for: opencli ${args.join(' ')}`); }
+  // OpenCLI 2 wraps JSON responses in { ok, data } while 1.x returns the
+  // result directly. Supporting both keeps the Mac importer upgrade-safe.
+  if (parsed && typeof parsed === 'object' && typeof parsed.ok === 'boolean') {
+    if (!parsed.ok) throw new Error(parsed.error?.message || 'OpenCLI command failed');
+    return parsed.data;
+  }
+  return parsed;
 }
 
 const asArray = value => Array.isArray(value) ? value : (Array.isArray(value?.items) ? value.items : []);
