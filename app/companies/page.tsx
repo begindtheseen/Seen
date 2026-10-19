@@ -390,11 +390,11 @@ export default function CompaniesPage() {
                   }}
                   style={{
                     textDecoration: 'none',
-                    animation: `fadeUp .4s ${Math.min(i, 14) * 0.04}s ease both`,
+                    animation: `riseIn .55s ${Math.min(i, 14) * 0.045}s cubic-bezier(.16,1,.3,1) both`,
                   }}
                 >
                   <div
-                    className="ldr-item"
+                    className="ldr-item spot"
                     style={{
                       boxShadow:
                         risk === 'safe'

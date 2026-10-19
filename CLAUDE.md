@@ -50,6 +50,31 @@ and dashboard (PRs #122/#123) were intentionally REDESIGNED beyond the old site;
 longer the design source of truth for redesigned pages. `SITE_PARITY_CHECKLIST.md` /
 `ADMIN_PARITY_CHECKLIST.md` are frozen pre-06-30 records, not an active work queue.
 
+## Session 2026-10-19: Motion v2 — the "crisp" kit (claude/motion-graphics-update-yw7ei4)
+- **All motion lives in `app/motion.css`** (imported after globals.css in app/layout.tsx, so it wins the
+  cascade) + `components/motion/` (`MotionLayer` = the ONE pointer listener for `.spot` spotlight /
+  `.tilt` + the `.grain` layer; `KineticText` = per-word clip reveal; `Odometer` = rolling digits).
+  Transform/opacity/clip-path only, fine-pointer-only cursor effects, everything neutralized under
+  `prefers-reduced-motion` (block at the end of motion.css). The 2026-10-17 phone-performance rules and
+  the no-backdrop-filter-on-overlays rule (PR #322) are untouched.
+- **Intro splash is now ~1.4s** (820ms wordmark + 580ms shutter wipe; was 2.4s canvas slot-machine +
+  580ms fade). `components/IntroSplash.tsx` has no canvas; it keeps every contract: `sessionStorage
+  seen_intro_shown`, `markIntroDone()` → `seen:intro-done` (fired when the wipe STARTS so hero
+  entrances overlap it), `#intro-guard` hidden never removed, `html.intro-seen`.
+- **Shared keyframe `fadeUp` was reshaped** (snap-in + settle) in motion.css — all 21 inline
+  `animation: fadeUp …` call sites got crisper without edits. Nav active underline is ONE sliding
+  indicator (`Nav.module.css .ind`, measured in Nav.tsx). Toasts carry `--dur`/`--acc` + `.timed`
+  (draining hairline).
+- **Fixed in passing (pre-existing):** `lib/hooks/useCountUp.ts` initialised from the reduced-motion
+  media query inside `useState`, so the client's first render differed from the server HTML → React
+  #418 hydration error on every hero figure under reduced motion; and the first rAF timestamp could
+  precede the setTimeout start, flashing "-1%" in the hero gauge. Both verified with Playwright
+  against the production build (`next start` + API calls proxied to prod).
+- Company page: the page-local rAF score count-up is gone — `Odometer` renders the grade score and
+  the integer metric tiles. Dashboard stat pills are Odometers too.
+- Test suite: 1223/1231 pass; the 8 failures are `api/brain.timeline.test.mjs` (need the live brain)
+  and fail identically on the untouched base commit.
+
 ## Session 2026-10-17: self-filling company pages read the Arctic Shift archive when Reddit refuses
 - Verified on prod: the first enrichment cron run (Sheetz) got `reddit_429` from www.reddit.com on
   Vercel; cloud runners get 403. `ENRICH_SOURCE` (default `auto`) now switches the rest of a run to the

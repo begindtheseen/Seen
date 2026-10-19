@@ -9,6 +9,7 @@
    to push itself to the far edge, which collapses the global nav's space-between so the
    logo + links pack together on the left. */
 .primary {
+  position: relative; /* anchors the sliding indicator */
   display: flex;
   align-items: center;
   gap: 0.12rem;
@@ -43,26 +44,24 @@
   color: #fff;
   font-weight: 600;
 }
-/* Gradient underline for the active destination — mirrors the mockup's hairline accent.
-   Draws itself in from the left on route change (a small "alive" cue). */
-.linkActive::after {
-  content: "";
+/* ONE sliding indicator for the active destination. Nav.tsx measures the active link and
+   writes transform/width, so on route change the bar GLIDES from the old link to the new
+   one instead of each link drawing its own underline. */
+.ind {
   position: absolute;
-  left: 0.62rem;
-  right: 0.62rem;
+  left: 0;
   bottom: -0.42rem;
   height: 2px;
+  width: 0;
   border-radius: 2px;
   background: linear-gradient(90deg, var(--indigo), var(--blue));
-  transform-origin: left center;
-  animation: navUnderlineIn 0.35s cubic-bezier(0.16, 1, 0.3, 1);
-}
-@keyframes navUnderlineIn {
-  from { transform: scaleX(0); opacity: 0.4; }
-  to   { transform: scaleX(1); opacity: 1; }
+  box-shadow: 0 0 10px rgba(99, 102, 241, 0.55);
+  opacity: 0;
+  pointer-events: none;
+  transition: transform 0.45s var(--ease-out), width 0.45s var(--ease-out), opacity 0.2s ease;
 }
 @media (prefers-reduced-motion: reduce) {
-  .linkActive::after { animation: none; }
+  .ind { transition: none; }
 }
 
 .chevron {

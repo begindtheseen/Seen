@@ -11,9 +11,12 @@ import { useEffect, useRef, useState } from 'react'
 //   refreshing seed → live figures), it eases from the CURRENT displayed value,
 //   never restarting at 0.
 //
-// Honors prefers-reduced-motion: it initializes at and snaps straight to the
-// target, never animating, so the reduced-motion contract ("count-up jumps to
-// the final value") holds without any per-caller branching.
+// Honors prefers-reduced-motion: it snaps straight to the target in its first
+// effect, never animating, so the reduced-motion contract ("count-up jumps to
+// the final value") holds without any per-caller branching. The initial render is
+// 0 on BOTH server and client — reading the media query in the useState
+// initializer made the client's first render differ from the server HTML under
+// reduced motion (React #418 hydration mismatch on every hero figure).
 
 const prefersReducedMotion = () =>
   typeof window !== 'undefined' &&
@@ -24,8 +27,8 @@ export function useCountUp(
   target: number,
   { duration = 900, start = true, delay = 0 }: { duration?: number; start?: boolean; delay?: number } = {},
 ): number {
-  const [value, setValue] = useState<number>(() => (prefersReducedMotion() ? target : 0))
-  const current = useRef<number>(prefersReducedMotion() ? target : 0)
+  const [value, setValue] = useState<number>(0)
+  const current = useRef<number>(0)
   const frame = useRef<number | null>(null)
 
   useEffect(() => {
@@ -43,7 +46,9 @@ export function useCountUp(
     const run = () => {
       const t0 = performance.now()
       const tick = (now: number) => {
-        const t = Math.min(1, (now - t0) / duration)
+        // Clamp from below too: the first rAF timestamp can precede the setTimeout start,
+        // which made ease-out go negative and flash "-1%" in the hero gauge.
+        const t = Math.max(0, Math.min(1, (now - t0) / duration))
         const eased = 1 - Math.pow(1 - t, 3) // ease-out cubic
         const v = t < 1 ? from + (target - from) * eased : target
         current.current = v

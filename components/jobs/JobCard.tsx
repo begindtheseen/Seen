@@ -95,7 +95,7 @@ export default function JobCard({ job, index, onSaveToggle, onOpen, onApply, onC
   }
 
   return (
-    <div className={`jlc ${risk}`} style={{ animation: `fadeUp .4s ${Math.min(index, 12) * 0.06}s ease both` }}>
+    <div className={`jlc ${risk} spot`} style={{ animation: `riseIn .5s ${Math.min(index, 12) * 0.05}s cubic-bezier(.16,1,.3,1) both` }}>
       <div
         className="jlc-top"
         onClick={() => onOpen(job)}

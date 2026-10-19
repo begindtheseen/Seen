@@ -71,6 +71,8 @@ export default function Nav() {
   const [isPro, setIsPro] = useState(false)
   const [showUpgrade, setShowUpgrade] = useState(false)
   const [showSurvey, setShowSurvey] = useState(false)
+  const primaryRef = useRef<HTMLDivElement>(null)
+  const indRef = useRef<HTMLSpanElement>(null)
 
   const fetchBalance = useCallback(async () => {
     if (!isSeeker) { setCreditBalance(null); return }
@@ -124,6 +126,31 @@ export default function Nav() {
     return () => window.removeEventListener('scroll', onScroll)
   }, [])
 
+  // Sliding active indicator: measure the active primary link and glide the bar under it
+  // (Nav.module.css .ind). Re-measured on route change, auth change, resize and font load.
+  useEffect(() => {
+    const wrap = primaryRef.current
+    const ind = indRef.current
+    if (!wrap || !ind) return
+    const measure = () => {
+      const active = wrap.querySelector<HTMLElement>(`.${styles.linkActive}`)
+      if (!active) { ind.style.opacity = '0'; ind.dataset.live = ''; return }
+      const x = active.offsetLeft + 10 // inside the link's .62rem side padding
+      const w = Math.max(8, active.offsetWidth - 20)
+      const live = ind.dataset.live === '1'
+      if (!live) ind.style.transition = 'none' // first appearance: land, don't glide in from x=0
+      ind.style.transform = `translateX(${x}px)`
+      ind.style.width = `${w}px`
+      ind.style.opacity = '1'
+      if (!live) { void ind.offsetWidth; ind.style.transition = ''; ind.dataset.live = '1' }
+    }
+    measure()
+    const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(measure) : null
+    ro?.observe(wrap)
+    document.fonts?.ready?.then(measure).catch(() => {})
+    return () => ro?.disconnect()
+  }, [pathname, isSeeker, isLoggedIn])
+
   const isActive = (path: string) => pathname === path || pathname.startsWith(path + '/')
 
   const handleSignOut = async () => {
@@ -158,7 +185,7 @@ export default function Nav() {
         </Link>
 
         {/* Primary destinations — the five that matter for the current auth state. */}
-        <div className={styles.primary}>
+        <div className={styles.primary} ref={primaryRef}>
           {isSeeker ? (
             <>
               <Link href="/dashboard" className={linkCls('/dashboard')}>Dashboard</Link>
@@ -199,6 +226,7 @@ export default function Nav() {
             <Link href="/feed" className={styles.menuItem} role="menuitem">Live feed</Link>
             <Link href="/agencies" className={styles.menuItem} role="menuitem">Agency ghost index</Link>
           </Dropdown>
+          <span ref={indRef} className={styles.ind} aria-hidden="true" />
         </div>
 
         <div className={styles.right}>

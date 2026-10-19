@@ -13,6 +13,7 @@ import { aggregateJobLocations } from '@/lib/jobLocations'
 import CompanyRedditDiscussion from '@/components/CompanyRedditDiscussion'
 import CompanyPublicRecord from '@/components/CompanyPublicRecord'
 import IndustryBenchmark, { type Benchmark } from '@/components/IndustryBenchmark'
+import Odometer from '@/components/motion/Odometer'
 import { isGradeableScore, notEnoughReviewsLabel, gradeBasisLabel, MIN_REPORTS_FOR_GRADE } from '@/lib/gradeGate'
 
 // ── Types ──────────────────────────────────────────────────────────────────────
@@ -96,9 +97,12 @@ function riskColor(risk: string): string {
 // ── Sub-components ─────────────────────────────────────────────────────────────
 
 function MetBox({ label, value, alarm, color }: { label: string; value: string; alarm?: boolean; color?: string }) {
+  // Integer figures ("48%", "12d", "16") roll in (components/motion/Odometer); anything else
+  // ("—", "1.5") renders as text.
+  const m = /^(\d{1,4})(%|d)?$/.exec(value)
   return (
     <div className={`co-m${alarm ? ' co-alarm' : ''}`}>
-      <span className="co-mn" style={color ? { color } : undefined}>{value}</span>
+      <span className="co-mn" style={color ? { color } : undefined}>{m ? <Odometer value={Number(m[1])} suffix={m[2]} /> : value}</span>
       <span className="co-ml">{label}</span>
     </div>
   )
@@ -476,9 +480,7 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
     else window.location.href = '/companies'
   }
 
-  const [displayScore, setDisplayScore] = useState(0)
   const [showGradeCard, setShowGradeCard] = useState(false)
-  const [scoreRevealed, setScoreRevealed] = useState(false)
   const [myApp, setMyApp] = useState<{company: string; role: string; status: string; stage: string; appliedAt: number; daysSince: number} | null>(null)
 
   // Deep link: /company/<slug>#reports opens that section on load.
@@ -609,23 +611,6 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
       .catch(() => setJobsFetched(true))
       .finally(() => setJobsLoading(false))
   }, [open.roles, open.locations, companyName, jobsFetched])
-
-  // Score reveal animation
-  useEffect(() => {
-    if (!score || scoreRevealed || !isGradeableScore(score)) return
-    setScoreRevealed(true)
-    const target = score.overall_score
-    const duration = 1200
-    const start = performance.now()
-    function tick(now: number) {
-      const elapsed = now - start
-      const progress = Math.min(elapsed / duration, 1)
-      const eased = 1 - Math.pow(1 - progress, 3)
-      setDisplayScore(Math.round(eased * target))
-      if (progress < 1) requestAnimationFrame(tick)
-    }
-    requestAnimationFrame(tick)
-  }, [score]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Compare: Enter key and the button share one path.
   function addCompare() {
@@ -900,7 +885,7 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
                 <div className={`co-grade-letter ${risk}`}>{g}</div>
                 <div className="co-grade-main">
                   <span className="co-grade-lbl">Seen Grade</span>
-                  <span className="co-grade-score">{displayScore} / 100</span>
+                  <span className="co-grade-score"><Odometer value={score.overall_score} /> / 100</span>
                   {verdict && <p className="co-verdict">{verdict}</p>}
                   <div className="co-grade-meta">
                     {score.data_quality && <DataQualityBadge dq={score.data_quality} reportCount={fpReports} webCount={webEst} />}
