@@ -46,7 +46,13 @@ for (const search of searches.slice(0, 12)) {
   for (const hit of results) {
     const id = String(hit?.id || hit?.jobKey || '').trim();
     if (!/^[a-f0-9]{16}$/i.test(id) || dedupe.has(id)) continue;
-    const detail = await opencliJson(['indeed', 'job', id, '-f', 'json']);
+    let detail;
+    try {
+      detail = await opencliJson(['indeed', 'job', id, '-f', 'json']);
+    } catch (error) {
+      console.warn(`Skipping Indeed job ${id}: ${error.message}`);
+      continue;
+    }
     const job = Array.isArray(detail) ? detail[0] : detail;
     if (job && typeof job === 'object') dedupe.set(id, { ...hit, ...job, search_query: query });
   }
