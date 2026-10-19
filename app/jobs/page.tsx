@@ -40,6 +40,7 @@ export default function JobsPage() {
     status,
     statusMsg,
     recommended,
+    recHasResume,
     recSkills,
     recStatus,
     coScores,
@@ -321,12 +322,16 @@ export default function JobsPage() {
                 <button key={role} className="sugg-chip" onClick={() => { setQuery(role); searchJobs(role) }}>{role}</button>
               ))}
             </div>
-            {isLoggedIn && recStatus === 'done' && recommended.length === 0 && (
+            {/* Only when the ACCOUNT has no résumé on file (the rail says so) — never because the rail is empty. */}
+            {isLoggedIn && recStatus === 'done' && recommended.length === 0 && recHasResume === false && (
               <div style={{ marginTop: '1.5rem', padding: '.85rem 1.1rem', background: 'rgba(139,92,246,0.07)', border: '1px solid rgba(139,92,246,0.2)', borderRadius: 10, maxWidth: 340, margin: '1.5rem auto 0', textAlign: 'left' }}>
                 <div style={{ fontFamily: 'var(--display)', fontSize: '.82rem', fontWeight: 700, color: 'var(--white)', marginBottom: '.22rem' }}>Get personalized matches</div>
                 <div style={{ fontFamily: 'var(--mono)', fontSize: '.6rem', color: 'var(--sub)', lineHeight: 1.6, marginBottom: '.65rem' }}>Upload your resume and we&apos;ll surface jobs that match your skills and experience level automatically.</div>
                 <a href="/resume" style={{ fontFamily: 'var(--mono)', fontSize: '.62rem', color: '#a78bfa', textDecoration: 'none' }}>Upload resume →</a>
               </div>
+            )}
+            {isLoggedIn && recStatus === 'done' && recommended.length === 0 && recHasResume === true && (
+              <div style={{ marginTop: '1.25rem', fontFamily: 'var(--mono)', fontSize: '.6rem', color: 'var(--dim)' }}>Nothing in today&apos;s listings matched your résumé yet — search by title above.</div>
             )}
           </div>
         ) : status === 'loading' ? (

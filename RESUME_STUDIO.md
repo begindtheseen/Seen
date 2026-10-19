@@ -110,6 +110,10 @@ chronological with nothing dropped and nothing added.
   of backslashes, constant format strings + newline-free values in the rate-limiter logs, URL host
   comparison in the smoke harness, and three unused symbols removed. Pre-existing same-pattern
   entity decoding in `lib/server/listingImport.js` and `api/reports.js` is left for its own PR.
+  Second CodeQL round on the pushed head (9 alerts): the legacy `.docx` reader takes each `<w:t>`
+  run's captured text instead of stripping tags, the rate-limiter sanitizer removes newlines as
+  the `/\n|\r/g` alternation CodeQL recognises, the optimizer's search loop keeps no dead
+  `variant` variable, and three more unused imports are gone.
 - `npx tsc --noEmit` clean; `npm run build` clean (`/resume/studio` 84.9 kB, 258 kB first load).
 - Runtime: `scripts/resume-studio-smoke.mjs` against the final production build in headless Chromium —
   paste → structure (70) → fix-all (73) → live metric edit (79) → ATS check A → PDF (4564 B,

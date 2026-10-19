@@ -84,8 +84,31 @@ longer the design source of truth for redesigned pages. `SITE_PARITY_CHECKLIST.m
   mandatory separator), Markdown `esc` escapes `\`, rate-limiter logs use constant format strings + `logSafe`
   (newline-free, printable, ≤120 chars), smoke harness compares `new URL(url).host`. Same entity-decode
   pattern still exists in `lib/server/listingImport.js:157` and `api/reports.js:883` (not touched here).
+  Round 2 (head 1d4806e, 9 alerts): the legacy `.docx` reader now takes each `<w:t>` run's CAPTURED text
+  (`matchAll` group 1) instead of "stripping tags" from the match (CodeQL: incomplete multi-character
+  sanitization); `logSafe` removes newlines as the plain alternation `/\n|\r/g` — the only form CodeQL's
+  log-injection query recognises as a sanitizer (a `[\r\n]+` class is NOT); the optimizer's search loop no
+  longer keeps a dead `variant` variable (only scores are compared; the final variant is rebuilt once);
+  unused imports dropped. Reading alert annotations: `gh api repos/<o>/<r>/check-runs/<id>/annotations`.
 - **Verification:** optimizer 9/9 + tailor 13/13; full suite 1302/1310 (the 8 = brain timeline, pre-existing);
   tsc clean; `next build` clean; server→JSON→client probe equal; smoke result recorded in RESUME_STUDIO.md.
+- **/jobs "Matched to your résumé" rail — owner screenshot: "Upload your resume" card shown to an account WITH a
+  résumé.** Root cause (two classes): `api/jobs.js handleRecommended` read ONLY the derived cache table
+  `resume_skills` (filled best-effort by the upload path's `storeCareerSignals`, which returned early for any
+  résumé with zero dictionary skills — i.e. most non-tech résumés — and is never run by a Studio/profile save),
+  and the page treated "0 recommendations" as "no résumé". Now: the rail reads the CANONICAL résumé
+  (`profiles.resume_text`, same `isReadableResume` predicate as the save gate) alongside the cache; when the row
+  is missing / signal-less / older than `profiles.resume_updated_at` it derives the signal NOW
+  (`deriveResumeSignal` in `lib/server/resumeJobMatch.js` = `extractEmployment` + `extractCareerSignal`, titles
+  count as signal) and self-heals the row (PostgREST upsert `on_conflict=user_id`, awaited before returning).
+  Response carries `has_resume: true|false|null` (null = profile read failed — never claim "no résumé" without
+  evidence) and `reason: null|'no_resume'|'no_matches'|'no_signal'|'unavailable'`. `useJobSearch` exposes
+  `recHasResume`; the upload card renders only on `has_resume === false`, and a résumé with no matches gets an
+  honest one-liner instead. `storeCareerSignals` now writes the per-user row whenever titles OR skills exist
+  (anonymized layers still need skills). Tests: `api/jobs.recommended.test.mjs` (5 handler cases, stubbed
+  PostgREST + auth), `lib/server/resumeJobMatch.test.mjs` (+2). Schema note: `profiles.resume_text /
+  resume_file_name / resume_word_count / resume_updated_at` exist in prod (every `save_resume` writes them) but
+  are in NO checked-in migration — hand-applied drift to codify when the next schema PR lands.
 
 ## Session 2026-10-19 C: Résumé Studio (claude/resume-handling-optimization-ywotv9) — facts verified
 - **The résumé pipeline is now structured end to end**: `lib/resume/{model,extract,parse,health,rewrite,tailor,render}`

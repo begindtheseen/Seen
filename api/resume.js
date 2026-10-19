@@ -869,7 +869,11 @@ async function storeCareerSignals(resumeText, employment, req) {
   let signal = null;
   try { signal = extractCareerSignal(resumeText, employment); }
   catch (_) { signal = null; }
-  if (!signal?.skills?.length) return null;
+  // A non-tech résumé can carry zero dictionary skills and still have real job titles — the
+  // strongest signal the /jobs rail has. Persist the per-user row whenever there is ANY signal;
+  // the anonymized market layers below still need skills.
+  const topTitles = (Array.isArray(employment) ? employment : []).slice(0, 3).map(e => e && e.title).filter(Boolean);
+  if (!signal || (!signal.skills?.length && !topTitles.length)) return null;
 
   // The anonymized inserts below are best-effort — never let one failing reject this function,
   // so the caller still gets `signal` back and the résumé→jobs warm can fire off it.
@@ -878,10 +882,9 @@ async function storeCareerSignals(resumeText, employment, req) {
 
     // Layer 1: per-user resume_skills (private, with user_id)
     if (userId) {
-      const topTitles = employment.slice(0, 3).map(e => e.title).filter(Boolean);
       await sb.from('resume_skills').upsert({
         user_id: userId,
-        skills: signal.skills,
+        skills: signal.skills || [],
         seniority: signal.seniority,
         function: signal.function,
         years_exp: signal.years_exp,
@@ -890,7 +893,8 @@ async function storeCareerSignals(resumeText, employment, req) {
       }, { onConflict: 'user_id' }).catch(() => {});
     }
 
-    // Layer 2: anonymized career_signals (no user_id — pure market signal)
+    // Layer 2: anonymized career_signals (no user_id — pure market signal); needs real skills
+    if (!signal.skills?.length) return signal;
     const { data: signalRow } = await sb.from('career_signals').insert({
       skills: signal.skills,
       seniority: signal.seniority,

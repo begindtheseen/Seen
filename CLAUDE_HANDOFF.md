@@ -33,7 +33,9 @@ searches an objective — the owner's GNC case (Membership Specialist must lead,
 acceptance test. One apply path: the browser re-applies the JSON plan with overrides and gets exactly the
 server's variant (wire-contract test). CodeQL's 16 alerts on the PR head were fixed at the class (CSPRNG ids,
 one-pass entity decode, host-based link checks, linear regex, log format strings). After merge: same deploy
-checks as above.
+checks as above. Also in this PR: the /jobs "Matched to your résumé" rail now reads the canonical
+`profiles.resume_text` and self-heals the `resume_skills` cache, so an account with a résumé is never shown the
+"Upload your resume" card (owner screenshot 2026-10-19); the response's `has_resume` drives the card.
 
 ---
 
