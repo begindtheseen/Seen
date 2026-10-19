@@ -239,7 +239,7 @@ export default function Nav() {
           {/* Credits — subtle monospace chip (Pro shows an unlimited badge). */}
           {isSeeker && isPro && (
             <Link href="/pricing" className={styles.pro} title="Seen Pro — unlimited AI credits. Manage your membership.">
-              ★ Unlimited · PRO
+              ★ <span className={styles.proLong}>Unlimited · </span>PRO
             </Link>
           )}
           {isSeeker && !isPro && creditBalance !== null && (

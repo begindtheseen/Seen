@@ -69,6 +69,25 @@ longer the design source of truth for redesigned pages. `SITE_PARITY_CHECKLIST.m
   nav; iOS Safari does not composite nested backdrop-filters, so the hero showed straight through and
   the menu was unreadable (owner screenshot 2026-10-19). Same rule already held for `.co-sticky` and
   CompanyScoreModal. Glass stays only on surfaces that sit over the static background.
+- **Homepage v3** (owner asked for the "future concept" direction, not its colors or features): centered
+  hero (`components/HomeHero.tsx`, same search routing + proof refresh) → `components/home/WorkspacePreview`
+  — a window with Dashboard / Tracker / Company intel / Résumé AI tabs that each MIRROR A REAL SCREEN.
+  Dashboard/Tracker/Résumé use labeled EXAMPLE data (fictional companies); Company intel shows REAL live
+  Amazon data (the old proof card). Never add visitor/community counts — Seen has none (brain
+  seen:growth). `LandingMarketingSections` = 4 feature cards (grades, tracker check-ins, SeenFit,
+  Agency Ghost Index) + final CTA. Gotcha hit here: never use `<nav>` inside page content —
+  globals.css styles every `nav` element as the fixed site bar.
+- **Dashboard v2** (owner's second reference: "less clutter, less noise", look capable of 10k MRR):
+  `app/dashboard/page.tsx` render rewritten on `dashboard.module.css` — intro (hello + one primary
+  "+ Track application" → `/tracker?add=1`, which opens the add form) → row [health card with a
+  one-sentence verdict + 4 Odometer pills | next best move] → row [active pipeline | signals] →
+  benchmarks (only when enough data) → toolkit tiles (résumé status lives on its tile) → quiet
+  recently-checked/badges rows. All data logic unchanged. Settings/sign-out left the hero (the nav
+  account menu has them). Nav on ≤480px shows "★ PRO" (the long pill pushed logo + avatar off-screen).
+- **Tracker check-ins live on the application card** (owner request 2026-10-19). `EventStore.dueChecks`
+  returns ONE check per application — the earliest unanswered in schedule order; a snoozed one holds
+  the app back rather than letting a later check jump it. The old full-card stack above the list (and
+  its duplicate response+interview questions per old app) is gone; a one-line counter jumps to the first.
 - **Jobs filters** (`components/jobs/JobFilters.tsx` + `.module.css`): one "Filters" button with a
   count badge opens a panel with the four selects; active filters show as self-clearing chips next to
   the button. Filter state/behaviour in `useJobSearch` is untouched.

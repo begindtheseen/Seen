@@ -67,23 +67,25 @@ export const EventStore = {
     const due: DueCheck[] = []
     const snoozed = this._getSnoozed()
 
+    // ONE question per application at a time: the earliest unanswered check in schedule order
+    // (response → interview → outcome). An old application used to queue all of its overdue
+    // checks at once, so "Did they schedule interviews?" was asked before "Did they respond?".
+    // If that earliest check is snoozed, the application waits — a later check never jumps it.
     for (const app of apps.filter(a => a.status === 'active' || a.status === 'ghosted')) {
       const days = Math.floor((Date.now() - app.appliedAt) / 86400000)
-      for (const chk of CHECK_SCHEDULE) {
-        if (days < chk.day) continue
-        if (this.hasCheck(app.id, chk.type)) continue
-        const snoozeKey = app.id + ':' + chk.type
-        if (snoozed[snoozeKey] && Date.now() < snoozed[snoozeKey]) continue
-        due.push({
-          app,
-          checkType: chk.type,
-          day: chk.day,
-          daysElapsed: days,
-          label: chk.label,
-          q: chk.q,
-          overdue: days - chk.day,
-        })
-      }
+      const chk = CHECK_SCHEDULE.find(c => days >= c.day && !this.hasCheck(app.id, c.type))
+      if (!chk) continue
+      const snoozeKey = app.id + ':' + chk.type
+      if (snoozed[snoozeKey] && Date.now() < snoozed[snoozeKey]) continue
+      due.push({
+        app,
+        checkType: chk.type,
+        day: chk.day,
+        daysElapsed: days,
+        label: chk.label,
+        q: chk.q,
+        overdue: days - chk.day,
+      })
     }
     return due.sort((a, b) => b.overdue - a.overdue)
   },

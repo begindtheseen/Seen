@@ -6,7 +6,7 @@ import { useAuth } from '@/lib/auth'
 import { AppStore } from '@/lib/stores/AppStore'
 import { EventStore } from '@/lib/stores/EventStore'
 import { STAGES } from '@/lib/constants'
-import type { Application } from '@/lib/types'
+import type { Application, DueCheck } from '@/lib/types'
 import dynamic from 'next/dynamic'
 import Link from 'next/link'
 import { listingHref } from '@/lib/listingHref.js'
@@ -52,13 +52,17 @@ function ghostWatch(days: number, intel?: Intel): Watch | null {
   return { tone: 'danger', text: `Day ${days} · ${x}× their ${avg}${gp >= 30 ? (est ? ` — estimated ghost rate ${gp}%. Likely ghosted.` : ` — they ghost ${gp}% of applicants here. Likely ghosted.`) : ' — likely ghosted.'}` }
 }
 
-function AppCard({ app, onUpdate, onRemove, onShare, onReload, intel }: {
+function AppCard({ app, onUpdate, onRemove, onShare, onReload, intel, check, onAnswer, onSnooze }: {
   app: Application
   onUpdate: (id: string, changes: Partial<Application>) => void
   onRemove: (id: string) => void
   onShare: (app: Application) => void
   onReload: () => void
   intel?: Intel
+  /** The one check-in due on this application, asked right on its card. */
+  check?: DueCheck
+  onAnswer: (appId: string, checkType: string, data: Record<string, unknown>) => void
+  onSnooze: (appId: string, checkType: string) => void
 }) {
   const [withdrawing, setWithdrawing] = useState(false)
   const days = getDaysSince(app.appliedAt)
@@ -119,6 +123,9 @@ function AppCard({ app, onUpdate, onRemove, onShare, onReload, intel }: {
           })}
         </div>
       )}
+
+      {/* Check-in: asked on the application it is about, not in a separate stack above the list. */}
+      {check && <CheckIn check={check} onAnswer={onAnswer} onSnooze={onSnooze} ghostRate={intel?.ghost_rate} avgWaitDays={intel?.avg_wait_days} />}
 
       {/* Ghost Watch — time-aware verdict from this company's real Seen data */}
       {watch && (
@@ -224,58 +231,51 @@ function AppCard({ app, onUpdate, onRemove, onShare, onReload, intel }: {
   )
 }
 
-function CheckCard({ check, onAnswer, onSnooze, ghostRate, avgWaitDays }: {
-  check: ReturnType<typeof EventStore.dueChecks>[0]
+function CheckIn({ check, onAnswer, onSnooze, ghostRate, avgWaitDays }: {
+  check: DueCheck
   onAnswer: (appId: string, checkType: string, data: Record<string, unknown>) => void
   onSnooze: (appId: string, checkType: string) => void
   ghostRate?: number
   avgWaitDays?: number
 }) {
-  const { app, checkType, daysElapsed, label, q } = check
+  const { app, checkType, daysElapsed, q } = check
   const answers: Array<{ label: string; data: Record<string, unknown>; highlight?: boolean }> = []
   if (checkType === 'response_check') {
     answers.push({ label: '✅ Got a response', data: { got_response: true, response_type: 'unknown', days_to_response: daysElapsed }, highlight: true })
-    answers.push({ label: '📅 Interview scheduled', data: { got_response: true, response_type: 'interview', days_to_response: daysElapsed }, highlight: true })
+    answers.push({ label: '📅 Interview', data: { got_response: true, response_type: 'interview', days_to_response: daysElapsed }, highlight: true })
     answers.push({ label: '❌ Rejected', data: { got_response: true, response_type: 'rejection', days_to_response: daysElapsed } })
     answers.push({ label: '👻 Ghosted', data: { got_response: false, response_type: 'ghosted', days_to_response: daysElapsed } })
     answers.push({ label: '↩ I withdrew', data: { got_response: false, response_type: 'withdrew', withdrew: true, days_to_response: daysElapsed } })
   } else if (checkType === 'interview_check') {
     answers.push({ label: '✅ Had an interview', data: { had_interview: true, interview_type: 'interview' }, highlight: true })
-    answers.push({ label: '📞 Phone screen only', data: { had_interview: true, interview_type: 'phone_screen' }, highlight: true })
+    answers.push({ label: '📞 Phone screen', data: { had_interview: true, interview_type: 'phone_screen' }, highlight: true })
     answers.push({ label: '❌ Rejected', data: { had_interview: false, ended: true, outcome: 'rejected' } })
-    answers.push({ label: '👻 Still no response', data: { had_interview: false, ended: false } })
+    answers.push({ label: '👻 Still nothing', data: { had_interview: false, ended: false } })
     answers.push({ label: '↩ I withdrew', data: { had_interview: false, ended: true, outcome: 'withdrew', withdrew: true } })
   } else {
-    answers.push({ label: '🎉 Got an offer!', data: { outcome: 'offer' }, highlight: true })
+    answers.push({ label: '🎉 Got an offer', data: { outcome: 'offer' }, highlight: true })
     answers.push({ label: '❌ Rejected', data: { outcome: 'rejected' } })
     answers.push({ label: '👻 Ghosted', data: { outcome: 'ghosted' } })
     answers.push({ label: '🔄 Still active', data: { outcome: 'active' } })
     answers.push({ label: '↩ I withdrew', data: { outcome: 'withdrew', withdrew: true } })
   }
+  const showGhost = ghostRate != null && ghostRate > 0.4 && checkType === 'response_check'
 
   return (
-    <div className="check-card">
-      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '.5rem' }}>
-        <div>
-          <div style={{ fontFamily: 'var(--display)', fontWeight: 700, fontSize: '.85rem', color: 'var(--white)' }}>{app.company}</div>
-          <div style={{ fontFamily: 'var(--mono)', fontSize: '.6rem', color: 'var(--muted)' }}>{app.role} · Day {daysElapsed}</div>
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '.4rem', flexShrink: 0 }}>
-          <span style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', color: 'var(--amber)', background: 'rgba(245,158,11,.1)', border: '1px solid rgba(245,158,11,.2)', borderRadius: 4, padding: '.15rem .45rem' }}>{label}</span>
-          <button onClick={() => onSnooze(app.id, checkType)} style={{ background: 'none', border: 'none', fontFamily: 'var(--mono)', fontSize: '.6rem', color: 'var(--muted)', cursor: 'pointer', padding: '.1rem .3rem' }} title="Remind me tomorrow">✕</button>
-        </div>
+    <div className="app-check" onClick={e => e.stopPropagation()}>
+      <div className="app-check-head">
+        <span className="app-check-tag"><span className="app-check-dot" />Day {daysElapsed} check-in</span>
+        <button type="button" className="app-check-later" onClick={() => onSnooze(app.id, checkType)} title="Ask me again tomorrow">Later</button>
       </div>
-      <div style={{ fontSize: '.78rem', color: 'var(--sub)', marginBottom: '.5rem' }}>{q}</div>
-      {ghostRate != null && ghostRate > 0.4 && checkType === 'response_check' && (
-        <div style={{ background: ghostRate > 0.6 ? 'rgba(239,68,68,.07)' : 'rgba(245,158,11,.06)', border: `1px solid ${ghostRate > 0.6 ? 'rgba(239,68,68,.2)' : 'rgba(245,158,11,.2)'}`, borderRadius: 7, padding: '.45rem .75rem', marginBottom: '.65rem', fontFamily: 'var(--mono)', fontSize: '.6rem', color: ghostRate > 0.6 ? 'var(--red)' : 'var(--amber)', lineHeight: 1.6 }}>
-          {ghostRate > 0.6 ? '👻' : '⚠'} {app.company} has a <strong>{Math.round(ghostRate * 100)}% ghost rate</strong>
-          {avgWaitDays ? ` · most non-responses happen around day ${avgWaitDays}` : ' · most non-responses happen within 3 weeks'}
-          {daysElapsed < (avgWaitDays || 21) ? ` — you're at day ${daysElapsed}` : ` — you're past day ${avgWaitDays || 21}`}
+      <div className="app-check-q">{q}</div>
+      {showGhost && (
+        <div className="app-check-note">
+          {app.company} ghosts {Math.round(ghostRate! * 100)}% of applicants{avgWaitDays ? `, usually by day ${avgWaitDays}` : ''}.
         </div>
       )}
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '.45rem' }}>
+      <div className="app-check-opts">
         {answers.map(a => (
-          <button key={a.label} className="btn btn-ghost" style={{ fontSize: '.7rem', padding: '.38rem .75rem', ...(a.highlight ? { borderColor: 'var(--green)', color: 'var(--green)' } : {}) }} onClick={() => onAnswer(app.id, checkType, a.data)}>
+          <button key={a.label} type="button" className={`app-check-opt${a.highlight ? ' hi' : ''}`} onClick={() => onAnswer(app.id, checkType, a.data)}>
             {a.label}
           </button>
         ))}
@@ -311,6 +311,11 @@ function TrackerPage() {
     if (!isLoggedIn) { router.replace('/login'); return }
     if (isLoggedIn && !isSeeker) { router.replace('/'); return }
   }, [ready, isLoggedIn, isSeeker, router])
+
+  // ?add=1 (the dashboard's "+ Track application") opens the add-application form directly.
+  useEffect(() => {
+    if (searchParams?.get('add') === '1') setShowManual(true)
+  }, [searchParams])
 
   const loadApps = useCallback(async () => {
     const data = await AppStore.load(isLoggedIn)
@@ -548,6 +553,8 @@ function TrackerPage() {
   const hired = apps.filter(a => a.status === 'hired')
   const rejected = apps.filter(a => a.status === 'rejected')
   const dueChecks = EventStore.dueChecks(apps)
+  const checkByApp = new Map(dueChecks.map(d => [d.app.id, d]))
+  const firstChecked = orderedApps.find(a => checkByApp.has(a.id))
 
   const handleManualAdd = async () => {
     if (!manualForm.company.trim() || !manualForm.role.trim()) return
@@ -756,22 +763,18 @@ function TrackerPage() {
           </div>
         )}
 
-        {/* Check prompts */}
-        {dueChecks.length > 0 && (
-          <div style={{ marginBottom: '1.5rem' }}>
-            <div style={{ fontFamily: 'var(--mono)', fontSize: '.6rem', textTransform: 'uppercase', letterSpacing: '.09em', color: 'var(--amber)', marginBottom: '.75rem', display: 'flex', alignItems: 'center', gap: '.5rem' }}>
-              <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--amber)', display: 'inline-block', animation: 'pulse 2s infinite' }} />
-              {dueChecks.length} application check{dueChecks.length > 1 ? 's' : ''} due
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '.65rem' }}>
-              {dueChecks.map(d => {
-                const score = companyScores[d.app.company.toLowerCase().trim()]
-                return (
-                  <CheckCard key={`${d.app.id}_${d.checkType}`} check={d} onAnswer={handleCheckAnswer} onSnooze={handleSnooze} ghostRate={score?.ghost_rate} avgWaitDays={score?.avg_wait_days} />
-                )
-              })}
-            </div>
-          </div>
+        {/* Check-ins live on each application's card. Up here: one line saying how many are
+            waiting, which jumps to the first one in list order. */}
+        {firstChecked && (
+          <button
+            type="button"
+            className="check-count"
+            onClick={() => document.getElementById(`app_${firstChecked.id}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' })}
+          >
+            <span className="app-check-dot" />
+            {dueChecks.length} application{dueChecks.length > 1 ? 's' : ''} waiting on a quick check-in
+            <span className="check-count-go">Go to first ↓</span>
+          </button>
         )}
 
         {/* Empty state */}
@@ -825,7 +828,7 @@ function TrackerPage() {
           <div id="trackerList" style={{ display: 'flex', flexDirection: 'column', gap: '.75rem' }}>
             {orderedApps.map(app => (
               <div key={app.id} style={highlightId === app.id ? { borderRadius: 12, boxShadow: '0 0 0 2px var(--green), 0 0 30px rgba(16,185,129,0.3)', transition: 'box-shadow 2.5s ease' } : undefined}>
-                <AppCard app={app} onUpdate={handleUpdate} onRemove={handleRemove} onShare={handleShare} onReload={loadApps} intel={companyScores[app.company.toLowerCase().trim()]} />
+                <AppCard app={app} onUpdate={handleUpdate} onRemove={handleRemove} onShare={handleShare} onReload={loadApps} intel={companyScores[app.company.toLowerCase().trim()]} check={checkByApp.get(app.id)} onAnswer={handleCheckAnswer} onSnooze={handleSnooze} />
               </div>
             ))}
           </div>
