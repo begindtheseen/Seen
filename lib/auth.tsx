@@ -75,6 +75,7 @@ const SESSION_LOCAL_KEYS = [
 
 function clearSessionLocalData() {
   try { SESSION_LOCAL_KEYS.forEach(k => localStorage.removeItem(k)) } catch { /* ignore */ }
+  try { sessionStorage.removeItem('seen_job_cache_v1') } catch { /* ignore */ } // JobCache is sessionStorage
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {

@@ -12,6 +12,7 @@ import { SavedJobsStore } from '@/lib/stores/SavedJobs'
 import { JobCache } from '@/lib/stores/JobCache'
 import { Score } from '@/lib/score'
 import type { SavedJob } from '@/lib/types'
+import PageHeader from '@/components/shell/PageHeader'
 
 function savedAgo(iso?: string): string {
   if (!iso) return ''
@@ -54,12 +55,11 @@ export default function SavedPage() {
   return (
     <div className="page-full">
       <div style={{ maxWidth: 720, margin: '0 auto', padding: '1.5rem 1rem 7rem', width: '100%', boxSizing: 'border-box' }}>
-        <div style={{ marginBottom: '1.25rem' }}>
-          <h1 style={{ fontFamily: 'var(--display)', fontWeight: 800, fontSize: '1.5rem', color: 'var(--white)', letterSpacing: '-.02em', margin: 0 }}>Saved jobs</h1>
-          <div style={{ fontFamily: 'var(--mono)', fontSize: '.65rem', color: 'var(--dim)', marginTop: '.35rem' }}>
-            {loading ? 'Loading…' : items.length ? `${items.length} listing${items.length === 1 ? '' : 's'} saved` : ''}
-          </div>
-        </div>
+        <PageHeader
+          eyebrow="Bookmarks"
+          title="Saved jobs"
+          sub={loading ? 'Loading…' : items.length ? `${items.length} listing${items.length === 1 ? '' : 's'} saved — each reopens to the exact role you saved.` : 'Tap ♡ on any listing to keep it here.'}
+        />
 
         {loading ? (
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '40vh' }}><div className="spinner" /></div>

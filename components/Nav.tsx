@@ -71,6 +71,7 @@ export default function Nav() {
   const [isPro, setIsPro] = useState(false)
   const [showUpgrade, setShowUpgrade] = useState(false)
   const [showSurvey, setShowSurvey] = useState(false)
+  const [isMac, setIsMac] = useState(true)
   const primaryRef = useRef<HTMLDivElement>(null)
   const indRef = useRef<HTMLSpanElement>(null)
 
@@ -119,6 +120,8 @@ export default function Nav() {
 
   // Close the mobile drawer and any open dropdown whenever the route changes
   useEffect(() => { setMenuOpen(false); setMoreOpen(false); setAcctOpen(false) }, [pathname])
+
+  useEffect(() => { setIsMac(/Mac|iPhone|iPad/.test(navigator.platform || '')) }, [])
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 10)
@@ -179,7 +182,8 @@ export default function Nav() {
     <>
       <nav id="mainNav" className={scrolled ? 'nav-scrolled' : ''}>
         <button className="side-menu-toggle" onClick={() => setMenuOpen(true)} aria-label="Menu" title="Menu">☰</button>
-        <Link href="/" className="logo" aria-label="Seen — home">
+        {/* Signed-in seekers: the wordmark is "home" = the dashboard, like every signed-in product. */}
+        <Link href={isSeeker ? '/dashboard' : '/'} className="logo" aria-label="Seen — home">
           <span className="logo-pulse" />
           {/* Four clipped letters: on the first load of a session they rise in one after another
               (app/motion.css `html.seen-first .logo-l`); otherwise they are just the wordmark. */}
@@ -236,6 +240,12 @@ export default function Nav() {
         </div>
 
         <div className={styles.right}>
+          {/* ⌘K — jump anywhere (components/shell/CommandPalette). Desktop only; phones have the tab bar. */}
+          <button type="button" className={styles.cmdk} onClick={() => window.dispatchEvent(new Event('seen:palette'))} title="Jump to anything (⌘K)" aria-label="Search and jump to anything">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" aria-hidden><circle cx="11" cy="11" r="7" /><path d="M20 20l-3.5-3.5" /></svg>
+            <span className={styles.cmdkLabel}>Jump to…</span>
+            <kbd className={styles.cmdkKey}>{isMac ? '⌘' : 'Ctrl'}K</kbd>
+          </button>
           {/* Credits — subtle monospace chip (Pro shows an unlimited badge). */}
           {isSeeker && isPro && (
             <Link href="/pricing" className={styles.pro} title="Seen Pro — unlimited AI credits. Manage your membership.">
@@ -247,7 +257,7 @@ export default function Nav() {
               className={`${styles.chip}${creditBalance === 0 ? ' ' + styles.chipZero : ''}`}
               title={creditBalance === 0
                 ? 'Out of AI credits — upgrade or earn more by tracking applications and answering surveys'
-                : `${creditBalance} AI credit${creditBalance === 1 ? '' : 's'} left today`}
+                : `${creditBalance} AI credit${creditBalance === 1 ? '' : 's'} available`}
               onClick={() => creditBalance === 0 ? setShowUpgrade(true) : setShowSurvey(true)}
             >
               <span className={styles.chipSpark} />

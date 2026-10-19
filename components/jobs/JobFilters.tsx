@@ -13,7 +13,8 @@ const NICHE: Array<[NicheFilter, string]> = [
   ['logistics', 'Logistics / Warehouse'], ['finance', 'Finance'], ['other', 'Other'],
 ]
 const LEVEL: Array<[LevelFilter, string]> = [['', 'Any level'], ['entry', 'Entry level'], ['mid', 'Mid level'], ['senior', 'Senior']]
-const TYPE: Array<[TypeFilter, string]> = [['', 'Any type'], ['Full-time', 'Full-time'], ['Part-time', 'Part-time'], ['Contract', 'Contract']]
+// No ingest path emits 'Contract' (every source maps to Full-time/Part-time), so that option could never match.
+const TYPE: Array<[TypeFilter, string]> = [['', 'Any type'], ['Full-time', 'Full-time'], ['Part-time', 'Part-time']]
 const POSTED: Array<[PostedFilter, string]> = [['', 'Any time'], ['1', 'Last 24 hours'], ['7', 'Last week'], ['30', 'Last month']]
 
 const label = <T extends string>(opts: Array<[T, string]>, v: T) => opts.find(o => o[0] === v)?.[1] ?? v
@@ -105,7 +106,7 @@ export default function JobFilters({
             </select>
           </label>
           <label className={styles.row}>
-            <span className={styles.label}>Posted</span>
+            <span className={styles.label} title="When the listing entered Seen's corpus — sources don't carry the original post date">Added to Seen</span>
             <select className={styles.select} value={posted} onChange={e => setPosted(e.target.value as PostedFilter)}>
               {POSTED.map(([v, t]) => <option key={v} value={v}>{t}</option>)}
             </select>

@@ -216,7 +216,7 @@ export function drawCompanyCard(canvas: HTMLCanvasElement, d: CompanyCardData) {
   statRow(c, PAD, dY + 40, W - PAD * 2, [
     { value: `${Math.round((d.ghost_rate || 0) * 100)}%`, label: 'Ghost rate', color: C.red },
     { value: `${Math.round((d.response_rate || 0) * 100)}%`, label: 'Response rate', color: C.green },
-    { value: `${Math.round(d.avg_wait_days || 0)}d`, label: 'Avg wait', color: C.white },
+    { value: d.avg_wait_days ? `${Math.round(d.avg_wait_days)}d` : '—', label: 'Avg wait', color: C.white },
     { value: `${Math.round(d.waste || 0)}%`, label: 'Wasted-time risk', color: C.amber },
   ])
 

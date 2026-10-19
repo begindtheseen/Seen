@@ -48,8 +48,8 @@ async function recordApplyActivity({ company, role, location, uid, jobId, applyU
     });
     const notif = buildNotificationRow('apply_activity', {
       companyName: company, companyKey, jobId,
-      title: role ? `New applicant — ${role}` : 'New applicant',
-      body: `A candidate applied to ${role ? `“${role}”` : 'a listing'}${location ? ` (${location})` : ''} via your Seen listing.`,
+      title: role ? `Apply click — ${role}` : 'Apply click',
+      body: `A candidate clicked Apply on ${role ? `“${role}”` : 'a listing'}${location ? ` (${location})` : ''} from Seen.`,
       meta: { role: role || null, city: location || null },
     });
     if (notif) await db('employer_notifications', { method: 'POST', body: JSON.stringify(notif) });

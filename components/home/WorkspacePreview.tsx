@@ -49,7 +49,7 @@ function letterGrade(s: number): string {
   return 'F'
 }
 
-export default function WorkspacePreview({ proof }: { proof: ProofScore }) {
+export default function WorkspacePreview({ proof, live = false }: { proof: ProofScore; live?: boolean }) {
   const [tab, setTab] = useState<Tab>('dashboard')
   const [inView, setInView] = useState(false)
   const [seen, setSeen] = useState(false) // has ever been in view — gates the first number roll
@@ -127,7 +127,9 @@ export default function WorkspacePreview({ proof }: { proof: ProofScore }) {
                 <div className={styles.sub}>{meta.sub}</div>
               </div>
               {tab === 'company'
-                ? <span className={`${styles.tag} ${styles.tagLive}`}><span className={styles.liveDot} />Live data</span>
+                ? (live
+                    ? <span className={`${styles.tag} ${styles.tagLive}`}><span className={styles.liveDot} />Live data</span>
+                    : <span className={styles.tag} title="Last stored snapshot — the live figures load in a moment">Real data · snapshot</span>)
                 : <span className={styles.tag}>Example data</span>}
             </div>
 
@@ -278,14 +280,14 @@ function CompanyTab({ proof }: { proof: ProofScore }) {
         <div className={styles.coStats}>
           <div><span>Responds to applicants</span><b style={{ color: tone(proof.response_rate >= 0.5, proof.response_rate >= 0.3) }}><Odometer value={respPct} suffix="%" /></b></div>
           {/* 0 means no wait data yet (the company page shows "—" for the same case). */}
-          <div><span>Median wait to hear back</span>{proof.avg_wait_days > 0
+          <div><span>Average wait to hear back</span>{proof.avg_wait_days > 0
             ? <b style={{ color: tone(proof.avg_wait_days <= 21, proof.avg_wait_days <= 45) }}><Odometer value={proof.avg_wait_days} suffix={'\u00a0days'} /></b>
             : <b style={{ color: 'var(--dim)' }}>—</b>}</div>
           <div><span>Wasted-effort risk</span><b style={{ color: tone(proof.waste <= 30, proof.waste <= 60) }}><Odometer value={proof.waste} suffix="%" /></b></div>
         </div>
       </div>
       <div className={styles.coFoot}>
-        <span>Seen grade {proof.overall_score}/100 · grades need at least 5 reports</span>
+        <span>Seen grade {proof.overall_score}/100 · from {proof.first_party_report_count} applicant reports</span>
         <Link href="/company/amazon">Full report →</Link>
       </div>
     </div>

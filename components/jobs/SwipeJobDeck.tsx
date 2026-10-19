@@ -5,6 +5,7 @@ import { SavedJobsStore } from '@/lib/stores/SavedJobs'
 import { useAuth } from '@/lib/auth'
 import type { Job } from '@/lib/types'
 import HiringProbability from '@/components/HiringProbability'
+import { Score } from '@/lib/score'
 
 // ── SwipeJobDeck ──────────────────────────────────────────────────────────────
 
@@ -157,7 +158,7 @@ export default function SwipeJobDeck({ jobs, onOpen, onDismiss, onSave, onApply,
           You matched {savedCount} job{savedCount !== 1 ? 's' : ''}
         </div>
         <div style={{ fontFamily: 'var(--mono)', fontSize: '.6rem', color: 'var(--sub)', marginBottom: '1rem' }}>
-          Saved applications are in your tracker
+          Right-swiped jobs are in your Saved list
         </div>
         <div style={{ display: 'flex', gap: '.5rem', justifyContent: 'center', flexWrap: 'wrap' }}>
           <a href="/resume" style={{ fontFamily: 'var(--mono)', fontSize: '.62rem', padding: '.35rem .8rem', background: 'rgba(99,102,241,.15)', border: '1px solid rgba(99,102,241,.35)', borderRadius: 7, color: 'var(--indigo)', textDecoration: 'none' }}>See all matches →</a>
@@ -189,8 +190,7 @@ export default function SwipeJobDeck({ jobs, onOpen, onDismiss, onSave, onApply,
   const secondY = 8 - dragProgress * 8
 
   const scoreRisk = (score: number | null): 'safe' | 'warn' | 'danger' | 'unrated' =>
-    score == null ? 'unrated' : score >= 75 ? 'safe' : score >= 50 ? 'warn' : 'danger'
-  const scoreColor = (score: number | null) => score == null ? 'var(--dim)' : score >= 75 ? 'var(--green)' : score >= 50 ? 'var(--amber)' : 'var(--red)'
+    Score.risk(score)
   // Continuous HSL scale: 25→0° (red), 60→60° (yellow), 95→120° (green).
   // A null (unrated) listing gets a neutral desaturated gray — never a colored verdict.
   const scoreHsl = (score: number | null, alpha: number) => {
@@ -298,8 +298,8 @@ export default function SwipeJobDeck({ jobs, onOpen, onDismiss, onSave, onApply,
           if (!sc) return null
           return (
             <HiringProbability
-              responseRate={sc.response_rate ?? (sc.overall_score ? sc.overall_score / 100 * 0.45 : 0.20)}
-              ghostRate={sc.ghost_rate || 0.55}
+              responseRate={sc.response_rate ?? null}
+              ghostRate={sc.ghost_rate ?? null}
               jobLevel={topJob.level}
               compact
             />

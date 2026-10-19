@@ -1,0 +1,7 @@
+.bar {
+  position: fixed; top: 0; left: 0; height: 2px; width: 0; opacity: 0;
+  z-index: 9990; pointer-events: none;
+  background: linear-gradient(90deg, var(--indigo), var(--blue) 60%, #a855f7);
+  box-shadow: 0 0 12px rgba(99, 102, 241, 0.85), 0 0 2px rgba(255, 255, 255, 0.4);
+  transition: width 0.35s var(--ease-out), opacity 0.3s ease;
+}

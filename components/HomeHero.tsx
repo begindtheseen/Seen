@@ -54,6 +54,7 @@ export default function HomeHero() {
   const [query, setQuery] = useState('')
   const [location, setLocation] = useState('')
   const [proof, setProof] = useState<ProofScore>(FEATURED_SEED)
+  const [proofLive, setProofLive] = useState(false) // true once the live leaderboard refresh landed
 
   // Entrance choreography starts as soon as the display font is available (useIntroGate)
   // — there is no blocking intro; the hero rising IS the opening.
@@ -102,6 +103,7 @@ export default function HomeHero() {
             report_count: match.score.report_count,
             first_party_report_count: firstPartyReportCount(match.score),
           })
+          setProofLive(true)
         }
       } catch { /* keep the real seed */ }
     })()
@@ -171,13 +173,13 @@ export default function HomeHero() {
         <div className={`${styles.trust} ${styles.stage} ${styles.d6}`}>
           <span><b>Free</b> company checks</span>
           <span><b>No account</b> needed to look</span>
-          <span><b>No grade</b> until 5+ reports</span>
+          <span><b>No grade</b> without enough evidence</span>
         </div>
       </section>
 
       {/* What you get once you start tracking: the workspace, with example results — and the
           company tab running on Seen's real, live data (the proof this hero used to carry). */}
-      <WorkspacePreview proof={proof} />
+      <WorkspacePreview proof={proof} live={proofLive} />
     </>
   )
 }

@@ -12,8 +12,10 @@ interface HiringProbabilityProps {
   compact?: boolean       // compact mode for swipe cards (less height)
 }
 
-function calcProb(responseRate: number, ghostRate: number, jobLevel?: string, profileExp?: string): number {
-  const base = (responseRate || 0.20) * (1 - (ghostRate || 0.55) * 0.45)
+function calcProb(responseRate: number, jobLevel?: string, profileExp?: string): number {
+  // The chance of hearing back IS the company's reported response rate (ghosting is already its
+  // complement — multiplying by it again double-counted and `0 || 0.55` invented a 55% ghost rate).
+  const base = responseRate
 
   // Level match multiplier
   const exp = (profileExp || '').toLowerCase()
@@ -29,12 +31,13 @@ function calcProb(responseRate: number, ghostRate: number, jobLevel?: string, pr
     else levelMult = 1.0
   }
 
-  return Math.min(0.70, Math.max(0.03, base * levelMult))
+  return Math.min(0.95, Math.max(0.02, base * levelMult))
 }
 
 export default function HiringProbability({ responseRate, ghostRate, overallScore: _overallScore, jobLevel, profileExp, compact = false }: HiringProbabilityProps) {
   if (responseRate == null || ghostRate == null) return null
-  const prob = calcProb(responseRate, ghostRate, jobLevel, profileExp)
+  const personalized = !!(jobLevel && profileExp)
+  const prob = calcProb(responseRate, jobLevel, profileExp)
   const pct = Math.round(prob * 100)
   const color = pct >= 40 ? 'var(--green)' : pct >= 20 ? 'var(--amber)' : 'var(--red)'
 
@@ -50,16 +53,16 @@ export default function HiringProbability({ responseRate, ghostRate, overallScor
     )
   }
 
-  const context = pct >= 50
-    ? `Strong match — above-average response chance`
+  const context = (pct >= 50
+    ? 'Most applicants here hear back'
     : pct >= 30
-    ? `Moderate — apply with a tailored resume`
-    : `Competitive — company responds to fewer applicants`
+    ? 'Mixed — apply with a tailored résumé'
+    : 'Few applicants here hear back') + (personalized ? ' · adjusted for your level' : ' · company-wide estimate from applicant reports')
 
   return (
     <div style={{ background: 'rgba(99,102,241,.06)', border: '1px solid rgba(99,102,241,.15)', borderRadius: 9, padding: '.65rem .85rem' }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '.35rem' }}>
-        <span style={{ fontFamily: 'var(--mono)', fontSize: '.52rem', color: 'var(--dim)', textTransform: 'uppercase', letterSpacing: '.08em' }}>Your response probability</span>
+        <span style={{ fontFamily: 'var(--mono)', fontSize: '.52rem', color: 'var(--dim)', textTransform: 'uppercase', letterSpacing: '.08em' }}>Estimated response chance</span>
         <span style={{ fontFamily: 'var(--display)', fontSize: '1.1rem', fontWeight: 700, color, lineHeight: 1 }}>~{pct}%</span>
       </div>
       <div style={{ height: 4, background: 'rgba(255,255,255,.07)', borderRadius: 2, overflow: 'hidden', marginBottom: '.3rem' }}>

@@ -94,7 +94,7 @@ export default async function handler(req, res) {
   console.log(`[user-sync] action=${action} uid=${uid}`);
 
   // Rate-limit mutating actions per user (not reads — those are cheap DB fetches)
-  const WRITE_ACTIONS = new Set(['add_application','update_application','remove_application','save_job','unsave_job','save_profile','save_resume','delete_account','submit_resume_survey']);
+  const WRITE_ACTIONS = new Set(['add_application','update_application','remove_application','save_job','unsave_job','save_profile','save_resume','delete_account','submit_resume_survey','report_job_availability']);
   if (WRITE_ACTIONS.has(action)) {
     const windowHour = Math.floor(Date.now() / 3_600_000);
     const rlKey = `${uid}:user-sync:${windowHour}`;

@@ -40,9 +40,10 @@ export default async function handler(req, res) {
   const cutoff = new Date(now - 7 * 86400e3).toISOString();
 
   // Oldest first so Day-30 applications win the per-run send budget over fresher Day-7 ones.
-  const r = await q(`applications?select=id,user_id,company,role,status,applied_at,created_at&created_at=lt.${encodeURIComponent(cutoff)}&order=created_at.asc&limit=1000`);
+  // The column is company_name (api/user-sync.js writes it); selecting `company` 400'd every run.
+  const r = await q(`applications?select=id,user_id,company_name,role,status,applied_at,created_at&created_at=lt.${encodeURIComponent(cutoff)}&order=created_at.asc&limit=1000`);
   if (!r.ok) return res.status(200).json({ ok: false, reason: 'query_failed', sent: 0 });
-  const apps = await r.json();
+  const apps = (await r.json()).map((a) => ({ ...a, company: a.company_name }));
 
   const optRes = await q('email_prefs?select=user_id&outcome_opt_out=eq.true&limit=10000');
   const optOut = new Set((optRes.ok ? await optRes.json() : []).map((x) => x.user_id));

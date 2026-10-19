@@ -152,8 +152,8 @@ export function useJobSearch() {
     const copy = [...list]
     // Unrated (null) listings sort to the end of a score/waste sort — never treated as 0.
     if (mode === 'waste') copy.sort((a, b) => (a.waste ?? Infinity) - (b.waste ?? Infinity))
-    else if (mode !== 'recent') copy.sort((a, b) => (b.score ?? -Infinity) - (a.score ?? -Infinity)) // transparency
-    // 'recent' keeps server order. Every mode then keeps Featured and posted-on-Seen listings
+    else if (mode === 'recent') copy.sort((a, b) => (Date.parse(b.posted_at || '') || 0) - (Date.parse(a.posted_at || '') || 0)) // newest first, undated last
+    else copy.sort((a, b) => (b.score ?? -Infinity) - (a.score ?? -Infinity)) // transparency Every mode then keeps Featured and posted-on-Seen listings
     // first (stable, so the chosen sort still orders within each tier) — lib/server/jobPriority.js.
     return sortByPriority(copy)
   }
@@ -178,17 +178,17 @@ export function useJobSearch() {
 
   const updateDisplay = useCallback((list: Job[], sortMode: SortMode) => {
     const f = applyFilters(list)
-    // Never blank the board: if active filters zero out a non-empty result set, fall
-    // back to showing all nearby roles with a note, rather than "No results".
+    // Filters that match nothing say so (the chips stay lit, so the fix is obvious) instead of
+    // silently showing every row under an active filter.
     if (f.length === 0 && list.length > 0) {
-      const s = applySort(list, sortMode)
-      setFiltered(s)
-      setStatusMsg(`No exact filter matches — showing all ${s.length} nearby role${s.length !== 1 ? 's' : ''}`)
+      setFiltered([])
+      setStatusMsg('No listings match these filters — clear one to see the rest.')
       return
     }
     const s = applySort(f, sortMode)
     setFiltered(s)
-    setStatusMsg(s.length === 0 ? 'No results. Try a different title or wider radius.' : `${s.length} result${s.length !== 1 ? 's' : ''}`)
+    // The server caps a page at 60; say so rather than presenting 60 as the whole count.
+    setStatusMsg(s.length === 0 ? 'No results. Try a different title or wider radius.' : `${s.length === 60 && list.length === 60 ? '60+' : s.length} result${s.length !== 1 ? 's' : ''}`)
   }, [niche, level, jobType, posted]) // eslint-disable-line react-hooks/exhaustive-deps
   // Latest sort + filters for the delayed top-up refresh (its timer outlives the render it was set in).
   const sortRef = useRef(sort); sortRef.current = sort
@@ -347,21 +347,24 @@ export function useJobSearch() {
   useEffect(() => {
     try {
       const apps = AppStore.loadSync()
-      setAppliedCos(new Set(apps.map(a => a.company.toLowerCase().trim())))
+      // Keys are job ids and apply URLs — "Applied" means THIS listing, not any listing at the company.
+      setAppliedCos(new Set(apps.flatMap(a => [a.jobId, a.jobUrl].filter((k): k is string => !!k))))
     } catch {}
   }, [])
 
+  // Suggest a level chip from the profile ONCE — and only if at least one loaded listing carries that
+  // level (level is inferred from titles and is mostly "Mid level", so a "senior" chip emptied the board).
+  const levelSuggestedRef = useRef(false)
   useEffect(() => {
-    if (!profile?.experience || level) return // don't override if user already set it
+    if (!profile?.experience || level || levelSuggestedRef.current || !jobs.length) return
     const exp = profile.experience.toLowerCase()
-    if (exp.includes('entry') || exp.includes('0-1') || exp.includes('junior') || exp.includes('intern')) {
-      setLevel('entry')
-    } else if (exp.includes('senior') || exp.includes('5+') || exp.includes('lead') || exp.includes('staff') || exp.includes('principal')) {
-      setLevel('senior')
-    } else if (exp.includes('mid') || exp.includes('2-') || exp.includes('3-') || exp.includes('4-')) {
-      setLevel('mid')
-    }
-  }, [profile?.experience]) // eslint-disable-line react-hooks/exhaustive-deps
+    const want = (exp.includes('entry') || exp.includes('0-1') || exp.includes('junior') || exp.includes('intern')) ? 'entry'
+      : (exp.includes('senior') || exp.includes('5+') || exp.includes('lead') || exp.includes('staff') || exp.includes('principal')) ? 'senior'
+      : (exp.includes('mid') || exp.includes('2-') || exp.includes('3-') || exp.includes('4-')) ? 'mid' : ''
+    if (!want) return
+    levelSuggestedRef.current = true
+    if (jobs.some(j => (j.level || '').toLowerCase().includes(want))) setLevel(want as LevelFilter)
+  }, [profile?.experience, jobs]) // eslint-disable-line react-hooks/exhaustive-deps
 
   async function requestGpsLocation() {
     if (!navigator.geolocation || location.trim()) return
@@ -400,8 +403,8 @@ export function useJobSearch() {
   async function searchJobs(queryOverride?: string, locationOverride?: string) {
     const q = (queryOverride ?? query).trim()
     const loc = (locationOverride ?? location).trim()
-    if (!q && !loc) {
-      setStatusMsg('Enter a job title or location to search.')
+    if (!q) {
+      setStatusMsg('Enter a job title to search.')
       return
     }
     searchedOnceRef.current = true
@@ -452,7 +455,7 @@ export function useJobSearch() {
           return
         }
         if (!res.ok) throw new Error(`HTTP ${res.status}`)
-        const data = await res.json() as { jobs?: unknown[]; results?: unknown[]; widened?: boolean; radius?: number; topup?: string | null }
+        const data = await res.json() as { jobs?: unknown[]; results?: unknown[]; widened?: boolean; fallback?: 'outside_radius' | 'unrelated' | 'remote_thin' | null; radius?: number | null; location?: string; topup?: string | null }
         const raw: Job[] = toJobs(data.jobs || data.results || [], loc)
         searchCache.set(cacheKey, { jobs: raw, ts: Date.now() })
         JobCache.setMany(raw)
@@ -461,7 +464,15 @@ export function useJobSearch() {
         setStatus('done')
         // When we had to widen past the requested radius (nothing within it), say so —
         // otherwise nearby-but-outside-radius results look like the radius is broken.
-        if (data.widened && loc && raw.length) {
+        // Say exactly what the server did when it could not fill the page from matches:
+        //  unrelated      → nothing matched the title at all; these are other openings (never "matches")
+        //  outside_radius → matches exist, just outside the radius
+        //  remote_thin    → few remote matches; non-remote roles fill the rest
+        if (raw.length && data.fallback === 'unrelated') {
+          setStatusMsg(`No matches for "${q}" — showing ${raw.length} other opening${raw.length !== 1 ? 's' : ''}${loc && data.location !== 'remote' ? ` near ${loc}` : ''}`)
+        } else if (raw.length && data.fallback === 'remote_thin') {
+          setStatusMsg(`Few remote matches for "${q}" — also showing roles that aren't marked remote`)
+        } else if (raw.length && (data.fallback === 'outside_radius' || data.widened) && loc && data.location !== 'remote') {
           setStatusMsg(`No jobs within ${data.radius || radius} mi of ${loc} — showing the ${raw.length} nearest matches`)
         }
         if (q) try { RecentSearchesStore.push(q, loc || undefined) } catch {}

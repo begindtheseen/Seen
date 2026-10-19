@@ -14,7 +14,7 @@ export const revalidate = 3600
 
 export const metadata: Metadata = {
   title: 'Real Hiring Outcomes from Reddit — Who Ghosts, Who Responds | Seen',
-  description: 'Tired of "does anyone know if X is ghosting" threads? Seen aggregates real applicant outcomes into ghost rates and response times for 47,000+ companies — the data those Reddit threads are missing.',
+  description: 'Tired of "does anyone know if X is ghosting" threads? Seen aggregates real applicant outcomes into ghost rates and response times for hundreds of companies — the data those Reddit threads are missing.',
   keywords: ['reddit hiring', 'does anyone know if they ghost', 'reddit job application ghosted', 'companies that ghost applicants reddit', 'reddit recruiting', 'r/recruitinghell'],
   alternates: { canonical: 'https://seenjobs.io/reddit' },
   openGraph: { title: 'Real Hiring Outcomes from Reddit', description: 'Ghost rates and response times from real applicant reports — the data Reddit threads are missing.', url: 'https://seenjobs.io/reddit', type: 'website', siteName: 'Seen' },

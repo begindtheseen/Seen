@@ -145,7 +145,7 @@ export async function recomputeCompanyScoreFromReports(SUPABASE_URL, hdrs, compa
     // report at its trust weight; only the anti-gaming holds (anonymous/duplicate/velocity) wait.
     // Reports + "what people are saying" (the stored web_reviews), fetched together.
     const [r, wr, withMentions] = await Promise.all([
-      fetch(`${SUPABASE_URL}/rest/v1/reports?company_name=ilike.${enc}&${SCORABLE_REPORTS_FILTER}&select=outcome,platform&limit=2000`, { headers: hdrs }),
+      fetch(`${SUPABASE_URL}/rest/v1/reports?company_name=ilike.${enc}&${SCORABLE_REPORTS_FILTER}&select=outcome,platform,wait_days,rounds&limit=2000`, { headers: hdrs }),
       fetch(`${SUPABASE_URL}/rest/v1/company_scores?company_name=eq.${enc}&select=web_reviews&limit=1`, { headers: hdrs })
         .then((x) => (x.ok ? x.json() : [])).catch(() => []),
       hasMentionCount(SUPABASE_URL, hdrs),
@@ -153,8 +153,9 @@ export async function recomputeCompanyScoreFromReports(SUPABASE_URL, hdrs, compa
     if (!r.ok) return false;
     const reps = await r.json();
     if (!Array.isArray(reps)) return false;
+    // Carry each trust class's mean wait_days / rounds so the stored avg wait is real, not null.
     const byType = {};
-    for (const row of reps) { const t = classifyPlatform(row.platform); (byType[t] ||= []).push({ outcome: row.outcome }); }
+    for (const row of reps) { const t = classifyPlatform(row.platform); (byType[t] ||= []).push({ outcome: row.outcome, wait_days: row.wait_days, rounds: row.rounds }); }
     // Mentions count exactly half a report (SOURCE_TRUST.mentions) — only once mention_count can be stored,
     // so the stored score and its evidence count always agree.
     const webReviews = Array.isArray(wr) && wr[0] ? wr[0].web_reviews : null;
@@ -162,7 +163,11 @@ export async function recomputeCompanyScoreFromReports(SUPABASE_URL, hdrs, compa
     const totalMentions = withMentions ? mentionTotal(webReviews) : 0;
     if (mentions.length) byType.mentions = mentions;
     if (!reps.length && !totalMentions) return false;
-    const sources = Object.entries(byType).map(([type, outcomes]) => ({ type, outcomes }));
+    const mean = (rows, key, max) => { const v = rows.map(r => Number(r[key])).filter(x => Number.isFinite(x) && x > 0 && x <= max); return v.length ? v.reduce((a, b) => a + b, 0) / v.length : null; };
+    const sources = Object.entries(byType).map(([type, rows]) => ({
+      type, outcomes: rows.map(r => ({ outcome: r.outcome })),
+      ...(type === 'mentions' ? {} : { avgWaitDays: mean(rows, 'wait_days', 365), avgRounds: mean(rows, 'rounds', 20) }),
+    }));
     // Fold in admin-confirmed dead listings so companies that leave zombie postings up
     // carry the (bounded) penalty in their stored grade.
     const confirmedStaleListings = await fetchConfirmedStaleCount(SUPABASE_URL, hdrs, companyName);
@@ -182,10 +187,11 @@ export async function recomputeCompanyScoreFromReports(SUPABASE_URL, hdrs, compa
       report_count: fz.report_count,
       // Recompute runs with web:{} — this count is 100% first-party report rows.
       first_party_report_count: fz.first_party_report_count ?? fz.report_count,
-      web_report_count: 0,
+      // A mentions-only recompute (no report rows) must not erase the row's web-research provenance:
+      // keep web_report_count/data_source as stored so the page can still say "web-research estimate".
+      ...(reps.length ? { web_report_count: 0, data_source: 'reports' } : {}),
       ...(withMentions ? { mention_count: totalMentions } : {}),
       data_quality: fz.confidence_label || 'low',
-      data_source: 'reports',
       expires_at: new Date(Date.now() + _SCORE_TTL_MS).toISOString(),
     };
     const sv = await fetch(`${SUPABASE_URL}/rest/v1/company_scores?on_conflict=company_name`, {

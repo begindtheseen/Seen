@@ -8,6 +8,7 @@ import { useAuth } from '@/lib/auth'
 import OutcomeCard from '@/components/OutcomeCard'
 import { reportSourceBadge } from '@/lib/reportSource'
 import type { Application } from '@/lib/types'
+import PageHeader from '@/components/shell/PageHeader'
 
 type Outcome = 'ghosted' | 'autoreject' | 'human' | 'waiting' | ''
 type Stage = 'application' | 'phone' | 'interview' | 'final' | ''
@@ -378,16 +379,12 @@ function ReportPage() {
             ✦ Prefilled for you{company ? <> — reporting <span style={{ color: 'var(--white)', fontWeight: 700 }}>{company}</span></> : ''}. Fill any missing field and hit submit.
           </div>
         )}
-        <div style={{ fontFamily: 'var(--mono)', fontSize: '.52rem', textTransform: 'uppercase', letterSpacing: '.22em', color: 'var(--blue)', marginBottom: '.6rem', display: 'flex', alignItems: 'center', gap: 12 }}>
-          <span style={{ width: 22, height: 1, background: 'var(--blue)', display: 'inline-block' }} />
-          Anonymous report
-        </div>
-        <h1 style={{ fontFamily: 'var(--display)', fontSize: '1.75rem', fontWeight: 800, color: 'var(--white)', letterSpacing: '-.03em', marginBottom: '.25rem' }}>
-          Report your experience
-        </h1>
-        <p style={{ color: 'var(--sub)', fontSize: '.82rem', fontWeight: 300, marginBottom: '1.5rem' }}>
-          Takes 60 seconds. Helps thousands of job seekers tonight. 100% anonymous.
-        </p>
+        <PageHeader
+          eyebrow="Anonymous report"
+          title="Report your experience"
+          crumbLabel="Report"
+          sub="Takes 60 seconds. Warns the next applicant who checks this company. Never shown with your name."
+        />
 
         {/* Step progress indicator */}
         {(() => { const step = outcome ? 2 : 1; return (
