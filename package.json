@@ -22,7 +22,9 @@
   "dependencies": {
     "@supabase/supabase-js": "^2.49.2",
     "@vercel/functions": "3.9.7",
+    "docx": "^9.12.0",
     "next": "^15.5.19",
+    "pdfjs-dist": "^6.4.299",
     "pdfkit": "^0.19.1",
     "posthog-js": "^1.396.6",
     "react": "19.0.0",

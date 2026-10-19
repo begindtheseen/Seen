@@ -73,8 +73,18 @@ const SESSION_LOCAL_KEYS = [
   'seen_recent_v1', 'seen_job_cache_v1', 'seen_job_location_v1',
 ]
 
+// Per-user Résumé Studio caches (parsed doc + tailored variants) are keyed by user id, but a
+// shared device still must not carry them past sign-out.
+const SESSION_LOCAL_PREFIXES = ['seen_resume_doc_', 'seen_resume_variants_']
+
 function clearSessionLocalData() {
-  try { SESSION_LOCAL_KEYS.forEach(k => localStorage.removeItem(k)) } catch { /* ignore */ }
+  try {
+    SESSION_LOCAL_KEYS.forEach(k => localStorage.removeItem(k))
+    for (let i = localStorage.length - 1; i >= 0; i--) {
+      const k = localStorage.key(i)
+      if (k && SESSION_LOCAL_PREFIXES.some(p => k.startsWith(p))) localStorage.removeItem(k)
+    }
+  } catch { /* ignore */ }
   try { sessionStorage.removeItem('seen_job_cache_v1') } catch { /* ignore */ } // JobCache is sessionStorage
 }
 

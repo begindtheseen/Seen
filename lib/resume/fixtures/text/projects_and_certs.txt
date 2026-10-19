@@ -1,0 +1,31 @@
+Kenji Watanabe
+Seattle, WA • kenji.w@example.com • 206-555-0133 • github.com/kenjiw • kenjiw.dev
+
+Summary
+Backend engineer focused on reliability. Go, Python, Kubernetes.
+
+Experience
+Software Engineer II — Rainier Cloud | Seattle, WA | Jan 2022 – Present
+• Own the ingestion service handling 2B events/day; cut p99 latency 41% by batching writes.
+• On-call lead for a 6-person team; reduced pages 60% with better alert thresholds.
+
+Software Engineer — Cascade Analytics | Remote | Jul 2019 – Dec 2021
+• Built the billing pipeline in Python that processed $12M/month.
+
+Projects
+Latencyscope — open-source tracing CLI | github.com/kenjiw/latencyscope | 2023 – Present
+• 1,400 GitHub stars; used by 3 companies in production.
+Homelab Kubernetes cluster
+• Runs 20 services on 3 nodes with GitOps deploys.
+
+Education
+M.S. Computer Science, University of Washington, Seattle, WA, 2019
+B.S. Computer Science, University of Washington, 2017 — Magna Cum Laude
+
+Certifications
+• Certified Kubernetes Administrator (CKA), CNCF, Mar 2023
+• AWS Certified Solutions Architect – Associate (2022)
+
+Technical Skills
+Languages: Go, Python, SQL
+Infrastructure: Kubernetes, Terraform, AWS, Postgres, Kafka

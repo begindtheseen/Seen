@@ -50,6 +50,101 @@ and dashboard (PRs #122/#123) were intentionally REDESIGNED beyond the old site;
 longer the design source of truth for redesigned pages. `SITE_PARITY_CHECKLIST.md` /
 `ADMIN_PARITY_CHECKLIST.md` are frozen pre-06-30 records, not an active work queue.
 
+## Session 2026-10-19 D: Tailor v2 — the autonomous résumé optimizer (same branch / PR #329)
+- **Why:** the owner tailored their résumé for a GNC Sales Associate posting and the v1 engine kept *Valet
+  Attendant* while dropping *Membership Specialist – UFC Gym* (no bullets → no keyword score). The
+  requirement is an optimizer that decides from what each job IS and works autonomously.
+- **What:** `lib/resume/tailor/{competencies,relevance,optimizer}.js` — competency vectors implied by
+  titles/employers/postings (built on `lib/application-intelligence/roleOntology.js`), relevance =
+  0.6·coverage + 0.25·family alignment + 0.15·keywords (recency/tenure reported separately, never in
+  relevance), tiers relative to the best role → keep/trim/condense/drop with constraints (current roles
+  never dropped, no recent gap, ≥2 roles), bullet selection in a page budget, transferable fill flagged
+  `confirm:true` + prompts (dates, family metric), targeted summary through the firewall, relevance layout
+  ("Relevant Experience" + "Additional Experience" lines via `meta.sectionTitles` / extra `style:'lines'`),
+  objective search (two seeds + hill-climb ≤60 evaluations, ~200 ms, deterministic). Full write-up:
+  `RESUME_STUDIO.md` "Tailor v2 — the optimizer".
+- **ONE apply path (contract):** `applyPlan(base, plan, overrides)` is used by the server (`tailorResume`)
+  and the browser (`lib/resume/engine-client.ts applyTailorPlan`). The plan is self-sufficient JSON:
+  decisions carry `ranked` + `implied`, skills edits are plan DATA (`planSkillEdits` in tailor.js →
+  `applySkillEdits`), the summary context (`summary`, `summaryFallback`, `summaryKeywords`) rides in
+  `plan.ctx`, terminology swaps apply only with `applyTerminology`. Caught by a probe before shipping: the
+  browser re-apply picked a different fill bullet than the server because `implied` lived only on the
+  internal `plan.roles` — the five-case "wire contract" test in `optimizer.test.mjs` now pins server ==
+  client. Never add server-only post-processing on the variant again; put it on the plan.
+- **Studio Tailor panel** (`components/resume/TailorPanel.tsx`): decision table (tier chip, relevance bar,
+  reasons, competency chips, per-role keep/trim/condense/drop select — drop disabled for current roles),
+  layout toggle, prompts, composed bullets with "Not true for me — remove", summary + skills toggles,
+  polish accept/reject, gaps, strengths; everything re-applies locally (no credit). Button label is
+  "Optimize for this job →" (the smoke script selects on it).
+- **CodeQL (PR #329 head f87f42f) flagged 16 alerts in touched code — fixed at the class:** `newId` uses the
+  platform CSPRNG (`globalThis.crypto.getRandomValues`, counter fallback; NO `Math.random` in lib/resume),
+  one-pass XML entity decoding (`decodeXml` in extract/docx.js; `decodeEntities` in resumeUpload.js — the
+  old chained `.replace(/&amp;/…)` first was a double-unescape), link kinds by HOST (`urlHost`/`hostIs` in
+  model.js — never `url.includes('linkedin.com')`), credential-suffix regex made linear (disjoint tokens +
+  mandatory separator), Markdown `esc` escapes `\`, rate-limiter logs use constant format strings + `logSafe`
+  (newline-free, printable, ≤120 chars), smoke harness compares `new URL(url).host`. Same entity-decode
+  pattern still exists in `lib/server/listingImport.js:157` and `api/reports.js:883` (not touched here).
+  Round 2 (head 1d4806e, 9 alerts): the legacy `.docx` reader now takes each `<w:t>` run's CAPTURED text
+  (`matchAll` group 1) instead of "stripping tags" from the match (CodeQL: incomplete multi-character
+  sanitization); `logSafe` removes newlines as the plain alternation `/\n|\r/g` — the only form CodeQL's
+  log-injection query recognises as a sanitizer (a `[\r\n]+` class is NOT); the optimizer's search loop no
+  longer keeps a dead `variant` variable (only scores are compared; the final variant is rebuilt once);
+  unused imports dropped. Reading alert annotations: `gh api repos/<o>/<r>/check-runs/<id>/annotations`.
+- **Verification:** optimizer 9/9 + tailor 13/13; full suite 1302/1310 (the 8 = brain timeline, pre-existing);
+  tsc clean; `next build` clean; server→JSON→client probe equal; smoke result recorded in RESUME_STUDIO.md.
+- **/jobs "Matched to your résumé" rail — owner screenshot: "Upload your resume" card shown to an account WITH a
+  résumé.** Root cause (two classes): `api/jobs.js handleRecommended` read ONLY the derived cache table
+  `resume_skills` (filled best-effort by the upload path's `storeCareerSignals`, which returned early for any
+  résumé with zero dictionary skills — i.e. most non-tech résumés — and is never run by a Studio/profile save),
+  and the page treated "0 recommendations" as "no résumé". Now: the rail reads the CANONICAL résumé
+  (`profiles.resume_text`, same `isReadableResume` predicate as the save gate) alongside the cache; when the row
+  is missing / signal-less / older than `profiles.resume_updated_at` it derives the signal NOW
+  (`deriveResumeSignal` in `lib/server/resumeJobMatch.js` = `extractEmployment` + `extractCareerSignal`, titles
+  count as signal) and self-heals the row (PostgREST upsert `on_conflict=user_id`, awaited before returning).
+  Response carries `has_resume: true|false|null` (null = profile read failed — never claim "no résumé" without
+  evidence) and `reason: null|'no_resume'|'no_matches'|'no_signal'|'unavailable'`. `useJobSearch` exposes
+  `recHasResume`; the upload card renders only on `has_resume === false`, and a résumé with no matches gets an
+  honest one-liner instead. `storeCareerSignals` now writes the per-user row whenever titles OR skills exist
+  (anonymized layers still need skills). Tests: `api/jobs.recommended.test.mjs` (5 handler cases, stubbed
+  PostgREST + auth), `lib/server/resumeJobMatch.test.mjs` (+2). Schema note: `profiles.resume_text /
+  resume_file_name / resume_word_count / resume_updated_at` exist in prod (every `save_resume` writes them) but
+  are in NO checked-in migration — hand-applied drift to codify when the next schema PR lands.
+
+## Session 2026-10-19 C: Résumé Studio (claude/resume-handling-optimization-ywotv9) — facts verified
+- **The résumé pipeline is now structured end to end**: `lib/resume/{model,extract,parse,health,rewrite,tailor,render}`
+  (see `RESUME_STUDIO.md` — the reference). `ResumeDoc` lives as LOSSLESS canonical text in
+  `profiles.resume_text` (`serializeToText`), so there is **no schema change**; `parseResume(serializeToText(doc))`
+  is stable and every text fixture round-trips through text, JSON Resume, PDF and DOCX at ATS score 100.
+- **Extraction is layout-aware** (`lib/resume/extract/pdf.js`, pdfjs-dist 6.4 legacy build: columns, bold/italic,
+  links; DOCX styles/numPr/tabs). `lib/server/resumeUpload.js extractUploadText` delegates to it; the old
+  `pdfText.js` is the fallback. `vercel.json` now has `includeFiles: node_modules/pdfjs-dist/**` on
+  `api/resume.js` + `api/apply.js` — **verify the first prod PDF parse after deploy reports `layout.method: 'pdfjs'`**.
+- **`/api/resume` Studio actions** (`lib/server/resumeStudio.js`): `structure`/`health`/`rewrite`/`ats_check`/
+  `templates` free (rate key `resume-studio` 120/h), `export` free-branded / Pro-unbranded (`resume-export` 60/h),
+  `tailor` 1 credit via `gateAI('resume_tailor')` with `polish` Pro-only + `llmAvailable()`. `parse` also returns
+  `doc`/`health`/`coverage`/`layout`/`warnings`. `download_resume`/`email_analysis` render through the new PDF
+  renderer (`template` body field; legacy Harvard builder kept as fallback). Contract tests: `api/resume.studio.test.mjs`.
+- **Renderer rules learned the hard way (verified with the real extractor):** never use pdfkit `characterSpacing`
+  (pdf.js/pdfminer read "S U M M A R Y" — the LEGACY builder had this bug in production); pdfkit `text()` with a
+  `link` needs an explicit `width` or the annotation rect is NaN; DOCX right-aligned dates must be a real
+  `<w:tab/>` (`new Tab()`), not a literal tab in `<w:t>`; built-in Times/Helvetica garble non-WinAnsi glyphs →
+  the renderer auto-switches to the embedded Liberation Sans TTFs that ship inside `pdfjs-dist/standard_fonts`.
+- **Parser class fixes from the ATS round-trip:** packed-roles split must ignore pieces with a date range
+  ("Title — Company | 2020 – Present" was two roles); bare known cities (`KNOWN_CITIES` in lexicon) are
+  locations; "Audit Senior"-style trailing-role titles; a header piece that is ONE date is the role's date;
+  a parked unknown header line occupies a title/company slot (stacked dateless headers no longer shift by one).
+  Engine class fix: `extractTaxonomyConcepts` matches plurals of 4+ letter aliases ("forklifts").
+- **UI:** `/resume/studio` (editor + Health/Tailor/Export panels; parse/score/rewrite run in the browser via
+  `lib/resume/engine-client.ts`), entry points on `/resume` (header pill + card + Export-tab template picker +
+  "tailor in Studio" hand-off via `sessionStorage.seen_studio_job`) and `/profile`. Device-local per-user caches
+  (`seen_resume_doc_*`, `seen_resume_variants_*`) are swept on sign-out in `lib/auth.tsx`.
+- **Verification:** full suite 1293/1301 (the 8 = brain timeline, pre-existing), `tsc` clean, `next build` clean,
+  `node scripts/resume-studio-smoke.mjs` (Playwright against `next start`; uses `/opt/pw-browsers/chromium-1194`
+  via `executablePath` because the installed playwright expects 1223) — all steps green. NOT verified live:
+  signed-in tailoring against prod Supabase, LLM polish with a real key, Vercel includeFiles on a real deploy.
+- Decision recorded: no `resume_documents` migration in this PR (device-local variants); revisit only if
+  cross-device tailored versions are requested.
+
 ## Session 2026-10-19: Motion v2 — the "crisp" kit (claude/motion-graphics-update-yw7ei4)
 - **All motion lives in `app/motion.css`** (imported after globals.css in app/layout.tsx, so it wins the
   cascade) + `components/motion/` (`MotionLayer` = the ONE pointer listener for `.spot` spotlight /

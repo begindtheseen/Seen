@@ -139,6 +139,8 @@ export function useJobSearch() {
   const [recommended, setRecommended] = useState<Job[]>([])
   const [recSkills, setRecSkills] = useState<string[]>([])
   const [recStatus, setRecStatus] = useState<'idle' | 'loading' | 'done'>('idle')
+  // Whether the account has a résumé on file (from the rail's response); null = unknown.
+  const [recHasResume, setRecHasResume] = useState<boolean | null>(null)
   const [coScores, setCoScores] = useState<CoScoreMap>({})
   const [appliedCos, setAppliedCos] = useState<Set<string>>(new Set())
   const abortRef = useRef<AbortController | null>(null)
@@ -284,15 +286,17 @@ export function useJobSearch() {
 
   // Fetch resume-powered recommendations when logged in
   useEffect(() => {
-    if (!isLoggedIn) return
+    if (!isLoggedIn) { setRecHasResume(null); return }
     setRecStatus('loading')
+    setRecHasResume(null)
     aiHeaders().then(hdrs => fetch('/api/jobs', {
       method: 'POST',
       headers: hdrs,
       body: JSON.stringify({ action: 'recommended' }),
     }))
     .then(r => r.ok ? r.json() : {})
-    .then((data: { jobs?: unknown[]; skills?: string[] }) => {
+    .then((data: { jobs?: unknown[]; skills?: string[]; has_resume?: boolean | null }) => {
+      if (typeof data.has_resume === 'boolean') setRecHasResume(data.has_resume)
       if (Array.isArray(data.jobs) && data.jobs.length) {
         const raw: Job[] = (data.jobs as Record<string, unknown>[]).map(j => ({
           id: String(j.id || 'rec_' + Math.random().toString(36).slice(2, 8)),
@@ -545,6 +549,7 @@ export function useJobSearch() {
     recommended,
     recSkills,
     recStatus,
+    recHasResume,
     coScores,
     appliedCos,
     // actions

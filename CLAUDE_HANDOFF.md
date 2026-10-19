@@ -13,7 +13,29 @@
 > **Read this first. Every session. No exceptions.**
 > Then read SEEN_STRATEGY.md. Then `git status`. Then pick up exactly where this doc ends.
 
-Last updated: **2026-07-06 (Operation 50% build — Ghost Report, outcome emails, employer engine, Seen Live realtime, employer portal)**
+Last updated: **2026-10-19 (Résumé Studio + Tailor v2 optimizer; see RESUME_STUDIO.md and CLAUDE.md "Session 2026-10-19 C/D")**
+
+---
+
+## ⚠️ CURRENT STATE (2026-10-19) — Résumé Studio landed on `claude/resume-handling-optimization-ywotv9`
+
+The résumé handling was rebuilt as a structured pipeline (extract → structure → health → rewrite →
+tailor → render → ATS check) with a new `/resume/studio` page. **Read `RESUME_STUDIO.md` first** for the
+map, contracts and the verification record. Nothing changed in the DB: the canonical serialized text in
+`profiles.resume_text` is the store. After the PR merges and deploys: confirm a production deployment exists
+for the merged sha, then upload one PDF on prod and check the parse response's `layout.method === 'pdfjs'`
+(proves `vercel.json includeFiles` traced the pdfjs assets). Everything after this heading is older context.
+
+**Tailor v2 (same PR):** tailoring is now an autonomous optimizer (`lib/resume/tailor/optimizer.js`) that
+decides which roles stay / shrink to a line / leave the page from what each job *is* (competency model), fills
+thin relevant roles honestly (flagged to confirm), prompts for missing facts, writes a targeted summary and
+searches an objective — the owner's GNC case (Membership Specialist must lead, Valet must not) is the
+acceptance test. One apply path: the browser re-applies the JSON plan with overrides and gets exactly the
+server's variant (wire-contract test). CodeQL's 16 alerts on the PR head were fixed at the class (CSPRNG ids,
+one-pass entity decode, host-based link checks, linear regex, log format strings). After merge: same deploy
+checks as above. Also in this PR: the /jobs "Matched to your résumé" rail now reads the canonical
+`profiles.resume_text` and self-heals the `resume_skills` cache, so an account with a résumé is never shown the
+"Upload your resume" card (owner screenshot 2026-10-19); the response's `has_resume` drives the card.
 
 ---
 

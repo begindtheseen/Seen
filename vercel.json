@@ -52,10 +52,12 @@
       "maxDuration": 60
     },
     "api/resume.js": {
-      "maxDuration": 30
+      "maxDuration": 30,
+      "includeFiles": "node_modules/pdfjs-dist/**"
     },
     "api/apply.js": {
-      "maxDuration": 30
+      "maxDuration": 30,
+      "includeFiles": "node_modules/pdfjs-dist/**"
     },
     "api/jobs.js": {
       "maxDuration": 60

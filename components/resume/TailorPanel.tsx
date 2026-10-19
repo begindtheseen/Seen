@@ -1,0 +1,283 @@
+'use client'
+
+// Tailor panel — the optimizer's plan for ONE application, with every decision visible and
+// overridable. The server computes the plan once (1 credit); everything the user changes here
+// (keep a role anyway, drop a composed bullet, answer a prompt, switch the layout, keep their own
+// summary) is re-applied in the browser with applyTailorPlan — instant, no credit.
+
+import { useEffect, useMemo, useState } from 'react'
+import s from './studio.module.css'
+import { aiHeaders } from '@/lib/aiHeaders'
+import type { ResumeDoc, TailorPlan, TailorResponse, PolishResult, TailorDecision, TailorOverrides } from '@/lib/resume/types'
+import type { SavedJob } from '@/lib/types'
+import { applyTailorPlan } from '@/lib/resume/engine-client'
+import { scoreColor } from './HealthPanel'
+
+export interface TailorJob { title: string; company: string; description: string; jobId: string; url?: string }
+type Props = {
+  doc: ResumeDoc
+  isLoggedIn: boolean
+  pro: boolean | null
+  savedJobs: SavedJob[]
+  initialJob: TailorJob | null
+  onNeed: (reason: 'credits' | 'pro' | 'signin') => void
+  onUseVariant: (variant: ResumeDoc, meta: { role: string; company: string; jobId: string; scoreBefore: number; scoreAfter: number }) => void
+}
+
+const TIER_LABEL: Record<string, string> = { core: 'Core', supporting: 'Supporting', context: 'Context', omit: 'Not relevant' }
+const TIER_CLASS: Record<string, string> = { core: 'chipGreen', supporting: 'chipBlue', context: 'chipAmber', omit: 'chip' }
+const DECISION_LABEL: Record<string, string> = { keep: 'Keep in full', trim: 'Trim to the relevant bullets', condense: 'One line (Additional Experience)', drop: 'Leave off this version' }
+
+function clone<T>(v: T): T { return JSON.parse(JSON.stringify(v)) as T }
+
+export default function TailorPanel({ doc, isLoggedIn, pro, savedJobs, initialJob, onNeed, onUseVariant }: Props) {
+  const [job, setJob] = useState<TailorJob>(initialJob || { title: '', company: '', description: '', jobId: '' })
+  const [savedId, setSavedId] = useState('')
+  const [polish, setPolish] = useState(false)
+  const [state, setState] = useState<'idle' | 'loading' | 'done' | 'error'>('idle')
+  const [error, setError] = useState('')
+  const [plan, setPlan] = useState<TailorPlan | null>(null)
+  const [baseDoc, setBaseDoc] = useState<ResumeDoc | null>(null) // the doc the plan was built for
+  const [serverVariant, setServerVariant] = useState<ResumeDoc | null>(null)
+  const [polishRes, setPolishRes] = useState<PolishResult | null>(null)
+  const [overrides, setOverrides] = useState<TailorOverrides>({})
+  const [answers, setAnswers] = useState<Record<string, string>>({})
+  const [rejectedPolish, setRejectedPolish] = useState<Set<string>>(new Set())
+  const [showAll, setShowAll] = useState(false)
+
+  useEffect(() => { if (initialJob) setJob(initialJob) }, [initialJob])
+
+  function pickSaved(id: string) {
+    setSavedId(id)
+    const sj = savedJobs.find((j) => String(j.job_id) === id)
+    if (!sj) return
+    const snap = sj.snapshot as { title?: string; company?: string; description?: string; apply_url?: string } | undefined
+    setJob({ title: sj.role || snap?.title || '', company: sj.company || snap?.company || '', description: snap?.description || '', jobId: String(sj.job_id), url: sj.apply_url || snap?.apply_url || '' })
+  }
+
+  async function run() {
+    if (!job.title.trim() && !job.description.trim()) { setError('Add the job title or paste the job description.'); return }
+    if (!isLoggedIn) { onNeed('signin'); return }
+    setState('loading'); setError('')
+    try {
+      const res = await fetch('/api/resume', {
+        method: 'POST', headers: await aiHeaders(),
+        body: JSON.stringify({ action: 'tailor', doc, jobTitle: job.title, company: job.company, jobDescription: job.description, jobId: job.jobId || undefined, polish: polish && pro === true }),
+      })
+      const data = (await res.json().catch(() => ({}))) as TailorResponse
+      if (res.status === 401 || res.status === 402 || data.credits_required || data.pro_required) { setState('idle'); onNeed(data.pro_required ? 'pro' : 'credits'); return }
+      if (!res.ok || !data.plan) { setError(data.error || 'Could not tailor this résumé. Try again.'); setState('error'); return }
+      window.dispatchEvent(new Event('seen:credits-updated'))
+      setPlan(data.plan); setBaseDoc(clone(doc)); setServerVariant(data.variant); setPolishRes(data.polish); setOverrides({}); setAnswers({}); setRejectedPolish(new Set())
+      setState('done')
+    } catch { setError('Network error — try again.'); setState('error') }
+  }
+
+  // The variant the user will take: the plan re-applied with their overrides (+ polish accepted).
+  const finalVariant = useMemo(() => {
+    if (!plan || !baseDoc) return null
+    const prompts = plan.prompts || []
+    const live = applyTailorPlan(baseDoc, plan, { ...overrides, prompts, answers })
+    if (polishRes && serverVariant) {
+      for (const ch of polishRes.changes) {
+        if (rejectedPolish.has(ch.id)) continue
+        for (const e of live.experience) { const b = e.bullets.find((x) => x.id === ch.id); if (b && b.text === ch.from) { b.text = ch.text; live.meta.provenance.push({ kind: 'polish', bulletId: b.id, from: ch.from, to: ch.text, reason: ch.reason }) } }
+      }
+    }
+    return live
+  }, [plan, baseDoc, overrides, answers, polishRes, serverVariant, rejectedPolish])
+
+  const setDecision = (itemId: string, decision: TailorDecision['decision']) => setOverrides((o) => ({ ...o, decisions: { ...(o.decisions || {}), [itemId]: decision } }))
+  const excludeAdded = (key: string) => setOverrides((o) => ({ ...o, excludeAdded: [...(o.excludeAdded || []), key] }))
+  const decisions = plan?.decisions || []
+  const visibleDecisions = showAll ? decisions : decisions.slice(0, 8)
+  const added = finalVariant ? finalVariant.meta.provenance.filter((p) => p.kind === 'transferable_bullet') : []
+  const summaryOn = overrides.summary !== false
+  const layout = overrides.layout || plan?.strategy?.layout || 'chronological'
+
+  return (
+    <div style={{ animation: 'fadeUp .3s ease both' }}>
+      <div className={s.card}>
+        <div className={s.cardTitle}>Tailor to a job</div>
+        <p className={s.dim} style={{ marginBottom: '.75rem' }}>The optimizer reads what each of your jobs <em>is</em>, decides which roles lead, which shrink to a line and which stay off this version, picks the bullets that speak to the posting inside a one-page budget, and writes a summary from your own facts. Every decision shows its reason and you can overrule any of it. Nothing is invented.</p>
+        {savedJobs.length > 0 && (
+          <div style={{ marginBottom: '.55rem' }}>
+            <span className={s.label}>Saved job</span>
+            <select className={s.input} value={savedId} onChange={(e) => pickSaved(e.target.value)}>
+              <option value="">📌 Choose a saved job…</option>
+              {savedJobs.map((j) => <option key={String(j.job_id)} value={String(j.job_id)}>{j.role || 'Role'}{j.company ? ` — ${j.company}` : ''}</option>)}
+            </select>
+          </div>
+        )}
+        <div className={s.row}>
+          <div><span className={s.label}>Job title</span><input className={s.input} value={job.title} onChange={(e) => setJob({ ...job, title: e.target.value })} placeholder="Sales Associate" /></div>
+          <div><span className={s.label}>Company</span><input className={s.input} value={job.company} onChange={(e) => setJob({ ...job, company: e.target.value })} placeholder="GNC" /></div>
+        </div>
+        <span className={s.label}>Job description</span>
+        <textarea className={`${s.input} ${s.area}`} rows={5} value={job.description} onChange={(e) => setJob({ ...job, description: e.target.value })} placeholder="Paste the posting — requirements, responsibilities, the lot." />
+        <div className={s.opts} style={{ marginTop: '.6rem', justifyContent: 'space-between' }}>
+          <label className={s.dim} style={{ display: 'flex', alignItems: 'center', gap: '.4rem', cursor: pro ? 'pointer' : 'default' }}>
+            <input type="checkbox" checked={polish && pro === true} disabled={pro !== true} onChange={(e) => { if (pro !== true) { onNeed('pro'); return } setPolish(e.target.checked) }} />
+            Polish wording with AI {pro === true ? '' : '· Pro'}
+          </label>
+          <button type="button" className={s.btnPrimary} onClick={run} disabled={state === 'loading'}>
+            {state === 'loading' ? 'Optimizing…' : plan ? 'Re-run for this job →' : 'Optimize for this job →'}<span style={{ marginLeft: '.45rem', fontSize: '.55rem', opacity: .7, fontFamily: 'var(--mono)', fontWeight: 400 }}>· 1 credit</span>
+          </button>
+        </div>
+        {error && <div className={s.err} style={{ marginTop: '.6rem', marginBottom: 0 }}>{error}</div>}
+      </div>
+
+      {state === 'done' && plan && finalVariant && (
+        <>
+          <div className={s.card}>
+            <div className={s.beforeAfter}>
+              <span style={{ color: scoreColor(plan.score.before) }}>{plan.score.before}</span>
+              <span className={s.arrow}>→</span>
+              <span style={{ color: scoreColor(plan.score.after) }}>{plan.score.after}</span>
+              <span className={s.dim} style={{ fontWeight: 400, fontSize: '.62rem' }}>match score · {plan.job.familyLabel || plan.job.roleFamily} posting · {plan.strategy ? `${plan.strategy.estimatedLines} of ${plan.strategy.linesBudget} lines (${plan.strategy.pages} page${plan.strategy.pages === 1 ? '' : 's'})` : ''}{plan.objective ? ` · searched ${plan.objective.evaluations} versions` : ''}</span>
+            </div>
+            <p className={s.dim} style={{ marginTop: '.5rem' }}>
+              {decisions.length ? `${decisions.filter((d) => d.tier === 'core').map((d) => d.title).join(' and ') || 'Your most relevant roles'} lead this version. ${decisions.filter((d) => d.decision === 'condense').length ? `${decisions.filter((d) => d.decision === 'condense').length} role${decisions.filter((d) => d.decision === 'condense').length === 1 ? '' : 's'} became one line, ` : ''}${decisions.filter((d) => d.decision === 'drop').length ? `${decisions.filter((d) => d.decision === 'drop').length} left off, ` : ''}bullets that speak to the posting lead each role.` : 'No roles to optimize — add experience first.'}
+            </p>
+            <div className={s.opts} style={{ marginTop: '.6rem' }}>
+              <span className={s.label} style={{ margin: 0 }}>Layout</span>
+              <button type="button" className={`${s.tiny}${layout === 'relevance' ? ` ${s.chipGreen}` : ''}`} onClick={() => setOverrides((o) => ({ ...o, layout: 'relevance' }))}>Relevant first</button>
+              <button type="button" className={`${s.tiny}${layout === 'chronological' ? ` ${s.chipGreen}` : ''}`} onClick={() => setOverrides((o) => ({ ...o, layout: 'chronological' }))}>Chronological</button>
+              <span className={s.muted}>{layout === 'relevance' ? 'Relevant Experience leads; other roles are lines under Additional Experience.' : 'Most recent first; irrelevant roles condensed.'}</span>
+            </div>
+            <div className={s.findingActions} style={{ marginTop: '.7rem' }}>
+              <button type="button" className={s.btnGreen} onClick={() => onUseVariant(finalVariant, { role: job.title, company: job.company, jobId: job.jobId, scoreBefore: plan.score.before, scoreAfter: plan.score.after })}>Use this version →</button>
+              <span className={s.muted} style={{ alignSelf: 'center' }}>Your base résumé stays exactly as it is.</span>
+            </div>
+          </div>
+
+          {decisions.length > 0 && (
+            <div className={s.card}>
+              <span className={s.secTitle}>Role decisions · overrule any</span>
+              <div style={{ marginTop: '.55rem', display: 'flex', flexDirection: 'column', gap: '.5rem' }}>
+                {visibleDecisions.map((d) => {
+                  const current = (overrides.decisions && overrides.decisions[d.itemId]) || d.decision
+                  const pct = Math.round(Math.min(1, d.relevance / Math.max(0.01, decisions[0].relevance)) * 100)
+                  return (
+                    <div key={d.itemId} className={s.finding} style={{ flexDirection: 'column', gap: '.35rem' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', gap: '.5rem', alignItems: 'baseline', flexWrap: 'wrap' }}>
+                        <div style={{ minWidth: 0 }}>
+                          <strong style={{ color: 'var(--white)', fontSize: '.8rem' }}>{d.title || d.company}</strong>{d.company && d.title ? <span className={s.dim}> · {d.company}</span> : null}
+                          <span className={s.dim}> · {d.familyLabel}{d.current ? ' · current' : ''}{d.dateless ? ' · no dates' : ''}</span>
+                        </div>
+                        <span className={`${s.chip} ${s[TIER_CLASS[d.tier]] || s.chip}`}>{TIER_LABEL[d.tier]} · {pct}%</span>
+                      </div>
+                      <div className={s.bar}><div className={s.barFill} style={{ width: `${Math.max(3, pct)}%`, background: d.tier === 'core' ? 'var(--green)' : d.tier === 'supporting' ? 'var(--blue)' : d.tier === 'context' ? 'var(--amber)' : 'var(--muted)' }} /></div>
+                      <div className={s.muted} style={{ color: 'var(--sub)' }}>{d.reasons.slice(0, 2).join(' ')}</div>
+                      {d.shared.length > 0 && <div className={s.chips}>{d.shared.slice(0, 4).map((c) => <span key={c.competency} className={`${s.chip}${c.evidenced ? ` ${s.chipGreen}` : ''}`} title={c.evidenced ? 'shown in your bullets' : 'implied by the title'}>{c.competency}{c.evidenced ? ' ✓' : ''}</span>)}</div>}
+                      <div className={s.opts}>
+                        <span className={s.label} style={{ margin: 0 }}>On this version</span>
+                        <select className={s.input} style={{ maxWidth: 300, padding: '.3rem .5rem', fontSize: '.72rem' }} value={current} onChange={(e) => setDecision(d.itemId, e.target.value as TailorDecision['decision'])}>
+                          {(['keep', 'trim', 'condense', 'drop'] as const).map((k) => <option key={k} value={k} disabled={k === 'drop' && d.current}>{DECISION_LABEL[k]}{k === d.decision ? ' (suggested)' : ''}</option>)}
+                        </select>
+                        {d.bullets > 0 && (current === 'keep' || current === 'trim') && <span className={s.muted}>{current === 'trim' ? 'top bullets only' : `${Math.min(d.bullets, 6)} of ${d.bullets} bullets`}</span>}
+                      </div>
+                    </div>
+                  )
+                })}
+                {decisions.length > 8 && <button type="button" className={s.tiny} onClick={() => setShowAll((v) => !v)}>{showAll ? 'Show fewer' : `Show all ${decisions.length} roles`}</button>}
+              </div>
+            </div>
+          )}
+
+          {(plan.prompts || []).length > 0 && (
+            <div className={s.card}>
+              <span className={s.secTitle} style={{ color: 'var(--blue)' }}>Make it stronger — answer what you can</span>
+              <div className={s.dim} style={{ margin: '.35rem 0 .6rem' }}>Your answers become bullets in your own words. Leave blank anything you do not know.</div>
+              {(plan.prompts || []).map((p) => (
+                <div key={p.id} style={{ marginBottom: '.55rem' }}>
+                  <span className={s.label}>{p.roleTitle}{p.company ? ` · ${p.company}` : ''}</span>
+                  <input className={s.input} value={answers[p.id] || ''} placeholder={p.question} onChange={(e) => setAnswers((a) => ({ ...a, [p.id]: e.target.value }))} />
+                  <div className={s.muted} style={{ marginTop: '.15rem' }}>{p.why}</div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {added.length > 0 && (
+            <div className={s.card}>
+              <span className={s.secTitle} style={{ color: 'var(--amber)' }}>Written from what your titles involve — confirm each</span>
+              <div className={s.dim} style={{ margin: '.35rem 0 .5rem' }}>These lines describe duties a job like yours inherently includes. Keep only the ones that are true for you; remove the rest.</div>
+              {added.map((a) => (
+                <div key={String(a.bulletId)} className={s.finding}>
+                  <span className={s.findingIcon} style={{ color: 'var(--amber)' }}>?</span>
+                  <div className={s.findingBody}>
+                    <div className={s.findingMsg}>{String(a.text)}</div>
+                    <div className={s.muted}>{String(a.basis)}</div>
+                    <div className={s.findingActions}><button type="button" className={s.tiny} onClick={() => excludeAdded(`${String(a.itemId)}:${String(a.competency)}`)}>Not true for me — remove</button></div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {plan.summary && (
+            <div className={s.card}>
+              <span className={s.secTitle}>Summary · for this posting</span>
+              <p style={{ fontSize: '.8rem', color: 'var(--text)', lineHeight: 1.6, margin: '.5rem 0' }}>{finalVariant.basics.summary || plan.summary.text}</p>
+              {plan.summary.replaced && <div className={s.diff} style={{ marginBottom: '.4rem' }}><span className={s.muted}>Replaces: </span><span className={s.del}>{plan.summary.replaced}</span></div>}
+              <label className={s.dim} style={{ display: 'flex', gap: '.4rem', alignItems: 'center', cursor: 'pointer' }}><input type="checkbox" checked={summaryOn} onChange={(e) => setOverrides((o) => ({ ...o, summary: e.target.checked }))} />Use this summary</label>
+            </div>
+          )}
+
+          {plan.skills && (plan.skills.added.length > 0 || plan.skills.reordered) && (
+            <div className={s.card}>
+              <span className={s.secTitle}>Skills · {plan.skills.added.length ? `+${plan.skills.added.length} from your own résumé` : 'matched skills first'}</span>
+              {plan.skills.added.length > 0 && (
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '.35rem', margin: '.5rem 0' }}>
+                  {plan.skills.added.map((a) => <span key={a.term} className={s.chip} title={a.evidence}>{a.term}</span>)}
+                </div>
+              )}
+              <p className={s.dim} style={{ margin: '.25rem 0 .5rem' }}>{plan.skills.added.length ? 'Each term is already written in your résumé — listing it under Skills makes keyword scans find it.' : ''}{plan.skills.reordered ? ' The skills this posting asks for lead each list.' : ''}</p>
+              <label className={s.dim} style={{ display: 'flex', gap: '.4rem', alignItems: 'center', cursor: 'pointer' }}><input type="checkbox" checked={overrides.skills !== false} onChange={(e) => setOverrides((o) => ({ ...o, skills: e.target.checked }))} />Apply these skills edits</label>
+            </div>
+          )}
+
+          {polishRes && (
+            <div className={s.card}>
+              <span className={s.secTitle}>AI polish {polishRes.available ? `· ${polishRes.changes.length} bullet${polishRes.changes.length === 1 ? '' : 's'}` : ''}</span>
+              {!polishRes.available ? (
+                <div className={s.dim} style={{ marginTop: '.4rem' }}>{polishRes.reason === 'pro_required' ? 'Polish is a Pro feature.' : 'The AI polish is not available right now — the optimization above is complete without it.'}</div>
+              ) : polishRes.changes.length === 0 ? (
+                <div className={s.dim} style={{ marginTop: '.4rem' }}>No wording changes passed the fabrication check — your bullets were already tight.</div>
+              ) : polishRes.changes.map((ch) => (
+                <div key={ch.id} style={{ marginTop: '.5rem', borderTop: '1px solid var(--line)', paddingTop: '.5rem' }}>
+                  <div className={s.diff}><span className={s.del}>{ch.from}</span><br /><span className={s.ins}>{ch.text}</span></div>
+                  <div className={s.findingActions}><button type="button" className={`${s.tiny}${rejectedPolish.has(ch.id) ? '' : ` ${s.chipGreen}`}`} onClick={() => setRejectedPolish((r) => { const n = new Set(r); if (n.has(ch.id)) n.delete(ch.id); else n.add(ch.id); return n })}>{rejectedPolish.has(ch.id) ? 'Rejected — keep original' : '✓ Accepted'}</button>{ch.reason && <span className={s.muted} style={{ alignSelf: 'center' }}>{ch.reason}</span>}</div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {plan.gaps.length > 0 && (
+            <div className={s.card}>
+              <span className={s.secTitle} style={{ color: 'var(--amber)' }}>Gaps — honest list</span>
+              <div style={{ marginTop: '.5rem' }}>
+                {plan.gaps.map((g) => (
+                  <div key={g.requirement} className={`${s.gap} ${g.severity === 'likely_covered' ? s.gapCovered : g.severity === 'fatal' ? s.gapFatal : s.gapWarn}`}>
+                    <strong style={{ color: 'var(--white)' }}>{g.requirement}</strong>{g.level ? <span className={s.muted}> · {g.level}</span> : null}
+                    <div className={s.muted} style={{ marginTop: '.15rem', color: 'var(--sub)' }}>{g.explanation}{g.mustNotInvent ? ' Do not add this unless it is true.' : ''}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {plan.strengths.length > 0 && (
+            <div className={s.card}>
+              <span className={s.secTitle}>Your strongest evidence</span>
+              <div style={{ marginTop: '.5rem', display: 'flex', flexDirection: 'column', gap: '.35rem' }}>
+                {plan.strengths.slice(0, 6).map((m) => <div key={m.requirement} style={{ fontSize: '.76rem', color: 'var(--sub)', lineHeight: 1.5 }}><span style={{ color: 'var(--green)' }}>✓ </span><strong style={{ color: 'var(--white)' }}>{m.requirement}</strong>{m.evidence ? ` — ${m.evidence.slice(0, 100)}` : ''}</div>)}
+              </div>
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  )
+}

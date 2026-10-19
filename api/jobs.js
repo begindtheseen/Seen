@@ -7,7 +7,8 @@ import { sortByPriority, companyMatchesQuery, queryNamesCompany, isRemoteListing
 import { waitUntil } from '@vercel/functions';
 import { aggregateForQuery, upsertJobs, inferLevel, wasRecentlyPulled, recordPull } from '../lib/server/jobSources.js';
 import { aggregateWithSources } from '../lib/jobs/expand.js';
-import { deriveResumeJobQuery, pullResumeJobFloor } from '../lib/server/resumeJobMatch.js';
+import { deriveResumeJobQuery, pullResumeJobFloor, deriveResumeSignal, resumeSkillsStale } from '../lib/server/resumeJobMatch.js';
+import { isReadableResume } from '../lib/server/resumeReadability.js';
 import { scoreJob, wasteScore, scoreRow, explainListingScore } from '../lib/server/jobScore.js';
 import { computeListingFreshness } from '../lib/server/listingFreshness.js';
 import { geocodeLocation, haversineMiles, milesToKm, hasUsableCoords, geoBoxClause, sanitizeCoords } from '../lib/server/geo.js';
@@ -796,25 +797,49 @@ async function handleRecommended(req, res, _body) {
   };
 
   try {
-    // Fetch this user's extracted resume skills
-    const skillsRes = await fetch(
-      `${SUPABASE_URL}/rest/v1/resume_skills?user_id=eq.${encodeURIComponent(user_id)}&select=skills,seniority,function,years_exp,top_titles&limit=1`,
-      { headers: dbHeaders }
-    );
-    const skillsRows = skillsRes.ok ? await skillsRes.json() : [];
-    if (!Array.isArray(skillsRows) || !skillsRows.length || !skillsRows[0]?.skills?.length) {
-      return res.status(200).json({ ok: true, jobs: [], reason: 'no_resume' });
-    }
+    // The CANONICAL résumé is profiles.resume_text — what every upload / Studio / profile save
+    // writes. resume_skills is a derived cache the upload path fills best-effort, so it can be
+    // missing (a non-tech résumé with no dictionary skills, a save through the Studio, a failed
+    // background step) or stale (older than the résumé). Read both; when the cache is missing
+    // or stale, derive the signal from the résumé NOW and self-heal the row. A signed-in user
+    // with a résumé on file is never told to upload one, and the response says which case it is.
+    const uid = encodeURIComponent(user_id);
+    const [skillsRes, profRes] = await Promise.all([
+      fetch(`${SUPABASE_URL}/rest/v1/resume_skills?user_id=eq.${uid}&select=skills,seniority,function,years_exp,top_titles,updated_at&limit=1`, { headers: dbHeaders }).catch(() => null),
+      fetch(`${SUPABASE_URL}/rest/v1/profiles?id=eq.${uid}&select=resume_text,resume_updated_at&limit=1`, { headers: dbHeaders }).catch(() => null),
+    ]);
+    const skillsRows = skillsRes && skillsRes.ok ? await skillsRes.json().catch(() => []) : [];
+    const row = Array.isArray(skillsRows) && skillsRows[0] ? skillsRows[0] : null;
+    const profRows = profRes && profRes.ok ? await profRes.json().catch(() => null) : null;
+    const prof = Array.isArray(profRows) ? (profRows[0] || {}) : null; // null = the profile read failed
+    const resumeText = typeof prof?.resume_text === 'string' ? prof.resume_text : '';
+    // true / false when the profile was read; null when it could not be (never claim "no résumé" without evidence)
+    const hasResume = prof ? (!!resumeText && isReadableResume(resumeText)) : null;
+    if (hasResume === false) return res.status(200).json({ ok: true, jobs: [], has_resume: false, reason: 'no_resume' });
 
-    const { skills = [], seniority, function: fn, top_titles } = skillsRows[0];
-    const topSkills = skills.slice(0, 5);
+    let signal = row;
+    let heal = null;
+    if (hasResume && resumeSkillsStale(row, prof.resume_updated_at)) {
+      signal = deriveResumeSignal(resumeText);
+      heal = fetch(`${SUPABASE_URL}/rest/v1/resume_skills?on_conflict=user_id`, {
+        method: 'POST',
+        headers: { ...dbHeaders, Prefer: 'resolution=merge-duplicates,return=minimal' },
+        body: JSON.stringify({ user_id, skills: signal.skills, seniority: signal.seniority, function: signal.function, years_exp: signal.years_exp, top_titles: signal.top_titles, updated_at: new Date().toISOString() }),
+      }).catch(() => null);
+    }
+    const { skills = [], seniority, function: fn, top_titles } = signal || {};
+    const topSkills = (Array.isArray(skills) ? skills : []).slice(0, 5);
     const now = encodeURIComponent(new Date().toISOString());
 
     // The résumé's real ROLE (title first, else function, else strongest skill) — a
     // high-recall query that catches listings pure skill-matching misses: a "Budtender"
     // whose skills are "customer service, POS" would otherwise never surface a budtender
     // listing. Same derivation the parse-time warm uses.
-    const roleQuery = deriveResumeJobQuery({ top_titles, function: fn, skills });
+    const roleQuery = deriveResumeJobQuery({ top_titles, function: fn, skills: topSkills });
+    if (!topSkills.length && !roleQuery) {
+      if (heal) await heal;
+      return res.status(200).json({ ok: true, jobs: [], has_resume: hasResume, reason: hasResume ? 'no_signal' : 'unavailable' });
+    }
 
     // Map resume seniority to job level filter terms
     const levelTerms = { junior: 'entry', mid: 'mid', senior: 'senior', staff: 'senior', principal: 'senior', executive: 'director' };
@@ -912,7 +937,8 @@ async function handleRecommended(req, res, _body) {
       ...scoreRow(j),
     }));
 
-    return res.status(200).json({ ok: true, jobs, skills: topSkills.slice(0, 3), seniority, function: fn });
+    if (heal) await heal; // the self-healed cache row lands before the function returns
+    return res.status(200).json({ ok: true, jobs, skills: topSkills.slice(0, 3), seniority, function: fn, has_resume: hasResume, reason: jobs.length ? null : 'no_matches' });
   } catch (e) {
     logError('jobs/recommended', e.message, { user_id });
     return res.status(500).json({ error: e.message, jobs: [] });

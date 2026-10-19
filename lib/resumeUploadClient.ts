@@ -17,6 +17,11 @@ export interface ParseResumeResult {
   fileName: string
   wordCount?: number
   employment?: unknown[]
+  /** Résumé Studio: the server's layout-aware structured document (lib/resume), its health score
+   *  and how much of the raw text it covers — present when structuring succeeded. */
+  doc?: unknown
+  health?: unknown
+  coverage?: number | null
   error?: string
   credits_required?: boolean
 }
@@ -54,6 +59,7 @@ export async function parseResumeFile(
   })
   const data = (await res.json().catch(() => ({}))) as {
     text?: string; wordCount?: number; employment?: unknown[]; credits_required?: boolean; error?: string
+    doc?: unknown; health?: unknown; coverage?: number | null
   }
   if (data.credits_required) {
     return { ok: false, fileName: file.name, credits_required: true, error: data.error }
@@ -62,7 +68,7 @@ export async function parseResumeFile(
     const wordCount = typeof data.wordCount === 'number' && data.wordCount > 0
       ? data.wordCount
       : data.text.trim().split(/\s+/).filter(Boolean).length
-    return { ok: true, text: data.text, fileName: file.name, wordCount, employment: data.employment }
+    return { ok: true, text: data.text, fileName: file.name, wordCount, employment: data.employment, doc: data.doc, health: data.health, coverage: data.coverage ?? null }
   }
   return { ok: false, fileName: file.name, error: data.error }
 }

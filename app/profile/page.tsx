@@ -378,6 +378,7 @@ export default function ProfilePage() {
                   {resumeBusy ? 'Uploading…' : resumeMeta ? 'Replace résumé' : 'Upload résumé →'}
                 </button>
                 <button type="button" className={styles.ghost} onClick={() => router.push('/resume')}>Open Résumé AI →</button>
+                <button type="button" className={styles.ghost} onClick={() => router.push('/resume/studio')}>✦ Résumé Studio →</button>
               </div>
               <input
                 ref={resumeFileRef}

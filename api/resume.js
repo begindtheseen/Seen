@@ -9,6 +9,11 @@ import { extractUploadText } from '../lib/server/resumeUpload.js';
 import { isReadableResume } from '../lib/server/resumeReadability.js';
 import { deriveResumeJobQuery, pullResumeJobFloor } from '../lib/server/resumeJobMatch.js';
 import { firstPartyReportCount, isGradeable } from '../lib/server/reportCounts.js';
+import { structureAction, healthAction, rewriteAction, tailorAction, atsCheckAction, exportAction, templatesAction, structureText, StudioError } from '../lib/server/resumeStudio.js';
+import { renderPdf } from '../lib/resume/render/pdf.js';
+import { parseResume } from '../lib/resume/parse/index.js';
+import { normalizeDoc, docIsEmpty } from '../lib/resume/model.js';
+import { llmAvailable } from '../lib/server/llm.js';
 
 // One-line "Seen data" block from read-only company intel (ghost/response from our
 // scores), or '' when we have no data on the company. This is the differentiator —
@@ -85,6 +90,12 @@ export default async function handler(req, res) {
     if (!authed?.email) return res.status(401).json({ error: 'Sign in to email your package' });
     return handleEmailAnalysis(req, res, { ...body, email: authed.email }, authed.pro);
   }
+
+  // ── Résumé Studio routes (lib/server/resumeStudio.js) ──────────────────────
+  // structure / health / rewrite / ats_check / templates: deterministic, keyless, FREE (CPU only,
+  // rate-limited). export: free with the "seenjobs.io" line, unbranded for Pro (same rule as
+  // download_resume). tailor: 1 credit like every AI tool; its optional LLM polish is Pro-only.
+  if (STUDIO_ROUTES[body.action]) return handleStudio(req, res, body);
 
   // ── Route: download_resume — return a complete, submittable résumé PDF ────────
   // Built deterministically from the user's OWN parsed résumé text (header,
@@ -196,12 +207,19 @@ async function handleParseResume(req, res, body) {
     // Keyless file→text extraction + quality gates (PDF / Word / plain-text). See resumeUpload.js.
     const extracted = await extractUploadText({ base64, fileName, mimeType });
     if (!extracted.ok) return res.status(extracted.status).json({ error: extracted.error });
-    const { text: extractedText, fileType, wordCount } = extracted;
+    const { text: extractedText, fileType, wordCount, lines, layout, warnings } = extracted;
 
     // Extract structured employment history — deterministic regex/heuristics.
     let employment = [];
     try { employment = extractEmployment(extractedText); }
     catch(_) { employment = []; }
+
+    // Résumé Studio: the structured document (+ health score + how much of the raw text it
+    // covers) from the same extraction, so one upload = one credit = everything the Studio needs.
+    // Best-effort: a structuring failure never fails the upload (the text path still works).
+    let studio = null;
+    try { studio = structureText({ text: extractedText, lines, source: fileType, fileName, layout }); }
+    catch (e) { console.warn('parse: structuring failed (text path still returned):', e && e.message); }
 
     // Fire-and-forget: persist the résumé signal, THEN warm the corpus for the résumé's role
     // so the /jobs "Matched to your résumé" rail is already full when the user gets there. A
@@ -214,7 +232,11 @@ async function handleParseResume(req, res, body) {
       new Promise(r => setTimeout(r, 8000)),
     ]).catch(() => {});
 
-    return res.status(200).json({ ok: true, text: extractedText, fileName, fileType, wordCount, employment });
+    return res.status(200).json({
+      ok: true, text: extractedText, fileName, fileType, wordCount, employment,
+      doc: studio ? studio.doc : null, health: studio ? studio.health : null, coverage: studio ? studio.coverage : null,
+      layout: layout || null, warnings: warnings || [],
+    });
 
   } catch(err) {
     const ref = logError('parse-resume', err, { method: req.method });
@@ -517,6 +539,70 @@ function drawFooter(doc, LEFT, W, RULE, FOOT, footerBand) {
      .text('Optimized with Seen  ·  seenjobs.io', LEFT, footY + 9, { width: W, align: 'center', characterSpacing: 0.3, lineBreak: false });
 }
 
+// ── Résumé Studio dispatch ───────────────────────────────────────────────────
+// action → rate-limit key. Credit/Pro gating is decided per action in handleStudio.
+const STUDIO_ROUTES = {
+  structure: 'resume-studio', health: 'resume-studio', rewrite: 'resume-studio', ats_check: 'resume-studio', templates: 'resume-studio',
+  export: 'resume-export', tailor: 'resume-tailor',
+};
+
+async function handleStudio(req, res, body) {
+  if (req.method !== 'POST') return res.status(405).end('Method not allowed');
+  if (await applyRateLimit(req, res, STUDIO_ROUTES[body.action])) return;
+  try {
+    switch (body.action) {
+      case 'templates': return res.status(200).json(templatesAction());
+      case 'structure': return res.status(200).json(structureAction(body));
+      case 'health': return res.status(200).json(healthAction(body));
+      case 'rewrite': return res.status(200).json(rewriteAction(body));
+      case 'ats_check': return res.status(200).json(await atsCheckAction(body));
+      case 'export': {
+        // Effective Pro status (no credit consumed) decides branding — same rule as download_resume.
+        const { pro } = await resolveProAccess(req);
+        const out = await exportAction(body, { pro });
+        const asciiName = out.fileName.replace(/[^\x20-\x7E]/g, '-').replace(/"/g, '');
+        res.setHeader('Content-Type', out.contentType);
+        res.setHeader('Content-Disposition', `attachment; filename="${asciiName}"; filename*=UTF-8''${encodeURIComponent(out.fileName)}`);
+        res.setHeader('Cache-Control', 'no-store');
+        res.setHeader('X-Seen-Template', out.template || '');
+        res.setHeader('X-Seen-Pages', String(out.pages || ''));
+        res.setHeader('X-Seen-Branded', pro ? '0' : '1');
+        return res.status(200).send(out.buffer);
+      }
+      case 'tailor': {
+        const gate = await gateAI(req, 'resume_tailor');
+        if (!gate.ok) return res.status(gate.status).json({ error: gate.error, credits_required: gate.credits_required, pro_required: gate.pro_required, balance: gate.balance ?? 0 });
+        const out = await tailorAction(body, { pro: !!gate.pro, allowPolish: llmAvailable() });
+        return res.status(200).json({ ...out, balance: gate.balance, pro: !!gate.pro });
+      }
+      default: return res.status(400).json({ error: `Unknown action: ${body.action}` });
+    }
+  } catch (err) {
+    if (err instanceof StudioError) return res.status(err.status).json({ error: err.message, ...err.extra });
+    const ref = logError('resume-studio', err, { method: req.method, action: body.action });
+    return res.status(500).json({ error: err.message, ref });
+  }
+}
+
+// Résumé PDF for the legacy export actions (download_resume / email_analysis): the structured
+// renderer (lib/resume/render — links, metadata, whole-word headings) whenever the résumé parses
+// into a document, else the legacy Harvard builder as the safety net. A caller that already holds
+// a structured `doc` (the Studio) sends it and skips re-parsing. Returns null when there is
+// nothing renderable.
+async function buildExportPdf({ resume, doc: docIn, job, company, jobDescription, template, optimized, pro }) {
+  let doc = docIn && typeof docIn === 'object' ? normalizeDoc(docIn) : null;
+  if (!doc || docIsEmpty(doc)) { try { doc = parseResume({ text: String(resume || ''), source: 'text' }); } catch { doc = null; } }
+  if (doc && !docIsEmpty(doc) && (doc.experience.length || doc.skills.length || doc.basics.summary)) {
+    // The target role becomes the headline only when the candidate wrote none (never the company).
+    const r = await renderPdf(doc, { template: template || 'classic', pro, appendix: optimized || null, targetLine: !doc.basics.headline && job ? String(job).slice(0, 120) : '' });
+    return { buffer: r.buffer, name: doc.basics.name || '', pages: r.pages, template: r.template };
+  }
+  const legacy = buildResumeDocument({ resume, jobDescription, job, company });
+  const hasContent = legacy.name || legacy.summary || (legacy.experience && legacy.experience.length) || (legacy.skills && legacy.skills.length) || (legacy.education && legacy.education.length);
+  if (!hasContent) return null;
+  return { buffer: await buildResumePDF(legacy, { role: job, company, optimized, pro }), name: legacy.name || '', pages: null, template: 'legacy' };
+}
+
 // ── Email analysis handler ─────────────────────────────────────────────────────
 async function handleEmailAnalysis(req, res, body, pro = false) {
   try {
@@ -547,18 +633,12 @@ async function handleEmailAnalysis(req, res, body, pro = false) {
     let pdfBase64 = null;
     let attachName = `Seen Resume.pdf`;
     try {
-      const resumeDoc = buildResumeDocument({ resume, jobDescription, job: role, company: co });
-      // Only attach a real document when we have actual content to render.
-      const hasContent = resumeDoc.name || resumeDoc.summary ||
-        (resumeDoc.experience && resumeDoc.experience.length) ||
-        (resumeDoc.skills && resumeDoc.skills.length) ||
-        (resumeDoc.education && resumeDoc.education.length);
-      if (hasContent) {
-        // Optional optimized-package appendix (additive) — never edits the base résumé body.
-        const optimized = _normalizeOptimizedPackage(body);
-        const pdfBuf = await buildResumePDF(resumeDoc, { role, company: co, optimized, pro });
-        pdfBase64 = pdfBuf.toString('base64');
-        attachName = resumeFileName({ name: resumeDoc.name, role });
+      // Optional optimized-package appendix (additive) — never edits the base résumé body.
+      const optimized = _normalizeOptimizedPackage(body);
+      const built = await buildExportPdf({ resume, doc: body.doc, job: role, company: co, jobDescription, template: body.template, optimized, pro });
+      if (built) {
+        pdfBase64 = built.buffer.toString('base64');
+        attachName = resumeFileName({ name: built.name, role });
       } else {
         // Honest degradation: the email still sends (best-effort), but log why the
         // résumé attachment is missing so a caller that forgot `resume`/`jobDescription`
@@ -737,19 +817,14 @@ async function handleDownloadResume(req, res, body) {
     // callers get the "seenjobs.io" footer; Pro users get a clean, unbranded résumé.
     const { pro } = await resolveProAccess(req);
 
-    const resumeDoc = buildResumeDocument({ resume, jobDescription, job, company });
-    const hasContent = resumeDoc.name || resumeDoc.summary ||
-      (resumeDoc.experience && resumeDoc.experience.length) ||
-      (resumeDoc.skills && resumeDoc.skills.length) ||
-      (resumeDoc.education && resumeDoc.education.length);
-    if (!hasContent) {
-      return res.status(422).json({ error: 'Could not read enough structure from this résumé to build a document. Make sure it has your roles and bullet points.' });
-    }
-
     // Optional optimized-package appendix (additive) — never edits the base résumé body.
     const optimized = _normalizeOptimizedPackage(body);
-    const pdfBuf = await buildResumePDF(resumeDoc, { role: job, company, optimized, pro });
-    const filename = resumeFileName({ name: resumeDoc.name, role: job });
+    const built = await buildExportPdf({ resume, doc: body.doc, job, company, jobDescription, template: body.template, optimized, pro });
+    if (!built) {
+      return res.status(422).json({ error: 'Could not read enough structure from this résumé to build a document. Make sure it has your roles and bullet points.' });
+    }
+    const pdfBuf = built.buffer;
+    const filename = resumeFileName({ name: built.name, role: job });
 
     // RFC 5987 — a plain ASCII fallback plus a UTF-8 encoded name so the em-dash
     // survives. asciiName strips non-ASCII for the fallback token.
@@ -794,7 +869,11 @@ async function storeCareerSignals(resumeText, employment, req) {
   let signal = null;
   try { signal = extractCareerSignal(resumeText, employment); }
   catch (_) { signal = null; }
-  if (!signal?.skills?.length) return null;
+  // A non-tech résumé can carry zero dictionary skills and still have real job titles — the
+  // strongest signal the /jobs rail has. Persist the per-user row whenever there is ANY signal;
+  // the anonymized market layers below still need skills.
+  const topTitles = (Array.isArray(employment) ? employment : []).slice(0, 3).map(e => e && e.title).filter(Boolean);
+  if (!signal || (!signal.skills?.length && !topTitles.length)) return null;
 
   // The anonymized inserts below are best-effort — never let one failing reject this function,
   // so the caller still gets `signal` back and the résumé→jobs warm can fire off it.
@@ -803,10 +882,9 @@ async function storeCareerSignals(resumeText, employment, req) {
 
     // Layer 1: per-user resume_skills (private, with user_id)
     if (userId) {
-      const topTitles = employment.slice(0, 3).map(e => e.title).filter(Boolean);
       await sb.from('resume_skills').upsert({
         user_id: userId,
-        skills: signal.skills,
+        skills: signal.skills || [],
         seniority: signal.seniority,
         function: signal.function,
         years_exp: signal.years_exp,
@@ -815,7 +893,8 @@ async function storeCareerSignals(resumeText, employment, req) {
       }, { onConflict: 'user_id' }).catch(() => {});
     }
 
-    // Layer 2: anonymized career_signals (no user_id — pure market signal)
+    // Layer 2: anonymized career_signals (no user_id — pure market signal); needs real skills
+    if (!signal.skills?.length) return signal;
     const { data: signalRow } = await sb.from('career_signals').insert({
       skills: signal.skills,
       seniority: signal.seniority,
