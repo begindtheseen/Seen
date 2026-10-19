@@ -50,6 +50,43 @@ and dashboard (PRs #122/#123) were intentionally REDESIGNED beyond the old site;
 longer the design source of truth for redesigned pages. `SITE_PARITY_CHECKLIST.md` /
 `ADMIN_PARITY_CHECKLIST.md` are frozen pre-06-30 records, not an active work queue.
 
+## Session 2026-10-19 D: Tailor v2 — the autonomous résumé optimizer (same branch / PR #329)
+- **Why:** the owner tailored their résumé for a GNC Sales Associate posting and the v1 engine kept *Valet
+  Attendant* while dropping *Membership Specialist – UFC Gym* (no bullets → no keyword score). The
+  requirement is an optimizer that decides from what each job IS and works autonomously.
+- **What:** `lib/resume/tailor/{competencies,relevance,optimizer}.js` — competency vectors implied by
+  titles/employers/postings (built on `lib/application-intelligence/roleOntology.js`), relevance =
+  0.6·coverage + 0.25·family alignment + 0.15·keywords (recency/tenure reported separately, never in
+  relevance), tiers relative to the best role → keep/trim/condense/drop with constraints (current roles
+  never dropped, no recent gap, ≥2 roles), bullet selection in a page budget, transferable fill flagged
+  `confirm:true` + prompts (dates, family metric), targeted summary through the firewall, relevance layout
+  ("Relevant Experience" + "Additional Experience" lines via `meta.sectionTitles` / extra `style:'lines'`),
+  objective search (two seeds + hill-climb ≤60 evaluations, ~200 ms, deterministic). Full write-up:
+  `RESUME_STUDIO.md` "Tailor v2 — the optimizer".
+- **ONE apply path (contract):** `applyPlan(base, plan, overrides)` is used by the server (`tailorResume`)
+  and the browser (`lib/resume/engine-client.ts applyTailorPlan`). The plan is self-sufficient JSON:
+  decisions carry `ranked` + `implied`, skills edits are plan DATA (`planSkillEdits` in tailor.js →
+  `applySkillEdits`), the summary context (`summary`, `summaryFallback`, `summaryKeywords`) rides in
+  `plan.ctx`, terminology swaps apply only with `applyTerminology`. Caught by a probe before shipping: the
+  browser re-apply picked a different fill bullet than the server because `implied` lived only on the
+  internal `plan.roles` — the five-case "wire contract" test in `optimizer.test.mjs` now pins server ==
+  client. Never add server-only post-processing on the variant again; put it on the plan.
+- **Studio Tailor panel** (`components/resume/TailorPanel.tsx`): decision table (tier chip, relevance bar,
+  reasons, competency chips, per-role keep/trim/condense/drop select — drop disabled for current roles),
+  layout toggle, prompts, composed bullets with "Not true for me — remove", summary + skills toggles,
+  polish accept/reject, gaps, strengths; everything re-applies locally (no credit). Button label is
+  "Optimize for this job →" (the smoke script selects on it).
+- **CodeQL (PR #329 head f87f42f) flagged 16 alerts in touched code — fixed at the class:** `newId` uses the
+  platform CSPRNG (`globalThis.crypto.getRandomValues`, counter fallback; NO `Math.random` in lib/resume),
+  one-pass XML entity decoding (`decodeXml` in extract/docx.js; `decodeEntities` in resumeUpload.js — the
+  old chained `.replace(/&amp;/…)` first was a double-unescape), link kinds by HOST (`urlHost`/`hostIs` in
+  model.js — never `url.includes('linkedin.com')`), credential-suffix regex made linear (disjoint tokens +
+  mandatory separator), Markdown `esc` escapes `\`, rate-limiter logs use constant format strings + `logSafe`
+  (newline-free, printable, ≤120 chars), smoke harness compares `new URL(url).host`. Same entity-decode
+  pattern still exists in `lib/server/listingImport.js:157` and `api/reports.js:883` (not touched here).
+- **Verification:** optimizer 9/9 + tailor 13/13; full suite 1302/1310 (the 8 = brain timeline, pre-existing);
+  tsc clean; `next build` clean; server→JSON→client probe equal; smoke result recorded in RESUME_STUDIO.md.
+
 ## Session 2026-10-19 C: Résumé Studio (claude/resume-handling-optimization-ywotv9) — facts verified
 - **The résumé pipeline is now structured end to end**: `lib/resume/{model,extract,parse,health,rewrite,tailor,render}`
   (see `RESUME_STUDIO.md` — the reference). `ResumeDoc` lives as LOSSLESS canonical text in

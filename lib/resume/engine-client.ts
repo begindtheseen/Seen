@@ -9,7 +9,8 @@ import { scoreResume as _scoreResume } from './health/score.js'
 import { rewriteDoc as _rewriteDoc, rewriteBullet as _rewriteBullet, suggestVerbs as _suggestVerbs } from './rewrite/rules.js'
 import { listTemplates as _listTemplates } from './render/templates.js'
 import { renderText as _renderText, renderMarkdown as _renderMarkdown } from './render/text.js'
-import type { ResumeDoc, Health, RewriteLogEntry, TemplateInfo } from './types'
+import { applyPlan as _applyPlan, bulletFromAnswer as _bulletFromAnswer } from './tailor/optimizer.js'
+import type { ResumeDoc, Health, RewriteLogEntry, TemplateInfo, TailorPlan, TailorOverrides, TailorPrompt } from './types'
 
 export const normalizeDoc = (input: unknown): ResumeDoc => _normalizeDoc(input) as unknown as ResumeDoc
 export const emptyDoc = (): ResumeDoc => _emptyDoc() as unknown as ResumeDoc
@@ -37,3 +38,7 @@ export function parseDateText(text: string): { start: string; end: string } {
   if (single && single !== 'present') return { start: _toToken(single), end: '' }
   return { start: '', end: '' }
 }
+
+/** Re-apply a tailor plan with the user's overrides — pure, instant, no credit. */
+export const applyTailorPlan = (base: ResumeDoc, plan: TailorPlan, overrides: TailorOverrides = {}): ResumeDoc => _applyPlan(base, plan, overrides) as unknown as ResumeDoc
+export const bulletFromAnswer = (prompt: TailorPrompt, answer: string): string => _bulletFromAnswer(prompt, answer)

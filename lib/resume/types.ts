@@ -44,14 +44,38 @@ export interface Health {
 export interface RewriteLogEntry { section: string; itemId: string; bulletId: string; from: string; to: string; changes: Array<{ rule: string; from: string; to: string }>; notes: string[] }
 
 export interface TailorGap { requirement: string; level: string; category?: string; severity: string; mustNotInvent: boolean; explanation: string; evidence: string | null }
+export interface TailorDecision {
+  itemId: string; title: string; company: string
+  tier: 'core' | 'supporting' | 'context' | 'omit'
+  decision: 'keep' | 'trim' | 'condense' | 'drop'
+  relevance: number; recency?: number; tenure?: number; current: boolean; dateless: boolean; bullets: number
+  family: string; familyLabel: string
+  shared: Array<{ competency: string; group: string; demand: number; have: number; evidenced: boolean; bulletIds: string[] }>
+  keptBullets: string[]; droppedBullets: string[]
+  ranked: Array<{ bulletId: string; score: number; competencies: string[]; keywords: string[] }>
+  implied?: string[]
+  reasons: string[]; overridable: boolean
+}
+export interface TailorPrompt { id: string; itemId: string; roleTitle: string; company: string; kind: 'dates' | 'metric'; question: string; unit: string | null; why: string }
+export interface TailorAdded { kind: 'transferable_bullet'; itemId: string; bulletId: string; text: string; competency: string; basis: string; confirm: boolean; reason: string }
+export interface TailorObjective { total: number; match: number; keywordCoverage: number; health: number; relevanceDensity: number; lengthFit: number; completeness: number; lines: number; penalty: number }
+export interface TailorOverrides { decisions?: Record<string, TailorDecision['decision']>; transferable?: boolean; excludeAdded?: string[]; summary?: boolean; skills?: boolean; terminology?: boolean; layout?: 'chronological' | 'relevance'; prompts?: TailorPrompt[]; answers?: Record<string, string> }
 export interface TailorPlan {
   version: string
-  job: { title: string; company: string; roleFamily: string; requirementCount: number }
+  optimizer?: string
+  job: { title: string; company: string; jobId?: string; roleFamily: string; family?: string; familyLabel?: string; requirementCount: number }
+  objective?: { before: TailorObjective; after: TailorObjective; evaluations: number }
+  strategy?: { layout: 'chronological' | 'relevance'; pages: number; estimatedLines: number; linesBudget: number; order: string[]; summaryMode: string }
+  decisions?: TailorDecision[]
+  prompts?: TailorPrompt[]
+  added?: TailorAdded[]
+  ctx?: { jobTitle: string; company: string; jobId: string; pages: number; jobFamily: string; jobFamilyLabel: string; summary?: boolean; summaryFallback?: string; summaryKeywords?: Array<{ term: string; display: string; weight: number; surfaces: string[] }> }
   score: { before: number; after: number; criticalCoverage: number; keywordCoverage: { before: number; after: number } }
-  roles: Array<{ itemId: string; title: string; company: string; relevance: number; titleOverlap: number; bullets: Array<{ bulletId: string; score: number; hits: string[] }> }>
-  summary: { text: string; replaced: string; sources: { title: string; years: number | null; companies: string[]; strengths: string[]; keptSentences?: string[] } } | null
-  skills: { reordered: boolean; added: Array<{ term: string; evidence: string; why: string }> }
+  roles: Array<{ itemId: string; title: string; company: string; relevance: number; titleOverlap: number; tier?: string; family?: string; familyLabel?: string; bullets: Array<{ bulletId: string; score: number; hits: string[] }> }>
+  summary: { text: string; replaced: string; sources: Record<string, unknown> | null; targeted?: boolean } | null
+  skills: { reordered: boolean; reorders?: Array<{ kind: 'reorder_skills'; groupId: string; from: string[]; to: string[] }>; additions?: Array<{ groupId: string | null; term: string; listed: string; evidence: string; why: string }>; added: Array<{ term: string; evidence: string; why: string }> }
   terminology: Array<{ bulletId: string; itemId: string; from: string; to: string; alias: string; term: string }>
+  applyTerminology?: boolean
   gaps: TailorGap[]
   keywords: { matched: Array<{ term: string; weight: number; span: string }>; missing: Array<{ term: string; weight: number; source: string }>; coverage: number }
   strengths: Array<{ requirement: string; evidence: string }>

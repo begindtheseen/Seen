@@ -23,7 +23,8 @@ fs.mkdirSync(OUT, { recursive: true });
 process.env.SUPABASE_URL = process.env.SUPABASE_URL || 'https://db.example';
 process.env.SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY || 'service-key';
 const realFetch = globalThis.fetch;
-globalThis.fetch = async (url, opts) => (String(url).startsWith('https://db.example') ? new Response('[]', { status: 200, headers: { 'Content-Type': 'application/json' } }) : realFetch(url, opts));
+const isFakeDb = (url) => { try { return new URL(String(url)).host === 'db.example'; } catch { return false; } };
+globalThis.fetch = async (url, opts) => (isFakeDb(url) ? new Response('[]', { status: 200, headers: { 'Content-Type': 'application/json' } }) : realFetch(url, opts));
 const { default: handler } = await import('../api/resume.js');
 const api = http.createServer((req, res) => {
   let raw = '';
@@ -101,9 +102,9 @@ try {
   check('DOCX download is a zip container', fs.readFileSync(docxPath)[0] === 0x50, `${fs.statSync(docxPath).size} bytes`);
 
   await page.getByRole('button', { name: /Tailor/ }).first().click();
-  await page.getByPlaceholder('Commercial Electrician').fill('Store Manager');
+  await page.getByPlaceholder('Sales Associate').fill('Store Manager');
   await page.getByPlaceholder(/Paste the posting/).fill('Retail store manager. Scheduling, inventory, POS, customer service, team leadership.');
-  await page.getByRole('button', { name: /Tailor my résumé/ }).click();
+  await page.getByRole('button', { name: /Optimize for this job/ }).click();
   await page.waitForTimeout(800);
   check('signed-out tailoring routes to sign-in', page.url().includes('/login'), page.url());
 

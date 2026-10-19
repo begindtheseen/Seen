@@ -13,7 +13,7 @@
 > **Read this first. Every session. No exceptions.**
 > Then read SEEN_STRATEGY.md. Then `git status`. Then pick up exactly where this doc ends.
 
-Last updated: **2026-10-19 (Résumé Studio — structured résumé pipeline; see RESUME_STUDIO.md and CLAUDE.md "Session 2026-10-19 C")**
+Last updated: **2026-10-19 (Résumé Studio + Tailor v2 optimizer; see RESUME_STUDIO.md and CLAUDE.md "Session 2026-10-19 C/D")**
 
 ---
 
@@ -25,6 +25,15 @@ map, contracts and the verification record. Nothing changed in the DB: the canon
 `profiles.resume_text` is the store. After the PR merges and deploys: confirm a production deployment exists
 for the merged sha, then upload one PDF on prod and check the parse response's `layout.method === 'pdfjs'`
 (proves `vercel.json includeFiles` traced the pdfjs assets). Everything after this heading is older context.
+
+**Tailor v2 (same PR):** tailoring is now an autonomous optimizer (`lib/resume/tailor/optimizer.js`) that
+decides which roles stay / shrink to a line / leave the page from what each job *is* (competency model), fills
+thin relevant roles honestly (flagged to confirm), prompts for missing facts, writes a targeted summary and
+searches an objective — the owner's GNC case (Membership Specialist must lead, Valet must not) is the
+acceptance test. One apply path: the browser re-applies the JSON plan with overrides and gets exactly the
+server's variant (wire-contract test). CodeQL's 16 alerts on the PR head were fixed at the class (CSPRNG ids,
+one-pass entity decode, host-based link checks, linear regex, log format strings). After merge: same deploy
+checks as above.
 
 ---
 
