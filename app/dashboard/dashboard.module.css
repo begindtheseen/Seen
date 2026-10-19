@@ -41,7 +41,7 @@
 .ghostBtn:hover { border-color: rgba(129, 140, 248, 0.45); background: rgba(99, 102, 241, 0.1); }
 
 /* ── Rows + cards ── */
-.row { display: grid; grid-template-columns: 1.45fr 1fr; gap: 1rem; }
+.row { display: grid; grid-template-columns: minmax(0, 1.45fr) minmax(0, 1fr); gap: 1rem; }
 .row > * { animation: riseIn 0.6s var(--ease-out) backwards; }
 .row > *:nth-child(2) { animation-delay: 0.08s; }
 
@@ -80,7 +80,7 @@
 .ring > span { position: relative; z-index: 1; font-family: var(--display); font-weight: 800; font-size: 2.1rem; letter-spacing: -0.04em; line-height: 1; }
 .healthT { font-family: var(--display); font-weight: 800; font-size: 1.35rem; letter-spacing: -0.035em; color: var(--white); margin: 0 0 0.35rem; }
 .healthS { margin: 0; font-size: 0.84rem; line-height: 1.55; color: var(--sub); }
-.pills { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.5rem; }
+.pills { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0.5rem; }
 .pill { text-align: center; padding: 0.65rem 0.3rem; border-radius: 13px; background: rgba(255, 255, 255, 0.045); border: 1px solid rgba(255, 255, 255, 0.1); min-width: 0; }
 .pill small { display: block; font-family: var(--mono); font-size: 0.5rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--dim); }
 .pill b { display: block; font-family: var(--display); font-weight: 800; font-size: 1.35rem; margin-top: 0.25rem; line-height: 1.1; }
@@ -137,15 +137,16 @@
 .lock { display: flex; align-items: center; justify-content: space-between; gap: 0.6rem; padding: 0.75rem 0 0.1rem; font-size: 0.74rem; color: var(--dim); text-decoration: none; }
 
 /* ── Benchmarks ── */
-.metrics { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.75rem; }
-.metric { padding: 1rem 1.05rem; border-radius: 16px; border: 1px solid rgba(255, 255, 255, 0.09); background: rgba(255, 255, 255, 0.025); }
+.metrics { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0.75rem; }
+.metric { min-width: 0; padding: 1rem 1.05rem; border-radius: 16px; border: 1px solid rgba(255, 255, 255, 0.09); background: rgba(255, 255, 255, 0.025); }
 .metric b { display: block; font-family: var(--display); font-weight: 800; font-size: 1.7rem; letter-spacing: -0.03em; margin: 0.5rem 0 0.15rem; }
 .metric small { font-family: var(--mono); font-size: 0.6rem; color: var(--dim); }
 
 /* ── Toolkit ── */
-.tools { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.75rem; }
+.tools { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0.75rem; }
 .tool {
-  display: block; padding: 1.05rem 1.05rem 1rem; border-radius: 16px;
+  display: block;
+  min-width: 0; padding: 1.05rem 1.05rem 1rem; border-radius: 16px;
   border: 1px solid rgba(255, 255, 255, 0.09); background: #12141f; text-decoration: none; color: inherit;
   transition: transform 0.35s var(--ease-out), border-color 0.2s ease;
 }
@@ -161,7 +162,7 @@
 
 @media (max-width: 900px) {
   .row { grid-template-columns: 1fr; }
-  .tools, .metrics { grid-template-columns: repeat(2, 1fr); }
+  .tools, .metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 @media (max-width: 560px) {
   .intro { flex-direction: column; align-items: stretch; padding-top: 1.5rem; }

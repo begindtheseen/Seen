@@ -104,6 +104,15 @@ longer the design source of truth for redesigned pages. `SITE_PARITY_CHECKLIST.m
   the integer metric tiles. Dashboard stat pills are Odometers too.
 - Test suite: 1223/1231 pass; the 8 failures are `api/brain.timeline.test.mjs` (need the live brain)
   and fail identically on the untouched base commit.
+- **Phone overflow rule (owner iPhone screenshot: "my toolkit gets cut off"):** a `1fr` grid track has
+  `min-width:auto`, so one nowrap child (a résumé file name, "Report an outcome →") widens the whole
+  column past the viewport and `.page-full{overflow-x:hidden}` just clips it. Every grid track in
+  `dashboard.module.css`, `WorkspacePreview.module.css` and `LandingMarketingSections.module.css` is now
+  `minmax(0, …)` and tiles carry `min-width:0`; the tracker's `.stage-step` flex items got the same
+  (`min-width:0` + ellipsis, tighter at ≤400px — "Phone Screen"/"Final Round" clipped the last step at 360px).
+  `document.scrollWidth` does NOT catch this class of bug; check per element (any non-fixed, non-decorative
+  element with `getBoundingClientRect().right > clientWidth`) at 360/390/430 — verified clean on
+  /dashboard, /, /tracker, /jobs, /companies, /company/amazon, /pricing.
 
 ## Session 2026-10-17: self-filling company pages read the Arctic Shift archive when Reddit refuses
 - Verified on prod: the first enrichment cron run (Sheetz) got `reddit_429` from www.reddit.com on

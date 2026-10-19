@@ -783,7 +783,8 @@ select.fi,select.fs,select.fi-r,select.fs-r{background-image:url("data:image/svg
 
 /* Stage pipeline */
 .stage-pipe{display:flex;align-items:center;gap:0;margin-bottom:.85rem;flex-wrap:nowrap;overflow:hidden;border-radius:6px;border:1px solid var(--line2)}
-.stage-step{flex:1;padding:.32rem .2rem;text-align:center;font-family:var(--mono);font-size:.52rem;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);background:var(--raised);transition:all .2s;white-space:nowrap;border-right:1px solid var(--line2);cursor:default}
+.stage-step{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;padding:.32rem .2rem;text-align:center;font-family:var(--mono);font-size:.52rem;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);background:var(--raised);transition:all .2s;white-space:nowrap;border-right:1px solid var(--line2);cursor:default}
+@media(max-width:400px){.stage-step{letter-spacing:.02em;padding:.32rem .12rem;font-size:.5rem}}
 .stage-step:last-child{border-right:none}
 .stage-step.done{background:var(--gdim);color:var(--green)}
 .stage-step.current{background:var(--blue);color:#fff;font-weight:700}
