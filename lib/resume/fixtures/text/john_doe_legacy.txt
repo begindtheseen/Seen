@@ -1,0 +1,14 @@
+John Doe
+Senior Software Engineer
+
+EXPERIENCE
+Acme Corp - Senior Software Engineer    Jan 2020 - Present
+• Responsible for backend services using Python and AWS
+• Worked on data pipelines processing 2 million events daily
+• Helped migrate legacy systems to Kubernetes
+
+Globex Inc - Software Engineer    Jun 2017 - Dec 2019
+• Built REST APIs in Node.js serving 50k users
+• Participated in code review and agile ceremonies
+
+SKILLS: Python, JavaScript, React, AWS, Docker, SQL

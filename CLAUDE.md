@@ -50,6 +50,41 @@ and dashboard (PRs #122/#123) were intentionally REDESIGNED beyond the old site;
 longer the design source of truth for redesigned pages. `SITE_PARITY_CHECKLIST.md` /
 `ADMIN_PARITY_CHECKLIST.md` are frozen pre-06-30 records, not an active work queue.
 
+## Session 2026-10-19 C: Résumé Studio (claude/resume-handling-optimization-ywotv9) — facts verified
+- **The résumé pipeline is now structured end to end**: `lib/resume/{model,extract,parse,health,rewrite,tailor,render}`
+  (see `RESUME_STUDIO.md` — the reference). `ResumeDoc` lives as LOSSLESS canonical text in
+  `profiles.resume_text` (`serializeToText`), so there is **no schema change**; `parseResume(serializeToText(doc))`
+  is stable and every text fixture round-trips through text, JSON Resume, PDF and DOCX at ATS score 100.
+- **Extraction is layout-aware** (`lib/resume/extract/pdf.js`, pdfjs-dist 6.4 legacy build: columns, bold/italic,
+  links; DOCX styles/numPr/tabs). `lib/server/resumeUpload.js extractUploadText` delegates to it; the old
+  `pdfText.js` is the fallback. `vercel.json` now has `includeFiles: node_modules/pdfjs-dist/**` on
+  `api/resume.js` + `api/apply.js` — **verify the first prod PDF parse after deploy reports `layout.method: 'pdfjs'`**.
+- **`/api/resume` Studio actions** (`lib/server/resumeStudio.js`): `structure`/`health`/`rewrite`/`ats_check`/
+  `templates` free (rate key `resume-studio` 120/h), `export` free-branded / Pro-unbranded (`resume-export` 60/h),
+  `tailor` 1 credit via `gateAI('resume_tailor')` with `polish` Pro-only + `llmAvailable()`. `parse` also returns
+  `doc`/`health`/`coverage`/`layout`/`warnings`. `download_resume`/`email_analysis` render through the new PDF
+  renderer (`template` body field; legacy Harvard builder kept as fallback). Contract tests: `api/resume.studio.test.mjs`.
+- **Renderer rules learned the hard way (verified with the real extractor):** never use pdfkit `characterSpacing`
+  (pdf.js/pdfminer read "S U M M A R Y" — the LEGACY builder had this bug in production); pdfkit `text()` with a
+  `link` needs an explicit `width` or the annotation rect is NaN; DOCX right-aligned dates must be a real
+  `<w:tab/>` (`new Tab()`), not a literal tab in `<w:t>`; built-in Times/Helvetica garble non-WinAnsi glyphs →
+  the renderer auto-switches to the embedded Liberation Sans TTFs that ship inside `pdfjs-dist/standard_fonts`.
+- **Parser class fixes from the ATS round-trip:** packed-roles split must ignore pieces with a date range
+  ("Title — Company | 2020 – Present" was two roles); bare known cities (`KNOWN_CITIES` in lexicon) are
+  locations; "Audit Senior"-style trailing-role titles; a header piece that is ONE date is the role's date;
+  a parked unknown header line occupies a title/company slot (stacked dateless headers no longer shift by one).
+  Engine class fix: `extractTaxonomyConcepts` matches plurals of 4+ letter aliases ("forklifts").
+- **UI:** `/resume/studio` (editor + Health/Tailor/Export panels; parse/score/rewrite run in the browser via
+  `lib/resume/engine-client.ts`), entry points on `/resume` (header pill + card + Export-tab template picker +
+  "tailor in Studio" hand-off via `sessionStorage.seen_studio_job`) and `/profile`. Device-local per-user caches
+  (`seen_resume_doc_*`, `seen_resume_variants_*`) are swept on sign-out in `lib/auth.tsx`.
+- **Verification:** full suite 1293/1301 (the 8 = brain timeline, pre-existing), `tsc` clean, `next build` clean,
+  `node scripts/resume-studio-smoke.mjs` (Playwright against `next start`; uses `/opt/pw-browsers/chromium-1194`
+  via `executablePath` because the installed playwright expects 1223) — all steps green. NOT verified live:
+  signed-in tailoring against prod Supabase, LLM polish with a real key, Vercel includeFiles on a real deploy.
+- Decision recorded: no `resume_documents` migration in this PR (device-local variants); revisit only if
+  cross-device tailored versions are requested.
+
 ## Session 2026-10-19: Motion v2 — the "crisp" kit (claude/motion-graphics-update-yw7ei4)
 - **All motion lives in `app/motion.css`** (imported after globals.css in app/layout.tsx, so it wins the
   cascade) + `components/motion/` (`MotionLayer` = the ONE pointer listener for `.spot` spotlight /

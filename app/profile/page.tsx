@@ -455,6 +455,12 @@ export default function ProfilePage() {
               >
                 Open Résumé AI →
               </button>
+              <button
+                onClick={() => router.push('/resume/studio')}
+                style={{ flex: 1, minWidth: 130, padding: '.72rem 1rem', background: 'var(--idim)', border: '1px solid var(--imid)', color: '#c7d2fe', borderRadius: 10, fontFamily: 'var(--mono)', fontSize: '.7rem', cursor: 'pointer', boxSizing: 'border-box' }}
+              >
+                ✦ Résumé Studio →
+              </button>
             </div>
             <input
               ref={resumeFileRef}

@@ -1,8 +1,11 @@
 'use client'
 
 import { useState, useEffect, useRef, Suspense } from 'react'
-import { useSearchParams } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
+import Link from 'next/link'
 import { ResumeStore } from '@/lib/stores/ResumeStore'
+import { ResumeDocStore } from '@/lib/stores/ResumeDocStore'
+import type { ResumeDoc } from '@/lib/resume/types'
 import { SavedJobsStore } from '@/lib/stores/SavedJobs'
 import { useAuth } from '@/lib/auth'
 import { aiHeaders } from '@/lib/aiHeaders'
@@ -385,6 +388,7 @@ function ResumeInput({ resumeText, setResumeText, resumeMeta, onUpload, onClear,
 function ResumePageInner() {
   const { isLoggedIn, user, profile } = useAuth()
   const params = useSearchParams()
+  const router = useRouter()
 
   const [resumeText, setResumeText] = useState('')
   const [resumeMeta, setResumeMeta] = useState<{ fileName: string; wordCount: number } | null>(null)
@@ -421,6 +425,7 @@ function ResumePageInner() {
 
   const [copied, setCopied] = useState<string | null>(null)
   const [downloading, setDownloading] = useState(false)
+  const [pdfTemplate, setPdfTemplate] = useState<'classic' | 'engineering' | 'modern'>('classic')
   const [emailState, setEmailState] = useState<'idle' | 'sending' | 'sent'>('idle')
   const [emailAddr, setEmailAddr] = useState('')
 
@@ -509,6 +514,8 @@ function ResumePageInner() {
         window.dispatchEvent(new Event('seen:credits-updated'))
         const wc = r.wordCount || r.text.trim().split(/\s+/).length
         await ResumeStore.save(r.text, r.fileName, wc, user?.id, isLoggedIn)
+        // Résumé Studio reuses the server's layout-aware parse instead of re-parsing the text.
+        if (r.doc) ResumeDocStore.putParsed(user?.id, r.text, r.doc as ResumeDoc)
         setResumeText(r.text); setResumeMeta({ fileName: r.fileName, wordCount: wc }); setError('')
       } else {
         setError(r.error || 'Could not read this file. Paste your résumé text into the box instead.')
@@ -669,7 +676,7 @@ function ResumePageInner() {
         // Signed-out callers send no token and get the free-tier "seenjobs.io" footer.
         method: 'POST', headers: await aiHeaders(),
         body: JSON.stringify({
-          action: 'download_resume', resume: resumeText, job: jobTitle, company: jobCompany, jobDescription: jobJD,
+          action: 'download_resume', resume: resumeText, job: jobTitle, company: jobCompany, jobDescription: jobJD, template: pdfTemplate,
           optimizedBullets: (fitOut?.safe_bullets || []).map(b => b.text),
           humanproofBullets: hp ? hp.package.bullets.map(b => b.humanized_text) : undefined,
           confirmWarnings: confirmList(),
@@ -699,7 +706,7 @@ function ResumePageInner() {
       await fetch('/api/resume', {
         method: 'POST', headers: await aiHeaders(),
         body: JSON.stringify({
-          action: 'email_analysis', email: emailAddr.trim(), co: jobCompany, role: jobTitle,
+          action: 'email_analysis', email: emailAddr.trim(), co: jobCompany, role: jobTitle, template: pdfTemplate,
           ...(jobUrl ? { jobUrl } : {}),
           bullets: [], keywords: (fitOut?.missing_keywords || []).slice(0, 12),
           optimizedBullets: (fitOut?.safe_bullets || []).map(b => b.text),
@@ -713,6 +720,12 @@ function ResumePageInner() {
       })
       setEmailState('sent')
     } catch { setEmailState('idle') }
+  }
+
+  // Hand the current job to Résumé Studio's Tailor tab (sessionStorage — descriptions are too long for a URL).
+  function openStudioForJob() {
+    try { sessionStorage.setItem('seen_studio_job', JSON.stringify({ title: jobTitle, company: jobCompany, description: jobJD, jobId: savedId || '', url: jobUrl })) } catch { /* ignore */ }
+    router.push('/resume/studio?tab=tailor')
   }
 
   const trackHref = `/apply?co=${encodeURIComponent(jobCompany)}&role=${encodeURIComponent(jobTitle)}${jobUrl ? `&jobUrl=${encodeURIComponent(jobUrl)}` : ''}`
@@ -742,6 +755,9 @@ function ResumePageInner() {
           <p style={{ color: 'var(--sub)', fontSize: '.85rem', fontWeight: 300 }}>
             One résumé, one job — your fit score, safe rewrites, a human-sounding pass, and the strategy to get through, sharpened with Seen&apos;s data on how this company actually treats applicants.
           </p>
+          <Link href="/resume/studio" style={{ display: 'inline-flex', alignItems: 'center', gap: '.4rem', marginTop: '.7rem', background: 'var(--idim)', border: '1px solid var(--imid)', color: '#c7d2fe', borderRadius: 999, padding: '.35rem .8rem', fontFamily: 'var(--mono)', fontSize: '.62rem', textDecoration: 'none' }}>
+            ✦ New: Résumé Studio — score, fix and export your résumé in ATS-safe templates →
+          </Link>
         </div>
 
         {error && (
@@ -816,7 +832,17 @@ function ResumePageInner() {
           {/* Right: output */}
           <div>
             {!analyzed ? (
-              <ResultEmpty icon="🎯" text={'Your fit score, safe rewrites, a human-sounding pass,\nand the strategy to get through appear here.'} />
+              <>
+                <Card>
+                  {kicker('Before the job: fix the résumé itself', 'var(--indigo)')}
+                  <div style={{ fontFamily: 'var(--display)', fontWeight: 800, color: 'var(--white)', fontSize: '.95rem', marginBottom: '.3rem' }}>Résumé Studio</div>
+                  <p style={{ fontFamily: 'var(--mono)', fontSize: '.65rem', color: 'var(--sub)', lineHeight: 1.6, marginBottom: '.8rem' }}>
+                    A health score with every weak bullet pinpointed and fixed without inventing a word · a tailored version built only from your own facts · PDF, Word, text, Markdown and JSON Resume exports in three templates, each checked the way a parser reads it.
+                  </p>
+                  <Link href="/resume/studio" style={{ ...btnPrimary, display: 'block', textAlign: 'center', textDecoration: 'none', boxSizing: 'border-box' } as React.CSSProperties}>Open Résumé Studio →<span style={{ marginLeft: '.5rem', fontSize: '.55rem', opacity: .65, fontFamily: 'var(--mono)', fontWeight: 400 }}>· free</span></Link>
+                </Card>
+                <ResultEmpty icon="🎯" text={'Your fit score, safe rewrites, a human-sounding pass,\nand the strategy to get through appear here.'} />
+              </>
             ) : (
               <>
                 <div className="ai-tabs" role="tablist">
@@ -964,7 +990,14 @@ function ResumePageInner() {
                         <button onClick={() => copy(packageText(), 'pkg')} style={{ padding: '.65rem', background: 'var(--raised)', border: '1px solid var(--line2)', color: copied === 'pkg' ? 'var(--green)' : 'var(--sub)', borderRadius: 9, fontFamily: 'var(--mono)', fontSize: '.68rem', cursor: 'pointer' }}>{copied === 'pkg' ? '✓ Copied' : 'Copy final package'}</button>
                         <button onClick={downloadResume} disabled={downloading} style={{ padding: '.65rem', background: 'var(--surface)', border: '1.5px solid var(--blue)', color: 'var(--blue)', borderRadius: 9, fontFamily: 'var(--mono)', fontSize: '.68rem', fontWeight: 700, cursor: downloading ? 'not-allowed' : 'pointer', opacity: downloading ? 0.6 : 1 }}>{downloading ? 'Building…' : '⬇ Download résumé PDF'}</button>
                       </div>
+                      <div style={{ display: 'flex', gap: '.4rem', alignItems: 'center', flexWrap: 'wrap', marginBottom: '.6rem' }}>
+                        {label('PDF template')}
+                        {(['classic', 'engineering', 'modern'] as const).map(t => (
+                          <button key={t} type="button" onClick={() => setPdfTemplate(t)} style={{ background: pdfTemplate === t ? 'var(--gdim)' : 'none', border: `1px solid ${pdfTemplate === t ? 'var(--gmid)' : 'var(--line2)'}`, color: pdfTemplate === t ? 'var(--green)' : 'var(--dim)', borderRadius: 6, padding: '.25rem .6rem', fontFamily: 'var(--mono)', fontSize: '.6rem', cursor: 'pointer', textTransform: 'capitalize' }}>{t}</button>
+                        ))}
+                      </div>
                       <div style={{ fontFamily: 'var(--mono)', fontSize: '.55rem', color: 'var(--muted)', lineHeight: 1.5 }}>The PDF is a complete, ATS-ready résumé built from your own text, with the optimized bullets as a clearly-marked appendix · free.</div>
+                      <button type="button" onClick={openStudioForJob} style={{ marginTop: '.7rem', background: 'none', border: '1px solid var(--imid)', color: '#c7d2fe', borderRadius: 8, padding: '.5rem .85rem', fontFamily: 'var(--mono)', fontSize: '.64rem', cursor: 'pointer', width: '100%' }}>✦ Tailor the whole résumé to this job in Résumé Studio →</button>
                     </Card>
 
                     <Card>
