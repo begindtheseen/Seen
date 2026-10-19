@@ -312,6 +312,11 @@ function TrackerPage() {
     if (isLoggedIn && !isSeeker) { router.replace('/'); return }
   }, [ready, isLoggedIn, isSeeker, router])
 
+  // ?add=1 (the dashboard's "+ Track application") opens the add-application form directly.
+  useEffect(() => {
+    if (searchParams?.get('add') === '1') setShowManual(true)
+  }, [searchParams])
+
   const loadApps = useCallback(async () => {
     const data = await AppStore.load(isLoggedIn)
     setApps(data)

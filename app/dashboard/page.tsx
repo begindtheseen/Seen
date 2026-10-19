@@ -12,6 +12,7 @@ import WelcomeOnboarding from '@/components/WelcomeOnboarding'
 import type { Application } from '@/lib/types'
 import { isGradeableScore } from '@/lib/gradeGate'
 import Odometer from '@/components/motion/Odometer'
+import styles from './dashboard.module.css'
 
 function companySlug(name: string) {
   return encodeURIComponent(name.toLowerCase().replace(/\s+/g, '-'))
@@ -212,10 +213,6 @@ export default function DashboardPage() {
   const statusLine = active.length
     ? `${active.length} open application${active.length !== 1 ? 's' : ''}${dueChecks.length ? ` · ${dueChecks.length} check${dueChecks.length > 1 ? 's' : ''} due` : ''}`
     : 'No open applications right now'
-  // Historical context — only shown once the user has tracked anything.
-  const contextLine = apps.length
-    ? `${apps.length} tracked total · ${hired.length} hired · ${ghosted.length} ghosted`
-    : "Hit 'Apply' on any job to start tracking"
 
   // Next best move
   type Move = { icon: string; title: string; sub: string; go: () => void }
@@ -236,12 +233,22 @@ export default function DashboardPage() {
     try { if (user?.id) localStorage.setItem(`seen_onboarding_hidden_${user.id}`, '1') } catch {}
   }
 
+  // Health headline: one plain sentence instead of a caption line.
+  const healthHead = !health
+    ? { t: 'Your score unlocks soon.', s: `Track ${Math.max(1, 3 - apps.length)} more application${Math.max(1, 3 - apps.length) !== 1 ? 's' : ''} and Seen scores how your search is going.`, badge: 'Getting started', tone: 'muted' }
+    : health.score >= 75
+      ? { t: "You're getting noticed.", s: 'Your response rate is beating the average. Keep doing what works.', badge: 'Above average', tone: 'green' }
+      : health.score >= 55
+        ? { t: "You're on track.", s: 'Steady replies. A follow-up on your quiet applications could tip it.', badge: 'On track', tone: 'amber' }
+        : { t: 'Room to improve.', s: 'Fewer replies than average. Check companies before applying and tailor your résumé.', badge: 'Needs attention', tone: 'red' }
+  const signalCount = alertCount + (surveyInsight ? 1 : 0)
+  const today = new Date().toLocaleDateString('en-US', { month: 'short', year: 'numeric' })
+
   return (
     <div className="page-full">
-      {/* .stagger: sections rise one after another (app/motion.css) */}
-      <div className="dash stagger">
+      <div className={styles.dash}>
 
-        {/* ── A. First-run getting-started guide ─────────────────── */}
+        {/* ── First-run getting-started guide ── */}
         {showOnboarding && (
           <WelcomeOnboarding
             name={name}
@@ -250,264 +257,204 @@ export default function DashboardPage() {
           />
         )}
 
-        {/* ── B. Hero Command Center ─────────────────────────────── */}
-        <section className="dhero">
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '.5rem', marginBottom: '.9rem' }}>
-            <span className="deyebrow">✦ Command Center</span>
-            <div style={{ display: 'flex', gap: '.4rem', alignItems: 'center', flexShrink: 0 }}>
-              {isPro && (
-                <Link href="/pricing" title="Seen Pro — manage membership" style={{ fontFamily: 'var(--mono)', fontSize: '.56rem', fontWeight: 700, letterSpacing: '.05em', color: 'var(--green)', background: 'rgba(16,185,129,.14)', border: '1px solid rgba(16,185,129,.4)', borderRadius: 7, padding: '.24rem .5rem', textDecoration: 'none' }}>★ PRO</Link>
-              )}
-              <Link href="/profile" title="Settings" style={{ fontFamily: 'var(--mono)', fontSize: '.66rem', color: 'var(--sub)', border: '1px solid var(--line2)', borderRadius: 7, padding: '.24rem .5rem', textDecoration: 'none' }}>⚙</Link>
-              <button onClick={async () => { await supabase.auth.signOut(); router.push('/') }} style={{ fontFamily: 'var(--mono)', fontSize: '.56rem', color: 'var(--muted)', background: 'none', border: '1px solid var(--line2)', borderRadius: 7, padding: '.24rem .5rem', cursor: 'pointer' }}>Sign out</button>
-            </div>
+        {/* ── Intro: who, what matters today, one primary action. (Settings / sign-out live in the
+            nav's account menu; Pro shows in the nav.) ── */}
+        <header className={styles.intro}>
+          <div style={{ minWidth: 0 }}>
+            <div className={styles.eyebrow}>✦ Command Center · {today}</div>
+            <h1 className={styles.hello}>Hey, {name}<span className={styles.dot}>.</span></h1>
+            <p className={styles.status}>{statusLine}{apps.length ? <span className={styles.statusDim}> · {apps.length} tracked total</span> : null}</p>
           </div>
+          <Link href="/tracker?add=1" className={`${styles.primary} btn-shine`}>+ Track application</Link>
+        </header>
 
-          <h1 className="dhero-name">Hey, {name}.</h1>
-          <p className="dhero-status" style={{ marginBottom: apps.length ? '.25rem' : '1rem' }}>{statusLine}</p>
-          {apps.length > 0 && (
-            <p style={{ fontFamily: 'var(--mono)', fontSize: '.6rem', color: 'var(--dim)', marginBottom: '1rem' }}>{contextLine}</p>
-          )}
-
-          {/* Job Search Health — historical performance across all tracked apps */}
-          <div className="dhealth">
-            <div className="dring" style={{ background: `conic-gradient(${healthColor} ${healthDeg}deg, var(--line2) 0deg)` }}>
-              <span style={{ color: healthColor }}>{health ? health.score : '—'}</span>
+        {/* ── Row 1: search health | next best move ── */}
+        <div className={styles.row}>
+          <section className={`${styles.card} ${styles.health} spot`}>
+            <div className={styles.cardHead}>
+              <span className={styles.eyebrow}>Job search health</span>
+              <span className={`${styles.badge} ${styles[healthHead.tone]}`}>● {healthHead.badge}</span>
             </div>
-            <div style={{ minWidth: 0 }}>
-              <div style={{ fontFamily: 'var(--display)', fontSize: '.82rem', fontWeight: 700, color: 'var(--white)' }}>Job Search Health</div>
-              <div style={{ fontFamily: 'var(--mono)', fontSize: '.6rem', color: 'var(--sub)', marginTop: '.15rem', lineHeight: 1.5 }}>
-                {health
-                  ? `${health.score >= 75 ? 'Performing above average' : health.score >= 55 ? 'On track' : 'Room to improve'} · based on ${apps.length} tracked app${apps.length !== 1 ? 's' : ''}`
-                  : `Track ${Math.max(1, 3 - apps.length)} more application${Math.max(1, 3 - apps.length) !== 1 ? 's' : ''} to unlock your score`}
+            <div className={styles.healthBody}>
+              <div className={styles.ring} style={{ background: `conic-gradient(${healthColor} ${healthDeg}deg, rgba(255,255,255,.1) 0deg)` }}>
+                <span style={{ color: healthColor }}>{health ? <Odometer value={health.score} /> : '—'}</span>
+              </div>
+              <div style={{ minWidth: 0 }}>
+                <h2 className={styles.healthT}>{healthHead.t}</h2>
+                <p className={styles.healthS}>{healthHead.s}</p>
               </div>
             </div>
-          </div>
-
-          {/* Stat pills — "Open" is current; Response/Hired/Ghosted are all-time (see caption) */}
-          <div className="dpills">
-            {/* Figures roll in (and re-roll when the store loads) instead of flashing. */}
-            <div className="dpill"><div className="dpill-l">Open</div><div className="dpill-n" style={{ color: 'var(--blue)' }}><Odometer value={active.length} /></div></div>
-            <div className="dpill"><div className="dpill-l">Response</div><div className="dpill-n" style={{ color: 'var(--indigo)' }}>{responseNum == null ? '—' : <Odometer value={responseNum} suffix="%" />}</div></div>
-            <div className="dpill"><div className="dpill-l">Hired</div><div className="dpill-n" style={{ color: 'var(--green)' }}><Odometer value={hired.length} /></div></div>
-            <div className="dpill"><div className="dpill-l">Ghosted</div><div className="dpill-n" style={{ color: 'var(--red)' }}><Odometer value={ghosted.length} /></div></div>
-          </div>
-          {apps.length > 0 && (
-            <div style={{ fontFamily: 'var(--mono)', fontSize: '.5rem', color: 'var(--muted)', textAlign: 'center', marginTop: '.45rem', letterSpacing: '.04em' }}>
-              Response · Hired · Ghosted based on {apps.length} tracked app{apps.length !== 1 ? 's' : ''}
+            <div className={styles.pills}>
+              <div className={styles.pill}><small>Open</small><b style={{ color: '#93b4ff' }}><Odometer value={active.length} /></b></div>
+              <div className={styles.pill}><small>Response</small><b style={{ color: '#a5a2ff' }}>{responseNum == null ? '—' : <Odometer value={responseNum} suffix="%" />}</b></div>
+              <div className={styles.pill}><small>Hired</small><b style={{ color: 'var(--green)' }}><Odometer value={hired.length} /></b></div>
+              <div className={styles.pill}><small>Ghosted</small><b style={{ color: '#f87185' }}><Odometer value={ghosted.length} /></b></div>
             </div>
-          )}
+            {apps.length > 0 && <p className={styles.caption}>Based on {apps.length} tracked application{apps.length !== 1 ? 's' : ''}</p>}
+          </section>
 
-          {/* CTAs */}
-          <div className="dhero-cta">
-            <Link href="/jobs" className="dbtn dbtn-primary">Find jobs →</Link>
-            <Link href="/report" className="dbtn dbtn-ghost">Report outcome</Link>
-          </div>
-        </section>
-
-        {/* ── B2. Résumé — always-visible upload / status entry ──── */}
-        <section>
-          <div className="dcard dcard-pad spot" style={{ display: 'flex', alignItems: 'center', gap: '.8rem', flexWrap: 'wrap' }}>
-            <span style={{ fontSize: '1.5rem', flexShrink: 0 }}>📄</span>
-            <div style={{ minWidth: 0, flex: '1 1 160px' }}>
-              {hasResume ? (
-                <>
-                  <div style={{ fontFamily: 'var(--display)', fontSize: '.85rem', fontWeight: 700, color: 'var(--white)' }}>Résumé on file</div>
-                  <div style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', color: 'var(--muted)', marginTop: '.15rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    {profile?.resume_file_name || 'Résumé'}{profile?.resume_word_count ? ` · ${profile.resume_word_count} words` : ''}
-                  </div>
-                </>
-              ) : (
-                <>
-                  <div style={{ fontFamily: 'var(--display)', fontSize: '.85rem', fontWeight: 700, color: 'var(--white)' }}>Add your résumé</div>
-                  <div style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', color: 'var(--muted)', marginTop: '.15rem', lineHeight: 1.45 }}>Upload a PDF or Word doc to unlock résumé-fit scoring and earn AI credits</div>
-                </>
-              )}
+          <section className={`${styles.card} spot`}>
+            <div className={styles.cardHead}>
+              <h2 className={styles.cardT}>Next best move</h2>
+              {topMoves.length > 0 && <span className={styles.eyebrow}>{topMoves.length} action{topMoves.length !== 1 ? 's' : ''}</span>}
             </div>
-            <div style={{ display: 'flex', gap: '.45rem', flexShrink: 0 }}>
-              {hasResume ? (
-                <>
-                  <Link href="/resume" className="dbtn dbtn-primary" style={{ flex: 'none', padding: '.5rem .9rem' }}>Scan résumé fit →</Link>
-                  <Link href="/resume" className="dbtn dbtn-ghost" style={{ flex: 'none', padding: '.5rem .8rem' }}>Replace</Link>
-                </>
-              ) : (
-                <Link href="/resume" className="dbtn dbtn-primary" style={{ flex: 'none', padding: '.5rem 1rem' }}>Upload résumé →</Link>
-              )}
-            </div>
-          </div>
-        </section>
-
-        {/* ── C. Next Best Move ──────────────────────────────────── */}
-        <section>
-          <div className="dsec-head"><div className="dsec-title">Next best move</div></div>
-          {active.length === 0 ? (
-            <div className="dcard dcard-pad spot">
-              <div style={{ fontFamily: 'var(--display)', fontSize: '.92rem', fontWeight: 800, color: 'var(--white)', marginBottom: '.35rem', letterSpacing: '-.02em' }}>
-                {apps.length ? 'Start your next tracked application' : 'Start tracking applications'}
-              </div>
-              <p style={{ fontSize: '.78rem', color: 'var(--sub)', lineHeight: 1.6, marginBottom: '.9rem' }}>
-                {apps.length
-                  ? `You've tracked ${apps.length} application${apps.length !== 1 ? 's' : ''} and landed ${hired.length} hire${hired.length !== 1 ? 's' : ''}. Keep the streak going by adding your next role.`
-                  : 'Start tracking applications to unlock your real response rate, ghost rate, and company benchmarks.'}
-              </p>
-              <div style={{ display: 'flex', gap: '.5rem', flexWrap: 'wrap' }}>
-                <Link href="/jobs" className="dbtn dbtn-primary" style={{ flex: '1 1 auto' }}>Find jobs</Link>
-                <Link href="/tracker" className="dbtn dbtn-ghost" style={{ flex: '1 1 auto' }}>Add application</Link>
-                <Link href="/resume" className="dbtn dbtn-ghost" style={{ flex: '1 1 auto' }}>Upload résumé</Link>
-              </div>
-            </div>
-          ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '.5rem' }}>
-              {topMoves.map((m, i) => (
-                <button key={i} className="dmove spot" onClick={m.go}>
-                  <span className="dmove-ic">{m.icon}</span>
-                  <span style={{ minWidth: 0 }}>
-                    <span className="dmove-t" style={{ display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{m.title}</span>
-                    <span className="dmove-s" style={{ display: 'block' }}>{m.sub}</span>
-                  </span>
-                  <span className="dmove-x">→</span>
-                </button>
-              ))}
-            </div>
-          )}
-        </section>
-
-        {/* ── D. Active Pipeline ─────────────────────────────────── */}
-        <section>
-          <div className="dsec-head">
-            <div className="dsec-title">Active pipeline</div>
-            {active.length > 0 && <Link href="/tracker" className="dsec-link">View all →</Link>}
-          </div>
-          {active.length === 0 ? (
-            <div className="dpipe-empty">
-              <div style={{ fontSize: '1.6rem', marginBottom: '.4rem' }}>📋</div>
-              <div style={{ fontFamily: 'var(--display)', fontSize: '.85rem', fontWeight: 700, color: 'var(--white)', marginBottom: '.25rem' }}>No open applications</div>
-              <div style={{ fontFamily: 'var(--mono)', fontSize: '.6rem', color: 'var(--muted)', lineHeight: 1.6, marginBottom: '1rem' }}>When you apply to a new job, it&apos;ll appear here until you report the outcome.</div>
-              <Link href="/jobs" className="dbtn dbtn-primary" style={{ display: 'inline-flex', flex: 'none', padding: '.6rem 1.2rem' }}>Find your next tracked job →</Link>
-            </div>
-          ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '.5rem' }}>
-              {active.slice(0, 4).map(app => {
-                const days = Math.floor((Date.now() - app.appliedAt) / 86400000)
-                const sc = coScores[app.company.toLowerCase()]
-                const ghostPct = sc ? Math.round(sc.ghost_rate * 100) : null
-                const risk = sc ? (sc.ghost_rate > 0.55 ? { c: 'var(--red)', t: 'high ghost risk' } : sc.ghost_rate > 0.35 ? { c: 'var(--amber)', t: `${ghostPct}% ghost` } : { c: 'var(--green)', t: `${ghostPct}% ghost` }) : null
-                return (
-                  <div key={app.id} className="dpipe spot">
-                    <div className="dpipe-logo">{(app.company || '?').charAt(0).toUpperCase()}</div>
-                    <div style={{ minWidth: 0, flex: 1 }}>
-                      <div style={{ fontFamily: 'var(--display)', fontSize: '.83rem', fontWeight: 700, color: 'var(--white)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{app.company}</div>
-                      <div style={{ fontFamily: 'var(--mono)', fontSize: '.56rem', color: 'var(--muted)', marginTop: '.12rem', display: 'flex', gap: '.4rem', flexWrap: 'wrap' }}>
-                        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{app.role || 'Role'}</span>
-                        <span>· Day {days}</span>
-                        {risk && <span style={{ color: risk.c }}>· {risk.t}</span>}
-                      </div>
-                    </div>
-                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '.3rem', flexShrink: 0 }}>
-                      <span style={{ fontFamily: 'var(--mono)', fontSize: '.55rem', background: 'var(--raised)', border: '1px solid var(--line)', borderRadius: 6, padding: '.18rem .45rem', color: 'var(--sub)' }}>{app.stage}</span>
-                      <button onClick={() => router.push('/tracker')} style={{ fontFamily: 'var(--mono)', fontSize: '.55rem', color: 'var(--blue)', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>Update outcome →</button>
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
-          )}
-        </section>
-
-        {/* ── E. Quick Actions ───────────────────────────────────── */}
-        <section>
-          <div className="dqa">
-            <Link href="/resume" className="dqa-tile spot"><span className="dqa-ic">🧠</span><div className="dqa-t">Resume AI</div><div className="dqa-s">Optimize before applying</div></Link>
-            <Link href="/tracker" className="dqa-tile spot"><span className="dqa-ic">📋</span><div className="dqa-t">All applications</div><div className="dqa-s">View your pipeline</div></Link>
-            <Link href="/demand" className="dqa-tile spot"><span className="dqa-ic">🗺️</span><div className="dqa-t">Demand map</div><div className="dqa-s">See where hiring is hot</div></Link>
-            <Link href="/report" className="dqa-tile spot"><span className="dqa-ic">📢</span><div className="dqa-t">Report outcome</div><div className="dqa-s">Help the community</div></Link>
-          </div>
-        </section>
-
-        {/* ── F. Signals / Alerts ────────────────────────────────── */}
-        <section>
-          <div className="dsec-head"><div className="dsec-title">Signals</div>
-            {alertCount > 0 && <span style={{ fontFamily: 'var(--mono)', fontSize: '.55rem', background: 'var(--rdim)', color: 'var(--red)', border: '1px solid #ff3b5c28', borderRadius: 100, padding: '.1rem .45rem' }}>{alertCount}</span>}
-          </div>
-          <div className="dcard">
-            {surveyInsight && (
-              <div style={{ display: 'flex', alignItems: 'flex-start', gap: '.6rem', padding: '.7rem .9rem', borderBottom: (alertCount > 0) ? '1px solid var(--line)' : 'none' }}>
-                <span style={{ color: 'var(--green)', flexShrink: 0 }}>✓</span>
-                <div><div style={{ fontFamily: 'var(--mono)', fontSize: '.6rem', color: 'var(--green)', fontWeight: 600 }}>{surveyInsight.label}</div><div style={{ fontSize: '.68rem', color: 'var(--sub)', fontWeight: 300, marginTop: '.1rem' }}>{surveyInsight.desc}</div></div>
+            {topMoves.length ? topMoves.map((m, i) => (
+              <button key={i} type="button" className={styles.move} onClick={m.go}>
+                <span className={styles.sym}>{m.icon}</span>
+                <span style={{ minWidth: 0, flex: 1 }}>
+                  <b>{m.title}</b>
+                  <small>{m.sub}</small>
+                </span>
+                <span className={styles.go} aria-hidden="true">→</span>
+              </button>
+            )) : (
+              <div className={styles.empty}>
+                <b>Start tracking applications</b>
+                <p>Your real response rate, ghost rate and company benchmarks fill in from here.</p>
+                <div className={styles.emptyBtns}>
+                  <Link href="/jobs" className={`${styles.primary} btn-shine`}>Find jobs</Link>
+                  <Link href="/tracker?add=1" className={styles.ghostBtn}>Add one I applied to</Link>
+                </div>
               </div>
             )}
-            {alertCount === 0 && !surveyInsight && (
-              <div style={{ padding: '.9rem 1rem', fontFamily: 'var(--mono)', fontSize: '.65rem', color: 'var(--muted)', textAlign: 'center' }}>All clear ✓</div>
+          </section>
+        </div>
+
+        {/* ── Row 2: active pipeline | signals ── */}
+        <div className={styles.secHead}>
+          <h2 className={styles.secT}>Active pipeline</h2>
+          {active.length > 0 && <Link href="/tracker" className={styles.link}>View all →</Link>}
+        </div>
+        <div className={styles.row}>
+          <section className={`${styles.card} ${styles.tight}`}>
+            {active.length === 0 ? (
+              <div className={styles.empty}>
+                <b>No open applications</b>
+                <p>Apply to a job and it appears here until you report what happened.</p>
+                <div className={styles.emptyBtns}><Link href="/jobs" className={styles.ghostBtn}>Find your next job →</Link></div>
+              </div>
+            ) : active.slice(0, 4).map(app => {
+              const days = Math.floor((Date.now() - app.appliedAt) / 86400000)
+              const sc = coScores[app.company.toLowerCase()]
+              const ghostPct = sc ? Math.round(sc.ghost_rate * 100) : null
+              const tone = sc ? (sc.ghost_rate > 0.55 ? 'var(--red)' : sc.ghost_rate > 0.35 ? 'var(--amber)' : 'var(--green)') : undefined
+              return (
+                <Link key={app.id} href={`/tracker#app_${app.id}`} className={styles.job}>
+                  <span className={styles.jobIco}>{(app.company || '?').charAt(0).toUpperCase()}</span>
+                  <span className={styles.jobInfo}>
+                    <b>{app.company}</b>
+                    <small>{app.role || 'Role'}</small>
+                    <small className={styles.jobMeta}>Day {days}{ghostPct != null && <> · <span style={{ color: tone }}>{ghostPct}% reported ghost rate</span></>}</small>
+                  </span>
+                  <span className={styles.stage}>{app.stage}</span>
+                </Link>
+              )
+            })}
+          </section>
+
+          <section className={`${styles.card} ${styles.tight}`}>
+            <div className={styles.cardHead}>
+              <h2 className={styles.cardT}>Signals</h2>
+              {signalCount > 0 && <span className={`${styles.badge} ${styles.red}`}>{signalCount} to review</span>}
+            </div>
+            {signalCount === 0 && <p className={styles.allClear}>All clear. Nothing needs you right now.</p>}
+            {surveyInsight && (
+              <div className={styles.signal}>
+                <span style={{ color: 'var(--green)' }}>✓</span>
+                <span><b>{surveyInsight.label}</b><small>{surveyInsight.desc}</small></span>
+              </div>
             )}
             {surges.map(co => (
-              <button key={`surge-${co}`} onClick={() => router.push(`/company/${companySlug(co)}`)} style={{ width: '100%', textAlign: 'left', padding: '.7rem .9rem', borderBottom: '1px solid var(--line)', display: 'flex', alignItems: 'flex-start', gap: '.55rem', cursor: 'pointer', background: 'rgba(239,68,68,.04)', border: 'none' }}>
-                <span style={{ flexShrink: 0 }}>👻</span>
-                <span><span style={{ display: 'block', fontSize: '.72rem', fontWeight: 600, color: 'var(--red)' }}>{co} — ghost surge</span><span style={{ display: 'block', fontFamily: 'var(--mono)', fontSize: '.56rem', color: 'var(--muted)', marginTop: '.1rem' }}>3+ ghost reports this week · check before you follow up</span></span>
+              <button key={`surge-${co}`} type="button" className={styles.signal} onClick={() => router.push(`/company/${companySlug(co)}`)}>
+                <span>👻</span>
+                <span><b style={{ color: '#fca5a5' }}>{co}: ghost surge</b><small>3+ ghost reports this week. Check before you follow up.</small></span>
               </button>
             ))}
             {staleApps.slice(0, 3).map(a => {
               const days = Math.floor((Date.now() - a.appliedAt) / 86400000)
               return (
-                <button key={`stale-${a.id}`} onClick={() => router.push('/tracker')} style={{ width: '100%', textAlign: 'left', padding: '.7rem .9rem', borderBottom: '1px solid var(--line)', display: 'flex', alignItems: 'flex-start', gap: '.55rem', cursor: 'pointer', background: 'none', border: 'none' }}>
-                  <span style={{ color: 'var(--amber)', flexShrink: 0 }}>⚠</span>
-                  <span><span style={{ display: 'block', fontSize: '.72rem', fontWeight: 600, color: 'var(--white)' }}>{a.company} — {a.role}</span><span style={{ display: 'block', fontFamily: 'var(--mono)', fontSize: '.56rem', color: 'var(--muted)', marginTop: '.1rem' }}>{days}d no update · past expected window</span></span>
+                <button key={`stale-${a.id}`} type="button" className={styles.signal} onClick={() => router.push(`/tracker#app_${a.id}`)}>
+                  <span style={{ color: 'var(--amber)' }}>⚠</span>
+                  <span><b>{a.company} has been quiet for {days} days</b><small>Past its usual response window. Follow up or update the outcome.</small></span>
                 </button>
               )
             })}
-            {/* Subtle Pro upsell — a small locked row, not a huge CTA */}
             {!isPro && (
-              <button onClick={() => router.push('/pricing')} style={{ width: '100%', textAlign: 'left', padding: '.6rem .9rem', display: 'flex', alignItems: 'center', gap: '.55rem', cursor: 'pointer', background: 'none', border: 'none' }}>
-                <span style={{ flexShrink: 0, opacity: .7 }}>🔒</span>
-                <span style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', color: 'var(--muted)', flex: 1 }}>Ghost-surge email alerts before you apply</span>
-                <span style={{ fontFamily: 'var(--mono)', fontSize: '.56rem', color: 'var(--blue)', flexShrink: 0 }}>Pro →</span>
-              </button>
+              <Link href="/pricing" className={styles.lock}>
+                <span>🔒 Ghost-surge email alerts before you apply</span><span className={styles.link}>Pro →</span>
+              </Link>
+            )}
+          </section>
+        </div>
+
+        {/* ── Benchmarks (only once there is enough of your own data) ── */}
+        {benchmarks && (
+          <>
+            <div className={styles.secHead}>
+              <h2 className={styles.secT}>Career benchmarks</h2>
+              <span className={styles.eyebrow}>You vs reference averages</span>
+            </div>
+            <div className={styles.metrics}>
+              {benchmarks.metrics.map(m => (
+                <div key={m.lbl} className={styles.metric}>
+                  <span className={styles.eyebrow}>{m.lbl}</span>
+                  <b style={{ color: m.col }}>{m.val}</b>
+                  <small>{m.avg}</small>
+                </div>
+              ))}
+            </div>
+            <p className={styles.caption}>Based on {benchmarks.n} tracked applications. Treat small samples as directional.</p>
+          </>
+        )}
+
+        {/* ── Toolkit (the résumé status lives on its tile) ── */}
+        <div className={styles.secHead}>
+          <h2 className={styles.secT}>Your toolkit</h2>
+        </div>
+        <div className={styles.tools}>
+          <Link href="/resume" className={`${styles.tool} spot`}>
+            <span className={styles.sym}>🧠</span>
+            <b>Résumé AI</b>
+            <small>{hasResume ? `${profile?.resume_file_name || 'Résumé on file'} · Scan fit →` : 'Add your résumé →'}</small>
+          </Link>
+          <Link href="/tracker" className={`${styles.tool} spot`}>
+            <span className={styles.sym}>📋</span>
+            <b>Applications</b>
+            <small>{dueChecks.length ? `${dueChecks.length} check-in${dueChecks.length > 1 ? 's' : ''} waiting →` : 'Manage your pipeline →'}</small>
+          </Link>
+          <Link href="/companies" className={`${styles.tool} spot`}>
+            <span className={styles.sym}>🏢</span>
+            <b>Company intel</b>
+            <small>See who actually responds →</small>
+          </Link>
+          <Link href="/report" className={`${styles.tool} spot`}>
+            <span className={styles.sym}>📣</span>
+            <b>Report an outcome</b>
+            <small>Warn the next applicant →</small>
+          </Link>
+        </div>
+
+        {/* ── Quiet footer rows: recently checked + badges ── */}
+        {(recentCos.length > 0 || badges.length > 0) && (
+          <div className={styles.quiet}>
+            {recentCos.length > 0 && (
+              <div className={styles.quietRow}>
+                <span className={styles.eyebrow}>Recently checked</span>
+                <div className={styles.chips}>
+                  {recentCos.map((co, i) => <a key={i} href={`/company/${co.slug}`} className="dchip">{co.name}</a>)}
+                </div>
+              </div>
+            )}
+            {badges.length > 0 && (
+              <div className={styles.quietRow}>
+                <span className={styles.eyebrow}>Badges</span>
+                <div className={styles.chips}>
+                  {badges.map(b => <span key={b.id} className={styles.badgeChip} title={b.desc}>{b.icon} {b.label}</span>)}
+                </div>
+              </div>
             )}
           </div>
-        </section>
-
-        {/* ── G. Recently Checked Companies ──────────────────────── */}
-        {recentCos.length > 0 && (
-          <section>
-            <div className="dsec-head"><div className="dsec-title" style={{ fontSize: '.82rem' }}>Recently checked companies</div></div>
-            <div style={{ display: 'flex', gap: '.45rem', flexWrap: 'wrap' }}>
-              {recentCos.map((co, i) => (
-                <a key={i} href={`/company/${co.slug}`} className="dchip">{co.name}</a>
-              ))}
-            </div>
-          </section>
         )}
-
-        {/* ── H. Career Benchmarks ───────────────────────────────── */}
-        {benchmarks && (
-          <section>
-            <div className="dsec-head"><div className="dsec-title" style={{ fontSize: '.82rem' }}>Career benchmarks</div><span className="deyebrow">Based on {benchmarks.n} tracked app{benchmarks.n !== 1 ? 's' : ''} · vs industry avg</span></div>
-            <div className="dbench">
-              {benchmarks.metrics.map(m => (
-                <div key={m.lbl} className="dbench-c">
-                  <div style={{ fontFamily: 'var(--mono)', fontSize: '.5rem', textTransform: 'uppercase', letterSpacing: '.06em', color: 'var(--muted)', marginBottom: '.3rem' }}>{m.lbl}</div>
-                  <div style={{ fontFamily: 'var(--display)', fontSize: '1.35rem', fontWeight: 800, color: m.col, lineHeight: 1 }}>{m.val}</div>
-                  <div style={{ fontFamily: 'var(--mono)', fontSize: '.52rem', color: 'var(--dim)', marginTop: '.2rem' }}>Top {m.pct}% · {m.avg}</div>
-                </div>
-              ))}
-            </div>
-          </section>
-        )}
-
-        {/* ── I. Earned Badges ───────────────────────────────────── */}
-        {badges.length > 0 && (
-          <section>
-            <div className="dsec-head"><div className="dsec-title" style={{ fontSize: '.82rem' }}>Earned badges</div><span className="deyebrow">Your achievements</span></div>
-            <div style={{ display: 'flex', gap: '.5rem', flexWrap: 'wrap' }}>
-              {badges.map(b => (
-                <div key={b.id} style={{ background: 'var(--surface)', border: '1px solid var(--line2)', borderRadius: 10, padding: '.5rem .75rem', display: 'flex', alignItems: 'center', gap: '.45rem' }}>
-                  <span style={{ fontSize: '1rem' }}>{b.icon}</span>
-                  <div><div style={{ fontFamily: 'var(--display)', fontSize: '.7rem', fontWeight: 700, color: 'var(--white)', lineHeight: 1.2 }}>{b.label}</div><div style={{ fontFamily: 'var(--mono)', fontSize: '.5rem', color: 'var(--muted)' }}>{b.desc}</div></div>
-                </div>
-              ))}
-            </div>
-          </section>
-        )}
-
       </div>
     </div>
   )

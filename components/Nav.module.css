@@ -314,6 +314,10 @@
   .avatar:hover, .avatar:active { transform: none; }
 }
 @media (max-width: 480px) {
-  /* Keep the bar breathable on small phones — the drawer carries the full nav. */
+  /* Keep the bar breathable on small phones — the drawer carries the full nav. The full
+     "Unlimited · PRO" pill pushed the logo and the avatar off a 390px screen. */
   .chipLabel { display: none; }
+  .proLong { display: none; }
+  .right { gap: 0.35rem; }
+  .iconBtn { width: 32px; height: 32px; }
 }

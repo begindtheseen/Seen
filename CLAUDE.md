@@ -77,6 +77,13 @@ longer the design source of truth for redesigned pages. `SITE_PARITY_CHECKLIST.m
   seen:growth). `LandingMarketingSections` = 4 feature cards (grades, tracker check-ins, SeenFit,
   Agency Ghost Index) + final CTA. Gotcha hit here: never use `<nav>` inside page content —
   globals.css styles every `nav` element as the fixed site bar.
+- **Dashboard v2** (owner's second reference: "less clutter, less noise", look capable of 10k MRR):
+  `app/dashboard/page.tsx` render rewritten on `dashboard.module.css` — intro (hello + one primary
+  "+ Track application" → `/tracker?add=1`, which opens the add form) → row [health card with a
+  one-sentence verdict + 4 Odometer pills | next best move] → row [active pipeline | signals] →
+  benchmarks (only when enough data) → toolkit tiles (résumé status lives on its tile) → quiet
+  recently-checked/badges rows. All data logic unchanged. Settings/sign-out left the hero (the nav
+  account menu has them). Nav on ≤480px shows "★ PRO" (the long pill pushed logo + avatar off-screen).
 - **Tracker check-ins live on the application card** (owner request 2026-10-19). `EventStore.dueChecks`
   returns ONE check per application — the earliest unanswered in schedule order; a snoozed one holds
   the app back rather than letting a later check jump it. The old full-card stack above the list (and
