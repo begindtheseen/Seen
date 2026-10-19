@@ -9,6 +9,7 @@ import { aiHeaders } from '@/lib/aiHeaders'
 import { matchCities } from '@/lib/data/usCities'
 import { ResumeStore } from '@/lib/stores/ResumeStore'
 import { parseResumeFile } from '@/lib/resumeUploadClient'
+import PageHeader from '@/components/shell/PageHeader'
 
 const inp: React.CSSProperties = {
   width: '100%',
@@ -314,13 +315,7 @@ export default function ProfilePage() {
   return (
     <div className="page-full">
       <div style={{ maxWidth: 520, margin: '0 auto', padding: '2rem 1.25rem 4rem', width: '100%', boxSizing: 'border-box' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '.75rem', marginBottom: '2rem' }}>
-          <button onClick={() => router.push('/dashboard')} style={{ background: 'none', border: 'none', color: 'var(--muted)', cursor: 'pointer', fontSize: '1.1rem', padding: '.25rem', lineHeight: 1 }}>←</button>
-          <div>
-            <div style={{ fontFamily: 'var(--mono)', fontSize: '.6rem', color: 'var(--green)', textTransform: 'uppercase', letterSpacing: '.08em', marginBottom: '.2rem' }}>Account</div>
-            <h1 style={{ fontFamily: 'var(--display)', fontSize: '1.5rem', fontWeight: 800, color: 'var(--white)', letterSpacing: '-.03em' }}>Profile settings</h1>
-          </div>
-        </div>
+        <PageHeader eyebrow="Account" tone="green" title="Profile settings" crumbLabel="Profile" />
 
         {/* Basic info */}
         <div style={card}>

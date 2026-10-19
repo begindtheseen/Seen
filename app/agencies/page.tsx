@@ -5,6 +5,7 @@ import { publicDiscussionCountPath, parseExactCount, publicDiscussionShare } fro
 import { STAFFING_AGENCIES, type StaffingAgency } from '@/lib/agencies'
 import { pickActiveSponsor } from '@/lib/server/sponsorSlot'
 import { jsonLdHtml } from '@/lib/jsonLd'
+import PageHeader from '@/components/shell/PageHeader'
 
 // The Staffing Agency Ghost Index: a ranked, living page of major staffing agencies by
 // ghosting/transparency signals. Server component + ISR, reading cached scores DIRECTLY from
@@ -255,19 +256,18 @@ export default async function AgenciesPage() {
     <div className="page-full">
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLdHtml(jsonLd) }} />
       <div style={wrap}>
-        <div style={{ ...mono('.55rem', 'var(--blue)'), textTransform: 'uppercase', letterSpacing: '.2em', marginBottom: '.7rem', display: 'flex', alignItems: 'center', gap: 10 }}>
-          <span style={{ width: 20, height: 1, background: 'var(--blue)', display: 'inline-block' }} />
-          Live index · updates hourly
-        </div>
-        <h1 style={{ fontFamily: 'var(--display)', fontSize: 'clamp(1.7rem,5.5vw,2.5rem)', fontWeight: 800, color: 'var(--white)', letterSpacing: '-.03em', lineHeight: 1.08, margin: '0 0 .9rem' }}>
-          The Staffing Agency Ghost Index
-        </h1>
-        <p style={{ color: 'var(--sub)', fontSize: '.95rem', lineHeight: 1.75, fontWeight: 300, margin: '0 0 1.4rem' }}>
-          Staffing agencies are the highest-volume gatekeepers in hiring — and the most common source of &ldquo;the recruiter just disappeared&rdquo; stories. This index tracks {STAFFING_AGENCIES.length} major agencies by what applicants actually report: who replies, who ghosts, and how long it takes.
-          {totalReports > 0
-            ? ` It currently reflects ${totalReports.toLocaleString()} applicant-reported outcome${totalReports !== 1 ? 's' : ''}${totalPublic ? ` (${totalPublic.toLocaleString()} shared publicly in discussion threads or on review sites)` : ''} and grows with every new one.`
-            : ' No agency has applicant-reported outcomes on Seen yet — it grows with every report submitted.'}
-        </p>
+        <PageHeader
+          size="lg"
+          eyebrow="Live index · updates hourly"
+          title="The Staffing Agency Ghost Index"
+          crumbLabel="Agency Ghost Index"
+          sub={<>
+            Staffing agencies are the highest-volume gatekeepers in hiring — and the most common source of &ldquo;the recruiter just disappeared&rdquo; stories. This index tracks {STAFFING_AGENCIES.length} major agencies by what applicants actually report: who replies, who ghosts, and how long it takes.
+            {totalReports > 0
+              ? ` It currently reflects ${totalReports.toLocaleString()} applicant-reported outcome${totalReports !== 1 ? 's' : ''}${totalPublic ? ` (${totalPublic.toLocaleString()} shared publicly in discussion threads or on review sites)` : ''} and grows with every new one.`
+              : ' No agency has applicant-reported outcomes on Seen yet — it grows with every report submitted.'}
+          </>}
+        />
         <div style={{ display: 'flex', gap: '.6rem', flexWrap: 'wrap', margin: '0 0 2.6rem' }}>
           <Link href="/report?outcome=ghosted" className="btn" style={{ background: 'linear-gradient(135deg,var(--g-start),var(--g-mid),var(--g-end))', color: '#fff', padding: '.7rem 1.3rem', fontWeight: 800 }}>Ghosted by an agency? Report it →</Link>
           <Link href="/ghosted" className="btn btn-ghost" style={{ padding: '.7rem 1.3rem' }}>Why this index exists</Link>

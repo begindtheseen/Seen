@@ -15,6 +15,7 @@ import CompanyPublicRecord from '@/components/CompanyPublicRecord'
 import IndustryBenchmark, { type Benchmark } from '@/components/IndustryBenchmark'
 import Odometer from '@/components/motion/Odometer'
 import { isGradeableScore, notEnoughReviewsLabel, gradeBasisLabel, MIN_REPORTS_FOR_GRADE } from '@/lib/gradeGate'
+import { Crumbs } from '@/components/shell/PageHeader'
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -781,6 +782,8 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
   return (
     <div className="page-full">
       <div className="co-page">
+        {/* Where you are: Dashboard › Companies › {name} — the same trail every inner page carries. */}
+        <Crumbs items={[{ href: '/companies', label: 'Companies' }]} current={<span style={{ textTransform: 'capitalize' }}>{companyName}</span>} />
 
         {/* ── "You applied here" context strip ── */}
         {myApp && (

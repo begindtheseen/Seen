@@ -16,6 +16,7 @@ import MatchAnalysisPanel from '@/components/optimizer/MatchAnalysisPanel'
 import type { MatchAnalysis } from '@/lib/resume-intelligence/engine'
 import ErrorBoundary from '@/components/ErrorBoundary'
 import { MIN_REPORTS_FOR_GRADE } from '@/lib/gradeGate'
+import PageHeader from '@/components/shell/PageHeader'
 
 const ResumeSurveyModal = dynamic(() => import('@/components/ResumeSurveyModal'), { ssr: false })
 
@@ -733,16 +734,13 @@ function ResumePageInner() {
       {showUpgrade && <UpgradeModal reason={upgradeReason} featureName={upgradeFeature} onClose={() => setShowUpgrade(false)} />}
       {showSurvey && <ResumeSurveyModal onClose={() => setShowSurvey(false)} />}
       <div className="resume-page">
-        <div className="resume-hdr">
-          <div style={{ fontFamily: 'var(--mono)', fontSize: '.52rem', textTransform: 'uppercase', letterSpacing: '.22em', color: 'var(--blue)', marginBottom: '.6rem', display: 'flex', alignItems: 'center', gap: 12 }}>
-            <span style={{ width: 22, height: 1, background: 'var(--blue)', display: 'inline-block' }} />
-            Application Intelligence
-          </div>
-          <h1 style={{ fontFamily: 'var(--display)', fontSize: '2rem', fontWeight: 800, color: 'var(--white)', letterSpacing: '-.03em', marginBottom: '.3rem' }}>Win this application</h1>
-          <p style={{ color: 'var(--sub)', fontSize: '.85rem', fontWeight: 300 }}>
-            One résumé, one job — your fit score, safe rewrites, a human-sounding pass, and the strategy to get through, sharpened with Seen&apos;s data on how this company actually treats applicants.
-          </p>
-        </div>
+        <PageHeader
+          className="resume-hdr"
+          eyebrow="Application Intelligence"
+          title="Win this application"
+          crumbLabel="Résumé AI"
+          sub={<>One résumé, one job — your fit score, safe rewrites, a human-sounding pass, and the strategy to get through, sharpened with Seen&apos;s data on how this company actually treats applicants.</>}
+        />
 
         {error && (
           <div style={{ background: 'var(--rdim)', border: '1px solid rgba(239,68,68,0.25)', borderRadius: 8, padding: '.72rem 1rem', fontFamily: 'var(--mono)', fontSize: '.72rem', color: 'var(--red)', marginBottom: '1rem', overflowWrap: 'anywhere' }}>{error}</div>

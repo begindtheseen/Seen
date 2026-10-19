@@ -6,6 +6,9 @@ import Footer from '@/components/Footer'
 import { ToastHost } from '@/components/ToastHost'
 import MicroSurveyHost from '@/components/MicroSurveyHost'
 import MotionLayer from '@/components/motion/MotionLayer'
+import TabBar from '@/components/shell/TabBar'
+import CommandPalette from '@/components/shell/CommandPalette'
+import RouteProgress from '@/components/shell/RouteProgress'
 import './globals.css'
 import './motion.css'
 
@@ -71,9 +74,13 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <div className="aurora" aria-hidden="true">
             <div className="aurora-3" />
           </div>
+          {/* The connected shell: route progress hairline, nav, page, footer, phone tab bar, ⌘K palette. */}
+          <RouteProgress />
           <Nav />
           <div className="site-main">{children}</div>
           <Footer />
+          <TabBar />
+          <CommandPalette />
           <div id="toast" />
           <ToastHost />
           <MicroSurveyHost />

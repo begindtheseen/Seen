@@ -1,3 +1,5 @@
+import PageHeader from '@/components/shell/PageHeader'
+
 export default function FAQPage() {
   const sections = [
     {
@@ -89,16 +91,13 @@ export default function FAQPage() {
   return (
     <div className="page-full">
       <div style={{ maxWidth: 760, margin: '0 auto', padding: '4rem 2rem', width: '100%', boxSizing: 'border-box' }}>
-        <div style={{ fontFamily: 'var(--mono)', fontSize: '.52rem', textTransform: 'uppercase', letterSpacing: '.22em', color: 'var(--blue)', marginBottom: '.6rem', display: 'flex', alignItems: 'center', gap: 12 }}>
-          <span style={{ width: 22, height: 1, background: 'var(--blue)', display: 'inline-block' }} />
-          Help center
-        </div>
-        <h1 style={{ fontFamily: 'var(--display)', fontSize: '2rem', fontWeight: 800, color: 'var(--white)', letterSpacing: '-.03em', marginBottom: '.35rem' }}>
-          Frequently asked questions
-        </h1>
-        <p style={{ color: 'var(--sub)', fontSize: '.85rem', marginBottom: '3rem' }}>
-          Can&apos;t find what you need? Email <a href="mailto:hello@seenjobs.io" style={{ color: 'var(--blue)', textDecoration: 'none' }}>hello@seenjobs.io</a>
-        </p>
+        <PageHeader
+          eyebrow="Help center"
+          title="Frequently asked questions"
+          crumbLabel="FAQ"
+          sub={<>Can&apos;t find what you need? Email <a href="mailto:hello@seenjobs.io">hello@seenjobs.io</a></>}
+        />
+        <div style={{ height: '1.4rem' }} />
 
         {sections.map(section => (
           <div key={section.heading} style={{ marginBottom: '2.5rem' }}>

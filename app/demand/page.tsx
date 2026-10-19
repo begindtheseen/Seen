@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useMemo } from 'react'
+import PageHeader from '@/components/shell/PageHeader'
 
 interface DemandJob {
   t: string
@@ -207,16 +208,13 @@ export default function DemandPage() {
       <div className="demand-page">
         {/* Header */}
         <div className="demand-hdr">
-          <div style={{ fontFamily: 'var(--mono)', fontSize: '.52rem', textTransform: 'uppercase', letterSpacing: '.22em', color: 'var(--amber)', marginBottom: '.6rem', display: 'flex', alignItems: 'center', gap: 12 }}>
-            <span style={{ width: 22, height: 1, background: 'var(--amber)', display: 'inline-block' }} />
-            Job demand{blsPeriod ? ` · BLS ${blsPeriod}` : ''} + live Seen listings
-          </div>
-          <h1 style={{ fontFamily: 'var(--display)', fontSize: '2rem', fontWeight: 800, color: 'var(--white)', letterSpacing: '-.03em', marginBottom: '.28rem' }}>
-            Where jobs desperately need people
-          </h1>
-          <p style={{ color: 'var(--sub)', fontSize: '.82rem', fontWeight: 300, marginBottom: '1.5rem', maxWidth: 680 }}>
-            Two honest sources, labeled per card: <span style={{ color: 'var(--green)' }}>● LIVE</span> markets computed from real listings on Seen, and <span style={{ color: 'var(--blue)' }}>≈ MODELED</span> markets from the BLS blend. Search any city — if we don&apos;t have it, we generate it from live listings on the spot.
-          </p>
+          <PageHeader
+            eyebrow={<>Job demand{blsPeriod ? ` · BLS ${blsPeriod}` : ''} + live Seen listings</>}
+            tone="amber"
+            title="Where jobs desperately need people"
+            crumbLabel="Hiring demand"
+            sub={<>Two honest sources, labeled per card: <span style={{ color: 'var(--green)' }}>● LIVE</span> markets computed from real listings on Seen, and <span style={{ color: 'var(--blue)' }}>≈ MODELED</span> markets from the BLS blend. Search any city — if we don&apos;t have it, we generate it from live listings on the spot.</>}
+          />
 
           {/* Filters */}
           <div className="demand-filters">

@@ -113,6 +113,23 @@ longer the design source of truth for redesigned pages. `SITE_PARITY_CHECKLIST.m
   `document.scrollWidth` does NOT catch this class of bug; check per element (any non-fixed, non-decorative
   element with `getBoundingClientRect().right > clientWidth`) at 360/390/430 — verified clean on
   /dashboard, /, /tracker, /jobs, /companies, /company/amazon, /pricing.
+- **The connected shell (owner: "the whole site needs to feel connected… like one product"):** `components/shell/`.
+  `PageHeader` is THE header for every inner page (crumbs → eyebrow → title → sub → actions; `Crumbs` alone
+  on the company page above its hero) — the root crumb is Dashboard for signed-in seekers, Home otherwise,
+  so "back to the dashboard" is the same tap on every page. Used on tracker, companies, company, jobs,
+  résumé, report, saved, profile, feed, demand, agencies, faq; do NOT hand-roll a new page header.
+  `TabBar` = phone (≤768px) bottom tabs (Dashboard/Jobs/Track/Companies/Résumé; guests get
+  Home/Jobs/Companies/Pricing/Sign in), solid #0e111c, hidden on /employers /login /reset /admin, ducks while
+  a field is focused (`html.kb`), and sets `html.tabbar` which pads `.site-main`/`footer` and lifts the
+  legacy bottom `.toast` (globals.css next to `.site-main`). `CommandPalette` = ⌘K / Ctrl+K (pages, actions,
+  "Check “X”" → /company/slug, "Find “X” jobs", the user's tracked applications from `AppStore.loadSync()`,
+  recently checked companies from `seen_recent_cos`) + `g` then d/j/t/c/r/s/h jumps; opened by the nav's
+  "Jump to…" pill (desktop only) and the footer via `window.dispatchEvent(new Event('seen:palette'))`.
+  `RouteProgress` = 2px top hairline on internal link clicks that change the pathname (and on
+  `seen:nav-start`), completed by the pathname effect. Nav wordmark → /dashboard for signed-in seekers.
+  Footer is a real site map (Product / Intel / Company / Legal). Verified with Playwright
+  (`scratchpad/shell.mjs`: crumb click, g-t, Ctrl+K search/route, tab bar tap/duck, guest tabs, footer
+  clearance) + the per-element overflow check on 15 pages at 360/390/430.
 
 ## Session 2026-10-17: self-filling company pages read the Arctic Shift archive when Reddit refuses
 - Verified on prod: the first enrichment cron run (Sheetz) got `reddit_429` from www.reddit.com on

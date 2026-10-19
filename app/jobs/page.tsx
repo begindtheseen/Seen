@@ -18,6 +18,7 @@ import { notify } from '@/lib/notify'
 import { matchCities } from '@/lib/data/usCities'
 import { takesSeenApply } from '@/lib/seenApplyMode'
 import { useCompanySuggestions, CompanySuggestList, CompanyResultCard } from '@/components/jobs/CompanySuggest'
+import PageHeader from '@/components/shell/PageHeader'
 
 export default function JobsPage() {
   const router = useRouter()
@@ -99,12 +100,14 @@ export default function JobsPage() {
     <div className="page-full">
       <div className="jpage">
         <div className="jpage-hdr">
-          <div style={{ fontFamily: 'var(--mono)', fontSize: '.52rem', textTransform: 'uppercase', letterSpacing: '.22em', color: 'var(--green)', marginBottom: '.6rem', display: 'flex', alignItems: 'center', gap: 12 }}>
-            <span style={{ width: 22, height: 1, background: 'var(--green)', display: 'inline-block', flexShrink: 0 }} />
-            Job search · transparency-first
-          </div>
-          <h1>Open positions</h1>
-          <p>Sorted by transparency. Every listing shows waste risk, process score, and vibe tags — not just salary and location.</p>
+          <PageHeader
+            eyebrow="Job search · transparency-first"
+            tone="green"
+            title="Open positions"
+            crumbLabel="Jobs"
+            sub="Sorted by transparency. Every listing shows waste risk, process score, and vibe tags — not just salary and location."
+            className="jpage-head"
+          />
 
           {/* Search bar — job titles AND company names in the same box (CompanySuggest.tsx) */}
           <div style={{ display: 'flex', gap: '.5rem', marginTop: '1rem', flexWrap: 'wrap' }}>

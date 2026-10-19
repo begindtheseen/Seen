@@ -24,6 +24,8 @@ body{background:var(--ink);background-image:radial-gradient(ellipse at 30% 0%,rg
 /* Sticky-footer shell: page content fills the viewport so the footer always sits at the
    bottom with no dead scroll space, even on short pages. */
 .site-main{flex:1 0 auto;display:flex;flex-direction:column;width:100%;min-width:0}
+/* Phone tab bar (components/shell/TabBar) — pages and the footer leave room for it; the bottom toast rides above it. */
+@media(max-width:768px){html.tabbar .site-main{padding-bottom:calc(64px + env(safe-area-inset-bottom,0px))}html.tabbar footer{padding-bottom:calc(1.2rem + 64px + env(safe-area-inset-bottom,0px))!important}html.tabbar .toast{bottom:calc(80px + env(safe-area-inset-bottom,0px))}}
 
 @keyframes heroIn{from{opacity:0;transform:translateY(18px)}to{opacity:1;transform:translateY(0)}}
 @keyframes heroOut{from{opacity:1;transform:translateY(0)}to{opacity:0;transform:translateY(-14px)}}
@@ -371,6 +373,7 @@ nav.nav-scrolled{background:rgba(6,6,8,0.82);backdrop-filter:blur(60px) saturate
 /* ═══ JOBS PAGE ═══ */
 .jpage{max-width:1300px;margin:0 auto;padding:2.5rem 2rem;overflow-x:clip}
 .jpage-hdr{margin-bottom:1.75rem}
+.jpage-hdr .jpage-head{margin-bottom:.25rem}
 .jpage-hdr h1{font-family:var(--display);font-size:2rem;font-weight:800;color:var(--white);letter-spacing:-.03em;margin-bottom:.28rem}
 .jpage-hdr p{color:var(--sub);font-size:.82rem;font-weight:300}
 .jsb{display:flex;gap:.55rem;margin-bottom:1.35rem;flex-wrap:wrap}

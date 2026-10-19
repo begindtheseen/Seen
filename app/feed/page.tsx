@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { AppStore } from '@/lib/stores/AppStore'
 import { isPublicDiscussion, reportDate, reportSourceBadge, reportSourceLink } from '@/lib/reportSource'
 import ReportSourceLink from '@/components/ReportSourceLink'
+import PageHeader from '@/components/shell/PageHeader'
 
 type Filter = 'all' | 'ghosted' | 'rejected' | 'interviewing' | 'hired'
 
@@ -117,16 +118,12 @@ export default function FeedPage() {
   return (
     <div className="page-full">
       <div style={{ maxWidth: 720, margin: '0 auto', padding: '2rem 1.25rem', width: '100%', boxSizing: 'border-box' }}>
-        {/* Header */}
-        <div style={{ marginBottom: '1.5rem' }}>
-          <div className="eyebrow">Live feed</div>
-          <h1 style={{ fontFamily: 'var(--display)', fontSize: '1.75rem', fontWeight: 800, color: 'var(--white)', letterSpacing: '-.03em', marginBottom: '.35rem' }}>
-            Fresh from the community
-          </h1>
-          <p style={{ color: 'var(--sub)', fontSize: '.82rem', fontWeight: 300, margin: 0 }}>
-            Real experiences — every report shapes the score for that company.
-          </p>
-        </div>
+        <PageHeader
+          eyebrow="Live feed"
+          title="Fresh from the community"
+          crumbLabel="Live feed"
+          sub="Real experiences — every report shapes the score for that company."
+        />
 
         {/* CTA strip — old HTML order: report CTA comes first */}
         <div style={{ background: 'rgba(16,185,129,.06)', border: '1px solid rgba(16,185,129,.18)', borderRadius: 10, padding: '.75rem 1rem', marginBottom: '1.25rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '.75rem', flexWrap: 'wrap', cursor: 'pointer', transition: 'background .15s' }} onClick={() => window.location.href = '/report'}>

@@ -1,0 +1,44 @@
+/* Phone tab bar. Solid (#0e111c) — never translucent over content. */
+
+.bar {
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 560;
+  display: none;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  background: #0e111c;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  padding: 0.25rem 0.25rem calc(0.25rem + env(safe-area-inset-bottom, 0px));
+  box-shadow: 0 -10px 30px rgba(0, 0, 0, 0.45);
+  transition: transform 0.28s var(--ease-out);
+}
+@media (max-width: 768px) { .bar { display: grid; } }
+:global(html.kb) .bar { transform: translateY(110%); }
+
+.item {
+  display: flex; flex-direction: column; align-items: center; gap: 0.18rem;
+  padding: 0.35rem 0 0.3rem; min-width: 0;
+  color: var(--dim); text-decoration: none;
+  -webkit-tap-highlight-color: transparent;
+  transition: color 0.18s ease;
+}
+.ico {
+  display: grid; place-items: center;
+  width: 46px; height: 27px; border-radius: 999px;
+  transition: background 0.22s ease, box-shadow 0.22s ease, transform 0.3s var(--ease-spring);
+}
+.ico svg { width: 21px; height: 21px; }
+.item:active .ico { transform: scale(0.9); }
+.label {
+  font-family: var(--mono); font-size: 0.54rem; letter-spacing: 0.04em;
+  max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.on { color: #fff; }
+.on .ico {
+  background: rgba(99, 102, 241, 0.22);
+  box-shadow: inset 0 0 0 1px rgba(129, 140, 248, 0.35), 0 0 18px rgba(99, 102, 241, 0.2);
+}
+.on .label { color: #c7d2fe; }
+
+@media (prefers-reduced-motion: reduce) {
+  .bar, .item, .ico { transition: none; }
+  .item:active .ico { transform: none; }
+}

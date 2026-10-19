@@ -282,6 +282,24 @@
 .iconBtnActive { color: var(--white); border-color: var(--line2); background: rgba(255, 255, 255, 0.06); }
 .iconBtn svg { width: 17px; height: 17px; }
 
+/* ⌘K trigger — reads as a search field, acts as the palette opener. */
+.cmdk {
+  display: inline-flex; align-items: center; gap: 0.45rem;
+  height: 34px; padding: 0 0.55rem 0 0.65rem; border-radius: 9px;
+  border: 1px solid var(--line); background: rgba(255, 255, 255, 0.025);
+  color: var(--dim); font-family: var(--body); font-size: 0.76rem; cursor: pointer;
+  transition: color 0.15s ease, border-color 0.15s ease, background 0.15s ease;
+}
+.cmdk:hover { color: var(--sub); border-color: var(--line2); background: rgba(255, 255, 255, 0.05); }
+.cmdk svg { width: 15px; height: 15px; flex: none; }
+.cmdkLabel { white-space: nowrap; }
+.cmdkKey {
+  font-family: var(--mono); font-size: 0.56rem; letter-spacing: 0.04em; color: var(--sub);
+  border: 1px solid var(--line2); border-bottom-width: 2px; border-radius: 4px; padding: 0.08rem 0.32rem;
+}
+@media (max-width: 1024px) { .cmdkLabel { display: none; } .cmdk { padding: 0 0.5rem; } }
+@media (max-width: 768px) { .cmdk { display: none; } }
+
 /* Account avatar trigger. */
 .avatar {
   display: grid;

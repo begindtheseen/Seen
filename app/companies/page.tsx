@@ -7,6 +7,7 @@ import { AppStore } from '@/lib/stores/AppStore'
 import CompanyScoreModal from '@/components/CompanyScoreModal'
 import { firstPartyReportCount } from '@/lib/server/reportCounts'
 import { isGradeableScore, MIN_REPORTS_FOR_GRADE } from '@/lib/gradeGate'
+import PageHeader from '@/components/shell/PageHeader'
 
 interface Company {
   id: string
@@ -144,31 +145,12 @@ export default function CompaniesPage() {
     <div className="page-full">
       <div style={{ maxWidth: 960, margin: '0 auto', padding: '2.5rem 1.5rem', width: '100%', boxSizing: 'border-box' }}>
         <div style={{ marginBottom: '2rem' }}>
-          <div className="eyebrow">Transparency rankings</div>
-          <h1
-            style={{
-              fontFamily: 'var(--display)',
-              fontSize: '1.9rem',
-              fontWeight: 800,
-              color: 'var(--white)',
-              letterSpacing: '-.03em',
-              marginBottom: '.35rem',
-            }}
-          >
-            Company scoreboard
-          </h1>
-          <p
-            style={{
-              color: 'var(--sub)',
-              fontSize: '.82rem',
-              fontWeight: 300,
-              marginBottom: '1.5rem',
-            }}
-          >
-            Ranked by hiring transparency score. Ghost rate, response rate, and
-            process quality — all in one place. Only companies with at least{' '}
-            {MIN_REPORTS_FOR_GRADE} real reviews are graded.
-          </p>
+          <PageHeader
+            eyebrow="Transparency rankings"
+            title="Company scoreboard"
+            crumbLabel="Companies"
+            sub={<>Ranked by hiring transparency score. Ghost rate, response rate, and process quality — all in one place. Only companies with at least {MIN_REPORTS_FOR_GRADE} real reviews are graded.</>}
+          />
 
           {/* Hero company lookup */}
           <form
