@@ -85,6 +85,7 @@ function clearSessionLocalData() {
       if (k && SESSION_LOCAL_PREFIXES.some(p => k.startsWith(p))) localStorage.removeItem(k)
     }
   } catch { /* ignore */ }
+  try { sessionStorage.removeItem('seen_job_cache_v1') } catch { /* ignore */ } // JobCache is sessionStorage
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {

@@ -182,7 +182,7 @@ async function scoreFromDb(name: string): Promise<GrowthScore | null> {
       risk_level: gradeable ? (s >= 70 ? 'safe' : s >= 40 ? 'warn' : 'danger') : null,
       industry: row.industry || null,
       waste: gradeable ? row.waste_score ?? null : null,
-      summary: row.raw_summary || null,
+      summary: /^estimated baseline/i.test(String(row.raw_summary || '')) ? null : (row.raw_summary || null),
     }
   } catch {
     return null
@@ -197,10 +197,14 @@ async function leaderboardFromDb(by: 'fused' | 'first_party' = 'fused'): Promise
   const creds = sbCreds()
   if (!creds) return []
   const headers = { apikey: creds.key, Authorization: `Bearer ${creds.key}` }
-  const order = by === 'first_party' ? 'first_party_report_count.desc.nullslast,report_count.desc' : 'report_count.desc'
+  // Only ≥1-real-report rows can be gradeable, and the gate runs after the 150 cap — so the slots must
+  // be filled from those (same fix as api/reports.js leaderboard). `by` is kept for callers; both
+  // orderings now start from first-party counts.
+  void by
+  const order = 'first_party_report_count.desc.nullslast,report_count.desc'
   try {
     const r = await fetch(
-      `${creds.url}/rest/v1/company_scores?select=${LEADERBOARD_SELECT}${await mentionSel(creds.url, { apikey: creds.key, Authorization: `Bearer ${creds.key}` })}&order=${order}&limit=150`,
+      `${creds.url}/rest/v1/company_scores?select=${LEADERBOARD_SELECT}${await mentionSel(creds.url, { apikey: creds.key, Authorization: `Bearer ${creds.key}` })}&first_party_report_count=gte.1&order=${order}&limit=150`,
       { headers, signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) },
     )
     if (!r.ok) return []

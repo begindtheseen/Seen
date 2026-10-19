@@ -202,10 +202,12 @@ async function handleGet(req, res) {
     // Freshness meta, surfaced instead of hidden: the last refresh-log entry (the July 2026
     // cron miss was invisible because this log was write-only) + an explicit stale flag when
     // the BLS blend is older than ~2 monthly cycles.
+    // demand_refresh_log is service_role-only (migration 003) — the anon key read it as null forever.
     let lastRefresh = null;
+    const LOG_KEY = process.env.SUPABASE_SERVICE_KEY || SUPABASE_ANON;
     try {
       const lr = await fetch(`${SUPABASE_URL}/rest/v1/demand_refresh_log?select=status,bls_period,created_at&order=created_at.desc&limit=1`, {
-        headers: { apikey: SUPABASE_ANON, Authorization: `Bearer ${SUPABASE_ANON}` },
+        headers: { apikey: LOG_KEY, Authorization: `Bearer ${LOG_KEY}` },
       });
       if (lr.ok) lastRefresh = (await lr.json())?.[0] || null;
     } catch (_e) {}

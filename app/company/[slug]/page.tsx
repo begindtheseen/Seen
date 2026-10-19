@@ -15,6 +15,7 @@ import CompanyPublicRecord from '@/components/CompanyPublicRecord'
 import IndustryBenchmark, { type Benchmark } from '@/components/IndustryBenchmark'
 import Odometer from '@/components/motion/Odometer'
 import { isGradeableScore, notEnoughReviewsLabel, gradeBasisLabel, MIN_REPORTS_FOR_GRADE } from '@/lib/gradeGate'
+import { Crumbs } from '@/components/shell/PageHeader'
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -186,16 +187,21 @@ function VibeTagList({ sc }: { sc: CompanyScore }) {
   )
 }
 
-function HiringFunnel({ sc }: { sc: CompanyScore }) {
-  const rsp = ratePct(sc.response_rate) ?? 0
-  const rgp = ratePct(sc.ghost_rate) ?? 0
-  const viewedPct = Math.min(100, Math.round((Math.min(1, Math.max(0, sc.response_rate || 0)) * 1.8) * 100))
-  const stages = [
-    { label: 'Applied',   pct: 100,      color: 'var(--sub, #888)'     },
-    { label: 'Viewed',    pct: Math.min(100, viewedPct), color: 'var(--blue)'  },
-    { label: 'Responded', pct: rsp,      color: 'var(--amber)'          },
-    { label: 'Ghosted',   pct: rgp,      color: 'var(--red)',  note: '← most here' },
-  ]
+/** Ghost stages named in the ghosted reports: [{ label, n, pct }] sorted by count. Empty when none named one. */
+function ghostStageRows(reports: Report[]): Array<{ label: string; n: number; pct: number }> {
+  const counts: Record<string, number> = {}
+  for (const r of reports) {
+    if (r.outcome !== 'ghosted' || !r.ghost_stage) continue
+    const k = String(r.ghost_stage).replace(/_/g, ' ').trim().toLowerCase()
+    if (k) counts[k] = (counts[k] || 0) + 1
+  }
+  const total = Object.values(counts).reduce((a, b) => a + b, 0)
+  return Object.entries(counts).sort((a, b) => b[1] - a[1]).map(([label, n]) => ({ label: label.charAt(0).toUpperCase() + label.slice(1), n, pct: Math.round((n / total) * 100) }))
+}
+
+function HiringFunnel({ rows }: { rows: Array<{ label: string; n: number; pct: number }> }) {
+  const palette = ['var(--red)', 'var(--amber)', 'var(--blue)', 'var(--sub, #888)', 'var(--dim)']
+  const stages = rows.slice(0, 5).map((r, i) => ({ label: r.label, pct: r.pct, color: palette[i] || 'var(--dim)', note: i === 0 ? '← most here' : undefined }))
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '.55rem' }}>
       {stages.map(s => (
@@ -440,7 +446,6 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
   // Approved employer replies to reports, keyed by report id (Wave 2). Display-only employer voice,
   // never a score input — clearly labeled as the employer's claim.
   const [employerReplies, setEmployerReplies] = useState<Record<string, { body: string; created_at: string }>>({})
-  const [viewers, setViewers] = useState(0)
   const [perk, setPerk] = useState<{ featured: boolean; verified: boolean }>({ featured: false, verified: false })
   useEffect(() => {
     let alive = true
@@ -512,12 +517,8 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
     } catch {}
   }, [slug])
 
-  // T3-9: Stable per-session viewer count (consistent for same company + day)
-  useEffect(() => {
-    const day = Math.floor(Date.now() / 86400000)
-    const hash = [...(slug + day)].reduce((h, c) => (h * 31 + c.charCodeAt(0)) & 0xffff, 0)
-    setViewers((hash % 22) + 5)
-  }, [slug])
+  // (The "N Seen users checked this week" line was a hash of the slug + day, not data. Removed —
+  // Seen shows no visitor counts it does not have.)
 
   // T3-7: Record this company visit in localStorage for dashboard "Recently checked"
   useEffect(() => {
@@ -781,6 +782,8 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
   return (
     <div className="page-full">
       <div className="co-page">
+        {/* Where you are: Dashboard › Companies › {name} — the same trail every inner page carries. */}
+        <Crumbs items={[{ href: '/companies', label: 'Companies' }]} current={<span style={{ textTransform: 'capitalize' }}>{companyName}</span>} />
 
         {/* ── "You applied here" context strip ── */}
         {myApp && (
@@ -837,7 +840,6 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
               </div>
               <div className="co-ind">
                 {industry ? <span>{industry}</span> : null}
-                {viewers > 0 && <span className="co-viewers"><span className="co-dot" />{viewers} Seen users checked this week</span>}
               </div>
             </div>
           </div>
@@ -999,13 +1001,14 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
                       <span>Avg timeline</span><b>{score.avg_wait_days != null ? `${score.avg_wait_days} days` : '—'}</b>
                     </div>
                   </div>
+                  {(() => { const rows = ghostStageRows(hiringReports); const n = rows.reduce((a, r) => a + r.n, 0); return rows.length > 0 && (
                   <div className="co-card">
                     <div className="co-sec-lbl" style={{ marginBottom: '.85rem' }}>Where they ghost</div>
-                    <HiringFunnel sc={score} />
-                    <div style={{ marginTop: '.85rem', fontFamily: 'var(--mono)', fontSize: '.58rem', color: 'var(--green)', lineHeight: 1.5 }}>
-                      Exclusive to Seen — no other job board tracks which stage companies ghost at.
+                    <HiringFunnel rows={rows} />
+                    <div style={{ marginTop: '.85rem', fontFamily: 'var(--mono)', fontSize: '.58rem', color: 'var(--dim)', lineHeight: 1.5 }}>
+                      Share of the {n} ghosted report{n !== 1 ? 's' : ''} that named the stage where contact stopped.
                     </div>
-                  </div>
+                  </div>) })()}
                 </div>
                 <OutcomeDistribution reports={hiringReports} />
               </Section>
@@ -1025,7 +1028,7 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
                             thirdPartyN > 0 ? `${thirdPartyN} found in public discussions (reduced weight)` : '',
                             employeeN > 0 ? `${employeeN} employee review${employeeN !== 1 ? 's' : ''} (shown, not counted in the hiring grade)` : '',
                           ].filter(Boolean).join(' · ')
-                        : `${reports.length} report${reports.length !== 1 ? 's' : ''} from real applicants · anonymous · verified`)
+                        : `${reports.length} report${reports.length !== 1 ? 's' : ''} submitted to Seen · anonymous applicant claims`)
                     : 'Reports are anonymous claims, labeled by source and weighted by trust.'}
                 </div>
                 <input
@@ -1100,7 +1103,7 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
 
             {webReviews.length > 0 && (
               <Section id="online" icon="💬" title="What applicants say online" count={webReviews.length} open={open.online} onToggle={toggle}
-                summary="AI-summarized insights from Reddit, Glassdoor & Blind · refreshed every 30 days">
+                summary="AI-summarized insights from public reviews and discussions · refreshed when the score is rebuilt">
                 <WebReviewsSection reviews={webReviews} />
               </Section>
             )}

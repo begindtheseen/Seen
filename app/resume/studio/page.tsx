@@ -17,13 +17,14 @@ import HealthPanel from '@/components/resume/HealthPanel'
 import TailorPanel, { type TailorJob } from '@/components/resume/TailorPanel'
 import ExportPanel from '@/components/resume/ExportPanel'
 import UpgradeModal from '@/components/UpgradeModal'
+import PageHeader from '@/components/shell/PageHeader'
 import { useAuth } from '@/lib/auth'
 import { aiHeaders } from '@/lib/aiHeaders'
 import { ResumeStore } from '@/lib/stores/ResumeStore'
 import { ResumeDocStore, type StoredVariant } from '@/lib/stores/ResumeDocStore'
 import { SavedJobsStore } from '@/lib/stores/SavedJobs'
 import { parseResumeFile } from '@/lib/resumeUploadClient'
-import { parseResume, scoreResume, serializeToText, rewriteDoc, rewriteBullet, emptyDoc, normalizeDoc, docStats, newId } from '@/lib/resume/engine-client'
+import { parseResume, scoreResume, serializeToText, rewriteDoc, emptyDoc, normalizeDoc, docStats, newId } from '@/lib/resume/engine-client'
 import type { ResumeDoc, Health } from '@/lib/resume/types'
 import type { SavedJob } from '@/lib/types'
 import { showToast } from '@/lib/toast'
@@ -218,13 +219,14 @@ function StudioInner() {
     <div className="page-full">
       {showUpgrade && <UpgradeModal reason={showUpgrade} featureName={showUpgrade === 'pro' ? 'AI polish' : undefined} onClose={() => setShowUpgrade(null)} />}
       <div className={s.wrap}>
-        <div className={s.top}>
-          <div style={{ minWidth: 0 }}>
-            <div className={s.kicker}>Résumé Studio</div>
-            <h1 className={s.h1}>{doc ? (doc.basics.name || 'Your résumé') : 'Build a résumé parsers read and recruiters remember'}</h1>
-            <p className={s.sub}>Score it, fix every weak bullet without inventing a word, tailor it to a job from your own facts, then export it in a template any ATS can parse.</p>
-          </div>
-          {doc && (
+        <PageHeader
+          eyebrow="Résumé Studio"
+          title={doc ? (doc.basics.name || 'Your résumé') : 'Build a résumé parsers read and recruiters remember'}
+          crumbLabel="Résumé Studio"
+          crumbs={[{ href: '/resume', label: 'Résumé AI' }]}
+          tone="indigo"
+          sub="Score it, fix every weak bullet without inventing a word, tailor it to a job from your own facts, then export it in a template any ATS can parse."
+          actions={doc ? (
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '.45rem', minWidth: 0 }}>
               <div className={s.src}>
                 {active ? <strong>Tailored · {active.label}</strong> : <strong>Base résumé</strong>}
@@ -239,8 +241,8 @@ function StudioInner() {
                 <button type="button" className={`${s.btn} ${s.btnDanger}`} onClick={clearAll}>Clear</button>
               </div>
             </div>
-          )}
-        </div>
+          ) : undefined}
+        />
         <input ref={fileRef} type="file" accept=".pdf,.doc,.docx,.txt,.md,text/plain" style={{ display: 'none' }} onChange={(e) => { const f = e.target.files?.[0]; if (f) uploadFile(f); e.target.value = '' }} />
 
         {error && <div className={s.err}>{error}</div>}
@@ -327,6 +329,3 @@ export default function StudioPage() {
     </Suspense>
   )
 }
-
-// keep the single-bullet rewrite available for future inline use without a second import path
-export { rewriteBullet as _rewriteBullet }

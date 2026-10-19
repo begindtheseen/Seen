@@ -13,7 +13,7 @@ const FEATURES = [
     href: '/companies',
     tag: 'Company intel',
     title: 'Ghost rates and grades',
-    desc: 'Every company gets a ghost rate, response time and grade from applicant outcomes. No grade until there are at least five reports, and estimates are labeled as estimates.',
+    desc: 'Every company gets a ghost rate, response time and grade from applicant outcomes. No grade until there is enough evidence — at least one report to Seen and five pieces in total — and estimates are labeled as estimates.',
     icon: (
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
         <path d="M9 10h.01M15 10h.01" />
@@ -49,7 +49,7 @@ const FEATURES = [
     href: '/agencies',
     tag: 'Agency index',
     title: 'Which staffing agencies ghost',
-    desc: 'Robert Half, Aerotek, Insight Global and more, ranked by applicant-reported ghost and response rates. No reports, no number.',
+    desc: 'Insight Global, Randstad, Addison Group and more, ranked by applicant-reported ghost and response rates. No reports, no number.',
     icon: (
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
         <path d="M3 21h18M5 21V7l7-4 7 4v14" />

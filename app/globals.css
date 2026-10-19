@@ -24,6 +24,8 @@ body{background:var(--ink);background-image:radial-gradient(ellipse at 30% 0%,rg
 /* Sticky-footer shell: page content fills the viewport so the footer always sits at the
    bottom with no dead scroll space, even on short pages. */
 .site-main{flex:1 0 auto;display:flex;flex-direction:column;width:100%;min-width:0}
+/* Phone tab bar (components/shell/TabBar) — pages and the footer leave room for it; the bottom toast rides above it. */
+@media(max-width:768px){html.tabbar .site-main{padding-bottom:calc(64px + env(safe-area-inset-bottom,0px))}html.tabbar footer{padding-bottom:calc(1.2rem + 64px + env(safe-area-inset-bottom,0px))!important}html.tabbar .toast{bottom:calc(80px + env(safe-area-inset-bottom,0px))}}
 
 @keyframes heroIn{from{opacity:0;transform:translateY(18px)}to{opacity:1;transform:translateY(0)}}
 @keyframes heroOut{from{opacity:1;transform:translateY(0)}to{opacity:0;transform:translateY(-14px)}}
@@ -371,6 +373,7 @@ nav.nav-scrolled{background:rgba(6,6,8,0.82);backdrop-filter:blur(60px) saturate
 /* ═══ JOBS PAGE ═══ */
 .jpage{max-width:1300px;margin:0 auto;padding:2.5rem 2rem;overflow-x:clip}
 .jpage-hdr{margin-bottom:1.75rem}
+.jpage-hdr .jpage-head{margin-bottom:.25rem}
 .jpage-hdr h1{font-family:var(--display);font-size:2rem;font-weight:800;color:var(--white);letter-spacing:-.03em;margin-bottom:.28rem}
 .jpage-hdr p{color:var(--sub);font-size:.82rem;font-weight:300}
 .jsb{display:flex;gap:.55rem;margin-bottom:1.35rem;flex-wrap:wrap}
@@ -575,8 +578,6 @@ select.fi,select.fs,select.fi-r,select.fs-r{background-image:url("data:image/svg
 .co-badge-verified{color:var(--blue);background:rgba(59,130,246,.12);border:1px solid rgba(59,130,246,.4)}
 .co-badge-featured{color:#f7c948;background:rgba(247,201,72,.12);border:1px solid rgba(247,201,72,.4)}
 .co-ind{display:flex;align-items:center;gap:.4rem .9rem;flex-wrap:wrap}
-.co-viewers{display:inline-flex;align-items:center;gap:.3rem;color:var(--dim)}
-.co-dot{width:5px;height:5px;border-radius:50%;background:var(--green);display:inline-block;animation:pulse 1.5s ease infinite}
 .co-verdict{font-family:var(--body);font-size:.92rem;line-height:1.45;color:var(--text);margin:.45rem 0 .5rem;font-weight:400}
 .co-grade-meta{display:flex;align-items:center;gap:.4rem .9rem;flex-wrap:wrap}
 .co-dq{font-family:var(--mono);font-size:.58rem;font-weight:600;display:inline-flex;align-items:center;gap:.3rem}
@@ -783,7 +784,8 @@ select.fi,select.fs,select.fi-r,select.fs-r{background-image:url("data:image/svg
 
 /* Stage pipeline */
 .stage-pipe{display:flex;align-items:center;gap:0;margin-bottom:.85rem;flex-wrap:nowrap;overflow:hidden;border-radius:6px;border:1px solid var(--line2)}
-.stage-step{flex:1;padding:.32rem .2rem;text-align:center;font-family:var(--mono);font-size:.52rem;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);background:var(--raised);transition:all .2s;white-space:nowrap;border-right:1px solid var(--line2);cursor:default}
+.stage-step{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;padding:.32rem .2rem;text-align:center;font-family:var(--mono);font-size:.52rem;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);background:var(--raised);transition:all .2s;white-space:nowrap;border-right:1px solid var(--line2);cursor:default}
+@media(max-width:400px){.stage-step{letter-spacing:.02em;padding:.32rem .12rem;font-size:.5rem}}
 .stage-step:last-child{border-right:none}
 .stage-step.done{background:var(--gdim);color:var(--green)}
 .stage-step.current{background:var(--blue);color:#fff;font-weight:700}

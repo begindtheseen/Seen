@@ -10,7 +10,7 @@
 .sub { margin: 0.9rem auto 0; color: var(--sub); font-size: clamp(0.95rem, 2vw, 1.05rem); line-height: 1.6; }
 
 .grid { display: grid; grid-template-columns: 1fr; gap: 0.9rem; }
-@media (min-width: 680px) { .grid { grid-template-columns: 1fr 1fr; } }
+@media (min-width: 680px) { .grid { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); } }
 /* Reveal wrappers stretch so the cards in a row keep equal heights. */
 .grid > * { display: flex; }
 .grid > * > * { flex: 1; }

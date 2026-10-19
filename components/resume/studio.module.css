@@ -1,10 +1,5 @@
 /* Résumé Studio — editor + panels. Tokens from globals.css; motion from motion.css (fadeUp). */
 .wrap { max-width: 1240px; width: 100%; margin: 0 auto; padding: 2rem 2rem 3rem; box-sizing: border-box; min-width: 0; }
-.top { display: flex; align-items: flex-end; justify-content: space-between; gap: 1rem; flex-wrap: wrap; margin-bottom: 1.25rem; }
-.kicker { font-family: var(--mono); font-size: .52rem; text-transform: uppercase; letter-spacing: .22em; color: var(--blue); margin-bottom: .5rem; display: flex; align-items: center; gap: 12px; }
-.kicker::before { content: ''; width: 22px; height: 1px; background: var(--blue); display: inline-block; }
-.h1 { font-family: var(--display); font-size: 1.9rem; font-weight: 800; color: var(--white); letter-spacing: -.03em; margin: 0 0 .25rem; }
-.sub { color: var(--sub); font-size: .82rem; font-weight: 300; margin: 0; max-width: 60ch; }
 .src { display: flex; align-items: center; gap: .5rem; flex-wrap: wrap; font-family: var(--mono); font-size: .62rem; color: var(--sub); }
 .src strong { color: var(--green); font-weight: 600; }
 .btn { background: none; border: 1px solid var(--line2); color: var(--sub); border-radius: 8px; padding: .45rem .8rem; font-family: var(--mono); font-size: .64rem; cursor: pointer; transition: border-color .15s, color .15s; white-space: nowrap; }
@@ -130,7 +125,6 @@
   .wrap { padding: 1.3rem .9rem 2.5rem; }
   .seg { flex-wrap: wrap; overflow-x: visible; }
   .segBtn { flex: 1 1 auto; text-align: center; }
-  .h1 { font-size: 1.5rem; }
   .tpls { grid-template-columns: 1fr; }
   .preview { display: none; }
 }

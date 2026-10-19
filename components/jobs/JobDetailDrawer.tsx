@@ -261,7 +261,7 @@ export default function JobDetailDrawer({ job, isLoggedIn, onClose, onApply, onC
           {/* Report experience */}
           <div style={{ background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 12, padding: '1rem', marginBottom: '1rem' }}>
             <div style={{ fontFamily: 'var(--display)', fontSize: '.82rem', fontWeight: 700, color: 'var(--white)', marginBottom: '.22rem' }}>Report your experience</div>
-            <p style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', color: 'var(--sub)', marginBottom: '.75rem', lineHeight: 1.6 }}>Applied here? 60 seconds helps thousands of job seekers.</p>
+            <p style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', color: 'var(--sub)', marginBottom: '.75rem', lineHeight: 1.6 }}>Applied here? 60 seconds warns the next applicant.</p>
             <div style={{ display: 'flex', gap: '.35rem', flexWrap: 'wrap' }}>
               {([
                 { label: '👻 Ghosted',   outcome: 'ghosted',      bg: 'rgba(239,68,68,0.1)',    border: 'rgba(239,68,68,0.3)',    color: 'var(--red)'   },

@@ -48,7 +48,7 @@ export default function JobCard({ job, index, onSaveToggle, onOpen, onApply, onC
   const [saved, setSaved] = useState(() => SavedJobsStore.isSaved(job.id))
   const [reportedInactive, setReportedInactive] = useState(false)
   const [reportingInactive, setReportingInactive] = useState(false)
-  const { user } = useAuth()
+  const { user, isLoggedIn } = useAuth()
   const logoLetter = (job.company || '?')[0].toUpperCase()
 
   async function reportInactive(e: React.MouseEvent) {
@@ -83,11 +83,11 @@ export default function JobCard({ job, index, onSaveToggle, onOpen, onApply, onC
   function toggleSave(e: React.MouseEvent) {
     e.stopPropagation()
     if (saved) {
-      SavedJobsStore.remove(job.id, false)
+      SavedJobsStore.remove(job.id, isLoggedIn)
       setSaved(false)
       notify({ title: 'Removed from saved', sub: `${job.title} · ${job.company}`, severity: 'info', duration: 2600 })
     } else {
-      SavedJobsStore.save(job, false)
+      SavedJobsStore.save(job, isLoggedIn)
       setSaved(true)
       notify({ title: 'Saved to your list', sub: `${job.title} · ${job.company}`, severity: 'success', duration: 2600 })
     }

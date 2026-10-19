@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useMemo } from 'react'
+import PageHeader from '@/components/shell/PageHeader'
 
 interface DemandJob {
   t: string
@@ -119,6 +120,7 @@ export default function DemandPage() {
   const [data, setData] = useState<DemandCity[] | null>(null)
   const [loadFailed, setLoadFailed] = useState(false)
   const [blsPeriod, setBlsPeriod] = useState<string | null>(null)
+  const [fresh, setFresh] = useState<{ stale: boolean; updatedAt: string | null; lastRefresh: { status?: string; created_at?: string } | null }>({ stale: false, updatedAt: null, lastRefresh: null })
   const [locFilter, setLocFilter] = useState('')
   const [nicheFilter, setNicheFilter] = useState('')
   const [expFilter, setExpFilter] = useState('')
@@ -130,9 +132,10 @@ export default function DemandPage() {
   useEffect(() => {
     fetch('/api/demand')
       .then(r => r.json())
-      .then((d: { demand?: DemandCity[]; bls_period?: string }) => {
+      .then((d: { demand?: DemandCity[]; bls_period?: string; bls_stale?: boolean; generated_at?: string; last_refresh?: { status?: string; created_at?: string } | null }) => {
         setData(d.demand ?? [])
         setBlsPeriod(d.bls_period || null)
+        setFresh({ stale: !!d.bls_stale, updatedAt: d.generated_at || null, lastRefresh: d.last_refresh || null })
       })
       .catch(() => { setData([]); setLoadFailed(true) })
   }, [])
@@ -207,16 +210,13 @@ export default function DemandPage() {
       <div className="demand-page">
         {/* Header */}
         <div className="demand-hdr">
-          <div style={{ fontFamily: 'var(--mono)', fontSize: '.52rem', textTransform: 'uppercase', letterSpacing: '.22em', color: 'var(--amber)', marginBottom: '.6rem', display: 'flex', alignItems: 'center', gap: 12 }}>
-            <span style={{ width: 22, height: 1, background: 'var(--amber)', display: 'inline-block' }} />
-            Job demand{blsPeriod ? ` · BLS ${blsPeriod}` : ''} + live Seen listings
-          </div>
-          <h1 style={{ fontFamily: 'var(--display)', fontSize: '2rem', fontWeight: 800, color: 'var(--white)', letterSpacing: '-.03em', marginBottom: '.28rem' }}>
-            Where jobs desperately need people
-          </h1>
-          <p style={{ color: 'var(--sub)', fontSize: '.82rem', fontWeight: 300, marginBottom: '1.5rem', maxWidth: 680 }}>
-            Two honest sources, labeled per card: <span style={{ color: 'var(--green)' }}>● LIVE</span> markets computed from real listings on Seen, and <span style={{ color: 'var(--blue)' }}>≈ MODELED</span> markets from the BLS blend. Search any city — if we don&apos;t have it, we generate it from live listings on the spot.
-          </p>
+          <PageHeader
+            eyebrow={<>Job demand{blsPeriod ? ` · BLS ${blsPeriod}` : ''}{(data ?? []).some(c => c.kind === 'live') ? ' + live Seen listings' : ' · modeled'}</>}
+            tone="amber"
+            title="Where jobs desperately need people"
+            crumbLabel="Hiring demand"
+            sub={<>Two honest sources, labeled per card: <span style={{ color: 'var(--green)' }}>● LIVE</span> markets computed from real listings on Seen, and <span style={{ color: 'var(--blue)' }}>≈ MODELED</span> markets from the BLS blend. Search any city — if we don&apos;t have it, we generate it from live listings on the spot.</>}
+          />
 
           {/* Filters */}
           <div className="demand-filters">
@@ -252,12 +252,20 @@ export default function DemandPage() {
           </div>
         </div>
 
-        {/* Stats row */}
+        {/* Freshness, said out loud: the BLS blend is refreshed monthly by cron; when that has not
+            happened for 65+ days the data is stale and the page says so instead of hiding it. */}
+        {fresh.stale && (
+          <div style={{ background: 'rgba(245,158,11,.08)', border: '1px solid rgba(245,158,11,.3)', borderRadius: 10, padding: '.65rem 1rem', marginBottom: '1rem', fontFamily: 'var(--mono)', fontSize: '.62rem', color: 'var(--amber)', lineHeight: 1.6 }}>
+            ⚠ Modeled figures last refreshed {fresh.updatedAt ? relAgo(fresh.updatedAt) : 'a while ago'}{blsPeriod ? ` (BLS ${blsPeriod})` : ''}. Treat them as a vintage, not a live reading.
+          </div>
+        )}
+        {/* Stats row — "~" whenever any city is modeled: these totals are estimates, not counted listings. */}
+        {(() => { const modeled = filtered.some(c => c.kind !== 'live'); const t = (n: string) => (modeled ? `~${n}` : n); return (
         <div className="demand-stat-row">
           {[
-            { n: stats.total.toLocaleString(), l: 'Total openings tracked' },
+            { n: t(stats.total.toLocaleString()), l: modeled ? 'Openings (modeled)' : 'Openings tracked' },
             { n: stats.cities, l: 'Markets' },
-            { n: stats.entryLevel.toLocaleString(), l: 'Entry-level jobs' },
+            { n: t(stats.entryLevel.toLocaleString()), l: modeled ? 'Entry-level (modeled)' : 'Entry-level jobs' },
             { n: `${stats.avgDI}/100`, l: 'Avg demand index' },
           ].map((s, i) => (
             <div key={i} className="dsr">
@@ -266,6 +274,7 @@ export default function DemandPage() {
             </div>
           ))}
         </div>
+        ) })()}
 
         {/* City grid */}
         {data === null ? (
