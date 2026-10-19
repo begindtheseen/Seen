@@ -10,20 +10,7 @@ import { matchCities } from '@/lib/data/usCities'
 import { ResumeStore } from '@/lib/stores/ResumeStore'
 import { parseResumeFile } from '@/lib/resumeUploadClient'
 import PageHeader from '@/components/shell/PageHeader'
-
-const inp: React.CSSProperties = {
-  width: '100%',
-  background: 'var(--raised, var(--surface))',
-  border: '1.5px solid var(--line2)',
-  borderRadius: 8,
-  padding: '.7rem 1rem',
-  color: 'var(--white)',
-  fontFamily: 'var(--body)',
-  fontSize: '.875rem',
-  outline: 'none',
-  caretColor: 'var(--green)',
-  boxSizing: 'border-box',
-}
+import styles from './profile.module.css'
 
 // Per-user profile cache (keyed by user id → NO cross-user bleed on shared devices) so the
 // fields render instantly on every revisit instead of loading from scratch each time.
@@ -35,45 +22,6 @@ function readProfileCache(uid?: string): CachedProfile | null {
 function writeProfileCache(uid: string | undefined, p: CachedProfile) {
   if (!uid || typeof window === 'undefined') return
   try { localStorage.setItem(`seen_profile_v2_${uid}`, JSON.stringify(p)) } catch { /* quota — ignore */ }
-}
-
-// A loading placeholder matching the input's footprint — shown only on the very first load
-// (before any cache exists) so the fields never flash empty.
-const inpSkeleton: React.CSSProperties = {
-  width: '100%',
-  height: '2.6rem',
-  borderRadius: 8,
-  background: 'linear-gradient(90deg, var(--card) 25%, var(--raised, var(--surface)) 50%, var(--card) 75%)',
-  backgroundSize: '200% 100%',
-  border: '1.5px solid var(--line)',
-  boxSizing: 'border-box',
-  animation: 'pulse 1.3s ease-in-out infinite',
-}
-
-const sectionHead: React.CSSProperties = {
-  padding: '.85rem 1.25rem',
-  borderBottom: '1px solid var(--line)',
-  fontFamily: 'var(--mono)',
-  fontSize: '.62rem',
-  color: 'var(--dim)',
-  textTransform: 'uppercase',
-  letterSpacing: '.08em',
-}
-
-const card: React.CSSProperties = {
-  background: 'var(--surface)',
-  border: '1px solid var(--line)',
-  borderRadius: 14,
-  overflow: 'hidden',
-  marginBottom: '1rem',
-}
-
-function Label({ text }: { text: string }) {
-  return (
-    <label style={{ fontFamily: 'var(--mono)', fontSize: '.6rem', textTransform: 'uppercase', letterSpacing: '.08em', color: 'var(--dim)', display: 'block', marginBottom: '.4rem' }}>
-      {text}
-    </label>
-  )
 }
 
 type LocResult = { display: string }
@@ -312,337 +260,258 @@ export default function ProfilePage() {
     }
   }
 
+  const initial = (name || user?.email || 'S').trim().charAt(0).toUpperCase()
+  const lvl: Record<string, string> = { entry: 'Entry level', mid: 'Mid level', senior: 'Senior', lead: 'Lead / Staff' }
+  const discard = () => { setName(initName); setCity(initCity); setExperience(initExperience); setSaveMsg('') }
+
   return (
     <div className="page-full">
-      <div style={{ maxWidth: 520, margin: '0 auto', padding: '2rem 1.25rem 4rem', width: '100%', boxSizing: 'border-box' }}>
-        <PageHeader eyebrow="Account" tone="green" title="Profile settings" crumbLabel="Profile" />
+      <div className={styles.wrap}>
+        <PageHeader
+          eyebrow="Account"
+          tone="indigo"
+          title="Settings"
+          crumbLabel="Settings"
+          sub="Your profile, résumé, security and plan — one place. Changes save when you say so."
+        />
 
-        {/* Basic info */}
-        <div style={card}>
-          <div style={sectionHead}>Basic info</div>
-          <div style={{ padding: '1.25rem' }}>
-            <div style={{ marginBottom: '1rem' }}>
-              <Label text="First name" />
-              {loaded ? (
-                <input
-                  type="text"
-                  value={name}
-                  onChange={e => setName(e.target.value)}
-                  onFocus={e => { e.target.style.borderColor = 'var(--green)' }}
-                  onBlur={e => { e.target.style.borderColor = 'var(--line2)' }}
-                  placeholder="Your first name"
-                  style={inp}
-                />
-              ) : <div style={inpSkeleton} />}
+        <div className={styles.layout}>
+          {/* ── Left rail: who you are + jump links ── */}
+          <aside className={styles.rail}>
+            <div className={styles.me}>
+              <div className={styles.avatar}>{initial}</div>
+              <div className={styles.meT}>
+                <div className={styles.meName}>{name || 'Your name'}</div>
+                <div className={styles.meMail}>{user?.email}</div>
+                <span className={`${styles.plan} ${isPro ? styles.planPro : styles.planFree}`}>{isPro ? '★ Seen Pro' : 'Free plan'}</span>
+              </div>
             </div>
-            <div>
-              <Label text="Email" />
-              <input type="email" value={user?.email || ''} disabled style={{ ...inp, opacity: 0.6, cursor: 'not-allowed' }} />
+            {/* div, not <nav>: globals.css styles every nav element as the fixed site bar */}
+            <div className={styles.jumps} role="navigation" aria-label="Settings sections">
+              <a href="#profile" className={styles.jump}><span>👤</span>Profile</a>
+              <a href="#resume" className={styles.jump}><span>📄</span>Résumé</a>
+              <a href="#security" className={styles.jump}><span>🔒</span>Security</a>
+              <a href="#plan" className={styles.jump}><span>◈</span>Plan &amp; billing</a>
+              <a href="#danger" className={`${styles.jump} ${styles.jumpDanger}`}><span>⚠</span>Delete account</a>
             </div>
-          </div>
-        </div>
+          </aside>
 
-        {/* Location */}
-        <div style={card}>
-          <div style={sectionHead}>Job location</div>
-          <div style={{ padding: '1.25rem' }}>
-            <Label text="Your city" />
-            <div style={{ position: 'relative' }} ref={cityContainerRef}>
-              {loaded ? (
-              <input
-                type="text"
-                autoComplete="off"
-                value={city}
-                onChange={e => onCityInput(e.target.value)}
-                onFocus={e => { e.target.style.borderColor = 'var(--green)'; if (citySuggs.length) setShowCitySuggs(true) }}
-                onBlur={e => { e.target.style.borderColor = 'var(--line2)' }}
-                placeholder="e.g. Los Angeles, CA"
-                style={inp}
-              />
-              ) : <div style={inpSkeleton} />}
-              {showCitySuggs && citySuggs.length > 0 && (
-                <div style={{ position: 'absolute', zIndex: 200, background: 'var(--surface)', border: '1px solid var(--line2)', borderRadius: 8, width: '100%', top: 'calc(100% + 4px)', left: 0, boxShadow: '0 8px 24px rgba(0,0,0,.4)' }}>
-                  {citySuggs.map((s, i) => (
-                    <div
-                      key={i}
-                      onMouseDown={e => { e.preventDefault(); setCity(s.display); setShowCitySuggs(false) }}
-                      style={{ padding: '.65rem 1rem', cursor: 'pointer', fontSize: '.82rem', color: 'var(--white)', borderBottom: '1px solid var(--line)' }}
-                      onMouseOver={e => { (e.currentTarget as HTMLElement).style.background = 'var(--card)' }}
-                      onMouseOut={e => { (e.currentTarget as HTMLElement).style.background = '' }}
-                    >
-                      {s.display}
+          <div className={styles.col}>
+            {/* ── Profile ── */}
+            <section id="profile" className={styles.card}>
+              <div className={styles.cardHead}>
+                <div>
+                  <div className={styles.eyebrow}>Profile</div>
+                  <h2 className={styles.cardT}>About you</h2>
+                  <p className={styles.cardS}>Your name greets you on the dashboard; your city and level shape the Jobs page.</p>
+                </div>
+              </div>
+              <div className={styles.grid2}>
+                <div className={styles.field}>
+                  <label className={styles.label} htmlFor="pf-name">First name</label>
+                  {loaded ? <input id="pf-name" className={styles.input} type="text" value={name} onChange={e => setName(e.target.value)} placeholder="Your first name" /> : <div className={styles.skeleton} />}
+                </div>
+                <div className={styles.field}>
+                  <label className={styles.label} htmlFor="pf-email">Email</label>
+                  <input id="pf-email" className={styles.input} type="email" value={user?.email || ''} disabled />
+                </div>
+                <div className={styles.field} style={{ position: 'relative' }} ref={cityContainerRef}>
+                  <label className={styles.label} htmlFor="pf-city">Your city</label>
+                  {loaded ? (
+                    <input
+                      id="pf-city"
+                      className={styles.input}
+                      type="text"
+                      autoComplete="off"
+                      value={city}
+                      onChange={e => onCityInput(e.target.value)}
+                      onFocus={() => { if (citySuggs.length) setShowCitySuggs(true) }}
+                      placeholder="e.g. Los Angeles, CA"
+                    />
+                  ) : <div className={styles.skeleton} />}
+                  {showCitySuggs && citySuggs.length > 0 && (
+                    <div className={styles.suggs}>
+                      {citySuggs.map((s, i) => (
+                        <div key={i} className={styles.sugg} onMouseDown={e => { e.preventDefault(); setCity(s.display); setShowCitySuggs(false) }}>{s.display}</div>
+                      ))}
                     </div>
-                  ))}
+                  )}
+                  <div className={styles.hint}>Auto-loads nearby listings on the Jobs page.</div>
+                </div>
+                <div className={styles.field}>
+                  <label className={styles.label} htmlFor="pf-level">Experience level</label>
+                  {loaded ? (
+                    <select id="pf-level" className={styles.select} value={experience} onChange={e => setExperience(e.target.value)}>
+                      <option value="">Select a level</option>
+                      <option value="entry">Entry level (0–2 yrs)</option>
+                      <option value="mid">Mid level (3–6 yrs)</option>
+                      <option value="senior">Senior (7+ yrs)</option>
+                      <option value="lead">Lead / Staff</option>
+                    </select>
+                  ) : <div className={styles.skeleton} />}
+                  <div className={styles.hint}>{experience ? `Jobs suggests a ${lvl[experience] || experience} filter when it fits.` : 'Jobs can suggest a level filter for you.'}</div>
+                </div>
+              </div>
+              {saveMsg && <div className={`${styles.msg} ${saveMsgOk ? styles.ok : styles.err}`}>{saveMsg}</div>}
+            </section>
+
+            {/* ── Résumé — add / replace here, not only inside Résumé AI ── */}
+            <section id="resume" className={styles.card}>
+              <div className={styles.cardHead}>
+                <div>
+                  <div className={styles.eyebrow}>Résumé</div>
+                  <h2 className={styles.cardT}>{resumeMeta ? 'On file' : 'Add your résumé'}</h2>
+                  <p className={styles.cardS}>One upload powers job matching, your fit score and rewrites in Résumé AI.</p>
+                </div>
+              </div>
+              {resumeMeta && (
+                <div className={styles.file}>
+                  <div className={styles.fileIco}>📄</div>
+                  <div style={{ minWidth: 0 }}>
+                    <div className={styles.fileName}>{resumeMeta.fileName}</div>
+                    <div className={styles.fileMeta}>✓ {resumeMeta.wordCount.toLocaleString()} words · matched to jobs</div>
+                  </div>
                 </div>
               )}
-            </div>
-            <div style={{ fontFamily: 'var(--mono)', fontSize: '.6rem', color: 'var(--muted)', marginTop: '.5rem' }}>
-              Used to auto-load nearby job listings on the Jobs page.
-            </div>
-          </div>
-        </div>
-
-        {/* Job preferences */}
-        <div style={card}>
-          <div style={sectionHead}>Job preferences</div>
-          <div style={{ padding: '1.25rem' }}>
-            <Label text="Experience level" />
-            {loaded ? (
-            <select
-              value={experience}
-              onChange={e => setExperience(e.target.value)}
-              onFocus={e => { e.target.style.borderColor = 'var(--green)' }}
-              onBlur={e => { e.target.style.borderColor = 'var(--line2)' }}
-              style={{ ...inp, cursor: 'pointer', appearance: 'none' as const }}
-            >
-              <option value="">— Select level —</option>
-              <option value="entry">🌱 Entry level (0–2 yrs)</option>
-              <option value="mid">📈 Mid level (3–6 yrs)</option>
-              <option value="senior">⭐ Senior (7+ yrs)</option>
-              <option value="lead">🔷 Lead / Staff</option>
-            </select>
-            ) : <div style={inpSkeleton} />}
-            <div style={{ fontFamily: 'var(--mono)', fontSize: '.6rem', color: 'var(--muted)', marginTop: '.5rem' }}>
-              Use the search filter on the Jobs page to filter by industry.
-            </div>
-          </div>
-        </div>
-
-        {/* Save changes — sits directly under the fields it persists (name / city / experience),
-            not stranded below the account & billing cards. */}
-        {isDirty && (
-          <button
-            onClick={saveProfile}
-            disabled={saving}
-            style={{ width: '100%', padding: '.9rem', background: 'var(--green)', color: 'var(--ink)', border: 'none', borderRadius: 10, fontFamily: 'var(--display)', fontWeight: 800, fontSize: '.9rem', cursor: saving ? 'not-allowed' : 'pointer', marginBottom: '1rem', opacity: saving ? 0.7 : 1 }}
-          >
-            {saving ? 'Saving...' : 'Save changes →'}
-          </button>
-        )}
-        {saveMsg && (
-          <div style={{ fontFamily: 'var(--mono)', fontSize: '.65rem', color: saveMsgOk ? 'var(--green)' : 'var(--red)', textAlign: 'center', marginBottom: '1.5rem' }}>{saveMsg}</div>
-        )}
-
-        {/* Résumé — add / replace here, not only inside Résumé AI */}
-        <div style={card}>
-          <div style={sectionHead}>Résumé</div>
-          <div style={{ padding: '1.25rem' }}>
-            {resumeMeta ? (
-              <div style={{ background: 'rgba(16,185,129,0.08)', border: '1px solid rgba(16,185,129,0.22)', borderRadius: 8, padding: '.72rem 1rem', fontFamily: 'var(--mono)', fontSize: '.68rem', color: 'var(--green)', marginBottom: '.85rem', overflowWrap: 'anywhere' }}>
-                ✓ résumé on file — {resumeMeta.fileName} · {resumeMeta.wordCount} words
-              </div>
-            ) : (
-              <div style={{ fontFamily: 'var(--body)', fontSize: '.8rem', color: 'var(--sub)', lineHeight: 1.6, marginBottom: '.85rem' }}>
-                Add your résumé once and we&apos;ll match jobs to it on the Jobs page — and power your fit score &amp; rewrites in Résumé AI.
-              </div>
-            )}
-            <div style={{ display: 'flex', gap: '.5rem', flexWrap: 'wrap' }}>
-              <button
-                onClick={() => resumeFileRef.current?.click()}
-                disabled={resumeBusy}
-                style={{ flex: 1, minWidth: 150, padding: '.72rem 1rem', background: resumeMeta ? 'none' : 'var(--green)', color: resumeMeta ? 'var(--green)' : 'var(--ink)', border: resumeMeta ? '1px solid rgba(16,185,129,0.4)' : 'none', borderRadius: 10, fontFamily: 'var(--display)', fontWeight: 800, fontSize: '.82rem', cursor: resumeBusy ? 'not-allowed' : 'pointer', opacity: resumeBusy ? 0.65 : 1 }}
-              >
-                {resumeBusy ? 'Uploading…' : resumeMeta ? 'Replace résumé' : 'Upload résumé →'}
-              </button>
-              <button
-                onClick={() => router.push('/resume')}
-                style={{ flex: 1, minWidth: 130, padding: '.72rem 1rem', background: 'var(--raised, var(--surface))', border: '1px solid var(--line2)', color: 'var(--sub)', borderRadius: 10, fontFamily: 'var(--mono)', fontSize: '.7rem', cursor: 'pointer', boxSizing: 'border-box' }}
-              >
-                Open Résumé AI →
-              </button>
-            </div>
-            <input
-              ref={resumeFileRef}
-              type="file"
-              accept=".pdf,.doc,.docx,.txt,.md,text/plain"
-              onChange={e => { const f = e.target.files?.[0]; if (f) onResumeFile(f); e.target.value = '' }}
-              style={{ display: 'none' }}
-            />
-            <div style={{ fontFamily: 'var(--mono)', fontSize: '.6rem', color: 'var(--muted)', marginTop: '.6rem', lineHeight: 1.6 }}>
-              PDF, Word, or .txt. Uploading matches jobs to your experience automatically.
-            </div>
-            {resumeMsg && (
-              <div style={{ fontFamily: 'var(--mono)', fontSize: '.62rem', color: resumeMsgOk ? 'var(--green)' : 'var(--red)', marginTop: '.6rem', lineHeight: 1.6 }}>{resumeMsg}</div>
-            )}
-          </div>
-        </div>
-
-        {/* Account & Security */}
-        <div style={card}>
-          <div style={sectionHead}>Account &amp; Security</div>
-          <div style={{ padding: '1.25rem' }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '.5rem', marginBottom: '.75rem' }}>
-              <div>
-                <div style={{ fontSize: '.82rem', fontWeight: 500, color: 'var(--white)' }}>Change password</div>
-                <div style={{ fontFamily: 'var(--mono)', fontSize: '.62rem', color: 'var(--muted)' }}>A reset link is sent to your email</div>
-              </div>
-              <button
-                className="btn btn-ghost"
-                style={{ fontSize: '.75rem' }}
-                onClick={sendResetLink}
-                disabled={linkSending}
-              >
-                {linkSending ? 'Sending...' : 'Send link →'}
-              </button>
-            </div>
-
-            {linkSent && (
-              <div style={{ borderTop: '1px solid var(--line)', paddingTop: '.85rem', marginBottom: '.85rem' }}>
-                <div style={{ fontFamily: 'var(--mono)', fontSize: '.62rem', color: 'var(--blue)', marginBottom: '.75rem', lineHeight: 1.6 }}>
-                  ✓ Link sent — click it in your email, then come back and set your new password here
-                </div>
-              </div>
-            )}
-
-            {showPassForm && (
-              <div style={{ borderTop: linkSent ? 'none' : '1px solid var(--line)', paddingTop: linkSent ? 0 : '.85rem', marginBottom: '.85rem' }}>
-                <div style={{ marginBottom: '.65rem' }}>
-                  <label style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', textTransform: 'uppercase', letterSpacing: '.07em', color: 'var(--dim)', display: 'block', marginBottom: '.32rem' }}>New password</label>
-                  <input
-                    type="password"
-                    value={newPass}
-                    onChange={e => setNewPass(e.target.value)}
-                    onFocus={e => { e.target.style.borderColor = 'var(--blue)' }}
-                    onBlur={e => { e.target.style.borderColor = 'var(--line2)' }}
-                    placeholder="Min 8 characters"
-                    style={{ ...inp, caretColor: 'var(--blue)' }}
-                  />
-                </div>
-                <div style={{ marginBottom: '.85rem' }}>
-                  <label style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', textTransform: 'uppercase', letterSpacing: '.07em', color: 'var(--dim)', display: 'block', marginBottom: '.32rem' }}>Confirm new password</label>
-                  <input
-                    type="password"
-                    value={confirmPass}
-                    onChange={e => setConfirmPass(e.target.value)}
-                    onFocus={e => { e.target.style.borderColor = 'var(--blue)' }}
-                    onBlur={e => { e.target.style.borderColor = 'var(--line2)' }}
-                    placeholder="Confirm password"
-                    style={{ ...inp, caretColor: 'var(--blue)' }}
-                  />
-                </div>
-                {passMsg && (
-                  <div style={{ fontFamily: 'var(--mono)', fontSize: '.62rem', color: passMsgOk ? 'var(--green)' : 'var(--red)', marginBottom: '.65rem' }}>{passMsg}</div>
-                )}
-                <div style={{ display: 'flex', gap: '.5rem' }}>
-                  <button
-                    className="btn btn-ghost"
-                    style={{ flex: 1, justifyContent: 'center', fontSize: '.78rem' }}
-                    onClick={() => { setShowPassForm(false); setPassMsg('') }}
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    className="btn btn-green"
-                    style={{ flex: 2, justifyContent: 'center', fontWeight: 800, fontSize: '.78rem' }}
-                    onClick={updatePassword}
-                    disabled={updatingPass}
-                  >
-                    {updatingPass ? 'Updating...' : 'Update password →'}
-                  </button>
-                </div>
-              </div>
-            )}
-
-            {!showPassForm && passMsg && (
-              <div style={{ fontFamily: 'var(--mono)', fontSize: '.62rem', color: passMsgOk ? 'var(--green)' : 'var(--red)', marginBottom: '.65rem' }}>{passMsg}</div>
-            )}
-
-            <div style={{ borderTop: '1px solid var(--line)', paddingTop: '.75rem' }}>
-              <button
-                onClick={signOut}
-                style={{ background: 'rgba(239,68,68,0.07)', border: '1px solid rgba(239,68,68,0.25)', color: 'var(--red)', borderRadius: 8, padding: '.65rem 1.25rem', fontFamily: 'var(--mono)', fontSize: '.74rem', fontWeight: 600, cursor: 'pointer', width: '100%', transition: 'background .15s,border-color .15s' }}
-                onMouseOver={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(239,68,68,0.14)' }}
-                onMouseOut={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(239,68,68,0.07)' }}
-              >
-                Sign out of Seen
-              </button>
-            </div>
-          </div>
-        </div>
-
-        {/* Billing & Subscription */}
-        <div style={card}>
-          <div style={sectionHead}>Billing &amp; Subscription</div>
-          <div style={{ padding: '1.25rem' }}>
-            {isPro ? (
-              <>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '.5rem', marginBottom: '.6rem' }}>
-                  <span style={{ fontFamily: 'var(--display)', fontWeight: 800, fontSize: '.95rem', color: 'var(--green)' }}>Seen Pro</span>
-                  <span style={{ fontFamily: 'var(--mono)', fontSize: '.52rem', color: sub?.cancel_at_period_end ? 'var(--red)' : 'var(--green)', border: `1px solid ${sub?.cancel_at_period_end ? 'rgba(239,68,68,.35)' : 'rgba(16,185,129,.35)'}`, borderRadius: 20, padding: '.12rem .5rem', letterSpacing: '.06em' }}>
-                    {sub?.cancel_at_period_end ? 'CANCELING' : 'ACTIVE'}
-                  </span>
-                </div>
-                {sub && (
-                  <div style={{ fontFamily: 'var(--mono)', fontSize: '.66rem', color: 'var(--sub)', marginBottom: '.6rem', lineHeight: 1.6 }}>
-                    {sub.amount != null ? `$${sub.amount}/${sub.interval === 'year' ? 'yr' : 'mo'}` : 'Active'}
-                    {sub.current_period_end ? (sub.cancel_at_period_end
-                      ? ` · ends ${new Date(sub.current_period_end).toLocaleDateString()}`
-                      : ` · renews ${new Date(sub.current_period_end).toLocaleDateString()}`) : ''}
-                  </div>
-                )}
-                <div style={{ fontFamily: 'var(--body)', fontSize: '.78rem', color: 'var(--sub)', lineHeight: 1.65, marginBottom: '1rem' }}>
-                  {sub?.cancel_at_period_end
-                    ? 'Your membership is set to cancel — you keep Pro until the date above. Change your mind anytime before then.'
-                    : 'Your subscription renews automatically each billing period until you cancel. Cancel anytime — you keep Pro through the month you’ve already paid for.'}
-                </div>
-                {sub?.cancel_at_period_end ? (
-                  <button
-                    onClick={() => manageSubscription('resume_subscription')}
-                    disabled={portalLoading}
-                    style={{ width: '100%', padding: '.85rem', background: portalLoading ? 'var(--line)' : 'linear-gradient(135deg,#4f46e5 0%,#7c3aed 100%)', color: '#fff', border: 'none', borderRadius: 10, fontFamily: 'var(--display)', fontWeight: 800, fontSize: '.85rem', cursor: portalLoading ? 'default' : 'pointer' }}
-                  >
-                    {portalLoading ? 'Working…' : 'Resume membership'}
-                  </button>
-                ) : (
-                  <button
-                    onClick={() => manageSubscription('cancel_subscription')}
-                    disabled={portalLoading || !sub}
-                    title={!sub ? 'No active Stripe subscription on file' : undefined}
-                    style={{ width: '100%', padding: '.8rem', background: 'none', color: 'var(--red)', border: '1px solid rgba(239,68,68,.4)', borderRadius: 10, fontFamily: 'var(--mono)', fontWeight: 600, fontSize: '.74rem', cursor: (portalLoading || !sub) ? 'default' : 'pointer', opacity: (portalLoading || !sub) ? 0.55 : 1 }}
-                  >
-                    {portalLoading ? 'Working…' : 'Cancel membership'}
-                  </button>
-                )}
-                {subMsg && (
-                  <div style={{ fontFamily: 'var(--mono)', fontSize: '.6rem', color: 'var(--sub)', marginTop: '.7rem', lineHeight: 1.6 }}>{subMsg}</div>
-                )}
-              </>
-            ) : (
-              <>
-                <div style={{ fontFamily: 'var(--body)', fontSize: '.82rem', color: 'var(--white)', marginBottom: '.4rem' }}>You&apos;re on the <strong>Free</strong> plan.</div>
-                <div style={{ fontFamily: 'var(--body)', fontSize: '.76rem', color: 'var(--sub)', lineHeight: 1.65, marginBottom: '1rem' }}>
-                  Seen Pro is $9.99/month (or $6.99/month billed annually). It renews automatically until you cancel, and you can cancel anytime from this page.
-                </div>
-                <button
-                  onClick={() => router.push('/pricing')}
-                  style={{ width: '100%', padding: '.8rem', background: 'linear-gradient(135deg,#4f46e5 0%,#7c3aed 100%)', color: '#fff', border: 'none', borderRadius: 10, fontFamily: 'var(--display)', fontWeight: 800, fontSize: '.85rem', cursor: 'pointer' }}
-                >
-                  View Pro plans →
+              <div className={styles.btnRow}>
+                <button type="button" className={resumeMeta ? styles.ghost : styles.primary} onClick={() => resumeFileRef.current?.click()} disabled={resumeBusy}>
+                  {resumeBusy ? 'Uploading…' : resumeMeta ? 'Replace résumé' : 'Upload résumé →'}
                 </button>
-              </>
-            )}
-            <div style={{ fontFamily: 'var(--mono)', fontSize: '.55rem', color: 'var(--dim)', marginTop: '.9rem', lineHeight: 1.6 }}>
-              See <a href="/legal" style={{ color: 'var(--sub)' }}>Subscription Terms</a> for renewal, cancellation, and refund details.
-            </div>
+                <button type="button" className={styles.ghost} onClick={() => router.push('/resume')}>Open Résumé AI →</button>
+              </div>
+              <input
+                ref={resumeFileRef}
+                type="file"
+                accept=".pdf,.doc,.docx,.txt,.md,text/plain"
+                onChange={e => { const f = e.target.files?.[0]; if (f) onResumeFile(f); e.target.value = '' }}
+                style={{ display: 'none' }}
+              />
+              <div className={styles.hint}>PDF, Word or .txt. Parsing uses one AI credit.</div>
+              {resumeMsg && <div className={`${styles.msg} ${resumeMsgOk ? styles.ok : styles.err}`}>{resumeMsg}</div>}
+            </section>
+
+            {/* ── Security ── */}
+            <section id="security" className={styles.card}>
+              <div className={styles.cardHead}>
+                <div>
+                  <div className={styles.eyebrow}>Security</div>
+                  <h2 className={styles.cardT}>Sign-in &amp; password</h2>
+                </div>
+              </div>
+              <div className={styles.row}>
+                <div>
+                  <div className={styles.rowT}>Change password</div>
+                  <div className={styles.rowS}>We email you a reset link first, then you set the new one here.</div>
+                </div>
+                <button type="button" className={styles.ghost} onClick={sendResetLink} disabled={linkSending}>{linkSending ? 'Sending…' : linkSent ? 'Resend link' : 'Send link →'}</button>
+              </div>
+              {linkSent && <div className={`${styles.msg} ${styles.info}`}>✓ Link sent — open it from your email, then set your new password below.</div>}
+              {showPassForm && (
+                <div className={styles.sub}>
+                  <div className={styles.grid2}>
+                    <div className={styles.field}>
+                      <label className={styles.label} htmlFor="pf-pass">New password</label>
+                      <input id="pf-pass" className={styles.input} type="password" value={newPass} onChange={e => setNewPass(e.target.value)} placeholder="Min 8 characters" />
+                    </div>
+                    <div className={styles.field}>
+                      <label className={styles.label} htmlFor="pf-pass2">Confirm new password</label>
+                      <input id="pf-pass2" className={styles.input} type="password" value={confirmPass} onChange={e => setConfirmPass(e.target.value)} placeholder="Confirm password" />
+                    </div>
+                  </div>
+                  {passMsg && <div className={`${styles.msg} ${passMsgOk ? styles.ok : styles.err}`}>{passMsg}</div>}
+                  <div className={styles.btnRow} style={{ marginTop: '0.9rem' }}>
+                    <button type="button" className={styles.primary} onClick={updatePassword} disabled={updatingPass}>{updatingPass ? 'Updating…' : 'Update password →'}</button>
+                    <button type="button" className={styles.ghost} onClick={() => { setShowPassForm(false); setPassMsg('') }}>Cancel</button>
+                  </div>
+                </div>
+              )}
+              {!showPassForm && passMsg && <div className={`${styles.msg} ${passMsgOk ? styles.ok : styles.err}`}>{passMsg}</div>}
+              <div className={styles.row}>
+                <div>
+                  <div className={styles.rowT}>Sign out of Seen</div>
+                  <div className={styles.rowS}>On this device. Your applications stay synced to your account.</div>
+                </div>
+                <button type="button" className={`${styles.ghost} ${styles.danger}`} onClick={signOut}>Sign out</button>
+              </div>
+            </section>
+
+            {/* ── Plan & billing ── */}
+            <section id="plan" className={styles.card}>
+              <div className={styles.cardHead}>
+                <div>
+                  <div className={styles.eyebrow}>Plan &amp; billing</div>
+                  <h2 className={styles.cardT}>{isPro ? 'Seen Pro' : 'Free plan'}</h2>
+                </div>
+              </div>
+              {isPro ? (
+                <>
+                  <div className={styles.planCard}>
+                    <div>
+                      <div className={styles.planName}>Seen Pro</div>
+                      <div className={styles.planMeta}>
+                        {sub?.amount != null ? `$${sub.amount}/${sub.interval === 'year' ? 'yr' : 'mo'}` : 'Active'}
+                        {sub?.current_period_end ? (sub.cancel_at_period_end
+                          ? ` · ends ${new Date(sub.current_period_end).toLocaleDateString()}`
+                          : ` · renews ${new Date(sub.current_period_end).toLocaleDateString()}`) : ''}
+                      </div>
+                    </div>
+                    <span className={`${styles.badge} ${sub?.cancel_at_period_end ? styles.bRed : styles.bGreen}`}>{sub?.cancel_at_period_end ? 'Canceling' : 'Active'}</span>
+                  </div>
+                  <p className={styles.cardS} style={{ margin: '0 0 1rem' }}>
+                    {sub?.cancel_at_period_end
+                      ? 'Your membership is set to cancel — you keep Pro until the date above. Change your mind anytime before then.'
+                      : 'Renews automatically each billing period until you cancel. Cancel anytime — you keep Pro through the period you’ve already paid for.'}
+                  </p>
+                  <div className={styles.btnRow}>
+                    {sub?.cancel_at_period_end ? (
+                      <button type="button" className={styles.primary} onClick={() => manageSubscription('resume_subscription')} disabled={portalLoading}>{portalLoading ? 'Working…' : 'Resume membership'}</button>
+                    ) : (
+                      <button type="button" className={`${styles.ghost} ${styles.danger}`} onClick={() => manageSubscription('cancel_subscription')} disabled={portalLoading || !sub} title={!sub ? 'No active Stripe subscription on file' : undefined}>{portalLoading ? 'Working…' : 'Cancel membership'}</button>
+                    )}
+                    <button type="button" className={styles.ghost} onClick={() => router.push('/pricing')}>Plans &amp; credits</button>
+                  </div>
+                  {subMsg && <div className={`${styles.msg} ${styles.info}`}>{subMsg}</div>}
+                </>
+              ) : (
+                <>
+                  <div className={styles.planCard}>
+                    <div>
+                      <div className={styles.planName}>Free</div>
+                      <div className={styles.planMeta}>1 AI credit a day · every company grade and the tracker, always free</div>
+                    </div>
+                    <span className={`${styles.badge} ${styles.bDim}`}>Current</span>
+                  </div>
+                  <p className={styles.cardS} style={{ margin: '0 0 1rem' }}>Seen Pro is $9.99/month or $83.88/year — unlimited AI credits and deeper company analysis. Renews until you cancel; cancel anytime from this page.</p>
+                  <div className={styles.btnRow}>
+                    <button type="button" className={styles.primary} onClick={() => router.push('/pricing')}>See Pro plans →</button>
+                  </div>
+                </>
+              )}
+              <div className={styles.fine}>See <a href="/legal">Subscription Terms</a> for renewal, cancellation and refund details.</div>
+            </section>
+
+            {/* ── Danger zone ── */}
+            <section id="danger" className={`${styles.card} ${styles.dangerCard}`}>
+              <div className={styles.cardHead}>
+                <div>
+                  <div className={styles.eyebrow} style={{ color: '#f87185' }}>Danger zone</div>
+                  <h2 className={styles.cardT}>Delete your account</h2>
+                  <p className={styles.cardS}>Permanently removes your account, applications and saved data. There is no undo.</p>
+                </div>
+              </div>
+              <button type="button" className={`${styles.ghost} ${styles.danger}`} onClick={deleteAccount} disabled={deleting}>{deleting ? 'Deleting…' : 'Delete my account'}</button>
+            </section>
           </div>
         </div>
 
-        {/* Danger zone */}
-        <div style={{ background: 'var(--surface)', border: '1px solid #ff3b5c28', borderRadius: 14, overflow: 'hidden' }}>
-          <div style={{ padding: '.85rem 1.25rem', borderBottom: '1px solid #ff3b5c22', fontFamily: 'var(--mono)', fontSize: '.62rem', color: '#ff3b5c', textTransform: 'uppercase', letterSpacing: '.08em' }}>Danger zone</div>
-          <div style={{ padding: '1.25rem' }}>
-            <div style={{ fontSize: '.78rem', color: 'var(--sub)', marginBottom: '.85rem', lineHeight: 1.6 }}>
-              Permanently deletes your account, applications, and saved data. This cannot be undone.
-            </div>
-            <button
-              onClick={deleteAccount}
-              disabled={deleting}
-              style={{ background: 'none', border: '1px solid #ff3b5c44', color: '#ff3b5c', borderRadius: 8, padding: '.6rem 1.25rem', fontFamily: 'var(--mono)', fontSize: '.72rem', cursor: deleting ? 'not-allowed' : 'pointer', opacity: deleting ? 0.6 : 1 }}
-            >
-              {deleting ? 'Deleting...' : 'Delete my account'}
-            </button>
+        {/* ── Unsaved changes: floats in the moment a field differs from what's saved ── */}
+        {isDirty && (
+          <div className={styles.saveBar} role="status">
+            <span className={styles.saveT}><b>Unsaved changes</b> · name, city or level</span>
+            <button type="button" className={styles.ghost} onClick={discard} disabled={saving}>Discard</button>
+            <button type="button" className={styles.primary} onClick={saveProfile} disabled={saving}>{saving ? 'Saving…' : 'Save changes'}</button>
           </div>
-        </div>
+        )}
       </div>
     </div>
   )
