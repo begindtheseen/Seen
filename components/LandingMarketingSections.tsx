@@ -1,12 +1,19 @@
 'use client'
 
+import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import Reveal from '@/components/Reveal'
+import styles from './LandingMarketingSections.module.css'
 
-const VALUE_CARDS = [
+// Below the workspace window: the four things only Seen does, each linking to the real page,
+// then one closing call to action. (Replaces the old "Why Seen" four-card grid + three-step
+// "How it works" — the workspace window above now shows how it works.)
+const FEATURES = [
   {
-    title: 'Ghost rates',
-    desc: 'See how often applicants report getting no response.',
+    href: '/companies',
+    tag: 'Company intel',
+    title: 'Ghost rates and grades',
+    desc: 'Every company gets a ghost rate, response time and grade from applicant outcomes. No grade until there are at least five reports, and estimates are labeled as estimates.',
     icon: (
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
         <path d="M9 10h.01M15 10h.01" />
@@ -15,39 +22,41 @@ const VALUE_CARDS = [
     ),
   },
   {
-    title: 'Response times',
-    desc: 'Know whether people hear back in days, weeks, or never.',
+    href: '/tracker',
+    tag: 'Tracker',
+    title: 'A tracker that asks what happened',
+    desc: 'Day 7, 14 and 30 check-ins on each application. Your answers become your real response rate, and the next applicant’s warning.',
     icon: (
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-        <circle cx="12" cy="12" r="9" />
-        <path d="M12 7v5l3 2" />
+        <path d="M9 11l3 3 8-8" />
+        <path d="M20 12v7a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h9" />
       </svg>
     ),
   },
   {
-    title: 'Company grades',
-    desc: 'Compare companies before you spend time applying.',
+    href: '/resume',
+    tag: 'Résumé AI',
+    title: 'Tailored for the exact role',
+    desc: 'SeenFit scores your résumé against one job and rewrites it in your voice, so you know your fit before you spend an hour applying.',
     icon: (
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-        <path d="M12 2l2.4 5 5.6.8-4 4 1 5.6L12 19l-5 2.4 1-5.6-4-4 5.6-.8L12 2Z" />
+        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+        <path d="M14 2v6h6M8 13h8M8 17h5" />
       </svg>
     ),
   },
   {
-    title: 'Real outcomes',
-    desc: 'Built from applicant reports, not company marketing.',
+    href: '/agencies',
+    tag: 'Agency index',
+    title: 'Which staffing agencies ghost',
+    desc: 'Robert Half, Aerotek, Insight Global and more, ranked by applicant-reported ghost and response rates. No reports, no number.',
     icon: (
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-        <path d="M20 6 9 17l-5-5" />
+        <path d="M3 21h18M5 21V7l7-4 7 4v14" />
+        <path d="M9 21v-6h6v6M9 10h.01M15 10h.01" />
       </svg>
     ),
   },
-]
-
-const STEPS = [
-  { n: 1, t: 'Search a company', d: 'Type a name — or tap an example above.' },
-  { n: 2, t: 'See real applicant outcomes', d: 'Ghost rate, response time, and a grade.' },
-  { n: 3, t: 'Decide if it’s worth applying', d: 'Spend your hours where people hear back.' },
 ]
 
 export default function LandingMarketingSections() {
@@ -55,46 +64,27 @@ export default function LandingMarketingSections() {
 
   return (
     <div>
-      {/* VALUE SECTION */}
-      <section className="lp2-section">
-        <div className="lp2-wrap">
-          <Reveal className="lp2-section-head">
-            <div className="lp2-kicker">Why Seen</div>
-            <h2 className="lp2-h2">Stop applying blind.</h2>
-            <p className="lp2-section-sub">
-              Every number on Seen comes from what actually happened to real applicants —
-              never from employer marketing.
+      <section className={styles.section}>
+        <div className={styles.wrap}>
+          <Reveal className={styles.head}>
+            <div className={styles.kicker}>Why Seen</div>
+            <h2 className={styles.h2}>Stop applying blind.</h2>
+            <p className={styles.sub}>
+              Seen is built from what happened to applicants, never from employer marketing.
             </p>
           </Reveal>
-          <div className="lp2-grid-4">
-            {VALUE_CARDS.map((c, i) => (
-              <Reveal key={c.title} delay={i * 70}>
-                <div className="lp2-card spot">
-                  <div className="lp2-card-ico">{c.icon}</div>
-                  <h3 className="lp2-card-t">{c.title}</h3>
-                  <p className="lp2-card-d">{c.desc}</p>
-                </div>
-              </Reveal>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* HOW IT WORKS */}
-      <section className="lp2-section" style={{ paddingTop: 0 }}>
-        <div className="lp2-wrap">
-          <Reveal className="lp2-section-head">
-            <div className="lp2-kicker">Simple by design</div>
-            <h2 className="lp2-h2">How Seen works</h2>
-          </Reveal>
-          <div className="lp2-steps">
-            {STEPS.map((s, i) => (
-              <Reveal key={s.n} delay={i * 110}>
-                <div className="lp2-step spot">
-                  <div className="lp2-step-n">{s.n}</div>
-                  <h3 className="lp2-step-t">{s.t}</h3>
-                  <p className="lp2-step-d">{s.d}</p>
-                </div>
+          <div className={styles.grid}>
+            {FEATURES.map((f, i) => (
+              <Reveal key={f.href} delay={i * 80}>
+                <Link href={f.href} className={`${styles.card} spot`}>
+                  <div className={styles.cardTop}>
+                    <span className={styles.ico}>{f.icon}</span>
+                    <span className={styles.tag}>{f.tag}</span>
+                  </div>
+                  <h3 className={styles.cardT}>{f.title}</h3>
+                  <p className={styles.cardD}>{f.desc}</p>
+                  <span className={styles.more}>Open <span aria-hidden="true">→</span></span>
+                </Link>
               </Reveal>
             ))}
           </div>
@@ -116,6 +106,9 @@ export default function LandingMarketingSections() {
                 <div className="lp2-cta-row" style={{ marginTop: '1.8rem' }}>
                   <button className="lp2-btn lp2-btn-primary" onClick={() => router.push('/companies')}>
                     Check a company
+                  </button>
+                  <button className="lp2-btn lp2-btn-ghost" onClick={() => router.push('/login?signup=1')}>
+                    Start tracking free
                   </button>
                 </div>
               </div>

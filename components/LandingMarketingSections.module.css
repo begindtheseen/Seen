@@ -1,0 +1,47 @@
+/* "Why Seen" — four feature cards, each a link to the real page. */
+
+.section { position: relative; z-index: 2; padding: clamp(2.5rem, 6vw, 4rem) 0; }
+.wrap { width: 100%; max-width: 1040px; margin: 0 auto; padding: 0 1.25rem; box-sizing: border-box; }
+@media (min-width: 768px) { .wrap { padding: 0 2rem; } }
+
+.head { text-align: center; max-width: 46ch; margin: 0 auto clamp(1.8rem, 4vw, 2.6rem); }
+.kicker { font-family: var(--mono); font-size: 0.66rem; letter-spacing: 0.16em; text-transform: uppercase; color: #a5b4fc; margin-bottom: 0.8rem; }
+.h2 { font-family: var(--display); font-weight: 800; color: #fff; letter-spacing: -0.035em; line-height: 1.08; font-size: clamp(1.9rem, 4.6vw, 3rem); margin: 0; }
+.sub { margin: 0.9rem auto 0; color: var(--sub); font-size: clamp(0.95rem, 2vw, 1.05rem); line-height: 1.6; }
+
+.grid { display: grid; grid-template-columns: 1fr; gap: 0.9rem; }
+@media (min-width: 680px) { .grid { grid-template-columns: 1fr 1fr; } }
+/* Reveal wrappers stretch so the cards in a row keep equal heights. */
+.grid > * { display: flex; }
+.grid > * > * { flex: 1; }
+
+.card {
+  display: flex;
+  flex-direction: column;
+  padding: 1.4rem 1.4rem 1.2rem;
+  border-radius: 18px;
+  border: 1px solid var(--line2);
+  background: #0d1120;
+  text-decoration: none;
+  transition: transform 0.35s var(--ease-out), border-color 0.25s ease, box-shadow 0.3s ease;
+}
+.card:hover { transform: translateY(-3px); border-color: rgba(129, 140, 248, 0.35); box-shadow: 0 18px 50px rgba(0, 0, 0, 0.45), 0 0 40px rgba(99, 102, 241, 0.12); }
+.cardTop { display: flex; align-items: center; justify-content: space-between; gap: 0.6rem; margin-bottom: 1rem; }
+.ico {
+  width: 40px; height: 40px; border-radius: 11px; display: grid; place-items: center;
+  color: #a5b4fc; background: rgba(99, 102, 241, 0.12); border: 1px solid rgba(99, 102, 241, 0.25);
+  transition: transform 0.35s var(--ease-spring), color 0.25s ease, background 0.25s ease;
+}
+.ico svg { width: 19px; height: 19px; }
+.card:hover .ico { transform: scale(1.08) rotate(-4deg); color: #c7d2fe; background: rgba(99, 102, 241, 0.2); }
+.tag { font-family: var(--mono); font-size: 0.56rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--dim); }
+.cardT { font-family: var(--display); font-weight: 700; font-size: 1.1rem; color: #fff; letter-spacing: -0.02em; margin: 0 0 0.45rem; }
+.cardD { font-size: 0.88rem; color: var(--sub); line-height: 1.6; margin: 0 0 1rem; }
+.more { margin-top: auto; font-family: var(--mono); font-size: 0.66rem; color: #a5b4fc; }
+.more span { display: inline-block; transition: transform 0.3s var(--ease-out); }
+.card:hover .more span { transform: translateX(4px); }
+
+@media (prefers-reduced-motion: reduce) {
+  .card, .ico, .more span { transition: none; }
+  .card:hover, .card:hover .ico, .card:hover .more span { transform: none; }
+}

@@ -2,30 +2,16 @@
 
 import { useState, useCallback, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import Link from 'next/link'
 import { RecentSearchesStore } from '@/lib/stores/RecentSearches'
 import { useIntroGate } from '@/lib/hooks/useIntroGate'
-import { useCountUp } from '@/lib/hooks/useCountUp'
 import { firstPartyReportCount } from '@/lib/server/reportCounts'
 import { isGradeableScore } from '@/lib/gradeGate'
 import KineticText from '@/components/motion/KineticText'
+import WorkspacePreview, { type ProofScore } from '@/components/home/WorkspacePreview'
 import styles from './HomeHero.module.css'
 
 const JOB_KEYWORDS = ['engineer', 'developer', 'manager', 'analyst', 'designer', 'nurse', 'coordinator', 'specialist', 'director', 'associate', 'assistant', 'recruiter', 'sales', 'marketing', 'accountant', 'therapist', 'technician']
 
-interface ProofScore {
-  name: string
-  industry: string
-  overall_score: number
-  ghost_rate: number
-  response_rate: number
-  avg_wait_days: number
-  waste: number
-  /** FUSED total (first-party + web-research claim) — never rendered as "reports". */
-  report_count: number
-  /** Real applicant-report rows — the only count the card may call "applicant reports". */
-  first_party_report_count: number
-}
 
 // Real proof, not a promise: a genuine company's real hiring behaviour rendered in the
 // first screen. Seeded from Seen's own production company-score leaderboard
@@ -61,13 +47,6 @@ const EXAMPLES: Array<{ label: string; slug: string }> = [
   { label: 'McDonald’s', slug: 'mcdonalds' },
 ]
 
-function letterGrade(s: number): string {
-  if (s >= 80) return 'A'
-  if (s >= 65) return 'B'
-  if (s >= 50) return 'C'
-  if (s >= 35) return 'D'
-  return 'F'
-}
 const slugify = (n: string) => encodeURIComponent(n.toLowerCase().trim().replace(/\s+/g, '-'))
 
 export default function HomeHero() {
@@ -79,14 +58,6 @@ export default function HomeHero() {
   // Entrance choreography starts as soon as the display font is available (useIntroGate)
   // — there is no blocking intro; the hero rising IS the opening.
   const ready = useIntroGate()
-  // Once the entrance has settled, the proof card drops its stage delay so the cursor
-  // tilt (MotionLayer → .tilt) responds instantly instead of 300ms late.
-  const [landed, setLanded] = useState(false)
-  useEffect(() => {
-    if (!ready) return
-    const t = setTimeout(() => setLanded(true), 1300)
-    return () => clearTimeout(t)
-  }, [ready])
 
   // Preserve the original routing logic: company queries → /company/<slug>,
   // job-style queries → /jobs?q=&loc=
@@ -137,155 +108,77 @@ export default function HomeHero() {
     return () => ac.abort()
   }, [])
 
-  const ghostPct = Math.round(proof.ghost_rate * 100)
-  const respPct = Math.round(proof.response_rate * 100)
-  const grade = letterGrade(proof.overall_score)
-
-  // Animated figures — the ring and its number share ONE eased value so they can
-  // never disagree mid-flight. Colors key off the FINAL values (never the animated
-  // ones) so semantics don't flicker green→red while counting.
-  const ghostAnim = Math.round(useCountUp(ghostPct, { start: ready, duration: 1500, delay: 420 }))
-  const respAnim = Math.round(useCountUp(respPct, { start: ready, duration: 1200, delay: 540 }))
-  const waitAnim = Math.round(useCountUp(proof.avg_wait_days, { start: ready, duration: 1200, delay: 640 }))
-  const wasteAnim = Math.round(useCountUp(proof.waste, { start: ready, duration: 1200, delay: 740 }))
-
-  // Semantic colour — green responds, red ghosts, amber in between (matches the app).
-  const ghostColor = proof.ghost_rate > 0.5 ? 'var(--red)' : proof.ghost_rate > 0.3 ? 'var(--amber)' : 'var(--green)'
-  const respColor = proof.response_rate >= 0.5 ? 'var(--green)' : proof.response_rate >= 0.3 ? 'var(--amber)' : 'var(--red)'
-  const waitColor = proof.avg_wait_days > 45 ? 'var(--red)' : proof.avg_wait_days > 21 ? 'var(--amber)' : 'var(--green)'
-  const wasteColor = proof.waste > 60 ? 'var(--red)' : proof.waste > 30 ? 'var(--amber)' : 'var(--green)'
-  const risk = proof.overall_score >= 70 ? 'safe' : proof.overall_score >= 40 ? 'warn' : 'danger'
-  const gradeColor = risk === 'safe' ? 'var(--green)' : risk === 'warn' ? 'var(--amber)' : 'var(--red)'
-  const gradeTint = risk === 'safe' ? 'rgba(16,185,129,.14)' : risk === 'warn' ? 'rgba(245,158,11,.14)' : 'rgba(239,68,68,.14)'
-  const gradeBorder = risk === 'safe' ? 'rgba(16,185,129,.4)' : risk === 'warn' ? 'rgba(245,158,11,.4)' : 'rgba(239,68,68,.4)'
-
   return (
-    <section className={`${styles.hero}${ready ? ' ' + styles.heroIn : ''}${landed ? ' ' + styles.landed : ''}`}>
-      <div className={styles.grid}>
-        {/* ── Left: headline + one search ──
-            On mobile the wrapper dissolves (display:contents) so the proof card can
-            slot in directly after the search — real data on the FIRST screen. */}
-        <div className={styles.left}>
-          <span className={`${styles.eyebrow} ${styles.stage} ${styles.d1}`}>
-            <span className={styles.pulse} />
-            Real hiring outcomes from real applicants
-          </span>
+    <>
+      <section className={`${styles.hero}${ready ? ' ' + styles.heroIn : ''}`}>
+        <span className={`${styles.eyebrow} ${styles.stage} ${styles.d1}`}>
+          <span className={styles.pulse} />
+          Real hiring outcomes from real applicants
+        </span>
 
-          {/* Kinetic headline: each word rises from behind its own clip, 42ms apart
-              (KineticText gates on `ready` like the other stages). */}
-          <KineticText as="h1" className={styles.title} in={ready} delay={120}>
-            See who actually <span className={styles.grad}>responds</span> before you apply.
-          </KineticText>
+        {/* Kinetic headline: each word rises from behind its own clip, 42ms apart. */}
+        <KineticText as="h1" className={styles.title} in={ready} delay={120}>
+          See who actually <span className={styles.grad}>responds</span> before you apply.
+        </KineticText>
 
-          <p className={`${styles.lede} ${styles.stage} ${styles.d3}`}>
-            Check a company&apos;s ghost rate, response time, and real applicant outcomes — before you
-            spend another hour on an application that goes nowhere.
-          </p>
+        <p className={`${styles.lede} ${styles.stage} ${styles.d3}`}>
+          Check any company&apos;s ghost rate before you spend an hour applying. Then track every
+          application in one place that tells you when to follow up and when to move on.
+        </p>
 
-          <form
-            className={`${styles.search} ${styles.stage} ${styles.d4}`}
-            onSubmit={(e) => { e.preventDefault(); doSearch() }}
-            aria-label="Check a company"
-          >
-            <label className={styles.field}>
-              <SearchIcon />
-              <input
-                className={styles.input}
-                type="text"
-                placeholder="Company or job title"
-                autoComplete="off"
-                value={query}
-                onChange={e => setQuery(e.target.value)}
-                aria-label="Company or job title"
-              />
-            </label>
-            <label className={styles.field}>
-              <PinIcon />
-              <input
-                className={styles.input}
-                type="text"
-                placeholder="City or remote"
-                autoComplete="off"
-                value={location}
-                onChange={e => setLocation(e.target.value)}
-                aria-label="City or remote"
-              />
-            </label>
-            <button className={`${styles.go} btn-shine`} type="submit">Check company</button>
-          </form>
+        <form
+          className={`${styles.search} ${styles.stage} ${styles.d4}`}
+          onSubmit={(e) => { e.preventDefault(); doSearch() }}
+          aria-label="Check a company"
+        >
+          <label className={styles.field}>
+            <SearchIcon />
+            <input
+              className={styles.input}
+              type="text"
+              placeholder="Company or job title"
+              autoComplete="off"
+              value={query}
+              onChange={e => setQuery(e.target.value)}
+              aria-label="Company or job title"
+            />
+          </label>
+          <label className={styles.field}>
+            <PinIcon />
+            <input
+              className={styles.input}
+              type="text"
+              placeholder="City or remote"
+              autoComplete="off"
+              value={location}
+              onChange={e => setLocation(e.target.value)}
+              aria-label="City or remote"
+            />
+          </label>
+          <button className={`${styles.go} btn-shine`} type="submit">Check company</button>
+        </form>
 
-          {/* One tap to first value — real companies with real report volume. */}
-          <div className={`${styles.examples} ${styles.stage} ${styles.d5}`} aria-label="Example companies">
-            <span className={styles.examplesLabel}>Try one</span>
-            {EXAMPLES.map(ex => (
-              <button
-                key={ex.slug}
-                type="button"
-                className={styles.chip}
-                onClick={() => router.push(`/company/${ex.slug}`)}
-              >
-                {ex.label}
-              </button>
-            ))}
-          </div>
-
-          <div className={`${styles.trust} ${styles.stage} ${styles.d6}`}>
-            <span><b>Free</b> company checks</span>
-            <span><b>No account</b> needed to look</span>
-            <span><b>Real</b> applicant reports</span>
-          </div>
+        {/* One tap to first value — real companies with real scores. */}
+        <div className={`${styles.examples} ${styles.stage} ${styles.d5}`} aria-label="Example companies">
+          <span className={styles.examplesLabel}>Try one</span>
+          {EXAMPLES.map(ex => (
+            <button key={ex.slug} type="button" className={styles.chip} onClick={() => router.push(`/company/${ex.slug}`)}>
+              {ex.label}
+            </button>
+          ))}
         </div>
 
-        {/* ── Right: the thesis, made visible (real company, real numbers) ── */}
-        <aside className={`${styles.proof} ${styles.stage} ${styles.d4} tilt`} aria-label={`${proof.name} hiring report`}>
-          {/* A highlight travels the card border forever; the card leans toward the cursor. */}
-          <span className="beam" aria-hidden="true"><span className="beam-spin" /></span>
-          <div className={styles.proofHead}>
-            <div className={styles.co}>
-              <div className={styles.logo}>{proof.name[0]?.toUpperCase()}</div>
-              <div style={{ minWidth: 0 }}>
-                <h3 className={styles.coName}>{proof.name}</h3>
-                <span className={styles.coMeta}>{proof.first_party_report_count > 0
-                  ? `${proof.first_party_report_count.toLocaleString()} applicant report${proof.first_party_report_count === 1 ? '' : 's'}`
-                  : 'Estimated from public web data'}</span>
-              </div>
-            </div>
-            <div className={styles.grade} style={{ color: gradeColor, background: gradeTint, border: `1px solid ${gradeBorder}` }}>
-              GRADE&nbsp;{grade}
-            </div>
-          </div>
+        <div className={`${styles.trust} ${styles.stage} ${styles.d6}`}>
+          <span><b>Free</b> company checks</span>
+          <span><b>No account</b> needed to look</span>
+          <span><b>No grade</b> until 5+ reports</span>
+        </div>
+      </section>
 
-          <div className={styles.gaugeRow}>
-            {/* Ring and number share ghostAnim — they land together, always in sync. */}
-            <div className={styles.gauge} style={{ background: `conic-gradient(${ghostColor} ${ghostAnim}%, var(--line2) 0)` }} aria-hidden>
-              <div className={styles.gaugeNum}>
-                <b>{ghostAnim}%</b>
-                <small>ghosted</small>
-              </div>
-            </div>
-            <div className={styles.stats}>
-              <div className={styles.stat}>
-                <span className={styles.statK}>Responds to applicants</span>
-                <span className={styles.statV} style={{ color: respColor }}>{respAnim}%</span>
-              </div>
-              <div className={styles.stat}>
-                <span className={styles.statK}>Median wait to hear back</span>
-                <span className={styles.statV} style={{ color: waitColor }}>{waitAnim} days</span>
-              </div>
-              <div className={styles.stat}>
-                <span className={styles.statK}>Wasted-effort risk</span>
-                <span className={styles.statV} style={{ color: wasteColor }}>{wasteAnim}%</span>
-              </div>
-            </div>
-          </div>
-
-          <div className={styles.proofFoot}>
-            <span>From real applicant reports</span>
-            <Link href={`/company/${slugify(proof.name)}`} className={styles.reportLink}>Full report →</Link>
-          </div>
-        </aside>
-      </div>
-    </section>
+      {/* What you get once you start tracking: the workspace, with example results — and the
+          company tab running on Seen's real, live data (the proof this hero used to carry). */}
+      <WorkspacePreview proof={proof} />
+    </>
   )
 }
 

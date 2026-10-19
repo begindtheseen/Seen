@@ -1,58 +1,35 @@
-/* Homepage hero — one consolidated company search beside a live proof card built from
-   real applicant data. Dark brand identity + Syne display / DM Mono numerals, using the
-   real tokens from app/globals.css. Replaces the old "Check a company" + "Browse ghost
-   rates" + search triad with a single working search. */
+/* Homepage hero — centered and calm: one message, one working search, one-tap examples, a
+   short trust line. The proof that used to sit beside it lives in the workspace window right
+   below (components/home/WorkspacePreview), next to the example dashboard. Seen's own tokens
+   from app/globals.css (Syne display, DM Mono, Instrument Sans, indigo/violet). */
 
 .hero {
   position: relative;
   z-index: 2;
   width: 100%;
-  max-width: 1180px;
+  max-width: 1120px;
   margin: 0 auto;
-  padding: clamp(5.25rem, 9vw, 7rem) 1.25rem clamp(2.5rem, 6vw, 4rem);
+  padding: clamp(5.5rem, 10vw, 7.5rem) 1.25rem clamp(2.5rem, 5vw, 3.5rem);
   box-sizing: border-box;
-}
-@media (min-width: 768px) { .hero { padding-left: 2rem; padding-right: 2rem; } }
-
-.grid {
-  display: grid;
-  grid-template-columns: 1.08fr 0.92fr;
-  gap: clamp(2rem, 4.5vw, 3.5rem);
+  display: flex;
+  flex-direction: column;
   align-items: center;
-}
-/* ── Mobile is DESIGNED, not wrapped ──────────────────────────────────────────
-   The left column dissolves (display:contents) so hero pieces become grid items
-   we can ORDER: headline → search → PROOF CARD → chips → trust. The proof card
-   (the product's thesis) lands on the first scroll instead of two screens down.
-   Spacing moves to per-item margins because grid gap would double up. */
-@media (max-width: 920px) {
-  .grid { grid-template-columns: 1fr; gap: 0; }
-  .left { display: contents; }
-  .eyebrow { order: 1; justify-self: start; }
-  .title { order: 2; }
-  .lede { order: 3; }
-  .search { order: 4; }
-  .proof { order: 5; margin-top: 1.4rem; }
-  .examples { order: 6; margin-top: 1.3rem; }
-  .trust { order: 7; margin-top: 1.1rem; }
+  text-align: center;
 }
 
-/* ── Left column ── */
 .eyebrow {
   display: inline-flex;
   align-items: center;
   gap: 0.55rem;
   font-family: var(--mono);
-  font-size: 0.66rem;
+  font-size: 0.64rem;
   letter-spacing: 0.12em;
   text-transform: uppercase;
-  color: var(--sub);
-  border: 1px solid var(--glass-line);
-  background: rgba(255, 255, 255, 0.05);
-  padding: 0.4rem 0.8rem;
+  color: #c7d2fe;
+  border: 1px solid rgba(129, 140, 248, 0.3);
+  background: rgba(99, 102, 241, 0.1);
+  padding: 0.42rem 0.85rem;
   border-radius: 999px;
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
 }
 .pulse {
   width: 7px;
@@ -72,11 +49,12 @@
 .title {
   font-family: var(--display);
   font-weight: 800;
-  letter-spacing: -0.035em;
-  line-height: 0.98;
-  font-size: clamp(2.35rem, 5.4vw, 4rem);
+  letter-spacing: -0.04em;
+  line-height: 1.02;
+  font-size: clamp(2.4rem, 5.6vw, 4.3rem);
   color: var(--white);
-  margin: 1.1rem 0 0;
+  margin: 1.3rem 0 0;
+  max-width: 100%;
   text-wrap: balance;
 }
 .grad {
@@ -88,32 +66,32 @@
 
 .lede {
   color: var(--sub);
-  font-size: 1.06rem;
-  line-height: 1.55;
-  margin: 1.15rem 0 1.6rem;
-  max-width: 48ch;
+  font-size: clamp(1rem, 2.1vw, 1.12rem);
+  line-height: 1.6;
+  margin: 1.25rem 0 1.9rem;
+  max-width: 54ch;
 }
 
-/* ── One consolidated search ── */
+/* ── One working search ── */
 .search {
   display: flex;
   gap: 0.5rem;
-  background: var(--glass);
-  border: 1px solid var(--glass-line);
+  width: 100%;
+  max-width: 680px;
+  background: #0d1120;
+  border: 1px solid var(--line2);
   border-radius: 16px;
   padding: 0.5rem;
-  backdrop-filter: blur(24px) saturate(150%);
-  -webkit-backdrop-filter: blur(24px) saturate(150%);
-  box-shadow: var(--glass-hi), 0 24px 70px -24px rgba(0, 0, 0, 0.75);
+  text-align: left;
+  box-shadow: 0 24px 70px -24px rgba(0, 0, 0, 0.75), 0 0 60px -20px rgba(99, 102, 241, 0.35);
+  transition: border-color 0.25s ease, box-shadow 0.25s ease;
 }
-.field {
-  display: flex;
-  align-items: center;
-  gap: 0.55rem;
-  padding: 0 0.75rem;
-  flex: 1;
-  min-width: 0;
+.search:focus-within {
+  border-color: rgba(129, 140, 248, 0.6);
+  box-shadow: 0 20px 60px -24px rgba(0, 0, 0, 0.7), 0 0 0 3px rgba(99, 102, 241, 0.16), 0 0 50px rgba(99, 102, 241, 0.25);
 }
+.field { display: flex; align-items: center; gap: 0.55rem; padding: 0 0.75rem; flex: 1; min-width: 0; }
+.field:first-child { flex: 1.5; }
 .field + .field { border-left: 1px solid var(--line); }
 .field svg { color: var(--dim); flex: none; }
 .input {
@@ -123,353 +101,80 @@
   color: var(--white);
   font-family: var(--body);
   font-size: 0.95rem;
-  padding: 0.7rem 0;
+  padding: 0.75rem 0;
   outline: none;
   caret-color: var(--blue);
 }
 .input::placeholder { color: var(--dim); }
-
 .go {
   flex: none;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.4rem;
-  padding: 0.7rem 1.2rem;
+  padding: 0.75rem 1.25rem;
   border: none;
   border-radius: 11px;
   font-family: var(--body);
   font-weight: 700;
-  font-size: 0.88rem;
+  font-size: 0.9rem;
   color: #fff;
   cursor: pointer;
   white-space: nowrap;
   background: linear-gradient(135deg, #1d4ed8 0%, #7c3aed 55%, #a855f7 100%);
   box-shadow: 0 0 24px rgba(124, 58, 237, 0.35);
-  transition: filter 0.15s ease, transform 0.12s ease;
 }
 .go:hover { filter: brightness(1.08); }
-.go:active { transform: translateY(1px); }
 
-@media (max-width: 520px) {
-  .search { flex-wrap: wrap; }
-  .field { flex: 1 1 100%; padding: 0.35rem 0.6rem; }
-  .field + .field { border-left: none; border-top: 1px solid var(--line); }
-  .go { flex: 1 1 100%; padding: 0.75rem; }
-  .lede { font-size: 0.98rem; }
-}
-
-.trust {
-  display: flex;
-  gap: 1.4rem;
-  margin-top: 1rem;
-  flex-wrap: wrap;
-  color: var(--dim);
-  font-size: 0.82rem;
-}
-.trust b {
-  color: var(--sub);
-  font-family: var(--mono);
-  font-weight: 600;
-}
-
-/* ── Proof card (real company, real numbers) ── */
-.proof {
-  position: relative;
-  background: linear-gradient(160deg, rgba(23, 26, 43, 0.72), rgba(13, 15, 26, 0.85));
-  border: 1px solid var(--glass-line);
-  border-radius: 24px;
-  padding: 1.5rem;
-  backdrop-filter: blur(28px) saturate(150%);
-  -webkit-backdrop-filter: blur(28px) saturate(150%);
-  box-shadow: var(--glass-hi), 0 40px 90px -30px rgba(0, 0, 0, 0.85);
-}
-/* Gradient ring border — indigo catching the aurora at the top-left, fading to a
-   green whisper bottom-right. Masked so only the 1px ring paints. */
-.proof::before {
-  content: "";
-  position: absolute;
-  inset: -1px;
-  border-radius: 24px;
-  padding: 1px;
-  background: linear-gradient(140deg, rgba(129, 140, 248, 0.55), transparent 38%, transparent 68%, rgba(52, 211, 153, 0.35));
-  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
-  -webkit-mask-composite: xor;
-  mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
-  mask-composite: exclude;
-  pointer-events: none;
-}
-
-.proofHead {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.6rem;
-  position: relative;
-}
-.co { display: flex; align-items: center; gap: 0.7rem; min-width: 0; }
-.logo {
-  width: 38px;
-  height: 38px;
-  border-radius: 10px;
-  background: var(--raised);
-  border: 1px solid var(--line);
-  display: grid;
-  place-items: center;
-  font-family: var(--display);
-  font-weight: 800;
-  color: var(--white);
-  flex-shrink: 0;
-}
-.coName {
-  margin: 0;
-  font-family: var(--display);
-  font-size: 1.02rem;
-  font-weight: 700;
-  color: var(--white);
-  letter-spacing: -0.01em;
-  text-transform: capitalize;
-}
-.coMeta {
-  font-family: var(--mono);
-  font-size: 0.62rem;
-  color: var(--dim);
-}
-.grade {
-  font-family: var(--mono);
-  font-weight: 700;
-  font-size: 0.82rem;
-  padding: 0.32rem 0.6rem;
-  border-radius: 9px;
-  white-space: nowrap;
-  flex-shrink: 0;
-}
-
-.gaugeRow {
-  display: flex;
-  align-items: center;
-  gap: 1.15rem;
-  margin: 1.15rem 0 0.3rem;
-}
-.gauge {
-  width: 112px;
-  height: 112px;
-  border-radius: 50%;
-  flex: none;
-  display: grid;
-  place-items: center;
-  position: relative;
-}
-.gauge::after {
-  content: "";
-  position: absolute;
-  inset: 11px;
-  border-radius: 50%;
-  background: #0e111c;
-}
-.gaugeNum {
-  position: relative;
-  z-index: 1; /* sit above the inner-circle ::after that masks the conic ring */
-  text-align: center;
-  font-family: var(--mono);
-  line-height: 1;
-}
-.gaugeNum b {
-  display: block;
-  font-size: 1.65rem;
-  font-weight: 700;
-  color: var(--white);
-}
-.gaugeNum small {
-  color: var(--dim);
-  font-size: 0.58rem;
-  letter-spacing: 0.09em;
-  text-transform: uppercase;
-}
-
-.stats { flex: 1; display: flex; flex-direction: column; gap: 0.7rem; min-width: 0; }
-.stat {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 0.75rem;
-  padding-bottom: 0.6rem;
-  border-bottom: 1px dashed var(--line);
-}
-.stat:last-child { border-bottom: 0; padding-bottom: 0; }
-.statK { color: var(--sub); font-size: 0.78rem; min-width: 0; }
-.statV {
-  font-family: var(--mono);
-  font-weight: 600;
-  font-size: 0.95rem;
-  white-space: nowrap;
-}
-
-.proofFoot {
-  margin-top: 1.1rem;
-  padding-top: 0.9rem;
-  border-top: 1px solid var(--line);
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.6rem;
-}
-.proofFoot span { color: var(--dim); font-family: var(--mono); font-size: 0.62rem; }
-.reportLink {
-  color: var(--blue);
-  font-family: var(--mono);
-  font-weight: 600;
-  font-size: 0.72rem;
-  text-decoration: none;
-  white-space: nowrap;
-}
-.reportLink:hover { color: #93c5fd; }
-
-/* ── Entrance choreography ─────────────────────────────────────────────────────
-   Every .stage element starts hidden and rises when the section gets .heroIn
-   (which useIntroGate flips as soon as the display font is ready). Delays d1→d6
-   cascade left column top-to-bottom; the proof card rides with the search bar
-   and settles with a slight scale so it reads as "landing", not "appearing". */
-.stage {
-  opacity: 0;
-  transform: translateY(18px);
-  transition:
-    opacity 0.7s cubic-bezier(0.16, 1, 0.3, 1),
-    transform 0.7s cubic-bezier(0.16, 1, 0.3, 1);
-  will-change: opacity, transform;
-}
-.proof.stage { transform: translateY(22px) scale(0.975); }
-.heroIn .stage { opacity: 1; transform: none; }
-.heroIn .d1 { transition-delay: 0.05s; }
-.heroIn .d2 { transition-delay: 0.13s; }
-.heroIn .d3 { transition-delay: 0.21s; }
-.heroIn .d4 { transition-delay: 0.30s; }
-.heroIn .d5 { transition-delay: 0.40s; }
-.heroIn .d6 { transition-delay: 0.50s; }
-
-/* The proof card leans toward the cursor (MotionLayer writes --rx/--ry on `.tilt`).
-   Its entrance ends ON the tilt transform (the vars start at 0deg, i.e. flat), so the
-   two can never fight; once it has landed (HomeHero adds .landed ~1.3s after `ready`)
-   the stage delay is dropped so the lean answers the pointer instantly. */
-.heroIn .proof {
-  transform: perspective(1000px) rotateX(var(--rx, 0deg)) rotateY(var(--ry, 0deg));
-}
-.landed .proof { transition-delay: 0s; transition-duration: 0.6s; }
-.landed .proof.tilting { transition: transform 0.14s linear; }
-
-/* Figures never jitter while counting. */
-.gaugeNum b,
-.statV { font-variant-numeric: tabular-nums; }
-
-/* Grade chip pops after the ring has mostly swept (springy, tiny overshoot). */
-.grade {
-  opacity: 0;
-  transform: scale(0.55);
-  transition:
-    transform 0.55s cubic-bezier(0.34, 1.56, 0.64, 1) 1.35s,
-    opacity 0.3s ease 1.35s;
-}
-.heroIn .grade { opacity: 1; transform: scale(1); }
-
-/* ── Search focus: the whole bar lights up, not just a caret ── */
-.search {
-  transition: border-color 0.25s ease, box-shadow 0.25s ease;
-}
-.search:focus-within {
-  border-color: rgba(129, 140, 248, 0.55);
-  box-shadow:
-    0 20px 60px -24px rgba(0, 0, 0, 0.7),
-    0 0 0 3px rgba(99, 102, 241, 0.16),
-    0 0 44px rgba(99, 102, 241, 0.2);
-}
-
-/* ── "Try one" example chips — one tap to first value ── */
-.examples {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  flex-wrap: wrap;
-  margin-top: 1rem;
-}
-.examplesLabel {
-  font-family: var(--mono);
-  font-size: 0.62rem;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: var(--dim);
-  margin-right: 0.15rem;
-}
+/* ── "Try one" chips ── */
+.examples { display: flex; align-items: center; justify-content: center; gap: 0.5rem; flex-wrap: wrap; margin-top: 1.1rem; }
+.examplesLabel { font-family: var(--mono); font-size: 0.6rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--dim); margin-right: 0.15rem; }
 .chip {
   font-family: var(--body);
   font-size: 0.8rem;
   font-weight: 600;
   color: var(--sub);
-  background: rgba(255, 255, 255, 0.045);
-  border: 1px solid var(--glass-line);
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--line2);
   border-radius: 999px;
-  padding: 0.34rem 0.85rem;
+  padding: 0.36rem 0.9rem;
   cursor: pointer;
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-  transition: color 0.18s ease, border-color 0.18s ease, background 0.18s ease,
-    transform 0.18s ease, box-shadow 0.22s ease;
+  transition: color 0.18s ease, border-color 0.18s ease, background 0.18s ease, transform 0.25s var(--ease-spring), box-shadow 0.22s ease;
 }
 .chip:hover {
   color: var(--white);
   border-color: rgba(129, 140, 248, 0.5);
   background: rgba(99, 102, 241, 0.1);
-  transform: translateY(-1px);
+  transform: translateY(-2px);
   box-shadow: 0 6px 20px rgba(99, 102, 241, 0.18);
 }
-.chip:active { transform: translateY(0) scale(0.97); }
+.chip:active { transform: scale(0.96); }
 
-/* Mobile: a deliberate 2×2 chip grid (no orphaned wrap), label on its own line,
-   and the trust row becomes a ✓ checklist — one font, no mid-phrase line breaks. */
+.trust { display: flex; justify-content: center; gap: 1.4rem; margin-top: 1.4rem; flex-wrap: wrap; color: var(--dim); font-size: 0.82rem; }
+.trust b { color: var(--sub); font-weight: 600; }
+
+/* ── Entrance choreography: stages rise when useIntroGate flips (font ready). ── */
+.stage {
+  opacity: 0;
+  transform: translateY(16px);
+  transition: opacity 0.7s var(--ease-out), transform 0.7s var(--ease-out);
+}
+.heroIn .stage { opacity: 1; transform: none; }
+.heroIn .d1 { transition-delay: 0.02s; }
+.heroIn .d3 { transition-delay: 0.42s; }
+.heroIn .d4 { transition-delay: 0.52s; }
+.heroIn .d5 { transition-delay: 0.62s; }
+.heroIn .d6 { transition-delay: 0.72s; }
+
 @media (max-width: 560px) {
-  .examples {
-    display: grid;
-    grid-template-columns: repeat(2, 1fr);
-    gap: 0.5rem;
-  }
-  .examplesLabel { grid-column: 1 / -1; margin: 0 0 0.05rem; }
-  .chip {
-    padding: 0.6rem 0.5rem;
-    text-align: center;
-    font-size: 0.84rem;
-  }
-  .trust {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 0.5rem;
-    font-size: 0.82rem;
-  }
-  .trust span { display: flex; align-items: baseline; gap: 0.45rem; }
-  .trust span::before {
-    content: "✓";
-    color: var(--green);
-    font-family: var(--mono);
-    font-size: 0.72rem;
-    flex-shrink: 0;
-  }
-  /* Single-font emphasis on mobile — the desktop mono-bold mix breaks ugly when wrapping. */
-  .trust b { font-family: var(--body); color: var(--white); }
+  .search { flex-wrap: wrap; }
+  .field, .field:first-child { flex: 1 1 100%; padding: 0.35rem 0.6rem; }
+  .field + .field { border-left: none; border-top: 1px solid var(--line); }
+  .go { flex: 1 1 100%; padding: 0.8rem; }
+  .examples { display: grid; grid-template-columns: repeat(2, 1fr); width: 100%; }
+  .examplesLabel { grid-column: 1 / -1; margin: 0; }
+  .chip { padding: 0.6rem 0.5rem; font-size: 0.84rem; }
+  .trust { gap: 0.4rem 1.1rem; font-size: 0.78rem; }
 }
 
 @media (prefers-reduced-motion: reduce) {
   .pulse { animation: none; }
-  .stage,
-  .proof.stage {
-    opacity: 1;
-    transform: none;
-    transition: none;
-  }
-  .grade {
-    opacity: 1;
-    transform: none;
-    transition: none;
-  }
-  .heroIn .proof,
-  .landed .proof { transform: none; transition: none; }
-  .chip,
-  .search { transition: none; }
+  .stage { opacity: 1; transform: none; transition: none; }
+  .chip, .search { transition: none; }
 }
