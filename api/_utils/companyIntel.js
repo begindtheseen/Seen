@@ -68,7 +68,7 @@ export function mentionTotal(webReviews) {
   let list = webReviews;
   if (typeof list === 'string') { try { list = JSON.parse(list); } catch { list = []; } }
   if (!Array.isArray(list)) return 0;
-  return list.filter((r) => r && String(r.text || r.quote || r.summary || '').trim()).length;
+  return list.filter((r) => r && r.kind !== 'employee_review' && String(r.text || r.quote || r.summary || '').trim()).length;
 }
 /** company_scores.web_reviews (array or JSON string) → fusion outcomes for the 'mentions' source. */
 export function mentionOutcomes(webReviews) {
@@ -77,6 +77,7 @@ export function mentionOutcomes(webReviews) {
   if (!Array.isArray(list)) return [];
   const out = [];
   for (const r of list) {
+    if (r?.kind === 'employee_review') continue;
     const c = classifyMention(r && (r.text || r.quote || r.summary));
     if (c) out.push({ outcome: c });
   }

@@ -65,6 +65,9 @@
     "api/ingest-local-indeed.js": {
       "maxDuration": 60
     },
+    "api/ingest-local-company-intel.js": {
+      "maxDuration": 60
+    },
     "api/admin-stats.js": {
       "maxDuration": 15
     },

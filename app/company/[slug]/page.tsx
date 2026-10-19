@@ -61,6 +61,8 @@ interface WebReview {
   sentiment: 'positive' | 'negative' | 'mixed'
   source?: string
   year?: string
+  kind?: 'employee_review' | 'public_commentary' | 'applicant_outcome'
+  url?: string
 }
 
 type SectionKey = 'odds' | 'breakdown' | 'reports' | 'online' | 'reddit' | 'locations' | 'roles' | 'compare' | 'about'
@@ -227,7 +229,7 @@ function WebReviewsSection({ reviews }: { reviews: WebReview[] }) {
   return (
     <div style={{ padding: '0 0 1.5rem' }}>
       <div className="co-sec-lbl" style={{ marginBottom: '.75rem' }}>
-        What applicants are saying online
+        What people are saying online
       </div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: '.6rem' }}>
         {reviews.map((rv, i) => (
@@ -240,7 +242,7 @@ function WebReviewsSection({ reviews }: { reviews: WebReview[] }) {
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '.5rem', flexWrap: 'wrap' }}>
               <span style={{ fontFamily: 'var(--mono)', fontSize: '.54rem', fontWeight: 600, color: sentColor(rv.sentiment) }}>{sentLabel(rv.sentiment)}</span>
-              {rv.source && <span style={{ fontFamily: 'var(--mono)', fontSize: '.52rem', color: 'var(--muted)' }}>{rv.source}</span>}
+              {rv.source && <span style={{ fontFamily: 'var(--mono)', fontSize: '.52rem', color: 'var(--muted)' }}>{rv.kind === 'employee_review' ? 'Employee review · ' : ''}{rv.source}</span>}
               {rv.year && <span style={{ fontFamily: 'var(--mono)', fontSize: '.52rem', color: 'var(--muted)' }}>{rv.year}</span>}
             </div>
           </div>
