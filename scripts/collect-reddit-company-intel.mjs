@@ -4,6 +4,7 @@ import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { classifyRawRedditExcerpt, flattenRedditRead, unwrapOpenCli } from '../lib/server/redditIntelCollector.js';
 import { censorExcerpt } from '../lib/server/companyIntelImport.js';
+import { rankAndFilter } from '../api/_utils/companyReddit.js';
 
 const exec = promisify(execFile);
 const token = process.env.SEEN_COMPANY_INTEL_INGEST_TOKEN;
@@ -38,7 +39,12 @@ for (const target of targets.companies || []) {
   let posts = [];
   try { posts = await opencli(['reddit', 'search', jobQuery(target.company), '--sort', 'relevance', '--time', 'year', '--limit', String(postLimit), '-f', 'json']); }
   catch (error) { console.warn(`[skip] ${target.company}: search failed: ${error.message}`); continue; }
-  for (const post of Array.isArray(posts) ? posts : []) {
+  // Search engines occasionally return a word collision (for example, a product rather than
+  // an employer). Keep only threads that actually name this company in an employment context.
+  const relevantPosts = rankAndFilter((Array.isArray(posts) ? posts : []).map(post => ({
+    ...post, permalink: post.url || post.permalink || '', _body: post.selftext || '',
+  })), target.company, postLimit);
+  for (const post of relevantPosts) {
     const id = post.id || String(post.url || '').match(/comments\/([a-z0-9]+)/i)?.[1];
     const sourceUrl = String(post.url || post.permalink || '');
     if (!id || !sourceUrl) continue;
