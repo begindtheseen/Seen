@@ -64,6 +64,11 @@ longer the design source of truth for redesigned pages. `SITE_PARITY_CHECKLIST.m
   while the hero choreography runs. `useIntroGate()` now just flips once the display font is ready
   (≤300ms) — the API is unchanged for HomeHero. Rationale: the cover played on EVERY page's first
   load, including Google landings on company pages, and hid readable content for 1.4–3s.
+- **Floating menus/panels over content are SOLID (#0e111c), never translucent glass.** The nav
+  account/More menu used `--glass-strong` (72% alpha) + backdrop-filter nested inside the blurred
+  nav; iOS Safari does not composite nested backdrop-filters, so the hero showed straight through and
+  the menu was unreadable (owner screenshot 2026-10-19). Same rule already held for `.co-sticky` and
+  CompanyScoreModal. Glass stays only on surfaces that sit over the static background.
 - **Jobs filters** (`components/jobs/JobFilters.tsx` + `.module.css`): one "Filters" button with a
   count badge opens a panel with the four selects; active filters show as self-clearing chips next to
   the button. Filter state/behaviour in `useJobSearch` is untouched.
