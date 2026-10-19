@@ -57,10 +57,16 @@ longer the design source of truth for redesigned pages. `SITE_PARITY_CHECKLIST.m
   Transform/opacity/clip-path only, fine-pointer-only cursor effects, everything neutralized under
   `prefers-reduced-motion` (block at the end of motion.css). The 2026-10-17 phone-performance rules and
   the no-backdrop-filter-on-overlays rule (PR #322) are untouched.
-- **Intro splash is now ~1.4s** (820ms wordmark + 580ms shutter wipe; was 2.4s canvas slot-machine +
-  580ms fade). `components/IntroSplash.tsx` has no canvas; it keeps every contract: `sessionStorage
-  seen_intro_shown`, `markIntroDone()` → `seen:intro-done` (fired when the wipe STARTS so hero
-  entrances overlap it), `#intro-guard` hidden never removed, `html.intro-seen`.
+- **There is NO blocking intro splash any more** (owner call 2026-10-19). `IntroSplash.tsx`, the
+  `#intro-guard` cover and the `intro-seen` script are deleted. The opening is in the page: on the FIRST
+  load of a session `app/layout.tsx` marks `html.seen-first` before first paint (sessionStorage
+  `seen_opened`), and pure CSS rises the nav wordmark letter by letter + draws a hairline under the nav
+  while the hero choreography runs. `useIntroGate()` now just flips once the display font is ready
+  (≤300ms) — the API is unchanged for HomeHero. Rationale: the cover played on EVERY page's first
+  load, including Google landings on company pages, and hid readable content for 1.4–3s.
+- **Jobs filters** (`components/jobs/JobFilters.tsx` + `.module.css`): one "Filters" button with a
+  count badge opens a panel with the four selects; active filters show as self-clearing chips next to
+  the button. Filter state/behaviour in `useJobSearch` is untouched.
 - **Shared keyframe `fadeUp` was reshaped** (snap-in + settle) in motion.css — all 21 inline
   `animation: fadeUp …` call sites got crisper without edits. Nav active underline is ONE sliding
   indicator (`Nav.module.css .ind`, measured in Nav.tsx). Toasts carry `--dur`/`--acc` + `.timed`

@@ -327,7 +327,7 @@
 
 /* ── Entrance choreography ─────────────────────────────────────────────────────
    Every .stage element starts hidden and rises when the section gets .heroIn
-   (which useIntroGate flips the moment the intro splash dissolves). Delays d1→d6
+   (which useIntroGate flips as soon as the display font is ready). Delays d1→d6
    cascade left column top-to-bottom; the proof card rides with the search bar
    and settles with a slight scale so it reads as "landing", not "appearing". */
 .stage {

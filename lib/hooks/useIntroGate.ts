@@ -1,33 +1,25 @@
 'use client'
 
-// Splash→page handoff. Returns true once the intro splash has cleared (or was
-// skipped), so entrance animations start exactly as the splash dissolves instead
-// of playing invisibly behind it. IntroSplash sets window.__seenIntroDone and
-// dispatches 'seen:intro-done' in both its show and skip paths; a safety timeout
-// guarantees the page can never be held hostage if neither happens.
+// Entrance gate for page choreography (hero stages, kinetic headline, count-ups).
+// There is no blocking intro any more: the page IS the opening. The gate flips the moment
+// the display face is available (cached fonts: immediately; a cold load: at most ~300ms),
+// so the first words never rise in a fallback font and the hero starts on the first paint.
 
 import { useEffect, useState } from 'react'
 
-declare global {
-  interface Window { __seenIntroDone?: boolean }
-}
+const FONT_WAIT = 300
 
 export function useIntroGate(): boolean {
   const [ready, setReady] = useState(false)
 
   useEffect(() => {
-    if (window.__seenIntroDone) { setReady(true); return }
-    let timer: ReturnType<typeof setTimeout> | null = null
-    const on = () => {
-      if (timer) clearTimeout(timer)
-      setReady(true)
-    }
-    window.addEventListener('seen:intro-done', on, { once: true })
-    timer = setTimeout(on, 4200) // safety net — never block the page
-    return () => {
-      window.removeEventListener('seen:intro-done', on)
-      if (timer) clearTimeout(timer)
-    }
+    let done = false
+    const go = () => { if (!done) { done = true; setReady(true) } }
+    let fontLoad: Promise<unknown> | null = null
+    try { fontLoad = document.fonts?.load('800 1em Syne') ?? null } catch { fontLoad = null }
+    if (fontLoad && typeof fontLoad.then === 'function') fontLoad.then(go, go)
+    const t = setTimeout(go, FONT_WAIT)
+    return () => { done = true; clearTimeout(t) }
   }, [])
 
   return ready
