@@ -100,8 +100,6 @@ Stripe webhook are all properly defended.
   (no filter injection).
 - **Stripe webhook** (`api/stripe.js`): HMAC-SHA256 signature verified with
   `timingSafeEqual`; refuses unsigned webhooks (503).
-- **SSRF** (`api/import-listing.js`): DNS-resolves and rejects private IPs on every
-  redirect hop, with content-type allow-listing and a body-size cap.
 - **No committed secrets**; `.env*` gitignored; anon key public by design.
 
 **Documented as hardening backlog (Low / not independently exploitable)**
@@ -110,8 +108,6 @@ Stripe webhook are all properly defended.
   `Authorization` header, which a cross-origin page can't attach). Tighten to an
   exact-match allowlist when convenient — deferred here to avoid breaking Vercel
   preview origins in a security patch.
-- `api/import-listing.js` POST is unauthenticated and writes the shared `jobs`
-  table (rate-limited; spam/pollution vector, not IDOR).
 - Info: DNS-rebinding TOCTOU in the SSRF check; non-timing-safe cron-secret
   compares (high-entropy secrets, network-bound — impractical); `verifyJWT` omits
   `aud`/`iss` checks (not exploitable — HMAC-SHA256 is forced, so `alg:none`/

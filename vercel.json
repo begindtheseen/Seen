@@ -62,7 +62,7 @@
     "api/jobs.js": {
       "maxDuration": 60
     },
-    "api/import-listing.js": {
+    "api/ingest-local-indeed.js": {
       "maxDuration": 60
     },
     "api/admin-stats.js": {

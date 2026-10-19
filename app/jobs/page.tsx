@@ -12,8 +12,6 @@ import SwipeJobDeck from '@/components/jobs/SwipeJobDeck'
 import JobFilters from '@/components/jobs/JobFilters'
 import ApplyCheckpoint from '@/components/ApplyCheckpoint'
 import ApplyOptimizeModal from '@/components/ApplyOptimizeModal'
-import ImportListingModal from '@/components/jobs/ImportListingModal'
-import { SavedJobsStore } from '@/lib/stores/SavedJobs'
 import { notify } from '@/lib/notify'
 import { matchCities } from '@/lib/data/usCities'
 import { takesSeenApply } from '@/lib/seenApplyMode'
@@ -58,7 +56,6 @@ export default function JobsPage() {
   const [deckDone, setDeckDone] = useState(false)
   const [swipeMode, setSwipeMode] = useState(false)
   const [checkpointJob, setCheckpointJob] = useState<Job | null>(null)
-  const [showImport, setShowImport] = useState(false)
   // When the checkpoint is opened AFTER the user already confirmed applying (the Apply &
   // Optimize funnel), it should record the application immediately rather than re-ask.
   const [checkpointAuto, setCheckpointAuto] = useState(false)
@@ -204,17 +201,6 @@ export default function JobsPage() {
               {status === 'loading' ? 'Searching...' : 'Search →'}
             </button>
           </div>
-
-          {/* Paste-a-link import — bring any listing (Indeed, LinkedIn, a careers page…)
-              into the optimize flow */}
-          <button
-            onClick={() => setShowImport(true)}
-            style={{ background: 'none', border: 'none', padding: 0, marginTop: '.55rem', cursor: 'pointer', fontFamily: 'var(--mono)', fontSize: '.62rem', color: 'var(--sub)', display: 'inline-flex', alignItems: 'center', gap: 6 }}
-          >
-            <span aria-hidden>🔗</span>
-            Found a job somewhere else?
-            <span style={{ color: '#a5b4fc', fontWeight: 700 }}>Paste the link to optimize your resume for it →</span>
-          </button>
 
           {/* Filter bar */}
           <JobFilters
@@ -382,22 +368,6 @@ export default function JobsPage() {
         onApplied={() => { setCheckpointAuto(true); setCheckpointJob(applyJob) }}
       />
     )}
-
-    {showImport && (
-      <ImportListingModal
-        onClose={() => setShowImport(false)}
-        onImported={job => {
-          setShowImport(false)
-          // An import is the user handing us a listing they care about — keep it visibly:
-          // saved list (with full snapshot) + DB row, so it survives the modal closing.
-          SavedJobsStore.save(job, isLoggedIn)
-          setSaveVersion(v => v + 1)
-          notify({ title: 'Listing added & saved', sub: `${job.title} · ${job.company} — in your Saved list`, severity: 'success', duration: 3200 })
-          setApplyJob(job)
-        }}
-      />
-    )}
-
     {checkpointJob && (
       <ApplyCheckpoint
         job={checkpointJob}

@@ -17,7 +17,8 @@
     "memory:status": "node scripts/memory-status.mjs",
     "memory:mcp": "node memory/mcp/server.mjs",
     "memory:graph": "node scripts/memory-graph.mjs",
-    "brain": "node scripts/brain.mjs"
+    "brain": "node scripts/brain.mjs",
+    "ingest:indeed": "node scripts/ingest-indeed-opencli.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.49.2",
