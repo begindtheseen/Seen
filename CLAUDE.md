@@ -69,6 +69,10 @@ longer the design source of truth for redesigned pages. `SITE_PARITY_CHECKLIST.m
   nav; iOS Safari does not composite nested backdrop-filters, so the hero showed straight through and
   the menu was unreadable (owner screenshot 2026-10-19). Same rule already held for `.co-sticky` and
   CompanyScoreModal. Glass stays only on surfaces that sit over the static background.
+- **Tracker check-ins live on the application card** (owner request 2026-10-19). `EventStore.dueChecks`
+  returns ONE check per application — the earliest unanswered in schedule order; a snoozed one holds
+  the app back rather than letting a later check jump it. The old full-card stack above the list (and
+  its duplicate response+interview questions per old app) is gone; a one-line counter jumps to the first.
 - **Jobs filters** (`components/jobs/JobFilters.tsx` + `.module.css`): one "Filters" button with a
   count badge opens a panel with the four selects; active filters show as self-clearing chips next to
   the button. Filter state/behaviour in `useJobSearch` is untouched.
