@@ -191,7 +191,6 @@ export default function SwipeJobDeck({ jobs, onOpen, onDismiss, onSave, onApply,
 
   const scoreRisk = (score: number | null): 'safe' | 'warn' | 'danger' | 'unrated' =>
     Score.risk(score)
-  const scoreColor = (score: number | null) => Score.color(Score.risk(score))
   // Continuous HSL scale: 25→0° (red), 60→60° (yellow), 95→120° (green).
   // A null (unrated) listing gets a neutral desaturated gray — never a colored verdict.
   const scoreHsl = (score: number | null, alpha: number) => {

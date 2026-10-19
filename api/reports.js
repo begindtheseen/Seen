@@ -341,7 +341,6 @@ export default async function handler(req, res) {
   // Same rule the FAQ states: ≥3 scorable "ghosted" reports in the last 7 days. Names are matched
   // exactly (case-insensitive) so "general" never counts Dollar General's reports.
   if (body.action === 'ghost_surges') {
-    if (!SUPABASE_URL || !SUPABASE_SERVICE_KEY) return res.status(200).json({ ok: true, surges: [] });
     const names = Array.isArray(body.names) ? [...new Set(body.names.map(n => String(n || '').toLowerCase().trim()).filter(Boolean))].slice(0, 20) : [];
     if (!names.length) return res.status(200).json({ ok: true, surges: [] });
     try {
