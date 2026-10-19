@@ -3,6 +3,9 @@
 import { isValidCompanyName, normalizeCompany } from './_utils/reportWrite.js';
 
 const headersFor = key => ({ apikey: key, Authorization: `Bearer ${key}` });
+// A lowercase, spaceless identifier is usually an ATS board slug, not the employer's
+// display name. Keep it available as a last resort, but never let it outrank real names.
+const isSlugLike = name => String(name || '') === String(name || '').toLowerCase() && !/\s/.test(String(name || ''));
 const page = async (url, headers, offset) => {
   const response = await fetch(`${url}/rest/v1/jobs?select=company&availability_status=eq.active&expires_at=gt.${encodeURIComponent(new Date().toISOString())}&company=not.is.null&order=company.asc&limit=1000&offset=${offset}`, { headers });
   return response.ok ? response.json() : [];
@@ -33,6 +36,6 @@ export default async function handler(req, res) {
     if (!isValidCompanyName(name) || !normalized || counts.has(normalized)) continue;
     counts.set(normalized, { company: name, active_listings: 0, existing_reports: Number(row.report_count) || 0 });
   }
-  const companies = [...counts.values()].sort((a, b) => b.active_listings - a.active_listings || b.existing_reports - a.existing_reports || a.company.localeCompare(b.company)).slice(0, limit);
+  const companies = [...counts.values()].sort((a, b) => Number(isSlugLike(a.company)) - Number(isSlugLike(b.company)) || b.active_listings - a.active_listings || b.existing_reports - a.existing_reports || a.company.localeCompare(b.company)).slice(0, limit);
   return res.status(200).json({ ok: true, companies, scanned_active_companies: counts.size });
 }
