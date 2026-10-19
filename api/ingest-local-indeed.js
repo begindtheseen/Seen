@@ -6,26 +6,51 @@ import { buildJob, upsertJobs } from '../lib/server/jobSources.js';
 
 const text = (value, max = 12000) => String(value || '').replace(/\0/g, '').trim().slice(0, max);
 
-function indeedUrl(value) {
+export function indeedUrl(value) {
   try {
     const url = new URL(String(value || ''));
-    return /^https:$/.test(url.protocol) && /(^|\.)indeed\.com$/i.test(url.hostname) ? url.toString() : '';
+    if (!/^https:$/.test(url.protocol) || !/(^|\.)indeed\.com$/i.test(url.hostname)) return '';
+    // The jk is the listing identity; tracking parameters and fragments only create duplicate URLs.
+    const jk = url.searchParams.get('jk');
+    if (!jk) return '';
+    return `https://www.indeed.com/viewjob?jk=${encodeURIComponent(jk)}`;
   } catch { return ''; }
+}
+
+export function classifyWorkArrangement(raw = {}) {
+  const evidence = `${raw.location || ''} ${raw.description || ''} ${raw.job_type || raw.jobType || ''}`.toLowerCase();
+  if (/\bhybrid\b/.test(evidence)) return 'hybrid';
+  if (/\b(remote|work from home|wfh|telecommut)\b/.test(evidence)) return 'remote';
+  if (/\b(on[- ]site|in[- ]office)\b/.test(evidence)) return 'onsite';
+  return 'unknown';
+}
+
+function locationLikeEmployer(value) {
+  const v = text(value, 120);
+  // A comma-separated list of US city names is a bad company value, but do not split or
+  // "repair" ambiguous real names such as Everforth, CyberCoders.
+  return /^(?:Chicago|Bismarck|Cincinatti|Cincinnati|Detroit|Indianapolis|Sioux Falls)(?:,\s*(?:Chicago|Bismarck|Cincinatti|Cincinnati|Detroit|Indianapolis|Sioux Falls)){1,}$/i.test(v);
 }
 
 export function normalizeLocalIndeedJob(raw) {
   const url = indeedUrl(raw?.url || raw?.job_url || raw?.jobUrl);
   if (!url) return null;
+  const company = text(raw?.company || raw?.company_name || raw?.companyName, 120);
+  if (!company || locationLikeEmployer(company)) return null;
+  const arrangement = classifyWorkArrangement(raw);
+  const location = text(raw?.location, 120);
   return buildJob({
     title: text(raw?.title || raw?.position, 200),
-    company: text(raw?.company || raw?.company_name || raw?.companyName, 120),
-    location: text(raw?.location, 120) || 'Remote',
+    company,
+    // Never turn a Remote search into a false Remote listing. Unknown stays an honest location.
+    location: location || (arrangement === 'remote' ? 'Remote' : 'Unknown'),
     salary: text(raw?.salary, 120) || null,
     description: text(raw?.description, 12000),
     apply_url: url,
     source: 'Indeed (local OpenCLI)',
     type: /part[ -]?time/i.test(text(raw?.job_type || raw?.jobType || raw?.type, 80)) ? 'Part-time' : 'Full-time',
     searchQuery: text(raw?.search_query || raw?.searchQuery || raw?.title, 160),
+    externalId: text(raw?.id || raw?.jobKey || new URL(url).searchParams.get('jk'), 80),
   });
 }
 
@@ -47,7 +72,8 @@ export default async function handler(req, res) {
 
   try {
     const result = await upsertJobs(rows, url, key);
-    return res.status(200).json({ ok: true, received: input.length, accepted: rows.length, upserted: result.upserted || 0, dropped: result.dropped || 0 });
+    const deduplicated = Math.max(0, rows.length - (result.deduped || rows.length));
+    return res.status(200).json({ ok: true, received: input.length, accepted: rows.length, rejected: input.length - rows.length, deduplicated, upserted: result.upserted || 0, dropped: result.dropped || 0, inserted: null, updated: null });
   } catch (error) {
     console.error('local Indeed ingestion failed:', error.message);
     return res.status(500).json({ error: 'Could not store Indeed listings.' });
