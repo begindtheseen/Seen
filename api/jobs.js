@@ -5,12 +5,13 @@ import { logError } from '../lib/server/errlog.js';
 import { filterAndRank, filterByLocation, sortByProximity, locationDbTerm, expandQueryTerms } from './_utils/jobRelevance.js';
 import { sortByPriority, companyMatchesQuery, queryNamesCompany, isRemoteListing } from '../lib/server/jobPriority.js';
 import { waitUntil } from '@vercel/functions';
-import { aggregateForQuery, upsertJobs, inferLevel, wasRecentlyPulled, recordPull } from '../lib/server/jobSources.js';
+import { aggregateForQuery, upsertJobs, inferLevel, wasRecentlyPulled, recordPull, adzunaPay } from '../lib/server/jobSources.js';
 import { aggregateWithSources } from '../lib/jobs/expand.js';
 import { deriveResumeJobQuery, pullResumeJobFloor, deriveResumeSignal, resumeSkillsStale } from '../lib/server/resumeJobMatch.js';
 import { isReadableResume } from '../lib/server/resumeReadability.js';
 import { scoreJob, wasteScore, scoreRow, explainListingScore } from '../lib/server/jobScore.js';
 import { computeListingFreshness } from '../lib/server/listingFreshness.js';
+import { listingSignals } from '../lib/server/listingSignals.js';
 import { geocodeLocation, haversineMiles, milesToKm, hasUsableCoords, geoBoxClause, sanitizeCoords } from '../lib/server/geo.js';
 
 // ── Suppressed listings (migration 047) ─────────────────────────────────────────────────────
@@ -153,6 +154,12 @@ export default async function handler(req, res) {
   if (_body.action === 'company_jobs') {
     if (await applyRateLimit(req, res, 'job-read', { bucketKey: rlBucket.key })) return;
     return handleCompanyJobs(req, res, _body);
+  }
+
+  // ── Listing signals: a company's rating from its own open posts (not its applicant grade) ──
+  if (_body.action === 'listing_signals') {
+    if (await applyRateLimit(req, res, 'job-read', { bucketKey: rlBucket.key })) return;
+    return handleListingSignals(req, res, _body);
   }
 
   // ── Recommended jobs: personalized from resume_skills ────────────────────
@@ -707,6 +714,40 @@ function buildFallbackFilter(q) {
   return `or=${encodeURIComponent(`(${conditions.join(',')})`)}`;
 }
 
+// The ONE employer-name key for the company page's listing reads (company_jobs, listing_signals):
+// legal suffixes dropped, hyphens and spaces alike — "Coca-Cola" ↔ "Coca Cola", never "Amazon Flex" ↔ "Amazon".
+const companyNameKey = n => String(n || '').toLowerCase().trim().replace(/[\s,]+(inc\.?|llc\.?|corp\.?|ltd\.?|co\.|plc\.?)\.?$/i, '').replace(/[\s-]+/g, ' ').trim();
+const companyIlike = name => encodeURIComponent(`*${String(name).toLowerCase().trim().replace(/[\s-]+/g, '*')}*`);
+
+// ── handleListingSignals: every open post of ONE company → lib/server/listingSignals.js ─────────
+// Read-only. Up to 3,000 posts (3 pages); cached per instance for 30 minutes (posts change hourly at most).
+const SIGNALS_CACHE = new Map();
+async function handleListingSignals(req, res, body) {
+  const company = typeof body.company === 'string' ? body.company.trim().slice(0, 100).replace(/[<>`\\]/g, '') : '';
+  if (!company) return res.status(400).json({ error: 'company required' });
+  const SUPABASE_URL = process.env.SUPABASE_URL, KEY = process.env.SUPABASE_SERVICE_KEY;
+  if (!SUPABASE_URL || !KEY) return res.status(503).json({ error: 'DB unavailable' });
+  const key = companyNameKey(company);
+  const hit = SIGNALS_CACHE.get(key);
+  if (hit && Date.now() - hit.at < 30 * 60_000) return res.status(200).json({ ok: true, signals: hit.value, _src: 'cache' });
+  const headers = { apikey: KEY, Authorization: `Bearer ${KEY}` };
+  const now = encodeURIComponent(new Date().toISOString());
+  const rows = [];
+  try {
+    for (let page = 0; page < 3; page++) {
+      const r = await fetch(`${SUPABASE_URL}/rest/v1/jobs?company=ilike.${companyIlike(company)}&expires_at=gt.${now}&availability_status=eq.active&select=company,salary,source,source_type,ats_provider,is_employer_posted,score,created_at&order=id.asc&limit=1000&offset=${page * 1000}`, { headers });
+      if (!r.ok) return res.status(502).json({ error: 'Could not read the job posts — try again.' });
+      const batch = await r.json();
+      rows.push(...batch.filter(j => companyNameKey(j.company) === key));
+      if (batch.length < 1000) break;
+    }
+  } catch (e) { logError('listing_signals', e.message, { company }); return res.status(502).json({ error: 'Could not read the job posts — try again.' }); }
+  const value = listingSignals(rows);
+  SIGNALS_CACHE.set(key, { at: Date.now(), value });
+  if (SIGNALS_CACHE.size > 2000) SIGNALS_CACHE.delete(SIGNALS_CACHE.keys().next().value);
+  return res.status(200).json({ ok: true, signals: value });
+}
+
 // ── handleCompanyJobs: DB lookup + live search for a specific company ─────────
 async function handleCompanyJobs(req, res, body) {
   const { company } = body;
@@ -723,9 +764,9 @@ async function handleCompanyJobs(req, res, body) {
   // Check DB first (non-expired listings for THIS company). Wildcards only between tokens
   // ("coca-cola" ↔ "Coca Cola"), then an exact normalized-name check — the old `*name*`
   // contains-match listed Amazon Flex under Amazon and every United* employer under United.
-  const nameKey = n => String(n || '').toLowerCase().trim().replace(/[\s,]+(inc\.?|llc\.?|corp\.?|ltd\.?|co\.|plc\.?)\.?$/i, '').replace(/[\s-]+/g, ' ').trim();
+  const nameKey = companyNameKey;
   try {
-    const pattern = encodeURIComponent(`*${safeName.toLowerCase().trim().replace(/[\s-]+/g, '*')}*`);
+    const pattern = companyIlike(safeName);
     const r = await fetch(
       `${SUPABASE_URL}/rest/v1/jobs?company=ilike.${pattern}&expires_at=gt.${now}&select=id,title,company,location,salary,apply_url,source,type,level,score,waste_score&order=score.desc&limit=40`,
       { headers: dbHeaders }
@@ -977,7 +1018,9 @@ async function _fetchAdzuna(what, where, appId, appKey, distKm) {
     const data = await res.json();
     const expires = new Date(Date.now() + 7*24*60*60*1000).toISOString();
     return (data.results||[]).map(j => {
-      const salary = j.salary_min||j.salary_max ? (j.salary_min>=10000?`$${Math.round(j.salary_min/1000)}k`:j.salary_min>0?`$${j.salary_min}/hr`:null) : null;
+      // Adzuna's own salary ESTIMATE (salary_is_predicted) is not the employer's pay — never shown or scored as it.
+      const pay = adzunaPay(j);
+      const salary = pay.salary;
       // Keep Adzuna's coordinates so location-browsed listings are distance-filterable too;
       // (0,0)/non-finite → NULL (honest "unknown"), never a bogus equator point.
       const { lat: adzLat, lng: adzLng } = sanitizeCoords(j.latitude, j.longitude);
@@ -986,7 +1029,7 @@ async function _fetchAdzuna(what, where, appId, appKey, distKm) {
         company: j.company?.display_name||'Unknown',
         location: j.location?.display_name||where,
         salary,
-        salary_min: j.salary_min||0,
+        salary_min: Math.round(pay.salaryMin) || 0,
         description: (j.description||'').replace(/<[^>]*>/g,'').replace(/\s+/g,' ').trim().slice(0,8000),
         apply_url: j.redirect_url||null,
         source: 'Adzuna',

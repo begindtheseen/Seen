@@ -16,6 +16,7 @@ import IndustryBenchmark, { type Benchmark } from '@/components/IndustryBenchmar
 import Odometer from '@/components/motion/Odometer'
 import { isGradeableScore, notEnoughReviewsLabel, gradeBasisLabel, MIN_REPORTS_FOR_GRADE } from '@/lib/gradeGate'
 import { Crumbs } from '@/components/shell/PageHeader'
+import ListingSignals from '@/components/ListingSignals'
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -926,6 +927,9 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
               {gatheringPublic && <EnrichmentNotice companyName={companyName} />}
             </div>
           )}
+
+          {/* The company's own job posts, rated on their own — separate from (and never part of) the Seen Grade. */}
+          {!loading && !error && companyName && <ListingSignals companyName={companyName} />}
 
           {/* Actions: one primary, the rest compact. */}
           {!loading && (

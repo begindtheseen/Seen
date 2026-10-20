@@ -50,6 +50,36 @@ and dashboard (PRs #122/#123) were intentionally REDESIGNED beyond the old site;
 longer the design source of truth for redesigned pages. `SITE_PARITY_CHECKLIST.md` /
 `ADMIN_PARITY_CHECKLIST.md` are frozen pre-06-30 records, not an active work queue.
 
+## Session 2026-10-20 G: every free report source + "Listing signals" for every company with posts
+- **Sources (all free):**
+  - `scripts/collect-archive-reports.mjs` runs Reddit archive → Hacker News (`ARCHIVE_REPORTS_SOURCES`;
+    `lib/reports/hnHarvest.js`, official Algolia API).
+  - `scripts/collect-web-reports.mjs` (`WEB_REPORTS_*`) runs Google, searched and read in the owner's
+    Chrome via OpenCLI. Google gives servers a JS wall and datacenter browsers its CAPTCHA (both verified
+    2026-10-20). A CAPTCHA stops Google for the run and is never solved.
+  - One loop for all of them: `lib/reports/collectorRun.js`. The ingest re-checks ANY host with context;
+    non-Reddit passes → `Public review · <host>`, `web_rule_match`, weight 0.3.
+- **OWNER DECISION 2026-10-20:** Glassdoor + Indeed review/interview pages stay SKIPPED (`webHarvest.js
+  SKIP_HOSTS`, with LinkedIn/Facebook/X/TikTok). They are what Google mostly returns for applicant stories
+  (Indeed: 15,413 interview reports for Home Depot). Do not relitigate. The sandbox safety check also
+  blocked loading them.
+- `lib/server/opencliBrowser.js`: OpenCLI browser commands in either argument form (2.x `--session` flag,
+  1.8 positional session), retried once on a usage error. The career-site collector uses it.
+- **Bug fixed at the source:** Adzuna fills `salary_min/max` with its OWN estimate
+  (`salary_is_predicted="1"`). Seen showed it as the listing's pay and the scorer gave +12 "compensation
+  disclosed" (−8 waste). `adzunaPay()` in `jobSources.js` drops estimates (also used by `api/jobs.js
+  _fetchAdzuna`). Stored rows keep theirs until they expire (≤14 d): a re-seen row only bumps
+  `last_seen_at`. Not measured: the predicted share (no Adzuna keys in the cloud env). Prod showed 102/102
+  Walmart and 10/10 Chipotle Adzuna rows with a salary.
+- **Listing signals** (`lib/server/listingSignals.js`, `POST /api/jobs {action:'listing_signals', company}`,
+  `components/ListingSignals.tsx` under the grade on `/company/[slug]`):
+  - Score = 30% pay shown + 30% avg listing transparency score + 25% apply-with-the-employer + 15% not
+    open 30+ days. A missing part is dropped and the weights rescaled. Needs ≥3 open posts.
+  - Labelled "from its job posts · not applicant reports". It NEVER touches company_scores or the grade.
+  - Prod, read-only: SpaceX 66 (pay 6%, direct 93%, n=2,922); Walmart 63 (pay 100%, direct 0%); Amazon 58.
+  - Name match = the page's own `company_jobs` key, so "Chipotle Mexican Grill" posts rate that page, not
+    /company/chipotle.
+
 ## Session 2026-10-20 F: free, deep applicant reports from the Reddit archive (owner: "10 per company minimum… no cap", budget FREE ONLY)
 - **Prod coverage before this work (read-only, 2026-10-20):**
   - 8,654 hiring companies, 8,243 of them with 0 reports; 4,111 scorable reports over 1,126 companies.
