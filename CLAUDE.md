@@ -50,6 +50,34 @@ and dashboard (PRs #122/#123) were intentionally REDESIGNED beyond the old site;
 longer the design source of truth for redesigned pages. `SITE_PARITY_CHECKLIST.md` /
 `ADMIN_PARITY_CHECKLIST.md` are frozen pre-06-30 records, not an active work queue.
 
+## Session 2026-10-20: held-report review queue (claude/friendly-sagan-47rfat) — facts verified on prod
+- **Why SpaceX "lost" its reports:** nothing was deleted. The Oct 18 bulk import writes every row
+  `needs_review:true`, and d6c9933 (PR #328, 10-19) made the company page hide ALL held rows. So 101 SpaceX
+  rows (90 Indeed employee reviews, ~10 hiring accounts, 1 anonymous) vanished from the page while the
+  hiring ones still counted in the grade. Across all companies, 302 rows are held.
+- **Admin → Community → "Reports awaiting review"** (`components/admin/ReviewQueuePanel.tsx`; rules in
+  `lib/server/reportReview.js`; actions `list_held_reports` / `review_reports` in api/admin-stats.js):
+  - The default sort puts "needs your eyes" first: anything that isn't a clear positive outcome, plus
+    anti-gaming holds. Then positives, then employee reviews.
+  - "Approve all positive" skips possible duplicates.
+  - **Approve NEVER touches outcome_weight.** The old `approve_report` forced 1.0. It had already done
+    that to 25 rows, harmless to grades (fusion tiers by platform) but wrong data; it is now routed
+    through the same path.
+  - Approving an employee review sets trust_reason `external_employee_review`.
+  - Reject keeps the row: needs_review stays true, trust_reason `admin_rejected`, weight 0.
+  - Every decision goes to `admin_audit_log` with the prior values, PATCHes repeat the pending filter,
+    and touched companies are recomputed.
+- **SCORABLE_REPORTS_FILTER is now `and=(…)`** and excludes `external_employee_review` and
+  `admin_rejected` regardless of hold. `trust_reason.is.null` is explicit because SQL `<>` drops NULLs.
+  Prod count is identical to the old filter for every other row (4,088), minus 4 Tesla
+  "Reddit firsthand employee DISCUSSION" rows that `EMPLOYEE_REVIEW_RE` now also catches (4,084).
+- **Data facts, verified on prod, not acted on:**
+  - 153 of the 302 held rows are verbatim duplicates (15 are hiring accounts, double-counted).
+  - The 270 imported "employee reviews" are templated paraphrase with no source link.
+  - The demo rows to delete (Hilton ×2, Advatix, Goodwill, "Seen Jobs") were APPROVED via the old
+    button on 10-17–10-19.
+  - Prod has NO database backups (`pitr_enabled:false`, empty backup list).
+
 ## Session 2026-10-19 D: Tailor v2 — the autonomous résumé optimizer (same branch / PR #329)
 - **Why:** the owner tailored their résumé for a GNC Sales Associate posting and the v1 engine kept *Valet
   Attendant* while dropping *Membership Specialist – UFC Gym* (no bullets → no keyword score). The

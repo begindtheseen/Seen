@@ -6,6 +6,7 @@ import { Panel, MetricRow, Card, CardHeader, Badge, BarChart, relTime, outcomeCo
 import { clearStaleMessage } from './clearStale'
 import { AdminHero, AdminCommandCenter, AdminMetricCard, CardSubLink, AdminAttentionQueue, AdminTabs, type HealthStatus, type TabKey } from './overview'
 import { KpiModal, ManageAccountsModal, RevenueDetailModal, TrialsDetailModal, SharesDetailModal, ErrorsDetailModal } from './modals'
+import { ReviewQueuePanel } from './ReviewQueuePanel'
 import { JobCrisisBanner, JobRefreshButton, JobRunner, ReportRow, IssueRow, RedditDisputesPanel, ListingTicketsPanel, MergePanel, CompanyExportPanel, CreditsPanel, FlagsPanel, ClustersPanel, JobDedupePanel, AllJobsBrowser, DeployPanel } from './panels'
 import { GhostReportPanel } from './GhostReportPanel'
 import { LiveBell } from './LiveBell'
@@ -124,6 +125,7 @@ export function AdminShell({ stats, token, reload, onLogout, onUnauthorized }: {
   const openIssues = stats.issues?.open ?? 0
   const openDisputes = stats.reddit_disputes?.open ?? 0
   const pendingClaims = stats.employer_claims?.pending ?? 0
+  const heldReports = stats.held_reports?.pending ?? 0
   const openListingDisputes = stats.listing_disputes?.open ?? 0
   const unfulfilledPurchases = stats.employer_purchases?.unfulfilled ?? 0
   const stripeOn = !!m?.stripe_connected
@@ -149,6 +151,7 @@ export function AdminShell({ stats, token, reload, onLogout, onUnauthorized }: {
   if (openIssues > 0) attn.push({ key: 'issues', sev: 'amber', title: `${openIssues} open data-quality issue${openIssues === 1 ? '' : 's'}`, detail: 'Community-reported data problems awaiting resolution (Advanced tools → issues).' })
   if (openDisputes > 0) attn.push({ key: 'disputes', sev: 'amber', title: `${openDisputes} open Reddit dispute${openDisputes === 1 ? '' : 's'}`, detail: 'Visitors flagged the surfaced public-Reddit discussion on a company page — review and act (Community Data → Reddit disputes).', action: { label: 'Review', onClick: () => setTab('community') } })
   // ── Employer-side attention: claims, listing disputes, unfulfilled purchases ──
+  if (heldReports > 0) attn.push({ key: 'heldreports', sev: 'amber', title: `${heldReports} held report${heldReports === 1 ? '' : 's'} awaiting review`, detail: 'Imported and anti-gaming-held reports wait for your decision. Non-positive outcomes are sorted first; approve positives in bulk (Community → Reports awaiting review).', action: { label: 'Review', onClick: () => setTab('community') } })
   if (pendingClaims > 0) attn.push({ key: 'claims', sev: 'amber', title: `${pendingClaims} employer claim${pendingClaims === 1 ? '' : 's'} awaiting approval`, detail: 'Employers requested to manage a company on /employers. Approve or reject each one — approval grants login-scoped access to that company (Revenue → Employer account claims).', action: { label: 'Review', onClick: () => setTab('revenue') } })
   if (openListingDisputes > 0) attn.push({ key: 'listingdisputes', sev: 'amber', title: `${openListingDisputes} open listing dispute${openListingDisputes === 1 ? '' : 's'}`, detail: 'Employers disputed a listing (inactive / removal / edit). Only an admin can approve or deny — approval applies the takedown or edit (Community Data → Listing disputes).', action: { label: 'Review', onClick: () => setTab('community') } })
   if (unfulfilledPurchases > 0) attn.push({ key: 'purchases', sev: 'amber', title: `${unfulfilledPurchases} employer purchase${unfulfilledPurchases === 1 ? '' : 's'} awaiting fulfillment`, detail: 'An employer paid for Featured placement or Transparency Verified and is waiting on the perk to be granted (Revenue → Employer purchases).', action: { label: 'Review', onClick: () => setTab('revenue') } })
@@ -173,6 +176,7 @@ export function AdminShell({ stats, token, reload, onLogout, onUnauthorized }: {
     if (inactiveCount > 0) probs.push(`${inactiveCount} flagged listing${inactiveCount === 1 ? '' : 's'}`)
     if (openIssues > 0) probs.push(`${openIssues} data issue${openIssues === 1 ? '' : 's'}`)
     if (openDisputes > 0) probs.push(`${openDisputes} Reddit dispute${openDisputes === 1 ? '' : 's'}`)
+    if (heldReports > 0) probs.push(`${heldReports} held report${heldReports === 1 ? '' : 's'} to review`)
     if (pendingClaims > 0) probs.push(`${pendingClaims} employer claim${pendingClaims === 1 ? '' : 's'} to approve`)
     if (openListingDisputes > 0) probs.push(`${openListingDisputes} listing dispute${openListingDisputes === 1 ? '' : 's'}`)
     if (unfulfilledPurchases > 0) probs.push(`${unfulfilledPurchases} purchase${unfulfilledPurchases === 1 ? '' : 's'} to fulfill`)
@@ -388,6 +392,9 @@ export function AdminShell({ stats, token, reload, onLogout, onUnauthorized }: {
                 ))}
               </div>
             </div>
+
+            {/* Held reports — the review queue (non-positive outcomes first) */}
+            <ReviewQueuePanel token={token} onChanged={reload} />
 
             {/* Recent hiring reports (moderation) */}
             <Card style={{ marginTop: '.65rem' }}>

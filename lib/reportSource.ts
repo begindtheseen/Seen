@@ -38,8 +38,10 @@ export const isPublicDiscussion = (platform?: string | null): boolean =>
   isRedditSourced(platform) || isPublicReviewSourced(platform)
 
 /** An employee review ("what it's like to work here") — shown, but never a hiring outcome or score input. */
-export const isEmployeeReview = (r: { report_text?: string | null }): boolean =>
-  /\bemployee review\b/i.test(String(r?.report_text ?? ''))
+// An admin-approved employee review is marked by trust_reason (lib/server/reportReview.js) even when
+// its text does not say so; the ingest writes new ones the same way.
+export const isEmployeeReview = (r: { report_text?: string | null; trust_reason?: string | null }): boolean =>
+  r?.trust_reason === 'external_employee_review' || /\bemployee (?:review|discussion)\b/i.test(String(r?.report_text ?? ''))
 
 // Same test as classifyPlatform's 'ingest' tier (api/_utils/companyIntel.js), so the label always
 // matches how the row is weighted.

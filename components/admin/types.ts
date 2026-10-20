@@ -45,6 +45,7 @@ export interface AdminStats {
   enrichment?: { ready: boolean; queued?: number; running?: number; done?: number; empty?: number; error?: number; reports_added_24h?: number; llm_calls_24h?: number }
   // Employer-side attention signals surfaced in the overview queue (see AdminShell).
   employer_claims?: { pending: number }
+  held_reports?: { pending: number }
   listing_disputes?: { open: number }
   employer_purchases?: { unfulfilled: number }
   duplicate_clusters: { suspected: number; items: DupCluster[] }
