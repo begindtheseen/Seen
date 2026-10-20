@@ -2,7 +2,7 @@
 // Mac-local raw Reddit collection. Uses OpenCLI + the real browser; never runs on Vercel.
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
-import { classifyRawRedditExcerpt, flattenRedditRead, unwrapOpenCli } from '../lib/server/redditIntelCollector.js';
+import { classifyRawRedditExcerpt, flattenRedditRead, unwrapOpenCli, opencliFailure } from '../lib/server/redditIntelCollector.js';
 import { censorExcerpt } from '../lib/server/companyIntelImport.js';
 import { rankAndFilter } from '../api/_utils/companyReddit.js';
 
@@ -28,10 +28,26 @@ const explicitTargets = (() => {
 })();
 
 async function opencli(args) {
-  const { stdout } = await exec('opencli', args, { maxBuffer: 10 * 1024 * 1024, timeout: 90000 });
+  let stdout;
+  try { ({ stdout } = await exec('opencli', args, { maxBuffer: 10 * 1024 * 1024, timeout: 90000 })); }
+  catch (error) { throw new Error(opencliFailure(error)); }
   const parsed = JSON.parse(stdout);
   if (parsed?.ok === false) throw new Error(parsed?.error?.message || 'OpenCLI command failed');
   return unwrapOpenCli(parsed);
+}
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+// Reddit throttles a browser that searches back to back: on 2026-10-20 a 25-company run had its
+// first 5 searches answered and the next 20 fail. Space searches out, and give a failed one a
+// single second try after a longer pause. COMPANY_INTEL_SEARCH_GAP_MS tunes the gap (0 in tests).
+const SEARCH_GAP_MS = Math.max(0, Number(process.env.COMPANY_INTEL_SEARCH_GAP_MS ?? 4000));
+const RETRY_PAUSE_MS = SEARCH_GAP_MS ? Math.max(15000, SEARCH_GAP_MS * 4) : 0;
+async function searchWithRetry(args) {
+  try { return await opencli(args); }
+  catch (first) {
+    console.warn(`[retry] search failed once, waiting ${Math.round(RETRY_PAUSE_MS / 1000)}s: ${String(first.message).split('\n')[0].slice(0, 200)}`);
+    await sleep(RETRY_PAUSE_MS);
+    return await opencli(args);
+  }
 }
 const getJson = async (path) => {
   const response = await fetch(`${base}${path}`, { headers: { Authorization: `Bearer ${token}` } });
@@ -51,9 +67,11 @@ const targets = explicitTargets
   ? { companies: explicitTargets.map(company => ({ company })) }
   : await getJson(`/api/local-company-intel-targets?limit=${targetCount}`);
 console.log(`[targets] ${explicitTargets ? 'chosen' : 'from Seen'}: ${(targets.companies || []).length}`);
+let searched = 0;
 for (const target of targets.companies || []) {
   let posts = [];
-  try { posts = await opencli(['reddit', 'search', jobQuery(target.company), '--sort', 'relevance', '--time', 'year', '--limit', String(postLimit), '-f', 'json']); }
+  if (searched++ > 0 && SEARCH_GAP_MS) await sleep(SEARCH_GAP_MS + Math.floor(Math.random() * 1500));
+  try { posts = await searchWithRetry(['reddit', 'search', jobQuery(target.company), '--sort', 'relevance', '--time', 'year', '--limit', String(postLimit), '-f', 'json']); }
   catch (error) { console.warn(`[skip] ${target.company}: search failed: ${error.message}`); continue; }
   // Search engines occasionally return a word collision (for example, a product rather than
   // an employer). Keep only threads that actually name this company in an employment context.
@@ -79,9 +97,13 @@ for (const target of targets.companies || []) {
   }
   console.log(`[collect] ${target.company}: ${rawItems.filter(i => i.company === target.company).length} raw excerpts`);
 }
-const summary = { ok: true, targets: (targets.companies || []).length, collected: rawItems.length, dry_run: dryRun, imported_reports: 0, commentary: 0, duplicates: 0, rejected: 0 };
+const summary = { ok: true, targets: (targets.companies || []).length, collected: rawItems.length, dry_run: dryRun, imported_reports: 0, commentary: 0, duplicates: 0, rejected: 0, rejection_reasons: [] };
 if (!dryRun) for (let i = 0; i < rawItems.length; i += 50) {
   const result = await postJson(rawItems.slice(i, i + 50));
   for (const key of ['imported_reports', 'commentary', 'duplicates', 'rejected']) summary[key] += Number(result[key] || 0);
+  // Seen says why it rejected items (distinct reasons); keep them so a rejected total is never a mystery.
+  for (const reason of Array.isArray(result.errors) ? result.errors : []) {
+    if (summary.rejection_reasons.length < 10 && !summary.rejection_reasons.includes(String(reason))) summary.rejection_reasons.push(String(reason).slice(0, 160));
+  }
 }
 console.log(JSON.stringify(summary, null, 2));
