@@ -71,3 +71,14 @@ test('moderators cannot purge', async () => {
   assert.equal(res.statusCode, 403);
   assert.ok(!calls.some((c) => c.url.includes('/rpc/sweep_stale_jobs')));
 });
+
+// The per-click budget must fit inside the function limit with one worst-case batch (8s
+// statement_timeout) and the post-sweep counts/audit to spare — the 15s-limit / 6s+8s budget that
+// timed out in prod on 2026-10-19 fails this test.
+test('purge budget + one worst-case batch + overhead fits inside the admin-stats maxDuration', async () => {
+  const { readFileSync } = await import('node:fs');
+  const { PURGE_BUDGET_MS, PURGE_BATCH } = await import('./admin-stats.js');
+  const max = JSON.parse(readFileSync(new URL('../vercel.json', import.meta.url), 'utf8')).functions['api/admin-stats.js'].maxDuration;
+  assert.ok(PURGE_BUDGET_MS + 8_000 + 4_000 <= max * 1000, `${PURGE_BUDGET_MS}ms budget + 12s does not fit in ${max}s`);
+  assert.ok(PURGE_BATCH <= 500, 'one batch must stay well under the 8s statement_timeout');
+});
