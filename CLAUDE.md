@@ -50,6 +50,50 @@ and dashboard (PRs #122/#123) were intentionally REDESIGNED beyond the old site;
 longer the design source of truth for redesigned pages. `SITE_PARITY_CHECKLIST.md` /
 `ADMIN_PARITY_CHECKLIST.md` are frozen pre-06-30 records, not an active work queue.
 
+## Session 2026-10-20 F: free, deep applicant reports from the Reddit archive (owner: "10 per company minimum… no cap", budget FREE ONLY)
+- **Prod coverage before this work (read-only, 2026-10-20):**
+  - 8,654 hiring companies, 8,243 of them with 0 reports; 4,111 scorable reports over 1,126 companies.
+  - Only 28 companies have ≥10 reports.
+  - The paid pipelines (web-reports.mjs Claude web_search; reddit-backfill.mjs Sonnet+Opus) are off the table
+    by owner decision.
+- **Rules:** `lib/reports/applicantRules.js` is a strict, rule-based first-hand classifier (no LLM).
+  - The old `classifyRawRedditExcerpt` was mostly wrong on real archive text: other employers, advice,
+    "maybe I'm way off base" counted as an offer.
+  - Every rule is pinned by a real sentence in `applicantRules.test.mjs`.
+  - `storableAccount` picks the stored words so Seen's server re-check passes on them alone.
+  - `reports_outcome_check` has no 'assessment' → `REPORT_OUTCOME` maps assessment→interviewing and
+    responded→human.
+- **Harvester:** `lib/reports/archiveHarvest.js`.
+  - Per company: its own subreddits (`pickCompanySubs`) + `JOB_SUBREDDITS`, year windows.
+  - It ALTERNATES company-sub and job-sub searches. Company subs are mostly "got hired", job subs mostly
+    ghosted/rejected (survivorship skew).
+  - One account per voice; cross-posts are deduped.
+  - The goal counts NEW reports Seen accepts (the collector's `onAccounts` returns `imported_reports`), so a
+    re-run walks past what Seen already has.
+- **Collector:** `scripts/collect-archive-reports.mjs` (`npm run ingest:archive-reports`).
+  - Env: `ARCHIVE_REPORTS_{COMPANIES_JSON,COMPANY_LIMIT,BELOW,GOAL(0=no cap),YEARS,MINUTES_PER_COMPANY,TOTAL_MINUTES}`.
+  - `GET /api/local-company-intel-targets?below=K` returns companies with open listings and fewer than K
+    applicant reports, most listings first.
+  - Seen Command's "✦ Applicant Reports" tab drives it (seen-command#227).
+- **Ingest:** `api/ingest-local-company-intel.js` re-runs the rules on every Reddit account that carries a
+  `context` (title, is_op, company_sub).
+  - Pass → published like reddit_import: platform `Reddit r/<sub>`, source reddit, weight 0.3,
+    `trust_reason 'reddit_rule_match'` (bulk-removable), needs_review false.
+  - Fail → commentary (`downgraded`).
+  - No context → the old held path.
+  - The OpenCLI Reddit collector now sends context and uses the same rules.
+- **Live yield (writes to a fake DB, real archive + real handler):**
+  - Chipotle goal 5 ×2 runs → 10 distinct; Home Depot ~60 in 6 min via r/HomeDepot.
+  - Chipotle 11 / Sheetz 6 in a 4-minute budget.
+  - Small local companies have few real accounts; we never invent them.
+- **Lessons:**
+  - Node's fetch error is just "fetch failed"; the archive fetcher now appends `e.cause.code`, and a run's
+    `search_errors` names it.
+  - A sandbox/managed network needs `NODE_EXTRA_CA_CERTS`/proxy passed to child collectors (seen-command
+    `NETWORK_ENV`).
+- **NOT done:** a production import. Nothing was written to prod. The first real run should be a Preview,
+  then an Import of the 25 thinnest.
+
 ## Session 2026-10-20 E: company-first job pull ("search Tesla → try every source") — PR #340 + seen-command #224
 - **`POST /api/local-company-jobs`** (Bearer LOCAL_INDEED_INGEST_SECRET, 1–10 companies, 270s budget) runs
   `lib/jobs/companyJobs.js pullCompanyJobs` per company:
