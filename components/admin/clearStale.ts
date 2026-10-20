@@ -7,7 +7,10 @@
 // 14,700 stale rows stayed, and the alert never cleared). This loops the call until the server
 // says complete, then reports the true totals and what is left.
 //
-// Pure (fetch injected) so the loop is unit-tested offline: components/admin/clearStale.test.mjs.
+// The loop itself (retries, budget, no-progress stop) is drainAdminAction in ./drain.ts, shared with
+// "Remove dupes". Unit-tested offline: components/admin/clearStale.test.mjs.
+
+import { drainAdminAction, DRAIN_LIMITS, num } from './drain.ts'
 
 export type ClearStaleResult = {
   ok: boolean
@@ -29,14 +32,7 @@ export type ClearStaleResult = {
   error?: string
 }
 
-// A round that died in transit (Vercel/gateway timeout, a dropped connection, an HTML error page)
-// is not a failed sweep: every batch the server committed before the cut-off is already saved, and
-// the sweep is idempotent. Retry those; an explicit server error (500 with a reason) stays a failure.
-const MAX_LOST_ROUNDS = 2
-const isTransient = (status: number, body: Record<string, unknown>) =>
-  status === 502 || status === 503 || status === 504 || Object.keys(body).length === 0
-
-export const CLEAR_STALE_LIMITS = { maxRounds: 40, budgetMs: 240_000 }
+export const CLEAR_STALE_LIMITS = { maxRounds: DRAIN_LIMITS.maxRounds, budgetMs: DRAIN_LIMITS.budgetMs }
 
 export async function clearStaleUntilDone(token: string, opts: {
   fetchImpl?: typeof fetch
@@ -45,47 +41,23 @@ export async function clearStaleUntilDone(token: string, opts: {
   now?: () => number
   onProgress?: (p: { rounds: number; cleared: number; remaining: number | null }) => void
 } = {}): Promise<ClearStaleResult> {
-  const fetchImpl = opts.fetchImpl ?? fetch
-  const maxRounds = opts.maxRounds ?? CLEAR_STALE_LIMITS.maxRounds
-  const now = opts.now ?? Date.now
-  const deadline = now() + (opts.budgetMs ?? CLEAR_STALE_LIMITS.budgetMs)
   const out: ClearStaleResult = { ok: true, cleared: 0, deleted: 0, retained: 0, staled: 0, complete: false, remaining: null, kept: null, rounds: 0, lostRounds: 0 }
-  let lostInARow = 0
-
-  while (out.rounds < maxRounds && now() < deadline) {
-    let d: Record<string, unknown> = {}
-    try {
-      const res = await fetchImpl('/api/admin-stats', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'X-Admin-Token': token },
-        body: JSON.stringify({ action: 'purge_stale_jobs' }),
-      })
-      d = await res.json().catch(() => ({})) as Record<string, unknown>
-      out.rounds += 1
-      if (!res.ok || !d.ok) {
-        if (isTransient(res.status, d) && lostInARow < MAX_LOST_ROUNDS) { lostInARow++; out.lostRounds++; continue }
-        // Keep what earlier rounds achieved — a later failure must not erase a real result.
-        return { ...out, ok: out.rounds > 1, error: String(d.detail || d.error || `HTTP ${res.status}`) }
-      }
-    } catch (e) {
-      out.rounds += 1
-      if (lostInARow < MAX_LOST_ROUNDS) { lostInARow++; out.lostRounds++; continue }
-      return { ...out, ok: out.rounds > 1, error: (e as Error).message }
-    }
-    lostInARow = 0
-    const num = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) ? v : 0)
-    out.deleted += num(d.deleted)
-    out.retained += num(d.retained)
-    out.staled += num(d.staled)
-    out.cleared = out.deleted + out.retained
-    out.remaining = typeof d.remaining === 'number' ? d.remaining : null
-    out.kept = typeof d.kept === 'number' ? d.kept : null
-    opts.onProgress?.({ rounds: out.rounds, cleared: out.cleared, remaining: out.remaining })
-    if (d.complete !== false) { out.complete = true; break }
-    // A round that removed nothing yet reports more work is not making progress — stop, don't spin.
-    if (num(d.deleted) + num(d.retained) + num(d.staled) === 0) break
-  }
-  return out
+  let rounds = 0
+  const r = await drainAdminAction(token, 'purge_stale_jobs', {
+    ...opts,
+    onRound: (d) => {
+      rounds += 1
+      out.deleted += num(d.deleted)
+      out.retained += num(d.retained)
+      out.staled += num(d.staled)
+      out.cleared = out.deleted + out.retained
+      out.remaining = typeof d.remaining === 'number' ? d.remaining : null
+      out.kept = typeof d.kept === 'number' ? d.kept : null
+      opts.onProgress?.({ rounds, cleared: out.cleared, remaining: out.remaining })
+      return num(d.deleted) + num(d.retained) + num(d.staled)
+    },
+  })
+  return { ...out, ok: r.ok, complete: r.complete, rounds: r.rounds, lostRounds: r.lostRounds, ...(r.error ? { error: r.error } : {}) }
 }
 
 /** One line for the toast, from what actually happened. */

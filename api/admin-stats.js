@@ -10,6 +10,8 @@ import {
 import { recomputeCompanyScoreFromReports, normalizeCompany } from './_utils/reportWrite.js';
 import { logError } from '../lib/server/errlog.js';
 import { runStaleSweep, STALE_CLEARABLE_FILTER, STALE_KEPT_FILTER } from '../lib/server/staleSweep.js';
+import { planJobDedupe, describeGroups } from '../lib/server/jobDedupe.js';
+import { findCompanyDuplicates } from '../lib/server/companyDupes.js';
 import { SCORABLE_REPORTS_FILTER, REJECTED_TRUST_REASON } from '../lib/server/reportCounts.js';
 import { sortHeldReports, groupCounts, planDecision, classifyHeldReport, SORTS as HELD_SORTS } from '../lib/server/reportReview.js';
 import { buildCompanyAuditBundle } from './_utils/companyAuditBundle.js';
@@ -29,6 +31,59 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 // worst-case batch (8s statement_timeout) and the post-sweep counts/audit.
 export const PURGE_BUDGET_MS = 40_000;
 export const PURGE_BATCH = 500;
+// Admin "Remove dupes": the full-table scan must finish (~6s for 28k rows on prod) or nothing is
+// deleted; deletes stop starting at 40s so the response, audit and counts fit in the 60s limit.
+export const DEDUPE_SCAN_BUDGET_MS = 25_000;
+export const DEDUPE_BUDGET_MS = 40_000;
+export const DEDUPE_BATCH = 100;
+const DEDUPE_SELECT = 'id,title,company,location,apply_url,source,external_id,is_employer_posted,availability_status,expires_at,last_seen_at,created_at';
+
+// Every jobs row, by keyset pages on the primary key (one PostgREST read returns at most 1,000 rows).
+async function loadJobsForDedupe(db, deadline) {
+  const rows = [];
+  let after = null;
+  for (;;) {
+    if (Date.now() > deadline) return { ok: false, error: `scan did not finish in time (${rows.length} rows read) — nothing was deleted` };
+    const r = await db(`jobs?select=${DEDUPE_SELECT}&order=id.asc&limit=1000${after ? `&id=gt.${after}` : ''}`);
+    if (!r.ok) return { ok: false, error: `jobs scan failed (HTTP ${r.status}) — nothing was deleted` };
+    const page = await r.json().catch(() => null);
+    if (!Array.isArray(page)) return { ok: false, error: 'jobs scan returned no rows — nothing was deleted' };
+    rows.push(...page);
+    if (page.length < 1000) return { ok: true, rows };
+    after = page[page.length - 1].id;
+  }
+}
+
+export const AUTO_MERGE_BUDGET_MS = 40_000;
+
+// Every company_scores name (one PostgREST read returns at most 1,000 rows).
+async function loadAllCompanyNames(db) {
+  const rows = [];
+  for (let offset = 0; ; offset += 1000) {
+    const r = await db(`company_scores?select=id,name:company_name,report_count,overall_score&order=id.asc&limit=1000&offset=${offset}`);
+    if (!r.ok) return { ok: false, error: `company scan failed (HTTP ${r.status})` };
+    const page = await r.json().catch(() => null);
+    if (!Array.isArray(page)) return { ok: false, error: 'company scan returned no rows' };
+    rows.push(...page);
+    if (page.length < 1000) return { ok: true, rows };
+  }
+}
+
+// Job ids users hold. A failed read refuses the whole dedupe — never delete without knowing.
+async function loadReferencedJobIds(db) {
+  const ids = new Set();
+  for (const [table, col] of [['saved_jobs', 'job_id'], ['applications', 'job_id'], ['seen_applications', 'job_id']]) {
+    for (let offset = 0; ; offset += 1000) {
+      const r = await db(`${table}?select=${col}&${col}=not.is.null&order=${col}.asc&limit=1000&offset=${offset}`);
+      if (!r.ok) return { ok: false, error: `could not read ${table} (HTTP ${r.status}) — nothing was deleted` };
+      const page = await r.json().catch(() => null);
+      if (!Array.isArray(page)) return { ok: false, error: `could not read ${table} — nothing was deleted` };
+      for (const row of page) ids.add(String(row[col]));
+      if (page.length < 1000) break;
+    }
+  }
+  return { ok: true, ids };
+}
 
 const ALLOWED = ['https://seenjobs.io', 'https://www.seenjobs.io'];
 
@@ -781,16 +836,11 @@ async function _handler(req, res) {
   }
 
   if (action === 'find_duplicates') {
-    const r = await db('company_scores?select=id,name:company_name,report_count,overall_score&order=report_count.desc&limit=500');
-    if (!r.ok) return res.status(500).json({ error: 'Query failed' });
-    const rows = await r.json();
-    const norm = n => n ? n.toLowerCase().trim().replace(/[\s,]+(inc\.?|llc\.?|corp\.?|ltd\.?|co\.|plc\.?|group|holdings|enterprises|solutions|technologies)\.?$/i, '').trim() : '';
-    const groups = {};
-    rows.forEach(row => { const k = norm(row.name); (groups[k] = groups[k] || []).push(row); });
-    const duplicates = Object.entries(groups)
-      .filter(([, g]) => g.length > 1)
-      .map(([key, companies]) => ({ key, companies }));
-    return res.status(200).json({ ok: true, duplicates });
+    // Every company, not the top 500 (rules + why: lib/server/companyDupes.js).
+    const all = await loadAllCompanyNames(db);
+    if (!all.ok) return res.status(500).json({ error: all.error });
+    const duplicates = findCompanyDuplicates(all.rows);
+    return res.status(200).json({ ok: true, duplicates, total: all.rows.length });
   }
 
   // ── Shared single-merge routine ──────────────────────────────────────────────
@@ -965,27 +1015,32 @@ async function _handler(req, res) {
   }
 
   if (action === 'auto_merge') {
-    const r = await db('company_scores?select=id,name:company_name,report_count&order=report_count.desc&limit=500');
-    if (!r.ok) return res.status(500).json({ error: 'Query failed' });
-    const rows = await r.json();
-    const norm = n => n ? n.toLowerCase().trim().replace(/[\s,]+(inc\.?|llc\.?|corp\.?|ltd\.?|co\.|plc\.?|group|holdings|enterprises|solutions|technologies)\.?$/i, '').trim() : '';
-    const groups = {};
-    rows.forEach(row => { const k = norm(row.name); (groups[k] = groups[k] || []).push(row); });
-    let merged = 0;
+    // Only groups whose names differ by a legal-form suffix are merged automatically ("ShiftKey, LLC"
+    // = "ShiftKey"); "Compass Group" vs "Compass" is listed for a human (lib/server/companyDupes.js).
+    // Merges run until the time budget; the client repeats while `complete` is false.
+    const all = await loadAllCompanyNames(db);
+    if (!all.ok) return res.status(500).json({ error: all.error });
+    const found = findCompanyDuplicates(all.rows);
+    const autoGroups = found.filter((g) => g.auto);
+    const deadline = Date.now() + AUTO_MERGE_BUDGET_MS;
+    let merged = 0, failed = 0, done = 0;
     const groupSummaries = [];
-    for (const group of Object.values(groups).filter(g => g.length > 1)) {
-      const primary = group.reduce((b, r) => (r.report_count||0) > (b.report_count||0) ? r : b);
+    for (const group of autoGroups) {
+      if (Date.now() > deadline) break;
+      const [primary, ...rest] = group.companies;
       const absorbed = [];
-      for (const sec of group.filter(r => r.id !== primary.id)) {
+      for (const sec of rest) {
         // SAME single-merge routine per pair — fixes auto_merge's old defects
         // (no response_rate write, no report remap → the resurrection bug, no per-merge log).
         const mr = await mergeCompanyPair(primary.id, sec.id);
-        if (mr.ok) { absorbed.push(sec.name); merged++; }
+        if (mr.ok) { absorbed.push(sec.name); merged++; } else failed++;
       }
+      done++;
       if (absorbed.length) groupSummaries.push({ canonical: primary.name, absorbed });
     }
-    await db('admin_audit_log', { method: 'POST', body: JSON.stringify({ admin_id: sess.admin_id, username: 'admin', action: 'auto_merge_companies', metadata: { merged, groups: groupSummaries.length } }), headers: { Prefer: 'return=minimal' } }).catch(() => {});
-    return res.status(200).json({ ok: true, merged, groups: groupSummaries });
+    const remaining = autoGroups.length - done;
+    await db('admin_audit_log', { method: 'POST', body: JSON.stringify({ admin_id: sess.admin_id, username: 'admin', action: 'auto_merge_companies', metadata: { merged, failed, groups: groupSummaries.length, remaining } }), headers: { Prefer: 'return=minimal' } }).catch(() => {});
+    return res.status(200).json({ ok: true, merged, failed, groups: groupSummaries, complete: remaining === 0, remaining, manual: found.length - autoGroups.length });
   }
 
   // ── list_merges: latest 50 merge-log rows (trimmed for the admin history UI) ──
@@ -1497,51 +1552,45 @@ async function _handler(req, res) {
   }
 
   // ── JOB DEDUPLICATION ────────────────────────────────────────────────────────
-  if (action === 'scan_job_dupes') {
-    // Adzuna uses different tracking params per search query, so apply_url varies
-    // for the same job matched by multiple searches. Use (title, company, city) instead.
-    const r = await db('jobs?select=id,title,company,city&limit=100000');
-    if (!r.ok) return res.status(500).json({ error: 'Query failed' });
-    const jobs = await r.json();
-    const seen = new Map();
-    for (const j of (jobs || [])) {
-      const key = `${(j.title || '').toLowerCase().trim()}|${(j.company || '').toLowerCase().trim()}|${(j.city || '').toLowerCase().trim()}`;
-      seen.set(key, (seen.get(key) || 0) + 1);
+  // Rules (what counts as a duplicate, what is never deleted): lib/server/jobDedupe.js. The scan reads
+  // EVERY row by keyset pages (a single PostgREST read is capped at 1,000 rows, which is why one press
+  // never finished), and a press deletes until its time budget; the client repeats until `complete`.
+  if (action === 'scan_job_dupes' || action === 'dedupe_jobs') {
+    if (action === 'dedupe_jobs' && adminRole === 'moderator') return res.status(403).json({ error: 'Insufficient role' });
+    const t0 = Date.now();
+    const scan = await loadJobsForDedupe(db, t0 + DEDUPE_SCAN_BUDGET_MS);
+    if (!scan.ok) return res.status(500).json({ error: scan.error });
+    const refs = await loadReferencedJobIds(db);
+    if (!refs.ok) return res.status(500).json({ error: refs.error });
+    const plan = planJobDedupe(scan.rows, refs.ids);
+    const summary = { total: plan.total, groups: plan.groups.length, protected: plan.protectedExtras };
+    if (action === 'scan_job_dupes') {
+      return res.status(200).json({ ok: true, suspected: plan.deleteIds.length, ...summary, sample: describeGroups(plan.groups), ms: Date.now() - t0 });
     }
-    let suspected = 0;
-    for (const count of seen.values()) if (count > 1) suspected += count - 1;
-    return res.status(200).json({ ok: true, suspected, total: (jobs || []).length });
-  }
-
-  if (action === 'dedupe_jobs') {
-    if (adminRole === 'moderator') return res.status(403).json({ error: 'Insufficient role' });
-    const r = await db('jobs?select=id,title,company,city,last_seen_at,created_at&limit=100000');
-    if (!r.ok) return res.status(500).json({ error: 'Query failed' });
-    const jobs = await r.json();
-    // Group by (title, company, city) case-insensitive
-    const byKey = new Map();
-    for (const j of (jobs || [])) {
-      const key = `${(j.title || '').toLowerCase().trim()}|${(j.company || '').toLowerCase().trim()}|${(j.city || '').toLowerCase().trim()}`;
-      if (!byKey.has(key)) byKey.set(key, []);
-      byKey.get(key).push(j);
+    const byId = new Map(scan.rows.map((r) => [String(r.id), r]));
+    const deadline = t0 + DEDUPE_BUDGET_MS;
+    const removed = [];
+    let error = null;
+    for (let i = 0; i < plan.deleteIds.length && Date.now() < deadline; i += DEDUPE_BATCH) {
+      const batch = plan.deleteIds.slice(i, i + DEDUPE_BATCH).filter((id) => UUID_RE.test(String(id)));
+      if (!batch.length) continue;
+      // is_employer_posted=eq.false repeats the plan's guard in the statement itself; select=id makes
+      // the response the list of rows ACTUALLY deleted, so the count is never assumed.
+      const dr = await db(`jobs?id=in.(${batch.join(',')})&is_employer_posted=eq.false&select=id`, { method: 'DELETE' });
+      if (!dr.ok) { error = `delete failed (HTTP ${dr.status}): ${(await dr.text().catch(() => '')).slice(0, 160)}`; break; }
+      const gone = await dr.json().catch(() => []);
+      for (const g of (Array.isArray(gone) ? gone : [])) removed.push(String(g.id));
     }
-    const toDelete = [];
-    for (const group of byKey.values()) {
-      if (group.length <= 1) continue;
-      // Keep newest by last_seen_at, then created_at
-      group.sort((a, b) => ((b.last_seen_at || b.created_at || '') > (a.last_seen_at || a.created_at || '') ? 1 : -1));
-      toDelete.push(...group.slice(1).map(j => j.id));
+    const remaining = Math.max(0, plan.deleteIds.length - removed.length);
+    const snap = (id) => { const r = byId.get(id) || {}; return { id, title: r.title, company: r.company, location: r.location, source: r.source, apply_url: r.apply_url }; };
+    if (removed.length) {
+      await db('admin_audit_log', { method: 'POST', body: JSON.stringify({ admin_id: sess.admin_id, username: sess.username || 'admin', action: 'dedupe_jobs', target_type: 'jobs', metadata: { deleted: removed.length, remaining, protected: plan.protectedExtras, rows: removed.slice(0, 300).map(snap) } }), headers: { Prefer: 'return=minimal' } }).catch(() => {});
     }
-    if (!toDelete.length) return res.status(200).json({ ok: true, deleted: 0 });
-    let deleted = 0;
-    for (let i = 0; i < toDelete.length; i += 100) {
-      const batch = toDelete.slice(i, i + 100);
-      // SECURITY: Encode each ID to prevent injection via crafted job IDs.
-      const encodedIds = batch.map(id => encodeURIComponent(String(id))).join(',');
-      const dr = await db(`jobs?id=in.(${encodedIds})`, { method: 'DELETE', headers: { Prefer: 'return=minimal' } });
-      if (dr.ok) deleted += batch.length;
+    if (error) {
+      logError('admin-stats', `dedupe_jobs: ${error}`, {});
+      return res.status(500).json({ error: 'Failed to remove duplicates', detail: error, deleted: removed.length, remaining, ...summary });
     }
-    return res.status(200).json({ ok: true, deleted });
+    return res.status(200).json({ ok: true, deleted: removed.length, remaining, complete: remaining === 0, ...summary, ms: Date.now() - t0 });
   }
 
   if (action === 'deny_report') {

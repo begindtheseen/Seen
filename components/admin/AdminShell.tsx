@@ -254,7 +254,7 @@ export function AdminShell({ stats, token, reload, onLogout, onUnauthorized }: {
 
         {tab === 'jobs' && (
           <div className="a2-tabpanel">
-          <Panel title="Jobs & Companies" right={staleJobs > 0 ? <JobRefreshButton token={token} onDone={reload} /> : <span className="ac-panel-status">{jh ? `${jh.active_pct}% live` : ''}</span>}>
+          <Panel title="Jobs & Companies" right={<JobRefreshButton token={token} onDone={reload} stale={staleJobs} idle={<span className="ac-panel-status">{jh ? `${jh.active_pct}% live` : ''}</span>} />}>
             <MetricRow label="Total stored jobs" value={(jb?.total ?? 0).toLocaleString()} status="all statuses" onClick={() => openKpi('jobs_total', 'All stored jobs')} />
             <MetricRow label="Active listings" value={activeJobs.toLocaleString()} status="live jobs users see" tone={jh?.crisis ? 'red' : 'blue'} onClick={() => openKpi('jobs_active', 'Active job listings')} />
             <MetricRow label="Added today" value={jb?.added_today ?? jb?.new_today ?? 0} status="new listings" tone={(jb?.added_today ?? 0) > 0 ? 'green' : 'dim'} onClick={() => openKpi('jobs_today', 'Jobs added today')} />
