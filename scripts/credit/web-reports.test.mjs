@@ -56,11 +56,13 @@ function fixtureContent(accounts) {
 
 // ---------- request shape ----------
 
-test('request shape: sonnet 5.5, web_search_20260209 only, no thinking, no format, medium effort', () => {
+test('request shape: sonnet 5.5, web_search_20260209 only (Hacker News blocked), no thinking, no format, medium effort', () => {
   const r = buildRequest(RH);
   assert.match(r.custom_id, /^[a-zA-Z0-9_-]{1,64}$/);
   assert.equal(r.params.model, 'claude-sonnet-5-5');
-  assert.deepEqual(r.params.tools, [{ type: 'web_search_20260209', name: 'web_search', max_uses: 5 }]);
+  assert.deepEqual(r.params.tools, [{ type: 'web_search_20260209', name: 'web_search', max_uses: 5,
+    blocked_domains: ['news.ycombinator.com', 'ycombinator.com', 'hn.algolia.com'] }]);
+  assert.equal('allowed_domains' in r.params.tools[0], false, 'the API takes allowed_domains OR blocked_domains, never both');
   assert.equal(r.params.tools.some((t) => /code_execution/.test(t.type)), false);
   assert.equal('thinking' in r.params, false);
   assert.deepEqual(r.params.output_config, { effort: 'medium' });

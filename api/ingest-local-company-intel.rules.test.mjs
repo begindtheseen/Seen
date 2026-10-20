@@ -61,13 +61,13 @@ test('the outcome comes from Seen’s own reading; assessment maps to a value th
   assert.equal(db2.reports[0].needs_review, true, 'no context → held for review, as before');
 });
 
-test('any public page with context is re-checked: a Hacker News account publishes as a public review; a web page cannot claim a company subreddit', async () => {
+test('any public page with context is re-checked: a forum account publishes as a public review; a web page cannot claim a company subreddit', async () => {
   const db = stub();
-  const r = await call({ items: [{ company: 'Amazon', source: 'Hacker News', source_url: 'https://news.ycombinator.com/item?id=123', kind: 'applicant_outcome', outcome: 'interview',
+  const r = await call({ items: [{ company: 'Amazon', source: 'Web · forum.example.org', source_url: 'https://forum.example.org/t/123', kind: 'applicant_outcome', outcome: 'interview',
     excerpt: 'The first time I interviewed at Amazon, the interviewer either pretended a fire alarm was going off, or it actually was.', context: { title: 'Ask HN: interview horror stories', is_op: false, company_sub: false } }] });
   assert.equal(r.body.published_reports, 1, JSON.stringify(r.body));
   const row = db.reports[0];
-  assert.equal(row.platform, 'Public review · news.ycombinator.com');
+  assert.equal(row.platform, 'Public review · forum.example.org');
   assert.equal(row.source, 'web_public');
   assert.equal(row.trust_reason, 'web_rule_match');
   assert.equal(row.outcome_weight, 0.3);
@@ -77,4 +77,16 @@ test('any public page with context is re-checked: a Hacker News account publishe
     excerpt: 'Just got hired, orientation is Monday and I am so excited!', context: { title: 'Finally', is_op: true, company_sub: true } }] });
   assert.equal(r2.body.downgraded, 1, 'company_sub is a Reddit-only context — elsewhere the company must be named');
   assert.equal(db2.reports.length, 0);
+});
+
+test('owner-excluded sources are refused whatever sent them: Hacker News, Glassdoor, Indeed', async () => {
+  const db = stub();
+  const items = ['https://news.ycombinator.com/item?id=1', 'https://www.glassdoor.com/Interview/x.htm', 'https://ca.indeed.com/cmp/x/interviews'].map((source_url) => ({
+    company: 'Amazon', source: 'Web', source_url, kind: 'applicant_outcome', outcome: 'interview',
+    excerpt: 'The first time I interviewed at Amazon, the interviewer pretended a fire alarm was going off.', context: { title: 'x', is_op: false, company_sub: false } }));
+  const r = await call({ items });
+  assert.equal(r.body.rejected, 3);
+  assert.equal(db.reports.length, 0);
+  assert.equal(db.reviews.length, 0, 'not kept as commentary either');
+  assert.ok(r.body.errors.some((e) => /excluded source: news\.ycombinator\.com \(owner decision\)/.test(e)));
 });

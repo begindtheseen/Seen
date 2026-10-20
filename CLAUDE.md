@@ -77,13 +77,19 @@ longer the design source of truth for redesigned pages. `SITE_PARITY_CHECKLIST.m
 
 ## Session 2026-10-20 G: every free report source + "Listing signals" for every company with posts
 - **Sources (all free):**
-  - `scripts/collect-archive-reports.mjs` runs Reddit archive → Hacker News (`ARCHIVE_REPORTS_SOURCES`;
-    `lib/reports/hnHarvest.js`, official Algolia API).
+  - `scripts/collect-archive-reports.mjs` runs the Reddit archive (`ARCHIVE_REPORTS_SOURCES`, now `reddit` only).
   - `scripts/collect-web-reports.mjs` (`WEB_REPORTS_*`) runs Google, searched and read in the owner's
     Chrome via OpenCLI. Google gives servers a JS wall and datacenter browsers its CAPTCHA (both verified
     2026-10-20). A CAPTCHA stops Google for the run and is never solved.
   - One loop for all of them: `lib/reports/collectorRun.js`. The ingest re-checks ANY host with context;
     non-Reddit passes → `Public review · <host>`, `web_rule_match`, weight 0.3.
+- **OWNER DECISION 2026-10-20: NO HACKER NEWS, EVER** ("filled with vibecoders trying to sneak fake reviews
+  that are self advertisements"). The HN collector (`hnHarvest.js`) is deleted. ONE list of excluded sources,
+  `lib/reports/excludedSources.js` (HN + Glassdoor/Indeed/LinkedIn/Facebook/Instagram/X/TikTok/Threads), is
+  enforced three times: the Google collector never opens them, the ingest refuses them ("excluded source: …
+  (owner decision)"), and the paid web-search script passes HN as `blocked_domains`. Prod has 2 older
+  HN-sourced rows from the Oct 17 paid pipeline (Stripe, Grafana Labs — `web_search_public_review`); not
+  touched without the owner's OK. OpenCLI on the owner's Mac is 2.0.1 (the `--session` flag form).
 - **OWNER DECISION 2026-10-20:** Glassdoor + Indeed review/interview pages stay SKIPPED (`webHarvest.js
   SKIP_HOSTS`, with LinkedIn/Facebook/X/TikTok). They are what Google mostly returns for applicant stories
   (Indeed: 15,413 interview reports for Home Depot). Do not relitigate. The sandbox safety check also

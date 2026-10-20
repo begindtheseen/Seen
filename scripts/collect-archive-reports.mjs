@@ -1,10 +1,9 @@
 #!/usr/bin/env node
-// Free, deep applicant-report collection (no model, no spend, no browser) from two public sources, in order,
-// with ONE goal of new reports per company (lib/reports/collectorRun.js):
-//   1. reddit     — the Arctic Shift Reddit archive (lib/reports/archiveHarvest.js): the company's own
-//                   subreddits + the job subreddits, year by year, every thread's post and comment tree;
-//   2. hackernews — Hacker News through its official Algolia API (lib/reports/hnHarvest.js): strong for
-//                   tech employers, near-empty for retail.
+// Free, deep applicant-report collection (no model, no spend, no browser) with ONE goal of new reports per
+// company (lib/reports/collectorRun.js), from:
+//   reddit — the Arctic Shift Reddit archive (lib/reports/archiveHarvest.js): the company's own subreddits +
+//            the job subreddits, year by year, every thread's post and comment tree.
+// (Hacker News was removed 2026-10-20 by owner decision — lib/reports/excludedSources.js.)
 // Everything passes the strict first-hand rules (lib/reports/applicantRules.js). Accounts stream to Seen's
 // /api/ingest-local-company-intel in batches; Seen re-checks each one with the same rules and publishes it as
 // attributed public discussion (weight 0.3), or keeps it as commentary when it fails.
@@ -15,7 +14,7 @@
 //        fewer than K applicant reports (most open listings first) — the "fill every company to K" queue,
 //      ARCHIVE_REPORTS_GOAL (NEW reports per company before moving on — new_reports, not accounts found; default 10;
 //        0 = until every source is exhausted),
-//      ARCHIVE_REPORTS_SOURCES (comma list, in order; default "reddit,hackernews"),
+//      ARCHIVE_REPORTS_SOURCES (comma list, in order; default and only value "reddit"),
 //      ARCHIVE_REPORTS_YEARS (history depth, 1–10, default 5),
 //      ARCHIVE_REPORTS_MINUTES_PER_COMPANY (time budget per company, 1–240, default 20),
 //      ARCHIVE_REPORTS_TOTAL_MINUTES (time budget for the whole run, 1–1440; unset = none). When it runs
@@ -23,7 +22,6 @@
 //        own wall-clock limit gets a clean summary instead of a killed process.
 // flags: --dry-run (collect and print, send nothing). Prints one JSON summary on stdout.
 import { harvestCompany } from '../lib/reports/archiveHarvest.js';
-import { harvestHackerNews } from '../lib/reports/hnHarvest.js';
 import { runCollection } from '../lib/reports/collectorRun.js';
 import { createArcticFetcher } from './credit/lib/arcticShift.mjs';
 import { censorExcerpt } from '../lib/server/companyIntelImport.js';
@@ -40,7 +38,7 @@ const runDeadline = totalMinutes ? Date.now() + totalMinutes * 60_000 : Infinity
 const companyLimit = int(process.env.ARCHIVE_REPORTS_COMPANY_LIMIT, 1, 100, 10);
 const below = int(process.env.ARCHIVE_REPORTS_BELOW, 1, 10000, null);
 const dryRun = process.argv.includes('--dry-run');
-const SOURCE_IDS = ['reddit', 'hackernews'];
+const SOURCE_IDS = ['reddit'];
 const sourceIds = String(process.env.ARCHIVE_REPORTS_SOURCES || SOURCE_IDS.join(',')).split(',').map((x) => x.trim().toLowerCase()).filter(Boolean);
 const unknownSource = sourceIds.find((x) => !SOURCE_IDS.includes(x));
 if (unknownSource || !sourceIds.length) throw new Error(`ARCHIVE_REPORTS_SOURCES must list ${SOURCE_IDS.join(' and/or ')} (got "${unknownSource || ''}").`);
@@ -78,8 +76,6 @@ const SOURCES = {
   reddit: { id: 'reddit', label: 'Reddit', harvest: (company, o) => harvestCompany(company, { fetcher, years, ...o }),
     toItem: (company, a) => item(company, a, `Reddit r/${a.subreddit}`, { title: a.title, is_op: a.isOp, company_sub: a.inCompanySub }),
     preview: (a) => `r/${a.subreddit}${a.isOp ? ' OP' : ''}` },
-  hackernews: { id: 'hackernews', label: 'Hacker News', harvest: (company, o) => harvestHackerNews(company, o),
-    toItem: (company, a) => item(company, a, 'Hacker News', { title: a.title, is_op: false, company_sub: false }), preview: () => 'Hacker News' },
 };
 const summary = await runCollection({ targets, goal, minutes, runDeadline, dryRun, postItems, sources: sourceIds.map((id) => SOURCES[id]), meta: { years } });
 console.log(JSON.stringify(summary, null, 2));

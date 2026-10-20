@@ -35,6 +35,7 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { SECURITY_PREAMBLE } from '../../lib/server/promptGuard.js';
+import { HACKER_NEWS_DOMAINS } from '../../lib/reports/excludedSources.js';
 import { STAFFING_AGENCIES } from '../../lib/agencies.ts';
 import { SOURCE_TRUST, classifyPlatform } from '../../api/_utils/companyIntel.js';
 import { recomputeCompanyScoreFromReports, resolveOrCreateCompany } from '../../api/_utils/reportWrite.js';
@@ -214,7 +215,8 @@ export function buildRequest(t, { maxUses = DEFAULT_MAX_USES } = {}) {
       // (400) — so the answer is a fenced JSON block parsed defensively below.
       output_config: { effort: 'medium' },
       // Dynamic filtering is built into _20260209 — do NOT also declare code_execution.
-      tools: [{ type: 'web_search_20260209', name: 'web_search', max_uses: maxUses }],
+      // Hacker News is never a source (owner decision 2026-10-20) — blocked at the search itself.
+      tools: [{ type: 'web_search_20260209', name: 'web_search', max_uses: maxUses, blocked_domains: HACKER_NEWS_DOMAINS }],
       messages: [{ role: 'user', content: buildPrompt(t, maxUses) }],
     },
   };

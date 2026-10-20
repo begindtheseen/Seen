@@ -1,6 +1,7 @@
 // Admin-only receiver for raw, source-attributed company-intelligence excerpts from the local Mac.
 import { normalizeIntelItem } from '../lib/server/companyIntelImport.js';
 import { classifyApplicantAccount, REPORT_OUTCOME } from '../lib/reports/applicantRules.js';
+import { excludedSource } from '../lib/reports/excludedSources.js';
 import { resolveOrCreateCompany, recomputeCompanyScoreFromReports, writeReport } from './_utils/reportWrite.js';
 
 const headersFor = key => ({ apikey: key, Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' });
@@ -26,7 +27,11 @@ export default async function handler(req, res) {
   async function ingestOne(raw) {
     const item = normalizeIntelItem(raw);
     if (!item) { metrics.rejected++; note('invalid item: needs a company, an https source link and an excerpt of 20+ characters'); return; }
-    // An account that carries its page context (any source: Reddit, Hacker News, a page Google found) is
+    // Sources the owner ruled out (lib/reports/excludedSources.js: Hacker News, Glassdoor, Indeed, LinkedIn,
+    // Facebook, X, TikTok) are refused here whatever sent them — never a report, never commentary.
+    const excluded = excludedSource(item.source_url);
+    if (excluded) { metrics.rejected++; note(`excluded source: ${excluded.replace(/\.$/, '')} (owner decision)`); return; }
+    // An account that carries its page context (any source: Reddit, a page Google found) is
     // re-checked HERE with the same strict rules the collectors use. Passing → published as attributed
     // public discussion (weight 0.3: Reddit tier for reddit.com, "Public review · <host>" for the rest);
     // failing → kept only as commentary, never as a report. Accounts without context keep the old path
@@ -74,7 +79,7 @@ export default async function handler(req, res) {
           // published. trust_reason marks the batch so it can be found and removed in one query.
           ? { company_id: cid || undefined, role: item.role, platform: `Reddit r/${sub || 'unknown'}`, source: 'reddit', outcome, outcome_weight: 0.3, trust_reason: 'reddit_rule_match', needs_review: false, rounds: 0, unpaid_work: 'na', experience_level: 'Unknown', report_text: `${item.excerpt} [Source: ${item.source_url}]` }
           : checked
-          // Any other public page (Hacker News, a forum Google found): the established public-review contract
+          // Any other public page (a forum Google found): the established public-review contract
           // (api/_utils/companyIntel.js PUBLIC_REVIEW_PLATFORM_PREFIX, weight 0.3), published, tagged as a batch.
           ? { company_id: cid || undefined, role: item.role, platform: `Public review · ${host.replace(/^www\./, '')}`, source: 'web_public', outcome, outcome_weight: 0.3, trust_reason: 'web_rule_match', needs_review: false, rounds: 0, unpaid_work: 'na', experience_level: 'Unknown', report_text: `${item.excerpt} [Source: ${item.source_url}]` }
           : { company_id: cid || undefined, role: item.role, platform: `Public review · ${new URL(item.source_url).hostname.replace(/^www\./, '')}`, source: 'web_public', outcome, outcome_weight: 0.3, trust_reason: 'external_import', needs_review: true, rounds: 0, unpaid_work: 'na', experience_level: 'Unknown', report_text: `${item.excerpt} [Source: ${item.source_url}]` };
