@@ -50,6 +50,27 @@ and dashboard (PRs #122/#123) were intentionally REDESIGNED beyond the old site;
 longer the design source of truth for redesigned pages. `SITE_PARITY_CHECKLIST.md` /
 `ADMIN_PARITY_CHECKLIST.md` are frozen pre-06-30 records, not an active work queue.
 
+## Session 2026-10-20 D: job-writer request economy (same branch) — facts from prod edge logs 2026-10-19
+- **The Supabase "Logs Ingest over quota" alert (org billing, restriction from 2026-10-28) was NOT Seen**:
+  it was the separate Dispatch project (begindtheseen/Dispatch, Supabase ref gsxmncxvfmigjggjbzqb), whose
+  always-on Railway worker polls `claim_task` every 3s from 4 runners (~115k gateway log lines/day). Owner
+  decision 2026-10-20: retire Dispatch entirely; the owner DELETED its Supabase project the same day (alert
+  resolved). Seen ≈ 20k edge log lines/day (~2.5 KB each).
+- **Seen bug found in passing:** 1,384 of 1,620 `POST /rest/v1/jobs` on 10-19 were 400
+  `invalid input syntax for type integer` — Adzuna salaries are decimals (41683.01) and `jobs.salary_min`
+  is integer (written by api/jobs.js `_fetchAdzuna`, the location-jobs path). One decimal sank the multi-row
+  INSERT, postShape's halving re-sent it ~2×log2(n) times, and the listing was still lost. Fixed at the class
+  in `upsertJobs`: `coerceIntegerColumns` rounds every integer jobs column (salary_min/max, score,
+  waste_score, availability_report_count) before posting.
+- **Company ids are resolved in batches** (`resolveCompanyIds` in jobSources.js: one `name=in.(…)` lookup per
+  ≤40 names / ≤6,000 encoded chars, one insert for the missing names, per-name fallback on any failed round).
+  Replaces one GET per company (4,658/day) in upsertJobs and both refresh-jobs call sites.
+- **Data facts, not acted on:** `companies` has 101,744 rows but 55,642 distinct names (no unique index on
+  name; concurrent creates race) — a dedupe + unique index is a separate change. Seen's DB is 684 MB, of
+  which `jobs` is 625 MB for 54 MB of live rows (dead space from 1.08M deletes / 1.17M updates);
+  `VACUUM (FULL, ANALYZE) public.jobs` would reclaim it — not run (needs owner OK; DB size is not the red line).
+- Tests: `lib/server/jobSources.requests.test.mjs` (6).
+
 ## Session 2026-10-20 C: SpaceX "16 applicant reports" — duplicates + employee reviews (same branch)
 - **The Oct 18 SpaceX/Tesla import ran twice.** Every imported row exists exactly twice (same company,
   outcome, platform, role, text; invented timestamps up to a year apart): 150 extra copies = 13 hiring
