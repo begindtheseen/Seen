@@ -20,11 +20,11 @@ mark(`env ${CREDIT_KEY_ENV} (or ANTHROPIC_API_KEY locally)`, !!creditApiKey(), c
 for (const k of ['SUPABASE_URL', 'SUPABASE_SERVICE_KEY']) mark(`env ${k}`, !!process.env[k], process.env[k] ? 'set' : 'MISSING');
 
 await check('anthropic: key valid + Haiku 5.5 answers', async () => {
-  const m = await client().messages.create({ model: MODELS.cheap, max_tokens: 16, messages: [{ role: 'user', content: 'Reply with: ok' }] });
+  const m = await (await client()).messages.create({ model: MODELS.cheap, max_tokens: 16, messages: [{ role: 'user', content: 'Reply with: ok' }] });
   return `stop=${m.stop_reason}, model=${m.model}`;
 });
 await check('anthropic: batch endpoint accepts a request', async () => {
-  const b = await client().messages.batches.create({ requests: [{ custom_id: 'preflight', params: { model: MODELS.cheap, max_tokens: 16, messages: [{ role: 'user', content: 'Reply with: ok' }] } }] });
+  const b = await (await client()).messages.batches.create({ requests: [{ custom_id: 'preflight', params: { model: MODELS.cheap, max_tokens: 16, messages: [{ role: 'user', content: 'Reply with: ok' }] } }] });
   return `batch ${b.id} ${b.processing_status} (left to finish; costs a fraction of a cent)`;
 });
 await check('supabase: service key reads company_scores', async () => {
