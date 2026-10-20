@@ -65,6 +65,12 @@ longer the design source of truth for redesigned pages. `SITE_PARITY_CHECKLIST.m
   EXPERIMENTAL, argument form unverified) → `POST /api/ingest-local-career-jobs`, which re-runs `rowFromPosting`.
   Seen Command drives it as a third collector `career_site` and runs Indeed for the same names (its Company jobs tab).
 - CodeQL rule hit twice this day: test fakes must route by `new URL(u).hostname ===`, never `/host\.com/.test(url)`.
+- **Tesla / SpaceX test pages (owner, same day):** SpaceX's careers page is a front end for Greenhouse
+  boards `spacex` + `spacexglobal` (+ `xai`, xAI's own) — the board sync already covers it (2,760 US/remote).
+  Tesla blocks every server, even a datacenter headless Chrome; the Chrome collector now HARVESTS inside the
+  open page (`harvestInPage`: Tesla's careers feed → scroll fallback; job JSON-LD → Tesla per-job feed),
+  streams batches of 50, `CAREER_SITE_MAX_JOBS` default 3000. Tesla's real feed shape is unverified (only a
+  real visitor's browser can read it) — the scroll path does not depend on it. JOB_INGESTION_ENGINE.md §29.1.
 
 ## Session 2026-10-20 D: job-writer request economy (same branch) — facts from prod edge logs 2026-10-19
 - **The Supabase "Logs Ingest over quota" alert (org billing, restriction from 2026-10-28) was NOT Seen**:

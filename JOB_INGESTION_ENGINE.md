@@ -157,3 +157,24 @@ server-side source for a company and reports each separately (`lib/jobs/companyJ
 Indeed runs on the Mac (Seen Command). `needs_browser` sites go to `scripts/collect-career-site.mjs`
 (OpenCLI `browser open/eval/close`, session `seen-careers`; EXPERIMENTAL until run once on the Mac), which
 sends raw JobPosting objects to `POST /api/ingest-local-career-jobs`; Seen applies the same checks.
+
+### 29.1 The in-page harvest (2026-10-20): every job on a site that refuses servers
+Owner test pages: `https://www.tesla.com/careers/search/?site=US` and `https://www.spacex.com/careers/jobs`.
+- **SpaceX** needs no browser: its careers page is an Angular app that reads
+  `content.spacex.com/cms-assets/job_posts_new.json` (3,110 rows on 2026-10-20), and every row links to a
+  Greenhouse board: `spacex` (2,772), `spacexglobal` (32, international) and `xai` (306, xAI's own jobs).
+  Seen syncs `spacex` + `spacexglobal` hourly, so the company pull saves 2,760 US/remote SpaceX jobs.
+- **Tesla** refuses every server (Akamai: 403 on the page, robots.txt and the careers feed, including
+  from a headless Chrome in a datacenter), so it is read in the owner's Chrome. `harvestInPage`
+  (lib/server/careerBrowser.js) runs INSIDE the open page: the list comes from Tesla's own careers feed
+  (`/cua-api/apps/careers/state`, parsed tolerantly: the biggest array of objects with an id and a
+  title, ids resolved through the feed's lookup tables), else from scrolling the search page until no
+  new job links appear; each job's data comes from its page's JobPosting JSON-LD (in-page fetch, no tab
+  per job), else Tesla's per-job feed (`/cua-api/careers/job/<id>`, description = its longest text). A
+  job with neither is counted as `no_data`, never invented. Two requests at a time, 300 ms apart.
+- The exact Tesla feed shape is NOT verified (nothing outside a real visitor's browser can read it);
+  the scroll fallback does not depend on it. Each run reports `method` (tesla_feed | page_scroll |
+  pages) and `notes` for a strategy that did not apply.
+- Verified with a real headless Chrome on a stand-in www.tesla.com (host-resolver mapped) through the
+  real collector, Seen Command and Seen's rowFromPosting: feed mode 120/120 listed (90 US saved), scroll
+  mode 120/120, per-job-feed mode 40/40, 2,000 jobs in 5 min 18 s streamed in 40 batches of 50.
