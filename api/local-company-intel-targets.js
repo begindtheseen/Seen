@@ -3,6 +3,9 @@
 // never creates a company. Same Bearer secret as /api/ingest-local-company-intel.
 //
 //   GET ?limit=N    the collector's default targets: the N companies with the most open listings.
+//   GET ?limit=N&below=K  the same, but only companies with fewer than K applicant reports (the
+//                   archive collector's "fill every company to K" queue). Companies with no open
+//                   listings are not in it: a company is filled because people apply there now.
 //   GET ?catalog=1  EVERY company Seen knows, with its counts, so the operator can pick targets
 //                   (major companies, under-reported ones, or one specific company).
 //
@@ -87,6 +90,8 @@ export default async function handler(req, res) {
   if (!url || !key) return res.status(503).json({ error: 'Company target storage is unavailable.' });
   const catalog = String(req.query?.catalog || '') === '1';
   const limit = Math.min(100, Math.max(1, Number(req.query?.limit) || 10));
+  const belowRaw = Number(req.query?.below);
+  const below = Number.isInteger(belowRaw) && belowRaw >= 1 && belowRaw <= 10000 ? belowRaw : null;
   const headers = headersFor(key), counts = new Map();
   const [mentions, employee] = await Promise.all([hasColumn(url, headers, 'mention_count'), hasColumn(url, headers, 'employee_review_count')]);
   const [jobsOk, scoresOk] = await Promise.all([activeListingCounts(url, headers, counts), scoreCounts(url, headers, counts, { mentions, employee })]);
@@ -94,5 +99,7 @@ export default async function handler(req, res) {
   if (!jobsOk || !scoresOk) return res.status(502).json({ error: `Could not read ${!jobsOk ? 'job listings' : 'company scores'} — try again.` });
   const all = [...counts.values()].map((c) => ({ ...c, existing_reports: c.applicant_reports, slug_like: isSlugLike(c.company) })).sort(rank);
   if (catalog) return res.status(200).json({ ok: true, companies: all, total: all.length, employee_review_counts: employee, generated_at: new Date().toISOString() });
-  return res.status(200).json({ ok: true, companies: all.slice(0, limit), scanned_active_companies: counts.size });
+  const queue = below ? all.filter((c) => c.active_listings > 0 && c.applicant_reports < below) : all;
+  return res.status(200).json({ ok: true, companies: queue.slice(0, limit), scanned_active_companies: counts.size,
+    ...(below ? { below, below_count: queue.length } : {}) });
 }
