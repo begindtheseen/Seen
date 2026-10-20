@@ -15,9 +15,11 @@ export default async function handler(req, res) {
   if (!url || !key) return res.status(503).json({ error: 'Company-intelligence storage is unavailable.' });
   const hdrs = headersFor(key), strictExisting = body.require_existing === true;
   const metrics = { ok: true, received: input.length, accepted: 0, imported_reports: 0, commentary: 0, duplicates: 0, rejected: 0, errors: [] }, reportCompanies = new Set();
+  // Every rejection carries a reason; distinct reasons only, so a batch of 100 cannot bloat the reply.
+  const note = (reason) => { if (!metrics.errors.includes(reason) && metrics.errors.length < 20) metrics.errors.push(reason); };
   for (const raw of input) {
     const item = normalizeIntelItem(raw);
-    if (!item) { metrics.rejected++; continue; }
+    if (!item) { metrics.rejected++; note('invalid item: needs a company, an https source link and an excerpt of 20+ characters'); continue; }
     // The automatic collector is intentionally limited to companies Seen already knows.
     // Manual admin imports remain available for a deliberately entered new company.
     if (strictExisting) {
@@ -27,18 +29,22 @@ export default async function handler(req, res) {
         fetch(`${url}/rest/v1/jobs?company=ilike.${encodeURIComponent(item.company)}&select=id&limit=1`, { headers: hdrs }),
       ]);
       const known = (score.ok && (await score.json()).length) || (job.ok && (await job.json()).length);
-      if (!known) { metrics.rejected++; metrics.errors.push(`unknown company: ${item.company}`); continue; }
+      if (!known) { metrics.rejected++; note(`unknown company: ${item.company}`); continue; }
     }
     // Register first: the unique source_hash is the cross-run and cross-query duplicate guard.
-    const claim = await fetch(`${url}/rest/v1/company_intel_imports`, { method: 'POST', headers: { ...hdrs, Prefer: 'resolution=ignore-duplicates,return=representation' }, body: JSON.stringify({ company_name: item.company, source: item.source, source_url: item.source_url, source_hash: item.source_hash, kind: item.kind }) });
+    // on_conflict must NAME source_hash. Without it PostgREST resolves ignore-duplicates against the
+    // primary key, so an excerpt already imported by an earlier run hit the source_hash unique index
+    // as a 409 and was reported as REJECTED (2026-10-20: a re-run of 25 companies → 84 × 409, 0 duplicates).
+    const claim = await fetch(`${url}/rest/v1/company_intel_imports?on_conflict=source_hash`, { method: 'POST', headers: { ...hdrs, Prefer: 'resolution=ignore-duplicates,return=representation' }, body: JSON.stringify({ company_name: item.company, source: item.source, source_url: item.source_url, source_hash: item.source_hash, kind: item.kind }) });
+    if (claim.status === 409) { metrics.duplicates++; continue; } // a unique key raced or the other (source_url, source_hash) index
     const claimed = claim.ok ? await claim.json().catch(() => []) : [];
-    if (!claim.ok) { metrics.errors.push(`registry ${claim.status}`); metrics.rejected++; continue; }
+    if (!claim.ok) { note(`registry ${claim.status}`); metrics.rejected++; continue; }
     if (!Array.isArray(claimed) || !claimed.length) { metrics.duplicates++; continue; }
     metrics.accepted++;
     if (item.kind === 'applicant_outcome') {
       const cid = await resolveOrCreateCompany(url, hdrs, item.company);
       const ok = await writeReport(url, hdrs, { company_id: cid || undefined, role: item.role, platform: `Public review · ${new URL(item.source_url).hostname.replace(/^www\./, '')}`, source: 'web_public', outcome: item.outcome, outcome_weight: 0.3, trust_reason: 'external_import', needs_review: true, rounds: 0, unpaid_work: 'na', experience_level: 'Unknown', report_text: `${item.excerpt} [Source: ${item.source_url}]` }, item.company.toLowerCase());
-      if (ok) { metrics.imported_reports++; reportCompanies.add(item.company); } else { metrics.errors.push('report write failed'); metrics.rejected++; }
+      if (ok) { metrics.imported_reports++; reportCompanies.add(item.company); } else { note('report write failed'); metrics.rejected++; }
     } else {
       // Commentary stays on the company page but carries a kind flag so employee reviews do not
       // count as hiring-outcome mentions.
@@ -49,7 +55,7 @@ export default async function handler(req, res) {
       if (!Array.isArray(reviews)) reviews = [];
       reviews.push({ text: item.excerpt, source: item.source, year: item.year, sentiment: item.sentiment, url: item.source_url, kind: item.kind, source_hash: item.source_hash });
       const save = await fetch(`${url}/rest/v1/company_scores?on_conflict=company_name`, { method: 'POST', headers: { ...hdrs, Prefer: 'resolution=merge-duplicates,return=minimal' }, body: JSON.stringify({ company_name: item.company.toLowerCase(), web_reviews: reviews.slice(-100) }) });
-      if (save.ok) metrics.commentary++; else { metrics.errors.push('commentary write failed'); metrics.rejected++; }
+      if (save.ok) metrics.commentary++; else { note('commentary write failed'); metrics.rejected++; }
     }
   }
   // Commentary is display-only and must never rewrite a company's score/count cache.
