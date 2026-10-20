@@ -4,6 +4,7 @@ import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { classifyRawRedditExcerpt, flattenRedditRead, unwrapOpenCli, opencliFailure } from '../lib/server/redditIntelCollector.js';
 import { censorExcerpt } from '../lib/server/companyIntelImport.js';
+import { storableAccount, outcomeSentiment, isCompanySubreddit } from '../lib/reports/applicantRules.js';
 import { rankAndFilter } from '../api/_utils/companyReddit.js';
 
 const exec = promisify(execFile);
@@ -84,14 +85,28 @@ for (const target of targets.companies || []) {
     if (!id || !sourceUrl) continue;
     try {
       const read = await opencli(['reddit', 'read', id, '--limit', '12', '--depth', '1', '--max-length', '700', '-f', 'json']);
+      const opBody = String(post.selftext || '').replace(/\s+/g, ' ').trim();
+      const context = { title: String(post.title || '').slice(0, 300), company_sub: isCompanySubreddit(post.subreddit, [target.company]) };
       for (const entry of flattenRedditRead(read)) {
-        const excerpt = censorExcerpt(entry.text);
-        if (excerpt.length < 40) continue;
+        const text = censorExcerpt(entry.text);
+        if (text.length < 40) continue;
         const url = entry.url || sourceUrl;
+        // The opening post is the post's own text; everything else read is a comment.
+        // (The read output may cut the post at --max-length, so compare openings.)
+        const isOp = !!opBody && (entry.text === opBody || opBody.startsWith(entry.text.slice(0, 160)) || entry.text.startsWith(opBody.slice(0, 160)));
+        // A first-hand applicant account only under Seen's strict rules (lib/reports/applicantRules.js),
+        // with the stored words chosen so Seen's server-side re-check passes; anything else is commentary.
+        const account = storableAccount(text, { names: [target.company], title: context.title, isOp, inCompanySub: context.company_sub });
+        const excerpt = account ? account.excerpt : text;
         const key = `${target.company.toLowerCase()}\n${url}\n${excerpt.toLowerCase()}`;
         if (sourceSeen.has(key)) continue;
         sourceSeen.add(key);
-        rawItems.push({ company: target.company, source: `Reddit r/${post.subreddit || 'unknown'}`, source_url: url, excerpt, ...classifyRawRedditExcerpt(excerpt), year: String(new Date().getFullYear()) });
+        const raw = classifyRawRedditExcerpt(text);
+        const kind = account ? { kind: 'applicant_outcome', outcome: account.outcome, sentiment: outcomeSentiment(account.outcome) }
+          : { kind: raw.kind === 'employee_review' ? 'employee_review' : 'public_commentary', sentiment: raw.sentiment };
+        rawItems.push({ company: target.company, source: `Reddit r/${post.subreddit || 'unknown'}`, source_url: url, excerpt, ...kind,
+          ...(post.created_utc ? { posted: new Date(Number(post.created_utc) * 1000).toISOString() } : { year: String(new Date().getFullYear()) }),
+          context: { ...context, is_op: isOp } });
       }
     } catch (error) { console.warn(`[skip] ${target.company} post ${id}: ${error.message}`); }
   }

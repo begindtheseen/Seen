@@ -70,3 +70,14 @@ test('default mode is the collector’s top-N by open listings; a failed read re
   await handler({ method: 'GET', headers: { authorization: 'Bearer nope' }, query: {} }, unauth);
   assert.equal(unauth.code, 401);
 });
+
+test('below=K: only companies with open listings and fewer than K applicant reports, most listings first', async () => {
+  const { r } = await call({ limit: '10', below: '10' });
+  assert.deepEqual(r.body.companies.map((c) => c.company), ['Acme Corp'], 'SpaceX has 11; Gone Inc has no open listings');
+  assert.equal(r.body.below, 10);
+  assert.equal(r.body.below_count, 1);
+  const all = await call({ limit: '10', below: '12' });
+  assert.deepEqual(all.r.body.companies.map((c) => c.company), ['SpaceX', 'Acme Corp']);
+  const ignored = await call({ limit: '10', below: 'x' });
+  assert.equal(ignored.r.body.below, undefined, 'an invalid value is ignored, not guessed');
+});

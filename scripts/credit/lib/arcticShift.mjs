@@ -190,7 +190,9 @@ export function createArcticFetcher({
           items = [];
         }
       } catch (e) {
-        error = e?.name === 'TimeoutError' ? 'client_timeout' : `network: ${e?.message || e}`;
+        // Node's fetch says only "fetch failed"; the reason (a certificate, DNS, a refused connection) is the cause.
+        const cause = e?.cause ? ` (${e.cause.code || e.cause.message || e.cause})` : '';
+        error = e?.name === 'TimeoutError' ? 'client_timeout' : `network: ${e?.message || e}${cause}`;
       }
       stats.errors++;
       if (!retried && error !== 'rate_limited' && isRetryable(status, error)) {

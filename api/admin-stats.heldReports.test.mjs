@@ -27,9 +27,14 @@ function install() {
       const m = /id=in\.\(([^)]*)\)/.exec(u);
       return res200(m ? HELD.filter((r) => m[1].split(',').includes(r.id)) : HELD);
     }
+    // The single-report path (moderate_report, which the old approve_report button now uses).
+    if (u.includes('/rest/v1/reports?') && method === 'GET' && /id=eq\./.test(u)) {
+      const id = /id=eq\.([0-9a-f-]+)/.exec(u)[1];
+      return res200(HELD.filter((r) => r.id === id).map((r) => ({ ...r })));
+    }
     if (u.includes('/rest/v1/reports?') && method === 'PATCH') {
-      const ids = /id=in\.\(([^)]*)\)/.exec(u)[1].split(',');
-      return res200(ids.map((id) => ({ id })));
+      const m = /id=in\.\(([^)]*)\)/.exec(u) || /id=eq\.([0-9a-f-]+)/.exec(u);
+      return res200(m[1].split(',').map((id) => ({ id })));
     }
     return res200([]);
   };

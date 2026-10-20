@@ -15,6 +15,7 @@ import { findCompanyDuplicates } from '../lib/server/companyDupes.js';
 import { SCORABLE_REPORTS_FILTER, REJECTED_TRUST_REASON, DUPLICATE_TRUST_REASON } from '../lib/server/reportCounts.js';
 import { findDuplicateReports, DUPLICATE_PATCH } from '../lib/server/reportDupes.js';
 import { sortHeldReports, groupCounts, planDecision, classifyHeldReport, SORTS as HELD_SORTS } from '../lib/server/reportReview.js';
+import { moderationPlan, reportState, rulesCheck, DECISIONS as MODERATION_DECISIONS } from '../lib/server/reportModeration.js';
 import { buildCompanyAuditBundle } from './_utils/companyAuditBundle.js';
 import { isDisputeStatus, isDisputeReviewStatus, disputeStatusCounts, orderDisputesOpenFirst } from './_utils/companyReddit.js';
 import { isDisputeDecision, resolveDisputeEffect, disputeStatusCounts as listingDisputeCounts, orderDisputesOpenFirst as orderListingDisputes, buildListingTickets } from '../lib/server/listingDisputes.js';
@@ -439,7 +440,9 @@ async function _handler(req, res) {
     const jobReportsByStatus = { active: 0, expired: 0, unknown: 0 };
     jobReportRows.forEach(r => { jobReportsByStatus[r.status] = (jobReportsByStatus[r.status] || 0) + 1; });
 
-    const recentReports = recentReportsRes.ok ? await recentReportsRes.json() : [];
+    // Each recent row carries its real state (live / held / rejected / duplicate, counted in the grade or
+    // not) and whether Seen's strict first-hand rules would accept it today — so the buttons' results show.
+    const recentReports = (recentReportsRes.ok ? await recentReportsRes.json() : []).map((r) => ({ ...r, ...reportState(r), rules: rulesCheck(r) }));
     const recentApps    = recentAppsRes.ok    ? await recentAppsRes.json()    : [];
     const inactiveReportRows = inactiveReportsRes.ok ? await inactiveReportsRes.json() : [];
 
@@ -1631,10 +1634,10 @@ async function _handler(req, res) {
   // (every PATCH repeats the pending filter, so a double click or a second admin cannot re-decide a
   // row), each decision is audit-logged with the prior values, and every touched company's stored
   // score is recomputed so the page and the grade move together.
-  if (action === 'review_reports' || action === 'approve_report') {
-    const decision = action === 'approve_report' ? 'approve' : body.decision;
+  if (action === 'review_reports') {
+    const decision = body.decision;
     if (!['approve', 'reject'].includes(decision)) return res.status(400).json({ error: 'decision must be approve or reject' });
-    const ids = (action === 'approve_report' ? [body.id] : (Array.isArray(body.ids) ? body.ids : [])).map(String);
+    const ids = (Array.isArray(body.ids) ? body.ids : []).map(String);
     if (!ids.length || ids.length > 500) return res.status(400).json({ error: 'provide 1–500 report ids' });
     if (!ids.every((id) => UUID_RE.test(id))) return res.status(400).json({ error: 'invalid report id' });
     const inList = `id=in.(${ids.map(encodeURIComponent).join(',')})`;
@@ -1713,20 +1716,35 @@ async function _handler(req, res) {
     return res.status(200).json({ ok: true, marked: marked.length, remaining, complete: remaining === 0, groups, companies: companies.length, recomputed, by_company: byCompany, ms: Date.now() - t0 });
   }
 
-  if (action === 'investigate_report') {
-    const { id } = body;
-    if (!id) return res.status(400).json({ error: 'id required' });
-    await db(`reports?id=eq.${encodeURIComponent(id)}`, { method: 'PATCH', body: JSON.stringify({ needs_review: true }), headers: { Prefer: 'return=minimal' } });
-    await db('admin_audit_log', { method: 'POST', body: JSON.stringify({ admin_id: sess.admin_id, username: 'admin', action: 'investigate_report', target_type: 'report', target_id: String(id) }), headers: { Prefer: 'return=minimal' } });
-    return res.status(200).json({ ok: true });
-  }
-
-  if (action === 'deny_hiring_report') {
-    const { id } = body;
-    if (!id) return res.status(400).json({ error: 'id required' });
-    await db(`reports?id=eq.${encodeURIComponent(id)}`, { method: 'PATCH', body: JSON.stringify({ outcome_weight: 0, needs_review: false }), headers: { Prefer: 'return=minimal' } });
-    await db('admin_audit_log', { method: 'POST', body: JSON.stringify({ admin_id: sess.admin_id, username: 'admin', action: 'deny_hiring_report', target_type: 'report', target_id: String(id) }), headers: { Prefer: 'return=minimal' } });
-    return res.status(200).json({ ok: true });
+  // moderate_report: ONE report from Admin → "Recent hiring reports" (✓ approve · ? hold · ✕ reject · restore).
+  // lib/server/reportModeration.js decides what each decision writes — what the page and the grade really
+  // read — and the answer always says what happened ("Already live — nothing to approve"). The old action
+  // names map here, so an older admin page still works (and its ✕ now really takes a report out of the grade).
+  if (action === 'moderate_report' || action === 'approve_report' || action === 'investigate_report' || action === 'deny_hiring_report') {
+    const decision = action === 'moderate_report' ? body.decision : { approve_report: 'approve', investigate_report: 'hold', deny_hiring_report: 'reject' }[action];
+    if (!MODERATION_DECISIONS.includes(decision)) return res.status(400).json({ error: 'decision must be approve, reject, hold or restore' });
+    const id = String(body.id || '');
+    if (!UUID_RE.test(id)) return res.status(400).json({ error: 'invalid report id' });
+    const cur = await db(`reports?id=eq.${id}&select=${HELD_SELECT}`);
+    if (!cur.ok) return res.status(502).json({ error: `could not read the report (${cur.status})` });
+    const row = (await cur.json())[0];
+    if (!row) return res.status(404).json({ error: 'That report no longer exists — reload the list.' });
+    let prior = null;
+    if (decision === 'restore') {
+      const a = await db(`admin_audit_log?target_type=eq.report&target_id=eq.${id}&action=in.(reject_report,reject_held_report)&select=metadata&order=created_at.desc&limit=1`);
+      prior = a.ok ? ((await a.json())[0]?.metadata?.prior || null) : null;
+    }
+    const plan = moderationPlan(row, decision, prior);
+    if (!plan.patch) return res.status(200).json({ ok: true, changed: 0, message: plan.message, ...reportState(row) });
+    const pr = await db(`reports?id=eq.${id}&${plan.filter}`, { method: 'PATCH', body: JSON.stringify(plan.patch) });
+    if (!pr.ok) return res.status(502).json({ error: `update failed (${pr.status})` });
+    const changed = (await pr.json().catch(() => [])).length;
+    if (!changed) return res.status(409).json({ error: 'It changed while you were looking — reload the list and try again.' });
+    await db('admin_audit_log', { method: 'POST', body: JSON.stringify({ admin_id: sess.admin_id, username: 'admin', action: `${decision}_report`, target_type: 'report', target_id: id,
+      metadata: { company: row.company_name, outcome: row.outcome, prior: { needs_review: row.needs_review, trust_reason: row.trust_reason, outcome_weight: row.outcome_weight } } }), headers: { Prefer: 'return=minimal' } });
+    const company = String(row.company_name || '').toLowerCase().trim();
+    const recomputed = company ? !!(await recomputeCompanyScoreFromReports(SB, { apikey: SK, Authorization: `Bearer ${SK}`, 'Content-Type': 'application/json' }, company)) : false;
+    return res.status(200).json({ ok: true, changed, message: plan.message, recomputed, ...reportState({ ...row, ...plan.patch }) });
   }
 
   if (action === 'detect_duplicates_by_signals') {

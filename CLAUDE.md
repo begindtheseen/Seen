@@ -50,6 +50,111 @@ and dashboard (PRs #122/#123) were intentionally REDESIGNED beyond the old site;
 longer the design source of truth for redesigned pages. `SITE_PARITY_CHECKLIST.md` /
 `ADMIN_PARITY_CHECKLIST.md` are frozen pre-06-30 records, not an active work queue.
 
+## Session 2026-10-20 H: "Approving these does nothing" — Admin → Recent hiring reports buttons (same branch)
+- **Verified on prod (read-only):**
+  - Every row in the last-25 list was already LIVE (needs_review=false). The owner approved 188 held rows
+    02:00–06:00 UTC via the review queue (admin_audit_log `approve_held_report`).
+  - ✓ (`approve_report`, routed through review_reports) only touches HELD rows → "ok, 0 changed", no feedback.
+  - ✕ (`deny_hiring_report`) only set `outcome_weight 0`, which fusion IGNORES (it tiers by platform), so a
+    "denied" report kept counting.
+  - ? set needs_review=true, but held `external_import` rows still count (`SCORE_COUNTED_TRUST_REASONS`).
+  - Net: no button on that list changed a grade.
+- **Now** (`lib/server/reportModeration.js` + `moderate_report` in `api/admin-stats.js`; the old action names
+  map to it):
+  - approve = held → public;
+  - reject = ANY row → `needs_review true, trust_reason admin_rejected, weight 0` (hidden, never scored);
+  - hold = live → queue;
+  - restore = a rejected row → its prior values from the audit log.
+  - Every PATCH repeats its condition, each decision is audited with the prior values, and the company is
+    recomputed. The answer always carries a message.
+- **The list shows each row's state** (Live / Held / Rejected / Duplicate; "counts in grade") and
+  `rules: passes|fails` (strict rules, run as comment and as post). Only meaningful buttons are enabled.
+  Errors (including 401) are shown.
+- **Data, not acted on (owner's call, row by row):** 17 of the last 25 rows fail the strict rules. Overall,
+  28 of the 35 live Reddit-sourced imported rows fail, but without thread context some failures are real
+  accounts — so nothing was auto-rejected. The site nav's "Sign in" on /admin is normal: the admin uses its
+  own token, not a site session.
+
+## Session 2026-10-20 G: every free report source + "Listing signals" for every company with posts
+- **Sources (all free):**
+  - `scripts/collect-archive-reports.mjs` runs the Reddit archive (`ARCHIVE_REPORTS_SOURCES`, now `reddit` only).
+  - `scripts/collect-web-reports.mjs` (`WEB_REPORTS_*`) runs Google, searched and read in the owner's
+    Chrome via OpenCLI. Google gives servers a JS wall and datacenter browsers its CAPTCHA (both verified
+    2026-10-20). A CAPTCHA stops Google for the run and is never solved.
+  - One loop for all of them: `lib/reports/collectorRun.js`. The ingest re-checks ANY host with context;
+    non-Reddit passes → `Public review · <host>`, `web_rule_match`, weight 0.3.
+- **OWNER DECISION 2026-10-20: NO HACKER NEWS, EVER** ("filled with vibecoders trying to sneak fake reviews
+  that are self advertisements"). The HN collector (`hnHarvest.js`) is deleted. ONE list of excluded sources,
+  `lib/reports/excludedSources.js` (HN + Glassdoor/Indeed/LinkedIn/Facebook/Instagram/X/TikTok/Threads), is
+  enforced three times: the Google collector never opens them, the ingest refuses them ("excluded source: …
+  (owner decision)"), and the paid web-search script passes HN as `blocked_domains`. Prod has 2 older
+  HN-sourced rows from the Oct 17 paid pipeline (Stripe, Grafana Labs — `web_search_public_review`); not
+  touched without the owner's OK. OpenCLI on the owner's Mac is 2.0.1 (the `--session` flag form).
+- **OWNER DECISION 2026-10-20:** Glassdoor + Indeed review/interview pages stay SKIPPED (`webHarvest.js
+  SKIP_HOSTS`, with LinkedIn/Facebook/X/TikTok). They are what Google mostly returns for applicant stories
+  (Indeed: 15,413 interview reports for Home Depot). Do not relitigate. The sandbox safety check also
+  blocked loading them.
+- `lib/server/opencliBrowser.js`: OpenCLI browser commands in either argument form (2.x `--session` flag,
+  1.8 positional session), retried once on a usage error. The career-site collector uses it.
+- **Bug fixed at the source:** Adzuna fills `salary_min/max` with its OWN estimate
+  (`salary_is_predicted="1"`). Seen showed it as the listing's pay and the scorer gave +12 "compensation
+  disclosed" (−8 waste). `adzunaPay()` in `jobSources.js` drops estimates (also used by `api/jobs.js
+  _fetchAdzuna`). Stored rows keep theirs until they expire (≤14 d): a re-seen row only bumps
+  `last_seen_at`. Not measured: the predicted share (no Adzuna keys in the cloud env). Prod showed 102/102
+  Walmart and 10/10 Chipotle Adzuna rows with a salary.
+- **Listing signals** (`lib/server/listingSignals.js`, `POST /api/jobs {action:'listing_signals', company}`,
+  `components/ListingSignals.tsx` under the grade on `/company/[slug]`):
+  - Score = 30% pay shown + 30% avg listing transparency score + 25% apply-with-the-employer + 15% not
+    open 30+ days. A missing part is dropped and the weights rescaled. Needs ≥3 open posts.
+  - Labelled "from its job posts · not applicant reports". It NEVER touches company_scores or the grade.
+  - Prod, read-only: SpaceX 66 (pay 6%, direct 93%, n=2,922); Walmart 63 (pay 100%, direct 0%); Amazon 58.
+  - Name match = the page's own `company_jobs` key, so "Chipotle Mexican Grill" posts rate that page, not
+    /company/chipotle.
+
+## Session 2026-10-20 F: free, deep applicant reports from the Reddit archive (owner: "10 per company minimum… no cap", budget FREE ONLY)
+- **Prod coverage before this work (read-only, 2026-10-20):**
+  - 8,654 hiring companies, 8,243 of them with 0 reports; 4,111 scorable reports over 1,126 companies.
+  - Only 28 companies have ≥10 reports.
+  - The paid pipelines (web-reports.mjs Claude web_search; reddit-backfill.mjs Sonnet+Opus) are off the table
+    by owner decision.
+- **Rules:** `lib/reports/applicantRules.js` is a strict, rule-based first-hand classifier (no LLM).
+  - The old `classifyRawRedditExcerpt` was mostly wrong on real archive text: other employers, advice,
+    "maybe I'm way off base" counted as an offer.
+  - Every rule is pinned by a real sentence in `applicantRules.test.mjs`.
+  - `storableAccount` picks the stored words so Seen's server re-check passes on them alone.
+  - `reports_outcome_check` has no 'assessment' → `REPORT_OUTCOME` maps assessment→interviewing and
+    responded→human.
+- **Harvester:** `lib/reports/archiveHarvest.js`.
+  - Per company: its own subreddits (`pickCompanySubs`) + `JOB_SUBREDDITS`, year windows.
+  - It ALTERNATES company-sub and job-sub searches. Company subs are mostly "got hired", job subs mostly
+    ghosted/rejected (survivorship skew).
+  - One account per voice; cross-posts are deduped.
+  - The goal counts NEW reports Seen accepts (the collector's `onAccounts` returns `imported_reports`), so a
+    re-run walks past what Seen already has.
+- **Collector:** `scripts/collect-archive-reports.mjs` (`npm run ingest:archive-reports`).
+  - Env: `ARCHIVE_REPORTS_{COMPANIES_JSON,COMPANY_LIMIT,BELOW,GOAL(0=no cap),YEARS,MINUTES_PER_COMPANY,TOTAL_MINUTES}`.
+  - `GET /api/local-company-intel-targets?below=K` returns companies with open listings and fewer than K
+    applicant reports, most listings first.
+  - Seen Command's "✦ Applicant Reports" tab drives it (seen-command#227).
+- **Ingest:** `api/ingest-local-company-intel.js` re-runs the rules on every Reddit account that carries a
+  `context` (title, is_op, company_sub).
+  - Pass → published like reddit_import: platform `Reddit r/<sub>`, source reddit, weight 0.3,
+    `trust_reason 'reddit_rule_match'` (bulk-removable), needs_review false.
+  - Fail → commentary (`downgraded`).
+  - No context → the old held path.
+  - The OpenCLI Reddit collector now sends context and uses the same rules.
+- **Live yield (writes to a fake DB, real archive + real handler):**
+  - Chipotle goal 5 ×2 runs → 10 distinct; Home Depot ~60 in 6 min via r/HomeDepot.
+  - Chipotle 11 / Sheetz 6 in a 4-minute budget.
+  - Small local companies have few real accounts; we never invent them.
+- **Lessons:**
+  - Node's fetch error is just "fetch failed"; the archive fetcher now appends `e.cause.code`, and a run's
+    `search_errors` names it.
+  - A sandbox/managed network needs `NODE_EXTRA_CA_CERTS`/proxy passed to child collectors (seen-command
+    `NETWORK_ENV`).
+- **NOT done:** a production import. Nothing was written to prod. The first real run should be a Preview,
+  then an Import of the 25 thinnest.
+
 ## Session 2026-10-20 E: company-first job pull ("search Tesla → try every source") — PR #340 + seen-command #224
 - **`POST /api/local-company-jobs`** (Bearer LOCAL_INDEED_INGEST_SECRET, 1–10 companies, 270s budget) runs
   `lib/jobs/companyJobs.js pullCompanyJobs` per company:
@@ -65,6 +170,12 @@ longer the design source of truth for redesigned pages. `SITE_PARITY_CHECKLIST.m
   EXPERIMENTAL, argument form unverified) → `POST /api/ingest-local-career-jobs`, which re-runs `rowFromPosting`.
   Seen Command drives it as a third collector `career_site` and runs Indeed for the same names (its Company jobs tab).
 - CodeQL rule hit twice this day: test fakes must route by `new URL(u).hostname ===`, never `/host\.com/.test(url)`.
+- **Tesla / SpaceX test pages (owner, same day):** SpaceX's careers page is a front end for Greenhouse
+  boards `spacex` + `spacexglobal` (+ `xai`, xAI's own) — the board sync already covers it (2,760 US/remote).
+  Tesla blocks every server, even a datacenter headless Chrome; the Chrome collector now HARVESTS inside the
+  open page (`harvestInPage`: Tesla's careers feed → scroll fallback; job JSON-LD → Tesla per-job feed),
+  streams batches of 50, `CAREER_SITE_MAX_JOBS` default 3000. Tesla's real feed shape is unverified (only a
+  real visitor's browser can read it) — the scroll path does not depend on it. JOB_INGESTION_ENGINE.md §29.1.
 
 ## Session 2026-10-20 D: job-writer request economy (same branch) — facts from prod edge logs 2026-10-19
 - **The Supabase "Logs Ingest over quota" alert (org billing, restriction from 2026-10-28) was NOT Seen**:
