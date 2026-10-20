@@ -10,7 +10,6 @@
 //   • --dry-run (or DRY_RUN=1) builds requests and prints the estimate without calling the API;
 //   • runs are resumable: batch ids are saved before polling, so a crash re-attaches, never resubmits.
 
-import Anthropic from '@anthropic-ai/sdk';
 import { appendFileSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -54,11 +53,16 @@ export function creditApiKey() {
   return process.env[CREDIT_KEY_ENV] || process.env.ANTHROPIC_API_KEY || '';
 }
 
+// The SDK is loaded only when a paid job actually needs a client. The FREE collectors
+// (collect-archive-reports.mjs, via reddit.mjs → this file's pure helpers) must start on a checkout
+// whose node_modules has no @anthropic-ai/sdk — a top-level import crashed them on the owner's Mac
+// (ERR_MODULE_NOT_FOUND, 2026-10-20).
 let _client = null;
-export function client() {
+export async function client() {
   if (!_client) {
     const apiKey = creditApiKey();
     if (!apiKey) throw new Error(`${CREDIT_KEY_ENV} is not set (add it to the environment, never to a file)`);
+    const { default: Anthropic } = await import('@anthropic-ai/sdk');
     // Pin the public API endpoint: cloud sessions export ANTHROPIC_BASE_URL for Claude Code's own
     // traffic, and the SDK would otherwise follow it — the credit jobs must bill the credit account.
     _client = new Anthropic({ apiKey, baseURL: 'https://api.anthropic.com' });
@@ -149,7 +153,7 @@ export async function runBatch({ label, requests, estimate = {}, pollMs = 30_000
     state = { label, createdAt: new Date().toISOString(), estimateUsd: est.usd, batches: [] };
     for (let i = 0; i < requests.length; i += MAX_PER_BATCH) {
       const chunk = wellFormed(requests.slice(i, i + MAX_PER_BATCH));
-      const b = await client().messages.batches.create({ requests: chunk });
+      const b = await (await client()).messages.batches.create({ requests: chunk });
       state.batches.push({ id: b.id, n: chunk.length, done: false });
       writeFileSync(statePath, JSON.stringify(state, null, 2)); // persist BEFORE the next submit
       log(`[${label}] submitted ${b.id} (${chunk.length} requests)`);
@@ -163,7 +167,7 @@ export async function runBatch({ label, requests, estimate = {}, pollMs = 30_000
     let pending = 0;
     for (const b of state.batches) {
       if (b.done) continue;
-      const cur = await client().messages.batches.retrieve(b.id);
+      const cur = await (await client()).messages.batches.retrieve(b.id);
       if (cur.processing_status === 'ended') { b.done = true; b.counts = cur.request_counts; }
       else { pending++; log(`[${label}] ${b.id}: ${cur.request_counts.processing} processing, ${cur.request_counts.succeeded} done`); }
     }
@@ -178,7 +182,7 @@ export async function runBatch({ label, requests, estimate = {}, pollMs = 30_000
   const resultsPath = join(dir, 'results.jsonl');
   writeFileSync(resultsPath, '');
   for (const b of state.batches) {
-    for await (const r of await client().messages.batches.results(b.id)) {
+    for await (const r of await (await client()).messages.batches.results(b.id)) {
       results.set(r.custom_id, r.result);
       if (r.result.type === 'succeeded') costUsd += costOfUsage(r.result.message.model, r.result.message.usage);
       appendFileSync(resultsPath, JSON.stringify({ custom_id: r.custom_id, result: r.result }) + '\n');
