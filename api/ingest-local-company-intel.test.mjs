@@ -68,3 +68,61 @@ test('every rejection says why, once per reason', async () => {
   assert.equal(r.body.rejected, 3);
   assert.deepEqual(r.body.errors.sort(), ['invalid item: needs a company, an https source link and an excerpt of 20+ characters', 'unknown company: SpaceX']);
 });
+
+// 2026-10-20 22:47 PT: "SyntaxError: Unexpected end of JSON input" killed a batch. The company insert
+// went out without Prefer return=representation, PostgREST answered 201 with an EMPTY body, and
+// .json() threw after the company row already existed.
+function stubWrites({ companyBody = 'echo', reportFails = false } = {}) {
+  const calls = [];
+  global.fetch = async (url, opts = {}) => {
+    const u = String(url); const method = opts.method || 'GET'; calls.push({ u, method, prefer: opts.headers?.Prefer });
+    if (u.includes('/company_intel_imports') && method === 'POST') { const row = JSON.parse(opts.body); return { ok: true, status: 201, async json() { return [row]; } }; }
+    if (u.includes('/company_intel_imports') && method === 'DELETE') return { ok: true, status: 204, async json() { return null; } };
+    if (u.includes('/companies?name=ilike.') ) return { ok: true, status: 200, async json() { return []; } };
+    if (u.endsWith('/rest/v1/companies') && method === 'POST') {
+      // Real PostgREST: no return=representation → 201 with an empty body.
+      const rep = /return=representation/.test(opts.headers?.Prefer || '');
+      return { ok: true, status: 201, async json() { if (!rep || companyBody === 'empty') throw new SyntaxError('Unexpected end of JSON input'); return [{ id: 'co-1' }]; } };
+    }
+    if (u.includes('/rest/v1/reports') && method === 'POST') {
+      if (reportFails === 'throw') throw new Error('socket hang up');
+      return { ok: !reportFails, status: reportFails ? 500 : 201, async text() { return ''; } };
+    }
+    if (u.includes('/company_scores?company_name=eq.') && u.includes('select=company_name')) return { ok: true, status: 200, async json() { return [{ company_name: 'spacex' }]; } };
+    if (u.includes('/jobs?company=ilike.')) return { ok: true, status: 200, async json() { return [{ id: 1 }]; } };
+    // recompute + anything else: an empty, harmless answer
+    return { ok: true, status: 200, async json() { return []; }, async text() { return ''; } };
+  };
+  return calls;
+}
+const outcome = (i) => item(i, { kind: 'applicant_outcome', outcome: 'ghosted', excerpt: `I applied in March and was ghosted after the phone screen, attempt ${i}.` });
+
+test('a new company no longer crashes the batch: the insert asks for the row back', async () => {
+  const calls = stubWrites();
+  const r = await call({ items: [outcome(10), item(11)], require_existing: true });
+  assert.equal(r.code, 200);
+  assert.equal(r.body.imported_reports, 1);
+  assert.equal(r.body.commentary, 1);
+  assert.equal(r.body.accepted, 2);
+  const ins = calls.find((c) => c.u.endsWith('/rest/v1/companies') && c.method === 'POST');
+  assert.match(ins.prefer, /return=representation/);
+});
+
+test('a write that fails or throws releases the registration and costs only that item', async () => {
+  let calls = stubWrites({ reportFails: true });
+  let r = await call({ items: [outcome(12), item(13)], require_existing: true });
+  assert.equal(r.code, 200);
+  assert.equal(r.body.rejected, 1);
+  assert.equal(r.body.commentary, 1, 'the next item still landed');
+  assert.ok(calls.some((c) => c.method === 'DELETE' && c.u.includes('company_intel_imports?source_hash=eq.')), 'registration released');
+  assert.ok(r.body.errors.includes('report write failed'));
+
+  calls = stubWrites({ reportFails: 'throw' });
+  r = await call({ items: [outcome(14), item(15)], require_existing: true });
+  assert.equal(r.code, 200, 'one throwing item never 500s the batch');
+  assert.equal(r.body.rejected, 1);
+  assert.equal(r.body.commentary, 1);
+  assert.ok(calls.some((c) => c.method === 'DELETE'));
+  assert.ok(r.body.errors.some((e) => /^item failed: socket hang up/.test(e)));
+  assert.equal(r.body.accepted, 1, 'accepted counts only stored items');
+});

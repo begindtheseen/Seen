@@ -52,17 +52,27 @@ export async function resolveOrCreateCompany(SUPABASE_URL, hdrs, rawName) {
   const safeCo = String(rawName).trim().slice(0, 200);
   const coNorm = normalizeCompany(safeCo);
   const coWord = encodeURIComponent(safeCo.split(/\s+/)[0]);
+  // Exact (case-insensitive) name first. The first-word wildcard below keeps only 20 rows, and a
+  // common first word ("Home", "The", "American") has far more than 20 matches, so the existing
+  // company was never in the page and a duplicate was created (2026-10-20: a third "Home Depot").
+  const exact = await fetch(`${SUPABASE_URL}/rest/v1/companies?name=ilike.${encodeURIComponent(safeCo.replace(/[%_*\\]/g, ''))}&select=id,name&order=created_at.asc&limit=1`, { headers: hdrs });
+  const exactRows = exact.ok ? await exact.json().catch(() => []) : [];
+  if (exactRows?.[0]?.id) return exactRows[0].id;
   const coSearch = await fetch(`${SUPABASE_URL}/rest/v1/companies?name=ilike.*${coWord}*&select=id,name&limit=20`, { headers: hdrs });
   const coRows = coSearch.ok ? await coSearch.json() : [];
   let cid = (coRows || []).find(c => normalizeCompany(c.name) === coNorm)?.id
     || (coRows || []).find(c => c.name.toLowerCase() === safeCo.toLowerCase())?.id
     || null;
   if (!cid) {
+    // Ask for the row back explicitly: a caller whose headers lack Prefer return=representation got a
+    // 201 with an EMPTY body, and .json() threw "Unexpected end of JSON input" AFTER the company row
+    // was created (2026-10-20: it killed a company-intel import batch, and every retry created
+    // another companies row).
     const insRes = await fetch(`${SUPABASE_URL}/rest/v1/companies`, {
-      method: 'POST', headers: hdrs,
+      method: 'POST', headers: { ...hdrs, Prefer: 'return=representation' },
       body: JSON.stringify({ name: safeCo, logo_letter: safeCo[0]?.toUpperCase() || '?' }),
     });
-    if (insRes.ok) { const insRows = await insRes.json(); cid = Array.isArray(insRows) ? insRows[0]?.id : insRows?.id; }
+    if (insRes.ok) { const insRows = await insRes.json().catch(() => null); cid = Array.isArray(insRows) ? insRows[0]?.id : insRows?.id; }
     if (!cid) {
       const retry = await fetch(`${SUPABASE_URL}/rest/v1/companies?name=ilike.${encodeURIComponent(safeCo)}&select=id&limit=1`, { headers: hdrs });
       if (retry.ok) { const r = await retry.json(); cid = r?.[0]?.id || null; }
@@ -80,10 +90,10 @@ export async function resolveOrCreateLocation(SUPABASE_URL, hdrs, cid, rawLoc) {
   let lid = locRows?.[0]?.id || null;
   if (!lid) {
     const locIns = await fetch(`${SUPABASE_URL}/rest/v1/company_locations`, {
-      method: 'POST', headers: hdrs,
+      method: 'POST', headers: { ...hdrs, Prefer: 'return=representation' },
       body: JSON.stringify({ company_id: cid, city: safeLoc }),
     });
-    if (locIns.ok) { const lr = await locIns.json(); lid = Array.isArray(lr) ? lr[0]?.id : lr?.id; }
+    if (locIns.ok) { const lr = await locIns.json().catch(() => null); lid = Array.isArray(lr) ? lr[0]?.id : lr?.id; }
   }
   return lid;
 }
