@@ -11,13 +11,11 @@ import {
   mapLimit,
 } from '../lib/server/jobSources.js';
 // Employer-direct ATS ingestion + self-growing source registry (multi-source engine).
-import { fetchSourceJobs } from '../lib/jobs/atsProviders.js';
-import { seedSources, dueSources, recordSourceSync } from '../lib/jobs/sourceRegistry.js';
-import { SEED_SOURCES } from '../lib/jobs/seedSources.js';
 // Stale-job protocol (age → stale → delete): one batched Postgres function, shared with the admin
 // "clear stale now" action. Replaced deleteExpired() + markStaleJobs(), which could not finish.
 import { runStaleSweep } from '../lib/server/staleSweep.js';
 import { JOB_SEARCHES } from '../lib/server/jobSearchCatalog.js';
+import { fetchUsaJobs, usajobsCredentials } from '../lib/server/usajobs.js';
 
 // Refresh a batch of registered employer-direct ATS boards straight from the source. Fail-open +
 // bounded so it never breaks the cron or exceeds the function time budget. Returns a small summary.
@@ -32,35 +30,6 @@ const HANDLER_BUDGET_MS = Number(process.env.REFRESH_JOBS_BUDGET_MS || 270_000);
 // Slice of the run the stale sweep may use. It is batched and resumable, so a backlog it cannot
 // finish carries to the next run rather than costing this run its ingestion.
 const SWEEP_BUDGET_MS = Number(process.env.REFRESH_JOBS_SWEEP_BUDGET_MS || 45_000);
-
-export async function refreshEmployerSources(supabaseUrl, serviceKey, { full = false } = {}) {
-  const summary = { sources: 0, upserted: 0, skipped: [] };
-  try {
-    // Seed the registry (idempotent merge-duplicates — a cheap no-op after the first run).
-    await seedSources(SEED_SOURCES, supabaseUrl, serviceKey);
-    // Ingest the freshest-need ingestable sources DIRECTLY (employer-direct, real apply URLs).
-    const due = await dueSources(supabaseUrl, serviceKey, full ? 40 : 24);
-    if (due.length) {
-      const results = await mapLimit(due, 8, async (s) => {
-        const r = await fetchSourceJobs({ provider: s.provider, tenant: s.tenant, companyName: s.company_name });
-        return { s, ok: r.ok && r.rows.length > 0, rows: r.rows };
-      });
-      const rows = [];
-      await Promise.all(results.map(({ s, ok, rows: r }) => {
-        if (ok) rows.push(...r);
-        // ok:false (error) OR 200-but-empty both count toward the circuit breaker, so a wrong/dead
-        // tenant self-disables; a real success resets it.
-        return recordSourceSync({ id: s.id, ok, jobCount: r.length, prevFailures: s.consecutive_failures || 0 }, supabaseUrl, serviceKey);
-      }));
-      for (let i = 0; i < rows.length; i += 100) {
-        const u = await upsertJobs(rows.slice(i, i + 100), supabaseUrl, serviceKey).catch(() => ({ upserted: 0 }));
-        summary.upserted += u.upserted || 0;
-      }
-      summary.sources = due.length;
-    }
-  } catch (e) { console.warn('refreshEmployerSources (non-fatal):', e.message); }
-  return summary;
-}
 
 // 240 searches across 12 batches of 20. 6 cron runs/day → all 12 batches covered in 2 days.
 // Adzuna free tier: 250 calls/day — 120/day (20×6) stays well within limit.
@@ -276,7 +245,9 @@ export default async function handler(req, res) {
     // Run Adzuna searches (bounded to 8 concurrent) AND the keyless secondary sources.
     // fetchAdzuna already isolates its own failures (returns []), so no listing can break
     // the run; bounding concurrency prevents "fetch failed" from socket exhaustion.
-    const [adzunaArrays, secondary] = await Promise.all([
+    // USAJOBS runs the same searches when its key is set (lib/server/usajobs.js); [] otherwise.
+    const usajobsCreds = usajobsCredentials();
+    const [adzunaArrays, secondary, usajobsArrays] = await Promise.all([
       mapLimit(searches, 8, async s => {
         const jobs = await fetchAdzuna(s.what, s.where, ADZUNA_APP_ID, ADZUNA_APP_KEY);
         const canonical = canonicalMap[s.what] || s.what.toLowerCase().trim();
@@ -287,10 +258,18 @@ export default async function handler(req, res) {
         console.warn('secondary sources error (non-fatal):', e.message);
         return { jobs: [], bySource: {} };
       }),
+      usajobsCreds
+        ? mapLimit(searches, 4, async s => {
+          const jobs = await fetchUsaJobs(s.what, s.where, { credentials: usajobsCreds, radiusMiles: 50 });
+          const canonical = canonicalMap[s.what] || s.what.toLowerCase().trim();
+          return jobs.map(j => ({ ...j, search_query: canonical }));
+        })
+        : Promise.resolve([]),
     ]);
     const adzunaJobs = adzunaArrays.flat();
-    const allJobs = [...adzunaJobs, ...secondary.jobs];
-    const sourceCounts = { Adzuna: adzunaJobs.length, ...secondary.bySource };
+    const usajobsJobs = usajobsArrays.flat();
+    const allJobs = [...adzunaJobs, ...usajobsJobs, ...secondary.jobs];
+    const sourceCounts = { Adzuna: adzunaJobs.length, ...(usajobsCreds ? { USAJOBS: usajobsJobs.length } : {}), ...secondary.bySource };
 
     // Pre-warm the company-ID cache in batched lookups (one request per ~40 names, not one per
     // company — each request is a billed Supabase gateway log line).
@@ -327,13 +306,8 @@ export default async function handler(req, res) {
     const inserted = (countBefore != null && countAfter != null) ? Math.max(0, countAfter - countBefore) : null;
     const updated = inserted != null ? Math.max(0, upsertedTotal - inserted) : null;
 
-    // ── Employer-direct ATS refresh ─────────────────────────────────────────────
-    // Pull registered Greenhouse/Lever/Ashby/… boards straight from the source (freshest,
-    // employer-direct). Non-fatal + bounded — it never breaks the aggregator refresh above.
-    // Growing the registry is api/discover-sources.js's job, on its own invocation and crons.
-    const atsSummary = await refreshEmployerSources(SUPABASE_URL, SUPABASE_SERVICE_KEY, {
-      full: fullMode,
-    });
+    // Employer-direct boards (Greenhouse/Lever/Ashby/…) sync in api/refresh-employer-boards.js, on
+    // their own hourly invocation. Here they ran last on whatever budget was left, 24 at a time.
 
     // Job insights are now generated deterministically on demand (lib/server/jobInsights.js
     // via api/job-insights.js) — no Anthropic pre-generation needed in the cron.
@@ -387,7 +361,6 @@ export default async function handler(req, res) {
       purged: junkResult.removed,
       stale_sweep: sweep,
       merged,
-      ats: atsSummary, // employer-direct sources synced + registry growth
     });
 
   } catch (err) {

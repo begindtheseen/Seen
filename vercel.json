@@ -42,6 +42,9 @@
     "api/refresh-jobs.js": {
       "maxDuration": 300
     },
+    "api/refresh-employer-boards.js": {
+      "maxDuration": 300
+    },
     "api/discover-sources.js": {
       "maxDuration": 300
     },
@@ -97,6 +100,10 @@
     }
   },
   "crons": [
+    {
+      "path": "/api/refresh-employer-boards",
+      "schedule": "15 * * * *"
+    },
     {
       "path": "/api/outcome-followups",
       "schedule": "0 15 * * *"

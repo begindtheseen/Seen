@@ -117,3 +117,23 @@ Columnar Common Crawl index (Athena/DuckDB) for the host sweep; a real job queue
 
 ### Attribution
 Provider architecture adapted from **ever-jobs** (MIT); ATS endpoints/methods from **kalil0321/ats-scrapers** (MIT); Common Crawl discovery method from **Feashliaa/job-board-aggregator** (MIT code) run against **Common Crawl** (ToU); dedup idea from **JobNavigator** (MIT). No CC BY-NC data, no unlicensed code, and no ToS-violating scraping was incorporated.
+
+## 28. 2026-10-20 — employer boards on their own clock; USAJOBS
+- **Board sync moved to `api/refresh-employer-boards.js`** (hourly cron at :15, 300 s). Before, it ran at the
+  tail of `refresh-jobs` on leftover budget, 24 boards at a time: prod had 4,173 active boards (registry
+  `job_count` sum ~153k) but only 41 synced in two days, some last synced 2026-08-28. Now up to
+  `EMPLOYER_BOARDS_PER_RUN` (default 200) of the stalest boards per run → the registry refreshes about daily.
+  Dry run on prod (writes stubbed): 60 stalest boards in 3.4 s; the stalest are mostly empty/404 boards the
+  circuit breaker will now finally degrade (3 fails) and disable (8).
+- **Market filter** `lib/jobs/usLocation.js`: board rows are kept only when US, remote, or location-less.
+  Sample of 25 boards: 57% US/remote; the rest London, Bengaluru, CDMX, "Remote (EMEA)"… A state code alone
+  never beats a named foreign place ("Bengaluru, IN", "Vancouver, BC, CA"). Sync health uses the full board
+  size, so a board whose openings are all abroad is healthy, not dead.
+- **Seen Command** can trigger it: `POST /api/refresh-employer-boards` with `Bearer LOCAL_INDEED_INGEST_SECRET`
+  and `{companies:[…≤50]}` or `{limit:1..400}`.
+- **USAJOBS** (`lib/server/usajobs.js`): official federal board, free key at developer.usajobs.gov
+  (`USAJOBS_API_KEY` + `USAJOBS_EMAIL`, the email the key was issued to). Runs with each cron batch search and
+  in the on-site live top-up (`usajobsTopUp` in expand.js). No-op without the key. Headers verified against
+  the live endpoint (401 on a fake key). No request-rate limit is published; 500 rows/page, 10k/query.
+- **Jooble not built**: its request/response format is only shown after key signup, so it was not coded
+  against a guess. Build it once a key exists and a real response can be recorded as a fixture.
