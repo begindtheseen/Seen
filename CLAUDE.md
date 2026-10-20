@@ -50,6 +50,22 @@ and dashboard (PRs #122/#123) were intentionally REDESIGNED beyond the old site;
 longer the design source of truth for redesigned pages. `SITE_PARITY_CHECKLIST.md` /
 `ADMIN_PARITY_CHECKLIST.md` are frozen pre-06-30 records, not an active work queue.
 
+## Session 2026-10-20 E: company-first job pull ("search Tesla → try every source") — PR #340 + seen-command #224
+- **`POST /api/local-company-jobs`** (Bearer LOCAL_INDEED_INGEST_SECRET, 1–10 companies, 270s budget) runs
+  `lib/jobs/companyJobs.js pullCompanyJobs` per company:
+  1. **Boards**: registered `company_sources`, else `lib/jobs/boardFinder.js findBoards` probes 6 ATS by name slugs
+     and registers hits (`discoveredVia:'company_search'`). A 200 is NOT proof: Workable answers 200 + 0 jobs and
+     SmartRecruiters answers 200 for any slug, so a hit needs ≥1 job and, when the board names itself, the same name.
+  2. **Career site**: `lib/jobs/careerSite.js` (robots → job sitemap → schema.org JobPosting).
+  3. **Adzuna**, filtered by `sameCompanyName`.
+  Every saved row is US/remote only.
+- **Live 2026-10-20 (writes stubbed):** SpaceX: 2,760 from Greenhouse. Home Depot: 15/15 from its career site.
+  Tesla: robots.txt itself is Akamai 403 → `needs_browser`. Walmart: JS-rendered → `needs_browser`.
+- **Sites that refuse servers** go to the Mac: `scripts/collect-career-site.mjs` (OpenCLI browser open/eval/close —
+  EXPERIMENTAL, argument form unverified) → `POST /api/ingest-local-career-jobs`, which re-runs `rowFromPosting`.
+  Seen Command drives it as a third collector `career_site` and runs Indeed for the same names (its Company jobs tab).
+- CodeQL rule hit twice this day: test fakes must route by `new URL(u).hostname ===`, never `/host\.com/.test(url)`.
+
 ## Session 2026-10-20 D: job-writer request economy (same branch) — facts from prod edge logs 2026-10-19
 - **The Supabase "Logs Ingest over quota" alert (org billing, restriction from 2026-10-28) was NOT Seen**:
   it was the separate Dispatch project (begindtheseen/Dispatch, Supabase ref gsxmncxvfmigjggjbzqb), whose
