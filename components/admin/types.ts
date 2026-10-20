@@ -3,6 +3,10 @@ export interface RecentReport {
   id: string; company_name: string; outcome: string; role: string; city: string
   platform: string; created_at: string; report_text: string
   outcome_weight: number; trust_reason: string; needs_review: boolean
+  /** From the server (lib/server/reportModeration.js): what the page and the grade read right now. */
+  state?: 'live' | 'held' | 'rejected' | 'duplicate'; counted?: boolean
+  /** Would Seen's strict first-hand rules accept this imported account today? null = not judged. */
+  rules?: 'passes' | 'fails' | null
 }
 export interface RecentApp {
   id: string; company_name: string; role: string; city: string

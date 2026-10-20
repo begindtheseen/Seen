@@ -208,47 +208,69 @@ export function JobRunner({ token }: { token: string }) {
   )
 }
 
+// One report in "Recent hiring reports". Every button shows what the server did (lib/server/reportModeration.js):
+// a live report has nothing to approve, ✕ really takes it out of the grade, a rejected one can be restored.
+const STATE_CHIP: Record<string, { label: string; color: string }> = {
+  live: { label: 'Live', color: 'var(--green)' }, held: { label: 'Held for review', color: 'var(--amber)' },
+  rejected: { label: 'Rejected', color: 'var(--red)' }, duplicate: { label: 'Duplicate copy', color: 'var(--muted)' },
+}
 export function ReportRow({ report: r, token, onRefresh }: { report: RecentReport; token: string; onRefresh: () => void }) {
   const [acting, setActing] = useState(false)
-  const [localStatus, setLocalStatus] = useState<string | null>(null)
+  const [msg, setMsg] = useState<{ text: string; ok: boolean } | null>(null)
+  const [state, setState] = useState<string>(r.state || (r.needs_review ? 'held' : 'live'))
+  const [counted, setCounted] = useState<boolean | undefined>(r.counted)
 
-  async function act(action: string) {
-    setActing(true)
+  async function act(decision: 'approve' | 'reject' | 'hold' | 'restore') {
+    setActing(true); setMsg(null)
     try {
       const res = await fetch('/api/admin-stats', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'X-Admin-Token': token },
-        body: JSON.stringify({ action, id: r.id }),
+        body: JSON.stringify({ action: 'moderate_report', decision, id: r.id }),
       })
+      const b = await res.json().catch(() => ({}))
       if (res.ok) {
-        setLocalStatus(action === 'approve_report' ? 'approved' : action === 'investigate_report' ? 'review' : 'denied')
-        setTimeout(onRefresh, 1200)
+        setMsg({ text: b.message || 'Done.', ok: true })
+        if (b.state) setState(b.state)
+        if (typeof b.counted === 'boolean') setCounted(b.counted)
+        if (b.changed) setTimeout(onRefresh, 2500)
+      } else {
+        setMsg({ text: res.status === 401 || res.status === 403 ? 'Your admin session ended — sign in again, then retry.' : (b.error || `Failed (HTTP ${res.status}).`), ok: false })
       }
+    } catch {
+      setMsg({ text: 'Could not reach Seen — check the connection and retry.', ok: false })
     } finally {
       setActing(false)
     }
   }
 
-  const isDenied = localStatus === 'denied' || (r.outcome_weight === 0 && !r.needs_review)
+  const chip = STATE_CHIP[state] || STATE_CHIP.live
   const oc = outcomeColor(r.outcome)
+  const btn = (bg: string, on: boolean) => ({ background: bg, border: 'none', borderRadius: 5, minWidth: 26, height: 26, padding: '0 .4rem', color: '#fff', fontSize: '.7rem', cursor: on ? 'pointer' : 'not-allowed', opacity: on ? 1 : 0.35 })
+  const tag = (text: string, color: string, title?: string) => <span title={title} style={{ marginLeft: '.4rem', color, border: `1px solid ${color}55`, borderRadius: 4, padding: '0 .3rem' }}>{text}</span>
   return (
-    <div style={{ padding: '.6rem 1rem', borderBottom: '1px solid var(--line2)', borderLeft: `3px solid ${oc}`, margin: '0 -1rem', opacity: isDenied ? 0.45 : 1 }}>
+    <div style={{ padding: '.6rem 1rem', borderBottom: '1px solid var(--line2)', borderLeft: `3px solid ${oc}`, margin: '0 -1rem', opacity: state === 'rejected' || state === 'duplicate' ? 0.55 : 1 }}>
       <div style={{ display: 'flex', alignItems: 'flex-start', gap: '.6rem', flexWrap: 'wrap' }}>
-        <span style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', color: outcomeColor(r.outcome), background: outcomeColor(r.outcome) + '18', border: `1px solid ${outcomeColor(r.outcome)}30`, borderRadius: 4, padding: '.1rem .4rem', flexShrink: 0, marginTop: 1 }}>{r.outcome}</span>
+        <span style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', color: oc, background: oc + '18', border: `1px solid ${oc}30`, borderRadius: 4, padding: '.1rem .4rem', flexShrink: 0, marginTop: 1 }}>{r.outcome}</span>
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontFamily: 'var(--mono)', fontSize: '.65rem', color: 'var(--white)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.company_name} · {r.role}</div>
-          <div style={{ fontFamily: 'var(--mono)', fontSize: '.6rem', color: 'var(--sub)', marginTop: '.15rem' }}>{r.report_text?.slice(0, 90)}{r.report_text?.length > 90 ? '…' : ''}</div>
-          <div style={{ fontFamily: 'var(--mono)', fontSize: '.55rem', color: 'var(--muted)', marginTop: '.15rem' }}>
-            {relTime(r.created_at)} · community · {r.trust_reason || r.platform}
-            {r.needs_review && !localStatus && <span style={{ marginLeft: '.4rem', color: 'var(--amber)' }}>● Review</span>}
-            {localStatus === 'denied' && <span style={{ marginLeft: '.4rem', color: 'var(--red)' }}>✗ Denied</span>}
-            {localStatus === 'approved' && <span style={{ marginLeft: '.4rem', color: 'var(--green)' }}>✓ Approved</span>}
+          <div style={{ fontFamily: 'var(--mono)', fontSize: '.65rem', color: 'var(--white)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.company_name}{r.role ? ` · ${r.role}` : ''}</div>
+          <div style={{ fontFamily: 'var(--mono)', fontSize: '.6rem', color: 'var(--sub)', marginTop: '.15rem', overflowWrap: 'anywhere' }}>{r.report_text?.slice(0, 140)}{r.report_text?.length > 140 ? '…' : ''}</div>
+          <div style={{ fontFamily: 'var(--mono)', fontSize: '.55rem', color: 'var(--muted)', marginTop: '.2rem', display: 'flex', flexWrap: 'wrap', gap: '.2rem 0', alignItems: 'center' }}>
+            <span>{relTime(r.created_at)} · {r.platform}{r.trust_reason ? ` · ${r.trust_reason}` : ''}</span>
+            {tag(chip.label, chip.color)}
+            {counted === true && tag('counts in grade', 'var(--sub)', 'This report is part of the company’s grade right now')}
+            {counted === false && state === 'live' && tag('not in grade', 'var(--muted)')}
+            {r.rules === 'fails' && tag('⚠ fails new rules', 'var(--amber)', 'Seen’s strict first-hand rules would not accept this as an applicant account — read it and reject it if it is not one')}
+            {r.rules === 'passes' && tag('✓ passes rules', 'var(--green)')}
           </div>
+          {msg && <div role="status" style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', marginTop: '.3rem', color: msg.ok ? 'var(--green)' : 'var(--red)' }}>{msg.text}</div>}
         </div>
         <div style={{ display: 'flex', gap: '.3rem', flexShrink: 0 }}>
-          <button onClick={() => act('approve_report')} disabled={acting} title="Approve" style={{ background: 'var(--green)', border: 'none', borderRadius: 5, width: 26, height: 26, color: '#fff', fontSize: '.75rem', cursor: 'pointer' }}>✓</button>
-          <button onClick={() => act('investigate_report')} disabled={acting} title="Investigate" style={{ background: 'var(--amber)', border: 'none', borderRadius: 5, width: 26, height: 26, color: '#fff', fontSize: '.75rem', cursor: 'pointer' }}>?</button>
-          <button onClick={() => act('deny_hiring_report')} disabled={acting} title="Deny" style={{ background: 'var(--red)', border: 'none', borderRadius: 5, width: 26, height: 26, color: '#fff', fontSize: '.75rem', cursor: 'pointer' }}>✗</button>
+          {state === 'rejected'
+            ? <button onClick={() => act('restore')} disabled={acting} title="Restore — put it back the way it was before it was rejected" style={btn('var(--green)', !acting)}>↺</button>
+            : <button onClick={() => act('approve')} disabled={acting || state !== 'held'} title={state === 'held' ? 'Approve — make it public' : 'Already live — nothing to approve'} style={btn('var(--green)', !acting && state === 'held')}>✓</button>}
+          <button onClick={() => act('hold')} disabled={acting || state !== 'live'} title={state === 'live' ? 'Hold — move it back to the review queue' : 'Only a live report can be held'} style={btn('var(--amber)', !acting && state === 'live')}>?</button>
+          <button onClick={() => act('reject')} disabled={acting || state === 'rejected'} title="Reject — hide it and take it out of the grade (reversible with ↺)" style={btn('var(--red)', !acting && state !== 'rejected')}>✗</button>
         </div>
       </div>
     </div>

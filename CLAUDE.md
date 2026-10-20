@@ -50,6 +50,31 @@ and dashboard (PRs #122/#123) were intentionally REDESIGNED beyond the old site;
 longer the design source of truth for redesigned pages. `SITE_PARITY_CHECKLIST.md` /
 `ADMIN_PARITY_CHECKLIST.md` are frozen pre-06-30 records, not an active work queue.
 
+## Session 2026-10-20 H: "Approving these does nothing" — Admin → Recent hiring reports buttons (same branch)
+- **Verified on prod (read-only):**
+  - Every row in the last-25 list was already LIVE (needs_review=false). The owner approved 188 held rows
+    02:00–06:00 UTC via the review queue (admin_audit_log `approve_held_report`).
+  - ✓ (`approve_report`, routed through review_reports) only touches HELD rows → "ok, 0 changed", no feedback.
+  - ✕ (`deny_hiring_report`) only set `outcome_weight 0`, which fusion IGNORES (it tiers by platform), so a
+    "denied" report kept counting.
+  - ? set needs_review=true, but held `external_import` rows still count (`SCORE_COUNTED_TRUST_REASONS`).
+  - Net: no button on that list changed a grade.
+- **Now** (`lib/server/reportModeration.js` + `moderate_report` in `api/admin-stats.js`; the old action names
+  map to it):
+  - approve = held → public;
+  - reject = ANY row → `needs_review true, trust_reason admin_rejected, weight 0` (hidden, never scored);
+  - hold = live → queue;
+  - restore = a rejected row → its prior values from the audit log.
+  - Every PATCH repeats its condition, each decision is audited with the prior values, and the company is
+    recomputed. The answer always carries a message.
+- **The list shows each row's state** (Live / Held / Rejected / Duplicate; "counts in grade") and
+  `rules: passes|fails` (strict rules, run as comment and as post). Only meaningful buttons are enabled.
+  Errors (including 401) are shown.
+- **Data, not acted on (owner's call, row by row):** 17 of the last 25 rows fail the strict rules. Overall,
+  28 of the 35 live Reddit-sourced imported rows fail, but without thread context some failures are real
+  accounts — so nothing was auto-rejected. The site nav's "Sign in" on /admin is normal: the admin uses its
+  own token, not a site session.
+
 ## Session 2026-10-20 G: every free report source + "Listing signals" for every company with posts
 - **Sources (all free):**
   - `scripts/collect-archive-reports.mjs` runs Reddit archive → Hacker News (`ARCHIVE_REPORTS_SOURCES`;
