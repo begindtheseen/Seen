@@ -25,6 +25,10 @@ import { enrichmentQueueStats } from '../lib/server/enrichmentQueue.js';
 const HELD_PENDING_FILTER = `needs_review=is.true&or=(trust_reason.is.null,trust_reason.neq.${REJECTED_TRUST_REASON})`;
 const HELD_SELECT = 'id,company_name,outcome,role,platform,source,created_at,report_text,outcome_weight,trust_reason,needs_review';
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+// Admin "Clear stale" per-request budget — must stay below vercel.json maxDuration (60s) minus one
+// worst-case batch (8s statement_timeout) and the post-sweep counts/audit.
+export const PURGE_BUDGET_MS = 40_000;
+export const PURGE_BATCH = 500;
 
 const ALLOWED = ['https://seenjobs.io', 'https://www.seenjobs.io'];
 
@@ -1936,10 +1940,15 @@ async function _handler(req, res) {
   // drain it, since it only deletes stale rows unseen 14d+.
   if (action === 'purge_stale_jobs') {
     if (adminRole === 'moderator') return res.status(403).json({ error: 'Insufficient role' });
+    // Time budget (prod 2026-10-19: "Task timed out after 15 seconds" mid-clear). The old budget
+    // started batches for 6s, a batch can run to the 8s statement_timeout, and the counts + audit
+    // came after — 6 + 8 + overhead crossed the 15s function limit, Vercel killed the request and the
+    // button said "clear failed". Now: the function limit is 60s (vercel.json), no new batch starts
+    // after 40s (40 + 8 + ~2s of counts/audit < 60), and batches are 500 rows so one batch stays well
+    // under 8s on the bloated jobs table (the sweep still halves on a statement timeout).
     const sweep = await runStaleSweep({
       url: SB, key: SK,
-      // Starts no new batch after 6s: one batch is at most the 8s statement_timeout, so 6+8 < 15s.
-      mode: 'all', deadline: Date.now() + 6_000,
+      mode: 'all', batch: PURGE_BATCH, deadline: Date.now() + PURGE_BUDGET_MS,
     });
     if (!sweep.ok) {
       logError('admin-stats', `purge_stale_jobs failed: ${sweep.error}`, {});

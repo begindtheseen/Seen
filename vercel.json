@@ -72,7 +72,7 @@
       "maxDuration": 60
     },
     "api/admin-stats.js": {
-      "maxDuration": 15
+      "maxDuration": 60
     },
     "api/admin-rescore-jobs.js": {
       "maxDuration": 300

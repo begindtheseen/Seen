@@ -23,8 +23,18 @@ export type ClearStaleResult = {
   /** 'expired' rows kept for users' saved/applied links — never deleted by design. */
   kept: number | null
   rounds: number
+  /** Rounds lost to a gateway timeout / dropped connection and retried. Batches the server finished
+   *  before the cut-off ARE saved; they are just not in `cleared` (the next round's `remaining` is). */
+  lostRounds: number
   error?: string
 }
+
+// A round that died in transit (Vercel/gateway timeout, a dropped connection, an HTML error page)
+// is not a failed sweep: every batch the server committed before the cut-off is already saved, and
+// the sweep is idempotent. Retry those; an explicit server error (500 with a reason) stays a failure.
+const MAX_LOST_ROUNDS = 2
+const isTransient = (status: number, body: Record<string, unknown>) =>
+  status === 502 || status === 503 || status === 504 || Object.keys(body).length === 0
 
 export const CLEAR_STALE_LIMITS = { maxRounds: 40, budgetMs: 240_000 }
 
@@ -39,7 +49,8 @@ export async function clearStaleUntilDone(token: string, opts: {
   const maxRounds = opts.maxRounds ?? CLEAR_STALE_LIMITS.maxRounds
   const now = opts.now ?? Date.now
   const deadline = now() + (opts.budgetMs ?? CLEAR_STALE_LIMITS.budgetMs)
-  const out: ClearStaleResult = { ok: true, cleared: 0, deleted: 0, retained: 0, staled: 0, complete: false, remaining: null, kept: null, rounds: 0 }
+  const out: ClearStaleResult = { ok: true, cleared: 0, deleted: 0, retained: 0, staled: 0, complete: false, remaining: null, kept: null, rounds: 0, lostRounds: 0 }
+  let lostInARow = 0
 
   while (out.rounds < maxRounds && now() < deadline) {
     let d: Record<string, unknown> = {}
@@ -52,12 +63,16 @@ export async function clearStaleUntilDone(token: string, opts: {
       d = await res.json().catch(() => ({})) as Record<string, unknown>
       out.rounds += 1
       if (!res.ok || !d.ok) {
+        if (isTransient(res.status, d) && lostInARow < MAX_LOST_ROUNDS) { lostInARow++; out.lostRounds++; continue }
         // Keep what earlier rounds achieved — a later failure must not erase a real result.
         return { ...out, ok: out.rounds > 1, error: String(d.detail || d.error || `HTTP ${res.status}`) }
       }
     } catch (e) {
-      return { ...out, ok: out.rounds > 0, error: (e as Error).message }
+      out.rounds += 1
+      if (lostInARow < MAX_LOST_ROUNDS) { lostInARow++; out.lostRounds++; continue }
+      return { ...out, ok: out.rounds > 1, error: (e as Error).message }
     }
+    lostInARow = 0
     const num = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) ? v : 0)
     out.deleted += num(d.deleted)
     out.retained += num(d.retained)
@@ -79,6 +94,7 @@ export function clearStaleMessage(r: ClearStaleResult): string {
   const parts = [`cleared ${r.cleared.toLocaleString()} stale`]
   if (r.kept) parts.push(`${r.kept.toLocaleString()} kept for saved/applied links`)
   if (!r.complete) parts.push(r.remaining != null ? `${r.remaining.toLocaleString()} still left — click again` : 'not finished — click again')
+  if (r.lostRounds) parts.push(`${r.lostRounds} round${r.lostRounds === 1 ? '' : 's'} timed out and retried (work saved)`)
   if (r.error) parts.push(`stopped: ${r.error.slice(0, 60)}`)
   return parts.join(' · ')
 }

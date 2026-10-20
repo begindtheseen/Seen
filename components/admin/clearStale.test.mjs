@@ -80,3 +80,40 @@ test('respects the time budget', async () => {
   assert.equal(r.rounds, 3)
   assert.equal(r.complete, false)
 })
+
+// Prod 2026-10-19 23:00: Vercel killed a purge round at its 15s limit ("Task timed out after 15
+// seconds"), the browser got a non-JSON 504, and the button said "clear failed" although every batch
+// committed before the cut-off was saved. A lost round is retried; an explicit server error is not.
+test('a timed-out round (504, non-JSON) is retried and the clear still completes', async () => {
+  let left = 9000; let n = 0
+  const fetchImpl = async () => {
+    n++
+    if (n === 2) return { ok: false, status: 504, async json() { throw new Error('not json') } }
+    const d = Math.min(left, 4000); left -= d
+    return { ok: true, status: 200, async json() { return { ok: true, deleted: d, retained: 0, staled: 0, complete: left === 0, remaining: left, kept: 1 } } }
+  }
+  const r = await clearStaleUntilDone('tok', { fetchImpl })
+  assert.equal(r.ok, true)
+  assert.equal(r.complete, true)
+  assert.equal(r.remaining, 0)
+  assert.equal(r.lostRounds, 1)
+  assert.match(clearStaleMessage(r), /1 round timed out and retried \(work saved\)/)
+})
+
+test('a dropped connection on the first round is retried, not reported as a failed clear', async () => {
+  let n = 0
+  const fetchImpl = async () => {
+    if (++n === 1) throw new Error('Failed to fetch')
+    return { ok: true, status: 200, async json() { return { ok: true, deleted: 132, retained: 0, staled: 0, complete: true, remaining: 0, kept: 1 } } }
+  }
+  const r = await clearStaleUntilDone('tok', { fetchImpl })
+  assert.equal(r.ok, true); assert.equal(r.cleared, 132); assert.equal(r.lostRounds, 1)
+})
+
+test('three lost rounds in a row stop with the real error — no endless retry', async () => {
+  const fetchImpl = async () => ({ ok: false, status: 504, async json() { return {} } })
+  const r = await clearStaleUntilDone('tok', { fetchImpl })
+  assert.equal(r.rounds, 3)
+  assert.equal(r.ok, true, 'rounds may have committed work before timing out')
+  assert.match(clearStaleMessage(r), /stopped: HTTP 504/)
+})
