@@ -137,3 +137,23 @@ Provider architecture adapted from **ever-jobs** (MIT); ATS endpoints/methods fr
   the live endpoint (401 on a fake key). No request-rate limit is published; 500 rows/page, 10k/query.
 - **Jooble not built**: its request/response format is only shown after key signup, so it was not coded
   against a guess. Build it once a key exists and a real response can be recorded as a fixture.
+
+## 29. 2026-10-20 — company-first job pull ("search Tesla")
+One call, `POST /api/local-company-jobs` (Bearer `LOCAL_INDEED_INGEST_SECRET`, ≤10 companies), runs every
+server-side source for a company and reports each separately (`lib/jobs/companyJobs.js`):
+1. **Job boards**: its registered `company_sources` rows; if none, `lib/jobs/boardFinder.js` asks
+   Greenhouse/Lever/Ashby/Workable/Recruitee/SmartRecruiters under name slugs (`tesla`, `home-depot`,
+   `thehomedepot`…). A 200 is not proof (Workable 200 "Tesla" with 0 jobs; SmartRecruiters 200 for any slug):
+   a hit needs ≥1 job and, when the board names itself, the same company name. Verified hits are
+   registered (`discovered_via: company_search`) so the hourly sync keeps them.
+2. **Career site** (`lib/jobs/careerSite.js`): robots.txt (honoured; longest-match, `*`/`$`) → job sitemaps
+   (index walk, job sitemaps first) → schema.org JobPosting on each page; employer must match, US/remote only,
+   expired skipped; rows `source: 'Company site'`, `source_type: 'EMPLOYER_SITE'`,
+   `external_id: site:<host>:<identifier>`. Live 2026-10-20: Home Depot 15/15 pages, Target 8/8 (with
+   salaries); Walmart pages carry no JobPosting server-side (JS-rendered) → `needs_browser`; Tesla 403s
+   robots.txt itself → `blocked` → `needs_browser`.
+3. **Adzuna** for the name, keeping only listings whose employer IS that company (no unverified
+   `company` API parameter is used).
+Indeed runs on the Mac (Seen Command). `needs_browser` sites go to `scripts/collect-career-site.mjs`
+(OpenCLI `browser open/eval/close`, session `seen-careers`; EXPERIMENTAL until run once on the Mac), which
+sends raw JobPosting objects to `POST /api/ingest-local-career-jobs`; Seen applies the same checks.
