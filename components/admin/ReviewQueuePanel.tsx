@@ -56,6 +56,19 @@ export function ReviewQueuePanel({ token, onChanged }: { token: string; onChange
 
   const visible = useMemo(() => (rows || []).filter((r) => showEmployee || r.review.group !== 'employee_review'), [rows, showEmployee])
   const positiveIds = useMemo(() => (rows || []).filter((r) => r.review.group === 'positive' && !r.review.flags.includes('possible_duplicate')).map((r) => r.id), [rows])
+  // "Approve all" = every pending report EXCEPT later copies of a duplicate: approving those would
+  // publish (and, for hiring accounts, count) the same review twice. They stay for a manual call.
+  const allIds = useMemo(() => (rows || []).filter((r) => !r.review.flags.includes('possible_duplicate')).map((r) => r.id), [rows])
+  const allBreakdown = useMemo(() => {
+    const keep = (rows || []).filter((r) => !r.review.flags.includes('possible_duplicate'))
+    return {
+      eyes: keep.filter((r) => r.review.group === 'needs_eyes').length,
+      antiGaming: keep.filter((r) => r.review.flags.includes('anti_gaming_hold')).length,
+      positive: keep.filter((r) => r.review.group === 'positive').length,
+      employee: keep.filter((r) => r.review.group === 'employee_review').length,
+      dupes: (rows || []).length - keep.length,
+    }
+  }, [rows])
 
   async function decide(ids: string[], decision: 'approve' | 'reject', confirmText?: string) {
     if (!ids.length) return
@@ -92,6 +105,10 @@ export function ReviewQueuePanel({ token, onChanged }: { token: string; onChange
           <button disabled={busy || !positiveIds.length} style={btn('var(--green)')}
             onClick={() => decide(positiveIds, 'approve', `Approve all ${positiveIds.length} positive hiring report(s)? Possible duplicates and everything in "needs your eyes" are NOT included.`)}>
             ✓ Approve all positive ({positiveIds.length})
+          </button>
+          <button disabled={busy || !allIds.length} style={btn('var(--green)')}
+            onClick={() => decide(allIds, 'approve', `Approve ALL ${allIds.length} held reports?\n\n• ${allBreakdown.eyes} not clearly positive ("needs your eyes")${allBreakdown.antiGaming ? `, incl. ${allBreakdown.antiGaming} anti-gaming hold(s)` : ''}\n• ${allBreakdown.positive} positive hiring outcomes\n• ${allBreakdown.employee} employee reviews (published, never scored)\n\n${allBreakdown.dupes} possible duplicate(s) are NOT included — reject or approve those yourself.\n\nApproved reports go public at their original trust weight and company scores are recomputed. Every decision is audit-logged.`)}>
+            ✓ Approve all ({allIds.length})
           </button>
           <button disabled={busy || !selected.size} style={btn('var(--blue)')} onClick={() => decide([...selected], 'approve', `Approve ${selected.size} selected report(s)?`)}>✓ Approve selected ({selected.size})</button>
           <button disabled={busy || !selected.size} style={btn('var(--red)')} onClick={() => decide([...selected], 'reject', `Reject ${selected.size} selected report(s)? They are kept (hidden, unscored) and can be restored from the audit log.`)}>✗ Reject selected</button>
