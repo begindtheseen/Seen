@@ -50,6 +50,28 @@ and dashboard (PRs #122/#123) were intentionally REDESIGNED beyond the old site;
 longer the design source of truth for redesigned pages. `SITE_PARITY_CHECKLIST.md` /
 `ADMIN_PARITY_CHECKLIST.md` are frozen pre-06-30 records, not an active work queue.
 
+## Session 2026-10-20 C: SpaceX "16 applicant reports" — duplicates + employee reviews (same branch)
+- **The Oct 18 SpaceX/Tesla import ran twice.** Every imported row exists exactly twice (same company,
+  outcome, platform, role, text; invented timestamps up to a year apart): 150 extra copies = 13 hiring
+  accounts + 137 employee reviews. SpaceX's "16 applicant reports" were 11 accounts (5 Glassdoor counted
+  twice in the rates); its 90 Indeed employee reviews are 45. Tesla: 23 → 15 accounts, 184 → 92 reviews.
+- **Duplicates** (`lib/server/reportDupes.js`, key = company+outcome+platform+role+text ≥40 chars): a copy is
+  MARKED, never deleted — `{needs_review:true, trust_reason:'duplicate_import'}` (in
+  NEVER_SCORED_TRUST_REASONS; needs_review keeps it out under the old filter too, so deploy order is safe;
+  excluded from HELD_PENDING_FILTER). Keeper = oldest copy an admin has not rejected. Admin → Community →
+  "Duplicate reports" (`scan_report_dupes` / `dedupe_reports`, audited `mark_duplicate_report` with prior
+  values + `duplicate_of`, recomputes touched companies). The external `ingest` action now skips an account
+  already held (or repeated in the batch).
+- **Employee reviews now move the grade by their letter grade, never as hiring outcomes**
+  (`lib/server/employeeReviews.js` parses `[B+]` on a 4-point scale; `employeeReviewAdjustment` in
+  companyScore.js: ±5 max, C = neutral, nothing under 5 reviews, full strength at 30). They never touch
+  response/ghost rates or the applicant count, and never create a grade on their own. Wired into the stored
+  recompute, `_fuseWithReports`, and the audit bundle. Stored count `company_scores.employee_review_count`
+  (migration 20261020120000, additive; probed by `hasEmployeeReviewCount`); the score cache recomputes when
+  the live employee-review count differs. Badge: "11 applicant reports · 45 employee reviews · 20 online mentions".
+- Dry run on prod data after marking: SpaceX 90 → 88 (82% response, 45 reviews avg 2.2 → +0), Tesla 87 → 78
+  (92 reviews avg 2.4 → +1). Tests: employeeReviews 4, reportDupes 4, handler 2; suite 1359/1367 (the 8 = brain).
+
 ## Session 2026-10-20 B: "one press clears everything" — dupes, stale, company merge (same branch)
 - **Admin job "Remove dupes" was deleting REAL listings.** Its key was title|company|`city`, and `city` is
   blank on every jobs row in prod (27,668 / 27,668), so it grouped the same title at the same company in

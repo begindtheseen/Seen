@@ -16,6 +16,7 @@ import {
 } from './companyIntel.js';
 import { explainListingScore, SCORE_RANGE, WASTE_RANGE } from '../../lib/server/jobScore.js';
 import { MIN_REPORTS_FOR_GRADE, isScorableReport } from '../../lib/server/reportCounts.js';
+import { employeeReviewSignal } from '../../lib/server/employeeReviews.js';
 
 // Below this many reports actually counted toward the grade, the sample is treated as too
 // small for a firm reading — the PDF prints a strong low-sample warning. It IS the public grade
@@ -260,7 +261,8 @@ export async function buildCompanyAuditBundle({ db, serviceKey, adminId, adminRo
   // Live-recompute the fused grade from the included reports (empty web prior = pure function
   // of our own reports) so the export shows the exact score + inputs, independent of any cache.
   const fusionSources = Object.entries(bySource).map(([type, rows]) => ({ type, outcomes: rows }));
-  const computed = fuseCompanyIntel({ web: {}, sources: fusionSources });
+  // Employee reviews move the grade by their letter grades (lib/server/employeeReviews.js) — same as the live score.
+  const computed = fuseCompanyIntel({ web: {}, sources: fusionSources, employeeReviews: employeeReviewSignal(reports || []) });
 
   // Per-LISTING transparency scores WITH their full factor breakdown. Every listing score the
   // product ever displays is reproduced here next to the exact logic that produced it — the

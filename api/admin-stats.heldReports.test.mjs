@@ -49,7 +49,7 @@ test('list_held_reports returns the pending queue, needs-your-eyes first, with g
   assert.equal(res.jsonBody.reports[0].id, B, 'the rejection is first');
   const q = calls.find((c) => c.u.includes('/rest/v1/reports?')).u;
   assert.match(q, /needs_review=is\.true/);
-  assert.match(q, /trust_reason\.neq\.admin_rejected/, 'rejected rows never resurface');
+  assert.match(q, /trust_reason\.not\.in\.\(admin_rejected,duplicate_import\)/, "rejected rows and duplicate copies never resurface");
 });
 
 test('approve: hiring rows keep their weight; employee reviews become never-scored; audit + recompute', async () => {
@@ -69,7 +69,7 @@ test('approve: hiring rows keep their weight; employee reviews become never-scor
   assert.equal(audit.body[0].action, 'approve_held_report');
   assert.deepEqual(Object.keys(audit.body[0].metadata.prior).sort(), ['needs_review', 'outcome_weight', 'trust_reason']);
   // The stored score is recomputed from the (new) scorable corpus for the touched company.
-  assert.ok(calls.some((c) => c.method === 'GET' && c.u.includes('/rest/v1/reports?company_name=ilike.spacex') && c.u.includes('trust_reason.not.in.(external_employee_review,admin_rejected)')), 'the company score is recomputed');
+  assert.ok(calls.some((c) => c.method === 'GET' && c.u.includes('/rest/v1/reports?company_name=ilike.spacex') && c.u.includes('trust_reason.not.in.(external_employee_review,admin_rejected,duplicate_import)')), 'the company score is recomputed');
   assert.equal(res.jsonBody.companies, 1);
 });
 

@@ -32,6 +32,9 @@ interface CompanyScore {
   report_count: number
   first_party_report_count?: number
   web_report_count?: number
+  mention_count?: number
+  /** Employee reviews behind the grade — they move it by their letter grades (lib/server/employeeReviews.js). */
+  employee_review_count?: number
   risk_level: 'safe' | 'warn' | 'danger' | null
   process_score?: number | null
   data_quality?: string
@@ -124,7 +127,16 @@ function BarRow({ label, value, color }: { label: string; value: number; color: 
   )
 }
 
-function DataQualityBadge({ dq, reportCount, webCount = 0 }: { dq: string; reportCount: number; webCount?: number }) {
+// Every kind of evidence behind the grade, so the count matches the math: applicant reports (rates),
+// employee reviews (their letter grades adjust the score) and online mentions (½ a report each).
+function evidenceLine(reportCount: number, employeeCount = 0, mentionCount = 0): string {
+  const parts = [`${reportCount} applicant report${reportCount === 1 ? '' : 's'}`]
+  if (employeeCount > 0) parts.push(`${employeeCount} employee review${employeeCount === 1 ? '' : 's'}`)
+  if (mentionCount > 0) parts.push(`${mentionCount} online mention${mentionCount === 1 ? '' : 's'}`)
+  return parts.join(' · ')
+}
+
+function DataQualityBadge({ dq, reportCount, webCount = 0, employeeCount = 0, mentionCount = 0 }: { dq: string; reportCount: number; webCount?: number; employeeCount?: number; mentionCount?: number }) {
   // reportCount here is FIRST-PARTY applicant reports only. With zero first-party rows the
   // score is a web-research estimate — say exactly that; never mint "High confidence · N
   // reports" from the LLM's claimed mention count (that number looked fake because it was).
@@ -135,7 +147,7 @@ function DataQualityBadge({ dq, reportCount, webCount = 0 }: { dq: string; repor
       </span>
     )
   }
-  const n = `${reportCount} applicant report${reportCount === 1 ? '' : 's'}`
+  const n = evidenceLine(reportCount, employeeCount, mentionCount)
   const map: Record<string, { emoji: string; label: string; color: string }> = {
     strong:   { emoji: '🟢', label: `High confidence · ${n}`,     color: 'var(--green)' },
     moderate: { emoji: '🟡', label: `Moderate confidence · ${n}`, color: 'var(--amber)' },
@@ -892,7 +904,7 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
                   <span className="co-grade-score"><Odometer value={score.overall_score} /> / 100</span>
                   {verdict && <p className="co-verdict">{verdict}</p>}
                   <div className="co-grade-meta">
-                    {score.data_quality && <DataQualityBadge dq={score.data_quality} reportCount={fpReports} webCount={webEst} />}
+                    {score.data_quality && <DataQualityBadge dq={score.data_quality} reportCount={fpReports} webCount={webEst} employeeCount={score.employee_review_count || 0} mentionCount={score.mention_count || 0} />}
                     {fpReports === 0 && webEst > 0 && <span className="co-live">web-research estimate</span>}
                   </div>
                 </div>
@@ -1016,19 +1028,21 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
               </Section>
             )}
 
-            <Section id="reports" icon="🗣" title="Applicant reports" count={reports.length} open={open.reports} onToggle={toggle}
+            {/* The list holds applicant reports AND employee reviews, so the header names both and counts
+                each separately — it used to read "Applicant reports 100" for 15 accounts + 85 reviews. */}
+            <Section id="reports" icon="🗣" title={employeeN > 0 ? 'Applicant reports & employee reviews' : 'Applicant reports'} count={employeeN > 0 ? null : hiringReports.length} open={open.reports} onToggle={toggle}
               summary={reports.length > 0
-                ? [`${ghostedN} ghosted`, `${interviewN} interviewed`, `${hiredN} hired`, thirdPartyN > 0 ? `${thirdPartyN} from public discussions` : '', employeeN > 0 ? `${employeeN} employee review${employeeN !== 1 ? 's' : ''}` : ''].filter(Boolean).join(' · ')
+                ? [`${hiringReports.length} applicant report${hiringReports.length !== 1 ? 's' : ''}`, employeeN > 0 ? `${employeeN} employee review${employeeN !== 1 ? 's' : ''}` : '', `${ghostedN} ghosted`, `${interviewN} interviewed`, `${hiredN} hired`, thirdPartyN > 0 ? `${thirdPartyN} from public discussions` : ''].filter(Boolean).join(' · ')
                 : 'None yet — be the first to report'}>
               <div className="co-reports-tools">
                 <div style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', color: 'var(--muted)', lineHeight: 1.6, flex: 1, minWidth: 180 }}>
                   {reports.length > 0
                     ? (thirdPartyN > 0 || importedN > 0 || employeeN > 0
-                        ? [`${reports.length} report${reports.length !== 1 ? 's' : ''}`,
+                        ? [`${hiringReports.length} applicant report${hiringReports.length !== 1 ? 's' : ''}`,
                             seenN > 0 ? `${seenN} submitted to Seen` : '',
                             importedN > 0 ? `${importedN} imported from review sites (reduced weight)` : '',
                             thirdPartyN > 0 ? `${thirdPartyN} found in public discussions (reduced weight)` : '',
-                            employeeN > 0 ? `${employeeN} employee review${employeeN !== 1 ? 's' : ''} (shown, not counted in the hiring grade)` : '',
+                            employeeN > 0 ? `${employeeN} employee review${employeeN !== 1 ? 's' : ''} (their letter grades adjust the score; they are not hiring outcomes)` : '',
                           ].filter(Boolean).join(' · ')
                         : `${reports.length} report${reports.length !== 1 ? 's' : ''} submitted to Seen · anonymous applicant claims`)
                     : 'Reports are anonymous claims, labeled by source and weighted by trust.'}

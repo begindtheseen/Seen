@@ -17,7 +17,7 @@
 
 import {
   calcOverallScore, calcWaste, tenureAdjustment, scoreConfidence, confidenceLabel,
-  staleListingPenalty,
+  staleListingPenalty, employeeReviewAdjustment,
 } from './companyScore.js';
 import { wilsonInterval } from '../../lib/server/wilson.js';
 
@@ -166,7 +166,7 @@ export function blendRate(prior, empiricalRate, effN) {
 export const WEB_CLAIM_CAP = 500;
 
 export function fuseCompanyIntel(input = {}) {
-  const { web = {}, sources = [], avgTenureMonths = null, tenureSample = 0, dataAgeDays = 0, confirmedStaleListings = 0 } = input;
+  const { web = {}, sources = [], avgTenureMonths = null, tenureSample = 0, dataAgeDays = 0, confirmedStaleListings = 0, employeeReviews = null } = input;
 
   // Pool empirical evidence across sources, each weighted by its trust.
   let wGhost = 0, wResp = 0, wResolved = 0, effN = 0, rawResolved = 0, rawGhost = 0, mentionResolved = 0;
@@ -215,7 +215,11 @@ export function fuseCompanyIntel(input = {}) {
   const base = calcOverallScore(response_rate ?? 0, ghost_rate ?? 0, avg_wait_days ?? 0, effCount);
   const tAdj = tenureAdjustment(avgTenureMonths, tenureSample);
   const stalePen = staleListingPenalty(confirmedStaleListings);
-  const overall_score = clamp100(base + tAdj + stalePen);
+  // Employee reviews: their letter grades (never their 'human' outcome label) — bounded workplace
+  // adjustment. employeeReviews = { count, grades } from lib/server/employeeReviews.js.
+  const empGrades = Array.isArray(employeeReviews?.grades) ? employeeReviews.grades : [];
+  const empAdj = employeeReviewAdjustment(empGrades);
+  const overall_score = clamp100(base + tAdj + stalePen + empAdj);
   const waste_score = calcWaste(ghost_rate ?? 0, avg_rounds ?? 0, unpaid_rate);
   const confidence = scoreConfidence({
     reportCount: effCount, tenureSample, dataAgeDays,
@@ -227,6 +231,9 @@ export function fuseCompanyIntel(input = {}) {
     base_score: base,
     tenure_adjustment: tAdj,
     stale_listing_penalty: stalePen,
+    employee_review_adjustment: empAdj,
+    employee_review_count: Math.max(0, Math.floor(Number(employeeReviews?.count)) || 0),
+    employee_review_avg_grade: empGrades.length ? round1(empGrades.reduce((a, b) => a + b, 0) / empGrades.length) : null,
     confirmed_stale_listings: Math.max(0, Math.floor(Number(confirmedStaleListings)) || 0),
     ghost_rate,
     response_rate,

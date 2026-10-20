@@ -81,6 +81,24 @@ export function tenureAdjustment(avgTenureMonths, tenureSample) {
   return Math.round(adj * strength);
 }
 
+// Employee-review adjustment (owner request 2026-10-20: employee reviews must move the grade).
+// Each review carries the employee's letter grade (lib/server/employeeReviews.js, 4-point scale,
+// C = 2.0 = neutral). The mean grade's distance from neutral moves the score by at most ±5 points —
+// below tenure's ±8 and far below applicant outcomes, because a workplace opinion is not evidence
+// of how a company treats applicants — scaled by sample size (no effect under 5 reviews, full at 30).
+export const EMPLOYEE_REVIEW_POINTS_MAX = 5;
+export const MIN_EMPLOYEE_REVIEWS = 5;
+export const FULL_EMPLOYEE_REVIEWS = 30;
+export const NEUTRAL_EMPLOYEE_GRADE = 2.0;
+export function employeeReviewAdjustment(grades) {
+  const g = (Array.isArray(grades) ? grades : []).map(Number).filter((x) => Number.isFinite(x) && x >= 0 && x <= 4);
+  if (g.length < MIN_EMPLOYEE_REVIEWS) return 0;
+  const mean = g.reduce((a, b) => a + b, 0) / g.length;
+  const lean = Math.max(-1, Math.min(1, (mean - NEUTRAL_EMPLOYEE_GRADE) / 2));
+  const strength = Math.min(1, g.length / FULL_EMPLOYEE_REVIEWS);
+  return Math.round(EMPLOYEE_REVIEW_POINTS_MAX * lean * strength);
+}
+
 // Confidence 0–1 from how much data backs the score and how fresh it is.
 // FIRST-PARTY reports carry most of the weight (0.7), tenure adds up to 0.3; stale data decays.
 // `webClaimedCount` is an LLM web-research *claim*, NOT applicant reports: it contributes only
