@@ -395,7 +395,7 @@ test('resolveCompanyTargets: --companies / --targets-file / --skip-if-reports fl
   const seen = [];
   const select = async (opts) => { seen.push(opts); return [{ name: 'AutoZone', writeName: 'autozone', aliases: ['autozone', 'autozone, inc.'], jobs: 40, origin: 'jobs' }]; };
   const prevUrl = process.env.SUPABASE_URL, prevKey = process.env.SUPABASE_SERVICE_KEY;
-  process.env.SUPABASE_URL ||= 'https://x.supabase.co'; process.env.SUPABASE_SERVICE_KEY ||= 'k';
+  process.env.SUPABASE_URL = 'https://x.supabase.co'; process.env.SUPABASE_SERVICE_KEY = 'k';
   try {
     assert.deepEqual(await resolveCompanyTargets(['node', 'x', 'run'], { select }), []);
     const t = await resolveCompanyTargets(['node', 'x', 'run', '--companies', '300', '--skip-if-reports', '5'], { select, log: () => {} });

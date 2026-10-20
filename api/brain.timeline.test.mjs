@@ -36,8 +36,8 @@ const CLIENT_ROW = {
   created_at: '2026-08-14T00:00:00.000Z', expires_at: null, revoked_at: null, last_used_at: null,
 };
 process.env.BRAIN_API_TOKEN = TOKEN;
-process.env.SUPABASE_URL = process.env.SUPABASE_URL || 'https://example.supabase.co';
-process.env.SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY || 'test-service-key';
+process.env.SUPABASE_URL = 'https://example.supabase.co';
+process.env.SUPABASE_SERVICE_KEY = 'test-service-key';
 
 const { default: handler } = await import('./brain.js');
 
