@@ -62,8 +62,8 @@ test('orderDisputesOpenFirst tolerates empty / non-array input', () => {
 
 // ── Handler contract (mocked Supabase REST) ────────────────────────────────────────────
 
-process.env.SUPABASE_URL = process.env.SUPABASE_URL || 'https://example.supabase.co';
-process.env.SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY || 'test-service-key';
+process.env.SUPABASE_URL = 'https://example.supabase.co';
+process.env.SUPABASE_SERVICE_KEY = 'test-service-key';
 
 const { default: handler } = await import('./admin-stats.js');
 
