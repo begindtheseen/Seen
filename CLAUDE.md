@@ -50,6 +50,28 @@ and dashboard (PRs #122/#123) were intentionally REDESIGNED beyond the old site;
 longer the design source of truth for redesigned pages. `SITE_PARITY_CHECKLIST.md` /
 `ADMIN_PARITY_CHECKLIST.md` are frozen pre-06-30 records, not an active work queue.
 
+## Session 2026-10-20 I: first production import — rule false positives fixed + cleaned (owner: "yes do both")
+- **First real runs from Seen Command (owner's Mac):** ~90 reports for Home Depot, Starbucks, Robert Half, Snowflake,
+  Quantinuum, US Foods. Read back from prod, 9 were wrong, all at seams of `lib/reports/applicantRules.js`:
+  a company name used as a word ("am I being a snowflake" — also in the thread TITLE), a company listed as a tool
+  ("(Snowflake, etc") carrying scope to the next sentence, a second person between speaker and event ("why YOU
+  didn't get the job"), questions ending "?." (the old check was `endsWith('?')`), an event inside quotes, and the
+  later event losing ("hired me … just to reject me" → offer; "completely ghosted" → interview).
+- **Fixes:** `mentions()` (no predicate "a <name>"), `weakMention()` (lists/parentheses/examples don't carry scope;
+  also applied to titles), SECOND_PERSON in the speaker check, `askedAbout()` (a statement followed by a question
+  still counts), `insideQuotes()`, negation judged on the clause after the last `but`. Each pinned by the real
+  sentence in applicantRules.test.mjs. Old-vs-new diff over all 83 prod `reddit_rule_match` rows: exactly the bad
+  ones change; one good row ("never worked at Home Depot but I have an interview") was caught and fixed.
+- **One report per Reddit post/comment:** `redditPermalinkKey`/`canonicalSourceUrl` drop the title slug (OpenCLI
+  links have it, archive links don't), and the ingest refuses an account when ANY report for that company already
+  cites the same permalink (any pipeline, any state). The OpenCLI collector's subreddit already carries "r/", so
+  its source was "Reddit r/r/Quantinuum" → platform "Reddit r/r"; both ends fixed.
+- **Prod cleanup (audited, `username: claude-seenjobs (owner request 2026-10-20)`):** 6 rejected via
+  `moderationPlan(…,'reject')`, 1 marked `duplicate_import`, 2 outcomes corrected (`correct_report_outcome`), 1
+  platform corrected; 5 companies recomputed (Snowflake 69→62, Home Depot 91, Robert Half 56→58, Quantinuum
+  87→85, Starbucks 87→85). Left as is (ambiguous, owner's call): RH "strong first interview with a recruiter",
+  "in-person interview at the company", "got offered to work as a staff Accountant".
+
 ## Session 2026-10-20 H: "Approving these does nothing" — Admin → Recent hiring reports buttons (same branch)
 - **Verified on prod (read-only):**
   - Every row in the last-25 list was already LIVE (needs_review=false). The owner approved 188 held rows

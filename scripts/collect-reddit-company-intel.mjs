@@ -104,7 +104,7 @@ for (const target of targets.companies || []) {
         const raw = classifyRawRedditExcerpt(text);
         const kind = account ? { kind: 'applicant_outcome', outcome: account.outcome, sentiment: outcomeSentiment(account.outcome) }
           : { kind: raw.kind === 'employee_review' ? 'employee_review' : 'public_commentary', sentiment: raw.sentiment };
-        rawItems.push({ company: target.company, source: `Reddit r/${post.subreddit || 'unknown'}`, source_url: url, excerpt, ...kind,
+        rawItems.push({ company: target.company, source: `Reddit r/${String(post.subreddit || 'unknown').replace(/^\/?r\//i, '')}`, source_url: url, excerpt, ...kind,
           ...(post.created_utc ? { posted: new Date(Number(post.created_utc) * 1000).toISOString() } : { year: String(new Date().getFullYear()) }),
           context: { ...context, is_op: isOp } });
       }
