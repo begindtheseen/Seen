@@ -13,6 +13,19 @@ const targetCount = Math.min(100, Math.max(1, Number(process.env.COMPANY_INTEL_C
 const postLimit = Math.min(10, Math.max(1, Number(process.env.COMPANY_INTEL_POSTS_PER_COMPANY) || 3));
 const dryRun = process.argv.includes('--dry-run');
 if (!token) throw new Error('Set SEEN_COMPANY_INTEL_INGEST_TOKEN first.');
+// Optional explicit targets (Seen Command's company picker): a JSON array of up to 100 company names.
+// Without it, Seen chooses (its most active existing companies). Either way the import sends
+// require_existing: true, so a name Seen does not already know is rejected, never created.
+const explicitTargets = (() => {
+  const raw = process.env.COMPANY_INTEL_COMPANIES_JSON;
+  if (!raw) return null;
+  let list;
+  try { list = JSON.parse(raw); } catch { throw new Error('COMPANY_INTEL_COMPANIES_JSON must be a JSON array of company names.'); }
+  if (!Array.isArray(list)) throw new Error('COMPANY_INTEL_COMPANIES_JSON must be a JSON array of company names.');
+  const names = [...new Set(list.map(n => String(n || '').replace(/[\u0000-\u001f\u007f]/g, '').trim().slice(0, 120)).filter(Boolean))];
+  if (!names.length || names.length > 100) throw new Error('COMPANY_INTEL_COMPANIES_JSON must name 1–100 companies.');
+  return names;
+})();
 
 async function opencli(args) {
   const { stdout } = await exec('opencli', args, { maxBuffer: 10 * 1024 * 1024, timeout: 90000 });
@@ -34,7 +47,10 @@ const postJson = async (items) => {
 };
 const jobQuery = company => `"${company}" (interview OR hiring OR recruiter OR ghosted OR workplace)`;
 const rawItems = [], sourceSeen = new Set();
-const targets = await getJson(`/api/local-company-intel-targets?limit=${targetCount}`);
+const targets = explicitTargets
+  ? { companies: explicitTargets.map(company => ({ company })) }
+  : await getJson(`/api/local-company-intel-targets?limit=${targetCount}`);
+console.log(`[targets] ${explicitTargets ? 'chosen' : 'from Seen'}: ${(targets.companies || []).length}`);
 for (const target of targets.companies || []) {
   let posts = [];
   try { posts = await opencli(['reddit', 'search', jobQuery(target.company), '--sort', 'relevance', '--time', 'year', '--limit', String(postLimit), '-f', 'json']); }
