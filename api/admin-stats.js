@@ -10,7 +10,8 @@ import {
 import { recomputeCompanyScoreFromReports, normalizeCompany } from './_utils/reportWrite.js';
 import { logError } from '../lib/server/errlog.js';
 import { runStaleSweep, STALE_CLEARABLE_FILTER, STALE_KEPT_FILTER } from '../lib/server/staleSweep.js';
-import { SCORABLE_REPORTS_FILTER } from '../lib/server/reportCounts.js';
+import { SCORABLE_REPORTS_FILTER, REJECTED_TRUST_REASON } from '../lib/server/reportCounts.js';
+import { sortHeldReports, groupCounts, planDecision, classifyHeldReport, SORTS as HELD_SORTS } from '../lib/server/reportReview.js';
 import { buildCompanyAuditBundle } from './_utils/companyAuditBundle.js';
 import { isDisputeStatus, isDisputeReviewStatus, disputeStatusCounts, orderDisputesOpenFirst } from './_utils/companyReddit.js';
 import { isDisputeDecision, resolveDisputeEffect, disputeStatusCounts as listingDisputeCounts, orderDisputesOpenFirst as orderListingDisputes, buildListingTickets } from '../lib/server/listingDisputes.js';
@@ -18,6 +19,12 @@ import { buildNotificationRow } from '../lib/server/employerNotificationsStore.j
 import { normalizeClaimCompany } from '../lib/server/employerClaims.js';
 import { EMPLOYER_SKUS } from '../lib/server/employerSkus.js';
 import { enrichmentQueueStats } from '../lib/server/enrichmentQueue.js';
+
+// Held reports still awaiting a decision: on hold and not already rejected (rejected rows stay held,
+// with trust_reason admin_rejected, so they never resurface in the queue).
+const HELD_PENDING_FILTER = `needs_review=is.true&or=(trust_reason.is.null,trust_reason.neq.${REJECTED_TRUST_REASON})`;
+const HELD_SELECT = 'id,company_name,outcome,role,platform,source,created_at,report_text,outcome_weight,trust_reason,needs_review';
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 const ALLOWED = ['https://seenjobs.io', 'https://www.seenjobs.io'];
 
@@ -268,7 +275,7 @@ async function _handler(req, res) {
       reportsMonthRes, searchLogsWeekRes,
       jobsTotalRes, creditTxnRes, outcomeSharesRes, usersMonthRes,
       searchEvents30Res, resumeScans30Res, disputesOpenRes,
-      pendingClaimsRes, listingDisputesOpenRes, unfulfilledPurchasesRes,
+      pendingClaimsRes, listingDisputesOpenRes, unfulfilledPurchasesRes, heldReportsRes,
     ] = await Promise.all([
       db(`profiles?select=id`, { headers: { Prefer: 'count=exact', 'Range-Unit': 'items', Range: '0-0' } }),
       db(`profiles?created_at=gte.${todayISO}&select=id`, { headers: { Prefer: 'count=exact', 'Range-Unit': 'items', Range: '0-0' } }),
@@ -329,7 +336,10 @@ async function _handler(req, res) {
       //    and is waiting on the admin to grant the perk (migration 048).
       db(`employer_company_claims?status=eq.pending&select=id`, { headers: { Prefer: 'count=exact', 'Range-Unit': 'items', Range: '0-0' } }),
       db(`listing_disputes?status=eq.open&select=id`, { headers: { Prefer: 'count=exact', 'Range-Unit': 'items', Range: '0-0' } }),
-      db(`employer_purchases?status=eq.paid&select=id`, { headers: { Prefer: 'count=exact', 'Range-Unit': 'items', Range: '0-0' } })
+      db(`employer_purchases?status=eq.paid&select=id`, { headers: { Prefer: 'count=exact', 'Range-Unit': 'items', Range: '0-0' } }),
+      // Held reports awaiting an admin decision (Community → Reports awaiting review). Rejected rows
+      // stay held but are done, so they are not pending.
+      db(`reports?${HELD_PENDING_FILTER}&select=id`, { headers: { Prefer: 'count=exact', 'Range-Unit': 'items', Range: '0-0' } }),
     ]);
 
     const usersTotal = ct(usersTotalRes);
@@ -532,6 +542,7 @@ async function _handler(req, res) {
       reddit_disputes: { open: ct(disputesOpenRes) },
       enrichment: await enrichmentP,
       employer_claims: { pending: ct(pendingClaimsRes) },
+      held_reports: { pending: ct(heldReportsRes) },
       listing_disputes: { open: ct(listingDisputesOpenRes) },
       employer_purchases: { unfulfilled: ct(unfulfilledPurchasesRes) },
       duplicate_clusters: { suspected: dupClusters.length, items: dupClusters },
@@ -1547,12 +1558,49 @@ async function _handler(req, res) {
     return res.status(200).json({ ok: true });
   }
 
-  if (action === 'approve_report') {
-    const { id } = body;
-    if (!id) return res.status(400).json({ error: 'id required' });
-    await db(`reports?id=eq.${encodeURIComponent(id)}`, { method: 'PATCH', body: JSON.stringify({ needs_review: false, outcome_weight: 1.0 }), headers: { Prefer: 'return=minimal' } });
-    await db('admin_audit_log', { method: 'POST', body: JSON.stringify({ admin_id: sess.admin_id, username: 'admin', action: 'approve_report', target_type: 'report', target_id: String(id) }), headers: { Prefer: 'return=minimal' } });
-    return res.status(200).json({ ok: true });
+  // ── Held-report review queue (lib/server/reportReview.js holds the rules) ──────────────────────
+  // list_held_reports: every pending held report, classified + sorted ("needs your eyes" first).
+  if (action === 'list_held_reports') {
+    const sort = HELD_SORTS.includes(body.sort) ? body.sort : 'needs_eyes';
+    const r = await db(`reports?${HELD_PENDING_FILTER}&select=${HELD_SELECT}&order=created_at.desc&limit=1000`);
+    if (!r.ok) return res.status(502).json({ error: `could not read held reports (${r.status})` });
+    const rows = sortHeldReports(await r.json(), sort);
+    return res.status(200).json({ ok: true, sort, counts: groupCounts(rows), truncated: rows.length >= 1000, reports: rows });
+  }
+  // review_reports: approve or reject a set of held reports. Only rows STILL pending are touched
+  // (every PATCH repeats the pending filter, so a double click or a second admin cannot re-decide a
+  // row), each decision is audit-logged with the prior values, and every touched company's stored
+  // score is recomputed so the page and the grade move together.
+  if (action === 'review_reports' || action === 'approve_report') {
+    const decision = action === 'approve_report' ? 'approve' : body.decision;
+    if (!['approve', 'reject'].includes(decision)) return res.status(400).json({ error: 'decision must be approve or reject' });
+    const ids = (action === 'approve_report' ? [body.id] : (Array.isArray(body.ids) ? body.ids : [])).map(String);
+    if (!ids.length || ids.length > 500) return res.status(400).json({ error: 'provide 1–500 report ids' });
+    if (!ids.every((id) => UUID_RE.test(id))) return res.status(400).json({ error: 'invalid report id' });
+    const inList = `id=in.(${ids.map(encodeURIComponent).join(',')})`;
+    const cur = await db(`reports?${inList}&${HELD_PENDING_FILTER}&select=${HELD_SELECT}`);
+    if (!cur.ok) return res.status(502).json({ error: `could not read the reports (${cur.status})` });
+    const rows = await cur.json();
+    let changed = 0;
+    const done = [];
+    for (const { patch, ids: groupIds } of planDecision(rows, decision)) {
+      const pr = await db(`reports?id=in.(${groupIds.map(encodeURIComponent).join(',')})&${HELD_PENDING_FILTER}`, { method: 'PATCH', body: JSON.stringify(patch) });
+      if (!pr.ok) return res.status(502).json({ error: `update failed (${pr.status}) after ${changed} report(s)`, changed });
+      const updated = await pr.json().catch(() => []);
+      changed += updated.length;
+      for (const u of updated) done.push(u.id);
+    }
+    const byId = new Map(rows.map((r) => [r.id, r]));
+    const audit = done.map((id) => {
+      const r = byId.get(id) || {};
+      return { admin_id: sess.admin_id, username: 'admin', action: `${decision}_held_report`, target_type: 'report', target_id: String(id),
+        metadata: { company: r.company_name, outcome: r.outcome, group: classifyHeldReport(r).group, prior: { needs_review: r.needs_review, trust_reason: r.trust_reason, outcome_weight: r.outcome_weight } } };
+    });
+    if (audit.length) await db('admin_audit_log', { method: 'POST', body: JSON.stringify(audit), headers: { Prefer: 'return=minimal' } });
+    const companies = [...new Set(done.map((id) => String(byId.get(id)?.company_name || '').toLowerCase().trim()).filter(Boolean))];
+    let recomputed = 0;
+    for (const c of companies.slice(0, 200)) { if (await recomputeCompanyScoreFromReports(SB, { apikey: SK, Authorization: `Bearer ${SK}`, 'Content-Type': 'application/json' }, c)) recomputed++; }
+    return res.status(200).json({ ok: true, decision, requested: ids.length, changed, skipped: ids.length - changed, companies: companies.length, recomputed });
   }
 
   if (action === 'investigate_report') {

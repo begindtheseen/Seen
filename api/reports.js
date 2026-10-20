@@ -14,7 +14,7 @@ import { buildSearchUrl, parseRedditSearchAtom } from './_utils/companyReddit.js
 import { SECURITY_PREAMBLE, fenceUntrusted, scanInjection } from '../lib/server/promptGuard.js';
 import { fetchIndustryBenchmark } from '../lib/server/benchmark.js';
 import { isEvidencedScore, suppressionReason, servedDataSource } from '../lib/server/scoreProvenance.js';
-import { firstPartyReportCount, mentionCount, webClaimCount, gateScore, isGradeable, SCORABLE_REPORTS_FILTER, scorableResolvedCountPath, parseExactCount } from '../lib/server/reportCounts.js';
+import { firstPartyReportCount, mentionCount, webClaimCount, gateScore, isGradeable, SCORABLE_REPORTS_FILTER, scorableResolvedCountPath, parseExactCount, EMPLOYEE_REVIEW_RE } from '../lib/server/reportCounts.js';
 import { enqueueCompanyEnrichment } from '../lib/server/enrichmentQueue.js';
 
 // Authorize admin/cron-only actions (the Anthropic web-research endpoints). Accepts a Vercel
@@ -1286,7 +1286,7 @@ Return ONLY a valid JSON array. Return [] if there are genuinely no hiring exper
           outcome_weight:   weight,
           // An employee review ("what it's like to work here") is not a hiring outcome — stored for the
           // page but never scored (lib/server/reportCounts.js SCORABLE_REPORTS_FILTER).
-          trust_reason:     (rpt.kind === 'employee_review' || /\bemployee review\b/i.test(String(rpt.report_text || '')) || /employee/i.test(String(rpt.platform || ''))) ? 'external_employee_review' : 'external_import',
+          trust_reason:     (rpt.kind === 'employee_review' || EMPLOYEE_REVIEW_RE.test(String(rpt.report_text || '')) || /employee/i.test(String(rpt.platform || ''))) ? 'external_employee_review' : 'external_import',
           needs_review:     true, // queued for an admin spot-check — but COUNTED in the score at ingest trust (SCORABLE_REPORTS_FILTER)
           rounds:           Number.isInteger(rpt.rounds) ? rpt.rounds : 0,
           unpaid_work:      'na',
