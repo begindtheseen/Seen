@@ -69,7 +69,7 @@ const notReached = [];
 
 for (const company of targets) {
   if (ingestDown || Date.now() >= runDeadline) { notReached.push(company); continue; }
-  const row = { company, found: 0, new_reports: null, sent: 0, imported: 0, published: 0, duplicates: 0, downgraded: 0, rejected: 0, threads_read: 0, searches: 0, failed_searches: 0, company_subs: [], stopped_by: null, outcomes: {} };
+  const row = { company, found: 0, new_reports: null, sent: 0, imported: 0, published: 0, duplicates: 0, downgraded: 0, rejected: 0, threads_read: 0, searches: 0, failed_searches: 0, search_errors: [], company_subs: [], stopped_by: null, outcomes: {} };
   let buffer = [];
   // Sends what is buffered: in batches of 50, and also as soon as the buffer could complete the goal —
   // the goal counts reports Seen newly ACCEPTS (a re-run re-finds accounts Seen already holds), so Seen
@@ -108,7 +108,7 @@ for (const company of targets) {
       log: (m) => console.log(`[harvest]${m}`),
     });
     await flush(true);
-    Object.assign(row, { new_reports: dryRun ? null : row.imported, threads_read: r.threadsRead, searches: r.searches, failed_searches: r.failedSearches, company_subs: r.companySubs, stopped_by: r.stoppedBy });
+    Object.assign(row, { new_reports: dryRun ? null : row.imported, threads_read: r.threadsRead, searches: r.searches, failed_searches: r.failedSearches, search_errors: r.searchErrors || [], company_subs: r.companySubs, stopped_by: r.stoppedBy });
   } catch (e) {
     await flush(true).catch(() => {});
     row.stopped_by = 'error'; row.error = String(e.message || e).split('\n')[0].slice(0, 200);
