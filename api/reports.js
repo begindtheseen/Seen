@@ -1344,6 +1344,8 @@ Return ONLY a valid JSON array. Return [] if there are genuinely no hiring exper
 
   try {
     // ── Query reports directly by company_name (no FK join) ───────────────────
+    // REPORT_LIST_LIMIT: the list was capped at 100 newest rows, so a company with more public rows
+    // (SpaceX 106, Tesla 207 on 2026-10-20) silently lost its OLDEST reports from the page.
     // Wildcards only BETWEEN tokens (so "Towne Park LLC" / "coca-cola" still match); every row is
     // then checked with sameCompany. Held rows (anti-gaming needs_review) are not public.
     const nameEnc = encodeURIComponent(`*${canonical.replace(/[\s-]+/g, '*')}*`);
@@ -1352,7 +1354,7 @@ Return ONLY a valid JSON array. Return [] if there are genuinely no hiring exper
       + `&needs_review=not.is.true`
       + `&select=id,role,outcome,ghost_stage,rounds,report_text,platform,outcome_weight,trust_reason,created_at,experience_level,location_id,company_name,company_id`
       + `&order=created_at.desc`
-      + `&limit=100`;
+      + `&limit=${REPORT_LIST_LIMIT}`;
 
     console.log(`REPORTS: fetching URL: ${url.replace(SUPABASE_URL, '[URL]')}`);
 
@@ -1383,7 +1385,7 @@ Return ONLY a valid JSON array. Return [] if there are genuinely no hiring exper
         + `?company_id=in.(${ids.join(',')})`
         + `&needs_review=not.is.true`
         + `&select=id,role,outcome,ghost_stage,rounds,report_text,platform,outcome_weight,trust_reason,created_at,experience_level,location_id,company_id`
-        + `&order=created_at.desc&limit=100`;
+        + `&order=created_at.desc&limit=${REPORT_LIST_LIMIT}`;
       const fbRes = await fetch(fbUrl, { headers: hdrs });
       const fbRows = fbRes.ok ? await fbRes.json() : [];
       console.log(`REPORTS: fallback company_id query got ${fbRows?.length || 0} rows`);
@@ -1411,7 +1413,7 @@ Return ONLY a valid JSON array. Return [] if there are genuinely no hiring exper
           + `?company_id=in.(${ids2.join(',')})`
           + `&needs_review=not.is.true`
           + `&select=id,role,outcome,ghost_stage,rounds,report_text,platform,outcome_weight,trust_reason,created_at,experience_level,location_id,company_id`
-          + `&order=created_at.desc&limit=100`;
+          + `&order=created_at.desc&limit=${REPORT_LIST_LIMIT}`;
         const fb2 = await fetch(fbUrl2, { headers: hdrs });
         if (fb2.ok) {
           const fb2Rows = await fb2.json();
@@ -1538,6 +1540,9 @@ async function buildResponse(res, reports, hdrs, SUPABASE_URL, city) {
 
   return res.status(200).json({ ok: true, reports: filtered, cities, total: enriched.length });
 }
+
+// Public rows the company page lists (it shows them 10 at a time). Large enough for every company today.
+export const REPORT_LIST_LIMIT = 500;
 
 // ── handleCompanyScore: merged from api/company-score.js ──────────────────────
 const _SCORE_TTL_MS = 365 * 24 * 60 * 60 * 1000;

@@ -71,7 +71,7 @@ export function reportSourceBadge(platform?: string | null, reportText?: string 
   if (isEmployeeReview({ report_text: reportText })) {
     return {
       label: `Employee review${site ? ` · ${site}` : ''}`,
-      title: 'A current or former employee describing what it is like to work here, imported from a review site. It is not a hiring outcome, so it does not count toward the hiring grade.',
+      title: 'A current or former employee describing what it is like to work here, imported from a review site. It is not a hiring outcome, so it never counts as an applicant report — its letter grade adjusts the score by a small, capped amount.',
     }
   }
   if (isImportedReview(platform)) {

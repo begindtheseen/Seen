@@ -1028,19 +1028,21 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
               </Section>
             )}
 
-            <Section id="reports" icon="🗣" title="Applicant reports" count={reports.length} open={open.reports} onToggle={toggle}
+            {/* The list holds applicant reports AND employee reviews, so the header names both and counts
+                each separately — it used to read "Applicant reports 100" for 15 accounts + 85 reviews. */}
+            <Section id="reports" icon="🗣" title={employeeN > 0 ? 'Applicant reports & employee reviews' : 'Applicant reports'} count={employeeN > 0 ? null : hiringReports.length} open={open.reports} onToggle={toggle}
               summary={reports.length > 0
-                ? [`${ghostedN} ghosted`, `${interviewN} interviewed`, `${hiredN} hired`, thirdPartyN > 0 ? `${thirdPartyN} from public discussions` : '', employeeN > 0 ? `${employeeN} employee review${employeeN !== 1 ? 's' : ''}` : ''].filter(Boolean).join(' · ')
+                ? [`${hiringReports.length} applicant report${hiringReports.length !== 1 ? 's' : ''}`, employeeN > 0 ? `${employeeN} employee review${employeeN !== 1 ? 's' : ''}` : '', `${ghostedN} ghosted`, `${interviewN} interviewed`, `${hiredN} hired`, thirdPartyN > 0 ? `${thirdPartyN} from public discussions` : ''].filter(Boolean).join(' · ')
                 : 'None yet — be the first to report'}>
               <div className="co-reports-tools">
                 <div style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', color: 'var(--muted)', lineHeight: 1.6, flex: 1, minWidth: 180 }}>
                   {reports.length > 0
                     ? (thirdPartyN > 0 || importedN > 0 || employeeN > 0
-                        ? [`${reports.length} report${reports.length !== 1 ? 's' : ''}`,
+                        ? [`${hiringReports.length} applicant report${hiringReports.length !== 1 ? 's' : ''}`,
                             seenN > 0 ? `${seenN} submitted to Seen` : '',
                             importedN > 0 ? `${importedN} imported from review sites (reduced weight)` : '',
                             thirdPartyN > 0 ? `${thirdPartyN} found in public discussions (reduced weight)` : '',
-                            employeeN > 0 ? `${employeeN} employee review${employeeN !== 1 ? 's' : ''} (shown, not counted in the hiring grade)` : '',
+                            employeeN > 0 ? `${employeeN} employee review${employeeN !== 1 ? 's' : ''} (their letter grades adjust the score; they are not hiring outcomes)` : '',
                           ].filter(Boolean).join(' · ')
                         : `${reports.length} report${reports.length !== 1 ? 's' : ''} submitted to Seen · anonymous applicant claims`)
                     : 'Reports are anonymous claims, labeled by source and weighted by trust.'}
