@@ -26,13 +26,17 @@ export default async function handler(req, res) {
   async function ingestOne(raw) {
     const item = normalizeIntelItem(raw);
     if (!item) { metrics.rejected++; note('invalid item: needs a company, an https source link and an excerpt of 20+ characters'); return; }
-    // A Reddit account that carries its thread context is re-checked HERE with the same strict rules the
-    // collectors use. Passing → published as attributed public discussion (Reddit tier, weight 0.3);
+    // An account that carries its page context (any source: Reddit, Hacker News, a page Google found) is
+    // re-checked HERE with the same strict rules the collectors use. Passing → published as attributed
+    // public discussion (weight 0.3: Reddit tier for reddit.com, "Public review · <host>" for the rest);
     // failing → kept only as commentary, never as a report. Accounts without context keep the old path
     // (held for admin review).
     let checked = false;
-    if (item.kind === 'applicant_outcome' && item.context && /(^|\.)reddit\.com$/i.test(new URL(item.source_url).hostname)) {
-      const r = classifyApplicantAccount(item.excerpt, { names: [item.company], title: item.context.title, isOp: item.context.is_op, inCompanySub: item.context.company_sub });
+    const host = new URL(item.source_url).hostname.toLowerCase();
+    const isReddit = /(^|\.)reddit\.com$/.test(host);
+    if (item.kind === 'applicant_outcome' && item.context) {
+      // "The company's own subreddit" only means something on Reddit; elsewhere it is never assumed.
+      const r = classifyApplicantAccount(item.excerpt, { names: [item.company], title: item.context.title, isOp: item.context.is_op, inCompanySub: isReddit && item.context.company_sub });
       if (r.kind === 'applicant_outcome') { checked = true; item.outcome = r.outcome; }
       else { item.kind = 'public_commentary'; item.outcome = null; metrics.downgraded++; note('kept as commentary: not a first-hand applicant account under Seen’s rules'); }
     }
@@ -65,10 +69,14 @@ export default async function handler(req, res) {
         const cid = await resolveOrCreateCompany(url, hdrs, item.company);
         const outcome = REPORT_OUTCOME[item.outcome] || item.outcome; // reports_outcome_check has no 'assessment'
         const sub = (/^Reddit r\/(\w+)/i.exec(item.source) || [])[1] || (/\/r\/(\w+)/i.exec(item.source_url) || [])[1];
-        const row = checked
+        const row = checked && isReddit
           // Same row shape as api/reports.js reddit_import: Reddit tier (0.3), labelled public discussion,
           // published. trust_reason marks the batch so it can be found and removed in one query.
           ? { company_id: cid || undefined, role: item.role, platform: `Reddit r/${sub || 'unknown'}`, source: 'reddit', outcome, outcome_weight: 0.3, trust_reason: 'reddit_rule_match', needs_review: false, rounds: 0, unpaid_work: 'na', experience_level: 'Unknown', report_text: `${item.excerpt} [Source: ${item.source_url}]` }
+          : checked
+          // Any other public page (Hacker News, a forum Google found): the established public-review contract
+          // (api/_utils/companyIntel.js PUBLIC_REVIEW_PLATFORM_PREFIX, weight 0.3), published, tagged as a batch.
+          ? { company_id: cid || undefined, role: item.role, platform: `Public review · ${host.replace(/^www\./, '')}`, source: 'web_public', outcome, outcome_weight: 0.3, trust_reason: 'web_rule_match', needs_review: false, rounds: 0, unpaid_work: 'na', experience_level: 'Unknown', report_text: `${item.excerpt} [Source: ${item.source_url}]` }
           : { company_id: cid || undefined, role: item.role, platform: `Public review · ${new URL(item.source_url).hostname.replace(/^www\./, '')}`, source: 'web_public', outcome, outcome_weight: 0.3, trust_reason: 'external_import', needs_review: true, rounds: 0, unpaid_work: 'na', experience_level: 'Unknown', report_text: `${item.excerpt} [Source: ${item.source_url}]` };
         const ok = await writeReport(url, hdrs, row, item.company.toLowerCase());
         if (ok) { metrics.accepted++; metrics.imported_reports++; if (checked) metrics.published_reports++; reportCompanies.add(item.company); } else { await release(); note('report write failed'); metrics.rejected++; }

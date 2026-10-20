@@ -21,7 +21,8 @@
     "ingest:indeed": "node scripts/ingest-indeed-opencli.mjs",
     "ingest:company-intel": "node scripts/ingest-company-intel.mjs",
     "ingest:reddit-intel": "node scripts/collect-reddit-company-intel.mjs",
-    "ingest:archive-reports": "node scripts/collect-archive-reports.mjs"
+    "ingest:archive-reports": "node scripts/collect-archive-reports.mjs",
+    "ingest:web-reports": "node scripts/collect-web-reports.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.49.2",

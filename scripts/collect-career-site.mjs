@@ -18,6 +18,7 @@
 //      CAREER_SITE_MAX_JOBS (jobs the harvest reads per site, 1–5000, default 3000),
 //      CAREER_SITE_LIMIT (job pages opened one by one when the harvest finds nothing, 1–60, default 20)
 // flags: --dry-run (read, send nothing). Prints one JSON summary on stdout.
+import { createOpenCliBrowser } from '../lib/server/opencliBrowser.js';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { EXTRACT_JS, parseExtract, safeStartUrl, harvestStartJs, HARVEST_POLL_JS, harvestTakeJs, parseEvalJson } from '../lib/server/careerBrowser.js';
@@ -54,9 +55,11 @@ async function opencli(args) {
   if (parsed?.ok === false) throw new Error(parsed?.error?.message || 'OpenCLI command failed');
   return unwrapOpenCli(parsed);
 }
-const evalInPage = (js) => opencli(['browser', 'eval', js, '--session', SESSION]);
+// open/eval/close in whichever argument form the installed OpenCLI speaks (lib/server/opencliBrowser.js).
+const browser = createOpenCliBrowser({ run: opencli, session: SESSION });
+const evalInPage = (js) => browser.eval(js);
 async function readPage(url) {
-  await opencli(['browser', 'open', url, '--session', SESSION]);
+  await browser.open(url);
   await sleep(3500 + Math.floor(Math.random() * 1500)); // let the page render
   return parseExtract(await evalInPage(EXTRACT_JS));
 }
@@ -140,7 +143,7 @@ async function collect({ company, url: start }) {
 
 const sites = [];
 try { for (const t of targets) sites.push(await collect(t)); }
-finally { await opencli(['browser', 'close', '--session', SESSION]).catch(() => {}); }
+finally { await browser.close().catch(() => {}); }
 const total = (k) => sites.reduce((a, x) => a + (Number(x[k]) || 0), 0);
 console.log(JSON.stringify({ ok: sites.every((x) => !x.errors.length || x.pages_read > 0), dry_run: dryRun, targets: sites.length,
   pages_read: total('pages_read'), listed: total('listed'), postings_found: total('postings_found'), saved: total('saved'), sites }, null, 2));
