@@ -45,6 +45,12 @@
     "api/refresh-employer-boards.js": {
       "maxDuration": 300
     },
+    "api/local-company-jobs.js": {
+      "maxDuration": 300
+    },
+    "api/ingest-local-career-jobs.js": {
+      "maxDuration": 60
+    },
     "api/discover-sources.js": {
       "maxDuration": 300
     },
