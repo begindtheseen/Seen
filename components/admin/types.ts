@@ -121,7 +121,7 @@ export interface RecentJob {
 }
 export interface JobGroup { company: string; total: number; active: number }
 export interface DupCompany { id: string; name: string; report_count: number; overall_score: number }
-export interface DupGroup { key: string; companies: DupCompany[] }
+export interface DupGroup { key: string; companies: DupCompany[]; auto?: boolean }
 export interface MergePrefill { primary: string; secondary: string; nonce: number }
 export interface MergeLog { id: string; created_at: string; primary_name: string; secondary_name: string; moved_reports: number; undone_at: string | null }
 export interface FeatureFlag {

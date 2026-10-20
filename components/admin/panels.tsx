@@ -4,6 +4,8 @@ import { useState, useEffect, useCallback } from 'react'
 import type { AdminStats, RecentReport, Issue, RedditDispute, RedditDisputeCounts, ListingDispute, ListingDisputeCounts, ListingDisputeApplied, ListingTicket, InactiveReport, DupCluster, RecentJob, JobGroup, DupGroup, MergePrefill, MergeLog, FeatureFlag } from './types'
 import { Card, CardHeader, Badge, relTime, outcomeColor, availColor, runRefreshAndClear, runClearStale, refreshResultMsg } from './primitives'
 import { clearStaleMessage } from './clearStale'
+import { dedupeJobsUntilDone, dedupeMessage } from './dedupeJobs'
+import { drainAdminAction, num } from './drain'
 import { saveFile } from './saveFile'
 import { safeLocalGet, safeLocalSet } from '@/lib/safeStorage'
 
@@ -107,7 +109,9 @@ export function JobCrisisBanner({
 
 // Stale-job remediation for the Jobs & Companies panel: the instant server-side sweep only.
 // (Fresh listings arrive on the 6×/day refresh cron; the crisis banner runs a full backfill.)
-export function JobRefreshButton({ token, onDone }: { token: string; onDone: () => void }) {
+// `stale` = the current clearable count. At 0 the button hides but the last result stays on screen —
+// it used to unmount with the button the moment the reload showed 0, so a full clear looked like nothing.
+export function JobRefreshButton({ token, onDone, stale, idle }: { token: string; onDone: () => void; stale: number; idle?: React.ReactNode }) {
   const [busy, setBusy] = useState(false)
   const [msg, setMsg] = useState('')
   async function run() {
@@ -120,7 +124,8 @@ export function JobRefreshButton({ token, onDone }: { token: string; onDone: () 
   return (
     <span style={{ display: 'inline-flex', alignItems: 'center', gap: '.4rem' }}>
       {msg && <span style={{ fontFamily: 'var(--mono)', fontSize: '.52rem', color: msg.startsWith('✓') ? 'var(--green)' : msg.startsWith('✗') ? 'var(--red)' : 'var(--amber)' }}>{msg}</span>}
-      <button className="ac-attn-act" onClick={run} disabled={busy}>{busy ? '…' : 'Clear stale'}</button>
+      {(stale > 0 || busy) && <button className="ac-attn-act" onClick={run} disabled={busy}>{busy ? '…' : 'Clear stale'}</button>}
+      {stale === 0 && !busy && !msg && idle}
     </span>
   )
 }
@@ -972,29 +977,33 @@ export function MergePanel({ token, prefill }: { token: string; prefill: MergePr
   }
 
   async function autoMerge() {
+    if (!confirm('Auto-merge every company whose names differ only by a legal suffix (e.g. "ShiftKey, LLC" → "ShiftKey")? Each merge is logged and can be undone from Merge history. Names that differ by more ("Compass Group" vs "Compass") are listed for you, never merged automatically.')) return
     setAutoMerging(true)
     setStatus({ text: 'Scanning and merging…', color: 'var(--dim)' })
-    try {
-      const res = await fetch('/api/admin-stats', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'X-Admin-Token': token },
-        body: JSON.stringify({ action: 'auto_merge' }),
-      })
-      const d = await res.json()
-      if (!d.ok) throw new Error(d.error || res.status)
-      if (!d.merged) {
-        setStatus({ text: '✓ Auto-merge complete — no duplicates found', color: 'var(--green)' })
-      } else {
-        const summary = (d.groups || []).map((g: { canonical: string; absorbed: string[] }) => `"${g.absorbed.join('", "')}" → "${g.canonical}"`).join(' · ')
-        setStatus({ text: `✓ Merged ${d.merged} duplicate${d.merged !== 1 ? 's' : ''}: ${summary}`, color: 'var(--green)' })
-      }
-      scan()
-      loadMerges()
-    } catch (e) {
-      setStatus({ text: 'Auto-merge failed: ' + (e as Error).message, color: 'var(--red)' })
-    }
+    const absorbed: string[] = []
+    let merged = 0, failed = 0, manual = 0
+    const r = await drainAdminAction(token, 'auto_merge', {
+      onRound: (d) => {
+        merged += num(d.merged); failed += num(d.failed); manual = num(d.manual)
+        for (const g of (Array.isArray(d.groups) ? d.groups : []) as { canonical: string; absorbed: string[] }[]) absorbed.push(`"${g.absorbed.join('", "')}" → "${g.canonical}"`)
+        setStatus({ text: `Merging… ${merged} merged${typeof d.remaining === 'number' && d.remaining ? ` · ${d.remaining} group${d.remaining === 1 ? '' : 's'} left` : ''}`, color: 'var(--dim)' })
+        return num(d.merged)
+      },
+    })
+    const tail = [
+      failed ? `${failed} failed` : '',
+      manual ? `${manual} look-alike group${manual === 1 ? ' needs' : 's need'} your call (listed below)` : '',
+      !r.complete && r.ok ? 'not finished — press again' : '',
+      r.error ? `stopped: ${r.error.slice(0, 80)}` : '',
+    ].filter(Boolean).join(' · ')
+    if (!r.ok) setStatus({ text: 'Auto-merge failed: ' + (r.error || 'unknown error'), color: 'var(--red)' })
+    else if (!merged) setStatus({ text: `✓ Auto-merge complete — nothing to merge automatically${tail ? ' · ' + tail : ''}`, color: tail ? 'var(--amber)' : 'var(--green)' })
+    else setStatus({ text: `✓ Merged ${merged} duplicate${merged !== 1 ? 's' : ''}: ${absorbed.join(' · ')}${tail ? ' · ' + tail : ''}`, color: r.complete && !failed ? 'var(--green)' : 'var(--amber)' })
+    scan()
+    loadMerges()
     setAutoMerging(false)
   }
+
 
   // Reclaim a company that got wrongly absorbed into another, by NAME — reverses the most recent
   // not-yet-undone merge where this was the absorbed company (no merge_id hunting required).
@@ -1083,12 +1092,12 @@ export function MergePanel({ token, prefill }: { token: string; prefill: MergePr
         ? <div style={{ fontFamily: 'var(--mono)', fontSize: '.62rem', color: 'var(--dim)' }}>Click &quot;Scan for dupes&quot; to detect company name duplicates.</div>
         : dupes.length === 0
           ? <div style={{ fontFamily: 'var(--mono)', fontSize: '.62rem', color: 'var(--green)' }}>✓ No duplicates detected</div>
-          : dupes.map(({ key, companies }) => {
+          : dupes.map(({ key, companies, auto }) => {
             const prim = companies[0]
             const rest = companies.slice(1)
             return (
               <div key={key} style={{ padding: '.65rem 0', borderBottom: '1px solid var(--line2)' }}>
-                <div style={{ fontFamily: 'var(--mono)', fontSize: '.5rem', textTransform: 'uppercase', letterSpacing: '.1em', color: 'var(--amber)', marginBottom: '.3rem' }}>{companies.length} entries match &quot;{key}&quot;</div>
+                <div style={{ fontFamily: 'var(--mono)', fontSize: '.5rem', textTransform: 'uppercase', letterSpacing: '.1em', color: 'var(--amber)', marginBottom: '.3rem' }}>{companies.length} entries match &quot;{key}&quot; · {auto ? 'same name (Auto-merge handles it)' : 'look-alike — your call'}</div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '.35rem', flexWrap: 'wrap' }}>
                   <span style={{ fontFamily: 'var(--mono)', fontSize: '.6rem', padding: '.18rem .55rem', borderRadius: 4, background: 'rgba(16,185,129,.12)', color: 'var(--green)', border: '1px solid rgba(16,185,129,.2)' }}>{prim.name} <span style={{ opacity: .6 }}>({prim.report_count || 0})</span></span>
                   {rest.map(c => (
@@ -1551,11 +1560,14 @@ export function ClustersPanel({ clusters, suspected, token, onRefresh }: { clust
   )
 }
 
+type DupeSampleRow = { id: string; title?: string; company?: string; location?: string; source?: string; status?: string }
+type DupeSampleGroup = { keep: DupeSampleRow; remove: DupeSampleRow[]; kept: DupeSampleRow[] }
+
 export function JobDedupePanel({ token }: { token: string }) {
   const [scanning, setScanning] = useState(false)
   const [deduping, setDeduping] = useState(false)
   const [suspected, setSuspected] = useState<number | null>(null)
-  const [deleted, setDeleted] = useState<number | null>(null)
+  const [sample, setSample] = useState<DupeSampleGroup[]>([])
   const [msg, setMsg] = useState('')
   const [target, setTarget] = useState('20')
   const [targetSaving, setTargetSaving] = useState(false)
@@ -1582,35 +1594,31 @@ export function JobDedupePanel({ token }: { token: string }) {
   }
 
   async function scan() {
-    setScanning(true); setMsg(''); setSuspected(null); setDeleted(null)
+    setScanning(true); setMsg(''); setSuspected(null); setSample([])
     try {
       const r = await fetch('/api/admin-stats', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'X-Admin-Token': token },
         body: JSON.stringify({ action: 'scan_job_dupes' }),
       })
-      const d = await r.json()
-      if (!d.ok) throw new Error(d.error || 'Scan failed')
-      setSuspected(d.suspected)
-      setMsg(d.suspected === 0 ? '✓ No duplicates found' : `Found ${d.suspected} duplicate${d.suspected !== 1 ? 's' : ''} (exact apply_url match)`)
+      const d = await r.json().catch(() => ({}))
+      if (!d.ok) throw new Error(d.error || `Scan failed (HTTP ${r.status})`)
+      setSuspected(d.suspected); setSample(Array.isArray(d.sample) ? d.sample : [])
+      const kept = d.protected ? ` · ${d.protected.toLocaleString()} more kept (employer-posted or saved/applied by a user)` : ''
+      setMsg(d.suspected === 0
+        ? `✓ No duplicates in ${Number(d.total || 0).toLocaleString()} listings${kept}`
+        : `Found ${d.suspected.toLocaleString()} duplicate${d.suspected !== 1 ? 's' : ''} in ${d.groups.toLocaleString()} group${d.groups !== 1 ? 's' : ''} across all ${Number(d.total || 0).toLocaleString()} listings${kept}`)
     } catch(e) { setMsg(`✗ ${(e as Error).message}`) }
     setScanning(false)
   }
 
   async function dedupe() {
-    if (!confirm(`Remove ${suspected} duplicate job listing${suspected !== 1 ? 's' : ''}? This keeps the newest copy of each duplicate set and deletes the rest. Cannot be undone.`)) return
+    if (!confirm(`Remove ${suspected} duplicate job listing${suspected !== 1 ? 's' : ''}? The best copy of each listing is kept (one a user saved/applied to, else the one still live, else the most recently seen). Employer-posted and saved/applied listings are never deleted. Cannot be undone.`)) return
     setDeduping(true); setMsg('')
-    try {
-      const r = await fetch('/api/admin-stats', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'X-Admin-Token': token },
-        body: JSON.stringify({ action: 'dedupe_jobs' }),
-      })
-      const d = await r.json()
-      if (!d.ok) throw new Error(d.error || 'Dedupe failed')
-      setDeleted(d.deleted); setSuspected(0)
-      setMsg(d.deleted === 0 ? '✓ No duplicates to remove' : `✓ Removed ${d.deleted} duplicate listing${d.deleted !== 1 ? 's' : ''}`)
-    } catch(e) { setMsg(`✗ ${(e as Error).message}`) }
+    const r = await dedupeJobsUntilDone(token, { onProgress: (p) => setMsg(`… removed ${p.deleted.toLocaleString()}${p.remaining != null ? ` · ${p.remaining.toLocaleString()} left` : ''}`) })
+    setMsg(dedupeMessage(r))
+    if (r.complete) { setSuspected(0); setSample([]) }
+    else if (r.remaining != null) setSuspected(r.remaining)
     setDeduping(false)
   }
 
@@ -1620,7 +1628,7 @@ export function JobDedupePanel({ token }: { token: string }) {
     <Card style={{ marginBottom: '1.25rem' }}>
       <CardHeader
         title="Job deduplication"
-        action={<span style={{ fontFamily: 'var(--mono)', fontSize: '.48rem', color: 'var(--dim)' }}>Exact match on apply_url — keeps newest copy</span>}
+        action={<span style={{ fontFamily: 'var(--mono)', fontSize: '.48rem', color: 'var(--dim)' }}>Same listing: title + company + location, or same link + title</span>}
       />
       <div style={{ display: 'flex', gap: '.5rem', flexWrap: 'wrap', marginBottom: msg ? '.65rem' : 0 }}>
         <button onClick={scan} disabled={scanning || deduping} style={{ ...btnBase, borderColor: 'var(--blue)', color: 'var(--blue)' }}>
@@ -1632,7 +1640,19 @@ export function JobDedupePanel({ token }: { token: string }) {
           </button>
         )}
       </div>
-      {msg && <div style={{ fontFamily: 'var(--mono)', fontSize: '.62rem', color: deleted != null && deleted > 0 ? 'var(--green)' : suspected === 0 ? 'var(--green)' : msg.startsWith('✗') ? 'var(--red)' : 'var(--amber)' }}>{msg}</div>}
+      {msg && <div style={{ fontFamily: 'var(--mono)', fontSize: '.62rem', color: msg.startsWith('✗') ? 'var(--red)' : msg.startsWith('✓') ? 'var(--green)' : 'var(--amber)' }}>{msg}</div>}
+      {sample.length > 0 && (
+        <div style={{ marginTop: '.6rem', display: 'flex', flexDirection: 'column', gap: '.4rem' }}>
+          <div style={{ fontFamily: 'var(--mono)', fontSize: '.48rem', textTransform: 'uppercase', letterSpacing: '.12em', color: 'var(--dim)' }}>Examples — check before removing</div>
+          {sample.map((g) => (
+            <div key={g.keep.id} style={{ fontFamily: 'var(--mono)', fontSize: '.56rem', lineHeight: 1.5, padding: '.4rem .55rem', border: '1px solid var(--line2)', borderRadius: 6 }}>
+              <div style={{ color: 'var(--green)' }}>keep · {g.keep.title} · {g.keep.company || '—'} · {g.keep.location || 'no location'} · {g.keep.source || '?'} · {g.keep.status || '?'}</div>
+              {g.remove.map((r) => <div key={r.id} style={{ color: 'var(--red)' }}>remove · {r.title} · {r.company || '—'} · {r.location || 'no location'} · {r.source || '?'} · {r.status || '?'}</div>)}
+              {g.kept.map((r) => <div key={r.id} style={{ color: 'var(--sub)' }}>kept (protected) · {r.title} · {r.company || '—'} · {r.location || 'no location'}</div>)}
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* Aggregation target */}
       <div style={{ marginTop: '.85rem', paddingTop: '.75rem', borderTop: '1px solid var(--line2)' }}>
@@ -1650,7 +1670,7 @@ export function JobDedupePanel({ token }: { token: string }) {
       </div>
 
       <div style={{ fontFamily: 'var(--mono)', fontSize: '.5rem', color: 'var(--dim)', marginTop: '.5rem' }}>
-        Scan first to preview. Delete keeps the most recently seen copy. Run the SQL migration in <code style={{ color: 'var(--sub)' }}>014_job_dedup.sql</code> after deduping to block future dupes.
+        Scan first to preview. The scan reads every listing; one press removes every duplicate (it keeps going until done). New copies are already blocked when they arrive — the database merges a re-imported listing into the existing row.
       </div>
     </Card>
   )

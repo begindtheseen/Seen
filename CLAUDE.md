@@ -50,6 +50,35 @@ and dashboard (PRs #122/#123) were intentionally REDESIGNED beyond the old site;
 longer the design source of truth for redesigned pages. `SITE_PARITY_CHECKLIST.md` /
 `ADMIN_PARITY_CHECKLIST.md` are frozen pre-06-30 records, not an active work queue.
 
+## Session 2026-10-20 B: "one press clears everything" — dupes, stale, company merge (same branch)
+- **Admin job "Remove dupes" was deleting REAL listings.** Its key was title|company|`city`, and `city` is
+  blank on every jobs row in prod (27,668 / 27,668), so it grouped the same title at the same company in
+  different places (one Lever "Chief Officer" in Constanta, Rijeka, St Petersburg) — 4,247 rows queued. It also
+  read one capped PostgREST page (1,000 rows), so each press found more, and it had no employer/user protection
+  (seen_applications CASCADES from jobs). No audit row was ever written, so past deletions cannot be counted.
+- **Now** (`lib/server/jobDedupe.js`): a duplicate = DB identity (lower title + lower company +
+  `job_location_key(location)`, same as trigger jobs_dedupe_refresh) OR same source+external_id OR same apply URL
+  (tracking params dropped) + same title. Prod 2026-10-20: exactly 4 duplicates, all one Adzuna /details/<id>
+  ad stored twice with drifted company/location text. Employer-posted and user-held rows (saved_jobs,
+  applications, seen_applications) are never deleted and are preferred as keeper. The scan reads every row by
+  keyset pages (~6s); a failed reference read refuses the delete; DELETE repeats `is_employer_posted=eq.false`
+  and `select=id` counts real deletions; each press is audited (`dedupe_jobs`, up to 300 row snapshots).
+- **ONE client loop for every "press until done" admin action:** `components/admin/drain.ts drainAdminAction`
+  (retries 502/503/504/empty/thrown rounds ≤2 in a row, stops on no progress, 40 rounds / 240s). Used by
+  `clearStale.ts`, `dedupeJobs.ts` and the company Auto-merge. Do not hand-roll another loop.
+- **Company dupes** (`lib/server/companyDupes.js`): scan read only the top 500 of 1,718 companies (said "none"
+  while 3 groups existed). Now all. Auto-merge merges ONLY names differing by a legal suffix (Inc/LLC/Corp/Ltd/
+  Co/PLC); "Compass Group" vs "Compass" (different companies) is listed as a look-alike for a human.
+- **Clear stale panel:** the button + its result message unmounted the moment the reload showed 0, so a full
+  clear looked like nothing happened; the message now stays. Stale on prod was 129 (all clearable) — the #333
+  fix had not yet been pressed post-deploy.
+- **Tracker "Clear dupes"** fired the deletes un-awaited and reloaded at once → the reload resurrected them.
+  Now awaited (prod has 13 applications, 0 duplicates — latent).
+- Verification: new tests (jobDedupe 8, companyDupes 2, dedupeJobs 4, handler 4 incl. 3,800-row paging);
+  suite 1349/1357 (the 8 = brain timeline); tsc + next build clean; Playwright on `next start` with mocked
+  writes: one press each — stale 9,000 in 4 calls incl. a 504, dupes 2,600 in 3 rounds, auto-merge 2 rounds;
+  read-only dry run of the new rules on prod data = 4 groups / 4 deletes / 0 protected.
+
 ## Session 2026-10-20: held-report review queue (claude/friendly-sagan-47rfat) — facts verified on prod
 - **Why SpaceX "lost" its reports:** nothing was deleted. The Oct 18 bulk import writes every row
   `needs_review:true`, and d6c9933 (PR #328, 10-19) made the company page hide ALL held rows. So 101 SpaceX

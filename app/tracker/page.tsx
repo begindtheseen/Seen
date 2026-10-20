@@ -535,7 +535,7 @@ function TrackerPage() {
     loadApps()
   }
 
-  const clearDupes = () => {
+  const clearDupes = async () => {
     // Only OPEN duplicates of the same company+role are dupes; a finished application at the same
     // company last year is history, not a duplicate. Newest copy wins. Always confirmed.
     const seen = new Set<string>()
@@ -551,10 +551,13 @@ function TrackerPage() {
     if (!removed.length) { setUpdateInsight({ title: 'No duplicates', body: 'Every open application is unique.', color: 'rgba(99,102,241,0.12)' }); return }
     if (!confirm(`Remove ${removed.length} duplicate open application${removed.length > 1 ? 's' : ''}? The newest copy of each is kept.`)) return
     localStorage.setItem('seen_applications_v1', JSON.stringify(deduped))
-    // Also delete the dropped duplicates from the DB — dedupe-in-localStorage-only just
-    // let them resurrect on the next load.
-    if (isLoggedIn) removed.forEach(a => { if (!a.id.startsWith('app_')) AppStore.remove(a.id, true).catch(() => {}) })
-    loadApps()
+    setApps(deduped)
+    // Also delete the dropped duplicates from the DB — dedupe-in-localStorage-only just let them
+    // resurrect on the next load. AWAITED before the reload: firing the deletes and reloading at once
+    // let the reload's SELECT win the race and bring the duplicates straight back, so one press never
+    // cleared them all (the same race AppStore.update/remove already await for).
+    if (isLoggedIn) await Promise.all(removed.filter(a => !a.id.startsWith('app_')).map(a => AppStore.remove(a.id, true).catch(() => {})))
+    await loadApps()
   }
 
   if (!isLoggedIn || !isSeeker) return null
