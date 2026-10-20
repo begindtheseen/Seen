@@ -32,6 +32,9 @@ interface CompanyScore {
   report_count: number
   first_party_report_count?: number
   web_report_count?: number
+  mention_count?: number
+  /** Employee reviews behind the grade — they move it by their letter grades (lib/server/employeeReviews.js). */
+  employee_review_count?: number
   risk_level: 'safe' | 'warn' | 'danger' | null
   process_score?: number | null
   data_quality?: string
@@ -124,7 +127,16 @@ function BarRow({ label, value, color }: { label: string; value: number; color: 
   )
 }
 
-function DataQualityBadge({ dq, reportCount, webCount = 0 }: { dq: string; reportCount: number; webCount?: number }) {
+// Every kind of evidence behind the grade, so the count matches the math: applicant reports (rates),
+// employee reviews (their letter grades adjust the score) and online mentions (½ a report each).
+function evidenceLine(reportCount: number, employeeCount = 0, mentionCount = 0): string {
+  const parts = [`${reportCount} applicant report${reportCount === 1 ? '' : 's'}`]
+  if (employeeCount > 0) parts.push(`${employeeCount} employee review${employeeCount === 1 ? '' : 's'}`)
+  if (mentionCount > 0) parts.push(`${mentionCount} online mention${mentionCount === 1 ? '' : 's'}`)
+  return parts.join(' · ')
+}
+
+function DataQualityBadge({ dq, reportCount, webCount = 0, employeeCount = 0, mentionCount = 0 }: { dq: string; reportCount: number; webCount?: number; employeeCount?: number; mentionCount?: number }) {
   // reportCount here is FIRST-PARTY applicant reports only. With zero first-party rows the
   // score is a web-research estimate — say exactly that; never mint "High confidence · N
   // reports" from the LLM's claimed mention count (that number looked fake because it was).
@@ -135,7 +147,7 @@ function DataQualityBadge({ dq, reportCount, webCount = 0 }: { dq: string; repor
       </span>
     )
   }
-  const n = `${reportCount} applicant report${reportCount === 1 ? '' : 's'}`
+  const n = evidenceLine(reportCount, employeeCount, mentionCount)
   const map: Record<string, { emoji: string; label: string; color: string }> = {
     strong:   { emoji: '🟢', label: `High confidence · ${n}`,     color: 'var(--green)' },
     moderate: { emoji: '🟡', label: `Moderate confidence · ${n}`, color: 'var(--amber)' },
@@ -892,7 +904,7 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
                   <span className="co-grade-score"><Odometer value={score.overall_score} /> / 100</span>
                   {verdict && <p className="co-verdict">{verdict}</p>}
                   <div className="co-grade-meta">
-                    {score.data_quality && <DataQualityBadge dq={score.data_quality} reportCount={fpReports} webCount={webEst} />}
+                    {score.data_quality && <DataQualityBadge dq={score.data_quality} reportCount={fpReports} webCount={webEst} employeeCount={score.employee_review_count || 0} mentionCount={score.mention_count || 0} />}
                     {fpReports === 0 && webEst > 0 && <span className="co-live">web-research estimate</span>}
                   </div>
                 </div>

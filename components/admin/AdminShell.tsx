@@ -7,6 +7,7 @@ import { clearStaleMessage } from './clearStale'
 import { AdminHero, AdminCommandCenter, AdminMetricCard, CardSubLink, AdminAttentionQueue, AdminTabs, type HealthStatus, type TabKey } from './overview'
 import { KpiModal, ManageAccountsModal, RevenueDetailModal, TrialsDetailModal, SharesDetailModal, ErrorsDetailModal } from './modals'
 import { ReviewQueuePanel } from './ReviewQueuePanel'
+import { ReportDupesCard } from './ReportDupesCard'
 import { JobCrisisBanner, JobRefreshButton, JobRunner, ReportRow, IssueRow, RedditDisputesPanel, ListingTicketsPanel, MergePanel, CompanyExportPanel, CreditsPanel, FlagsPanel, ClustersPanel, JobDedupePanel, AllJobsBrowser, DeployPanel } from './panels'
 import { GhostReportPanel } from './GhostReportPanel'
 import { LiveBell } from './LiveBell'
@@ -395,6 +396,7 @@ export function AdminShell({ stats, token, reload, onLogout, onUnauthorized }: {
 
             {/* Held reports — the review queue (non-positive outcomes first) */}
             <ReviewQueuePanel token={token} onChanged={reload} />
+            <ReportDupesCard token={token} onChanged={reload} />
 
             {/* Recent hiring reports (moderation) */}
             <Card style={{ marginTop: '.65rem' }}>

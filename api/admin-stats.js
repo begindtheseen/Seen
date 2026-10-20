@@ -12,7 +12,8 @@ import { logError } from '../lib/server/errlog.js';
 import { runStaleSweep, STALE_CLEARABLE_FILTER, STALE_KEPT_FILTER } from '../lib/server/staleSweep.js';
 import { planJobDedupe, describeGroups } from '../lib/server/jobDedupe.js';
 import { findCompanyDuplicates } from '../lib/server/companyDupes.js';
-import { SCORABLE_REPORTS_FILTER, REJECTED_TRUST_REASON } from '../lib/server/reportCounts.js';
+import { SCORABLE_REPORTS_FILTER, REJECTED_TRUST_REASON, DUPLICATE_TRUST_REASON } from '../lib/server/reportCounts.js';
+import { findDuplicateReports, DUPLICATE_PATCH } from '../lib/server/reportDupes.js';
 import { sortHeldReports, groupCounts, planDecision, classifyHeldReport, SORTS as HELD_SORTS } from '../lib/server/reportReview.js';
 import { buildCompanyAuditBundle } from './_utils/companyAuditBundle.js';
 import { isDisputeStatus, isDisputeReviewStatus, disputeStatusCounts, orderDisputesOpenFirst } from './_utils/companyReddit.js';
@@ -24,7 +25,8 @@ import { enrichmentQueueStats } from '../lib/server/enrichmentQueue.js';
 
 // Held reports still awaiting a decision: on hold and not already rejected (rejected rows stay held,
 // with trust_reason admin_rejected, so they never resurface in the queue).
-const HELD_PENDING_FILTER = `needs_review=is.true&or=(trust_reason.is.null,trust_reason.neq.${REJECTED_TRUST_REASON})`;
+// Duplicate copies (lib/server/reportDupes.js) are held too, but they are decided — never queued.
+const HELD_PENDING_FILTER = `needs_review=is.true&or=(trust_reason.is.null,trust_reason.not.in.(${REJECTED_TRUST_REASON},${DUPLICATE_TRUST_REASON}))`;
 const HELD_SELECT = 'id,company_name,outcome,role,platform,source,created_at,report_text,outcome_weight,trust_reason,needs_review';
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 // Admin "Clear stale" per-request budget — must stay below vercel.json maxDuration (60s) minus one
@@ -68,6 +70,11 @@ async function loadAllCompanyNames(db) {
     if (page.length < 1000) return { ok: true, rows };
   }
 }
+
+// Admin "duplicate reports": full scan (~5k rows) must finish or nothing changes; marking stops at 40s.
+export const REPORT_DUPE_SCAN_BUDGET_MS = 20_000;
+export const REPORT_DUPE_BUDGET_MS = 40_000;
+const REPORT_DUPE_SELECT = 'id,company_name,outcome,platform,role,report_text,created_at,trust_reason,needs_review,outcome_weight';
 
 // Job ids users hold. A failed read refuses the whole dedupe — never delete without knowing.
 async function loadReferencedJobIds(db) {
@@ -1654,6 +1661,56 @@ async function _handler(req, res) {
     let recomputed = 0;
     for (const c of companies.slice(0, 200)) { if (await recomputeCompanyScoreFromReports(SB, { apikey: SK, Authorization: `Bearer ${SK}`, 'Content-Type': 'application/json' }, c)) recomputed++; }
     return res.status(200).json({ ok: true, decision, requested: ids.length, changed, skipped: ids.length - changed, companies: companies.length, recomputed });
+  }
+
+  // ── Duplicate report copies (lib/server/reportDupes.js) ──────────────────────────────────────
+  // scan_report_dupes: every stored copy of an account we already hold, by company. dedupe_reports:
+  // mark those copies (kept, hidden, never scored — reversible), audit each with its prior values and
+  // the original it duplicates, recompute every touched company. Repeats until `complete`.
+  if (action === 'scan_report_dupes' || action === 'dedupe_reports') {
+    if (action === 'dedupe_reports' && adminRole === 'moderator') return res.status(403).json({ error: 'Insufficient role' });
+    const t0 = Date.now();
+    const rows = [];
+    for (let after = null; ;) {
+      if (Date.now() - t0 > REPORT_DUPE_SCAN_BUDGET_MS) return res.status(500).json({ error: `scan did not finish in time (${rows.length} reports read) — nothing was changed` });
+      const r = await db(`reports?select=${REPORT_DUPE_SELECT}&order=id.asc&limit=1000${after ? `&id=gt.${after}` : ''}`);
+      if (!r.ok) return res.status(500).json({ error: `reports scan failed (HTTP ${r.status}) — nothing was changed` });
+      const page = await r.json().catch(() => null);
+      if (!Array.isArray(page)) return res.status(500).json({ error: 'reports scan returned no rows — nothing was changed' });
+      rows.push(...page);
+      if (page.length < 1000) break;
+      after = page[page.length - 1].id;
+    }
+    const { dupes, groups } = findDuplicateReports(rows);
+    const byCompany = {};
+    for (const d of dupes) { const c = d.company || '(no company)'; byCompany[c] = (byCompany[c] || 0) + 1; }
+    if (action === 'scan_report_dupes') {
+      return res.status(200).json({ ok: true, total: rows.length, groups, suspected: dupes.length, by_company: byCompany });
+    }
+    const byId = new Map(rows.map((r) => [String(r.id), r]));
+    const marked = [];
+    let error = null;
+    for (let i = 0; i < dupes.length && Date.now() - t0 < REPORT_DUPE_BUDGET_MS; i += 100) {
+      const batch = dupes.slice(i, i + 100).filter((d) => UUID_RE.test(d.id));
+      if (!batch.length) continue;
+      // Repeats "not already a duplicate" in the statement, so a second press can never re-mark a row.
+      const pr = await db(`reports?id=in.(${batch.map((d) => d.id).join(',')})&or=(trust_reason.is.null,trust_reason.neq.${DUPLICATE_TRUST_REASON})&select=id`, { method: 'PATCH', body: JSON.stringify(DUPLICATE_PATCH) });
+      if (!pr.ok) { error = `update failed (HTTP ${pr.status}) after ${marked.length} report(s)`; break; }
+      const got = new Set(((await pr.json().catch(() => [])) || []).map((u) => String(u.id)));
+      const audit = batch.filter((d) => got.has(d.id)).map((d) => {
+        const r = byId.get(d.id) || {};
+        marked.push(d);
+        return { admin_id: sess.admin_id, username: sess.username || 'admin', action: 'mark_duplicate_report', target_type: 'report', target_id: d.id,
+          metadata: { company: r.company_name, duplicate_of: d.keep, prior: { needs_review: r.needs_review, trust_reason: r.trust_reason, outcome_weight: r.outcome_weight } } };
+      });
+      if (audit.length) await db('admin_audit_log', { method: 'POST', body: JSON.stringify(audit), headers: { Prefer: 'return=minimal' } }).catch(() => {});
+    }
+    const companies = [...new Set(marked.map((d) => String(d.company).toLowerCase().trim()).filter(Boolean))];
+    let recomputed = 0;
+    for (const c of companies.slice(0, 50)) { if (await recomputeCompanyScoreFromReports(SB, { apikey: SK, Authorization: `Bearer ${SK}`, 'Content-Type': 'application/json' }, c)) recomputed++; }
+    const remaining = Math.max(0, dupes.length - marked.length);
+    if (error) return res.status(500).json({ error: 'Failed to mark duplicate reports', detail: error, marked: marked.length, remaining });
+    return res.status(200).json({ ok: true, marked: marked.length, remaining, complete: remaining === 0, groups, companies: companies.length, recomputed, by_company: byCompany, ms: Date.now() - t0 });
   }
 
   if (action === 'investigate_report') {

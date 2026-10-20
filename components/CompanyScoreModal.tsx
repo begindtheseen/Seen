@@ -23,6 +23,8 @@ type Score = {
   waste?: number
   report_count?: number
   first_party_report_count?: number
+  employee_review_count?: number
+  mention_count?: number
   data_source?: string
   industry?: string
   verification_status?: string
@@ -35,7 +37,14 @@ const pct = (v?: number | null) => (v == null ? '—' : `${Math.round(Math.min(1
 
 function DataQuality({ s }: { s: Score }) {
   const fp = s.first_party_report_count ?? (s.data_source === 'reports' ? (s.report_count || 0) : 0)
-  if (fp > 0) return <span className={styles.dq} style={{ color: 'var(--green)' }}>🟢 {fp} applicant report{fp === 1 ? '' : 's'}</span>
+  if (fp > 0) {
+    // Same evidence line as the company page: everything that moves the grade.
+    const extra = [
+      s.employee_review_count ? `${s.employee_review_count} employee review${s.employee_review_count === 1 ? '' : 's'}` : '',
+      s.mention_count ? `${s.mention_count} online mention${s.mention_count === 1 ? '' : 's'}` : '',
+    ].filter(Boolean)
+    return <span className={styles.dq} style={{ color: 'var(--green)' }}>🟢 {[`${fp} applicant report${fp === 1 ? '' : 's'}`, ...extra].join(' · ')}</span>
+  }
   return <span className={styles.dq} style={{ color: 'var(--amber)' }}>🌐 Web-research estimate — no first-party reports yet</span>
 }
 

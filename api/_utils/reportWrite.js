@@ -6,8 +6,9 @@
 // never touch RLS-protected reads on the client's behalf.
 
 import { classifyPlatform, fuseCompanyIntel, mentionOutcomes, mentionTotal } from './companyIntel.js';
-import { hasMentionCount } from '../../lib/server/scoreColumns.js';
+import { hasMentionCount, hasEmployeeReviewCount } from '../../lib/server/scoreColumns.js';
 import { SCORABLE_REPORTS_FILTER } from '../../lib/server/reportCounts.js';
+import { EMPLOYEE_REVIEWS_FILTER, employeeReviewSignal } from '../../lib/server/employeeReviews.js';
 import { broadcastActivity } from '../../lib/server/realtime.js';
 
 const _SCORE_TTL_MS = 365 * 24 * 60 * 60 * 1000;
@@ -137,6 +138,18 @@ export async function fetchConfirmedStaleCount(SUPABASE_URL, hdrs, companyName) 
   } catch { return 0; }
 }
 
+// A company's employee reviews as { count, grades } (lib/server/employeeReviews.js) — what the score
+// uses from them. `pattern` is the already-encoded company_name ilike value. null when the read fails,
+// so a hiccup can never silently drop them from a stored score (callers then skip the store).
+export async function fetchEmployeeReviewSignal(SUPABASE_URL, hdrs, pattern) {
+  try {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/reports?company_name=ilike.${pattern}&${EMPLOYEE_REVIEWS_FILTER}&select=report_text,trust_reason,needs_review&limit=2000`, { headers: hdrs });
+    if (!r.ok) return null;
+    const rows = await r.json();
+    return Array.isArray(rows) ? employeeReviewSignal(rows) : null;
+  } catch { return null; }
+}
+
 export async function recomputeCompanyScoreFromReports(SUPABASE_URL, hdrs, companyName) {
   try {
     if (!SUPABASE_URL || !hdrs?.apikey || !companyName) return false;
@@ -144,13 +157,17 @@ export async function recomputeCompanyScoreFromReports(SUPABASE_URL, hdrs, compa
     // Same corpus the score path uses (lib/server/reportCounts.js SCORABLE_REPORTS_FILTER): every
     // report at its trust weight; only the anti-gaming holds (anonymous/duplicate/velocity) wait.
     // Reports + "what people are saying" (the stored web_reviews), fetched together.
-    const [r, scoreRows, withMentions] = await Promise.all([
+    const [r, scoreRows, withMentions, employeeReviews, withEmployeeCount] = await Promise.all([
       fetch(`${SUPABASE_URL}/rest/v1/reports?company_name=ilike.${enc}&${SCORABLE_REPORTS_FILTER}&select=outcome,platform,wait_days,rounds&limit=2000`, { headers: hdrs }),
       fetch(`${SUPABASE_URL}/rest/v1/company_scores?company_name=eq.${enc}&select=web_reviews,web_report_count,data_source,ghost_rate,response_rate,avg_wait_days,avg_rounds,unpaid_rate&limit=1`, { headers: hdrs })
         .then((x) => (x.ok ? x.json() : [])).catch(() => []),
       hasMentionCount(SUPABASE_URL, hdrs),
+      fetchEmployeeReviewSignal(SUPABASE_URL, hdrs, enc),
+      hasEmployeeReviewCount(SUPABASE_URL, hdrs),
     ]);
     if (!r.ok) return false;
+    // Never store a score that silently lost its employee reviews to a failed read.
+    if (!employeeReviews) return false;
     const reps = await r.json();
     if (!Array.isArray(reps)) return false;
     // Carry each trust class's mean wait_days / rounds so the stored avg wait is real, not null.
@@ -163,6 +180,7 @@ export async function recomputeCompanyScoreFromReports(SUPABASE_URL, hdrs, compa
     const mentions = withMentions ? mentionOutcomes(webReviews) : [];
     const totalMentions = withMentions ? mentionTotal(webReviews) : 0;
     if (mentions.length) byType.mentions = mentions;
+    // Employee reviews adjust a grade; they never create one (no applicant evidence = no grade).
     if (!reps.length && !totalMentions) return false;
     const mean = (rows, key, max) => { const v = rows.map(r => Number(r[key])).filter(x => Number.isFinite(x) && x > 0 && x <= max); return v.length ? v.reduce((a, b) => a + b, 0) / v.length : null; };
     const sources = Object.entries(byType).map(([type, rows]) => ({
@@ -183,7 +201,7 @@ export async function recomputeCompanyScoreFromReports(SUPABASE_URL, hdrs, compa
       avg_rounds: priorScore.avg_rounds,
       unpaid_rate: priorScore.unpaid_rate,
     } : {};
-    const fz = fuseCompanyIntel({ web, sources, confirmedStaleListings });
+    const fz = fuseCompanyIntel({ web, sources, confirmedStaleListings, employeeReviews });
     if (!fz || !(fz.report_count || totalMentions)) return false;
     // Belt-and-suspenders: fusion already clamps, but the WRITER enforces the range too so a
     // rate can never persist as e.g. 34.0 (→ "3400% ghost rate"). rates [0,1], scores [0,100].
@@ -201,6 +219,7 @@ export async function recomputeCompanyScoreFromReports(SUPABASE_URL, hdrs, compa
       web_report_count: fz.web_report_count,
       data_source: fz.web_report_count > 0 && reps.length ? 'fused' : (fz.web_report_count > 0 ? (priorScore?.data_source || 'web_search') : 'reports'),
       ...(withMentions ? { mention_count: totalMentions } : {}),
+      ...(withEmployeeCount ? { employee_review_count: employeeReviews.count } : {}),
       data_quality: fz.confidence_label || 'low',
       expires_at: new Date(Date.now() + _SCORE_TTL_MS).toISOString(),
     };

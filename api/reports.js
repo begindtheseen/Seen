@@ -6,8 +6,10 @@ import { applyRateLimit } from '../lib/server/ratelimit.js';
 import { logError } from '../lib/server/errlog.js';
 import { calcOverallScore, calcWaste, tenureAdjustment, scoreConfidence, confidenceLabel, aggregateTenure, MIN_TENURE_SAMPLE } from './_utils/companyScore.js';
 import { fuseCompanyIntel, classifyPlatform, WEB_CLAIM_CAP, mentionOutcomes, mentionTotal } from './_utils/companyIntel.js';
-import { hasMentionCount, mentionSel } from '../lib/server/scoreColumns.js';
-import { recomputeCompanyScoreFromReports, fetchConfirmedStaleCount, resolveOrCreateCompany, resolveOrCreateLocation } from './_utils/reportWrite.js';
+import { hasMentionCount, mentionSel, hasEmployeeReviewCount } from '../lib/server/scoreColumns.js';
+import { EMPLOYEE_REVIEWS_FILTER } from '../lib/server/employeeReviews.js';
+import { reportDupKey } from '../lib/server/reportDupes.js';
+import { recomputeCompanyScoreFromReports, fetchConfirmedStaleCount, resolveOrCreateCompany, resolveOrCreateLocation, fetchEmployeeReviewSignal } from './_utils/reportWrite.js';
 import { anthropicEnabled } from '../lib/server/aiflag.js';
 import { listEmployerListings, closeEmployerListing } from '../lib/server/employerListings.js';
 import { buildSearchUrl, parseRedditSearchAtom } from './_utils/companyReddit.js';
@@ -1257,8 +1259,20 @@ Return ONLY a valid JSON array. Return [] if there are genuinely no hiring exper
 
     const SOURCE_WEIGHTS = { glassdoor: 0.7, indeed: 0.6, linkedin: 0.5, blind: 0.6, trustpilot: 0.4, news: 0.3, other: 0.3 };
 
-    let imported = 0, skipped = 0, errors = [];
+    let imported = 0, skipped = 0, duplicates = 0, errors = [];
     const wroteCompanies = new Set();
+    // Same account already stored (or earlier in this batch) → skip. The Oct 18 SpaceX/Tesla import ran
+    // twice and every row landed twice (lib/server/reportDupes.js). One read per company, cached.
+    const heldKeys = new Map();
+    const keysFor = async (company) => {
+      const k = String(company).toLowerCase().trim();
+      if (heldKeys.has(k)) return heldKeys.get(k);
+      const r = await fetch(`${SUPABASE_URL}/rest/v1/reports?company_name=ilike.${encodeURIComponent(k)}&select=company_name,outcome,platform,role,report_text&limit=5000`, { headers: hdrsBase });
+      if (!r.ok) throw new Error(`duplicate check failed (${r.status})`);
+      const set = new Set(((await r.json()) || []).map(reportDupKey).filter(Boolean));
+      heldKeys.set(k, set);
+      return set;
+    };
     for (const rpt of reports.slice(0, 500)) {
       try {
         if (!rpt.company || !rpt.outcome || !isValidCompanyName(rpt.company)) { skipped++; continue; }
@@ -1293,8 +1307,11 @@ Return ONLY a valid JSON array. Return [] if there are genuinely no hiring exper
           experience_level: rpt.experience_level ? String(rpt.experience_level).slice(0, 50) : 'Unknown',
         };
         if (cid) row.company_id = cid;
+        const held = await keysFor(row.company_name);
+        const dupKey = reportDupKey(row);
+        if (dupKey && held.has(dupKey)) { duplicates++; skipped++; continue; }
         const ins = await fetch(`${SUPABASE_URL}/rest/v1/reports`, { method: 'POST', headers: { ...hdrsBase, Prefer: 'return=minimal' }, body: JSON.stringify(row) });
-        if (ins.ok) { imported++; wroteCompanies.add(row.company_name); } else skipped++;
+        if (ins.ok) { imported++; wroteCompanies.add(row.company_name); if (dupKey) held.add(dupKey); } else skipped++;
       } catch(e) { errors.push(e.message); skipped++; }
     }
     // Recompute each company that got a report so ingested intel actually moves grades
@@ -1302,7 +1319,7 @@ Return ONLY a valid JSON array. Return [] if there are genuinely no hiring exper
     // Imported reports count toward the score at ingest trust (0.55), so this moves the grade.
     for (const c of [...wroteCompanies].slice(0, 25)) { await recomputeCompanyScoreFromReports(SUPABASE_URL, hdrsBase, c); }
     if (errors.length) logError('reports/reddit_import', `${errors.length} errors`, { subreddit: body.subreddit || null, imported, skipped, sample: errors.slice(0, 3) });
-    return res.status(200).json({ ok: true, imported, skipped, errors: errors.slice(0, 5), recomputed: Math.min(wroteCompanies.size, 25) });
+    return res.status(200).json({ ok: true, imported, skipped, duplicates, errors: errors.slice(0, 5), recomputed: Math.min(wroteCompanies.size, 25) });
   }
 
   // ── Fetch reports ───────────────────────────────────────────────────────────
@@ -1555,6 +1572,7 @@ function _rowToScoreRaw(row) {
     avg_wait_days: row.avg_wait_days, avg_rounds: row.avg_rounds, waste: row.waste_score,
     unpaid_rate: row.unpaid_rate, report_count: row.report_count || 0,
     first_party_report_count: firstParty, mention_count: mentionCount(row), web_report_count: webClaim,
+    employee_review_count: Math.max(0, Number(row.employee_review_count) || 0),
     avg_tenure_months: row.avg_tenure_months || null, tenure_sample_count: row.tenure_sample_count || 0,
     confidence, confidence_label: confidenceLabel(confidence), sufficient: confidence >= 0.33,
     // Provenance is reported, never renamed. This previously collapsed every non-'reports' row to
@@ -1608,11 +1626,20 @@ async function _fuseWithReports(name, web, SUPABASE_URL, dbH) {
     // (lib/server/reportCounts.js SCORABLE_REPORTS_FILTER — the same corpus the stored recompute uses).
     let r = await fetch(`${SUPABASE_URL}/rest/v1/reports?company_name=ilike.${enc}&${SCORABLE_REPORTS_FILTER}&select=outcome,platform,wait_days,rounds&limit=2000`, { headers: dbH });
     let reps = r.ok ? await r.json() : null;
+    let empPattern = enc;
     if ((!Array.isArray(reps) || !reps.length) && /[\s-]/.test(String(name))) {
-      r = await fetch(`${SUPABASE_URL}/rest/v1/reports?company_name=ilike.${_fuzzyNamePattern(name)}&${SCORABLE_REPORTS_FILTER}&select=outcome,platform,wait_days,rounds&limit=2000`, { headers: dbH });
+      empPattern = _fuzzyNamePattern(name);
+      r = await fetch(`${SUPABASE_URL}/rest/v1/reports?company_name=ilike.${empPattern}&${SCORABLE_REPORTS_FILTER}&select=outcome,platform,wait_days,rounds&limit=2000`, { headers: dbH });
       reps = r.ok ? await r.json() : null;
     }
     if (!Array.isArray(reps)) return null;
+    // Employee reviews move the grade by their letter grades (lib/server/employeeReviews.js). Read with
+    // the same name match that found the reports. A failed read fuses without them and stores no
+    // count, so the cache staleness check repairs the row on the next view.
+    const [employeeReviews, withEmployeeCount] = await Promise.all([
+      fetchEmployeeReviewSignal(SUPABASE_URL, dbH, empPattern),
+      hasEmployeeReviewCount(SUPABASE_URL, dbH),
+    ]);
     const byType = groupReportsByType(reps);
     // "What people are saying" (stored web_reviews) counts exactly half a report — only once
     // mention_count can be stored, so this path and the stored recompute always agree.
@@ -1630,9 +1657,10 @@ async function _fuseWithReports(name, web, SUPABASE_URL, dbH) {
     // Admin-confirmed dead listings (zombie postings) carry a bounded penalty here too,
     // so the company-page score matches the stored recompute path.
     const confirmedStaleListings = await fetchConfirmedStaleCount(SUPABASE_URL, dbH, name);
-    const fz = fuseCompanyIntel({ web, sources, confirmedStaleListings });
+    const fz = fuseCompanyIntel({ web, sources, confirmedStaleListings, employeeReviews: employeeReviews || null });
     // mention_count = EVERY quoted account (each counts half a report toward the bar); null = column absent.
-    return fz ? { ...fz, mention_count: totalMentions } : fz;
+    // employee_review_store = the count to persist (undefined → JSON omits it: column absent or read failed).
+    return fz ? { ...fz, mention_count: totalMentions, employee_review_store: withEmployeeCount && employeeReviews ? employeeReviews.count : undefined } : fz;
   } catch (_e) { return null; }
 }
 
@@ -1739,7 +1767,7 @@ async function handleCompanyScore(req, res, body) {
         const eGr = fz?fz.ghost_rate:gr, eRr = fz?fz.response_rate:rr, eWait = Math.round(fz?fz.avg_wait_days:wait), eRounds = fz?fz.avg_rounds:Math.round(rounds*10)/10, eUnpaid = fz?fz.unpaid_rate:unpaid, eCnt = fz?fz.report_count:cnt;
         const overall = fz?fz.overall_score:_calcScore(rr,gr,wait,cnt), waste = fz?fz.waste_score:_calcWaste(gr,rounds,unpaid);
         const revs = Array.isArray(p.reviews) ? p.reviews.slice(0,6).map(r=>({text:(r.text||'').slice(0,400),sentiment:['positive','negative','mixed'].includes(r.sentiment)?r.sentiment:'mixed',source:(r.source||'').slice(0,80),year:(r.year||'').slice(0,4)})) : [];
-        const row = { company_name:co, overall_score:overall, ghost_rate:eGr, response_rate:eRr, avg_wait_days:eWait, avg_rounds:eRounds, waste_score:waste, unpaid_rate:eUnpaid, report_count:eCnt, first_party_report_count: fz ? (fz.first_party_report_count ?? 0) : 0, web_report_count: fz ? (fz.web_report_count ?? cnt) : cnt, ...((await hasMentionCount(SUPABASE_URL, dbH)) ? { mention_count: mentionTotal(revs) } : {}), data_quality:p.data_quality||'medium', data_source:'web_search', industry:(p.industry||'').slice(0,80), raw_summary:(p.summary||'').slice(0,500), expires_at:new Date(Date.now()+_SCORE_TTL_MS).toISOString(), web_reviews:revs };
+        const row = { company_name:co, overall_score:overall, ghost_rate:eGr, response_rate:eRr, avg_wait_days:eWait, avg_rounds:eRounds, waste_score:waste, unpaid_rate:eUnpaid, report_count:eCnt, first_party_report_count: fz ? (fz.first_party_report_count ?? 0) : 0, web_report_count: fz ? (fz.web_report_count ?? cnt) : cnt, ...((await hasMentionCount(SUPABASE_URL, dbH)) ? { mention_count: mentionTotal(revs) } : {}), employee_review_count: fz?.employee_review_store, data_quality:p.data_quality||'medium', data_source:'web_search', industry:(p.industry||'').slice(0,80), raw_summary:(p.summary||'').slice(0,500), expires_at:new Date(Date.now()+_SCORE_TTL_MS).toISOString(), web_reviews:revs };
         const sv = await fetch(`${SUPABASE_URL}/rest/v1/company_scores?on_conflict=company_name`, { method:'POST', headers:{...dbH,Prefer:'resolution=merge-duplicates,return=minimal'}, body:JSON.stringify(row) });
         results.push({ company:co, score:overall, reviews:revs.length, saved:sv.ok });
       } catch(e) {
@@ -1768,6 +1796,11 @@ async function handleCompanyScore(req, res, body) {
         ? fetch(`${SUPABASE_URL}/rest/v1/${livePath}`, { headers: { ...dbH, Prefer: 'count=exact' } })
             .then((r) => (r.ok ? parseExactCount(r.headers.get('content-range')) : null)).catch(() => null)
         : Promise.resolve(null);
+      // …and how many employee reviews (they move the grade too; compared once the column exists).
+      const liveEmpP = (await hasEmployeeReviewCount(SUPABASE_URL, dbH))
+        ? fetch(`${SUPABASE_URL}/rest/v1/reports?select=id&company_name=ilike.${nameEnc}&${EMPLOYEE_REVIEWS_FILTER}&limit=1`, { headers: { ...dbH, Prefer: 'count=exact' } })
+            .then((r) => (r.ok ? parseExactCount(r.headers.get('content-range')) : null)).catch(() => null)
+        : Promise.resolve(null);
       let cacheRes = await fetch(`${SUPABASE_URL}/rest/v1/company_scores?company_name=ilike.${nameEnc}&order=created_at.desc&limit=1`, { headers: dbH });
       let rows = cacheRes.ok ? await cacheRes.json() : null;
       // Slug decoding turns hyphens into spaces ("coca cola") — retry with token wildcards
@@ -1789,7 +1822,12 @@ async function handleCompanyScore(req, res, body) {
         // Mentions: only compared once the column exists (row carries mention_count).
         const mentionsStale = 'mention_count' in rows[0]
           && mentionTotal(rows[0].web_reviews) !== mentionCount(rows[0]);
-        if ((live != null && live > 0 && Math.min(live, 2000) !== firstPartyReportCount(rows[0])) || mentionsStale) {
+        // Employee reviews: a stored count that differs from what we hold (or was never stored) is stale.
+        const liveEmp = await liveEmpP;
+        const employeeStale = liveEmp != null && 'employee_review_count' in rows[0]
+          && Math.min(liveEmp, 2000) !== (Number(rows[0].employee_review_count) || 0)
+          && firstPartyReportCount(rows[0]) > 0;
+        if ((live != null && live > 0 && Math.min(live, 2000) !== firstPartyReportCount(rows[0])) || mentionsStale || employeeStale) {
           const fresh = await recomputeCompanyScoreFromReports(SUPABASE_URL, dbH, rows[0].company_name || name);
           if (fresh) { console.log(`score repaired for "${name}": ${firstPartyReportCount(rows[0])} → ${fresh.first_party_report_count} reports`); rows[0] = { ...rows[0], ...fresh }; }
         }
@@ -1821,12 +1859,13 @@ async function handleCompanyScore(req, res, body) {
       first_party_report_count: repFused.first_party_report_count ?? repFused.report_count,
       web_report_count: repFused.web_report_count ?? 0,
       ...(repFused.mention_count != null ? { mention_count: repFused.mention_count } : {}),
+      employee_review_count: repFused.employee_review_count, employee_review_adjustment: repFused.employee_review_adjustment,
       data_quality: repFused.confidence_label || 'low', data_source: 'reports', risk_level: repFused.risk_level,
       process_score: repFused.overall_score, industry: '', summary: '', web_reviews: [], fused_sources: repFused.sources_used || [],
     };
     if (SUPABASE_URL && SUPABASE_SERVICE_KEY) {
       const expires = new Date(Date.now() + _SCORE_TTL_MS).toISOString();
-      const rowBase = { company_name:name.toLowerCase().trim(), overall_score:score.overall_score, ghost_rate:score.ghost_rate, response_rate:score.response_rate, avg_wait_days:score.avg_wait_days, avg_rounds:score.avg_rounds, waste_score:score.waste, unpaid_rate:score.unpaid_rate, report_count:score.report_count, first_party_report_count: score.first_party_report_count, web_report_count: score.web_report_count, ...(score.mention_count != null ? { mention_count: score.mention_count } : {}), data_quality:score.data_quality, data_source:'reports', industry:'', raw_summary:'', expires_at:expires };
+      const rowBase = { company_name:name.toLowerCase().trim(), overall_score:score.overall_score, ghost_rate:score.ghost_rate, response_rate:score.response_rate, avg_wait_days:score.avg_wait_days, avg_rounds:score.avg_rounds, waste_score:score.waste, unpaid_rate:score.unpaid_rate, report_count:score.report_count, first_party_report_count: score.first_party_report_count, web_report_count: score.web_report_count, ...(score.mention_count != null ? { mention_count: score.mention_count } : {}), employee_review_count: repFused.employee_review_store, data_quality:score.data_quality, data_source:'reports', industry:'', raw_summary:'', expires_at:expires };
       // web_reviews is NOT sent: merge-duplicates keeps the stored "what people are saying" quotes
       // (sending [] used to erase them — and they now count toward the score).
       try { await fetch(`${SUPABASE_URL}/rest/v1/company_scores?on_conflict=company_name`, { method:'POST', headers:{...dbH,Prefer:'resolution=merge-duplicates,return=minimal'}, body:JSON.stringify(rowBase) }); } catch(_e) {}
@@ -1903,7 +1942,7 @@ async function handleCompanyScore(req, res, body) {
 
   if (SUPABASE_URL && SUPABASE_SERVICE_KEY) {
     const expires = new Date(Date.now() + _SCORE_TTL_MS).toISOString();
-    const rowBase = { company_name:name.toLowerCase().trim(), overall_score:overall, ghost_rate:eGr, response_rate:eRr, avg_wait_days:eWait, avg_rounds:eRounds, waste_score:waste, unpaid_rate:eUnpaid, report_count:eCnt, first_party_report_count: score.first_party_report_count, web_report_count: score.web_report_count, ...((await hasMentionCount(SUPABASE_URL, dbH)) ? { mention_count: mentionTotal(reviews) } : {}), data_quality:score.data_quality, data_source:'web_search', industry:score.industry, raw_summary:score.summary, expires_at:expires };
+    const rowBase = { company_name:name.toLowerCase().trim(), overall_score:overall, ghost_rate:eGr, response_rate:eRr, avg_wait_days:eWait, avg_rounds:eRounds, waste_score:waste, unpaid_rate:eUnpaid, report_count:eCnt, first_party_report_count: score.first_party_report_count, web_report_count: score.web_report_count, ...((await hasMentionCount(SUPABASE_URL, dbH)) ? { mention_count: mentionTotal(reviews) } : {}), employee_review_count: fused?.employee_review_store, data_quality:score.data_quality, data_source:'web_search', industry:score.industry, raw_summary:score.summary, expires_at:expires };
     try {
       const prefer = force_refresh ? 'resolution=merge-duplicates,return=minimal' : 'resolution=ignore-duplicates,return=minimal';
       let saveRes = await fetch(`${SUPABASE_URL}/rest/v1/company_scores?on_conflict=company_name`, { method:'POST', headers:{...dbH,Prefer:prefer}, body:JSON.stringify({...rowBase,web_reviews:reviews}) });
