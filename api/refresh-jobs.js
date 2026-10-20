@@ -6,7 +6,7 @@ import { logError } from '../lib/server/errlog.js';
 import {
   fetchAdzuna,
   fetchSecondarySources,
-  getOrCreateCompanyId,
+  resolveCompanyIds,
   upsertJobs,
   mapLimit,
 } from '../lib/server/jobSources.js';
@@ -292,10 +292,10 @@ export default async function handler(req, res) {
     const allJobs = [...adzunaJobs, ...secondary.jobs];
     const sourceCounts = { Adzuna: adzunaJobs.length, ...secondary.bySource };
 
-    // Pre-warm the company-ID cache (bounded to 12 concurrent so a large full-mode batch
-    // can't open thousands of DB connections at once → "fetch failed").
+    // Pre-warm the company-ID cache in batched lookups (one request per ~40 names, not one per
+    // company — each request is a billed Supabase gateway log line).
     const uniqueCompanies = [...new Set(allJobs.map(j => j.company).filter(Boolean))];
-    await mapLimit(uniqueCompanies, 12, name => getOrCreateCompanyId(name, SUPABASE_URL, SUPABASE_SERVICE_KEY));
+    await resolveCompanyIds(uniqueCompanies, SUPABASE_URL, SUPABASE_SERVICE_KEY);
 
     // Upsert in batches of 100, SEQUENTIALLY. These used to run 3 at a time for throughput, but the
     // dedupe trigger UPDATEs (and sometimes DELETEs) the existing row a duplicate matches, so two
@@ -349,9 +349,10 @@ export default async function handler(req, res) {
           { headers: h }
         );
         if (nullRes.ok) {
-          const nullJobs = await nullRes.json();
-          for (const j of (nullJobs || [])) {
-            const cid = await getOrCreateCompanyId(j.company, SUPABASE_URL, SUPABASE_SERVICE_KEY);
+          const nullJobs = (await nullRes.json()) || [];
+          const nullIds = await resolveCompanyIds(nullJobs.map(j => j.company), SUPABASE_URL, SUPABASE_SERVICE_KEY);
+          for (const [i, j] of nullJobs.entries()) {
+            const cid = nullIds[i];
             if (cid) {
               await fetch(`${SUPABASE_URL}/rest/v1/jobs?id=eq.${j.id}`, {
                 method: 'PATCH',
