@@ -1,5 +1,5 @@
 // Admin-only receiver for raw, source-attributed company-intelligence excerpts from the local Mac.
-import { normalizeIntelItem } from '../lib/server/companyIntelImport.js';
+import { normalizeIntelItem, redditPermalinkKey } from '../lib/server/companyIntelImport.js';
 import { classifyApplicantAccount, REPORT_OUTCOME } from '../lib/reports/applicantRules.js';
 import { excludedSource } from '../lib/reports/excludedSources.js';
 import { resolveOrCreateCompany, recomputeCompanyScoreFromReports, writeReport } from './_utils/reportWrite.js';
@@ -45,6 +45,20 @@ export default async function handler(req, res) {
       if (r.kind === 'applicant_outcome') { checked = true; item.outcome = r.outcome; }
       else { item.kind = 'public_commentary'; item.outcome = null; metrics.downgraded++; note('kept as commentary: not a first-hand applicant account under Seen’s rules'); }
     }
+    // One report per Reddit post/comment per company, across every pipeline and link form: the registry
+    // below keys on the excerpt too, so the same post sent by two collectors (different words chosen, or a
+    // title slug in one link) became two reports. Any report already citing this permalink — live, held,
+    // rejected — makes this a duplicate.
+    if (item.kind === 'applicant_outcome' && isReddit) {
+      const pk = redditPermalinkKey(item.source_url);
+      if (pk) {
+        const cname = encodeURIComponent(item.company.toLowerCase());
+        const ex = await fetch(`${url}/rest/v1/reports?company_name=eq.${cname}&report_text=ilike.${encodeURIComponent(`*/comments/${pk.post}*`)}&select=report_text&limit=50`, { headers: hdrs });
+        if (!ex.ok) { metrics.rejected++; note(`duplicate check failed (${ex.status})`); return; }
+        const cited = (await ex.json()).flatMap((r) => String(r.report_text || '').match(/https:\/\/[^\s\]]+/g) || []);
+        if (cited.some((u) => redditPermalinkKey(u)?.key === pk.key)) { metrics.duplicates++; return; }
+      }
+    }
     // The automatic collector is intentionally limited to companies Seen already knows.
     // Manual admin imports remain available for a deliberately entered new company.
     if (strictExisting) {
@@ -73,7 +87,7 @@ export default async function handler(req, res) {
       if (item.kind === 'applicant_outcome') {
         const cid = await resolveOrCreateCompany(url, hdrs, item.company);
         const outcome = REPORT_OUTCOME[item.outcome] || item.outcome; // reports_outcome_check has no 'assessment'
-        const sub = (/^Reddit r\/(\w+)/i.exec(item.source) || [])[1] || (/\/r\/(\w+)/i.exec(item.source_url) || [])[1];
+        const sub = (/\/r\/(\w+)/i.exec(item.source_url) || [])[1] || (/^Reddit (?:r\/)+(\w+)/i.exec(item.source) || [])[1];
         const row = checked && isReddit
           // Same row shape as api/reports.js reddit_import: Reddit tier (0.3), labelled public discussion,
           // published. trust_reason marks the batch so it can be found and removed in one query.
