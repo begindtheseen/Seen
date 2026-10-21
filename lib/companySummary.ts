@@ -11,6 +11,7 @@
 // Wrapped in React cache() so generateMetadata and the layout render share one read per request.
 
 import { cache } from 'react'
+import { PACIFIC } from './time/pacific.js';
 
 export type CompanySummary = {
   company_name: string
@@ -50,9 +51,9 @@ async function readSummary(storedName: string): Promise<CompanySummary | null> {
 /** One company's summary by its STORED company_scores name (lower(trim)). Null when absent. */
 export const getCompanySummary = cache(readSummary)
 
-/** "October 2026" from an ISO timestamp, or null. Fixed locale + UTC so SSR output is stable. */
+/** "October 2026" from an ISO timestamp, or null. Fixed locale + California time so SSR output is stable. */
 export function summaryMonth(iso: string): string | null {
   const t = Date.parse(iso)
   if (!Number.isFinite(t)) return null
-  return new Date(t).toLocaleDateString('en-US', { month: 'long', year: 'numeric', timeZone: 'UTC' })
+  return new Date(t).toLocaleDateString('en-US', { month: 'long', year: 'numeric', timeZone: PACIFIC })
 }

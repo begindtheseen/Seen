@@ -23,6 +23,7 @@ import { buildNotificationRow } from '../lib/server/employerNotificationsStore.j
 import { normalizeClaimCompany } from '../lib/server/employerClaims.js';
 import { EMPLOYER_SKUS } from '../lib/server/employerSkus.js';
 import { enrichmentQueueStats } from '../lib/server/enrichmentQueue.js';
+import { pacificDate, pacificDayStart } from '../lib/time/pacific.js';
 
 // Held reports still awaiting a decision: on hold and not already rejected (rejected rows stay held,
 // with trust_reason admin_rejected, so they never resurface in the queue).
@@ -305,7 +306,7 @@ async function _handler(req, res) {
   // ── GET: dashboard stats ─────────────────────────────────────────────────────
   if (req.method === 'GET') {
     const now = new Date();
-    const todayISO = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
+    const todayISO = pacificDayStart(now).toISOString();
     const weekISO  = new Date(Date.now() - 7 * 86400000).toISOString();
     const monthISO = new Date(Date.now() - 30 * 86400000).toISOString();
 
@@ -451,11 +452,10 @@ async function _handler(req, res) {
     // Build 30-day daily chart
     const chartDays = [];
     for (let i = 29; i >= 0; i--) {
-      const d = new Date(now); d.setDate(d.getDate() - i);
-      chartDays.push(d.toISOString().slice(0, 10));
+      chartDays.push(pacificDate(pacificDayStart(now, -i)));
     }
     const chartMap = {};
-    reportsMonth.forEach(r => { const d = r.created_at?.slice(0, 10); if (d) chartMap[d] = (chartMap[d] || 0) + 1; });
+    reportsMonth.forEach(r => { const d = r.created_at ? pacificDate(new Date(r.created_at)) : null; if (d) chartMap[d] = (chartMap[d] || 0) + 1; });
     const reportsChart = chartDays.map(date => ({ date, count: chartMap[date] || 0 }));
     // Top companies
     const companyCountMap = {};
@@ -573,7 +573,7 @@ async function _handler(req, res) {
     // 30-day daily signups (alongside the existing reports chart) for the conversion view.
     const usersMonth = usersMonthRes && usersMonthRes.ok ? await usersMonthRes.json() : [];
     const signupMap = {};
-    (Array.isArray(usersMonth) ? usersMonth : []).forEach(u => { const d = u.created_at?.slice(0, 10); if (d) signupMap[d] = (signupMap[d] || 0) + 1; });
+    (Array.isArray(usersMonth) ? usersMonth : []).forEach(u => { const d = u.created_at ? pacificDate(new Date(u.created_at)) : null; if (d) signupMap[d] = (signupMap[d] || 0) + 1; });
     const signupsChart = chartDays.map(date => ({ date, count: signupMap[date] || 0 }));
 
     const monetization = {
@@ -781,7 +781,7 @@ async function _handler(req, res) {
   if (action === 'export_csv') {
     const now = new Date();
     const ct2 = r => parseInt((r?.headers?.get('content-range') || '').split('/')[1]) || 0;
-    const todayISO = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
+    const todayISO = pacificDayStart(now).toISOString();
     const weekISO = new Date(Date.now() - 7 * 86400000).toISOString();
     const monthISO = new Date(Date.now() - 30 * 86400000).toISOString();
 
@@ -804,7 +804,7 @@ async function _handler(req, res) {
     const reportsMonth = reportsMonthRes.ok ? await reportsMonthRes.json() : [];
     const subs = await stripeSubsBreakdown();
 
-    const byDay = (rows) => { const m = {}; (rows || []).forEach(x => { const d = x.created_at?.slice(0, 10); if (d) m[d] = (m[d] || 0) + 1; }); return m; };
+    const byDay = (rows) => { const m = {}; (rows || []).forEach(x => { const d = x.created_at ? pacificDate(new Date(x.created_at)) : null; if (d) m[d] = (m[d] || 0) + 1; }); return m; };
     const su = byDay(usersMonth), rp = byDay(reportsMonth), sh = byDay(shares);
 
     const lines = [];
@@ -834,13 +834,12 @@ async function _handler(req, res) {
     lines.push([]);
     lines.push(['DAILY (last 30 days)', 'date', 'new_users', 'reports', 'card_shares']);
     for (let i = 29; i >= 0; i--) {
-      const d = new Date(now); d.setDate(d.getDate() - i);
-      const k = d.toISOString().slice(0, 10);
+      const k = pacificDate(pacificDayStart(now, -i));
       lines.push(['', k, su[k] || 0, rp[k] || 0, sh[k] || 0]);
     }
 
     const csv = lines.map(row => row.map(csvCell).join(',')).join('\n');
-    const stamp = now.toISOString().slice(0, 10);
+    const stamp = pacificDate(now);
     await db('admin_audit_log', { method: 'POST', body: JSON.stringify({ admin_id: sess.admin_id, username: 'admin', action: 'export_csv' }), headers: { Prefer: 'return=minimal' } }).catch(() => {});
     return res.status(200).json({ ok: true, filename: `seen-metrics-${stamp}.csv`, csv });
   }
@@ -1355,7 +1354,7 @@ async function _handler(req, res) {
     // `comped` (migration 051) is what makes the grant DURABLE: the Stripe reconcile
     // paths refuse to revoke comped accounts, so an admin grant no longer evaporates on
     // the next pricing-page load / nightly sweep for anyone with a stripe_customer_id.
-    await db(`ai_credits?on_conflict=user_id`, { method: 'POST', body: JSON.stringify({ user_id, pro: !!pro, comped: !!pro, balance: pro ? 999 : 3, daily_earned: 0, last_reset: new Date().toISOString().split('T')[0] }), headers: { Prefer: 'resolution=merge-duplicates,return=minimal' } });
+    await db(`ai_credits?on_conflict=user_id`, { method: 'POST', body: JSON.stringify({ user_id, pro: !!pro, comped: !!pro, balance: pro ? 999 : 3, daily_earned: 0, last_reset: pacificDate() }), headers: { Prefer: 'resolution=merge-duplicates,return=minimal' } });
     await db('admin_audit_log', { method: 'POST', body: JSON.stringify({ admin_id: sess.admin_id, username: sess.username || 'admin', action: 'set_pro', target_type: 'user', target_id: user_id, metadata: { pro } }), headers: { Prefer: 'return=minimal' } });
     return res.status(200).json({ ok: true });
   }
@@ -1403,7 +1402,7 @@ async function _handler(req, res) {
   if (action === 'get_recent_jobs') {
     const { period } = body;
     const now = new Date();
-    const todayISO2  = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
+    const todayISO2  = pacificDayStart(now).toISOString();
     const weekISO2   = new Date(Date.now() - 7 * 86400000).toISOString();
     const monthISO2  = new Date(Date.now() - 30 * 86400000).toISOString();
     const cutoff = period === 'today' ? todayISO2 : period === 'month' ? monthISO2 : weekISO2;
@@ -1787,18 +1786,25 @@ async function _handler(req, res) {
 
   // ── get_jobs_grouped: all jobs by company for admin browser ───────────────────
   if (action === 'get_jobs_grouped') {
-    const r = await db('jobs?select=id,company,availability_status&limit=10000');
-    if (!r.ok) return res.status(500).json({ error: 'Query failed' });
-    const jobs = await r.json();
-    const groups = {};
-    for (const j of (jobs || [])) {
-      const co = j.company || 'Unknown';
-      if (!groups[co]) groups[co] = { company: co, total: 0, active: 0 };
-      groups[co].total++;
-      if (j.availability_status === 'active') groups[co].active++;
+    // Every job, counted by the database (admin_jobs_by_company, migration 20261021120000). The old
+    // read asked for 10,000 rows but PostgREST returns at most 1,000, so the panel said "1,000 total"
+    // and grouped only those. Until the migration is applied: every row by keyset pages.
+    const rpc = await db('rpc/admin_jobs_by_company', { method: 'POST', body: '{}' });
+    let groups = null;
+    if (rpc.ok) { const v = await rpc.json(); groups = (Array.isArray(v) ? v : []).map((g) => ({ company: g.company, total: Number(g.total) || 0, active: Number(g.active) || 0 })); }
+    else {
+      const by = {};
+      for (let after = null, i = 0; i < 400; i++) {
+        const r = await db(`jobs?select=id,company,availability_status&order=id.asc&limit=1000${after ? `&id=gt.${after}` : ''}`);
+        if (!r.ok) return res.status(500).json({ error: 'Query failed' });
+        const page = await r.json();
+        for (const j of page) { const co = j.company || 'Unknown'; const g = by[co] || (by[co] = { company: co, total: 0, active: 0 }); g.total++; if (j.availability_status === 'active') g.active++; }
+        if (page.length < 1000) break;
+        after = page[page.length - 1].id;
+      }
+      groups = Object.values(by).sort((a, b) => b.total - a.total);
     }
-    const sorted = Object.values(groups).sort((a, b) => b.total - a.total);
-    return res.status(200).json({ ok: true, groups: sorted, total_jobs: (jobs || []).length });
+    return res.status(200).json({ ok: true, groups, total_jobs: groups.reduce((a, g) => a + g.total, 0) });
   }
 
   // ── get_company_jobs: all listings for one company ────────────────────────────
@@ -1905,7 +1911,7 @@ async function _handler(req, res) {
       newBalance = amount;
       const ins = await db(`ai_credits?on_conflict=user_id`, {
         method: 'POST',
-        body: JSON.stringify({ user_id: userId, balance: amount, pro: false, daily_earned: 0, last_reset: new Date().toISOString().split('T')[0] }),
+        body: JSON.stringify({ user_id: userId, balance: amount, pro: false, daily_earned: 0, last_reset: pacificDate() }),
         headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
       });
       if (!ins.ok) return res.status(500).json({ error: 'Failed to create credit balance' });
@@ -1972,7 +1978,7 @@ async function _handler(req, res) {
   if (body.action === 'get_kpi_detail') {
     const metric = body.metric;
     const now = new Date();
-    const todayISO = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
+    const todayISO = pacificDayStart(now).toISOString();
     const weekISO  = new Date(Date.now() - 7 * 86400000).toISOString();
     const monthISO = new Date(Date.now() - 30 * 86400000).toISOString();
 

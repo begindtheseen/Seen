@@ -149,7 +149,7 @@ function AppCard({ app, onUpdate, onRemove, onShare, onReload, intel, check, onA
 
       {/* Meta row */}
       <div style={{ display: 'flex', gap: '.6rem', flexWrap: 'wrap', marginTop: '.5rem', alignItems: 'center' }}>
-        <span style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', color: 'var(--muted)' }}>Applied {new Date(app.appliedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
+        <span style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', color: 'var(--muted)' }}>Applied {new Date(app.appliedAt).toLocaleDateString('en-US', { timeZone: 'America/Los_Angeles', month: 'short', day: 'numeric' })}</span>
         {app.platform && <span style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', color: 'var(--muted)' }}>via {app.platform}</span>}
         {listing && (listing.internal
           // A listing posted on Seen: its page is /jobs/<id> here, so open it in the app.
@@ -161,7 +161,7 @@ function AppCard({ app, onUpdate, onRemove, onShare, onReload, intel, check, onA
           knows the posting they read may have changed. */}
       {app.listingEditedAt && Date.parse(app.listingEditedAt) > app.appliedAt && (
         <div style={{ marginTop: '.45rem', fontFamily: 'var(--mono)', fontSize: '.56rem', color: 'var(--amber)' }}>
-          ✎ Listing edited by the employer {new Date(app.listingEditedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} — after you applied
+          ✎ Listing edited by the employer {new Date(app.listingEditedAt).toLocaleDateString('en-US', { timeZone: 'America/Los_Angeles', month: 'short', day: 'numeric' })} — after you applied
         </div>
       )}
 
@@ -172,7 +172,7 @@ function AppCard({ app, onUpdate, onRemove, onShare, onReload, intel, check, onA
           {app.messages.map((m, i) => (
             <div key={i} style={{ borderRadius: 9, padding: '.5rem .7rem', background: m.from === 'employer' ? 'rgba(59,130,246,.08)' : 'var(--raised)', border: `1px solid ${m.from === 'employer' ? 'rgba(59,130,246,.25)' : 'var(--line)'}` }}>
               <div style={{ fontFamily: 'var(--mono)', fontSize: '.54rem', color: m.from === 'employer' ? 'var(--blue)' : 'var(--muted)', marginBottom: '.2rem' }}>
-                {m.from === 'employer' ? `🏢 ${app.company}` : m.withdrawal ? 'You · withdrew' : 'You'} · {new Date(m.at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                {m.from === 'employer' ? `🏢 ${app.company}` : m.withdrawal ? 'You · withdrew' : 'You'} · {new Date(m.at).toLocaleDateString('en-US', { timeZone: 'America/Los_Angeles', month: 'short', day: 'numeric' })}
               </div>
               {m.text
                 ? <div style={{ fontSize: '.8rem', color: 'var(--white)', lineHeight: 1.5, whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>{m.text}</div>

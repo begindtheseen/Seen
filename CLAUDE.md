@@ -50,6 +50,29 @@ and dashboard (PRs #122/#123) were intentionally REDESIGNED beyond the old site;
 longer the design source of truth for redesigned pages. `SITE_PARITY_CHECKLIST.md` /
 `ADMIN_PARITY_CHECKLIST.md` are frozen pre-06-30 records, not an active work queue.
 
+## Session 2026-10-21 A: California time everywhere + truthful admin counts + a full backup tool
+- **OWNER DECISION 2026-10-21: no UTC anywhere — "we are in California".** Every day/week/month bucket and
+  every displayed date is America/Los_Angeles via ONE helper, `lib/time/pacific.js` (pacificDate,
+  pacificDayStart, pacificWeekStart, formatPacific, …; DST-tested). Never use `toISOString().slice(0, 10)`,
+  `new Date(y, m, d)` (the server's day) or `getUTC*` for a calendar day; every `toLocale(Date|Time)String` and
+  `new Date(…).toLocaleString` carries `timeZone: 'America/Los_Angeles'`. The daily AI-credit reset is the
+  California day in JS (credits.js, user-sync.js) AND in SQL (migration 20261021120000 → consume_credit).
+- **Admin "Added today" (22,511) was right for midnight UTC = 5 PM PT the day before**; now midnight PT. Active
+  (72,392) and Stale (3,390) were right — they are `availability_status`, not `status`.
+- **"All job listings — 1,000 total" was the PostgREST 1,000-row cap**, grouped as if it were every job. Now
+  `admin_jobs_by_company()` (same migration) counts in SQL and returns ONE jsonb value (max-rows also caps a
+  function's rows); before the migration the handler keyset-pages every row. Same cap class still exists in
+  reads asking `limit=2000+` (reportWrite.js per-company reports, demand.js, search_logs, email_prefs) —
+  harmless at today's sizes, wrong past 1,000 rows; fix when touched.
+- **Backups: prod has none** (`pitr_enabled:false`, empty list). `scripts/backup/export-supabase.mjs <dir>` makes
+  a full logical backup over the Management API (SUPABASE_ACCESS_TOKEN, read-only SQL, paced for its 429
+  throttle): schema in two parts (before/after data), every public row + auth users/identities + storage rows
+  + migration history as `jsonb_populate_recordset` inserts, Storage files, Vault secret NAMES, manifest with
+  per-table counts, RESTORE.md. Postgres 17.6 in prod.
+- **Data volume (prod, 2026-10-21):** 76,135 jobs (+41k in 24h, ~1–2k/hour steady, 38.7k from Greenhouse boards);
+  DB 421 MB, jobs 361 MB (262 MB heap, 99 MB across 21 indexes, avg description 2.6 KB). Plan not readable
+  with this token (org endpoint 403) — owner to confirm Free vs Pro (Free = 500 MB cap).
+
 ## Session 2026-10-20 I: first production import — rule false positives fixed + cleaned (owner: "yes do both")
 - **First real runs from Seen Command (owner's Mac):** ~90 reports for Home Depot, Starbucks, Robert Half, Snowflake,
   Quantinuum, US Foods. Read back from prod, 9 were wrong, all at seams of `lib/reports/applicantRules.js`:

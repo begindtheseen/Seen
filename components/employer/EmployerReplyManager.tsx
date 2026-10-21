@@ -34,7 +34,7 @@ function fmtDate(iso: string | null) {
   if (!iso) return ''
   const t = Date.parse(iso)
   if (!Number.isFinite(t)) return ''
-  try { return new Date(t).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) } catch { return '' }
+  try { return new Date(t).toLocaleDateString(undefined, { timeZone: 'America/Los_Angeles', month: 'short', day: 'numeric', year: 'numeric' }) } catch { return '' }
 }
 
 export function EmployerReplyManager({ company }: { company: string }) {

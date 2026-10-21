@@ -11,6 +11,7 @@ import { ResumeStore } from '@/lib/stores/ResumeStore'
 import { parseResumeFile } from '@/lib/resumeUploadClient'
 import PageHeader from '@/components/shell/PageHeader'
 import styles from './profile.module.css'
+import { formatPacific } from '@/lib/time/pacific.js'
 
 // Per-user profile cache (keyed by user id → NO cross-user bleed on shared devices) so the
 // fields render instantly on every revisit instead of loading from scratch each time.
@@ -452,8 +453,8 @@ export default function ProfilePage() {
                       <div className={styles.planMeta}>
                         {sub?.amount != null ? `$${sub.amount}/${sub.interval === 'year' ? 'yr' : 'mo'}` : 'Active'}
                         {sub?.current_period_end ? (sub.cancel_at_period_end
-                          ? ` · ends ${new Date(sub.current_period_end).toLocaleDateString()}`
-                          : ` · renews ${new Date(sub.current_period_end).toLocaleDateString()}`) : ''}
+                          ? ` · ends ${formatPacific(sub.current_period_end, { dateStyle: 'medium' })}`
+                          : ` · renews ${formatPacific(sub.current_period_end, { dateStyle: 'medium' })}`) : ''}
                       </div>
                     </div>
                     <span className={`${styles.badge} ${sub?.cancel_at_period_end ? styles.bRed : styles.bGreen}`}>{sub?.cancel_at_period_end ? 'Canceling' : 'Active'}</span>

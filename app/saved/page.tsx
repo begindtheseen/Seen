@@ -22,7 +22,7 @@ function savedAgo(iso?: string): string {
   if (days <= 0) return 'Saved today'
   if (days === 1) return 'Saved yesterday'
   if (days < 30) return `Saved ${days}d ago`
-  return `Saved ${new Date(t).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}`
+  return `Saved ${new Date(t).toLocaleDateString(undefined, { timeZone: 'America/Los_Angeles', month: 'short', day: 'numeric' })}`
 }
 
 export default function SavedPage() {

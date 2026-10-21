@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { pacificParts } from '@/lib/time/pacific.js';
 
 // Renders the derived employer feed. The server component owns the fetch + derivation
 // (lib/server/employerNotifications.js); this component owns presentation and two client-only
@@ -44,9 +45,10 @@ const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', '
 // Deterministic (UTC) absolute date — identical on server and client, so it hydrates cleanly.
 function absDate(iso: string | null): string {
   if (!iso) return ''
-  const d = new Date(iso)
-  if (Number.isNaN(d.getTime())) return ''
-  return `${MONTHS[d.getUTCMonth()]} ${d.getUTCDate()}, ${d.getUTCFullYear()}`
+  const t = new Date(iso)
+  if (Number.isNaN(t.getTime())) return ''
+  const d = pacificParts(t)
+  return `${MONTHS[d.month - 1]} ${d.day}, ${d.year}`
 }
 
 // Client-clock relative time — only rendered after mount.

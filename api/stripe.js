@@ -7,6 +7,7 @@ import { ONE_TIME_SKUS, PRO_TRIAL_DAYS } from '../lib/server/creditRules.js';
 import { fulfillOneTimeCheckout } from '../lib/server/stripeFulfillment.js';
 import { EMPLOYER_SKUS } from '../lib/server/employerSkus.js';
 import { fulfillEmployerCheckout, isEmployerSession } from '../lib/server/employerFulfillment.js';
+import { pacificDate } from '../lib/time/pacific.js';
 
 const CORS = (req, res) => {
   const o = req.headers.origin || '';
@@ -74,7 +75,7 @@ function db(SUPABASE_URL, SERVICE_KEY) {
 async function setPro(uid, isPro, env) {
   if (!uid) return;
   const q = db(env.SUPABASE_URL, env.SERVICE_KEY);
-  const today = new Date().toISOString().slice(0, 10);
+  const today = pacificDate();
   // Revokes must NEVER touch an admin-comped account (migration 051) — comped Pro is
   // granted outside the Stripe lifecycle, so Stripe's "no active subscription" is not
   // evidence against it. The filter makes a comped row simply not match (0-row PATCH),

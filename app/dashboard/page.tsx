@@ -262,7 +262,7 @@ export default function DashboardPage() {
           ? { t: "You're on track.", s: `${health.responseRate}% of your applications got a reply. A follow-up on the quiet ones could tip it.`, badge: 'On track', tone: 'amber' }
           : { t: 'Room to improve.', s: `${health.ghostRate}% of your applications went silent. Check a company's ghost rate before applying and tailor your résumé.`, badge: 'Needs attention', tone: 'red' }
   const signalCount = alertCount + (surveyInsight ? 1 : 0)
-  const today = new Date().toLocaleDateString('en-US', { month: 'short', year: 'numeric' })
+  const today = new Date().toLocaleDateString('en-US', { timeZone: 'America/Los_Angeles', month: 'short', year: 'numeric' })
 
   return (
     <div className="page-full">

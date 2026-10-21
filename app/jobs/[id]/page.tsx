@@ -354,7 +354,7 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
         )}
         {job.edited_at && (
           <div style={{ marginTop: '.3rem', fontFamily: 'var(--mono)', fontSize: '.56rem', color: 'var(--amber)', lineHeight: 1.55 }}>
-            ✎ Edited by the employer {new Date(job.edited_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+            ✎ Edited by the employer {new Date(job.edited_at).toLocaleDateString('en-US', { timeZone: 'America/Los_Angeles', month: 'short', day: 'numeric', year: 'numeric' })}
           </div>
         )}
 

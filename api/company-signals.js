@@ -14,6 +14,7 @@ import {
   buildCompanyIndex, matchViaIndex,
 } from '../lib/server/companyEntityMatch.js';
 import { SEC_PHRASES, fetchEdgarGroup } from '../lib/server/secEdgar.js';
+import { pacificDate } from '../lib/time/pacific.js';
 
 const ALLOWED = ['https://seenjobs.io', 'https://www.seenjobs.io'];
 
@@ -123,8 +124,8 @@ async function adminRoute(req, res, { db, body, adminToken }) {
 async function ingestSec(req, res, { db, body }) {
   // Date window (default last 90 days). Format YYYY-MM-DD.
   const days = Math.min(Math.max(parseInt(body.days, 10) || 90, 1), 365);
-  const enddt = new Date().toISOString().slice(0, 10);
-  const startdt = new Date(Date.now() - days * 86400000).toISOString().slice(0, 10);
+  const enddt = pacificDate();
+  const startdt = pacificDate(new Date(Date.now() - days * 86400000));
   const userAgent = body.user_agent || 'SeenJobs/1.0 job-transparency (contact via seenjobs.io)';
 
   // Our candidate companies (the ones we have pages for). Build the O(1) match index once.
