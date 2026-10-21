@@ -1570,7 +1570,7 @@ async function _handler(req, res) {
   // 1,000-row cap); taking a listing down stays delete_listing (expire + suppress); nothing here
   // hard-deletes. Every change is audited with the prior values.
   if (action === 'jobs_browse') {
-    const b = browseJobsPath(body.filters || {});
+    const b = browseJobsPath(body.filters || {}, Date.now(), { todayStart: pacificDayStart(new Date()) });
     if (b.error) return res.status(400).json({ error: b.error });
     const r = await db(b.path, { headers: { Prefer: 'count=exact' } });
     if (!r.ok) return res.status(502).json({ error: 'Could not read listings', status: r.status, detail: (await r.text().catch(() => '')).slice(0, 200) });
