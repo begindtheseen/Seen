@@ -15,6 +15,7 @@
 // web-research claim) and stopped reading jobs after 25,000 rows.
 import { isValidCompanyName, normalizeCompany } from './_utils/reportWrite.js';
 import { firstPartyReportCount, mentionCount, isGradeable, reportsNeededForGrade } from '../lib/server/reportCounts.js';
+import { searchableName } from '../lib/reports/targetNames.js';
 
 const headersFor = key => ({ apikey: key, Authorization: `Bearer ${key}` });
 // A lowercase, spaceless identifier is usually an ATS board slug, not the employer's
@@ -99,7 +100,9 @@ export default async function handler(req, res) {
   if (!jobsOk || !scoresOk) return res.status(502).json({ error: `Could not read ${!jobsOk ? 'job listings' : 'company scores'} — try again.` });
   const all = [...counts.values()].map((c) => ({ ...c, existing_reports: c.applicant_reports, slug_like: isSlugLike(c.company) })).sort(rank);
   if (catalog) return res.status(200).json({ ok: true, companies: all, total: all.length, employee_review_counts: employee, generated_at: new Date().toISOString() });
-  const queue = below ? all.filter((c) => c.active_listings > 0 && c.applicant_reports < below) : all;
+  // A board slug that was only capitalized ("Andurilindustries") matches nobody's post and burns a run's
+  // minutes, so it is never handed out as a target (the catalog above still lists it, flagged).
+  const queue = (below ? all.filter((c) => c.active_listings > 0 && c.applicant_reports < below) : all).filter((c) => !c.slug_like && searchableName(c));
   return res.status(200).json({ ok: true, companies: queue.slice(0, limit), scanned_active_companies: counts.size,
     ...(below ? { below, below_count: queue.length } : {}) });
 }

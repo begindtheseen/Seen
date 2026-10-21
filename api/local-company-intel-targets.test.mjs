@@ -13,8 +13,8 @@ const ok = (b) => ({ ok: true, status: 200, async json() { return b; } });
 
 // 2,500 SpaceX listings (spans three keyset pages), 1 Acme listing, and scores for SpaceX (lowercase,
 // as company_scores stores names), Acme, and a company with reports but no open listings.
-function install({ jobsFail = false } = {}) {
-  const jobs = [...Array.from({ length: 2500 }, (_, i) => ({ id: uid(i + 1), company: 'SpaceX' })), { id: uid(9999), company: 'Acme Corp' }];
+function install({ jobsFail = false, extraJobs = [] } = {}) {
+  const jobs = [...Array.from({ length: 2500 }, (_, i) => ({ id: uid(i + 1), company: 'SpaceX' })), { id: uid(9999), company: 'Acme Corp' }, ...extraJobs];
   const scores = [
     { company_name: 'spacex', report_count: 16, first_party_report_count: 11, data_source: 'reports', mention_count: 20, employee_review_count: 45 },
     { company_name: 'acme corp', report_count: 40, first_party_report_count: 0, data_source: 'web_search', mention_count: 2, employee_review_count: 0 },
@@ -80,4 +80,14 @@ test('below=K: only companies with open listings and fewer than K applicant repo
   assert.deepEqual(all.r.body.companies.map((c) => c.company), ['SpaceX', 'Acme Corp']);
   const ignored = await call({ limit: '10', below: 'x' });
   assert.equal(ignored.r.body.below, undefined, 'an invalid value is ignored, not guessed');
+});
+
+test('targets: a capitalized board slug is never handed out; the catalog still lists it', async () => {
+  const extraJobs = [{ id: uid(10001), company: 'Andurilindustries' }, { id: uid(10002), company: 'Walmart' }];
+  const { r } = await call({ limit: '25', below: '10' }, { extraJobs });
+  const names = r.body.companies.map((c) => c.company);
+  assert.ok(!names.includes('Andurilindustries'), names.join(', '));
+  assert.ok(names.includes('Walmart'));
+  const cat = await call({ catalog: '1' }, { extraJobs });
+  assert.ok(cat.r.body.companies.some((c) => c.company === 'Andurilindustries'));
 });
