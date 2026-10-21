@@ -132,7 +132,10 @@ export function resetDelayMs(getHeader, nowMs = Date.now()) {
  * workers); 429 → wait for the advertised reset (else 10s/30s/60s), up to 3 times; nearly-exhausted
  * budget → wait for the reset; a retryable failure (timeout / 5xx / network / bad JSON / an
  * {"error":"Query timed out"} body) is retried ONCE after retryDelayMs, then given up and counted.
- * get(path, params) → { ok, status, items, error, retried }.
+ * get(path, params, { deadlineAt }) → { ok, status, items, error, retried }. With a deadline (epoch ms) the
+ * call never runs past it: no request starts, no back-off or retry waits, and no client timeout reaches
+ * beyond it — it answers { ok:false, error:'deadline' } instead (a time-boxed cloud run must end on time;
+ * the 10/30/60 s back-offs alone are longer than its per-company budget).
  */
 export function createArcticFetcher({
   fetchImpl = fetch, sleep = (ms) => new Promise((r) => setTimeout(r, ms)), now = () => Date.now(),
@@ -141,26 +144,31 @@ export function createArcticFetcher({
 } = {}) {
   let nextAt = 0;
   const stats = { requests: 0, r429: 0, errors: 0, retries: 0, failed: 0 };
-  async function gate() {
+  // false = the next start would be at or past the deadline (nothing is waited for or sent).
+  async function gate(deadlineAt) {
     for (;;) {
       const wait = nextAt - now();
+      if (now() + Math.max(0, wait) >= deadlineAt) return false;
       if (wait <= 0) break;
       await sleep(wait);
     }
     nextAt = now() + intervalMs;
+    return true;
   }
   const BACKOFF = [10_000, 30_000, 60_000];
   const urlFor = (path, params = {}) => `${base}${path}?${new URLSearchParams(params)}`;
 
-  async function get(path, params) {
+  async function get(path, params, { deadlineAt = Infinity } = {}) {
     const url = urlFor(path, params);
-    let n429 = 0, retried = false;
+    let n429 = 0, retried = false, last = null;
     for (;;) {
-      await gate();
+      // Out of time before a back-off or retry: answer with the refusal that caused it, not a bare 'deadline'.
+      if (!(await gate(deadlineAt))) { if (last) stats.failed++; return { ok: false, status: last?.status ?? 0, items: [], error: last?.error ?? 'deadline', retried }; }
       stats.requests++;
       let status = 0, error, items = [];
       try {
-        const res = await fetchImpl(url, { headers: { 'User-Agent': ARCTIC_UA, Accept: 'application/json' }, signal: AbortSignal.timeout(timeoutMs) });
+        const budget = Math.max(1000, Math.min(timeoutMs, deadlineAt - now()));
+        const res = await fetchImpl(url, { headers: { 'User-Agent': ARCTIC_UA, Accept: 'application/json' }, signal: AbortSignal.timeout(budget) });
         status = res.status;
         const hdr = (k) => res.headers?.get?.(k) ?? null;
         if (status === 429) {
@@ -170,6 +178,7 @@ export function createArcticFetcher({
             n429++;
             log(`  429 from Arctic Shift — backing off ${Math.round(wait / 1000)}s`);
             nextAt = Math.max(nextAt, now() + wait);
+            last = { status, error: 'rate_limited' };
             continue;
           }
           error = 'rate_limited';
@@ -200,6 +209,7 @@ export function createArcticFetcher({
         stats.retries++;
         log(`  Arctic Shift ${path} failed (${error}) — retrying once in ${Math.round(retryDelayMs / 1000)}s`);
         nextAt = Math.max(nextAt, now() + retryDelayMs);
+        last = { status, error };
         continue;
       }
       stats.failed++;

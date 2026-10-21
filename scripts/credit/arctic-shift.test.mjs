@@ -176,6 +176,32 @@ test('fetcher: "Query timed out" retried once after the delay, then given up and
   assert.equal((await fetcherFor(async () => resp(504, { error: 'Query timed out' })).get('/x', {})).error, 'Query timed out');
 });
 
+test('fetcher: a deadline is never waited past — the refusal that needed the wait is the answer', async () => {
+  // Live 2026-10-21: the archive answered most searches 422 "Timeout. Maybe slow down a bit" in < 1 s; a
+  // retry waits 5 s and a 429 backs off 10/30/60 s — longer than a cloud run's whole per-company budget.
+  const clock = fakeClock();
+  const at = [];
+  const busy = createArcticFetcher({ ...clock, retryDelayMs: 5000, fetchImpl: async () => { at.push(clock.now()); return resp(422, { data: null, error: 'Timeout. Maybe slow down a bit' }); } });
+  const r = await busy.get('/api/posts/search', { query: 'x' }, { deadlineAt: 3000 });
+  assert.deepEqual({ ok: r.ok, status: r.status, error: r.error }, { ok: false, status: 422, error: 'Timeout. Maybe slow down a bit' });
+  assert.equal(at.length, 1, 'the 5 s retry would end past the deadline, so it is not attempted');
+  assert.ok(clock.now() < 3000);
+  const c2 = fakeClock();
+  const limited = createArcticFetcher({ ...c2, fetchImpl: async () => resp(429, '', { 'x-ratelimit-reset': '30' }) });
+  const l = await limited.get('/x', {}, { deadlineAt: 20_000 });
+  assert.deepEqual({ ok: l.ok, error: l.error }, { ok: false, error: 'rate_limited' });
+  assert.ok(c2.now() < 20_000, 'no 30 s back-off past the deadline');
+  // Past the deadline nothing is sent at all.
+  let sent = 0;
+  const late = createArcticFetcher({ now: () => 10_000, sleep: async () => {}, fetchImpl: async () => { sent++; return resp(200, { data: [] }); } });
+  assert.equal((await late.get('/x', {}, { deadlineAt: 5000 })).error, 'deadline');
+  assert.equal(sent, 0);
+  // Without a deadline: unchanged (one retry after the delay).
+  const c3 = fakeClock(); let n = 0;
+  const free = createArcticFetcher({ ...c3, fetchImpl: async () => (n++ === 0 ? resp(422, { error: 'Timeout. Maybe slow down a bit' }) : resp(200, { data: [P.aa] })) });
+  assert.equal((await free.get('/x', {})).ok, true);
+});
+
 test('fetcher: nearly-exhausted budget waits for the advertised reset', async () => {
   const clock = fakeClock();
   const at = [];
