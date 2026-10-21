@@ -2,10 +2,16 @@
 // Intelligence). It returns names already present in Seen's active listings or company scores; it
 // never creates a company. Same Bearer secret as /api/ingest-local-company-intel.
 //
-//   GET ?limit=N    the collector's default targets: the N companies with the most open listings.
-//   GET ?limit=N&below=K  the same, but only companies with fewer than K applicant reports (the
-//                   archive collector's "fill every company to K" queue). Companies with no open
-//                   listings are not in it: a company is filled because people apply there now.
+//   GET ?limit=N    the collector's default targets: the N companies with the most open listings (N ≤ 100).
+//   GET ?limit=N&below=K  only companies with fewer than K applicant reports (the archive collector's
+//                   "fill every company to K" queue; N ≤ 1000 so the hourly cloud run can rotate through
+//                   it). Companies with no open listings are not in it: a company is filled because people
+//                   apply there now. Companies with a PUBLIC FOOTPRINT come first — at least one applicant
+//                   report or online mention already found — then the rest, each group by open listings.
+//                   Measured 2026-10-21 (real archive, the cloud run's 1.9-minute budget): the old
+//                   most-listings-first head (ATS-board companies — Natera, Brex, Loenbro, Verkada, Axon)
+//                   gave 0 accounts even with every post in their own subreddits read, while Verizon (4
+//                   reports), TopGolf (8), Kohl's (2) and Instacart (4) gave 8, 3, 1 and 1.
 //   GET ?catalog=1  EVERY company Seen knows, with its counts, so the operator can pick targets
 //                   (major companies, under-reported ones, or one specific company).
 //
@@ -82,6 +88,9 @@ async function hasColumn(url, headers, col) {
 
 const rank = (a, b) => Number(isSlugLike(a.company)) - Number(isSlugLike(b.company)) || b.active_listings - a.active_listings
   || b.applicant_reports - a.applicant_reports || a.company.localeCompare(b.company);
+// A company someone has already written about publicly is where more first-hand accounts are found.
+export const hasFootprint = (c) => c.applicant_reports > 0 || c.mentions > 0;
+const fillRank = (a, b) => Number(hasFootprint(b)) - Number(hasFootprint(a)) || rank(a, b);
 
 export default async function handler(req, res) {
   if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
@@ -90,9 +99,9 @@ export default async function handler(req, res) {
   const url = process.env.SUPABASE_URL, key = process.env.SUPABASE_SERVICE_KEY;
   if (!url || !key) return res.status(503).json({ error: 'Company target storage is unavailable.' });
   const catalog = String(req.query?.catalog || '') === '1';
-  const limit = Math.min(100, Math.max(1, Number(req.query?.limit) || 10));
   const belowRaw = Number(req.query?.below);
   const below = Number.isInteger(belowRaw) && belowRaw >= 1 && belowRaw <= 10000 ? belowRaw : null;
+  const limit = Math.min(below ? 1000 : 100, Math.max(1, Number(req.query?.limit) || 10));
   const headers = headersFor(key), counts = new Map();
   const [mentions, employee] = await Promise.all([hasColumn(url, headers, 'mention_count'), hasColumn(url, headers, 'employee_review_count')]);
   const [jobsOk, scoresOk] = await Promise.all([activeListingCounts(url, headers, counts), scoreCounts(url, headers, counts, { mentions, employee })]);
@@ -102,7 +111,7 @@ export default async function handler(req, res) {
   if (catalog) return res.status(200).json({ ok: true, companies: all, total: all.length, employee_review_counts: employee, generated_at: new Date().toISOString() });
   // A board slug that was only capitalized ("Andurilindustries") matches nobody's post and burns a run's
   // minutes, so it is never handed out as a target (the catalog above still lists it, flagged).
-  const queue = (below ? all.filter((c) => c.active_listings > 0 && c.applicant_reports < below) : all).filter((c) => !c.slug_like && searchableName(c));
+  const queue = (below ? all.filter((c) => c.active_listings > 0 && c.applicant_reports < below).sort(fillRank) : all).filter((c) => !c.slug_like && searchableName(c));
   return res.status(200).json({ ok: true, companies: queue.slice(0, limit), scanned_active_companies: counts.size,
     ...(below ? { below, below_count: queue.length } : {}) });
 }

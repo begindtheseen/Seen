@@ -50,6 +50,26 @@ and dashboard (PRs #122/#123) were intentionally REDESIGNED beyond the old site;
 longer the design source of truth for redesigned pages. `SITE_PARITY_CHECKLIST.md` /
 `ADMIN_PARITY_CHECKLIST.md` are frozen pre-06-30 records, not an active work queue.
 
+## Session 2026-10-21 C: why the cloud applicant-report cron found 0 (branch fix-archive-yield)
+- **Prod (read-only):** collector_runs 1–3 (16:35/17:35/18:35 UTC) each did 2 companies, `found 0`, `stopped_by time`,
+  ~232 s. The logged summary DROPPED per-company `searches`/`failed_searches`/`search_errors`, so it looked clean.
+- **Reproduced locally** with the cron's exact path (real Arctic Shift, writes stubbed) for Natera + Brex: 0/0 — 52
+  archive requests, **35 were HTTP 422 "Timeout. Maybe slow down a bit"** (~0.5–1.5 s each), 2 were 429; at any pace
+  (1 s / 6 s / 12 s gaps → 1/8, 1/8, 3/8 answered), so not Vercel-specific. Plain subreddit LISTINGS (no text filter)
+  answered every time in 0.9–2.5 s. Even with every post of r/natera (5), r/Brex (23), r/verkada (111) read: 0
+  accounts — the queue's head (most listings) is ATS-board tech with no first-hand footprint. Same budget, companies
+  with ≥1 report: Verizon 8, TopGolf 3, Kohl's 1, Instacart 1.
+- **Fix:** company subs are LISTED page by page and matched locally (title: any applicant word; body: hiring words;
+  plus a job-context gate — r/verizon "Was offered 25% discount" passed the old title=offer path AND the rules as an
+  `offer`); a busy-archive breaker (4 refused full-text searches in a row → skip the rest, `archive_busy`); the shared
+  fetcher takes a per-call `deadlineAt` (no 5 s retry / 10–60 s 429 back-off past it); the fill queue (`below=K`) puts
+  companies with a report or mention first and goes to 1,000; the cron offers 8 candidates (clock decides), logs
+  searches/refusals/reasons, `failed` when every search was refused / `partial` when ≥ half; rotation by outcome
+  (dry+read to end 30 d, read to end 14 d, goal 7 d, time 7 d / 2 d still finding / 1 d barely read, busy 1 d); a
+  company started with no time for one search is `not_reached`, never "tried".
+- **Rules gap NOT fixed (follow-up):** `storableAccount('Was offered 25% discount…', {inCompanySub:true})` → offer.
+  The harvest gate keeps it out of the archive collectors; the ingest re-check alone would still accept it.
+
 ## Session 2026-10-21 B: career sites like a person, always-on reports, storage guard, verified backup
 - **Career-site navigator** (`lib/server/careerAgent.js` in-page agent + `scripts/collect-career-site.mjs`): no
   start page needed; finds the list (landing pages followed deeper), uses the SITE'S OWN search + United States
