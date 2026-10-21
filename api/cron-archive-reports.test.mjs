@@ -6,7 +6,6 @@ process.env.SUPABASE_SERVICE_KEY = 'svc';
 process.env.LOCAL_COMPANY_INTEL_INGEST_SECRET = 'local';
 const { runCloudCollection, retryAfterDays, skippedCompanies, runVerdict, default: handler } = await import('./cron-archive-reports.js');
 
-const DAY = 86_400_000;
 const NOW = Date.parse('2026-10-21T19:35:00Z');
 const hoursAgo = (h) => new Date(NOW - h * 3_600_000).toISOString();
 
