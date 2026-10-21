@@ -8,6 +8,7 @@ import { dedupeJobsUntilDone, dedupeMessage } from './dedupeJobs'
 import { drainAdminAction, num } from './drain'
 import { saveFile } from './saveFile'
 import { safeLocalGet, safeLocalSet } from '@/lib/safeStorage'
+import { pacificDate } from '@/lib/time/pacific.js';
 
 const ISSUE_TYPE_LABEL: Record<string, string> = {
   wrong_data: 'Wrong data', duplicate: 'Duplicate', broken_listing: 'Broken listing', spam: 'Spam', other: 'Other',
@@ -1182,7 +1183,7 @@ export function CompanyExportPanel({ token }: { token: string }) {
   const [ready, setReady] = useState<{ filename: string; mime: string; content: string | Blob; label: string } | null>(null)
 
   const inputStyle: React.CSSProperties = { width: '100%', background: 'var(--raised)', border: '1px solid var(--line2)', borderRadius: 7, padding: '.42rem .65rem', fontFamily: 'var(--mono)', fontSize: '.65rem', color: 'var(--white)', outline: 'none', boxSizing: 'border-box' }
-  const slugDate = (name: string) => ({ slug: name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'company', date: new Date().toISOString().slice(0, 10) })
+  const slugDate = (name: string) => ({ slug: name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'company', date: pacificDate() })
 
   // Raw JSON audit bundle (unchanged contract).
   async function prepareJson() {

@@ -5,6 +5,7 @@ import type { AdminStats, Sub, Tone } from './types'
 import { UserRow } from './UserRow'
 import { DetailModal, DetailStat, relTime } from './primitives'
 import ModalPortal from '@/components/ModalPortal'
+import { formatPacific } from '@/lib/time/pacific.js'
 
 export function KpiDetailRows({ metric, rows, token, onDeleteRow }: { metric: string; rows: Record<string, unknown>[]; token: string; onDeleteRow: (id: string) => void }) {
   const cell = (txt: unknown, color?: string) => (
@@ -272,7 +273,7 @@ export function TrialsDetailModal({ token, onClose }: { token: string; onClose: 
   }, [token])
 
   const statusTone = (s: string): Tone => s === 'trialing' ? 'blue' : s === 'active' ? 'green' : s === 'past_due' || s === 'unpaid' ? 'amber' : s === 'canceled' ? 'red' : 'sub'
-  const fmtDate = (unix: number | null) => unix ? new Date(unix * 1000).toLocaleDateString() : '—'
+  const fmtDate = (unix: number | null) => unix ? formatPacific(unix * 1000, { dateStyle: 'medium' }) : '—'
   // Trialing subs first (this is the Trials door), then the rest.
   const subs = (data?.subscriptions || []).slice().sort((a, b) => (a.status === 'trialing' ? -1 : 0) - (b.status === 'trialing' ? -1 : 0))
   const trialCount = subs.filter(s => s.status === 'trialing').length

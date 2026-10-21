@@ -624,8 +624,6 @@ async function handleEmailAnalysis(req, res, body, pro = false) {
     });
     const applyLink = `https://seenjobs.io/apply?${applyParams.toString()}`;
 
-    const date = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-
     // ── Generate the complete-résumé PDF attachment ──
     // Build a real, submittable résumé from the user's OWN parsed résumé text
     // (header, summary, experience, skills, education). The before/after tips

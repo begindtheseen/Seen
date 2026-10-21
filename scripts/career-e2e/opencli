@@ -1,0 +1,11 @@
+#!/usr/bin/env node
+// Stand-in for OpenCLI's browser commands (flag form: browser <cmd> <arg> --session <name>), forwarding
+// to scripts/career-e2e/browserd.mjs. Prints OpenCLI's { ok, data } envelope.
+const args = process.argv.slice(2);
+if (args[0] !== 'browser') { console.error('usage: opencli browser <open|eval|close> …'); process.exit(2); }
+const cmd = args[1]; const arg = args[2];
+const body = cmd === 'open' ? { cmd, url: arg } : cmd === 'eval' ? { cmd, js: arg } : { cmd };
+const r = await fetch(`http://127.0.0.1:${process.env.E2E_BROWSERD_PORT}/`, { method: 'POST', body: JSON.stringify(body) });
+const v = await r.json();
+process.stdout.write(JSON.stringify(v));
+if (v.ok === false) process.exit(1);

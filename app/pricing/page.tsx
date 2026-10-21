@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { useAuth } from '@/lib/auth'
 import { aiHeaders } from '@/lib/aiHeaders'
 import { FREE_DAILY_CREDITS, WELCOME_CREDITS, MAX_DAILY_EARN, PRO_TRIAL_DAYS, ONE_TIME_SKUS } from '@/lib/creditRules'
+import { formatPacific } from '@/lib/time/pacific.js'
 
 // UI copy is generated from the SAME constants the server enforces — never a hand-typed
 // number that drifts. Free tier is 1 AI credit/day (owner decision 2026-07-02).
@@ -363,8 +364,8 @@ function PricingPageInner() {
                   <div style={{ fontFamily: 'var(--mono)', fontSize: '.62rem', color: 'var(--sub)', textAlign: 'center', marginBottom: '.7rem', lineHeight: 1.6 }}>
                     {sub.amount != null ? `$${sub.amount}/${sub.interval === 'year' ? 'yr' : 'mo'}` : 'Active'}
                     {sub.current_period_end ? (sub.cancel_at_period_end
-                      ? ` · ends ${new Date(sub.current_period_end).toLocaleDateString()}`
-                      : ` · renews ${new Date(sub.current_period_end).toLocaleDateString()}`) : ''}
+                      ? ` · ends ${formatPacific(sub.current_period_end, { dateStyle: 'medium' })}`
+                      : ` · renews ${formatPacific(sub.current_period_end, { dateStyle: 'medium' })}`) : ''}
                   </div>
                 )}
                 {sub?.cancel_at_period_end ? (

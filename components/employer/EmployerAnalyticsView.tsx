@@ -78,9 +78,9 @@ const sub: React.CSSProperties = { color: 'var(--sub)', fontSize: '.78rem', line
 const fmtPct = (v: number | null | undefined) => (v == null ? '—' : `${Number.isInteger(v) ? v : v.toFixed(1)}%`)
 const gradeColor = (g: string | null) => (g === 'A' || g === 'B' ? 'var(--green)' : g === 'C' ? 'var(--amber)' : 'var(--red)')
 const monthLabel = (m: string) => {
+  // A 'YYYY-MM' key (already a California month) → "Oct '26" — no clock involved.
   const [y, mm] = m.split('-')
-  const d = new Date(Date.UTC(Number(y), Number(mm) - 1, 1))
-  return d.toLocaleDateString('en-US', { month: 'short', year: '2-digit', timeZone: 'UTC' })
+  return `${['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][Number(mm) - 1] || mm} '${String(y).slice(2)}`
 }
 
 // `grow` animates the fill from 0 → its width (scaleX from the left, matching the

@@ -9,6 +9,7 @@ import OutcomeCard from '@/components/OutcomeCard'
 import { reportSourceBadge } from '@/lib/reportSource'
 import type { Application } from '@/lib/types'
 import PageHeader from '@/components/shell/PageHeader'
+import { formatPacific } from '@/lib/time/pacific.js'
 
 type Outcome = 'ghosted' | 'autoreject' | 'human' | 'waiting' | ''
 type Stage = 'application' | 'phone' | 'interview' | 'final' | ''
@@ -550,7 +551,7 @@ function ReportPage() {
                   })()}
                 </div>
                 <span style={{ fontFamily: 'var(--mono)', fontSize: '.52rem', color: 'var(--muted)', flexShrink: 0 }}>
-                  {new Date(r.created_at).toLocaleDateString()}
+                  {formatPacific(r.created_at, { dateStyle: 'medium' })}
                 </span>
               </div>
             ))}

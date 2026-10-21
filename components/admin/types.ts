@@ -40,6 +40,7 @@ export interface AdminStats {
   }
   applications: { total: number; ghosted_30d: number; hired_30d: number; ghost_rate_pct: number | null; recent: RecentApp[] }
   company_lookups?: { ready: boolean; today: number; top: { company: string; count: number }[] }
+  storage?: { db_bytes: number; enabled: boolean; max_mb: number; blocking: boolean } | null
   jobs: { total?: number; active: number; new_today: number; added_today: number; stale_or_expired: number; stale_clearable?: number | null; expired_kept?: number | null; stale_overdue?: number | null; inactive_reports: InactiveReport[] }
   job_health?: { active: number; total: number; stale: number; active_pct: number; crisis: boolean }
   errors: { today: number; this_week: number; by_route: Record<string, number>; recent: { endpoint: string; error_msg: string; created_at: string }[] }

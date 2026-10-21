@@ -8,6 +8,7 @@
 
 import { buildCompanyAuditBundle, auditBundleHash } from './_utils/companyAuditBundle.js';
 import { renderCompanyAuditPdf } from '../lib/server/companyAuditPdf.js';
+import { pacificDate } from '../lib/time/pacific.js';
 
 const ALLOWED = ['https://seenjobs.io', 'https://www.seenjobs.io'];
 
@@ -72,7 +73,7 @@ export default async function handler(req, res) {
     }).catch(() => {});
 
     const slug = company.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'company';
-    const date = new Date().toISOString().slice(0, 10);
+    const date = pacificDate();
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `attachment; filename="seen-legal-audit-${slug}-${date}.pdf"`);
     res.setHeader('X-Source-Json-Sha256', hash);

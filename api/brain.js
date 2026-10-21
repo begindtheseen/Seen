@@ -31,6 +31,7 @@
 import { timingSafeEqual } from 'node:crypto';
 import * as store from '../lib/server/brainStore.js';
 import { logError } from '../lib/server/errlog.js';
+import { pacificDate } from '../lib/time/pacific.js';
 
 // Constant-time bearer check. Returns null when the gateway isn't configured (token unset).
 function tokenOk(req) {
@@ -92,7 +93,7 @@ async function runOp(op, body, actor) {
   if (op === 'briefing') {
     let today; let since;
     try {
-      today = optionalDate(body.today, 'today') || new Date().toISOString().slice(0, 10);
+      today = optionalDate(body.today, 'today') || pacificDate();
       since = optionalDate(body.since, 'since');
     } catch (e) { return { status: 400, json: { ok: false, error: e.message } }; }
     return { status: 200, json: { ok: true, briefing: await store.briefing({ today, since }) } };
@@ -132,7 +133,7 @@ async function runOp(op, body, actor) {
   }
   if (op === 'append_timeline') {
     if (!body.heading || !body.text) return { status: 400, json: { ok: false, error: 'append_timeline needs heading + text' } };
-    const date = body.date || new Date().toISOString().slice(0, 10);
+    const date = body.date || pacificDate();
     return { status: 200, json: { ok: true, ...(await store.appendTimeline(date, body.heading, body.text)) } };
   }
   return { status: 400, json: { ok: false, error: `unknown op: ${op || '(none)'}` } };

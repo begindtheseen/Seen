@@ -140,6 +140,13 @@ export function AdminShell({ stats, token, reload, onLogout, onUnauthorized }: {
   const attn: AttnItem[] = []
   if (jh?.crisis) attn.push({ key: 'crisis', sev: 'red', title: `Job board crisis — ${activeJobs.toLocaleString()} active listings`, detail: `${(jh.stale ?? 0).toLocaleString()} stale · only ${jh.active_pct}% of the corpus is live. Seekers see a dead board.`, action: { label: 'Refresh', onClick: runEmergencyRefresh, busy: emgBusy } })
   else if (staleAlert) attn.push({ key: 'stale', sev: 'amber', title: jb?.stale_overdue != null ? `${jb.stale_overdue.toLocaleString()} stale listings overdue for cleanup` : `${staleJobs.toLocaleString()} stale / expired listings`, detail: jb?.stale_overdue != null ? `The daily sweep should already have removed these. Clear stale removes all ${staleJobs.toLocaleString()} stale listings now.` : 'Listings the sources stopped returning. Clearing removes them now instead of on the next scheduled sweep.', action: { label: 'Clear stale', onClick: runStaleClear, busy: emgBusy } })
+  // Database storage vs the guard (Free plan: over 500 MB the whole database turns read-only).
+  const st = stats.storage
+  if (st) {
+    const mb = Math.round(st.db_bytes / 1048576)
+    if (st.blocking) attn.push({ key: 'storage', sev: 'red', title: `Database at ${mb} MB — new board listings are paused`, detail: `The storage guard stops new aggregated listings past ${st.max_mb} MB so the database never hits the 500 MB read-only limit. Existing listings still refresh and employer posts still go in. Upgrade the Supabase plan, then raise or turn off the guard.` })
+    else if (st.enabled && mb >= st.max_mb - 30) attn.push({ key: 'storage', sev: 'amber', title: `Database at ${mb} MB of ${st.max_mb} MB guard`, detail: 'New board listings pause at the guard so the database never turns read-only. Upgrading the Supabase plan removes the limit.' })
+  }
   if (errToday > 10) attn.push({ key: 'errs', sev: 'red', title: `${errToday} API errors today`, detail: 'Error volume is elevated — see the failing routes.', action: { label: 'View', onClick: () => setDetail('errors') } })
   if (stripeOn && paidUsers === 0) attn.push({ key: 'norev', sev: 'amber', title: '0 paid users — revenue not activated yet', detail: 'Stripe is connected but there are no active paid subscriptions. Conversion has not started.', action: { label: 'View', onClick: () => setDetail('revenue') } })
   if ((m?.past_due ?? 0) > 0) attn.push({ key: 'pastdue', sev: 'amber', title: `${m!.past_due} subscription${m!.past_due === 1 ? '' : 's'} past due`, detail: 'Payment is failing — these accounts may churn without follow-up.', action: { label: 'View', onClick: () => setDetail('trials') } })
@@ -261,6 +268,7 @@ export function AdminShell({ stats, token, reload, onLogout, onUnauthorized }: {
             <MetricRow label="Added today" value={jb?.added_today ?? jb?.new_today ?? 0} status="new listings" tone={(jb?.added_today ?? 0) > 0 ? 'green' : 'dim'} onClick={() => openKpi('jobs_today', 'Jobs added today')} />
             <MetricRow label="Stale / expired" value={staleJobs.toLocaleString()} status={keptExpired ? `hidden · ${keptExpired.toLocaleString()} kept for saved/applied` : 'hidden from search'} tone={staleAlert ? 'amber' : 'dim'} onClick={() => openKpi('jobs_stale', 'Stale & expired jobs')} />
             <MetricRow label="Company scores" value={stats.companies.with_scores.toLocaleString()} status="graded companies" onClick={() => openKpi('companies_scored', 'Companies with scores')} />
+            {stats.storage && <MetricRow label="Database size" value={`${Math.round(stats.storage.db_bytes / 1048576)} MB`} status={stats.storage.blocking ? `new listings paused at ${stats.storage.max_mb} MB` : stats.storage.enabled ? `new listings pause at ${stats.storage.max_mb} MB (Free plan: 500 MB)` : 'storage guard off'} tone={stats.storage.blocking ? 'red' : Math.round(stats.storage.db_bytes / 1048576) >= stats.storage.max_mb - 30 ? 'amber' : 'dim'} />}
             <MetricRow label="Reported inactive" value={inactiveCount} status="user-flagged listings" tone={inactiveCount > 0 ? 'amber' : 'dim'} />
           </Panel>
             {/* New job listings browser */}

@@ -31,7 +31,7 @@ function when(ms: number) {
   if (d <= 0) return 'Today'
   if (d === 1) return 'Yesterday'
   if (d < 7) return `${d} days ago`
-  return new Date(ms).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+  return new Date(ms).toLocaleDateString('en-US', { timeZone: 'America/Los_Angeles', month: 'short', day: 'numeric' })
 }
 
 export default function NotificationsBell({ uid, className }: { uid: string; className?: string }) {

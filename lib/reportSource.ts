@@ -13,6 +13,7 @@
 // bundles don't pull in the scoring module; lib/server/reportSource.test.mjs asserts they agree).
 // Display only: scoring weights (SOURCE_TRUST) are untouched here.
 
+import { pacificParts } from './time/pacific.js';
 export const PUBLIC_REVIEW_PLATFORM_PREFIX = 'Public review · '
 const PUBLIC_REVIEW_RE = /^public review ·\s*(.*)$/i
 const HOST_RE = /^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]*[a-z0-9])?)+$/
@@ -183,12 +184,12 @@ export function reportDate(
   }
   const p = parsePostedDate(reportSourceLink(platform, reportText)?.posted)
   if (!p || p.ms > now + 86_400_000) return { label: '', sortMs: null }
-  const d = new Date(p.ms)
+  const d = pacificParts(new Date(p.ms))
   // Review-site style: recent → relative ("posted 12d ago"); older → month + year ("posted Jul 2025"),
   // which keeps cards from all reading "1y ago"; year-only sources → just the year.
-  const label = p.precision === 'year' ? `posted ${d.getUTCFullYear()}`
+  const label = p.precision === 'year' ? `posted ${d.year}`
     : now - p.ms < 30 * 86_400_000 ? `posted ${relativeAgo(p.ms, now)}`
-    : `posted ${MONTHS[d.getUTCMonth()]} ${d.getUTCFullYear()}`
+    : `posted ${MONTHS[d.month - 1]} ${d.year}`
   return { label, sortMs: p.ms }
 }
 

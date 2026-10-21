@@ -16,6 +16,7 @@ import {
 import { runStaleSweep } from '../lib/server/staleSweep.js';
 import { JOB_SEARCHES } from '../lib/server/jobSearchCatalog.js';
 import { fetchUsaJobs, usajobsCredentials } from '../lib/server/usajobs.js';
+import { pacificHour, pacificDayOfYear } from '../lib/time/pacific.js';
 
 // Refresh a batch of registered employer-direct ATS boards straight from the source. Fail-open +
 // bounded so it never breaks the cron or exceeds the function time budget. Returns a small summary.
@@ -50,13 +51,13 @@ const BATCH_SIZE = 30;
 function getCurrentBatch() {
   const BATCH_HOURS = [2, 6, 10, 14, 18, 22];
   const now = new Date();
-  const hour = now.getUTCHours();
+  const hour = pacificHour(now);
   const runsPerDay = BATCH_HOURS.length;
   const totalBatches = Math.ceil(ALL_SEARCHES.length / BATCH_SIZE);
   const runOfDay = BATCH_HOURS.reduce((best, h, i) => {
     return Math.abs(h - hour) < Math.abs(BATCH_HOURS[best] - hour) ? i : best;
   }, 0);
-  const dayOfYear = Math.floor((now - new Date(now.getUTCFullYear(), 0, 0)) / 86400000);
+  const dayOfYear = pacificDayOfYear(now);
   return (dayOfYear * runsPerDay + runOfDay) % totalBatches;
 }
 
@@ -213,7 +214,7 @@ export default async function handler(req, res) {
       }
     }
 
-    // Pick which batch to run based on current UTC hour.
+    // Pick which batch to run based on the current California hour.
     // Pass ?batch=N to override (useful for manually triggering a specific batch).
     const batchParam = reqUrl.searchParams.get('batch');
     const batchIndex = batchParam !== null ? parseInt(batchParam) : getCurrentBatch();

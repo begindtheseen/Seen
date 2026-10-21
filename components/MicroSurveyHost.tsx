@@ -5,6 +5,7 @@ import { usePathname } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import MicroSurveyModal, { type MicroQuestion } from './MicroSurveyModal'
 import { GENERAL_QUESTIONS, buildContextualQuestion } from '@/lib/server/microSurvey'
+import { pacificDate } from '@/lib/time/pacific.js';
 
 // MicroSurveyHost decides WHEN the no-incentive micro-survey pops. Mounted once, next to
 // ToastHost, in the root layout. The whole design goal is "never nag":
@@ -26,7 +27,7 @@ const DWELL_MS = 20000 // settle for ~20s before considering a show
 const SKIP_PREFIXES = ['/employers', '/admin', '/login', '/signup', '/pricing']
 
 function todayStr(): string {
-  return new Date().toISOString().slice(0, 10) // YYYY-MM-DD, UTC day bucket
+  return pacificDate() // YYYY-MM-DD, the California day
 }
 
 // The hard once-per-day gate: true if we have already SHOWN a micro-survey today (regardless of

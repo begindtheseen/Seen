@@ -15,6 +15,7 @@ import { buildNotificationRow } from '../lib/server/employerNotificationsStore.j
 import { isReadableResume } from '../lib/server/resumeReadability.js';
 import { deleteApplicantResumes } from '../lib/server/seenApplyStore.js';
 import { decodeThread } from '../lib/server/applicationThread.js';
+import { pacificDate } from '../lib/time/pacific.js';
 
 // Verify a Supabase JWT locally (HS256) — no network round-trip.
 // Returns the payload (with .sub = user UUID) on success, null on failure.
@@ -115,7 +116,7 @@ export default async function handler(req, res) {
   if (action === 'load') {
     const appsLimit = Math.min(500, Math.max(1, parseInt(body.apps_limit) || 200));
     const appsOffset = Math.max(0, parseInt(body.apps_offset) || 0);
-    const today = new Date().toISOString().split('T')[0];
+    const today = pacificDate();
     const [appsRes, savedRes, recentRes, credRes, flagsRes, threadsRes] = await Promise.all([
       db(`applications?user_id=eq.${uid}&select=id,job_id,company_name,role,city,platform,job_url,status,stage,score,waste_score,events,applied_at,employer_stage,created_at,updated_at&order=created_at.desc&limit=${appsLimit}&offset=${appsOffset}`, { headers: { Prefer: 'count=estimated' } }),
       db(`saved_jobs?user_id=eq.${uid}&order=saved_at.desc&limit=500`),
@@ -516,7 +517,7 @@ export default async function handler(req, res) {
 
   // ── GET CREDITS ──────────────────────────────────────────────────────────────
   if (action === 'get_credits') {
-    const today = new Date().toISOString().split('T')[0];
+    const today = pacificDate();
     const cRes = await db(`ai_credits?user_id=eq.${uid}&limit=1`);
     let cred = cRes.ok ? (await cRes.json())[0] : null;
     if (!cred) {
@@ -546,7 +547,7 @@ export default async function handler(req, res) {
       }
     } catch { /* fall back to inline path */ }
 
-    const today = new Date().toISOString().split('T')[0];
+    const today = pacificDate();
     const cRes = await db(`ai_credits?user_id=eq.${uid}&limit=1`);
     let cred = cRes.ok ? (await cRes.json())[0] : null;
     if (!cred) {
@@ -584,7 +585,7 @@ export default async function handler(req, res) {
   // ── EARN CREDIT (track application) ──────────────────────────────────────────
   if (action === 'earn_credit') {
     const { jid } = body;
-    const today = new Date().toISOString().split('T')[0];
+    const today = pacificDate();
     const cRes = await db(`ai_credits?user_id=eq.${uid}&limit=1`);
     let cred = cRes.ok ? (await cRes.json())[0] : null;
     if (hasProAccess(cred)) return res.status(200).json({ ok: false, reason: 'pro' });
@@ -632,7 +633,7 @@ export default async function handler(req, res) {
 
   // ── GET QUESTION (earn a credit) ──────────────────────────────────────────────
   if (action === 'get_question') {
-    const today = new Date().toISOString().split('T')[0];
+    const today = pacificDate();
     // Check daily earn cap
     const cRes = await db(`ai_credits?user_id=eq.${uid}&limit=1`);
     const cred = cRes.ok ? (await cRes.json())[0] : null;
@@ -704,7 +705,7 @@ export default async function handler(req, res) {
   if (action === 'submit_answer') {
     const { question_key, answer } = body;
     if (!question_key || !answer) return res.status(400).json({ error: 'question_key and answer required' });
-    const today = new Date().toISOString().split('T')[0];
+    const today = pacificDate();
 
     // Check daily earn cap
     const cRes = await db(`ai_credits?user_id=eq.${uid}&limit=1`);
@@ -746,7 +747,7 @@ export default async function handler(req, res) {
 
   // ── CREDIT HISTORY ────────────────────────────────────────────────────────────
   if (action === 'credit_history') {
-    const today = new Date().toISOString().split('T')[0];
+    const today = pacificDate();
     const [credRes, txRes] = await Promise.all([
       db(`ai_credits?user_id=eq.${uid}&limit=1`),
       db(`credit_transactions?user_id=eq.${uid}&order=created_at.desc&limit=30`),
@@ -888,7 +889,7 @@ export default async function handler(req, res) {
     });
 
     // Also check daily cap so UI knows if credits are still earnable
-    const today = new Date().toISOString().split('T')[0];
+    const today = pacificDate();
     const cRes = await db(`ai_credits?user_id=eq.${uid}&limit=1`);
     const cred = cRes.ok ? (await cRes.json())[0] : null;
     const dailyEarned = (cred?.last_reset === today ? cred?.daily_earned : 0) || 0;
@@ -907,7 +908,7 @@ export default async function handler(req, res) {
   // highest-value missing data points as survey-shaped questions. Answers flow
   // through the existing submit_answer pipeline (records + awards a credit).
   if (action === 'get_opportunities') {
-    const today = new Date().toISOString().split('T')[0];
+    const today = pacificDate();
     const [appsRes, aqRes, cRes] = await Promise.all([
       db(`applications?user_id=eq.${uid}&select=company_name,role,status,stage,events,created_at,applied_at&order=created_at.desc&limit=100`),
       db(`answered_questions?user_id=eq.${uid}&select=question_key&limit=1000`),
@@ -942,7 +943,7 @@ export default async function handler(req, res) {
   // parser (NO AI), and picks a random past (company, role) the user hasn't been surveyed
   // about yet. Returns generic hiring-experience questions about THAT company.
   if (action === 'resume_survey') {
-    const today = new Date().toISOString().split('T')[0];
+    const today = pacificDate();
 
     // Daily-earn cap (mirrors submit_answer / get_question): pro = unlimited, free = MAX_DAILY_EARN/day.
     const cRes = await db(`ai_credits?user_id=eq.${uid}&limit=1`);
@@ -1011,7 +1012,7 @@ export default async function handler(req, res) {
     if (!answeredKeys.length) return res.status(400).json({ error: 'no answers provided' });
 
     const coNorm = normalizeCompany(company);
-    const today = new Date().toISOString().split('T')[0];
+    const today = pacificDate();
 
     // ── Anti-farming: one completed survey per (user, company). Reserve the slot first via
     // a unique-constrained insert; a duplicate (unique violation → 409) means it was already

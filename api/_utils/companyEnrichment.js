@@ -22,6 +22,7 @@
 import { normalizeCompanyKey, isSearchableCompany, rankAndFilter } from './companyReddit.js';
 import { isValidCompanyName } from './reportWrite.js';
 import { fenceUntrusted, scanInjection } from '../../lib/server/promptGuard.js';
+import { pacificDate } from '../../lib/time/pacific.js';
 
 // ── Tunables (env-overridable in the worker; defaults sized for Groq's FREE tier) ─────────────
 // Groq free tier, llama-3.3-70b-versatile (org-wide, shared with every other LLM_API_KEY caller):
@@ -238,11 +239,11 @@ export function selectThreads(items, name, { cap = ENRICH_DEFAULTS.threads, impo
   return out;
 }
 
-/** An ISO timestamp / date → "YYYY-MM-DD" (UTC), or null when missing, invalid or in the future. */
+/** An ISO timestamp / date → "YYYY-MM-DD" (California date), or null when missing, invalid or in the future. */
 export function postedDay(iso, now = Date.now()) {
   const t = Date.parse(String(iso || ''));
   if (!Number.isFinite(t) || t > now + 86_400_000 || t < Date.UTC(2005, 0, 1)) return null;
-  return new Date(t).toISOString().slice(0, 10);
+  return pacificDate(new Date(t));
 }
 
 /** Canonical, safe thread link appended to report_text (lib/reportSource.ts renders it as attribution). */

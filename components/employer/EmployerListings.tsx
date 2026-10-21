@@ -126,7 +126,7 @@ export function EmployerListings() {
                   <div style={{ flex: 1, minWidth: 220 }}>
                     <div style={{ fontFamily: 'var(--display)', fontSize: '.9rem', fontWeight: 700, color: 'var(--white)' }}>{l.title}</div>
                     <div style={{ ...mono('.6rem', 'var(--dim)'), marginTop: 2 }}>
-                      {[l.location, l.created_at ? `posted ${new Date(l.created_at).toLocaleDateString()}` : '', l.availability_status].filter(Boolean).join(' · ')}
+                      {[l.location, l.created_at ? `posted ${new Date(l.created_at).toLocaleDateString('en-US', { timeZone: 'America/Los_Angeles' })}` : '', l.availability_status].filter(Boolean).join(' · ')}
                       {l.apply_url && <> · <a href={l.apply_url} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--dim)' }}>view</a></>}
                     </div>
                   </div>
