@@ -103,6 +103,9 @@
     },
     "api/enrich-companies.js": {
       "maxDuration": 300
+    },
+    "api/cron-archive-reports.js": {
+      "maxDuration": 300
     }
   },
   "crons": [
@@ -181,6 +184,10 @@
     {
       "path": "/api/enrich-companies",
       "schedule": "*/15 * * * *"
+    },
+    {
+      "path": "/api/cron-archive-reports",
+      "schedule": "35 * * * *"
     }
   ]
 }

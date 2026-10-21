@@ -21,11 +21,8 @@
 //        out, the company in progress stops and the rest are listed as not_reached, so a caller with its
 //        own wall-clock limit gets a clean summary instead of a killed process.
 // flags: --dry-run (collect and print, send nothing). Prints one JSON summary on stdout.
-import { harvestCompany } from '../lib/reports/archiveHarvest.js';
 import { runCollection } from '../lib/reports/collectorRun.js';
-import { createArcticFetcher } from './credit/lib/arcticShift.mjs';
-import { censorExcerpt } from '../lib/server/companyIntelImport.js';
-import { outcomeSentiment } from '../lib/reports/applicantRules.js';
+import { redditArchiveSource } from '../lib/reports/archiveSource.js';
 
 const token = process.env.SEEN_COMPANY_INTEL_INGEST_TOKEN;
 const base = (process.env.SEEN_COMPANY_INTEL_INGEST_URL || 'https://seenjobs.io/api/ingest-local-company-intel').replace(/\/api\/ingest-local-company-intel\/?$/, '');
@@ -69,14 +66,7 @@ const postItems = async (items) => {
 
 const targets = explicit || (await getJson(`/api/local-company-intel-targets?limit=${companyLimit}${below ? `&below=${below}` : ''}`)).companies?.map((c) => c.company).filter(Boolean) || [];
 console.log(`[targets] ${explicit ? 'chosen' : below ? `from Seen (under ${below} applicant reports)` : 'from Seen'}: ${targets.length} · goal ${goal || 'until exhausted'} new reports per company · ${sourceIds.join(' → ')} · ${years} years · ${minutes} min each`);
-const fetcher = createArcticFetcher({ log: () => {} });
-const item = (company, a, source, context) => ({ company, source, source_url: a.url, excerpt: censorExcerpt(a.excerpt), kind: 'applicant_outcome', outcome: a.outcome,
-  sentiment: outcomeSentiment(a.outcome), posted: a.created, context });
-const SOURCES = {
-  reddit: { id: 'reddit', label: 'Reddit', harvest: (company, o) => harvestCompany(company, { fetcher, years, ...o }),
-    toItem: (company, a) => item(company, a, `Reddit r/${a.subreddit}`, { title: a.title, is_op: a.isOp, company_sub: a.inCompanySub }),
-    preview: (a) => `r/${a.subreddit}${a.isOp ? ' OP' : ''}` },
-};
+const SOURCES = { reddit: redditArchiveSource({ years }) };
 const summary = await runCollection({ targets, goal, minutes, runDeadline, dryRun, postItems, sources: sourceIds.map((id) => SOURCES[id]), meta: { years } });
 console.log(JSON.stringify(summary, null, 2));
 
