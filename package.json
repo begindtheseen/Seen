@@ -23,6 +23,7 @@
     "ingest:reddit-intel": "node scripts/collect-reddit-company-intel.mjs",
     "ingest:archive-reports": "node scripts/collect-archive-reports.mjs",
     "backup:supabase": "node scripts/backup/export-supabase.mjs",
+    "test:career-e2e": "node scripts/career-e2e/run.mjs",
     "ingest:web-reports": "node scripts/collect-web-reports.mjs"
   },
   "dependencies": {
