@@ -82,6 +82,19 @@ test('below=K: only companies with open listings and fewer than K applicant repo
   assert.equal(ignored.r.body.below, undefined, 'an invalid value is ignored, not guessed');
 });
 
+test('below=K: companies with a public footprint (a report or a mention) come before bigger ones without; the queue goes past 100', async () => {
+  // 3 Verkada listings beat Acme's 1 on listings alone, but Acme already has an online mention.
+  const extraJobs = [...[1, 2, 3].map((i) => ({ id: uid(20000 + i), company: 'Verkada' })),
+    ...Array.from({ length: 150 }, (_, i) => ({ id: uid(30000 + i), company: `Shop ${String(i).padStart(3, '0')} Co` }))];
+  const { r } = await call({ limit: '1000', below: '10' }, { extraJobs });
+  const names = r.body.companies.map((c) => c.company);
+  assert.equal(names[0], 'Acme Corp');
+  assert.ok(names.indexOf('Verkada') > 0);
+  assert.equal(names.length, 152, 'not capped at 100 in the fill queue');
+  const plain = await call({ limit: '1000' }, { extraJobs });
+  assert.equal(plain.r.body.companies.length, 100, 'the default list keeps its 100 cap');
+});
+
 test('targets: a capitalized board slug is never handed out; the catalog still lists it', async () => {
   const extraJobs = [{ id: uid(10001), company: 'Andurilindustries' }, { id: uid(10002), company: 'Walmart' }];
   const { r } = await call({ limit: '25', below: '10' }, { extraJobs });
