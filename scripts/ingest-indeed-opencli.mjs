@@ -52,13 +52,29 @@ async function retry(task, { attempts = 2, delayMs = 750, random = Math.random }
   throw last;
 }
 
+// Why an `opencli …` call failed, in ONE line a person can act on. Node's execFile error is just
+// "Command failed: opencli …" when the tool wrote nothing to stderr — which is what the owner's runs showed
+// on 2026-10-21 ("every search failed", no reason). The reason is then the exit code, a timeout kill, or
+// what OpenCLI printed on stdout (2.x prints its own errors there).
+export function describeExecFailure(error, args = []) {
+  const cmd = `opencli ${args.slice(0, 3).join(' ')}`;
+  if (error && error.code === 'ENOENT') return `${cmd}: OpenCLI is not installed or not on PATH`;
+  if (error && (error.killed || error.signal === 'SIGTERM') && !error.code) return `${cmd}: timed out after 120 s (Chrome/Browser Bridge did not answer)`;
+  const tail = (t) => String(t || '').split(/\r?\n/).map((l) => l.trim()).filter(Boolean).slice(-2).join(' | ').slice(0, 300);
+  const why = tail(error && error.stderr) || tail(error && error.stdout);
+  const code = error && typeof error.code === 'number' ? `exit ${error.code}` : (error && error.signal ? `killed by ${error.signal}` : 'failed');
+  return `${cmd}: ${code}${why ? ` — ${why}` : ' with no output'}`;
+}
+
 export async function runIndeedImport({ env = process.env, execFileImpl = exec, fetchImpl = fetch, log = console, random = Math.random } = {}) {
   const cfg = configFromEnv(env);
   const started = Date.now();
   const metrics = { ok: true, searches: 0, detailed: 0, upserted: 0, searches_requested: cfg.searches.length, searches_attempted: 0, searches_successful: 0, searches_failed: 0, raw_search_hits: 0, unique_indeed_ids: 0, duplicate_search_hits: 0, detail_requests_attempted: 0, detail_requests_successful: 0, detail_requests_failed: 0, jobs_submitted: 0, jobs_inserted: null, jobs_updated: null, jobs_rejected: 0, jobs_deduplicated: 0, errors: {}, lastErrors: {}, pagination_supported: true, detail_concurrency: cfg.concurrency };
   const opencli = async args => {
-    const { stdout } = await execFileImpl('opencli', args, { maxBuffer: 10 * 1024 * 1024, timeout: 120_000 });
-    return unwrapOpenCli(stdout, args);
+    let out;
+    try { out = await execFileImpl('opencli', args, { maxBuffer: 10 * 1024 * 1024, timeout: 120_000 }); }
+    catch (error) { throw new Error(describeExecFailure(error, args)); }
+    return unwrapOpenCli(out.stdout, args);
   };
   const hits = new Map();
   for (const search of cfg.searches.slice(0, cfg.maxSearches)) {

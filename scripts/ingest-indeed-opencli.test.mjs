@@ -34,3 +34,15 @@ test('pipeline continues after a failed search/detail and reports accurate metri
   assert.equal(out.detail_requests_successful, 1); assert.equal(out.detail_requests_failed, 1); assert.equal(out.upserted, 1);
   assert.ok(calls.some(a => a.includes('--start')));
 });
+
+// Owner 2026-10-21: every Indeed search "failed" with only "Command failed: opencli indeed search …" — no
+// reason, because OpenCLI wrote nothing to stderr. The failure must name exit code / timeout / stdout.
+import { describeExecFailure } from './ingest-indeed-opencli.mjs';
+test('an opencli failure names its real reason', () => {
+  const args = ['indeed', 'search', 'Nurse', '--location', 'Remote'];
+  assert.match(describeExecFailure({ killed: true, signal: 'SIGTERM', code: null }, args), /timed out after 120 s/);
+  assert.match(describeExecFailure({ code: 1, stderr: '', stdout: '{"error":"Browser Bridge extension is not connected"}\n' }, args), /exit 1 — \{"error":"Browser Bridge extension is not connected"\}/);
+  assert.match(describeExecFailure({ code: 2, stderr: 'Error: unknown option --start\n' }, args), /exit 2 — Error: unknown option --start/);
+  assert.match(describeExecFailure({ code: 'ENOENT' }, args), /not installed/);
+  assert.match(describeExecFailure({ code: 1 }, args), /exit 1 with no output/);
+});
