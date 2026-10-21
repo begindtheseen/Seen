@@ -75,6 +75,7 @@ export default function PrivacyPage() {
             <li style={li}>your email address and authentication credentials (managed by our auth provider);</li>
             <li style={li}>optional profile details you provide — name/display name, city, industry, experience level, and onboarding survey answers;</li>
             <li style={li}>content you add — application-tracker entries, saved jobs, submitted reports, and any resume text or file you upload (used for resume tools you request);</li>
+            <li style={li}>if you turn on Inbox Autopilot, the facts Seen reads from emails you forward to your private Seen address — company, role, what happened (applied, interview, assessment, rejection or offer), the sender’s name and domain, and the date. We do not store the email’s text, subject or attachments, and turning the feature off deletes these facts;</li>
             <li style={li}>your subscription, credit balance, and entitlement status;</li>
             <li style={li}>session and authentication tokens needed to keep you signed in.</li>
           </ul>
@@ -124,7 +125,7 @@ export default function PrivacyPage() {
             <li style={li}><strong>Supabase</strong> — database and user authentication.</li>
             <li style={li}><strong>Stripe</strong> — payment and subscription processing. Seen does not store full card numbers; Stripe handles payment details.</li>
             <li style={li}><strong>Vercel</strong> — application hosting and serverless infrastructure (including request logs).</li>
-            <li style={li}><strong>Resend</strong> — delivery of transactional email.</li>
+            <li style={li}><strong>Resend</strong> — delivery of transactional email, and receipt of email you forward to your Inbox Autopilot address.</li>
             <li style={li}><strong>PostHog</strong> — privacy-conscious product analytics, where enabled.</li>
             <li style={li}><strong>Anthropic</strong> — AI processing used for features such as summarizing public discussion and resume tools; inputs are sent for processing to generate the requested output.</li>
           </ul>

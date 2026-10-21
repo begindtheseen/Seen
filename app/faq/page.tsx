@@ -70,6 +70,27 @@ export default function FAQPage() {
       ],
     },
     {
+      heading: 'Inbox Autopilot',
+      items: [
+        {
+          q: 'What is Inbox Autopilot?',
+          a: 'Turn it on from your tracker and Seen gives you a private address (track-…@seenjobs.io). Forward your job emails to it — with a Gmail filter, or one by one — and Seen reads each one: a “thanks for applying” adds the application, an interview invite or assessment moves it forward, a rejection or offer closes it out. It is free.',
+        },
+        {
+          q: 'What does Seen keep from my emails?',
+          a: 'Only what it pulled out: the company, the role, what happened (applied, interview, assessment, rejection, offer), the sender’s name and domain, and the date. Seen never stores the email’s text, subject or attachments. Mail sent to your address passes through our email provider, Resend, which keeps received mail only briefly. Turning Inbox Autopilot off deletes your address and everything Seen read; your tracker cards stay.',
+        },
+        {
+          q: 'Does it share my outcomes?',
+          a: 'Not on its own. When Seen reads a rejection, offer or interview, it asks you once whether to add it — anonymously — to that company’s grade. Nothing is added unless you tap Yes.',
+        },
+        {
+          q: 'What if Seen reads an email wrong?',
+          a: 'It only acts on clear wording (“we have decided to move forward with other candidates”), never on “if you are selected…”. When it can’t tell which company an email is from, it asks you which application it belongs to. You can still edit any card by hand, pause the address, or get a new one.',
+        },
+      ],
+    },
+    {
       heading: 'For employers',
       items: [
         {

@@ -16,6 +16,7 @@ import { isReadableResume } from '../lib/server/resumeReadability.js';
 import { deleteApplicantResumes } from '../lib/server/seenApplyStore.js';
 import { decodeThread } from '../lib/server/applicationThread.js';
 import { pacificDate } from '../lib/time/pacific.js';
+import * as inbox from '../lib/server/inbox/store.js';
 
 // Verify a Supabase JWT locally (HS256) — no network round-trip.
 // Returns the payload (with .sub = user UUID) on success, null on failure.
@@ -110,6 +111,36 @@ export default async function handler(req, res) {
         if (count > 300) return res.status(429).json({ error: 'Too many requests — slow down.' });
       }
     } catch(_) { /* fail open */ }
+  }
+
+  // ── INBOX AUTOPILOT — the user's own controls (lib/server/inbox/store.js) ───────────────────────────
+  // status: is it on, the address, the Gmail confirmation code, recent facts · enable/new_address/pause/
+  // disable · assign an email Seen couldn't place · record the answer to "add this to the grade?".
+  // Every action is scoped to the signed-in uid; ids from the client are UUID-checked before any query.
+  if (typeof action === 'string' && action.startsWith('inbox_')) {
+    const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    const q = inbox.dbClient(SUPABASE_URL, SERVICE_KEY);
+    try {
+      if (!(await inbox.tablesReady(q))) return res.status(200).json({ ready: false });
+      if (action === 'inbox_status') return res.status(200).json(await inbox.status(q, uid));
+      if (action === 'inbox_enable') { await inbox.ensureAddress(q, uid); return res.status(200).json(await inbox.status(q, uid)); }
+      if (action === 'inbox_new_address') { await inbox.ensureAddress(q, uid, { regenerate: true }); return res.status(200).json(await inbox.status(q, uid)); }
+      if (action === 'inbox_pause') { await inbox.setPaused(q, uid, body.paused === true); return res.status(200).json(await inbox.status(q, uid)); }
+      if (action === 'inbox_disable') { const ok = await inbox.disable(q, uid); return res.status(200).json({ ok, ...(await inbox.status(q, uid)) }); }
+      if (action === 'inbox_assign') {
+        if (!UUID.test(String(body.id || '')) || !UUID.test(String(body.application_id || ''))) return res.status(400).json({ error: 'id and application_id required' });
+        const r = await inbox.assign(q, uid, body.id, body.application_id);
+        return res.status(r.ok ? 200 : 400).json(r);
+      }
+      if (action === 'inbox_share') {
+        if (!UUID.test(String(body.id || ''))) return res.status(400).json({ error: 'id required' });
+        return res.status(200).json({ ok: await inbox.setShare(q, uid, body.id, body.choice) });
+      }
+      return res.status(400).json({ error: 'Unknown action: ' + action });
+    } catch (e) {
+      console.error('[user-sync] inbox: %s', String(e.message || e).replace(/\n|\r/g, ' ').replace(/[^\x20-\x7e]/g, '').slice(0, 200));
+      return res.status(500).json({ error: String(e.message || 'inbox error').slice(0, 200) });
+    }
   }
 
   // ── LOAD — applications + saved jobs + recent cos + credits + feature flags ──
