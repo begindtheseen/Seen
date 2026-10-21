@@ -316,6 +316,10 @@ async function _handler(req, res) {
     // db() wrapper — before the migration is applied it 404s, and that must read as { ready:false },
     // not mark every other number on this dashboard `degraded`.
     const enrichmentP = enrichmentQueueStats(SB, SK);
+    // Database size against the storage guard (migration 20261021130000). Outside db() for the same reason:
+    // before the migration it 404s, and that must read as null, not mark the dashboard degraded.
+    const storageP = fetch(`${SB}/rest/v1/rpc/jobs_storage_status`, { method: 'POST', headers: { apikey: SK, Authorization: `Bearer ${SK}`, 'Content-Type': 'application/json' }, body: '{}' })
+      .then((r) => (r.ok ? r.json() : null)).catch(() => null);
     // The "stale" number the admin alert + Clear stale button use: the SAME definition the sweep
     // clears (lib/server/staleSweep.js). The older stale_or_expired count also includes 'expired'
     // rows kept for users' saved/applied links, which no clear can (or should) remove.
@@ -610,6 +614,7 @@ async function _handler(req, res) {
       issues: { open: issues.length, items: issues },
       reddit_disputes: { open: ct(disputesOpenRes) },
       enrichment: await enrichmentP,
+      storage: await storageP,
       employer_claims: { pending: ct(pendingClaimsRes) },
       held_reports: { pending: ct(heldReportsRes) },
       listing_disputes: { open: ct(listingDisputesOpenRes) },

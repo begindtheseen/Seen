@@ -172,25 +172,38 @@ for (let i = 0; i < have.length; i += 40) {
   const part = have.slice(i, i + 40).map(([sc, t]) => `select ${lit(`${sc}.${t}`)} t, count(*)::bigint n from ${qn(sc, t)}`).join(' union all ');
   for (const r of await q(part)) counts[r.t] = Number(r.n);
 }
-const BATCH = 2000;
+// Keyset pages (primary key > the last row written) — OFFSET re-reads every earlier row and timed out deep in
+// the jobs table. Rows can be large (job descriptions), so a page that hits the statement timeout is retried
+// at half the size (down to 25 rows) and the size creeps back up after successes.
+const isTimeout = (e) => /57014|statement timeout/.test(String(e?.message || e));
 for (const [schema, table] of targets) {
   const key = `${schema}.${table}`;
   const meta = metaRows.filter((m) => m.t === key);
   if (!meta.length) { manifest.tables[key] = { error: 'not found' }; continue; }
   const insertable = meta.filter((m) => m.gen !== 's').map((m) => ident(m.attname));
   const override = meta.some((m) => m.ident === 'a') ? ' overriding system value' : '';
-  const pk = pkRows.filter((p) => p.t === key);
-  const order = pk.length ? pk.map((p) => ident(p.attname)).join(', ') : 'ctid';
+  const pk = pkRows.filter((p) => p.t === key).map((p) => p.attname);
+  const pkCols = pk.map(ident).join(', ');
   const expected = counts[key] ?? null;
-  let written = 0;
-  for (let offset = 0; expected == null || offset < expected + BATCH; offset += BATCH) {
-    const rows = await q(`select to_jsonb(t) r from ${qn(schema, table)} t order by ${order} limit ${BATCH} offset ${offset}`);
+  let written = 0, batch = 1000, last = null, offset = 0;
+  for (;;) {
+    let where = '';
+    if (pk.length && last) where = ` where (${pk.map((c) => `t.${ident(c)}`).join(', ')}) > (select ${pkCols} from jsonb_populate_record(null::${qn(schema, table)}, ${lit(JSON.stringify(last))}::jsonb))`;
+    const sql = `select to_jsonb(t) r from ${qn(schema, table)} t${where} order by ${pk.length ? pk.map((c) => `t.${ident(c)}`).join(', ') : 'ctid'} limit ${batch}${pk.length ? '' : ` offset ${offset}`}`;
+    let rows;
+    try { rows = await q(sql); } catch (e) {
+      if (isTimeout(e) && batch > 25) { batch = Math.max(25, Math.floor(batch / 2)); continue; }
+      throw e;
+    }
     if (!rows.length) break;
     const json = JSON.stringify(rows.map((x) => x.r));
     if (json.includes(TAG)) throw new Error(`${key}: data contains the quote tag`);
     await w(`insert into ${qn(schema, table)} (${insertable.join(', ')})${override} select ${insertable.join(', ')} from jsonb_populate_recordset(null::${qn(schema, table)}, ${TAG}${json}${TAG}::jsonb) on conflict do nothing;\n`);
-    written += rows.length;
-    if (rows.length < BATCH) break;
+    written += rows.length; offset += rows.length;
+    const lr = rows[rows.length - 1].r; last = Object.fromEntries(pk.map((c) => [c, lr[c]]));
+    if (rows.length < batch) break;
+    if (batch < 1000) batch = Math.min(1000, Math.ceil(batch * 1.25));
+    if (expected > 20000 && written % 10000 < batch) console.log(`[data] ${key}: ${written}/${expected} …`);
   }
   manifest.tables[key] = { expected, written };
   console.log(`[data] ${key}: ${written}/${expected}`);
