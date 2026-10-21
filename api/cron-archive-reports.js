@@ -18,6 +18,7 @@ import targetsHandler from './local-company-intel-targets.js';
 import ingestHandler from './ingest-local-company-intel.js';
 import { runCollection } from '../lib/reports/collectorRun.js';
 import { redditArchiveSource } from '../lib/reports/archiveSource.js';
+import { searchableName } from '../lib/reports/targetNames.js';
 
 export const PIPELINE = 'applicant_reports_cloud';
 const RUN_MS = 230_000;          // the function may run 300 s; leave room to write the log
@@ -40,10 +41,7 @@ export function callHandler(handler, { method = 'GET', query = {}, body, headers
   });
 }
 
-// A board slug that was only capitalized ("Andurilindustries", "Ivcevidensia") matches no one's post, and a
-// search for it burns the run's minutes (seen live 2026-10-21: 2 companies, 0 accounts, all 230 s). Real
-// names have a space, a Seen grade row, or are a normal-length single word ("Walmart", "Salesforce").
-export const searchableName = (c) => /\s/.test(c.company) || c.has_score || String(c.company).length < 12;
+export { searchableName }; // shared rule: lib/reports/targetNames.js
 
 async function recentlyTried() {
   const since = new Date(Date.now() - ROTATE_DAYS * 86400000).toISOString();

@@ -24,6 +24,7 @@ import { normalizeClaimCompany } from '../lib/server/employerClaims.js';
 import { EMPLOYER_SKUS } from '../lib/server/employerSkus.js';
 import { enrichmentQueueStats } from '../lib/server/enrichmentQueue.js';
 import { pacificDate, pacificDayStart } from '../lib/time/pacific.js';
+import { browsePath as browseJobsPath, nextCursor as nextJobsCursor, validatePatch as validateJobPatch, restorePatch as jobRestorePatch, isJobId, HOLDERS as JOB_HOLDERS } from '../lib/server/jobAdmin.js';
 
 // Held reports still awaiting a decision: on hold and not already rejected (rejected rows stay held,
 // with trust_reason admin_rejected, so they never resurface in the queue).
@@ -1562,6 +1563,77 @@ async function _handler(req, res) {
     }
     await db('admin_audit_log', { method: 'POST', body: JSON.stringify({ admin_id: sess.admin_id, username: sess.username || 'admin', action: 'delete_listing', target_type: 'job', target_id: jid, metadata: { soft_deleted, suppressed } }), headers: { Prefer: 'return=minimal' } });
     return res.status(200).json({ ok: true, soft_deleted, suppressed });
+  }
+
+  // ── JOB MANAGER (Seen Command's Jobs tab + any admin client) ──────────────────────────────────────
+  // Rules and query building: lib/server/jobAdmin.js. Browse pages by key over EVERY row (never the
+  // 1,000-row cap); taking a listing down stays delete_listing (expire + suppress); nothing here
+  // hard-deletes. Every change is audited with the prior values.
+  if (action === 'jobs_browse') {
+    const b = browseJobsPath(body.filters || {}, Date.now(), { todayStart: pacificDayStart(new Date()) });
+    if (b.error) return res.status(400).json({ error: b.error });
+    const r = await db(b.path, { headers: { Prefer: 'count=exact' } });
+    if (!r.ok) return res.status(502).json({ error: 'Could not read listings', status: r.status, detail: (await r.text().catch(() => '')).slice(0, 200) });
+    const jobs = await r.json().catch(() => []);
+    const total = Number.parseInt(String(r.headers.get('content-range') || '').split('/')[1], 10);
+    return res.status(200).json({ ok: true, jobs, total: Number.isFinite(total) ? total : null, next: nextJobsCursor(jobs, b), sort: b.sort });
+  }
+
+  if (action === 'job_detail') {
+    const id = String(body.job_id || '');
+    if (!isJobId(id)) return res.status(400).json({ error: 'job_id must be a listing id' });
+    const r = await db(`jobs?id=eq.${id}&select=*&limit=1`);
+    if (!r.ok) return res.status(502).json({ error: 'Could not read the listing', status: r.status });
+    const job = (await r.json().catch(() => []))[0];
+    if (!job) return res.status(404).json({ error: 'No listing with that id' });
+    const count = (p) => db(p, { headers: { Prefer: 'count=exact', 'Range-Unit': 'items', Range: '0-0' } })
+      .then((x) => (x.ok ? Number.parseInt(String(x.headers.get('content-range') || '').split('/')[1], 10) || 0 : null));
+    const [holderCounts, auditRes, suppRes] = await Promise.all([
+      Promise.all(JOB_HOLDERS.map(([t, col, label]) => count(`${t}?${col}=eq.${id}&select=${col}`).then((n) => ({ table: t, label, count: n })))),
+      db(`admin_audit_log?target_type=eq.job&target_id=eq.${id}&select=action,username,created_at,metadata&order=created_at.desc&limit=20`),
+      job.apply_url ? db(`suppressed_listings?apply_url=eq.${encodeURIComponent(job.apply_url)}&select=reason,created_at&limit=1`) : Promise.resolve(null),
+    ]);
+    const history = auditRes.ok ? await auditRes.json().catch(() => []) : [];
+    const suppressed = suppRes && suppRes.ok ? (await suppRes.json().catch(() => []))[0] || null : null;
+    return res.status(200).json({ ok: true, job, holders: holderCounts, history, suppressed, on_site: !!job.expires_at && new Date(job.expires_at) > new Date() });
+  }
+
+  if (action === 'job_update') {
+    if (adminRole === 'moderator') return res.status(403).json({ error: 'Insufficient role' });
+    const id = String(body.job_id || '');
+    if (!isJobId(id)) return res.status(400).json({ error: 'job_id must be a listing id' });
+    const { patch, errors } = validateJobPatch(body.patch || {});
+    if (errors.length) return res.status(400).json({ error: errors.join('; '), errors });
+    const keys = Object.keys(patch);
+    if (!keys.length) return res.status(400).json({ error: 'nothing to change' });
+    const priorRes = await db(`jobs?id=eq.${id}&select=${keys.join(',')}&limit=1`);
+    const prior = priorRes.ok ? (await priorRes.json().catch(() => []))[0] : null;
+    if (!prior) return res.status(404).json({ error: 'No listing with that id' });
+    const up = await db(`jobs?id=eq.${id}&select=*`, { method: 'PATCH', body: JSON.stringify({ ...patch, edited_at: new Date().toISOString() }) });
+    if (!up.ok) return res.status(502).json({ error: 'The database refused the change', status: up.status, detail: (await up.text().catch(() => '')).slice(0, 200) });
+    const job = (await up.json().catch(() => []))[0] || null;
+    await db('admin_audit_log', { method: 'POST', body: JSON.stringify({ admin_id: sess.admin_id, username: sess.username || 'admin', action: 'job_update', target_type: 'job', target_id: id, metadata: { prior, patch } }), headers: { Prefer: 'return=minimal' } });
+    return res.status(200).json({ ok: true, job, changed: keys });
+  }
+
+  // Undo delete_listing / an expiry: back on the site for 14 days, and its apply link un-suppressed.
+  if (action === 'job_restore') {
+    if (adminRole === 'moderator') return res.status(403).json({ error: 'Insufficient role' });
+    const id = String(body.job_id || '');
+    if (!isJobId(id)) return res.status(400).json({ error: 'job_id must be a listing id' });
+    const priorRes = await db(`jobs?id=eq.${id}&select=availability_status,expires_at,last_checked_at,apply_url&limit=1`);
+    const prior = priorRes.ok ? (await priorRes.json().catch(() => []))[0] : null;
+    if (!prior) return res.status(404).json({ error: 'No listing with that id' });
+    const up = await db(`jobs?id=eq.${id}&select=*`, { method: 'PATCH', body: JSON.stringify(jobRestorePatch()) });
+    if (!up.ok) return res.status(502).json({ error: 'The database refused the change', status: up.status });
+    let unsuppressed = null;
+    if (prior.apply_url) {
+      const sr = await db(`suppressed_listings?apply_url=eq.${encodeURIComponent(prior.apply_url)}`, { method: 'DELETE' });
+      unsuppressed = sr.ok ? (await sr.json().catch(() => [])) : null;
+    }
+    const job = (await up.json().catch(() => []))[0] || null;
+    await db('admin_audit_log', { method: 'POST', body: JSON.stringify({ admin_id: sess.admin_id, username: sess.username || 'admin', action: 'job_restore', target_type: 'job', target_id: id, metadata: { prior, unsuppressed } }), headers: { Prefer: 'return=minimal' } });
+    return res.status(200).json({ ok: true, job });
   }
 
   // ── JOB DEDUPLICATION ────────────────────────────────────────────────────────
