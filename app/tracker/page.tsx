@@ -17,6 +17,7 @@ import { isGradeableScore } from '@/lib/gradeGate'
 import ModalPortal from '@/components/ModalPortal'
 import WithdrawModal from '@/components/WithdrawModal'
 import PageHeader from '@/components/shell/PageHeader'
+import InboxAutopilot from '@/components/tracker/InboxAutopilot'
 const SurveyModal = dynamic(() => import('@/components/SurveyModal'), { ssr: false })
 const ResumeSurveyModal = dynamic(() => import('@/components/ResumeSurveyModal'), { ssr: false })
 
@@ -94,6 +95,18 @@ function AppCard({ app, onUpdate, onRemove, onShare, onReload, intel, check, onA
               🏢 Employer: {app.employerStage}
             </div>
           )}
+          {/* Inbox Autopilot read an employer email about this application (lib/server/inbox/apply.js). */}
+          {(() => {
+            const fromEmail = (app.events || []).filter(e => e.source === 'email')
+            if (!fromEmail.length) return null
+            const last = fromEmail[fromEmail.length - 1]
+            const label: Record<string, string> = { application_submitted: 'confirmation', interview_received: 'interview invite', assessment_received: 'assessment', rejected: 'rejection', offer_received: 'offer' }
+            return (
+              <div title="Updated from an email you forwarded to Seen" style={{ display: 'inline-flex', alignItems: 'center', gap: '.25rem', marginTop: '.25rem', marginLeft: app.employerStage ? '.35rem' : 0, fontFamily: 'var(--mono)', fontSize: '.55rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.06em', color: 'var(--blue)', border: '1px solid currentColor', borderRadius: 999, padding: '.12rem .5rem' }}>
+                ✉ From email: {label[String(last.type)] || 'update'}
+              </div>
+            )
+          })()}
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '.25rem', flexShrink: 0 }}>
           {app.score != null && (
@@ -648,6 +661,9 @@ function TrackerPage() {
             {apps.length > 0 && <button className="btn btn-ghost" style={{ fontSize: '.72rem', color: 'var(--muted)' }} onClick={() => { if (confirm('Remove all applications? This cannot be undone.')) { AppStore.clear(isLoggedIn); setApps([]) } }}>Clear all</button>}
           </>}
         />
+
+        {/* Inbox Autopilot — forwarded job emails keep these cards up to date (hidden until it is live) */}
+        <InboxAutopilot apps={apps} token={token} onAppsChanged={loadApps} />
 
         {/* Stats */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(84px, 1fr))', gap: '.6rem', marginBottom: '1.5rem' }}>

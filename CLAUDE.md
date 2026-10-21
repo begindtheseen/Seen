@@ -50,6 +50,36 @@ and dashboard (PRs #122/#123) were intentionally REDESIGNED beyond the old site;
 longer the design source of truth for redesigned pages. `SITE_PARITY_CHECKLIST.md` /
 `ADMIN_PARITY_CHECKLIST.md` are frozen pre-06-30 records, not an active work queue.
 
+## Session 2026-10-21 D: Inbox Autopilot — forwarded job emails keep the tracker up to date (owner: "if it doesn't cost us any money that's genius")
+- **Why:** prod had 8 accounts / 15 tracked applications / 2 sign-ups in 30 days — the tracker (the strategy's data
+  engine) is barely used because people stop logging by hand. Now each user gets `track-<12 chars>@seenjobs.io`
+  (`lib/server/inbox/address.js`) and forwards job emails to it (Gmail filter, or one by one).
+- **Free, verified 2026-10-21:** Resend receiving is ALREADY enabled for seenjobs.io (root MX ->
+  inbound-smtp.us-east-1.amazonaws.com; Resend domain "Receiving: enabled"), so no DNS change. Received mail counts
+  toward the free 3,000/month + 100/day shared with sent mail (28 used this month) — fine for ~20–30 active users;
+  past that, Cloudflare Email Routing is free + unlimited (needs the DNS moved off Namecheap), and only the fetch in
+  `store.js resendClient` would change.
+- **Path:** Resend webhook `email.received` (a POKE — body untrusted) or the hourly catch-up (`GET /api/inbox-email`,
+  cron :50) -> `GET api.resend.com/emails/receiving/{id}` with RESEND_KEY -> token from received_for/to/Delivered-To
+  (a Gmail filter-forward keeps the user's own To:) -> `classify.js` (rules only: rejection > offer > interview >
+  assessment > received; a conditional sentence — "if selected we'll schedule an interview" — never counts; job
+  boards/ATS are never the company; hand-forwards are unwrapped; Gmail's forwarding confirmation code is pulled out
+  for the setup screen) -> `apply.js planChange` (stage only rises, hired/withdrawn never reopened, interview reopens a
+  ghosted card, same email event within 3 days once, events `source:'email'`) -> applications row.
+- **Privacy (owner-approved default):** only facts are stored (`inbox_events`: kind, company, role, vendor, sender
+  name/domain, confidence, date) — never text/subject/attachments. Outcomes reach a company's grade ONLY when the user
+  taps Yes (the panel calls the existing `quick_submit`). Turning it off deletes the address + all facts.
+- **UI:** `components/tracker/InboxAutopilot.tsx` at the top of /tracker (hidden until the migration is applied),
+  "From email" chip on cards, dashboard tile (shown only when live), FAQ + privacy sections. Server actions
+  `inbox_status|enable|new_address|pause|disable|assign|share` in api/user-sync.js.
+- **Verification:** classify 19, apply 10, handler e2e 8 (fake PostgREST + fake Resend: webhook, replay, catch-up,
+  not-ours mail, Gmail code, send-only key, paused), user-sync 4; full suite 1559/1559; tsc + next build clean;
+  Playwright on `next start` with every call stubbed: enable -> setup steps, live Gmail code, Yes -> quick_submit,
+  no overflow at 390/360, panel hidden before the migration. NOT verified live: whether prod RESEND_KEY can READ
+  received mail (`GET /api/inbox-email?check=1` answers `resend_read: ok|forbidden`), a real forwarded email.
+- **Pending owner actions:** apply migration `20261022120000_inbox_autopilot.sql` (additive); then the Resend webhook
+  (`https://seenjobs.io/api/inbox-email`, event email.received) can be added — the hourly catch-up works without it.
+
 ## Session 2026-10-21 C: why the cloud applicant-report cron found 0 (branch fix-archive-yield)
 - **Prod (read-only):** collector_runs 1–3 (16:35/17:35/18:35 UTC) each did 2 companies, `found 0`, `stopped_by time`,
   ~232 s. The logged summary DROPPED per-company `searches`/`failed_searches`/`search_errors`, so it looked clean.

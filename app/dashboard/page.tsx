@@ -89,6 +89,17 @@ export default function DashboardPage() {
     })
   }, [isSeeker, token])
 
+  // Inbox Autopilot tile: shown once the feature is live (null = not live yet / unknown → hidden).
+  const [inbox, setInbox] = useState<{ ready: boolean; enabled?: boolean; received_count?: number } | null>(null)
+  useEffect(() => {
+    if (!isSeeker) return
+    token().then(tok => {
+      if (!tok) return
+      fetch('/api/user-sync', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${tok}` }, body: JSON.stringify({ action: 'inbox_status' }) })
+        .then(r => r.ok ? r.json() : null).then(d => setInbox(d && typeof d.ready === 'boolean' ? d : null)).catch(() => {})
+    })
+  }, [isSeeker, token])
+
   useEffect(() => {
     try {
       const raw = localStorage.getItem('seen_recent_cos')
@@ -442,6 +453,13 @@ export default function DashboardPage() {
             <b>Applications</b>
             <small>{dueChecks.length ? `${dueChecks.length} check-in${dueChecks.length > 1 ? 's' : ''} waiting →` : 'Manage your pipeline →'}</small>
           </Link>
+          {inbox?.ready && (
+            <Link href="/tracker#autopilot" className={`${styles.tool} spot`}>
+              <span className={styles.sym}>✉️</span>
+              <b>Inbox Autopilot</b>
+              <small>{inbox.enabled ? `On · ${inbox.received_count || 0} email${inbox.received_count === 1 ? '' : 's'} read →` : 'Forward job emails — tracking fills itself →'}</small>
+            </Link>
+          )}
           <Link href="/companies" className={`${styles.tool} spot`}>
             <span className={styles.sym}>🏢</span>
             <b>Company intel</b>

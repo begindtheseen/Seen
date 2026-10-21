@@ -1,0 +1,47 @@
+/* Inbox Autopilot panel (tracker). Solid surface; every flex child can shrink (min-width:0) so a long
+   address or company name never widens the page on a phone (CLAUDE.md phone-overflow rule). */
+.card { background: var(--raised); border: 1px solid var(--line2); border-radius: 12px; padding: 1rem 1.15rem; margin-bottom: 1.5rem; min-width: 0; }
+.pitch { display: flex; gap: 1rem; align-items: center; justify-content: space-between; flex-wrap: wrap; }
+.pitch > div { flex: 1 1 320px; min-width: 0; }
+.eyebrow { font-family: var(--mono); font-size: .58rem; text-transform: uppercase; letter-spacing: .09em; color: var(--green); margin-bottom: .3rem; }
+.title { font-family: var(--display); font-size: 1rem; font-weight: 700; color: var(--white); margin: 0 0 .3rem; }
+.sub { font-size: .82rem; color: var(--muted); line-height: 1.55; margin: 0 0 .35rem; }
+.fine { font-family: var(--mono); font-size: .6rem; color: var(--dim); line-height: 1.6; margin: 0; }
+
+.head { display: flex; align-items: center; justify-content: space-between; gap: .75rem; flex-wrap: wrap; }
+.headL { display: flex; align-items: center; gap: .5rem; flex-wrap: wrap; min-width: 0; font-size: .85rem; color: var(--white); }
+.dot { width: 8px; height: 8px; border-radius: 50%; background: var(--green); box-shadow: 0 0 0 3px rgba(34, 197, 94, .15); flex-shrink: 0; }
+.dotOff { background: var(--dim); box-shadow: none; }
+.muted { font-family: var(--mono); font-size: .62rem; color: var(--muted); }
+
+.addrRow { display: flex; align-items: center; gap: .5rem; margin-top: .65rem; flex-wrap: wrap; min-width: 0; }
+.addr, .filter, .code { font-family: var(--mono); background: var(--card); border: 1px solid var(--line2); border-radius: 7px; padding: .35rem .6rem; color: var(--white); min-width: 0; overflow-wrap: anywhere; }
+.addr { font-size: .78rem; }
+.filter { font-size: .62rem; line-height: 1.5; flex: 1 1 260px; }
+.code { font-size: .9rem; letter-spacing: .08em; margin: 0 .4rem; }
+
+.confirm { margin-top: .8rem; padding: .7rem .85rem; border-radius: 9px; border: 1px solid rgba(34, 197, 94, .3); background: rgba(34, 197, 94, .06); font-size: .8rem; color: var(--white); line-height: 1.7; }
+.confirm a { color: var(--blue); }
+
+.steps { margin: .85rem 0 0; padding-left: 1.2rem; display: grid; gap: .55rem; font-size: .78rem; color: var(--muted); line-height: 1.6; }
+.steps b, .steps i { color: var(--white); }
+
+.block { margin-top: .85rem; display: grid; gap: .5rem; }
+.ask { display: flex; align-items: center; justify-content: space-between; gap: .6rem; flex-wrap: wrap; padding: .55rem .7rem; border-radius: 9px; background: var(--card); border: 1px solid var(--line); font-size: .8rem; color: var(--white); line-height: 1.5; }
+.ask > span:first-child { flex: 1 1 260px; min-width: 0; }
+.btns { display: flex; gap: .4rem; align-items: center; flex-wrap: wrap; }
+.select { background: var(--surface); color: var(--white); border: 1px solid var(--line2); border-radius: 7px; padding: .3rem .45rem; font-size: .72rem; max-width: 220px; }
+
+.list { list-style: none; margin: .85rem 0 0; padding: 0; display: grid; gap: .3rem; }
+.list li { display: grid; grid-template-columns: minmax(0, auto) minmax(0, 1fr) auto; gap: .6rem; align-items: center; font-size: .78rem; color: var(--white); }
+.co { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.kind { font-family: var(--mono); font-size: .55rem; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; border: 1px solid currentColor; border-radius: 999px; padding: .1rem .45rem; color: var(--blue); white-space: nowrap; }
+.k_interview, .k_offer { color: var(--green); }
+.k_rejection { color: var(--red); }
+.k_assessment { color: var(--amber); }
+
+.foot { display: flex; gap: 1rem; margin-top: .85rem; padding-top: .65rem; border-top: 1px solid var(--line); flex-wrap: wrap; }
+.link { background: none; border: none; padding: 0; color: var(--blue); font-family: var(--mono); font-size: .62rem; cursor: pointer; }
+.link:disabled { opacity: .5; cursor: default; }
+.danger { color: var(--red); }
+.err { margin-top: .6rem; font-family: var(--mono); font-size: .62rem; color: var(--red); }

@@ -6,7 +6,8 @@ export interface HiringEvent {
   id: string
   type: EventType | CheckType | string
   date: number
-  source: 'user' | 'inferred' | 'admin_verified'
+  // 'email' = read from a forwarded employer email by Inbox Autopilot (lib/server/inbox/apply.js)
+  source: 'user' | 'inferred' | 'admin_verified' | 'email' | 'seen_apply'
   confidence: number | 'low' | 'medium' | 'high'
   trust_weight?: number
   anomaly_flags?: string[]
