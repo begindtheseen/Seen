@@ -53,8 +53,11 @@ const words = (q) => String(q || '').toLowerCase().split(/\s+/).filter(Boolean);
 const matches = (j, q) => words(q).every((w) => j.title.toLowerCase().includes(w));
 const ldPage = (host, S, re, p) => { const m = re.exec(p); if (!m) return null; const j = S.jobs.find((x) => x.id === m[1]); if (!j) return [404, page('Not found', '<h1>Not found</h1>')]; return [200, page(j.title, `<h1>${j.title}</h1>`, ld(j, S.company, `https://${host}${p}`))]; };
 const us = (j) => !ABROAD.includes(j.location);
+// Data embedded in an inline <script>: JSON with every character that could end the script or the string
+// escaped (<, >, &, U+2028, U+2029).
+const js = (v) => JSON.stringify(v).replace(/[<>&\u2028\u2029]/g, (c) => `\\u${c.charCodeAt(0).toString(16).padStart(4, '0')}`);
 const page = (title, body, head = '') => `<!doctype html><html><head><meta charset="utf-8"><title>${title}</title>${head}</head><body><nav><a href="/">Home</a> <a href="/about">About</a></nav><main>${body}</main><footer>© fixture</footer></body></html>`;
-const ld = (j, co, url) => `<script type="application/ld+json">${JSON.stringify({ '@context': 'https://schema.org', '@type': 'JobPosting', title: j.title, description: desc(j.title, co), hiringOrganization: { '@type': 'Organization', name: co }, url, identifier: j.id, datePosted: '2026-10-01', jobLocation: { '@type': 'Place', address: { '@type': 'PostalAddress', addressLocality: j.location.split(',')[0], addressRegion: (j.location.split(', ')[1] || ''), addressCountry: us(j) ? 'US' : 'DE' } } })}</script>`;
+const ld = (j, co, url) => `<script type="application/ld+json">${js({ '@context': 'https://schema.org', '@type': 'JobPosting', title: j.title, description: desc(j.title, co), hiringOrganization: { '@type': 'Organization', name: co }, url, identifier: j.id, datePosted: '2026-10-01', jobLocation: { '@type': 'Place', address: { '@type': 'PostalAddress', addressLocality: j.location.split(',')[0], addressRegion: (j.location.split(', ')[1] || ''), addressCountry: us(j) ? 'US' : 'DE' } } })}</script>`;
 export const hits = { pagedFirstFail: new Set() };
 
 function handle(req, res) {
@@ -99,15 +102,15 @@ function handle(req, res) {
     if (host === 'www.morebuttonco.com') {
       const S = SITES.more;
       if (p === '/careers/openings') return send(200, page('Openings', `<h1>${S.jobs.length} open positions</h1><div id="list"></div><button id="more">Load more</button>
-<script>const DATA=${JSON.stringify(S.jobs)};let n=0;function show(){n+=15;document.getElementById('list').innerHTML=DATA.slice(0,n).map(j=>'<div class="job-card"><a href="/careers/openings/position/'+j.id+'">'+j.title+'</a><p>'+j.location+'</p></div>').join('');if(n>=DATA.length)document.getElementById('more').remove();}document.getElementById('more').onclick=show;show();</script>`));
+<script>const DATA=${js(S.jobs)};let n=0;function show(){n+=15;document.getElementById('list').innerHTML=DATA.slice(0,n).map(j=>'<div class="job-card"><a href="/careers/openings/position/'+j.id+'">'+j.title+'</a><p>'+j.location+'</p></div>').join('');if(n>=DATA.length)document.getElementById('more').remove();}document.getElementById('more').onclick=show;show();</script>`));
       const m = /^\/careers\/openings\/position\/(\d+)$/.exec(p);
-      if (m) { const j = S.jobs.find((x) => x.id === m[1]); if (!j) return send(404, page('Not found', '<h1>Not found</h1>')); return send(200, page(j.title, `<div id="app"></div><script>setTimeout(()=>{document.getElementById('app').innerHTML=${JSON.stringify(`<h1>${j.title}</h1><p>${j.location}</p><section class="description">${desc(j.title, S.company)}</section>`)};},300);</script>`)); }
+      if (m) { const j = S.jobs.find((x) => x.id === m[1]); if (!j) return send(404, page('Not found', '<h1>Not found</h1>')); return send(200, page(j.title, `<div id="app"></div><script>setTimeout(()=>{document.getElementById('app').innerHTML=${js(`<h1>${j.title}</h1><p>${j.location}</p><section class="description">${desc(j.title, S.company)}</section>`)};},300);</script>`)); }
     }
     // ---- Scroll Co (infinite scroll) ----
     if (host === 'www.scrollco.com') {
       const S = SITES.scroll;
       if (p === '/careers/jobs') return send(200, page('Jobs', `<h1>Jobs</h1><div id="list"></div><div style="height:2000px"></div>
-<script>const DATA=${JSON.stringify(S.jobs)};let n=0;function more(){n=Math.min(DATA.length,n+20);document.getElementById('list').innerHTML=DATA.slice(0,n).map(j=>'<article class="job"><a href="/careers/jobs/'+j.id+'">'+j.title+'</a> · '+j.location+'</article>').join('');}more();addEventListener('scroll',()=>{if(innerHeight+scrollY>=document.body.scrollHeight-50)setTimeout(more,200);});</script>`));
+<script>const DATA=${js(S.jobs)};let n=0;function more(){n=Math.min(DATA.length,n+20);document.getElementById('list').innerHTML=DATA.slice(0,n).map(j=>'<article class="job"><a href="/careers/jobs/'+j.id+'">'+j.title+'</a> · '+j.location+'</article>').join('');}more();addEventListener('scroll',()=>{if(innerHeight+scrollY>=document.body.scrollHeight-50)setTimeout(more,200);});</script>`));
       const m = /^\/careers\/jobs\/(\d+)$/.exec(p);
       if (m) { const j = S.jobs.find((x) => x.id === m[1]); if (!j) return send(404, page('Not found', '<h1>Not found</h1>')); return send(200, page(j.title, `<h1>${j.title}</h1>`, ld(j, S.company, `https://${host}${p}`))); }
     }
@@ -155,7 +158,7 @@ document.getElementById('go').onclick=()=>{st.page=1;load();};document.getElemen
       const S = SITES.facet;
       if (p === '/jobs' || p === '/jobs/') return send(200, page('Jobs | Facet Co', `<h1>Find your role</h1><div class="kw"><input id="kw" type="search" placeholder="Keywords"></div>
 <aside class="filters"><button id="locbtn" aria-expanded="false">Location</button><div id="locs" hidden></div></aside><p id="count"></p><div id="list"></div><nav class="pagination" id="pages"></nav>
-<script>const DATA=${JSON.stringify(S.jobs.map((j) => ({ ...j, country: countryOf(j) })))};let kw='',cs=new Set(),pg=1;
+<script>const DATA=${js(S.jobs.map((j) => ({ ...j, country: countryOf(j) })))};let kw='',cs=new Set(),pg=1;
 const box=document.getElementById('locs');const counts={};DATA.forEach(j=>counts[j.country]=(counts[j.country]||0)+1);box.innerHTML=Object.keys(counts).map(k=>'<label><input type="checkbox" value="'+k+'"> '+k+' ('+counts[k]+')</label>').join('<br>');
 document.getElementById('locbtn').onclick=()=>{box.hidden=!box.hidden;};box.addEventListener('change',e=>{if(e.target.checked)cs.add(e.target.value);else cs.delete(e.target.value);pg=1;draw();});
 document.getElementById('kw').addEventListener('keydown',e=>{if(e.key==='Enter'){kw=e.target.value.toLowerCase();pg=1;draw();}});
@@ -168,7 +171,7 @@ document.getElementById('pages').onclick=e=>{const b=e.target.closest('button');
       const S = SITES.ahead;
       if (p === '/careers' || p === '/careers/') return send(200, page('Careers | Ahead Co', `<h1>Careers</h1><div class="finder"><input id="what" placeholder="Job title"><div class="where"><input id="where" placeholder="City, state or country"><ul role="listbox" id="sugg"></ul></div><button id="find" type="button">Find jobs</button></div>
 <p id="count"></p><div id="list"></div><button id="more" type="button">Load more</button>
-<script>const DATA=${JSON.stringify(S.jobs.map((j) => ({ ...j, country: countryOf(j) })))};const PLACES=['United States','United Kingdom','Germany','Canada'];let what='',where='',n=0;
+<script>const DATA=${js(S.jobs.map((j) => ({ ...j, country: countryOf(j) })))};const PLACES=['United States','United Kingdom','Germany','Canada'];let what='',where='',n=0;
 const sg=document.getElementById('sugg');document.getElementById('where').addEventListener('input',e=>{const v=e.target.value.toLowerCase();sg.innerHTML=v.length<2?'':PLACES.filter(x=>x.toLowerCase().startsWith(v.slice(0,6))).map(x=>'<li role="option">'+x+'</li>').join('');});
 sg.onclick=e=>{const li=e.target.closest('li');if(li){where=li.textContent;document.getElementById('where').value=where;sg.innerHTML='';}};
 document.getElementById('find').onclick=()=>{what=document.getElementById('what').value.toLowerCase();n=0;more();};

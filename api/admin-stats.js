@@ -786,7 +786,6 @@ async function _handler(req, res) {
   if (action === 'export_csv') {
     const now = new Date();
     const ct2 = r => parseInt((r?.headers?.get('content-range') || '').split('/')[1]) || 0;
-    const todayISO = pacificDayStart(now).toISOString();
     const weekISO = new Date(Date.now() - 7 * 86400000).toISOString();
     const monthISO = new Date(Date.now() - 30 * 86400000).toISOString();
 

@@ -7,6 +7,7 @@
 //
 // usage: node scripts/career-e2e/run.mjs [case …]   (needs openssl + Chromium at /opt/pw-browsers/chromium)
 import { spawn, execFileSync } from 'node:child_process';
+import { randomInt } from 'node:crypto';
 import { mkdtempSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
@@ -19,7 +20,7 @@ const HERE = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(HERE, '..', '..');
 const tmp = mkdtempSync(join(tmpdir(), 'career-e2e-'));
 execFileSync('openssl', ['req', '-x509', '-newkey', 'rsa:2048', '-nodes', '-days', '2', '-subj', '/CN=fixture', '-keyout', join(tmp, 'k.pem'), '-out', join(tmp, 'c.pem')], { stdio: 'ignore' });
-const BASE = 20000 + Math.floor(Math.random() * 20000); // fresh ports every run (a stale run can never hold them)
+const BASE = randomInt(20000, 40000); // fresh ports every run (a stale run can never hold them)
 const SITE_PORT = BASE, BROWSER_PORT = BASE + 1, INGEST_PORT = BASE + 2;
 const sites = await startSites({ port: SITE_PORT, key: readFileSync(join(tmp, 'k.pem')), cert: readFileSync(join(tmp, 'c.pem')) });
 
