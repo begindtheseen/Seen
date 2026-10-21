@@ -50,6 +50,35 @@ and dashboard (PRs #122/#123) were intentionally REDESIGNED beyond the old site;
 longer the design source of truth for redesigned pages. `SITE_PARITY_CHECKLIST.md` /
 `ADMIN_PARITY_CHECKLIST.md` are frozen pre-06-30 records, not an active work queue.
 
+## Session 2026-10-21 B: career sites like a person, always-on reports, storage guard, verified backup
+- **Career-site navigator** (`lib/server/careerAgent.js` in-page agent + `scripts/collect-career-site.mjs`): no
+  start page needed; finds the list (landing pages followed deeper), uses the SITE'S OWN search + United States
+  filter whatever the layout (search box + Enter / its button / its form; dropdown, type-ahead suggestion, or a
+  checkbox in a collapsed filter panel — a US filter that empties the list is undone), lists every job (Tesla/
+  Workday feeds; the page's own listing request incl. POST bodies captured by a fetch/XHR spy, replayed page by
+  page; Next / numbered / Load more / infinite scroll; merged when a feed is short of the site total). One job =
+  one identity across pages/keywords/passes; 2 passes, then it names what is missing. Pages 1,000 (max 5,000).
+  Verified: `npm run test:career-e2e` — real Chromium, 8 fixture sites, real collector + agent + Seen's
+  rowFromPosting: 11/11 complete, 0 dupes, 0 abroad. NOT verified on real sites from the owner's Chrome.
+- **Bug class fixed:** `opencliBrowser.js` judged the echoed command (`--session`) as a usage error, so every
+  real failure was retried in the other form and its reason hidden.
+- **Always-on applicant reports:** `api/cron-archive-reports.js` (Vercel hourly :35) runs the Reddit-archive
+  collector in-process (shared source `lib/reports/archiveSource.js`, same ingest handler), 2 real-name companies
+  per run (the archive answers ~1 search/9 s when busy, measured), 7-day rotation via `public.collector_runs`
+  (migration 20261021150000); `GET ?runs=1` (local intel token) feeds Seen Command. Live dry run against prod
+  targets + the real archive worked; nothing written. Company pull now reads up to 10 Adzuna pages.
+- **Storage guard** (migration 20261021130000, NOT applied — the session's classifier refused a prod schema
+  write; owner to approve): past `jobs_storage_guard.max_mb` (470) new aggregated listings are skipped (existing
+  ones still refresh, employer posts allowed); size read once per transaction (2.5 ms measured). Admin shows DB
+  size + alert. Migration 20261021140000 drops 4 unused jobs indexes (~23 MB). DB 425 MB at 13:00 UTC; jobs'
+  size is mostly descriptions (194 MB compressed, Greenhouse avg 5.4k chars); the project is almost certainly
+  Free (no backups listed, grace-period wording).
+- **Backup verified:** keyset-paged export finished `complete: true` (78 tables, 219,359 rows, 135 MB); restored
+  into a scratch Postgres 16: every count equal, 71 policies, 2 triggers, 236 indexes = prod. Delivered to the
+  owner as a tar. `npm run backup:supabase <dir>`.
+- **Pending owner actions:** merge PR #345; then apply migrations 20261021120000 (PT credits + admin counts),
+  20261021130000 (guard), 20261021140000 (index drop), 20261021150000 (collector_runs); decide the Supabase plan.
+
 ## Session 2026-10-21 A: California time everywhere + truthful admin counts + a full backup tool
 - **OWNER DECISION 2026-10-21: no UTC anywhere — "we are in California".** Every day/week/month bucket and
   every displayed date is America/Los_Angeles via ONE helper, `lib/time/pacific.js` (pacificDate,
