@@ -18,7 +18,7 @@
 // env: SUPABASE_URL, SUPABASE_ACCESS_TOKEN (Management API: SQL read), SUPABASE_SERVICE_KEY (Storage files).
 // usage: node scripts/backup/export-supabase.mjs <out-dir>
 import { mkdirSync, writeFileSync, createWriteStream, readFileSync } from 'node:fs';
-import { join, dirname } from 'node:path';
+import { join, dirname, resolve, sep } from 'node:path';
 import { createGzip } from 'node:zlib';
 import { createHash } from 'node:crypto';
 
@@ -217,7 +217,11 @@ if (SUPABASE_SERVICE_KEY) {
     const key = `${o.bucket_id}/${o.name}`;
     if (!r.ok) { manifest.files[key] = { error: `HTTP ${r.status}` }; continue; }
     const buf = Buffer.from(await r.arrayBuffer());
-    const p = join(out, 'storage', o.bucket_id, ...o.name.split('/'));
+    // Object names come from the database: never let one climb out of the backup folder.
+    const parts = [String(o.bucket_id), ...String(o.name).split('/')];
+    if (parts.some((x) => !x || x === '.' || x === '..' || x.includes('\\') || x.includes('\0'))) { manifest.files[key] = { error: 'unsafe object path — not written' }; continue; }
+    const root = resolve(out, 'storage'); const p = resolve(root, ...parts);
+    if (!p.startsWith(root + sep)) { manifest.files[key] = { error: 'unsafe object path — not written' }; continue; }
     mkdirSync(dirname(p), { recursive: true }); writeFileSync(p, buf);
     manifest.files[key] = { bytes: buf.length, sha256: createHash('sha256').update(buf).digest('hex') };
   }
