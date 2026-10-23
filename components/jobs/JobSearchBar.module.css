@@ -1,0 +1,151 @@
+/* Job search bar — title/company box, then [location · radius · Search] on one row.
+   On phones the row stacks under a full-width title box and the location box keeps a real
+   width: at 390px the old 130px-wide input clipped its own placeholder ("City or stat…") and
+   value ("'hoenix, AZ") — live audit 2026-10-23. */
+
+.wrap {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 1rem;
+}
+
+.query {
+  position: relative;
+  flex: 2 1 260px;
+  min-width: 0;
+  display: flex;
+}
+
+.row {
+  flex: 1 1 360px;
+  min-width: 0;
+  display: flex;
+  gap: 0.5rem;
+}
+
+.loc {
+  position: relative;
+  flex: 1 1 160px;
+  min-width: 0;
+}
+
+.input {
+  width: 100%;
+  min-width: 0;
+  background: var(--surface);
+  border: 1.5px solid var(--line2);
+  border-radius: 8px;
+  padding: 0.62rem 0.9rem;
+  color: var(--white);
+  font-family: var(--body);
+  font-size: 0.875rem;
+  outline: none;
+  caret-color: var(--blue);
+}
+.input:focus { border-color: rgba(59, 130, 246, 0.6); }
+.locInput { padding-right: 2.4rem; }
+
+.pin {
+  position: absolute;
+  right: 0.15rem;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 2.2rem;
+  height: 2.2rem;
+  display: grid;
+  place-items: center;
+  background: none;
+  border: none;
+  font-size: 0.9rem;
+  color: var(--muted);
+  padding: 0;
+  line-height: 1;
+  transition: color 0.15s;
+}
+.pin:not(:disabled) { cursor: pointer; }
+.pinBusy { color: var(--blue); }
+.pinOff { opacity: 0.3; cursor: default; }
+
+.suggs {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  z-index: 50;
+  background: var(--card);
+  border: 1px solid var(--line2);
+  border-radius: 8px;
+  margin-top: 2px;
+  overflow: hidden;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+}
+.sugg {
+  padding: 0.5rem 0.8rem;
+  font-family: var(--mono);
+  font-size: 0.68rem;
+  color: var(--sub);
+  cursor: pointer;
+}
+.sugg:hover { background: var(--surface); }
+
+.radius {
+  flex: none;
+  background: var(--card);
+  border: 1px solid var(--line2);
+  border-radius: 6px;
+  padding: 0.33rem 0.68rem;
+  font-family: var(--mono);
+  font-size: 0.68rem;
+  color: var(--sub);
+  outline: none;
+  cursor: pointer;
+}
+
+.go {
+  flex: none;
+  background: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%);
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  padding: 0.62rem 1.25rem;
+  font-family: var(--display);
+  font-weight: 800;
+  font-size: 0.85rem;
+  cursor: pointer;
+  box-shadow: 0 0 20px rgba(59, 130, 246, 0.3);
+}
+.go:disabled { cursor: not-allowed; opacity: 0.6; }
+
+/* The honest location note under the results header. */
+.notice {
+  margin: -0.35rem 0 0.85rem;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid rgba(245, 158, 11, 0.25);
+  background: rgba(245, 158, 11, 0.07);
+  border-radius: 8px;
+  font-family: var(--mono);
+  font-size: 0.64rem;
+  line-height: 1.5;
+  color: var(--amber);
+}
+
+/* One line for a signed-in account with a résumé but no city on the profile. */
+.cityLine {
+  margin: 0.2rem 0 1.1rem;
+  font-family: var(--mono);
+  font-size: 0.64rem;
+  color: var(--dim);
+}
+.cityLine a { color: #a78bfa; text-decoration: none; }
+
+@media (max-width: 560px) {
+  /* Three rows: title · city (full width, so "Phoenix, AZ" never clips) · [radius · Search]. */
+  .wrap { gap: 0.45rem; }
+  .query, .row { flex: 1 1 100%; }
+  .row { flex-wrap: wrap; }
+  .loc { flex: 1 1 100%; }
+  .input { font-size: 16px; padding: 0.68rem 0.85rem; }
+  .radius { font-size: 0.78rem; padding: 0.33rem 0.6rem; }
+  .go { flex: 1 1 auto; padding: 0.62rem 0.95rem; }
+}

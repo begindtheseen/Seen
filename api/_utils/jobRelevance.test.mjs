@@ -1,7 +1,7 @@
 // Tests for job relevance + company matching. Run: node --test api/_utils/jobRelevance.test.mjs
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { relevanceScore, isRelated, isRelevant, effectiveSynonyms, looksLikeCompany, filterAndRank, tokenize, parseLocation, locationScore, filterByLocation, locationDbTerm, expandQueryTerms } from './jobRelevance.js';
+import { relevanceScore, isRelated, isRelevant, effectiveSynonyms, looksLikeCompany, filterAndRank, tokenize, parseLocation, locationScore, filterByLocation, locationDbTerm, expandQueryTerms, seniorityPenalty, tokenInTitle } from './jobRelevance.js';
 
 const J = (title, company, description = '') => ({ title, company, description, score: 65 });
 const L = (location) => ({ title: 'Nurse', company: 'X', location, score: 65 });
@@ -213,4 +213,32 @@ test('locationDbTerm returns the city (or state) for the DB pre-filter', () => {
   assert.equal(locationDbTerm('New York, NY'), 'new york');
   assert.equal(locationDbTerm('Texas'), 'texas');
   assert.equal(locationDbTerm(''), '');
+});
+
+// ── Live audit 2026-10-23: "customer service" opened with a PwC Director + Deloitte "ServiceNow" ──
+test('customer service: the plain role outranks Director/Architect titles; "ServiceNow" is not "service"', () => {
+  const q = 'customer service';
+  const csr = J('Customer Service Representative', 'PLS');
+  const dir = J('Managed Services - Data, Analytics & AI - Director', 'PwC');
+  const snow = J('Cyber ServiceNow Architect', 'Deloitte');
+  const care = J('Customer Care Specialist', 'Lucid', 'customer service for owners');
+  assert.equal(isRelevant(snow, q), false, 'token "service" must not match inside "ServiceNow"');
+  assert.equal(isRelevant(dir, q), true, 'still relevant (Services), just ranked low');
+  assert.ok(relevanceScore(csr, q) > relevanceScore(care, q), 'full phrase beats one token');
+  assert.ok(relevanceScore(care, q) > relevanceScore(dir, q), 'one plain token beats a Director with one token');
+  const out = filterAndRank([dir, snow, care, csr], q).map((j) => j.title);
+  assert.deepEqual(out, ['Customer Service Representative', 'Customer Care Specialist', 'Managed Services - Data, Analytics & AI - Director']);
+});
+
+test('a query that names a seniority pays no seniority penalty', () => {
+  assert.equal(seniorityPenalty('Senior Registered Nurse', 'senior nurse'), 0);
+  assert.equal(seniorityPenalty('Director of Customer Service', 'director customer service'), 0);
+  assert.ok(seniorityPenalty('Director of Customer Service', 'customer service') >= 40);
+  assert.ok(seniorityPenalty('Senior Customer Service Rep', 'customer service') >= 20);
+  assert.equal(seniorityPenalty('Customer Service Representative', 'customer service'), 0);
+  // "nurse" still finds "Nurses" / "Nursing", not "Nursery".
+  assert.equal(tokenInTitle('registered nurses', 'nurse'), true);
+  assert.equal(tokenInTitle('nursing assistant', 'nurse'), false); // "nursing" is nurs+ing, not nurse+ing
+  assert.equal(tokenInTitle('nursery worker', 'nurse'), false);
+  assert.equal(tokenInTitle('software engineering manager', 'engineer'), true);
 });
