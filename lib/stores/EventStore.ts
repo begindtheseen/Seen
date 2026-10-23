@@ -2,6 +2,7 @@
 
 import { CHECK_SCHEDULE } from '../constants'
 import type { DueCheck } from '../types'
+import { nextCheck, type NextCheck } from './checkSchedule'
 
 const KEY = 'seen_hevents_v1'
 const SNOOZE_KEY = 'seen_check_snooze'
@@ -60,6 +61,21 @@ export const EventStore = {
 
   hasCheck(appId: string, checkType: string): boolean {
     return this.get().some(e => e.appId === appId && e.type === checkType)
+  },
+
+  /** The check types already answered for one application (feeds checkSchedule.nextCheck). */
+  answeredChecks(appId: string): string[] {
+    const types = new Set(CHECK_SCHEDULE.map(c => c.type as string))
+    return this.get().filter(e => e.appId === appId && types.has(e.type)).map(e => e.type)
+  },
+
+  /**
+   * When this application is next asked a check-in (7 / 14 / 30 days after applying), or null once
+   * all three are answered. The card prints it as "Next check-in Oct 30 — did they respond?".
+   */
+  nextCheck(app: import('../types').Application, now = Date.now()): NextCheck | null {
+    if (app.status !== 'active') return null
+    return nextCheck(app.appliedAt, this.answeredChecks(app.id), now)
   },
 
   dueChecks(apps: import('../types').Application[]): DueCheck[] {

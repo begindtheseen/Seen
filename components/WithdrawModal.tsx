@@ -3,9 +3,12 @@
 // Withdraw an application from the tracker (owner request 2026-10-18).
 //   1. Confirm, with an optional note to the employer (a reason, or a thank-you). For an
 //      Apply-on-Seen application the employer is notified in-app and by email.
-//   2. Right after: why did you withdraw? An optional reason and an optional review of the company.
-//      Saved as a first-party report — it counts toward the company's Seen score
-//      (api/apply.js withdraw_review). Both steps are optional to fill in; withdrawing happens in step 1.
+//   2. Right after — ONLY when the application is at least a week old: why did you withdraw? An
+//      optional reason and an optional review of the company. Saved as a first-party report — it
+//      counts toward the company's Seen score (api/apply.js withdraw_review). A Day-0 entry has had no
+//      hiring process to review, so it skips straight to done (user audit 2026-10-23: a card added by
+//      mistake was being walked through a public-review prompt; "Delete" on the card is for those).
+//      Both steps are optional to fill in; withdrawing happens in step 1.
 
 import { useEffect, useState } from 'react'
 import ModalPortal from '@/components/ModalPortal'
@@ -16,6 +19,8 @@ import type { Application } from '@/lib/types'
 type Step = 'confirm' | 'why' | 'done'
 
 const REASONS = Object.entries(WITHDRAW_REASONS as Record<string, string>)
+/** The review prompt is offered only once the application is this old. */
+export const REVIEW_AFTER_DAYS = 7
 
 export default function WithdrawModal({ app, onClose, onWithdrawn }: {
   app: Application
@@ -29,6 +34,7 @@ export default function WithdrawModal({ app, onClose, onWithdrawn }: {
   // (the server enforces the same rule — lib/server/applicationThread.js applicantMayNote).
   const employerWrote = (app.messages || []).some(m => m.from === 'employer')
   const canNote = isSeen && !employerWrote
+  const reviewable = Date.now() - app.appliedAt >= REVIEW_AFTER_DAYS * 86400000
   const [step, setStep] = useState<Step>('confirm')
   const [message, setMessage] = useState('')
   const [reason, setReason] = useState('')
@@ -62,7 +68,7 @@ export default function WithdrawModal({ app, onClose, onWithdrawn }: {
       if (!ok) { setErr(String(d.error || 'Could not withdraw — please try again')); return }
       setNotified(d.employer_notified === true)
       onWithdrawn()
-      setStep('why')
+      setStep(reviewable ? 'why' : 'done')
     } catch { setErr('Could not withdraw — please try again') } finally { setBusy(false) }
   }
 
@@ -79,8 +85,8 @@ export default function WithdrawModal({ app, onClose, onWithdrawn }: {
 
   const label: React.CSSProperties = { fontFamily: 'var(--mono)', fontSize: '.55rem', textTransform: 'uppercase', letterSpacing: '.09em', color: 'var(--dim)', margin: '.9rem 0 .4rem' }
   const area: React.CSSProperties = { width: '100%', boxSizing: 'border-box', minHeight: 84, resize: 'vertical', background: 'var(--raised)', border: '1px solid var(--line2)', borderRadius: 9, padding: '.6rem .7rem', color: 'var(--white)', fontFamily: 'var(--body)', fontSize: '.82rem', lineHeight: 1.5 }
-  const primary: React.CSSProperties = { flex: 1, padding: '.65rem 1rem', borderRadius: 9, border: 'none', background: 'var(--blue)', color: '#fff', fontWeight: 700, fontSize: '.82rem', cursor: busy ? 'wait' : 'pointer', opacity: busy ? .7 : 1 }
-  const ghost: React.CSSProperties = { padding: '.65rem 1rem', borderRadius: 9, border: '1px solid var(--line2)', background: 'none', color: 'var(--sub)', fontSize: '.82rem', cursor: 'pointer' }
+  const primary: React.CSSProperties = { flex: 1, minHeight: 44, padding: '.65rem 1rem', borderRadius: 9, border: 'none', background: 'var(--blue)', color: '#fff', fontWeight: 700, fontSize: '.82rem', cursor: busy ? 'wait' : 'pointer', opacity: busy ? .7 : 1 }
+  const ghost: React.CSSProperties = { minHeight: 44, padding: '.65rem 1rem', borderRadius: 9, border: '1px solid var(--line2)', background: 'none', color: 'var(--sub)', fontSize: '.82rem', cursor: 'pointer' }
 
   let content
   if (step === 'confirm') {
@@ -111,7 +117,7 @@ export default function WithdrawModal({ app, onClose, onWithdrawn }: {
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '.35rem', marginTop: '.7rem' }}>
           {REASONS.map(([code, text]) => (
             <button key={code} type="button" aria-pressed={reason === code} onClick={() => setReason(r => (r === code ? '' : code))}
-              style={{ padding: '.38rem .7rem', borderRadius: 999, fontSize: '.72rem', cursor: 'pointer', border: `1px solid ${reason === code ? 'var(--blue)' : 'var(--line2)'}`, background: reason === code ? 'rgba(59,130,246,.12)' : 'none', color: reason === code ? 'var(--white)' : 'var(--sub)' }}>
+              style={{ minHeight: 40, padding: '.38rem .7rem', borderRadius: 999, fontSize: '.72rem', cursor: 'pointer', border: `1px solid ${reason === code ? 'var(--blue)' : 'var(--line2)'}`, background: reason === code ? 'rgba(59,130,246,.12)' : 'none', color: reason === code ? 'var(--white)' : 'var(--sub)' }}>
               {text}
             </button>
           ))}
@@ -132,7 +138,9 @@ export default function WithdrawModal({ app, onClose, onWithdrawn }: {
     content = (
       <>
         <p style={{ fontSize: '.86rem', color: 'var(--sub)', lineHeight: 1.6, margin: '.6rem 0 0' }}>
-          {counted ? `Thanks — it now counts toward ${app.company}’s Seen score.` : 'Thanks — it’s saved. It will count once it clears our duplicate check.'}
+          {counted === null
+            ? `Withdrawn${notified ? ` — ${app.company} has been told` : ''}. Nothing was filed about ${app.company}; the card stays in your tracker as withdrawn.`
+            : counted ? `Thanks — it now counts toward ${app.company}’s Seen score.` : 'Thanks — it’s saved. It will count once it clears our duplicate check.'}
         </p>
         <div style={{ display: 'flex', marginTop: '1rem' }}>
           <button type="button" onClick={onClose} style={primary}>Done</button>
@@ -151,7 +159,7 @@ export default function WithdrawModal({ app, onClose, onWithdrawn }: {
               <div style={{ fontFamily: 'var(--display)', fontWeight: 800, fontSize: '1.05rem', color: 'var(--white)', marginTop: '.2rem' }}>{app.role}</div>
               <div style={{ fontSize: '.78rem', color: 'var(--sub)' }}>{app.company}</div>
             </div>
-            <button type="button" onClick={onClose} disabled={busy} aria-label="Close" style={{ background: 'none', border: '1px solid var(--line2)', borderRadius: 8, width: 32, height: 32, color: 'var(--muted)', cursor: 'pointer', flexShrink: 0 }}>✕</button>
+            <button type="button" onClick={onClose} disabled={busy} aria-label="Close" style={{ background: 'none', border: '1px solid var(--line2)', borderRadius: 8, width: 44, height: 44, color: 'var(--muted)', cursor: 'pointer', flexShrink: 0 }}>✕</button>
           </div>
           {content}
         </div>
