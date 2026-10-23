@@ -68,7 +68,15 @@ function numOrNull(v: unknown): number | null {
   return Number.isFinite(n) && n > 0 ? Math.round(n) : null
 }
 
-export type SortMode = 'transparency' | 'waste' | 'recent'
+// 'best' = the server's query relevance (title match > role-family match > description), with the
+// transparency score as the tiebreak. It is the default: the live audit (2026-10-23) found
+// "customer service · Phoenix" opening with a PwC Director because the page re-sorted the server's
+// relevance order by transparency score. The other three stay as explicit choices.
+export type SortMode = 'best' | 'transparency' | 'waste' | 'recent'
+// A search result as the API serves it: `relevance` (server rank for the typed query) and
+// `in_radius` (false = a fill-in from further away / remote, which never sorts above an in-radius row).
+export interface SearchJob extends Job { relevance?: number | null; in_radius?: boolean }
+export type RecReason = 'no_resume' | 'no_signal' | 'no_city' | 'no_matches' | 'unavailable' | null
 export type NicheFilter = '' | 'tech' | 'healthcare' | 'retail' | 'logistics' | 'finance' | 'other'
 export type LevelFilter = '' | 'entry' | 'mid' | 'senior'
 export type TypeFilter = '' | 'Full-time' | 'Part-time' | 'Contract'
@@ -80,7 +88,7 @@ export type CoScoreMap = Record<string, { ghost_rate: number; overall_score: num
 
 // API listing → the page's Job shape. Module-level so the search and its silent top-up refresh
 // map identically.
-function toJobs(items: unknown[], loc: string): Job[] {
+function toJobs(items: unknown[], loc: string): SearchJob[] {
   return items.map((item: unknown) => {
     const j = item as Record<string, unknown>
     const company = String(j.company || j.co || '')
@@ -96,7 +104,10 @@ function toJobs(items: unknown[], loc: string): Job[] {
       location,
       score: numOrNull(j.score),
       waste: numOrNull(j.waste_score ?? j.waste),
-      level: String(j.level || j.lvl || 'Mid level'),
+      // '' = the title says nothing about level; never a default label (the old 'Mid level').
+      level: String(j.level || j.lvl || ''),
+      relevance: numOrNull(j.relevance),
+      in_radius: j.in_radius !== false,
       type: String(j.type || 'Full-time'),
       source: String(j.source || 'Job board'),
       description: String(j.description || ''),
@@ -131,16 +142,21 @@ export function useJobSearch() {
   const [level, setLevel] = useState<LevelFilter>('')
   const [jobType, setJobType] = useState<TypeFilter>('')
   const [posted, setPosted] = useState<PostedFilter>('')
-  const [sort, setSort] = useState<SortMode>('transparency')
+  const [sort, setSort] = useState<SortMode>('best')
   const [jobs, setJobs] = useState<Job[]>([])
   const [filtered, setFiltered] = useState<Job[]>([])
   const [status, setStatus] = useState<'idle' | 'loading' | 'done' | 'error'>('idle')
   const [statusMsg, setStatusMsg] = useState('Enter a search above →')
+  // The honest location note for the current page ("Only 6 within 25 mi …"); null = nothing to say.
+  const [notice, setNotice] = useState<string | null>(null)
   const [recommended, setRecommended] = useState<Job[]>([])
   const [recSkills, setRecSkills] = useState<string[]>([])
   const [recStatus, setRecStatus] = useState<'idle' | 'loading' | 'done'>('idle')
   // Whether the account has a résumé on file (from the rail's response); null = unknown.
   const [recHasResume, setRecHasResume] = useState<boolean | null>(null)
+  // Why the rail is empty ('no_city' → the page asks for a city) and the city it matched near.
+  const [recReason, setRecReason] = useState<RecReason>(null)
+  const [recCity, setRecCity] = useState<string | null>(null)
   const [coScores, setCoScores] = useState<CoScoreMap>({})
   const [appliedCos, setAppliedCos] = useState<Set<string>>(new Set())
   const abortRef = useRef<AbortController | null>(null)
@@ -151,12 +167,14 @@ export function useJobSearch() {
   const hasFilters = !!(niche || level || jobType || posted)
 
   function applySort(list: Job[], mode: SortMode): Job[] {
-    const copy = [...list]
-    // Unrated (null) listings sort to the end of a score/waste sort — never treated as 0.
+    const copy = [...list] as SearchJob[]
+    const score = (j: Job) => j.score ?? -Infinity // unrated (null) sorts to the end, never treated as 0
     if (mode === 'waste') copy.sort((a, b) => (a.waste ?? Infinity) - (b.waste ?? Infinity))
     else if (mode === 'recent') copy.sort((a, b) => (Date.parse(b.posted_at || '') || 0) - (Date.parse(a.posted_at || '') || 0)) // newest first, undated last
-    else copy.sort((a, b) => (b.score ?? -Infinity) - (a.score ?? -Infinity)) // transparency Every mode then keeps Featured and posted-on-Seen listings
-    // first (stable, so the chosen sort still orders within each tier) — lib/server/jobPriority.js.
+    else if (mode === 'transparency') copy.sort((a, b) => score(b) - score(a))
+    else copy.sort((a, b) => ((b.relevance ?? 0) - (a.relevance ?? 0)) || (score(b) - score(a))) // best match: server relevance, score tiebreak
+    // Every mode then keeps in-radius rows ahead of the far-away/remote fill-ins, and Featured and
+    // posted-on-Seen listings first within each (stable) — lib/server/jobPriority.js.
     return sortByPriority(copy)
   }
 
@@ -264,16 +282,15 @@ export function useJobSearch() {
       return
     }
 
-    // 3) Signed-out with a recent search (no stored choice) → restore it; this counts as a
-    //    previously-set location, so GPS won't fire over it.
+    // 3) Signed-out with a recent search (no stored choice) → restore its LOCATION only; this
+    //    counts as a previously-set location, so GPS won't fire over it. The query is NOT re-run:
+    //    the store also holds homepage company lookups ("Walmart" → /company/walmart), so the old
+    //    auto-search opened /jobs with a stale "Walmart" results page (live audit 2026-10-23).
     try {
       const recent = RecentSearchesStore.get()
       if (recent.length > 0) {
-        const last = recent[0]
         autoSearchedRef.current = true
-        setQuery(last.name)
-        if (last.loc) setLocationRaw(last.loc)
-        searchJobs(last.name, last.loc)
+        if (recent[0].loc) setLocationRaw(recent[0].loc)
         return
       }
     } catch {}
@@ -286,17 +303,20 @@ export function useJobSearch() {
 
   // Fetch resume-powered recommendations when logged in
   useEffect(() => {
-    if (!isLoggedIn) { setRecHasResume(null); return }
+    if (!isLoggedIn) { setRecHasResume(null); setRecReason(null); setRecCity(null); return }
     setRecStatus('loading')
     setRecHasResume(null)
+    setRecReason(null)
     aiHeaders().then(hdrs => fetch('/api/jobs', {
       method: 'POST',
       headers: hdrs,
       body: JSON.stringify({ action: 'recommended' }),
     }))
     .then(r => r.ok ? r.json() : {})
-    .then((data: { jobs?: unknown[]; skills?: string[]; has_resume?: boolean | null }) => {
+    .then((data: { jobs?: unknown[]; skills?: string[]; has_resume?: boolean | null; reason?: RecReason; city?: string | null }) => {
       if (typeof data.has_resume === 'boolean') setRecHasResume(data.has_resume)
+      setRecReason(data.reason ?? null)
+      setRecCity(typeof data.city === 'string' && data.city ? data.city : null)
       if (Array.isArray(data.jobs) && data.jobs.length) {
         const raw: Job[] = (data.jobs as Record<string, unknown>[]).map(j => ({
           id: String(j.id || 'rec_' + Math.random().toString(36).slice(2, 8)),
@@ -305,7 +325,7 @@ export function useJobSearch() {
           location: String(j.location || 'US'),
           score: numOrNull(j.score),
           waste: numOrNull(j.waste_score ?? j.waste),
-          level: String(j.level || 'Mid level'),
+          level: String(j.level || ''),
           type: String(j.type || 'Full-time'),
           source: String(j.source || 'Seen'),
           description: String(j.description || ''),
@@ -414,6 +434,7 @@ export function useJobSearch() {
     searchedOnceRef.current = true
     const seq = ++searchSeqRef.current
     if (topupTimerRef.current) { clearTimeout(topupTimerRef.current); topupTimerRef.current = null }
+    setNotice(null)
 
     const cacheKey = `${q}|${loc}|${radius}`
     const cached = searchCache.get(cacheKey)
@@ -459,25 +480,29 @@ export function useJobSearch() {
           return
         }
         if (!res.ok) throw new Error(`HTTP ${res.status}`)
-        const data = await res.json() as { jobs?: unknown[]; results?: unknown[]; widened?: boolean; fallback?: 'outside_radius' | 'unrelated' | 'remote_thin' | null; radius?: number | null; location?: string; topup?: string | null }
+        const data = await res.json() as { jobs?: unknown[]; results?: unknown[]; widened?: boolean; fallback?: 'outside_radius' | 'unrelated' | 'remote_thin' | null; radius?: number | null; location?: string; topup?: string | null; in_radius?: number | null }
         const raw: Job[] = toJobs(data.jobs || data.results || [], loc)
         searchCache.set(cacheKey, { jobs: raw, ts: Date.now() })
         JobCache.setMany(raw)
         setJobs(raw)
         updateDisplay(raw, sort)
         setStatus('done')
-        // When we had to widen past the requested radius (nothing within it), say so —
-        // otherwise nearby-but-outside-radius results look like the radius is broken.
         // Say exactly what the server did when it could not fill the page from matches:
-        //  unrelated      → nothing matched the title at all; these are other openings (never "matches")
-        //  outside_radius → matches exist, just outside the radius
-        //  remote_thin    → few remote matches; non-remote roles fill the rest
+        //  unrelated   → nothing matched the title at all; these are other openings (never "matches")
+        //  remote_thin → few remote matches; non-remote roles fill the rest
+        // For a place search the server counts the rows inside the radius (`in_radius`) and serves
+        // them first; the note says how many — never "no jobs within 25 mi" above six Phoenix rows.
+        const placeSearch = !!loc && data.location !== 'remote' && radius !== '0'
+        const inR = typeof data.in_radius === 'number' ? data.in_radius : null
         if (raw.length && data.fallback === 'unrelated') {
-          setStatusMsg(`No matches for "${q}" — showing ${raw.length} other opening${raw.length !== 1 ? 's' : ''}${loc && data.location !== 'remote' ? ` near ${loc}` : ''}`)
+          setStatusMsg(`No matches for "${q}" — showing ${raw.length} other opening${raw.length !== 1 ? 's' : ''}${placeSearch ? ` near ${loc}` : ''}`)
         } else if (raw.length && data.fallback === 'remote_thin') {
           setStatusMsg(`Few remote matches for "${q}" — also showing roles that aren't marked remote`)
-        } else if (raw.length && (data.fallback === 'outside_radius' || data.widened) && loc && data.location !== 'remote') {
-          setStatusMsg(`No jobs within ${data.radius || radius} mi of ${loc} — showing the ${raw.length} nearest matches`)
+        } else if (raw.length && placeSearch && inR !== null && inR < raw.length) {
+          const r = data.radius || radius
+          setNotice(inR === 0
+            ? `No ${q} jobs within ${r} mi of ${loc} — showing the nearest and remote ones`
+            : `Only ${inR} within ${r} mi of ${loc} — the rest are further away or remote`)
         }
         if (q) try { RecentSearchesStore.push(q, loc || undefined) } catch {}
         // The server answered instantly from our corpus and is pulling more listings in the
@@ -545,11 +570,14 @@ export function useJobSearch() {
     filtered,
     status,
     statusMsg,
+    notice,
     // recommendations + company scores
     recommended,
     recSkills,
     recStatus,
     recHasResume,
+    recReason,
+    recCity,
     coScores,
     appliedCos,
     // actions

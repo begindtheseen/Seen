@@ -60,6 +60,19 @@ export default function JobDetailDrawer({ job, isLoggedIn, onClose, onApply, onC
     return () => cancelAnimationFrame(id)
   }, [])
 
+  // Esc closes the drawer, like the backdrop and ✕ (the Seen-apply modal on top handles its own).
+  useEffect(() => {
+    if (seenApplyOpen) return
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
+    document.addEventListener('keydown', onKey)
+    return () => document.removeEventListener('keydown', onKey)
+  }, [onClose, seenApplyOpen])
+
+  // The AI summary replaces the posting text by default; the full posting is one tap away. A long
+  // posting with no summary is folded at a paragraph boundary with "Read more" (never a bare "…").
+  const [showFull, setShowFull] = useState(false)
+  useEffect(() => { setShowFull(false) }, [job.id])
+
   const loadInsights = useCallback(async (j: Job) => {
     const desc = j.description || ''
     if (!desc || desc.length <= 80) { setInsightsState('no_desc'); return }
@@ -99,7 +112,24 @@ export default function JobDetailDrawer({ job, isLoggedIn, onClose, onApply, onC
 
   const risk = Score.risk(job.score)
   const avail = job.availability_status
-  const descParas = formatDesc(insights?.description_summary || job.description || '')
+  const fullParas = formatDesc(job.description || '')
+  const summaryParas = formatDesc(insights?.description_summary || '')
+  const FOLD_CHARS = 1400
+  const fullChars = (job.description || '').length
+  // Which paragraphs to show: the summary (collapsed), the whole posting (expanded), or a long
+  // posting folded after the paragraphs that fit FOLD_CHARS.
+  let descParas = fullParas
+  let foldLabel: string | null = null
+  if (!showFull && summaryParas.length && fullParas.length) {
+    descParas = summaryParas
+    foldLabel = `Read the full posting (${fullChars.toLocaleString()} characters) ↓`
+  } else if (!showFull && !summaryParas.length && fullChars > FOLD_CHARS + 300) {
+    const kept: string[] = []
+    let used = 0
+    for (const p of fullParas) { if (used && used + p.length > FOLD_CHARS) break; kept.push(p); used += p.length }
+    descParas = kept
+    foldLabel = 'Read more ↓'
+  }
   const chips = [job.type, job.level, job.salary && job.salary !== '—' ? job.salary : ''].filter(Boolean) as string[]
 
   return (
@@ -165,7 +195,7 @@ export default function JobDetailDrawer({ job, isLoggedIn, onClose, onApply, onC
             <div className="jd-stat"><span className="jd-sn" style={{ color: Score.color(risk) }}>{job.score ?? '–'}</span><span className="jd-sl">Score</span></div>
             <div className="jd-stat"><span className="jd-sn" style={{ color: job.waste == null ? 'var(--dim)' : job.waste > 55 ? 'var(--red)' : job.waste > 35 ? 'var(--amber)' : 'var(--green)' }}>{job.waste == null ? '–' : `${job.waste}%`}</span><span className="jd-sl">Waste risk</span></div>
             <div className="jd-stat"><span className="jd-sn" style={{ fontSize: '.72rem' }}>{job.type || 'Full-time'}</span><span className="jd-sl">Type</span></div>
-            <div className="jd-stat"><span className="jd-sn" style={{ fontSize: '.72rem' }}>{job.level || 'Mid level'}</span><span className="jd-sl">Level</span></div>
+            <div className="jd-stat"><span className="jd-sn" style={{ fontSize: '.72rem' }}>{job.level || '—'}</span><span className="jd-sl">Level</span></div>
             <div className="jd-stat"><span className="jd-sn" style={{ color: 'var(--green)', fontSize: '.75rem' }}>{job.salary || '—'}</span><span className="jd-sl">Salary</span></div>
             <div className="jd-stat"><span className="jd-sn" style={{ fontSize: '.65rem', color: 'var(--blue)' }}>{job.source || 'Job board'}</span><span className="jd-sl">Source</span></div>
           </div>
@@ -253,7 +283,15 @@ export default function JobDetailDrawer({ job, isLoggedIn, onClose, onApply, onC
             {insightsState === 'loading'
               ? <Skeleton widths={[95, 82, 90, 70, 86, 75, 92]} h={9} />
               : descParas.length > 0
-                ? descParas.map((p, i) => <p key={i} style={{ fontSize: '.8rem', color: 'var(--sub)', lineHeight: 1.8, margin: '0 0 .75rem' }}>{p}</p>)
+                ? <>
+                    {descParas.map((p, i) => <p key={i} style={{ fontSize: '.8rem', color: 'var(--sub)', lineHeight: 1.8, margin: '0 0 .75rem' }}>{p}</p>)}
+                    {foldLabel && (
+                      <button type="button" onClick={() => setShowFull(true)} style={{ background: 'none', border: '1px solid var(--line2)', borderRadius: 7, color: 'var(--green)', cursor: 'pointer', fontFamily: 'var(--mono)', fontSize: '.62rem', padding: '.4rem .75rem' }}>{foldLabel}</button>
+                    )}
+                    {showFull && summaryParas.length > 0 && (
+                      <button type="button" onClick={() => setShowFull(false)} style={{ background: 'none', border: '1px solid var(--line2)', borderRadius: 7, color: 'var(--dim)', cursor: 'pointer', fontFamily: 'var(--mono)', fontSize: '.62rem', padding: '.4rem .75rem' }}>Show the summary ↑</button>
+                    )}
+                  </>
                 : <p style={{ fontSize: '.8rem', color: 'var(--muted)', fontWeight: 300 }}>No description available.</p>
             }
           </div>

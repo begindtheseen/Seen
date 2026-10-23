@@ -12,7 +12,9 @@ const NICHE: Array<[NicheFilter, string]> = [
   ['', 'Any industry'], ['tech', 'Tech / Software'], ['healthcare', 'Healthcare'], ['retail', 'Retail / Food Service'],
   ['logistics', 'Logistics / Warehouse'], ['finance', 'Finance'], ['other', 'Other'],
 ]
-const LEVEL: Array<[LevelFilter, string]> = [['', 'Any level'], ['entry', 'Entry level'], ['mid', 'Mid level'], ['senior', 'Senior']]
+// Level is read from the title (lib/server/jobSources.js inferLevel): Entry / Senior / Director+ or unknown.
+// There is no "Mid level" signal — the old option matched the default label, i.e. every unlabelled job.
+const LEVEL: Array<[LevelFilter, string]> = [['', 'Any level'], ['entry', 'Entry level'], ['senior', 'Senior']]
 // No ingest path emits 'Contract' (every source maps to Full-time/Part-time), so that option could never match.
 const TYPE: Array<[TypeFilter, string]> = [['', 'Any type'], ['Full-time', 'Full-time'], ['Part-time', 'Part-time']]
 const POSTED: Array<[PostedFilter, string]> = [['', 'Any time'], ['1', 'Last 24 hours'], ['7', 'Last week'], ['30', 'Last month']]

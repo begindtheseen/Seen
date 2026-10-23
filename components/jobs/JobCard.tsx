@@ -149,8 +149,8 @@ export default function JobCard({ job, index, onSaveToggle, onOpen, onApply, onC
 
       <div className="jlc-meta">
         <span className="jlc-mi">{job.type || 'Full-time'}</span>
-        <span className="jlc-mi">·</span>
-        <span className="jlc-mi">{job.level}</span>
+        {/* Level only when the title says it (unknown is '' — never a default "Mid level"). */}
+        {job.level && <><span className="jlc-mi">·</span><span className="jlc-mi">{job.level}</span></>}
         {job.salary && <><span className="jlc-mi">·</span><span className="jlc-sal">{job.salary}</span></>}
         <span className="jlc-mi">·</span>
         <span className="jlc-mi" style={{ color: 'var(--blue)' }}>{job.source || 'Job board'}</span>
