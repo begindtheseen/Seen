@@ -163,3 +163,12 @@
   .pop, .row, .chip, .count { animation: none; }
   .btn { transition: none; }
 }
+
+/* Phone floor (audit 2026-10-23): 12px labels and chips; the Filters button, chips and Clear get the
+   44px hit area that app/globals.css gives every button on phones. */
+@media (max-width: 768px) {
+  .count, .chip, .clear, .label { font-size: 0.75rem; }
+  .count { min-width: 20px; height: 20px; }
+  .btn, .chip, .clear, .done { min-height: 44px; }
+  .label { letter-spacing: 0.06em; }
+}

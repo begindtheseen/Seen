@@ -132,7 +132,7 @@ export default function CompaniesPage() {
       onClick={() => setSort(key)}
       className="btn btn-ghost"
       style={{
-        fontSize: '.72rem',
+        fontSize: 'var(--fs-72)',
         padding: '.45rem .85rem',
         ...(sort === key ? { background: 'var(--bdim)', borderColor: 'var(--blue)' } : {}),
       }}
@@ -195,10 +195,10 @@ export default function CompaniesPage() {
                       setShowLookupSuggs(false)
                       router.push(`/company/${encodeURIComponent(c.name.toLowerCase().replace(/\s+/g, '-'))}`)
                     }}
-                    style={{ display: 'flex', width: '100%', textAlign: 'left', alignItems: 'center', justifyContent: 'space-between', gap: '.6rem', background: 'none', border: 'none', borderBottom: '1px solid var(--line2)', padding: '.55rem .85rem', cursor: 'pointer', color: 'var(--white)', fontFamily: 'var(--mono)', fontSize: '.72rem' }}
+                    style={{ display: 'flex', width: '100%', textAlign: 'left', alignItems: 'center', justifyContent: 'space-between', gap: '.6rem', background: 'none', border: 'none', borderBottom: '1px solid var(--line2)', padding: '.55rem .85rem', cursor: 'pointer', color: 'var(--white)', fontFamily: 'var(--mono)', fontSize: 'var(--fs-72)' }}
                   >
                     <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.name}</span>
-                    <span style={{ flexShrink: 0, color: 'var(--dim)', fontSize: '.6rem' }}>{Math.round(c.score.overall_score)}/100 · {reportsLabel(c.score)}</span>
+                    <span style={{ flexShrink: 0, color: 'var(--dim)', fontSize: 'var(--fs-60)' }}>{Math.round(c.score.overall_score)}/100 · {reportsLabel(c.score)}</span>
                   </button>
                 ))}
               </div>
@@ -228,7 +228,7 @@ export default function CompaniesPage() {
           <div
             style={{
               fontFamily: 'var(--mono)',
-              fontSize: '.58rem',
+              fontSize: 'var(--fs-58)',
               color: 'var(--dim)',
             }}
           >
@@ -281,7 +281,7 @@ export default function CompaniesPage() {
               padding: '3rem',
               color: 'var(--muted)',
               fontFamily: 'var(--mono)',
-              fontSize: '.72rem',
+              fontSize: 'var(--fs-72)',
             }}
           >
             Loading scoreboard...
@@ -294,7 +294,7 @@ export default function CompaniesPage() {
                   style={{
                     color: 'var(--muted)',
                     fontFamily: 'var(--mono)',
-                    fontSize: '.72rem',
+                    fontSize: 'var(--fs-72)',
                     marginBottom: '1.25rem',
                   }}
                 >
@@ -313,7 +313,7 @@ export default function CompaniesPage() {
                     borderRadius: 9,
                     padding: '.7rem 1.4rem',
                     fontFamily: 'var(--mono)',
-                    fontSize: '.72rem',
+                    fontSize: 'var(--fs-72)',
                     fontWeight: 600,
                     color: 'var(--blue)',
                     textDecoration: 'none',
@@ -326,7 +326,7 @@ export default function CompaniesPage() {
                   style={{
                     marginTop: '.75rem',
                     fontFamily: 'var(--mono)',
-                    fontSize: '.58rem',
+                    fontSize: 'var(--fs-58)',
                     color: 'var(--dim)',
                   }}
                 >
@@ -338,7 +338,7 @@ export default function CompaniesPage() {
                 style={{
                   color: 'var(--muted)',
                   fontFamily: 'var(--mono)',
-                  fontSize: '.72rem',
+                  fontSize: 'var(--fs-72)',
                 }}
               >
                 No company data yet. Use the search above to look up any company.
@@ -395,21 +395,21 @@ export default function CompaniesPage() {
                           style={{
                             marginLeft: '.3rem',
                             color: 'var(--green)',
-                            fontSize: '.55rem',
+                            fontSize: 'var(--fs-55)',
                           }}
                         >
                           ✓
                         </span>
                       )}
                       {appliedCos.has(co.name.toLowerCase().trim()) && (
-                        <span style={{ fontFamily: 'var(--mono)', fontSize: '.48rem', background: 'rgba(99,102,241,.12)', border: '1px solid rgba(99,102,241,.25)', borderRadius: 4, padding: '.06rem .28rem', color: 'var(--indigo)', marginLeft: '.35rem', verticalAlign: 'middle', flexShrink: 0 }}>Applied</span>
+                        <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-48)', background: 'rgba(99,102,241,.12)', border: '1px solid rgba(99,102,241,.25)', borderRadius: 4, padding: '.06rem .28rem', color: 'var(--indigo)', marginLeft: '.35rem', verticalAlign: 'middle', flexShrink: 0 }}>Applied</span>
                       )}
                     </div>
                     {co.industry && (
                       <div
                         style={{
                           fontFamily: 'var(--mono)',
-                          fontSize: '.52rem',
+                          fontSize: 'var(--fs-52)',
                           color: 'var(--dim)',
                           marginTop: '.15rem',
                           letterSpacing: '.03em',
@@ -431,7 +431,7 @@ export default function CompaniesPage() {
                         <span
                           style={{
                             fontFamily: 'var(--mono)',
-                            fontSize: '.5rem',
+                            fontSize: 'var(--fs-50)',
                             background:
                               co.score.ghost_rate > 0.5
                                 ? 'rgba(239,68,68,0.12)'
@@ -456,7 +456,7 @@ export default function CompaniesPage() {
                         <span
                           style={{
                             fontFamily: 'var(--mono)',
-                            fontSize: '.5rem',
+                            fontSize: 'var(--fs-50)',
                             background: 'rgba(16,185,129,0.08)',
                             color: 'var(--green)',
                             border: '1px solid rgba(16,185,129,0.2)',
