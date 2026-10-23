@@ -21,7 +21,7 @@ import { broadcastActivity } from '../lib/server/realtime.js';
 import {
   normalizeCompanyKey, isSearchableCompany, parseRedditSearchAtom, rankAndFilter,
   buildSearchUrl, needsBroadFallback, emptyStateDecision, ttlForStatus, cacheFresh,
-  sanitizeDispute, MAX_ITEMS,
+  sanitizeDispute, showableItems, refilterCached, MAX_ITEMS,
 } from './_utils/companyReddit.js';
 
 const REDDIT_UA = 'SeenJobs/1.0 RSS reader (+https://seenjobs.io)';
@@ -75,7 +75,17 @@ async function liveSearch(companyName) {
     degraded = biased.degraded && broad.degraded;   // authoritative if EITHER pass answered
     ranked = rankAndFilter(all, companyName, MAX_ITEMS);
   }
-  return { items: ranked, degraded: ranked.length === 0 && degraded };
+  // One relevant thread is a coincidence, not "discussion": under MIN_SHOW_THREADS the result is an
+  // honest empty (cached briefly), and the page hides the whole section.
+  const items = showableItems(ranked);
+  return { items, degraded: items.length === 0 && degraded && ranked.length === 0 };
+}
+
+// A cached row's items as the page may show them NOW: rows written under an older relevance rule
+// are re-judged on their title + subreddit (audit 2026-10-23: /company/target served hockey and war
+// news from a 24h cache), and fewer than MIN_SHOW_THREADS relevant threads is an empty section.
+function servedItems(row, companyName) {
+  return showableItems(refilterCached(row?.items || [], row?.company_name || companyName));
 }
 
 // ── Supabase cache I/O (service key; no-ops cleanly when DB is unconfigured) ───────
@@ -130,9 +140,10 @@ async function handleLookup(req, res, body) {
     const row = await readCache(SUPABASE_URL, key);
     if (row && cacheFresh(row)) {
       res.setHeader('Cache-Control', 'public, s-maxage=600, stale-while-revalidate=3600');
+      const items = servedItems(row, companyName);
       return res.status(200).json({
-        ok: true, company: row.company_name, items: row.items || [],
-        status: row.status || emptyStateDecision(row.items), cached: true, fetched_at: row.fetched_at,
+        ok: true, company: row.company_name, items,
+        status: emptyStateDecision(items), cached: true, fetched_at: row.fetched_at,
       });
     }
     stale = row;   // keep any stale row to fall back on if the live fetch fails
@@ -155,9 +166,10 @@ async function handleLookup(req, res, body) {
   //    429 can't poison a real company with a false "no discussion".
   if (result === null || (result.items.length === 0 && result.degraded)) {
     if (stale) {
+      const items = servedItems(stale, companyName);
       return res.status(200).json({
-        ok: true, company: stale.company_name, items: stale.items || [],
-        status: stale.status || 'ok', cached: true, stale: true, fetched_at: stale.fetched_at,
+        ok: true, company: stale.company_name, items,
+        status: emptyStateDecision(items), cached: true, stale: true, fetched_at: stale.fetched_at,
       });
     }
     return res.status(200).json({ ok: true, company: companyName, items: [], status: 'checking', cached: false });

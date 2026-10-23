@@ -16,7 +16,8 @@ import { buildSearchUrl, parseRedditSearchAtom } from './_utils/companyReddit.js
 import { SECURITY_PREAMBLE, fenceUntrusted, scanInjection } from '../lib/server/promptGuard.js';
 import { fetchIndustryBenchmark } from '../lib/server/benchmark.js';
 import { isEvidencedScore, suppressionReason, servedDataSource } from '../lib/server/scoreProvenance.js';
-import { firstPartyReportCount, mentionCount, webClaimCount, gateScore, isGradeable, SCORABLE_REPORTS_FILTER, scorableResolvedCountPath, parseExactCount, EMPLOYEE_REVIEW_RE } from '../lib/server/reportCounts.js';
+import { firstPartyReportCount, mentionCount, webClaimCount, gateScore, isGradeable, SCORABLE_REPORTS_FILTER, scorableResolvedCountPath, parseExactCount, EMPLOYEE_REVIEW_RE, scoreUpdatedAt } from '../lib/server/reportCounts.js';
+import { feedRowPasses } from '../lib/reports/feedFilter.js';
 import { enqueueCompanyEnrichment } from '../lib/server/enrichmentQueue.js';
 
 // Authorize admin/cron-only actions (the Anthropic web-research endpoints). Accepts a Vercel
@@ -355,7 +356,23 @@ export default async function handler(req, res) {
       const rows = r.ok ? await r.json() : [];
       const counts = {};
       for (const row of (Array.isArray(rows) ? rows : [])) { const k = String(row.company_name || '').toLowerCase().trim(); counts[k] = (counts[k] || 0) + 1; }
-      const surges = names.filter(n => (counts[n] || 0) >= 3).map(n => ({ name: n, ghosted_7d: counts[n] }));
+      const surging = names.filter(n => (counts[n] || 0) >= 3);
+      // The company's CURRENT grade rides along: a week's 3 ghost reports at a company whose overall
+      // ghost rate is 13% (Walmart, grade A) is not a warning on its own — the dashboard words the
+      // signal with the base rate, or drops it when the grade is A / the ghost rate is under 20%.
+      const grades = {};
+      if (surging.length) {
+        try {
+          const gl = surging.map(n => `"${n.replace(/"/g, '')}"`).join(',');
+          const gr = await fetch(`${SUPABASE_URL}/rest/v1/company_scores?select=company_name,overall_score,ghost_rate,report_count,first_party_report_count,data_source&company_name=in.(${encodeURIComponent(gl)})&limit=40`, { headers: hdrsBase });
+          for (const g of (gr.ok ? await gr.json() : [])) {
+            const k = String(g.company_name || '').toLowerCase().trim();
+            const gradeable = isGradeable(g);
+            grades[k] = { gradeable, overall_score: gradeable ? g.overall_score : null, ghost_rate: gradeable ? g.ghost_rate : null };
+          }
+        } catch { /* the surge still reports its count; the client words it without a base rate */ }
+      }
+      const surges = surging.map(n => ({ name: n, ghosted_7d: counts[n], ...(grades[n] || { gradeable: null, overall_score: null, ghost_rate: null }) }));
       return res.status(200).json({ ok: true, surges });
     } catch(e) { return res.status(200).json({ ok: true, surges: [] }); }
   }
@@ -695,25 +712,41 @@ export default async function handler(req, res) {
       const outcomes = outcomeMap[outcome] || null;
 
       // Only reports that shape a score are public — held rows (anti-gaming review) never were.
+      // A row compiled from public discussion is shown only when its text still passes the strict
+      // first-hand applicant rules for its company (lib/reports/feedFilter.js) — a customer's
+      // "support ghosted me" or an employee's "she hired me and now wants me gone" is not an
+      // applicant account. The window read is wider than the page so a page still fills; the
+      // client continues from `next_offset` (rows consumed), never offset + page size.
+      const readWindow = Math.min(150, safeLimit * 4);
       let url = `${SUPABASE_URL}/rest/v1/reports`
-        + `?select=id,role,outcome,ghost_stage,rounds,report_text,platform,created_at,experience_level,company_name`
+        + `?select=id,role,outcome,ghost_stage,rounds,report_text,platform,created_at,experience_level,company_name,trust_reason`
         + `&${SCORABLE_REPORTS_FILTER}`
         + `&order=created_at.desc`
-        + `&limit=${safeLimit}&offset=${safeOffset}`;
+        + `&limit=${readWindow}&offset=${safeOffset}`;
       if (outcomes) url += `&outcome=in.(${outcomes.join(',')})`;
 
       // Exact count: "Load more (N remaining)" printed a planner estimate before.
       const r = await fetch(url, { headers: { ...hdrsBase, 'Prefer': 'count=exact' } });
       if (!r.ok) { console.error('FEED: supabase error', r.status); return res.status(500).json({ error: 'feed error' }); }
-      const rows = await r.json();
-      const page = (rows || []).map(row => ({ ...row, source: classifyPlatform(row.platform) }));
+      const raw = await r.json();
+      const rows = Array.isArray(raw) ? raw : [];
+      const page = [];
+      let consumed = 0;
+      for (const row of rows) {
+        consumed += 1;
+        if (!feedRowPasses(row)) continue;
+        page.push({ ...row, source: classifyPlatform(row.platform) });
+        if (page.length >= safeLimit) break;
+      }
 
-      // Content-Range: 0-19/1234
+      // Content-Range: 0-19/1234 — the corpus size (an upper bound on what the rules let through).
       const contentRange = r.headers.get('content-range') || '';
-      const total = parseInt(contentRange.split('/')[1]) || page.length;
+      const total = parseInt(contentRange.split('/')[1]) || rows.length;
+      const nextOffset = safeOffset + consumed;
+      const hasMore = rows.length === readWindow ? true : consumed < rows.length;
 
-      console.log(`FEED: offset=${safeOffset} page=${page.length} total=${total}`);
-      return res.status(200).json({ ok: true, reports: page, total });
+      console.log(`FEED: offset=${safeOffset} read=${rows.length} shown=${page.length} total=${total}`);
+      return res.status(200).json({ ok: true, reports: page, total, next_offset: nextOffset, has_more: hasMore });
     } catch(e) {
       console.error('FEED: unhandled error:', e.message);
       return res.status(500).json({ error: 'feed error', detail: e.message });
@@ -1586,6 +1619,9 @@ function _rowToScoreRaw(row) {
     risk_level: s >= 70 ? 'safe' : s >= 40 ? 'warn' : 'danger',
     industry: row.industry || '', summary: /^estimated baseline/i.test(String(row.raw_summary || '')) ? '' : (row.raw_summary || ''),
     process_score: s, web_reviews: reviews,
+    // When this score was last (re)computed — the "Last updated" under every grade
+    // (lib/server/reportCounts.js scoreUpdatedAt: company_scores has no updated_at column).
+    updated_at: scoreUpdatedAt(row),
   };
 }
 
@@ -1867,6 +1903,7 @@ async function handleCompanyScore(req, res, body) {
       employee_review_count: repFused.employee_review_count, employee_review_adjustment: repFused.employee_review_adjustment,
       data_quality: repFused.confidence_label || 'low', data_source: 'reports', risk_level: repFused.risk_level,
       process_score: repFused.overall_score, industry: '', summary: '', web_reviews: [], fused_sources: repFused.sources_used || [],
+      updated_at: new Date().toISOString(),
     };
     if (SUPABASE_URL && SUPABASE_SERVICE_KEY) {
       const expires = new Date(Date.now() + _SCORE_TTL_MS).toISOString();

@@ -5,6 +5,8 @@ import { AppStore } from '@/lib/stores/AppStore'
 import { isPublicDiscussion, reportDate, reportSourceBadge, reportSourceLink } from '@/lib/reportSource'
 import ReportSourceLink from '@/components/ReportSourceLink'
 import PageHeader from '@/components/shell/PageHeader'
+import { displayCompanyName } from '@/lib/companyDisplay'
+import { collapseByCompany } from '@/lib/reports/feedFilter.js'
 
 type Filter = 'all' | 'ghosted' | 'rejected' | 'interviewing' | 'hired'
 
@@ -19,6 +21,8 @@ interface FeedReport {
   created_at: string
   experience_level?: string
   company_name?: string
+  /** Later rows of the same company folded into this card (one card per company per page). */
+  more_from_company?: number
 }
 
 const OUTCOME_LABELS: Record<string, { label: string; cls: string }> = {
@@ -57,6 +61,7 @@ export default function FeedPage() {
   const [reports, setReports] = useState<FeedReport[]>([])
   const [offset, setOffset] = useState(0)
   const [total, setTotal] = useState(0)
+  const [hasMore, setHasMore] = useState(false)
   const [loading, setLoading] = useState(true)
   const [loadingMore, setLoadingMore] = useState(false)
   const [appliedCos, setAppliedCos] = useState<Set<string>>(new Set())
@@ -75,12 +80,16 @@ export default function FeedPage() {
         }),
       })
       if (!res.ok) throw new Error('Failed')
-      const data = await res.json() as { reports?: FeedReport[]; total?: number }
-      const rows = data.reports || []
+      const data = await res.json() as { reports?: FeedReport[]; total?: number; next_offset?: number; has_more?: boolean }
+      // One card per company per page: a run of ten Albertsons imports becomes one card with "+9 more".
+      const rows = collapseByCompany(data.reports || []) as FeedReport[]
       setTotal(data.total || 0)
+      // The server reads a wider window than it returns, so the next page starts where it stopped.
+      setOffset(typeof data.next_offset === 'number' ? data.next_offset : newOffset + PAGE_SIZE)
+      setHasMore(data.has_more ?? ((typeof data.next_offset === 'number' ? data.next_offset : newOffset + PAGE_SIZE) < (data.total || 0)))
       setReports(prev => append ? [...prev, ...rows] : rows)
     } catch {
-      if (!append) setReports([])
+      if (!append) { setReports([]); setHasMore(false) }
     }
     setLoading(false)
     setLoadingMore(false)
@@ -99,12 +108,8 @@ export default function FeedPage() {
   }, [filter, loadFeed])
 
   function loadMore() {
-    const next = offset + PAGE_SIZE
-    setOffset(next)
-    loadFeed(filter, next, true)
+    loadFeed(filter, offset, true)
   }
-
-  const hasMore = offset + PAGE_SIZE < total
 
   return (
     <div className="page-full">
@@ -164,7 +169,7 @@ export default function FeedPage() {
                       <span style={{ fontFamily: 'var(--mono)', fontSize: '.7rem', fontWeight: 600, color: 'var(--white)' }}>{oc.label}</span>
                       {r.company_name && (
                         <a href={`/company/${encodeURIComponent(r.company_name.toLowerCase().replace(/\s+/g, '-'))}`} style={{ fontFamily: 'var(--mono)', fontSize: '.62rem', color: 'var(--blue)', marginLeft: '.5rem', textDecoration: 'none' }}>
-                          @ {r.company_name}
+                          @ {displayCompanyName(r.company_name)}
                         </a>
                       )}
                       {r.company_name && appliedCos.has(r.company_name.toLowerCase().trim()) && (
@@ -209,6 +214,11 @@ export default function FeedPage() {
                       <ReportSourceLink url={src.url} host={src.host} posted={src.posted} />
                     </div>
                   )}
+                  {(r.more_from_company ?? 0) > 0 && r.company_name && (
+                    <a href={`/company/${encodeURIComponent(r.company_name.toLowerCase().replace(/\s+/g, '-'))}#reports`} style={{ display: 'inline-block', marginTop: '.5rem', fontFamily: 'var(--mono)', fontSize: '.58rem', color: 'var(--muted)', textDecoration: 'none' }}>
+                      + {r.more_from_company} more from {displayCompanyName(r.company_name)} on its page →
+                    </a>
+                  )}
                 </div>
               )
             })}
@@ -220,7 +230,7 @@ export default function FeedPage() {
                   disabled={loadingMore}
                   style={{ background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 8, padding: '.65rem 1.5rem', fontFamily: 'var(--mono)', fontSize: '.68rem', color: 'var(--sub)', cursor: loadingMore ? 'not-allowed' : 'pointer', opacity: loadingMore ? 0.6 : 1 }}
                 >
-                  {loadingMore ? 'Loading...' : `Load more (${total - offset - PAGE_SIZE} remaining)`}
+                  {loadingMore ? 'Loading...' : `Load more${total > offset ? ` (${(total - offset).toLocaleString()} to read)` : ''}`}
                 </button>
               </div>
             )}
