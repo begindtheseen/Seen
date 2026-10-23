@@ -10,13 +10,14 @@ import CompanyScoreCard from '@/components/CompanyScoreCard'
 import { isPublicDiscussion, isEmployeeReview, isImportedReview, reportDate, reportSourceBadge, reportSourceLink, sortReportsByDate } from '@/lib/reportSource'
 import ReportSourceLink from '@/components/ReportSourceLink'
 import { aggregateJobLocations } from '@/lib/jobLocations'
-import CompanyRedditDiscussion from '@/components/CompanyRedditDiscussion'
+import CompanyRedditDiscussion, { type RedditDiscussionResult } from '@/components/CompanyRedditDiscussion'
 import CompanyPublicRecord from '@/components/CompanyPublicRecord'
 import IndustryBenchmark, { type Benchmark } from '@/components/IndustryBenchmark'
 import Odometer from '@/components/motion/Odometer'
 import { isGradeableScore, notEnoughReviewsLabel, gradeBasisLabel, MIN_REPORTS_FOR_GRADE } from '@/lib/gradeGate'
 import { Crumbs } from '@/components/shell/PageHeader'
 import ListingSignals from '@/components/ListingSignals'
+import { gradeLetter, displayCompanyName, isResolvedOutcome, lastUpdatedLabel } from '@/lib/companyDisplay'
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -43,6 +44,8 @@ interface CompanyScore {
   industry?: string
   summary?: string
   web_reviews?: WebReview[]
+  /** When the score was last (re)computed (api/reports.js _rowToScore). */
+  updated_at?: string | null
 }
 
 interface Report {
@@ -73,13 +76,8 @@ type SectionKey = 'odds' | 'breakdown' | 'reports' | 'online' | 'reddit' | 'loca
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
-function letterGrade(score: number): string {
-  if (score >= 80) return 'A'
-  if (score >= 65) return 'B'
-  if (score >= 50) return 'C'
-  if (score >= 35) return 'D'
-  return 'F'
-}
+// ONE grade scale for the page, the sticky strip, the share card and the OG image (lib/companyDisplay.ts).
+const letterGrade = (score: number): string => gradeLetter(score)
 
 // Convert a stored rate (fraction in [0,1]) to a clamped whole-number percent. Raw values
 // out of range (e.g. a hand-math merge writing 34.0 instead of 0.34) clamp to 0–100 and warn
@@ -431,9 +429,12 @@ function Section({ id, icon, title, summary, count, open, onToggle, children }: 
 export default function CompanyPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = use(params)
   const companyName = decodeURIComponent(slug).replace(/-/g, ' ')
-  // The report form is pre-filled with this company, named the way this page shows it (capitalized),
-  // so "Report experience" from a company page never asks which company again.
-  const reportHref = `/report?company=${encodeURIComponent(companyName.replace(/\b\w/g, c => c.toUpperCase()))}&from=company`
+  // How the company is shown everywhere on this page ("walmart" → "Walmart", "aaa" → "AAA"). Lookups
+  // keep using the lowercase slug name; only the rendering changes (lib/companyDisplay.ts).
+  const displayName = displayCompanyName(companyName)
+  // The report form is pre-filled with this company, named the way this page shows it, so "Report
+  // experience" from a company page never asks which company again.
+  const reportHref = `/report?company=${encodeURIComponent(displayName)}&from=company`
 
   const [reports, setReports] = useState<Report[]>([])
   const [score, setScore] = useState<CompanyScore | null>(null)
@@ -466,6 +467,22 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
     let alive = true
     fetch('/api/reports', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'employer_perk', name: companyName }) })
       .then(r => r.json()).then(d => { if (alive && d) setPerk({ featured: !!d.featured, verified: !!d.verified }) }).catch(() => {})
+    return () => { alive = false }
+  }, [companyName])
+  // Reddit discussion is fetched by the page (cache-first endpoint) so the SECTION can be hidden when
+  // fewer than two relevant threads exist — one coincidental thread is not "discussion". null = not
+  // answered yet (the section shows while checking).
+  const [reddit, setReddit] = useState<RedditDiscussionResult | null>(null)
+  useEffect(() => {
+    let alive = true
+    fetch('/api/company-reddit', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ company: companyName }) })
+      .then(r => r.json().catch(() => ({})))
+      .then((j: { items?: RedditDiscussionResult['items']; status?: string }) => {
+        if (!alive) return
+        const items = Array.isArray(j.items) ? j.items : []
+        setReddit({ items, status: j.status === 'checking' ? 'checking' : items.length ? 'ok' : 'empty' })
+      })
+      .catch(() => { if (alive) setReddit({ items: [], status: 'error' }) })
     return () => { alive = false }
   }, [companyName])
   const [companyJobs, setCompanyJobs] = useState<Array<{title:string;company:string;location:string;salary:string|null;url:string|null;source:string;type:string;level:string;score:number}>>([])
@@ -651,10 +668,10 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
   function share() {
     const url = window.location.href.split('#')[0]
     const data = {
-      title: `${companyName} on Seen`,
+      title: `${displayName} on Seen`,
       text: isGradeableScore(score)
-        ? `${companyName} has a Seen score of ${score.overall_score}/100`
-        : `${companyName} on Seen — real applicant reports on how they hire`,
+        ? `${displayName} has a Seen score of ${score.overall_score}/100 (${letterGrade(score.overall_score)})`
+        : `${displayName} on Seen — real applicant reports on how they hire`,
       url,
     }
     if (navigator.share) { navigator.share(data).catch(() => {}); return }
@@ -696,13 +713,23 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
   // the score — lib/server/reportCounts.js).
   const hiringReports = reports.filter(r => !isEmployeeReview(r))
   const employeeN = reports.length - hiringReports.length
-  const oc = hiringReports.reduce((m, r) => { const k = r.outcome || 'unknown'; m[k] = (m[k] || 0) + 1; return m }, {} as Record<string, number>)
+  // "Applicant reports" = rows with a decided outcome — the same rows the grade is built from
+  // (lib/server/reportCounts.js scorableResolvedCountPath). Rows still "waiting" are listed but counted
+  // apart: the header said "48 applicant reports" while this section said 77 (29 were waiting).
+  const outcomeReports = hiringReports.filter(r => isResolvedOutcome(r.outcome))
+  const waitingN = hiringReports.length - outcomeReports.length
+  const oc = outcomeReports.reduce((m, r) => { const k = r.outcome || 'unknown'; m[k] = (m[k] || 0) + 1; return m }, {} as Record<string, number>)
   const ghostedN = oc.ghosted || 0
   const hiredN = (oc.hired || 0) + (oc.offer || 0)
   const interviewN = (oc.interview || 0) + (oc.human || 0) + (oc.interviewing || 0)
-  const thirdPartyN = hiringReports.filter(r => isPublicDiscussion(r.platform)).length
-  const importedN = hiringReports.filter(r => isImportedReview(r.platform)).length
-  const seenN = hiringReports.length - thirdPartyN - importedN
+  const thirdPartyN = outcomeReports.filter(r => isPublicDiscussion(r.platform)).length
+  const importedN = outcomeReports.filter(r => isImportedReview(r.platform)).length
+  const seenN = outcomeReports.length - thirdPartyN - importedN
+  // The list: what was submitted to Seen first, then everything compiled from public discussion and
+  // review sites under its own heading — a raw Reddit quote must never look like a Seen user's report.
+  const seenRows = reports.filter(r => !isPublicDiscussion(r.platform) && !isImportedReview(r.platform))
+  const publicRows = reports.filter(r => isPublicDiscussion(r.platform) || isImportedReview(r.platform))
+  const updatedLine = graded ? lastUpdatedLabel(score.updated_at) : ''
 
   const ocLabel: Record<string, string> = {
     ghosted: '👻 Ghosted', autoreject: '🤖 Auto-rejected',
@@ -798,7 +825,7 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
     <div className="page-full">
       <div className="co-page">
         {/* Where you are: Dashboard › Companies › {name} — the same trail every inner page carries. */}
-        <Crumbs items={[{ href: '/companies', label: 'Companies' }]} current={<span style={{ textTransform: 'capitalize' }}>{companyName}</span>} />
+        <Crumbs items={[{ href: '/companies', label: 'Companies' }]} current={displayName} />
 
         {/* ── "You applied here" context strip ── */}
         {myApp && (
@@ -827,7 +854,7 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
             <div className="co-sticky-in">
               <button type="button" className="co-sticky-back" onClick={goBack} aria-label="Back" tabIndex={stuck ? 0 : -1}>←</button>
               <span className="co-sticky-logo" aria-hidden>{logoLetter}</span>
-              <span className="co-sticky-name">{companyName}</span>
+              <span className="co-sticky-name">{displayName}</span>
               {graded && (
                 <span className="co-sticky-grade">
                   <span className={`co-sticky-letter ${risk}`}>{g}</span>
@@ -845,7 +872,7 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
             <div className="co-logo-lg">{logoLetter}</div>
             <div className="co-id">
               <div className="co-name">
-                {companyName}
+                {displayName}
                 {perk.verified && (
                   <span className="co-badge co-badge-verified" title="This employer committed to responding to applicants. Reviewed against real outcome data — it never affects the transparency score.">✓ Transparency Verified</span>
                 )}
@@ -888,8 +915,8 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
                 <span className="co-grade-score" style={{ fontSize: '.95rem' }}>{ungradedLabel}</span>
                 <p className="co-verdict">
                   {fpReports > 0
-                    ? `We have ${gradeBasisLabel(score)} for ${companyName} so far. A grade appears at ${MIN_REPORTS_FOR_GRADE} — each report counts 1, each thing people say online counts ½.`
-                    : `No applicant reports for ${companyName} yet. A grade appears once ${MIN_REPORTS_FOR_GRADE} real reports are in.`}
+                    ? `We have ${gradeBasisLabel(score)} for ${displayName} so far. A grade appears at ${MIN_REPORTS_FOR_GRADE} — each report counts 1, each thing people say online counts ½.`
+                    : `No applicant reports for ${displayName} yet. A grade appears once ${MIN_REPORTS_FOR_GRADE} real reports are in.`}
                 </p>
                 <div className="co-grade-meta">
                   <a href={reportHref} className="co-live" style={{ textDecoration: 'none' }}>+ Add yours to help grade it</a>
@@ -907,19 +934,28 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
                   <div className="co-grade-meta">
                     {score.data_quality && <DataQualityBadge dq={score.data_quality} reportCount={fpReports} webCount={webEst} employeeCount={score.employee_review_count || 0} mentionCount={score.mention_count || 0} />}
                     {fpReports === 0 && webEst > 0 && <span className="co-live">web-research estimate</span>}
+                    {updatedLine && <span className="co-dq" style={{ color: 'var(--muted)' }}>{updatedLine}</span>}
                   </div>
                 </div>
               </div>
 
               <VibeTagList sc={score} />
 
-              <div className="co-mets co-mets-5">
-                <MetBox label="Response" value={pct(score.response_rate)} color="var(--blue)" />
-                <MetBox label="Ghosted" value={pct(score.ghost_rate)} alarm={ghostHigh} color={ghostColor} />
-                <MetBox label="Avg wait" value={score.avg_wait_days != null ? `${score.avg_wait_days}d` : '—'} color={waitColor} />
-                <MetBox label="Rounds" value={score.avg_rounds != null ? score.avg_rounds.toFixed(1) : '—'} />
-                <MetBox label="Waste risk" value={score.waste != null ? `${score.waste}%` : '—'} color={wasteColor} />
-              </div>
+              {/* A number the reports never gave (no wait or round counts on any row) is left out, never shown as "—". */}
+              {(() => {
+                const tiles = [
+                  score.response_rate != null ? <MetBox key="r" label="Response" value={pct(score.response_rate)} color="var(--blue)" /> : null,
+                  score.ghost_rate != null ? <MetBox key="g" label="Ghosted" value={pct(score.ghost_rate)} alarm={ghostHigh} color={ghostColor} /> : null,
+                  score.avg_wait_days != null ? <MetBox key="w" label="Avg wait" value={`${score.avg_wait_days}d`} color={waitColor} /> : null,
+                  score.avg_rounds != null ? <MetBox key="n" label="Rounds" value={score.avg_rounds.toFixed(1)} /> : null,
+                  score.waste != null ? <MetBox key="x" label="Waste risk" value={`${score.waste}%`} color={wasteColor} /> : null,
+                ].filter(Boolean)
+                return tiles.length > 0 ? (
+                  <div className={`co-mets${tiles.length === 5 ? ' co-mets-5' : ''}`} style={tiles.length !== 5 ? { gridTemplateColumns: `repeat(${tiles.length}, minmax(0, 1fr))` } : undefined}>
+                    {tiles}
+                  </div>
+                ) : null
+              })()}
             </>
           ) : (
             <div style={{ textAlign: 'center', padding: '1.5rem 1rem', color: 'var(--muted)', fontFamily: 'var(--mono)', fontSize: '.72rem' }}>
@@ -936,7 +972,7 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
             <div className="co-actions">
               <TrackCTA companyName={companyName} />
               <div className="co-action-row">
-                <a href={`/resume?company=${encodeURIComponent(companyName || '')}`} className="co-act co-act-primary"><span>✨ Analyze résumé for <span style={{ textTransform: 'capitalize' }}>{companyName}</span></span></a>
+                <a href={`/resume?company=${encodeURIComponent(companyName || '')}`} className="co-act co-act-primary"><span>✨ Analyze résumé for {displayName}</span></a>
                 <a href={reportHref} className="co-act">📝 Report experience</a>
               </div>
               <div className="co-chip-row">
@@ -948,7 +984,7 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
                     clean URL; visitors landing with ?sv= see the normal page. */}
                 <a
                   className="co-chip co-chip-reddit"
-                  href={`https://reddit.com/submit?url=${encodeURIComponent(`https://seenjobs.io/company/${slug}${graded ? `?sv=${score.overall_score}` : ''}`)}&title=${encodeURIComponent(graded ? `Is ${companyName} worth applying to? Seen score: ${score.overall_score}/100` : `Is ${companyName} worth applying to? Applicant reports on Seen`)}`}
+                  href={`https://reddit.com/submit?url=${encodeURIComponent(`https://seenjobs.io/company/${slug}${graded ? `?sv=${score.overall_score}` : ''}`)}&title=${encodeURIComponent(graded ? `Is ${displayName} worth applying to? Seen score: ${score.overall_score}/100` : `Is ${displayName} worth applying to? Applicant reports on Seen`)}`}
                   target="_blank" rel="noopener noreferrer"
                 >🔴 Post to Reddit</a>
                 {graded && <button type="button" className="co-chip" onClick={() => setShowGradeCard(true)}>🖼 Grade card</button>}
@@ -959,8 +995,9 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
           {showGradeCard && graded && (
             <CompanyScoreCard
               data={{
-                company: companyName,
+                company: displayName,
                 industry: industry || score.industry,
+                updated_at: score.updated_at,
                 overall_score: score.overall_score,
                 ghost_rate: score.ghost_rate ?? 0,
                 response_rate: score.response_rate ?? 0,
@@ -991,10 +1028,10 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
             {graded && (
               <Section id="odds" icon="📅" title="Your odds here" open={open.odds} onToggle={toggle}
                 summary={`${score.avg_wait_days != null ? `${score.avg_wait_days}d typical wait · ` : ''}${respPct}% hear back · your response probability & industry rank`}>
-                <HiringProbability responseRate={score.response_rate} ghostRate={score.ghost_rate} overallScore={score.overall_score} />
+                <HiringProbability responseRate={score.response_rate} ghostRate={score.ghost_rate} overallScore={score.overall_score} reportCount={fpReports} />
                 {benchmark && (
                   <div style={{ margin: '1rem 0 0' }}>
-                    <IndustryBenchmark benchmark={benchmark} variant="public" companyName={companyName} />
+                    <IndustryBenchmark benchmark={benchmark} variant="public" companyName={displayName} />
                   </div>
                 )}
               </Section>
@@ -1034,18 +1071,19 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
 
             {/* The list holds applicant reports AND employee reviews, so the header names both and counts
                 each separately — it used to read "Applicant reports 100" for 15 accounts + 85 reviews. */}
-            <Section id="reports" icon="🗣" title={employeeN > 0 ? 'Applicant reports & employee reviews' : 'Applicant reports'} count={employeeN > 0 ? null : hiringReports.length} open={open.reports} onToggle={toggle}
+            <Section id="reports" icon="🗣" title={employeeN > 0 ? 'Applicant reports & employee reviews' : 'Applicant reports'} count={employeeN > 0 ? null : outcomeReports.length} open={open.reports} onToggle={toggle}
               summary={reports.length > 0
-                ? [`${hiringReports.length} applicant report${hiringReports.length !== 1 ? 's' : ''}`, employeeN > 0 ? `${employeeN} employee review${employeeN !== 1 ? 's' : ''}` : '', `${ghostedN} ghosted`, `${interviewN} interviewed`, `${hiredN} hired`, thirdPartyN > 0 ? `${thirdPartyN} from public discussions` : ''].filter(Boolean).join(' · ')
+                ? [`${outcomeReports.length} applicant report${outcomeReports.length !== 1 ? 's' : ''}`, waitingN > 0 ? `${waitingN} still waiting (no outcome yet)` : '', employeeN > 0 ? `${employeeN} employee review${employeeN !== 1 ? 's' : ''}` : '', `${ghostedN} ghosted`, `${interviewN} interviewed`, `${hiredN} hired`, thirdPartyN > 0 ? `${thirdPartyN} from public discussion` : ''].filter(Boolean).join(' · ')
                 : 'None yet — be the first to report'}>
               <div className="co-reports-tools">
                 <div style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', color: 'var(--muted)', lineHeight: 1.6, flex: 1, minWidth: 180 }}>
                   {reports.length > 0
-                    ? (thirdPartyN > 0 || importedN > 0 || employeeN > 0
-                        ? [`${hiringReports.length} applicant report${hiringReports.length !== 1 ? 's' : ''}`,
+                    ? (thirdPartyN > 0 || importedN > 0 || employeeN > 0 || waitingN > 0
+                        ? [`${outcomeReports.length} applicant report${outcomeReports.length !== 1 ? 's' : ''} with an outcome`,
                             seenN > 0 ? `${seenN} submitted to Seen` : '',
                             importedN > 0 ? `${importedN} imported from review sites (reduced weight)` : '',
-                            thirdPartyN > 0 ? `${thirdPartyN} found in public discussions (reduced weight)` : '',
+                            thirdPartyN > 0 ? `${thirdPartyN} found in public discussion (reduced weight)` : '',
+                            waitingN > 0 ? `${waitingN} still waiting — not counted until they resolve` : '',
                             employeeN > 0 ? `${employeeN} employee review${employeeN !== 1 ? 's' : ''} (their letter grades adjust the score; they are not hiring outcomes)` : '',
                           ].filter(Boolean).join(' · ')
                         : `${reports.length} report${reports.length !== 1 ? 's' : ''} submitted to Seen · anonymous applicant claims`)
@@ -1062,20 +1100,39 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
               </div>
               {reports.length > 0 ? (
                 <>
-                  {reports.slice(0, reportsShown).map(r => {
+                  {[...seenRows, ...publicRows].slice(0, reportsShown).map((r, i) => {
                     const badge = reportSourceBadge(r.platform, r.report_text)
                     const employee = isEmployeeReview(r)
                     const src = reportSourceLink(r.platform, r.report_text)
                     const body = src ? src.body : r.report_text
                     const when = reportDate(r.platform, r.report_text, r.created_at).label
+                    const isPublic = i >= seenRows.length
+                    // Group headings: Seen submissions first, then everything quoted from public sources.
+                    const heading = i === 0 && seenRows.length > 0 && publicRows.length > 0
+                      ? <div className="co-sec-lbl" style={{ margin: '.2rem 0 .6rem' }}>Submitted to Seen · {seenRows.length}</div>
+                      : i === seenRows.length && publicRows.length > 0
+                        ? (
+                          <div style={{ margin: `${i === 0 ? '.2rem' : '1.1rem'} 0 .6rem` }}>
+                            <div className="co-sec-lbl">From public discussion &amp; review sites · {publicRows.length}</div>
+                            <div style={{ fontFamily: 'var(--mono)', fontSize: '.56rem', color: 'var(--muted)', lineHeight: 1.6, marginTop: '.25rem' }}>
+                              Quoted from public threads and review sites, each linked to its source. Counted at reduced weight — not submitted by a Seen user.
+                            </div>
+                          </div>
+                        )
+                        : null
+                    const roleLine = r.role && !/^unknown/i.test(r.role) ? r.role : ''
                     return (
-                      <div key={r.id} className={`rcard${r.outcome ? ` outcome-${r.outcome}` : ''}`}>
+                      <div key={r.id} style={{ display: 'contents' }}>
+                      {heading}
+                      <div className={`rcard${r.outcome ? ` outcome-${r.outcome}` : ''}${isPublic ? ' rcard-public' : ''}`} style={isPublic ? { borderStyle: 'dashed' } : undefined}>
                         <div className="rc-hd">
                           <div style={{ flex: 1, minWidth: 0 }}>
-                            <div className="rc-role">
-                              {r.role || 'Unknown role'}
-                              {r.ghost_stage && <span style={{ color: 'var(--muted)' }}> · ghosted at {r.ghost_stage.replace(/_/g, ' ')}</span>}
-                            </div>
+                            {(roleLine || r.ghost_stage) && (
+                              <div className="rc-role">
+                                {roleLine}
+                                {r.ghost_stage && <span style={{ color: 'var(--muted)' }}>{roleLine ? ' · ' : ''}ghosted at {r.ghost_stage.replace(/_/g, ' ')}</span>}
+                              </div>
+                            )}
                             <div className="rc-meta">
                               {[r.city ? `📍 ${r.city}` : '', r.rounds ? `${r.rounds} round${r.rounds !== 1 ? 's' : ''}` : '', when].filter(Boolean).join(' · ')}
                             </div>
@@ -1102,6 +1159,7 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
                           {src && <ReportSourceLink url={src.url} host={src.host} posted={src.posted} className="rc-srclink" />}
                         </div>
                       </div>
+                      </div>
                     )
                   })}
                   {reports.length > reportsShown && (
@@ -1114,7 +1172,7 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
                 <div style={{ textAlign: 'center', padding: '1.5rem 1rem', color: 'var(--muted)', fontFamily: 'var(--mono)', fontSize: '.7rem', lineHeight: 1.7 }}>
                   {location
                     ? <>No reports mention &ldquo;{location}&rdquo;. <button type="button" onClick={() => setLocation('')} style={{ background: 'none', border: 'none', color: 'var(--blue)', cursor: 'pointer', fontFamily: 'inherit', fontSize: 'inherit', padding: 0 }}>Clear the city filter</button></>
-                    : <>No community reports yet — {companyName} gets a grade once {MIN_REPORTS_FOR_GRADE} real reports are in.</>}
+                    : <>No community reports yet — {displayName} gets a grade once {MIN_REPORTS_FOR_GRADE} real reports are in.</>}
                   {gatheringPublic && <EnrichmentNotice companyName={companyName} />}
                   <div style={{ marginTop: '.6rem' }}><a href={reportHref} style={{ color: 'var(--green)', textDecoration: 'none' }}>Be the first to report →</a></div>
                 </div>
@@ -1128,15 +1186,19 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
               </Section>
             )}
 
-            <Section id="reddit" icon="🔴" title="Reddit discussion" open={open.reddit} onToggle={toggle}
-              summary={`Live public threads mentioning ${companyName} — every item links to its source`}>
-              <CompanyRedditDiscussion companyName={companyName} hasReportData={reports.length > 0 || !!score} />
-            </Section>
+            {/* Shown only while checking, or once at least two threads about hiring at this company exist
+                (api/company-reddit.js MIN_SHOW_THREADS). A page without real discussion has no Reddit row. */}
+            {(reddit === null || reddit.status === 'checking' || reddit.items.length >= 2) && (
+              <Section id="reddit" icon="🔴" title="Reddit discussion" count={reddit?.items.length || null} open={open.reddit} onToggle={toggle}
+                summary={reddit?.items.length ? `${reddit.items.length} public threads about hiring at ${displayName} — every item links to its source` : `Checking public threads about hiring at ${displayName}…`}>
+                <CompanyRedditDiscussion companyName={displayName} hasReportData={reports.length > 0 || !!score} prefetched={reddit} />
+              </Section>
+            )}
 
             <Section id="locations" icon="📍" title="Locations" open={open.locations} onToggle={toggle}
               summary={cityRows.length > 0
-                ? `${cityRows.length} cit${cityRows.length === 1 ? 'y' : 'ies'} with reported outcomes · where ${companyName} is hiring now`
-                : `Where ${companyName} is hiring now · no reports name a city yet`}>
+                ? `${cityRows.length} cit${cityRows.length === 1 ? 'y' : 'ies'} with reported outcomes · where ${displayName} is hiring now`
+                : `Where ${displayName} is hiring now · no reports name a city yet`}>
               {cityRows.length > 0 && (
                 <div style={{ marginBottom: '1.5rem' }}>
                   <div className="co-sec-lbl" style={{ marginBottom: '.35rem' }}>Reported outcomes by city</div>
@@ -1172,7 +1234,7 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
                 </div>
               )}
               <div>
-                <div className="co-sec-lbl" style={{ marginBottom: '.35rem' }}>Where {companyName} is hiring</div>
+                <div className="co-sec-lbl" style={{ marginBottom: '.35rem' }}>Where {displayName} is hiring</div>
                 {jobsLoading || !jobsFetched ? (
                   <div style={{ ...sectionNote, marginBottom: 0 }}>Checking current job listings…</div>
                 ) : hiringRows.length > 0 ? (
@@ -1216,10 +1278,10 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
             </Section>
 
             <Section id="roles" icon="💼" title="Open roles" count={jobsFetched ? companyJobs.length : null} open={open.roles} onToggle={toggle}
-              summary={jobsFetched ? (companyJobs.length > 0 ? `${companyJobs.length} current listing${companyJobs.length !== 1 ? 's' : ''} · apply with the ${graded ? 'grade' : 'reports'} in mind` : 'No open roles found right now') : `Current job listings at ${companyName}`}>
+              summary={jobsFetched ? (companyJobs.length > 0 ? `${companyJobs.length} current listing${companyJobs.length !== 1 ? 's' : ''} · apply with the ${graded ? 'grade' : 'reports'} in mind` : 'No open roles found right now') : `Current job listings at ${displayName}`}>
               {jobsLoading && (
                 <div style={{ textAlign: 'center', padding: '1.5rem', color: 'var(--muted)', fontFamily: 'var(--mono)', fontSize: '.7rem' }}>
-                  Searching for open roles at {companyName}…
+                  Searching for open roles at {displayName}…
                 </div>
               )}
               {!jobsLoading && jobsFetched && companyJobs.length === 0 && (
@@ -1256,7 +1318,7 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
             </Section>
 
             <Section id="compare" icon="⚡" title="Compare" open={open.compare} onToggle={toggle}
-              summary={compareList.length > 0 ? `${companyName} vs ${compareList.map(c => c.name).join(' & ')}` : 'Side by side with up to 2 other companies'}>
+              summary={compareList.length > 0 ? `${displayName} vs ${compareList.map(c => c.name).join(' & ')}` : 'Side by side with up to 2 other companies'}>
               <div className="co-cmp-form">
                 <input
                   type="text"
@@ -1300,7 +1362,7 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
                       <tr>
                         <th className="co-cmp-metric-h">Metric</th>
                         <th className="co-cmp-co">
-                          <div className="co-cmp-name">{companyName}</div>
+                          <div className="co-cmp-name">{displayName}</div>
                           <div style={{ fontFamily: 'var(--mono)', fontSize: '.5rem', color: 'var(--blue)', textTransform: 'uppercase', letterSpacing: '.08em' }}>current</div>
                         </th>
                         {compareList.map(c => (

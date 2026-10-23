@@ -5,6 +5,8 @@
 import { tenureAdjustment } from '@/api/_utils/companyScore.js'
 import { firstPartyReportCount as firstPartyCountOf, webClaimCount, isGradeable, MIN_REPORTS_FOR_GRADE } from '@/lib/server/reportCounts.js'
 import { mentionSel } from '@/lib/server/scoreColumns.js'
+import { scoreUpdatedAt } from '@/lib/server/reportCounts.js'
+import { gradeLetter, displayCompanyName as displayName } from '@/lib/companyDisplay'
 
 export { MIN_REPORTS_FOR_GRADE }
 
@@ -30,6 +32,8 @@ export type GrowthScore = {
   industry?: string | null
   waste?: number | null
   summary?: string | null
+  /** When the stored score was last (re)computed — the "Last updated" under the grade. */
+  updated_at?: string | null
 }
 
 // Honest count for public claims ("N applicant reports", schema.org ratingCount): first-party
@@ -149,7 +153,7 @@ async function scoreFromDb(name: string): Promise<GrowthScore | null> {
   const creds = sbCreds()
   if (!creds) return null
   const headers = { apikey: creds.key, Authorization: `Bearer ${creds.key}` }
-  const sel = `select=company_name,overall_score,ghost_rate,response_rate,avg_wait_days,avg_rounds,report_count,first_party_report_count${await mentionSel(creds.url, headers)},web_report_count,data_source,waste_score,industry,raw_summary,avg_tenure_months,tenure_sample_count`
+  const sel = `select=company_name,overall_score,ghost_rate,response_rate,avg_wait_days,avg_rounds,report_count,first_party_report_count${await mentionSel(creds.url, headers)},web_report_count,data_source,waste_score,industry,raw_summary,avg_tenure_months,tenure_sample_count,created_at,expires_at`
   try {
     const enc = encodeURIComponent(name.toLowerCase().trim())
     let r = await fetch(`${creds.url}/rest/v1/company_scores?company_name=ilike.${enc}&${sel}&order=created_at.desc&limit=1`, { headers, signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) })
@@ -183,6 +187,7 @@ async function scoreFromDb(name: string): Promise<GrowthScore | null> {
       industry: row.industry || null,
       waste: gradeable ? row.waste_score ?? null : null,
       summary: /^estimated baseline/i.test(String(row.raw_summary || '')) ? null : (row.raw_summary || null),
+      updated_at: scoreUpdatedAt(row),
     }
   } catch {
     return null
@@ -231,17 +236,14 @@ export const titleCase = (slug: string) =>
 // renders "Lowe S" and \b\w would render "Lowe'S". This only capitalizes the first letter of
 // each space-separated word, so punctuation inside a word survives. Prefer it whenever a
 // score row is in hand — the stored name carries the company's real punctuation.
-export const displayCompanyName = (name: string) =>
-  String(name).split(' ').map((w) => (w ? w.charAt(0).toUpperCase() + w.slice(1) : w)).join(' ')
+// Canonical implementation: lib/companyDisplay.ts (shared with every client surface).
+export const displayCompanyName = (name: string) => displayName(name)
 
-// 0–100 score → letter grade. Matches the scale used on the companies leaderboard.
-// Callers must only pass a GRADEABLE score (see GrowthScore.gradeable) — never a 0 stand-in.
+// 0–100 score → letter grade. ONE scale for the page, the share card, the OG image and the
+// leaderboard (lib/companyDisplay.ts gradeLetter). Callers must only pass a GRADEABLE score (see
+// GrowthScore.gradeable) — never a 0 stand-in.
 export function grade(score: number): string {
-  if (score >= 80) return 'A'
-  if (score >= 65) return 'B'
-  if (score >= 50) return 'C'
-  if (score >= 35) return 'D'
-  return 'F'
+  return gradeLetter(score)
 }
 
 export const riskColor = (risk?: string | null): string =>

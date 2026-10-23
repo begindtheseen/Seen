@@ -11,6 +11,7 @@ import { useScrollLock } from '@/components/ModalPortal'
 import { drawCompanyCard, type CompanyCardData } from '@/lib/cardKit'
 import { shareCardImage, shareHint, type ShareDest } from '@/lib/shareCard'
 import { track } from '@/lib/analytics'
+import { gradeLetter, displayCompanyName, lastUpdatedLabel } from '@/lib/companyDisplay'
 
 // Only ever rendered for a GRADEABLE score (lib/gradeGate.ts) — the company page hides the
 // "Grade card" action below MIN_REPORTS_FOR_GRADE real reports, so no PNG is minted from 2 reviews.
@@ -25,15 +26,13 @@ export interface CompanyScoreCardData {
   report_count: number
   risk?: 'safe' | 'warn' | 'danger'
   tags?: string[]
+  /** When the score was last (re)computed — printed on the card as "updated <date>". */
+  updated_at?: string | null
 }
 
-function letterGrade(s: number) {
-  if (s >= 90) return 'A+'; if (s >= 85) return 'A'; if (s >= 80) return 'A-'
-  if (s >= 77) return 'B+'; if (s >= 73) return 'B'; if (s >= 70) return 'B-'
-  if (s >= 67) return 'C+'; if (s >= 63) return 'C'; if (s >= 60) return 'C-'
-  if (s >= 55) return 'D+'; if (s >= 50) return 'D'; if (s >= 45) return 'D-'
-  return 'F'
-}
+// The SAME letter the page shows (lib/companyDisplay.ts). The card used its own 13-step A+/A/A-
+// scale, so a page that said "A · 91" minted a card that said "A+" (audit 2026-10-23).
+const letterGrade = (s: number) => gradeLetter(s)
 
 export default function CompanyScoreCard({ data, shareUrl, onClose, onShared }: { data: CompanyScoreCardData; shareUrl?: string; onClose: () => void; onShared?: (via: string) => void }) {
   const [dataUrl, setDataUrl] = useState<string | null>(null)
@@ -51,11 +50,13 @@ export default function CompanyScoreCard({ data, shareUrl, onClose, onShared }: 
   const risk = data.risk ?? (score >= 70 ? 'safe' : score >= 40 ? 'warn' : 'danger')
   const OC = risk === 'safe' ? '#10b981' : risk === 'danger' ? '#ef4444' : '#f59e0b'
   const grade = letterGrade(score)
+  const company = displayCompanyName(data.company) || 'Company'
+  const updated = lastUpdatedLabel(data.updated_at)
   const shareText = risk === 'danger'
-    ? `${data.company} scores ${score}/100 (${grade}) on Seen — ${Math.round((data.ghost_rate || 0) * 100)}% ghost rate. Research before you apply.`
+    ? `${company} scores ${score}/100 (${grade}) on Seen — ${Math.round((data.ghost_rate || 0) * 100)}% ghost rate. Research before you apply.`
     : risk === 'warn'
-    ? `${data.company} scores ${score}/100 (${grade}) on Seen. Know before you apply.`
-    : `${data.company} scores ${score}/100 (${grade}) on Seen — strong hiring process.`
+    ? `${company} scores ${score}/100 (${grade}) on Seen. Know before you apply.`
+    : `${company} scores ${score}/100 (${grade}) on Seen — strong hiring process.`
 
   useEffect(() => { setMounted(true) }, [])
 
@@ -67,7 +68,7 @@ export default function CompanyScoreCard({ data, shareUrl, onClose, onShared }: 
         await document.fonts.ready
         const canvas = document.createElement('canvas')
         const payload: CompanyCardData = {
-          company: data.company || 'Company',
+          company,
           grade,
           overall_score: score,
           ghost_rate: data.ghost_rate,
@@ -76,6 +77,7 @@ export default function CompanyScoreCard({ data, shareUrl, onClose, onShared }: 
           waste: data.waste,
           report_count: data.report_count,
           risk,
+          updated: updated ? updated.replace('Last updated', 'updated') : undefined,
         }
         drawCompanyCard(canvas, payload)
         setDataUrl(canvas.toDataURL('image/png'))
@@ -123,7 +125,7 @@ export default function CompanyScoreCard({ data, shareUrl, onClose, onShared }: 
     <div style={{ position: 'fixed', inset: 0, zIndex: 99999, background: 'rgba(4,5,12,0.985)', display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '1.5rem 1.25rem 2.5rem', overflowY: 'auto' }}>
       <div style={{ width: '100%', maxWidth: 480 }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem' }}>
-          <div style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', color: OC, textTransform: 'uppercase', letterSpacing: '.1em', fontWeight: 600 }}>Grade {grade} — {data.company}</div>
+          <div style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', color: OC, textTransform: 'uppercase', letterSpacing: '.1em', fontWeight: 600 }}>Grade {grade} — {company}{updated ? ` · ${updated}` : ''}</div>
           <button onClick={onClose} style={{ background: 'none', border: 'none', fontFamily: 'var(--mono)', fontSize: '.65rem', color: 'rgba(255,255,255,0.3)', cursor: 'pointer', padding: '.2rem .4rem' }}>✕ close</button>
         </div>
 
