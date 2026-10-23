@@ -18,6 +18,12 @@ import ModalPortal from '@/components/ModalPortal'
 import WithdrawModal from '@/components/WithdrawModal'
 import PageHeader from '@/components/shell/PageHeader'
 import InboxAutopilot from '@/components/tracker/InboxAutopilot'
+import ApplicationForm from '@/components/tracker/ApplicationForm'
+import ConfirmDialog from '@/components/tracker/ConfirmDialog'
+import StagePipeline from '@/components/tracker/StagePipeline'
+import { emptyForm, formFromApplication, toNewApplication, editChanges, type ApplicationForm as FormValues } from '@/lib/stores/applicationEdit'
+import { nextCheckLine, DAY_MS } from '@/lib/stores/checkSchedule'
+import s from '@/components/tracker/tracker.module.css'
 const SurveyModal = dynamic(() => import('@/components/SurveyModal'), { ssr: false })
 const ResumeSurveyModal = dynamic(() => import('@/components/ResumeSurveyModal'), { ssr: false })
 
@@ -54,10 +60,16 @@ function ghostWatch(days: number, intel?: Intel): Watch | null {
   return { tone: 'danger', text: `Day ${days} · ${x}× their ${avg}${gp >= 30 ? (est ? ` — estimated ghost rate ${gp}%. Likely ghosted.` : ` — they ghost ${gp}% of applicants here. Likely ghosted.`) : ' — likely ghosted.'}` }
 }
 
-function AppCard({ app, onUpdate, onRemove, onShare, onReload, intel, check, onAnswer, onSnooze }: {
+function AppCard({ app, expanded, setExpanded, onUpdate, onEdit, onRemove, onShare, onReload, intel, check, onAnswer, onSnooze }: {
   app: Application
+  /** One card open at a time (the page owns it, so the phone's floating button can get out of its way). */
+  expanded: boolean
+  setExpanded: (open: boolean) => void
   onUpdate: (id: string, changes: Partial<Application>) => void
-  onRemove: (id: string) => void
+  /** Opens the Edit form (company, role, location, platform, applied-on). */
+  onEdit: (app: Application) => void
+  /** Delete after its own confirm: AppStore.remove — nothing is reported anywhere. */
+  onRemove: (id: string) => Promise<void>
   onShare: (app: Application) => void
   onReload: () => void
   intel?: Intel
@@ -67,31 +79,37 @@ function AppCard({ app, onUpdate, onRemove, onShare, onReload, intel, check, onA
   onSnooze: (appId: string, checkType: string) => void
 }) {
   const [withdrawing, setWithdrawing] = useState(false)
+  const [deleting, setDeleting] = useState(false)
   const days = getDaysSince(app.appliedAt)
   const statusClass = STATUS_MAP[app.status] || ''
   const isActive = app.status === 'active'
-  const [expanded, setExpanded] = useState(false)
   const ghostRate = intel?.ghost_rate
   const watch = isActive ? ghostWatch(days, intel) : null
   const listing = listingHref(app)
-  const linkStyle = { fontFamily: 'var(--mono)', fontSize: '.58rem', color: 'var(--blue)', textDecoration: 'none' } as const
+  // 40px hit area without growing the row (negative vertical margin).
+  const linkStyle = { fontFamily: 'var(--mono)', fontSize: '.58rem', color: 'var(--blue)', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', minHeight: 40, padding: '0 .4rem', margin: '-8px -.4rem' } as const
+  // "Next check-in Oct 30 — did they respond?" — null while a check is due (the card asks it instead).
+  const nextLine = isActive && !check ? nextCheckLine(app.appliedAt, EventStore.answeredChecks(app.id)) : null
+  const fmt = (ms: number) => new Date(ms).toLocaleDateString('en-US', { timeZone: 'America/Los_Angeles', month: 'short', day: 'numeric' })
 
   return (
     <div className={`app-card ${statusClass}`} id={`app_${app.id}`}>
       {/* Clickable header — tap to expand/collapse update actions */}
       <div
         className="app-card-head"
-        onClick={() => { if (isActive) setExpanded(e => !e) }}
-        style={{ cursor: isActive ? 'pointer' : 'default' }}
+        onClick={() => { if (isActive) setExpanded(!expanded) }}
+        style={{ cursor: isActive ? 'pointer' : 'default', marginBottom: isActive ? '.35rem' : undefined }}
       >
         <div className="app-card-logo">{app.company.charAt(0)}</div>
         <div style={{ flex: 1, minWidth: 0 }}>
           <div className="app-card-co">{app.company}</div>
-          <div className="app-card-title">{app.role}</div>
+          <div className="app-card-title" style={{ overflowWrap: 'anywhere' }}>{app.role}</div>
           {app.location && <div style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', color: 'var(--muted)' }}>{app.location}</div>}
-          {/* Set by the employer from their Seen applications inbox (api/employer-listings syncApplicantTracker). */}
-          {app.employerStage && (
-            <div title="Updated by the employer on Seen" style={{ display: 'inline-flex', alignItems: 'center', gap: '.25rem', marginTop: '.25rem', fontFamily: 'var(--mono)', fontSize: '.55rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.06em', color: app.employerStage === 'Not selected' ? 'var(--red)' : 'var(--green)', border: '1px solid currentColor', borderRadius: 999, padding: '.12rem .5rem' }}>
+          {/* Set by the employer from their Seen applications inbox (lib/server/seenApply.js) — only an
+              Apply-on-Seen application has an employer on Seen. Prod's column default ("New") used to put
+              "EMPLOYER: NEW" on every hand-tracked card. */}
+          {app.seenApply && app.employerStage && (
+            <div className={`${s.empBadge}${app.employerStage === 'Not selected' ? ' ' + s.neg : ''}`} title={`${app.company} set this from their Seen applications inbox — it is their status for your application, not Seen's guess.`}>
               🏢 Employer: {app.employerStage}
             </div>
           )}
@@ -102,7 +120,7 @@ function AppCard({ app, onUpdate, onRemove, onShare, onReload, intel, check, onA
             const last = fromEmail[fromEmail.length - 1]
             const label: Record<string, string> = { application_submitted: 'confirmation', interview_received: 'interview invite', assessment_received: 'assessment', rejected: 'rejection', offer_received: 'offer' }
             return (
-              <div title="Updated from an email you forwarded to Seen" style={{ display: 'inline-flex', alignItems: 'center', gap: '.25rem', marginTop: '.25rem', marginLeft: app.employerStage ? '.35rem' : 0, fontFamily: 'var(--mono)', fontSize: '.55rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.06em', color: 'var(--blue)', border: '1px solid currentColor', borderRadius: 999, padding: '.12rem .5rem' }}>
+              <div title="Updated from an email you forwarded to Seen" style={{ display: 'inline-flex', alignItems: 'center', gap: '.25rem', marginTop: '.25rem', marginLeft: app.seenApply && app.employerStage ? '.35rem' : 0, fontFamily: 'var(--mono)', fontSize: '.55rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.06em', color: 'var(--blue)', border: '1px solid currentColor', borderRadius: 999, padding: '.12rem .5rem' }}>
                 ✉ From email: {label[String(last.type)] || 'update'}
               </div>
             )
@@ -119,24 +137,16 @@ function AppCard({ app, onUpdate, onRemove, onShare, onReload, intel, check, onA
           )}
           <span style={{ fontFamily: 'var(--mono)', fontSize: '.55rem', color: 'var(--muted)', background: 'var(--raised)', border: '1px solid var(--line)', borderRadius: 4, padding: '.1rem .35rem' }}>Day {days}</span>
           {isActive && (
-            <span style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', color: 'var(--blue)', marginTop: '.1rem' }}>{expanded ? '▲' : 'Update ▼'}</span>
+            <button type="button" className={s.toggle} aria-expanded={expanded} onClick={e => { e.stopPropagation(); setExpanded(!expanded) }}>
+              {expanded ? '▲ Close' : 'Update ▼'}
+            </button>
           )}
         </div>
       </div>
 
-      {/* Stage pipeline (active only, collapsed when expanded to save space) */}
-      {isActive && !expanded && (
-        <div className="stage-pipe" style={{ marginTop: '.65rem' }}>
-          {STAGES.map((s, i) => {
-            const stageIdx = STAGES.indexOf(app.stage as typeof STAGES[number])
-            const isDone = i < stageIdx
-            const isCurrent = i === stageIdx
-            return (
-              <div key={s} className={`stage-step ${isDone ? 'done' : ''} ${isCurrent ? 'current' : ''}`} title={s}>{s}</div>
-            )
-          })}
-        </div>
-      )}
+      {/* Stage control — six buttons on wide screens, chip + "Next: … →" on phones. */}
+      {isActive && <StagePipeline stage={app.stage} onStage={st => onUpdate(app.id, { stage: st })} />}
+      {nextLine && <div className={s.nextCheck}>{nextLine}</div>}
 
       {/* Check-in: asked on the application it is about, not in a separate stack above the list. */}
       {check && <CheckIn check={check} onAnswer={onAnswer} onSnooze={onSnooze} ghostRate={intel?.ghost_rate} avgWaitDays={intel?.avg_wait_days} />}
@@ -161,8 +171,8 @@ function AppCard({ app, onUpdate, onRemove, onShare, onReload, intel, check, onA
       )}
 
       {/* Meta row */}
-      <div style={{ display: 'flex', gap: '.6rem', flexWrap: 'wrap', marginTop: '.5rem', alignItems: 'center' }}>
-        <span style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', color: 'var(--muted)' }}>Applied {new Date(app.appliedAt).toLocaleDateString('en-US', { timeZone: 'America/Los_Angeles', month: 'short', day: 'numeric' })}</span>
+      <div style={{ display: 'flex', gap: '.6rem', flexWrap: 'wrap', marginTop: '.5rem', alignItems: 'center', minHeight: 24 }}>
+        <span style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', color: 'var(--muted)' }}>Applied {fmt(app.appliedAt)}</span>
         {app.platform && <span style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', color: 'var(--muted)' }}>via {app.platform}</span>}
         {listing && (listing.internal
           // A listing posted on Seen: its page is /jobs/<id> here, so open it in the app.
@@ -174,7 +184,7 @@ function AppCard({ app, onUpdate, onRemove, onShare, onReload, intel, check, onA
           knows the posting they read may have changed. */}
       {app.listingEditedAt && Date.parse(app.listingEditedAt) > app.appliedAt && (
         <div style={{ marginTop: '.45rem', fontFamily: 'var(--mono)', fontSize: '.56rem', color: 'var(--amber)' }}>
-          ✎ Listing edited by the employer {new Date(app.listingEditedAt).toLocaleDateString('en-US', { timeZone: 'America/Los_Angeles', month: 'short', day: 'numeric' })} — after you applied
+          ✎ Listing edited by the employer {fmt(Date.parse(app.listingEditedAt))} — after you applied
         </div>
       )}
 
@@ -185,7 +195,7 @@ function AppCard({ app, onUpdate, onRemove, onShare, onReload, intel, check, onA
           {app.messages.map((m, i) => (
             <div key={i} style={{ borderRadius: 9, padding: '.5rem .7rem', background: m.from === 'employer' ? 'rgba(59,130,246,.08)' : 'var(--raised)', border: `1px solid ${m.from === 'employer' ? 'rgba(59,130,246,.25)' : 'var(--line)'}` }}>
               <div style={{ fontFamily: 'var(--mono)', fontSize: '.54rem', color: m.from === 'employer' ? 'var(--blue)' : 'var(--muted)', marginBottom: '.2rem' }}>
-                {m.from === 'employer' ? `🏢 ${app.company}` : m.withdrawal ? 'You · withdrew' : 'You'} · {new Date(m.at).toLocaleDateString('en-US', { timeZone: 'America/Los_Angeles', month: 'short', day: 'numeric' })}
+                {m.from === 'employer' ? `🏢 ${app.company}` : m.withdrawal ? 'You · withdrew' : 'You'} · {fmt(Date.parse(m.at))}
               </div>
               {m.text
                 ? <div style={{ fontSize: '.8rem', color: 'var(--white)', lineHeight: 1.5, whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>{m.text}</div>
@@ -195,52 +205,61 @@ function AppCard({ app, onUpdate, onRemove, onShare, onReload, intel, check, onA
         </div>
       )}
 
-      {/* Actions — shown when expanded */}
+      {/* Actions — shown when expanded. Outcomes (reported to Seen once, as the ONE community report per
+          terminal outcome) are kept apart from managing the record (Edit / Delete file nothing). */}
       {isActive && expanded && (
-        <div className="app-actions" style={{ marginTop: '.85rem', borderTop: '1px solid var(--line)', paddingTop: '.75rem' }}>
-          <div style={{ fontFamily: 'var(--mono)', fontSize: '.52rem', textTransform: 'uppercase', letterSpacing: '.09em', color: 'var(--dim)', marginBottom: '.5rem' }}>What happened?</div>
-          <div style={{ display: 'flex', gap: '.4rem', flexWrap: 'wrap' }}>
-            <button className="btn btn-ghost" style={{ fontSize: '.68rem', padding: '.4rem .85rem', borderColor: 'var(--green)', color: 'var(--green)', fontWeight: 600 }} onClick={e => { e.stopPropagation(); onUpdate(app.id, { status: 'hired', stage: 'Offer' }); setExpanded(false) }}>🎉 Got the job</button>
-            <button className="btn btn-ghost" style={{ fontSize: '.68rem', padding: '.4rem .85rem', borderColor: 'rgba(239,68,68,.3)', color: 'var(--red)' }} onClick={e => { e.stopPropagation(); onUpdate(app.id, { status: 'ghosted' }); setExpanded(false) }}>👻 Ghosted</button>
-            <button className="btn btn-ghost" style={{ fontSize: '.68rem', padding: '.4rem .85rem', color: 'var(--muted)' }} onClick={e => { e.stopPropagation(); onUpdate(app.id, { status: 'rejected' }); setExpanded(false) }}>❌ Rejected</button>
+        <div className={`app-actions ${s.panel}`} onClick={e => e.stopPropagation()}>
+          <div className={s.label}>What happened?</div>
+          <div className={s.actRow}>
+            <button type="button" className={`${s.act} ${s.actGreen}`} onClick={() => { onUpdate(app.id, { status: 'hired', stage: 'Offer' }); setExpanded(false) }}>🎉 Got the job</button>
+            <button type="button" className={`${s.act} ${s.actRed}`} onClick={() => { onUpdate(app.id, { status: 'ghosted' }); setExpanded(false) }}>👻 Ghosted</button>
+            <button type="button" className={`${s.act} ${s.actQuiet}`} onClick={() => { onUpdate(app.id, { status: 'rejected' }); setExpanded(false) }}>❌ Rejected</button>
           </div>
-          <div style={{ fontFamily: 'var(--mono)', fontSize: '.52rem', textTransform: 'uppercase', letterSpacing: '.09em', color: 'var(--dim)', marginBottom: '.4rem', marginTop: '.65rem' }}>Move stage</div>
-          <div style={{ display: 'flex', gap: '.35rem', flexWrap: 'wrap' }}>
-            {STAGES.filter(s => s !== app.stage && s !== 'Offer').map(s => (
-              <button key={s} className="btn btn-ghost" style={{ fontSize: '.62rem', padding: '.28rem .65rem' }} onClick={e => { e.stopPropagation(); onUpdate(app.id, { stage: s }); setExpanded(false) }}>→ {s}</button>
-            ))}
+          {/* Phones: the pipeline is a chip + "Next"; jumping to any stage happens here. */}
+          <div className={s.moveRow} style={{ flexDirection: 'column' }}>
+            <div className={s.label}>Move to stage</div>
+            <div className={s.actRow} style={{ marginBottom: '.75rem' }}>
+              {STAGES.filter(st => st !== app.stage).map(st => (
+                <button key={st} type="button" className={s.act} onClick={() => { onUpdate(app.id, { stage: st }); setExpanded(false) }}>→ {st}</button>
+              ))}
+            </div>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '.5rem', marginTop: '.65rem' }}>
-            <button
-              onClick={e => { e.stopPropagation(); setExpanded(false) }}
-              style={{ background: 'none', border: 'none', fontFamily: 'var(--mono)', fontSize: '.6rem', color: 'var(--muted)', cursor: 'pointer', padding: '0' }}
-            >
-              ✕ collapse
-            </button>
-            <button
-              onClick={e => { e.stopPropagation(); setWithdrawing(true) }}
-              style={{ background: 'none', border: 'none', fontFamily: 'var(--mono)', fontSize: '.6rem', color: 'var(--red)', cursor: 'pointer', padding: '0' }}
-            >
-              ↩ Withdraw application
-            </button>
+          <div className={s.label}>This record</div>
+          <div className={s.manage}>
+            <button type="button" className={s.act} onClick={() => onEdit(app)}>✎ Edit</button>
+            <button type="button" className={`${s.act} ${s.actQuiet}`} onClick={() => setDeleting(true)} title="Added by mistake? Delete files nothing.">🗑 Delete</button>
+            <button type="button" className={`${s.act} ${s.actRed}`} onClick={() => setWithdrawing(true)}>↩ Withdraw</button>
+          </div>
+          <div style={{ fontFamily: 'var(--mono)', fontSize: '.56rem', color: 'var(--dim)', marginTop: '.5rem', lineHeight: 1.5 }}>
+            Delete = added by mistake, nothing is filed. Withdraw = you pulled out; the card stays.
           </div>
         </div>
       )}
       {!isActive && (
-        <div style={{ marginTop: '.75rem', display: 'flex', gap: '.4rem', flexWrap: 'wrap', alignItems: 'center' }}>
+        <div className={s.actRow} style={{ marginTop: '.75rem' }}>
           {app.status !== 'withdrawn' && (
             <button
-              className="btn"
-              style={{ fontSize: '.66rem', padding: '.34rem .8rem', fontWeight: 700, color: '#fff', border: 'none', background: 'linear-gradient(135deg,#3b82f6 0%,#8b5cf6 100%)', boxShadow: '0 0 16px rgba(99,102,241,.3)' }}
+              type="button"
+              className={`${s.act} ${s.actPrimary}`}
               onClick={() => onShare(app)}
             >
               ✦ Share outcome card
             </button>
           )}
-          <button className="btn btn-ghost" style={{ fontSize: '.62rem', padding: '.28rem .65rem', color: 'var(--muted)' }} onClick={() => onRemove(app.id)}>Remove</button>
+          <button type="button" className={`${s.act} ${s.actQuiet}`} onClick={() => setDeleting(true)}>🗑 Delete</button>
         </div>
       )}
       {withdrawing && <WithdrawModal app={app} onClose={() => setWithdrawing(false)} onWithdrawn={onReload} />}
+      {deleting && (
+        <ConfirmDialog
+          title="Delete this application?"
+          body={<>Removes <b style={{ color: 'var(--white)' }}>{app.company} · {app.role}</b> from your tracker. Nothing is sent to Seen or to {app.company} — no report, no review. Use this for entries added by mistake.</>}
+          confirmLabel="Delete"
+          busyLabel="Deleting…"
+          onConfirm={async () => { await onRemove(app.id); setDeleting(false) }}
+          onClose={() => setDeleting(false)}
+        />
+      )}
     </div>
   )
 }
@@ -279,7 +298,7 @@ function CheckIn({ check, onAnswer, onSnooze, ghostRate, avgWaitDays }: {
     <div className="app-check" onClick={e => e.stopPropagation()}>
       <div className="app-check-head">
         <span className="app-check-tag"><span className="app-check-dot" />Day {daysElapsed} check-in</span>
-        <button type="button" className="app-check-later" onClick={() => onSnooze(app.id, checkType)} title="Ask me again tomorrow">Later</button>
+        <button type="button" className="app-check-later" style={{ minHeight: 44, minWidth: 44, margin: '-.6rem -.3rem -.6rem 0' }} onClick={() => onSnooze(app.id, checkType)} title="Ask me again tomorrow">Later</button>
       </div>
       <div className="app-check-q">{q}</div>
       {showGhost && (
@@ -289,7 +308,7 @@ function CheckIn({ check, onAnswer, onSnooze, ghostRate, avgWaitDays }: {
       )}
       <div className="app-check-opts">
         {answers.map(a => (
-          <button key={a.label} type="button" className={`app-check-opt${a.highlight ? ' hi' : ''}`} onClick={() => onAnswer(app.id, checkType, a.data)}>
+          <button key={a.label} type="button" className={`app-check-opt${a.highlight ? ' hi' : ''}`} style={{ minHeight: 44 }} onClick={() => onAnswer(app.id, checkType, a.data)}>
             {a.label}
           </button>
         ))}
@@ -314,7 +333,9 @@ function TrackerPage() {
   // their résumé); fall back to the tracked-application survey only when there's no résumé data.
   const [surveyMode, setSurveyMode] = useState<'resume' | 'tracker'>('resume')
   const [creditsEarned, setCreditsEarned] = useState(0)
-  const [manualForm, setManualForm] = useState({ company: '', role: '', location: '', platform: 'Direct' })
+  const [editing, setEditing] = useState<Application | null>(null)
+  const [expandedId, setExpandedId] = useState('')
+  const [confirmClear, setConfirmClear] = useState(false)
   const [highlightId, setHighlightId] = useState('')
   const highlightedRef = useRef('')
   const [updateInsight, setUpdateInsight] = useState<{ title: string; body: string; color: string } | null>(null)
@@ -494,9 +515,20 @@ function TrackerPage() {
     }
   }
 
+  // Delete (the card's own confirm already happened): AppStore.remove is awaited, then the list
+  // reloads. Nothing is reported — a typo must never become a company review.
   const handleRemove = async (id: string) => {
     await AppStore.remove(id, isLoggedIn)
-    loadApps()
+    await loadApps()
+  }
+
+  // Edit: only the fields that changed go to AppStore.update (→ update_application). No event, no report.
+  const handleEditSave = async (values: FormValues) => {
+    if (!editing) return
+    const changes = editChanges(editing, values)
+    if (Object.keys(changes).length) await AppStore.update(editing.id, changes, isLoggedIn)
+    setEditing(null)
+    await loadApps()
   }
 
   // Route a terminal tracked app to the report page pre-loaded for one-click card creation.
@@ -585,56 +617,32 @@ function TrackerPage() {
   const checkByApp = new Map(dueChecks.map(d => [d.app.id, d]))
   const firstChecked = orderedApps.find(a => checkByApp.has(a.id))
 
-  const handleManualAdd = async () => {
-    if (!manualForm.company.trim() || !manualForm.role.trim()) return
-    await AppStore.add({ company: manualForm.company.trim(), role: manualForm.role.trim(), location: manualForm.location.trim(), platform: manualForm.platform, stage: 'Applied', status: 'active' }, isLoggedIn)
+  const handleManualAdd = async (values: FormValues) => {
+    await AppStore.add(toNewApplication(values), isLoggedIn)
     setApps(AppStore.loadSync())
-    setManualForm({ company: '', role: '', location: '', platform: 'Direct' })
     setShowManual(false)
   }
+  // The survey banner asks what happened — only meaningful once something could have happened.
+  const anyWeekOld = apps.some(a => Date.now() - a.appliedAt >= 7 * DAY_MS)
 
   return (
     <>
-    {/* Manual add modal */}
+    {/* Add / Edit — one form (components/tracker/ApplicationForm) */}
     {showManual && (
-      <ModalPortal>
-      <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.88)', zIndex: 9000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-        onClick={e => { if (e.target === e.currentTarget) setShowManual(false) }}>
-        <div style={{ width: 'calc(100% - 2rem)', maxWidth: 440, background: 'var(--surface)', border: '1px solid rgba(99,102,241,.25)', borderRadius: 14, overflow: 'hidden', boxShadow: '0 32px 96px rgba(0,0,0,.7),0 0 72px rgba(99,102,241,.18),0 0 140px rgba(124,58,237,.08)' }}>
-          <div style={{ padding: '.9rem 1.1rem', borderBottom: '1px solid var(--line)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <span style={{ fontFamily: 'var(--display)', fontSize: '.88rem', fontWeight: 700, color: 'var(--white)' }}>Track application</span>
-            <button onClick={() => setShowManual(false)} style={{ background: 'none', border: 'none', color: 'var(--dim)', cursor: 'pointer', fontSize: '1rem' }}>✕</button>
-          </div>
-          <div style={{ padding: '1rem 1.1rem', display: 'flex', flexDirection: 'column', gap: '.65rem' }}>
-            {[
-              { key: 'company', label: 'Company *', placeholder: 'e.g. Stripe' },
-              { key: 'role', label: 'Role *', placeholder: 'e.g. Software Engineer' },
-              { key: 'location', label: 'Location', placeholder: 'e.g. Remote' },
-              { key: 'platform', label: 'Applied via', placeholder: 'e.g. LinkedIn, Direct' },
-            ].map(f => (
-              <div key={f.key}>
-                <div style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', color: 'var(--muted)', marginBottom: '.25rem', textTransform: 'uppercase', letterSpacing: '.06em' }}>{f.label}</div>
-                <input
-                  value={manualForm[f.key as keyof typeof manualForm]}
-                  onChange={e => setManualForm(prev => ({ ...prev, [f.key]: e.target.value }))}
-                  onKeyDown={e => e.key === 'Enter' && handleManualAdd()}
-                  placeholder={f.placeholder}
-                  style={{ width: '100%', background: 'var(--card)', border: '1.5px solid var(--line2)', borderRadius: 8, padding: '.5rem .75rem', color: 'var(--white)', fontFamily: 'var(--body)', fontSize: '.82rem', outline: 'none', boxSizing: 'border-box' }}
-                />
-              </div>
-            ))}
-            <button
-              className="btn btn-green"
-              style={{ width: '100%', justifyContent: 'center', marginTop: '.25rem' }}
-              onClick={handleManualAdd}
-              disabled={!manualForm.company.trim() || !manualForm.role.trim()}
-            >
-              Add to tracker →
-            </button>
-          </div>
-        </div>
-      </div>
-      </ModalPortal>
+      <ApplicationForm title="Track application" initial={emptyForm()} submitLabel="Add to tracker →" busyLabel="Adding…" onSubmit={handleManualAdd} onClose={() => setShowManual(false)} />
+    )}
+    {editing && (
+      <ApplicationForm title={`Edit · ${editing.company}`} initial={formFromApplication(editing)} submitLabel="Save changes" busyLabel="Saving…" onSubmit={handleEditSave} onClose={() => setEditing(null)} />
+    )}
+    {confirmClear && (
+      <ConfirmDialog
+        title="Remove every application?"
+        body={`Clears all ${apps.length} from your tracker and your account. Nothing is reported. This cannot be undone.`}
+        confirmLabel="Remove all"
+        busyLabel="Removing…"
+        onConfirm={async () => { await AppStore.clear(isLoggedIn); setApps([]); setConfirmClear(false) }}
+        onClose={() => setConfirmClear(false)}
+      />
     )}
     {outcomeApp && <OutcomeCard app={outcomeApp} onClose={() => setOutcomeApp(null)} />}
     {roundsApp && !outcomeApp && (
@@ -648,25 +656,30 @@ function TrackerPage() {
       />
     )}
     <div className="page-full">
-      <div style={{ maxWidth: 1000, margin: '0 auto', padding: '2.5rem 2rem', width: '100%', boxSizing: 'border-box' }}>
+      <div className={s.body} style={{ maxWidth: 1000, margin: '0 auto', padding: '2.5rem 1rem', width: '100%', boxSizing: 'border-box' }}>
 
-        {/* Header — shared shell header: crumb back to the dashboard, title, actions */}
+        {/* Header — shared shell header: crumb back to the dashboard, title, actions. On phones the
+            action lives in the floating button above the tab bar instead (never a tab-bar item). */}
         <PageHeader
+          className={s.hdr}
           eyebrow="Application tracker"
           title="My applications"
-          sub="Applications sync to your account. Check-in answers stay on this device."
-          actions={<>
-            <button className="btn btn-green" style={{ fontSize: '.72rem' }} onClick={() => setShowManual(true)}>+ Track manually</button>
-            <button className="btn btn-ghost" style={{ fontSize: '.72rem' }} onClick={clearDupes}>Clear dupes</button>
-            {apps.length > 0 && <button className="btn btn-ghost" style={{ fontSize: '.72rem', color: 'var(--muted)' }} onClick={() => { if (confirm('Remove all applications? This cannot be undone.')) { AppStore.clear(isLoggedIn); setApps([]) } }}>Clear all</button>}
-          </>}
+          sub="Your applications sync to your account. Seen checks in with you at day 7, 14 and 30."
+          actions={<button type="button" className={`${s.act} ${s.actPrimary} ${s.deskOnly}`} onClick={() => setShowManual(true)}>+ Track application</button>}
         />
 
         {/* Inbox Autopilot — forwarded job emails keep these cards up to date (hidden until it is live) */}
         <InboxAutopilot apps={apps} token={token} onAppsChanged={loadApps} />
 
-        {/* Stats */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(84px, 1fr))', gap: '.6rem', marginBottom: '1.5rem' }}>
+        {/* Stats — tiles on wide screens; one line on phones so the cards come first */}
+        {apps.length > 0 && (
+          <div className={`${s.statLine} ${s.phoneOnly}`} aria-label="Totals">
+            <b>{active.length}</b> active<span className={s.sep}>·</span><b>{hired.length}</b> hired<span className={s.sep}>·</span><b>{ghosted.length}</b> ghosted
+            {rejected.length > 0 && <><span className={s.sep}>·</span><b>{rejected.length}</b> rejected</>}
+            {withdrawn.length > 0 && <><span className={s.sep}>·</span><b>{withdrawn.length}</b> withdrawn</>}
+          </div>
+        )}
+        <div className={`${s.statTiles} ${s.deskOnly}`}>
           {[
             { label: 'Total', n: apps.length },
             { label: 'Active', n: active.length },
@@ -682,9 +695,9 @@ function TrackerPage() {
           ))}
         </div>
 
-        {/* Funnel visualization */}
-        {apps.length >= 2 && (
-          <div style={{ marginBottom: '1.5rem', background: 'var(--raised)', border: '1px solid var(--line2)', borderRadius: 12, padding: '1rem 1.25rem' }}>
+        {/* Funnel visualization — needs enough applications to mean anything */}
+        {apps.length >= 5 && (
+          <div className={s.after} style={{ marginBottom: '1.5rem', background: 'var(--raised)', border: '1px solid var(--line2)', borderRadius: 12, padding: '1rem 1.25rem' }}>
             <div style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', textTransform: 'uppercase', letterSpacing: '.09em', color: 'var(--dim)', marginBottom: '.85rem' }}>Application Funnel</div>
             <div className="funnel">
               {(() => {
@@ -717,7 +730,7 @@ function TrackerPage() {
 
         {/* Pipeline (active apps, desktop) */}
         {active.length > 0 && (
-          <div className="tracker-pipeline-wrap" style={{ marginBottom: '1.5rem' }}>
+          <div className={`tracker-pipeline-wrap ${s.after}`} style={{ marginBottom: '1.5rem' }}>
             <div style={{ display: 'flex', gap: '.75rem', overflowX: 'auto', padding: '.25rem 0' }}>
               {STAGES.map(stage => {
                 const stageApps = active.filter(a => a.stage === stage)
@@ -793,7 +806,7 @@ function TrackerPage() {
               <div style={{ fontFamily: 'var(--display)', fontSize: '.82rem', fontWeight: 700, color: 'var(--white)', marginBottom: '.3rem' }}>{updateInsight.title}</div>
               <div style={{ fontFamily: 'var(--mono)', fontSize: '.65rem', color: 'var(--sub)', lineHeight: 1.7 }}>{updateInsight.body}</div>
             </div>
-            <button onClick={() => setUpdateInsight(null)} style={{ background: 'none', border: 'none', color: 'var(--muted)', cursor: 'pointer', fontSize: '.75rem', padding: '.1rem', flexShrink: 0 }}>✕</button>
+            <button type="button" aria-label="Dismiss" onClick={() => setUpdateInsight(null)} style={{ background: 'none', border: 'none', color: 'var(--muted)', cursor: 'pointer', fontSize: '.75rem', minWidth: 44, minHeight: 44, margin: '-.6rem -.6rem -.6rem 0', flexShrink: 0 }}>✕</button>
           </div>
         )}
 
@@ -803,6 +816,7 @@ function TrackerPage() {
           <button
             type="button"
             className="check-count"
+            style={{ minHeight: 44 }}
             onClick={() => document.getElementById(`app_${firstChecked.id}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' })}
           >
             <span className="app-check-dot" />
@@ -811,19 +825,26 @@ function TrackerPage() {
           </button>
         )}
 
-        {/* Empty state */}
+        {/* Empty state — both ways in: track one yourself, or Apply on a job */}
         {apps.length === 0 && (
-          <div style={{ textAlign: 'center', padding: '3rem 2rem' }}>
+          <div className={s.empty}>
             <div style={{ fontSize: '2.5rem', marginBottom: '1rem' }}>📋</div>
             <div style={{ fontFamily: 'var(--display)', fontSize: '1.1rem', fontWeight: 700, color: 'var(--white)', marginBottom: '.5rem' }}>No applications yet</div>
-            <div style={{ fontFamily: 'var(--mono)', fontSize: '.7rem', color: 'var(--muted)', marginBottom: '1.5rem' }}>Browse jobs and hit Apply to start tracking</div>
-            <a href="/jobs" className="btn btn-green" style={{ display: 'inline-flex', textDecoration: 'none', justifyContent: 'center' }}>Browse jobs →</a>
+            <div style={{ fontSize: '.82rem', color: 'var(--sub)', lineHeight: 1.6, maxWidth: 420, margin: '0 auto' }}>Add one you already sent, or hit Apply on a job here and it lands on this list by itself.</div>
+            <div className={s.emptyBtns}>
+              <button type="button" className={`${s.act} ${s.actPrimary}`} onClick={() => setShowManual(true)}>+ Track application</button>
+              <Link href="/jobs" className={s.act}>Browse jobs →</Link>
+            </div>
           </div>
         )}
 
-        {/* Survey CTA — show when user has apps with data to contribute */}
-        {apps.length >= 1 && !showSurvey && (
+        {/* Survey CTA — once at least one application is a week old there is something to report */}
+        {anyWeekOld && !showSurvey && (
           <div
+            className={s.after}
+            role="button"
+            tabIndex={0}
+            onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSurveyMode('resume'); setShowSurvey(true) } }}
             onClick={() => { setSurveyMode('resume'); setShowSurvey(true) }}
             style={{
               background: 'linear-gradient(90deg, rgba(99,102,241,.1), rgba(124,58,237,.06))',
@@ -852,7 +873,7 @@ function TrackerPage() {
           </div>
         )}
         {creditsEarned > 0 && !showSurvey && (
-          <div style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', color: 'var(--green)', textAlign: 'center', marginBottom: '.65rem' }}>
+          <div className={s.after} style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', color: 'var(--green)', textAlign: 'center', marginBottom: '.65rem' }}>
             ✓ +{creditsEarned} credits earned this session
           </div>
         )}
@@ -862,14 +883,26 @@ function TrackerPage() {
           <div id="trackerList" style={{ display: 'flex', flexDirection: 'column', gap: '.75rem' }}>
             {orderedApps.map(app => (
               <div key={app.id} style={highlightId === app.id ? { borderRadius: 12, boxShadow: '0 0 0 2px var(--green), 0 0 30px rgba(16,185,129,0.3)', transition: 'box-shadow 2.5s ease' } : undefined}>
-                <AppCard app={app} onUpdate={handleUpdate} onRemove={handleRemove} onShare={handleShare} onReload={loadApps} intel={companyScores[app.company.toLowerCase().trim()]} check={checkByApp.get(app.id)} onAnswer={handleCheckAnswer} onSnooze={handleSnooze} />
+                <AppCard app={app} expanded={expandedId === app.id} setExpanded={open => setExpandedId(open ? app.id : '')} onUpdate={handleUpdate} onEdit={setEditing} onRemove={handleRemove} onShare={handleShare} onReload={loadApps} intel={companyScores[app.company.toLowerCase().trim()]} check={checkByApp.get(app.id)} onAnswer={handleCheckAnswer} onSnooze={handleSnooze} />
               </div>
             ))}
           </div>
         )}
 
+        {/* Housekeeping — under the list, out of the way of it */}
+        {apps.length > 0 && (
+          <div className={`${s.house} ${s.after}`}>
+            <button type="button" className={`${s.act} ${s.actQuiet}`} onClick={clearDupes}>Clear dupes</button>
+            <button type="button" className={`${s.act} ${s.actQuiet}`} onClick={() => setConfirmClear(true)}>Clear all</button>
+          </div>
+        )}
+
       </div>
     </div>
+    {/* Phones: "+ Track application" floats above the tab bar so it is always one tap away */}
+    {apps.length > 0 && !showManual && !editing && !expandedId && (
+      <button type="button" className={s.fab} onClick={() => setShowManual(true)} aria-label="Track application">+ Track application</button>
+    )}
     {showSurvey && surveyMode === 'resume' && (
       <ResumeSurveyModal
         onClose={() => setShowSurvey(false)}

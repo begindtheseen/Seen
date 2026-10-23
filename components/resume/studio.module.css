@@ -128,3 +128,16 @@
   .tpls { grid-template-columns: 1fr; }
   .preview { display: none; }
 }
+
+/* Phone floor (audit 2026-10-23): 12px for every label, chip, button and note. The résumé preview
+   thumbnail (.preview, .pvHead) is a miniature page, not text to read, and keeps its scale. */
+@media (max-width: 768px) {
+  .src, .btn, .segBtn, .muted, .dim, .label, .mono, .secTitle, .tiny, .fixBtn, .chip, .barHead, .findingIcon,
+  .findingCtx, .diff, .gap, .tplTag, .pvName, .check, .notice, .err, .okBox, .empty, .pasteArea, .vbtn { font-size: .75rem; }
+  .btn, .segBtn, .fixBtn, .vbtn, .chipBtn { min-height: 44px; }
+}
+
+/* PHONE FLOOR (≤768px) — generated: every selector in this file under 12px reads 12px on a phone */
+@media (max-width: 768px) {
+  .preview, .pvHead { font-size: 0.75rem; }
+}

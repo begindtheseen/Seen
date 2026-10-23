@@ -98,6 +98,8 @@ export default function ResetPage() {
               <label style={{ fontFamily: 'var(--mono)', fontSize: '.6rem', textTransform: 'uppercase' as const, letterSpacing: '.08em', color: 'var(--dim)', display: 'block', marginBottom: '.35rem' }}>Email address</label>
               <input
                 type="email"
+                autoComplete="email"
+                inputMode="email"
                 value={email}
                 onChange={e => setEmail(e.target.value)}
                 onKeyDown={e => { if (e.key === 'Enter') sendCode() }}
@@ -131,6 +133,7 @@ export default function ResetPage() {
               <input
                 type="text"
                 inputMode="numeric"
+                autoComplete="one-time-code"
                 maxLength={8}
                 value={code}
                 onChange={e => setCode(e.target.value.replace(/\D/g, ''))}
@@ -144,6 +147,7 @@ export default function ResetPage() {
               <label style={{ fontFamily: 'var(--mono)', fontSize: '.6rem', textTransform: 'uppercase' as const, letterSpacing: '.08em', color: 'var(--dim)', display: 'block', marginBottom: '.35rem' }}>New password</label>
               <input
                 type="password"
+                autoComplete="new-password"
                 value={newPass}
                 onChange={e => setNewPass(e.target.value)}
                 onFocus={e => { e.target.style.borderColor = 'var(--blue)' }}
@@ -156,6 +160,7 @@ export default function ResetPage() {
               <label style={{ fontFamily: 'var(--mono)', fontSize: '.6rem', textTransform: 'uppercase' as const, letterSpacing: '.08em', color: 'var(--dim)', display: 'block', marginBottom: '.35rem' }}>Confirm new password</label>
               <input
                 type="password"
+                autoComplete="new-password"
                 value={confirmPass}
                 onChange={e => setConfirmPass(e.target.value)}
                 onKeyDown={e => { if (e.key === 'Enter') verifyCode() }}

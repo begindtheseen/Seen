@@ -368,3 +368,35 @@
   .timer { display: none; }
   .liveDot { animation: none; }
 }
+
+/* ── Phone floors (audit 2026-10-23): the tab strip no longer scrolls off the right edge (it was 491px
+   wide at 390) — it is a 4-up, then 2×2, grid of 44px tabs; small type meets the 12px floor; the
+   example dashboard drops its second panel under 520px so the window stays near one screen tall. ── */
+@media (max-width: 820px) {
+  .side { overflow: visible; padding: 0.5rem 0.6rem; }
+  .tabs { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0.3rem; width: 100%; flex: 1 1 100%; }
+  .tab { width: auto; min-height: 44px; justify-content: center; padding: 0.5rem 0.35rem; }
+  .tabIco { width: auto; }
+}
+@media (max-width: 600px) {
+  .tabs { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 768px) {
+  .url, .sub, .tag, .statK, .statN, .panelHd, .rowRole, .ghost, .pill, .day, .checkTag, .gaugeIn small, .coFoot,
+  .fitFor, .fit small, .kwOk, .kwAdd, .bulletOld small, .bulletNew small, .foot, .pro, .pro b, .opt, .insight p,
+  .insight button, .checkDone { font-size: 0.75rem; }
+  .statV :global(.odo-s) { font-size: 0.55em; }
+  /* Pipeline step labels: 11px uppercase (decorative), allowed to wrap so five fit in 330px. */
+  .step { font-size: 0.69rem; white-space: normal; letter-spacing: 0; }
+  .tag { padding: 0.3rem 0.6rem; letter-spacing: 0.06em; }
+  .opt, .insight button { min-height: 44px; }
+}
+@media (max-width: 520px) {
+  .split > .panel:nth-child(2) { display: none; }
+  .stat { padding: 0.7rem 0.75rem; }
+}
+
+/* PHONE FLOOR (≤768px) — generated: every selector in this file under 12px reads 12px on a phone */
+@media (max-width: 768px) {
+  .step, .fitFor b { font-size: 0.75rem; }
+}

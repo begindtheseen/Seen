@@ -1,5 +1,6 @@
 import { ImageResponse } from 'next/og'
 import { getScore, titleCase, displayCompanyName, grade, riskColor, riskLabel, pct, firstPartyReportCount, MIN_REPORTS_FOR_GRADE } from '@/lib/growth'
+import { lastUpdatedLabel } from '@/lib/companyDisplay'
 
 // Dynamic OG share image for company pages — the biggest virality lever. Renders the company's
 // REAL Seen Grade + ghost%/response% in an on-brand card. 1200×630. When no data exists we still
@@ -39,9 +40,10 @@ export async function GET(_req: Request, { params }: { params: Promise<{ slug: s
   // Only FIRST-PARTY rows may be published as "applicant reports" — the fused count once put
   // the LLM's claimed web-mention number (e.g. "12,775 applicant reports") on every share unfurl.
   const fpOg = firstPartyReportCount(s)
-  const footRight = fpOg > 0
+  const updated = hasData ? lastUpdatedLabel(s?.updated_at) : ''
+  const footRight = (fpOg > 0
     ? `${fpOg.toLocaleString()} applicant report${fpOg === 1 ? '' : 's'}`
-    : 'Real applicant outcomes'
+    : 'Real applicant outcomes') + (updated ? ` · ${updated.replace('Last updated', 'updated')}` : '')
 
   return new ImageResponse(
     (

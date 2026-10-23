@@ -50,6 +50,60 @@ and dashboard (PRs #122/#123) were intentionally REDESIGNED beyond the old site;
 longer the design source of truth for redesigned pages. `SITE_PARITY_CHECKLIST.md` /
 `ADMIN_PARITY_CHECKLIST.md` are frozen pre-06-30 records, not an active work queue.
 
+## Session 2026-10-23: launch-readiness audit → the ten blockers fixed (PR #351, branch claude/friendly-sagan-47rfat)
+- **The audit** (two agents as a new job seeker, desktop + iPhone, real account `jordan.avery.audit@seenjobs.io`,
+  real résumé, 39-point research rubric; report in the session scratchpad `audit/REPORT.md`) found 10 trust
+  breakers: silent credit spend + contradicting credit copy; search ranked by transparency score, not the query, and
+  a fallback banner that fired whenever the server widened; résumé deck matching Dallas sales roles to a Phoenix
+  cashier; company pages showing non-hiring Reddit threads (the word "target") and disagreeing counts/grades;
+  "Apply & Optimize" with no plain Apply; tracker with no edit/delete and 8px phone pipeline; verify link landing on
+  the homepage; sub-12px text and sub-44px controls; thin credibility (no founder, /contact 404); global sign-out.
+- **How it was fixed:** six agents on worktrees pinned to a6ae053 (`claude/wip-fix-{auth,company,search,tracker,
+  credits,mobile}`), merged into the integration branch, 5 conflicts resolved, then an integrated re-audit.
+- **Durable rules learned (keep):**
+  - `lib/pricing.ts`, `app/pricing`, `components/UpgradeModal`, `app/profile` all read `PRO_PRICING` /
+    `CREDIT_RESET_LABEL` / `JOB_INSIGHTS_COST` from `lib/server/creditRules.js`; `lib/pricing.test.mjs` fails on
+    any hand-typed price. Résumé parse is FREE (rule-based, no model) — never re-add `gateAI('parse_resume')`.
+  - Job search: relevance (`api/_utils/jobRelevance.js`) ranks, transparency breaks ties; the API returns
+    `in_radius`; location = geo OR city text (509/846 Phoenix rows have NULL coords). Recommendations need a
+    title-family AND city/remote match; the rail hides when a query is typed.
+  - ONE grade scale: `lib/companyDisplay.ts gradeLetter` (hero, share card, OG, homepage preview). "Last updated"
+    = `scoreUpdatedAt` (company_scores has NO updated_at; derived from expires_at − 365d).
+  - Reddit threads need sentence-level hiring context; common-word brands need the company named with it
+    (`api/_utils/companyReddit.js`); section hidden under 2 threads. Feed rows re-checked by the strict rules.
+  - `signOut({ scope: 'local' })` everywhere; "Sign out of all devices" in Settings is the only global one.
+    A 401 on sync → `lib/sessionExpired.ts` toast + /login?return=.
+  - Verify email redirect is /dashboard; the login page polls `getUser` every 5 s (≤60) after signup. The Supabase
+    confirmation template + subject ("Confirm your Seen account") were applied in prod via the Management API;
+    the old template is saved in the session scratchpad for rollback.
+  - **Phone floors:** `--fs-NN` tokens in globals.css jump to .75rem ≤768px; every CSS module ends with a GENERATED
+    "PHONE FLOOR" block (scratchpad `floor-modules.mjs`: every selector under 12px at every width → .75rem,
+    `!important` carried; selectors a module already floors or that are ≥12px at some width are left alone).
+    Unclassed in-prose anchors get a 44px tap box by vertical padding (`.site-main a:not([class])`). Deliberate
+    exceptions: `.sring-l` 11px, nav tabs, tracker stage steps. The CHECK is per element at 360/390
+    (scratchpad `broad-measure.mjs`: overflow / <40px controls / <11.5px text) — a `document.scrollWidth` or
+    desktop-only check misses all of it.
+- **Verification:** tsc clean; suite 1633/1633; `next build` clean; Playwright on `next start` with the merged
+  `api/*.js` served by a read-only shim (refuses Supabase writes, Reddit, model calls); phone sweep over 25 pages ×
+  2 widths: 0 overflow (decorative orb excepted), 0 tiny text, 0 small controls. **Harness lesson:** a `next start`
+  left running across a rebuild serves HTML for CSS hashes that no longer exist (400s) and every page measures
+  "clean" with no styles — kill by port (`ss -ltnp`) and confirm every CSS bundle is 200 before trusting a sweep.
+- **CodeQL lesson (PR #351 went red twice before this):** the repo's security-and-quality scan flagged plain hrefs
+  built from the tracker's own store as XSS / open redirect. Running the same queries LOCALLY (CodeQL bundle in
+  the session scratchpad: `codeql database create … --codescanning-config` then `database analyze` on
+  `Security/CWE-079/XssThroughDom.ql`, `Xss.ql`, `CWE-601/ClientSideUrlRedirect.ql`) showed every path crossing
+  `lib/stores/AppStore.test.mjs`: its Map-backed localStorage fake joins every storage write in the app to every
+  storage read. Code scanning now scans shipped code only (`.github/codeql/codeql-config.yml` excludes
+  `**/*.test.*`, wired via `config-file:` in codeql.yml). Links built from browser storage still go through
+  `lib/safeHref.js` (`pathSegment` / `slugSegment` / `httpHref`) — keep using it; a `.test()` regex guard is not a
+  sanitizer CodeQL recognises, `encodeURIComponent` and a `new URL()` round-trip are. When CodeQL is red, get the
+  path locally first; the alerts API needs `security_events` the session token lacks, and the annotations alone
+  mislead (they showed `key={app.id}` as the sink).
+- **NOT verified live:** the confirmation email on a real signup; a real credit spend against prod.
+- **Owner decisions outstanding:** delete the test account (0 public reports, 2 saved jobs); Inbox Autopilot
+  migration (pinned); "Connect Gmail" design (pinned — Google restricted scope, 100-user cap unverified,
+  ~$540/yr CASA past it); USAJOBS keys in Vercel; Indeed collector root cause (task #35).
+
 ## Session 2026-10-21 D: Inbox Autopilot — forwarded job emails keep the tracker up to date (owner: "if it doesn't cost us any money that's genius")
 - **Why:** prod had 8 accounts / 15 tracked applications / 2 sign-ups in 30 days — the tracker (the strategy's data
   engine) is barely used because people stop logging by hand. Now each user gets `track-<12 chars>@seenjobs.io`

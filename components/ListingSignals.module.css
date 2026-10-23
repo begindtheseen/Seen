@@ -32,3 +32,13 @@
 .fDetail { grid-area: d; font-size: 0.68rem; color: var(--dim); min-width: 0; overflow-wrap: anywhere; }
 .basis { margin: 0.6rem 0 0; font-size: 0.68rem; color: var(--dim); }
 .thinLine { margin: 0.6rem 0 0; font-family: var(--mono); font-size: 0.66rem; color: var(--dim); }
+
+/* Phone floor (audit 2026-10-23): every label and value reads at 12px. */
+@media (max-width: 768px) {
+  .kicker, .scope, .score small, .fLabel em, .fVal, .fDetail, .basis, .thinLine { font-size: 0.75rem; }
+}
+
+/* PHONE FLOOR (≤768px) — generated: every selector in this file under 12px reads 12px on a phone */
+@media (max-width: 768px) {
+  .kicker, .scope, .score small, .fLabel em, .fVal, .fDetail, .basis, .thinLine { font-size: 0.75rem; }
+}

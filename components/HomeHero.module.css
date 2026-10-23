@@ -178,3 +178,14 @@
   .stage { opacity: 1; transform: none; transition: none; }
   .chip, .search { transition: none; }
 }
+
+/* Phone floor (audit 2026-10-23): eyebrow and "Try one" label read at 12px. */
+@media (max-width: 768px) {
+  .eyebrow, .examplesLabel { font-size: 0.75rem; }
+  .eyebrow { letter-spacing: 0.06em; }
+}
+
+/* PHONE FLOOR (≤768px) — generated: every selector in this file under 12px reads 12px on a phone */
+@media (max-width: 768px) {
+  .eyebrow, .examplesLabel { font-size: 0.75rem; }
+}

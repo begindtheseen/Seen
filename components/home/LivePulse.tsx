@@ -10,6 +10,7 @@
 import Link from 'next/link'
 import { useEffect, useState } from 'react'
 import styles from './LivePulse.module.css'
+import { displayCompanyName } from '@/lib/companyDisplay'
 
 type Row = { id: string; company_name?: string; role?: string; outcome: string; created_at: string }
 
@@ -44,12 +45,21 @@ export default function LivePulse() {
     fetch('/api/reports', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'feed', limit: 16 }),
+      body: JSON.stringify({ action: 'feed', limit: 30 }),
     })
       .then(r => (r.ok ? r.json() : null))
       .then((d: { reports?: Row[]; total?: number } | null) => {
         if (cancelled || !d?.reports) return
-        setRows(d.reports.filter(r => r.company_name && OUTCOME[r.outcome]))
+        // One chip per company: the server already keeps non-applicant rows out, and a company with
+        // ten fresh imports must not fill the whole strip ("albertsons got an offer" × 7).
+        const seen = new Set<string>()
+        setRows(d.reports.filter(r => {
+          if (!r.company_name || !OUTCOME[r.outcome]) return false
+          const k = r.company_name.toLowerCase().trim()
+          if (seen.has(k)) return false
+          seen.add(k)
+          return true
+        }))
         setTotal(d.total || 0)
       })
       .catch(() => { /* the strip simply doesn't render */ })
@@ -63,7 +73,7 @@ export default function LivePulse() {
     return (
       <Link key={(hidden ? 'b' : 'a') + r.id} href={`/company/${slug(r.company_name!)}`} className={`${styles.chip} ${styles[o.cls]}`} tabIndex={hidden ? -1 : 0} aria-hidden={hidden || undefined}>
         <span className={styles.ico} aria-hidden>{o.icon}</span>
-        <b>{r.company_name}</b>
+        <b>{displayCompanyName(r.company_name)}</b>
         <span className={styles.what}>{o.label}{r.role ? ` · ${r.role}` : ''}</span>
         <time className={styles.when} dateTime={r.created_at}>{ago(r.created_at)}</time>
       </Link>

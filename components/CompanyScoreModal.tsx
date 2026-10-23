@@ -11,6 +11,7 @@ import { useAuth } from '@/lib/auth'
 import IndustryBenchmark, { type Benchmark } from './IndustryBenchmark'
 import styles from './CompanyScoreModal.module.css'
 import { isGradeableScore, notEnoughReviewsLabel, MIN_REPORTS_FOR_GRADE } from '@/lib/gradeGate'
+import { gradeLetter, displayCompanyName, lastUpdatedLabel } from '@/lib/companyDisplay'
 
 // Grade gate (lib/gradeGate.ts): below MIN_REPORTS_FOR_GRADE real reports the API sends
 // gradeable:false and null verdict fields — the modal then shows the report count, not a grade.
@@ -28,10 +29,13 @@ type Score = {
   data_source?: string
   industry?: string
   verification_status?: string
+  updated_at?: string | null
 }
 
 const slugify = (n: string) => encodeURIComponent(n.toLowerCase().replace(/\s+/g, '-'))
-const gradeOf = (s: number) => (s >= 80 ? 'A' : s >= 65 ? 'B' : s >= 50 ? 'C' : s >= 35 ? 'D' : 'F')
+// ONE grade scale for every surface (lib/companyDisplay.ts) — the page, this modal, the share card
+// and the OG image must agree.
+const gradeOf = (s: number) => gradeLetter(s)
 const riskColor = (s: number) => (s >= 65 ? 'var(--green)' : s >= 45 ? 'var(--amber)' : 'var(--red)')
 const pct = (v?: number | null) => (v == null ? '—' : `${Math.round(Math.min(1, Math.max(0, v)) * 100)}%`)
 
@@ -91,13 +95,15 @@ export default function CompanyScoreModal({ companyName, onClose }: { companyNam
 
   const s = score
   const graded = isGradeableScore(s)
+  const shownName = displayCompanyName(companyName)
+  const updated = graded ? lastUpdatedLabel(s.updated_at) : ''
   const score100 = graded ? Math.round(s.overall_score) : 0
   const color = riskColor(score100)
   const R = 40, CIRC = 2 * Math.PI * R
   const dashOff = revealed ? CIRC * (1 - score100 / 100) : CIRC
 
   return (
-    <div className={styles.overlay} onClick={onClose} role="dialog" aria-modal="true" aria-label={`${companyName} Seen score`}>
+    <div className={styles.overlay} onClick={onClose} role="dialog" aria-modal="true" aria-label={`${shownName} Seen score`}>
       <div className={styles.dialog} onClick={(e) => e.stopPropagation()}>
         <div className={styles.handle} aria-hidden />
         <button className={styles.close} onClick={onClose} aria-label="Close">✕</button>
@@ -106,7 +112,7 @@ export default function CompanyScoreModal({ companyName, onClose }: { companyNam
           <div className={styles.logo}>{(companyName[0] || '?').toUpperCase()}</div>
           <div style={{ minWidth: 0 }}>
             <div className={styles.name}>
-              {companyName}
+              {shownName}
               {s?.verification_status === 'verified' && <span className={styles.verified}>✓ Verified</span>}
             </div>
             {s?.industry && <div className={styles.ind}>{s.industry}</div>}
@@ -128,7 +134,7 @@ export default function CompanyScoreModal({ companyName, onClose }: { companyNam
         ) : notFound || !s ? (
           <div style={{ padding: '0.5rem 0 1.25rem', textAlign: 'center' }}>
             <p style={{ color: 'var(--sub)', fontFamily: 'var(--mono)', fontSize: '.72rem', lineHeight: 1.7, marginBottom: '1.25rem' }}>
-              No score yet for “{companyName}”. Open the full report to research it.
+              No score yet for “{shownName}”. Open the full report to research it.
             </p>
             <a href={`/company/${slugify(companyName)}`} className={styles.full}>Open full report →</a>
           </div>
@@ -172,22 +178,30 @@ export default function CompanyScoreModal({ companyName, onClose }: { companyNam
               <div className={styles.gradeMeta}>
                 <div className={styles.gradeVerdict}>Seen transparency grade</div>
                 <DataQuality s={s} />
+                {updated && <span className={styles.dq} style={{ color: 'var(--muted)' }}>{updated}</span>}
               </div>
             </div>
 
+            {/* A metric the reports never gave (no wait_days on any row) is left out, never shown as "—". */}
             <div className={styles.metrics}>
-              <div className={styles.metric}>
-                <div className={styles.metricN} style={{ color: 'var(--green)' }}>{pct(s.response_rate)}</div>
-                <div className={styles.metricL}>reply rate</div>
-              </div>
-              <div className={styles.metric}>
-                <div className={styles.metricN} style={{ color: (s.ghost_rate || 0) > 0.5 ? 'var(--red)' : 'var(--amber)' }}>{pct(s.ghost_rate)}</div>
-                <div className={styles.metricL}>ghost rate</div>
-              </div>
-              <div className={styles.metric}>
-                <div className={styles.metricN} style={{ color: 'var(--white)' }}>{s.avg_wait_days != null ? `${Math.round(s.avg_wait_days)}d` : '—'}</div>
-                <div className={styles.metricL}>avg wait</div>
-              </div>
+              {s.response_rate != null && (
+                <div className={styles.metric}>
+                  <div className={styles.metricN} style={{ color: 'var(--green)' }}>{pct(s.response_rate)}</div>
+                  <div className={styles.metricL}>reply rate</div>
+                </div>
+              )}
+              {s.ghost_rate != null && (
+                <div className={styles.metric}>
+                  <div className={styles.metricN} style={{ color: (s.ghost_rate || 0) > 0.5 ? 'var(--red)' : 'var(--amber)' }}>{pct(s.ghost_rate)}</div>
+                  <div className={styles.metricL}>ghost rate</div>
+                </div>
+              )}
+              {s.avg_wait_days != null && (
+                <div className={styles.metric}>
+                  <div className={styles.metricN} style={{ color: 'var(--white)' }}>{`${Math.round(s.avg_wait_days)}d`}</div>
+                  <div className={styles.metricL}>avg wait</div>
+                </div>
+              )}
             </div>
 
             {benchmark && (

@@ -45,3 +45,8 @@
 .link:disabled { opacity: .5; cursor: default; }
 .danger { color: var(--red); }
 .err { margin-top: .6rem; font-family: var(--mono); font-size: .62rem; color: var(--red); }
+
+/* PHONE FLOOR (≤768px) — generated: every selector in this file under 12px reads 12px on a phone */
+@media (max-width: 768px) {
+  .eyebrow, .fine, .muted, .filter, .select, .kind, .link, .err { font-size: 0.75rem; }
+}

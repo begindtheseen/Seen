@@ -6,8 +6,11 @@ import { useState, useEffect, useCallback, useRef, type ReactNode } from 'react'
 import dynamic from 'next/dynamic'
 import { useAuth } from '@/lib/auth'
 import { supabase } from '@/lib/supabase'
+import { markIntentionalSignOut } from '@/lib/sessionExpired'
 import UpgradeModal from './UpgradeModal'
 import NotificationsBell from './NotificationsBell'
+import CreditsPopover from './CreditsPopover'
+import { dailyResetLabel } from '@/lib/creditRules'
 import styles from './Nav.module.css'
 
 // The earn-credits flow: the résumé survey (asks about the user's past employers).
@@ -68,12 +71,16 @@ export default function Nav() {
   const [moreOpen, setMoreOpen] = useState(false)
   const [acctOpen, setAcctOpen] = useState(false)
   const [creditBalance, setCreditBalance] = useState<number | null>(null)
+  // Credits chip popover (components/CreditsPopover.tsx) + the get_credits facts it shows.
+  const [creditsOpen, setCreditsOpen] = useState(false)
+  const [creditInfo, setCreditInfo] = useState<{ daily_earned?: number | null; max_daily_earn?: number | null; welcome?: boolean }>({})
   const [isPro, setIsPro] = useState(false)
   const [showUpgrade, setShowUpgrade] = useState(false)
   const [showSurvey, setShowSurvey] = useState(false)
   const [isMac, setIsMac] = useState(true)
   const primaryRef = useRef<HTMLDivElement>(null)
   const indRef = useRef<HTMLSpanElement>(null)
+  const drawerCloseRef = useRef<HTMLButtonElement>(null)
 
   const fetchBalance = useCallback(async () => {
     if (!isSeeker) { setCreditBalance(null); return }
@@ -87,8 +94,11 @@ export default function Nav() {
           body: JSON.stringify({ action: 'get_credits' }),
         })
         if (!res.ok || cancelled) return
-        const data = await res.json() as { balance?: number; pro?: boolean }
-        if (!cancelled) { setCreditBalance(data.pro ? 999 : (data.balance ?? null)); setIsPro(!!data.pro) }
+        const data = await res.json() as { balance?: number; pro?: boolean; daily_earned?: number | null; max_daily_earn?: number | null; welcome?: boolean }
+        if (!cancelled) {
+          setCreditBalance(data.pro ? 999 : (data.balance ?? null)); setIsPro(!!data.pro)
+          setCreditInfo({ daily_earned: data.daily_earned ?? null, max_daily_earn: data.max_daily_earn ?? null, welcome: !!data.welcome })
+        }
       } catch { /* ignore */ }
     })
     return () => { cancelled = true }
@@ -120,6 +130,31 @@ export default function Nav() {
 
   // Close the mobile drawer and any open dropdown whenever the route changes
   useEffect(() => { setMenuOpen(false); setMoreOpen(false); setAcctOpen(false) }, [pathname])
+
+  // Phone drawer = a modal: the page behind it must not scroll (iOS ignores body overflow:hidden,
+  // so the body is pinned at its scroll offset and restored on close), Escape closes it, and
+  // focus lands on the close button so a keyboard/screen-reader user is inside the dialog.
+  useEffect(() => {
+    if (!menuOpen) return
+    const body = document.body
+    const y = window.scrollY
+    const prev = { position: body.style.position, top: body.style.top, width: body.style.width, overflow: body.style.overflow }
+    body.style.position = 'fixed'
+    body.style.top = `-${y}px`
+    body.style.width = '100%'
+    body.style.overflow = 'hidden'
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setMenuOpen(false) }
+    document.addEventListener('keydown', onKey)
+    drawerCloseRef.current?.focus()
+    return () => {
+      document.removeEventListener('keydown', onKey)
+      body.style.position = prev.position
+      body.style.top = prev.top
+      body.style.width = prev.width
+      body.style.overflow = prev.overflow
+      window.scrollTo(0, y)
+    }
+  }, [menuOpen])
 
   useEffect(() => { setIsMac(/Mac|iPhone|iPad/.test(navigator.platform || '')) }, [])
 
@@ -157,7 +192,11 @@ export default function Nav() {
   const isActive = (path: string) => pathname === path || pathname.startsWith(path + '/')
 
   const handleSignOut = async () => {
-    await supabase.auth.signOut()
+    // scope 'local': THIS device only. The default (global) revoked every session the account
+    // had — signing out on a phone logged the user out on their laptop (audit 2026-10-23).
+    // "Sign out of all devices" lives in Settings → Security, on purpose.
+    markIntentionalSignOut()
+    await supabase.auth.signOut({ scope: 'local' })
     router.push('/')
   }
 
@@ -253,17 +292,30 @@ export default function Nav() {
             </Link>
           )}
           {isSeeker && !isPro && creditBalance !== null && (
-            <button
-              className={`${styles.chip}${creditBalance === 0 ? ' ' + styles.chipZero : ''}`}
-              title={creditBalance === 0
-                ? 'Out of AI credits — upgrade or earn more by tracking applications and answering surveys'
-                : `${creditBalance} AI credit${creditBalance === 1 ? '' : 's'} available`}
-              onClick={() => creditBalance === 0 ? setShowUpgrade(true) : setShowSurvey(true)}
-            >
-              <span className={styles.chipSpark} />
-              <b>{creditBalance}</b>
-              <span className={styles.chipLabel}>{creditBalance === 0 ? 'credits · top up' : `credit${creditBalance === 1 ? '' : 's'}`}</span>
-            </button>
+            <span style={{ position: 'relative', display: 'inline-flex' }}>
+              <button
+                className={`${styles.chip}${creditBalance === 0 ? ' ' + styles.chipZero : ''}`}
+                data-credits-chip
+                aria-haspopup="dialog"
+                aria-expanded={creditsOpen}
+                title={creditBalance === 0
+                  ? `Out of AI credits — ${dailyResetLabel()}. Tap for ways to get more.`
+                  : `${creditBalance} AI credit${creditBalance === 1 ? '' : 's'} available · ${dailyResetLabel()}`}
+                onClick={() => setCreditsOpen(o => !o)}
+              >
+                <span className={styles.chipSpark} />
+                <b>{creditBalance}</b>
+                <span className={styles.chipLabel}>{creditBalance === 0 ? 'credits · top up' : `credit${creditBalance === 1 ? '' : 's'}`}</span>
+              </button>
+              {creditsOpen && (
+                <CreditsPopover
+                  info={{ balance: creditBalance, ...creditInfo }}
+                  onClose={() => setCreditsOpen(false)}
+                  onEarn={() => setShowSurvey(true)}
+                  onUpgrade={() => setShowUpgrade(true)}
+                />
+              )}
+            </span>
           )}
 
           {/* Application updates — a bell that opens a modal (components/NotificationsBell.tsx). */}
@@ -326,13 +378,25 @@ export default function Nav() {
         </div>
       </nav>
 
-      {/* Mobile slide-out menu */}
-      <div className={`side-menu-overlay${menuOpen ? ' open' : ''}`} onClick={() => setMenuOpen(false)} />
-      <div className={`side-menu${menuOpen ? ' open' : ''}`}>
+      {/* Mobile slide-out menu — slides in from the RIGHT (thumb side), over a tap-to-close
+          backdrop; Escape closes it too (effect above). Labels match the tab bar and the desktop
+          primary row word for word, so the three navigations read as one. */}
+      <div className={`side-menu-overlay${menuOpen ? ' open' : ''}`} onClick={() => setMenuOpen(false)} aria-hidden="true" />
+      <div
+        className={`side-menu ${styles.drawer}${menuOpen ? ` open ${styles.drawerOpen}` : ''}`}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Menu"
+        aria-hidden={!menuOpen}
+        // Off-screen drawer: nothing inside is tabbable or readable until it opens.
+        inert={!menuOpen}
+      >
         <div className="side-menu-logo">
           <span className="logo-pulse" />
           <span style={{ fontFamily: 'var(--display)', fontWeight: 800, fontSize: '1.2rem', color: 'var(--white)', letterSpacing: '-.02em' }}>Seen</span>
-          <button onClick={() => setMenuOpen(false)} style={{ marginLeft: 'auto', background: 'none', border: 'none', color: 'var(--muted)', cursor: 'pointer', fontSize: '1rem' }}>✕</button>
+          <button ref={drawerCloseRef} type="button" className={styles.drawerClose} onClick={() => setMenuOpen(false)} aria-label="Close menu">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" aria-hidden><path d="M6 6l12 12M18 6L6 18" /></svg>
+          </button>
         </div>
         {/* Credit balance — always visible at the top of the mobile drawer for signed-in seekers */}
         {isSeeker && isPro && (
@@ -372,14 +436,15 @@ export default function Nav() {
         {/* Grouped so the drawer reads as sections, not a flat wall of links. */}
         {isSeeker && <div className="side-menu-label">Your job search</div>}
         {isSeeker && <Link href="/dashboard" className={`side-menu-item${isActive('/dashboard') ? ' active' : ''}`}><span className="side-menu-icon">▦</span>Dashboard</Link>}
-        {isSeeker && <Link href="/jobs" className={`side-menu-item${isActive('/jobs') ? ' active' : ''}`}><span className="side-menu-icon">💼</span>Find jobs</Link>}
-        {isSeeker && <Link href="/tracker" className={`side-menu-item${isActive('/tracker') ? ' active' : ''}`}><span className="side-menu-icon">✓</span>Track applications</Link>}
+        {isSeeker && <Link href="/jobs" className={`side-menu-item${isActive('/jobs') ? ' active' : ''}`}><span className="side-menu-icon">💼</span>Jobs</Link>}
+        {isSeeker && <Link href="/companies" className={`side-menu-item${isActive('/companies') ? ' active' : ''}`}><span className="side-menu-icon">🏢</span>Companies</Link>}
+        {isSeeker && <Link href="/tracker" className={`side-menu-item${isActive('/tracker') ? ' active' : ''}`}><span className="side-menu-icon">✓</span>Track</Link>}
         {isSeeker && <Link href="/resume" className={`side-menu-item${isActive('/resume') ? ' active' : ''}`}><span className="side-menu-icon">📄</span>Résumé AI</Link>}
         {isSeeker && <Link href="/saved" className={`side-menu-item${isActive('/saved') ? ' active' : ''}`}><span className="side-menu-icon">♥</span>Saved jobs</Link>}
 
         <div className="side-menu-label">Explore</div>
         {!isSeeker && <Link href="/jobs" className={`side-menu-item${isActive('/jobs') ? ' active' : ''}`}><span className="side-menu-icon">💼</span>Jobs</Link>}
-        <Link href="/companies" className={`side-menu-item${isActive('/companies') ? ' active' : ''}`}><span className="side-menu-icon">🏢</span>Company intel</Link>
+        {!isSeeker && <Link href="/companies" className={`side-menu-item${isActive('/companies') ? ' active' : ''}`}><span className="side-menu-icon">🏢</span>Companies</Link>}
         <Link href="/agencies" className={`side-menu-item${isActive('/agencies') ? ' active' : ''}`}><span className="side-menu-icon">👻</span>Agency ghost index</Link>
         <Link href="/demand" className={`side-menu-item${isActive('/demand') ? ' active' : ''}`}><span className="side-menu-icon">📊</span>Hiring demand</Link>
         <Link href="/feed" className={`side-menu-item${isActive('/feed') ? ' active' : ''}`}><span className="side-menu-icon">📡</span>Live feed</Link>
@@ -391,13 +456,18 @@ export default function Nav() {
         <div style={{ marginTop: 'auto', padding: '1rem 1.25rem 1.25rem', borderTop: '1px solid var(--line)', display: 'flex', flexDirection: 'column', gap: '.5rem' }}>
           {isSeeker ? (
             <>
-              <Link href="/profile" onClick={() => setMenuOpen(false)} style={{ display: 'block', background: 'none', border: '1px solid var(--line2)', color: 'var(--sub)', borderRadius: 8, padding: '.5rem 1rem', fontFamily: 'var(--mono)', fontSize: '.65rem', cursor: 'pointer', textAlign: 'center', textDecoration: 'none' }}>⚙ Profile &amp; settings</Link>
-              <button onClick={() => { handleSignOut(); setMenuOpen(false) }} style={{ background: 'rgba(239,68,68,0.07)', border: '1px solid rgba(239,68,68,0.25)', color: 'var(--red)', borderRadius: 8, padding: '.5rem 1rem', fontFamily: 'var(--mono)', fontSize: '.65rem', fontWeight: 600, cursor: 'pointer', width: '100%' }}>Sign out</button>
+              <Link href="/profile" onClick={() => setMenuOpen(false)} className={styles.drawerGhost}>⚙ Profile &amp; settings</Link>
+              <button type="button" onClick={() => { handleSignOut(); setMenuOpen(false) }} className={styles.drawerDanger}>Sign out</button>
             </>
           ) : isLoggedIn ? (
-            <button onClick={() => { handleSignOut(); setMenuOpen(false) }} style={{ background: 'rgba(239,68,68,0.07)', border: '1px solid rgba(239,68,68,0.25)', color: 'var(--red)', borderRadius: 8, padding: '.5rem 1rem', fontFamily: 'var(--mono)', fontSize: '.65rem', fontWeight: 600, cursor: 'pointer', width: '100%' }}>Sign out</button>
+            <button type="button" onClick={() => { handleSignOut(); setMenuOpen(false) }} className={styles.drawerDanger}>Sign out</button>
           ) : (
-            <Link href="/login" className="btn btn-ghost" style={{ width: '100%', justifyContent: 'center' }}>Sign in</Link>
+            <>
+              {/* A guest's first move is an account, not a login — the nav's "Get started" button is
+                  hidden under 480px (globals.css), so until now the drawer's only CTA was Sign in. */}
+              <Link href="/login?signup=1" className={`btn btn-solid ${styles.drawerCta}`}>Create free account</Link>
+              <Link href="/login" className={`btn btn-ghost ${styles.drawerCta}`}>Sign in</Link>
+            </>
           )}
         </div>
       </div>

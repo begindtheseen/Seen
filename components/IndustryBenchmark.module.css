@@ -131,3 +131,13 @@
 @media (prefers-reduced-motion: reduce) {
   .fill { animation: none; }
 }
+
+/* Phone floor (audit 2026-10-23): labels, values and the footnote read at 12px. */
+@media (max-width: 768px) {
+  .kicker, .scope, .rowLabel, .rowVals, .costText, .foot { font-size: 0.75rem; }
+}
+
+/* PHONE FLOOR (≤768px) — generated: every selector in this file under 12px reads 12px on a phone */
+@media (max-width: 768px) {
+  .kicker, .scope, .rowLabel, .rowVals, .costText, .foot { font-size: 0.75rem; }
+}

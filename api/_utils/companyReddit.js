@@ -14,6 +14,8 @@
 
 // Legal-suffix stripper shared with the reports.js company normalizer, so a cache key
 // derived here collides with the same company however it was typed.
+import { mentionsCompany, isWeakMention, isCompanySubreddit, nameVariants } from '../../lib/reports/applicantRules.js';
+
 const LEGAL_SUFFIX = /[\s,]+(inc\.?|llc\.?|corp\.?|ltd\.?|co\.|plc\.?|group|holdings|enterprises|solutions|technologies)\.?$/i;
 
 // Job-context terms. Three jobs: (1) bias Reddit's own search relevance toward
@@ -171,31 +173,116 @@ function containsWord(haystack, needle) {
   return new RegExp(`(^|[^a-z0-9])${esc}([^a-z0-9]|$)`, 'i').test(String(haystack));
 }
 
-// Does the company name appear as a WORD in the thread's title or body? For multi-word
-// names the full phrase OR a distinctive (>=4 char) first token qualifies; short names
-// (<=3 chars, e.g. "HP", "3M") match only as a whole word (substring-collision guard).
-function mentionsCompany(item, companyName) {
-  if (!item) return false;
-  const hay = `${item.title || ''}  ${item._body || ''}`;
+// Hiring-context GATE for ONE sentence: the strict GATE_TERMS plus unambiguous phrases for the
+// words that are too loose on their own ("offer" → "job offer" / "offer letter"; "apply" →
+// "applied to"). A thread is about hiring only when such a word sits in the SAME SENTENCE as the
+// company's name — "Jets rejected trade offer … first target" has "rejected" and "target" in the
+// same title and is still about hockey, so the name must also be used as the EMPLOYER (below).
+const GATE_PHRASES = [
+  'job offer', 'offer letter', 'got an offer', 'got the offer', 'received an offer', 'applied to', 'applied at',
+  'applied for', 'applied with', 'my application', 'application status', 'hired', 'hire', 'hires', 'phone screen',
+  'background check', 'drug test', 'orientation', 'assessment', 'hiring manager', 'hiring process', 'laid off',
+  'internship', 'intern', 'human resources', 'rejection', 'rejections', 'position', 'positions', 'applicant',
+  'applicants', 'candidates', 'recruiters', 'interviews', 'jobs', 'hiring managers',
+];
+// "hr" is a GATE term no more: "1 hr later" matched it (Target's r/UkrainianConflict thread passed on a body
+// mention). It still biases the search query and the ranking.
+const SENTENCE_GATE = [...GATE_TERMS.filter((t) => t !== 'hr'), ...GATE_PHRASES];
+export function hasHiringContext(text) {
+  const t = String(text || '');
+  return SENTENCE_GATE.some((term) => containsWord(t, term));
+}
+
+// Company names that are ordinary English words. For these a mention counts only when the word is
+// used as the EMPLOYER (employerUsage) — otherwise "became the target of a public humiliation",
+// "your target salary", "help Iran target …", "mind the gap", "apple pie" and "shell script" all
+// land on a company page (audit 2026-10-23, /company/target). Extend when a real page shows the
+// collision; keep brands that are not dictionary words (Walmart, Amazon, Twilio) OUT so their
+// casual lowercase mentions still count.
+export const COMMON_WORD_BRANDS = new Set([
+  'target', 'apple', 'gap', 'chase', 'shell', 'sprint', 'square', 'box', 'snap', 'ring', 'meta', 'alphabet',
+  'block', 'stripe', 'slack', 'discord', 'zoom', 'indeed', 'monster', 'subway', 'staples', 'boost', 'mint',
+  'bumble', 'hinge', 'match', 'visa', 'total', 'orange', 'three', 'vans', 'coach', 'guess', 'express', 'limited',
+  'dash', 'glass', 'bolt', 'root', 'nest', 'path', 'flow', 'ally', 'affirm', 'brex', 'chime', 'compass',
+  'fidelity', 'harvest', 'honey', 'lemonade', 'lime', 'marathon', 'mosaic', 'oracle', 'pilot', 'progressive',
+  'public', 'shift', 'simple', 'spring', 'tide', 'toast', 'wish', 'dish', 'fox', 'hub', 'kind', 'loft', 'marvel',
+  'plaid', 'pure', 'quest', 'relay', 'rise', 'sage', 'scale', 'sonic', 'spark', 'sprout', 'stash', 'thrive',
+  'true', 'unity', 'wave', 'west', 'wise', 'zip', 'anthem', 'carter', 'frontier', 'liberty', 'mutual', 'national',
+  'northern', 'pioneer', 'regal', 'republic', 'sears', 'signature', 'standard', 'sterling', 'summit', 'united',
+  'universal', 'western', 'aspen', 'atlas', 'beacon', 'bridge', 'cascade', 'crest', 'delta', 'echo', 'elevate',
+  'forward', 'horizon', 'legacy', 'nova', 'prime', 'tribe', 'vertex', 'zenith',
+]);
+export const isCommonWordBrand = (companyName) => COMMON_WORD_BRANDS.has(normalizeCompanyKey(companyName));
+
+// The company word used as an employer: preceded by a hiring preposition ("applied to Target",
+// "job at target", "ghosted by Target"), followed by an employer noun ("Target's recruiter", "Target
+// store", "target hiring process"), or written as a proper noun mid-sentence in text that is not
+// headline-cased ("I interviewed and Target never called back").
+const EMPLOYER_BEFORE = /\b(?:at|for|with|from|by|to|into|join(?:ed|ing)?|via|through|w\/|left|leaving|quit|working|work|hired|recruited|interview(?:ed|ing)?|offer(?:ed)?|apply(?:ing)?|applied|ghosted|rejected)\s+(?:the\s+|a\s+|my\s+|our\s+|local\s+|my local\s+)?$/i;
+const EMPLOYER_AFTER = /^(?:'s|’s)?\s+(?:store|stores|warehouse|dc|distribution|fulfillment|corporate|hq|headquarters|hiring|hires|hired|recruiter|recruiters|recruiting|hr|interview|interviews|interviewer|job|jobs|career|careers|application|applications|team|employee|employees|manager|managers|position|positions|orientation|onboarding|background check|drug test|shift|shifts|associate|associates|cashier|driver|tech|intern|internship|internships|rejected|ghosted|never|didn'?t|hasn'?t|called|emailed|offered|reached|responded|replied|got back)\b/i;
+const headlineCased = (s) => {
+  const words = String(s).split(/\s+/).filter((w) => /^[a-z]/i.test(w) && w.length >= 4);
+  return words.length >= 3 && words.filter((w) => /^[A-Z]/.test(w)).length / words.length >= 0.6;
+};
+export function employerUsage(sentence, companyName) {
   const key = normalizeCompanyKey(companyName);
+  const s = String(sentence || '');
   if (!key) return false;
-  if (containsWord(hay, key)) return true;
-  const tokens = key.split(' ').filter(Boolean);
-  if (tokens.length > 1 && tokens[0].length >= 4 && containsWord(hay, tokens[0])) return true;
+  const esc = key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const rx = new RegExp(`(^|[^a-z0-9])(${esc})(?=[^a-z0-9]|$)`, 'gi');
+  const headline = headlineCased(s);
+  let m;
+  while ((m = rx.exec(s)) !== null) {
+    const at = m.index + m[1].length;
+    const before = s.slice(0, at);
+    const after = s.slice(at + m[2].length);
+    if (EMPLOYER_BEFORE.test(before) || EMPLOYER_AFTER.test(after)) return true;
+    // Proper noun mid-sentence ("… and Target never …"), unless every word is capitalized anyway.
+    const properNoun = /^[A-Z]/.test(m[2]) && /[a-z0-9]/i.test(before.replace(/^[\s"'“‘(\[]+/, '')) && !/[.!?]\s*$/.test(before);
+    if (properNoun && !headline) return true;
+  }
   return false;
 }
 
-// Is this thread relevant to show on a COMPANY page — i.e. about working at / applying to
-// this company, not a name collision? Two conditions, both required:
-//   1) the company is named (mentionsCompany), AND
-//   2) it is employment context — the thread is in a career/work subreddit OR carries a
-//      job-context keyword. Condition (2) is what keeps a common-word brand ("Amazon",
-//      "Apple") from surfacing product-restock / shopping / recipe threads. Better an
-//      honest empty state than off-topic noise on a company's page (also defamation-safe:
-//      we only ever surface *employment* discussion, framed as such).
+// Sentences of a title/body. Titles use " — " / " | " / ":" as separators between clauses that are
+// not about the same thing ("Jets rejected trade offer … — Read more: …").
+const sentences = (text) => String(text || '').replace(/\s+/g, ' ').split(/(?<=[.!?])\s+|\s+[—|]\s+|\n+/).map((x) => x.trim()).filter(Boolean);
+
+// The company named in a sentence, as a word and not as an ordinary word ("being a target", "a
+// list: Target, Walmart, Costco") — applicantRules' mention tests, shared with the collectors. Names
+// shorter than three letters ("HP", "3M") have no rule variants and fall back to a whole-word match.
+function namedIn(sentence, companyName, key) {
+  if (!nameVariants([companyName]).length) return containsWord(sentence, key);
+  return mentionsCompany(sentence, [companyName]) && !isWeakMention(sentence, [companyName]);
+}
+
+// Is this thread relevant to show on a COMPANY page — about applying to / being hired by THIS
+// company, not a name collision? A thread counts when, in ONE sentence of its title or body, the
+// company is named as the employer (for a common-word brand: used as the employer) AND a hiring
+// word appears — or the thread is in the company's own subreddit and talks about hiring. For a
+// name that is not an ordinary word, a mention inside a career/work subreddit still counts.
 export function isRelevant(item, companyName) {
-  if (!mentionsCompany(item, companyName)) return false;
-  return isCareerSubreddit(item.subreddit) || hasJobContext(item);
+  if (!item) return false;
+  const key = normalizeCompanyKey(companyName);
+  if (!key) return false;
+  const common = COMMON_WORD_BRANDS.has(key);
+  const sub = String(item.subreddit || '');
+  let named = false;
+  let titleNamed = false;
+  for (const [field, text] of [['title', item.title || ''], ['body', item._body || '']]) {
+    for (const s of sentences(text)) {
+      if (!namedIn(s, companyName, key)) continue;
+      if (common && !employerUsage(s, companyName)) continue;
+      named = true;
+      if (field === 'title') titleNamed = true;
+      if (hasHiringContext(s)) return true;
+    }
+  }
+  if (!named) return (isCompanySubreddit(sub, [companyName]) || isCompanySubreddit(sub, [key])) && hasJobContext(item);
+  if (common) return false;
+  // A thread titled after the company whose post talks about hiring is about hiring at the company.
+  if (titleNamed && hasHiringContext(item._body || '')) return true;
+  return isCareerSubreddit(sub);
 }
 
 // Rank score for a relevant thread: job-context threads and title (vs body-only)
@@ -204,7 +291,8 @@ export function scoreRelevance(item, companyName) {
   let score = 0;
   const title = (item.title || '').toLowerCase();
   const body = (item._body || '').toLowerCase();
-  if (mentionsCompany({ title: item.title, _body: '' }, companyName)) score += 3; // named in the title
+  const key = normalizeCompanyKey(companyName);
+  if (key && sentences(item.title || '').some((s) => namedIn(s, companyName, key))) score += 3; // named in the title
   if (isCareerSubreddit(item.subreddit)) score += 2;                              // posted in a work/career sub
   for (const term of JOB_CONTEXT_TERMS) {
     if (containsWord(title, term)) { score += 2; break; }
@@ -221,8 +309,16 @@ export function scoreRelevance(item, companyName) {
   return score;
 }
 
+// Stored items carry the relevance-rule version they passed. A cached row written under an older
+// rule is re-judged at serve time (refilterCached) instead of waiting out its TTL.
+export const ITEM_RULES_VERSION = 2;
+
+// Fewer than this many relevant threads and the section is not shown at all (one thread is a
+// coincidence, not "discussion"). Enforced here (status 'empty') and mirrored by the page.
+export const MIN_SHOW_THREADS = 2;
+
 // Filter to company-relevant threads, drop duplicate permalinks, rank, cap. Returns the
-// clean display array [{ id, title, subreddit, permalink, author, created }] (the
+// clean display array [{ id, title, subreddit, permalink, author, created, v }] (the
 // internal `_body` is stripped — it is never persisted or shown).
 export function rankAndFilter(items, companyName, limit = MAX_ITEMS) {
   const seen = new Set();
@@ -238,7 +334,21 @@ export function rankAndFilter(items, companyName, limit = MAX_ITEMS) {
     if (d !== 0) return d;
     return (Date.parse(b.created) || 0) - (Date.parse(a.created) || 0);
   });
-  return relevant.slice(0, Math.max(0, limit)).map(({ _body, ...rest }) => rest);
+  return relevant.slice(0, Math.max(0, limit)).map(({ _body, ...rest }) => ({ ...rest, v: ITEM_RULES_VERSION }));
+}
+
+// The list a page may show: the ranked threads, or nothing under MIN_SHOW_THREADS.
+export function showableItems(items) {
+  const list = Array.isArray(items) ? items : [];
+  return list.length >= MIN_SHOW_THREADS ? list : [];
+}
+
+// Cached items written under an older relevance rule (no `v`, or a lower one) are re-judged on
+// what the cache kept — title + subreddit (bodies are never stored). Items at the current version
+// pass through untouched.
+export function refilterCached(items, companyName) {
+  const list = Array.isArray(items) ? items : [];
+  return list.filter((it) => it && ((it.v || 0) >= ITEM_RULES_VERSION || isRelevant({ title: it.title, subreddit: it.subreddit }, companyName)));
 }
 
 // ── Query building ─────────────────────────────────────────────────────────────

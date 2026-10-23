@@ -1,0 +1,138 @@
+/* Tracker page + card controls (app/tracker, components/tracker). Rules this file enforces:
+   every tappable thing is ≥44px tall; on phones the list comes first and "+ Track application"
+   floats above the tab bar; the stage pipeline is six real buttons on wide screens and one
+   current-stage chip + "Next: … →" on ≤480px. Grid/flex tracks are minmax(0,…)/min-width:0 so a
+   long role name can never widen the page (CLAUDE.md phone-overflow rule). */
+
+/* ── Page order ── */
+.body { display: flex; flex-direction: column; min-width: 0; }
+.after { order: 0; }
+@media (max-width: 768px) {
+  .after { order: 5; }          /* funnel, survey banner, housekeeping → after the cards */
+  .deskOnly { display: none !important; }
+}
+@media (min-width: 769px) {
+  .phoneOnly { display: none !important; }
+}
+
+/* Breadcrumb links in the shared header get a 40px hit area here without moving the title
+   (negative vertical margin keeps the row's visual height). */
+.hdr :global(ol) a { min-height: 40px; display: inline-flex; align-items: center; margin-top: -9px; margin-bottom: -9px; }
+
+/* ── Stats ── */
+.statTiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(84px, 1fr)); gap: .6rem; margin-bottom: 1.5rem; }
+.statLine { font-family: var(--mono); font-size: .64rem; color: var(--sub); margin: -.4rem 0 1rem; line-height: 1.6; overflow-wrap: anywhere; }
+.statLine b { color: var(--white); font-weight: 600; }
+.statLine .sep { color: var(--dim); margin: 0 .35rem; }
+
+/* ── Buttons: one hit-area rule ── */
+.act {
+  display: inline-flex; align-items: center; justify-content: center; gap: .35rem;
+  min-height: 44px; padding: .55rem .95rem; border-radius: 10px; box-sizing: border-box;
+  font-family: var(--body); font-weight: 600; font-size: .76rem; line-height: 1.2; cursor: pointer;
+  background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.12); color: var(--sub);
+  transition: color .15s, border-color .15s, background .15s; white-space: nowrap; text-decoration: none;
+}
+.act:hover { color: var(--white); border-color: rgba(255,255,255,.28); background: rgba(255,255,255,.07); }
+.act:disabled { opacity: .45; cursor: not-allowed; }
+.actPrimary { background: linear-gradient(135deg,#1d4ed8 0%,#7c3aed 55%,#a855f7 100%); color: #fff; font-weight: 800; border: none; box-shadow: 0 0 28px rgba(124,58,237,.35); }
+.actPrimary:hover { color: #fff; box-shadow: 0 0 40px rgba(124,58,237,.55); }
+.actGreen { border-color: rgba(16,185,129,.5); color: var(--green); }
+.actGreen:hover { color: var(--green); background: rgba(16,185,129,.1); border-color: var(--green); }
+.actRed { border-color: rgba(239,68,68,.35); color: var(--red); }
+.actRed:hover { color: var(--red); background: rgba(239,68,68,.08); border-color: rgba(239,68,68,.6); }
+.actQuiet { color: var(--muted); }
+.actRow { display: flex; flex-wrap: wrap; gap: .45rem; }
+.actRow > * { flex: 0 1 auto; min-width: 0; }
+@media (max-width: 480px) {
+  .actRow > * { flex: 1 1 calc(50% - .45rem); }
+}
+
+/* Header "Update ▼" toggle on the card */
+.toggle { min-height: 44px; min-width: 44px; padding: .4rem .5rem; margin: -.4rem -.5rem -.4rem 0; background: none; border: none; cursor: pointer; font-family: var(--mono); font-size: .6rem; color: var(--blue); border-radius: 8px; }
+.toggle:hover { background: rgba(59,130,246,.08); }
+
+/* ── Stage pipeline ── */
+.pipe { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 0; margin-top: .65rem; border: 1px solid var(--line2); border-radius: 8px; overflow: hidden; background: var(--raised); }
+.step {
+  min-height: 44px; padding: .3rem .25rem; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font-family: var(--mono); font-size: .58rem; text-transform: uppercase; letter-spacing: .05em; color: var(--muted);
+  background: transparent; border: none; border-right: 1px solid var(--line2); cursor: pointer; transition: background .15s, color .15s;
+}
+.step:last-child { border-right: none; }
+.step:hover { color: var(--white); background: rgba(255,255,255,.05); }
+.step.done { color: var(--green); background: var(--gdim); }
+.step.current { color: #fff; background: var(--blue); font-weight: 700; cursor: default; }
+.pipePhone { display: none; }
+@media (max-width: 480px) {
+  .pipe { display: none; }
+  .pipePhone { display: flex; align-items: center; gap: .5rem; margin-top: .65rem; min-width: 0; }
+  .chip { display: inline-flex; align-items: center; min-height: 36px; padding: .3rem .7rem; border-radius: 999px; background: var(--blue); color: #fff; font-family: var(--mono); font-size: .62rem; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; white-space: nowrap; flex-shrink: 0; }
+  .nextBtn { flex: 1 1 auto; min-width: 0; min-height: 44px; justify-content: flex-start; overflow: hidden; text-overflow: ellipsis; }
+  .moveRow { display: flex; }
+}
+@media (min-width: 481px) {
+  .moveRow { display: none !important; }
+}
+.pipeHint { font-family: var(--mono); font-size: .56rem; color: var(--dim); margin-top: .3rem; }
+
+/* Next check-in line on an active card */
+.nextCheck { display: flex; align-items: center; gap: .4rem; margin-top: .5rem; font-family: var(--mono); font-size: .6rem; color: var(--muted); line-height: 1.5; overflow-wrap: anywhere; }
+.nextCheck::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: var(--line2); flex-shrink: 0; }
+
+/* Employer badge — only on Apply-on-Seen applications */
+.empBadge { display: inline-flex; align-items: center; gap: .25rem; margin-top: .25rem; font-family: var(--mono); font-size: .55rem; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--green); border: 1px solid currentColor; border-radius: 999px; padding: .12rem .5rem; cursor: help; }
+.empBadge.neg { color: var(--red); }
+
+/* Expanded panel */
+.panel { margin-top: .85rem; border-top: 1px solid var(--line); padding-top: .75rem; }
+.label { font-family: var(--mono); font-size: .52rem; text-transform: uppercase; letter-spacing: .09em; color: var(--dim); margin: 0 0 .5rem; }
+.panel .label + .actRow { margin-bottom: .75rem; }
+.manage { display: flex; flex-wrap: wrap; gap: .45rem; margin-top: .25rem; padding-top: .75rem; border-top: 1px dashed var(--line); }
+.manage > * { flex: 1 1 auto; }
+
+/* ── Floating add button (phones) ── */
+.fab {
+  position: fixed; right: 16px; z-index: 540;
+  bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+  display: none; align-items: center; gap: .4rem; min-height: 48px; padding: .6rem 1.05rem; border-radius: 999px; border: none; cursor: pointer;
+  background: linear-gradient(135deg,#1d4ed8 0%,#7c3aed 55%,#a855f7 100%); color: #fff; font-family: var(--body); font-weight: 800; font-size: .8rem;
+  box-shadow: 0 10px 30px rgba(0,0,0,.45), 0 0 28px rgba(124,58,237,.45);
+}
+:global(html.tabbar) .fab { bottom: calc(64px + 14px + env(safe-area-inset-bottom, 0px)); }
+@media (max-width: 768px) { .fab { display: inline-flex; } }
+
+/* ── Modal (add / edit / confirm) ── */
+.backdrop { position: fixed; inset: 0; background: rgba(0,0,0,.88); z-index: 9000; display: flex; align-items: flex-start; justify-content: center; padding: 6vh 1rem; overflow-y: auto; box-sizing: border-box; }
+.dialog { width: 100%; max-width: 440px; background: var(--surface); border: 1px solid rgba(99,102,241,.25); border-radius: 14px; overflow: hidden; box-shadow: 0 32px 96px rgba(0,0,0,.7), 0 0 72px rgba(99,102,241,.18); box-sizing: border-box; }
+.dialogHead { padding: .8rem .9rem .8rem 1.1rem; border-bottom: 1px solid var(--line); display: flex; align-items: center; justify-content: space-between; gap: .5rem; }
+.dialogTitle { font-family: var(--display); font-size: .92rem; font-weight: 700; color: var(--white); min-width: 0; }
+.close { min-width: 44px; min-height: 44px; background: none; border: none; color: var(--dim); cursor: pointer; font-size: 1rem; border-radius: 8px; }
+.close:hover { color: var(--white); background: rgba(255,255,255,.06); }
+.dialogBody { padding: 1rem 1.1rem 1.1rem; display: flex; flex-direction: column; gap: .7rem; }
+.field label { display: block; font-family: var(--mono); font-size: .58rem; color: var(--muted); margin-bottom: .3rem; text-transform: uppercase; letter-spacing: .06em; }
+.input, .select {
+  width: 100%; min-height: 44px; box-sizing: border-box; background: var(--card); border: 1.5px solid var(--line2); border-radius: 9px; padding: .55rem .75rem;
+  color: var(--white); font-family: var(--body); font-size: 16px; outline: none; color-scheme: dark;
+}
+.input:focus, .select:focus { border-color: var(--blue); }
+.two { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .6rem; }
+@media (max-width: 400px) { .two { grid-template-columns: minmax(0, 1fr); } }
+.err { color: var(--red); font-size: .74rem; }
+.hint { font-size: .74rem; color: var(--muted); line-height: 1.5; margin: 0; }
+.dialogBtns { display: flex; gap: .5rem; margin-top: .25rem; }
+.dialogBtns > * { flex: 1 1 0; }
+
+/* ── Empty state ── */
+.empty { text-align: center; padding: 2.5rem 1rem; }
+.emptyBtns { display: flex; justify-content: center; flex-wrap: wrap; gap: .5rem; margin-top: 1.25rem; }
+
+/* Housekeeping row under the list */
+.house { display: flex; flex-wrap: wrap; gap: .45rem; margin-top: 1.25rem; padding-top: 1rem; border-top: 1px solid var(--line); }
+
+@media (prefers-reduced-motion: reduce) { .act, .step, .toggle { transition: none; } }
+
+/* PHONE FLOOR (≤768px) — generated: every selector in this file under 12px reads 12px on a phone */
+@media (max-width: 768px) {
+  .statLine, .toggle, .step, .chip, .pipeHint, .nextCheck, .empBadge, .label, .field label, .err, .hint { font-size: 0.75rem; }
+}

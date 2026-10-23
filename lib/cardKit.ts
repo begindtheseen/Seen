@@ -31,6 +31,8 @@ export interface CompanyCardData {
   waste: number           // 0–100
   report_count: number
   risk?: Risk
+  /** "updated Oct 20, 2026" — printed with the confidence line. */
+  updated?: string
 }
 
 export interface OutcomeStep { label: string; sub: string; mark?: string }
@@ -213,17 +215,19 @@ export function drawCompanyCard(canvas: HTMLCanvasElement, d: CompanyCardData) {
   c.strokeStyle = 'rgba(255,255,255,0.10)'; c.lineWidth = 1
   c.beginPath(); c.moveTo(PAD, dY); c.lineTo(W - PAD, dY); c.stroke()
 
+  // A wait the reports never gave is left out (three cells), never printed as "—".
   statRow(c, PAD, dY + 40, W - PAD * 2, [
     { value: `${Math.round((d.ghost_rate || 0) * 100)}%`, label: 'Ghost rate', color: C.red },
     { value: `${Math.round((d.response_rate || 0) * 100)}%`, label: 'Response rate', color: C.green },
-    { value: d.avg_wait_days ? `${Math.round(d.avg_wait_days)}d` : '—', label: 'Avg wait', color: C.white },
+    ...(d.avg_wait_days ? [{ value: `${Math.round(d.avg_wait_days)}d`, label: 'Avg wait', color: C.white }] : []),
     { value: `${Math.round(d.waste || 0)}%`, label: 'Wasted-time risk', color: C.amber },
   ])
 
   const confY = dY + 40 + 130
   const n = d.report_count || 0
   const conf = n >= 12 ? 'High confidence' : n >= 4 ? 'Growing confidence' : 'Early signal'
-  const line = n > 0 ? `Based on ${n.toLocaleString()} applicant report${n === 1 ? '' : 's'}  ·  ${conf}` : 'Baseline estimate  ·  share your experience to sharpen it'
+  const line = (n > 0 ? `Based on ${n.toLocaleString()} applicant report${n === 1 ? '' : 's'}  ·  ${conf}` : 'Baseline estimate  ·  share your experience to sharpen it')
+    + (d.updated ? `  ·  ${d.updated}` : '')
   c.font = '400 21px "Instrument Sans",sans-serif'
   const lineW = c.measureText(line).width
   c.fillStyle = accent; c.beginPath(); c.arc(W / 2 - lineW / 2 - 16, confY, 6, 0, Math.PI * 2); c.fill()

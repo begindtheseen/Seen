@@ -72,7 +72,7 @@ function reportHref(agencyName: string) {
 
 function ReportCta({ agencyName }: { agencyName: string }) {
   return (
-    <Link href={reportHref(agencyName)} style={{ ...mono('.6rem', 'var(--blue)'), textDecoration: 'none', whiteSpace: 'nowrap', flexShrink: 0 }}>
+    <Link href={reportHref(agencyName)} className="tap" style={{ ...mono('var(--fs-60)', 'var(--blue)'), textDecoration: 'none', whiteSpace: 'nowrap', flexShrink: 0 }}>
       Report →
     </Link>
   )
@@ -90,11 +90,11 @@ function ReportedRow({ r, rank }: { r: Ranked; rank: number }) {
   const thin = n < 10
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: '.85rem', background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 10, padding: '.85rem 1rem', marginBottom: '.55rem' }}>
-      <div style={{ ...mono('.62rem', 'var(--muted)'), width: 18, textAlign: 'right', flexShrink: 0 }}>{rank}</div>
+      <div style={{ ...mono('var(--fs-62)', 'var(--muted)'), width: 18, textAlign: 'right', flexShrink: 0 }}>{rank}</div>
       <div style={{ fontFamily: 'var(--display)', fontSize: '1.5rem', fontWeight: 800, color: accent, width: 30, textAlign: 'center', flexShrink: 0 }}>{grade(s.overall_score)}</div>
       <div style={{ minWidth: 0, flex: 1 }}>
-        <Link href={`/company/${r.slug}`} style={{ fontFamily: 'var(--display)', fontSize: '.92rem', fontWeight: 700, color: 'var(--white)', textDecoration: 'none' }}>{r.agency.name}</Link>
-        <div style={{ ...mono('.6rem', 'var(--dim)'), marginTop: '.15rem' }}>
+        <Link href={`/company/${r.slug}`} className="tap" style={{ fontFamily: 'var(--display)', fontSize: '.92rem', fontWeight: 700, color: 'var(--white)', textDecoration: 'none' }}>{r.agency.name}</Link>
+        <div style={{ ...mono('var(--fs-60)', 'var(--dim)'), marginTop: '.15rem' }}>
           {n.toLocaleString()} report{n !== 1 ? 's' : ''}
           {r.publicDiscussion ? ` · ${r.publicDiscussion.toLocaleString()} from public threads & review sites` : ''}
           {` · ${riskLabel(s.risk_level)}`}
@@ -102,8 +102,8 @@ function ReportedRow({ r, rank }: { r: Ranked; rank: number }) {
         </div>
       </div>
       <div style={{ textAlign: 'right', flexShrink: 0 }}>
-        {ghost != null && <div style={mono('.62rem', 'var(--red)')}>{ghost}% ghost</div>}
-        {reply != null && <div style={mono('.62rem', 'var(--green)')}>{reply}% reply</div>}
+        {ghost != null && <div style={mono('var(--fs-62)', 'var(--red)')}>{ghost}% ghost</div>}
+        {reply != null && <div style={mono('var(--fs-62)', 'var(--green)')}>{reply}% reply</div>}
       </div>
       <ReportCta agencyName={r.agency.name} />
     </div>
@@ -118,8 +118,8 @@ function BuildingRow({ r }: { r: Ranked }) {
     <div style={{ display: 'flex', alignItems: 'center', gap: '.85rem', background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 10, padding: '.85rem 1rem', marginBottom: '.55rem', opacity: 0.92 }}>
       <div style={{ fontFamily: 'var(--display)', fontSize: '1.5rem', fontWeight: 800, color: 'var(--muted)', width: 30, textAlign: 'center', flexShrink: 0 }}>—</div>
       <div style={{ minWidth: 0, flex: 1 }}>
-        <Link href={`/company/${r.slug}`} style={{ fontFamily: 'var(--display)', fontSize: '.92rem', fontWeight: 700, color: 'var(--white)', textDecoration: 'none' }}>{r.agency.name}</Link>
-        <div style={{ ...mono('.6rem', 'var(--dim)'), marginTop: '.15rem' }}>
+        <Link href={`/company/${r.slug}`} className="tap" style={{ fontFamily: 'var(--display)', fontSize: '.92rem', fontWeight: 700, color: 'var(--white)', textDecoration: 'none' }}>{r.agency.name}</Link>
+        <div style={{ ...mono('var(--fs-60)', 'var(--dim)'), marginTop: '.15rem' }}>
           {/* The one wording every surface uses — reports plus half of each online mention, like the company page. */}
           {notEnoughReviewsLabel(r.row?.score ?? null)}
           {r.publicDiscussion ? ` · ${r.publicDiscussion.toLocaleString()} from public threads & review sites` : ''}
@@ -136,8 +136,8 @@ function EmptyRow({ r }: { r: Ranked }) {
     <div style={{ display: 'flex', alignItems: 'center', gap: '.85rem', background: 'var(--surface)', border: '1px dashed var(--line2)', borderRadius: 10, padding: '.85rem 1rem', marginBottom: '.55rem' }}>
       <div style={{ fontFamily: 'var(--display)', fontSize: '1.5rem', fontWeight: 800, color: 'var(--muted)', width: 30, textAlign: 'center', flexShrink: 0 }}>—</div>
       <div style={{ minWidth: 0, flex: 1 }}>
-        <Link href={`/company/${r.slug}`} style={{ fontFamily: 'var(--display)', fontSize: '.92rem', fontWeight: 700, color: 'var(--sub)', textDecoration: 'none' }}>{r.agency.name}</Link>
-        <div style={{ ...mono('.6rem', 'var(--muted)'), marginTop: '.15rem' }}>No reports yet — be the first</div>
+        <Link href={`/company/${r.slug}`} className="tap" style={{ fontFamily: 'var(--display)', fontSize: '.92rem', fontWeight: 700, color: 'var(--sub)', textDecoration: 'none' }}>{r.agency.name}</Link>
+        <div style={{ ...mono('var(--fs-60)', 'var(--muted)'), marginTop: '.15rem' }}>No reports yet — be the first</div>
       </div>
       <ReportCta agencyName={r.agency.name} />
     </div>
@@ -279,10 +279,10 @@ export default async function AgenciesPage() {
             score. Renders only when the owner has granted an active sponsor (employer_perks.sponsor_until). */}
         {sponsor && (
           <div style={{ display: 'flex', alignItems: 'center', gap: '.9rem', flexWrap: 'wrap', margin: '0 0 2.6rem', padding: '.9rem 1.1rem', background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 12 }}>
-            <span style={{ fontFamily: 'var(--mono)', fontSize: '.5rem', textTransform: 'uppercase', letterSpacing: '.16em', color: 'var(--muted)', border: '1px solid var(--line2)', borderRadius: 5, padding: '.15rem .4rem', flexShrink: 0 }}>Sponsored</span>
+            <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-50)', textTransform: 'uppercase', letterSpacing: '.16em', color: 'var(--muted)', border: '1px solid var(--line2)', borderRadius: 5, padding: '.15rem .4rem', flexShrink: 0 }}>Sponsored</span>
             <div style={{ minWidth: 0, flex: 1 }}>
               <div style={{ fontFamily: 'var(--display)', fontSize: '.92rem', fontWeight: 700, color: 'var(--white)', textTransform: 'capitalize' }}>{sponsor.company}</div>
-              <div style={{ fontFamily: 'var(--mono)', fontSize: '.56rem', color: 'var(--sub)', marginTop: '.1rem' }}>Sponsors the Staffing Agency Ghost Index · placement only, never part of the ranking</div>
+              <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-56)', color: 'var(--sub)', marginTop: '.1rem' }}>Sponsors the Staffing Agency Ghost Index · placement only, never part of the ranking</div>
             </div>
             <Link href={`/company/${slugify(sponsor.company)}`} className="btn btn-ghost" style={{ padding: '.5rem 1rem', flexShrink: 0 }}>View their record →</Link>
           </div>
@@ -313,7 +313,7 @@ export default async function AgenciesPage() {
         )}
 
         {reported.length === 0 && building.length === 0 && unlisted.length === 0 && (
-          <div style={{ textAlign: 'center', padding: '2.5rem', color: 'var(--muted)', fontFamily: 'var(--mono)', fontSize: '.7rem' }}>
+          <div style={{ textAlign: 'center', padding: '2.5rem', color: 'var(--muted)', fontFamily: 'var(--mono)', fontSize: 'var(--fs-70)' }}>
             The index is loading its first data. Check back shortly — or <Link href="/report?outcome=ghosted" style={{ color: 'var(--blue)' }}>add the first report</Link>.
           </div>
         )}
@@ -328,7 +328,7 @@ export default async function AgenciesPage() {
           ))}
         </section>
 
-        <p style={{ ...mono('.6rem', 'var(--dim)'), lineHeight: 1.7 }}>
+        <p style={{ ...mono('var(--fs-60)', 'var(--dim)'), lineHeight: 1.7 }}>
           Seen Grades aggregate applicant reports and public hiring signals into a 0–100 score. They are community signals, not verified facts, and update hourly as new reports arrive. Grades and percentages appear only once at least {MIN_REPORTS_FOR_GRADE} applicants have reported outcomes. Report counts include outcomes shared publicly in discussion threads and on review sites (labeled and counted at reduced weight); web-research estimates are never counted as reports.
         </p>
       </div>

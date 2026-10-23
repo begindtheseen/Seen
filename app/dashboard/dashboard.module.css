@@ -183,3 +183,9 @@
   .go, .tool { transition: none; }
   .move:hover .go, .tool:hover { transform: none; }
 }
+
+/* PHONE FLOOR (≤768px) — generated: every selector in this file under 12px reads 12px on a phone */
+@media (max-width: 768px) {
+  .eyebrow, .link, .badge, .pill small, .caption, .move small, .signal small, .tool small, .jobInfo small, .stage, .lock, .metric small, .badgeChip { font-size: 0.75rem; }
+  .jobMeta { font-size: 0.75rem !important; }
+}

@@ -42,3 +42,8 @@
   .bar, .item, .ico { transition: none; }
   .item:active .ico { transform: none; }
 }
+
+/* PHONE FLOOR (≤768px) — generated: every selector in this file under 12px reads 12px on a phone */
+@media (max-width: 768px) {
+  .label { font-size: 0.75rem; }
+}

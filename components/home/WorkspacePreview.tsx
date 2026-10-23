@@ -14,6 +14,7 @@
 // timer); numbers roll with the shared Odometer. prefers-reduced-motion: no auto-advance.
 
 import { useEffect, useRef, useState, type CSSProperties } from 'react'
+import { gradeLetter } from '@/lib/companyDisplay'
 import Link from 'next/link'
 import Odometer from '@/components/motion/Odometer'
 import styles from './WorkspacePreview.module.css'
@@ -41,13 +42,8 @@ const TABS: Array<{ id: Tab; label: string; icon: string; title: string; sub: st
 ]
 const CYCLE_MS = 6500
 
-function letterGrade(s: number): string {
-  if (s >= 80) return 'A'
-  if (s >= 65) return 'B'
-  if (s >= 50) return 'C'
-  if (s >= 35) return 'D'
-  return 'F'
-}
+// The one grade scale the company page and grade card use (lib/companyDisplay).
+const letterGrade = gradeLetter
 
 export default function WorkspacePreview({ proof, live = false }: { proof: ProofScore; live?: boolean }) {
   const [tab, setTab] = useState<Tab>('dashboard')

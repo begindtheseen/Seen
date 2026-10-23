@@ -79,3 +79,8 @@
   .overlay, .panel { animation: none; }
   .item, .enter { transition: none; }
 }
+
+/* PHONE FLOOR (≤768px) — generated: every selector in this file under 12px reads 12px on a phone */
+@media (max-width: 768px) {
+  .esc, .keys, .foot kbd, .group, .text small, .enter, .foot { font-size: 0.75rem; }
+}

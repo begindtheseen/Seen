@@ -4,9 +4,15 @@ import { useState, useCallback, useEffect } from 'react'
 import { Score } from '@/lib/score'
 import { SavedJobsStore } from '@/lib/stores/SavedJobs'
 import { aiHeaders } from '@/lib/aiHeaders'
+import { useAuth } from '@/lib/auth'
 import type { Job } from '@/lib/types'
 import ModalPortal from '@/components/ModalPortal'
 import SeenApplyModal from '@/components/jobs/SeenApplyModal'
+import ApplyCheckpoint from '@/components/ApplyCheckpoint'
+import CreditConfirmDialog from '@/components/CreditConfirmDialog'
+import { trackApplyClick } from '@/lib/trackApply'
+import { hasConfirmedCreditUse } from '@/lib/creditConfirm'
+import { JOB_INSIGHTS_COST, RESUME_OPTIMIZE_COST, creditCostLabel, dailyResetLabel } from '@/lib/creditRules'
 
 // ── Job detail drawer helpers ─────────────────────────────────────────────────
 
@@ -17,7 +23,27 @@ interface Insights {
   description_summary: string
 }
 
+// /api/job-insights answer shape (see that file's header): a probe never charges.
+interface InsightsResponse extends Partial<Insights> {
+  _src?: 'db' | 'generated' | 'empty' | 'uncached' | 'no_credits'
+  cached?: boolean
+  price?: number
+  cost?: number
+  charged?: boolean
+  balance?: number
+  credits_required?: boolean
+  error?: string
+}
+
+// loading → probing the shared cache (free)
+// done → insights on screen (cached, or just generated)
+// uncached → not cached yet; the price-tagged "Reveal" button is shown, nothing spent
+// generating → the paid call is in flight
+// credits → the paid call was refused (out of credits / signed out)
+type InsightsState = 'loading' | 'done' | 'unavailable' | 'no_desc' | 'uncached' | 'generating' | 'credits'
+
 const L1_TTL = 24 * 60 * 60 * 1000
+const OPTIMIZE_PRICE = creditCostLabel(RESUME_OPTIMIZE_COST)
 
 function formatDesc(text: string): string[] {
   if (!text || text.length < 10) return []
@@ -44,10 +70,16 @@ export default function JobDetailDrawer({ job, isLoggedIn, onClose, onApply, onC
   onApply: (job: Job) => void
   onCheckCompany: (company: string) => void
 }) {
+  const { user } = useAuth()
   const [visible, setVisible] = useState(false)
   const [saved, setSaved] = useState(() => SavedJobsStore.isSaved(job.id))
   const [insights, setInsights] = useState<Insights | null>(null)
-  const [insightsState, setInsightsState] = useState<'loading' | 'done' | 'unavailable' | 'no_desc' | 'credits'>('loading')
+  const [insightsState, setInsightsState] = useState<InsightsState>('loading')
+  const [insightPrice, setInsightPrice] = useState<number>(JOB_INSIGHTS_COST)
+  // The ledger line after a paid generation ("1 credit used · 4 left") and any refusal text.
+  const [insightNote, setInsightNote] = useState('')
+  const [confirmOpen, setConfirmOpen] = useState(false)
+  const [checkpoint, setCheckpoint] = useState(false)
   // Apply on Seen: an employer-posted listing whose employer takes applications here
   // (apply_mode 'seen' | 'both'); 'both' also keeps the employer's own site as a second button.
   const mode = job.employer_posted ? (job.apply_mode || 'external') : 'external'
@@ -60,6 +92,21 @@ export default function JobDetailDrawer({ job, isLoggedIn, onClose, onApply, onC
     return () => cancelAnimationFrame(id)
   }, [])
 
+  // Esc closes the drawer, like the backdrop and ✕ (the Seen-apply modal on top handles its own).
+  useEffect(() => {
+    if (seenApplyOpen) return
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
+    document.addEventListener('keydown', onKey)
+    return () => document.removeEventListener('keydown', onKey)
+  }, [onClose, seenApplyOpen])
+
+  // The AI summary replaces the posting text by default; the full posting is one tap away. A long
+  // posting with no summary is folded at a paragraph boundary with "Read more" (never a bare "…").
+  const [showFull, setShowFull] = useState(false)
+  useEffect(() => { setShowFull(false) }, [job.id])
+
+  // Step 1 (free): the device cache, then a PROBE of the shared cache. A probe never gates,
+  // generates or charges — it either returns the cached insight or the price of a real call.
   const loadInsights = useCallback(async (j: Job) => {
     const desc = j.description || ''
     if (!desc || desc.length <= 80) { setInsightsState('no_desc'); return }
@@ -76,21 +123,55 @@ export default function JobDetailDrawer({ job, isLoggedIn, onClose, onApply, onC
       const res = await fetch('/api/job-insights', {
         method: 'POST',
         headers: await aiHeaders(),
-        body: JSON.stringify({ jobId: j.id, job: j.title, company: j.company, jobDescription: desc, needsSummary: true }),
+        body: JSON.stringify({ jobId: j.id, job: j.title, company: j.company, jobDescription: desc, needsSummary: true, probe: true }),
       })
-      const d = await res.json()
-      if (d.credits_required) { setInsightsState('credits'); return }
-      // A freshly generated insight ('generated') consumed a credit server-side; DB-cache
-      // hits are free. Only refresh the Nav balance when a credit was actually spent.
-      if (d._src === 'generated') window.dispatchEvent(new Event('seen:credits-updated'))
+      const d = await res.json() as InsightsResponse
+      if (d._src === 'uncached') { setInsightPrice(typeof d.price === 'number' ? d.price : JOB_INSIGHTS_COST); setInsightsState('uncached'); return }
       if (d.what_they_want?.length) {
         try { localStorage.setItem(key, JSON.stringify({ ts: Date.now(), data: d })) } catch { /* ignore */ }
-        setInsights(d); setInsightsState('done')
-      } else { setInsights(d); setInsightsState('unavailable') }
+        setInsights(d as Insights); setInsightsState('done')
+      } else { setInsights(d as Insights); setInsightsState('unavailable') }
     } catch { setInsightsState('unavailable') }
   }, [])
 
   useEffect(() => { loadInsights(job) }, [job, loadInsights])
+
+  // Step 2 (paid, explicit): generate the insight. Reached only from the price-tagged button,
+  // after the one-time confirmation on this account/device.
+  const generateInsights = useCallback(async () => {
+    const desc = job.description || ''
+    setInsightsState('generating'); setInsightNote('')
+    try {
+      const res = await fetch('/api/job-insights', {
+        method: 'POST',
+        headers: await aiHeaders(),
+        body: JSON.stringify({ jobId: job.id, job: job.title, company: job.company, jobDescription: desc, needsSummary: true }),
+      })
+      const d = await res.json() as InsightsResponse
+      if (d.credits_required || res.status === 401 || res.status === 402) {
+        setInsightNote(d.error || 'Out of AI credits.'); setInsightsState('credits'); return
+      }
+      if (d.charged) {
+        window.dispatchEvent(new Event('seen:credits-updated'))
+        setInsightNote(`${creditCostLabel(d.cost ?? JOB_INSIGHTS_COST)} used${typeof d.balance === 'number' && d.balance < 900 ? ` · ${d.balance} left` : ''} · ${dailyResetLabel()}`)
+      }
+      if (d.what_they_want?.length) {
+        try { localStorage.setItem('ji_' + job.id, JSON.stringify({ ts: Date.now(), data: d })) } catch { /* ignore */ }
+        setInsights(d as Insights); setInsightsState('done')
+      } else { setInsights(d as Insights); setInsightsState('unavailable') }
+    } catch { setInsightsState('unavailable') }
+  }, [job])
+
+  function revealInsights() {
+    if (!isLoggedIn) { setInsightNote(''); setInsightsState('credits'); return }
+    if (hasConfirmedCreditUse(user?.id)) generateInsights()
+    else setConfirmOpen(true)
+  }
+
+  function applyExternal() {
+    trackApplyClick(job)
+    setCheckpoint(true)
+  }
 
   function toggleSave() {
     if (saved) { SavedJobsStore.remove(job.id, isLoggedIn); setSaved(false) }
@@ -99,7 +180,24 @@ export default function JobDetailDrawer({ job, isLoggedIn, onClose, onApply, onC
 
   const risk = Score.risk(job.score)
   const avail = job.availability_status
-  const descParas = formatDesc(insights?.description_summary || job.description || '')
+  const fullParas = formatDesc(job.description || '')
+  const summaryParas = formatDesc(insights?.description_summary || '')
+  const FOLD_CHARS = 1400
+  const fullChars = (job.description || '').length
+  // Which paragraphs to show: the summary (collapsed), the whole posting (expanded), or a long
+  // posting folded after the paragraphs that fit FOLD_CHARS.
+  let descParas = fullParas
+  let foldLabel: string | null = null
+  if (!showFull && summaryParas.length && fullParas.length) {
+    descParas = summaryParas
+    foldLabel = `Read the full posting (${fullChars.toLocaleString()} characters) ↓`
+  } else if (!showFull && !summaryParas.length && fullChars > FOLD_CHARS + 300) {
+    const kept: string[] = []
+    let used = 0
+    for (const p of fullParas) { if (used && used + p.length > FOLD_CHARS) break; kept.push(p); used += p.length }
+    descParas = kept
+    foldLabel = 'Read more ↓'
+  }
   const chips = [job.type, job.level, job.salary && job.salary !== '—' ? job.salary : ''].filter(Boolean) as string[]
 
   return (
@@ -148,6 +246,13 @@ export default function JobDetailDrawer({ job, isLoggedIn, onClose, onApply, onC
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontFamily: 'var(--display)', fontSize: '1.05rem', fontWeight: 800, color: 'var(--white)', letterSpacing: '-.025em', lineHeight: 1.2, marginBottom: '.22rem' }}>{job.title}</div>
                 <div style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', color: 'var(--dim)' }}>{job.company}{job.location ? ` · 📍 ${job.location}` : ''}</div>
+                {externalApply && (
+                  <a href={job.apply_url!} target="_blank" rel="noopener noreferrer" data-testid="posting-link"
+                    onClick={() => trackApplyClick(job)}
+                    style={{ display: 'inline-block', marginTop: '.4rem', fontFamily: 'var(--mono)', fontSize: '.6rem', color: 'var(--green)', textDecoration: 'none' }}>
+                    Open the job posting ↗
+                  </a>
+                )}
               </div>
               <div className={`sring ${risk}`} style={{ width: 40, height: 40, flexShrink: 0 }} title={job.score == null ? 'Not enough signal in this listing to score it' : undefined}>
                 <div className="sring-n" style={{ fontSize: '.8rem' }}>{job.score ?? '–'}</div>
@@ -165,7 +270,7 @@ export default function JobDetailDrawer({ job, isLoggedIn, onClose, onApply, onC
             <div className="jd-stat"><span className="jd-sn" style={{ color: Score.color(risk) }}>{job.score ?? '–'}</span><span className="jd-sl">Score</span></div>
             <div className="jd-stat"><span className="jd-sn" style={{ color: job.waste == null ? 'var(--dim)' : job.waste > 55 ? 'var(--red)' : job.waste > 35 ? 'var(--amber)' : 'var(--green)' }}>{job.waste == null ? '–' : `${job.waste}%`}</span><span className="jd-sl">Waste risk</span></div>
             <div className="jd-stat"><span className="jd-sn" style={{ fontSize: '.72rem' }}>{job.type || 'Full-time'}</span><span className="jd-sl">Type</span></div>
-            <div className="jd-stat"><span className="jd-sn" style={{ fontSize: '.72rem' }}>{job.level || 'Mid level'}</span><span className="jd-sl">Level</span></div>
+            <div className="jd-stat"><span className="jd-sn" style={{ fontSize: '.72rem' }}>{job.level || '—'}</span><span className="jd-sl">Level</span></div>
             <div className="jd-stat"><span className="jd-sn" style={{ color: 'var(--green)', fontSize: '.75rem' }}>{job.salary || '—'}</span><span className="jd-sl">Salary</span></div>
             <div className="jd-stat"><span className="jd-sn" style={{ fontSize: '.65rem', color: 'var(--blue)' }}>{job.source || 'Job board'}</span><span className="jd-sl">Source</span></div>
           </div>
@@ -205,16 +310,33 @@ export default function JobDetailDrawer({ job, isLoggedIn, onClose, onApply, onC
             <div style={{ fontFamily: 'var(--mono)', fontSize: '.56rem', textTransform: 'uppercase' as const, letterSpacing: '.08em', color: 'var(--dim)', marginBottom: '.7rem' }}>
               WHAT {(job.company || 'THIS COMPANY').toUpperCase()} IS HIRING FOR
             </div>
-            {insightsState === 'loading' && <Skeleton widths={[80, 65, 72, 58, 68]} h={10} />}
+            {(insightsState === 'loading' || insightsState === 'generating') && <Skeleton widths={[80, 65, 72, 58, 68]} h={10} />}
             {insightsState === 'no_desc' && <div style={{ fontSize: '.72rem', color: 'var(--muted)' }}>No description for AI analysis.</div>}
             {insightsState === 'unavailable' && <div style={{ fontSize: '.72rem', color: 'var(--muted)' }}>AI insights unavailable for this listing.</div>}
+            {insightsState === 'uncached' && (
+              <div>
+                <div style={{ fontSize: '.74rem', color: 'var(--sub)', lineHeight: 1.6, marginBottom: '.6rem' }}>
+                  Nobody has analyzed this listing yet. Generate what they really want, the unstated expectations and an insider tip.
+                </div>
+                <button type="button" onClick={revealInsights} data-testid="reveal-insights"
+                  style={{ width: '100%', padding: '.62rem .9rem', background: 'rgba(16,185,129,.12)', color: 'var(--green)', border: '1px solid rgba(16,185,129,.4)', borderRadius: 9, fontFamily: 'var(--display)', fontWeight: 800, fontSize: '.8rem', cursor: 'pointer' }}>
+                  Reveal AI insights · {creditCostLabel(insightPrice)}
+                </button>
+                <div style={{ fontFamily: 'var(--mono)', fontSize: '.54rem', color: 'var(--muted)', marginTop: '.4rem', lineHeight: 1.5 }}>
+                  Once generated it is free for everyone for 7 days. {dailyResetLabel()}.
+                </div>
+              </div>
+            )}
             {insightsState === 'credits' && (
               <div style={{ fontSize: '.72rem', color: 'var(--muted)', lineHeight: 1.6 }}>
-                {isLoggedIn ? "Out of AI credits — insights will return soon." : <><a href="/login" style={{ color: 'var(--green)' }}>Sign in</a> to unlock AI insights.</>}
+                {isLoggedIn
+                  ? <>{insightNote || 'Out of AI credits.'} <a href="/tracker" style={{ color: 'var(--green)' }}>Earn credits</a> · <a href="/pricing" style={{ color: 'var(--green)' }}>Pricing</a></>
+                  : <><a href="/login" style={{ color: 'var(--green)' }}>Sign in</a> to generate AI insights ({creditCostLabel(insightPrice)}; free once cached).</>}
               </div>
             )}
             {insightsState === 'done' && insights && (
               <>
+                {insightNote && <div data-testid="insight-note" style={{ fontFamily: 'var(--mono)', fontSize: '.54rem', color: 'var(--muted)', marginBottom: '.55rem' }}>{insightNote}</div>}
                 <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: '.5rem' }}>
                   {insights.what_they_want.map((item, i) => (
                     <li key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: '.5rem', fontSize: '.78rem', color: 'var(--sub)', lineHeight: 1.5 }}>
@@ -250,10 +372,18 @@ export default function JobDetailDrawer({ job, isLoggedIn, onClose, onApply, onC
           {/* Description */}
           <div style={{ marginBottom: '1.1rem' }}>
             <div style={{ fontFamily: 'var(--mono)', fontSize: '.56rem', textTransform: 'uppercase' as const, letterSpacing: '.08em', color: 'var(--dim)', marginBottom: '.6rem' }}>ABOUT THIS ROLE</div>
-            {insightsState === 'loading'
+            {(insightsState === 'loading' || insightsState === 'generating')
               ? <Skeleton widths={[95, 82, 90, 70, 86, 75, 92]} h={9} />
               : descParas.length > 0
-                ? descParas.map((p, i) => <p key={i} style={{ fontSize: '.8rem', color: 'var(--sub)', lineHeight: 1.8, margin: '0 0 .75rem' }}>{p}</p>)
+                ? <>
+                    {descParas.map((p, i) => <p key={i} style={{ fontSize: '.8rem', color: 'var(--sub)', lineHeight: 1.8, margin: '0 0 .75rem' }}>{p}</p>)}
+                    {foldLabel && (
+                      <button type="button" onClick={() => setShowFull(true)} style={{ background: 'none', border: '1px solid var(--line2)', borderRadius: 7, color: 'var(--green)', cursor: 'pointer', fontFamily: 'var(--mono)', fontSize: '.62rem', padding: '.4rem .75rem' }}>{foldLabel}</button>
+                    )}
+                    {showFull && summaryParas.length > 0 && (
+                      <button type="button" onClick={() => setShowFull(false)} style={{ background: 'none', border: '1px solid var(--line2)', borderRadius: 7, color: 'var(--dim)', cursor: 'pointer', fontFamily: 'var(--mono)', fontSize: '.62rem', padding: '.4rem .75rem' }}>Show the summary ↑</button>
+                    )}
+                  </>
                 : <p style={{ fontSize: '.8rem', color: 'var(--muted)', fontWeight: 300 }}>No description available.</p>
             }
           </div>
@@ -287,7 +417,9 @@ export default function JobDetailDrawer({ job, isLoggedIn, onClose, onApply, onC
           >
             🏢 Check {job.company} →
           </button>
-          <div style={{ display: 'flex', gap: '.6rem' }}>
+          <div style={externalApply && !seenApply
+            ? { display: 'grid', gridTemplateColumns: 'auto minmax(0, 1fr) minmax(0, 1fr)', gap: '.6rem', alignItems: 'stretch' }
+            : { display: 'flex', gap: '.6rem' }}>
             <button onClick={toggleSave} style={{ background: 'none', border: '1px solid var(--line2)', borderRadius: 8, padding: '.58rem .85rem', fontSize: '.95rem', cursor: 'pointer', color: saved ? 'var(--green)' : 'var(--muted)', flexShrink: 0 }}>{saved ? '♥' : '♡'}</button>
             {seenApply && (
               <button
@@ -296,12 +428,29 @@ export default function JobDetailDrawer({ job, isLoggedIn, onClose, onApply, onC
               >Apply on Seen →</button>
             )}
             {externalApply
-              ? <button
-                  onClick={() => { onClose(); onApply(job) }}
-                  style={seenApply
-                    ? { flex: 1, textAlign: 'center', background: 'none', color: 'var(--sub)', borderRadius: 8, padding: '.58rem .8rem', fontFamily: 'var(--display)', fontWeight: 700, fontSize: '.76rem', border: '1px solid var(--line2)', cursor: 'pointer' }
-                    : { flex: 1, textAlign: 'center', background: 'var(--green)', color: 'var(--ink)', borderRadius: 8, padding: '.58rem 1rem', fontFamily: 'var(--display)', fontWeight: 800, fontSize: '.82rem', border: 'none', cursor: 'pointer' }}
-                >{seenApply ? 'Apply on their site →' : <>Apply &amp; Optimize →</>}</button>
+              ? <>
+                  {/* FREE: opens the posting in a new tab, then the tracker checkpoint asks
+                      "Did you apply?" — the existing add path. Nothing is spent. */}
+                  <a
+                    href={job.apply_url!}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    data-testid="drawer-apply-link"
+                    onClick={applyExternal}
+                    style={seenApply
+                      ? { flex: 1, textAlign: 'center', background: 'none', color: 'var(--sub)', borderRadius: 8, padding: '.58rem .8rem', fontFamily: 'var(--display)', fontWeight: 700, fontSize: '.76rem', border: '1px solid var(--line2)', textDecoration: 'none' }
+                      : { minWidth: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', textAlign: 'center', background: 'var(--green)', color: 'var(--ink)', borderRadius: 8, padding: '.58rem .6rem', fontFamily: 'var(--display)', fontWeight: 800, fontSize: '.82rem', textDecoration: 'none' }}
+                  >{seenApply ? 'Apply on their site ↗' : 'Apply ↗'}</a>
+                  {!seenApply && (
+                    <button
+                      type="button"
+                      data-testid="drawer-optimize-btn"
+                      onClick={() => { onClose(); onApply(job) }}
+                      title={`Optimize your résumé for this job · ${OPTIMIZE_PRICE}`}
+                      style={{ minWidth: 0, textAlign: 'center', background: 'rgba(99,102,241,.08)', color: '#a5b4fc', borderRadius: 8, padding: '.5rem .5rem', fontFamily: 'var(--display)', fontWeight: 800, fontSize: '.74rem', lineHeight: 1.15, border: '1px solid rgba(99,102,241,.35)', cursor: 'pointer' }}
+                    >Optimize · {OPTIMIZE_PRICE.replace(' ', '\u00a0')}</button>
+                  )}
+                </>
               : !seenApply && <button disabled style={{ flex: 1, background: 'var(--raised)', color: 'var(--muted)', border: 'none', borderRadius: 8, padding: '.58rem 1rem', fontFamily: 'var(--display)', fontWeight: 800, fontSize: '.82rem', opacity: .45 }}>No apply link</button>
             }
           </div>
@@ -309,6 +458,15 @@ export default function JobDetailDrawer({ job, isLoggedIn, onClose, onApply, onC
       </div>
       {seenApplyOpen && (
         <SeenApplyModal job={job} onClose={() => setSeenApplyOpen(false)} />
+      )}
+      {checkpoint && <ApplyCheckpoint job={job} onClose={() => setCheckpoint(false)} />}
+      {confirmOpen && (
+        <CreditConfirmDialog
+          cost={insightPrice}
+          action={`generate AI insights for ${job.company}`}
+          onConfirm={() => { setConfirmOpen(false); generateInsights() }}
+          onCancel={() => setConfirmOpen(false)}
+        />
       )}
     </ModalPortal>
   )

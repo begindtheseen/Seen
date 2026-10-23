@@ -1,5 +1,6 @@
 'use client'
 
+import { pathSegment, slugSegment } from '@/lib/safeHref.js'
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
@@ -62,7 +63,10 @@ export default function DashboardPage() {
   const [apps, setApps] = useState<Application[]>([])
   const [loading, setLoading] = useState(true)
   const [isPro, setIsPro] = useState(false)
-  const [surges, setSurges] = useState<string[]>([])
+  // A ghost surge for a tracked company, with the company's current grade when known (api/reports.js
+  // ghost_surges). Worded with the base rate, or dropped when the grade is A / the ghost rate < 20%.
+  type Surge = { name: string; ghosted_7d: number; gradeable?: boolean | null; overall_score?: number | null; ghost_rate?: number | null }
+  const [surges, setSurges] = useState<Surge[]>([])
   const [recentCos, setRecentCos] = useState<Array<{name: string; slug: string}>>([])
   // Greeting by the visitor's local hour — set after mount so the server HTML (UTC) never mismatches.
   const [greeting, setGreeting] = useState('Hey')
@@ -132,10 +136,18 @@ export default function DashboardPage() {
       body: JSON.stringify({ action: 'ghost_surges', names: tracked }),
     })
       .then(r => (r.ok ? r.json() : null))
-      .then((d: { surges?: Array<{ name: string }> } | null) => {
+      .then((d: { surges?: Surge[] } | null) => {
         if (cancelled || !d?.surges?.length) return
-        const hit = new Set(d.surges.map(s => s.name))
-        setSurges(tracked.filter(co => hit.has(co.toLowerCase())))
+        const byKey = new Map(d.surges.map(s => [String(s.name).toLowerCase(), s]))
+        setSurges(tracked.flatMap(co => {
+          const hit = byKey.get(co.toLowerCase())
+          if (!hit) return []
+          // Walmart: "ghost surge — 3+ ghost reports this week" next to its own page's A / 13% ghost rate
+          // (audit 2026-10-23). A week's handful at a responsive company is noise, not a warning.
+          const graded = hit.gradeable === true && typeof hit.overall_score === 'number' && typeof hit.ghost_rate === 'number'
+          if (graded && (hit.overall_score! >= 80 || hit.ghost_rate! < 0.2)) return []
+          return [{ ...hit, name: co }]
+        }))
       })
       .catch(() => { /* stale-only fallback */ })
     return () => { cancelled = true }
@@ -235,7 +247,9 @@ export default function DashboardPage() {
   const responseNum = apps.length ? Math.round((apps.filter(responded).length / apps.length) * 100) : null
 
   // Health ring visuals
-  const healthColor = health ? (health.score >= 75 ? 'var(--green)' : health.score >= 55 ? 'var(--amber)' : 'var(--red)') : 'var(--muted)'
+  // Under two reported outcomes the score is a placeholder ("Too early to call"), so it is drawn neutral —
+  // a red "50" next to "too early" read as a bad verdict (audit 2026-10-23).
+  const healthColor = health && health.terminal >= 2 ? (health.score >= 75 ? 'var(--green)' : health.score >= 55 ? 'var(--amber)' : 'var(--red)') : 'var(--muted)'
   const healthDeg = health ? Math.round((health.score / 100) * 360) : 0
 
   // Status line — "open" = currently in-progress; distinct from "tracked total" (all-time).
@@ -370,7 +384,7 @@ export default function DashboardPage() {
               const ghostPct = sc ? Math.round(sc.ghost_rate * 100) : null
               const tone = sc ? (sc.ghost_rate > 0.55 ? 'var(--red)' : sc.ghost_rate > 0.35 ? 'var(--amber)' : 'var(--green)') : undefined
               return (
-                <Link key={app.id} href={`/tracker#app_${app.id}`} className={styles.job}>
+                <Link key={app.id} href={`/tracker#app_${pathSegment(app.id)}`} className={styles.job}>
                   <span className={styles.jobIco}>{(app.company || '?').charAt(0).toUpperCase()}</span>
                   <span className={styles.jobInfo}>
                     <b>{app.company}</b>
@@ -395,12 +409,15 @@ export default function DashboardPage() {
                 <span><b>{surveyInsight.label}</b><small>{surveyInsight.desc}</small></span>
               </div>
             )}
-            {surges.map(co => (
-              <button key={`surge-${co}`} type="button" className={styles.signal} onClick={() => router.push(`/company/${companySlug(co)}`)}>
-                <span>👻</span>
-                <span><b style={{ color: '#fca5a5' }}>{co}: ghost surge</b><small>3+ ghost reports this week. Check before you follow up.</small></span>
-              </button>
-            ))}
+            {surges.map(sg => {
+              const base = typeof sg.ghost_rate === 'number' ? `${Math.round(sg.ghost_rate * 100)}% ghost rate overall` : null
+              return (
+                <button key={`surge-${sg.name}`} type="button" className={styles.signal} onClick={() => router.push(`/company/${companySlug(sg.name)}`)}>
+                  <span>👻</span>
+                  <span><b style={{ color: '#fca5a5' }}>{sg.name}: {sg.ghosted_7d} ghost report{sg.ghosted_7d === 1 ? '' : 's'} this week</b><small>{base ? `Still ${base}. ` : ''}Check before you follow up.</small></span>
+                </button>
+              )
+            })}
             {staleApps.slice(0, 3).map(a => {
               const days = Math.floor((Date.now() - a.appliedAt) / 86400000)
               return (
@@ -479,7 +496,7 @@ export default function DashboardPage() {
               <div className={styles.quietRow}>
                 <span className={styles.eyebrow}>Recently checked</span>
                 <div className={styles.chips}>
-                  {recentCos.map((co, i) => <a key={i} href={`/company/${co.slug}`} className="dchip">{co.name}</a>)}
+                  {recentCos.map((co, i) => <a key={i} href={`/company/${slugSegment(co.slug)}`} className="dchip">{co.name}</a>)}
                 </div>
               </div>
             )}

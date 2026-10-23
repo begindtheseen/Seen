@@ -141,3 +141,8 @@
     animation: none;
   }
 }
+
+/* PHONE FLOOR (≤768px) — generated: every selector in this file under 12px reads 12px on a phone */
+@media (max-width: 768px) {
+  .eyebrow, .footnote { font-size: 0.75rem; }
+}

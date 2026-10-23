@@ -182,16 +182,57 @@ function titleHasSynonym(title, syn) {
   return new RegExp(`(^|[^a-z0-9])${syn.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}([^a-z0-9]|$)`).test(title);
 }
 
+// A query TOKEN is in the title only as a whole word (plural / -ing / -er / -ed forms allowed):
+// "service" matches "Customer Service" and "Services" but NOT "ServiceNow"; "nurse" matches
+// "Nurses"/"Nursing" but not "Nursery". The old substring test let "customer service" accept
+// three Deloitte "Cyber ServiceNow" architects as relevant (live audit 2026-10-23).
+const _tokenRe = new Map();
+export function tokenInTitle(title, token) {
+  if (!title || !token) return false;
+  let re = _tokenRe.get(token);
+  if (!re) {
+    re = new RegExp(`(^|[^a-z0-9])${token.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(s|es|ing|er|ers|ed)?([^a-z0-9]|$)`);
+    if (_tokenRe.size > 2000) _tokenRe.clear();
+    _tokenRe.set(token, re);
+  }
+  return re.test(title);
+}
+
 // Whole-query company match (a company-name search like "stripe").
 function isCompanyMatch(company, qNorm) {
   return !!qNorm && (company === qNorm || company.includes(qNorm) || (qNorm.length >= 4 && qNorm.includes(company) && company.length >= 4));
 }
 
-// Relevance score of a listing for a query — used for RANKING. Title hits weigh most,
-// then company, then description; a true-synonym phrase in the title adds a boost; the
-// full query phrase in the title adds a big bonus. Returns 0 when nothing matches.
-// Description hits still contribute to the RANK (as a weak tiebreaker) but — unlike the
-// old behavior — a description-only hit does NOT make a listing relevant (see isRelevant).
+// ── Seniority alignment ────────────────────────────────────────────────────────────────────
+// A query that names no seniority ("customer service", "cashier", "nurse") is, overwhelmingly,
+// someone looking for the front-line role. A Director / VP / Architect / Senior / Manager
+// title that happens to share a word with it is a weaker match than the plain role, so it is
+// ranked below every plain-role match (never dropped — isRelevant is unchanged). A query that
+// DOES name a seniority ("senior nurse", "director of customer service") pays no penalty.
+const QUERY_SENIORITY_RE = /(^|[^a-z0-9])(director|vp|vice president|chief|head|principal|architect|senior|sr|lead|manager|supervisor|executive|officer)([^a-z0-9]|$)/;
+const TITLE_SENIORITY = [
+  [/(^|[^a-z0-9])(director|vp|vice president|chief|head of|c[efot]o|president|partner)([^a-z0-9]|$)/, 40],
+  [/(^|[^a-z0-9])(principal|architect|staff)([^a-z0-9]|$)/, 30],
+  [/(^|[^a-z0-9])(senior|sr\.?|lead)([^a-z0-9]|$)/, 20],
+  [/(^|[^a-z0-9])(manager|supervisor)([^a-z0-9]|$)/, 15],
+];
+export function seniorityPenalty(title, query) {
+  const q = String(query || '').toLowerCase();
+  if (QUERY_SENIORITY_RE.test(q)) return 0;
+  const t = String(title || '').toLowerCase();
+  let pen = 0;
+  for (const [re, p] of TITLE_SENIORITY) if (re.test(t)) pen = Math.max(pen, p);
+  return pen;
+}
+
+// Relevance score of a listing for a query — used for RANKING. Tiers, highest first:
+//   full query phrase in the title (+30) > every query token in the title (+12 each) >
+//   a true-synonym / role-family phrase in the title (+12) > provenance (+6) > company (+8) >
+//   description (+3 per token, a weak tiebreak only). A company-name search adds +60.
+// Then the seniority penalty: for a query that names no seniority, Director/Architect/Senior/
+// Manager titles rank below plain-role titles (floored at 1 so a relevant row never scores 0).
+// Returns 0 when nothing matches. A description-only hit ranks but does NOT make a listing
+// relevant (see isRelevant).
 export function relevanceScore(job, query, { synonyms = [], canonical = '' } = {}) {
   const tokens = tokenize(query);
   if (!tokens.length) return 1; // empty query: everything is "related"
@@ -202,13 +243,16 @@ export function relevanceScore(job, query, { synonyms = [], canonical = '' } = {
 
   let score = 0;
   if (isCompanyMatch(company, qNorm)) score += 60;
+  let titleHits = 0;
   for (const t of tokens) {
-    if (title.includes(t)) score += 12;
+    if (tokenInTitle(title, t)) { score += 12; titleHits++; }
     else if (company.includes(t)) score += 8;
     else if (desc.includes(t)) score += 3;
   }
+  // Every token in the title (not just some) is a stronger match than a scatter.
+  if (tokens.length > 1 && titleHits === tokens.length) score += 10;
   // Phrase bonus: the full query appears verbatim in the title.
-  if (qNorm && title.includes(qNorm)) score += 20;
+  if (qNorm && title.includes(qNorm)) score += 30;
   // True-synonym title match (e.g. "budtender" → a "Cannabis Dispensary Associate").
   for (const syn of effectiveSynonyms(query, synonyms)) {
     if (titleHasSynonym(title, syn)) score += 12;
@@ -216,7 +260,8 @@ export function relevanceScore(job, query, { synonyms = [], canonical = '' } = {
   // Provenance: fetched by our own aggregation FOR this query. A moderate boost — below a title
   // hit, so title matches still rank first, but enough to lift a genuine role a title-only bar missed.
   if (_provenanceMatch(job, query, canonical)) score += 6;
-  return score;
+  if (score <= 0) return 0;
+  return Math.max(1, score - seniorityPenalty(title, query));
 }
 
 // Is this listing GENUINELY related enough to show? The bar is a TITLE or COMPANY signal:
@@ -234,7 +279,7 @@ export function isRelevant(job, query, { synonyms = [], canonical = '' } = {}) {
   const qNorm = normalizeCompany(query);
 
   if (isCompanyMatch(company, qNorm)) return true;
-  for (const t of tokens) { if (title.includes(t)) return true; }
+  for (const t of tokens) { if (tokenInTitle(title, t)) return true; }
   if (qNorm && title.includes(qNorm)) return true;
   for (const syn of effectiveSynonyms(query, synonyms)) { if (titleHasSynonym(title, syn)) return true; }
   // Fetched by our aggregation FOR this exact query (search_query provenance) — the signal that

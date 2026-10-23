@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useMemo } from 'react'
+import React, { useState, useEffect, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { Score } from '@/lib/score'
 import { AppStore } from '@/lib/stores/AppStore'
@@ -8,6 +8,7 @@ import CompanyScoreModal from '@/components/CompanyScoreModal'
 import { firstPartyReportCount } from '@/lib/server/reportCounts'
 import { isGradeableScore, MIN_REPORTS_FOR_GRADE } from '@/lib/gradeGate'
 import PageHeader from '@/components/shell/PageHeader'
+import { gradeLetter, displayCompanyName } from '@/lib/companyDisplay'
 
 interface Company {
   id: string
@@ -29,22 +30,25 @@ interface Company {
   }
 }
 
-// "12r" = 12 first-party applicant reports. A score with none behind it is a web-research
-// estimate and says so — the fused report_count once rendered here as "12775r".
+// "12 reports" = 12 first-party applicant reports (it read "11R" — cryptic, audit 2026-10-23). A
+// score with none behind it is a web-research estimate and says so — the fused report_count once
+// rendered here as "12775r".
 function reportsLabel(s: Company['score']): string {
   const fp = firstPartyReportCount(s)
-  return fp > 0 ? `${fp}r` : 'est.'
+  return fp > 0 ? `${fp} report${fp === 1 ? '' : 's'}` : 'estimate'
 }
+
+// The top of the board is reserved for well-evidenced grades: a company needs this many first-party
+// reports to take one of the first TOP_SLOTS places. Thinner grades (5–9 reports) still appear, below,
+// under their own heading — "#1 aaa · 100/100 · 11 reports" over "#2 united wholesale mortgage · 8"
+// read as a board nobody curates.
+const WELL_EVIDENCED_REPORTS = 10
+const TOP_SLOTS = 20
 
 type SortKey = 'score' | 'ghost' | 'wait'
 
-function grade(score: number): string {
-  if (score >= 80) return 'A'
-  if (score >= 65) return 'B'
-  if (score >= 50) return 'C'
-  if (score >= 35) return 'D'
-  return 'F'
-}
+// ONE grade scale for every surface (lib/companyDisplay.ts).
+const grade = (score: number): string => gradeLetter(score)
 
 export default function CompaniesPage() {
   const router = useRouter()
@@ -115,8 +119,19 @@ export default function CompaniesPage() {
       list = [...list].sort((a, b) => a.score.ghost_rate - b.score.ghost_rate)
     if (sort === 'wait')
       list = [...list].sort((a, b) => a.score.avg_wait_days - b.score.avg_wait_days)
-    return list
+    // Stable partition: well-evidenced companies take the top slots in the chosen order; the rest
+    // follow in the same order. Filtering by name keeps the plain order (the visitor asked for a name).
+    if (search.trim()) return list
+    const strong = list.filter((c) => firstPartyReportCount(c.score) >= WELL_EVIDENCED_REPORTS)
+    const thin = list.filter((c) => firstPartyReportCount(c.score) < WELL_EVIDENCED_REPORTS)
+    return [...strong, ...thin]
   }, [companies, search, sort])
+  // Where the thinner grades begin (the heading sits before this index), or -1 when none / searching.
+  const thinStart = useMemo(() => {
+    if (search.trim()) return -1
+    const i = filtered.findIndex((c) => firstPartyReportCount(c.score) < WELL_EVIDENCED_REPORTS)
+    return i >= 0 && i < filtered.length ? i : -1
+  }, [filtered, search])
 
   function handleLookup(e: React.FormEvent) {
     e.preventDefault()
@@ -132,7 +147,7 @@ export default function CompaniesPage() {
       onClick={() => setSort(key)}
       className="btn btn-ghost"
       style={{
-        fontSize: '.72rem',
+        fontSize: 'var(--fs-72)',
         padding: '.45rem .85rem',
         ...(sort === key ? { background: 'var(--bdim)', borderColor: 'var(--blue)' } : {}),
       }}
@@ -195,10 +210,10 @@ export default function CompaniesPage() {
                       setShowLookupSuggs(false)
                       router.push(`/company/${encodeURIComponent(c.name.toLowerCase().replace(/\s+/g, '-'))}`)
                     }}
-                    style={{ display: 'flex', width: '100%', textAlign: 'left', alignItems: 'center', justifyContent: 'space-between', gap: '.6rem', background: 'none', border: 'none', borderBottom: '1px solid var(--line2)', padding: '.55rem .85rem', cursor: 'pointer', color: 'var(--white)', fontFamily: 'var(--mono)', fontSize: '.72rem' }}
+                    style={{ display: 'flex', width: '100%', textAlign: 'left', alignItems: 'center', justifyContent: 'space-between', gap: '.6rem', background: 'none', border: 'none', borderBottom: '1px solid var(--line2)', padding: '.55rem .85rem', cursor: 'pointer', color: 'var(--white)', fontFamily: 'var(--mono)', fontSize: 'var(--fs-72)' }}
                   >
-                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.name}</span>
-                    <span style={{ flexShrink: 0, color: 'var(--dim)', fontSize: '.6rem' }}>{Math.round(c.score.overall_score)}/100 · {reportsLabel(c.score)}</span>
+                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{displayCompanyName(c.name)}</span>
+                    <span style={{ flexShrink: 0, color: 'var(--dim)', fontSize: 'var(--fs-60)' }}>{Math.round(c.score.overall_score)}/100 · {reportsLabel(c.score)}</span>
                   </button>
                 ))}
               </div>
@@ -228,7 +243,7 @@ export default function CompaniesPage() {
           <div
             style={{
               fontFamily: 'var(--mono)',
-              fontSize: '.58rem',
+              fontSize: 'var(--fs-58)',
               color: 'var(--dim)',
             }}
           >
@@ -281,7 +296,7 @@ export default function CompaniesPage() {
               padding: '3rem',
               color: 'var(--muted)',
               fontFamily: 'var(--mono)',
-              fontSize: '.72rem',
+              fontSize: 'var(--fs-72)',
             }}
           >
             Loading scoreboard...
@@ -294,7 +309,7 @@ export default function CompaniesPage() {
                   style={{
                     color: 'var(--muted)',
                     fontFamily: 'var(--mono)',
-                    fontSize: '.72rem',
+                    fontSize: 'var(--fs-72)',
                     marginBottom: '1.25rem',
                   }}
                 >
@@ -313,7 +328,7 @@ export default function CompaniesPage() {
                     borderRadius: 9,
                     padding: '.7rem 1.4rem',
                     fontFamily: 'var(--mono)',
-                    fontSize: '.72rem',
+                    fontSize: 'var(--fs-72)',
                     fontWeight: 600,
                     color: 'var(--blue)',
                     textDecoration: 'none',
@@ -326,7 +341,7 @@ export default function CompaniesPage() {
                   style={{
                     marginTop: '.75rem',
                     fontFamily: 'var(--mono)',
-                    fontSize: '.58rem',
+                    fontSize: 'var(--fs-58)',
                     color: 'var(--dim)',
                   }}
                 >
@@ -338,7 +353,7 @@ export default function CompaniesPage() {
                 style={{
                   color: 'var(--muted)',
                   fontFamily: 'var(--mono)',
-                  fontSize: '.72rem',
+                  fontSize: 'var(--fs-72)',
                 }}
               >
                 No company data yet. Use the search above to look up any company.
@@ -350,6 +365,11 @@ export default function CompaniesPage() {
             {filtered.map((co, i) => {
               const risk = Score.risk(co.score.overall_score)
               const g = grade(co.score.overall_score)
+              const divider = thinStart >= 0 && i === thinStart ? (
+                <div key="thin-divider" style={{ gridColumn: '1 / -1', fontFamily: 'var(--mono)', fontSize: '.6rem', color: 'var(--muted)', letterSpacing: '.08em', textTransform: 'uppercase', padding: '.9rem .2rem .3rem', borderTop: '1px solid var(--line)' }}>
+                  Early grades · fewer than {WELL_EVIDENCED_REPORTS} applicant reports{thinStart >= TOP_SLOTS ? '' : ` · the top ${TOP_SLOTS} need ${WELL_EVIDENCED_REPORTS}+`}
+                </div>
+              ) : null
               const fillPct = Math.max(4, co.score.overall_score)
               const fillColor =
                 risk === 'safe'
@@ -358,8 +378,9 @@ export default function CompaniesPage() {
                   ? 'var(--amber)'
                   : 'var(--red)'
               return (
+                <React.Fragment key={co.id || co.name}>
+                {divider}
                 <a
-                  key={co.id || co.name}
                   href={`/company/${encodeURIComponent(
                     co.name.toLowerCase().replace(/\s+/g, '-')
                   )}`}
@@ -389,27 +410,27 @@ export default function CompaniesPage() {
                     <div className="ldr-rank">#{i + 1}</div>
                     <div className={`ldr-score ${risk}`}>{g}</div>
                     <div className="ldr-name">
-                      {co.name}
+                      {displayCompanyName(co.name)}
                       {co.verified && (
                         <span
                           style={{
                             marginLeft: '.3rem',
                             color: 'var(--green)',
-                            fontSize: '.55rem',
+                            fontSize: 'var(--fs-55)',
                           }}
                         >
                           ✓
                         </span>
                       )}
                       {appliedCos.has(co.name.toLowerCase().trim()) && (
-                        <span style={{ fontFamily: 'var(--mono)', fontSize: '.48rem', background: 'rgba(99,102,241,.12)', border: '1px solid rgba(99,102,241,.25)', borderRadius: 4, padding: '.06rem .28rem', color: 'var(--indigo)', marginLeft: '.35rem', verticalAlign: 'middle', flexShrink: 0 }}>Applied</span>
+                        <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-48)', background: 'rgba(99,102,241,.12)', border: '1px solid rgba(99,102,241,.25)', borderRadius: 4, padding: '.06rem .28rem', color: 'var(--indigo)', marginLeft: '.35rem', verticalAlign: 'middle', flexShrink: 0 }}>Applied</span>
                       )}
                     </div>
                     {co.industry && (
                       <div
                         style={{
                           fontFamily: 'var(--mono)',
-                          fontSize: '.52rem',
+                          fontSize: 'var(--fs-52)',
                           color: 'var(--dim)',
                           marginTop: '.15rem',
                           letterSpacing: '.03em',
@@ -431,7 +452,7 @@ export default function CompaniesPage() {
                         <span
                           style={{
                             fontFamily: 'var(--mono)',
-                            fontSize: '.5rem',
+                            fontSize: 'var(--fs-50)',
                             background:
                               co.score.ghost_rate > 0.5
                                 ? 'rgba(239,68,68,0.12)'
@@ -456,7 +477,7 @@ export default function CompaniesPage() {
                         <span
                           style={{
                             fontFamily: 'var(--mono)',
-                            fontSize: '.5rem',
+                            fontSize: 'var(--fs-50)',
                             background: 'rgba(16,185,129,0.08)',
                             color: 'var(--green)',
                             border: '1px solid rgba(16,185,129,0.2)',
@@ -482,6 +503,7 @@ export default function CompaniesPage() {
                     </div>
                   </div>
                 </a>
+                </React.Fragment>
               )
             })}
           </div>

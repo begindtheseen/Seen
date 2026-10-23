@@ -5,6 +5,7 @@ import { usePathname, useRouter } from 'next/navigation'
 import { useState, useEffect, useRef, type ReactNode } from 'react'
 import { useAuth } from '@/lib/auth'
 import { supabase } from '@/lib/supabase'
+import { markIntentionalSignOut } from '@/lib/sessionExpired'
 import styles from '../Nav.module.css'
 import empStyles from './EmployerNav.module.css'
 
@@ -75,7 +76,9 @@ export function EmployerNav() {
   const avatarInitial = (profile?.name?.trim()?.[0] || user?.email?.[0] || 'E').toUpperCase()
 
   const handleSignOut = async () => {
-    try { await supabase.auth.signOut() } catch { /* ignore */ }
+    // Local scope only — the default (global) also signed the user out on their other devices.
+    markIntentionalSignOut()
+    try { await supabase.auth.signOut({ scope: 'local' }) } catch { /* ignore */ }
     setMenuOpen(false)
     setAcctOpen(false)
     router.push('/')

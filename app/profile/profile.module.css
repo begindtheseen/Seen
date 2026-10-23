@@ -43,10 +43,11 @@
 .jump:hover { color: var(--white); background: rgba(255, 255, 255, 0.05); transform: translateX(2px); }
 .jump span:first-child { width: 22px; text-align: center; font-size: 0.85rem; opacity: 0.85; }
 .jumpDanger { color: #f87185; }
+/* Phones: the chips WRAP (two rows at 390px) instead of running off the right edge — the old
+   overflow-x row reached 617px at 390 with its scrollbar hidden, so nothing hinted it scrolled. */
 @media (max-width: 860px) {
-  .jumps { flex-direction: row; overflow-x: auto; scrollbar-width: none; padding: 0.3rem; }
-  .jumps::-webkit-scrollbar { display: none; }
-  .jump { white-space: nowrap; padding: 0.45rem 0.7rem; }
+  .jumps { flex-direction: row; flex-wrap: wrap; padding: 0.3rem; }
+  .jump { white-space: nowrap; padding: 0.45rem 0.7rem; min-height: 40px; }
 }
 
 /* ── Cards ── */
@@ -147,6 +148,7 @@
 .bDim { color: var(--sub); border-color: var(--line2); }
 .fine { font-family: var(--mono); font-size: 0.55rem; color: var(--dim); margin-top: 0.9rem; line-height: 1.6; }
 .fine a { color: var(--sub); }
+@media (max-width: 768px) { .fine a { display: inline-block; padding: 1rem 0; margin: -1rem 0; } }
 
 .dangerCard { border-color: rgba(239, 68, 68, 0.22); background: linear-gradient(150deg, #1d1420, #0f111d); }
 
@@ -173,4 +175,9 @@
   .me, .jumps, .col > *, .suggs, .saveBar { animation: none; }
   .jump, .primary, .ghost, .input, .select { transition: none; }
   .jump:hover, .primary:hover { transform: none; }
+}
+
+/* PHONE FLOOR (≤768px) — generated: every selector in this file under 12px reads 12px on a phone */
+@media (max-width: 768px) {
+  .meMail, .plan, .eyebrow, .label, .hint, .rowS, .msg, .fileMeta, .planMeta, .badge, .fine { font-size: 0.75rem; }
 }

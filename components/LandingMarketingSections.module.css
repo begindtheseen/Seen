@@ -45,3 +45,13 @@
   .card, .ico, .more span { transition: none; }
   .card:hover, .card:hover .ico, .card:hover .more span { transform: none; }
 }
+
+/* Phone floor (audit 2026-10-23): kicker, card tags and "Open →" read at 12px. */
+@media (max-width: 768px) {
+  .kicker, .tag, .more { font-size: 0.75rem; }
+}
+
+/* PHONE FLOOR (≤768px) — generated: every selector in this file under 12px reads 12px on a phone */
+@media (max-width: 768px) {
+  .kicker, .tag, .more { font-size: 0.75rem; }
+}

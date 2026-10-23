@@ -5,6 +5,8 @@ import { AppStore } from '@/lib/stores/AppStore'
 import { isPublicDiscussion, reportDate, reportSourceBadge, reportSourceLink } from '@/lib/reportSource'
 import ReportSourceLink from '@/components/ReportSourceLink'
 import PageHeader from '@/components/shell/PageHeader'
+import { displayCompanyName } from '@/lib/companyDisplay'
+import { collapseByCompany } from '@/lib/reports/feedFilter.js'
 
 type Filter = 'all' | 'ghosted' | 'rejected' | 'interviewing' | 'hired'
 
@@ -19,6 +21,8 @@ interface FeedReport {
   created_at: string
   experience_level?: string
   company_name?: string
+  /** Later rows of the same company folded into this card (one card per company per page). */
+  more_from_company?: number
 }
 
 const OUTCOME_LABELS: Record<string, { label: string; cls: string }> = {
@@ -57,6 +61,7 @@ export default function FeedPage() {
   const [reports, setReports] = useState<FeedReport[]>([])
   const [offset, setOffset] = useState(0)
   const [total, setTotal] = useState(0)
+  const [hasMore, setHasMore] = useState(false)
   const [loading, setLoading] = useState(true)
   const [loadingMore, setLoadingMore] = useState(false)
   const [appliedCos, setAppliedCos] = useState<Set<string>>(new Set())
@@ -75,12 +80,16 @@ export default function FeedPage() {
         }),
       })
       if (!res.ok) throw new Error('Failed')
-      const data = await res.json() as { reports?: FeedReport[]; total?: number }
-      const rows = data.reports || []
+      const data = await res.json() as { reports?: FeedReport[]; total?: number; next_offset?: number; has_more?: boolean }
+      // One card per company per page: a run of ten Albertsons imports becomes one card with "+9 more".
+      const rows = collapseByCompany(data.reports || []) as FeedReport[]
       setTotal(data.total || 0)
+      // The server reads a wider window than it returns, so the next page starts where it stopped.
+      setOffset(typeof data.next_offset === 'number' ? data.next_offset : newOffset + PAGE_SIZE)
+      setHasMore(data.has_more ?? ((typeof data.next_offset === 'number' ? data.next_offset : newOffset + PAGE_SIZE) < (data.total || 0)))
       setReports(prev => append ? [...prev, ...rows] : rows)
     } catch {
-      if (!append) setReports([])
+      if (!append) { setReports([]); setHasMore(false) }
     }
     setLoading(false)
     setLoadingMore(false)
@@ -99,12 +108,8 @@ export default function FeedPage() {
   }, [filter, loadFeed])
 
   function loadMore() {
-    const next = offset + PAGE_SIZE
-    setOffset(next)
-    loadFeed(filter, next, true)
+    loadFeed(filter, offset, true)
   }
-
-  const hasMore = offset + PAGE_SIZE < total
 
   return (
     <div className="page-full">
@@ -119,10 +124,10 @@ export default function FeedPage() {
         {/* CTA strip — old HTML order: report CTA comes first */}
         <div style={{ background: 'rgba(16,185,129,.06)', border: '1px solid rgba(16,185,129,.18)', borderRadius: 10, padding: '.75rem 1rem', marginBottom: '1.25rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '.75rem', flexWrap: 'wrap', cursor: 'pointer', transition: 'background .15s' }} onClick={() => window.location.href = '/report'}>
           <div>
-            <div style={{ fontFamily: 'var(--mono)', fontSize: '.62rem', color: 'var(--green)', fontWeight: 600, marginBottom: '.1rem' }}>Your experience matters</div>
-            <div style={{ fontSize: '.72rem', color: 'var(--sub)', fontWeight: 300 }}>Had an interview? Got ghosted? Add your report — it shapes scores for every future applicant.</div>
+            <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-62)', color: 'var(--green)', fontWeight: 600, marginBottom: '.1rem' }}>Your experience matters</div>
+            <div style={{ fontSize: 'var(--fs-72)', color: 'var(--sub)', fontWeight: 300 }}>Had an interview? Got ghosted? Add your report — it shapes scores for every future applicant.</div>
           </div>
-          <div style={{ fontFamily: 'var(--mono)', fontSize: '.65rem', color: 'var(--green)', flexShrink: 0, whiteSpace: 'nowrap' }}>Add yours →</div>
+          <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-65)', color: 'var(--green)', flexShrink: 0, whiteSpace: 'nowrap' }}>Add yours →</div>
         </div>
 
         {/* The old "ghost surges this week" banner here was any two companies with a ghosted row in the
@@ -143,11 +148,11 @@ export default function FeedPage() {
 
         {/* Feed */}
         {loading ? (
-          <div style={{ textAlign: 'center', padding: '3rem', color: 'var(--muted)', fontFamily: 'var(--mono)', fontSize: '.72rem' }}>
+          <div style={{ textAlign: 'center', padding: '3rem', color: 'var(--muted)', fontFamily: 'var(--mono)', fontSize: 'var(--fs-72)' }}>
             Loading feed...
           </div>
         ) : reports.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: '3rem', color: 'var(--muted)', fontFamily: 'var(--mono)', fontSize: '.72rem' }}>
+          <div style={{ textAlign: 'center', padding: '3rem', color: 'var(--muted)', fontFamily: 'var(--mono)', fontSize: 'var(--fs-72)' }}>
             No reports yet for this filter.
           </div>
         ) : (
@@ -161,25 +166,25 @@ export default function FeedPage() {
                 <div key={r.id} className={`rcard ${oc.cls}`} style={{ marginBottom: '.65rem' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '.5rem' }}>
                     <div>
-                      <span style={{ fontFamily: 'var(--mono)', fontSize: '.7rem', fontWeight: 600, color: 'var(--white)' }}>{oc.label}</span>
+                      <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-70)', fontWeight: 600, color: 'var(--white)' }}>{oc.label}</span>
                       {r.company_name && (
-                        <a href={`/company/${encodeURIComponent(r.company_name.toLowerCase().replace(/\s+/g, '-'))}`} style={{ fontFamily: 'var(--mono)', fontSize: '.62rem', color: 'var(--blue)', marginLeft: '.5rem', textDecoration: 'none' }}>
-                          @ {r.company_name}
+                        <a href={`/company/${encodeURIComponent(r.company_name.toLowerCase().replace(/\s+/g, '-'))}`} className="tap" style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-62)', color: 'var(--blue)', marginLeft: '.5rem', textDecoration: 'none' }}>
+                          @ {displayCompanyName(r.company_name)}
                         </a>
                       )}
                       {r.company_name && appliedCos.has(r.company_name.toLowerCase().trim()) && (
-                        <span style={{ fontFamily: 'var(--mono)', fontSize: '.52rem', background: 'rgba(99,102,241,.12)', border: '1px solid rgba(99,102,241,.25)', borderRadius: 4, padding: '.1rem .35rem', color: 'var(--indigo)', marginLeft: '.3rem', verticalAlign: 'middle' }}>
+                        <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-52)', background: 'rgba(99,102,241,.12)', border: '1px solid rgba(99,102,241,.25)', borderRadius: 4, padding: '.1rem .35rem', color: 'var(--indigo)', marginLeft: '.3rem', verticalAlign: 'middle' }}>
                           You applied
                         </span>
                       )}
                     </div>
-                    <span style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', color: 'var(--muted)', flexShrink: 0 }}>
+                    <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-58)', color: 'var(--muted)', flexShrink: 0 }}>
                       {isPublicDiscussion(r.platform) ? reportDate(r.platform, r.report_text, r.created_at).label : timeAgo(r.created_at)}
                     </span>
                   </div>
 
                   {r.role && (
-                    <div style={{ fontFamily: 'var(--mono)', fontSize: '.62rem', color: 'var(--dim)', marginBottom: '.4rem' }}>
+                    <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-62)', color: 'var(--dim)', marginBottom: '.4rem' }}>
                       {r.role}{r.experience_level ? ` · ${r.experience_level}` : ''}
                     </div>
                   )}
@@ -200,7 +205,7 @@ export default function FeedPage() {
                   </div>
 
                   {body && (
-                    <p style={{ fontFamily: 'var(--mono)', fontSize: '.68rem', color: 'var(--sub)', lineHeight: 1.7, margin: 0 }}>
+                    <p style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-68)', color: 'var(--sub)', lineHeight: 1.7, margin: 0 }}>
                       {body}
                     </p>
                   )}
@@ -208,6 +213,11 @@ export default function FeedPage() {
                     <div style={{ marginTop: '.45rem' }}>
                       <ReportSourceLink url={src.url} host={src.host} posted={src.posted} />
                     </div>
+                  )}
+                  {(r.more_from_company ?? 0) > 0 && r.company_name && (
+                    <a href={`/company/${encodeURIComponent(r.company_name.toLowerCase().replace(/\s+/g, '-'))}#reports`} style={{ display: 'inline-block', marginTop: '.5rem', fontFamily: 'var(--mono)', fontSize: '.58rem', color: 'var(--muted)', textDecoration: 'none' }}>
+                      + {r.more_from_company} more from {displayCompanyName(r.company_name)} on its page →
+                    </a>
                   )}
                 </div>
               )
@@ -218,9 +228,9 @@ export default function FeedPage() {
                 <button
                   onClick={loadMore}
                   disabled={loadingMore}
-                  style={{ background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 8, padding: '.65rem 1.5rem', fontFamily: 'var(--mono)', fontSize: '.68rem', color: 'var(--sub)', cursor: loadingMore ? 'not-allowed' : 'pointer', opacity: loadingMore ? 0.6 : 1 }}
+                  style={{ background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 8, padding: '.65rem 1.5rem', fontFamily: 'var(--mono)', fontSize: 'var(--fs-68)', color: 'var(--sub)', cursor: loadingMore ? 'not-allowed' : 'pointer', opacity: loadingMore ? 0.6 : 1 }}
                 >
-                  {loadingMore ? 'Loading...' : `Load more (${total - offset - PAGE_SIZE} remaining)`}
+                  {loadingMore ? 'Loading...' : `Load more${total > offset ? ` (${(total - offset).toLocaleString()} to read)` : ''}`}
                 </button>
               </div>
             )}
@@ -232,7 +242,7 @@ export default function FeedPage() {
           <div style={{ fontFamily: 'var(--display)', fontSize: '1rem', fontWeight: 800, color: 'var(--white)', marginBottom: '.4rem' }}>
             Had a notable experience?
           </div>
-          <p style={{ fontFamily: 'var(--mono)', fontSize: '.65rem', color: 'var(--sub)', marginBottom: '1rem' }}>
+          <p style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-65)', color: 'var(--sub)', marginBottom: '1rem' }}>
             Takes 60 seconds. Helps the next applicant who checks this company.
           </p>
           <a href="/report" style={{ display: 'inline-block', background: 'linear-gradient(135deg,#3b82f6 0%,#8b5cf6 100%)', border: 'none', borderRadius: 8, padding: '.65rem 1.5rem', fontFamily: 'var(--display)', fontWeight: 800, fontSize: '.82rem', color: '#fff', textDecoration: 'none', boxShadow: '0 0 20px rgba(59,130,246,0.3)' }}>

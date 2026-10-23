@@ -115,11 +115,15 @@ function DisputeForm({ companyName, presetPermalink, onClose }: {
 }
 
 // ── Main block ──────────────────────────────────────────────────────────────────────
-export default function CompanyRedditDiscussion({ companyName, hasReportData = false }: {
+export type RedditDiscussionResult = { items: RedditThread[]; status: 'ok' | 'empty' | 'checking' | 'error' }
+
+export default function CompanyRedditDiscussion({ companyName, hasReportData = false, prefetched }: {
   companyName: string; hasReportData?: boolean
+  /** The page's own fetch of /api/company-reddit (it decides whether to show the section at all). */
+  prefetched?: RedditDiscussionResult | null
 }) {
-  const [status, setStatus] = useState<Status>('loading')
-  const [items, setItems] = useState<RedditThread[]>([])
+  const [status, setStatus] = useState<Status>(prefetched ? prefetched.status : 'loading')
+  const [items, setItems] = useState<RedditThread[]>(prefetched ? prefetched.items : [])
   const [showDispute, setShowDispute] = useState(false)
   const [flaggedPermalink, setFlaggedPermalink] = useState<string | undefined>(undefined)
 
@@ -140,7 +144,8 @@ export default function CompanyRedditDiscussion({ companyName, hasReportData = f
     }
   }, [companyName])
 
-  useEffect(() => { load() }, [load])
+  useEffect(() => { if (!prefetched) load() }, [load, prefetched])
+  useEffect(() => { if (prefetched) { setItems(prefetched.items); setStatus(prefetched.status) } }, [prefetched])
 
   const openDispute = (permalink?: string) => { setFlaggedPermalink(permalink); setShowDispute(true) }
 

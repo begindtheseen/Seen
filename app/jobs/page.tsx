@@ -10,6 +10,7 @@ import JobDetailDrawer from '@/components/jobs/JobDetailDrawer'
 import CoPreviewModal from '@/components/jobs/CoPreviewModal'
 import SwipeJobDeck from '@/components/jobs/SwipeJobDeck'
 import JobFilters from '@/components/jobs/JobFilters'
+import ResumeMatches from '@/components/jobs/ResumeMatches'
 import ApplyCheckpoint from '@/components/ApplyCheckpoint'
 import ApplyOptimizeModal from '@/components/ApplyOptimizeModal'
 import { notify } from '@/lib/notify'
@@ -17,6 +18,13 @@ import { matchCities } from '@/lib/data/usCities'
 import { takesSeenApply } from '@/lib/seenApplyMode'
 import { useCompanySuggestions, CompanySuggestList, CompanyResultCard } from '@/components/jobs/CompanySuggest'
 import PageHeader from '@/components/shell/PageHeader'
+import bar from '@/components/jobs/JobSearchBar.module.css'
+
+// Empty-state suggestions, most-held first. Live corpus counts by title (prod, read-only,
+// 2026-10-23): software engineer 3,960 · nurse 1,360 · sales associate 648 · customer service 489 ·
+// warehouse 398 · data analyst 231 · cashier 113 · server 50. (Marketing 1,525 / product manager
+// 1,092 were dropped for the hourly roles the audit persona actually searches for.)
+const SUGGESTED_ROLES = ['Software Engineer', 'Nurse', 'Sales Associate', 'Customer Service', 'Warehouse', 'Data Analyst', 'Cashier', 'Server']
 
 export default function JobsPage() {
   const router = useRouter()
@@ -37,8 +45,11 @@ export default function JobsPage() {
     filtered,
     status,
     statusMsg,
+    notice,
     recommended,
     recHasResume,
+    recReason,
+    recCity,
     recSkills,
     recStatus,
     coScores,
@@ -52,8 +63,6 @@ export default function JobsPage() {
   const [checkCompany, setCheckCompany] = useState<string | null>(null)
   const [detailJob, setDetailJob] = useState<Job | null>(null)
   const [saveVersion, setSaveVersion] = useState(0)
-  const [swipeCount, setSwipeCount] = useState(0)
-  const [deckDone, setDeckDone] = useState(false)
   const [swipeMode, setSwipeMode] = useState(false)
   const [checkpointJob, setCheckpointJob] = useState<Job | null>(null)
   // When the checkpoint is opened AFTER the user already confirmed applying (the Apply &
@@ -68,19 +77,6 @@ export default function JobsPage() {
     setSaveVersion(v => v + 1)
   }
 
-  const inputStyle: React.CSSProperties = {
-    flex: 1, minWidth: 130,
-    background: 'var(--surface)',
-    border: '1.5px solid var(--line2)',
-    borderRadius: 8,
-    padding: '.62rem .9rem',
-    color: 'var(--white)',
-    fontFamily: 'var(--body)',
-    fontSize: '.875rem',
-    outline: 'none',
-    caretColor: 'var(--blue)',
-  }
-
   const selectStyle: React.CSSProperties = {
     background: 'var(--card)',
     border: '1px solid var(--line2)',
@@ -93,6 +89,13 @@ export default function JobsPage() {
     cursor: 'pointer',
   }
 
+  const hasCity = location.trim().length > 0
+  // The résumé rail: only with ≥3 real matches (same role family, near the profile city), and
+  // never once a search has been typed — the search is the page's job.
+  const typed = query.trim().length > 0
+  const showRail = isLoggedIn && !typed && (recStatus === 'loading' || recommended.length >= 3)
+  const showCityLine = isLoggedIn && !typed && recStatus === 'done' && recReason === 'no_city'
+
   return (
     <>
     <div className="page-full">
@@ -103,15 +106,16 @@ export default function JobsPage() {
             tone="green"
             title="Open positions"
             crumbLabel="Jobs"
-            sub="Sorted by transparency. Every listing shows waste risk, process score, and vibe tags — not just salary and location."
+            sub="Ranked by how well they match your search. Every listing shows waste risk, process score, and vibe tags — not just salary and location."
             className="jpage-head"
           />
 
           {/* Search bar — job titles AND company names in the same box (CompanySuggest.tsx) */}
-          <div style={{ display: 'flex', gap: '.5rem', marginTop: '1rem', flexWrap: 'wrap' }}>
-            <div style={{ position: 'relative', flex: 2, minWidth: 180, display: 'flex' }}>
+          <div className={bar.wrap}>
+            <div className={bar.query}>
             <input
               type="text"
+              className={bar.input}
               placeholder="Job title, role or company..."
               value={query}
               onFocus={() => setShowCoSuggs(true)}
@@ -125,7 +129,6 @@ export default function JobsPage() {
                 }
               }}
               onKeyDown={e => { if (e.key === 'Enter') { if (debounceRef.current) clearTimeout(debounceRef.current); setShowCoSuggs(false); searchJobs() } }}
-              style={{ ...inputStyle, width: '100%' }}
             />
             {showCoSuggs && (
               <CompanySuggestList
@@ -139,67 +142,79 @@ export default function JobsPage() {
               />
             )}
             </div>
-            <div style={{ position: 'relative', flex: 1, minWidth: 130 }}>
-              <input
-                type="text"
-                placeholder="City or state..."
-                value={location}
-                onChange={e => {
-                  const val = e.target.value
-                  setLocation(val)
-                  if (val.length >= 2) {
-                    setLocSuggs(matchCities(val, 6))
-                    setShowLocSuggs(true)
-                  } else {
-                    setShowLocSuggs(false)
-                  }
-                }}
-                onKeyDown={e => e.key === 'Enter' && searchJobs()}
-                onBlur={() => setTimeout(() => setShowLocSuggs(false), 150)}
-                style={{ ...inputStyle, flex: 'unset', minWidth: 'unset', width: '100%', paddingRight: '2rem' }}
-              />
-              <button
-                onClick={requestGpsLocation}
-                title="Use my location"
-                disabled={gpsLoading || !!location.trim()}
-                style={{ position: 'absolute', right: '.5rem', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: gpsLoading || location.trim() ? 'default' : 'pointer', fontSize: '.9rem', color: gpsLoading ? 'var(--blue)' : 'var(--muted)', padding: 0, lineHeight: 1, opacity: location.trim() ? 0.3 : 1, transition: 'color .15s' }}
+            <div className={bar.row}>
+              <div className={bar.loc}>
+                <input
+                  type="text"
+                  className={`${bar.input} ${bar.locInput}`}
+                  placeholder="City or state..."
+                  aria-label="City or state"
+                  value={location}
+                  onChange={e => {
+                    const val = e.target.value
+                    setLocation(val)
+                    if (val.length >= 2) {
+                      setLocSuggs(matchCities(val, 6))
+                      setShowLocSuggs(true)
+                    } else {
+                      setShowLocSuggs(false)
+                    }
+                  }}
+                  // Enter searches AND closes the suggestion list (it used to stay open over the
+                  // Search button); Esc just closes it.
+                  onKeyDown={e => {
+                    if (e.key === 'Enter') { setShowLocSuggs(false); searchJobs() }
+                    else if (e.key === 'Escape') setShowLocSuggs(false)
+                  }}
+                  onBlur={() => setTimeout(() => setShowLocSuggs(false), 150)}
+                />
+                <button
+                  type="button"
+                  onClick={requestGpsLocation}
+                  title="Use my location"
+                  aria-label="Use my location"
+                  disabled={gpsLoading || hasCity}
+                  className={`${bar.pin}${gpsLoading ? ' ' + bar.pinBusy : ''}${hasCity ? ' ' + bar.pinOff : ''}`}
+                >
+                  {gpsLoading ? '⏳' : '📍'}
+                </button>
+                {showLocSuggs && locSuggs.length > 0 && (
+                  <div className={bar.suggs}>
+                    {locSuggs.map(city => (
+                      <div key={city} className={bar.sugg} onMouseDown={() => { setLocation(city); setShowLocSuggs(false) }}>{city}</div>
+                    ))}
+                  </div>
+                )}
+              </div>
+              {/* A radius only means something next to a place: with no city the select reads
+                  "Anywhere" (Remote stays available) instead of a dangling "25 mi". */}
+              <select
+                className={bar.radius}
+                aria-label="Distance"
+                value={hasCity || radius === '0' ? radius : 'any'}
+                onChange={e => setRadius(e.target.value === 'any' ? '25' : e.target.value)}
               >
-                {gpsLoading ? '⏳' : '📍'}
+                {hasCity ? (
+                  <>
+                    <option value="10">10 mi</option>
+                    <option value="25">25 mi</option>
+                    <option value="50">50 mi</option>
+                    <option value="100">100 mi</option>
+                  </>
+                ) : (
+                  <option value="any">Anywhere</option>
+                )}
+                <option value="0">Remote</option>
+              </select>
+              <button
+                type="button"
+                className={bar.go}
+                onClick={() => searchJobs()}
+                disabled={status === 'loading'}
+              >
+                {status === 'loading' ? 'Searching...' : 'Search →'}
               </button>
-              {showLocSuggs && locSuggs.length > 0 && (
-                <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 50, background: 'var(--card)', border: '1px solid var(--line2)', borderRadius: 8, marginTop: 2, overflow: 'hidden', boxShadow: '0 8px 24px rgba(0,0,0,.4)' }}>
-                  {locSuggs.map(city => (
-                    <div key={city} onMouseDown={() => { setLocation(city); setShowLocSuggs(false) }}
-                      style={{ padding: '.45rem .8rem', fontFamily: 'var(--mono)', fontSize: '.68rem', color: 'var(--sub)', cursor: 'pointer' }}
-                      onMouseEnter={e => (e.currentTarget.style.background = 'var(--surface)')}
-                      onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
-                    >{city}</div>
-                  ))}
-                </div>
-              )}
             </div>
-            <select value={radius} onChange={e => setRadius(e.target.value)} style={selectStyle}>
-              <option value="10">10 mi</option>
-              <option value="25">25 mi</option>
-              <option value="50">50 mi</option>
-              <option value="100">100 mi</option>
-              <option value="0">Remote</option>
-            </select>
-            <button
-              onClick={() => searchJobs()}
-              disabled={status === 'loading'}
-              style={{
-                background: 'linear-gradient(135deg,#3b82f6 0%,#8b5cf6 100%)',
-                color: '#fff', border: 'none', borderRadius: 8,
-                padding: '.62rem 1.25rem',
-                fontFamily: 'var(--display)', fontWeight: 800, fontSize: '.85rem',
-                cursor: status === 'loading' ? 'not-allowed' : 'pointer',
-                opacity: status === 'loading' ? 0.6 : 1,
-                boxShadow: '0 0 20px rgba(59,130,246,0.3)',
-              }}
-            >
-              {status === 'loading' ? 'Searching...' : 'Search →'}
-            </button>
           </div>
 
           {/* Filter bar */}
@@ -213,40 +228,18 @@ export default function JobsPage() {
           />
         </div>
 
-        {/* Recommended section — powered by resume intelligence */}
-        {isLoggedIn && (recStatus === 'loading' || recommended.length > 0) && (
-          <div style={{ marginBottom: '1.5rem', paddingBottom: '1.5rem', borderBottom: '1px solid var(--line)' }}>
-            <div style={{ fontFamily: 'var(--mono)', fontSize: '.52rem', textTransform: 'uppercase' as const, letterSpacing: '.12em', color: 'var(--green)', marginBottom: '.75rem', display: 'flex', alignItems: 'center', gap: 10 }}>
-              <span style={{ width: 20, height: 1.5, background: 'linear-gradient(90deg, var(--green), #8b5cf6)', display: 'inline-block', flexShrink: 0 }} />
-              Matched to your resume
-              {recSkills.length > 0 && (
-                <span style={{ color: 'var(--dim)', letterSpacing: 'normal', textTransform: 'none' as const, marginLeft: 2, fontSize: '.6rem' }}>
-                  · {recSkills.slice(0, 3).join(', ')}
-                </span>
-              )}
-              {deckDone && swipeCount > 0 && (
-                <span style={{ color: 'var(--green)', letterSpacing: 'normal', textTransform: 'none' as const, marginLeft: 2, fontSize: '.6rem' }}>
-                  · {swipeCount} saved today
-                </span>
-              )}
-            </div>
-            {recStatus === 'loading' ? (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '.65rem' }}>
-                {[0, 1, 2].map(i => (
-                  <div key={i} style={{ height: 110, background: 'var(--raised)', borderRadius: 12, animation: `pulse 1.4s ${i * 0.15}s ease infinite` }} />
-                ))}
-              </div>
-            ) : (
-              <SwipeJobDeck
-                jobs={recommended}
-                onOpen={j => setDetailJob(j)}
-                onDismiss={() => setDeckDone(true)}
-                onSave={() => setSwipeCount(c => c + 1)}
-                onApply={j => { if (takesSeenApply(j)) { setDetailJob(j); return } if (j.apply_url) { trackApplyClick(j); window.open(j.apply_url, '_blank', 'noopener,noreferrer') } setCheckpointJob(j) }}
-                coScores={coScores}
-              />
-            )}
-          </div>
+        {/* Matched to your résumé — compact, gated, hidden once a search is typed */}
+        {showRail && (
+          <ResumeMatches
+            jobs={recommended}
+            loading={recStatus === 'loading'}
+            skills={recSkills}
+            city={recCity}
+            onOpen={j => setDetailJob(j)}
+          />
+        )}
+        {showCityLine && (
+          <div className={bar.cityLine}>Add your city in <a href="/profile">Settings</a> for local matches to your résumé.</div>
         )}
 
         {/* The search names a company → its card (grade only when it has enough reviews) */}
@@ -272,15 +265,18 @@ export default function JobsPage() {
             )}
             <select
               className="jss"
+              aria-label="Sort results"
               value={sort}
               onChange={e => setSort(e.target.value as SortMode)}
             >
+              <option value="best">Best match</option>
               <option value="transparency">By transparency</option>
               <option value="waste">Lowest waste risk</option>
               <option value="recent">Most recent</option>
             </select>
           </div>
         </div>
+        {notice && filtered.length > 0 && <div className={bar.notice} role="status">{notice}</div>}
 
         {/* Results — swipe deck or list */}
         {filtered.length > 0 && swipeMode ? (
@@ -304,7 +300,7 @@ export default function JobsPage() {
             <div style={{ fontFamily: 'var(--display)', fontSize: '1.1rem', fontWeight: 700, color: 'var(--white)', letterSpacing: '-.02em', marginBottom: '.4rem' }}>What role are you hunting?</div>
             <div style={{ fontFamily: 'var(--mono)', fontSize: '.62rem', color: 'var(--muted)', marginBottom: '1.15rem' }}>Every result is transparency-scored before you waste a single application.</div>
             <div style={{ display: 'flex', gap: '.45rem', flexWrap: 'wrap', justifyContent: 'center' }}>
-              {['Software Engineer', 'Product Manager', 'Data Analyst', 'Marketing'].map(role => (
+              {SUGGESTED_ROLES.map(role => (
                 <button key={role} className="sugg-chip" onClick={() => { setQuery(role); searchJobs(role) }}>{role}</button>
               ))}
             </div>
@@ -316,8 +312,8 @@ export default function JobsPage() {
                 <a href="/resume" style={{ fontFamily: 'var(--mono)', fontSize: '.62rem', color: '#a78bfa', textDecoration: 'none' }}>Upload resume →</a>
               </div>
             )}
-            {isLoggedIn && recStatus === 'done' && recommended.length === 0 && recHasResume === true && (
-              <div style={{ marginTop: '1.25rem', fontFamily: 'var(--mono)', fontSize: '.6rem', color: 'var(--dim)' }}>Nothing in today&apos;s listings matched your résumé yet — search by title above.</div>
+            {isLoggedIn && recStatus === 'done' && recommended.length < 3 && recHasResume === true && recReason !== 'no_city' && (
+              <div style={{ marginTop: '1.25rem', fontFamily: 'var(--mono)', fontSize: '.6rem', color: 'var(--dim)' }}>Nothing near {recCity || 'you'} matched your résumé&apos;s roles yet — search by title above.</div>
             )}
           </div>
         ) : status === 'loading' ? (
