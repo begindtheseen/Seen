@@ -88,6 +88,17 @@ longer the design source of truth for redesigned pages. `SITE_PARITY_CHECKLIST.m
   2 widths: 0 overflow (decorative orb excepted), 0 tiny text, 0 small controls. **Harness lesson:** a `next start`
   left running across a rebuild serves HTML for CSS hashes that no longer exist (400s) and every page measures
   "clean" with no styles — kill by port (`ss -ltnp`) and confirm every CSS bundle is 200 before trusting a sweep.
+- **CodeQL lesson (PR #351 went red twice before this):** the repo's security-and-quality scan flagged plain hrefs
+  built from the tracker's own store as XSS / open redirect. Running the same queries LOCALLY (CodeQL bundle in
+  the session scratchpad: `codeql database create … --codescanning-config` then `database analyze` on
+  `Security/CWE-079/XssThroughDom.ql`, `Xss.ql`, `CWE-601/ClientSideUrlRedirect.ql`) showed every path crossing
+  `lib/stores/AppStore.test.mjs`: its Map-backed localStorage fake joins every storage write in the app to every
+  storage read. Code scanning now scans shipped code only (`.github/codeql/codeql-config.yml` excludes
+  `**/*.test.*`, wired via `config-file:` in codeql.yml). Links built from browser storage still go through
+  `lib/safeHref.js` (`pathSegment` / `slugSegment` / `httpHref`) — keep using it; a `.test()` regex guard is not a
+  sanitizer CodeQL recognises, `encodeURIComponent` and a `new URL()` round-trip are. When CodeQL is red, get the
+  path locally first; the alerts API needs `security_events` the session token lacks, and the annotations alone
+  mislead (they showed `key={app.id}` as the sink).
 - **NOT verified live:** the confirmation email on a real signup; a real credit spend against prod.
 - **Owner decisions outstanding:** delete the test account (0 public reports, 2 saved jobs); Inbox Autopilot
   migration (pinned); "Connect Gmail" design (pinned — Google restricted scope, 100-user cap unverified,
