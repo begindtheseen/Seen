@@ -4,6 +4,7 @@
 // driven by `openJobListing` (index.html:11213) + AI insights block (11260–11405).
 // Source of truth: origin/main. AI uses the existing /api/job-insights endpoint (unchanged).
 
+import { httpHref } from '@/lib/safeHref.js'
 import { useState, useEffect, useCallback, use } from 'react'
 import { useRouter } from 'next/navigation'
 import { Score } from '@/lib/score'
@@ -537,7 +538,7 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
                   ✨ Optimize resume first →
                 </a>
                 <a
-                  href={job.apply_url || '#'}
+                  href={httpHref(job.apply_url) || '#'}
                   target="_blank"
                   rel="noopener noreferrer"
                   style={{ display: 'block', textAlign: 'center', background: 'var(--card)', border: '1px solid var(--line2)', color: 'var(--sub)', borderRadius: 9, padding: '.75rem', fontFamily: 'var(--mono)', fontSize: '.72rem', textDecoration: 'none' }}

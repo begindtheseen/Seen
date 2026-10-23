@@ -1,5 +1,6 @@
 'use client'
 
+import { pathSegment, slugSegment } from '@/lib/safeHref.js'
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
@@ -383,7 +384,7 @@ export default function DashboardPage() {
               const ghostPct = sc ? Math.round(sc.ghost_rate * 100) : null
               const tone = sc ? (sc.ghost_rate > 0.55 ? 'var(--red)' : sc.ghost_rate > 0.35 ? 'var(--amber)' : 'var(--green)') : undefined
               return (
-                <Link key={app.id} href={`/tracker#app_${app.id}`} className={styles.job}>
+                <Link key={app.id} href={`/tracker#app_${pathSegment(app.id)}`} className={styles.job}>
                   <span className={styles.jobIco}>{(app.company || '?').charAt(0).toUpperCase()}</span>
                   <span className={styles.jobInfo}>
                     <b>{app.company}</b>
@@ -495,7 +496,7 @@ export default function DashboardPage() {
               <div className={styles.quietRow}>
                 <span className={styles.eyebrow}>Recently checked</span>
                 <div className={styles.chips}>
-                  {recentCos.map((co, i) => <a key={i} href={`/company/${co.slug}`} className="dchip">{co.name}</a>)}
+                  {recentCos.map((co, i) => <a key={i} href={`/company/${slugSegment(co.slug)}`} className="dchip">{co.name}</a>)}
                 </div>
               </div>
             )}

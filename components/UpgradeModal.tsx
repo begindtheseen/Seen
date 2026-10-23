@@ -25,7 +25,6 @@ interface UpgradeModalProps {
 const MONTHLY_PRICE = `$${PRO_PRICING.monthly.toFixed(2)}`
 const YEARLY_PRICE = `$${PRO_PRICING.yearly_per_month.toFixed(2)}`           // per-month, billed annually
 const MONTHLY_NUM = PRO_PRICING.monthly
-const YEARLY_NUM = PRO_PRICING.yearly_per_month
 const YEARLY_TOTAL = PRO_PRICING.yearly_total
 const ANNUAL_SAVINGS = +(MONTHLY_NUM * 12 - YEARLY_TOTAL).toFixed(2) // ~35.99
 
