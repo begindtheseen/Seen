@@ -280,7 +280,7 @@ export default async function handler(req, res) {
     return res.status(200).json({ ok: true });
   }
 
-  // ── UPDATE APPLICATION STAGE/STATUS ─────────────────────────────────────────
+  // ── UPDATE APPLICATION STAGE/STATUS/EDIT ─────────────────────────────────────────
   if (action === 'update_application') {
     const { id, changes } = body;
     if (!id || !changes) return res.status(400).json({ error: 'id and changes required' });
@@ -294,6 +294,17 @@ export default async function handler(req, res) {
     if (changes.stage)  allowed.stage  = changes.stage;
     if (changes.status) allowed.status = changes.status;
     if (changes.events && Array.isArray(changes.events)) allowed.events = changes.events.slice(0, 50);
+    // The card's Edit (AppStore EDITABLE_KEYS): the user's own record of what they applied to.
+    // Same shape as add_application; company and role may not be blanked; applied_at must parse.
+    const text = (v, max) => String(v).trim().slice(0, max);
+    if (typeof changes.company === 'string' && text(changes.company, 200)) allowed.company_name = text(changes.company, 200);
+    if (typeof changes.role === 'string' && text(changes.role, 200))       allowed.role = text(changes.role, 200);
+    if (typeof changes.location === 'string') allowed.city = text(changes.location, 120);
+    if (typeof changes.platform === 'string' && text(changes.platform, 60)) allowed.platform = text(changes.platform, 60);
+    if (changes.appliedAt != null) {
+      const t = new Date(changes.appliedAt).getTime();
+      if (Number.isFinite(t) && t <= Date.now() + 86400000) allowed.applied_at = new Date(t).toISOString();
+    }
     if (Object.keys(allowed).length) {
       const r = await db(`applications?id=eq.${encodeURIComponent(id)}&user_id=eq.${uid}`, {
         method: 'PATCH', body: JSON.stringify({ ...allowed, updated_at: new Date().toISOString() }),

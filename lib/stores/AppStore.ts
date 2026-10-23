@@ -1,16 +1,12 @@
 'use client'
 
 import { _sync } from '../sync'
-import { supabase } from '../supabase'
 import type { Application, HiringEvent, AppStatus } from '../types'
 
 const KEY = 'seen_applications_v1'
 
-function isLoggedIn(): boolean {
-  // Checked at call time — sync check via cached session is not available client-side
-  // Callers that need async auth check should use supabase.auth.getSession()
-  return false // will be overridden by AuthContext usage
-}
+/** What "Edit" on a card may change — the only non-stage/status fields update_application accepts. */
+export const EDITABLE_KEYS = ['company', 'role', 'location', 'platform', 'appliedAt'] as const
 
 function mapRow(a: Record<string, unknown>): Application {
   return {
@@ -149,6 +145,11 @@ export const AppStore = {
     return { ok: true }
   },
 
+  /**
+   * Stage / status moves AND the card's Edit (company, role, location, platform, appliedAt —
+   * EDITABLE_KEYS). An edit is a correction of the user's own record: it files no event and no
+   * community report (handleUpdate in the tracker only reports on a terminal `status`).
+   */
   async update(id: string, changes: Partial<Application>, loggedIn: boolean): Promise<void> {
     const apps = this.loadSync()
     const idx = apps.findIndex(a => a.id === id)

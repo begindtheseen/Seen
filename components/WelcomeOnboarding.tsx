@@ -41,8 +41,11 @@ export default function WelcomeOnboarding({
       icon: '✓',
       title: 'Track your first application',
       sub: 'See your real response and ghost rates as outcomes come in',
-      cta: 'Find jobs',
-      go: () => router.push('/jobs'),
+      // Same words as the page's primary button ("+ Track application" → the add form); finding a
+      // job is the secondary way in. The two used to disagree ("Find jobs →" here).
+      cta: '+ Track application',
+      go: () => router.push('/tracker?add=1'),
+      alt: { label: 'or find a job →', href: '/jobs' },
     },
     {
       done: state.companiesChecked > 0,
@@ -101,7 +104,7 @@ export default function WelcomeOnboarding({
             <div
               key={i}
               style={{
-                display: 'flex', alignItems: 'center', gap: '.7rem',
+                display: 'flex', alignItems: 'center', gap: '.7rem', flexWrap: 'wrap',
                 background: s.done ? 'transparent' : 'var(--surface)',
                 border: `1px solid ${isNext ? 'rgba(99,102,241,.4)' : 'var(--line2)'}`,
                 borderRadius: 11, padding: '.65rem .7rem',
@@ -118,15 +121,19 @@ export default function WelcomeOnboarding({
                   color: s.done ? 'var(--green)' : 'var(--sub)',
                 }}
               >{s.done ? '✓' : s.icon}</span>
-              <div style={{ minWidth: 0, flex: 1 }}>
+              {/* The text keeps ≥180px; on a phone the CTA wraps under it instead of squeezing the title. */}
+              <div style={{ minWidth: 0, flex: '1 1 180px' }}>
                 <div style={{ fontFamily: 'var(--display)', fontSize: '.8rem', fontWeight: 700, color: s.done ? 'var(--sub)' : 'var(--white)', textDecoration: s.done ? 'line-through' : 'none' }}>{s.title}</div>
                 {!s.done && <div style={{ fontFamily: 'var(--mono)', fontSize: '.56rem', color: 'var(--muted)', marginTop: '.15rem', lineHeight: 1.45 }}>{s.sub}</div>}
+                {!s.done && 'alt' in s && s.alt && (
+                  <a href={s.alt.href} onClick={e => { e.preventDefault(); router.push(s.alt!.href) }} style={{ display: 'inline-flex', alignItems: 'center', minHeight: 40, fontFamily: 'var(--mono)', fontSize: '.58rem', color: 'var(--blue)', textDecoration: 'none', marginTop: '-.2rem', marginBottom: '-.5rem' }}>{s.alt.label}</a>
+                )}
               </div>
               {!s.done && (
                 <button
                   onClick={s.go}
                   className={isNext ? 'dbtn dbtn-primary' : 'dbtn dbtn-ghost'}
-                  style={{ flexShrink: 0, flex: 'none', padding: '.42rem .8rem', fontSize: '.66rem' }}
+                  style={{ flex: '0 1 auto', marginLeft: 'auto', minHeight: 44, padding: '.42rem .8rem', fontSize: '.66rem' }}
                 >{s.cta} →</button>
               )}
             </div>
