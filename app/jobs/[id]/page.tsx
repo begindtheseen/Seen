@@ -144,7 +144,7 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
           location: String(r.location ?? ''),
           score: numOrNull(r.score),
           waste: numOrNull(r.waste_score ?? r.waste),
-          level: String(r.level ?? 'Mid level'),
+          level: String(r.level ?? ''), // no level in the listing → shown as unknown, never invented
           type: String(r.type ?? 'Full-time'),
           source: String(r.source ?? 'Job board'),
           description: String(r.description ?? ''),
@@ -290,7 +290,7 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
           <div className="jd-stat"><span className="jd-sn" style={{ color: Score.color(risk) }}>{job.score ?? '–'}</span><span className="jd-sl">Score</span></div>
           <div className="jd-stat"><span className="jd-sn" style={{ color: job.waste == null ? 'var(--dim)' : job.waste > 55 ? 'var(--red)' : job.waste > 35 ? 'var(--amber)' : 'var(--green)' }}>{job.waste == null ? '–' : `${job.waste}%`}</span><span className="jd-sl">Waste risk</span></div>
           <div className="jd-stat"><span className="jd-sn" style={{ fontSize: '.75rem' }}>{job.type || 'Full-time'}</span><span className="jd-sl">Type</span></div>
-          <div className="jd-stat"><span className="jd-sn" style={{ fontSize: '.75rem' }}>{job.level || 'Mid level'}</span><span className="jd-sl">Level</span></div>
+          <div className="jd-stat"><span className="jd-sn" style={{ fontSize: '.75rem' }}>{job.level || '—'}</span><span className="jd-sl">Level</span></div>
           <div className="jd-stat"><span className="jd-sn" style={{ color: 'var(--green)', fontSize: '.78rem' }}>{job.salary || '—'}</span><span className="jd-sl">Salary</span></div>
           <div className="jd-stat"><span className="jd-sn" style={{ fontSize: '.68rem', color: 'var(--blue)' }}>{job.source || 'Job board'}</span><span className="jd-sl">Source</span></div>
         </div>

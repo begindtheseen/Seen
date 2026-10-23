@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { PRO_PRICING } from '@/lib/creditRules'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/lib/auth'
 import { aiHeaders } from '@/lib/aiHeaders'
@@ -20,11 +21,12 @@ interface UpgradeModalProps {
   featureName?: string // e.g. "Human Voice", "HumanProof"
 }
 
-const MONTHLY_PRICE = '$9.99'
-const YEARLY_PRICE = '$6.99'           // per-month, billed annually
-const MONTHLY_NUM = 9.99
-const YEARLY_NUM = 6.99
-const YEARLY_TOTAL = +(YEARLY_NUM * 12).toFixed(2)       // 83.88
+// Prices come from ONE place (lib/server/creditRules.js PRO_PRICING, pinned to api/stripe.js).
+const MONTHLY_PRICE = `$${PRO_PRICING.monthly.toFixed(2)}`
+const YEARLY_PRICE = `$${PRO_PRICING.yearly_per_month.toFixed(2)}`           // per-month, billed annually
+const MONTHLY_NUM = PRO_PRICING.monthly
+const YEARLY_NUM = PRO_PRICING.yearly_per_month
+const YEARLY_TOTAL = PRO_PRICING.yearly_total
 const ANNUAL_SAVINGS = +(MONTHLY_NUM * 12 - YEARLY_TOTAL).toFixed(2) // ~35.99
 
 const PRO_BULLETS = [

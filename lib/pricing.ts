@@ -1,13 +1,13 @@
 /**
- * Seen Pro prices — ONE place, so Settings, modals and copy never disagree with /pricing.
- * app/pricing/page.tsx and components/UpgradeModal.tsx still carry their own local copies of
- * these numbers (owned by another change); `lib/pricing.test.mjs` pins them to this file so a
- * drift fails the suite instead of shipping two prices.
+ * Seen Pro prices — ONE place. The numbers live in lib/server/creditRules.js (PRO_PRICING, pinned to
+ * api/stripe.js by its test); this module just gives the client typed names and the Settings line.
  */
-export const PRO_MONTHLY = 9.99
+import { PRO_PRICING } from './server/creditRules.js'
+
+export const PRO_MONTHLY: number = PRO_PRICING.monthly
 /** Per-month price of the yearly plan ("$6.99/mo billed yearly"). */
-export const PRO_YEARLY_PER_MONTH = 6.99
-export const PRO_YEARLY_TOTAL = +(PRO_YEARLY_PER_MONTH * 12).toFixed(2) // 83.88
+export const PRO_YEARLY_PER_MONTH: number = PRO_PRICING.yearly_per_month
+export const PRO_YEARLY_TOTAL: number = PRO_PRICING.yearly_total
 
 export const usd = (n: number) => `$${n.toFixed(2)}`
 
