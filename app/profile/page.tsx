@@ -14,6 +14,7 @@ import { parseResumeFile } from '@/lib/resumeUploadClient'
 import PageHeader from '@/components/shell/PageHeader'
 import styles from './profile.module.css'
 import { formatPacific } from '@/lib/time/pacific.js'
+import { FREE_DAILY_CREDITS, CREDIT_RESET_LABEL, RESUME_PARSE_COST } from '@/lib/creditRules'
 
 // Per-user profile cache (keyed by user id → NO cross-user bleed on shared devices) so the
 // fields render instantly on every revisit instead of loading from scratch each time.
@@ -129,11 +130,8 @@ export default function ProfilePage() {
   async function onResumeFile(file: File) {
     setResumeBusy(true); setResumeMsg('')
     try {
+      // Parsing is FREE (RESUME_PARSE_COST = 0 — no model call), so there is no credit path here.
       const r = await parseResumeFile(file, { location: (city || initCity || '').trim() })
-      if (r.credits_required) {
-        setResumeMsg('You’re out of AI credits today — parsing a résumé uses one. Upgrade for unlimited.')
-        setResumeMsgOk(false); setResumeBusy(false); return
-      }
       if (r.ok && r.text) {
         await ResumeStore.save(r.text, r.fileName, r.wordCount || 0, user?.id, isLoggedIn)
         setResumeMeta({ fileName: r.fileName, wordCount: r.wordCount || 0 })
@@ -419,7 +417,7 @@ export default function ProfilePage() {
                 onChange={e => { const f = e.target.files?.[0]; if (f) onResumeFile(f); e.target.value = '' }}
                 style={{ display: 'none' }}
               />
-              <div className={styles.hint}>PDF, Word or .txt. Parsing uses one AI credit.</div>
+              <div className={styles.hint}>PDF, Word or .txt. {RESUME_PARSE_COST === 0 ? 'Free — no AI credit used.' : `Parsing uses ${RESUME_PARSE_COST} AI credit.`}</div>
               {resumeMsg && <div className={`${styles.msg} ${resumeMsgOk ? styles.ok : styles.err}`}>{resumeMsg}</div>}
             </section>
 
@@ -517,7 +515,7 @@ export default function ProfilePage() {
                   <div className={styles.planCard}>
                     <div>
                       <div className={styles.planName}>Free</div>
-                      <div className={styles.planMeta}>1 AI credit a day · every company grade and the tracker, always free</div>
+                      <div className={styles.planMeta}>{FREE_DAILY_CREDITS} AI credit a day (resets at {CREDIT_RESET_LABEL}) · every company grade and the tracker, always free</div>
                     </div>
                     <span className={`${styles.badge} ${styles.bDim}`}>Current</span>
                   </div>

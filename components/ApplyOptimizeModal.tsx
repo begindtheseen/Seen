@@ -1,18 +1,22 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/lib/auth'
 import { aiHeaders } from '@/lib/aiHeaders'
 import { ResumeStore } from '@/lib/stores/ResumeStore'
 import UpgradeModal from './UpgradeModal'
-import { FREE_DAILY_CREDITS } from '@/lib/creditRules'
+import CreditConfirmDialog from './CreditConfirmDialog'
+import { RESUME_OPTIMIZE_COST, creditCostLabel, dailyResetLabel } from '@/lib/creditRules'
+import { hasConfirmedCreditUse } from '@/lib/creditConfirm'
+import { trackApplyClick } from '@/lib/trackApply'
 import ApplicationIntelligencePanel, { type ApplicationIntelligence } from './optimizer/ApplicationIntelligencePanel'
 import ErrorBoundary from './ErrorBoundary'
 import type { Job } from '@/lib/types'
 import ModalPortal from '@/components/ModalPortal'
 
-const CREDIT_WORD = FREE_DAILY_CREDITS === 1 ? 'credit' : 'credits'
+// The optimizer's price, rendered from the credit rules — the same literal the server charges.
+const OPTIMIZE_PRICE = creditCostLabel(RESUME_OPTIMIZE_COST)
 
 interface OptimizeBullet {
   original: string
@@ -57,6 +61,7 @@ type Step =
   | 'not-logged-in'
   | 'no-resume'
   | 'resume-corrupted'
+  | 'confirm'
   | 'choose'
   | 'optimizing'
   | 'review'
@@ -128,8 +133,10 @@ const kicker: React.CSSProperties = {
   letterSpacing: '.08em', color: 'var(--dim)', marginBottom: '.45rem',
 }
 
+// Fit score colour: green / amber / NEUTRAL. A low score means the résumé lacks the listing's
+// keywords — not an error — so it is never painted red at a non-technical job seeker.
 function scoreColor(s: number): string {
-  return s >= 70 ? 'var(--green)' : s >= 45 ? 'var(--amber)' : 'var(--red)'
+  return s >= 70 ? 'var(--green)' : s >= 45 ? 'var(--amber)' : 'var(--sub)'
 }
 
 function LoadingDots() {
@@ -171,6 +178,9 @@ export default function ApplyOptimizeModal({
   const [upgradeFeature, setUpgradeFeature] = useState<string | undefined>(undefined)
   // null = unknown (don't show upsell yet), true = Pro, false = free.
   const [pro, setPro] = useState<boolean | null>(null)
+  // Live balance (daily + purchased) from get_credits, re-read after every paid call so the
+  // post-optimize line states the real number, never "1 of your 1 daily credit".
+  const [balance, setBalance] = useState<number | null>(null)
   const [upsellDismissed, setUpsellDismissed] = useState(false)
 
   // HumanProof sub-flow (runs AFTER SeenFit, inside the review step).
@@ -196,25 +206,27 @@ export default function ApplyOptimizeModal({
     ResumeStore.load(user?.id, isLoggedIn).then(data => {
       if (data?.text && data.text.length > 50) {
         setResumeText(data.text)
-        // Skip the choose step — user already picked "Apply & Optimize"
-        runOptimize(data.text)
+        // The person tapped "Optimize · 1 credit", so run it — but the FIRST paid action on
+        // this account/device is confirmed once ("This uses 1 of your N credits").
+        if (hasConfirmedCreditUse(user?.id)) runOptimize(data.text)
+        else setStep('confirm')
       } else {
         setStep('no-resume')
       }
     })
   }, [isLoggedIn, user?.id]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Pro status for the post-win upsell — same get_credits signal Nav.tsx uses.
-  useEffect(() => {
-    if (!isLoggedIn) { setPro(null); return }
-    let cancelled = false
-    aiHeaders()
-      .then(h => fetch('/api/user-sync', { method: 'POST', headers: h, body: JSON.stringify({ action: 'get_credits' }) }))
-      .then(r => r.ok ? r.json() : null)
-      .then(d => { if (!cancelled && d) setPro(!!d.pro) })
-      .catch(() => { /* leave pro null — upsell stays hidden when status is unknown */ })
-    return () => { cancelled = true }
-  }, [isLoggedIn, user?.id])
+  // Pro status + live balance — same get_credits signal Nav.tsx uses.
+  const refreshCredits = useCallback(async () => {
+    if (!isLoggedIn) { setPro(null); setBalance(null); return }
+    try {
+      const h = await aiHeaders()
+      const r = await fetch('/api/user-sync', { method: 'POST', headers: h, body: JSON.stringify({ action: 'get_credits' }) })
+      const d = r.ok ? await r.json() : null
+      if (d) { setPro(!!d.pro); setBalance(typeof d.balance === 'number' ? d.balance : null) }
+    } catch { /* leave unknown — the upsell stays hidden when status is unknown */ }
+  }, [isLoggedIn])
+  useEffect(() => { refreshCredits() }, [refreshCredits, user?.id])
 
   // Pre-build the résumé PDF as soon as results are on screen — and again after
   // HumanProof rewrites the bullets (runHumanProof clears pdfBlob) — so the blob is
@@ -224,8 +236,13 @@ export default function ApplyOptimizeModal({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [step, result, hp, pdfBlob, pdfFailed])
 
-  // Derived views over the SeenFit result — grounded, no fabrication.
-  const realBullets = (result?.optimized_bullets || []).filter(b => !isGuidance(b.original) && !isGuidance(b.optimized))
+  // Derived views over the SeenFit result — grounded, no fabrication. The server already emits
+  // one rewrite per source bullet (lib/server/seenfitCompat.js); the dedupe here is the
+  // client-side guarantee that the same before/after can never be shown twice.
+  const seenPairs = new Set<string>()
+  const realBullets = (result?.optimized_bullets || [])
+    .filter(b => !isGuidance(b.original) && !isGuidance(b.optimized))
+    .filter(b => { const k = `${b.original.trim().toLowerCase()}→${b.optimized.trim().toLowerCase()}`; if (seenPairs.has(k)) return false; seenPairs.add(k); return true })
   const guidanceItems = (result?.optimized_bullets || []).filter(b => isGuidance(b.original) || isGuidance(b.optimized))
   const matchReasons = Array.from(new Set(realBullets.map(b => b.addresses).filter(Boolean))).slice(0, 6)
   const gaps = (result?.keywords_added || []).slice(0, 8)
@@ -264,8 +281,9 @@ export default function ApplyOptimizeModal({
         throw new Error(e.error || `Error ${r.status}`)
       }
       const data = await r.json() as OptimizeResult
-      // Optimize consumed a credit server-side — refresh the Nav balance.
+      // Optimize consumed a credit server-side — refresh the Nav balance and our own.
       window.dispatchEvent(new Event('seen:credits-updated'))
+      refreshCredits()
       setResult(data)
       setStep('review')
       // Fire-and-forget the richer V2 deep-match read-out (free, no extra credit).
@@ -466,7 +484,7 @@ export default function ApplyOptimizeModal({
       document.body.appendChild(a); a.click(); a.remove()
       setTimeout(() => URL.revokeObjectURL(url), 10000)
     }
-    if (job.apply_url) window.open(job.apply_url, '_blank', 'noopener,noreferrer')
+    if (job.apply_url) { trackApplyClick(job); window.open(job.apply_url, '_blank', 'noopener,noreferrer') }
     onApplied()
     onClose()
   }
@@ -511,8 +529,9 @@ export default function ApplyOptimizeModal({
     setStep('done')
   }
 
+  // FREE: open the posting (new tab) and hand off to the tracker checkpoint — no credit.
   function applyWithoutOptimize() {
-    if (job.apply_url) window.open(job.apply_url, '_blank', 'noopener,noreferrer')
+    if (job.apply_url) { trackApplyClick(job); window.open(job.apply_url, '_blank', 'noopener,noreferrer') }
     onApplied()
     onClose()
   }
@@ -523,15 +542,23 @@ export default function ApplyOptimizeModal({
     ? 'Your Application Intelligence'
     : step === 'optimizing' ? 'Optimizing your resume…'
     : step === 'sending' ? 'Sending to your email…'
-    : 'Apply & Optimize'
+    : 'Optimize for this job'
 
   return (
     <>
     {showUpgrade && <UpgradeModal reason={upgradeReason} featureName={upgradeFeature} onClose={() => setShowUpgrade(false)} />}
+    {step === 'confirm' && (
+      <CreditConfirmDialog
+        cost={RESUME_OPTIMIZE_COST}
+        action={`optimize your résumé for ${job.title} at ${job.company}`}
+        onConfirm={() => runOptimize()}
+        onCancel={() => setStep('choose')}
+      />
+    )}
     <ModalPortal>
     <div style={overlay} onClick={onClose}>
       <div style={sheet} onClick={e => e.stopPropagation()}>
-        {/* Header */}
+        {/* Header — the job posting link lives here so it is visible above the fold on every step. */}
         <div style={sheetHdr}>
           <div style={{ minWidth: 0 }}>
             <div style={{ fontFamily: 'var(--display)', fontSize: '.88rem', fontWeight: 700, color: 'var(--white)' }}>
@@ -540,14 +567,21 @@ export default function ApplyOptimizeModal({
             <div style={{ fontFamily: 'var(--mono)', fontSize: '.56rem', color: 'var(--muted)', marginTop: '.1rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
               {job.title} · {job.company}
             </div>
+            {job.apply_url && (
+              <a href={job.apply_url} target="_blank" rel="noopener noreferrer" data-testid="modal-posting-link"
+                onClick={() => trackApplyClick(job)}
+                style={{ display: 'inline-block', marginTop: '.3rem', fontFamily: 'var(--mono)', fontSize: '.6rem', color: 'var(--green)', textDecoration: 'none' }}>
+                Open the job posting ↗
+              </a>
+            )}
           </div>
-          <button style={btnClose} onClick={onClose}>✕</button>
+          <button style={btnClose} onClick={onClose} aria-label="Close">✕</button>
         </div>
 
         <div className="ai-safe-bottom" style={{ paddingTop: '1.1rem', paddingLeft: '1.1rem', paddingRight: '1.1rem', minHeight: 240 }}>
 
-          {/* ── loading-resume ── */}
-          {step === 'loading-resume' && <LoadingDots />}
+          {/* ── loading-resume / confirm (the dialog sits above) ── */}
+          {(step === 'loading-resume' || step === 'confirm') && <LoadingDots />}
 
           {/* ── not-logged-in ── */}
           {step === 'not-logged-in' && (
@@ -569,7 +603,7 @@ export default function ApplyOptimizeModal({
                     style={{ display: 'block', textAlign: 'center', ...btnGhost, textDecoration: 'none' } as React.CSSProperties}
                     onClick={onClose}
                   >
-                    Continue as guest (not tracked)
+                    Apply ↗ as a guest (not tracked)
                   </a>
                 )}
               </div>
@@ -597,7 +631,7 @@ export default function ApplyOptimizeModal({
                 >
                   Upload resume + optimize →
                 </button>
-                <button style={btnGhost} onClick={applyWithoutOptimize}>Apply without optimizing</button>
+                <button style={btnGhost} onClick={applyWithoutOptimize}>Apply ↗ without optimizing · free</button>
               </div>
             </>
           )}
@@ -623,7 +657,7 @@ export default function ApplyOptimizeModal({
                 >
                   Re-upload or paste resume →
                 </button>
-                <button style={btnGhost} onClick={applyWithoutOptimize}>Apply without optimizing</button>
+                <button style={btnGhost} onClick={applyWithoutOptimize}>Apply ↗ without optimizing · free</button>
               </div>
             </>
           )}
@@ -650,11 +684,11 @@ export default function ApplyOptimizeModal({
               )}
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: '.5rem' }}>
-                <button style={btnPrimary} onClick={() => runOptimize()}>
-                  🧠 Optimize &amp; Apply · 1 credit
+                <button style={btnPrimary} data-testid="modal-optimize-btn" onClick={() => (hasConfirmedCreditUse(user?.id) ? runOptimize() : setStep('confirm'))}>
+                  Optimize for this job · {OPTIMIZE_PRICE}
                 </button>
                 <button style={btnGhost} onClick={applyWithoutOptimize}>
-                  Apply without optimizing
+                  Apply ↗ without optimizing · free
                 </button>
               </div>
             </>
@@ -668,7 +702,7 @@ export default function ApplyOptimizeModal({
                 Scoring your fit and rewriting bullets for this role…
               </div>
               <button style={{ background: 'none', border: 'none', color: 'var(--dim)', fontFamily: 'var(--mono)', fontSize: '.62rem', cursor: 'pointer', textDecoration: 'underline' }} onClick={applyWithoutOptimize}>
-                Skip — just apply directly
+                Skip — just apply ↗
               </button>
             </div>
           )}
@@ -711,13 +745,14 @@ export default function ApplyOptimizeModal({
                 </div>
               )}
 
-              {/* Gaps */}
+              {/* Gaps — keywords the listing uses that the résumé does not. Amber, not red: a
+                  missing word is a to-do, not a failure. */}
               {gaps.length > 0 && (
                 <div>
-                  <div style={kicker}>Add if you genuinely have it</div>
+                  <div style={kicker}>Missing from your résumé — add only if true</div>
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: '.3rem' }}>
                     {gaps.map(k => (
-                      <span key={k} style={{ background: 'rgba(239,68,68,.08)', border: '1px solid rgba(239,68,68,.25)', color: 'var(--red)', borderRadius: 5, padding: '.18rem .55rem', fontFamily: 'var(--mono)', fontSize: '.62rem', maxWidth: '100%', overflowWrap: 'anywhere' }}>{k}</span>
+                      <span key={k} style={{ background: 'rgba(245,158,11,.08)', border: '1px solid rgba(245,158,11,.28)', color: 'var(--amber)', borderRadius: 5, padding: '.18rem .55rem', fontFamily: 'var(--mono)', fontSize: '.62rem', maxWidth: '100%', overflowWrap: 'anywhere' }}>{k}</span>
                     ))}
                   </div>
                 </div>
@@ -726,7 +761,7 @@ export default function ApplyOptimizeModal({
               {/* Safe improvements (before/after) */}
               {realBullets.length > 0 && (
                 <div>
-                  <div style={kicker}>Safe improvements — {realBullets.length} bullet{realBullets.length !== 1 ? 's' : ''}, grounded in your résumé</div>
+                  <div style={kicker}>Safe improvements — {realBullets.length} of your own bullet{realBullets.length !== 1 ? 's' : ''}, nothing invented</div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '.6rem' }}>
                     {realBullets.map((b, i) => (
                       <div key={i} style={{ background: 'var(--card)', border: '1px solid var(--line2)', borderRadius: 10, overflow: 'hidden' }}>
@@ -747,7 +782,7 @@ export default function ApplyOptimizeModal({
               {/* Add-before-using (clearly marked — never presented as a confirmed rewrite) */}
               {guidanceItems.length > 0 && (
                 <div>
-                  <div style={{ ...kicker, color: 'var(--amber)' }}>⚠ Add before using — needs a real detail from you</div>
+                  <div style={{ ...kicker, color: 'var(--amber)' }}>Needs a real detail from you — add only if true</div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '.4rem' }}>
                     {guidanceItems.map((g, i) => (
                       <div key={i} style={{ background: 'rgba(245,158,11,.06)', border: '1px solid rgba(245,158,11,.2)', borderRadius: 8, padding: '.55rem .75rem', fontSize: '.72rem', color: 'var(--sub)', lineHeight: 1.5, overflowWrap: 'anywhere' }}>
@@ -844,14 +879,14 @@ export default function ApplyOptimizeModal({
               </div>
               )}
 
-              {/* Post-win upsell */}
+              {/* Post-win ledger line — the REAL balance, the real reset, then the upsell. */}
               {pro === false && !upsellDismissed && (
-                <div style={{ display: 'flex', alignItems: 'center', gap: '.6rem', background: 'rgba(99,102,241,.08)', border: '1px solid rgba(99,102,241,.25)', borderRadius: 8, padding: '.5rem .6rem .5rem .85rem' }}>
+                <div data-testid="credit-ledger" style={{ display: 'flex', alignItems: 'center', gap: '.6rem', background: 'rgba(99,102,241,.08)', border: '1px solid rgba(99,102,241,.25)', borderRadius: 8, padding: '.5rem .6rem .5rem .85rem' }}>
                   <button
                     onClick={() => { setUpgradeReason('generic'); setUpgradeFeature(undefined); setShowUpgrade(true) }}
                     style={{ flex: 1, textAlign: 'left', background: 'none', border: 'none', padding: 0, cursor: 'pointer', fontFamily: 'var(--body)', fontSize: '.66rem', color: 'var(--sub)', lineHeight: 1.5 }}
                   >
-                    That used 1 of your {FREE_DAILY_CREDITS} daily {CREDIT_WORD} · <span style={{ color: '#a5b4fc', fontWeight: 700 }}>Pro removes the cap →</span>
+                    {OPTIMIZE_PRICE} used{balance != null ? ` · ${balance} left` : ''} · {dailyResetLabel()} · <span style={{ color: '#a5b4fc', fontWeight: 700 }}>Pro removes the cap →</span>
                   </button>
                   <button
                     onClick={() => setUpsellDismissed(true)}
@@ -911,7 +946,7 @@ export default function ApplyOptimizeModal({
                     ✉ Email it
                   </button>
                 </div>
-                <button style={btnGhost} onClick={() => runOptimize()}>← Re-optimize</button>
+                <button style={btnGhost} onClick={() => runOptimize()}>← Re-optimize · {OPTIMIZE_PRICE}</button>
               </div>
             </div>
           )}

@@ -83,7 +83,9 @@ export interface ConfirmedAnswer { id: string; forRequirement: string | null; un
 
 // ── shared style helpers (match the résumé/optimizer design system) ──
 const mono = 'var(--mono)'
-function scoreColor(s: number): string { return s >= 70 ? 'var(--green)' : s >= 45 ? 'var(--amber)' : 'var(--red)' }
+// Score rings: green / amber / NEUTRAL. A low score means the résumé lacks the listing's keywords
+// — a to-do, not an alarm — so it is never painted red.
+function scoreColor(s: number): string { return s >= 70 ? 'var(--green)' : s >= 45 ? 'var(--amber)' : 'var(--sub)' }
 function pct(n: number): string { return `${Math.round((n || 0) * 100)}%` }
 
 // Render-safe text coercion. The panel renders many fields straight from a complex local engine;
@@ -101,7 +103,20 @@ function matchColor(t: MatchType): string {
     : t === 'adjacent' ? 'var(--green)'
     : t === 'transferable' ? 'var(--blue)'
     : t === 'weak' ? 'var(--amber)'
-    : 'var(--red)'
+    : 'var(--amber)'
+}
+// Plain-English meta line under a requirement. The engine's internal words (required · risky,
+// required · fatal) are jargon to a job seeker; what they need to know is whether to add it.
+function plainMeta(m: AiMatch): string {
+  const base = m.importance === 'required' ? 'Listed as required'
+    : m.importance === 'preferred' ? 'Nice to have'
+    : m.importance === 'hidden' ? 'Implied by the role'
+    : m.importance === 'responsibility' ? 'Part of the job'
+    : ''
+  if (m.matchType !== 'missing' && m.matchType !== 'weak') return base
+  const tail = m.missSeverity === 'fatal' ? 'needs a real detail from you'
+    : 'add only if true'
+  return [base, tail].filter(Boolean).join(' · ')
 }
 function matchLabel(t: MatchType): string {
   return t === 'exact' ? 'Exact'
@@ -135,7 +150,7 @@ function MatchRow({ m }: { m: AiMatch }) {
       {Array.isArray(m.evidence) && typeof m.evidence[0] === 'string' && m.evidence[0].length > 0 && (
         <div style={{ fontFamily: mono, fontSize: '.58rem', color: c, lineHeight: 1.5, overflowWrap: 'anywhere' }}>▸ {m.evidence[0].slice(0, 140)}</div>
       )}
-      {m.importance && <div style={{ fontFamily: mono, fontSize: '.52rem', color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '.05em' }}>{m.importance}{m.missSeverity ? ` · ${m.missSeverity}` : ''}</div>}
+      {plainMeta(m) && <div style={{ fontFamily: mono, fontSize: '.54rem', color: 'var(--muted)', letterSpacing: '.02em' }}>{plainMeta(m)}</div>}
     </li>
   )
 }
@@ -266,8 +281,8 @@ export default function ApplicationIntelligencePanel({
       {/* Match views */}
       <MatchSection title="Why you match" color="var(--green)" items={pkg.why_you_match} />
       <MatchSection title="Transferable proof" color="var(--blue)" items={pkg.transferable_proof} />
-      <MatchSection title="Missing but recoverable" color="var(--amber)" items={pkg.missing_recoverable} />
-      <MatchSection title="Missing and risky" color="var(--red)" items={pkg.missing_risky} />
+      <MatchSection title="Worth adding — only if true" color="var(--amber)" items={pkg.missing_recoverable} />
+      <MatchSection title="Missing — add only if true" color="var(--amber)" items={pkg.missing_risky} />
 
       {!compact && (
         <>
@@ -308,8 +323,8 @@ export default function ApplicationIntelligencePanel({
           {/* Confirm before using — visually distinct, NOT final copy */}
           {pkg.needs_confirmation?.length > 0 && (
             <Card style={{ border: '1px solid rgba(245,158,11,.28)' }}>
-              {kicker('⚠ Confirm before using', 'var(--amber)')}
-              <div style={{ fontFamily: mono, fontSize: '.56rem', color: 'var(--amber)', marginBottom: '.6rem', lineHeight: 1.5 }}>Not final copy. Each needs a real detail from you — we will not invent it.</div>
+              {kicker('Needs a real detail from you', 'var(--amber)')}
+              <div style={{ fontFamily: mono, fontSize: '.56rem', color: 'var(--amber)', marginBottom: '.6rem', lineHeight: 1.5 }}>Not final copy. Fill in the real number or detail first — we will not invent it.</div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '.55rem' }}>
                 {pkg.needs_confirmation.map((b, i) => (
                   <div key={b.id || i} style={{ background: 'rgba(245,158,11,.06)', border: '1px solid rgba(245,158,11,.2)', borderRadius: 8, padding: '.7rem .85rem' }}>

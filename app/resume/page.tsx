@@ -363,7 +363,7 @@ function ResumeInput({ resumeText, setResumeText, resumeMeta, onUpload, onClear,
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '.4rem', flexWrap: 'wrap', gap: '.4rem' }}>
         {label('Your resume')}
         <div style={{ display: 'flex', gap: '.5rem' }}>
-          <button onClick={() => fileRef.current?.click()} style={{ background: 'none', border: '1px solid var(--line2)', color: 'var(--dim)', borderRadius: 6, padding: '.25rem .65rem', fontFamily: 'var(--mono)', fontSize: '.6rem', cursor: 'pointer' }}>Upload PDF/Word/txt</button>
+          <button onClick={() => fileRef.current?.click()} title="Upload is free — no AI credit used" style={{ background: 'none', border: '1px solid var(--line2)', color: 'var(--dim)', borderRadius: 6, padding: '.25rem .65rem', fontFamily: 'var(--mono)', fontSize: '.6rem', cursor: 'pointer' }}>Upload PDF/Word/txt · free</button>
           {resumeText && <button onClick={onClear} style={{ background: 'none', border: 'none', color: 'var(--muted)', fontFamily: 'var(--mono)', fontSize: '.6rem', cursor: 'pointer' }}>Clear</button>}
         </div>
         <input ref={fileRef} type="file" accept=".pdf,.doc,.docx,.txt,.md,text/plain" onChange={onUpload} style={{ display: 'none' }} />
@@ -505,14 +505,9 @@ function ResumePageInner() {
     try {
       // Canonical upload path (shared with Settings). Passing the profile city lets the server
       // fire the background résumé→jobs match at the user's location — non-blocking.
+      // Parsing is FREE (RESUME_PARSE_COST = 0 — no model call): no credit path, no balance change.
       const r = await parseResumeFile(file, { location: profile?.city || '' })
-      if (r.credits_required) {
-        if (isLoggedIn) { setUpgradeReason('credits'); setUpgradeFeature(undefined); setShowUpgrade(true) }
-        else setError('Sign in to use AI resume features.')
-        return
-      }
       if (r.ok && r.text) {
-        window.dispatchEvent(new Event('seen:credits-updated'))
         const wc = r.wordCount || r.text.trim().split(/\s+/).length
         await ResumeStore.save(r.text, r.fileName, wc, user?.id, isLoggedIn)
         // Résumé Studio reuses the server's layout-aware parse instead of re-parsing the text.
@@ -579,17 +574,18 @@ function ResumePageInner() {
     setV2Rerunning(false)
   }
 
-  // Read-only insights: DB cache is free; a fresh generation costs 1 credit (surfaced honestly).
+  // Read-only insights: a PROBE of the shared cache only (free, never generates, never charges —
+  // see api/job-insights.js). A listing nobody has analyzed yet simply shows no bonus here; the
+  // price-tagged "Reveal AI insights" button on the Jobs page is the one place that spends.
   async function loadInsights() {
     if (!jobJD || jobJD.length < 80) { setInsights(null); return }
     try {
       const res = await fetch('/api/job-insights', {
         method: 'POST', headers: await aiHeaders(),
-        body: JSON.stringify({ jobId: jobIdFor(), job: jobTitle, company: jobCompany, jobDescription: jobJD, needsSummary: true }),
+        body: JSON.stringify({ jobId: jobIdFor(), job: jobTitle, company: jobCompany, jobDescription: jobJD, needsSummary: true, probe: true }),
       })
       const d = await res.json()
-      if (d.credits_required) return // silent — insights are a bonus, not a wall here
-      if (d._src === 'generated') window.dispatchEvent(new Event('seen:credits-updated'))
+      if (d._src === 'uncached' || d.credits_required) return
       if (d.what_they_want?.length || d.insider_tip) setInsights(d)
     } catch { /* insights are best-effort */ }
   }

@@ -4,19 +4,21 @@ import { useState, useEffect, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useAuth } from '@/lib/auth'
 import { aiHeaders } from '@/lib/aiHeaders'
-import { FREE_DAILY_CREDITS, WELCOME_CREDITS, MAX_DAILY_EARN, PRO_TRIAL_DAYS, ONE_TIME_SKUS } from '@/lib/creditRules'
+import { FREE_DAILY_CREDITS, WELCOME_CREDITS, MAX_DAILY_EARN, PRO_TRIAL_DAYS, ONE_TIME_SKUS, PRO_PRICING, CREDIT_RESET_LABEL, RESUME_PARSE_COST } from '@/lib/creditRules'
 import { formatPacific } from '@/lib/time/pacific.js'
 
 // UI copy is generated from the SAME constants the server enforces — never a hand-typed
 // number that drifts. Free tier is 1 AI credit/day (owner decision 2026-07-02).
 const CREDIT_WORD = FREE_DAILY_CREDITS === 1 ? 'credit' : 'credits'
 const FREE_DAILY_LABEL = `${FREE_DAILY_CREDITS} AI ${CREDIT_WORD} per day`
+// Résumé upload/parse is free (RESUME_PARSE_COST = 0 — it makes no model call).
+const PARSE_LINE = RESUME_PARSE_COST === 0 ? 'Résumé upload & parse — always free' : `Résumé upload & parse — ${RESUME_PARSE_COST} credit`
 
-const MONTHLY = '$9.99'
-const YEARLY  = '$6.99'
-const MONTHLY_NUM = 9.99
-const YEARLY_NUM  = 6.99
-const YEARLY_TOTAL = +(YEARLY_NUM * 12).toFixed(2)              // 83.88
+// Pro prices come from the SAME constants Stripe is charged with (api/stripe.js).
+const MONTHLY = `$${PRO_PRICING.monthly.toFixed(2)}`
+const YEARLY  = `$${PRO_PRICING.yearly_per_month.toFixed(2)}`
+const MONTHLY_NUM = PRO_PRICING.monthly
+const YEARLY_TOTAL = PRO_PRICING.yearly_total                        // 83.88
 const ANNUAL_SAVINGS = +(MONTHLY_NUM * 12 - YEARLY_TOTAL).toFixed(2) // ~35.99
 
 // One-time SKUs — prices/grants come from the SAME constants the server fulfills with.
@@ -25,8 +27,8 @@ const CREDITS20 = ONE_TIME_SKUS.credits20 // $4.99 · 20 credits
 const skuPrice = (cents: number) => `$${(cents / 100).toFixed(2)}`
 
 const FREE_FEATURES = [
-  `${FREE_DAILY_LABEL} — parse, optimize, score`,
-  'Resume parse + bullet scanner',
+  `${FREE_DAILY_LABEL} — optimize, score, job insights (resets at ${CREDIT_RESET_LABEL})`,
+  PARSE_LINE,
   'Earn credits by tracking apps & surveys',
   'Company ghost rates & trust scores',
   'Job listings filtered by trust',
@@ -39,17 +41,17 @@ const PRO_FEATURES = [
   'Unlimited AI credits — no daily cap',
   'Ghost risk alerts when companies change behavior',
   'AI company deep-dive analysis',
-  'AI job insights per listing',
+  'Unlimited AI job insights per listing',
   'Human Voice — rewrites that sound like you, not a bot',
   'Priority support',
   'Early access to every new feature',
 ]
 
 const COMPARISON: [string, string | boolean, string | boolean][] = [
-  ['AI credits',                `${FREE_DAILY_CREDITS}/day`, 'Unlimited'],
-  ['Resume AI — parse & scan',  true,         true],
-  ['Resume AI — optimize',      true,         true],
-  ['AI job insights',           false,        true],
+  ['AI credits',                `${FREE_DAILY_CREDITS}/day · resets ${CREDIT_RESET_LABEL}`, 'Unlimited'],
+  ['Résumé upload & parse',     RESUME_PARSE_COST === 0 ? 'Free' : `${RESUME_PARSE_COST} credit`, 'Free'],
+  ['Resume AI — scan & optimize', '1 credit each', 'Unlimited'],
+  ['AI job insights',           '1 credit each (free once cached)', 'Unlimited'],
   ['Company ghost rates',       true,         true],
   ['Ghost risk alerts',         false,        true],
   ['AI company analysis',       false,        true],
@@ -61,13 +63,13 @@ const COMPARISON: [string, string | boolean, string | boolean][] = [
 
 const FAQ = [
   { q: 'What is Human Voice?', a: 'AI-optimized résumés often sound generic — and some companies auto-filter applications that read as machine-written. Human Voice rewrites your optimized bullets so they sound like you: varied sentence structure, natural rhythm, every keyword kept. Your words, your voice, still ATS-ready.' },
-  { q: 'How do free AI credits work?', a: `You start with a ${WELCOME_CREDITS}-credit welcome bonus, then get ${FREE_DAILY_CREDITS} AI ${CREDIT_WORD} that reset each day at midnight. Each credit covers one AI action: parse a resume, optimize bullets for a job, or run the ATS scanner. You can earn up to ${MAX_DAILY_EARN} more credits a day by tracking your applications and answering quick surveys about companies you've worked with.` },
+  { q: 'How do free AI credits work?', a: `You start with a ${WELCOME_CREDITS}-credit welcome bonus, then get ${FREE_DAILY_CREDITS} free AI ${CREDIT_WORD} that resets at ${CREDIT_RESET_LABEL} (California time). Each credit covers one AI action, and every button that spends one says so: optimize your résumé for a job, run the ATS scanner, build your application advantage, or generate AI insights for a listing nobody has analyzed yet. Uploading and parsing your résumé is free. You can earn up to ${MAX_DAILY_EARN} more credits a day by tracking your applications and answering quick surveys about companies you've worked with. Purchased credits never reset.` },
   { q: 'How does the free trial work?', a: `Pro starts with ${PRO_TRIAL_DAYS} days free — no card required. If you add a payment method before the trial ends, your plan renews at the price you chose; cancel anytime. If you don't add one, nothing is charged and access simply ends.` },
   { q: 'What if I don\'t want a subscription?', a: `Pay once, own it: the Interview Sprint (${skuPrice(SPRINT.amount_cents)}) gives you ${SPRINT.credits} AI credits plus ${SPRINT.pro_days} days of full Pro access, and the Credit Pack (${skuPrice(CREDITS20.amount_cents)}) adds ${CREDITS20.credits} AI credits. Purchased credits never expire and roll over every day — no auto-renewal, ever.` },
   { q: 'Can I cancel Pro?', a: 'Yes, anytime — no contracts. You keep Pro until the end of your billing period. We don\'t trap you.' },
   { q: 'Is my data sold to employers?', a: 'Never. We work for job seekers. Your resume content is processed in-memory to generate your optimization and immediately discarded. We never sell, share, or expose your info to recruiters or employers.' },
   { q: 'When does Pro activate?', a: 'Instantly after payment. Credits update in real-time — no waiting, no manual activation.' },
-  { q: 'What if I hit the daily limit?', a: `Free users get ${FREE_DAILY_CREDITS} ${CREDIT_WORD}/day. Track an application to earn one back. Answer a 10-second survey to earn more — up to ${MAX_DAILY_EARN} a day. Or upgrade to Pro for unlimited.` },
+  { q: 'What if I hit the daily limit?', a: `Free users get ${FREE_DAILY_CREDITS} ${CREDIT_WORD}/day, back at ${CREDIT_RESET_LABEL}. Track an application to earn one back. Answer a 10-second survey to earn more — up to ${MAX_DAILY_EARN} a day. Or upgrade to Pro for unlimited.` },
 ]
 
 function PricingPageInner() {
