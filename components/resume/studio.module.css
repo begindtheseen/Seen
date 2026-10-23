@@ -136,3 +136,8 @@
   .findingCtx, .diff, .gap, .tplTag, .pvName, .check, .notice, .err, .okBox, .empty, .pasteArea, .vbtn { font-size: .75rem; }
   .btn, .segBtn, .fixBtn, .vbtn, .chipBtn { min-height: 44px; }
 }
+
+/* PHONE FLOOR (≤768px) — generated: every selector in this file under 12px reads 12px on a phone */
+@media (max-width: 768px) {
+  .preview, .pvHead { font-size: 0.75rem; }
+}

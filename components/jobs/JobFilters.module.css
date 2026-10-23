@@ -172,3 +172,8 @@
   .btn, .chip, .clear, .done { min-height: 44px; }
   .label { letter-spacing: 0.06em; }
 }
+
+/* PHONE FLOOR (≤768px) — generated: every selector in this file under 12px reads 12px on a phone */
+@media (max-width: 768px) {
+  .count, .chip, .clear, .label { font-size: 0.75rem; }
+}

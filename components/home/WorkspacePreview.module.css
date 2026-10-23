@@ -395,3 +395,8 @@
   .split > .panel:nth-child(2) { display: none; }
   .stat { padding: 0.7rem 0.75rem; }
 }
+
+/* PHONE FLOOR (≤768px) — generated: every selector in this file under 12px reads 12px on a phone */
+@media (max-width: 768px) {
+  .step, .fitFor b { font-size: 0.75rem; }
+}

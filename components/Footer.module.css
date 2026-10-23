@@ -63,3 +63,8 @@
   .col { gap: 0; } /* the 44px rows carry their own spacing */
   .logo { min-height: 44px; }
 }
+
+/* PHONE FLOOR (≤768px) — generated: every selector in this file under 12px reads 12px on a phone */
+@media (max-width: 768px) {
+  .cmd { font-size: 0.75rem; }
+}

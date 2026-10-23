@@ -31,3 +31,8 @@
   transition: color 0.15s ease, border-color 0.15s ease;
 }
 .link:hover { color: var(--white); border-color: rgba(129, 140, 248, 0.5); }
+
+/* PHONE FLOOR (≤768px) — generated: every selector in this file under 12px reads 12px on a phone */
+@media (max-width: 768px) {
+  .label { font-size: 0.75rem; }
+}

@@ -149,3 +149,8 @@
   .radius { font-size: 0.78rem; padding: 0.33rem 0.6rem; }
   .go { flex: 1 1 auto; padding: 0.62rem 0.95rem; }
 }
+
+/* PHONE FLOOR (≤768px) — generated: every selector in this file under 12px reads 12px on a phone */
+@media (max-width: 768px) {
+  .sugg, .notice, .cityLine { font-size: 0.75rem; }
+}

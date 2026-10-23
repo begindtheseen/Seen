@@ -148,6 +148,7 @@
 .bDim { color: var(--sub); border-color: var(--line2); }
 .fine { font-family: var(--mono); font-size: 0.55rem; color: var(--dim); margin-top: 0.9rem; line-height: 1.6; }
 .fine a { color: var(--sub); }
+@media (max-width: 768px) { .fine a { display: inline-block; padding: 1rem 0; margin: -1rem 0; } }
 
 .dangerCard { border-color: rgba(239, 68, 68, 0.22); background: linear-gradient(150deg, #1d1420, #0f111d); }
 
@@ -174,4 +175,9 @@
   .me, .jumps, .col > *, .suggs, .saveBar { animation: none; }
   .jump, .primary, .ghost, .input, .select { transition: none; }
   .jump:hover, .primary:hover { transform: none; }
+}
+
+/* PHONE FLOOR (≤768px) — generated: every selector in this file under 12px reads 12px on a phone */
+@media (max-width: 768px) {
+  .meMail, .plan, .eyebrow, .label, .hint, .rowS, .msg, .fileMeta, .planMeta, .badge, .fine { font-size: 0.75rem; }
 }

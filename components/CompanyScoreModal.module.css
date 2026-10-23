@@ -122,3 +122,8 @@
   .ind, .verified, .dq, .metricL, .full { font-size: 0.75rem; }
   .ringScore { font-size: 0.69rem; }
 }
+
+/* PHONE FLOOR (≤768px) — generated: every selector in this file under 12px reads 12px on a phone */
+@media (max-width: 768px) {
+  .ringScore { font-size: 0.75rem; }
+}

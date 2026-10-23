@@ -12,3 +12,8 @@
 .ghost:hover { border-color: rgba(129, 140, 248, 0.5); }
 .fine { font-family: var(--mono); font-size: 0.62rem; color: var(--dim); margin-top: 1.6rem; }
 .fine a { color: var(--sub); }
+
+/* PHONE FLOOR (≤768px) — generated: every selector in this file under 12px reads 12px on a phone */
+@media (max-width: 768px) {
+  .code, .fine { font-size: 0.75rem; }
+}

@@ -50,3 +50,8 @@
 @media (max-width: 768px) {
   .kicker, .tag, .more { font-size: 0.75rem; }
 }
+
+/* PHONE FLOOR (≤768px) — generated: every selector in this file under 12px reads 12px on a phone */
+@media (max-width: 768px) {
+  .kicker, .tag, .more { font-size: 0.75rem; }
+}

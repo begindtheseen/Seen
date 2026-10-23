@@ -63,3 +63,8 @@
   .chip { font-size: 0.78rem; min-height: 44px; }
   .more { display: inline-flex; align-items: center; min-height: 44px; }
 }
+
+/* PHONE FLOOR (≤768px) — generated: every selector in this file under 12px reads 12px on a phone */
+@media (max-width: 768px) {
+  .head, .ico, .when, .chip { font-size: 0.75rem; }
+}

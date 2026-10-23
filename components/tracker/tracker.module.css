@@ -131,3 +131,8 @@
 .house { display: flex; flex-wrap: wrap; gap: .45rem; margin-top: 1.25rem; padding-top: 1rem; border-top: 1px solid var(--line); }
 
 @media (prefers-reduced-motion: reduce) { .act, .step, .toggle { transition: none; } }
+
+/* PHONE FLOOR (≤768px) — generated: every selector in this file under 12px reads 12px on a phone */
+@media (max-width: 768px) {
+  .statLine, .toggle, .step, .chip, .pipeHint, .nextCheck, .empBadge, .label, .field label, .err, .hint { font-size: 0.75rem; }
+}

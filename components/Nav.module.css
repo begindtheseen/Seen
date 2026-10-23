@@ -386,3 +386,8 @@ div.drawer.drawerOpen { transform: translateX(0); }
   div.drawer { transition: none; }
 }
 div.drawer :global(.side-menu-item) { min-height: 44px; }
+
+/* PHONE FLOOR (≤768px) — generated: every selector in this file under 12px reads 12px on a phone */
+@media (max-width: 768px) {
+  .menuLabel, .menuNote, .chip, .pro, .cmdkKey { font-size: 0.75rem; }
+}

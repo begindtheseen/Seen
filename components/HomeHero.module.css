@@ -184,3 +184,8 @@
   .eyebrow, .examplesLabel { font-size: 0.75rem; }
   .eyebrow { letter-spacing: 0.06em; }
 }
+
+/* PHONE FLOOR (≤768px) — generated: every selector in this file under 12px reads 12px on a phone */
+@media (max-width: 768px) {
+  .eyebrow, .examplesLabel { font-size: 0.75rem; }
+}
