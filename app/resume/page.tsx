@@ -1,5 +1,6 @@
 'use client'
 
+import { httpHref } from '@/lib/safeHref.js'
 import { useState, useEffect, useRef, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
@@ -1004,7 +1005,7 @@ function ResumePageInner() {
                     <Card>
                       {kicker('Now apply — and get Seen')}
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '.5rem' }}>
-                        {jobUrl && <a href={jobUrl} target="_blank" rel="noopener noreferrer" style={{ display: 'block', textAlign: 'center', ...btnPrimary, textDecoration: 'none', boxSizing: 'border-box' } as React.CSSProperties}>Continue to apply →</a>}
+                        {httpHref(jobUrl) && <a href={httpHref(jobUrl) ?? '#'} target="_blank" rel="noopener noreferrer" style={{ display: 'block', textAlign: 'center', ...btnPrimary, textDecoration: 'none', boxSizing: 'border-box' } as React.CSSProperties}>Continue to apply →</a>}
                         <a href={trackHref} style={{ display: 'block', textAlign: 'center', background: 'var(--green)', color: 'var(--ink)', borderRadius: 8, padding: '.7rem 1rem', fontFamily: 'var(--display)', fontWeight: 800, fontSize: '.8rem', textDecoration: 'none' }}>📌 Track this application</a>
                         <a href={reportHref} style={{ display: 'block', textAlign: 'center', background: 'none', border: '1px solid var(--line2)', color: 'var(--sub)', borderRadius: 8, padding: '.6rem 1rem', fontFamily: 'var(--mono)', fontSize: 'var(--fs-68)', textDecoration: 'none' }}>Report what happened →</a>
                       </div>

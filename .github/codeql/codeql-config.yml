@@ -1,0 +1,13 @@
+# Code scanning looks at shipped code only. Test files are excluded because their in-memory fakes
+# (AppStore.test.mjs stands in a Map-backed localStorage) are read by CodeQL as real data flow: every
+# storage write in the app (a URL query param saved as a recent search, a form field) then reaches
+# every storage read, and plain hrefs built from the tracker's own store show up as XSS / open
+# redirect (PR #351). The queries stay the workflow's security-and-quality suite.
+name: Seen code scanning
+paths-ignore:
+  - '**/*.test.mjs'
+  - '**/*.test.ts'
+  - '**/*.test.tsx'
+  - '**/*.test.js'
+  - '**/__tests__/**'
+  - 'scratchpad/**'

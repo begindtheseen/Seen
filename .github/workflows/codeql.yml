@@ -36,6 +36,8 @@ jobs:
           languages: javascript-typescript
           # security-and-quality is a superset of the default security queries.
           queries: security-and-quality
+          # Shipped code only: test fakes are not data flow (see the config file).
+          config-file: ./.github/codeql/codeql-config.yml
 
       - name: Perform CodeQL Analysis
         uses: github/codeql-action/analyze@v3
