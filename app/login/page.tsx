@@ -103,8 +103,11 @@ function LoginContent() {
     // via the email link landed on the job-seeker front page instead of their portal. Employers →
     // their dashboard (which walks them through claiming + posting via the activation checklist);
     // seekers land on THEIR dashboard — the verify screen promises exactly that, and the homepage
-    // with a signed-in nav read as "nothing happened" (audit 2026-10-23). Path redirects on this
-    // origin are already allow-listed (the password-reset flow uses ${origin}/reset).
+    // with a signed-in nav read as "nothing happened" (audit 2026-10-23). Supabase honours a path on
+    // the Site URL's own origin (the reset flow's ${origin}/reset proves it, verified 2026-10-23); any
+    // OTHER origin — a Vercel preview — must be in Authentication → URL Configuration → Redirect
+    // URLs, or the link is sent to the Site URL root (a preview signup's link came back as
+    // redirect_to=https://seenjobs.io/).
     const verifyDest = effectiveType === 'employer' ? '/employers/dashboard' : '/dashboard'
     const { error: err } = await supabase.auth.signUp({
       email,
@@ -122,23 +125,34 @@ function LoginContent() {
   // is only 'employer' here when employer signup is open.)
   const afterVerify = () => router.replace(EMPLOYER_SIGNUP_ENABLED && signupType === 'employer' ? '/employers/dashboard' : returnTo)
 
-  /** True once this browser holds a confirmed session (the email link was clicked). */
-  async function isVerified(): Promise<boolean> {
+  /**
+   * True once the email link has been clicked. Same device: the link signs THIS browser in and
+   * getUser() sees the confirmed session. Other device (the link tapped on a phone while this tab
+   * waits on a laptop): no session ever reaches this browser, so the credentials typed a moment
+   * ago are tried — sign-in is refused until the address is confirmed and succeeds right after.
+   * The password path is tried only when asked (`withPassword`): every other poll, so the sign-in
+   * endpoint sees at most one attempt per 10 s.
+   */
+  async function isVerified(withPassword: boolean): Promise<boolean> {
     const { data, error: err } = await supabase.auth.getUser()
-    return !err && !!data.user?.email_confirmed_at
+    if (!err && data.user?.email_confirmed_at) return true
+    if (!withPassword || !email || !password) return false
+    const { error: signErr } = await supabase.auth.signInWithPassword({ email, password })
+    return !signErr
   }
 
   async function checkVerification() {
     setLoading(true); clearError()
-    const ok = await isVerified()
+    const ok = await isVerified(true)
     setLoading(false)
     if (!ok) { setError('Not verified yet — open the link in your email, then this page moves on by itself.'); return }
     afterVerify()
   }
 
-  // Auto-detect the click: the confirmation link signs this browser in (supabase-js shares the
-  // session across tabs), so polling getUser() every 5 s while the tab is visible moves the user
-  // on without the extra tap. Stops after 5 minutes; the button above remains.
+  // Auto-detect the click: on the same device the confirmation link signs this browser in
+  // (supabase-js shares the session across tabs); from another device the credentials are retried
+  // (see isVerified). Polls every 5 s while the tab is visible, stops after 5 minutes; the button
+  // above remains.
   useEffect(() => {
     if (step !== 'verify') return
     verifyPolls.current = 0
@@ -146,7 +160,7 @@ function LoginContent() {
     const tick = async () => {
       if (stopped || document.visibilityState === 'hidden') return
       if (verifyPolls.current++ >= VERIFY_POLL_MAX) { stopped = true; return }
-      if (await isVerified()) { stopped = true; afterVerify() }
+      if (await isVerified(verifyPolls.current % 2 === 0)) { stopped = true; afterVerify() }
     }
     const id = setInterval(tick, VERIFY_POLL_MS)
     document.addEventListener('visibilitychange', tick)
