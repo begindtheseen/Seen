@@ -1,0 +1,58 @@
+/* Login layout. Desktop centers the card in the viewport; on phones the ~430px of empty space
+   above the form (audit, 390px) is gone — the card starts just under the nav so the first field
+   is on screen without scrolling. */
+.wrap {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 80px 1.5rem 1.5rem;
+  box-sizing: border-box;
+}
+.card { width: 100%; max-width: 420px; animation: fadeUp 0.4s ease both; }
+@media (max-width: 768px) {
+  .wrap { align-items: flex-start; min-height: 0; padding: calc(64px + 1.25rem) 1.25rem 2rem; }
+}
+
+/* ≥44px targets for every text-styled control (back, forgot password, create one, sign in). */
+.textBtn {
+  display: inline-flex; align-items: center; gap: 0.35rem;
+  min-height: 44px; padding: 0 0.5rem; margin: 0 -0.5rem;
+  background: none; border: none; cursor: pointer; border-radius: 8px;
+  font-family: var(--mono); font-size: 0.72rem; color: var(--dim);
+}
+.textBtn:hover, .textBtn:focus-visible { color: var(--white); outline: none; }
+.textBtn:focus-visible { box-shadow: 0 0 0 2px rgba(129, 140, 248, 0.6); }
+.linkBtn {
+  display: inline-flex; align-items: center; min-height: 44px; padding: 0 0.4rem; margin: 0 -0.4rem;
+  background: none; border: none; cursor: pointer; border-radius: 8px;
+  font-family: var(--body); font-size: 0.82rem; color: var(--blue); text-decoration: underline;
+}
+.linkBtn:focus-visible { outline: none; box-shadow: 0 0 0 2px rgba(129, 140, 248, 0.6); }
+.linkDim { color: var(--muted); font-family: var(--mono); font-size: 0.72rem; }
+
+/* Password field with a show/hide toggle inside it. */
+.pwWrap { position: relative; }
+.pwWrap input { padding-right: 3.4rem !important; }
+.pwToggle {
+  position: absolute; right: 2px; top: 50%; transform: translateY(-50%);
+  min-width: 44px; height: 44px; padding: 0 0.6rem;
+  display: inline-flex; align-items: center; justify-content: center;
+  background: none; border: none; cursor: pointer; border-radius: 8px;
+  color: var(--dim); font-family: var(--mono); font-size: 0.66rem; letter-spacing: 0.04em;
+}
+.pwToggle:hover, .pwToggle:focus-visible { color: var(--white); outline: none; }
+.pwToggle:focus-visible { box-shadow: 0 0 0 2px rgba(129, 140, 248, 0.6); }
+
+.notice {
+  background: rgba(245, 158, 11, 0.1); border: 1px solid rgba(245, 158, 11, 0.3); border-radius: 8px;
+  padding: 0.72rem 1rem; margin-bottom: 1rem; text-align: center;
+  font-family: var(--mono); font-size: 0.72rem; color: var(--amber);
+}
+.auto { font-family: var(--mono); font-size: 0.62rem; color: var(--dim); margin-bottom: 0.9rem; }
+.auto::before { content: ''; display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--green); margin-right: 0.4rem; animation: pulse 1.6s infinite; }
+
+@media (prefers-reduced-motion: reduce) {
+  .card { animation: none; }
+  .auto::before { animation: none; }
+}

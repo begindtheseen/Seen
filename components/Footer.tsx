@@ -27,7 +27,7 @@ const COLS: Array<{ title: string; links: Array<{ href: string; label: string }>
     { href: '/employers', label: 'For employers' },
     { href: '/report', label: 'Report an outcome' },
     { href: '/faq', label: 'FAQ' },
-    { href: 'mailto:hello@seenjobs.io', label: 'Contact' },
+    { href: '/contact', label: 'Contact' },
   ] },
   { title: 'Legal', links: [
     { href: '/terms', label: 'Terms' },
@@ -56,14 +56,12 @@ export default function Footer() {
         {COLS.map(col => (
           <div key={col.title} className={styles.col}>
             <div className={styles.colT}>{col.title}</div>
-            {col.links.map(l => l.href.startsWith('mailto:')
-              ? <a key={l.href} href={l.href} className={styles.link}>{l.label}</a>
-              : <Link key={l.href} href={l.href} className={styles.link}>{l.label}</Link>)}
+            {col.links.map(l => <Link key={l.href} href={l.href} className={styles.link}>{l.label}</Link>)}
           </div>
         ))}
       </div>
       <div className={styles.bottom}>
-        <span>© 2026 Seen</span>
+        <span>© 2026 Seen · <span className={styles.dim}>Made in California by a job seeker who got ghosted too.</span></span>
         <span className={styles.dim}>Scores never change for money. Submissions are claims, labeled by confidence.</span>
       </div>
     </footer>

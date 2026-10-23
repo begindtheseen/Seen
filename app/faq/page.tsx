@@ -1,7 +1,12 @@
+import type { ReactNode } from 'react'
+import Link from 'next/link'
 import PageHeader from '@/components/shell/PageHeader'
 
+const EMAIL = 'hello@seenjobs.io'
+const Mail = () => <a href={`mailto:${EMAIL}`}>{EMAIL}</a>
+
 export default function FAQPage() {
-  const sections = [
+  const sections: Array<{ heading: string; items: Array<{ q: string; a: ReactNode }> }> = [
     {
       heading: 'About Seen',
       items: [
@@ -19,7 +24,11 @@ export default function FAQPage() {
         },
         {
           q: 'Who built Seen?',
-          a: 'Seen was built by someone who lived this problem — months of applying to ghost jobs, completing unpaid assessments with no response, and watching good candidates lose months to companies that were never actually hiring. We got frustrated enough to fix it.',
+          a: <>Brandon, Seen&apos;s founder, in California. He built it after months of applying to jobs that were never really open, finishing unpaid assessments nobody answered, and watching good candidates lose a season to companies that had stopped hiring. Seen is independent and bootstrapped: no employer pays for placement, and no score has ever changed for money. He reads every message sent to <Mail />.</>,
+        },
+        {
+          q: 'How do I contact Seen?',
+          a: <>Email <Mail /> — or use the <Link href="/contact">contact page</Link>, which says what to include. A person answers within two business days.</>,
         },
       ],
     },
@@ -65,28 +74,7 @@ export default function FAQPage() {
         },
         {
           q: 'Can I edit or delete my report?',
-          a: 'Because reports are fully anonymous, we cannot verify ownership. If you believe a report you submitted contains an error or personal information that should be removed, email hello@seenjobs.io and we will review it manually.',
-        },
-      ],
-    },
-    {
-      heading: 'Inbox Autopilot',
-      items: [
-        {
-          q: 'What is Inbox Autopilot?',
-          a: 'Turn it on from your tracker and Seen gives you a private address (track-…@seenjobs.io). Forward your job emails to it — with a Gmail filter, or one by one — and Seen reads each one: a “thanks for applying” adds the application, an interview invite or assessment moves it forward, a rejection or offer closes it out. It is free.',
-        },
-        {
-          q: 'What does Seen keep from my emails?',
-          a: 'Only what it pulled out: the company, the role, what happened (applied, interview, assessment, rejection, offer), the sender’s name and domain, and the date. Seen never stores the email’s text, subject or attachments. Mail sent to your address passes through our email provider, Resend, which keeps received mail only briefly. Turning Inbox Autopilot off deletes your address and everything Seen read; your tracker cards stay.',
-        },
-        {
-          q: 'Does it share my outcomes?',
-          a: 'Not on its own. When Seen reads a rejection, offer or interview, it asks you once whether to add it — anonymously — to that company’s grade. Nothing is added unless you tap Yes.',
-        },
-        {
-          q: 'What if Seen reads an email wrong?',
-          a: 'It only acts on clear wording (“we have decided to move forward with other candidates”), never on “if you are selected…”. When it can’t tell which company an email is from, it asks you which application it belongs to. You can still edit any card by hand, pause the address, or get a new one.',
+          a: <>Because reports are fully anonymous, we cannot verify ownership. If you believe a report you submitted contains an error or personal information that should be removed, email <Mail /> and we will review it manually.</>,
         },
       ],
     },
@@ -99,7 +87,7 @@ export default function FAQPage() {
         },
         {
           q: 'Can I dispute a report?',
-          a: 'Email hello@seenjobs.io with the specific content, the reason it violates our guidelines (factual inaccuracy, personal information, or clear fabrication), and supporting evidence. We review within 14 business days. We do not remove reports simply because they are negative — negative experiences are protected speech and the core data this platform is built on.',
+          a: <>Email <Mail /> with the specific content, the reason it violates our guidelines (factual inaccuracy, personal information, or clear fabrication), and supporting evidence. We review within 14 business days. We do not remove reports simply because they are negative — negative experiences are protected speech and the core data this platform is built on.</>,
         },
         {
           q: 'Does Seen accept paid placements?',
@@ -116,7 +104,7 @@ export default function FAQPage() {
           eyebrow="Help center"
           title="Frequently asked questions"
           crumbLabel="FAQ"
-          sub={<>Can&apos;t find what you need? Email <a href="mailto:hello@seenjobs.io">hello@seenjobs.io</a></>}
+          sub={<>Can&apos;t find what you need? Email <Mail /> or visit the <Link href="/contact">contact page</Link>.</>}
         />
         <div style={{ height: '1.4rem' }} />
 

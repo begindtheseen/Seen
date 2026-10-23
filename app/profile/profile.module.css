@@ -43,10 +43,11 @@
 .jump:hover { color: var(--white); background: rgba(255, 255, 255, 0.05); transform: translateX(2px); }
 .jump span:first-child { width: 22px; text-align: center; font-size: 0.85rem; opacity: 0.85; }
 .jumpDanger { color: #f87185; }
+/* Phones: the chips WRAP (two rows at 390px) instead of running off the right edge — the old
+   overflow-x row reached 617px at 390 with its scrollbar hidden, so nothing hinted it scrolled. */
 @media (max-width: 860px) {
-  .jumps { flex-direction: row; overflow-x: auto; scrollbar-width: none; padding: 0.3rem; }
-  .jumps::-webkit-scrollbar { display: none; }
-  .jump { white-space: nowrap; padding: 0.45rem 0.7rem; }
+  .jumps { flex-direction: row; flex-wrap: wrap; padding: 0.3rem; }
+  .jump { white-space: nowrap; padding: 0.45rem 0.7rem; min-height: 40px; }
 }
 
 /* ── Cards ── */

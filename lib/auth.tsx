@@ -4,6 +4,7 @@ import { createContext, useContext, useEffect, useState, useCallback, type React
 import type { User, Session } from '@supabase/supabase-js'
 import { supabase } from './supabase'
 import { _sync } from './sync'
+import { consumeIntentionalSignOut, handleSessionExpired, resetSessionExpiredGuard } from './sessionExpired'
 import type { UserProfile } from './types'
 import { resolveEmployerCompany, selectActiveClaim } from './server/employerClaims'
 
@@ -164,9 +165,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setReady(true)
     }).catch(() => setReady(true))
 
+    // Tracks whether a SIGNED_OUT follows a real session (expiry) or just the initial "no session"
+    // notification supabase-js emits on load — only the former deserves the expired toast.
+    let hadUser = false
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (session?.user) hadUser = true
       if (event === 'SIGNED_IN' && session?.user) {
         setUser(session.user)
+        resetSessionExpiredGuard()
       } else if (event === 'TOKEN_REFRESHED' && session?.user) {
         setUser(session.user)
       } else if (event === 'USER_UPDATED' && session?.user) {
@@ -177,6 +183,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // Wipe this session's device-local data so it can't bleed into (or be uploaded
         // by) the next account or guest on this device.
         clearSessionLocalData()
+        // supabase-js emits SIGNED_OUT by itself when the refresh token is rejected. Every real
+        // sign-out button marks itself first (lib/sessionExpired.ts); an unmarked SIGNED_OUT after
+        // a live session is an expiry → one toast + /login?return=…, never silence.
+        const intentional = consumeIntentionalSignOut()
+        if (hadUser && !intentional) void handleSessionExpired()
+        hadUser = false
       }
     })
 

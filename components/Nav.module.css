@@ -339,3 +339,50 @@
   .right { gap: 0.35rem; }
   .iconBtn { width: 32px; height: 32px; }
 }
+
+/* ── Phone drawer (overrides the global .side-menu, which slides in from the LEFT) ──
+   Element selectors raise specificity above globals.css's `.side-menu` / `.side-menu.open`
+   whatever the stylesheet order. Right side = thumb side on a phone; solid surface. */
+div.drawer {
+  left: auto;
+  right: 0;
+  border-right: 0;
+  border-left: 1px solid var(--line);
+  background: #0e111c;
+  transform: translateX(100%);
+  box-shadow: -20px 0 60px rgba(0, 0, 0, 0.5);
+  padding-bottom: calc(1.5rem + env(safe-area-inset-bottom, 0px));
+}
+div.drawer.drawerOpen { transform: translateX(0); }
+.drawerClose {
+  margin-left: auto;
+  width: 44px;
+  height: 44px;
+  margin-top: -10px;
+  margin-bottom: -10px;
+  margin-right: -0.5rem;
+  display: grid;
+  place-items: center;
+  background: none;
+  border: none;
+  border-radius: 10px;
+  color: var(--sub);
+  cursor: pointer;
+  transition: color 0.15s ease, background 0.15s ease;
+}
+.drawerClose svg { width: 20px; height: 20px; }
+.drawerClose:hover, .drawerClose:focus-visible { color: var(--white); background: rgba(255, 255, 255, 0.07); outline: none; }
+.drawerClose:focus-visible { box-shadow: 0 0 0 2px rgba(129, 140, 248, 0.6); }
+/* Every control in the drawer's foot is a real thumb target (≥44px). */
+.drawerCta { width: 100%; justify-content: center; min-height: 44px; font-size: 0.84rem; }
+.drawerGhost, .drawerDanger {
+  display: flex; align-items: center; justify-content: center; width: 100%; min-height: 44px;
+  border-radius: 10px; padding: 0.5rem 1rem; cursor: pointer; text-decoration: none;
+  font-family: var(--body); font-size: 0.84rem; font-weight: 600;
+}
+.drawerGhost { background: none; border: 1px solid var(--line2); color: var(--sub); }
+.drawerDanger { background: rgba(239, 68, 68, 0.07); border: 1px solid rgba(239, 68, 68, 0.25); color: var(--red); }
+@media (prefers-reduced-motion: reduce) {
+  div.drawer { transition: none; }
+}
+div.drawer :global(.side-menu-item) { min-height: 44px; }

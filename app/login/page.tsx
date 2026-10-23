@@ -1,9 +1,16 @@
 'use client'
 
-import { useState, useEffect, Suspense } from 'react'
+import { useState, useEffect, useRef, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/lib/auth'
+import { SESSION_EXPIRED_MESSAGE, clearSessionExpiredNotice, wasSessionExpiredRecently } from '@/lib/sessionExpired'
+import styles from './login.module.css'
+
+// "Check your email" auto-detects the click: poll while the tab is visible, every 5 s, for at
+// most 5 minutes (60 polls); "I verified my email →" stays as the manual fallback.
+const VERIFY_POLL_MS = 5_000
+const VERIFY_POLL_MAX = 60
 
 type Step = 'who' | 'email' | 'password' | 'verify' | 'signin'
 
@@ -45,7 +52,7 @@ function LoginContent() {
   // Where to land after auth. /apply, /pricing and the UpgradeModal pass ?return= / ?next=
   // so the user resumes what they were doing — dumping everyone on /dashboard lost the
   // "did you apply?" context and the upgrade intent.
-  const returnTo = safeInternalPath(params.get('return')) || safeInternalPath(params.get('next')) || '/dashboard'
+  const returnTo = safeInternalPath(params.get('return')) || safeInternalPath(params.get('returnTo')) || safeInternalPath(params.get('next')) || '/dashboard'
   // "For employers →" links here with ?type=employer — open the chooser (not seeker sign-in).
   const [step, setStep] = useState<Step>(
     params.get('signup') === '1' || params.get('type') === 'employer' ? 'who' : 'signin'
@@ -58,6 +65,13 @@ function LoginContent() {
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const [focused, setFocused] = useState<string | null>(null)
+  const [showPw, setShowPw] = useState(false)
+  // Set by lib/sessionExpired.ts right before it routes here — the toast does not survive the
+  // navigation, so the page itself says why the user is looking at a login form.
+  const [expiredNotice, setExpiredNotice] = useState(false)
+  const verifyPolls = useRef(0)
+
+  useEffect(() => { setExpiredNotice(wasSessionExpiredRecently()) }, [])
 
   useEffect(() => {
     // Already signed in and hitting /login → bounce out. Employers land directly on their
@@ -88,9 +102,10 @@ function LoginContent() {
     // the verify link to the project Site URL (the seeker homepage) — so a new employer who confirms
     // via the email link landed on the job-seeker front page instead of their portal. Employers →
     // their dashboard (which walks them through claiming + posting via the activation checklist);
-    // seekers keep the homepage. Path redirects on this origin are already allow-listed (the
-    // password-reset flow uses ${origin}/reset).
-    const verifyDest = effectiveType === 'employer' ? '/employers/dashboard' : '/'
+    // seekers land on THEIR dashboard — the verify screen promises exactly that, and the homepage
+    // with a signed-in nav read as "nothing happened" (audit 2026-10-23). Path redirects on this
+    // origin are already allow-listed (the password-reset flow uses ${origin}/reset).
+    const verifyDest = effectiveType === 'employer' ? '/employers/dashboard' : '/dashboard'
     const { error: err } = await supabase.auth.signUp({
       email,
       password,
@@ -102,17 +117,42 @@ function LoginContent() {
     setStep('verify')
   }
 
+  // Fresh employer signups land on their dashboard (activation checklist guides them to claim +
+  // post); seekers resume returnTo. (The kill switch forces seeker in createAccount, so signupType
+  // is only 'employer' here when employer signup is open.)
+  const afterVerify = () => router.replace(EMPLOYER_SIGNUP_ENABLED && signupType === 'employer' ? '/employers/dashboard' : returnTo)
+
+  /** True once this browser holds a confirmed session (the email link was clicked). */
+  async function isVerified(): Promise<boolean> {
+    const { data, error: err } = await supabase.auth.getUser()
+    return !err && !!data.user?.email_confirmed_at
+  }
+
   async function checkVerification() {
     setLoading(true); clearError()
-    const { data, error: err } = await supabase.auth.getUser()
+    const ok = await isVerified()
     setLoading(false)
-    if (err || !data.user) { setError('Not verified yet. Check your email.'); return }
-    if (!data.user.email_confirmed_at) { setError('Still waiting on verification. Check your inbox.'); return }
-    // Fresh employer signups land on their dashboard (activation checklist guides them to claim +
-    // post); seekers resume returnTo. (The kill switch forces seeker in createAccount, so signupType
-    // is only 'employer' here when employer signup is open.)
-    router.replace(EMPLOYER_SIGNUP_ENABLED && signupType === 'employer' ? '/employers/dashboard' : returnTo)
+    if (!ok) { setError('Not verified yet — open the link in your email, then this page moves on by itself.'); return }
+    afterVerify()
   }
+
+  // Auto-detect the click: the confirmation link signs this browser in (supabase-js shares the
+  // session across tabs), so polling getUser() every 5 s while the tab is visible moves the user
+  // on without the extra tap. Stops after 5 minutes; the button above remains.
+  useEffect(() => {
+    if (step !== 'verify') return
+    verifyPolls.current = 0
+    let stopped = false
+    const tick = async () => {
+      if (stopped || document.visibilityState === 'hidden') return
+      if (verifyPolls.current++ >= VERIFY_POLL_MAX) { stopped = true; return }
+      if (await isVerified()) { stopped = true; afterVerify() }
+    }
+    const id = setInterval(tick, VERIFY_POLL_MS)
+    document.addEventListener('visibilitychange', tick)
+    return () => { stopped = true; clearInterval(id); document.removeEventListener('visibilitychange', tick) }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [step])
 
   async function resendVerification() {
     if (!email) return
@@ -127,6 +167,7 @@ function LoginContent() {
     const { data, error: err } = await supabase.auth.signInWithPassword({ email, password })
     setLoading(false)
     if (err) { setError('Incorrect email or password.'); return }
+    clearSessionExpiredNotice()
     // Route employers straight to their dashboard. Employer-ness comes from the account's own signup
     // metadata; the /dashboard guard is the safety net for any older account whose metadata predates
     // this. Sign-in is NOT gated by the kill switch — existing employers must still get in when closed.
@@ -145,16 +186,36 @@ function LoginContent() {
   }
 
   const backBtn = (to: Step) => (
-    <button
-      onClick={() => { clearError(); setStep(to) }}
-      style={{ background: 'none', border: 'none', color: 'var(--dim)', fontFamily: 'var(--mono)', fontSize: '.68rem', cursor: 'pointer', marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '.35rem' }}
-    >
-      ← back
-    </button>
+    <div style={{ marginBottom: '1rem' }}>
+      <button type="button" className={styles.textBtn} onClick={() => { clearError(); setStep(to) }} aria-label="Back">
+        ← back
+      </button>
+    </div>
   )
 
-  const label = (text: string) => (
-    <label style={{ fontFamily: 'var(--mono)', fontSize: '.6rem', textTransform: 'uppercase' as const, letterSpacing: '.08em', color: 'var(--dim)', display: 'block', marginBottom: '.35rem' }}>
+  // Password input with a show/hide toggle — the same control on signup and sign-in.
+  const pwField = (id: string, opts: { autoComplete: 'new-password' | 'current-password'; placeholder: string; onEnter: () => void }) => (
+    <div className={styles.pwWrap}>
+      <input
+        id={id}
+        type={showPw ? 'text' : 'password'}
+        autoComplete={opts.autoComplete}
+        placeholder={opts.placeholder}
+        value={password}
+        onChange={e => setPassword(e.target.value)}
+        style={fieldStyle(focused === id)}
+        onFocus={() => setFocused(id)}
+        onBlur={() => setFocused(null)}
+        onKeyDown={e => e.key === 'Enter' && opts.onEnter()}
+      />
+      <button type="button" className={styles.pwToggle} onClick={() => setShowPw(v => !v)} aria-label={showPw ? 'Hide password' : 'Show password'} aria-pressed={showPw}>
+        {showPw ? 'HIDE' : 'SHOW'}
+      </button>
+    </div>
+  )
+
+  const label = (text: string, htmlFor?: string) => (
+    <label htmlFor={htmlFor} style={{ fontFamily: 'var(--mono)', fontSize: '.6rem', textTransform: 'uppercase' as const, letterSpacing: '.08em', color: 'var(--dim)', display: 'block', marginBottom: '.35rem' }}>
       {text}
     </label>
   )
@@ -167,13 +228,15 @@ function LoginContent() {
   ]).filter(t => EMPLOYER_SIGNUP_ENABLED || t.type !== 'employer')
 
   return (
-    <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1.5rem', paddingTop: 80 }}>
-      <div style={{ width: '100%', maxWidth: 420, animation: 'fadeUp .4s ease both' }}>
+    <div className={styles.wrap}>
+      <div className={styles.card}>
         {/* Logo */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '.5rem', marginBottom: '2rem', justifyContent: 'center' }}>
           <span style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--blue)', boxShadow: '0 0 10px rgba(59,130,246,0.6)', display: 'inline-block', animation: 'pulse 2s infinite' }} />
           <span style={{ fontFamily: 'var(--display)', fontSize: '1.3rem', fontWeight: 800, color: 'var(--white)', letterSpacing: '-.02em' }}>Seen</span>
         </div>
+
+        {expiredNotice && <div className={styles.notice} role="status">{SESSION_EXPIRED_MESSAGE}</div>}
 
         {/* Error */}
         {error && (
@@ -215,7 +278,7 @@ function LoginContent() {
             </div>
             <div style={{ textAlign: 'center', fontSize: '.78rem', color: 'var(--muted)' }}>
               Already have an account?{' '}
-              <button onClick={() => { clearError(); setStep('signin') }} style={{ background: 'none', border: 'none', color: 'var(--blue)', fontSize: '.78rem', cursor: 'pointer', textDecoration: 'underline', fontFamily: 'var(--body)' }}>
+              <button type="button" className={styles.linkBtn} onClick={() => { clearError(); setStep('signin') }}>
                 Sign in →
               </button>
             </div>
@@ -229,12 +292,12 @@ function LoginContent() {
             <div style={{ fontFamily: 'var(--display)', fontSize: '1.4rem', fontWeight: 800, color: 'var(--white)', letterSpacing: '-.025em', marginBottom: '.2rem' }}>Create your account</div>
             <div style={{ fontSize: '.82rem', color: 'var(--sub)', fontWeight: 300, marginBottom: '1.5rem' }}>Free forever for job seekers</div>
             <div style={{ marginBottom: '.85rem' }}>
-              {label('First name')}
-              <input type="text" placeholder="What should we call you?" value={name} onChange={e => setName(e.target.value)} style={fieldStyle(focused === 'name')} onFocus={() => setFocused('name')} onBlur={() => setFocused(null)} />
+              {label('First name', 'su-name')}
+              <input id="su-name" type="text" autoComplete="given-name" placeholder="What should we call you?" value={name} onChange={e => setName(e.target.value)} style={fieldStyle(focused === 'name')} onFocus={() => setFocused('name')} onBlur={() => setFocused(null)} />
             </div>
             <div style={{ marginBottom: '1.25rem' }}>
-              {label('Email')}
-              <input type="email" placeholder="you@email.com" value={email} onChange={e => setEmail(e.target.value)} style={fieldStyle(focused === 'email')} onFocus={() => setFocused('email')} onBlur={() => setFocused(null)} onKeyDown={e => e.key === 'Enter' && goToPassword()} />
+              {label('Email', 'su-email')}
+              <input id="su-email" type="email" autoComplete="email" inputMode="email" placeholder="you@email.com" value={email} onChange={e => setEmail(e.target.value)} style={fieldStyle(focused === 'email')} onFocus={() => setFocused('email')} onBlur={() => setFocused(null)} onKeyDown={e => e.key === 'Enter' && goToPassword()} />
             </div>
             <button style={btnStyle} onClick={goToPassword} disabled={loading}>Continue →</button>
           </div>
@@ -247,8 +310,8 @@ function LoginContent() {
             <div style={{ fontFamily: 'var(--display)', fontSize: '1.4rem', fontWeight: 800, color: 'var(--white)', letterSpacing: '-.025em', marginBottom: '.2rem' }}>Set a password</div>
             <div style={{ fontSize: '.82rem', color: 'var(--sub)', fontWeight: 300, marginBottom: '1.5rem' }}>Make it something you&apos;ll remember</div>
             <div style={{ marginBottom: '1.25rem' }}>
-              {label('Password')}
-              <input type="password" placeholder="At least 8 characters" value={password} onChange={e => setPassword(e.target.value)} style={fieldStyle(focused === 'pw')} onFocus={() => setFocused('pw')} onBlur={() => setFocused(null)} onKeyDown={e => e.key === 'Enter' && createAccount()} />
+              {label('Password', 'su-pw')}
+              {pwField('su-pw', { autoComplete: 'new-password', placeholder: 'At least 8 characters', onEnter: createAccount })}
               <div style={{ height: 3, background: 'var(--line2)', borderRadius: 2, overflow: 'hidden', marginTop: '.5rem' }}>
                 <div style={{
                   height: '100%', borderRadius: 2, transition: 'all .3s',
@@ -272,18 +335,19 @@ function LoginContent() {
               We sent a verification link to<br />
               <strong style={{ color: 'var(--white)' }}>{verifyEmail}</strong>
             </div>
-            <div style={{ background: 'var(--bdim)', border: '1px solid var(--bmid)', borderRadius: 8, padding: '.85rem 1rem', fontFamily: 'var(--mono)', fontSize: '.68rem', color: 'var(--blue)', marginBottom: '1.5rem', lineHeight: 1.65, textAlign: 'left' }}>
-              ✓ Click the link in your email<br />
-              ✓ Come back here and tap below<br />
-              ✓ You&apos;ll go straight to your dashboard
+            <div style={{ background: 'var(--bdim)', border: '1px solid var(--bmid)', borderRadius: 8, padding: '.85rem 1rem', fontFamily: 'var(--mono)', fontSize: '.68rem', color: 'var(--blue)', marginBottom: '1rem', lineHeight: 1.65, textAlign: 'left' }}>
+              ✓ Open the link in your email<br />
+              ✓ It signs you in and opens your dashboard<br />
+              ✓ Left this tab open? It moves on by itself
             </div>
+            <div className={styles.auto} aria-live="polite">Watching for your click — no need to refresh</div>
             <button style={btnStyle} onClick={checkVerification} disabled={loading}>
               {loading ? 'Checking...' : 'I verified my email →'}
             </button>
-            <button onClick={resendVerification} style={{ width: '100%', padding: '.65rem', background: 'none', border: '1px solid var(--line2)', color: 'var(--sub)', borderRadius: 8, fontFamily: 'var(--body)', fontSize: '.8rem', cursor: 'pointer', marginBottom: '.75rem' }}>
+            <button type="button" onClick={resendVerification} style={{ width: '100%', minHeight: 44, padding: '.65rem', background: 'none', border: '1px solid var(--line2)', color: 'var(--sub)', borderRadius: 8, fontFamily: 'var(--body)', fontSize: '.8rem', cursor: 'pointer', marginBottom: '.5rem' }}>
               Resend verification email
             </button>
-            <button onClick={() => { setEmail(''); setStep('email') }} style={{ background: 'none', border: 'none', color: 'var(--muted)', fontFamily: 'var(--mono)', fontSize: '.62rem', cursor: 'pointer' }}>
+            <button type="button" className={`${styles.linkBtn} ${styles.linkDim}`} onClick={() => { setEmail(''); setStep('email') }}>
               Use a different email
             </button>
           </div>
@@ -296,17 +360,17 @@ function LoginContent() {
             <div style={{ fontFamily: 'var(--display)', fontSize: '1.4rem', fontWeight: 800, color: 'var(--white)', letterSpacing: '-.025em', marginBottom: '.2rem' }}>Welcome back</div>
             <div style={{ fontSize: '.82rem', color: 'var(--sub)', fontWeight: 300, marginBottom: '1.5rem' }}>Sign in to your account</div>
             <div style={{ marginBottom: '.85rem' }}>
-              {label('Email')}
-              <input type="email" placeholder="you@email.com" value={email} onChange={e => setEmail(e.target.value)} style={fieldStyle(focused === 'siEmail')} onFocus={() => setFocused('siEmail')} onBlur={() => setFocused(null)} />
+              {label('Email', 'si-email')}
+              <input id="si-email" type="email" autoComplete="email" inputMode="email" placeholder="you@email.com" value={email} onChange={e => setEmail(e.target.value)} style={fieldStyle(focused === 'siEmail')} onFocus={() => setFocused('siEmail')} onBlur={() => setFocused(null)} />
             </div>
             <div style={{ marginBottom: '.5rem' }}>
-              {label('Password')}
-              <input type="password" placeholder="••••••••" value={password} onChange={e => setPassword(e.target.value)} style={fieldStyle(focused === 'siPw')} onFocus={() => setFocused('siPw')} onBlur={() => setFocused(null)} onKeyDown={e => e.key === 'Enter' && doSignIn()} />
+              {label('Password', 'si-pw')}
+              {pwField('si-pw', { autoComplete: 'current-password', placeholder: '••••••••', onEnter: doSignIn })}
             </div>
-            <div style={{ textAlign: 'right', marginBottom: '1.25rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '.75rem' }}>
               {/* /reset is the working code-based flow (send code → verify → set password).
                   The old in-page step emailed a link that dead-ended on /dashboard. */}
-              <button onClick={() => router.push('/reset')} style={{ background: 'none', border: 'none', color: 'var(--muted)', fontFamily: 'var(--mono)', fontSize: '.62rem', cursor: 'pointer', textDecoration: 'underline' }}>
+              <button type="button" className={`${styles.linkBtn} ${styles.linkDim}`} onClick={() => router.push('/reset')}>
                 Forgot password?
               </button>
             </div>
@@ -315,7 +379,7 @@ function LoginContent() {
             </button>
             <div style={{ textAlign: 'center', fontSize: '.78rem', color: 'var(--muted)' }}>
               No account?{' '}
-              <button onClick={() => { clearError(); setStep('who') }} style={{ background: 'none', border: 'none', color: 'var(--blue)', fontSize: '.78rem', cursor: 'pointer', textDecoration: 'underline', fontFamily: 'var(--body)' }}>
+              <button type="button" className={styles.linkBtn} onClick={() => { clearError(); setStep('who') }}>
                 Create one →
               </button>
             </div>
