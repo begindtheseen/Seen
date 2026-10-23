@@ -254,7 +254,7 @@ function StudioInner() {
               <div className={s.cardTitle}>Drop your résumé here</div>
               <div className={s.dim} style={{ marginBottom: '1rem' }}>PDF, Word or text. We read the layout (columns, bold headings, bullets), not just the characters.</div>
               <div style={{ display: 'flex', gap: '.5rem', justifyContent: 'center', flexWrap: 'wrap' }}>
-                <button type="button" className={s.btnPrimary} onClick={() => fileRef.current?.click()} disabled={busy}>{busy ? 'Reading…' : 'Upload a file'}<span style={{ marginLeft: '.45rem', fontSize: '.55rem', opacity: .7, fontFamily: 'var(--mono)', fontWeight: 400 }}>· 1 credit</span></button>
+                <button type="button" className={s.btnPrimary} onClick={() => fileRef.current?.click()} disabled={busy}>{busy ? 'Reading…' : 'Upload a file'}<span style={{ marginLeft: '.45rem', fontSize: 'var(--fs-55)', opacity: .7, fontFamily: 'var(--mono)', fontWeight: 400 }}>· 1 credit</span></button>
                 <button type="button" className={s.btn} onClick={() => setMode('paste')}>Paste text · free</button>
                 <button type="button" className={s.btn} onClick={startBlank}>Start from blank</button>
               </div>

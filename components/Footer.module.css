@@ -53,3 +53,13 @@
   .link, .cmd { transition: none; }
   .link:hover { transform: none; }
 }
+
+/* Phone floor (audit 2026-10-23): column titles and the bottom line read at 12px; every link is a
+   44px-tall target (the footer gets longer on a phone; it is the end of the page). */
+@media (max-width: 768px) {
+  .colT, .bottom, .dim, .cmd kbd { font-size: 0.75rem; }
+  .colT { letter-spacing: 0.1em; }
+  .link { display: inline-flex; align-items: center; min-height: 44px; min-width: 44px; }
+  .col { gap: 0; } /* the 44px rows carry their own spacing */
+  .logo { min-height: 44px; }
+}

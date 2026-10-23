@@ -1,7 +1,11 @@
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
   --ink:#02040a;--void:#05070f;--surface:#0c0f1a;--card:rgba(255,255,255,0.03);--raised:rgba(255,255,255,0.05);
-  --line:rgba(255,255,255,0.08);--line2:rgba(255,255,255,0.12);--muted:#4b5563;--dim:#6b7280;
+  --line:rgba(255,255,255,0.08);--line2:rgba(255,255,255,0.12);
+  /* Muted text tiers, measured 2026-10-23 against the lightest solid surface (--raised over --surface = #181b25):
+     --muted #7a8492 = 4.53:1 (was #4b5563, 2.5:1), --dim #848b99 = 5.02:1 (was #6b7280, 3.9:1), --sub 7.5:1.
+     The minimum that clears WCAG 4.5:1 for the small meta text these carry; keep the order muted < dim < sub. */
+  --muted:#7a8492;--dim:#848b99;
   --sub:#9ca3af;--text:#e5e7eb;--white:#f9fafb;
   --green:#10b981;--gdim:rgba(16,185,129,0.08);--gmid:rgba(16,185,129,0.15);
   --red:#ef4444;--rdim:rgba(239,68,68,0.08);--rmid:rgba(239,68,68,0.15);
@@ -18,6 +22,12 @@
   --display:'Syne',sans-serif;
   --mono:'DM Mono',monospace;
   --body:'Instrument Sans',sans-serif;
+  /* Type-floor tokens: each is the desktop size it is named after (rem of the 16px root). On phones
+     (≤768px) every one becomes the 12px reading floor — see PHONE FLOORS at the end of this file.
+     Inline TSX sizes under 12px use these (fontSize: 'var(--fs-55)'), never a bare '.55rem'. */
+  --fs-46:.46rem;--fs-48:.48rem;--fs-50:.5rem;--fs-52:.52rem;--fs-53:.53rem;--fs-54:.54rem;--fs-55:.55rem;--fs-56:.56rem;
+  --fs-57:.57rem;--fs-58:.58rem;--fs-60:.6rem;--fs-62:.62rem;--fs-64:.64rem;--fs-65:.65rem;--fs-66:.66rem;--fs-68:.68rem;
+  --fs-70:.7rem;--fs-72:.72rem;--fs-74:.74rem;
 }
 html{scroll-behavior:smooth;overflow-x:hidden;-webkit-text-size-adjust:100%;text-size-adjust:100%}
 body{background:var(--ink);background-image:radial-gradient(ellipse at 30% 0%,rgba(99,102,241,0.07) 0%,transparent 50%),radial-gradient(ellipse at 80% 100%,rgba(124,58,237,0.05) 0%,transparent 50%);color:var(--text);font-family:var(--body);font-size:15px;line-height:1.6;overflow-x:hidden;-webkit-font-smoothing:antialiased;width:100%;max-width:100%;min-height:100dvh;display:flex;flex-direction:column}
@@ -1737,3 +1747,49 @@ button:not(:disabled):active{opacity:.82}
 /* A modal is open (components/ModalPortal.tsx): freeze the page behind it. Modals portal to <body>,
    outside .site-main, so their own animations keep running. */
 body.modal-open .site-main,body.modal-open .site-main *,body.modal-open nav,body.modal-open nav *{animation-play-state:paused!important}
+
+/* ═══ PHONE FLOORS (≤768px) — phone audit 2026-10-23: a 12px reading floor and 44px hit areas ═══
+   Rem is the 16px root, so .75rem = 12px. Three mechanisms, all phone-only so desktop is untouched:
+   1. The --fs-NN tokens (declared in :root as the desktop size they are named after) jump to the floor
+      here, so an inline fontSize:'var(--fs-55)' reads "0.55rem on desktop, 12px on a phone".
+   2. Every globals.css class under 12px is listed once below and floored. The list is generated from
+      this file's own font-size rules (scratchpad audit/fix-mobile) — add new small classes to it.
+   3. Inline literals still in TSX ("font-size:.55rem" as React serializes it on the server,
+      "font-size: 0.55rem" once the browser re-serializes the attribute) are caught by attribute
+      selectors — the only way a stylesheet can floor an inline style. New code uses the tokens; this
+      net covers what is left (jobs cards, company page, tracker, dashboard).
+   Deliberate exceptions: score-ring labels (.sring-l) sit inside a 44px ring and stop at 11px; nav
+   tabs (.ntab) and tracker stage steps (.stage-step) are sized by their own layouts.
+   Hit areas: a 44px minimum on every control (min-height/min-width, never bigger glyphs). The fixed
+   nav, side menu, tab bar and command palette size their own controls and are excluded. The .tap
+   utility gives an inline text link (Report →, @ company) the same floor. */
+@media(max-width:768px){
+  :root{--fs-46:.75rem;--fs-48:.75rem;--fs-50:.75rem;--fs-52:.75rem;--fs-53:.75rem;--fs-54:.75rem;--fs-55:.75rem;--fs-56:.75rem;--fs-57:.75rem;--fs-58:.75rem;--fs-60:.75rem;--fs-62:.75rem;--fs-64:.75rem;--fs-65:.75rem;--fs-66:.75rem;--fs-68:.75rem;--fs-70:.75rem;--fs-72:.75rem;--fs-74:.75rem}
+  .loader-txt,.eyebrow,.waste-badge,.vibe,.mbar-lbl,.mbar-val,.funnel-label,.funnel-pct,.funnel-ghost-note,.tick,.tloc,.hero-kicker,.qtag,.hs-l,.ht-url,.ht-status,.ht-loc,.ht-role,.wp-label,.wp-note,.src-chip,.ldr-rank,.ldr-loc,.ldr-label,.ldr-waste,.side-menu-label,.jc-logo,.jc-ts-lbl,.jc-co,.jc-loc,.jc-sal,.how-n,.how-tag,.diff-winner,.fh,.fc,.jct,.jss,.jlc-sl,.jlc-loc,.jlc-mi,.jlc-sal,.jlc-waste-badge,.jd-sl,.dsr-l,.dc-urg,.dc-count,.rpanel-title,.rp-live,.fl,.rta,.r-empty-txt,.shl,.as-title,.fp-title,.fp-val,.back-btn,.co-ind,.co-loc-tag,.co-grade-lbl,.co-grade-score,.co-verified,.co-share-btn,.co-live,.co-ml,.agg-item,.feed-filter-btn,.feed-role,.feed-meta,.rc-av,.rc-meta,.rc-src,.rc-via,.co-badge,.co-dq,.co-sec-lbl,.co-tl-l,.co-act,.co-chip,.co-track-input,.co-sticky-logo,.co-sticky-score span,.co-sec-cnt,.co-sec-sum,.co-kv,.co-city-input,.co-more,.co-pill,.co-link-btn,.co-about-line,.co-cmp-input,.co-cmp-go,.co-cmp-clear,.co-cmp-table,.co-cmp-metric-h,.co-cmp-name,.co-cmp-metric,.co-cmp-val,.co-seo-sub,.fb-hd,.ok-msg,.pc-eye,.pc-per,.disc,.toast,.check-count,.app-check-tag,.app-check-later,.app-check-note,.app-check-opt,.app-card-co,.app-card-loc,.app-card-score-l,.status-pill,.days-chip,.nudge,.pipeline-col-hdr,.pipeline-col-count,.pipeline-mini-card .co,.pipeline-mini-card .days,.tracker-stat-l,.dstat-l,.dsec-link,.deyebrow,.dmove-s,.dqa-s,.dchip,.sugg-chip,.hs-title,.hs-rec,.vfeed-hdr-l,.vfeed-clock,.vfeed-detail,.vfeed-ts,.vfeed-foot,.vtag,.vtag-grade,.idx-eyebrow,.adm-kpi-l,.adm-kpi-sub,.adm-section-lbl,.surge-chip,.oc-comp,.oc-trust-sig,.oc-btn,.oc-benchmark,.oc-trust,.qs-btn,.adm-btn,.adm-btn-danger,.issue-chip,.issue-badge,.swipe-badge,.co-page .vibe,.co-page .rc-outcome,.co-page .rc-meta,.co-page .rc-src,.co-page .rc-via,.lp2-trust-l,.ac-eyebrow,.ac-meta,.ac-panel-title,.ac-panel-status,.ac-tile-l,.ac-tile-p,.ac-mrow-l,.ac-mrow-mid,.ac-mrow-arrow,.ac-panel-foot,.ac-attn-t,.ac-attn-d,.ac-attn-act,.ac-allclear,.ac-badge,.ac-btn,.ac-adv>summary,.ac-modal-sub,.ac-modal-search input,.ac-acct-email,.ac-acct-age,.a2-eyebrow,.a2-build,.a2-pill,.a2-card-l,.a2-card-p,.a2-card-sec,.a2-queue-ttl,.a2-queue-count,.a2-queue-empty,.a2-attn-sev,.a2-attn-t,.a2-attn-d,.a2-attn-act,.a2-tab,.a2-overview-hint,.ai-tab{font-size:.75rem}
+  .hstat-l,.adm-panel-hdr,.co-page .rc-srclink{font-size:.75rem!important}
+  .sring-l,.hs-c-lbl,.hs-m-lbl,.hs-m-avg,.dpill-l{font-size:.69rem}
+  /* The listing score ring (JobCard sets width/height 46 inline): 11px "CAUTION" needs a 56px ring; min-width wins over the inline width. */
+  .sring{min-width:56px;min-height:56px}
+  .sring-l{letter-spacing:0}
+  [style*="font-size:.42rem"],[style*="font-size: 0.42rem"],[style*="font-size:.44rem"],[style*="font-size: 0.44rem"],[style*="font-size:.46rem"],[style*="font-size: 0.46rem"],[style*="font-size:.48rem"],[style*="font-size: 0.48rem"],[style*="font-size:.5rem"],[style*="font-size: 0.5rem"],[style*="font-size:.52rem"],[style*="font-size: 0.52rem"],[style*="font-size:.53rem"],[style*="font-size: 0.53rem"],[style*="font-size:.54rem"],[style*="font-size: 0.54rem"],[style*="font-size:.55rem"],[style*="font-size: 0.55rem"],[style*="font-size:.56rem"],[style*="font-size: 0.56rem"],[style*="font-size:.57rem"],[style*="font-size: 0.57rem"],[style*="font-size:.58rem"],[style*="font-size: 0.58rem"],[style*="font-size:.6rem"],[style*="font-size: 0.6rem"],[style*="font-size:.62rem"],[style*="font-size: 0.62rem"],[style*="font-size:.64rem"],[style*="font-size: 0.64rem"],[style*="font-size:.65rem"],[style*="font-size: 0.65rem"],[style*="font-size:.66rem"],[style*="font-size: 0.66rem"],[style*="font-size:.68rem"],[style*="font-size: 0.68rem"],[style*="font-size:.7rem"],[style*="font-size: 0.7rem"],[style*="font-size:.72rem"],[style*="font-size: 0.72rem"],[style*="font-size:.74rem"],[style*="font-size: 0.74rem"]{font-size:.75rem!important}
+  button:not(nav *,.side-menu *,[class*="TabBar"] *,[class*="CommandPalette"] *),[role=button]:not(nav *,[class*="TabBar"] *),select,textarea,input:not([type=checkbox],[type=radio],[type=range],[type=hidden],[type=file]),a.btn,a.co-chip,a.co-act,a.co-live,.analyze-btn,.tap{min-height:44px}
+  button:not(nav *,.side-menu *,[class*="TabBar"] *,[class*="CommandPalette"] *){min-width:44px}
+  .tap{display:inline-flex;align-items:center;min-width:44px}
+  /* Leaderboard tiles (/companies): 1fr tracks have min-width:auto, so a nowrap "100/100 · 11R" line pushed
+     the 2-up grid 10px past a 360px viewport; the jobs page wrapper is a fit-content flex child and did the same. */
+  .ldr-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .ldr-item{min-width:0;padding:1.2rem .7rem}
+  .jpage{width:100%;min-width:0}
+  .co-chip,.feed-filter-btn,.qtag{padding-top:0;padding-bottom:0;display:inline-flex;align-items:center}
+  /* Company SEO prose links (app/company/[slug]/layout.tsx) and the jobs page 📍 button: the 44px floor
+     applied here so the inline-styled markup (owned elsewhere) needs no change; the location input
+     clears the now 44px-wide button. */
+  .co-seo [role=navigation] a{display:inline-flex;align-items:center;min-height:44px}
+  button[title="Use my location"]{right:0!important;width:44px}
+  input:has(+ button[title="Use my location"]){padding-right:2.9rem!important}
+}
+/* Pricing "Full comparison" rows (app/pricing): the value columns shrink on phones instead of forcing
+   a 380px minimum that clipped the Pro column at 390px wide. */
+.pr-cmp-row{display:grid;grid-template-columns:minmax(0,1fr) 100px 100px;gap:1rem;align-items:center;padding:.65rem 1.25rem;border-top:1px solid var(--line)}
+.pr-cmp-head{background:var(--raised);border-top:0}
+@media(max-width:480px){.pr-cmp-row{grid-template-columns:minmax(0,1fr) 68px 68px;gap:.5rem;padding:.65rem .85rem}}
