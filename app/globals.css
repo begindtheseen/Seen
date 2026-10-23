@@ -1775,6 +1775,11 @@ body.modal-open .site-main,body.modal-open .site-main *,body.modal-open nav,body
   button:not(nav *,.side-menu *,[class*="TabBar"] *,[class*="CommandPalette"] *),[role=button]:not(nav *,[class*="TabBar"] *),select,textarea,input:not([type=checkbox],[type=radio],[type=range],[type=hidden],[type=file]),a.btn,a.co-chip,a.co-act,a.co-live,.analyze-btn,.tap{min-height:44px}
   button:not(nav *,.side-menu *,[class*="TabBar"] *,[class*="CommandPalette"] *){min-width:44px}
   .tap{display:inline-flex;align-items:center;min-width:44px}
+  /* Inline text links in prose (no class: FAQ/contact/legal mail links, "Tell us", "+ N more…"): vertical
+     padding on an inline element grows the tap box to 44px without moving the line it sits in. Chips that
+     are links (.dchip) become 44px rows. */
+  .site-main a:not([class]){padding-block:.9rem;padding-inline:.3rem;margin-inline:-.3rem}
+  .dchip{display:inline-flex;align-items:center;min-height:44px}
   /* Leaderboard tiles (/companies): 1fr tracks have min-width:auto, so a nowrap "100/100 · 11R" line pushed
      the 2-up grid 10px past a 360px viewport; the jobs page wrapper is a fit-content flex child and did the same. */
   .ldr-grid{grid-template-columns:repeat(2,minmax(0,1fr))}

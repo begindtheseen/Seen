@@ -100,7 +100,8 @@ export default function SavedPage() {
                         rel="noopener noreferrer"
                         onClick={e => e.stopPropagation()}
                         title="Open original posting"
-                        style={{ fontFamily: 'var(--mono)', fontSize: '.6rem', color: 'var(--sub)', textDecoration: 'none', border: '1px solid var(--line2)', borderRadius: 6, padding: '.3rem .5rem' }}
+                        className="tap"
+                        style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-60)', color: 'var(--sub)', textDecoration: 'none', border: '1px solid var(--line2)', borderRadius: 6, padding: '.3rem .5rem' }}
                       >Apply ↗</a>
                     )}
                     <button
