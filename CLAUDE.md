@@ -50,6 +50,32 @@ and dashboard (PRs #122/#123) were intentionally REDESIGNED beyond the old site;
 longer the design source of truth for redesigned pages. `SITE_PARITY_CHECKLIST.md` /
 `ADMIN_PARITY_CHECKLIST.md` are frozen pre-06-30 records, not an active work queue.
 
+## Session 2026-10-23 B: PR #351 merged + second audit (desktop + phone, same method) — verdict: public beta ready
+- **Merged** PR #351 as squash a8cfb08 at the owner's word ("Merging now"); Vercel production deployment fired from the
+  merge and seenjobs.io served it within ~45 s (verified: /contact 200, FAQ names the founder). Draft PR #352 carries one
+  follow-up (verify screen detects confirmation from another device).
+- **Second audit** ran against the PR preview (Vercel Authentication: `get_access_to_vercel_url` share link, cookie set by
+  one visit, valid ~23 h — a push redeploys the branch alias and the share no longer applies, so NEVER push the audited
+  branch mid-audit; back up commits to a `claude/wip-*` branch instead). New account `jordan.avery.audit2@seenjobs.io`
+  (seenjobs.io addresses are readable via Resend receiving — that is how confirmation/reset emails are read).
+  Report: session scratchpad `audit2/REPORT-v2.md`. Desktop 26 pass / 7 partial / 0 fail; phone 30 / 5 / 0 (morning:
+  24 / 4 / 8). Blockers: credits, search, tracker, phone minimums, credibility, sessions FIXED; deck, company pages,
+  optimize, signup PARTLY. Remaining (reported, not fixed): company-page counts from two denominators (header =
+  first-party applicant reports, section = every community row), Reddit threads/quotes that read scraped + stored
+  "Reddit r/r/" platforms, ATS slugs as company names ("plscareers"), Studio button "Upload a file · 1 credit"
+  (`app/resume/studio/page.tsx:257`), résumé rail reads only `profiles.city`, Optimize output quality, thin/foreign
+  Phoenix inventory, micro-survey after withdraw/on 404, résumé keys left in localStorage after sign-out
+  (`seen_resume_<uid>`, `seen_resume_meta_<uid>`, `seen_profile_v2_<uid>` are not in the auth.tsx sweep).
+- **Supabase auth facts verified with real emails:** a redirect path on the Site URL's own origin IS honoured
+  (reset link kept `/reset`), so `/dashboard` works in prod with the EMPTY `uri_allow_list`; any other origin (a
+  preview) is replaced by the Site URL root. The "Forgot password" page's 8-digit code is real: the magic-link
+  template carries `{{ .Token }}` (otp length 8, 1 h); Settings' reset uses the recovery LINK template. Writing
+  `uri_allow_list` via the Management API was refused by the session's classifier — owner's dashboard action if a
+  preview ever needs it.
+- **Verify-screen lesson:** `getUser()` polling sees a confirmation only in the browser that opened the link; a link
+  tapped on another device never moves the waiting tab on → retry `signInWithPassword` with the typed credentials
+  (PR #352).
+
 ## Session 2026-10-23: launch-readiness audit → the ten blockers fixed (PR #351, branch claude/friendly-sagan-47rfat)
 - **The audit** (two agents as a new job seeker, desktop + iPhone, real account `jordan.avery.audit@seenjobs.io`,
   real résumé, 39-point research rubric; report in the session scratchpad `audit/REPORT.md`) found 10 trust
