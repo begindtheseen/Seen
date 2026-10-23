@@ -8,6 +8,25 @@ import { aiHeaders } from '@/lib/aiHeaders'
 import { notify } from '@/lib/notify'
 import type { Job } from '@/lib/types'
 import { takesSeenApply } from '@/lib/seenApplyMode'
+import { trackApplyClick } from '@/lib/trackApply'
+import { RESUME_OPTIMIZE_COST, creditCostLabel } from '@/lib/creditRules'
+import ApplyCheckpoint from '@/components/ApplyCheckpoint'
+
+// The optimize action's price, rendered from the credit rules so the label can never drift.
+const OPTIMIZE_PRICE = creditCostLabel(RESUME_OPTIMIZE_COST)
+
+// Secondary (outlined) action next to the primary Apply — the paid optimizer. Inline because
+// globals.css is owned elsewhere; mirrors .jlc-apply's shape without its gradient.
+// The price must never be clipped: the label may wrap to "Optimize ·" / "1 credit" on a
+// narrow phone, so the number is always visible.
+const optimizeBtn: React.CSSProperties = {
+  background: 'rgba(99,102,241,.08)', color: '#a5b4fc', border: '1px solid rgba(99,102,241,.35)',
+  borderRadius: 8, padding: '.55rem .5rem', fontFamily: 'var(--display)', fontWeight: 800, fontSize: '.74rem', lineHeight: 1.15,
+  cursor: 'pointer', textAlign: 'center', minWidth: 0,
+}
+// Split row: a grid with minmax(0, 1fr) tracks so the row's min-content can never widen the
+// page on a phone (a flex row of nowrap buttons did exactly that at 390px — CLAUDE.md phone rule).
+const splitRow: React.CSSProperties = { display: 'grid', gridTemplateColumns: 'auto minmax(0, 1fr) minmax(0, 1fr)', alignItems: 'stretch' }
 
 function jobVibes(job: Job): { cls: string; txt: string }[] {
   const vibes: { cls: string; txt: string }[] = []
@@ -48,6 +67,8 @@ export default function JobCard({ job, index, onSaveToggle, onOpen, onApply, onC
   const [saved, setSaved] = useState(() => SavedJobsStore.isSaved(job.id))
   const [reportedInactive, setReportedInactive] = useState(false)
   const [reportingInactive, setReportingInactive] = useState(false)
+  // After a plain "Apply ↗" the existing tracker checkpoint offers "Did you apply? → track it".
+  const [checkpoint, setCheckpoint] = useState(false)
   const { user, isLoggedIn } = useAuth()
   const logoLetter = (job.company || '?')[0].toUpperCase()
 
@@ -163,7 +184,10 @@ export default function JobCard({ job, index, onSaveToggle, onOpen, onApply, onC
         🏢 Check {job.company} →
       </button>
 
-      <div className="jlc-actions">
+      {/* Two separate actions (2026-10-23): "Apply ↗" is FREE — it opens the listing in a new
+          tab and offers tracking; "Optimize · 1 credit" is the paid optimizer. One tap never
+          spends a credit the person did not ask for. */}
+      <div className="jlc-actions" style={!takesSeenApply(job) && job.apply_url ? splitRow : undefined}>
         <button
           className="jlc-save"
           data-saved={saved ? '1' : '0'}
@@ -172,14 +196,36 @@ export default function JobCard({ job, index, onSaveToggle, onOpen, onApply, onC
         >
           {saved ? '♥' : '♡'}
         </button>
-        <button
-          className="jlc-apply"
-          onClick={e => { e.stopPropagation(); onApply(job) }}
-          disabled={!job.apply_url && !takesSeenApply(job)}
-        >
-          {takesSeenApply(job) ? 'Apply on Seen →' : <>Apply &amp; Optimize →</>}
-        </button>
+        {takesSeenApply(job) ? (
+          <button className="jlc-apply" onClick={e => { e.stopPropagation(); onApply(job) }}>Apply on Seen →</button>
+        ) : job.apply_url ? (
+          <>
+            <a
+              className="jlc-apply"
+              href={job.apply_url}
+              target="_blank"
+              rel="noopener noreferrer"
+              data-testid="apply-link"
+              style={{ textDecoration: 'none', minWidth: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+              onClick={e => { e.stopPropagation(); trackApplyClick(job); setCheckpoint(true) }}
+            >
+              Apply ↗
+            </a>
+            <button
+              type="button"
+              style={optimizeBtn}
+              data-testid="optimize-btn"
+              title={`Optimize your résumé for this job · ${OPTIMIZE_PRICE}`}
+              onClick={e => { e.stopPropagation(); onApply(job) }}
+            >
+              Optimize · {OPTIMIZE_PRICE.replace(' ', '\u00a0')}
+            </button>
+          </>
+        ) : (
+          <button className="jlc-apply" disabled style={{ opacity: .45, cursor: 'not-allowed' }}>No apply link</button>
+        )}
       </div>
+      {checkpoint && <ApplyCheckpoint job={job} onClose={() => setCheckpoint(false)} />}
 
       <button
         onClick={() => onOpen(job)}

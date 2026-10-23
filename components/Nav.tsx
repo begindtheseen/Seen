@@ -8,6 +8,8 @@ import { useAuth } from '@/lib/auth'
 import { supabase } from '@/lib/supabase'
 import UpgradeModal from './UpgradeModal'
 import NotificationsBell from './NotificationsBell'
+import CreditsPopover from './CreditsPopover'
+import { dailyResetLabel } from '@/lib/creditRules'
 import styles from './Nav.module.css'
 
 // The earn-credits flow: the résumé survey (asks about the user's past employers).
@@ -68,6 +70,9 @@ export default function Nav() {
   const [moreOpen, setMoreOpen] = useState(false)
   const [acctOpen, setAcctOpen] = useState(false)
   const [creditBalance, setCreditBalance] = useState<number | null>(null)
+  // Credits chip popover (components/CreditsPopover.tsx) + the get_credits facts it shows.
+  const [creditsOpen, setCreditsOpen] = useState(false)
+  const [creditInfo, setCreditInfo] = useState<{ daily_earned?: number | null; max_daily_earn?: number | null; welcome?: boolean }>({})
   const [isPro, setIsPro] = useState(false)
   const [showUpgrade, setShowUpgrade] = useState(false)
   const [showSurvey, setShowSurvey] = useState(false)
@@ -87,8 +92,11 @@ export default function Nav() {
           body: JSON.stringify({ action: 'get_credits' }),
         })
         if (!res.ok || cancelled) return
-        const data = await res.json() as { balance?: number; pro?: boolean }
-        if (!cancelled) { setCreditBalance(data.pro ? 999 : (data.balance ?? null)); setIsPro(!!data.pro) }
+        const data = await res.json() as { balance?: number; pro?: boolean; daily_earned?: number | null; max_daily_earn?: number | null; welcome?: boolean }
+        if (!cancelled) {
+          setCreditBalance(data.pro ? 999 : (data.balance ?? null)); setIsPro(!!data.pro)
+          setCreditInfo({ daily_earned: data.daily_earned ?? null, max_daily_earn: data.max_daily_earn ?? null, welcome: !!data.welcome })
+        }
       } catch { /* ignore */ }
     })
     return () => { cancelled = true }
@@ -253,17 +261,30 @@ export default function Nav() {
             </Link>
           )}
           {isSeeker && !isPro && creditBalance !== null && (
-            <button
-              className={`${styles.chip}${creditBalance === 0 ? ' ' + styles.chipZero : ''}`}
-              title={creditBalance === 0
-                ? 'Out of AI credits — upgrade or earn more by tracking applications and answering surveys'
-                : `${creditBalance} AI credit${creditBalance === 1 ? '' : 's'} available`}
-              onClick={() => creditBalance === 0 ? setShowUpgrade(true) : setShowSurvey(true)}
-            >
-              <span className={styles.chipSpark} />
-              <b>{creditBalance}</b>
-              <span className={styles.chipLabel}>{creditBalance === 0 ? 'credits · top up' : `credit${creditBalance === 1 ? '' : 's'}`}</span>
-            </button>
+            <span style={{ position: 'relative', display: 'inline-flex' }}>
+              <button
+                className={`${styles.chip}${creditBalance === 0 ? ' ' + styles.chipZero : ''}`}
+                data-credits-chip
+                aria-haspopup="dialog"
+                aria-expanded={creditsOpen}
+                title={creditBalance === 0
+                  ? `Out of AI credits — ${dailyResetLabel()}. Tap for ways to get more.`
+                  : `${creditBalance} AI credit${creditBalance === 1 ? '' : 's'} available · ${dailyResetLabel()}`}
+                onClick={() => setCreditsOpen(o => !o)}
+              >
+                <span className={styles.chipSpark} />
+                <b>{creditBalance}</b>
+                <span className={styles.chipLabel}>{creditBalance === 0 ? 'credits · top up' : `credit${creditBalance === 1 ? '' : 's'}`}</span>
+              </button>
+              {creditsOpen && (
+                <CreditsPopover
+                  info={{ balance: creditBalance, ...creditInfo }}
+                  onClose={() => setCreditsOpen(false)}
+                  onEarn={() => setShowSurvey(true)}
+                  onUpgrade={() => setShowUpgrade(true)}
+                />
+              )}
+            </span>
           )}
 
           {/* Application updates — a bell that opens a modal (components/NotificationsBell.tsx). */}

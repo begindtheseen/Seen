@@ -108,11 +108,12 @@ export default async function handler(req, res) {
   }
 
   // ── Route: parse — formerly api/parse-resume.js, folded in to stay at 11 functions ──
+  // FREE (RESUME_PARSE_COST = 0, lib/server/creditRules.js): handleParseResume is file→text
+  // extraction + rule-based structuring with NO model call, so it is rate-limited only — never
+  // credit-gated. Signed-out callers can parse too (the result is returned, not stored).
   if (body.action === 'parse' || body.base64) {
     if (req.method !== 'POST') return res.status(405).end('Method not allowed');
     if (await applyRateLimit(req, res, 'parse-resume')) return;
-    const gate = await gateAI(req, 'parse_resume');
-    if (!gate.ok) return res.status(gate.status).json({ error: gate.error, credits_required: gate.credits_required, balance: gate.balance ?? 0 });
     return handleParseResume(req, res, body);
   }
 
@@ -215,7 +216,7 @@ async function handleParseResume(req, res, body) {
     catch(_) { employment = []; }
 
     // Résumé Studio: the structured document (+ health score + how much of the raw text it
-    // covers) from the same extraction, so one upload = one credit = everything the Studio needs.
+    // covers) from the same extraction, so one upload = everything the Studio needs.
     // Best-effort: a structuring failure never fails the upload (the text path still works).
     let studio = null;
     try { studio = structureText({ text: extractedText, lines, source: fileType, fileName, layout }); }
