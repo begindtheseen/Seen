@@ -61,27 +61,8 @@ export default function CompaniesPage() {
   const [search, setSearch] = useState('')
   const [sort, setSort] = useState<SortKey>('score')
   const [lookup, setLookup] = useState('')
-  const [showLookupSuggs, setShowLookupSuggs] = useState(false)
   const [appliedCos, setAppliedCos] = useState<Set<string>>(new Set())
   const [modalCo, setModalCo] = useState<string | null>(null)
-
-  // Instant company autocomplete for the lookup field — filters the already-loaded leaderboard
-  // (companies with scores) locally. Prefix matches rank first; free text still works for any
-  // company not yet scored (the lookup then web-researches it).
-  const lookupSuggs = useMemo(() => {
-    const q = lookup.trim().toLowerCase()
-    if (q.length < 2) return []
-    const starts: Company[] = []
-    const contains: Company[] = []
-    for (const c of companies) {
-      const n = c.name.toLowerCase()
-      if (n === q) continue
-      if (n.startsWith(q)) starts.push(c)
-      else if (n.includes(q)) contains.push(c)
-      if (starts.length >= 6) break
-    }
-    return [...starts, ...contains].slice(0, 6)
-  }, [companies, lookup])
 
   useEffect(() => {
     try {
@@ -185,12 +166,14 @@ export default function CompaniesPage() {
               placeholder="Look up any company — Google, Stripe, Tesla..."
               aria-label="Look up a company"
               value={lookup}
-              onChange={(e) => { setLookup(e.target.value); setShowLookupSuggs(true) }}
-              onFocus={(e) => { e.currentTarget.style.borderColor = 'var(--blue)'; setShowLookupSuggs(true) }}
-              onBlur={(e) => {
-                e.currentTarget.style.borderColor = 'rgba(99,102,241,.3)'
-                setTimeout(() => setShowLookupSuggs(false), 150)
-              }}
+              name="seen-company-lookup"
+              autoComplete="off"
+              autoCorrect="off"
+              spellCheck={false}
+              enterKeyHint="search"
+              onChange={(e) => setLookup(e.target.value)}
+              onFocus={(e) => { e.currentTarget.style.borderColor = 'var(--blue)' }}
+              onBlur={(e) => { e.currentTarget.style.borderColor = 'rgba(99,102,241,.3)' }}
               style={{
                 width: '100%',
                 boxSizing: 'border-box',
@@ -206,26 +189,6 @@ export default function CompaniesPage() {
                 boxShadow: '0 0 24px rgba(99,102,241,.08)',
               }}
             />
-            {showLookupSuggs && lookupSuggs.length > 0 && (
-              <div style={{ position: 'absolute', top: 'calc(100% + 4px)', left: 0, right: 0, zIndex: 30, background: 'var(--surface, #0c0f1a)', border: '1px solid rgba(99,102,241,.3)', borderRadius: 10, overflow: 'hidden', boxShadow: '0 12px 32px rgba(0,0,0,.5)' }}>
-                {lookupSuggs.map((c) => (
-                  <button
-                    key={c.name}
-                    type="button"
-                    onMouseDown={(e) => {
-                      e.preventDefault()
-                      setLookup(c.name)
-                      setShowLookupSuggs(false)
-                      router.push(`/company/${encodeURIComponent(c.name.toLowerCase().replace(/\s+/g, '-'))}`)
-                    }}
-                    style={{ display: 'flex', width: '100%', textAlign: 'left', alignItems: 'center', justifyContent: 'space-between', gap: '.6rem', background: 'none', border: 'none', borderBottom: '1px solid var(--line2)', padding: '.55rem .85rem', cursor: 'pointer', color: 'var(--white)', fontFamily: 'var(--mono)', fontSize: 'var(--fs-72)' }}
-                  >
-                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{displayCompanyName(c.name)}</span>
-                    <span style={{ flexShrink: 0, color: 'var(--dim)', fontSize: 'var(--fs-60)' }}>{Math.round(c.score.overall_score)}/100 · {reportsLabel(c.score)}</span>
-                  </button>
-                ))}
-              </div>
-            )}
             </div>
             <button
               type="submit"
@@ -270,7 +233,7 @@ export default function CompaniesPage() {
             marginBottom: '1.5rem',
           }}
         >
-          <input
+          <input autoComplete="off"
             type="text"
             placeholder="Filter scoreboard..."
             aria-label="Filter the scoreboard"

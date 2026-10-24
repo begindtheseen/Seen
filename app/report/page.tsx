@@ -428,22 +428,22 @@ function ReportPage() {
                     <button type="button" onClick={() => setCompanyLocked(false)} style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', fontFamily: 'var(--mono)', fontSize: '.6rem', color: 'var(--blue)', flexShrink: 0 }}>change</button>
                   </div>
                 ) : (
-                  <input type="text" placeholder="e.g. Stripe" value={company} onChange={e => setCompany(e.target.value)} style={inputStyle} />
+                  <input autoComplete="off" type="text" placeholder="e.g. Stripe" value={company} onChange={e => setCompany(e.target.value)} style={inputStyle} />
                 )}
               </div>
               <div>
                 {lbl('Job title *')}
-                <input ref={roleRef} type="text" placeholder="e.g. Software Engineer" value={role} onChange={e => setRole(e.target.value)} style={inputStyle} />
+                <input autoComplete="off" ref={roleRef} type="text" placeholder="e.g. Software Engineer" value={role} onChange={e => setRole(e.target.value)} style={inputStyle} />
               </div>
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '.75rem' }}>
               <div>
                 {lbl('City, State *')}
-                <input ref={locationRef} type="text" placeholder="e.g. Austin, TX" value={location} onChange={e => setLocation(e.target.value)} style={inputStyle} />
+                <input autoComplete="off" ref={locationRef} type="text" placeholder="e.g. Austin, TX" value={location} onChange={e => setLocation(e.target.value)} style={inputStyle} />
               </div>
               <div>
                 {lbl('Platform (optional)')}
-                <input type="text" placeholder="LinkedIn, Indeed, Greenhouse..." value={platform} onChange={e => setPlatform(e.target.value)} style={inputStyle} />
+                <input autoComplete="off" type="text" placeholder="LinkedIn, Indeed, Greenhouse..." value={platform} onChange={e => setPlatform(e.target.value)} style={inputStyle} />
               </div>
             </div>
           </div>

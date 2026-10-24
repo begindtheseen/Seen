@@ -818,9 +818,9 @@ function ResumePageInner() {
               {(showManual || savedJobs.length === 0) && (
                 <div>
                   {label('Job title')}
-                  <input type="text" placeholder="e.g. Cashier" value={jobTitle} onChange={e => setJobTitle(e.target.value)} style={inputStyle} />
+                  <input autoComplete="off" type="text" placeholder="e.g. Cashier" value={jobTitle} onChange={e => setJobTitle(e.target.value)} style={inputStyle} />
                   {label('Company')}
-                  <input type="text" placeholder="e.g. Target" value={jobCompany} onChange={e => setJobCompany(e.target.value)} onBlur={() => fetchIntel(jobCompany)} style={inputStyle} />
+                  <input autoComplete="off" type="text" placeholder="e.g. Target" value={jobCompany} onChange={e => setJobCompany(e.target.value)} onBlur={() => fetchIntel(jobCompany)} style={inputStyle} />
                   {label('Job URL (optional)')}
                   <input type="url" placeholder="https://…" value={jobUrl} onChange={e => setJobUrl(e.target.value)} style={inputStyle} />
                   {label('Job description')}

@@ -8,7 +8,6 @@ import { _sync } from '@/lib/sync'
 import { markIntentionalSignOut } from '@/lib/sessionExpired'
 import { proPriceLine } from '@/lib/pricing'
 import { aiHeaders } from '@/lib/aiHeaders'
-import { matchCities } from '@/lib/data/usCities'
 import { ResumeStore } from '@/lib/stores/ResumeStore'
 import { parseResumeFile } from '@/lib/resumeUploadClient'
 import PageHeader from '@/components/shell/PageHeader'
@@ -33,7 +32,6 @@ function writeProfileCache(uid: string | undefined, p: CachedProfile) {
   try { localStorage.setItem(`seen_profile_v2_${uid}`, JSON.stringify(p)) } catch { /* quota — ignore */ }
 }
 
-type LocResult = { display: string }
 
 export default function ProfilePage() {
   const router = useRouter()
@@ -72,9 +70,6 @@ export default function ProfilePage() {
   const isDirty = name !== initName || city !== initCity || experience !== initExperience
 
   // City autocomplete
-  const [citySuggs, setCitySuggs] = useState<LocResult[]>([])
-  const [showCitySuggs, setShowCitySuggs] = useState(false)
-  const cityContainerRef = useRef<HTMLDivElement>(null)
 
   // Password change (send-link flow)
   const [linkSending, setLinkSending] = useState(false)
@@ -193,26 +188,9 @@ export default function ProfilePage() {
     setPortalLoading(false)
   }
 
-  // Close suggestions on outside click
-  useEffect(() => {
-    function handle(e: MouseEvent) {
-      if (cityContainerRef.current && !cityContainerRef.current.contains(e.target as Node)) {
-        setShowCitySuggs(false)
-      }
-    }
-    document.addEventListener('mousedown', handle)
-    return () => document.removeEventListener('mousedown', handle)
-  }, [])
-
-  // Instant, offline city suggestions — filters the bundled US_CITIES list locally instead of
-  // hitting a slow public geocoder (Nominatim) on every keystroke.
   function onCityInput(val: string) {
     touched.current.city = true
     setCity(val)
-    if (val.trim().length < 2) { setCitySuggs([]); setShowCitySuggs(false); return }
-    const results: LocResult[] = matchCities(val, 6).map(display => ({ display }))
-    setCitySuggs(results)
-    setShowCitySuggs(results.length > 0)
   }
 
   async function saveProfile() {
@@ -400,7 +378,7 @@ export default function ProfilePage() {
                   <label className={styles.label} htmlFor="pf-email">Email</label>
                   <input id="pf-email" className={styles.input} type="email" value={user?.email || ''} disabled />
                 </div>
-                <div className={styles.field} style={{ position: 'relative' }} ref={cityContainerRef}>
+                <div className={styles.field}>
                   <label className={styles.label} htmlFor="pf-city">Your city</label>
                   {loaded ? (
                     <input
@@ -411,17 +389,9 @@ export default function ProfilePage() {
                       autoComplete="off"
                       value={city}
                       onChange={e => onCityInput(e.target.value)}
-                      onFocus={() => { if (citySuggs.length) setShowCitySuggs(true) }}
                       placeholder="e.g. Los Angeles, CA"
                     />
                   ) : <div className={styles.skeleton} />}
-                  {showCitySuggs && citySuggs.length > 0 && (
-                    <div className={styles.suggs}>
-                      {citySuggs.map((s, i) => (
-                        <div key={i} className={styles.sugg} onMouseDown={e => { e.preventDefault(); setCity(s.display); setShowCitySuggs(false) }}>{s.display}</div>
-                      ))}
-                    </div>
-                  )}
                   <div className={styles.hint}>Auto-loads nearby listings on the Jobs page.</div>
                 </div>
                 <div className={styles.field}>

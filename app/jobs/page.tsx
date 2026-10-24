@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useRef, Fragment } from 'react'
+import { useState, Fragment } from 'react'
 import { useRouter } from 'next/navigation'
 import type { Job } from '@/lib/types'
 import { trackApplyClick } from '@/lib/trackApply'
@@ -14,9 +14,8 @@ import ResumeMatches from '@/components/jobs/ResumeMatches'
 import ApplyCheckpoint from '@/components/ApplyCheckpoint'
 import ApplyOptimizeModal from '@/components/ApplyOptimizeModal'
 import { notify } from '@/lib/notify'
-import { matchCities } from '@/lib/data/usCities'
 import { takesSeenApply } from '@/lib/seenApplyMode'
-import { useCompanySuggestions, CompanySuggestList, CompanyResultCard } from '@/components/jobs/CompanySuggest'
+import { useCompanySuggestions, CompanyResultCard } from '@/components/jobs/CompanySuggest'
 import PageHeader from '@/components/shell/PageHeader'
 import { LoadError } from '@/components/shell/LoadStates'
 import { resultsView } from '@/lib/searchView.js'
@@ -37,8 +36,7 @@ export default function JobsPage() {
     isLoggedIn,
     query, setQuery,
     location, setLocation,
-    locSuggs, setLocSuggs,
-    showLocSuggs, setShowLocSuggs,
+    committedQuery,
     gpsLoading,
     radius, setRadius,
     niche, setNiche,
@@ -80,10 +78,10 @@ export default function JobsPage() {
   // When the checkpoint is opened AFTER the user already confirmed applying (the Apply &
   // Optimize funnel), it should record the application immediately rather than re-ask.
   const [checkpointAuto, setCheckpointAuto] = useState(false)
-  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  // Company search in the same box: matching companies under the input, card above results.
-  const coSuggs = useCompanySuggestions(query)
-  const [showCoSuggs, setShowCoSuggs] = useState(false)
+  // No autofill (owner 2026-10-24: "I hate the autofill… gets in the way"): no lists under the boxes and
+  // no searching while typing. A search runs on Enter or the Search button. When the search that RAN
+  // names a company, its card shows above the results.
+  const coSuggs = useCompanySuggestions(status === 'done' ? committedQuery : '')
 
   function handleSaveToggle() {
     setSaveVersion(v => v + 1)
@@ -119,9 +117,6 @@ export default function JobsPage() {
     try { await navigator.clipboard.writeText(window.location.href); setCopied(true); setTimeout(() => setCopied(false), 1800) }
     catch { notify({ title: 'Copy this page’s address to share the search', severity: 'info', duration: 2600 }) }
   }
-  // Suggestions never repeat what is already typed (the list used to offer "Phoenix, AZ" under a
-  // typed "Phoenix, AZ" and, on a phone, sit on the Search button).
-  const visibleLocSuggs = locSuggs.filter(c => c.toLowerCase() !== location.trim().toLowerCase())
 
   return (
     <>
@@ -137,7 +132,7 @@ export default function JobsPage() {
             className="jpage-head"
           />
 
-          {/* Search bar — job titles AND company names in the same box (CompanySuggest.tsx) */}
+          {/* Search bar — job titles AND company names in the same box. No autofill: Enter / Search runs it. */}
           <div className={bar.wrap}>
             <div className={bar.query}>
             <input
@@ -146,31 +141,15 @@ export default function JobsPage() {
               placeholder="Job title, role or company..."
               aria-label="Job title, role or company"
               value={query}
-              onFocus={() => setShowCoSuggs(true)}
-              onBlur={() => setTimeout(() => setShowCoSuggs(false), 150)}
-              onChange={e => {
-                const val = e.target.value
-                setQuery(val)
-                if (debounceRef.current) clearTimeout(debounceRef.current)
-                if (val.trim().length >= 2) {
-                  // Auto-search the settled value only; it never becomes the URL (commit:false) and an
-                  // Enter for the same search right after sends no second request (useJobSearch).
-                  debounceRef.current = setTimeout(() => searchJobs(val, undefined, { commit: false }), 450)
-                }
-              }}
-              onKeyDown={e => { if (e.key === 'Enter') { if (debounceRef.current) clearTimeout(debounceRef.current); setShowCoSuggs(false); searchJobs() } }}
+              name="seen-job-query"
+              autoComplete="off"
+              autoCorrect="off"
+              autoCapitalize="off"
+              spellCheck={false}
+              enterKeyHint="search"
+              onChange={e => setQuery(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter') searchJobs() }}
             />
-            {showCoSuggs && (
-              <CompanySuggestList
-                items={coSuggs}
-                onPick={name => {
-                  if (debounceRef.current) clearTimeout(debounceRef.current)
-                  setQuery(name)
-                  setShowCoSuggs(false)
-                  searchJobs(name)
-                }}
-              />
-            )}
             </div>
             <div className={bar.row}>
               <div className={bar.loc}>
@@ -180,26 +159,13 @@ export default function JobsPage() {
                   placeholder="City or state..."
                   aria-label="City or state"
                   value={location}
-                  onChange={e => {
-                    const val = e.target.value
-                    // Still composing the search: a pending auto-search for the title alone (with the
-                    // old location) is dropped — Enter / Search sends the whole search once.
-                    if (debounceRef.current) { clearTimeout(debounceRef.current); debounceRef.current = null }
-                    setLocation(val)
-                    if (val.length >= 2) {
-                      setLocSuggs(matchCities(val, 6))
-                      setShowLocSuggs(true)
-                    } else {
-                      setShowLocSuggs(false)
-                    }
-                  }}
-                  // Enter searches AND closes the suggestion list (it used to stay open over the
-                  // Search button); Esc just closes it.
-                  onKeyDown={e => {
-                    if (e.key === 'Enter') { setShowLocSuggs(false); searchJobs() }
-                    else if (e.key === 'Escape') setShowLocSuggs(false)
-                  }}
-                  onBlur={() => setTimeout(() => setShowLocSuggs(false), 150)}
+                  name="seen-job-location"
+                  autoComplete="off"
+                  autoCorrect="off"
+                  spellCheck={false}
+                  enterKeyHint="search"
+                  onChange={e => setLocation(e.target.value)}
+                  onKeyDown={e => { if (e.key === 'Enter') searchJobs() }}
                 />
                 <button
                   type="button"
@@ -211,13 +177,6 @@ export default function JobsPage() {
                 >
                   {gpsLoading ? '⏳' : '📍'}
                 </button>
-                {showLocSuggs && visibleLocSuggs.length > 0 && (
-                  <div className={bar.suggs} role="listbox" aria-label="Matching cities">
-                    {visibleLocSuggs.map(city => (
-                      <div key={city} className={bar.sugg} onMouseDown={() => { setLocation(city); setShowLocSuggs(false) }}>{city}</div>
-                    ))}
-                  </div>
-                )}
               </div>
               {/* A radius only means something next to a place: with no city the select reads
                   "Anywhere" (Remote stays available) instead of a dangling "25 mi". */}
@@ -277,7 +236,7 @@ export default function JobsPage() {
         )}
 
         {/* The search names a company → its card (grade only when it has enough reviews) */}
-        {status === 'done' && <CompanyResultCard items={coSuggs} searched={query} />}
+        {status === 'done' && <CompanyResultCard items={coSuggs} searched={committedQuery} />}
 
         {/* Results header */}
         <div className="jtb">

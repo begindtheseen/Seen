@@ -136,8 +136,8 @@ export default function TailorPanel({ doc, isLoggedIn, pro, savedJobs, initialJo
           </div>
         )}
         <div className={s.row}>
-          <div><span className={s.label}>Job title</span><input className={s.input} value={job.title} onChange={(e) => setJob({ ...job, title: e.target.value })} placeholder="Sales Associate" /></div>
-          <div><span className={s.label}>Company</span><input className={s.input} value={job.company} onChange={(e) => setJob({ ...job, company: e.target.value })} placeholder="GNC" /></div>
+          <div><span className={s.label}>Job title</span><input autoComplete="off" className={s.input} value={job.title} onChange={(e) => setJob({ ...job, title: e.target.value })} placeholder="Sales Associate" /></div>
+          <div><span className={s.label}>Company</span><input autoComplete="off" className={s.input} value={job.company} onChange={(e) => setJob({ ...job, company: e.target.value })} placeholder="GNC" /></div>
         </div>
         <span className={s.label}>Job description</span>
         <textarea className={`${s.input} ${s.area}`} rows={5} value={job.description} onChange={(e) => setJob({ ...job, description: e.target.value })} placeholder="Paste the posting — requirements, responsibilities, the lot." />

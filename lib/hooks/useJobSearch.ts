@@ -142,8 +142,6 @@ export function useJobSearch() {
   const setLocation = useCallback((v: string) => { setLocationRaw(v); writeStoredLocation(v) }, [])
   const autoSearchedRef = useRef(false)
   const searchedOnceRef = useRef(false) // a real search has run → a radius change should re-search
-  const [locSuggs, setLocSuggs] = useState<string[]>([])
-  const [showLocSuggs, setShowLocSuggs] = useState(false)
   const [gpsLoading, setGpsLoading] = useState(false)
   const [radius, setRadius] = useState('25')
   const [niche, setNiche] = useState<NicheFilter>('')
@@ -189,6 +187,8 @@ export function useJobSearch() {
   // The last COMMITTED search (Enter / Search / a pick / a link) — what the URL shows and "Show more"
   // continues. The debounced auto-search never commits.
   const committedRef = useRef<{ q: string; loc: string; radius: string } | null>(null)
+  // The committed query as state, for what the page shows about the search that ran (the company card).
+  const [committedQuery, setCommittedQuery] = useState('')
   // The search key a request is in flight for — a second call for the same search is dropped.
   const inflightKeyRef = useRef<string | null>(null)
   // A radius set FROM the URL on load: its state change must not re-run the search it came with.
@@ -516,7 +516,7 @@ export function useJobSearch() {
     }
     searchedOnceRef.current = true
     const cacheKey = `${q}|${loc}|${rad}`
-    if (commit) { committedRef.current = { q, loc, radius: rad }; writeUrl({ radius: rad }) }
+    if (commit) { committedRef.current = { q, loc, radius: rad }; setCommittedQuery(q); writeUrl({ radius: rad }) }
     if (inflightKeyRef.current === cacheKey) return // the same search is already on its way
     const cached = searchCache.get(cacheKey)
     const showCached = (c: CachedSearch, refreshing: boolean) => {
@@ -714,8 +714,7 @@ export function useJobSearch() {
     // search inputs
     query, setQuery,
     location, setLocation,
-    locSuggs, setLocSuggs,
-    showLocSuggs, setShowLocSuggs,
+    committedQuery,
     gpsLoading,
     radius, setRadius,
     // filters + sort
