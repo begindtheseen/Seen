@@ -36,13 +36,22 @@ export function checkDueAt(appliedAt: number, day: number): number {
   return pacificDayStart(new Date(appliedAt), day).getTime()
 }
 
+/** Day 30 and later: only the final-outcome question is asked — "did they respond?" is moot by then. */
+export const FINAL_CHECK_DAY = 30
+
+/** The checks still worth asking at this age, in schedule order (audit 3 M7: a 31-day-old card was
+ *  asked the day-7 and day-14 questions before the outcome; a 400-day-old one "DAY 399 · Did they respond?"). */
+export function checksInPlay(appliedAt: number, now = Date.now()) {
+  return daysSince(appliedAt, now) >= FINAL_CHECK_DAY ? CHECK_SCHEDULE.filter(c => c.day === FINAL_CHECK_DAY) : [...CHECK_SCHEDULE]
+}
+
 /**
  * The earliest scheduled check this application has not answered, or null once all three are
  * done. `answered` = the check types already recorded for it (EventStore.hasCheck).
  */
 export function nextCheck(appliedAt: number, answered: Iterable<string>, now = Date.now()): NextCheck | null {
   const done = new Set(answered)
-  const chk = CHECK_SCHEDULE.find(c => !done.has(c.type))
+  const chk = checksInPlay(appliedAt, now).find(c => !done.has(c.type))
   if (!chk) return null
   // Due the moment the California day count reaches `day` — the same clock the card's "Day N" uses.
   const dueAt = checkDueAt(appliedAt, chk.day)
@@ -55,9 +64,17 @@ export function formatCheckDate(ms: number, now = Date.now()): string {
   return formatPacific(ms, sameYear ? { month: 'short', day: 'numeric' } : { month: 'short', day: 'numeric', year: 'numeric' })
 }
 
-/** The one line an active card shows under its stage: null while a check is due (the card asks it instead). */
-export function nextCheckLine(appliedAt: number, answered: Iterable<string>, now = Date.now()): string | null {
+/**
+ * The one line an active card shows under its stage: null while a check is being asked (the card asks
+ * it instead). `snoozedUntil` = when a due check that was put off with "Later" comes back — the card
+ * then says so instead of going quiet (audit 3 M6: after "Later" nothing said when it would return).
+ */
+export function nextCheckLine(appliedAt: number, answered: Iterable<string>, now = Date.now(), snoozedUntil: number | null = null): string | null {
   const n = nextCheck(appliedAt, answered, now)
-  if (!n || n.due) return null
+  if (!n) return null
+  if (n.due) {
+    if (snoozedUntil != null && snoozedUntil > now) return `We'll ask again ${formatCheckDate(snoozedUntil, now)} — ${n.q}`
+    return null
+  }
   return `Next check-in ${formatCheckDate(n.dueAt, now)} — ${n.q}`
 }
