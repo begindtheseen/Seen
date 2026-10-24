@@ -699,6 +699,9 @@ function TrackerPage() {
             {withdrawn.length > 0 && <><span className={s.sep}>·</span><b>{withdrawn.length}</b> withdrawn</>}
           </div>
         )}
+        {/* Hidden when the account could not be read and this device holds nothing: a row of zeros under an
+            error block would still read as "you have no applications" (R-1). */}
+        {!(loadFailed && apps.length === 0) && (
         <div className={`${s.statTiles} ${s.deskOnly}`}>
           {[
             { label: 'Total', n: apps.length },
@@ -714,6 +717,7 @@ function TrackerPage() {
             </div>
           ))}
         </div>
+        )}
 
         {/* Funnel visualization — needs enough applications to mean anything */}
         {apps.length >= 5 && (

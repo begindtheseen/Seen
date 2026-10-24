@@ -212,6 +212,7 @@ export default function DashboardPage() {
   const active = apps.filter(a => a.status === 'active')
   const ghosted = apps.filter(a => a.status === 'ghosted')
   const hired = apps.filter(a => a.status === 'hired')
+  const noData = loadFailed && apps.length === 0
   const dueChecks = EventStore.dueChecks(apps)
   const staleApps = active.filter(a => {
     const sc = coScores[a.company.toLowerCase()]
@@ -359,11 +360,12 @@ export default function DashboardPage() {
                 <p className={styles.healthS}>{healthHead.s}</p>
               </div>
             </div>
+            {/* No numbers from a failed load with nothing local: "0 / 0 / 0" under an error reads as a verdict (R-1). */}
             <div className={styles.pills}>
-              <div className={styles.pill}><small>Open</small><b style={{ color: '#93b4ff' }}><Odometer value={active.length} /></b></div>
-              <div className={styles.pill}><small>Response</small><b style={{ color: '#a5a2ff' }}>{responseNum == null ? '—' : <Odometer value={responseNum} suffix="%" />}</b></div>
-              <div className={styles.pill}><small>Hired</small><b style={{ color: 'var(--green)' }}><Odometer value={hired.length} /></b></div>
-              <div className={styles.pill}><small>Ghosted</small><b style={{ color: '#f87185' }}><Odometer value={ghosted.length} /></b></div>
+              <div className={styles.pill}><small>Open</small><b style={{ color: '#93b4ff' }}>{noData ? '—' : <Odometer value={active.length} />}</b></div>
+              <div className={styles.pill}><small>Response</small><b style={{ color: '#a5a2ff' }}>{noData || responseNum == null ? '—' : <Odometer value={responseNum} suffix="%" />}</b></div>
+              <div className={styles.pill}><small>Hired</small><b style={{ color: 'var(--green)' }}>{noData ? '—' : <Odometer value={hired.length} />}</b></div>
+              <div className={styles.pill}><small>Ghosted</small><b style={{ color: '#f87185' }}>{noData ? '—' : <Odometer value={ghosted.length} />}</b></div>
             </div>
             {apps.length > 0 && <p className={styles.caption}>Based on {apps.length} tracked application{apps.length !== 1 ? 's' : ''}</p>}
           </section>
@@ -373,7 +375,9 @@ export default function DashboardPage() {
               <h2 className={styles.cardT}>Next best move</h2>
               {topMoves.length > 0 && <span className={styles.eyebrow}>{topMoves.length} action{topMoves.length !== 1 ? 's' : ''}</span>}
             </div>
-            {topMoves.length ? topMoves.map((m, i) => (
+            {noData ? (
+              <p className={styles.allClear}>Not loaded — use Retry above.</p>
+            ) : topMoves.length ? topMoves.map((m, i) => (
               <button key={i} type="button" className={styles.move} onClick={m.go}>
                 <span className={styles.sym}>{m.icon}</span>
                 <span style={{ minWidth: 0, flex: 1 }}>
@@ -402,7 +406,9 @@ export default function DashboardPage() {
         </div>
         <div className={styles.row}>
           <section className={`${styles.card} ${styles.tight}`}>
-            {active.length === 0 ? (
+            {noData ? (
+              <p className={styles.allClear}>Your pipeline could not be loaded — use Retry above.</p>
+            ) : active.length === 0 ? (
               <div className={styles.empty}>
                 <b>No open applications</b>
                 <p>Apply to a job and it appears here until you report what happened.</p>
