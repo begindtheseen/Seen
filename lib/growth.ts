@@ -145,6 +145,42 @@ function sbCreds(): { url: string; key: string } | null {
 const fuzzyPattern = (name: string) =>
   encodeURIComponent(String(name).toLowerCase().trim().replace(/[\s-]+/g, '*'))
 
+// One company_scores row → the GrowthScore every server surface publishes (company page metadata, OG
+// card, /data, /lists, llms.txt). Mirrors the cache-hit shape of api/reports.js `_rowToScore` INCLUDING the
+// tenure adjustment, so a bulk reader that maps its rows through this cannot disagree with getScore().
+// null for a missing row or a row with no stored score.
+export function growthScoreFromRow(row: Record<string, any> | null | undefined): GrowthScore | null {
+  if (!row || row.overall_score == null) return null
+  // Same tenure fold-in as the live read path (api/reports.js _rowToScore) — canonical
+  // implementation imported, not mirrored, so the two can't drift.
+  const tAdj = tenureAdjustment(row.avg_tenure_months, row.tenure_sample_count)
+  const s = Math.max(0, Math.min(100, Math.round(row.overall_score + tAdj)))
+  // Same grade gate as api/reports.js gateScore: the OG card, SEO title and page must agree.
+  const gradeable = isGradeable(row)
+  return {
+    company_name: row.company_name ?? null,
+    gradeable,
+    overall_score: gradeable ? s : null,
+    ghost_rate: gradeable ? row.ghost_rate ?? null : null,
+    response_rate: gradeable ? row.response_rate ?? null : null,
+    avg_wait_days: gradeable ? row.avg_wait_days ?? null : null,
+    avg_rounds: gradeable ? row.avg_rounds ?? null : null,
+    report_count: row.report_count ?? 0,
+    first_party_report_count: row.first_party_report_count ?? null,
+    mention_count: row.mention_count ?? 0,
+    web_report_count: row.web_report_count ?? null,
+    data_source: row.data_source ?? null,
+    risk_level: gradeable ? (s >= 70 ? 'safe' : s >= 40 ? 'warn' : 'danger') : null,
+    industry: row.industry || null,
+    waste: gradeable ? row.waste_score ?? null : null,
+    summary: /^estimated baseline/i.test(String(row.raw_summary || '')) ? null : (row.raw_summary || null),
+    updated_at: scoreUpdatedAt(row),
+  }
+}
+
+/** The company_scores columns growthScoreFromRow reads (raw_summary optional — bulk readers skip it). */
+export const GROWTH_SCORE_COLUMNS = 'company_name,overall_score,ghost_rate,response_rate,avg_wait_days,avg_rounds,report_count,first_party_report_count,web_report_count,data_source,waste_score,industry,avg_tenure_months,tenure_sample_count,created_at,expires_at'
+
 // Build-time: read one company's cached score straight from Supabase. Mirrors the cache-hit shape
 // of api/reports.js `_rowToScore` INCLUDING the tenure adjustment — the OG unfurl and the live
 // page must show the SAME grade (a Reddit post whose preview says 78 while the page says 84 reads
@@ -162,33 +198,7 @@ async function scoreFromDb(name: string): Promise<GrowthScore | null> {
       r = await fetch(`${creds.url}/rest/v1/company_scores?company_name=ilike.${fuzzyPattern(name)}&${sel}&order=created_at.desc&limit=1`, { headers, signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) })
       rows = r.ok ? await r.json() : null
     }
-    const row = rows?.[0]
-    if (!row || row.overall_score == null) return null
-    // Same tenure fold-in as the live read path (api/reports.js _rowToScore) — canonical
-    // implementation imported, not mirrored, so the two can't drift.
-    const tAdj = tenureAdjustment(row.avg_tenure_months, row.tenure_sample_count)
-    const s = Math.max(0, Math.min(100, Math.round(row.overall_score + tAdj)))
-    // Same grade gate as api/reports.js gateScore: the OG card, SEO title and page must agree.
-    const gradeable = isGradeable(row)
-    return {
-      company_name: row.company_name ?? null,
-      gradeable,
-      overall_score: gradeable ? s : null,
-      ghost_rate: gradeable ? row.ghost_rate ?? null : null,
-      response_rate: gradeable ? row.response_rate ?? null : null,
-      avg_wait_days: gradeable ? row.avg_wait_days ?? null : null,
-      avg_rounds: gradeable ? row.avg_rounds ?? null : null,
-      report_count: row.report_count ?? 0,
-      first_party_report_count: row.first_party_report_count ?? null,
-      mention_count: row.mention_count ?? 0,
-      web_report_count: row.web_report_count ?? null,
-      data_source: row.data_source ?? null,
-      risk_level: gradeable ? (s >= 70 ? 'safe' : s >= 40 ? 'warn' : 'danger') : null,
-      industry: row.industry || null,
-      waste: gradeable ? row.waste_score ?? null : null,
-      summary: /^estimated baseline/i.test(String(row.raw_summary || '')) ? null : (row.raw_summary || null),
-      updated_at: scoreUpdatedAt(row),
-    }
+    return growthScoreFromRow(rows?.[0])
   } catch {
     return null
   }
