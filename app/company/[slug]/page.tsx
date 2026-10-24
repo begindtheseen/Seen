@@ -30,6 +30,7 @@ import { jobsSearchHref } from '@/lib/searchRoute'
 import { reportCardOutcome } from '@/lib/reportCardOutcome'
 import { splitWebReviews, webResearchNote } from '@/lib/webReviewQuotes'
 import { replyTiming, REPORT_WHEN_YOU_HEAR } from '@/lib/replyTiming'
+import { useCompanySeed } from '@/components/CompanySeed'
 import { httpHref } from '@/lib/safeHref.js'
 
 // ── Types ──────────────────────────────────────────────────────────────────────
@@ -162,11 +163,14 @@ function ConfidenceBadge({ sum, webCount }: { sum: CompanySummary; webCount: num
   const color = sum.confidence.level === 'high' ? 'var(--green)' : sum.confidence.level === 'moderate' ? 'var(--amber)' : 'var(--red)'
   // The word is capped below "High" until enough reports come from Seen users, and the badge names where
   // the reports came from — the reports section below says the same (lib/companyPageSummary.ts).
+  const src = sum.confidence.sources
   return (
-    <span className="co-dq" style={{ color }} title={sum.confidence.capNote || undefined}>
-      {sum.confidence.emoji} {sum.confidence.label}
-      {sum.confidence.sources ? <span style={{ color: 'var(--muted)' }}> ({sum.confidence.sources})</span> : null}
-    </span>
+    <>
+      <span className="co-dq" style={{ color }} title={sum.confidence.capNote || undefined}>
+        {sum.confidence.emoji} {sum.confidence.label}
+      </span>
+      {src ? <span className="co-dq" style={{ color: 'var(--muted)', flexBasis: '100%' }}>{src.charAt(0).toUpperCase() + src.slice(1)}</span> : null}
+    </>
   )
 }
 
@@ -484,9 +488,12 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
   const [reports, setReports] = useState<Report[]>([])
   // The same list with no city filter — null until it has loaded (lib/companyPageSummary.ts sources).
   const [allReports, setAllReports] = useState<Report[] | null>(null)
-  const [score, setScore] = useState<CompanyScore | null>(null)
-  const [industry, setIndustry] = useState('')
-  const [loading, setLoading] = useState(true)
+  // First paint from the server's stored row (components/CompanySeed.tsx) when it is gradeable — the
+  // grade, answer sentence and stats are in the HTML; the live /api/reports read below replaces it.
+  const seed = useCompanySeed()
+  const [score, setScore] = useState<CompanyScore | null>(seed as CompanyScore | null)
+  const [industry, setIndustry] = useState(seed?.industry || '')
+  const [loading, setLoading] = useState(!seed)
   const [error, setError] = useState('')
   const [notFound, setNotFound] = useState(false)
   // Self-filling pages: the score API reports when this company is queued for public-discussion
@@ -641,7 +648,7 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
   const [reportsLoading, setReportsLoading] = useState(true)
   useEffect(() => {
     let alive = true
-    setLoading(true)
+    if (!seed) setLoading(true) // a seeded hero stays on screen while the live read runs
     setError('')
     fetch(`/api/reports?type=score&name=${encodeURIComponent(companyName)}`)
       .then(async sRes => {
@@ -992,7 +999,7 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
                   {/* One sentence for assistive tech; the letter + rolling digits are presentational. */}
                   <span className="co-grade-score">
                     <span className="sr-only">{`Seen Grade ${g}, ${score.overall_score} out of 100`}</span>
-                    <span aria-hidden="true"><Odometer value={score.overall_score} /> / 100</span>
+                    <span aria-hidden="true"><Odometer value={score.overall_score} instant={!!seed} /> / 100</span>
                   </span>
                   {verdict && <p className="co-verdict">{verdict}</p>}
                   <div className="co-grade-meta">
