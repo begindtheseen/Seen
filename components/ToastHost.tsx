@@ -60,7 +60,10 @@ export function ToastHost() {
     <div
       aria-live="polite"
       style={{
-        position: 'fixed', top: 'max(76px, calc(env(safe-area-inset-top, 0px) + 64px))', right: 12, zIndex: 10000,
+        position: 'fixed', top: 'max(76px, calc(env(safe-area-inset-top, 0px) + 64px))', right: 12,
+        // Above every sheet and modal (the outcome card's sheet is 99999): a toast fired while one is open
+        // — the "+3 days of Seen Pro" reward lands exactly then — was drawn underneath it, unseen.
+        zIndex: 100000,
         display: 'flex', flexDirection: 'column', gap: 10, width: 'min(360px, calc(100vw - 24px))', pointerEvents: 'none',
       }}
     >

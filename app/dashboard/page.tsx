@@ -16,6 +16,7 @@ import { _sync } from '@/lib/sync'
 import { isChecklistDismissed, withChecklistDismissed } from '@/lib/onboardingPrefs'
 import { healthUnlockLine, HEALTH_MIN_APPS } from '@/lib/dashboardCopy'
 import WelcomeOnboarding from '@/components/WelcomeOnboarding'
+import InviteCard from '@/components/growth/InviteCard'
 import type { Application } from '@/lib/types'
 import { isGradeableScore } from '@/lib/gradeGate'
 import Odometer from '@/components/motion/Odometer'
@@ -551,6 +552,9 @@ export default function DashboardPage() {
             <small>Warn the next applicant →</small>
           </Link>
         </div>
+
+        {/* ── Earn Seen Pro: the invite link + progress (hidden until the growth tables exist) ── */}
+        <InviteCard id="invite" />
 
         {/* ── Quiet footer rows: recently checked + badges ── */}
         {(recentCos.length > 0 || badges.length > 0) && (

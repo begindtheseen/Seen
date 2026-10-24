@@ -6,6 +6,7 @@ import Footer from '@/components/Footer'
 import { ToastHost } from '@/components/ToastHost'
 import MicroSurveyHost from '@/components/MicroSurveyHost'
 import MotionLayer from '@/components/motion/MotionLayer'
+import ReferralHost from '@/components/growth/ReferralHost'
 import TabBar from '@/components/shell/TabBar'
 import CommandPalette from '@/components/shell/CommandPalette'
 import RouteProgress from '@/components/shell/RouteProgress'
@@ -92,6 +93,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <div id="toast" />
           <ToastHost />
           <MicroSurveyHost />
+          {/* Invite links: keeps ?ref= and claims it once an account signs in (lib/referralClient.ts). */}
+          <ReferralHost />
           {/* Cursor spotlight / tilt listener + film grain (app/motion.css) */}
           <MotionLayer />
         </AuthProvider>

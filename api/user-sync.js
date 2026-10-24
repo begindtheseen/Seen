@@ -19,6 +19,7 @@ import { isReadableResume } from '../lib/server/resumeReadability.js';
 import { deleteApplicantResumes } from '../lib/server/seenApplyStore.js';
 import { decodeThread } from '../lib/server/applicationThread.js';
 import { pacificDate } from '../lib/time/pacific.js';
+import { claimReferral, referralStatus, rewardReferralOnApplication } from '../lib/server/growthRewards.js';
 import * as inbox from '../lib/server/inbox/store.js';
 import { PROFILE_LIMITS, PROFILE_NAME_REQUIRED } from '../lib/profileLimits.js';
 import { sanitizeEvents, clientApplicationId, casWindow, timelineAnomalies, naturalKeyQuery, isMissingColumn, cleanText, COMPANY_MAX, ROLE_MAX, CITY_MAX, PLATFORM_MAX } from '../lib/server/trackerWrites.js';
@@ -82,7 +83,7 @@ export default async function handler(req, res) {
   console.log(`[user-sync] action=${action} uid=${uid} auth=${who.via}`);
 
   // Rate-limit mutating actions per user (not reads — those are cheap DB fetches)
-  const WRITE_ACTIONS = new Set(['add_application','update_application','remove_application','save_job','unsave_job','save_profile','save_resume','delete_account','submit_resume_survey','report_job_availability']);
+  const WRITE_ACTIONS = new Set(['claim_referral','add_application','update_application','remove_application','save_job','unsave_job','save_profile','save_resume','delete_account','submit_resume_survey','report_job_availability']);
   if (WRITE_ACTIONS.has(action)) {
     const windowHour = Math.floor(Date.now() / 3_600_000);
     const rlKey = `${uid}:user-sync:${windowHour}`;
@@ -269,7 +270,15 @@ export default async function handler(req, res) {
       data = [];
     }
     console.log('[user-sync] add_application ok, id:', data?.[0]?.id);
-    return res.status(200).json({ id: data?.[0]?.id || null, updated_at: data?.[0]?.updated_at || null });
+    // Invite a friend (lib/server/growthRewards.js): a claimed invitee's first tracked application
+    // hands out the invite rewards once. Awaited (the function may freeze after the response), but it
+    // can never fail the add: any error or a missing table is "no reward".
+    let reward = null;
+    if (data?.[0]?.id) {
+      const rr = await rewardReferralOnApplication(db, uid).catch(() => null);
+      if (rr && rr.rewarded) reward = { kind: 'referral', days: rr.days, pro_until: rr.pro_until };
+    }
+    return res.status(200).json({ id: data?.[0]?.id || null, updated_at: data?.[0]?.updated_at || null, ...(reward ? { reward } : {}) });
   }
 
   // ── REMOVE APPLICATION ──────────────────────────────────────────────────────
@@ -490,10 +499,16 @@ export default async function handler(req, res) {
       'applications', 'application_events', 'saved_jobs', 'ai_credits', 'credit_transactions',
       'user_recent_cos', 'login_signals', 'answered_questions', 'resume_employment',
       'resume_skills', 'job_availability_reports', 'search_events',
+      // Growth rewards (migration 20261024160000; these also cascade with the auth user).
+      'growth_rewards', 'referral_codes',
     ];
-    await Promise.all(userTables.map(t =>
-      db(`${t}?user_id=eq.${uid}`, { method: 'DELETE', headers: { Prefer: 'return=minimal' } }).catch(() => {})
-    ));
+    await Promise.all([
+      ...userTables.map(t =>
+        db(`${t}?user_id=eq.${uid}`, { method: 'DELETE', headers: { Prefer: 'return=minimal' } }).catch(() => {})
+      ),
+      db(`referrals?invitee_id=eq.${uid}`, { method: 'DELETE', headers: { Prefer: 'return=minimal' } }).catch(() => {}),
+      db(`referrals?referrer_id=eq.${uid}`, { method: 'DELETE', headers: { Prefer: 'return=minimal' } }).catch(() => {}),
+    ]);
     // Best-effort: remove any resume files this user uploaded to the `resumes` Storage bucket.
     // Uploads are keyed under a `${uid}/` prefix; list then delete. No-ops if the bucket is
     // empty for this user or uses a different convention — never blocks the deletion.
@@ -646,6 +661,33 @@ export default async function handler(req, res) {
     }
     broadcastActivity('flag'); // instant Seen Live ping
     return res.status(200).json({ ok: true });
+  }
+
+  // ── INVITE A FRIEND (lib/server/growthRewards.js) ───────────────────────────────────────────────
+  // referral_status: the caller's invite code (made on first ask), progress and Pro days earned.
+  // claim_referral: the code this NEW account arrived with. `final` tells the browser whether to forget
+  // the code (claimed / refused for good) or keep it for a later try (not ready yet, a failed read).
+  // Both answer { ready: false } / not_ready before migration 20261024160000_growth_rewards.sql.
+  if (action === 'referral_status') {
+    try {
+      return res.status(200).json(await referralStatus(db, uid));
+    } catch {
+      return res.status(200).json({ ready: false });
+    }
+  }
+  if (action === 'claim_referral') {
+    try {
+      // The account's sign-up time comes from the auth server, never from the client.
+      let accountCreatedAt = null;
+      const ur = await fetch(`${SUPABASE_URL}/auth/v1/admin/users/${encodeURIComponent(uid)}`, {
+        headers: { apikey: SERVICE_KEY, Authorization: `Bearer ${SERVICE_KEY}` },
+      }).catch(() => null);
+      if (ur && ur.ok) accountCreatedAt = (await ur.json().catch(() => null))?.created_at || null;
+      const r = await claimReferral(db, uid, body.code, { accountCreatedAt });
+      return res.status(200).json(r);
+    } catch {
+      return res.status(200).json({ ok: false, reason: 'failed', final: false });
+    }
   }
 
   // ── GET CREDITS ──────────────────────────────────────────────────────────────

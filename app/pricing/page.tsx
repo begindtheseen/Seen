@@ -6,6 +6,7 @@ import { useAuth } from '@/lib/auth'
 import { aiHeaders } from '@/lib/aiHeaders'
 import { FREE_DAILY_CREDITS, WELCOME_CREDITS, MAX_DAILY_EARN, PRO_TRIAL_DAYS, ONE_TIME_SKUS, PRO_PRICING, CREDIT_RESET_LABEL, RESUME_PARSE_COST } from '@/lib/creditRules'
 import { formatPacific } from '@/lib/time/pacific.js'
+import { REPORT_REWARD_PRO_DAYS, REPORT_REWARD_MONTHLY_CAP_DAYS, REPORT_REWARD_MIN_TRACKED_DAYS, REFERRAL_REWARD_PRO_DAYS, REFERRAL_MAX_REWARDED, dayWord, proDaysLabel } from '@/lib/creditRules'
 
 // UI copy is generated from the SAME constants the server enforces — never a hand-typed
 // number that drifts. Free tier is 1 AI credit/day (owner decision 2026-07-02).
@@ -70,6 +71,8 @@ const FAQ = [
   { q: 'How do free AI credits work?', a: `The first time you use an AI tool you get a ${WELCOME_CREDITS}-credit welcome bonus for that day (the first action uses one of them). From then on you get ${FREE_DAILY_CREDITS} free AI ${CREDIT_WORD} a day, reset at ${CREDIT_RESET_LABEL} (California time). Each credit covers one AI action, and every button that spends one says so: optimize your résumé for a job, run the ATS scanner, build your application advantage, or generate AI insights for a listing nobody has analyzed yet. Uploading and parsing your résumé is free. You can earn up to ${MAX_DAILY_EARN} more credits a day by tracking your applications and answering quick surveys about companies you've worked with. Purchased credits never reset.` },
   { q: 'How does the free trial work?', a: `Pro starts with ${PRO_TRIAL_DAYS} days free — no card required. If you add a payment method before the trial ends, your plan renews at the price you chose; cancel anytime. If you don't add one, nothing is charged and access simply ends.` },
   { q: 'What if I don\'t want a subscription?', a: `Pay once, own it: the Interview Sprint (${skuPrice(SPRINT.amount_cents)}) gives you ${SPRINT.credits} AI credits plus ${SPRINT.pro_days} days of full Pro access, and the Credit Pack (${skuPrice(CREDITS20.amount_cents)}) adds ${CREDITS20.credits} AI credits. Purchased credits never expire and roll over every day — no auto-renewal, ever.` },
+  // Growth rewards (lib/server/growthRewards.js) — rendered from the same constants the server grants with.
+  { q: 'Can I get Pro without paying?', a: `Yes. Report what happened with an application on your tracker and get ${proDaysLabel(REPORT_REWARD_PRO_DAYS)}, once per application that has been on your tracker for at least ${dayWord(REPORT_REWARD_MIN_TRACKED_DAYS)}, up to ${dayWord(REPORT_REWARD_MONTHLY_CAP_DAYS)} a month. Every outcome earns the same. Invite a friend with your link from the dashboard: when they track their first application, you both get ${proDaysLabel(REFERRAL_REWARD_PRO_DAYS)} (you are rewarded for up to ${REFERRAL_MAX_REWARDED} friends). Earned Pro time is added on top of any you have, and it never renews or charges you.` },
   { q: 'Can I cancel Pro?', a: 'Yes, anytime — no contracts. You keep Pro until the end of your billing period. We don\'t trap you.' },
   // What the code does (api/user-sync.js save_resume → profiles.resume_text; delete_resume / delete_account
   // clear it): the résumé is STORED on the profile — the old answer ("processed in-memory … immediately

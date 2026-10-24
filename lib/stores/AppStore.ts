@@ -5,6 +5,7 @@ import { markQuiet } from '../quietWindow'
 import { STAGES } from '../constants'
 import type { Application, HiringEvent, AppStatus } from '../types'
 import { eventId, isSuperseded, stageCorrectedEvent } from './checkEvents'
+import { showReferralReward } from '../rewardNotice'
 
 const KEY = 'seen_applications_v1'
 
@@ -96,6 +97,13 @@ const pendingChanges = (a: Application): Partial<Application> => ({
   stage: a.stage, status: a.status, company: a.company, role: a.role, location: a.location, platform: a.platform, appliedAt: a.appliedAt,
 })
 
+/** add_application answers `reward` when this add was an invitee's first tracked application and the
+ *  invite rewards were handed out (lib/server/growthRewards.js) — say so once. */
+const noteAddReward = (body: unknown) => {
+  const rw = (body as { reward?: { kind?: string; days?: number; pro_until?: string | null } } | null)?.reward
+  if (rw && rw.kind === 'referral') showReferralReward({ rewarded: true, days: rw.days, pro_until: rw.pro_until || undefined })
+}
+
 const save = (apps: Application[]) => { try { localStorage.setItem(KEY, JSON.stringify(apps)) } catch { /* storage unavailable */ } }
 const tokenOf = (body: unknown): number | null => {
   const t = (body as { updated_at?: unknown } | null)?.updated_at
@@ -165,6 +173,7 @@ export const AppStore = {
         for (const a of unsynced) {
           const r = await _syncRaw('add_application', { application: a })
           const id = (r.body as { id?: string } | null)?.id
+          if (r.ok && id) noteAddReward(r.body)
           if (r.ok && id) { a.id = id; a.updatedAt = tokenOf(r.body) ?? a.updatedAt; a.unsynced = false }
           else failed.push(a.id)
         }
@@ -268,6 +277,7 @@ export const AppStore = {
       const r = await _syncRaw('add_application', { application: entry })
       const newId = (r.body as { id?: string } | null)?.id
       if (r.ok && newId) {
+        noteAddReward(r.body)
         synced = true
         id = newId
         const stored = this.loadSync()
@@ -394,6 +404,7 @@ export const AppStore = {
       const r = await _syncRaw('add_application', { application: a })
       const newId = (r.body as { id?: string } | null)?.id
       if (!(r.ok && newId)) return { status: 'failed', anomalies: [] }
+      noteAddReward(r.body)
       const stored = this.loadSync()
       const idx = stored.findIndex(x => x.id === a.id)
       if (idx !== -1) { stored[idx] = { ...stored[idx], id: newId, updatedAt: tokenOf(r.body) ?? stored[idx].updatedAt, unsynced: false }; save(stored) }

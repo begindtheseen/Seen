@@ -12,6 +12,7 @@ import { matchCities } from '@/lib/data/usCities'
 import { ResumeStore } from '@/lib/stores/ResumeStore'
 import { parseResumeFile } from '@/lib/resumeUploadClient'
 import PageHeader from '@/components/shell/PageHeader'
+import InviteCard from '@/components/growth/InviteCard'
 import DangerConfirmDialog from '@/components/DangerConfirmDialog'
 import DeleteAccountDialog from '@/components/profile/DeleteAccountDialog'
 import { PROFILE_LIMITS, PROFILE_NAME_REQUIRED, clampProfileField } from '@/lib/profileLimits.js'
@@ -60,6 +61,10 @@ export default function ProfilePage() {
   const [portalLoading, setPortalLoading] = useState(false)
   const [sub, setSub] = useState<{ status: string; cancel_at_period_end: boolean; current_period_end: number | null; amount: number | null; interval: string | null } | null>(null)
   const [subMsg, setSubMsg] = useState('')
+  // A Pro TIME WINDOW with no subscription (ai_credits.pro_until: earned by reports / invites, or an
+  // Interview Sprint). It ends on its own; nothing renews, so the subscription copy must not show.
+  const [proUntil, setProUntil] = useState<string | null>(null)
+  const [inviteReady, setInviteReady] = useState(false)
   // Already "loaded" if we have a cached copy (instant render); otherwise show a skeleton
   // for the one-time first load rather than an empty flash.
   const [loaded, setLoaded] = useState(!!_cache)
@@ -161,6 +166,7 @@ export default function ProfilePage() {
       const r = await fetch('/api/stripe?action=subscription_status', { method: 'POST', headers: await aiHeaders(), body: '{}' })
       const d = await r.json()
       setSub(d?.subscription || null)
+      setProUntil(typeof d?.pro_until === 'string' ? d.pro_until : null)
       // Reconcile Pro with Stripe's truth: if the subscription has ended, this flips the
       // Billing section to Free so the Cancel/Resume buttons disappear.
       if (typeof d?.pro === 'boolean') setIsPro(d.pro)
@@ -370,6 +376,7 @@ export default function ProfilePage() {
               <a href="#resume" className={styles.jump}><span>📄</span>Résumé</a>
               <a href="#security" className={styles.jump}><span>🔒</span>Security</a>
               <a href="#plan" className={styles.jump}><span>◈</span>Plan &amp; billing</a>
+              {inviteReady && <a href="#invite" className={styles.jump}><span>↗</span>Invite friends</a>}
               <a href="#danger" className={`${styles.jump} ${styles.jumpDanger}`}><span>⚠</span>Delete account</a>
             </div>
           </aside>
@@ -543,7 +550,23 @@ export default function ProfilePage() {
                   <h2 className={styles.cardT}>{isPro ? 'Seen Pro' : 'Free plan'}</h2>
                 </div>
               </div>
-              {isPro ? (
+              {isPro && !sub && proUntil ? (
+                <>
+                  <div className={styles.planCard}>
+                    <div>
+                      <div className={styles.planName}>Seen Pro</div>
+                      <div className={styles.planMeta}>Until {formatPacific(proUntil, { dateStyle: 'medium' })}</div>
+                    </div>
+                    <span className={`${styles.badge} ${styles.bGreen}`}>Active</span>
+                  </div>
+                  <p className={styles.cardS} style={{ margin: '0 0 1rem' }}>
+                    This is Pro time you earned or bought, not a subscription. It ends on the date above. Nothing renews and nothing is charged.
+                  </p>
+                  <div className={styles.btnRow}>
+                    <button type="button" className={styles.ghost} onClick={() => router.push('/pricing')}>Plans &amp; credits</button>
+                  </div>
+                </>
+              ) : isPro ? (
                 <>
                   <div className={styles.planCard}>
                     <div>
@@ -594,6 +617,9 @@ export default function ProfilePage() {
               )}
               <div className={styles.fine}>See the <a href="/terms#billing">Subscription Terms</a> for renewal, cancellation and refund details.</div>
             </section>
+
+            {/* ── Invite friends (Seen Pro days for invites and reports; hidden until the growth tables exist) ── */}
+            <InviteCard id="invite" onReady={setInviteReady} />
 
             {/* ── Danger zone ── */}
             <section id="danger" className={`${styles.card} ${styles.dangerCard}`}>
