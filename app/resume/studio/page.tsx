@@ -85,7 +85,8 @@ function StudioInner() {
   const doc = activeId ? variantDoc : baseDoc
   const health: Health | null = useMemo(() => (doc ? scoreResume(doc) : null), [doc])
   const fixAll = useMemo(() => (doc ? rewriteDoc(doc) : null), [doc])
-  const fixAllCount = fixAll ? fixAll.log.filter((l) => l.changes.some((c) => c.rule !== 'hygiene')).length : 0
+  // the button counts what the preview pre-selects (not punctuation, not tense-only)
+  const fixAllCount = fixAll ? fixAll.log.filter((l) => l.to !== l.from && l.changes.some((c) => c.rule !== 'hygiene' && c.rule !== 'tense')).length : 0
   // "Fix N bullets": a preview with checkboxes first, then Apply, with Undo afterwards — never a
   // silent rewrite that autosaves (the 2026-10-24 audits).
   const [fixPreview, setFixPreview] = useState(false)
@@ -214,9 +215,9 @@ function StudioInner() {
   function undoFixes() { if (!undo) return; onChange(undo.doc); setUndo(null); showToast('Restored your original wording.') }
 
   // ── variants ──
-  function useVariant(v: ResumeDoc, meta: { role: string; company: string; jobId: string; scoreBefore: number; scoreAfter: number }) {
+  function useVariant(v: ResumeDoc, meta: { role: string; company: string; jobId: string; scoreBefore: number | null; scoreAfter: number | null }) {
     const label = [meta.role, meta.company].filter(Boolean).join(' @ ') || 'Tailored'
-    const rec: StoredVariant = { id: v.id, label, role: meta.role, company: meta.company, jobId: meta.jobId, createdAt: new Date().toISOString(), doc: v, baseHash: '', scoreBefore: meta.scoreBefore, scoreAfter: meta.scoreAfter }
+    const rec: StoredVariant = { id: v.id, label, role: meta.role, company: meta.company, jobId: meta.jobId, createdAt: new Date().toISOString(), doc: v, baseHash: '', scoreBefore: meta.scoreBefore ?? undefined, scoreAfter: meta.scoreAfter ?? undefined }
     setVariants(ResumeDocStore.saveVariant(user?.id, rec)); setActiveId(v.id); setVariantDoc(v); setTab('export')
     showToast('Tailored version ready — review it, then export.')
   }

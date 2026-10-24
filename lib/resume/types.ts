@@ -74,7 +74,9 @@ export interface TailorPlan {
   rewrites?: TailorRewrite[]
   applyRewrites?: boolean
   ctx?: { jobTitle: string; company: string; jobId: string; pages: number; jobFamily: string; jobFamilyLabel: string; jobVec?: Record<string, number>; summary?: boolean; summaryFallback?: string; summaryKeywords?: Array<{ term: string; display: string; weight: number; surfaces: string[] }> }
-  score: { before: number; after: number; criticalCoverage: number | null; keywordCoverage: { before: number; after: number } }
+  // SeenFit verdict before/after (the same scale as the Optimize modal and /resume); null when the
+  // posting states fewer than three requirements (the verdict sentence says why).
+  score: { before: number | null; after: number | null; verdict?: { score: number | null; band: string | null; sentence: string; gate: string | null; withheld: string | null }; requirementCount?: number; criticalCoverage: number | null; keywordCoverage: { before: number; after: number } }
   roles: Array<{ itemId: string; title: string; company: string; relevance: number; titleOverlap: number; tier?: string; family?: string; familyLabel?: string; bullets: Array<{ bulletId: string; score: number; hits: string[] }> }>
   summary: { text: string; replaced: string; sources: Record<string, unknown> | null; targeted?: boolean } | null
   skills: { reordered: boolean; reorders?: Array<{ kind: 'reorder_skills'; groupId: string; from: string[]; to: string[] }>; additions?: Array<{ groupId: string | null; term: string; listed: string; evidence: string; why: string }>; added: Array<{ term: string; evidence: string; why: string }> }

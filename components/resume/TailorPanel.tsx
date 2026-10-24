@@ -15,6 +15,7 @@ import { scoreColor } from './HealthPanel'
 import { useAuth } from '@/lib/auth'
 import CreditConfirmDialog from '@/components/CreditConfirmDialog'
 import { hasConfirmedCreditUse } from '@/lib/creditConfirm'
+import { markQuiet } from '@/lib/quietWindow'
 import { RESUME_OPTIMIZE_COST, creditCostLabel } from '@/lib/creditRules'
 
 export interface TailorJob { title: string; company: string; description: string; jobId: string; url?: string }
@@ -25,7 +26,7 @@ type Props = {
   savedJobs: SavedJob[]
   initialJob: TailorJob | null
   onNeed: (reason: 'credits' | 'pro' | 'signin') => void
-  onUseVariant: (variant: ResumeDoc, meta: { role: string; company: string; jobId: string; scoreBefore: number; scoreAfter: number }) => void
+  onUseVariant: (variant: ResumeDoc, meta: { role: string; company: string; jobId: string; scoreBefore: number | null; scoreAfter: number | null }) => void
 }
 
 const TIER_LABEL: Record<string, string> = { core: 'Core', supporting: 'Supporting', context: 'Context', omit: 'Not relevant' }
@@ -86,6 +87,7 @@ export default function TailorPanel({ doc, isLoggedIn, pro, savedJobs, initialJo
       window.dispatchEvent(new Event('seen:credits-updated'))
       setPlan(data.plan); setBaseDoc(clone(doc)); setServerVariant(data.variant); setPolishRes(data.polish); setOverrides({}); setAnswers({}); setRejectedPolish(new Set())
       setState('done')
+      markQuiet() // nothing optional pops over a result the person just paid for
     } catch { setError('Network error — try again.'); setState('error') }
   }
 
@@ -154,15 +156,19 @@ export default function TailorPanel({ doc, isLoggedIn, pro, savedJobs, initialJo
       {state === 'done' && plan && finalVariant && (
         <>
           <div className={s.card}>
-            {noRequirements ? (
-              <div className={s.dim} style={{ color: 'var(--amber)' }}>The posting text gave us no requirements to match — this version is arranged from the job title and family only. Paste the full posting (requirements and responsibilities) for a real match score.</div>
+            {noRequirements || plan.score.after == null || plan.score.before == null ? (
+              <div className={s.dim} style={{ color: 'var(--amber)' }}>{plan.score.verdict?.withheld ? plan.score.verdict.sentence : 'The posting text gave us no requirements to match — this version is arranged from the job title and family only.'} Paste the full posting (requirements and responsibilities) for a real match score.</div>
             ) : (
-              <div className={s.beforeAfter}>
-                <span style={{ color: scoreColor(plan.score.before) }}>{plan.score.before}</span>
-                <span className={s.arrow}>→</span>
-                <span style={{ color: scoreColor(plan.score.after) }}>{plan.score.after}</span>
-                <span className={s.dim} style={{ fontWeight: 400, fontSize: '.62rem' }}>match score · {plan.job.familyLabel || plan.job.roleFamily} posting · {plan.job.requirementCount} requirements read · {plan.strategy ? `${plan.strategy.estimatedLines} of ${plan.strategy.linesBudget} lines (${plan.strategy.pages} page${plan.strategy.pages === 1 ? '' : 's'})` : ''}</span>
-              </div>
+              <>
+                <div className={s.beforeAfter}>
+                  <span style={{ color: scoreColor(plan.score.before) }}>{plan.score.before}</span>
+                  <span className={s.arrow}>→</span>
+                  <span style={{ color: scoreColor(plan.score.after) }}>{plan.score.after}</span>
+                  <span className={s.dim} style={{ fontWeight: 400, fontSize: '.62rem' }}>SeenFit match · {plan.job.familyLabel || plan.job.roleFamily} posting · {plan.score.requirementCount ?? plan.job.requirementCount} requirements read · {plan.strategy ? `${plan.strategy.estimatedLines} of ${plan.strategy.linesBudget} lines (${plan.strategy.pages} page${plan.strategy.pages === 1 ? '' : 's'})` : ''}</span>
+                </div>
+                {/* the same one-sentence why the Optimize modal and /resume show; the gate first */}
+                {plan.score.verdict && <p className={s.dim} style={{ marginTop: '.4rem', color: plan.score.verdict.gate ? 'var(--amber)' : undefined }}>{plan.score.verdict.sentence.replace(/^\d+ — /, '')}</p>}
+              </>
             )}
             <p className={s.dim} style={{ marginTop: '.5rem' }}>
               {decisions.length ? `${decisions.filter((d) => d.tier === 'core').map((d) => d.title).join(' and ') || 'Your most relevant roles'} lead this version. ${decisions.filter((d) => d.decision === 'condense').length ? `${decisions.filter((d) => d.decision === 'condense').length} role${decisions.filter((d) => d.decision === 'condense').length === 1 ? '' : 's'} became one line, ` : ''}${decisions.filter((d) => d.decision === 'drop').length ? `${decisions.filter((d) => d.decision === 'drop').length} left off, ` : ''}bullets that speak to the posting lead each role.` : 'No roles to optimize — add experience first.'}
