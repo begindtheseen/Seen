@@ -15,6 +15,7 @@ import ModalPortal from '@/components/ModalPortal'
 import { useAuth } from '@/lib/auth'
 import { WITHDRAW_REASONS, MESSAGE_MAX, REVIEW_MAX } from '@/lib/server/applicationThread.js'
 import type { Application } from '@/lib/types'
+import { markQuiet } from '@/lib/quietWindow'
 
 type Step = 'confirm' | 'why' | 'done'
 
@@ -67,6 +68,7 @@ export default function WithdrawModal({ app, onClose, onWithdrawn }: {
       const { ok, d } = await call({ action: 'withdraw', application_id: app.id, message: canNote ? message : undefined })
       if (!ok) { setErr(String(d.error || 'Could not withdraw — please try again')); return }
       setNotified(d.employer_notified === true)
+      markQuiet() // a withdrawal is a weighty moment — no micro-survey for two minutes (lib/quietWindow)
       onWithdrawn()
       setStep(reviewable ? 'why' : 'done')
     } catch { setErr('Could not withdraw — please try again') } finally { setBusy(false) }
