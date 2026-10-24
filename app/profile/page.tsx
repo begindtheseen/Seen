@@ -525,7 +525,7 @@ export default function ProfilePage() {
                   </div>
                 </>
               )}
-              <div className={styles.fine}>See <a href="/legal">Subscription Terms</a> for renewal, cancellation and refund details.</div>
+              <div className={styles.fine}>See the <a href="/terms#billing">Subscription Terms</a> for renewal, cancellation and refund details.</div>
             </section>
 
             {/* ── Danger zone ── */}

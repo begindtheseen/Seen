@@ -164,7 +164,7 @@ export default function CompaniesPage() {
             eyebrow="Transparency rankings"
             title="Company scoreboard"
             crumbLabel="Companies"
-            sub={<>Ranked by hiring transparency score. Ghost rate, response rate, and process quality — all in one place. Only companies with at least {MIN_REPORTS_FOR_GRADE} real reviews are graded.</>}
+            sub={<>Ranked by hiring transparency score. Ghost rate, response rate, and process quality — all in one place. A company is graded once it has at least one report submitted to Seen and {MIN_REPORTS_FOR_GRADE} pieces of evidence in total (an online mention counts as half).</>}
           />
 
           {/* Hero company lookup */}

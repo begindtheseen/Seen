@@ -52,8 +52,8 @@ export async function generateMetadata(
   const description = summary
     ? clipSentences(summary.summary)
     : ghostPct != null
-    ? `Does ${name} ghost applicants? ${ghostPct}% ghost rate from real applicant outcomes. See ${name}'s response time, interview rounds, and hiring reviews — aggregated from Reddit, Glassdoor, and verified job-seeker reports.`
-    : `Does ${name} ghost applicants? See ${name}'s ghost rate, response time, and hiring reviews — aggregated from Reddit, Glassdoor, and verified job-seeker reports on Seen.`
+    ? `Does ${name} ghost applicants? ${ghostPct}% ghost rate from real applicant outcomes. See ${name}'s response time, interview rounds, and hiring reviews — aggregated from Reddit and verified job-seeker reports.`
+    : `Does ${name} ghost applicants? See ${name}'s ghost rate, response time, and hiring reviews — aggregated from Reddit and verified job-seeker reports on Seen.`
 
   return {
     title: `${name} Ghost Rate & Hiring Reviews (Reddit + Real Reports)`,

@@ -1,71 +1,90 @@
+import type { Metadata } from 'next'
+import Link from 'next/link'
+import { PRO_TRIAL_DAYS, ONE_TIME_SKUS } from '@/lib/server/creditRules.js'
+import { proPriceLine } from '@/lib/pricing'
+import { LEGAL_CONTACT } from '@/components/legal/LegalBits'
+
+// /legal is a HUB, not a fourth legal document. Until 2026-10-24 this page was a second, older set of
+// terms that contradicted /terms, /privacy and /content-policy ("your first charge occurs at checkout"
+// against the $0 no-card trial; "binding arbitration under AAA" against the terms' open venue item; a
+// "Pro waitlist"; a "Billing & Subscription portal" button that does not exist). Everything legal now
+// lives in the three documents; this page links them and repeats only facts the code implements,
+// rendered from the same constants the server charges with (lib/pricing.test.mjs fails on a hand-typed
+// price).
+
+export const metadata: Metadata = {
+  title: 'Legal',
+  description: 'Seen’s Terms of Service, Privacy Policy and Content Policy in one place, with the plain facts about the free trial, prices, one-time purchases and your data.',
+  alternates: { canonical: 'https://seenjobs.io/legal' },
+  openGraph: {
+    title: 'Legal | Seen',
+    description: 'Terms of Service, Privacy Policy and Content Policy — and the plain facts about the trial, prices and your data.',
+    url: 'https://seenjobs.io/legal',
+    type: 'website',
+    siteName: 'Seen',
+    images: ['/opengraph-image'],
+  },
+}
+
+const DOCS = [
+  { href: '/terms', title: 'Terms of Service', body: 'Eligibility, acceptable use, what the data is (and is not), subscriptions, one-time purchases, employer products, liability.' },
+  { href: '/privacy', title: 'Privacy Policy', body: 'What Seen collects, how it is used, who can access it, the processors we rely on, and your rights.' },
+  { href: '/content-policy', title: 'Content Policy', body: 'How Seen sources and labels content, what the aggregate numbers mean, what we remove, and how to dispute something.' },
+] as const
+
+const usd = (cents: number) => `$${(cents / 100).toFixed(2)}`
+
 export default function LegalPage() {
-  const sections = [
-    {
-      title: 'Terms of Service',
-      body: `By accessing Seen you agree to these terms. You must be 18 or older. Use is personal and non-commercial only — no scraping, no building competitive products. You are responsible for your account. Prohibited conduct includes: false reports, sharing personal information about individuals, coordinated inauthentic activity, bots, impersonation, harassment, and reverse-engineering. We reserve the right to suspend accounts that violate these terms. We may update terms with material change notice.`,
-    },
-    {
-      title: 'Section 230 & User-Generated Content',
-      body: `Seen operates as an interactive computer service under 47 U.S.C. § 230 and is not liable for user-submitted content. By submitting a report, you represent that it reflects a genuine first-hand experience, is truthful to the best of your knowledge, contains no personal identifying information about individuals, and that you have the right to share it. You grant Seen a perpetual, irrevocable, royalty-free license to use submitted content. We moderate content at our discretion. Report abuse to hello@seenjobs.io — we review within 14 business days.`,
-    },
-    {
-      title: 'Scores, Ratings & Data Disclaimer',
-      body: `All scores are expressions of aggregated community opinion, not verified facts — not endorsements or definitive characterizations of any company. Ghost surge alerts are statistical signals, not accusations. Sample size limitations apply to all metrics. We provide no warranty on accuracy, completeness, or timeliness of any data. Nothing on Seen constitutes employment, legal, or financial advice. AI-generated content is clearly labeled and inherently probabilistic. All company names and trademarks belong to their respective owners.`,
-    },
-    {
-      title: 'Privacy Policy',
-      body: `Anonymous users: We store only report text, company name, location, timestamp, and a hashed session ID. Registered users: We store email, optional display name, application data, and auth tokens. Pro waitlist: Email only, for launch notification. We use aggregated/anonymized page views only. We never sell, rent, or lease personal data. No behavioral advertising, no profiling. Cookies/local storage: minimal functional only (no tracking pixels). Third-party processors: Supabase (database/auth), Anthropic (AI). Data retention: anonymous reports indefinite; registered accounts until deletion. Not directed at minors. Privacy requests: hello@seenjobs.io`,
-    },
-    {
-      title: 'Subscription Terms & Auto-Renewal',
-      body: `Seen Pro is a recurring subscription billed through Stripe. Monthly plans are $9.99/month; annual plans are $6.99/month billed once per year ($83.88/year). By subscribing you authorize Seen to automatically charge your payment method the applicable amount at the start of each billing period — monthly for monthly plans, annually for annual plans — until you cancel. Your first charge occurs at checkout; renewals occur on the same calendar date each period. You can cancel anytime from Profile → Billing & Subscription (which opens the Stripe customer portal); cancellation stops future renewals and your Pro access continues through the end of the period you already paid for. Charges are generally non-refundable except where required by law; we do not provide partial-period refunds. If a payment fails, we may retry and may suspend Pro access until payment succeeds. We may change prices or plan features with at least 30 days' notice before the change takes effect on your next renewal; continued use after the effective date constitutes acceptance. Promotional pricing applies only for its stated term and then renews at the standard rate. Questions or cancellation help: hello@seenjobs.io.`,
-    },
-    {
-      title: 'CCPA & GDPR Rights',
-      body: `California residents have the right to: (a) know what data we collect, (b) request deletion, (c) opt out of sale (moot — we don't sell), (d) non-discrimination for exercising rights. European residents have the right to: access, rectify, erasure, restrict processing, data portability, object to processing, and withdraw consent. Data may be transferred to the US. To exercise any right, contact hello@seenjobs.io.`,
-    },
-    {
-      title: 'Arbitration & Limitation of Liability',
-      body: `Disputes are resolved through binding arbitration under AAA Consumer Rules. You waive the right to a jury trial and class action (except small claims or injunctions). The platform is provided "AS IS" with no warranty. Liability is capped at the greater of (a) amounts you paid in the prior 12 months or (b) $100 USD. You agree to indemnify Seen for violations of these terms, content you submit, infringement of third-party rights, or illegal use of the platform. Governed by California law; venue in Los Angeles County.`,
-    },
-    {
-      title: 'Employer & Company Dispute Process',
-      body: `To dispute content: provide your name/title/company, the specific content at issue, the reason it violates our guidelines (factual inaccuracy, personal info, or clear fabrication — not simply "it's negative"), and supporting evidence. We review within 14 business days. We will remove: personal identifying information, explicit threats, demonstrably fabricated content. We will NOT remove: negative experiences, ghosting reports, criticisms, misleading job postings — these are protected speech. Employers may submit an official response alongside disputed content. We comply with valid legal process and will contest demands designed to suppress user speech.`,
-    },
-    {
-      title: 'Content Guidelines',
-      body: `Reports must: describe a genuine first-hand hiring experience, focus on the company's process (not named individuals), and reflect something you personally experienced or witnessed. Reports must NOT: include personal contact info (phone/email/address), assert unknown facts as certain, contain threats/hate speech/slurs, include promotional URLs, or represent coordinated inauthentic activity. We will remove: personal identifying info, explicit threats, demonstrably fabricated or coordinated content, hate speech. We will NOT remove: accurate ghosting accounts, misleading job description reports, disrespectful hiring behavior reports, honest subjective assessments, or genuine applicant experiences.`,
-    },
+  const sprint = ONE_TIME_SKUS.sprint
+  const pack = ONE_TIME_SKUS.credits20
+  // Plain facts, each one implemented in code and stated in the documents above:
+  //   trial → api/stripe.js checkout (trial_period_days, payment_method_collection 'if_required');
+  //   prices → lib/server/creditRules.js PRO_PRICING (the inline Stripe price uses the same cents);
+  //   cancel → api/stripe.js cancel_subscription, Settings → Plan & billing;
+  //   one-time SKUs → ONE_TIME_SKUS, fulfilled by lib/server/stripeFulfillment.js;
+  //   résumé → profiles.resume_text via save_resume / delete via delete_resume + delete_account.
+  const facts = [
+    `Seen Pro starts with a ${PRO_TRIAL_DAYS}-day free trial and asks for no card. Nothing is charged unless you add a payment method; without one, access simply ends.`,
+    `Seen Pro is ${proPriceLine()}. It renews until you cancel, and you cancel in Settings → Plan & billing — access continues to the end of the period you paid for.`,
+    `One-time purchases never renew: the ${sprint.name} (${usd(sprint.amount_cents)}) adds ${sprint.credits} AI credits and ${sprint.pro_days} days of Pro; the ${pack.name} (${usd(pack.amount_cents)}) adds ${pack.credits} AI credits. Purchased credits do not expire or reset.`,
+    'Your résumé is stored on your profile until you replace it or delete your account, and is used only for your own tools (job matching, fit scores, rewrites). It is never shown to employers or sold.',
+    'We do not sell personal data. Company scores and reports are aggregated applicant claims and public discussion, not verified facts, and nothing on Seen is legal, employment or financial advice.',
   ]
 
   return (
     <div className="rise-in" style={{ minHeight: '100vh' }}>
       <div style={{ maxWidth: 760, margin: '0 auto', padding: '4rem 2rem', width: '100%', boxSizing: 'border-box' }}>
-        <div style={{ background: 'var(--adim)', border: '1px solid rgba(245,158,11,0.25)', borderRadius: 10, padding: '1rem 1.25rem', marginBottom: '2rem', fontFamily: 'var(--mono)', fontSize: '.7rem', color: 'var(--amber)', lineHeight: 1.7 }}>
-          ⚠ Important: Seen is not a law firm and nothing on this platform constitutes legal advice. Company scores and ghost surge indicators are expressions of community opinion, not verified facts. If you have a dispute with an employer, consult a licensed employment attorney.
-        </div>
-
         <h1 style={{ fontFamily: 'var(--display)', fontSize: '2rem', fontWeight: 800, color: 'var(--white)', letterSpacing: '-.03em', marginBottom: '.35rem' }}>
-          Legal & Privacy
+          Legal
         </h1>
-        <p style={{ color: 'var(--sub)', fontSize: '.82rem', marginBottom: '2.5rem' }}>
-          Last updated: July 2026 · Questions? <a href="mailto:hello@seenjobs.io" style={{ color: 'var(--blue)', textDecoration: 'none' }}>hello@seenjobs.io</a>
+        <p style={{ color: 'var(--sub)', fontSize: '.82rem', lineHeight: 1.7, marginBottom: '2rem' }}>
+          Three documents govern Seen. They are drafts awaiting attorney review, and they are the only
+          place our terms live — this page just points to them. Questions:{' '}
+          <a href={`mailto:${LEGAL_CONTACT}`} style={{ color: 'var(--blue)', textDecoration: 'none' }}>{LEGAL_CONTACT}</a>
         </p>
 
-        <div style={{ fontFamily: 'var(--mono)', fontSize: '.62rem', color: 'var(--muted)', background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 8, padding: '.65rem 1rem', marginBottom: '2rem', display: 'flex', alignItems: 'center', gap: '.5rem' }}>
-          🔒 We do not sell your personal data. Ever.
+        <div style={{ display: 'grid', gap: '.75rem', marginBottom: '2.5rem' }}>
+          {DOCS.map(d => (
+            <Link key={d.href} href={d.href} style={{ display: 'block', background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 12, padding: '1rem 1.2rem', textDecoration: 'none' }}>
+              <div style={{ fontFamily: 'var(--display)', fontSize: '1rem', fontWeight: 800, color: 'var(--white)', marginBottom: '.25rem' }}>{d.title} →</div>
+              <div style={{ fontFamily: 'var(--body)', fontSize: '.8rem', color: 'var(--sub)', lineHeight: 1.6 }}>{d.body}</div>
+            </Link>
+          ))}
         </div>
 
-        {sections.map(section => (
-          <div key={section.title} style={{ marginBottom: '2rem' }}>
-            <h2 style={{ fontFamily: 'var(--display)', fontSize: '1.1rem', fontWeight: 800, color: 'var(--white)', letterSpacing: '-.02em', marginBottom: '.65rem' }}>
-              {section.title}
-            </h2>
-            <p style={{ fontFamily: 'var(--body)', fontSize: '.82rem', color: 'var(--sub)', lineHeight: 1.8, borderLeft: '2px solid var(--line2)', paddingLeft: '1rem', margin: 0 }}>
-              {section.body}
-            </p>
-          </div>
-        ))}
+        <h2 style={{ fontFamily: 'var(--display)', fontSize: '1.1rem', fontWeight: 800, color: 'var(--white)', letterSpacing: '-.02em', marginBottom: '.65rem' }}>
+          The plain facts
+        </h2>
+        <p style={{ fontFamily: 'var(--mono)', fontSize: '.62rem', color: 'var(--muted)', lineHeight: 1.7, margin: '0 0 .9rem' }}>
+          Each line below is what the product does today and is stated in the documents above
+          (<Link href="/terms#billing" style={{ color: 'var(--sub)' }}>Terms §8–9</Link>,{' '}
+          <Link href="/privacy" style={{ color: 'var(--sub)' }}>Privacy §2, §6</Link>).
+        </p>
+        <ul style={{ margin: 0, paddingLeft: '1.1rem' }}>
+          {facts.map(f => (
+            <li key={f} style={{ fontFamily: 'var(--body)', fontSize: '.82rem', color: 'var(--sub)', lineHeight: 1.8, marginBottom: '.5rem' }}>{f}</li>
+          ))}
+        </ul>
       </div>
     </div>
   )
