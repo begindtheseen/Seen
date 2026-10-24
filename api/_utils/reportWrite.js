@@ -167,13 +167,15 @@ export async function recomputeCompanyScoreFromReports(SUPABASE_URL, hdrs, compa
     // Same corpus the score path uses (lib/server/reportCounts.js SCORABLE_REPORTS_FILTER): every
     // report at its trust weight; only the anti-gaming holds (anonymous/duplicate/velocity) wait.
     // Reports + "what people are saying" (the stored web_reviews), fetched together.
-    const [r, scoreRows, withMentions, employeeReviews, withEmployeeCount] = await Promise.all([
+    // Every read here is independent of the others — one round trip of wall time, not two.
+    const [r, scoreRows, withMentions, employeeReviews, withEmployeeCount, confirmedStaleListings] = await Promise.all([
       fetch(`${SUPABASE_URL}/rest/v1/reports?company_name=ilike.${enc}&${SCORABLE_REPORTS_FILTER}&select=outcome,platform,wait_days,rounds&limit=2000`, { headers: hdrs }),
       fetch(`${SUPABASE_URL}/rest/v1/company_scores?company_name=eq.${enc}&select=web_reviews,web_report_count,data_source,ghost_rate,response_rate,avg_wait_days,avg_rounds,unpaid_rate&limit=1`, { headers: hdrs })
         .then((x) => (x.ok ? x.json() : [])).catch(() => []),
       hasMentionCount(SUPABASE_URL, hdrs),
       fetchEmployeeReviewSignal(SUPABASE_URL, hdrs, enc),
       hasEmployeeReviewCount(SUPABASE_URL, hdrs),
+      fetchConfirmedStaleCount(SUPABASE_URL, hdrs, companyName),
     ]);
     if (!r.ok) return false;
     // Never store a score that silently lost its employee reviews to a failed read.
@@ -199,7 +201,6 @@ export async function recomputeCompanyScoreFromReports(SUPABASE_URL, hdrs, compa
     }));
     // Fold in admin-confirmed dead listings so companies that leave zombie postings up
     // carry the (bounded) penalty in their stored grade.
-    const confirmedStaleListings = await fetchConfirmedStaleCount(SUPABASE_URL, hdrs, companyName);
     // Keep a separately stored web-research estimate when real reports arrive. It is an
     // estimate, never an applicant-report count, but erasing it here made cached totals jump.
     const priorWebCount = Math.max(0, Number(priorScore?.web_report_count) || 0);

@@ -3,6 +3,7 @@
 // Passwords hashed with scrypt (Node built-in). No plaintext credentials stored.
 
 import { randomBytes, scryptSync, timingSafeEqual, createHash } from 'crypto';
+import { fetchAdminJobsCounts } from '../lib/server/adminJobsCounts.js';
 import {
   SOURCE_TRUST, PRIOR_STRENGTH, classifyPlatform, fuseCompanyIntel, aggregateOutcomes,
   GHOST_OUTCOMES, RESPONSE_OUTCOMES, NONTERMINAL_OUTCOMES,
@@ -324,16 +325,16 @@ async function _handler(req, res) {
     // The "stale" number the admin alert + Clear stale button use: the SAME definition the sweep
     // clears (lib/server/staleSweep.js). The older stale_or_expired count also includes 'expired'
     // rows kept for users' saved/applied links, which no clear can (or should) remove.
-    const countHdr = { headers: { Prefer: 'count=exact', 'Range-Unit': 'items', Range: '0-0' } };
     // stale_overdue: stale rows the daily cron sweep should ALREADY have deleted (unseen 15d+ — its
     // cut-off is 14d, plus a day of grace). Normal churn keeps thousands of rows stale for 7–14 days
     // by design; only an overdue backlog means the sweep is falling behind and needs a manual clear.
-    const overdueCutoff = encodeURIComponent(new Date(Date.now() - 15 * 86_400_000).toISOString());
-    const staleCountsP = Promise.all([
-      db(`jobs?${STALE_CLEARABLE_FILTER}&select=id`, countHdr),
-      db(`jobs?${STALE_KEPT_FILTER}&select=id`, countHdr),
-      db(`jobs?${STALE_CLEARABLE_FILTER}&last_seen_at=lt.${overdueCutoff}&select=id`, countHdr),
-    ]).catch(() => [null, null, null]);
+    // ALL seven jobs counts (total, active, added today, stale+expired, clearable, kept, overdue) come
+    // from ONE scan via lib/server/adminJobsCounts.js — they used to be seven concurrent exact counts
+    // over the whole table on every poll, the top load on the database (see that file). Exact either way.
+    const jobsCountsP = fetchAdminJobsCounts({
+      supabaseUrl: SB, serviceKey: SK, db, todayISO,
+      overdueISO: new Date(Date.now() - 15 * 86_400_000).toISOString(),
+    });
 
     const [
       usersTotalRes, usersTodayRes, usersWeekRes,
@@ -342,11 +343,10 @@ async function _handler(req, res) {
       coScoredRes, issuesRes, creditListRes,
       errTodayRes, errWeekRes,
       dauRes, dupClustersRes, flagsRes,
-      staleJobsRes, zeroSearchesRes, jobReportsRes, searchLogsTodayRes,
-      recentReportsRes, recentAppsRes, jobsTodayRes, inactiveReportsRes,
-      jobsActiveRes,
+      zeroSearchesRes, jobReportsRes, searchLogsTodayRes,
+      recentReportsRes, recentAppsRes, inactiveReportsRes,
       reportsMonthRes, searchLogsWeekRes,
-      jobsTotalRes, creditTxnRes, outcomeSharesRes, usersMonthRes,
+      creditTxnRes, outcomeSharesRes, usersMonthRes,
       searchEvents30Res, resumeScans30Res, disputesOpenRes,
       pendingClaimsRes, listingDisputesOpenRes, unfulfilledPurchasesRes, heldReportsRes,
     ] = await Promise.all([
@@ -367,7 +367,6 @@ async function _handler(req, res) {
       db(`login_signals?created_at=gte.${todayISO}&select=user_id`),
       db(`duplicate_clusters?status=eq.suspected&order=risk_score.desc&limit=10`),
       db(`feature_flags?select=flag_name,status,percentage,description,updated_by,updated_at&order=flag_name.asc`),
-      db(`jobs?availability_status=in.(stale,expired)&select=id`, { headers: { Prefer: 'count=exact', 'Range-Unit': 'items', Range: '0-0' } }),
       db(`search_events?result_count=eq.0&created_at=gte.${weekISO}&select=query&order=created_at.desc&limit=20`),
       db(`job_availability_reports?reported_at=gte.${weekISO}&select=job_id,status&limit=200`),
       db(`search_logs?created_at=gte.${todayISO}&select=id`, { headers: { Prefer: 'count=exact', 'Range-Unit': 'items', Range: '0-0' } }),
@@ -379,20 +378,9 @@ async function _handler(req, res) {
       // ever needs a place again.
       db(`reports?select=id,company_name,outcome,role,platform,created_at,report_text,outcome_weight,trust_reason,needs_review&order=created_at.desc&limit=25`),
       db(`applications?select=id,company_name,role,city,status,stage,platform,created_at&order=created_at.desc&limit=25`),
-      db(`jobs?created_at=gte.${todayISO}&select=id`, { headers: { Prefer: 'count=exact', 'Range-Unit': 'items', Range: '0-0' } }),
       db(`job_availability_reports?status=in.(expired,unknown)&select=id,job_id,status,reported_at,company,title,city,apply_url&order=reported_at.desc&limit=50`),
-      // `select=count` is not a count primitive: on the 60k+ jobs table PostgREST spent the full
-      // statement timeout trying to serve it, then the dashboard quietly displayed zero. Ask for
-      // an exact count in Content-Range instead and discard the rows with HEAD. This is the same
-      // count contract used by the smaller tables above, without transferring any job records.
-      db(`jobs?availability_status=eq.active&select=id`, {
-        method: 'HEAD', headers: { Prefer: 'count=exact', 'Range-Unit': 'items', Range: '0-0' },
-      }),
       db(`reports?created_at=gte.${monthISO}&select=created_at,company_name,outcome&order=created_at.asc&limit=2000`),
       db(`search_logs?created_at=gte.${weekISO}&select=query&limit=500`),
-      db(`jobs?select=id`, {
-        method: 'HEAD', headers: { Prefer: 'count=exact', 'Range-Unit': 'items', Range: '0-0' },
-      }),
       db(`credit_transactions?select=delta&limit=20000`),
       db(`outcome_card_shares?select=shared_via,created_at&order=created_at.desc&limit=5000`),
       db(`profiles?created_at=gte.${monthISO}&select=created_at&order=created_at.asc&limit=5000`),
@@ -417,11 +405,10 @@ async function _handler(req, res) {
 
     const usersTotal = ct(usersTotalRes);
     const issues = issuesRes.ok ? await issuesRes.json() : [];
-    const jobsActive = ct(jobsActiveRes);
-    // jobsTodayRes already performs this exact count. The old duplicate `select=count` query both
-    // wasted a second table scan and could disagree with `added_today` when one request timed out.
-    const jobsNewToday = ct(jobsTodayRes);
-    const jobsTotal = ct(jobsTotalRes);
+    const jobsCounts = await jobsCountsP;
+    const jobsActive = jobsCounts.active || 0;
+    const jobsNewToday = jobsCounts.added_today || 0;
+    const jobsTotal = jobsCounts.total || 0;
     const creditRows = creditListRes.ok ? await creditListRes.json() : [];
     const proCount = creditRows.filter(r => r.pro).length;
     const totalBalance = creditRows.reduce((s, r) => s + (Number(r.balance) || 0), 0);
@@ -551,8 +538,7 @@ async function _handler(req, res) {
     // Either condition alone is enough to declare a crisis.
     const JOB_HEALTH_MIN_ACTIVE = 500;   // floor of live listings before we alert
     const JOB_HEALTH_MIN_RATIO  = 0.40;  // min share of corpus that must be active
-    const staleJobs = ct(staleJobsRes);
-    const [staleClearableRes, staleKeptRes, staleOverdueRes] = await staleCountsP;
+    const staleJobs = jobsCounts.stale_or_expired || 0;
     const activePct = jobsTotal > 0 ? Math.round((jobsActive / jobsTotal) * 100) : 0;
     const jobCrisis =
       jobsActive < JOB_HEALTH_MIN_ACTIVE ||
@@ -630,12 +616,13 @@ async function _handler(req, res) {
         total: jobsTotal,
         active: jobsActive,
         new_today: jobsNewToday,
-        added_today: ct(jobsTodayRes),
-        stale_or_expired: ct(staleJobsRes),
+        added_today: jobsNewToday,
+        stale_or_expired: staleJobs,
         // Clearable stale rows (what "Clear stale" removes) vs expired rows kept for saved/applied links.
-        stale_clearable: staleClearableRes?.ok ? ct(staleClearableRes) : null,
-        expired_kept: staleKeptRes?.ok ? ct(staleKeptRes) : null,
-        stale_overdue: staleOverdueRes?.ok ? ct(staleOverdueRes) : null,
+        stale_clearable: jobsCounts.stale_clearable,
+        expired_kept: jobsCounts.expired_kept,
+        stale_overdue: jobsCounts.stale_overdue,
+        counts_source: jobsCounts.source, // 'rpc' (one scan) or 'exact' (seven, before the migration)
         zero_result_searches_7d: zeroSearchRows.length,
         top_zero_queries: [...new Set(zeroSearchRows.map(r => r.query))].slice(0, 10),
         availability_reports_7d: jobReportRows.length,

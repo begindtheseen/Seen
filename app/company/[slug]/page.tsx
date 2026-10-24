@@ -465,7 +465,9 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
   const [perk, setPerk] = useState<{ featured: boolean; verified: boolean }>({ featured: false, verified: false })
   useEffect(() => {
     let alive = true
-    fetch('/api/reports', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'employer_perk', name: companyName }) })
+    // Public reads are GETs so Vercel's CDN can answer repeat visitors (lib/server/publicRead.js); a
+    // POST is never cached at the edge, which is why every one of these used to hit the database.
+    fetch(`/api/reports?type=perk&name=${encodeURIComponent(companyName)}`)
       .then(r => r.json()).then(d => { if (alive && d) setPerk({ featured: !!d.featured, verified: !!d.verified }) }).catch(() => {})
     return () => { alive = false }
   }, [companyName])
@@ -475,7 +477,7 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
   const [reddit, setReddit] = useState<RedditDiscussionResult | null>(null)
   useEffect(() => {
     let alive = true
-    fetch('/api/company-reddit', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ company: companyName }) })
+    fetch(`/api/company-reddit?company=${encodeURIComponent(companyName)}`)
       .then(r => r.json().catch(() => ({})))
       .then((j: { items?: RedditDiscussionResult['items']; status?: string }) => {
         if (!alive) return
@@ -563,39 +565,18 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
     } catch {}
   }, [slug, companyName])
 
-  // Fetch reports + score
+  // The grade (score) and the report list are independent reads, so they start together and the hero
+  // renders the moment the score answers. They used to run as one waterfall — list → employer replies →
+  // score — so the grade, the thing the page exists for, arrived last, and the whole chain re-ran on
+  // every keystroke in the city filter (which only the list uses). All GETs: CDN-cacheable.
+  const [reportsLoading, setReportsLoading] = useState(true)
   useEffect(() => {
-    async function load() {
-      setLoading(true)
-      setError('')
-      try {
-        // Fetch community reports
-        const rRes = await fetch('/api/reports', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ company: companyName.toLowerCase(), city: location }),
-        })
-        if (rRes.ok) {
-          const rJson = await rRes.json() as { reports?: Report[]; ok?: boolean }
-          // Newest experience first by its REAL date (imported rows: the source's posted date).
-          if (rJson.reports) setReports(sortReportsByDate(rJson.reports))
-        }
-
-        // Approved employer replies for this company, keyed by report id (best-effort, public).
-        try {
-          const repRes = await fetch(`/api/employer-replies?company=${encodeURIComponent(companyName)}`)
-          if (repRes.ok) {
-            const repJson = await repRes.json() as { replies?: Record<string, { body: string; created_at: string }> }
-            if (repJson.replies) setEmployerReplies(repJson.replies)
-          }
-        } catch { /* replies are additive — a failure just hides them */ }
-
-        // Fetch score from company-score endpoint
-        const sRes = await fetch('/api/reports', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ name: companyName }),
-        })
+    let alive = true
+    setLoading(true)
+    setError('')
+    fetch(`/api/reports?type=score&name=${encodeURIComponent(companyName)}`)
+      .then(async sRes => {
+        if (!alive) return
         if (sRes.ok) {
           const sJson = await sRes.json() as { score?: CompanyScore; ok?: boolean; not_found?: boolean; enrichment?: { status?: string } }
           setEnrichmentStatus(typeof sJson.enrichment?.status === 'string' ? sJson.enrichment.status : null)
@@ -607,22 +588,42 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
             if (sJson.score.web_reviews?.length) setWebReviews(sJson.score.web_reviews)
           }
         }
-      } catch {
-        setError('Failed to load company data.')
-      }
-      setLoading(false)
-    }
-    load()
-  }, [companyName, location]) // eslint-disable-line react-hooks/exhaustive-deps
+      })
+      .catch(() => { if (alive) setError('Failed to load company data.') })
+      .finally(() => { if (alive) setLoading(false) })
+    return () => { alive = false }
+  }, [companyName])
+
+  useEffect(() => {
+    let alive = true
+    setReportsLoading(true)
+    const list = fetch(`/api/reports?type=list&company=${encodeURIComponent(companyName.toLowerCase())}&city=${encodeURIComponent(location)}`)
+      .then(async rRes => {
+        if (!alive || !rRes.ok) return
+        const rJson = await rRes.json() as { reports?: Report[]; ok?: boolean }
+        // Newest experience first by its REAL date (imported rows: the source's posted date).
+        if (rJson.reports) setReports(sortReportsByDate(rJson.reports))
+      })
+      .catch(() => {})
+      .finally(() => { if (alive) setReportsLoading(false) })
+    // Approved employer replies for this company, keyed by report id (best-effort, public, additive —
+    // a failure just hides them). Independent of the list, so it runs alongside it.
+    fetch(`/api/employer-replies?company=${encodeURIComponent(companyName)}`)
+      .then(async repRes => {
+        if (!alive || !repRes.ok) return
+        const repJson = await repRes.json() as { replies?: Record<string, { body: string; created_at: string }> }
+        if (repJson.replies) setEmployerReplies(repJson.replies)
+      })
+      .catch(() => {})
+    void list
+    return () => { alive = false }
+  }, [companyName, location])
 
   // Industry benchmark — how this company ranks vs its sector on Seen (public aggregate). Turns a
   // bare score into authoritative context. Fail-soft: the page renders fine without it.
   useEffect(() => {
     let alive = true
-    fetch('/api/reports', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'industry_benchmark', name: companyName }),
-    })
+    fetch(`/api/reports?type=benchmark&name=${encodeURIComponent(companyName)}`)
       .then(r => (r.ok ? r.json() : { benchmark: null }))
       .then(d => { if (alive) setBenchmark((d?.benchmark as Benchmark) || null) })
       .catch(() => {})
@@ -634,11 +635,7 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
   useEffect(() => {
     if ((!open.roles && !open.locations) || jobsFetched) return
     setJobsLoading(true)
-    fetch('/api/jobs', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'company_jobs', company: companyName }),
-    })
+    fetch(`/api/jobs?action=company_jobs&company=${encodeURIComponent(companyName)}`)
       .then(r => r.ok ? r.json() : { jobs: [] })
       .then(d => { setCompanyJobs(d.jobs || []); setJobsFetched(true) })
       .catch(() => setJobsFetched(true))
@@ -655,11 +652,7 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
     }
     setCompareList(prev => [...prev, { name, score: null, loading: true }])
     setCompareInput('')
-    fetch('/api/reports', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name }),
-    })
+    fetch(`/api/reports?type=score&name=${encodeURIComponent(name)}`)
       .then(r => r.ok ? r.json() : { score: null })
       .then(d => setCompareList(prev => prev.map(c => c.name === name ? { ...c, score: d.score ?? null, loading: false } : c)))
       .catch(() => setCompareList(prev => prev.map(c => c.name === name ? { ...c, loading: false } : c)))
@@ -690,7 +683,7 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
   const webEst = score ? (score.web_report_count ?? (score.data_source === 'reports' ? 0 : (score.report_count || 0))) : 0
   // Honest status line: only while the enrichment worker has this company queued/running AND the
   // page has no first-party reports to show. It promises nothing about what will be found.
-  const gatheringPublic = !loading && fpReports === 0 && reports.length === 0 && (enrichmentStatus === 'queued' || enrichmentStatus === 'running')
+  const gatheringPublic = !loading && !reportsLoading && fpReports === 0 && reports.length === 0 && (enrichmentStatus === 'queued' || enrichmentStatus === 'running')
   const logoLetter = (companyName[0] || '?').toUpperCase()
   const ghostRate = graded ? score.ghost_rate || 0 : 0
   const ghostHigh = ghostRate > 0.5
@@ -1074,7 +1067,7 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
             <Section id="reports" icon="🗣" title={employeeN > 0 ? 'Applicant reports & employee reviews' : 'Applicant reports'} count={employeeN > 0 ? null : outcomeReports.length} open={open.reports} onToggle={toggle}
               summary={reports.length > 0
                 ? [`${outcomeReports.length} applicant report${outcomeReports.length !== 1 ? 's' : ''}`, waitingN > 0 ? `${waitingN} still waiting (no outcome yet)` : '', employeeN > 0 ? `${employeeN} employee review${employeeN !== 1 ? 's' : ''}` : '', `${ghostedN} ghosted`, `${interviewN} interviewed`, `${hiredN} hired`, thirdPartyN > 0 ? `${thirdPartyN} from public discussion` : ''].filter(Boolean).join(' · ')
-                : 'None yet — be the first to report'}>
+                : reportsLoading ? 'Loading reports…' : 'None yet — be the first to report'}>
               <div className="co-reports-tools">
                 <div style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', color: 'var(--muted)', lineHeight: 1.6, flex: 1, minWidth: 180 }}>
                   {reports.length > 0
@@ -1098,7 +1091,9 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
                   className="co-city-input"
                 />
               </div>
-              {reports.length > 0 ? (
+              {reportsLoading && reports.length === 0 ? (
+                <p style={{ fontFamily: 'var(--mono)', fontSize: '.75rem', color: 'var(--muted)', margin: '8px 0 0' }}>Loading reports…</p>
+              ) : reports.length > 0 ? (
                 <>
                   {[...seenRows, ...publicRows].slice(0, reportsShown).map((r, i) => {
                     const badge = reportSourceBadge(r.platform, r.report_text)

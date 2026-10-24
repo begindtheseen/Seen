@@ -1,6 +1,7 @@
 import { createHmac, timingSafeEqual } from 'crypto';
 import { getQueryExpansion } from '../lib/server/expand.js';
 import { applyRateLimit, rateLimit, rateLimitGlobal, resolveRateBucket } from '../lib/server/ratelimit.js';
+import { jobsReadFromQuery, setPublicCache } from '../lib/server/publicRead.js';
 import { logError } from '../lib/server/errlog.js';
 import { filterAndRank, relevanceScore, sortByProximity, locationDbTerm, expandQueryTerms, parseLocation, locationScore } from './_utils/jobRelevance.js';
 import { sortByPriority, companyMatchesQuery, queryNamesCompany, isRemoteListing } from '../lib/server/jobPriority.js';
@@ -144,14 +145,18 @@ export default async function handler(req, res) {
   const _devO=!_o||_o.includes('localhost')||_o.includes('127.0.0.1');
   res.setHeader('Access-Control-Allow-Origin',(_devO||['https://seenjobs.io','https://www.seenjobs.io'].includes(_o))?(_o||'*'):'https://seenjobs.io');
   res.setHeader('Vary','Origin');
-  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 
   if (req.method === 'OPTIONS') return res.status(200).end();
-  if (req.method !== 'POST') return res.status(405).end('Method not allowed');
+  // The two company-page reads (listing signals, a company's open roles) are public and identical for
+  // every visitor, so they are also served as cacheable GETs (lib/server/publicRead.js): same body, same
+  // handler, and the CDN answers repeat visitors instead of the database. Everything else stays POST.
+  const publicRead = req.method === 'GET' ? jobsReadFromQuery(req.query) : null;
+  if (req.method !== 'POST' && !publicRead) return res.status(405).end('Method not allowed');
 
   // Parse body early so we can route before rate limiting
-  let _body = req.body;
+  let _body = publicRead || req.body;
   if (typeof _body === 'string') { try { _body = JSON.parse(_body); } catch(e) { _body = {}; } }
   if (!_body || typeof _body !== 'object') _body = {};
 
@@ -170,12 +175,14 @@ export default async function handler(req, res) {
   // ── Company jobs: fetch/search jobs for a specific company ─────────────────
   if (_body.action === 'company_jobs') {
     if (await applyRateLimit(req, res, 'job-read', { bucketKey: rlBucket.key })) return;
+    setPublicCache(res, 'company_jobs');
     return handleCompanyJobs(req, res, _body);
   }
 
   // ── Listing signals: a company's rating from its own open posts (not its applicant grade) ──
   if (_body.action === 'listing_signals') {
     if (await applyRateLimit(req, res, 'job-read', { bucketKey: rlBucket.key })) return;
+    setPublicCache(res, 'listing_signals');
     return handleListingSignals(req, res, _body);
   }
 
