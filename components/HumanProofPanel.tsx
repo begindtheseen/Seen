@@ -51,7 +51,7 @@ function riskColor(r: string): string {
   return r === 'low' ? 'var(--green)' : r === 'medium' ? 'var(--amber)' : 'var(--red)'
 }
 
-export default function HumanProofPanel({ job }: { job: Job }) {
+export default function HumanProofPanel({ job, optimized = false }: { job: Job; /** True only after SeenFit ran on this page — the copy never claims an optimization that did not happen. */ optimized?: boolean }) {
   const { isLoggedIn } = useAuth()
   const { user } = useAuth() as unknown as { user: { id?: string } | null }
   const [state, setState] = useState<State>('idle')
@@ -124,7 +124,7 @@ export default function HumanProofPanel({ job }: { job: Job }) {
         <div style={{ background: 'var(--gdim)', border: '1px solid var(--line)', borderRadius: 12, padding: '1.1rem 1.1rem 1.25rem' }}>
           <div style={{ fontFamily: 'var(--display)', fontWeight: 800, color: 'var(--white)', fontSize: '.95rem', marginBottom: '.3rem' }}>HumanProof</div>
           <p style={{ fontFamily: mono, fontSize: '.65rem', color: 'var(--sub)', lineHeight: 1.6, marginBottom: '.9rem' }}>
-            Your application is optimized. Now make it sound real — remove generic AI tone and add truthful, specific work context so it&apos;s interview-ready.
+            {optimized ? 'Your application is optimized. Now make it sound real — ' : 'Make your application sound real — '}remove generic AI tone and add truthful, specific work context so it&apos;s interview-ready.
           </p>
           <button
             onClick={run}
@@ -171,7 +171,7 @@ export default function HumanProofPanel({ job }: { job: Job }) {
         <div style={{ background: 'var(--gdim)', border: '1px solid var(--line2)', borderRadius: 12, padding: '1.4rem', textAlign: 'center', position: 'relative', overflow: 'hidden' }}>
           <div style={{ fontSize: '1.5rem', marginBottom: '.5rem' }}>🔒</div>
           <div style={{ fontFamily: 'var(--display)', fontWeight: 800, color: 'var(--white)', fontSize: '1rem', marginBottom: '.5rem' }}>
-            Your application is optimized. Now make it sound real.
+            {optimized ? 'Your application is optimized. Now make it sound real.' : 'Make your application sound real.'}
           </div>
           <p style={{ fontFamily: mono, fontSize: '.66rem', color: 'var(--sub)', lineHeight: 1.65, marginBottom: '1.1rem', maxWidth: 420, marginLeft: 'auto', marginRight: 'auto' }}>
             Unlock HumanProof to remove generic AI tone, add truthful work context, and make your application interview-ready.

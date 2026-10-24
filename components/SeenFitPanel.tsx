@@ -54,7 +54,7 @@ function pct(n: number): string {
 
 const mono = 'var(--mono)'
 
-export default function SeenFitPanel({ job }: { job: Job }) {
+export default function SeenFitPanel({ job, onOptimized }: { job: Job; /** Called once a SeenFit run succeeds on this page. */ onOptimized?: () => void }) {
   const { isLoggedIn } = useAuth()
   const { user } = useAuth() as unknown as { user: { id?: string } | null }
   const [state, setState] = useState<State>('idle')
@@ -107,10 +107,11 @@ export default function SeenFitPanel({ job }: { job: Job }) {
       if (!res.ok || data.error) { setState('error'); return }
       setOut(data)
       setState('done')
+      onOptimized?.()
     } catch {
       setState('error')
     }
-  }, [job, isLoggedIn, user])
+  }, [job, isLoggedIn, user, onOptimized])
 
   // ── Trigger button (idle) ──
   if (state === 'idle') {

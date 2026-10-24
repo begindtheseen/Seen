@@ -242,3 +242,48 @@ test('a query that names a seniority pays no seniority penalty', () => {
   assert.equal(tokenInTitle('nursery worker', 'nurse'), false);
   assert.equal(tokenInTitle('software engineering manager', 'engineer'), true);
 });
+
+// H9 (audit 2026-10-24, scratchpad audit3/jobs/matrix.json): rows that shared one word with the search
+// were served as matches. Each pair is a real served title.
+test('isTitleRelated: a match is the role searched, not a shared word', async () => {
+  const { isTitleRelated } = await import('./jobRelevance.js');
+  const rel = (title, q, company = 'Acme') => isTitleRelated({ title, company }, q);
+  // pharmacy technician · Phoenix
+  assert.equal(rel('Environmental Services & Facilities Technician', 'pharmacy technician'), false);
+  assert.equal(rel('Pharmacy Technician', 'pharmacy technician'), true);
+  assert.equal(rel('Pharmacy Tech II', 'pharmacy technician'), true);
+  // call center · Phoenix
+  assert.equal(rel('Mechanical Engineer – Mission Critical Data Centers', 'call center'), false);
+  assert.equal(rel('Center-Based Behavior Technician', 'call center'), false);
+  assert.equal(rel('Call Center Representative', 'call center'), true);
+  assert.equal(rel('Customer Service Representative', 'call center'), true, 'same role family');
+  // retail manager · Tucson
+  assert.equal(rel('Case Manager (PRN/Pool)', 'retail manager'), false);
+  assert.equal(rel('Store Manager', 'retail manager'), true);
+  // marketing manager / sales associate
+  assert.equal(rel('Group Product Manager', 'marketing manager'), false);
+  assert.equal(rel('Senior Marketing Manager', 'marketing manager'), true);
+  assert.equal(rel('Consulting Associate / Forensic Services', 'sales associate'), false);
+  assert.equal(rel('Retail Sales Associate', 'sales associate'), true);
+  // single-word and family queries keep working
+  assert.equal(rel('Cosmetics Cashier', 'cashier'), true);
+  assert.equal(rel('Material Handler', 'warehouse'), true);
+  assert.equal(rel('Registered Nurses', 'nurse'), true);
+  // a company search matches every row at that company
+  assert.equal(rel('Shift Supervisor', 'starbucks', 'Starbucks'), true);
+  assert.equal(rel('anything', ''), true, 'no query → nothing to judge');
+});
+
+test('isTitleRelated: abbreviations a title uses count as the query word (live 2026-10-24)', async () => {
+  const { isTitleRelated } = await import('./jobRelevance.js');
+  // A "travel nurse" search on the preview marked these real Phoenix listings as unrelated.
+  for (const title of ['Travel Med Surg RN', 'Travel Progressive Care Unit RN - $2,456 per week', 'Travel Behavioral Health RN - $2,184 per week', 'Travel LPN - Long Term Care']) {
+    assert.equal(isTitleRelated({ title, company: 'Aya Healthcare' }, 'travel nurse'), true, title);
+  }
+  assert.equal(isTitleRelated({ title: 'Pharmacy Tech II', company: 'CVS' }, 'pharmacy technician'), true);
+  assert.equal(isTitleRelated({ title: 'Customer Service Rep', company: 'X' }, 'customer service representative'), true);
+  // still whole-word only, and only real abbreviations
+  assert.equal(isTitleRelated({ title: 'Nursery Teacher', company: 'X' }, 'travel nurse'), false);
+  assert.equal(isTitleRelated({ title: 'Travel Agent', company: 'X' }, 'travel nurse'), false);
+  assert.equal(isTitleRelated({ title: 'Technical Writer', company: 'X' }, 'pharmacy technician'), false);
+});

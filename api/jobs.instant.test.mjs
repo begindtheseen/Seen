@@ -91,14 +91,20 @@ test('"customer service": the plain CSR outranks the Director; ServiceNow is not
   const careIdx = titles.findIndex((t) => /Customer Care/.test(t));
   assert.ok(dirIdx > 0 && careIdx > 0 && careIdx < dirIdx, `Customer Care (coordinate-less, says Austin) ranks above the Director: ${titles.join(' | ')}`);
   // The Portland CSR has the highest transparency score and a perfect title match, but it is a
-  // fill-in from far away: it is served LAST and flagged, and the count excludes it.
-  assert.equal(titles[titles.length - 1], 'Customer Service Representative @ Far Co');
+  // fill-in from far away: it is served after every in-radius MATCH and flagged, and the count
+  // excludes it. The PwC Director only shares "service(s)" with the search: it is not a match, so it
+  // sits below every match (related:false — the page lists it under "Other openings", audit H9).
+  const farIdx = titles.indexOf('Customer Service Representative @ Far Co');
+  assert.equal(farIdx, titles.length - 2, titles.join(' | '));
+  assert.equal(titles[titles.length - 1], 'Managed Services - Data, Analytics & AI - Director @ PwC');
+  assert.equal(res.body.jobs[titles.length - 1].related, false);
+  assert.ok(res.body.jobs.slice(0, -1).every((j) => j.related === true), 'every other row is a match');
   assert.ok(!titles.some((t) => /karllagerfeld/.test(t)), `a row naming a non-US place never reaches a US search: ${titles.join(' | ')}`);
   assert.equal(titles.filter((t) => t === 'Customer Service Representative @ PLS Financial Services').length, 1, 'the Adzuna teaser hides behind the full-text row');
   assert.ok(!res.body.jobs.some((j) => j.source === 'Adzuna'), 'the teaser copy is the one dropped');
-  assert.equal(res.body.jobs[res.body.jobs.length - 1].in_radius, false);
+  assert.equal(res.body.jobs[farIdx].in_radius, false);
   assert.equal(res.body.in_radius, 3, 'CSR + Customer Care (text says Austin, no coords) + Director');
-  assert.ok(res.body.jobs.slice(0, 3).every((j) => j.in_radius === true));
+  assert.ok(res.body.jobs.slice(0, 2).every((j) => j.in_radius === true));
   assert.ok(res.body.jobs.every((j) => typeof j.relevance === 'number' && j.relevance > 0), 'every row carries its relevance');
   assert.equal(res.body.fallback, 'outside_radius');
 });

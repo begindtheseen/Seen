@@ -18,6 +18,8 @@ interface FeedReport {
   rounds?: number
   report_text?: string
   platform?: string
+  /** How the row arrived (direct_submission, external_import, …) — the provenance badge keys on it. */
+  trust_reason?: string | null
   created_at: string
   experience_level?: string
   company_name?: string
@@ -159,7 +161,7 @@ export default function FeedPage() {
           <>
             {reports.map(r => {
               const oc = OUTCOME_LABELS[r.outcome] || { label: r.outcome, cls: '' }
-              const badge = reportSourceBadge(r.platform, r.report_text)
+              const badge = reportSourceBadge(r.platform, r.report_text, r.trust_reason)
               const src = reportSourceLink(r.platform, r.report_text)
               const body = src ? src.body : r.report_text
               return (
