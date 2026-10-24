@@ -33,6 +33,13 @@ export interface CompanyCardData {
   risk?: Risk
   /** "updated Oct 20, 2026" — printed with the confidence line. */
   updated?: string
+  /**
+   * The page's confidence word ("High confidence" / "Moderate confidence" / "Low confidence" —
+   * lib/companySummary.ts, from the stored data_quality). When given it is printed as is; the card
+   * never derives its own from the row count (Target: "High confidence" on the card under a
+   * "Moderate confidence" hero, audit 2026-10-23).
+   */
+  confidence?: string
 }
 
 export interface OutcomeStep { label: string; sub: string; mark?: string }
@@ -225,7 +232,7 @@ export function drawCompanyCard(canvas: HTMLCanvasElement, d: CompanyCardData) {
 
   const confY = dY + 40 + 130
   const n = d.report_count || 0
-  const conf = n >= 12 ? 'High confidence' : n >= 4 ? 'Growing confidence' : 'Early signal'
+  const conf = d.confidence || (n >= 12 ? 'High confidence' : n >= 4 ? 'Growing confidence' : 'Early signal')
   const line = (n > 0 ? `Based on ${n.toLocaleString()} applicant report${n === 1 ? '' : 's'}  ·  ${conf}` : 'Baseline estimate  ·  share your experience to sharpen it')
     + (d.updated ? `  ·  ${d.updated}` : '')
   c.font = '400 21px "Instrument Sans",sans-serif'

@@ -28,6 +28,8 @@ export interface CompanyScoreCardData {
   tags?: string[]
   /** When the score was last (re)computed — printed on the card as "updated <date>". */
   updated_at?: string | null
+  /** The page's confidence word (lib/companySummary.ts) — the card prints this, never its own. */
+  confidence?: string
 }
 
 // The SAME letter the page shows (lib/companyDisplay.ts). The card used its own 13-step A+/A/A-
@@ -78,6 +80,7 @@ export default function CompanyScoreCard({ data, shareUrl, onClose, onShared }: 
           report_count: data.report_count,
           risk,
           updated: updated ? updated.replace('Last updated', 'updated') : undefined,
+          confidence: data.confidence,
         }
         drawCompanyCard(canvas, payload)
         setDataUrl(canvas.toDataURL('image/png'))
