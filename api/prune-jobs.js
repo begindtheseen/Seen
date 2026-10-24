@@ -18,11 +18,12 @@
 
 import { logError } from '../lib/server/errlog.js';
 import { pruneStaleJobs, PRUNE_DEFAULTS } from '../lib/server/jobPrune.js';
+import { isVercelCron } from '../lib/server/cronAuth.js';
 
 export default async function handler(req, res) {
   const cronSecret = process.env.CRON_SECRET;
   const adminToken = req.headers['x-admin-token'] || '';
-  const isCron = req.headers['x-vercel-cron'] === '1';
+  const isCron = isVercelCron(req);
   // Fail CLOSED: a destructive endpoint must never be an open trigger. Every non-cron caller must
   // present a valid CRON_SECRET or a valid admin session; a missing/blank secret simply makes the
   // cron-secret path unavailable (callers fall through to 401) — same stance as api/refresh-jobs.js.

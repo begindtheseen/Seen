@@ -19,6 +19,7 @@ const call = async (req) => { const r = { code: 200, body: null, status(c) { thi
 test('auth: cron header or CRON_SECRET bearer; anything else 401', async () => {
   assert.equal((await call({ method: 'GET', headers: {}, query: {} })).code, 401);
   assert.equal((await call({ method: 'POST', headers: {}, query: { secret: 'nope' } })).code, 401);
+  assert.equal((await call({ method: 'GET', headers: { 'x-vercel-cron': '1' }, query: {} })).code, 401, 'the header anyone can send is not a cron');
 });
 
 test('no credentials: { ok:true, skipped:"no_credentials" } and not one request (IndexNow is production-only)', async () => {
@@ -26,7 +27,7 @@ test('no credentials: { ok:true, skipped:"no_credentials" } and not one request 
   const real = global.fetch;
   global.fetch = async () => { calls++; return json([]); };
   try {
-    const r = await call({ method: 'GET', headers: { 'x-vercel-cron': '1' }, query: {} });
+    const r = await call({ method: 'GET', headers: { authorization: 'Bearer cron' }, query: {} });
     assert.equal(r.code, 200);
     assert.equal(r.body.ok, true);
     assert.equal(r.body.skipped, 'no_credentials');

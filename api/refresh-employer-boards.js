@@ -14,7 +14,7 @@
 // is not mistaken for a dead one by the circuit breaker.
 //
 // Callers:
-//   • Vercel cron (GET, x-vercel-cron / Bearer CRON_SECRET) — the stalest boards, up to BOARDS_PER_RUN.
+//   • Vercel cron (GET, Bearer CRON_SECRET) — the stalest boards, up to BOARDS_PER_RUN.
 //   • Seen Command on the owner's Mac (POST, Bearer LOCAL_INDEED_INGEST_SECRET) —
 //       { companies?: string[1..50] }  sync those companies' boards now, or
 //       { limit?: 1..400 }             sync that many of the stalest boards now.
@@ -110,7 +110,6 @@ function authorize(req) {
   const cron = process.env.CRON_SECRET;
   const local = process.env.LOCAL_INDEED_INGEST_SECRET;
   if (cron && auth === `Bearer ${cron}`) return 'cron';
-  if (req.headers['x-vercel-cron'] === '1') return 'cron'; // same gate as api/refresh-jobs.js
   if (local && auth === `Bearer ${local}`) return 'local';
   return null;
 }

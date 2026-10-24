@@ -22,12 +22,13 @@ import { feedRowPasses } from '../lib/reports/feedFilter.js';
 import { redditPlatform } from '../lib/reports/platformLabel.js';
 import { enqueueCompanyEnrichment } from '../lib/server/enrichmentQueue.js';
 import { rewardReport } from '../lib/server/growthRewards.js';
+import { isVercelCron } from '../lib/server/cronAuth.js';
 
 // Authorize admin/cron-only actions (the Anthropic web-research endpoints). Accepts a Vercel
 // cron header, a shared CRON_SECRET, or a valid admin_sessions token. Everything Anthropic in
 // this file is gated behind this — no anonymous caller can spend a web-search credit.
 export async function isAdminOrCron(req, SUPABASE_URL, SERVICE_KEY) {
-  if (req.headers['x-vercel-cron'] === '1') return true;
+  if (isVercelCron(req)) return true;
   const CRON_SECRET = process.env.CRON_SECRET;
   if (CRON_SECRET && req.headers['x-cron-secret'] === CRON_SECRET) return true;
   const adminToken = (req.headers['x-admin-token'] || '').trim();
@@ -450,7 +451,7 @@ export default async function handler(req, res) {
   // the tenure columns or table are absent the PATCH simply no-ops.
   if (body.action === 'update_tenure') {
     const CRON_SECRET = process.env.CRON_SECRET;
-    const isCron = req.headers['x-vercel-cron'] === '1';
+    const isCron = isVercelCron(req);
     const hasCronSecret = CRON_SECRET && req.headers['x-cron-secret'] === CRON_SECRET;
     if (!isCron && !hasCronSecret) {
       const adminToken = (req.headers['x-admin-token'] || '').trim();
@@ -857,7 +858,7 @@ export default async function handler(req, res) {
   // action at the top of the handler (before the benchmark GET block).
   if (body.action === 'reddit_import') {
     const CRON_SECRET = process.env.CRON_SECRET;
-    const isCron = req.headers['x-vercel-cron'] === '1';
+    const isCron = isVercelCron(req);
     const hasCronSecret = CRON_SECRET && req.headers['x-cron-secret'] === CRON_SECRET;
     if (!isCron && !hasCronSecret) {
       // Validate X-Admin-Token against admin_sessions table

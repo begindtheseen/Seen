@@ -17,6 +17,7 @@ import { runStaleSweep } from '../lib/server/staleSweep.js';
 import { JOB_SEARCHES } from '../lib/server/jobSearchCatalog.js';
 import { fetchUsaJobs, usajobsCredentials } from '../lib/server/usajobs.js';
 import { pacificHour, pacificDayOfYear } from '../lib/time/pacific.js';
+import { isVercelCron } from '../lib/server/cronAuth.js';
 
 // Refresh a batch of registered employer-direct ATS boards straight from the source. Fail-open +
 // bounded so it never breaks the cron or exceeds the function time budget. Returns a small summary.
@@ -140,7 +141,7 @@ export default async function handler(req, res) {
 
   const cronSecret = process.env.CRON_SECRET;
   const adminToken = req.headers['x-admin-token'] || '';
-  const isCron     = req.headers['x-vercel-cron'] === '1';
+  const isCron     = isVercelCron(req);
   // Vercel kills the function at maxDuration and the caller gets a 504 with NO record of what ran.
   // Stop short of that and return what completed. Kept below the configured ceiling so the response
   // is actually written before the platform pulls the plug.

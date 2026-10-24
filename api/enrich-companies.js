@@ -16,9 +16,10 @@
 import { logError } from '../lib/server/errlog.js';
 import { runEnrichment } from '../lib/server/companyEnrichmentWorker.js';
 import { readEnrichConfig } from './_utils/companyEnrichment.js';
+import { isVercelCron } from '../lib/server/cronAuth.js';
 
 async function authorized(req) {
-  if (req.headers['x-vercel-cron'] === '1') return true;
+  if (isVercelCron(req)) return true;
   const secret = process.env.CRON_SECRET;
   if (secret && (req.headers.authorization === `Bearer ${secret}` || req.headers['x-cron-secret'] === secret)) return true;
   const adminToken = String(req.headers['x-admin-token'] || '').trim();

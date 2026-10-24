@@ -11,11 +11,12 @@
 
 import { logError } from '../lib/server/errlog.js';
 import { refreshStaleJobs } from '../lib/server/staleRefresh.js';
+import { isVercelCron } from '../lib/server/cronAuth.js';
 
 export default async function handler(req, res) {
   const cronSecret = process.env.CRON_SECRET;
   const adminToken = req.headers['x-admin-token'] || '';
-  const isCron = req.headers['x-vercel-cron'] === '1';
+  const isCron = isVercelCron(req);
   if (!isCron && cronSecret) {
     const authHeader = req.headers['authorization'] || '';
     const querySecret = new URL(req.url, 'https://x').searchParams.get('secret') || '';
