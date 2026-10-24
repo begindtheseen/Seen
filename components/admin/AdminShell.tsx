@@ -8,6 +8,7 @@ import { AdminHero, AdminCommandCenter, AdminMetricCard, CardSubLink, AdminAtten
 import { KpiModal, ManageAccountsModal, RevenueDetailModal, TrialsDetailModal, SharesDetailModal, ErrorsDetailModal } from './modals'
 import { ReviewQueuePanel } from './ReviewQueuePanel'
 import { ReportDupesCard } from './ReportDupesCard'
+import { SearchDataPanel } from './SearchDataPanel'
 import { JobCrisisBanner, JobRefreshButton, JobRunner, ReportRow, IssueRow, RedditDisputesPanel, ListingTicketsPanel, MergePanel, CompanyExportPanel, CreditsPanel, FlagsPanel, ClustersPanel, JobDedupePanel, AllJobsBrowser, DeployPanel } from './panels'
 import { GhostReportPanel } from './GhostReportPanel'
 import { LiveBell } from './LiveBell'
@@ -367,6 +368,9 @@ export function AdminShell({ stats, token, reload, onLogout, onUnauthorized }: {
                 }
               </div>
             </div>
+
+            {/* Search demand — Google + Bing queries behind Seen's pages (api/cron-search-data.js, daily) */}
+            <SearchDataPanel token={token} />
 
             {/* Self-filling company pages — the enrichment queue (api/enrich-companies cron, every 15 min).
                 Companies land here when a visitor looks them up with zero first-party reports. */}

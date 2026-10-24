@@ -26,6 +26,7 @@ import { EMPLOYER_SKUS } from '../lib/server/employerSkus.js';
 import { enrichmentQueueStats } from '../lib/server/enrichmentQueue.js';
 import { pacificDate, pacificDayStart } from '../lib/time/pacific.js';
 import { recentGrants } from '../lib/server/growthRewards.js';
+import { loadSearchOpportunities } from '../lib/server/searchOpportunities.js';
 import { browsePath as browseJobsPath, nextCursor as nextJobsCursor, validatePatch as validateJobPatch, restorePatch as jobRestorePatch, isJobId, HOLDERS as JOB_HOLDERS } from '../lib/server/jobAdmin.js';
 
 // Held reports still awaiting a decision: on hold and not already rejected (rejected rows stay held,
@@ -305,6 +306,15 @@ async function _handler(req, res) {
   const sess = sessRes.ok ? (await sessRes.json())[0] : null;
   if (!sess || new Date(sess.expires_at) < new Date()) return res.status(401).json({ error: 'Session expired — log in again' });
   const adminRole = sess.role;
+
+  // ── SEARCH OPPORTUNITIES — what people search before they reach Seen (Google + Bing, last 28 days) ──
+  // GET ?action=search_opportunities (or POST {action}). Striking-distance queries, low-CTR pages, intents,
+  // companies by search demand, missing pages, freshness and the weekly digest (lib/server/searchOpportunities.js).
+  // Read-only, all roles. Admin-only: raw queries appear here and nowhere public.
+  if ((req.method === 'GET' ? req.query?.action : body.action) === 'search_opportunities') {
+    const out = await loadSearchOpportunities({ url: SB, key: SK });
+    return res.status(out.ok ? 200 : 502).json(out);
+  }
 
   // ── GET: dashboard stats ─────────────────────────────────────────────────────
   if (req.method === 'GET') {

@@ -109,6 +109,9 @@
     },
     "api/inbox-email.js": {
       "maxDuration": 60
+    },
+    "api/cron-search-data.js": {
+      "maxDuration": 120
     }
   },
   "crons": [
@@ -195,6 +198,10 @@
     {
       "path": "/api/inbox-email",
       "schedule": "50 * * * *"
+    },
+    {
+      "path": "/api/cron-search-data",
+      "schedule": "20 13 * * *"
     }
   ]
 }
