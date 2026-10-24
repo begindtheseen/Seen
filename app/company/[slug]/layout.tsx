@@ -2,19 +2,19 @@ import type { Metadata } from 'next'
 // Build-safe score reader — reads the cached score DIRECTLY from Supabase and NEVER self-fetches
 // the live https://seenjobs.io/api/reports (which had no build detection here and could hang
 // `next build`). generateMetadata + the layout render below both go through this one helper.
-import { getScore, displayCompanyName, type GrowthScore } from '@/lib/growth'
+import { getScore, getScoreState, slugToName, displayCompanyName, type GrowthScore } from '@/lib/growth'
 import { buildCompanyFaq } from '@/lib/server/companyFaq'
 import { jsonLdHtml } from '@/lib/jsonLd'
 // Offline, numerically-grounded "What applicants report" paragraph (company_summaries). No-op when the
 // table is missing/empty or the read fails — the page renders exactly as before.
 import { getCompanySummary, summaryMonth, type CompanySummary } from '@/lib/companySummary'
-import { pageTitle } from '@/lib/cardCopy.js'
+import { isStaffingAgency } from '@/lib/agencies'
 // ONE set of facts for everything this file publishes (lib/companyMeta.ts): the meta description, the
 // JSON-LD nodes, the H1 paragraph and the FAQ read the same count, rates and grade as the page and the
 // OG card. Audit 2026-10-24 (L-1): the description said 62 / 73% / 81 while the H1 said 48 / 87% / 91.
-import { companyMetaFacts } from '@/lib/companyMeta'
+import { companyMetaFacts, companyRobots } from '@/lib/companyMeta'
 
-const titleCase = (slug: string) => slug.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
+const titleCase = (slug: string) => slugToName(slug).replace(/\b\w/g, c => c.toUpperCase())
 // Slug-mangled fallback only when no score row exists — the stored name keeps real punctuation
 // ("lowe's" → "Lowe's", not "Lowe S"), and this name feeds the OG title + schema.org for shares.
 const bestName = (slug: string, s: GrowthScore | null) =>
@@ -33,24 +33,27 @@ export async function generateMetadata(
   { params }: { params: Promise<{ slug: string }> }
 ): Promise<Metadata> {
   const { slug } = await params
-  const s = await getScore(slug)
+  const { score: s, ok: scoreRead } = await getScoreState(slug)
   const name = bestName(slug, s)
   // The stored paragraph (company_summaries) is quoted only while its numbers still match the live
   // score; otherwise the description is built from the same facts the page shows (lib/companyMeta.ts).
   const summary = s?.gradeable ? await getCompanySummary(summaryKey(slug, s)) : null
   const facts = companyMetaFacts(name, s, summary)
-  const { description } = facts
-  // "Walmart: Seen grade A, 13% ghost rate" / "Ledgent Technology on Seen: who replies, who ghosts" (lib/cardCopy.js),
-  // from the SAME facts as the description, never "Hiring Transparency Score" (owner 2026-10-24).
-  const title = pageTitle({ company: name, grade: facts.grade, ghostRate: facts.ratesShown ? s?.ghost_rate : null })
+  // "Walmart application status: who hears back (48 reports)" + "87% of applicants hear back from Walmart;
+  // 13% never do. …" (lib/cardCopy.js via companyMetaFacts): the same facts as the page, never "Hiring
+  // Transparency Score" (owner 2026-10-24), no dashes.
+  const { title, description } = facts
 
   return {
     title,
     description,
     keywords: [
-      `${name} hiring`, `${name} ghosting`, `${name} reddit`, `does ${name} ghost applicants`,
-      `${name} interview process`, `${name} hiring reviews`, `${name} response time`,
+      `${name} application status`, `${name} hiring process`, `${name} hiring`, `${name} response time`,
+      `${name} interview process`, `does ${name} ghost applicants`,
+      ...(isStaffingAgency(s?.company_name ?? name) ? [`is ${name} legit`] : []),
     ],
+    // No grade → noindex, follow (only when the score read succeeded; lib/companyMeta.ts companyRobots).
+    ...companyRobots(facts.gradeable, scoreRead),
     openGraph: {
       title,
       description,
@@ -124,6 +127,8 @@ export default async function CompanySlugLayout(
         responseRate: facts.ratesShown ? s.response_rate : null,
         avgWaitDays: facts.waitDays,
         reportCount: fpSeo,
+        mentionCount: facts.mentions,
+        isAgency: isStaffingAgency(s.company_name ?? name),
       })
     : []
 
@@ -268,8 +273,9 @@ export default async function CompanySlugLayout(
               aria-label={`Explore ${name} hiring`}
               style={{ display: 'flex', flexWrap: 'wrap', gap: '.5rem 1rem', marginTop: '.85rem', paddingTop: '.85rem', borderTop: '1px solid var(--line)' }}
             >
-              <a href={`/faq/does-${slug}-ghost-applicants`} style={{ fontFamily: 'var(--mono)', fontSize: '.62rem', color: 'var(--blue)', textDecoration: 'none' }}>Does {name} ghost applicants?</a>
-              <a href={`/faq/${slug}-hiring-process`} style={{ fontFamily: 'var(--mono)', fontSize: '.62rem', color: 'var(--blue)', textDecoration: 'none' }}>{name} hiring process</a>
+              {/* The hiring-process and application-status questions are answered in the FAQ below; the
+                  old /faq/<x> pages now point their canonical here, so they are not linked. */}
+              <a href="/methods" style={{ fontFamily: 'var(--mono)', fontSize: '.62rem', color: 'var(--blue)', textDecoration: 'none' }}>How grades work</a>
               <a href={`/compare?a=${encodeURIComponent(name)}`} style={{ fontFamily: 'var(--mono)', fontSize: '.62rem', color: 'var(--blue)', textDecoration: 'none' }}>Compare {name} vs another</a>
             </div>
           </div>
