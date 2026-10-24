@@ -360,9 +360,13 @@ function TrackerPage() {
     if (searchParams?.get('add') === '1') setShowManual(true)
   }, [searchParams])
 
+  // Inbox Autopilot's status arrives inside `load` (one call at mount, not two); undefined = not loaded
+  // yet, null = the bundle could not carry it (the panel then asks for itself).
+  const [inboxStatus, setInboxStatus] = useState<unknown>(undefined)
   const loadApps = useCallback(async () => {
-    const { apps: data, synced } = await AppStore.loadResult(isLoggedIn)
+    const { apps: data, synced, inbox } = await AppStore.loadResult(isLoggedIn)
     setApps(data)
+    if (inbox !== undefined) setInboxStatus(inbox)
     setLoadFailed(!synced)
     setLoading(false)
     // Highlight + scroll to one card: the one just added (?new=1 — the DB returns it first), or the
@@ -701,7 +705,7 @@ function TrackerPage() {
         )}
 
         {/* Inbox Autopilot — forwarded job emails keep these cards up to date (hidden until it is live) */}
-        <InboxAutopilot apps={apps} token={token} onAppsChanged={loadApps} />
+        <InboxAutopilot apps={apps} token={token} onAppsChanged={loadApps} status={inboxStatus} />
 
         {/* Stats — tiles on wide screens; one line on phones so the cards come first */}
         {apps.length > 0 && (

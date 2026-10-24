@@ -62,6 +62,8 @@ export type LoadResult = {
   /** True when the account's rows were read. False = the sync failed (or there was no session) and
    *  `apps` is only what this device last stored — a page must show that as an error, never as "0". */
   synced: boolean
+  /** The Inbox Autopilot status that rode along with `load` (null = not read; undefined = signed out). */
+  inbox?: LoadBundle['inbox']
 }
 
 export const AppStore = {
@@ -73,7 +75,7 @@ export const AppStore = {
   async loadResult(loggedIn: boolean): Promise<LoadResult> {
     if (!loggedIn) return { apps: this.loadSync(), synced: true }
     const bundle = await this.loadBundle(loggedIn)
-    return bundle ? { apps: bundle.applications, synced: true } : { apps: this.loadSync(), synced: false }
+    return bundle ? { apps: bundle.applications, synced: true, inbox: bundle.inbox } : { apps: this.loadSync(), synced: false, inbox: null }
   },
 
   async load(loggedIn: boolean): Promise<Application[]> {
