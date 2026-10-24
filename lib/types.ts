@@ -41,8 +41,11 @@ export interface Application {
   /** When the employer last edited the listing (Seen-posted listings only). */
   listingEditedAt?: string
   appliedAt: number
+  /** For a synced record: the account row's updated_at as last seen (the compare-and-set token). */
   updatedAt: number
   events: HiringEvent[]
+  /** A change made on this device that has not reached the account yet (retried on load / "Retry"). */
+  unsynced?: boolean
 }
 
 export interface UserProfile {

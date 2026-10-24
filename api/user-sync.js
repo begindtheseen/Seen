@@ -20,6 +20,11 @@ import { deleteApplicantResumes } from '../lib/server/seenApplyStore.js';
 import { decodeThread } from '../lib/server/applicationThread.js';
 import { pacificDate } from '../lib/time/pacific.js';
 import * as inbox from '../lib/server/inbox/store.js';
+import { sanitizeEvents, clientApplicationId, casWindow, timelineAnomalies, naturalKeyQuery, isMissingColumn, cleanText, COMPANY_MAX, ROLE_MAX, CITY_MAX, PLATFORM_MAX } from '../lib/server/trackerWrites.js';
+
+// Does applications.client_id exist yet (migration 20261024130000)? Probed on use; a "no" is
+// re-checked every 10 minutes so an applied migration is picked up without a redeploy.
+let clientIdColumn = { ok: null, at: 0 };
 
 // Verify a Supabase JWT locally (HS256) — no network round-trip.
 // Returns the payload (with .sub = user UUID) on success, null on failure.
@@ -206,42 +211,83 @@ export default async function handler(req, res) {
   }
 
   // ── ADD APPLICATION ─────────────────────────────────────────────────────────
+  // Idempotent on the tracker's own id ("app_<ms>", lib/stores/AppStore add): a retried or replayed
+  // request returns the row it already made (audit 3 H4: one request → two rows during a stall).
+  // Before migration 20261024130000 (client_id column + unique index) the same request is matched by
+  // its natural key (same user, company, role, applied_at, created in the last 15 min).
   if (action === 'add_application') {
+    if (clientIdColumn.ok === false && Date.now() - clientIdColumn.at > 600000) clientIdColumn = { ok: null, at: 0 };
     const a = body.application || {};
-    // Sanitize the client event history: array of small objects, capped, required fields only.
-    const events = Array.isArray(a.events)
-      ? a.events.slice(0, 50).map(e => ({
-          id: String(e?.id || '').slice(0, 40),
-          type: String(e?.type || '').slice(0, 40),
-          date: Number(e?.date) || Date.now(),
-          source: String(e?.source || 'user').slice(0, 20),
-          confidence: e?.confidence ?? 'low',
-        })).filter(e => e.type)
-      : [];
+    const events = sanitizeEvents(a.events);
+    const clientId = clientApplicationId(a.id);
     const row = {
       user_id:      uid,
       job_id:       a.jobId ? String(a.jobId).slice(0, 80) : null,
-      company_name: a.company   || '',
-      role:         a.role      || '',
-      city:         a.location  || '',
-      platform:     a.platform  || 'Seen',
+      company_name: cleanText(a.company, COMPANY_MAX),
+      role:         cleanText(a.role, ROLE_MAX),
+      city:         cleanText(a.location, CITY_MAX),
+      platform:     cleanText(a.platform, PLATFORM_MAX) || 'Seen',
       job_url:      a.jobUrl    || null,
       status:       a.status    || 'active',
       stage:        a.stage     || 'Applied',
       score:        a.score     || null,
       waste_score:  a.waste     || null,
-      applied_at:   a.appliedAt ? new Date(a.appliedAt).toISOString() : new Date().toISOString(),
+      applied_at:   a.appliedAt && Number.isFinite(new Date(a.appliedAt).getTime()) ? new Date(a.appliedAt).toISOString() : new Date().toISOString(),
       events,
     };
-    const r = await db('applications', { method: 'POST', body: JSON.stringify(row), headers: { Prefer: 'return=representation' } });
+    // One row by a filter. `missing` = PostgREST says the client_id column is not there yet
+    // (PGRST204 / 42703) — any other refusal is not read as "no column".
+    const findOne = async (q) => {
+      const r = await db(q).catch(() => null);
+      if (!r) return { row: null, missing: false };
+      if (!r.ok) {
+        const e = await r.json().catch(() => ({}));
+        return { row: null, missing: r.status === 400 && isMissingColumn(e) };
+      }
+      const rows = await r.json().catch(() => []);
+      return { row: Array.isArray(rows) && rows[0] ? rows[0] : null, missing: false };
+    };
+    const byClientId = `applications?user_id=eq.${uid}&client_id=eq.${encodeURIComponent(clientId || '')}&select=id,updated_at&limit=1`;
+    const existing = (row) => res.status(200).json({ id: row.id, updated_at: row.updated_at || null, existing: true });
+    // 1. The same client id already landed (after the migration). A different client id is a
+    //    different add, even for the same company + role on the same day.
+    if (clientId && clientIdColumn.ok !== false) {
+      const hit = await findOne(byClientId);
+      if (hit.missing) clientIdColumn = { ok: false, at: Date.now() };
+      else if (hit.row) return existing(hit.row);
+    }
+    // 2. Before the migration: the same request already landed (natural key).
+    if (!clientId || clientIdColumn.ok === false) {
+      const hit = await findOne(naturalKeyQuery(uid, row));
+      if (hit.row) return existing(hit.row);
+    }
+    // 3. Insert — with the client id and ON CONFLICT DO NOTHING when the column exists, plain otherwise.
+    let r = null;
+    if (clientId && clientIdColumn.ok !== false) {
+      r = await db('applications?on_conflict=user_id,client_id', { method: 'POST', body: JSON.stringify({ ...row, client_id: clientId }), headers: { Prefer: 'resolution=ignore-duplicates,return=representation' } });
+      if (!r.ok && r.status === 400) {
+        const e = await r.clone().json().catch(() => ({}));
+        if (isMissingColumn(e)) { clientIdColumn = { ok: false, at: Date.now() }; r = null; }
+        // 42P10: the column exists but its unique index does not (yet) — store the id without ON CONFLICT.
+        else if (e && e.code === '42P10') r = await db('applications', { method: 'POST', body: JSON.stringify({ ...row, client_id: clientId }), headers: { Prefer: 'return=representation' } });
+      } else if (r.ok) clientIdColumn = { ok: true, at: Date.now() };
+    }
+    if (!r) r = await db('applications', { method: 'POST', body: JSON.stringify(row), headers: { Prefer: 'return=representation' } });
     if (!r.ok) {
       const errText = await r.text().catch(() => '');
       console.error('[user-sync] add_application failed:', r.status, errText);
-      return res.status(400).json({ error: 'Insert failed' });
+      // A database timeout / outage is retryable (the client keeps the card and resends it).
+      return res.status(r.status >= 500 ? 502 : 400).json({ error: 'Insert failed' });
     }
-    const data = await r.json();
+    let data = await r.json().catch(() => []);
+    if (!Array.isArray(data) || !data.length) {
+      // The unique index swallowed a concurrent duplicate: answer with the row that won.
+      const winner = clientId ? (await findOne(byClientId)).row : null;
+      if (winner) return existing(winner);
+      data = [];
+    }
     console.log('[user-sync] add_application ok, id:', data?.[0]?.id);
-    return res.status(200).json({ id: data?.[0]?.id || null });
+    return res.status(200).json({ id: data?.[0]?.id || null, updated_at: data?.[0]?.updated_at || null });
   }
 
   // ── REMOVE APPLICATION ──────────────────────────────────────────────────────
@@ -284,6 +330,10 @@ export default async function handler(req, res) {
   }
 
   // ── UPDATE APPLICATION STAGE/STATUS/EDIT ─────────────────────────────────────────
+  // Compare-and-set (audit 3 H4): the client sends `updatedAt`, the millisecond it last saw on the
+  // row; the PATCH matches only that row state. 0 rows → 409 with the current row (another device,
+  // or this device's own timed-out write that ran late), or 410 when the row is gone. Without an
+  // `updatedAt` (older clients) the PATCH is unconditional, as before.
   if (action === 'update_application') {
     const { id, changes } = body;
     if (!id || !changes) return res.status(400).json({ error: 'id and changes required' });
@@ -294,32 +344,50 @@ export default async function handler(req, res) {
       return res.status(200).json({ ok: false, reason: 'not_synced' });
     }
     const allowed = {};
-    if (changes.stage)  allowed.stage  = changes.stage;
-    if (changes.status) allowed.status = changes.status;
-    if (changes.events && Array.isArray(changes.events)) allowed.events = changes.events.slice(0, 50);
+    if (changes.stage)  allowed.stage  = String(changes.stage).slice(0, 40);
+    if (changes.status) allowed.status = String(changes.status).slice(0, 20);
+    if (Array.isArray(changes.events)) allowed.events = sanitizeEvents(changes.events);
     // The card's Edit (AppStore EDITABLE_KEYS): the user's own record of what they applied to.
     // Same shape as add_application; company and role may not be blanked; applied_at must parse.
-    const text = (v, max) => String(v).trim().slice(0, max);
-    if (typeof changes.company === 'string' && text(changes.company, 200)) allowed.company_name = text(changes.company, 200);
-    if (typeof changes.role === 'string' && text(changes.role, 200))       allowed.role = text(changes.role, 200);
-    if (typeof changes.location === 'string') allowed.city = text(changes.location, 120);
-    if (typeof changes.platform === 'string' && text(changes.platform, 60)) allowed.platform = text(changes.platform, 60);
+    if (typeof changes.company === 'string' && cleanText(changes.company, COMPANY_MAX)) allowed.company_name = cleanText(changes.company, COMPANY_MAX);
+    if (typeof changes.role === 'string' && cleanText(changes.role, ROLE_MAX))          allowed.role = cleanText(changes.role, ROLE_MAX);
+    if (typeof changes.location === 'string') allowed.city = cleanText(changes.location, CITY_MAX);
+    if (typeof changes.platform === 'string' && cleanText(changes.platform, PLATFORM_MAX)) allowed.platform = cleanText(changes.platform, PLATFORM_MAX);
     if (changes.appliedAt != null) {
       const t = new Date(changes.appliedAt).getTime();
       if (Number.isFinite(t) && t <= Date.now() + 86400000) allowed.applied_at = new Date(t).toISOString();
     }
-    if (Object.keys(allowed).length) {
-      const r = await db(`applications?id=eq.${encodeURIComponent(id)}&user_id=eq.${uid}`, {
-        method: 'PATCH', body: JSON.stringify({ ...allowed, updated_at: new Date().toISOString() }),
-        headers: { Prefer: 'return=minimal' },
-      });
-      if (!r.ok) {
-        const e = await r.text().catch(() => '');
-        console.error('[user-sync] update_application failed:', r.status, e.slice(0, 200));
-        return res.status(200).json({ ok: false, reason: 'patch_failed' });
-      }
+    const where = `applications?id=eq.${encodeURIComponent(id)}&user_id=eq.${uid}`;
+    const current = async () => {
+      const g = await db(`${where}&limit=1`).catch(() => null);
+      const rows = g && g.ok ? await g.json().catch(() => []) : [];
+      return Array.isArray(rows) && rows[0] ? rows[0] : null;
+    };
+    const expected = body.updatedAt ?? changes.updatedAt;
+    const cas = casWindow(expected);
+    if (!Object.keys(allowed).length) {
+      const row = await current();
+      if (!row) return res.status(410).json({ error: 'gone' });
+      return res.status(200).json({ ok: true, updated_at: row.updated_at, anomalies: timelineAnomalies(row.applied_at, row.events) });
     }
-    return res.status(200).json({ ok: true });
+    const r = await db(`${where}${cas}`, {
+      method: 'PATCH', body: JSON.stringify({ ...allowed, updated_at: new Date().toISOString() }),
+      headers: { Prefer: 'return=representation' },
+    });
+    if (!r.ok) {
+      const e = await r.text().catch(() => '');
+      console.error('[user-sync] update_application failed:', r.status, e.slice(0, 200));
+      return res.status(200).json({ ok: false, reason: 'patch_failed' });
+    }
+    const rows = await r.json().catch(() => []);
+    const row = Array.isArray(rows) ? rows[0] : null;
+    if (!row) {
+      const now = await current();
+      if (!now) return res.status(410).json({ error: 'gone' });
+      // The row exists but not in the state the client last saw: hand back what is there now.
+      return res.status(409).json({ error: 'stale', application: now });
+    }
+    return res.status(200).json({ ok: true, updated_at: row.updated_at, anomalies: timelineAnomalies(row.applied_at, row.events) });
   }
 
   // ── CLEAR ALL APPLICATIONS (tracker "Clear all") ─────────────────────────────
