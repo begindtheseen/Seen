@@ -18,8 +18,8 @@ import { applyRateLimit } from '../lib/server/ratelimit.js';
 import { logError } from '../lib/server/errlog.js';
 import { gateAI } from '../lib/server/credits.js';
 import { runOptimizer, ENGINE_VERSION } from '../lib/optimizer/index.js';
-import { buildApplicationPackage } from '../lib/application-intelligence/index.js';
-import { analyzeApplication } from '../lib/resume-intelligence/engine.js';
+import { previewOnlyError } from '../lib/server/postingGate.js';
+import { freeDiagnostic } from '../lib/server/optimizePackage.js';
 import { extractJobFacts } from '../lib/optimizer/extractJobFacts.js';
 import { runHumanProof, HUMANPROOF_ENGINE_VERSION } from '../lib/humanizer/index.js';
 import { buildHumanProofPackage, normalizeBulletList } from '../lib/server/humanizePackage.js';
@@ -493,6 +493,12 @@ export default async function handler(req, res) {
     if (!resumeText || String(resumeText).trim().length < 40) {
       return res.status(400).json({ error: 'RESUME_REQUIRED', message: 'Provide résumé text (at least 40 characters).' });
     }
+    // A preview-only listing (≤520-char teaser) has nothing to measure — same answer as the paid
+    // path, so the client shows ONE paste box for both (lib/server/postingGate.js).
+    if (String(jobDescription || '').trim()) {
+      const preview = previewOnlyError(body);
+      if (preview) return res.status(preview.status).json({ ...preview.body, charged: false });
+    }
 
     const uid = haveDb ? await resolveUid(req, SUPABASE_URL, SERVICE_KEY) : null;
 
@@ -502,10 +508,13 @@ export default async function handler(req, res) {
       haveDb ? getCompanyProcess(db, company) : Promise.resolve({ score: null, confidence: null }),
     ]);
 
-    // Job facts: prefer cached → else extract → cache for next time.
+    // Job facts: extract from the posting the caller sent (fast, deterministic, and always the
+    // CURRENT text — a pasted posting can change under the same manual jobId). The flat job_facts
+    // cache carries no sections, constraints or posting phrases, so it is read only when no
+    // posting text was sent at all.
     let jobFacts = null;
     let factsSource = 'extracted';
-    if (haveDb && jobId) {
+    if (haveDb && jobId && !String(jobDescription || '').trim()) {
       jobFacts = await getCachedJobFacts(db, jobId);
       if (jobFacts) factsSource = 'cache';
     }
@@ -553,42 +562,14 @@ export default async function handler(req, res) {
       } catch (e) { console.error('optimizer persist:', e.message); }
     }
 
-    // Application Intelligence V2 — additive, non-breaking. Runs the richer local engine and
-    // attaches its package under `application_intelligence`. Never throws into the legacy
-    // path: if V2 fails for any reason, the classic SeenFit response is returned unchanged.
-    let application_intelligence = null;
-    try {
-      application_intelligence = buildApplicationPackage({
-        resumeText: String(resumeText),
-        jobDescription: jobDescription || '',
-        jobTitle: jobTitle || '',
-        company: company || '',
-        confirmedAnswers: Array.isArray(body.confirmed_answers) ? body.confirmed_answers : [],
-        pro: !!companyProc /* placeholder — V2 does not gate; kept for future Pro-only sections */,
-      });
-    } catch (e) { console.error('application_intelligence_v2:', e.message); }
-
-    // Canonical Resume Intelligence Engine — the unified job+résumé understanding that replaces the
-    // three keyword engines above. Rides alongside during migration (the UI can consume this single
-    // MatchAnalysis instead of three independent keyword arrays). `?debug=1` returns the
-    // explainability dump. Never throws into the response.
-    let resume_intelligence = null;
-    try {
-      resume_intelligence = analyzeApplication({
-        resumeText: String(resumeText),
-        jobDescription: jobDescription || '',
-        jobTitle: jobTitle || '',
-        company: company || '',
-        debug: /^(1|true)$/i.test(String(req.query?.debug || body.debug || '')),
-      });
-    } catch (e) { console.error('resume_intelligence:', e.message); }
-
+    // The FREE response is the diagnosis only (lib/server/optimizePackage.js freeDiagnostic): the
+    // ONE verdict, the matched/missing requirements, the constraints checklist and the factor
+    // breakdown. Bullets, rewrites, questions, the summary and the application message are the
+    // paid package (api/resume.js tool:optimize) — the credit buys a strict superset of this.
+    // The V2 and Resume-Intelligence engines no longer ride here: their second and third scores
+    // contradicted the one verdict on the same screen (2026-10-24 audits, D4).
     return res.status(200).json({
-      ...output,
-      application_intelligence,
-      resume_intelligence,
-      engine_version_v2: application_intelligence?.engine_version || null,
-      engine_version_ri: resume_intelligence?.engine_version || null,
+      ...freeDiagnostic(output),
       legacy_seenfit_compatible: true,
       run_id: runId, _facts_source: factsSource, _engine_version: ENGINE_VERSION,
     });
