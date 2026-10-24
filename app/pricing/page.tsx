@@ -1,7 +1,7 @@
 'use client'
 
-import { useState, useEffect, useRef, Suspense } from 'react'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useState, useEffect, useRef } from 'react'
+import { useRouter } from 'next/navigation'
 import { useAuth } from '@/lib/auth'
 import { aiHeaders } from '@/lib/aiHeaders'
 import { FREE_DAILY_CREDITS, WELCOME_CREDITS, MAX_DAILY_EARN, PRO_TRIAL_DAYS, ONE_TIME_SKUS, PRO_PRICING, CREDIT_RESET_LABEL, RESUME_PARSE_COST } from '@/lib/creditRules'
@@ -88,9 +88,8 @@ const FAQ = [
   { q: 'What if I hit the daily limit?', a: `Free users get ${FREE_DAILY_CREDITS} ${CREDIT_WORD}/day, back at ${CREDIT_RESET_LABEL}. Track an application to earn one back. Answer a 10-second survey to earn more — up to ${MAX_DAILY_EARN} a day. Or upgrade to Pro for unlimited.` },
 ]
 
-function PricingPageInner() {
+export default function PricingPage() {
   const router = useRouter()
-  const params = useSearchParams()
   const { isLoggedIn } = useAuth()
   // Monthly first: a cold visitor's first price is the monthly one, not the yearly total (conversion
   // audit 2026-10-24: the first price seen was "$83.88"). Yearly stays one tap away with its saving.
@@ -111,7 +110,12 @@ function PricingPageInner() {
   // double-tap created two Stripe sessions (audit 2026-10-24). The ref closes the gap synchronously.
   const checkoutInFlight = useRef(false)
 
+  // The Stripe return (?upgraded=1&purchase=&session_id=) is read from window.location after mount.
+  // useSearchParams needed a <Suspense> boundary that turned the WHOLE page into a client render, so a
+  // cold visitor saw nothing until the bundle hydrated (LCP ~3.8 s on a throttled phone — conversion
+  // audit 2026-10-24); now the page is in the server HTML.
   useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
     if (params.get('upgraded') === '1') {
       setUpgraded(true)
       const bought = params.get('purchase')
@@ -126,7 +130,7 @@ function PricingPageInner() {
           .catch(() => { /* webhook still covers it if confirm fails */ })
       }
     }
-  }, [params])
+  }, [])
 
   useEffect(() => {
     fetch('/api/stripe?action=status')
@@ -612,10 +616,3 @@ function PricingPageInner() {
   )
 }
 
-export default function PricingPage() {
-  return (
-    <Suspense>
-      <PricingPageInner />
-    </Suspense>
-  )
-}

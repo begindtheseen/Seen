@@ -17,6 +17,7 @@ import { isStaffingAgency } from '@/lib/agencies'
 // JSON-LD nodes, the H1 paragraph and the FAQ read the same count, rates and grade as the page and the
 // OG card. Audit 2026-10-24 (L-1): the description said 62 / 73% / 81 while the H1 said 48 / 87% / 91.
 import { companyMetaFacts, companyRobots } from '@/lib/companyMeta'
+import { CompanySeedProvider, type CompanySeedScore } from '@/components/CompanySeed'
 
 const titleCase = (slug: string) => slugToName(slug).replace(/\b\w/g, c => c.toUpperCase())
 // Slug-mangled fallback only when no score row exists — the stored name keeps real punctuation
@@ -94,6 +95,30 @@ function interpret(s: GrowthScore): string {
   if (score >= 80) return 'Applicants are largely kept in the loop, making this one of the more transparent hiring processes we track.'
   if (score >= 50) return 'Outcomes are mixed — some applicants get timely responses while others are left waiting.'
   return 'Hiring transparency here is below average based on the outcomes applicants have reported.'
+}
+
+// The page's first paint (components/CompanySeed.tsx): the SAME stored row this layout publishes, so
+// the grade, the answer sentence and the stats are in the server HTML. Gradeable rows only.
+function seedFrom(s: GrowthScore | null): CompanySeedScore | null {
+  if (!s || !s.gradeable || typeof s.overall_score !== 'number') return null
+  return {
+    gradeable: true,
+    overall_score: s.overall_score,
+    response_rate: s.response_rate ?? null,
+    ghost_rate: s.ghost_rate ?? null,
+    avg_wait_days: s.avg_wait_days ?? null,
+    avg_rounds: s.avg_rounds ?? null,
+    waste: s.waste ?? null,
+    report_count: s.report_count ?? 0,
+    first_party_report_count: s.first_party_report_count ?? null,
+    web_report_count: s.web_report_count ?? null,
+    mention_count: s.mention_count ?? null,
+    risk_level: s.risk_level ?? null,
+    data_quality: s.data_quality ?? null,
+    data_source: s.data_source ?? null,
+    industry: s.industry ?? null,
+    updated_at: s.updated_at ?? null,
+  }
 }
 
 export default async function CompanySlugLayout(
@@ -307,7 +332,7 @@ export default async function CompanySlugLayout(
           </details>
         </section>
       )}
-      {children}
+      <CompanySeedProvider seed={seedFrom(s)}>{children}</CompanySeedProvider>
     </>
   )
 }

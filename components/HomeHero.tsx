@@ -3,7 +3,6 @@
 import { useState, useCallback, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { RecentSearchesStore } from '@/lib/stores/RecentSearches'
-import { useIntroGate } from '@/lib/hooks/useIntroGate'
 import { firstPartyReportCount } from '@/lib/server/reportCounts'
 import { isGradeableScore } from '@/lib/gradeGate'
 import { homeSearchRoute, type ResolveCandidate } from '@/lib/searchRoute'
@@ -69,9 +68,8 @@ export default function HomeHero() {
   const [proof, setProof] = useState<ProofScore>(FEATURED_SEED)
   const [proofLive, setProofLive] = useState(false) // true once the live leaderboard refresh landed
 
-  // Entrance choreography starts as soon as the display font is available (useIntroGate)
-  // — there is no blocking intro; the hero rising IS the opening.
-  const ready = useIntroGate()
+  // Entrance choreography is CSS from the first paint (HomeHero.module.css .stage, motion.css .kt):
+  // it never waits for this bundle to hydrate, so the headline and lede paint with the HTML.
 
   // "Company or job title": a company Seen knows → its page; anything else → job search
   // (lib/searchRoute.ts). The lookup starts while the visitor types, so Enter rarely waits on it.
@@ -139,14 +137,14 @@ export default function HomeHero() {
 
   return (
     <>
-      <section className={`${styles.hero}${ready ? ' ' + styles.heroIn : ''}`}>
+      <section className={styles.hero}>
         <span className={`${styles.eyebrow} ${styles.stage} ${styles.d1}`}>
           <span className={styles.pulse} />
           Real hiring outcomes from real applicants
         </span>
 
         {/* Kinetic headline: each word rises from behind its own clip, 42ms apart. */}
-        <KineticText as="h1" className={styles.title} in={ready} delay={120}>
+        <KineticText as="h1" className={styles.title} in delay={120}>
           See who actually <span className={styles.grad}>responds</span> before you apply.
         </KineticText>
 
