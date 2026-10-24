@@ -27,6 +27,9 @@ import { feedRowVerdict } from '@/lib/reports/feedFilter.js'
 import { looksLikeBotOrLinkText, trimToSentence } from '@/lib/reports/excerptText.js'
 import { displayPay } from '@/lib/jobs/pay.js'
 import { jobsSearchHref } from '@/lib/searchRoute'
+import { reportCardOutcome } from '@/lib/reportCardOutcome'
+import { splitWebReviews, webResearchNote } from '@/lib/webReviewQuotes'
+import { httpHref } from '@/lib/safeHref.js'
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -156,9 +159,12 @@ function ConfidenceBadge({ sum, webCount }: { sum: CompanySummary; webCount: num
   }
   if (!sum.confidence) return null
   const color = sum.confidence.level === 'high' ? 'var(--green)' : sum.confidence.level === 'moderate' ? 'var(--amber)' : 'var(--red)'
+  // The word is capped below "High" until enough reports come from Seen users, and the badge names where
+  // the reports came from — the reports section below says the same (lib/companyPageSummary.ts).
   return (
-    <span className="co-dq" style={{ color }}>
+    <span className="co-dq" style={{ color }} title={sum.confidence.capNote || undefined}>
       {sum.confidence.emoji} {sum.confidence.label}
+      {sum.confidence.sources ? <span style={{ color: 'var(--muted)' }}> ({sum.confidence.sources})</span> : null}
     </span>
   )
 }
@@ -237,19 +243,28 @@ function HiringFunnel({ rows }: { rows: Array<{ label: string; n: number; pct: n
 // did not accept as a first-hand applicant account (kind 'public_commentary') carries no sentiment /
 // outcome label, only "Commentary" (owner 2026-10-24: a Reddit AutoModerator notice read "~ Mixed").
 // Quotes with links or bot text are filtered out before this renders (shownWebReviews).
+//
+// An entry with NO source link is not a quote: it is the old web-research pipeline's paraphrase
+// ("Aggregated research · 2025: Applicants say the first step is…"), which read as machine-written to
+// the conversion audit's visitors (2026-10-24). Those are folded into ONE collapsed note at the end,
+// plainly labelled, never in quote marks; the section's count is unchanged (lib/webReviewQuotes.ts).
 function WebReviewsSection({ reviews, hidden }: { reviews: WebReview[]; hidden: number }) {
   if (!reviews || reviews.length === 0) return null
+  const { quotes, summaries } = splitWebReviews(reviews)
   const sentColor = (s: string) => s === 'positive' ? 'var(--green)' : s === 'negative' ? 'var(--red)' : 'var(--amber)'
   const sentLabel = (s: string) => s === 'positive' ? '✓ Positive' : s === 'negative' ? '✗ Negative' : '~ Mixed'
   const sentBorder = (s: string) => s === 'positive' ? 'rgba(16,185,129,.3)' : s === 'negative' ? 'rgba(239,68,68,.3)' : 'rgba(245,158,11,.3)'
   return (
     <div style={{ padding: '0 0 1.5rem' }}>
-      <div className="co-sec-lbl" style={{ marginBottom: '.75rem' }}>
-        What people are saying online
-      </div>
+      {quotes.length > 0 && (
+        <div className="co-sec-lbl" style={{ marginBottom: '.75rem' }}>
+          What people are saying online
+        </div>
+      )}
       <div style={{ display: 'flex', flexDirection: 'column', gap: '.6rem' }}>
-        {reviews.map((rv, i) => {
+        {quotes.map((rv, i) => {
           const account = rv.kind === 'applicant_outcome'
+          const href = httpHref(rv.url)
           return (
           <div key={i} style={{
             background: 'var(--card)', border: `1px solid ${account ? sentBorder(rv.sentiment) : 'var(--line2)'}`,
@@ -264,11 +279,22 @@ function WebReviewsSection({ reviews, hidden }: { reviews: WebReview[]; hidden: 
                 : <span style={{ fontFamily: 'var(--mono)', fontSize: '.54rem', fontWeight: 600, color: 'var(--muted)' }}>{rv.kind === 'employee_review' ? '💼 Employee review' : '💬 Commentary'}</span>}
               {rv.source && <span style={{ fontFamily: 'var(--mono)', fontSize: '.52rem', color: 'var(--muted)' }}>{displayPlatform(rv.source)}</span>}
               {rv.year && <span style={{ fontFamily: 'var(--mono)', fontSize: '.52rem', color: 'var(--muted)' }}>{rv.year}</span>}
+              {href && <a href={href} target="_blank" rel="nofollow ugc noopener noreferrer" style={{ fontFamily: 'var(--mono)', fontSize: '.52rem', color: 'var(--blue)', textDecoration: 'none' }}>Source ↗</a>}
             </div>
           </div>
           )
         })}
       </div>
+      {summaries.length > 0 && (
+        <details className="co-research-note" style={{ marginTop: quotes.length ? '.8rem' : 0, background: 'var(--surface)', border: '1px dashed var(--line2)', borderRadius: 8, padding: '.15rem .9rem' }}>
+          <summary style={{ cursor: 'pointer', listStyle: 'none', padding: '.6rem 0', minHeight: 44, display: 'flex', alignItems: 'center', fontFamily: 'var(--mono)', fontSize: '.75rem', color: 'var(--muted)', lineHeight: 1.5 }}>
+            {webResearchNote(summaries.length)}
+          </summary>
+          <ul style={{ margin: '0 0 .7rem', paddingLeft: '1.1rem', fontFamily: 'var(--body)', fontSize: '.78rem', color: 'var(--muted)', lineHeight: 1.6 }}>
+            {summaries.map((rv, i) => <li key={i}>{trimToSentence(rv.text, 300)}</li>)}
+          </ul>
+        </details>
+      )}
       {hidden > 0 && (
         <div style={{ fontFamily: 'var(--mono)', fontSize: '.56rem', color: 'var(--muted)', marginTop: '.6rem', lineHeight: 1.6 }}>
           {hidden} quote{hidden === 1 ? '' : 's'} not shown: {hidden === 1 ? 'it contains' : 'they contain'} links or moderator-bot text, which is never a first-hand account.
@@ -455,6 +481,8 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
   const { isLoggedIn } = useAuth()
 
   const [reports, setReports] = useState<Report[]>([])
+  // The same list with no city filter — null until it has loaded (lib/companyPageSummary.ts sources).
+  const [allReports, setAllReports] = useState<Report[] | null>(null)
   const [score, setScore] = useState<CompanyScore | null>(null)
   const [industry, setIndustry] = useState('')
   const [loading, setLoading] = useState(true)
@@ -646,7 +674,13 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
         if (!alive || !rRes.ok) return
         const rJson = await rRes.json() as { reports?: Report[]; ok?: boolean }
         // Newest experience first by its REAL date (imported rows: the source's posted date).
-        if (rJson.reports) setReports(sortReportsByDate(rJson.reports))
+        if (rJson.reports) {
+          const sorted = sortReportsByDate(rJson.reports)
+          setReports(sorted)
+          // The hero badge names where the reports came from — from the UNFILTERED list, so typing a
+          // city into the reports filter never changes the grade's source counts.
+          if (!location) setAllReports(sorted)
+        }
       })
       .catch(() => {})
       .finally(() => { if (alive) setReportsLoading(false) })
@@ -710,7 +744,7 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
   // ONE summary object (lib/companyPageSummary.ts) feeds every count, rate, confidence label and sentence on
   // this page — hero, odds, breakdown, the reports list, the share card. Before it, each block did its
   // own arithmetic and the page said 48, 77 and 28 for the same company (audit 2026-10-23/24).
-  const sum = buildCompanySummary(score, reports)
+  const sum = buildCompanySummary(score, reports, { sourceReports: allReports })
   const fpReports = sum.applicantReports
   const webEst = sum.webClaim
   // Honest status line: only while the enrichment worker has this company queued/running AND the
@@ -751,17 +785,6 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
   const listRows = [...seenRows, ...publicRows]
   const shownWebReviews = webReviews.filter(rv => !looksLikeBotOrLinkText(rv.text))
   const updatedLine = graded ? lastUpdatedLabel(score.updated_at) : ''
-
-  const ocLabel: Record<string, string> = {
-    ghosted: '👻 Ghosted', autoreject: '🤖 Auto-rejected',
-    human: '✅ Got response', hired: '🎉 Hired',
-    offer: '🎁 Offer', interview: '📞 Interview',
-    rejected: '❌ Rejected', waiting: '⏳ Waiting',
-  }
-  const ocClass: Record<string, string> = {
-    ghosted: 'v-r', autoreject: 'v-y', rejected: 'v-y',
-    human: 'v-g', hired: 'v-g', offer: 'v-g', interview: 'v-b', waiting: 'v-n',
-  }
 
   if (!loading && notFound) {
     return (
@@ -1179,24 +1202,26 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
                         ? <div className="co-sec-lbl" style={{ margin: '1.1rem 0 .6rem' }}>{publicRowsHeading(sum.listed)}</div>
                         : null
                     const roleLine = r.role && !/^unknown/i.test(r.role) ? r.role : ''
+                    // One outcome per card: the chip and the "ghosted at …" stage come from one helper.
+                    const card = reportCardOutcome(r, { employee, commentary })
                     return (
                       <div key={r.id} style={{ display: 'contents' }}>
                       {heading}
                       <div className={`rcard${r.outcome ? ` outcome-${r.outcome}` : ''}${isPublic ? ' rcard-public' : ''}`} style={isPublic ? { borderStyle: 'dashed' } : undefined}>
                         <div className="rc-hd">
                           <div style={{ flex: 1, minWidth: 0 }}>
-                            {(roleLine || r.ghost_stage) && (
+                            {(roleLine || card.ghostStage) && (
                               <div className="rc-role">
                                 {roleLine}
-                                {r.ghost_stage && <span style={{ color: 'var(--muted)' }}>{roleLine ? ' · ' : ''}ghosted at {r.ghost_stage.replace(/_/g, ' ')}</span>}
+                                {card.ghostStage && <span style={{ color: 'var(--muted)' }}>{roleLine ? ' · ' : ''}ghosted at {card.ghostStage}</span>}
                               </div>
                             )}
                             <div className="rc-meta">
                               {[r.city ? `📍 ${r.city}` : '', r.rounds ? `${r.rounds} round${r.rounds !== 1 ? 's' : ''}` : '', when].filter(Boolean).join(' · ')}
                             </div>
                           </div>
-                          <span className={`vibe rc-outcome ${employee || commentary ? 'v-n' : (ocClass[r.outcome] || 'v-n')}`} title={commentary ? 'Not the poster’s own applicant account under Seen’s rules — shown as commentary, no outcome' : undefined}>
-                            {employee ? '💼 Employee review' : commentary ? '💬 Commentary' : (ocLabel[r.outcome] || r.outcome)}
+                          <span className={`vibe rc-outcome ${card.cls}`} title={commentary ? 'Not the poster’s own applicant account under Seen’s rules — shown as commentary, no outcome' : undefined}>
+                            {card.label}
                           </span>
                         </div>
                         {body && <div className="rc-body">{body}</div>}
