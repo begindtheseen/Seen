@@ -42,3 +42,11 @@ export const STAFFING_AGENCIES: StaffingAgency[] = [
   { name: 'Volt Workforce Solutions', aliases: ['volt workforce solutions', 'volt information sciences'] },
   { name: 'Integrity Staffing Solutions', aliases: ['integrity staffing solutions', 'integrity staffing'] },
 ]
+
+// Exact-alias lookup, same matching rule as the index: is this stored company_scores name (or a display
+// name) one of the staffing agencies above? Used by the company page to add the "Is <agency> legit?"
+// FAQ. Exact by design, for the reason given at the top of this file.
+const AGENCY_ALIASES = new Set(STAFFING_AGENCIES.flatMap(a => [a.name.toLowerCase(), ...a.aliases]))
+export function isStaffingAgency(name: string | null | undefined): boolean {
+  return AGENCY_ALIASES.has(String(name ?? '').toLowerCase().trim())
+}

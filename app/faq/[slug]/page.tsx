@@ -14,6 +14,15 @@ import { jsonLdHtml } from '@/lib/jsonLd'
 // (firstPartyReportCount). A score built from web research alone is worded as Seen's estimate from
 // aggregated public data — the fused report_count includes the web pipeline's claimed mentions
 // and is never presented as applicant reports.
+//
+// SEARCH (plan 2026-10-24): these pages repeat the company page's numbers (grade, ghost / response
+// rate, wait) with a few template sentences, and the company page now answers the same questions
+// ("<x> hiring process", "<x> application status", "does <x> ghost applicants") in its own FAQ and
+// FAQPage JSON-LD. Two URLs with the same answer split the ranking, and an open-ended slug route is
+// exactly the scaled templated content Google demotes. So: for a GRADED company the page's canonical
+// is the company page (the stronger, fuller copy collects the signals); for anything else (no grade,
+// unknown company, unparseable slug) the page is noindex with links followed. noindex and a cross-page
+// canonical are never combined. They are no longer in the sitemap.
 
 export const revalidate = 3600
 export const dynamicParams = true
@@ -50,12 +59,15 @@ export async function generateMetadata(
 ): Promise<Metadata> {
   const { slug } = await params
   const parsed = parseSlug(slug)
-  if (!parsed) return pageMetadata({ title: 'Hiring FAQ', description: 'Frequently asked questions about how companies hire, from real applicant reports.', path: '/faq' })
+  if (!parsed) return { ...pageMetadata({ title: 'Hiring FAQ', description: 'Frequently asked questions about how companies hire, from real applicant reports.', path: `/faq/${slug}` }), robots: { index: false, follow: true } }
   const name = titleCase(parsed.company)
   const s = await getScore(parsed.company)
   const ghostPct = pct(s?.ghost_rate)
   const reported = firstPartyReportCount(s) > 0
-  const url = `https://seenjobs.io/faq/${slug}`
+  const graded = s != null && s.gradeable && s.overall_score != null
+  // Graded → canonical (and og:url) is the company page; otherwise this URL, kept out of the index.
+  const url = graded ? `https://seenjobs.io/company/${slugify(parsed.company)}` : `https://seenjobs.io/faq/${slug}`
+  const robots = graded ? {} : { robots: { index: false, follow: true } }
 
   if (parsed.kind === 'ghost') {
     const title = `Does ${name} Ghost Applicants? (${reported ? 'Real Data' : 'Hiring Data'}, ${new Date().getFullYear()})`
@@ -64,17 +76,23 @@ export async function generateMetadata(
           ? `${name} ghosts roughly ${ghostPct}% of applicants based on real reported outcomes. See ${name}'s response rate, average wait time, and what Reddit says before you apply.`
           : `Seen estimates ${name} ghosts roughly ${ghostPct}% of applicants, from aggregated public hiring data — no applicant reports yet. See the estimate and add your own experience.`)
       : `Does ${name} ghost applicants? See real reported hiring outcomes, response rates, and wait times — and add your own experience.`
-    return pageMetadata({
-      title, description, path: url, ogTitle: title, type: 'article',
-      keywords: [`does ${name} ghost applicants`, `${name} ghosting`, `${name} no response`, `${name} reddit hiring`, `is ${name} ghosting candidates`],
-    })
+    return {
+      ...pageMetadata({
+        title, description, path: url, ogTitle: title, type: 'article',
+        keywords: [`does ${name} ghost applicants`, `${name} ghosting`, `${name} no response`, `${name} reddit hiring`, `is ${name} ghosting candidates`],
+      }),
+      ...robots,
+    }
   }
   const title = `${name} Hiring Process: Stages, Wait Time & Ghost Rate`
   const description = `How ${name}'s hiring process works — stages, average wait time${ghostPct != null ? `, and a ${ghostPct}% ${reported ? '' : 'estimated '}ghost rate` : ''} — ${reported ? 'from real applicant reports' : 'estimated from aggregated public hiring data'}. What to expect before you apply.`
-  return pageMetadata({
-    title, description, path: url, ogTitle: title, type: 'article',
-    keywords: [`${name} hiring process`, `${name} interview process`, `${name} application timeline`, `how long does ${name} take to respond`, `${name} hiring stages`],
-  })
+  return {
+    ...pageMetadata({
+      title, description, path: url, ogTitle: title, type: 'article',
+      keywords: [`${name} hiring process`, `${name} interview process`, `${name} application timeline`, `how long does ${name} take to respond`, `${name} hiring stages`],
+    }),
+    ...robots,
+  }
 }
 
 const S = {
@@ -233,8 +251,8 @@ export default async function FaqSlugPage({ params }: { params: Promise<{ slug: 
         <h2 style={S.h2}>{isGhost ? `Why applicants think ${name} ghosts them` : `What ${name}'s hiring process looks like`}</h2>
         <p style={S.p}>
           {isGhost
-            ? `"Ghosting" means applying and never hearing back — no rejection, no update, nothing. It's the single most common complaint on Reddit threads about ${name}. ${s && respPct != null ? `${name}'s ${reported ? 'reported' : 'estimated'} response rate is ${respPct}%, so a meaningful share of applicants never get a reply.` : `Reported response data for ${name} is still thin — every new report makes the signal sharper.`} Common reasons: roles filled internally, listings left open after closing, or high applicant volume that outpaces recruiting capacity.`
-            : `${s?.summary ? s.summary : `Most applicants describe an online application, an initial screen, one or more interview rounds, and then a decision.`} ${wait != null ? `${reported ? 'Reported' : 'Estimated'} average time to first response is about ${wait} days.` : ''} ${s?.avg_rounds ? (reported ? `Applicants report roughly ${Math.round(s.avg_rounds)} interview round(s).` : `Public hiring data suggests roughly ${Math.round(s.avg_rounds)} interview round(s).`) : ''}`}
+            ? `"Ghosting" means applying and never hearing back — no rejection, no update, nothing. ${s && respPct != null ? `${name}'s ${reported ? 'reported' : 'estimated'} response rate is ${respPct}%, so a meaningful share of applicants never get a reply.` : `Reported response data for ${name} is still thin — every new report makes the signal sharper.`} Common reasons: roles filled internally, listings left open after closing, or high applicant volume that outpaces recruiting capacity.`
+            : `${s?.summary ? s.summary : `Seen does not have a written summary of ${name}'s hiring process yet.`} ${wait != null ? `${reported ? 'Reported' : 'Estimated'} average time to first response is about ${wait} days.` : ''} ${s?.avg_rounds ? (reported ? `Applicants report roughly ${Math.round(s.avg_rounds)} interview round(s).` : `Public hiring data suggests roughly ${Math.round(s.avg_rounds)} interview round(s).`) : ''}`}
         </p>
 
         <h2 style={S.h2}>What you can do before you apply</h2>

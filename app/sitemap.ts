@@ -1,17 +1,22 @@
 import type { MetadataRoute } from 'next'
-import { SEED_COMPANIES, slugify as growthSlugify } from '@/lib/growth'
-import { fetchAllCompanyNames } from '@/lib/server/sitemapCompanies.js'
+import { fetchSitemapCompanies } from '@/lib/server/sitemapCompanies.js'
 
-// Dynamic sitemap: static routes + every scored company page + the seeded growth surfaces
-// (FAQ long-tail, compare, reddit). Refreshes hourly so newly scored companies get indexed.
-// Pulls names server-side (service key, never shipped to client).
+// Dynamic sitemap: static routes + every GRADED company page. Refreshes hourly so newly graded
+// companies get indexed. Pulls names server-side (service key, never shipped to client).
+//
+// Search plan 2026-10-24 — what is deliberately NOT here, because each answers noindex or points its
+// canonical elsewhere, and a sitemap URL like that is a Search Console error:
+//   - company pages with no grade (noindex, app/company/[slug]/layout.tsx);
+//   - /faq/does-<x>-ghost-applicants and /faq/<x>-hiring-process (canonical = the company page, or
+//     noindex when ungraded; app/faq/[slug]/page.tsx);
+//   - job listings /jobs/[id] (noindex for now, app/jobs/[id]/layout.tsx).
 export const revalidate = 3600
 
 const BASE = 'https://seenjobs.io'
 
-// Every scored company, read past PostgREST's 1,000-row cap (lib/server/sitemapCompanies.js).
-async function getCompanyNames(): Promise<string[]> {
-  return fetchAllCompanyNames({ url: process.env.SUPABASE_URL, key: process.env.SUPABASE_SERVICE_KEY })
+// Every graded company, read past PostgREST's 1,000-row cap (lib/server/sitemapCompanies.js).
+async function getCompanies(): Promise<Array<{ name: string; lastModified: string | null }>> {
+  return fetchSitemapCompanies({ url: process.env.SUPABASE_URL, key: process.env.SUPABASE_SERVICE_KEY })
 }
 
 const slugify = (name: string) => encodeURIComponent(name.toLowerCase().trim().replace(/\s+/g, '-'))
@@ -33,25 +38,16 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { url: `${BASE}/reddit`, lastModified: now, changeFrequency: 'weekly', priority: 0.7 },
     { url: `${BASE}/agencies`, lastModified: now, changeFrequency: 'daily', priority: 0.8 },
     { url: `${BASE}/ghosted`, lastModified: now, changeFrequency: 'weekly', priority: 0.7 },
+    { url: `${BASE}/methods`, lastModified: now, changeFrequency: 'monthly', priority: 0.6 },
   ]
 
-  // Growth surfaces: long-tail FAQ pages for the seeded top companies. These are the high-intent
-  // queries ("does <x> ghost applicants", "<x> hiring process"). Other companies render on-demand.
-  const faqRoutes: MetadataRoute.Sitemap = SEED_COMPANIES.flatMap(name => {
-    const c = growthSlugify(name)
-    return [
-      { url: `${BASE}/faq/does-${c}-ghost-applicants`, lastModified: now, changeFrequency: 'weekly' as const, priority: 0.7 },
-      { url: `${BASE}/faq/${c}-hiring-process`, lastModified: now, changeFrequency: 'weekly' as const, priority: 0.7 },
-    ]
-  })
-
-  const companies = await getCompanyNames()
-  const companyRoutes: MetadataRoute.Sitemap = companies.map(name => ({
+  const companies = await getCompanies()
+  const companyRoutes: MetadataRoute.Sitemap = companies.map(({ name, lastModified }) => ({
     url: `${BASE}/company/${slugify(name)}`,
-    lastModified: now,
+    lastModified: lastModified ? new Date(lastModified) : now,
     changeFrequency: 'weekly',
     priority: 0.8,
   }))
 
-  return [...staticRoutes, ...faqRoutes, ...companyRoutes]
+  return [...staticRoutes, ...companyRoutes]
 }

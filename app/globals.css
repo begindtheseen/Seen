@@ -622,6 +622,10 @@ select.fi,select.fs,select.fi-r,select.fs-r{background-image:url("data:image/svg
 .co-verdict{font-family:var(--body);font-size:.92rem;line-height:1.45;color:var(--text);margin:.45rem 0 .5rem;font-weight:400}
 .co-grade-meta{display:flex;align-items:center;gap:.4rem .9rem;flex-wrap:wrap}
 .co-dq{font-family:var(--mono);font-size:.58rem;font-weight:600;display:inline-flex;align-items:center;gap:.3rem}
+/* "How grades work" next to the grade → /methods. 12px+ everywhere, and a 44px tap box on phones. */
+.co-method{font-family:var(--mono);font-size:.75rem;color:var(--blue);text-decoration:underline;text-underline-offset:3px;display:inline-flex;align-items:center}
+.co-method:hover{color:var(--white)}
+@media (max-width:768px){.co-method{min-height:44px}}
 .co-sec-lbl{font-family:var(--mono);font-size:.56rem;text-transform:uppercase;letter-spacing:.08em;color:var(--muted)}
 .co-tl-n{font-family:var(--mono);font-size:1.3rem;font-weight:500;line-height:1;margin-bottom:.15rem}
 .co-tl-l{font-family:var(--mono);font-size:.52rem;color:var(--muted)}

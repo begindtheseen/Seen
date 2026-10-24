@@ -944,6 +944,7 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
                 </p>
                 <div className="co-grade-meta">
                   <a href={reportHref} className="co-live" style={{ textDecoration: 'none' }}>+ Add yours to help grade it</a>
+                  <a href="/methods" className="co-method">How grades work</a>
                 </div>
               </div>
             </div>
@@ -963,6 +964,7 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
                     <ConfidenceBadge sum={sum} webCount={webEst} />
                     {fpReports === 0 && webEst > 0 && <span className="co-live">web-research estimate</span>}
                     {updatedLine && <span className="co-dq" style={{ color: 'var(--muted)' }}>{updatedLine}</span>}
+                    <a href="/methods" className="co-method">How grades work</a>
                   </div>
                 </div>
               </div>
@@ -1136,9 +1138,9 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
               <div className="co-reports-tools">
                 <div style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', color: 'var(--muted)', lineHeight: 1.6, flex: 1, minWidth: 180 }}>
                   {reportsProvenanceLine(sum)}
-                  {sum.listedNote ? ` · ${sum.listedNote}` : ''}
-                  {commentaryN > 0 ? ` · ${commentaryN} quote${commentaryN === 1 ? '' : 's'} shown as commentary (a reply about someone else, or no first-hand account) with no outcome label` : ''}
-                  {hiddenPublicN > 0 ? ` · ${hiddenPublicN} quote${hiddenPublicN === 1 ? '' : 's'} not shown (links or moderator-bot text)` : ''}
+                  {sum.listedNote ? ` ${sum.listedNote}` : ''}
+                  {commentaryN > 0 ? ` ${commentaryN} ${commentaryN === 1 ? 'quote is' : 'quotes are'} commentary, not counted.` : ''}
+                  {hiddenPublicN > 0 ? ` ${hiddenPublicN} hidden (links or bot text).` : ''}
                 </div>
                 <input
                   type="text"
@@ -1165,15 +1167,8 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
                     // Group headings: Seen submissions first, then everything quoted from public sources.
                     const heading = i === 0 && seenRows.length > 0 && publicRows.length > 0
                       ? <div className="co-sec-lbl" style={{ margin: '.2rem 0 .6rem' }}>Submitted to Seen · {seenRows.length}</div>
-                      : i === seenRows.length && publicRows.length > 0
-                        ? (
-                          <div style={{ margin: `${i === 0 ? '.2rem' : '1.1rem'} 0 .6rem` }}>
-                            <div className="co-sec-lbl">{publicRowsHeading(sum.listed)}{hiddenPublicN > 0 ? ` · ${hiddenPublicN} not shown` : ''}</div>
-                            <div style={{ fontFamily: 'var(--mono)', fontSize: '.56rem', color: 'var(--muted)', lineHeight: 1.6, marginTop: '.25rem' }}>
-                              Quoted from public threads and review sites, each linked to its source. Only rows with an outcome count, at reduced weight — none was submitted by a Seen user.
-                            </div>
-                          </div>
-                        )
+                      : i === seenRows.length && i > 0 && publicRows.length > 0
+                        ? <div className="co-sec-lbl" style={{ margin: '1.1rem 0 .6rem' }}>{publicRowsHeading(sum.listed)}</div>
                         : null
                     const roleLine = r.role && !/^unknown/i.test(r.role) ? r.role : ''
                     return (

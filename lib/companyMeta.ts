@@ -5,12 +5,15 @@
 //
 // Audit 2026-10-24 (money/legal report L-1): /company/walmart's <meta description> and WebPage node said
 // "62 reports … 73% / 27% … 81/100" (a company_summaries paragraph frozen on 2026-10-17) while the H1,
-// the FAQPage node and the OG card said 48 / 13% / 87% / 91. A stored summary paragraph is now used ONLY
-// when its numbers still match the live score; otherwise the description is built from the facts.
+// the FAQPage node and the OG card said 48 / 13% / 87% / 91. A stored summary paragraph is now shown ONLY
+// when its numbers still match the live score, and the title + description are always built from these
+// facts, answer first (lib/cardCopy.js pageTitle / pageDescription, search plan 2026-10-24).
 //
 // Pure; relative .js/.ts imports only so `node --test lib/companyMeta.test.mjs` runs it as is.
 
 import { gradeLetter } from './gradeScale.js'
+import { pageDescription, pageTitle } from './cardCopy.js'
+import { formatPacific } from './time/pacific.js'
 import { firstPartyReportCount, mentionCount, MIN_REPORTS_FOR_GRADE } from './server/reportCounts.js'
 import { MIN_REPORTS_FOR_RATES, pctOf, responseVerdict, type ResponseVerdict } from './companyPageSummary.ts'
 
@@ -24,6 +27,8 @@ export type MetaScore = {
   first_party_report_count?: number | null
   mention_count?: number | null
   data_source?: string | null
+  /** When the stored score was last (re)computed (lib/server/reportCounts.js scoreUpdatedAt). */
+  updated_at?: string | null
 } | null | undefined
 
 export type MetaSummary = {
@@ -49,7 +54,11 @@ export interface CompanyMetaFacts {
   verdictKind: ResponseVerdict | null
   /** The stored company_summaries paragraph may be quoted only while its numbers match the live score. */
   summaryUsable: boolean
-  /** The <meta description>: the usable stored paragraph, else one built from these facts. */
+  /** "Oct 2026" (California time) from the score's last recompute, or '' when unknown. */
+  updatedMonth: string
+  /** The <title>: "Walmart application status: who hears back (48 reports)" (lib/cardCopy.js pageTitle). */
+  title: string
+  /** The <meta description>, answer first, built from these facts (lib/cardCopy.js pageDescription). */
   description: string
   /** "48 applicant reports and 32 online mentions" — what the grade stands on. */
   basis: string
@@ -90,23 +99,34 @@ export function companyMetaFacts(name: string, s: MetaScore, summary: MetaSummar
   const ratesShown = gradeable && reportCount >= MIN_REPORTS_FOR_RATES && s!.response_rate != null
   const ghostPct = ratesShown ? pctOf(s!.ghost_rate) : null
   const respPct = ratesShown ? pctOf(s!.response_rate) : null
-  const waitDays = gradeable && s!.avg_wait_days != null && Number.isFinite(Number(s!.avg_wait_days)) ? Math.round(Number(s!.avg_wait_days)) : null
+  // A wait under one day is how unknown waits were stored before fusion read wait_days (the share PNG
+  // printed "0d"); it is left out everywhere rather than published as a fact.
+  const waitRaw = gradeable && s!.avg_wait_days != null && Number.isFinite(Number(s!.avg_wait_days)) ? Math.round(Number(s!.avg_wait_days)) : null
+  const waitDays = waitRaw != null && waitRaw > 0 ? waitRaw : null
   const verdictKind = ratesShown ? responseVerdict(s!.response_rate) : null
   const basis = reportCount > 0
     ? `${plural(reportCount, 'applicant report')}${mentions > 0 ? ` and ${plural(mentions, 'online mention')}` : ''}`
     : 'aggregated hiring data'
   const summaryUsable = gradeable && summaryMatchesScore(summary, reportCount, score)
+  const updatedMonth = gradeable && s!.updated_at ? formatPacific(s!.updated_at, { month: 'short', year: 'numeric' }) : ''
 
-  let description: string
-  if (summaryUsable) description = clipSentences(summary!.summary)
-  else if (gradeable && ratesShown) {
-    const hear = verdictKind === 'most_hear_back' ? 'Most applicants hear back' : verdictKind === 'mixed' ? 'About half of applicants hear back' : 'Most applicants never hear back'
-    description = `${name} has a Seen Grade of ${grade} (${score}/100) from ${basis}: ${respPct}% of applicants hear back, ${ghostPct}% are ghosted${waitDays != null ? `, typical wait ${plural(waitDays, 'day')}` : ''}. ${hear}. Self-reported outcomes from Seen users and public discussion — claims, not verified facts.`
-  } else if (gradeable) {
-    description = `${name} has a Seen Grade of ${grade} (${score}/100) from ${basis} — too few applicant reports for a response rate (${MIN_REPORTS_FOR_RATES} needed). Self-reported outcomes from Seen users and public discussion — claims, not verified facts.`
-  } else {
-    description = `${name} is not graded on Seen yet (${plural(reportCount, 'applicant report')} so far; a grade needs ${MIN_REPORTS_FOR_GRADE} pieces of evidence). See what applicants report about its hiring process — response time, interview rounds and ghosting.`
-  }
+  const title = pageTitle({ company: name, reports: reportCount, graded: gradeable })
+  const description = pageDescription({
+    company: name, graded: gradeable, ratesShown, responsePct: respPct, ghostPct, grade, score, basis,
+    reports: reportCount, waitDays, updated: updatedMonth,
+    minReports: gradeable ? MIN_REPORTS_FOR_RATES : MIN_REPORTS_FOR_GRADE,
+  })
 
-  return { name, gradeable, score, grade, reportCount, mentions, ratesShown, ghostPct, respPct, waitDays, verdictKind, summaryUsable, description, basis }
+  return { name, gradeable, score, grade, reportCount, mentions, ratesShown, ghostPct, respPct, waitDays, verdictKind, summaryUsable, updatedMonth, title, description, basis }
+}
+
+/**
+ * The search directive for a company page (search plan 2026-10-24). A graded page is indexable. A page
+ * whose score read SUCCEEDED and found no grade is kept out of the index, links still followed: ~8,000
+ * near-empty company pages are the scaled templated content Google demotes. A FAILED read (timeout, DB
+ * error, no credentials at build) decides nothing, so a graded page is never noindexed by an outage.
+ * Spread into the Metadata object; the sitemap lists only graded companies (lib/server/sitemapCompanies.js).
+ */
+export function companyRobots(gradeable: boolean, readOk: boolean): { robots?: { index: false; follow: true } } {
+  return gradeable || !readOk ? {} : { robots: { index: false, follow: true } }
 }
