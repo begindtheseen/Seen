@@ -8,6 +8,7 @@
 
 import { NONTERMINAL_OUTCOMES } from '@/api/_utils/companyIntel.js'
 import { formatPacific } from '@/lib/time/pacific.js'
+import { looksLikeSlug, splitSlugWords } from '@/lib/jobs/companyName.js'
 
 // ── Letter grade ─────────────────────────────────────────────────────────────────────────────────
 // The one scale. 80+ A · 65+ B · 50+ C · 35+ D · else F (matches lib/growth.ts grade(), the OG
@@ -46,6 +47,9 @@ function caseWord(word: string, first: boolean): string {
   const lower = word.toLowerCase()
   if (BRAND_CASE[lower]) return BRAND_CASE[lower]
   if (!first && SMALL_WORDS.has(lower)) return lower
+  // A short token with no vowel is an initialism ("pls" → "PLS", "ivc" → "IVC", "k2" → "K2");
+  // "alo" has one and reads as a word ("Alo").
+  if (lower.length <= 4 && /^[a-z0-9]+$/.test(lower) && !/[aeiouy]/.test(lower)) return lower.toUpperCase()
   // Capitalize the first letter and the letter after a hyphen ("e-commerce" → "E-Commerce",
   // "coca-cola" → "Coca-Cola"); never after an apostrophe ("lowe's" stays "Lowe's").
   return lower.replace(/(^|-)([a-zà-ÿ])/g, (_m, sep: string, c: string) => sep + c.toUpperCase())
@@ -56,6 +60,12 @@ function caseWord(word: string, first: boolean): string {
  * "United Wholesale Mortgage", "aaa" → "AAA", "mcdonald's" → "McDonald's", "bank of america" →
  * "Bank of America". A name that already carries mixed case (an employer-typed "DoorDash") is
  * returned as is. Empty input → ''.
+ *
+ * ATS board slugs stored as company names (76% of active job rows, 2026-10-24: "plscareers",
+ * "tactilemedical", "jpmorganchase") are read through lib/jobs/companyName.js first — board noise
+ * dropped, category words split off, then cased here ("PLS", "Tactile Medical", "JPMorgan Chase").
+ * A slug no rule can read is Title Cased whole ("Karllagerfeld"): a raw lowercase slug is never
+ * shown. Stored data is untouched; the slug stays the data key for lookups.
  */
 export function displayCompanyName(name: string | null | undefined): string {
   const raw = String(name ?? '').trim().replace(/\s+/g, ' ')
@@ -64,7 +74,8 @@ export function displayCompanyName(name: string | null | undefined): string {
   if (whole) return whole
   // Already mixed-case (not all lower, not all upper) → the author chose the casing; keep it.
   if (raw !== raw.toLowerCase() && raw !== raw.toUpperCase()) return raw
-  return raw.split(' ').map((w, i) => caseWord(w, i === 0)).join(' ')
+  const words = looksLikeSlug(raw) ? splitSlugWords(raw) : raw.split(' ')
+  return words.map((w, i) => caseWord(w, i === 0)).join(' ')
 }
 
 // ── Outcomes ─────────────────────────────────────────────────────────────────────────────────────

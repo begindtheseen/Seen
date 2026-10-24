@@ -5,7 +5,10 @@ import { logError } from '../lib/server/errlog.js';
 import { filterAndRank, relevanceScore, sortByProximity, locationDbTerm, expandQueryTerms, parseLocation, locationScore } from './_utils/jobRelevance.js';
 import { sortByPriority, companyMatchesQuery, queryNamesCompany, isRemoteListing } from '../lib/server/jobPriority.js';
 import { waitUntil } from '@vercel/functions';
-import { aggregateForQuery, upsertJobs, inferLevel, wasRecentlyPulled, recordPull, adzunaPay } from '../lib/server/jobSources.js';
+import { aggregateForQuery, upsertJobs, inferLevel, wasRecentlyPulled, recordPull, adzunaPay, cleanDescription } from '../lib/server/jobSources.js';
+import { locationScope } from '../lib/jobs/usLocation.js';
+import { preferFullText } from '../lib/jobs/listingTwins.js';
+import { deriveResumeCity } from '../lib/server/resumeJobMatch.js';
 import { aggregateWithSources } from '../lib/jobs/expand.js';
 import { deriveResumeJobQuery, pullResumeJobFloor, deriveResumeSignal, resumeSkillsStale } from '../lib/server/resumeJobMatch.js';
 import { isReadableResume } from '../lib/server/resumeReadability.js';
@@ -325,7 +328,13 @@ export default async function handler(req, res) {
       const inArea = relevant.filter((row) => !loc || isRemote || isRemoteListing(row) || nearSearch(row));
       const postIds = new Set(inArea.map((r) => r.id).filter(Boolean));
       const out = [], seenKeys = new Set();
-      for (const j of [...inArea.map(toUiRow), ...base]) {
+      // Rows that name a non-US place never reach a US search (lib/jobs/usLocation.js — the same
+      // judgement the ingest makes; stored rows from before it, and from paths that lacked it, are
+      // still in the corpus: a Lever "La Roca del Valles, Barcelona" cashier answered "cashier ·
+      // Phoenix" on 2026-10-23). An Adzuna teaser of a posting we hold in full from the employer's
+      // board is hidden behind that full-text row (lib/jobs/listingTwins.js).
+      for (const j of preferFullText([...inArea.map(toUiRow), ...base])) {
+        if (locationScope(j.location) === 'non_us') continue;
         const key = j.id || `${(j.title || '').toLowerCase()}|${(j.company || '').toLowerCase()}|${(j.location || '').toLowerCase()}`;
         if (seenKeys.has(key)) continue;
         seenKeys.add(key);
@@ -791,7 +800,7 @@ async function handleCompanyJobs(req, res, body) {
       `${SUPABASE_URL}/rest/v1/jobs?company=ilike.${pattern}&expires_at=gt.${now}&select=id,title,company,location,salary,apply_url,source,type,level,score,waste_score&order=score.desc&limit=40`,
       { headers: dbHeaders }
     );
-    const cached = (r.ok ? await r.json() : []).filter(j => nameKey(j.company) === nameKey(safeName)).slice(0, 20);
+    const cached = preferFullText((r.ok ? await r.json() : []).filter(j => nameKey(j.company) === nameKey(safeName) && locationScope(j.location) !== 'non_us')).slice(0, 20);
     if (Array.isArray(cached) && cached.length >= 3) {
       const jobs = cached.map(j => ({ title: j.title, company: j.company, location: j.location, salary: j.salary, url: j.apply_url, source: j.source, type: j.type, level: inferLevel(j.title || ''), ...scoreRow(j) }));
       return res.status(200).json({ ok: true, jobs, _src: 'cache' });
@@ -907,7 +916,14 @@ async function handleRecommended(req, res, _body) {
     // near the person — the profile city (within RAIL_MILES when both have coordinates, else the
     // city named in the listing) or a remote listing. Without a city the rail would only ever
     // show far-away jobs, so it says so instead (reason 'no_city'; the page links to Settings).
-    const city = String(prof?.city || '').trim().slice(0, 80);
+    // The profile city, else the city the résumé itself states ("Phoenix, AZ 85004" in its first
+    // line — the live audit's persona was asked to retype a city the résumé already had).
+    let city = String(prof?.city || '').trim().slice(0, 80);
+    let citySource = city ? 'profile' : null;
+    if (!city && hasResume) {
+      city = deriveResumeCity(resumeText);
+      citySource = city ? 'resume' : null;
+    }
     if (!city) {
       if (heal) await heal;
       return res.status(200).json({ ok: true, jobs: [], skills: topSkills.slice(0, 3), seniority, function: fn, has_resume: hasResume, reason: 'no_city' });
@@ -936,7 +952,7 @@ async function handleRecommended(req, res, _body) {
       seenIds.add(j.id);
       return true;
     });
-    const qualifies = (j) => jobMatchesResume(j, resume) && jobNearCity(j, home);
+    const qualifies = (j) => jobMatchesResume(j, resume) && jobNearCity(j, home) && locationScope(j.location) !== 'non_us';
     let matched = unique.filter(qualifies);
 
     // ── Floor: when the corpus is thin for this résumé near this city, pull LIVE for the role
@@ -991,7 +1007,7 @@ async function handleRecommended(req, res, _body) {
     }));
 
     if (heal) await heal; // the self-healed cache row lands before the function returns
-    return res.status(200).json({ ok: true, jobs, skills: topSkills.slice(0, 3), seniority, function: fn, has_resume: hasResume, city, reason: jobs.length ? null : 'no_matches' });
+    return res.status(200).json({ ok: true, jobs, skills: topSkills.slice(0, 3), seniority, function: fn, has_resume: hasResume, city, city_source: citySource, reason: jobs.length ? null : 'no_matches' });
   } catch (e) {
     logError('jobs/recommended', e.message, { user_id });
     return res.status(500).json({ error: e.message, jobs: [] });
@@ -1030,8 +1046,10 @@ async function _fetchAdzuna(what, where, appId, appKey, distKm) {
     const data = await res.json();
     const expires = new Date(Date.now() + 7*24*60*60*1000).toISOString();
     return (data.results||[]).map(j => {
-      // Adzuna's own salary ESTIMATE (salary_is_predicted) is not the employer's pay — never shown or scored as it.
-      const pay = adzunaPay(j);
+      // Adzuna's own salary ESTIMATE (salary_is_predicted) is not the employer's pay — never shown or
+      // scored as it; an annualised hourly wage is shown as the hourly figure the posting states.
+      const description = cleanDescription(j.description || '');
+      const pay = adzunaPay(j, description);
       const salary = pay.salary;
       // Keep Adzuna's coordinates so location-browsed listings are distance-filterable too;
       // (0,0)/non-finite → NULL (honest "unknown"), never a bogus equator point.
@@ -1042,7 +1060,7 @@ async function _fetchAdzuna(what, where, appId, appKey, distKm) {
         location: j.location?.display_name||where,
         salary,
         salary_min: Math.round(pay.salaryMin) || 0,
-        description: (j.description||'').replace(/<[^>]*>/g,'').replace(/\s+/g,' ').trim().slice(0,8000),
+        description,
         apply_url: j.redirect_url||null,
         source: 'Adzuna',
         type: j.contract_time==='part_time'?'Part-time':'Full-time',
