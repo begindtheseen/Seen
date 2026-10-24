@@ -27,9 +27,9 @@ const pct = (r: number) => `${Math.round(r * 100)}%`
 const half = MENTION_WEIGHT === 0.5 ? 'half' : weightLabel(MENTION_WEIGHT)
 
 const SOURCES: Array<{ label: string; note: string; weight: number }> = [
-  // classifyPlatform (api/_utils/companyIntel.js) weighs a report by its platform text, and a Seen report's
-  // platform is where the person applied, so a Seen report naming one of these sites is weighted 0.55 today.
-  { label: 'Reports from Seen users', note: 'Sent with the report form or the application tracker. One exception today: a report that names Glassdoor, Blind, Indeed or LinkedIn as the place the person applied is counted like an imported account.', weight: TRUST.direct },
+  // classifyPlatform (api/_utils/companyIntel.js) reads trust_reason, so a Seen report that names the job
+  // board the person applied on (LinkedIn, Indeed…) keeps the full weight.
+  { label: 'Reports from Seen users', note: 'Sent with the report form or the application tracker. Naming the job board you applied on (LinkedIn, Indeed…) does not change the weight.', weight: TRUST.direct },
   { label: 'Seen applicant surveys', note: 'Answers applicants give in Seen’s own short surveys.', weight: TRUST.seen_intel },
   { label: 'Imported hiring accounts', note: 'First hand hiring accounts imported from job review sites.', weight: TRUST.ingest },
   { label: 'Reddit', note: 'Shown as public discussion, never as a Seen user’s report.', weight: TRUST.reddit },
