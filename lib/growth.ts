@@ -149,28 +149,34 @@ const fuzzyPattern = (name: string) =>
 // of api/reports.js `_rowToScore` INCLUDING the tenure adjustment — the OG unfurl and the live
 // page must show the SAME grade (a Reddit post whose preview says 78 while the page says 84 reads
 // as a lie; audit finding "two different Seen Grades in a single post").
-async function scoreFromDb(name: string): Promise<GrowthScore | null> {
+// `ok` is false when the read itself failed (no credentials, an HTTP error, a timeout): the caller then
+// knows NOTHING about the company, which is different from "no score row" (ok, score null).
+type ScoreRead = { score: GrowthScore | null; ok: boolean }
+
+async function scoreFromDb(name: string): Promise<ScoreRead> {
   const creds = sbCreds()
-  if (!creds) return null
+  if (!creds) return { score: null, ok: false }
   const headers = { apikey: creds.key, Authorization: `Bearer ${creds.key}` }
   const sel = `select=company_name,overall_score,ghost_rate,response_rate,avg_wait_days,avg_rounds,report_count,first_party_report_count${await mentionSel(creds.url, headers)},web_report_count,data_source,waste_score,industry,raw_summary,avg_tenure_months,tenure_sample_count,created_at,expires_at`
   try {
     const enc = encodeURIComponent(name.toLowerCase().trim())
     let r = await fetch(`${creds.url}/rest/v1/company_scores?company_name=ilike.${enc}&${sel}&order=created_at.desc&limit=1`, { headers, signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) })
-    let rows = r.ok ? await r.json() : null
+    if (!r.ok) return { score: null, ok: false }
+    let rows = await r.json()
     if ((!rows || !rows[0]) && /[\s-]/.test(name)) {
       r = await fetch(`${creds.url}/rest/v1/company_scores?company_name=ilike.${fuzzyPattern(name)}&${sel}&order=created_at.desc&limit=1`, { headers, signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) })
-      rows = r.ok ? await r.json() : null
+      if (!r.ok) return { score: null, ok: false }
+      rows = await r.json()
     }
-    const row = rows?.[0]
-    if (!row || row.overall_score == null) return null
+    const row = Array.isArray(rows) ? rows[0] : null
+    if (!row || row.overall_score == null) return { score: null, ok: true }
     // Same tenure fold-in as the live read path (api/reports.js _rowToScore) — canonical
     // implementation imported, not mirrored, so the two can't drift.
     const tAdj = tenureAdjustment(row.avg_tenure_months, row.tenure_sample_count)
     const s = Math.max(0, Math.min(100, Math.round(row.overall_score + tAdj)))
     // Same grade gate as api/reports.js gateScore: the OG card, SEO title and page must agree.
     const gradeable = isGradeable(row)
-    return {
+    return { ok: true, score: {
       company_name: row.company_name ?? null,
       gradeable,
       overall_score: gradeable ? s : null,
@@ -188,9 +194,9 @@ async function scoreFromDb(name: string): Promise<GrowthScore | null> {
       waste: gradeable ? row.waste_score ?? null : null,
       summary: /^estimated baseline/i.test(String(row.raw_summary || '')) ? null : (row.raw_summary || null),
       updated_at: scoreUpdatedAt(row),
-    }
+    } }
   } catch {
-    return null
+    return { score: null, ok: false }
   }
 }
 
@@ -258,8 +264,24 @@ export const pct = (v: number | null | undefined) =>
 // A single company's real score — read DIRECTLY from the cached company_scores table (never a
 // self-fetch of the live API). Server-only; returns null when no data / creds absent / on failure.
 export async function getScore(nameOrSlug: string): Promise<GrowthScore | null> {
-  const name = nameOrSlug.includes('-') ? nameOrSlug.replace(/-/g, ' ') : nameOrSlug
-  return scoreFromDb(name)
+  return (await getScoreState(nameOrSlug)).score
+}
+
+// Same read, plus whether it succeeded. Search-engine directives need the difference: a company with
+// no grade is kept out of the index (`robots` noindex), but a failed read must never noindex a page
+// that may well be graded (app/company/[slug]/layout.tsx).
+export async function getScoreState(nameOrSlug: string): Promise<ScoreRead> {
+  return scoreFromDb(slugToName(nameOrSlug))
+}
+
+// The ONE slug scheme decoded (decodeURIComponent + hyphens → spaces). Route params can arrive still
+// percent-encoded ("bath-%26-body-works"), and the encoded form matched no stored name, so "bath & body
+// works" read as "no score" in its metadata and OG card while the page itself showed the grade (found
+// by the sitemap robots sample, 2026-10-24). A malformed escape keeps the raw text.
+export function slugToName(nameOrSlug: string): string {
+  let d = String(nameOrSlug ?? '')
+  try { d = decodeURIComponent(d) } catch { /* not an escape sequence; use as is */ }
+  return d.includes('-') ? d.replace(/-/g, ' ') : d
 }
 
 // Is this company known to Seen at all — a companies row (listings / reports have named it) or any
@@ -270,7 +292,7 @@ export async function getScore(nameOrSlug: string): Promise<GrowthScore | null> 
 export async function companyExists(nameOrSlug: string): Promise<boolean> {
   const creds = sbCreds()
   if (!creds) return true
-  const name = (nameOrSlug.includes('-') ? nameOrSlug.replace(/-/g, ' ') : nameOrSlug).toLowerCase().trim()
+  const name = slugToName(nameOrSlug).toLowerCase().trim()
   if (!name) return false
   const headers = { apikey: creds.key, Authorization: `Bearer ${creds.key}` }
   const patterns = [encodeURIComponent(name), ...(/[\s-]/.test(name) ? [fuzzyPattern(name)] : [])]
@@ -337,7 +359,7 @@ export async function getEmployerPerk(nameOrSlug: string): Promise<EmployerPerk>
   const creds = sbCreds()
   const none = { featured: false, verified: false }
   if (!creds) return none
-  const name = (nameOrSlug.includes('-') ? nameOrSlug.replace(/-/g, ' ') : nameOrSlug).toLowerCase().trim()
+  const name = slugToName(nameOrSlug).toLowerCase().trim()
   const headers = { apikey: creds.key, Authorization: `Bearer ${creds.key}` }
   try {
     const r = await fetch(`${creds.url}/rest/v1/employer_perks?company=eq.${encodeURIComponent(name)}&select=featured_until,verified_until&limit=1`, { headers, signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) })
