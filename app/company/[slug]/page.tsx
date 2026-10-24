@@ -29,6 +29,7 @@ import { displayPay } from '@/lib/jobs/pay.js'
 import { jobsSearchHref } from '@/lib/searchRoute'
 import { reportCardOutcome } from '@/lib/reportCardOutcome'
 import { splitWebReviews, webResearchNote } from '@/lib/webReviewQuotes'
+import { replyTiming, REPORT_WHEN_YOU_HEAR } from '@/lib/replyTiming'
 import { httpHref } from '@/lib/safeHref.js'
 
 // ── Types ──────────────────────────────────────────────────────────────────────
@@ -746,6 +747,9 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
   // own arithmetic and the page said 48, 77 and 28 for the same company (audit 2026-10-23/24).
   const sum = buildCompanySummary(score, reports, { sourceReports: allReports })
   const fpReports = sum.applicantReports
+  // "How long until they reply?" — only from real numbers (lib/replyTiming.ts): the stored average, else
+  // the median of ≥5 listed reports that name a wait, else an honest "not enough data yet".
+  const timing = replyTiming(score?.avg_wait_days, (allReports ?? reports).map(r => r.wait_days))
   const webEst = sum.webClaim
   // Honest status line: only while the enrichment worker has this company queued/running AND the
   // page has no first-party reports to show. It promises nothing about what will be found.
@@ -1112,7 +1116,14 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
           <div className="co-secs">
             {graded && (
               <Section id="odds" icon="📅" title="Your odds here" open={open.odds} onToggle={toggle}
-                summary={`${score.avg_wait_days != null ? `${score.avg_wait_days}d typical wait · ` : ''}${sum.ratesShown ? `${respPct}% hear back` : `too few applicant reports for a rate (${fpReports} of ${MIN_REPORTS_FOR_RATES})`} · your response probability & industry rank`}>
+                summary={`${timing.short} · ${sum.ratesShown ? `${respPct}% hear back` : `too few applicant reports for a rate (${fpReports} of ${MIN_REPORTS_FOR_RATES})`} · your response probability & industry rank`}>
+                <div className="co-card" style={{ marginBottom: '1rem' }}>
+                  <div className="co-sec-lbl" style={{ marginBottom: '.45rem' }}>How long until they reply</div>
+                  <p style={{ margin: 0, fontSize: '.9rem', color: 'var(--text)', lineHeight: 1.55 }}>{timing.line}</p>
+                  {!timing.known && (
+                    <a href={reportHref} style={{ display: 'inline-flex', alignItems: 'center', minHeight: 44, fontFamily: 'var(--mono)', fontSize: '.75rem', color: 'var(--green)', textDecoration: 'none' }}>{REPORT_WHEN_YOU_HEAR} →</a>
+                  )}
+                </div>
                 <HiringProbability responseRate={score.response_rate} ghostRate={score.ghost_rate} overallScore={score.overall_score} reportCount={fpReports} mentionCount={sum.mentions} context={sum.oddsContext} />
                 {benchmark && (
                   <div style={{ margin: '1rem 0 0' }}>
@@ -1146,7 +1157,7 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
                       <span>Avg rounds</span><b>{score.avg_rounds != null ? score.avg_rounds : '—'}</b>
                     </div>
                     <div className="co-kv">
-                      <span>Avg timeline</span><b>{score.avg_wait_days != null ? `${score.avg_wait_days} days` : '—'}</b>
+                      <span>Typical wait</span><b>{timing.known ? `${timing.days} days` : 'Not enough data yet'}</b>
                     </div>
                   </div>
                   {(() => { const rows = ghostStageRows(hiringReports); const n = rows.reduce((a, r) => a + r.n, 0); return rows.length > 0 && (
