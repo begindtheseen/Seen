@@ -56,9 +56,24 @@ function mapRow(a: Record<string, unknown>): Application {
   }
 }
 
+/** What a load produced and whether it came from the account (or only from this device's store). */
+export type LoadResult = {
+  apps: Application[]
+  /** True when the account's rows were read. False = the sync failed (or there was no session) and
+   *  `apps` is only what this device last stored — a page must show that as an error, never as "0". */
+  synced: boolean
+}
+
 export const AppStore = {
   loadSync(): Application[] {
     try { return JSON.parse(localStorage.getItem(KEY) || '[]') } catch { return [] }
+  },
+
+  /** `load` plus the truth about where the data came from (see LoadResult). */
+  async loadResult(loggedIn: boolean): Promise<LoadResult> {
+    if (!loggedIn) return { apps: this.loadSync(), synced: true }
+    const bundle = await this.loadBundle(loggedIn)
+    return bundle ? { apps: bundle.applications, synced: true } : { apps: this.loadSync(), synced: false }
   },
 
   async load(loggedIn: boolean): Promise<Application[]> {
@@ -67,7 +82,8 @@ export const AppStore = {
   },
 
   /** `load` with everything it carries (see LoadBundle). null when signed out or the call failed —
-   *  the caller falls back to loadSync() for the applications. */
+   *  the caller falls back to loadSync() for the applications (and, if it shows them, says so:
+   *  LoadResult.synced). */
   async loadBundle(loggedIn: boolean): Promise<LoadBundle | null> {
     if (loggedIn) {
       const result = await _sync('load') as RawLoad | null

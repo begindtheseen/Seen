@@ -8,9 +8,10 @@
 // listing expires after 14 days. Here it has a whole invocation, every hour, sized so the full
 // registry refreshes about once a day.
 //
-// Only listings in Seen's market are kept (lib/jobs/usLocation.js: US, remote, or no location). A
-// board's sync health is judged on everything it returned, so a healthy board whose openings are all
-// abroad is not mistaken for a dead one by the circuit breaker.
+// Only listings in Seen's market are kept (lib/jobs/usLocation.js: US, remote, or no location —
+// applied inside fetchSourceJobs, the one entry every board path uses, and again here). A board's
+// sync health is judged on everything it returned, so a healthy board whose openings are all abroad
+// is not mistaken for a dead one by the circuit breaker.
 //
 // Callers:
 //   • Vercel cron (GET, x-vercel-cron / Bearer CRON_SECRET) — the stalest boards, up to BOARDS_PER_RUN.
@@ -53,15 +54,21 @@ export async function syncBoards(sources, {
     const wave = sources.slice(i, i + WAVE);
     const results = await mapLimit(wave, CONCURRENCY, async (s) => {
       const r = await fetchJobs({ provider: s.provider, tenant: s.tenant, companyName: s.company_name });
-      return { s, ok: !!r.ok && r.rows.length > 0, rows: r.rows || [] };
+      // fetchSourceJobs already drops rows outside the market and reports the board's full size;
+      // an older fake / caller that returns unfiltered rows is filtered here as well.
+      const rows = r.rows || [];
+      const total = Number.isFinite(r.total) ? r.total : rows.length;
+      const learned = r.companyName && r.companyName !== s.company_name ? r.companyName : null;
+      return { s, ok: !!r.ok && total > 0, rows, total, dropped: Number.isFinite(r.droppedOutsideMarket) ? r.droppedOutsideMarket : 0, learned };
     });
     const keep = [];
-    for (const { s, ok, rows } of results) {
+    for (const { s, ok, rows, total, dropped } of results) {
       const p = (out.by_provider[s.provider] ||= { boards: 0, fetched: 0, kept: 0 });
       p.boards++;
       if (!ok) { out.failed++; continue; }
       out.synced++;
-      out.fetched += rows.length; p.fetched += rows.length;
+      out.fetched += total; p.fetched += total;
+      out.dropped_outside_market += dropped;
       for (const row of rows) {
         if (inUsMarket(row.location)) { keep.push(row); p.kept++; } else out.dropped_outside_market++;
       }
@@ -72,9 +79,11 @@ export async function syncBoards(sources, {
       out.upserted += u.upserted || 0;
     }
     // ok:false and 200-but-empty both count toward the circuit breaker, as before. jobCount is the
-    // board's full size, not the US share, so the registry shows what the board really holds.
-    await Promise.all(results.map(({ s, ok, rows }) =>
-      record({ id: s.id, ok, jobCount: rows.length, prevFailures: s.consecutive_failures || 0 }, supabaseUrl, serviceKey)));
+    // board's full size, not the US share, so the registry shows what the board really holds. A
+    // company name the board itself stated is written back (lib/jobs/companyName.js), so a
+    // slug-named registry row learns its real name.
+    await Promise.all(results.map(({ s, ok, total, learned }) =>
+      record({ id: s.id, ok, jobCount: total, prevFailures: s.consecutive_failures || 0, companyName: learned }, supabaseUrl, serviceKey)));
   }
   return out;
 }

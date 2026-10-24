@@ -1,4 +1,5 @@
 import type { Metadata } from 'next'
+import { pageMetadata } from '@/lib/seo'
 import Link from 'next/link'
 import { Suspense } from 'react'
 import { getLeaderboard, titleCase, slugify } from '@/lib/growth'
@@ -13,14 +14,14 @@ import ComparePicker, { CompareQuery } from './ComparePicker'
 
 export const revalidate = 3600
 
-export const metadata: Metadata = {
-  title: 'Compare Company Hiring: Ghost Rates Side by Side — Seen',
+export const metadata: Metadata = pageMetadata({
+  title: 'Compare Company Hiring: Ghost Rates Side by Side',
   description: 'Compare any two companies side by side on hiring transparency — ghost rate, response rate, average wait, and Seen Grade — from applicant reports, with labeled estimates where reports are missing. Decide where to apply.',
   keywords: ['compare company hiring', 'ghost rate comparison', 'which company responds faster', 'company hiring comparison', 'compare ghost rates'],
-  alternates: { canonical: 'https://seenjobs.io/compare' },
-  openGraph: { title: 'Compare Company Hiring Side by Side', description: 'Ghost rate, response rate, and Seen Grade for any two companies — from applicant reports, with labeled estimates where reports are missing.', url: 'https://seenjobs.io/compare', type: 'website', siteName: 'Seen' },
-  twitter: { card: 'summary_large_image', title: 'Compare Company Hiring Side by Side', description: 'Ghost rate, response rate, and Seen Grade for any two companies.' },
-}
+  path: '/compare',
+  ogTitle: 'Compare Company Hiring Side by Side',
+  ogDescription: 'Ghost rate, response rate, and Seen Grade for any two companies — from applicant reports, with labeled estimates where reports are missing.',
+})
 
 const wrap = { maxWidth: 760, margin: '0 auto', padding: '3.5rem 1.25rem 5rem', width: '100%', boxSizing: 'border-box' as const }
 

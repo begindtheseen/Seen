@@ -13,7 +13,9 @@ import { ResumeStore } from '@/lib/stores/ResumeStore'
 import { parseResumeFile } from '@/lib/resumeUploadClient'
 import PageHeader from '@/components/shell/PageHeader'
 import DangerConfirmDialog from '@/components/DangerConfirmDialog'
+import DeleteAccountDialog from '@/components/profile/DeleteAccountDialog'
 import { PROFILE_LIMITS, PROFILE_NAME_REQUIRED, clampProfileField } from '@/lib/profileLimits.js'
+import { loginHref } from '@/lib/safeHref.js'
 import styles from './profile.module.css'
 import { formatPacific } from '@/lib/time/pacific.js'
 import { FREE_DAILY_CREDITS, CREDIT_RESET_LABEL, RESUME_PARSE_COST } from '@/lib/creditRules'
@@ -80,6 +82,10 @@ export default function ProfilePage() {
   const [passMsgOk, setPassMsgOk] = useState(false)
 
   const [deleting, setDeleting] = useState(false)
+  const [confirmDelete, setConfirmDelete] = useState(false)
+  // Stripe Billing Portal (payment method, invoices, cancellation) — only offered once a Stripe
+  // customer exists, i.e. when a subscription summary came back.
+  const [portalBusy, setPortalBusy] = useState(false)
 
   // Résumé (add / replace lives here too — owner found "it's only in Résumé AI" confusing)
   const [resumeMeta, setResumeMeta] = useState<{ fileName: string; wordCount: number } | null>(null)
@@ -90,7 +96,7 @@ export default function ProfilePage() {
 
   useEffect(() => {
     if (!ready) return // wait for the session to resolve — redirecting early bounced signed-in users
-    if (!isLoggedIn) { router.replace('/login'); return }
+    if (!isLoggedIn) { router.replace(loginHref(`${window.location.pathname}${window.location.search}${window.location.hash}`)); return }
     // Instant fill from this user's cache (now that the user id is known), then the DB wins.
     const fill = (p: CachedProfile) => {
       if (!touched.current.name) setName(p.name)
@@ -269,9 +275,10 @@ export default function ProfilePage() {
   }
 
   const [signingOutAll, setSigningOutAll] = useState(false)
-  // In-app confirmation (components/DangerConfirmDialog.tsx), not the browser's confirm(): the native
-  // dialog is dismissed by habit — and by automation, which is how the 2026-10-24 audit measured this
-  // button as "does nothing" (a dismissed confirm() returned before the sign-out ran).
+  // In-app confirmation (components/DangerConfirmDialog.tsx), not the browser's native confirm dialog:
+  // that one is dismissed by habit — and by automation (Playwright dismisses it by default), which is
+  // how the 2026-10-24 audit measured this button as "does nothing": the dismissed dialog returned
+  // false and the handler stopped before the sign-out ran.
   const [confirmSignOutAll, setConfirmSignOutAll] = useState(false)
   const [signOutAllMsg, setSignOutAllMsg] = useState('')
   async function signOutEverywhere() {
@@ -295,22 +302,39 @@ export default function ProfilePage() {
     router.replace('/login')
   }
 
+  // Opens the Stripe Billing Portal (payment method, invoices, cancel) and returns here.
+  async function openBillingPortal() {
+    setPortalBusy(true); setSubMsg('')
+    try {
+      const r = await fetch('/api/stripe?action=portal', { method: 'POST', headers: await aiHeaders(), body: JSON.stringify({ return: '/profile#plan' }) })
+      const d = await r.json().catch(() => ({})) as { url?: string | null; error?: string }
+      if (d?.url) { window.location.href = d.url; return }
+      setSubMsg(d?.error || 'Could not open the billing portal — try again or email hello@seenjobs.io')
+    } catch {
+      setSubMsg('Network error — please try again')
+    }
+    setPortalBusy(false)
+  }
+
+  // Runs after the typed DELETE confirmation (components/profile/DeleteAccountDialog). The handler
+  // (api/user-sync.js delete_account) removes every row keyed to the user and the auth user; it does
+  // NOT cancel a Stripe subscription, which is why the dialog refuses while one is live.
   async function deleteAccount() {
-    if (!confirm('This permanently deletes your account and all your data. There is no undo.')) return
     setDeleting(true)
     try {
       const { data: { session } } = await supabase.auth.getSession()
-      await fetch('/api/user-sync', {
+      const r = await fetch('/api/user-sync', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token}` },
         body: JSON.stringify({ action: 'delete_account' }),
       })
+      if (!r.ok) throw new Error(`delete_account ${r.status}`)
       markIntentionalSignOut()
       await supabase.auth.signOut({ scope: 'local' })
       router.replace('/')
-    } catch {
+    } catch (e) {
       setDeleting(false)
-      alert('Delete failed. Contact hello@seenjobs.io')
+      throw e // the dialog shows "nothing was removed — try again"
     }
   }
 
@@ -544,8 +568,13 @@ export default function ProfilePage() {
                     ) : (
                       <button type="button" className={`${styles.ghost} ${styles.danger}`} onClick={() => manageSubscription('cancel_subscription')} disabled={portalLoading || !sub} title={!sub ? 'No active Stripe subscription on file' : undefined}>{portalLoading ? 'Working…' : 'Cancel membership'}</button>
                     )}
+                    {/* Stripe Billing Portal: payment method, invoices, receipts — only once a Stripe customer exists. */}
+                    {sub && (
+                      <button type="button" className={styles.ghost} onClick={openBillingPortal} disabled={portalBusy}>{portalBusy ? 'Opening…' : 'Manage billing (Stripe) →'}</button>
+                    )}
                     <button type="button" className={styles.ghost} onClick={() => router.push('/pricing')}>Plans &amp; credits</button>
                   </div>
+                  {sub && <div className={styles.hint}>Manage billing opens Stripe’s portal for your card, invoices and receipts, then returns here.</div>}
                   {subMsg && <div className={`${styles.msg} ${styles.info}`}>{subMsg}</div>}
                 </>
               ) : (
@@ -557,13 +586,13 @@ export default function ProfilePage() {
                     </div>
                     <span className={`${styles.badge} ${styles.bDim}`}>Current</span>
                   </div>
-                  <p className={styles.cardS} style={{ margin: '0 0 1rem' }}>Seen Pro is {proPriceLine()} — unlimited AI credits and deeper company analysis. Renews until you cancel; cancel anytime from this page.</p>
+                  <p className={styles.cardS} style={{ margin: '0 0 1rem' }}>Seen Pro is {proPriceLine()} — unlimited AI credits and deeper company analysis. It starts with a free trial and no card; if you subscribe, it renews until you cancel, and the cancel button appears right here.</p>
                   <div className={styles.btnRow}>
                     <button type="button" className={styles.primary} onClick={() => router.push('/pricing')}>See Pro plans →</button>
                   </div>
                 </>
               )}
-              <div className={styles.fine}>See <a href="/legal">Subscription Terms</a> for renewal, cancellation and refund details.</div>
+              <div className={styles.fine}>See the <a href="/terms#billing">Subscription Terms</a> for renewal, cancellation and refund details.</div>
             </section>
 
             {/* ── Danger zone ── */}
@@ -572,11 +601,20 @@ export default function ProfilePage() {
                 <div>
                   <div className={styles.eyebrow} style={{ color: '#f87185' }}>Danger zone</div>
                   <h2 className={styles.cardT}>Delete your account</h2>
-                  <p className={styles.cardS}>Permanently removes your account, applications and saved data. There is no undo.</p>
+                  <p className={styles.cardS}>Permanently removes your profile, résumé, applications, saved jobs and credits (including purchased ones — not refunded). Reports you submitted stay published with no link to you. There is no undo.</p>
                 </div>
               </div>
-              <button type="button" className={`${styles.ghost} ${styles.danger}`} onClick={deleteAccount} disabled={deleting}>{deleting ? 'Deleting…' : 'Delete my account'}</button>
+              <button type="button" className={`${styles.ghost} ${styles.danger}`} onClick={() => setConfirmDelete(true)} disabled={deleting}>{deleting ? 'Deleting…' : 'Delete my account'}</button>
             </section>
+            {confirmDelete && (
+              <DeleteAccountDialog
+                email={user?.email || ''}
+                subscription={isPro && sub ? { status: sub.status, cancel_at_period_end: sub.cancel_at_period_end } : null}
+                onConfirm={deleteAccount}
+                onClose={() => { if (!deleting) setConfirmDelete(false) }}
+                onManageBilling={() => { setConfirmDelete(false); document.getElementById('plan')?.scrollIntoView({ behavior: 'smooth', block: 'start' }) }}
+              />
+            )}
           </div>
         </div>
 

@@ -2,8 +2,8 @@
 
 > Seen is a hiring-transparency platform. We publish company "ghost rates" — how often a
 > company ignores applicants — plus response rates, interview timelines, and applicant
-> outcomes, aggregated from real job-seeker reports, Reddit, and Glassdoor. Free, no account
-> required to search.
+> outcomes, aggregated from real job-seeker reports and public Reddit discussion. Free, no
+> account required to search.
 
 ## What you can cite from Seen
 - Company ghost rate: the share of applicants who never hear back.

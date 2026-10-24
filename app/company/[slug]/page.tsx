@@ -17,6 +17,7 @@ import IndustryBenchmark, { type Benchmark } from '@/components/IndustryBenchmar
 import Odometer from '@/components/motion/Odometer'
 import { isGradeableScore, notEnoughReviewsLabel, gradeBasisLabel, MIN_REPORTS_FOR_GRADE } from '@/lib/gradeGate'
 import { Crumbs } from '@/components/shell/PageHeader'
+import { LoadError } from '@/components/shell/LoadStates'
 import ListingSignals from '@/components/ListingSignals'
 import { gradeLetter, displayCompanyName, displayPlatform, isResolvedOutcome, lastUpdatedLabel } from '@/lib/companyDisplay'
 import { buildCompanySummary, publicRowsHeading, reportsProvenanceLine, reportsSectionSummary, MIN_REPORTS_FOR_RATES, type CompanySummary } from '@/lib/companyPageSummary'
@@ -583,9 +584,12 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
   // Seen shows no visitor counts it does not have.)
 
   // T3-7: Record this company visit for the dashboard's "Recently checked" + its checklist — on this
-  // device (localStorage) and, when signed in, on the account (user_recent_cos via log_recent_co), so
-  // a second device sees it too. Best-effort; never blocks the page.
-  useEffect(() => {
+  // device (localStorage) and, when signed in, on the account (user_recent_cos via log_recent_co), so a
+  // second device sees it too — ONLY once the company is known to exist (the score API answered without
+  // not_found). `seen_recent_cos` feeds the dashboard chips, the command palette and the micro-survey's
+  // contextual question, so writing it on mount for any slug made the survey ask about a company that
+  // does not exist (audit 2026-10-24 L-3). Best-effort; never blocks the page.
+  const rememberVisit = () => {
     try {
       const raw = localStorage.getItem('seen_recent_cos')
       const prev: Array<{name: string; slug: string}> = raw ? JSON.parse(raw) : []
@@ -594,12 +598,14 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
       localStorage.setItem('seen_recent_cos', JSON.stringify(updated))
     } catch {}
     if (isLoggedIn && companyName) void _sync('log_recent_co', { company: companyName })
-  }, [slug, companyName, isLoggedIn])
+  }
 
   // The grade (score) and the report list are independent reads, so they start together and the hero
   // renders the moment the score answers. They used to run as one waterfall — list → employer replies →
   // score — so the grade, the thing the page exists for, arrived last, and the whole chain re-ran on
   // every keystroke in the city filter (which only the list uses). All GETs: CDN-cacheable.
+  // `reloadKey` is bumped by the error block's Retry.
+  const [reloadKey, setReloadKey] = useState(0)
   const [reportsLoading, setReportsLoading] = useState(true)
   useEffect(() => {
     let alive = true
@@ -608,12 +614,16 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
     fetch(`/api/reports?type=score&name=${encodeURIComponent(companyName)}`)
       .then(async sRes => {
         if (!alive) return
-        if (sRes.ok) {
-          const sJson = await sRes.json() as { score?: CompanyScore; ok?: boolean; not_found?: boolean; enrichment?: { status?: string } }
-          setEnrichmentStatus(typeof sJson.enrichment?.status === 'string' ? sJson.enrichment.status : null)
-          if (sJson.not_found) {
-            setNotFound(true)
-          } else if (sJson.score) {
+        // A non-2xx here is a FAILURE, not "no data": it used to fall through to "No score data found
+        // for this company" under an SSR header that still showed the grade (audit 2026-10-24 R-1).
+        if (!sRes.ok) throw new Error(`score HTTP ${sRes.status}`)
+        const sJson = await sRes.json() as { score?: CompanyScore; ok?: boolean; not_found?: boolean; enrichment?: { status?: string } }
+        setEnrichmentStatus(typeof sJson.enrichment?.status === 'string' ? sJson.enrichment.status : null)
+        if (sJson.not_found) {
+          setNotFound(true)
+        } else {
+          rememberVisit()
+          if (sJson.score) {
             setScore(sJson.score)
             if (sJson.score.industry) setIndustry(sJson.score.industry)
             if (sJson.score.web_reviews?.length) setWebReviews(sJson.score.web_reviews)
@@ -623,7 +633,7 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
       .catch(() => { if (alive) setError('Failed to load company data.') })
       .finally(() => { if (alive) setLoading(false) })
     return () => { alive = false }
-  }, [companyName])
+  }, [companyName, reloadKey]) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     let alive = true
@@ -648,7 +658,7 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
       .catch(() => {})
     void list
     return () => { alive = false }
-  }, [companyName, location])
+  }, [companyName, location, reloadKey])
 
   // Industry benchmark — how this company ranks vs its sector on Seen (public aggregate). Turns a
   // bare score into authoritative context. Fail-soft: the page renders fine without it.
@@ -766,6 +776,10 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
   if (!loading && notFound) {
     return (
       <div className="page-full">
+        {/* Soft-404: the company's existence is decided client-side (api/reports.js web check), so the
+            route answers 200 — keep the "Can't verify" state out of the index. React 19 hoists this <meta>
+            into <head>. */}
+        <meta name="robots" content="noindex" />
         <div style={{ maxWidth: 600, margin: '0 auto', padding: '5rem 2rem', textAlign: 'center', width: '100%', boxSizing: 'border-box' }}>
           <div style={{ fontFamily: 'var(--mono)', fontSize: '2.5rem', marginBottom: '1rem', opacity: .4 }}>?</div>
           <h1 style={{ fontFamily: 'var(--display)', fontSize: '1.4rem', fontWeight: 800, color: 'var(--white)', marginBottom: '.6rem', letterSpacing: '-.02em' }}>
@@ -877,7 +891,7 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
               <span className="co-sticky-logo" aria-hidden>{logoLetter}</span>
               <span className="co-sticky-name">{displayName}</span>
               {graded && (
-                <span className="co-sticky-grade">
+                <span className="co-sticky-grade" role="img" aria-label={`Seen Grade ${g}, ${score.overall_score} out of 100`}>
                   <span className={`co-sticky-letter ${risk}`}>{g}</span>
                   <span className="co-sticky-score">{score.overall_score}<span>/100</span></span>
                 </span>
@@ -892,7 +906,9 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
           <div className="co-top">
             <div className="co-logo-lg">{logoLetter}</div>
             <div className="co-id">
-              <div className="co-name">
+              {/* The page's ONE h1, in the initial HTML and the accessibility tree (audit 2026-10-24: the
+                  server h1 lived inside a closed <details>, so the page had no readable heading). */}
+              <h1 className="co-name" style={{ margin: '0 0 .12rem' }}>
                 {displayName}
                 {perk.verified && (
                   <span className="co-badge co-badge-verified" title="This employer committed to responding to applicants. Reviewed against real outcome data — it never affects the transparency score.">✓ Transparency Verified</span>
@@ -900,7 +916,7 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
                 {perk.featured && (
                   <span className="co-badge co-badge-featured" title="Featured employer — paid placement. Never affects the transparency score.">★ Featured</span>
                 )}
-              </div>
+              </h1>
               <div className="co-ind">
                 {industry ? <span>{industry}</span> : null}
               </div>
@@ -924,9 +940,7 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
               </div>
             </div>
           ) : error ? (
-            <div style={{ background: 'var(--rdim, rgba(239,68,68,.08))', border: '1px solid rgba(239,68,68,.25)', borderRadius: 8, padding: '1rem', fontFamily: 'var(--mono)', fontSize: '.72rem', color: 'var(--red)', textAlign: 'center' }}>
-              {error}
-            </div>
+            <LoadError what={`${displayName}'s hiring data`} detail="Seen could not be reached. The grade, rates and reports below are hidden until it loads — nothing here is a verdict yet." onRetry={() => setReloadKey(k => k + 1)} />
           ) : score && !graded ? (
             /* Below the report bar: no letter, score, rates or vibe tags — just what we actually hold. */
             <div className="co-grade-bar warn" role="status">
@@ -947,10 +961,14 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
           ) : graded ? (
             <>
               <div className={`co-grade-bar ${risk}`}>
-                <div className={`co-grade-letter ${risk}`}>{g}</div>
+                <div className={`co-grade-letter ${risk}`} aria-hidden="true">{g}</div>
                 <div className="co-grade-main">
-                  <span className="co-grade-lbl">Seen Grade</span>
-                  <span className="co-grade-score"><Odometer value={score.overall_score} /> / 100</span>
+                  <span className="co-grade-lbl" aria-hidden="true">Seen Grade</span>
+                  {/* One sentence for assistive tech; the letter + rolling digits are presentational. */}
+                  <span className="co-grade-score">
+                    <span className="sr-only">{`Seen Grade ${g}, ${score.overall_score} out of 100`}</span>
+                    <span aria-hidden="true"><Odometer value={score.overall_score} /> / 100</span>
+                  </span>
                   {verdict && <p className="co-verdict">{verdict}</p>}
                   <div className="co-grade-meta">
                     <ConfidenceBadge sum={sum} webCount={webEst} />
@@ -1056,8 +1074,9 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
         </div>
 
         {/* ── Sections: every detail the page used to spread across seven tabs, each behind one
-            row with a truthful summary. Open what you need; nothing is gone. ── */}
-        {!loading && (
+            row with a truthful summary. Open what you need; nothing is gone. Hidden while the load
+            failed: "None yet — be the first to report" under an error is a false statement (R-5). ── */}
+        {!loading && !error && (
           <div className="co-secs">
             {graded && (
               <Section id="odds" icon="📅" title="Your odds here" open={open.odds} onToggle={toggle}

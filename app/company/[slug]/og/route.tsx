@@ -1,5 +1,5 @@
 import { ImageResponse } from 'next/og'
-import { getScore, titleCase, displayCompanyName, grade, pct, firstPartyReportCount } from '@/lib/growth'
+import { getScore, companyExists, titleCase, displayCompanyName, grade, pct, firstPartyReportCount } from '@/lib/growth'
 import { lastUpdatedLabel } from '@/lib/companyDisplay'
 import { loadCardFonts } from '@/lib/server/cardFonts'
 import { INK, TEXT, ACCENTS, accentKeyForRisk, riskForScore, rgba } from '@/lib/cardTheme.js'
@@ -12,7 +12,7 @@ import { companyVerdict, companyStatPairs, confidenceLine, ogNoDataLines } from 
 // assets/fonts via lib/server/cardFonts.ts. 1200×630.
 //
 // A company nobody has graded gets its own honest design (never a "?" ring): the headline says so
-// and invites the first grade — it still has to be worth tapping.
+// and the second line claims only what the row proves (its real report count, or "Be the first.").
 //
 // Satori (next/og) rule: every <div> with more than one child node MUST set display:flex.
 // ROUTE HANDLER, not the opengraph-image file convention — deliberately. The convention
@@ -31,6 +31,12 @@ const white = (a: number) => `rgba(255,255,255,${a})`
 export async function GET(_req: Request, { params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params
   const [s, fonts] = await Promise.all([getScore(slug), loadCardFonts()])
+  // A company Seen has never heard of gets no card: the page itself says "Can't verify" for it, and a
+  // branded "Be the first to report how Zzyzx treats applicants" unfurl would vouch for a name that
+  // does not exist (L-3). Short cache so a company created later gets its card within the hour.
+  if (!s && !(await companyExists(slug))) {
+    return new Response('Not found', { status: 404, headers: { 'Cache-Control': 'public, s-maxage=3600' } })
+  }
   // Prefer the STORED canonical name — a slug can't carry punctuation, so titleCase(slug)
   // rendered "Lowe S" on the public unfurl where the company is actually "Lowe's".
   const name = s?.company_name ? displayCompanyName(s.company_name) : titleCase(slug)
@@ -52,7 +58,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ slug: s
   const verdict = hasData ? companyVerdict({ ghostRate: s?.ghost_rate ?? 0, responseRate: s?.response_rate ?? 0 }) : ''
   const pairs = hasData ? companyStatPairs({ ghostRate: s?.ghost_rate ?? 0, responseRate: s?.response_rate ?? 0, avgWaitDays: wait }) : []
   const conf = hasData ? confidenceLine(fp, updated) : ''
-  const [noDataHead, noDataSub] = ogNoDataLines(name)
+  const [noDataHead, noDataSub] = ogNoDataLines(name, fp)
   const url = `seenjobs.io/company/${slug}`
 
   // Name size: one line, never wrapped or clipped. Syne ExtraBold runs ~0.72em per character, so

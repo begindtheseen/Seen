@@ -19,11 +19,15 @@ const row = (i) => ({ id: `00000000-0000-0000-0000-00000000000${i}`, title: `Cas
 // Director and a "ServiceNow" architect in Austin with HIGH scores, a coordinate-less ATS row
 // whose text says Austin, and a CSR in Portland (far away).
 const CS = [
-  { id: '10000000-0000-0000-0000-000000000001', title: 'Customer Service Representative', company: 'PLS', location: '5828 W. Thomas Rd., Austin, TX', lat: 30.28, lng: -97.75, apply_url: 'https://example.com/csr', description: 'front line customer service', search_query: 'customer service', expires_at: NOW, created_at: new Date().toISOString(), score: 48 },
+  { id: '10000000-0000-0000-0000-000000000001', title: 'Customer Service Representative', company: 'plscareers', ats_tenant: 'plscareers', location: '5828 W. Thomas Rd., Austin, TX', lat: 30.28, lng: -97.75, apply_url: 'https://example.com/csr', description: 'front line customer service', search_query: 'customer service', expires_at: NOW, created_at: new Date().toISOString(), score: 48 },
   { id: '10000000-0000-0000-0000-000000000002', title: 'Managed Services - Data, Analytics & AI - Director', company: 'PwC', location: 'Austin, Travis County', lat: 30.26, lng: -97.73, apply_url: 'https://example.com/dir', description: 'lead client work', search_query: 'customer service', expires_at: NOW, created_at: new Date().toISOString(), score: 92, salary: '$128k' },
   { id: '10000000-0000-0000-0000-000000000003', title: 'Cyber ServiceNow Architect', company: 'Deloitte', location: 'Austin, Travis County', lat: 30.26, lng: -97.73, apply_url: 'https://example.com/snow', description: 'ServiceNow platform', search_query: 'servicenow', expires_at: NOW, created_at: new Date().toISOString(), score: 95 },
   { id: '10000000-0000-0000-0000-000000000004', title: 'Customer Care Specialist', company: 'lucidmotors', location: 'Austin, TX', lat: null, lng: null, apply_url: 'https://example.com/care', description: 'customer service for owners', search_query: null, expires_at: NOW, created_at: new Date().toISOString(), score: 70 },
   { id: '10000000-0000-0000-0000-000000000005', title: 'Customer Service Representative', company: 'Far Co', location: 'Portland, OR', lat: 45.52, lng: -122.68, apply_url: 'https://example.com/far', description: 'customer service', search_query: 'customer service', expires_at: NOW, created_at: new Date().toISOString(), score: 99 },
+  // Stored before the market filter: a Lever row abroad (live 2026-10-23: "Cashier- La Roca del Valles, Barcelona" in a Phoenix search).
+  { id: '10000000-0000-0000-0000-000000000006', title: 'Customer Service Agent', company: 'karllagerfeld', location: 'La Roca del Valles, Barcelona', lat: null, lng: null, apply_url: 'https://jobs.eu.lever.co/karllagerfeld/x', description: 'customer service in our outlet', search_query: 'customer service', expires_at: NOW, created_at: new Date().toISOString(), score: 70, source: 'Lever' },
+  // Adzuna's 500-char teaser of the PLS posting the corpus already holds in full from the board.
+  { id: '10000000-0000-0000-0000-000000000007', title: 'Customer Service Representative', company: 'plscareers', location: 'Phoenix, AZ', lat: 33.45, lng: -112.07, apply_url: 'https://www.adzuna.com/details/1', description: 'PLS is a leader in financial services. Customer Service Representative RESPONSIBILITIES: Greet customers and process transactions with care, speed and a smile, every day of the wee…', search_query: 'customer service', expires_at: NOW, created_at: new Date().toISOString(), score: 55, source: 'Adzuna' },
 ];
 let liveCalls = 0, liveDone = 0;
 globalThis.fetch = async (url, opts = {}) => {
@@ -39,6 +43,8 @@ globalThis.fetch = async (url, opts = {}) => {
     return new Response(JSON.stringify(rows), { status: 200, headers: { 'Content-Type': 'application/json' } });
   }
   if (u.includes('geocode_cache')) return new Response(JSON.stringify([{ lat: 30.27, lng: -97.74 }]), { status: 200, headers: { 'Content-Type': 'application/json' } });
+  // The registry names the board the plscareers rows were discovered under (lib/server/tenantNames.js).
+  if (u.includes('/rest/v1/company_sources')) return new Response(JSON.stringify([{ tenant: 'plscareers', company_name: 'PLS Financial Services' }, { tenant: 'lucidmotors', company_name: 'lucidmotors' }]), { status: 200, headers: { 'Content-Type': 'application/json' } });
   // rate limits, flags, pull log, expansion cache, perks, suppressed …: empty / allowed
   return new Response('[]', { status: 200, headers: { 'Content-Type': 'application/json' } });
 };
@@ -75,7 +81,11 @@ test('"customer service": the plain CSR outranks the Director; ServiceNow is not
   const res = await call({ query: 'customer service', location: 'Austin, TX', radius: '25', db_only: true });
   assert.equal(res.code, 200);
   const titles = res.body.jobs.map((j) => `${j.title} @ ${j.company}`);
-  assert.equal(titles[0], 'Customer Service Representative @ PLS', titles.join(' | '));
+  // Stored under the board slug "plscareers"; served as the employer name the registry holds for that
+  // tenant, so the card, the drawer and "Check X →" all read "PLS Financial Services".
+  assert.equal(titles[0], 'Customer Service Representative @ PLS Financial Services', titles.join(' | '));
+  assert.equal(res.body.jobs[0].company_slug, 'plscareers', 'the stored key rides along');
+  assert.equal(res.body.jobs.find((j) => /Customer Care/.test(j.title)).company, 'lucidmotors', 'a registry row that is still the slug renames nothing');
   assert.ok(!titles.some((t) => /ServiceNow/.test(t)), 'the "service" token must not match inside "ServiceNow"');
   const dirIdx = titles.findIndex((t) => /Director/.test(t));
   const careIdx = titles.findIndex((t) => /Customer Care/.test(t));
@@ -83,6 +93,9 @@ test('"customer service": the plain CSR outranks the Director; ServiceNow is not
   // The Portland CSR has the highest transparency score and a perfect title match, but it is a
   // fill-in from far away: it is served LAST and flagged, and the count excludes it.
   assert.equal(titles[titles.length - 1], 'Customer Service Representative @ Far Co');
+  assert.ok(!titles.some((t) => /karllagerfeld/.test(t)), `a row naming a non-US place never reaches a US search: ${titles.join(' | ')}`);
+  assert.equal(titles.filter((t) => t === 'Customer Service Representative @ PLS Financial Services').length, 1, 'the Adzuna teaser hides behind the full-text row');
+  assert.ok(!res.body.jobs.some((j) => j.source === 'Adzuna'), 'the teaser copy is the one dropped');
   assert.equal(res.body.jobs[res.body.jobs.length - 1].in_radius, false);
   assert.equal(res.body.in_radius, 3, 'CSR + Customer Care (text says Austin, no coords) + Director');
   assert.ok(res.body.jobs.slice(0, 3).every((j) => j.in_radius === true));

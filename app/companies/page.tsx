@@ -1,6 +1,7 @@
 'use client'
 
-import React, { useState, useEffect, useMemo } from 'react'
+import React, { useState, useEffect, useMemo, useCallback } from 'react'
+import { LoadError } from '@/components/shell/LoadStates'
 import { useRouter } from 'next/navigation'
 import { Score } from '@/lib/score'
 import { AppStore } from '@/lib/stores/AppStore'
@@ -54,6 +55,9 @@ export default function CompaniesPage() {
   const router = useRouter()
   const [companies, setCompanies] = useState<Company[]>([])
   const [loading, setLoading] = useState(true)
+  // The leaderboard request failed (API down / 500 / bad JSON): an error with Retry, never
+  // "No company data yet" (R-1).
+  const [loadFailed, setLoadFailed] = useState(false)
   const [search, setSearch] = useState('')
   const [sort, setSort] = useState<SortKey>('score')
   const [lookup, setLookup] = useState('')
@@ -86,19 +90,25 @@ export default function CompaniesPage() {
     } catch {}
   }, [])
 
-  useEffect(() => {
-    // GET: the board is identical for every visitor and the edge serves it (lib/server/publicRead.js).
-    fetch('/api/reports?type=leaderboard')
-      .then((r) => r.json())
-      .then((d: { companies?: Company[] }) => {
-        // Grade gate: the API already ranks only gradeable companies (≥5 real reports); filter
-        // again so a CDN-cached pre-gate payload can never put an ungraded company on the board.
-        const graded = (d.companies || []).filter((c) => isGradeableScore(c.score))
-        if (graded.length) setCompanies(graded)
-      })
-      .catch(() => {})
-      .finally(() => setLoading(false))
+  const loadLeaderboard = useCallback(async () => {
+    setLoading(true)
+    setLoadFailed(false)
+    try {
+      // GET: the board is identical for every visitor and the edge serves it (lib/server/publicRead.js).
+      const r = await fetch('/api/reports?type=leaderboard')
+      if (!r.ok) throw new Error(`HTTP ${r.status}`)
+      const d = await r.json() as { companies?: Company[] }
+      if (!Array.isArray(d.companies)) throw new Error('bad payload')
+      // Grade gate: the API already ranks only gradeable companies (≥5 real reports); filter
+      // again so a CDN-cached pre-gate payload can never put an ungraded company on the board.
+      setCompanies(d.companies.filter((c) => isGradeableScore(c.score)))
+    } catch {
+      setLoadFailed(true)
+    } finally {
+      setLoading(false)
+    }
   }, [])
+  useEffect(() => { void loadLeaderboard() }, [loadLeaderboard])
 
   const filtered = useMemo(() => {
     let list = companies
@@ -161,7 +171,7 @@ export default function CompaniesPage() {
             eyebrow="Transparency rankings"
             title="Company scoreboard"
             crumbLabel="Companies"
-            sub={<>Ranked by hiring transparency score. Ghost rate, response rate, and process quality — all in one place. Only companies with at least {MIN_REPORTS_FOR_GRADE} real reviews are graded.</>}
+            sub={<>Ranked by hiring transparency score. Ghost rate, response rate, and process quality — all in one place. A company is graded once it has at least one report submitted to Seen and {MIN_REPORTS_FOR_GRADE} pieces of evidence in total (an online mention counts as half).</>}
           />
 
           {/* Hero company lookup */}
@@ -173,6 +183,7 @@ export default function CompaniesPage() {
             <input
               type="text"
               placeholder="Look up any company — Google, Stripe, Tesla..."
+              aria-label="Look up a company"
               value={lookup}
               onChange={(e) => { setLookup(e.target.value); setShowLookupSuggs(true) }}
               onFocus={(e) => { e.currentTarget.style.borderColor = 'var(--blue)'; setShowLookupSuggs(true) }}
@@ -262,6 +273,7 @@ export default function CompaniesPage() {
           <input
             type="text"
             placeholder="Filter scoreboard..."
+            aria-label="Filter the scoreboard"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             onFocus={(e) => (e.currentTarget.style.borderColor = 'var(--blue)')}
@@ -297,6 +309,10 @@ export default function CompaniesPage() {
             }}
           >
             Loading scoreboard...
+          </div>
+        ) : loadFailed ? (
+          <div style={{ padding: '1.5rem 0' }}>
+            <LoadError what="the company scoreboard" detail="Seen could not be reached. You can still look up any company by name above." onRetry={loadLeaderboard} />
           </div>
         ) : filtered.length === 0 ? (
           <div style={{ textAlign: 'center', padding: '3rem 1.5rem' }}>

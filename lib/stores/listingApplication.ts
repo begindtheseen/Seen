@@ -6,6 +6,7 @@
 // listingApplication.test.mjs and, server-side, api/user-sync.addApplication.test.mjs.
 
 import type { Application } from '../types.ts'
+import { displayCompanyName } from '../companyNames.js'
 
 export interface ListingLike {
   id?: string | number | null
@@ -42,7 +43,9 @@ export function applicationFromListing(job: ListingLike, opts: { platform?: stri
   const jobUrl = clean(job.apply_url, 2000) || undefined
   const jobId = job.id == null || job.id === '' ? undefined : String(job.id).slice(0, 80)
   return {
-    company: clean(job.company),
+    // The employer as a person names it — "PLS Financial Services", never the board slug
+    // "plscareers" the listing may be stored under (lib/companyNames.js).
+    company: displayCompanyName(clean(job.company)) || clean(job.company),
     role: clean(job.title),           // the full title — never shortened or re-mapped to a family
     location: clean(job.location),    // '' when the listing has none; the card hides an empty one
     platform: opts.platform || platformFromUrl(jobUrl),

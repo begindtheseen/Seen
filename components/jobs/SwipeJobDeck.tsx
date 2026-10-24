@@ -6,6 +6,9 @@ import { useAuth } from '@/lib/auth'
 import type { Job } from '@/lib/types'
 import HiringProbability from '@/components/HiringProbability'
 import { Score } from '@/lib/score'
+import { displayCompanyName } from '@/lib/companyDisplay'
+import { displayPay } from '@/lib/jobs/pay.js'
+import { roleSnippet, isDescriptionPreview } from '@/lib/jobs/descriptionText.js'
 
 // ── SwipeJobDeck ──────────────────────────────────────────────────────────────
 
@@ -256,11 +259,11 @@ export default function SwipeJobDeck({ jobs, onOpen, onDismiss, onSave, onApply,
             fontFamily: 'var(--display)', fontWeight: 800, fontSize: '1.05rem',
             color: scoreHsl(topJob.score, 1), flexShrink: 0,
           }}>
-            {(topJob.company || '?')[0].toUpperCase()}
+            {(displayCompanyName(topJob.company) || '?')[0].toUpperCase()}
           </div>
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ fontFamily: 'var(--display)', fontSize: '.92rem', fontWeight: 700, color: 'var(--white)', letterSpacing: '-.02em', lineHeight: 1.25, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{topJob.title}</div>
-            <div style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', color: 'var(--dim)', marginTop: '.12rem' }}>{topJob.company}{topJob.location ? ` · ${topJob.location}` : ''}</div>
+            <div style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', color: 'var(--dim)', marginTop: '.12rem' }}>{displayCompanyName(topJob.company)}{topJob.location ? ` · ${topJob.location}` : ''}</div>
           </div>
           <div className={`sring ${scoreRisk(topJob.score)}`} style={{ width: 40, height: 40, flexShrink: 0 }} title={topJob.score == null ? 'Not enough signal in this listing to score it' : undefined}>
             <div className="sring-n" style={{ fontSize: '.8rem' }}>{topJob.score ?? '–'}</div>
@@ -268,14 +271,17 @@ export default function SwipeJobDeck({ jobs, onOpen, onDismiss, onSave, onApply,
         </div>
 
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '.3rem', marginBottom: '.55rem' }}>
-          {topJob.salary && <span style={{ background: 'rgba(16,185,129,.12)', border: '1px solid rgba(16,185,129,.3)', borderRadius: 5, padding: '.17rem .5rem', fontSize: '.6rem', fontFamily: 'var(--mono)', color: 'var(--green)', fontWeight: 600 }}>{topJob.salary}</span>}
+          {displayPay(topJob) && <span style={{ background: 'rgba(16,185,129,.12)', border: '1px solid rgba(16,185,129,.3)', borderRadius: 5, padding: '.17rem .5rem', fontSize: '.6rem', fontFamily: 'var(--mono)', color: 'var(--green)', fontWeight: 600 }}>{displayPay(topJob)}</span>}
           {topJob.type && <span style={{ background: 'rgba(99,102,241,.1)', border: '1px solid rgba(99,102,241,.25)', borderRadius: 5, padding: '.17rem .5rem', fontSize: '.6rem', fontFamily: 'var(--mono)', color: '#a5b4fc' }}>{topJob.type}</span>}
           {topJob.level && <span style={{ background: 'rgba(255,255,255,.06)', border: '1px solid rgba(255,255,255,.12)', borderRadius: 5, padding: '.17rem .5rem', fontSize: '.6rem', fontFamily: 'var(--mono)', color: 'var(--sub)' }}>{topJob.level}</span>}
         </div>
 
+        {/* The first thing the posting says about the ROLE — not the employer's mission paragraph
+            that 302 SpaceX rows share (lib/jobs/descriptionText.js roleSnippet). */}
         {topJob.description && (
           <div style={{ fontFamily: 'var(--body)', fontSize: '.7rem', color: 'var(--muted)', lineHeight: 1.55, overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>
-            {topJob.description}
+            {roleSnippet(topJob.description, topJob.company, topJob.title, 220)}
+            {isDescriptionPreview(topJob) && <span style={{ color: 'var(--dim)' }}> (preview — full posting on the employer&apos;s site)</span>}
           </div>
         )}
 

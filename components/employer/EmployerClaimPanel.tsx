@@ -52,13 +52,23 @@ export function EmployerClaimPanel() {
         <div style={kicker}>Manage your company</div>
         <h2 style={h2}>Own this company? Claim it.</h2>
         <p style={body}>
-          Sign in with an employer account to request your company. Once an admin approves your
-          claim, your dashboard, analytics, and notifications open scoped to your company
-          automatically — no re-typing the name each time.
+          Three steps, all free: create an employer account (or sign in to one), request your company
+          right here, and an admin approves the claim — instantly when you signed up with a work email at
+          the company&apos;s own domain, otherwise within a business day. Approved claims open your
+          dashboard, analytics and notifications scoped to your company; nobody sees a company they
+          don&apos;t represent.
         </p>
-        <Link href="/login?type=employer" style={{ ...primaryBtn, display: 'inline-block', textDecoration: 'none' }}>
-          Sign in as an employer →
-        </Link>
+        <div style={{ display: 'flex', gap: '.6rem', flexWrap: 'wrap', alignItems: 'center' }}>
+          <Link href="/login?type=employer" style={{ ...primaryBtn, display: 'inline-block', textDecoration: 'none' }}>
+            Create an employer account →
+          </Link>
+          <Link href="/login?type=employer&return=%2Femployers%23claim" style={{ ...mono('.7rem', 'var(--sub)'), textDecoration: 'none', border: '1px solid var(--line2)', borderRadius: 9, padding: '.7rem 1.1rem' }}>
+            I have one — sign in
+          </Link>
+        </div>
+        <p style={{ ...mono('.58rem', 'var(--muted)'), lineHeight: 1.6, margin: '1rem 0 0' }}>
+          Questions before you claim? <a href="/contact" style={{ color: 'var(--sub)' }}>Contact us</a> — a person answers within two business days.
+        </p>
       </div>
     )
   }

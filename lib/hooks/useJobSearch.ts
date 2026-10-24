@@ -157,6 +157,8 @@ export function useJobSearch() {
   // Why the rail is empty ('no_city' → the page asks for a city) and the city it matched near.
   const [recReason, setRecReason] = useState<RecReason>(null)
   const [recCity, setRecCity] = useState<string | null>(null)
+  // Where the rail's city came from: the profile, or the résumé's own contact line.
+  const [recCitySource, setRecCitySource] = useState<'profile' | 'resume' | null>(null)
   const [coScores, setCoScores] = useState<CoScoreMap>({})
   const [appliedCos, setAppliedCos] = useState<Set<string>>(new Set())
   const abortRef = useRef<AbortController | null>(null)
@@ -270,15 +272,20 @@ export function useJobSearch() {
       return
     }
 
-    // 2) Signed-in → pre-fill HOME location. If profile.city hasn't loaded yet, this effect
-    //    re-runs when it arrives (profile?.city is a dep); we do NOT fall through to GPS while
-    //    a home location may still be incoming, and signed-in users never auto-GPS.
+    // 2) Signed-in → the profile HOME city wins. `ready` flips before the profile row arrives
+    //    (lib/auth.tsx loads it after the session), so we wait for the row (profile is a dep) rather
+    //    than fall through to GPS while a home city may still be incoming. A signed-in account with
+    //    NO city on file gets the same geolocation a guest gets — the live audit (2026-10-23) saw a
+    //    member start on "📍 Anywhere" while a guest got Phoenix. Order: profile city → GPS → Anywhere.
     if (isLoggedIn) {
-      if (profile?.city) {
+      if (!profile) return
+      if (profile.city) {
         autoSearchedRef.current = true
         setLocationRaw(profile.city)
         searchJobs(undefined, profile.city)
+        return
       }
+      if (typeof navigator !== 'undefined' && navigator.geolocation) requestGpsLocation()
       return
     }
 
@@ -299,11 +306,11 @@ export function useJobSearch() {
     if (typeof navigator !== 'undefined' && navigator.geolocation) {
       requestGpsLocation()
     }
-  }, [ready, isLoggedIn, profile?.city]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [ready, isLoggedIn, profile === null, profile?.city]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Fetch resume-powered recommendations when logged in
   useEffect(() => {
-    if (!isLoggedIn) { setRecHasResume(null); setRecReason(null); setRecCity(null); return }
+    if (!isLoggedIn) { setRecHasResume(null); setRecReason(null); setRecCity(null); setRecCitySource(null); return }
     setRecStatus('loading')
     setRecHasResume(null)
     setRecReason(null)
@@ -313,10 +320,11 @@ export function useJobSearch() {
       body: JSON.stringify({ action: 'recommended' }),
     }))
     .then(r => r.ok ? r.json() : {})
-    .then((data: { jobs?: unknown[]; skills?: string[]; has_resume?: boolean | null; reason?: RecReason; city?: string | null }) => {
+    .then((data: { jobs?: unknown[]; skills?: string[]; has_resume?: boolean | null; reason?: RecReason; city?: string | null; city_source?: 'profile' | 'resume' | null }) => {
       if (typeof data.has_resume === 'boolean') setRecHasResume(data.has_resume)
       setRecReason(data.reason ?? null)
       setRecCity(typeof data.city === 'string' && data.city ? data.city : null)
+      setRecCitySource(data.city_source === 'resume' || data.city_source === 'profile' ? data.city_source : null)
       if (Array.isArray(data.jobs) && data.jobs.length) {
         const raw: Job[] = (data.jobs as Record<string, unknown>[]).map(j => ({
           id: String(j.id || 'rec_' + Math.random().toString(36).slice(2, 8)),
@@ -548,6 +556,12 @@ export function useJobSearch() {
     setStatusMsg(jobs.length > 0 ? `${jobs.length} result${jobs.length !== 1 ? 's' : ''}` : 'Enter a search above →')
   }
 
+  // The error state's Retry: re-run the same query and location (the inputs still hold them).
+  function retrySearch() {
+    searchCache.delete(`${query.trim()}|${location.trim()}|${radius}`)
+    void searchJobs()
+  }
+
   return {
     // auth passthrough (search machine reacts to these)
     isLoggedIn,
@@ -578,10 +592,12 @@ export function useJobSearch() {
     recHasResume,
     recReason,
     recCity,
+    recCitySource,
     coScores,
     appliedCos,
     // actions
     searchJobs,
+    retrySearch,
     requestGpsLocation,
     clearFilters,
   }

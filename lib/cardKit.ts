@@ -13,7 +13,7 @@
 import { INK, TEXT, TYPE, ACCENTS, accentKeyForOutcome, accentKeyForRisk, riskForScore, rgba } from '@/lib/cardTheme.js'
 import {
   outcomeHeadline, daysLabel, subLine, metaLine, contextStrip, outcomeKind, companyUrl,
-  companyVerdict, companyStatPairs, confidenceLine,
+  companyVerdict, companyStatPairs, confidenceLine, timelineLine, eventDays,
 } from '@/lib/cardCopy.js'
 import { heroCells, layoutGrid } from '@/lib/cardLayout.js'
 import { formatPacific } from '@/lib/time/pacific.js'
@@ -32,7 +32,13 @@ export interface CompanyGradeContext {
   score: number
   ghostRate?: number | null     // 0–1
   responseRate?: number | null  // 0–1
+  avgWaitDays?: number | null
+  /** First-party applicant reports behind the grade — printed as "based on N reports" when ≥ 5. */
+  reports?: number | null
 }
+
+/** A tracked hiring event (lib/types.ts HiringEvent, reduced to what the card draws). */
+export interface CardEvent { type: string; date: number }
 
 export interface OutcomeCardData {
   company: string
@@ -43,11 +49,13 @@ export interface OutcomeCardData {
   days?: number | null
   reachedInterview?: boolean
   platform?: string
-  /** The application's city, printed in the top-right meta when known. */
-  city?: string
-  /** When the outcome happened (ms) — the month in the top-right meta. */
-  dateMs?: number
-  /** The company's Seen grade, when it has one. Absent → the context strip is omitted. */
+  /** When the application was submitted (ms) — anchors the timeline and the event marks. */
+  appliedMs?: number
+  /** The tracker's events; the grid marks their days and ONE line says what happened and when. */
+  events?: CardEvent[]
+  /** A first name the user chose to show in the context line. Default: none. */
+  name?: string
+  /** The company's Seen grade, when it has one. Absent → the context line is omitted. */
   companyGrade?: CompanyGradeContext | null
 }
 
@@ -277,8 +285,16 @@ function drawMark(c: Ctx, kind: 'yes' | 'no' | 'dot', cx: number, cy: number, s:
   c.restore()
 }
 
-function drawDayGrid(c: Ctx, x: number, y: number, kind: string, days: number | null | undefined, boxW: number, boxH: number, accent: string, dim: number, align: 'left' | 'right' | 'center' = 'left', valign: 'bottom' | 'middle' = 'bottom') {
-  const cells = heroCells(kind, days)
+function drawEventMark(c: Ctx, kind: string, cx: number, cy: number, s: number, accent: string) {
+  c.save()
+  c.strokeStyle = accent; c.fillStyle = accent; c.lineWidth = Math.max(2.5, s * 0.09)
+  if (kind === 'interview') { c.beginPath(); c.arc(cx, cy, s * 0.2, 0, Math.PI * 2); c.stroke() }
+  else { c.beginPath(); c.arc(cx, cy, s * 0.12, 0, Math.PI * 2); c.fill() }
+  c.restore()
+}
+
+function drawDayGrid(c: Ctx, x: number, y: number, kind: string, days: number | null | undefined, boxW: number, boxH: number, accent: string, dim: number, align: 'left' | 'right' | 'center' = 'left', valign: 'bottom' | 'middle' = 'bottom', marks: { day: number; kind: string }[] = []) {
+  const cells = heroCells(kind, days, marks)
   const g = layoutGrid(cells.length, boxW, boxH)
   const x0 = align === 'right' ? x + boxW - g.width : align === 'center' ? x + Math.round((boxW - g.width) / 2) : x
   const y0 = valign === 'middle' ? y + Math.round((boxH - g.height) / 2) : y + boxH - g.height
@@ -297,6 +313,7 @@ function drawDayGrid(c: Ctx, x: number, y: number, kind: string, days: number | 
       c.fillStyle = rgba(accent, a); c.fill()
       // A hairline keeps the faintest ghosted cells legible as cells.
       c.strokeStyle = rgba(accent, Math.min(0.5, a + 0.08)); c.lineWidth = 1; c.stroke()
+      if (cell.mark) drawEventMark(c, cell.mark, cx + g.cell / 2, cy + g.cell / 2, g.cell, accent)
       if (cell.kind === 'more' && cell.label) {
         const fs = fitFont(c, cell.label, 700, TYPE.text, Math.round(g.cell * 0.34), 12, g.cell - 10)
         c.font = font(700, fs); c.fillStyle = rgba(accent, Math.min(1, 0.55 + (cell.alpha ?? 1) * 0.4)); c.textAlign = 'center'; c.textBaseline = 'middle'
@@ -315,23 +332,42 @@ function bigNumber(c: Ctx, x: number, baseline: number, value: string, label: st
   const descent = c.measureText(value).actualBoundingBoxDescent || 0
   c.font = font(400, TYPE.numberLabel); c.fillStyle = white(TEXT.body)
   c.fillText(ellipsize(c, label, maxW), x, baseline + descent + 40)
+  return baseline + descent + 40
 }
 
-// "Walmart · Seen grade [A] · 13% of applicants get ghosted" — the letter in a small accent tag.
-function contextLine(c: Ctx, f: Frame, baseline: number, strip: { before: string; letter: string; after: string }, accent: string) {
-  c.font = font(400, TYPE.context); c.fillStyle = white(TEXT.body); c.textAlign = 'left'
+// "Applied Oct 3 · Interview Oct 7 · Offer Oct 15" — what actually happened, in one line.
+function timelineText(c: Ctx, text: string, x: number, baseline: number, maxW: number) {
+  if (!text) return
+  c.font = font(500, TYPE.context); c.fillStyle = white(TEXT.strong); c.textAlign = 'left'
+  c.fillText(ellipsize(c, text, maxW), x, baseline)
+}
+
+// "[A] Walmart replies to 87% of applicants. Not this time.  · based on 48 reports" — the grade
+// letter in a small accent tag, then the sentence that explains the story (lib/cardCopy.js).
+function contextLine(c: Ctx, f: Frame, baseline: number, strip: { letter: string; text: string; based: string }, accent: string) {
   let x = f.PAD
-  c.fillText(strip.before, x, baseline); x += c.measureText(strip.before).width + 4
   c.font = font(700, 20, TYPE.display)
   const lw = c.measureText(strip.letter).width
   const tagW = lw + 22, tagH = 32
   roundRect(c, x, baseline - 24, tagW, tagH, 7)
   c.strokeStyle = rgba(accent, 0.7); c.lineWidth = 1.5; c.stroke()
   c.fillStyle = rgba(accent, 0.12); c.fill()
-  c.fillStyle = accent; c.fillText(strip.letter, x + 11, baseline - 1)
-  x += tagW + 4
+  c.fillStyle = accent; c.textAlign = 'left'; c.fillText(strip.letter, x + 11, baseline - 1)
+  x += tagW + 14
   c.font = font(400, TYPE.context); c.fillStyle = white(TEXT.body)
-  c.fillText(ellipsize(c, strip.after, f.W - f.PAD - x), x, baseline)
+  const room = f.W - f.PAD - x
+  // The sentence is never cut: the denominator steps aside first, then the type steps down.
+  let based = strip.based ? ` · ${strip.based}` : ''
+  if (c.measureText(strip.text + based).width > room) based = ''
+  const fs = fitFont(c, strip.text, 400, TYPE.text, TYPE.context, 20, room)
+  c.font = font(400, fs); c.fillStyle = white(TEXT.body)
+  const text = ellipsize(c, strip.text, room)
+  c.fillText(text, x, baseline)
+  if (based) {
+    x += c.measureText(text).width
+    c.fillStyle = white(TEXT.faint)
+    c.fillText(based, x, baseline)
+  }
 }
 
 // ── OUTCOME CARD ───────────────────────────────────────────────────────────────────────────
@@ -343,13 +379,16 @@ export function drawOutcomeCard(canvas: HTMLCanvasElement, d: OutcomeCardData, f
   const accent = A.hex
   const days = d.days != null && Number.isFinite(d.days) ? Math.max(0, Math.round(d.days)) : null
   const head = outcomeHeadline({ outcome: d.outcome, company: d.company, days, reachedInterview: !!d.reachedInterview })
-  const sub = subLine(d.role, d.platform)
-  const strip = contextStrip(d.company, d.companyGrade ?? null)
+  // The company rides in the sub-line when the headline is the person's number ("Offer in 12 days.").
+  const sub = subLine(d.role, d.platform, kind === 'hired' ? d.company : undefined)
+  const strip = contextStrip(d.company, d.companyGrade ?? null, { outcome: d.outcome, days, name: d.name })
+  const timeline = timelineLine(d.events ?? [], { outcome: d.outcome, appliedMs: d.appliedMs })
+  const marks = eventDays(d.events ?? [], d.appliedMs ?? NaN)
   const inner = f.W - f.PAD * 2
 
   if (!f.story) {
     paintBg(c, f, accent, { x: f.W * 0.78, y: 700, r: 620, a: A.bloom })
-    topRow(c, f, accent, metaLine(d.dateMs ?? NaN, d.city))
+    topRow(c, f, accent, '') // no month, no city: the timeline carries the dates, the card is not a receipt
 
     const hl = headline(c, head.parts, f.PAD, 270, inner, TYPE.headline, TYPE.headlineMin, 3, accent)
     let y = hl.bottom
@@ -358,19 +397,23 @@ export function drawOutcomeCard(canvas: HTMLCanvasElement, d: OutcomeCardData, f
       c.font = font(400, TYPE.sub); c.fillStyle = white(TEXT.body); c.textAlign = 'left'
       c.fillText(ellipsize(c, sub, inner), f.PAD, y)
     }
+    // Rows from the bottom up: footer hairline 952 · context 918 · timeline · hero.
+    const contextBase = 918
+    const timelineBase = strip ? contextBase - 50 : 902
+    const heroBottom = timeline ? timelineBase - 54 : strip ? contextBase - 66 : 880
     const heroTop = y + 46
-    const heroBottom = strip ? 850 : 880
     const numW = 380
-    drawDayGrid(c, f.PAD + numW + 40, heroTop, kind, days, f.W - f.PAD - (f.PAD + numW + 40), heroBottom - heroTop, accent, A.dim, 'right')
+    drawDayGrid(c, f.PAD + numW + 40, heroTop, kind, days, f.W - f.PAD - (f.PAD + numW + 40), heroBottom - heroTop, accent, A.dim, 'right', 'bottom', marks)
     bigNumber(c, f.PAD, heroBottom - 74, days != null ? String(days) : '?', daysLabel({ outcome: d.outcome, days }), TYPE.number, numW)
-    if (strip) contextLine(c, f, 924, strip, accent)
+    timelineText(c, timeline, f.PAD, timelineBase, inner)
+    if (strip) contextLine(c, f, contextBase, strip, accent)
     footer(c, f, companyUrl(d.company), 'Tracked with Seen')
     return
   }
 
-  // Story: the same elements with more air — headline, the number, then the calendar full width.
+  // Story: the same elements with more air — headline, the number + timeline, then the calendar.
   paintBg(c, f, accent, { x: f.W * 0.5, y: 1250, r: 760, a: A.bloom })
-  topRow(c, f, accent, metaLine(d.dateMs ?? NaN, d.city))
+  topRow(c, f, accent, '')
   const hl = headline(c, head.parts, f.PAD, f.top + 232, inner, 108, TYPE.headlineMin, 3, accent)
   let y = hl.bottom
   if (sub) {
@@ -379,12 +422,13 @@ export function drawOutcomeCard(canvas: HTMLCanvasElement, d: OutcomeCardData, f
     c.fillText(ellipsize(c, sub, inner), f.PAD, y)
   }
   const numBase = y + 268
-  bigNumber(c, f.PAD, numBase, days != null ? String(days) : '?', daysLabel({ outcome: d.outcome, days }), 260, inner)
+  const labelBase = bigNumber(c, f.PAD, numBase, days != null ? String(days) : '?', daysLabel({ outcome: d.outcome, days }), 260, inner)
+  if (timeline) timelineText(c, timeline, f.PAD, labelBase + 46, inner)
   const hairline = f.bottom - 76 - 52
   const contextBase = hairline - 54
-  const gridTop = numBase + 150
+  const gridTop = labelBase + (timeline ? 110 : 70)
   const gridBottom = (strip ? contextBase - 70 : hairline - 64)
-  drawDayGrid(c, f.PAD, gridTop, kind, days, inner, Math.max(120, gridBottom - gridTop), accent, A.dim, 'center', 'middle')
+  drawDayGrid(c, f.PAD, gridTop, kind, days, inner, Math.max(120, gridBottom - gridTop), accent, A.dim, 'center', 'middle', marks)
   if (strip) contextLine(c, f, contextBase, strip, accent)
   footer(c, f, companyUrl(d.company), 'Tracked with Seen')
 }
@@ -433,7 +477,7 @@ export function drawCompanyCard(canvas: HTMLCanvasElement, d: CompanyCardData, f
   const pairs = companyStatPairs({ ghostRate: d.ghost_rate, responseRate: d.response_rate, avgWaitDays: d.avg_wait_days })
   const updated = d.updatedAt ? formatPacific(new Date(d.updatedAt), { dateStyle: 'medium' }) : ''
   const updatedMs = d.updatedAt ? new Date(d.updatedAt).getTime() : NaN
-  const meta = ['SEEN GRADE', metaLine(updatedMs, '')].filter(Boolean).join(' · ')
+  const meta = ['HIRING GRADE', metaLine(updatedMs, '')].filter(Boolean).join(' · ')
   const conf = (d.confidence ? `${d.confidence} · ` : '') + confidenceLine(d.report_count, updated)
 
   if (!f.story) {

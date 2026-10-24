@@ -262,6 +262,33 @@ export async function getScore(nameOrSlug: string): Promise<GrowthScore | null> 
   return scoreFromDb(name)
 }
 
+// Is this company known to Seen at all — a companies row (listings / reports have named it) or any
+// company_scores row, graded or not? Server-only, same direct-from-Supabase pattern. The company OG
+// route 404s when this is false so `/company/<anything>/og` cannot mint a branded card for a company
+// that does not exist (audit 2026-10-24 L-3). A read failure answers true: a flaky DB must never 404 a
+// real company's share image.
+export async function companyExists(nameOrSlug: string): Promise<boolean> {
+  const creds = sbCreds()
+  if (!creds) return true
+  const name = (nameOrSlug.includes('-') ? nameOrSlug.replace(/-/g, ' ') : nameOrSlug).toLowerCase().trim()
+  if (!name) return false
+  const headers = { apikey: creds.key, Authorization: `Bearer ${creds.key}` }
+  const patterns = [encodeURIComponent(name), ...(/[\s-]/.test(name) ? [fuzzyPattern(name)] : [])]
+  try {
+    for (const table of ['companies?name=ilike.', 'company_scores?company_name=ilike.']) {
+      for (const p of patterns) {
+        const r = await fetch(`${creds.url}/rest/v1/${table}${p}&select=id&limit=1`, { headers, signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) })
+        if (!r.ok) return true
+        const rows = await r.json()
+        if (Array.isArray(rows) && rows.length > 0) return true
+      }
+    }
+    return false
+  } catch {
+    return true
+  }
+}
+
 // The public leaderboard — read DIRECTLY from company_scores (never a self-fetch of the live API).
 export async function getLeaderboard(opts: { by?: 'fused' | 'first_party' } = {}): Promise<LeaderboardRow[]> {
   return leaderboardFromDb(opts.by ?? 'fused')

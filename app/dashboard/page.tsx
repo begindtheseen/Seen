@@ -1,7 +1,7 @@
 'use client'
 
-import { pathSegment, slugSegment } from '@/lib/safeHref.js'
-import { useEffect, useState } from 'react'
+import { pathSegment, slugSegment, loginHref } from '@/lib/safeHref.js'
+import { useCallback, useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { useAuth } from '@/lib/auth'
@@ -16,6 +16,7 @@ import WelcomeOnboarding from '@/components/WelcomeOnboarding'
 import type { Application } from '@/lib/types'
 import { isGradeableScore } from '@/lib/gradeGate'
 import Odometer from '@/components/motion/Odometer'
+import { LoadError, PageSkeleton } from '@/components/shell/LoadStates'
 import styles from './dashboard.module.css'
 
 function companySlug(name: string) {
@@ -61,11 +62,23 @@ function calcJobSearchHealth(apps: Application[]) {
   return { score, responseRate, ghostRate, interviewRate, terminal: terminal.length }
 }
 
+/** This device's recently checked companies (seen_recent_cos), well-formed rows only. */
+function localRecentCompanies(): Array<{ name: string; slug: string }> {
+  try {
+    const raw = localStorage.getItem('seen_recent_cos')
+    if (raw) return (JSON.parse(raw) as Array<{ name: string; slug: string }>).filter(c => c && c.name && c.slug)
+  } catch {}
+  return []
+}
+
 export default function DashboardPage() {
   const router = useRouter()
   const { user, profile, isLoggedIn, isSeeker, ready } = useAuth()
   const [apps, setApps] = useState<Application[]>([])
   const [loading, setLoading] = useState(true)
+  // The account's rows could not be read (API down / 500 / no session). The page then shows an error
+  // block with Retry and whatever this device last synced — never "0 open · No applications" (R-1).
+  const [loadFailed, setLoadFailed] = useState(false)
   const [isPro, setIsPro] = useState(false)
   // A ghost surge for a tracked company, with the company's current grade when known (api/reports.js
   // ghost_surges). Worded with the base rate, or dropped when the grade is A / the ghost rate < 20%.
@@ -97,18 +110,11 @@ export default function DashboardPage() {
   // Companies this person checked: this device's list first, then the account's (user_recent_cos,
   // written by the company page when signed in) so the checklist's third step and "Recently checked"
   // are true on a second device too. ONE slug scheme (CLAUDE.md): lower-case, spaces → hyphens.
-  const localRecent = (): Array<{ name: string; slug: string }> => {
-    try {
-      const raw = localStorage.getItem('seen_recent_cos')
-      if (raw) return (JSON.parse(raw) as Array<{ name: string; slug: string }>).filter(c => c && c.name && c.slug)
-    } catch {}
-    return []
-  }
-  useEffect(() => { setRecentCos(localRecent().slice(0, 5)) }, [])
+  useEffect(() => { setRecentCos(localRecentCompanies().slice(0, 5)) }, [])
 
   useEffect(() => {
     if (!ready) return // wait for the session to resolve — redirecting early bounced signed-in users
-    if (!isLoggedIn) { router.replace('/login'); return }
+    if (!isLoggedIn) { router.replace(loginHref(`${window.location.pathname}${window.location.search}`)); return }
     // Employers have no seeker dashboard — route them to their portal. Safety net for a stale
     // link or a post-login redirect race; the login page already sends employers to /employers.
     if (isLoggedIn && !isSeeker) { router.replace('/employers'); return }
@@ -118,26 +124,28 @@ export default function DashboardPage() {
   // recently-checked companies and the Inbox Autopilot status. The page used to fire four (load,
   // get_credits, inbox_status, get_recent_cos) — each a function invocation + rate-limit RPC + its
   // reads, and the audit of 2026-10-24 measured 8–15 s / 504s on that path at first paint.
+  // A failed load is an error block with Retry over what this device last synced (R-1), never "0".
+  const loadApps = useCallback(async () => {
+    setLoading(true)
+    const bundle = await AppStore.loadBundle(true).catch(() => null)
+    setApps(bundle ? bundle.applications : AppStore.loadSync())
+    setLoadFailed(!bundle)
+    setLoading(false)
+    if (!bundle) return
+    setIsPro(!!bundle.credits?.pro)
+    setInbox(bundle.inbox)
+    const local = localRecentCompanies()
+    const seen = new Set(local.map(c => c.slug))
+    const fromAccount = bundle.recent_cos
+      .map(x => String(x?.company_name || '').trim()).filter(Boolean)
+      .map(name => ({ name, slug: encodeURIComponent(name.toLowerCase().replace(/\s+/g, '-')) }))
+      .filter(c => !seen.has(c.slug) && (seen.add(c.slug), true))
+    if (fromAccount.length) setRecentCos([...local, ...fromAccount].slice(0, 5))
+  }, [])
   useEffect(() => {
     if (!isLoggedIn) return
-    let alive = true
-    AppStore.loadBundle(true).then(bundle => {
-      if (!alive) return
-      setApps(bundle ? bundle.applications : AppStore.loadSync())
-      setLoading(false)
-      if (!bundle) return
-      setIsPro(!!bundle.credits?.pro)
-      setInbox(bundle.inbox)
-      const local = localRecent()
-      const seen = new Set(local.map(c => c.slug))
-      const fromAccount = bundle.recent_cos
-        .map(x => String(x?.company_name || '').trim()).filter(Boolean)
-        .map(name => ({ name, slug: encodeURIComponent(name.toLowerCase().replace(/\s+/g, '-')) }))
-        .filter(c => !seen.has(c.slug) && (seen.add(c.slug), true))
-      if (fromAccount.length) setRecentCos([...local, ...fromAccount].slice(0, 5))
-    }).catch(() => { if (alive) { setApps(AppStore.loadSync()); setLoading(false) } })
-    return () => { alive = false }
-  }, [isLoggedIn])
+    void loadApps()
+  }, [isLoggedIn, loadApps])
 
   // Ghost-surge alerts for the companies you're waiting on — served by api/reports.js
   // (action:'ghost_surges', ≥3 scorable ghosted reports in the last 7 days, exact-name match).
@@ -206,12 +214,17 @@ export default function DashboardPage() {
       .catch(() => {})
   }, [apps])
 
+  // Before the session resolves, and while the first load is in flight, the page is a skeleton in its
+  // own shape — not a blank, not a spinner (R-2). A signed-out visitor is redirected by the effect above.
+  if (!ready || (isLoggedIn && isSeeker && loading)) {
+    return <div className="page-full"><div className={styles.dash}><PageSkeleton label="Loading your dashboard" tiles={4} rows={3} /></div></div>
+  }
   if (!isLoggedIn || !isSeeker) return null
-  if (loading) return <div className="page-full"><div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '60vh' }}><div className="spinner" /></div></div>
 
   const active = apps.filter(a => a.status === 'active')
   const ghosted = apps.filter(a => a.status === 'ghosted')
   const hired = apps.filter(a => a.status === 'hired')
+  const noData = loadFailed && apps.length === 0
   const dueChecks = EventStore.dueChecks(apps)
   const staleApps = active.filter(a => {
     const sc = coScores[a.company.toLowerCase()]
@@ -325,10 +338,25 @@ export default function DashboardPage() {
           <div style={{ minWidth: 0 }}>
             <div className={styles.eyebrow}>✦ Command Center · {today}</div>
             <h1 className={styles.hello}>{greeting}, {name}<span className={styles.dot}>.</span></h1>
-            <p className={styles.status}>{statusLine}{apps.length ? <span className={styles.statusDim}> · {apps.length} tracked total</span> : null}</p>
+            <p className={styles.status}>
+              {loadFailed
+                ? (apps.length ? `Showing the ${apps.length} application${apps.length !== 1 ? 's' : ''} this device last synced` : 'Your applications could not be loaded')
+                : <>{statusLine}{apps.length ? <span className={styles.statusDim}> · {apps.length} tracked total</span> : null}</>}
+            </p>
           </div>
           <Link href="/tracker?add=1" className={`${styles.primary} btn-shine`}>+ Track application</Link>
         </header>
+
+        {loadFailed && (
+          <div style={{ marginBottom: '1rem' }}>
+            <LoadError
+              what="your applications from your account"
+              detail={apps.length ? 'Seen could not be reached. The numbers below come from what this device last synced and may be behind.' : 'Seen could not be reached, so nothing below reflects your account yet.'}
+              onRetry={loadApps}
+              retrying={loading}
+            />
+          </div>
+        )}
 
         {/* ── Row 1: search health | next best move ── */}
         <div className={styles.row}>
@@ -346,11 +374,12 @@ export default function DashboardPage() {
                 <p className={styles.healthS}>{healthHead.s}</p>
               </div>
             </div>
+            {/* No numbers from a failed load with nothing local: "0 / 0 / 0" under an error reads as a verdict (R-1). */}
             <div className={styles.pills}>
-              <div className={styles.pill}><small>Open</small><b style={{ color: '#93b4ff' }}><Odometer value={active.length} /></b></div>
-              <div className={styles.pill}><small>Response</small><b style={{ color: '#a5a2ff' }}>{responseNum == null ? '—' : <Odometer value={responseNum} suffix="%" />}</b></div>
-              <div className={styles.pill}><small>Hired</small><b style={{ color: 'var(--green)' }}><Odometer value={hired.length} /></b></div>
-              <div className={styles.pill}><small>Ghosted</small><b style={{ color: '#f87185' }}><Odometer value={ghosted.length} /></b></div>
+              <div className={styles.pill}><small>Open</small><b style={{ color: '#93b4ff' }}>{noData ? '—' : <Odometer value={active.length} />}</b></div>
+              <div className={styles.pill}><small>Response</small><b style={{ color: '#a5a2ff' }}>{noData || responseNum == null ? '—' : <Odometer value={responseNum} suffix="%" />}</b></div>
+              <div className={styles.pill}><small>Hired</small><b style={{ color: 'var(--green)' }}>{noData ? '—' : <Odometer value={hired.length} />}</b></div>
+              <div className={styles.pill}><small>Ghosted</small><b style={{ color: '#f87185' }}>{noData ? '—' : <Odometer value={ghosted.length} />}</b></div>
             </div>
             {apps.length > 0 && <p className={styles.caption}>Based on {apps.length} tracked application{apps.length !== 1 ? 's' : ''}</p>}
           </section>
@@ -360,7 +389,9 @@ export default function DashboardPage() {
               <h2 className={styles.cardT}>Next best move</h2>
               {topMoves.length > 0 && <span className={styles.eyebrow}>{topMoves.length} action{topMoves.length !== 1 ? 's' : ''}</span>}
             </div>
-            {topMoves.length ? topMoves.map((m, i) => (
+            {noData ? (
+              <p className={styles.allClear}>Not loaded — use Retry above.</p>
+            ) : topMoves.length ? topMoves.map((m, i) => (
               <button key={i} type="button" className={styles.move} onClick={m.go}>
                 <span className={styles.sym}>{m.icon}</span>
                 <span style={{ minWidth: 0, flex: 1 }}>
@@ -389,7 +420,9 @@ export default function DashboardPage() {
         </div>
         <div className={styles.row}>
           <section className={`${styles.card} ${styles.tight}`}>
-            {active.length === 0 ? (
+            {noData ? (
+              <p className={styles.allClear}>Your pipeline could not be loaded — use Retry above.</p>
+            ) : active.length === 0 ? (
               <div className={styles.empty}>
                 <b>No open applications</b>
                 <p>Apply to a job and it appears here until you report what happened.</p>

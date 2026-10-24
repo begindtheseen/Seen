@@ -5,7 +5,8 @@
 // industry benchmark for one company, shows the grade ring, the three metrics candidates care about,
 // the "vs your industry" benchmark, a one-tap track, and a link to the full report.
 
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useRef, useState, useCallback } from 'react'
+import { useFocusTrap } from '@/lib/hooks/useFocusTrap'
 import { AppStore } from '@/lib/stores/AppStore'
 import { useAuth } from '@/lib/auth'
 import IndustryBenchmark, { type Benchmark } from './IndustryBenchmark'
@@ -60,6 +61,9 @@ export default function CompanyScoreModal({ companyName, onClose }: { companyNam
   const [notFound, setNotFound] = useState(false)
   const [tracked, setTracked] = useState(false)
   const [revealed, setRevealed] = useState(false)
+  const dialogRef = useRef<HTMLDivElement>(null)
+  // Tab stays inside the sheet; closing returns focus to the scoreboard row that opened it.
+  useFocusTrap(dialogRef, true)
 
   // Escape to close + lock the background scroll while open.
   useEffect(() => {
@@ -104,7 +108,7 @@ export default function CompanyScoreModal({ companyName, onClose }: { companyNam
 
   return (
     <div className={styles.overlay} onClick={onClose} role="dialog" aria-modal="true" aria-label={`${shownName} Seen score`}>
-      <div className={styles.dialog} onClick={(e) => e.stopPropagation()}>
+      <div className={styles.dialog} ref={dialogRef} onClick={(e) => e.stopPropagation()}>
         <div className={styles.handle} aria-hidden />
         <button className={styles.close} onClick={onClose} aria-label="Close">✕</button>
 
