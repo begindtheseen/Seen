@@ -110,8 +110,9 @@ test('IndexNow in production: changed gradeable companies + hubs + never-submitt
   const r = await runIndexNow({ env: { VERCEL_ENV: 'production', SUPABASE_URL: 'https://sb.example', SUPABASE_SERVICE_KEY: 'svc' }, fetchImpl, nowMs });
   assert.match(scoresUrl, new RegExp(`expires_at=gte\\.${new Date(nowMs - 24 * 3600_000 + SCORE_TTL_MS).toISOString().replace(/\./g, '\\.')}`), 'written in the last day = expires_at ≥ now − 1d + TTL');
   assert.equal(posts.length, 1);
-  assert.deepEqual(posts[0].urlList.sort(), ['https://seenjobs.io/agencies', 'https://seenjobs.io/companies', 'https://seenjobs.io/company/target', 'https://seenjobs.io/methods'].sort());
-  assert.equal(r.static_new, 3, '/agencies, /ghosted and /methods were never submitted (/ghosted fails its 200 check)');
+  const fresh = ['/methods', '/data', '/lists', '/lists/employers-that-respond', '/lists/staffing-agencies-ghosting'].map((p) => `https://seenjobs.io${p}`);
+  assert.deepEqual(posts[0].urlList.sort(), ['https://seenjobs.io/agencies', 'https://seenjobs.io/companies', 'https://seenjobs.io/company/target', ...fresh].sort());
+  assert.equal(r.static_new, 2 + fresh.length, '/agencies, /ghosted and the new pages were never submitted (/ghosted fails its 200 check)');
   assert.equal(r.skipped_recent, 1);
 });
 
