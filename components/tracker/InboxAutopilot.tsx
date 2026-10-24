@@ -29,10 +29,13 @@ const KIND: Record<string, string> = {
 }
 const SHARE_OUTCOME: Record<string, string> = { rejection: 'rejected', offer: 'offer', interview: 'interview' }
 
-export default function InboxAutopilot({ apps, token, onAppsChanged }: {
+export default function InboxAutopilot({ apps, token, onAppsChanged, status }: {
   apps: Application[]
   token: () => Promise<string | null>
   onAppsChanged: () => void
+  /** The status the page's own `load` already carried. undefined = the page has not loaded yet (wait);
+   *  null = it could not carry one (ask for it here). Saves a second /api/user-sync call at mount. */
+  status?: unknown
 }) {
   const [st, setSt] = useState<Status | null>(null)
   const [busy, setBusy] = useState(false)
@@ -54,7 +57,16 @@ export default function InboxAutopilot({ apps, token, onAppsChanged }: {
     seen.current = r.received_count || 0
   }, [])
 
-  useEffect(() => { load() }, [load])
+  useEffect(() => {
+    if (status === undefined) return
+    if (status && typeof (status as Status).ready === 'boolean') {
+      // The page's load already holds the cards that go with this status: record it, no reload.
+      const s0 = status as Status
+      setSt(s0); seen.current = s0.received_count || 0
+      return
+    }
+    load()
+  }, [status, load])
 
   const settingUp = !!(st?.enabled && (showSetup || !st.received_count || st.forwarding_confirm))
   // While the user is setting up, look every 15 s so Gmail's confirmation code appears on its own.
