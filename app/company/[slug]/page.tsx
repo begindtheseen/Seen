@@ -26,6 +26,7 @@ import { buildCompanySummary, publicRowsHeading, reportsProvenanceLine, reportsS
 import { feedRowVerdict } from '@/lib/reports/feedFilter.js'
 import { looksLikeBotOrLinkText, trimToSentence } from '@/lib/reports/excerptText.js'
 import { displayPay } from '@/lib/jobs/pay.js'
+import { jobsSearchHref } from '@/lib/searchRoute'
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -775,11 +776,18 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
             Can&apos;t verify &ldquo;{companyName}&rdquo;
           </h1>
           <p style={{ color: 'var(--sub)', fontFamily: 'var(--mono)', fontSize: '.72rem', lineHeight: 1.7, marginBottom: '1.75rem' }}>
-            We couldn&apos;t find this company online. Make sure you&apos;re using the official company name — we need to verify it exists before scoring.
+            We couldn&apos;t find a company by that name. Looking for a job instead? Search open roles — or use the company&apos;s official name to check how it treats applicants.
           </p>
-          <a href="/companies" style={{ display: 'inline-flex', alignItems: 'center', gap: '.4rem', background: 'rgba(99,102,241,0.1)', border: '1px solid rgba(99,102,241,0.3)', borderRadius: 9, padding: '.65rem 1.3rem', fontFamily: 'var(--mono)', fontSize: '.72rem', fontWeight: 600, color: 'var(--blue)', textDecoration: 'none' }}>
-            ← Back to company scoreboard
-          </a>
+          {/* A job title typed into a company box lands here (conversion audit 2026-10-24: "barista").
+              The primary way on is the job search for the same words (lib/searchRoute.ts). */}
+          <div style={{ display: 'flex', gap: '.6rem', justifyContent: 'center', flexWrap: 'wrap' }}>
+            <a href={jobsSearchHref(companyName)} className="btn-shine" style={{ display: 'inline-flex', alignItems: 'center', minHeight: 44, gap: '.4rem', background: 'linear-gradient(135deg,#4f46e5,#7c3aed)', border: 'none', borderRadius: 9, padding: '.65rem 1.3rem', fontFamily: 'var(--display)', fontSize: '.85rem', fontWeight: 800, color: '#fff', textDecoration: 'none', maxWidth: '100%', minWidth: 0, overflowWrap: 'anywhere' }}>
+              See &ldquo;{companyName}&rdquo; jobs →
+            </a>
+            <a href="/companies" style={{ display: 'inline-flex', alignItems: 'center', minHeight: 44, gap: '.4rem', background: 'rgba(99,102,241,0.1)', border: '1px solid rgba(99,102,241,0.3)', borderRadius: 9, padding: '.65rem 1.3rem', fontFamily: 'var(--mono)', fontSize: '.75rem', fontWeight: 600, color: 'var(--blue)', textDecoration: 'none' }}>
+              Browse company grades
+            </a>
+          </div>
         </div>
       </div>
     )
