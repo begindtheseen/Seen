@@ -231,12 +231,17 @@ export default function ApplicationIntelligencePanel({
 
   return (
     <div style={{ animation: 'fadeUp .3s ease both' }}>
-      {/* Header — role family + fit + confidence */}
+      {/* Header — role family + confidence. The fit ring is the page's headline score ONLY on the
+          full /resume panel. In `compact` mode (the Optimize modal) the SeenFit match above it is
+          the one headline — a second ring (live audit: 61 beside 86 beside 65/100) read as three
+          verdicts for one job — so the engine's family/confidence read-out is a labelled line. */}
       <Card>
         <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-          <div style={{ flexShrink: 0, width: 60, height: 60, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', border: `3px solid ${scoreColor(pkg.fit_score)}` }}>
-            <span style={{ fontFamily: 'var(--display)', fontWeight: 800, fontSize: '1.3rem', color: scoreColor(pkg.fit_score) }}>{pkg.fit_score}</span>
-          </div>
+          {!compact && (
+            <div style={{ flexShrink: 0, width: 60, height: 60, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', border: `3px solid ${scoreColor(pkg.fit_score)}` }}>
+              <span style={{ fontFamily: 'var(--display)', fontWeight: 800, fontSize: '1.3rem', color: scoreColor(pkg.fit_score) }}>{pkg.fit_score}</span>
+            </div>
+          )}
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ fontFamily: 'var(--display)', fontWeight: 800, color: 'var(--white)', fontSize: '.95rem' }}>Deep match analysis</div>
             <div style={{ fontFamily: mono, fontSize: '.6rem', color: 'var(--dim)', marginTop: '.2rem', overflowWrap: 'anywhere' }}>
@@ -249,8 +254,9 @@ export default function ApplicationIntelligencePanel({
         )}
       </Card>
 
-      {/* ATS simulation */}
-      {ats && (
+      {/* ATS simulation — full panel only. The modal already shows the one "missing" list, and
+          a second score beside the SeenFit match is exactly the contradiction the audit flagged. */}
+      {ats && !compact && (
         <Card>
           {kicker('ATS simulation')}
           <div style={{ display: 'flex', alignItems: 'center', gap: '.6rem', marginBottom: '.7rem' }}>
@@ -259,7 +265,7 @@ export default function ApplicationIntelligencePanel({
           </div>
           {ats.missing_exact_keywords?.length > 0 && (
             <>
-              <div style={{ fontFamily: mono, fontSize: '.56rem', color: 'var(--amber)', marginBottom: '.4rem', lineHeight: 1.5 }}>Missing exact keywords — add the ones genuinely yours:</div>
+              <div style={{ fontFamily: mono, fontSize: '.56rem', color: 'var(--amber)', marginBottom: '.4rem', lineHeight: 1.5 }}>Posting wording your résumé does not use verbatim — it may say the same thing another way; add a word only if it is true for you:</div>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '.35rem', marginBottom: ats.recommendations?.length ? '.7rem' : 0 }}>
                 {ats.missing_exact_keywords.slice(0, 14).map((k, i) => (
                   <span key={i} style={{ background: 'rgba(245,158,11,.08)', border: '1px solid rgba(245,158,11,.25)', color: 'var(--amber)', borderRadius: 5, padding: '.2rem .55rem', fontFamily: mono, fontSize: '.62rem', maxWidth: '100%', overflowWrap: 'anywhere' }}>{k}</span>
@@ -278,11 +284,13 @@ export default function ApplicationIntelligencePanel({
         </Card>
       )}
 
-      {/* Match views */}
-      <MatchSection title="Why you match" color="var(--green)" items={pkg.why_you_match} />
+      {/* Match views. In compact mode the modal already shows ONE "Why you match" and ONE "Missing"
+          list from the SeenFit result; only the transferable proof (which SeenFit does not have) is
+          added here, so a keyword is never listed twice or on both sides. */}
+      {!compact && <MatchSection title="Why you match" color="var(--green)" items={pkg.why_you_match} />}
       <MatchSection title="Transferable proof" color="var(--blue)" items={pkg.transferable_proof} />
-      <MatchSection title="Worth adding — only if true" color="var(--amber)" items={pkg.missing_recoverable} />
-      <MatchSection title="Missing — add only if true" color="var(--amber)" items={pkg.missing_risky} />
+      {!compact && <MatchSection title="Worth adding — only if true" color="var(--amber)" items={pkg.missing_recoverable} />}
+      {!compact && <MatchSection title="Missing — add only if true" color="var(--amber)" items={pkg.missing_risky} />}
 
       {!compact && (
         <>

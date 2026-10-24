@@ -2,7 +2,8 @@
 // Queries by company_name column directly — no company table join needed.
 
 import { createHmac, timingSafeEqual } from 'crypto';
-import { applyRateLimit } from '../lib/server/ratelimit.js';
+import { applyRateLimit, rateLimitGlobal } from '../lib/server/ratelimit.js';
+import { reportsReadFromQuery, setPublicCache } from '../lib/server/publicRead.js';
 import { logError } from '../lib/server/errlog.js';
 import { calcOverallScore, calcWaste, tenureAdjustment, scoreConfidence, confidenceLabel, aggregateTenure, MIN_TENURE_SAMPLE } from './_utils/companyScore.js';
 import { fuseCompanyIntel, classifyPlatform, WEB_CLAIM_CAP, mentionOutcomes, mentionTotal } from './_utils/companyIntel.js';
@@ -18,6 +19,7 @@ import { fetchIndustryBenchmark } from '../lib/server/benchmark.js';
 import { isEvidencedScore, suppressionReason, servedDataSource } from '../lib/server/scoreProvenance.js';
 import { firstPartyReportCount, mentionCount, webClaimCount, gateScore, isGradeable, SCORABLE_REPORTS_FILTER, scorableResolvedCountPath, parseExactCount, EMPLOYEE_REVIEW_RE, scoreUpdatedAt } from '../lib/server/reportCounts.js';
 import { feedRowPasses } from '../lib/reports/feedFilter.js';
+import { redditPlatform } from '../lib/reports/platformLabel.js';
 import { enqueueCompanyEnrichment } from '../lib/server/enrichmentQueue.js';
 
 // Authorize admin/cron-only actions (the Anthropic web-research endpoints). Accepts a Vercel
@@ -245,9 +247,16 @@ export default async function handler(req, res) {
     else if (req.query.action === 'update_tenure') body = { action: 'update_tenure' };
   }
   const isCronGet = req.method === 'GET' && !!body.action;
+  // Public reads as cacheable GETs (lib/server/publicRead.js): the query maps to the SAME body the POST
+  // route uses, so one handler answers both and the CDN can serve repeat visitors. Measured 2026-10-24:
+  // under 10–20 concurrent visitors every POST here waited 5–25 s on the shared database while the one
+  // GET endpoint with cache headers answered from the edge in <100 ms.
+  const publicRead = req.method === 'GET' && !isCronGet ? reportsReadFromQuery(req.query) : null;
+  if (publicRead) body = publicRead;
+  const isPublicGet = !!publicRead;
 
   // ── GET: benchmark stats (industry or company) ───────────────────────────────
-  if (req.method === 'GET' && !isCronGet) {
+  if (req.method === 'GET' && !isCronGet && !isPublicGet) {
     const limited = await applyRateLimit(req, res, 'benchmarks');
     if (limited) return;
     const { type, name, names } = req.query || {};
@@ -267,7 +276,7 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: 'type required: industry|company|batch' });
   }
 
-  if (req.method !== 'POST' && !isCronGet) return res.status(405).end('Method not allowed');
+  if (req.method !== 'POST' && !isCronGet && !isPublicGet) return res.status(405).end('Method not allowed');
 
   if (!SUPABASE_URL || !SUPABASE_SERVICE_KEY) {
     return res.status(500).json({ error: 'DB not configured' });
@@ -289,7 +298,7 @@ export default async function handler(req, res) {
   if (body.action === 'employer_perk') {
     const name = String(body.name || '').trim().toLowerCase();
     if (!name) return res.status(200).json({ featured: false, verified: false });
-    res.setHeader('Cache-Control', 'public, s-maxage=300, stale-while-revalidate=600');
+    setPublicCache(res, 'perk');
     try {
       const r = await fetch(`${SUPABASE_URL}/rest/v1/employer_perks?company=eq.${encodeURIComponent(name)}&select=featured_until,verified_until&limit=1`, { headers: hdrsBase });
       const row = r.ok ? (await r.json())[0] : null;
@@ -319,7 +328,7 @@ export default async function handler(req, res) {
   //    never-empty employer reputation hero and the consumer company page's credibility context.
   //    MUST be checked before the company_score block below, which greedily matches any body.name. ──
   if (body.action === 'industry_benchmark') {
-    if (await applyRateLimit(req, res, 'company-score')) return;
+    if (await applyRateLimit(req, res, 'industry-benchmark')) return;
     const name = (body.name || body.company || '').trim();
     if (!name) return res.status(400).json({ ok: false, error: 'name required' });
     let benchmark = null;
@@ -329,14 +338,14 @@ export default async function handler(req, res) {
         SERVICE_KEY: process.env.SUPABASE_SERVICE_KEY,
       });
     } catch { /* fail-soft: the page still renders its own score without the benchmark */ }
-    res.setHeader('Cache-Control', 'public, s-maxage=600, stale-while-revalidate=1200');
+    setPublicCache(res, 'benchmark');
     return res.status(200).json({ ok: true, benchmark });
   }
 
   // ── Company-score: merged from api/company-score.js ─────────────────────────
   if (body.action === 'company_score' || body.action === 'research' || body.action === 'resolve' || body.action === 'populate' || body.name) {
     if (await applyRateLimit(req, res, 'company-score')) return;
-    res.setHeader('Cache-Control', 'public, s-maxage=600, stale-while-revalidate=1200');
+    setPublicCache(res, 'score');
     return handleCompanyScore(req, res, body);
   }
 
@@ -419,7 +428,7 @@ export default async function handler(req, res) {
       }));
       // Identical for every visitor and only changes when the score cron runs — let the
       // CDN serve it so a popular leaderboard page doesn't hit the DB on every load.
-      res.setHeader('Cache-Control', 'public, s-maxage=300, stale-while-revalidate=600');
+      setPublicCache(res, 'leaderboard');
       return res.status(200).json({ ok: true, companies });
     } catch(e) { return res.status(200).json({ companies: [] }); }
   }
@@ -1243,7 +1252,7 @@ Return ONLY a valid JSON array. Return [] if there are genuinely no hiring exper
         const sourcePost = fresh[exp.post_idx] || fresh[0];
         const rpt = {
           company_name: company,
-          platform: `Reddit r/${sourcePost.subreddit}`,
+          platform: redditPlatform(sourcePost.subreddit),
           outcome: exp.outcome,
           role: exp.role ? String(exp.role).trim().slice(0, 200) : '', // reports.role is NOT NULL (prod)
           report_text: exp.summary || sourcePost.title.slice(0, 500),
@@ -1391,6 +1400,7 @@ Return ONLY a valid JSON array. Return [] if there are genuinely no hiring exper
 
     console.log(`REPORTS: fetching URL: ${url.replace(SUPABASE_URL, '[URL]')}`);
 
+    setPublicCache(res, 'list');
     const rRes = await fetch(url, { headers: hdrs });
 
     if (!rRes.ok) {
@@ -1406,8 +1416,10 @@ Return ONLY a valid JSON array. Return [] if there are genuinely no hiring exper
         return res.status(200).json({ ok: true, reports: [], cities: [], _debug: `fetch failed: ${rRes.status}` });
       }
       const cosRows = await cosRes.json();
+      // The same-company test as the main query: "Amazon Flex" / "Amazon Web Services" rows must not
+      // join Amazon's list (the old `includes` let 2 Amazon Flex rows make the page say 28 under a 26 hero).
       const ids = (cosRows || [])
-        .filter(c => normalize(c.name) === canonical || c.name.toLowerCase().includes(canonical))
+        .filter(c => nameKey(c.name) === nameKey(canonical))
         .map(c => c.id).filter(Boolean);
 
       if (!ids.length) {
@@ -1417,10 +1429,10 @@ Return ONLY a valid JSON array. Return [] if there are genuinely no hiring exper
       const fbUrl = `${SUPABASE_URL}/rest/v1/reports`
         + `?company_id=in.(${ids.join(',')})`
         + `&needs_review=not.is.true`
-        + `&select=id,role,outcome,ghost_stage,rounds,report_text,platform,outcome_weight,trust_reason,created_at,experience_level,location_id,company_id`
+        + `&select=id,role,outcome,ghost_stage,rounds,report_text,platform,outcome_weight,trust_reason,created_at,experience_level,location_id,company_name,company_id`
         + `&order=created_at.desc&limit=${REPORT_LIST_LIMIT}`;
       const fbRes = await fetch(fbUrl, { headers: hdrs });
-      const fbRows = fbRes.ok ? await fbRes.json() : [];
+      const fbRows = (fbRes.ok ? await fbRes.json() : []).filter(r => !r.company_name || sameCompany(r));
       console.log(`REPORTS: fallback company_id query got ${fbRows?.length || 0} rows`);
       return buildResponse(res, fbRows, hdrs, SUPABASE_URL, city);
     }
@@ -1428,35 +1440,13 @@ Return ONLY a valid JSON array. Return [] if there are genuinely no hiring exper
     const rows = (await rRes.json() || []).filter(sameCompany);
     console.log(`REPORTS: company_name query got ${rows?.length || 0} rows`);
 
-    // Also get any older reports that have company_id but no company_name
-    // by doing a secondary company_id-based lookup and merging
-    const cosRes2 = await fetch(
-      `${SUPABASE_URL}/rest/v1/companies?name=ilike.${nameEnc}&select=id,name&limit=20`,
-      { headers: hdrs }
-    );
-    let extraRows = [];
-    if (cosRes2.ok) {
-      const cosRows2 = await cosRes2.json();
-      const ids2 = (cosRows2 || [])
-        .filter(c => normalize(c.name) === canonical || c.name.toLowerCase().includes(canonical))
-        .map(c => c.id).filter(Boolean);
-      if (ids2.length) {
-        const knownIds = new Set((rows || []).map(r => r.id));
-        const fbUrl2 = `${SUPABASE_URL}/rest/v1/reports`
-          + `?company_id=in.(${ids2.join(',')})`
-          + `&needs_review=not.is.true`
-          + `&select=id,role,outcome,ghost_stage,rounds,report_text,platform,outcome_weight,trust_reason,created_at,experience_level,location_id,company_id`
-          + `&order=created_at.desc&limit=${REPORT_LIST_LIMIT}`;
-        const fb2 = await fetch(fbUrl2, { headers: hdrs });
-        if (fb2.ok) {
-          const fb2Rows = await fb2.json();
-          extraRows = (fb2Rows || []).filter(r => !knownIds.has(r.id));
-          if (extraRows.length) console.log(`REPORTS: merged ${extraRows.length} older company_id-only rows`);
-        }
-      }
-    }
-
-    return buildResponse(res, [...(rows || []), ...extraRows], hdrs, SUPABASE_URL, city);
+    // The former "older rows with company_id but no company_name" merge (a companies lookup + a second
+    // 500-row report_text read, both sequential) is gone: reports.company_name is set on every row in
+    // production (verified read-only 2026-10-24: company_name IS NULL → 0 of 4,679), so it only ever
+    // re-read rows the query above had already returned — and, because it never applied sameCompany, it
+    // also leaked OTHER companies' rows into the list (Amazon showed two "Amazon Flex" survey reports via
+    // companies.name ILIKE *amazon*). The company_id fallback above still covers a failed primary read.
+    return buildResponse(res, rows || [], hdrs, SUPABASE_URL, city);
 
   } catch(e) {
     console.error('REPORTS error:', e.message);
@@ -1677,17 +1667,25 @@ async function _fuseWithReports(name, web, SUPABASE_URL, dbH) {
     // Employee reviews move the grade by their letter grades (lib/server/employeeReviews.js). Read with
     // the same name match that found the reports. A failed read fuses without them and stores no
     // count, so the cache staleness check repairs the row on the next view.
-    const [employeeReviews, withEmployeeCount] = await Promise.all([
+    // Everything after the report rows is independent: one round of parallel reads, not four sequential
+    // ones (the column probes are memoized per instance, so they cost nothing after the first call).
+    const withMentions = await hasMentionCount(SUPABASE_URL, dbH);
+    const [employeeReviews, withEmployeeCount, wr, confirmedStaleListings] = await Promise.all([
       fetchEmployeeReviewSignal(SUPABASE_URL, dbH, empPattern),
       hasEmployeeReviewCount(SUPABASE_URL, dbH),
+      // "What people are saying" (stored web_reviews) counts exactly half a report — only once
+      // mention_count can be stored, so this path and the stored recompute always agree.
+      withMentions
+        ? fetch(`${SUPABASE_URL}/rest/v1/company_scores?company_name=eq.${enc}&select=web_reviews&limit=1`, { headers: dbH })
+            .then((x) => (x.ok ? x.json() : [])).catch(() => [])
+        : Promise.resolve(null),
+      // Admin-confirmed dead listings (zombie postings) carry a bounded penalty here too,
+      // so the company-page score matches the stored recompute path.
+      fetchConfirmedStaleCount(SUPABASE_URL, dbH, name),
     ]);
     const byType = groupReportsByType(reps);
-    // "What people are saying" (stored web_reviews) counts exactly half a report — only once
-    // mention_count can be stored, so this path and the stored recompute always agree.
     let totalMentions = null;
-    if (await hasMentionCount(SUPABASE_URL, dbH)) {
-      const wr = await fetch(`${SUPABASE_URL}/rest/v1/company_scores?company_name=eq.${enc}&select=web_reviews&limit=1`, { headers: dbH })
-        .then((x) => (x.ok ? x.json() : [])).catch(() => []);
+    if (withMentions) {
       const webReviews = Array.isArray(wr) && wr[0] ? wr[0].web_reviews : null;
       const mentions = mentionOutcomes(webReviews);
       totalMentions = mentionTotal(webReviews);
@@ -1695,9 +1693,6 @@ async function _fuseWithReports(name, web, SUPABASE_URL, dbH) {
     }
     if (!Object.keys(byType).length && !totalMentions) return null;
     const sources = sourcesFromGroups(byType);
-    // Admin-confirmed dead listings (zombie postings) carry a bounded penalty here too,
-    // so the company-page score matches the stored recompute path.
-    const confirmedStaleListings = await fetchConfirmedStaleCount(SUPABASE_URL, dbH, name);
     const fz = fuseCompanyIntel({ web, sources, confirmedStaleListings, employeeReviews: employeeReviews || null });
     // mention_count = EVERY quoted account (each counts half a report toward the bar); null = column absent.
     // employee_review_store = the count to persist (undefined → JSON omits it: column absent or read failed).
@@ -1927,6 +1922,14 @@ async function handleCompanyScore(req, res, body) {
   const aiOn = await anthropicUsable(SUPABASE_URL, SUPABASE_SERVICE_KEY);
   if (!aiOn) {
     return res.json(await withEnrichment({ ok: true, no_data: true, score: null, message: `No applicant reports yet for "${name}". Be the first to report your experience.` }));
+  }
+  // The per-visitor 'company-score' cap was 20/hour per IP — two reads per page view, shared by everyone
+  // behind one NAT — and it was the only thing bounding this PAID call. Visitors now get a read cap that
+  // survives a shared network, and the spend is bounded where it happens: one platform-wide hourly
+  // budget, fail-closed like every other paid fan-out (lib/server/ratelimit.js rateLimitGlobal).
+  const research = await rateLimitGlobal('company-research');
+  if (!research.allowed) {
+    return res.json(await withEnrichment({ ok: true, no_data: true, score: null, degraded: 'research_budget', message: `No applicant reports yet for "${name}". Be the first to report your experience.` }));
   }
 
   let apiRes;

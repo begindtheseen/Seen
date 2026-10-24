@@ -5,7 +5,7 @@ import { AppStore } from '@/lib/stores/AppStore'
 import { isPublicDiscussion, reportDate, reportSourceBadge, reportSourceLink } from '@/lib/reportSource'
 import ReportSourceLink from '@/components/ReportSourceLink'
 import PageHeader from '@/components/shell/PageHeader'
-import { displayCompanyName } from '@/lib/companyDisplay'
+import { displayCompanyName, displayPlatform } from '@/lib/companyDisplay'
 import { collapseByCompany } from '@/lib/reports/feedFilter.js'
 
 type Filter = 'all' | 'ghosted' | 'rejected' | 'interviewing' | 'hired'
@@ -197,7 +197,7 @@ export default function FeedPage() {
                       <span className="vibe v-r">ghosted after {r.ghost_stage}</span>
                     )}
                     {r.platform && !badge && (
-                      <span className="vibe v-n">{r.platform}</span>
+                      <span className="vibe v-n">{displayPlatform(r.platform)}</span>
                     )}
                     {badge && (
                       <span className="vibe v-n" style={{ borderStyle: 'dashed', color: 'var(--dim)' }} title={badge.title}>{badge.label}</span>

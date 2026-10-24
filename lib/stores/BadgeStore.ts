@@ -2,6 +2,8 @@
 
 import { CHECK_SCHEDULE } from '../constants'
 import type { Application, Badge } from '../types'
+import { checkDueAt, DAY_MS } from './checkSchedule'
+import { pacificDaysBetween } from '../time/pacific.js'
 
 interface StoredCheckEvent {
   appId?: string
@@ -22,7 +24,7 @@ export const BadgeStore = {
 
     const offerDays = (a: Application): number | null => {
       const oe = (a.events || []).find(e => e.type === 'offer_received')
-      return oe ? Math.max(1, Math.round((oe.date - a.appliedAt) / 86400000)) : null
+      return oe ? Math.max(1, pacificDaysBetween(a.appliedAt, oe.date)) : null
     }
 
     if (hired.length >= 1) {
@@ -61,8 +63,8 @@ export const BadgeStore = {
       CHECK_SCHEDULE.some(chk => {
         const evt = allChecks.find(e => e.appId === a.id && e.type === chk.type)
         if (!evt || !evt.createdAt) return false
-        const dueAt = a.appliedAt + chk.day * 86400000
-        return evt.createdAt <= dueAt + 86400000
+        // Same due instant as the card's check-in (checkSchedule): within one day of it counts as early.
+        return evt.createdAt <= checkDueAt(a.appliedAt, chk.day) + DAY_MS
       })
     ).length
     if (earlyCount >= 3) {

@@ -20,6 +20,12 @@ import type { Job } from '@/lib/types'
 import ModalPortal from '@/components/ModalPortal'
 import SeenApplyModal from '@/components/jobs/SeenApplyModal'
 import { takesSeenApply } from '@/lib/seenApplyMode'
+import CreditConfirmDialog from '@/components/CreditConfirmDialog'
+import { hasConfirmedCreditUse } from '@/lib/creditConfirm'
+import { JOB_INSIGHTS_COST, creditCostLabel, dailyResetLabel } from '@/lib/creditRules'
+import { displayCompanyName } from '@/lib/companyDisplay'
+import { displayPay } from '@/lib/jobs/pay.js'
+import { paragraphs, isDescriptionPreview, stripDanglingEllipsis, endsCutOff } from '@/lib/jobs/descriptionText.js'
 
 interface Insights {
   what_they_want: string[]
@@ -45,11 +51,15 @@ function numOrNull(v: unknown): number | null {
   return Number.isFinite(n) && n > 0 ? Math.round(n) : null
 }
 
-// Format raw/AI description into clean paragraphs — port of old _formatDescText
-function formatDesc(text: string): string[] {
-  if (!text || text.length < 10) return []
-  const t = text.replace(/^Category\s*:\s*[^\n.]+\s*/i, '').trim()
-  return t.split(/\n+/).map(l => l.trim()).filter(Boolean)
+// /api/job-insights answer shape (see that file's header): a probe never charges.
+interface InsightsResponse extends Partial<Insights> {
+  _src?: 'db' | 'generated' | 'empty' | 'uncached' | 'no_credits'
+  price?: number
+  cost?: number
+  charged?: boolean
+  balance?: number
+  credits_required?: boolean
+  error?: string
 }
 
 function companySlug(name: string) {
@@ -69,13 +79,22 @@ function Skeleton({ widths, h }: { widths: number[]; h: number }) {
 export default function JobDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params)
   const router = useRouter()
-  const { isLoggedIn } = useAuth()
+  const { isLoggedIn, user } = useAuth()
 
   const [job, setJob] = useState<Job | null>(null)
   const [resolved, setResolved] = useState(false)
   const [saved, setSaved] = useState(false)
   const [insights, setInsights] = useState<Insights | null>(null)
-  const [insightsState, setInsightsState] = useState<'loading' | 'done' | 'unavailable' | 'no_desc' | 'credits'>('loading')
+  // loading → probing the shared cache (free) · uncached → not cached; the price-tagged "Reveal"
+  // button is shown, nothing spent · generating → the paid call is in flight · credits → refused ·
+  // preview → the row is a source's teaser (Adzuna): nothing to analyze, nothing to sell.
+  // Until 2026-10-24 this page called /api/job-insights WITHOUT probe:true on load, so opening a
+  // permalink while signed in generated — and charged — an insight nobody asked for; the drawer had
+  // been fixed (PR #351), the permalink page had not. Same two-step flow now.
+  const [insightsState, setInsightsState] = useState<'loading' | 'done' | 'unavailable' | 'no_desc' | 'uncached' | 'generating' | 'credits' | 'preview'>('loading')
+  const [insightPrice, setInsightPrice] = useState<number>(JOB_INSIGHTS_COST)
+  const [insightNote, setInsightNote] = useState('')
+  const [confirmOpen, setConfirmOpen] = useState(false)
   const [showApplyModal, setShowApplyModal] = useState(false)
   const [showSeenApply, setShowSeenApply] = useState(false)
   const [showShareCard, setShowShareCard] = useState(false)
@@ -168,12 +187,15 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
       .finally(() => setResolved(true))
   }, [id])
 
+  // Step 1 (free): the device cache, then a PROBE of the shared cache. A probe never gates,
+  // generates or charges — it either returns the cached insight or the price of a real call.
   const loadInsights = useCallback(async (j: Job) => {
     const desc = j.description || ''
     if (!desc || desc.length <= 80) {
       setInsightsState('no_desc')
       return
     }
+    if (isDescriptionPreview(j)) { setInsightsState('preview'); return }
     // L1: localStorage 24h
     const cacheKey = 'ji_' + j.id
     try {
@@ -185,24 +207,21 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
       }
     } catch { /* ignore */ }
 
-    // L2: /api/job-insights (DB cache 7d → Claude on miss). Bearer token if signed in.
+    // L2: the shared cache (DB, 7d) — probed, never generated from here.
     try {
       const res = await fetch('/api/job-insights', {
         method: 'POST',
         headers: await aiHeaders(),
-        body: JSON.stringify({ jobId: j.id, job: j.title, company: j.company, jobDescription: desc, needsSummary: true }),
+        body: JSON.stringify({ jobId: j.id, job: j.title, company: j.company, jobDescription: desc, needsSummary: true, probe: true }),
       })
-      const d = await res.json()
-      if (d.credits_required) { setInsightsState('credits'); return }
-      // A freshly generated insight ('generated') consumed a credit server-side; DB-cache
-      // hits are free. Only refresh the Nav balance when a credit was actually spent.
-      if (d._src === 'generated') window.dispatchEvent(new Event('seen:credits-updated'))
+      const d = await res.json() as InsightsResponse
+      if (d._src === 'uncached') { setInsightPrice(typeof d.price === 'number' ? d.price : JOB_INSIGHTS_COST); setInsightsState('uncached'); return }
       if (d.what_they_want?.length) {
         try { localStorage.setItem(cacheKey, JSON.stringify({ ts: Date.now(), data: d })) } catch { /* ignore */ }
-        setInsights(d)
+        setInsights(d as Insights)
         setInsightsState('done')
       } else {
-        setInsights(d) // may still carry description_summary
+        setInsights(d as Insights) // may still carry description_summary
         setInsightsState('unavailable')
       }
     } catch {
@@ -213,6 +232,39 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
   useEffect(() => {
     if (job) loadInsights(job)
   }, [job, loadInsights])
+
+  // Step 2 (paid, explicit): generate the insight. Reached only from the price-tagged button,
+  // after the one-time confirmation on this account/device.
+  const generateInsights = useCallback(async () => {
+    if (!job) return
+    const desc = job.description || ''
+    setInsightsState('generating'); setInsightNote('')
+    try {
+      const res = await fetch('/api/job-insights', {
+        method: 'POST',
+        headers: await aiHeaders(),
+        body: JSON.stringify({ jobId: job.id, job: job.title, company: job.company, jobDescription: desc, needsSummary: true }),
+      })
+      const d = await res.json() as InsightsResponse
+      if (d.credits_required || res.status === 401 || res.status === 402) {
+        setInsightNote(d.error || 'Out of AI credits.'); setInsightsState('credits'); return
+      }
+      if (d.charged) {
+        window.dispatchEvent(new Event('seen:credits-updated'))
+        setInsightNote(`${creditCostLabel(d.cost ?? JOB_INSIGHTS_COST)} used${typeof d.balance === 'number' && d.balance < 900 ? ` · ${d.balance} left` : ''} · ${dailyResetLabel()}`)
+      }
+      if (d.what_they_want?.length) {
+        try { localStorage.setItem('ji_' + job.id, JSON.stringify({ ts: Date.now(), data: d })) } catch { /* ignore */ }
+        setInsights(d as Insights); setInsightsState('done')
+      } else { setInsights(d as Insights); setInsightsState('unavailable') }
+    } catch { setInsightsState('unavailable') }
+  }, [job])
+
+  function revealInsights() {
+    if (!isLoggedIn) { setInsightNote(''); setInsightsState('credits'); return }
+    if (hasConfirmedCreditUse(user?.id)) generateInsights()
+    else setConfirmOpen(true)
+  }
 
   function toggleSave() {
     if (!job) return
@@ -253,9 +305,16 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
   if (!job) return <div className="page-full"><div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '60vh' }}><div className="spinner" /></div></div>
 
   const risk = Score.risk(job.score)
-  const chips = [job.type, job.level, job.salary && job.salary !== '—' ? job.salary : ''].filter(Boolean) as string[]
+  const companyName = displayCompanyName(job.company) || job.company
+  const pay = displayPay(job)
+  const chips = [job.type, job.level, pay && pay !== '—' ? pay : ''].filter(Boolean) as string[]
   const avail = job.availability_status
-  const descParas = formatDesc(insights?.description_summary || job.description || '')
+  const preview = isDescriptionPreview(job)
+  const cutOff = !preview && endsCutOff(job.description || '')
+  const postingHref = httpHref(job.apply_url)
+  // Paragraphs: the row's own newlines (ingest keeps them since 2026-10-24), else the headings and
+  // bullets the one-line stored text carries (lib/jobs/descriptionText.js paragraphs).
+  const descParas = paragraphs(insights?.description_summary || (preview ? stripDanglingEllipsis(job.description || '') : (job.description || '')))
 
   return (
     <div className="page-full">
@@ -266,11 +325,11 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
         <div className="hero-terminal" style={{ display: 'block', marginBottom: '1.5rem', padding: '1.25rem' }}>
           <div style={{ display: 'flex', alignItems: 'flex-start', gap: '1rem', marginBottom: chips.length > 0 ? '.85rem' : 0 }}>
             <div style={{ width: 52, height: 52, borderRadius: 10, background: 'var(--raised)', border: '1px solid var(--line2)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'var(--display)', fontWeight: 800, fontSize: '1.3rem', color: 'var(--white)', flexShrink: 0 }}>
-              {(job.company || '?')[0].toUpperCase()}
+              {(companyName || '?')[0].toUpperCase()}
             </div>
             <div style={{ flex: 1, minWidth: 0 }}>
               <h1 style={{ fontFamily: 'var(--display)', fontSize: '1.25rem', fontWeight: 800, color: 'var(--white)', letterSpacing: '-.025em', lineHeight: 1.2, marginBottom: '.3rem' }}>{job.title}</h1>
-              <div style={{ fontFamily: 'var(--mono)', fontSize: '.65rem', color: 'var(--dim)' }}>{job.company}{job.location ? ` · 📍 ${job.location}` : ''}</div>
+              <div style={{ fontFamily: 'var(--mono)', fontSize: '.65rem', color: 'var(--dim)' }}>{companyName}{job.location ? ` · 📍 ${job.location}` : ''}</div>
             </div>
             <div style={{ textAlign: 'center', flexShrink: 0 }}>
               <div className={`sring ${risk}`} style={{ width: 44, height: 44 }} title={job.score == null ? 'Not enough signal in this listing to score it' : undefined}><div className="sring-n" style={{ fontSize: '.85rem' }}>{job.score ?? '–'}</div></div>
@@ -292,7 +351,7 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
           <div className="jd-stat"><span className="jd-sn" style={{ color: job.waste == null ? 'var(--dim)' : job.waste > 55 ? 'var(--red)' : job.waste > 35 ? 'var(--amber)' : 'var(--green)' }}>{job.waste == null ? '–' : `${job.waste}%`}</span><span className="jd-sl">Waste risk</span></div>
           <div className="jd-stat"><span className="jd-sn" style={{ fontSize: '.75rem' }}>{job.type || 'Full-time'}</span><span className="jd-sl">Type</span></div>
           <div className="jd-stat"><span className="jd-sn" style={{ fontSize: '.75rem' }}>{job.level || '—'}</span><span className="jd-sl">Level</span></div>
-          <div className="jd-stat"><span className="jd-sn" style={{ color: 'var(--green)', fontSize: '.78rem' }}>{job.salary || '—'}</span><span className="jd-sl">Salary</span></div>
+          <div className="jd-stat"><span className="jd-sn" style={{ color: 'var(--green)', fontSize: '.78rem' }}>{pay || '—'}</span><span className="jd-sl">{pay && /\/hr$/.test(pay) ? 'Hourly pay' : 'Salary'}</span></div>
           <div className="jd-stat"><span className="jd-sn" style={{ fontSize: '.68rem', color: 'var(--blue)' }}>{job.source || 'Job board'}</span><span className="jd-sl">Source</span></div>
         </div>
 
@@ -379,15 +438,35 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
         {/* AI insights */}
         <div style={{ marginTop: '1.5rem', background: 'var(--gdim)', border: '1px solid var(--line)', borderRadius: 12, padding: '1.25rem', animation: 'fadeUp .4s .15s ease both' }}>
           <div style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', textTransform: 'uppercase', letterSpacing: '.08em', color: 'var(--dim)', marginBottom: '.85rem' }}>
-            WHAT {(job.company || 'THIS COMPANY').toUpperCase()} IS HIRING FOR
+            WHAT {(companyName || 'THIS COMPANY').toUpperCase()} IS HIRING FOR
           </div>
-          {insightsState === 'loading' && <Skeleton widths={[80, 65, 72, 58, 68]} h={10} />}
+          {(insightsState === 'loading' || insightsState === 'generating') && <Skeleton widths={[80, 65, 72, 58, 68]} h={10} />}
           {insightsState === 'no_desc' && <div style={{ fontSize: '.75rem', color: 'var(--muted)' }}>No description available for AI analysis.</div>}
           {insightsState === 'unavailable' && <div style={{ fontSize: '.75rem', color: 'var(--muted)' }}>AI insights unavailable for this listing.</div>}
+          {insightsState === 'preview' && (
+            <div style={{ fontSize: '.75rem', color: 'var(--muted)', lineHeight: 1.6 }}>
+              This source gives Seen only a preview of the posting, so there is nothing to analyze yet.{' '}
+              {postingHref ? <a href={postingHref} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--green)' }}>Open the full posting to analyze it ↗</a> : 'Open the full posting on the employer\'s site to analyze it.'}
+            </div>
+          )}
+          {insightsState === 'uncached' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '.55rem' }}>
+              <div style={{ fontSize: '.75rem', color: 'var(--sub)', lineHeight: 1.6 }}>Nobody has generated the insight for this listing yet. Once generated it is free for everyone for 7 days.</div>
+              <button type="button" onClick={revealInsights} data-testid="reveal-insights"
+                style={{ alignSelf: 'flex-start', background: 'var(--green)', color: 'var(--ink)', border: 'none', borderRadius: 8, padding: '.55rem .95rem', fontFamily: 'var(--display)', fontWeight: 800, fontSize: '.8rem', cursor: 'pointer' }}>
+                Reveal AI insights · {creditCostLabel(insightPrice)}
+              </button>
+            </div>
+          )}
           {insightsState === 'credits' && (
             <div style={{ fontSize: '.75rem', color: 'var(--muted)', lineHeight: 1.6 }}>
-              {isLoggedIn ? "You're out of AI credits for now — insights will be available again soon." : <>Sign in to unlock AI insights for this role. <a href="/login" style={{ color: 'var(--green)' }}>Sign in →</a></>}
+              {isLoggedIn
+                ? (insightNote || "You're out of AI credits for now — insights will be available again soon.")
+                : <>Sign in to generate AI insights ({creditCostLabel(insightPrice)}; free once cached). <a href="/login" style={{ color: 'var(--green)' }}>Sign in →</a></>}
             </div>
+          )}
+          {insightsState === 'done' && insightNote && (
+            <div style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', color: 'var(--dim)', marginBottom: '.6rem' }}>{insightNote}</div>
           )}
           {insightsState === 'done' && insights && (
             <>
@@ -426,10 +505,22 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
         {/* Description */}
         <div style={{ marginTop: '1.5rem', animation: 'fadeUp .4s .25s ease both' }}>
           <div style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', textTransform: 'uppercase', letterSpacing: '.08em', color: 'var(--dim)', marginBottom: '.75rem' }}>ABOUT THIS ROLE</div>
-          {insightsState === 'loading'
+          {insightsState === 'loading' || insightsState === 'generating'
             ? <Skeleton widths={[95, 82, 90, 70, 86, 75, 92, 65, 80, 88]} h={9} />
             : descParas.length > 0
-              ? descParas.map((p, i) => <p key={i} style={{ fontSize: '.84rem', color: 'var(--sub)', lineHeight: 1.8, margin: '0 0 .85rem' }}>{p}</p>)
+              ? <>
+                  {descParas.map((p, i) => <p key={i} style={{ fontSize: '.84rem', color: 'var(--sub)', lineHeight: 1.8, margin: '0 0 .85rem' }}>{p}</p>)}
+                  {preview && (
+                    <div style={{ margin: '0 0 .85rem', padding: '.55rem .8rem', background: 'rgba(245,158,11,.07)', border: '1px solid rgba(245,158,11,.2)', borderRadius: 8, fontFamily: 'var(--mono)', fontSize: '.62rem', color: 'var(--amber)', lineHeight: 1.55 }}>
+                      ✂ Preview from {job.source || 'this source'}. The full posting is on the employer&apos;s site{postingHref ? <> — <a href={postingHref} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--amber)' }}>open it ↗</a></> : '.'}
+                    </div>
+                  )}
+                  {cutOff && !insights?.description_summary && (
+                    <div style={{ margin: '0 0 .85rem', fontFamily: 'var(--mono)', fontSize: '.62rem', color: 'var(--dim)', lineHeight: 1.55 }}>
+                      Continues on the employer&apos;s site{postingHref ? <> — <a href={postingHref} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--green)' }}>open it ↗</a></> : '.'}
+                    </div>
+                  )}
+                </>
               : <p style={{ fontSize: '.84rem', color: 'var(--muted)', fontWeight: 300 }}>No description available.</p>
           }
         </div>
@@ -479,7 +570,7 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
       <div style={{ position: 'sticky', bottom: 0, background: 'var(--ink)', borderTop: '1px solid var(--line2)', padding: '.9rem 1rem', paddingBottom: 'calc(.9rem + env(safe-area-inset-bottom))', zIndex: 10 }}>
         <div style={{ maxWidth: 720, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '.5rem', width: '100%', boxSizing: 'border-box' }}>
           <a href={`/company/${companySlug(job.company)}`} style={{ display: 'block', width: '100%', textAlign: 'center', fontFamily: 'var(--mono)', fontSize: '.65rem', color: 'var(--amber)', textDecoration: 'none', padding: '.25rem 0 .5rem', opacity: .85 }}>
-            🏢 Check {job.company || 'company'} →
+            🏢 Check {companyName || 'company'} →
           </a>
           <div style={{ display: 'flex', gap: '.75rem' }}>
             <button onClick={toggleSave} aria-label={saved ? 'Unsave' : 'Save'} style={{ background: 'none', border: '1px solid var(--line2)', borderRadius: 8, padding: '.65rem 1rem', fontSize: '1.1rem', cursor: 'pointer', color: saved ? 'var(--green)' : 'var(--muted)', flexShrink: 0 }}>{saved ? '♥' : '♡'}</button>
@@ -512,10 +603,18 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
         {showSeenApply && job && (
           <SeenApplyModal job={job} onClose={() => setShowSeenApply(false)} />
         )}
+        {confirmOpen && (
+          <CreditConfirmDialog
+            cost={insightPrice}
+            action={`generate AI insights for ${companyName}`}
+            onConfirm={() => { setConfirmOpen(false); generateInsights() }}
+            onCancel={() => setConfirmOpen(false)}
+          />
+        )}
         {showShareCard && job && (
           <ListingCard
             data={{
-              title: job.title, company: job.company, location: job.location,
+              title: job.title, company: companyName, location: job.location,
               level: job.level, type: job.type, score: job.score, waste: job.waste,
               whatTheyWant: insights?.what_they_want, insiderTip: insights?.insider_tip,
             }}

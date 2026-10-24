@@ -564,13 +564,15 @@ export default async function handler(req, res) {
     let cred = cRes.ok ? (await cRes.json())[0] : null;
     if (!cred) {
       // No row means they haven't used AI yet — show welcome balance preview (don't create row here)
-      return res.status(200).json({ balance: WELCOME_CREDITS, pro: false, daily_earned: 0, max_daily_earn: MAX_DAILY_EARN, welcome: true });
+      return res.status(200).json({ balance: WELCOME_CREDITS, daily: WELCOME_CREDITS, purchased: 0, pro: false, daily_earned: 0, max_daily_earn: MAX_DAILY_EARN, welcome: true });
     } else if (cred.last_reset !== today) {
       const nb = hasProAccess(cred) ? PRO_DAILY_CREDITS : FREE_DAILY_CREDITS;
       await db(`ai_credits?user_id=eq.${uid}`, { method: 'PATCH', body: JSON.stringify({ balance: nb, daily_earned: 0, last_reset: today }), headers: { Prefer: 'return=minimal' } });
       cred = { ...cred, balance: nb, daily_earned: 0, last_reset: today };
     }
-    return res.status(200).json({ balance: creditBalance(cred), pro: hasProAccess(cred), daily_earned: cred.daily_earned, max_daily_earn: MAX_DAILY_EARN });
+    // `daily` (today's resetting balance) and `purchased` (never resets) are the two parts of the
+    // total; the credits popover explains the arithmetic from them (balanceExplanation).
+    return res.status(200).json({ balance: creditBalance(cred), daily: Math.max(0, cred.balance || 0), purchased: Math.max(0, cred.purchased_credits || 0), pro: hasProAccess(cred), daily_earned: cred.daily_earned, max_daily_earn: MAX_DAILY_EARN });
   }
 
   // ── CONSUME CREDIT ────────────────────────────────────────────────────────────

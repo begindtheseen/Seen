@@ -1,6 +1,7 @@
 'use client'
 
 import { _sync } from '../sync'
+import { markQuiet } from '../quietWindow'
 import type { Application, HiringEvent, AppStatus } from '../types'
 
 const KEY = 'seen_applications_v1'
@@ -40,14 +41,30 @@ function mapRow(a: Record<string, unknown>): Application {
   }
 }
 
+/** What a load produced and whether it came from the account (or only from this device's store). */
+export type LoadResult = {
+  apps: Application[]
+  /** True when the account's rows were read. False = the sync failed (or there was no session) and
+   *  `apps` is only what this device last stored — a page must show that as an error, never as "0". */
+  synced: boolean
+}
+
 export const AppStore = {
   loadSync(): Application[] {
     try { return JSON.parse(localStorage.getItem(KEY) || '[]') } catch { return [] }
   },
 
-  async load(loggedIn: boolean): Promise<Application[]> {
+  /** `load` plus the truth about where the data came from (see LoadResult). */
+  async loadResult(loggedIn: boolean): Promise<LoadResult> {
+    if (!loggedIn) return { apps: this.loadSync(), synced: true }
+    const result = await _sync('load') as { applications?: Record<string, unknown>[] } | null
+    if (!result?.applications) return { apps: this.loadSync(), synced: false }
+    return { apps: await this.load(loggedIn, result), synced: true }
+  },
+
+  async load(loggedIn: boolean, prefetched?: { applications?: Record<string, unknown>[] } | null): Promise<Application[]> {
     if (loggedIn) {
-      const result = await _sync('load') as { applications?: Record<string, unknown>[] } | null
+      const result = prefetched ?? await _sync('load') as { applications?: Record<string, unknown>[] } | null
       if (result?.applications) {
         const mapped = result.applications.map(mapRow)
         const dbIds = new Set(mapped.map(a => String(a.id)))
@@ -197,6 +214,9 @@ export const AppStore = {
       apps[idx] = updated
       localStorage.setItem(KEY, JSON.stringify(apps))
     }
+    // An outcome ("Got the job" / Ghosted / Rejected / withdrawn) is a weighty moment: nothing optional
+    // (the micro-survey) pops for the next two minutes.
+    if (changes.status && changes.status !== 'active') markQuiet()
     const syncChanges = { ...changes }
     const updatedApp = apps.find(a => a.id === id)
     if (updatedApp?.events) syncChanges.events = updatedApp.events
@@ -206,11 +226,13 @@ export const AppStore = {
   },
 
   async remove(id: string, loggedIn: boolean): Promise<void> {
+    markQuiet() // a delete is a weighty moment — see update()
     localStorage.setItem(KEY, JSON.stringify(this.loadSync().filter(a => a.id !== id)))
     if (loggedIn) await _sync('remove_application', { id })
   },
 
   async clear(loggedIn = false): Promise<void> {
+    markQuiet()
     localStorage.removeItem(KEY)
     // "Clear all" must clear the account too — otherwise the DB rows resurrect
     // everything on the next load/device.

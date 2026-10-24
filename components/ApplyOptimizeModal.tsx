@@ -1,6 +1,7 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
+import { useFocusTrap } from '@/lib/hooks/useFocusTrap'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/lib/auth'
 import { aiHeaders } from '@/lib/aiHeaders'
@@ -14,6 +15,7 @@ import ApplicationIntelligencePanel, { type ApplicationIntelligence } from './op
 import ErrorBoundary from './ErrorBoundary'
 import type { Job } from '@/lib/types'
 import ModalPortal from '@/components/ModalPortal'
+import { uniqueKeywords, withoutKeywords } from '@/lib/optimizer/rewriteGuard.js'
 
 // The optimizer's price, rendered from the credit rules — the same literal the server charges.
 const OPTIMIZE_PRICE = creditCostLabel(RESUME_OPTIMIZE_COST)
@@ -29,6 +31,8 @@ interface OptimizeResult {
   job_priorities: string[]
   optimized_bullets: OptimizeBullet[]
   keywords_added: string[]
+  /** Posting words the résumé states differently ("POS" vs "cashier") — a note, never an edit. */
+  wording_notes?: string[]
   stealth?: boolean
   _seenfit_score?: number
 }
@@ -167,6 +171,10 @@ export default function ApplyOptimizeModal({
 }) {
   const router = useRouter()
   const { isLoggedIn, user, profile } = useAuth()
+  const sheetRef = useRef<HTMLDivElement>(null)
+  // Tab stays in the sheet (a stacked CreditConfirmDialog/UpgradeModal takes over while it is up);
+  // closing returns focus to the Apply button that opened it.
+  useFocusTrap(sheetRef, true)
   const [step, setStep] = useState<Step>('loading-resume')
   const [resumeText, setResumeText] = useState('')
   const [result, setResult] = useState<OptimizeResult | null>(null)
@@ -244,8 +252,12 @@ export default function ApplyOptimizeModal({
     .filter(b => !isGuidance(b.original) && !isGuidance(b.optimized))
     .filter(b => { const k = `${b.original.trim().toLowerCase()}→${b.optimized.trim().toLowerCase()}`; if (seenPairs.has(k)) return false; seenPairs.add(k); return true })
   const guidanceItems = (result?.optimized_bullets || []).filter(b => isGuidance(b.original) || isGuidance(b.optimized))
-  const matchReasons = Array.from(new Set(realBullets.map(b => b.addresses).filter(Boolean))).slice(0, 6)
-  const gaps = (result?.keywords_added || []).slice(0, 8)
+  // One keyword identity on every list (lib/optimizer/rewriteGuard keywordKey: case, plural and
+  // possessive folded) and matched ∩ missing = ∅ — the server guarantees both; the client repeats
+  // them so no response shape can ever show "cashier" as a match and as a gap again.
+  const matchReasons = uniqueKeywords(realBullets.map(b => b.addresses).filter(Boolean)).slice(0, 6)
+  const gaps = uniqueKeywords(withoutKeywords(result?.keywords_added || [], matchReasons)).slice(0, 8)
+  const wordingNotes = (result?.wording_notes || []).slice(0, 3)
   const fitScore = result?._seenfit_score != null ? Math.round(Number(result._seenfit_score)) : null
 
   async function runOptimize(resumeOverride?: string) {
@@ -557,7 +569,7 @@ export default function ApplyOptimizeModal({
     )}
     <ModalPortal>
     <div style={overlay} onClick={onClose}>
-      <div style={sheet} onClick={e => e.stopPropagation()}>
+      <div ref={sheetRef} role="dialog" aria-modal="true" aria-label={title} style={sheet} onClick={e => e.stopPropagation()}>
         {/* Header — the job posting link lives here so it is visible above the fold on every step. */}
         <div style={sheetHdr}>
           <div style={{ minWidth: 0 }}>
@@ -755,6 +767,19 @@ export default function ApplyOptimizeModal({
                       <span key={k} style={{ background: 'rgba(245,158,11,.08)', border: '1px solid rgba(245,158,11,.28)', color: 'var(--amber)', borderRadius: 5, padding: '.18rem .55rem', fontFamily: 'var(--mono)', fontSize: '.62rem', maxWidth: '100%', overflowWrap: 'anywhere' }}>{k}</span>
                     ))}
                   </div>
+                </div>
+              )}
+
+              {/* Wording the posting uses for something the résumé already says another way. A note
+                  for the person, never an edit to their bullet (the old "POS (cashier) system"). */}
+              {wordingNotes.length > 0 && (
+                <div>
+                  <div style={kicker}>Same thing, different word</div>
+                  <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: '.3rem' }}>
+                    {wordingNotes.map((n, i) => (
+                      <li key={i} style={{ fontFamily: 'var(--mono)', fontSize: '.6rem', color: 'var(--sub)', lineHeight: 1.55, overflowWrap: 'anywhere' }}>{n}</li>
+                    ))}
+                  </ul>
                 </div>
               )}
 

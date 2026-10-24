@@ -59,12 +59,49 @@ test('a healthy payload reports data_quality.degraded = false', async () => {
   assert.equal(out.payload.data_quality.failed_query_count, 0);
 });
 
-test('active and total job counts use exact HEAD metadata, never the timed-out select=count path', async () => {
+test('jobs counts come from ONE admin_jobs_counts pass when the RPC exists — no per-count scans', async () => {
   const calls = [];
   global.fetch = async (url, opts = {}) => {
     const u = String(url);
     calls.push({ url: u, opts });
     if (u.includes('/admin_sessions?token=eq')) return okRes(session);
+    if (u.endsWith('/rpc/admin_jobs_counts')) {
+      const body = JSON.parse(opts.body);
+      assert.ok(/^\d{4}-\d\d-\d\dT/.test(body.p_today) && /^\d{4}-\d\d-\d\dT/.test(body.p_overdue), 'day start + overdue cutoff are passed in');
+      return okRes({ total: 72086, active: 71372, added_today: 1200, stale_or_expired: 714, stale_clearable: 700, expired_kept: 14, stale_overdue: 3 });
+    }
+    return okRes([], { 'content-range': '0-0/7' });
+  };
+
+  const { req, res, out } = reqRes();
+  await handler(req, res);
+
+  assert.equal(out.code, 200);
+  assert.equal(out.payload.jobs.active, 71372);
+  assert.equal(out.payload.jobs.total, 72086);
+  assert.equal(out.payload.jobs.added_today, 1200);
+  assert.equal(out.payload.jobs.stale_or_expired, 714);
+  assert.equal(out.payload.jobs.stale_clearable, 700);
+  assert.equal(out.payload.jobs.expired_kept, 14);
+  assert.equal(out.payload.jobs.stale_overdue, 3);
+  assert.equal(out.payload.jobs.counts_source, 'rpc');
+  assert.equal(out.payload.job_health.crisis, false);
+  assert.equal(out.payload.data_quality.degraded, false);
+
+  const jobCountCalls = calls.filter((c) => c.url.includes('/jobs?') && c.opts?.method === 'HEAD');
+  assert.equal(jobCountCalls.length, 0, 'no dedicated jobs count scans when the RPC answered');
+  assert.equal(calls.filter((c) => c.url.endsWith('/rpc/admin_jobs_counts')).length, 1, 'exactly one pass');
+  assert.ok(!calls.some((c) => c.url.includes('/jobs?') && c.url.includes('count=')), 'no jobs count query at all');
+  assert.ok(!calls.some((c) => c.url.includes('select=count')), 'no dashboard query uses select=count');
+});
+
+test('before the migration (RPC 404) the seven jobs counts are exact HEAD metadata, never the timed-out select=count path', async () => {
+  const calls = [];
+  global.fetch = async (url, opts = {}) => {
+    const u = String(url);
+    calls.push({ url: u, opts });
+    if (u.includes('/admin_sessions?token=eq')) return okRes(session);
+    if (u.endsWith('/rpc/admin_jobs_counts')) return failRes(404);
     if (u.includes('/jobs?availability_status=eq.active&select=id')) {
       return okRes([], { 'content-range': '0-0/71372' });
     }
@@ -78,11 +115,12 @@ test('active and total job counts use exact HEAD metadata, never the timed-out s
   assert.equal(out.code, 200);
   assert.equal(out.payload.jobs.active, 71372);
   assert.equal(out.payload.jobs.total, 72086);
+  assert.equal(out.payload.jobs.counts_source, 'exact');
   assert.equal(out.payload.job_health.crisis, false);
   assert.equal(out.payload.data_quality.degraded, false);
 
   const jobCountCalls = calls.filter((c) => c.url.includes('/jobs?') && c.opts?.method === 'HEAD');
-  assert.equal(jobCountCalls.length, 2, 'active and total are the only dedicated jobs count calls');
+  assert.equal(jobCountCalls.length, 7, 'the seven dashboard counts, each a HEAD with exact metadata (lib/server/adminJobsCounts.js fallbackPaths)');
   for (const call of jobCountCalls) {
     assert.equal(call.opts.headers.Prefer, 'count=exact');
     assert.ok(!call.url.includes('select=count'), `legacy timeout path must be gone: ${call.url}`);

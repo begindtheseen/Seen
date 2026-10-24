@@ -10,6 +10,7 @@
 // firing the credits-updated event stay with the caller (they own that UI state).
 
 import { aiHeaders } from './aiHeaders'
+import { countWords } from '@/lib/resume/engine-client'
 
 export interface ParseResumeResult {
   ok: boolean
@@ -67,7 +68,7 @@ export async function parseResumeFile(
   if (data.text) {
     const wordCount = typeof data.wordCount === 'number' && data.wordCount > 0
       ? data.wordCount
-      : data.text.trim().split(/\s+/).filter(Boolean).length
+      : countWords(data.text)
     return { ok: true, text: data.text, fileName: file.name, wordCount, employment: data.employment, doc: data.doc, health: data.health, coverage: data.coverage ?? null }
   }
   return { ok: false, fileName: file.name, error: data.error }

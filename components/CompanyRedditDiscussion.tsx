@@ -213,11 +213,13 @@ export default function CompanyRedditDiscussion({ companyName, hasReportData = f
         </div>
       )}
 
-      {/* Reddit unreachable right now — graceful, transient, never an error card */}
+      {/* Reddit is still answering (a background search): the page re-asks every few seconds for ~20 s
+          and hides the section if nothing turns up — never a dead "Retry" on first load (audit 2026-10-23:
+          Walmart / Sheetz / Insight Global sat on "Still checking… Retry" for 15 s+). */}
       {status === 'checking' && (
-        <div style={{ textAlign: 'center', padding: '1.75rem 1.25rem', color: 'var(--muted)', fontFamily: 'var(--mono)', fontSize: '.66rem', background: 'var(--card)', border: '1px solid var(--line2)', borderRadius: 10, lineHeight: 1.6 }}>
+        <div role="status" style={{ textAlign: 'center', padding: '1.75rem 1.25rem', color: 'var(--muted)', fontFamily: 'var(--mono)', fontSize: '.66rem', background: 'var(--card)', border: '1px solid var(--line2)', borderRadius: 10, lineHeight: 1.6 }}>
           Still checking Reddit for {companyName}…
-          <br /><button onClick={load} style={{ ...btnGhost, marginTop: '.6rem' }}>Retry</button>
+          <br /><span style={{ fontSize: '.58rem', opacity: .75 }}>This closes by itself if no hiring threads turn up.</span>
         </div>
       )}
       {status === 'error' && (

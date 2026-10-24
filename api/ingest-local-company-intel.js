@@ -2,6 +2,7 @@
 import { normalizeIntelItem, redditPermalinkKey } from '../lib/server/companyIntelImport.js';
 import { classifyApplicantAccount, REPORT_OUTCOME } from '../lib/reports/applicantRules.js';
 import { excludedSource } from '../lib/reports/excludedSources.js';
+import { redditPlatform } from '../lib/reports/platformLabel.js';
 import { resolveOrCreateCompany, recomputeCompanyScoreFromReports, writeReport } from './_utils/reportWrite.js';
 
 const headersFor = key => ({ apikey: key, Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' });
@@ -91,7 +92,7 @@ export default async function handler(req, res) {
         const row = checked && isReddit
           // Same row shape as api/reports.js reddit_import: Reddit tier (0.3), labelled public discussion,
           // published. trust_reason marks the batch so it can be found and removed in one query.
-          ? { company_id: cid || undefined, role: item.role, platform: `Reddit r/${sub || 'unknown'}`, source: 'reddit', outcome, outcome_weight: 0.3, trust_reason: 'reddit_rule_match', needs_review: false, rounds: 0, unpaid_work: 'na', experience_level: 'Unknown', report_text: `${item.excerpt} [Source: ${item.source_url}]` }
+          ? { company_id: cid || undefined, role: item.role, platform: redditPlatform(sub || 'unknown'), source: 'reddit', outcome, outcome_weight: 0.3, trust_reason: 'reddit_rule_match', needs_review: false, rounds: 0, unpaid_work: 'na', experience_level: 'Unknown', report_text: `${item.excerpt} [Source: ${item.source_url}]` }
           : checked
           // Any other public page (a forum Google found): the established public-review contract
           // (api/_utils/companyIntel.js PUBLIC_REVIEW_PLATFORM_PREFIX, weight 0.3), published, tagged as a batch.

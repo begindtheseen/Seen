@@ -19,12 +19,13 @@ import ExportPanel from '@/components/resume/ExportPanel'
 import UpgradeModal from '@/components/UpgradeModal'
 import PageHeader from '@/components/shell/PageHeader'
 import { useAuth } from '@/lib/auth'
+import { RESUME_PARSE_COST, creditCostLabel } from '@/lib/creditRules'
 import { aiHeaders } from '@/lib/aiHeaders'
 import { ResumeStore } from '@/lib/stores/ResumeStore'
 import { ResumeDocStore, type StoredVariant } from '@/lib/stores/ResumeDocStore'
 import { SavedJobsStore } from '@/lib/stores/SavedJobs'
 import { parseResumeFile } from '@/lib/resumeUploadClient'
-import { parseResume, scoreResume, serializeToText, rewriteDoc, emptyDoc, normalizeDoc, docStats, newId } from '@/lib/resume/engine-client'
+import { parseResume, scoreResume, serializeToText, rewriteDoc, emptyDoc, normalizeDoc, docStats, newId, countWords } from '@/lib/resume/engine-client'
 import type { ResumeDoc, Health } from '@/lib/resume/types'
 import type { SavedJob } from '@/lib/types'
 import { showToast } from '@/lib/toast'
@@ -148,10 +149,12 @@ function StudioInner() {
     setBusy(true); setError('')
     try {
       const r = await parseResumeFile(file, { location: profile?.city || '' })
-      if (r.credits_required) { if (isLoggedIn) setShowUpgrade('credits'); else setError('Sign in to upload a résumé file (1 credit) — or paste the text, which is free.'); setBusy(false); return }
+      // The parse route is free and never answers credits_required; a 401 here means the session
+      // is gone, not that upload costs anything.
+      if (r.credits_required) { setError('Your session expired — sign in again, or paste the text (works signed out).'); setBusy(false); return }
       if (!r.ok || !r.text) { setError(r.error || 'Could not read this file. Paste the text instead.'); setBusy(false); return }
       window.dispatchEvent(new Event('seen:credits-updated'))
-      const wc = r.wordCount || r.text.trim().split(/\s+/).length
+      const wc = r.wordCount || countWords(r.text)
       const d = r.doc ? normalizeDoc(r.doc) : parseResume(r.text, r.fileName)
       // Keep the extractor's raw text as the canonical store until the first edit (lossless), but
       // cache the structured doc against it so the Studio never re-parses this upload.
@@ -167,7 +170,7 @@ function StudioInner() {
     if (t.length < 50) { setError('Paste the whole résumé — that is too short.'); return }
     if (!ResumeStore.isReadable(t)) { setError('That text does not read like a résumé (scrambled characters). Try re-exporting it from Word or Google Docs.'); return }
     const d = parseResume(t, 'Pasted résumé')
-    const wc = t.split(/\s+/).length
+    const wc = countWords(t)
     ResumeStore.save(t, 'Pasted résumé', wc, user?.id, isLoggedIn).catch(() => {})
     ResumeDocStore.putParsed(user?.id, t, d)
     setBaseDoc(d); setBaseMeta({ fileName: 'Pasted résumé', wordCount: wc }); setActiveId(null); setVariantDoc(null); setMode('editor'); setTab('health'); setError('')
@@ -254,7 +257,9 @@ function StudioInner() {
               <div className={s.cardTitle}>Drop your résumé here</div>
               <div className={s.dim} style={{ marginBottom: '1rem' }}>PDF, Word or text. We read the layout (columns, bold headings, bullets), not just the characters.</div>
               <div style={{ display: 'flex', gap: '.5rem', justifyContent: 'center', flexWrap: 'wrap' }}>
-                <button type="button" className={s.btnPrimary} onClick={() => fileRef.current?.click()} disabled={busy}>{busy ? 'Reading…' : 'Upload a file'}<span style={{ marginLeft: '.45rem', fontSize: 'var(--fs-55)', opacity: .7, fontFamily: 'var(--mono)', fontWeight: 400 }}>· 1 credit</span></button>
+                {/* Upload/parse is FREE (RESUME_PARSE_COST = 0; api/resume.js `parse` is never credit-gated).
+                    The live audit found this button priced "· 1 credit" while Settings and /pricing said free. */}
+                <button type="button" className={s.btnPrimary} onClick={() => fileRef.current?.click()} disabled={busy}>{busy ? 'Reading…' : 'Upload a file'}<span style={{ marginLeft: '.45rem', fontSize: 'var(--fs-55)', opacity: .7, fontFamily: 'var(--mono)', fontWeight: 400 }}>· {creditCostLabel(RESUME_PARSE_COST)}</span></button>
                 <button type="button" className={s.btn} onClick={() => setMode('paste')}>Paste text · free</button>
                 <button type="button" className={s.btn} onClick={startBlank}>Start from blank</button>
               </div>

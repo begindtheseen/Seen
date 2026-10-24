@@ -4,8 +4,10 @@ import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/lib/auth'
 import { AppStore } from '@/lib/stores/AppStore'
+import { applicationFromListing } from '@/lib/stores/listingApplication'
 import { aiHeaders } from '@/lib/aiHeaders'
 import ModalPortal from '@/components/ModalPortal'
+import { displayCompanyName } from '@/lib/companyDisplay'
 
 interface ApplyCheckpointProps {
   job: { id: string; title: string; company: string; location?: string; apply_url?: string | null }
@@ -60,6 +62,9 @@ export default function ApplyCheckpoint({ job, optimized: _optimized, autoConfir
   const router = useRouter()
   const { isLoggedIn } = useAuth()
   const [step, setStep] = useState<Step>(autoConfirm ? 'confirmed' : 'main')
+  // The employer as a person would name it ("PLS", never the board slug "plscareers") — what the
+  // tracker record and every sentence here carry.
+  const companyName = displayCompanyName(job.company) || job.company
   const [loading, setLoading] = useState(false)
 
   const [creditEarned, setCreditEarned] = useState(false)
@@ -111,21 +116,14 @@ export default function ApplyCheckpoint({ job, optimized: _optimized, autoConfir
     setStep('listing_gone')
   }
 
+  // The ONLY place this dialog writes an application: on "✓ Yes, I applied" (or autoConfirm, when
+  // the user already said so in the Optimize funnel). "Apply ↗" itself only opens the listing and
+  // records an anonymous click (lib/trackApply) — it never adds a card. The card carries the
+  // listing's full title, location, id and link (lib/stores/listingApplication).
   async function handleApplied() {
     setLoading(true)
     try {
-      await AppStore.add(
-        {
-          company: job.company,
-          role: job.title,
-          jobId: job.id,
-          jobUrl: job.apply_url ?? undefined,
-          location: job.location,
-          stage: 'Applied',
-          status: 'active',
-        },
-        isLoggedIn,
-      )
+      await AppStore.add(applicationFromListing(job), isLoggedIn)
       // Earn 1 AI credit back for tracking the application
       if (isLoggedIn) {
         try {
@@ -388,7 +386,7 @@ export default function ApplyCheckpoint({ job, optimized: _optimized, autoConfir
       style={backdropStyle}
       onClick={e => { if (e.target === e.currentTarget) onClose() }}
     >
-      <div style={sheetStyle}>
+      <div style={sheetStyle} role="dialog" aria-modal="true" aria-label={step === 'main' ? `Did you apply to ${job.company}?` : 'Application tracking'}>
         {/* ── MAIN ── */}
         {step === 'main' && (
           <div style={innerStyle}>
@@ -396,7 +394,7 @@ export default function ApplyCheckpoint({ job, optimized: _optimized, autoConfir
 
             <div style={headingStyle}>Did you apply?</div>
             <div style={subtitleStyle}>Answer once so Seen can start your response timeline.</div>
-            <div style={jobLineStyle}>{job.company} · {job.title}</div>
+            <div style={jobLineStyle}>{companyName} · {job.title}</div>
 
             <button
               style={primaryBtnStyle}
@@ -447,7 +445,7 @@ export default function ApplyCheckpoint({ job, optimized: _optimized, autoConfir
                 <>Sign in and report it from the listing card so it counts — verified dead
                 listings get pulled, and companies that leave them up lose transparency score.</>
               ) : (
-                <>We&apos;ll verify {job.company} — {job.title} and pull it if it&apos;s dead.
+                <>We&apos;ll verify {companyName} — {job.title} and pull it if it&apos;s dead.
                 Companies that leave inactive listings up lose transparency score, so this
                 report protects the next applicant&apos;s time.</>
               )}
@@ -473,7 +471,7 @@ export default function ApplyCheckpoint({ job, optimized: _optimized, autoConfir
                   key={reason}
                   style={reasonBtnStyle}
                   onClick={() => {
-                    saveSkipReason(job.company, job.title, reason, 'not_yet')
+                    saveSkipReason(companyName, job.title, reason, 'not_yet')
                     setStep('not_yet_confirmed')
                   }}
                 >
@@ -495,7 +493,7 @@ export default function ApplyCheckpoint({ job, optimized: _optimized, autoConfir
               lineHeight: 1.6,
               marginBottom: 24,
             }}>
-              We&apos;ll remind you to check back on {job.company} — {job.title}.
+              We&apos;ll remind you to check back on {companyName} — {job.title}.
             </div>
             <button style={closeFullBtnStyle} onClick={onClose}>
               Close
@@ -518,7 +516,7 @@ export default function ApplyCheckpoint({ job, optimized: _optimized, autoConfir
                   key={reason}
                   style={reasonBtnStyle}
                   onClick={() => {
-                    saveSkipReason(job.company, job.title, reason, 'declined')
+                    saveSkipReason(companyName, job.title, reason, 'declined')
                     // "Fake or outdated" is an availability claim, not just a skip reason —
                     // file it (weaker 'unknown' status) so it reaches the admin review queue
                     // instead of dying in localStorage.
@@ -567,7 +565,7 @@ export default function ApplyCheckpoint({ job, optimized: _optimized, autoConfir
               lineHeight: 1.6,
               marginBottom: 4,
             }}>
-              We&apos;ll tell you when {job.company} usually responds — and when silence becomes a signal.
+              We&apos;ll tell you when {companyName} usually responds — and when silence becomes a signal.
             </div>
 
             <div style={statsRowStyle}>

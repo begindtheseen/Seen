@@ -4,6 +4,7 @@ import { Suspense, useEffect, useState } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { useAuth } from '@/lib/auth'
 import { AppStore } from '@/lib/stores/AppStore'
+import { applicationFromListing } from '@/lib/stores/listingApplication'
 import { isGradeableScore } from '@/lib/gradeGate'
 
 interface CoScore {
@@ -54,7 +55,8 @@ function ApplyContent() {
   const role    = params?.get('role') ?? ''
   const jid     = params?.get('jid') ?? ''
   const jobUrl  = params?.get('jobUrl') ?? ''
-  const platform = params?.get('via') ?? 'Seen'
+  const city    = params?.get('city') ?? ''
+  const platform = params?.get('via') ?? ''
 
   const [score, setScore] = useState<CoScore | null>(null)
   const [phase, setPhase] = useState<Phase>('ask')
@@ -83,16 +85,8 @@ function ApplyContent() {
 
   async function handleYes() {
     setSaving(true)
-    await AppStore.add({
-      company: co || 'Unknown',
-      role: role || 'Unknown',
-      location: '',
-      platform,
-      stage: 'Applied',
-      status: 'active',
-      jobUrl: jobUrl || undefined,
-      jobId: jid || undefined,
-    }, isLoggedIn)
+    // Same pre-fill as "✓ Yes, I applied" on a job card: full title, the listing's city, its id and link.
+    await AppStore.add(applicationFromListing({ company: co || 'Unknown', title: role || 'Unknown', location: city, id: jid, apply_url: jobUrl }, platform ? { platform } : {}), isLoggedIn)
     setSaving(false)
 
     // Unlock insight based on company data
@@ -262,7 +256,7 @@ function ApplyContent() {
           {!isLoggedIn && (
             <div style={{ background: 'rgba(245,158,11,0.07)', border: '1px solid rgba(245,158,11,0.2)', borderRadius: 9, padding: '.65rem .9rem', marginBottom: '1rem', fontFamily: 'var(--mono)', fontSize: '.62rem', color: 'var(--amber)', lineHeight: 1.65 }}>
               <strong>Sign in</strong> to sync reminders across all devices.{' '}
-              <a href={`/login?return=${encodeURIComponent(`/apply?co=${encodeURIComponent(co)}&role=${encodeURIComponent(role)}&jid=${jid}&jobUrl=${encodeURIComponent(jobUrl)}`)}`} style={{ color: 'var(--blue)', textDecoration: 'none' }}>Sign in →</a>
+              <a href={`/login?return=${encodeURIComponent(`/apply?co=${encodeURIComponent(co)}&role=${encodeURIComponent(role)}&jid=${encodeURIComponent(jid)}&jobUrl=${encodeURIComponent(jobUrl)}${city ? `&city=${encodeURIComponent(city)}` : ''}`)}`} style={{ color: 'var(--blue)', textDecoration: 'none' }}>Sign in →</a>
             </div>
           )}
 

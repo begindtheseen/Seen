@@ -1,6 +1,16 @@
 import type { ReactNode } from 'react'
+import type { Metadata } from 'next'
 import Link from 'next/link'
 import PageHeader from '@/components/shell/PageHeader'
+import { pageMetadata } from '@/lib/seo'
+
+export const metadata: Metadata = pageMetadata({
+  title: 'FAQ — How Seen Works, What It Costs, Where the Data Comes From',
+  description:
+    'Answers about Seen: what the company grades and ghost rates mean, where applicant reports come from, what is free and what Pro adds, how the tracker and Résumé AI work, and how to contact us.',
+  path: '/faq',
+  ogTitle: 'Seen FAQ',
+})
 
 const EMAIL = 'hello@seenjobs.io'
 const Mail = () => <a href={`mailto:${EMAIL}`}>{EMAIL}</a>
@@ -74,7 +84,7 @@ export default function FAQPage() {
         },
         {
           q: 'Can I edit or delete my report?',
-          a: <>Because reports are fully anonymous, we cannot verify ownership. If you believe a report you submitted contains an error or personal information that should be removed, email <Mail /> and we will review it manually.</>,
+          a: <>Not from the site yet. If you were signed in when you reported, the report is linked to your account, so email <Mail /> from that account&apos;s address and we can correct or remove it. A signed-out report carries no account link, so we cannot verify who sent it — if one contains an error or personal information, email us and we review it manually.</>,
         },
       ],
     },
