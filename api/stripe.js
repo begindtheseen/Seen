@@ -4,6 +4,7 @@
 
 import { createHmac, timingSafeEqual } from 'crypto';
 import { ONE_TIME_SKUS, PRO_TRIAL_DAYS } from '../lib/server/creditRules.js';
+import { internalPath } from '../lib/safeHref.js';
 import { fulfillOneTimeCheckout } from '../lib/server/stripeFulfillment.js';
 import { EMPLOYER_SKUS } from '../lib/server/employerSkus.js';
 import { fulfillEmployerCheckout, isEmployerSession } from '../lib/server/employerFulfillment.js';
@@ -502,7 +503,10 @@ export default async function handler(req, res) {
     return res.status(200).json({ url: session.url });
   }
 
-  // ── CUSTOMER PORTAL (manage subscription) ────────────────────────────────
+  // ── CUSTOMER PORTAL (manage billing: payment method, invoices, cancel) ───────
+  // Settings → Plan & billing "Manage billing" opens it (audit 2026-10-24 M-7). The caller may name
+  // where Stripe should send the user back (`return`): an INTERNAL path only (lib/safeHref.js
+  // internalPath), on this request's origin; anything else falls back to /pricing.
   if (action === 'portal') {
     if (req.method !== 'POST') return res.status(405).end();
     if (!STRIPE_KEY) return res.status(503).json({ error: 'Payments not configured' });
@@ -510,18 +514,20 @@ export default async function handler(req, res) {
     const { uid, email } = await resolveUid(req, env);
     if (!uid) return res.status(401).json({ error: 'Sign in first' });
 
+    const origin = req.headers.origin || 'https://seenjobs.io';
+    const returnPath = internalPath(body.return) || '/pricing';
     const customerId = await resolveCustomerId(uid, email, env);
 
+    // No Stripe customer = nothing to manage (never subscribed or bought) — say so instead of
+    // bouncing the user to /pricing as if a portal had opened.
     if (!customerId) {
-      const origin = req.headers.origin || 'https://seenjobs.io';
-      return res.status(200).json({ url: `${origin}/pricing` });
+      return res.status(200).json({ url: null, no_customer: true, error: 'No billing account yet — nothing to manage.' });
     }
 
-    const origin = req.headers.origin || 'https://seenjobs.io';
     const portalRes = await fetch('https://api.stripe.com/v1/billing_portal/sessions', {
       method: 'POST',
       headers: { Authorization: `Bearer ${STRIPE_KEY}`, 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: new URLSearchParams({ customer: customerId, return_url: `${origin}/pricing` }).toString(),
+      body: new URLSearchParams({ customer: customerId, return_url: `${origin}${returnPath}` }).toString(),
     });
 
     if (!portalRes.ok) return res.status(502).json({ error: 'Portal unavailable' });

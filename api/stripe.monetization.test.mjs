@@ -294,3 +294,31 @@ test('confirm refuses a session owned by a different user', async () => {
   const res = await call({ action: 'confirm', body: { session_id: 'cs_x' }, headers: auth() });
   assert.equal(res.statusCode, 403);
 });
+
+// ── PORTAL: Settings "Manage billing" — return_url is an internal path on the request origin ──────
+
+test('portal returns to the internal path it was given, on the request origin, and refuses open redirects', async () => {
+  for (const [ret, expected] of [['/profile#plan', 'https://seenjobs.io/profile#plan'], ['//evil.example', 'https://seenjobs.io/pricing'], ['https://evil.example/x', 'https://seenjobs.io/pricing'], [undefined, 'https://seenjobs.io/pricing']]) {
+    const calls = installFetch([
+      [c => c.url.includes('/ai_credits?') , () => mockResponse([{ stripe_customer_id: 'cus_1' }])],
+      [c => c.url.includes('/v1/billing_portal/sessions'), () => mockResponse({ url: 'https://billing.stripe.com/s/1' })],
+    ]);
+    const res = await call({ action: 'portal', body: { return: ret }, headers: { ...auth(), origin: 'https://seenjobs.io' } });
+    assert.equal(res.statusCode, 200);
+    assert.equal(res.jsonBody.url, 'https://billing.stripe.com/s/1');
+    const form = new URLSearchParams(calls.find(c => c.url.includes('/v1/billing_portal/sessions')).body);
+    assert.equal(form.get('customer'), 'cus_1');
+    assert.equal(form.get('return_url'), expected, `return=${ret}`);
+  }
+});
+
+test('portal with no Stripe customer says so instead of pretending a portal opened', async () => {
+  installFetch([
+    [c => c.url.includes('/ai_credits?'), () => mockResponse([{ stripe_customer_id: null }])],
+    [c => c.url.includes('api.stripe.com/v1/customers?'), () => mockResponse({ data: [] })],
+  ]);
+  const res = await call({ action: 'portal', body: { return: '/profile#plan' }, headers: auth() });
+  assert.equal(res.statusCode, 200);
+  assert.equal(res.jsonBody.url, null);
+  assert.equal(res.jsonBody.no_customer, true);
+});
