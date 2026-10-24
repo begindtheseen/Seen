@@ -25,6 +25,12 @@ import { isEmployeeReview, isImportedReview, isPublicDiscussion } from './report
 /** Below this many applicant reports no response / ghost PERCENTAGE is shown — "too few reports" instead. */
 export const MIN_REPORTS_FOR_RATES = 5
 
+/** The confidence WORD a visitor reads never says "High" until this many applicant reports came from Seen
+ *  users (rows submitted to Seen, not public posts). Display only — the stored data_quality and every
+ *  score input are untouched (conversion audit 2026-10-24: "High confidence · 48 applicant reports" sat
+ *  above "none was submitted by a Seen user"). */
+export const MIN_SEEN_REPORTS_FOR_HIGH_CONFIDENCE = 5
+
 export type ScoreLike = {
   gradeable?: boolean | null
   overall_score?: number | null
@@ -97,8 +103,12 @@ export interface CompanySummary {
   oddsContext: string
   /** "48 applicant reports · 32 online mentions" — what the grade stands on. */
   evidenceLine: string
-  /** `word` is the bare "High confidence" the share card prints; `label` adds the evidence line. */
-  confidence: { level: ConfidenceLevel; word: string; label: string; emoji: string } | null
+  /** `word` is the bare "High confidence" the share card prints; `label` adds the evidence line;
+   *  `sources` names where the applicant reports came from ('' when the list is not loaded);
+   *  `capNote` explains a capped word ('' when not capped). */
+  confidence: { level: ConfidenceLevel; word: string; label: string; emoji: string; sources?: string; capNote?: string } | null
+  /** Applicant reports with an outcome by origin, from the UNFILTERED list; null until it has loaded. */
+  sources: { seen: number; public: number } | null
   /** Set when the listed rows with an outcome differ from the grade's count (a stale stored score). */
   listedNote: string
 }
@@ -139,6 +149,33 @@ export function confidenceFrom(dataQuality: string | null | undefined, evidence:
   const word = `${level === 'high' ? 'High' : level === 'moderate' ? 'Moderate' : 'Low'} confidence`
   const emoji = level === 'high' ? '🟢' : level === 'moderate' ? '🟡' : '🔴'
   return { level, word, emoji, label: `${word} · ${evidence}` }
+}
+
+/**
+ * The confidence a visitor may READ: the stored level, capped at moderate while fewer than
+ * MIN_SEEN_REPORTS_FOR_HIGH_CONFIDENCE applicant reports came from Seen users. An unknown Seen count
+ * (list not loaded) is treated as 0, so the badge never overclaims while it loads. Display only.
+ */
+export function capDisplayConfidence(conf: CompanySummary['confidence'], seenUserReports: number | null | undefined): CompanySummary['confidence'] {
+  if (!conf) return null
+  const seen = Math.max(0, Math.floor(Number(seenUserReports) || 0))
+  if (conf.level !== 'high' || seen >= MIN_SEEN_REPORTS_FOR_HIGH_CONFIDENCE) return conf
+  const word = 'Moderate confidence'
+  const rest = conf.label.startsWith(conf.word) ? conf.label.slice(conf.word.length) : ` · ${conf.label}`
+  return {
+    ...conf, level: 'moderate', word, emoji: '🟡', label: `${word}${rest}`,
+    capNote: `Shown as moderate until ${MIN_SEEN_REPORTS_FOR_HIGH_CONFIDENCE} applicant reports come from Seen users (${seen} so far) — most of this evidence is public posts.`,
+  }
+}
+
+/** Where the applicant reports came from, for the hero badge: "47 from public posts · 1 from Seen users".
+ *  Built from the listed rows (the same counts as the reports section); when they don't add up to the
+ *  grade's count (a stale stored score) only the Seen-user count — the one that matters — is named. */
+export function sourcesPhrase(applicantReports: number, seen: number, pub: number): string {
+  if (applicantReports <= 0) return ''
+  if (seen <= 0) return pub >= applicantReports ? 'all from public posts · none from Seen users yet' : 'none from Seen users yet'
+  if (seen + pub === applicantReports) return pub > 0 ? `${pub} from public posts · ${seen} from Seen ${seen === 1 ? 'user' : 'users'}` : `all from Seen users`
+  return `${seen} from Seen ${seen === 1 ? 'user' : 'users'}`
 }
 
 /** "48 applicant reports · 32 online mentions · 12 employee reviews" — every kind of evidence behind the grade. */
@@ -186,7 +223,7 @@ export function countListed(reports: ReportLike[] | null | undefined): { listed:
  * Build the summary. `graded` follows the API's gate (gradeable !== false and a numeric overall_score —
  * lib/gradeGate.ts isGradeableScore); every rate and sentence is null/'' below it.
  */
-export function buildCompanySummary(score: ScoreLike, reports: ReportLike[] | null | undefined): CompanySummary {
+export function buildCompanySummary(score: ScoreLike, reports: ReportLike[] | null | undefined, opts: { sourceReports?: ReportLike[] | null } = {}): CompanySummary {
   const s = score ?? null
   const graded = !!s && s.gradeable !== false && typeof s.overall_score === 'number' && Number.isFinite(s.overall_score)
   const applicantReports = firstPartyReportCount(s)
@@ -221,14 +258,20 @@ export function buildCompanySummary(score: ScoreLike, reports: ReportLike[] | nu
     }
   }
 
-  const confidence = applicantReports > 0 ? confidenceFrom(s?.data_quality, evidenceLine) : null
+  // Origins come from the UNFILTERED list (the page's city filter narrows `reports`); `sourceReports`
+  // undefined = `reports` is the full list, null = not loaded yet.
+  const srcRows = opts.sourceReports === undefined ? reports : opts.sourceReports
+  const sources = srcRows ? (() => { const l = countListed(srcRows).listed; return { seen: l.seenWithOutcome, public: l.publicWithOutcome + l.importedWithOutcome } })() : null
+  const stored = applicantReports > 0 ? confidenceFrom(s?.data_quality, evidenceLine) : null
+  const capped = capDisplayConfidence(stored, sources?.seen ?? 0)
+  const confidence = capped ? { ...capped, sources: sources ? sourcesPhrase(applicantReports, sources.seen, sources.public) : '' } : null
   // The list is read at a different moment than the stored score, and the API self-repairs a stale
   // score on the next request — but a visitor must never see two unexplained numbers.
   const listedNote = graded && scorableWithOutcome > 0 && scorableWithOutcome !== applicantReports
     ? `The grade was last built from ${plural(applicantReports, 'applicant report')}; this page lists ${scorableWithOutcome} with an outcome — it is refreshed on the next recompute.`
     : ''
 
-  return { graded, applicantReports, mentions, employeeReviews, webClaim, listed, outcomes, responseRate, ghostRate, ratesShown, responsePct, ghostPct, verdictKind, verdict, oddsContext, evidenceLine, confidence, listedNote }
+  return { graded, applicantReports, mentions, employeeReviews, webClaim, listed, outcomes, responseRate, ghostRate, ratesShown, responsePct, ghostPct, verdictKind, verdict, oddsContext, evidenceLine, confidence, sources, listedNote }
 }
 
 /** Subheading over the public rows, shown only when the list ALSO holds reports submitted to Seen

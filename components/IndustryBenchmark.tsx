@@ -6,6 +6,7 @@
 // with the cost-of-gap callout) and the consumer company page (third-person ranking).
 
 import styles from './IndustryBenchmark.module.css'
+import { industryVerdict } from '@/lib/industryVerdict'
 
 export type Benchmark = {
   scope: 'industry' | 'all'
@@ -47,17 +48,8 @@ function buildRows(b: Benchmark): Row[] {
   return rows
 }
 
-// Third-person one-liner for the consumer/company-page variant, derived from the response
-// percentile (falls back to overall). Neutral, informative — it's candidate-facing context.
-function publicVerdict(b: Benchmark, name: string): { tone: string; headline: string; detail: string } {
-  const where = b.scope === 'industry' && b.industry ? b.industry : 'employers on Seen'
-  const p = b.percentile.response ?? b.percentile.overall
-  if (p == null) return { tone: 'neutral', headline: `Not enough ${where} scored yet to rank`, detail: 'The grade above stands on its own for now.' }
-  if (p >= 75) return { tone: 'good', headline: `${name} replies more than ${p}% of ${where}`, detail: 'Better odds of hearing back than most of its industry.' }
-  if (p >= 45) return { tone: 'warn', headline: `${name} is about average for ${where}`, detail: 'Middle of the pack on responding to applicants.' }
-  return { tone: 'bad', headline: `${name} replies less than ${100 - p}% of ${where}`, detail: 'Most of its industry responds to applicants more often — factor that into your effort.' }
-}
-
+// Third-person one-liner for the consumer/company-page variant: the reply-rate comparison the bars
+// show, never contradicting the grade (lib/industryVerdict.ts).
 export default function IndustryBenchmark({
   benchmark,
   variant = 'employer',
@@ -75,7 +67,7 @@ export default function IndustryBenchmark({
   const where = b.scope === 'industry' && b.industry ? b.industry : 'employers on Seen'
   const isPublic = variant === 'public'
   const name = companyName ? companyName.charAt(0).toUpperCase() + companyName.slice(1) : 'This company'
-  const v = isPublic ? publicVerdict(b, name) : b.verdict
+  const v = isPublic ? industryVerdict(b, name) : b.verdict
   const kicker = isPublic ? `${name} vs its industry` : `You vs ${where}`
 
   return (

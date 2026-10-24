@@ -2,7 +2,6 @@
 
 import { useState, useCallback, useEffect, useRef } from 'react'
 import { useFocusTrap } from '@/lib/hooks/useFocusTrap'
-import { Score } from '@/lib/score'
 import { SavedJobsStore } from '@/lib/stores/SavedJobs'
 import { aiHeaders } from '@/lib/aiHeaders'
 import { useAuth } from '@/lib/auth'
@@ -18,6 +17,7 @@ import { displayCompanyName } from '@/lib/companyDisplay'
 import { displayPay, payLabel } from '@/lib/jobs/pay.js'
 import { paragraphs, isDescriptionPreview, stripDanglingEllipsis, endsCutOff } from '@/lib/jobs/descriptionText.js'
 import { httpHref } from '@/lib/safeHref.js'
+import ListingScoreRing from '@/components/jobs/ListingScoreRing'
 
 // ── Job detail drawer helpers ─────────────────────────────────────────────────
 
@@ -184,7 +184,6 @@ export default function JobDetailDrawer({ job, isLoggedIn, onClose, onApply, onC
     else { SavedJobsStore.save(job, isLoggedIn); setSaved(true) }
   }
 
-  const risk = Score.risk(job.score)
   const avail = job.availability_status
   const companyName = displayCompanyName(job.company) || job.company
   const preview = isDescriptionPreview(job)
@@ -267,9 +266,7 @@ export default function JobDetailDrawer({ job, isLoggedIn, onClose, onApply, onC
                   </a>
                 )}
               </div>
-              <div className={`sring ${risk}`} style={{ width: 40, height: 40, flexShrink: 0 }} title={job.score == null ? 'Not enough signal in this listing to score it' : undefined}>
-                <div className="sring-n" style={{ fontSize: '.8rem' }}>{job.score ?? '–'}</div>
-              </div>
+              <ListingScoreRing score={job.score} size={40} />
             </div>
             {chips.length > 0 && (
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '.3rem' }}>
@@ -280,7 +277,7 @@ export default function JobDetailDrawer({ job, isLoggedIn, onClose, onApply, onC
 
           {/* Stat grid */}
           <div className="jd-grid" style={{ marginBottom: '1rem' }}>
-            <div className="jd-stat"><span className="jd-sn" style={{ color: Score.color(risk) }}>{job.score ?? '–'}</span><span className="jd-sl">Score</span></div>
+            <div className="jd-stat"><span className="jd-sn">{job.score ?? '–'}</span><span className="jd-sl">Listing score</span></div>
             <div className="jd-stat"><span className="jd-sn" style={{ color: job.waste == null ? 'var(--dim)' : job.waste > 55 ? 'var(--red)' : job.waste > 35 ? 'var(--amber)' : 'var(--green)' }}>{job.waste == null ? '–' : `${job.waste}%`}</span><span className="jd-sl">Waste risk</span></div>
             <div className="jd-stat"><span className="jd-sn" style={{ fontSize: '.72rem' }}>{job.type || 'Full-time'}</span><span className="jd-sl">Type</span></div>
             <div className="jd-stat"><span className="jd-sn" style={{ fontSize: '.72rem' }}>{job.level || '—'}</span><span className="jd-sl">Level</span></div>

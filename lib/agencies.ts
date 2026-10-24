@@ -50,3 +50,15 @@ const AGENCY_ALIASES = new Set(STAFFING_AGENCIES.flatMap(a => [a.name.toLowerCas
 export function isStaffingAgency(name: string | null | undefined): boolean {
   return AGENCY_ALIASES.has(String(name ?? '').toLowerCase().trim())
 }
+
+// Which company page an Index row links to. The matched company_scores row's stored name is used only
+// when it actually holds applicant reports (that page has the data) AND it makes a routable slug: a
+// stored name with "/" ("teksystems c/o allegis group") encodes to "%2F", which the client router
+// reads as a path separator → 404 (conversion audit 2026-10-24). Otherwise the agency's display name.
+// Slug scheme = CLAUDE.md: encodeURIComponent(name.toLowerCase().replace(/\s+/g, '-')).
+export function agencyPageSlug(agencyName: string, storedName: string | null | undefined, firstPartyReports: number): string {
+  const slug = (n: string) => encodeURIComponent(n.toLowerCase().trim().replace(/\s+/g, '-'))
+  const stored = String(storedName ?? '').trim()
+  if (stored && firstPartyReports > 0 && !stored.includes('/')) return slug(stored)
+  return slug(agencyName)
+}

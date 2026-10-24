@@ -18,6 +18,8 @@ import { httpHref, pathSegment } from '@/lib/safeHref.js'
 import { wasOptimized } from '@/lib/optimizedJobs'
 import Link from 'next/link'
 import { JobCache } from '@/lib/stores/JobCache'
+import ListingScoreRing from '@/components/jobs/ListingScoreRing'
+import EmployerGradeChip from '@/components/jobs/EmployerGradeChip'
 
 // The optimize action's price, rendered from the credit rules so the label can never drift.
 const OPTIMIZE_PRICE = creditCostLabel(RESUME_OPTIMIZE_COST)
@@ -49,26 +51,14 @@ function jobVibes(job: Job): { cls: string; txt: string }[] {
   }
   if (displayPay(job)) vibes.push({ cls: 'v-g', txt: '💰 Pay listed' })
   if (score != null && score >= 75) vibes.push({ cls: 'v-g', txt: '✅ High transparency' })
-  else if (score != null && score < 40) vibes.push({ cls: 'v-r', txt: '⚠️ Low score' })
+  else if (score != null && score < 40) vibes.push({ cls: 'v-r', txt: '⚠️ Thin posting' })
   if (loc.includes('remote') || (job.type || '').toLowerCase().includes('remote')) {
     vibes.push({ cls: 'v-b', txt: '🏠 Remote' })
   }
   return vibes.slice(0, 3)
 }
 
-function ScoreRing({ score }: { score: number | null }) {
-  const risk = Score.risk(score)
-  const unrated = score == null
-  return (
-    <div className={`sring ${risk}`} style={{ width: 46, height: 46, flexShrink: 0 }} title={unrated ? 'Not enough signal in this listing to score it' : undefined}>
-      <div className="sring-n" style={{ fontSize: unrated ? '1.1rem' : '.9rem' }}>{unrated ? '–' : score}</div>
-      <div className="sring-l">{Score.label(risk)}</div>
-    </div>
-  )
-}
-
-export default function JobCard({ job, index, onSaveToggle, onOpen, onApply, onCheckCompany, alreadyApplied, more = [] }: { job: Job; index: number; onSaveToggle: (id: string) => void; onOpen: (job: Job) => void; onApply: (job: Job) => void; onCheckCompany: (company: string) => void; alreadyApplied?: boolean; /** Same employer + title at other addresses (lib/jobs/groupListings.js) — one card, "+N more locations". */ more?: Job[] }) {
-  const risk = Score.risk(job.score)
+export default function JobCard({ job, index, onSaveToggle, onOpen, onApply, onCheckCompany, alreadyApplied, more = [], employerScore = null }: { job: Job; index: number; onSaveToggle: (id: string) => void; onOpen: (job: Job) => void; onApply: (job: Job) => void; onCheckCompany: (company: string) => void; alreadyApplied?: boolean; /** Same employer + title at other addresses (lib/jobs/groupListings.js) — one card, "+N more locations". */ more?: Job[]; /** The employer's overall score when it is GRADEABLE (useJobSearch coScores — already grade-gated), else null. */ employerScore?: number | null }) {
   const wl = job.waste != null ? Score.wasteLabel(job.waste) : null
   const vibes = jobVibes(job)
   const [saved, setSaved] = useState(() => SavedJobsStore.isSaved(job.id))
@@ -139,7 +129,7 @@ export default function JobCard({ job, index, onSaveToggle, onOpen, onApply, onC
   }
 
   return (
-    <div className={`jlc ${risk} spot`} style={{ animation: `riseIn .5s ${Math.min(index, 12) * 0.05}s cubic-bezier(.16,1,.3,1) both` }}>
+    <div className="jlc spot" style={{ animation: `riseIn .5s ${Math.min(index, 12) * 0.05}s cubic-bezier(.16,1,.3,1) both` }}>
       <div
         className="jlc-top"
         onClick={() => onOpen(job)}
@@ -154,7 +144,7 @@ export default function JobCard({ job, index, onSaveToggle, onOpen, onApply, onC
           <div className="jlc-co">{companyName}</div>
           <div className="jlc-loc">📍 {job.location}{more.length > 0 && <span style={{ color: 'var(--dim)' }}> · +{more.length} more location{more.length !== 1 ? 's' : ''}</span>}</div>
         </div>
-        <ScoreRing score={job.score} />
+        <ListingScoreRing score={job.score} />
       </div>
 
       <div style={{ display: 'flex', alignItems: 'center', gap: '.35rem', flexWrap: 'wrap', margin: '.35rem 0' }}>
@@ -233,12 +223,20 @@ export default function JobCard({ job, index, onSaveToggle, onOpen, onApply, onC
         <span className="jlc-mi" style={{ color: 'var(--blue)' }}>{job.source || 'Job board'}</span>
       </div>
 
-      <button
-        onClick={e => { e.stopPropagation(); onCheckCompany(job.company) }}
-        style={{ display: 'block', width: '100%', textAlign: 'left', background: 'none', border: 'none', fontFamily: 'var(--mono)', fontSize: '.62rem', color: 'var(--amber)', padding: '.1rem 0 .55rem', opacity: .8, cursor: 'pointer' }}
-      >
-        🏢 Check {companyName} →
-      </button>
+      {/* The employer's own grade (how it treats applicants) when it has one — the ring above grades the
+          posting only. Without a grade, the quick company check. */}
+      {typeof employerScore === 'number' ? (
+        <div style={{ padding: '.1rem 0 .55rem' }}>
+          <EmployerGradeChip company={job.company} score={employerScore} />
+        </div>
+      ) : (
+        <button
+          onClick={e => { e.stopPropagation(); onCheckCompany(job.company) }}
+          style={{ display: 'block', width: '100%', textAlign: 'left', background: 'none', border: 'none', fontFamily: 'var(--mono)', fontSize: '.62rem', color: 'var(--amber)', padding: '.1rem 0 .55rem', opacity: .8, cursor: 'pointer' }}
+        >
+          🏢 Check {companyName} →
+        </button>
+      )}
 
       {/* Two separate actions (2026-10-23): "Apply ↗" is FREE — it opens the listing in a new
           tab and offers tracking; "Optimize · 1 credit" is the paid optimizer. One tap never

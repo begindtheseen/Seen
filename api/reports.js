@@ -1408,7 +1408,7 @@ Return ONLY a valid JSON array. Return [] if there are genuinely no hiring exper
     const url = `${SUPABASE_URL}/rest/v1/reports`
       + `?company_name=ilike.${nameEnc}`
       + `&needs_review=not.is.true`
-      + `&select=id,role,outcome,ghost_stage,rounds,report_text,platform,outcome_weight,trust_reason,created_at,experience_level,location_id,company_name,company_id`
+      + `&select=id,role,outcome,ghost_stage,rounds,wait_days,report_text,platform,outcome_weight,trust_reason,created_at,experience_level,location_id,company_name,company_id`
       + `&order=created_at.desc`
       + `&limit=${REPORT_LIST_LIMIT}`;
 
@@ -1443,7 +1443,7 @@ Return ONLY a valid JSON array. Return [] if there are genuinely no hiring exper
       const fbUrl = `${SUPABASE_URL}/rest/v1/reports`
         + `?company_id=in.(${ids.join(',')})`
         + `&needs_review=not.is.true`
-        + `&select=id,role,outcome,ghost_stage,rounds,report_text,platform,outcome_weight,trust_reason,created_at,experience_level,location_id,company_name,company_id`
+        + `&select=id,role,outcome,ghost_stage,rounds,wait_days,report_text,platform,outcome_weight,trust_reason,created_at,experience_level,location_id,company_name,company_id`
         + `&order=created_at.desc&limit=${REPORT_LIST_LIMIT}`;
       const fbRes = await fetch(fbUrl, { headers: hdrs });
       const fbRows = (fbRes.ok ? await fbRes.json() : []).filter(r => !r.company_name || sameCompany(r));

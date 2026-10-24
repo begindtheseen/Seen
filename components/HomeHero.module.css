@@ -149,18 +149,18 @@
 .trust { display: flex; justify-content: center; gap: 1.4rem; margin-top: 1.4rem; flex-wrap: wrap; color: var(--dim); font-size: 0.82rem; }
 .trust b { color: var(--sub); font-weight: 600; }
 
-/* ── Entrance choreography: stages rise when useIntroGate flips (font ready). ── */
-.stage {
-  opacity: 0;
-  transform: translateY(16px);
-  transition: opacity 0.7s var(--ease-out), transform 0.7s var(--ease-out);
-}
-.heroIn .stage { opacity: 1; transform: none; }
-.heroIn .d1 { transition-delay: 0.02s; }
-.heroIn .d3 { transition-delay: 0.42s; }
-.heroIn .d4 { transition-delay: 0.52s; }
-.heroIn .d5 { transition-delay: 0.62s; }
-.heroIn .d6 { transition-delay: 0.72s; }
+/* ── Entrance choreography: stages rise from the first paint (CSS only). ── */
+/* The rise is pure CSS from the FIRST PAINT and moves only `transform` — the words are visible from
+   the server HTML on, never hidden behind opacity:0 until the JS bundle hydrates. The old version
+   waited for hydration + the font gate (useIntroGate), so the lede (the page's LCP element) painted
+   at ~4.7 s on a throttled phone (conversion audit 2026-10-24). */
+@keyframes stageRise { from { transform: translateY(16px); } to { transform: none; } }
+.stage { animation: stageRise 0.7s var(--ease-out) both; }
+.d1 { animation-delay: 0.02s; }
+.d3 { animation-delay: 0.42s; }
+.d4 { animation-delay: 0.52s; }
+.d5 { animation-delay: 0.62s; }
+.d6 { animation-delay: 0.72s; }
 
 @media (max-width: 560px) {
   .search { flex-wrap: wrap; }
@@ -175,7 +175,7 @@
 
 @media (prefers-reduced-motion: reduce) {
   .pulse { animation: none; }
-  .stage { opacity: 1; transform: none; transition: none; }
+  .stage { animation: none; transform: none; }
   .chip, .search { transition: none; }
 }
 

@@ -13,7 +13,7 @@ const FEATURES = [
     href: '/companies',
     tag: 'Company intel',
     title: 'Ghost rates and grades',
-    desc: 'Every company gets a ghost rate, response time and grade from applicant outcomes. No grade until there is enough evidence — at least one report to Seen and five pieces in total — and estimates are labeled as estimates.',
+    desc: 'Every company gets a ghost rate, response time and grade from applicant outcomes. No grade until there is enough evidence — at least one real applicant report and five pieces in total — and estimates are labeled as estimates.',
     icon: (
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
         <path d="M9 10h.01M15 10h.01" />
