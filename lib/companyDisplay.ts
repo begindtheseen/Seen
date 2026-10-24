@@ -11,17 +11,14 @@ import { NONTERMINAL_OUTCOMES } from '@/api/_utils/companyIntel.js'
 import { formatPacific } from '@/lib/time/pacific.js'
 import { displayCompanyName as displayCompanyNameJs, KNOWN_BRANDS } from '@/lib/companyNames.js'
 import { displayPlatform as displayPlatformJs } from '@/lib/reports/platformLabel.js'
+import { gradeLetter as gradeLetterJs } from '@/lib/gradeScale.js'
 
 // ── Letter grade ─────────────────────────────────────────────────────────────────────────────────
-// The one scale. 80+ A · 65+ B · 50+ C · 35+ D · else F (matches lib/growth.ts grade(), the OG
-// image, the leaderboard and the score modal; the share card used a 13-step A+/A/A- scale that
+// The one scale lives in lib/gradeScale.js (plain JS — server metadata, the OG image, the leaderboard,
+// the score modal and the share card all read it; the card once used a 13-step A+/A/A- scale that
 // disagreed with the page it was opened from).
 export function gradeLetter(score: number): string {
-  if (score >= 80) return 'A'
-  if (score >= 65) return 'B'
-  if (score >= 50) return 'C'
-  if (score >= 35) return 'D'
-  return 'F'
+  return gradeLetterJs(score)
 }
 
 // ── Display name ─────────────────────────────────────────────────────────────────────────────────
