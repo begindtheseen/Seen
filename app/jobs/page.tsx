@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useRef } from 'react'
+import { useState, useRef, Fragment } from 'react'
 import { useRouter } from 'next/navigation'
 import type { Job } from '@/lib/types'
 import { trackApplyClick } from '@/lib/trackApply'
@@ -22,6 +22,7 @@ import { LoadError } from '@/components/shell/LoadStates'
 import { resultsView } from '@/lib/searchView.js'
 import bar from '@/components/jobs/JobSearchBar.module.css'
 import { groupListings } from '@/lib/jobs/groupListings.js'
+import { isMatch } from '@/lib/server/jobPriority.js'
 
 // Empty-state suggestions, most-held first. Live corpus counts by title (prod, read-only,
 // 2026-10-23): software engineer 3,960 · nurse 1,360 · sales associate 648 · customer service 489 ·
@@ -62,6 +63,9 @@ export default function JobsPage() {
     retrySearch,
     requestGpsLocation,
     clearFilters,
+    hasMore,
+    loadingMore,
+    loadMore,
   } = useJobSearch()
   // ONE decision for the results area (lib/searchView.js): error / idle / loading / empty / results.
   const view = resultsView({ status, count: filtered.length })
@@ -106,6 +110,14 @@ export default function JobsPage() {
   // Same employer + title at several addresses → one card with "+N more locations"
   // (lib/jobs/groupListings.js). Every row is still counted in the results line.
   const grouped = groupListings(filtered)
+  // Matches first, then — under a divider — openings that only share a word with the search. The
+  // hook's sort already puts every match first (lib/server/jobPriority.js), so one index splits them.
+  const firstOther = typed ? grouped.findIndex(g => !isMatch(g.lead)) : -1
+  const [copied, setCopied] = useState(false)
+  async function copySearchLink() {
+    try { await navigator.clipboard.writeText(window.location.href); setCopied(true); setTimeout(() => setCopied(false), 1800) }
+    catch { notify({ title: 'Copy this page’s address to share the search', severity: 'info', duration: 2600 }) }
+  }
   // Suggestions never repeat what is already typed (the list used to offer "Phoenix, AZ" under a
   // typed "Phoenix, AZ" and, on a phone, sit on the Search button).
   const visibleLocSuggs = locSuggs.filter(c => c.toLowerCase() !== location.trim().toLowerCase())
@@ -140,7 +152,9 @@ export default function JobsPage() {
                 setQuery(val)
                 if (debounceRef.current) clearTimeout(debounceRef.current)
                 if (val.trim().length >= 2) {
-                  debounceRef.current = setTimeout(() => searchJobs(val, undefined), 450)
+                  // Auto-search the settled value only; it never becomes the URL (commit:false) and an
+                  // Enter for the same search right after sends no second request (useJobSearch).
+                  debounceRef.current = setTimeout(() => searchJobs(val, undefined, { commit: false }), 450)
                 }
               }}
               onKeyDown={e => { if (e.key === 'Enter') { if (debounceRef.current) clearTimeout(debounceRef.current); setShowCoSuggs(false); searchJobs() } }}
@@ -167,6 +181,9 @@ export default function JobsPage() {
                   value={location}
                   onChange={e => {
                     const val = e.target.value
+                    // Still composing the search: a pending auto-search for the title alone (with the
+                    // old location) is dropped — Enter / Search sends the whole search once.
+                    if (debounceRef.current) { clearTimeout(debounceRef.current); debounceRef.current = null }
                     setLocation(val)
                     if (val.length >= 2) {
                       setLocSuggs(matchCities(val, 6))
@@ -264,7 +281,12 @@ export default function JobsPage() {
         {/* Results header */}
         <div className="jtb">
           <div className="jct">{statusMsg}</div>
-          <div style={{ display: 'flex', gap: '.4rem', alignItems: 'center' }}>
+          <div style={{ display: 'flex', gap: '.4rem', alignItems: 'center', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+            {status === 'done' && typed && (
+              <button type="button" className={bar.share} onClick={copySearchLink} data-testid="copy-search-link" title="Copy a link to this search">
+                {copied ? '✓ Copied' : '🔗 Copy link'}
+              </button>
+            )}
             {filtered.length > 0 && (
               <div style={{ display: 'flex', borderRadius: 8, overflow: 'hidden', border: '1px solid var(--line2)', background: 'var(--card)' }}>
                 <button
@@ -305,11 +327,26 @@ export default function JobsPage() {
             coScores={coScores}
           />
         ) : view === 'results' ? (
+          <>
           <div className="jlist">
             {grouped.map(({ lead: job, more }, i) => (
-              <JobCard key={job.id} job={job} more={more} index={i} onSaveToggle={handleSaveToggle} onOpen={j => setDetailJob(j)} onApply={j => takesSeenApply(j) ? setDetailJob(j) : setApplyJob(j)} onCheckCompany={co => setCheckCompany(co)} alreadyApplied={appliedCos.has(job.id) || (!!job.apply_url && appliedCos.has(job.apply_url))} />
+              <Fragment key={job.id}>
+                {i === firstOther && (
+                  <div className={bar.divider} role="separator" data-testid="other-openings">
+                    <span className={bar.dividerTitle}>Other openings{hasCity ? ' nearby' : ''}</span>
+                    <span className={bar.dividerSub}>Not {query.trim() ? `“${query.trim()}”` : 'this role'} — they share a word with your search.</span>
+                  </div>
+                )}
+                <JobCard job={job} more={more} index={i} onSaveToggle={handleSaveToggle} onOpen={j => setDetailJob(j)} onApply={j => takesSeenApply(j) ? setDetailJob(j) : setApplyJob(j)} onCheckCompany={co => setCheckCompany(co)} alreadyApplied={appliedCos.has(job.id) || (!!job.apply_url && appliedCos.has(job.apply_url))} />
+              </Fragment>
             ))}
           </div>
+          {hasMore && (
+            <button type="button" className={bar.more} onClick={() => loadMore()} disabled={loadingMore} data-testid="show-more">
+              {loadingMore ? 'Loading…' : 'Show 60 more'}
+            </button>
+          )}
+          </>
         ) : view === 'error' ? (
           /* A failed search is an error with a Retry — never the "No matches" empty state (R-3). */
           <div style={{ padding: '1.5rem 0 3rem' }}>
