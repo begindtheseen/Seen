@@ -17,12 +17,13 @@ import { aiHeaders } from '@/lib/aiHeaders'
 import { useAuth } from '@/lib/auth'
 import { trackApplyClick } from '@/lib/trackApply'
 import type { Job } from '@/lib/types'
-import ModalPortal from '@/components/ModalPortal'
+import ApplyOptimizeModal from '@/components/ApplyOptimizeModal'
+import ApplyCheckpoint from '@/components/ApplyCheckpoint'
 import SeenApplyModal from '@/components/jobs/SeenApplyModal'
 import { takesSeenApply } from '@/lib/seenApplyMode'
 import CreditConfirmDialog from '@/components/CreditConfirmDialog'
 import { hasConfirmedCreditUse } from '@/lib/creditConfirm'
-import { JOB_INSIGHTS_COST, creditCostLabel, dailyResetLabel } from '@/lib/creditRules'
+import { JOB_INSIGHTS_COST, RESUME_OPTIMIZE_COST, creditCostLabel, dailyResetLabel } from '@/lib/creditRules'
 import { displayCompanyName } from '@/lib/companyDisplay'
 import { displayPay } from '@/lib/jobs/pay.js'
 import { paragraphs, isDescriptionPreview, stripDanglingEllipsis, endsCutOff } from '@/lib/jobs/descriptionText.js'
@@ -41,6 +42,9 @@ interface ScoreExplanation {
   waste_score: number
   waste_factors: ScoreFactor[]
 }
+
+// The optimizer's price, rendered from the credit rules (same label as the search drawer).
+const OPTIMIZE_PRICE = creditCostLabel(RESUME_OPTIMIZE_COST)
 
 const L1_TTL = 24 * 60 * 60 * 1000 // localStorage TTL — matches old _INSIGHTS_L1_TTL (24h)
 
@@ -96,6 +100,10 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
   const [insightNote, setInsightNote] = useState('')
   const [confirmOpen, setConfirmOpen] = useState(false)
   const [showApplyModal, setShowApplyModal] = useState(false)
+  const [showCheckpoint, setShowCheckpoint] = useState(false)
+  const [checkpointAuto, setCheckpointAuto] = useState(false)
+  // HumanProof says "your application is optimized" only once SeenFit actually ran on this page.
+  const [optimized, setOptimized] = useState(false)
   const [showSeenApply, setShowSeenApply] = useState(false)
   const [showShareCard, setShowShareCard] = useState(false)
   const [reportedInactive, setReportedInactive] = useState(false)
@@ -368,7 +376,7 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
         {scoreWhy && Array.isArray(scoreWhy.score_factors) && scoreWhy.score_factors.length > 0 && (
           <details style={{ marginBottom: '.85rem', background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 8, padding: '.15rem .2rem' }}>
             <summary style={{ cursor: 'pointer', fontFamily: 'var(--mono)', fontSize: '.62rem', color: 'var(--sub)', padding: '.5rem .7rem', listStyle: 'none' }}>
-              ▸ Why this score is {job.score ?? 'unrated'}{job.score != null ? '/95' : ''} — see the exact factors
+              ▸ Why this listing scores {job.score ?? 'unrated'}{job.score != null ? '/100' : ''} — see the exact factors
             </summary>
             <div style={{ padding: '.2rem .7rem .6rem' }}>
               {scoreWhy.score_factors.map((f, i) => (
@@ -380,7 +388,7 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
                 </div>
               ))}
               <div style={{ fontFamily: 'var(--mono)', fontSize: '.54rem', color: 'var(--muted)', marginTop: '.5rem', lineHeight: 1.55 }}>
-                This grades the listing&apos;s transparency (salary disclosure, source, description quality) — not the company. It is not a verified fact about the employer.
+                Scores run 18–95 on a 100-point scale. This grades the listing&apos;s transparency (salary disclosure, source, description quality) — not the company. It is not a verified fact about the employer.
               </div>
             </div>
           </details>
@@ -526,10 +534,10 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
         </div>
 
         {/* SeenFit Engine — deterministic, keyless résumé/application optimizer */}
-        <SeenFitPanel job={job} />
+        <SeenFitPanel job={job} onOptimized={() => setOptimized(true)} />
 
         {/* HumanProof — runs AFTER SeenFit: removes generic AI tone, adds truthful work context */}
-        <HumanProofPanel job={job} />
+        <HumanProofPanel job={job} optimized={optimized} />
 
         {/* Report Your Experience — T1-15 */}
         <div style={{ marginTop: '1.5rem', background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 12, padding: '1.25rem' }}>
@@ -586,15 +594,33 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
                 Apply on Seen →
               </button>
             )}
-            {job.apply_url && job.apply_mode !== 'seen'
-              ? <button
-                  onClick={() => setShowApplyModal(true)}
-                  style={takesSeenApply(job)
-                    ? { flex: 1, textAlign: 'center', background: 'none', color: 'var(--sub)', borderRadius: 8, padding: '.65rem .8rem', fontFamily: 'var(--display)', fontWeight: 700, fontSize: '.78rem', border: '1px solid var(--line2)', cursor: 'pointer' }
-                    : { flex: 1, textAlign: 'center', background: 'var(--green)', color: 'var(--ink)', borderRadius: 8, padding: '.65rem 1rem', fontFamily: 'var(--display)', fontWeight: 800, fontSize: '.85rem', border: 'none', cursor: 'pointer' }}
-                >
-                  {takesSeenApply(job) ? 'Apply on their site →' : <>Apply &amp; Optimize →</>}
-                </button>
+            {/* Same two actions as the search drawer: "Apply ↗" is FREE (opens the posting, then the
+                tracker checkpoint offers to log it); "Optimize · 1 credit" is the paid optimizer. The
+                page used to offer only "Apply & Optimize →" (audit 2026-10-24). */}
+            {postingHref && job.apply_mode !== 'seen'
+              ? <>
+                  <a
+                    href={postingHref}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    data-testid="detail-apply-link"
+                    onClick={() => { trackApplyClick(job); setCheckpointAuto(false); setShowCheckpoint(true) }}
+                    style={takesSeenApply(job)
+                      ? { flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', textAlign: 'center', background: 'none', color: 'var(--sub)', borderRadius: 8, padding: '.65rem .8rem', fontFamily: 'var(--display)', fontWeight: 700, fontSize: '.78rem', border: '1px solid var(--line2)', textDecoration: 'none', minWidth: 0 }
+                      : { flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', textAlign: 'center', background: 'var(--green)', color: 'var(--ink)', borderRadius: 8, padding: '.65rem .8rem', fontFamily: 'var(--display)', fontWeight: 800, fontSize: '.85rem', textDecoration: 'none', minWidth: 0 }}
+                  >
+                    {takesSeenApply(job) ? 'Apply on their site ↗' : preview ? 'Open the full posting ↗' : 'Apply ↗'}
+                  </a>
+                  {!takesSeenApply(job) && !preview && (
+                    <button
+                      type="button"
+                      data-testid="detail-optimize-btn"
+                      onClick={() => setShowApplyModal(true)}
+                      title={`Optimize your résumé for this job · ${OPTIMIZE_PRICE}`}
+                      style={{ flex: 1, minWidth: 0, textAlign: 'center', background: 'rgba(99,102,241,.08)', color: '#a5b4fc', borderRadius: 8, padding: '.5rem .5rem', fontFamily: 'var(--display)', fontWeight: 800, fontSize: '.78rem', lineHeight: 1.15, border: '1px solid rgba(99,102,241,.35)', cursor: 'pointer' }}
+                    >Optimize · {OPTIMIZE_PRICE.replace(' ', '\u00a0')}</button>
+                  )}
+                </>
               : !takesSeenApply(job) && <button disabled style={{ flex: 1, background: 'var(--muted)', color: 'var(--ink)', border: 'none', borderRadius: 8, padding: '.65rem 1rem', fontFamily: 'var(--display)', fontWeight: 800, fontSize: '.85rem', opacity: .65 }}>No apply link</button>
             }
             </>}
@@ -622,34 +648,14 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
           />
         )}
         {showApplyModal && job && (
-          <ModalPortal>
-          <div style={{ position: 'fixed', inset: 0, zIndex: 1000, background: 'rgba(0,0,0,.78)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }} onClick={() => setShowApplyModal(false)}>
-            <div style={{ position: 'relative', background: 'var(--surface)', borderRadius: 16, padding: '1.5rem', width: '100%', maxWidth: 520, maxHeight: '85dvh', overflowY: 'auto', animation: 'fadeUp .25s ease both' }} onClick={e => e.stopPropagation()}>
-              <div style={{ fontFamily: 'var(--display)', fontSize: '1.1rem', fontWeight: 800, color: 'var(--white)', marginBottom: '.4rem' }}>Ready to apply?</div>
-              <p style={{ fontFamily: 'var(--mono)', fontSize: '.68rem', color: 'var(--sub)', marginBottom: '1.25rem', lineHeight: 1.65 }}>
-                Optimize your resume for this role before you apply — it takes 60 seconds and can significantly improve your chances.
-              </p>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '.65rem' }}>
-                <a
-                  href={`/resume?company=${encodeURIComponent(job.company)}&role=${encodeURIComponent(job.title)}`}
-                  style={{ display: 'block', textAlign: 'center', background: 'linear-gradient(135deg,#3b82f6 0%,#8b5cf6 100%)', color: '#fff', borderRadius: 9, padding: '.75rem', fontFamily: 'var(--display)', fontWeight: 800, fontSize: '.9rem', textDecoration: 'none' }}
-                >
-                  ✨ Optimize resume first →
-                </a>
-                <a
-                  href={httpHref(job.apply_url) || '#'}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  style={{ display: 'block', textAlign: 'center', background: 'var(--card)', border: '1px solid var(--line2)', color: 'var(--sub)', borderRadius: 9, padding: '.75rem', fontFamily: 'var(--mono)', fontSize: '.72rem', textDecoration: 'none' }}
-                  onClick={() => { trackApplyClick(job); setShowApplyModal(false) }}
-                >
-                  Skip optimization — apply directly
-                </a>
-              </div>
-              <button onClick={() => setShowApplyModal(false)} style={{ position: 'absolute', top: '1rem', right: '1rem', background: 'none', border: 'none', color: 'var(--muted)', fontSize: '1.2rem', cursor: 'pointer' }}>×</button>
-            </div>
-          </div>
-          </ModalPortal>
+          <ApplyOptimizeModal
+            job={job}
+            onClose={() => setShowApplyModal(false)}
+            onApplied={() => { setCheckpointAuto(true); setShowCheckpoint(true) }}
+          />
+        )}
+        {showCheckpoint && job && (
+          <ApplyCheckpoint job={job} autoConfirm={checkpointAuto} onClose={() => { setShowCheckpoint(false); setCheckpointAuto(false) }} />
         )}
       </div>
     </div>
