@@ -23,6 +23,7 @@ import { gradeLetter, displayCompanyName, displayPlatform, isResolvedOutcome, la
 import { buildCompanySummary, publicRowsHeading, reportsProvenanceLine, reportsSectionSummary, MIN_REPORTS_FOR_RATES, type CompanySummary } from '@/lib/companyPageSummary'
 import { feedRowVerdict } from '@/lib/reports/feedFilter.js'
 import { looksLikeBotOrLinkText, trimToSentence } from '@/lib/reports/excerptText.js'
+import { displayPay } from '@/lib/jobs/pay.js'
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -748,8 +749,8 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
   // A public row whose words carry a link or moderator-bot text is not shown at all (owner 2026-10-24,
   // lib/reports/excerptText.js); one the strict rules do not accept as the poster's own account is shown
   // as commentary with no outcome label (lib/reports/feedFilter.js — the feed's rule).
-  const seenRows = reports.filter(r => !isPublicDiscussion(r.platform) && !isImportedReview(r.platform))
-  const publicRowsAll = reports.filter(r => isPublicDiscussion(r.platform) || isImportedReview(r.platform))
+  const seenRows = reports.filter(r => !isPublicDiscussion(r.platform) && !isImportedReview(r.platform, r.trust_reason))
+  const publicRowsAll = reports.filter(r => isPublicDiscussion(r.platform) || isImportedReview(r.platform, r.trust_reason))
   const publicRows = publicRowsAll.filter(r => !looksLikeBotOrLinkText(r.report_text))
   const hiddenPublicN = publicRowsAll.length - publicRows.length
   const isCommentary = (r: Report): boolean => {
@@ -1155,7 +1156,7 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
               ) : reports.length > 0 ? (
                 <>
                   {listRows.slice(0, reportsShown).map((r, i) => {
-                    const badge = reportSourceBadge(r.platform, r.report_text)
+                    const badge = reportSourceBadge(r.platform, r.report_text, r.trust_reason)
                     const employee = isEmployeeReview(r)
                     const src = reportSourceLink(r.platform, r.report_text)
                     // Quotes end at a sentence or a whole word, never mid-word ("…an onsite interview. Perhaps").
@@ -1357,7 +1358,7 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
                     <div key={i} className="jlc" style={{ display: 'flex', flexDirection: 'column', gap: '.35rem', padding: '.85rem 1rem', background: 'var(--card)', border: '1px solid var(--line)', borderRadius: '10px' }}>
                       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '.5rem', flexWrap: 'wrap' }}>
                         <span className="jlc-title" style={{ fontSize: '.95rem', fontWeight: 700, color: 'var(--white)', letterSpacing: '-.02em', flex: 1 }}>{j.title}</span>
-                        {j.salary && <span style={{ fontFamily: 'var(--mono)', fontSize: '.6rem', color: 'var(--green)', whiteSpace: 'nowrap' }}>{j.salary}</span>}
+                        {displayPay(j) && <span style={{ fontFamily: 'var(--mono)', fontSize: '.6rem', color: 'var(--green)', whiteSpace: 'nowrap' }}>{displayPay(j)}</span>}
                       </div>
                       <div style={{ display: 'flex', gap: '.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
                         <span style={{ fontFamily: 'var(--mono)', fontSize: '.55rem', color: 'var(--muted)' }}>{j.location || 'US'}</span>

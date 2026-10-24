@@ -13,6 +13,9 @@ import { JobCache } from '@/lib/stores/JobCache'
 import { Score } from '@/lib/score'
 import type { SavedJob } from '@/lib/types'
 import PageHeader from '@/components/shell/PageHeader'
+import Link from 'next/link'
+import { pathSegment, httpHref } from '@/lib/safeHref.js'
+import { displayCompanyName } from '@/lib/companyDisplay'
 
 function savedAgo(iso?: string): string {
   if (!iso) return ''
@@ -40,10 +43,9 @@ export default function SavedPage() {
 
   useEffect(() => { refresh() }, [refresh])
 
-  function open(s: SavedJob) {
-    // Prime the session cache from the snapshot so the detail page loads instantly.
+  // Prime the session cache from the snapshot so the detail page loads instantly.
+  function prime(s: SavedJob) {
     if (s.snapshot) JobCache.set(s.snapshot)
-    router.push(`/jobs/${encodeURIComponent(s.job_id)}`)
   }
 
   async function remove(e: React.MouseEvent, jobId: string) {
@@ -74,40 +76,44 @@ export default function SavedPage() {
           <div style={{ display: 'flex', flexDirection: 'column', gap: '.6rem' }}>
             {items.map(s => {
               const color = typeof s.score === 'number' ? Score.color(Score.risk(s.score)) : 'var(--dim)'
+              // The card IS a link to the role inside Seen (it was plain text with only the external
+              // "Apply ↗" as a link — audit 2026-10-24, M10). The id comes from device storage, so it
+              // goes in the path through pathSegment; the posting link only as a parsed http(s) URL.
+              const href = `/jobs/${pathSegment(s.job_id)}`
+              const applyHref = httpHref(s.apply_url)
+              const company = displayCompanyName(s.company) || s.company
               return (
                 <div
                   key={s.job_id}
-                  onClick={() => open(s)}
-                  style={{ display: 'flex', alignItems: 'center', gap: '.85rem', background: 'var(--raised)', border: '1px solid var(--line2)', borderRadius: 12, padding: '.85rem 1rem', cursor: 'pointer', transition: 'border-color .15s' }}
+                  style={{ display: 'flex', alignItems: 'center', gap: '.85rem', background: 'var(--raised)', border: '1px solid var(--line2)', borderRadius: 12, padding: '.35rem .5rem .35rem 1rem', transition: 'border-color .15s' }}
                   onMouseOver={e => (e.currentTarget.style.borderColor = 'var(--line3, var(--dim))')}
                   onMouseOut={e => (e.currentTarget.style.borderColor = 'var(--line2)')}
                 >
-                  <div style={{ flex: 1, minWidth: 0 }}>
+                  <Link href={href} prefetch={false} onClick={() => prime(s)} data-testid="saved-open" style={{ flex: 1, minWidth: 0, minHeight: 44, padding: '.5rem 0', textDecoration: 'none', color: 'inherit', display: 'block' }}>
                     <div style={{ fontFamily: 'var(--display)', fontSize: '.9rem', fontWeight: 700, color: 'var(--white)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{s.role || 'Job'}</div>
-                    <div style={{ fontSize: '.72rem', color: 'var(--sub)', marginTop: '.1rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                      {s.company}{s.location ? ` · ${s.location}` : ''}
+                    <div style={{ fontSize: '.75rem', color: 'var(--sub)', marginTop: '.1rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                      {company}{s.location ? ` · ${s.location}` : ''}
                     </div>
-                    <div style={{ fontFamily: 'var(--mono)', fontSize: '.6rem', color: 'var(--dim)', marginTop: '.3rem' }}>{savedAgo(s.saved_at)}</div>
-                  </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '.65rem', flexShrink: 0 }}>
+                    <div style={{ fontFamily: 'var(--mono)', fontSize: '.75rem', color: 'var(--dim)', marginTop: '.3rem' }}>{savedAgo(s.saved_at)} · <span style={{ color: 'var(--green)' }}>Open in Seen →</span></div>
+                  </Link>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '.4rem', flexShrink: 0 }}>
                     {typeof s.score === 'number' && (
                       <div style={{ fontFamily: 'var(--mono)', fontSize: '.85rem', fontWeight: 700, color }}>{s.score}</div>
                     )}
-                    {s.apply_url && (
+                    {applyHref && (
                       <a
-                        href={s.apply_url}
+                        href={applyHref}
                         target="_blank"
                         rel="noopener noreferrer"
-                        onClick={e => e.stopPropagation()}
-                        title="Open original posting"
-                        className="tap"
-                        style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-60)', color: 'var(--sub)', textDecoration: 'none', border: '1px solid var(--line2)', borderRadius: 6, padding: '.3rem .5rem' }}
+                        title="Open the original posting"
+                        style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', minHeight: 44, minWidth: 44, fontFamily: 'var(--mono)', fontSize: '.75rem', color: 'var(--sub)', textDecoration: 'none', border: '1px solid var(--line2)', borderRadius: 6, padding: '0 .55rem' }}
                       >Apply ↗</a>
                     )}
                     <button
                       onClick={e => remove(e, s.job_id)}
                       title="Remove from saved"
-                      style={{ background: 'none', border: 'none', color: 'var(--muted)', cursor: 'pointer', fontSize: '.85rem', padding: '.2rem .35rem', lineHeight: 1 }}
+                      aria-label={`Remove ${s.role || 'this job'} from saved`}
+                      style={{ background: 'none', border: 'none', color: 'var(--muted)', cursor: 'pointer', fontSize: '.85rem', minHeight: 44, minWidth: 44, lineHeight: 1 }}
                     >✕</button>
                   </div>
                 </div>

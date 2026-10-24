@@ -47,7 +47,7 @@ async function call(body, { auth = true } = {}) {
 }
 
 test('cache hit is free and labelled so — no gate, no charge', async () => {
-  const calls = installFetch({ cachedRow: { what_they_want: ['x'], hidden_requirements: [], insider_tip: 'tip', description_summary: 'sum' } });
+  const calls = installFetch({ cachedRow: { job_id: 'j1', what_they_want: ['x'], hidden_requirements: [], insider_tip: 'tip', description_summary: 'sum' } });
   const res = await call({ jobId: 'j1', job: 'Specialist', company: 'Acme', jobDescription: DESC, needsSummary: true });
   assert.equal(res.code, 200);
   assert.equal(res.body._src, 'db');
@@ -67,7 +67,7 @@ test('probe on a miss answers the price without gating, generating or charging',
 });
 
 test('probe on a hit returns the cached insight for free', async () => {
-  installFetch({ cachedRow: { what_they_want: ['y'], hidden_requirements: [], insider_tip: '', description_summary: '' } });
+  installFetch({ cachedRow: { job_id: 'j3', what_they_want: ['y'], hidden_requirements: [], insider_tip: '', description_summary: '' } });
   const res = await call({ jobId: 'j3', job: 'Specialist', company: 'Acme', jobDescription: DESC, probe: true }, { auth: false });
   assert.equal(res.body._src, 'db');
   assert.deepEqual(res.body.what_they_want, ['y']);
@@ -90,4 +90,88 @@ test('a signed-out miss is refused with credits_required and nothing is generate
   assert.equal(res.code, 401);
   assert.equal(res.body.credits_required, true);
   assert.equal(res.body.charged, false);
+});
+
+// A stateful job_insights table: POST upserts by job_id, GET answers `job_id=in.(…)`.
+function installTable({ balance = 5 } = {}) {
+  const rows = new Map();
+  const calls = [];
+  globalThis.fetch = async (url, opts = {}) => {
+    const u = new URL(String(url));
+    const method = opts.method || 'GET';
+    calls.push({ path: u.pathname, method, body: opts.body });
+    if (u.pathname === '/auth/v1/user') return mockResponse({ id: UID });
+    if (u.pathname === '/rest/v1/feature_flags') return mockResponse([{ status: 'on' }]);
+    if (u.pathname === '/rest/v1/rpc/consume_credit') return mockResponse([{ status: 'ok', balance: balance - 1, pro: false }]);
+    if (u.pathname === '/rest/v1/job_insights' && method === 'POST') { const r = JSON.parse(opts.body); rows.set(r.job_id, r); return mockResponse(null, { status: 201 }); }
+    if (u.pathname === '/rest/v1/job_insights') {
+      const keys = (u.searchParams.get('job_id') || '').replace(/^in\.\(|\)$/g, '').split(',').map(k => k.replace(/^"|"$/g, ''));
+      return mockResponse(keys.map(k => rows.get(k)).filter(Boolean));
+    }
+    return mockResponse(null, { status: 201 });
+  };
+  return { rows, calls };
+}
+
+test('a paid insight is a FREE cached hit for the next visitor\'s probe (shared cache keyed by job + posting text)', async () => {
+  const { rows, calls } = installTable();
+  // Visitor A pays (no needsSummary flag — the shared row is still built complete).
+  const a = await call({ jobId: 'j9', job: 'Customer Support Specialist', company: 'Acme', jobDescription: DESC });
+  assert.equal(a.body._src, 'generated');
+  assert.equal(a.body.charged, true);
+  const [key] = [...rows.keys()];
+  assert.match(key, /^j9:[0-9a-f]{16}$/, 'the row is keyed by the job and a hash of its description');
+  assert.ok(typeof rows.get(key).description_summary === 'string');
+  const writeIdx = calls.findIndex(c => c.method === 'POST' && c.path === '/rest/v1/job_insights');
+  assert.ok(writeIdx >= 0, 'the shared row is written before the paying response returns');
+  // Visitor B, signed out, probes the same posting (whitespace differs): free hit, cached:true.
+  const before = calls.filter(c => c.path.includes('consume_credit')).length;
+  const b = await call({ jobId: 'j9', job: 'Customer Support Specialist', company: 'Acme', jobDescription: DESC.replace(/ /g, '  '), needsSummary: true, probe: true }, { auth: false });
+  assert.equal(b.body.cached, true);
+  assert.equal(b.body._src, 'db');
+  assert.equal(b.body.charged, false);
+  assert.deepEqual(b.body.what_they_want, a.body.what_they_want);
+  assert.equal(calls.filter(c => c.path.includes('consume_credit')).length, before, 'no credit touched');
+  // An edited posting is not served the old insight.
+  const c = await call({ jobId: 'j9', job: 'Customer Support Specialist', company: 'Acme', jobDescription: DESC + ' Night shift differential applies to every hour worked.', probe: true }, { auth: false });
+  assert.equal(c.body.cached, false);
+});
+
+test('a legacy row stored under the bare job id still serves when it has the summary asked for', async () => {
+  const { rows } = installTable();
+  rows.set('j10', { job_id: 'j10', what_they_want: ['z'], hidden_requirements: [], insider_tip: '', description_summary: 'sum', expires_at: '2999-01-01' });
+  const r = await call({ jobId: 'j10', job: 'Specialist', company: 'Acme', jobDescription: DESC, needsSummary: true, probe: true }, { auth: false });
+  assert.equal(r.body.cached, true);
+  rows.set('j11', { job_id: 'j11', what_they_want: ['z'], hidden_requirements: [], insider_tip: '', description_summary: '' });
+  const r2 = await call({ jobId: 'j11', job: 'Specialist', company: 'Acme', jobDescription: DESC, needsSummary: true, probe: true }, { auth: false });
+  assert.equal(r2.body.cached, false, 'a legacy row without the summary is not passed off as complete');
+});
+
+test('prod has no description_summary column: the write retries without it and a hit rebuilds the summary free', async () => {
+  const rows = new Map();
+  const writes = [];
+  globalThis.fetch = async (url, opts = {}) => {
+    const u = new URL(String(url));
+    const method = opts.method || 'GET';
+    if (u.pathname === '/auth/v1/user') return mockResponse({ id: UID });
+    if (u.pathname === '/rest/v1/feature_flags') return mockResponse([{ status: 'on' }]);
+    if (u.pathname === '/rest/v1/rpc/consume_credit') return mockResponse([{ status: 'ok', balance: 4, pro: false }]);
+    if (u.pathname === '/rest/v1/job_insights' && method === 'POST') {
+      const r = JSON.parse(opts.body); writes.push(Object.keys(r));
+      if ('description_summary' in r) return mockResponse({ message: "Could not find the 'description_summary' column" }, { ok: false, status: 400 });
+      rows.set(r.job_id, r); return mockResponse(null, { status: 201 });
+    }
+    if (u.pathname === '/rest/v1/job_insights') {
+      const keys = (u.searchParams.get('job_id') || '').replace(/^in\.\(|\)$/g, '').split(',').map(k => k.replace(/^"|"$/g, ''));
+      return mockResponse(keys.map(k => rows.get(k)).filter(Boolean));
+    }
+    return mockResponse(null, { status: 201 });
+  };
+  const a = await call({ jobId: 'j12', job: 'Customer Support Specialist', company: 'Acme', jobDescription: DESC, needsSummary: true });
+  assert.equal(a.body.charged, true);
+  assert.equal(writes.length, 2, 'one rejected write, one retry');
+  assert.equal(rows.size, 1, 'the row landed without the missing column');
+  const b = await call({ jobId: 'j12', job: 'Customer Support Specialist', company: 'Acme', jobDescription: DESC, needsSummary: true, probe: true }, { auth: false });
+  assert.equal(b.body.cached, true);
+  assert.equal(b.body.description_summary, a.body.description_summary, 'the deterministic summary is rebuilt, not lost');
 });

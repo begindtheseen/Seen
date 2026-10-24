@@ -3,8 +3,8 @@ import { getQueryExpansion } from '../lib/server/expand.js';
 import { applyRateLimit, rateLimit, rateLimitGlobal, resolveRateBucket } from '../lib/server/ratelimit.js';
 import { jobsReadFromQuery, setPublicCache } from '../lib/server/publicRead.js';
 import { logError } from '../lib/server/errlog.js';
-import { filterAndRank, relevanceScore, sortByProximity, locationDbTerm, expandQueryTerms, parseLocation, locationScore } from './_utils/jobRelevance.js';
-import { sortByPriority, companyMatchesQuery, queryNamesCompany, isRemoteListing } from '../lib/server/jobPriority.js';
+import { filterAndRank, relevanceScore, isTitleRelated, sortByProximity, locationDbTerm, expandQueryTerms, parseLocation, locationScore } from './_utils/jobRelevance.js';
+import { sortByPriority, companyMatchesQuery, queryNamesCompany, isRemoteListing, isSeedListing } from '../lib/server/jobPriority.js';
 import { waitUntil } from '@vercel/functions';
 import { aggregateForQuery, upsertJobs, inferLevel, wasRecentlyPulled, recordPull, adzunaPay, cleanDescription } from '../lib/server/jobSources.js';
 import { locationScope } from '../lib/jobs/usLocation.js';
@@ -247,6 +247,13 @@ export default async function handler(req, res) {
   let synonyms = []; // canonical + expansion terms — true-synonym signals (matched vs the TITLE)
   let searchTerms = []; // original + canonical + deterministic expansion — the DB pool + corpus reads
   const PAGE_MIN = 10; // below this many results we widen (geo, then corpus, then national)
+  // Paging ("Show 60 more"): `offset` is a multiple of PAGE into the ranked, in-radius matches. The
+  // pool reads widen with it so a later page has rows to rank; capped so one search stays bounded.
+  const PAGE = 60;
+  const MAX_OFFSET = 240;
+  let offset = 0;
+  let poolLimit = PAGE + 1;
+  let poolFull = false; // a title/search_query read came back full → more matches exist past this page
   let serve = async (list) => list; // final shaping of every response (set once the search context exists)
 
   try {
@@ -261,6 +268,10 @@ export default async function handler(req, res) {
     relevanceQuery = safeQuery;
 
     loc = (location || '').trim();
+    const rawOffset = parseInt(body.offset, 10);
+    offset = Number.isFinite(rawOffset) && rawOffset > 0 ? Math.min(MAX_OFFSET, Math.floor(rawOffset / PAGE) * PAGE) : 0;
+    // One row past the page: a full read means the corpus holds more than this page can show.
+    poolLimit = PAGE + offset + 1;
 
     const SUPABASE_URL = process.env.SUPABASE_URL;
     const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY;
@@ -330,9 +341,11 @@ export default async function handler(req, res) {
     // sort keeps the same partition). A direct post is included when the search names its company
     // or the listing matches the query, and it is remote or inside the searched area. Reads
     // relevanceQuery/synonyms at call time (they are filled in by the DB-first block below).
-    serve = async (list) => {
+    let seedsDropped = 0; // Seen's own seed/test rows kept out of results (reported, never served)
+    serve = async (list, { withPosts = true } = {}) => {
       const base = Array.isArray(list) ? list : [];
-      const employerPool = await employerPoolP;
+      // A later page carries only its own slice: the direct posts already led page one.
+      const employerPool = withPosts ? await employerPoolP : [];
       const relevant = (employerPool || []).filter((row) =>
         companyMatchesQuery(row.company, relevanceQuery) ||
         filterAndRank([row], relevanceQuery, { synonyms, canonical }).length > 0);
@@ -346,6 +359,7 @@ export default async function handler(req, res) {
       // board is hidden behind that full-text row (lib/jobs/listingTwins.js).
       for (const j of preferFullText([...inArea.map(toUiRow), ...base])) {
         if (locationScope(j.location) === 'non_us') continue;
+        if (isSeedListing(j)) { seedsDropped++; continue; }
         const key = j.id || `${(j.title || '').toLowerCase()}|${(j.company || '').toLowerCase()}|${(j.location || '').toLowerCase()}`;
         if (seenKeys.has(key)) continue;
         seenKeys.add(key);
@@ -354,6 +368,9 @@ export default async function handler(req, res) {
           employer_posted: postIds.has(j.id) || j.employer_posted === true,
           in_radius: nearSearch(j),
           relevance: relevanceScore(j, relevanceQuery, { synonyms, canonical }),
+          // A MATCH (the role typed) vs an opening that only shares a word with it — the page lists
+          // matches first and the rest under "Other openings" (jobRelevance.isTitleRelated).
+          related: isTitleRelated(j, relevanceQuery, { canonical }),
         };
         // A search that names the company (company name typed into the job search) ranks that
         // company's listings first — jobPriority.priorityTier, kept by the client's sort too.
@@ -436,21 +453,22 @@ export default async function handler(req, res) {
         // All pool reads in ONE parallel round (keyword + company + every term) — they're independent.
         const [[kwRows, coRows], termRows] = await Promise.all([Promise.all([
           t3filter
-            ? fetch(`${SUPABASE_URL}/rest/v1/jobs?${t3filter}${geoClause}&expires_at=gt.${now}&limit=60`, { headers: dbHeaders })
+            ? fetch(`${SUPABASE_URL}/rest/v1/jobs?${t3filter}${geoClause}&expires_at=gt.${now}&limit=${poolLimit}`, { headers: dbHeaders })
                 .then(r => r.ok ? r.json() : []).catch(() => [])
             : Promise.resolve([]),
-          fetch(`${SUPABASE_URL}/rest/v1/jobs?company=ilike.*${qEnc}*${geoClause}&expires_at=gt.${now}&limit=60`, { headers: dbHeaders })
+          fetch(`${SUPABASE_URL}/rest/v1/jobs?company=ilike.*${qEnc}*${geoClause}&expires_at=gt.${now}&limit=${poolLimit}`, { headers: dbHeaders })
             .then(r => r.ok ? r.json() : []).catch(() => []),
         ]),
           // Search both search_query and title columns so jobs cached under different
           // query keys still surface for synonymous searches.
           Promise.all(searchTerms.map(term => {
             const orFilter = `or=${encodeURIComponent(`(search_query.ilike.*${term}*,title.ilike.*${term}*)`)}`;
-            return fetch(`${SUPABASE_URL}/rest/v1/jobs?${orFilter}${geoClause}&expires_at=gt.${now}&limit=60`, { headers: dbHeaders })
+            return fetch(`${SUPABASE_URL}/rest/v1/jobs?${orFilter}${geoClause}&expires_at=gt.${now}&limit=${poolLimit}`, { headers: dbHeaders })
               .then(r => r.ok ? r.json() : []).catch(() => []);
           })),
         ]);
 
+        poolFull = termRows.some((arr) => Array.isArray(arr) && arr.length >= poolLimit);
         // Pool everything, dedup, then keep only listings RELATED to the query,
         // ranked by relevance (title > company > description) then quality score.
         const pool = [], seen = new Set();
@@ -467,14 +485,29 @@ export default async function handler(req, res) {
         // coordinates, else coarse city → state), nearest first.
         dbMatches = applyRadius(dbMatches);
 
+        // A later page ("Show 60 more") is a slice of the same ranked matches — no top-up, no fill-ins.
+        // The pool is re-read wider for every page and re-ranked, so a row's rank can move between
+        // reads: the client sends the ids it already shows (`exclude`) and gets the best 60 it does not
+        // have — never a repeat, whatever the read order.
+        if (offset > 0) {
+          const shown = new Set((Array.isArray(body.exclude) ? body.exclude : []).slice(0, MAX_OFFSET + PAGE).map(String));
+          const rest = dbMatches.filter((j) => !shown.has(String(j.id)));
+          const jobs = await serve(rest.slice(0, PAGE), { withPosts: false });
+          return res.status(200).json({ ok: true, jobs, in_radius: countInRadius(jobs), query, location: loc, radius: Number.isFinite(radiusMiles) ? radiusMiles : null, offset, has_more: offset + PAGE <= MAX_OFFSET && (rest.length > PAGE || (poolFull && rest.length >= PAGE)), _src: 'db-page' });
+        }
         if (dbMatches.length >= TARGET) {
           console.log(`DB HIT: "${query}" → "${canonical}" @ "${loc}" (${radiusMiles}mi) — ${dbMatches.length} in-radius results (no API call)`);
-          const jobs = await serve(dbMatches.slice(0, 60));
-          return res.status(200).json({ ok: true, jobs, in_radius: countInRadius(jobs), query, location: loc, radius: Number.isFinite(radiusMiles) ? radiusMiles : null, _src: 'db' });
+          const jobs = await serve(dbMatches.slice(0, PAGE));
+          if (seedsDropped) console.log(`SEED ROWS DROPPED: ${seedsDropped}`);
+          return res.status(200).json({ ok: true, jobs, in_radius: countInRadius(jobs), query, location: loc, radius: Number.isFinite(radiusMiles) ? radiusMiles : null, offset: 0, has_more: dbMatches.length > PAGE || (poolFull && dbMatches.length >= PAGE), _src: 'db' });
         }
       } catch(e) { console.warn('DB-first search error:', e.message); }
       console.log(`DB TOP-UP: "${query}" → "${canonical}" @ "${loc}" — ${dbMatches.length} in DB, pulling more from API`);
     }
+
+    // A later page that the DB-first block could not answer (DB error) is an empty last page, never
+    // page one again.
+    if (offset > 0) return res.status(200).json({ ok: true, jobs: [], in_radius: 0, query, location: loc, offset, has_more: false, _src: 'db-page' });
 
     // ── INSTANT RESPONSE (owner directive 2026-10-17: a search never waits on a live pull) ──────
     // Below TARGET this handler used to AWAIT a live Adzuna/ATS aggregation (plus geo and national
@@ -573,6 +606,7 @@ export default async function handler(req, res) {
     console.log(`INSTANT: "${query}" @ "${loc}" — ${jobs.length} served (${inRadius} in radius, fallback ${fallback || 'none'}), top-up ${decision}`);
     return res.status(200).json({
       ok: true, jobs, in_radius: inRadius, query, location: loc, radius: Number.isFinite(radiusMiles) ? radiusMiles : null,
+      offset: 0, has_more: dbMatches.length > PAGE || (poolFull && dbMatches.length >= PAGE),
       _src: dbOnly ? 'db-refresh' : `db-${decision}`, widened, fallback,
       topup: pending ? 'pending' : null,
       ...(decision === 'budget' ? { degraded: true } : {}),
