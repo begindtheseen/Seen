@@ -11,6 +11,7 @@ import { SavedJobsStore } from '@/lib/stores/SavedJobs'
 import { useAuth } from '@/lib/auth'
 import { aiHeaders } from '@/lib/aiHeaders'
 import { parseResumeFile } from '@/lib/resumeUploadClient'
+import { countWords } from '@/lib/resume/engine-client'
 import type { SavedJob } from '@/lib/types'
 import UpgradeModal from '@/components/UpgradeModal'
 import { FREE_DAILY_CREDITS } from '@/lib/creditRules'
@@ -509,7 +510,7 @@ function ResumePageInner() {
       // Parsing is FREE (RESUME_PARSE_COST = 0 — no model call): no credit path, no balance change.
       const r = await parseResumeFile(file, { location: profile?.city || '' })
       if (r.ok && r.text) {
-        const wc = r.wordCount || r.text.trim().split(/\s+/).length
+        const wc = r.wordCount || countWords(r.text)
         await ResumeStore.save(r.text, r.fileName, wc, user?.id, isLoggedIn)
         // Résumé Studio reuses the server's layout-aware parse instead of re-parsing the text.
         if (r.doc) ResumeDocStore.putParsed(user?.id, r.text, r.doc as ResumeDoc)
@@ -530,7 +531,7 @@ function ResumePageInner() {
     setError('')
     // Persist a pasted résumé so every surface (and future sessions) can reuse it.
     if (!resumeMeta && resumeText.trim().length >= 40) {
-      const wc = resumeText.trim().split(/\s+/).length
+      const wc = countWords(resumeText)
       ResumeStore.save(resumeText, 'Pasted résumé', wc, user?.id, isLoggedIn).catch(() => {})
       setResumeMeta({ fileName: 'Pasted résumé', wordCount: wc })
     }
@@ -803,9 +804,9 @@ function ResumePageInner() {
               {(showManual || savedJobs.length === 0) && (
                 <div>
                   {label('Job title')}
-                  <input type="text" placeholder="e.g. Engineering Manager" value={jobTitle} onChange={e => setJobTitle(e.target.value)} style={inputStyle} />
+                  <input type="text" placeholder="e.g. Cashier" value={jobTitle} onChange={e => setJobTitle(e.target.value)} style={inputStyle} />
                   {label('Company')}
-                  <input type="text" placeholder="e.g. Notion" value={jobCompany} onChange={e => setJobCompany(e.target.value)} onBlur={() => fetchIntel(jobCompany)} style={inputStyle} />
+                  <input type="text" placeholder="e.g. Target" value={jobCompany} onChange={e => setJobCompany(e.target.value)} onBlur={() => fetchIntel(jobCompany)} style={inputStyle} />
                   {label('Job URL (optional)')}
                   <input type="url" placeholder="https://…" value={jobUrl} onChange={e => setJobUrl(e.target.value)} style={inputStyle} />
                   {label('Job description')}
