@@ -1,14 +1,29 @@
-// One-click unsubscribe for outcome follow-up emails (Operation 50%, Engine E2). Each email's
-// footer links here with the user's uid + an HMAC token (lib/server/outcomeEmails.unsubToken), so
-// opting out needs no login. On a valid token we set email_prefs.outcome_opt_out = true (migration
-// 045), which api/outcome-followups.js honors before every send. GET only — renders a plain
-// confirmation page either way, never leaking whether a uid exists.
+// One-click unsubscribe for Seen's emails. Each email's footer links here with the user's uid, the
+// list, and an HMAC token for that list (lib/server/outcomeEmails.unsubToken), so opting out needs no
+// login. Lists:
+//   outcome      (default) — Day 7/14/30 check-ins → email_prefs.outcome_opt_out (migration 045)
+//   job_matches            — résumé job-match emails → email_prefs.job_match_opt_out
+//                            (migration 20261024190000)
+// Each list stops only itself. GET renders a plain confirmation page. POST is the RFC 8058 one-click
+// path mail apps use from the List-Unsubscribe-Post header (same query string) and answers 200 with
+// no page. Neither reveals whether a uid exists.
 
 import { verifyUnsub } from '../lib/server/outcomeEmails.js';
 
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY;
 const EMAIL_SECRET = process.env.EMAIL_UNSUB_SECRET || process.env.CRON_SECRET || SERVICE_KEY;
+
+const LISTS = {
+  outcome: {
+    column: 'outcome_opt_out',
+    done: "You won't get outcome check-in emails from Seen anymore. You can still track and report applications any time at seenjobs.io — nothing else changes.",
+  },
+  job_matches: {
+    column: 'job_match_opt_out',
+    done: "You won't get job match emails from Seen anymore. Your résumé and its matches are still on the Jobs page at seenjobs.io — nothing else changes.",
+  },
+};
 
 function page(res, status, heading, body) {
   res.setHeader('Content-Type', 'text/html; charset=utf-8');
@@ -25,12 +40,15 @@ function page(res, status, heading, body) {
 }
 
 export default async function handler(req, res) {
-  if (req.method !== 'GET') return res.status(405).json({ error: 'method_not_allowed' });
+  if (req.method !== 'GET' && req.method !== 'POST') return res.status(405).json({ error: 'method_not_allowed' });
 
   const uid = String(req.query?.uid || '');
   const token = String(req.query?.token || '');
+  const listName = String(req.query?.list || 'outcome');
+  const list = Object.prototype.hasOwnProperty.call(LISTS, listName) ? LISTS[listName] : null;
 
-  if (!verifyUnsub(uid, token, EMAIL_SECRET)) {
+  if (!list || !verifyUnsub(uid, token, EMAIL_SECRET, listName)) {
+    if (req.method === 'POST') return res.status(400).json({ ok: false });
     return page(res, 400, 'Link not valid', "This unsubscribe link isn't valid or has expired. If you keep getting emails you don't want, reply to one and we'll remove you.");
   }
 
@@ -42,10 +60,11 @@ export default async function handler(req, res) {
           apikey: SERVICE_KEY, Authorization: `Bearer ${SERVICE_KEY}`,
           'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal',
         },
-        body: JSON.stringify({ user_id: uid, outcome_opt_out: true, updated_at: new Date().toISOString() }),
+        body: JSON.stringify({ user_id: uid, [list.column]: true, updated_at: new Date().toISOString() }),
       });
     } catch { /* best-effort; still show success so the user isn't told to retry */ }
   }
 
-  return page(res, 200, "You're unsubscribed", "You won't get outcome check-in emails from Seen anymore. You can still track and report applications any time at seenjobs.io — nothing else changes.");
+  if (req.method === 'POST') return res.status(200).json({ ok: true });
+  return page(res, 200, "You're unsubscribed", list.done);
 }

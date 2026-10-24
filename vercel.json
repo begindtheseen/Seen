@@ -112,6 +112,9 @@
     },
     "api/cron-search-data.js": {
       "maxDuration": 120
+    },
+    "api/cron-job-matches.js": {
+      "maxDuration": 300
     }
   },
   "crons": [
@@ -202,6 +205,10 @@
     {
       "path": "/api/cron-search-data",
       "schedule": "20 13 * * *"
+    },
+    {
+      "path": "/api/cron-job-matches",
+      "schedule": "5 16,22 * * *"
     }
   ]
 }
