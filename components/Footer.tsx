@@ -26,6 +26,7 @@ const COLS: Array<{ title: string; links: Array<{ href: string; label: string }>
   { title: 'Company', links: [
     { href: '/employers', label: 'For employers' },
     { href: '/report', label: 'Report an outcome' },
+    { href: '/methods', label: 'How grades work' },
     { href: '/faq', label: 'FAQ' },
     { href: '/contact', label: 'Contact' },
   ] },
