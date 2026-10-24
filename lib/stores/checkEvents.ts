@@ -7,14 +7,13 @@
 
 import { CHECK_SCHEDULE, type CheckType } from '../constants.ts'
 import type { Application, DueCheck, HiringEvent } from '../types.ts'
-import { daysSince } from './checkSchedule.ts'
+import { checksInPlay, daysSince, FINAL_CHECK_DAY } from './checkSchedule.ts'
 
 export const CHECK_ANSWERED = 'check_answered'
 export const CHECK_SNOOZED = 'check_snoozed'
 export const STAGE_CORRECTED = 'stage_corrected'
 
-/** Day 30 and later: the final-outcome question is the one that matters; day-7/14 are moot. */
-export const FINAL_CHECK_DAY = 30
+export { FINAL_CHECK_DAY }
 
 const CHECK_TYPES = new Set<string>(CHECK_SCHEDULE.map(c => c.type))
 export const isCheckType = (t: string): t is CheckType => CHECK_TYPES.has(t)
@@ -84,17 +83,14 @@ export function snoozedUntilFromEvents(events: readonly HiringEvent[] | undefine
  * union of what the events say and the device cache (the caller merges them).
  *
  * - Earliest unanswered check whose day has come, in schedule order (response → interview → outcome).
- * - From day 30 the final-outcome question is asked first: a 31-day-old card no longer gets
+ * - From day 30 ONLY the final-outcome question is asked: a 31-day-old card no longer gets
  *   "Did they respond?" (audit M7 — "DAY 399 CHECK-IN — Did they respond?").
  * - A snoozed check holds the application; a later check never jumps the queue.
  */
 export function pickDueCheck(app: Application, answered: ReadonlySet<string>, snoozedUntil: (type: CheckType) => number | null, now = Date.now()): DueCheck | null {
   if (app.status !== 'active') return null
   const days = daysSince(app.appliedAt, now)
-  const ordered = days >= FINAL_CHECK_DAY
-    ? [...CHECK_SCHEDULE].sort((a, b) => (b.day === FINAL_CHECK_DAY ? 1 : 0) - (a.day === FINAL_CHECK_DAY ? 1 : 0))
-    : [...CHECK_SCHEDULE]
-  const chk = ordered.find(c => days >= c.day && !answered.has(c.type))
+  const chk = checksInPlay(app.appliedAt, now).find(c => days >= c.day && !answered.has(c.type))
   if (!chk) return null
   const until = snoozedUntil(chk.type)
   if (until != null && until > now) return null

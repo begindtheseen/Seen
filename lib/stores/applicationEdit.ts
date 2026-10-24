@@ -62,7 +62,8 @@ export function formFromApplication(app: Pick<Application, 'company' | 'role' | 
 export function validateForm(f: ApplicationForm, now = Date.now()): string | null {
   if (!f.company.trim()) return 'Company is required'
   if (!f.role.trim()) return 'Role is required'
-  if (f.company.trim().length > COMPANY_MAX || f.role.trim().length > ROLE_MAX) return `Keep it under ${COMPANY_MAX} characters`
+  if (f.company.trim().length > COMPANY_MAX) return `Keep the company under ${COMPANY_MAX} characters`
+  if (f.role.trim().length > ROLE_MAX) return `Keep the role under ${ROLE_MAX} characters`
   if (f.location.trim().length > LOCATION_MAX) return `Keep the location under ${LOCATION_MAX} characters`
   if (!DAY_RE.test(f.appliedOn)) return 'Pick the day you applied'
   if (f.appliedOn > todayPacific(now)) return 'The applied-on date can’t be in the future'
