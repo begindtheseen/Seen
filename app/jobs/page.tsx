@@ -28,7 +28,8 @@ import { isMatch } from '@/lib/server/jobPriority.js'
 // 2026-10-23): software engineer 3,960 · nurse 1,360 · sales associate 648 · customer service 489 ·
 // warehouse 398 · data analyst 231 · cashier 113 · server 50. (Marketing 1,525 / product manager
 // 1,092 were dropped for the hourly roles the audit persona actually searches for.)
-const SUGGESTED_ROLES = ['Software Engineer', 'Nurse', 'Sales Associate', 'Customer Service', 'Warehouse', 'Data Analyst', 'Cashier', 'Server']
+// Ordered for the people who land here from search (hourly roles first — conversion audit 2026-10-24).
+const SUGGESTED_ROLES = ['Cashier', 'Warehouse', 'Customer Service', 'Sales Associate', 'Nurse', 'Server', 'Data Analyst', 'Software Engineer']
 
 export default function JobsPage() {
   const router = useRouter()
@@ -337,7 +338,7 @@ export default function JobsPage() {
                     <span className={bar.dividerSub}>Not {query.trim() ? `“${query.trim()}”` : 'this role'} — they share a word with your search.</span>
                   </div>
                 )}
-                <JobCard job={job} more={more} index={i} onSaveToggle={handleSaveToggle} onOpen={j => setDetailJob(j)} onApply={j => takesSeenApply(j) ? setDetailJob(j) : setApplyJob(j)} onCheckCompany={co => setCheckCompany(co)} alreadyApplied={appliedCos.has(job.id) || (!!job.apply_url && appliedCos.has(job.apply_url))} />
+                <JobCard job={job} more={more} index={i} onSaveToggle={handleSaveToggle} onOpen={j => setDetailJob(j)} onApply={j => takesSeenApply(j) ? setDetailJob(j) : setApplyJob(j)} onCheckCompany={co => setCheckCompany(co)} alreadyApplied={appliedCos.has(job.id) || (!!job.apply_url && appliedCos.has(job.apply_url))} employerScore={coScores[job.company.toLowerCase().trim()]?.overall_score ?? null} />
               </Fragment>
             ))}
           </div>

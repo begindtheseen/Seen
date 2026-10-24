@@ -7,7 +7,6 @@
 import { httpHref } from '@/lib/safeHref.js'
 import { useState, useEffect, useCallback, use } from 'react'
 import { useRouter } from 'next/navigation'
-import { Score } from '@/lib/score'
 import { JobCache } from '@/lib/stores/JobCache'
 import { SavedJobsStore } from '@/lib/stores/SavedJobs'
 import ListingCard from '@/components/ListingCard'
@@ -27,6 +26,9 @@ import { JOB_INSIGHTS_COST, RESUME_OPTIMIZE_COST, creditCostLabel, dailyResetLab
 import { displayCompanyName } from '@/lib/companyDisplay'
 import { displayPay, payLabel } from '@/lib/jobs/pay.js'
 import { paragraphs, isDescriptionPreview, stripDanglingEllipsis, endsCutOff } from '@/lib/jobs/descriptionText.js'
+import { isGradeableScore } from '@/lib/gradeGate'
+import ListingScoreRing from '@/components/jobs/ListingScoreRing'
+import EmployerGradeChip from '@/components/jobs/EmployerGradeChip'
 
 interface Insights {
   what_they_want: string[]
@@ -241,6 +243,23 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
     if (job) loadInsights(job)
   }, [job, loadInsights])
 
+  // The employer's Seen grade (how it treats applicants), from the same DB-only batch_scores read the
+  // job list uses (api/reports.js). Shown only when gradeable — the listing ring grades the post.
+  const [employerScore, setEmployerScore] = useState<number | null>(null)
+  useEffect(() => {
+    const co = (job?.company || '').toLowerCase().trim()
+    if (!co) return
+    let alive = true
+    fetch('/api/reports', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'batch_scores', names: [co] }) })
+      .then(r => (r.ok ? r.json() : { scores: {} }))
+      .then((d: { scores?: Record<string, { overall_score?: number | null; gradeable?: boolean | null; first_party_report_count?: number | null }> }) => {
+        const sc = d.scores?.[co]
+        if (alive && isGradeableScore(sc)) setEmployerScore(sc.overall_score)
+      })
+      .catch(() => {})
+    return () => { alive = false }
+  }, [job?.company])
+
   // Step 2 (paid, explicit): generate the insight. Reached only from the price-tagged button,
   // after the one-time confirmation on this account/device.
   const generateInsights = useCallback(async () => {
@@ -312,7 +331,6 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
 
   if (!job) return <div className="page-full"><div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '60vh' }}><div className="spinner" /></div></div>
 
-  const risk = Score.risk(job.score)
   const companyName = displayCompanyName(job.company) || job.company
   const pay = displayPay(job)
   const chips = [job.type, job.level, pay && pay !== '—' ? pay : ''].filter(Boolean) as string[]
@@ -338,11 +356,9 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
             <div style={{ flex: 1, minWidth: 0 }}>
               <h1 style={{ fontFamily: 'var(--display)', fontSize: '1.25rem', fontWeight: 800, color: 'var(--white)', letterSpacing: '-.025em', lineHeight: 1.2, marginBottom: '.3rem' }}>{job.title}</h1>
               <div style={{ fontFamily: 'var(--mono)', fontSize: '.65rem', color: 'var(--dim)' }}>{companyName}{job.location ? ` · 📍 ${job.location}` : ''}</div>
+              {employerScore != null && <div style={{ marginTop: '.45rem' }}><EmployerGradeChip company={job.company} score={employerScore} /></div>}
             </div>
-            <div style={{ textAlign: 'center', flexShrink: 0 }}>
-              <div className={`sring ${risk}`} style={{ width: 44, height: 44 }} title={job.score == null ? 'Not enough signal in this listing to score it' : undefined}><div className="sring-n" style={{ fontSize: '.85rem' }}>{job.score ?? '–'}</div></div>
-              <div style={{ fontFamily: 'var(--mono)', fontSize: '.75rem', color: 'var(--muted)', marginTop: '.15rem' }}>{job.score == null ? 'unrated' : 'score'}</div>
-            </div>
+            <ListingScoreRing score={job.score} size={44} />
           </div>
           {chips.length > 0 && (
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '.4rem' }}>
@@ -355,7 +371,7 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
 
         {/* Stat grid — Score / Waste / Type / Level / Salary / Source */}
         <div className="jd-grid">
-          <div className="jd-stat"><span className="jd-sn" style={{ color: Score.color(risk) }}>{job.score ?? '–'}</span><span className="jd-sl">Score</span></div>
+          <div className="jd-stat"><span className="jd-sn">{job.score ?? '–'}</span><span className="jd-sl">Listing score</span></div>
           <div className="jd-stat"><span className="jd-sn" style={{ color: job.waste == null ? 'var(--dim)' : job.waste > 55 ? 'var(--red)' : job.waste > 35 ? 'var(--amber)' : 'var(--green)' }}>{job.waste == null ? '–' : `${job.waste}%`}</span><span className="jd-sl">Waste risk</span></div>
           <div className="jd-stat"><span className="jd-sn" style={{ fontSize: '.75rem' }}>{job.type || 'Full-time'}</span><span className="jd-sl">Type</span></div>
           <div className="jd-stat"><span className="jd-sn" style={{ fontSize: '.75rem' }}>{job.level || '—'}</span><span className="jd-sl">Level</span></div>
