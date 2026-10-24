@@ -51,7 +51,11 @@ function LoginContent() {
   // with ?return= (lib/safeHref.js loginHref — the same parameter lib/sessionExpired.ts uses);
   // /pricing and the UpgradeModal pass ?next=. Both are read, both sanitized to an internal path, so
   // the user resumes what they were doing instead of landing on /dashboard.
-  const returnTo = safeInternalPath(params.get('return')) || safeInternalPath(params.get('returnTo')) || safeInternalPath(params.get('next')) || '/dashboard'
+  const explicitReturn = safeInternalPath(params.get('return')) || safeInternalPath(params.get('returnTo')) || safeInternalPath(params.get('next'))
+  const returnTo = explicitReturn || '/dashboard'
+  // Employers land on their portal unless the link that sent them here named a page (the claim card's
+  // "I have one — sign in" returns to /employers#claim).
+  const employerReturnTo = explicitReturn || '/employers/dashboard'
   // "Sign in as an employer →" / "Claim your company" link here with ?type=employer: the employer
   // role is already chosen, so the page opens on the account form for that role (not "Who are you?"
   // again — audit 2026-10-24 E-2). ?signup=1 opens the chooser; everything else is sign-in.
@@ -78,8 +82,8 @@ function LoginContent() {
     // Already signed in and hitting /login → bounce out. Employers land directly on their
     // dashboard (it shows the claim/activation checklist when they haven't claimed yet); seekers
     // resume returnTo.
-    if (isLoggedIn) router.replace(isEmployer ? '/employers/dashboard' : returnTo)
-  }, [isLoggedIn, isEmployer, router, returnTo])
+    if (isLoggedIn) router.replace(isEmployer ? employerReturnTo : returnTo)
+  }, [isLoggedIn, isEmployer, router, returnTo, employerReturnTo])
 
   function clearError() { setError('') }
 
@@ -124,7 +128,7 @@ function LoginContent() {
   // Fresh employer signups land on their dashboard (activation checklist guides them to claim +
   // post); seekers resume returnTo. (The kill switch forces seeker in createAccount, so signupType
   // is only 'employer' here when employer signup is open.)
-  const afterVerify = () => router.replace(EMPLOYER_SIGNUP_ENABLED && signupType === 'employer' ? '/employers/dashboard' : returnTo)
+  const afterVerify = () => router.replace(EMPLOYER_SIGNUP_ENABLED && signupType === 'employer' ? employerReturnTo : returnTo)
 
   /**
    * True once the email link has been clicked. Same device: the link signs THIS browser in and
@@ -188,7 +192,7 @@ function LoginContent() {
     // this. Sign-in is NOT gated by the kill switch — existing employers must still get in when closed.
     const m = (data.user?.user_metadata || {}) as Record<string, unknown>
     const isEmp = m.account_type === 'employer' || m.role_type === 'employer' || m.type === 'employer'
-    router.replace(isEmp ? '/employers/dashboard' : returnTo)
+    router.replace(isEmp ? employerReturnTo : returnTo)
   }
 
   const btnStyle: React.CSSProperties = {

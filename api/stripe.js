@@ -356,7 +356,8 @@ export default async function handler(req, res) {
     const email = String(body.email || '').trim().slice(0, 200);
     const company = String(body.company || '').trim().slice(0, 200);
     const target = String(body.target_url || '').trim().slice(0, 500);
-    if (!email || !email.includes('@') || !company) return res.status(400).json({ error: 'Company and a valid email are required' });
+    // Same shape check as the form (components/EmployerCheckout.tsx) — the receipt and every follow-up go here.
+    if (!company || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return res.status(400).json({ error: 'Company and a valid email are required' });
     const origin = req.headers.origin || 'https://seenjobs.io';
     const form = new URLSearchParams({
       'payment_method_types[]': 'card',

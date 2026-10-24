@@ -553,8 +553,11 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
   // (The "N Seen users checked this week" line was a hash of the slug + day, not data. Removed —
   // Seen shows no visitor counts it does not have.)
 
-  // T3-7: Record this company visit in localStorage for dashboard "Recently checked"
-  useEffect(() => {
+  // T3-7: Record this company visit in localStorage for dashboard "Recently checked" — ONLY once the
+  // company is known to exist (the score API answered without not_found). `seen_recent_cos` feeds the
+  // dashboard chips, the command palette and the micro-survey's contextual question, so writing it on
+  // mount for any slug made the survey ask "Did zzyzx nonexistent widgets ever get back to you?" (L-3).
+  const rememberVisit = () => {
     try {
       const raw = localStorage.getItem('seen_recent_cos')
       const prev: Array<{name: string; slug: string}> = raw ? JSON.parse(raw) : []
@@ -562,7 +565,7 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
       const updated = [{ name: companyName, slug }, ...filtered].slice(0, 10)
       localStorage.setItem('seen_recent_cos', JSON.stringify(updated))
     } catch {}
-  }, [slug, companyName])
+  }
 
   // Fetch reports + score. `reloadKey` is bumped by the error block's Retry.
   const [reloadKey, setReloadKey] = useState(0)
@@ -605,10 +608,13 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
         setEnrichmentStatus(typeof sJson.enrichment?.status === 'string' ? sJson.enrichment.status : null)
         if (sJson.not_found) {
           setNotFound(true)
-        } else if (sJson.score) {
-          setScore(sJson.score)
-          if (sJson.score.industry) setIndustry(sJson.score.industry)
-          if (sJson.score.web_reviews?.length) setWebReviews(sJson.score.web_reviews)
+        } else {
+          rememberVisit()
+          if (sJson.score) {
+            setScore(sJson.score)
+            if (sJson.score.industry) setIndustry(sJson.score.industry)
+            if (sJson.score.web_reviews?.length) setWebReviews(sJson.score.web_reviews)
+          }
         }
       } catch {
         setError('Failed to load company data.')

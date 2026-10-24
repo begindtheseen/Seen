@@ -1,5 +1,5 @@
 import { ImageResponse } from 'next/og'
-import { getScore, titleCase, displayCompanyName, grade, riskColor, riskLabel, pct, firstPartyReportCount, MIN_REPORTS_FOR_GRADE } from '@/lib/growth'
+import { getScore, companyExists, titleCase, displayCompanyName, grade, riskColor, riskLabel, pct, firstPartyReportCount, MIN_REPORTS_FOR_GRADE } from '@/lib/growth'
 import { lastUpdatedLabel } from '@/lib/companyDisplay'
 
 // Dynamic OG share image for company pages — the biggest virality lever. Renders the company's
@@ -20,6 +20,12 @@ const size = { width: 1200, height: 630 }
 export async function GET(_req: Request, { params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params
   const s = await getScore(slug)
+  // A company Seen has never heard of gets no card: the page itself says "Can't verify" for it, and a
+  // branded "Be the first to report how Zzyzx treats applicants" unfurl would vouch for a name that
+  // does not exist (L-3). Short cache so a company created later gets its card within the hour.
+  if (!s && !(await companyExists(slug))) {
+    return new Response('Not found', { status: 404, headers: { 'Cache-Control': 'public, s-maxage=3600' } })
+  }
   // Prefer the STORED canonical name — a slug can't carry punctuation, so titleCase(slug)
   // rendered "Lowe S" on the public unfurl where the company is actually "Lowe's".
   const name = s?.company_name ? displayCompanyName(s.company_name) : titleCase(slug)

@@ -1,6 +1,7 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
+import Link from 'next/link'
 import { EMPLOYER_SKUS } from '@/lib/server/employerSkus'
 
 // Renders on the Stripe return page (/employers?purchased=<sku>&session_id=cs_...). Confirms the
@@ -61,9 +62,15 @@ export function EmployerCheckout() {
   const [target, setTarget] = useState('')
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState('')
+  // One Checkout Session per click: `disabled` only applies after a re-render, so a double-tap made
+  // two live Stripe sessions (audit 2026-10-24 M-13). The ref closes the gap synchronously.
+  const inFlight = useRef(false)
+  const validEmail = (v: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v.trim())
 
   async function go(sku: SkuKey) {
-    if (!company.trim() || !email.includes('@')) { setErr('Enter your company and a valid email.'); return }
+    if (!company.trim() || !validEmail(email)) { setErr('Enter your company name and a valid work email.'); return }
+    if (inFlight.current) return
+    inFlight.current = true
     setBusy(true); setErr('')
     try {
       const res = await fetch('/api/stripe?action=employer_checkout', {
@@ -75,6 +82,7 @@ export function EmployerCheckout() {
       if (d.url) { window.location.href = d.url; return }
       setErr(d.error || 'Could not start checkout — try again.')
     } catch { setErr('Network error — try again.') }
+    inFlight.current = false
     setBusy(false)
   }
 
@@ -98,14 +106,24 @@ export function EmployerCheckout() {
             </div>
 
             {isOpen ? (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '.5rem' }}>
-                <input value={company} onChange={e => setCompany(e.target.value)} placeholder="Company name" style={inp} />
-                <input value={email} onChange={e => setEmail(e.target.value)} placeholder="Work email (receipt + contact)" style={inp} />
-                <input value={target} onChange={e => setTarget(e.target.value)} placeholder="Listing URL (optional)" style={inp} />
-                {err && <div style={{ fontFamily: 'var(--mono)', fontSize: '.55rem', color: 'var(--red)' }}>{err}</div>}
-                <button onClick={() => go(sku)} disabled={busy} style={{ ...btn, opacity: busy ? .6 : 1 }}>{busy ? 'Starting…' : `Continue to payment — ${price} →`}</button>
-                <button onClick={() => { setOpen(null); setErr('') }} style={{ background: 'none', border: 'none', color: 'var(--dim)', fontFamily: 'var(--mono)', fontSize: '.55rem', cursor: 'pointer', padding: '.2rem' }}>Cancel</button>
-              </div>
+              <form onSubmit={e => { e.preventDefault(); go(sku) }} noValidate style={{ display: 'flex', flexDirection: 'column', gap: '.5rem' }}>
+                <input value={company} onChange={e => setCompany(e.target.value)} placeholder="Company name — exactly as it appears on Seen" aria-label="Company name" autoComplete="organization" required style={inp} />
+                <input type="email" inputMode="email" autoComplete="email" required value={email} onChange={e => setEmail(e.target.value)} placeholder="Work email (receipt + contact)" aria-label="Work email" style={inp} />
+                <input type="url" inputMode="url" value={target} onChange={e => setTarget(e.target.value)} placeholder="Listing URL (optional)" aria-label="Listing URL (optional)" style={inp} />
+                {/* What the handler does with the name (api/stripe.js employer_checkout → employerFulfillment.js):
+                    it is stored as typed and, for Featured, keyed into employer_perks by that exact name — the
+                    checkout does not verify the company exists on Seen. Say so, and offer the check. */}
+                <div style={{ fontFamily: 'var(--mono)', fontSize: '.55rem', color: 'var(--muted)', lineHeight: 1.6 }}>
+                  Placement is keyed to this exact name and applies to the roles Seen lists under it; the name is not checked at checkout.{' '}
+                  {company.trim() ? <Link href={`/employers/dashboard?company=${encodeURIComponent(company.trim())}`} style={{ color: 'var(--sub)' }}>See what Seen has for “{company.trim()}” →</Link> : null}
+                </div>
+                {err && <div role="alert" style={{ fontFamily: 'var(--mono)', fontSize: '.55rem', color: 'var(--red)' }}>{err}</div>}
+                <button type="submit" disabled={busy} style={{ ...btn, opacity: busy ? .6 : 1 }}>{busy ? 'Starting…' : `Continue to payment — ${price} →`}</button>
+                <div style={{ fontFamily: 'var(--mono)', fontSize: '.52rem', color: 'var(--muted)', lineHeight: 1.6, textAlign: 'center' }}>
+                  One-time payment via Stripe, no account. By continuing you agree to the <Link href="/terms#employer" style={{ color: 'var(--sub)' }}>employer terms</Link>; payments never change a score.
+                </div>
+                <button type="button" onClick={() => { setOpen(null); setErr('') }} style={{ background: 'none', border: 'none', color: 'var(--dim)', fontFamily: 'var(--mono)', fontSize: '.55rem', cursor: 'pointer', padding: '.2rem' }}>Cancel</button>
+              </form>
             ) : (
               <button onClick={() => { setOpen(sku); setErr('') }} style={btn}>Get started →</button>
             )}
