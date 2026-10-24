@@ -110,13 +110,20 @@ export const PUBLIC_REVIEW_PLATFORM_PREFIX = 'Public review · ';
 export const PUBLIC_REVIEW_PLATFORM_RE = /^public review ·/i;
 export const publicReviewPlatform = (host) => `${PUBLIC_REVIEW_PLATFORM_PREFIX}${String(host || '').trim().toLowerCase()}`;
 
-// Map a free-form `reports.platform` string to a fusion source type / trust tier.
-export function classifyPlatform(platform) {
+// How a report a PERSON submitted to Seen is marked (report form, tracker, apply flow, anonymous form).
+// On those rows `platform` is where the person APPLIED ("LinkedIn", "Indeed"), not where the account
+// came from. Mirrored by lib/reportSource.ts FIRST_PARTY_TRUST_REASONS (display).
+export const FIRST_PARTY_TRUST_REASONS = new Set(['direct_submission', 'anonymous_unverified', 'duplicate_user_company']);
+
+// Map a report to a fusion source type / trust tier, from its free-form `platform` and — so a Seen
+// user's report that names the job board they applied on is not weighed like an imported review —
+// its `trust_reason`. Callers that score rows must select trust_reason and pass it.
+export function classifyPlatform(platform, trustReason = null) {
   const raw = String(platform || '');
   if (PUBLIC_REVIEW_PLATFORM_RE.test(raw)) return 'public_web';
   const p = raw.toLowerCase();
   if (/reddit/.test(p)) return 'reddit';
-  if (/glassdoor|blind|indeed|linkedin/.test(p)) return 'ingest';
+  if (/glassdoor|blind|indeed|linkedin/.test(p)) return FIRST_PARTY_TRUST_REASONS.has(String(trustReason || '')) ? 'direct' : 'ingest';
   if (/seen[_ -]?intel|survey/.test(p)) return 'seen_intel';
   return 'direct';
 }

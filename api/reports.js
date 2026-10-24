@@ -758,7 +758,7 @@ export default async function handler(req, res) {
       for (const row of rows) {
         consumed += 1;
         if (!feedRowPasses(row)) continue;
-        page.push({ ...row, source: classifyPlatform(row.platform) });
+        page.push({ ...row, source: classifyPlatform(row.platform, row.trust_reason) });
         if (page.length >= safeLimit) break;
       }
 
@@ -1646,7 +1646,7 @@ function _fuzzyNamePattern(name) {
 export function groupReportsByType(reps) {
   const byType = {};
   for (const row of reps) {
-    const type = classifyPlatform(row.platform);
+    const type = classifyPlatform(row.platform, row.trust_reason);
     (byType[type] ||= []).push({ outcome: row.outcome, wait_days: row.wait_days, rounds: row.rounds });
   }
   return byType;
@@ -1669,12 +1669,12 @@ async function _fuseWithReports(name, web, SUPABASE_URL, dbH) {
     const enc = encodeURIComponent(String(name).toLowerCase().trim());
     // Every report counts at its trust weight; only the anti-gaming holds wait for an admin
     // (lib/server/reportCounts.js SCORABLE_REPORTS_FILTER — the same corpus the stored recompute uses).
-    let r = await fetch(`${SUPABASE_URL}/rest/v1/reports?company_name=ilike.${enc}&${SCORABLE_REPORTS_FILTER}&select=outcome,platform,wait_days,rounds&limit=2000`, { headers: dbH });
+    let r = await fetch(`${SUPABASE_URL}/rest/v1/reports?company_name=ilike.${enc}&${SCORABLE_REPORTS_FILTER}&select=outcome,platform,trust_reason,wait_days,rounds&limit=2000`, { headers: dbH });
     let reps = r.ok ? await r.json() : null;
     let empPattern = enc;
     if ((!Array.isArray(reps) || !reps.length) && /[\s-]/.test(String(name))) {
       empPattern = _fuzzyNamePattern(name);
-      r = await fetch(`${SUPABASE_URL}/rest/v1/reports?company_name=ilike.${empPattern}&${SCORABLE_REPORTS_FILTER}&select=outcome,platform,wait_days,rounds&limit=2000`, { headers: dbH });
+      r = await fetch(`${SUPABASE_URL}/rest/v1/reports?company_name=ilike.${empPattern}&${SCORABLE_REPORTS_FILTER}&select=outcome,platform,trust_reason,wait_days,rounds&limit=2000`, { headers: dbH });
       reps = r.ok ? await r.json() : null;
     }
     if (!Array.isArray(reps)) return null;

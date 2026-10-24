@@ -170,7 +170,7 @@ export async function recomputeCompanyScoreFromReports(SUPABASE_URL, hdrs, compa
     // Reports + "what people are saying" (the stored web_reviews), fetched together.
     // Every read here is independent of the others — one round trip of wall time, not two.
     const [r, scoreRows, withMentions, employeeReviews, withEmployeeCount, confirmedStaleListings] = await Promise.all([
-      fetch(`${SUPABASE_URL}/rest/v1/reports?company_name=ilike.${enc}&${SCORABLE_REPORTS_FILTER}&select=outcome,platform,wait_days,rounds&limit=2000`, { headers: hdrs }),
+      fetch(`${SUPABASE_URL}/rest/v1/reports?company_name=ilike.${enc}&${SCORABLE_REPORTS_FILTER}&select=outcome,platform,trust_reason,wait_days,rounds&limit=2000`, { headers: hdrs }),
       fetch(`${SUPABASE_URL}/rest/v1/company_scores?company_name=eq.${enc}&select=web_reviews,web_report_count,data_source,ghost_rate,response_rate,avg_wait_days,avg_rounds,unpaid_rate&limit=1`, { headers: hdrs })
         .then((x) => (x.ok ? x.json() : [])).catch(() => []),
       hasMentionCount(SUPABASE_URL, hdrs),
@@ -185,7 +185,7 @@ export async function recomputeCompanyScoreFromReports(SUPABASE_URL, hdrs, compa
     if (!Array.isArray(reps)) return false;
     // Carry each trust class's mean wait_days / rounds so the stored avg wait is real, not null.
     const byType = {};
-    for (const row of reps) { const t = classifyPlatform(row.platform); (byType[t] ||= []).push({ outcome: row.outcome, wait_days: row.wait_days, rounds: row.rounds }); }
+    for (const row of reps) { const t = classifyPlatform(row.platform, row.trust_reason); (byType[t] ||= []).push({ outcome: row.outcome, wait_days: row.wait_days, rounds: row.rounds }); }
     // Mentions count exactly half a report (SOURCE_TRUST.mentions) — only once mention_count can be stored,
     // so the stored score and its evidence count always agree.
     const priorScore = Array.isArray(scoreRows) && scoreRows[0] ? scoreRows[0] : null;

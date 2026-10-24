@@ -14,6 +14,21 @@ test('classifyPlatform maps real reports.platform values to trust tiers', () => 
   assert.equal(classifyPlatform(''), 'direct');
 });
 
+test('classifyPlatform: a Seen user naming the board they applied on keeps full weight; imports stay ingest', () => {
+  // Prod 2026-10-24: SpaceX "LinkedIn" direct_submission and anonymous_unverified rows were scored 0.55.
+  for (const reason of ['direct_submission', 'anonymous_unverified', 'duplicate_user_company']) {
+    assert.equal(classifyPlatform('LinkedIn', reason), 'direct', reason);
+    assert.equal(classifyPlatform('Indeed', reason), 'direct', reason);
+  }
+  assert.equal(classifyPlatform('Glassdoor', 'external_import'), 'ingest');
+  assert.equal(classifyPlatform('Indeed', 'duplicate_import'), 'ingest');
+  assert.equal(classifyPlatform('LinkedIn', null), 'ingest');      // unknown provenance: no promotion
+  assert.equal(classifyPlatform('LinkedIn'), 'ingest');
+  // The provenance prefixes still win over a first-party reason.
+  assert.equal(classifyPlatform('Public review · indeed.com', 'direct_submission'), 'public_web');
+  assert.equal(classifyPlatform('Reddit r/jobs', 'direct_submission'), 'reddit');
+});
+
 test('classifyPlatform: "Public review · <host>" rows are third-party low-trust (public_web), never ingest/direct', () => {
   // The web-search review-site contract: platform 'Public review · <hostname>', source 'web_public',
   // outcome_weight 0.3, trust_reason 'web_search_public_review'.

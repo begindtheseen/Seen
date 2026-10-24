@@ -210,7 +210,7 @@ export async function buildCompanyAuditBundle({ db, serviceKey, adminId, adminRo
   // Annotate each report with its classified source, trust weight, and whether it counted
   // toward the grade (needs_review rows are held out of scoring, same as the fusion filter).
   const annotated = (reports || []).map(r => {
-    const source_type = classifyPlatform(r.platform);
+    const source_type = classifyPlatform(r.platform, r.trust_reason);
     return {
       id: r.id,
       submitter: pseudonymize(r.user_id),

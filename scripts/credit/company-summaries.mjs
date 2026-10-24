@@ -55,7 +55,7 @@ export function displayName(stored) {
 // after the post, so created_at is the import date; they carry the real one in report_text as
 // "[Public <host> post, posted YYYY…". Without that tag an imported row has no known year.
 export function reportYear(r) {
-  const kind = classifyPlatform(r?.platform);
+  const kind = classifyPlatform(r?.platform, r?.trust_reason);
   if (kind === 'reddit' || kind === 'public_web') {
     const m = /\[Public [^\]]*?\bposted (\d{4})\b/.exec(String(r?.report_text || ''));
     return m ? Number(m[1]) : null;
@@ -70,7 +70,7 @@ export function reportYear(r) {
 export function buildStats(score, reports) {
   const rows = Array.isArray(reports) ? reports : [];
   const bySource = { direct: [], seen_intel: [], ingest: [], reddit: [] };
-  for (const r of rows) (bySource[classifyPlatform(r.platform)] ||= []).push(r);
+  for (const r of rows) (bySource[classifyPlatform(r.platform, r.trust_reason)] ||= []).push(r);
   const agg = aggregateOutcomes(rows);
   // A year range is stated only when EVERY row's year is known — otherwise "2024" would read as
   // "all from 2024" when it is just the few rows that carry a posted date.
@@ -266,7 +266,7 @@ export function snippetBlock(reports) {
   for (const r of reports) {
     const t = String(r.report_text || '').replace(/\s+/g, ' ').trim();
     if (t.length < 15) continue;
-    const kind = classifyPlatform(r.platform);
+    const kind = classifyPlatform(r.platform, r.trust_reason);
     const src = kind === 'reddit' ? 'public discussion' : kind === 'public_web' ? 'public review site' : (SOURCE_LABELS[kind] || 'unknown source').replace(/_/g, ' ');
     lines.push(`- [${src}; outcome: ${String(r.outcome || 'unknown').slice(0, 30)}] ${t.slice(0, SNIPPET_CHARS)}`);
     if (lines.length >= MAX_SNIPPETS) break;
@@ -353,7 +353,7 @@ async function gather({ companies, minReports, log }) {
   let done = 0;
   const items = await pool(scores, 8, async (s) => {
     const enc = encodeURIComponent(String(s.company_name).toLowerCase().trim());
-    const reports = await sb(`reports?company_name=ilike.${enc}&${SCORABLE_REPORTS_FILTER}&select=outcome,platform,source,report_text,created_at&order=created_at.desc&limit=${REPORT_ROW_CAP}`);
+    const reports = await sb(`reports?company_name=ilike.${enc}&${SCORABLE_REPORTS_FILTER}&select=outcome,platform,source,trust_reason,report_text,created_at&order=created_at.desc&limit=${REPORT_ROW_CAP}`);
     if (++done % 250 === 0) log(`[gather] ${done}/${scores.length}`);
     // Re-check against the real corpus — the stored count can be stale.
     if (!Array.isArray(reports) || reports.length < minReports) return null;

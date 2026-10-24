@@ -129,3 +129,13 @@ test('reconcile keeps the LLM outcome when the detector is unsure', () => {
   assert.equal(reconcileOutcome('offer', undefined), 'offer');
   assert.equal(reconcileOutcome('ghosted', null), 'ghosted');
 });
+
+test('groupReportsByType weighs a Seen user report naming LinkedIn as direct, an imported one as ingest', async () => {
+  const { groupReportsByType } = await import('./reports.js');
+  const g = groupReportsByType([
+    { outcome: 'human', platform: 'LinkedIn', trust_reason: 'direct_submission' },
+    { outcome: 'ghosted', platform: 'Glassdoor', trust_reason: 'external_import' },
+  ]);
+  assert.equal(g.direct?.length, 1);
+  assert.equal(g.ingest?.length, 1);
+});
