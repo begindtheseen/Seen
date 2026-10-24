@@ -1,6 +1,6 @@
 'use client'
 
-import { CHECK_SCHEDULE, type CheckType } from '../constants'
+import type { CheckType } from '../constants'
 import type { Application, DueCheck } from '../types'
 import { nextCheck, type NextCheck } from './checkSchedule'
 import { answeredFromEvents, isCheckType, pickDueCheck, snoozedUntilFromEvents } from './checkEvents'
