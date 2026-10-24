@@ -6,6 +6,7 @@ import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/lib/auth'
 import { SESSION_EXPIRED_MESSAGE, clearSessionExpiredNotice, wasSessionExpiredRecently } from '@/lib/sessionExpired'
 import { internalPath } from '@/lib/safeHref.js'
+import { savePendingSignup, readPendingSignup, clearPendingSignup, isEmailThrottle, signupConfirmed } from '@/lib/pendingSignup.js'
 import styles from './login.module.css'
 
 // "Check your email" auto-detects the click: poll while the tab is visible, every 5 s, for at
@@ -80,6 +81,9 @@ function LoginContent() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [verifyEmail, setVerifyEmail] = useState('')
+  // The id supabase-js returned from signUp — the verify poll asks the server whether THAT account is
+  // confirmed (api/signup-status.js), so a click on another device is seen within one poll.
+  const [verifyUid, setVerifyUid] = useState<string | null>(null)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const [focused, setFocused] = useState<string | null>(null)
@@ -112,6 +116,20 @@ function LoginContent() {
   const coolingDown = cooldownUntil > 0 && cooldownLeft > 0
 
   useEffect(() => { setExpiredNotice(wasSessionExpiredRecently()) }, [])
+
+  // A reload / back-navigation of the verify screen used to drop the person on the account form —
+  // and a second "Create account" inside the email throttle window then failed with "For security
+  // purposes…" (audit 2026-10-24 H3). This tab remembers the signup it is waiting on (address + id,
+  // never the password) and comes back to the verify screen. Explicit employer links keep their form.
+  useEffect(() => {
+    if (cameAsEmployer) return
+    const pending = readPendingSignup()
+    if (!pending) return
+    setEmail(pending.email); setVerifyEmail(pending.email); setVerifyUid(pending.uid)
+    if (pending.type === 'employer' && EMPLOYER_SIGNUP_ENABLED) setSignupType('employer')
+    setStep('verify')
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   useEffect(() => {
     // Already signed in and hitting /login → bounce out. Employers land directly on their
@@ -149,14 +167,22 @@ function LoginContent() {
     // URLs, or the link is sent to the Site URL root (a preview signup's link came back as
     // redirect_to=https://seenjobs.io/).
     const verifyDest = effectiveType === 'employer' ? '/employers/dashboard' : '/dashboard'
-    const { error: err } = await supabase.auth.signUp({
+    const { data: signed, error: err } = await supabase.auth.signUp({
       email,
       password,
       options: { data: meta, emailRedirectTo: `${window.location.origin}${verifyDest}` },
     })
     setLoading(false)
-    if (err) { setError(err.message); return }
-    setVerifyEmail(email)
+    if (err && !isEmailThrottle(err)) { setError(err.message); return }
+    // A throttled signUp is a REPEAT of one that just sent the link (Supabase refuses a second email
+    // to the same address inside its window): that link still works, so wait for it on the verify
+    // screen instead of stranding the person on this form with "For security purposes…" (H3).
+    if (err) setNotice('We sent your confirmation link a moment ago — open the newest email from Seen.')
+    const addr = email.trim()
+    savePendingSignup({ email: addr, uid: signed?.user?.id, type: effectiveType })
+    const pending = readPendingSignup()
+    setVerifyUid(pending && pending.email === addr.toLowerCase() ? pending.uid : (signed?.user?.id ?? null))
+    setVerifyEmail(addr)
     setStep('verify')
   }
 
@@ -166,53 +192,89 @@ function LoginContent() {
   const afterVerify = () => router.replace(EMPLOYER_SIGNUP_ENABLED && signupType === 'employer' ? employerReturnTo : returnTo)
 
   /**
-   * True once the email link has been clicked. Same device: the link signs THIS browser in and
-   * getUser() sees the confirmed session. Other device (the link tapped on a phone while this tab
-   * waits on a laptop): no session ever reaches this browser, so the credentials typed a moment
-   * ago are tried — sign-in is refused until the address is confirmed and succeeds right after.
-   * The password path is tried only when asked (`withPassword`): every other poll, so the sign-in
-   * endpoint sees at most one attempt per 10 s.
+   * Has the email link been clicked?
+   *  - 'in': this browser is signed in to the confirmed account (same device: the link signed it in;
+   *    other device: the server said confirmed and the credentials typed a moment ago were used once).
+   *  - 'confirmed': confirmed, but this tab cannot sign itself in (reloaded — the password is never
+   *    stored — or the password was refused): the caller hands over to the sign-in form.
+   *  - false: not yet.
+   * Other device = the link tapped on a phone while this tab waits on a laptop: no session ever
+   * reaches this browser, so getUser() alone can never see it. With the signUp id the server answers
+   * (api/signup-status.js) on EVERY poll and sign-in is attempted only once the answer is yes. Without
+   * an id (a throttled repeat signup that never got one) the credentials are retried, at most once per
+   * 10 s (`withPassword` on every other poll), so the project's per-IP sign-in budget is not spent.
    */
-  async function isVerified(withPassword: boolean): Promise<boolean> {
+  async function isVerified(withPassword: boolean): Promise<'in' | 'confirmed' | false> {
     const { data, error: err } = await supabase.auth.getUser()
-    if (!err && data.user?.email_confirmed_at) return true
-    if (!withPassword || !email || !password) return false
-    const { error: signErr } = await supabase.auth.signInWithPassword({ email, password })
-    return !signErr
+    if (!err && data.user?.email_confirmed_at) return 'in'
+    const addr = (verifyEmail || email).trim()
+    if (verifyUid) {
+      const confirmed = await signupConfirmed(verifyUid)
+      if (confirmed !== true) return false
+      if (!addr || !password) return 'confirmed'
+      const { error: signErr } = await supabase.auth.signInWithPassword({ email: addr, password })
+      return signErr ? 'confirmed' : 'in'
+    }
+    if (!withPassword || !addr || !password) return false
+    const { error: signErr } = await supabase.auth.signInWithPassword({ email: addr, password })
+    return signErr ? false : 'in'
+  }
+
+  /** The address is confirmed but this tab holds no session: the sign-in form, prefilled, says so. */
+  function confirmedSignInHere() {
+    clearPendingSignup()
+    setEmail(verifyEmail || email); setPassword(''); setError('')
+    setNotice('Your email is confirmed. Sign in with your password to continue.')
+    setStep('signin')
+  }
+
+  function verified(result: 'in' | 'confirmed') {
+    if (result === 'in') { clearPendingSignup(); clearSessionExpiredNotice(); afterVerify() }
+    else confirmedSignInHere()
   }
 
   async function checkVerification() {
     setLoading(true); clearError()
-    const ok = await isVerified(true)
+    const result = await isVerified(true)
     setLoading(false)
-    if (!ok) { setError('Not verified yet — open the link in your email, then this page moves on by itself.'); return }
-    afterVerify()
+    if (result) { verified(result); return }
+    // No uid and no password (a restored tab that never got an id): the sign-in form is the honest
+    // next step — it tells them to confirm first if they have not.
+    if (!verifyUid && !password) { setEmail(verifyEmail || email); setStep('signin'); return }
+    setError('Not confirmed yet — open the link in your email, then this page moves on by itself.')
   }
 
   // Auto-detect the click: on the same device the confirmation link signs this browser in
-  // (supabase-js shares the session across tabs); from another device the credentials are retried
-  // (see isVerified). Polls every 5 s while the tab is visible, stops after 5 minutes; the button
-  // above remains.
+  // (supabase-js shares the session across tabs); from another device the server is asked (see
+  // isVerified). Polls every 5 s while the tab is visible, at most 60 times; the button above remains.
+  // One poll at a time: a slow answer never overlaps the next tick or a visibilitychange tick.
   useEffect(() => {
     if (step !== 'verify') return
     verifyPolls.current = 0
     let stopped = false
+    let inFlight = false
     const tick = async () => {
-      if (stopped || document.visibilityState === 'hidden') return
-      if (verifyPolls.current++ >= VERIFY_POLL_MAX) { stopped = true; return }
-      if (await isVerified(verifyPolls.current % 2 === 0)) { stopped = true; afterVerify() }
+      if (stopped || inFlight || document.visibilityState === 'hidden') return
+      if (verifyPolls.current >= VERIFY_POLL_MAX) { stopped = true; return }
+      verifyPolls.current++
+      inFlight = true
+      try {
+        const result = await isVerified(verifyPolls.current % 2 === 0)
+        if (result && !stopped) { stopped = true; verified(result) }
+      } finally { inFlight = false }
     }
     const id = setInterval(tick, VERIFY_POLL_MS)
     document.addEventListener('visibilitychange', tick)
     return () => { stopped = true; clearInterval(id); document.removeEventListener('visibilitychange', tick) }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [step])
+  }, [step, verifyUid])
 
   async function resendVerification(to?: string) {
     const addr = (to || email).trim()
     if (!addr) return
     setNotice('')
-    const { error: err } = await supabase.auth.resend({ type: 'signup', email: addr, options: { emailRedirectTo: `${window.location.origin}/dashboard` } })
+    const dest = EMPLOYER_SIGNUP_ENABLED && signupType === 'employer' ? '/employers/dashboard' : '/dashboard'
+    const { error: err } = await supabase.auth.resend({ type: 'signup', email: addr, options: { emailRedirectTo: `${window.location.origin}${dest}` } })
     setError('')
     if (err) {
       // Supabase throttles resends ("…only request this after N seconds"): say that, not a generic failure.
@@ -227,9 +289,17 @@ function LoginContent() {
     if (!email.trim() || !password.trim()) { setError('Email and password required.'); return }
     setLoading(true); clearError(); setNotice(''); setUnconfirmedEmail('')
     const { data, error: err } = await supabase.auth.signInWithPassword({ email, password })
+    // A project that answers `invalid_credentials` for an unconfirmed address hides the real reason.
+    // When THIS tab started the signup for this address, the server can say whether it is confirmed:
+    // unconfirmed → the confirm-first message, whatever the password (it is the one thing to do next).
+    let unconfirmed = isUnconfirmedError(err)
+    if (err && !unconfirmed) {
+      const pending = readPendingSignup()
+      if (pending?.uid && pending.email === email.trim().toLowerCase()) unconfirmed = (await signupConfirmed(pending.uid)) === false
+    }
     setLoading(false)
     if (err) {
-      if (isUnconfirmedError(err)) {
+      if (unconfirmed) {
         // The password was right — the address just has not been confirmed. Do not call it wrong
         // (that sent people to reset a working password; audit 2026-10-24 M1).
         setUnconfirmedEmail(email.trim())
@@ -247,6 +317,7 @@ function LoginContent() {
       return
     }
     setSigninFails(0)
+    clearPendingSignup()
     clearSessionExpiredNotice()
     // Route employers straight to their dashboard. Employer-ness comes from the account's own signup
     // metadata; the /dashboard guard is the safety net for any older account whose metadata predates
@@ -454,8 +525,11 @@ function LoginContent() {
             <button type="button" onClick={() => resendVerification(verifyEmail)} style={{ width: '100%', minHeight: 44, padding: '.65rem', background: 'none', border: '1px solid var(--line2)', color: 'var(--sub)', borderRadius: 8, fontFamily: 'var(--body)', fontSize: '.8rem', cursor: 'pointer', marginBottom: '.5rem' }}>
               Resend verification email
             </button>
-            <button type="button" className={`${styles.linkBtn} ${styles.linkDim}`} onClick={() => { setEmail(''); setStep('email') }}>
+            <button type="button" className={`${styles.linkBtn} ${styles.linkDim}`} onClick={() => { clearPendingSignup(); setVerifyUid(null); setNotice(''); setEmail(''); setPassword(''); setStep('email') }}>
               Use a different email
+            </button>
+            <button type="button" className={`${styles.linkBtn} ${styles.linkDim}`} onClick={() => { clearPendingSignup(); setVerifyUid(null); setNotice(''); clearError(); setEmail(verifyEmail); setPassword(''); setStep('signin') }}>
+              Sign in instead
             </button>
           </div>
         )}
