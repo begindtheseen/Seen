@@ -11,11 +11,12 @@ import CreditConfirmDialog from './CreditConfirmDialog'
 import { RESUME_OPTIMIZE_COST, creditCostLabel, dailyResetLabel } from '@/lib/creditRules'
 import { hasConfirmedCreditUse } from '@/lib/creditConfirm'
 import { trackApplyClick } from '@/lib/trackApply'
-import ApplicationIntelligencePanel, { type ApplicationIntelligence } from './optimizer/ApplicationIntelligencePanel'
-import ErrorBoundary from './ErrorBoundary'
 import type { Job } from '@/lib/types'
 import ModalPortal from '@/components/ModalPortal'
-import { uniqueKeywords, withoutKeywords } from '@/lib/optimizer/rewriteGuard.js'
+import { uniqueKeywords } from '@/lib/optimizer/rewriteGuard.js'
+import { markQuiet } from '@/lib/quietWindow'
+import { markOptimized } from '@/lib/optimizedJobs'
+import { VerdictCard, WhyYouMatch, MissingList, Checklist, PaidPlanView, type Verdict, type RequirementRow, type ConstraintRow, type PaidPlan } from './optimizer/Verdict'
 
 // The optimizer's price, rendered from the credit rules — the same literal the server charges.
 const OPTIMIZE_PRICE = creditCostLabel(RESUME_OPTIMIZE_COST)
@@ -27,14 +28,29 @@ interface OptimizeBullet {
   addresses: string
 }
 
-interface OptimizeResult {
+// The paid package (api/resume.js tool:optimize → lib/server/optimizePackage.js): a strict
+// superset of the free diagnosis below.
+interface OptimizeResult extends PaidPlan {
   job_priorities: string[]
   optimized_bullets: OptimizeBullet[]
   keywords_added: string[]
-  /** Posting words the résumé states differently ("POS" vs "cashier") — a note, never an edit. */
+  /** Posting words the résumé states differently ("POS" vs "register") — a note, never an edit. */
   wording_notes?: string[]
   stealth?: boolean
-  _seenfit_score?: number
+  _seenfit_score?: number | null
+  verdict?: Verdict
+  matched_requirements?: RequirementRow[]
+  unsupported_requirements?: RequirementRow[]
+  constraints?: ConstraintRow[]
+  cached?: boolean
+  charged?: boolean
+}
+// The free diagnosis (api/optimizer.js action:optimize): verdict + matched/missing + checklist.
+interface FreeDiagnosis {
+  verdict: Verdict
+  matched_requirements: RequirementRow[]
+  unsupported_requirements: RequirementRow[]
+  constraints: ConstraintRow[]
 }
 
 // HumanProof "package mode" response (from /api/optimizer action:'humanize' with bullets[]).
@@ -62,6 +78,8 @@ interface HumanProofResult {
 
 type Step =
   | 'loading-resume'
+  | 'checking'
+  | 'needs-posting'
   | 'not-logged-in'
   | 'no-resume'
   | 'resume-corrupted'
@@ -195,9 +213,11 @@ export default function ApplyOptimizeModal({
   const [hpState, setHpState] = useState<HpState>('idle')
   const [hp, setHp] = useState<HumanProofResult | null>(null)
 
-  // Application Intelligence V2 — fetched in the background from the free (no-credit) optimize
-  // action and shown as a compact "deep match" read-out. Null = not available; render nothing.
-  const [aiPkg, setAiPkg] = useState<ApplicationIntelligence | null>(null)
+  // The free diagnosis shown BEFORE any credit is spent (choose step), and the full posting the
+  // person pasted when the listing is only a preview (D2).
+  const [diag, setDiag] = useState<FreeDiagnosis | null>(null)
+  const [posting, setPosting] = useState<string | null>(null)
+  const [pasteDraft, setPasteDraft] = useState('')
 
   // Copy + download state. The PDF is pre-built in the BACKGROUND while the user reads
   // their results, so the Apply tap can download + redirect fully in-gesture (iOS blocks
@@ -209,20 +229,78 @@ export default function ApplyOptimizeModal({
   const [pdfFailed, setPdfFailed] = useState(false)
   const [pdfName, setPdfName] = useState('Seen Resume.pdf')
 
+  // Opening the modal NEVER charges (2026-10-24 audits, E6/D8: after the first confirmation the
+  // card tap charged on mount, with no dialog and no choose step). It reads the free diagnosis and
+  // asks the server whether this exact optimization is already paid for (cached 7 days); a credit
+  // is spent only when the person presses the price-tagged button below.
   useEffect(() => {
     if (!isLoggedIn) { setStep('not-logged-in'); return }
     ResumeStore.load(user?.id, isLoggedIn).then(data => {
       if (data?.text && data.text.length > 50) {
         setResumeText(data.text)
-        // The person tapped "Optimize · 1 credit", so run it — but the FIRST paid action on
-        // this account/device is confirmed once ("This uses 1 of your N credits").
-        if (hasConfirmedCreditUse(user?.id)) runOptimize(data.text)
-        else setStep('confirm')
+        prepare(data.text, null)
       } else {
         setStep('no-resume')
       }
     })
   }, [isLoggedIn, user?.id]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Esc closes the sheet (M9) — unless a stacked dialog is up, which handles its own Esc.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape' && step !== 'confirm' && !showUpgrade) onClose() }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [step, showUpgrade, onClose])
+
+  // While a result is on screen nothing optional pops over it (the micro-survey slid in on top of
+  // a result the person had just paid for): hold the quiet window open while the review shows.
+  useEffect(() => {
+    if (step !== 'review') return
+    markQuiet()
+    const t = setInterval(() => markQuiet(), 60_000)
+    return () => clearInterval(t)
+  }, [step])
+
+  // What every call sends about the posting: the listing's text (or the pasted full posting), its
+  // source so the server can tell a teaser from a posting, and the job id for the cache key.
+  function postingBody(pasted: string | null) {
+    return pasted
+      ? { jobDescription: pasted, postingPasted: true, jobId: job.id }
+      : { jobDescription: job.description || '', jobSource: job.source || null, jobId: job.id }
+  }
+
+  // Free: the diagnosis + a cache probe. Never spends a credit.
+  async function prepare(text: string, pasted: string | null) {
+    setStep('checking'); setError('')
+    try {
+      const headers = await aiHeaders()
+      const [probeRes, diagRes] = await Promise.all([
+        fetch('/api/resume', { method: 'POST', headers, body: JSON.stringify({ tool: 'optimize', probe: true, job: job.title, company: job.company, resume: text, ...postingBody(pasted) }) }),
+        fetch('/api/optimizer', { method: 'POST', headers, body: JSON.stringify({ action: 'optimize', resumeText: text, jobTitle: job.title, company: job.company, ...postingBody(pasted), remoteOk: /remote/i.test(pasted || job.description || '') }) }),
+      ])
+      const probe = await probeRes.json().catch(() => ({})) as OptimizeResult & { error?: string }
+      const d = await diagRes.json().catch(() => ({})) as FreeDiagnosis & { error?: string }
+      if (probe.error === 'preview_only' || d.error === 'preview_only') { setStep('needs-posting'); return }
+      if (probe.error === 'RESUME_CORRUPTED') { setStep('resume-corrupted'); return }
+      if (probeRes.ok && probe.cached) { showResult(probe); return }
+      setDiag(diagRes.ok && d.verdict ? d : null)
+      setStep('choose')
+    } catch {
+      setStep('choose')
+    }
+  }
+
+  function showResult(data: OptimizeResult) {
+    setResult(data)
+    markOptimized(user?.id, job.id)
+    setStep('review')
+  }
+
+  // The price-tagged button: the first paid action on this account/device is confirmed once.
+  function pressOptimize() {
+    if (hasConfirmedCreditUse(user?.id)) runOptimize()
+    else setStep('confirm')
+  }
 
   // Pro status + live balance — same get_credits signal Nav.tsx uses.
   const refreshCredits = useCallback(async () => {
@@ -252,20 +330,18 @@ export default function ApplyOptimizeModal({
     .filter(b => !isGuidance(b.original) && !isGuidance(b.optimized))
     .filter(b => { const k = `${b.original.trim().toLowerCase()}→${b.optimized.trim().toLowerCase()}`; if (seenPairs.has(k)) return false; seenPairs.add(k); return true })
   const guidanceItems = (result?.optimized_bullets || []).filter(b => isGuidance(b.original) || isGuidance(b.optimized))
-  // One keyword identity on every list (lib/optimizer/rewriteGuard keywordKey: case, plural and
-  // possessive folded) and matched ∩ missing = ∅ — the server guarantees both; the client repeats
-  // them so no response shape can ever show "cashier" as a match and as a gap again.
-  const matchReasons = uniqueKeywords(realBullets.map(b => b.addresses).filter(Boolean)).slice(0, 6)
-  const gaps = uniqueKeywords(withoutKeywords(result?.keywords_added || [], matchReasons)).slice(0, 8)
+  // "Why you match" and "missing" come from the requirement rows (E7) — matched ∩ missing = ∅ by
+  // construction on the server; the keyword list is one keyword identity (keywordKey).
+  const gaps = uniqueKeywords((result?.unsupported_requirements || []).filter(m => !m.matched && !m.soft).map(m => m.surface)).slice(0, 8)
   const wordingNotes = (result?.wording_notes || []).slice(0, 3)
-  const fitScore = result?._seenfit_score != null ? Math.round(Number(result._seenfit_score)) : null
+  const fitScore = result?.verdict ? result.verdict.score : (result?._seenfit_score ?? null)
 
   async function runOptimize(resumeOverride?: string) {
     const text = resumeOverride ?? resumeText
     setStep('optimizing')
     setError('')
     // Reset any downstream state from a previous pass.
-    setHp(null); setHpState('idle'); setPdfBlob(null); setPdfFailed(false); setAiPkg(null)
+    setHp(null); setHpState('idle'); setPdfBlob(null); setPdfFailed(false)
     try {
       const headers = await aiHeaders()
       const r = await fetch('/api/resume', {
@@ -276,7 +352,7 @@ export default function ApplyOptimizeModal({
           job: job.title,
           company: job.company,
           resume: text,
-          jobDescription: job.description || '',
+          ...postingBody(posting),
         }),
       })
       if (!r.ok) {
@@ -287,46 +363,25 @@ export default function ApplyOptimizeModal({
           setStep('choose')
           return
         }
+        // A preview-only listing: nothing was charged — ask for the full posting.
+        if (e.error === 'preview_only') { setStep('needs-posting'); return }
         // Saved résumé couldn't be read (often a phone PDF that didn't convert to clean text).
         // Route to a clear recovery step instead of dead-ending on a raw error code.
         if (e.error === 'RESUME_CORRUPTED') { setStep('resume-corrupted'); return }
         throw new Error(e.error || `Error ${r.status}`)
       }
       const data = await r.json() as OptimizeResult
-      // Optimize consumed a credit server-side — refresh the Nav balance and our own.
-      window.dispatchEvent(new Event('seen:credits-updated'))
-      refreshCredits()
-      setResult(data)
-      setStep('review')
-      // Fire-and-forget the richer V2 deep-match read-out (free, no extra credit).
-      loadV2(text)
+      if (data.charged) {
+        // Optimize consumed a credit server-side — refresh the Nav balance and our own.
+        window.dispatchEvent(new Event('seen:credits-updated'))
+        refreshCredits()
+      }
+      showResult(data)
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : 'Optimization failed — try again'
       setError(msg)
       setStep('choose')
     }
-  }
-
-  // ── Application Intelligence V2 — background, best-effort, never blocks the flow ──
-  async function loadV2(text: string) {
-    try {
-      const r = await fetch('/api/optimizer', {
-        method: 'POST',
-        headers: await aiHeaders(),
-        body: JSON.stringify({
-          action: 'optimize',
-          resumeText: text,
-          jobId: job.id,
-          jobTitle: job.title,
-          company: job.company,
-          jobDescription: job.description || '',
-          remoteOk: /remote/i.test(job.description || ''),
-        }),
-      })
-      if (!r.ok) return
-      const data = await r.json().catch(() => ({})) as { application_intelligence?: ApplicationIntelligence | null }
-      if (data.application_intelligence) setAiPkg(data.application_intelligence)
-    } catch { /* V2 read-out is a bonus — never surface an error */ }
   }
 
   // ── HumanProof: chain the optimized bullets through the deterministic humanizer ──
@@ -592,8 +647,30 @@ export default function ApplyOptimizeModal({
 
         <div className="ai-safe-bottom" style={{ paddingTop: '1.1rem', paddingLeft: '1.1rem', paddingRight: '1.1rem', minHeight: 240 }}>
 
-          {/* ── loading-resume / confirm (the dialog sits above) ── */}
-          {(step === 'loading-resume' || step === 'confirm') && <LoadingDots />}
+          {/* ── loading-resume / checking (free) / confirm (the dialog sits above) ── */}
+          {(step === 'loading-resume' || step === 'checking' || step === 'confirm') && <LoadingDots />}
+
+          {/* ── needs-posting: the listing is only a teaser — nothing was charged (D2) ── */}
+          {step === 'needs-posting' && (
+            <div className="ai-stack">
+              <div style={{ background: 'rgba(245,158,11,.06)', border: '1px solid rgba(245,158,11,.22)', borderRadius: 10, padding: '.8rem .95rem' }}>
+                <div style={{ fontFamily: 'var(--display)', fontWeight: 800, color: 'var(--white)', fontSize: '.88rem', marginBottom: '.3rem' }}>This listing only has a summary</div>
+                <div style={{ fontSize: 'var(--fs-72)', color: 'var(--sub)', lineHeight: 1.6 }}>
+                  Seen only holds a short preview of this posting, so there is nothing real to optimize against — and no credit was used. Open the posting, copy its full text, and paste it here.
+                </div>
+              </div>
+              <label style={{ display: 'block', fontFamily: 'var(--mono)', fontSize: 'var(--fs-58)', color: 'var(--dim)', textTransform: 'uppercase', letterSpacing: '.08em' }}>
+                Full job posting
+                <textarea data-testid="posting-paste" value={pasteDraft} onChange={e => setPasteDraft(e.target.value)} rows={7} placeholder="Paste the whole posting: duties, requirements, schedule…"
+                  style={{ display: 'block', width: '100%', marginTop: '.35rem', background: 'var(--surface)', border: '1.5px solid var(--line2)', borderRadius: 8, padding: '.65rem .8rem', color: 'var(--white)', fontFamily: 'var(--mono)', fontSize: '.8rem', lineHeight: 1.55, boxSizing: 'border-box', textTransform: 'none', letterSpacing: 0 }} />
+              </label>
+              <button style={{ ...btnPrimary, opacity: pasteDraft.trim().length < 200 ? 0.55 : 1 }} disabled={pasteDraft.trim().length < 200}
+                onClick={() => { const t = pasteDraft.trim(); setPosting(t); prepare(resumeText, t) }}>
+                Check this posting · free
+              </button>
+              <button style={btnGhost} onClick={applyWithoutOptimize}>Apply ↗ without optimizing · free</button>
+            </div>
+          )}
 
           {/* ── not-logged-in ── */}
           {step === 'not-logged-in' && (
@@ -677,15 +754,24 @@ export default function ApplyOptimizeModal({
           {/* ── choose ── */}
           {step === 'choose' && (
             <>
+              {/* The free diagnosis first — the same verdict the paid result opens with. */}
+              {diag && (
+                <div className="ai-stack" style={{ marginBottom: '1rem' }}>
+                  <VerdictCard verdict={diag.verdict} note="free" />
+                  <WhyYouMatch matched={diag.matched_requirements} limit={4} />
+                  <MissingList missing={diag.unsupported_requirements} limit={6} />
+                </div>
+              )}
               <div style={{ background: 'rgba(99,102,241,.07)', border: '1px solid rgba(99,102,241,.18)', borderRadius: 10, padding: '.8rem .95rem', marginBottom: '1rem' }}>
-                <div style={{ fontFamily: 'var(--mono)', fontSize: '.52rem', textTransform: 'uppercase', letterSpacing: '.1em', color: '#818cf8', fontWeight: 700, marginBottom: '.45rem' }}>When you optimize first</div>
+                <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-52)', textTransform: 'uppercase', letterSpacing: '.1em', color: '#818cf8', fontWeight: 700, marginBottom: '.45rem' }}>What {OPTIMIZE_PRICE} adds — kept for 7 days</div>
                 {[
-                  '🎯 SeenFit scores your résumé against this exact role',
-                  '🔑 Surfaces the keywords their ATS scans for',
-                  '🗣 HumanProof makes it read real & interview-ready',
-                  '📧 Emailed résumé + one-click back to your tracker',
+                  'Which of your bullets should lead each job for this posting',
+                  'Number questions — your answer writes the bullet',
+                  'An availability line built from this posting’s schedule',
+                  'A summary for this job, built only from your own facts',
+                  'Wording proposals you accept one by one, and HumanProof',
                 ].map(t => (
-                  <div key={t} style={{ fontFamily: 'var(--mono)', fontSize: '.62rem', color: 'rgba(165,180,252,.85)', marginBottom: '.22rem' }}>{t}</div>
+                  <div key={t} style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-62)', color: 'rgba(165,180,252,.85)', marginBottom: '.22rem' }}>• {t}</div>
                 ))}
               </div>
 
@@ -696,7 +782,7 @@ export default function ApplyOptimizeModal({
               )}
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: '.5rem' }}>
-                <button style={btnPrimary} data-testid="modal-optimize-btn" onClick={() => (hasConfirmedCreditUse(user?.id) ? runOptimize() : setStep('confirm'))}>
+                <button style={btnPrimary} data-testid="modal-optimize-btn" onClick={pressOptimize}>
                   Optimize for this job · {OPTIMIZE_PRICE}
                 </button>
                 <button style={btnGhost} onClick={applyWithoutOptimize}>
@@ -728,47 +814,19 @@ export default function ApplyOptimizeModal({
                 </div>
               )}
 
-              {/* Fit score */}
-              {fitScore != null && (
-                <div style={{ display: 'flex', alignItems: 'center', gap: '.85rem', background: 'var(--gdim)', border: '1px solid var(--line)', borderRadius: 12, padding: '.9rem 1rem' }}>
-                  <div style={{ flexShrink: 0, width: 52, height: 52, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', border: `3px solid ${scoreColor(fitScore)}` }}>
-                    <span style={{ fontFamily: 'var(--display)', fontWeight: 800, fontSize: '1.15rem', color: scoreColor(fitScore) }}>{fitScore}</span>
-                  </div>
-                  <div style={{ minWidth: 0 }}>
-                    <div style={{ fontFamily: 'var(--display)', fontWeight: 800, color: 'var(--white)', fontSize: '.9rem' }}>SeenFit match</div>
-                    <div style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', color: 'var(--dim)', lineHeight: 1.5 }}>
-                      {result.stealth ? '🗣 Human Voice applied — sounds like you, every keyword kept' : 'Grounded in your real résumé — nothing invented'}
-                    </div>
-                  </div>
-                </div>
+              {/* ONE verdict (score or none, band, one sentence; the hard gate first). */}
+              {result.verdict && (
+                <VerdictCard verdict={result.verdict} cached={!!result.cached}
+                  note={result.stealth ? 'Human Voice applied' : 'grounded in your real résumé — nothing invented'} />
               )}
 
-              {/* Top matches */}
-              {matchReasons.length > 0 && (
-                <div>
-                  <div style={kicker}>Why you match</div>
-                  <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: '.35rem' }}>
-                    {matchReasons.map((m, i) => (
-                      <li key={i} className="ai-trunc" style={{ display: 'flex', gap: '.5rem', fontSize: '.75rem', color: 'var(--sub)', lineHeight: 1.5 }}>
-                        <span style={{ color: 'var(--green)', flexShrink: 0 }}>✓</span><span style={{ minWidth: 0, overflowWrap: 'anywhere' }}>{m}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
+              {/* Why you match — from the matched requirements and their evidence (E7). */}
+              <WhyYouMatch matched={result.matched_requirements || []} />
+              <MissingList missing={result.unsupported_requirements || []} />
+              <Checklist constraints={result.constraints || []} />
 
-              {/* Gaps — keywords the listing uses that the résumé does not. Amber, not red: a
-                  missing word is a to-do, not a failure. */}
-              {gaps.length > 0 && (
-                <div>
-                  <div style={kicker}>Missing from your résumé — add only if true</div>
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '.3rem' }}>
-                    {gaps.map(k => (
-                      <span key={k} style={{ background: 'rgba(245,158,11,.08)', border: '1px solid rgba(245,158,11,.28)', color: 'var(--amber)', borderRadius: 5, padding: '.18rem .55rem', fontFamily: 'var(--mono)', fontSize: '.62rem', maxWidth: '100%', overflowWrap: 'anywhere' }}>{k}</span>
-                    ))}
-                  </div>
-                </div>
-              )}
+              {/* The paid work: availability line, moves, number questions, summary, proposals. */}
+              <PaidPlanView plan={result} />
 
               {/* Wording the posting uses for something the résumé already says another way. A note
                   for the person, never an edit to their bullet (the old "POS (cashier) system"). */}
@@ -815,14 +873,6 @@ export default function ApplyOptimizeModal({
                       </div>
                     ))}
                   </div>
-                </div>
-              )}
-
-              {/* Application Intelligence V2 — compact deep-match read-out (background-loaded) */}
-              {aiPkg && (
-                <div style={{ borderTop: '1px solid var(--line)', paddingTop: '.9rem' }}>
-                  <div style={{ ...kicker, color: 'var(--indigo)' }}>Deep match analysis</div>
-                  <ErrorBoundary label="deep-dive-compact"><ApplicationIntelligencePanel pkg={aiPkg} compact /></ErrorBoundary>
                 </div>
               )}
 
@@ -905,7 +955,12 @@ export default function ApplyOptimizeModal({
               )}
 
               {/* Post-win ledger line — the REAL balance, the real reset, then the upsell. */}
-              {pro === false && !upsellDismissed && (
+              {result.cached && (
+                <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-60)', color: 'var(--green)', lineHeight: 1.5 }}>
+                  No credit used — you optimized this job with this résumé in the last 7 days. A new résumé or a new posting costs {OPTIMIZE_PRICE}.
+                </div>
+              )}
+              {pro === false && !upsellDismissed && result.charged && (
                 <div data-testid="credit-ledger" style={{ display: 'flex', alignItems: 'center', gap: '.6rem', background: 'rgba(99,102,241,.08)', border: '1px solid rgba(99,102,241,.25)', borderRadius: 8, padding: '.5rem .6rem .5rem .85rem' }}>
                   <button
                     onClick={() => { setUpgradeReason('generic'); setUpgradeFeature(undefined); setShowUpgrade(true) }}
@@ -971,7 +1026,6 @@ export default function ApplyOptimizeModal({
                     ✉ Email it
                   </button>
                 </div>
-                <button style={btnGhost} onClick={() => runOptimize()}>← Re-optimize · {OPTIMIZE_PRICE}</button>
               </div>
             </div>
           )}

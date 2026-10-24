@@ -4,7 +4,7 @@ import { applyRateLimit, rateLimit, rateLimitGlobal, resolveRateBucket } from '.
 import { jobsReadFromQuery, setPublicCache } from '../lib/server/publicRead.js';
 import { logError } from '../lib/server/errlog.js';
 import { filterAndRank, relevanceScore, isTitleRelated, sortByProximity, locationDbTerm, expandQueryTerms, parseLocation, locationScore } from './_utils/jobRelevance.js';
-import { sortByPriority, companyMatchesQuery, queryNamesCompany, isRemoteListing, isSeedListing } from '../lib/server/jobPriority.js';
+import { sortByPriority, companyMatchesQuery, queryNamesCompany, isSeedListing } from '../lib/server/jobPriority.js';
 import { waitUntil } from '@vercel/functions';
 import { aggregateForQuery, upsertJobs, inferLevel, wasRecentlyPulled, recordPull, adzunaPay, cleanDescription } from '../lib/server/jobSources.js';
 import { locationScope } from '../lib/jobs/usLocation.js';

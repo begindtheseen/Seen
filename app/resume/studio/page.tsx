@@ -16,6 +16,7 @@ import DocEditor from '@/components/resume/DocEditor'
 import HealthPanel from '@/components/resume/HealthPanel'
 import TailorPanel, { type TailorJob } from '@/components/resume/TailorPanel'
 import ExportPanel from '@/components/resume/ExportPanel'
+import FixPreview from '@/components/resume/FixPreview'
 import UpgradeModal from '@/components/UpgradeModal'
 import PageHeader from '@/components/shell/PageHeader'
 import { useAuth } from '@/lib/auth'
@@ -84,7 +85,12 @@ function StudioInner() {
   const doc = activeId ? variantDoc : baseDoc
   const health: Health | null = useMemo(() => (doc ? scoreResume(doc) : null), [doc])
   const fixAll = useMemo(() => (doc ? rewriteDoc(doc) : null), [doc])
-  const fixAllCount = fixAll ? fixAll.log.filter((l) => l.changes.some((c) => c.rule !== 'hygiene')).length : 0
+  // the button counts what the preview pre-selects (not punctuation, not tense-only)
+  const fixAllCount = fixAll ? fixAll.log.filter((l) => l.to !== l.from && l.changes.some((c) => c.rule !== 'hygiene' && c.rule !== 'tense')).length : 0
+  // "Fix N bullets": a preview with checkboxes first, then Apply, with Undo afterwards — never a
+  // silent rewrite that autosaves (the 2026-10-24 audits).
+  const [fixPreview, setFixPreview] = useState(false)
+  const [undo, setUndo] = useState<{ doc: ResumeDoc; n: number } | null>(null)
 
   // ── load ──
   useEffect(() => {
@@ -196,16 +202,27 @@ function StudioInner() {
     const info = health.bullets.find((b) => b.bulletId === bulletId)
     onChange(mapBullet(doc, bulletId, (t) => replaceLead(t, verb, info?.lead.token || '')))
   }
-  function fixAllNow() { if (!fixAll || !doc) return; onChange(fixAll.doc); showToast(`Rewrote ${fixAllCount} bullet${fixAllCount === 1 ? '' : 's'} — nothing new was invented.`) }
+  function fixAllNow() { if (!fixAll || !doc) return; setFixPreview(true) }
+  function applyFixes(bulletIds: string[]) {
+    if (!fixAll || !doc) return
+    const chosen = new Set(bulletIds)
+    let next = doc
+    let n = 0
+    for (const l of fixAll.log) { if (!chosen.has(l.bulletId) || l.to === l.from) continue; next = mapBullet(next, l.bulletId, () => l.to); n++ }
+    setUndo({ doc, n }); setFixPreview(false)
+    if (n) { onChange(next); showToast(`Rewrote ${n} bullet${n === 1 ? '' : 's'} from your own words — Undo is in the Health tab.`) }
+  }
+  function undoFixes() { if (!undo) return; onChange(undo.doc); setUndo(null); showToast('Restored your original wording.') }
 
   // ── variants ──
-  function useVariant(v: ResumeDoc, meta: { role: string; company: string; jobId: string; scoreBefore: number; scoreAfter: number }) {
+  function useVariant(v: ResumeDoc, meta: { role: string; company: string; jobId: string; scoreBefore: number | null; scoreAfter: number | null }) {
     const label = [meta.role, meta.company].filter(Boolean).join(' @ ') || 'Tailored'
-    const rec: StoredVariant = { id: v.id, label, role: meta.role, company: meta.company, jobId: meta.jobId, createdAt: new Date().toISOString(), doc: v, baseHash: '', scoreBefore: meta.scoreBefore, scoreAfter: meta.scoreAfter }
+    const rec: StoredVariant = { id: v.id, label, role: meta.role, company: meta.company, jobId: meta.jobId, createdAt: new Date().toISOString(), doc: v, baseHash: '', scoreBefore: meta.scoreBefore ?? undefined, scoreAfter: meta.scoreAfter ?? undefined }
     setVariants(ResumeDocStore.saveVariant(user?.id, rec)); setActiveId(v.id); setVariantDoc(v); setTab('export')
     showToast('Tailored version ready — review it, then export.')
   }
   function switchTo(id: string | null) {
+    setUndo(null); setFixPreview(false)
     setActiveId(id)
     if (id) { const v = variants.find((x) => x.id === id); setVariantDoc(v ? normalizeDoc(v.doc) : null) } else setVariantDoc(null)
   }
@@ -304,6 +321,13 @@ function StudioInner() {
                   <div className={`${s.seg} ${s.hideMobile}`}>
                     {(['health', 'tailor', 'export'] as Tab[]).map((t) => <button key={t} type="button" className={`${s.segBtn}${panelTab === t ? ` ${s.segBtnActive}` : ''}`} onClick={() => setTab(t)}>{t === 'health' ? `💚 Health${health ? ` · ${health.score}` : ''}` : t === 'tailor' ? '🎯 Tailor' : '📤 Export'}</button>)}
                   </div>
+                  {panelTab === 'health' && undo && (
+                    <div className={s.okBox} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '.6rem', flexWrap: 'wrap' }}>
+                      <span>Rewrote {undo.n} bullet{undo.n === 1 ? '' : 's'}. Not what you wanted?</span>
+                      <button type="button" className={s.btn} data-testid="fix-undo" onClick={undoFixes}>Undo</button>
+                    </div>
+                  )}
+                  {panelTab === 'health' && fixPreview && fixAll && <FixPreview log={fixAll.log} onApply={applyFixes} onCancel={() => setFixPreview(false)} />}
                   {panelTab === 'health' && health && <HealthPanel health={health} doc={doc} onJump={jump} onApplyRewrite={applyRewrite} onApplyVerb={applyVerb} onFixAll={fixAllNow} fixAllCount={fixAllCount} />}
                   {panelTab === 'tailor' && <TailorPanel doc={doc} isLoggedIn={isLoggedIn} pro={pro} savedJobs={savedJobs} initialJob={initialJob} onNeed={(r) => { if (r === 'signin') { setError('Sign in to tailor your résumé (1 credit).'); router.push('/login?next=/resume/studio?tab=tailor') } else setShowUpgrade(r) }} onUseVariant={useVariant} />}
                   {panelTab === 'export' && <ExportPanel doc={doc} pro={pro} isLoggedIn={isLoggedIn} onNeedPro={() => setShowUpgrade(isLoggedIn ? 'pro' : 'generic')} role={active?.role} />}
