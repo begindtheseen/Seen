@@ -1,11 +1,13 @@
 'use client'
 
-// SeenFitPanel — the SeenFit Engine UI. Mobile-first.
+// SeenFitPanel — the FREE SeenFit diagnosis for one job. Mobile-first.
 //
-// Renders the deterministic optimizer output for one job: SeenFit Score, "Why you
-// match", missing keywords, safe résumé bullets, confirm-before-using suggestions, a
-// ready-to-send application message, company hiring/process risk, and save/copy/apply
-// actions. All scoring is computed server-side by api/optimizer.js (no external AI).
+// Renders the ONE verdict (score or none, band, one sentence, the hard-gate line first), the
+// factors that were measured, "Why you match" with the résumé sentence that proves each match,
+// what the posting asks for that the résumé does not show, the screens the résumé cannot answer,
+// and the company's hiring-process risk. Bullets, the rewrite plan and the application message
+// are the paid package (api/resume.js tool:optimize — "Optimize" on the job card); the free
+// response no longer carries them (2026-10-24 audit, C3). Computed server-side, no external AI.
 
 import { useState, useCallback } from 'react'
 import { ResumeStore } from '@/lib/stores/ResumeStore'
@@ -13,16 +15,17 @@ import { aiHeaders } from '@/lib/aiHeaders'
 import { useAuth } from '@/lib/auth'
 import type { Job } from '@/lib/types'
 import { MIN_REPORTS_FOR_GRADE } from '@/lib/gradeGate'
+import { VerdictCard, WhyYouMatch, MissingList, Checklist, type Verdict, type ConstraintRow } from '@/components/optimizer/Verdict'
 
-interface Contribution { factor: string; weight: number; raw: number; points: number; reason: string }
+interface Contribution { factor: string; weight: number; raw: number; points: number; reason: string; scored?: boolean }
 interface RiskFlag { code: string; severity: 'low' | 'medium' | 'high'; message: string }
-interface RequirementMatch { requirement: string; surface: string; importance: string; matched: boolean; via: string; evidence: string | null }
-interface SafeBullet { text: string; evidenceUsed: string[]; template: string }
-interface ConfirmItem { text: string; reason: string; placeholder: string }
+interface RequirementMatch { requirement: string; surface: string; importance: string; matched: boolean; via: string; evidence: string | null; soft?: boolean; hard?: boolean }
 
 interface OptimizerOutput {
   run_id?: string | null
-  fit_score: number
+  verdict: Verdict
+  constraints: ConstraintRow[]
+  fit_score: number | null
   confidence: number
   confidence_label: 'low' | 'medium' | 'high'
   required_match: number
@@ -36,20 +39,13 @@ interface OptimizerOutput {
   missing_keywords: string[]
   matched_requirements: RequirementMatch[]
   unsupported_requirements: RequirementMatch[]
-  safe_bullets: SafeBullet[]
-  confirm_before_using: ConfirmItem[]
-  application_message: string
   explanation: { summary: string; contributions: Contribution[]; notes: string[] }
 }
 
-type State = 'idle' | 'no_resume' | 'loading' | 'done' | 'error' | 'disabled'
+type State = 'idle' | 'no_resume' | 'loading' | 'done' | 'error' | 'disabled' | 'preview'
 
 function scoreColor(s: number): string {
   return s >= 70 ? 'var(--green)' : s >= 45 ? 'var(--amber)' : 'var(--red)'
-}
-
-function pct(n: number): string {
-  return `${Math.round((n || 0) * 100)}%`
 }
 
 const mono = 'var(--mono)'
@@ -59,7 +55,6 @@ export default function SeenFitPanel({ job }: { job: Job }) {
   const { user } = useAuth() as unknown as { user: { id?: string } | null }
   const [state, setState] = useState<State>('idle')
   const [out, setOut] = useState<OptimizerOutput | null>(null)
-  const [copied, setCopied] = useState<string | null>(null)
 
   const sendFeedback = useCallback(async (action: string, runId?: string | null) => {
     try {
@@ -70,15 +65,6 @@ export default function SeenFitPanel({ job }: { job: Job }) {
       })
     } catch { /* non-fatal */ }
   }, [])
-
-  const copy = useCallback(async (text: string, key: string, runId?: string | null) => {
-    try {
-      await navigator.clipboard.writeText(text)
-      setCopied(key)
-      setTimeout(() => setCopied(null), 1600)
-      sendFeedback('copy', runId)
-    } catch { /* ignore */ }
-  }, [sendFeedback])
 
   const run = useCallback(async () => {
     setState('loading')
@@ -98,12 +84,14 @@ export default function SeenFitPanel({ job }: { job: Job }) {
           jobTitle: job.title,
           company: job.company,
           jobDescription: job.description || '',
+          jobSource: job.source || null,
           jobLocation: job.location || '',
           remoteOk: /remote/i.test(job.location || ''),
         }),
       })
       if (res.status === 403) { setState('disabled'); return }
       const data = await res.json()
+      if (res.status === 422 && data.error === 'preview_only') { setState('preview'); return }
       if (!res.ok || data.error) { setState('error'); return }
       setOut(data)
       setState('done')
@@ -120,7 +108,7 @@ export default function SeenFitPanel({ job }: { job: Job }) {
           onClick={run}
           style={{ width: '100%', background: 'linear-gradient(135deg,#3b82f6 0%,#8b5cf6 100%)', color: '#fff', border: 'none', borderRadius: 10, padding: '.85rem 1rem', fontFamily: 'var(--display)', fontWeight: 800, fontSize: '.9rem', cursor: 'pointer' }}
         >
-          ✨ Optimize for this job
+          ✨ Check my fit for this job · free
         </button>
         <div style={{ fontFamily: mono, fontSize: '.55rem', color: 'var(--muted)', textAlign: 'center', marginTop: '.45rem' }}>
           Deterministic SeenFit Engine — no AI guesswork, your data stays grounded.
@@ -147,6 +135,12 @@ export default function SeenFitPanel({ job }: { job: Job }) {
     )
   }
 
+  if (state === 'preview') {
+    return (
+      <div style={{ marginTop: '1.5rem', fontFamily: mono, fontSize: 'var(--fs-70)', color: 'var(--muted)', textAlign: 'center', padding: '1rem', lineHeight: 1.6 }}>This listing only has a summary, so there is nothing to measure your résumé against. Open the full posting to read what it asks for.</div>
+    )
+  }
+
   if (state === 'disabled') {
     return (
       <div style={{ marginTop: '1.5rem', fontFamily: mono, fontSize: '.7rem', color: 'var(--muted)', textAlign: 'center', padding: '1rem' }}>SeenFit optimization is temporarily unavailable.</div>
@@ -164,109 +158,37 @@ export default function SeenFitPanel({ job }: { job: Job }) {
 
   if (!out) return null
 
-  const sortedContribs = [...out.explanation.contributions].sort((a, b) => b.points - a.points)
+  const sortedContribs = [...out.explanation.contributions].filter((c) => c.scored !== false).sort((a, b) => b.points - a.points)
 
   return (
     <div style={{ marginTop: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-      {/* SeenFit Score header */}
-      <div style={{ background: 'var(--gdim)', border: '1px solid var(--line)', borderRadius: 12, padding: '1.25rem' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-          <div style={{ position: 'relative', flexShrink: 0, width: 64, height: 64, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', border: `3px solid ${scoreColor(out.fit_score)}` }}>
-            <span style={{ fontFamily: 'var(--display)', fontWeight: 800, fontSize: '1.35rem', color: scoreColor(out.fit_score) }}>{out.fit_score}</span>
+      <VerdictCard verdict={out.verdict} note={`${out.confidence_label} confidence · free`} />
+
+      {out.verdict.score != null && (
+        <Section title="WHAT THE SCORE IS MADE OF">
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '.6rem' }}>
+            {sortedContribs.map((c) => (
+              <div key={c.factor}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '.25rem' }}>
+                  <span style={{ fontFamily: mono, fontSize: 'var(--fs-62)', color: 'var(--sub)' }}>{labelOf(c.factor)}</span>
+                  <span style={{ fontFamily: mono, fontSize: 'var(--fs-62)', color: 'var(--white)' }}>+{c.points} pts</span>
+                </div>
+                <div style={{ height: 5, background: 'var(--raised)', borderRadius: 3, overflow: 'hidden' }}>
+                  <div style={{ width: `${Math.min(100, c.raw * 100)}%`, height: '100%', background: scoreColor(c.raw * 100) }} />
+                </div>
+                <div style={{ fontFamily: mono, fontSize: 'var(--fs-55)', color: 'var(--muted)', marginTop: '.25rem', lineHeight: 1.5 }}>{c.reason}</div>
+              </div>
+            ))}
           </div>
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontFamily: 'var(--display)', fontWeight: 800, color: 'var(--white)', fontSize: '1rem' }}>SeenFit Score</div>
-            <div style={{ fontFamily: mono, fontSize: '.6rem', color: 'var(--dim)', marginTop: '.2rem' }}>
-              {out.confidence_label} confidence ({pct(out.confidence)}) · v{ (out as { engine_version?: string }).engine_version || 'seenfit-1.0.0' }
-            </div>
-          </div>
-        </div>
-        <p style={{ fontFamily: mono, fontSize: '.65rem', color: 'var(--sub)', lineHeight: 1.6, marginTop: '.85rem' }}>{out.explanation.summary}</p>
+        </Section>
+      )}
+
+      {out.matched_requirements.length > 0 && <Section title="WHY YOU MATCH"><WhyYouMatch matched={out.matched_requirements} limit={8} /></Section>}
+      {out.unsupported_requirements.length > 0 && <Section title="WHAT THE POSTING ALSO ASKS FOR"><MissingList missing={out.unsupported_requirements} limit={10} /></Section>}
+      {(out.constraints || []).some((c) => c.status === 'ask') && <Section title="SCREENS YOUR RÉSUMÉ CAN'T ANSWER"><Checklist constraints={out.constraints} /></Section>}
+      <div style={{ fontFamily: mono, fontSize: 'var(--fs-60)', color: 'var(--muted)', lineHeight: 1.6 }}>
+        The rewrite plan — which bullet to lead with, number questions that write a bullet, an availability line, a summary for this job — is the Optimize button on the listing.
       </div>
-
-      {/* Why your score is X — self-explaining contributions */}
-      <Section title="WHY YOUR SCORE IS THIS">
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '.6rem' }}>
-          {sortedContribs.map((c) => (
-            <div key={c.factor}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '.25rem' }}>
-                <span style={{ fontFamily: mono, fontSize: '.62rem', color: 'var(--sub)' }}>{labelOf(c.factor)}</span>
-                <span style={{ fontFamily: mono, fontSize: '.62rem', color: 'var(--white)' }}>+{c.points} pts</span>
-              </div>
-              <div style={{ height: 5, background: 'var(--raised)', borderRadius: 3, overflow: 'hidden' }}>
-                <div style={{ width: `${Math.min(100, c.raw * 100)}%`, height: '100%', background: scoreColor(c.raw * 100) }} />
-              </div>
-              <div style={{ fontFamily: mono, fontSize: '.55rem', color: 'var(--muted)', marginTop: '.25rem', lineHeight: 1.5 }}>{c.reason}</div>
-            </div>
-          ))}
-        </div>
-      </Section>
-
-      {/* Why you match */}
-      {out.matched_requirements.length > 0 && (
-        <Section title="WHY YOU MATCH">
-          <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: '.5rem' }}>
-            {out.matched_requirements.map((m, i) => (
-              <li key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: '.5rem', fontSize: '.78rem', color: 'var(--sub)', lineHeight: 1.5 }}>
-                <span style={{ color: 'var(--green)', fontSize: '.6rem', marginTop: '.2rem', flexShrink: 0 }}>✓</span>
-                <span><strong style={{ color: 'var(--white)' }}>{m.surface}</strong>{m.via === 'related' ? ' (transferable)' : ''}{m.evidence ? ` — ${m.evidence.slice(0, 90)}` : ''}</span>
-              </li>
-            ))}
-          </ul>
-        </Section>
-      )}
-
-      {/* Missing keywords */}
-      {out.missing_keywords.length > 0 && (
-        <Section title="MISSING KEYWORDS">
-          <div style={{ fontFamily: mono, fontSize: '.58rem', color: 'var(--muted)', marginBottom: '.6rem', lineHeight: 1.5 }}>Add the ones you genuinely have — ATS filters scan for these literally.</div>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '.4rem' }}>
-            {out.missing_keywords.map((k, i) => (
-              <span key={i} style={{ background: 'rgba(239,68,68,.08)', border: '1px solid rgba(239,68,68,.25)', color: 'var(--red)', borderRadius: 5, padding: '.2rem .55rem', fontFamily: mono, fontSize: '.62rem' }}>{k}</span>
-            ))}
-          </div>
-        </Section>
-      )}
-
-      {/* Safe résumé bullets */}
-      {out.safe_bullets.length > 0 && (
-        <Section title="SAFE RÉSUMÉ BULLETS">
-          <div style={{ fontFamily: mono, fontSize: '.58rem', color: 'var(--green)', marginBottom: '.6rem' }}>✓ Fully backed by your résumé — no invented claims.</div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '.55rem' }}>
-            {out.safe_bullets.map((b, i) => (
-              <div key={i} style={{ background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 8, padding: '.7rem .85rem', display: 'flex', gap: '.6rem', alignItems: 'flex-start' }}>
-                <span style={{ fontSize: '.78rem', color: 'var(--sub)', lineHeight: 1.6, flex: 1 }}>{b.text}</span>
-                <button onClick={() => copy(b.text, `b${i}`, out.run_id)} style={{ background: 'none', border: '1px solid var(--line2)', borderRadius: 6, padding: '.25rem .5rem', fontFamily: mono, fontSize: '.55rem', color: copied === `b${i}` ? 'var(--green)' : 'var(--muted)', cursor: 'pointer', flexShrink: 0 }}>{copied === `b${i}` ? '✓' : 'copy'}</button>
-              </div>
-            ))}
-          </div>
-        </Section>
-      )}
-
-      {/* Confirm before using */}
-      {out.confirm_before_using.length > 0 && (
-        <Section title="CONFIRM BEFORE USING">
-          <div style={{ fontFamily: mono, fontSize: '.58rem', color: 'var(--amber)', marginBottom: '.6rem', lineHeight: 1.5 }}>⚠ These need a real number/detail from you. We will not invent it.</div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '.55rem' }}>
-            {out.confirm_before_using.map((c, i) => (
-              <div key={i} style={{ background: 'rgba(245,158,11,.06)', border: '1px solid rgba(245,158,11,.2)', borderRadius: 8, padding: '.7rem .85rem' }}>
-                <div style={{ fontSize: '.76rem', color: 'var(--sub)', lineHeight: 1.6 }}>{c.text}</div>
-                <div style={{ fontFamily: mono, fontSize: '.55rem', color: 'var(--muted)', marginTop: '.35rem' }}>{c.reason}</div>
-              </div>
-            ))}
-          </div>
-        </Section>
-      )}
-
-      {/* Application message */}
-      <Section title="APPLICATION MESSAGE">
-        <div style={{ background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 8, padding: '.85rem' }}>
-          <p style={{ fontSize: '.78rem', color: 'var(--sub)', lineHeight: 1.7, margin: 0 }}>{out.application_message}</p>
-          <div style={{ display: 'flex', gap: '.5rem', marginTop: '.75rem' }}>
-            <button onClick={() => copy(out.application_message, 'msg', out.run_id)} style={{ background: 'var(--green)', color: 'var(--ink)', border: 'none', borderRadius: 7, padding: '.45rem .9rem', fontFamily: 'var(--display)', fontWeight: 800, fontSize: '.7rem', cursor: 'pointer' }}>{copied === 'msg' ? '✓ Copied' : 'Copy message'}</button>
-          </div>
-        </div>
-      </Section>
 
       {/* Company hiring / process risk */}
       <Section title="COMPANY HIRING RISK">

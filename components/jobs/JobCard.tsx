@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Score } from '@/lib/score'
 import { SavedJobsStore } from '@/lib/stores/SavedJobs'
 import { useAuth } from '@/lib/auth'
@@ -15,6 +15,7 @@ import { displayCompanyName } from '@/lib/companyDisplay'
 import { displayPay } from '@/lib/jobs/pay.js'
 import { roleSnippet, isDescriptionPreview } from '@/lib/jobs/descriptionText.js'
 import { httpHref } from '@/lib/safeHref.js'
+import { wasOptimized } from '@/lib/optimizedJobs'
 
 // The optimize action's price, rendered from the credit rules so the label can never drift.
 const OPTIMIZE_PRICE = creditCostLabel(RESUME_OPTIMIZE_COST)
@@ -86,6 +87,11 @@ export default function JobCard({ job, index, onSaveToggle, onOpen, onApply, onC
   const snippet = job.description ? roleSnippet(job.description, job.company, job.title) : ''
   const applyHref = httpHref(job.apply_url)
   const canOptimize = !takesSeenApply(job) && !!applyHref && !preview
+  // This person already optimized this listing on this device within 7 days (a hint; the modal
+  // asks the server cache before it ever offers to charge).
+  // Read after mount (localStorage) so the server HTML and the first client render agree.
+  const [optimizedHere, setOptimizedHere] = useState(false)
+  useEffect(() => { setOptimizedHere(wasOptimized(user?.id, job.id)) }, [user?.id, job.id])
 
   async function reportInactive(e: React.MouseEvent) {
     e.stopPropagation()
@@ -264,10 +270,11 @@ export default function JobCard({ job, index, onSaveToggle, onOpen, onApply, onC
                 type="button"
                 style={optimizeBtn}
                 data-testid="optimize-btn"
-                title={`Optimize your résumé for this job · ${OPTIMIZE_PRICE}`}
+                title={optimizedHere ? 'Open your optimization for this job — kept for 7 days, no credit' : `Optimize your résumé for this job · ${OPTIMIZE_PRICE}`}
                 onClick={e => { e.stopPropagation(); onApply(job) }}
               >
-                Optimize · {OPTIMIZE_PRICE.replace(' ', '\u00a0')}
+                {/* opening the modal never charges; it checks the server cache first (C2/E6) */}
+                {optimizedHere ? 'Optimize · cached' : <>Optimize · {OPTIMIZE_PRICE.replace(' ', '\u00a0')}</>}
               </button>
             )}
           </>
