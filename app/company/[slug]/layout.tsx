@@ -49,7 +49,7 @@ export async function generateMetadata(
     description,
     keywords: [
       `${name} hiring`, `${name} ghosting`, `${name} reddit`, `does ${name} ghost applicants`,
-      `${name} interview process`, `${name} hiring reviews`, `${name} glassdoor`, `${name} response time`,
+      `${name} interview process`, `${name} hiring reviews`, `${name} response time`,
     ],
     openGraph: {
       title,
