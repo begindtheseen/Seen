@@ -1,10 +1,25 @@
 'use client'
 
-import { _sync } from '../sync'
+import { _sync, isNotFound } from '../sync'
 import { markQuiet } from '../quietWindow'
 import type { Application, HiringEvent, AppStatus } from '../types'
 
 const KEY = 'seen_applications_v1'
+
+/** Everything one `load` answers with. The dashboard reads its pro flag, recent companies and the Inbox
+ *  Autopilot tile from the SAME call that brings the applications — one request at mount, not four. */
+export type LoadBundle = {
+  applications: Application[]
+  credits: { balance: number; pro: boolean; daily_earned: number } | null
+  recent_cos: Array<{ company_name?: string }>
+  inbox: { ready: boolean; enabled?: boolean; received_count?: number } | null
+  apps_total?: number
+}
+type RawLoad = { applications?: Record<string, unknown>[]; credits?: LoadBundle['credits']; recent_cos?: LoadBundle['recent_cos']; inbox?: LoadBundle['inbox']; apps_total?: number }
+
+/** What update()/remove() report back. `not_found` = the server has no such row for this account
+ *  (deleted on another device, or never this user's) — the local copy is dropped, nothing to retry. */
+export type StoreResult = { ok: boolean; reason?: 'not_found' | 'not_synced' | 'patch_failed' | 'delete_failed' | 'offline' }
 
 /** What "Edit" on a card may change — the only non-stage/status fields update_application accepts. */
 export const EDITABLE_KEYS = ['company', 'role', 'location', 'platform', 'appliedAt'] as const
@@ -47,8 +62,15 @@ export const AppStore = {
   },
 
   async load(loggedIn: boolean): Promise<Application[]> {
+    const bundle = await this.loadBundle(loggedIn)
+    return bundle ? bundle.applications : this.loadSync()
+  },
+
+  /** `load` with everything it carries (see LoadBundle). null when signed out or the call failed —
+   *  the caller falls back to loadSync() for the applications. */
+  async loadBundle(loggedIn: boolean): Promise<LoadBundle | null> {
     if (loggedIn) {
-      const result = await _sync('load') as { applications?: Record<string, unknown>[] } | null
+      const result = await _sync('load') as RawLoad | null
       if (result?.applications) {
         const mapped = result.applications.map(mapRow)
         const dbIds = new Set(mapped.map(a => String(a.id)))
@@ -73,10 +95,16 @@ export const AppStore = {
         }
         const merged = [...mapped, ...unsynced]
         localStorage.setItem(KEY, JSON.stringify(merged))
-        return merged
+        return {
+          applications: merged,
+          credits: result.credits ?? null,
+          recent_cos: Array.isArray(result.recent_cos) ? result.recent_cos : [],
+          inbox: result.inbox && typeof result.inbox.ready === 'boolean' ? result.inbox : null,
+          apps_total: result.apps_total,
+        }
       }
     }
-    return this.loadSync()
+    return null
   },
 
   async syncFromDb(loggedIn: boolean): Promise<void> {
@@ -151,7 +179,7 @@ export const AppStore = {
    * EDITABLE_KEYS). An edit is a correction of the user's own record: it files no event and no
    * community report (handleUpdate in the tracker only reports on a terminal `status`).
    */
-  async update(id: string, changes: Partial<Application>, loggedIn: boolean): Promise<void> {
+  async update(id: string, changes: Partial<Application>, loggedIn: boolean): Promise<StoreResult> {
     const apps = this.loadSync()
     const idx = apps.findIndex(a => a.id === id)
     if (idx !== -1) {
@@ -206,13 +234,25 @@ export const AppStore = {
     if (updatedApp?.events) syncChanges.events = updatedApp.events
     // Awaited: the tracker reloads right after, and an un-awaited PATCH let the reload's SELECT win
     // the race and visibly revert a "Ghosted"/"Rejected" click.
-    if (loggedIn) await _sync('update_application', { id, changes: syncChanges })
+    if (!loggedIn) return { ok: true }
+    const r = await _sync('update_application', { id, changes: syncChanges }) as StoreResult | null
+    if (isNotFound(r)) {
+      // Removed on another device (or never this account's): the local copy is stale — drop it so the
+      // reload that follows shows the truth. Not an error for the person; nothing to retry.
+      localStorage.setItem(KEY, JSON.stringify(this.loadSync().filter(a => a.id !== id)))
+      return { ok: false, reason: 'not_found' }
+    }
+    return r ?? { ok: false, reason: 'offline' }
   },
 
-  async remove(id: string, loggedIn: boolean): Promise<void> {
+  async remove(id: string, loggedIn: boolean): Promise<StoreResult> {
     markQuiet() // a delete is a weighty moment — see update()
     localStorage.setItem(KEY, JSON.stringify(this.loadSync().filter(a => a.id !== id)))
-    if (loggedIn) await _sync('remove_application', { id })
+    if (!loggedIn) return { ok: true }
+    const r = await _sync('remove_application', { id }) as StoreResult | null
+    // 404 = already gone on the server: the local copy is gone too, which is the state the person wanted.
+    if (isNotFound(r)) return { ok: true, reason: 'not_found' }
+    return r ?? { ok: false, reason: 'offline' }
   },
 
   async clear(loggedIn = false): Promise<void> {

@@ -2,7 +2,7 @@
 // The client sends its Supabase access token; we validate it here, then use the
 // service key to talk to the DB. No RLS policies required on the client side.
 
-import { createHmac, timingSafeEqual } from 'crypto';
+import { resolveUid } from '../lib/server/supabaseJwt.js';
 import { rateLimit } from '../lib/server/ratelimit.js';
 import { broadcastActivity } from '../lib/server/realtime.js';
 import { buildOpportunities } from './_utils/opportunityEngine.js';
@@ -17,23 +17,9 @@ import { deleteApplicantResumes } from '../lib/server/seenApplyStore.js';
 import { decodeThread } from '../lib/server/applicationThread.js';
 import { pacificDate } from '../lib/time/pacific.js';
 import * as inbox from '../lib/server/inbox/store.js';
+import { PROFILE_LIMITS, PROFILE_NAME_REQUIRED } from '../lib/profileLimits.js';
 
-// Verify a Supabase JWT locally (HS256) — no network round-trip.
-// Returns the payload (with .sub = user UUID) on success, null on failure.
-// Requires SUPABASE_JWT_SECRET env var from Supabase Dashboard → Settings → API.
-function verifyJWTLocal(token, secret) {
-  try {
-    const parts = token.split('.');
-    if (parts.length !== 3) return null;
-    const mac = createHmac('sha256', secret).update(`${parts[0]}.${parts[1]}`).digest('base64url');
-    const sigBuf = Buffer.from(parts[2], 'base64url');
-    const macBuf = Buffer.from(mac, 'base64url');
-    if (sigBuf.length !== macBuf.length || !timingSafeEqual(sigBuf, macBuf)) return null;
-    const payload = JSON.parse(Buffer.from(parts[1], 'base64url').toString('utf8'));
-    if (!payload.sub || payload.exp < Math.floor(Date.now() / 1000)) return null;
-    return payload;
-  } catch { return null; }
-}
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export default async function handler(req, res) {
   const _o=req.headers.origin||'';
@@ -57,26 +43,13 @@ export default async function handler(req, res) {
   const { allowed: ipOk } = await rateLimit(req, 'user-sync');
   if (!ipOk) return res.status(429).json({ error: 'Too many requests — slow down.' });
 
-  let uid;
-  const JWT_SECRET = process.env.SUPABASE_JWT_SECRET;
-  // Fast path: verify the HS256 JWT locally (no round-trip). Supabase has migrated projects
-  // to ASYMMETRIC signing keys (ES256/RS256), which this HS256 check can't verify — so when
-  // local verification fails we MUST fall back to the Supabase auth API rather than 401.
-  // (gateAI in lib/server/credits.js and api/stripe.js already do exactly this; user-sync was
-  // the one endpoint missing the fallback, which 401'd every request once tokens went ES256.)
-  const payload = JWT_SECRET ? verifyJWTLocal(token, JWT_SECRET) : null;
-  if (payload) {
-    uid = payload.sub;
-  } else {
-    // Validate via the Supabase auth API (works for any signing algorithm).
-    const userRes = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
-      headers: { apikey: SERVICE_KEY, Authorization: `Bearer ${token}` },
-    });
-    if (!userRes.ok) return res.status(401).json({ error: 'Invalid token' });
-    const { id } = await userRes.json();
-    if (!id) return res.status(401).json({ error: 'Could not identify user' });
-    uid = id;
-  }
+  // Who is calling: HS256 locally when the project still has a JWT secret, else the project's ES256
+  // key from its JWKS (cached in the warm function), else the auth API. Before 2026-10-24 the
+  // project's asymmetric tokens failed the HS256 check and EVERY call paid an /auth/v1/user round
+  // trip before its first DB read (lib/server/supabaseJwt.js).
+  const who = await resolveUid(token, { supabaseUrl: SUPABASE_URL, serviceKey: SERVICE_KEY });
+  if (!who) return res.status(401).json({ error: 'Invalid token' });
+  const uid = who.uid;
 
   // ── All DB calls use service key — bypasses RLS ─────────────────────────────
   const db = (path, opts = {}) => fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
@@ -93,7 +66,7 @@ export default async function handler(req, res) {
   let body = req.body;
   if (typeof body === 'string') { try { body = JSON.parse(body); } catch(e) { body = {}; } }
   const { action } = body || {};
-  console.log(`[user-sync] action=${action} uid=${uid}`);
+  console.log(`[user-sync] action=${action} uid=${uid} auth=${who.via}`);
 
   // Rate-limit mutating actions per user (not reads — those are cheap DB fetches)
   const WRITE_ACTIONS = new Set(['add_application','update_application','remove_application','save_job','unsave_job','save_profile','save_resume','delete_account','submit_resume_survey','report_job_availability']);
@@ -148,7 +121,10 @@ export default async function handler(req, res) {
     const appsLimit = Math.min(500, Math.max(1, parseInt(body.apps_limit) || 200));
     const appsOffset = Math.max(0, parseInt(body.apps_offset) || 0);
     const today = pacificDate();
-    const [appsRes, savedRes, recentRes, credRes, flagsRes, threadsRes] = await Promise.all([
+    // Inbox Autopilot status rides along (same Promise.all, cached table probe) so the dashboard and the
+    // tracker do not fire a separate inbox_status call at mount. null = could not be read right now.
+    const inboxQ = inbox.dbClient(SUPABASE_URL, SERVICE_KEY);
+    const [appsRes, savedRes, recentRes, credRes, flagsRes, threadsRes, inboxStatus] = await Promise.all([
       db(`applications?user_id=eq.${uid}&select=id,job_id,company_name,role,city,platform,job_url,status,stage,score,waste_score,events,applied_at,employer_stage,created_at,updated_at&order=created_at.desc&limit=${appsLimit}&offset=${appsOffset}`, { headers: { Prefer: 'count=estimated' } }),
       db(`saved_jobs?user_id=eq.${uid}&order=saved_at.desc&limit=500`),
       db(`user_recent_cos?user_id=eq.${uid}&order=viewed_at.desc&limit=6`),
@@ -157,6 +133,7 @@ export default async function handler(req, res) {
       // Apply-on-Seen applications + their conversations (employer messages, the withdrawal note) — read
       // from the one copy on seen_applications. 400s harmlessly before migration 20261018150000.
       db(`seen_applications?applicant_user_id=eq.${uid}&select=job_id,thread&order=updated_at.desc&limit=200`).catch(() => null),
+      inbox.status(inboxQ, uid).catch(() => null),
     ]);
     const apps   = appsRes.ok   ? await appsRes.json()   : [];
     const threads = threadsRes && threadsRes.ok ? await threadsRes.json().catch(() => []) : [];
@@ -199,7 +176,7 @@ export default async function handler(req, res) {
     const ua = (req.headers['user-agent'] || '').slice(0, 200);
     db('login_signals', { method: 'POST', body: JSON.stringify({ user_id: uid, ip_address: ip, user_agent: ua }), headers: { Prefer: 'return=minimal' } }).catch(() => {});
     const appsTotal = parseInt((appsRes.headers?.get('content-range') || '').split('/')[1]) || apps.length;
-    return res.status(200).json({ applications: apps, saved_jobs: saved, apps_total: appsTotal, apps_offset: appsOffset, recent_cos: recent, credits, flags });
+    return res.status(200).json({ applications: apps, saved_jobs: saved, apps_total: appsTotal, apps_offset: appsOffset, recent_cos: recent, credits, flags, inbox: inboxStatus });
   }
 
   // ── ADD APPLICATION ─────────────────────────────────────────────────────────
@@ -244,8 +221,19 @@ export default async function handler(req, res) {
   // ── REMOVE APPLICATION ──────────────────────────────────────────────────────
   if (action === 'remove_application') {
     const { id } = body;
-    // Accept both real UUIDs and legacy app_ ids stored in the DB
-    if (id) await db(`applications?id=eq.${encodeURIComponent(id)}&user_id=eq.${uid}`, { method: 'DELETE', headers: { Prefer: 'return=minimal' } });
+    if (!id) return res.status(400).json({ error: 'id required' });
+    // A client-local 'app_' id never reached the DB (the column is uuid): nothing to delete, say so.
+    if (!UUID_RE.test(String(id))) return res.status(200).json({ ok: false, reason: 'not_synced' });
+    // The WHERE scopes to the caller; `return=representation` tells us whether a row was actually
+    // the caller's. Another user's id, or one already deleted elsewhere, is a 404 — never a false
+    // "ok" (audit 2026-10-24, M3). The row itself is never touched when it is not the caller's.
+    const r = await db(`applications?id=eq.${encodeURIComponent(id)}&user_id=eq.${uid}&select=id`, { method: 'DELETE', headers: { Prefer: 'return=representation' } });
+    if (!r.ok) {
+      console.error('[user-sync] remove_application failed:', r.status);
+      return res.status(200).json({ ok: false, reason: 'delete_failed' });
+    }
+    const gone = await r.json().catch(() => []);
+    if (!Array.isArray(gone) || gone.length === 0) return res.status(404).json({ ok: false, reason: 'not_found' });
     return res.status(200).json({ ok: true });
   }
 
@@ -287,7 +275,7 @@ export default async function handler(req, res) {
     // The id column is uuid — a legacy client-local 'app_...' id can never match a DB row.
     // Report that honestly so the client knows the update did NOT persist (instead of the
     // old behavior: PostgREST 400s on the uuid cast and we still said ok:true).
-    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(id))) {
+    if (!UUID_RE.test(String(id))) {
       return res.status(200).json({ ok: false, reason: 'not_synced' });
     }
     const allowed = {};
@@ -306,15 +294,20 @@ export default async function handler(req, res) {
       if (Number.isFinite(t) && t <= Date.now() + 86400000) allowed.applied_at = new Date(t).toISOString();
     }
     if (Object.keys(allowed).length) {
-      const r = await db(`applications?id=eq.${encodeURIComponent(id)}&user_id=eq.${uid}`, {
+      // `return=representation` + select=id: the PATCH stays scoped to the caller AND tells us whether
+      // any row was theirs. Another user's id, or a row deleted on another device, is a 404 — the old
+      // return=minimal 204 said "ok" after changing nothing (audit 2026-10-24, M3).
+      const r = await db(`applications?id=eq.${encodeURIComponent(id)}&user_id=eq.${uid}&select=id`, {
         method: 'PATCH', body: JSON.stringify({ ...allowed, updated_at: new Date().toISOString() }),
-        headers: { Prefer: 'return=minimal' },
+        headers: { Prefer: 'return=representation' },
       });
       if (!r.ok) {
         const e = await r.text().catch(() => '');
         console.error('[user-sync] update_application failed:', r.status, e.slice(0, 200));
         return res.status(200).json({ ok: false, reason: 'patch_failed' });
       }
+      const changed = await r.json().catch(() => []);
+      if (!Array.isArray(changed) || changed.length === 0) return res.status(404).json({ ok: false, reason: 'not_found' });
     }
     return res.status(200).json({ ok: true });
   }
@@ -339,6 +332,15 @@ export default async function handler(req, res) {
     const SAFE_FIELDS = ['email','name','type','city','industry','experience','survey_completed','onboarding_survey'];
     const row = { id: uid };
     SAFE_FIELDS.forEach(f => { if (p[f] !== undefined) row[f] = p[f]; });
+    // Input hygiene (audit 2026-10-24, P1): the free-text fields are trimmed and capped (same limits as
+    // the Settings form, lib/profileLimits.js), and a name that is present but blank is refused —
+    // signup requires one, and the dashboard greeting has nowhere to fall back to.
+    for (const f of ['name', 'city', 'industry']) {
+      if (row[f] === undefined || row[f] === null) continue;
+      if (typeof row[f] !== 'string') return res.status(400).json({ ok: false, error: `${f} must be text` });
+      row[f] = row[f].trim().slice(0, PROFILE_LIMITS[f] || 120);
+    }
+    if (row.name !== undefined && !row.name) return res.status(400).json({ ok: false, error: PROFILE_NAME_REQUIRED });
     const r = await db('profiles?on_conflict=id', {
       method: 'POST',
       body: JSON.stringify(row),

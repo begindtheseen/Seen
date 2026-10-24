@@ -12,6 +12,8 @@ import { matchCities } from '@/lib/data/usCities'
 import { ResumeStore } from '@/lib/stores/ResumeStore'
 import { parseResumeFile } from '@/lib/resumeUploadClient'
 import PageHeader from '@/components/shell/PageHeader'
+import DangerConfirmDialog from '@/components/DangerConfirmDialog'
+import { PROFILE_LIMITS, PROFILE_NAME_REQUIRED, clampProfileField } from '@/lib/profileLimits.js'
 import styles from './profile.module.css'
 import { formatPacific } from '@/lib/time/pacific.js'
 import { FREE_DAILY_CREDITS, CREDIT_RESET_LABEL, RESUME_PARSE_COST } from '@/lib/creditRules'
@@ -106,9 +108,10 @@ export default function ProfilePage() {
         writeProfileCache(user?.id, loadedProfile)
       }
     }).catch(() => {}).finally(() => setLoaded(true))
-    // Subscription status — gates the Billing section + Manage/Cancel button.
-    _sync('load').then((res) => {
-      const pro = !!(res as { credits?: { pro?: boolean } } | null)?.credits?.pro
+    // Subscription status — gates the Billing section + Manage/Cancel button. get_credits is one DB
+    // read; this used to call `load` (the whole tracker: six reads) for one boolean.
+    _sync('get_credits').then((res) => {
+      const pro = !!(res as { pro?: boolean } | null)?.pro
       setIsPro(pro)
       if (pro) loadSub()
     }).catch(() => {})
@@ -201,21 +204,27 @@ export default function ProfilePage() {
   }
 
   async function saveProfile() {
+    // Trim + cap (lib/profileLimits.js, the server applies the same) and refuse a blank name instead
+    // of saving one: signup requires a name and the dashboard greets by it (audit 2026-10-24, P1).
+    const cleanName = clampProfileField('name', name)
+    const cleanCity = clampProfileField('city', city)
+    if (!cleanName) { setSaveMsg(PROFILE_NAME_REQUIRED); setSaveMsgOk(false); return }
     setSaving(true)
     setSaveMsg('')
-    const result = await _sync('save_profile', { profile: { name: name.trim(), city: city.trim(), experience } }) as { ok?: boolean } | null
+    const result = await _sync('save_profile', { profile: { name: cleanName, city: cleanCity, experience } }) as { ok?: boolean; error?: string } | null
     if (!result || result.ok === false) {
-      setSaveMsg('Save failed — please try again.')
+      setSaveMsg(result?.error || 'Save failed — please try again.')
       setSaveMsgOk(false)
       setSaving(false)
       return
     }
     // Per-user cache (no cross-user bleed) so the saved values render instantly next time.
-    writeProfileCache(user?.id, { name: name.trim(), city: city.trim(), experience })
+    writeProfileCache(user?.id, { name: cleanName, city: cleanCity, experience })
+    setName(cleanName); setCity(cleanCity)
     setSaveMsg('Saved!')
     setSaveMsgOk(true)
-    setInitName(name.trim())
-    setInitCity(city.trim())
+    setInitName(cleanName)
+    setInitCity(cleanCity)
     setInitExperience(experience)
     loadProfile()
     setSaving(false)
@@ -260,14 +269,29 @@ export default function ProfilePage() {
   }
 
   const [signingOutAll, setSigningOutAll] = useState(false)
+  // In-app confirmation (components/DangerConfirmDialog.tsx), not the browser's confirm(): the native
+  // dialog is dismissed by habit — and by automation, which is how the 2026-10-24 audit measured this
+  // button as "does nothing" (a dismissed confirm() returned before the sign-out ran).
+  const [confirmSignOutAll, setConfirmSignOutAll] = useState(false)
+  const [signOutAllMsg, setSignOutAllMsg] = useState('')
   async function signOutEverywhere() {
-    if (!confirm('Sign out of Seen on every device, including this one? You can sign back in right away.')) return
     setSigningOutAll(true)
+    setSignOutAllMsg('')
     markIntentionalSignOut()
-    // scope 'global' revokes every refresh token for the account; other devices see a 401 on their
-    // next sync and get the "session expired" message instead of a silently empty tracker.
-    await supabase.auth.signOut({ scope: 'global' })
+    // scope 'global' revokes every refresh token for the account (this device's too); other devices
+    // see a 401 on their next sync and get the "session expired" message instead of a silently empty
+    // tracker. supabase-js also clears this device's local session on a successful global call.
+    const { error } = await supabase.auth.signOut({ scope: 'global' })
+    if (error) {
+      // The server refused (network, or the session was already dead): say so and end THIS device's
+      // session anyway so the person is never left looking signed in after asking to be signed out.
+      setSignOutAllMsg('Could not reach the sign-in server to end your other sessions — try again in a moment. This device is signed out.')
+      markIntentionalSignOut()
+      await supabase.auth.signOut({ scope: 'local' })
+    }
     try { localStorage.removeItem('seen_last_page') } catch {}
+    setConfirmSignOutAll(false)
+    setSigningOutAll(false)
     router.replace('/login')
   }
 
@@ -339,7 +363,7 @@ export default function ProfilePage() {
               <div className={styles.grid2}>
                 <div className={styles.field}>
                   <label className={styles.label} htmlFor="pf-name">First name</label>
-                  {loaded ? <input id="pf-name" className={styles.input} type="text" autoComplete="given-name" value={name} onChange={e => { touched.current.name = true; setName(e.target.value) }} placeholder="Your first name" /> : <div className={styles.skeleton} />}
+                  {loaded ? <input id="pf-name" className={styles.input} type="text" autoComplete="given-name" maxLength={PROFILE_LIMITS.name} value={name} onChange={e => { touched.current.name = true; setName(e.target.value) }} placeholder="Your first name" /> : <div className={styles.skeleton} />}
                 </div>
                 <div className={styles.field}>
                   <label className={styles.label} htmlFor="pf-email">Email</label>
@@ -350,6 +374,7 @@ export default function ProfilePage() {
                   {loaded ? (
                     <input
                       id="pf-city"
+                      maxLength={PROFILE_LIMITS.city}
                       className={styles.input}
                       type="text"
                       autoComplete="off"
@@ -469,8 +494,21 @@ export default function ProfilePage() {
                   <div className={styles.rowT}>Sign out of all devices</div>
                   <div className={styles.rowS}>Ends every session on every phone and computer — use it if you signed in somewhere you don’t control.</div>
                 </div>
-                <button type="button" className={`${styles.ghost} ${styles.danger}`} onClick={signOutEverywhere} disabled={signingOutAll}>{signingOutAll ? 'Signing out…' : 'Sign out everywhere'}</button>
+                <button type="button" className={`${styles.ghost} ${styles.danger}`} onClick={() => setConfirmSignOutAll(true)} disabled={signingOutAll} aria-haspopup="dialog">{signingOutAll ? 'Signing out…' : 'Sign out everywhere'}</button>
               </div>
+              {signOutAllMsg && <div className={`${styles.msg} ${styles.err}`} role="alert">{signOutAllMsg}</div>}
+              {confirmSignOutAll && (
+                <DangerConfirmDialog
+                  testId="signout-all-confirm"
+                  title="Sign out of Seen on every device?"
+                  body={['Every phone and computer signed in to this account is signed out, including this one. Anyone using your account elsewhere loses access the moment their page next talks to Seen.', 'Your applications and saved jobs stay in your account. You can sign back in right away.']}
+                  confirmLabel="Sign out everywhere"
+                  busy={signingOutAll}
+                  busyLabel="Signing out…"
+                  onConfirm={signOutEverywhere}
+                  onCancel={() => { if (!signingOutAll) setConfirmSignOutAll(false) }}
+                />
+              )}
             </section>
 
             {/* ── Plan & billing ── */}

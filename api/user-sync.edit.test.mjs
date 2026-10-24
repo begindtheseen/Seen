@@ -33,7 +33,8 @@ function install() {
     const body = opts.body ? JSON.parse(opts.body) : null;
     const m = opts.method || 'GET';
     if (m === 'GET') return Response.json(rows.filter((r) => match(r, u)));
-    if (m === 'PATCH') { patches.push({ url: u.pathname + u.search, body }); for (const r of rows.filter((r) => match(r, u))) Object.assign(r, body); return new Response(null, { status: 204 }); }
+    const represent = /return=representation/.test(String((opts.headers || {}).Prefer || ''));
+    if (m === 'PATCH') { patches.push({ url: u.pathname + u.search, body }); const hit = rows.filter((r) => match(r, u)); for (const r of hit) Object.assign(r, body); return represent ? Response.json(hit) : new Response(null, { status: 204 }); }
     if (m === 'POST') { rows.push({ ...body }); return Response.json([body], { status: 201 }); }
     return new Response(null, { status: 405 });
   };

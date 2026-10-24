@@ -63,7 +63,7 @@ function calcJobSearchHealth(apps: Application[]) {
 
 export default function DashboardPage() {
   const router = useRouter()
-  const { user, profile, isLoggedIn, isSeeker, ready, token } = useAuth()
+  const { user, profile, isLoggedIn, isSeeker, ready } = useAuth()
   const [apps, setApps] = useState<Application[]>([])
   const [loading, setLoading] = useState(true)
   const [isPro, setIsPro] = useState(false)
@@ -91,50 +91,20 @@ export default function DashboardPage() {
     setOnboardHidden(device || isChecklistDismissed(profile?.onboarding_survey))
   }, [user?.id, profile?.onboarding_survey])
 
-  useEffect(() => {
-    if (!isSeeker) return
-    token().then(tok => {
-      if (!tok) return
-      fetch('/api/user-sync', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${tok}` }, body: JSON.stringify({ action: 'get_credits' }) })
-        .then(r => r.json()).then(d => setIsPro(!!d?.pro)).catch(() => {})
-    })
-  }, [isSeeker, token])
-
   // Inbox Autopilot tile: shown once the feature is live (null = not live yet / unknown → hidden).
   const [inbox, setInbox] = useState<{ ready: boolean; enabled?: boolean; received_count?: number } | null>(null)
-  useEffect(() => {
-    if (!isSeeker) return
-    token().then(tok => {
-      if (!tok) return
-      fetch('/api/user-sync', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${tok}` }, body: JSON.stringify({ action: 'inbox_status' }) })
-        .then(r => r.ok ? r.json() : null).then(d => setInbox(d && typeof d.ready === 'boolean' ? d : null)).catch(() => {})
-    })
-  }, [isSeeker, token])
 
   // Companies this person checked: this device's list first, then the account's (user_recent_cos,
   // written by the company page when signed in) so the checklist's third step and "Recently checked"
   // are true on a second device too. ONE slug scheme (CLAUDE.md): lower-case, spaces → hyphens.
-  useEffect(() => {
-    let local: Array<{ name: string; slug: string }> = []
+  const localRecent = (): Array<{ name: string; slug: string }> => {
     try {
       const raw = localStorage.getItem('seen_recent_cos')
-      if (raw) local = (JSON.parse(raw) as Array<{ name: string; slug: string }>).filter(c => c && c.name && c.slug)
+      if (raw) return (JSON.parse(raw) as Array<{ name: string; slug: string }>).filter(c => c && c.name && c.slug)
     } catch {}
-    setRecentCos(local.slice(0, 5))
-    if (!isLoggedIn) return
-    let alive = true
-    _sync('get_recent_cos').then(r => {
-      const rows = (r as { recent?: Array<{ company_name?: string }> } | null)?.recent
-      if (!alive || !Array.isArray(rows)) return
-      const seen = new Set(local.map(c => c.slug))
-      const fromAccount = rows
-        .map(x => String(x?.company_name || '').trim()).filter(Boolean)
-        .map(name => ({ name, slug: encodeURIComponent(name.toLowerCase().replace(/\s+/g, '-')) }))
-        .filter(c => !seen.has(c.slug) && (seen.add(c.slug), true))
-      if (fromAccount.length) setRecentCos([...local, ...fromAccount].slice(0, 5))
-    }).catch(() => {})
-    return () => { alive = false }
-  }, [isLoggedIn])
+    return []
+  }
+  useEffect(() => { setRecentCos(localRecent().slice(0, 5)) }, [])
 
   useEffect(() => {
     if (!ready) return // wait for the session to resolve — redirecting early bounced signed-in users
@@ -144,9 +114,29 @@ export default function DashboardPage() {
     if (isLoggedIn && !isSeeker) { router.replace('/employers'); return }
   }, [ready, isLoggedIn, isSeeker, router])
 
+  // ONE /api/user-sync call at mount: `load` brings the applications AND the pro flag, the account's
+  // recently-checked companies and the Inbox Autopilot status. The page used to fire four (load,
+  // get_credits, inbox_status, get_recent_cos) — each a function invocation + rate-limit RPC + its
+  // reads, and the audit of 2026-10-24 measured 8–15 s / 504s on that path at first paint.
   useEffect(() => {
     if (!isLoggedIn) return
-    AppStore.load(true).then(data => { setApps(data); setLoading(false) })
+    let alive = true
+    AppStore.loadBundle(true).then(bundle => {
+      if (!alive) return
+      setApps(bundle ? bundle.applications : AppStore.loadSync())
+      setLoading(false)
+      if (!bundle) return
+      setIsPro(!!bundle.credits?.pro)
+      setInbox(bundle.inbox)
+      const local = localRecent()
+      const seen = new Set(local.map(c => c.slug))
+      const fromAccount = bundle.recent_cos
+        .map(x => String(x?.company_name || '').trim()).filter(Boolean)
+        .map(name => ({ name, slug: encodeURIComponent(name.toLowerCase().replace(/\s+/g, '-')) }))
+        .filter(c => !seen.has(c.slug) && (seen.add(c.slug), true))
+      if (fromAccount.length) setRecentCos([...local, ...fromAccount].slice(0, 5))
+    }).catch(() => { if (alive) { setApps(AppStore.loadSync()); setLoading(false) } })
+    return () => { alive = false }
   }, [isLoggedIn])
 
   // Ghost-surge alerts for the companies you're waiting on — served by api/reports.js
