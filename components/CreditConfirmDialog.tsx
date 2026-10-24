@@ -1,7 +1,7 @@
 'use client'
 
-// The one-time "This uses 1 of your N credits" confirmation shown before the FIRST paid AI
-// action on an account/device (lib/creditConfirm.ts remembers the answer). Solid surface
+// The one-time "This uses 1 of your N credits" confirmation shown before the FIRST paid
+// action (the optimizers are deterministic rule engines — the copy never claims a model is used) on an account/device (lib/creditConfirm.ts remembers the answer). Solid surface
 // (#0e111c — never translucent over content, per the 2026-10-19 overlay rule), sits above
 // every drawer/modal, and reads the live balance so N is never a guess.
 
@@ -55,10 +55,10 @@ export default function CreditConfirmDialog({ cost = 1, action, onConfirm, onCan
         style={{ position: 'fixed', inset: 0, zIndex: 9950, background: 'rgba(0,0,0,.72)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}
         onClick={onCancel}>
         <div ref={boxRef} onClick={e => e.stopPropagation()} style={{ width: '100%', maxWidth: 380, background: '#0e111c', border: '1px solid var(--line2)', borderRadius: 16, padding: '1.15rem 1.2rem 1rem', boxShadow: '0 30px 80px rgba(0,0,0,.7)' }}>
-          <div style={{ fontFamily: 'var(--mono)', fontSize: '.52rem', textTransform: 'uppercase', letterSpacing: '.1em', color: 'var(--dim)', marginBottom: '.5rem' }}>AI credit</div>
+          <div style={{ fontFamily: 'var(--mono)', fontSize: '.52rem', textTransform: 'uppercase', letterSpacing: '.1em', color: 'var(--dim)', marginBottom: '.5rem' }}>Credit</div>
           <div id="credit-confirm-title" style={{ fontFamily: 'var(--display)', fontSize: '1rem', fontWeight: 800, color: 'var(--white)', lineHeight: 1.3, marginBottom: '.45rem' }}>{headline}</div>
           <p style={{ fontSize: '.78rem', color: 'var(--sub)', lineHeight: 1.6, margin: '0 0 .5rem' }}>
-            {cost === 0 ? `We will ${action} for free.` : `It will ${action}. Every AI action costs ${label}; you will see the price on the button each time.`}
+            {cost === 0 ? `We will ${action} for free.` : `It will ${action}. Every paid action costs ${label}; you will see the price on the button each time.`}
           </p>
           <p style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', color: 'var(--muted)', lineHeight: 1.6, margin: '0 0 1rem' }}>
             {dailyResetLabel()} · purchased credits never reset · we only ask this once.

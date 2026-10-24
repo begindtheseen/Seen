@@ -16,10 +16,11 @@ import type { SavedJob } from '@/lib/types'
 import UpgradeModal from '@/components/UpgradeModal'
 import { FREE_DAILY_CREDITS } from '@/lib/creditRules'
 import dynamic from 'next/dynamic'
-import ApplicationIntelligencePanel, { type ApplicationIntelligence, type ConfirmedAnswer } from '@/components/optimizer/ApplicationIntelligencePanel'
-import MatchAnalysisPanel from '@/components/optimizer/MatchAnalysisPanel'
-import type { MatchAnalysis } from '@/lib/resume-intelligence/engine'
-import ErrorBoundary from '@/components/ErrorBoundary'
+import { VerdictCard, WhyYouMatch, MissingList, Checklist, PaidPlanView, type Verdict, type ConstraintRow, type PaidPlan } from '@/components/optimizer/Verdict'
+import CreditConfirmDialog from '@/components/CreditConfirmDialog'
+import { hasConfirmedCreditUse } from '@/lib/creditConfirm'
+import { RESUME_OPTIMIZE_COST, creditCostLabel } from '@/lib/creditRules'
+import { markQuiet } from '@/lib/quietWindow'
 import { MIN_REPORTS_FOR_GRADE } from '@/lib/gradeGate'
 import PageHeader from '@/components/shell/PageHeader'
 
@@ -27,17 +28,20 @@ const ResumeSurveyModal = dynamic(() => import('@/components/ResumeSurveyModal')
 
 const CREDIT_WORD = FREE_DAILY_CREDITS === 1 ? 'credit' : 'credits'
 
-type Tab = 'fit' | 'intel' | 'rewrite' | 'humanproof' | 'strategy' | 'export'
+type Tab = 'fit' | 'rewrite' | 'humanproof' | 'strategy' | 'export'
+const OPTIMIZE_PRICE = creditCostLabel(RESUME_OPTIMIZE_COST)
 
 // ── SeenFit optimizer output (canonical, from /api/optimizer action:'optimize') ──
-interface Contribution { factor: string; weight: number; raw: number; points: number; reason: string }
+interface Contribution { factor: string; weight: number; raw: number; points: number; reason: string; scored?: boolean }
 interface RiskFlag { code: string; severity: 'low' | 'medium' | 'high'; message: string }
-interface RequirementMatch { requirement: string; surface: string; importance: string; matched: boolean; via: string; evidence: string | null }
-interface SafeBullet { text: string; evidenceUsed: string[]; template: string }
-interface ConfirmItem { text: string; reason: string; placeholder: string }
+interface RequirementMatch { requirement: string; surface: string; importance: string; matched: boolean; via: string; evidence: string | null; soft?: boolean; hard?: boolean }
+// The FREE diagnosis (/api/optimizer action:'optimize'): the one verdict + matched/missing +
+// checklist + the factor breakdown. Bullets, rewrites and the message are the paid package below.
 interface OptimizerOutput {
   run_id?: string | null
-  fit_score: number
+  verdict: Verdict
+  constraints: ConstraintRow[]
+  fit_score: number | null
   confidence: number
   confidence_label: 'low' | 'medium' | 'high'
   required_match: number
@@ -51,16 +55,25 @@ interface OptimizerOutput {
   missing_keywords: string[]
   matched_requirements: RequirementMatch[]
   unsupported_requirements: RequirementMatch[]
-  safe_bullets: SafeBullet[]
-  confirm_before_using: ConfirmItem[]
-  application_message: string
   explanation: { summary: string; contributions: Contribution[]; notes: string[] }
   engine_version?: string
-  // Application Intelligence V2 — additive, may be null (falls back to the legacy UI).
-  application_intelligence?: ApplicationIntelligence | null
-  // Canonical Resume Intelligence Engine — the unified analysis (preferred when present).
-  resume_intelligence?: MatchAnalysis | null
 }
+// The PAID package (/api/resume tool:'optimize', 1 credit, cached 7 days) — a strict superset.
+interface OptimizeBullet { original: string; optimized: string; addresses: string }
+interface PaidOptimize extends PaidPlan {
+  verdict?: Verdict
+  matched_requirements?: RequirementMatch[]
+  unsupported_requirements?: RequirementMatch[]
+  constraints?: ConstraintRow[]
+  optimized_bullets: OptimizeBullet[]
+  keywords_added: string[]
+  wording_notes?: string[]
+  application_message?: string
+  cached?: boolean
+  charged?: boolean
+}
+const isGuidance = (s: string) => /^\s*\(/.test(String(s || ''))
+const realBulletsOf = (p: PaidOptimize | null) => (p?.optimized_bullets || []).filter(b => !isGuidance(b.original) && !isGuidance(b.optimized))
 
 // ── HumanProof package-mode output ──
 interface HpConfirm { text: string; reason: string; placeholder: string }
@@ -135,67 +148,35 @@ function Card({ children, style }: { children: React.ReactNode; style?: React.CS
 
 // ═══ FIT TAB — the diagnosis (scores, coverage, matches, company risk) ═══
 function FitView({ out, intel, jobCompany, insights }: { out: OptimizerOutput; intel: CompanyIntel | null; jobCompany: string; insights: Insights | null }) {
-  const metrics: Array<{ label: string; raw: number }> = [
-    { label: 'ATS keyword coverage', raw: out.ats_coverage },
-    { label: 'Required skills matched', raw: out.required_match },
-    { label: 'Preferred skills matched', raw: out.preferred_match },
-    { label: 'Evidence strength', raw: out.evidence_strength },
-    { label: 'Seniority alignment', raw: out.seniority_alignment },
-  ]
+  // Only the factors that were actually measured (an ungraded company or an unknown location is
+  // not scored — lib/optimizer/explainScore.js), as plain bars.
+  const metrics = (out.explanation.contributions || []).filter(c => c.scored !== false && c.factor !== 'risk_penalty' && c.factor !== 'company_process_score')
   return (
     <div style={{ animation: 'fadeUp .3s ease both' }}>
-      <Card>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-          <div style={{ flexShrink: 0, width: 64, height: 64, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', border: `3px solid ${scoreColor(out.fit_score)}` }}>
-            <span style={{ fontFamily: 'var(--display)', fontWeight: 800, fontSize: '1.35rem', color: scoreColor(out.fit_score) }}>{out.fit_score}</span>
-          </div>
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontFamily: 'var(--display)', fontWeight: 800, color: 'var(--white)', fontSize: '1rem' }}>SeenFit Score</div>
-            <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-60)', color: 'var(--dim)', marginTop: '.2rem' }}>{out.confidence_label} confidence ({pct(out.confidence)})</div>
-          </div>
-        </div>
-        <p style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-65)', color: 'var(--sub)', lineHeight: 1.6, marginTop: '.85rem' }}>{out.explanation.summary}</p>
-      </Card>
+      <Card><VerdictCard verdict={out.verdict} note={`${out.confidence_label} confidence · free`} /></Card>
 
-      <Card>
-        {kicker('Coverage breakdown')}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '.65rem' }}>
-          {metrics.map((m) => (
-            <div key={m.label}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '.25rem' }}>
-                <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-62)', color: 'var(--sub)' }}>{m.label}</span>
-                <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-62)', color: 'var(--white)' }}>{pct(m.raw)}</span>
-              </div>
-              <div style={{ height: 5, background: 'var(--raised)', borderRadius: 3, overflow: 'hidden' }}>
-                <div style={{ width: `${Math.min(100, m.raw * 100)}%`, height: '100%', background: scoreColor(m.raw * 100) }} />
-              </div>
-            </div>
-          ))}
-        </div>
-      </Card>
-
-      {out.matched_requirements.length > 0 && (
+      {out.verdict.score != null && metrics.length > 0 && (
         <Card>
-          {kicker('Why you match', 'var(--green)')}
-          <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: '.5rem' }}>
-            {out.matched_requirements.slice(0, 8).map((m, i) => (
-              <li key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: '.5rem', fontSize: '.78rem', color: 'var(--sub)', lineHeight: 1.5 }}>
-                <span style={{ color: 'var(--green)', fontSize: 'var(--fs-60)', marginTop: '.2rem', flexShrink: 0 }}>✓</span>
-                <span style={{ minWidth: 0, overflowWrap: 'anywhere' }}><strong style={{ color: 'var(--white)' }}>{m.surface}</strong>{m.via === 'related' ? ' (transferable)' : ''}{m.evidence ? ` — ${m.evidence.slice(0, 90)}` : ''}</span>
-              </li>
+          {kicker('What the score is made of')}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '.65rem' }}>
+            {metrics.map((m) => (
+              <div key={m.factor} title={m.reason}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '.25rem', gap: '.5rem' }}>
+                  <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-62)', color: 'var(--sub)', minWidth: 0 }}>{m.reason}</span>
+                  <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-62)', color: 'var(--white)', flexShrink: 0 }}>{m.points} pts</span>
+                </div>
+                <div style={{ height: 5, background: 'var(--raised)', borderRadius: 3, overflow: 'hidden' }}>
+                  <div style={{ width: `${Math.min(100, m.raw * 100)}%`, height: '100%', background: scoreColor(m.raw * 100) }} />
+                </div>
+              </div>
             ))}
-          </ul>
-        </Card>
-      )}
-
-      {out.unsupported_requirements.length > 0 && (
-        <Card>
-          {kicker('Missing requirements', 'var(--red)')}
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '.35rem' }}>
-            {out.unsupported_requirements.slice(0, 10).map((m, i) => <span key={i}>{chip(m.surface, 'var(--red)', 'var(--rdim)', '#ff3b5c20')}</span>)}
           </div>
         </Card>
       )}
+
+      {out.matched_requirements.length > 0 && <Card><WhyYouMatch matched={out.matched_requirements} limit={8} /></Card>}
+      {out.unsupported_requirements.length > 0 && <Card><MissingList missing={out.unsupported_requirements} limit={10} /></Card>}
+      {(out.constraints || []).some(c => c.status === 'ask') && <Card><Checklist constraints={out.constraints} /></Card>}
 
       <Card>
         {kicker('Company hiring risk')}
@@ -240,48 +221,42 @@ function FitView({ out, intel, jobCompany, insights }: { out: OptimizerOutput; i
   )
 }
 
-// ═══ REWRITE TAB — deliverables (safe bullets, keywords, confirm, message) ═══
-function RewriteView({ out, copy, copied }: { out: OptimizerOutput; copy: (t: string, k: string) => void; copied: string | null }) {
+// ═══ REWRITE TAB — the PAID deliverables (plan, moves, questions, availability, summary, bullets) ═══
+function RewriteView({ out, copy, copied }: { out: PaidOptimize; copy: (t: string, k: string) => void; copied: string | null }) {
+  const real = realBulletsOf(out)
+  const guidance = (out.optimized_bullets || []).filter(b => isGuidance(b.original) || isGuidance(b.optimized))
   return (
-    <div style={{ animation: 'fadeUp .3s ease both' }}>
-      {out.missing_keywords.length > 0 && (
-        <Card>
-          {kicker('Keywords to include (only if genuinely yours)', 'var(--amber)')}
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '.35rem' }}>
-            {out.missing_keywords.map((k, i) => <span key={i}>{chip(k, 'var(--amber)', 'rgba(245,158,11,.08)', 'rgba(245,158,11,.25)')}</span>)}
-          </div>
-        </Card>
-      )}
+    <div style={{ animation: 'fadeUp .3s ease both' }} className="ai-stack">
+      {out.cached && <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-60)', color: 'var(--green)' }}>No credit used — you built this plan for this job and résumé in the last 7 days.</div>}
+      <PaidPlanView plan={out} />
 
-      {out.safe_bullets.length > 0 ? (
+      {real.length > 0 && (
         <Card>
-          {kicker('Safe résumé bullets', 'var(--green)')}
-          <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-58)', color: 'var(--green)', marginBottom: '.6rem' }}>✓ Fully backed by your résumé — no invented numbers, tools, or claims.</div>
+          {kicker('Safe improvements to your own bullets', 'var(--green)')}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '.55rem' }}>
-            {out.safe_bullets.map((b, i) => (
+            {real.map((b, i) => (
               <div key={i} style={{ background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 8, padding: '.7rem .85rem', display: 'flex', gap: '.6rem', alignItems: 'flex-start' }}>
-                <span style={{ fontSize: '.78rem', color: 'var(--sub)', lineHeight: 1.6, flex: 1, minWidth: 0, overflowWrap: 'anywhere' }}>{b.text}</span>
-                <button onClick={() => copy(b.text, `sb${i}`)} style={{ background: 'none', border: '1px solid var(--line2)', borderRadius: 6, padding: '.25rem .5rem', fontFamily: 'var(--mono)', fontSize: 'var(--fs-55)', color: copied === `sb${i}` ? 'var(--green)' : 'var(--muted)', cursor: 'pointer', flexShrink: 0 }}>{copied === `sb${i}` ? '✓' : 'copy'}</button>
+                <span style={{ fontSize: '.78rem', color: 'var(--sub)', lineHeight: 1.6, flex: 1, minWidth: 0, overflowWrap: 'anywhere' }}>{b.optimized}</span>
+                <button onClick={() => copy(b.optimized, `sb${i}`)} style={{ background: 'none', border: '1px solid var(--line2)', borderRadius: 6, padding: '.25rem .5rem', fontFamily: 'var(--mono)', fontSize: 'var(--fs-55)', color: copied === `sb${i}` ? 'var(--green)' : 'var(--muted)', cursor: 'pointer', flexShrink: 0 }}>{copied === `sb${i}` ? '✓' : 'copy'}</button>
               </div>
             ))}
           </div>
         </Card>
-      ) : (
-        <Card><div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-70)', color: 'var(--muted)', lineHeight: 1.6 }}>No safe automatic rewrites for this résumé — add bullets that map to the missing requirements, each with a real number.</div></Card>
       )}
 
-      {out.confirm_before_using.length > 0 && (
+      {guidance.length > 0 && (
         <Card>
-          {kicker('⚠ Confirm before using', 'var(--amber)')}
-          <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-58)', color: 'var(--amber)', marginBottom: '.6rem', lineHeight: 1.5 }}>These need a real number/detail from you. We will not invent it.</div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '.55rem' }}>
-            {out.confirm_before_using.map((c, i) => (
-              <div key={i} style={{ background: 'rgba(245,158,11,.06)', border: '1px solid rgba(245,158,11,.2)', borderRadius: 8, padding: '.7rem .85rem' }}>
-                <div style={{ fontSize: '.76rem', color: 'var(--sub)', lineHeight: 1.6, overflowWrap: 'anywhere' }}>{c.text}</div>
-                <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-55)', color: 'var(--muted)', marginTop: '.35rem' }}>{c.reason}</div>
-              </div>
-            ))}
+          {kicker('⚠ Needs a real detail from you — add only if true', 'var(--amber)')}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '.45rem' }}>
+            {guidance.map((g, i) => <div key={i} style={{ background: 'rgba(245,158,11,.06)', border: '1px solid rgba(245,158,11,.2)', borderRadius: 8, padding: '.6rem .8rem', fontSize: '.76rem', color: 'var(--sub)', lineHeight: 1.6, overflowWrap: 'anywhere' }}>Write a bullet for <strong style={{ color: 'var(--white)' }}>{g.addresses}</strong> — only if it reflects real work, with a real number.</div>)}
           </div>
+        </Card>
+      )}
+
+      {(out.wording_notes || []).length > 0 && (
+        <Card>
+          {kicker('Same thing, different word')}
+          {(out.wording_notes || []).slice(0, 3).map((n, i) => <div key={i} style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-62)', color: 'var(--sub)', lineHeight: 1.6, marginBottom: '.3rem', overflowWrap: 'anywhere' }}>{n}</div>)}
         </Card>
       )}
 
@@ -289,7 +264,7 @@ function RewriteView({ out, copy, copied }: { out: OptimizerOutput; copy: (t: st
         <Card>
           {kicker('Application message')}
           <p style={{ fontSize: '.78rem', color: 'var(--sub)', lineHeight: 1.7, margin: 0, overflowWrap: 'anywhere' }}>{out.application_message}</p>
-          <button onClick={() => copy(out.application_message, 'msg')} style={{ marginTop: '.75rem', background: 'var(--green)', color: 'var(--ink)', border: 'none', borderRadius: 7, padding: '.45rem .9rem', fontFamily: 'var(--display)', fontWeight: 800, fontSize: 'var(--fs-70)', cursor: 'pointer' }}>{copied === 'msg' ? '✓ Copied' : 'Copy message'}</button>
+          <button onClick={() => copy(out.application_message || '', 'msg')} style={{ marginTop: '.75rem', background: 'var(--green)', color: 'var(--ink)', border: 'none', borderRadius: 7, padding: '.45rem .9rem', fontFamily: 'var(--display)', fontWeight: 800, fontSize: 'var(--fs-70)', cursor: 'pointer' }}>{copied === 'msg' ? '✓ Copied' : 'Copy message'}</button>
         </Card>
       )}
     </div>
@@ -413,9 +388,15 @@ function ResumePageInner() {
 
   // Fit / SeenFit (anchor analysis)
   const [fitOut, setFitOut] = useState<OptimizerOutput | null>(null)
-  const [fitState, setFitState] = useState<'idle' | 'loading' | 'done' | 'error' | 'disabled'>('idle')
+  const [fitState, setFitState] = useState<'idle' | 'loading' | 'done' | 'error' | 'disabled' | 'preview'>('idle')
   const [fitErrRef, setFitErrRef] = useState('') // server error ref for a failed optimize (traceable in api_errors)
-  const [v2Rerunning, setV2Rerunning] = useState(false) // "Improve this result" re-score in flight
+  // The paid package (Rewrite tab): probed free after every analysis, bought only on a press.
+  const [paid, setPaid] = useState<PaidOptimize | null>(null)
+  const [paidState, setPaidState] = useState<'idle' | 'checking' | 'loading' | 'done' | 'error' | 'preview'>('idle')
+  const [confirmPaid, setConfirmPaid] = useState(false)
+  // A saved job carries its listing source so the server can tell an Adzuna teaser from a posting;
+  // the moment the person edits the description it is THEIR pasted posting.
+  const [jobSource, setJobSource] = useState<string | null>(null)
 
   // HumanProof
   const [hp, setHp] = useState<HumanProofResult | null>(null)
@@ -490,6 +471,7 @@ function ResumePageInner() {
     setJobTitle(s.role || snap?.title || '')
     setJobCompany(co)
     setJobJD(snap?.description || '')
+    setJobSource((snap as { source?: string | null } | undefined)?.source || null)
     setJobUrl(snap?.apply_url || '')
     setShowManual(false)
     setError('')
@@ -538,42 +520,65 @@ function ResumePageInner() {
     setAnalyzed(true)
     setTab('fit')
     // Reset downstream tabs so they re-run against the new inputs.
-    setHp(null); setHpState('idle'); setAdvResult(null); setAdvState('idle')
-    await runFit()
+    setHp(null); setHpState('idle'); setAdvResult(null); setAdvState('idle'); setPaid(null); setPaidState('idle')
+    const ok = await runFit()
     loadInsights()
+    if (ok && isLoggedIn) probePaid()
   }
 
-  async function runFit(confirmedAnswers?: ConfirmedAnswer[]) {
+  // What every optimize call sends about the posting (the source lets the server tell an Adzuna
+  // teaser from a posting; an edited description is the person's own pasted posting).
+  function postingBody() {
+    return jobSource ? { jobDescription: jobJD, jobSource, jobId: jobIdFor() } : { jobDescription: jobJD, postingPasted: !!jobJD.trim(), jobId: jobIdFor() }
+  }
+
+  // FREE: the diagnosis — the one verdict, matched/missing, the checklist.
+  async function runFit(): Promise<boolean> {
     setFitState('loading'); setFitErrRef('')
     try {
       const res = await fetch('/api/optimizer', {
         method: 'POST', headers: await aiHeaders(),
-        body: JSON.stringify({
-          action: 'optimize', resumeText, jobId: jobIdFor(), jobTitle, company: jobCompany, jobDescription: jobJD, remoteOk: /remote/i.test(jobJD),
-          ...(confirmedAnswers?.length ? { confirmed_answers: confirmedAnswers } : {}),
-        }),
+        body: JSON.stringify({ action: 'optimize', resumeText, jobTitle, company: jobCompany, ...postingBody(), remoteOk: /remote/i.test(jobJD) }),
       })
-      if (res.status === 403) { setFitState('disabled'); return }
+      if (res.status === 403) { setFitState('disabled'); return false }
       const data = await res.json().catch(() => ({}))
-      if (!res.ok || data.error) { setFitErrRef(data?.ref || ''); setFitState('error'); return }
+      if (res.status === 422 && data.error === 'preview_only') { setFitState('preview'); setShowManual(true); return false }
+      if (!res.ok || data.error) { setFitErrRef(data?.ref || ''); setFitState('error'); return false }
       setFitOut(data as OptimizerOutput); setFitState('done')
-    } catch { setFitState('error') }
+      return true
+    } catch { setFitState('error'); return false }
   }
 
-  // "Improve this result": fold the user's confirmed answers back into the V2 engine and
-  // re-score. The optimize action is free (deterministic, no credit) — safe to re-run.
-  async function rerunV2WithAnswers(answers: ConfirmedAnswer[]) {
-    if (!answers.length) return
-    setV2Rerunning(true)
+  // FREE: is the paid plan for exactly these inputs already bought (cached 7 days)? Never charges.
+  async function probePaid() {
+    setPaidState('checking')
     try {
-      const res = await fetch('/api/optimizer', {
-        method: 'POST', headers: await aiHeaders(),
-        body: JSON.stringify({ action: 'optimize', resumeText, jobId: jobIdFor(), jobTitle, company: jobCompany, jobDescription: jobJD, remoteOk: /remote/i.test(jobJD), confirmed_answers: answers }),
-      })
-      const data = await res.json().catch(() => ({}))
-      if (res.ok && !data.error) setFitOut(data as OptimizerOutput)
-    } catch { /* keep the prior result on failure */ }
-    setV2Rerunning(false)
+      const res = await fetch('/api/resume', { method: 'POST', headers: await aiHeaders(), body: JSON.stringify({ tool: 'optimize', probe: true, resume: resumeText, job: jobTitle, company: jobCompany, ...postingBody() }) })
+      const data = await res.json().catch(() => ({})) as PaidOptimize & { error?: string }
+      if (data.error === 'preview_only') { setPaidState('preview'); return }
+      if (res.ok && data.cached) { setPaid(data); setPaidState('done'); return }
+      setPaidState('idle')
+    } catch { setPaidState('idle') }
+  }
+
+  // PAID: only on a press of the price-tagged button; the first paid action is confirmed once.
+  function pressPaid() {
+    if (!isLoggedIn) { setError('Sign in to build your rewrite plan.'); return }
+    if (hasConfirmedCreditUse(user?.id)) runPaid()
+    else setConfirmPaid(true)
+  }
+  async function runPaid() {
+    setConfirmPaid(false); setPaidState('loading'); setError('')
+    try {
+      const res = await fetch('/api/resume', { method: 'POST', headers: await aiHeaders(), body: JSON.stringify({ tool: 'optimize', resume: resumeText, job: jobTitle, company: jobCompany, ...postingBody() }) })
+      const data = await res.json().catch(() => ({})) as PaidOptimize & { error?: string; credits_required?: boolean; pro_required?: boolean }
+      if (res.status === 402 || data.credits_required) { setUpgradeReason('credits'); setUpgradeFeature(undefined); setShowUpgrade(true); setPaidState('idle'); return }
+      if (data.error === 'preview_only') { setPaidState('preview'); return }
+      if (!res.ok || data.error) { setPaidState('error'); return }
+      if (data.charged) window.dispatchEvent(new Event('seen:credits-updated'))
+      setPaid(data); setPaidState('done'); setHp(null); setHpState('idle')
+      markQuiet()
+    } catch { setPaidState('error') }
   }
 
   // Read-only insights: a PROBE of the shared cache only (free, never generates, never charges —
@@ -593,16 +598,17 @@ function ResumePageInner() {
   }
 
   async function runHumanProof() {
-    if (!fitOut?.safe_bullets?.length) { setError('Run the fit analysis first — HumanProof works on your safe bullets.'); return }
+    const real = realBulletsOf(paid)
+    if (!real.length) { setError('Build your rewrite plan first — HumanProof works on your improved bullets.'); return }
     setHpState('loading'); setError('')
     try {
       const res = await fetch('/api/optimizer', {
         method: 'POST', headers: await aiHeaders(),
         body: JSON.stringify({
           action: 'humanize',
-          bullets: fitOut.safe_bullets.map(b => b.text),
-          applicationMessage: fitOut.application_message || undefined,
-          warnings: fitOut.confirm_before_using.map(c => ({ phrase: c.placeholder, warning: c.reason || c.text })),
+          bullets: real.map(b => b.optimized),
+          applicationMessage: paid?.application_message || undefined,
+          warnings: (paid?.optimized_bullets || []).filter(b => isGuidance(b.original)).map(g => ({ phrase: g.addresses, warning: `Add a bullet with a real detail for: ${g.addresses}` })),
           jobId: jobIdFor(), jobTitle, company: jobCompany, jobDescription: jobJD, resumeText,
         }),
       })
@@ -643,20 +649,20 @@ function ResumePageInner() {
   // ── Export helpers ──
   function finalBullets(): string[] {
     if (hp?.package?.bullets?.length) return hp.package.bullets.map(b => b.humanized_text)
-    return (fitOut?.safe_bullets || []).map(b => b.text)
+    return realBulletsOf(paid).map(b => b.optimized)
   }
-  function finalMessage(): string { return hp?.package?.application_message?.humanized_text || fitOut?.application_message || '' }
+  function finalMessage(): string { return hp?.package?.application_message?.humanized_text || paid?.application_message || '' }
   function confirmList(): string[] {
     if (hp?.package) {
       const carried = (hp.package.carried_warnings || []).map(w => w.warning).filter(Boolean)
       const perItem = hp.package.bullets.flatMap(b => (b.confirm_before_using || []).map(c => c.text))
       return Array.from(new Set([...carried, ...perItem])).filter(Boolean)
     }
-    return (fitOut?.confirm_before_using || []).map(c => c.text)
+    return (paid?.optimized_bullets || []).filter(b => isGuidance(b.original)).map(g => `Add a bullet with a real detail for: ${g.addresses}`)
   }
   function packageText(): string {
     const lines: string[] = [`${jobTitle}${jobCompany ? ' — ' + jobCompany : ''}`]
-    if (fitOut) lines.push(`SeenFit match: ${fitOut.fit_score}/100`)
+    if (fitOut && fitOut.fit_score != null) lines.push(`SeenFit match: ${fitOut.fit_score}/100`)
     lines.push('', 'OPTIMIZED BULLETS' + (hp ? ' (HumanProof)' : ''))
     for (const b of finalBullets()) lines.push(`• ${b}`)
     const msg = finalMessage()
@@ -676,7 +682,7 @@ function ResumePageInner() {
         method: 'POST', headers: await aiHeaders(),
         body: JSON.stringify({
           action: 'download_resume', resume: resumeText, job: jobTitle, company: jobCompany, jobDescription: jobJD, template: pdfTemplate,
-          optimizedBullets: (fitOut?.safe_bullets || []).map(b => b.text),
+          optimizedBullets: finalBullets(),
           humanproofBullets: hp ? hp.package.bullets.map(b => b.humanized_text) : undefined,
           confirmWarnings: confirmList(),
           applicationMessage: finalMessage() || undefined,
@@ -707,8 +713,8 @@ function ResumePageInner() {
         body: JSON.stringify({
           action: 'email_analysis', email: emailAddr.trim(), co: jobCompany, role: jobTitle, template: pdfTemplate,
           ...(jobUrl ? { jobUrl } : {}),
-          bullets: [], keywords: (fitOut?.missing_keywords || []).slice(0, 12),
-          optimizedBullets: (fitOut?.safe_bullets || []).map(b => b.text),
+          bullets: [], keywords: (fitOut?.unsupported_requirements || []).filter(m => !m.soft).map(m => m.surface).slice(0, 12),
+          optimizedBullets: finalBullets(),
           humanproofBullets: hp ? hp.package.bullets.map(b => b.humanized_text) : undefined,
           confirmWarnings: confirmList(),
           applicationMessage: finalMessage() || undefined,
@@ -732,10 +738,8 @@ function ResumePageInner() {
   const trackHref = `/apply?co=${encodeURIComponent(jobCompany)}&role=${encodeURIComponent(jobTitle)}${jobUrl ? `&jobUrl=${encodeURIComponent(jobUrl)}` : ''}${savedId ? `&jid=${encodeURIComponent(savedId)}` : ''}${trackedSaved?.location ? `&city=${encodeURIComponent(trackedSaved.location)}` : ''}`
   const reportHref = `/report?company=${encodeURIComponent(jobCompany)}&role=${encodeURIComponent(jobTitle)}`
 
-  const hasV2 = !!fitOut?.application_intelligence
   const tabs: Array<{ id: Tab; label: string }> = [
     { id: 'fit', label: '🎯 Fit' },
-    ...(hasV2 ? [{ id: 'intel' as Tab, label: '🧬 Deep Dive' }] : []),
     { id: 'rewrite', label: '✍️ Rewrite' },
     { id: 'humanproof', label: '🗣 HumanProof' },
     { id: 'strategy', label: '🧠 Strategy' },
@@ -746,6 +750,14 @@ function ResumePageInner() {
     <div className="page-full">
       {showUpgrade && <UpgradeModal reason={upgradeReason} featureName={upgradeFeature} onClose={() => setShowUpgrade(false)} />}
       {showSurvey && <ResumeSurveyModal onClose={() => setShowSurvey(false)} />}
+      {confirmPaid && (
+        <CreditConfirmDialog
+          cost={RESUME_OPTIMIZE_COST}
+          action={`build your rewrite plan for ${jobTitle || 'this job'}${jobCompany ? ` at ${jobCompany}` : ''}`}
+          onConfirm={() => runPaid()}
+          onCancel={() => setConfirmPaid(false)}
+        />
+      )}
       <div className="resume-page">
         <PageHeader
           className="resume-hdr"
@@ -812,7 +824,7 @@ function ResumePageInner() {
                   {label('Job URL (optional)')}
                   <input type="url" placeholder="https://…" value={jobUrl} onChange={e => setJobUrl(e.target.value)} style={inputStyle} />
                   {label('Job description')}
-                  <textarea placeholder="Paste the job description..." value={jobJD} onChange={e => setJobJD(e.target.value)} rows={4} style={{ ...areaStyle, marginBottom: '.75rem' }} />
+                  <textarea placeholder="Paste the job description..." value={jobJD} onChange={e => { setJobJD(e.target.value); setJobSource(null) }} rows={4} style={{ ...areaStyle, marginBottom: '.75rem' }} />
                   {label('Your background (for Strategy) — optional')}
                   <textarea placeholder="What draws you to this role? Any unique experience?" value={background} onChange={e => setBackground(e.target.value)} rows={3} style={{ ...areaStyle, marginBottom: '.75rem' }} />
                 </div>
@@ -852,24 +864,26 @@ function ResumePageInner() {
                   fitState === 'loading' ? <ResultEmpty icon="⏳" text={'Scoring your fit…'} />
                   : fitState === 'disabled' ? <ResultEmpty icon="🚧" text={'SeenFit is temporarily unavailable.'} />
                   : fitState === 'error' ? <div><ResultEmpty icon="⚠️" text={'Could not score your fit. Try again.'} />{fitErrRef && <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-55)', color: 'var(--dim)', marginTop: '.35rem' }}>Error ref: {fitErrRef} — share this if it keeps happening.</div>}<button onClick={() => runFit()} style={{ ...btnPrimary, marginTop: '.5rem' }}>Retry</button></div>
+                  : fitState === 'preview' ? <ResultEmpty icon="📄" text={'This listing only has a summary. Paste the full posting to optimize for it.'} />
                   : fitOut ? <FitView out={fitOut} intel={companyIntel} jobCompany={jobCompany} insights={insights} /> : null
                 )}
 
-                {/* DEEP DIVE — the canonical Resume Intelligence Engine (one MatchAnalysis). Falls
-                    back to the legacy V2 panel only if the canonical analysis is unavailable. */}
-                {tab === 'intel' && (
-                  fitState === 'loading' ? <ResultEmpty icon="⏳" text={'Building your deep match analysis…'} />
-                  : fitOut?.resume_intelligence
-                    ? <ErrorBoundary label="match-analysis"><MatchAnalysisPanel analysis={fitOut.resume_intelligence} /></ErrorBoundary>
-                    : fitOut?.application_intelligence
-                      ? <ErrorBoundary label="deep-dive"><ApplicationIntelligencePanel pkg={fitOut.application_intelligence} onAnswers={rerunV2WithAnswers} rerunning={v2Rerunning} /></ErrorBoundary>
-                      : <ResultEmpty icon="🧬" text={'Run the analysis to see the deep match breakdown.'} />
-                )}
-
-                {/* REWRITE */}
+                {/* REWRITE — the paid plan (a strict superset of the free Fit tab) */}
                 {tab === 'rewrite' && (
-                  fitState === 'loading' ? <ResultEmpty icon="⏳" text={'Preparing your rewrites…'} />
-                  : fitOut ? <RewriteView out={fitOut} copy={copy} copied={copied} /> : <ResultEmpty icon="✍️" text={'Run the analysis to get safe, grounded rewrites.'} />
+                  fitState === 'loading' || paidState === 'checking' ? <ResultEmpty icon="⏳" text={'Checking for a plan you already built…'} />
+                  : paidState === 'preview' || fitState === 'preview' ? <ResultEmpty icon="📄" text={'This listing only has a summary. Paste the full posting to optimize for it — no credit is used for a preview.'} />
+                  : paidState === 'loading' ? <ResultEmpty icon="✍️" text={'Building your rewrite plan…'} />
+                  : paidState === 'done' && paid ? <RewriteView out={paid} copy={copy} copied={copied} />
+                  : fitOut ? (
+                    <Card>
+                      <div style={{ fontFamily: 'var(--display)', fontWeight: 800, color: 'var(--white)', fontSize: '.95rem', marginBottom: '.3rem' }}>Your rewrite plan for this job</div>
+                      <p style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-65)', color: 'var(--sub)', lineHeight: 1.6, marginBottom: '.9rem' }}>
+                        Which bullet should lead each job, number questions that write a bullet from your answer, an availability line from this posting&apos;s schedule, a summary built only from your own facts, and wording proposals you accept one by one. Kept for 7 days — reopening it is free.
+                      </p>
+                      {paidState === 'error' && <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-62)', color: 'var(--red)', marginBottom: '.6rem' }}>Could not build the plan — no credit was used if it failed. Try again.</div>}
+                      <button style={btnPrimary} data-testid="resume-paid-btn" onClick={pressPaid}>Build my rewrite plan →<span style={{ marginLeft: '.5rem', fontSize: 'var(--fs-55)', opacity: .65, fontFamily: 'var(--mono)', fontWeight: 400 }}>· {OPTIMIZE_PRICE}</span></button>
+                    </Card>
+                  ) : <ResultEmpty icon="✍️" text={'Run the analysis first — then build the rewrite plan for this job.'} />
                 )}
 
                 {/* HUMANPROOF */}
@@ -980,7 +994,7 @@ function ResumePageInner() {
                     <Card>
                       {kicker('Your final package')}
                       <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-62)', color: 'var(--sub)', lineHeight: 1.6, marginBottom: '.85rem' }}>
-                        {finalBullets().length} bullet{finalBullets().length !== 1 ? 's' : ''}{hp ? ' (HumanProof)' : ''}{fitOut ? ` · SeenFit ${fitOut.fit_score}/100` : ''}{confirmList().length ? ` · ${confirmList().length} to confirm` : ''}
+                        {finalBullets().length} bullet{finalBullets().length !== 1 ? 's' : ''}{hp ? ' (HumanProof)' : ''}{fitOut && fitOut.fit_score != null ? ` · SeenFit ${fitOut.fit_score}/100` : ''}{confirmList().length ? ` · ${confirmList().length} to confirm` : ''}
                       </div>
                       <div className="ai-btn-row" style={{ marginBottom: '.6rem' }}>
                         <button onClick={() => copy(packageText(), 'pkg')} style={{ padding: '.65rem', background: 'var(--raised)', border: '1px solid var(--line2)', color: copied === 'pkg' ? 'var(--green)' : 'var(--sub)', borderRadius: 9, fontFamily: 'var(--mono)', fontSize: 'var(--fs-68)', cursor: 'pointer' }}>{copied === 'pkg' ? '✓ Copied' : 'Copy final package'}</button>

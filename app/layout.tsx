@@ -24,6 +24,9 @@ export const metadata: Metadata = {
   description: 'Check any company’s ghost rate, response time, and real applicant outcomes before you apply. Hiring transparency aggregated from Reddit and verified job-seeker reports.',
   keywords: ['company ghost rate', 'does company ghost applicants', 'hiring reviews reddit', 'interview process reviews', 'job application tracker', 'company response rate', 'glassdoor alternative'],
   applicationName: 'Seen',
+  // Google Search Console ownership tag. Set GOOGLE_SITE_VERIFICATION in Vercel to the content value
+  // Search Console shows for the "HTML tag" method; unset renders nothing.
+  ...(process.env.GOOGLE_SITE_VERIFICATION ? { verification: { google: process.env.GOOGLE_SITE_VERIFICATION } } : {}),
   icons: {
     icon: '/favicon.svg',
   },

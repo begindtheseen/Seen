@@ -2,9 +2,13 @@ import PDFDocument from 'pdfkit';
 import { createClient } from '@supabase/supabase-js';
 import { applyRateLimit } from '../lib/server/ratelimit.js';
 import { logError } from '../lib/server/errlog.js';
-import { gateAI, resolveProAccess } from '../lib/server/credits.js';
+import { gateAI, resolveProAccess, resolveAuthedUser } from '../lib/server/credits.js';
+import { RESUME_OPTIMIZE_COST } from '../lib/server/creditRules.js';
+import { previewOnlyError } from '../lib/server/postingGate.js';
+import { optimizeCacheKey, readCachedOptimize, writeCachedOptimize } from '../lib/server/optimizeCache.js';
+import { buildPaidOptimize } from '../lib/server/optimizePackage.js';
 import { runAdvantage, extractEmployment, extractCareerSignal, buildResumeDocument, resumeFileName } from '../lib/server/resumeAnalysis.js';
-import { scannerFromSeenFit, optimizeFromSeenFit } from '../lib/server/seenfitCompat.js';
+import { scannerFromSeenFit } from '../lib/server/seenfitCompat.js';
 import { extractUploadText } from '../lib/server/resumeUpload.js';
 import { isReadableResume } from '../lib/server/resumeReadability.js';
 import { deriveResumeJobQuery, pullResumeJobFloor } from '../lib/server/resumeJobMatch.js';
@@ -124,6 +128,9 @@ export default async function handler(req, res) {
 
   if (req.method !== 'POST') return res.status(405).end('Method not allowed');
 
+  // optimize: checks, cache and probe all happen BEFORE the credit gate (handleOptimizeTool).
+  if (tool === 'optimize') return handleOptimizeTool(req, res, body);
+
   // Credit gate — 1 credit per call; Pro users get Stealth Mode baked into optimize at no extra cost
   const gate = await gateAI(req, `resume_${tool || 'tool'}`);
   if (!gate.ok) return res.status(gate.status).json({ error: gate.error, credits_required: gate.credits_required, balance: gate.balance ?? 0 });
@@ -147,13 +154,6 @@ export default async function handler(req, res) {
       const intelNote = _seenIntel(company, body.companyIntel);
       // Canonical SeenFit pipeline, adapted to the legacy scanner shape (keyless/deterministic).
       parsed = scannerFromSeenFit({ resume, jobDescription, job, company, intelNote });
-
-    } else if (tool === 'optimize') {
-      const { job, company, resume, jobDescription } = body;
-      if (!resume) return res.status(400).json({ error: 'Resume required' });
-      // Canonical SeenFit pipeline, adapted to the legacy optimize shape. Pro users get
-      // "Human Voice" (stealth field) baked in — same call, no extra credit or cost.
-      parsed = optimizeFromSeenFit({ resume, jobDescription, job, company, pro: gate.pro });
 
     } else if (tool === 'coach') {
       const { job, company, resume, jobDescription, background } = body;
@@ -540,6 +540,42 @@ function drawFooter(doc, LEFT, W, RULE, FOOT, footerBand) {
      .text('Optimized with Seen  ·  seenjobs.io', LEFT, footY + 9, { width: W, align: 'center', characterSpacing: 0.3, lineBreak: false });
 }
 
+// ── tool:optimize — the paid optimizer (1 credit, cached 7 days) ─────────────────────────────
+// Order matters, and every step before gateAI is free:
+//   1. identity (no token → 401, nothing charged);
+//   2. a readable résumé (a corrupted one used to be charged and THEN refused);
+//   3. a real posting — a ≤520-char preview / Adzuna teaser is 422 `preview_only` (D2);
+//   4. the 7-day cache per (user, job, posting text, résumé text) — a hit is returned free with
+//      `cached: true` (C2);  `probe: true` stops here and reports `cached: false` + the price;
+//   5. only then the credit, the package (lib/server/optimizePackage.js — a strict superset of the
+//      free diagnosis, C3) and the cache write.
+async function handleOptimizeTool(req, res, body) {
+  try {
+    const authed = await resolveAuthedUser(req);
+    if (!authed?.uid) return res.status(401).json({ error: 'Sign in to use AI features', credits_required: true });
+    const { job, company, resume, jobDescription, jobId } = body;
+    if (!resume) return res.status(400).json({ error: 'Resume required' });
+    if (!isReadableResume(resume)) return res.status(400).json({ error: 'RESUME_CORRUPTED' });
+    const preview = previewOnlyError(body);
+    if (preview) return res.status(preview.status).json({ ...preview.body, charged: false });
+
+    const key = optimizeCacheKey({ uid: authed.uid, jobId, jobDescription, resume });
+    const hit = await readCachedOptimize(authed.uid, key);
+    if (hit) return res.status(200).json({ ...hit.output, cached: true, cached_at: hit.created_at, charged: false });
+    if (body.probe) return res.status(200).json({ cached: false, price: RESUME_OPTIMIZE_COST, charged: false });
+
+    const gate = await gateAI(req, 'resume_optimize');
+    if (!gate.ok) return res.status(gate.status).json({ error: gate.error, credits_required: gate.credits_required, pro_required: gate.pro_required, balance: gate.balance ?? 0 });
+    // Pro users get "Human Voice" (stealth field) baked in — same call, no extra credit or cost.
+    const result = buildPaidOptimize({ resume, jobDescription, job, company, pro: gate.pro, jobId });
+    const stored = await writeCachedOptimize(authed.uid, key, result);
+    return res.status(200).json({ ...result, cached: false, cache_saved: stored, charged: true, balance: gate.balance });
+  } catch (err) {
+    const ref = logError('resume', err, { method: req.method, tool: 'optimize' });
+    return res.status(500).json({ error: err.message, ref });
+  }
+}
+
 // ── Résumé Studio dispatch ───────────────────────────────────────────────────
 // action → rate-limit key. Credit/Pro gating is decided per action in handleStudio.
 const STUDIO_ROUTES = {
@@ -571,6 +607,11 @@ async function handleStudio(req, res, body) {
         return res.status(200).send(out.buffer);
       }
       case 'tailor': {
+        // a posting that is only a preview is never charged (a title-only tailor stays allowed)
+        if (String(body.jobDescription || '').trim()) {
+          const preview = previewOnlyError(body);
+          if (preview) return res.status(preview.status).json({ ...preview.body, charged: false });
+        }
         const gate = await gateAI(req, 'resume_tailor');
         if (!gate.ok) return res.status(gate.status).json({ error: gate.error, credits_required: gate.credits_required, pro_required: gate.pro_required, balance: gate.balance ?? 0 });
         const out = await tailorAction(body, { pro: !!gate.pro, allowPolish: llmAvailable() });
