@@ -91,7 +91,7 @@ function AppCard({ app, expanded, setExpanded, onUpdate, onEdit, onRemove, onSha
   // 40px hit area without growing the row (negative vertical margin).
   const linkStyle = { fontFamily: 'var(--mono)', fontSize: '.58rem', color: 'var(--blue)', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', minHeight: 40, padding: '0 .4rem', margin: '-8px -.4rem' } as const
   // "Next check-in Oct 30 — did they respond?" — null while a check is due (the card asks it instead).
-  const nextLine = isActive && !check ? nextCheckLine(app.appliedAt, EventStore.answeredChecks(app.id)) : null
+  const nextLine = isActive && !check ? nextCheckLine(app.appliedAt, EventStore.answeredChecks(app)) : null
   const fmt = (ms: number) => new Date(ms).toLocaleDateString('en-US', { timeZone: 'America/Los_Angeles', month: 'short', day: 'numeric' })
 
   return (

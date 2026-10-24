@@ -55,9 +55,17 @@ export function formatCheckDate(ms: number, now = Date.now()): string {
   return formatPacific(ms, sameYear ? { month: 'short', day: 'numeric' } : { month: 'short', day: 'numeric', year: 'numeric' })
 }
 
-/** The one line an active card shows under its stage: null while a check is due (the card asks it instead). */
-export function nextCheckLine(appliedAt: number, answered: Iterable<string>, now = Date.now()): string | null {
+/**
+ * The one line an active card shows under its stage: null while a check is being asked (the card asks
+ * it instead). `snoozedUntil` = when a due check that was put off with "Later" comes back — the card
+ * then says so instead of going quiet (audit 3 M6: after "Later" nothing said when it would return).
+ */
+export function nextCheckLine(appliedAt: number, answered: Iterable<string>, now = Date.now(), snoozedUntil: number | null = null): string | null {
   const n = nextCheck(appliedAt, answered, now)
-  if (!n || n.due) return null
+  if (!n) return null
+  if (n.due) {
+    if (snoozedUntil != null && snoozedUntil > now) return `We'll ask again ${formatCheckDate(snoozedUntil, now)} — ${n.q}`
+    return null
+  }
   return `Next check-in ${formatCheckDate(n.dueAt, now)} — ${n.q}`
 }

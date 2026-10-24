@@ -18,6 +18,13 @@ export const EDITABLE_FIELDS = ['company', 'role', 'location', 'platform', 'appl
 
 export const PLATFORM_OPTIONS = ['Direct', 'LinkedIn', 'Indeed', 'Seen', 'Referral', 'Other'] as const
 
+/** Field caps (audit 3 M9: a 200-character company name overflowed the card and the Delete modal;
+ *  the inputs capped silently). The form shows a counter at the cap; the server caps the same
+ *  (lib/server/trackerWrites.js). */
+export const COMPANY_MAX = 120
+export const ROLE_MAX = 120
+export const LOCATION_MAX = 80
+
 const DAY_RE = /^\d{4}-\d{2}-\d{2}$/
 
 /** Today on the Pacific calendar — the add form's default. */
@@ -55,7 +62,8 @@ export function formFromApplication(app: Pick<Application, 'company' | 'role' | 
 export function validateForm(f: ApplicationForm, now = Date.now()): string | null {
   if (!f.company.trim()) return 'Company is required'
   if (!f.role.trim()) return 'Role is required'
-  if (f.company.trim().length > 200 || f.role.trim().length > 200) return 'Keep it under 200 characters'
+  if (f.company.trim().length > COMPANY_MAX || f.role.trim().length > ROLE_MAX) return `Keep it under ${COMPANY_MAX} characters`
+  if (f.location.trim().length > LOCATION_MAX) return `Keep the location under ${LOCATION_MAX} characters`
   if (!DAY_RE.test(f.appliedOn)) return 'Pick the day you applied'
   if (f.appliedOn > todayPacific(now)) return 'The applied-on date can’t be in the future'
   return null
