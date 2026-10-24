@@ -303,6 +303,26 @@ export function isRelevant(job, query, { synonyms = [], canonical = '' } = {}) {
 // technician · Phoenix" served "Environmental Services & Facilities Technician" and "call center"
 // served "Center-Based Behavior Technician" as if they matched (audit 2026-10-24, H9). The page shows
 // rows that are not a match under "Other openings", below every match, whatever the sort.
+// Whole-word abbreviations a title uses for a query word. Conservative on purpose: only forms that
+// mean exactly the same job word ("Travel Med Surg RN" is a nurse job; "Pharmacy Tech" is a technician).
+// Found live 2026-10-24: a "travel nurse" search marked 35 of 60 travel-RN listings as unrelated.
+const TOKEN_ALIASES = {
+  nurse: ['rn', 'lpn', 'lvn'],
+  technician: ['tech'],
+  representative: ['rep'],
+  manager: ['mgr'],
+  assistant: ['asst'],
+  associate: ['assoc'],
+  administrative: ['admin'],
+  administrator: ['admin'],
+  developer: ['dev'],
+};
+function tokenOrAliasInTitle(title, token) {
+  if (tokenInTitle(title, token)) return true;
+  const aliases = TOKEN_ALIASES[token];
+  return !!aliases && aliases.some((a) => tokenInTitle(title, a));
+}
+
 export function isTitleRelated(job, query, { canonical = '' } = {}) {
   const tokens = tokenize(query);
   if (!tokens.length) return true;
@@ -311,7 +331,7 @@ export function isTitleRelated(job, query, { canonical = '' } = {}) {
   const qNorm = normalizeCompany(query);
   if (isCompanyMatch(company, qNorm)) return true;
   if (qNorm && title.includes(qNorm)) return true;
-  if (tokens.every((t) => tokenInTitle(title, t))) return true;
+  if (tokens.every((t) => tokenOrAliasInTitle(title, t))) return true;
   const fam = [...(_familyFor(query) || [])];
   const cn = String(canonical || '').toLowerCase().trim();
   if (cn && cn !== qNorm && cn.split(' ').length > 1) fam.push(cn);

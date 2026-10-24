@@ -273,3 +273,17 @@ test('isTitleRelated: a match is the role searched, not a shared word', async ()
   assert.equal(rel('Shift Supervisor', 'starbucks', 'Starbucks'), true);
   assert.equal(rel('anything', ''), true, 'no query → nothing to judge');
 });
+
+test('isTitleRelated: abbreviations a title uses count as the query word (live 2026-10-24)', async () => {
+  const { isTitleRelated } = await import('./jobRelevance.js');
+  // A "travel nurse" search on the preview marked these real Phoenix listings as unrelated.
+  for (const title of ['Travel Med Surg RN', 'Travel Progressive Care Unit RN - $2,456 per week', 'Travel Behavioral Health RN - $2,184 per week', 'Travel LPN - Long Term Care']) {
+    assert.equal(isTitleRelated({ title, company: 'Aya Healthcare' }, 'travel nurse'), true, title);
+  }
+  assert.equal(isTitleRelated({ title: 'Pharmacy Tech II', company: 'CVS' }, 'pharmacy technician'), true);
+  assert.equal(isTitleRelated({ title: 'Customer Service Rep', company: 'X' }, 'customer service representative'), true);
+  // still whole-word only, and only real abbreviations
+  assert.equal(isTitleRelated({ title: 'Nursery Teacher', company: 'X' }, 'travel nurse'), false);
+  assert.equal(isTitleRelated({ title: 'Travel Agent', company: 'X' }, 'travel nurse'), false);
+  assert.equal(isTitleRelated({ title: 'Technical Writer', company: 'X' }, 'pharmacy technician'), false);
+});
