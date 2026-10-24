@@ -231,45 +231,40 @@ export function buildCompanySummary(score: ScoreLike, reports: ReportLike[] | nu
   return { graded, applicantReports, mentions, employeeReviews, webClaim, listed, outcomes, responseRate, ghostRate, ratesShown, responsePct, ghostPct, verdictKind, verdict, oddsContext, evidenceLine, confidence, listedNote }
 }
 
-/** "77 rows from public discussion & review sites · 48 with an outcome · 29 still waiting (not counted)". */
+/** Subheading over the public rows, shown only when the list ALSO holds reports submitted to Seen
+ *  (otherwise the provenance line already says every row is from public posts). Owner 2026-10-24:
+ *  the section said "29 applicant reports" four ways; each fact now appears once. */
 export function publicRowsHeading(listed: ListedCounts): string {
-  const n = listed.publicDiscussion + listed.imported
-  const withOutcome = listed.publicWithOutcome + listed.importedWithOutcome
-  const parts = [`${plural(n, 'row')} from public discussion & review sites`]
-  if (withOutcome !== n) {
-    parts.push(`${withOutcome} with an outcome`)
-    if (listed.publicWaiting > 0) parts.push(`${listed.publicWaiting} still waiting (not counted)`)
-    const employee = n - withOutcome - listed.publicWaiting
-    if (employee > 0) parts.push(plural(employee, 'employee review'))
-  }
-  return parts.join(' · ')
+  return `From public posts · ${listed.publicDiscussion + listed.imported}`
 }
 
-/** The reports section's one-line summary under its title. */
+/** The reports section's one-line summary under its title: the outcome mix. The count itself is the
+ *  title's badge; it is repeated here only when the badge is hidden (employee reviews in the list). */
 export function reportsSectionSummary(sum: CompanySummary): string {
   if (sum.listed.rows === 0) return 'None yet — be the first to report'
   const { listed, outcomes } = sum
   return [
-    plural(listed.withOutcome, 'applicant report'),
-    listed.waiting > 0 ? `${listed.waiting} still waiting (no outcome yet)` : '',
+    listed.employee > 0 ? plural(listed.withOutcome, 'applicant report') : '',
     listed.employee > 0 ? plural(listed.employee, 'employee review') : '',
     `${outcomes.ghosted} ghosted`, `${outcomes.interview} interviewed`, `${outcomes.hired} hired`,
-    listed.publicWithOutcome > 0 ? `${listed.publicWithOutcome} from public discussion` : '',
+    listed.waiting > 0 ? `${listed.waiting} still waiting` : '',
   ].filter(Boolean).join(' · ')
 }
 
-/** The reports section's provenance line (what the list holds, by kind). */
+/** Where the listed reports came from, in one or two short sentences (no counts the header already shows). */
 export function reportsProvenanceLine(sum: CompanySummary): string {
   const { listed } = sum
   if (listed.rows === 0) return 'Reports are anonymous claims, labeled by source and weighted by trust.'
-  const mixed = listed.publicDiscussion > 0 || listed.imported > 0 || listed.employee > 0 || listed.waiting > 0
-  if (!mixed) return `${plural(listed.rows, 'report')} submitted to Seen · anonymous applicant claims`
-  return [
-    `${plural(listed.withOutcome, 'applicant report')} with an outcome — the rows the grade is built from`,
-    listed.seenWithOutcome > 0 ? `${listed.seenWithOutcome} submitted to Seen` : '',
-    listed.importedWithOutcome > 0 ? `${listed.importedWithOutcome} imported from review sites (reduced weight)` : '',
-    listed.publicWithOutcome > 0 ? `${listed.publicWithOutcome} found in public discussion (reduced weight)` : '',
-    listed.waiting > 0 ? `${listed.waiting} more still waiting — listed, not counted until they resolve` : '',
-    listed.employee > 0 ? `${plural(listed.employee, 'employee review')} (their letter grades adjust the score; they are not hiring outcomes)` : '',
-  ].filter(Boolean).join(' · ')
+  const fromPublic = listed.publicWithOutcome + listed.importedWithOutcome
+  const parts: string[] = []
+  if (listed.seenWithOutcome > 0 && fromPublic > 0) {
+    parts.push(`${listed.seenWithOutcome} submitted to Seen, ${fromPublic} from public posts (public posts count at lower weight)`)
+  } else if (fromPublic > 0) {
+    parts.push('All from public posts, each linked to its source and counted at lower weight')
+  } else {
+    parts.push('All submitted to Seen as anonymous applicant claims')
+  }
+  if (listed.waiting > 0) parts.push(`${listed.waiting} still waiting ${listed.waiting === 1 ? 'is' : 'are'} listed but not counted`)
+  if (listed.employee > 0) parts.push('Employee reviews adjust the score but are not hiring outcomes')
+  return parts.join('. ') + '.'
 }
