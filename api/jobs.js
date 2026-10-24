@@ -6,7 +6,11 @@ import { logError } from '../lib/server/errlog.js';
 import { filterAndRank, relevanceScore, sortByProximity, locationDbTerm, expandQueryTerms, parseLocation, locationScore } from './_utils/jobRelevance.js';
 import { sortByPriority, companyMatchesQuery, queryNamesCompany, isRemoteListing } from '../lib/server/jobPriority.js';
 import { waitUntil } from '@vercel/functions';
-import { aggregateForQuery, upsertJobs, inferLevel, wasRecentlyPulled, recordPull, adzunaPay } from '../lib/server/jobSources.js';
+import { aggregateForQuery, upsertJobs, inferLevel, wasRecentlyPulled, recordPull, adzunaPay, cleanDescription } from '../lib/server/jobSources.js';
+import { locationScope } from '../lib/jobs/usLocation.js';
+import { preferFullText } from '../lib/jobs/listingTwins.js';
+import { deriveResumeCity } from '../lib/server/resumeJobMatch.js';
+import { loadTenantNames, applyTenantNames, withTenantName } from '../lib/server/tenantNames.js';
 import { aggregateWithSources } from '../lib/jobs/expand.js';
 import { deriveResumeJobQuery, pullResumeJobFloor, deriveResumeSignal, resumeSkillsStale } from '../lib/server/resumeJobMatch.js';
 import { isReadableResume } from '../lib/server/resumeReadability.js';
@@ -92,7 +96,7 @@ async function getEmployerPostedPool(url, headers) {
     // employer_user_id IS NOT NULL rides the partial index idx_jobs_employer_user_id (migration 055) —
     // every employer-posted row has an owner. The old is_employer_posted=eq.true + order=created_at +
     // select=* had no index and seq-scanned the whole table: 4.5s on prod, paid by every cold instance.
-    const cols = 'id,title,company,location,salary,apply_url,description,type,level,source,score,waste_score,search_query,lat,lng,created_at,is_employer_posted,availability_status'
+    const cols = 'id,title,company,location,salary,apply_url,description,type,level,source,score,waste_score,search_query,lat,lng,created_at,is_employer_posted,availability_status,ats_tenant'
     const q = (c) => fetch(`${url}/rest/v1/jobs?employer_user_id=not.is.null&is_employer_posted=eq.true&expires_at=gt.${iso}&select=${c}&limit=500`, { headers })
     // apply_mode exists only once the Apply-on-Seen migration is applied; before that, selecting it
     // 400s — retry without it so search priority never depends on that migration.
@@ -203,7 +207,7 @@ export default async function handler(req, res) {
       // NOTE: jobs has apply_url ONLY — selecting a phantom `url` column made PostgREST
       // reject the whole select, so every direct /jobs/<id> link 404'd. Same class as the
       // employer-listings phantom-url bug; `url` is aliased from apply_url in the response.
-      const cols = 'id,title,company,location,salary,apply_url,description,type,level,source,score,waste_score,availability_status,created_at,last_seen_at,last_checked_at,availability_report_count,is_employer_posted';
+      const cols = 'id,title,company,location,salary,apply_url,description,type,level,source,score,waste_score,availability_status,created_at,last_seen_at,last_checked_at,availability_report_count,is_employer_posted,ats_tenant';
       const get = (select) => fetch(`${U}/rest/v1/jobs?id=eq.${encodeURIComponent(id)}&select=${select}&limit=1`, { headers: { apikey: K, Authorization: `Bearer ${K}` } });
       // apply_mode exists once the Apply-on-Seen migration is applied; before that the column is
       // missing and PostgREST 400s the select, so retry without it (lib/server/seenApply.js).
@@ -215,11 +219,11 @@ export default async function handler(req, res) {
       if (!Array.isArray(rows) || !rows.length) return res.status(404).json({ error: 'Not found' });
       // Attach the score's factor breakdown so the detail page can show WHY, not just a number,
       // plus the factual freshness descriptor (our-own-observation facts — never an employer verdict).
-      const job = {
+      const job = withTenantName({
         ...rows[0], url: rows[0].apply_url || null,
         ...scoreRow(rows[0]), score_explanation: explainListingScore(rows[0]),
         freshness: computeListingFreshness(rows[0]),
-      };
+      }, await loadTenantNames(U, { apikey: K, Authorization: `Bearer ${K}` }));
       return res.status(200).json({ job });
     } catch (e) {
       logError('jobs/get_by_id', e.message);
@@ -270,6 +274,9 @@ export default async function handler(req, res) {
     // The employer-posted pool is only needed when the response is shaped, so it loads in parallel
     // with the search's own DB reads instead of in front of them (serve() awaits it).
     const employerPoolP = SUPABASE_URL && SUPABASE_SERVICE_KEY ? getEmployerPostedPool(SUPABASE_URL, dbHeaders) : Promise.resolve([]);
+    // Board slug → registered employer name (lib/server/tenantNames.js), cached per instance; a row
+    // still stored under its slug ("plscareers") is served as the name the registry holds for it.
+    const tenantNamesP = SUPABASE_URL && SUPABASE_SERVICE_KEY ? loadTenantNames(SUPABASE_URL, dbHeaders) : Promise.resolve(new Map());
     const [suppressedSet, featuredSet] = await Promise.all([
       getSuppressedSet(SUPABASE_URL, dbHeaders),
       getFeaturedSet(SUPABASE_URL, dbHeaders),
@@ -332,7 +339,13 @@ export default async function handler(req, res) {
       const inArea = relevant.filter((row) => !loc || isRemote || isRemoteListing(row) || nearSearch(row));
       const postIds = new Set(inArea.map((r) => r.id).filter(Boolean));
       const out = [], seenKeys = new Set();
-      for (const j of [...inArea.map(toUiRow), ...base]) {
+      // Rows that name a non-US place never reach a US search (lib/jobs/usLocation.js — the same
+      // judgement the ingest makes; stored rows from before it, and from paths that lacked it, are
+      // still in the corpus: a Lever "La Roca del Valles, Barcelona" cashier answered "cashier ·
+      // Phoenix" on 2026-10-23). An Adzuna teaser of a posting we hold in full from the employer's
+      // board is hidden behind that full-text row (lib/jobs/listingTwins.js).
+      for (const j of preferFullText([...inArea.map(toUiRow), ...base])) {
+        if (locationScope(j.location) === 'non_us') continue;
         const key = j.id || `${(j.title || '').toLowerCase()}|${(j.company || '').toLowerCase()}|${(j.location || '').toLowerCase()}`;
         if (seenKeys.has(key)) continue;
         seenKeys.add(key);
@@ -346,7 +359,7 @@ export default async function handler(req, res) {
         // company's listings first — jobPriority.priorityTier, kept by the client's sort too.
         out.push(queryNamesCompany(j.company, relevanceQuery) ? { ...flagged, company_match: true } : flagged);
       }
-      return applyFeatured(dropSuppressed(out, suppressedSet), featuredSet);
+      return applyTenantNames(applyFeatured(dropSuppressed(out, suppressedSet), featuredSet), await tenantNamesP);
     };
     const countInRadius = (jobs) => (jobs || []).filter((j) => j.in_radius !== false).length;
 
@@ -591,6 +604,7 @@ function toUiRow(j, loc = '') {
     lat: j.lat ?? null, lng: j.lng ?? null, posted_at: j.created_at || null,
     employer_posted: j.is_employer_posted === true, // posted on Seen by the employer → search priority
     apply_mode: j.is_employer_posted === true ? (j.apply_mode || 'external') : 'external', // Apply on Seen
+    ats_tenant: j.ats_tenant || null, // the board slug this row was stored under (lib/server/tenantNames.js)
   };
 }
 
@@ -616,7 +630,7 @@ function dedupByIdentity(arr) {
 async function corpusRelevant({ supabaseUrl, dbHeaders, terms, query, canonical, synonyms, center, loc, limit = 60 }) {
   if (!supabaseUrl) return [];
   const now = encodeURIComponent(new Date().toISOString());
-  const cols = 'id,created_at,title,company,location,salary,apply_url,description,type,level,source,score,waste_score,search_query,lat,lng';
+  const cols = 'id,created_at,title,company,location,salary,apply_url,description,type,level,source,score,waste_score,search_query,lat,lng,ats_tenant';
   const uniq = [...new Set((terms || []).map(t => String(t || '').toLowerCase().trim()).filter(t => t.length > 1))].slice(0, 6);
   if (!uniq.length) return [];
   try {
@@ -648,6 +662,7 @@ async function corpusRelevant({ supabaseUrl, dbHeaders, terms, query, canonical,
       source: j.source || 'Seen', ...scoreRow(j),
       search_query: j.search_query || null,
       lat: j.lat ?? null, lng: j.lng ?? null, posted_at: j.created_at || null,
+      ats_tenant: j.ats_tenant || null,
     }));
   } catch (e) {
     console.warn('corpusRelevant error:', e.message);
@@ -662,7 +677,7 @@ async function nearestListings(loc, supabaseUrl, dbHeaders) {
   const now = encodeURIComponent(new Date().toISOString());
   // id + created_at must be in the select — without them mapUi's id was always null and
   // /jobs/<id> permalinks from this fallback path could never resolve.
-  const cols = 'id,created_at,title,company,location,salary,apply_url,description,type,level,source,score,waste_score';
+  const cols = 'id,created_at,title,company,location,salary,apply_url,description,type,level,source,score,waste_score,ats_tenant';
   const mapUi = rows => (Array.isArray(rows) ? rows : []).map(j => ({
     id: j.id || null,
     title: j.title, company: j.company, location: j.location,
@@ -670,6 +685,7 @@ async function nearestListings(loc, supabaseUrl, dbHeaders) {
     type: j.type || 'Full-time', level: inferLevel(j.title || ''),
     source: j.source || 'Seen', ...scoreRow(j),
     posted_at: j.created_at || null,
+    ats_tenant: j.ats_tenant || null,
   }));
   try {
     const term = locationDbTerm(loc);
@@ -795,12 +811,13 @@ async function handleCompanyJobs(req, res, body) {
   try {
     const pattern = companyIlike(safeName);
     const r = await fetch(
-      `${SUPABASE_URL}/rest/v1/jobs?company=ilike.${pattern}&expires_at=gt.${now}&select=id,title,company,location,salary,apply_url,source,type,level,score,waste_score&order=score.desc&limit=40`,
+      `${SUPABASE_URL}/rest/v1/jobs?company=ilike.${pattern}&expires_at=gt.${now}&select=id,title,company,location,salary,apply_url,source,type,level,score,waste_score,ats_tenant&order=score.desc&limit=40`,
       { headers: dbHeaders }
     );
-    const cached = (r.ok ? await r.json() : []).filter(j => nameKey(j.company) === nameKey(safeName)).slice(0, 20);
+    const cached = preferFullText((r.ok ? await r.json() : []).filter(j => nameKey(j.company) === nameKey(safeName) && locationScope(j.location) !== 'non_us')).slice(0, 20);
     if (Array.isArray(cached) && cached.length >= 3) {
-      const jobs = cached.map(j => ({ title: j.title, company: j.company, location: j.location, salary: j.salary, url: j.apply_url, source: j.source, type: j.type, level: inferLevel(j.title || ''), ...scoreRow(j) }));
+      const names = await loadTenantNames(SUPABASE_URL, dbHeaders);
+      const jobs = applyTenantNames(cached.map(j => ({ title: j.title, company: j.company, location: j.location, salary: j.salary, url: j.apply_url, source: j.source, type: j.type, level: inferLevel(j.title || ''), ...scoreRow(j), ats_tenant: j.ats_tenant || null })), names);
       return res.status(200).json({ ok: true, jobs, _src: 'cache' });
     }
   } catch(e) { console.warn('company_jobs cache:', e.message); }
@@ -914,7 +931,14 @@ async function handleRecommended(req, res, _body) {
     // near the person — the profile city (within RAIL_MILES when both have coordinates, else the
     // city named in the listing) or a remote listing. Without a city the rail would only ever
     // show far-away jobs, so it says so instead (reason 'no_city'; the page links to Settings).
-    const city = String(prof?.city || '').trim().slice(0, 80);
+    // The profile city, else the city the résumé itself states ("Phoenix, AZ 85004" in its first
+    // line — the live audit's persona was asked to retype a city the résumé already had).
+    let city = String(prof?.city || '').trim().slice(0, 80);
+    let citySource = city ? 'profile' : null;
+    if (!city && hasResume) {
+      city = deriveResumeCity(resumeText);
+      citySource = city ? 'resume' : null;
+    }
     if (!city) {
       if (heal) await heal;
       return res.status(200).json({ ok: true, jobs: [], skills: topSkills.slice(0, 3), seniority, function: fn, has_resume: hasResume, reason: 'no_city' });
@@ -925,7 +949,7 @@ async function handleRecommended(req, res, _body) {
     const parsedCity = parseLocation(city);
     const cityTerm = parsedCity && parsedCity.city ? parsedCity.city : locationDbTerm(city);
     const scope = center ? geoScopeClause(center, RAIL_MILES, cityTerm) : (cityTerm ? `&location=ilike.*${encodeURIComponent(cityTerm)}*` : '');
-    const cols = 'id,title,company,location,salary,apply_url,description,type,level,source,score,waste_score,lat,lng';
+    const cols = 'id,title,company,location,salary,apply_url,description,type,level,source,score,waste_score,lat,lng,ats_tenant';
     const read = (filter, limit) => fetch(`${SUPABASE_URL}/rest/v1/jobs?${filter}&expires_at=gt.${now}&select=${cols}&order=score.desc&limit=${limit}`, { headers: dbHeaders })
       .then(r => r.ok ? r.json() : []).catch(() => []);
     const safeTerm = (s) => String(s || '').replace(/[^a-zA-Z0-9\s\-+#.]/g, '').trim().slice(0, 40);
@@ -943,7 +967,7 @@ async function handleRecommended(req, res, _body) {
       seenIds.add(j.id);
       return true;
     });
-    const qualifies = (j) => jobMatchesResume(j, resume) && jobNearCity(j, home);
+    const qualifies = (j) => jobMatchesResume(j, resume) && jobNearCity(j, home) && locationScope(j.location) !== 'non_us';
     let matched = unique.filter(qualifies);
 
     // ── Floor: when the corpus is thin for this résumé near this city, pull LIVE for the role
@@ -983,10 +1007,12 @@ async function handleRecommended(req, res, _body) {
     }));
     ranked.sort((a, b) => b._matchScore - a._matchScore);
 
-    const jobs = ranked.slice(0, 8).map(j => ({
+    const names = await loadTenantNames(SUPABASE_URL, dbHeaders);
+    const jobs = ranked.slice(0, 8).map(j => withTenantName({
       id: j.id,
       title: j.title,
       company: j.company,
+      ats_tenant: j.ats_tenant || null,
       location: j.location,
       salary: j.salary,
       apply_url: j.apply_url,
@@ -995,10 +1021,10 @@ async function handleRecommended(req, res, _body) {
       level: inferLevel(j.title || ''),
       source: j.source || 'Seen',
       ...scoreRow(j),
-    }));
+    }, names));
 
     if (heal) await heal; // the self-healed cache row lands before the function returns
-    return res.status(200).json({ ok: true, jobs, skills: topSkills.slice(0, 3), seniority, function: fn, has_resume: hasResume, city, reason: jobs.length ? null : 'no_matches' });
+    return res.status(200).json({ ok: true, jobs, skills: topSkills.slice(0, 3), seniority, function: fn, has_resume: hasResume, city, city_source: citySource, reason: jobs.length ? null : 'no_matches' });
   } catch (e) {
     logError('jobs/recommended', e.message, { user_id });
     return res.status(500).json({ error: e.message, jobs: [] });
@@ -1037,8 +1063,10 @@ async function _fetchAdzuna(what, where, appId, appKey, distKm) {
     const data = await res.json();
     const expires = new Date(Date.now() + 7*24*60*60*1000).toISOString();
     return (data.results||[]).map(j => {
-      // Adzuna's own salary ESTIMATE (salary_is_predicted) is not the employer's pay — never shown or scored as it.
-      const pay = adzunaPay(j);
+      // Adzuna's own salary ESTIMATE (salary_is_predicted) is not the employer's pay — never shown or
+      // scored as it; an annualised hourly wage is shown as the hourly figure the posting states.
+      const description = cleanDescription(j.description || '');
+      const pay = adzunaPay(j, description);
       const salary = pay.salary;
       // Keep Adzuna's coordinates so location-browsed listings are distance-filterable too;
       // (0,0)/non-finite → NULL (honest "unknown"), never a bogus equator point.
@@ -1049,7 +1077,7 @@ async function _fetchAdzuna(what, where, appId, appKey, distKm) {
         location: j.location?.display_name||where,
         salary,
         salary_min: Math.round(pay.salaryMin) || 0,
-        description: (j.description||'').replace(/<[^>]*>/g,'').replace(/\s+/g,' ').trim().slice(0,8000),
+        description,
         apply_url: j.redirect_url||null,
         source: 'Adzuna',
         type: j.contract_time==='part_time'?'Part-time':'Full-time',

@@ -6,6 +6,7 @@
 // listingApplication.test.mjs and, server-side, api/user-sync.addApplication.test.mjs.
 
 import type { Application } from '../types.ts'
+import { displayCompanyName } from '../companyNames.js'
 // (location/url cleaning below — audit 3 L4: raw "Mesa, Maricopa County" and tracking params on the card)
 
 export interface ListingLike {
@@ -70,7 +71,9 @@ export function applicationFromListing(job: ListingLike, opts: { platform?: stri
   const jobUrl = cleanApplyUrl(job.apply_url) || undefined
   const jobId = job.id == null || job.id === '' ? undefined : String(job.id).slice(0, 80)
   return {
-    company: clean(job.company),
+    // The employer as a person names it — "PLS Financial Services", never the board slug
+    // "plscareers" the listing may be stored under (lib/companyNames.js).
+    company: displayCompanyName(clean(job.company)) || clean(job.company),
     role: clean(job.title),           // the full title — never shortened or re-mapped to a family
     location: stripCounty(job.location), // "Mesa, Maricopa County" → "Mesa"; '' when the listing has none
     platform: opts.platform || platformFromUrl(jobUrl),

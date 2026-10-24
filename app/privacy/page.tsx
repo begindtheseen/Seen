@@ -1,5 +1,7 @@
 import type { Metadata } from 'next'
+import { pageMetadata } from '@/lib/seo'
 import Link from 'next/link'
+import { DraftNote, Placeholder, LegalFooter, LEGAL_CONTACT } from '@/components/legal/LegalBits'
 
 // Privacy Policy — DRAFT for the owner's attorney to review.
 // Accuracy priority: the "account access" section is written HONESTLY. The system's admin API
@@ -10,20 +12,14 @@ import Link from 'next/link'
 // false). Instead: we access account data only to operate the service, support users, ensure
 // security, and comply with law — never sold, never accessed for unrelated purposes.
 
-export const metadata: Metadata = {
-  title: 'Privacy Policy — What Seen Collects & How Account Data Is Used | Seen',
+export const metadata: Metadata = pageMetadata({
+  title: 'Privacy Policy — What Seen Collects & How Account Data Is Used',
   description:
-    'What Seen collects, how account data is used, who can access it (including administrators, for support and security), the processors we rely on, and your rights. Draft — pending legal review.',
-  alternates: { canonical: 'https://seenjobs.io/privacy' },
-  openGraph: {
-    title: 'Privacy Policy | Seen',
-    description:
-      'What Seen collects, how account data is used and accessed, the processors we use, and your rights.',
-    url: 'https://seenjobs.io/privacy',
-    type: 'website',
-    siteName: 'Seen',
-  },
-}
+    'What Seen collects, how account data is used, who can access it (including administrators, for support and security), the processors we rely on, and your rights.',
+  path: '/privacy',
+  ogTitle: 'Privacy Policy | Seen',
+  ogDescription: 'What Seen collects, how account data is used and accessed, the processors we use, and your rights.',
+})
 
 const wrap = { maxWidth: 760, margin: '0 auto', padding: '4rem 2rem', width: '100%', boxSizing: 'border-box' as const }
 const h2 = { fontFamily: 'var(--display)', fontSize: '1.1rem', fontWeight: 800, color: 'var(--white)', letterSpacing: '-.02em', margin: '0 0 .65rem' } as const
@@ -37,21 +33,14 @@ export default function PrivacyPage() {
   return (
     <div className="rise-in" style={{ minHeight: '100vh' }}>
       <div style={wrap}>
-        {/* Draft status banner */}
-        <div style={{ background: 'var(--adim)', border: '1px solid rgba(245,158,11,0.25)', borderRadius: 10, padding: '1rem 1.25rem', marginBottom: '2rem', fontFamily: 'var(--mono)', fontSize: '.7rem', color: 'var(--amber)', lineHeight: 1.7 }}>
-          ⚠ Draft — pending legal review. This document has not been reviewed by a licensed attorney and is
-          not legal advice. It describes Seen&apos;s current data practices as implemented; do not rely on it
-          as final policy until counsel has approved it. Bracketed [PLACEHOLDER] items must be completed before
-          publication.
-        </div>
-
         <h1 style={{ fontFamily: 'var(--display)', fontSize: '2rem', fontWeight: 800, color: 'var(--white)', letterSpacing: '-.03em', margin: '0 0 .35rem' }}>
           Privacy Policy
         </h1>
-        <p style={{ color: 'var(--sub)', fontSize: '.82rem', margin: '0 0 1.5rem' }}>
-          Draft prepared 2026-07-19 · Effective date: [PLACEHOLDER] · Privacy questions?{' '}
-          <a href="mailto:hello@seenjobs.io" style={link}>hello@seenjobs.io</a>
+        <p style={{ color: 'var(--sub)', fontSize: '.82rem', margin: '0 0 .6rem' }}>
+          Draft prepared 2026-07-19 · Effective date: <Placeholder>effective date</Placeholder> · Privacy questions?{' '}
+          <a href={`mailto:${LEGAL_CONTACT}`} style={link}>{LEGAL_CONTACT}</a>
         </p>
+        <DraftNote />
 
         <div style={{ fontFamily: 'var(--mono)', fontSize: '.62rem', color: 'var(--muted)', background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 8, padding: '.65rem 1rem', marginBottom: '2rem', lineHeight: 1.6 }}>
           🔒 We do not sell your personal data, and we do not access account data for purposes unrelated to
@@ -62,7 +51,7 @@ export default function PrivacyPage() {
           <h2 style={h2}>1. Who we are</h2>
           <p style={p}>
             Seen (&ldquo;Seen,&rdquo; &ldquo;we,&rdquo; &ldquo;us&rdquo;) is a hiring-transparency platform
-            operated by [PLACEHOLDER — legal entity name], located at [PLACEHOLDER — business address]. This
+            operated by <Placeholder>legal entity name</Placeholder>, located at <Placeholder>business address</Placeholder>. This
             policy explains what we collect, how we use and protect it, who can access it, and the choices you
             have.
           </p>
@@ -74,7 +63,7 @@ export default function PrivacyPage() {
           <ul style={{ margin: '0 0 .9rem', paddingLeft: '1.1rem' }}>
             <li style={li}>your email address and authentication credentials (managed by our auth provider);</li>
             <li style={li}>optional profile details you provide — name/display name, city, industry, experience level, and onboarding survey answers;</li>
-            <li style={li}>content you add — application-tracker entries, saved jobs, submitted reports, and any resume text or file you upload (used for resume tools you request);</li>
+            <li style={li}>content you add — application-tracker entries, saved jobs, submitted reports, and any résumé text or file you upload. Your résumé is stored on your profile until you replace it or delete your account (both in Settings) and is used only for your own tools — job matching, fit scores and rewrites. It is never shown to employers or recruiters and never sold;</li>
             <li style={li}>if you turn on Inbox Autopilot, the facts Seen reads from emails you forward to your private Seen address — company, role, what happened (applied, interview, assessment, rejection or offer), the sender’s name and domain, and the date. We do not store the email’s text, subject or attachments, and turning the feature off deletes these facts;</li>
             <li style={li}>your subscription, credit balance, and entitlement status;</li>
             <li style={li}>session and authentication tokens needed to keep you signed in.</li>
@@ -128,8 +117,9 @@ export default function PrivacyPage() {
             <li style={li}><strong>Resend</strong> — delivery of transactional email, and receipt of email you forward to your Inbox Autopilot address.</li>
             <li style={li}><strong>PostHog</strong> — privacy-conscious product analytics, where enabled.</li>
             <li style={li}><strong>Anthropic</strong> — AI processing used for features such as summarizing public discussion and resume tools; inputs are sent for processing to generate the requested output.</li>
+            <li style={li}><strong>Google Fonts</strong> — the typefaces on every page are loaded from fonts.googleapis.com and fonts.gstatic.com, so your browser sends Google the request (your IP address and browser details), as with any font host.</li>
           </ul>
-          <p style={p}>[PLACEHOLDER — counsel/owner to confirm this list is complete and current, and to add any data-processing agreements or sub-processor disclosures required.]</p>
+          <p style={p}><Placeholder>counsel/owner to confirm this list is complete and current, and to add any data-processing agreements or sub-processor disclosures required</Placeholder></p>
         </div>
 
         <div style={section}>
@@ -147,9 +137,11 @@ export default function PrivacyPage() {
           <p style={p}>
             We keep account data for as long as your account is active and as needed to provide the service,
             then delete or anonymize it within a reasonable period, except where longer retention is required
-            by law or for legitimate business or security purposes. Reports and public-discussion items may be
-            retained in aggregated or de-identified form. [PLACEHOLDER — counsel to set specific retention
-            periods.]
+            by law or for legitimate business or security purposes. When you delete your account in Settings,
+            your profile, résumé, tracker entries, saved jobs, credits and sign-in record are removed and the
+            reports you submitted stay published without any link to you (they are de-identified, not deleted,
+            because they are already part of a company&apos;s public record). Public-discussion items may be
+            retained in aggregated or de-identified form. <Placeholder>counsel to set specific retention periods</Placeholder>
           </p>
         </div>
 
@@ -162,7 +154,7 @@ export default function PrivacyPage() {
             <li style={li}>opt out of non-essential analytics;</li>
             <li style={li}>exercise rights under applicable law, which may include CCPA/CPRA (California) and GDPR (EEA/UK) rights such as access, deletion, portability, and objection.</li>
           </ul>
-          <p style={p}>To exercise any right, contact <a href="mailto:hello@seenjobs.io" style={link}>hello@seenjobs.io</a>. [PLACEHOLDER — counsel to confirm required disclosures, verification steps, and any jurisdiction-specific rights and appeal processes.]</p>
+          <p style={p}>To exercise any right, contact <a href={`mailto:${LEGAL_CONTACT}`} style={link}>{LEGAL_CONTACT}</a>. <Placeholder>counsel to confirm required disclosures, verification steps, and any jurisdiction-specific rights and appeal processes</Placeholder></p>
         </div>
 
         <div style={section}>
@@ -171,7 +163,7 @@ export default function PrivacyPage() {
             We use reasonable administrative and technical safeguards, including access controls and audit
             logging for administrative actions. No system is perfectly secure. Data may be processed in the
             United States and other countries where our providers operate. Seen is not directed to children,
-            and we do not knowingly collect data from anyone under [PLACEHOLDER — 16/18].
+            and we do not knowingly collect data from anyone under <Placeholder>minimum age, 16 or 18</Placeholder>.
           </p>
         </div>
 
@@ -186,9 +178,7 @@ export default function PrivacyPage() {
           </p>
         </div>
 
-        <p style={{ fontFamily: 'var(--mono)', fontSize: '.6rem', color: 'var(--dim)', marginTop: '2rem', lineHeight: 1.7 }}>
-          Draft — pending legal review. Seen is not a law firm and nothing here is legal advice.
-        </p>
+        <LegalFooter />
       </div>
     </div>
   )

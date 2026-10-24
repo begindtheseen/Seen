@@ -1,4 +1,5 @@
 import type { Metadata } from 'next'
+import { pageMetadata } from '@/lib/seo'
 import Link from 'next/link'
 import { getScore, titleCase, pct } from '@/lib/growth'
 import ComparePicker from '../ComparePicker'
@@ -23,18 +24,15 @@ function parse(slugs: string): [string, string] | null {
 export async function generateMetadata({ params }: { params: Promise<{ slugs: string }> }): Promise<Metadata> {
   const { slugs } = await params
   const parsed = parse(slugs)
-  if (!parsed) return { title: 'Compare Company Hiring — Seen' }
+  if (!parsed) return pageMetadata({ title: 'Compare Company Hiring', description: 'Compare any two companies side by side on hiring transparency.', path: '/compare' })
   const aName = titleCase(parsed[0]), bName = titleCase(parsed[1])
   const url = `https://seenjobs.io/compare/${slugs}`
   const title = `${aName} vs ${bName} Hiring: Ghost Rate & Response Time Compared`
   const description = `${aName} vs ${bName} — which treats applicants better? Compare ghost rate, response rate, average wait, and Seen Grade side by side — from applicant reports, with labeled estimates where reports are missing.`
-  return {
-    title, description,
+  return pageMetadata({
+    title, description, path: url, ogTitle: title,
     keywords: [`${aName} vs ${bName} hiring`, `${aName} or ${bName}`, `${aName} vs ${bName} ghost rate`, `which is better ${aName} ${bName}`, `${aName} ${bName} interview process`],
-    alternates: { canonical: url },
-    openGraph: { title, description, url, type: 'website', siteName: 'Seen' },
-    twitter: { card: 'summary_large_image', title, description },
-  }
+  })
 }
 
 const wrap = { maxWidth: 760, margin: '0 auto', padding: '3.5rem 1.25rem 5rem', width: '100%', boxSizing: 'border-box' as const }

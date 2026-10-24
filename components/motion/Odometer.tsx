@@ -4,7 +4,8 @@
 // target with a spring; columns settle left to right (the `.odo-*` rules in app/motion.css).
 // Rolls from 0 on mount (or when `start` flips true) and re-rolls from the current digits
 // whenever `value` changes, so live-refreshed figures move instead of flashing.
-// Screen readers get the plain number; prefers-reduced-motion snaps straight to it.
+// Screen readers get ONE value (`role="img"` + aria-label; the reel digits are presentational —
+// audit 2026-10-24 heard "0 | 0 | 1 | 2 | 3 … 9" per figure); prefers-reduced-motion snaps straight to it.
 
 import { useEffect, useState, type CSSProperties } from 'react'
 
@@ -39,10 +40,10 @@ export default function Odometer({ value, prefix, suffix, start = true, delay = 
 
   const n = Math.max(0, Math.round(Number.isFinite(value) ? value : 0))
   const digits = String(n).padStart(Math.max(1, minDigits), '0').split('')
+  const text = `${prefix ?? ''}${n}${suffix ?? ''}`
 
   return (
-    <span className={`odo${className ? ' ' + className : ''}`} style={style}>
-      <span className="odo-sr">{prefix}{n}{suffix}</span>
+    <span className={`odo${className ? ' ' + className : ''}`} style={style} role="img" aria-label={text}>
       {prefix ? <span className="odo-s" aria-hidden="true">{prefix}</span> : null}
       {digits.map((d, c) => (
         <span key={`${digits.length}-${c}`} className="odo-d" aria-hidden="true">

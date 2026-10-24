@@ -1,4 +1,5 @@
 import type { Metadata } from 'next'
+import { pageMetadata } from '@/lib/seo'
 import Link from 'next/link'
 import { getLeaderboard, titleCase, slugify, grade, riskColor, riskLabel } from '@/lib/growth'
 
@@ -12,14 +13,14 @@ import { getLeaderboard, titleCase, slugify, grade, riskColor, riskLabel } from 
 
 export const revalidate = 3600
 
-export const metadata: Metadata = {
-  title: 'Real Hiring Outcomes from Reddit — Who Ghosts, Who Responds | Seen',
+export const metadata: Metadata = pageMetadata({
+  title: 'Real Hiring Outcomes from Reddit — Who Ghosts, Who Responds',
   description: 'Tired of "does anyone know if X is ghosting" threads? Seen aggregates real applicant outcomes into ghost rates and response times for hundreds of companies — the data those Reddit threads are missing.',
   keywords: ['reddit hiring', 'does anyone know if they ghost', 'reddit job application ghosted', 'companies that ghost applicants reddit', 'reddit recruiting', 'r/recruitinghell'],
-  alternates: { canonical: 'https://seenjobs.io/reddit' },
-  openGraph: { title: 'Real Hiring Outcomes from Reddit', description: 'Ghost rates and response times from real applicant reports — the data Reddit threads are missing.', url: 'https://seenjobs.io/reddit', type: 'website', siteName: 'Seen' },
-  twitter: { card: 'summary_large_image', title: 'Real Hiring Outcomes from Reddit', description: 'Ghost rates and response times from real applicant reports.' },
-}
+  path: '/reddit',
+  ogTitle: 'Real Hiring Outcomes from Reddit',
+  ogDescription: 'Ghost rates and response times from real applicant reports — the data Reddit threads are missing.',
+})
 
 const wrap = { maxWidth: 760, margin: '0 auto', padding: '3.5rem 1.25rem 5rem', width: '100%', boxSizing: 'border-box' as const }
 

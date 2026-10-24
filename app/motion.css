@@ -84,7 +84,7 @@
 
 /* ── Odometer (.odo) — digits roll like a split-flap; columns settle left→right ── */
 .odo{display:inline-flex;align-items:baseline;line-height:1;font-variant-numeric:tabular-nums;white-space:nowrap;vertical-align:baseline}
-.odo-d{display:inline-block;height:1.16em;overflow:hidden;position:relative;vertical-align:bottom}
+.odo-d{display:inline-block;height:1.16em;overflow:hidden;position:relative;vertical-align:bottom;user-select:none}
 .odo-r{display:block;transform:translateY(calc(var(--n,0) * -1.16em));transition:transform .95s var(--ease-spring);transition-delay:calc(var(--c,0) * 55ms)}
 .odo-r>span{display:block;height:1.16em;line-height:1.16em}
 .odo-sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}

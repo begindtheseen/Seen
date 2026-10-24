@@ -259,7 +259,7 @@ export default function UpgradeModal({ reason, onClose, featureName }: UpgradeMo
           <div style={{ fontFamily: 'var(--body)', fontSize: '.66rem', color: 'var(--sub)', textAlign: 'center', lineHeight: 1.6, marginTop: '.85rem' }}>
             Free for {PRO_TRIAL_DAYS} days. No card required. If you add a payment method, renews at
             {plan === 'yearly' ? ` $${YEARLY_TOTAL.toFixed(2)}/yr` : ` ${MONTHLY_PRICE}/mo`} after the trial — cancel
-            anytime; without one, access simply ends. See <a href="/legal" style={{ color: 'var(--blue)' }}>Subscription Terms</a>.
+            anytime; without one, access simply ends. See <a href="/terms#billing" style={{ color: 'var(--blue)' }}>Subscription Terms</a>.
           </div>
 
           <div style={{ display: 'flex', justifyContent: 'center', gap: '1.5rem', marginTop: '.75rem' }}>

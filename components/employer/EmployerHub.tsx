@@ -97,6 +97,19 @@ export function EmployerHub() {
   const [reports, setReports] = useState<RawReport[]>([])
   const [score, setScore] = useState<Score>(null)
   const [benchmark, setBenchmark] = useState<Benchmark | null>(null)
+  // What each source actually answered (audit 2026-10-24 E-1): company_jobs can answer
+  // `{jobs: [], _src: 'db-degraded', degraded: true}` (aggregation budget spent) or fail outright, and
+  // the score API answers `not_found` for a company it cannot find anywhere. None of those is "0 live
+  // postings · a clean slate" — each gets its own words.
+  const [jobsState, setJobsState] = useState<'ok' | 'degraded' | 'failed'>('ok')
+  const [scoreState, setScoreState] = useState<'ok' | 'not_found' | 'failed'>('ok')
+  const [loadStarted, setLoadStarted] = useState(0)
+  const [elapsed, setElapsed] = useState(0)
+  useEffect(() => {
+    if (!loading) return
+    const id = setInterval(() => setElapsed(Math.round((Date.now() - loadStarted) / 1000)), 1000)
+    return () => clearInterval(id)
+  }, [loading, loadStarted])
 
   // ── Tab state (from ?tab=, default 'overview'; shallow URL update, lazy mount) ──
   const initialTab: TabKey = isTab(params.get('tab')) ? (params.get('tab') as TabKey) : 'overview'
@@ -157,29 +170,31 @@ export function EmployerHub() {
     active.classList.add('emp-panel-in')
   }, [tab, loaded])
 
+  // Every request is bounded (LOAD_TIMEOUT_MS): a first-time company lookup aggregates live listings
+  // and can take ~25 s, but "Loading…" forever is never an outcome — past the bound a source is `failed`
+  // and says so with a Retry.
+  const LOAD_TIMEOUT_MS = 45_000
   const load = useCallback(async (name: string) => {
     const q = name.trim()
     if (!q) return
-    setLoading(true); setErr(''); setLoaded(false)
+    setLoading(true); setErr(''); setLoaded(false); setLoadStarted(Date.now()); setElapsed(0)
+    const post = (url: string, body: Record<string, unknown>) =>
+      fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body), signal: AbortSignal.timeout(LOAD_TIMEOUT_MS) })
     try {
       const [jobsRes, scoreRes, feedRes, benchRes] = await Promise.all([
-        fetch('/api/jobs', {
-          method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ action: 'company_jobs', company: q }),
-        }).then(r => (r.ok ? r.json() : { jobs: [] })).catch(() => ({ jobs: [] })),
-        fetch('/api/reports', {
-          method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ action: 'company_score', name: q }),
-        }).then(r => (r.ok ? r.json() : { score: null })).catch(() => ({ score: null })),
-        fetch(`/employers/dashboard/reports-feed?company=${encodeURIComponent(q)}`)
+        post('/api/jobs', { action: 'company_jobs', company: q })
+          .then(r => (r.ok ? r.json() : { jobs: [], failed: true })).catch(() => ({ jobs: [], failed: true })),
+        post('/api/reports', { action: 'company_score', name: q })
+          .then(r => (r.ok ? r.json() : { score: null, failed: true })).catch(() => ({ score: null, failed: true })),
+        fetch(`/employers/dashboard/reports-feed?company=${encodeURIComponent(q)}`, { signal: AbortSignal.timeout(LOAD_TIMEOUT_MS) })
           .then(r => (r.ok ? r.json() : { reports: [] })).catch(() => ({ reports: [] })),
-        fetch('/api/reports', {
-          method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ action: 'industry_benchmark', name: q }),
-        }).then(r => (r.ok ? r.json() : { benchmark: null })).catch(() => ({ benchmark: null })),
+        post('/api/reports', { action: 'industry_benchmark', name: q })
+          .then(r => (r.ok ? r.json() : { benchmark: null })).catch(() => ({ benchmark: null })),
       ])
       setPostings(Array.isArray(jobsRes?.jobs) ? jobsRes.jobs : [])
+      setJobsState(jobsRes?.failed ? 'failed' : jobsRes?.degraded || jobsRes?._src === 'error' ? 'degraded' : 'ok')
       setScore((scoreRes?.score as Score) || null)
+      setScoreState(scoreRes?.not_found ? 'not_found' : scoreRes?.failed ? 'failed' : 'ok')
       setReports(Array.isArray(feedRes?.reports) ? feedRes.reports : [])
       setBenchmark((benchRes?.benchmark as Benchmark) || null)
       setLoaded(true)
@@ -308,19 +323,53 @@ export function EmployerHub() {
         )}
 
         {loading && (
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '30vh' }}>
+          <div role="status" aria-live="polite" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '.8rem', minHeight: '30vh', textAlign: 'center' }}>
             <div className="spinner" />
+            <div style={{ fontFamily: 'var(--mono)', fontSize: '.66rem', color: 'var(--sub)', lineHeight: 1.6, maxWidth: 420 }}>
+              Loading {company}…{elapsed >= 4 ? ` ${elapsed}s.` : ''}
+              {elapsed >= 4 && <><br />The first lookup of a company pulls its live listings from the job boards, which can take up to about 30 seconds; later visits are instant.</>}
+            </div>
           </div>
         )}
 
-        {company && loaded && !loading && (
+        {/* The score API could not find this company anywhere — say so, never a "clean slate" hero. */}
+        {company && loaded && !loading && scoreState === 'not_found' && (
+          <div role="alert" style={{ background: 'var(--card)', border: '1px solid rgba(245,158,11,.35)', borderRadius: 16, padding: '2rem', textAlign: 'center' }}>
+            <div style={{ fontSize: '1.8rem', marginBottom: '.6rem' }}>?</div>
+            <div style={{ fontFamily: 'var(--display)', fontSize: '1.05rem', fontWeight: 800, color: 'var(--white)', marginBottom: '.4rem' }}>We can&apos;t find a company called &ldquo;{company}&rdquo;</div>
+            <p style={{ color: 'var(--sub)', fontSize: '.8rem', lineHeight: 1.65, margin: '0 auto 1rem', maxWidth: 480 }}>
+              Nothing on Seen or online matches that name. Check the spelling, or use the official company name as it appears on your job postings.
+            </p>
+            <div style={{ display: 'flex', gap: '.6rem', justifyContent: 'center', flexWrap: 'wrap' }}>
+              <button type="button" onClick={() => load(company)} style={{ background: 'transparent', border: '1px solid var(--line2)', borderRadius: 9, padding: '.6rem 1.1rem', fontFamily: 'var(--mono)', fontSize: '.66rem', color: 'var(--white)', cursor: 'pointer' }}>Try again</button>
+              <a href="/contact" style={{ border: '1px solid var(--line2)', borderRadius: 9, padding: '.6rem 1.1rem', fontFamily: 'var(--mono)', fontSize: '.66rem', color: 'var(--sub)', textDecoration: 'none' }}>Contact us</a>
+            </div>
+          </div>
+        )}
+
+        {company && loaded && !loading && scoreState !== 'not_found' && (
           <>
+            {(jobsState !== 'ok' || scoreState === 'failed') && (
+              <div role="alert" style={{ display: 'flex', alignItems: 'center', gap: '.9rem', flexWrap: 'wrap', background: 'rgba(239,68,68,.07)', border: '1px solid rgba(239,68,68,.28)', borderRadius: 12, padding: '.8rem 1rem', marginBottom: '1rem' }}>
+                <div style={{ flex: 1, minWidth: 220, fontFamily: 'var(--body)', fontSize: '.8rem', color: 'var(--sub)', lineHeight: 1.55 }}>
+                  <b style={{ color: 'var(--white)', display: 'block', marginBottom: '.15rem' }}>
+                    {scoreState === 'failed' ? 'Couldn’t load the reputation data.' : jobsState === 'failed' ? 'Couldn’t load the live postings.' : 'Live postings are unavailable right now.'}
+                  </b>
+                  {scoreState === 'failed'
+                    ? 'Seen could not be reached for the grade, ghost rate and response rate — nothing below is a verdict yet.'
+                    : jobsState === 'failed'
+                      ? 'The listings request did not get through, so the postings count below is not your real number.'
+                      : 'Seen is out of its live job-board budget for the moment, so the postings count below is not your real number. The hourly refresh fills it in.'}
+                </div>
+                <button type="button" onClick={() => load(company)} style={{ minHeight: 44, padding: '.6rem 1.1rem', background: 'rgba(255,255,255,.06)', border: '1px solid var(--line2)', borderRadius: 10, color: 'var(--white)', fontFamily: 'var(--display)', fontWeight: 700, fontSize: '.82rem', cursor: 'pointer' }}>Retry</button>
+              </div>
+            )}
             {/* ── Reputation hero (always visible above the tabs) ──────────────── */}
             <section className="emp-reveal" style={{ background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 16, padding: '1.6rem', marginBottom: '1.4rem', animationDelay: '70ms' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '1.4rem', flexWrap: 'wrap' }}>
                 <GradeRing score={hasRep ? overall! : null} />
                 <div style={{ display: 'flex', gap: '1.6rem', flexWrap: 'wrap' }}>
-                  <CountStat value={postings.length} label="live postings" color="var(--blue)" />
+                  <CountStat value={jobsState === 'ok' ? postings.length : null} label="live postings" color="var(--blue)" />
                   <CountStat value={totalReports} label="applicant reports" color="var(--white)" />
                   <CountStat value={ghost} suffix="%" label="ghost rate" color="var(--red)" />
                   <CountStat value={reply} suffix="%" label="response rate" color="var(--green)" />

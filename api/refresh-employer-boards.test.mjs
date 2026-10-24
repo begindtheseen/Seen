@@ -84,3 +84,23 @@ test('auth: no secret → 401; the local secret is accepted; bad input → 400',
   assert.equal((await call({ headers: auth, body: { companies: Array(51).fill('x') } })).code, 400);
   assert.equal((await call({ method: 'PUT', headers: auth })).code, 405);
 });
+
+
+test('a board whose feed states its name writes the name back; counts come from the fetch result', async () => {
+  const recorded = [];
+  const out = await syncBoards([{ ...src(1), company_name: 'plscareers', tenant: 'plscareers' }, { ...src(2), company_name: 'Stripe', tenant: 'stripe' }], {
+    supabaseUrl: 'u', serviceKey: 'k',
+    fetchJobs: async ({ tenant }) => (tenant === 'plscareers'
+      ? { ok: true, rows: [row('Phoenix, AZ', 1)], total: 3, droppedOutsideMarket: 2, companyName: 'PLS' }
+      : { ok: true, rows: [row('Remote', 2)], total: 1, droppedOutsideMarket: 0, companyName: 'Stripe' }),
+    upsert: async (rows) => ({ upserted: rows.length }),
+    record: async (r) => { recorded.push(r); },
+  });
+  assert.equal(out.fetched, 4);
+  assert.equal(out.kept, 2);
+  assert.equal(out.dropped_outside_market, 2);
+  const pls = recorded.find((r) => r.id === 's1');
+  assert.equal(pls.jobCount, 3);
+  assert.equal(pls.companyName, 'PLS', 'the learned name is written back');
+  assert.equal(recorded.find((r) => r.id === 's2').companyName, null, 'an unchanged name is not rewritten');
+});
