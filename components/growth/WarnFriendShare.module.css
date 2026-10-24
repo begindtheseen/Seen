@@ -1,0 +1,57 @@
+/* Warn-a-friend share. Solid surfaces only (no translucent glass over content), 44px tap targets,
+   no text under 12px at any width, and every flex child may shrink (min-width:0) so a long company
+   name never widens the page on a phone. */
+.wrap { display: flex; flex-direction: column; gap: .5rem; min-width: 0; }
+.page {
+  margin-top: 1rem;
+  padding: .85rem 1rem;
+  border: 1px solid var(--line2);
+  border-radius: 14px;
+  background: #0e111c;
+}
+.modal { margin: 0 0 .75rem; }
+.lead {
+  margin: 0;
+  font-family: var(--body);
+  font-size: .86rem;
+  line-height: 1.5;
+  color: var(--sub, rgba(255,255,255,.72));
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: .5rem;
+  min-height: 44px;
+  padding: 0 1rem;
+  border-radius: 10px;
+  border: 1px solid rgba(59,130,246,.55);
+  background: rgba(59,130,246,.14);
+  color: #f9fafb;
+  font-family: var(--body);
+  font-size: .86rem;
+  font-weight: 600;
+  cursor: pointer;
+  min-width: 0;
+  max-width: 100%;
+  text-align: center;
+}
+.btn:hover { background: rgba(59,130,246,.22); }
+.btn:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
+.btn span:last-child { min-width: 0; overflow-wrap: anywhere; }
+.ico { font-size: .9rem; }
+.page .btn { align-self: flex-start; }
+.modal .btn { width: 100%; }
+.note {
+  margin: 0;
+  font-family: var(--body);
+  font-size: .8rem;
+  line-height: 1.5;
+  color: var(--sub, rgba(255,255,255,.72));
+  overflow-wrap: anywhere;
+}
+@media (max-width: 480px) {
+  .page .btn { align-self: stretch; }
+}

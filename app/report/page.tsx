@@ -2,7 +2,8 @@
 
 import { useState, useEffect, useRef, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
-import { AppStore } from '@/lib/stores/AppStore'
+import { AppStore, isDbId } from '@/lib/stores/AppStore'
+import { showReportReward } from '@/lib/rewardNotice'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/lib/auth'
 import OutcomeCard from '@/components/OutcomeCard'
@@ -199,7 +200,7 @@ function ReportPage() {
       try {
         const { data: { session } } = await supabase.auth.getSession()
         if (!session) return // anonymous can't create a first-party tracker report; card still shows
-        await fetch('/api/reports', {
+        const r = await fetch('/api/reports', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
           body: JSON.stringify({
@@ -209,8 +210,13 @@ function ReportPage() {
             location: autoApp.location || '',
             platform: autoApp.platform || '',
             outcome: outcomeForStatus,
+            // The tracked application's account id: the server rewards the report with Pro days after
+            // checking the row is this account's and old enough (lib/server/growthRewards.js).
+            ...(isDbId(autoApp.id) ? { application_id: autoApp.id } : {}),
           }),
         })
+        const d = r.ok ? await r.json().catch(() => null) as { reward?: Parameters<typeof showReportReward>[0] } | null : null
+        if (d?.reward) showReportReward(d.reward)
       } catch { /* non-blocking — the card is the user-facing win */ }
     })()
   }, [autoApp, trackerSubmitted])
