@@ -109,6 +109,8 @@ const sameSite = (a: string, b: string) => a === b || a.endsWith(`.${b}`) || b.e
 // Trailing attribution appended by the web-reports pipeline:
 //   "<summary> [Public <host> post, posted <date>: <url>]"   (", posted <date>" optional)
 const BRACKET_SUFFIX_RE = /\s*\[Public ([^\s\]]+) post(?:, posted ([^:\]]+))?: (https?:\/\/[^\s\]]+)\]\s*$/
+//   "<words> [Source: <url>]"  (the rule-based collectors; 4,208 of 4,521 public rows on prod carry it)
+const SOURCE_SUFFIX_RE = /\s*\[Source:\s*(https?:\/\/[^\s\]]+)\]\s*$/i
 const BARE_URL_SUFFIX_RE = /\s*(https?:\/\/[^\s\]]+)\s*$/
 
 /**
@@ -129,7 +131,7 @@ export function reportSourceLink(
   // An opened-but-unclosed "[Public …" means the 2000-char cap cut the attribution — its URL may be
   // truncated, so never link it.
   if (/\[Public [^\]]*$/.test(text)) return null
-  const m = BRACKET_SUFFIX_RE.exec(text) || BARE_URL_SUFFIX_RE.exec(text)
+  const m = BRACKET_SUFFIX_RE.exec(text) || SOURCE_SUFFIX_RE.exec(text) || BARE_URL_SUFFIX_RE.exec(text)
   if (!m) return null
   const url = (m.length === 4 ? m[3] : m[1]).replace(/[.,;)]+$/, '')
   const host = hostOf(url)
