@@ -19,7 +19,7 @@ const inp: React.CSSProperties = {
   boxSizing: 'border-box',
 }
 const label: React.CSSProperties = { fontFamily: 'var(--mono)', fontSize: '.6rem', textTransform: 'uppercase', letterSpacing: '.08em', color: 'var(--dim)', display: 'block', marginBottom: '.35rem' }
-const h1: React.CSSProperties = { fontFamily: 'var(--display)', fontSize: '1.4rem', fontWeight: 800, color: 'var(--white)', letterSpacing: '-.025em', marginBottom: '.2rem' }
+const h1: React.CSSProperties = { fontFamily: 'var(--display)', fontSize: '1.4rem', fontWeight: 800, color: 'var(--white)', letterSpacing: '-.025em', margin: '0 0 .2rem' }
 const sub: React.CSSProperties = { fontSize: '.82rem', color: 'var(--sub)', fontWeight: 300, marginBottom: '.5rem' }
 const fine: React.CSSProperties = { fontFamily: 'var(--mono)', fontSize: '.62rem', color: 'var(--muted)', lineHeight: 1.55, marginBottom: '1.5rem' }
 const focusOn = (e: React.FocusEvent<HTMLInputElement>) => { e.target.style.borderColor = 'var(--blue)' }
@@ -68,17 +68,20 @@ export default function ResetPage() {
       setMsg(LINK_EXPIRED_COPY); setOk(false); setMode('code')
       return
     }
+    // Once the link has become a session, the tokens leave the address bar (and the history entry):
+    // supabase-js reads the hash but leaves it there, and it is a live credential for an hour.
+    const dropHash = () => { if (isLink && window.location.hash) { try { window.history.replaceState(window.history.state, '', window.location.pathname) } catch { /* ignore */ } } }
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       if (!alive) return
       if (event === 'PASSWORD_RECOVERY' || ((event === 'SIGNED_IN' || event === 'INITIAL_SESSION') && session && isLink)) {
         setEmail(session?.user?.email || '')
-        setMode('set')
+        setMode('set'); dropHash()
       }
     })
     // getSession awaits the client's own URL parsing, so a recovery link is already a session here.
     supabase.auth.getSession().then(({ data }) => {
       if (!alive) return
-      if (data.session) { setEmail(data.session.user.email || ''); setMode('set'); return }
+      if (data.session) { setEmail(data.session.user.email || ''); setMode('set'); dropHash(); return }
       if (!isLink) { setMode('code'); return }
       // A link with no session after a moment: used twice, or expired — the code flow still works.
       setTimeout(() => { if (alive) setMode(m => { if (m === 'detecting') { setMsg(LINK_EXPIRED_COPY); setOk(false); return 'code' } return m }) }, 4000)
@@ -144,6 +147,12 @@ export default function ResetPage() {
     const { error } = await supabase.auth.updateUser({ password: np })
     setVerifying(false)
     if (error) {
+      // A signed-in visitor whose session is older than Supabase's "secure password change" window is
+      // asked to re-prove it is them: the emailed code does exactly that, so hand over to it.
+      if ((error as { code?: string }).code === 'reauthentication_needed' || /reauthenticat/i.test(error.message)) {
+        setMsg('For your security, confirm it is you with a code we email you.'); setOk(false); setMode('code')
+        return
+      }
       // The recovery session can lapse (link opened long ago) — point at the code flow, not a dead end.
       const dead = /session|jwt|expired|not authenticated/i.test(error.message) || error.status === 401
       setMsg(dead ? LINK_EXPIRED_COPY : error.message); setOk(false)
@@ -180,14 +189,14 @@ export default function ResetPage() {
 
         {mode === 'detecting' && (
           <div data-testid="reset-detecting">
-            <div style={h1}>One moment</div>
+            <h1 style={h1}>One moment</h1>
             <div style={sub}>Checking your reset link…</div>
           </div>
         )}
 
         {mode === 'set' && (
           <div data-testid="reset-set">
-            <div style={h1}>Set your new password</div>
+            <h1 style={h1}>Set your new password</h1>
             <div style={sub}>{email ? <>For <span style={{ fontFamily: 'var(--mono)', color: 'var(--blue)' }}>{email}</span>.</> : 'Your reset link checked out.'} Choose a new password and you are back in.</div>
             <div style={fine}>Your other devices stay signed in until you sign them out (Settings → Sign out of all devices).</div>
             {passwordFields(setNewPassword)}
@@ -205,7 +214,7 @@ export default function ResetPage() {
 
         {mode === 'code' && step === 1 && (
           <div data-testid="reset-email">
-            <div style={h1}>Reset your password</div>
+            <h1 style={h1}>Reset your password</h1>
             {/* This flow sends the sign-in-code email (supabase signInWithOtp → an 8-digit code, no link).
                 Settings → Change password sends the OTHER email, a reset LINK, which lands on this page
                 in `set` mode. Each screen says exactly what its own email contains and names the other
@@ -242,7 +251,7 @@ export default function ResetPage() {
 
         {mode === 'code' && step === 2 && (
           <div data-testid="reset-code">
-            <div style={h1}>Enter your code</div>
+            <h1 style={h1}>Enter your code</h1>
             <div style={{ ...sub, marginBottom: '.35rem' }}>{CODE_SENT_COPY(email.trim())}</div>
             <div style={fine}>An 8-digit code, not a link. It expires in 10 minutes. Nothing arrived? Check spam, or make sure this is the address you signed up with.</div>
             <div style={{ marginBottom: '.85rem' }}>
