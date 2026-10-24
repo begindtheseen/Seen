@@ -9,6 +9,8 @@
 
 import { useState } from 'react'
 import { bulletFromAnswer } from '@/lib/resume/engine-client'
+// display spelling of canonical skills — the same table the verdict sentence uses
+import { displaySkill } from '@/lib/optimizer/explainScore.js'
 
 export interface Verdict {
   score: number | null
@@ -43,8 +45,7 @@ export interface PaidPlan {
 const kicker: React.CSSProperties = { fontFamily: 'var(--mono)', fontSize: 'var(--fs-55)', textTransform: 'uppercase', letterSpacing: '.08em', color: 'var(--dim)', marginBottom: '.45rem' }
 const card: React.CSSProperties = { background: 'var(--card)', border: '1px solid var(--line2)', borderRadius: 10, padding: '.6rem .75rem' }
 const amberCard: React.CSSProperties = { background: 'rgba(245,158,11,.06)', border: '1px solid rgba(245,158,11,.22)', borderRadius: 8, padding: '.55rem .75rem' }
-const PROPER: Record<string, string> = { spanish: 'Spanish', english: 'English', excel: 'Excel', crm: 'CRM', 'point of sale': 'point of sale (POS)' }
-const show = (s: string) => PROPER[s] || s.replace(/\b(spanish|english)\b/g, (w) => PROPER[w] || w)
+const show = (s: string): string => displaySkill(s)
 
 function bandColor(score: number | null): string {
   if (score == null) return 'var(--muted)'
