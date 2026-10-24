@@ -8,6 +8,7 @@ import { useAuth } from '@/lib/auth'
 import { AppStore } from '@/lib/stores/AppStore'
 import { EventStore } from '@/lib/stores/EventStore'
 import { BadgeStore } from '@/lib/stores/BadgeStore'
+import { daysSince } from '@/lib/stores/checkSchedule'
 import WelcomeOnboarding from '@/components/WelcomeOnboarding'
 import type { Application } from '@/lib/types'
 import { isGradeableScore } from '@/lib/gradeGate'
@@ -201,7 +202,7 @@ export default function DashboardPage() {
   const staleApps = active.filter(a => {
     const sc = coScores[a.company.toLowerCase()]
     const threshold = sc?.avg_wait_days ? Math.round(sc.avg_wait_days * 1.4) : 30
-    return Math.floor((Date.now() - a.appliedAt) / 86400000) > threshold
+    return daysSince(a.appliedAt) > threshold
   })
   const alertCount = staleApps.length + surges.length
   const allEvents = EventStore.get()
@@ -379,7 +380,7 @@ export default function DashboardPage() {
                 <div className={styles.emptyBtns}><Link href="/jobs" className={styles.ghostBtn}>Find your next job →</Link></div>
               </div>
             ) : active.slice(0, 4).map(app => {
-              const days = Math.floor((Date.now() - app.appliedAt) / 86400000)
+              const days = daysSince(app.appliedAt)
               const sc = coScores[app.company.toLowerCase()]
               const ghostPct = sc ? Math.round(sc.ghost_rate * 100) : null
               const tone = sc ? (sc.ghost_rate > 0.55 ? 'var(--red)' : sc.ghost_rate > 0.35 ? 'var(--amber)' : 'var(--green)') : undefined
@@ -419,7 +420,7 @@ export default function DashboardPage() {
               )
             })}
             {staleApps.slice(0, 3).map(a => {
-              const days = Math.floor((Date.now() - a.appliedAt) / 86400000)
+              const days = daysSince(a.appliedAt)
               return (
                 <button key={`stale-${a.id}`} type="button" className={styles.signal} onClick={() => router.push(`/tracker#app_${a.id}`)}>
                   <span style={{ color: 'var(--amber)' }}>⚠</span>

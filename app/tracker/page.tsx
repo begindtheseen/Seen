@@ -22,7 +22,8 @@ import ApplicationForm from '@/components/tracker/ApplicationForm'
 import ConfirmDialog from '@/components/tracker/ConfirmDialog'
 import StagePipeline from '@/components/tracker/StagePipeline'
 import { emptyForm, formFromApplication, toNewApplication, editChanges, type ApplicationForm as FormValues } from '@/lib/stores/applicationEdit'
-import { nextCheckLine, DAY_MS } from '@/lib/stores/checkSchedule'
+import { nextCheckLine, daysSince } from '@/lib/stores/checkSchedule'
+import { splitOpenDuplicates } from '@/lib/stores/applicationDupes'
 import s from '@/components/tracker/tracker.module.css'
 const SurveyModal = dynamic(() => import('@/components/SurveyModal'), { ssr: false })
 const ResumeSurveyModal = dynamic(() => import('@/components/ResumeSurveyModal'), { ssr: false })
@@ -35,9 +36,9 @@ const STATUS_MAP: Record<string, string> = {
   withdrawn: 'rejected',
 }
 
-function getDaysSince(ts: number): number {
-  return Math.floor((Date.now() - ts) / 86400000)
-}
+// "Day N" = California calendar days since applying (lib/stores/checkSchedule daysSince — the same
+// count the day-7/14/30 check-ins fire on). Never a 24-hour-period count or a UTC day.
+const getDaysSince = (ts: number): number => daysSince(ts)
 
 type Watch = { tone: 'ok' | 'warn' | 'danger'; text: string }
 type Intel = { ghost_rate?: number; avg_wait_days?: number; report_count?: number; first_party_report_count?: number; data_source?: string | null; overall_score?: number }
