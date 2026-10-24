@@ -49,7 +49,7 @@ test('the listing the audit applied to lands as one row with every field it had'
   const row = t.applications[0];
   assert.equal(row.user_id, UID);
   assert.equal(row.role, 'Cosmetics Cashier');
-  assert.equal(row.city, 'Glendale, Maricopa County');
+  assert.equal(row.city, 'Glendale', 'the city without the aggregator county (audit 3 L4)');
   assert.equal(row.company_name, 'Walmart');
   assert.equal(row.job_id, 'j_6c1f');
   assert.equal(row.job_url, listing.apply_url);

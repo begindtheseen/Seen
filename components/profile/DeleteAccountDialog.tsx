@@ -2,29 +2,28 @@
 
 // "Delete my account" — the app's dialog pattern (solid #0e111c surface over a dimmed page, see
 // CreditConfirmDialog), not a native confirm(). It lists exactly what delete_account removes
-// (lib/accountDelete.js), requires the word DELETE typed, and refuses to run while a Seen Pro
-// subscription is still live, because the server deletes the Seen account without cancelling Stripe.
+// (lib/accountDelete.js) and requires the word DELETE typed. When a Seen Pro subscription is live it
+// says, before the user confirms, that deletion cancels it immediately (the server does that first and
+// deletes nothing if it cannot).
 
 import { useEffect, useState } from 'react'
 import ModalPortal from '@/components/ModalPortal'
-import { DELETE_CONFIRM_WORD, DELETE_CONSEQUENCES, deleteConfirmReady, deleteBlockedBySubscription } from '@/lib/accountDelete.js'
+import { DELETE_CONFIRM_WORD, DELETE_CONSEQUENCES, SUBSCRIPTION_CANCEL_NOTICE, deleteConfirmReady, deletionCancelsSubscription } from '@/lib/accountDelete.js'
 
 export type SubscriptionSummary = { status: string; cancel_at_period_end: boolean } | null
 
-export default function DeleteAccountDialog({ email, subscription, onConfirm, onClose, onManageBilling }: {
+export default function DeleteAccountDialog({ email, subscription, onConfirm, onClose }: {
   email: string
   /** The live Stripe subscription summary from Settings, or null when there is none. */
   subscription: SubscriptionSummary
   onConfirm: () => Promise<void>
   onClose: () => void
-  /** Scrolls to / opens the cancel control in Plan & billing. */
-  onManageBilling: () => void
 }) {
   const [typed, setTyped] = useState('')
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState('')
-  const blocked = deleteBlockedBySubscription(subscription)
-  const ready = deleteConfirmReady(typed) && !blocked
+  const cancelsSubscription = deletionCancelsSubscription(subscription)
+  const ready = deleteConfirmReady(typed)
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape' && !busy) onClose() }
@@ -55,32 +54,25 @@ export default function DeleteAccountDialog({ email, subscription, onConfirm, on
             {DELETE_CONSEQUENCES.map(c => <li key={c} style={{ fontSize: '.76rem', color: 'var(--sub)', lineHeight: 1.55, marginBottom: '.25rem' }}>{c}</li>)}
           </ul>
 
-          {blocked ? (
-            <div role="alert" style={{ background: 'rgba(245,158,11,.08)', border: '1px solid rgba(245,158,11,.3)', borderRadius: 10, padding: '.7rem .85rem', marginBottom: '.9rem' }}>
-              <div style={{ fontSize: '.78rem', color: 'var(--white)', fontWeight: 600, marginBottom: '.2rem' }}>Cancel your Seen Pro membership first.</div>
-              <div style={{ fontSize: '.74rem', color: 'var(--sub)', lineHeight: 1.55 }}>
-                Deleting the account does not cancel billing with Stripe, so a live membership would keep renewing with no account behind it. Cancel it in Plan &amp; billing (you keep Pro to the end of the paid period), then come back here.
-              </div>
-              <button type="button" onClick={onManageBilling} style={{ marginTop: '.6rem', padding: '.5rem .9rem', background: 'none', border: '1px solid rgba(245,158,11,.45)', color: '#fbbf24', borderRadius: 8, fontFamily: 'var(--mono)', fontSize: '.64rem', cursor: 'pointer' }}>
-                Go to Plan &amp; billing →
-              </button>
+          {cancelsSubscription && (
+            <div role="note" style={{ background: 'rgba(245,158,11,.08)', border: '1px solid rgba(245,158,11,.3)', borderRadius: 10, padding: '.7rem .85rem', marginBottom: '.9rem', fontSize: '.76rem', color: 'var(--sub)', lineHeight: 1.55 }}>
+              {SUBSCRIPTION_CANCEL_NOTICE}
             </div>
-          ) : (
-            <label style={{ display: 'block', marginBottom: '.9rem' }}>
-              <span style={{ ...mono, color: 'var(--dim)', display: 'block', marginBottom: '.35rem' }}>Type {DELETE_CONFIRM_WORD} to confirm</span>
-              <input
-                value={typed}
-                onChange={e => setTyped(e.target.value)}
-                onKeyDown={e => { if (e.key === 'Enter') go() }}
-                autoComplete="off"
-                autoCapitalize="characters"
-                spellCheck={false}
-                aria-label={`Type ${DELETE_CONFIRM_WORD} to confirm`}
-                placeholder={DELETE_CONFIRM_WORD}
-                style={{ width: '100%', boxSizing: 'border-box', background: 'var(--surface)', border: '1.5px solid var(--line2)', borderRadius: 8, padding: '.65rem .85rem', color: 'var(--white)', fontFamily: 'var(--mono)', fontSize: '.85rem', letterSpacing: '.12em', outline: 'none' }}
-              />
-            </label>
           )}
+          <label style={{ display: 'block', marginBottom: '.9rem' }}>
+            <span style={{ ...mono, color: 'var(--dim)', display: 'block', marginBottom: '.35rem' }}>Type {DELETE_CONFIRM_WORD} to confirm</span>
+            <input
+              value={typed}
+              onChange={e => setTyped(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter') go() }}
+              autoComplete="off"
+              autoCapitalize="characters"
+              spellCheck={false}
+              aria-label={`Type ${DELETE_CONFIRM_WORD} to confirm`}
+              placeholder={DELETE_CONFIRM_WORD}
+              style={{ width: '100%', boxSizing: 'border-box', background: 'var(--surface)', border: '1.5px solid var(--line2)', borderRadius: 8, padding: '.65rem .85rem', color: 'var(--white)', fontFamily: 'var(--mono)', fontSize: '.85rem', letterSpacing: '.12em', outline: 'none' }}
+            />
+          </label>
 
           {err && <div role="alert" style={{ ...mono, color: '#f87185', marginBottom: '.7rem' }}>{err}</div>}
 

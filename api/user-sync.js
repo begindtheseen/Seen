@@ -9,7 +9,10 @@ import { buildOpportunities } from './_utils/opportunityEngine.js';
 import { extractEmployment } from '../lib/server/resumeAnalysis.js';
 import { buildResumeSurvey, RESUME_SURVEY_KEYS, mapAnswersToReport } from './_utils/resumeSurvey.js';
 import { normalizeCompany, isValidCompanyName, resolveOrCreateCompany, assessSubmitTrust, writeReport, recomputeCompanyScoreFromReports } from './_utils/reportWrite.js';
-import { WELCOME_CREDITS, FREE_DAILY_CREDITS, PRO_DAILY_CREDITS, RESUME_OPTIMIZE_COST, RESUME_SURVEY_AWARD, TRACK_APPLICATION_AWARD, MAX_DAILY_EARN, MAX_FREE_BALANCE, hasProAccess, creditBalance } from '../lib/server/creditRules.js';
+import { WELCOME_CREDITS, FREE_DAILY_CREDITS, PRO_DAILY_CREDITS, RESUME_OPTIMIZE_COST, RESUME_SURVEY_AWARD, TRACK_APPLICATION_AWARD, MAX_DAILY_EARN, hasProAccess, creditBalance, earnedBalance } from '../lib/server/creditRules.js';
+import { ensureCreditsRow } from '../lib/server/ensureCreditsRow.js';
+import { firstCreditsRow as firstCreditsRowFallback } from '../lib/server/creditRules.js';
+import { cancelLiveSubscriptions } from '../lib/server/stripeCancel.js';
 import { normalizeClaimCompany } from '../lib/server/employerClaims.js';
 import { buildNotificationRow } from '../lib/server/employerNotificationsStore.js';
 import { isReadableResume } from '../lib/server/resumeReadability.js';
@@ -17,6 +20,11 @@ import { deleteApplicantResumes } from '../lib/server/seenApplyStore.js';
 import { decodeThread } from '../lib/server/applicationThread.js';
 import { pacificDate } from '../lib/time/pacific.js';
 import * as inbox from '../lib/server/inbox/store.js';
+import { sanitizeEvents, clientApplicationId, casWindow, timelineAnomalies, naturalKeyQuery, isMissingColumn, cleanText, COMPANY_MAX, ROLE_MAX, CITY_MAX, PLATFORM_MAX } from '../lib/server/trackerWrites.js';
+
+// Does applications.client_id exist yet (migration 20261024130000)? Probed on use; a "no" is
+// re-checked every 10 minutes so an applied migration is picked up without a redeploy.
+let clientIdColumn = { ok: null, at: 0 };
 
 // Verify a Supabase JWT locally (HS256) — no network round-trip.
 // Returns the payload (with .sub = user UUID) on success, null on failure.
@@ -203,42 +211,83 @@ export default async function handler(req, res) {
   }
 
   // ── ADD APPLICATION ─────────────────────────────────────────────────────────
+  // Idempotent on the tracker's own id ("app_<ms>", lib/stores/AppStore add): a retried or replayed
+  // request returns the row it already made (audit 3 H4: one request → two rows during a stall).
+  // Before migration 20261024130000 (client_id column + unique index) the same request is matched by
+  // its natural key (same user, company, role, applied_at, created in the last 15 min).
   if (action === 'add_application') {
+    if (clientIdColumn.ok === false && Date.now() - clientIdColumn.at > 600000) clientIdColumn = { ok: null, at: 0 };
     const a = body.application || {};
-    // Sanitize the client event history: array of small objects, capped, required fields only.
-    const events = Array.isArray(a.events)
-      ? a.events.slice(0, 50).map(e => ({
-          id: String(e?.id || '').slice(0, 40),
-          type: String(e?.type || '').slice(0, 40),
-          date: Number(e?.date) || Date.now(),
-          source: String(e?.source || 'user').slice(0, 20),
-          confidence: e?.confidence ?? 'low',
-        })).filter(e => e.type)
-      : [];
+    const events = sanitizeEvents(a.events);
+    const clientId = clientApplicationId(a.id);
     const row = {
       user_id:      uid,
       job_id:       a.jobId ? String(a.jobId).slice(0, 80) : null,
-      company_name: a.company   || '',
-      role:         a.role      || '',
-      city:         a.location  || '',
-      platform:     a.platform  || 'Seen',
+      company_name: cleanText(a.company, COMPANY_MAX),
+      role:         cleanText(a.role, ROLE_MAX),
+      city:         cleanText(a.location, CITY_MAX),
+      platform:     cleanText(a.platform, PLATFORM_MAX) || 'Seen',
       job_url:      a.jobUrl    || null,
       status:       a.status    || 'active',
       stage:        a.stage     || 'Applied',
       score:        a.score     || null,
       waste_score:  a.waste     || null,
-      applied_at:   a.appliedAt ? new Date(a.appliedAt).toISOString() : new Date().toISOString(),
+      applied_at:   a.appliedAt && Number.isFinite(new Date(a.appliedAt).getTime()) ? new Date(a.appliedAt).toISOString() : new Date().toISOString(),
       events,
     };
-    const r = await db('applications', { method: 'POST', body: JSON.stringify(row), headers: { Prefer: 'return=representation' } });
+    // One row by a filter. `missing` = PostgREST says the client_id column is not there yet
+    // (PGRST204 / 42703) — any other refusal is not read as "no column".
+    const findOne = async (q) => {
+      const r = await db(q).catch(() => null);
+      if (!r) return { row: null, missing: false };
+      if (!r.ok) {
+        const e = await r.json().catch(() => ({}));
+        return { row: null, missing: r.status === 400 && isMissingColumn(e) };
+      }
+      const rows = await r.json().catch(() => []);
+      return { row: Array.isArray(rows) && rows[0] ? rows[0] : null, missing: false };
+    };
+    const byClientId = `applications?user_id=eq.${uid}&client_id=eq.${encodeURIComponent(clientId || '')}&select=id,updated_at&limit=1`;
+    const existing = (row) => res.status(200).json({ id: row.id, updated_at: row.updated_at || null, existing: true });
+    // 1. The same client id already landed (after the migration). A different client id is a
+    //    different add, even for the same company + role on the same day.
+    if (clientId && clientIdColumn.ok !== false) {
+      const hit = await findOne(byClientId);
+      if (hit.missing) clientIdColumn = { ok: false, at: Date.now() };
+      else if (hit.row) return existing(hit.row);
+    }
+    // 2. Before the migration: the same request already landed (natural key).
+    if (!clientId || clientIdColumn.ok === false) {
+      const hit = await findOne(naturalKeyQuery(uid, row));
+      if (hit.row) return existing(hit.row);
+    }
+    // 3. Insert — with the client id and ON CONFLICT DO NOTHING when the column exists, plain otherwise.
+    let r = null;
+    if (clientId && clientIdColumn.ok !== false) {
+      r = await db('applications?on_conflict=user_id,client_id', { method: 'POST', body: JSON.stringify({ ...row, client_id: clientId }), headers: { Prefer: 'resolution=ignore-duplicates,return=representation' } });
+      if (!r.ok && r.status === 400) {
+        const e = await r.clone().json().catch(() => ({}));
+        if (isMissingColumn(e)) { clientIdColumn = { ok: false, at: Date.now() }; r = null; }
+        // 42P10: the column exists but its unique index does not (yet) — store the id without ON CONFLICT.
+        else if (e && e.code === '42P10') r = await db('applications', { method: 'POST', body: JSON.stringify({ ...row, client_id: clientId }), headers: { Prefer: 'return=representation' } });
+      } else if (r.ok) clientIdColumn = { ok: true, at: Date.now() };
+    }
+    if (!r) r = await db('applications', { method: 'POST', body: JSON.stringify(row), headers: { Prefer: 'return=representation' } });
     if (!r.ok) {
       const errText = await r.text().catch(() => '');
       console.error('[user-sync] add_application failed:', r.status, errText);
-      return res.status(400).json({ error: 'Insert failed' });
+      // A database timeout / outage is retryable (the client keeps the card and resends it).
+      return res.status(r.status >= 500 ? 502 : 400).json({ error: 'Insert failed' });
     }
-    const data = await r.json();
+    let data = await r.json().catch(() => []);
+    if (!Array.isArray(data) || !data.length) {
+      // The unique index swallowed a concurrent duplicate: answer with the row that won.
+      const winner = clientId ? (await findOne(byClientId)).row : null;
+      if (winner) return existing(winner);
+      data = [];
+    }
     console.log('[user-sync] add_application ok, id:', data?.[0]?.id);
-    return res.status(200).json({ id: data?.[0]?.id || null });
+    return res.status(200).json({ id: data?.[0]?.id || null, updated_at: data?.[0]?.updated_at || null });
   }
 
   // ── REMOVE APPLICATION ──────────────────────────────────────────────────────
@@ -281,6 +330,10 @@ export default async function handler(req, res) {
   }
 
   // ── UPDATE APPLICATION STAGE/STATUS/EDIT ─────────────────────────────────────────
+  // Compare-and-set (audit 3 H4): the client sends `updatedAt`, the millisecond it last saw on the
+  // row; the PATCH matches only that row state. 0 rows → 409 with the current row (another device,
+  // or this device's own timed-out write that ran late), or 410 when the row is gone. Without an
+  // `updatedAt` (older clients) the PATCH is unconditional, as before.
   if (action === 'update_application') {
     const { id, changes } = body;
     if (!id || !changes) return res.status(400).json({ error: 'id and changes required' });
@@ -291,32 +344,50 @@ export default async function handler(req, res) {
       return res.status(200).json({ ok: false, reason: 'not_synced' });
     }
     const allowed = {};
-    if (changes.stage)  allowed.stage  = changes.stage;
-    if (changes.status) allowed.status = changes.status;
-    if (changes.events && Array.isArray(changes.events)) allowed.events = changes.events.slice(0, 50);
+    if (changes.stage)  allowed.stage  = String(changes.stage).slice(0, 40);
+    if (changes.status) allowed.status = String(changes.status).slice(0, 20);
+    if (Array.isArray(changes.events)) allowed.events = sanitizeEvents(changes.events);
     // The card's Edit (AppStore EDITABLE_KEYS): the user's own record of what they applied to.
     // Same shape as add_application; company and role may not be blanked; applied_at must parse.
-    const text = (v, max) => String(v).trim().slice(0, max);
-    if (typeof changes.company === 'string' && text(changes.company, 200)) allowed.company_name = text(changes.company, 200);
-    if (typeof changes.role === 'string' && text(changes.role, 200))       allowed.role = text(changes.role, 200);
-    if (typeof changes.location === 'string') allowed.city = text(changes.location, 120);
-    if (typeof changes.platform === 'string' && text(changes.platform, 60)) allowed.platform = text(changes.platform, 60);
+    if (typeof changes.company === 'string' && cleanText(changes.company, COMPANY_MAX)) allowed.company_name = cleanText(changes.company, COMPANY_MAX);
+    if (typeof changes.role === 'string' && cleanText(changes.role, ROLE_MAX))          allowed.role = cleanText(changes.role, ROLE_MAX);
+    if (typeof changes.location === 'string') allowed.city = cleanText(changes.location, CITY_MAX);
+    if (typeof changes.platform === 'string' && cleanText(changes.platform, PLATFORM_MAX)) allowed.platform = cleanText(changes.platform, PLATFORM_MAX);
     if (changes.appliedAt != null) {
       const t = new Date(changes.appliedAt).getTime();
       if (Number.isFinite(t) && t <= Date.now() + 86400000) allowed.applied_at = new Date(t).toISOString();
     }
-    if (Object.keys(allowed).length) {
-      const r = await db(`applications?id=eq.${encodeURIComponent(id)}&user_id=eq.${uid}`, {
-        method: 'PATCH', body: JSON.stringify({ ...allowed, updated_at: new Date().toISOString() }),
-        headers: { Prefer: 'return=minimal' },
-      });
-      if (!r.ok) {
-        const e = await r.text().catch(() => '');
-        console.error('[user-sync] update_application failed:', r.status, e.slice(0, 200));
-        return res.status(200).json({ ok: false, reason: 'patch_failed' });
-      }
+    const where = `applications?id=eq.${encodeURIComponent(id)}&user_id=eq.${uid}`;
+    const current = async () => {
+      const g = await db(`${where}&limit=1`).catch(() => null);
+      const rows = g && g.ok ? await g.json().catch(() => []) : [];
+      return Array.isArray(rows) && rows[0] ? rows[0] : null;
+    };
+    const expected = body.updatedAt ?? changes.updatedAt;
+    const cas = casWindow(expected);
+    if (!Object.keys(allowed).length) {
+      const row = await current();
+      if (!row) return res.status(410).json({ error: 'gone' });
+      return res.status(200).json({ ok: true, updated_at: row.updated_at, anomalies: timelineAnomalies(row.applied_at, row.events) });
     }
-    return res.status(200).json({ ok: true });
+    const r = await db(`${where}${cas}`, {
+      method: 'PATCH', body: JSON.stringify({ ...allowed, updated_at: new Date().toISOString() }),
+      headers: { Prefer: 'return=representation' },
+    });
+    if (!r.ok) {
+      const e = await r.text().catch(() => '');
+      console.error('[user-sync] update_application failed:', r.status, e.slice(0, 200));
+      return res.status(200).json({ ok: false, reason: 'patch_failed' });
+    }
+    const rows = await r.json().catch(() => []);
+    const row = Array.isArray(rows) ? rows[0] : null;
+    if (!row) {
+      const now = await current();
+      if (!now) return res.status(410).json({ error: 'gone' });
+      // The row exists but not in the state the client last saw: hand back what is there now.
+      return res.status(409).json({ error: 'stale', application: now });
+    }
+    return res.status(200).json({ ok: true, updated_at: row.updated_at, anomalies: timelineAnomalies(row.applied_at, row.events) });
   }
 
   // ── CLEAR ALL APPLICATIONS (tracker "Clear all") ─────────────────────────────
@@ -391,6 +462,24 @@ export default async function handler(req, res) {
 
   // ── DELETE ACCOUNT ──────────────────────────────────────────────────────────
   if (action === 'delete_account') {
+    // Billing first: a deleted Seen account must never keep billing. Read the Stripe customer BEFORE the
+    // rows go (it lives on ai_credits) and cancel every live subscription immediately
+    // (lib/server/stripeCancel.js). If that cannot be confirmed — the read fails, the Stripe key is
+    // missing, or a cancel is refused — nothing is deleted and the user is told so.
+    const billingRes = await db(`ai_credits?user_id=eq.${uid}&select=stripe_customer_id&limit=1`).catch(() => null);
+    if (!billingRes || !billingRes.ok) {
+      return res.status(503).json({ error: 'We could not check your billing, so nothing was deleted. Try again in a minute.' });
+    }
+    const stripeCustomerId = (await billingRes.json().catch(() => []))?.[0]?.stripe_customer_id || null;
+    if (stripeCustomerId) {
+      const cancel = await cancelLiveSubscriptions({ customerId: stripeCustomerId, stripeKey: process.env.STRIPE_SECRET_KEY });
+      if (!cancel.ok) {
+        console.error('[user-sync] delete_account: Stripe cancel failed:', cancel.error);
+        return res.status(502).json({ error: 'We could not cancel your Seen Pro subscription, so nothing was deleted. Try again or email hello@seenjobs.io.' });
+      }
+      if (cancel.cancelled.length) console.log(`[user-sync] delete_account: cancelled ${cancel.cancelled.length} subscription(s)`);
+    }
+
     // GDPR Art.17 (right to erasure): remove every row keyed to this user before deleting
     // the auth record — previously only applications + profile were cleared, orphaning
     // credits, events, resume data, saved jobs, etc. Best-effort per table (a missing
@@ -633,15 +722,11 @@ export default async function handler(req, res) {
     const cRes = await db(`ai_credits?user_id=eq.${uid}&limit=1`);
     let cred = cRes.ok ? (await cRes.json())[0] : null;
     if (hasProAccess(cred)) return res.status(200).json({ ok: false, reason: 'pro' });
-    // A brand-new user has no ai_credits row yet — create one (like submit_answer does)
-    // so their FIRST tracked application still earns. Refusing here was a silent dead end.
+    // A brand-new user has no ai_credits row yet — create it WITH the welcome bonus (the same row an
+    // AI action creates; lib/server/ensureCreditsRow.js) so their FIRST tracked application still earns
+    // and the "10" their chip showed is not taken away.
     if (!cred) {
-      const ins = await db('ai_credits?on_conflict=user_id', {
-        method: 'POST',
-        body: JSON.stringify({ user_id: uid, balance: FREE_DAILY_CREDITS, pro: false, daily_earned: 0, last_reset: today }),
-        headers: { Prefer: 'resolution=merge-duplicates,return=representation' },
-      });
-      cred = ins.ok ? (await ins.json())[0] : null;
+      cred = await ensureCreditsRow(db, uid, today);
       if (!cred) return res.status(200).json({ ok: false, reason: 'no_row' });
     }
 
@@ -668,10 +753,12 @@ export default async function handler(req, res) {
 
     // Daily reset baseline is FREE_DAILY_CREDITS (code resets daily; DB DEFAULT stays 1 per migration 031).
     const baseBalance = resetToday ? FREE_DAILY_CREDITS : (cred.balance || 0);
-    const newBalance = Math.min(baseBalance + TRACK_APPLICATION_AWARD, MAX_FREE_BALANCE);
-    const newEarned = dailyEarned + TRACK_APPLICATION_AWARD;
+    // Earning never lowers a balance (a welcome balance above the free cap stays as it is).
+    const { balance: newBalance, gained } = earnedBalance(baseBalance, TRACK_APPLICATION_AWARD);
+    if (gained <= 0) return res.status(200).json({ ok: false, reason: 'balance_cap', balance: creditBalance(cred) });
+    const newEarned = dailyEarned + gained;
     await db(`ai_credits?user_id=eq.${uid}`, { method: 'PATCH', body: JSON.stringify({ balance: newBalance, daily_earned: newEarned, ...(resetToday ? { last_reset: today } : {}) }), headers: { Prefer: 'return=minimal' } });
-    await db('credit_transactions', { method: 'POST', body: JSON.stringify({ user_id: uid, delta: 1, reason: 'track_application', metadata: { jid: jid || null } }), headers: { Prefer: 'return=minimal' } });
+    await db('credit_transactions', { method: 'POST', body: JSON.stringify({ user_id: uid, delta: gained, reason: 'track_application', metadata: { jid: jid || null } }), headers: { Prefer: 'return=minimal' } });
     return res.status(200).json({ ok: true, balance: newBalance + Math.max(0, cred.purchased_credits || 0), earned: true });
   }
 
@@ -754,7 +841,8 @@ export default async function handler(req, res) {
     // Check daily earn cap
     const cRes = await db(`ai_credits?user_id=eq.${uid}&limit=1`);
     let cred = cRes.ok ? (await cRes.json())[0] : null;
-    if (!cred) { await db('ai_credits', { method: 'POST', body: JSON.stringify({ user_id: uid, balance: FREE_DAILY_CREDITS, daily_earned: 0, last_reset: today, pro: false }), headers: { Prefer: 'return=minimal' } }); cred = { balance: FREE_DAILY_CREDITS, daily_earned: 0, last_reset: today, pro: false }; }
+    if (!cred) cred = await ensureCreditsRow(db, uid, today); // the welcome row, like every other first credit event
+    if (!cred) return res.status(503).json({ error: 'credits_unavailable' });
     const isPro = hasProAccess(cred);
     const resetToday = cred.last_reset !== today;
     const dailyEarned = resetToday ? 0 : (cred.daily_earned || 0);
@@ -769,11 +857,15 @@ export default async function handler(req, res) {
     // DEFAULT stays 1 per migration 031). The response must report the SAME number we persist —
     // the old code PATCHed one balance but told the client another, so the modal and the Nav
     // chip showed different balances at the same time.
-    const newBalance = isPro ? PRO_DAILY_CREDITS : Math.min((resetToday ? FREE_DAILY_CREDITS : (cred.balance || 0)) + TRACK_APPLICATION_AWARD, MAX_FREE_BALANCE);
-    const newEarned = resetToday ? TRACK_APPLICATION_AWARD : dailyEarned + TRACK_APPLICATION_AWARD;
-    const patch = isPro ? {} : { balance: newBalance, daily_earned: newEarned, ...(resetToday ? { last_reset: today } : {}) };
+    // Earning never lowers a balance: an account still holding its welcome balance above the free cap
+    // keeps it, and the answer is recorded without a credit (credited:false, the modal shows no "+1").
+    const earned = isPro ? { balance: PRO_DAILY_CREDITS, gained: 0 } : earnedBalance(resetToday ? FREE_DAILY_CREDITS : (cred.balance || 0), TRACK_APPLICATION_AWARD);
+    const newBalance = earned.balance;
+    const credited = !isPro && earned.gained > 0;
+    const newEarned = credited ? (resetToday ? earned.gained : dailyEarned + earned.gained) : dailyEarned;
+    const patch = credited ? { balance: newBalance, daily_earned: newEarned, ...(resetToday ? { last_reset: today } : {}) } : {};
     if (Object.keys(patch).length) await db(`ai_credits?user_id=eq.${uid}`, { method: 'PATCH', body: JSON.stringify(patch), headers: { Prefer: 'return=minimal' } });
-    await db('credit_transactions', { method: 'POST', body: JSON.stringify({ user_id: uid, delta: 1, reason: 'earned_question', metadata: { question_key, answer } }), headers: { Prefer: 'return=minimal' } });
+    if (credited) await db('credit_transactions', { method: 'POST', body: JSON.stringify({ user_id: uid, delta: earned.gained, reason: 'earned_question', metadata: { question_key, answer } }), headers: { Prefer: 'return=minimal' } });
 
     // Feed answer back into company intelligence (best-effort)
     const [qtype, company] = question_key.split('|');
@@ -786,7 +878,7 @@ export default async function handler(req, res) {
       }
     }
 
-    return res.status(200).json({ ok: true, balance: isPro ? newBalance : newBalance + Math.max(0, cred.purchased_credits || 0), earned_today: newEarned });
+    return res.status(200).json({ ok: true, credited, balance: isPro ? newBalance : newBalance + Math.max(0, cred.purchased_credits || 0), earned_today: newEarned });
   }
 
   // ── CREDIT HISTORY ────────────────────────────────────────────────────────────
@@ -1136,10 +1228,10 @@ export default async function handler(req, res) {
     const AWARD = RESUME_SURVEY_AWARD;
     const cRes = await db(`ai_credits?user_id=eq.${uid}&limit=1`);
     let cr = cRes.ok ? (await cRes.json())[0] : null;
-    if (!cr) {
-      await db('ai_credits', { method: 'POST', body: JSON.stringify({ user_id: uid, balance: AWARD, daily_earned: AWARD, last_reset: today, pro: false }), headers: { Prefer: 'return=minimal' } });
-      cr = { balance: AWARD, daily_earned: AWARD, last_reset: today, pro: false };
-    }
+    // A first-ever credit event creates the welcome row (lib/server/ensureCreditsRow.js); the award
+    // below then runs ONCE. The old inline insert wrote balance=AWARD, daily_earned=AWARD and the code
+    // below added AWARD again — a new user got the survey award twice and no welcome bonus.
+    if (!cr) cr = (await ensureCreditsRow(db, uid, today)) || firstCreditsRowFallback(today);
     let awarded = 0;
     let balance = creditBalance(cr);
     if (hasProAccess(cr)) {
