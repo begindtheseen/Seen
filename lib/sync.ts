@@ -25,7 +25,7 @@ export type SyncResult = {
 // and the 2026-10-24 audit measured 8–15 s per call on a cold path. In-flight only: nothing is
 // cached once answered, so a read after a write always reaches the server. WRITES ARE NEVER
 // SHARED: two update_application calls are two sends (AppStore's per-application queue orders them).
-const READ_ACTIONS = new Set(['load', 'load_profile', 'get_credits', 'inbox_status', 'get_recent_cos', 'get_employment', 'credit_history'])
+const READ_ACTIONS = new Set(['load', 'load_profile', 'get_credits', 'inbox_status', 'get_recent_cos', 'get_employment', 'credit_history', 'referral_status'])
 const inflight = new Map<string, Promise<SyncResult>>()
 
 /**

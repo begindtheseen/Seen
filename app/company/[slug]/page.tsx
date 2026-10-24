@@ -19,6 +19,8 @@ import { isGradeableScore, notEnoughReviewsLabel, gradeBasisLabel, MIN_REPORTS_F
 import { Crumbs } from '@/components/shell/PageHeader'
 import { LoadError } from '@/components/shell/LoadStates'
 import ListingSignals from '@/components/ListingSignals'
+import WarnFriendShare from '@/components/growth/WarnFriendShare'
+import { warnFriendText } from '@/lib/growthCopy.js'
 import { gradeLetter, displayCompanyName, displayPlatform, isResolvedOutcome, lastUpdatedLabel } from '@/lib/companyDisplay'
 import { buildCompanySummary, publicRowsHeading, reportsProvenanceLine, reportsSectionSummary, MIN_REPORTS_FOR_RATES, type CompanySummary } from '@/lib/companyPageSummary'
 import { feedRowVerdict } from '@/lib/reports/feedFilter.js'
@@ -524,7 +526,6 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
   const [compareList, setCompareList] = useState<Array<{name: string; score: CompanyScore | null; loading: boolean}>>([])
   // Reports render in pages of 5 — "Show more" reveals the rest; nothing is hidden for good.
   const [reportsShown, setReportsShown] = useState(5)
-  const [copied, setCopied] = useState(false)
   // Sticky context strip: once the hero's grade card scrolls under the nav, a slim bar keeps the
   // company + grade in view with a way back — the page can be long, the context never leaves.
   const heroRef = useRef<HTMLDivElement | null>(null)
@@ -698,19 +699,6 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
       .then(r => r.ok ? r.json() : { score: null })
       .then(d => setCompareList(prev => prev.map(c => c.name === name ? { ...c, score: d.score ?? null, loading: false } : c)))
       .catch(() => setCompareList(prev => prev.map(c => c.name === name ? { ...c, loading: false } : c)))
-  }
-
-  function share() {
-    const url = window.location.href.split('#')[0]
-    const data = {
-      title: `${displayName} on Seen`,
-      text: isGradeableScore(score)
-        ? `${displayName} has a Seen score of ${score.overall_score}/100 (${letterGrade(score.overall_score)})`
-        : `${displayName} on Seen — real applicant reports on how they hire`,
-      url,
-    }
-    if (navigator.share) { navigator.share(data).catch(() => {}); return }
-    navigator.clipboard?.writeText(url).then(() => { setCopied(true); setTimeout(() => setCopied(false), 1800) }).catch(() => {})
   }
 
   // Only a gradeable score is a verdict — below the report bar there is no letter, number or risk.
@@ -1015,6 +1003,17 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
             </div>
           )}
 
+          {/* Warn a friend: right under the grade, worded from exactly what this page shows (lib/growthCopy.js).
+              A signed-in person's link carries their invite code. Replaces the old plain "Share" chip. */}
+          {!loading && !error && companyName && (
+            <WarnFriendShare
+              context="company_page"
+              path={`/company/${slug}`}
+              lead={`Know someone applying to ${displayName}?`}
+              text={warnFriendText({ company: displayName, graded, letter: g, applicantReports: fpReports, ratesShown: sum.ratesShown, ghostRate: sum.ghostRate, responseRate: sum.responseRate })}
+            />
+          )}
+
           {/* The company's own job posts, rated on their own — separate from (and never part of) the Seen Grade. */}
           {!loading && !error && companyName && <ListingSignals companyName={companyName} />}
 
@@ -1028,7 +1027,6 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
               </div>
               <div className="co-chip-row">
                 <button type="button" className="co-chip" onClick={() => openSection('compare')}>⚡ Compare</button>
-                <button type="button" className="co-chip" onClick={share}>{copied ? '✓ Link copied' : '↗ Share'}</button>
                 {/* ?sv=<score> versions the shared URL: Reddit caches unfurls PER URL roughly
                     forever, so links shared before the OG card existed are stuck blank. A new
                     score → a new URL → a fresh unfurl fetch. rel=canonical keeps SEO on the

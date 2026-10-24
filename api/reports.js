@@ -21,6 +21,7 @@ import { firstPartyReportCount, mentionCount, webClaimCount, gateScore, isGradea
 import { feedRowPasses } from '../lib/reports/feedFilter.js';
 import { redditPlatform } from '../lib/reports/platformLabel.js';
 import { enqueueCompanyEnrichment } from '../lib/server/enrichmentQueue.js';
+import { rewardReport } from '../lib/server/growthRewards.js';
 
 // Authorize admin/cron-only actions (the Anthropic web-research endpoints). Accepts a Vercel
 // cron header, a shared CRON_SECRET, or a valid admin_sessions token. Everything Anthropic in
@@ -291,6 +292,16 @@ export default async function handler(req, res) {
     Authorization: `Bearer ${SUPABASE_SERVICE_KEY}`,
     'Content-Type': 'application/json',
   };
+  // PostgREST fetcher with the service key, the shape lib/server/growthRewards.js expects.
+  const serviceDb = (path, opts = {}) => fetch(`${SUPABASE_URL}/rest/v1/${path}`, { ...opts, headers: { ...hdrsBase, ...(opts.headers || {}) } });
+  // "Report and get Pro" (lib/server/growthRewards.js): the outcome just written for one of the caller's
+  // OWN tracked applications earns Pro days, by the application's server-side age, the same for every
+  // outcome. It never touches the report, its weight or any score, and it can never fail the report:
+  // a missing table (before migration 20261024160000) or any error is simply no reward.
+  const reportReward = async (uid, applicationId) => {
+    if (!applicationId) return null;
+    try { return await rewardReport(serviceDb, uid, String(applicationId)); } catch { return null; }
+  };
 
   // ── Employer perks (Engine E4) — active Featured / Transparency Verified for a company.
   // Isolated read so the company page can show the badge without touching the scoring path.
@@ -525,7 +536,8 @@ export default async function handler(req, res) {
         console.error('[reports/quick_submit] DB error:', r.status, e.slice(0, 200));
         return res.status(400).json({ error: 'Submit failed' });
       }
-      return res.status(200).json({ ok: true, submitted: true });
+      const reward = await reportReward(uid, body.application_id);
+      return res.status(200).json({ ok: true, submitted: true, ...(reward ? { reward } : {}) });
     } catch(err) {
       logError('reports/quick_submit', err.message);
       return res.status(500).json({ error: 'Internal error' });
@@ -606,7 +618,8 @@ export default async function handler(req, res) {
         if (errText.includes('company_name') || errText.includes('column')) repRes = await fetch(`${SUPABASE_URL}/rest/v1/reports`, { method: 'POST', headers: { ...hdrs, Prefer: 'return=minimal' }, body: JSON.stringify(reportBase) });
       }
       if (!repRes.ok) { const e = await repRes.text().catch(() => ''); console.error('[reports/create_from_tracker] DB error:', repRes.status, e.slice(0, 200)); return res.status(500).json({ error: 'Failed to save report' }); }
-      return res.status(200).json({ ok: true, company_id: cid, trust_reason: trust.reason });
+      const reward = await reportReward(uid, body.application_id);
+      return res.status(200).json({ ok: true, company_id: cid, trust_reason: trust.reason, ...(reward ? { reward } : {}) });
     } catch(err) {
       logError('reports/create_from_tracker', err.message);
       return res.status(500).json({ error: 'Internal error' });

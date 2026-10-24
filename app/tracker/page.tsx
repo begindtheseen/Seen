@@ -31,6 +31,7 @@ import { responded } from '@/lib/stores/outcomes'
 import { companySlug } from '@/lib/cardCopy.js'
 import { slugSegment } from '@/lib/safeHref.js'
 import { showToast } from '@/lib/toast'
+import { showReportReward } from '@/lib/rewardNotice'
 import s from '@/components/tracker/tracker.module.css'
 import { LoadError, PageSkeleton } from '@/components/shell/LoadStates'
 import { loginHref } from '@/lib/safeHref.js'
@@ -539,13 +540,20 @@ function TrackerPage() {
       const outcome = changes.status
       // quick_submit requires a signed-in user — without the Bearer token every one of
       // these community reports 401'd silently and the tracker→intel flywheel fed nothing.
+      // The application's own (account) id rides along so the server can reward the report with Pro
+      // days ("Report and get Pro", lib/server/growthRewards.js): it reads the row itself, by id and
+      // user, and judges its age from the row. The reward line is shown when the answer comes back.
+      const appId = isDbId(id) ? id : null
       token().then(tok => {
         if (!tok) return
         fetch('/api/reports', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${tok}` },
-          body: JSON.stringify({ action: 'quick_submit', company: origApp.company, outcome, role: origApp.role, city: origApp.location || '' }),
-        }).catch(() => {})
+          body: JSON.stringify({ action: 'quick_submit', company: origApp.company, outcome, role: origApp.role, city: origApp.location || '', ...(appId ? { application_id: appId } : {}) }),
+        })
+          .then(res => (res.ok ? res.json() : null))
+          .then((d: { reward?: Parameters<typeof showReportReward>[0] } | null) => { if (d?.reward) showReportReward(d.reward) })
+          .catch(() => {})
       }).catch(() => {})
     }
     if (changes.status && ['hired', 'ghosted', 'rejected'].includes(changes.status)) {

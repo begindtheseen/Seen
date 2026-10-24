@@ -16,6 +16,9 @@ import { gradeLetter } from '@/lib/companyDisplay'
 import { isGradeableScore } from '@/lib/gradeGate'
 import { track } from '@/lib/analytics'
 import CardShareModal from '@/components/CardShareModal'
+import WarnFriendShare from '@/components/growth/WarnFriendShare'
+import { warnAfterOutcomeText } from '@/lib/growthCopy.js'
+import { companySlug } from '@/lib/cardCopy.js'
 
 interface Props {
   app: Application
@@ -115,6 +118,16 @@ export default function OutcomeCard({ app, onClose, onShared, otherGrades }: Pro
       onShareAttempt={(dest) => onShared?.(dest)}
       onShared={(dest, method) => track('card_shared', { card_type: 'outcome', method, destination: dest, outcome: status })}
       skipLabel="Skip, don't share"
-    />
+    >
+      {/* Right after a ghosting or a rejection: one tap to warn a friend who is applying there. */}
+      {(status === 'ghosted' || status === 'rejected') && (
+        <WarnFriendShare
+          variant="modal"
+          context="after_report"
+          path={`/company/${companySlug(data.company)}`}
+          text={warnAfterOutcomeText({ company: data.company, outcome: status, days: data.days })}
+        />
+      )}
+    </CardShareModal>
   )
 }

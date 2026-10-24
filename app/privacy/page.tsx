@@ -66,6 +66,7 @@ export default function PrivacyPage() {
             <li style={li}>content you add — application-tracker entries, saved jobs, submitted reports, and any résumé text or file you upload. Your résumé is stored on your profile until you replace it or delete your account (both in Settings) and is used only for your own tools — job matching, fit scores and rewrites. It is never shown to employers or recruiters and never sold;</li>
             <li style={li}>if you turn on Inbox Autopilot, the facts Seen reads from emails you forward to your private Seen address — company, role, what happened (applied, interview, assessment, rejection or offer), the sender’s name and domain, and the date. We do not store the email’s text, subject or attachments, and turning the feature off deletes these facts;</li>
             <li style={li}>your subscription, credit balance, and entitlement status;</li>
+            <li style={li}>for earned Pro time, your invite code, which account invited you (if any) and the accounts you invited, and a record of each reward (what earned it, how many days, and when). An invited friend never sees your tracker or reports, and you never see theirs; the invite card only shows counts. If you arrive from an invite link before signing up, the code is kept on your device until you sign in;</li>
             <li style={li}>session and authentication tokens needed to keep you signed in.</li>
           </ul>
           <p style={p}><strong>If you submit a report without an account,</strong> we store the report text, the company name, a general location, a timestamp, and a hashed session identifier — not your name or email.</p>
@@ -138,7 +139,7 @@ export default function PrivacyPage() {
             We keep account data for as long as your account is active and as needed to provide the service,
             then delete or anonymize it within a reasonable period, except where longer retention is required
             by law or for legitimate business or security purposes. When you delete your account in Settings,
-            any active subscription is cancelled first, then your profile, résumé, tracker entries, saved jobs, credits and sign-in record are removed and the
+            any active subscription is cancelled first, then your profile, résumé, tracker entries, saved jobs, credits, invite and reward records and sign-in record are removed and the
             reports you submitted stay published without any link to you (they are de-identified, not deleted,
             because they are already part of a company&apos;s public record). Public-discussion items may be
             retained in aggregated or de-identified form. <Placeholder>counsel to set specific retention periods</Placeholder>

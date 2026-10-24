@@ -6,6 +6,7 @@
 // Seen never stores an email — only the company, the role and what happened.
 
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { showReportReward } from '@/lib/rewardNotice'
 import { _sync } from '@/lib/sync'
 import { formatPacific } from '@/lib/time/pacific.js'
 import type { Application } from '@/lib/types'
@@ -94,10 +95,13 @@ export default function InboxAutopilot({ apps, token, onAppsChanged, status }: {
     if (yes && ev.company) {
       const tok = await token()
       if (tok) {
-        await fetch('/api/reports', {
+        // The matched application's id lets the server reward the report with Pro days (it checks
+        // the row is this account's and old enough itself — lib/server/growthRewards.js).
+        const d = await fetch('/api/reports', {
           method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${tok}` },
-          body: JSON.stringify({ action: 'quick_submit', company: ev.company, outcome: SHARE_OUTCOME[ev.kind], role: ev.role || '' }),
-        }).catch(() => {})
+          body: JSON.stringify({ action: 'quick_submit', company: ev.company, outcome: SHARE_OUTCOME[ev.kind], role: ev.role || '', ...(ev.application_id ? { application_id: ev.application_id } : {}) }),
+        }).then(r => (r.ok ? r.json() : null)).catch(() => null) as { reward?: Parameters<typeof showReportReward>[0] } | null
+        if (d?.reward) showReportReward(d.reward)
       }
     }
     await act('inbox_share', { id: ev.id, choice: yes ? 'shared' : 'declined' })
