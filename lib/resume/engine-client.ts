@@ -2,7 +2,7 @@
 // Everything here runs in the browser — no network, no credits — because the modules under
 // lib/resume/{model,parse,health,rewrite,render/templates,render/text}.js import no Node built-ins.
 // Rendering (PDF/DOCX), tailoring and the ATS round-trip stay on the server (/api/resume).
-import { normalizeDoc as _normalizeDoc, serializeToText as _serializeToText, docStats as _docStats, docIsEmpty as _docIsEmpty, newId as _newId, splitSkillList as _splitSkillList, emptyDoc as _emptyDoc, titleForKind as _titleForKind } from './model.js'
+import { normalizeDoc as _normalizeDoc, serializeToText as _serializeToText, docStats as _docStats, countWords as _countWords, docIsEmpty as _docIsEmpty, newId as _newId, splitSkillList as _splitSkillList, emptyDoc as _emptyDoc, titleForKind as _titleForKind } from './model.js'
 import { parseResume as _parseResume } from './parse/index.js'
 import { findDateRange as _findDateRange, formatRange as _formatRange, parseDateToken as _parseDateToken, toToken as _toToken } from './parse/dates.js'
 import { scoreResume as _scoreResume } from './health/score.js'
@@ -15,6 +15,7 @@ import type { ResumeDoc, Health, RewriteLogEntry, TemplateInfo, TailorPlan, Tail
 export const normalizeDoc = (input: unknown): ResumeDoc => _normalizeDoc(input) as unknown as ResumeDoc
 export const emptyDoc = (): ResumeDoc => _emptyDoc() as unknown as ResumeDoc
 export const serializeToText = (doc: ResumeDoc): string => _serializeToText(doc)
+export const countWords = (text: string): number => _countWords(text)
 export const docStats = (doc: ResumeDoc): { words: number; bullets: number; roles: number; education: number; skills: number; sections: number } => _docStats(doc)
 export const docIsEmpty = (doc: ResumeDoc): boolean => _docIsEmpty(doc)
 export const newId = (prefix?: string): string => _newId(prefix)

@@ -1,6 +1,7 @@
 'use client'
 
 import { _sync } from '../sync'
+import { markQuiet } from '../quietWindow'
 import type { Application, HiringEvent, AppStatus } from '../types'
 
 const KEY = 'seen_applications_v1'
@@ -197,6 +198,9 @@ export const AppStore = {
       apps[idx] = updated
       localStorage.setItem(KEY, JSON.stringify(apps))
     }
+    // An outcome ("Got the job" / Ghosted / Rejected / withdrawn) is a weighty moment: nothing optional
+    // (the micro-survey) pops for the next two minutes.
+    if (changes.status && changes.status !== 'active') markQuiet()
     const syncChanges = { ...changes }
     const updatedApp = apps.find(a => a.id === id)
     if (updatedApp?.events) syncChanges.events = updatedApp.events
@@ -206,11 +210,13 @@ export const AppStore = {
   },
 
   async remove(id: string, loggedIn: boolean): Promise<void> {
+    markQuiet() // a delete is a weighty moment — see update()
     localStorage.setItem(KEY, JSON.stringify(this.loadSync().filter(a => a.id !== id)))
     if (loggedIn) await _sync('remove_application', { id })
   },
 
   async clear(loggedIn = false): Promise<void> {
+    markQuiet()
     localStorage.removeItem(KEY)
     // "Clear all" must clear the account too — otherwise the DB rows resurrect
     // everything on the next load/device.

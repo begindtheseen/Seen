@@ -93,7 +93,12 @@ export default function ResetPage() {
         {step === 1 ? (
           <div>
             <div style={{ fontFamily: 'var(--display)', fontSize: '1.4rem', fontWeight: 800, color: 'var(--white)', letterSpacing: '-.025em', marginBottom: '.2rem' }}>Reset your password</div>
-            <div style={{ fontSize: '.82rem', color: 'var(--sub)', fontWeight: 300, marginBottom: '1.5rem' }}>Enter your email and we&apos;ll send an 8-digit code</div>
+            {/* This flow sends the sign-in-code email (supabase signInWithOtp → an 8-digit code, no link).
+                Settings → Change password sends the OTHER email, a reset LINK. Each screen says exactly
+                what its own email contains and names the other path (audit 2026-10-23: the two screens
+                read as if one of them were wrong). */}
+            <div style={{ fontSize: '.82rem', color: 'var(--sub)', fontWeight: 300, marginBottom: '.5rem' }}>Enter your email and we&apos;ll send an 8-digit code — a code to type here, not a link.</div>
+            <div style={{ fontFamily: 'var(--mono)', fontSize: '.62rem', color: 'var(--muted)', lineHeight: 1.55, marginBottom: '1.5rem' }}>Already signed in and prefer a link? Settings → Change password emails one instead.</div>
             <div style={{ marginBottom: '1.25rem' }}>
               <label style={{ fontFamily: 'var(--mono)', fontSize: '.6rem', textTransform: 'uppercase' as const, letterSpacing: '.08em', color: 'var(--dim)', display: 'block', marginBottom: '.35rem' }}>Email address</label>
               <input
@@ -126,7 +131,7 @@ export default function ResetPage() {
         ) : (
           <div>
             <div style={{ fontFamily: 'var(--display)', fontSize: '1.4rem', fontWeight: 800, color: 'var(--white)', letterSpacing: '-.025em', marginBottom: '.2rem' }}>Enter your code</div>
-            <div style={{ fontSize: '.82rem', color: 'var(--sub)', fontWeight: 300, marginBottom: '.35rem' }}>We sent an 8-digit code to</div>
+            <div style={{ fontSize: '.82rem', color: 'var(--sub)', fontWeight: 300, marginBottom: '.35rem' }}>We sent an 8-digit code (not a link) to</div>
             <div style={{ fontFamily: 'var(--mono)', fontSize: '.82rem', color: 'var(--blue)', marginBottom: '1.5rem' }}>{email.trim()}</div>
             <div style={{ marginBottom: '.85rem' }}>
               <label style={{ fontFamily: 'var(--mono)', fontSize: '.6rem', textTransform: 'uppercase' as const, letterSpacing: '.08em', color: 'var(--dim)', display: 'block', marginBottom: '.35rem' }}>8-digit code</label>

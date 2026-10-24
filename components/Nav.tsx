@@ -73,7 +73,7 @@ export default function Nav() {
   const [creditBalance, setCreditBalance] = useState<number | null>(null)
   // Credits chip popover (components/CreditsPopover.tsx) + the get_credits facts it shows.
   const [creditsOpen, setCreditsOpen] = useState(false)
-  const [creditInfo, setCreditInfo] = useState<{ daily_earned?: number | null; max_daily_earn?: number | null; welcome?: boolean }>({})
+  const [creditInfo, setCreditInfo] = useState<{ daily_earned?: number | null; max_daily_earn?: number | null; welcome?: boolean; daily?: number | null; purchased?: number | null }>({})
   const [isPro, setIsPro] = useState(false)
   const [showUpgrade, setShowUpgrade] = useState(false)
   const [showSurvey, setShowSurvey] = useState(false)
@@ -94,10 +94,10 @@ export default function Nav() {
           body: JSON.stringify({ action: 'get_credits' }),
         })
         if (!res.ok || cancelled) return
-        const data = await res.json() as { balance?: number; pro?: boolean; daily_earned?: number | null; max_daily_earn?: number | null; welcome?: boolean }
+        const data = await res.json() as { balance?: number; pro?: boolean; daily_earned?: number | null; max_daily_earn?: number | null; welcome?: boolean; daily?: number | null; purchased?: number | null }
         if (!cancelled) {
           setCreditBalance(data.pro ? 999 : (data.balance ?? null)); setIsPro(!!data.pro)
-          setCreditInfo({ daily_earned: data.daily_earned ?? null, max_daily_earn: data.max_daily_earn ?? null, welcome: !!data.welcome })
+          setCreditInfo({ daily_earned: data.daily_earned ?? null, max_daily_earn: data.max_daily_earn ?? null, welcome: !!data.welcome, daily: data.daily ?? null, purchased: data.purchased ?? null })
         }
       } catch { /* ignore */ }
     })
@@ -288,7 +288,7 @@ export default function Nav() {
           {/* Credits — subtle monospace chip (Pro shows an unlimited badge). */}
           {isSeeker && isPro && (
             <Link href="/pricing" className={styles.pro} title="Seen Pro — unlimited AI credits. Manage your membership.">
-              ★ <span className={styles.proLong}>Unlimited · </span>PRO
+              <span className={`${styles.pill} ${styles.proPill}`}>★ <span className={styles.proLong}>Unlimited · </span>PRO</span>
             </Link>
           )}
           {isSeeker && !isPro && creditBalance !== null && (
@@ -303,9 +303,12 @@ export default function Nav() {
                   : `${creditBalance} AI credit${creditBalance === 1 ? '' : 's'} available · ${dailyResetLabel()}`}
                 onClick={() => setCreditsOpen(o => !o)}
               >
-                <span className={styles.chipSpark} />
-                <b>{creditBalance}</b>
-                <span className={styles.chipLabel}>{creditBalance === 0 ? 'credits · top up' : `credit${creditBalance === 1 ? '' : 's'}`}</span>
+                {/* The pill is the visual; the button around it is the hit area (44px tall on phones). */}
+                <span className={styles.pill}>
+                  <span className={styles.chipSpark} />
+                  <b>{creditBalance}</b>
+                  <span className={styles.chipLabel}>{creditBalance === 0 ? 'credits · top up' : `credit${creditBalance === 1 ? '' : 's'}`}</span>
+                </span>
               </button>
               {creditsOpen && (
                 <CreditsPopover
@@ -348,7 +351,7 @@ export default function Nav() {
                   aria-label="Account menu"
                   title="Account"
                 >
-                  {avatarInitial}
+                  <span className={styles.avatarDot}>{avatarInitial}</span>
                 </button>
               }
             >

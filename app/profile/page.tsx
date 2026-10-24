@@ -432,7 +432,7 @@ export default function ProfilePage() {
               <div className={styles.row}>
                 <div>
                   <div className={styles.rowT}>Change password</div>
-                  <div className={styles.rowS}>We email you a reset link first, then you set the new one here.</div>
+                  <div className={styles.rowS}>We email you a reset link (a link to open, not a code), then you set the new one here. Signed out and locked out? The sign-in page&apos;s “Forgot password?” sends an 8-digit code instead.</div>
                 </div>
                 <button type="button" className={styles.ghost} onClick={sendResetLink} disabled={linkSending}>{linkSending ? 'Sending…' : linkSent ? 'Resend link' : 'Send link →'}</button>
               </div>

@@ -109,7 +109,7 @@ export default function NotificationsBell({ uid, className }: { uid: string; cla
                   <div style={{ fontFamily: 'var(--mono)', fontSize: '.55rem', textTransform: 'uppercase', letterSpacing: '.1em', color: 'var(--blue)' }}>Notifications</div>
                   <div style={{ fontFamily: 'var(--display)', fontWeight: 800, fontSize: '1.05rem', color: 'var(--white)', marginTop: '.15rem' }}>Application updates</div>
                 </div>
-                <button type="button" onClick={closeModal} aria-label="Close" style={{ background: 'none', border: '1px solid var(--line2)', borderRadius: 8, width: 32, height: 32, color: 'var(--muted)', cursor: 'pointer', flexShrink: 0 }}>✕</button>
+                <button type="button" onClick={closeModal} aria-label="Close" style={{ background: 'none', border: '1px solid var(--line2)', borderRadius: 10, width: 44, height: 44, color: 'var(--muted)', cursor: 'pointer', flexShrink: 0 }}>✕</button>
               </div>
 
               {items.length === 0 ? (

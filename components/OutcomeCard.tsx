@@ -1,17 +1,21 @@
 'use client'
 
-// Tracker "Outcome" share card. The 1080×1080 creative is drawn by the shared premium
-// kit (lib/cardKit.ts). Rendered through a portal to document.body so a transformed
-// ancestor can't trap the fixed backdrop. Maps the tracked Application (events, dates,
-// status, platform) into the kit's outcome model — a journey stepper + stat row.
+// Tracker "Outcome" share card: a typographic poster of this one application's story, drawn by
+// the shared kit (lib/cardKit.ts) in square and story formats, shared through the one modal
+// shell (components/CardShareModal.tsx) and lib/shareCard.ts. Maps the tracked Application
+// (events, dates, status, platform, city) into the kit's outcome model. The company's Seen grade,
+// when it has one, is looked up (bounded) so the card can carry one honest line of context —
+// never invented when absent.
 
-import { useEffect, useState, useRef } from 'react'
-import { createPortal } from 'react-dom'
-import { useScrollLock } from '@/components/ModalPortal'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { Application } from '@/lib/types'
-import { drawOutcomeCard, type OutcomeCardData } from '@/lib/cardKit'
-import { shareCardImage, shareHint, type ShareDest } from '@/lib/shareCard'
+import { drawOutcomeCard, type CardFormat, type OutcomeCardData, type CompanyGradeContext } from '@/lib/cardKit'
+import { ACCENTS, accentKeyForOutcome } from '@/lib/cardTheme.js'
+import { outcomeShareText, outcomeHeadline, companyHref, daysBetween } from '@/lib/cardCopy.js'
+import { gradeLetter } from '@/lib/companyDisplay'
+import { isGradeableScore } from '@/lib/gradeGate'
 import { track } from '@/lib/analytics'
+import CardShareModal from '@/components/CardShareModal'
 
 interface Props {
   app: Application
@@ -19,9 +23,12 @@ interface Props {
   // Fired once when the card is shared to a destination or downloaded. Used by the
   // tracker→report→share loop to record a light outcome_card_shares analytics row.
   onShared?: (via: string) => void
+  /** Letter grades of the person's OTHER tracked companies (when the tracker knows them) — lets a
+   *  hired post compare: "The other 3 places I applied were a C or worse on seenjobs.io". */
+  otherGrades?: string[]
 }
 
-function buildOutcome(app: Application): OutcomeCardData {
+export function buildOutcome(app: Application): OutcomeCardData {
   const events = app.events || []
   const appliedMs = events.find(e => e.type === 'application_submitted')?.date || app.appliedAt || Date.now()
   const offerEvt = events.find(e => e.type === 'offer_received')
@@ -29,150 +36,85 @@ function buildOutcome(app: Application): OutcomeCardData {
   const ghostEvt = events.find(e => e.type === 'ghosted')
   const intEvt = events.find(e => e.type === 'interview_received')
   const outcomeMs = (offerEvt || rejEvt || ghostEvt)?.date || app.updatedAt || Date.now()
-  const days = Math.max(0, Math.round((outcomeMs - appliedMs) / 86400000))
-
   const outcome = (app.status === 'hired' || offerEvt) ? 'hired'
     : (app.status === 'ghosted' || ghostEvt) ? 'ghosted'
     : 'rejected'
-  const reachedInterview = !!intEvt
-  const word = outcome === 'hired' ? 'HIRED' : outcome === 'ghosted' ? 'GHOSTED' : 'REJECTED'
-  const mark = outcome === 'hired' ? '✓' : '✕'
-
-  // Ghosted has no decision date — frame the timeline as "silence", not a verdict day.
-  const steps = outcome === 'ghosted'
-    ? [
-        { label: 'Applied', sub: 'Day 0' },
-        { label: 'Interview', sub: reachedInterview ? 'Reached' : 'Not reached' },
-        { label: 'Ghosted', sub: `${days}d of silence`, mark },
-      ]
-    : [
-        { label: 'Applied', sub: 'Day 0' },
-        { label: 'Interview', sub: reachedInterview ? 'Reached' : 'Not reached' },
-        { label: word, sub: `Day ${days}`, mark },
-      ]
-
-  const stats = [
-    { value: outcome === 'ghosted' ? `${days}d` : `${days}d`, label: outcome === 'ghosted' ? 'No reply for' : 'To decision', color: '#ffffff' },
-    { value: reachedInterview ? 'Yes' : 'No', label: 'Reached interview', color: reachedInterview ? '#10b981' : 'rgba(255,255,255,0.85)' },
-    { value: app.platform || 'Seen', label: 'Applied via', color: '#ffffff' },
-  ]
-
-  return { company: app.company || 'Company', role: app.role, outcome, days, reachedInterview, platform: app.platform, steps, stats }
+  return {
+    company: app.company || 'Company',
+    role: app.role,
+    outcome,
+    days: daysBetween(appliedMs, outcomeMs),
+    reachedInterview: !!intEvt,
+    platform: app.platform,
+    appliedMs,
+    // The tracker's real events: the grid marks their days and the timeline line names them.
+    events: events.filter(e => Number.isFinite(e.date)).map(e => ({ type: String(e.type), date: e.date })),
+  }
 }
 
-export default function OutcomeCard({ app, onClose, onShared }: Props) {
-  const [dataUrl, setDataUrl] = useState<string | null>(null)
-  const [blob, setBlob] = useState<Blob | null>(null)
-  const [mounted, setMounted] = useState(false)
-  const [hint, setHint] = useState<string | null>(null)
-  const doneRef = useRef(false)
-
-  const status = (app.status || 'ghosted') as 'hired' | 'rejected' | 'ghosted'
-  const OC = status === 'hired' ? '#10b981' : status === 'ghosted' ? '#ef4444' : '#ef4444'
-  const days = Math.max(1, Math.round((app.updatedAt - app.appliedAt) / 86400000))
-  const outcomeWord = status === 'hired' ? 'got an offer' : status === 'ghosted' ? 'got ghosted' : 'got rejected'
-  const shareText = `Tracked my ${app.company} application on Seen — ${outcomeWord} after ${days} days. Check any company's ghost rate at seenjobs.io`
-
-  // No public per-outcome page exists, so unfurl the company page (which has a dynamic
-  // OG image) when we know the company, else the root site OG image.
-  // Must round-trip through /company/[slug]'s decoder — stripping punctuation ("H&M"→"hm")
-  // made every shared card link land on a dataless page.
-  const companySlug = encodeURIComponent((app.company || '').toLowerCase().trim().replace(/\s+/g, '-'))
-  const unfurlUrl = companySlug ? `https://seenjobs.io/company/${companySlug}` : 'https://seenjobs.io'
-
-  useEffect(() => { setMounted(true) }, [])
-
-  useEffect(() => {
-    if (doneRef.current) return
-    doneRef.current = true
-    const run = async () => {
-      try {
-        await document.fonts.ready
-        const canvas = document.createElement('canvas')
-        drawOutcomeCard(canvas, buildOutcome(app))
-        setDataUrl(canvas.toDataURL('image/png'))
-        canvas.toBlob(b => { if (b) setBlob(b) }, 'image/png')
-        track('card_generated', { card_type: 'outcome', outcome: status })
-      } catch { /* leave preview in loading state */ }
+// The company's grade for the context strip, from the same batch_scores the tracker reads
+// (api/reports.js → gateScore). Bounded so the card never waits on a slow network; a miss or a
+// non-gradeable company simply means no strip.
+async function lookupGrade(company: string): Promise<CompanyGradeContext | null> {
+  const name = company.toLowerCase().trim()
+  if (!name) return null
+  try {
+    const r = await fetch('/api/reports', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'batch_scores', names: [name] }),
+      signal: AbortSignal.timeout(1500),
+    })
+    if (!r.ok) return null
+    const d = await r.json() as { scores?: Record<string, { gradeable?: boolean | null; overall_score?: number | null; ghost_rate?: number | null; response_rate?: number | null; avg_wait_days?: number | null; first_party_report_count?: number | null }> }
+    const s = d.scores?.[name]
+    if (!isGradeableScore(s)) return null
+    return {
+      grade: gradeLetter(s.overall_score), score: Math.round(s.overall_score),
+      ghostRate: s.ghost_rate ?? null, responseRate: s.response_rate ?? null,
+      avgWaitDays: s.avg_wait_days ?? null,
+      // First-party only — the fused count is a web claim and never reads as "reports".
+      reports: s.first_party_report_count ?? null,
     }
-    run()
-  }, [app]) // eslint-disable-line react-hooks/exhaustive-deps
-
-  useEffect(() => {
-    const h = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
-    window.addEventListener('keydown', h)
-    return () => window.removeEventListener('keydown', h)
-  }, [onClose])
-
-  async function share(dest: ShareDest) {
-    try { onShared?.(dest) } catch { /* never block the share UX */ }
-    const fileName = `seen_${status}_${(app.company || 'c').replace(/[^a-z0-9]/gi, '_')}_${Date.now()}.png`
-    const result = await shareCardImage({ blob, dataUrl, fileName, text: shareText, url: unfurlUrl, dest })
-    // Method reflects how the image actually travelled: native share sheet, clipboard
-    // copy, plain download, or the destination whose composer/unfurl we opened.
-    // 'cancelled'/'noop' means nothing was shared — don't count those.
-    if (result !== 'cancelled' && result !== 'noop') {
-      const method = dest === 'download' ? 'download'
-        : result === 'native' ? 'native_share'
-        : result === 'clipboard+open' ? 'copy'
-        : dest
-      track('card_shared', { card_type: 'outcome', method, destination: dest, outcome: status })
-    }
-    const msg = shareHint(result, dest)
-    if (msg) {
-      setHint(msg)
-      // Clipboard/unfurl paths keep the modal open so the user can read the hint
-      // and finish the post; native/download/cancel close as before.
-      return
-    }
-    if (dest !== 'download') setTimeout(onClose, 400)
+  } catch {
+    return null
   }
+}
 
-  useScrollLock(mounted)
-  if (!mounted) return null
+export default function OutcomeCard({ app, onClose, onShared, otherGrades }: Props) {
+  const data = useMemo(() => buildOutcome(app), [app])
+  const status = data.outcome
+  const accent = ACCENTS[accentKeyForOutcome(status)].hex
+  const head = outcomeHeadline({ outcome: status, company: data.company, days: data.days, reachedInterview: data.reachedInterview })
+  // No public per-outcome page exists, so unfurl the company page (which has a dynamic OG image).
+  // The slug must round-trip through /company/[slug]'s decoder — one scheme (lib/cardCopy.js).
+  const unfurlUrl = companyHref(data.company)
 
-  return createPortal(
-    <div style={{ position: 'fixed', inset: 0, zIndex: 99999, background: 'rgba(4,5,12,0.985)', display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '1.5rem 1.25rem 2.5rem', overflowY: 'auto' }}>
-      <div style={{ width: '100%', maxWidth: 480 }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem' }}>
-          <div style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', color: OC, textTransform: 'uppercase', letterSpacing: '.1em', fontWeight: 600 }}>
-            {status} — {app.company}
-          </div>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', fontFamily: 'var(--mono)', fontSize: '.65rem', color: 'rgba(255,255,255,0.3)', cursor: 'pointer', padding: '.2rem .4rem' }}>✕ close</button>
-        </div>
+  // One grade lookup shared by both formats and by the post text (which quotes the real rate).
+  const gradePromise = useMemo(() => lookupGrade(data.company), [data.company])
+  const [grade, setGrade] = useState<CompanyGradeContext | null>(null)
+  useEffect(() => { let on = true; gradePromise.then(g => { if (on) setGrade(g) }); return () => { on = false } }, [gradePromise])
+  const shareText = outcomeShareText({ outcome: status, company: data.company, days: data.days, reachedInterview: data.reachedInterview, grade, others: otherGrades })
+  const draw = useCallback(async (canvas: HTMLCanvasElement, format: CardFormat) => {
+    const companyGrade = await gradePromise
+    drawOutcomeCard(canvas, { ...data, companyGrade }, format)
+  }, [data, gradePromise])
 
-        <div style={{ fontFamily: 'var(--display)', fontSize: '1.15rem', fontWeight: 800, color: '#fff', marginBottom: '.2rem', letterSpacing: '-.02em' }}>Your outcome card is ready</div>
-        <div style={{ fontFamily: 'var(--body)', fontSize: '.78rem', color: 'rgba(255,255,255,0.45)', marginBottom: '1.1rem', lineHeight: 1.6 }}>Share your experience — help the next applicant know what to expect.</div>
-
-        {dataUrl ? (
-          <img src={dataUrl} alt="Outcome card" style={{ width: '100%', borderRadius: 16, boxShadow: `0 24px 80px rgba(0,0,0,0.9), 0 0 60px ${OC}22`, marginBottom: '1rem', display: 'block' }} />
-        ) : (
-          <div style={{ width: '100%', aspectRatio: '1 / 1', borderRadius: 16, background: '#0c0f1a', border: `1px solid ${OC}22`, marginBottom: '1rem', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '.85rem' }}>
-            <div style={{ fontFamily: 'var(--display)', fontSize: '3rem', fontWeight: 800, color: OC, opacity: .7 }}>{app.company[0]?.toUpperCase()}</div>
-            <div style={{ fontFamily: 'var(--mono)', fontSize: '.6rem', color: 'rgba(255,255,255,0.2)', letterSpacing: '.1em' }}>Generating your card…</div>
-          </div>
-        )}
-
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '.5rem', marginBottom: '.5rem' }}>
-          <button onClick={() => share('linkedin')} style={{ background: 'rgba(10,102,194,0.15)', border: '1px solid rgba(10,102,194,0.4)', color: '#60a5fa', fontFamily: 'var(--mono)', fontSize: '.65rem', fontWeight: 600, padding: '.7rem .6rem', borderRadius: 9, cursor: 'pointer' }}>in · LinkedIn</button>
-          <button onClick={() => share('twitter')} style={{ background: 'rgba(29,161,242,0.1)', border: '1px solid rgba(29,161,242,0.3)', color: 'rgba(150,210,255,0.9)', fontFamily: 'var(--mono)', fontSize: '.65rem', fontWeight: 600, padding: '.7rem .6rem', borderRadius: 9, cursor: 'pointer' }}>𝕏 · Twitter</button>
-          <button onClick={() => share('reddit')} style={{ background: 'rgba(255,69,0,0.15)', border: '1px solid rgba(255,69,0,0.4)', color: '#ff6314', fontFamily: 'var(--mono)', fontSize: '.65rem', fontWeight: 600, padding: '.7rem .6rem', borderRadius: 9, cursor: 'pointer' }}>Reddit</button>
-        </div>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '.5rem', marginBottom: '.7rem' }}>
-          <button onClick={() => share('threads')} style={{ background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.18)', color: '#fff', fontFamily: 'var(--mono)', fontSize: '.65rem', fontWeight: 600, padding: '.7rem .9rem', borderRadius: 9, cursor: 'pointer' }}>Threads</button>
-          <button onClick={() => share('download')} disabled={!dataUrl} style={{ background: 'rgba(99,102,241,0.1)', border: '1px solid rgba(99,102,241,0.25)', color: 'rgba(180,180,255,0.85)', fontFamily: 'var(--mono)', fontSize: '.65rem', padding: '.7rem .9rem', borderRadius: 9, cursor: dataUrl ? 'pointer' : 'not-allowed', opacity: dataUrl ? 1 : 0.5 }}>↓ Save Image</button>
-        </div>
-
-        {hint && (
-          <div role="status" style={{ display: 'flex', alignItems: 'center', gap: '.5rem', background: 'rgba(16,185,129,0.12)', border: '1px solid rgba(16,185,129,0.35)', color: '#a7f3d0', fontFamily: 'var(--body)', fontSize: '.72rem', lineHeight: 1.5, padding: '.6rem .75rem', borderRadius: 9, marginBottom: '.7rem' }}>
-            <span style={{ flexShrink: 0 }}>📋</span>
-            <span>{hint}</span>
-          </div>
-        )}
-
-        <button onClick={onClose} style={{ background: 'none', border: 'none', width: '100%', fontFamily: 'var(--mono)', fontSize: '.6rem', color: 'rgba(255,255,255,0.25)', cursor: 'pointer', padding: '.5rem', textAlign: 'center' }}>Skip — don&apos;t share</button>
-      </div>
-    </div>,
-    document.body,
+  return (
+    <CardShareModal
+      kicker="Outcome card"
+      title={head.text}
+      sub={head.parts.length > 1 ? 'Share it. The next applicant deserves to know what to expect.' : `${data.company}. Share it so the next applicant knows what to expect.`}
+      accent={accent}
+      draw={draw}
+      shareText={shareText}
+      shareUrl={unfurlUrl}
+      fileBase={`${status}_${(data.company || 'c').replace(/[^a-z0-9]/gi, '_')}`}
+      onClose={onClose}
+      onGenerated={(format) => track('card_generated', { card_type: 'outcome', outcome: status, format })}
+      onShareAttempt={(dest) => onShared?.(dest)}
+      onShared={(dest, method) => track('card_shared', { card_type: 'outcome', method, destination: dest, outcome: status })}
+      skipLabel="Skip, don't share"
+    />
   )
 }

@@ -21,6 +21,7 @@ export {
   PRO_PRICING,
   creditCostLabel,
   dailyResetLabel,
+  balanceExplanation,
   RESUME_SURVEY_AWARD,
   TRACK_APPLICATION_AWARD,
   MAX_DAILY_EARN,

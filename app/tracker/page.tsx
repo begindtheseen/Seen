@@ -14,6 +14,7 @@ import OutcomeCard from '@/components/OutcomeCard'
 import RoundsPrompt from '@/components/RoundsPrompt'
 import { firstPartyReportCount } from '@/lib/server/reportCounts'
 import { isGradeableScore } from '@/lib/gradeGate'
+import { gradeLetter } from '@/lib/companyDisplay'
 import ModalPortal from '@/components/ModalPortal'
 import WithdrawModal from '@/components/WithdrawModal'
 import PageHeader from '@/components/shell/PageHeader'
@@ -22,7 +23,8 @@ import ApplicationForm from '@/components/tracker/ApplicationForm'
 import ConfirmDialog from '@/components/tracker/ConfirmDialog'
 import StagePipeline from '@/components/tracker/StagePipeline'
 import { emptyForm, formFromApplication, toNewApplication, editChanges, type ApplicationForm as FormValues } from '@/lib/stores/applicationEdit'
-import { nextCheckLine, DAY_MS } from '@/lib/stores/checkSchedule'
+import { nextCheckLine, daysSince } from '@/lib/stores/checkSchedule'
+import { splitOpenDuplicates } from '@/lib/stores/applicationDupes'
 import s from '@/components/tracker/tracker.module.css'
 const SurveyModal = dynamic(() => import('@/components/SurveyModal'), { ssr: false })
 const ResumeSurveyModal = dynamic(() => import('@/components/ResumeSurveyModal'), { ssr: false })
@@ -35,9 +37,9 @@ const STATUS_MAP: Record<string, string> = {
   withdrawn: 'rejected',
 }
 
-function getDaysSince(ts: number): number {
-  return Math.floor((Date.now() - ts) / 86400000)
-}
+// "Day N" = California calendar days since applying (lib/stores/checkSchedule daysSince — the same
+// count the day-7/14/30 check-ins fire on). Never a 24-hour-period count or a UTC day.
+const getDaysSince = (ts: number): number => daysSince(ts)
 
 type Watch = { tone: 'ok' | 'warn' | 'danger'; text: string }
 type Intel = { ghost_rate?: number; avg_wait_days?: number; report_count?: number; first_party_report_count?: number; data_source?: string | null; overall_score?: number }
@@ -461,7 +463,7 @@ function TrackerPage() {
       if (d.score && isGradeableScore(d.score)) score = d.score
     } catch {}
 
-    const days = Math.floor((Date.now() - app.appliedAt) / 86400000)
+    const days = daysSince(app.appliedAt)
 
     if (checkType === 'response_check') {
       const rt = data.response_type as string
@@ -581,18 +583,9 @@ function TrackerPage() {
   }
 
   const clearDupes = async () => {
-    // Only OPEN duplicates of the same company+role are dupes; a finished application at the same
-    // company last year is history, not a duplicate. Newest copy wins. Always confirmed.
-    const seen = new Set<string>()
-    const local = AppStore.loadSync()
-    const removed: Application[] = []
-    const deduped = [...local].sort((a, b) => (b.appliedAt || 0) - (a.appliedAt || 0)).filter(a => {
-      if (a.status !== 'active') return true
-      const key = `${a.company.toLowerCase().trim()}|${a.role.toLowerCase().trim()}`
-      if (seen.has(key)) { removed.push(a); return false }
-      seen.add(key)
-      return true
-    })
+    // Only OPEN duplicates of the same company+role are dupes (lib/stores/applicationDupes); a finished
+    // application at the same company last year is history, not a duplicate. Newest copy wins. Always confirmed.
+    const { kept: deduped, removed } = splitOpenDuplicates(AppStore.loadSync())
     if (!removed.length) { setUpdateInsight({ title: 'No duplicates', body: 'Every open application is unique.', color: 'rgba(99,102,241,0.12)' }); return }
     if (!confirm(`Remove ${removed.length} duplicate open application${removed.length > 1 ? 's' : ''}? The newest copy of each is kept.`)) return
     localStorage.setItem('seen_applications_v1', JSON.stringify(deduped))
@@ -615,6 +608,9 @@ function TrackerPage() {
   const withdrawn = apps.filter(a => a.status === 'withdrawn')
   const dueChecks = EventStore.dueChecks(apps)
   const checkByApp = new Map(dueChecks.map(d => [d.app.id, d]))
+  // Housekeeping is for a LIST: with one card "Clear all" beside it read as a threat (phone audit
+  // 2026-10-23), and "Clear dupes" only means something when there is a duplicate to clear.
+  const openDupes = splitOpenDuplicates(apps).removed.length
   const firstChecked = orderedApps.find(a => checkByApp.has(a.id))
 
   const handleManualAdd = async (values: FormValues) => {
@@ -623,7 +619,7 @@ function TrackerPage() {
     setShowManual(false)
   }
   // The survey banner asks what happened — only meaningful once something could have happened.
-  const anyWeekOld = apps.some(a => Date.now() - a.appliedAt >= 7 * DAY_MS)
+  const anyWeekOld = apps.some(a => daysSince(a.appliedAt) >= 7)
 
   return (
     <>
@@ -644,7 +640,15 @@ function TrackerPage() {
         onClose={() => setConfirmClear(false)}
       />
     )}
-    {outcomeApp && <OutcomeCard app={outcomeApp} onClose={() => setOutcomeApp(null)} />}
+    {outcomeApp && (
+      <OutcomeCard
+        app={outcomeApp}
+        onClose={() => setOutcomeApp(null)}
+        // The other tracked companies' letters (same batch_scores the cards read) so a hired post
+        // can compare honestly: "The other 3 places I applied were a C or worse".
+        otherGrades={Object.entries(companyScores).filter(([k]) => k !== outcomeApp.company.toLowerCase().trim()).map(([, v]) => gradeLetter(v.overall_score))}
+      />
+    )}
     {roundsApp && !outcomeApp && (
       <RoundsPrompt
         app={roundsApp}
@@ -725,31 +729,6 @@ function TrackerPage() {
             {ghosted.length > 0 && (
               <div className="funnel-ghost-note" style={{ marginTop: '.5rem' }}>👻 {ghosted.length} ghosted before responding</div>
             )}
-          </div>
-        )}
-
-        {/* Pipeline (active apps, desktop) */}
-        {active.length > 0 && (
-          <div className={`tracker-pipeline-wrap ${s.after}`} style={{ marginBottom: '1.5rem' }}>
-            <div style={{ display: 'flex', gap: '.75rem', overflowX: 'auto', padding: '.25rem 0' }}>
-              {STAGES.map(stage => {
-                const stageApps = active.filter(a => a.stage === stage)
-                if (!stageApps.length) return null
-                return (
-                  <div key={stage} className="pipeline-col">
-                    <div style={{ fontFamily: 'var(--mono)', fontSize: '.55rem', textTransform: 'uppercase', letterSpacing: '.1em', color: 'var(--muted)', marginBottom: '.5rem' }}>{stage} <span style={{ color: 'var(--sub)' }}>({stageApps.length})</span></div>
-                    {stageApps.slice(0, 3).map(a => (
-                      <div key={a.id} className="pipeline-mini-card">
-                        <div style={{ fontFamily: 'var(--display)', fontSize: '.72rem', fontWeight: 700, color: 'var(--white)', marginBottom: '.1rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{a.company}</div>
-                        <div style={{ fontFamily: 'var(--mono)', fontSize: '.55rem', color: 'var(--muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{a.role.slice(0, 22)}{a.role.length > 22 ? '…' : ''}</div>
-                        <div style={{ fontFamily: 'var(--mono)', fontSize: '.52rem', color: 'var(--dim)', marginTop: '.25rem' }}>Day {getDaysSince(a.appliedAt)}</div>
-                      </div>
-                    ))}
-                    {stageApps.length > 3 && <div style={{ fontFamily: 'var(--mono)', fontSize: '.55rem', color: 'var(--muted)', padding: '.2rem 0' }}>+{stageApps.length - 3} more</div>}
-                  </div>
-                )
-              })}
-            </div>
           </div>
         )}
 
@@ -889,10 +868,12 @@ function TrackerPage() {
           </div>
         )}
 
-        {/* Housekeeping — under the list, out of the way of it */}
-        {apps.length > 0 && (
+        {/* Housekeeping — under the list, out of the way of it; only once there is a list (≥2 cards). */}
+        {apps.length > 1 && (
           <div className={`${s.house} ${s.after}`}>
-            <button type="button" className={`${s.act} ${s.actQuiet}`} onClick={clearDupes}>Clear dupes</button>
+            {openDupes > 0 && (
+              <button type="button" className={`${s.act} ${s.actQuiet}`} onClick={clearDupes}>Clear {openDupes} duplicate{openDupes > 1 ? 's' : ''}</button>
+            )}
             <button type="button" className={`${s.act} ${s.actQuiet}`} onClick={() => setConfirmClear(true)}>Clear all</button>
           </div>
         )}

@@ -8,7 +8,7 @@
 
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import Link from 'next/link'
-import { FREE_DAILY_CREDITS, WELCOME_CREDITS, MAX_DAILY_EARN, CREDIT_RESET_LABEL, dailyResetLabel } from '@/lib/creditRules'
+import { FREE_DAILY_CREDITS, WELCOME_CREDITS, MAX_DAILY_EARN, CREDIT_RESET_LABEL, balanceExplanation } from '@/lib/creditRules'
 
 export interface CreditInfo {
   balance: number
@@ -16,6 +16,10 @@ export interface CreditInfo {
   max_daily_earn?: number | null
   /** true = no ai_credits row yet: the balance shown is the untouched welcome bonus. */
   welcome?: boolean
+  /** Today's resetting part of the balance (ai_credits.balance) — null when the API predates it. */
+  daily?: number | null
+  /** Never-resetting purchased credits (ai_credits.purchased_credits). */
+  purchased?: number | null
 }
 
 export default function CreditsPopover({ info, onClose, onEarn, onUpgrade }: {
@@ -79,8 +83,13 @@ export default function CreditsPopover({ info, onClose, onEarn, onUpgrade }: {
         {info.welcome && <div style={row}><span>Welcome bonus</span><span style={val}>{WELCOME_CREDITS} credits, unused</span></div>}
         <div style={row}><span>Purchased credits</span><span style={val}>never reset</span></div>
       </div>
+      {/* The arithmetic, in one sentence from the same constants the server enforces (the audit saw
+          "10 available · Free daily credit 1 · Welcome bonus 10" and could not tell how they add up). */}
+      <p data-testid="credits-explain" style={{ fontFamily: 'var(--mono)', fontSize: '.56rem', color: 'var(--sub)', lineHeight: 1.6, margin: '0 0 .5rem' }}>
+        {balanceExplanation({ balance: info.balance, daily: info.daily ?? null, purchased: info.purchased ?? 0, earned, welcome: !!info.welcome })}
+      </p>
       <p style={{ fontFamily: 'var(--mono)', fontSize: '.56rem', color: 'var(--muted)', lineHeight: 1.6, margin: '0 0 .75rem' }}>
-        Every AI action costs 1 credit and says so on its button. {dailyResetLabel()}. Résumé upload, company grades and the tracker are always free.
+        Every AI action costs 1 credit and says so on its button. Résumé upload, company grades and the tracker are always free.
       </p>
       <div style={{ display: 'flex', gap: '.4rem' }}>
         <button type="button" onClick={() => { onClose(); zero ? onUpgrade() : onEarn() }} style={link}>{zero ? 'Top up →' : 'Earn credits →'}</button>

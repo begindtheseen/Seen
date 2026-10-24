@@ -2,12 +2,17 @@ import type { Metadata } from 'next'
 // Build-safe score reader — reads the cached score DIRECTLY from Supabase and NEVER self-fetches
 // the live https://seenjobs.io/api/reports (which had no build detection here and could hang
 // `next build`). generateMetadata + the layout render below both go through this one helper.
-import { getScore, firstPartyReportCount, displayCompanyName, type GrowthScore } from '@/lib/growth'
+import { getScore, displayCompanyName, type GrowthScore } from '@/lib/growth'
 import { buildCompanyFaq } from '@/lib/server/companyFaq'
 import { jsonLdHtml } from '@/lib/jsonLd'
 // Offline, numerically-grounded "What applicants report" paragraph (company_summaries). No-op when the
 // table is missing/empty or the read fails — the page renders exactly as before.
 import { getCompanySummary, summaryMonth, type CompanySummary } from '@/lib/companySummary'
+import { pageTitle } from '@/lib/cardCopy.js'
+// ONE set of facts for everything this file publishes (lib/companyMeta.ts): the meta description, the
+// JSON-LD nodes, the H1 paragraph and the FAQ read the same count, rates and grade as the page and the
+// OG card. Audit 2026-10-24 (L-1): the description said 62 / 73% / 81 while the H1 said 48 / 87% / 91.
+import { companyMetaFacts } from '@/lib/companyMeta'
 
 const titleCase = (slug: string) => slug.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
 // Slug-mangled fallback only when no score row exists — the stored name keeps real punctuation
@@ -24,46 +29,30 @@ function summaryKey(slug: string, s: GrowthScore | null): string {
   return d.replace(/-/g, ' ')
 }
 
-// Meta descriptions are cut by search engines; keep whole sentences up to ~300 chars.
-function clipSentences(text: string, max = 300): string {
-  if (text.length <= max) return text
-  const parts = text.split(/(?<=[.!?])\s+/)
-  let out = ''
-  for (const p of parts) {
-    if ((out ? out.length + 1 : 0) + p.length > max) break
-    out = out ? `${out} ${p}` : p
-  }
-  return out || `${text.slice(0, max - 1).trimEnd()}…`
-}
-
 export async function generateMetadata(
   { params }: { params: Promise<{ slug: string }> }
 ): Promise<Metadata> {
   const { slug } = await params
   const s = await getScore(slug)
   const name = bestName(slug, s)
-  const ghostPct = s?.ghost_rate != null ? Math.round(s.ghost_rate * 100) : null
-  // AI summaries can quote rates — only for gradeable companies (5-report grade gate).
+  // The stored paragraph (company_summaries) is quoted only while its numbers still match the live
+  // score; otherwise the description is built from the same facts the page shows (lib/companyMeta.ts).
   const summary = s?.gradeable ? await getCompanySummary(summaryKey(slug, s)) : null
-
-  // Reddit-targeted: LLM/Google searches like "<company> hiring reddit" and "does <company>
-  // ghost applicants" should land here. Real ghost % folded in when we have it. A grounded
-  // company summary (same text as the visible paragraph) takes precedence when one exists.
-  const description = summary
-    ? clipSentences(summary.summary)
-    : ghostPct != null
-    ? `Does ${name} ghost applicants? ${ghostPct}% ghost rate from real applicant outcomes. See ${name}'s response time, interview rounds, and hiring reviews — aggregated from Reddit, Glassdoor, and verified job-seeker reports.`
-    : `Does ${name} ghost applicants? See ${name}'s ghost rate, response time, and hiring reviews — aggregated from Reddit, Glassdoor, and verified job-seeker reports on Seen.`
+  const facts = companyMetaFacts(name, s, summary)
+  const { description } = facts
+  // "Walmart: Seen grade A, 13% ghost rate" / "Ledgent Technology on Seen: who replies, who ghosts" (lib/cardCopy.js),
+  // from the SAME facts as the description, never "Hiring Transparency Score" (owner 2026-10-24).
+  const title = pageTitle({ company: name, grade: facts.grade, ghostRate: facts.ratesShown ? s?.ghost_rate : null })
 
   return {
-    title: `${name} Ghost Rate & Hiring Reviews (Reddit + Real Reports)`,
+    title,
     description,
     keywords: [
       `${name} hiring`, `${name} ghosting`, `${name} reddit`, `does ${name} ghost applicants`,
       `${name} interview process`, `${name} hiring reviews`, `${name} glassdoor`, `${name} response time`,
     ],
     openGraph: {
-      title: `${name} — Hiring Transparency Score`,
+      title,
       description,
       type: 'website',
       siteName: 'Seen',
@@ -72,12 +61,12 @@ export async function generateMetadata(
       // rotates the og:image URL every deploy, so crawlers nearly always hit a COLD render —
       // and Reddit permanently caches "no preview" for a URL whose image misses its ~4s
       // budget. A stable URL keeps prior fetches warm across deploys.
-      images: [{ url: `/company/${slug}/og`, width: 1200, height: 630, alt: 'Hiring transparency score on Seen' }],
+      images: [{ url: `/company/${slug}/og`, width: 1200, height: 630, alt: `${name} on Seen: who replies, who ghosts` }],
     },
     twitter: {
       // summary_large_image so the dynamic 1200×630 card renders full-bleed in shares.
       card: 'summary_large_image',
-      title: `${name} Ghost Rate & Hiring Reviews`,
+      title,
       description,
       images: [`/company/${slug}/og`],
     },
@@ -106,9 +95,15 @@ export default async function CompanySlugLayout(
   const { slug } = await params
   const s = await getScore(slug)
   const name = bestName(slug, s)
-  const summary: CompanySummary | null = s?.gradeable ? await getCompanySummary(summaryKey(slug, s)) : null
+  const storedSummary: CompanySummary | null = s?.gradeable ? await getCompanySummary(summaryKey(slug, s)) : null
+  const facts = companyMetaFacts(name, s, storedSummary)
+  // A frozen paragraph whose numbers no longer match the live score is not shown or published.
+  const summary = facts.summaryUsable ? storedSummary : null
   const pageUrl = `https://seenjobs.io/company/${slug}`
 
+  // No aggregateRating: a Seen Grade is Seen's own assessment, not a rating anyone gave the company
+  // or Seen, and a self-asserted Organization rating is an ineligible / spam signal for search engines
+  // (money/legal audit 2026-10-24, L-1). The grade is published in the FAQPage answers and the H1.
   const org: Record<string, unknown> = {
     '@type': 'Organization',
     '@id': `${pageUrl}#organization`,
@@ -116,31 +111,18 @@ export default async function CompanySlugLayout(
     url: pageUrl,
   }
   if (s?.industry) org.industry = s.industry
-  // Only assert an aggregateRating when we have REAL reports behind it. "Real" means
-  // FIRST-PARTY rows (migration 063) — the fused report_count once fed the LLM's claimed
-  // web-mention number into schema.org ratingCount, publishing a fabricated figure to Google.
-  const fpSeo = firstPartyReportCount(s)
-  if (s && fpSeo > 0 && s.overall_score != null) {
-    org.aggregateRating = {
-      '@type': 'AggregateRating',
-      ratingValue: (s.overall_score / 20).toFixed(1),
-      bestRating: '5',
-      worstRating: '0',
-      ratingCount: fpSeo,
-      reviewAspect: 'Hiring process and applicant response',
-    }
-  }
+  const fpSeo = facts.reportCount
 
-  // FAQ built ONLY from real data (percentages gated on first-party reports; grade Q always names
-  // its basis). Backs both a FAQPage node AND the visible block below — the format AI answer engines
-  // (ChatGPT, Perplexity, Gemini) cite for "does <company> ghost applicants?" queries. Empty → omitted.
+  // FAQ built ONLY from the same facts (percentages only with MIN_REPORTS_FOR_RATES applicant reports;
+  // the grade Q always names its basis). Backs both a FAQPage node AND the visible block below — the
+  // format AI answer engines (ChatGPT, Perplexity, Gemini) cite for "does <company> ghost applicants?".
   const faq = s
     ? buildCompanyFaq({
         name,
-        overallScore: s.overall_score,
-        ghostRate: s.ghost_rate,
-        responseRate: s.response_rate,
-        avgWaitDays: s.avg_wait_days,
+        overallScore: facts.score,
+        ghostRate: facts.ratesShown ? s.ghost_rate : null,
+        responseRate: facts.ratesShown ? s.response_rate : null,
+        avgWaitDays: facts.waitDays,
         reportCount: fpSeo,
       })
     : []
@@ -186,13 +168,15 @@ export default async function CompanySlugLayout(
   // Google can read and cite real hiring data from the initial HTML — the client UI below
   // only hydrates after load. Rendered ONLY when we have a real score or a grounded company
   // summary (company_summaries, status 'ok'). Null-safe.
-  const hasFacts = s != null && s.overall_score != null
+  const hasFacts = facts.gradeable && s != null
   const accent = accentFor(s?.risk_level)
-  const ghostPct = s?.ghost_rate != null ? Math.round(s.ghost_rate * 100) : null
-  const respPct = s?.response_rate != null ? Math.round(s.response_rate * 100) : null
-  const waitDays = s?.avg_wait_days != null ? Math.round(s.avg_wait_days) : null
-  const reportCount = firstPartyReportCount(s)
-  const dataPoints = reportCount > 0 ? `${reportCount} applicant report${reportCount === 1 ? '' : 's'}` : 'estimated data'
+  // Same numbers as the meta description, the FAQ and the page (lib/companyMeta.ts): rates only with
+  // enough applicant reports, first-party count only.
+  const ghostPct = facts.ghostPct
+  const respPct = facts.respPct
+  const waitDays = facts.waitDays
+  const reportCount = fpSeo
+  const dataPoints = reportCount > 0 ? facts.basis : 'estimated data'
   const summaryDate = summary ? summaryMonth(summary.generated_at) : null
   const summaryBlock = summary ? (
     <div style={{ marginTop: hasFacts ? '.85rem' : 0, paddingTop: hasFacts ? '.85rem' : 0, borderTop: hasFacts ? '1px solid var(--line)' : 'none' }}>
@@ -222,7 +206,7 @@ export default async function CompanySlugLayout(
               <span className="co-seo-ico" aria-hidden>📄</span>
               <span className="co-seo-txt">
                 <span className="co-seo-ttl">About {name}&apos;s hiring data</span>
-                <span className="co-seo-sub">{hasFacts && s ? `Seen Grade ${s.overall_score}/100 in plain English` : 'What applicants report'}{faq.length > 0 ? ` · ${faq.length} frequently asked questions` : ''}</span>
+                <span className="co-seo-sub">{hasFacts && s ? `Seen Grade ${facts.grade} · ${facts.score}/100 in plain English` : 'What applicants report'}{faq.length > 0 ? ` · ${faq.length} frequently asked questions` : ''}</span>
               </span>
               <span className="co-seo-chev" aria-hidden />
             </summary>
@@ -248,7 +232,7 @@ export default async function CompanySlugLayout(
                 lineHeight: 1.3,
               }}
             >
-              {name} hiring data — Seen Grade {s.overall_score}/100
+              {name} hiring data — Seen Grade {facts.grade} · {facts.score}/100
             </h1>
             <p
               style={{
@@ -260,15 +244,17 @@ export default async function CompanySlugLayout(
               }}
             >
               {name} has a Seen Grade of{' '}
-              <strong style={{ color: 'var(--white)', fontWeight: 600 }}>{s.overall_score}/100</strong>.{' '}
+              <strong style={{ color: 'var(--white)', fontWeight: 600 }}>{facts.grade} · {facts.score}/100</strong>
+              {' '}from {dataPoints}.{' '}
               {ghostPct != null && (
                 <>Applicants report a{' '}
                   <strong style={{ color: accent, fontWeight: 600 }}>{ghostPct}% ghost rate</strong>
                   {respPct != null ? <> and a {respPct}% response rate</> : null}
                   {waitDays != null ? <>, with an average wait of {waitDays} day{waitDays === 1 ? '' : 's'} to hear back</> : null}
-                  {' '}across {dataPoints}.{' '}
+                  .{' '}
                 </>
               )}
+              {ghostPct == null && <>Too few applicant reports yet for a response or ghost rate. </>}
               {interpret(s)}
             </p>
             </>)}

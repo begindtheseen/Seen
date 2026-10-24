@@ -5,7 +5,7 @@
 // (lib/time/pacific.js) — owner decision 2026-10-21: no UTC anywhere.
 
 import { CHECK_SCHEDULE } from '../constants.ts'
-import { formatPacific } from '../time/pacific.js'
+import { formatPacific, pacificDaysBetween, pacificDayStart } from '../time/pacific.js'
 
 export const DAY_MS = 86400000
 
@@ -13,7 +13,7 @@ export interface NextCheck {
   type: (typeof CHECK_SCHEDULE)[number]['type']
   /** Schedule day (7, 14 or 30). */
   day: number
-  /** When it becomes due: appliedAt + day. */
+  /** When it becomes due: midnight PT at the start of the `day`-th California day after applying. */
   dueAt: number
   /** Already due now (the card is asking it). */
   due: boolean
@@ -21,9 +21,19 @@ export interface NextCheck {
   q: string
 }
 
-/** Whole days since `appliedAt` (floored, never negative). */
+/**
+ * "Day N" for an application: whole CALIFORNIA calendar days since it was sent (never negative).
+ * The one day counter for tracker cards, the dashboard and the check-in schedule — an application
+ * sent late in the evening is Day 1 the next morning, and "Day 7" lands on the date the card names.
+ * (owner decision 2026-10-21: no UTC anywhere; lib/time/pacific.js)
+ */
 export function daysSince(appliedAt: number, now = Date.now()): number {
-  return Math.max(0, Math.floor((now - appliedAt) / DAY_MS))
+  return Math.max(0, pacificDaysBetween(appliedAt, now))
+}
+
+/** The instant a day-`day` check comes due: midnight PT at the start of that California day. */
+export function checkDueAt(appliedAt: number, day: number): number {
+  return pacificDayStart(new Date(appliedAt), day).getTime()
 }
 
 /**
@@ -34,8 +44,9 @@ export function nextCheck(appliedAt: number, answered: Iterable<string>, now = D
   const done = new Set(answered)
   const chk = CHECK_SCHEDULE.find(c => !done.has(c.type))
   if (!chk) return null
-  const dueAt = appliedAt + chk.day * DAY_MS
-  return { type: chk.type, day: chk.day, dueAt, due: now >= dueAt, q: chk.q.charAt(0).toLowerCase() + chk.q.slice(1) }
+  // Due the moment the California day count reaches `day` — the same clock the card's "Day N" uses.
+  const dueAt = checkDueAt(appliedAt, chk.day)
+  return { type: chk.type, day: chk.day, dueAt, due: daysSince(appliedAt, now) >= chk.day, q: chk.q.charAt(0).toLowerCase() + chk.q.slice(1) }
 }
 
 /** "Oct 30" on the Pacific calendar (adds the year only when it is not the current one). */

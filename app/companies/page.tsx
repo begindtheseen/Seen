@@ -87,11 +87,8 @@ export default function CompaniesPage() {
   }, [])
 
   useEffect(() => {
-    fetch('/api/reports', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'leaderboard' }),
-    })
+    // GET: the board is identical for every visitor and the edge serves it (lib/server/publicRead.js).
+    fetch('/api/reports?type=leaderboard')
       .then((r) => r.json())
       .then((d: { companies?: Company[] }) => {
         // Grade gate: the API already ranks only gradeable companies (≥5 real reports); filter
