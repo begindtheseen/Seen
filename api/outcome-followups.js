@@ -4,7 +4,7 @@
 // what happened"), and logs the send so it never repeats.
 //
 // Contract facts this handler depends on (verified against the schema, not assumed):
-//   - Vercel crons fire as GET with header `x-vercel-cron: 1` (see api/demand.js). We route that
+//   - Vercel crons fire as GET with `Authorization: Bearer <CRON_SECRET>` (lib/server/cronAuth.js). We route that
 //     GET into the run; a manual run is allowed with `?secret=<CRON_SECRET>`.
 //   - applications columns: id, user_id, company, role, status, applied_at, created_at
 //     (migrations 016 + 037). Age anchors on applied_at, falls back to created_at.
@@ -17,6 +17,7 @@
 // next run retries. No RESEND_KEY → clean no-op (nothing sent, 200).
 
 import { dueMilestone, buildEmail, unsubToken } from '../lib/server/outcomeEmails.js';
+import { isVercelCron } from '../lib/server/cronAuth.js';
 
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY;
@@ -27,7 +28,7 @@ const SITE = 'https://seenjobs.io';
 const MAX_SENDS = 100; // per run — keeps us well under the 60s function budget
 
 export default async function handler(req, res) {
-  const isCron = req.headers['x-vercel-cron'] === '1';
+  const isCron = isVercelCron(req);
   const hasSecret = CRON_SECRET && (req.headers['x-cron-secret'] === CRON_SECRET || req.query?.secret === CRON_SECRET);
   if (!isCron && !hasSecret) return res.status(401).json({ error: 'unauthorized' });
   if (!SUPABASE_URL || !SERVICE_KEY) return res.status(500).json({ error: 'db_not_configured' });

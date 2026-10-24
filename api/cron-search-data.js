@@ -13,7 +13,7 @@
 // With neither, the search pull answers { ok:true, skipped:'no_credentials' } and makes no request. Before
 // migration 20261024170000_search_data is applied, the writes no-op and say so (deploy code before schema).
 //
-// GET  (Vercel cron, x-vercel-cron or `Authorization: Bearer $CRON_SECRET`) → one run.
+// GET  (Vercel cron: `Authorization: Bearer $CRON_SECRET`, lib/server/cronAuth.js) → one run.
 // POST ?secret=$CRON_SECRET[&days=N][&static=1] → a manual run; days (≤ 480) backfills Search Console history,
 //      static=1 re-submits every static page to IndexNow.
 import { pullSearchConsole } from '../lib/server/searchConsole.js';
@@ -22,6 +22,7 @@ import { storeSearchRecords, pruneSearchRows } from '../lib/server/searchData.js
 import { submitUrls, indexableCompanyUrls, recentlySubmitted, everSubmitted, indexNowEnabled, STATIC_PATHS, HUB_PATHS, SITE } from '../lib/server/indexNow.js';
 import { hasMentionCount } from '../lib/server/scoreColumns.js';
 import { SCORE_TTL_MS } from '../lib/server/reportCounts.js';
+import { isVercelCron } from '../lib/server/cronAuth.js';
 
 const RUN_MS = 100_000; // vercel.json maxDuration 120 s
 
@@ -99,8 +100,8 @@ export async function runSearchData({ env = process.env, fetchImpl = fetch, now 
 export default async function handler(req, res) {
   const q = req.query || {};
   const cron = process.env.CRON_SECRET;
-  // Same rule as the other Seen crons: Vercel's header, or the CRON_SECRET bearer Vercel adds when it is set.
-  const isCron = req.headers?.['x-vercel-cron'] === '1' || (cron && req.headers?.authorization === `Bearer ${cron}`);
+  // Vercel's cron call carries the CRON_SECRET bearer (lib/server/cronAuth.js); x-vercel-cron is spoofable and ignored.
+  const isCron = isVercelCron(req, cron);
   const manual = req.method === 'POST' && cron && q.secret === cron;
   if (!((req.method === 'GET' && isCron) || manual)) return res.status(401).json({ error: 'Unauthorized' });
   if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_KEY) return res.status(503).json({ error: 'Storage is unavailable.' });

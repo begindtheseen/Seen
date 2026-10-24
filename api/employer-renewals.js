@@ -4,11 +4,12 @@
 // no-op until the key is set. Idempotent: each row stores the ISO `until` it was last reminded for
 // (renewal_reminded_until), so we email once per period and a renewal re-arms the next reminder.
 //
-// Vercel crons fire as GET (x-vercel-cron header) — routed into the same logic as an admin POST.
+// Vercel crons fire as GET (CRON_SECRET bearer, lib/server/cronAuth.js) — routed into the same logic as an admin POST.
 // Renewal reuses the existing one-time checkout; this never charges. Best-effort throughout: a single
 // employer's failure never aborts the batch.
 
 import { pickRenewalReminders } from '../lib/server/renewalReminders.js';
+import { isVercelCron, hasCronSecret, hasAdminSession } from '../lib/server/cronAuth.js';
 
 const WINDOW_DAYS = 7;
 
@@ -44,8 +45,12 @@ async function sendReminderEmail(to, company, items) {
 }
 
 export default async function handler(req, res) {
-  const isCron = req.method === 'GET' && (req.headers['x-vercel-cron'] || req.query?.cron);
-  if (req.method !== 'POST' && !isCron) return res.status(405).json({ error: 'Method not allowed' });
+  // Vercel's cron (GET + its CRON_SECRET bearer), a manual run with the secret, or an admin POST.
+  // Before 2026-10-24 `?cron=1` or any POST ran it (it emails employers), and the real cron GET was
+  // refused (lib/server/cronAuth.js).
+  if (req.method !== 'GET' && req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
+  const allowed = req.method === 'GET' ? isVercelCron(req) : (hasCronSecret(req) || await hasAdminSession(req));
+  if (!allowed) return res.status(401).json({ error: 'Unauthorized' });
 
   const SUPABASE_URL = process.env.SUPABASE_URL;
   const SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY;

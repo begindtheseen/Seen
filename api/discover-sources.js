@@ -26,6 +26,7 @@ import { discoverFromCommonCrawl } from '../lib/jobs/discovery.js';
 import { detectAts } from '../lib/jobs/atsDetect.js';
 import { mapLimit } from '../lib/server/jobSources.js';
 import { logError } from '../lib/server/errlog.js';
+import { isVercelCron } from '../lib/server/cronAuth.js';
 
 // Must stay under the maxDuration declared for this function in vercel.json (300s), with room to
 // serialize the response. Discovery gets the WHOLE budget here — that is the entire point.
@@ -78,7 +79,7 @@ export function sweepOptionsFromParams(params, now = Date.now()) {
 // being set: if that env var is blank the cron-secret path is simply unavailable and callers fall
 // through to 401, rather than the endpoint becoming an open trigger for outbound crawling.
 async function authorize(req) {
-  if (req.headers['x-vercel-cron'] === '1') return true;
+  if (isVercelCron(req)) return true;
 
   const cronSecret = process.env.CRON_SECRET;
   const authHeader = req.headers['authorization'] || '';

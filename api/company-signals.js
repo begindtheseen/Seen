@@ -15,6 +15,7 @@ import {
 } from '../lib/server/companyEntityMatch.js';
 import { SEC_PHRASES, fetchEdgarGroup } from '../lib/server/secEdgar.js';
 import { pacificDate } from '../lib/time/pacific.js';
+import { isVercelCron } from '../lib/server/cronAuth.js';
 
 const ALLOWED = ['https://seenjobs.io', 'https://www.seenjobs.io'];
 
@@ -56,10 +57,10 @@ async function route(req, res) {
   if (typeof body === 'string') { try { body = JSON.parse(body); } catch { body = {}; } }
   body = body || {};
 
-  // Weekly Vercel cron (GET, x-vercel-cron header — same trust pattern as api/demand.js):
+  // Weekly Vercel cron (GET + CRON_SECRET bearer, lib/server/cronAuth.js):
   // ingest the last 14 days of SEC filings so the public-record section stays populated
   // without anyone remembering to run it. Before this, NOTHING fed company_signals in prod.
-  if (req.method === 'GET' && req.headers['x-vercel-cron'] === '1') {
+  if (req.method === 'GET' && isVercelCron(req)) {
     return ingestSec(req, res, { db, body: { days: 14 } });
   }
 

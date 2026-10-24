@@ -6,10 +6,11 @@
 //
 // The webhook is a poke, not a source of truth: Seen fetches the email from Resend with its own key, so
 // the request body is never trusted (see lib/server/inbox/store.js). No secret to configure.
-// Vercel crons fire GET with `x-vercel-cron: 1` (api/demand.js); a manual run uses ?secret=<CRON_SECRET>.
+// Vercel crons fire GET with `Authorization: Bearer <CRON_SECRET>` (lib/server/cronAuth.js); a manual run uses ?secret=<CRON_SECRET>.
 
 import { dbClient, resendClient, tablesReady, processEmail, catchUp, isProviderId } from '../lib/server/inbox/store.js';
 import { rateLimit as defaultRateLimit } from '../lib/server/ratelimit.js';
+import { isVercelCron } from '../lib/server/cronAuth.js';
 
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY;
@@ -51,7 +52,7 @@ export default async function handler(req, res, deps = {}) {
       lastCheck = { at: Date.now(), body };
       return res.status(200).json(body);
     }
-    const isCron = req.headers['x-vercel-cron'] === '1';
+    const isCron = isVercelCron(req);
     const hasSecret = CRON_SECRET && (req.headers['x-cron-secret'] === CRON_SECRET || (req.query && req.query.secret === CRON_SECRET));
     if (!isCron && !hasSecret) return res.status(401).json({ ok: false, error: 'unauthorized' });
     if (!(await tablesReady(q))) return res.status(200).json({ ok: false, error: 'not_set_up' });

@@ -8,6 +8,7 @@ import assert from 'node:assert/strict';
 process.env.SUPABASE_URL = 'https://db.test';
 process.env.SUPABASE_SERVICE_KEY = 'service';
 process.env.RESEND_KEY = 're_test';
+process.env.CRON_SECRET = process.env.CRON_SECRET || 'cron_test';
 const { default: handler } = await import('./inbox-email.js');
 
 const UID = '11111111-1111-4111-8111-111111111111';
@@ -116,11 +117,13 @@ test('the hourly catch-up processes what no webhook delivered, and ignores other
   db.mail.set('e-0006-aaaa', { ...forwarded('e-0006-aaaa', 'hello', 'hi'), received_for: ['hello@seenjobs.io'], to: ['hello@seenjobs.io'] });
   const unauth = await call(db, { method: 'GET' });
   assert.equal(unauth.status, 401);
-  const r = await call(db, { method: 'GET', headers: { 'x-vercel-cron': '1' } });
+  // Anyone can send x-vercel-cron; only Vercel's CRON_SECRET bearer runs the catch-up (lib/server/cronAuth.js).
+  assert.equal((await call(db, { method: 'GET', headers: { 'x-vercel-cron': '1' } })).status, 401);
+  const r = await call(db, { method: 'GET', headers: { authorization: `Bearer ${process.env.CRON_SECRET}` } });
   assert.equal(r.body.ok, true);
   assert.deepEqual(r.body.results, { applied: 1, not_ours: 1 });
   assert.equal(db.t.applications[0].stage, 'Phone Screen');
-  const again = await call(db, { method: 'GET', headers: { 'x-vercel-cron': '1' } });
+  const again = await call(db, { method: 'GET', headers: { authorization: `Bearer ${process.env.CRON_SECRET}` } });
   assert.equal(again.body.processed, 0, 'a second run has nothing left');
 });
 

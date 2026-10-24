@@ -1,15 +1,19 @@
 // Daily cron: clear the employer's copy of declined / withdrawn Apply-on-Seen applications 30 days
 // after the decision (lib/server/applicationRetention.js has the policy and why). Vercel crons fire
-// as GET with the x-vercel-cron header; an admin can also POST. Safe to run any time: the 30-day
+// as GET with the CRON_SECRET bearer (lib/server/cronAuth.js); an admin can also POST. Safe to run any time: the 30-day
 // cutoff is fixed, so an extra run only clears what is already due. No-op before migration
 // 20261018170000.
 
 import { purgeDecidedApplications } from '../lib/server/applicationRetention.js';
 import { lifecycleAvailable, deleteResumeObjects } from '../lib/server/seenApplyStore.js';
+import { isVercelCron, hasCronSecret, hasAdminSession } from '../lib/server/cronAuth.js';
 
 export default async function handler(req, res) {
-  const isCron = req.method === 'GET' && !!req.headers['x-vercel-cron'];
-  if (req.method !== 'POST' && !isCron) return res.status(405).json({ error: 'Method not allowed' });
+  // Vercel's cron (GET + its CRON_SECRET bearer), a manual run with the secret, or an admin POST.
+  // Before 2026-10-24 any POST ran it and the cron GET was refused (lib/server/cronAuth.js).
+  if (req.method !== 'GET' && req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
+  const allowed = req.method === 'GET' ? isVercelCron(req) : (hasCronSecret(req) || await hasAdminSession(req));
+  if (!allowed) return res.status(401).json({ error: 'Unauthorized' });
   const SUPABASE_URL = process.env.SUPABASE_URL;
   const SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY;
   if (!SUPABASE_URL || !SERVICE_KEY) return res.status(500).json({ error: 'DB not configured' });

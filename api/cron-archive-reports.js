@@ -24,7 +24,7 @@
 // how many it reaches (a company that is read to the end in 20 s gives its minutes to the next), and the
 // ones it never reached stay in the queue.
 //
-// GET  (Vercel cron, `Authorization: Bearer $CRON_SECRET` or x-vercel-cron) → one run, ≤ ~4 minutes.
+// GET  (Vercel cron, `Authorization: Bearer $CRON_SECRET`) → one run, ≤ ~4 minutes.
 // GET  ?runs=1 with `Authorization: Bearer $LOCAL_COMPANY_INTEL_INGEST_SECRET` → the last 50 cloud runs
 //      (Seen Command reads this for its Notifications and Home tabs).
 // POST ?secret=$CRON_SECRET → a manual run.
@@ -33,6 +33,7 @@ import ingestHandler from './ingest-local-company-intel.js';
 import { runCollection } from '../lib/reports/collectorRun.js';
 import { redditArchiveSource } from '../lib/reports/archiveSource.js';
 import { searchableName } from '../lib/reports/targetNames.js';
+import { isVercelCron } from '../lib/server/cronAuth.js';
 
 export const PIPELINE = 'applicant_reports_cloud';
 const RUN_MS = 230_000;          // the function may run 300 s; leave room to write the log
@@ -168,7 +169,7 @@ export default async function handler(req, res) {
   }
   const cron = process.env.CRON_SECRET;
   // Same rule as the other Seen crons: Vercel's header, or the CRON_SECRET bearer Vercel adds when it is set.
-  const isCron = req.headers['x-vercel-cron'] === '1' || (cron && req.headers.authorization === `Bearer ${cron}`);
+  const isCron = isVercelCron(req, cron);
   const manual = req.method === 'POST' && cron && q.secret === cron;
   if (!((req.method === 'GET' && isCron) || manual)) return res.status(401).json({ error: 'Unauthorized' });
   if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_KEY) return res.status(503).json({ error: 'Storage is unavailable.' });

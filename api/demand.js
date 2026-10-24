@@ -2,6 +2,7 @@ import { rateLimit } from '../lib/server/ratelimit.js';
 import { logError } from '../lib/server/errlog.js';
 import { geocodeLocation, haversineMiles } from '../lib/server/geo.js';
 import { computeCityDemand, normalizeCityLabel } from '../lib/server/demandFromCorpus.js';
+import { isVercelCron } from '../lib/server/cronAuth.js';
 
 // /api/demand — Demand data hub.
 //
@@ -38,7 +39,7 @@ async function route(req, res) {
   // Vercel crons fire as GET — route a cron-authenticated GET into the refresh handler
   // (handlePost re-checks auth itself). Without this the monthly BLS refresh was
   // unreachable: the cron GET just read the public cache and the data never updated.
-  if (req.method === 'GET' && (req.headers['x-vercel-cron'] === '1' || req.query?.action === 'refresh')) {
+  if (req.method === 'GET' && (isVercelCron(req) || req.query?.action === 'refresh')) {
     return handlePost(req, res);
   }
   if (req.method === 'GET' && req.query?.city) return handleCityGet(req, res);
@@ -245,7 +246,7 @@ async function handlePost(req, res) {
   const token = authHeader.replace(/^Bearer /i, '').trim();
   let authed = false;
   const adminToken = req.headers['x-admin-token'] || '';
-  const isCron     = req.headers['x-vercel-cron'] === '1';
+  const isCron     = isVercelCron(req);
 
   if (isCron || (CRON_SECRET && token === CRON_SECRET)) {
     authed = true;

@@ -9,6 +9,7 @@ import { fulfillOneTimeCheckout } from '../lib/server/stripeFulfillment.js';
 import { EMPLOYER_SKUS } from '../lib/server/employerSkus.js';
 import { fulfillEmployerCheckout, isEmployerSession } from '../lib/server/employerFulfillment.js';
 import { pacificDate } from '../lib/time/pacific.js';
+import { isVercelCron } from '../lib/server/cronAuth.js';
 
 const CORS = (req, res) => {
   const o = req.headers.origin || '';
@@ -308,7 +309,7 @@ export default async function handler(req, res) {
   // revoked. Comped accounts (no stripe_customer_id) are never touched.
   if (action === 'reconcile_all') {
     const cronSecret = process.env.CRON_SECRET;
-    const isCron = req.headers['x-vercel-cron'] === '1';
+    const isCron = isVercelCron(req);
     const authHeader = req.headers['authorization'] || '';
     const qsecret = new URL(req.url, 'https://x').searchParams.get('secret') || '';
     // Fail CLOSED: a non-cron caller must present a valid cron secret. Do NOT make
