@@ -1,17 +1,16 @@
 'use client'
 
-// Company "Hiring Grade" share card. The 1080×1080 creative is drawn by the shared
-// premium kit (lib/cardKit.ts) used by the outcome card too. The modal is rendered
-// through a portal to document.body so a transformed/animated ancestor on the company
-// page can't trap the fixed backdrop (that was the "background bleeds through" bug).
+// Company "Grade" share card: the company name, its grade letter as a watermark, the score,
+// three typographic stat pairs and the confidence line, drawn by the shared kit (lib/cardKit.ts)
+// in square and story formats and shared through the one modal shell (CardShareModal.tsx).
 
-import { useEffect, useState, useRef } from 'react'
-import { createPortal } from 'react-dom'
-import { useScrollLock } from '@/components/ModalPortal'
-import { drawCompanyCard, type CompanyCardData } from '@/lib/cardKit'
-import { shareCardImage, shareHint, type ShareDest } from '@/lib/shareCard'
+import { useCallback } from 'react'
+import { drawCompanyCard, type CardFormat, type CompanyCardData } from '@/lib/cardKit'
+import { ACCENTS, accentKeyForRisk, riskForScore } from '@/lib/cardTheme.js'
+import { companyShareText, companyHref } from '@/lib/cardCopy.js'
 import { track } from '@/lib/analytics'
-import { gradeLetter, displayCompanyName, lastUpdatedLabel } from '@/lib/companyDisplay'
+import { gradeLetter, displayCompanyName } from '@/lib/companyDisplay'
+import CardShareModal from '@/components/CardShareModal'
 
 // Only ever rendered for a GRADEABLE score (lib/gradeGate.ts) — the company page hides the
 // "Grade card" action below MIN_REPORTS_FOR_GRADE real reports, so no PNG is minted from 2 reviews.
@@ -30,136 +29,47 @@ export interface CompanyScoreCardData {
   updated_at?: string | null
 }
 
-// The SAME letter the page shows (lib/companyDisplay.ts). The card used its own 13-step A+/A/A-
-// scale, so a page that said "A · 91" minted a card that said "A+" (audit 2026-10-23).
-const letterGrade = (s: number) => gradeLetter(s)
-
 export default function CompanyScoreCard({ data, shareUrl, onClose, onShared }: { data: CompanyScoreCardData; shareUrl?: string; onClose: () => void; onShared?: (via: string) => void }) {
-  const [dataUrl, setDataUrl] = useState<string | null>(null)
-  const [blob, setBlob] = useState<Blob | null>(null)
-  const [mounted, setMounted] = useState(false)
-  const [hint, setHint] = useState<string | null>(null)
-  const doneRef = useRef(false)
-
-  // The unfurl URL: the company page (which has a dynamic OG image) when known,
-  // else the root site. Pasting this into Reddit/X/etc renders an image preview card.
-  const unfurlUrl = shareUrl
-    || `https://seenjobs.io/company/${encodeURIComponent((data.company || '').toLowerCase().trim().replace(/\s+/g, '-'))}`
-
   const score = Math.round(data.overall_score || 0)
-  const risk = data.risk ?? (score >= 70 ? 'safe' : score >= 40 ? 'warn' : 'danger')
-  const OC = risk === 'safe' ? '#10b981' : risk === 'danger' ? '#ef4444' : '#f59e0b'
-  const grade = letterGrade(score)
+  const risk = data.risk ?? riskForScore(score)
+  const accent = ACCENTS[accentKeyForRisk(risk)].hex
+  // The SAME letter the page shows (lib/companyDisplay.ts) — the card once used its own 13-step
+  // A+/A/A- scale, so a page that said "A · 91" minted a card that said "A+" (audit 2026-10-23).
+  const grade = gradeLetter(score)
   const company = displayCompanyName(data.company) || 'Company'
-  const updated = lastUpdatedLabel(data.updated_at)
-  const shareText = risk === 'danger'
-    ? `${company} scores ${score}/100 (${grade}) on Seen — ${Math.round((data.ghost_rate || 0) * 100)}% ghost rate. Research before you apply.`
-    : risk === 'warn'
-    ? `${company} scores ${score}/100 (${grade}) on Seen. Know before you apply.`
-    : `${company} scores ${score}/100 (${grade}) on Seen — strong hiring process.`
+  // The unfurl URL: the company page (which has a dynamic OG image) — one slug scheme (lib/cardCopy.js).
+  const unfurlUrl = shareUrl || companyHref(data.company)
+  const shareText = companyShareText({ company, grade, score, ghostRate: data.ghost_rate, responseRate: data.response_rate, risk })
 
-  useEffect(() => { setMounted(true) }, [])
-
-  useEffect(() => {
-    if (doneRef.current) return
-    doneRef.current = true
-    const run = async () => {
-      try {
-        await document.fonts.ready
-        const canvas = document.createElement('canvas')
-        const payload: CompanyCardData = {
-          company,
-          grade,
-          overall_score: score,
-          ghost_rate: data.ghost_rate,
-          response_rate: data.response_rate,
-          avg_wait_days: data.avg_wait_days,
-          waste: data.waste,
-          report_count: data.report_count,
-          risk,
-          updated: updated ? updated.replace('Last updated', 'updated') : undefined,
-        }
-        drawCompanyCard(canvas, payload)
-        setDataUrl(canvas.toDataURL('image/png'))
-        canvas.toBlob(b => { if (b) setBlob(b) }, 'image/png')
-        track('card_generated', { card_type: 'company', risk })
-      } catch { /* leave preview in loading state */ }
+  const draw = useCallback((canvas: HTMLCanvasElement, format: CardFormat) => {
+    const payload: CompanyCardData = {
+      company,
+      grade,
+      overall_score: score,
+      ghost_rate: data.ghost_rate,
+      response_rate: data.response_rate,
+      avg_wait_days: data.avg_wait_days,
+      report_count: data.report_count,
+      risk,
+      updatedAt: data.updated_at ?? null,
     }
-    run()
-  }, [data]) // eslint-disable-line react-hooks/exhaustive-deps
+    drawCompanyCard(canvas, payload, format)
+  }, [company, grade, score, data, risk])
 
-  useEffect(() => {
-    const h = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
-    window.addEventListener('keydown', h)
-    return () => window.removeEventListener('keydown', h)
-  }, [onClose])
-
-  async function share(dest: ShareDest) {
-    try { onShared?.(dest) } catch { /* never block the share UX */ }
-    const fileName = `seen_grade_${(data.company || 'c').replace(/[^a-z0-9]/gi, '_')}_${Date.now()}.png`
-    const result = await shareCardImage({ blob, dataUrl, fileName, text: shareText, url: unfurlUrl, dest })
-    // Method reflects how the image actually travelled: native share sheet, clipboard
-    // copy, plain download, or the destination whose composer/unfurl we opened.
-    // 'cancelled'/'noop' means nothing was shared — don't count those.
-    if (result !== 'cancelled' && result !== 'noop') {
-      const method = dest === 'download' ? 'download'
-        : result === 'native' ? 'native_share'
-        : result === 'clipboard+open' ? 'copy'
-        : dest
-      track('card_shared', { card_type: 'company', method, destination: dest, risk })
-    }
-    const msg = shareHint(result, dest)
-    if (msg) {
-      setHint(msg)
-      // Clipboard/unfurl paths keep the modal open so the user can read the hint
-      // and complete the post; native/download/cancel close as before.
-      return
-    }
-    if (dest !== 'download') setTimeout(onClose, 400)
-  }
-
-  useScrollLock(mounted)
-  if (!mounted) return null
-
-  return createPortal(
-    <div style={{ position: 'fixed', inset: 0, zIndex: 99999, background: 'rgba(4,5,12,0.985)', display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '1.5rem 1.25rem 2.5rem', overflowY: 'auto' }}>
-      <div style={{ width: '100%', maxWidth: 480 }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem' }}>
-          <div style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', color: OC, textTransform: 'uppercase', letterSpacing: '.1em', fontWeight: 600 }}>Grade {grade} — {company}{updated ? ` · ${updated}` : ''}</div>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', fontFamily: 'var(--mono)', fontSize: '.65rem', color: 'rgba(255,255,255,0.3)', cursor: 'pointer', padding: '.2rem .4rem' }}>✕ close</button>
-        </div>
-
-        <div style={{ fontFamily: 'var(--display)', fontSize: '1.15rem', fontWeight: 800, color: '#fff', marginBottom: '.2rem', letterSpacing: '-.02em' }}>Your grade card is ready</div>
-        <div style={{ fontFamily: 'var(--body)', fontSize: '.78rem', color: 'rgba(255,255,255,0.45)', marginBottom: '1.1rem', lineHeight: 1.6 }}>Share this company&apos;s hiring grade — help the next applicant know before they apply.</div>
-
-        {dataUrl ? (
-          <img src={dataUrl} alt="Grade card" style={{ width: '100%', borderRadius: 16, boxShadow: `0 24px 80px rgba(0,0,0,0.9), 0 0 60px ${OC}22`, marginBottom: '1rem', display: 'block' }} />
-        ) : (
-          <div style={{ width: '100%', aspectRatio: '1 / 1', borderRadius: 16, background: '#0c0f1a', border: `1px solid ${OC}22`, marginBottom: '1rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <div style={{ fontFamily: 'var(--mono)', fontSize: '.6rem', color: 'rgba(255,255,255,0.2)', letterSpacing: '.1em' }}>Generating your card…</div>
-          </div>
-        )}
-
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '.5rem', marginBottom: '.5rem' }}>
-          <button onClick={() => share('linkedin')} style={{ background: 'rgba(10,102,194,0.15)', border: '1px solid rgba(10,102,194,0.4)', color: '#60a5fa', fontFamily: 'var(--mono)', fontSize: '.65rem', fontWeight: 600, padding: '.7rem .6rem', borderRadius: 9, cursor: 'pointer' }}>in · LinkedIn</button>
-          <button onClick={() => share('twitter')} style={{ background: 'rgba(29,161,242,0.1)', border: '1px solid rgba(29,161,242,0.3)', color: 'rgba(150,210,255,0.9)', fontFamily: 'var(--mono)', fontSize: '.65rem', fontWeight: 600, padding: '.7rem .6rem', borderRadius: 9, cursor: 'pointer' }}>𝕏 · Twitter</button>
-          <button onClick={() => share('reddit')} style={{ background: 'rgba(255,69,0,0.15)', border: '1px solid rgba(255,69,0,0.4)', color: '#ff6314', fontFamily: 'var(--mono)', fontSize: '.65rem', fontWeight: 600, padding: '.7rem .6rem', borderRadius: 9, cursor: 'pointer' }}>Reddit</button>
-        </div>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '.5rem', marginBottom: '.7rem' }}>
-          <button onClick={() => share('threads')} style={{ background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.18)', color: '#fff', fontFamily: 'var(--mono)', fontSize: '.65rem', fontWeight: 600, padding: '.7rem .9rem', borderRadius: 9, cursor: 'pointer' }}>Threads</button>
-          <button onClick={() => share('download')} disabled={!dataUrl} style={{ background: 'rgba(99,102,241,0.1)', border: '1px solid rgba(99,102,241,0.25)', color: 'rgba(180,180,255,0.85)', fontFamily: 'var(--mono)', fontSize: '.65rem', padding: '.7rem .9rem', borderRadius: 9, cursor: dataUrl ? 'pointer' : 'not-allowed', opacity: dataUrl ? 1 : 0.5 }}>↓ Save Image</button>
-        </div>
-
-        {hint && (
-          <div role="status" style={{ display: 'flex', alignItems: 'center', gap: '.5rem', background: 'rgba(16,185,129,0.12)', border: '1px solid rgba(16,185,129,0.35)', color: '#a7f3d0', fontFamily: 'var(--body)', fontSize: '.72rem', lineHeight: 1.5, padding: '.6rem .75rem', borderRadius: 9, marginBottom: '.7rem' }}>
-            <span style={{ flexShrink: 0 }}>📋</span>
-            <span>{hint}</span>
-          </div>
-        )}
-
-        <button onClick={onClose} style={{ background: 'none', border: 'none', width: '100%', fontFamily: 'var(--mono)', fontSize: '.6rem', color: 'rgba(255,255,255,0.25)', cursor: 'pointer', padding: '.5rem', textAlign: 'center' }}>Skip</button>
-      </div>
-    </div>,
-    document.body,
+  return (
+    <CardShareModal
+      kicker={`Seen grade ${grade}`}
+      title={`${company}: ${score}/100`}
+      sub="Share this company's grade so the next applicant knows before they apply."
+      accent={accent}
+      draw={draw}
+      shareText={shareText}
+      shareUrl={unfurlUrl}
+      fileBase={`grade_${(data.company || 'c').replace(/[^a-z0-9]/gi, '_')}`}
+      onClose={onClose}
+      onGenerated={(format) => track('card_generated', { card_type: 'company', risk, format })}
+      onShareAttempt={(dest) => onShared?.(dest)}
+      onShared={(dest, method) => track('card_shared', { card_type: 'company', method, destination: dest, risk })}
+    />
   )
 }
