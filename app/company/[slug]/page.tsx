@@ -1308,7 +1308,7 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
                       </div>
                       {j.url && (
                         <a href={j.url} target="_blank" rel="noopener noreferrer" className="analyze-btn" style={{ display: 'inline-block', textAlign: 'center', padding: '.45rem 1rem', fontSize: '.7rem', marginTop: '.2rem', width: 'auto', alignSelf: 'flex-start' }}>
-                          Apply → 1 credit
+                          Apply ↗
                         </a>
                       )}
                     </div>
