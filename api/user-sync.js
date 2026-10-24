@@ -2,7 +2,7 @@
 // The client sends its Supabase access token; we validate it here, then use the
 // service key to talk to the DB. No RLS policies required on the client side.
 
-import { resolveUid } from '../lib/server/supabaseJwt.js';
+import { resolveUid, sessionStillValid } from '../lib/server/supabaseJwt.js';
 import { rateLimit } from '../lib/server/ratelimit.js';
 import { broadcastActivity } from '../lib/server/realtime.js';
 import { buildOpportunities } from './_utils/opportunityEngine.js';
@@ -39,16 +39,21 @@ export default async function handler(req, res) {
   const token = (req.headers.authorization || '').replace(/^Bearer\s+/i, '').trim();
   if (!token) return res.status(401).json({ error: 'No auth token' });
 
-  // IP-level gate — blocks flood attempts before any DB or auth work
-  const { allowed: ipOk } = await rateLimit(req, 'user-sync');
+  // Who is calling, in ONE parallel hop (lib/server/supabaseJwt.js):
+  //  - the IP gate (rate-limit RPC, ≤350 ms);
+  //  - the signature, verified locally (HS256 secret, else the project's ES256 JWKS cached in the warm
+  //    function) — a forged or expired token never costs a network call;
+  //  - "does this session still exist?" from the auth server, so "Sign out of all devices" ends the
+  //    other devices' access at once, not when their hour-long access token expires.
+  // Before 2026-10-24 these were three SERIAL trips (rate limit → /auth/v1/user with no timeout → DB),
+  // and an auth hiccup hung the whole call to the 15 s limit (the audit's 504s on trivial reads).
+  const authOpts = { supabaseUrl: SUPABASE_URL, serviceKey: SERVICE_KEY };
+  const whoP = resolveUid(token, authOpts);
+  const aliveP = whoP.then((w) => (w && w.via !== 'auth_api' ? sessionStillValid(token, authOpts) : true));
+  const [{ allowed: ipOk }, who, alive] = await Promise.all([rateLimit(req, 'user-sync'), whoP, aliveP]);
   if (!ipOk) return res.status(429).json({ error: 'Too many requests — slow down.' });
-
-  // Who is calling: HS256 locally when the project still has a JWT secret, else the project's ES256
-  // key from its JWKS (cached in the warm function), else the auth API. Before 2026-10-24 the
-  // project's asymmetric tokens failed the HS256 check and EVERY call paid an /auth/v1/user round
-  // trip before its first DB read (lib/server/supabaseJwt.js).
-  const who = await resolveUid(token, { supabaseUrl: SUPABASE_URL, serviceKey: SERVICE_KEY });
   if (!who) return res.status(401).json({ error: 'Invalid token' });
+  if (alive === false) return res.status(401).json({ error: 'Session ended — sign in again.' });
   const uid = who.uid;
 
   // ── All DB calls use service key — bypasses RLS ─────────────────────────────
