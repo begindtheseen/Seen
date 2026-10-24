@@ -502,10 +502,13 @@ export default async function handler(req, res) {
       haveDb ? getCompanyProcess(db, company) : Promise.resolve({ score: null, confidence: null }),
     ]);
 
-    // Job facts: prefer cached → else extract → cache for next time.
+    // Job facts: extract from the posting the caller sent (fast, deterministic, and always the
+    // CURRENT text — a pasted posting can change under the same manual jobId). The flat job_facts
+    // cache carries no sections, constraints or posting phrases, so it is read only when no
+    // posting text was sent at all.
     let jobFacts = null;
     let factsSource = 'extracted';
-    if (haveDb && jobId) {
+    if (haveDb && jobId && !String(jobDescription || '').trim()) {
       jobFacts = await getCachedJobFacts(db, jobId);
       if (jobFacts) factsSource = 'cache';
     }
