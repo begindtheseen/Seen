@@ -288,7 +288,7 @@ export default function Nav() {
           {/* Credits — subtle monospace chip (Pro shows an unlimited badge). */}
           {isSeeker && isPro && (
             <Link href="/pricing" className={styles.pro} title="Seen Pro — unlimited AI credits. Manage your membership.">
-              ★ <span className={styles.proLong}>Unlimited · </span>PRO
+              <span className={`${styles.pill} ${styles.proPill}`}>★ <span className={styles.proLong}>Unlimited · </span>PRO</span>
             </Link>
           )}
           {isSeeker && !isPro && creditBalance !== null && (
@@ -303,9 +303,12 @@ export default function Nav() {
                   : `${creditBalance} AI credit${creditBalance === 1 ? '' : 's'} available · ${dailyResetLabel()}`}
                 onClick={() => setCreditsOpen(o => !o)}
               >
-                <span className={styles.chipSpark} />
-                <b>{creditBalance}</b>
-                <span className={styles.chipLabel}>{creditBalance === 0 ? 'credits · top up' : `credit${creditBalance === 1 ? '' : 's'}`}</span>
+                {/* The pill is the visual; the button around it is the hit area (44px tall on phones). */}
+                <span className={styles.pill}>
+                  <span className={styles.chipSpark} />
+                  <b>{creditBalance}</b>
+                  <span className={styles.chipLabel}>{creditBalance === 0 ? 'credits · top up' : `credit${creditBalance === 1 ? '' : 's'}`}</span>
+                </span>
               </button>
               {creditsOpen && (
                 <CreditsPopover
@@ -348,7 +351,7 @@ export default function Nav() {
                   aria-label="Account menu"
                   title="Account"
                 >
-                  {avatarInitial}
+                  <span className={styles.avatarDot}>{avatarInitial}</span>
                 </button>
               }
             >

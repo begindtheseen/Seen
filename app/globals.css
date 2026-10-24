@@ -1141,7 +1141,9 @@ details[open] .dt-chev{transform:rotate(180deg)}
 .side-menu-item .side-menu-icon{font-size:1rem;width:20px;text-align:center;flex-shrink:0}
 @media(max-width:768px){
   .nav-pills{display:none}
-  .side-menu-toggle{display:flex}
+  /* 44×44 thumb target (phone audit 2026-10-23: 29×36); pulled 8px into the bar's own gutter so the
+     bar is no wider than before. The glyph stays its size. */
+  .side-menu-toggle{display:flex;width:44px;height:44px;padding:0;margin:0 0 0 -8px}
 }
 /* Hide "For employers →" button in nav on small phones — it overflows the nav bar at 375px */
 @media(max-width:480px){

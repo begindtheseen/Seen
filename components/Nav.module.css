@@ -209,14 +209,15 @@
 }
 
 /* Credits chip — subtle monospace pill (replaces the loud gradient "🪙 10 credits"). */
+/* The BUTTON is the hit area (transparent, 44px tall on phones — see the phone block); the inner
+   .pill is the visual. Same split for the Pro badge and the avatar: a 44×44 target never grows the
+   glyph (phone audit 2026-10-23: chip 49×25, icons 32×32, avatar 32×32, menu rows 31px). */
 .chip {
   display: inline-flex;
   align-items: center;
-  gap: 0.4rem;
-  padding: 0.34rem 0.62rem;
-  border-radius: 999px;
-  border: 1px solid var(--line2);
-  background: rgba(255, 255, 255, 0.02);
+  padding: 0;
+  border: none;
+  background: none;
   font-family: var(--mono);
   font-size: 0.66rem;
   font-weight: 500;
@@ -224,9 +225,18 @@
   color: var(--sub);
   cursor: pointer;
   white-space: nowrap;
+}
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.34rem 0.62rem;
+  border-radius: 999px;
+  border: 1px solid var(--line2);
+  background: rgba(255, 255, 255, 0.02);
   transition: border-color 0.15s ease, color 0.15s ease;
 }
-.chip:hover { border-color: rgba(255, 255, 255, 0.24); color: var(--text); }
+.chip:hover .pill { border-color: rgba(255, 255, 255, 0.24); color: var(--text); }
 .chip b { color: var(--white); font-weight: 600; }
 .chipSpark {
   width: 6px;
@@ -249,11 +259,6 @@
 .pro {
   display: inline-flex;
   align-items: center;
-  gap: 0.34rem;
-  padding: 0.34rem 0.62rem;
-  border-radius: 999px;
-  border: 1px solid rgba(16, 185, 129, 0.4);
-  background: linear-gradient(135deg, rgba(16, 185, 129, 0.14), rgba(99, 102, 241, 0.14));
   font-family: var(--mono);
   font-size: 0.62rem;
   font-weight: 700;
@@ -262,6 +267,12 @@
   color: var(--green);
   text-decoration: none;
   white-space: nowrap;
+}
+/* link = hit area, .proPill = the visual */
+.proPill {
+  gap: 0.34rem;
+  border: 1px solid rgba(16, 185, 129, 0.4);
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.14), rgba(99, 102, 241, 0.14));
 }
 
 /* Icon button (Saved bookmark). */
@@ -301,43 +312,59 @@
 @media (max-width: 768px) { .cmdk { display: none; } }
 
 /* Account avatar trigger. */
+/* The button is the hit area, .avatarDot the 32px gradient disc. */
 .avatar {
   display: grid;
   place-items: center;
   width: 32px;
   height: 32px;
-  border-radius: 50%;
+  padding: 0;
   border: none;
+  border-radius: 50%;
+  background: none;
+  cursor: pointer;
+}
+.avatarDot {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
   background: linear-gradient(135deg, var(--g-start) 0%, var(--g-mid) 55%, var(--g-end) 100%);
   color: #fff;
   font-family: var(--body);
   font-size: 0.78rem;
   font-weight: 700;
-  cursor: pointer;
   line-height: 1;
+  transition: transform 0.3s var(--ease-spring), box-shadow 0.25s ease;
 }
-.avatar { transition: transform 0.3s var(--ease-spring), box-shadow 0.25s ease; }
-.avatar:hover { filter: brightness(1.08); transform: scale(1.08); box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.25), 0 6px 18px rgba(99, 102, 241, 0.35); }
-.avatar:active { transform: scale(0.94); }
+.avatar:hover .avatarDot { filter: brightness(1.08); transform: scale(1.08); box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.25), 0 6px 18px rgba(99, 102, 241, 0.35); }
+.avatar:active .avatarDot { transform: scale(0.94); }
 
 /* Below the tablet breakpoint the primary row + More collapse into the existing
    hamburger drawer (global .side-menu / .side-menu-toggle). */
 @media (max-width: 768px) {
   .primary { display: none; }
+  /* 44×44 hit areas (phone audit 2026-10-23: chip 49×25, icons 32×32, avatar 32×32, menu rows 31px)
+     without a wider bar: the boxes grow, the glyphs don't, and the gap between them goes — the
+     boxes carry their own spacing. */
+  .right { gap: 0; }
+  .chip, .pro { min-height: 44px; }
+  .iconBtn { width: 44px; height: 44px; border-color: transparent; background: transparent; }
+  .avatar { width: 44px; height: 44px; }
+  .menuItem { min-height: 44px; }
 }
 @media (prefers-reduced-motion: reduce) {
   .menu, .menu > * { animation: none; }
-  .menuItem, .menuItem::before, .avatar { transition: none; }
+  .menuItem, .menuItem::before, .avatarDot { transition: none; }
   .menuItem:hover { padding-left: 0.6rem; }
-  .avatar:hover, .avatar:active { transform: none; }
+  .avatar:hover .avatarDot, .avatar:active .avatarDot { transform: none; }
 }
 @media (max-width: 480px) {
   /* Keep the bar breathable on small phones — the drawer carries the full nav. The full
      "Unlimited · PRO" pill pushed the logo and the avatar off a 390px screen. */
   .chipLabel { display: none; }
   .proLong { display: none; }
-  .right { gap: 0.35rem; }
-  .iconBtn { width: 32px; height: 32px; }
 }
 
 /* ── Phone drawer (overrides the global .side-menu, which slides in from the LEFT) ──
