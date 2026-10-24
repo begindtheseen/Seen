@@ -22,6 +22,8 @@ const COLS: Array<{ title: string; links: Array<{ href: string; label: string }>
     { href: '/demand', label: 'Hiring demand' },
     { href: '/feed', label: 'Live feed' },
     { href: '/ghosted', label: 'Been ghosted?' },
+    { href: '/lists', label: 'Monthly lists' },
+    { href: '/data', label: 'Open data' },
   ] },
   { title: 'Company', links: [
     { href: '/employers', label: 'For employers' },

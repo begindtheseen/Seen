@@ -8,8 +8,10 @@ import { AdminHero, AdminCommandCenter, AdminMetricCard, CardSubLink, AdminAtten
 import { KpiModal, ManageAccountsModal, RevenueDetailModal, TrialsDetailModal, SharesDetailModal, ErrorsDetailModal } from './modals'
 import { ReviewQueuePanel } from './ReviewQueuePanel'
 import { ReportDupesCard } from './ReportDupesCard'
+import { SearchDataPanel } from './SearchDataPanel'
 import { JobCrisisBanner, JobRefreshButton, JobRunner, ReportRow, IssueRow, RedditDisputesPanel, ListingTicketsPanel, MergePanel, CompanyExportPanel, CreditsPanel, FlagsPanel, ClustersPanel, JobDedupePanel, AllJobsBrowser, DeployPanel } from './panels'
 import { GhostReportPanel } from './GhostReportPanel'
+import { SignupSourcesPanel } from './SignupSourcesPanel'
 import { LiveBell } from './LiveBell'
 import { EmployerPanel } from './EmployerPanel'
 import { EmployerClaimsPanel } from './EmployerClaimsPanel'
@@ -257,6 +259,8 @@ export function AdminShell({ stats, token, reload, onLogout, onUnauthorized }: {
             <MetricRow label="Suspected duplicates" value={dupSuspected} status="shared-signal clusters" tone={dupSuspected > 0 ? 'amber' : 'dim'} />
             <button className="ac-btn" onClick={() => setManageOpen(true)}>Manage accounts →</button>
           </Panel>
+          {/* First-touch signup attribution (lib/server/attributionReport.js, migration 20261024180000) */}
+          <SignupSourcesPanel token={token} />
           </div>
         )}
 
@@ -367,6 +371,9 @@ export function AdminShell({ stats, token, reload, onLogout, onUnauthorized }: {
                 }
               </div>
             </div>
+
+            {/* Search demand — Google + Bing queries behind Seen's pages (api/cron-search-data.js, daily) */}
+            <SearchDataPanel token={token} />
 
             {/* Self-filling company pages — the enrichment queue (api/enrich-companies cron, every 15 min).
                 Companies land here when a visitor looks them up with zero first-party reports. */}

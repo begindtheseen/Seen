@@ -2,6 +2,7 @@ import HomeHero from '@/components/HomeHero'
 import LandingMarketingSections from '@/components/LandingMarketingSections'
 import LivePulse from '@/components/home/LivePulse'
 import { jsonLdHtml } from '@/lib/jsonLd'
+import { siteOrganization } from '@/lib/siteIdentity'
 
 // schema.org for the homepage only (rendered once, here, not by the root layout on every page): who
 // publishes the site and what it is. The logo is the stable /favicon.svg in public/ (no build hash).
@@ -11,13 +12,9 @@ import { jsonLdHtml } from '@/lib/jsonLd'
 const HOME_JSON_LD = {
   '@context': 'https://schema.org',
   '@graph': [
-    {
-      '@type': 'Organization',
-      '@id': 'https://seenjobs.io/#organization',
-      name: 'Seen',
-      url: 'https://seenjobs.io',
-      logo: 'https://seenjobs.io/favicon.svg',
-    },
+    // One Organization node for the whole site (lib/siteIdentity.ts): name, logo, contact, description and,
+    // once NEXT_PUBLIC_SAME_AS is set, Seen's social profiles.
+    siteOrganization(),
     {
       '@type': 'WebSite',
       '@id': 'https://seenjobs.io/#website',

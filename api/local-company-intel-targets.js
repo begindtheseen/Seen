@@ -12,6 +12,13 @@
 //                   most-listings-first head (ATS-board companies — Natera, Brex, Loenbro, Verkada, Axon)
 //                   gave 0 accounts even with every post in their own subreddits read, while Verizon (4
 //                   reports), TopGolf (8), Kohl's (2) and Instacart (4) gave 8, 3, 1 and 1.
+//   GET …&order=search_demand  opt-in: companies people actually SEARCH for (Google/Bing, last 28 days, from
+//                   public.search_daily via lib/server/searchOpportunities.js searchDemandTargets) come first,
+//                   most impressions first, then the default order. With `below`, a searched company under K
+//                   reports joins the queue even with no open listings (people look it up, so its page needs
+//                   reports). Each entry carries `search_demand: { impressions, clicks, intents }`. Without search
+//                   data (no credentials yet, or before the migration) the order is the default one and
+//                   `search_data_ready` is false. The default order is unchanged.
 //   GET ?catalog=1  EVERY company Seen knows, with its counts, so the operator can pick targets
 //                   (major companies, under-reported ones, or one specific company).
 //
@@ -22,6 +29,7 @@
 import { isValidCompanyName, normalizeCompany } from './_utils/reportWrite.js';
 import { firstPartyReportCount, mentionCount, isGradeable, reportsNeededForGrade } from '../lib/server/reportCounts.js';
 import { searchableName } from '../lib/reports/targetNames.js';
+import { searchDemandTargets } from '../lib/server/searchOpportunities.js';
 
 const headersFor = key => ({ apikey: key, Authorization: `Bearer ${key}` });
 // A lowercase, spaceless identifier is usually an ATS board slug, not the employer's
@@ -92,6 +100,30 @@ const rank = (a, b) => Number(isSlugLike(a.company)) - Number(isSlugLike(b.compa
 export const hasFootprint = (c) => c.applicant_reports > 0 || c.mentions > 0;
 const fillRank = (a, b) => Number(hasFootprint(b)) - Number(hasFootprint(a)) || rank(a, b);
 
+/**
+ * Searched companies first (most impressions first), then the rest of `queue` in its own order. With `below`, a
+ * known company people search for that is under `below` reports joins even without open listings.
+ * @param {object[]} queue  the default-ordered targets
+ * @param {object[]} all    every known company (the catalog rows)
+ * @param {Array<{ company: string, known: boolean, impressions: number, clicks: number, intents: string[] }>} demand
+ * @param {number|null} below
+ */
+export function orderBySearchDemand(queue, all, demand, below) {
+  const byName = new Map(all.map((c) => [normalizeCompany(c.company), c]));
+  const inQueue = new Set(queue.map((c) => normalizeCompany(c.company)));
+  const first = [], taken = new Set();
+  for (const d of Array.isArray(demand) ? demand : []) {
+    if (!d?.known || !(d.impressions > 0)) continue;
+    const k = normalizeCompany(d.company), c = byName.get(k);
+    if (!c || taken.has(k)) continue;
+    const eligible = inQueue.has(k) || (below != null && c.applicant_reports < below && !c.slug_like && searchableName(c));
+    if (!eligible) continue;
+    taken.add(k);
+    first.push({ ...c, search_demand: { impressions: d.impressions, clicks: d.clicks, intents: d.intents } });
+  }
+  return [...first, ...queue.filter((c) => !taken.has(normalizeCompany(c.company)))];
+}
+
 export default async function handler(req, res) {
   if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
   const secret = process.env.LOCAL_COMPANY_INTEL_INGEST_SECRET;
@@ -111,7 +143,13 @@ export default async function handler(req, res) {
   if (catalog) return res.status(200).json({ ok: true, companies: all, total: all.length, employee_review_counts: employee, generated_at: new Date().toISOString() });
   // A board slug that was only capitalized ("Andurilindustries") matches nobody's post and burns a run's
   // minutes, so it is never handed out as a target (the catalog above still lists it, flagged).
-  const queue = (below ? all.filter((c) => c.active_listings > 0 && c.applicant_reports < below).sort(fillRank) : all).filter((c) => !c.slug_like && searchableName(c));
+  let queue = (below ? all.filter((c) => c.active_listings > 0 && c.applicant_reports < below).sort(fillRank) : all).filter((c) => !c.slug_like && searchableName(c));
+  let demandMeta = {};
+  if (String(req.query?.order || '') === 'search_demand') {
+    const demand = await searchDemandTargets({ url, key, companies: all.map((c) => ({ company_name: c.company, first_party_report_count: c.applicant_reports, mention_count: c.mentions })) });
+    queue = orderBySearchDemand(queue, all, demand.companies, below);
+    demandMeta = { order: 'search_demand', search_data_ready: demand.ready };
+  }
   return res.status(200).json({ ok: true, companies: queue.slice(0, limit), scanned_active_companies: counts.size,
-    ...(below ? { below, below_count: queue.length } : {}) });
+    ...(below ? { below, below_count: queue.length } : {}), ...demandMeta });
 }

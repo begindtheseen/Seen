@@ -10,6 +10,7 @@ import { hasMentionCount, hasEmployeeReviewCount } from '../../lib/server/scoreC
 import { SCORABLE_REPORTS_FILTER } from '../../lib/server/reportCounts.js';
 import { EMPLOYEE_REVIEWS_FILTER, employeeReviewSignal } from '../../lib/server/employeeReviews.js';
 import { broadcastActivity } from '../../lib/server/realtime.js';
+import { notifyCompanyRecomputed } from '../../lib/server/indexNow.js';
 
 const _SCORE_TTL_MS = 365 * 24 * 60 * 60 * 1000;
 
@@ -239,6 +240,9 @@ export async function recomputeCompanyScoreFromReports(SUPABASE_URL, hdrs, compa
       headers: { ...hdrs, Prefer: 'resolution=merge-duplicates,return=minimal' },
       body: JSON.stringify(row),
     });
+    // A gradeable page that just changed is offered to IndexNow (production only, batched, after the
+    // response via waitUntil; it never throws and never delays this return).
+    if (sv.ok) notifyCompanyRecomputed(row);
     // The written row (truthy) on success, so a caller can serve the fresh numbers right away.
     return sv.ok ? row : false;
   } catch { return false; }

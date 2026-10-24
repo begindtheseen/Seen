@@ -4,6 +4,10 @@ import type { Metadata } from 'next'
 // `next build`). generateMetadata + the layout render below both go through this one helper.
 import { getScore, getScoreState, slugToName, displayCompanyName, type GrowthScore } from '@/lib/growth'
 import { buildCompanyFaq } from '@/lib/server/companyFaq'
+// Living search data (lib/server/searchOpportunities.js): the intents real searchers used for THIS company in
+// the last 28 days lead its FAQ, each answered from the page's own facts. Returns [] on any failure.
+import { topIntentsForCompany } from '@/lib/server/searchOpportunities.js'
+import { mergeIntentFaq } from '@/lib/server/intentAnswers.js'
 import { jsonLdHtml } from '@/lib/jsonLd'
 // Offline, numerically-grounded "What applicants report" paragraph (company_summaries). No-op when the
 // table is missing/empty or the read fails — the page renders exactly as before.
@@ -119,7 +123,7 @@ export default async function CompanySlugLayout(
   // FAQ built ONLY from the same facts (percentages only with MIN_REPORTS_FOR_RATES applicant reports;
   // the grade Q always names its basis). Backs both a FAQPage node AND the visible block below — the
   // format AI answer engines (ChatGPT, Perplexity, Gemini) cite for "does <company> ghost applicants?".
-  const faq = s
+  const baseFaq = s
     ? buildCompanyFaq({
         name,
         overallScore: facts.score,
@@ -131,6 +135,8 @@ export default async function CompanySlugLayout(
         isAgency: isStaffingAgency(s.company_name ?? name),
       })
     : []
+  const searched = facts.gradeable ? await topIntentsForCompany(s?.company_name || name) : []
+  const faq = mergeIntentFaq(baseFaq, facts, searched, { avgRounds: s?.avg_rounds ?? null })
 
   const jsonLd = {
     '@context': 'https://schema.org',
