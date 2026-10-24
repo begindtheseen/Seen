@@ -1,5 +1,6 @@
 'use client'
 
+import { displayCompanyName } from '@/lib/companyDisplay'
 import { useState, useEffect } from 'react'
 import { firstPartyReportCount } from '@/lib/server/reportCounts'
 import { isGradeableScore, notEnoughReviewsLabel } from '@/lib/gradeGate'
@@ -86,7 +87,7 @@ export default function CoPreviewModal({ company, onClose }: { company: string; 
       >
         {/* Header */}
         <div style={{ padding: '1rem 1.15rem .75rem', borderBottom: '1px solid var(--line)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <div style={{ fontFamily: 'var(--display)', fontSize: '1rem', fontWeight: 800, color: 'var(--white)', letterSpacing: '-.02em' }}>{company}</div>
+          <div style={{ fontFamily: 'var(--display)', fontSize: '1rem', fontWeight: 800, color: 'var(--white)', letterSpacing: '-.02em' }}>{displayCompanyName(company)}</div>
           <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'var(--dim)', cursor: 'pointer', fontSize: '1rem', padding: '.2rem .3rem', lineHeight: 1 }}>✕</button>
         </div>
 

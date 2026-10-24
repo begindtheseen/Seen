@@ -13,6 +13,10 @@ import CreditConfirmDialog from '@/components/CreditConfirmDialog'
 import { trackApplyClick } from '@/lib/trackApply'
 import { hasConfirmedCreditUse } from '@/lib/creditConfirm'
 import { JOB_INSIGHTS_COST, RESUME_OPTIMIZE_COST, creditCostLabel, dailyResetLabel } from '@/lib/creditRules'
+import { displayCompanyName } from '@/lib/companyDisplay'
+import { displayPay } from '@/lib/jobs/pay.js'
+import { paragraphs, isDescriptionPreview, stripDanglingEllipsis, endsCutOff } from '@/lib/jobs/descriptionText.js'
+import { httpHref } from '@/lib/safeHref.js'
 
 // ── Job detail drawer helpers ─────────────────────────────────────────────────
 
@@ -40,16 +44,11 @@ interface InsightsResponse extends Partial<Insights> {
 // uncached → not cached yet; the price-tagged "Reveal" button is shown, nothing spent
 // generating → the paid call is in flight
 // credits → the paid call was refused (out of credits / signed out)
-type InsightsState = 'loading' | 'done' | 'unavailable' | 'no_desc' | 'uncached' | 'generating' | 'credits'
+// preview → the row is a source's teaser of the posting (Adzuna): nothing to analyze, nothing to sell
+type InsightsState = 'loading' | 'done' | 'unavailable' | 'no_desc' | 'uncached' | 'generating' | 'credits' | 'preview'
 
 const L1_TTL = 24 * 60 * 60 * 1000
 const OPTIMIZE_PRICE = creditCostLabel(RESUME_OPTIMIZE_COST)
-
-function formatDesc(text: string): string[] {
-  if (!text || text.length < 10) return []
-  return text.replace(/^Category\s*:\s*[^\n.]+\s*/i, '').trim()
-    .split(/\n+/).map(l => l.trim()).filter(Boolean)
-}
 
 function Skeleton({ widths, h }: { widths: number[]; h: number }) {
   return (
@@ -110,6 +109,9 @@ export default function JobDetailDrawer({ job, isLoggedIn, onClose, onApply, onC
   const loadInsights = useCallback(async (j: Job) => {
     const desc = j.description || ''
     if (!desc || desc.length <= 80) { setInsightsState('no_desc'); return }
+    // A teaser is not the posting: analyzing it would charge a credit for the employer's mission
+    // paragraph plus a cut-off sentence (owner report 2026-10-24).
+    if (isDescriptionPreview(j)) { setInsightsState('preview'); return }
     const key = 'ji_' + j.id
     try {
       const raw = localStorage.getItem(key)
@@ -180,8 +182,14 @@ export default function JobDetailDrawer({ job, isLoggedIn, onClose, onApply, onC
 
   const risk = Score.risk(job.score)
   const avail = job.availability_status
-  const fullParas = formatDesc(job.description || '')
-  const summaryParas = formatDesc(insights?.description_summary || '')
+  const companyName = displayCompanyName(job.company) || job.company
+  const preview = isDescriptionPreview(job)
+  const cutOff = !preview && endsCutOff(job.description || '')
+  const postingHref = httpHref(job.apply_url)
+  // Paragraphs: the row's own newlines (ingest keeps them since 2026-10-24), else the headings and
+  // bullets the one-line stored text carries (lib/jobs/descriptionText.js paragraphs).
+  const fullParas = paragraphs(preview ? stripDanglingEllipsis(job.description || '') : (job.description || ''))
+  const summaryParas = paragraphs(insights?.description_summary || '')
   const FOLD_CHARS = 1400
   const fullChars = (job.description || '').length
   // Which paragraphs to show: the summary (collapsed), the whole posting (expanded), or a long
@@ -198,7 +206,8 @@ export default function JobDetailDrawer({ job, isLoggedIn, onClose, onApply, onC
     descParas = kept
     foldLabel = 'Read more ↓'
   }
-  const chips = [job.type, job.level, job.salary && job.salary !== '—' ? job.salary : ''].filter(Boolean) as string[]
+  const pay = displayPay(job)
+  const chips = [job.type, job.level, pay && pay !== '—' ? pay : ''].filter(Boolean) as string[]
 
   return (
     <ModalPortal>
@@ -229,7 +238,7 @@ export default function JobDetailDrawer({ job, isLoggedIn, onClose, onApply, onC
           <button onClick={onClose} style={{ background: 'none', border: '1px solid var(--line2)', borderRadius: 7, color: 'var(--dim)', cursor: 'pointer', fontSize: '.72rem', padding: '.28rem .65rem', fontFamily: 'var(--mono)', flexShrink: 0 }}>← Back</button>
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ fontFamily: 'var(--display)', fontSize: '.85rem', fontWeight: 700, color: 'var(--white)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{job.title}</div>
-            <div style={{ fontFamily: 'var(--mono)', fontSize: '.52rem', color: 'var(--muted)' }}>{job.company}</div>
+            <div style={{ fontFamily: 'var(--mono)', fontSize: '.52rem', color: 'var(--muted)' }}>{companyName}</div>
           </div>
           <a href={`/jobs/${encodeURIComponent(job.id)}`} style={{ fontFamily: 'var(--mono)', fontSize: '.52rem', color: 'var(--muted)', textDecoration: 'none', flexShrink: 0, padding: '.25rem' }}>↗</a>
           <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'var(--dim)', cursor: 'pointer', fontSize: '1rem', padding: '.2rem', lineHeight: 1, flexShrink: 0 }}>✕</button>
@@ -241,11 +250,11 @@ export default function JobDetailDrawer({ job, isLoggedIn, onClose, onApply, onC
           <div className="hero-terminal" style={{ display: 'block', marginBottom: '1.1rem', padding: '1rem' }}>
             <div style={{ display: 'flex', alignItems: 'flex-start', gap: '.8rem', marginBottom: chips.length ? '.7rem' : 0 }}>
               <div style={{ width: 44, height: 44, borderRadius: 9, background: 'var(--raised)', border: '1px solid var(--line2)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'var(--display)', fontWeight: 800, fontSize: '1.1rem', color: 'var(--white)', flexShrink: 0 }}>
-                {(job.company || '?')[0].toUpperCase()}
+                {(companyName || '?')[0].toUpperCase()}
               </div>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontFamily: 'var(--display)', fontSize: '1.05rem', fontWeight: 800, color: 'var(--white)', letterSpacing: '-.025em', lineHeight: 1.2, marginBottom: '.22rem' }}>{job.title}</div>
-                <div style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', color: 'var(--dim)' }}>{job.company}{job.location ? ` · 📍 ${job.location}` : ''}</div>
+                <div style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', color: 'var(--dim)' }}>{companyName}{job.location ? ` · 📍 ${job.location}` : ''}</div>
                 {externalApply && (
                   <a href={job.apply_url!} target="_blank" rel="noopener noreferrer" data-testid="posting-link"
                     onClick={() => trackApplyClick(job)}
@@ -271,7 +280,7 @@ export default function JobDetailDrawer({ job, isLoggedIn, onClose, onApply, onC
             <div className="jd-stat"><span className="jd-sn" style={{ color: job.waste == null ? 'var(--dim)' : job.waste > 55 ? 'var(--red)' : job.waste > 35 ? 'var(--amber)' : 'var(--green)' }}>{job.waste == null ? '–' : `${job.waste}%`}</span><span className="jd-sl">Waste risk</span></div>
             <div className="jd-stat"><span className="jd-sn" style={{ fontSize: '.72rem' }}>{job.type || 'Full-time'}</span><span className="jd-sl">Type</span></div>
             <div className="jd-stat"><span className="jd-sn" style={{ fontSize: '.72rem' }}>{job.level || '—'}</span><span className="jd-sl">Level</span></div>
-            <div className="jd-stat"><span className="jd-sn" style={{ color: 'var(--green)', fontSize: '.75rem' }}>{job.salary || '—'}</span><span className="jd-sl">Salary</span></div>
+            <div className="jd-stat"><span className="jd-sn" style={{ color: 'var(--green)', fontSize: '.75rem' }}>{pay || '—'}</span><span className="jd-sl">{pay && /\/hr$/.test(pay) ? 'Hourly pay' : 'Salary'}</span></div>
             <div className="jd-stat"><span className="jd-sn" style={{ fontSize: '.65rem', color: 'var(--blue)' }}>{job.source || 'Job board'}</span><span className="jd-sl">Source</span></div>
           </div>
 
@@ -308,8 +317,14 @@ export default function JobDetailDrawer({ job, isLoggedIn, onClose, onApply, onC
           {/* AI Insights */}
           <div style={{ background: 'var(--gdim)', border: '1px solid var(--line)', borderRadius: 12, padding: '1rem', marginBottom: '1.1rem' }}>
             <div style={{ fontFamily: 'var(--mono)', fontSize: '.56rem', textTransform: 'uppercase' as const, letterSpacing: '.08em', color: 'var(--dim)', marginBottom: '.7rem' }}>
-              WHAT {(job.company || 'THIS COMPANY').toUpperCase()} IS HIRING FOR
+              WHAT {(companyName || 'THIS COMPANY').toUpperCase()} IS HIRING FOR
             </div>
+            {insightsState === 'preview' && (
+              <div style={{ fontSize: '.72rem', color: 'var(--muted)', lineHeight: 1.6 }}>
+                This source gives Seen only a preview of the posting, so there is nothing to analyze yet.{' '}
+                {postingHref ? <a href={postingHref} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--green)' }}>Open the full posting to analyze it ↗</a> : 'Open the full posting on the employer\'s site to analyze it.'}
+              </div>
+            )}
             {(insightsState === 'loading' || insightsState === 'generating') && <Skeleton widths={[80, 65, 72, 58, 68]} h={10} />}
             {insightsState === 'no_desc' && <div style={{ fontSize: '.72rem', color: 'var(--muted)' }}>No description for AI analysis.</div>}
             {insightsState === 'unavailable' && <div style={{ fontSize: '.72rem', color: 'var(--muted)' }}>AI insights unavailable for this listing.</div>}
@@ -377,6 +392,16 @@ export default function JobDetailDrawer({ job, isLoggedIn, onClose, onApply, onC
               : descParas.length > 0
                 ? <>
                     {descParas.map((p, i) => <p key={i} style={{ fontSize: '.8rem', color: 'var(--sub)', lineHeight: 1.8, margin: '0 0 .75rem' }}>{p}</p>)}
+                    {preview && (
+                      <div style={{ margin: '0 0 .75rem', padding: '.5rem .75rem', background: 'rgba(245,158,11,.07)', border: '1px solid rgba(245,158,11,.2)', borderRadius: 8, fontFamily: 'var(--mono)', fontSize: '.6rem', color: 'var(--amber)', lineHeight: 1.55 }}>
+                        ✂ Preview from {job.source || 'this source'}. The full posting is on the employer&apos;s site{postingHref ? <> — <a href={postingHref} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--amber)' }}>open it ↗</a></> : '.'}
+                      </div>
+                    )}
+                    {cutOff && !foldLabel && (
+                      <div style={{ margin: '0 0 .75rem', fontFamily: 'var(--mono)', fontSize: '.6rem', color: 'var(--dim)', lineHeight: 1.55 }}>
+                        Continues on the employer&apos;s site{postingHref ? <> — <a href={postingHref} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--green)' }}>open it ↗</a></> : '.'}
+                      </div>
+                    )}
                     {foldLabel && (
                       <button type="button" onClick={() => setShowFull(true)} style={{ background: 'none', border: '1px solid var(--line2)', borderRadius: 7, color: 'var(--green)', cursor: 'pointer', fontFamily: 'var(--mono)', fontSize: '.62rem', padding: '.4rem .75rem' }}>{foldLabel}</button>
                     )}
@@ -415,9 +440,9 @@ export default function JobDetailDrawer({ job, isLoggedIn, onClose, onApply, onC
             onClick={() => onCheckCompany(job.company)}
             style={{ display: 'block', width: '100%', textAlign: 'left', background: 'none', border: 'none', fontFamily: 'var(--mono)', fontSize: '.6rem', color: 'var(--amber)', padding: '.05rem 0 .45rem', opacity: .85, cursor: 'pointer' }}
           >
-            🏢 Check {job.company} →
+            🏢 Check {companyName} →
           </button>
-          <div style={externalApply && !seenApply
+          <div style={externalApply && !seenApply && !preview
             ? { display: 'grid', gridTemplateColumns: 'auto minmax(0, 1fr) minmax(0, 1fr)', gap: '.6rem', alignItems: 'stretch' }
             : { display: 'flex', gap: '.6rem' }}>
             <button onClick={toggleSave} style={{ background: 'none', border: '1px solid var(--line2)', borderRadius: 8, padding: '.58rem .85rem', fontSize: '.95rem', cursor: 'pointer', color: saved ? 'var(--green)' : 'var(--muted)', flexShrink: 0 }}>{saved ? '♥' : '♡'}</button>
@@ -439,9 +464,9 @@ export default function JobDetailDrawer({ job, isLoggedIn, onClose, onApply, onC
                     onClick={applyExternal}
                     style={seenApply
                       ? { flex: 1, textAlign: 'center', background: 'none', color: 'var(--sub)', borderRadius: 8, padding: '.58rem .8rem', fontFamily: 'var(--display)', fontWeight: 700, fontSize: '.76rem', border: '1px solid var(--line2)', textDecoration: 'none' }
-                      : { minWidth: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', textAlign: 'center', background: 'var(--green)', color: 'var(--ink)', borderRadius: 8, padding: '.58rem .6rem', fontFamily: 'var(--display)', fontWeight: 800, fontSize: '.82rem', textDecoration: 'none' }}
-                  >{seenApply ? 'Apply on their site ↗' : 'Apply ↗'}</a>
-                  {!seenApply && (
+                      : { minWidth: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', textAlign: 'center', background: 'var(--green)', color: 'var(--ink)', borderRadius: 8, padding: '.58rem .6rem', fontFamily: 'var(--display)', fontWeight: 800, fontSize: '.82rem', textDecoration: 'none', ...(preview ? { flex: 1 } : {}) }}
+                  >{seenApply ? 'Apply on their site ↗' : preview ? 'Open the full posting ↗' : 'Apply ↗'}</a>
+                  {!seenApply && !preview && (
                     <button
                       type="button"
                       data-testid="drawer-optimize-btn"
@@ -463,7 +488,7 @@ export default function JobDetailDrawer({ job, isLoggedIn, onClose, onApply, onC
       {confirmOpen && (
         <CreditConfirmDialog
           cost={insightPrice}
-          action={`generate AI insights for ${job.company}`}
+          action={`generate AI insights for ${companyName}`}
           onConfirm={() => { setConfirmOpen(false); generateInsights() }}
           onCancel={() => setConfirmOpen(false)}
         />

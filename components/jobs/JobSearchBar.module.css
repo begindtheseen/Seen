@@ -150,6 +150,24 @@
   .go { flex: 1 1 auto; padding: 0.62rem 0.95rem; }
 }
 
+/* On a phone the city box is full width and the [radius · Search] row sits right under it, so an
+   absolutely positioned suggestion list landed ON the Search button (358×37 over "Search →", live
+   audit 2026-10-23: the first thumb tap picked the city already typed, the second searched). The list
+   now flows in the document and pushes that row down, and each row is a real 44px tap target. */
+@media (max-width: 768px) {
+  .suggs {
+    position: static;
+    margin-top: 0.35rem;
+    box-shadow: none;
+  }
+  .sugg {
+    min-height: 44px;
+    display: flex;
+    align-items: center;
+    padding: 0.5rem 0.9rem;
+  }
+}
+
 /* PHONE FLOOR (≤768px) — generated: every selector in this file under 12px reads 12px on a phone */
 @media (max-width: 768px) {
   .sugg, .notice, .cityLine { font-size: 0.75rem; }
