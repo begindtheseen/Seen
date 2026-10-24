@@ -2,12 +2,13 @@ import type { Metadata } from 'next'
 // Build-safe score reader — reads the cached score DIRECTLY from Supabase and NEVER self-fetches
 // the live https://seenjobs.io/api/reports (which had no build detection here and could hang
 // `next build`). generateMetadata + the layout render below both go through this one helper.
-import { getScore, firstPartyReportCount, displayCompanyName, type GrowthScore } from '@/lib/growth'
+import { getScore, firstPartyReportCount, displayCompanyName, grade, type GrowthScore } from '@/lib/growth'
 import { buildCompanyFaq } from '@/lib/server/companyFaq'
 import { jsonLdHtml } from '@/lib/jsonLd'
 // Offline, numerically-grounded "What applicants report" paragraph (company_summaries). No-op when the
 // table is missing/empty or the read fails — the page renders exactly as before.
 import { getCompanySummary, summaryMonth, type CompanySummary } from '@/lib/companySummary'
+import { pageTitle, pageDescription } from '@/lib/cardCopy.js'
 
 const titleCase = (slug: string) => slug.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
 // Slug-mangled fallback only when no score row exists — the stored name keeps real punctuation
@@ -42,28 +43,30 @@ export async function generateMetadata(
   const { slug } = await params
   const s = await getScore(slug)
   const name = bestName(slug, s)
-  const ghostPct = s?.ghost_rate != null ? Math.round(s.ghost_rate * 100) : null
   // AI summaries can quote rates — only for gradeable companies (5-report grade gate).
   const summary = s?.gradeable ? await getCompanySummary(summaryKey(slug, s)) : null
 
-  // Reddit-targeted: LLM/Google searches like "<company> hiring reddit" and "does <company>
-  // ghost applicants" should land here. Real ghost % folded in when we have it. A grounded
-  // company summary (same text as the visible paragraph) takes precedence when one exists.
+  // The grounded company summary (same text as the visible paragraph) takes precedence when one
+  // exists; otherwise the one honest, specific description every share surface shares
+  // (lib/cardCopy.js): the real reply/ghost rates when graded, "nobody has graded this yet" when not.
+  const graded = !!s?.gradeable && s.overall_score != null
+  const letter = graded ? grade(s!.overall_score!) : null
   const description = summary
     ? clipSentences(summary.summary)
-    : ghostPct != null
-    ? `Does ${name} ghost applicants? ${ghostPct}% ghost rate from real applicant outcomes. See ${name}'s response time, interview rounds, and hiring reviews — aggregated from Reddit, Glassdoor, and verified job-seeker reports.`
-    : `Does ${name} ghost applicants? See ${name}'s ghost rate, response time, and hiring reviews — aggregated from Reddit, Glassdoor, and verified job-seeker reports on Seen.`
+    : pageDescription({ company: name, grade: letter, ghostRate: graded ? s?.ghost_rate : null, responseRate: graded ? s?.response_rate : null, reports: firstPartyReportCount(s) })
+  // "Walmart: Seen grade A, 13% ghost rate" / "Ledgent Technology on Seen: who replies, who ghosts".
+  // Never "Hiring Transparency Score" (owner 2026-10-24: dated wording nobody says).
+  const title = pageTitle({ company: name, grade: letter, ghostRate: graded ? s?.ghost_rate : null })
 
   return {
-    title: `${name} Ghost Rate & Hiring Reviews (Reddit + Real Reports)`,
+    title,
     description,
     keywords: [
       `${name} hiring`, `${name} ghosting`, `${name} reddit`, `does ${name} ghost applicants`,
       `${name} interview process`, `${name} hiring reviews`, `${name} glassdoor`, `${name} response time`,
     ],
     openGraph: {
-      title: `${name} — Hiring Transparency Score`,
+      title,
       description,
       type: 'website',
       siteName: 'Seen',
@@ -72,12 +75,12 @@ export async function generateMetadata(
       // rotates the og:image URL every deploy, so crawlers nearly always hit a COLD render —
       // and Reddit permanently caches "no preview" for a URL whose image misses its ~4s
       // budget. A stable URL keeps prior fetches warm across deploys.
-      images: [{ url: `/company/${slug}/og`, width: 1200, height: 630, alt: 'Hiring transparency score on Seen' }],
+      images: [{ url: `/company/${slug}/og`, width: 1200, height: 630, alt: `${name} on Seen: who replies, who ghosts` }],
     },
     twitter: {
       // summary_large_image so the dynamic 1200×630 card renders full-bleed in shares.
       card: 'summary_large_image',
-      title: `${name} Ghost Rate & Hiring Reviews`,
+      title,
       description,
       images: [`/company/${slug}/og`],
     },
