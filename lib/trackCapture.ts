@@ -54,7 +54,6 @@ export function appliedAtFromChoice(choice: AppliedChoice | string | null | unde
 }
 
 // ── The outcome emails, as api/outcome-followups.js sends them ────────────────────────────────────
-const MILESTONES = [7, 14, 30] as const
 /** lib/server/outcomeEmails.js milestoneForAge — kept in step by a test that runs both. */
 export function milestoneForAge(age: number | null): 7 | 14 | 30 | null {
   if (age == null) return null
