@@ -26,6 +26,7 @@ import { EMPLOYER_SKUS } from '../lib/server/employerSkus.js';
 import { enrichmentQueueStats } from '../lib/server/enrichmentQueue.js';
 import { pacificDate, pacificDayStart } from '../lib/time/pacific.js';
 import { recentGrants } from '../lib/server/growthRewards.js';
+import { loadAttributionReport } from '../lib/server/attributionReport.js';
 import { browsePath as browseJobsPath, nextCursor as nextJobsCursor, validatePatch as validateJobPatch, restorePatch as jobRestorePatch, isJobId, HOLDERS as JOB_HOLDERS } from '../lib/server/jobAdmin.js';
 
 // Held reports still awaiting a decision: on hold and not already rejected (rejected rows stay held,
@@ -305,6 +306,14 @@ async function _handler(req, res) {
   const sess = sessRes.ok ? (await sessRes.json())[0] : null;
   if (!sess || new Date(sess.expires_at) < new Date()) return res.status(401).json({ error: 'Session expired — log in again' });
   const adminRole = sess.role;
+
+  // ── GET ?action=signup_attribution&days=30: "Where signups come from" (lib/server/attributionReport.js).
+  // Read-only, every role. { ready: false } before migration 20261024180000_signup_attribution.sql.
+  const getAction = req.method === 'GET' ? String((req.query && req.query.action) || '') : '';
+  if (getAction === 'signup_attribution') {
+    const out = await loadAttributionReport(db, { days: req.query.days, stripeKey: process.env.STRIPE_SECRET_KEY || null });
+    return res.status(out.ok ? 200 : 502).json(out);
+  }
 
   // ── GET: dashboard stats ─────────────────────────────────────────────────────
   if (req.method === 'GET') {
