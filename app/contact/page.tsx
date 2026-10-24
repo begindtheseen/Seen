@@ -1,13 +1,15 @@
 import type { Metadata } from 'next'
+import { pageMetadata } from '@/lib/seo'
 import Link from 'next/link'
 import PageHeader from '@/components/shell/PageHeader'
 import styles from './contact.module.css'
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
   title: 'Contact',
   description: 'Email hello@seenjobs.io — a person answers within two business days.',
-  alternates: { canonical: '/contact' },
-}
+  path: '/contact',
+  ogTitle: 'Contact Seen',
+})
 
 const EMAIL = 'hello@seenjobs.io'
 

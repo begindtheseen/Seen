@@ -745,6 +745,10 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
   if (!loading && notFound) {
     return (
       <div className="page-full">
+        {/* Soft-404: the company's existence is decided client-side (api/reports.js web check), so the
+            route answers 200 — keep the "Can't verify" state out of the index. React 19 hoists this <meta>
+            into <head>. */}
+        <meta name="robots" content="noindex" />
         <div style={{ maxWidth: 600, margin: '0 auto', padding: '5rem 2rem', textAlign: 'center', width: '100%', boxSizing: 'border-box' }}>
           <div style={{ fontFamily: 'var(--mono)', fontSize: '2.5rem', marginBottom: '1rem', opacity: .4 }}>?</div>
           <h1 style={{ fontFamily: 'var(--display)', fontSize: '1.4rem', fontWeight: 800, color: 'var(--white)', marginBottom: '.6rem', letterSpacing: '-.02em' }}>
@@ -856,7 +860,7 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
               <span className="co-sticky-logo" aria-hidden>{logoLetter}</span>
               <span className="co-sticky-name">{displayName}</span>
               {graded && (
-                <span className="co-sticky-grade">
+                <span className="co-sticky-grade" role="img" aria-label={`Seen Grade ${g}, ${score.overall_score} out of 100`}>
                   <span className={`co-sticky-letter ${risk}`}>{g}</span>
                   <span className="co-sticky-score">{score.overall_score}<span>/100</span></span>
                 </span>
@@ -871,7 +875,9 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
           <div className="co-top">
             <div className="co-logo-lg">{logoLetter}</div>
             <div className="co-id">
-              <div className="co-name">
+              {/* The page's ONE h1, in the initial HTML and the accessibility tree (audit 2026-10-24: the
+                  server h1 lived inside a closed <details>, so the page had no readable heading). */}
+              <h1 className="co-name" style={{ margin: '0 0 .12rem' }}>
                 {displayName}
                 {perk.verified && (
                   <span className="co-badge co-badge-verified" title="This employer committed to responding to applicants. Reviewed against real outcome data — it never affects the transparency score.">✓ Transparency Verified</span>
@@ -879,7 +885,7 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
                 {perk.featured && (
                   <span className="co-badge co-badge-featured" title="Featured employer — paid placement. Never affects the transparency score.">★ Featured</span>
                 )}
-              </div>
+              </h1>
               <div className="co-ind">
                 {industry ? <span>{industry}</span> : null}
               </div>
@@ -926,10 +932,14 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
           ) : graded ? (
             <>
               <div className={`co-grade-bar ${risk}`}>
-                <div className={`co-grade-letter ${risk}`}>{g}</div>
+                <div className={`co-grade-letter ${risk}`} aria-hidden="true">{g}</div>
                 <div className="co-grade-main">
-                  <span className="co-grade-lbl">Seen Grade</span>
-                  <span className="co-grade-score"><Odometer value={score.overall_score} /> / 100</span>
+                  <span className="co-grade-lbl" aria-hidden="true">Seen Grade</span>
+                  {/* One sentence for assistive tech; the letter + rolling digits are presentational. */}
+                  <span className="co-grade-score">
+                    <span className="sr-only">{`Seen Grade ${g}, ${score.overall_score} out of 100`}</span>
+                    <span aria-hidden="true"><Odometer value={score.overall_score} /> / 100</span>
+                  </span>
                   {verdict && <p className="co-verdict">{verdict}</p>}
                   <div className="co-grade-meta">
                     {score.data_quality && <DataQualityBadge dq={score.data_quality} reportCount={fpReports} webCount={webEst} employeeCount={score.employee_review_count || 0} mentionCount={score.mention_count || 0} />}

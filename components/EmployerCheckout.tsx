@@ -99,9 +99,9 @@ export function EmployerCheckout() {
 
             {isOpen ? (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '.5rem' }}>
-                <input value={company} onChange={e => setCompany(e.target.value)} placeholder="Company name" style={inp} />
-                <input value={email} onChange={e => setEmail(e.target.value)} placeholder="Work email (receipt + contact)" style={inp} />
-                <input value={target} onChange={e => setTarget(e.target.value)} placeholder="Listing URL (optional)" style={inp} />
+                <input value={company} onChange={e => setCompany(e.target.value)} placeholder="Company name" aria-label="Company name" style={inp} />
+                <input value={email} onChange={e => setEmail(e.target.value)} placeholder="Work email (receipt + contact)" aria-label="Work email for the receipt and contact" type="email" autoComplete="email" style={inp} />
+                <input value={target} onChange={e => setTarget(e.target.value)} placeholder="Listing URL (optional)" aria-label="Listing URL (optional)" style={inp} />
                 {err && <div style={{ fontFamily: 'var(--mono)', fontSize: '.55rem', color: 'var(--red)' }}>{err}</div>}
                 <button onClick={() => go(sku)} disabled={busy} style={{ ...btn, opacity: busy ? .6 : 1 }}>{busy ? 'Starting…' : `Continue to payment — ${price} →`}</button>
                 <button onClick={() => { setOpen(null); setErr('') }} style={{ background: 'none', border: 'none', color: 'var(--dim)', fontFamily: 'var(--mono)', fontSize: '.55rem', cursor: 'pointer', padding: '.2rem' }}>Cancel</button>

@@ -1,4 +1,5 @@
 import type { Metadata } from 'next'
+import { pageMetadata } from '@/lib/seo'
 import Link from 'next/link'
 
 // Content Policy — how Seen sources, attributes, and stands behind the content it hosts.
@@ -8,20 +9,14 @@ import Link from 'next/link'
 // It states well-known principles (third-party content, opinion, truth) WITHOUT asserting legal
 // conclusions — a licensed attorney must confirm the posture before anyone relies on it.
 
-export const metadata: Metadata = {
-  title: 'Content Policy — How Seen Sources & Stands Behind Its Content | Seen',
+export const metadata: Metadata = pageMetadata({
+  title: 'Content Policy — How Seen Sources & Stands Behind Its Content',
   description:
     'How Seen aggregates third-party public discussion and user-submitted reports, attributes them, computes aggregate statistics, and handles disputes and corrections. Draft — pending legal review.',
-  alternates: { canonical: 'https://seenjobs.io/content-policy' },
-  openGraph: {
-    title: 'Content Policy | Seen',
-    description:
-      'How Seen sources, attributes, and stands behind its content — third-party discussion, first-hand reports, and aggregate statistics.',
-    url: 'https://seenjobs.io/content-policy',
-    type: 'website',
-    siteName: 'Seen',
-  },
-}
+  path: '/content-policy',
+  ogTitle: 'Content Policy | Seen',
+  ogDescription: 'How Seen sources, attributes, and stands behind its content — third-party discussion, first-hand reports, and aggregate statistics.',
+})
 
 const wrap = { maxWidth: 760, margin: '0 auto', padding: '4rem 2rem', width: '100%', boxSizing: 'border-box' as const }
 const h2 = { fontFamily: 'var(--display)', fontSize: '1.1rem', fontWeight: 800, color: 'var(--white)', letterSpacing: '-.02em', margin: '0 0 .65rem' } as const

@@ -11,6 +11,7 @@ import UpgradeModal from './UpgradeModal'
 import NotificationsBell from './NotificationsBell'
 import CreditsPopover from './CreditsPopover'
 import { dailyResetLabel } from '@/lib/creditRules'
+import { useFocusTrap } from '@/lib/hooks/useFocusTrap'
 import styles from './Nav.module.css'
 
 // The earn-credits flow: the résumé survey (asks about the user's past employers).
@@ -81,6 +82,10 @@ export default function Nav() {
   const primaryRef = useRef<HTMLDivElement>(null)
   const indRef = useRef<HTMLSpanElement>(null)
   const drawerCloseRef = useRef<HTMLButtonElement>(null)
+  const drawerRef = useRef<HTMLDivElement>(null)
+  // Modal contract (lib/hooks/useFocusTrap): Tab cycles inside the open drawer, focus lands on the close
+  // button, and closing returns focus to the hamburger that opened it.
+  useFocusTrap(drawerRef, menuOpen, { initialFocus: drawerCloseRef })
 
   const fetchBalance = useCallback(async () => {
     if (!isSeeker) { setCreditBalance(null); return }
@@ -132,8 +137,8 @@ export default function Nav() {
   useEffect(() => { setMenuOpen(false); setMoreOpen(false); setAcctOpen(false) }, [pathname])
 
   // Phone drawer = a modal: the page behind it must not scroll (iOS ignores body overflow:hidden,
-  // so the body is pinned at its scroll offset and restored on close), Escape closes it, and
-  // focus lands on the close button so a keyboard/screen-reader user is inside the dialog.
+  // so the body is pinned at its scroll offset and restored on close) and Escape closes it. Focus
+  // (into the dialog, trapped, returned to the opener) is the useFocusTrap call above.
   useEffect(() => {
     if (!menuOpen) return
     const body = document.body
@@ -145,7 +150,6 @@ export default function Nav() {
     body.style.overflow = 'hidden'
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setMenuOpen(false) }
     document.addEventListener('keydown', onKey)
-    drawerCloseRef.current?.focus()
     return () => {
       document.removeEventListener('keydown', onKey)
       body.style.position = prev.position
@@ -220,7 +224,9 @@ export default function Nav() {
   return (
     <>
       <nav id="mainNav" className={scrolled ? 'nav-scrolled' : ''}>
-        <button className="side-menu-toggle" onClick={() => setMenuOpen(true)} aria-label="Menu" title="Menu">☰</button>
+        {/* First focusable element on every page: jumps keyboard users past the nav to <main id="main">. */}
+        <a href="#main" className="skip-link">Skip to content</a>
+        <button className="side-menu-toggle" onClick={() => setMenuOpen(true)} aria-label="Menu" title="Menu" aria-expanded={menuOpen} aria-controls="side-menu" aria-haspopup="dialog">☰</button>
         {/* Signed-in seekers: the wordmark is "home" = the dashboard, like every signed-in product. */}
         <Link href={isSeeker ? '/dashboard' : '/'} className="logo" aria-label="Seen — home">
           <span className="logo-pulse" />
@@ -383,6 +389,8 @@ export default function Nav() {
           primary row word for word, so the three navigations read as one. */}
       <div className={`side-menu-overlay${menuOpen ? ' open' : ''}`} onClick={() => setMenuOpen(false)} aria-hidden="true" />
       <div
+        id="side-menu"
+        ref={drawerRef}
         className={`side-menu ${styles.drawer}${menuOpen ? ` open ${styles.drawerOpen}` : ''}`}
         role="dialog"
         aria-modal="true"

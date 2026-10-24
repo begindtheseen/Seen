@@ -176,6 +176,7 @@ export default function CompaniesPage() {
             <input
               type="text"
               placeholder="Look up any company — Google, Stripe, Tesla..."
+              aria-label="Look up a company"
               value={lookup}
               onChange={(e) => { setLookup(e.target.value); setShowLookupSuggs(true) }}
               onFocus={(e) => { e.currentTarget.style.borderColor = 'var(--blue)'; setShowLookupSuggs(true) }}
@@ -265,6 +266,7 @@ export default function CompaniesPage() {
           <input
             type="text"
             placeholder="Filter scoreboard..."
+            aria-label="Filter the scoreboard"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             onFocus={(e) => (e.currentTarget.style.borderColor = 'var(--blue)')}

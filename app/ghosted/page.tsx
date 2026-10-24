@@ -1,4 +1,5 @@
 import type { Metadata } from 'next'
+import { pageMetadata } from '@/lib/seo'
 import Link from 'next/link'
 
 // Niche landing page for people who just got ghosted (the r/recruitinghell audience):
@@ -7,28 +8,18 @@ import Link from 'next/link'
 
 export const revalidate = 3600
 
-export const metadata: Metadata = {
-  title: 'Been Ghosted? Make It Count | Seen',
+export const metadata: Metadata = pageMetadata({
+  title: 'Been Ghosted? Make It Count',
   description:
     'Ghosted after an application or interview? Report it in 2 minutes — anonymously. Your report updates a live ghost index of companies and staffing agencies, so the next applicant checks before they apply.',
   keywords: [
     'ghosted after interview', 'ghosted by recruiter', 'job application ghosted',
     'ghosted after final round', 'report ghosting', 'company ghosted me', 'staffing agency ghosted me',
   ],
-  alternates: { canonical: 'https://seenjobs.io/ghosted' },
-  openGraph: {
-    title: 'Been ghosted? Make it count.',
-    description: 'Report it in 2 minutes, anonymously. Your report updates a live ghost index the next applicant checks before applying.',
-    url: 'https://seenjobs.io/ghosted',
-    type: 'website',
-    siteName: 'Seen',
-  },
-  twitter: {
-    card: 'summary_large_image',
-    title: 'Been ghosted? Make it count.',
-    description: 'Report it in 2 minutes, anonymously — and put it on the record.',
-  },
-}
+  path: '/ghosted',
+  ogTitle: 'Been ghosted? Make it count.',
+  ogDescription: 'Report it in 2 minutes, anonymously. Your report updates a live ghost index the next applicant checks before applying.',
+})
 
 const wrap = { maxWidth: 720, margin: '0 auto', padding: '4rem 1.25rem 5rem', width: '100%', boxSizing: 'border-box' as const }
 

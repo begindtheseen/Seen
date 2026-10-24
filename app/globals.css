@@ -1,4 +1,19 @@
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+/* Metric-matched local fallbacks for the three Google fonts (CLS fix, audit 2026-10-24). With plain
+   `display=swap` the hero h1 reflowed from 140px to 211px the moment Syne arrived — one layout shift
+   of 0.308 on every cold homepage load (Playwright LayoutShift observer; 0.000 with fonts blocked).
+   Each face scales Arial / Liberation Sans (metric twins) to the real font's average advance width so
+   the fallback text occupies the same lines before the swap. Numbers come from the actual font files
+   (fontkit, same English sample for every face, against LiberationSans-Regular / LiberationMono-Regular):
+   Syne's weights differ enormously in width (400 = 97%, 800 = 176% of Arial), so each weight range
+   gets its own face; the browser picks by the requested font-weight. Recompute if a font is swapped. */
+@font-face{font-family:'Syne Fallback';font-weight:100 449;src:local('Arial'),local('Liberation Sans'),local('Helvetica');size-adjust:97.40%;ascent-override:94.97%;descent-override:28.24%;line-gap-override:0%}
+@font-face{font-family:'Syne Fallback';font-weight:450 549;src:local('Arial'),local('Liberation Sans'),local('Helvetica');size-adjust:104.93%;ascent-override:88.15%;descent-override:26.21%;line-gap-override:0%}
+@font-face{font-family:'Syne Fallback';font-weight:550 649;src:local('Arial'),local('Liberation Sans'),local('Helvetica');size-adjust:112.80%;ascent-override:82.00%;descent-override:24.38%;line-gap-override:0%}
+@font-face{font-family:'Syne Fallback';font-weight:650 749;src:local('Arial'),local('Liberation Sans'),local('Helvetica');size-adjust:121.77%;ascent-override:75.96%;descent-override:22.58%;line-gap-override:0%}
+@font-face{font-family:'Syne Fallback';font-weight:750 900;src:local('Arial'),local('Liberation Sans'),local('Helvetica');size-adjust:175.77%;ascent-override:52.63%;descent-override:15.65%;line-gap-override:0%}
+@font-face{font-family:'Instrument Sans Fallback';src:local('Arial'),local('Liberation Sans'),local('Helvetica');size-adjust:101.42%;ascent-override:95.64%;descent-override:24.65%;line-gap-override:0%}
+@font-face{font-family:'DM Mono Fallback';src:local('Courier New'),local('Liberation Mono'),local('Menlo');size-adjust:99.98%;ascent-override:99.22%;descent-override:31.01%;line-gap-override:0%}
 :root{
   --ink:#02040a;--void:#05070f;--surface:#0c0f1a;--card:rgba(255,255,255,0.03);--raised:rgba(255,255,255,0.05);
   --line:rgba(255,255,255,0.08);--line2:rgba(255,255,255,0.12);
@@ -19,9 +34,9 @@
   /* Gradient stops — used across buttons, fills, text */
   --g-start:#1d4ed8;--g-mid:#7c3aed;--g-end:#a855f7;
   --g-text-start:#a5b4fc;--g-text-mid:#c084fc;--g-text-end:#e879f9;
-  --display:'Syne',sans-serif;
-  --mono:'DM Mono',monospace;
-  --body:'Instrument Sans',sans-serif;
+  --display:'Syne','Syne Fallback',sans-serif;
+  --mono:'DM Mono','DM Mono Fallback',monospace;
+  --body:'Instrument Sans','Instrument Sans Fallback',sans-serif;
   /* Type-floor tokens: each is the desktop size it is named after (rem of the 16px root). On phones
      (≤768px) every one becomes the 12px reading floor — see PHONE FLOORS at the end of this file.
      Inline TSX sizes under 12px use these (fontSize: 'var(--fs-55)'), never a bare '.55rem'. */
@@ -33,7 +48,23 @@ html{scroll-behavior:smooth;overflow-x:hidden;-webkit-text-size-adjust:100%;text
 body{background:var(--ink);background-image:radial-gradient(ellipse at 30% 0%,rgba(99,102,241,0.07) 0%,transparent 50%),radial-gradient(ellipse at 80% 100%,rgba(124,58,237,0.05) 0%,transparent 50%);color:var(--text);font-family:var(--body);font-size:15px;line-height:1.6;overflow-x:hidden;-webkit-font-smoothing:antialiased;width:100%;max-width:100%;min-height:100dvh;display:flex;flex-direction:column}
 /* Sticky-footer shell: page content fills the viewport so the footer always sits at the
    bottom with no dead scroll space, even on short pages. */
-.site-main{flex:1 0 auto;display:flex;flex-direction:column;width:100%;min-width:0}
+/* min-height = one viewport: client-rendered pages (/companies, /pricing, every signed-in screen) used to
+   paint the footer inside the first screen and then push it out when their data arrived — CLS 0.31–0.33
+   from the footer alone (audit 2026-10-24). With the footer always below the fold, late content never moves
+   anything the visitor can see. The fixed 58px nav overlays the top, so no subtraction. */
+.site-main{flex:1 0 auto;display:flex;flex-direction:column;width:100%;min-width:0;min-height:100vh;min-height:100dvh}
+.site-main:focus{outline:none}
+/* Visually hidden, still read by assistive tech (Odometer values, the company-page grade sentence, labels). */
+.sr-only{position:absolute!important;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0 0 0 0);clip-path:inset(50%);white-space:nowrap;border:0}
+/* "Skip to content" — the first focusable element in the nav; invisible until it has keyboard focus. */
+.skip-link{position:fixed;top:.6rem;left:.6rem;z-index:10000;transform:translateY(-200%);opacity:0;padding:.7rem 1rem;border-radius:9px;background:#0e111c;color:var(--white);border:1px solid rgba(129,140,248,.6);font-family:var(--mono);font-size:.78rem;text-decoration:none;transition:transform .15s ease,opacity .15s ease}
+.skip-link:focus,.skip-link:focus-visible{transform:none;opacity:1;outline:2px solid rgba(129,140,248,.9);outline-offset:2px}
+@media(prefers-reduced-motion:reduce){.skip-link{transition:none}}
+/* Unclassed anchors in prose (FAQ/contact/legal mail links, "Tell us"): the UA default blue measured 2.18:1 on
+   the page background (audit 2026-10-24). --blue is 5.6:1 on --ink. The ≤768px block further down gives the same
+   selector its 44px tap box. */
+.site-main a:not([class]){color:var(--blue);text-decoration:underline;text-decoration-color:rgba(59,130,246,.45);text-underline-offset:.14em}
+.site-main a:not([class]):hover{text-decoration-color:var(--blue)}
 /* Phone tab bar (components/shell/TabBar) — pages and the footer leave room for it; the bottom toast rides above it. */
 @media(max-width:768px){html.tabbar .site-main{padding-bottom:calc(64px + env(safe-area-inset-bottom,0px))}html.tabbar footer{padding-bottom:calc(1.2rem + 64px + env(safe-area-inset-bottom,0px))!important}html.tabbar .toast{bottom:calc(80px + env(safe-area-inset-bottom,0px))}}
 
@@ -330,7 +361,7 @@ nav.nav-scrolled{background:rgba(6,6,8,0.82);backdrop-filter:blur(60px) saturate
 .side-menu-item .side-menu-icon{font-size:1rem;width:20px;text-align:center;flex-shrink:0}
 .side-menu-label{font-family:var(--mono);font-size:.5rem;text-transform:uppercase;letter-spacing:.14em;color:var(--dim);padding:1rem 1.25rem .35rem}
 .side-menu-label:first-of-type{padding-top:.5rem}
-.side-menu-toggle{background:none;border:none;color:var(--sub);cursor:pointer;padding:.35rem;font-size:1.1rem;display:flex;align-items:center;justify-content:center;border-radius:6px;transition:all .15s}
+.side-menu-toggle{background:none;border:none;color:var(--sub);cursor:pointer;padding:.35rem;min-width:44px;min-height:44px;font-size:1.1rem;display:flex;align-items:center;justify-content:center;border-radius:6px;transition:all .15s}
 .side-menu-toggle:hover{color:var(--white);background:var(--raised)}
 .feat-sec{padding:4rem 1.5rem;max-width:1200px;margin:0 auto}
 .feat-hdr{display:flex;align-items:flex-end;justify-content:space-between;margin-bottom:1.5rem}
@@ -1139,7 +1170,7 @@ details[open] .dt-chev{transform:rotate(180deg)}
 }
 
 /* ── MOBILE SIDE MENU (ported from original) ── */
-.side-menu-toggle{display:none;background:none;border:none;color:var(--sub);cursor:pointer;padding:.35rem;font-size:1.25rem;align-items:center;justify-content:center;border-radius:6px;transition:all .15s;flex-shrink:0;margin-right:.25rem}
+.side-menu-toggle{display:none;background:none;border:none;color:var(--sub);cursor:pointer;padding:.35rem;min-width:44px;min-height:44px;font-size:1.25rem;align-items:center;justify-content:center;border-radius:6px;transition:all .15s;flex-shrink:0;margin-right:.25rem}
 .side-menu-toggle:hover{color:var(--white);background:var(--raised)}
 .side-menu{position:fixed;left:0;top:0;bottom:0;width:270px;max-width:82vw;background:var(--void);border-right:1px solid var(--line);z-index:9100;transform:translateX(-100%);transition:transform .25s ease;display:flex;flex-direction:column;padding:1.5rem 0;overflow-y:auto}
 .side-menu.open{transform:translateX(0)}

@@ -1,4 +1,5 @@
 import type { Metadata } from 'next'
+import { pageMetadata } from '@/lib/seo'
 import Link from 'next/link'
 
 // Terms of Service — DRAFT for the owner's attorney to review.
@@ -7,20 +8,13 @@ import Link from 'next/link'
 // employer/portal terms, subscriptions/billing (Stripe), IP, liability limits, indemnity, and changes.
 // Governing law / venue / arbitration are left as [PLACEHOLDER] — do not invent a jurisdiction.
 
-export const metadata: Metadata = {
-  title: 'Terms of Service | Seen',
+export const metadata: Metadata = pageMetadata({
+  title: 'Terms of Service',
   description:
     'The terms for using Seen: eligibility, acceptable use, that data is informational and user- and third-party-sourced, no warranty of accuracy, disputes, employer terms, subscriptions, and liability limits. Draft — pending legal review.',
-  alternates: { canonical: 'https://seenjobs.io/terms' },
-  openGraph: {
-    title: 'Terms of Service | Seen',
-    description:
-      'Eligibility, acceptable use, informational-data disclaimer, disputes, employer terms, subscriptions, and liability limits.',
-    url: 'https://seenjobs.io/terms',
-    type: 'website',
-    siteName: 'Seen',
-  },
-}
+  path: '/terms',
+  ogDescription: 'Eligibility, acceptable use, informational-data disclaimer, disputes, employer terms, subscriptions, and liability limits.',
+})
 
 const wrap = { maxWidth: 760, margin: '0 auto', padding: '4rem 2rem', width: '100%', boxSizing: 'border-box' as const }
 const h2 = { fontFamily: 'var(--display)', fontSize: '1.1rem', fontWeight: 800, color: 'var(--white)', letterSpacing: '-.02em', margin: '0 0 .65rem' } as const

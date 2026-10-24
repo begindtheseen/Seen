@@ -106,6 +106,7 @@ export function EmployerListings() {
             onChange={e => setName(e.target.value)}
             onKeyDown={e => { if (e.key === 'Enter') look() }}
             placeholder="Your company name (as it appears on the listing)"
+            aria-label="Your company name, as it appears on the listing"
             style={{ flex: 1, minWidth: 220, background: 'var(--raised)', border: '1px solid var(--line2)', borderRadius: 9, padding: '.7rem .9rem', ...mono('.75rem', 'var(--white)'), outline: 'none' }}
           />
           <button onClick={look} disabled={loading || !name.trim()} style={{ background: 'linear-gradient(135deg,#1d4ed8,#7c3aed)', border: 'none', borderRadius: 9, padding: '.7rem 1.4rem', fontFamily: 'var(--display)', fontWeight: 800, fontSize: '.8rem', color: '#fff', cursor: 'pointer', opacity: loading ? .6 : 1 }}>

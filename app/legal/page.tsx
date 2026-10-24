@@ -1,3 +1,13 @@
+import type { Metadata } from 'next'
+import { pageMetadata } from '@/lib/seo'
+
+export const metadata: Metadata = pageMetadata({
+  title: 'Legal & Privacy',
+  description:
+    'Seen’s terms of service, Section 230 notice, scores and data disclaimer, privacy policy, subscription terms, CCPA/GDPR rights, dispute process and content guidelines, on one page.',
+  path: '/legal',
+})
+
 export default function LegalPage() {
   const sections = [
     {

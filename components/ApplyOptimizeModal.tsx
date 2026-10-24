@@ -1,6 +1,7 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
+import { useFocusTrap } from '@/lib/hooks/useFocusTrap'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/lib/auth'
 import { aiHeaders } from '@/lib/aiHeaders'
@@ -167,6 +168,10 @@ export default function ApplyOptimizeModal({
 }) {
   const router = useRouter()
   const { isLoggedIn, user, profile } = useAuth()
+  const sheetRef = useRef<HTMLDivElement>(null)
+  // Tab stays in the sheet (a stacked CreditConfirmDialog/UpgradeModal takes over while it is up);
+  // closing returns focus to the Apply button that opened it.
+  useFocusTrap(sheetRef, true)
   const [step, setStep] = useState<Step>('loading-resume')
   const [resumeText, setResumeText] = useState('')
   const [result, setResult] = useState<OptimizeResult | null>(null)
@@ -557,7 +562,7 @@ export default function ApplyOptimizeModal({
     )}
     <ModalPortal>
     <div style={overlay} onClick={onClose}>
-      <div style={sheet} onClick={e => e.stopPropagation()}>
+      <div ref={sheetRef} role="dialog" aria-modal="true" aria-label={title} style={sheet} onClick={e => e.stopPropagation()}>
         {/* Header — the job posting link lives here so it is visible above the fold on every step. */}
         <div style={sheetHdr}>
           <div style={{ minWidth: 0 }}>

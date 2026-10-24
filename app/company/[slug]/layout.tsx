@@ -237,7 +237,7 @@ export default async function CompanySlugLayout(
             }}
           >
             {hasFacts && s && (<>
-            <h1
+            <h2
               style={{
                 fontFamily: 'var(--display)',
                 fontSize: '1.05rem',
@@ -249,7 +249,7 @@ export default async function CompanySlugLayout(
               }}
             >
               {name} hiring data — Seen Grade {s.overall_score}/100
-            </h1>
+            </h2>
             <p
               style={{
                 fontSize: '.86rem',

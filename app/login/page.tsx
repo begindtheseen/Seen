@@ -252,18 +252,21 @@ function LoginContent() {
 
         {expiredNotice && <div className={styles.notice} role="status">{SESSION_EXPIRED_MESSAGE}</div>}
 
-        {/* Error */}
-        {error && (
-          <div style={{ background: 'var(--rdim)', border: '1px solid rgba(239,68,68,0.25)', borderRadius: 8, padding: '.72rem 1rem', fontFamily: 'var(--mono)', fontSize: '.72rem', color: 'var(--red)', marginBottom: '1rem', textAlign: 'center' }}>
-            {error}
-          </div>
-        )}
+        {/* Error — rendered INSIDE an always-present live region so assistive tech announces it the
+            moment it appears (audit 2026-10-24: the message sat outside the empty role="alert"). */}
+        <div role="alert" aria-live="assertive" aria-atomic="true">
+          {error && (
+            <div style={{ background: 'var(--rdim)', border: '1px solid rgba(239,68,68,0.25)', borderRadius: 8, padding: '.72rem 1rem', fontFamily: 'var(--mono)', fontSize: '.72rem', color: 'var(--red)', marginBottom: '1rem', textAlign: 'center' }}>
+              {error}
+            </div>
+          )}
+        </div>
 
         {/* ── STEP: WHO ── */}
         {step === 'who' && (
           <div>
             <div style={{ textAlign: 'center', marginBottom: '1.75rem' }}>
-              <div style={{ fontFamily: 'var(--display)', fontSize: '1.5rem', fontWeight: 800, color: 'var(--white)', letterSpacing: '-.025em', marginBottom: '.35rem' }}>Who are you?</div>
+              <h1 style={{ fontFamily: 'var(--display)', fontSize: '1.5rem', fontWeight: 800, color: 'var(--white)', letterSpacing: '-.025em', margin: '0 0 .35rem' }}>Who are you?</h1>
               <div style={{ fontSize: '.85rem', color: 'var(--sub)', fontWeight: 300 }}>Pick one to get started</div>
             </div>
             {!EMPLOYER_SIGNUP_ENABLED && cameAsEmployer && (
@@ -303,7 +306,7 @@ function LoginContent() {
         {step === 'email' && (
           <div>
             {backBtn('who')}
-            <div style={{ fontFamily: 'var(--display)', fontSize: '1.4rem', fontWeight: 800, color: 'var(--white)', letterSpacing: '-.025em', marginBottom: '.2rem' }}>Create your account</div>
+            <h1 style={{ fontFamily: 'var(--display)', fontSize: '1.4rem', fontWeight: 800, color: 'var(--white)', letterSpacing: '-.025em', margin: '0 0 .2rem' }}>Create your account</h1>
             <div style={{ fontSize: '.82rem', color: 'var(--sub)', fontWeight: 300, marginBottom: '1.5rem' }}>Free forever for job seekers</div>
             <div style={{ marginBottom: '.85rem' }}>
               {label('First name', 'su-name')}
@@ -321,7 +324,7 @@ function LoginContent() {
         {step === 'password' && (
           <div>
             {backBtn('email')}
-            <div style={{ fontFamily: 'var(--display)', fontSize: '1.4rem', fontWeight: 800, color: 'var(--white)', letterSpacing: '-.025em', marginBottom: '.2rem' }}>Set a password</div>
+            <h1 style={{ fontFamily: 'var(--display)', fontSize: '1.4rem', fontWeight: 800, color: 'var(--white)', letterSpacing: '-.025em', margin: '0 0 .2rem' }}>Set a password</h1>
             <div style={{ fontSize: '.82rem', color: 'var(--sub)', fontWeight: 300, marginBottom: '1.5rem' }}>Make it something you&apos;ll remember</div>
             <div style={{ marginBottom: '1.25rem' }}>
               {label('Password', 'su-pw')}
@@ -344,7 +347,7 @@ function LoginContent() {
         {step === 'verify' && (
           <div style={{ textAlign: 'center' }}>
             <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>📬</div>
-            <div style={{ fontFamily: 'var(--display)', fontSize: '1.4rem', fontWeight: 800, color: 'var(--white)', letterSpacing: '-.025em', marginBottom: '.5rem' }}>Check your email</div>
+            <h1 style={{ fontFamily: 'var(--display)', fontSize: '1.4rem', fontWeight: 800, color: 'var(--white)', letterSpacing: '-.025em', margin: '0 0 .5rem' }}>Check your email</h1>
             <div style={{ fontSize: '.85rem', color: 'var(--sub)', fontWeight: 300, lineHeight: 1.7, marginBottom: '1.25rem' }}>
               We sent a verification link to<br />
               <strong style={{ color: 'var(--white)' }}>{verifyEmail}</strong>
@@ -371,7 +374,7 @@ function LoginContent() {
         {step === 'signin' && (
           <div>
             {backBtn('who')}
-            <div style={{ fontFamily: 'var(--display)', fontSize: '1.4rem', fontWeight: 800, color: 'var(--white)', letterSpacing: '-.025em', marginBottom: '.2rem' }}>Welcome back</div>
+            <h1 style={{ fontFamily: 'var(--display)', fontSize: '1.4rem', fontWeight: 800, color: 'var(--white)', letterSpacing: '-.025em', margin: '0 0 .2rem' }}>Welcome back</h1>
             <div style={{ fontSize: '.82rem', color: 'var(--sub)', fontWeight: 300, marginBottom: '1.5rem' }}>Sign in to your account</div>
             <div style={{ marginBottom: '.85rem' }}>
               {label('Email', 'si-email')}
