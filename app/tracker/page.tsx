@@ -28,6 +28,7 @@ import { splitOpenDuplicates } from '@/lib/stores/applicationDupes'
 import s from '@/components/tracker/tracker.module.css'
 import { LoadError, PageSkeleton } from '@/components/shell/LoadStates'
 import { loginHref } from '@/lib/safeHref.js'
+import { showToast } from '@/lib/toast'
 const SurveyModal = dynamic(() => import('@/components/SurveyModal'), { ssr: false })
 const ResumeSurveyModal = dynamic(() => import('@/components/ResumeSurveyModal'), { ssr: false })
 
@@ -416,8 +417,14 @@ function TrackerPage() {
       .catch(() => {})
   }, [apps])
 
+  // The server answered "no such application for this account" (removed on another device): the
+  // store already dropped the local copy; say so once and show the account's real list.
+  const REMOVED_ELSEWHERE = 'That application was removed on another device — your list is up to date.'
+
   const handleUpdate = async (id: string, changes: Partial<Application>) => {
-    await AppStore.update(id, changes, isLoggedIn)
+    const r = await AppStore.update(id, changes, isLoggedIn)
+    // Never a community report or an outcome card for a row that no longer exists.
+    if (r.reason === 'not_found') { showToast(REMOVED_ELSEWHERE); await loadApps(); return }
     // The ONE community report per terminal outcome (hired included — "Got the job" never reached
     // the company's score before). A withdrawal is the applicant's move, not the company's: no report.
     if (changes.status === 'ghosted' || changes.status === 'rejected' || changes.status === 'hired') {
@@ -534,7 +541,8 @@ function TrackerPage() {
   const handleEditSave = async (values: FormValues) => {
     if (!editing) return
     const changes = editChanges(editing, values)
-    if (Object.keys(changes).length) await AppStore.update(editing.id, changes, isLoggedIn)
+    const r = Object.keys(changes).length ? await AppStore.update(editing.id, changes, isLoggedIn) : null
+    if (r?.reason === 'not_found') showToast(REMOVED_ELSEWHERE)
     setEditing(null)
     await loadApps()
   }

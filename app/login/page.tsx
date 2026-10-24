@@ -6,7 +6,7 @@ import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/lib/auth'
 import { SESSION_EXPIRED_MESSAGE, clearSessionExpiredNotice, wasSessionExpiredRecently } from '@/lib/sessionExpired'
 import { internalPath } from '@/lib/safeHref.js'
-import { savePendingSignup, readPendingSignup, clearPendingSignup, isEmailThrottle, signupConfirmed } from '@/lib/pendingSignup.js'
+import { savePendingSignup, readPendingSignup, clearPendingSignup, markPendingSignin, isEmailThrottle, signupConfirmed } from '@/lib/pendingSignup.js'
 import styles from './login.module.css'
 
 // "Check your email" auto-detects the click: poll while the tab is visible, every 5 s, for at
@@ -18,6 +18,18 @@ const VERIFY_POLL_MAX = 60
 // letting someone hammer the form with the same generic error, audit 2026-10-24 M4).
 const SIGNIN_FAILS_BEFORE_COOLDOWN = 5
 const SIGNIN_COOLDOWN_MS = 30_000
+// The count and the cooldown survive a reload of this tab (sessionStorage) — a refresh is not a reset.
+const SIGNIN_THROTTLE_KEY = 'seen_signin_throttle'
+function readThrottle(): { fails: number; until: number } {
+  try {
+    const v = JSON.parse(sessionStorage.getItem(SIGNIN_THROTTLE_KEY) || 'null')
+    if (v && typeof v.fails === 'number' && typeof v.until === 'number') return v
+  } catch { /* blocked storage */ }
+  return { fails: 0, until: 0 }
+}
+function writeThrottle(fails: number, until: number) {
+  try { if (!fails && !until) sessionStorage.removeItem(SIGNIN_THROTTLE_KEY); else sessionStorage.setItem(SIGNIN_THROTTLE_KEY, JSON.stringify({ fails, until })) } catch { /* ignore */ }
+}
 
 /** Supabase's answer to a correct password on an unconfirmed address (`email_not_confirmed`, 400).
  *  Projects that return `invalid_credentials` for the same case cannot be told apart from a wrong
@@ -107,13 +119,18 @@ function LoginContent() {
     const tick = () => {
       const left = Math.max(0, Math.ceil((cooldownUntil - Date.now()) / 1000))
       setCooldownLeft(left)
-      if (left === 0) { setCooldownUntil(0); setSigninFails(0); setError('') }
+      if (left === 0) { setCooldownUntil(0); setSigninFails(0); writeThrottle(0, 0); setError('') }
     }
     tick()
     const id = setInterval(tick, 500)
     return () => clearInterval(id)
   }, [cooldownUntil])
   const coolingDown = cooldownUntil > 0 && cooldownLeft > 0
+  useEffect(() => {
+    const t = readThrottle()
+    if (t.until > Date.now()) { setSigninFails(t.fails); setCooldownUntil(t.until); setError('Too many attempts.') }
+    else if (t.fails) setSigninFails(t.fails)
+  }, [])
 
   useEffect(() => { setExpiredNotice(wasSessionExpiredRecently()) }, [])
 
@@ -124,7 +141,7 @@ function LoginContent() {
   useEffect(() => {
     if (cameAsEmployer) return
     const pending = readPendingSignup()
-    if (!pending) return
+    if (!pending || pending.stage !== 'verify') return
     setEmail(pending.email); setVerifyEmail(pending.email); setVerifyUid(pending.uid)
     if (pending.type === 'employer' && EMPLOYER_SIGNUP_ENABLED) setSignupType('employer')
     setStep('verify')
@@ -300,8 +317,8 @@ function LoginContent() {
     setLoading(false)
     if (err) {
       if (unconfirmed) {
-        // The password was right — the address just has not been confirmed. Do not call it wrong
-        // (that sent people to reset a working password; audit 2026-10-24 M1).
+        // The address has not been confirmed: that is the one thing to do next, so say it instead of
+        // "wrong password" (which sent people to reset a working one; audit 2026-10-24 M1).
         setUnconfirmedEmail(email.trim())
         setError('')
         return
@@ -309,14 +326,16 @@ function LoginContent() {
       const fails = signinFails + 1
       setSigninFails(fails)
       if (fails >= SIGNIN_FAILS_BEFORE_COOLDOWN) {
-        setCooldownUntil(Date.now() + SIGNIN_COOLDOWN_MS)
+        const until = Date.now() + SIGNIN_COOLDOWN_MS
+        setCooldownUntil(until); writeThrottle(fails, until)
         setError(`Too many attempts — wait ${SIGNIN_COOLDOWN_MS / 1000} seconds, then try again. Forgot it? Use “Forgot password?” below.`)
         return
       }
+      writeThrottle(fails, 0)
       setError('Incorrect email or password.')
       return
     }
-    setSigninFails(0)
+    setSigninFails(0); writeThrottle(0, 0)
     clearPendingSignup()
     clearSessionExpiredNotice()
     // Route employers straight to their dashboard. Employer-ness comes from the account's own signup
@@ -528,7 +547,7 @@ function LoginContent() {
             <button type="button" className={`${styles.linkBtn} ${styles.linkDim}`} onClick={() => { clearPendingSignup(); setVerifyUid(null); setNotice(''); setEmail(''); setPassword(''); setStep('email') }}>
               Use a different email
             </button>
-            <button type="button" className={`${styles.linkBtn} ${styles.linkDim}`} onClick={() => { clearPendingSignup(); setVerifyUid(null); setNotice(''); clearError(); setEmail(verifyEmail); setPassword(''); setStep('signin') }}>
+            <button type="button" className={`${styles.linkBtn} ${styles.linkDim}`} onClick={() => { markPendingSignin(); setVerifyUid(null); setNotice(''); clearError(); setEmail(verifyEmail); setPassword(''); setStep('signin') }}>
               Sign in instead
             </button>
           </div>
