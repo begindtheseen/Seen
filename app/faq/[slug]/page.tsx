@@ -1,4 +1,5 @@
 import type { Metadata } from 'next'
+import { pageMetadata } from '@/lib/seo'
 import Link from 'next/link'
 import {
   getScore, titleCase, slugify, grade, riskColor, riskLabel, pct, firstPartyReportCount,
@@ -49,7 +50,7 @@ export async function generateMetadata(
 ): Promise<Metadata> {
   const { slug } = await params
   const parsed = parseSlug(slug)
-  if (!parsed) return { title: 'Hiring FAQ — Seen' }
+  if (!parsed) return pageMetadata({ title: 'Hiring FAQ', description: 'Frequently asked questions about how companies hire, from real applicant reports.', path: '/faq' })
   const name = titleCase(parsed.company)
   const s = await getScore(parsed.company)
   const ghostPct = pct(s?.ghost_rate)
@@ -63,23 +64,17 @@ export async function generateMetadata(
           ? `${name} ghosts roughly ${ghostPct}% of applicants based on real reported outcomes. See ${name}'s response rate, average wait time, and what Reddit says before you apply.`
           : `Seen estimates ${name} ghosts roughly ${ghostPct}% of applicants, from aggregated public hiring data — no applicant reports yet. See the estimate and add your own experience.`)
       : `Does ${name} ghost applicants? See real reported hiring outcomes, response rates, and wait times — and add your own experience.`
-    return {
-      title, description,
+    return pageMetadata({
+      title, description, path: url, ogTitle: title, type: 'article',
       keywords: [`does ${name} ghost applicants`, `${name} ghosting`, `${name} no response`, `${name} reddit hiring`, `is ${name} ghosting candidates`],
-      openGraph: { title, description, url, type: 'article', siteName: 'Seen' },
-      twitter: { card: 'summary_large_image', title, description },
-      alternates: { canonical: url },
-    }
+    })
   }
   const title = `${name} Hiring Process: Stages, Wait Time & Ghost Rate`
   const description = `How ${name}'s hiring process works — stages, average wait time${ghostPct != null ? `, and a ${ghostPct}% ${reported ? '' : 'estimated '}ghost rate` : ''} — ${reported ? 'from real applicant reports' : 'estimated from aggregated public hiring data'}. What to expect before you apply.`
-  return {
-    title, description,
+  return pageMetadata({
+    title, description, path: url, ogTitle: title, type: 'article',
     keywords: [`${name} hiring process`, `${name} interview process`, `${name} application timeline`, `how long does ${name} take to respond`, `${name} hiring stages`],
-    openGraph: { title, description, url, type: 'article', siteName: 'Seen' },
-    twitter: { card: 'summary_large_image', title, description },
-    alternates: { canonical: url },
-  }
+  })
 }
 
 const S = {

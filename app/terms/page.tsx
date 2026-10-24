@@ -1,4 +1,5 @@
 import type { Metadata } from 'next'
+import { pageMetadata } from '@/lib/seo'
 import Link from 'next/link'
 import { PRO_TRIAL_DAYS, ONE_TIME_SKUS } from '@/lib/server/creditRules.js'
 import { EMPLOYER_SKUS } from '@/lib/server/employerSkus.js'
@@ -13,21 +14,14 @@ import { DraftNote, Placeholder, LegalFooter, LEGAL_CONTACT } from '@/components
 // invent a jurisdiction. Every price, trial length and credit grant renders from the constants the
 // server charges and fulfils with (lib/server/creditRules.js, lib/server/employerSkus.js).
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
   title: 'Terms of Service',
   description:
     'The terms for using Seen: eligibility, acceptable use, that data is informational and user- and third-party-sourced, no warranty of accuracy, disputes, employer products, subscriptions, one-time purchases, and liability limits.',
-  alternates: { canonical: 'https://seenjobs.io/terms' },
-  openGraph: {
-    title: 'Terms of Service | Seen',
-    description:
-      'Eligibility, acceptable use, informational-data disclaimer, disputes, employer products, subscriptions, one-time purchases, and liability limits.',
-    url: 'https://seenjobs.io/terms',
-    type: 'website',
-    siteName: 'Seen',
-    images: ['/opengraph-image'],
-  },
-}
+  path: '/terms',
+  ogTitle: 'Terms of Service | Seen',
+  ogDescription: 'Eligibility, acceptable use, informational-data disclaimer, disputes, employer products, subscriptions, one-time purchases, and liability limits.',
+})
 
 const wrap = { maxWidth: 760, margin: '0 auto', padding: '4rem 2rem', width: '100%', boxSizing: 'border-box' as const }
 const h2 = { fontFamily: 'var(--display)', fontSize: '1.1rem', fontWeight: 800, color: 'var(--white)', letterSpacing: '-.02em', margin: '0 0 .65rem' } as const

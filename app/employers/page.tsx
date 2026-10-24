@@ -1,4 +1,5 @@
 import type { Metadata } from 'next'
+import { pageMetadata } from '@/lib/seo'
 import Reveal from '@/components/Reveal'
 import { EmployerNav, EmployerFooter } from '@/components/employer/EmployerNav'
 import { EmployerCheckout, EmployerPurchaseConfirm } from '@/components/EmployerCheckout'
@@ -16,13 +17,14 @@ import { EmployerSurfaces } from '@/components/employer/EmployerSurfaces'
 // checkout writes only to the employer-namespaced tables (employer_purchases / employer_perks), so
 // employer activity can never mix into seeker data.
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
   title: 'Seen for Employers — Hire people who actually show up',
   description:
     'See your hiring reputation the way candidates do — your ghost rate, response rate, and Seen grade — then get in front of ready-to-apply candidates with Featured placement and the Transparency Verified badge.',
-  alternates: { canonical: 'https://seenjobs.io/employers' },
-  openGraph: { title: 'Seen for Employers', description: 'Hire people who actually show up. See your reputation, reach candidates, prove you respond.', url: 'https://seenjobs.io/employers', type: 'website', siteName: 'Seen' },
-}
+  path: '/employers',
+  ogTitle: 'Seen for Employers',
+  ogDescription: 'Hire people who actually show up. See your reputation, reach candidates, prove you respond.',
+})
 
 const wrap = { maxWidth: 900, margin: '0 auto', padding: '0 1.5rem', width: '100%', boxSizing: 'border-box' as const }
 

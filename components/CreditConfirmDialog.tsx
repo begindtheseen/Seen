@@ -5,7 +5,8 @@
 // (#0e111c — never translucent over content, per the 2026-10-19 overlay rule), sits above
 // every drawer/modal, and reads the live balance so N is never a guess.
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import { useFocusTrap } from '@/lib/hooks/useFocusTrap'
 import { useAuth } from '@/lib/auth'
 import { aiHeaders } from '@/lib/aiHeaders'
 import { creditCostLabel, dailyResetLabel } from '@/lib/creditRules'
@@ -22,6 +23,8 @@ export default function CreditConfirmDialog({ cost = 1, action, onConfirm, onCan
   const { user } = useAuth()
   const [balance, setBalance] = useState<number | null>(null)
   const [pro, setPro] = useState(false)
+  const boxRef = useRef<HTMLDivElement>(null)
+  useFocusTrap(boxRef, true)
 
   useEffect(() => {
     let cancelled = false
@@ -51,7 +54,7 @@ export default function CreditConfirmDialog({ cost = 1, action, onConfirm, onCan
       <div role="dialog" aria-modal="true" aria-labelledby="credit-confirm-title" data-testid="credit-confirm"
         style={{ position: 'fixed', inset: 0, zIndex: 9950, background: 'rgba(0,0,0,.72)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}
         onClick={onCancel}>
-        <div onClick={e => e.stopPropagation()} style={{ width: '100%', maxWidth: 380, background: '#0e111c', border: '1px solid var(--line2)', borderRadius: 16, padding: '1.15rem 1.2rem 1rem', boxShadow: '0 30px 80px rgba(0,0,0,.7)' }}>
+        <div ref={boxRef} onClick={e => e.stopPropagation()} style={{ width: '100%', maxWidth: 380, background: '#0e111c', border: '1px solid var(--line2)', borderRadius: 16, padding: '1.15rem 1.2rem 1rem', boxShadow: '0 30px 80px rgba(0,0,0,.7)' }}>
           <div style={{ fontFamily: 'var(--mono)', fontSize: '.52rem', textTransform: 'uppercase', letterSpacing: '.1em', color: 'var(--dim)', marginBottom: '.5rem' }}>AI credit</div>
           <div id="credit-confirm-title" style={{ fontFamily: 'var(--display)', fontSize: '1rem', fontWeight: 800, color: 'var(--white)', lineHeight: 1.3, marginBottom: '.45rem' }}>{headline}</div>
           <p style={{ fontSize: '.78rem', color: 'var(--sub)', lineHeight: 1.6, margin: '0 0 .5rem' }}>

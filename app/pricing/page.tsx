@@ -288,11 +288,16 @@ function PricingPageInner() {
           {/* Billing toggle — annual is recommended */}
           <div style={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'center', gap: '.55rem' }}>
             <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexWrap: 'wrap', maxWidth: '100%', gap: '.5rem .75rem', background: 'var(--card)', border: `1px solid ${yearly ? 'rgba(99,102,241,.4)' : 'var(--line)'}`, borderRadius: 24, padding: '.4rem .95rem', transition: 'border-color .2s', boxShadow: yearly ? '0 0 22px rgba(99,102,241,.18)' : 'none' }}>
-              <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-68)', color: yearly ? 'var(--muted)' : 'var(--white)' }}>Monthly</span>
+              <span id="bill-monthly" style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-68)', color: yearly ? 'var(--muted)' : 'var(--white)' }}>Monthly</span>
+              {/* role="switch": assistive tech reads "Yearly billing, switch, on/off" (audit 2026-10-24: the
+                  old aria-pressed button never said which period was active). Space/Enter toggle natively. */}
               <button
+                type="button"
                 onClick={() => setYearly(!yearly)}
-                aria-label="Toggle billing period"
-                aria-pressed={yearly}
+                role="switch"
+                aria-checked={yearly}
+                aria-label="Yearly billing"
+                aria-describedby="bill-monthly bill-yearly"
                 /* 44×44 hit area around the 38×20 switch; the negative margin keeps the pill the height it was. */
                 style={{ width: 44, height: 44, margin: '-12px -3px', padding: 0, display: 'grid', placeItems: 'center', background: 'none', border: 'none', cursor: 'pointer', flexShrink: 0 }}
               >
@@ -300,7 +305,7 @@ function PricingPageInner() {
                   <span style={{ position: 'absolute', top: 2, left: yearly ? 20 : 2, width: 16, height: 16, borderRadius: '50%', background: '#fff', transition: 'left .2s' }} />
                 </span>
               </button>
-              <span style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-68)', color: yearly ? 'var(--white)' : 'var(--muted)' }}>
+              <span id="bill-yearly" style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-68)', color: yearly ? 'var(--white)' : 'var(--muted)' }}>
                 Yearly
               </span>
               <span style={{ background: 'linear-gradient(90deg,#4f46e5,#7c3aed)', color: '#fff', fontFamily: 'var(--mono)', fontSize: 'var(--fs-52)', fontWeight: 700, letterSpacing: '.05em', padding: '.18rem .55rem', borderRadius: 100, whiteSpace: 'nowrap' }}>

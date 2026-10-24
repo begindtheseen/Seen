@@ -1,4 +1,5 @@
 import type { Metadata } from 'next'
+import { pageMetadata } from '@/lib/seo'
 import Link from 'next/link'
 import { DraftNote, Placeholder, LegalFooter, LEGAL_CONTACT } from '@/components/legal/LegalBits'
 
@@ -11,21 +12,14 @@ import { DraftNote, Placeholder, LegalFooter, LEGAL_CONTACT } from '@/components
 // false). Instead: we access account data only to operate the service, support users, ensure
 // security, and comply with law — never sold, never accessed for unrelated purposes.
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
   title: 'Privacy Policy — What Seen Collects & How Account Data Is Used',
   description:
     'What Seen collects, how account data is used, who can access it (including administrators, for support and security), the processors we rely on, and your rights.',
-  alternates: { canonical: 'https://seenjobs.io/privacy' },
-  openGraph: {
-    title: 'Privacy Policy | Seen',
-    description:
-      'What Seen collects, how account data is used and accessed, the processors we use, and your rights.',
-    url: 'https://seenjobs.io/privacy',
-    type: 'website',
-    siteName: 'Seen',
-    images: ['/opengraph-image'],
-  },
-}
+  path: '/privacy',
+  ogTitle: 'Privacy Policy | Seen',
+  ogDescription: 'What Seen collects, how account data is used and accessed, the processors we use, and your rights.',
+})
 
 const wrap = { maxWidth: 760, margin: '0 auto', padding: '4rem 2rem', width: '100%', boxSizing: 'border-box' as const }
 const h2 = { fontFamily: 'var(--display)', fontSize: '1.1rem', fontWeight: 800, color: 'var(--white)', letterSpacing: '-.02em', margin: '0 0 .65rem' } as const

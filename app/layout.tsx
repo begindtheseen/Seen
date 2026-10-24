@@ -79,7 +79,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           {/* The connected shell: route progress hairline, nav, page, footer, phone tab bar, ⌘K palette. */}
           <RouteProgress />
           <Nav />
-          <div className="site-main">{children}</div>
+          {/* The ONE <main> landmark (audit 2026-10-24: `.site-main` was a div, so there was no main
+              landmark and the nav's "Skip to content" link had nowhere to land). tabIndex -1 lets the
+              skip link move focus here; the class keeps every `.site-main` rule in globals.css. */}
+          <main id="main" className="site-main" tabIndex={-1}>{children}</main>
           <Footer />
           <TabBar />
           <CommandPalette />

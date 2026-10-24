@@ -1,6 +1,16 @@
 import type { ReactNode } from 'react'
+import type { Metadata } from 'next'
 import Link from 'next/link'
 import PageHeader from '@/components/shell/PageHeader'
+import { pageMetadata } from '@/lib/seo'
+
+export const metadata: Metadata = pageMetadata({
+  title: 'FAQ — How Seen Works, What It Costs, Where the Data Comes From',
+  description:
+    'Answers about Seen: what the company grades and ghost rates mean, where applicant reports come from, what is free and what Pro adds, how the tracker and Résumé AI work, and how to contact us.',
+  path: '/faq',
+  ogTitle: 'Seen FAQ',
+})
 
 const EMAIL = 'hello@seenjobs.io'
 const Mail = () => <a href={`mailto:${EMAIL}`}>{EMAIL}</a>

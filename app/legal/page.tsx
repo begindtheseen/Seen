@@ -1,4 +1,5 @@
 import type { Metadata } from 'next'
+import { pageMetadata } from '@/lib/seo'
 import Link from 'next/link'
 import { PRO_TRIAL_DAYS, ONE_TIME_SKUS } from '@/lib/server/creditRules.js'
 import { proPriceLine } from '@/lib/pricing'
@@ -12,19 +13,14 @@ import { LEGAL_CONTACT } from '@/components/legal/LegalBits'
 // rendered from the same constants the server charges with (lib/pricing.test.mjs fails on a hand-typed
 // price).
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
   title: 'Legal',
-  description: 'Seen’s Terms of Service, Privacy Policy and Content Policy in one place, with the plain facts about the free trial, prices, one-time purchases and your data.',
-  alternates: { canonical: 'https://seenjobs.io/legal' },
-  openGraph: {
-    title: 'Legal | Seen',
-    description: 'Terms of Service, Privacy Policy and Content Policy — and the plain facts about the trial, prices and your data.',
-    url: 'https://seenjobs.io/legal',
-    type: 'website',
-    siteName: 'Seen',
-    images: ['/opengraph-image'],
-  },
-}
+  description:
+    'Seen’s Terms of Service, Privacy Policy and Content Policy in one place, with the plain facts about the free trial, prices, one-time purchases and your data.',
+  path: '/legal',
+  ogTitle: 'Legal | Seen',
+  ogDescription: 'Terms of Service, Privacy Policy and Content Policy — and the plain facts about the trial, prices and your data.',
+})
 
 const DOCS = [
   { href: '/terms', title: 'Terms of Service', body: 'Eligibility, acceptable use, what the data is (and is not), subscriptions, one-time purchases, employer products, liability.' },

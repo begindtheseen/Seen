@@ -1,4 +1,5 @@
 import type { Metadata } from 'next'
+import { pageMetadata } from '@/lib/seo'
 import Link from 'next/link'
 import { getScoresByNames, slugify, grade, riskColor, riskLabel, pct, MIN_REPORTS_FOR_GRADE, type LeaderboardRow } from '@/lib/growth'
 import { publicDiscussionCountPath, parseExactCount, publicDiscussionShare } from '@/lib/server/reportCounts'
@@ -31,8 +32,8 @@ import PageHeader from '@/components/shell/PageHeader'
 
 export const revalidate = 3600
 
-export const metadata: Metadata = {
-  title: 'Staffing Agency Ghost Index — Which Agencies Ghost Candidates | Seen',
+export const metadata: Metadata = pageMetadata({
+  title: 'Staffing Agency Ghost Index — Which Agencies Ghost Candidates',
   description:
     'A live index of major staffing agencies — Robert Half, Aerotek, Insight Global, TEKsystems, Randstad and more — ranked by applicant-reported ghost and response rates, from outcomes submitted to Seen or shared publicly in discussion threads and on review sites. Agencies without reports are labeled, never given a made-up rate.',
   keywords: [
@@ -40,20 +41,10 @@ export const metadata: Metadata = {
     'recruiter ghosted me', 'staffing agency reviews', 'best staffing agencies', 'worst staffing agencies',
     'Robert Half ghosting', 'Aerotek ghosting', 'Insight Global ghosting',
   ],
-  alternates: { canonical: 'https://seenjobs.io/agencies' },
-  openGraph: {
-    title: 'The Staffing Agency Ghost Index',
-    description: 'Major staffing agencies ranked by applicant-reported ghost and response rates — no reports, no number.',
-    url: 'https://seenjobs.io/agencies',
-    type: 'website',
-    siteName: 'Seen',
-  },
-  twitter: {
-    card: 'summary_large_image',
-    title: 'The Staffing Agency Ghost Index',
-    description: 'Staffing agencies ranked by applicant-reported ghost rates — no reports, no number.',
-  },
-}
+  path: '/agencies',
+  ogTitle: 'The Staffing Agency Ghost Index',
+  ogDescription: 'Major staffing agencies ranked by applicant-reported ghost and response rates — no reports, no number.',
+})
 
 const wrap = { maxWidth: 760, margin: '0 auto', padding: '3.5rem 1.25rem 5rem', width: '100%', boxSizing: 'border-box' as const }
 const mono = (size: string, color: string): React.CSSProperties => ({ fontFamily: 'var(--mono)', fontSize: size, color })

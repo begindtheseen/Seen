@@ -131,6 +131,7 @@ export default function JobsPage() {
               type="text"
               className={bar.input}
               placeholder="Job title, role or company..."
+              aria-label="Job title, role or company"
               value={query}
               onFocus={() => setShowCoSuggs(true)}
               onBlur={() => setTimeout(() => setShowCoSuggs(false), 150)}

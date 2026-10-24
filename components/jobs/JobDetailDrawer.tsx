@@ -1,6 +1,7 @@
 'use client'
 
-import { useState, useCallback, useEffect } from 'react'
+import { useState, useCallback, useEffect, useRef } from 'react'
+import { useFocusTrap } from '@/lib/hooks/useFocusTrap'
 import { Score } from '@/lib/score'
 import { SavedJobsStore } from '@/lib/stores/SavedJobs'
 import { aiHeaders } from '@/lib/aiHeaders'
@@ -70,6 +71,9 @@ export default function JobDetailDrawer({ job, isLoggedIn, onClose, onApply, onC
   onCheckCompany: (company: string) => void
 }) {
   const { user } = useAuth()
+  const panelRef = useRef<HTMLDivElement>(null)
+  // Tab cycles inside the drawer; closing returns focus to the job card that opened it.
+  useFocusTrap(panelRef, true)
   const [visible, setVisible] = useState(false)
   const [saved, setSaved] = useState(() => SavedJobsStore.isSaved(job.id))
   const [insights, setInsights] = useState<Insights | null>(null)
@@ -222,7 +226,7 @@ export default function JobDetailDrawer({ job, isLoggedIn, onClose, onApply, onC
         onClick={onClose}
       />
       {/* Slide-in panel */}
-      <div style={{
+      <div ref={panelRef} role="dialog" aria-modal="true" aria-label={`${job.title} at ${job.company}`} style={{
         position: 'fixed', top: 0, right: 0, bottom: 0, zIndex: 9900,
         width: 'min(540px, 100vw)',
         background: 'var(--surface)',
@@ -241,7 +245,7 @@ export default function JobDetailDrawer({ job, isLoggedIn, onClose, onApply, onC
             <div style={{ fontFamily: 'var(--mono)', fontSize: '.52rem', color: 'var(--muted)' }}>{companyName}</div>
           </div>
           <a href={`/jobs/${encodeURIComponent(job.id)}`} style={{ fontFamily: 'var(--mono)', fontSize: '.52rem', color: 'var(--muted)', textDecoration: 'none', flexShrink: 0, padding: '.25rem' }}>↗</a>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'var(--dim)', cursor: 'pointer', fontSize: '1rem', padding: '.2rem', lineHeight: 1, flexShrink: 0 }}>✕</button>
+          <button onClick={onClose} aria-label="Close" style={{ background: 'none', border: 'none', color: 'var(--dim)', cursor: 'pointer', fontSize: '1rem', padding: '.2rem', lineHeight: 1, flexShrink: 0 }}>✕</button>
         </div>
 
         {/* Scrollable content */}
