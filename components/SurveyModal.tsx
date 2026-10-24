@@ -138,14 +138,17 @@ export default function SurveyModal({ apps, onClose, onCreditsEarned }: SurveyMo
     setSubmitting(false)
 
     if (d.ok) {
-      const earned = creditsEarned + 1
+      // credited:false = the answer was recorded but no credit was added (the balance is already above the
+      // free cap, e.g. a new account's welcome balance) — never show a "+1" that did not happen.
+      const got = d.credited === false ? 0 : 1
+      const earned = creditsEarned + got
       setCreditsEarned(earned)
       setBalance(d.balance || balance)
       // Each answered question earns a credit — refresh the Nav balance immediately, not
       // only when the whole survey completes.
       window.dispatchEvent(new CustomEvent('seen:credits-updated'))
-      setCreditPopVal(1)
-      setCreditPopVisible(true)
+      setCreditPopVal(got)
+      setCreditPopVisible(got > 0)
       setPhase('credit-pop')
       setTimeout(() => {
         setCreditPopVisible(false)
