@@ -4,6 +4,7 @@ import { useState, useEffect, useRef, use, type CSSProperties, type ReactNode } 
 import { createPortal } from 'react-dom'
 import { Score } from '@/lib/score'
 import { useAuth } from '@/lib/auth'
+import { _sync } from '@/lib/sync'
 import { AppStore } from '@/lib/stores/AppStore'
 import HiringProbability from '@/components/HiringProbability'
 import CompanyScoreCard from '@/components/CompanyScoreCard'
@@ -435,6 +436,7 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
   // The report form is pre-filled with this company, named the way this page shows it, so "Report
   // experience" from a company page never asks which company again.
   const reportHref = `/report?company=${encodeURIComponent(displayName)}&from=company`
+  const { isLoggedIn } = useAuth()
 
   const [reports, setReports] = useState<Report[]>([])
   const [score, setScore] = useState<CompanyScore | null>(null)
@@ -552,7 +554,9 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
   // (The "N Seen users checked this week" line was a hash of the slug + day, not data. Removed —
   // Seen shows no visitor counts it does not have.)
 
-  // T3-7: Record this company visit in localStorage for dashboard "Recently checked"
+  // T3-7: Record this company visit for the dashboard's "Recently checked" + its checklist — on this
+  // device (localStorage) and, when signed in, on the account (user_recent_cos via log_recent_co), so
+  // a second device sees it too. Best-effort; never blocks the page.
   useEffect(() => {
     try {
       const raw = localStorage.getItem('seen_recent_cos')
@@ -561,7 +565,8 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
       const updated = [{ name: companyName, slug }, ...filtered].slice(0, 10)
       localStorage.setItem('seen_recent_cos', JSON.stringify(updated))
     } catch {}
-  }, [slug, companyName])
+    if (isLoggedIn && companyName) void _sync('log_recent_co', { company: companyName })
+  }, [slug, companyName, isLoggedIn])
 
   // Fetch reports + score
   useEffect(() => {

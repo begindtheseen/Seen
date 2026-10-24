@@ -9,6 +9,9 @@ import { AppStore } from '@/lib/stores/AppStore'
 import { EventStore } from '@/lib/stores/EventStore'
 import { BadgeStore } from '@/lib/stores/BadgeStore'
 import { daysSince } from '@/lib/stores/checkSchedule'
+import { _sync } from '@/lib/sync'
+import { isChecklistDismissed, withChecklistDismissed } from '@/lib/onboardingPrefs'
+import { healthUnlockLine, HEALTH_MIN_APPS } from '@/lib/dashboardCopy'
 import WelcomeOnboarding from '@/components/WelcomeOnboarding'
 import type { Application } from '@/lib/types'
 import { isGradeableScore } from '@/lib/gradeGate'
@@ -49,7 +52,7 @@ function hadInterview(a: Application): boolean {
 }
 
 function calcJobSearchHealth(apps: Application[]) {
-  if (apps.length < 3) return null
+  if (apps.length < HEALTH_MIN_APPS) return null
   const terminal = apps.filter(a => a.status !== 'active')
   const responseRate = Math.round((apps.filter(responded).length / apps.length) * 100)
   const ghostRate = Math.round((apps.filter(a => a.status === 'ghosted').length / apps.length) * 100)
@@ -76,14 +79,17 @@ export default function DashboardPage() {
     setGreeting(h < 5 ? 'Still up' : h < 12 ? 'Good morning' : h < 17 ? 'Good afternoon' : h < 22 ? 'Good evening' : 'Late one')
   }, [])
   const [coScores, setCoScores] = useState<Record<string, {ghost_rate: number; overall_score: number; avg_wait_days: number}>>({})
-  // Start hidden to avoid a flash for returning users; the effect flips it on for anyone
-  // who hasn't dismissed the first-run guide.
+  // Start hidden to avoid a flash for returning users; the effect flips it on for anyone who hasn't
+  // dismissed the first-run guide on THIS device (localStorage) or on ANY device (the account's
+  // profile blob — lib/onboardingPrefs). Re-evaluated when the profile arrives.
   const [onboardHidden, setOnboardHidden] = useState(true)
 
   useEffect(() => {
     if (!user?.id) return
-    try { setOnboardHidden(localStorage.getItem(`seen_onboarding_hidden_${user.id}`) === '1') } catch { setOnboardHidden(false) }
-  }, [user?.id])
+    let device = false
+    try { device = localStorage.getItem(`seen_onboarding_hidden_${user.id}`) === '1' } catch { device = false }
+    setOnboardHidden(device || isChecklistDismissed(profile?.onboarding_survey))
+  }, [user?.id, profile?.onboarding_survey])
 
   useEffect(() => {
     if (!isSeeker) return
@@ -105,12 +111,30 @@ export default function DashboardPage() {
     })
   }, [isSeeker, token])
 
+  // Companies this person checked: this device's list first, then the account's (user_recent_cos,
+  // written by the company page when signed in) so the checklist's third step and "Recently checked"
+  // are true on a second device too. ONE slug scheme (CLAUDE.md): lower-case, spaces → hyphens.
   useEffect(() => {
+    let local: Array<{ name: string; slug: string }> = []
     try {
       const raw = localStorage.getItem('seen_recent_cos')
-      if (raw) setRecentCos(JSON.parse(raw).slice(0, 5))
+      if (raw) local = (JSON.parse(raw) as Array<{ name: string; slug: string }>).filter(c => c && c.name && c.slug)
     } catch {}
-  }, [])
+    setRecentCos(local.slice(0, 5))
+    if (!isLoggedIn) return
+    let alive = true
+    _sync('get_recent_cos').then(r => {
+      const rows = (r as { recent?: Array<{ company_name?: string }> } | null)?.recent
+      if (!alive || !Array.isArray(rows)) return
+      const seen = new Set(local.map(c => c.slug))
+      const fromAccount = rows
+        .map(x => String(x?.company_name || '').trim()).filter(Boolean)
+        .map(name => ({ name, slug: encodeURIComponent(name.toLowerCase().replace(/\s+/g, '-')) }))
+        .filter(c => !seen.has(c.slug) && (seen.add(c.slug), true))
+      if (fromAccount.length) setRecentCos([...local, ...fromAccount].slice(0, 5))
+    }).catch(() => {})
+    return () => { alive = false }
+  }, [isLoggedIn])
 
   useEffect(() => {
     if (!ready) return // wait for the session to resolve — redirecting early bounced signed-in users
@@ -275,11 +299,13 @@ export default function DashboardPage() {
   const dismissOnboarding = () => {
     setOnboardHidden(true)
     try { if (user?.id) localStorage.setItem(`seen_onboarding_hidden_${user.id}`, '1') } catch {}
+    // Mirror to the account so another device does not re-show it (same save path Settings uses).
+    if (isLoggedIn) void _sync('save_profile', { profile: { onboarding_survey: withChecklistDismissed(profile?.onboarding_survey) } })
   }
 
   // Health headline: one plain sentence instead of a caption line.
   const healthHead = !health
-    ? { t: 'Your score unlocks soon.', s: `Track ${Math.max(1, 3 - apps.length)} more application${Math.max(1, 3 - apps.length) !== 1 ? 's' : ''} and Seen scores how your search is going.`, badge: 'Getting started', tone: 'muted' }
+    ? { t: 'Your score unlocks soon.', s: healthUnlockLine(apps.length), badge: 'Getting started', tone: 'muted' }
     : health.terminal < 2
       ? { t: 'Too early to call.', s: 'Report what happened with a couple of applications and this becomes a real read on your search.', badge: 'Early days', tone: 'muted' }
       : health.score >= 75
