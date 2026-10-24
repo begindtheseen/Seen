@@ -23,6 +23,7 @@ import { gradeLetter, displayCompanyName, displayPlatform, isResolvedOutcome, la
 import { buildCompanySummary, publicRowsHeading, reportsProvenanceLine, reportsSectionSummary, MIN_REPORTS_FOR_RATES, type CompanySummary } from '@/lib/companyPageSummary'
 import { feedRowVerdict } from '@/lib/reports/feedFilter.js'
 import { looksLikeBotOrLinkText, trimToSentence } from '@/lib/reports/excerptText.js'
+import { displayPay } from '@/lib/jobs/pay.js'
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -1357,7 +1358,7 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
                     <div key={i} className="jlc" style={{ display: 'flex', flexDirection: 'column', gap: '.35rem', padding: '.85rem 1rem', background: 'var(--card)', border: '1px solid var(--line)', borderRadius: '10px' }}>
                       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '.5rem', flexWrap: 'wrap' }}>
                         <span className="jlc-title" style={{ fontSize: '.95rem', fontWeight: 700, color: 'var(--white)', letterSpacing: '-.02em', flex: 1 }}>{j.title}</span>
-                        {j.salary && <span style={{ fontFamily: 'var(--mono)', fontSize: '.6rem', color: 'var(--green)', whiteSpace: 'nowrap' }}>{j.salary}</span>}
+                        {displayPay(j) && <span style={{ fontFamily: 'var(--mono)', fontSize: '.6rem', color: 'var(--green)', whiteSpace: 'nowrap' }}>{displayPay(j)}</span>}
                       </div>
                       <div style={{ display: 'flex', gap: '.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
                         <span style={{ fontFamily: 'var(--mono)', fontSize: '.55rem', color: 'var(--muted)' }}>{j.location || 'US'}</span>
