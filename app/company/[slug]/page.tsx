@@ -956,6 +956,7 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
                 </p>
                 <div className="co-grade-meta">
                   <a href={reportHref} className="co-live" style={{ textDecoration: 'none' }}>+ Add yours to help grade it</a>
+                  <a href="/methods" className="co-method">How grades work</a>
                 </div>
               </div>
             </div>
@@ -975,6 +976,7 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
                     <ConfidenceBadge sum={sum} webCount={webEst} />
                     {fpReports === 0 && webEst > 0 && <span className="co-live">web-research estimate</span>}
                     {updatedLine && <span className="co-dq" style={{ color: 'var(--muted)' }}>{updatedLine}</span>}
+                    <a href="/methods" className="co-method">How grades work</a>
                   </div>
                 </div>
               </div>
