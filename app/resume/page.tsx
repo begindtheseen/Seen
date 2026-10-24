@@ -726,7 +726,9 @@ function ResumePageInner() {
     router.push('/resume/studio?tab=tailor')
   }
 
-  const trackHref = `/apply?co=${encodeURIComponent(jobCompany)}&role=${encodeURIComponent(jobTitle)}${jobUrl ? `&jobUrl=${encodeURIComponent(jobUrl)}` : ''}`
+  // The tracked card should carry what the listing had: the saved job's city and id ride along.
+  const trackedSaved = savedId ? savedJobs.find(j => String(j.job_id) === savedId) : undefined
+  const trackHref = `/apply?co=${encodeURIComponent(jobCompany)}&role=${encodeURIComponent(jobTitle)}${jobUrl ? `&jobUrl=${encodeURIComponent(jobUrl)}` : ''}${savedId ? `&jid=${encodeURIComponent(savedId)}` : ''}${trackedSaved?.location ? `&city=${encodeURIComponent(trackedSaved.location)}` : ''}`
   const reportHref = `/report?company=${encodeURIComponent(jobCompany)}&role=${encodeURIComponent(jobTitle)}`
 
   const hasV2 = !!fitOut?.application_intelligence

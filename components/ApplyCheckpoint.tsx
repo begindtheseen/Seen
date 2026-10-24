@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/lib/auth'
 import { AppStore } from '@/lib/stores/AppStore'
+import { applicationFromListing } from '@/lib/stores/listingApplication'
 import { aiHeaders } from '@/lib/aiHeaders'
 import ModalPortal from '@/components/ModalPortal'
 
@@ -111,21 +112,14 @@ export default function ApplyCheckpoint({ job, optimized: _optimized, autoConfir
     setStep('listing_gone')
   }
 
+  // The ONLY place this dialog writes an application: on "✓ Yes, I applied" (or autoConfirm, when
+  // the user already said so in the Optimize funnel). "Apply ↗" itself only opens the listing and
+  // records an anonymous click (lib/trackApply) — it never adds a card. The card carries the
+  // listing's full title, location, id and link (lib/stores/listingApplication).
   async function handleApplied() {
     setLoading(true)
     try {
-      await AppStore.add(
-        {
-          company: job.company,
-          role: job.title,
-          jobId: job.id,
-          jobUrl: job.apply_url ?? undefined,
-          location: job.location,
-          stage: 'Applied',
-          status: 'active',
-        },
-        isLoggedIn,
-      )
+      await AppStore.add(applicationFromListing(job), isLoggedIn)
       // Earn 1 AI credit back for tracking the application
       if (isLoggedIn) {
         try {
@@ -388,7 +382,7 @@ export default function ApplyCheckpoint({ job, optimized: _optimized, autoConfir
       style={backdropStyle}
       onClick={e => { if (e.target === e.currentTarget) onClose() }}
     >
-      <div style={sheetStyle}>
+      <div style={sheetStyle} role="dialog" aria-modal="true" aria-label={step === 'main' ? `Did you apply to ${job.company}?` : 'Application tracking'}>
         {/* ── MAIN ── */}
         {step === 'main' && (
           <div style={innerStyle}>
