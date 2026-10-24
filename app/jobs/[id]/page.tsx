@@ -341,7 +341,7 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
             </div>
             <div style={{ textAlign: 'center', flexShrink: 0 }}>
               <div className={`sring ${risk}`} style={{ width: 44, height: 44 }} title={job.score == null ? 'Not enough signal in this listing to score it' : undefined}><div className="sring-n" style={{ fontSize: '.85rem' }}>{job.score ?? '–'}</div></div>
-              <div style={{ fontFamily: 'var(--mono)', fontSize: '.45rem', color: 'var(--muted)', marginTop: '.15rem' }}>{job.score == null ? 'unrated' : 'score'}</div>
+              <div style={{ fontFamily: 'var(--mono)', fontSize: '.75rem', color: 'var(--muted)', marginTop: '.15rem' }}>{job.score == null ? 'unrated' : 'score'}</div>
             </div>
           </div>
           {chips.length > 0 && (
@@ -548,25 +548,25 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
           <div style={{ display: 'flex', gap: '.5rem', flexWrap: 'wrap' }}>
             <a
               href={`/report?from=company&company=${encodeURIComponent(job?.company || '')}&role=${encodeURIComponent(job?.title || '')}&outcome=ghosted`}
-              style={{ fontFamily: 'var(--mono)', fontSize: '.65rem', background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)', color: 'var(--red)', borderRadius: 7, padding: '.4rem .85rem', textDecoration: 'none' }}
+              style={{ fontFamily: 'var(--mono)', fontSize: '.65rem', background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)', color: 'var(--red)', borderRadius: 7, padding: '.4rem .85rem', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', minHeight: 44 }}
             >
               👻 Got ghosted
             </a>
             <a
               href={`/report?from=company&company=${encodeURIComponent(job?.company || '')}&role=${encodeURIComponent(job?.title || '')}&outcome=rejected`}
-              style={{ fontFamily: 'var(--mono)', fontSize: '.65rem', background: 'rgba(99,102,241,0.1)', border: '1px solid rgba(99,102,241,0.3)', color: 'var(--blue)', borderRadius: 7, padding: '.4rem .85rem', textDecoration: 'none' }}
+              style={{ fontFamily: 'var(--mono)', fontSize: '.65rem', background: 'rgba(99,102,241,0.1)', border: '1px solid rgba(99,102,241,0.3)', color: 'var(--blue)', borderRadius: 7, padding: '.4rem .85rem', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', minHeight: 44 }}
             >
               🤝 Rejected
             </a>
             <a
               href={`/report?from=company&company=${encodeURIComponent(job?.company || '')}&role=${encodeURIComponent(job?.title || '')}&outcome=interviewing`}
-              style={{ fontFamily: 'var(--mono)', fontSize: '.65rem', background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.3)', color: 'var(--green)', borderRadius: 7, padding: '.4rem .85rem', textDecoration: 'none' }}
+              style={{ fontFamily: 'var(--mono)', fontSize: '.65rem', background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.3)', color: 'var(--green)', borderRadius: 7, padding: '.4rem .85rem', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', minHeight: 44 }}
             >
               📅 Got an interview
             </a>
             <a
               href={`/report?from=company&company=${encodeURIComponent(job?.company || '')}&role=${encodeURIComponent(job?.title || '')}&outcome=hired`}
-              style={{ fontFamily: 'var(--mono)', fontSize: '.65rem', background: 'rgba(16,185,129,0.08)', border: '1px solid rgba(16,185,129,0.2)', color: 'var(--green)', borderRadius: 7, padding: '.4rem .85rem', textDecoration: 'none' }}
+              style={{ fontFamily: 'var(--mono)', fontSize: '.65rem', background: 'rgba(16,185,129,0.08)', border: '1px solid rgba(16,185,129,0.2)', color: 'var(--green)', borderRadius: 7, padding: '.4rem .85rem', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', minHeight: 44 }}
             >
               ✅ Got an offer
             </a>
@@ -577,7 +577,7 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
       {/* Sticky footer */}
       <div style={{ position: 'sticky', bottom: 0, background: 'var(--ink)', borderTop: '1px solid var(--line2)', padding: '.9rem 1rem', paddingBottom: 'calc(.9rem + env(safe-area-inset-bottom))', zIndex: 10 }}>
         <div style={{ maxWidth: 720, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '.5rem', width: '100%', boxSizing: 'border-box' }}>
-          <a href={`/company/${companySlug(job.company)}`} style={{ display: 'block', width: '100%', textAlign: 'center', fontFamily: 'var(--mono)', fontSize: '.65rem', color: 'var(--amber)', textDecoration: 'none', padding: '.25rem 0 .5rem', opacity: .85 }}>
+          <a href={`/company/${companySlug(job.company)}`} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 44, width: '100%', textAlign: 'center', fontFamily: 'var(--mono)', fontSize: '.65rem', color: 'var(--amber)', textDecoration: 'none', opacity: .85 }}>
             🏢 Check {companyName || 'company'} →
           </a>
           <div style={{ display: 'flex', gap: '.75rem' }}>
