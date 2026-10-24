@@ -1,13 +1,16 @@
-// ONE place for how a company is shown: its display name, its letter grade, and the "last updated"
-// line under a grade. Pure (no I/O) — imported by client components, server components, the OG
-// image and the api/*.js handlers alike, so the page, the share card, the leaderboard, the feed and
-// the unfurl can never disagree (audit 2026-10-23: the page said "A · 91" while the grade card said
-// "A+", /companies showed "aaa" and "united wholesale mortgage", the ticker "albertsons").
+// ONE place for how a company is shown: its display name, its letter grade, the "last updated"
+// line under a grade, and the spelling of a stored platform label. Pure (no I/O) — imported by client
+// components, server components, the OG image and the api/*.js handlers alike, so the page, the share
+// card, the leaderboard, the feed and the unfurl can never disagree (audit 2026-10-23: the page said
+// "A · 91" while the grade card said "A+", /companies showed "aaa" and "united wholesale mortgage",
+// the ticker "albertsons"; 2026-10-24: /companies "Jpmorganchase", quotes labelled "Reddit r/r/walmart").
 //
 // Stored data is never changed here: company_scores / reports keep their lowercase names.
 
 import { NONTERMINAL_OUTCOMES } from '@/api/_utils/companyIntel.js'
 import { formatPacific } from '@/lib/time/pacific.js'
+import { displayCompanyName as displayCompanyNameJs, KNOWN_BRANDS } from '@/lib/companyNames.js'
+import { displayPlatform as displayPlatformJs } from '@/lib/reports/platformLabel.js'
 
 // ── Letter grade ─────────────────────────────────────────────────────────────────────────────────
 // The one scale. 80+ A · 65+ B · 50+ C · 35+ D · else F (matches lib/growth.ts grade(), the OG
@@ -22,49 +25,24 @@ export function gradeLetter(score: number): string {
 }
 
 // ── Display name ─────────────────────────────────────────────────────────────────────────────────
-// Brands whose casing is not Title Case. Keys are the stored (lowercase) name or a single word of
-// it; the value is how the brand writes itself. Small on purpose — add a line when a real company
-// on the site renders wrong, never guess.
-const BRAND_CASE: Record<string, string> = {
-  "mcdonald's": "McDonald's", mcdonalds: "McDonald's", ebay: 'eBay', iheartmedia: 'iHeartMedia', pwc: 'PwC',
-  ups: 'UPS', 'at&t': 'AT&T', aaa: 'AAA', ibm: 'IBM', cvs: 'CVS', hp: 'HP', '3m': '3M', kpmg: 'KPMG', ey: 'EY',
-  bmw: 'BMW', usaa: 'USAA', fedex: 'FedEx', cdw: 'CDW', saic: 'SAIC', 'h&m': 'H&M', 't-mobile': 'T-Mobile',
-  jpmorgan: 'JPMorgan', nvidia: 'NVIDIA', ubs: 'UBS', cbre: 'CBRE', adp: 'ADP', aecom: 'AECOM', bae: 'BAE',
-  dhl: 'DHL', dsw: 'DSW', gnc: 'GNC', hca: 'HCA', kfc: 'KFC', lg: 'LG', nbcuniversal: 'NBCUniversal', pnc: 'PNC',
-  pepsico: 'PepsiCo', usps: 'USPS', ulta: 'Ulta', wework: 'WeWork', 'o’reilly': 'O’Reilly',
-  "o'reilly": "O'Reilly", linkedin: 'LinkedIn', paypal: 'PayPal', youtube: 'YouTube', github: 'GitHub',
-  gitlab: 'GitLab', doordash: 'DoorDash', carmax: 'CarMax', petsmart: 'PetSmart', walgreens: 'Walgreens',
-  'mistral.ai': 'Mistral AI', openai: 'OpenAI', deepmind: 'DeepMind', spacex: 'SpaceX', 'coca-cola': 'Coca-Cola',
-  taskus: 'TaskUs', givewell: 'GiveWell', sosafe: 'SoSafe', adventhealth: 'AdventHealth', arcbest: 'ArcBest',
-  sunrun: 'Sunrun', dupont: 'DuPont', servicenow: 'ServiceNow', salesforce: 'Salesforce', snowflake: 'Snowflake', uwm: 'UWM', 'ge': 'GE', 'td': 'TD', 'bny': 'BNY', 'rbc': 'RBC', 'hsbc': 'HSBC',
-  'nyu': 'NYU', 'ucla': 'UCLA', 'usc': 'USC', 'mit': 'MIT', 'llc': 'LLC', 'inc': 'Inc', 'usa': 'USA', 'us': 'US',
-}
-// Words that stay lowercase inside a name ("Bank of America", "Barnes & Noble").
-const SMALL_WORDS = new Set(['of', 'and', 'the', 'for', 'at', 'in', 'on', 'de', 'la', 'du', 'von', 'van', 'y'])
-
-function caseWord(word: string, first: boolean): string {
-  const lower = word.toLowerCase()
-  if (BRAND_CASE[lower]) return BRAND_CASE[lower]
-  if (!first && SMALL_WORDS.has(lower)) return lower
-  // Capitalize the first letter and the letter after a hyphen ("e-commerce" → "E-Commerce",
-  // "coca-cola" → "Coca-Cola"); never after an apostrophe ("lowe's" stays "Lowe's").
-  return lower.replace(/(^|-)([a-zà-ÿ])/g, (_m, sep: string, c: string) => sep + c.toUpperCase())
-}
+// The map and the casing rules live in lib/companyNames.js (plain JS) so the api/*.js handlers and the
+// enrichment pipeline read the SAME map as the client. Re-exported here for TypeScript callers.
+export { KNOWN_BRANDS }
 
 /**
  * How a stored company name is shown: "walmart" → "Walmart", "united wholesale mortgage" →
- * "United Wholesale Mortgage", "aaa" → "AAA", "mcdonald's" → "McDonald's", "bank of america" →
- * "Bank of America". A name that already carries mixed case (an employer-typed "DoorDash") is
- * returned as is. Empty input → ''.
+ * "United Wholesale Mortgage", "aaa" → "AAA", "jpmorganchase" → "JPMorgan Chase", "mcdonald's" →
+ * "McDonald's", "bank of america" → "Bank of America". A name that already carries mixed case (an
+ * employer-typed "DoorDash") is returned as is. Empty input → ''.
  */
 export function displayCompanyName(name: string | null | undefined): string {
-  const raw = String(name ?? '').trim().replace(/\s+/g, ' ')
-  if (!raw) return ''
-  const whole = BRAND_CASE[raw.toLowerCase()]
-  if (whole) return whole
-  // Already mixed-case (not all lower, not all upper) → the author chose the casing; keep it.
-  if (raw !== raw.toLowerCase() && raw !== raw.toUpperCase()) return raw
-  return raw.split(' ').map((w, i) => caseWord(w, i === 0)).join(' ')
+  return displayCompanyNameJs(name)
+}
+
+// ── Platform label ───────────────────────────────────────────────────────────────────────────────
+/** A stored platform / source label as it is shown: "Reddit r/r/walmart" → "Reddit r/walmart" (lib/reports/platformLabel.js). */
+export function displayPlatform(platform: string | null | undefined): string {
+  return displayPlatformJs(platform)
 }
 
 // ── Outcomes ─────────────────────────────────────────────────────────────────────────────────────

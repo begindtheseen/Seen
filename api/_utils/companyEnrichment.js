@@ -23,6 +23,8 @@ import { normalizeCompanyKey, isSearchableCompany, rankAndFilter } from './compa
 import { isValidCompanyName } from './reportWrite.js';
 import { fenceUntrusted, scanInjection } from '../../lib/server/promptGuard.js';
 import { pacificDate } from '../../lib/time/pacific.js';
+import { redditPlatform } from '../../lib/reports/platformLabel.js';
+import { displayCompanyName } from '../../lib/companyNames.js';
 
 // ── Tunables (env-overridable in the worker; defaults sized for Groq's FREE tier) ─────────────
 // Groq free tier, llama-3.3-70b-versatile (org-wide, shared with every other LLM_API_KEY caller):
@@ -449,7 +451,7 @@ export function buildReportRow(exp, { companyName, subreddit, threadId, companyI
   const day = postedDay(posted);
   return {
     company_name: String(companyName).toLowerCase().trim(),
-    platform: `Reddit r/${subreddit}`,
+    platform: redditPlatform(subreddit),
     outcome: exp.outcome,
     role: exp.role ? String(exp.role).trim().slice(0, 200) : '', // reports.role is NOT NULL (prod)
     report_text: link ? `${summary} [Public reddit.com post${day ? `, posted ${day}` : ''}: ${link}]` : summary,
@@ -609,9 +611,9 @@ export function tpmWaitMs(history, tokens, now = Date.now(), limit = ENRICH_DEFA
   return Math.max(0, (recent.length ? recent[recent.length - 1].at : now) + 60_000 - now);
 }
 
-/** Display spelling for a created companies row ("lowe's" → "Lowe's"), like lib/growth.ts displayCompanyName. */
+/** Display spelling for a created companies row ("lowe's" → "Lowe's") — the ONE map, lib/companyNames.js. */
 export function displayName(name) {
-  return String(name).split(' ').map((w) => (w ? w.charAt(0).toUpperCase() + w.slice(1) : w)).join(' ');
+  return displayCompanyName(name);
 }
 
 /** Read the subset of ENRICH_* env overrides that are positive integers. */
