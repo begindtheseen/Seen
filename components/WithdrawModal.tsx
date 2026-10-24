@@ -100,7 +100,7 @@ export default function WithdrawModal({ app, onClose, onWithdrawn }: {
         {canNote && (
           <>
             <div style={label}>Message to {app.company} (optional)</div>
-            <textarea value={message} onChange={e => setMessage(e.target.value)} maxLength={MESSAGE_MAX} placeholder="A reason, or a quick thank-you — they’ll see it with your application." style={area} />
+            <textarea autoComplete="off" value={message} onChange={e => setMessage(e.target.value)} maxLength={MESSAGE_MAX} placeholder="A reason, or a quick thank-you — they’ll see it with your application." style={area} />
           </>
         )}
         {err && <div role="alert" style={{ color: 'var(--red)', fontSize: '.75rem', marginTop: '.6rem' }}>{err}</div>}
@@ -125,7 +125,7 @@ export default function WithdrawModal({ app, onClose, onWithdrawn }: {
           ))}
         </div>
         <div style={label}>Review {app.company} (optional)</div>
-        <textarea value={review} onChange={e => setReview(e.target.value)} maxLength={REVIEW_MAX} placeholder="How was their hiring process? Did they reply, how fast, how were you treated?" style={area} />
+        <textarea autoComplete="off" value={review} onChange={e => setReview(e.target.value)} maxLength={REVIEW_MAX} placeholder="How was their hiring process? Did they reply, how fast, how were you treated?" style={area} />
         <div style={{ fontSize: '.68rem', color: 'var(--muted)', lineHeight: 1.5, marginTop: '.4rem' }}>
           Shared anonymously on {app.company}’s Seen page and counted in their hiring score, along with what your tracker shows happened.
         </div>

@@ -43,7 +43,7 @@ export function DeclineMessagePicker({ templates, value, onChange, allowNone }: 
         {allowNone && chip('none', 'No message', () => onChange(''))}
       </div>
       {mode !== 'none' && (
-        <textarea value={value} onChange={e => { onChange(e.target.value); if (mode !== 'custom') setMode('custom') }} maxLength={DECLINE_MESSAGE_MAX} rows={4}
+        <textarea autoComplete="off" value={value} onChange={e => { onChange(e.target.value); if (mode !== 'custom') setMode('custom') }} maxLength={DECLINE_MESSAGE_MAX} rows={4}
           aria-label="Decline message" placeholder={mode === 'custom' ? 'Write your message — it goes to the applicant as written.' : undefined}
           style={{ width: '100%', boxSizing: 'border-box', resize: 'vertical', background: 'var(--card)', border: '1px solid var(--line2)', borderRadius: 8, padding: '.55rem .65rem', color: 'var(--white)', fontSize: '.78rem', lineHeight: 1.5, fontFamily: 'var(--body)' }} />
       )}

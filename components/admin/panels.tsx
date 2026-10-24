@@ -643,7 +643,7 @@ export function ListingDisputesPanel({ token }: { token: string }) {
                 )}
                 {d.admin_note && <div style={{ fontFamily: 'var(--mono)', fontSize: '.54rem', color: 'var(--muted)', marginTop: '.25rem' }}>Admin note: {d.admin_note}</div>}
                 {open && (
-                  <input
+                  <input autoComplete="off"
                     value={notes[d.id] || ''}
                     onChange={e => setNotes(n => ({ ...n, [d.id]: e.target.value }))}
                     placeholder="Optional note to the employer"
@@ -772,7 +772,7 @@ export function ListingTicketsPanel({ token }: { token: string }) {
             {t.status === 'open' && (
               <div style={{ marginTop: '.45rem' }}>
                 {(openDispute || (rep && rep.count > 0)) && (
-                  <input value={notes[t.job_id] || ''} onChange={e => setNotes(n => ({ ...n, [t.job_id]: e.target.value }))} placeholder="Note to the employer (optional)" style={{ width: '100%', boxSizing: 'border-box', background: 'var(--raised)', border: '1px solid var(--line2)', borderRadius: 6, padding: '.35rem .5rem', fontFamily: 'var(--mono)', fontSize: '.55rem', color: 'var(--white)', outline: 'none', marginBottom: '.35rem' }} />
+                  <input autoComplete="off" value={notes[t.job_id] || ''} onChange={e => setNotes(n => ({ ...n, [t.job_id]: e.target.value }))} placeholder="Note to the employer (optional)" style={{ width: '100%', boxSizing: 'border-box', background: 'var(--raised)', border: '1px solid var(--line2)', borderRadius: 6, padding: '.35rem .5rem', fontFamily: 'var(--mono)', fontSize: '.55rem', color: 'var(--white)', outline: 'none', marginBottom: '.35rem' }} />
                 )}
                 <div style={{ display: 'flex', gap: '.4rem', flexWrap: 'wrap' }}>
                   {openDispute ? (
@@ -1087,12 +1087,12 @@ export function MergePanel({ token, prefill }: { token: string; prefill: MergePr
         <div style={{ display: 'flex', gap: '.5rem', alignItems: 'flex-end', flexWrap: 'wrap' }}>
           <div style={{ flex: 1, minWidth: 110 }}>
             <div style={{ fontFamily: 'var(--mono)', fontSize: '.48rem', color: 'var(--muted)', marginBottom: '.22rem' }}>Keep (primary)</div>
-            <input value={primary} onChange={e => setPrimary(e.target.value)} placeholder="e.g. Amazon" style={inputStyle} />
+            <input autoComplete="off" value={primary} onChange={e => setPrimary(e.target.value)} placeholder="e.g. Amazon" style={inputStyle} />
           </div>
           <div style={{ fontFamily: 'var(--mono)', fontSize: '.8rem', color: 'var(--dim)', flexShrink: 0, paddingBottom: '.45rem' }}>←</div>
           <div style={{ flex: 1, minWidth: 110 }}>
             <div style={{ fontFamily: 'var(--mono)', fontSize: '.48rem', color: 'var(--muted)', marginBottom: '.22rem' }}>Absorb (secondary)</div>
-            <input value={secondary} onChange={e => setSecondary(e.target.value)} placeholder="e.g. amazon.com" style={inputStyle} />
+            <input autoComplete="off" value={secondary} onChange={e => setSecondary(e.target.value)} placeholder="e.g. amazon.com" style={inputStyle} />
           </div>
           <button onClick={manualMerge} disabled={merging} style={{ fontFamily: 'var(--mono)', fontSize: '.6rem', padding: '.42rem .9rem', borderRadius: 7, border: '1px solid rgba(239,68,68,.3)', background: 'rgba(239,68,68,.08)', color: 'var(--red)', cursor: 'pointer', flexShrink: 0 }}>Merge →</button>
         </div>
@@ -1105,7 +1105,7 @@ export function MergePanel({ token, prefill }: { token: string; prefill: MergePr
         <div style={{ display: 'flex', gap: '.5rem', alignItems: 'flex-end', flexWrap: 'wrap' }}>
           <div style={{ flex: 1, minWidth: 140 }}>
             <div style={{ fontFamily: 'var(--mono)', fontSize: '.48rem', color: 'var(--muted)', marginBottom: '.22rem' }}>Absorbed company name</div>
-            <input value={resplitName} onChange={e => setResplitName(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') resplitCompany() }} placeholder="e.g. Towne Park" style={inputStyle} />
+            <input autoComplete="off" value={resplitName} onChange={e => setResplitName(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') resplitCompany() }} placeholder="e.g. Towne Park" style={inputStyle} />
           </div>
           <button onClick={resplitCompany} disabled={resplitting} style={{ fontFamily: 'var(--mono)', fontSize: '.6rem', padding: '.42rem .9rem', borderRadius: 7, border: '1px solid rgba(59,130,246,.35)', background: 'rgba(59,130,246,.1)', color: 'var(--blue)', cursor: 'pointer', flexShrink: 0 }}>{resplitting ? 'Separating…' : 'Separate ←'}</button>
         </div>
@@ -1277,7 +1277,7 @@ export function CompanyExportPanel({ token }: { token: string }) {
       <div style={{ display: 'flex', gap: '.5rem', alignItems: 'flex-end', flexWrap: 'wrap' }}>
         <div style={{ flex: 1, minWidth: 140 }}>
           <div style={{ fontFamily: 'var(--mono)', fontSize: '.48rem', color: 'var(--muted)', marginBottom: '.22rem' }}>Company name</div>
-          <input value={company} onChange={e => { setCompany(e.target.value); setReady(null) }} onKeyDown={e => { if (e.key === 'Enter') prepareJson() }} placeholder="e.g. FedEx" style={inputStyle} />
+          <input autoComplete="off" value={company} onChange={e => { setCompany(e.target.value); setReady(null) }} onKeyDown={e => { if (e.key === 'Enter') prepareJson() }} placeholder="e.g. FedEx" style={inputStyle} />
         </div>
         {ready ? (
           <button onClick={download} style={{ fontFamily: 'var(--mono)', fontSize: '.6rem', padding: '.42rem .9rem', borderRadius: 7, border: '1px solid rgba(16,185,129,.5)', background: 'rgba(16,185,129,.12)', color: 'var(--green)', cursor: 'pointer', flexShrink: 0 }}>
@@ -1764,7 +1764,7 @@ export function AllJobsBrowser({ token, onUnauthorized }: { token: string; onUna
     <Card style={{ marginBottom: '1.25rem' }}>
       <CardHeader title={`All job listings${totalJobs ? ` — ${totalJobs.toLocaleString()} total` : ''}`} />
       <div style={{ marginBottom: '.75rem' }}>
-        <input
+        <input autoComplete="off"
           type="text"
           placeholder="Filter by company…"
           value={search}
@@ -1905,7 +1905,7 @@ export function DeployPanel() {
             In Vercel → Seen project → Settings → find <span style={{ color: 'var(--white)' }}>Deploy Hooks</span> → create one for branch <span style={{ color: 'var(--blue)' }}>next-migration</span> → paste the URL below.
           </div>
           <div style={{ display: 'flex', gap: '.5rem', flexWrap: 'wrap' }}>
-            <input
+            <input autoComplete="off"
               type="text"
               value={input}
               onChange={e => setInput(e.target.value)}

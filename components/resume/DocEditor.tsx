@@ -20,14 +20,14 @@ function lowerFirst(t: string): string { return /^[A-Z][a-z]/.test(t) ? t.charAt
 function AutoArea({ value, onChange, className, placeholder, id, onBlur, rows = 1 }: { value: string; onChange: (v: string) => void; className?: string; placeholder?: string; id?: string; onBlur?: () => void; rows?: number }) {
   const ref = useRef<HTMLTextAreaElement>(null)
   useEffect(() => { const el = ref.current; if (!el) return; el.style.height = 'auto'; el.style.height = `${el.scrollHeight}px` }, [value])
-  return <textarea ref={ref} id={id} rows={rows} value={value} placeholder={placeholder} className={className} onChange={(e) => onChange(e.target.value)} onBlur={onBlur} />
+  return <textarea autoComplete="off" ref={ref} id={id} rows={rows} value={value} placeholder={placeholder} className={className} onChange={(e) => onChange(e.target.value)} onBlur={onBlur} />
 }
 
 function Field({ label, value, onChange, placeholder, onBlur, type = 'text' }: { label: string; value: string; onChange: (v: string) => void; placeholder?: string; onBlur?: () => void; type?: string }) {
   return (
     <div>
       <span className={s.label}>{label}</span>
-      <input type={type} className={s.input} value={value} placeholder={placeholder} onChange={(e) => onChange(e.target.value)} onBlur={onBlur} />
+      <input autoComplete="off" type={type} className={s.input} value={value} placeholder={placeholder} onChange={(e) => onChange(e.target.value)} onBlur={onBlur} />
     </div>
   )
 }
@@ -38,7 +38,7 @@ function DateField({ item, onChange }: { item: { start: string; end: string; dat
   return (
     <div>
       <span className={s.label}>Dates</span>
-      <input className={s.input} value={text} placeholder="Jun 2021 – Present" onChange={(e) => setText(e.target.value)} onBlur={() => { const t = text.trim(); const p = parseDateText(t); onChange({ start: p.start, end: p.end, dateText: t }) }} />
+      <input autoComplete="off" className={s.input} value={text} placeholder="Jun 2021 – Present" onChange={(e) => setText(e.target.value)} onBlur={() => { const t = text.trim(); const p = parseDateText(t); onChange({ start: p.start, end: p.end, dateText: t }) }} />
     </div>
   )
 }
@@ -253,7 +253,7 @@ export default function DocEditor({ doc, onChange, highlightId }: Props) {
           return (
             <div key={key} className={s.sec}>
               <div className={s.secHead}>
-                <input className={s.input} style={{ maxWidth: 260, fontFamily: 'var(--mono)', fontSize: '.62rem', textTransform: 'uppercase', letterSpacing: '.1em', color: 'var(--green)' }} value={ex.title} onChange={(e) => update((x) => { x.extra[xi].title = e.target.value })} />
+                <input autoComplete="off" className={s.input} style={{ maxWidth: 260, fontFamily: 'var(--mono)', fontSize: '.62rem', textTransform: 'uppercase', letterSpacing: '.1em', color: 'var(--green)' }} value={ex.title} onChange={(e) => update((x) => { x.extra[xi].title = e.target.value })} />
                 <div className={s.secTools}>
                   <button type="button" className={s.tiny} onClick={() => moveSection(key, -1)} aria-label="Move up">↑</button>
                   <button type="button" className={s.tiny} onClick={() => moveSection(key, 1)} aria-label="Move down">↓</button>
@@ -318,7 +318,7 @@ function SkillGroupEditor({ group, onChange, onRemove }: { group: ResumeSkillGro
         <Field label="Group (optional)" value={group.label} onChange={(v) => onChange({ ...group, label: v })} placeholder="Languages" />
         <div>
           <span className={s.label}>Skills — comma separated</span>
-          <input className={s.input} value={text} placeholder="Go, Python, SQL" onChange={(e) => setText(e.target.value)} onBlur={() => onChange({ ...group, items: splitSkillList(text) })} />
+          <input autoComplete="off" className={s.input} value={text} placeholder="Go, Python, SQL" onChange={(e) => setText(e.target.value)} onBlur={() => onChange({ ...group, items: splitSkillList(text) })} />
         </div>
         <button type="button" className={s.tiny} style={{ alignSelf: 'end', marginBottom: '.2rem' }} onClick={onRemove} aria-label="Remove group">✕</button>
       </div>

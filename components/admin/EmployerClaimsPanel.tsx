@@ -89,7 +89,7 @@ export function EmployerClaimsPanel({ token }: { token: string }) {
       {/* God-view any company — the owner's admin god-view entry (not limited to claims) */}
       <div style={{ display: 'flex', gap: '.5rem', flexWrap: 'wrap', alignItems: 'center', padding: '.6rem 0 .8rem', borderBottom: '1px solid var(--line2)', marginBottom: '.6rem' }}>
         <span style={{ fontFamily: 'var(--mono)', fontSize: '.55rem', color: 'var(--dim)', textTransform: 'uppercase', letterSpacing: '.1em' }}>God-view any company</span>
-        <input
+        <input autoComplete="off"
           value={godviewCompany}
           onChange={e => setGodviewCompany(e.target.value)}
           placeholder="Company name"

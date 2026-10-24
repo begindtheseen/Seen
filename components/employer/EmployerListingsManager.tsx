@@ -660,7 +660,7 @@ function AddListingForm({ token, onCreated, onCancel, initial, editId, seenApply
       {!isEdit && <div style={{ marginBottom: '1rem', paddingBottom: '1rem', borderBottom: '1px solid var(--line)' }}>
         <label style={label}>Import from a link — your careers page, ATS, Indeed, LinkedIn…</label>
         <div style={{ display: 'flex', gap: '.5rem', flexWrap: 'wrap' }}>
-          <input value={importUrl} onChange={e => setImportUrl(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') importFromLink() }} placeholder="https://boards.greenhouse.io/yourco/jobs/123" style={{ ...field, flex: '1 1 240px', width: 'auto' }} />
+          <input autoComplete="off" value={importUrl} onChange={e => setImportUrl(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') importFromLink() }} placeholder="https://boards.greenhouse.io/yourco/jobs/123" style={{ ...field, flex: '1 1 240px', width: 'auto' }} />
           <button onClick={importFromLink} disabled={importing} style={{ ...ghostBtn, opacity: importing ? .6 : 1 }}>{importing ? 'Reading…' : 'Import'}</button>
         </div>
         <div style={{ ...mono('.55rem', 'var(--dim)'), marginTop: '.4rem', lineHeight: 1.6 }}>
@@ -673,7 +673,7 @@ function AddListingForm({ token, onCreated, onCancel, initial, editId, seenApply
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(200px,1fr))', gap: '.9rem' }}>
         <div>
           <label style={label}>Title *</label>
-          <input value={title} onChange={e => setTitle(e.target.value)} placeholder="Senior Product Designer" style={field} />
+          <input autoComplete="off" value={title} onChange={e => setTitle(e.target.value)} placeholder="Senior Product Designer" style={field} />
         </div>
         {seenApplyAvailable && (
           <div style={{ gridColumn: '1 / -1' }}>
@@ -696,16 +696,16 @@ function AddListingForm({ token, onCreated, onCancel, initial, editId, seenApply
         {needsLink && (
           <div>
             <label style={label}>Apply link — where candidates are redirected to apply *</label>
-            <input value={applyUrl} onChange={e => setApplyUrl(e.target.value)} placeholder="https://…" style={field} />
+            <input autoComplete="off" value={applyUrl} onChange={e => setApplyUrl(e.target.value)} placeholder="https://…" style={field} />
           </div>
         )}
         <div>
           <label style={label}>Location</label>
-          <input value={location} onChange={e => setLocation(e.target.value)} placeholder="Remote · US" style={field} />
+          <input autoComplete="off" value={location} onChange={e => setLocation(e.target.value)} placeholder="Remote · US" style={field} />
         </div>
         <div>
           <label style={label}>Salary</label>
-          <input value={salary} onChange={e => setSalary(e.target.value)} placeholder="$120k–$150k" style={field} />
+          <input autoComplete="off" value={salary} onChange={e => setSalary(e.target.value)} placeholder="$120k–$150k" style={field} />
         </div>
         <div>
           <label style={label}>Type</label>
@@ -716,7 +716,7 @@ function AddListingForm({ token, onCreated, onCancel, initial, editId, seenApply
         </div>
         <div style={{ gridColumn: '1 / -1' }}>
           <label style={label}>Description</label>
-          <textarea value={description} onChange={e => setDescription(e.target.value)} rows={3} placeholder="What the role is and who it's for." style={{ ...field, resize: 'vertical' }} />
+          <textarea autoComplete="off" value={description} onChange={e => setDescription(e.target.value)} rows={3} placeholder="What the role is and who it's for." style={{ ...field, resize: 'vertical' }} />
         </div>
       </div>
       {err && <div style={{ ...mono('.62rem', 'var(--red)'), marginTop: '.8rem' }}>{err}</div>}
@@ -791,17 +791,17 @@ function DisputeModal({ listing, token, onClose, onSubmitted, defaultKind }: { l
         </div>
 
         <label style={label}>What&apos;s wrong? *</label>
-        <textarea value={detail} onChange={e => setDetail(e.target.value)} rows={4} placeholder="Tell our reviewers what needs to change and why." style={{ ...field, resize: 'vertical', marginBottom: '1rem' }} />
+        <textarea autoComplete="off" value={detail} onChange={e => setDetail(e.target.value)} rows={4} placeholder="Tell our reviewers what needs to change and why." style={{ ...field, resize: 'vertical', marginBottom: '1rem' }} />
 
         {kind === 'edit' && (
           <div style={{ borderTop: '1px solid var(--line)', paddingTop: '1rem', marginBottom: '1rem' }}>
             <div style={{ ...mono('.55rem', 'var(--blue)'), textTransform: 'uppercase', letterSpacing: '.1em', marginBottom: '.8rem' }}>Proposed changes (optional)</div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(180px,1fr))', gap: '.8rem' }}>
-              <div><label style={label}>New title</label><input value={pc.title || ''} onChange={e => setPc(p => ({ ...p, title: e.target.value }))} style={field} /></div>
-              <div><label style={label}>New location</label><input value={pc.location || ''} onChange={e => setPc(p => ({ ...p, location: e.target.value }))} style={field} /></div>
-              <div><label style={label}>New salary</label><input value={pc.salary || ''} onChange={e => setPc(p => ({ ...p, salary: e.target.value }))} style={field} /></div>
-              <div><label style={label}>New apply link</label><input value={pc.apply_url || ''} onChange={e => setPc(p => ({ ...p, apply_url: e.target.value }))} placeholder="https://…" style={field} /></div>
-              <div style={{ gridColumn: '1 / -1' }}><label style={label}>New description</label><textarea value={pc.description || ''} onChange={e => setPc(p => ({ ...p, description: e.target.value }))} rows={2} style={{ ...field, resize: 'vertical' }} /></div>
+              <div><label style={label}>New title</label><input autoComplete="off" value={pc.title || ''} onChange={e => setPc(p => ({ ...p, title: e.target.value }))} style={field} /></div>
+              <div><label style={label}>New location</label><input autoComplete="off" value={pc.location || ''} onChange={e => setPc(p => ({ ...p, location: e.target.value }))} style={field} /></div>
+              <div><label style={label}>New salary</label><input autoComplete="off" value={pc.salary || ''} onChange={e => setPc(p => ({ ...p, salary: e.target.value }))} style={field} /></div>
+              <div><label style={label}>New apply link</label><input autoComplete="off" value={pc.apply_url || ''} onChange={e => setPc(p => ({ ...p, apply_url: e.target.value }))} placeholder="https://…" style={field} /></div>
+              <div style={{ gridColumn: '1 / -1' }}><label style={label}>New description</label><textarea autoComplete="off" value={pc.description || ''} onChange={e => setPc(p => ({ ...p, description: e.target.value }))} rows={2} style={{ ...field, resize: 'vertical' }} /></div>
             </div>
           </div>
         )}
@@ -1049,7 +1049,7 @@ function ApplicationsInbox({ listing, token, onClose, canClose }: { listing: Lis
                   </div>
                 )}
                 <div style={{ display: 'flex', gap: '.4rem', alignItems: 'flex-end', marginTop: '.6rem' }}>
-                  <textarea
+                  <textarea autoComplete="off"
                     value={drafts[a.id] || ''}
                     onChange={e => setDrafts(m => ({ ...m, [a.id]: e.target.value }))}
                     maxLength={600}

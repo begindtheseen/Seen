@@ -65,7 +65,7 @@ export default function RoundsPrompt({ app, onSubmit, onSkip }: Props) {
           <div style={{ fontFamily: 'var(--mono)', fontSize: '.62rem', textTransform: 'uppercase', letterSpacing: '.09em', color: 'var(--dim)', marginBottom: '.5rem' }}>
             Anything notable? (optional)
           </div>
-          <textarea
+          <textarea autoComplete="off"
             value={notes}
             onChange={e => setNotes(e.target.value)}
             placeholder="Fast process, great team, salary negotiated well..."

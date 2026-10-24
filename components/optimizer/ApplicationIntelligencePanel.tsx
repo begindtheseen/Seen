@@ -190,7 +190,7 @@ function ImproveSection({ questions, onAnswers, rerunning }: {
             <label style={{ display: 'block', fontSize: '.72rem', color: 'var(--sub)', lineHeight: 1.5, marginBottom: '.3rem', overflowWrap: 'anywhere' }}>
               {q.question}{q.unit ? <span style={{ color: 'var(--muted)', fontFamily: mono, fontSize: '.58rem' }}> ({q.unit})</span> : null}
             </label>
-            <input
+            <input autoComplete="off"
               type="text"
               value={vals[q.id] || ''}
               onChange={e => setVals(v => ({ ...v, [q.id]: e.target.value }))}

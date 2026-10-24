@@ -517,7 +517,7 @@ function ReportPage() {
               </div>
             </div>
             {lbl('Anything else? (optional)')}
-            <textarea
+            <textarea autoComplete="off"
               placeholder="What stood out about this process? How did it make you feel?"
               value={notes}
               onChange={e => setNotes(e.target.value)}

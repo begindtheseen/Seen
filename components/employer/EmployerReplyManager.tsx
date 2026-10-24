@@ -145,7 +145,7 @@ export function EmployerReplyManager({ company }: { company: string }) {
                   </div>
                 ) : isOpen ? (
                   <div style={{ borderTop: '1px solid var(--line)', paddingTop: '.6rem', display: 'flex', flexDirection: 'column', gap: '.5rem' }}>
-                    <textarea
+                    <textarea autoComplete="off"
                       value={draft} onChange={e => setDraft(e.target.value)} rows={3} autoFocus
                       placeholder="Add your side — what actually happened, or what you're changing. Shown publicly after review; never affects your score."
                       style={{ width: '100%', boxSizing: 'border-box', background: 'var(--raised)', border: '1px solid var(--line2)', borderRadius: 8, padding: '.6rem .7rem', fontFamily: 'var(--sans, inherit)', fontSize: '.78rem', color: 'var(--white)', outline: 'none', resize: 'vertical' }}

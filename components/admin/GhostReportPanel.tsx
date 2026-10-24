@@ -96,7 +96,7 @@ export function GhostReportPanel() {
             </div>
           )}
 
-          <textarea
+          <textarea autoComplete="off"
             readOnly
             value={caption}
             onFocus={(e) => e.currentTarget.select()}

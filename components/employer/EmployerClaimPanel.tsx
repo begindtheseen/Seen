@@ -177,7 +177,7 @@ export function EmployerClaimPanel() {
           onKeyDown={e => { if (e.key === 'Enter') submit() }}
           placeholder="Your company name"
           aria-label="Your company name"
-          autoComplete="organization"
+          autoComplete="off"
           style={{ flex: 1, minWidth: 220, background: 'var(--raised)', border: '1px solid var(--line2)', borderRadius: 9, padding: '.7rem .9rem', ...mono('.75rem', 'var(--white)'), outline: 'none' }}
         />
         <button onClick={submit} disabled={busy || !name.trim()} style={{ ...primaryBtn, opacity: busy || !name.trim() ? .6 : 1 }}>

@@ -372,11 +372,11 @@ export default function ProfilePage() {
               <div className={styles.grid2}>
                 <div className={styles.field}>
                   <label className={styles.label} htmlFor="pf-name">First name</label>
-                  {loaded ? <input id="pf-name" className={styles.input} type="text" autoComplete="given-name" maxLength={PROFILE_LIMITS.name} value={name} onChange={e => { touched.current.name = true; setName(e.target.value) }} placeholder="Your first name" /> : <div className={styles.skeleton} />}
+                  {loaded ? <input id="pf-name" className={styles.input} type="text" autoComplete="off" maxLength={PROFILE_LIMITS.name} value={name} onChange={e => { touched.current.name = true; setName(e.target.value) }} placeholder="Your first name" /> : <div className={styles.skeleton} />}
                 </div>
                 <div className={styles.field}>
                   <label className={styles.label} htmlFor="pf-email">Email</label>
-                  <input id="pf-email" className={styles.input} type="email" value={user?.email || ''} disabled />
+                  <input autoComplete="off" id="pf-email" className={styles.input} type="email" value={user?.email || ''} disabled />
                 </div>
                 <div className={styles.field}>
                   <label className={styles.label} htmlFor="pf-city">Your city</label>
