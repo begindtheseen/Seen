@@ -184,7 +184,7 @@ export default function TermsPage() {
           <ul style={{ margin: '0 0 .9rem', paddingLeft: '1.1rem' }}>
             <li style={li}>purchased credits do not expire and are not reset by the daily free-credit reset; they are spent after your free daily credit;</li>
             <li style={li}>a purchased Pro period ends on its last day with no renewal and no charge;</li>
-            <li style={li}>deleting your account removes any remaining purchased credits and unused Pro time, and those are not refunded;</li>
+            <li style={li}>deleting your account removes any remaining purchased credits and unused Pro time, and those are not refunded; it also cancels an active Seen Pro subscription immediately, with no refund for the rest of the current period and no further charges;</li>
             <li style={li}>one-time charges are generally non-refundable except where required by law.</li>
           </ul>
         </div>

@@ -30,4 +30,6 @@ export {
   ONE_TIME_SKUS,
   hasProAccess,
   creditBalance,
+  firstCreditsRow,
+  earnedBalance,
 } from './server/creditRules.js';

@@ -15,7 +15,7 @@ import { trackApplyClick } from '@/lib/trackApply'
 import { hasConfirmedCreditUse } from '@/lib/creditConfirm'
 import { JOB_INSIGHTS_COST, RESUME_OPTIMIZE_COST, creditCostLabel, dailyResetLabel } from '@/lib/creditRules'
 import { displayCompanyName } from '@/lib/companyDisplay'
-import { displayPay } from '@/lib/jobs/pay.js'
+import { displayPay, payLabel } from '@/lib/jobs/pay.js'
 import { paragraphs, isDescriptionPreview, stripDanglingEllipsis, endsCutOff } from '@/lib/jobs/descriptionText.js'
 import { httpHref } from '@/lib/safeHref.js'
 
@@ -284,7 +284,7 @@ export default function JobDetailDrawer({ job, isLoggedIn, onClose, onApply, onC
             <div className="jd-stat"><span className="jd-sn" style={{ color: job.waste == null ? 'var(--dim)' : job.waste > 55 ? 'var(--red)' : job.waste > 35 ? 'var(--amber)' : 'var(--green)' }}>{job.waste == null ? '–' : `${job.waste}%`}</span><span className="jd-sl">Waste risk</span></div>
             <div className="jd-stat"><span className="jd-sn" style={{ fontSize: '.72rem' }}>{job.type || 'Full-time'}</span><span className="jd-sl">Type</span></div>
             <div className="jd-stat"><span className="jd-sn" style={{ fontSize: '.72rem' }}>{job.level || '—'}</span><span className="jd-sl">Level</span></div>
-            <div className="jd-stat"><span className="jd-sn" style={{ color: 'var(--green)', fontSize: '.75rem' }}>{pay || '—'}</span><span className="jd-sl">{pay && /\/hr$/.test(pay) ? 'Hourly pay' : 'Salary'}</span></div>
+            <div className="jd-stat"><span className="jd-sn" style={{ color: 'var(--green)', fontSize: '.75rem' }}>{pay || '—'}</span><span className="jd-sl">{pay ? payLabel(pay) : 'Salary'}</span></div>
             <div className="jd-stat"><span className="jd-sn" style={{ fontSize: '.65rem', color: 'var(--blue)' }}>{job.source || 'Job board'}</span><span className="jd-sl">Source</span></div>
           </div>
 

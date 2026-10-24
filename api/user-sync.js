@@ -2,14 +2,17 @@
 // The client sends its Supabase access token; we validate it here, then use the
 // service key to talk to the DB. No RLS policies required on the client side.
 
-import { createHmac, timingSafeEqual } from 'crypto';
+import { resolveUid, sessionStillValid } from '../lib/server/supabaseJwt.js';
 import { rateLimit } from '../lib/server/ratelimit.js';
 import { broadcastActivity } from '../lib/server/realtime.js';
 import { buildOpportunities } from './_utils/opportunityEngine.js';
 import { extractEmployment } from '../lib/server/resumeAnalysis.js';
 import { buildResumeSurvey, RESUME_SURVEY_KEYS, mapAnswersToReport } from './_utils/resumeSurvey.js';
 import { normalizeCompany, isValidCompanyName, resolveOrCreateCompany, assessSubmitTrust, writeReport, recomputeCompanyScoreFromReports } from './_utils/reportWrite.js';
-import { WELCOME_CREDITS, FREE_DAILY_CREDITS, PRO_DAILY_CREDITS, RESUME_OPTIMIZE_COST, RESUME_SURVEY_AWARD, TRACK_APPLICATION_AWARD, MAX_DAILY_EARN, MAX_FREE_BALANCE, hasProAccess, creditBalance } from '../lib/server/creditRules.js';
+import { WELCOME_CREDITS, FREE_DAILY_CREDITS, PRO_DAILY_CREDITS, RESUME_OPTIMIZE_COST, RESUME_SURVEY_AWARD, TRACK_APPLICATION_AWARD, MAX_DAILY_EARN, hasProAccess, creditBalance, earnedBalance } from '../lib/server/creditRules.js';
+import { ensureCreditsRow } from '../lib/server/ensureCreditsRow.js';
+import { firstCreditsRow as firstCreditsRowFallback } from '../lib/server/creditRules.js';
+import { cancelLiveSubscriptions } from '../lib/server/stripeCancel.js';
 import { normalizeClaimCompany } from '../lib/server/employerClaims.js';
 import { buildNotificationRow } from '../lib/server/employerNotificationsStore.js';
 import { isReadableResume } from '../lib/server/resumeReadability.js';
@@ -17,23 +20,14 @@ import { deleteApplicantResumes } from '../lib/server/seenApplyStore.js';
 import { decodeThread } from '../lib/server/applicationThread.js';
 import { pacificDate } from '../lib/time/pacific.js';
 import * as inbox from '../lib/server/inbox/store.js';
+import { PROFILE_LIMITS, PROFILE_NAME_REQUIRED } from '../lib/profileLimits.js';
+import { sanitizeEvents, clientApplicationId, casWindow, timelineAnomalies, naturalKeyQuery, isMissingColumn, cleanText, COMPANY_MAX, ROLE_MAX, CITY_MAX, PLATFORM_MAX } from '../lib/server/trackerWrites.js';
 
-// Verify a Supabase JWT locally (HS256) — no network round-trip.
-// Returns the payload (with .sub = user UUID) on success, null on failure.
-// Requires SUPABASE_JWT_SECRET env var from Supabase Dashboard → Settings → API.
-function verifyJWTLocal(token, secret) {
-  try {
-    const parts = token.split('.');
-    if (parts.length !== 3) return null;
-    const mac = createHmac('sha256', secret).update(`${parts[0]}.${parts[1]}`).digest('base64url');
-    const sigBuf = Buffer.from(parts[2], 'base64url');
-    const macBuf = Buffer.from(mac, 'base64url');
-    if (sigBuf.length !== macBuf.length || !timingSafeEqual(sigBuf, macBuf)) return null;
-    const payload = JSON.parse(Buffer.from(parts[1], 'base64url').toString('utf8'));
-    if (!payload.sub || payload.exp < Math.floor(Date.now() / 1000)) return null;
-    return payload;
-  } catch { return null; }
-}
+// Does applications.client_id exist yet (migration 20261024130000)? Probed on use; a "no" is
+// re-checked every 10 minutes so an applied migration is picked up without a redeploy.
+let clientIdColumn = { ok: null, at: 0 };
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export default async function handler(req, res) {
   const _o=req.headers.origin||'';
@@ -53,30 +47,22 @@ export default async function handler(req, res) {
   const token = (req.headers.authorization || '').replace(/^Bearer\s+/i, '').trim();
   if (!token) return res.status(401).json({ error: 'No auth token' });
 
-  // IP-level gate — blocks flood attempts before any DB or auth work
-  const { allowed: ipOk } = await rateLimit(req, 'user-sync');
+  // Who is calling, in ONE parallel hop (lib/server/supabaseJwt.js):
+  //  - the IP gate (rate-limit RPC, ≤350 ms);
+  //  - the signature, verified locally (HS256 secret, else the project's ES256 JWKS cached in the warm
+  //    function) — a forged or expired token never costs a network call;
+  //  - "does this session still exist?" from the auth server, so "Sign out of all devices" ends the
+  //    other devices' access at once, not when their hour-long access token expires.
+  // Before 2026-10-24 these were three SERIAL trips (rate limit → /auth/v1/user with no timeout → DB),
+  // and an auth hiccup hung the whole call to the 15 s limit (the audit's 504s on trivial reads).
+  const authOpts = { supabaseUrl: SUPABASE_URL, serviceKey: SERVICE_KEY };
+  const whoP = resolveUid(token, authOpts);
+  const aliveP = whoP.then((w) => (w && w.via !== 'auth_api' ? sessionStillValid(token, authOpts) : true));
+  const [{ allowed: ipOk }, who, alive] = await Promise.all([rateLimit(req, 'user-sync'), whoP, aliveP]);
   if (!ipOk) return res.status(429).json({ error: 'Too many requests — slow down.' });
-
-  let uid;
-  const JWT_SECRET = process.env.SUPABASE_JWT_SECRET;
-  // Fast path: verify the HS256 JWT locally (no round-trip). Supabase has migrated projects
-  // to ASYMMETRIC signing keys (ES256/RS256), which this HS256 check can't verify — so when
-  // local verification fails we MUST fall back to the Supabase auth API rather than 401.
-  // (gateAI in lib/server/credits.js and api/stripe.js already do exactly this; user-sync was
-  // the one endpoint missing the fallback, which 401'd every request once tokens went ES256.)
-  const payload = JWT_SECRET ? verifyJWTLocal(token, JWT_SECRET) : null;
-  if (payload) {
-    uid = payload.sub;
-  } else {
-    // Validate via the Supabase auth API (works for any signing algorithm).
-    const userRes = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
-      headers: { apikey: SERVICE_KEY, Authorization: `Bearer ${token}` },
-    });
-    if (!userRes.ok) return res.status(401).json({ error: 'Invalid token' });
-    const { id } = await userRes.json();
-    if (!id) return res.status(401).json({ error: 'Could not identify user' });
-    uid = id;
-  }
+  if (!who) return res.status(401).json({ error: 'Invalid token' });
+  if (alive === false) return res.status(401).json({ error: 'Session ended — sign in again.' });
+  const uid = who.uid;
 
   // ── All DB calls use service key — bypasses RLS ─────────────────────────────
   const db = (path, opts = {}) => fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
@@ -93,7 +79,7 @@ export default async function handler(req, res) {
   let body = req.body;
   if (typeof body === 'string') { try { body = JSON.parse(body); } catch(e) { body = {}; } }
   const { action } = body || {};
-  console.log(`[user-sync] action=${action} uid=${uid}`);
+  console.log(`[user-sync] action=${action} uid=${uid} auth=${who.via}`);
 
   // Rate-limit mutating actions per user (not reads — those are cheap DB fetches)
   const WRITE_ACTIONS = new Set(['add_application','update_application','remove_application','save_job','unsave_job','save_profile','save_resume','delete_account','submit_resume_survey','report_job_availability']);
@@ -148,7 +134,10 @@ export default async function handler(req, res) {
     const appsLimit = Math.min(500, Math.max(1, parseInt(body.apps_limit) || 200));
     const appsOffset = Math.max(0, parseInt(body.apps_offset) || 0);
     const today = pacificDate();
-    const [appsRes, savedRes, recentRes, credRes, flagsRes, threadsRes] = await Promise.all([
+    // Inbox Autopilot status rides along (same Promise.all, cached table probe) so the dashboard and the
+    // tracker do not fire a separate inbox_status call at mount. null = could not be read right now.
+    const inboxQ = inbox.dbClient(SUPABASE_URL, SERVICE_KEY);
+    const [appsRes, savedRes, recentRes, credRes, flagsRes, threadsRes, inboxStatus] = await Promise.all([
       db(`applications?user_id=eq.${uid}&select=id,job_id,company_name,role,city,platform,job_url,status,stage,score,waste_score,events,applied_at,employer_stage,created_at,updated_at&order=created_at.desc&limit=${appsLimit}&offset=${appsOffset}`, { headers: { Prefer: 'count=estimated' } }),
       db(`saved_jobs?user_id=eq.${uid}&order=saved_at.desc&limit=500`),
       db(`user_recent_cos?user_id=eq.${uid}&order=viewed_at.desc&limit=6`),
@@ -157,6 +146,7 @@ export default async function handler(req, res) {
       // Apply-on-Seen applications + their conversations (employer messages, the withdrawal note) — read
       // from the one copy on seen_applications. 400s harmlessly before migration 20261018150000.
       db(`seen_applications?applicant_user_id=eq.${uid}&select=job_id,thread&order=updated_at.desc&limit=200`).catch(() => null),
+      inbox.status(inboxQ, uid).catch(() => null),
     ]);
     const apps   = appsRes.ok   ? await appsRes.json()   : [];
     const threads = threadsRes && threadsRes.ok ? await threadsRes.json().catch(() => []) : [];
@@ -199,53 +189,105 @@ export default async function handler(req, res) {
     const ua = (req.headers['user-agent'] || '').slice(0, 200);
     db('login_signals', { method: 'POST', body: JSON.stringify({ user_id: uid, ip_address: ip, user_agent: ua }), headers: { Prefer: 'return=minimal' } }).catch(() => {});
     const appsTotal = parseInt((appsRes.headers?.get('content-range') || '').split('/')[1]) || apps.length;
-    return res.status(200).json({ applications: apps, saved_jobs: saved, apps_total: appsTotal, apps_offset: appsOffset, recent_cos: recent, credits, flags });
+    return res.status(200).json({ applications: apps, saved_jobs: saved, apps_total: appsTotal, apps_offset: appsOffset, recent_cos: recent, credits, flags, inbox: inboxStatus });
   }
 
   // ── ADD APPLICATION ─────────────────────────────────────────────────────────
+  // Idempotent on the tracker's own id ("app_<ms>", lib/stores/AppStore add): a retried or replayed
+  // request returns the row it already made (audit 3 H4: one request → two rows during a stall).
+  // Before migration 20261024130000 (client_id column + unique index) the same request is matched by
+  // its natural key (same user, company, role, applied_at, created in the last 15 min).
   if (action === 'add_application') {
+    if (clientIdColumn.ok === false && Date.now() - clientIdColumn.at > 600000) clientIdColumn = { ok: null, at: 0 };
     const a = body.application || {};
-    // Sanitize the client event history: array of small objects, capped, required fields only.
-    const events = Array.isArray(a.events)
-      ? a.events.slice(0, 50).map(e => ({
-          id: String(e?.id || '').slice(0, 40),
-          type: String(e?.type || '').slice(0, 40),
-          date: Number(e?.date) || Date.now(),
-          source: String(e?.source || 'user').slice(0, 20),
-          confidence: e?.confidence ?? 'low',
-        })).filter(e => e.type)
-      : [];
+    const events = sanitizeEvents(a.events);
+    const clientId = clientApplicationId(a.id);
     const row = {
       user_id:      uid,
       job_id:       a.jobId ? String(a.jobId).slice(0, 80) : null,
-      company_name: a.company   || '',
-      role:         a.role      || '',
-      city:         a.location  || '',
-      platform:     a.platform  || 'Seen',
+      company_name: cleanText(a.company, COMPANY_MAX),
+      role:         cleanText(a.role, ROLE_MAX),
+      city:         cleanText(a.location, CITY_MAX),
+      platform:     cleanText(a.platform, PLATFORM_MAX) || 'Seen',
       job_url:      a.jobUrl    || null,
       status:       a.status    || 'active',
       stage:        a.stage     || 'Applied',
       score:        a.score     || null,
       waste_score:  a.waste     || null,
-      applied_at:   a.appliedAt ? new Date(a.appliedAt).toISOString() : new Date().toISOString(),
+      applied_at:   a.appliedAt && Number.isFinite(new Date(a.appliedAt).getTime()) ? new Date(a.appliedAt).toISOString() : new Date().toISOString(),
       events,
     };
-    const r = await db('applications', { method: 'POST', body: JSON.stringify(row), headers: { Prefer: 'return=representation' } });
+    // One row by a filter. `missing` = PostgREST says the client_id column is not there yet
+    // (PGRST204 / 42703) — any other refusal is not read as "no column".
+    const findOne = async (q) => {
+      const r = await db(q).catch(() => null);
+      if (!r) return { row: null, missing: false };
+      if (!r.ok) {
+        const e = await r.json().catch(() => ({}));
+        return { row: null, missing: r.status === 400 && isMissingColumn(e) };
+      }
+      const rows = await r.json().catch(() => []);
+      return { row: Array.isArray(rows) && rows[0] ? rows[0] : null, missing: false };
+    };
+    const byClientId = `applications?user_id=eq.${uid}&client_id=eq.${encodeURIComponent(clientId || '')}&select=id,updated_at&limit=1`;
+    const existing = (row) => res.status(200).json({ id: row.id, updated_at: row.updated_at || null, existing: true });
+    // 1. The same client id already landed (after the migration). A different client id is a
+    //    different add, even for the same company + role on the same day.
+    if (clientId && clientIdColumn.ok !== false) {
+      const hit = await findOne(byClientId);
+      if (hit.missing) clientIdColumn = { ok: false, at: Date.now() };
+      else if (hit.row) return existing(hit.row);
+    }
+    // 2. Before the migration: the same request already landed (natural key).
+    if (!clientId || clientIdColumn.ok === false) {
+      const hit = await findOne(naturalKeyQuery(uid, row));
+      if (hit.row) return existing(hit.row);
+    }
+    // 3. Insert — with the client id and ON CONFLICT DO NOTHING when the column exists, plain otherwise.
+    let r = null;
+    if (clientId && clientIdColumn.ok !== false) {
+      r = await db('applications?on_conflict=user_id,client_id', { method: 'POST', body: JSON.stringify({ ...row, client_id: clientId }), headers: { Prefer: 'resolution=ignore-duplicates,return=representation' } });
+      if (!r.ok && r.status === 400) {
+        const e = await r.clone().json().catch(() => ({}));
+        if (isMissingColumn(e)) { clientIdColumn = { ok: false, at: Date.now() }; r = null; }
+        // 42P10: the column exists but its unique index does not (yet) — store the id without ON CONFLICT.
+        else if (e && e.code === '42P10') r = await db('applications', { method: 'POST', body: JSON.stringify({ ...row, client_id: clientId }), headers: { Prefer: 'return=representation' } });
+      } else if (r.ok) clientIdColumn = { ok: true, at: Date.now() };
+    }
+    if (!r) r = await db('applications', { method: 'POST', body: JSON.stringify(row), headers: { Prefer: 'return=representation' } });
     if (!r.ok) {
       const errText = await r.text().catch(() => '');
       console.error('[user-sync] add_application failed:', r.status, errText);
-      return res.status(400).json({ error: 'Insert failed' });
+      // A database timeout / outage is retryable (the client keeps the card and resends it).
+      return res.status(r.status >= 500 ? 502 : 400).json({ error: 'Insert failed' });
     }
-    const data = await r.json();
+    let data = await r.json().catch(() => []);
+    if (!Array.isArray(data) || !data.length) {
+      // The unique index swallowed a concurrent duplicate: answer with the row that won.
+      const winner = clientId ? (await findOne(byClientId)).row : null;
+      if (winner) return existing(winner);
+      data = [];
+    }
     console.log('[user-sync] add_application ok, id:', data?.[0]?.id);
-    return res.status(200).json({ id: data?.[0]?.id || null });
+    return res.status(200).json({ id: data?.[0]?.id || null, updated_at: data?.[0]?.updated_at || null });
   }
 
   // ── REMOVE APPLICATION ──────────────────────────────────────────────────────
   if (action === 'remove_application') {
     const { id } = body;
-    // Accept both real UUIDs and legacy app_ ids stored in the DB
-    if (id) await db(`applications?id=eq.${encodeURIComponent(id)}&user_id=eq.${uid}`, { method: 'DELETE', headers: { Prefer: 'return=minimal' } });
+    if (!id) return res.status(400).json({ error: 'id required' });
+    // A client-local 'app_' id never reached the DB (the column is uuid): nothing to delete, say so.
+    if (!UUID_RE.test(String(id))) return res.status(200).json({ ok: false, reason: 'not_synced' });
+    // The WHERE scopes to the caller; `return=representation` tells us whether a row was actually
+    // the caller's. Another user's id, or one already deleted elsewhere, is a 404 — never a false
+    // "ok" (audit 2026-10-24, M3). The row itself is never touched when it is not the caller's.
+    const r = await db(`applications?id=eq.${encodeURIComponent(id)}&user_id=eq.${uid}&select=id`, { method: 'DELETE', headers: { Prefer: 'return=representation' } });
+    if (!r.ok) {
+      console.error('[user-sync] remove_application failed:', r.status);
+      return res.status(200).json({ ok: false, reason: 'delete_failed' });
+    }
+    const gone = await r.json().catch(() => []);
+    if (!Array.isArray(gone) || gone.length === 0) return res.status(404).json({ ok: false, reason: 'not_found' });
     return res.status(200).json({ ok: true });
   }
 
@@ -281,42 +323,64 @@ export default async function handler(req, res) {
   }
 
   // ── UPDATE APPLICATION STAGE/STATUS/EDIT ─────────────────────────────────────────
+  // Compare-and-set (audit 3 H4): the client sends `updatedAt`, the millisecond it last saw on the
+  // row; the PATCH matches only that row state. 0 rows → 409 with the current row (another device,
+  // or this device's own timed-out write that ran late), or 410 when the row is gone. Without an
+  // `updatedAt` (older clients) the PATCH is unconditional, as before.
   if (action === 'update_application') {
     const { id, changes } = body;
     if (!id || !changes) return res.status(400).json({ error: 'id and changes required' });
     // The id column is uuid — a legacy client-local 'app_...' id can never match a DB row.
     // Report that honestly so the client knows the update did NOT persist (instead of the
     // old behavior: PostgREST 400s on the uuid cast and we still said ok:true).
-    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(id))) {
+    if (!UUID_RE.test(String(id))) {
       return res.status(200).json({ ok: false, reason: 'not_synced' });
     }
     const allowed = {};
-    if (changes.stage)  allowed.stage  = changes.stage;
-    if (changes.status) allowed.status = changes.status;
-    if (changes.events && Array.isArray(changes.events)) allowed.events = changes.events.slice(0, 50);
+    if (changes.stage)  allowed.stage  = String(changes.stage).slice(0, 40);
+    if (changes.status) allowed.status = String(changes.status).slice(0, 20);
+    if (Array.isArray(changes.events)) allowed.events = sanitizeEvents(changes.events);
     // The card's Edit (AppStore EDITABLE_KEYS): the user's own record of what they applied to.
     // Same shape as add_application; company and role may not be blanked; applied_at must parse.
-    const text = (v, max) => String(v).trim().slice(0, max);
-    if (typeof changes.company === 'string' && text(changes.company, 200)) allowed.company_name = text(changes.company, 200);
-    if (typeof changes.role === 'string' && text(changes.role, 200))       allowed.role = text(changes.role, 200);
-    if (typeof changes.location === 'string') allowed.city = text(changes.location, 120);
-    if (typeof changes.platform === 'string' && text(changes.platform, 60)) allowed.platform = text(changes.platform, 60);
+    if (typeof changes.company === 'string' && cleanText(changes.company, COMPANY_MAX)) allowed.company_name = cleanText(changes.company, COMPANY_MAX);
+    if (typeof changes.role === 'string' && cleanText(changes.role, ROLE_MAX))          allowed.role = cleanText(changes.role, ROLE_MAX);
+    if (typeof changes.location === 'string') allowed.city = cleanText(changes.location, CITY_MAX);
+    if (typeof changes.platform === 'string' && cleanText(changes.platform, PLATFORM_MAX)) allowed.platform = cleanText(changes.platform, PLATFORM_MAX);
     if (changes.appliedAt != null) {
       const t = new Date(changes.appliedAt).getTime();
       if (Number.isFinite(t) && t <= Date.now() + 86400000) allowed.applied_at = new Date(t).toISOString();
     }
-    if (Object.keys(allowed).length) {
-      const r = await db(`applications?id=eq.${encodeURIComponent(id)}&user_id=eq.${uid}`, {
-        method: 'PATCH', body: JSON.stringify({ ...allowed, updated_at: new Date().toISOString() }),
-        headers: { Prefer: 'return=minimal' },
-      });
-      if (!r.ok) {
-        const e = await r.text().catch(() => '');
-        console.error('[user-sync] update_application failed:', r.status, e.slice(0, 200));
-        return res.status(200).json({ ok: false, reason: 'patch_failed' });
-      }
+    const where = `applications?id=eq.${encodeURIComponent(id)}&user_id=eq.${uid}`;
+    const current = async () => {
+      const g = await db(`${where}&limit=1`).catch(() => null);
+      const rows = g && g.ok ? await g.json().catch(() => []) : [];
+      return Array.isArray(rows) && rows[0] ? rows[0] : null;
+    };
+    const expected = body.updatedAt ?? changes.updatedAt;
+    const cas = casWindow(expected);
+    if (!Object.keys(allowed).length) {
+      const row = await current();
+      if (!row) return res.status(410).json({ error: 'gone' });
+      return res.status(200).json({ ok: true, updated_at: row.updated_at, anomalies: timelineAnomalies(row.applied_at, row.events) });
     }
-    return res.status(200).json({ ok: true });
+    const r = await db(`${where}${cas}`, {
+      method: 'PATCH', body: JSON.stringify({ ...allowed, updated_at: new Date().toISOString() }),
+      headers: { Prefer: 'return=representation' },
+    });
+    if (!r.ok) {
+      const e = await r.text().catch(() => '');
+      console.error('[user-sync] update_application failed:', r.status, e.slice(0, 200));
+      return res.status(200).json({ ok: false, reason: 'patch_failed' });
+    }
+    const rows = await r.json().catch(() => []);
+    const row = Array.isArray(rows) ? rows[0] : null;
+    if (!row) {
+      const now = await current();
+      if (!now) return res.status(410).json({ error: 'gone' });
+      // The row exists but not in the state the client last saw: hand back what is there now.
+      return res.status(409).json({ error: 'stale', application: now });
+    }
+    return res.status(200).json({ ok: true, updated_at: row.updated_at, anomalies: timelineAnomalies(row.applied_at, row.events) });
   }
 
   // ── CLEAR ALL APPLICATIONS (tracker "Clear all") ─────────────────────────────
@@ -339,6 +403,15 @@ export default async function handler(req, res) {
     const SAFE_FIELDS = ['email','name','type','city','industry','experience','survey_completed','onboarding_survey'];
     const row = { id: uid };
     SAFE_FIELDS.forEach(f => { if (p[f] !== undefined) row[f] = p[f]; });
+    // Input hygiene (audit 2026-10-24, P1): the free-text fields are trimmed and capped (same limits as
+    // the Settings form, lib/profileLimits.js), and a name that is present but blank is refused —
+    // signup requires one, and the dashboard greeting has nowhere to fall back to.
+    for (const f of ['name', 'city', 'industry']) {
+      if (row[f] === undefined || row[f] === null) continue;
+      if (typeof row[f] !== 'string') return res.status(400).json({ ok: false, error: `${f} must be text` });
+      row[f] = row[f].trim().slice(0, PROFILE_LIMITS[f] || 120);
+    }
+    if (row.name !== undefined && !row.name) return res.status(400).json({ ok: false, error: PROFILE_NAME_REQUIRED });
     const r = await db('profiles?on_conflict=id', {
       method: 'POST',
       body: JSON.stringify(row),
@@ -391,6 +464,24 @@ export default async function handler(req, res) {
 
   // ── DELETE ACCOUNT ──────────────────────────────────────────────────────────
   if (action === 'delete_account') {
+    // Billing first: a deleted Seen account must never keep billing. Read the Stripe customer BEFORE the
+    // rows go (it lives on ai_credits) and cancel every live subscription immediately
+    // (lib/server/stripeCancel.js). If that cannot be confirmed — the read fails, the Stripe key is
+    // missing, or a cancel is refused — nothing is deleted and the user is told so.
+    const billingRes = await db(`ai_credits?user_id=eq.${uid}&select=stripe_customer_id&limit=1`).catch(() => null);
+    if (!billingRes || !billingRes.ok) {
+      return res.status(503).json({ error: 'We could not check your billing, so nothing was deleted. Try again in a minute.' });
+    }
+    const stripeCustomerId = (await billingRes.json().catch(() => []))?.[0]?.stripe_customer_id || null;
+    if (stripeCustomerId) {
+      const cancel = await cancelLiveSubscriptions({ customerId: stripeCustomerId, stripeKey: process.env.STRIPE_SECRET_KEY });
+      if (!cancel.ok) {
+        console.error('[user-sync] delete_account: Stripe cancel failed:', cancel.error);
+        return res.status(502).json({ error: 'We could not cancel your Seen Pro subscription, so nothing was deleted. Try again or email hello@seenjobs.io.' });
+      }
+      if (cancel.cancelled.length) console.log(`[user-sync] delete_account: cancelled ${cancel.cancelled.length} subscription(s)`);
+    }
+
     // GDPR Art.17 (right to erasure): remove every row keyed to this user before deleting
     // the auth record — previously only applications + profile were cleared, orphaning
     // credits, events, resume data, saved jobs, etc. Best-effort per table (a missing
@@ -633,15 +724,11 @@ export default async function handler(req, res) {
     const cRes = await db(`ai_credits?user_id=eq.${uid}&limit=1`);
     let cred = cRes.ok ? (await cRes.json())[0] : null;
     if (hasProAccess(cred)) return res.status(200).json({ ok: false, reason: 'pro' });
-    // A brand-new user has no ai_credits row yet — create one (like submit_answer does)
-    // so their FIRST tracked application still earns. Refusing here was a silent dead end.
+    // A brand-new user has no ai_credits row yet — create it WITH the welcome bonus (the same row an
+    // AI action creates; lib/server/ensureCreditsRow.js) so their FIRST tracked application still earns
+    // and the "10" their chip showed is not taken away.
     if (!cred) {
-      const ins = await db('ai_credits?on_conflict=user_id', {
-        method: 'POST',
-        body: JSON.stringify({ user_id: uid, balance: FREE_DAILY_CREDITS, pro: false, daily_earned: 0, last_reset: today }),
-        headers: { Prefer: 'resolution=merge-duplicates,return=representation' },
-      });
-      cred = ins.ok ? (await ins.json())[0] : null;
+      cred = await ensureCreditsRow(db, uid, today);
       if (!cred) return res.status(200).json({ ok: false, reason: 'no_row' });
     }
 
@@ -668,10 +755,12 @@ export default async function handler(req, res) {
 
     // Daily reset baseline is FREE_DAILY_CREDITS (code resets daily; DB DEFAULT stays 1 per migration 031).
     const baseBalance = resetToday ? FREE_DAILY_CREDITS : (cred.balance || 0);
-    const newBalance = Math.min(baseBalance + TRACK_APPLICATION_AWARD, MAX_FREE_BALANCE);
-    const newEarned = dailyEarned + TRACK_APPLICATION_AWARD;
+    // Earning never lowers a balance (a welcome balance above the free cap stays as it is).
+    const { balance: newBalance, gained } = earnedBalance(baseBalance, TRACK_APPLICATION_AWARD);
+    if (gained <= 0) return res.status(200).json({ ok: false, reason: 'balance_cap', balance: creditBalance(cred) });
+    const newEarned = dailyEarned + gained;
     await db(`ai_credits?user_id=eq.${uid}`, { method: 'PATCH', body: JSON.stringify({ balance: newBalance, daily_earned: newEarned, ...(resetToday ? { last_reset: today } : {}) }), headers: { Prefer: 'return=minimal' } });
-    await db('credit_transactions', { method: 'POST', body: JSON.stringify({ user_id: uid, delta: 1, reason: 'track_application', metadata: { jid: jid || null } }), headers: { Prefer: 'return=minimal' } });
+    await db('credit_transactions', { method: 'POST', body: JSON.stringify({ user_id: uid, delta: gained, reason: 'track_application', metadata: { jid: jid || null } }), headers: { Prefer: 'return=minimal' } });
     return res.status(200).json({ ok: true, balance: newBalance + Math.max(0, cred.purchased_credits || 0), earned: true });
   }
 
@@ -754,7 +843,8 @@ export default async function handler(req, res) {
     // Check daily earn cap
     const cRes = await db(`ai_credits?user_id=eq.${uid}&limit=1`);
     let cred = cRes.ok ? (await cRes.json())[0] : null;
-    if (!cred) { await db('ai_credits', { method: 'POST', body: JSON.stringify({ user_id: uid, balance: FREE_DAILY_CREDITS, daily_earned: 0, last_reset: today, pro: false }), headers: { Prefer: 'return=minimal' } }); cred = { balance: FREE_DAILY_CREDITS, daily_earned: 0, last_reset: today, pro: false }; }
+    if (!cred) cred = await ensureCreditsRow(db, uid, today); // the welcome row, like every other first credit event
+    if (!cred) return res.status(503).json({ error: 'credits_unavailable' });
     const isPro = hasProAccess(cred);
     const resetToday = cred.last_reset !== today;
     const dailyEarned = resetToday ? 0 : (cred.daily_earned || 0);
@@ -769,11 +859,15 @@ export default async function handler(req, res) {
     // DEFAULT stays 1 per migration 031). The response must report the SAME number we persist —
     // the old code PATCHed one balance but told the client another, so the modal and the Nav
     // chip showed different balances at the same time.
-    const newBalance = isPro ? PRO_DAILY_CREDITS : Math.min((resetToday ? FREE_DAILY_CREDITS : (cred.balance || 0)) + TRACK_APPLICATION_AWARD, MAX_FREE_BALANCE);
-    const newEarned = resetToday ? TRACK_APPLICATION_AWARD : dailyEarned + TRACK_APPLICATION_AWARD;
-    const patch = isPro ? {} : { balance: newBalance, daily_earned: newEarned, ...(resetToday ? { last_reset: today } : {}) };
+    // Earning never lowers a balance: an account still holding its welcome balance above the free cap
+    // keeps it, and the answer is recorded without a credit (credited:false, the modal shows no "+1").
+    const earned = isPro ? { balance: PRO_DAILY_CREDITS, gained: 0 } : earnedBalance(resetToday ? FREE_DAILY_CREDITS : (cred.balance || 0), TRACK_APPLICATION_AWARD);
+    const newBalance = earned.balance;
+    const credited = !isPro && earned.gained > 0;
+    const newEarned = credited ? (resetToday ? earned.gained : dailyEarned + earned.gained) : dailyEarned;
+    const patch = credited ? { balance: newBalance, daily_earned: newEarned, ...(resetToday ? { last_reset: today } : {}) } : {};
     if (Object.keys(patch).length) await db(`ai_credits?user_id=eq.${uid}`, { method: 'PATCH', body: JSON.stringify(patch), headers: { Prefer: 'return=minimal' } });
-    await db('credit_transactions', { method: 'POST', body: JSON.stringify({ user_id: uid, delta: 1, reason: 'earned_question', metadata: { question_key, answer } }), headers: { Prefer: 'return=minimal' } });
+    if (credited) await db('credit_transactions', { method: 'POST', body: JSON.stringify({ user_id: uid, delta: earned.gained, reason: 'earned_question', metadata: { question_key, answer } }), headers: { Prefer: 'return=minimal' } });
 
     // Feed answer back into company intelligence (best-effort)
     const [qtype, company] = question_key.split('|');
@@ -786,7 +880,7 @@ export default async function handler(req, res) {
       }
     }
 
-    return res.status(200).json({ ok: true, balance: isPro ? newBalance : newBalance + Math.max(0, cred.purchased_credits || 0), earned_today: newEarned });
+    return res.status(200).json({ ok: true, credited, balance: isPro ? newBalance : newBalance + Math.max(0, cred.purchased_credits || 0), earned_today: newEarned });
   }
 
   // ── CREDIT HISTORY ────────────────────────────────────────────────────────────
@@ -1136,10 +1230,10 @@ export default async function handler(req, res) {
     const AWARD = RESUME_SURVEY_AWARD;
     const cRes = await db(`ai_credits?user_id=eq.${uid}&limit=1`);
     let cr = cRes.ok ? (await cRes.json())[0] : null;
-    if (!cr) {
-      await db('ai_credits', { method: 'POST', body: JSON.stringify({ user_id: uid, balance: AWARD, daily_earned: AWARD, last_reset: today, pro: false }), headers: { Prefer: 'return=minimal' } });
-      cr = { balance: AWARD, daily_earned: AWARD, last_reset: today, pro: false };
-    }
+    // A first-ever credit event creates the welcome row (lib/server/ensureCreditsRow.js); the award
+    // below then runs ONCE. The old inline insert wrote balance=AWARD, daily_earned=AWARD and the code
+    // below added AWARD again — a new user got the survey award twice and no welcome bonus.
+    if (!cr) cr = (await ensureCreditsRow(db, uid, today)) || firstCreditsRowFallback(today);
     let awarded = 0;
     let balance = creditBalance(cr);
     if (hasProAccess(cr)) {

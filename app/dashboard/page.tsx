@@ -9,6 +9,9 @@ import { AppStore } from '@/lib/stores/AppStore'
 import { EventStore } from '@/lib/stores/EventStore'
 import { BadgeStore } from '@/lib/stores/BadgeStore'
 import { daysSince } from '@/lib/stores/checkSchedule'
+import { responded, hadInterview, rated, responseRate, realOutcomes, HEALTH_MIN_OUTCOMES } from '@/lib/stores/outcomes'
+import { sortApplications, pastWindow, REFERENCE_WINDOW_DAYS } from '@/lib/stores/applicationOrder'
+import { STAGES } from '@/lib/constants'
 import { _sync } from '@/lib/sync'
 import { isChecklistDismissed, withChecklistDismissed } from '@/lib/onboardingPrefs'
 import { healthUnlockLine, HEALTH_MIN_APPS } from '@/lib/dashboardCopy'
@@ -43,28 +46,31 @@ function surveyFrustration(onboarding: string | Record<string, unknown> | undefi
   }
 }
 
-const RESPONSE_EVENTS = new Set(['response_received', 'interview_received', 'interview_completed', 'offer_received'])
-/** The company engaged: a decision (hired/rejected) or a logged response/interview. Ghosted and withdrawn are not responses. */
-function responded(a: Application): boolean {
-  return a.status === 'hired' || a.status === 'rejected' || (a.events || []).some(e => RESPONSE_EVENTS.has(e.type))
-}
-function hadInterview(a: Application): boolean {
-  return a.status === 'hired' || (a.events || []).some(e => e.type === 'interview_received' || e.type === 'interview_completed')
+// "Responded", "interviewed" and the rated set (withdrawn excluded) are ONE definition shared with
+// the tracker (lib/stores/outcomes, audit 3 M2). `terminal` = REAL outcomes (hired/rejected/ghosted) —
+// a withdrawal is not a verdict on the search.
+function calcJobSearchHealth(apps: Application[]) {
+  const r = rated(apps)
+  if (r.length < HEALTH_MIN_APPS) return null
+  const responseRate = Math.round((r.filter(responded).length / r.length) * 100)
+  const ghostRate = Math.round((r.filter(a => a.status === 'ghosted').length / r.length) * 100)
+  const interviewRate = Math.round((r.filter(hadInterview).length / r.length) * 100)
+  const score = Math.max(0, Math.min(100, Math.round(50 + responseRate * 0.3 - ghostRate * 0.4 + interviewRate * 0.5)))
+  return { score, responseRate, ghostRate, interviewRate, terminal: realOutcomes(r) }
 }
 
-function calcJobSearchHealth(apps: Application[]) {
-  if (apps.length < HEALTH_MIN_APPS) return null
-  const terminal = apps.filter(a => a.status !== 'active')
-  const responseRate = Math.round((apps.filter(responded).length / apps.length) * 100)
-  const ghostRate = Math.round((apps.filter(a => a.status === 'ghosted').length / apps.length) * 100)
-  const interviewRate = Math.round((apps.filter(hadInterview).length / apps.length) * 100)
-  const score = Math.max(0, Math.min(100, Math.round(50 + responseRate * 0.3 - ghostRate * 0.4 + interviewRate * 0.5)))
-  return { score, responseRate, ghostRate, interviewRate, terminal: terminal.length }
+/** This device's recently checked companies (seen_recent_cos), well-formed rows only. */
+function localRecentCompanies(): Array<{ name: string; slug: string }> {
+  try {
+    const raw = localStorage.getItem('seen_recent_cos')
+    if (raw) return (JSON.parse(raw) as Array<{ name: string; slug: string }>).filter(c => c && c.name && c.slug)
+  } catch {}
+  return []
 }
 
 export default function DashboardPage() {
   const router = useRouter()
-  const { user, profile, isLoggedIn, isSeeker, ready, token } = useAuth()
+  const { user, profile, isLoggedIn, isSeeker, ready } = useAuth()
   const [apps, setApps] = useState<Application[]>([])
   const [loading, setLoading] = useState(true)
   // The account's rows could not be read (API down / 500 / no session). The page then shows an error
@@ -95,50 +101,13 @@ export default function DashboardPage() {
     setOnboardHidden(device || isChecklistDismissed(profile?.onboarding_survey))
   }, [user?.id, profile?.onboarding_survey])
 
-  useEffect(() => {
-    if (!isSeeker) return
-    token().then(tok => {
-      if (!tok) return
-      fetch('/api/user-sync', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${tok}` }, body: JSON.stringify({ action: 'get_credits' }) })
-        .then(r => r.json()).then(d => setIsPro(!!d?.pro)).catch(() => {})
-    })
-  }, [isSeeker, token])
-
   // Inbox Autopilot tile: shown once the feature is live (null = not live yet / unknown → hidden).
   const [inbox, setInbox] = useState<{ ready: boolean; enabled?: boolean; received_count?: number } | null>(null)
-  useEffect(() => {
-    if (!isSeeker) return
-    token().then(tok => {
-      if (!tok) return
-      fetch('/api/user-sync', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${tok}` }, body: JSON.stringify({ action: 'inbox_status' }) })
-        .then(r => r.ok ? r.json() : null).then(d => setInbox(d && typeof d.ready === 'boolean' ? d : null)).catch(() => {})
-    })
-  }, [isSeeker, token])
 
   // Companies this person checked: this device's list first, then the account's (user_recent_cos,
   // written by the company page when signed in) so the checklist's third step and "Recently checked"
   // are true on a second device too. ONE slug scheme (CLAUDE.md): lower-case, spaces → hyphens.
-  useEffect(() => {
-    let local: Array<{ name: string; slug: string }> = []
-    try {
-      const raw = localStorage.getItem('seen_recent_cos')
-      if (raw) local = (JSON.parse(raw) as Array<{ name: string; slug: string }>).filter(c => c && c.name && c.slug)
-    } catch {}
-    setRecentCos(local.slice(0, 5))
-    if (!isLoggedIn) return
-    let alive = true
-    _sync('get_recent_cos').then(r => {
-      const rows = (r as { recent?: Array<{ company_name?: string }> } | null)?.recent
-      if (!alive || !Array.isArray(rows)) return
-      const seen = new Set(local.map(c => c.slug))
-      const fromAccount = rows
-        .map(x => String(x?.company_name || '').trim()).filter(Boolean)
-        .map(name => ({ name, slug: encodeURIComponent(name.toLowerCase().replace(/\s+/g, '-')) }))
-        .filter(c => !seen.has(c.slug) && (seen.add(c.slug), true))
-      if (fromAccount.length) setRecentCos([...local, ...fromAccount].slice(0, 5))
-    }).catch(() => {})
-    return () => { alive = false }
-  }, [isLoggedIn])
+  useEffect(() => { setRecentCos(localRecentCompanies().slice(0, 5)) }, [])
 
   useEffect(() => {
     if (!ready) return // wait for the session to resolve — redirecting early bounced signed-in users
@@ -148,12 +117,27 @@ export default function DashboardPage() {
     if (isLoggedIn && !isSeeker) { router.replace('/employers'); return }
   }, [ready, isLoggedIn, isSeeker, router])
 
+  // ONE /api/user-sync call at mount: `load` brings the applications AND the pro flag, the account's
+  // recently-checked companies and the Inbox Autopilot status. The page used to fire four (load,
+  // get_credits, inbox_status, get_recent_cos) — each a function invocation + rate-limit RPC + its
+  // reads, and the audit of 2026-10-24 measured 8–15 s / 504s on that path at first paint.
+  // A failed load is an error block with Retry over what this device last synced (R-1), never "0".
   const loadApps = useCallback(async () => {
     setLoading(true)
-    const { apps: data, synced } = await AppStore.loadResult(true)
-    setApps(data)
-    setLoadFailed(!synced)
+    const bundle = await AppStore.loadBundle(true).catch(() => null)
+    setApps(bundle ? bundle.applications : AppStore.loadSync())
+    setLoadFailed(!bundle)
     setLoading(false)
+    if (!bundle) return
+    setIsPro(!!bundle.credits?.pro)
+    setInbox(bundle.inbox)
+    const local = localRecentCompanies()
+    const seen = new Set(local.map(c => c.slug))
+    const fromAccount = bundle.recent_cos
+      .map(x => String(x?.company_name || '').trim()).filter(Boolean)
+      .map(name => ({ name, slug: encodeURIComponent(name.toLowerCase().replace(/\s+/g, '-')) }))
+      .filter(c => !seen.has(c.slug) && (seen.add(c.slug), true))
+    if (fromAccount.length) setRecentCos([...local, ...fromAccount].slice(0, 5))
   }, [])
   useEffect(() => {
     if (!isLoggedIn) return
@@ -239,11 +223,14 @@ export default function DashboardPage() {
   const hired = apps.filter(a => a.status === 'hired')
   const noData = loadFailed && apps.length === 0
   const dueChecks = EventStore.dueChecks(apps)
-  const staleApps = active.filter(a => {
-    const sc = coScores[a.company.toLowerCase()]
-    const threshold = sc?.avg_wait_days ? Math.round(sc.avg_wait_days * 1.4) : 30
-    return daysSince(a.appliedAt) > threshold
-  })
+  // Past the window: 1.4× the company's real average wait, or — when Seen has no wait data for it — the
+  // 21-day REFERENCE window, worded as a reference (audit 3 M3: "past its typical window" for a company
+  // Seen knew nothing about).
+  const windowOf = (a: Application) => pastWindow(a, coScores[a.company.toLowerCase()]?.avg_wait_days)
+  const staleApps = sortApplications(active.filter(a => windowOf(a).past), 'oldest', new Set())
+  const staleSub = (a: Application) => windowOf(a).reference
+    ? `Past the ${REFERENCE_WINDOW_DAYS}-day reference window — Seen has no response-time data for ${a.company} yet.`
+    : `Past ${a.company}'s usual response window (~${Math.round(coScores[a.company.toLowerCase()]!.avg_wait_days)} days).`
   const alertCount = staleApps.length + surges.length
   const allEvents = EventStore.get()
 
@@ -253,11 +240,11 @@ export default function DashboardPage() {
 
   // Career Benchmarks — gated n>=3 && terminal>=2
   const benchmarks = (() => {
-    const n = apps.length
-    const terminal = apps.filter(a => ['hired', 'rejected', 'ghosted'].includes(a.status))
-    if (n < 3 || terminal.length < 2) return null
-    const rr = Math.round((apps.filter(responded).length / n) * 100)
-    const ir = Math.round((apps.filter(hadInterview).length / n) * 100)
+    const r = rated(apps)
+    const n = r.length
+    if (n < 3 || realOutcomes(r) < HEALTH_MIN_OUTCOMES) return null
+    const rr = Math.round((r.filter(responded).length / n) * 100)
+    const ir = Math.round((r.filter(hadInterview).length / n) * 100)
     const or = Math.round((hired.length / n) * 100)
     const gr = Math.round((ghosted.length / n) * 100)
     const AVG = refRates ? { rr: Math.round(refRates.response_rate * 100), ir: Math.round(refRates.interview_rate * 100), or: Math.round(refRates.offer_rate * 100), gr: Math.round(refRates.ghost_rate * 100) } : null
@@ -285,13 +272,18 @@ export default function DashboardPage() {
 
   const rawName = profile?.name || user?.user_metadata?.name || ''
   const name = rawName ? rawName.charAt(0).toUpperCase() + rawName.slice(1).split(/[^a-zA-Z]/)[0] : 'there'
-  const responseNum = apps.length ? Math.round((apps.filter(responded).length / apps.length) * 100) : null
+  // Responses (incl. check-in "Got a response") ÷ tracked, withdrawn excluded (M2).
+  const responseNum = responseRate(apps)
+  const ratedCount = rated(apps).length
 
   // Health ring visuals
   // Under two reported outcomes the score is a placeholder ("Too early to call"), so it is drawn neutral —
   // a red "50" next to "too early" read as a bad verdict (audit 2026-10-23).
-  const healthColor = health && health.terminal >= 2 ? (health.score >= 75 ? 'var(--green)' : health.score >= 55 ? 'var(--amber)' : 'var(--red)') : 'var(--muted)'
-  const healthDeg = health ? Math.round((health.score / 100) * 360) : 0
+  // No number at all until two real outcomes exist (audit 3 M1: "58" next to "Too early to call", drifting
+  // 58 → 56 → 53 as Day-0 cards were added).
+  const healthReal = !!health && health.terminal >= HEALTH_MIN_OUTCOMES
+  const healthColor = health && healthReal ? (health.score >= 75 ? 'var(--green)' : health.score >= 55 ? 'var(--amber)' : 'var(--red)') : 'var(--muted)'
+  const healthDeg = health && healthReal ? Math.round((health.score / 100) * 360) : 0
 
   // Status line — "open" = currently in-progress; distinct from "tracked total" (all-time).
   const statusLine = active.length
@@ -302,9 +294,17 @@ export default function DashboardPage() {
   type Move = { icon: string; title: string; sub: string; go: () => void }
   const moves: Move[] = []
   if (apps.length > 0) {
-    if (staleApps[0]) moves.push({ icon: '⏰', title: `Follow up with ${staleApps[0].company}`, sub: 'Past its typical response window', go: () => router.push('/tracker') })
-    if (dueChecks.length) moves.push({ icon: '📮', title: `Report ${dueChecks.length} outcome${dueChecks.length > 1 ? 's' : ''}`, sub: 'Unlocks your real response & ghost rates', go: () => router.push('/tracker') })
-    if (active[0]) moves.push({ icon: '🔎', title: `Find more roles like ${active[0].company}`, sub: 'Keep your pipeline full', go: () => router.push('/jobs') })
+    const stale = staleApps[0]
+    // Straight to that card (#app_<id>), like the Signals row — not the top of the tracker (M3).
+    if (stale) moves.push({ icon: '⏰', title: `Follow up with ${stale.company}`, sub: windowOf(stale).reference ? `Past the ${REFERENCE_WINDOW_DAYS}-day reference window` : 'Past its usual response window', go: () => router.push(`/tracker#app_${pathSegment(stale.id)}`) })
+    if (dueChecks.length) moves.push({ icon: '📮', title: `Report ${dueChecks.length} outcome${dueChecks.length > 1 ? 's' : ''}`, sub: 'Unlocks your real response & ghost rates', go: () => router.push(`/tracker#app_${pathSegment(dueChecks[0].app.id)}`) })
+    // The open application that has got furthest (then the newest), searched as its role in its city (M4).
+    const like = [...active].filter(a => a.role).sort((a, b) => (STAGES.indexOf(b.stage as typeof STAGES[number]) - STAGES.indexOf(a.stage as typeof STAGES[number])) || (b.appliedAt - a.appliedAt))[0]
+    if (like) {
+      const q = new URLSearchParams({ q: like.role.slice(0, 120) })
+      if (like.location && !/^remote$/i.test(like.location.trim())) q.set('loc', like.location.slice(0, 80))
+      moves.push({ icon: '🔎', title: `Find more roles like ${like.role}`, sub: like.location ? `Searches “${like.role}” near ${like.location}` : `Searches “${like.role}”`, go: () => router.push(`/jobs?${q.toString()}`) })
+    }
     if (!moves.length) moves.push({ icon: '🔎', title: 'Find your next role', sub: 'Jobs sorted by transparency', go: () => router.push('/jobs') })
   }
   const topMoves = moves.slice(0, 3)
@@ -322,8 +322,8 @@ export default function DashboardPage() {
   // Health headline: one plain sentence instead of a caption line.
   const healthHead = !health
     ? { t: 'Your score unlocks soon.', s: healthUnlockLine(apps.length), badge: 'Getting started', tone: 'muted' }
-    : health.terminal < 2
-      ? { t: 'Too early to call.', s: 'Report what happened with a couple of applications and this becomes a real read on your search.', badge: 'Early days', tone: 'muted' }
+    : !healthReal
+      ? { t: 'Too early to call.', s: `Your score appears once ${HEALTH_MIN_OUTCOMES} applications have a real outcome (hired, rejected or ghosted) — ${health.terminal} so far.`, badge: 'Early days', tone: 'muted' }
       : health.score >= 75
         ? { t: "You're getting noticed.", s: `${health.interviewRate}% of your applications reached an interview and ${health.responseRate}% got a reply. Keep doing what works.`, badge: 'Strong', tone: 'green' }
         : health.score >= 55
@@ -380,7 +380,7 @@ export default function DashboardPage() {
             </div>
             <div className={styles.healthBody}>
               <div className={styles.ring} style={{ background: `conic-gradient(${healthColor} ${healthDeg}deg, rgba(255,255,255,.1) 0deg)` }}>
-                <span style={{ color: healthColor }}>{health ? <Odometer value={health.score} /> : '—'}</span>
+                <span style={{ color: healthColor }} aria-label={healthReal ? undefined : 'No score yet'}>{health && healthReal ? <Odometer value={health.score} /> : '—'}</span>
               </div>
               <div style={{ minWidth: 0 }}>
                 <h2 className={styles.healthT}>{healthHead.t}</h2>
@@ -394,7 +394,7 @@ export default function DashboardPage() {
               <div className={styles.pill}><small>Hired</small><b style={{ color: 'var(--green)' }}>{noData ? '—' : <Odometer value={hired.length} />}</b></div>
               <div className={styles.pill}><small>Ghosted</small><b style={{ color: '#f87185' }}>{noData ? '—' : <Odometer value={ghosted.length} />}</b></div>
             </div>
-            {apps.length > 0 && <p className={styles.caption}>Based on {apps.length} tracked application{apps.length !== 1 ? 's' : ''}</p>}
+            {ratedCount > 0 && <p className={styles.caption}>Based on {ratedCount} tracked application{ratedCount !== 1 ? 's' : ''}{apps.length > ratedCount ? ` · ${apps.length - ratedCount} withdrawn not counted` : ''}</p>}
           </section>
 
           <section className={`${styles.card} spot`}>
@@ -441,7 +441,7 @@ export default function DashboardPage() {
                 <p>Apply to a job and it appears here until you report what happened.</p>
                 <div className={styles.emptyBtns}><Link href="/jobs" className={styles.ghostBtn}>Find your next job →</Link></div>
               </div>
-            ) : active.slice(0, 4).map(app => {
+            ) : sortApplications(active, 'attention', new Set(dueChecks.map(d => d.app.id))).slice(0, 4).map(app => {
               const days = daysSince(app.appliedAt)
               const sc = coScores[app.company.toLowerCase()]
               const ghostPct = sc ? Math.round(sc.ghost_rate * 100) : null
@@ -484,9 +484,9 @@ export default function DashboardPage() {
             {staleApps.slice(0, 3).map(a => {
               const days = daysSince(a.appliedAt)
               return (
-                <button key={`stale-${a.id}`} type="button" className={styles.signal} onClick={() => router.push(`/tracker#app_${a.id}`)}>
+                <button key={`stale-${a.id}`} type="button" className={styles.signal} onClick={() => router.push(`/tracker#app_${pathSegment(a.id)}`)}>
                   <span style={{ color: 'var(--amber)' }}>⚠</span>
-                  <span><b>{a.company} has been quiet for {days} days</b><small>Past its usual response window. Follow up or update the outcome.</small></span>
+                  <span><b>{a.company} has been quiet for {days} days</b><small>{staleSub(a)} Follow up or update the outcome.</small></span>
                 </button>
               )
             })}

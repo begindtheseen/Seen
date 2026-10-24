@@ -14,8 +14,10 @@ import ApplyCheckpoint from '@/components/ApplyCheckpoint'
 import { displayCompanyName } from '@/lib/companyDisplay'
 import { displayPay } from '@/lib/jobs/pay.js'
 import { roleSnippet, isDescriptionPreview } from '@/lib/jobs/descriptionText.js'
-import { httpHref } from '@/lib/safeHref.js'
+import { httpHref, pathSegment } from '@/lib/safeHref.js'
 import { wasOptimized } from '@/lib/optimizedJobs'
+import Link from 'next/link'
+import { JobCache } from '@/lib/stores/JobCache'
 
 // The optimize action's price, rendered from the credit rules so the label can never drift.
 const OPTIMIZE_PRICE = creditCostLabel(RESUME_OPTIMIZE_COST)
@@ -284,12 +286,18 @@ export default function JobCard({ job, index, onSaveToggle, onOpen, onApply, onC
       </div>
       {checkpoint && <ApplyCheckpoint job={job} onClose={() => setCheckpoint(false)} />}
 
-      <button
-        onClick={() => onOpen(job)}
-        style={{ display: 'block', width: '100%', textAlign: 'center', background: 'none', border: 'none', borderTop: '1px solid var(--line)', marginTop: '.6rem', paddingTop: '.6rem', fontFamily: 'var(--mono)', fontSize: '.62rem', color: 'var(--green)', cursor: 'pointer' }}
+      {/* A real link to the listing's own page (it was a button that, signed in, POSTed the posting to
+          /api/job-insights and changed nothing on screen — audit 2026-10-24). The detail page probes the
+          insight cache when it opens; nothing is sent from the card. */}
+      <Link
+        href={`/jobs/${pathSegment(job.id)}`}
+        prefetch={false}
+        data-testid="view-details"
+        onClick={e => { e.stopPropagation(); JobCache.set(job) }}
+        style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%', minHeight: 44, textDecoration: 'none', borderTop: '1px solid var(--line)', marginTop: '.6rem', fontFamily: 'var(--mono)', fontSize: '.75rem', color: 'var(--green)' }}
       >
         View details + AI insights →
-      </button>
+      </Link>
 
       {!reportedInactive ? (
         <button

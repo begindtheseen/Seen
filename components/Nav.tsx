@@ -7,6 +7,7 @@ import dynamic from 'next/dynamic'
 import { useAuth } from '@/lib/auth'
 import { supabase } from '@/lib/supabase'
 import { markIntentionalSignOut } from '@/lib/sessionExpired'
+import { _sync } from '@/lib/sync'
 import UpgradeModal from './UpgradeModal'
 import NotificationsBell from './NotificationsBell'
 import CreditsPopover from './CreditsPopover'
@@ -65,7 +66,7 @@ function Dropdown({ trigger, open, setOpen, align = 'right', children }: {
 export default function Nav() {
   const pathname = usePathname()
   const router = useRouter()
-  const { isLoggedIn, isSeeker, token, user, profile } = useAuth()
+  const { isLoggedIn, isSeeker, user, profile } = useAuth()
   const [resetSent, setResetSent] = useState(false)
   const [scrolled, setScrolled] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
@@ -90,24 +91,16 @@ export default function Nav() {
   const fetchBalance = useCallback(async () => {
     if (!isSeeker) { setCreditBalance(null); return }
     let cancelled = false
-    token().then(async (tok) => {
-      if (!tok || cancelled) return
-      try {
-        const res = await fetch('/api/user-sync', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${tok}` },
-          body: JSON.stringify({ action: 'get_credits' }),
-        })
-        if (!res.ok || cancelled) return
-        const data = await res.json() as { balance?: number; pro?: boolean; daily_earned?: number | null; max_daily_earn?: number | null; welcome?: boolean; daily?: number | null; purchased?: number | null }
-        if (!cancelled) {
-          setCreditBalance(data.pro ? 999 : (data.balance ?? null)); setIsPro(!!data.pro)
-          setCreditInfo({ daily_earned: data.daily_earned ?? null, max_daily_earn: data.max_daily_earn ?? null, welcome: !!data.welcome, daily: data.daily ?? null, purchased: data.purchased ?? null })
-        }
-      } catch { /* ignore */ }
-    })
+    // Through _sync: a page asking get_credits in the same moment (pricing, résumé, the first-credit
+    // dialog) shares this one request instead of adding a second function invocation.
+    _sync('get_credits').then((d) => {
+      const data = d as { balance?: number; pro?: boolean; daily_earned?: number | null; max_daily_earn?: number | null; welcome?: boolean; daily?: number | null; purchased?: number | null } | null
+      if (!data || cancelled) return
+      setCreditBalance(data.pro ? 999 : (data.balance ?? null)); setIsPro(!!data.pro)
+      setCreditInfo({ daily_earned: data.daily_earned ?? null, max_daily_earn: data.max_daily_earn ?? null, welcome: !!data.welcome, daily: data.daily ?? null, purchased: data.purchased ?? null })
+    }).catch(() => { /* ignore */ })
     return () => { cancelled = true }
-  }, [isSeeker, token])
+  }, [isSeeker])
 
   useEffect(() => {
     fetchBalance()

@@ -44,13 +44,21 @@ export const isPublicDiscussion = (platform?: string | null): boolean =>
 export const isEmployeeReview = (r: { report_text?: string | null; trust_reason?: string | null }): boolean =>
   r?.trust_reason === 'external_employee_review' || /\bemployee (?:review|discussion)\b/i.test(String(r?.report_text ?? ''))
 
-// Same test as classifyPlatform's 'ingest' tier (api/_utils/companyIntel.js), so the label always
-// matches how the row is weighted.
+// Imported review-site rows are identified by HOW THEY ARRIVED (trust_reason), never by `platform`:
+// on a first-hand Seen report `platform` is where the person APPLIED ("LinkedIn", "Indeed"), so the old
+// platform test badged a direct submission "Imported from LinkedIn" (audit 2026-10-24, M5). Prod
+// 2026-10-24: imports carry external_import (40) / duplicate_import (151); first-hand rows carry
+// direct_submission / anonymous_unverified / duplicate_user_company; no import has a null reason.
 const IMPORT_SITE_RE = /glassdoor|blind|indeed|linkedin/i
 const IMPORT_SITE_NAME: Record<string, string> = { glassdoor: 'Glassdoor', blind: 'Blind', indeed: 'Indeed', linkedin: 'LinkedIn' }
-/** A review imported from a review site (Glassdoor / Indeed / LinkedIn / Blind) — not submitted to Seen. */
-export const isImportedReview = (platform?: string | null): boolean =>
-  !isPublicDiscussion(platform) && IMPORT_SITE_RE.test(String(platform ?? ''))
+export const IMPORTED_TRUST_REASONS: ReadonlySet<string> = new Set(['external_import', 'duplicate_import'])
+export const FIRST_PARTY_TRUST_REASONS: ReadonlySet<string> = new Set(['direct_submission', 'anonymous_unverified', 'duplicate_user_company'])
+/** A hiring account imported from a review site — not submitted to Seen. Keyed on trust_reason. */
+export const isImportedReview = (platform?: string | null, trustReason?: string | null): boolean =>
+  !isPublicDiscussion(platform) && IMPORTED_TRUST_REASONS.has(String(trustReason ?? ''))
+/** A report a person submitted to Seen (the platform field is where they applied, not a source). */
+export const isFirstPartyReport = (trustReason?: string | null): boolean =>
+  FIRST_PARTY_TRUST_REASONS.has(String(trustReason ?? ''))
 const importSiteName = (platform?: string | null): string => {
   const m = IMPORT_SITE_RE.exec(String(platform ?? ''))
   return m ? IMPORT_SITE_NAME[m[0].toLowerCase()] : ''
@@ -67,18 +75,21 @@ export const publicReviewLabel = (host?: string | null): string =>
  * The honest provenance badge for a report row, or null for first-hand Seen reports.
  * `label` is the visible text; `title` is the hover explanation.
  */
-export function reportSourceBadge(platform?: string | null, reportText?: string | null): { label: string; title: string } | null {
+export function reportSourceBadge(platform?: string | null, reportText?: string | null, trustReason?: string | null): { label: string; title: string } | null {
+  // A first-hand Seen report never carries a provenance badge, whatever site it was applied through.
+  if (isFirstPartyReport(trustReason)) return null
   const site = importSiteName(platform) || String(platform ?? '').trim().split(/\s+/)[0]
-  if (isEmployeeReview({ report_text: reportText })) {
+  if (isEmployeeReview({ report_text: reportText, trust_reason: trustReason })) {
     return {
       label: `Employee review${site ? ` · ${site}` : ''}`,
       title: 'A current or former employee describing what it is like to work here, imported from a review site. It is not a hiring outcome, so it never counts as an applicant report — its letter grade adjusts the score by a small, capped amount.',
     }
   }
-  if (isImportedReview(platform)) {
+  if (isImportedReview(platform, trustReason)) {
+    const from = importSiteName(platform)
     return {
-      label: `Imported from ${site}`,
-      title: `An applicant's hiring account imported from ${site} — not submitted directly to Seen, and counted at reduced weight`,
+      label: from ? `Imported from ${from}` : 'Imported from a review site',
+      title: `An applicant's hiring account imported from ${from || 'a review site'} — not submitted directly to Seen, and counted at reduced weight`,
     }
   }
   if (isPublicReviewSourced(platform)) {

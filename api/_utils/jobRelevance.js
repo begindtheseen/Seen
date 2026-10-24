@@ -60,7 +60,7 @@ const ROLE_FAMILIES = [
   // Front-line retail.
   ['cashier', 'checkout associate', 'front end associate', 'retail cashier'],
   ['retail associate', 'sales associate', 'store associate', 'retail sales associate', 'merchandiser', 'stock associate'],
-  ['customer service representative', 'customer service associate', 'customer support representative', 'call center representative', 'csr'],
+  ['customer service representative', 'customer service associate', 'customer support representative', 'call center representative', 'csr', 'customer service specialist', 'customer care specialist', 'customer care representative', 'customer service agent'],
   // Care / clinical support.
   ['caregiver', 'caregiving', 'home care aide', 'personal care aide', 'direct support professional', 'home health aide'],
   ['certified nursing assistant', 'cna', 'nursing assistant', 'patient care technician', 'patient care assistant'],
@@ -70,6 +70,10 @@ const ROLE_FAMILIES = [
   ['janitor', 'custodian', 'housekeeper', 'cleaner', 'custodial', 'housekeeping', 'janitorial'],
   // Admin.
   ['administrative assistant', 'office assistant', 'administrative coordinator', 'front desk receptionist', 'office administrator', 'receptionist'],
+  // Pharmacy (a "pharmacy technician" search listed "Environmental Services Technician" rows — audit 2026-10-24).
+  ['pharmacy technician', 'pharmacy tech', 'certified pharmacy technician', 'cpht'],
+  // Retail management ("retail manager · Tucson" opened with "Case Manager (PRN/Pool)").
+  ['retail manager', 'store manager', 'assistant store manager', 'retail store manager'],
 ];
 
 // Normalize a surface for family matching: lowercase, keep alnum/+#., collapse spaces.
@@ -286,6 +290,52 @@ export function isRelevant(job, query, { synonyms = [], canonical = '' } = {}) {
   // recovers "Asset Protection Specialist" for a "theft prevention" search. Not description, not a
   // generic expansion word, so the budtender→Sales Manager leak stays closed.
   if (_provenanceMatch(job, query, canonical)) return true;
+  return false;
+}
+
+// Is the listing a MATCH for the search — the role the person typed, not just a row that shares a
+// word with it? Title-family tier or better, judged on the title (or the company for a company search):
+//  • a company-name match, OR
+//  • the full query phrase in the title, OR
+//  • EVERY query token in the title (whole words, plural/-ing forms), OR
+//  • a curated role-family phrase (or the canonical form of the query) in the title.
+// isRelevant() is looser on purpose (ANY token keeps a row in the pool), which is how "pharmacy
+// technician · Phoenix" served "Environmental Services & Facilities Technician" and "call center"
+// served "Center-Based Behavior Technician" as if they matched (audit 2026-10-24, H9). The page shows
+// rows that are not a match under "Other openings", below every match, whatever the sort.
+// Whole-word abbreviations a title uses for a query word. Conservative on purpose: only forms that
+// mean exactly the same job word ("Travel Med Surg RN" is a nurse job; "Pharmacy Tech" is a technician).
+// Found live 2026-10-24: a "travel nurse" search marked 35 of 60 travel-RN listings as unrelated.
+const TOKEN_ALIASES = {
+  nurse: ['rn', 'lpn', 'lvn'],
+  technician: ['tech'],
+  representative: ['rep'],
+  manager: ['mgr'],
+  assistant: ['asst'],
+  associate: ['assoc'],
+  administrative: ['admin'],
+  administrator: ['admin'],
+  developer: ['dev'],
+};
+function tokenOrAliasInTitle(title, token) {
+  if (tokenInTitle(title, token)) return true;
+  const aliases = TOKEN_ALIASES[token];
+  return !!aliases && aliases.some((a) => tokenInTitle(title, a));
+}
+
+export function isTitleRelated(job, query, { canonical = '' } = {}) {
+  const tokens = tokenize(query);
+  if (!tokens.length) return true;
+  const title = String(job.title || '').toLowerCase();
+  const company = normalizeCompany(job.company);
+  const qNorm = normalizeCompany(query);
+  if (isCompanyMatch(company, qNorm)) return true;
+  if (qNorm && title.includes(qNorm)) return true;
+  if (tokens.every((t) => tokenOrAliasInTitle(title, t))) return true;
+  const fam = [...(_familyFor(query) || [])];
+  const cn = String(canonical || '').toLowerCase().trim();
+  if (cn && cn !== qNorm && cn.split(' ').length > 1) fam.push(cn);
+  for (const syn of effectiveSynonyms('', fam)) { if (titleHasSynonym(title, syn)) return true; }
   return false;
 }
 
