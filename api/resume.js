@@ -555,7 +555,7 @@ async function handleOptimizeTool(req, res, body) {
     if (!authed?.uid) return res.status(401).json({ error: 'Sign in to use AI features', credits_required: true });
     const { job, company, resume, jobDescription, jobId } = body;
     if (!resume) return res.status(400).json({ error: 'Resume required' });
-    if (!isReadableResume(resume || '')) return res.status(400).json({ error: 'RESUME_CORRUPTED' });
+    if (!isReadableResume(resume)) return res.status(400).json({ error: 'RESUME_CORRUPTED' });
     const preview = previewOnlyError(body);
     if (preview) return res.status(preview.status).json({ ...preview.body, charged: false });
 
