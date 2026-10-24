@@ -12,7 +12,7 @@ import { companyVerdict, companyStatPairs, confidenceLine, ogNoDataLines } from 
 // assets/fonts via lib/server/cardFonts.ts. 1200×630.
 //
 // A company nobody has graded gets its own honest design (never a "?" ring): the headline says so
-// and invites the first grade — it still has to be worth tapping.
+// and the second line claims only what the row proves (its real report count, or "Be the first.").
 //
 // Satori (next/og) rule: every <div> with more than one child node MUST set display:flex.
 // ROUTE HANDLER, not the opengraph-image file convention — deliberately. The convention
@@ -52,7 +52,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ slug: s
   const verdict = hasData ? companyVerdict({ ghostRate: s?.ghost_rate ?? 0, responseRate: s?.response_rate ?? 0 }) : ''
   const pairs = hasData ? companyStatPairs({ ghostRate: s?.ghost_rate ?? 0, responseRate: s?.response_rate ?? 0, avgWaitDays: wait }) : []
   const conf = hasData ? confidenceLine(fp, updated) : ''
-  const [noDataHead, noDataSub] = ogNoDataLines(name)
+  const [noDataHead, noDataSub] = ogNoDataLines(name, fp)
   const url = `seenjobs.io/company/${slug}`
 
   // Name size: one line, never wrapped or clipped. Syne ExtraBold runs ~0.72em per character, so

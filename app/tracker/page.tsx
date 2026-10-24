@@ -14,6 +14,7 @@ import OutcomeCard from '@/components/OutcomeCard'
 import RoundsPrompt from '@/components/RoundsPrompt'
 import { firstPartyReportCount } from '@/lib/server/reportCounts'
 import { isGradeableScore } from '@/lib/gradeGate'
+import { gradeLetter } from '@/lib/companyDisplay'
 import ModalPortal from '@/components/ModalPortal'
 import WithdrawModal from '@/components/WithdrawModal'
 import PageHeader from '@/components/shell/PageHeader'
@@ -639,7 +640,15 @@ function TrackerPage() {
         onClose={() => setConfirmClear(false)}
       />
     )}
-    {outcomeApp && <OutcomeCard app={outcomeApp} onClose={() => setOutcomeApp(null)} />}
+    {outcomeApp && (
+      <OutcomeCard
+        app={outcomeApp}
+        onClose={() => setOutcomeApp(null)}
+        // The other tracked companies' letters (same batch_scores the cards read) so a hired post
+        // can compare honestly: "The other 3 places I applied were a C or worse".
+        otherGrades={Object.entries(companyScores).filter(([k]) => k !== outcomeApp.company.toLowerCase().trim()).map(([, v]) => gradeLetter(v.overall_score))}
+      />
+    )}
     {roundsApp && !outcomeApp && (
       <RoundsPrompt
         app={roundsApp}

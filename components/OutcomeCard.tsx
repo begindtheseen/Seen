@@ -7,7 +7,7 @@
 // when it has one, is looked up (bounded) so the card can carry one honest line of context —
 // never invented when absent.
 
-import { useCallback, useMemo } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { Application } from '@/lib/types'
 import { drawOutcomeCard, type CardFormat, type OutcomeCardData, type CompanyGradeContext } from '@/lib/cardKit'
 import { ACCENTS, accentKeyForOutcome } from '@/lib/cardTheme.js'
@@ -23,6 +23,9 @@ interface Props {
   // Fired once when the card is shared to a destination or downloaded. Used by the
   // tracker→report→share loop to record a light outcome_card_shares analytics row.
   onShared?: (via: string) => void
+  /** Letter grades of the person's OTHER tracked companies (when the tracker knows them) — lets a
+   *  hired post compare: "The other 3 places I applied were a C or worse on seenjobs.io". */
+  otherGrades?: string[]
 }
 
 export function buildOutcome(app: Application): OutcomeCardData {
@@ -43,8 +46,9 @@ export function buildOutcome(app: Application): OutcomeCardData {
     days: daysBetween(appliedMs, outcomeMs),
     reachedInterview: !!intEvt,
     platform: app.platform,
-    city: app.location,
-    dateMs: outcomeMs,
+    appliedMs,
+    // The tracker's real events: the grid marks their days and the timeline line names them.
+    events: events.filter(e => Number.isFinite(e.date)).map(e => ({ type: String(e.type), date: e.date })),
   }
 }
 
@@ -62,27 +66,35 @@ async function lookupGrade(company: string): Promise<CompanyGradeContext | null>
       signal: AbortSignal.timeout(1500),
     })
     if (!r.ok) return null
-    const d = await r.json() as { scores?: Record<string, { gradeable?: boolean | null; overall_score?: number | null; ghost_rate?: number | null; response_rate?: number | null }> }
+    const d = await r.json() as { scores?: Record<string, { gradeable?: boolean | null; overall_score?: number | null; ghost_rate?: number | null; response_rate?: number | null; avg_wait_days?: number | null; first_party_report_count?: number | null }> }
     const s = d.scores?.[name]
     if (!isGradeableScore(s)) return null
-    return { grade: gradeLetter(s.overall_score), score: Math.round(s.overall_score), ghostRate: s.ghost_rate ?? null, responseRate: s.response_rate ?? null }
+    return {
+      grade: gradeLetter(s.overall_score), score: Math.round(s.overall_score),
+      ghostRate: s.ghost_rate ?? null, responseRate: s.response_rate ?? null,
+      avgWaitDays: s.avg_wait_days ?? null,
+      // First-party only — the fused count is a web claim and never reads as "reports".
+      reports: s.first_party_report_count ?? null,
+    }
   } catch {
     return null
   }
 }
 
-export default function OutcomeCard({ app, onClose, onShared }: Props) {
+export default function OutcomeCard({ app, onClose, onShared, otherGrades }: Props) {
   const data = useMemo(() => buildOutcome(app), [app])
   const status = data.outcome
   const accent = ACCENTS[accentKeyForOutcome(status)].hex
   const head = outcomeHeadline({ outcome: status, company: data.company, days: data.days, reachedInterview: data.reachedInterview })
-  const shareText = outcomeShareText({ outcome: status, company: data.company, days: data.days, reachedInterview: data.reachedInterview })
   // No public per-outcome page exists, so unfurl the company page (which has a dynamic OG image).
   // The slug must round-trip through /company/[slug]'s decoder — one scheme (lib/cardCopy.js).
   const unfurlUrl = companyHref(data.company)
 
-  // One grade lookup shared by both formats.
+  // One grade lookup shared by both formats and by the post text (which quotes the real rate).
   const gradePromise = useMemo(() => lookupGrade(data.company), [data.company])
+  const [grade, setGrade] = useState<CompanyGradeContext | null>(null)
+  useEffect(() => { let on = true; gradePromise.then(g => { if (on) setGrade(g) }); return () => { on = false } }, [gradePromise])
+  const shareText = outcomeShareText({ outcome: status, company: data.company, days: data.days, reachedInterview: data.reachedInterview, grade, others: otherGrades })
   const draw = useCallback(async (canvas: HTMLCanvasElement, format: CardFormat) => {
     const companyGrade = await gradePromise
     drawOutcomeCard(canvas, { ...data, companyGrade }, format)
@@ -92,7 +104,7 @@ export default function OutcomeCard({ app, onClose, onShared }: Props) {
     <CardShareModal
       kicker="Outcome card"
       title={head.text}
-      sub="Share it. The next applicant deserves to know what to expect."
+      sub={head.parts.length > 1 ? 'Share it. The next applicant deserves to know what to expect.' : `${data.company}. Share it so the next applicant knows what to expect.`}
       accent={accent}
       draw={draw}
       shareText={shareText}
