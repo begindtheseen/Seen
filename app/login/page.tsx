@@ -544,12 +544,14 @@ function LoginContent() {
             <button type="button" onClick={() => resendVerification(verifyEmail)} style={{ width: '100%', minHeight: 44, padding: '.65rem', background: 'none', border: '1px solid var(--line2)', color: 'var(--sub)', borderRadius: 8, fontFamily: 'var(--body)', fontSize: '.8rem', cursor: 'pointer', marginBottom: '.5rem' }}>
               Resend verification email
             </button>
-            <button type="button" className={`${styles.linkBtn} ${styles.linkDim}`} onClick={() => { clearPendingSignup(); setVerifyUid(null); setNotice(''); setEmail(''); setPassword(''); setStep('email') }}>
-              Use a different email
-            </button>
-            <button type="button" className={`${styles.linkBtn} ${styles.linkDim}`} onClick={() => { markPendingSignin(); setVerifyUid(null); setNotice(''); clearError(); setEmail(verifyEmail); setPassword(''); setStep('signin') }}>
-              Sign in instead
-            </button>
+            <div style={{ display: 'flex', justifyContent: 'center', flexWrap: 'wrap', gap: '.25rem 1.25rem' }}>
+              <button type="button" className={`${styles.linkBtn} ${styles.linkDim}`} onClick={() => { clearPendingSignup(); setVerifyUid(null); setNotice(''); setEmail(''); setPassword(''); setStep('email') }}>
+                Use a different email
+              </button>
+              <button type="button" className={`${styles.linkBtn} ${styles.linkDim}`} onClick={() => { markPendingSignin(); setVerifyUid(null); setNotice(''); clearError(); setEmail(verifyEmail); setPassword(''); setStep('signin') }}>
+                Sign in instead
+              </button>
+            </div>
           </div>
         )}
 
