@@ -19,7 +19,7 @@
 // relevance ranking are REUSED (imported) from the live company-page search (./companyReddit.js).
 // If you change a rule here, consider whether the backfill's copy needs the same change.
 
-import { normalizeCompanyKey, isSearchableCompany, rankAndFilter } from './companyReddit.js';
+import { normalizeCompanyKey, isSearchableCompany, rankAndFilter, isReadWorthy } from './companyReddit.js';
 import { isValidCompanyName } from './reportWrite.js';
 import { fenceUntrusted, scanInjection } from '../../lib/server/promptGuard.js';
 import { pacificDate } from '../../lib/time/pacific.js';
@@ -228,7 +228,10 @@ export function selectThreads(items, name, { cap = ENRICH_DEFAULTS.threads, impo
   const list = Array.isArray(items) ? items : [];
   const bodies = new Map(list.filter((it) => it && it.id).map((it) => [it.id, it._body || '']));
   const terms = mentionTerms(name);
-  const ranked = rankAndFilter(list, name, list.length || 1);
+  // Threads to READ (isReadWorthy: named as the employer, not news) — the display list's stricter
+  // "opening post is a first-hand account" gate (isRelevant) would starve the worker of the comment
+  // threads it extracts accounts from.
+  const ranked = rankAndFilter(list, name, list.length || 1, { relevance: isReadWorthy });
   const out = [];
   for (const it of ranked) {
     if (out.length >= cap) break;

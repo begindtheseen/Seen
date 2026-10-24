@@ -291,6 +291,14 @@ export function isRelevant(item, companyName) {
   return (namedAsEmployer(item, companyName) || own) && firstHandApplicantThread(item, companyName);
 }
 
+// The bar for a thread the enrichment worker READS (api/_utils/companyEnrichment.js selectThreads):
+// about hiring at this company and not news — the worker reads the whole thread and its comments and
+// extracts first-hand accounts itself, so the display gate's "opening post is a first-hand account"
+// requirement does not apply to what it may read.
+export function isReadWorthy(item, companyName) {
+  return !!item && !isNewsThread(item) && namedAsEmployer(item, companyName);
+}
+
 export function namedAsEmployer(item, companyName) {
   if (!item) return false;
   const key = normalizeCompanyKey(companyName);
@@ -352,12 +360,12 @@ export const MIN_SHOW_THREADS = 2;
 // Filter to company-relevant threads, drop duplicate permalinks, rank, cap. Returns the
 // clean display array [{ id, title, subreddit, permalink, author, created, v }] (the
 // internal `_body` is stripped — it is never persisted or shown).
-export function rankAndFilter(items, companyName, limit = MAX_ITEMS) {
+export function rankAndFilter(items, companyName, limit = MAX_ITEMS, { relevance = isRelevant } = {}) {
   const seen = new Set();
   const relevant = [];
   for (const it of Array.isArray(items) ? items : []) {
     if (!it || !it.permalink || seen.has(it.permalink)) continue;
-    if (!isRelevant(it, companyName)) continue;
+    if (!relevance(it, companyName)) continue;
     seen.add(it.permalink);
     relevant.push(it);
   }
