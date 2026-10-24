@@ -1,4 +1,5 @@
 import type { Metadata } from 'next'
+import { pageMetadata } from '@/lib/seo'
 import { MIN_REPORTS_FOR_GRADE } from '@/lib/gradeGate'
 import Link from 'next/link'
 import { EmployerNav, EmployerFooter } from '@/components/employer/EmployerNav'
@@ -13,17 +14,14 @@ import { mentionSel } from '@/lib/server/scoreColumns.js'
 
 export const dynamic = 'force-dynamic'
 
-export const metadata: Metadata = {
-  title: 'Companies That Respond — Transparency Verified employers | Seen',
+export const metadata: Metadata = pageMetadata({
+  title: 'Companies That Respond — Transparency Verified employers',
   description:
     'Employers who publicly committed to responding to applicants, verified against real outcome data. See their ghost rate, response rate, and Seen grade before you apply.',
-  alternates: { canonical: 'https://seenjobs.io/employers/verified' },
-  openGraph: {
-    title: 'Companies That Respond — Transparency Verified on Seen',
-    description: 'Employers who commit to responding to applicants — verified against real outcomes, never bought.',
-    url: 'https://seenjobs.io/employers/verified', type: 'website', siteName: 'Seen',
-  },
-}
+  path: '/employers/verified',
+  ogTitle: 'Companies That Respond — Transparency Verified on Seen',
+  ogDescription: 'Employers who commit to responding to applicants — verified against real outcomes, never bought.',
+})
 
 type Row = { company: string; slug: string; grade: string | null; score: number | null; responseRate: number | null; ghostRate: number | null; reportCount: number }
 

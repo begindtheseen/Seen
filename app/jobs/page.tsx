@@ -18,7 +18,10 @@ import { matchCities } from '@/lib/data/usCities'
 import { takesSeenApply } from '@/lib/seenApplyMode'
 import { useCompanySuggestions, CompanySuggestList, CompanyResultCard } from '@/components/jobs/CompanySuggest'
 import PageHeader from '@/components/shell/PageHeader'
+import { LoadError } from '@/components/shell/LoadStates'
+import { resultsView } from '@/lib/searchView.js'
 import bar from '@/components/jobs/JobSearchBar.module.css'
+import { groupListings } from '@/lib/jobs/groupListings.js'
 
 // Empty-state suggestions, most-held first. Live corpus counts by title (prod, read-only,
 // 2026-10-23): software engineer 3,960 · nurse 1,360 · sales associate 648 · customer service 489 ·
@@ -50,14 +53,18 @@ export default function JobsPage() {
     recHasResume,
     recReason,
     recCity,
+    recCitySource,
     recSkills,
     recStatus,
     coScores,
     appliedCos,
     searchJobs,
+    retrySearch,
     requestGpsLocation,
     clearFilters,
   } = useJobSearch()
+  // ONE decision for the results area (lib/searchView.js): error / idle / loading / empty / results.
+  const view = resultsView({ status, count: filtered.length })
 
   const [applyJob, setApplyJob] = useState<Job | null>(null)
   const [checkCompany, setCheckCompany] = useState<string | null>(null)
@@ -90,11 +97,18 @@ export default function JobsPage() {
   }
 
   const hasCity = location.trim().length > 0
-  // The résumé rail: only with ≥3 real matches (same role family, near the profile city), and
-  // never once a search has been typed — the search is the page's job.
+  // The résumé rail: with ≥1 real match (same role family, near the person's city — the profile's,
+  // else the résumé's own), and never once a search has been typed — the search is the page's job.
+  // (The old ≥3 bar hid the one Phoenix match the audit persona had: "Nothing near Phoenix matched".)
   const typed = query.trim().length > 0
-  const showRail = isLoggedIn && !typed && (recStatus === 'loading' || recommended.length >= 3)
+  const showRail = isLoggedIn && !typed && (recStatus === 'loading' || recommended.length >= 1)
   const showCityLine = isLoggedIn && !typed && recStatus === 'done' && recReason === 'no_city'
+  // Same employer + title at several addresses → one card with "+N more locations"
+  // (lib/jobs/groupListings.js). Every row is still counted in the results line.
+  const grouped = groupListings(filtered)
+  // Suggestions never repeat what is already typed (the list used to offer "Phoenix, AZ" under a
+  // typed "Phoenix, AZ" and, on a phone, sit on the Search button).
+  const visibleLocSuggs = locSuggs.filter(c => c.toLowerCase() !== location.trim().toLowerCase())
 
   return (
     <>
@@ -117,6 +131,7 @@ export default function JobsPage() {
               type="text"
               className={bar.input}
               placeholder="Job title, role or company..."
+              aria-label="Job title, role or company"
               value={query}
               onFocus={() => setShowCoSuggs(true)}
               onBlur={() => setTimeout(() => setShowCoSuggs(false), 150)}
@@ -178,9 +193,9 @@ export default function JobsPage() {
                 >
                   {gpsLoading ? '⏳' : '📍'}
                 </button>
-                {showLocSuggs && locSuggs.length > 0 && (
-                  <div className={bar.suggs}>
-                    {locSuggs.map(city => (
+                {showLocSuggs && visibleLocSuggs.length > 0 && (
+                  <div className={bar.suggs} role="listbox" aria-label="Matching cities">
+                    {visibleLocSuggs.map(city => (
                       <div key={city} className={bar.sugg} onMouseDown={() => { setLocation(city); setShowLocSuggs(false) }}>{city}</div>
                     ))}
                   </div>
@@ -235,6 +250,7 @@ export default function JobsPage() {
             loading={recStatus === 'loading'}
             skills={recSkills}
             city={recCity}
+            citySource={recCitySource}
             onOpen={j => setDetailJob(j)}
           />
         )}
@@ -288,13 +304,18 @@ export default function JobsPage() {
             onApply={j => { if (takesSeenApply(j)) { setDetailJob(j); return } if (j.apply_url) { trackApplyClick(j); window.open(j.apply_url, '_blank', 'noopener,noreferrer') } setCheckpointJob(j) }}
             coScores={coScores}
           />
-        ) : filtered.length > 0 ? (
+        ) : view === 'results' ? (
           <div className="jlist">
-            {filtered.map((job, i) => (
-              <JobCard key={job.id} job={job} index={i} onSaveToggle={handleSaveToggle} onOpen={j => setDetailJob(j)} onApply={j => takesSeenApply(j) ? setDetailJob(j) : setApplyJob(j)} onCheckCompany={co => setCheckCompany(co)} alreadyApplied={appliedCos.has(job.id) || (!!job.apply_url && appliedCos.has(job.apply_url))} />
+            {grouped.map(({ lead: job, more }, i) => (
+              <JobCard key={job.id} job={job} more={more} index={i} onSaveToggle={handleSaveToggle} onOpen={j => setDetailJob(j)} onApply={j => takesSeenApply(j) ? setDetailJob(j) : setApplyJob(j)} onCheckCompany={co => setCheckCompany(co)} alreadyApplied={appliedCos.has(job.id) || (!!job.apply_url && appliedCos.has(job.apply_url))} />
             ))}
           </div>
-        ) : status === 'idle' ? (
+        ) : view === 'error' ? (
+          /* A failed search is an error with a Retry — never the "No matches" empty state (R-3). */
+          <div style={{ padding: '1.5rem 0 3rem' }}>
+            <LoadError what="job listings" detail="The search request did not get through. Your title and location are kept — try again." onRetry={retrySearch} />
+          </div>
+        ) : view === 'idle' ? (
           <div style={{ textAlign: 'center', padding: '2.75rem 1.5rem 3.25rem' }}>
             <div style={{ fontFamily: 'var(--mono)', fontSize: '.56rem', color: 'var(--green)', textTransform: 'uppercase', letterSpacing: '.16em', marginBottom: '.5rem' }}>Start a search</div>
             <div style={{ fontFamily: 'var(--display)', fontSize: '1.1rem', fontWeight: 700, color: 'var(--white)', letterSpacing: '-.02em', marginBottom: '.4rem' }}>What role are you hunting?</div>
@@ -312,11 +333,11 @@ export default function JobsPage() {
                 <a href="/resume" style={{ fontFamily: 'var(--mono)', fontSize: '.62rem', color: '#a78bfa', textDecoration: 'none' }}>Upload resume →</a>
               </div>
             )}
-            {isLoggedIn && recStatus === 'done' && recommended.length < 3 && recHasResume === true && recReason !== 'no_city' && (
+            {isLoggedIn && recStatus === 'done' && recommended.length === 0 && recHasResume === true && recReason !== 'no_city' && (
               <div style={{ marginTop: '1.25rem', fontFamily: 'var(--mono)', fontSize: '.6rem', color: 'var(--dim)' }}>Nothing near {recCity || 'you'} matched your résumé&apos;s roles yet — search by title above.</div>
             )}
           </div>
-        ) : status === 'loading' ? (
+        ) : view === 'loading' ? (
           <div className="jlist">
             {[0, 1, 2, 3, 4].map(i => (
               <div key={i} style={{ background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 12, padding: '1rem 1.1rem', display: 'flex', gap: '.75rem', alignItems: 'flex-start' }}>
@@ -331,13 +352,13 @@ export default function JobsPage() {
               </div>
             ))}
           </div>
-        ) : (
+        ) : view === 'empty' ? (
           <div style={{ textAlign: 'center', padding: '4rem 2rem' }}>
             <div style={{ fontSize: '2rem', marginBottom: '.75rem' }}>🔍</div>
             <div style={{ fontFamily: 'var(--display)', fontSize: '1.05rem', fontWeight: 800, color: 'var(--white)', marginBottom: '.4rem' }}>No matches for this search</div>
             <div style={{ color: 'var(--sub)', fontFamily: 'var(--body)', fontSize: '.82rem', fontWeight: 300, maxWidth: 360, margin: '0 auto', lineHeight: 1.6 }}>Try a broader job title, widen the radius, or clear a filter — new roles are indexed continuously.</div>
           </div>
-        )}
+        ) : null}
       </div>
     </div>
 

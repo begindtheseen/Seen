@@ -10,6 +10,7 @@ import { useRouter, usePathname } from 'next/navigation'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useAuth } from '@/lib/auth'
 import { AppStore } from '@/lib/stores/AppStore'
+import { useFocusTrap } from '@/lib/hooks/useFocusTrap'
 import styles from './CommandPalette.module.css'
 
 type Item = { id: string; label: string; hint?: string; group: string; href: string; keys?: string; icon: string; kw?: string }
@@ -59,7 +60,11 @@ export default function CommandPalette() {
   const [mine, setMine] = useState<Item[]>([])
   const inputRef = useRef<HTMLInputElement>(null)
   const listRef = useRef<HTMLDivElement>(null)
+  const panelRef = useRef<HTMLDivElement>(null)
   const pendingG = useRef<number | null>(null)
+  // Tab stays in the palette; Escape/close returns focus to whatever opened it (the nav "Jump to…"
+  // pill or the footer button) instead of dropping it on <body>.
+  useFocusTrap(panelRef, open, { initialFocus: inputRef })
 
   const go = useCallback((href: string) => {
     setOpen(false)
@@ -147,7 +152,7 @@ export default function CommandPalette() {
   let lastGroup = ''
   return (
     <div className={styles.overlay} onMouseDown={() => setOpen(false)}>
-      <div className={styles.panel} role="dialog" aria-modal="true" aria-label="Jump to" onMouseDown={e => e.stopPropagation()} onKeyDown={onKeyDown}>
+      <div ref={panelRef} className={styles.panel} role="dialog" aria-modal="true" aria-label="Jump to" onMouseDown={e => e.stopPropagation()} onKeyDown={onKeyDown}>
         <div className={styles.inputRow}>
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" aria-hidden><circle cx="11" cy="11" r="7" /><path d="M20 20l-3.5-3.5" /></svg>
           <input

@@ -52,7 +52,10 @@
 .toggle { min-height: 44px; min-width: 44px; padding: .4rem .5rem; margin: -.4rem -.5rem -.4rem 0; background: none; border: none; cursor: pointer; font-family: var(--mono); font-size: .6rem; color: var(--blue); border-radius: 8px; }
 .toggle:hover { background: rgba(59,130,246,.08); }
 
-/* ── Stage pipeline ── */
+/* ── Stage pipeline ──
+   The current-stage fill is blue-700 (#1d4ed8), not --blue (#3b82f6): white 12px text on --blue is
+   3.68:1 (phone audit 2026-10-23), on #1d4ed8 it is 6.7:1. Every chip colour pair in this block is
+   checked at ≥4.5:1 by components/tracker/stageContrast.test.mjs — keep them in sync. */
 .pipe { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 0; margin-top: .65rem; border: 1px solid var(--line2); border-radius: 8px; overflow: hidden; background: var(--raised); }
 .step {
   min-height: 44px; padding: .3rem .25rem; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
@@ -62,12 +65,12 @@
 .step:last-child { border-right: none; }
 .step:hover { color: var(--white); background: rgba(255,255,255,.05); }
 .step.done { color: var(--green); background: var(--gdim); }
-.step.current { color: #fff; background: var(--blue); font-weight: 700; cursor: default; }
+.step.current { color: #fff; background: #1d4ed8; font-weight: 700; cursor: default; }
 .pipePhone { display: none; }
 @media (max-width: 480px) {
   .pipe { display: none; }
   .pipePhone { display: flex; align-items: center; gap: .5rem; margin-top: .65rem; min-width: 0; }
-  .chip { display: inline-flex; align-items: center; min-height: 36px; padding: .3rem .7rem; border-radius: 999px; background: var(--blue); color: #fff; font-family: var(--mono); font-size: .62rem; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; white-space: nowrap; flex-shrink: 0; }
+  .chip { display: inline-flex; align-items: center; min-height: 36px; padding: .3rem .7rem; border-radius: 999px; background: #1d4ed8; color: #fff; font-family: var(--mono); font-size: .62rem; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; white-space: nowrap; flex-shrink: 0; }
   .nextBtn { flex: 1 1 auto; min-width: 0; min-height: 44px; justify-content: flex-start; overflow: hidden; text-overflow: ellipsis; }
   .moveRow { display: flex; }
 }

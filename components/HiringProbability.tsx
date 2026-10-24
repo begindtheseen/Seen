@@ -1,8 +1,16 @@
 'use client'
 
+import { MIN_REPORTS_FOR_RATES, oddsPhrase, responseVerdict, tooFewReportsLine } from '@/lib/companyPageSummary'
+
 // Grade gate: a probability is derived from the company's response/ghost rates, which are null when
 // the company is below MIN_REPORTS_FOR_GRADE real reports (lib/gradeGate.ts). With no real rates there
 // is no honest probability — the component renders nothing instead of inventing default rates.
+//
+// The wording ("Most applicants here hear back" …) comes from lib/companyPageSummary.ts responseVerdict —
+// the SAME thresholds as the hero's verdict sentence, so the two can never disagree (audit 2026-10-23:
+// Insight Global's hero said "Most applicants never hear back" over an odds panel saying "Most applicants
+// here hear back"). With fewer than MIN_REPORTS_FOR_RATES applicant reports no percentage is shown at all
+// (Chipotle: "77% … the share of 2 applicant reports").
 interface HiringProbabilityProps {
   responseRate?: number | null   // e.g. 0.22 (22%)
   ghostRate?: number | null      // e.g. 0.55 (55%)
@@ -10,7 +18,12 @@ interface HiringProbabilityProps {
   jobLevel?: string       // e.g. "Senior", "Entry Level", "Mid level"
   profileExp?: string     // from profile.experience e.g. "2-5 years", "Senior"
   compact?: boolean       // compact mode for swipe cards (less height)
-  reportCount?: number    // applicant reports the rate was computed from — named as the basis
+  /** Applicant reports the rate was computed from — named as the basis; below MIN_REPORTS_FOR_RATES no percentage is shown. */
+  reportCount?: number
+  /** Online mentions that also feed the rate (each counts half) — named with the basis. */
+  mentionCount?: number
+  /** The page's one-line context for the panel (lib/companyPageSummary.ts oddsContext); built here when absent. */
+  context?: string
 }
 
 function calcProb(responseRate: number, jobLevel?: string, profileExp?: string): number {
@@ -39,14 +52,17 @@ function calcProb(responseRate: number, jobLevel?: string, profileExp?: string):
   return Math.min(0.95, Math.max(0.02, base * levelMult))
 }
 
-export default function HiringProbability({ responseRate, ghostRate, overallScore: _overallScore, jobLevel, profileExp, compact = false, reportCount }: HiringProbabilityProps) {
+export default function HiringProbability({ responseRate, ghostRate, overallScore: _overallScore, jobLevel, profileExp, compact = false, reportCount, mentionCount = 0, context: givenContext }: HiringProbabilityProps) {
   if (responseRate == null || ghostRate == null) return null
   const personalized = !!(jobLevel && profileExp)
   const prob = calcProb(responseRate, jobLevel, profileExp)
   const pct = Math.round(prob * 100)
   const color = pct >= 40 ? 'var(--green)' : pct >= 20 ? 'var(--amber)' : 'var(--red)'
+  // A named basis below the bar → no percentage (the swipe deck passes no count and keeps its bar).
+  const tooFew = typeof reportCount === 'number' && reportCount < MIN_REPORTS_FOR_RATES
 
   if (compact) {
+    if (tooFew) return null
     return (
       <div style={{ display: 'flex', alignItems: 'center', gap: '.45rem', marginTop: '.3rem' }}>
         <span style={{ fontFamily: 'var(--mono)', fontSize: '.5rem', color: 'var(--dim)', flexShrink: 0 }}>Response chance</span>
@@ -58,13 +74,26 @@ export default function HiringProbability({ responseRate, ghostRate, overallScor
     )
   }
 
-  const context = (pct >= 50
-    ? 'Most applicants here hear back'
-    : pct >= 30
-    ? 'Mixed — apply with a tailored résumé'
-    : 'Few applicants here hear back') + (personalized
-      ? ' · adjusted for your level'
-      : ` · the share of ${reportCount && reportCount > 0 ? `${reportCount} applicant report${reportCount === 1 ? '' : 's'}` : 'applicant reports'} that heard back`)
+  if (tooFew && !personalized) {
+    return (
+      <div style={{ background: 'rgba(99,102,241,.06)', border: '1px solid rgba(99,102,241,.15)', borderRadius: 9, padding: '.65rem .85rem' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '.35rem', gap: '.6rem' }}>
+          <span style={{ fontFamily: 'var(--mono)', fontSize: '.52rem', color: 'var(--dim)', textTransform: 'uppercase', letterSpacing: '.08em' }}>Response chance</span>
+          <span style={{ fontFamily: 'var(--display)', fontSize: '.95rem', fontWeight: 700, color: 'var(--muted)', lineHeight: 1 }}>Too few reports</span>
+        </div>
+        <div style={{ fontFamily: 'var(--mono)', fontSize: '.52rem', color: 'var(--muted)', lineHeight: 1.5 }}>{givenContext || tooFewReportsLine(reportCount!)}</div>
+      </div>
+    )
+  }
+
+  const basis = typeof reportCount === 'number' && reportCount > 0
+    ? (mentionCount > 0
+        ? `the share of ${reportCount} applicant report${reportCount === 1 ? '' : 's'} (and ${mentionCount} online mention${mentionCount === 1 ? '' : 's'}, each counting half) that heard back`
+        : `the share of ${reportCount} applicant report${reportCount === 1 ? '' : 's'} that heard back`)
+    : 'the share of applicant reports that heard back'
+  const context = personalized
+    ? `${oddsPhrase(responseVerdict(prob))} · adjusted for your level`
+    : (givenContext || `${oddsPhrase(responseVerdict(prob))} · ${basis}`)
 
   return (
     <div style={{ background: 'rgba(99,102,241,.06)', border: '1px solid rgba(99,102,241,.15)', borderRadius: 9, padding: '.65rem .85rem' }}>

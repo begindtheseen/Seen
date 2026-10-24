@@ -84,7 +84,8 @@ export default function WelcomeOnboarding({
         <button
           onClick={onDismiss}
           title="Hide getting started"
-          style={{ flexShrink: 0, background: 'none', border: 'none', color: 'var(--dim)', cursor: 'pointer', fontSize: '.95rem', lineHeight: 1, padding: '.15rem .25rem' }}
+          aria-label="Hide getting started"
+          style={{ flexShrink: 0, background: 'none', border: 'none', color: 'var(--dim)', cursor: 'pointer', fontSize: '.95rem', lineHeight: 1, minWidth: 44, minHeight: 44, margin: '-.6rem -.6rem 0 0', borderRadius: 10 }}
         >✕</button>
       </div>
 

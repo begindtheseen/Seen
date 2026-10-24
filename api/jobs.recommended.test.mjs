@@ -209,3 +209,43 @@ test('no city on the profile → reason no_city, no listing reads, nothing far a
     assert.equal(jobReads().length, 0);
   } finally { state.city = 'Temecula, CA'; }
 });
+
+
+test('no profile city but the résumé states one → the rail uses the résumé\'s city (city_source: resume)', async () => {
+  const saved = { ...state };
+  state.city = '';
+  state.skillsRow = null;
+  state.resumeText = `Jordan Avery
+Phoenix, AZ 85004 · (602) 555-0148 · jordan.avery.jobs@gmail.com · linkedin.com/in/jordanavery
+
+SUMMARY
+Customer-focused retail and front-desk professional with 5+ years of experience.
+
+EXPERIENCE
+Sales Associate — GNC | 2021 – Present
+• Sold supplements and built repeat business with regulars.
+
+Valet Attendant — Towne Park | Oct 2019 – Jan 2021
+• Parked and retrieved vehicles for hotel guests.`;
+  state.jobsRows = [{ ...jobRow(7), title: 'Seasonal Sales Associate (Part-Time) - Biltmore Fashion Park', company: 'aloyoga', location: 'Phoenix, Arizona, United States', lat: 33.51, lng: -112.03 }];
+  try {
+    const res = await call();
+    assert.equal(res.code, 200);
+    assert.notEqual(res.body.reason, 'no_city', JSON.stringify(res.body));
+    assert.equal(res.body.city, 'Phoenix, AZ');
+    assert.equal(res.body.city_source, 'resume');
+    assert.equal(res.body.jobs.length, 1, 'one Phoenix sales associate match is a match');
+    assert.ok(jobReads().some((c) => /phoenix/i.test(decodeURIComponent(c.u))), 'the local reads are scoped to the résumé city');
+  } finally { Object.assign(state, saved); }
+});
+
+test('no city anywhere → still an honest no_city', async () => {
+  const saved = { ...state };
+  state.city = '';
+  state.skillsRow = null;
+  try {
+    const res = await call();
+    assert.equal(res.body.reason, 'no_city');
+    assert.equal(res.body.has_resume, true);
+  } finally { Object.assign(state, saved); }
+});

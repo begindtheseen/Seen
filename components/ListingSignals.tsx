@@ -15,7 +15,8 @@ export default function ListingSignals({ companyName }: { companyName: string })
   useEffect(() => {
     if (!companyName) return
     let live = true
-    fetch('/api/jobs', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'listing_signals', company: companyName }) })
+    // GET so the CDN can serve it (lib/server/publicRead.js); the rating is identical for every visitor.
+    fetch(`/api/jobs?action=listing_signals&company=${encodeURIComponent(companyName)}`)
       .then((r) => (r.ok ? r.json() : null))
       .then((b) => { if (live && b?.signals) setS(b.signals as Signals) })
       .catch(() => {})

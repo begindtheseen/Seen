@@ -2,7 +2,7 @@
 
 import { CHECK_SCHEDULE } from '../constants'
 import type { DueCheck } from '../types'
-import { nextCheck, type NextCheck } from './checkSchedule'
+import { nextCheck, daysSince, type NextCheck } from './checkSchedule'
 
 const KEY = 'seen_hevents_v1'
 const SNOOZE_KEY = 'seen_check_snooze'
@@ -89,7 +89,7 @@ export const EventStore = {
     // Only OPEN applications are asked — a card already marked ghosted/rejected/hired/withdrawn has
     // its answer, so it must not keep raising "Did they respond?" at day 7/14/30.
     for (const app of apps.filter(a => a.status === 'active')) {
-      const days = Math.floor((Date.now() - app.appliedAt) / 86400000)
+      const days = daysSince(app.appliedAt) // California calendar days — the card's "Day N"
       const chk = CHECK_SCHEDULE.find(c => days >= c.day && !this.hasCheck(app.id, c.type))
       if (!chk) continue
       const snoozeKey = app.id + ':' + chk.type

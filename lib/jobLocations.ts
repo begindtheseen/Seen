@@ -3,6 +3,8 @@
 // This is listing data, NOT applicant reports — callers must label it as such
 // ("from N current job listings"). Pure; no I/O. Tested in lib/server/jobLocations.test.mjs.
 
+import { locationScope } from './jobs/usLocation.js'
+
 export type JobLocationBucket = { label: string; count: number }
 export type JobLocationSummary = {
   listings: number          // listings considered (every job passed in)
@@ -10,6 +12,8 @@ export type JobLocationSummary = {
   remote: number            // listings that are remote / work-from-anywhere
   places: JobLocationBucket[] // top N named places, most listings first (a listing can name several)
   otherPlaces: number       // how many further distinct places were cut by the top-N limit
+  /** Listings whose location is outside the US (Bangalore, London …) — left out, counted here so the page can say so. */
+  abroad: number
 }
 
 const REMOTE_RE = /\b(remote|anywhere|work from home|wfh|telecommute|virtual)\b/i
@@ -49,9 +53,14 @@ export function aggregateJobLocations(
   const counts = new Map<string, JobLocationBucket>()
   let remote = 0
   let withLocation = 0
+  let abroad = 0
   for (const j of list) {
     const loc = String(j?.location ?? '').trim()
     if (!loc) continue
+    // Seen's market is the US + remote (lib/jobs/usLocation.js — the same rule the board sync stores
+    // by). Older stored rows predate that gate, so Walmart's Locations tab listed Bangalore (audit
+    // 2026-10-24); a foreign office is never "where <company> is hiring" here.
+    if (locationScope(loc) === 'non_us') { abroad += 1; continue }
     let named = false
     if (REMOTE_RE.test(loc)) { remote += 1; named = true }
     else {
@@ -78,5 +87,6 @@ export function aggregateJobLocations(
     remote,
     places: sorted.slice(0, n),
     otherPlaces: Math.max(0, sorted.length - n),
+    abroad,
   }
 }

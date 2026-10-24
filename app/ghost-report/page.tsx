@@ -1,4 +1,5 @@
 import type { Metadata } from 'next'
+import { pageMetadata } from '@/lib/seo'
 import Link from 'next/link'
 import { getLeaderboard, getScoresByNames, slugify, grade, riskColor, riskLabel, type LeaderboardRow } from '@/lib/growth'
 import { STAFFING_AGENCIES } from '@/lib/agencies'
@@ -12,24 +13,16 @@ import { assembleGhostReport, pickHeadline, weekProvenance } from '@/lib/server/
 
 export const revalidate = 3600
 
-export const metadata: Metadata = {
-  title: 'The Weekly Ghost Report — Which Companies Ghost Applicants | Seen',
+export const metadata: Metadata = pageMetadata({
+  title: 'The Weekly Ghost Report — Which Companies Ghost Applicants',
   description:
     'A weekly, auto-generated snapshot of hiring transparency from real applicant reports: the most-reported ghosters, the companies that actually reply, and the running staffing-agency ghost index. Real numbers only — companies with no reports show no score.',
-  alternates: { canonical: 'https://seenjobs.io/ghost-report' },
-  openGraph: {
-    title: 'The Weekly Ghost Report',
-    description: 'The most-reported ghosters and the companies that actually reply — from real applicant outcomes.',
-    url: 'https://seenjobs.io/ghost-report',
-    type: 'website',
-    siteName: 'Seen',
-  },
-  twitter: {
-    card: 'summary_large_image',
-    title: 'The Weekly Ghost Report',
-    description: 'The most-reported ghosters and the companies that actually reply — from real applicant outcomes.',
-  },
-}
+  path: '/ghost-report',
+  ogTitle: 'The Weekly Ghost Report',
+  ogDescription: 'The most-reported ghosters and the companies that actually reply — from real applicant outcomes.',
+  // This segment ships its own share card (app/ghost-report/opengraph-image.tsx); file-based images win.
+  image: { url: '/ghost-report/opengraph-image', width: 1200, height: 630, alt: 'The Weekly Ghost Report on Seen' },
+})
 
 const wrap = { maxWidth: 760, margin: '0 auto', padding: '3.5rem 1.25rem 5rem', width: '100%', boxSizing: 'border-box' as const }
 const mono = (size: string, color: string): React.CSSProperties => ({ fontFamily: 'var(--mono)', fontSize: size, color })

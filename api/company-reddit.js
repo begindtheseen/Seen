@@ -16,6 +16,7 @@
 // Service key is server-only (bypasses the RLS-on/no-policy tables); it is never exposed.
 
 import { applyRateLimit } from '../lib/server/ratelimit.js';
+import { setPublicCache } from '../lib/server/publicRead.js';
 import { logError } from '../lib/server/errlog.js';
 import { broadcastActivity } from '../lib/server/realtime.js';
 import {
@@ -139,7 +140,7 @@ async function handleLookup(req, res, body) {
   if (hasDb && !dryRun) {
     const row = await readCache(SUPABASE_URL, key);
     if (row && cacheFresh(row)) {
-      res.setHeader('Cache-Control', 'public, s-maxage=600, stale-while-revalidate=3600');
+      setPublicCache(res, 'reddit');
       const items = servedItems(row, companyName);
       return res.status(200).json({
         ok: true, company: row.company_name, items,
@@ -167,11 +168,13 @@ async function handleLookup(req, res, body) {
   if (result === null || (result.items.length === 0 && result.degraded)) {
     if (stale) {
       const items = servedItems(stale, companyName);
+      setPublicCache(res, 'reddit_checking'); // a stale answer: let the edge hold it only briefly
       return res.status(200).json({
         ok: true, company: stale.company_name, items,
         status: emptyStateDecision(items), cached: true, stale: true, fetched_at: stale.fetched_at,
       });
     }
+    setPublicCache(res, 'reddit_checking'); // "checking" is transient: short edge hold, never 10 minutes
     return res.status(200).json({ ok: true, company: companyName, items: [], status: 'checking', cached: false });
   }
 
@@ -179,6 +182,7 @@ async function handleLookup(req, res, body) {
   const items = result.items;
   const status = emptyStateDecision(items);
   if (hasDb && !dryRun) await writeCache(SUPABASE_URL, key, companyName, items, status);
+  if (!dryRun) setPublicCache(res, 'reddit');
   return res.status(200).json({
     ok: true, company: companyName, items, status,
     cached: false, dry_run: dryRun || undefined, fetched_at: new Date().toISOString(),

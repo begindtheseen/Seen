@@ -6,6 +6,7 @@ import { useState, useEffect, useRef, type ReactNode } from 'react'
 import { useAuth } from '@/lib/auth'
 import { supabase } from '@/lib/supabase'
 import { markIntentionalSignOut } from '@/lib/sessionExpired'
+import { useFocusTrap } from '@/lib/hooks/useFocusTrap'
 import styles from '../Nav.module.css'
 import empStyles from './EmployerNav.module.css'
 
@@ -61,6 +62,17 @@ export function EmployerNav() {
   const [scrolled, setScrolled] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
   const [acctOpen, setAcctOpen] = useState(false)
+  const drawerRef = useRef<HTMLDivElement>(null)
+  const drawerCloseRef = useRef<HTMLButtonElement>(null)
+  // Same modal contract as the seeker drawer (lib/hooks/useFocusTrap): focus in, Tab trapped, Escape
+  // closes, focus returned to the hamburger.
+  useFocusTrap(drawerRef, menuOpen, { initialFocus: drawerCloseRef })
+  useEffect(() => {
+    if (!menuOpen) return
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setMenuOpen(false) }
+    document.addEventListener('keydown', onKey)
+    return () => document.removeEventListener('keydown', onKey)
+  }, [menuOpen])
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 10)
@@ -87,7 +99,8 @@ export function EmployerNav() {
   return (
     <>
       <nav id="mainNav" className={scrolled ? 'nav-scrolled' : ''}>
-        <button className="side-menu-toggle" onClick={() => setMenuOpen(true)} aria-label="Menu" title="Menu">☰</button>
+        <a href="#main" className="skip-link">Skip to content</a>
+        <button className="side-menu-toggle" onClick={() => setMenuOpen(true)} aria-label="Menu" title="Menu" aria-expanded={menuOpen} aria-controls="employer-side-menu" aria-haspopup="dialog">☰</button>
 
         {/* The wordmark ALWAYS goes home — this is the escape hatch that was missing. */}
         <Link href="/" className="logo" title="Back to Seen home">
@@ -152,13 +165,23 @@ export function EmployerNav() {
       </nav>
 
       {/* Mobile slide-out drawer (reuses the global side-menu styles as the seeker nav does). */}
-      <div className={`side-menu-overlay${menuOpen ? ' open' : ''}`} onClick={() => setMenuOpen(false)} />
-      <div className={`side-menu${menuOpen ? ' open' : ''}`}>
+      <div className={`side-menu-overlay${menuOpen ? ' open' : ''}`} onClick={() => setMenuOpen(false)} aria-hidden="true" />
+      <div
+        id="employer-side-menu"
+        ref={drawerRef}
+        className={`side-menu${menuOpen ? ' open' : ''}`}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Menu"
+        aria-hidden={!menuOpen}
+        inert={!menuOpen}
+      >
         <div className="side-menu-logo">
           <span className="logo-pulse" />
           <span style={{ fontFamily: 'var(--display)', fontWeight: 800, fontSize: '1.2rem', color: 'var(--white)', letterSpacing: '-.02em' }}>Seen</span>
           <span style={{ fontFamily: 'var(--mono)', fontSize: '.55rem', color: 'var(--dim)', textTransform: 'uppercase', letterSpacing: '.12em' }}>employers</span>
-          <button onClick={() => setMenuOpen(false)} style={{ marginLeft: 'auto', background: 'none', border: 'none', color: 'var(--muted)', cursor: 'pointer', fontSize: '1rem' }} aria-label="Close menu">✕</button>
+          {/* 44×44 hit area by box size (the glyph stays 1rem); negative block margins keep the row height. */}
+          <button ref={drawerCloseRef} type="button" onClick={() => setMenuOpen(false)} style={{ marginLeft: 'auto', width: 44, height: 44, marginTop: -10, marginBottom: -10, marginRight: '-.5rem', display: 'grid', placeItems: 'center', background: 'none', border: 'none', borderRadius: 10, color: 'var(--muted)', cursor: 'pointer', fontSize: '1rem' }} aria-label="Close menu">✕</button>
         </div>
 
         <div className="side-menu-label">For employers</div>

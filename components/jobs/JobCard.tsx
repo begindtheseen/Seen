@@ -11,6 +11,10 @@ import { takesSeenApply } from '@/lib/seenApplyMode'
 import { trackApplyClick } from '@/lib/trackApply'
 import { RESUME_OPTIMIZE_COST, creditCostLabel } from '@/lib/creditRules'
 import ApplyCheckpoint from '@/components/ApplyCheckpoint'
+import { displayCompanyName } from '@/lib/companyDisplay'
+import { displayPay } from '@/lib/jobs/pay.js'
+import { roleSnippet, isDescriptionPreview } from '@/lib/jobs/descriptionText.js'
+import { httpHref } from '@/lib/safeHref.js'
 
 // The optimize action's price, rendered from the credit rules so the label can never drift.
 const OPTIMIZE_PRICE = creditCostLabel(RESUME_OPTIMIZE_COST)
@@ -40,7 +44,7 @@ function jobVibes(job: Job): { cls: string; txt: string }[] {
   } else if (src.includes('indeed')) {
     vibes.push({ cls: 'v-n', txt: '🔍 Indeed' })
   }
-  if (job.salary) vibes.push({ cls: 'v-g', txt: '💰 Salary listed' })
+  if (displayPay(job)) vibes.push({ cls: 'v-g', txt: '💰 Pay listed' })
   if (score != null && score >= 75) vibes.push({ cls: 'v-g', txt: '✅ High transparency' })
   else if (score != null && score < 40) vibes.push({ cls: 'v-r', txt: '⚠️ Low score' })
   if (loc.includes('remote') || (job.type || '').toLowerCase().includes('remote')) {
@@ -60,7 +64,7 @@ function ScoreRing({ score }: { score: number | null }) {
   )
 }
 
-export default function JobCard({ job, index, onSaveToggle, onOpen, onApply, onCheckCompany, alreadyApplied }: { job: Job; index: number; onSaveToggle: (id: string) => void; onOpen: (job: Job) => void; onApply: (job: Job) => void; onCheckCompany: (company: string) => void; alreadyApplied?: boolean }) {
+export default function JobCard({ job, index, onSaveToggle, onOpen, onApply, onCheckCompany, alreadyApplied, more = [] }: { job: Job; index: number; onSaveToggle: (id: string) => void; onOpen: (job: Job) => void; onApply: (job: Job) => void; onCheckCompany: (company: string) => void; alreadyApplied?: boolean; /** Same employer + title at other addresses (lib/jobs/groupListings.js) — one card, "+N more locations". */ more?: Job[] }) {
   const risk = Score.risk(job.score)
   const wl = job.waste != null ? Score.wasteLabel(job.waste) : null
   const vibes = jobVibes(job)
@@ -69,8 +73,19 @@ export default function JobCard({ job, index, onSaveToggle, onOpen, onApply, onC
   const [reportingInactive, setReportingInactive] = useState(false)
   // After a plain "Apply ↗" the existing tracker checkpoint offers "Did you apply? → track it".
   const [checkpoint, setCheckpoint] = useState(false)
+  const [moreOpen, setMoreOpen] = useState(false)
   const { user, isLoggedIn } = useAuth()
-  const logoLetter = (job.company || '?')[0].toUpperCase()
+  // The employer as a person names it: "PLS", not the board slug "plscareers" (lib/companyDisplay.ts).
+  // job.company stays the data key for the company lookup behind "Check".
+  const companyName = displayCompanyName(job.company) || job.company
+  const logoLetter = (companyName || '?')[0].toUpperCase()
+  const pay = displayPay(job)
+  // An Adzuna row is a ~500-char teaser of the posting, never its text: say so, link the full
+  // posting, and never sell an optimization of a text we do not have.
+  const preview = isDescriptionPreview(job)
+  const snippet = job.description ? roleSnippet(job.description, job.company, job.title) : ''
+  const applyHref = httpHref(job.apply_url)
+  const canOptimize = !takesSeenApply(job) && !!applyHref && !preview
 
   async function reportInactive(e: React.MouseEvent) {
     e.stopPropagation()
@@ -106,11 +121,11 @@ export default function JobCard({ job, index, onSaveToggle, onOpen, onApply, onC
     if (saved) {
       SavedJobsStore.remove(job.id, isLoggedIn)
       setSaved(false)
-      notify({ title: 'Removed from saved', sub: `${job.title} · ${job.company}`, severity: 'info', duration: 2600 })
+      notify({ title: 'Removed from saved', sub: `${job.title} · ${companyName}`, severity: 'info', duration: 2600 })
     } else {
       SavedJobsStore.save(job, isLoggedIn)
       setSaved(true)
-      notify({ title: 'Saved to your list', sub: `${job.title} · ${job.company}`, severity: 'success', duration: 2600 })
+      notify({ title: 'Saved to your list', sub: `${job.title} · ${companyName}`, severity: 'success', duration: 2600 })
     }
     onSaveToggle(job.id)
   }
@@ -128,8 +143,8 @@ export default function JobCard({ job, index, onSaveToggle, onOpen, onApply, onC
         <div className="jrc-logo">{logoLetter}</div>
         <div style={{ flex: 1, minWidth: 0 }}>
           <div className="jlc-title">{job.title}</div>
-          <div className="jlc-co">{job.company}</div>
-          <div className="jlc-loc">📍 {job.location}</div>
+          <div className="jlc-co">{companyName}</div>
+          <div className="jlc-loc">📍 {job.location}{more.length > 0 && <span style={{ color: 'var(--dim)' }}> · +{more.length} more location{more.length !== 1 ? 's' : ''}</span>}</div>
         </div>
         <ScoreRing score={job.score} />
       </div>
@@ -154,6 +169,9 @@ export default function JobCard({ job, index, onSaveToggle, onOpen, onApply, onC
         {(job.availability_status === 'expired' || job.availability_status === 'closed') && (
           <span className="vibe v-r" style={{ fontSize: '.57rem' }}>✕ likely closed</span>
         )}
+        {preview && (
+          <span className="vibe v-a" title="This source gives Seen only a short preview of the posting" style={{ fontSize: '.57rem' }}>✂ Preview — full posting on the employer&apos;s site</span>
+        )}
         {vibes.map((v, i) => (
           <span key={i} className={`vibe ${v.cls}`}>{v.txt}</span>
         ))}
@@ -162,9 +180,39 @@ export default function JobCard({ job, index, onSaveToggle, onOpen, onApply, onC
         )}
       </div>
 
-      {job.description && (
+      {/* The posting's first sentence about the ROLE (lib/jobs/descriptionText.js roleSnippet) — not the
+          company's mission paragraph that every one of its cards used to open with. */}
+      {snippet && (
         <div style={{ fontSize: '.72rem', color: 'var(--muted)', margin: '.25rem 0', lineHeight: 1.55 }}>
-          {job.description.slice(0, 120)}...
+          {snippet}
+        </div>
+      )}
+
+      {more.length > 0 && (
+        <div style={{ margin: '.1rem 0 .3rem' }}>
+          <button
+            type="button"
+            onClick={e => { e.stopPropagation(); setMoreOpen(o => !o) }}
+            aria-expanded={moreOpen}
+            style={{ background: 'none', border: 'none', padding: '.35rem 0', fontFamily: 'var(--mono)', fontSize: '.62rem', color: 'var(--blue)', cursor: 'pointer', minHeight: 44 }}
+          >
+            📍 {moreOpen ? 'Hide' : 'Show'} {more.length} more location{more.length !== 1 ? 's' : ''} for this role {moreOpen ? '▴' : '▾'}
+          </button>
+          {moreOpen && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '.2rem' }}>
+              {more.map(m => (
+                <button
+                  key={m.id}
+                  type="button"
+                  onClick={e => { e.stopPropagation(); onOpen(m) }}
+                  style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '.5rem', width: '100%', minWidth: 0, minHeight: 44, textAlign: 'left', background: 'var(--raised)', border: '1px solid var(--line)', borderRadius: 8, padding: '.45rem .7rem', cursor: 'pointer', color: 'inherit' }}
+                >
+                  <span style={{ fontFamily: 'var(--mono)', fontSize: '.64rem', color: 'var(--sub)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0 }}>📍 {m.location}</span>
+                  <span style={{ fontFamily: 'var(--mono)', fontSize: '.6rem', color: 'var(--green)', flexShrink: 0 }}>Open →</span>
+                </button>
+              ))}
+            </div>
+          )}
         </div>
       )}
 
@@ -172,7 +220,7 @@ export default function JobCard({ job, index, onSaveToggle, onOpen, onApply, onC
         <span className="jlc-mi">{job.type || 'Full-time'}</span>
         {/* Level only when the title says it (unknown is '' — never a default "Mid level"). */}
         {job.level && <><span className="jlc-mi">·</span><span className="jlc-mi">{job.level}</span></>}
-        {job.salary && <><span className="jlc-mi">·</span><span className="jlc-sal">{job.salary}</span></>}
+        {pay && <><span className="jlc-mi">·</span><span className="jlc-sal">{pay}</span></>}
         <span className="jlc-mi">·</span>
         <span className="jlc-mi" style={{ color: 'var(--blue)' }}>{job.source || 'Job board'}</span>
       </div>
@@ -181,13 +229,13 @@ export default function JobCard({ job, index, onSaveToggle, onOpen, onApply, onC
         onClick={e => { e.stopPropagation(); onCheckCompany(job.company) }}
         style={{ display: 'block', width: '100%', textAlign: 'left', background: 'none', border: 'none', fontFamily: 'var(--mono)', fontSize: '.62rem', color: 'var(--amber)', padding: '.1rem 0 .55rem', opacity: .8, cursor: 'pointer' }}
       >
-        🏢 Check {job.company} →
+        🏢 Check {companyName} →
       </button>
 
       {/* Two separate actions (2026-10-23): "Apply ↗" is FREE — it opens the listing in a new
           tab and offers tracking; "Optimize · 1 credit" is the paid optimizer. One tap never
           spends a credit the person did not ask for. */}
-      <div className="jlc-actions" style={!takesSeenApply(job) && job.apply_url ? splitRow : undefined}>
+      <div className="jlc-actions" style={canOptimize ? splitRow : undefined}>
         <button
           className="jlc-save"
           data-saved={saved ? '1' : '0'}
@@ -198,28 +246,30 @@ export default function JobCard({ job, index, onSaveToggle, onOpen, onApply, onC
         </button>
         {takesSeenApply(job) ? (
           <button className="jlc-apply" onClick={e => { e.stopPropagation(); onApply(job) }}>Apply on Seen →</button>
-        ) : job.apply_url ? (
+        ) : applyHref ? (
           <>
             <a
               className="jlc-apply"
-              href={job.apply_url}
+              href={applyHref}
               target="_blank"
               rel="noopener noreferrer"
               data-testid="apply-link"
-              style={{ textDecoration: 'none', minWidth: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+              style={{ textDecoration: 'none', minWidth: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', ...(canOptimize ? {} : { flex: 1 }) }}
               onClick={e => { e.stopPropagation(); trackApplyClick(job); setCheckpoint(true) }}
             >
-              Apply ↗
+              {preview ? 'Open the full posting ↗' : 'Apply ↗'}
             </a>
-            <button
-              type="button"
-              style={optimizeBtn}
-              data-testid="optimize-btn"
-              title={`Optimize your résumé for this job · ${OPTIMIZE_PRICE}`}
-              onClick={e => { e.stopPropagation(); onApply(job) }}
-            >
-              Optimize · {OPTIMIZE_PRICE.replace(' ', '\u00a0')}
-            </button>
+            {canOptimize && (
+              <button
+                type="button"
+                style={optimizeBtn}
+                data-testid="optimize-btn"
+                title={`Optimize your résumé for this job · ${OPTIMIZE_PRICE}`}
+                onClick={e => { e.stopPropagation(); onApply(job) }}
+              >
+                Optimize · {OPTIMIZE_PRICE.replace(' ', '\u00a0')}
+              </button>
+            )}
           </>
         ) : (
           <button className="jlc-apply" disabled style={{ opacity: .45, cursor: 'not-allowed' }}>No apply link</button>

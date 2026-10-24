@@ -5,7 +5,9 @@ import { usePathname } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import MicroSurveyModal, { type MicroQuestion } from './MicroSurveyModal'
 import { GENERAL_QUESTIONS, buildContextualQuestion } from '@/lib/server/microSurvey'
-import { pacificDate } from '@/lib/time/pacific.js';
+import { pacificDate } from '@/lib/time/pacific.js'
+import { microSurveyGate, pageIsNotFound } from '@/lib/microSurveyGate'
+import { inQuietWindow, QUIET_EVENT } from '@/lib/quietWindow'
 
 // MicroSurveyHost decides WHEN the no-incentive micro-survey pops. Mounted once, next to
 // ToastHost, in the root layout. The whole design goal is "never nag":
@@ -14,6 +16,9 @@ import { pacificDate } from '@/lib/time/pacific.js';
 //     feels scheduled.
 //   • A short dwell delay before it will even consider showing (a pop the instant a page
 //     loads reads as a nag; a pop after the user has settled reads as ambient).
+//   • NEVER right after something weighty: a tracker delete / withdraw / outcome opens a
+//     two-minute quiet window (lib/quietWindow.ts) that cancels a pending pop and blocks new ones;
+//     never on a 404, nor on /login /reset /contact (lib/microSurveyGate.ts has the full list).
 // Because there is no reward, there is nothing to farm — the point is BREADTH of hiring signal.
 
 // Device-local cap state (NOT user data): "did we already pop today?". Safe to persist across
@@ -22,9 +27,6 @@ import { pacificDate } from '@/lib/time/pacific.js';
 const CAP_KEY = 'seen_msurvey_v1'
 const SHOW_PROBABILITY = 0.15 // ~15% of eligible loads
 const DWELL_MS = 20000 // settle for ~20s before considering a show
-// Surfaces where a hiring-signal poll is off-topic or would hurt a first impression / conversion:
-// the landing page ('/'), the employer side, admin, and auth/pricing funnels.
-const SKIP_PREFIXES = ['/employers', '/admin', '/login', '/signup', '/pricing']
 
 function todayStr(): string {
   return pacificDate() // YYYY-MM-DD, the California day
@@ -84,13 +86,14 @@ export default function MicroSurveyHost() {
 
   useEffect(() => {
     if (firedRef.current) return
-    if (!pathname) return
-    if (pathname === '/' || SKIP_PREFIXES.some((p) => pathname.startsWith(p))) return
-    if (alreadyShownToday()) return
+    const gate = () => microSurveyGate({ pathname, notFound: pageIsNotFound(), quiet: inQuietWindow(), shownToday: alreadyShownToday() })
+    if (gate() !== 'ok') return
 
     const t = setTimeout(() => {
       if (firedRef.current) return
-      if (alreadyShownToday()) return // re-check: another tab or a race may have spent the slot
+      // Re-check everything at fire time: the 404 marker mounts after this effect ran, another tab
+      // may have spent today's slot, and a delete / withdraw during the dwell opens the quiet window.
+      if (gate() !== 'ok') return
       if (Math.random() >= SHOW_PROBABILITY) return // lost the roll — a later load can try again
       const q = pickQuestion()
       if (!q) return
@@ -98,10 +101,21 @@ export default function MicroSurveyHost() {
       markShownToday() // occupy today's slot the instant we commit to showing
       setQuestion(q)
     }, DWELL_MS)
+    // A tracker delete / withdraw / outcome while the dwell timer runs cancels this pop outright.
+    const onQuiet = () => clearTimeout(t)
+    window.addEventListener(QUIET_EVENT, onQuiet)
 
-    return () => clearTimeout(t)
+    return () => { clearTimeout(t); window.removeEventListener(QUIET_EVENT, onQuiet) }
     // Re-evaluate on route change (SPA nav); firedRef still caps it at one pop per session.
   }, [pathname])
+
+  // A weighty action while the card is already up (e.g. the tracker's Delete behind it) takes it down.
+  useEffect(() => {
+    if (!question) return
+    const onQuiet = () => setQuestion(null)
+    window.addEventListener(QUIET_EVENT, onQuiet)
+    return () => window.removeEventListener(QUIET_EVENT, onQuiet)
+  }, [question])
 
   // Record an ANSWER (a real hiring-signal data point). Fire-and-forget with keepalive so it
   // survives an immediate navigation. Auth is optional — attach the Bearer token when signed in,

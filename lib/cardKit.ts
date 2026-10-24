@@ -1,24 +1,62 @@
-// ── Seen share-card kit — premium 1080×1080 canvas creatives ───────────────
-// Browser-only canvas code. Single source of truth for the company "Hiring Grade"
-// card (CompanyScoreCard) and the tracker "Outcome" card (OutcomeCard). Clean type
-// hierarchy (Syne display + Instrument Sans labels — both already loaded globally in
-// app/layout.tsx), grade ring, stat row, journey stepper, and CTA footer. No emoji,
-// no monospace body text — these are the launch creatives, so they read as brand.
+// ── Seen share-card kit — typographic posters, 1080×1080 and 1080×1920 ─────────────────────
+// Browser-only canvas code. ONE source for the tracker "Outcome" card (OutcomeCard) and the
+// company "Grade" card (CompanyScoreCard). The server OG unfurl (app/company/[slug]/og) is the
+// same design in satori. Palette + type scale: lib/cardTheme.js. Every sentence: lib/cardCopy.js.
+// Hero grid math: lib/cardLayout.js.
+//
+// The outcome card is a poster of one person's hiring story: a sentence headline with the
+// company set in the accent, and the DAYS as the picture (one cell per day, the decision day
+// marked, ghosting literally fading out) beside one big number. Full bleed, no inner frame,
+// no widgets, no buttons. Fonts Syne (display) + Instrument Sans (text) are loaded globally
+// by app/layout.tsx; callers await document.fonts.ready before drawing.
 
+import { INK, TEXT, TYPE, ACCENTS, accentKeyForOutcome, accentKeyForRisk, riskForScore, rgba } from '@/lib/cardTheme.js'
+import {
+  outcomeHeadline, daysLabel, subLine, metaLine, contextStrip, outcomeKind, companyUrl,
+  companyVerdict, companyStatPairs, confidenceLine, timelineLine, eventDays,
+} from '@/lib/cardCopy.js'
+import { heroCells, layoutGrid } from '@/lib/cardLayout.js'
+import { formatPacific } from '@/lib/time/pacific.js'
+
+export type CardFormat = 'square' | 'story'
 export const W = 1080
 export const H = 1080
+export const STORY_H = 1920
 export const PAD = 84
 
 type Ctx = CanvasRenderingContext2D
 type Risk = 'safe' | 'warn' | 'danger'
 
-const C = {
-  ink: '#070810',
-  white: '#ffffff',
-  green: '#10b981',
-  red: '#ef4444',
-  amber: '#f59e0b',
-  blue: '#3b82f6',
+export interface CompanyGradeContext {
+  grade: string
+  score: number
+  ghostRate?: number | null     // 0–1
+  responseRate?: number | null  // 0–1
+  avgWaitDays?: number | null
+  /** First-party applicant reports behind the grade — printed as "based on N reports" when ≥ 5. */
+  reports?: number | null
+}
+
+/** A tracked hiring event (lib/types.ts HiringEvent, reduced to what the card draws). */
+export interface CardEvent { type: string; date: number }
+
+export interface OutcomeCardData {
+  company: string
+  role?: string
+  /** ghosted · rejected · hired/offer · interview · waiting (lib/cardCopy.js outcomeKind). */
+  outcome: string
+  /** Days from applying to the outcome (or to today, for silence). null = unknown, never invented. */
+  days?: number | null
+  reachedInterview?: boolean
+  platform?: string
+  /** When the application was submitted (ms) — anchors the timeline and the event marks. */
+  appliedMs?: number
+  /** The tracker's events; the grid marks their days and ONE line says what happened and when. */
+  events?: CardEvent[]
+  /** A first name the user chose to show in the context line. Default: none. */
+  name?: string
+  /** The company's Seen grade, when it has one. Absent → the context line is omitted. */
+  companyGrade?: CompanyGradeContext | null
 }
 
 export interface CompanyCardData {
@@ -27,272 +65,450 @@ export interface CompanyCardData {
   overall_score: number
   ghost_rate: number      // 0–1
   response_rate: number   // 0–1
-  avg_wait_days: number
-  waste: number           // 0–100
-  report_count: number
+  avg_wait_days: number   // 0 = unknown, left out
+  report_count: number    // first-party only
   risk?: Risk
-  /** "updated Oct 20, 2026" — printed with the confidence line. */
-  updated?: string
+  /** ISO timestamp of the last (re)compute, printed as "updated Oct 19, 2026" (California time). */
+  updatedAt?: string | null
+  /** The page's confidence word ("High confidence" …, lib/companyPageSummary.ts). Printed as given; the card never derives one from the row count. */
+  confidence?: string
 }
 
-export interface OutcomeStep { label: string; sub: string; mark?: string }
-export interface StatCell { value: string; label: string; color?: string }
+// ── Frame ──────────────────────────────────────────────────────────────────────────────────
+interface Frame { W: number; H: number; PAD: number; top: number; bottom: number; story: boolean }
 
-export interface OutcomeCardData {
-  company: string
-  role?: string
-  outcome: string
-  days?: number | null
-  reachedInterview?: boolean
-  platform?: string
-  steps?: OutcomeStep[]
-  stats?: StatCell[]
+function frame(format: CardFormat): Frame {
+  // Story safe margins: 180px top/bottom stay clear of IG/TikTok UI.
+  return format === 'story'
+    ? { W, H: STORY_H, PAD, top: 180, bottom: STORY_H - 180, story: true }
+    : { W, H, PAD, top: 0, bottom: H, story: false }
 }
 
-function hexA(h: string, a: number): string {
-  const n = parseInt(h.slice(1), 16)
-  return `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},${a})`
+function prep(canvas: HTMLCanvasElement, f: Frame): Ctx {
+  canvas.width = f.W; canvas.height = f.H
+  const c = canvas.getContext('2d')!
+  c.textBaseline = 'alphabetic'
+  return c
 }
 
+const white = (a: number) => `rgba(255,255,255,${a})`
+const font = (weight: number, px: number, family: string = TYPE.text) => `${weight} ${px}px ${family}`
+
+// ── Primitives ─────────────────────────────────────────────────────────────────────────────
 function roundRect(c: Ctx, x: number, y: number, w: number, h: number, r: number) {
+  const rr = Math.min(r, w / 2, h / 2)
   c.beginPath()
-  c.moveTo(x + r, y); c.arcTo(x + w, y, x + w, y + h, r)
-  c.arcTo(x + w, y + h, x, y + h, r); c.arcTo(x, y + h, x, y, r)
-  c.arcTo(x, y, x + w, y, r); c.closePath()
+  c.moveTo(x + rr, y); c.arcTo(x + w, y, x + w, y + h, rr)
+  c.arcTo(x + w, y + h, x, y + h, rr); c.arcTo(x, y + h, x, y, rr)
+  c.arcTo(x, y, x + w, y, rr); c.closePath()
 }
 
 // Manual letter-spacing — reliable across iOS Safari versions (ctx.letterSpacing is new).
-function tracked(c: Ctx, text: string, x: number, y: number, ls: number, align: 'left' | 'center' | 'right' = 'left') {
+function tracked(c: Ctx, text: string, x: number, y: number, ls: number, align: 'left' | 'right' = 'left') {
   const chars = [...text]
   const widths = chars.map(ch => c.measureText(ch).width)
   const total = widths.reduce((a, b) => a + b, 0) + ls * (chars.length - 1)
-  let sx = align === 'right' ? x - total : align === 'center' ? x - total / 2 : x
+  let sx = align === 'right' ? x - total : x
   const prev = c.textAlign; c.textAlign = 'left'
   for (let i = 0; i < chars.length; i++) { c.fillText(chars[i], sx, y); sx += widths[i] + ls }
   c.textAlign = prev
+  return total
 }
 
-// Shrink font until the text fits a max width.
-function fitFont(c: Ctx, text: string, weight: string, family: string, start: number, min: number, maxW: number): number {
+function ellipsize(c: Ctx, text: string, maxW: number): string {
+  if (c.measureText(text).width <= maxW) return text
+  let t = text
+  while (t.length > 2 && c.measureText(t + '…').width > maxW) t = t.slice(0, -1)
+  return t.trimEnd() + '…'
+}
+
+// Shrink a font until a single line fits.
+function fitFont(c: Ctx, text: string, weight: number, family: string, start: number, min: number, maxW: number): number {
   let fs = start
-  c.font = `${weight} ${fs}px ${family}`
-  while (c.measureText(text).width > maxW && fs > min) { fs -= 2; c.font = `${weight} ${fs}px ${family}` }
+  c.font = font(weight, fs, family)
+  while (c.measureText(text).width > maxW && fs > min) { fs -= 2; c.font = font(weight, fs, family) }
   return fs
 }
 
-function wrapText(c: Ctx, text: string, x: number, y: number, maxW: number, lh: number) {
+// Fit a block of text: shrink from `start` until it wraps into ≤ maxLines that each fit maxW and
+// the block (cap height + line gaps) is no taller than maxH.
+function fitWrapped(c: Ctx, text: string, weight: number, family: string, start: number, min: number, maxW: number, maxLines: number, maxH = Infinity): { fs: number; lines: string[]; lh: number; height: number } {
+  let fs = start
+  const blockH = (n: number, size: number) => (n - 1) * Math.round(size * 1.02) + size * 0.75
+  const fits = (ls: string[]) => ls.length <= maxLines && blockH(ls.length, fs) <= maxH && ls.every(l => c.measureText(l).width <= maxW)
+  c.font = font(weight, fs, family)
+  let lines = wrapLines(c, text, maxW)
+  while (!fits(lines) && fs > min) { fs -= 4; c.font = font(weight, fs, family); lines = wrapLines(c, text, maxW) }
+  if (lines.length > maxLines) { lines = lines.slice(0, maxLines); lines[maxLines - 1] = ellipsize(c, lines[maxLines - 1] + '…', maxW) }
+  else lines = lines.map(l => ellipsize(c, l, maxW))
+  return { fs, lines, lh: Math.round(fs * 1.02), height: blockH(lines.length, fs) }
+}
+
+// The company name block: one line at `start`, wrapping and shrinking for long names. Its last
+// baseline sits at `anchor` unless the block would climb above `top`; then it hangs from `top`.
+// Returns the baseline of the last line so the verdict can follow it.
+function companyName(c: Ctx, text: string, x: number, top: number, anchor: number, maxW: number, start: number, min: number): number {
+  const name = fitWrapped(c, text, 800, TYPE.display, start, min, maxW, 3, anchor - top + start * 0.75)
+  c.font = font(800, name.fs, TYPE.display); c.fillStyle = white(TEXT.full); c.textAlign = 'left'
+  const first = Math.max(anchor - (name.lines.length - 1) * name.lh, top + name.fs * 0.75)
+  name.lines.forEach((l, i) => c.fillText(l, x - name.fs * 0.04, first + i * name.lh))
+  return first + (name.lines.length - 1) * name.lh
+}
+
+function wrapLines(c: Ctx, text: string, maxW: number): string[] {
   const words = text.split(' ')
-  let line = '', yy = y
+  const lines: string[] = []
+  let line = ''
   for (const w of words) {
     const test = line ? line + ' ' + w : w
-    if (c.measureText(test).width > maxW && line) { c.fillText(line, x, yy); line = w; yy += lh }
-    else line = test
+    if (c.measureText(test).width > maxW && line) { lines.push(line); line = w } else line = test
   }
-  if (line) c.fillText(line, x, yy)
+  if (line) lines.push(line)
+  return lines
 }
 
-function paintBg(c: Ctx, accent: string) {
-  c.fillStyle = C.ink; c.fillRect(0, 0, W, H)
-  const g = c.createRadialGradient(W * 0.5, H * 0.26, 0, W * 0.5, H * 0.26, 680)
-  g.addColorStop(0, hexA(accent, 0.18)); g.addColorStop(1, 'rgba(0,0,0,0)')
-  c.fillStyle = g; c.fillRect(0, 0, W, H)
-  const g2 = c.createRadialGradient(W * 0.92, H * 1.02, 0, W * 0.92, H * 1.02, 560)
-  g2.addColorStop(0, 'rgba(124,58,237,0.12)'); g2.addColorStop(1, 'rgba(0,0,0,0)')
-  c.fillStyle = g2; c.fillRect(0, 0, W, H)
-  const v = c.createRadialGradient(W / 2, H / 2, H * 0.34, W / 2, H / 2, H * 0.72)
-  v.addColorStop(0, 'rgba(0,0,0,0)'); v.addColorStop(1, 'rgba(0,0,0,0.45)')
-  c.fillStyle = v; c.fillRect(0, 0, W, H)
-  c.fillStyle = accent; c.fillRect(0, 0, W, 8)
-  roundRect(c, 10, 18, W - 20, H - 28, 34)
-  c.strokeStyle = 'rgba(255,255,255,0.07)'; c.lineWidth = 2; c.stroke()
+// ── Background: ink, a quiet dot grid, one soft accent bloom, a 6% hairline frame ───────────
+function paintBg(c: Ctx, f: Frame, accent: string, bloom: { x: number; y: number; r: number; a: number }) {
+  c.fillStyle = INK; c.fillRect(0, 0, f.W, f.H)
+  // Dot grid: the paper's texture. Very low alpha so it reads as tooth, not a pattern.
+  c.fillStyle = white(0.045)
+  const step = 36
+  for (let y = step; y < f.H; y += step) for (let x = step; x < f.W; x += step) { c.beginPath(); c.arc(x, y, 1.2, 0, Math.PI * 2); c.fill() }
+  // One bloom behind the hero graphic.
+  const g = c.createRadialGradient(bloom.x, bloom.y, 0, bloom.x, bloom.y, bloom.r)
+  g.addColorStop(0, rgba(accent, bloom.a)); g.addColorStop(0.55, rgba(accent, bloom.a * 0.35)); g.addColorStop(1, rgba(accent, 0))
+  c.fillStyle = g; c.fillRect(0, 0, f.W, f.H)
+  // Full-bleed hairline — a print edge, not a modal border.
+  c.strokeStyle = white(0.06); c.lineWidth = 1
+  c.strokeRect(0.5, 0.5, f.W - 1, f.H - 1)
 }
 
-function wordmark(c: Ctx, accent: string, rightLabel: string) {
-  const y = PAD + 4
+// ── Shared rows ────────────────────────────────────────────────────────────────────────────
+function topRow(c: Ctx, f: Frame, accent: string, meta: string) {
+  const y = f.top + f.PAD + 16
   c.fillStyle = accent
-  c.shadowColor = accent; c.shadowBlur = 18
-  c.beginPath(); c.arc(PAD + 10, y + 18, 10, 0, Math.PI * 2); c.fill()
-  c.shadowBlur = 0
-  c.font = '800 42px "Syne",sans-serif'; c.fillStyle = C.white; c.textAlign = 'left'; c.textBaseline = 'middle'
-  c.fillText('Seen', PAD + 32, y + 20)
-  c.font = '500 19px "Instrument Sans",sans-serif'; c.fillStyle = 'rgba(255,255,255,0.42)'; c.textBaseline = 'middle'
-  tracked(c, rightLabel, W - PAD, y + 20, 2.5, 'right')
+  c.beginPath(); c.arc(f.PAD + 9, y - 13, 9, 0, Math.PI * 2); c.fill()
+  c.font = font(800, TYPE.wordmark, TYPE.display); c.fillStyle = white(TEXT.full); c.textAlign = 'left'
+  c.fillText('Seen', f.PAD + 30, y)
+  if (meta) {
+    c.font = font(500, TYPE.meta); c.fillStyle = white(TEXT.meta)
+    tracked(c, meta, f.W - f.PAD, y - 2, 3, 'right')
+  }
 }
 
-function gradeRing(c: Ctx, cx: number, cy: number, r: number, frac: number, accent: string, centerBig: string) {
-  c.save()
-  c.lineWidth = 20
-  c.beginPath(); c.arc(cx, cy, r, 0, Math.PI * 2); c.strokeStyle = 'rgba(255,255,255,0.09)'; c.stroke()
-  c.shadowColor = accent; c.shadowBlur = 28
-  c.beginPath(); c.lineCap = 'round'
-  c.arc(cx, cy, r, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * Math.max(0.02, Math.min(1, frac)))
-  c.strokeStyle = accent; c.stroke()
-  c.restore()
-  c.font = `800 ${Math.round(r * 0.92)}px "Syne",sans-serif`; c.fillStyle = accent
-  c.textAlign = 'center'; c.textBaseline = 'middle'
-  c.fillText(centerBig, cx, cy + 2)
+function footer(c: Ctx, f: Frame, url: string, note: string) {
+  const base = f.bottom - 76
+  c.strokeStyle = white(0.06); c.lineWidth = 1
+  c.beginPath(); c.moveTo(f.PAD, base - 52); c.lineTo(f.W - f.PAD, base - 52); c.stroke()
+  const inner = f.W - f.PAD * 2
+  c.font = font(600, TYPE.footerUrl); c.fillStyle = white(TEXT.strong); c.textAlign = 'left'
+  const shownUrl = ellipsize(c, url, inner)
+  c.fillText(shownUrl, f.PAD, base)
+  const urlW = c.measureText(shownUrl).width
+  // The URL is the point of the footer; the note takes what is left or steps aside.
+  const room = inner - urlW - 48
+  c.font = font(400, TYPE.footerNote); c.fillStyle = white(TEXT.faint); c.textAlign = 'right'
+  if (room >= 140) c.fillText(ellipsize(c, note, room), f.W - f.PAD, base)
+  c.textAlign = 'left'
+  return base - 52
 }
 
-function statRow(c: Ctx, x: number, y: number, w: number, cells: StatCell[]) {
-  const n = cells.length, cw = w / n
-  cells.forEach((cell, i) => {
-    const cx = x + cw * i + cw / 2
-    if (i > 0) {
-      c.strokeStyle = 'rgba(255,255,255,0.10)'; c.lineWidth = 1
-      c.beginPath(); c.moveTo(x + cw * i, y - 2); c.lineTo(x + cw * i, y + 78); c.stroke()
+// A sentence headline with the company name in the accent. Wraps word by word, fits down to
+// `min` so it stays ≤ maxLines; a still-too-long company name is ellipsized, never clipped.
+function headline(c: Ctx, parts: { text: string; accent: boolean }[], x: number, y: number, maxW: number, start: number, min: number, maxLines: number, accent: string): { bottom: number; size: number } {
+  type Word = { text: string; accent: boolean }
+  const toWords = (ps: { text: string; accent: boolean }[]): Word[] => {
+    const words: Word[] = []
+    ps.forEach(p => p.text.trim().split(/\s+/).filter(Boolean).forEach(t => words.push({ text: t, accent: p.accent })))
+    return words
+  }
+  const layout = (words: Word[], fs: number): Word[][] => {
+    c.font = font(800, fs, TYPE.display)
+    const lines: Word[][] = []
+    let line: Word[] = [], lineW = 0
+    const space = c.measureText(' ').width
+    for (const w of words) {
+      const ww = c.measureText(w.text).width
+      const next = line.length ? lineW + space + ww : ww
+      if (next > maxW && line.length) { lines.push(line); line = [w]; lineW = ww } else { line.push(w); lineW = next }
     }
-    let vFs = 54
-    c.font = `700 ${vFs}px "Syne",sans-serif`
-    while (c.measureText(cell.value).width > cw - 16 && vFs > 26) { vFs -= 2; c.font = `700 ${vFs}px "Syne",sans-serif` }
-    c.fillStyle = cell.color || C.white; c.textAlign = 'center'; c.textBaseline = 'alphabetic'
-    c.fillText(cell.value, cx, y + 46)
-    c.font = '500 17px "Instrument Sans",sans-serif'; c.fillStyle = 'rgba(255,255,255,0.42)'; c.textBaseline = 'top'
-    tracked(c, cell.label.toUpperCase(), cx, y + 64, 1.8, 'center')
+    if (line.length) lines.push(line)
+    return lines
+  }
+  // The budget is HEIGHT (maxLines at the start size): four short lines at 72px take the same
+  // room as three at 100px and keep the whole company name, so no ellipsis is needed.
+  const maxH = maxLines * Math.round(start * 1.04)
+  const tall = (ls: Word[][], size: number) => ls.length * Math.round(size * 1.04) > maxH
+  let fs = start
+  let words = toWords(parts)
+  let lines = layout(words, fs)
+  while (tall(lines, fs) && fs > min) { fs -= 4; lines = layout(words, fs) }
+  // Still too long at the minimum size: shorten the company name itself.
+  let guard = 0
+  while (tall(lines, fs) && guard++ < 40) {
+    const i = parts.findIndex(p => p.accent)
+    if (i < 0) break
+    const name = parts[i].text.replace(/…$/, '')
+    if (name.length <= 3) break
+    parts = parts.map((p, j) => j === i ? { ...p, text: name.slice(0, -2).trimEnd() + '…' } : p)
+    words = toWords(parts); lines = layout(words, fs)
+  }
+  const lh = Math.round(fs * 1.04)
+  c.font = font(800, fs, TYPE.display); c.textAlign = 'left'
+  const space = c.measureText(' ').width
+  let yy = y
+  for (const line of lines) {
+    let xx = x
+    line.forEach((w, i) => {
+      c.fillStyle = w.accent ? accent : white(TEXT.full)
+      c.fillText(w.text, xx, yy)
+      xx += c.measureText(w.text).width + (i < line.length - 1 ? space : 0)
+    })
+    yy += lh
+  }
+  return { bottom: yy - lh, size: fs }
+}
+
+// ── The hero: the days as cells ────────────────────────────────────────────────────────────
+function drawMark(c: Ctx, kind: 'yes' | 'no' | 'dot', cx: number, cy: number, s: number) {
+  c.save()
+  c.strokeStyle = INK; c.fillStyle = INK; c.lineCap = 'round'; c.lineJoin = 'round'
+  c.lineWidth = Math.max(3, s * 0.12)
+  if (kind === 'yes') {
+    c.beginPath(); c.moveTo(cx - s * 0.26, cy + 0.02 * s); c.lineTo(cx - s * 0.06, cy + s * 0.22); c.lineTo(cx + s * 0.3, cy - s * 0.22); c.stroke()
+  } else if (kind === 'no') {
+    c.beginPath(); c.moveTo(cx - s * 0.22, cy - s * 0.22); c.lineTo(cx + s * 0.22, cy + s * 0.22)
+    c.moveTo(cx + s * 0.22, cy - s * 0.22); c.lineTo(cx - s * 0.22, cy + s * 0.22); c.stroke()
+  } else {
+    c.beginPath(); c.arc(cx, cy, s * 0.16, 0, Math.PI * 2); c.fill()
+  }
+  c.restore()
+}
+
+function drawEventMark(c: Ctx, kind: string, cx: number, cy: number, s: number, accent: string) {
+  c.save()
+  c.strokeStyle = accent; c.fillStyle = accent; c.lineWidth = Math.max(2.5, s * 0.09)
+  if (kind === 'interview') { c.beginPath(); c.arc(cx, cy, s * 0.2, 0, Math.PI * 2); c.stroke() }
+  else { c.beginPath(); c.arc(cx, cy, s * 0.12, 0, Math.PI * 2); c.fill() }
+  c.restore()
+}
+
+function drawDayGrid(c: Ctx, x: number, y: number, kind: string, days: number | null | undefined, boxW: number, boxH: number, accent: string, dim: number, align: 'left' | 'right' | 'center' = 'left', valign: 'bottom' | 'middle' = 'bottom', marks: { day: number; kind: string }[] = []) {
+  const cells = heroCells(kind, days, marks)
+  const g = layoutGrid(cells.length, boxW, boxH)
+  const x0 = align === 'right' ? x + boxW - g.width : align === 'center' ? x + Math.round((boxW - g.width) / 2) : x
+  const y0 = valign === 'middle' ? y + Math.round((boxH - g.height) / 2) : y + boxH - g.height
+  const r = Math.max(6, g.cell * 0.22)
+  const mark: 'yes' | 'no' | 'dot' = kind === 'hired' ? 'yes' : kind === 'rejected' ? 'no' : 'dot'
+  cells.forEach((cell, i) => {
+    const cx = x0 + (i % g.perRow) * (g.cell + g.gap)
+    const cy = y0 + Math.floor(i / g.perRow) * (g.cell + g.gap)
+    roundRect(c, cx, cy, g.cell, g.cell, r)
+    if (cell.kind === 'decision') {
+      c.save(); c.shadowColor = rgba(accent, 0.55); c.shadowBlur = g.cell * 0.5
+      c.fillStyle = accent; c.fill(); c.restore()
+      drawMark(c, mark, cx + g.cell / 2, cy + g.cell / 2, g.cell)
+    } else {
+      const a = Math.max(0.03, dim * (cell.alpha ?? 1))
+      c.fillStyle = rgba(accent, a); c.fill()
+      // A hairline keeps the faintest ghosted cells legible as cells.
+      c.strokeStyle = rgba(accent, Math.min(0.5, a + 0.08)); c.lineWidth = 1; c.stroke()
+      if (cell.mark) drawEventMark(c, cell.mark, cx + g.cell / 2, cy + g.cell / 2, g.cell, accent)
+      if (cell.kind === 'more' && cell.label) {
+        const fs = fitFont(c, cell.label, 700, TYPE.text, Math.round(g.cell * 0.34), 12, g.cell - 10)
+        c.font = font(700, fs); c.fillStyle = rgba(accent, Math.min(1, 0.55 + (cell.alpha ?? 1) * 0.4)); c.textAlign = 'center'; c.textBaseline = 'middle'
+        c.fillText(cell.label, cx + g.cell / 2, cy + g.cell / 2 + 1)
+        c.textAlign = 'left'; c.textBaseline = 'alphabetic'
+      }
+    }
   })
+  return { x: x0, y: y0, ...g }
 }
 
-function ctaBar(c: Ctx, accent: string, text: string) {
-  const h = 70, y = H - PAD - h + 8, x = PAD, w = W - PAD * 2
-  roundRect(c, x, y, w, h, 18); c.fillStyle = hexA(accent, 0.13); c.fill()
-  c.strokeStyle = hexA(accent, 0.32); c.lineWidth = 1.5; c.stroke()
-  c.font = '600 25px "Instrument Sans",sans-serif'; c.fillStyle = C.white
-  c.textAlign = 'center'; c.textBaseline = 'middle'
-  c.fillText(text, W / 2, y + h / 2)
+function bigNumber(c: Ctx, x: number, baseline: number, value: string, label: string, size: number, maxW: number) {
+  const fs = fitFont(c, value, 800, TYPE.display, size, Math.round(size * 0.6), maxW)
+  c.font = font(800, fs, TYPE.display); c.fillStyle = white(TEXT.full); c.textAlign = 'left'
+  c.fillText(value, x - fs * 0.04, baseline)
+  const descent = c.measureText(value).actualBoundingBoxDescent || 0
+  c.font = font(400, TYPE.numberLabel); c.fillStyle = white(TEXT.body)
+  c.fillText(ellipsize(c, label, maxW), x, baseline + descent + 40)
+  return baseline + descent + 40
 }
 
-function stepper(c: Ctx, x: number, y: number, w: number, steps: OutcomeStep[], accent: string) {
-  const n = steps.length, gap = w / Math.max(1, n - 1)
-  c.strokeStyle = accent; c.lineWidth = 3
-  c.beginPath(); c.moveTo(x, y); c.lineTo(x + w, y); c.stroke()
-  steps.forEach((s, i) => {
-    const sx = x + gap * i, last = i === n - 1
-    c.beginPath(); c.arc(sx, y, last ? 17 : 11, 0, Math.PI * 2)
-    c.fillStyle = accent; c.shadowColor = accent; c.shadowBlur = last ? 22 : 0; c.fill(); c.shadowBlur = 0
-    if (last && s.mark) { c.fillStyle = C.ink; c.font = '700 18px "Syne",sans-serif'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText(s.mark, sx, y + 1) }
-    const al: 'left' | 'center' | 'right' = i === 0 ? 'left' : last ? 'right' : 'center'
-    const lx = i === 0 ? sx - 6 : last ? sx + 6 : sx
-    c.font = '600 23px "Instrument Sans",sans-serif'; c.fillStyle = C.white; c.textAlign = al; c.textBaseline = 'alphabetic'
-    c.fillText(s.label, lx, y - 32)
-    c.font = '400 18px "Instrument Sans",sans-serif'; c.fillStyle = 'rgba(255,255,255,0.42)'; c.textBaseline = 'top'
-    c.fillText(s.sub, lx, y + 26)
-  })
+// "Applied Oct 3 · Interview Oct 7 · Offer Oct 15" — what actually happened, in one line.
+function timelineText(c: Ctx, text: string, x: number, baseline: number, maxW: number) {
+  if (!text) return
+  c.font = font(500, TYPE.context); c.fillStyle = white(TEXT.strong); c.textAlign = 'left'
+  c.fillText(ellipsize(c, text, maxW), x, baseline)
 }
 
-// ── COMPANY HIRING GRADE CARD ──────────────────────────────────────────────
-export function drawCompanyCard(canvas: HTMLCanvasElement, d: CompanyCardData) {
-  canvas.width = W; canvas.height = H
-  const c = canvas.getContext('2d')!
-  const score = Math.round(d.overall_score || 0)
-  const risk: Risk = d.risk ?? (score >= 70 ? 'safe' : score >= 40 ? 'warn' : 'danger')
-  const accent = risk === 'safe' ? C.green : risk === 'danger' ? C.red : C.amber
-  const verdict = risk === 'safe' ? 'Strong, transparent hiring process'
-    : risk === 'danger' ? 'High risk — most applicants get ghosted'
-    : 'Mixed signals — proceed with eyes open'
-
-  paintBg(c, accent)
-  wordmark(c, accent, 'HIRING GRADE')
-
-  const ringR = 150, ringCx = PAD + ringR, ringCy = 392
-  gradeRing(c, ringCx, ringCy, ringR, score / 100, accent, d.grade)
-  c.font = '500 19px "Instrument Sans",sans-serif'; c.fillStyle = hexA(accent, 0.8)
-  c.textAlign = 'center'; c.textBaseline = 'top'
-  tracked(c, 'SEEN GRADE', ringCx, ringCy + ringR * 0.42, 2, 'center')
-
-  const tx = ringCx + ringR + 52
-  const txW = W - PAD - tx
-  fitFont(c, d.company, '800', '"Syne",sans-serif', 64, 34, txW)
-  c.fillStyle = C.white; c.textAlign = 'left'; c.textBaseline = 'alphabetic'
-  c.fillText(d.company, tx, 320)
-  c.font = '800 72px "Syne",sans-serif'; c.fillStyle = accent; c.textBaseline = 'alphabetic'
-  c.fillText(`${score}`, tx, 410)
-  const sW = c.measureText(`${score}`).width
-  c.font = '600 34px "Instrument Sans",sans-serif'; c.fillStyle = 'rgba(255,255,255,0.45)'
-  c.fillText('/100', tx + sW + 12, 410)
-  c.font = '400 25px "Instrument Sans",sans-serif'; c.fillStyle = 'rgba(255,255,255,0.82)'
-  wrapText(c, verdict, tx, 452, txW, 33)
-
-  const dY = ringCy + ringR + 70
-  c.strokeStyle = 'rgba(255,255,255,0.10)'; c.lineWidth = 1
-  c.beginPath(); c.moveTo(PAD, dY); c.lineTo(W - PAD, dY); c.stroke()
-
-  // A wait the reports never gave is left out (three cells), never printed as "—".
-  statRow(c, PAD, dY + 40, W - PAD * 2, [
-    { value: `${Math.round((d.ghost_rate || 0) * 100)}%`, label: 'Ghost rate', color: C.red },
-    { value: `${Math.round((d.response_rate || 0) * 100)}%`, label: 'Response rate', color: C.green },
-    ...(d.avg_wait_days ? [{ value: `${Math.round(d.avg_wait_days)}d`, label: 'Avg wait', color: C.white }] : []),
-    { value: `${Math.round(d.waste || 0)}%`, label: 'Wasted-time risk', color: C.amber },
-  ])
-
-  const confY = dY + 40 + 130
-  const n = d.report_count || 0
-  const conf = n >= 12 ? 'High confidence' : n >= 4 ? 'Growing confidence' : 'Early signal'
-  const line = (n > 0 ? `Based on ${n.toLocaleString()} applicant report${n === 1 ? '' : 's'}  ·  ${conf}` : 'Baseline estimate  ·  share your experience to sharpen it')
-    + (d.updated ? `  ·  ${d.updated}` : '')
-  c.font = '400 21px "Instrument Sans",sans-serif'
-  const lineW = c.measureText(line).width
-  c.fillStyle = accent; c.beginPath(); c.arc(W / 2 - lineW / 2 - 16, confY, 6, 0, Math.PI * 2); c.fill()
-  c.fillStyle = 'rgba(255,255,255,0.5)'; c.textAlign = 'center'; c.textBaseline = 'middle'
-  c.fillText(line, W / 2, confY)
-
-  ctaBar(c, accent, 'Check any company free  ·  seenjobs.io')
+// "[A] Walmart replies to 87% of applicants. Not this time.  · based on 48 reports" — the grade
+// letter in a small accent tag, then the sentence that explains the story (lib/cardCopy.js).
+function contextLine(c: Ctx, f: Frame, baseline: number, strip: { letter: string; text: string; based: string }, accent: string) {
+  let x = f.PAD
+  c.font = font(700, 20, TYPE.display)
+  const lw = c.measureText(strip.letter).width
+  const tagW = lw + 22, tagH = 32
+  roundRect(c, x, baseline - 24, tagW, tagH, 7)
+  c.strokeStyle = rgba(accent, 0.7); c.lineWidth = 1.5; c.stroke()
+  c.fillStyle = rgba(accent, 0.12); c.fill()
+  c.fillStyle = accent; c.textAlign = 'left'; c.fillText(strip.letter, x + 11, baseline - 1)
+  x += tagW + 14
+  c.font = font(400, TYPE.context); c.fillStyle = white(TEXT.body)
+  const room = f.W - f.PAD - x
+  // The sentence is never cut: the denominator steps aside first, then the type steps down.
+  let based = strip.based ? ` · ${strip.based}` : ''
+  if (c.measureText(strip.text + based).width > room) based = ''
+  const fs = fitFont(c, strip.text, 400, TYPE.text, TYPE.context, 20, room)
+  c.font = font(400, fs); c.fillStyle = white(TEXT.body)
+  const text = ellipsize(c, strip.text, room)
+  c.fillText(text, x, baseline)
+  if (based) {
+    x += c.measureText(text).width
+    c.fillStyle = white(TEXT.faint)
+    c.fillText(based, x, baseline)
+  }
 }
 
-// ── TRACKER OUTCOME CARD ───────────────────────────────────────────────────
-const OUTCOME_MAP: Record<string, { word: string; color: string; mark: string }> = {
-  ghosted: { word: 'GHOSTED', color: C.red, mark: '✕' },
-  rejected: { word: 'REJECTED', color: C.red, mark: '✕' },
-  autoreject: { word: 'AUTO-REJECTED', color: C.red, mark: '✕' },
-  hired: { word: 'HIRED', color: C.green, mark: '✓' },
-  offer: { word: 'OFFER', color: C.green, mark: '✓' },
-  interview: { word: 'INTERVIEW', color: C.blue, mark: '•' },
-  human: { word: 'GOT A REPLY', color: C.green, mark: '✓' },
-  waiting: { word: 'STILL WAITING', color: C.amber, mark: '•' },
-}
+// ── OUTCOME CARD ───────────────────────────────────────────────────────────────────────────
+export function drawOutcomeCard(canvas: HTMLCanvasElement, d: OutcomeCardData, format: CardFormat = 'square') {
+  const f = frame(format)
+  const c = prep(canvas, f)
+  const kind = outcomeKind(d.outcome)
+  const A = ACCENTS[accentKeyForOutcome(d.outcome)]
+  const accent = A.hex
+  const days = d.days != null && Number.isFinite(d.days) ? Math.max(0, Math.round(d.days)) : null
+  const head = outcomeHeadline({ outcome: d.outcome, company: d.company, days, reachedInterview: !!d.reachedInterview })
+  // The company rides in the sub-line when the headline is the person's number ("Offer in 12 days.").
+  const sub = subLine(d.role, d.platform, kind === 'hired' ? d.company : undefined)
+  const strip = contextStrip(d.company, d.companyGrade ?? null, { outcome: d.outcome, days, name: d.name })
+  const timeline = timelineLine(d.events ?? [], { outcome: d.outcome, appliedMs: d.appliedMs })
+  const marks = eventDays(d.events ?? [], d.appliedMs ?? NaN)
+  const inner = f.W - f.PAD * 2
 
-export function drawOutcomeCard(canvas: HTMLCanvasElement, d: OutcomeCardData) {
-  canvas.width = W; canvas.height = H
-  const c = canvas.getContext('2d')!
-  const o = OUTCOME_MAP[d.outcome] || { word: String(d.outcome || '').toUpperCase(), color: C.amber, mark: '•' }
-  const accent = o.color
+  if (!f.story) {
+    paintBg(c, f, accent, { x: f.W * 0.78, y: 700, r: 620, a: A.bloom })
+    topRow(c, f, accent, '') // no month, no city: the timeline carries the dates, the card is not a receipt
 
-  paintBg(c, accent)
-  wordmark(c, accent, 'HIRING OUTCOME')
-
-  fitFont(c, d.company, '800', '"Syne",sans-serif', 60, 34, W - PAD * 2)
-  c.fillStyle = C.white; c.textAlign = 'left'; c.textBaseline = 'alphabetic'
-  c.fillText(d.company, PAD, 248)
-  if (d.role) {
-    c.font = '400 26px "Instrument Sans",sans-serif'; c.fillStyle = 'rgba(255,255,255,0.5)'
-    let role = d.role
-    while (c.measureText(role).width > W - PAD * 2 && role.length > 4) role = role.slice(0, -1)
-    if (role !== d.role) role += '…'
-    c.fillText(role, PAD, 290)
+    const hl = headline(c, head.parts, f.PAD, 270, inner, TYPE.headline, TYPE.headlineMin, 3, accent)
+    let y = hl.bottom
+    if (sub) {
+      y += 58
+      c.font = font(400, TYPE.sub); c.fillStyle = white(TEXT.body); c.textAlign = 'left'
+      c.fillText(ellipsize(c, sub, inner), f.PAD, y)
+    }
+    // Rows from the bottom up: footer hairline 952 · context 918 · timeline · hero.
+    const contextBase = 918
+    const timelineBase = strip ? contextBase - 50 : 902
+    const heroBottom = timeline ? timelineBase - 54 : strip ? contextBase - 66 : 880
+    const heroTop = y + 46
+    const numW = 380
+    drawDayGrid(c, f.PAD + numW + 40, heroTop, kind, days, f.W - f.PAD - (f.PAD + numW + 40), heroBottom - heroTop, accent, A.dim, 'right', 'bottom', marks)
+    bigNumber(c, f.PAD, heroBottom - 74, days != null ? String(days) : '?', daysLabel({ outcome: d.outcome, days }), TYPE.number, numW)
+    timelineText(c, timeline, f.PAD, timelineBase, inner)
+    if (strip) contextLine(c, f, contextBase, strip, accent)
+    footer(c, f, companyUrl(d.company), 'Tracked with Seen')
+    return
   }
 
-  const owFs = fitFont(c, o.word, '800', '"Syne",sans-serif', 150, 70, W - PAD * 2)
-  c.font = `800 ${owFs}px "Syne",sans-serif`; c.fillStyle = accent
-  c.textAlign = 'left'; c.textBaseline = 'alphabetic'
-  c.shadowColor = accent; c.shadowBlur = 30
-  c.fillText(o.word, PAD, 430)
-  c.shadowBlur = 0
-  c.fillStyle = accent; roundRect(c, PAD, 452, 120, 7, 4); c.fill()
+  // Story: the same elements with more air — headline, the number + timeline, then the calendar.
+  paintBg(c, f, accent, { x: f.W * 0.5, y: 1250, r: 760, a: A.bloom })
+  topRow(c, f, accent, '')
+  const hl = headline(c, head.parts, f.PAD, f.top + 232, inner, 108, TYPE.headlineMin, 3, accent)
+  let y = hl.bottom
+  if (sub) {
+    y += 64
+    c.font = font(400, 32); c.fillStyle = white(TEXT.body); c.textAlign = 'left'
+    c.fillText(ellipsize(c, sub, inner), f.PAD, y)
+  }
+  const numBase = y + 268
+  const labelBase = bigNumber(c, f.PAD, numBase, days != null ? String(days) : '?', daysLabel({ outcome: d.outcome, days }), 260, inner)
+  if (timeline) timelineText(c, timeline, f.PAD, labelBase + 46, inner)
+  const hairline = f.bottom - 76 - 52
+  const contextBase = hairline - 54
+  const gridTop = labelBase + (timeline ? 110 : 70)
+  const gridBottom = (strip ? contextBase - 70 : hairline - 64)
+  drawDayGrid(c, f.PAD, gridTop, kind, days, inner, Math.max(120, gridBottom - gridTop), accent, A.dim, 'center', 'middle', marks)
+  if (strip) contextLine(c, f, contextBase, strip, accent)
+  footer(c, f, companyUrl(d.company), 'Tracked with Seen')
+}
 
-  const steps: OutcomeStep[] = d.steps && d.steps.length ? d.steps : [
-    { label: 'Applied', sub: 'Day 0' },
-    { label: 'Interview', sub: d.reachedInterview ? 'Reached' : 'Not reached' },
-    { label: o.word.split(' ')[0].replace('AUTO-', ''), sub: d.days != null ? `Day ${d.days}` : '—', mark: o.mark },
-  ]
-  stepper(c, PAD + 24, 590, W - PAD * 2 - 48, steps, accent)
+// ── COMPANY GRADE CARD ─────────────────────────────────────────────────────────────────────
+function watermarkLetter(c: Ctx, letter: string, rightX: number, baseline: number, size: number, maxW: number, accent: string) {
+  const fs = fitFont(c, letter, 800, TYPE.display, size, Math.round(size * 0.5), maxW)
+  c.font = font(800, fs, TYPE.display); c.textAlign = 'right'
+  c.fillStyle = rgba(accent, 0.22)
+  c.fillText(letter, rightX, baseline)
+  c.textAlign = 'left'
+}
 
-  const dY = 710
-  c.strokeStyle = 'rgba(255,255,255,0.10)'; c.lineWidth = 1
-  c.beginPath(); c.moveTo(PAD, dY); c.lineTo(W - PAD, dY); c.stroke()
+function scoreUnder(c: Ctx, score: number, rightX: number, baseline: number, accent: string, big = 76) {
+  c.font = font(800, big, TYPE.display); c.textAlign = 'right'
+  c.fillStyle = white(TEXT.faint); c.font = font(500, Math.round(big * 0.42)); const tail = '/100'
+  const tailW = c.measureText(tail).width
+  c.fillText(tail, rightX, baseline)
+  c.font = font(800, big, TYPE.display); c.fillStyle = accent
+  c.fillText(String(score), rightX - tailW - 8, baseline)
+  c.textAlign = 'left'
+}
 
-  statRow(c, PAD, dY + 40, W - PAD * 2, d.stats || [
-    { value: d.days != null ? `${d.days}d` : '—', label: 'To decision', color: C.white },
-    { value: d.reachedInterview ? 'Yes' : 'No', label: 'Reached interview', color: d.reachedInterview ? C.green : 'rgba(255,255,255,0.85)' },
-    { value: d.platform || 'Seen', label: 'Applied via', color: C.white },
-  ])
+function statPairs(c: Ctx, x: number, baseline: number, pairs: { value: string; label: string }[], valueSize: number, maxW: number) {
+  let xx = x
+  for (const p of pairs) {
+    c.font = font(700, valueSize, TYPE.display); c.fillStyle = white(TEXT.full); c.textAlign = 'left'
+    const vw = c.measureText(p.value).width
+    c.fillText(p.value, xx, baseline)
+    c.font = font(400, TYPE.context); c.fillStyle = white(TEXT.meta)
+    const lw = c.measureText(p.label).width
+    c.fillText(p.label, xx, baseline + 38)
+    xx += Math.max(vw, lw) + Math.max(56, maxW * 0.08)
+  }
+}
 
-  ctaBar(c, accent, 'Track your applications free  ·  seenjobs.io')
+export function drawCompanyCard(canvas: HTMLCanvasElement, d: CompanyCardData, format: CardFormat = 'square') {
+  const f = frame(format)
+  const c = prep(canvas, f)
+  const score = Math.round(d.overall_score || 0)
+  const risk: Risk = d.risk ?? riskForScore(score)
+  const A = ACCENTS[accentKeyForRisk(risk)]
+  const accent = A.hex
+  const inner = f.W - f.PAD * 2
+  const verdict = companyVerdict({ ghostRate: d.ghost_rate, responseRate: d.response_rate })
+  const pairs = companyStatPairs({ ghostRate: d.ghost_rate, responseRate: d.response_rate, avgWaitDays: d.avg_wait_days })
+  const updated = d.updatedAt ? formatPacific(new Date(d.updatedAt), { dateStyle: 'medium' }) : ''
+  const updatedMs = d.updatedAt ? new Date(d.updatedAt).getTime() : NaN
+  const meta = ['HIRING GRADE', metaLine(updatedMs, '')].filter(Boolean).join(' · ')
+  const conf = (d.confidence ? `${d.confidence} · ` : '') + confidenceLine(d.report_count, updated)
+
+  if (!f.story) {
+    paintBg(c, f, accent, { x: f.W * 0.8, y: 420, r: 640, a: A.bloom })
+    topRow(c, f, accent, meta)
+    watermarkLetter(c, d.grade, f.W - 40, 622, 600, 520, accent)
+    scoreUnder(c, score, f.W - f.PAD, 700, accent, 72)
+
+    // One line at up to 120px; a long name wraps (Syne is wide: 25 characters need three lines)
+    // rather than running off the card, and the verdict follows it down.
+    const nameBase = companyName(c, d.company, f.PAD, 176, 352, inner, 120, 60)
+    c.font = font(400, 34); c.fillStyle = white(TEXT.strong)
+    const lines = wrapLines(c, verdict, 520)
+    lines.forEach((l, i) => c.fillText(l, f.PAD, nameBase + 66 + i * 46))
+
+    statPairs(c, f.PAD, 812, pairs, 76, inner)
+    c.font = font(400, TYPE.footerNote); c.fillStyle = white(TEXT.meta); c.textAlign = 'left'
+    c.fillText(ellipsize(c, conf, inner), f.PAD, 904)
+    footer(c, f, companyUrl(d.company), 'Check any company free at seenjobs.io')
+    return
+  }
+
+  paintBg(c, f, accent, { x: f.W * 0.5, y: 1000, r: 820, a: A.bloom })
+  topRow(c, f, accent, meta)
+  const nameBase = companyName(c, d.company, f.PAD, f.top + 150, f.top + 300, inner, 128, 64)
+  c.font = font(400, 36); c.fillStyle = white(TEXT.strong)
+  wrapLines(c, verdict, inner).forEach((l, i) => c.fillText(l, f.PAD, nameBase + 72 + i * 48))
+  watermarkLetter(c, d.grade, f.W - 40, 1150, 820, inner + 40, accent)
+  scoreUnder(c, score, f.W - f.PAD, 1262, accent, 96)
+  statPairs(c, f.PAD, 1430, pairs, 84, inner)
+  c.font = font(400, TYPE.footerNote); c.fillStyle = white(TEXT.meta); c.textAlign = 'left'
+  c.fillText(ellipsize(c, conf, inner), f.PAD, 1540)
+  footer(c, f, companyUrl(d.company), 'Check any company free at seenjobs.io')
 }

@@ -119,7 +119,7 @@ export default function WorkspacePreview({ proof, live = false }: { proof: Proof
           <div className={styles.main} role="tabpanel">
             <div className={styles.top}>
               <div style={{ minWidth: 0 }}>
-                <h3 className={styles.title} key={`t-${tab}`}>{meta.title}</h3>
+                <h2 className={styles.title} key={`t-${tab}`}>{meta.title}</h2>
                 <div className={styles.sub}>{meta.sub}</div>
               </div>
               {tab === 'company'

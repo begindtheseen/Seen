@@ -9,7 +9,7 @@
 import { readFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { buildSearchUrl, isRelevant, isSearchableCompany, scoreRelevance } from '../../../api/_utils/companyReddit.js';
+import { buildSearchUrl, isReadWorthy, isSearchableCompany, scoreRelevance } from '../../../api/_utils/companyReddit.js';
 import { isValidCompanyName, normalizeCompany } from '../../../api/_utils/reportWrite.js';
 import { SECURITY_PREAMBLE, fenceUntrusted, scanInjection } from '../../../lib/server/promptGuard.js';
 import { MODELS, customId, jsonFormat, resultJson } from './batch.mjs';
@@ -296,9 +296,12 @@ export function mentionsAnyTerm(text, terms) {
 }
 
 /**
- * Rank search items with the production relevance gate (isRelevant: company named + job context)
+ * Rank search items with the production READ gate (isReadWorthy: company named as the employer and not
+ * news — this collector reads the whole thread and its comments and judges each account with the strict
+ * rules itself, so the company page's display gate, which also needs the OPENING post to be a first-hand
+ * account, does not apply here; same bar as the enrichment worker's selectThreads)
  * applied for EVERY spelling of the target ("manpower" / "manpowergroup", "teksystems" / "tek
- * systems"), then require a FULL-PHRASE mention (isRelevant accepts a ≥4-char first token, so
+ * systems"), then require a FULL-PHRASE mention (the gate accepts a ≥4-char first token, so
  * "Robert" alone would admit Robert Half — too loose for scored data), dedupe, rank by the best
  * scoreRelevance across spellings (recency tie-break, as rankAndFilter does), and cap.
  */
@@ -307,7 +310,7 @@ export function selectThreads(items, target, cap = DEFAULTS.threadsPerTarget) {
   const scored = [];
   for (const it of items) {
     if (!it?.permalink || !it.id || seen.has(it.id)) continue;
-    const terms = target.terms.filter((t) => isRelevant(it, t));
+    const terms = target.terms.filter((t) => isReadWorthy(it, t));
     if (!terms.length || !mentionsAnyTerm(`${it.title} ${it._body || ''}`, target.terms)) continue;
     seen.add(it.id);
     scored.push({ it, score: Math.max(...terms.map((t) => scoreRelevance(it, t))) });
