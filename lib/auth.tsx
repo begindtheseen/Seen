@@ -3,6 +3,7 @@
 import { createContext, useContext, useEffect, useState, useCallback, type ReactNode } from 'react'
 import type { User, Session } from '@supabase/supabase-js'
 import { supabase } from './supabase'
+import { SESSION_LOCAL_KEYS, SESSION_LOCAL_PREFIXES } from './sessionLocalKeys.js'
 import { _sync } from './sync'
 import { consumeIntentionalSignOut, handleSessionExpired, resetSessionExpiredGuard } from './sessionExpired'
 import type { UserProfile } from './types'
@@ -64,19 +65,8 @@ const AuthContext = createContext<AuthState>({
 // next account/guest on this device. Cleared on sign-out — leaving it caused a previous
 // user's applications/saved jobs/check-in history to bleed into whoever used the device
 // next (and AppStore's sync loop would even upload them into the next account).
-const SESSION_LOCAL_KEYS = [
-  'seen_applications_v1', 'seen_saved_v1', 'seen_hevents_v1', 'seen_check_snooze',
-  'seen_apply_reminders', 'seen_avoided_apps', 'seen_skip_reasons', 'seen_recent_cos',
-  '_seen_survey_done',
-  // Device-local search state — must clear on sign-out so the next account on a
-  // shared device doesn't inherit the previous user's recent searches / job cache /
-  // sticky job-search location.
-  'seen_recent_v1', 'seen_job_cache_v1', 'seen_job_location_v1',
-]
-
-// Per-user Résumé Studio caches (parsed doc + tailored variants) are keyed by user id, but a
-// shared device still must not carry them past sign-out.
-const SESSION_LOCAL_PREFIXES = ['seen_resume_doc_', 'seen_resume_variants_']
+// The lists live in lib/sessionLocalKeys.js (plain JS) so lib/sessionLocalKeys.test.mjs can
+// enumerate every localStorage write in the app and prove each user-scoped key is swept here.
 
 function clearSessionLocalData() {
   try {
