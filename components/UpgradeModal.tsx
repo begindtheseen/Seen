@@ -5,6 +5,7 @@ import { PRO_PRICING } from '@/lib/creditRules'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/lib/auth'
 import { aiHeaders } from '@/lib/aiHeaders'
+import { signupHref, trialSignupHref } from '@/lib/signupIntent.js'
 import { FREE_DAILY_CREDITS, PRO_TRIAL_DAYS, ONE_TIME_SKUS } from '@/lib/creditRules'
 import ModalPortal from '@/components/ModalPortal'
 
@@ -87,7 +88,7 @@ export default function UpgradeModal({ reason, onClose, featureName }: UpgradeMo
   async function handleUpgrade() {
     if (!isLoggedIn) {
       onClose()
-      router.push('/login?next=/pricing')
+      router.push(trialSignupHref(plan))
       return
     }
     setLoading(true)
@@ -121,7 +122,7 @@ export default function UpgradeModal({ reason, onClose, featureName }: UpgradeMo
   async function handleOneTime(sku: 'sprint' | 'credits20') {
     if (!isLoggedIn) {
       onClose()
-      router.push('/login?next=/pricing')
+      router.push(signupHref({ next: '/pricing' }))
       return
     }
     setSkuLoading(sku)

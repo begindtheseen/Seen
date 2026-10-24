@@ -27,6 +27,13 @@ function readPending(): Pending | null {
   } catch { clearPendingRef(); return null }
 }
 
+/** True while an invite code that arrived on this device is waiting for a sign-up (the invite banner,
+ *  the sign-up headline and the track flows say so). */
+export function hasPendingRef(): boolean {
+  if (typeof window === 'undefined') return false
+  return readPending() !== null
+}
+
 export function clearPendingRef(): void {
   try { window.localStorage.removeItem(PENDING_REF_KEY) } catch { /* storage blocked */ }
 }

@@ -75,7 +75,8 @@ export default function WelcomeOnboarding({
         <div style={{ minWidth: 0 }}>
           <div className="deyebrow" style={{ color: 'var(--indigo)' }}>✦ Getting started</div>
           <h2 style={{ fontFamily: 'var(--display)', fontSize: '1.15rem', fontWeight: 800, color: 'var(--white)', letterSpacing: '-.02em', margin: '.35rem 0 .2rem' }}>
-            Welcome to Seen, {name} 👋
+            {/* Sign-up no longer asks a name first (it is asked later, in Settings): no "Welcome to Seen, there". */}
+            {name && name !== 'there' ? <>Welcome to Seen, {name} 👋</> : <>Welcome to Seen 👋</>}
           </h2>
           <p style={{ fontSize: '.8rem', color: 'var(--sub)', lineHeight: 1.55, margin: 0 }}>
             Seen shows you which companies actually respond — so you stop wasting applications. Three quick steps to set you up:

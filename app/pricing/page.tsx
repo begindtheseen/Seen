@@ -4,6 +4,7 @@ import { useState, useEffect, useRef, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useAuth } from '@/lib/auth'
 import { aiHeaders } from '@/lib/aiHeaders'
+import { signupHref, trialSignupHref } from '@/lib/signupIntent.js'
 import { FREE_DAILY_CREDITS, WELCOME_CREDITS, MAX_DAILY_EARN, PRO_TRIAL_DAYS, ONE_TIME_SKUS, PRO_PRICING, CREDIT_RESET_LABEL, RESUME_PARSE_COST } from '@/lib/creditRules'
 import { formatPacific } from '@/lib/time/pacific.js'
 import { REPORT_REWARD_PRO_DAYS, REPORT_REWARD_MONTHLY_CAP_DAYS, REPORT_REWARD_MIN_TRACKED_DAYS, REFERRAL_REWARD_PRO_DAYS, REFERRAL_MAX_REWARDED, dayWord, proDaysLabel } from '@/lib/creditRules'
@@ -168,7 +169,7 @@ function PricingPageInner() {
 
   async function handleUpgrade() {
     if (!isLoggedIn) {
-      router.push('/login?next=/pricing')
+      router.push(trialSignupHref(yearly ? 'yearly' : 'monthly'))
       return
     }
     if (checkoutInFlight.current) return
@@ -200,7 +201,7 @@ function PricingPageInner() {
   // One-time purchase (mode:'payment' on the server) — same checkout endpoint, sku body.
   async function handleOneTime(sku: 'sprint' | 'credits20') {
     if (!isLoggedIn) {
-      router.push('/login?next=/pricing')
+      router.push(signupHref({ next: '/pricing' }))
       return
     }
     if (checkoutInFlight.current) return
@@ -337,7 +338,7 @@ function PricingPageInner() {
               ))}
             </div>
             <button
-              onClick={() => router.push(isLoggedIn ? '/resume' : '/login')}
+              onClick={() => router.push(isLoggedIn ? '/resume' : signupHref({ next: '/tracker' }))}
               style={{ width: '100%', background: 'none', border: '1px solid var(--line2)', borderRadius: 9, padding: '.75rem', fontFamily: 'var(--display)', fontWeight: 700, fontSize: '.82rem', color: 'var(--sub)', cursor: 'pointer' }}
             >
               {isLoggedIn ? 'Go to Resume AI' : 'Get started free'}

@@ -6,7 +6,7 @@
 // quiet window after a tracker delete / withdraw / outcome (lib/quietWindow.ts), or when today's
 // one slot is already spent.
 
-export const SKIP_PREFIXES = ['/employers', '/admin', '/login', '/signup', '/reset', '/pricing', '/contact']
+export const SKIP_PREFIXES = ['/employers', '/admin', '/login', '/signup', '/reset', '/pricing', '/trial', '/contact']
 
 export interface GateInput {
   pathname: string | null | undefined

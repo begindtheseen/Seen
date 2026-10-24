@@ -18,6 +18,7 @@ import { gradeLetter } from '@/lib/companyDisplay'
 import ModalPortal from '@/components/ModalPortal'
 import WithdrawModal from '@/components/WithdrawModal'
 import PageHeader from '@/components/shell/PageHeader'
+import GuestTracker from '@/components/tracker/GuestTracker'
 import InboxAutopilot from '@/components/tracker/InboxAutopilot'
 import ApplicationForm from '@/components/tracker/ApplicationForm'
 import ConfirmDialog from '@/components/tracker/ConfirmDialog'
@@ -34,7 +35,6 @@ import { showToast } from '@/lib/toast'
 import { showReportReward } from '@/lib/rewardNotice'
 import s from '@/components/tracker/tracker.module.css'
 import { LoadError, PageSkeleton } from '@/components/shell/LoadStates'
-import { loginHref } from '@/lib/safeHref.js'
 import type { CheckType } from '@/lib/constants'
 const SurveyModal = dynamic(() => import('@/components/SurveyModal'), { ssr: false })
 const ResumeSurveyModal = dynamic(() => import('@/components/ResumeSurveyModal'), { ssr: false })
@@ -405,8 +405,10 @@ function TrackerPage() {
 
   useEffect(() => {
     if (!ready) return // wait for the session to resolve — redirecting early bounced signed-in users
-    if (!isLoggedIn) { router.replace(loginHref(`${window.location.pathname}${window.location.search}${window.location.hash}`)); return }
-    if (isLoggedIn && !isSeeker) { router.replace('/'); return }
+    // A guest tracks on this device (GuestTracker below) — never a "Welcome back" sign-in wall for
+    // someone who has never had an account (conversion audit 2026-10-24).
+    if (!isLoggedIn) return
+    if (!isSeeker) { router.replace('/'); return }
   }, [ready, isLoggedIn, isSeeker, router])
 
   // ?add=1 (the dashboard's "+ Track application") opens the add-application form directly.
@@ -739,7 +741,8 @@ function TrackerPage() {
   if (!ready || (isLoggedIn && isSeeker && loading)) {
     return <div className="page-full"><div className={s.body} style={{ maxWidth: 1000, margin: '0 auto', padding: '2.5rem 1rem', width: '100%', boxSizing: 'border-box' }}><PageSkeleton label="Loading your applications" tiles={5} rows={4} /></div></div>
   }
-  if (!isLoggedIn || !isSeeker) return null
+  if (!isLoggedIn) return <GuestTracker />
+  if (!isSeeker) return null
 
   const active = apps.filter(a => a.status === 'active')
   const ghosted = apps.filter(a => a.status === 'ghosted')
