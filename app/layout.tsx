@@ -18,7 +18,9 @@ export const metadata: Metadata = {
     default: 'Seen — Company Ghost Rates & Hiring Transparency',
     template: '%s | Seen',
   },
-  description: 'Check any company’s ghost rate, response time, and real applicant outcomes before you apply. Hiring transparency aggregated from Reddit, Glassdoor, and verified job-seeker reports.',
+  // Sources named here must be ones Seen actually reads: Reddit (public discussion) and reports submitted
+  // to Seen. Glassdoor is an excluded source (owner decision 2026-10-20, lib/reports/excludedSources.js).
+  description: 'Check any company’s ghost rate, response time, and real applicant outcomes before you apply. Hiring transparency aggregated from Reddit and verified job-seeker reports.',
   keywords: ['company ghost rate', 'does company ghost applicants', 'hiring reviews reddit', 'interview process reviews', 'job application tracker', 'company response rate', 'glassdoor alternative'],
   applicationName: 'Seen',
   icons: {

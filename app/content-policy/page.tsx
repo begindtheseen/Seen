@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
+import { DraftNote, Placeholder, LegalFooter, LEGAL_CONTACT } from '@/components/legal/LegalBits'
 
 // Content Policy — how Seen sources, attributes, and stands behind the content it hosts.
 // DRAFT for the owner's attorney to review. This page describes the platform's neutral-aggregator
@@ -9,9 +10,9 @@ import Link from 'next/link'
 // conclusions — a licensed attorney must confirm the posture before anyone relies on it.
 
 export const metadata: Metadata = {
-  title: 'Content Policy — How Seen Sources & Stands Behind Its Content | Seen',
+  title: 'Content Policy — How Seen Sources & Stands Behind Its Content',
   description:
-    'How Seen aggregates third-party public discussion and user-submitted reports, attributes them, computes aggregate statistics, and handles disputes and corrections. Draft — pending legal review.',
+    'How Seen aggregates third-party public discussion and user-submitted reports, attributes them, computes aggregate statistics, and handles disputes and corrections.',
   alternates: { canonical: 'https://seenjobs.io/content-policy' },
   openGraph: {
     title: 'Content Policy | Seen',
@@ -20,6 +21,7 @@ export const metadata: Metadata = {
     url: 'https://seenjobs.io/content-policy',
     type: 'website',
     siteName: 'Seen',
+    images: ['/opengraph-image'],
   },
 }
 
@@ -35,27 +37,20 @@ export default function ContentPolicyPage() {
   return (
     <div className="rise-in" style={{ minHeight: '100vh' }}>
       <div style={wrap}>
-        {/* Draft status banner */}
-        <div style={{ background: 'var(--adim)', border: '1px solid rgba(245,158,11,0.25)', borderRadius: 10, padding: '1rem 1.25rem', marginBottom: '2rem', fontFamily: 'var(--mono)', fontSize: '.7rem', color: 'var(--amber)', lineHeight: 1.7 }}>
-          ⚠ Draft — pending legal review. This document has not been reviewed by a licensed attorney and
-          is not legal advice. It describes how Seen currently sources and presents content; do not rely on
-          it as final policy until counsel has approved it. Bracketed [PLACEHOLDER] items must be completed
-          before publication.
-        </div>
-
         <h1 style={{ fontFamily: 'var(--display)', fontSize: '2rem', fontWeight: 800, color: 'var(--white)', letterSpacing: '-.03em', margin: '0 0 .35rem' }}>
           Content Policy
         </h1>
-        <p style={{ color: 'var(--sub)', fontSize: '.82rem', margin: '0 0 2.5rem' }}>
-          Draft prepared 2026-07-19 · Effective date: [PLACEHOLDER] · Questions?{' '}
-          <a href="mailto:hello@seenjobs.io" style={link}>hello@seenjobs.io</a>
+        <p style={{ color: 'var(--sub)', fontSize: '.82rem', margin: '0 0 .6rem' }}>
+          Draft prepared 2026-07-19 · Effective date: <Placeholder>effective date</Placeholder> · Questions?{' '}
+          <a href={`mailto:${LEGAL_CONTACT}`} style={link}>{LEGAL_CONTACT}</a>
         </p>
+        <DraftNote />
 
         <div style={section}>
           <h2 style={h2}>1. What Seen is — a neutral aggregator</h2>
           <p style={p}>
-            Seen (&ldquo;Seen,&rdquo; &ldquo;we,&rdquo; &ldquo;us&rdquo;), operated by [PLACEHOLDER — legal
-            entity name], is a hiring-transparency platform that <strong>aggregates and organizes
+            Seen (&ldquo;Seen,&rdquo; &ldquo;we,&rdquo; &ldquo;us&rdquo;), operated by <Placeholder>legal entity name</Placeholder>,
+            is a hiring-transparency platform that <strong>aggregates and organizes
             content created by other people</strong>. The material shown on Seen comes from two sources:
             (a) publicly available third-party discussion, and (b) reports submitted by applicants about
             their own hiring experiences. Seen also computes aggregate statistics from those reports.
@@ -148,7 +143,7 @@ export default function ContentPolicyPage() {
             These are general principles, described here to explain the platform&apos;s design and intent. They
             are <strong>not legal conclusions</strong>, and nothing here is a promise about how any specific law
             applies to any specific content or dispute. A licensed attorney must review this posture before
-            anyone relies on it. [PLACEHOLDER — counsel to confirm governing framework and jurisdiction.]
+            anyone relies on it. <Placeholder>counsel to confirm governing framework and jurisdiction</Placeholder>
           </p>
         </div>
 
@@ -177,10 +172,11 @@ export default function ContentPolicyPage() {
           <h2 style={h2}>7. Disputes and corrections</h2>
           <p style={p}>
             Companies and individuals may dispute specific content. To open a dispute, contact{' '}
-            <a href="mailto:hello@seenjobs.io" style={link}>hello@seenjobs.io</a> with: the specific content at
+            <a href={`mailto:${LEGAL_CONTACT}`} style={link}>{LEGAL_CONTACT}</a> with: the specific content at
             issue; who you are and your relationship to the company; the basis for the dispute (factual
             inaccuracy, personal information, or fabrication — not simply that the content is negative); and any
-            supporting information. We aim to acknowledge disputes within [PLACEHOLDER — e.g., 14 business days].
+            supporting information. We review disputes within 14 business days (the same window stated on our{' '}
+            <Link href="/contact" style={link}>contact page</Link> and FAQ).
           </p>
           <p style={p}>
             Where appropriate, we will correct or remove content, add context, or attach an official response
@@ -209,9 +205,7 @@ export default function ContentPolicyPage() {
           </p>
         </div>
 
-        <p style={{ fontFamily: 'var(--mono)', fontSize: '.6rem', color: 'var(--dim)', marginTop: '2rem', lineHeight: 1.7 }}>
-          Draft — pending legal review. Seen is not a law firm and nothing here is legal advice.
-        </p>
+        <LegalFooter />
       </div>
     </div>
   )

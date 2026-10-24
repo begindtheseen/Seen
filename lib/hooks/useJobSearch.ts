@@ -556,6 +556,12 @@ export function useJobSearch() {
     setStatusMsg(jobs.length > 0 ? `${jobs.length} result${jobs.length !== 1 ? 's' : ''}` : 'Enter a search above →')
   }
 
+  // The error state's Retry: re-run the same query and location (the inputs still hold them).
+  function retrySearch() {
+    searchCache.delete(`${query.trim()}|${location.trim()}|${radius}`)
+    void searchJobs()
+  }
+
   return {
     // auth passthrough (search machine reacts to these)
     isLoggedIn,
@@ -591,6 +597,7 @@ export function useJobSearch() {
     appliedCos,
     // actions
     searchJobs,
+    retrySearch,
     requestGpsLocation,
     clearFilters,
   }

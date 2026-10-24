@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/lib/auth'
 import { SESSION_EXPIRED_MESSAGE, clearSessionExpiredNotice, wasSessionExpiredRecently } from '@/lib/sessionExpired'
+import { internalPath } from '@/lib/safeHref.js'
 import styles from './login.module.css'
 
 // "Check your email" auto-detects the click: poll while the tab is visible, every 5 s, for at
@@ -15,12 +16,9 @@ const VERIFY_POLL_MAX = 60
 type Step = 'who' | 'email' | 'password' | 'verify' | 'signin'
 
 // Only ever redirect to an internal path — anything else (full URLs, protocol-relative
-// '//evil.com') falls back to the dashboard so login can't be used as an open redirect.
-function safeInternalPath(p: string | null): string | null {
-  if (!p) return null
-  if (!p.startsWith('/') || p.startsWith('//')) return null
-  return p
-}
+// '//evil.com') falls back to the dashboard so login can't be used as an open redirect. The ONE
+// sanitizer is lib/safeHref.js internalPath (shared with every "sign in to continue" redirect).
+const safeInternalPath = (p: string | null): string | null => internalPath(p)
 
 function fieldStyle(focused: boolean) {
   return {
@@ -49,13 +47,20 @@ function LoginContent() {
   const params = useSearchParams()
   const { isLoggedIn, isEmployer } = useAuth()
   const cameAsEmployer = params.get('type') === 'employer'
-  // Where to land after auth. /apply, /pricing and the UpgradeModal pass ?return= / ?next=
-  // so the user resumes what they were doing — dumping everyone on /dashboard lost the
-  // "did you apply?" context and the upgrade intent.
-  const returnTo = safeInternalPath(params.get('return')) || safeInternalPath(params.get('returnTo')) || safeInternalPath(params.get('next')) || '/dashboard'
-  // "For employers →" links here with ?type=employer — open the chooser (not seeker sign-in).
+  // Where to land after auth. Every signed-out deep link (/tracker, /dashboard, /profile …) arrives
+  // with ?return= (lib/safeHref.js loginHref — the same parameter lib/sessionExpired.ts uses);
+  // /pricing and the UpgradeModal pass ?next=. Both are read, both sanitized to an internal path, so
+  // the user resumes what they were doing instead of landing on /dashboard.
+  const explicitReturn = safeInternalPath(params.get('return')) || safeInternalPath(params.get('returnTo')) || safeInternalPath(params.get('next'))
+  const returnTo = explicitReturn || '/dashboard'
+  // Employers land on their portal unless the link that sent them here named a page (the claim card's
+  // "I have one — sign in" returns to /employers#claim).
+  const employerReturnTo = explicitReturn || '/employers/dashboard'
+  // "Sign in as an employer →" / "Claim your company" link here with ?type=employer: the employer
+  // role is already chosen, so the page opens on the account form for that role (not "Who are you?"
+  // again — audit 2026-10-24 E-2). ?signup=1 opens the chooser; everything else is sign-in.
   const [step, setStep] = useState<Step>(
-    params.get('signup') === '1' || params.get('type') === 'employer' ? 'who' : 'signin'
+    EMPLOYER_SIGNUP_ENABLED && cameAsEmployer ? 'email' : params.get('signup') === '1' || cameAsEmployer ? 'who' : 'signin'
   )
   const [signupType, setSignupType] = useState<'seeker' | 'employer'>(EMPLOYER_SIGNUP_ENABLED && cameAsEmployer ? 'employer' : 'seeker')
   const [name, setName] = useState('')
@@ -77,8 +82,8 @@ function LoginContent() {
     // Already signed in and hitting /login → bounce out. Employers land directly on their
     // dashboard (it shows the claim/activation checklist when they haven't claimed yet); seekers
     // resume returnTo.
-    if (isLoggedIn) router.replace(isEmployer ? '/employers/dashboard' : returnTo)
-  }, [isLoggedIn, isEmployer, router, returnTo])
+    if (isLoggedIn) router.replace(isEmployer ? employerReturnTo : returnTo)
+  }, [isLoggedIn, isEmployer, router, returnTo, employerReturnTo])
 
   function clearError() { setError('') }
 
@@ -123,7 +128,7 @@ function LoginContent() {
   // Fresh employer signups land on their dashboard (activation checklist guides them to claim +
   // post); seekers resume returnTo. (The kill switch forces seeker in createAccount, so signupType
   // is only 'employer' here when employer signup is open.)
-  const afterVerify = () => router.replace(EMPLOYER_SIGNUP_ENABLED && signupType === 'employer' ? '/employers/dashboard' : returnTo)
+  const afterVerify = () => router.replace(EMPLOYER_SIGNUP_ENABLED && signupType === 'employer' ? employerReturnTo : returnTo)
 
   /**
    * True once the email link has been clicked. Same device: the link signs THIS browser in and
@@ -187,7 +192,7 @@ function LoginContent() {
     // this. Sign-in is NOT gated by the kill switch — existing employers must still get in when closed.
     const m = (data.user?.user_metadata || {}) as Record<string, unknown>
     const isEmp = m.account_type === 'employer' || m.role_type === 'employer' || m.type === 'employer'
-    router.replace(isEmp ? '/employers/dashboard' : returnTo)
+    router.replace(isEmp ? employerReturnTo : returnTo)
   }
 
   const btnStyle: React.CSSProperties = {
@@ -303,8 +308,18 @@ function LoginContent() {
         {step === 'email' && (
           <div>
             {backBtn('who')}
-            <div style={{ fontFamily: 'var(--display)', fontSize: '1.4rem', fontWeight: 800, color: 'var(--white)', letterSpacing: '-.025em', marginBottom: '.2rem' }}>Create your account</div>
-            <div style={{ fontSize: '.82rem', color: 'var(--sub)', fontWeight: 300, marginBottom: '1.5rem' }}>Free forever for job seekers</div>
+            <div style={{ fontFamily: 'var(--display)', fontSize: '1.4rem', fontWeight: 800, color: 'var(--white)', letterSpacing: '-.025em', marginBottom: '.2rem' }}>
+              {signupType === 'employer' ? 'Create your employer account' : 'Create your account'}
+            </div>
+            <div style={{ fontSize: '.82rem', color: 'var(--sub)', fontWeight: 300, marginBottom: signupType === 'employer' ? '.6rem' : '1.5rem' }}>
+              {signupType === 'employer' ? 'Then claim your company on the employers page — free.' : 'Free forever for job seekers'}
+            </div>
+            {signupType === 'employer' && (
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '.6rem', flexWrap: 'wrap', background: 'var(--bdim)', border: '1px solid var(--bmid)', borderRadius: 8, padding: '.55rem .8rem', fontFamily: 'var(--mono)', fontSize: '.62rem', color: 'var(--sub)', marginBottom: '1.25rem' }}>
+                <span>🏢 Employer account · a work email at your company&apos;s domain gets your claim approved instantly</span>
+                <button type="button" className={styles.linkBtn} onClick={() => { setSignupType('seeker'); clearError() }} style={{ fontSize: '.62rem' }}>Not an employer?</button>
+              </div>
+            )}
             <div style={{ marginBottom: '.85rem' }}>
               {label('First name', 'su-name')}
               <input id="su-name" type="text" autoComplete="given-name" placeholder="What should we call you?" value={name} onChange={e => setName(e.target.value)} style={fieldStyle(focused === 'name')} onFocus={() => setFocused('name')} onBlur={() => setFocused(null)} />
@@ -314,6 +329,12 @@ function LoginContent() {
               <input id="su-email" type="email" autoComplete="email" inputMode="email" placeholder="you@email.com" value={email} onChange={e => setEmail(e.target.value)} style={fieldStyle(focused === 'email')} onFocus={() => setFocused('email')} onBlur={() => setFocused(null)} onKeyDown={e => e.key === 'Enter' && goToPassword()} />
             </div>
             <button style={btnStyle} onClick={goToPassword} disabled={loading}>Continue →</button>
+            <div style={{ textAlign: 'center', fontSize: '.78rem', color: 'var(--muted)' }}>
+              Already have an account?{' '}
+              <button type="button" className={styles.linkBtn} onClick={() => { clearError(); setStep('signin') }}>
+                Sign in →
+              </button>
+            </div>
           </div>
         )}
 

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, Suspense } from 'react'
+import { useState, useEffect, useRef, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useAuth } from '@/lib/auth'
 import { aiHeaders } from '@/lib/aiHeaders'
@@ -28,6 +28,10 @@ const skuPrice = (cents: number) => `$${(cents / 100).toFixed(2)}`
 
 const FREE_FEATURES = [
   `${FREE_DAILY_LABEL} — optimize, score, job insights (resets at ${CREDIT_RESET_LABEL})`,
+  // The welcome bonus is real but narrow (lib/server/credits.js gateAI + consume_credit SQL): the
+  // ai_credits row is created on the FIRST AI action with WELCOME_CREDITS for that day, and the next
+  // daily reset brings it back to FREE_DAILY_CREDITS. Say exactly that — nowhere else did.
+  `${WELCOME_CREDITS}-credit welcome bonus on the day you first use an AI tool`,
   PARSE_LINE,
   'Earn credits by tracking apps & surveys',
   'Company ghost rates & trust scores',
@@ -63,11 +67,14 @@ const COMPARISON: [string, string | boolean, string | boolean][] = [
 
 const FAQ = [
   { q: 'What is Human Voice?', a: 'AI-optimized résumés often sound generic — and some companies auto-filter applications that read as machine-written. Human Voice rewrites your optimized bullets so they sound like you: varied sentence structure, natural rhythm, every keyword kept. Your words, your voice, still ATS-ready.' },
-  { q: 'How do free AI credits work?', a: `You start with a ${WELCOME_CREDITS}-credit welcome bonus, then get ${FREE_DAILY_CREDITS} free AI ${CREDIT_WORD} that resets at ${CREDIT_RESET_LABEL} (California time). Each credit covers one AI action, and every button that spends one says so: optimize your résumé for a job, run the ATS scanner, build your application advantage, or generate AI insights for a listing nobody has analyzed yet. Uploading and parsing your résumé is free. You can earn up to ${MAX_DAILY_EARN} more credits a day by tracking your applications and answering quick surveys about companies you've worked with. Purchased credits never reset.` },
+  { q: 'How do free AI credits work?', a: `The first time you use an AI tool you get a ${WELCOME_CREDITS}-credit welcome bonus for that day (the first action uses one of them). From then on you get ${FREE_DAILY_CREDITS} free AI ${CREDIT_WORD} a day, reset at ${CREDIT_RESET_LABEL} (California time). Each credit covers one AI action, and every button that spends one says so: optimize your résumé for a job, run the ATS scanner, build your application advantage, or generate AI insights for a listing nobody has analyzed yet. Uploading and parsing your résumé is free. You can earn up to ${MAX_DAILY_EARN} more credits a day by tracking your applications and answering quick surveys about companies you've worked with. Purchased credits never reset.` },
   { q: 'How does the free trial work?', a: `Pro starts with ${PRO_TRIAL_DAYS} days free — no card required. If you add a payment method before the trial ends, your plan renews at the price you chose; cancel anytime. If you don't add one, nothing is charged and access simply ends.` },
   { q: 'What if I don\'t want a subscription?', a: `Pay once, own it: the Interview Sprint (${skuPrice(SPRINT.amount_cents)}) gives you ${SPRINT.credits} AI credits plus ${SPRINT.pro_days} days of full Pro access, and the Credit Pack (${skuPrice(CREDITS20.amount_cents)}) adds ${CREDITS20.credits} AI credits. Purchased credits never expire and roll over every day — no auto-renewal, ever.` },
   { q: 'Can I cancel Pro?', a: 'Yes, anytime — no contracts. You keep Pro until the end of your billing period. We don\'t trap you.' },
-  { q: 'Is my data sold to employers?', a: 'Never. We work for job seekers. Your resume content is processed in-memory to generate your optimization and immediately discarded. We never sell, share, or expose your info to recruiters or employers.' },
+  // What the code does (api/user-sync.js save_resume → profiles.resume_text; delete_resume / delete_account
+  // clear it): the résumé is STORED on the profile — the old answer ("processed in-memory … immediately
+  // discarded") was false while Settings showed the file "On file".
+  { q: 'Is my data sold to employers?', a: 'Never. We work for job seekers. Your résumé is stored on your profile so your own tools can use it — job matching, fit scores and rewrites — until you replace it or delete your account (both in Settings). It is never shown to, shared with, or sold to recruiters or employers, and neither is anything else about you.' },
   { q: 'When does Pro activate?', a: 'Instantly after payment. Credits update in real-time — no waiting, no manual activation.' },
   { q: 'What if I hit the daily limit?', a: `Free users get ${FREE_DAILY_CREDITS} ${CREDIT_WORD}/day, back at ${CREDIT_RESET_LABEL}. Track an application to earn one back. Answer a 10-second survey to earn more — up to ${MAX_DAILY_EARN} a day. Or upgrade to Pro for unlimited.` },
 ]
@@ -89,6 +96,9 @@ function PricingPageInner() {
   const [isPro, setIsPro] = useState(false)
   const [portalLoading, setPortalLoading] = useState(false)
   const [sub, setSub] = useState<{ status: string; cancel_at_period_end: boolean; current_period_end: number | null; amount: number | null; interval: string | null } | null>(null)
+  // One live Checkout Session per click: `disabled` only takes effect after React re-renders, so a
+  // double-tap created two Stripe sessions (audit 2026-10-24). The ref closes the gap synchronously.
+  const checkoutInFlight = useRef(false)
 
   useEffect(() => {
     if (params.get('upgraded') === '1') {
@@ -158,6 +168,8 @@ function PricingPageInner() {
       router.push('/login?next=/pricing')
       return
     }
+    if (checkoutInFlight.current) return
+    checkoutInFlight.current = true
     setLoading(true)
     setError('')
     try {
@@ -169,14 +181,16 @@ function PricingPageInner() {
       })
       const d = await r.json()
       if (d.url) {
-        window.location.href = d.url
+        window.location.href = d.url // the ref stays set: this page is leaving
       } else {
         setError(d.error || 'Checkout failed — please try again or email hello@seenjobs.io')
         setLoading(false)
+        checkoutInFlight.current = false
       }
     } catch {
       setError('Network error — please try again')
       setLoading(false)
+      checkoutInFlight.current = false
     }
   }
 
@@ -186,6 +200,8 @@ function PricingPageInner() {
       router.push('/login?next=/pricing')
       return
     }
+    if (checkoutInFlight.current) return
+    checkoutInFlight.current = true
     setSkuLoading(sku)
     setError('')
     try {
@@ -201,10 +217,12 @@ function PricingPageInner() {
       } else {
         setError(d.error || 'Checkout failed — please try again or email hello@seenjobs.io')
         setSkuLoading(null)
+        checkoutInFlight.current = false
       }
     } catch {
       setError('Network error — please try again')
       setSkuLoading(null)
+      checkoutInFlight.current = false
     }
   }
 
@@ -557,13 +575,15 @@ function PricingPageInner() {
           <button
             className="btn-shine"
             onClick={handleUpgrade}
-            disabled={loading}
+            disabled={loading || skuLoading !== null}
             style={{ padding: '.95rem 3rem', background: 'linear-gradient(135deg,#4f46e5,#7c3aed)', border: 'none', borderRadius: 12, fontFamily: 'var(--display)', fontWeight: 800, fontSize: '1rem', color: '#fff', cursor: 'pointer', boxShadow: '0 0 40px rgba(99,102,241,.4)' }}
           >
             {loading ? 'Redirecting…' : `Start ${PRO_TRIAL_DAYS}-day free trial →`}
           </button>
+          {/* The renewal figure follows the toggle: the yearly plan is billed once a year (its per-month
+              figure is an equivalent, not a charge); monthly is billed monthly. */}
           <div style={{ fontFamily: 'var(--mono)', fontSize: 'var(--fs-58)', color: 'var(--dim)', marginTop: '.75rem' }}>
-            No card required · then {yearly ? YEARLY : MONTHLY}/mo if you continue · Cancel anytime
+            No card required · then {yearly ? `$${YEARLY_TOTAL.toFixed(2)}/yr (${YEARLY}/mo)` : `${MONTHLY}/mo`} if you continue · Cancel anytime
           </div>
         </div>
 
