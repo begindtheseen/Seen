@@ -14,7 +14,7 @@
 
 // Legal-suffix stripper shared with the reports.js company normalizer, so a cache key
 // derived here collides with the same company however it was typed.
-import { mentionsCompany, isWeakMention, isCompanySubreddit, nameVariants } from '../../lib/reports/applicantRules.js';
+import { mentionsCompany, isWeakMention, isCompanySubreddit, nameVariants, classifyApplicantAccount } from '../../lib/reports/applicantRules.js';
 
 const LEGAL_SUFFIX = /[\s,]+(inc\.?|llc\.?|corp\.?|ltd\.?|co\.|plc\.?|group|holdings|enterprises|solutions|technologies)\.?$/i;
 
@@ -256,12 +256,42 @@ function namedIn(sentence, companyName, key) {
   return mentionsCompany(sentence, [companyName]) && !isWeakMention(sentence, [companyName]);
 }
 
+// News ABOUT the company — layoffs, firings, executives, stock, lawsuits, policy — is never a thread
+// about applying to it, whatever hiring words its title carries (audit 2026-10-24: Walmart's section
+// showed "HEB hires exec that was fired from Walmart for taking H1B kickbacks"; Amazon's showed recruiter
+// layoffs and RTO news). Judged on the title.
+const NEWS_RE = /\b(?:layoffs?|laid off|lays off|fired|firing|fires|exec|execs|executives?|ceo|cfo|coo|cto|chairman|board of directors|shareholders?|stock|shares|earnings|quarterly|revenue|profits?|lawsuit|sued|sues|settlement|kickbacks?|h-?1b|rto|return[- ]to[- ]office|union(?:ize|ization|izing)?|strike|recall|outage|data breach|acquisition|acquires?|merger|ipo|antitrust|ftc|doj|congress|senator|tariffs?|bankrupt(?:cy)?)\b/i;
+export const isNewsThread = (item) => NEWS_RE.test(String(item?.title || ''));
+
+// Owner's bar for the discussion list (2026-10-24): a thread shows ONLY when the strict first-hand rules
+// (lib/reports/applicantRules.js — the same rules that admit a report) accept the opening post, judged
+// with its title and subreddit, or the title itself as a first-person applicant sentence ("Ghosted by
+// Walmart after 4 interview rounds"). A question, advice, a customer story, a reply about someone else, a
+// link or bot text never qualifies. Cached rows keep only title + subreddit, so they are judged on those.
+export function firstHandApplicantThread(item, companyName) {
+  const title = String(item?.title || '');
+  const body = String(item?._body || '');
+  const names = [companyName];
+  const sub = String(item?.subreddit || '');
+  const inCompanySub = isCompanySubreddit(sub, names) || isCompanySubreddit(sub, [normalizeCompanyKey(companyName)]);
+  if (body && classifyApplicantAccount(body, { names, title, isOp: true, inCompanySub }).kind === 'applicant_outcome') return true;
+  return classifyApplicantAccount(title, { names, inCompanySub }).kind === 'applicant_outcome';
+}
+
 // Is this thread relevant to show on a COMPANY page — about applying to / being hired by THIS
-// company, not a name collision? A thread counts when, in ONE sentence of its title or body, the
-// company is named as the employer (for a common-word brand: used as the employer) AND a hiring
-// word appears — or the thread is in the company's own subreddit and talks about hiring. For a
-// name that is not an ordinary word, a mention inside a career/work subreddit still counts.
+// company, not a name collision? The company must be named as the employer in a hiring sentence (or
+// the thread sit in its own subreddit and talk about hiring) — namedAsEmployer, kept from the first
+// relevance rule — AND the thread must not be news about the company AND the poster must give a
+// first-hand applicant account under the strict rules (firstHandApplicantThread).
 export function isRelevant(item, companyName) {
+  if (!item || isNewsThread(item)) return false;
+  // In the company's own subreddit a first-hand applicant account is about that company even when the
+  // post does not repeat its name (the strict rules take the subreddit as the context).
+  const own = isCompanySubreddit(item.subreddit, [companyName]) || isCompanySubreddit(item.subreddit, [normalizeCompanyKey(companyName)]);
+  return (namedAsEmployer(item, companyName) || own) && firstHandApplicantThread(item, companyName);
+}
+
+export function namedAsEmployer(item, companyName) {
   if (!item) return false;
   const key = normalizeCompanyKey(companyName);
   if (!key) return false;
@@ -311,7 +341,9 @@ export function scoreRelevance(item, companyName) {
 
 // Stored items carry the relevance-rule version they passed. A cached row written under an older
 // rule is re-judged at serve time (refilterCached) instead of waiting out its TTL.
-export const ITEM_RULES_VERSION = 2;
+//   1 — name as a word + job context · 2 — employer usage in one sentence (2026-10-23) ·
+//   3 — first-hand applicant account under the strict rules, no news threads (2026-10-24).
+export const ITEM_RULES_VERSION = 3;
 
 // Fewer than this many relevant threads and the section is not shown at all (one thread is a
 // coincidence, not "discussion"). Enforced here (status 'empty') and mirrored by the page.

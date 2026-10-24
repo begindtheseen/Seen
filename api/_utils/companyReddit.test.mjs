@@ -7,7 +7,7 @@ import {
   scoreRelevance, rankAndFilter, buildSearchUrl, ttlForStatus, cacheFresh,
   emptyStateDecision, needsBroadFallback, sanitizeDispute, isCareerSubreddit, hasJobContext,
   employerUsage, showableItems, refilterCached, MIN_SHOW_THREADS, ITEM_RULES_VERSION,
-  TTL_OK_MS, TTL_EMPTY_MS, MAX_ITEMS,
+  TTL_OK_MS, TTL_EMPTY_MS, MAX_ITEMS, namedAsEmployer, isNewsThread, firstHandApplicantThread,
 } from './companyReddit.js';
 
 // A minimal but realistic Reddit search Atom feed (two thread entries + one non-thread
@@ -82,33 +82,33 @@ test('parseRedditSearchAtom is total on junk input', () => {
 // ── relevance ────────────────────────────────────────────────────────────────────
 
 test('isRelevant matches company as a WORD, resisting substring collisions', () => {
-  assert.equal(isRelevant({ title: 'Apple hiring freeze', _body: '' }, 'Apple'), true);
-  assert.equal(isRelevant({ title: 'I love pineapple', _body: '' }, 'Apple'), false);
-  assert.equal(isRelevant({ title: 'nothing here', _body: 'Apple rejected me' }, 'Apple'), true);
+  assert.equal(namedAsEmployer({ title: 'Apple hiring freeze', _body: '' }, 'Apple'), true);
+  assert.equal(namedAsEmployer({ title: 'I love pineapple', _body: '' }, 'Apple'), false);
+  assert.equal(namedAsEmployer({ title: 'nothing here', _body: 'Apple rejected me' }, 'Apple'), true);
   // short name: whole-word only ("HP" not inside "help")
-  assert.equal(isRelevant({ title: 'HP laid off my team', _body: '' }, 'HP'), true);
-  assert.equal(isRelevant({ title: 'please help me', _body: '' }, 'HP'), false);
+  assert.equal(namedAsEmployer({ title: 'HP laid off my team', _body: '' }, 'HP'), true);
+  assert.equal(namedAsEmployer({ title: 'please help me', _body: '' }, 'HP'), false);
 });
 
 test('isRelevant accepts a distinctive first token for multi-word companies', () => {
-  assert.equal(isRelevant({ title: 'Globex interview was brutal', _body: '' }, 'Globex Corporation'), true);
+  assert.equal(namedAsEmployer({ title: 'Globex interview was brutal', _body: '' }, 'Globex Corporation'), true);
   // short first token is NOT enough on its own (collision risk)
-  assert.equal(isRelevant({ title: 'the cat sat', _body: '' }, 'Ca Technologies'), false);
+  assert.equal(namedAsEmployer({ title: 'the cat sat', _body: '' }, 'Ca Technologies'), false);
 });
 
 test('isRelevant gates out common-word brand collisions lacking employment context', () => {
   // The exact live-dry-run failure: "Amazon" product/shopping threads must be dropped —
   // company is named, but no career sub + no job context.
-  assert.equal(isRelevant({ title: 'Amazon Pokémon Restock | Mega Evolution', _body: 'in stock now', subreddit: 'PokemonDropNotify' }, 'Amazon'), false);
-  assert.equal(isRelevant({ title: 'RTX 4060 laptop for $212 on Amazon?', _body: 'great deal', subreddit: 'primedropper' }, 'Amazon'), false);
+  assert.equal(namedAsEmployer({ title: 'Amazon Pokémon Restock | Mega Evolution', _body: 'in stock now', subreddit: 'PokemonDropNotify' }, 'Amazon'), false);
+  assert.equal(namedAsEmployer({ title: 'RTX 4060 laptop for $212 on Amazon?', _body: 'great deal', subreddit: 'primedropper' }, 'Amazon'), false);
   // A real "working at Amazon" thread survives — job context present.
-  assert.equal(isRelevant({ title: 'Does the Amazon fulfillment center offer healthcare benefits?', _body: '', subreddit: 'Louisville' }, 'Amazon'), true);
+  assert.equal(namedAsEmployer({ title: 'Does the Amazon fulfillment center offer healthcare benefits?', _body: '', subreddit: 'Louisville' }, 'Amazon'), true);
 });
 
 test('isRelevant keeps career-subreddit threads even without a keyword in the title', () => {
-  assert.equal(isRelevant({ title: 'My experience with Acme', _body: 'it was a long process', subreddit: 'recruitinghell' }, 'Acme'), true);
+  assert.equal(namedAsEmployer({ title: 'My experience with Acme', _body: 'it was a long process', subreddit: 'recruitinghell' }, 'Acme'), true);
   // same title outside a career sub, no job context → dropped
-  assert.equal(isRelevant({ title: 'My experience with Acme', _body: 'bought a widget', subreddit: 'gadgets' }, 'Acme'), false);
+  assert.equal(namedAsEmployer({ title: 'My experience with Acme', _body: 'bought a widget', subreddit: 'gadgets' }, 'Acme'), false);
 });
 
 test('isCareerSubreddit recognizes work/career subs, case- + prefix-insensitive', () => {
@@ -129,9 +129,9 @@ test('hasJobContext detects employment keywords as words', () => {
 
 test('isRelevant drops "offer"-only brand collisions but keeps career-sub offer posts', () => {
   // gift-card "OFFER" naming Amazon, non-career sub → dropped
-  assert.equal(isRelevant({ title: '[OFFER] $100 Amazon gift card', _body: '', subreddit: 'Assistance' }, 'Amazon'), false);
+  assert.equal(namedAsEmployer({ title: '[OFFER] $100 Amazon gift card', _body: '', subreddit: 'Assistance' }, 'Amazon'), false);
   // a real "Amazon SDE offer" survives via its interview/career subreddit
-  assert.equal(isRelevant({ title: 'Amazon SDE offer', _body: '', subreddit: 'leetcodedesi' }, 'Amazon'), true);
+  assert.equal(namedAsEmployer({ title: 'Amazon SDE offer', _body: '', subreddit: 'leetcodedesi' }, 'Amazon'), true);
 });
 
 test('scoreRelevance floats title + job-context + recent threads to the top', () => {
@@ -145,10 +145,11 @@ test('rankAndFilter dedupes, drops irrelevant, ranks + caps, strips _body', () =
     { id: '1', permalink: 'https://reddit.com/r/x/comments/1/a/', title: 'Acme ghosted me after interview', _body: 'recruiter', created: '2026-07-01T00:00:00Z', subreddit: 'x' },
     { id: '1dup', permalink: 'https://reddit.com/r/x/comments/1/a/', title: 'dup link', _body: 'acme', created: '2026-07-01T00:00:00Z', subreddit: 'x' },
     { id: '2', permalink: 'https://reddit.com/r/y/comments/2/b/', title: 'pineapple smoothie recipe', _body: 'yum', created: '2026-07-02T00:00:00Z', subreddit: 'y' },
-    { id: '3', permalink: 'https://reddit.com/r/z/comments/3/c/', title: 'thoughts on Acme?', _body: 'the interview went well', created: '2026-06-01T00:00:00Z', subreddit: 'z' },
+    { id: '3', permalink: 'https://reddit.com/r/z/comments/3/c/', title: 'thoughts on Acme?', _body: 'I applied to Acme in May; they ghosted me after the interview.', created: '2026-06-01T00:00:00Z', subreddit: 'z' },
+    { id: '4', permalink: 'https://reddit.com/r/z/comments/4/d/', title: 'thoughts on Acme?', _body: 'the interview went well for my friend', created: '2026-06-01T00:00:00Z', subreddit: 'z' },
   ];
   const out = rankAndFilter(items, 'Acme');
-  assert.equal(out.length, 2);                       // dup collapsed, pineapple dropped
+  assert.equal(out.length, 2);                       // dup collapsed, pineapple dropped, second-hand "my friend" dropped
   assert.equal(out[0].id, '1');                      // ghosted+interview+recent ranks first
   assert.ok(!('_body' in out[0]));                   // internal field never leaks
 });
@@ -156,7 +157,7 @@ test('rankAndFilter dedupes, drops irrelevant, ranks + caps, strips _body', () =
 test('rankAndFilter respects the cap', () => {
   const many = Array.from({ length: 25 }, (_, i) => ({
     id: String(i), permalink: `https://reddit.com/r/x/comments/${i}/a/`,
-    title: `Acme thread ${i} interview`, _body: '', created: '2026-07-01T00:00:00Z', subreddit: 'x',
+    title: `Acme ghosted me after the interview, round ${i}`, _body: '', created: '2026-07-01T00:00:00Z', subreddit: 'x',
   }));
   assert.equal(rankAndFilter(many, 'Acme').length, MAX_ITEMS);
   assert.equal(rankAndFilter(many, 'Acme', 3).length, 3);
@@ -253,32 +254,32 @@ test('sanitizeDispute drops a non-reddit permalink + a malformed email, keeps th
 // ── Hiring-context relevance (audit 2026-10-23: /company/target showed hockey, TikTok and war news) ──
 // Every NO title below is the real cached thread that was on the page.
 test('a common-word brand used as an ordinary word is never a hiring thread', () => {
-  assert.equal(isRelevant({ title: 'Jets rejected trade offer from team Connor Hellebuyck wanted to play for — Read more: Connor Hellebuyck was the first target', subreddit: 'hockeynews' }, 'Target'), false);
-  assert.equal(isRelevant({ title: 'In London, an east Asian couple participating in a harmless street interview suddenly became the target of a public humiliation', subreddit: 'TikTokCringe' }, 'Target'), false);
-  assert.equal(isRelevant({ title: 'Zelenskyy is right — Russia uses satellites to help Iran target US forces', _body: 'strikes landed 1 hr later, the recruiter of militias said', subreddit: 'UkrainianConflict' }, 'Target'), false);
+  assert.equal(namedAsEmployer({ title: 'Jets rejected trade offer from team Connor Hellebuyck wanted to play for — Read more: Connor Hellebuyck was the first target', subreddit: 'hockeynews' }, 'Target'), false);
+  assert.equal(namedAsEmployer({ title: 'In London, an east Asian couple participating in a harmless street interview suddenly became the target of a public humiliation', subreddit: 'TikTokCringe' }, 'Target'), false);
+  assert.equal(namedAsEmployer({ title: 'Zelenskyy is right — Russia uses satellites to help Iran target US forces', _body: 'strikes landed 1 hr later, the recruiter of militias said', subreddit: 'UkrainianConflict' }, 'Target'), false);
   // r/jobsearchhacks is a career sub, and "target salary" still is not the employer.
-  assert.equal(isRelevant({ title: 'Stop giving recruiters your target salary on phone screens. Use this exact phrase instead.', subreddit: 'jobsearchhacks' }, 'Target'), false);
-  assert.equal(isRelevant({ title: 'Mind the gap — London tube etiquette', subreddit: 'london' }, 'Gap'), false);
-  assert.equal(isRelevant({ title: 'Best apple pie recipe? I applied the glaze twice', subreddit: 'Baking' }, 'Apple'), false);
+  assert.equal(namedAsEmployer({ title: 'Stop giving recruiters your target salary on phone screens. Use this exact phrase instead.', subreddit: 'jobsearchhacks' }, 'Target'), false);
+  assert.equal(namedAsEmployer({ title: 'Mind the gap — London tube etiquette', subreddit: 'london' }, 'Gap'), false);
+  assert.equal(namedAsEmployer({ title: 'Best apple pie recipe? I applied the glaze twice', subreddit: 'Baking' }, 'Apple'), false);
 });
 
 test('the same brands count when used as the employer in a hiring sentence', () => {
-  assert.equal(isRelevant({ title: 'Applied to Target, interviewed, then ghosted', subreddit: 'recruitinghell' }, 'Target'), true);
-  assert.equal(isRelevant({ title: 'target ghosted me after my interview', subreddit: 'jobs' }, 'Target'), true);
-  assert.equal(isRelevant({ title: "Target's hiring process for seasonal — how long after the interview?", subreddit: 'AskReddit' }, 'Target'), true);
-  assert.equal(isRelevant({ title: 'Got an offer from Gap as a sales associate', subreddit: 'jobs' }, 'Gap'), true);
+  assert.equal(namedAsEmployer({ title: 'Applied to Target, interviewed, then ghosted', subreddit: 'recruitinghell' }, 'Target'), true);
+  assert.equal(namedAsEmployer({ title: 'target ghosted me after my interview', subreddit: 'jobs' }, 'Target'), true);
+  assert.equal(namedAsEmployer({ title: "Target's hiring process for seasonal — how long after the interview?", subreddit: 'AskReddit' }, 'Target'), true);
+  assert.equal(namedAsEmployer({ title: 'Got an offer from Gap as a sales associate', subreddit: 'jobs' }, 'Gap'), true);
   // The company's own subreddit is the context even when the name is not repeated.
-  assert.equal(isRelevant({ title: 'Interview tomorrow at the DC, any tips?', subreddit: 'Target' }, 'Target'), true);
-  assert.equal(isRelevant({ title: 'Is the new store policy annoying anyone else?', subreddit: 'Target' }, 'Target'), false);
+  assert.equal(namedAsEmployer({ title: 'Interview tomorrow at the DC, any tips?', subreddit: 'Target' }, 'Target'), true);
+  assert.equal(namedAsEmployer({ title: 'Is the new store policy annoying anyone else?', subreddit: 'Target' }, 'Target'), false);
 });
 
 test('a hiring word in a different sentence from the name does not make a thread about hiring', () => {
-  assert.equal(isRelevant({ title: 'Walmart restock: PS5 back in stock', _body: 'in stock now at my local store', subreddit: 'PS5' }, 'Walmart'), false);
+  assert.equal(namedAsEmployer({ title: 'Walmart restock: PS5 back in stock', _body: 'in stock now at my local store', subreddit: 'PS5' }, 'Walmart'), false);
   // …but a thread titled after the company whose post is about hiring is about hiring there.
-  assert.equal(isRelevant({ title: 'thoughts on Walmart?', _body: 'the interview went well but no word since', subreddit: 'z' }, 'Walmart'), true);
-  assert.equal(isRelevant({ title: 'Ghosted by Walmart after 4 interview rounds', subreddit: 'recruitinghell' }, 'Walmart'), true);
+  assert.equal(namedAsEmployer({ title: 'thoughts on Walmart?', _body: 'the interview went well but no word since', subreddit: 'z' }, 'Walmart'), true);
+  assert.equal(namedAsEmployer({ title: 'Ghosted by Walmart after 4 interview rounds', subreddit: 'recruitinghell' }, 'Walmart'), true);
   // "1 hr" is not human resources.
-  assert.equal(isRelevant({ title: 'Walmart checkout took 1 hr today', subreddit: 'mildlyinfuriating' }, 'Walmart'), false);
+  assert.equal(namedAsEmployer({ title: 'Walmart checkout took 1 hr today', subreddit: 'mildlyinfuriating' }, 'Walmart'), false);
 });
 
 test('employerUsage: preposition before, employer noun after, or a mid-sentence proper noun', () => {
@@ -304,4 +305,39 @@ test('showableItems hides a lone thread; refilterCached re-judges items stored u
   // rankAndFilter stamps the rule version so the next read trusts the row.
   const ranked = rankAndFilter([{ id: '1', permalink: 'https://www.reddit.com/r/jobs/comments/1/a/', title: 'Target ghosted me after my interview', subreddit: 'jobs', _body: '' }], 'Target');
   assert.equal(ranked[0].v, ITEM_RULES_VERSION);
+});
+
+// ── First-hand gate (owner 2026-10-24: a thread shows only when the poster gives a first-hand applicant
+// account under the strict rules; news about the company never shows). Every NO below was on seenjobs.io.
+test('threads that are news about the company, or not the poster’s own applicant account, are never shown', () => {
+  // /company/walmart (2026-10-24): 2 of 5 "Reddit discussion" threads were not applicant experiences.
+  assert.equal(isRelevant({ title: 'HEB hires exec that was fired from Walmart for taking H1B kickbacks', _body: '', subreddit: 'walmart' }, 'Walmart'), false);
+  assert.equal(isNewsThread({ title: 'HEB hires exec that was fired from Walmart for taking H1B kickbacks' }), true);
+  assert.equal(isRelevant({ title: 'If I hired on at Walmart and spent my entire shift hiding in the bathroom, how long until I got fired?', _body: 'asking for a friend', subreddit: 'walmart' }, 'Walmart'), false);
+  // /company/amazon: 3 of 6 threads were recruiter layoffs and RTO news.
+  assert.equal(isRelevant({ title: 'Amazon lays off hundreds of recruiters as hiring slows', _body: 'The company confirmed the layoffs on Tuesday.', subreddit: 'recruitinghell' }, 'Amazon'), false);
+  assert.equal(isRelevant({ title: 'Amazon RTO: 5 days in office starting January', _body: 'Andy Jassy announced the return to office mandate.', subreddit: 'cscareerquestions' }, 'Amazon'), false);
+  assert.equal(isRelevant({ title: 'Amazon recruiter layoffs — what it means for interviews', _body: '', subreddit: 'leetcode' }, 'Amazon'), false);
+  // Questions and advice are discussion, not an account; a reply about someone else is not the poster's.
+  assert.equal(isRelevant({ title: 'Walmart interview tomorrow at the DC, any tips?', _body: '', subreddit: 'walmart' }, 'Walmart'), false);
+  assert.equal(isRelevant({ title: 'Does Walmart hire felons?', _body: 'Based off your post history, you’re a rehire. If you were hired previously with that record, I don’t see it being an issue this time.', subreddit: 'walmart' }, 'Walmart'), false);
+  // A link or bot notice in the opening post disqualifies it.
+  assert.equal(firstHandApplicantThread({ title: 'Walmart hired me', _body: 'Walmart hired me last week, full write-up at https://example.com/blog', subreddit: 'jobs' }, 'Walmart'), false);
+});
+
+test('first-hand applicant accounts show: the opening post judged with its title, or a first-person title', () => {
+  assert.equal(isRelevant({ title: 'Ghosted by Walmart after 4 interview rounds', _body: '', subreddit: 'recruitinghell' }, 'Walmart'), true);
+  assert.equal(isRelevant({ title: 'thoughts on Walmart?', _body: 'I applied to Walmart last week and they ghosted me after the interview.', subreddit: 'z' }, 'Walmart'), true);
+  assert.equal(isRelevant({ title: 'Got an offer from Gap as a sales associate', _body: '', subreddit: 'jobs' }, 'Gap'), true);
+  assert.equal(isRelevant({ title: 'target ghosted me after my interview', _body: '', subreddit: 'jobs' }, 'Target'), true);
+  // In the company's own subreddit the company is the context even when the post does not repeat it.
+  assert.equal(isRelevant({ title: 'Finally heard back', _body: 'I applied for the overnight stocker position and just got hired, orientation Monday!', subreddit: 'walmart' }, 'Walmart'), true);
+  assert.equal(firstHandApplicantThread({ title: 'Walmart interview tomorrow at the DC, any tips?', _body: '', subreddit: 'walmart' }, 'Walmart'), false);
+  // Cached rows (title + subreddit only) written under rule 2 are re-judged under rule 3.
+  assert.equal(ITEM_RULES_VERSION, 3);
+  const cached = [
+    { id: 'a', title: 'HEB hires exec that was fired from Walmart for taking H1B kickbacks', subreddit: 'walmart', v: 2 },
+    { id: 'b', title: 'Ghosted by Walmart after 4 interview rounds', subreddit: 'recruitinghell', v: 2 },
+  ];
+  assert.deepEqual(refilterCached(cached, 'Walmart').map((i) => i.id), ['b']);
 });
