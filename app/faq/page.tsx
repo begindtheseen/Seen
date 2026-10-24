@@ -48,7 +48,7 @@ export default function FAQPage() {
       items: [
         {
           q: 'How are transparency scores calculated?',
-          a: 'Scores start at a neutral 50, then add response rate (×40), subtract ghost rate (×30) and average wait (up to −15), and add a small log-scale bonus for the trust-weighted volume of evidence (capped at +10). Reports submitted to Seen count fully; public review-site and discussion accounts count at reduced weight; admin-confirmed dead listings apply a bounded penalty. No company is graded until it has at least one report submitted to Seen and five pieces of evidence in total (an online mention counts as half). 70+ is Safe, 40–69 is Caution, below 40 is Danger. All scores are expressions of aggregated applicant claims, not verified facts.',
+          a: 'Scores start at a neutral 50, then add response rate (×40), subtract ghost rate (×30) and average wait (up to −15), and add a small log-scale bonus for the trust-weighted volume of evidence (capped at +10). Reports submitted to Seen count fully; public review-site and discussion accounts count at reduced weight; admin-confirmed dead listings apply a bounded penalty. No company is graded until it has at least one real applicant report (sent to Seen or posted publicly) and five pieces of evidence in total (an online mention counts as half). 70+ is Safe, 40–69 is Caution, below 40 is Danger. All scores are expressions of aggregated applicant claims, not verified facts.',
         },
         {
           q: 'What are ghost surge alerts?',
