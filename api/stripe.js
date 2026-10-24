@@ -3,7 +3,7 @@
 //                   STRIPE_WEBHOOK_SECRET, SUPABASE_URL, SUPABASE_SERVICE_KEY, SUPABASE_JWT_SECRET
 
 import { createHmac, timingSafeEqual } from 'crypto';
-import { ONE_TIME_SKUS, PRO_TRIAL_DAYS } from '../lib/server/creditRules.js';
+import { ONE_TIME_SKUS, PRO_TRIAL_DAYS, firstCreditsRow } from '../lib/server/creditRules.js';
 import { internalPath } from '../lib/safeHref.js';
 import { fulfillOneTimeCheckout } from '../lib/server/stripeFulfillment.js';
 import { EMPLOYER_SKUS } from '../lib/server/employerSkus.js';
@@ -92,7 +92,9 @@ async function setPro(uid, isPro, env) {
   if (patch.status !== 200 && patch.status !== 204) {
     await q('ai_credits', {
       method: 'POST', headers: { Prefer: 'return=minimal' },
-      body: JSON.stringify({ user_id: uid, balance: isPro ? 999 : 3, pro: isPro, daily_earned: 0, last_reset: today }),
+      // A missing row for a non-Pro user is a first credit event like any other: the welcome row
+      // (lib/server/creditRules.js firstCreditsRow), not a hand-typed balance.
+      body: JSON.stringify(isPro ? { user_id: uid, balance: 999, pro: true, daily_earned: 0, last_reset: today } : { user_id: uid, ...firstCreditsRow(today) }),
     });
   }
 }

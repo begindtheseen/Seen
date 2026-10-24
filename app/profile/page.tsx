@@ -292,8 +292,8 @@ export default function ProfilePage() {
   }
 
   // Runs after the typed DELETE confirmation (components/profile/DeleteAccountDialog). The handler
-  // (api/user-sync.js delete_account) removes every row keyed to the user and the auth user; it does
-  // NOT cancel a Stripe subscription, which is why the dialog refuses while one is live.
+  // (api/user-sync.js delete_account) first cancels any live Stripe subscription (and deletes nothing if
+  // it cannot), then removes every row keyed to the user and the auth user.
   async function deleteAccount() {
     setDeleting(true)
     try {
@@ -573,7 +573,6 @@ export default function ProfilePage() {
                 subscription={isPro && sub ? { status: sub.status, cancel_at_period_end: sub.cancel_at_period_end } : null}
                 onConfirm={deleteAccount}
                 onClose={() => { if (!deleting) setConfirmDelete(false) }}
-                onManageBilling={() => { setConfirmDelete(false); document.getElementById('plan')?.scrollIntoView({ behavior: 'smooth', block: 'start' }) }}
               />
             )}
           </div>

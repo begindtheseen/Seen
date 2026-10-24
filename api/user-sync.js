@@ -9,7 +9,10 @@ import { buildOpportunities } from './_utils/opportunityEngine.js';
 import { extractEmployment } from '../lib/server/resumeAnalysis.js';
 import { buildResumeSurvey, RESUME_SURVEY_KEYS, mapAnswersToReport } from './_utils/resumeSurvey.js';
 import { normalizeCompany, isValidCompanyName, resolveOrCreateCompany, assessSubmitTrust, writeReport, recomputeCompanyScoreFromReports } from './_utils/reportWrite.js';
-import { WELCOME_CREDITS, FREE_DAILY_CREDITS, PRO_DAILY_CREDITS, RESUME_OPTIMIZE_COST, RESUME_SURVEY_AWARD, TRACK_APPLICATION_AWARD, MAX_DAILY_EARN, MAX_FREE_BALANCE, hasProAccess, creditBalance } from '../lib/server/creditRules.js';
+import { WELCOME_CREDITS, FREE_DAILY_CREDITS, PRO_DAILY_CREDITS, RESUME_OPTIMIZE_COST, RESUME_SURVEY_AWARD, TRACK_APPLICATION_AWARD, MAX_DAILY_EARN, hasProAccess, creditBalance, earnedBalance } from '../lib/server/creditRules.js';
+import { ensureCreditsRow } from '../lib/server/ensureCreditsRow.js';
+import { firstCreditsRow as firstCreditsRowFallback } from '../lib/server/creditRules.js';
+import { cancelLiveSubscriptions } from '../lib/server/stripeCancel.js';
 import { normalizeClaimCompany } from '../lib/server/employerClaims.js';
 import { buildNotificationRow } from '../lib/server/employerNotificationsStore.js';
 import { isReadableResume } from '../lib/server/resumeReadability.js';
@@ -391,6 +394,24 @@ export default async function handler(req, res) {
 
   // ── DELETE ACCOUNT ──────────────────────────────────────────────────────────
   if (action === 'delete_account') {
+    // Billing first: a deleted Seen account must never keep billing. Read the Stripe customer BEFORE the
+    // rows go (it lives on ai_credits) and cancel every live subscription immediately
+    // (lib/server/stripeCancel.js). If that cannot be confirmed — the read fails, the Stripe key is
+    // missing, or a cancel is refused — nothing is deleted and the user is told so.
+    const billingRes = await db(`ai_credits?user_id=eq.${uid}&select=stripe_customer_id&limit=1`).catch(() => null);
+    if (!billingRes || !billingRes.ok) {
+      return res.status(503).json({ error: 'We could not check your billing, so nothing was deleted. Try again in a minute.' });
+    }
+    const stripeCustomerId = (await billingRes.json().catch(() => []))?.[0]?.stripe_customer_id || null;
+    if (stripeCustomerId) {
+      const cancel = await cancelLiveSubscriptions({ customerId: stripeCustomerId, stripeKey: process.env.STRIPE_SECRET_KEY });
+      if (!cancel.ok) {
+        console.error('[user-sync] delete_account: Stripe cancel failed:', cancel.error);
+        return res.status(502).json({ error: 'We could not cancel your Seen Pro subscription, so nothing was deleted. Try again or email hello@seenjobs.io.' });
+      }
+      if (cancel.cancelled.length) console.log(`[user-sync] delete_account: cancelled ${cancel.cancelled.length} subscription(s)`);
+    }
+
     // GDPR Art.17 (right to erasure): remove every row keyed to this user before deleting
     // the auth record — previously only applications + profile were cleared, orphaning
     // credits, events, resume data, saved jobs, etc. Best-effort per table (a missing
@@ -633,15 +654,11 @@ export default async function handler(req, res) {
     const cRes = await db(`ai_credits?user_id=eq.${uid}&limit=1`);
     let cred = cRes.ok ? (await cRes.json())[0] : null;
     if (hasProAccess(cred)) return res.status(200).json({ ok: false, reason: 'pro' });
-    // A brand-new user has no ai_credits row yet — create one (like submit_answer does)
-    // so their FIRST tracked application still earns. Refusing here was a silent dead end.
+    // A brand-new user has no ai_credits row yet — create it WITH the welcome bonus (the same row an
+    // AI action creates; lib/server/ensureCreditsRow.js) so their FIRST tracked application still earns
+    // and the "10" their chip showed is not taken away.
     if (!cred) {
-      const ins = await db('ai_credits?on_conflict=user_id', {
-        method: 'POST',
-        body: JSON.stringify({ user_id: uid, balance: FREE_DAILY_CREDITS, pro: false, daily_earned: 0, last_reset: today }),
-        headers: { Prefer: 'resolution=merge-duplicates,return=representation' },
-      });
-      cred = ins.ok ? (await ins.json())[0] : null;
+      cred = await ensureCreditsRow(db, uid, today);
       if (!cred) return res.status(200).json({ ok: false, reason: 'no_row' });
     }
 
@@ -668,10 +685,12 @@ export default async function handler(req, res) {
 
     // Daily reset baseline is FREE_DAILY_CREDITS (code resets daily; DB DEFAULT stays 1 per migration 031).
     const baseBalance = resetToday ? FREE_DAILY_CREDITS : (cred.balance || 0);
-    const newBalance = Math.min(baseBalance + TRACK_APPLICATION_AWARD, MAX_FREE_BALANCE);
-    const newEarned = dailyEarned + TRACK_APPLICATION_AWARD;
+    // Earning never lowers a balance (a welcome balance above the free cap stays as it is).
+    const { balance: newBalance, gained } = earnedBalance(baseBalance, TRACK_APPLICATION_AWARD);
+    if (gained <= 0) return res.status(200).json({ ok: false, reason: 'balance_cap', balance: creditBalance(cred) });
+    const newEarned = dailyEarned + gained;
     await db(`ai_credits?user_id=eq.${uid}`, { method: 'PATCH', body: JSON.stringify({ balance: newBalance, daily_earned: newEarned, ...(resetToday ? { last_reset: today } : {}) }), headers: { Prefer: 'return=minimal' } });
-    await db('credit_transactions', { method: 'POST', body: JSON.stringify({ user_id: uid, delta: 1, reason: 'track_application', metadata: { jid: jid || null } }), headers: { Prefer: 'return=minimal' } });
+    await db('credit_transactions', { method: 'POST', body: JSON.stringify({ user_id: uid, delta: gained, reason: 'track_application', metadata: { jid: jid || null } }), headers: { Prefer: 'return=minimal' } });
     return res.status(200).json({ ok: true, balance: newBalance + Math.max(0, cred.purchased_credits || 0), earned: true });
   }
 
@@ -754,7 +773,8 @@ export default async function handler(req, res) {
     // Check daily earn cap
     const cRes = await db(`ai_credits?user_id=eq.${uid}&limit=1`);
     let cred = cRes.ok ? (await cRes.json())[0] : null;
-    if (!cred) { await db('ai_credits', { method: 'POST', body: JSON.stringify({ user_id: uid, balance: FREE_DAILY_CREDITS, daily_earned: 0, last_reset: today, pro: false }), headers: { Prefer: 'return=minimal' } }); cred = { balance: FREE_DAILY_CREDITS, daily_earned: 0, last_reset: today, pro: false }; }
+    if (!cred) cred = await ensureCreditsRow(db, uid, today); // the welcome row, like every other first credit event
+    if (!cred) return res.status(503).json({ error: 'credits_unavailable' });
     const isPro = hasProAccess(cred);
     const resetToday = cred.last_reset !== today;
     const dailyEarned = resetToday ? 0 : (cred.daily_earned || 0);
@@ -769,11 +789,15 @@ export default async function handler(req, res) {
     // DEFAULT stays 1 per migration 031). The response must report the SAME number we persist —
     // the old code PATCHed one balance but told the client another, so the modal and the Nav
     // chip showed different balances at the same time.
-    const newBalance = isPro ? PRO_DAILY_CREDITS : Math.min((resetToday ? FREE_DAILY_CREDITS : (cred.balance || 0)) + TRACK_APPLICATION_AWARD, MAX_FREE_BALANCE);
-    const newEarned = resetToday ? TRACK_APPLICATION_AWARD : dailyEarned + TRACK_APPLICATION_AWARD;
-    const patch = isPro ? {} : { balance: newBalance, daily_earned: newEarned, ...(resetToday ? { last_reset: today } : {}) };
+    // Earning never lowers a balance: an account still holding its welcome balance above the free cap
+    // keeps it, and the answer is recorded without a credit (credited:false, the modal shows no "+1").
+    const earned = isPro ? { balance: PRO_DAILY_CREDITS, gained: 0 } : earnedBalance(resetToday ? FREE_DAILY_CREDITS : (cred.balance || 0), TRACK_APPLICATION_AWARD);
+    const newBalance = earned.balance;
+    const credited = !isPro && earned.gained > 0;
+    const newEarned = credited ? (resetToday ? earned.gained : dailyEarned + earned.gained) : dailyEarned;
+    const patch = credited ? { balance: newBalance, daily_earned: newEarned, ...(resetToday ? { last_reset: today } : {}) } : {};
     if (Object.keys(patch).length) await db(`ai_credits?user_id=eq.${uid}`, { method: 'PATCH', body: JSON.stringify(patch), headers: { Prefer: 'return=minimal' } });
-    await db('credit_transactions', { method: 'POST', body: JSON.stringify({ user_id: uid, delta: 1, reason: 'earned_question', metadata: { question_key, answer } }), headers: { Prefer: 'return=minimal' } });
+    if (credited) await db('credit_transactions', { method: 'POST', body: JSON.stringify({ user_id: uid, delta: earned.gained, reason: 'earned_question', metadata: { question_key, answer } }), headers: { Prefer: 'return=minimal' } });
 
     // Feed answer back into company intelligence (best-effort)
     const [qtype, company] = question_key.split('|');
@@ -786,7 +810,7 @@ export default async function handler(req, res) {
       }
     }
 
-    return res.status(200).json({ ok: true, balance: isPro ? newBalance : newBalance + Math.max(0, cred.purchased_credits || 0), earned_today: newEarned });
+    return res.status(200).json({ ok: true, credited, balance: isPro ? newBalance : newBalance + Math.max(0, cred.purchased_credits || 0), earned_today: newEarned });
   }
 
   // ── CREDIT HISTORY ────────────────────────────────────────────────────────────
@@ -1136,10 +1160,10 @@ export default async function handler(req, res) {
     const AWARD = RESUME_SURVEY_AWARD;
     const cRes = await db(`ai_credits?user_id=eq.${uid}&limit=1`);
     let cr = cRes.ok ? (await cRes.json())[0] : null;
-    if (!cr) {
-      await db('ai_credits', { method: 'POST', body: JSON.stringify({ user_id: uid, balance: AWARD, daily_earned: AWARD, last_reset: today, pro: false }), headers: { Prefer: 'return=minimal' } });
-      cr = { balance: AWARD, daily_earned: AWARD, last_reset: today, pro: false };
-    }
+    // A first-ever credit event creates the welcome row (lib/server/ensureCreditsRow.js); the award
+    // below then runs ONCE. The old inline insert wrote balance=AWARD, daily_earned=AWARD and the code
+    // below added AWARD again — a new user got the survey award twice and no welcome bonus.
+    if (!cr) cr = (await ensureCreditsRow(db, uid, today)) || firstCreditsRowFallback(today);
     let awarded = 0;
     let balance = creditBalance(cr);
     if (hasProAccess(cr)) {
