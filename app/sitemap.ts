@@ -1,5 +1,6 @@
 import type { MetadataRoute } from 'next'
 import { SEED_COMPANIES, slugify as growthSlugify } from '@/lib/growth'
+import { fetchAllCompanyNames } from '@/lib/server/sitemapCompanies.js'
 
 // Dynamic sitemap: static routes + every scored company page + the seeded growth surfaces
 // (FAQ long-tail, compare, reddit). Refreshes hourly so newly scored companies get indexed.
@@ -8,22 +9,9 @@ export const revalidate = 3600
 
 const BASE = 'https://seenjobs.io'
 
+// Every scored company, read past PostgREST's 1,000-row cap (lib/server/sitemapCompanies.js).
 async function getCompanyNames(): Promise<string[]> {
-  const url = process.env.SUPABASE_URL
-  const key = process.env.SUPABASE_SERVICE_KEY
-  if (!url || !key) return []
-  try {
-    const r = await fetch(
-      `${url}/rest/v1/company_scores?select=company_name&order=report_count.desc&limit=10000`,
-      // AbortSignal.timeout so build-time sitemap generation can never hang on a slow Supabase.
-      { headers: { apikey: key, Authorization: `Bearer ${key}` }, next: { revalidate: 3600 }, signal: AbortSignal.timeout(8000) }
-    )
-    if (!r.ok) return []
-    const rows = await r.json()
-    return (Array.isArray(rows) ? rows : []).map((x: { company_name: string }) => x.company_name).filter(Boolean)
-  } catch {
-    return []
-  }
+  return fetchAllCompanyNames({ url: process.env.SUPABASE_URL, key: process.env.SUPABASE_SERVICE_KEY })
 }
 
 const slugify = (name: string) => encodeURIComponent(name.toLowerCase().trim().replace(/\s+/g, '-'))
