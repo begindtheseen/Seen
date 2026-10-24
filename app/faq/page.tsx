@@ -3,6 +3,7 @@ import type { Metadata } from 'next'
 import Link from 'next/link'
 import PageHeader from '@/components/shell/PageHeader'
 import { pageMetadata } from '@/lib/seo'
+import { REPORT_REWARD_PRO_DAYS, REPORT_REWARD_MONTHLY_CAP_DAYS, REPORT_REWARD_MIN_TRACKED_DAYS, REFERRAL_REWARD_PRO_DAYS, REFERRAL_MAX_REWARDED, REFERRAL_CLAIM_WINDOW_DAYS, dayWord, proDaysLabel } from '@/lib/server/creditRules.js'
 
 export const metadata: Metadata = pageMetadata({
   title: 'FAQ — How Seen Works, What It Costs, Where the Data Comes From',
@@ -26,7 +27,7 @@ export default function FAQPage() {
         },
         {
           q: 'Is Seen free for job seekers?',
-          a: 'Yes. Seen is completely free for job seekers and always will be. The core tools — company scores, ghost rates, community feed, job search, and basic tracker — are free forever. Pro is an optional upgrade for unlimited AI credits and deeper company analysis.',
+          a: 'Yes. Seen is completely free for job seekers and always will be. The core tools — company scores, ghost rates, community feed, job search, and basic tracker — are free forever. Pro is an optional upgrade for unlimited AI credits and deeper company analysis. You can also earn Pro time for free by reporting outcomes from your tracker and by inviting friends.',
         },
         {
           q: 'How is Seen different from Glassdoor or Indeed?',
@@ -81,6 +82,14 @@ export default function FAQPage() {
         {
           q: 'Why does submitting reports matter?',
           a: 'Every report that passes the anti-gaming checks updates the company\'s score, ghost rate and response rate as soon as it is saved. A report you submit today helps the next person who checks that company decide whether to apply. The more reports a company has, the more reliable its score becomes. It takes 60 seconds.',
+        },
+        {
+          q: 'Do I get anything for reporting an outcome?',
+          a: `Yes. When you report what happened with an application on your tracker (ghosted, rejected, an interview, an offer), you get ${proDaysLabel(REPORT_REWARD_PRO_DAYS)}. It is the same for every outcome, so the reward never pushes anyone toward one answer. It counts once per application, only when the application has been on your tracker for at least ${dayWord(REPORT_REWARD_MIN_TRACKED_DAYS)}, and up to ${dayWord(REPORT_REWARD_MONTHLY_CAP_DAYS)} a month (California time). Rewards never change how a report is weighted or how a company is graded. Days are added after any Pro time you already have.`,
+        },
+        {
+          q: 'How do invites work?',
+          a: `Your invite link is on your dashboard and in Settings. When a friend signs up with it and tracks their first application, you both get ${proDaysLabel(REFERRAL_REWARD_PRO_DAYS)}. You are rewarded for up to ${REFERRAL_MAX_REWARDED} friends; after that your friends still get their days. A link only counts for a new account, within ${dayWord(REFERRAL_CLAIM_WINDOW_DAYS)} of signing up, and never for your own account. Earned Pro time ends on its own: nothing renews and nothing is charged.`,
         },
         {
           q: 'Can I edit or delete my report?',

@@ -1,7 +1,7 @@
 import type { Metadata } from 'next'
 import { pageMetadata } from '@/lib/seo'
 import Link from 'next/link'
-import { PRO_TRIAL_DAYS, ONE_TIME_SKUS } from '@/lib/server/creditRules.js'
+import { PRO_TRIAL_DAYS, ONE_TIME_SKUS, REPORT_REWARD_PRO_DAYS, REPORT_REWARD_MONTHLY_CAP_DAYS, REPORT_REWARD_MIN_TRACKED_DAYS, REFERRAL_REWARD_PRO_DAYS, REFERRAL_MAX_REWARDED, REFERRAL_CLAIM_WINDOW_DAYS } from '@/lib/server/creditRules.js'
 import { EMPLOYER_SKUS } from '@/lib/server/employerSkus.js'
 import { proPriceLine } from '@/lib/pricing'
 import { DraftNote, Placeholder, LegalFooter, LEGAL_CONTACT } from '@/components/legal/LegalBits'
@@ -186,6 +186,26 @@ export default function TermsPage() {
             <li style={li}>a purchased Pro period ends on its last day with no renewal and no charge;</li>
             <li style={li}>deleting your account removes any remaining purchased credits and unused Pro time, and those are not refunded; it also cancels an active Seen Pro subscription immediately, with no refund for the rest of the current period and no further charges;</li>
             <li style={li}>one-time charges are generally non-refundable except where required by law.</li>
+          </ul>
+        </div>
+
+        <div style={section} id="earned-pro">
+          <h2 style={h2}>9a. Earned Pro time</h2>
+          <p style={p}>
+            You can earn Seen Pro time without paying. Reporting the outcome of an application you tracked on
+            Seen earns {REPORT_REWARD_PRO_DAYS} days of Pro, once per application, when the application was
+            on your tracker for at least {REPORT_REWARD_MIN_TRACKED_DAYS} days before the report, up to{' '}
+            {REPORT_REWARD_MONTHLY_CAP_DAYS} days per calendar month (Pacific time). The reward is the same
+            whatever the outcome. When a new account signs up with your invite link and tracks its first
+            application, both accounts earn {REFERRAL_REWARD_PRO_DAYS} days of Pro; an account is rewarded
+            as a referrer for at most {REFERRAL_MAX_REWARDED} invitees, and a link counts only for an account
+            created after the link and within {REFERRAL_CLAIM_WINDOW_DAYS} days of signing up.
+          </p>
+          <ul style={{ margin: '0 0 .9rem', paddingLeft: '1.1rem' }}>
+            <li style={li}>earned Pro time is added after any Pro time you already have, ends on its last day, never renews and is never charged;</li>
+            <li style={li}>rewards never affect how a report is weighted or any score, grade or ranking;</li>
+            <li style={li}>reports must describe what really happened, and invites must be real people; we may withhold or remove earned time gained through fake applications, fake accounts, self-referral or other abuse, and every grant is logged so it can be reviewed;</li>
+            <li style={li}>earned Pro time has no cash value and is removed if you delete your account.</li>
           </ul>
         </div>
 
