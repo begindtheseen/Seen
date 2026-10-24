@@ -126,7 +126,7 @@ test('C3: the free diagnosis has none of the paid fields; the paid package is a 
   assert.equal(paid.body.verdict.sentence, free.body.verdict.sentence, 'one verdict on both surfaces');
   for (const f of ['rewrite_plan', 'reorder', 'questions', 'availability', 'summary', 'optimized_bullets', 'application_message']) assert.ok(f in paid.body, `paid response lacks ${f}`);
   // the availability line is built from the posting's schedule and must be confirmed
-  assert.match(paid.body.availability.text, /^Availability: .*weekends/);
+  assert.match(paid.body.availability.text, /^Available: .*weekends/);
   assert.equal(paid.body.availability.needs_confirmation, true);
   // every rewrite proposal is grounded and off by default
   for (const r of paid.body.rewrite_plan) assert.equal(r.accepted, false);
