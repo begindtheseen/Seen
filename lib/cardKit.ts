@@ -62,6 +62,8 @@ export interface CompanyCardData {
   risk?: Risk
   /** ISO timestamp of the last (re)compute, printed as "updated Oct 19, 2026" (California time). */
   updatedAt?: string | null
+  /** The page's confidence word ("High confidence" …, lib/companyPageSummary.ts). Printed as given; the card never derives one from the row count. */
+  confidence?: string
 }
 
 // ── Frame ──────────────────────────────────────────────────────────────────────────────────
@@ -432,7 +434,7 @@ export function drawCompanyCard(canvas: HTMLCanvasElement, d: CompanyCardData, f
   const updated = d.updatedAt ? formatPacific(new Date(d.updatedAt), { dateStyle: 'medium' }) : ''
   const updatedMs = d.updatedAt ? new Date(d.updatedAt).getTime() : NaN
   const meta = ['SEEN GRADE', metaLine(updatedMs, '')].filter(Boolean).join(' · ')
-  const conf = confidenceLine(d.report_count, updated)
+  const conf = (d.confidence ? `${d.confidence} · ` : '') + confidenceLine(d.report_count, updated)
 
   if (!f.story) {
     paintBg(c, f, accent, { x: f.W * 0.8, y: 420, r: 640, a: A.bloom })

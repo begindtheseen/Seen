@@ -17,7 +17,10 @@ import Odometer from '@/components/motion/Odometer'
 import { isGradeableScore, notEnoughReviewsLabel, gradeBasisLabel, MIN_REPORTS_FOR_GRADE } from '@/lib/gradeGate'
 import { Crumbs } from '@/components/shell/PageHeader'
 import ListingSignals from '@/components/ListingSignals'
-import { gradeLetter, displayCompanyName, isResolvedOutcome, lastUpdatedLabel } from '@/lib/companyDisplay'
+import { gradeLetter, displayCompanyName, displayPlatform, isResolvedOutcome, lastUpdatedLabel } from '@/lib/companyDisplay'
+import { buildCompanySummary, publicRowsHeading, reportsProvenanceLine, reportsSectionSummary, MIN_REPORTS_FOR_RATES, type CompanySummary } from '@/lib/companyPageSummary'
+import { feedRowVerdict } from '@/lib/reports/feedFilter.js'
+import { looksLikeBotOrLinkText, trimToSentence } from '@/lib/reports/excerptText.js'
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -61,6 +64,8 @@ interface Report {
   location?: string
   city?: string
   platform?: string
+  trust_reason?: string | null
+  company_name?: string
 }
 
 interface WebReview {
@@ -73,6 +78,10 @@ interface WebReview {
 }
 
 type SectionKey = 'odds' | 'breakdown' | 'reports' | 'online' | 'reddit' | 'locations' | 'roles' | 'compare' | 'about'
+
+// Reddit "still checking" polling: 5 asks 4 s apart ≈ 20 s, then the section hides itself.
+const REDDIT_POLL_MS = 4000
+const REDDIT_POLL_ATTEMPTS = 5
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
@@ -126,39 +135,24 @@ function BarRow({ label, value, color }: { label: string; value: number; color: 
   )
 }
 
-// Every kind of evidence behind the grade, so the count matches the math: applicant reports (rates),
-// employee reviews (their letter grades adjust the score) and online mentions (½ a report each).
-function evidenceLine(reportCount: number, employeeCount = 0, mentionCount = 0): string {
-  const parts = [`${reportCount} applicant report${reportCount === 1 ? '' : 's'}`]
-  if (employeeCount > 0) parts.push(`${employeeCount} employee review${employeeCount === 1 ? '' : 's'}`)
-  if (mentionCount > 0) parts.push(`${mentionCount} online mention${mentionCount === 1 ? '' : 's'}`)
-  return parts.join(' · ')
-}
-
-function DataQualityBadge({ dq, reportCount, webCount = 0, employeeCount = 0, mentionCount = 0 }: { dq: string; reportCount: number; webCount?: number; employeeCount?: number; mentionCount?: number }) {
-  // reportCount here is FIRST-PARTY applicant reports only. With zero first-party rows the
-  // score is a web-research estimate — say exactly that; never mint "High confidence · N
-  // reports" from the LLM's claimed mention count (that number looked fake because it was).
-  if (reportCount === 0) {
+// The ONE confidence label (lib/companyPageSummary.ts): from the stored data_quality, with every kind of
+// evidence behind the grade. The share card prints the same word (Target's card said "High" under a
+// "Moderate" hero because it counted rows on its own — audit 2026-10-23).
+function ConfidenceBadge({ sum, webCount }: { sum: CompanySummary; webCount: number }) {
+  // With zero first-party rows the score is a web-research estimate — say exactly that; never mint
+  // "High confidence · N reports" from the LLM's claimed mention count (that number looked fake because it was).
+  if (sum.applicantReports === 0) {
     return (
       <span className="co-dq" style={{ color: 'var(--amber)' }}>
         🌐 {webCount > 0 ? 'Web-research estimate — no first-party reports yet' : 'Estimated'}
       </span>
     )
   }
-  const n = evidenceLine(reportCount, employeeCount, mentionCount)
-  const map: Record<string, { emoji: string; label: string; color: string }> = {
-    strong:   { emoji: '🟢', label: `High confidence · ${n}`,     color: 'var(--green)' },
-    moderate: { emoji: '🟡', label: `Moderate confidence · ${n}`, color: 'var(--amber)' },
-    limited:  { emoji: '🟡', label: `Low confidence · ${n}`,      color: 'var(--amber)' },
-    medium:   { emoji: '🟡', label: `Moderate confidence · ${n}`, color: 'var(--amber)' },
-    low:      { emoji: '🔴', label: `Low confidence · ${n}`,      color: 'var(--red)'   },
-    high:     { emoji: '🟢', label: `High confidence · ${n}`,     color: 'var(--green)' },
-  }
-  const info = map[dq] || { emoji: '🔴', label: 'Estimated', color: 'var(--red)' }
+  if (!sum.confidence) return null
+  const color = sum.confidence.level === 'high' ? 'var(--green)' : sum.confidence.level === 'moderate' ? 'var(--amber)' : 'var(--red)'
   return (
-    <span className="co-dq" style={{ color: info.color }}>
-      {info.emoji} {info.label}
+    <span className="co-dq" style={{ color }}>
+      {sum.confidence.emoji} {sum.confidence.label}
     </span>
   )
 }
@@ -232,7 +226,12 @@ function HiringFunnel({ rows }: { rows: Array<{ label: string; n: number; pct: n
   )
 }
 
-function WebReviewsSection({ reviews }: { reviews: WebReview[] }) {
+// Quotes compiled from public reviews and discussions (company_scores.web_reviews). They are raw words
+// from the source, labelled by source — never "AI-summarized" (audit 2026-10-23). A quote the strict rules
+// did not accept as a first-hand applicant account (kind 'public_commentary') carries no sentiment /
+// outcome label, only "Commentary" (owner 2026-10-24: a Reddit AutoModerator notice read "~ Mixed").
+// Quotes with links or bot text are filtered out before this renders (shownWebReviews).
+function WebReviewsSection({ reviews, hidden }: { reviews: WebReview[]; hidden: number }) {
   if (!reviews || reviews.length === 0) return null
   const sentColor = (s: string) => s === 'positive' ? 'var(--green)' : s === 'negative' ? 'var(--red)' : 'var(--amber)'
   const sentLabel = (s: string) => s === 'positive' ? '✓ Positive' : s === 'negative' ? '✗ Negative' : '~ Mixed'
@@ -243,22 +242,32 @@ function WebReviewsSection({ reviews }: { reviews: WebReview[] }) {
         What people are saying online
       </div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: '.6rem' }}>
-        {reviews.map((rv, i) => (
+        {reviews.map((rv, i) => {
+          const account = rv.kind === 'applicant_outcome'
+          return (
           <div key={i} style={{
-            background: 'var(--card)', border: `1px solid ${sentBorder(rv.sentiment)}`,
+            background: 'var(--card)', border: `1px solid ${account ? sentBorder(rv.sentiment) : 'var(--line2)'}`,
             borderRadius: 8, padding: '.85rem 1rem',
           }}>
             <div style={{ fontFamily: 'var(--mono)', fontSize: '.65rem', color: 'var(--dim)', lineHeight: 1.55, marginBottom: '.5rem' }}>
-              &ldquo;{rv.text}&rdquo;
+              &ldquo;{trimToSentence(rv.text, 500)}&rdquo;
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '.5rem', flexWrap: 'wrap' }}>
-              <span style={{ fontFamily: 'var(--mono)', fontSize: '.54rem', fontWeight: 600, color: sentColor(rv.sentiment) }}>{sentLabel(rv.sentiment)}</span>
-              {rv.source && <span style={{ fontFamily: 'var(--mono)', fontSize: '.52rem', color: 'var(--muted)' }}>{rv.kind === 'employee_review' ? 'Employee review · ' : ''}{rv.source}</span>}
+              {account
+                ? <span style={{ fontFamily: 'var(--mono)', fontSize: '.54rem', fontWeight: 600, color: sentColor(rv.sentiment) }}>{sentLabel(rv.sentiment)}</span>
+                : <span style={{ fontFamily: 'var(--mono)', fontSize: '.54rem', fontWeight: 600, color: 'var(--muted)' }}>{rv.kind === 'employee_review' ? '💼 Employee review' : '💬 Commentary'}</span>}
+              {rv.source && <span style={{ fontFamily: 'var(--mono)', fontSize: '.52rem', color: 'var(--muted)' }}>{displayPlatform(rv.source)}</span>}
               {rv.year && <span style={{ fontFamily: 'var(--mono)', fontSize: '.52rem', color: 'var(--muted)' }}>{rv.year}</span>}
             </div>
           </div>
-        ))}
+          )
+        })}
       </div>
+      {hidden > 0 && (
+        <div style={{ fontFamily: 'var(--mono)', fontSize: '.56rem', color: 'var(--muted)', marginTop: '.6rem', lineHeight: 1.6 }}>
+          {hidden} quote{hidden === 1 ? '' : 's'} not shown: {hidden === 1 ? 'it contains' : 'they contain'} links or moderator-bot text, which is never a first-hand account.
+        </div>
+      )}
     </div>
   )
 }
@@ -356,7 +365,9 @@ function TrackCTA({ companyName }: TrackCTAProps) {
 
 // ── Outcome distribution bar (for overview) ────────────────────────────────────
 
-function OutcomeDistribution({ reports }: { reports: Report[] }) {
+// Fed the applicant reports WITH an outcome only — the same rows (and the same count) as the hero. It
+// used to be fed every hiring row and read "77 community reports" under a "48 applicant reports" hero.
+function OutcomeDistribution({ reports, label }: { reports: Report[]; label: string }) {
   if (!reports || reports.length < 3) return null
   const dist: Record<string, number> = {}
   reports.forEach(r => { const oc = r.outcome || 'unknown'; dist[oc] = (dist[oc] || 0) + 1 })
@@ -372,7 +383,7 @@ function OutcomeDistribution({ reports }: { reports: Report[] }) {
   return (
     <div style={{ marginBottom: '.8rem' }}>
       <div style={{ fontFamily: 'var(--mono)', fontSize: '.5rem', textTransform: 'uppercase', letterSpacing: '.1em', color: 'var(--muted)', marginBottom: '.3rem' }}>
-        Outcome distribution · {total} community reports
+        {label}
       </div>
       <div style={{ display: 'flex', height: 8, borderRadius: 4, overflow: 'hidden', marginBottom: '.18rem' }}>
         {merged.map(s => (
@@ -473,17 +484,31 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
   // fewer than two relevant threads exist — one coincidental thread is not "discussion". null = not
   // answered yet (the section shows while checking).
   const [reddit, setReddit] = useState<RedditDiscussionResult | null>(null)
+  // `status:'checking'` means Reddit has not answered yet (a background search). The page re-asks every
+  // REDDIT_POLL_MS up to REDDIT_POLL_ATTEMPTS times (~20 s), then treats it as empty and hides the
+  // section — never a dead "Still checking… Retry" (audit 2026-10-23: three companies sat on it 15 s+).
   useEffect(() => {
     let alive = true
-    fetch('/api/company-reddit', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ company: companyName }) })
-      .then(r => r.json().catch(() => ({})))
-      .then((j: { items?: RedditDiscussionResult['items']; status?: string }) => {
-        if (!alive) return
-        const items = Array.isArray(j.items) ? j.items : []
-        setReddit({ items, status: j.status === 'checking' ? 'checking' : items.length ? 'ok' : 'empty' })
-      })
-      .catch(() => { if (alive) setReddit({ items: [], status: 'error' }) })
-    return () => { alive = false }
+    let attempts = 0
+    let timer: ReturnType<typeof setTimeout> | undefined
+    const ask = () => {
+      fetch('/api/company-reddit', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ company: companyName }) })
+        .then(r => r.json().catch(() => ({})))
+        .then((j: { items?: RedditDiscussionResult['items']; status?: string }) => {
+          if (!alive) return
+          const items = Array.isArray(j.items) ? j.items : []
+          if (j.status === 'checking' && items.length === 0) {
+            attempts += 1
+            if (attempts < REDDIT_POLL_ATTEMPTS) { setReddit({ items: [], status: 'checking' }); timer = setTimeout(ask, REDDIT_POLL_MS); return }
+            setReddit({ items: [], status: 'empty' })
+            return
+          }
+          setReddit({ items, status: items.length ? 'ok' : 'empty' })
+        })
+        .catch(() => { if (alive) setReddit({ items: [], status: 'error' }) })
+    }
+    ask()
+    return () => { alive = false; if (timer) clearTimeout(timer) }
   }, [companyName])
   const [companyJobs, setCompanyJobs] = useState<Array<{title:string;company:string;location:string;salary:string|null;url:string|null;source:string;type:string;level:string;score:number}>>([])
   const [jobsLoading, setJobsLoading] = useState(false)
@@ -683,52 +708,49 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
   const risk = graded ? Score.risk(score.overall_score) : 'warn'
   const g = graded ? letterGrade(score.overall_score) : '—'
   const ungradedLabel = score && !graded ? notEnoughReviewsLabel(score) : ''
-  // Honest count split (migration 063). Legacy payloads without the split fields infer from
-  // data_source: only 'reports'-derived scores were counted from real rows — anything else is
-  // the web-research pipeline's *claimed* number, which must never render as "reports".
-  const fpReports = score ? (score.first_party_report_count ?? (score.data_source === 'reports' ? (score.report_count || 0) : 0)) : 0
-  const webEst = score ? (score.web_report_count ?? (score.data_source === 'reports' ? 0 : (score.report_count || 0))) : 0
+  // ONE summary object (lib/companyPageSummary.ts) feeds every count, rate, confidence label and sentence on
+  // this page — hero, odds, breakdown, the reports list, the share card. Before it, each block did its
+  // own arithmetic and the page said 48, 77 and 28 for the same company (audit 2026-10-23/24).
+  const sum = buildCompanySummary(score, reports)
+  const fpReports = sum.applicantReports
+  const webEst = sum.webClaim
   // Honest status line: only while the enrichment worker has this company queued/running AND the
   // page has no first-party reports to show. It promises nothing about what will be found.
   const gatheringPublic = !loading && fpReports === 0 && reports.length === 0 && (enrichmentStatus === 'queued' || enrichmentStatus === 'running')
   const logoLetter = (companyName[0] || '?').toUpperCase()
-  const ghostRate = graded ? score.ghost_rate || 0 : 0
-  const ghostHigh = ghostRate > 0.5
-  const ghostPct = graded ? (ratePct(score.ghost_rate) ?? 0) : 0
-  const respPct = graded ? (ratePct(score.response_rate) ?? 0) : 0
+  const ghostRate = sum.ghostRate ?? 0
+  const ghostHigh = sum.ratesShown && ghostRate > 0.5
+  const ghostPct = sum.ghostPct ?? 0
+  const respPct = sum.responsePct ?? 0
   const ghostColor = ghostHigh ? 'var(--red)' : ghostRate > 0.3 ? 'var(--amber)' : 'var(--green)'
   const waitColor = (score?.avg_wait_days || 0) > 21 ? 'var(--amber)' : 'var(--text)'
   const wasteColor = (score?.waste || 0) > 60 ? 'var(--red)' : (score?.waste || 0) > 30 ? 'var(--amber)' : 'var(--green)'
+  // One plain-English line a first-time visitor can act on — the SAME response rate and thresholds as
+  // the odds panel (lib/companyPageSummary.ts responseVerdict), no percentage under MIN_REPORTS_FOR_RATES.
+  const verdict = sum.verdict
 
-  // One plain-English line a first-time visitor can act on, built only from the numbers shown.
-  const verdict = graded ? (() => {
-    const wait = score.avg_wait_days != null ? ` Typical wait to hear back: ${score.avg_wait_days} days.` : ''
-    if (ghostRate >= 0.5) return `Most applicants never hear back — ${Math.round(ghostRate * 10)} in 10 are ghosted.${wait}`
-    if ((score.response_rate || 0) >= 0.75) return `Most applicants hear back — ${respPct}% get a response.${wait}`
-    return `Mixed: about ${respPct}% of applicants hear back, ${ghostPct}% are ghosted.${wait}`
-  })() : ''
-
-  // Report outcome counts for the section summary + distribution (reused by two blocks). Employee
-  // reviews are shown but are NOT hiring outcomes, so they never enter these counts (same rule as
-  // the score — lib/server/reportCounts.js).
+  // The rows behind the counts. Employee reviews are shown but are NOT hiring outcomes (same rule as the
+  // score — lib/server/reportCounts.js); "applicant reports" are the hiring rows WITH an outcome.
   const hiringReports = reports.filter(r => !isEmployeeReview(r))
-  const employeeN = reports.length - hiringReports.length
-  // "Applicant reports" = rows with a decided outcome — the same rows the grade is built from
-  // (lib/server/reportCounts.js scorableResolvedCountPath). Rows still "waiting" are listed but counted
-  // apart: the header said "48 applicant reports" while this section said 77 (29 were waiting).
+  const employeeN = sum.listed.employee
   const outcomeReports = hiringReports.filter(r => isResolvedOutcome(r.outcome))
-  const waitingN = hiringReports.length - outcomeReports.length
-  const oc = outcomeReports.reduce((m, r) => { const k = r.outcome || 'unknown'; m[k] = (m[k] || 0) + 1; return m }, {} as Record<string, number>)
-  const ghostedN = oc.ghosted || 0
-  const hiredN = (oc.hired || 0) + (oc.offer || 0)
-  const interviewN = (oc.interview || 0) + (oc.human || 0) + (oc.interviewing || 0)
-  const thirdPartyN = outcomeReports.filter(r => isPublicDiscussion(r.platform)).length
-  const importedN = outcomeReports.filter(r => isImportedReview(r.platform)).length
-  const seenN = outcomeReports.length - thirdPartyN - importedN
   // The list: what was submitted to Seen first, then everything compiled from public discussion and
   // review sites under its own heading — a raw Reddit quote must never look like a Seen user's report.
+  // A public row whose words carry a link or moderator-bot text is not shown at all (owner 2026-10-24,
+  // lib/reports/excerptText.js); one the strict rules do not accept as the poster's own account is shown
+  // as commentary with no outcome label (lib/reports/feedFilter.js — the feed's rule).
   const seenRows = reports.filter(r => !isPublicDiscussion(r.platform) && !isImportedReview(r.platform))
-  const publicRows = reports.filter(r => isPublicDiscussion(r.platform) || isImportedReview(r.platform))
+  const publicRowsAll = reports.filter(r => isPublicDiscussion(r.platform) || isImportedReview(r.platform))
+  const publicRows = publicRowsAll.filter(r => !looksLikeBotOrLinkText(r.report_text))
+  const hiddenPublicN = publicRowsAll.length - publicRows.length
+  const isCommentary = (r: Report): boolean => {
+    if (isEmployeeReview(r)) return false
+    const v = feedRowVerdict({ ...r, company_name: r.company_name || companyName })
+    return !!v && v.kind !== 'applicant_outcome'
+  }
+  const commentaryN = publicRows.filter(isCommentary).length
+  const listRows = [...seenRows, ...publicRows]
+  const shownWebReviews = webReviews.filter(rv => !looksLikeBotOrLinkText(rv.text))
   const updatedLine = graded ? lastUpdatedLabel(score.updated_at) : ''
 
   const ocLabel: Record<string, string> = {
@@ -932,7 +954,7 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
                   <span className="co-grade-score"><Odometer value={score.overall_score} /> / 100</span>
                   {verdict && <p className="co-verdict">{verdict}</p>}
                   <div className="co-grade-meta">
-                    {score.data_quality && <DataQualityBadge dq={score.data_quality} reportCount={fpReports} webCount={webEst} employeeCount={score.employee_review_count || 0} mentionCount={score.mention_count || 0} />}
+                    <ConfidenceBadge sum={sum} webCount={webEst} />
                     {fpReports === 0 && webEst > 0 && <span className="co-live">web-research estimate</span>}
                     {updatedLine && <span className="co-dq" style={{ color: 'var(--muted)' }}>{updatedLine}</span>}
                   </div>
@@ -941,20 +963,31 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
 
               <VibeTagList sc={score} />
 
-              {/* A number the reports never gave (no wait or round counts on any row) is left out, never shown as "—". */}
+              {/* A number the reports never gave (no wait or round counts on any row) is left out, never shown as "—".
+                  Response / ghost percentages need MIN_REPORTS_FOR_RATES applicant reports (Chipotle showed "77%"
+                  from 2 — audit 2026-10-23); below it the page says so instead. */}
               {(() => {
                 const tiles = [
-                  score.response_rate != null ? <MetBox key="r" label="Response" value={pct(score.response_rate)} color="var(--blue)" /> : null,
-                  score.ghost_rate != null ? <MetBox key="g" label="Ghosted" value={pct(score.ghost_rate)} alarm={ghostHigh} color={ghostColor} /> : null,
+                  sum.ratesShown && score.response_rate != null ? <MetBox key="r" label="Response" value={pct(score.response_rate)} color="var(--blue)" /> : null,
+                  sum.ratesShown && score.ghost_rate != null ? <MetBox key="g" label="Ghosted" value={pct(score.ghost_rate)} alarm={ghostHigh} color={ghostColor} /> : null,
                   score.avg_wait_days != null ? <MetBox key="w" label="Avg wait" value={`${score.avg_wait_days}d`} color={waitColor} /> : null,
                   score.avg_rounds != null ? <MetBox key="n" label="Rounds" value={score.avg_rounds.toFixed(1)} /> : null,
                   score.waste != null ? <MetBox key="x" label="Waste risk" value={`${score.waste}%`} color={wasteColor} /> : null,
                 ].filter(Boolean)
-                return tiles.length > 0 ? (
-                  <div className={`co-mets${tiles.length === 5 ? ' co-mets-5' : ''}`} style={tiles.length !== 5 ? { gridTemplateColumns: `repeat(${tiles.length}, minmax(0, 1fr))` } : undefined}>
-                    {tiles}
-                  </div>
-                ) : null
+                return (
+                  <>
+                    {tiles.length > 0 && (
+                      <div className={`co-mets${tiles.length === 5 ? ' co-mets-5' : ''}`} style={tiles.length !== 5 ? { gridTemplateColumns: `repeat(${tiles.length}, minmax(0, 1fr))` } : undefined}>
+                        {tiles}
+                      </div>
+                    )}
+                    {!sum.ratesShown && (
+                      <div className="co-dq" role="note" style={{ display: 'block', color: 'var(--muted)', marginTop: '.5rem', lineHeight: 1.6 }}>
+                        Response and ghost rates appear at {MIN_REPORTS_FOR_RATES} applicant reports — {fpReports} so far.
+                      </div>
+                    )}
+                  </>
+                )
               })()}
             </>
           ) : (
@@ -1007,6 +1040,8 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
                 // the fused web claim published the phantom number to social. Its own zero-state
                 // ("Baseline estimate · share your experience") is the honest fallback.
                 report_count: fpReports,
+                // The SAME confidence word the hero shows (lib/companyPageSummary.ts) — the card never counts on its own.
+                confidence: sum.confidence?.word,
                 risk: score.risk_level ?? undefined,
                 tags: [
                   (score.ghost_rate ?? 0) >= 0.5 ? '👻 High ghost rate' : null,
@@ -1027,8 +1062,8 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
           <div className="co-secs">
             {graded && (
               <Section id="odds" icon="📅" title="Your odds here" open={open.odds} onToggle={toggle}
-                summary={`${score.avg_wait_days != null ? `${score.avg_wait_days}d typical wait · ` : ''}${respPct}% hear back · your response probability & industry rank`}>
-                <HiringProbability responseRate={score.response_rate} ghostRate={score.ghost_rate} overallScore={score.overall_score} reportCount={fpReports} />
+                summary={`${score.avg_wait_days != null ? `${score.avg_wait_days}d typical wait · ` : ''}${sum.ratesShown ? `${respPct}% hear back` : `too few applicant reports for a rate (${fpReports} of ${MIN_REPORTS_FOR_RATES})`} · your response probability & industry rank`}>
+                <HiringProbability responseRate={score.response_rate} ghostRate={score.ghost_rate} overallScore={score.overall_score} reportCount={fpReports} mentionCount={sum.mentions} context={sum.oddsContext} />
                 {benchmark && (
                   <div style={{ margin: '1rem 0 0' }}>
                     <IndustryBenchmark benchmark={benchmark} variant="public" companyName={displayName} />
@@ -1039,12 +1074,20 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
 
             {graded && (
               <Section id="breakdown" icon="📊" title="How the grade is built" open={open.breakdown} onToggle={toggle}
-                summary={`Response ${respPct}% · ghost ${ghostPct}% · waste ${score.waste ?? 0}% · where in the process they ghost`}>
+                summary={`${sum.ratesShown ? `Response ${respPct}% · ghost ${ghostPct}% · ` : ''}waste ${score.waste ?? 0}% · ${sum.ratesShown ? 'where in the process they ghost' : `rates appear at ${MIN_REPORTS_FOR_RATES} applicant reports (${fpReports} so far)`}`}>
                 <div className="co-two">
                   <div className="co-card">
                     <div className="co-sec-lbl" style={{ marginBottom: '.85rem' }}>Score breakdown</div>
-                    <BarRow label="Response rate" value={respPct} color={riskColor(risk)} />
-                    <BarRow label="Ghost rate" value={ghostPct} color="var(--red)" />
+                    {sum.ratesShown ? (
+                      <>
+                        <BarRow label="Response rate" value={respPct} color={riskColor(risk)} />
+                        <BarRow label="Ghost rate" value={ghostPct} color="var(--red)" />
+                      </>
+                    ) : (
+                      <div style={{ fontFamily: 'var(--mono)', fontSize: '.6rem', color: 'var(--muted)', lineHeight: 1.6, marginBottom: '.6rem' }}>
+                        Response and ghost rates are shown from {MIN_REPORTS_FOR_RATES} applicant reports — this grade stands on {sum.evidenceLine}.
+                      </div>
+                    )}
                     <BarRow label="Waste risk" value={score.waste || 0} color={wasteColor} />
                     <div className="co-kv">
                       <span>Process score</span><b style={{ color: riskColor(risk) }}>{score.process_score ?? score.overall_score} / 100</b>
@@ -1065,29 +1108,20 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
                     </div>
                   </div>) })()}
                 </div>
-                <OutcomeDistribution reports={hiringReports} />
+                <OutcomeDistribution reports={outcomeReports} label={`Outcome distribution · ${outcomeReports.length} applicant report${outcomeReports.length === 1 ? '' : 's'} with an outcome${sum.listed.waiting > 0 ? ` · ${sum.listed.waiting} still waiting not counted` : ''}`} />
               </Section>
             )}
 
             {/* The list holds applicant reports AND employee reviews, so the header names both and counts
                 each separately — it used to read "Applicant reports 100" for 15 accounts + 85 reviews. */}
-            <Section id="reports" icon="🗣" title={employeeN > 0 ? 'Applicant reports & employee reviews' : 'Applicant reports'} count={employeeN > 0 ? null : outcomeReports.length} open={open.reports} onToggle={toggle}
-              summary={reports.length > 0
-                ? [`${outcomeReports.length} applicant report${outcomeReports.length !== 1 ? 's' : ''}`, waitingN > 0 ? `${waitingN} still waiting (no outcome yet)` : '', employeeN > 0 ? `${employeeN} employee review${employeeN !== 1 ? 's' : ''}` : '', `${ghostedN} ghosted`, `${interviewN} interviewed`, `${hiredN} hired`, thirdPartyN > 0 ? `${thirdPartyN} from public discussion` : ''].filter(Boolean).join(' · ')
-                : 'None yet — be the first to report'}>
+            <Section id="reports" icon="🗣" title={employeeN > 0 ? 'Applicant reports & employee reviews' : 'Applicant reports'} count={employeeN > 0 ? null : sum.listed.withOutcome} open={open.reports} onToggle={toggle}
+              summary={reportsSectionSummary(sum)}>
               <div className="co-reports-tools">
                 <div style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', color: 'var(--muted)', lineHeight: 1.6, flex: 1, minWidth: 180 }}>
-                  {reports.length > 0
-                    ? (thirdPartyN > 0 || importedN > 0 || employeeN > 0 || waitingN > 0
-                        ? [`${outcomeReports.length} applicant report${outcomeReports.length !== 1 ? 's' : ''} with an outcome`,
-                            seenN > 0 ? `${seenN} submitted to Seen` : '',
-                            importedN > 0 ? `${importedN} imported from review sites (reduced weight)` : '',
-                            thirdPartyN > 0 ? `${thirdPartyN} found in public discussion (reduced weight)` : '',
-                            waitingN > 0 ? `${waitingN} still waiting — not counted until they resolve` : '',
-                            employeeN > 0 ? `${employeeN} employee review${employeeN !== 1 ? 's' : ''} (their letter grades adjust the score; they are not hiring outcomes)` : '',
-                          ].filter(Boolean).join(' · ')
-                        : `${reports.length} report${reports.length !== 1 ? 's' : ''} submitted to Seen · anonymous applicant claims`)
-                    : 'Reports are anonymous claims, labeled by source and weighted by trust.'}
+                  {reportsProvenanceLine(sum)}
+                  {sum.listedNote ? ` · ${sum.listedNote}` : ''}
+                  {commentaryN > 0 ? ` · ${commentaryN} quote${commentaryN === 1 ? '' : 's'} shown as commentary (a reply about someone else, or no first-hand account) with no outcome label` : ''}
+                  {hiddenPublicN > 0 ? ` · ${hiddenPublicN} quote${hiddenPublicN === 1 ? '' : 's'} not shown (links or moderator-bot text)` : ''}
                 </div>
                 <input
                   type="text"
@@ -1100,22 +1134,24 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
               </div>
               {reports.length > 0 ? (
                 <>
-                  {[...seenRows, ...publicRows].slice(0, reportsShown).map((r, i) => {
+                  {listRows.slice(0, reportsShown).map((r, i) => {
                     const badge = reportSourceBadge(r.platform, r.report_text)
                     const employee = isEmployeeReview(r)
                     const src = reportSourceLink(r.platform, r.report_text)
-                    const body = src ? src.body : r.report_text
+                    // Quotes end at a sentence or a whole word, never mid-word ("…an onsite interview. Perhaps").
+                    const body = trimToSentence(src ? src.body : r.report_text, 2000)
                     const when = reportDate(r.platform, r.report_text, r.created_at).label
                     const isPublic = i >= seenRows.length
+                    const commentary = isPublic && isCommentary(r)
                     // Group headings: Seen submissions first, then everything quoted from public sources.
                     const heading = i === 0 && seenRows.length > 0 && publicRows.length > 0
                       ? <div className="co-sec-lbl" style={{ margin: '.2rem 0 .6rem' }}>Submitted to Seen · {seenRows.length}</div>
                       : i === seenRows.length && publicRows.length > 0
                         ? (
                           <div style={{ margin: `${i === 0 ? '.2rem' : '1.1rem'} 0 .6rem` }}>
-                            <div className="co-sec-lbl">From public discussion &amp; review sites · {publicRows.length}</div>
+                            <div className="co-sec-lbl">{publicRowsHeading(sum.listed)}{hiddenPublicN > 0 ? ` · ${hiddenPublicN} not shown` : ''}</div>
                             <div style={{ fontFamily: 'var(--mono)', fontSize: '.56rem', color: 'var(--muted)', lineHeight: 1.6, marginTop: '.25rem' }}>
-                              Quoted from public threads and review sites, each linked to its source. Counted at reduced weight — not submitted by a Seen user.
+                              Quoted from public threads and review sites, each linked to its source. Only rows with an outcome count, at reduced weight — none was submitted by a Seen user.
                             </div>
                           </div>
                         )
@@ -1137,7 +1173,9 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
                               {[r.city ? `📍 ${r.city}` : '', r.rounds ? `${r.rounds} round${r.rounds !== 1 ? 's' : ''}` : '', when].filter(Boolean).join(' · ')}
                             </div>
                           </div>
-                          <span className={`vibe rc-outcome ${employee ? 'v-n' : (ocClass[r.outcome] || 'v-n')}`}>{employee ? '💼 Employee review' : (ocLabel[r.outcome] || r.outcome)}</span>
+                          <span className={`vibe rc-outcome ${employee || commentary ? 'v-n' : (ocClass[r.outcome] || 'v-n')}`} title={commentary ? 'Not the poster’s own applicant account under Seen’s rules — shown as commentary, no outcome' : undefined}>
+                            {employee ? '💼 Employee review' : commentary ? '💬 Commentary' : (ocLabel[r.outcome] || r.outcome)}
+                          </span>
                         </div>
                         {body && <div className="rc-body">{body}</div>}
                         {r.id && employerReplies[r.id] && (
@@ -1154,7 +1192,7 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
                           {badge ? (
                             <span className="vibe v-n rc-src" style={{ borderStyle: 'dashed', color: 'var(--dim)' }} title={badge.title}>{badge.label}</span>
                           ) : (
-                            <span className="rc-via">via <span className="vibe v-n rc-src">{r.platform || 'Seen'}</span></span>
+                            <span className="rc-via">via <span className="vibe v-n rc-src">{displayPlatform(r.platform) || 'Seen'}</span></span>
                           )}
                           {src && <ReportSourceLink url={src.url} host={src.host} posted={src.posted} className="rc-srclink" />}
                         </div>
@@ -1162,9 +1200,9 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
                       </div>
                     )
                   })}
-                  {reports.length > reportsShown && (
+                  {listRows.length > reportsShown && (
                     <button type="button" className="co-more" onClick={() => setReportsShown(n => n + 10)}>
-                      Show {Math.min(10, reports.length - reportsShown)} more of {reports.length - reportsShown} remaining
+                      Show {Math.min(10, listRows.length - reportsShown)} more of {listRows.length - reportsShown} remaining
                     </button>
                   )}
                 </>
@@ -1179,10 +1217,10 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
               )}
             </Section>
 
-            {webReviews.length > 0 && (
-              <Section id="online" icon="💬" title="What applicants say online" count={webReviews.length} open={open.online} onToggle={toggle}
-                summary="AI-summarized insights from public reviews and discussions · refreshed when the score is rebuilt">
-                <WebReviewsSection reviews={webReviews} />
+            {shownWebReviews.length > 0 && (
+              <Section id="online" icon="💬" title="What people say online" count={shownWebReviews.length} open={open.online} onToggle={toggle}
+                summary="Quotes compiled from public reviews and discussions · each labelled by its source · not Seen's assessment">
+                <WebReviewsSection reviews={shownWebReviews} hidden={webReviews.length - shownWebReviews.length} />
               </Section>
             )}
 
@@ -1241,7 +1279,8 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
                   <>
                     <div style={sectionNote}>
                       From {hiring.listings} current job listing{hiring.listings !== 1 ? 's' : ''}{capped ? ' (the top-scored open listings — there may be more)' : ''} · listing locations, not applicant reports
-                      {hiring.withLocation < hiring.listings ? ` · ${hiring.listings - hiring.withLocation} without a stated location` : ''}
+                      {hiring.abroad > 0 ? ` · ${hiring.abroad} outside the US not shown` : ''}
+                      {hiring.withLocation + hiring.abroad < hiring.listings ? ` · ${hiring.listings - hiring.withLocation - hiring.abroad} without a stated location` : ''}
                     </div>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '.45rem' }}>
                       {hiringRows.map(row => (
@@ -1264,7 +1303,9 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
                 ) : (
                   <div style={{ ...sectionNote, marginBottom: 0 }}>
                     {companyJobs.length > 0
-                      ? `${companyJobs.length} current job listing${companyJobs.length !== 1 ? 's' : ''}, but none states a location.`
+                      ? (hiring.abroad === companyJobs.length
+                          ? `${companyJobs.length} current job listing${companyJobs.length !== 1 ? 's' : ''}, all outside the US — Seen lists US and remote roles.`
+                          : `${companyJobs.length} current job listing${companyJobs.length !== 1 ? 's' : ''}, but none states a US location.`)
                       : 'No current job listings found for this company.'}
                   </div>
                 )}

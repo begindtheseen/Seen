@@ -27,6 +27,8 @@ export interface CompanyScoreCardData {
   tags?: string[]
   /** When the score was last (re)computed — printed on the card as "updated <date>". */
   updated_at?: string | null
+  /** The page's confidence word (lib/companySummary.ts) — the card prints this, never its own. */
+  confidence?: string
 }
 
 export default function CompanyScoreCard({ data, shareUrl, onClose, onShared }: { data: CompanyScoreCardData; shareUrl?: string; onClose: () => void; onShared?: (via: string) => void }) {
@@ -52,6 +54,8 @@ export default function CompanyScoreCard({ data, shareUrl, onClose, onShared }: 
       report_count: data.report_count,
       risk,
       updatedAt: data.updated_at ?? null,
+      // The page's confidence word (lib/companyPageSummary.ts) — the card prints it, never its own count-based one.
+      confidence: data.confidence,
     }
     drawCompanyCard(canvas, payload, format)
   }, [company, grade, score, data, risk])

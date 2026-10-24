@@ -18,6 +18,7 @@ import { fetchIndustryBenchmark } from '../lib/server/benchmark.js';
 import { isEvidencedScore, suppressionReason, servedDataSource } from '../lib/server/scoreProvenance.js';
 import { firstPartyReportCount, mentionCount, webClaimCount, gateScore, isGradeable, SCORABLE_REPORTS_FILTER, scorableResolvedCountPath, parseExactCount, EMPLOYEE_REVIEW_RE, scoreUpdatedAt } from '../lib/server/reportCounts.js';
 import { feedRowPasses } from '../lib/reports/feedFilter.js';
+import { redditPlatform } from '../lib/reports/platformLabel.js';
 import { enqueueCompanyEnrichment } from '../lib/server/enrichmentQueue.js';
 
 // Authorize admin/cron-only actions (the Anthropic web-research endpoints). Accepts a Vercel
@@ -1243,7 +1244,7 @@ Return ONLY a valid JSON array. Return [] if there are genuinely no hiring exper
         const sourcePost = fresh[exp.post_idx] || fresh[0];
         const rpt = {
           company_name: company,
-          platform: `Reddit r/${sourcePost.subreddit}`,
+          platform: redditPlatform(sourcePost.subreddit),
           outcome: exp.outcome,
           role: exp.role ? String(exp.role).trim().slice(0, 200) : '', // reports.role is NOT NULL (prod)
           report_text: exp.summary || sourcePost.title.slice(0, 500),
@@ -1406,8 +1407,10 @@ Return ONLY a valid JSON array. Return [] if there are genuinely no hiring exper
         return res.status(200).json({ ok: true, reports: [], cities: [], _debug: `fetch failed: ${rRes.status}` });
       }
       const cosRows = await cosRes.json();
+      // The same-company test as the main query: "Amazon Flex" / "Amazon Web Services" rows must not
+      // join Amazon's list (the old `includes` let 2 Amazon Flex rows make the page say 28 under a 26 hero).
       const ids = (cosRows || [])
-        .filter(c => normalize(c.name) === canonical || c.name.toLowerCase().includes(canonical))
+        .filter(c => nameKey(c.name) === nameKey(canonical))
         .map(c => c.id).filter(Boolean);
 
       if (!ids.length) {
@@ -1417,10 +1420,10 @@ Return ONLY a valid JSON array. Return [] if there are genuinely no hiring exper
       const fbUrl = `${SUPABASE_URL}/rest/v1/reports`
         + `?company_id=in.(${ids.join(',')})`
         + `&needs_review=not.is.true`
-        + `&select=id,role,outcome,ghost_stage,rounds,report_text,platform,outcome_weight,trust_reason,created_at,experience_level,location_id,company_id`
+        + `&select=id,role,outcome,ghost_stage,rounds,report_text,platform,outcome_weight,trust_reason,created_at,experience_level,location_id,company_name,company_id`
         + `&order=created_at.desc&limit=${REPORT_LIST_LIMIT}`;
       const fbRes = await fetch(fbUrl, { headers: hdrs });
-      const fbRows = fbRes.ok ? await fbRes.json() : [];
+      const fbRows = (fbRes.ok ? await fbRes.json() : []).filter(r => !r.company_name || sameCompany(r));
       console.log(`REPORTS: fallback company_id query got ${fbRows?.length || 0} rows`);
       return buildResponse(res, fbRows, hdrs, SUPABASE_URL, city);
     }
@@ -1438,19 +1441,20 @@ Return ONLY a valid JSON array. Return [] if there are genuinely no hiring exper
     if (cosRes2.ok) {
       const cosRows2 = await cosRes2.json();
       const ids2 = (cosRows2 || [])
-        .filter(c => normalize(c.name) === canonical || c.name.toLowerCase().includes(canonical))
+        .filter(c => nameKey(c.name) === nameKey(canonical))
         .map(c => c.id).filter(Boolean);
       if (ids2.length) {
         const knownIds = new Set((rows || []).map(r => r.id));
         const fbUrl2 = `${SUPABASE_URL}/rest/v1/reports`
           + `?company_id=in.(${ids2.join(',')})`
           + `&needs_review=not.is.true`
-          + `&select=id,role,outcome,ghost_stage,rounds,report_text,platform,outcome_weight,trust_reason,created_at,experience_level,location_id,company_id`
+          + `&select=id,role,outcome,ghost_stage,rounds,report_text,platform,outcome_weight,trust_reason,created_at,experience_level,location_id,company_name,company_id`
           + `&order=created_at.desc&limit=${REPORT_LIST_LIMIT}`;
         const fb2 = await fetch(fbUrl2, { headers: hdrs });
         if (fb2.ok) {
           const fb2Rows = await fb2.json();
-          extraRows = (fb2Rows || []).filter(r => !knownIds.has(r.id));
+          // A row that names a different company (older rows filed under a sibling company_id) stays out.
+          extraRows = (fb2Rows || []).filter(r => !knownIds.has(r.id) && (!r.company_name || sameCompany(r)));
           if (extraRows.length) console.log(`REPORTS: merged ${extraRows.length} older company_id-only rows`);
         }
       }
