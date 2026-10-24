@@ -8,6 +8,21 @@ import { eventId, isSuperseded, stageCorrectedEvent } from './checkEvents'
 
 const KEY = 'seen_applications_v1'
 
+/** Everything one `load` answers with. The dashboard reads its pro flag, recent companies and the Inbox
+ *  Autopilot tile from the SAME call that brings the applications — one request at mount, not four. */
+export type LoadBundle = {
+  applications: Application[]
+  credits: { balance: number; pro: boolean; daily_earned: number } | null
+  recent_cos: Array<{ company_name?: string }>
+  inbox: { ready: boolean; enabled?: boolean; received_count?: number } | null
+  apps_total?: number
+}
+type RawLoad = { applications?: Record<string, unknown>[]; credits?: LoadBundle['credits']; recent_cos?: LoadBundle['recent_cos']; inbox?: LoadBundle['inbox']; apps_total?: number }
+
+/** What remove() reports back (update() answers an UpdateResult). `not_found` = the server has no such
+ *  row for this account (deleted on another device, or never this user's) — nothing to retry. */
+export type StoreResult = { ok: boolean; reason?: 'not_found' | 'not_synced' | 'patch_failed' | 'delete_failed' | 'offline' }
+
 /** What "Edit" on a card may change — the only non-stage/status fields update_application accepts. */
 export const EDITABLE_KEYS = ['company', 'role', 'location', 'platform', 'appliedAt'] as const
 
@@ -98,6 +113,8 @@ export type LoadResult = {
   /** True when the account's rows were read. False = the sync failed (or there was no session) and
    *  `apps` is only what this device last stored — a page must show that as an error, never as "0". */
   synced: boolean
+  /** The Inbox Autopilot status that rode along with `load` (null = not read; undefined = signed out). */
+  inbox?: LoadBundle['inbox']
 }
 
 export const AppStore = {
@@ -111,14 +128,21 @@ export const AppStore = {
   /** `load` plus the truth about where the data came from (see LoadResult). */
   async loadResult(loggedIn: boolean): Promise<LoadResult> {
     if (!loggedIn) return { apps: this.loadSync(), synced: true }
-    const result = await _sync('load') as { applications?: Record<string, unknown>[] } | null
-    if (!result?.applications) return { apps: this.loadSync(), synced: false }
-    return { apps: await this.load(loggedIn, result), synced: true }
+    const bundle = await this.loadBundle(loggedIn)
+    return bundle ? { apps: bundle.applications, synced: true, inbox: bundle.inbox } : { apps: this.loadSync(), synced: false, inbox: null }
   },
 
-  async load(loggedIn: boolean, prefetched?: { applications?: Record<string, unknown>[] } | null): Promise<Application[]> {
+  async load(loggedIn: boolean): Promise<Application[]> {
+    const bundle = await this.loadBundle(loggedIn)
+    return bundle ? bundle.applications : this.loadSync()
+  },
+
+  /** `load` with everything it carries (see LoadBundle). null when signed out or the call failed —
+   *  the caller falls back to loadSync() for the applications (and, if it shows them, says so:
+   *  LoadResult.synced). */
+  async loadBundle(loggedIn: boolean): Promise<LoadBundle | null> {
     if (loggedIn) {
-      const result = prefetched ?? await _sync('load') as { applications?: Record<string, unknown>[] } | null
+      const result = await _sync('load') as RawLoad | null
       if (result?.applications) {
         const mapped = result.applications.map(mapRow)
         const dbIds = new Set(mapped.map(a => String(a.id)))
@@ -152,7 +176,7 @@ export const AppStore = {
           const row = byId.get(a.id)!
           if (r.ok && (r.body as { ok?: boolean } | null)?.ok) {
             Object.assign(row, { ...pendingChanges(a), events: a.events, updatedAt: tokenOf(r.body) ?? row.updatedAt })
-          } else if (r.status === 409 || r.status === 410) {
+          } else if (r.status === 409 || r.status === 410 || r.status === 404) {
             conflicts.push(a.id) // the account's version stands
           } else {
             Object.assign(row, { ...pendingChanges(a), events: a.events, unsynced: true }) // still pending
@@ -162,10 +186,16 @@ export const AppStore = {
         this.lastLoad = { conflicts, failed }
         const merged = [...mapped, ...unsynced]
         save(merged)
-        return merged
+        return {
+          applications: merged,
+          credits: result.credits ?? null,
+          recent_cos: Array.isArray(result.recent_cos) ? result.recent_cos : [],
+          inbox: result.inbox && typeof result.inbox.ready === 'boolean' ? result.inbox : null,
+          apps_total: result.apps_total,
+        }
       }
     }
-    return this.loadSync()
+    return null
   },
 
   async syncFromDb(loggedIn: boolean): Promise<void> {
@@ -343,7 +373,10 @@ export const AppStore = {
       if (at !== -1) { current[at] = server; save(current) }
       return { status: 'stale', anomalies, server }
     }
-    if (r.status === 410) {
+    if (r.status === 410 || r.status === 404) {
+      // Removed on another device (or never this account's — under compare-and-set the server cannot
+      // tell those apart and answers 410; an older server answered 404): the local copy is stale, so it
+      // leaves this device too and the reload that follows shows the truth. Nothing to retry.
       if (at !== -1) { current.splice(at, 1); save(current) }
       return { status: 'gone', anomalies }
     }
@@ -369,10 +402,16 @@ export const AppStore = {
     return this.update(id, pendingChanges(a), true)
   },
 
-  async remove(id: string, loggedIn: boolean): Promise<void> {
+  async remove(id: string, loggedIn: boolean): Promise<StoreResult> {
     markQuiet() // a delete is a weighty moment — see update()
     save(this.loadSync().filter(a => a.id !== id))
-    if (loggedIn) await _sync('remove_application', { id })
+    if (!loggedIn) return { ok: true }
+    const r = await _syncRaw('remove_application', { id })
+    // 404 = already gone on the server (removed on another device, or never this account's): the local
+    // copy is gone too, which is the state the person wanted — reported so the page can say so once.
+    if (r.status === 404) return { ok: true, reason: 'not_found' }
+    if (r.ok && r.body && typeof r.body === 'object') return r.body as StoreResult
+    return { ok: false, reason: r.status === 0 ? 'offline' : 'delete_failed' }
   },
 
   async clear(loggedIn = false): Promise<void> {

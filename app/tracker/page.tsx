@@ -413,6 +413,10 @@ function TrackerPage() {
     if (searchParams?.get('add') === '1') setShowManual(true)
   }, [searchParams])
 
+  // Inbox Autopilot's status arrives inside `load` (one call at mount, not two); undefined = not loaded
+  // yet, null = the bundle could not carry it (the panel then asks for itself).
+  const [inboxStatus, setInboxStatus] = useState<unknown>(undefined)
+
   // Check-in answers given on this device before they reached the account (offline, or answered before
   // answers were stored on the application) are written onto the application now (H3).
   const pushLedger = useCallback(async (data: Application[]) => {
@@ -444,8 +448,9 @@ function TrackerPage() {
   }, [])
 
   const loadApps = useCallback(async () => {
-    const { apps: data, synced } = await AppStore.loadResult(isLoggedIn)
+    const { apps: data, synced, inbox } = await AppStore.loadResult(isLoggedIn)
     setApps(data)
+    if (inbox !== undefined) setInboxStatus(inbox)
     setLoadFailed(!synced)
     setLoading(false)
     if (synced && isLoggedIn) {
@@ -503,11 +508,15 @@ function TrackerPage() {
       .catch(() => {})
   }, [apps])
 
+  // The server answered "no such application for this account" (removed on another device, 410/404):
+  // the store already dropped the local copy; say so once and show the account's real list.
+  const REMOVED_ELSEWHERE = 'That application was removed on another device — your list is up to date.'
+
   /** What a failed / refused write tells the user (H5 — never silent). */
   const sayResult = (r: UpdateResult, what = 'That change') => {
     if (r.status === 'failed') showToast(`${what} didn’t reach your account — it’s kept on this device. Tap “Not synced · Retry” on the card.`)
     else if (r.status === 'stale') showToast('Updated on another device — showing the latest.')
-    else if (r.status === 'gone') showToast('That application was deleted on another device.')
+    else if (r.status === 'gone') showToast(REMOVED_ELSEWHERE)
   }
 
   // Stage / status moves and check-in answers. The card moves at once; the write is queued per card
@@ -521,7 +530,9 @@ function TrackerPage() {
     const after = AppStore.loadSync()
     setApps(after)
     sayResult(r, changes.stage ? `Moving it to ${changes.stage}` : 'That update')
-    if (r.status === 'stale' || r.status === 'gone') return r
+    // Never a community report or an outcome card for a row that no longer exists.
+    if (r.status === 'gone') { await loadApps(); return r }
+    if (r.status === 'stale') return r
     // The ONE community report per terminal outcome (hired included — "Got the job" never reached
     // the company's score before). A withdrawal is the applicant's move, not the company's: no report.
     if (origApp && (changes.status === 'ghosted' || changes.status === 'rejected' || changes.status === 'hired')) {
@@ -555,6 +566,7 @@ function TrackerPage() {
     if (r.status === 'ok') showToast('Synced to your account.')
     else if (r.status === 'failed') showToast('Still can’t reach your account — it stays on this device and syncs when the connection is back.')
     else sayResult(r)
+    if (r.status === 'gone') await loadApps()
   }
 
   const handleCheckInsight = async (app: Application, checkType: string, data: Record<string, unknown>) => {
@@ -647,7 +659,7 @@ function TrackerPage() {
       return
     }
     setEditing(null); setEditNotice('')
-    if (r.status === 'gone') showToast('That application was deleted on another device.')
+    if (r.status === 'gone') { showToast(REMOVED_ELSEWHERE); await loadApps() }
     else if (r.status === 'failed') showToast('Saved on this device — it didn’t reach your account yet. Tap “Not synced · Retry” on the card.')
   }
 
@@ -829,7 +841,7 @@ function TrackerPage() {
         )}
 
         {/* Inbox Autopilot — forwarded job emails keep these cards up to date (hidden until it is live) */}
-        <InboxAutopilot apps={apps} token={token} onAppsChanged={loadApps} />
+        <InboxAutopilot apps={apps} token={token} onAppsChanged={loadApps} status={inboxStatus} />
 
         {/* Stats — tiles on wide screens; one line on phones so the cards come first */}
         {apps.length > 0 && (

@@ -35,8 +35,9 @@ function install({ tables = true } = {}) {
     const m = opts.method || 'GET';
     if (m === 'GET') return Response.json(rows.filter((r) => match(r, u)));
     if (m === 'POST') { const row = { ...body }; rows.push(row); return Response.json([row], { status: 201 }); }
-    if (m === 'PATCH') { for (const r of rows.filter((r) => match(r, u))) Object.assign(r, body); return new Response(null, { status: 204 }); }
-    if (m === 'DELETE') { t[name] = rows.filter((r) => !match(r, u)); return new Response(null, { status: 204 }); }
+    const represent = /return=representation/.test(String((opts.headers || {}).Prefer || ''));
+    if (m === 'PATCH') { const hit = rows.filter((r) => match(r, u)); for (const r of hit) Object.assign(r, body); return represent ? Response.json(hit) : new Response(null, { status: 204 }); }
+    if (m === 'DELETE') { const hit = rows.filter((r) => match(r, u)); t[name] = rows.filter((r) => !match(r, u)); return represent ? Response.json(hit) : new Response(null, { status: 204 }); }
     return new Response(null, { status: 405 });
   };
   return t;
