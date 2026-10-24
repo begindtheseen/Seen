@@ -16,6 +16,7 @@ import IndustryBenchmark, { type Benchmark } from '@/components/IndustryBenchmar
 import Odometer from '@/components/motion/Odometer'
 import { isGradeableScore, notEnoughReviewsLabel, gradeBasisLabel, MIN_REPORTS_FOR_GRADE } from '@/lib/gradeGate'
 import { Crumbs } from '@/components/shell/PageHeader'
+import { LoadError } from '@/components/shell/LoadStates'
 import ListingSignals from '@/components/ListingSignals'
 import { gradeLetter, displayCompanyName, isResolvedOutcome, lastUpdatedLabel } from '@/lib/companyDisplay'
 
@@ -563,7 +564,8 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
     } catch {}
   }, [slug, companyName])
 
-  // Fetch reports + score
+  // Fetch reports + score. `reloadKey` is bumped by the error block's Retry.
+  const [reloadKey, setReloadKey] = useState(0)
   useEffect(() => {
     async function load() {
       setLoading(true)
@@ -596,16 +598,17 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ name: companyName }),
         })
-        if (sRes.ok) {
-          const sJson = await sRes.json() as { score?: CompanyScore; ok?: boolean; not_found?: boolean; enrichment?: { status?: string } }
-          setEnrichmentStatus(typeof sJson.enrichment?.status === 'string' ? sJson.enrichment.status : null)
-          if (sJson.not_found) {
-            setNotFound(true)
-          } else if (sJson.score) {
-            setScore(sJson.score)
-            if (sJson.score.industry) setIndustry(sJson.score.industry)
-            if (sJson.score.web_reviews?.length) setWebReviews(sJson.score.web_reviews)
-          }
+        // A non-2xx here is a FAILURE, not "no data": it used to fall through to "No score data found
+        // for this company" under an SSR header that still showed the grade (audit 2026-10-24 R-1).
+        if (!sRes.ok) throw new Error(`score HTTP ${sRes.status}`)
+        const sJson = await sRes.json() as { score?: CompanyScore; ok?: boolean; not_found?: boolean; enrichment?: { status?: string } }
+        setEnrichmentStatus(typeof sJson.enrichment?.status === 'string' ? sJson.enrichment.status : null)
+        if (sJson.not_found) {
+          setNotFound(true)
+        } else if (sJson.score) {
+          setScore(sJson.score)
+          if (sJson.score.industry) setIndustry(sJson.score.industry)
+          if (sJson.score.web_reviews?.length) setWebReviews(sJson.score.web_reviews)
         }
       } catch {
         setError('Failed to load company data.')
@@ -613,7 +616,7 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
       setLoading(false)
     }
     load()
-  }, [companyName, location]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [companyName, location, reloadKey]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Industry benchmark — how this company ranks vs its sector on Seen (public aggregate). Turns a
   // bare score into authoritative context. Fail-soft: the page renders fine without it.
@@ -903,9 +906,7 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
               </div>
             </div>
           ) : error ? (
-            <div style={{ background: 'var(--rdim, rgba(239,68,68,.08))', border: '1px solid rgba(239,68,68,.25)', borderRadius: 8, padding: '1rem', fontFamily: 'var(--mono)', fontSize: '.72rem', color: 'var(--red)', textAlign: 'center' }}>
-              {error}
-            </div>
+            <LoadError what={`${displayName}'s hiring data`} detail="Seen could not be reached. The grade, rates and reports below are hidden until it loads — nothing here is a verdict yet." onRetry={() => setReloadKey(k => k + 1)} />
           ) : score && !graded ? (
             /* Below the report bar: no letter, score, rates or vibe tags — just what we actually hold. */
             <div className="co-grade-bar warn" role="status">
@@ -1022,8 +1023,9 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
         </div>
 
         {/* ── Sections: every detail the page used to spread across seven tabs, each behind one
-            row with a truthful summary. Open what you need; nothing is gone. ── */}
-        {!loading && (
+            row with a truthful summary. Open what you need; nothing is gone. Hidden while the load
+            failed: "None yet — be the first to report" under an error is a false statement (R-5). ── */}
+        {!loading && !error && (
           <div className="co-secs">
             {graded && (
               <Section id="odds" icon="📅" title="Your odds here" open={open.odds} onToggle={toggle}

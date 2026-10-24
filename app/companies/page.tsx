@@ -1,6 +1,7 @@
 'use client'
 
-import React, { useState, useEffect, useMemo } from 'react'
+import React, { useState, useEffect, useMemo, useCallback } from 'react'
+import { LoadError } from '@/components/shell/LoadStates'
 import { useRouter } from 'next/navigation'
 import { Score } from '@/lib/score'
 import { AppStore } from '@/lib/stores/AppStore'
@@ -54,6 +55,9 @@ export default function CompaniesPage() {
   const router = useRouter()
   const [companies, setCompanies] = useState<Company[]>([])
   const [loading, setLoading] = useState(true)
+  // The leaderboard request failed (API down / 500 / bad JSON): an error with Retry, never
+  // "No company data yet" (R-1).
+  const [loadFailed, setLoadFailed] = useState(false)
   const [search, setSearch] = useState('')
   const [sort, setSort] = useState<SortKey>('score')
   const [lookup, setLookup] = useState('')
@@ -86,22 +90,28 @@ export default function CompaniesPage() {
     } catch {}
   }, [])
 
-  useEffect(() => {
-    fetch('/api/reports', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'leaderboard' }),
-    })
-      .then((r) => r.json())
-      .then((d: { companies?: Company[] }) => {
-        // Grade gate: the API already ranks only gradeable companies (≥5 real reports); filter
-        // again so a CDN-cached pre-gate payload can never put an ungraded company on the board.
-        const graded = (d.companies || []).filter((c) => isGradeableScore(c.score))
-        if (graded.length) setCompanies(graded)
+  const loadLeaderboard = useCallback(async () => {
+    setLoading(true)
+    setLoadFailed(false)
+    try {
+      const r = await fetch('/api/reports', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'leaderboard' }),
       })
-      .catch(() => {})
-      .finally(() => setLoading(false))
+      if (!r.ok) throw new Error(`HTTP ${r.status}`)
+      const d = await r.json() as { companies?: Company[] }
+      if (!Array.isArray(d.companies)) throw new Error('bad payload')
+      // Grade gate: the API already ranks only gradeable companies (≥5 real reports); filter
+      // again so a CDN-cached pre-gate payload can never put an ungraded company on the board.
+      setCompanies(d.companies.filter((c) => isGradeableScore(c.score)))
+    } catch {
+      setLoadFailed(true)
+    } finally {
+      setLoading(false)
+    }
   }, [])
+  useEffect(() => { void loadLeaderboard() }, [loadLeaderboard])
 
   const filtered = useMemo(() => {
     let list = companies
@@ -300,6 +310,10 @@ export default function CompaniesPage() {
             }}
           >
             Loading scoreboard...
+          </div>
+        ) : loadFailed ? (
+          <div style={{ padding: '1.5rem 0' }}>
+            <LoadError what="the company scoreboard" detail="Seen could not be reached. You can still look up any company by name above." onRetry={loadLeaderboard} />
           </div>
         ) : filtered.length === 0 ? (
           <div style={{ textAlign: 'center', padding: '3rem 1.5rem' }}>

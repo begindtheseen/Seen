@@ -24,6 +24,8 @@ import StagePipeline from '@/components/tracker/StagePipeline'
 import { emptyForm, formFromApplication, toNewApplication, editChanges, type ApplicationForm as FormValues } from '@/lib/stores/applicationEdit'
 import { nextCheckLine, DAY_MS } from '@/lib/stores/checkSchedule'
 import s from '@/components/tracker/tracker.module.css'
+import { LoadError, PageSkeleton } from '@/components/shell/LoadStates'
+import { loginHref } from '@/lib/safeHref.js'
 const SurveyModal = dynamic(() => import('@/components/SurveyModal'), { ssr: false })
 const ResumeSurveyModal = dynamic(() => import('@/components/ResumeSurveyModal'), { ssr: false })
 
@@ -325,6 +327,9 @@ function TrackerPage() {
   // Newest application first (owner request 2026-10-18): by the date applied, then last update.
   const orderedApps = useMemo(() => [...apps].sort((a, b) => (b.appliedAt - a.appliedAt) || (b.updatedAt - a.updatedAt)), [apps])
   const [loading, setLoading] = useState(true)
+  // The account's rows could not be read: show the error + Retry and this device's local copy, never
+  // "0 TOTAL · No applications yet" (R-1).
+  const [loadFailed, setLoadFailed] = useState(false)
   const [outcomeApp, setOutcomeApp] = useState<Application | null>(null)
   const [roundsApp, setRoundsApp] = useState<Application | null>(null)
   const [showManual, setShowManual] = useState(false)
@@ -343,7 +348,7 @@ function TrackerPage() {
 
   useEffect(() => {
     if (!ready) return // wait for the session to resolve — redirecting early bounced signed-in users
-    if (!isLoggedIn) { router.replace('/login'); return }
+    if (!isLoggedIn) { router.replace(loginHref(`${window.location.pathname}${window.location.search}${window.location.hash}`)); return }
     if (isLoggedIn && !isSeeker) { router.replace('/'); return }
   }, [ready, isLoggedIn, isSeeker, router])
 
@@ -353,8 +358,9 @@ function TrackerPage() {
   }, [searchParams])
 
   const loadApps = useCallback(async () => {
-    const data = await AppStore.load(isLoggedIn)
+    const { apps: data, synced } = await AppStore.loadResult(isLoggedIn)
     setApps(data)
+    setLoadFailed(!synced)
     setLoading(false)
     // Highlight + scroll to one card: the one just added (?new=1 — the DB returns it first), or the
     // one a notification points at (#app_<id>, from the bell in the Nav).
@@ -605,8 +611,11 @@ function TrackerPage() {
     await loadApps()
   }
 
+  // Session unresolved or first load in flight → the page's own skeleton, never a blank (R-2).
+  if (!ready || (isLoggedIn && isSeeker && loading)) {
+    return <div className="page-full"><div className={s.body} style={{ maxWidth: 1000, margin: '0 auto', padding: '2.5rem 1rem', width: '100%', boxSizing: 'border-box' }}><PageSkeleton label="Loading your applications" tiles={5} rows={4} /></div></div>
+  }
   if (!isLoggedIn || !isSeeker) return null
-  if (loading) return <div className="page-full"><div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '60vh' }}><div className="spinner" /></div></div>
 
   const active = apps.filter(a => a.status === 'active')
   const ghosted = apps.filter(a => a.status === 'ghosted')
@@ -667,6 +676,17 @@ function TrackerPage() {
           sub="Your applications sync to your account. Seen checks in with you at day 7, 14 and 30."
           actions={<button type="button" className={`${s.act} ${s.actPrimary} ${s.deskOnly}`} onClick={() => setShowManual(true)}>+ Track application</button>}
         />
+
+        {loadFailed && (
+          <div style={{ marginBottom: '1.25rem' }}>
+            <LoadError
+              what="your applications from your account"
+              detail={apps.length ? `Seen could not be reached. The ${apps.length} below are what this device last synced; edits you make now sync when the connection is back.` : 'Seen could not be reached, so this list does not reflect your account yet.'}
+              onRetry={() => { setLoading(true); void loadApps() }}
+              retrying={loading}
+            />
+          </div>
+        )}
 
         {/* Inbox Autopilot — forwarded job emails keep these cards up to date (hidden until it is live) */}
         <InboxAutopilot apps={apps} token={token} onAppsChanged={loadApps} />
@@ -825,8 +845,8 @@ function TrackerPage() {
           </button>
         )}
 
-        {/* Empty state — both ways in: track one yourself, or Apply on a job */}
-        {apps.length === 0 && (
+        {/* Empty state — both ways in: track one yourself, or Apply on a job. Never shown for a failed load. */}
+        {apps.length === 0 && !loadFailed && (
           <div className={s.empty}>
             <div style={{ fontSize: '2.5rem', marginBottom: '1rem' }}>📋</div>
             <div style={{ fontFamily: 'var(--display)', fontSize: '1.1rem', fontWeight: 700, color: 'var(--white)', marginBottom: '.5rem' }}>No applications yet</div>
