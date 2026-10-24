@@ -50,6 +50,42 @@ and dashboard (PRs #122/#123) were intentionally REDESIGNED beyond the old site;
 longer the design source of truth for redesigned pages. `SITE_PARITY_CHECKLIST.md` /
 `ADMIN_PARITY_CHECKLIST.md` are frozen pre-06-30 records, not an active work queue.
 
+## Session 2026-10-24: SEO/AI visibility, cron auth, conversion, scoring weight (PRs #359–#366, all merged)
+- **Owner direction:** share cards are retired as a growth lever ("No one is sharing that shit"); the funnel card
+  branch `claude/wip-fix3-funnel` is shelved. Marketing plan = Claude Doc artifact Duen9PchrgV5smKKFBnbku. Supabase
+  is now on Pro (daily backups). SEO/AI tactics stay legitimate only (no fake reviews, doorway pages, bought links,
+  hidden text for AI).
+- **SEO/AI (#359, #362, #363):** sitemap pages every company row (`lib/server/sitemapCompanies.js`, 1,000-row
+  pages); only graded company pages are indexed (`companyRobots`); titles "<Company> application status: who
+  hears back (N reports)"; /methods, /data (CC BY dataset + CSV), /lists, dynamic llms.txt / llms-full.txt;
+  IndexNow key file; daily `api/cron-search-data.js` (13:20 UTC) stores Search Console / Bing queries in
+  `search_daily` and merges real searched intents into the company FAQ; signup attribution
+  (`seen_first_touch_v1` → `record_attribution` → `signup_attribution`, admin "Where signups come from").
+  Search Console / Bing need owner env keys (GSC_SITE_URL, GSC_SERVICE_ACCOUNT_JSON, BING_WEBMASTER_API_KEY).
+- **Cron auth (#364) — the reason outcome emails never sent:** Vercel crons send `Authorization: Bearer
+  <CRON_SECRET>` and NO `x-vercel-cron` header (which anyone can spoof). Seven crons trusted only that header, so
+  every real Vercel call was refused: `outcome_email_log` had 0 rows ever and /api/demand was stale since August.
+  ONE helper now: `lib/server/cronAuth.js` (`isVercelCron` = bearer only; `hasCronSecret`; `hasAdminSession`).
+  Never test `x-vercel-cron` again. Expect the first real day-30 emails (2, user db74a562) at the next 15:00 UTC
+  outcome-followups run — confirm rows in `outcome_email_log`.
+- **Conversion (#365):** company page "Applied to {Company}? Track it" card under the grade (role + WHEN applied →
+  check-in clock at the real date) → guest email ask via `signInWithOtp` carrying `pending_applications` in
+  user_metadata, created on first sign-in (`lib/pendingApplicationClient.ts`); one-screen sign-up with
+  `intent=track|trial|alert|invite` (`lib/signupIntent.js`); `/trial?plan=`; guest /tracker; confidence word
+  capped at Moderate until 5 Seen-user reports (`capDisplayConfidence`); `CompanySeed` SSR grade (LCP / 4.7→1.1 s,
+  /company/walmart 4.2→1.9 s). Verified on the Vercel preview at iPhone size with writes blocked.
+- **Scoring (#366):** `classifyPlatform(platform, trustReason)` — a first-party report (direct_submission /
+  anonymous_unverified / duplicate_user_company) that names LinkedIn/Indeed/Glassdoor/Blind as where the person
+  applied is `direct` (1.0), not `ingest` (0.55). Every scoring read must select `trust_reason` and pass it.
+  Recomputed after the prod deploy (2026-10-24 07:15 UTC): SpaceX 93→94, Tesla 77→76, Hilton 84→80 (its affected
+  row is an admin-approved "ghosted" via Indeed).
+- **Local smoke lesson:** `next start` serves no `/api/*` (Vercel functions), so data-gated UI (company page
+  TrackCta, badges) renders the error state — proxy API GETs to seenjobs.io in Playwright, or test the preview.
+- **Owner actions outstanding:** storage guard `update public.jobs_storage_guard set max_mb = 6000 …` (classifier
+  refused it); PostHog key; Search Console / Bing keys; NEXT_PUBLIC_SAME_AS; delete demo reports + test accounts
+  (incl. conv.audit.1450@seenjobs.io); pricing claims not backed by code ("Ghost risk alerts", "AI company
+  deep-dive"); Walmart report 651d5f93 reject?; Supabase email templates "Confirm email & continue →".
+
 ## Session 2026-10-23 B: PR #351 merged + second audit (desktop + phone, same method) — verdict: public beta ready
 - **Merged** PR #351 as squash a8cfb08 at the owner's word ("Merging now"); Vercel production deployment fired from the
   merge and seenjobs.io served it within ~45 s (verified: /contact 200, FAQ names the founder). Draft PR #352 carries one
