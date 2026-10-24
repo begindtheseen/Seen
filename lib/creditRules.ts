@@ -32,4 +32,12 @@ export {
   creditBalance,
   firstCreditsRow,
   earnedBalance,
+  REPORT_REWARD_PRO_DAYS,
+  REPORT_REWARD_MONTHLY_CAP_DAYS,
+  REPORT_REWARD_MIN_TRACKED_DAYS,
+  REFERRAL_REWARD_PRO_DAYS,
+  REFERRAL_MAX_REWARDED,
+  REFERRAL_CLAIM_WINDOW_DAYS,
+  dayWord,
+  proDaysLabel,
 } from './server/creditRules.js';
