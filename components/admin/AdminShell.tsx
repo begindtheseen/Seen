@@ -11,6 +11,7 @@ import { ReportDupesCard } from './ReportDupesCard'
 import { SearchDataPanel } from './SearchDataPanel'
 import { JobCrisisBanner, JobRefreshButton, JobRunner, ReportRow, IssueRow, RedditDisputesPanel, ListingTicketsPanel, MergePanel, CompanyExportPanel, CreditsPanel, FlagsPanel, ClustersPanel, JobDedupePanel, AllJobsBrowser, DeployPanel } from './panels'
 import { GhostReportPanel } from './GhostReportPanel'
+import { SignupSourcesPanel } from './SignupSourcesPanel'
 import { LiveBell } from './LiveBell'
 import { EmployerPanel } from './EmployerPanel'
 import { EmployerClaimsPanel } from './EmployerClaimsPanel'
@@ -258,6 +259,8 @@ export function AdminShell({ stats, token, reload, onLogout, onUnauthorized }: {
             <MetricRow label="Suspected duplicates" value={dupSuspected} status="shared-signal clusters" tone={dupSuspected > 0 ? 'amber' : 'dim'} />
             <button className="ac-btn" onClick={() => setManageOpen(true)}>Manage accounts →</button>
           </Panel>
+          {/* First-touch signup attribution (lib/server/attributionReport.js, migration 20261024180000) */}
+          <SignupSourcesPanel token={token} />
           </div>
         )}
 

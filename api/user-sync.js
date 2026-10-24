@@ -20,6 +20,7 @@ import { deleteApplicantResumes } from '../lib/server/seenApplyStore.js';
 import { decodeThread } from '../lib/server/applicationThread.js';
 import { pacificDate } from '../lib/time/pacific.js';
 import { claimReferral, referralStatus, rewardReferralOnApplication } from '../lib/server/growthRewards.js';
+import { recordSignupAttribution } from '../lib/server/signupAttribution.js';
 import * as inbox from '../lib/server/inbox/store.js';
 import { PROFILE_LIMITS, PROFILE_NAME_REQUIRED } from '../lib/profileLimits.js';
 import { sanitizeEvents, clientApplicationId, casWindow, timelineAnomalies, naturalKeyQuery, isMissingColumn, cleanText, COMPANY_MAX, ROLE_MAX, CITY_MAX, PLATFORM_MAX } from '../lib/server/trackerWrites.js';
@@ -83,7 +84,7 @@ export default async function handler(req, res) {
   console.log(`[user-sync] action=${action} uid=${uid} auth=${who.via}`);
 
   // Rate-limit mutating actions per user (not reads — those are cheap DB fetches)
-  const WRITE_ACTIONS = new Set(['claim_referral','add_application','update_application','remove_application','save_job','unsave_job','save_profile','save_resume','delete_account','submit_resume_survey','report_job_availability']);
+  const WRITE_ACTIONS = new Set(['claim_referral','record_attribution','add_application','update_application','remove_application','save_job','unsave_job','save_profile','save_resume','delete_account','submit_resume_survey','report_job_availability']);
   if (WRITE_ACTIONS.has(action)) {
     const windowHour = Math.floor(Date.now() / 3_600_000);
     const rlKey = `${uid}:user-sync:${windowHour}`;
@@ -501,6 +502,8 @@ export default async function handler(req, res) {
       'resume_skills', 'job_availability_reports', 'search_events',
       // Growth rewards (migration 20261024160000; these also cascade with the auth user).
       'growth_rewards', 'referral_codes',
+      // How the account first arrived (migration 20261024180000; also cascades with the auth user).
+      'signup_attribution',
     ];
     await Promise.all([
       ...userTables.map(t =>
@@ -685,6 +688,23 @@ export default async function handler(req, res) {
       if (ur && ur.ok) accountCreatedAt = (await ur.json().catch(() => null))?.created_at || null;
       const r = await claimReferral(db, uid, body.code, { accountCreatedAt });
       return res.status(200).json(r);
+    } catch {
+      return res.status(200).json({ ok: false, reason: 'failed', final: false });
+    }
+  }
+
+  // ── FIRST-TOUCH SIGNUP ATTRIBUTION (lib/server/signupAttribution.js) ────────────────────────────
+  // The device's first touch (landing path, referring host, utm tags, invite code), stored once for a
+  // NEW account. The account's age comes from the auth server, never the client. `final` tells the
+  // browser to forget the touch. { reason: 'not_ready' } before migration 20261024180000.
+  if (action === 'record_attribution') {
+    try {
+      let accountCreatedAt = null;
+      const ur = await fetch(`${SUPABASE_URL}/auth/v1/admin/users/${encodeURIComponent(uid)}`, {
+        headers: { apikey: SERVICE_KEY, Authorization: `Bearer ${SERVICE_KEY}` },
+      }).catch(() => null);
+      if (ur && ur.ok) accountCreatedAt = (await ur.json().catch(() => null))?.created_at || null;
+      return res.status(200).json(await recordSignupAttribution(db, uid, body, { accountCreatedAt }));
     } catch {
       return res.status(200).json({ ok: false, reason: 'failed', final: false });
     }
