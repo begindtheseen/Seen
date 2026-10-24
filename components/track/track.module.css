@@ -1,0 +1,255 @@
+/* The "I applied" moment: the company-page CTA, the job page's "Did you apply?" receipt and the guest
+   tracker share these pieces (components/track/*). Phone floors: no text under .75rem (12px), every
+   control at least 44px tall, solid backgrounds (nothing translucent sits over content). */
+
+.card {
+  background: #0e111c;
+  border: 1px solid rgba(16, 185, 129, 0.35);
+  border-radius: 14px;
+  padding: 1rem 1.05rem;
+  margin: 1rem 0 .25rem;
+  min-width: 0;
+}
+.card.quiet { border-color: var(--line2); }
+
+.title {
+  font-family: var(--display);
+  font-weight: 800;
+  font-size: 1.05rem;
+  line-height: 1.3;
+  color: var(--white);
+  margin: 0 0 .25rem;
+  overflow-wrap: anywhere;
+}
+.sub {
+  font-family: var(--body);
+  font-size: .875rem;
+  line-height: 1.55;
+  color: var(--sub);
+  margin: 0 0 .8rem;
+  overflow-wrap: anywhere;
+}
+.fact {
+  font-family: var(--mono);
+  font-size: .75rem;
+  line-height: 1.6;
+  color: var(--text);
+  margin: 0 0 .75rem;
+}
+.small {
+  font-family: var(--mono);
+  font-size: .75rem;
+  line-height: 1.6;
+  color: var(--dim);
+  margin: .55rem 0 0;
+  overflow-wrap: anywhere;
+}
+.err {
+  font-family: var(--mono);
+  font-size: .75rem;
+  line-height: 1.55;
+  color: var(--red);
+  margin: .5rem 0 0;
+}
+
+.primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: .4rem;
+  min-height: 48px;
+  width: 100%;
+  padding: .7rem 1.1rem;
+  border: none;
+  border-radius: 10px;
+  background: var(--green);
+  color: #03130c;
+  font-family: var(--display);
+  font-weight: 800;
+  font-size: .95rem;
+  cursor: pointer;
+  text-decoration: none;
+  box-sizing: border-box;
+}
+.primary:disabled { opacity: .6; cursor: not-allowed; }
+.primary:focus-visible, .ghost:focus-visible, .chip:focus-visible, .link:focus-visible, .input:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
+
+.ghost {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  padding: .55rem .9rem;
+  border: 1px solid var(--line2);
+  border-radius: 10px;
+  background: #0e111c;
+  color: var(--sub);
+  font-family: var(--mono);
+  font-size: .8rem;
+  cursor: pointer;
+  text-decoration: none;
+  box-sizing: border-box;
+}
+
+.link {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 0 .1rem;
+  background: none;
+  border: none;
+  color: var(--green);
+  font-family: var(--mono);
+  font-size: .8rem;
+  text-decoration: none;
+  cursor: pointer;
+}
+.linkDim { color: var(--dim); }
+
+.label {
+  display: block;
+  font-family: var(--mono);
+  font-size: .75rem;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  color: var(--dim);
+  margin: 0 0 .4rem;
+}
+.input {
+  width: 100%;
+  min-height: 46px;
+  box-sizing: border-box;
+  background: var(--surface);
+  border: 1.5px solid var(--line2);
+  border-radius: 9px;
+  padding: .6rem .85rem;
+  color: var(--white);
+  font-family: var(--body);
+  font-size: 1rem; /* 16px: iOS does not zoom into the field */
+  caret-color: var(--green);
+}
+.input:focus { border-color: var(--green); outline: none; }
+.field { margin: 0 0 .85rem; min-width: 0; }
+
+.chips {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: .45rem;
+  margin: 0 0 .85rem;
+}
+.chip {
+  min-height: 44px;
+  min-width: 0;
+  padding: .5rem .6rem;
+  border: 1px solid var(--line2);
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: .8rem;
+  line-height: 1.3;
+  cursor: pointer;
+  text-align: center;
+}
+.chip[aria-checked='true'] {
+  border-color: var(--green);
+  background: #0b2a1f;
+  color: var(--white);
+}
+@media (min-width: 560px) {
+  .chips { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+}
+
+.row {
+  display: flex;
+  gap: .5rem;
+  flex-wrap: wrap;
+  align-items: stretch;
+}
+.row > .input { flex: 1 1 14rem; width: auto; min-width: 0; }
+.row > .primary { flex: 0 0 auto; width: auto; }
+@media (max-width: 420px) {
+  .row > .primary { flex: 1 1 100%; }
+}
+
+.actions {
+  display: flex;
+  gap: .25rem 1rem;
+  flex-wrap: wrap;
+  align-items: center;
+  margin-top: .35rem;
+}
+
+.ok {
+  font-family: var(--display);
+  font-weight: 800;
+  font-size: 1.05rem;
+  color: var(--green);
+  margin: 0 0 .3rem;
+}
+
+/* Invite banner (components/growth/InviteBanner.tsx): fixed, slim, solid. */
+.invite {
+  position: fixed;
+  left: 50%;
+  bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+  transform: translateX(-50%);
+  z-index: 900;
+  width: min(640px, calc(100vw - 24px));
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  gap: .5rem .75rem;
+  padding: .45rem .45rem .45rem .95rem;
+  background: #0e111c;
+  border: 1px solid rgba(16, 185, 129, 0.45);
+  border-radius: 12px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.55);
+}
+.inviteText {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-family: var(--body);
+  font-size: .8125rem;
+  line-height: 1.45;
+  color: var(--text);
+}
+.inviteCta {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 0 .85rem;
+  border-radius: 9px;
+  background: var(--green);
+  color: #03130c;
+  font-family: var(--display);
+  font-weight: 800;
+  font-size: .8125rem;
+  text-decoration: none;
+  white-space: nowrap;
+}
+.inviteClose {
+  flex: 0 0 auto;
+  width: 44px;
+  height: 44px;
+  border: none;
+  background: none;
+  color: var(--dim);
+  font-size: 1.1rem;
+  cursor: pointer;
+  border-radius: 9px;
+}
+@media (max-width: 768px) {
+  :global(html.tabbar) .invite { bottom: calc(76px + env(safe-area-inset-bottom, 0px)); }
+  :global(html.tabbar.kb) .invite { display: none; }
+}
+@media (max-width: 480px) {
+  .invite { flex-wrap: wrap; gap: .45rem; padding: .6rem 3rem .55rem .8rem; }
+  .inviteText { flex: 1 1 100%; }
+  .inviteCta { flex: 1 1 100%; justify-content: center; }
+  .inviteClose { position: absolute; top: 2px; right: 2px; }
+}
+/* In-flow room at the end of the page so the footer can scroll clear of the fixed banner. */
+.inviteSpacer { height: 84px; }
+@media (max-width: 480px) { .inviteSpacer { height: 150px; } }

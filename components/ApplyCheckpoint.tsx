@@ -8,6 +8,12 @@ import { applicationFromListing } from '@/lib/stores/listingApplication'
 import { aiHeaders } from '@/lib/aiHeaders'
 import ModalPortal from '@/components/ModalPortal'
 import { displayCompanyName } from '@/lib/companyDisplay'
+import { buildCompanySummary } from '@/lib/companyPageSummary'
+import { appliedAtFromChoice, checkinEmailPlan, joinDays, type AppliedChoice } from '@/lib/trackCapture'
+import { hasPendingRef } from '@/lib/referralClient'
+import { safeNextPath } from '@/lib/signupIntent.js'
+import AppliedWhen from '@/components/track/AppliedWhen'
+import CheckinEmailAsk from '@/components/track/CheckinEmailAsk'
 
 interface ApplyCheckpointProps {
   job: { id: string; title: string; company: string; location?: string; apply_url?: string | null }
@@ -19,7 +25,7 @@ interface ApplyCheckpointProps {
   onClose: () => void
 }
 
-type Step = 'main' | 'not_yet' | 'declined' | 'confirmed' | 'not_yet_confirmed' | 'listing_gone'
+type Step = 'main' | 'when' | 'not_yet' | 'declined' | 'confirmed' | 'not_yet_confirmed' | 'listing_gone'
 
 const NOT_YET_REASONS = [
   'I want to edit the resume first',
@@ -68,6 +74,28 @@ export default function ApplyCheckpoint({ job, optimized: _optimized, autoConfir
   const [loading, setLoading] = useState(false)
 
   const [creditEarned, setCreditEarned] = useState(false)
+  // "I applied earlier": the check-in clock starts at the real date (lib/trackCapture.ts).
+  const [whenChoice, setWhenChoice] = useState<AppliedChoice | null>(null)
+  const [whenDay, setWhenDay] = useState('')
+  const [whenError, setWhenError] = useState('')
+  const [tracked, setTracked] = useState<{ appliedAt: number; trackedAt: number } | null>(null)
+  // The company's reported reply rate, only where the company page would show one (≥ the rates bar).
+  // batch_scores reads stored scores only — it never starts research for an unknown name.
+  const [responsePct, setResponsePct] = useState<number | null>(null)
+  useEffect(() => {
+    if (step !== 'confirmed' || !job.company) return
+    let alive = true
+    const name = String(job.company).toLowerCase().trim()
+    fetch('/api/reports', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'batch_scores', names: [name] }) })
+      .then(r => (r.ok ? r.json() : null))
+      .then((d: { scores?: Record<string, Record<string, unknown>> } | null) => {
+        const sc = d?.scores?.[name]
+        if (!alive || !sc) return
+        setResponsePct(buildCompanySummary(sc as Parameters<typeof buildCompanySummary>[0], []).responsePct)
+      })
+      .catch(() => { /* the line is simply left out */ })
+    return () => { alive = false }
+  }, [step, job.company])
 
   // If the user already confirmed they applied (finished the Apply & Optimize funnel),
   // record the application once on mount so it always lands in the tracker — no second
@@ -120,10 +148,11 @@ export default function ApplyCheckpoint({ job, optimized: _optimized, autoConfir
   // the user already said so in the Optimize funnel). "Apply ↗" itself only opens the listing and
   // records an anonymous click (lib/trackApply) — it never adds a card. The card carries the
   // listing's full title, location, id and link (lib/stores/listingApplication).
-  async function handleApplied() {
+  async function handleApplied(appliedAt: number = Date.now()) {
     setLoading(true)
+    setTracked({ appliedAt, trackedAt: Date.now() })
     try {
-      await AppStore.add(applicationFromListing(job), isLoggedIn)
+      await AppStore.add({ ...applicationFromListing(job), appliedAt }, isLoggedIn)
       // Earn 1 AI credit back for tracking the application
       if (isLoggedIn) {
         try {
@@ -147,6 +176,13 @@ export default function ApplyCheckpoint({ job, optimized: _optimized, autoConfir
     setStep('confirmed')
   }
 
+  // The check-in emails this application will really get (api/outcome-followups.js), and where a
+  // guest's confirmation link comes back to: this listing's page when it is a Seen listing, else the tracker.
+  const checkinPlan = tracked ? checkinEmailPlan(tracked.appliedAt, tracked.trackedAt) : []
+  const checkpointNext = (typeof window !== 'undefined' && window.location.pathname.startsWith('/jobs/') && safeNextPath(window.location.pathname)) || '/tracker'
+  const [inviteWaiting, setInviteWaiting] = useState(false)
+  useEffect(() => { setInviteWaiting(hasPendingRef()) }, [])
+
   // ── Styles ─────────────────────────────────────────────────────────────────
 
   const backdropStyle: React.CSSProperties = {
@@ -167,7 +203,8 @@ export default function ApplyCheckpoint({ job, optimized: _optimized, autoConfir
     maxWidth: 480,
     maxHeight: '85dvh',
     overflowY: 'auto',
-    background: 'var(--card)',
+    // Solid, never glass: a panel over content (CLAUDE.md, PR #322 rule) — the old 3% white let the page show through.
+    background: '#0e111c',
     borderRadius: 20,
     border: '1px solid var(--line2)',
     padding: '0 0 env(safe-area-inset-bottom, 16px)',
@@ -299,51 +336,11 @@ export default function ApplyCheckpoint({ job, optimized: _optimized, autoConfir
 
   const confirmedCheckStyle: React.CSSProperties = {
     fontFamily: 'var(--display)',
-    fontSize: 48,
+    fontSize: 40,
     fontWeight: 800,
     color: 'var(--green)',
     lineHeight: 1,
     marginBottom: 10,
-  }
-
-  const statsRowStyle: React.CSSProperties = {
-    display: 'flex',
-    gap: 12,
-    marginTop: 20,
-    marginBottom: 14,
-  }
-
-  const statBoxStyle: React.CSSProperties = {
-    flex: 1,
-    background: 'rgba(255,255,255,.04)',
-    border: '1px solid var(--line)',
-    borderRadius: 10,
-    padding: '12px 14px',
-  }
-
-  const statLabelStyle: React.CSSProperties = {
-    fontFamily: 'var(--mono)',
-    fontSize: 11,
-    color: 'var(--dim)',
-    marginBottom: 4,
-  }
-
-  const statValueStyle: React.CSSProperties = {
-    fontFamily: 'var(--mono)',
-    fontSize: 13,
-    color: 'var(--white)',
-    fontWeight: 600,
-  }
-
-  const ghostRiskStyle: React.CSSProperties = {
-    fontFamily: 'var(--mono)',
-    fontSize: 12,
-    color: 'var(--dim)',
-    marginBottom: 22,
-    padding: '10px 14px',
-    background: 'rgba(255,255,255,.03)',
-    border: '1px solid var(--line)',
-    borderRadius: 9,
   }
 
   const closeFullBtnStyle: React.CSSProperties = {
@@ -398,10 +395,20 @@ export default function ApplyCheckpoint({ job, optimized: _optimized, autoConfir
 
             <button
               style={primaryBtnStyle}
-              onClick={handleApplied}
+              onClick={() => handleApplied()}
               disabled={loading}
+              data-testid="checkpoint-applied"
             >
-              {loading ? 'Saving…' : '✓ Yes, I applied'}
+              {loading ? 'Saving…' : '✓ Yes, I applied today'}
+            </button>
+
+            <button
+              style={secondaryBtnStyle}
+              onClick={() => { setWhenChoice(null); setWhenError(''); setStep('when') }}
+              disabled={loading}
+              data-testid="checkpoint-applied-earlier"
+            >
+              I applied earlier
             </button>
 
             <button
@@ -424,6 +431,37 @@ export default function ApplyCheckpoint({ job, optimized: _optimized, autoConfir
               onClick={() => setStep('declined')}
             >
               I changed my mind
+            </button>
+          </div>
+        )}
+
+        {/* ── WHEN (applied before today) ── */}
+        {step === 'when' && (
+          <div style={innerStyle}>
+            <button style={backBtnStyle} onClick={() => setStep('main')}>
+              ← back
+            </button>
+            <div style={headingStyle}>When did you apply?</div>
+            <div style={{ ...jobLineStyle, marginBottom: 16 }}>{companyName} · {job.title}</div>
+            <AppliedWhen
+              legend="Pick the closest"
+              choice={whenChoice}
+              pickedDay={whenDay}
+              onChoice={c => { setWhenChoice(c); setWhenError('') }}
+              onPickedDay={setWhenDay}
+            />
+            {whenError && <div role="alert" style={{ fontFamily: 'var(--mono)', fontSize: 12, color: 'var(--red)', marginBottom: 10 }}>{whenError}</div>}
+            <button
+              style={{ ...primaryBtnStyle, textAlign: 'center' }}
+              disabled={loading}
+              data-testid="checkpoint-when-submit"
+              onClick={() => {
+                const at = whenChoice ? appliedAtFromChoice(whenChoice, whenDay) : null
+                if (at == null) { setWhenError(whenChoice ? 'Pick the day you applied (today or earlier).' : 'Pick when you applied.'); return }
+                void handleApplied(at)
+              }}
+            >
+              {loading ? 'Saving…' : 'Track it'}
             </button>
           </div>
         )}
@@ -558,30 +596,23 @@ export default function ApplyCheckpoint({ job, optimized: _optimized, autoConfir
               </div>
             )}
 
-            <div style={{
-              fontFamily: 'var(--mono)',
-              fontSize: 14,
-              color: 'var(--sub)',
-              lineHeight: 1.6,
-              marginBottom: 4,
-            }}>
-              We&apos;ll tell you when {companyName} usually responds — and when silence becomes a signal.
-            </div>
-
-            <div style={statsRowStyle}>
-              <div style={statBoxStyle}>
-                <div style={statLabelStyle}>Expected response</div>
-                <div style={statValueStyle}>7–14 days</div>
+            {responsePct != null && (
+              <div style={{ fontFamily: 'var(--mono)', fontSize: 13, color: 'var(--text)', lineHeight: 1.6, marginBottom: 10 }} data-testid="checkpoint-reply-rate">
+                {companyName} usually replies to {responsePct}% of applicants.
               </div>
-              <div style={statBoxStyle}>
-                <div style={statLabelStyle}>Next check-in</div>
-                <div style={statValueStyle}>in 3 days</div>
-              </div>
-            </div>
+            )}
 
-            <div style={ghostRiskStyle}>
-              Ghost risk if no response by day 21: <span style={{ color: 'var(--white)' }}>Moderate</span>
-            </div>
+            {isLoggedIn ? (
+              <div style={{ fontFamily: 'var(--mono)', fontSize: 14, color: 'var(--sub)', lineHeight: 1.6, marginBottom: 22 }} data-testid="checkpoint-signed-in">
+                {checkinPlan.length
+                  ? <>We&apos;ll email you on {joinDays(checkinPlan)} to ask what happened, unless you update it first.</>
+                  : <>Update it in your tracker when you hear back.</>}
+              </div>
+            ) : (
+              <div style={{ marginBottom: 18 }}>
+                <CheckinEmailAsk company={companyName} plan={checkinPlan} next={checkpointNext} inviteWaiting={inviteWaiting} trackerLink={false} />
+              </div>
+            )}
 
             <button style={trackerBtnStyle} onClick={() => router.push('/tracker')}>
               Go to tracker →

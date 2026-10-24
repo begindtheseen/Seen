@@ -147,7 +147,7 @@ function CTAs({ name, cslug }: { name: string; cslug: string }) {
       <Link href={`/company/${cslug}`} className="btn" style={{ background: 'linear-gradient(135deg,var(--g-start),var(--g-mid),var(--g-end))', color: '#fff', padding: '.7rem 1.3rem', fontWeight: 700 }}>
         See {name}&apos;s full hiring report →
       </Link>
-      <Link href="/tracker" className="btn btn-ghost" style={{ padding: '.7rem 1.3rem' }}>
+      <Link href={`/tracker?add=1&company=${encodeURIComponent(name)}`} className="btn btn-ghost" style={{ padding: '.7rem 1.3rem' }}>
         Track your application
       </Link>
       <Link href="/report" className="btn btn-ghost" style={{ padding: '.7rem 1.3rem' }}>

@@ -20,6 +20,7 @@ import { Crumbs } from '@/components/shell/PageHeader'
 import { LoadError } from '@/components/shell/LoadStates'
 import ListingSignals from '@/components/ListingSignals'
 import WarnFriendShare from '@/components/growth/WarnFriendShare'
+import TrackCta from '@/components/company/TrackCta'
 import { warnFriendText } from '@/lib/growthCopy.js'
 import { gradeLetter, displayCompanyName, displayPlatform, isResolvedOutcome, lastUpdatedLabel } from '@/lib/companyDisplay'
 import { buildCompanySummary, publicRowsHeading, reportsProvenanceLine, reportsSectionSummary, MIN_REPORTS_FOR_RATES, type CompanySummary } from '@/lib/companyPageSummary'
@@ -271,97 +272,6 @@ function WebReviewsSection({ reviews, hidden }: { reviews: WebReview[]; hidden: 
       {hidden > 0 && (
         <div style={{ fontFamily: 'var(--mono)', fontSize: '.56rem', color: 'var(--muted)', marginTop: '.6rem', lineHeight: 1.6 }}>
           {hidden} quote{hidden === 1 ? '' : 's'} not shown: {hidden === 1 ? 'it contains' : 'they contain'} links or moderator-bot text, which is never a first-hand account.
-        </div>
-      )}
-    </div>
-  )
-}
-
-interface TrackCTAProps {
-  companyName: string
-}
-function TrackCTA({ companyName }: TrackCTAProps) {
-  const { isLoggedIn } = useAuth()
-  const [state, setState] = useState<'idle' | 'loading' | 'success' | 'error'>('idle')
-  const [role, setRole] = useState('')
-  const [showInput, setShowInput] = useState(false)
-
-  async function handleTrack() {
-    if (!role.trim()) { setShowInput(true); return }
-    setState('loading')
-    try {
-      // AppStore.add handles both worlds correctly: local tracking for guests, and the
-      // authed add_application sync (wrapped payload + Bearer token) for signed-in users.
-      // The old raw fetch sent no auth and a flat body the handler couldn't read — this
-      // button had never once succeeded.
-      await AppStore.add({
-        company: companyName,
-        role: role.trim(),
-        platform: 'Seen',
-        status: 'active',
-        stage: 'Applied',
-      }, isLoggedIn)
-      setState('success')
-    } catch {
-      setState('error')
-    }
-  }
-
-  if (state === 'success') {
-    return (
-      <div style={{
-        background: 'rgba(16,185,129,0.07)', border: '1px solid rgba(16,185,129,0.2)',
-        borderRadius: 10, padding: '.75rem 1rem', marginBottom: '.75rem',
-        fontFamily: 'var(--mono)', fontSize: '.68rem', color: 'var(--green)',
-      }}>
-        ✓ Application tracked — check your tracker to follow up
-      </div>
-    )
-  }
-
-  return (
-    <div style={{ marginBottom: '.75rem' }}>
-      {showInput ? (
-        <div style={{ display: 'flex', gap: '.5rem', flexWrap: 'wrap' }}>
-          <input
-            autoFocus
-            type="text"
-            placeholder="Job title (e.g. Software Engineer)"
-            value={role}
-            onChange={e => setRole(e.target.value)}
-            onKeyDown={e => e.key === 'Enter' && handleTrack()}
-            className="co-track-input"
-          />
-          <button
-            onClick={handleTrack}
-            disabled={state === 'loading'}
-            style={{
-              background: 'linear-gradient(135deg,rgba(16,185,129,0.15),rgba(99,102,241,0.15))',
-              border: '1px solid rgba(16,185,129,0.3)', borderRadius: 6,
-              color: 'var(--green)', fontFamily: 'var(--mono)', fontSize: '.68rem',
-              padding: '.45rem 1rem', cursor: 'pointer', flexShrink: 0,
-            }}
-          >
-            {state === 'loading' ? 'Saving...' : 'Track →'}
-          </button>
-        </div>
-      ) : (
-        <button
-          onClick={() => setShowInput(true)}
-          style={{
-            width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center',
-            background: 'linear-gradient(135deg,rgba(16,185,129,0.15),rgba(99,102,241,0.15))',
-            border: '1px solid rgba(16,185,129,0.3)', borderRadius: 10,
-            color: 'var(--green)', fontFamily: 'var(--mono)', fontSize: '.78rem',
-            padding: '.75rem 1rem', cursor: 'pointer', fontWeight: 500,
-          }}
-        >
-          + I applied here — track this application
-        </button>
-      )}
-      {state === 'error' && (
-        <div style={{ fontFamily: 'var(--mono)', fontSize: '.6rem', color: 'var(--red)', marginTop: '.35rem' }}>
-          Could not save. Make sure you&apos;re signed in.
         </div>
       )}
     </div>
@@ -1005,6 +915,8 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
             </div>
           )}
 
+          {!loading && !error && companyName && <TrackCta company={displayName} slug={slug} responsePct={sum.ratesShown ? sum.responsePct : null} />}
+
           {/* Warn a friend: right under the grade, worded from exactly what this page shows (lib/growthCopy.js).
               A signed-in person's link carries their invite code. Replaces the old plain "Share" chip. */}
           {!loading && !error && companyName && (
@@ -1022,7 +934,6 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
           {/* Actions: one primary, the rest compact. */}
           {!loading && (
             <div className="co-actions">
-              <TrackCTA companyName={companyName} />
               <div className="co-action-row">
                 <a href={`/resume?company=${encodeURIComponent(companyName || '')}`} className="co-act co-act-primary"><span>✨ Analyze résumé for {displayName}</span></a>
                 <a href={reportHref} className="co-act">📝 Report experience</a>

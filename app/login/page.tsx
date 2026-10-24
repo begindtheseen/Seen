@@ -7,6 +7,9 @@ import { useAuth } from '@/lib/auth'
 import { SESSION_EXPIRED_MESSAGE, clearSessionExpiredNotice, wasSessionExpiredRecently } from '@/lib/sessionExpired'
 import { internalPath } from '@/lib/safeHref.js'
 import { savePendingSignup, readPendingSignup, clearPendingSignup, markPendingSignin, isEmailThrottle, signupConfirmed } from '@/lib/pendingSignup.js'
+import { parseSignupParams, intentCopy, nextLabel } from '@/lib/signupIntent.js'
+import { pendingApplicationsForSignup, PENDING_META_KEY } from '@/lib/pendingApplicationClient'
+import { hasPendingRef } from '@/lib/referralClient'
 import styles from './login.module.css'
 
 // "Check your email" auto-detects the click: poll while the tab is visible, every 5 s, for at
@@ -39,7 +42,11 @@ function isUnconfirmedError(err: { code?: string; message?: string } | null): bo
   return err.code === 'email_not_confirmed' || /not confirmed/i.test(err.message || '')
 }
 
-type Step = 'who' | 'email' | 'password' | 'verify' | 'signin'
+// One sign-up screen (email + password, or a passwordless link), the two "check your email" screens,
+// and sign-in. The old Who are you? → name + email → password chain was three screens before any
+// value (conversion audit 2026-10-24); the role is folded in (job seeker by default, a small
+// "Hiring?" link) and the name is asked later, in Settings.
+type Step = 'signup' | 'linksent' | 'verify' | 'signin'
 
 // Only ever redirect to an internal path — anything else (full URLs, protocol-relative
 // '//evil.com') falls back to the dashboard so login can't be used as an open redirect. The ONE
@@ -73,23 +80,26 @@ function LoginContent() {
   const params = useSearchParams()
   const { isLoggedIn, isEmployer } = useAuth()
   const cameAsEmployer = params.get('type') === 'employer'
+  // Why they came (?mode=signup&intent=track|trial|alert|invite&company=&next=) and where the
+  // confirmation link returns them — lib/signupIntent.js (tested). A friend's invite waiting on this
+  // device names the sign-up headline when nothing else does.
+  const [pendingRef, setPendingRef] = useState(false)
+  useEffect(() => { setPendingRef(hasPendingRef()) }, [])
+  const intent = parseSignupParams(params, { pendingRef, employerSignup: EMPLOYER_SIGNUP_ENABLED })
   // Where to land after auth. Every signed-out deep link (/tracker, /dashboard, /profile …) arrives
   // with ?return= (lib/safeHref.js loginHref — the same parameter lib/sessionExpired.ts uses);
-  // /pricing and the UpgradeModal pass ?next=. Both are read, both sanitized to an internal path, so
-  // the user resumes what they were doing instead of landing on /dashboard.
-  const explicitReturn = safeInternalPath(params.get('return')) || safeInternalPath(params.get('returnTo')) || safeInternalPath(params.get('next'))
+  // /pricing, the UpgradeModal and every intent link pass ?next=. All are read, all sanitized to an
+  // internal path, so the user resumes what they were doing instead of landing on /dashboard.
+  const explicitReturn = intent.next || safeInternalPath(params.get('return')) || safeInternalPath(params.get('returnTo')) || safeInternalPath(params.get('next'))
   const returnTo = explicitReturn || '/dashboard'
   // Employers land on their portal unless the link that sent them here named a page (the claim card's
   // "I have one — sign in" returns to /employers#claim).
   const employerReturnTo = explicitReturn || '/employers/dashboard'
   // "Sign in as an employer →" / "Claim your company" link here with ?type=employer: the employer
-  // role is already chosen, so the page opens on the account form for that role (not "Who are you?"
-  // again — audit 2026-10-24 E-2). ?signup=1 opens the chooser; everything else is sign-in.
-  const [step, setStep] = useState<Step>(
-    EMPLOYER_SIGNUP_ENABLED && cameAsEmployer ? 'email' : params.get('signup') === '1' || cameAsEmployer ? 'who' : 'signin'
-  )
+  // role is already chosen, so the page opens on the account form for that role (audit 2026-10-24
+  // E-2). ?signup=1, ?mode=signup or any intent opens sign-up; everything else is sign-in.
+  const [step, setStep] = useState<Step>(intent.mode === 'signup' || cameAsEmployer ? 'signup' : 'signin')
   const [signupType, setSignupType] = useState<'seeker' | 'employer'>(EMPLOYER_SIGNUP_ENABLED && cameAsEmployer ? 'employer' : 'seeker')
-  const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [verifyEmail, setVerifyEmail] = useState('')
@@ -157,37 +167,48 @@ function LoginContent() {
 
   function clearError() { setError('') }
 
-  async function goToPassword() {
-    if (!name.trim() || !email.trim()) { setError('Name and email are required.'); return }
-    if (!email.includes('@')) { setError('Enter a valid email.'); return }
-    clearError()
-    setStep('password')
+  const validEmail = (v: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v.trim())
+
+  /** What the sign-up carries in user_metadata. account_type is the stable key the DB trigger (migration
+   *  052) reads; role_type is kept for back-compat with the pre-052 trigger. A seeker's guest applications
+   *  ride along (lib/pendingApplicationClient.ts creates them on the first sign-in, on any device). */
+  function signupMeta(effectiveType: 'seeker' | 'employer'): Record<string, unknown> {
+    const meta: Record<string, unknown> = { role_type: effectiveType, account_type: effectiveType }
+    if (intent.intent) meta.signup_intent = intent.intent
+    if (effectiveType === 'seeker') {
+      const pending = pendingApplicationsForSignup()
+      if (pending.length) meta[PENDING_META_KEY] = pending
+    }
+    return meta
+  }
+
+  /** Where the confirmation link lands: an employer's portal, else the page they came from. */
+  function confirmDest(effectiveType: 'seeker' | 'employer'): string {
+    const verifyDest = effectiveType === 'employer' ? '/employers/dashboard' : '/dashboard'
+    return effectiveType === 'employer' ? verifyDest : (explicitReturn || verifyDest)
   }
 
   async function createAccount() {
+    if (!validEmail(email)) { setError('Enter a valid email.'); return }
     if (password.length < 8) { setError('Password must be at least 8 characters.'); return }
     setLoading(true); clearError()
     // Kill switch: force seeker when employer signup is closed, even if state somehow says otherwise.
     const effectiveType = EMPLOYER_SIGNUP_ENABLED ? signupType : 'seeker'
-    // Persist the intent under BOTH keys: account_type is the stable key the DB trigger (migration
-    // 052) reads; role_type is kept for back-compat with the pre-052 trigger, so signup labels the
-    // account correctly regardless of whether the migration has been applied yet.
-    const meta: Record<string, string> = { name, role_type: effectiveType, account_type: effectiveType }
+    const meta = signupMeta(effectiveType)
     // Route the EMAIL-CONFIRMATION link to the right place. Without emailRedirectTo, Supabase sends
     // the verify link to the project Site URL (the seeker homepage) — so a new employer who confirms
     // via the email link landed on the job-seeker front page instead of their portal. Employers →
     // their dashboard (which walks them through claiming + posting via the activation checklist);
-    // seekers land on THEIR dashboard — the verify screen promises exactly that, and the homepage
-    // with a signed-in nav read as "nothing happened" (audit 2026-10-23). Supabase honours a path on
+    // seekers land where they started (the company page, the tracker, the trial), else THEIR dashboard
+    // (audit 2026-10-23: the homepage with a signed-in nav read as "nothing happened"). Supabase honours a path on
     // the Site URL's own origin (the reset flow's ${origin}/reset proves it, verified 2026-10-23); any
     // OTHER origin — a Vercel preview — must be in Authentication → URL Configuration → Redirect
     // URLs, or the link is sent to the Site URL root (a preview signup's link came back as
     // redirect_to=https://seenjobs.io/).
-    const verifyDest = effectiveType === 'employer' ? '/employers/dashboard' : '/dashboard'
     const { data: signed, error: err } = await supabase.auth.signUp({
-      email,
+      email: email.trim(),
       password,
-      options: { data: meta, emailRedirectTo: `${window.location.origin}${verifyDest}` },
+      options: { data: meta, emailRedirectTo: `${window.location.origin}${confirmDest(effectiveType)}` },
     })
     setLoading(false)
     if (err && !isEmailThrottle(err)) { setError(err.message); return }
@@ -201,6 +222,24 @@ function LoginContent() {
     setVerifyUid(pending && pending.email === addr.toLowerCase() ? pending.uid : (signed?.user?.id ?? null))
     setVerifyEmail(addr)
     setStep('verify')
+  }
+
+  /** Passwordless: Supabase emails a link that confirms (new address) or signs in (existing account)
+   *  and lands on the same destination. An account made this way has no password until it sets one
+   *  through "Forgot password?" (/reset); it can always sign in with another link. */
+  async function sendLink() {
+    if (!validEmail(email)) { setError('Enter a valid email.'); return }
+    setLoading(true); clearError(); setNotice('')
+    const effectiveType = EMPLOYER_SIGNUP_ENABLED ? signupType : 'seeker'
+    const { error: err } = await supabase.auth.signInWithOtp({
+      email: email.trim(),
+      options: { shouldCreateUser: true, data: signupMeta(effectiveType), emailRedirectTo: `${window.location.origin}${confirmDest(effectiveType)}` },
+    })
+    setLoading(false)
+    if (err && !isEmailThrottle(err)) { setError('We couldn’t send the email right now. Try again in a moment.'); return }
+    if (err) setNotice('We sent you a link a moment ago. Open the newest email from Seen.')
+    setVerifyEmail(email.trim())
+    setStep('linksent')
   }
 
   // Fresh employer signups land on their dashboard (activation checklist guides them to claim +
@@ -290,7 +329,7 @@ function LoginContent() {
     const addr = (to || email).trim()
     if (!addr) return
     setNotice('')
-    const dest = EMPLOYER_SIGNUP_ENABLED && signupType === 'employer' ? '/employers/dashboard' : '/dashboard'
+    const dest = confirmDest(EMPLOYER_SIGNUP_ENABLED && signupType === 'employer' ? 'employer' : 'seeker')
     const { error: err } = await supabase.auth.resend({ type: 'signup', email: addr, options: { emailRedirectTo: `${window.location.origin}${dest}` } })
     setError('')
     if (err) {
@@ -346,6 +385,9 @@ function LoginContent() {
     router.replace(isEmp ? employerReturnTo : returnTo)
   }
 
+  const headline = intentCopy({ intent: intent.intent, company: intent.company })
+  const destLabel = signupType === 'employer' ? 'your employer dashboard' : nextLabel(explicitReturn, intent.company)
+
   const btnStyle: React.CSSProperties = {
     width: '100%', padding: '.85rem',
     background: 'linear-gradient(135deg,#3b82f6 0%,#8b5cf6 100%)',
@@ -354,14 +396,6 @@ function LoginContent() {
     cursor: loading ? 'not-allowed' : 'pointer', marginBottom: '.75rem',
     boxShadow: '0 0 20px rgba(59,130,246,0.3)', opacity: loading ? 0.6 : 1,
   }
-
-  const backBtn = (to: Step) => (
-    <div style={{ marginBottom: '1rem' }}>
-      <button type="button" className={styles.textBtn} onClick={() => { clearError(); setStep(to) }} aria-label="Back">
-        ← back
-      </button>
-    </div>
-  )
 
   // Password input with a show/hide toggle — the same control on signup and sign-in.
   const pwField = (id: string, opts: { autoComplete: 'new-password' | 'current-password'; placeholder: string; onEnter: () => void }) => (
@@ -385,17 +419,11 @@ function LoginContent() {
   )
 
   const label = (text: string, htmlFor?: string) => (
-    <label htmlFor={htmlFor} style={{ fontFamily: 'var(--mono)', fontSize: '.6rem', textTransform: 'uppercase' as const, letterSpacing: '.08em', color: 'var(--dim)', display: 'block', marginBottom: '.35rem' }}>
+    <label htmlFor={htmlFor} style={{ fontFamily: 'var(--mono)', fontSize: '.75rem', textTransform: 'uppercase' as const, letterSpacing: '.08em', color: 'var(--dim)', display: 'block', marginBottom: '.35rem' }}>
       {text}
     </label>
   )
 
-  // Signup role tiles. The Employer tile drops out when the kill switch closes employer signup,
-  // leaving only the seeker path (and the grid collapses to a single column).
-  const roleTiles = ([
-    { type: 'seeker' as const, emoji: '🎯', label: 'Job Seeker', desc: 'Find real jobs, track applications, avoid getting ghosted' },
-    { type: 'employer' as const, emoji: '🏢', label: 'Employer', desc: 'See your reputation, respond to applicants, post listings' },
-  ]).filter(t => EMPLOYER_SIGNUP_ENABLED || t.type !== 'employer')
 
   return (
     <div className={styles.wrap}>
@@ -426,100 +454,90 @@ function LoginContent() {
           )}
         </div>
 
-        {/* ── STEP: WHO ── */}
-        {step === 'who' && (
-          <div>
-            <div style={{ textAlign: 'center', marginBottom: '1.75rem' }}>
-              <h1 style={{ fontFamily: 'var(--display)', fontSize: '1.5rem', fontWeight: 800, color: 'var(--white)', letterSpacing: '-.025em', margin: '0 0 .35rem' }}>Who are you?</h1>
-              <div style={{ fontSize: '.85rem', color: 'var(--sub)', fontWeight: 300 }}>Pick one to get started</div>
-            </div>
+        {/* ── STEP: SIGN UP (one screen) ── */}
+        {step === 'signup' && (
+          <div data-testid="signup-step">
+            {signupType === 'employer' ? (
+              <>
+                <h1 style={{ fontFamily: 'var(--display)', fontSize: '1.4rem', fontWeight: 800, color: 'var(--white)', letterSpacing: '-.025em', margin: '0 0 .2rem' }}>Create your employer account</h1>
+                <div style={{ fontSize: '.82rem', color: 'var(--sub)', fontWeight: 300, marginBottom: '.6rem' }}>Then claim your company on the employers page. Free.</div>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '.6rem', flexWrap: 'wrap', background: 'var(--bdim)', border: '1px solid var(--bmid)', borderRadius: 8, padding: '.55rem .8rem', fontFamily: 'var(--mono)', fontSize: '.75rem', color: 'var(--sub)', marginBottom: '1.25rem' }}>
+                  <span>🏢 Employer account · a work email at your company&apos;s domain gets your claim approved instantly</span>
+                  <button type="button" className={styles.linkBtn} onClick={() => { setSignupType('seeker'); clearError() }} style={{ fontSize: '.75rem' }}>Not an employer?</button>
+                </div>
+              </>
+            ) : (
+              <>
+                <h1 data-testid="signup-title" style={{ fontFamily: 'var(--display)', fontSize: '1.4rem', fontWeight: 800, color: 'var(--white)', letterSpacing: '-.025em', margin: '0 0 .3rem' }}>{headline.title}</h1>
+                <div data-testid="signup-sub" style={{ fontSize: '.875rem', color: 'var(--sub)', fontWeight: 300, lineHeight: 1.55, marginBottom: '1.35rem' }}>{headline.sub}</div>
+              </>
+            )}
             {!EMPLOYER_SIGNUP_ENABLED && cameAsEmployer && (
-              <div style={{ background: 'var(--bdim)', border: '1px solid var(--bmid)', borderRadius: 8, padding: '.6rem .85rem', fontFamily: 'var(--mono)', fontSize: '.62rem', color: 'var(--sub)', marginBottom: '1.1rem', textAlign: 'center', lineHeight: 1.55 }}>
+              <div style={{ background: 'var(--bdim)', border: '1px solid var(--bmid)', borderRadius: 8, padding: '.6rem .85rem', fontFamily: 'var(--mono)', fontSize: '.75rem', color: 'var(--sub)', marginBottom: '1.1rem', textAlign: 'center', lineHeight: 1.55 }}>
                 Employer signups are currently closed. You can still create a job seeker account below.
               </div>
             )}
-            <div style={{ display: 'grid', gridTemplateColumns: roleTiles.length > 1 ? '1fr 1fr' : '1fr', gap: '.75rem', marginBottom: '1.25rem' }}>
-              {roleTiles.map(t => (
-                <button
-                  key={t.type}
-                  onClick={() => { setSignupType(t.type); setStep('email') }}
-                  style={{
-                    background: 'var(--surface)', border: '1.5px solid var(--line2)', borderRadius: 12,
-                    padding: '1.5rem 1rem', cursor: 'pointer', textAlign: 'center',
-                    transition: 'all .2s',
-                  }}
-                  onMouseOver={e => { (e.currentTarget as HTMLButtonElement).style.borderColor = 'var(--blue)'; (e.currentTarget as HTMLButtonElement).style.background = 'var(--bdim)' }}
-                  onMouseOut={e => { (e.currentTarget as HTMLButtonElement).style.borderColor = 'var(--line2)'; (e.currentTarget as HTMLButtonElement).style.background = 'var(--surface)' }}
-                >
-                  <div style={{ fontSize: '1.75rem', marginBottom: '.6rem' }}>{t.emoji}</div>
-                  <div style={{ fontFamily: 'var(--display)', fontSize: '.9rem', fontWeight: 700, color: 'var(--white)', marginBottom: '.2rem' }}>{t.label}</div>
-                  <div style={{ fontSize: '.72rem', color: 'var(--dim)', fontWeight: 300 }}>{t.desc}</div>
-                </button>
-              ))}
-            </div>
-            <div style={{ textAlign: 'center', fontSize: '.78rem', color: 'var(--muted)' }}>
+            <form onSubmit={e => { e.preventDefault(); void createAccount() }}>
+              <div style={{ marginBottom: '.85rem' }}>
+                {label('Email', 'su-email')}
+                <input id="su-email" type="email" autoComplete="email" inputMode="email" placeholder="you@email.com" value={email} onChange={e => setEmail(e.target.value)} style={fieldStyle(focused === 'email')} onFocus={() => setFocused('email')} onBlur={() => setFocused(null)} />
+              </div>
+              <div style={{ marginBottom: '1.1rem' }}>
+                {label('Password', 'su-pw')}
+                {pwField('su-pw', { autoComplete: 'new-password', placeholder: 'At least 8 characters', onEnter: createAccount })}
+                <div style={{ height: 3, background: 'var(--line2)', borderRadius: 2, overflow: 'hidden', marginTop: '.5rem' }}>
+                  <div style={{
+                    height: '100%', borderRadius: 2, transition: 'all .3s',
+                    width: `${Math.min(100, password.length * 8)}%`,
+                    background: password.length < 8 ? 'var(--red)' : password.length < 12 ? 'var(--amber)' : 'var(--green)',
+                  }} />
+                </div>
+              </div>
+              <button type="submit" style={btnStyle} disabled={loading} data-testid="signup-submit">
+                {loading ? 'Creating account...' : 'Create account →'}
+              </button>
+            </form>
+            <button type="button" onClick={() => void sendLink()} disabled={loading} data-testid="signup-link" style={{ width: '100%', minHeight: 44, padding: '.65rem', background: 'none', border: '1px solid var(--line2)', color: 'var(--sub)', borderRadius: 8, fontFamily: 'var(--body)', fontSize: '.85rem', cursor: 'pointer', marginBottom: '.75rem' }}>
+              No password? Email me a sign-in link
+            </button>
+            <div style={{ textAlign: 'center', fontSize: '.8rem', color: 'var(--muted)' }}>
               Already have an account?{' '}
               <button type="button" className={styles.linkBtn} onClick={() => { clearError(); setStep('signin') }}>
                 Sign in →
               </button>
             </div>
-          </div>
-        )}
-
-        {/* ── STEP: EMAIL ── */}
-        {step === 'email' && (
-          <div>
-            {backBtn('who')}
-            <h1 style={{ fontFamily: 'var(--display)', fontSize: '1.4rem', fontWeight: 800, color: 'var(--white)', letterSpacing: '-.025em', margin: '0 0 .2rem' }}>
-              {signupType === 'employer' ? 'Create your employer account' : 'Create your account'}
-            </h1>
-            <div style={{ fontSize: '.82rem', color: 'var(--sub)', fontWeight: 300, marginBottom: signupType === 'employer' ? '.6rem' : '1.5rem' }}>
-              {signupType === 'employer' ? 'Then claim your company on the employers page — free.' : 'Free forever for job seekers'}
-            </div>
-            {signupType === 'employer' && (
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '.6rem', flexWrap: 'wrap', background: 'var(--bdim)', border: '1px solid var(--bmid)', borderRadius: 8, padding: '.55rem .8rem', fontFamily: 'var(--mono)', fontSize: '.62rem', color: 'var(--sub)', marginBottom: '1.25rem' }}>
-                <span>🏢 Employer account · a work email at your company&apos;s domain gets your claim approved instantly</span>
-                <button type="button" className={styles.linkBtn} onClick={() => { setSignupType('seeker'); clearError() }} style={{ fontSize: '.62rem' }}>Not an employer?</button>
+            {EMPLOYER_SIGNUP_ENABLED && signupType === 'seeker' && (
+              <div style={{ textAlign: 'center', marginTop: '.25rem' }}>
+                <button type="button" className={`${styles.linkBtn} ${styles.linkDim}`} onClick={() => { setSignupType('employer'); clearError() }} data-testid="signup-employer">
+                  Hiring? Employer sign-up →
+                </button>
               </div>
             )}
-            <div style={{ marginBottom: '.85rem' }}>
-              {label('First name', 'su-name')}
-              <input id="su-name" type="text" autoComplete="given-name" placeholder="What should we call you?" value={name} onChange={e => setName(e.target.value)} style={fieldStyle(focused === 'name')} onFocus={() => setFocused('name')} onBlur={() => setFocused(null)} />
-            </div>
-            <div style={{ marginBottom: '1.25rem' }}>
-              {label('Email', 'su-email')}
-              <input id="su-email" type="email" autoComplete="email" inputMode="email" placeholder="you@email.com" value={email} onChange={e => setEmail(e.target.value)} style={fieldStyle(focused === 'email')} onFocus={() => setFocused('email')} onBlur={() => setFocused(null)} onKeyDown={e => e.key === 'Enter' && goToPassword()} />
-            </div>
-            <button style={btnStyle} onClick={goToPassword} disabled={loading}>Continue →</button>
-            <div style={{ textAlign: 'center', fontSize: '.78rem', color: 'var(--muted)' }}>
-              Already have an account?{' '}
-              <button type="button" className={styles.linkBtn} onClick={() => { clearError(); setStep('signin') }}>
-                Sign in →
-              </button>
-            </div>
           </div>
         )}
 
-        {/* ── STEP: PASSWORD ── */}
-        {step === 'password' && (
-          <div>
-            {backBtn('email')}
-            <h1 style={{ fontFamily: 'var(--display)', fontSize: '1.4rem', fontWeight: 800, color: 'var(--white)', letterSpacing: '-.025em', margin: '0 0 .2rem' }}>Set a password</h1>
-            <div style={{ fontSize: '.82rem', color: 'var(--sub)', fontWeight: 300, marginBottom: '1.5rem' }}>Make it something you&apos;ll remember</div>
-            <div style={{ marginBottom: '1.25rem' }}>
-              {label('Password', 'su-pw')}
-              {pwField('su-pw', { autoComplete: 'new-password', placeholder: 'At least 8 characters', onEnter: createAccount })}
-              <div style={{ height: 3, background: 'var(--line2)', borderRadius: 2, overflow: 'hidden', marginTop: '.5rem' }}>
-                <div style={{
-                  height: '100%', borderRadius: 2, transition: 'all .3s',
-                  width: `${Math.min(100, password.length * 8)}%`,
-                  background: password.length < 8 ? 'var(--red)' : password.length < 12 ? 'var(--amber)' : 'var(--green)',
-                }} />
-              </div>
+        {/* ── STEP: LINK SENT (passwordless) ── */}
+        {step === 'linksent' && (
+          <div style={{ textAlign: 'center' }} data-testid="linksent-step">
+            <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>📬</div>
+            <h1 style={{ fontFamily: 'var(--display)', fontSize: '1.4rem', fontWeight: 800, color: 'var(--white)', letterSpacing: '-.025em', margin: '0 0 .5rem' }}>Check your email</h1>
+            <div style={{ fontSize: '.875rem', color: 'var(--sub)', fontWeight: 300, lineHeight: 1.7, marginBottom: '1.25rem' }}>
+              We sent a sign-in link to<br />
+              <strong style={{ color: 'var(--white)' }}>{verifyEmail}</strong>
             </div>
-            <button style={btnStyle} onClick={createAccount} disabled={loading}>
-              {loading ? 'Creating account...' : 'Create account →'}
-            </button>
+            <div style={{ background: 'var(--bdim)', border: '1px solid var(--bmid)', borderRadius: 8, padding: '.85rem 1rem', fontFamily: 'var(--mono)', fontSize: '.75rem', color: 'var(--blue)', marginBottom: '1rem', lineHeight: 1.65, textAlign: 'left' }}>
+              ✓ Open the link in your email<br />
+              ✓ It signs you in and opens {destLabel}<br />
+              ✓ No password needed
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'center', flexWrap: 'wrap', gap: '.25rem 1.25rem' }}>
+              <button type="button" className={`${styles.linkBtn} ${styles.linkDim}`} onClick={() => { setNotice(''); clearError(); setStep('signup') }}>
+                Use a different email
+              </button>
+              <button type="button" className={`${styles.linkBtn} ${styles.linkDim}`} onClick={() => void sendLink()} disabled={loading}>
+                Send it again
+              </button>
+            </div>
           </div>
         )}
 
@@ -532,9 +550,9 @@ function LoginContent() {
               We sent a verification link to<br />
               <strong style={{ color: 'var(--white)' }}>{verifyEmail}</strong>
             </div>
-            <div style={{ background: 'var(--bdim)', border: '1px solid var(--bmid)', borderRadius: 8, padding: '.85rem 1rem', fontFamily: 'var(--mono)', fontSize: '.68rem', color: 'var(--blue)', marginBottom: '1rem', lineHeight: 1.65, textAlign: 'left' }}>
+            <div style={{ background: 'var(--bdim)', border: '1px solid var(--bmid)', borderRadius: 8, padding: '.85rem 1rem', fontFamily: 'var(--mono)', fontSize: '.75rem', color: 'var(--blue)', marginBottom: '1rem', lineHeight: 1.65, textAlign: 'left' }}>
               ✓ Open the link in your email<br />
-              ✓ It signs you in and opens your dashboard<br />
+              ✓ It signs you in and opens {destLabel}<br />
               ✓ Left this tab open? It moves on by itself
             </div>
             <div className={styles.auto} aria-live="polite">Watching for your click — no need to refresh</div>
@@ -545,7 +563,7 @@ function LoginContent() {
               Resend verification email
             </button>
             <div style={{ display: 'flex', justifyContent: 'center', flexWrap: 'wrap', gap: '.25rem 1.25rem' }}>
-              <button type="button" className={`${styles.linkBtn} ${styles.linkDim}`} onClick={() => { clearPendingSignup(); setVerifyUid(null); setNotice(''); setEmail(''); setPassword(''); setStep('email') }}>
+              <button type="button" className={`${styles.linkBtn} ${styles.linkDim}`} onClick={() => { clearPendingSignup(); setVerifyUid(null); setNotice(''); setEmail(''); setPassword(''); setStep('signup') }}>
                 Use a different email
               </button>
               <button type="button" className={`${styles.linkBtn} ${styles.linkDim}`} onClick={() => { markPendingSignin(); setVerifyUid(null); setNotice(''); clearError(); setEmail(verifyEmail); setPassword(''); setStep('signin') }}>
@@ -557,10 +575,11 @@ function LoginContent() {
 
         {/* ── STEP: SIGN IN ── */}
         {step === 'signin' && (
-          <div>
-            {backBtn('who')}
-            <h1 style={{ fontFamily: 'var(--display)', fontSize: '1.4rem', fontWeight: 800, color: 'var(--white)', letterSpacing: '-.025em', margin: '0 0 .2rem' }}>Welcome back</h1>
-            <div style={{ fontSize: '.82rem', color: 'var(--sub)', fontWeight: 300, marginBottom: '1.5rem' }}>Sign in to your account</div>
+          <div data-testid="signin-step">
+            {/* "Welcome back" only for someone who WAS signed in here (an expired session). A guest sent
+                here by a link has never had an account (conversion audit 2026-10-24). */}
+            <h1 style={{ fontFamily: 'var(--display)', fontSize: '1.4rem', fontWeight: 800, color: 'var(--white)', letterSpacing: '-.025em', margin: '0 0 .2rem' }}>{expiredNotice ? 'Welcome back' : 'Sign in'}</h1>
+            <div style={{ fontSize: '.82rem', color: 'var(--sub)', fontWeight: 300, marginBottom: '1.5rem' }}>{expiredNotice ? 'Sign in to pick up where you left off.' : 'Use the email you signed up with.'}</div>
             <div style={{ marginBottom: '.85rem' }}>
               {label('Email', 'si-email')}
               <input id="si-email" type="email" autoComplete="email" inputMode="email" placeholder="you@email.com" value={email} onChange={e => setEmail(e.target.value)} style={fieldStyle(focused === 'siEmail')} onFocus={() => setFocused('siEmail')} onBlur={() => setFocused(null)} />
@@ -584,15 +603,18 @@ function LoginContent() {
                 skipped the email is not sent to reset a working password. Resend goes to anyone — no
                 account enumeration. */}
             {error && !coolingDown && !unconfirmedEmail && (
-              <div style={{ textAlign: 'center', fontFamily: 'var(--mono)', fontSize: '.62rem', color: 'var(--muted)', marginBottom: '.75rem', lineHeight: 1.6 }}>
+              <div style={{ textAlign: 'center', fontFamily: 'var(--mono)', fontSize: '.75rem', color: 'var(--muted)', marginBottom: '.75rem', lineHeight: 1.6 }}>
                 Just signed up and never confirmed your email?{' '}
                 <button type="button" className={`${styles.linkBtn} ${styles.linkDim}`} onClick={() => resendVerification()} style={{ fontSize: 'inherit' }}>Resend the confirmation link</button>
               </div>
             )}
-            <div style={{ textAlign: 'center', fontSize: '.78rem', color: 'var(--muted)' }}>
-              No account?{' '}
-              <button type="button" className={styles.linkBtn} onClick={() => { clearError(); setStep('who') }}>
-                Create one →
+            <button type="button" onClick={() => void sendLink()} disabled={loading} data-testid="signin-link" style={{ width: '100%', minHeight: 44, padding: '.65rem', background: 'none', border: '1px solid var(--line2)', color: 'var(--sub)', borderRadius: 8, fontFamily: 'var(--body)', fontSize: '.85rem', cursor: 'pointer', marginBottom: '.75rem' }}>
+              Email me a sign-in link instead
+            </button>
+            <div style={{ textAlign: 'center', fontSize: '.8rem', color: 'var(--muted)' }}>
+              New to Seen?{' '}
+              <button type="button" className={styles.linkBtn} onClick={() => { clearError(); setStep('signup') }} data-testid="signin-create">
+                Create a free account →
               </button>
             </div>
           </div>
