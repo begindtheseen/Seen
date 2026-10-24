@@ -121,7 +121,7 @@ function ReportPage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [done, setDone] = useState(false)
-  const [recentReports, setRecentReports] = useState<Array<{id:string;outcome:string;company_name?:string;role?:string;platform?:string;created_at:string}>>([])
+  const [recentReports, setRecentReports] = useState<Array<{id:string;outcome:string;company_name?:string;role?:string;platform?:string;trust_reason?:string|null;created_at:string}>>([])
   const [matchedAppId, setMatchedAppId] = useState<string | null>(null)
   const [trackerUpdated, setTrackerUpdated] = useState(false)
   // The tracked app for one-click card mode (?app_id=&auto=1). When set, we render the
@@ -236,7 +236,7 @@ function ReportPage() {
       body: JSON.stringify({ action: 'feed', limit: 5, offset: 0 }),
     })
       .then(r => r.json())
-      .then((d: { reports?: Array<{id:string;outcome:string;company_name?:string;role?:string;platform?:string;created_at:string}> }) => {
+      .then((d: { reports?: Array<{id:string;outcome:string;company_name?:string;role?:string;platform?:string;trust_reason?:string|null;created_at:string}> }) => {
         if (d.reports?.length) setRecentReports(d.reports)
       })
       .catch(() => {})
@@ -544,7 +544,7 @@ function ReportPage() {
                   {r.company_name && <div style={{ fontFamily: 'var(--mono)', fontSize: '.58rem', color: 'var(--blue)', marginTop: '.15rem' }}>@ {r.company_name}</div>}
                   {r.role && <div style={{ fontFamily: 'var(--mono)', fontSize: '.56rem', color: 'var(--dim)', marginTop: '.1rem' }}>{r.role}</div>}
                   {(() => {
-                    const badge = reportSourceBadge(r.platform)
+                    const badge = reportSourceBadge(r.platform, null, r.trust_reason)
                     return badge && (
                       <div style={{ fontFamily: 'var(--mono)', fontSize: '.52rem', color: 'var(--muted)', marginTop: '.2rem' }} title={badge.title}>{badge.label}</div>
                     )

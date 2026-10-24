@@ -156,7 +156,7 @@ export function countListed(reports: ReportLike[] | null | undefined): { listed:
   let scorableWithOutcome = 0
   for (const r of rows) {
     const pub = isPublicDiscussion(r.platform)
-    const imp = !pub && isImportedReview(r.platform)
+    const imp = !pub && isImportedReview(r.platform, r.trust_reason)
     if (pub) listed.publicDiscussion += 1
     else if (imp) listed.imported += 1
     else listed.seen += 1

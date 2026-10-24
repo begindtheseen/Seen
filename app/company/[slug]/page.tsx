@@ -749,8 +749,8 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
   // A public row whose words carry a link or moderator-bot text is not shown at all (owner 2026-10-24,
   // lib/reports/excerptText.js); one the strict rules do not accept as the poster's own account is shown
   // as commentary with no outcome label (lib/reports/feedFilter.js — the feed's rule).
-  const seenRows = reports.filter(r => !isPublicDiscussion(r.platform) && !isImportedReview(r.platform))
-  const publicRowsAll = reports.filter(r => isPublicDiscussion(r.platform) || isImportedReview(r.platform))
+  const seenRows = reports.filter(r => !isPublicDiscussion(r.platform) && !isImportedReview(r.platform, r.trust_reason))
+  const publicRowsAll = reports.filter(r => isPublicDiscussion(r.platform) || isImportedReview(r.platform, r.trust_reason))
   const publicRows = publicRowsAll.filter(r => !looksLikeBotOrLinkText(r.report_text))
   const hiddenPublicN = publicRowsAll.length - publicRows.length
   const isCommentary = (r: Report): boolean => {
@@ -1156,7 +1156,7 @@ export default function CompanyPage({ params }: { params: Promise<{ slug: string
               ) : reports.length > 0 ? (
                 <>
                   {listRows.slice(0, reportsShown).map((r, i) => {
-                    const badge = reportSourceBadge(r.platform, r.report_text)
+                    const badge = reportSourceBadge(r.platform, r.report_text, r.trust_reason)
                     const employee = isEmployeeReview(r)
                     const src = reportSourceLink(r.platform, r.report_text)
                     // Quotes end at a sentence or a whole word, never mid-word ("…an onsite interview. Perhaps").
