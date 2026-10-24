@@ -25,6 +25,7 @@ import { normalizeClaimCompany } from '../lib/server/employerClaims.js';
 import { EMPLOYER_SKUS } from '../lib/server/employerSkus.js';
 import { enrichmentQueueStats } from '../lib/server/enrichmentQueue.js';
 import { pacificDate, pacificDayStart } from '../lib/time/pacific.js';
+import { recentGrants } from '../lib/server/growthRewards.js';
 import { browsePath as browseJobsPath, nextCursor as nextJobsCursor, validatePatch as validateJobPatch, restorePatch as jobRestorePatch, isJobId, HOLDERS as JOB_HOLDERS } from '../lib/server/jobAdmin.js';
 
 // Held reports still awaiting a decision: on hold and not already rejected (rejected rows stay held,
@@ -1681,6 +1682,14 @@ async function _handler(req, res) {
     });
     await db('admin_audit_log', { method: 'POST', body: JSON.stringify({ admin_id: sess.admin_id, username: 'admin', action: 'deny_report', target_type: 'job', target_id: String(job_id) }), headers: { Prefer: 'return=minimal' } });
     return res.status(200).json({ ok: true });
+  }
+
+  // ── Growth rewards (lib/server/growthRewards.js): the most recent Seen Pro grants for reports and
+  // invites, newest first, so a farmed reward can be spotted and undone by hand (delete the row and take
+  // the days off ai_credits.pro_until). Read-only. { ready: false } before migration 20261024160000.
+  if (action === 'list_growth_rewards') {
+    const out = await recentGrants(db, { limit: body.limit });
+    return res.status(200).json({ ok: true, ...out });
   }
 
   // ── Held-report review queue (lib/server/reportReview.js holds the rules) ──────────────────────
