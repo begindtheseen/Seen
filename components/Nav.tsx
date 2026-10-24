@@ -73,7 +73,7 @@ export default function Nav() {
   const [creditBalance, setCreditBalance] = useState<number | null>(null)
   // Credits chip popover (components/CreditsPopover.tsx) + the get_credits facts it shows.
   const [creditsOpen, setCreditsOpen] = useState(false)
-  const [creditInfo, setCreditInfo] = useState<{ daily_earned?: number | null; max_daily_earn?: number | null; welcome?: boolean }>({})
+  const [creditInfo, setCreditInfo] = useState<{ daily_earned?: number | null; max_daily_earn?: number | null; welcome?: boolean; daily?: number | null; purchased?: number | null }>({})
   const [isPro, setIsPro] = useState(false)
   const [showUpgrade, setShowUpgrade] = useState(false)
   const [showSurvey, setShowSurvey] = useState(false)
@@ -94,10 +94,10 @@ export default function Nav() {
           body: JSON.stringify({ action: 'get_credits' }),
         })
         if (!res.ok || cancelled) return
-        const data = await res.json() as { balance?: number; pro?: boolean; daily_earned?: number | null; max_daily_earn?: number | null; welcome?: boolean }
+        const data = await res.json() as { balance?: number; pro?: boolean; daily_earned?: number | null; max_daily_earn?: number | null; welcome?: boolean; daily?: number | null; purchased?: number | null }
         if (!cancelled) {
           setCreditBalance(data.pro ? 999 : (data.balance ?? null)); setIsPro(!!data.pro)
-          setCreditInfo({ daily_earned: data.daily_earned ?? null, max_daily_earn: data.max_daily_earn ?? null, welcome: !!data.welcome })
+          setCreditInfo({ daily_earned: data.daily_earned ?? null, max_daily_earn: data.max_daily_earn ?? null, welcome: !!data.welcome, daily: data.daily ?? null, purchased: data.purchased ?? null })
         }
       } catch { /* ignore */ }
     })
