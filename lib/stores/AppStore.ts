@@ -37,7 +37,9 @@ const STAGE_EVENT: Record<string, string | null> = {
   'Applied': null, 'Viewed': null, 'Phone Screen': 'response_received', 'Interview': 'interview_received',
   'Final Round': 'interview_received', 'Offer': 'offer_received', 'Rejected': 'rejected', 'Ghosted': 'ghosted', 'Withdrew': 'withdrawn',
 }
-const EVENT_LEVEL: Record<string, number> = { response_received: 2, interview_received: 3, offer_received: 5 }
+// A response is level 1 (Viewed): a check-in "Got a response" lifts an Applied card to Viewed, so moving
+// Phone Screen → Viewed keeps the response and only Viewed → Applied withdraws it.
+const EVENT_LEVEL: Record<string, number> = { response_received: 1, interview_received: 3, offer_received: 5 }
 const STATUS_EVENT: Record<string, string> = { hired: 'offer_received', rejected: 'rejected', ghosted: 'ghosted' }
 const stageLevel = (s: string) => STAGES.indexOf(s as typeof STAGES[number])
 
@@ -198,7 +200,7 @@ export const AppStore = {
    * Adds locally at once (the card appears), then sends it. `synced:false` = kept on this device with its
    * client id; the next load() (or Retry) sends it again — the server is idempotent on that id.
    */
-  async add(app: Partial<Application>, loggedIn: boolean): Promise<{ ok: boolean; synced: boolean; id: string }> {
+  async add(app: Partial<Application>, loggedIn: boolean): Promise<{ ok: boolean; synced: boolean; id: string; duplicate?: boolean }> {
     const now = Date.now()
     const initialEvent: HiringEvent = {
       id: 'ev_' + now,
@@ -225,10 +227,11 @@ export const AppStore = {
       (!entry.jobId && a.company?.toLowerCase() === entry.company?.toLowerCase() &&
         a.role?.toLowerCase() === entry.role?.toLowerCase() && a.status === 'active')
     )
-    if (!isDupe) {
-      apps.unshift(entry)
-      save(apps)
-    }
+    // Already on this list (a double submit, or the same listing tracked twice): nothing new is sent —
+    // sending it anyway made a second account row the next load showed as a second card.
+    if (isDupe) return { ok: true, synced: !loggedIn || (isDbId(isDupe.id) && !isDupe.unsynced), id: isDupe.id, duplicate: true }
+    apps.unshift(entry)
+    save(apps)
     let id = entry.id
     let synced = !loggedIn
     if (loggedIn && !isDbId(entry.id)) {

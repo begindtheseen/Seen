@@ -17,7 +17,7 @@ import { deleteApplicantResumes } from '../lib/server/seenApplyStore.js';
 import { decodeThread } from '../lib/server/applicationThread.js';
 import { pacificDate } from '../lib/time/pacific.js';
 import * as inbox from '../lib/server/inbox/store.js';
-import { sanitizeEvents, clientApplicationId, casWindow, timelineAnomalies, naturalKeyQuery, cleanText, COMPANY_MAX, ROLE_MAX, CITY_MAX, PLATFORM_MAX } from '../lib/server/trackerWrites.js';
+import { sanitizeEvents, clientApplicationId, casWindow, timelineAnomalies, naturalKeyQuery, isMissingColumn, cleanText, COMPANY_MAX, ROLE_MAX, CITY_MAX, PLATFORM_MAX } from '../lib/server/trackerWrites.js';
 
 // Does applications.client_id exist yet (migration 20261024130000)? Probed on use; a "no" is
 // re-checked every 10 minutes so an applied migration is picked up without a redeploy.
@@ -232,39 +232,55 @@ export default async function handler(req, res) {
       applied_at:   a.appliedAt && Number.isFinite(new Date(a.appliedAt).getTime()) ? new Date(a.appliedAt).toISOString() : new Date().toISOString(),
       events,
     };
-    const found = async (q) => {
+    // One row by a filter. `missing` = PostgREST says the client_id column is not there yet
+    // (PGRST204 / 42703) — any other refusal is not read as "no column".
+    const findOne = async (q) => {
       const r = await db(q).catch(() => null);
-      if (!r || !r.ok) return r && r.status === 400 ? 'no_column' : null;
+      if (!r) return { row: null, missing: false };
+      if (!r.ok) {
+        const e = await r.json().catch(() => ({}));
+        return { row: null, missing: r.status === 400 && isMissingColumn(e) };
+      }
       const rows = await r.json().catch(() => []);
-      return Array.isArray(rows) && rows[0] ? rows[0] : null;
+      return { row: Array.isArray(rows) && rows[0] ? rows[0] : null, missing: false };
     };
-    // 1. The same request already landed (natural key — works on every schema).
-    const dupe = await found(naturalKeyQuery(uid, row));
-    if (dupe && dupe !== 'no_column') return res.status(200).json({ id: dupe.id, updated_at: dupe.updated_at || null, existing: true });
-    // 2. The same client id already landed (after the migration).
+    const byClientId = `applications?user_id=eq.${uid}&client_id=eq.${encodeURIComponent(clientId || '')}&select=id,updated_at&limit=1`;
+    const existing = (row) => res.status(200).json({ id: row.id, updated_at: row.updated_at || null, existing: true });
+    // 1. The same client id already landed (after the migration). A different client id is a
+    //    different add, even for the same company + role on the same day.
     if (clientId && clientIdColumn.ok !== false) {
-      const byId = await found(`applications?user_id=eq.${uid}&client_id=eq.${encodeURIComponent(clientId)}&select=id,updated_at&limit=1`);
-      if (byId === 'no_column') clientIdColumn = { ok: false, at: Date.now() };
-      else if (byId) return res.status(200).json({ id: byId.id, updated_at: byId.updated_at || null, existing: true });
+      const hit = await findOne(byClientId);
+      if (hit.missing) clientIdColumn = { ok: false, at: Date.now() };
+      else if (hit.row) return existing(hit.row);
+    }
+    // 2. Before the migration: the same request already landed (natural key).
+    if (!clientId || clientIdColumn.ok === false) {
+      const hit = await findOne(naturalKeyQuery(uid, row));
+      if (hit.row) return existing(hit.row);
     }
     // 3. Insert — with the client id and ON CONFLICT DO NOTHING when the column exists, plain otherwise.
     let r = null;
     if (clientId && clientIdColumn.ok !== false) {
       r = await db('applications?on_conflict=user_id,client_id', { method: 'POST', body: JSON.stringify({ ...row, client_id: clientId }), headers: { Prefer: 'resolution=ignore-duplicates,return=representation' } });
-      if (!r.ok && r.status === 400) { clientIdColumn = { ok: false, at: Date.now() }; r = null; }
-      else if (r.ok) clientIdColumn = { ok: true, at: Date.now() };
+      if (!r.ok && r.status === 400) {
+        const e = await r.clone().json().catch(() => ({}));
+        if (isMissingColumn(e)) { clientIdColumn = { ok: false, at: Date.now() }; r = null; }
+        // 42P10: the column exists but its unique index does not (yet) — store the id without ON CONFLICT.
+        else if (e && e.code === '42P10') r = await db('applications', { method: 'POST', body: JSON.stringify({ ...row, client_id: clientId }), headers: { Prefer: 'return=representation' } });
+      } else if (r.ok) clientIdColumn = { ok: true, at: Date.now() };
     }
     if (!r) r = await db('applications', { method: 'POST', body: JSON.stringify(row), headers: { Prefer: 'return=representation' } });
     if (!r.ok) {
       const errText = await r.text().catch(() => '');
       console.error('[user-sync] add_application failed:', r.status, errText);
-      return res.status(400).json({ error: 'Insert failed' });
+      // A database timeout / outage is retryable (the client keeps the card and resends it).
+      return res.status(r.status >= 500 ? 502 : 400).json({ error: 'Insert failed' });
     }
     let data = await r.json().catch(() => []);
     if (!Array.isArray(data) || !data.length) {
       // The unique index swallowed a concurrent duplicate: answer with the row that won.
-      const winner = clientId ? await found(`applications?user_id=eq.${uid}&client_id=eq.${encodeURIComponent(clientId)}&select=id,updated_at&limit=1`) : null;
-      if (winner && winner !== 'no_column') return res.status(200).json({ id: winner.id, updated_at: winner.updated_at || null, existing: true });
+      const winner = clientId ? (await findOne(byClientId)).row : null;
+      if (winner) return existing(winner);
       data = [];
     }
     console.log('[user-sync] add_application ok, id:', data?.[0]?.id);

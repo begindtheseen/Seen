@@ -22,8 +22,8 @@ const TOKEN = `${head}.${pay}.${createHmac('sha256', 'jwt-secret').update(`${hea
 let seq = 0;
 const newId = () => `44444444-4444-4444-8444-${String(++seq).padStart(12, '0')}`;
 
-/** @param {{ clientIdColumn: boolean }} opts */
-function install({ clientIdColumn }) {
+/** @param {{ clientIdColumn: boolean, uniqueIndex?: boolean }} opts */
+function install({ clientIdColumn, uniqueIndex = true }) {
   const t = { applications: [] };
   const log = [];
   const match = (row, u) => [...u.searchParams.entries()].every(([k, v]) => {
@@ -47,6 +47,7 @@ function install({ clientIdColumn }) {
     const body = opts.body ? JSON.parse(opts.body) : null;
     const usesClientId = u.searchParams.has('client_id') || u.searchParams.get('on_conflict')?.includes('client_id') || (body && 'client_id' in body);
     if (!clientIdColumn && usesClientId) return Response.json({ code: 'PGRST204', message: "Could not find the 'client_id' column of 'applications' in the schema cache" }, { status: 400 });
+    if (!uniqueIndex && u.searchParams.has('on_conflict')) return Response.json({ code: '42P10', message: 'there is no unique or exclusion constraint matching the ON CONFLICT specification' }, { status: 400 });
     if (m === 'GET') return Response.json(rows.filter((r) => match(r, u)));
     if (m === 'PATCH') {
       const hit = rows.filter((r) => match(r, u));
@@ -93,6 +94,57 @@ test('a concurrent duplicate swallowed by the unique index still answers with th
   assert.equal(r.status, 200);
   assert.equal(r.body.id, APP);
   assert.equal(t.applications.length, 1);
+});
+
+test('a retry long after the first add (past the natural-key window) still finds its row by client id', async () => {
+  const { t } = install({ clientIdColumn: true });
+  const old = new Date(now - 3 * 3600000).toISOString();
+  t.applications.push({ id: APP, user_id: UID, client_id: 'app_' + now, company_name: 'OldCo', role: 'Analyst', applied_at: new Date(now - 5000).toISOString(), created_at: old, updated_at: old, events: [] });
+  const r = await call({ action: 'add_application', application: application() });
+  assert.equal(r.status, 200);
+  assert.equal(r.body.id, APP);
+  assert.equal(r.body.existing, true);
+  assert.equal(t.applications.length, 1);
+});
+
+test('with the column, two adds with DIFFERENT client ids are two rows even for the same company, role and day', async () => {
+  const { t } = install({ clientIdColumn: true });
+  await call({ action: 'add_application', application: application() });
+  const b = await call({ action: 'add_application', application: { ...application(), id: 'app_' + (now + 7) } });
+  assert.equal(b.status, 200);
+  assert.notEqual(b.body.existing, true);
+  assert.equal(t.applications.length, 2);
+  assert.deepEqual(t.applications.map((r) => r.client_id).sort(), ['app_' + now, 'app_' + (now + 7)].sort());
+});
+
+test('the same add sent twice with the column present: one row, and the client id is stored', async () => {
+  const { t } = install({ clientIdColumn: true });
+  const a = await call({ action: 'add_application', application: application() });
+  const b = await call({ action: 'add_application', application: application() });
+  assert.equal(t.applications.length, 1);
+  assert.equal(b.body.id, a.body.id);
+  assert.equal(t.applications[0].client_id, 'app_' + now);
+});
+
+test('column present but its unique index missing (42P10): the row is still written with its client id', async () => {
+  const { t } = install({ clientIdColumn: true, uniqueIndex: false });
+  const a = await call({ action: 'add_application', application: application() });
+  assert.equal(a.status, 200);
+  assert.ok(a.body.id);
+  assert.equal(t.applications.length, 1);
+  assert.equal(t.applications[0].client_id, 'app_' + now);
+  const b = await call({ action: 'add_application', application: application() });
+  assert.equal(b.body.id, a.body.id, 'the retry still finds it by client id');
+  assert.equal(t.applications.length, 1);
+});
+
+test('a database timeout on insert answers 502 (retryable), not a client error', async () => {
+  const { t } = install({ clientIdColumn: true });
+  const real = globalThis.fetch;
+  globalThis.fetch = async (url, opts = {}) => (opts.method === 'POST' && String(url).includes('/applications') ? Response.json({ code: '57014', message: 'canceling statement due to statement timeout' }, { status: 500 }) : real(url, opts));
+  const r = await call({ action: 'add_application', application: application() });
+  assert.equal(r.status, 502);
+  assert.equal(t.applications.length, 0);
 });
 
 function seedRow(t, updatedAt) {

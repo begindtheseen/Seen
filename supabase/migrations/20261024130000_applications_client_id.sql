@@ -11,7 +11,9 @@
 
 ALTER TABLE public.applications ADD COLUMN IF NOT EXISTS client_id text;
 
--- Partial: rows written before this migration (and server-created rows with no client id) stay NULL.
+-- NOT partial on purpose: PostgREST's `on_conflict=user_id,client_id` emits ON CONFLICT (user_id,
+-- client_id) with no WHERE clause, and Postgres cannot infer a PARTIAL unique index from that (42P10).
+-- NULLs are distinct in a unique index, so rows written before this migration (client_id NULL) never
+-- conflict with each other.
 CREATE UNIQUE INDEX IF NOT EXISTS applications_user_client_id_key
-  ON public.applications (user_id, client_id)
-  WHERE client_id IS NOT NULL;
+  ON public.applications (user_id, client_id);
