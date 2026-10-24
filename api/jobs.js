@@ -9,32 +9,15 @@ import { waitUntil } from '@vercel/functions';
 import { aggregateForQuery, upsertJobs, inferLevel, wasRecentlyPulled, recordPull, adzunaPay, cleanDescription } from '../lib/server/jobSources.js';
 import { locationScope } from '../lib/jobs/usLocation.js';
 import { preferFullText } from '../lib/jobs/listingTwins.js';
-import { deriveResumeCity } from '../lib/server/resumeJobMatch.js';
 import { loadTenantNames, applyTenantNames, withTenantName } from '../lib/server/tenantNames.js';
 import { aggregateWithSources } from '../lib/jobs/expand.js';
-import { deriveResumeJobQuery, pullResumeJobFloor, deriveResumeSignal, resumeSkillsStale } from '../lib/server/resumeJobMatch.js';
-import { isReadableResume } from '../lib/server/resumeReadability.js';
 import { scoreJob, wasteScore, scoreRow, explainListingScore } from '../lib/server/jobScore.js';
 import { computeListingFreshness } from '../lib/server/listingFreshness.js';
 import { listingSignals } from '../lib/server/listingSignals.js';
-import { geocodeLocation, haversineMiles, milesToKm, hasUsableCoords, boundingBox, sanitizeCoords } from '../lib/server/geo.js';
-import { resumeRoleFamilies, jobMatchesResume, jobNearCity, resumeMatchStrength } from '../lib/server/resumeJobMatch.js';
-import { isRemoteListing as remoteByLocation } from '../lib/server/jobPriority.js';
+import { geocodeLocation, haversineMiles, milesToKm, hasUsableCoords, sanitizeCoords } from '../lib/server/geo.js';
+import { findResumeMatches, geoScopeClause } from '../lib/server/resumeMatches.js';
 
-// DB-side scope for a place search: the indexed lat/lng bounding box OR the searched city named
-// in the listing's own location text. 497 of the 509 coordinate-less Phoenix rows in prod
-// (2026-10-23) are ATS-board rows whose location literally says "Phoenix, AZ"; the box alone
-// could not see them, so "customer service · Phoenix" returned one HVAC tech while 22 real
-// Customer Service Representative rows at Phoenix addresses stayed invisible. Two `or=` params
-// on one PostgREST read are ANDed (verified against prod, ~0.22s warm).
-function geoScopeClause(center, miles, cityTerm) {
-  const term = String(cityTerm || '').replace(/[(),*\\]/g, '').trim();
-  const b = boundingBox(center, miles);
-  if (!b) return term ? `&location=ilike.*${encodeURIComponent(term)}*` : '';
-  const f = (n) => n.toFixed(6);
-  const box = `and(lat.gte.${f(b.latMin)},lat.lte.${f(b.latMax)},lng.gte.${f(b.lngMin)},lng.lte.${f(b.lngMax)})`;
-  return `&or=${encodeURIComponent(term ? `(${box},location.ilike.*${term}*)` : `(${box})`)}`;
-}
+// DB-side scope for a place search (box OR city text): geoScopeClause in lib/server/resumeMatches.js.
 
 // ── Suppressed listings (migration 047) ─────────────────────────────────────────────────────
 // Admins can "delete" an ephemeral (live-search) listing they've confirmed dead; its apply_url
@@ -916,130 +899,24 @@ async function handleRecommended(req, res, _body) {
   };
 
   try {
-    // The CANONICAL résumé is profiles.resume_text — what every upload / Studio / profile save
-    // writes. resume_skills is a derived cache the upload path fills best-effort, so it can be
-    // missing (a non-tech résumé with no dictionary skills, a save through the Studio, a failed
-    // background step) or stale (older than the résumé). Read both; when the cache is missing
-    // or stale, derive the signal from the résumé NOW and self-heal the row. A signed-in user
-    // with a résumé on file is never told to upload one, and the response says which case it is.
-    const uid = encodeURIComponent(user_id);
-    const [skillsRes, profRes] = await Promise.all([
-      fetch(`${SUPABASE_URL}/rest/v1/resume_skills?user_id=eq.${uid}&select=skills,seniority,function,years_exp,top_titles,updated_at&limit=1`, { headers: dbHeaders }).catch(() => null),
-      fetch(`${SUPABASE_URL}/rest/v1/profiles?id=eq.${uid}&select=resume_text,resume_updated_at,city&limit=1`, { headers: dbHeaders }).catch(() => null),
-    ]);
-    const skillsRows = skillsRes && skillsRes.ok ? await skillsRes.json().catch(() => []) : [];
-    const row = Array.isArray(skillsRows) && skillsRows[0] ? skillsRows[0] : null;
-    const profRows = profRes && profRes.ok ? await profRes.json().catch(() => null) : null;
-    const prof = Array.isArray(profRows) ? (profRows[0] || {}) : null; // null = the profile read failed
-    const resumeText = typeof prof?.resume_text === 'string' ? prof.resume_text : '';
-    // true / false when the profile was read; null when it could not be (never claim "no résumé" without evidence)
-    const hasResume = prof ? (!!resumeText && isReadableResume(resumeText)) : null;
-    if (hasResume === false) return res.status(200).json({ ok: true, jobs: [], has_resume: false, reason: 'no_resume' });
-
-    let signal = row;
-    let heal = null;
-    if (hasResume && resumeSkillsStale(row, prof.resume_updated_at)) {
-      signal = deriveResumeSignal(resumeText);
-      heal = fetch(`${SUPABASE_URL}/rest/v1/resume_skills?on_conflict=user_id`, {
-        method: 'POST',
-        headers: { ...dbHeaders, Prefer: 'resolution=merge-duplicates,return=minimal' },
-        body: JSON.stringify({ user_id, skills: signal.skills, seniority: signal.seniority, function: signal.function, years_exp: signal.years_exp, top_titles: signal.top_titles, updated_at: new Date().toISOString() }),
-      }).catch(() => null);
-    }
-    const { skills = [], seniority, function: fn, top_titles } = signal || {};
-    const topSkills = (Array.isArray(skills) ? skills : []).slice(0, 5);
-    const now = encodeURIComponent(new Date().toISOString());
-
-    // The résumé's real ROLE (title first, else function, else strongest skill) — a
-    // high-recall query that catches listings pure skill-matching misses: a "Budtender"
-    // whose skills are "customer service, POS" would otherwise never surface a budtender
-    // listing. Same derivation the parse-time warm uses.
-    const roleQuery = deriveResumeJobQuery({ top_titles, function: fn, skills: topSkills });
-    const resume = resumeRoleFamilies({ top_titles, function: fn });
-    if ((!topSkills.length && !roleQuery) || (!resume.families.length && !resume.phrases.length)) {
+    // One matcher for the rail and the job-match emails (lib/server/resumeMatches.js): the canonical
+    // résumé (profiles.resume_text), the self-healed resume_skills cache, the family + city bar.
+    const m = await findResumeMatches({ supabaseUrl: SUPABASE_URL, serviceKey: SUPABASE_SERVICE_KEY, userId: user_id, allowFloor: true });
+    const hasResume = m.hasResume;
+    const heal = m.heal;
+    const topSkills = m.skills;
+    const seniority = m.seniority;
+    const fn = m.fn;
+    if (m.reason === 'no_resume') return res.status(200).json({ ok: true, jobs: [], has_resume: false, reason: 'no_resume' });
+    if (m.reason === 'no_signal' || m.reason === 'unavailable') {
       if (heal) await heal;
-      return res.status(200).json({ ok: true, jobs: [], has_resume: hasResume, reason: hasResume ? 'no_signal' : 'unavailable' });
+      return res.status(200).json({ ok: true, jobs: [], has_resume: hasResume, reason: m.reason });
     }
-
-    // ── The match bar (lib/server/resumeJobMatch.js): same title FAMILY as a résumé role, AND
-    // near the person — the profile city (within RAIL_MILES when both have coordinates, else the
-    // city named in the listing) or a remote listing. Without a city the rail would only ever
-    // show far-away jobs, so it says so instead (reason 'no_city'; the page links to Settings).
-    // The profile city, else the city the résumé itself states ("Phoenix, AZ 85004" in its first
-    // line — the live audit's persona was asked to retype a city the résumé already had).
-    let city = String(prof?.city || '').trim().slice(0, 80);
-    let citySource = city ? 'profile' : null;
-    if (!city && hasResume) {
-      city = deriveResumeCity(resumeText);
-      citySource = city ? 'resume' : null;
-    }
-    if (!city) {
+    if (m.reason === 'no_city') {
       if (heal) await heal;
-      return res.status(200).json({ ok: true, jobs: [], skills: topSkills.slice(0, 3), seniority, function: fn, has_resume: hasResume, reason: 'no_city' });
+      return res.status(200).json({ ok: true, jobs: [], skills: topSkills, seniority, function: fn, has_resume: hasResume, reason: 'no_city' });
     }
-    const RAIL_MILES = 30;
-    const center = await geocodeLocation(city, SUPABASE_URL, SUPABASE_SERVICE_KEY).catch(() => null);
-    const home = { city, center, miles: RAIL_MILES };
-    const parsedCity = parseLocation(city);
-    const cityTerm = parsedCity && parsedCity.city ? parsedCity.city : locationDbTerm(city);
-    const scope = center ? geoScopeClause(center, RAIL_MILES, cityTerm) : (cityTerm ? `&location=ilike.*${encodeURIComponent(cityTerm)}*` : '');
-    const cols = 'id,title,company,location,salary,apply_url,description,type,level,source,score,waste_score,lat,lng,ats_tenant';
-    const read = (filter, limit) => fetch(`${SUPABASE_URL}/rest/v1/jobs?${filter}&expires_at=gt.${now}&select=${cols}&order=score.desc&limit=${limit}`, { headers: dbHeaders })
-      .then(r => r.ok ? r.json() : []).catch(() => []);
-    const safeTerm = (s) => String(s || '').replace(/[^a-zA-Z0-9\s\-+#.]/g, '').trim().slice(0, 40);
-
-    // Candidate reads, all scoped to the city (or remote): the résumé's role phrases and the role
-    // query by TITLE. Skills are not titles — "sales" as a skill is what pulled in the hotel AE.
-    const terms = [...new Set([...resume.phrases, roleQuery].map(safeTerm).filter((t) => t.length >= 3))].slice(0, 4);
-    const localReads = terms.map((t) => read(`title=ilike.*${encodeURIComponent(t)}*${scope}`, 20));
-    const remoteReads = terms.slice(0, 2).map((t) => read(`title=ilike.*${encodeURIComponent(t)}*&location=ilike.*remote*`, 10));
-    const allResults = await Promise.all([...localReads, ...remoteReads]);
-
-    const seenIds = new Set();
-    const unique = allResults.flat().filter(j => {
-      if (!j?.id || seenIds.has(j.id)) return false;
-      seenIds.add(j.id);
-      return true;
-    });
-    const qualifies = (j) => jobMatchesResume(j, resume) && jobNearCity(j, home) && locationScope(j.location) !== 'non_us';
-    let matched = unique.filter(qualifies);
-
-    // ── Floor: when the corpus is thin for this résumé near this city, pull LIVE for the role
-    // AT the city through the SAME aggregation the search uses — inheriting its cooldown + global
-    // budget guards. Best-effort; on a cooldown/budget skip we serve what we have. Every pulled
-    // row still has to pass the same family + location bar.
-    const RECS_MIN = 6;
-    if (matched.length < RECS_MIN && roleQuery) {
-      const floor = await pullResumeJobFloor({
-        query: roleQuery,
-        location: city,
-        supabaseUrl: SUPABASE_URL,
-        serviceKey: SUPABASE_SERVICE_KEY,
-        adzunaAppId: process.env.ADZUNA_APP_ID,
-        adzunaAppKey: process.env.ADZUNA_APP_KEY,
-      });
-      const floorRelevant = filterAndRank(floor.jobs || [], roleQuery, { synonyms: expandQueryTerms(roleQuery), canonical: roleQuery });
-      for (const j of floorRelevant) {
-        const key = j.id || j.apply_url || `${(j.title || '').toLowerCase()}|${(j.company || '').toLowerCase()}`;
-        if (!key || seenIds.has(key)) continue;
-        seenIds.add(key);
-        const row = {
-          id: j.id || null, title: j.title, company: j.company, location: j.location,
-          salary: j.salary, apply_url: j.apply_url || j.url || null, description: j.description,
-          type: j.type || 'Full-time', level: j.level, source: j.source || 'Seen',
-          score: j.score, waste_score: j.waste_score, lat: j.lat ?? null, lng: j.lng ?? null,
-        };
-        if (qualifies(row)) matched.push(row);
-      }
-    }
-
-    // Rank: match strength (shared role phrase > family only), local before remote, then the
-    // listing's own transparency score.
-    const ranked = matched.map(j => ({
-      ...j,
-      _matchScore: resumeMatchStrength(j, resume) * 10 + (remoteByLocation(j) ? 0 : 5) + (scoreRow(j).score || 0),
-    }));
-    ranked.sort((a, b) => b._matchScore - a._matchScore);
+    const { ranked, city, citySource } = m;
 
     const names = await loadTenantNames(SUPABASE_URL, dbHeaders);
     const jobs = ranked.slice(0, 8).map(j => withTenantName({
@@ -1058,7 +935,7 @@ async function handleRecommended(req, res, _body) {
     }, names));
 
     if (heal) await heal; // the self-healed cache row lands before the function returns
-    return res.status(200).json({ ok: true, jobs, skills: topSkills.slice(0, 3), seniority, function: fn, has_resume: hasResume, city, city_source: citySource, reason: jobs.length ? null : 'no_matches' });
+    return res.status(200).json({ ok: true, jobs, skills: topSkills, seniority, function: fn, has_resume: hasResume, city, city_source: citySource, reason: jobs.length ? null : 'no_matches' });
   } catch (e) {
     logError('jobs/recommended', e.message, { user_id });
     return res.status(500).json({ error: e.message, jobs: [] });

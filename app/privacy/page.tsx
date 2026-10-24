@@ -79,6 +79,7 @@ export default function PrivacyPage() {
             <li style={li}>to provide the service — company scores, search, the tracker, resume tools, and reports;</li>
             <li style={li}>to operate accounts, process payments and subscriptions, and manage credits;</li>
             <li style={li}>to send transactional email you have asked for or that is necessary to the service;</li>
+            <li style={li}>to email you about your job search: check-ins on applications you track, and live listings that match the résumé on your account (at most two a day). Every one of these emails has a one-click unsubscribe, and each kind stops on its own;</li>
             <li style={li}>to provide support, investigate issues, moderate content, and prevent abuse and fraud;</li>
             <li style={li}>to keep the service secure and to comply with law.</li>
           </ul>
