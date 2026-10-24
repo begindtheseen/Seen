@@ -76,8 +76,8 @@ export default function HealthPanel({ health, doc, onJump, onApplyRewrite, onApp
         <p className={s.dim} style={{ marginTop: '.75rem', color: 'var(--sub)', fontSize: '.7rem' }}>{health.summary}</p>
         {fixAllCount > 0 && (
           <div className={s.findingActions} style={{ marginTop: '.6rem' }}>
-            <button type="button" className={s.btnGreen} onClick={onFixAll}>✦ Fix {fixAllCount} bullet{fixAllCount === 1 ? '' : 's'} safely</button>
-            <span className={s.muted} style={{ alignSelf: 'center' }}>Verbs, tense, passive voice, filler — never a new fact.</span>
+            <button type="button" className={s.btnGreen} data-testid="fix-all" onClick={onFixAll}>✦ Review {fixAllCount} bullet fix{fixAllCount === 1 ? '' : 'es'}</button>
+            <span className={s.muted} style={{ alignSelf: 'center' }}>Verbs, tense, passive voice, filler — shown as before → after first; never a new fact.</span>
           </div>
         )}
       </div>

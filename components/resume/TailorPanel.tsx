@@ -12,6 +12,10 @@ import type { ResumeDoc, TailorPlan, TailorResponse, PolishResult, TailorDecisio
 import type { SavedJob } from '@/lib/types'
 import { applyTailorPlan } from '@/lib/resume/engine-client'
 import { scoreColor } from './HealthPanel'
+import { useAuth } from '@/lib/auth'
+import CreditConfirmDialog from '@/components/CreditConfirmDialog'
+import { hasConfirmedCreditUse } from '@/lib/creditConfirm'
+import { RESUME_OPTIMIZE_COST, creditCostLabel } from '@/lib/creditRules'
 
 export interface TailorJob { title: string; company: string; description: string; jobId: string; url?: string }
 type Props = {
@@ -31,7 +35,11 @@ const DECISION_LABEL: Record<string, string> = { keep: 'Keep in full', trim: 'Tr
 function clone<T>(v: T): T { return JSON.parse(JSON.stringify(v)) as T }
 
 export default function TailorPanel({ doc, isLoggedIn, pro, savedJobs, initialJob, onNeed, onUseVariant }: Props) {
+  const { user } = useAuth()
   const [job, setJob] = useState<TailorJob>(initialJob || { title: '', company: '', description: '', jobId: '' })
+  // The first paid action on this account/device is confirmed once (lib/creditConfirm) — the
+  // 2026-10-24 audits found the Tailor charging with no dialog while every other paid button asked.
+  const [confirming, setConfirming] = useState(false)
   const [savedId, setSavedId] = useState('')
   const [polish, setPolish] = useState(false)
   const [state, setState] = useState<'idle' | 'loading' | 'done' | 'error'>('idle')
@@ -55,17 +63,25 @@ export default function TailorPanel({ doc, isLoggedIn, pro, savedJobs, initialJo
     setJob({ title: sj.role || snap?.title || '', company: sj.company || snap?.company || '', description: snap?.description || '', jobId: String(sj.job_id), url: sj.apply_url || snap?.apply_url || '' })
   }
 
-  async function run() {
+  function run() {
     if (!job.title.trim() && !job.description.trim()) { setError('Add the job title or paste the job description.'); return }
     if (!isLoggedIn) { onNeed('signin'); return }
+    if (!hasConfirmedCreditUse(user?.id)) { setConfirming(true); return }
+    void doRun()
+  }
+  async function doRun() {
+    setConfirming(false)
     setState('loading'); setError('')
     try {
       const res = await fetch('/api/resume', {
         method: 'POST', headers: await aiHeaders(),
         body: JSON.stringify({ action: 'tailor', doc, jobTitle: job.title, company: job.company, jobDescription: job.description, jobId: job.jobId || undefined, polish: polish && pro === true }),
       })
-      const data = (await res.json().catch(() => ({}))) as TailorResponse
+      const data = (await res.json().catch(() => ({}))) as TailorResponse & { message?: string }
       if (res.status === 401 || res.status === 402 || data.credits_required || data.pro_required) { setState('idle'); onNeed(data.pro_required ? 'pro' : 'credits'); return }
+      // A listing that is only a teaser (an Adzuna summary ending in "…") is refused BEFORE any
+      // credit is spent — paste the full posting above and run again.
+      if (res.status === 422 && data.error === 'preview_only') { setError(data.message || 'This listing only has a summary. Paste the full posting to optimize for it.'); setState('idle'); return }
       if (!res.ok || !data.plan) { setError(data.error || 'Could not tailor this résumé. Try again.'); setState('error'); return }
       window.dispatchEvent(new Event('seen:credits-updated'))
       setPlan(data.plan); setBaseDoc(clone(doc)); setServerVariant(data.variant); setPolishRes(data.polish); setOverrides({}); setAnswers({}); setRejectedPolish(new Set())
@@ -94,9 +110,17 @@ export default function TailorPanel({ doc, isLoggedIn, pro, savedJobs, initialJo
   const added = finalVariant ? finalVariant.meta.provenance.filter((p) => p.kind === 'transferable_bullet') : []
   const summaryOn = overrides.summary !== false
   const layout = overrides.layout || plan?.strategy?.layout || 'chronological'
+  const rewrites = plan?.rewrites || []
+  const accepted = new Set(Array.isArray(overrides.rewrites) ? overrides.rewrites : overrides.rewrites === true ? rewrites.map((r) => r.bulletId) : [])
+  const toggleRewrite = (id: string) => setOverrides((o) => { const cur = new Set(Array.isArray(o.rewrites) ? o.rewrites : o.rewrites === true ? rewrites.map((r) => r.bulletId) : []); if (cur.has(id)) cur.delete(id); else cur.add(id); return { ...o, rewrites: [...cur] } })
+  const noRequirements = !!plan && plan.job.requirementCount === 0
+  const topRelevance = decisions.length ? decisions[0].relevance : 0
 
   return (
     <div style={{ animation: 'fadeUp .3s ease both' }}>
+      {confirming && (
+        <CreditConfirmDialog cost={RESUME_OPTIMIZE_COST} action={`tailor your résumé for ${job.title || 'this job'}${job.company ? ` at ${job.company}` : ''}`} onConfirm={() => { void doRun() }} onCancel={() => setConfirming(false)} />
+      )}
       <div className={s.card}>
         <div className={s.cardTitle}>Tailor to a job</div>
         <p className={s.dim} style={{ marginBottom: '.75rem' }}>The optimizer reads what each of your jobs <em>is</em>, decides which roles lead, which shrink to a line and which stay off this version, picks the bullets that speak to the posting inside a one-page budget, and writes a summary from your own facts. Every decision shows its reason and you can overrule any of it. Nothing is invented.</p>
@@ -121,7 +145,7 @@ export default function TailorPanel({ doc, isLoggedIn, pro, savedJobs, initialJo
             Polish wording with AI {pro === true ? '' : '· Pro'}
           </label>
           <button type="button" className={s.btnPrimary} onClick={run} disabled={state === 'loading'}>
-            {state === 'loading' ? 'Optimizing…' : plan ? 'Re-run for this job →' : 'Optimize for this job →'}<span style={{ marginLeft: '.45rem', fontSize: '.55rem', opacity: .7, fontFamily: 'var(--mono)', fontWeight: 400 }}>· 1 credit</span>
+            {state === 'loading' ? 'Optimizing…' : plan ? 'Re-run for this job →' : 'Optimize for this job →'}<span style={{ marginLeft: '.45rem', fontSize: '.55rem', opacity: .7, fontFamily: 'var(--mono)', fontWeight: 400 }}>· {creditCostLabel(RESUME_OPTIMIZE_COST)}</span>
           </button>
         </div>
         {error && <div className={s.err} style={{ marginTop: '.6rem', marginBottom: 0 }}>{error}</div>}
@@ -130,12 +154,16 @@ export default function TailorPanel({ doc, isLoggedIn, pro, savedJobs, initialJo
       {state === 'done' && plan && finalVariant && (
         <>
           <div className={s.card}>
-            <div className={s.beforeAfter}>
-              <span style={{ color: scoreColor(plan.score.before) }}>{plan.score.before}</span>
-              <span className={s.arrow}>→</span>
-              <span style={{ color: scoreColor(plan.score.after) }}>{plan.score.after}</span>
-              <span className={s.dim} style={{ fontWeight: 400, fontSize: '.62rem' }}>match score · {plan.job.familyLabel || plan.job.roleFamily} posting · {plan.strategy ? `${plan.strategy.estimatedLines} of ${plan.strategy.linesBudget} lines (${plan.strategy.pages} page${plan.strategy.pages === 1 ? '' : 's'})` : ''}{plan.objective ? ` · searched ${plan.objective.evaluations} versions` : ''}</span>
-            </div>
+            {noRequirements ? (
+              <div className={s.dim} style={{ color: 'var(--amber)' }}>The posting text gave us no requirements to match — this version is arranged from the job title and family only. Paste the full posting (requirements and responsibilities) for a real match score.</div>
+            ) : (
+              <div className={s.beforeAfter}>
+                <span style={{ color: scoreColor(plan.score.before) }}>{plan.score.before}</span>
+                <span className={s.arrow}>→</span>
+                <span style={{ color: scoreColor(plan.score.after) }}>{plan.score.after}</span>
+                <span className={s.dim} style={{ fontWeight: 400, fontSize: '.62rem' }}>match score · {plan.job.familyLabel || plan.job.roleFamily} posting · {plan.job.requirementCount} requirements read · {plan.strategy ? `${plan.strategy.estimatedLines} of ${plan.strategy.linesBudget} lines (${plan.strategy.pages} page${plan.strategy.pages === 1 ? '' : 's'})` : ''}</span>
+              </div>
+            )}
             <p className={s.dim} style={{ marginTop: '.5rem' }}>
               {decisions.length ? `${decisions.filter((d) => d.tier === 'core').map((d) => d.title).join(' and ') || 'Your most relevant roles'} lead this version. ${decisions.filter((d) => d.decision === 'condense').length ? `${decisions.filter((d) => d.decision === 'condense').length} role${decisions.filter((d) => d.decision === 'condense').length === 1 ? '' : 's'} became one line, ` : ''}${decisions.filter((d) => d.decision === 'drop').length ? `${decisions.filter((d) => d.decision === 'drop').length} left off, ` : ''}bullets that speak to the posting lead each role.` : 'No roles to optimize — add experience first.'}
             </p>
@@ -145,6 +173,9 @@ export default function TailorPanel({ doc, isLoggedIn, pro, savedJobs, initialJo
               <button type="button" className={`${s.tiny}${layout === 'chronological' ? ` ${s.chipGreen}` : ''}`} onClick={() => setOverrides((o) => ({ ...o, layout: 'chronological' }))}>Chronological</button>
               <span className={s.muted}>{layout === 'relevance' ? 'Relevant Experience leads; other roles are lines under Additional Experience.' : 'Most recent first; irrelevant roles condensed.'}</span>
             </div>
+            {layout === 'relevance' && plan.strategy?.layout !== 'relevance' && (
+              <div className={s.muted} style={{ color: 'var(--amber)', marginTop: '.35rem' }}>⚠ This puts an older role above your current job. Store-level and hourly recruiters read that top-down as a gap — keep Chronological unless the older role is the only relevant one.</div>
+            )}
             <div className={s.findingActions} style={{ marginTop: '.7rem' }}>
               <button type="button" className={s.btnGreen} onClick={() => onUseVariant(finalVariant, { role: job.title, company: job.company, jobId: job.jobId, scoreBefore: plan.score.before, scoreAfter: plan.score.after })}>Use this version →</button>
               <span className={s.muted} style={{ alignSelf: 'center' }}>Your base résumé stays exactly as it is.</span>
@@ -157,7 +188,10 @@ export default function TailorPanel({ doc, isLoggedIn, pro, savedJobs, initialJo
               <div style={{ marginTop: '.55rem', display: 'flex', flexDirection: 'column', gap: '.5rem' }}>
                 {visibleDecisions.map((d) => {
                   const current = (overrides.decisions && overrides.decisions[d.itemId]) || d.decision
-                  const pct = Math.round(Math.min(1, d.relevance / Math.max(0.01, decisions[0].relevance)) * 100)
+                  // Absolute relevance (0–100), never renormalised: three near-ties must read as
+                  // near-ties, not as 100 / 99 / 95.
+                  const pct = Math.round(Math.min(1, d.relevance) * 100)
+                  const tie = d.itemId !== decisions[0].itemId && Math.abs(d.relevance - topRelevance) < 0.03
                   return (
                     <div key={d.itemId} className={s.finding} style={{ flexDirection: 'column', gap: '.35rem' }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', gap: '.5rem', alignItems: 'baseline', flexWrap: 'wrap' }}>
@@ -165,7 +199,7 @@ export default function TailorPanel({ doc, isLoggedIn, pro, savedJobs, initialJo
                           <strong style={{ color: 'var(--white)', fontSize: '.8rem' }}>{d.title || d.company}</strong>{d.company && d.title ? <span className={s.dim}> · {d.company}</span> : null}
                           <span className={s.dim}> · {d.familyLabel}{d.current ? ' · current' : ''}{d.dateless ? ' · no dates' : ''}</span>
                         </div>
-                        <span className={`${s.chip} ${s[TIER_CLASS[d.tier]] || s.chip}`}>{TIER_LABEL[d.tier]} · {pct}%</span>
+                        <span className={`${s.chip} ${s[TIER_CLASS[d.tier]] || s.chip}`} title="How much of what this posting asks for the role covers">{TIER_LABEL[d.tier]} · {pct}% fit{tie ? ' · tie' : ''}</span>
                       </div>
                       <div className={s.bar}><div className={s.barFill} style={{ width: `${Math.max(3, pct)}%`, background: d.tier === 'core' ? 'var(--green)' : d.tier === 'supporting' ? 'var(--blue)' : d.tier === 'context' ? 'var(--amber)' : 'var(--muted)' }} /></div>
                       <div className={s.muted} style={{ color: 'var(--sub)' }}>{d.reasons.slice(0, 2).join(' ')}</div>
@@ -182,6 +216,22 @@ export default function TailorPanel({ doc, isLoggedIn, pro, savedJobs, initialJo
                 })}
                 {decisions.length > 8 && <button type="button" className={s.tiny} onClick={() => setShowAll((v) => !v)}>{showAll ? 'Show fewer' : `Show all ${decisions.length} roles`}</button>}
               </div>
+            </div>
+          )}
+
+          {rewrites.length > 0 && (
+            <div className={s.card}>
+              <span className={s.secTitle}>Wording proposals · {accepted.size} of {rewrites.length} accepted</span>
+              <div className={s.dim} style={{ margin: '.35rem 0 .5rem' }}>Tense, lead verbs and filler — proposed, never applied on their own. Your bullets stay exactly as written unless you accept a change.</div>
+              {rewrites.map((r) => (
+                <div key={r.bulletId} style={{ marginTop: '.5rem', borderTop: '1px solid var(--line)', paddingTop: '.5rem' }}>
+                  <div className={s.diff}><span className={s.del}>{r.from}</span><br /><span className={s.ins}>{r.to}</span></div>
+                  <div className={s.findingActions}>
+                    <button type="button" className={`${s.tiny}${accepted.has(r.bulletId) ? ` ${s.chipGreen}` : ''}`} data-testid="tailor-rewrite-toggle" onClick={() => toggleRewrite(r.bulletId)}>{accepted.has(r.bulletId) ? '✓ Accepted' : 'Accept this wording'}</button>
+                    <span className={s.muted} style={{ alignSelf: 'center' }}>{r.rules.includes('tense') ? (r.tense === 'present' ? 'Present tense for a current role' : 'Past tense for a past role') : r.rules.join(', ')}</span>
+                  </div>
+                </div>
+              ))}
             </div>
           )}
 

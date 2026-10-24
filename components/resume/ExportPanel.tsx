@@ -8,7 +8,7 @@ import { useMemo, useState } from 'react'
 import s from './studio.module.css'
 import { aiHeaders } from '@/lib/aiHeaders'
 import type { ResumeDoc, AtsCheck, FormatInfo } from '@/lib/resume/types'
-import { listTemplates, renderText, renderMarkdown } from '@/lib/resume/engine-client'
+import { listTemplates, renderText, renderMarkdown, formatRange } from '@/lib/resume/engine-client'
 import { scoreColor } from './HealthPanel'
 
 const FORMATS: FormatInfo[] = [
@@ -79,8 +79,8 @@ export default function ExportPanel({ doc, pro, isLoggedIn, onNeedPro, role }: P
                 <div style={{ color: '#555' }}>{[doc.basics.location, doc.basics.email].filter(Boolean).join(' · ') || 'city · email'}</div>
                 {t.id !== 'modern' && <div className={s.pvRule} />}
                 <div className={s.pvHead} style={{ color: t.id === 'modern' ? t.accent : '#111', textAlign: 'left' }}>EXPERIENCE</div>
-                <div className={s.pvLine} style={{ textAlign: 'left' }}><span style={{ fontWeight: 700 }}>{t.roleLayout === 'company-first' ? (doc.experience[0]?.company || 'Company') : (doc.experience[0]?.title || 'Title')}</span><span style={{ color: '#666' }}>{t.roleLayout === 'company-first' ? (doc.experience[0]?.location || 'City') : '2022 – Present'}</span></div>
-                <div style={{ textAlign: 'left' }}>• {(doc.experience[0]?.bullets[0]?.text || 'Led the result that matters most.').slice(0, 60)}</div>
+                <div className={s.pvLine} style={{ textAlign: 'left' }}><span style={{ fontWeight: 700 }}>{t.roleLayout === 'company-first' ? (doc.experience[0]?.company || 'Company') : (doc.experience[0]?.title || 'Title')}</span><span style={{ color: '#666' }}>{t.roleLayout === 'company-first' ? (doc.experience[0]?.location || (doc.experience[0] ? '' : 'City')) : (doc.experience[0] ? (formatRange(doc.experience[0].start, doc.experience[0].end) || doc.experience[0].dateText || '') : 'Dates')}</span></div>
+                <div style={{ textAlign: 'left' }}>• {(doc.experience[0]?.bullets[0]?.text || (doc.experience[0] ? '' : 'Your first bullet appears here.')).slice(0, 60)}</div>
               </div>
             </button>
           ))}

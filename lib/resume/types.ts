@@ -59,7 +59,9 @@ export interface TailorDecision {
 export interface TailorPrompt { id: string; itemId: string; roleTitle: string; company: string; kind: 'dates' | 'metric'; question: string; unit: string | null; why: string }
 export interface TailorAdded { kind: 'transferable_bullet'; itemId: string; bulletId: string; text: string; competency: string; basis: string; confirm: boolean; reason: string }
 export interface TailorObjective { total: number; match: number; keywordCoverage: number; health: number; relevanceDensity: number; lengthFit: number; completeness: number; lines: number; penalty: number }
-export interface TailorOverrides { decisions?: Record<string, TailorDecision['decision']>; transferable?: boolean; excludeAdded?: string[]; summary?: boolean; skills?: boolean; terminology?: boolean; layout?: 'chronological' | 'relevance'; prompts?: TailorPrompt[]; answers?: Record<string, string> }
+export interface TailorRewrite { bulletId: string; itemId: string; from: string; to: string; rules: string[]; tense?: 'past' | 'present' }
+/** rewrites: true = accept every wording proposal, string[] = accepted bulletIds, absent = plan.applyRewrites (false). */
+export interface TailorOverrides { decisions?: Record<string, TailorDecision['decision']>; transferable?: boolean; excludeAdded?: string[]; summary?: boolean; skills?: boolean; terminology?: boolean; rewrites?: boolean | string[]; layout?: 'chronological' | 'relevance'; prompts?: TailorPrompt[]; answers?: Record<string, string> }
 export interface TailorPlan {
   version: string
   optimizer?: string
@@ -69,8 +71,10 @@ export interface TailorPlan {
   decisions?: TailorDecision[]
   prompts?: TailorPrompt[]
   added?: TailorAdded[]
-  ctx?: { jobTitle: string; company: string; jobId: string; pages: number; jobFamily: string; jobFamilyLabel: string; summary?: boolean; summaryFallback?: string; summaryKeywords?: Array<{ term: string; display: string; weight: number; surfaces: string[] }> }
-  score: { before: number; after: number; criticalCoverage: number; keywordCoverage: { before: number; after: number } }
+  rewrites?: TailorRewrite[]
+  applyRewrites?: boolean
+  ctx?: { jobTitle: string; company: string; jobId: string; pages: number; jobFamily: string; jobFamilyLabel: string; jobVec?: Record<string, number>; summary?: boolean; summaryFallback?: string; summaryKeywords?: Array<{ term: string; display: string; weight: number; surfaces: string[] }> }
+  score: { before: number; after: number; criticalCoverage: number | null; keywordCoverage: { before: number; after: number } }
   roles: Array<{ itemId: string; title: string; company: string; relevance: number; titleOverlap: number; tier?: string; family?: string; familyLabel?: string; bullets: Array<{ bulletId: string; score: number; hits: string[] }> }>
   summary: { text: string; replaced: string; sources: Record<string, unknown> | null; targeted?: boolean } | null
   skills: { reordered: boolean; reorders?: Array<{ kind: 'reorder_skills'; groupId: string; from: string[]; to: string[] }>; additions?: Array<{ groupId: string | null; term: string; listed: string; evidence: string; why: string }>; added: Array<{ term: string; evidence: string; why: string }> }
